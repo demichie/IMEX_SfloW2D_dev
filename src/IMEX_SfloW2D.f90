@@ -36,7 +36,7 @@ PROGRAM IMEX_SfloW2D
   USE geometry_2d, ONLY : init_source
   USE geometry_2d, ONLY : topography_reconstruction
 
-  USE geometry_2d, ONLY : dx,dy,B_cent
+  USE geometry_2d, ONLY : dx,dy,B_cent, cell_size
   ! USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
 
   USE init_2d, ONLY : collapsing_volume
@@ -54,8 +54,8 @@ PROGRAM IMEX_SfloW2D
 
   USE inpout_2d, ONLY : init_netcdf_output
   USE inpout_2d, ONLY : close_netcdf
-  
-
+  USE inpout_2d, ONLY : restart, restart_file 
+  USE inpout_2d, ONLY : read_restart_file, write_restart_file
   USE inpout_2d, ONLY : output_runout_flag
   USE inpout_2d, ONLY : output_cons_flag
   USE inpout_2d, ONLY : output_esri_flag
@@ -89,6 +89,8 @@ PROGRAM IMEX_SfloW2D
   USE parameters_2d, ONLY : collapsing_volume_flag
   USE parameters_2d, ONLY : serial_flag
 
+  USE parameters_2d, ONLY : stochastic_flag, length_spatial_corr
+  
   USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,          &
        thickness_levels , dyn_pres_levels
 
@@ -103,6 +105,8 @@ PROGRAM IMEX_SfloW2D
 
   USE constitutive_2d, ONLY : avg_profiles_mix
 
+  USE stochastic_module, ONLY : genConvolutionKernel, getSteadyStateZ
+  
   USE OMP_LIB
 
   IMPLICIT NONE
@@ -134,7 +138,11 @@ PROGRAM IMEX_SfloW2D
   REAL(wp) :: mod_vel , mod_vel2, r_u, r_v
 
   REAL(wp) :: vol
-
+  
+  INTEGER :: len_fname
+  CHARACTER(LEN=4) :: ext
+  LOGICAL :: is_binary_restart
+  
   WRITE(*,*) '---------------------'
   WRITE(*,*) 'IMEX_SfloW2D 2.0'
   WRITE(*,*) '---------------------'
@@ -192,9 +200,48 @@ PROGRAM IMEX_SfloW2D
 
   CALL allocate_solver_variables
 
+  is_binary_restart = .FALSE.
+  t = t_start
+    
   IF ( restart ) THEN
 
-     CALL read_solution
+     ! Calcola lunghezza stringa e estrae ultimi 4 caratteri
+     len_fname = LEN_TRIM(restart_file)
+     IF (len_fname >= 4) THEN
+        ext = restart_file(len_fname-3:len_fname)
+     ELSE
+        ext = '    '
+     END IF
+
+     IF ( ext .EQ. '.bin' ) THEN
+        ! ---------------------------------------------------------
+        ! CASO 1: RESTART BINARIO (Esatto)
+        ! ---------------------------------------------------------
+        WRITE(*,*) 'Rilevato file binario (.bin): Eseguo restart completo.'
+        CALL read_restart_file(TRIM(restart_file))
+
+        is_binary_restart = .TRUE. 
+        
+        ! Nel restart binario Z è già caricato, ma dobbiamo allocare il kernel
+        ! se la correlazione spaziale è attiva
+        IF (stochastic_flag .AND. length_spatial_corr > cell_size) THEN
+             CALL genConvolutionKernel()
+        END IF
+
+     ELSE
+        ! ---------------------------------------------------------
+        ! CASO 2: INIZIALIZZAZIONE CLASSICA (Python / ASCII)
+        ! ---------------------------------------------------------
+        WRITE(*,*) 'Rilevato formato standard: Eseguo read_solution.'
+        CALL read_solution
+
+        ! Nella vecchia procedura Z non viene letto, quindi bisogna inizializzarlo
+        ! e fare il burn-in (getSteadyStateZ fa sia kernel che burn-in)
+        IF ( stochastic_flag ) THEN
+             CALL getSteadyStateZ
+        END IF
+
+     END IF
 
   ELSE
 
@@ -213,8 +260,6 @@ PROGRAM IMEX_SfloW2D
   IF ( output_netcdf_flag ) CALL init_netcdf_output
   
   IF ( radial_source_flag .OR. lateral_source_flag ) CALL init_source
-
-  t = t_start
 
   CALL check_solve(.TRUE.)
 
@@ -245,8 +290,19 @@ PROGRAM IMEX_SfloW2D
   END IF
 
 
-  dt_old = dt0
-  dt_old_old = dt_old
+  IF ( is_binary_restart ) THEN
+     ! Se è un restart binario, 'dt' è già stato caricato dalla read_restart_file.
+     ! Inizializziamo lo storico con l'ultimo dt valido per continuità.
+     dt_old = dt
+     dt_old_old = dt
+     WRITE(*,*) 'Restarting with saved timestep dt =', dt
+  ELSE
+     ! Se è una nuova simulazione o restart legacy, usiamo il dt0 dall'input
+     dt = dt0
+     dt_old = dt0
+     dt_old_old = dt0
+  END IF
+  
   t_steady = t_end
   stop_flag = .FALSE.
 
@@ -323,7 +379,7 @@ PROGRAM IMEX_SfloW2D
 
      WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
           &ES11.3E3)")                                                          &
-          't =',t,'dt =',dt0,                                                   &
+          't =',t,'dt =',dt,                                                    &
           ' mass = ',dx*dy*SUM(q(1,:,:)) ,                                      &
           ' volume = ',dx*dy*SUM(qp(1,:,:)) ,                                   &
           ' area = ',dx*dy*COUNT(q(1,:,:).GT.1.D-5) ,                           &
@@ -523,6 +579,7 @@ PROGRAM IMEX_SfloW2D
         IF ( output_cons_flag .OR. output_esri_flag .OR. output_phys_flag .OR. output_netcdf_flag ) THEN
 
            CALL output_solution(t)
+           CALL write_restart_file('restart.bin')
                      
         END IF
 

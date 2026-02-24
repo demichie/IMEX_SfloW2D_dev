@@ -7673,6 +7673,139 @@ CONTAINS
        STOP "Stopped due to NetCDF error"
     END IF
   END SUBROUTINE check
-  
+
+SUBROUTINE write_restart_file(filename)
+    USE parameters_2d, ONLY : wp, n_vars, n_solid
+    USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, B_cent, erodible, deposit, erosion
+    USE solver_2d, ONLY : t, dt, q, hmax, pdynmax, mod_vel_max, Z
+    USE parameters_2d, ONLY : stochastic_flag, topo_change_flag
+
+    IMPLICIT NONE
+    CHARACTER(LEN=*), INTENT(IN) :: filename
+    INTEGER :: unit_rst, ierr
+
+    unit_rst = 33
+    OPEN(UNIT=unit_rst, FILE=filename, FORM='UNFORMATTED', STATUS='REPLACE', ACTION='WRITE', IOSTAT=ierr)
+    
+    IF (ierr /= 0) THEN
+        WRITE(*,*) 'ERRORE: Impossibile creare il file di restart: ', filename
+        RETURN
+    END IF
+
+    WRITE(*,*) 'Scrittura file di restart: ', filename, ' al tempo ', t
+
+    ! 1. Scrivi le dimensioni per controllo di coerenza
+    WRITE(unit_rst) comp_cells_x, comp_cells_y, n_vars, n_solid
+
+    ! 2. Scrivi scalari temporali
+    WRITE(unit_rst) t, dt
+
+    ! 3. Scrivi variabili principali
+    WRITE(unit_rst) q
+
+    ! 4. Scrivi variabili della griglia (Topografia ed erosione)
+    WRITE(unit_rst) B_cent
+    WRITE(unit_rst) erodible
+    WRITE(unit_rst) deposit
+    WRITE(unit_rst) erosion
+
+    ! 5. Scrivi variabili statistiche/massimi
+    WRITE(unit_rst) hmax
+    WRITE(unit_rst) pdynmax
+    WRITE(unit_rst) mod_vel_max
+
+    ! 6. Scrivi variabili stocastiche (SE ATTIVE)
+    IF (stochastic_flag) THEN
+        WRITE(unit_rst) Z
+    END IF
+
+    CLOSE(unit_rst)
+
+END SUBROUTINE write_restart_file
+
+SUBROUTINE read_restart_file(filename)
+    USE parameters_2d, ONLY : wp, n_vars, n_solid
+    USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, B_cent, erodible, deposit, erosion
+    USE solver_2d, ONLY : t, dt, q, hmax, pdynmax, mod_vel_max, Z
+    USE parameters_2d, ONLY : stochastic_flag
+    
+    ! Moduli necessari per ricalcolare le variabili derivate
+    USE geometry_2d, ONLY : topography_reconstruction
+    USE solver_2d, ONLY : qp, solve_cells, j_cent, k_cent
+    USE constitutive_2d, ONLY : qc_to_qp
+    
+    IMPLICIT NONE
+    CHARACTER(LEN=*), INTENT(IN) :: filename
+    INTEGER :: unit_rst, ierr
+    INTEGER :: nx_check, ny_check, nvars_check, nsolid_check
+    INTEGER :: j, k, l
+    REAL(wp) :: p_dyn_dummy
+
+    unit_rst = 33
+    OPEN(UNIT=unit_rst, FILE=filename, FORM='UNFORMATTED', STATUS='OLD', ACTION='READ', IOSTAT=ierr)
+
+    IF (ierr /= 0) THEN
+        WRITE(*,*) 'ERRORE CRITICO: File di restart non trovato: ', filename
+        STOP
+    END IF
+
+    WRITE(*,*) 'Lettura file di restart: ', filename
+
+    ! 1. Leggi e controlla le dimensioni
+    READ(unit_rst) nx_check, ny_check, nvars_check, nsolid_check
+
+    IF (nx_check /= comp_cells_x .OR. ny_check /= comp_cells_y) THEN
+        WRITE(*,*) 'ERRORE: Le dimensioni della griglia nel file di restart non corrispondono!'
+        STOP
+    END IF
+
+    ! 2. Leggi scalari temporali
+    READ(unit_rst) t, dt
+
+    ! 3. Leggi variabili principali
+    READ(unit_rst) q
+
+    ! 4. Leggi variabili della griglia
+    READ(unit_rst) B_cent
+    READ(unit_rst) erodible
+    READ(unit_rst) deposit
+    READ(unit_rst) erosion
+
+    ! 5. Leggi massimi
+    READ(unit_rst) hmax
+    READ(unit_rst) pdynmax
+    READ(unit_rst) mod_vel_max
+
+    ! 6. Leggi stocastico
+    IF (stochastic_flag) THEN
+        READ(unit_rst) Z
+    END IF
+
+    CLOSE(unit_rst)
+
+    ! --- FASE CRUCIALE: AGGIORNAMENTO VARIABILI DERIVATE ---
+    
+    ! A. Ricalcola le variabili fisiche (qp) da quelle conservative (q)
+    !$OMP PARALLEL DO PRIVATE(j,k,p_dyn_dummy)
+    DO l = 1, solve_cells
+       j = j_cent(l)
+       k = k_cent(l)
+       IF (q(1,j,k) > 0.0_wp) THEN
+           CALL qc_to_qp(q(1:n_vars,j,k), qp(1:n_vars+2,j,k), p_dyn_dummy)
+       ELSE
+           qp(:,j,k) = 0.0_wp
+           ! Nota: T_ambient deve essere accessibile qui o reimpostato
+       END IF
+    END DO
+    !$OMP END PARALLEL DO
+
+    ! B. Ricalcola pendenze e curvature della topografia
+    CALL topography_reconstruction
+
+    WRITE(*,*) 'Restart completato con successo al tempo t = ', t
+
+END SUBROUTINE read_restart_file
+
 END MODULE inpout_2d
+
 
