@@ -187,6 +187,15 @@ MODULE parameters_2d
 
   !> angle between W-E direction and first semi-axis (clockwise)
   REAL(wp) :: angle_source
+
+  !> Compass bearing (degrees, N=0 clockwise) of the blast/sector centre direction.
+  !> Only used when arc_width_source < 360.
+  REAL(wp) :: azimuth_source
+
+  !> Full angular width of the active emission arc (degrees).
+  !> 360 (default) = full circle; values < 360 restrict flux to a sector.
+  REAL(wp) :: arc_width_source
+
   REAL(wp) :: vel_source
   REAL(wp) :: T_source
   REAL(wp) :: h_source
@@ -197,11 +206,54 @@ MODULE parameters_2d
   REAL(wp) :: alphag_source(100)
   REAL(wp) :: alphal_source
 
+  !> Flag to use lognormal + sigmoid parameterisation instead of explicit arrays
+  !> - T  => compute DIAM_S, RHO_S and ALPHAS_SOURCE from distribution parameters
+  !> - F  => read DIAM_S, RHO_S and ALPHAS_SOURCE explicitly (legacy behaviour)
+  LOGICAL :: particle_distribution_flag
+
+  !> Fractal dimension D_f of the WEIGHT grain-size distribution (Turcotte 1986).
+  !> Per uniform log-d bin: w(d) proportional to d^(3 - D_f)
+  !>   D_f = 3 -> equal weight per log decade (flat)
+  !>   D_f > 3 -> tail in fines
+  !>   D_f < 3 -> tail in coarse
+  !> Typical natural deposits: 2.5 - 4.0
+  REAL(wp) :: fractal_dim
+
+  !> Minimum bin-centre diameter (m)
+  REAL(wp) :: diam_min
+
+  !> Maximum bin-centre diameter (m)
+  REAL(wp) :: diam_max
+
+  !> Minimum (coarsest-particle) density for the sigmoid fit (kg/m3)
+  REAL(wp) :: rho_s_min
+
+  !> Maximum (finest-particle) density for the sigmoid fit (kg/m3)
+  REAL(wp) :: rho_s_max
+
+  !> Steepness of the sigmoid in ln(d) space (negative => density rises as d falls)
+  REAL(wp) :: sigmoid_k
+
+  !> Inflection-point diameter of the sigmoid (m)
+  REAL(wp) :: sigmoid_d0
+
+  !> Total solid volume fraction at source (sum of all alphas_source bins)
+  REAL(wp) :: alphas_source_total
+
   REAL(wp) :: xs_source(100)
   REAL(wp) :: xg_source(100)
   REAL(wp) :: xl_source
 
   REAL(wp) :: time_param(4)
+
+  !> Number of time intervals for variable velocity basal source
+  INTEGER :: n_intervals
+
+  !> Start times of each interval for variable velocity basal source
+  REAL(wp) :: t_intervals(100)
+
+  !> Velocity for each interval for variable velocity basal source
+  REAL(wp) :: vel_intervals(100)
 
   !> Lateral source side:\n
   !> - 'E'       => East (requires x1_source and x2_source);

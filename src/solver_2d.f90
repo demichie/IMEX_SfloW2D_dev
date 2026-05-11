@@ -1,4011 +1,4016 @@
 !********************************************************************************
 !> \brief Numerical solver
 !
-!> This module contains the variables and the subroutines for the
-!> numerical solution of the equations.
+!> This module contains the variables and the subroutines for the 
+!> numerical solution of the equations.  
 !
 !> \date 07/10/2016
-!> @author
+!> @author 
 !> Mattia de' Michieli Vitturi
 !
 !********************************************************************************
 MODULE solver_2d
 
-   ! external variables
-
-   USE constitutive_2d, ONLY : implicit_flag, rheology_model
-   USE constitutive_2d, ONLY : T_ambient
-
-   USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,comp_cells_xy
-   USE geometry_2d, ONLY : comp_interfaces_x,comp_interfaces_y
-
-   USE geometry_2d, ONLY : B_cent
-
-   USE geometry_2d, ONLY : B_prime_x , B_prime_y
-   USE geometry_2d, ONLY : B_second_xx , B_second_xy , B_second_yy
-
-   USE geometry_2d, ONLY : B_prime_x_geom , B_prime_y_geom
-   USE geometry_2d, ONLY : B_second_xx_geom , B_second_xy_geom , B_second_yy_geom
-
-   USE geometry_2d, ONLY : grav_coeff
-   USE geometry_2d, ONLY : grav_coeff_stag_x , grav_coeff_stag_y
-
-   USE geometry_2d, ONLY : d_grav_coeff_dx , d_grav_coeff_dy
-   USE geometry_2d, ONLY : source_cell
-   USE geometry_2d, ONLY : cell_source_fractions
+  ! external variables
+
+  USE constitutive_2d, ONLY : implicit_flag, rheology_model
+  USE constitutive_2d, ONLY : T_ambient
+    
+  USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,comp_cells_xy
+  USE geometry_2d, ONLY : comp_interfaces_x,comp_interfaces_y
+
+  USE geometry_2d, ONLY : B_cent
+
+  USE geometry_2d, ONLY : B_prime_x , B_prime_y  
+  USE geometry_2d, ONLY : B_second_xx , B_second_xy , B_second_yy
+
+  USE geometry_2d, ONLY : B_prime_x_geom , B_prime_y_geom  
+  USE geometry_2d, ONLY : B_second_xx_geom , B_second_xy_geom , B_second_yy_geom
+
+  USE geometry_2d, ONLY : grav_coeff
+  USE geometry_2d, ONLY : grav_coeff_stag_x , grav_coeff_stag_y
+  
+  USE geometry_2d, ONLY : d_grav_coeff_dx , d_grav_coeff_dy
+  USE geometry_2d, ONLY : source_cell
+  USE geometry_2d, ONLY : cell_source_fractions
+  USE geometry_2d, ONLY : cell_arc_perim , cell_arc_n_x , cell_arc_n_y
+
+  USE parameters_2d, ONLY : wp , sp
+
+  USE parameters_2d, ONLY : n_eqns , n_vars , n_nh , n_solid
+  USE parameters_2d, ONLY : n_RK
+  USE parameters_2d, ONLY : verbose_level
+  USE parameters_2d, ONLY : radial_source_flag , bottom_radial_source_flag , time_param
+  USE parameters_2d, ONLY : lateral_source_flag
+  USE parameters_2d, ONLY : stochastic_flag
+
+  USE parameters_2d, ONLY : bcW , bcE , bcS , bcN
+
+  USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T, idx_alfas_first,      &
+       idx_alfas_last, idx_addGas_first, idx_addGas_last, idx_stoch, idx_pore,  &
+       idx_u, idx_v
+
+  USE parameters_2d, ONLY : idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn,    &
+       idx_solidEqn_first, idx_solidEqn_last, idx_addGasEqn_first,              &
+       idx_addGasEqn_last, idx_stochEqn, idx_poreEqn
+    
+  ! external procedures
+  USE geometry_2d, ONLY : limit
+  USE geometry_2d, ONLY : dx , dy , one_by_dx , one_by_dy 
+
+  USE OMP_LIB
+
+  IMPLICIT none
+
+  !> time
+  REAL(wp) :: t
+
+  !> Conservative variables
+  REAL(wp), ALLOCATABLE :: q(:,:,:)        
+  !> Conservative variables at previous time step
+  REAL(wp), ALLOCATABLE :: q0(:,:,:)        
+  !> Solution of the finite-volume semidiscrete cheme
+  REAL(wp), ALLOCATABLE :: q_fv(:,:,:)     
+
+  !> Map of positive thickness 
+  LOGICAL, ALLOCATABLE :: hpos(:,:)        
+  !> Map of positive thickness at previous output step
+  LOGICAL, ALLOCATABLE :: hpos_old(:,:)        
+
+
+  !> Reconstructed value at the left of the x-interface
+  REAL(wp), ALLOCATABLE :: q_interfaceL(:,:,:)        
+  !> Reconstructed value at the right of the x-interface
+  REAL(wp), ALLOCATABLE :: q_interfaceR(:,:,:)
+  !> Reconstructed value at the bottom of the y-interface
+  REAL(wp), ALLOCATABLE :: q_interfaceB(:,:,:)        
+  !> Reconstructed value at the top of the y-interface
+  REAL(wp), ALLOCATABLE :: q_interfaceT(:,:,:)
+
+  !> Reconstructed physical value at the left of the x-interface
+  REAL(wp), ALLOCATABLE :: qp_interfaceL(:,:,:)        
+  !> Reconstructed physical value at the right of the x-interface
+  REAL(wp), ALLOCATABLE :: qp_interfaceR(:,:,:)
+  !> Reconstructed physical value at the bottom of the y-interface
+  REAL(wp), ALLOCATABLE :: qp_interfaceB(:,:,:)        
+  !> Reconstructed physical value at the top of the y-interface
+  REAL(wp), ALLOCATABLE :: qp_interfaceT(:,:,:)
+
+  !> Reconstructed value at the NW corner of cell
+  REAL(wp), ALLOCATABLE :: q_cellNW(:,:,:)        
+  !> Reconstructed value at the NE corner of cell
+  REAL(wp), ALLOCATABLE :: q_cellNE(:,:,:)
+  !> Reconstructed value at the SW corner of cell
+  REAL(wp), ALLOCATABLE :: q_cellSW(:,:,:)        
+  !> Reconstructed value at the SE corner of cell
+  REAL(wp), ALLOCATABLE :: q_cellSE(:,:,:)
+
+  !> Reconstructed physical value at the NW corner of cell
+  REAL(wp), ALLOCATABLE :: qp_cellNW(:,:,:)        
+  !> Reconstructed physical value at the NE corner of cell
+  REAL(wp), ALLOCATABLE :: qp_cellNE(:,:,:)
+  !> Reconstructed physical value at the SW corner of cell
+  REAL(wp), ALLOCATABLE :: qp_cellSW(:,:,:)        
+  !> Reconstructed physical value at the SE corner of cell
+  REAL(wp), ALLOCATABLE :: qp_cellSE(:,:,:)
 
-   USE parameters_2d, ONLY : wp , sp
+  LOGICAL, ALLOCATABLE :: diverg_interfaceL(:,:)
+  LOGICAL, ALLOCATABLE :: diverg_interfaceR(:,:)
+  LOGICAL, ALLOCATABLE :: diverg_interfaceB(:,:)
+  LOGICAL, ALLOCATABLE :: diverg_interfaceT(:,:)
+  
 
-   USE parameters_2d, ONLY : n_eqns , n_vars , n_nh , n_solid
-   USE parameters_2d, ONLY : n_RK
-   USE parameters_2d, ONLY : verbose_level
-   USE parameters_2d, ONLY : radial_source_flag , bottom_radial_source_flag
-   USE parameters_2d, ONLY : lateral_source_flag
-   USE parameters_2d, ONLY : stochastic_flag
+  !> Maximum over time of thickness
+  REAL(wp), ALLOCATABLE :: hmax(:,:)
 
-   USE parameters_2d, ONLY : bcW , bcE , bcS , bcN
+  !> Maximum over time of dynamic pressure
+  REAL(wp), ALLOCATABLE :: pdynmax(:,:)
 
-   USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T, idx_alfas_first,      &
-      idx_alfas_last, idx_addGas_first, idx_addGas_last, idx_stoch, idx_pore,  &
-      idx_u, idx_v
-
-   USE parameters_2d, ONLY : idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn,    &
-      idx_solidEqn_first, idx_solidEqn_last, idx_addGasEqn_first,              &
-      idx_addGasEqn_last, idx_stochEqn, idx_poreEqn
-
-   ! external procedures
-   USE geometry_2d, ONLY : limit
-   USE geometry_2d, ONLY : dx , dy , one_by_dx , one_by_dy
-
-   USE OMP_LIB
-
-   IMPLICIT none
-
-   !> time
-   REAL(wp) :: t
+  !> Maximum over time of dynamic velocity
+  REAL(wp), ALLOCATABLE :: mod_vel_max(:,:)
 
-   !> Conservative variables
-   REAL(wp), ALLOCATABLE :: q(:,:,:)
-   !> Conservative variables at previous time step
-   REAL(wp), ALLOCATABLE :: q0(:,:,:)
-   !> Solution of the finite-volume semidiscrete cheme
-   REAL(wp), ALLOCATABLE :: q_fv(:,:,:)
-
-   !> Map of positive thickness
-   LOGICAL, ALLOCATABLE :: hpos(:,:)
-   !> Map of positive thickness at previous output step
-   LOGICAL, ALLOCATABLE :: hpos_old(:,:)
+  !> Maximum over time of thickness
+  LOGICAL, ALLOCATABLE :: vuln_table(:,:,:)
 
+  LOGICAL, ALLOCATABLE :: thck_table(:,:)
 
-   !> Reconstructed value at the left of the x-interface
-   REAL(wp), ALLOCATABLE :: q_interfaceL(:,:,:)
-   !> Reconstructed value at the right of the x-interface
-   REAL(wp), ALLOCATABLE :: q_interfaceR(:,:,:)
-   !> Reconstructed value at the bottom of the y-interface
-   REAL(wp), ALLOCATABLE :: q_interfaceB(:,:,:)
-   !> Reconstructed value at the top of the y-interface
-   REAL(wp), ALLOCATABLE :: q_interfaceT(:,:,:)
+  LOGICAL, ALLOCATABLE :: pdyn_table(:,:)
 
-   !> Reconstructed physical value at the left of the x-interface
-   REAL(wp), ALLOCATABLE :: qp_interfaceL(:,:,:)
-   !> Reconstructed physical value at the right of the x-interface
-   REAL(wp), ALLOCATABLE :: qp_interfaceR(:,:,:)
-   !> Reconstructed physical value at the bottom of the y-interface
-   REAL(wp), ALLOCATABLE :: qp_interfaceB(:,:,:)
-   !> Reconstructed physical value at the top of the y-interface
-   REAL(wp), ALLOCATABLE :: qp_interfaceT(:,:,:)
+  !> Max local speeds at the x-interface
+  REAL(wp), ALLOCATABLE :: a_interface_x_max(:,:,:)
+  !> Max local speeds at the y-interface
+  REAL(wp), ALLOCATABLE :: a_interface_y_max(:,:,:)
 
-   !> Reconstructed value at the NW corner of cell
-   REAL(wp), ALLOCATABLE :: q_cellNW(:,:,:)
-   !> Reconstructed value at the NE corner of cell
-   REAL(wp), ALLOCATABLE :: q_cellNE(:,:,:)
-   !> Reconstructed value at the SW corner of cell
-   REAL(wp), ALLOCATABLE :: q_cellSW(:,:,:)
-   !> Reconstructed value at the SE corner of cell
-   REAL(wp), ALLOCATABLE :: q_cellSE(:,:,:)
 
-   !> Reconstructed physical value at the NW corner of cell
-   REAL(wp), ALLOCATABLE :: qp_cellNW(:,:,:)
-   !> Reconstructed physical value at the NE corner of cell
-   REAL(wp), ALLOCATABLE :: qp_cellNE(:,:,:)
-   !> Reconstructed physical value at the SW corner of cell
-   REAL(wp), ALLOCATABLE :: qp_cellSW(:,:,:)
-   !> Reconstructed physical value at the SE corner of cell
-   REAL(wp), ALLOCATABLE :: qp_cellSE(:,:,:)
+  !> Local speeds at the left of the x-interface
+  REAL(wp), ALLOCATABLE :: a_interface_xNeg(:,:,:)
+  !> Local speeds at the right of the x-interface
+  REAL(wp), ALLOCATABLE :: a_interface_xPos(:,:,:)
+  !> Local speeds at the bottom of the y-interface
+  REAL(wp), ALLOCATABLE :: a_interface_yNeg(:,:,:)
+  !> Local speeds at the top of the y-interface
+  REAL(wp), ALLOCATABLE :: a_interface_yPos(:,:,:)
+  !> Semidiscrete numerical interface fluxes 
+  REAL(wp), ALLOCATABLE :: H_interface_x(:,:,:)
+  !> Semidiscrete numerical interface fluxes 
+  REAL(wp), ALLOCATABLE :: H_interface_y(:,:,:)
+  !> Physical variables (\f$\alpha_1, p_1, p_2, \rho u, w, T\f$)
+  REAL(wp), ALLOCATABLE :: qp(:,:,:)
 
-   LOGICAL, ALLOCATABLE :: diverg_interfaceL(:,:)
-   LOGICAL, ALLOCATABLE :: diverg_interfaceR(:,:)
-   LOGICAL, ALLOCATABLE :: diverg_interfaceB(:,:)
-   LOGICAL, ALLOCATABLE :: diverg_interfaceT(:,:)
+  !> Array defining fraction of cells affected by source term
+  REAL(wp), ALLOCATABLE :: source_xy(:,:)
 
+  REAL(wp), ALLOCATABLE :: solve_mask_time(:,:)
 
-   !> Maximum over time of thickness
-   REAL(wp), ALLOCATABLE :: hmax(:,:)
 
-   !> Maximum over time of dynamic pressure
-   REAL(wp), ALLOCATABLE :: pdynmax(:,:)
+  LOGICAL, ALLOCATABLE :: solve_mask(:,:)
+  LOGICAL, ALLOCATABLE :: solve_mask_temp(:,:)
+  LOGICAL, ALLOCATABLE :: solve_mask_x(:,:)
+  LOGICAL, ALLOCATABLE :: solve_mask_y(:,:)
 
-   !> Maximum over time of dynamic velocity
-   REAL(wp), ALLOCATABLE :: mod_vel_max(:,:)
+  INTEGER :: solve_cells
+  INTEGER :: solve_interfaces_x
+  INTEGER :: solve_interfaces_y
 
-   !> Maximum over time of thickness
-   LOGICAL, ALLOCATABLE :: vuln_table(:,:,:)
+  !> Time step
+  REAL(wp) :: dt
 
-   LOGICAL, ALLOCATABLE :: thck_table(:,:)
+  LOGICAL, ALLOCATABLE :: mask22(:,:) , mask21(:,:) , mask11(:,:) , mask12(:,:)
 
-   LOGICAL, ALLOCATABLE :: pdyn_table(:,:)
+  INTEGER :: i_RK           !< loop counter for the RK iteration
 
-   !> Max local speeds at the x-interface
-   REAL(wp), ALLOCATABLE :: a_interface_x_max(:,:,:)
-   !> Max local speeds at the y-interface
-   REAL(wp), ALLOCATABLE :: a_interface_y_max(:,:,:)
+  !> Butcher Tableau for the explicit part of the Runge-Kutta scheme
+  REAL(wp), ALLOCATABLE :: a_tilde_ij(:,:)
+  !> Butcher Tableau for the implicit part of the Runge-Kutta scheme
+  REAL(wp), ALLOCATABLE :: a_dirk_ij(:,:)
 
+  !> Coefficients for the explicit part of the Runge-Kutta scheme
+  REAL(wp), ALLOCATABLE :: omega_tilde(:)
 
-   !> Local speeds at the left of the x-interface
-   REAL(wp), ALLOCATABLE :: a_interface_xNeg(:,:,:)
-   !> Local speeds at the right of the x-interface
-   REAL(wp), ALLOCATABLE :: a_interface_xPos(:,:,:)
-   !> Local speeds at the bottom of the y-interface
-   REAL(wp), ALLOCATABLE :: a_interface_yNeg(:,:,:)
-   !> Local speeds at the top of the y-interface
-   REAL(wp), ALLOCATABLE :: a_interface_yPos(:,:,:)
-   !> Semidiscrete numerical interface fluxes
-   REAL(wp), ALLOCATABLE :: H_interface_x(:,:,:)
-   !> Semidiscrete numerical interface fluxes
-   REAL(wp), ALLOCATABLE :: H_interface_y(:,:,:)
-   !> Physical variables (\f$\alpha_1, p_1, p_2, \rho u, w, T\f$)
-   REAL(wp), ALLOCATABLE :: qp(:,:,:)
+  !> Coefficients for the implicit part of the Runge-Kutta scheme
+  REAL(wp), ALLOCATABLE :: omega(:)
 
-   !> Array defining fraction of cells affected by source term
-   REAL(wp), ALLOCATABLE :: source_xy(:,:)
+  !> Explicit coeff. for the hyperbolic part for a single step of the R-K scheme
+  REAL(wp), ALLOCATABLE :: a_tilde(:)
 
-   REAL(wp), ALLOCATABLE :: solve_mask_time(:,:)
+  !> Explicit coeff. for the non-hyp. part for a single step of the R-K scheme
+  REAL(wp), ALLOCATABLE :: a_dirk(:)
 
+  !> Implicit coeff. for the non-hyp. part for a single step of the R-K scheme
+  REAL(wp) :: a_diag
 
-   LOGICAL, ALLOCATABLE :: solve_mask(:,:)
-   LOGICAL, ALLOCATABLE :: solve_mask_temp(:,:)
-   LOGICAL, ALLOCATABLE :: solve_mask_x(:,:)
-   LOGICAL, ALLOCATABLE :: solve_mask_y(:,:)
+  !> Intermediate solutions of the Runge-Kutta scheme
+  REAL(wp), ALLOCATABLE :: q_rk(:,:,:,:)
 
-   INTEGER :: solve_cells
-   INTEGER :: solve_interfaces_x
-   INTEGER :: solve_interfaces_y
+  !> Intermediate physical solutions of the Runge-Kutta scheme
+  REAL(wp), ALLOCATABLE :: qp_rk(:,:,:,:)
 
-   !> Time step
-   REAL(wp) :: dt
+  !> Intermediate hyperbolic terms of the Runge-Kutta scheme
+  REAL(wp), ALLOCATABLE :: divFlux(:,:,:,:)
 
-   LOGICAL, ALLOCATABLE :: mask22(:,:) , mask21(:,:) , mask11(:,:) , mask12(:,:)
+  !> Intermediate non-hyperbolic terms of the Runge-Kutta scheme
+  REAL(wp), ALLOCATABLE :: NH(:,:,:,:)
 
-   INTEGER :: i_RK           !< loop counter for the RK iteration
+  !> Intermediate semi-implicit non-hyperbolic terms of the Runge-Kutta scheme
+  REAL(wp), ALLOCATABLE :: SI_NH(:,:,:,:)
 
-   !> Butcher Tableau for the explicit part of the Runge-Kutta scheme
-   REAL(wp), ALLOCATABLE :: a_tilde_ij(:,:)
-   !> Butcher Tableau for the implicit part of the Runge-Kutta scheme
-   REAL(wp), ALLOCATABLE :: a_dirk_ij(:,:)
+  !> Intermediate explicit terms of the Runge-Kutta scheme
+  REAL(wp), ALLOCATABLE :: expl_terms(:,:,:,:)
 
-   !> Coefficients for the explicit part of the Runge-Kutta scheme
-   REAL(wp), ALLOCATABLE :: omega_tilde(:)
+  !> Flag for the normalization of the array q in the implicit solution scheme
+  LOGICAL :: normalize_q
 
-   !> Coefficients for the implicit part of the Runge-Kutta scheme
-   REAL(wp), ALLOCATABLE :: omega(:)
+  !> Flag for the normalization of the array f in the implicit solution scheme
+  LOGICAL :: normalize_f
 
-   !> Explicit coeff. for the hyperbolic part for a single step of the R-K scheme
-   REAL(wp), ALLOCATABLE :: a_tilde(:)
+  !> Flag for the search of optimal step size in the implicit solution scheme
+  LOGICAL :: opt_search_NL
 
-   !> Explicit coeff. for the non-hyp. part for a single step of the R-K scheme
-   REAL(wp), ALLOCATABLE :: a_dirk(:)
+  !> Sum of all the terms of the equations except the transient term
+  REAL(wp), ALLOCATABLE :: residual_term(:,:,:)
 
-   !> Implicit coeff. for the non-hyp. part for a single step of the R-K scheme
-   REAL(wp) :: a_diag
+  INTEGER, ALLOCATABLE :: j_cent(:)
+  INTEGER, ALLOCATABLE :: k_cent(:)
 
-   !> Intermediate solutions of the Runge-Kutta scheme
-   REAL(wp), ALLOCATABLE :: q_rk(:,:,:,:)
+  INTEGER, ALLOCATABLE :: j_stag_x(:)
+  INTEGER, ALLOCATABLE :: k_stag_x(:)
 
-   !> Intermediate physical solutions of the Runge-Kutta scheme
-   REAL(wp), ALLOCATABLE :: qp_rk(:,:,:,:)
+  INTEGER, ALLOCATABLE :: j_stag_y(:)
+  INTEGER, ALLOCATABLE :: k_stag_y(:)
 
-   !> Intermediate hyperbolic terms of the Runge-Kutta scheme
-   REAL(wp), ALLOCATABLE :: divFlux(:,:,:,:)
+  REAL(wp) :: h , one_by_h
 
-   !> Intermediate non-hyperbolic terms of the Runge-Kutta scheme
-   REAL(wp), ALLOCATABLE :: NH(:,:,:,:)
-
-   !> Intermediate semi-implicit non-hyperbolic terms of the Runge-Kutta scheme
-   REAL(wp), ALLOCATABLE :: SI_NH(:,:,:,:)
-
-   !> Intermediate explicit terms of the Runge-Kutta scheme
-   REAL(wp), ALLOCATABLE :: expl_terms(:,:,:,:)
-
-   !> Flag for the normalization of the array q in the implicit solution scheme
-   LOGICAL :: normalize_q
-
-   !> Flag for the normalization of the array f in the implicit solution scheme
-   LOGICAL :: normalize_f
-
-   !> Flag for the search of optimal step size in the implicit solution scheme
-   LOGICAL :: opt_search_NL
-
-   !> Sum of all the terms of the equations except the transient term
-   REAL(wp), ALLOCATABLE :: residual_term(:,:,:)
-
-   INTEGER, ALLOCATABLE :: j_cent(:)
-   INTEGER, ALLOCATABLE :: k_cent(:)
-
-   INTEGER, ALLOCATABLE :: j_stag_x(:)
-   INTEGER, ALLOCATABLE :: k_stag_x(:)
-
-   INTEGER, ALLOCATABLE :: j_stag_y(:)
-   INTEGER, ALLOCATABLE :: k_stag_y(:)
-
-   REAL(wp) :: h , one_by_h
-
-   !> Stochastic Noise
-   REAL(wp), ALLOCATABLE :: Z(:,:)
-   !> Array for kernel
-   REAL(wp), ALLOCATABLE :: conv_kernel(:,:)
-   !> Friction values at cells
-   REAL(wp), ALLOCATABLE :: fric_array(:,:)
-
+  !> Stochastic Noise
+  REAL(wp), ALLOCATABLE :: Z(:,:)
+  !> Array for kernel
+  REAL(wp), ALLOCATABLE :: conv_kernel(:,:)
+  !> Friction values at cells
+  REAL(wp), ALLOCATABLE :: fric_array(:,:)
+  
 CONTAINS
 
-   !******************************************************************************
-   !> \brief Memory allocation
-   !
-   !> This subroutine allocate the memory for the variables of the
-   !> solver module.
-   !
-   !> \date 07/10/2016
-   !> @author
-   !> Mattia de' Michieli Vitturi
-   !
-   !******************************************************************************
+  !******************************************************************************
+  !> \brief Memory allocation
+  !
+  !> This subroutine allocate the memory for the variables of the 
+  !> solver module.
+  !
+  !> \date 07/10/2016
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !
+  !******************************************************************************
 
-   SUBROUTINE allocate_solver_variables
+  SUBROUTINE allocate_solver_variables
 
-      USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels
+    USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels
+    
+    IMPLICIT NONE
 
-      IMPLICIT NONE
+    REAL(wp) :: gamma , delta
 
-      REAL(wp) :: gamma , delta
+    INTEGER :: i,j
 
-      INTEGER :: i,j
-
-      h = n_vars * epsilon(1.0_wp)
-      one_by_h = 1.0_wp / h
-
-      ALLOCATE( q( n_vars , comp_cells_x , comp_cells_y ) , q0( n_vars ,          &
+    h = n_vars * epsilon(1.0_wp)
+    one_by_h = 1.0_wp / h
+    
+    ALLOCATE( q( n_vars , comp_cells_x , comp_cells_y ) , q0( n_vars ,          &
          comp_cells_x , comp_cells_y ) )
 
-      ALLOCATE( hpos( comp_cells_x , comp_cells_y ) , hpos_old ( comp_cells_x ,   &
+    ALLOCATE( hpos( comp_cells_x , comp_cells_y ) , hpos_old ( comp_cells_x ,   &
          comp_cells_y ) )
 
-      ALLOCATE( qp( n_vars+2 , comp_cells_x , comp_cells_y ) )
+    ALLOCATE( qp( n_vars+2 , comp_cells_x , comp_cells_y ) )
 
-      q(1:n_vars,1:comp_cells_x,1:comp_cells_y) = 0.0_wp
-      qp(1:n_vars+2,1:comp_cells_x,1:comp_cells_y) = 0.0_wp
-      qp(4,1:comp_cells_x,1:comp_cells_y) = T_ambient
+    q(1:n_vars,1:comp_cells_x,1:comp_cells_y) = 0.0_wp
+    qp(1:n_vars+2,1:comp_cells_x,1:comp_cells_y) = 0.0_wp
+    qp(4,1:comp_cells_x,1:comp_cells_y) = T_ambient
 
-      ALLOCATE( hmax( comp_cells_x , comp_cells_y ) )
-      ALLOCATE( pdynmax( comp_cells_x , comp_cells_y ) )
-      ALLOCATE( mod_vel_max( comp_cells_x , comp_cells_y ) )
+    ALLOCATE( hmax( comp_cells_x , comp_cells_y ) )
+    ALLOCATE( pdynmax( comp_cells_x , comp_cells_y ) )
+    ALLOCATE( mod_vel_max( comp_cells_x , comp_cells_y ) )
 
-      ALLOCATE( vuln_table( n_thickness_levels * n_dyn_pres_levels ,              &
+    ALLOCATE( vuln_table( n_thickness_levels * n_dyn_pres_levels ,              &
          comp_cells_x , comp_cells_y ) )
 
-      ALLOCATE( thck_table(comp_cells_x , comp_cells_y) )
+    ALLOCATE( thck_table(comp_cells_x , comp_cells_y) )
 
-      ALLOCATE( pdyn_table(comp_cells_x , comp_cells_y) )
+    ALLOCATE( pdyn_table(comp_cells_x , comp_cells_y) )
 
-      ALLOCATE( q_fv( n_vars , comp_cells_x , comp_cells_y ) )
+    ALLOCATE( q_fv( n_vars , comp_cells_x , comp_cells_y ) )
 
-      ALLOCATE( q_interfaceL( n_vars , comp_interfaces_x, comp_cells_y ) )
-      ALLOCATE( q_interfaceR( n_vars , comp_interfaces_x, comp_cells_y ) )
-      ALLOCATE( a_interface_xNeg( n_eqns , comp_interfaces_x, comp_cells_y ) )
-      ALLOCATE( a_interface_xPos( n_eqns , comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( q_interfaceL( n_vars , comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( q_interfaceR( n_vars , comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( a_interface_xNeg( n_eqns , comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( a_interface_xPos( n_eqns , comp_interfaces_x, comp_cells_y ) )
 
-      a_interface_xNeg = 0.0_wp
-      a_interface_xPos = 0.0_wp
-
-      ALLOCATE( H_interface_x( n_eqns , comp_interfaces_x, comp_cells_y ) )
-      ALLOCATE( H_interface_y( n_eqns , comp_cells_x, comp_interfaces_y ) )
-
-
-      ALLOCATE( q_interfaceB( n_vars , comp_cells_x, comp_interfaces_y ) )
-      ALLOCATE( q_interfaceT( n_vars , comp_cells_x, comp_interfaces_y ) )
-      ALLOCATE( a_interface_yNeg( n_eqns , comp_cells_x, comp_interfaces_y ) )
-      ALLOCATE( a_interface_yPos( n_eqns , comp_cells_x, comp_interfaces_y ) )
-
-      a_interface_yNeg = 0.0_wp
-      a_interface_yPos = 0.0_wp
-
-      ALLOCATE( qp_interfaceL( n_vars+2 , comp_interfaces_x, comp_cells_y ) )
-      ALLOCATE( qp_interfaceR( n_vars+2 , comp_interfaces_x, comp_cells_y ) )
-      ALLOCATE( qp_interfaceB( n_vars+2 , comp_cells_x, comp_interfaces_y ) )
-      ALLOCATE( qp_interfaceT( n_vars+2 , comp_cells_x, comp_interfaces_y ) )
-
-      ALLOCATE( q_cellNW( n_vars , comp_cells_x , comp_cells_y ) )
-      ALLOCATE( q_cellNE( n_vars , comp_cells_x , comp_cells_y ) )
-      ALLOCATE( q_cellSW( n_vars , comp_cells_x , comp_cells_y ) )
-      ALLOCATE( q_cellSE( n_vars , comp_cells_x , comp_cells_y ) )
-
-      ALLOCATE( qp_cellNW( n_vars+2 , comp_cells_x , comp_cells_y ) )
-      ALLOCATE( qp_cellNE( n_vars+2 , comp_cells_x , comp_cells_y ) )
-      ALLOCATE( qp_cellSW( n_vars+2 , comp_cells_x , comp_cells_y ) )
-      ALLOCATE( qp_cellSE( n_vars+2 , comp_cells_x , comp_cells_y ) )
-
-      ALLOCATE( diverg_interfaceL( comp_interfaces_x, comp_cells_y ) )
-      ALLOCATE( diverg_interfaceR( comp_interfaces_x, comp_cells_y ) )
-      ALLOCATE( diverg_interfaceB( comp_cells_x, comp_interfaces_y ) )
-      ALLOCATE( diverg_interfaceT( comp_cells_x, comp_interfaces_y ) )
-
-      ALLOCATE ( a_interface_x_max(n_eqns,comp_interfaces_x,comp_cells_y) )
-      ALLOCATE ( a_interface_y_max(n_eqns,comp_cells_x,comp_interfaces_y) )
-
-      ALLOCATE( solve_mask_time( comp_cells_x , comp_cells_y ) )
-      ALLOCATE( solve_mask( comp_cells_x , comp_cells_y ) )
-      ALLOCATE( solve_mask_temp( comp_cells_x , comp_cells_y ) )
-
-      solve_mask_time(1:comp_cells_x,1:comp_cells_y) = 0.0_wp
-
-      solve_mask(1,1:comp_cells_y) = .TRUE.
-      solve_mask(comp_cells_x,1:comp_cells_y) = .TRUE.
-      solve_mask(1:comp_cells_x,1) = .TRUE.
-      solve_mask(1:comp_cells_x,comp_cells_y) = .TRUE.
-
-      ALLOCATE( solve_mask_x( comp_interfaces_x , comp_cells_y ) )
-      ALLOCATE( solve_mask_y( comp_cells_x , comp_interfaces_y ) )
-
-      ALLOCATE( source_xy( comp_cells_x , comp_cells_y ) )
+    a_interface_xNeg = 0.0_wp
+    a_interface_xPos = 0.0_wp
+    
+    ALLOCATE( H_interface_x( n_eqns , comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( H_interface_y( n_eqns , comp_cells_x, comp_interfaces_y ) )
 
 
-      ALLOCATE( a_tilde_ij(n_RK,n_RK) )
-      ALLOCATE( a_dirk_ij(n_RK,n_RK) )
-      ALLOCATE( omega_tilde(n_RK) )
-      ALLOCATE( omega(n_RK) )
+    ALLOCATE( q_interfaceB( n_vars , comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( q_interfaceT( n_vars , comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( a_interface_yNeg( n_eqns , comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( a_interface_yPos( n_eqns , comp_cells_x, comp_interfaces_y ) )
+
+    a_interface_yNeg = 0.0_wp
+    a_interface_yPos = 0.0_wp
+   
+    ALLOCATE( qp_interfaceL( n_vars+2 , comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( qp_interfaceR( n_vars+2 , comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( qp_interfaceB( n_vars+2 , comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( qp_interfaceT( n_vars+2 , comp_cells_x, comp_interfaces_y ) )
+
+    ALLOCATE( q_cellNW( n_vars , comp_cells_x , comp_cells_y ) )
+    ALLOCATE( q_cellNE( n_vars , comp_cells_x , comp_cells_y ) )
+    ALLOCATE( q_cellSW( n_vars , comp_cells_x , comp_cells_y ) )
+    ALLOCATE( q_cellSE( n_vars , comp_cells_x , comp_cells_y ) )
+
+    ALLOCATE( qp_cellNW( n_vars+2 , comp_cells_x , comp_cells_y ) )
+    ALLOCATE( qp_cellNE( n_vars+2 , comp_cells_x , comp_cells_y ) )
+    ALLOCATE( qp_cellSW( n_vars+2 , comp_cells_x , comp_cells_y ) )
+    ALLOCATE( qp_cellSE( n_vars+2 , comp_cells_x , comp_cells_y ) )
+
+    ALLOCATE( diverg_interfaceL( comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( diverg_interfaceR( comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( diverg_interfaceB( comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( diverg_interfaceT( comp_cells_x, comp_interfaces_y ) )
+    
+    ALLOCATE ( a_interface_x_max(n_eqns,comp_interfaces_x,comp_cells_y) )
+    ALLOCATE ( a_interface_y_max(n_eqns,comp_cells_x,comp_interfaces_y) )
+
+    ALLOCATE( solve_mask_time( comp_cells_x , comp_cells_y ) )
+    ALLOCATE( solve_mask( comp_cells_x , comp_cells_y ) )
+    ALLOCATE( solve_mask_temp( comp_cells_x , comp_cells_y ) )
+
+    solve_mask_time(1:comp_cells_x,1:comp_cells_y) = 0.0_wp
+
+    solve_mask(1,1:comp_cells_y) = .TRUE.
+    solve_mask(comp_cells_x,1:comp_cells_y) = .TRUE.
+    solve_mask(1:comp_cells_x,1) = .TRUE.
+    solve_mask(1:comp_cells_x,comp_cells_y) = .TRUE.
+
+    ALLOCATE( solve_mask_x( comp_interfaces_x , comp_cells_y ) )
+    ALLOCATE( solve_mask_y( comp_cells_x , comp_interfaces_y ) )
+
+    ALLOCATE( source_xy( comp_cells_x , comp_cells_y ) )
 
 
-      ! Allocate the logical arrays defining the implicit parts of the system
-      ALLOCATE( mask22(n_eqns,n_eqns) )
-      ALLOCATE( mask21(n_eqns,n_eqns) )
-      ALLOCATE( mask11(n_eqns,n_eqns) )
-      ALLOCATE( mask12(n_eqns,n_eqns) )
+    ALLOCATE( a_tilde_ij(n_RK,n_RK) )
+    ALLOCATE( a_dirk_ij(n_RK,n_RK) )
+    ALLOCATE( omega_tilde(n_RK) )
+    ALLOCATE( omega(n_RK) )
 
-      ! Initialize the logical arrays with all false (everything is implicit)
-      mask11(1:n_eqns,1:n_eqns) = .FALSE.
-      mask12(1:n_eqns,1:n_eqns) = .FALSE.
-      mask22(1:n_eqns,1:n_eqns) = .FALSE.
-      mask21(1:n_eqns,1:n_eqns) = .FALSE.
 
-      ! Set to .TRUE. the elements not corresponding to equations and variables to
-      ! be solved implicitly
-      DO i = 1,n_eqns
+    ! Allocate the logical arrays defining the implicit parts of the system
+    ALLOCATE( mask22(n_eqns,n_eqns) )
+    ALLOCATE( mask21(n_eqns,n_eqns) )
+    ALLOCATE( mask11(n_eqns,n_eqns) )
+    ALLOCATE( mask12(n_eqns,n_eqns) )
 
-         DO j = 1,n_eqns
+    ! Initialize the logical arrays with all false (everything is implicit)
+    mask11(1:n_eqns,1:n_eqns) = .FALSE.
+    mask12(1:n_eqns,1:n_eqns) = .FALSE.
+    mask22(1:n_eqns,1:n_eqns) = .FALSE.
+    mask21(1:n_eqns,1:n_eqns) = .FALSE.
 
-            IF ( .NOT.implicit_flag(i) .AND. .NOT.implicit_flag(j) )              &
+    ! Set to .TRUE. the elements not corresponding to equations and variables to 
+    ! be solved implicitly
+    DO i = 1,n_eqns
+
+       DO j = 1,n_eqns
+
+          IF ( .NOT.implicit_flag(i) .AND. .NOT.implicit_flag(j) )              &
                mask11(j,i) = .TRUE.
-            IF ( implicit_flag(i) .AND. .NOT.implicit_flag(j) )                   &
+          IF ( implicit_flag(i) .AND. .NOT.implicit_flag(j) )                   &
                mask12(j,i) = .TRUE.
-            IF ( implicit_flag(i) .AND. implicit_flag(j) )                        &
+          IF ( implicit_flag(i) .AND. implicit_flag(j) )                        &
                mask22(j,i) = .TRUE.
-            IF ( .NOT.implicit_flag(i) .AND. implicit_flag(j) )                   &
+          IF ( .NOT.implicit_flag(i) .AND. implicit_flag(j) )                   &
                mask21(j,i) = .TRUE.
 
-         END DO
+       END DO
 
-      END DO
+    END DO
 
-      ! Initialize the coefficients for the IMEX Runge-Kutta scheme
-      ! Please note that with respect to the schemes described in Pareschi & Russo
-      ! (2000) we do not have the coefficient vectors c_tilde and c, because the
-      ! explicit and implicit terms do not depend explicitly on time.
+    ! Initialize the coefficients for the IMEX Runge-Kutta scheme
+    ! Please note that with respect to the schemes described in Pareschi & Russo 
+    ! (2000) we do not have the coefficient vectors c_tilde and c, because the 
+    ! explicit and implicit terms do not depend explicitly on time.
 
-      ! Explicit part coefficients (a_tilde_ij=0 for j>=i)
-      a_tilde_ij = 0.0_wp
+    ! Explicit part coefficients (a_tilde_ij=0 for j>=i)
+    a_tilde_ij = 0.0_wp
 
-      ! Weight coefficients of the explicit part in the final assemblage
-      omega_tilde = 0.0_wp
+    ! Weight coefficients of the explicit part in the final assemblage
+    omega_tilde = 0.0_wp
 
-      ! Implicit part coefficients (a_dirk_ij=0 for j>i)
-      a_dirk_ij = 0.0_wp
+    ! Implicit part coefficients (a_dirk_ij=0 for j>i)
+    a_dirk_ij = 0.0_wp
 
-      ! Weight coefficients of the explicit part in the final assemblage
-      omega = 0.0_wp
+    ! Weight coefficients of the explicit part in the final assemblage
+    omega = 0.0_wp
 
-      gamma = 1.0_wp - 1.0_wp / SQRT(2.0_wp)
-      delta = 1.0_wp - 1.0_wp / ( 2.0_wp * gamma )
+    gamma = 1.0_wp - 1.0_wp / SQRT(2.0_wp)
+    delta = 1.0_wp - 1.0_wp / ( 2.0_wp * gamma )
 
-      IF ( n_RK .EQ. 1 ) THEN
+    IF ( n_RK .EQ. 1 ) THEN
 
-         a_tilde_ij(1,1) = 1.0_wp
+       a_tilde_ij(1,1) = 1.0_wp
 
-         omega_tilde(1) = 1.0_wp
+       omega_tilde(1) = 1.0_wp
 
-         a_dirk_ij(1,1) = 0.0_wp
+       a_dirk_ij(1,1) = 0.0_wp
 
-         omega(1) = 0.0_wp
+       omega(1) = 0.0_wp
 
-      ELSEIF ( n_RK .EQ. 2 ) THEN
+    ELSEIF ( n_RK .EQ. 2 ) THEN
 
-         a_tilde_ij(2,1) = 1.0_wp
+       a_tilde_ij(2,1) = 1.0_wp
 
-         omega_tilde(1) = 1.0_wp
-         omega_tilde(2) = 0.0_wp
+       omega_tilde(1) = 1.0_wp
+       omega_tilde(2) = 0.0_wp
 
-         a_dirk_ij(2,2) = 1.0_wp
+       a_dirk_ij(2,2) = 1.0_wp
 
-         omega(1) = 0.0_wp
-         omega(2) = 1.0_wp
+       omega(1) = 0.0_wp
+       omega(2) = 1.0_wp
 
-      ELSEIF ( n_RK .EQ. 3 ) THEN
+    ELSEIF ( n_RK .EQ. 3 ) THEN
 
-         ! Tableau for the IMEX-SSP(3,3,2) Stiffly Accurate Scheme
-         ! from Pareschi & Russo (2005), Table IV
+       ! Tableau for the IMEX-SSP(3,3,2) Stiffly Accurate Scheme
+       ! from Pareschi & Russo (2005), Table IV
 
-         a_tilde_ij(2,1) = 0.5_wp
-         a_tilde_ij(3,1) = 0.5_wp
-         a_tilde_ij(3,2) = 0.5_wp
+       a_tilde_ij(2,1) = 0.5_wp
+       a_tilde_ij(3,1) = 0.5_wp
+       a_tilde_ij(3,2) = 0.5_wp
 
-         omega_tilde(1) =  1.0_wp / 3.0_wp
-         omega_tilde(2) =  1.0_wp / 3.0_wp
-         omega_tilde(3) =  1.0_wp / 3.0_wp
+       omega_tilde(1) =  1.0_wp / 3.0_wp
+       omega_tilde(2) =  1.0_wp / 3.0_wp
+       omega_tilde(3) =  1.0_wp / 3.0_wp
 
-         a_dirk_ij(1,1) = 0.25_wp
-         a_dirk_ij(2,2) = 0.25_wp
-         a_dirk_ij(3,1) = 1.0_wp / 3.0_wp
-         a_dirk_ij(3,2) = 1.0_wp / 3.0_wp
-         a_dirk_ij(3,3) = 1.0_wp / 3.0_wp
+       a_dirk_ij(1,1) = 0.25_wp
+       a_dirk_ij(2,2) = 0.25_wp
+       a_dirk_ij(3,1) = 1.0_wp / 3.0_wp
+       a_dirk_ij(3,2) = 1.0_wp / 3.0_wp
+       a_dirk_ij(3,3) = 1.0_wp / 3.0_wp
 
-         omega(1) =  1.0_wp / 3.0_wp
-         omega(2) =  1.0_wp / 3.0_wp
-         omega(3) =  1.0_wp / 3.0_wp
+       omega(1) =  1.0_wp / 3.0_wp
+       omega(2) =  1.0_wp / 3.0_wp
+       omega(3) =  1.0_wp / 3.0_wp
 
-      ELSEIF ( n_RK .EQ. 4 ) THEN
+    ELSEIF ( n_RK .EQ. 4 ) THEN
 
-         ! LRR(3,2,2) from Table 3 in Pareschi & Russo (2000)
+       ! LRR(3,2,2) from Table 3 in Pareschi & Russo (2000)
 
-         a_tilde_ij(2,1) = 0.5_wp
-         a_tilde_ij(3,1) = 1.0_wp / 3.0_wp
-         a_tilde_ij(4,2) = 1.0_wp
+       a_tilde_ij(2,1) = 0.5_wp
+       a_tilde_ij(3,1) = 1.0_wp / 3.0_wp
+       a_tilde_ij(4,2) = 1.0_wp
 
-         omega_tilde(1) = 0.0_wp
-         omega_tilde(2) = 1.0_wp
-         omega_tilde(3) = 0.0_wp
-         omega_tilde(4) = 0.0_wp
+       omega_tilde(1) = 0.0_wp
+       omega_tilde(2) = 1.0_wp
+       omega_tilde(3) = 0.0_wp
+       omega_tilde(4) = 0.0_wp
 
-         a_dirk_ij(2,2) = 0.5_wp
-         a_dirk_ij(3,3) = 1.0_wp / 3.0_wp
-         a_dirk_ij(4,3) = 0.75_wp
-         a_dirk_ij(4,4) = 0.25_wp
+       a_dirk_ij(2,2) = 0.5_wp
+       a_dirk_ij(3,3) = 1.0_wp / 3.0_wp
+       a_dirk_ij(4,3) = 0.75_wp
+       a_dirk_ij(4,4) = 0.25_wp
 
-         omega(1) = 0.0_wp
-         omega(2) = 0.0_wp
-         omega(3) = 0.75_wp
-         omega(4) = 0.25_wp
+       omega(1) = 0.0_wp
+       omega(2) = 0.0_wp
+       omega(3) = 0.75_wp
+       omega(4) = 0.25_wp
 
-      END IF
+    END IF
 
-      ALLOCATE( a_tilde(n_RK) )
-      ALLOCATE( a_dirk(n_RK) )
+    ALLOCATE( a_tilde(n_RK) )
+    ALLOCATE( a_dirk(n_RK) )
 
-      ALLOCATE( q_rk( n_vars , comp_cells_x , comp_cells_y , n_RK ) )
-      ALLOCATE( qp_rk( n_vars+2 , comp_cells_x , comp_cells_y , n_RK ) )
-      ALLOCATE( divFlux( n_eqns , comp_cells_x , comp_cells_y , n_RK ) )
-      ALLOCATE( NH( n_eqns , comp_cells_x , comp_cells_y , n_RK ) )
-      ALLOCATE( SI_NH( n_eqns , comp_cells_x , comp_cells_y , n_RK ) )
-      ALLOCATE( expl_terms( n_eqns , comp_cells_x , comp_cells_y , n_RK ) )
-
-      ALLOCATE( residual_term( n_vars , comp_cells_x , comp_cells_y ) )
-
-      comp_cells_xy = comp_cells_x * comp_cells_y
-
-      ALLOCATE( j_cent( comp_cells_xy ) )
-      ALLOCATE( k_cent( comp_cells_xy ) )
-
-      ALLOCATE( j_stag_x( comp_interfaces_x * comp_cells_y ) )
-      ALLOCATE( k_stag_x( comp_interfaces_x * comp_cells_y ) )
-
-      ALLOCATE( j_stag_y( comp_cells_x * comp_interfaces_y ) )
-      ALLOCATE( k_stag_y( comp_cells_x * comp_interfaces_y ) )
-
-      ! Allocate array containing the stochastic noise
-      IF (stochastic_flag) THEN
-         ALLOCATE ( Z(comp_cells_x , comp_cells_y) )
-         Z(1:comp_cells_x,1:comp_cells_y) = 0.0_wp
-      END IF
-
-      ! Allocate array containing the friction values if needed
-      IF ((rheology_model .EQ. 9) .OR. (rheology_model .EQ. 1)                    &
-         .OR. (rheology_model .EQ. 10)) THEN
-         ALLOCATE (fric_array(comp_cells_x , comp_cells_y))
-         fric_array(1:comp_cells_x,1:comp_cells_y) = 0.0_wp
-      END IF
-
-      WRITE(*,*) 'ALLOCATION OF ARRAYS COMPLETED'
-
-      RETURN
-
-   END SUBROUTINE allocate_solver_variables
-
-   !******************************************************************************
-   !> \brief Memory deallocation
-   !
-   !> This subroutine de-allocate the memory for the variables of the
-   !> solver module.
-   !
-   !> \date 07/10/2016
-   !> @author
-   !> Mattia de' Michieli Vitturi
-   !
-   !******************************************************************************
-
-   SUBROUTINE deallocate_solver_variables
-
-      USE geometry_2d, ONLY: cell_size
-      USE parameters_2d, ONLY: length_spatial_corr
-
-      DEALLOCATE( q , q0 , hpos , hpos_old )
-
-      DEALLOCATE( hmax , pdynmax , mod_vel_max )
-
-      DEALLOCATE( vuln_table )
-
-      DEALLOCATE( thck_table ,  pdyn_table )
-
-      DEALLOCATE( q_fv )
-
-      DEALLOCATE( q_interfaceL )
-      DEALLOCATE( q_interfaceR )
-      DEALLOCATE( q_interfaceB )
-      DEALLOCATE( q_interfaceT )
-
-      DEALLOCATE( q_cellNW )
-      DEALLOCATE( q_cellNE )
-      DEALLOCATE( q_cellSW )
-      DEALLOCATE( q_cellSE )
-
-      DEALLOCATE( qp_interfaceL )
-      DEALLOCATE( qp_interfaceR )
-      DEALLOCATE( qp_interfaceB )
-      DEALLOCATE( qp_interfaceT )
-
-      DEALLOCATE( qp_cellNW )
-      DEALLOCATE( qp_cellNE )
-      DEALLOCATE( qp_cellSW )
-      DEALLOCATE( qp_cellSE )
-
-      DEALLOCATE( diverg_interfaceL )
-      DEALLOCATE( diverg_interfaceR )
-      DEALLOCATE( diverg_interfaceB )
-      DEALLOCATE( diverg_interfaceT )
-
-
-      DEALLOCATE( a_interface_xNeg )
-      DEALLOCATE( a_interface_xPos )
-      DEALLOCATE( a_interface_yNeg )
-      DEALLOCATE( a_interface_yPos )
-
-      DEALLOCATE( a_interface_x_max )
-      DEALLOCATE( a_interface_y_max )
-
-      DEALLOCATE( H_interface_x )
-      DEALLOCATE( H_interface_y )
-
-      DEALLOCATE( solve_mask_time )
-      DEALLOCATE( solve_mask )
-      DEALLOCATE( solve_mask_temp )
-      DEALLOCATE( solve_mask_x )
-      DEALLOCATE( solve_mask_y )
-
-      DEALLOCATE( qp )
-
-      DEALLOCATE( source_xy )
-
-      DEALLOCATE( a_tilde_ij )
-      DEALLOCATE( a_dirk_ij )
-      DEALLOCATE( omega_tilde )
-      DEALLOCATE( omega )
-
-      DEALLOCATE( implicit_flag )
-
-      DEALLOCATE( a_tilde )
-      DEALLOCATE( a_dirk )
-
-      DEALLOCATE( q_rk )
-      DEALLOCATE( qp_rk )
-      DEALLOCATE( divFlux )
-      DEALLOCATE( NH )
-      DEALLOCATE( SI_NH )
-      DEALLOCATE( expl_terms )
-
-      DEALLOCATE( mask22 , mask21 , mask11 , mask12 )
-
-      DEALLOCATE( residual_term )
-
-      DEALLOCATE( j_cent , k_cent )
-      DEALLOCATE ( j_stag_x , k_stag_x )
-      DEALLOCATE ( j_stag_y , k_stag_y )
-
-      ! should use allocated(...) to see if arrays are allocated!
-      IF ( stochastic_flag ) THEN
-         DEALLOCATE( Z ) ! Stochastic noise
-         ! Deallocated kernel if activated before
-         IF (length_spatial_corr .GT. cell_size) THEN
-            DEALLOCATE(conv_kernel)
-         END IF
-      END IF
-
-      IF ((rheology_model .EQ. 9) .OR. (rheology_model .EQ. 1)                    &
-         .OR. (rheology_model .EQ. 10)) THEN
-         DEALLOCATE(fric_array) ! friction term
-      END IF
-
-      RETURN
-
-   END SUBROUTINE deallocate_solver_variables
-
-
-   !******************************************************************************
-   !> \brief Masking of cells to solve
-   !
-   !> This subroutine compute a 2D array of logicals defining the cells where the
-   !> systems of equations have to be solved. It is defined according to the
-   !> positive thickness in the cell and in the neighbour cells
-   !
-   !> \date 20/04/2017
-   !> @author
-   !> Mattia de' Michieli Vitturi
-   !
-   !******************************************************************************
-
-   SUBROUTINE check_solve(solve_all)
-
-      IMPLICIT NONE
-
-      LOGICAL, INTENT(IN) :: solve_all
-
-      INTEGER :: i,j,k
-
-      !$OMP PARALLEL
-
-      IF ( solve_all ) THEN
-
-         !$OMP WORKSHARE
+    ALLOCATE( q_rk( n_vars , comp_cells_x , comp_cells_y , n_RK ) )
+    ALLOCATE( qp_rk( n_vars+2 , comp_cells_x , comp_cells_y , n_RK ) )
+    ALLOCATE( divFlux( n_eqns , comp_cells_x , comp_cells_y , n_RK ) )
+    ALLOCATE( NH( n_eqns , comp_cells_x , comp_cells_y , n_RK ) )
+    ALLOCATE( SI_NH( n_eqns , comp_cells_x , comp_cells_y , n_RK ) )
+    ALLOCATE( expl_terms( n_eqns , comp_cells_x , comp_cells_y , n_RK ) )
+
+    ALLOCATE( residual_term( n_vars , comp_cells_x , comp_cells_y ) )
+
+    comp_cells_xy = comp_cells_x * comp_cells_y
+
+    ALLOCATE( j_cent( comp_cells_xy ) )
+    ALLOCATE( k_cent( comp_cells_xy ) )
+
+    ALLOCATE( j_stag_x( comp_interfaces_x * comp_cells_y ) )
+    ALLOCATE( k_stag_x( comp_interfaces_x * comp_cells_y ) )
+
+    ALLOCATE( j_stag_y( comp_cells_x * comp_interfaces_y ) )
+    ALLOCATE( k_stag_y( comp_cells_x * comp_interfaces_y ) )
+
+    ! Allocate array containing the stochastic noise
+    IF (stochastic_flag) THEN
+       ALLOCATE ( Z(comp_cells_x , comp_cells_y) )
+       Z(1:comp_cells_x,1:comp_cells_y) = 0.0_wp
+    END IF
+    
+    ! Allocate array containing the friction values if needed
+    IF ((rheology_model .EQ. 9) .OR. (rheology_model .EQ. 1)                    &
+      .OR. (rheology_model .EQ. 10) .OR. (rheology_model .EQ. 11)            &
+      .OR. (rheology_model .EQ. 12)) THEN
+      ALLOCATE (fric_array(comp_cells_x , comp_cells_y))
+      fric_array(1:comp_cells_x,1:comp_cells_y) = 0.0_wp
+    END IF
+    
+    WRITE(*,*) 'ALLOCATION OF ARRAYS COMPLETED'
+    
+    RETURN
+    
+  END SUBROUTINE allocate_solver_variables
+
+  !******************************************************************************
+  !> \brief Memory deallocation
+  !
+  !> This subroutine de-allocate the memory for the variables of the 
+  !> solver module.
+  !
+  !> \date 07/10/2016
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !
+  !******************************************************************************
+
+  SUBROUTINE deallocate_solver_variables
+
+    USE geometry_2d, ONLY: cell_size
+    USE parameters_2d, ONLY: length_spatial_corr
+    
+    DEALLOCATE( q , q0 , hpos , hpos_old )
+
+    DEALLOCATE( hmax , pdynmax , mod_vel_max )
+
+    DEALLOCATE( vuln_table )
+
+    DEALLOCATE( thck_table ,  pdyn_table )
+
+    DEALLOCATE( q_fv )
+
+    DEALLOCATE( q_interfaceL )
+    DEALLOCATE( q_interfaceR )
+    DEALLOCATE( q_interfaceB )
+    DEALLOCATE( q_interfaceT )
+
+    DEALLOCATE( q_cellNW )
+    DEALLOCATE( q_cellNE )
+    DEALLOCATE( q_cellSW )
+    DEALLOCATE( q_cellSE )
+
+    DEALLOCATE( qp_interfaceL )
+    DEALLOCATE( qp_interfaceR )
+    DEALLOCATE( qp_interfaceB )
+    DEALLOCATE( qp_interfaceT )
+
+    DEALLOCATE( qp_cellNW )
+    DEALLOCATE( qp_cellNE )
+    DEALLOCATE( qp_cellSW )
+    DEALLOCATE( qp_cellSE )
+
+    DEALLOCATE( diverg_interfaceL )
+    DEALLOCATE( diverg_interfaceR )
+    DEALLOCATE( diverg_interfaceB )
+    DEALLOCATE( diverg_interfaceT )
+
+    
+    DEALLOCATE( a_interface_xNeg )
+    DEALLOCATE( a_interface_xPos )
+    DEALLOCATE( a_interface_yNeg )
+    DEALLOCATE( a_interface_yPos )
+
+    DEALLOCATE( a_interface_x_max )
+    DEALLOCATE( a_interface_y_max )
+
+    DEALLOCATE( H_interface_x )
+    DEALLOCATE( H_interface_y )
+
+    DEALLOCATE( solve_mask_time )
+    DEALLOCATE( solve_mask )
+    DEALLOCATE( solve_mask_temp )
+    DEALLOCATE( solve_mask_x )
+    DEALLOCATE( solve_mask_y )
+
+    DEALLOCATE( qp )
+
+    DEALLOCATE( source_xy )
+
+    DEALLOCATE( a_tilde_ij )
+    DEALLOCATE( a_dirk_ij )
+    DEALLOCATE( omega_tilde )
+    DEALLOCATE( omega )
+
+    DEALLOCATE( implicit_flag )
+
+    DEALLOCATE( a_tilde )
+    DEALLOCATE( a_dirk )
+
+    DEALLOCATE( q_rk )
+    DEALLOCATE( qp_rk )
+    DEALLOCATE( divFlux )
+    DEALLOCATE( NH )
+    DEALLOCATE( SI_NH )
+    DEALLOCATE( expl_terms )
+
+    DEALLOCATE( mask22 , mask21 , mask11 , mask12 )
+
+    DEALLOCATE( residual_term )
+
+    DEALLOCATE( j_cent , k_cent )
+    DEALLOCATE ( j_stag_x , k_stag_x )
+    DEALLOCATE ( j_stag_y , k_stag_y )
+
+    ! should use allocated(...) to see if arrays are allocated!
+    IF ( stochastic_flag ) THEN
+       DEALLOCATE( Z ) ! Stochastic noise
+       ! Deallocated kernel if activated before
+       IF (length_spatial_corr .GT. cell_size) THEN 
+          DEALLOCATE(conv_kernel)
+       END IF
+    END IF
+    
+    IF ( (rheology_model .EQ. 1)  .OR. &
+     (rheology_model .EQ. 9)  .OR. &
+     (rheology_model .EQ. 10) .OR. &
+     (rheology_model .EQ. 11) .OR. &
+     (rheology_model .EQ. 12) ) THEN
+     DEALLOCATE(fric_array)  ! friction term
+    END IF
+
+    
+    RETURN
+    
+  END SUBROUTINE deallocate_solver_variables
+
+
+  !******************************************************************************
+  !> \brief Masking of cells to solve
+  !
+  !> This subroutine compute a 2D array of logicals defining the cells where the
+  !> systems of equations have to be solved. It is defined according to the 
+  !> positive thickness in the cell and in the neighbour cells
+  !
+  !> \date 20/04/2017
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !
+  !******************************************************************************
+
+  SUBROUTINE check_solve(solve_all)
+
+    IMPLICIT NONE
+
+    LOGICAL, INTENT(IN) :: solve_all
+    
+    INTEGER :: i,j,k
+
+    !$OMP PARALLEL
+         
+    IF ( solve_all ) THEN
+
+       !$OMP WORKSHARE
+       solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE. 
+       !$OMP END WORKSHARE
+
+    ELSE
+       
+       !$OMP WORKSHARE
+       solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .FALSE.
+       !$OMP END WORKSHARE
+
+    END IF
+    !$OMP BARRIER
+    
+    !$OMP WORKSHARE
+    WHERE ( ( q(1,2:comp_cells_x-1,2:comp_cells_y-1) .GT. 0.0_wp ) .AND.        &
+         ( solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1) .LE. t ) )       & 
          solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE.
-         !$OMP END WORKSHARE
+    !$OMP END WORKSHARE
+    
+    !$OMP BARRIER
 
-      ELSE
+    IF ( bottom_radial_source_flag ) THEN
 
-         !$OMP WORKSHARE
-         solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .FALSE.
-         !$OMP END WORKSHARE
+       !$OMP WORKSHARE
+       WHERE ( cell_source_fractions .GT. 0.0_wp ) solve_mask = .TRUE.
+       !$OMP END WORKSHARE
+       
+       !$OMP BARRIER
 
-      END IF
-      !$OMP BARRIER
+    END IF
 
-      !$OMP WORKSHARE
-      WHERE ( ( q(1,2:comp_cells_x-1,2:comp_cells_y-1) .GT. 0.0_wp ) .AND.        &
-         ( solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1) .LE. t ) )       &
-         solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE.
-      !$OMP END WORKSHARE
+    IF ( radial_source_flag ) THEN
+             
+       !$OMP DO private(j,k)
+    
+       DO k = 2,comp_cells_y-1
+   
+          DO j = 2,comp_cells_x-1
 
-      !$OMP BARRIER
+             IF ( source_cell(j,k) .EQ. 2 ) THEN
+                
+                solve_mask(j,k) = .TRUE.
+                
+             END IF
 
-      IF ( bottom_radial_source_flag ) THEN
+          END DO
+          
+       END DO
 
-         !$OMP WORKSHARE
-         WHERE ( cell_source_fractions .GT. 0.0_wp ) solve_mask = .TRUE.
-         !$OMP END WORKSHARE
+       !$OMP END DO
 
-         !$OMP BARRIER
+    END IF
 
-      END IF
+    !$OMP BARRIER
+    !$OMP MASTER
 
-      IF ( radial_source_flag ) THEN
+    DO i = 1,n_RK
 
-         !$OMP DO private(j,k)
-
-         DO k = 2,comp_cells_y-1
-
-            DO j = 2,comp_cells_x-1
-
-               IF ( source_cell(j,k) .EQ. 2 ) THEN
-
-                  solve_mask(j,k) = .TRUE.
-
-               END IF
-
-            END DO
-
-         END DO
-
-         !$OMP END DO
-
-      END IF
-
-      !$OMP BARRIER
-      !$OMP MASTER
-
-      DO i = 1,n_RK
-
-         solve_mask_temp = solve_mask
-
-         ! solution domain is extended to neighbours of positive-mass cells
-         solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
+       solve_mask_temp = solve_mask 
+       
+       ! solution domain is extended to neighbours of positive-mass cells
+       solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
             solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
             solve_mask_temp(1:comp_cells_x-2,2:comp_cells_y-1)
-
-         solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
+       
+       solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
             solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
             solve_mask_temp(3:comp_cells_x,2:comp_cells_y-1)
-
-         solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
+       
+       solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
             solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
             solve_mask_temp(2:comp_cells_x-1,1:comp_cells_y-2)
-
-         solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
+       
+       solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
             solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
-            solve_mask_temp(2:comp_cells_x-1,3:comp_cells_y)
+            solve_mask_temp(2:comp_cells_x-1,3:comp_cells_y) 
+       
+    END DO
 
-      END DO
+    !$OMP END MASTER
+    !$OMP BARRIER
 
-      !$OMP END MASTER
-      !$OMP BARRIER
+    !$OMP DO private(j,k)
+    
+    DO k = 1,comp_cells_y
+       
+       DO j = 1,comp_cells_x
+          
+          IF ( radial_source_flag ) THEN
+             
+             IF ( source_cell(j,k) .EQ. 1 ) solve_mask(j,k) = .FALSE.
+             
+          END IF
+          
+       END DO
+       
+    END DO
+    
+    !$OMP END DO
+    !$OMP WORKSHARE
 
-      !$OMP DO private(j,k)
+    solve_mask_x(1:comp_interfaces_x,1:comp_cells_y) = .FALSE.
+    solve_mask_y(1:comp_cells_x,1:comp_interfaces_y) = .FALSE.
 
-      DO k = 1,comp_cells_y
+    !$OMP END WORKSHARE
 
-         DO j = 1,comp_cells_x
+    !$OMP END PARALLEL
 
-            IF ( radial_source_flag ) THEN
+    !----- check for cells where computation is needed
+    i = 0
+        
+    DO k = 1,comp_cells_y
 
-               IF ( source_cell(j,k) .EQ. 1 ) solve_mask(j,k) = .FALSE.
+       DO j = 1,comp_cells_x
 
-            END IF
+          IF ( solve_mask(j,k) ) THEN
 
-         END DO
+             i = i+1
+             j_cent(i) = j
+             k_cent(i) = k
 
-      END DO
+             solve_mask_x(j,k) = .TRUE.
+             solve_mask_x(j+1,k) = .TRUE.
+             solve_mask_y(j,k) = .TRUE.
+             solve_mask_y(j,k+1) = .TRUE.
 
-      !$OMP END DO
-      !$OMP WORKSHARE
+          END IF
 
-      solve_mask_x(1:comp_interfaces_x,1:comp_cells_y) = .FALSE.
-      solve_mask_y(1:comp_cells_x,1:comp_interfaces_y) = .FALSE.
+       END DO
 
-      !$OMP END WORKSHARE
+    END DO
 
-      !$OMP END PARALLEL
+    solve_cells = i
+    
+    !----- check for y-interfaces where computation is needed
+    i = 0
+        
+    DO k = 1,comp_cells_y
 
-      !----- check for cells where computation is needed
-      i = 0
+       DO j = 1,comp_interfaces_x
 
-      DO k = 1,comp_cells_y
-         DO j = 1,comp_cells_x
+          IF ( solve_mask_x(j,k) ) THEN
 
-            DO j = 1,comp_cells_x
-               DO k = 1,comp_cells_y
+             i = i+1
+             j_stag_x(i) = j
+             k_stag_x(i) = k
 
-                  IF ( solve_mask(j,k) ) THEN
+          END IF
 
-                     i = i+1
-                     j_cent(i) = j
-                     k_cent(i) = k
+       END DO
 
-                     solve_mask_x(j,k) = .TRUE.
-                     solve_mask_x(j+1,k) = .TRUE.
-                     solve_mask_y(j,k) = .TRUE.
-                     solve_mask_y(j,k+1) = .TRUE.
+    END DO
 
-                  END IF
+    solve_interfaces_x = i
+   
+    !----- check for y-interfaces where computation is needed
 
-               END DO
+    i = 0
+        
+    DO k = 1,comp_interfaces_y
 
-            END DO
+       DO j = 1,comp_cells_x
 
-            solve_cells = i
+          IF ( solve_mask_y(j,k) ) THEN
 
-            !----- check for y-interfaces where computation is needed
-            i = 0
+             i = i+1
+             j_stag_y(i) = j
+             k_stag_y(i) = k
 
-            DO k = 1,comp_cells_y
-               DO j = 1,comp_interfaces_x
+          END IF
 
-                  DO j = 1,comp_interfaces_x
-                     DO k = 1,comp_cells_y
+       END DO
 
-                        IF ( solve_mask_x(j,k) ) THEN
+    END DO
 
-                           i = i+1
-                           j_stag_x(i) = j
-                           k_stag_x(i) = k
+    solve_interfaces_y = i
 
-                        END IF
+    RETURN
 
-                     END DO
+  END SUBROUTINE check_solve
 
-                  END DO
+  !*****************************************************************************
+  !> \brief Time-step computation
+  !
+  !> This subroutine evaluate the maximum time step according to the CFL
+  !> condition. The local speed are evaluated with the characteristic
+  !> polynomial of the Jacobian of the fluxes.
+  !
+  !> \date 07/10/2016
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !
+  !*****************************************************************************
 
-                  solve_interfaces_x = i
+  SUBROUTINE timestep
 
-                  !----- check for y-interfaces where computation is needed
+    ! External variables
+    USE geometry_2d, ONLY : dx,dy
+    USE parameters_2d, ONLY : max_dt , cfl
 
-                  i = 0
+    USE constitutive_2d, ONLY : qc_to_qp
 
-                  DO k = 1,comp_interfaces_y
-                     DO j = 1,comp_cells_x
+    IMPLICIT none
 
-                        DO j = 1,comp_cells_x
-                           DO k = 1,comp_interfaces_y
+    REAL(wp) :: dt_cfl        !< local time step
 
-                              IF ( solve_mask_y(j,k) ) THEN
+    REAL(wp) :: dt_interface_x, dt_interface_y
 
-                                 i = i+1
-                                 j_stag_y(i) = j
-                                 k_stag_y(i) = k
+    INTEGER :: i,j,k,l          !< loop counter
 
-                              END IF
+    REAL(wp) :: max_a
+    REAL(wp) p_dyn
 
-                           END DO
+    dt = max_dt
 
-                        END DO
+    IF ( cfl .NE. -1.0_wp ) THEN
 
-                        solve_interfaces_y = i
+       !$OMP PARALLEL DO private(j,k)
 
-                        RETURN
+       DO l = 1,solve_cells
 
-                     END SUBROUTINE check_solve
+          j = j_cent(l)
+          k = k_cent(l)
 
-                     !*****************************************************************************
-                     !> \brief Time-step computation
-                     !
-                     !> This subroutine evaluate the maximum time step according to the CFL
-                     !> condition. The local speed are evaluated with the characteristic
-                     !> polynomial of the Jacobian of the fluxes.
-                     !
-                     !> \date 07/10/2016
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !
-                     !*****************************************************************************
+          IF ( q(1,j,k) .GT. 0.0_wp ) THEN
 
-                     SUBROUTINE timestep
+             CALL qc_to_qp( q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
 
-                        ! External variables
-                        USE geometry_2d, ONLY : dx,dy
-                        USE parameters_2d, ONLY : max_dt , cfl
+          ELSE
 
-                        USE constitutive_2d, ONLY : qc_to_qp
+             qp(1:n_vars+2,j,k) = 0.0_wp
+             qp(4,j,k) = T_ambient
 
-                        IMPLICIT none
+          END IF
 
-                        REAL(wp) :: dt_cfl        !< local time step
+       END DO
 
-                        REAL(wp) :: dt_interface_x, dt_interface_y
+       !$OMP END PARALLEL DO
 
-                        INTEGER :: i,j,k,l          !< loop counter
+       !WRITE(*,*) 'qp(1:n_vars+2,1,1)',qp(1:n_vars+2,1,1)
+       !READ(*,*)
 
-                        REAL(wp) :: max_a
-                        REAL(wp) p_dyn
+       ! Compute the physical and conservative variables at the interfaces
+       CALL reconstruction( q , qp )
 
-                        dt = max_dt
+       ! Compute the max/min eigenvalues at the interfaces
+       CALL eval_speeds
 
-                        IF ( cfl .NE. -1.0_wp ) THEN
+       !$OMP PARALLEL
+       !$OMP DO private(j,k,i)
+       DO l = 1,solve_interfaces_x
 
-                           !$OMP PARALLEL DO private(j,k)
+          j = j_stag_x(l)
+          k = k_stag_x(l)
 
-                           DO l = 1,solve_cells
+          DO i=1,n_vars
 
-                              j = j_cent(l)
-                              k = k_cent(l)
+             a_interface_x_max(i,j,k) =                                         &
+                  MAX( a_interface_xPos(i,j,k) , -a_interface_xNeg(i,j,k) )
+ 
+          END DO
 
-                              IF ( q(1,j,k) .GT. 0.0_wp ) THEN
+       END DO
+       !$OMP END DO NOWAIT
+    
+       !$OMP DO private(j,k,i)
+       DO l = 1,solve_interfaces_y
 
-                                 CALL qc_to_qp( q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+          j = j_stag_y(l)
+          k = k_stag_y(l)
 
-                              ELSE
+          DO i=1,n_vars
 
-                                 qp(1:n_vars+2,j,k) = 0.0_wp
-                                 qp(4,j,k) = T_ambient
+             a_interface_y_max(i,j,k) =                                         &
+                  MAX( a_interface_yPos(i,j,k) , -a_interface_yNeg(i,j,k) )
 
-                              END IF
+ 
+          END DO
 
-                           END DO
+       END DO
+       !$OMP END DO
 
-                           !$OMP END PARALLEL DO
+       !$OMP DO private(j,k,max_a,dt_interface_x,dt_interface_y,dt_cfl)       
+       DO l = 1,solve_cells
 
-                           !WRITE(*,*) 'qp(1:n_vars+2,1,1)',qp(1:n_vars+2,1,1)
-                           !READ(*,*)
+          j = j_cent(l)
+          k = k_cent(l)
 
-                           ! Compute the physical and conservative variables at the interfaces
-                           CALL reconstruction( q , qp )
+          max_a =  MAX( MAXVAL(a_interface_x_max(:,j,k)) ,                      &
+               MAXVAL(a_interface_x_max(:,j+1,k)) )
 
-                           ! Compute the max/min eigenvalues at the interfaces
-                           CALL eval_speeds
+          IF ( max_a .GT. 0.0_wp ) THEN
 
-                           !$OMP PARALLEL
-                           !$OMP DO private(j,k,i)
-                           DO l = 1,solve_interfaces_x
+             dt_interface_x = cfl * dx / max_a
 
-                              j = j_stag_x(l)
-                              k = k_stag_x(l)
+          ELSE
 
-                              DO i=1,n_vars
+             dt_interface_x = dt
 
-                                 a_interface_x_max(i,j,k) =                                         &
-                                    MAX( a_interface_xPos(i,j,k) , -a_interface_xNeg(i,j,k) )
+          END IF
 
-                              END DO
+          max_a =  MAX( MAXVAL(a_interface_y_max(:,j,k)) ,                      &
+               MAXVAL(a_interface_y_max(:,j,k+1)) )
 
-                           END DO
-                           !$OMP END DO NOWAIT
+          IF ( max_a .GT. 0.0_wp ) THEN
 
-                           !$OMP DO private(j,k,i)
-                           DO l = 1,solve_interfaces_y
+             dt_interface_y = cfl * dy / max_a
 
-                              j = j_stag_y(l)
-                              k = k_stag_y(l)
+          ELSE
 
-                              DO i=1,n_vars
+             dt_interface_y = dt
 
-                                 a_interface_y_max(i,j,k) =                                         &
-                                    MAX( a_interface_yPos(i,j,k) , -a_interface_yNeg(i,j,k) )
+          END IF
 
+          dt_cfl = MIN( dt_interface_x , dt_interface_y )
 
-                              END DO
+          !$OMP ATOMIC
+          dt = MIN(dt,dt_cfl)
 
-                           END DO
-                           !$OMP END DO
+       END DO
+       !$OMP END DO
+       !$OMP END PARALLEL
 
-                           !$OMP DO private(j,k,max_a,dt_interface_x,dt_interface_y,dt_cfl)
-                           DO l = 1,solve_cells
+    END IF
 
-                              j = j_cent(l)
-                              k = k_cent(l)
+    RETURN
 
-                              max_a =  MAX( MAXVAL(a_interface_x_max(:,j,k)) ,                      &
-                                 MAXVAL(a_interface_x_max(:,j+1,k)) )
+  END SUBROUTINE timestep
 
-                              IF ( max_a .GT. 0.0_wp ) THEN
+  !******************************************************************************
+  !> \brief Runge-Kutta integration
+  !
+  !> This subroutine integrate the hyperbolic conservation law with
+  !> non-hyperbolic terms using an implicit-explicit runge-kutta scheme.
+  !> The fluxes are integrated explicitely while the non-hyperbolic terms
+  !> are integrated implicitely.
+  !
+  !> \date 07/10/2016
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !
+  !******************************************************************************
 
-                                 dt_interface_x = cfl * dx / max_a
+  SUBROUTINE imex_RK_solver
 
-                              ELSE
+    USE constitutive_2d, ONLY : maximum_solid_packing
+    
+    USE constitutive_2d, ONLY : eval_implicit_terms
 
-                                 dt_interface_x = dt
+    USE constitutive_2d, ONLY : eval_nh_semi_impl_terms
 
-                              END IF
+    USE constitutive_2d, ONLY : qc_to_qp
 
-                              max_a =  MAX( MAXVAL(a_interface_y_max(:,j,k)) ,                      &
-                                 MAXVAL(a_interface_y_max(:,j,k+1)) )
+    USE constitutive_2d, ONLY : eval_expl_terms
 
-                              IF ( max_a .GT. 0.0_wp ) THEN
+    USE constitutive_2d, ONLY : T_ambient
 
-                                 dt_interface_y = cfl * dy / max_a
+    USE geometry_2d, ONLY : B_nodata
 
-                              ELSE
-
-                                 dt_interface_y = dt
-
-                              END IF
-
-                              dt_cfl = MIN( dt_interface_x , dt_interface_y )
-
-                              !$OMP ATOMIC
-                              dt = MIN(dt,dt_cfl)
-
-                           END DO
-                           !$OMP END DO
-                           !$OMP END PARALLEL
-
-                        END IF
-
-                        RETURN
-
-                     END SUBROUTINE timestep
-
-                     !******************************************************************************
-                     !> \brief Runge-Kutta integration
-                     !
-                     !> This subroutine integrate the hyperbolic conservation law with
-                     !> non-hyperbolic terms using an implicit-explicit runge-kutta scheme.
-                     !> The fluxes are integrated explicitely while the non-hyperbolic terms
-                     !> are integrated implicitely.
-                     !
-                     !> \date 07/10/2016
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !
-                     !******************************************************************************
-
-                     SUBROUTINE imex_RK_solver
-
-                        USE constitutive_2d, ONLY : maximum_solid_packing
-
-                        USE constitutive_2d, ONLY : eval_implicit_terms
-
-                        USE constitutive_2d, ONLY : eval_nh_semi_impl_terms
-
-                        USE constitutive_2d, ONLY : qc_to_qp
-
-                        USE constitutive_2d, ONLY : eval_expl_terms
-
-                        USE constitutive_2d, ONLY : T_ambient
-
-                        USE geometry_2d, ONLY : B_nodata
-
-                        USE parameters_2d, ONLY : alpha_flag
-
+    USE parameters_2d, ONLY : alpha_flag
+    
 !!$    USE parameters_2d, ONLY : time_param , bottom_radial_source_flag
+    
+    IMPLICIT NONE
 
-                        IMPLICIT NONE
+    REAL(wp) :: q_si(n_vars) !< solution after the semi-implicit step
+    REAL(wp) :: q_guess(n_vars) !< initial guess for the solution of the RK step
+    INTEGER :: j,k,l            !< loop counter over the grid volumes
+    REAL(wp) :: Rj_not_impl(n_eqns)
 
-                        REAL(wp) :: q_si(n_vars) !< solution after the semi-implicit step
-                        REAL(wp) :: q_guess(n_vars) !< initial guess for the solution of the RK step
-                        INTEGER :: j,k,l            !< loop counter over the grid volumes
-                        REAL(wp) :: Rj_not_impl(n_eqns)
+    REAL(wp) :: p_dyn
 
-                        REAL(wp) :: p_dyn
+    REAL(wp) :: alpha_s
+    
+    IF ( verbose_level .GE. 1 ) WRITE(*,*) 'solver, imex_RK_solver: beginning'
 
-                        REAL(wp) :: alpha_s
+    !$OMP PARALLEL
+ 
+    !$OMP DO private(j,k)
+    DO l = 1,solve_cells
 
-                        IF ( verbose_level .GE. 1 ) WRITE(*,*) 'solver, imex_RK_solver: beginning'
+       j = j_cent(l)
+       k = k_cent(l)
 
-                        !$OMP PARALLEL
+       IF ( verbose_level .GE. 2 ) THEN
 
-                        !$OMP DO private(j,k)
-                        DO l = 1,solve_cells
+          WRITE(*,*) 'solver, imex_RK_solver: j,k',j,k
+          !READ(*,*)
+          
+       END IF
 
-                           j = j_cent(l)
-                           k = k_cent(l)
+       ! Initialization of the solution guess
+       q0( 1:n_vars , j , k ) = q( 1:n_vars , j , k )
+       ! Initialization of the variables for the Runge-Kutta scheme
+       q_rk( 1:n_vars , j , k , 1:n_RK ) = 0.0_wp
+       qp_rk( 1:n_vars+2 , j , k , 1:n_RK ) = 0.0_wp
+       qp_rk( 4 , j , k , 1:n_RK ) = T_ambient
+       
 
-                           IF ( verbose_level .GE. 2 ) THEN
+       divFlux(1:n_eqns , j , k , 1:n_RK ) = 0.0_wp
+       NH( 1:n_eqns, j , k , 1:n_RK ) = 0.0_wp
+       SI_NH( 1:n_eqns , j , k , 1:n_RK ) = 0.0_wp
+       expl_terms(1:n_eqns , j , k , 1:n_RK) = 0.0_wp
+       
+    END DO
+    !$OMP END DO
 
-                              WRITE(*,*) 'solver, imex_RK_solver: j,k',j,k
-                              !READ(*,*)
+    !$OMP END PARALLEL
 
-                           END IF
+    runge_kutta:DO i_RK = 1,n_RK
 
-                           ! Initialization of the solution guess
-                           q0( 1:n_vars , j , k ) = q( 1:n_vars , j , k )
-                           ! Initialization of the variables for the Runge-Kutta scheme
-                           q_rk( 1:n_vars , j , k , 1:n_RK ) = 0.0_wp
-                           qp_rk( 1:n_vars+2 , j , k , 1:n_RK ) = 0.0_wp
-                           qp_rk( 4 , j , k , 1:n_RK ) = T_ambient
+       IF ( verbose_level .GE. 1 ) WRITE(*,*) 'solver, imex_RK_solver: i_RK',i_RK
 
+       ! define the explicits coefficients for the i-th step of the Runge-Kutta
+       a_tilde = 0.0_wp
+       a_dirk = 0.0_wp
 
-                           divFlux(1:n_eqns , j , k , 1:n_RK ) = 0.0_wp
-                           NH( 1:n_eqns, j , k , 1:n_RK ) = 0.0_wp
-                           SI_NH( 1:n_eqns , j , k , 1:n_RK ) = 0.0_wp
-                           expl_terms(1:n_eqns , j , k , 1:n_RK) = 0.0_wp
+       ! in the first step of the RK scheme all the coefficients remain to 0
+       a_tilde(1:i_RK-1) = a_tilde_ij(i_RK,1:i_RK-1)
+       a_dirk(1:i_RK-1) = a_dirk_ij(i_RK,1:i_RK-1)
 
-                        END DO
-                        !$OMP END DO
+       ! define the implicit coefficient for the i-th step of the Runge-Kutta
+       a_diag = a_dirk_ij(i_RK,i_RK)
 
-                        !$OMP END PARALLEL
+       !$OMP PARALLEL 
+       !$OMP DO private(j,k,q_guess,q_si,Rj_not_impl)
 
-                        runge_kutta:DO i_RK = 1,n_RK
+       solve_cells_loop:DO l = 1,solve_cells
 
-                           IF ( verbose_level .GE. 1 ) WRITE(*,*) 'solver, imex_RK_solver: i_RK',i_RK
+          j = j_cent(l)
+          k = k_cent(l)
 
-                           ! define the explicits coefficients for the i-th step of the Runge-Kutta
-                           a_tilde = 0.0_wp
-                           a_dirk = 0.0_wp
+          IF ( verbose_level .GE. 2 ) THEN
 
-                           ! in the first step of the RK scheme all the coefficients remain to 0
-                           a_tilde(1:i_RK-1) = a_tilde_ij(i_RK,1:i_RK-1)
-                           a_dirk(1:i_RK-1) = a_dirk_ij(i_RK,1:i_RK-1)
+             WRITE(*,*) 'solver, imex_RK_solver: j,k',j,k
+             ! READ(*,*)
 
-                           ! define the implicit coefficient for the i-th step of the Runge-Kutta
-                           a_diag = a_dirk_ij(i_RK,i_RK)
+          END IF
 
-                           !$OMP PARALLEL
-                           !$OMP DO private(j,k,q_guess,q_si,Rj_not_impl)
+          ! initialize the RK step
+          IF ( i_RK .EQ. 1 ) THEN
 
-                           solve_cells_loop:DO l = 1,solve_cells
+             ! solution from the previous time step
+             q_guess(1:n_vars) = q0( 1:n_vars , j , k) 
 
-                              j = j_cent(l)
-                              k = k_cent(l)
+          ELSE
 
-                              IF ( verbose_level .GE. 2 ) THEN
+             ! solution from the previous RK step
+             !q_guess(1:n_vars) = q_rk( 1:n_vars , j , k  , MAX(1,i_RK-1))
 
-                                 WRITE(*,*) 'solver, imex_RK_solver: j,k',j,k
-                                 ! READ(*,*)
+          END IF
 
-                              END IF
+          ! New solution at the i_RK step without the implicit  and
+          ! semi-implicit term
+          q_fv( 1:n_vars , j , k ) = q0( 1:n_vars , j , k )                     &
+               - dt * (MATMUL( divFlux(1:n_eqns,j,k,1:i_RK)                     &
+               - expl_terms(1:n_eqns,j,k,1:i_RK) , a_tilde(1:i_RK) )            &
+               - MATMUL( NH(1:n_eqns,j,k,1:i_RK) + SI_NH(1:n_eqns,j,k,1:i_RK) , &
+               a_dirk(1:i_RK) ) )
 
-                              ! initialize the RK step
-                              IF ( i_RK .EQ. 1 ) THEN
+          CALL qc_to_qp(q_fv(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
 
-                                 ! solution from the previous time step
-                                 q_guess(1:n_vars) = q0( 1:n_vars , j , k)
+          IF ( verbose_level .GE. 2 ) THEN
 
-                              ELSE
+             WRITE(*,*) 'q_guess',q_guess
+             IF ( q_guess(1) .GT. 0.0_wp  ) THEN 
 
-                                 ! solution from the previous RK step
-                                 !q_guess(1:n_vars) = q_rk( 1:n_vars , j , k  , MAX(1,i_RK-1))
+                CALL qc_to_qp( q_guess , qp(1:n_vars+2,j,k) , p_dyn )
+                WRITE(*,*) 'q_guess: qp',qp(1:n_vars+2,j,k)
+
+             END IF
+
+          END IF
+
+          adiag_pos:IF ( a_diag .NE. 0.0_wp ) THEN
+
+             pos_thick:IF ( q_fv(1,j,k) .GT.  0.0_wp )  THEN
+
+                ! Eval the semi-implicit terms
+                ! (terms which non depend on velocity magnitude)
+                CALL eval_nh_semi_impl_terms( B_prime_x_geom(j,k) ,             &
+                     B_prime_y_geom(j,k) , B_second_xx_geom(j,k) ,              &
+                     B_second_xy_geom(j,k) , B_second_yy_geom(j,k) ,            &
+                     grav_coeff(j,k) , q_fv( 1:n_vars , j , k ) ,               &
+                     qp( 1:n_vars , j , k ) , SI_NH(1:n_eqns,j,k,i_RK) ,        &
+                     Z(j,k), fric_array(j,k) )
+
+                ! Assemble the initial guess for the implicit solver
+                q_si(1:n_vars) = q_fv(1:n_vars,j,k ) + dt * a_diag *            &
+                     SI_NH(1:n_eqns,j,k,i_RK)
+
+                IF ( ( q_fv(2,j,k)**2 + q_fv(3,j,k)**2 ) .EQ. 0.0_wp ) THEN
+
+                   !Case 1: if the velocity was null, then it must stay null
+                   q_si(2:3) = 0.0_wp 
+
+                ELSEIF ( ( q_si(2)*q_fv(2,j,k) .LT. 0.0_wp ) .OR.               &
+                     ( q_si(3)*q_fv(3,j,k) .LT. 0.0_wp ) ) THEN
+
+                   ! If the semi-impl. friction term changed the sign of the 
+                   ! velocity then set it to zero
+                   q_si(2:3) = 0.0_wp 
+
+                ELSE
+
+                   ! Align the velocity vector with previous one
+                   q_si(2:3) = SQRT( q_si(2)**2 + q_si(3)**2 ) *                &
+                        q_fv(2:3,j,k) / SQRT( q_fv(2,j,k)**2                    &
+                        + q_fv(3,j,k)**2 ) 
+
+                END IF
+
+                ! Update the semi-implicit term accordingly with the
+                ! corrections above
+                SI_NH(1:n_eqns,j,k,i_RK) = ( q_si(1:n_vars) -                   &
+                     q_fv(1:n_vars,j,k ) ) / ( dt*a_diag )
+
+                ! Initialize the guess for the NR solver
+                q_guess(1:n_vars) = q_si(1:n_vars)
 
-                              END IF
 
-                              ! New solution at the i_RK step without the implicit  and
-                              ! semi-implicit term
-                              q_fv( 1:n_vars , j , k ) = q0( 1:n_vars , j , k )                     &
-                                 - dt * (MATMUL( divFlux(1:n_eqns,j,k,1:i_RK)                     &
-                                 - expl_terms(1:n_eqns,j,k,1:i_RK) , a_tilde(1:i_RK) )            &
-                                 - MATMUL( NH(1:n_eqns,j,k,1:i_RK) + SI_NH(1:n_eqns,j,k,1:i_RK) , &
-                                 a_dirk(1:i_RK) ) )
+                Rj_not_impl =  ( MATMUL( divFlux(1:n_eqns,j,k,1:i_RK-1) -       &
+                     expl_terms(1:n_eqns,j,k,1:i_RK-1), a_tilde(1:i_RK-1) )     &
+                     - MATMUL( NH(1:n_eqns,j,k,1:i_RK-1)                        &
+                     + SI_NH(1:n_eqns,j,k,1:i_RK-1) , a_dirk(1:i_RK-1) ) )      &
+                     - a_diag * SI_NH(1:n_eqns,j,k,i_RK)
 
-                              CALL qc_to_qp(q_fv(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+                ! Solve the implicit system to find the solution at the 
+                ! i_RK step of the IMEX RK procedure
+                CALL solve_rk_step( q_guess(1:n_vars) , q0(1:n_vars,j,k ) ,     &
+                     a_tilde , a_dirk , a_diag , Rj_not_impl ,                  &
+                     divFlux( 1:n_eqns , j , k , 1:n_RK ) ,                     &
+                     expl_terms( 1:n_eqns,j,k,1:n_RK ) ,                        &
+                     NH( 1:n_eqns , j , k , 1:n_RK ) , B_prime_x_geom(j,k) ,    &
+                     B_prime_y_geom(j,k), Z(j,k), fric_array(j,k)  )
+                
+                IF ( comp_cells_y .EQ. 1 ) THEN
 
-                              IF ( verbose_level .GE. 2 ) THEN
+                   q_guess(3) = 0.0_wp
 
-                                 WRITE(*,*) 'q_guess',q_guess
-                                 IF ( q_guess(1) .GT. 0.0_wp  ) THEN
+                END IF
 
-                                    CALL qc_to_qp( q_guess , qp(1:n_vars+2,j,k) , p_dyn )
-                                    WRITE(*,*) 'q_guess: qp',qp(1:n_vars+2,j,k)
+                IF ( comp_cells_x .EQ. 1 ) THEN
 
-                                 END IF
+                   q_guess(2) = 0.0_wp
 
-                              END IF
+                END IF
 
-                              adiag_pos:IF ( a_diag .NE. 0.0_wp ) THEN
+                IF ( rheology_model .EQ. 8 ) THEN
+                   
+                   NH(1:n_eqns,j,k,i_RK) = ( q_guess(1:n_vars)                  &
+                        - q_si(1:n_vars) ) / ( dt*a_diag )
+                   
+                ELSE
+                   
+                   ! Eval and store the implicit term at the i_RK step
+                   CALL eval_implicit_terms( B_prime_x_geom(j,k) ,              &
+                        B_prime_y_geom(j,k) , Z(j,k), fric_array(j,k),          &
+                        r_qj = q_guess , r_nh_term_impl = NH(1:n_eqns,j,k,i_RK) )
+                   
+                   IF ( q_si(2)**2 + q_si(3)**2 .EQ. 0.0_wp ) THEN
+                      
+                      q_guess(2:3) = 0.0_wp 
+                      
+                   ELSEIF ( ( q_guess(2)*q_si(2) .LE. 0.0_wp ) .AND.            &
+                        ( q_guess(3)*q_si(3) .LE. 0.0_wp ) ) THEN
+                      
+                   ! If the impl. friction term changed the sign of the 
+                      ! velocity then set it to zero
+                      q_guess(2:3) = 0.0_wp 
+                      
+                   ELSE
+                      
+                      ! Align the velocity vector with previous one
+                      q_guess(2:3) = SQRT( q_guess(2)**2 + q_guess(3)**2 ) *      &
+                           q_si(2:3) / SQRT( q_si(2)**2 + q_si(3)**2 ) 
+                      
+                   END IF
+                   
+                END IF
+                
+             ELSE
 
-                                 pos_thick:IF ( q_fv(1,j,k) .GT.  0.0_wp )  THEN
+                ! If h=0 nothing has to be changed 
+                q_guess(1:n_vars) = q_fv( 1:n_vars , j , k ) 
+                q_si(1:n_vars) = q_fv( 1:n_vars , j , k ) 
+                SI_NH(1:n_eqns,j,k,i_RK) = 0.0_wp
+                NH(1:n_eqns,j,k,i_RK) = 0.0_wp
 
-                                    ! Eval the semi-implicit terms
-                                    ! (terms which non depend on velocity magnitude)
-                                    CALL eval_nh_semi_impl_terms( B_prime_x_geom(j,k) ,             &
-                                       B_prime_y_geom(j,k) , B_second_xx_geom(j,k) ,              &
-                                       B_second_xy_geom(j,k) , B_second_yy_geom(j,k) ,            &
-                                       grav_coeff(j,k) , q_fv( 1:n_vars , j , k ) ,               &
-                                       qp( 1:n_vars , j , k ) , SI_NH(1:n_eqns,j,k,i_RK) ,        &
-                                       Z(j,k), fric_array(j,k) )
+             END IF pos_thick
 
-                                    ! Assemble the initial guess for the implicit solver
-                                    q_si(1:n_vars) = q_fv(1:n_vars,j,k ) + dt * a_diag *            &
-                                       SI_NH(1:n_eqns,j,k,i_RK)
+          END IF adiag_pos
 
-                                    IF ( ( q_fv(2,j,k)**2 + q_fv(3,j,k)**2 ) .EQ. 0.0_wp ) THEN
+          IF ( a_diag .NE. 0.0_wp ) THEN
 
-                                       !Case 1: if the velocity was null, then it must stay null
-                                       q_si(2:3) = 0.0_wp
+             ! Update the implicit term with correction on the new velocity
+             NH(1:n_vars,j,k,i_RK) = ( q_guess(1:n_vars) - q_si(1:n_vars))      &
+                  / ( dt*a_diag ) 
 
-                                    ELSEIF ( ( q_si(2)*q_fv(2,j,k) .LT. 0.0_wp ) .OR.               &
-                                       ( q_si(3)*q_fv(3,j,k) .LT. 0.0_wp ) ) THEN
+          END IF
 
-                                       ! If the semi-impl. friction term changed the sign of the
-                                       ! velocity then set it to zero
-                                       q_si(2:3) = 0.0_wp
+          ! Store the solution at the end of the i_RK step
+          q_rk( 1:n_vars , j , k , i_RK ) = q_guess
 
-                                    ELSE
+          IF ( verbose_level .GE. 2 ) THEN
 
-                                       ! Align the velocity vector with previous one
-                                       q_si(2:3) = SQRT( q_si(2)**2 + q_si(3)**2 ) *                &
-                                          q_fv(2:3,j,k) / SQRT( q_fv(2,j,k)**2                    &
-                                          + q_fv(3,j,k)**2 )
+             WRITE(*,*) 'imex_RK_solver: qc',q_guess
 
-                                    END IF
+             IF ( q_guess(1) .GT. 0.0_wp ) THEN
 
-                                    ! Update the semi-implicit term accordingly with the
-                                    ! corrections above
-                                    SI_NH(1:n_eqns,j,k,i_RK) = ( q_si(1:n_vars) -                   &
-                                       q_fv(1:n_vars,j,k ) ) / ( dt*a_diag )
+                CALL qc_to_qp( q_guess , qp(1:n_vars+2,j,k) , p_dyn )
+                WRITE(*,*) 'imex_RK_solver: qp',qp(1:n_vars+2,j,k)
 
-                                    ! Initialize the guess for the NR solver
-                                    q_guess(1:n_vars) = q_si(1:n_vars)
+             END IF
+             
+             READ(*,*)
 
+          END IF
 
-                                    Rj_not_impl =  ( MATMUL( divFlux(1:n_eqns,j,k,1:i_RK-1) -       &
-                                       expl_terms(1:n_eqns,j,k,1:i_RK-1), a_tilde(1:i_RK-1) )     &
-                                       - MATMUL( NH(1:n_eqns,j,k,1:i_RK-1)                        &
-                                       + SI_NH(1:n_eqns,j,k,1:i_RK-1) , a_dirk(1:i_RK-1) ) )      &
-                                       - a_diag * SI_NH(1:n_eqns,j,k,i_RK)
 
-                                    ! Solve the implicit system to find the solution at the
-                                    ! i_RK step of the IMEX RK procedure
-                                    CALL solve_rk_step( q_guess(1:n_vars) , q0(1:n_vars,j,k ) ,     &
-                                       a_tilde , a_dirk , a_diag , Rj_not_impl ,                  &
-                                       divFlux( 1:n_eqns , j , k , 1:n_RK ) ,                     &
-                                       expl_terms( 1:n_eqns,j,k,1:n_RK ) ,                        &
-                                       NH( 1:n_eqns , j , k , 1:n_RK ) , B_prime_x_geom(j,k) ,    &
-                                       B_prime_y_geom(j,k), Z(j,k), fric_array(j,k)  )
+          IF ( omega_tilde(i_RK) .GT. 0.0_wp ) THEN
+          
+             IF ( q_rk(1,j,k,i_RK) .GT. 0.0_wp ) THEN
 
-                                    IF ( comp_cells_y .EQ. 1 ) THEN
+                CALL qc_to_qp( q_rk(1:n_vars,j,k,i_RK) ,                        &
+                     qp_rk(1:n_vars+2,j,k,i_RK) , p_dyn )
 
-                                       q_guess(3) = 0.0_wp
+             ELSE
 
-                                    END IF
+                qp_rk(1:n_vars+2,j,k,i_RK) = 0.0_wp
+                qp_rk(4,j,k,i_RK) = T_ambient
 
-                                    IF ( comp_cells_x .EQ. 1 ) THEN
+             END IF
 
-                                       q_guess(2) = 0.0_wp
+             ! Eval gravity term and radial bottom + lateral source terms
+             CALL eval_expl_terms( B_prime_x_geom(j,k) , B_prime_y_geom(j,k) ,  &
+                  B_second_xx_geom(j,k) , B_second_xy_geom(j,k) ,               &
+                  B_second_yy_geom(j,k) , grav_coeff(j,k), d_grav_coeff_dx(j,k),&
+                  d_grav_coeff_dx(j,k) , source_xy(j,k),                        &
+                  qp_rk(1:n_vars+2,j,k,i_RK), expl_terms(1:n_eqns,j,k,i_RK), t, &
+                  cell_source_fractions(j,k),                                   &
+                  cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k),    &
+                  dx * dy )
+  
+          END IF
 
-                                    END IF
+       END DO solve_cells_loop
 
-                                    IF ( rheology_model .EQ. 8 ) THEN
+       !$OMP END DO
+       !$OMP END PARALLEL 
 
-                                       NH(1:n_eqns,j,k,i_RK) = ( q_guess(1:n_vars)                  &
-                                          - q_si(1:n_vars) ) / ( dt*a_diag )
+       IF ( omega_tilde(i_RK) .GT. 0.0_wp ) THEN
 
-                                    ELSE
+          ! Eval and store the explicit hyperbolic (fluxes) terms
+          CALL eval_hyperbolic_terms(                                           &
+               q_rk(1:n_vars,1:comp_cells_x,1:comp_cells_y,i_RK) ,              &
+               qp_rk(1:n_vars+2,1:comp_cells_x,1:comp_cells_y,i_RK) ,           &
+               divFlux(1:n_eqns,1:comp_cells_x,1:comp_cells_y,i_RK) )
 
-                                       ! Eval and store the implicit term at the i_RK step
-                                       CALL eval_implicit_terms( B_prime_x_geom(j,k) ,              &
-                                          B_prime_y_geom(j,k) , Z(j,k), fric_array(j,k),          &
-                                          r_qj = q_guess , r_nh_term_impl = NH(1:n_eqns,j,k,i_RK) )
+       END IF
 
-                                       IF ( q_si(2)**2 + q_si(3)**2 .EQ. 0.0_wp ) THEN
+    END DO runge_kutta
 
-                                          q_guess(2:3) = 0.0_wp
+    !$OMP PARALLEL DO private(j,k)
 
-                                       ELSEIF ( ( q_guess(2)*q_si(2) .LE. 0.0_wp ) .AND.            &
-                                          ( q_guess(3)*q_si(3) .LE. 0.0_wp ) ) THEN
+    assemble_sol:DO l = 1,solve_cells
 
-                                          ! If the impl. friction term changed the sign of the
-                                          ! velocity then set it to zero
-                                          q_guess(2:3) = 0.0_wp
+       j = j_cent(l)
+       k = k_cent(l)
 
-                                       ELSE
+       residual_term(1:n_vars,j,k) = MATMUL( divFlux(1:n_eqns,j,k,1:n_RK)       &
+            - expl_terms(1:n_eqns,j,k,1:n_RK) , omega_tilde ) -                 &
+            MATMUL( NH(1:n_eqns,j,k,1:n_RK) + SI_NH(1:n_eqns,j,k,1:n_RK) ,      &
+            omega )
 
-                                          ! Align the velocity vector with previous one
-                                          q_guess(2:3) = SQRT( q_guess(2)**2 + q_guess(3)**2 ) *      &
-                                             q_si(2:3) / SQRT( q_si(2)**2 + q_si(3)**2 )
 
-                                       END IF
+       IF ( verbose_level .GE. 1 ) THEN
 
-                                    END IF
+          WRITE(*,*) 'cell jk =',j,k
+          WRITE(*,*) 'before imex_RK_solver: qc',q0(1:n_vars,j,k)
 
-                                 ELSE
+          IF ( q0(1,j,k) .GT. 0.0_wp ) THEN
 
-                                    ! If h=0 nothing has to be changed
-                                    q_guess(1:n_vars) = q_fv( 1:n_vars , j , k )
-                                    q_si(1:n_vars) = q_fv( 1:n_vars , j , k )
-                                    SI_NH(1:n_eqns,j,k,i_RK) = 0.0_wp
-                                    NH(1:n_eqns,j,k,i_RK) = 0.0_wp
+             CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+             WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+ 
+          END IF
 
-                                 END IF pos_thick
+       END IF
 
-                              END IF adiag_pos
+       IF ( ( SUM(ABS( omega_tilde(:)-a_tilde_ij(n_RK,:))) .EQ. 0.0_wp  )       &
+            .AND. ( SUM(ABS(omega(:)-a_dirk_ij(n_RK,:))) .EQ. 0.0_wp ) ) THEN
 
-                              IF ( a_diag .NE. 0.0_wp ) THEN
+          ! The assembling coeffs are equal to the last step of the RK scheme
+          q(1:n_vars,j,k) = q_rk(1:n_vars,j,k,n_RK)
 
-                                 ! Update the implicit term with correction on the new velocity
-                                 NH(1:n_vars,j,k,i_RK) = ( q_guess(1:n_vars) - q_si(1:n_vars))      &
-                                    / ( dt*a_diag )
+       ELSE
 
-                              END IF
+          ! The assembling coeffs are different
+          q(1:n_vars,j,k) = q0(1:n_vars,j,k) - dt*residual_term(1:n_vars,j,k)
 
-                              ! Store the solution at the end of the i_RK step
-                              q_rk( 1:n_vars , j , k , i_RK ) = q_guess
+       END IF
 
-                              IF ( verbose_level .GE. 2 ) THEN
+       IF ( ANY(ISNAN(q(:,j,k))) ) THEN
+          
+          WRITE(*,*) 'j,k,n_RK',j,k,n_RK
+          WRITE(*,*) 'dt',dt
+          WRITE(*,*) 'before imex_RK_solver: qc',q0(1:n_vars,j,k)
+          IF ( q0(1,j,k) .GT. 0.0_wp ) THEN
+             
+             CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+             WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+             
+          END IF
+          WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
+          
+          READ(*,*)
+          
+       END IF
+       
+       
+       ! negative_thickness_check:IF ( q(1,j,k) .LT. 0.0_wp ) THEN
+       negative_thickness_check:IF ( q(1,j,k) .LT. EPSILON(1.0_wp) ) THEN
 
-                                 WRITE(*,*) 'imex_RK_solver: qc',q_guess
+          IF ( q(1,j,k) .GT. -1.0E-7_wp ) THEN
 
-                                 IF ( q_guess(1) .GT. 0.0_wp ) THEN
+             q(1,j,k) = 0.0_wp
+             q(2:n_vars,j,k) = 0.0_wp
 
-                                    CALL qc_to_qp( q_guess , qp(1:n_vars+2,j,k) , p_dyn )
-                                    WRITE(*,*) 'imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+          ELSE
 
-                                 END IF
+             WRITE(*,*) 'j,k,n_RK',j,k,n_RK
+             WRITE(*,*) 'dt',dt
+             WRITE(*,*) 'before imex_RK_solver: qc',q0(1:n_vars,j,k)
+             IF ( q0(1,j,k) .GT. 0.0_wp ) THEN
 
-                                 READ(*,*)
+                CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+                WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
 
-                              END IF
+             END IF
+             WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
 
+             WRITE(*,*) 'divFlux(1,j,k,1:n_RK)',divFlux(1,j,k,1:n_RK) 
+
+             WRITE(*,*) H_interface_x(1,j+1,k), H_interface_x(1,j,k)
+             WRITE(*,*) qp_interfaceR(1:n_vars,j,k)
+             WRITE(*,*) qp(1:n_vars,j,k)
+             WRITE(*,*) qp_interfaceL(1:n_vars,j+1,k)
+
+             WRITE(*,*) 'expl_terms(1,j,k,1:n_RK)',expl_terms(1,j,k,1:n_RK) 
+             WRITE(*,*) 'NH(1,j,k,1:n_RK)',NH(1,j,k,1:n_RK) 
+             WRITE(*,*) 'SI_NH(1,j,k,1:n_RK)',SI_NH(1,j,k,1:n_RK) 
+
+             WRITE(*,*) 'B_cent(j,k)',B_cent(j,k)
+
+             READ(*,*)
+
+          END IF
+
+       END IF negative_thickness_check
+
+       negative_alpha_check:IF ( ANY(q(5:4+n_solid,j,k) .LT. 0.0_wp ) ) THEN
+
+          IF ( ANY(q(5:4+n_solid,j,k) .LE. -1.0E-7_wp ) ) THEN
+             
+             WRITE(*,*) 'WARNINIG: negative solid mass'
+             WRITE(*,*) 'j,k,n_RK',j,k,n_RK
+             WRITE(*,*) 'dt',dt
+             WRITE(*,*) 'before imex_RK_solver: qc',q0(1:n_vars,j,k)
+             IF ( q0(1,j,k) .GT. 0.0_wp ) THEN
+                
+                CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+                WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+                
+             END IF
+             WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
+
+             WRITE(*,*) 'H_interface(1)'
+             WRITE(*,*) H_interface_x(1,j+1,k)/dx*dt, H_interface_x(1,j,k)/dx*dt
+             WRITE(*,*) H_interface_y(1,j,k+1)/dy*dt, H_interface_y(1,j,k)/dy*dt
+             
+             WRITE(*,*) 'H_interface(5)'
+             WRITE(*,*) H_interface_x(5,j+1,k)/dx*dt, H_interface_x(5,j,k)/dx*dt
+             WRITE(*,*) H_interface_y(5,j,k+1)/dy*dt, H_interface_y(5,j,k)/dy*dt
+             
+
+             READ(*,*)
+
+          ELSE
+
+             WHERE ( q(5:4+n_solid,j,k) .GT. -1.0E-7_wp )  &
+                  q(5:4+n_solid,j,k) = 0.0_wp
+
+          END IF
+             
+       END IF negative_alpha_check
+
+       CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+
+       IF ( qp(1,j,k) .GT. 1.e-10_wp ) THEN
+       
+          IF ( alpha_flag ) THEN
+             
+             alpha_s = SUM(qp(5:4+n_solid,j,k))
+             
+          ELSE
+             
+             alpha_s = SUM(qp(5:4+n_solid,j,k)) / qp(1,j,k)
+             
+          END IF
+
+       ELSE
+
+          alpha_s = 0.0_wp
+
+       END IF
+          
+       IF ( alpha_s .GT. maximum_solid_packing ) THEN
+
+          IF ( ( alpha_s - maximum_solid_packing ) .LT. 1.e-4_wp ) THEN 
+
+             !q(5:4+n_solid,j,k) = q(5:4+n_solid,j,k) * maximum_solid_packing / alpha_s
+                
+          ELSE
+          
+             !WRITE(*,*) 'j,k',j,k
+             !WRITE(*,*) 'alpha_s',alpha_s
+             
+             !WRITE(*,*) 'before imex_RK_solver: qc',q0(1:n_vars,j,k)
+             !WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
+             
+             !CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+             !WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+             
+             !CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+             !WRITE(*,*) 'after imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+             
+             !WRITE(*,*) 'H_interface(1)'
+             !WRITE(*,*) H_interface_x(1,j+1,k)/dx*dt, H_interface_x(1,j,k)/dx*dt
+             !WRITE(*,*) H_interface_y(1,j,k+1)/dy*dt, H_interface_y(1,j,k)/dy*dt
+             
+             !WRITE(*,*) 'H_interface(5)'
+             !WRITE(*,*) H_interface_x(5,j+1,k)/dx*dt, H_interface_x(5,j,k)/dx*dt
+             !WRITE(*,*) H_interface_y(5,j,k+1)/dy*dt, H_interface_y(5,j,k)/dy*dt
+             
+             !WRITE(*,*) 'divFlux(1)',divFlux(1,j,k,1:n_RK)
+             !WRITE(*,*) 'expl_terms(1)', expl_terms(1,j,k,1:n_RK)
+             !WRITE(*,*) 'NH(1)', NH(1,j,k,1:n_RK)
+             !WRITE(*,*) 'SI(1)', SI_NH(1,j,k,1:n_RK) 
+             
+             !WRITE(*,*) 'divFlux(5)',divFlux(5,j,k,1:n_RK)
+             !WRITE(*,*) 'expl_terms(5)', expl_terms(5,j,k,1:n_RK)
+             !WRITE(*,*) 'NH(5)', NH(5,j,k,1:n_RK)
+             !WRITE(*,*) 'SI(5)', SI_NH(5,j,k,1:n_RK)
+             
+             !READ(*,*)
+
+          END IF
+             
+       END IF
+          
+       
+       IF ( qp(4,j,k) .LT. 273.0_wp ) THEN
+          
+          WRITE(*,*) 'temperature check'
+          WRITE(*,*) j,k
+          WRITE(*,*) 'qp new',qp(1:n_vars+2,j,k)
+          WRITE(*,*) 'qc new',q(1:n_vars,j,k)
+
+          CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+          WRITE(*,*) j,k
+          WRITE(*,*) 'qp old',qp(1:n_vars+2,j,k)
+          WRITE(*,*) 'qc old',q0(1:n_vars,j,k)
+
+          WRITE(*,*) 'H_interface(4)'
+          WRITE(*,*) H_interface_x(4,j+1,k)/dx*dt, H_interface_x(4,j,k)/dx*dt
+          WRITE(*,*) H_interface_y(4,j,k+1)/dy*dt, H_interface_y(4,j,k)/dy*dt
+
+          WRITE(*,*) H_interface_y(:,j,k)/dy*dt
+          READ(*,*)
+
+       END IF
+          
+       IF ( SUM(q(5:4+n_solid,j,k)) .GT. q(1,j,k) ) THEN
+
+          IF ( ( (SUM(q(5:4+n_solid,j,k))-q(1,j,k))/q(1,j,k) .LT. 1.0E-10_wp )  &
+               .OR. ( q(1,j,k) .LT. epsilon(1.0_wp) ) ) THEN
+
+             CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+
+             q(5:4+n_solid,j,k) = q(5:4+n_solid,j,k)                            &
+                  / SUM(q(5:4+n_solid,j,k)) * q(1,j,k)
+
+          ELSE
+
+             WRITE(*,*) 'WARNING:SUM(qsolid)>q1',SUM(q(5:4+n_solid,j,k))-q(1,j,k)
+             
+             WRITE(*,*) 'j,k,n_RK',j,k,n_RK
+             WRITE(*,*) 'dt',dt
+             WRITE(*,*) ' B_cent(j,k)', B_cent(j,k)
+             WRITE(*,*) 'before imex_RK_solver: qc',q0(1:n_vars,j,k)
+             IF ( q0(1,j,k) .GT. 0.0_wp ) THEN
+
+                CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+                WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+
+             END IF
+             WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
+             
+             IF ( q(1,j,k) .GT. 0.0_wp ) THEN
+
+                CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+                WRITE(*,*) 'after imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+
+             END IF
+
+             WRITE(*,*) 'H_interface(1)'
+             WRITE(*,*) H_interface_x(1,j+1,k)/dx*dt, H_interface_x(1,j,k)/dx*dt
+             WRITE(*,*) H_interface_y(1,j,k+1)/dy*dt, H_interface_y(1,j,k)/dy*dt
+             
+             WRITE(*,*) 'H_interface(5)'
+             WRITE(*,*) H_interface_x(5,j+1,k)/dx*dt, H_interface_x(5,j,k)/dx*dt
+             WRITE(*,*) H_interface_y(5,j,k+1)/dy*dt, H_interface_y(5,j,k)/dy*dt
+
+             WRITE(*,*) 'divFlux(1)',divFlux(1,j,k,1:n_RK)
+             WRITE(*,*) 'expl_terms(1)', expl_terms(1,j,k,1:n_RK)
+             WRITE(*,*) 'NH(1)', NH(1,j,k,1:n_RK)
+             WRITE(*,*) 'SI(1)', SI_NH(1,j,k,1:n_RK) 
+
+             WRITE(*,*) 'divFlux(5)',divFlux(5,j,k,1:n_RK)
+             WRITE(*,*) 'expl_terms(5)', expl_terms(5,j,k,1:n_RK)
+             WRITE(*,*) 'NH(5)', NH(5,j,k,1:n_RK)
+             WRITE(*,*) 'SI(5)', SI_NH(5,j,k,1:n_RK)
+              ! Rescale solid fractions to restore conservation (do not halt)
+              q(5:4+n_solid,j,k) = q(5:4+n_solid,j,k)                        &
+                   / SUM(q(5:4+n_solid,j,k)) * q(1,j,k)
+
+          END IF
+
+          IF ( verbose_level .GE. 1 ) THEN
+
+             WRITE(*,*) 'h new',q(1,j,k)
+
+          END IF
+
+       END IF
+
+       IF ( B_nodata(j,k) ) q(:,j,k) = 0.0_wp
+
+    END DO assemble_sol
+
+    !$OMP END PARALLEL DO
+     
+    RETURN
+
+  END SUBROUTINE imex_RK_solver
+
+  !******************************************************************************
+  !> \brief Runge-Kutta single step integration
+  !
+  !> This subroutine find the solution of the non-linear system 
+  !> given the a step of the implicit-explicit Runge-Kutta scheme for a
+  !> cell:\n
+  !> \f$ Q^{(i)} = Q^n - dt \sum_{j=1}^{i-1}\tilde{a}_{j}\partial_x 
+  !> F(Q^{(j)}) +  dt \sum_{j=1}^{i-1} a_j  NH(Q^{(j)}) 
+  !> + dt a_{diag} NH(Q^{(i)}) \f$\n
+  !
+  !> \param[in,out] qj        conservative variables 
+  !> \param[in]     qj_old    conservative variables at the old time step
+  !> \param[in]     a_tilde   explicit coefficents for the fluxes
+  !> \param[in]     a_dirk    explicit coefficient for the non-hyperbolic terms
+  !> \param[in]     a_diag    implicit coefficient for the non-hyperbolic terms 
+  !> \param[in]     Rj_not_impl
+  !> \param[in]     divFluxj
+  !> \param[in]     Expl_terms_j
+  !> \param[in]     NHj
+  !
+  !> \date 2019/12/16
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !
+  !******************************************************************************
+
+  SUBROUTINE solve_rk_step( qj, qj_old, a_tilde, a_dirk, a_diag, Rj_not_impl,   &
+       divFluxj, Expl_terms_j, NHj, Bprimej_x, Bprimej_y, Zij, fric_val )
 
-                              IF ( omega_tilde(i_RK) .GT. 0.0_wp ) THEN
+    USE parameters_2d, ONLY : max_nl_iter , tol_rel , tol_abs
+
+    USE constitutive_2d, ONLY : rheology_model
+    
+    USE constitutive_2d, ONLY : qc_to_qp , integrate_friction_term
 
-                                 IF ( q_rk(1,j,k,i_RK) .GT. 0.0_wp ) THEN
+    IMPLICIT NONE
 
-                                    CALL qc_to_qp( q_rk(1:n_vars,j,k,i_RK) ,                        &
-                                       qp_rk(1:n_vars+2,j,k,i_RK) , p_dyn )
+    REAL(wp), INTENT(INOUT) :: qj(n_vars)
+    REAL(wp), INTENT(IN) :: qj_old(n_vars)
+    REAL(wp), INTENT(IN) :: a_tilde(n_RK)
+    REAL(wp), INTENT(IN) :: a_dirk(n_RK)
+    REAL(wp), INTENT(IN) :: a_diag
+    REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns)
+    REAL(wp), INTENT(IN) :: divFluxj(n_eqns,n_RK)
+    REAL(wp), INTENT(IN) :: expl_terms_j(n_eqns,n_RK)
+    REAL(wp), INTENT(IN) :: NHj(n_eqns,n_RK)
+    REAL(wp), INTENT(IN) :: Bprimej_x
+    REAL(wp), INTENT(IN) :: Bprimej_y
+    REAL(wp), INTENT(IN):: Zij ! value stochastic process
+    REAL(wp), INTENT(OUT) :: fric_val ! to save the value of the friction
 
-                                 ELSE
+    REAL(wp) :: qj_init(n_vars)
 
-                                    qp_rk(1:n_vars+2,j,k,i_RK) = 0.0_wp
-                                    qp_rk(4,j,k,i_RK) = T_ambient
+    REAL(wp) :: qj_org(n_vars) , qj_rel(n_vars)
 
-                                 END IF
+    REAL(wp) :: left_matrix(n_eqns,n_vars)
+    REAL(wp) :: right_term(n_eqns)
 
-                                 ! Eval gravity term and radial bottom source terms
-                                 CALL eval_expl_terms( B_prime_x_geom(j,k) , B_prime_y_geom(j,k) ,  &
-                                    B_second_xx_geom(j,k) , B_second_xy_geom(j,k) ,               &
-                                    B_second_yy_geom(j,k) , grav_coeff(j,k), d_grav_coeff_dx(j,k),&
-                                    d_grav_coeff_dx(j,k) , source_xy(j,k),                        &
-                                    qp_rk(1:n_vars+2,j,k,i_RK), expl_terms(1:n_eqns,j,k,i_RK), t, &
-                                    cell_source_fractions(j,k) )
+    REAL(wp) :: scal_f
 
-                              END IF
+    REAL(wp) :: coeff_f(n_eqns)
 
-                           END DO solve_cells_loop
+    REAL(wp) :: qj_rel_NR_old(n_vars)
+    REAL(wp) :: scal_f_old
+    REAL(wp) :: desc_dir(n_vars)
+    REAL(wp) :: grad_f(n_vars)
 
-                           !$OMP END DO
-                           !$OMP END PARALLEL
+    INTEGER :: pivot(n_vars)
 
-                           IF ( omega_tilde(i_RK) .GT. 0.0_wp ) THEN
+    REAL(wp) :: left_matrix_small22(n_nh,n_nh)
+    REAL(wp) :: left_matrix_small21(n_eqns-n_nh,n_nh)
+    REAL(wp) :: left_matrix_small11(n_eqns-n_nh,n_vars-n_nh)
+    ! REAL(wp) :: left_matrix_small12(n_nh,n_vars-n_nh)
 
-                              ! Eval and store the explicit hyperbolic (fluxes) terms
-                              CALL eval_hyperbolic_terms(                                           &
-                                 q_rk(1:n_vars,1:comp_cells_x,1:comp_cells_y,i_RK) ,              &
-                                 qp_rk(1:n_vars+2,1:comp_cells_x,1:comp_cells_y,i_RK) ,           &
-                                 divFlux(1:n_eqns,1:comp_cells_x,1:comp_cells_y,i_RK) )
+    REAL(wp) :: desc_dir_small2(n_nh)
+    INTEGER :: pivot_small2(n_nh)
 
-                           END IF
+    REAL(wp) :: desc_dir_small1(n_vars-n_nh)
 
-                        END DO runge_kutta
+    INTEGER :: ok
 
-                        !$OMP PARALLEL DO private(j,k)
+    INTEGER :: i 
+    INTEGER :: nl_iter
 
-                        assemble_sol:DO l = 1,solve_cells
+    REAL(wp), PARAMETER :: STPMX=100.0_wp
+    REAL(wp) :: stpmax
+    LOGICAL :: check
 
-                           j = j_cent(l)
-                           k = k_cent(l)
+    REAL(wp), PARAMETER :: TOLF=1.0E-10_wp , TOLMIN=1.0E-6_wp
+    REAL(wp) :: TOLX
 
-                           residual_term(1:n_vars,j,k) = MATMUL( divFlux(1:n_eqns,j,k,1:n_RK)       &
-                              - expl_terms(1:n_eqns,j,k,1:n_RK) , omega_tilde ) -                 &
-                              MATMUL( NH(1:n_eqns,j,k,1:n_RK) + SI_NH(1:n_eqns,j,k,1:n_RK) ,      &
-                              omega )
+    ! REAL(wp) :: qpj(n_vars+2) , p_dyn
 
+    REAL(wp) :: desc_dir2(n_vars)
 
-                           IF ( verbose_level .GE. 1 ) THEN
+    REAL(wp) :: desc_dir_temp(n_vars)
 
-                              WRITE(*,*) 'cell jk =',j,k
-                              WRITE(*,*) 'before imex_RK_solver: qc',q0(1:n_vars,j,k)
+    REAL(wp) :: sol_small(2)
+    REAL(wp) :: inv_det
 
-                              IF ( q0(1,j,k) .GT. 0.0_wp ) THEN
+    IF ( rheology_model .EQ. 8 ) THEN
 
-                                 CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-                                 WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+       CALL integrate_friction_term( qj , dt )
+       RETURN
+       
+    END IF
 
-                              END IF
+    normalize_q = .TRUE.
+    normalize_f = .FALSE.
+    opt_search_NL = .TRUE.
 
-                           END IF
+    coeff_f(1:n_eqns) = 1.0_wp
 
-                           IF ( ( SUM(ABS( omega_tilde(:)-a_tilde_ij(n_RK,:))) .EQ. 0.0_wp  )       &
-                              .AND. ( SUM(ABS(omega(:)-a_dirk_ij(n_RK,:))) .EQ. 0.0_wp ) ) THEN
+    grad_f(1:n_eqns) = 0.0_wp
 
-                              ! The assembling coeffs are equal to the last step of the RK scheme
-                              q(1:n_vars,j,k) = q_rk(1:n_vars,j,k,n_RK)
+    qj_init = qj
 
-                           ELSE
+    ! normalize the functions of the nonlinear system
+    IF ( normalize_f ) THEN
 
-                              ! The assembling coeffs are different
-                              q(1:n_vars,j,k) = q0(1:n_vars,j,k) - dt*residual_term(1:n_vars,j,k)
+       qj = qj_old - dt * ( MATMUL( divFluxj - expl_terms_j,a_tilde)            &
+            - MATMUL(NHj,a_dirk) )
 
-                           END IF
+       CALL eval_f( qj , qj_old , a_diag , coeff_f , Rj_not_impl , Bprimej_x ,  &
+            Bprimej_y , right_term , scal_f, Zij, fric_val )
 
-                           IF ( ANY(ISNAN(q(:,j,k))) ) THEN
+       IF ( verbose_level .GE. 3 ) THEN
 
-                              WRITE(*,*) 'j,k,n_RK',j,k,n_RK
-                              WRITE(*,*) 'dt',dt
-                              WRITE(*,*) 'before imex_RK_solver: qc',q0(1:n_vars,j,k)
-                              IF ( q0(1,j,k) .GT. 0.0_wp ) THEN
+          WRITE(*,*) 'solve_rk_step: non-normalized right_term'
+          WRITE(*,*) right_term
+          WRITE(*,*) 'scal_f',scal_f
 
-                                 CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-                                 WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+       END IF
 
-                              END IF
-                              WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
+       DO i=1,n_eqns
 
-                              READ(*,*)
+          IF ( ABS(right_term(i)) .GE. 1.0_wp ) coeff_f(i) = 1.0_wp/right_term(i)
 
-                           END IF
+       END DO
 
+       right_term = coeff_f * right_term
 
-                           ! negative_thickness_check:IF ( q(1,j,k) .LT. 0.0_wp ) THEN
-                           negative_thickness_check:IF ( q(1,j,k) .LT. EPSILON(1.0_wp) ) THEN
+       scal_f = 0.5_wp * DOT_PRODUCT( right_term , right_term )
 
-                              IF ( q(1,j,k) .GT. -1.0E-7_wp ) THEN
+       IF ( verbose_level .GE. 3 ) THEN                    
+          WRITE(*,*) 'solve_rk_step: after normalization',scal_f
+       END IF
 
-                                 q(1,j,k) = 0.0_wp
-                                 q(2:n_vars,j,k) = 0.0_wp
+    END IF
 
-                              ELSE
+    !---- normalize the conservative variables ------
 
-                                 WRITE(*,*) 'j,k,n_RK',j,k,n_RK
-                                 WRITE(*,*) 'dt',dt
-                                 WRITE(*,*) 'before imex_RK_solver: qc',q0(1:n_vars,j,k)
-                                 IF ( q0(1,j,k) .GT. 0.0_wp ) THEN
+    IF ( normalize_q ) THEN
 
-                                    CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-                                    WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+       qj_org = qj
 
-                                 END IF
-                                 WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
+       qj_org = MAX( ABS(qj_org) , 1.0E-3_wp )
 
-                                 WRITE(*,*) 'divFlux(1,j,k,1:n_RK)',divFlux(1,j,k,1:n_RK)
+    ELSE 
 
-                                 WRITE(*,*) H_interface_x(1,j+1,k), H_interface_x(1,j,k)
-                                 WRITE(*,*) qp_interfaceR(1:n_vars,j,k)
-                                 WRITE(*,*) qp(1:n_vars,j,k)
-                                 WRITE(*,*) qp_interfaceL(1:n_vars,j+1,k)
+       qj_org(1:n_vars) = 1.0_wp
 
-                                 WRITE(*,*) 'expl_terms(1,j,k,1:n_RK)',expl_terms(1,j,k,1:n_RK)
-                                 WRITE(*,*) 'NH(1,j,k,1:n_RK)',NH(1,j,k,1:n_RK)
-                                 WRITE(*,*) 'SI_NH(1,j,k,1:n_RK)',SI_NH(1,j,k,1:n_RK)
+    END IF
 
-                                 WRITE(*,*) 'B_cent(j,k)',B_cent(j,k)
+    qj_rel = qj / qj_org
 
-                                 READ(*,*)
+    ! -----------------------------------------------
+    newton_raphson_loop:DO nl_iter=1,max_nl_iter
 
-                              END IF
+       TOLX = epsilon(qj_rel)
+       
+       IF ( verbose_level .GE. 2 ) WRITE(*,*) 'solve_rk_step: nl_iter',nl_iter
 
-                           END IF negative_thickness_check
+       CALL eval_f( qj , qj_old , a_diag , coeff_f , Rj_not_impl , Bprimej_x ,  &
+            Bprimej_y , right_term , scal_f , Zij , fric_val )
+       
+       IF ( verbose_level .GE. 2 ) THEN
 
-                           negative_alpha_check:IF ( ANY(q(5:4+n_solid,j,k) .LT. 0.0_wp ) ) THEN
+          WRITE(*,*) 'solve_rk_step: right_term',right_term
 
-                              IF ( ANY(q(5:4+n_solid,j,k) .LE. -1.0E-7_wp ) ) THEN
+       END IF
 
-                                 WRITE(*,*) 'WARNINIG: negative solid mass'
-                                 WRITE(*,*) 'j,k,n_RK',j,k,n_RK
-                                 WRITE(*,*) 'dt',dt
-                                 WRITE(*,*) 'before imex_RK_solver: qc',q0(1:n_vars,j,k)
-                                 IF ( q0(1,j,k) .GT. 0.0_wp ) THEN
+       IF ( verbose_level .GE. 2 ) THEN
 
-                                    CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-                                    WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+          WRITE(*,*) 'before_lnsrch: scal_f',scal_f
 
-                                 END IF
-                                 WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
+       END IF
 
-                                 WRITE(*,*) 'H_interface(1)'
-                                 WRITE(*,*) H_interface_x(1,j+1,k)/dx*dt, H_interface_x(1,j,k)/dx*dt
-                                 WRITE(*,*) H_interface_y(1,j,k+1)/dy*dt, H_interface_y(1,j,k)/dy*dt
+       ! check the residual of the system
 
-                                 WRITE(*,*) 'H_interface(5)'
-                                 WRITE(*,*) H_interface_x(5,j+1,k)/dx*dt, H_interface_x(5,j,k)/dx*dt
-                                 WRITE(*,*) H_interface_y(5,j,k+1)/dy*dt, H_interface_y(5,j,k)/dy*dt
+       IF ( MAXVAL( ABS( right_term(:) ) ) < TOLF ) THEN
 
+          IF ( verbose_level .GE. 3 ) WRITE(*,*) '1: check',check
+          EXIT newton_raphson_loop
 
-                                 READ(*,*)
+       END IF
 
-                              ELSE
+       IF ( ( normalize_f ) .AND. ( scal_f < 1.0E-6_wp ) ) THEN
 
-                                 WHERE ( q(5:4+n_solid,j,k) .GT. -1.0E-7_wp )  &
-                                    q(5:4+n_solid,j,k) = 0.0_wp
+          IF ( verbose_level .GE. 3 ) WRITE(*,*) 'check scal_f',check
+          EXIT newton_raphson_loop
 
-                              END IF
+       END IF
 
-                           END IF negative_alpha_check
+       ! ---- evaluate the descent direction ------------------------------------
 
-                           CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+       CALL eval_jacobian( qj_rel , qj_org , coeff_f , Bprimej_x , Bprimej_y ,  &
+            left_matrix, Zij, fric_val )
+       
+       IF ( COUNT( implicit_flag ) .EQ. n_eqns ) THEN
 
-                           IF ( qp(1,j,k) .GT. 1.e-10_wp ) THEN
+          desc_dir_temp = - right_term
 
-                              IF ( alpha_flag ) THEN
+          IF ( wp .EQ. sp ) THEN
 
-                                 alpha_s = SUM(qp(5:4+n_solid,j,k))
+             CALL SGESV(n_eqns,1, left_matrix , n_eqns, pivot, desc_dir_temp ,  &
+                  n_eqns, ok)
 
-                              ELSE
+          ELSE
 
-                                 alpha_s = SUM(qp(5:4+n_solid,j,k)) / qp(1,j,k)
+             CALL DGESV(n_eqns,1, left_matrix , n_eqns, pivot, desc_dir_temp ,  &
+                  n_eqns, ok)
+            
+          END IF
 
-                              END IF
+          desc_dir = desc_dir_temp
 
-                           ELSE
+       ELSE
 
-                              alpha_s = 0.0_wp
+          left_matrix_small11 = reshape(pack(left_matrix, mask11),              &
+               [n_eqns-n_nh,n_eqns-n_nh]) 
 
-                           END IF
+          ! not needed for computation
+          !left_matrix_small12 = reshape(pack(left_matrix, mask12),             &
+          !     [n_nh,n_eqns-n_nh]) 
 
-                           IF ( alpha_s .GT. maximum_solid_packing ) THEN
+          left_matrix_small22 = reshape(pack(left_matrix, mask22),              &
+               [n_nh,n_nh]) 
 
-                              IF ( ( alpha_s - maximum_solid_packing ) .LT. 1.e-4_wp ) THEN
+          left_matrix_small21 = reshape(pack(left_matrix, mask21),              &
+               [n_eqns-n_nh,n_nh]) 
 
-                                 !q(5:4+n_solid,j,k) = q(5:4+n_solid,j,k) * maximum_solid_packing / alpha_s
+          desc_dir_small1 = pack( right_term, .NOT.implicit_flag )
+          desc_dir_small2 = pack( right_term , implicit_flag )
 
-                              ELSE
+          DO i=1,n_vars-n_nh
 
-                                 !WRITE(*,*) 'j,k',j,k
-                                 !WRITE(*,*) 'alpha_s',alpha_s
+             desc_dir_small1(i) = desc_dir_small1(i) / left_matrix_small11(i,i)
 
-                                 !WRITE(*,*) 'before imex_RK_solver: qc',q0(1:n_vars,j,k)
-                                 !WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
+          END DO
 
-                                 !CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-                                 !WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+          desc_dir_small2 = desc_dir_small2 -                                   &
+               MATMUL( desc_dir_small1 , left_matrix_small21 )
+          
+          
+          IF ( COUNT( implicit_flag ) .EQ. 2 ) THEN
+             
+             inv_det = 1.0_wp /                                                 &
+                  ( left_matrix_small22(1,1) * left_matrix_small22(2,2) -       &
+                  left_matrix_small22(2,1) * left_matrix_small22(1,2) ) 
+             
+             sol_small(1) = ( desc_dir_small2(1) * left_matrix_small22(2,2) -   &
+                  desc_dir_small2(2) * left_matrix_small22(1,2) ) * inv_det
 
-                                 !CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-                                 !WRITE(*,*) 'after imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+             sol_small(2) = ( left_matrix_small22(1,1) * desc_dir_small2(2) -   &
+                  left_matrix_small22(2,1) * desc_dir_small2(1) ) * inv_det
 
-                                 !WRITE(*,*) 'H_interface(1)'
-                                 !WRITE(*,*) H_interface_x(1,j+1,k)/dx*dt, H_interface_x(1,j,k)/dx*dt
-                                 !WRITE(*,*) H_interface_y(1,j,k+1)/dy*dt, H_interface_y(1,j,k)/dy*dt
+             desc_dir_small2 = sol_small
 
-                                 !WRITE(*,*) 'H_interface(5)'
-                                 !WRITE(*,*) H_interface_x(5,j+1,k)/dx*dt, H_interface_x(5,j,k)/dx*dt
-                                 !WRITE(*,*) H_interface_y(5,j,k+1)/dy*dt, H_interface_y(5,j,k)/dy*dt
+          ELSE
+             
+             IF ( wp .EQ. sp ) THEN
+                
+                CALL SGESV(n_nh,1, left_matrix_small22 , n_nh , pivot_small2 ,  &
+                     desc_dir_small2 , n_nh, ok)
+                
+             ELSE
+                
+                CALL DGESV(n_nh,1, left_matrix_small22 , n_nh , pivot_small2 ,  &
+                     desc_dir_small2 , n_nh, ok)
+                
+             END IF
+             
+          END IF
 
-                                 !WRITE(*,*) 'divFlux(1)',divFlux(1,j,k,1:n_RK)
-                                 !WRITE(*,*) 'expl_terms(1)', expl_terms(1,j,k,1:n_RK)
-                                 !WRITE(*,*) 'NH(1)', NH(1,j,k,1:n_RK)
-                                 !WRITE(*,*) 'SI(1)', SI_NH(1,j,k,1:n_RK)
+          desc_dir = unpack( - desc_dir_small2 , implicit_flag , 0.0_wp )       &
+               + unpack( - desc_dir_small1 , .NOT.implicit_flag , 0.0_wp )
+          
+       END IF
 
-                                 !WRITE(*,*) 'divFlux(5)',divFlux(5,j,k,1:n_RK)
-                                 !WRITE(*,*) 'expl_terms(5)', expl_terms(5,j,k,1:n_RK)
-                                 !WRITE(*,*) 'NH(5)', NH(5,j,k,1:n_RK)
-                                 !WRITE(*,*) 'SI(5)', SI_NH(5,j,k,1:n_RK)
+       IF ( verbose_level .GE. 3 ) WRITE(*,*) 'desc_dir',desc_dir
 
-                                 !READ(*,*)
+       qj_rel_NR_old = qj_rel
+       scal_f_old = scal_f
 
-                              END IF
+       IF ( ( opt_search_NL ) .AND. ( nl_iter .GT. 1 ) ) THEN
+          ! Search for the step lambda giving a suffic. decrease in the solution 
 
-                           END IF
+          stpmax = STPMX * MAX( SQRT( DOT_PRODUCT(qj_rel,qj_rel) ) ,            &
+               DBLE( SIZE(qj_rel) ) )
 
+          grad_f = MATMUL( right_term , left_matrix )
 
-                           IF ( qp(4,j,k) .LT. 273.0_wp ) THEN
+          desc_dir2 = desc_dir
 
-                              WRITE(*,*) 'temperature check'
-                              WRITE(*,*) j,k
-                              WRITE(*,*) 'qp new',qp(1:n_vars+2,j,k)
-                              WRITE(*,*) 'qc new',q(1:n_vars,j,k)
+          CALL lnsrch( qj_rel_NR_old , qj_org , qj_old , scal_f_old , grad_f ,  &
+               desc_dir , coeff_f , qj_rel , scal_f , right_term , stpmax ,     &
+               check , Rj_not_impl , Bprimej_x , Bprimej_y, Zij, fric_val )
 
-                              CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-                              WRITE(*,*) j,k
-                              WRITE(*,*) 'qp old',qp(1:n_vars+2,j,k)
-                              WRITE(*,*) 'qc old',q0(1:n_vars,j,k)
+       ELSE
 
-                              WRITE(*,*) 'H_interface(4)'
-                              WRITE(*,*) H_interface_x(4,j+1,k)/dx*dt, H_interface_x(4,j,k)/dx*dt
-                              WRITE(*,*) H_interface_y(4,j,k+1)/dy*dt, H_interface_y(4,j,k)/dy*dt
+          qj_rel = qj_rel_NR_old + desc_dir
 
-                              WRITE(*,*) H_interface_y(:,j,k)/dy*dt
-                              READ(*,*)
+          qj = qj_rel * qj_org
 
-                           END IF
+          CALL eval_f( qj , qj_old , a_diag , coeff_f , Rj_not_impl ,           &
+               Bprimej_x , Bprimej_y , right_term , scal_f, Zij, fric_val )
 
-                           IF ( SUM(q(5:4+n_solid,j,k)) .GT. q(1,j,k) ) THEN
+       END IF
 
-                              IF ( ( (SUM(q(5:4+n_solid,j,k))-q(1,j,k))/q(1,j,k) .LT. 1.0E-10_wp )  &
-                                 .OR. ( q(1,j,k) .LT. epsilon(1.0_wp) ) ) THEN
+       IF ( verbose_level .GE. 2 ) WRITE(*,*) 'after_lnsrch: scal_f',scal_f
 
-                                 CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+       qj = qj_rel * qj_org
 
-                                 q(5:4+n_solid,j,k) = q(5:4+n_solid,j,k)                            &
-                                    / SUM(q(5:4+n_solid,j,k)) * q(1,j,k)
+       IF ( verbose_level .GE. 3 ) THEN
 
-                              ELSE
+          WRITE(*,*) 'qj',qj
 
-                                 WRITE(*,*) 'WARNING:SUM(qsolid)>q1',SUM(q(5:4+n_solid,j,k))-q(1,j,k)
+       END IF
 
-                                 WRITE(*,*) 'j,k,n_RK',j,k,n_RK
-                                 WRITE(*,*) 'dt',dt
-                                 WRITE(*,*) ' B_cent(j,k)', B_cent(j,k)
-                                 WRITE(*,*) 'before imex_RK_solver: qc',q0(1:n_vars,j,k)
-                                 IF ( q0(1,j,k) .GT. 0.0_wp ) THEN
+       IF ( MAXVAL( ABS( right_term(:) ) ) < TOLF ) THEN
 
-                                    CALL qc_to_qp(q0(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-                                    WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+          IF ( verbose_level .GE. 3 ) WRITE(*,*) '1: check',check
+          check= .FALSE.
+          EXIT newton_raphson_loop
 
-                                 END IF
-                                 WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
+       END IF
 
-                                 IF ( q(1,j,k) .GT. 0.0_wp ) THEN
+       IF (check) THEN
 
-                                    CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-                                    WRITE(*,*) 'after imex_RK_solver: qp',qp(1:n_vars+2,j,k)
+          check = ( MAXVAL( ABS(grad_f(:)) * MAX( ABS( qj_rel(:) ),1.0_wp ) /   &
+               MAX( scal_f , 0.5_wp * SIZE(qj_rel) ) )  < TOLMIN )
 
-                                 END IF
+          IF ( verbose_level .GE. 3 ) WRITE(*,*) '2: check',check
+          !          RETURN
 
-                                 WRITE(*,*) 'H_interface(1)'
-                                 WRITE(*,*) H_interface_x(1,j+1,k)/dx*dt, H_interface_x(1,j,k)/dx*dt
-                                 WRITE(*,*) H_interface_y(1,j,k+1)/dy*dt, H_interface_y(1,j,k)/dy*dt
+       END IF
 
-                                 WRITE(*,*) 'H_interface(5)'
-                                 WRITE(*,*) H_interface_x(5,j+1,k)/dx*dt, H_interface_x(5,j,k)/dx*dt
-                                 WRITE(*,*) H_interface_y(5,j,k+1)/dy*dt, H_interface_y(5,j,k)/dy*dt
+       IF ( MAXVAL( ABS( qj_rel(:) - qj_rel_NR_old(:) ) / MAX( ABS( qj_rel(:)) ,&
+            1.0_wp ) ) < TOLX ) THEN
 
-                                 WRITE(*,*) 'divFlux(1)',divFlux(1,j,k,1:n_RK)
-                                 WRITE(*,*) 'expl_terms(1)', expl_terms(1,j,k,1:n_RK)
-                                 WRITE(*,*) 'NH(1)', NH(1,j,k,1:n_RK)
-                                 WRITE(*,*) 'SI(1)', SI_NH(1,j,k,1:n_RK)
+          IF ( verbose_level .GE. 3 ) WRITE(*,*) 'check',check
+          EXIT newton_raphson_loop
 
-                                 WRITE(*,*) 'divFlux(5)',divFlux(5,j,k,1:n_RK)
-                                 WRITE(*,*) 'expl_terms(5)', expl_terms(5,j,k,1:n_RK)
-                                 WRITE(*,*) 'NH(5)', NH(5,j,k,1:n_RK)
-                                 WRITE(*,*) 'SI(5)', SI_NH(5,j,k,1:n_RK)
+       END IF
 
+    END DO newton_raphson_loop
+    
+    RETURN
+    
+  END SUBROUTINE solve_rk_step
 
-                                 READ(*,*)
+  !******************************************************************************
+  !> \brief Search the descent stepsize
+  !
+  !> This subroutine search for the lenght of the descent step in order to have
+  !> a decrease in the nonlinear function.
+  !> \param[in]     qj_rel_NR_old  
+  !> \param[in]     qj_org
+  !> \param[in]     qj_old
+  !> \param[in]     scal_f_old
+  !> \param[in]     grad_f
+  !> \param[in,out] desc_dir
+  !> \param[in]     coeff_f
+  !> \param[out]    qj_rel
+  !> \param[out]    scal_f
+  !> \param[out]    right_term
+  !> \param[in]     stpmax
+  !> \param[out]    check
+  !> \param[in]     RJ_not_impl
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !> \date 2019/12/16
+  !******************************************************************************
 
-                              END IF
+  SUBROUTINE lnsrch( qj_rel_NR_old , qj_org , qj_old , scal_f_old , grad_f ,    &
+       desc_dir , coeff_f , qj_rel , scal_f , right_term , stpmax , check ,     &
+       Rj_not_impl , Bprimej_x , Bprimej_y, Zij, fric_val )
 
-                              IF ( verbose_level .GE. 1 ) THEN
+    IMPLICIT NONE
 
-                                 WRITE(*,*) 'h new',q(1,j,k)
-                                 READ(*,*)
+    !> Initial point
+    REAL(wp), DIMENSION(:), INTENT(IN) :: qj_rel_NR_old
 
-                              END IF
+    !> Initial point
+    REAL(wp), DIMENSION(:), INTENT(IN) :: qj_org
 
-                           END IF
+    !> Initial point
+    REAL(wp), DIMENSION(:), INTENT(IN) :: qj_old
 
-                           IF ( B_nodata(j,k) ) q(:,j,k) = 0.0_wp
+    !> Gradient at xold
+    REAL(wp), DIMENSION(:), INTENT(IN) :: grad_f
 
-                        END DO assemble_sol
+    !> Value of the function at xold
+    REAL(wp), INTENT(IN) :: scal_f_old
 
-                        !$OMP END PARALLEL DO
+    !> Descent direction (usually Newton direction)
+    REAL(wp), DIMENSION(:), INTENT(INOUT) :: desc_dir
 
-                        RETURN
+    REAL(wp), INTENT(IN) :: stpmax
 
-                     END SUBROUTINE imex_RK_solver
+    !> Coefficients to rescale the nonlinear function
+    REAL(wp), DIMENSION(:), INTENT(IN) :: coeff_f
 
-                     !******************************************************************************
-                     !> \brief Runge-Kutta single step integration
-                     !
-                     !> This subroutine find the solution of the non-linear system
-                     !> given the a step of the implicit-explicit Runge-Kutta scheme for a
-                     !> cell:\n
-                     !> \f$ Q^{(i)} = Q^n - dt \sum_{j=1}^{i-1}\tilde{a}_{j}\partial_x
-                     !> F(Q^{(j)}) +  dt \sum_{j=1}^{i-1} a_j  NH(Q^{(j)})
-                     !> + dt a_{diag} NH(Q^{(i)}) \f$\n
-                     !
-                     !> \param[in,out] qj        conservative variables
-                     !> \param[in]     qj_old    conservative variables at the old time step
-                     !> \param[in]     a_tilde   explicit coefficents for the fluxes
-                     !> \param[in]     a_dirk    explicit coefficient for the non-hyperbolic terms
-                     !> \param[in]     a_diag    implicit coefficient for the non-hyperbolic terms
-                     !> \param[in]     Rj_not_impl
-                     !> \param[in]     divFluxj
-                     !> \param[in]     Expl_terms_j
-                     !> \param[in]     NHj
-                     !
-                     !> \date 2019/12/16
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !
-                     !******************************************************************************
+    !> Updated solution
+    REAL(wp), DIMENSION(:), INTENT(OUT) :: qj_rel
 
-                     SUBROUTINE solve_rk_step( qj, qj_old, a_tilde, a_dirk, a_diag, Rj_not_impl,   &
-                        divFluxj, Expl_terms_j, NHj, Bprimej_x, Bprimej_y, Zij, fric_val )
+    !> Value of the scalar function at x
+    REAL(wp), INTENT(OUT) :: scal_f
 
-                        USE parameters_2d, ONLY : max_nl_iter , tol_rel , tol_abs
+    !> Value of the scalar function at x
+    REAL(wp), INTENT(OUT) :: right_term(n_eqns)
 
-                        USE constitutive_2d, ONLY : rheology_model
+    !> Output quantity check is false on a normal exit 
+    LOGICAL, INTENT(OUT) :: check
 
-                        USE constitutive_2d, ONLY : qc_to_qp , integrate_friction_term
+    REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns)
 
-                        IMPLICIT NONE
+    REAL(wp), INTENT(IN) :: Bprimej_x
+    REAL(wp), INTENT(IN) :: Bprimej_y
 
-                        REAL(wp), INTENT(INOUT) :: qj(n_vars)
-                        REAL(wp), INTENT(IN) :: qj_old(n_vars)
-                        REAL(wp), INTENT(IN) :: a_tilde(n_RK)
-                        REAL(wp), INTENT(IN) :: a_dirk(n_RK)
-                        REAL(wp), INTENT(IN) :: a_diag
-                        REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns)
-                        REAL(wp), INTENT(IN) :: divFluxj(n_eqns,n_RK)
-                        REAL(wp), INTENT(IN) :: expl_terms_j(n_eqns,n_RK)
-                        REAL(wp), INTENT(IN) :: NHj(n_eqns,n_RK)
-                        REAL(wp), INTENT(IN) :: Bprimej_x
-                        REAL(wp), INTENT(IN) :: Bprimej_y
-                        REAL(wp), INTENT(IN):: Zij ! value stochastic process
-                        REAL(wp), INTENT(OUT) :: fric_val ! to save the value of the friction
+    ! vars for stochastic variable
+    REAL(wp), INTENT(IN):: Zij ! value stochastic process
+    REAL(wp), INTENT(OUT) :: fric_val ! to save the value of the friction
+    REAL(wp), PARAMETER :: TOLX=epsilon(qj_rel)
 
-                        REAL(wp) :: qj_init(n_vars)
+    INTEGER, DIMENSION(1) :: ndum
+    REAL(wp) :: ALF , a,alam,alam2,alamin,b,disc
+    REAL(wp) :: scal_f2
+    REAL(wp) :: desc_dir_abs
+    REAL(wp) :: rhs1 , rhs2 , slope, tmplam
 
-                        REAL(wp) :: qj_org(n_vars) , qj_rel(n_vars)
+    REAL(wp) :: scal_f_min , alam_min
 
-                        REAL(wp) :: left_matrix(n_eqns,n_vars)
-                        REAL(wp) :: right_term(n_eqns)
+    REAL(wp) :: qj(n_vars)
 
-                        REAL(wp) :: scal_f
+    ALF = 1.0e-4_wp
 
-                        REAL(wp) :: coeff_f(n_eqns)
+    IF ( size(grad_f) == size(desc_dir) .AND. size(grad_f) == size(qj_rel)      &
+         .AND. size(qj_rel) == size(qj_rel_NR_old) ) THEN
 
-                        REAL(wp) :: qj_rel_NR_old(n_vars)
-                        REAL(wp) :: scal_f_old
-                        REAL(wp) :: desc_dir(n_vars)
-                        REAL(wp) :: grad_f(n_vars)
+       ndum = size(grad_f)
 
-                        INTEGER :: pivot(n_vars)
+    ELSE
 
-                        REAL(wp) :: left_matrix_small22(n_nh,n_nh)
-                        REAL(wp) :: left_matrix_small21(n_eqns-n_nh,n_nh)
-                        REAL(wp) :: left_matrix_small11(n_eqns-n_nh,n_vars-n_nh)
-                        ! REAL(wp) :: left_matrix_small12(n_nh,n_vars-n_nh)
+       WRITE(*,*) 'nrerror: an assert_eq failed with this tag:', 'lnsrch'
+       STOP 'program terminated by assert_eq4'
 
-                        REAL(wp) :: desc_dir_small2(n_nh)
-                        INTEGER :: pivot_small2(n_nh)
+    END IF
 
-                        REAL(wp) :: desc_dir_small1(n_vars-n_nh)
+    check = .FALSE.
 
-                        INTEGER :: ok
+    desc_dir_abs = NORM2(desc_dir)
+    
+    IF ( desc_dir_abs > stpmax ) desc_dir(:) = desc_dir(:) * stpmax/desc_dir_abs  
 
-                        INTEGER :: i
-                        INTEGER :: nl_iter
+    slope = DOT_PRODUCT(grad_f,desc_dir)
 
-                        REAL(wp), PARAMETER :: STPMX=100.0_wp
-                        REAL(wp) :: stpmax
-                        LOGICAL :: check
+    alamin = TOLX / MAXVAL(ABS( desc_dir(:))/MAX( ABS(qj_rel_NR_old(:)),1.0_wp ))
 
-                        REAL(wp), PARAMETER :: TOLF=1.0E-10_wp , TOLMIN=1.0E-6_wp
-                        REAL(wp) :: TOLX
+    IF ( alamin .EQ. 0.0_wp ) THEN
 
-                        ! REAL(wp) :: qpj(n_vars+2) , p_dyn
+       qj_rel(:) = qj_rel_NR_old(:)
 
-                        REAL(wp) :: desc_dir2(n_vars)
+       RETURN
 
-                        REAL(wp) :: desc_dir_temp(n_vars)
+    END IF
 
-                        REAL(wp) :: sol_small(2)
-                        REAL(wp) :: inv_det
+    alam = 1.0_wp
 
-                        IF ( rheology_model .EQ. 8 ) THEN
+    scal_f_min = scal_f_old
 
-                           CALL integrate_friction_term( qj , dt )
-                           RETURN
+    optimal_step_search: DO
 
-                        END IF
+       IF ( verbose_level .GE. 4 ) THEN
 
-                        normalize_q = .TRUE.
-                        normalize_f = .FALSE.
-                        opt_search_NL = .TRUE.
+          WRITE(*,*) 'alam',alam
 
-                        coeff_f(1:n_eqns) = 1.0_wp
+       END IF
 
-                        grad_f(1:n_eqns) = 0.0_wp
+       qj_rel = qj_rel_NR_old + alam * desc_dir
 
-                        qj_init = qj
+       qj = qj_rel * qj_org
 
-                        ! normalize the functions of the nonlinear system
-                        IF ( normalize_f ) THEN
+       CALL eval_f( qj , qj_old , a_diag , coeff_f , Rj_not_impl , Bprimej_x ,  &
+            Bprimej_y, right_term , scal_f, Zij, fric_val )
 
-                           qj = qj_old - dt * ( MATMUL( divFluxj - expl_terms_j,a_tilde)            &
-                              - MATMUL(NHj,a_dirk) )
+       IF ( verbose_level .GE. 4 ) THEN
 
-                           CALL eval_f( qj , qj_old , a_diag , coeff_f , Rj_not_impl , Bprimej_x ,  &
-                              Bprimej_y , right_term , scal_f, Zij, fric_val )
+          WRITE(*,*) 'lnsrch: effe_old,effe',scal_f_old,scal_f
+          READ(*,*)
 
-                           IF ( verbose_level .GE. 3 ) THEN
+       END IF
 
-                              WRITE(*,*) 'solve_rk_step: non-normalized right_term'
-                              WRITE(*,*) right_term
-                              WRITE(*,*) 'scal_f',scal_f
+       IF ( scal_f .LT. scal_f_min ) THEN
 
-                           END IF
+          scal_f_min = scal_f
+          alam_min = alam
 
-                           DO i=1,n_eqns
+       END IF
 
-                              IF ( ABS(right_term(i)) .GE. 1.0_wp ) coeff_f(i) = 1.0_wp/right_term(i)
+       IF ( scal_f .LE. 0.9_wp * scal_f_old ) THEN   
+          ! sufficient function decrease
 
-                           END DO
+          IF ( verbose_level .GE. 4 ) THEN
 
-                           right_term = coeff_f * right_term
+             WRITE(*,*) 'sufficient function decrease'
 
-                           scal_f = 0.5_wp * DOT_PRODUCT( right_term , right_term )
+          END IF
 
-                           IF ( verbose_level .GE. 3 ) THEN
-                              WRITE(*,*) 'solve_rk_step: after normalization',scal_f
-                           END IF
+          EXIT optimal_step_search   
 
-                        END IF
+       ELSE IF ( alam < alamin ) THEN   
+          ! convergence on Delta_x
 
-                        !---- normalize the conservative variables ------
+          IF ( verbose_level .GE. 4 ) THEN
 
-                        IF ( normalize_q ) THEN
+             WRITE(*,*) ' convergence on Delta_x',alam,alamin
 
-                           qj_org = qj
+          END IF
 
-                           qj_org = MAX( ABS(qj_org) , 1.0E-3_wp )
+          qj_rel(:) = qj_rel_NR_old(:)
+          scal_f = scal_f_old
+          check = .TRUE.
 
-                        ELSE
+          EXIT optimal_step_search
 
-                           qj_org(1:n_vars) = 1.0_wp
+          !       ELSE IF ( scal_f .LE. scal_f_old + ALF * alam * slope ) THEN   
+       ELSE  
 
-                        END IF
+          IF ( alam .EQ. 1.0_wp ) THEN
 
-                        qj_rel = qj / qj_org
+             tmplam = - slope / ( 2.0_wp * ( scal_f - scal_f_old - slope ) )
 
-                        ! -----------------------------------------------
-                        newton_raphson_loop:DO nl_iter=1,max_nl_iter
+          ELSE
 
-                           TOLX = epsilon(qj_rel)
+             rhs1 = scal_f - scal_f_old - alam*slope
+             rhs2 = scal_f2 - scal_f_old - alam2*slope
 
-                           IF ( verbose_level .GE. 2 ) WRITE(*,*) 'solve_rk_step: nl_iter',nl_iter
+             a = ( rhs1/alam**2 - rhs2/alam2**2 ) / ( alam - alam2 )
+             b = ( -alam2*rhs1/alam**2 + alam*rhs2/alam2**2 ) / ( alam - alam2 )
 
-                           CALL eval_f( qj , qj_old , a_diag , coeff_f , Rj_not_impl , Bprimej_x ,  &
-                              Bprimej_y , right_term , scal_f , Zij , fric_val )
+             IF ( a .EQ. 0.0_wp ) THEN
 
-                           IF ( verbose_level .GE. 2 ) THEN
+                tmplam = - slope / ( 2.0_wp * b )
 
-                              WRITE(*,*) 'solve_rk_step: right_term',right_term
+             ELSE
 
-                           END IF
+                disc = b*b - 3.0_wp*a*slope
 
-                           IF ( verbose_level .GE. 2 ) THEN
+                IF ( disc .LT. 0.0_wp ) THEN
 
-                              WRITE(*,*) 'before_lnsrch: scal_f',scal_f
+                   tmplam = 0.5_wp * alam
 
-                           END IF
+                ELSE IF ( b .LE. 0.0_wp ) THEN
 
-                           ! check the residual of the system
+                   tmplam = ( - b + SQRT(disc) ) / ( 3.0_wp * a )
 
-                           IF ( MAXVAL( ABS( right_term(:) ) ) < TOLF ) THEN
+                ELSE
 
-                              IF ( verbose_level .GE. 3 ) WRITE(*,*) '1: check',check
-                              EXIT newton_raphson_loop
+                   tmplam = - slope / ( b + SQRT(disc) )
 
-                           END IF
+                ENDIF
 
-                           IF ( ( normalize_f ) .AND. ( scal_f < 1.0E-6_wp ) ) THEN
+             END IF
 
-                              IF ( verbose_level .GE. 3 ) WRITE(*,*) 'check scal_f',check
-                              EXIT newton_raphson_loop
+             IF ( tmplam .GT. 0.5_wp * alam ) tmplam = 0.5_wp * alam
 
-                           END IF
+          END IF
 
-                           ! ---- evaluate the descent direction ------------------------------------
+       END IF
 
-                           CALL eval_jacobian( qj_rel , qj_org , coeff_f , Bprimej_x , Bprimej_y ,  &
-                              left_matrix, Zij, fric_val )
+       alam2 = alam
+       scal_f2 = scal_f
+       alam = MAX( tmplam , 0.5_wp * alam )
 
-                           IF ( COUNT( implicit_flag ) .EQ. n_eqns ) THEN
+    END DO optimal_step_search
 
-                              desc_dir_temp = - right_term
+    RETURN
+    
+  END SUBROUTINE lnsrch
 
-                              IF ( wp .EQ. sp ) THEN
+  !******************************************************************************
+  !> \brief Evaluate the nonlinear system
+  !
+  !> This subroutine evaluate the value of the nonlinear system in the state 
+  !> defined by the variables qj.
+  !> \param[in]    qj          conservative variables 
+  !> \param[in]    qj_old      conservative variables at the old time step
+  !> \param[in]    a_diag      implicit coefficient for the non-hyperbolic term
+  !> \param[in]    coeff_f     coefficient to rescale the nonlinear functions
+  !> \param[in]    Rj_not_impl explicit terms
+  !> \param[out]   f_nl        values of the nonlinear functions
+  !> \param[out]   scal_f      value of the scalar function f=0.5*<F,F>
+  !> \date 2019/12/16
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !******************************************************************************
 
-                                 CALL SGESV(n_eqns,1, left_matrix , n_eqns, pivot, desc_dir_temp ,  &
-                                    n_eqns, ok)
+  SUBROUTINE eval_f( qj , qj_old , a_diag , coeff_f , Rj_not_impl , Bprimej_x , &
+       Bprimej_y , f_nl , scal_f, Zij, fric_val )
 
-                              ELSE
+    USE constitutive_2d, ONLY : eval_implicit_terms
 
-                                 CALL DGESV(n_eqns,1, left_matrix , n_eqns, pivot, desc_dir_temp ,  &
-                                    n_eqns, ok)
+    IMPLICIT NONE
 
-                              END IF
+    REAL(wp), INTENT(IN) :: qj(n_vars)
+    REAL(wp), INTENT(IN) :: qj_old(n_vars)
+    REAL(wp), INTENT(IN) :: a_diag
+    REAL(wp), INTENT(IN) :: coeff_f(n_eqns)
+    REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns)
 
-                              desc_dir = desc_dir_temp
+    REAL(wp), INTENT(IN) :: Bprimej_x
+    REAL(wp), INTENT(IN) :: Bprimej_y
+    
 
-                           ELSE
+    REAL(wp), INTENT(OUT) :: f_nl(n_eqns)
+    REAL(wp), INTENT(OUT) :: scal_f
 
-                              left_matrix_small11 = reshape(pack(left_matrix, mask11),              &
-                                 [n_eqns-n_nh,n_eqns-n_nh])
+    REAL(wp), INTENT(IN):: Zij ! value stochastic process
+    REAL(wp), INTENT(OUT) :: fric_val ! to save the value of the friction
 
-                              ! not needed for computation
-                              !left_matrix_small12 = reshape(pack(left_matrix, mask12),             &
-                              !     [n_nh,n_eqns-n_nh])
+    REAL(wp) :: nh_term_impl(n_eqns)
+    REAL(wp) :: Rj(n_eqns)
 
-                              left_matrix_small22 = reshape(pack(left_matrix, mask22),              &
-                                 [n_nh,n_nh])
+    CALL eval_implicit_terms( Bprimej_x , Bprimej_y, Zij, fric_val, r_qj = qj , &
+         r_nh_term_impl=nh_term_impl ) 
 
-                              left_matrix_small21 = reshape(pack(left_matrix, mask21),              &
-                                 [n_eqns-n_nh,n_nh])
+    Rj = Rj_not_impl - a_diag * nh_term_impl
 
-                              desc_dir_small1 = pack( right_term, .NOT.implicit_flag )
-                              desc_dir_small2 = pack( right_term , implicit_flag )
+    f_nl = qj - qj_old + dt * Rj
 
-                              DO i=1,n_vars-n_nh
+    f_nl = coeff_f * f_nl
 
-                                 desc_dir_small1(i) = desc_dir_small1(i) / left_matrix_small11(i,i)
+    scal_f = 0.5_wp * DOT_PRODUCT( f_nl , f_nl )
 
-                              END DO
+    RETURN
+    
+  END SUBROUTINE eval_f
 
-                              desc_dir_small2 = desc_dir_small2 -                                   &
-                                 MATMUL( desc_dir_small1 , left_matrix_small21 )
+  !******************************************************************************
+  !> \brief Evaluate the jacobian 
+  !
+  !> This subroutine evaluate the jacobian of the non-linear system
+  !> with respect to the conservative variables.
+  !
+  !> \param[in]    qj_rel        relative variation (qj=qj_rel*qj_org)
+  !> \param[in]    qj_org        conservative variables at the old time step
+  !> \param[in]    coeff_f       coefficient to rescale the nonlinear functions
+  !> \param[out]   left_matrix   matrix from the linearization of the system
+  !
+  !> \date 07/10/2016
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !******************************************************************************
 
+  SUBROUTINE eval_jacobian( qj_rel , qj_org , coeff_f, Bprimej_x , Bprimej_y ,  &
+       left_matrix, Zij, fric_val)
 
-                              IF ( COUNT( implicit_flag ) .EQ. 2 ) THEN
+    USE constitutive_2d, ONLY : eval_implicit_terms
 
-                                 inv_det = 1.0_wp /                                                 &
-                                    ( left_matrix_small22(1,1) * left_matrix_small22(2,2) -       &
-                                    left_matrix_small22(2,1) * left_matrix_small22(1,2) )
+    IMPLICIT NONE
 
-                                 sol_small(1) = ( desc_dir_small2(1) * left_matrix_small22(2,2) -   &
-                                    desc_dir_small2(2) * left_matrix_small22(1,2) ) * inv_det
+    REAL(wp), INTENT(IN) :: qj_rel(n_vars)
+    REAL(wp), INTENT(IN) :: qj_org(n_vars)
+    REAL(wp), INTENT(IN) :: coeff_f(n_eqns)
 
-                                 sol_small(2) = ( left_matrix_small22(1,1) * desc_dir_small2(2) -   &
-                                    left_matrix_small22(2,1) * desc_dir_small2(1) ) * inv_det
+    REAL(wp), INTENT(IN) :: Bprimej_x
+    REAL(wp), INTENT(IN) :: Bprimej_y
 
-                                 desc_dir_small2 = sol_small
+    REAL(wp), INTENT(OUT) :: left_matrix(n_eqns,n_vars)
 
-                              ELSE
+    REAL(wp), INTENT(IN):: Zij ! value stochastic process
+    REAL(wp), INTENT(OUT) :: fric_val ! to save the value of the friction
+    
+    REAL(wp) :: Jacob_relax(n_eqns,n_vars)
+    COMPLEX(wp) :: nh_terms_cmplx_impl(n_eqns)
+    COMPLEX(wp) :: qj_cmplx(n_vars) , qj_rel_cmplx(n_vars)
+    COMPLEX(wp) :: qj_rel_cmplx_init(n_vars)
 
-                                 IF ( wp .EQ. sp ) THEN
+    INTEGER :: i
+        
+    ! initialize the matrix of the linearized system and the Jacobian
 
-                                    CALL SGESV(n_nh,1, left_matrix_small22 , n_nh , pivot_small2 ,  &
-                                       desc_dir_small2 , n_nh, ok)
+    left_matrix(1:n_eqns,1:n_vars) = 0.0_wp
+    Jacob_relax(1:n_eqns,1:n_vars) = 0.0_wp
 
-                                 ELSE
+    ! evaluate the jacobian of the non-hyperbolic terms
 
-                                    CALL DGESV(n_nh,1, left_matrix_small22 , n_nh , pivot_small2 ,  &
-                                       desc_dir_small2 , n_nh, ok)
+    DO i=1,n_vars
 
-                                 END IF
+       qj_rel_cmplx_init(i) = CMPLX(qj_rel(i),0.0_wp,wp)
 
-                              END IF
+    END DO
 
-                              desc_dir = unpack( - desc_dir_small2 , implicit_flag , 0.0_wp )       &
-                                 + unpack( - desc_dir_small1 , .NOT.implicit_flag , 0.0_wp )
+    DO i=1,n_vars
 
-                           END IF
+       left_matrix(i,i) = coeff_f(i) * qj_org(i)
 
-                           IF ( verbose_level .GE. 3 ) WRITE(*,*) 'desc_dir',desc_dir
+       IF ( implicit_flag(i) ) THEN 
 
-                           qj_rel_NR_old = qj_rel
-                           scal_f_old = scal_f
+          qj_rel_cmplx(1:n_vars) = qj_rel_cmplx_init(1:n_vars)
+          qj_rel_cmplx(i) = CMPLX(qj_rel(i), h,wp)
 
-                           IF ( ( opt_search_NL ) .AND. ( nl_iter .GT. 1 ) ) THEN
-                              ! Search for the step lambda giving a suffic. decrease in the solution
+          qj_cmplx = qj_rel_cmplx * qj_org
 
-                              stpmax = STPMX * MAX( SQRT( DOT_PRODUCT(qj_rel,qj_rel) ) ,            &
-                                 DBLE( SIZE(qj_rel) ) )
+          CALL eval_implicit_terms( Bprimej_x , Bprimej_y, Zij, fric_val,       &
+               c_qj = qj_cmplx , c_nh_term_impl = nh_terms_cmplx_impl ) 
 
-                              grad_f = MATMUL( right_term , left_matrix )
+          Jacob_relax(1:n_eqns,i) = coeff_f(i) *                                &
+               AIMAG(nh_terms_cmplx_impl) * one_by_h
 
-                              desc_dir2 = desc_dir
+          left_matrix(1:n_eqns,i) = left_matrix(1:n_eqns,i) - dt * a_diag       &
+               * Jacob_relax(1:n_eqns,i)
+          
+       END IF
 
-                              CALL lnsrch( qj_rel_NR_old , qj_org , qj_old , scal_f_old , grad_f ,  &
-                                 desc_dir , coeff_f , qj_rel , scal_f , right_term , stpmax ,     &
-                                 check , Rj_not_impl , Bprimej_x , Bprimej_y, Zij, fric_val )
+    END DO
 
-                           ELSE
+    RETURN
+    
+  END SUBROUTINE eval_jacobian
 
-                              qj_rel = qj_rel_NR_old + desc_dir
+  !******************************************************************************
+  !> \brief Evaluate the eroion/deposition terms
+  !
+  !> This subroutine update the solution and the topography computing the 
+  !> erosion and deposition terms and the solution only because of entrainment.
+  !
+  !> \param[in]    dt      time step
+  !
+  !> \date 2019/11/08
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !******************************************************************************
 
-                              qj = qj_rel * qj_org
+  SUBROUTINE update_erosion_deposition_cell(dt)
 
-                              CALL eval_f( qj , qj_old , a_diag , coeff_f , Rj_not_impl ,           &
-                                 Bprimej_x , Bprimej_y , right_term , scal_f, Zij, fric_val )
+    USE constitutive_2d, ONLY : erosion_coeff , settling_flag
+    USE constitutive_2d, ONLY : maximum_solid_packing
+    
+    USE geometry_2d, ONLY : deposit , erosion , erodible
+    USE geometry_2d, ONLY : B_zone
 
-                           END IF
+    USE constitutive_2d, ONLY : eval_mass_exchange_terms
 
-                           IF ( verbose_level .GE. 2 ) WRITE(*,*) 'after_lnsrch: scal_f',scal_f
+    USE constitutive_2d, ONLY : qc_to_qp , mixt_var
+    USE constitutive_2d, ONLY : entrainment_flag
+    USE parameters_2d, ONLY : topo_change_flag , bottom_radial_source_flag
+    USE parameters_2d, ONLY : erodible_deposit_flag
+    USE parameters_2d, ONLY : pore_pressure_flag
 
-                           qj = qj_rel * qj_org
+    IMPLICIT NONE
+    
+    REAL(wp), INTENT(IN) :: dt
 
-                           IF ( verbose_level .GE. 3 ) THEN
+    REAL(wp) :: erosion_term(n_solid)
+    REAL(wp) :: deposition_term(n_solid)
+    REAL(wp) :: continuous_phase_erosion_term
+    REAL(wp) :: continuous_phase_loss_term
+    REAL(wp) :: eqns_term(n_eqns)
+    REAL(wp) :: topo_term
 
-                              WRITE(*,*) 'qj',qj
+    REAL(wp) :: r_Ri , r_rho_m
+    REAL(wp) :: r_rho_c      !< real-value carrier phase density [kg/m3]
+    REAL(wp) :: r_red_grav   !< real-value reduced gravity
 
-                           END IF
+    INTEGER :: j,k,l
 
-                           IF ( MAXVAL( ABS( right_term(:) ) ) < TOLF ) THEN
+    REAL(wp) :: out_of_source_fraction
 
-                              IF ( verbose_level .GE. 3 ) WRITE(*,*) '1: check',check
-                              check= .FALSE.
-                              EXIT newton_raphson_loop
+    REAL(wp) :: p_dyn
 
-                           END IF
+    LOGICAL :: sp_flag
+    REAL(wp) :: r_sp_heat_c
+    REAL(wp) :: r_sp_heat_mix
 
-                           IF (check) THEN
+    sp_flag = .FALSE.
 
-                              check = ( MAXVAL( ABS(grad_f(:)) * MAX( ABS( qj_rel(:) ),1.0_wp ) /   &
-                                 MAX( scal_f , 0.5_wp * SIZE(qj_rel) ) )  < TOLMIN )
 
-                              IF ( verbose_level .GE. 3 ) WRITE(*,*) '2: check',check
-                              !          RETURN
+    IF ( ( erosion_coeff .EQ. 0.0_wp ) .AND. ( .NOT.settling_flag ) &
+         .AND. ( .NOT.pore_pressure_flag ) .AND. ( .NOT.entrainment_flag) ) RETURN
 
-                           END IF
+    !$OMP PARALLEL DO private(j,k,erosion_term,deposition_term,eqns_term,       &
+    !$OMP & topo_term,r_Ri,r_rho_m,r_rho_c,r_red_grav,                          &
+    !$OMP & continuous_phase_erosion_term,continuous_phase_loss_term)
 
-                           IF ( MAXVAL( ABS( qj_rel(:) - qj_rel_NR_old(:) ) / MAX( ABS( qj_rel(:)) ,&
-                              1.0_wp ) ) < TOLX ) THEN
+    DO l = 1,solve_cells
 
-                              IF ( verbose_level .GE. 3 ) WRITE(*,*) 'check',check
-                              EXIT newton_raphson_loop
+       j = j_cent(l)
+       k = k_cent(l)
 
-                           END IF
+       IF ( q(1,j,k) .GT. 0.0_wp ) THEN
 
-                        END DO newton_raphson_loop
+          CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
 
-                        RETURN
+       ELSE
 
-                     END SUBROUTINE solve_rk_step
+          qp(1:n_vars+2,j,k) = 0.0_wp
+          qp(4,j,k) = T_ambient
 
-                     !******************************************************************************
-                     !> \brief Search the descent stepsize
-                     !
-                     !> This subroutine search for the lenght of the descent step in order to have
-                     !> a decrease in the nonlinear function.
-                     !> \param[in]     qj_rel_NR_old
-                     !> \param[in]     qj_org
-                     !> \param[in]     qj_old
-                     !> \param[in]     scal_f_old
-                     !> \param[in]     grad_f
-                     !> \param[in,out] desc_dir
-                     !> \param[in]     coeff_f
-                     !> \param[out]    qj_rel
-                     !> \param[out]    scal_f
-                     !> \param[out]    right_term
-                     !> \param[in]     stpmax
-                     !> \param[out]    check
-                     !> \param[in]     RJ_not_impl
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !> \date 2019/12/16
-                     !******************************************************************************
+       END IF
 
-                     SUBROUTINE lnsrch( qj_rel_NR_old , qj_org , qj_old , scal_f_old , grad_f ,    &
-                        desc_dir , coeff_f , qj_rel , scal_f , right_term , stpmax , check ,     &
-                        Rj_not_impl , Bprimej_x , Bprimej_y, Zij, fric_val )
+       CALL eval_mass_exchange_terms( qp(1:n_vars+2,j,k) , B_zone(j,k) ,           &
+            B_prime_x_geom(j,k) , B_prime_y_geom(j,k) , erodible(1:n_solid,j,k) ,  &
+            dt , erosion_term , deposition_term , continuous_phase_erosion_term ,  &
+            continuous_phase_loss_term , eqns_term , topo_term  )
+          
+       IF ( bottom_radial_source_flag ) THEN
 
-                        IMPLICIT NONE
+          ! entrainment, erosion and deposition occurs only outside source
+          out_of_source_fraction = 1.0_wp - cell_source_fractions(j,k)
+          deposition_term = deposition_term * out_of_source_fraction
+          erosion_term = erosion_term * out_of_source_fraction
+          eqns_term = eqns_term * out_of_source_fraction
+          topo_term = topo_term * out_of_source_fraction
 
-                        !> Initial point
-                        REAL(wp), DIMENSION(:), INTENT(IN) :: qj_rel_NR_old
+       END IF
+       
+       IF ( verbose_level .GE. 2 ) THEN
 
-                        !> Initial point
-                        REAL(wp), DIMENSION(:), INTENT(IN) :: qj_org
+          WRITE(*,*) 'before update erosion/deposition: j,k,q(:,j,k),B(j,k)',   &
+               j,k,q(:,j,k),B_cent(j,k)
 
-                        !> Initial point
-                        REAL(wp), DIMENSION(:), INTENT(IN) :: qj_old
+       END IF
 
-                        !> Gradient at xold
-                        REAL(wp), DIMENSION(:), INTENT(IN) :: grad_f
+       ! Update the solution with erosion/deposition terms
+       q(1:n_eqns,j,k) = q(1:n_eqns,j,k) + dt * eqns_term(1:n_eqns)
+       q(5:4+n_solid,j,k) = MAX( 0.0_wp , q(5:4+n_solid,j,k) )
+       
+       deposit(j,k,1:n_solid) = deposit(j,k,1:n_solid)                          &
+            + dt * deposition_term(1:n_solid)
 
-                        !> Value of the function at xold
-                        REAL(wp), INTENT(IN) :: scal_f_old
+       erosion(j,k,1:n_solid) = erosion(j,k,1:n_solid)                          &
+            + dt * erosion_term(1:n_solid)
 
-                        !> Descent direction (usually Newton direction)
-                        REAL(wp), DIMENSION(:), INTENT(INOUT) :: desc_dir
+       erodible(1:n_solid,j,k) = erodible(1:n_solid,j,k)                        &
+            - dt * erosion_term(1:n_solid)
 
-                        REAL(wp), INTENT(IN) :: stpmax
+       IF ( erodible_deposit_flag ) THEN
 
-                        !> Coefficients to rescale the nonlinear function
-                        REAL(wp), DIMENSION(:), INTENT(IN) :: coeff_f
+          erodible(1:n_solid,j,k) = erodible(1:n_solid,j,k)                     &
+               + dt * deposition_term(1:n_solid)
 
-                        !> Updated solution
-                        REAL(wp), DIMENSION(:), INTENT(OUT) :: qj_rel
+       END IF
+       
+       ! Update the topography with erosion/deposition terms
+       IF ( topo_change_flag ) THEN
 
-                        !> Value of the scalar function at x
-                        REAL(wp), INTENT(OUT) :: scal_f
+          B_cent(j,k) = B_cent(j,k) + dt * topo_term
 
-                        !> Value of the scalar function at x
-                        REAL(wp), INTENT(OUT) :: right_term(n_eqns)
+       END IF
 
-                        !> Output quantity check is false on a normal exit
-                        LOGICAL, INTENT(OUT) :: check
+       negative_alpha_check:IF ( ANY(q(5:4+n_solid,j,k) .LT. 0.0_wp ) ) THEN
 
-                        REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns)
+          WRITE(*,*) 'WARNINIG: negative solid mass'
+          WRITE(*,*) 'j,k',j,k
+          WRITE(*,*) 'dt',dt
+          WRITE(*,*) 'before erosion: qc',q(1:n_vars,j,k) - dt * eqns_term(1:n_eqns)
+          WRITE(*,*) 'deposition_term',deposition_term
+          WRITE(*,*) 'erosion_term',erosion_term
+          WRITE(*,*) 'after erosion: qc',q(1:n_vars,j,k)
 
-                        REAL(wp), INTENT(IN) :: Bprimej_x
-                        REAL(wp), INTENT(IN) :: Bprimej_y
+          READ(*,*)
+          
+       END IF negative_alpha_check
+       
+       ! Check for negative thickness
+       IF ( q(1,j,k) .LE. 0.0_wp ) THEN
 
-                        ! vars for stochastic variable
-                        REAL(wp), INTENT(IN):: Zij ! value stochastic process
-                        REAL(wp), INTENT(OUT) :: fric_val ! to save the value of the friction
-                        REAL(wp), PARAMETER :: TOLX=epsilon(qj_rel)
+          IF ( q(1,j,k) .GT. -1.0E-10_wp ) THEN
 
-                        INTEGER, DIMENSION(1) :: ndum
-                        REAL(wp) :: ALF , a,alam,alam2,alamin,b,disc
-                        REAL(wp) :: scal_f2
-                        REAL(wp) :: desc_dir_abs
-                        REAL(wp) :: rhs1 , rhs2 , slope, tmplam
+             q(1:n_vars,j,k) = 0.0_wp
 
-                        REAL(wp) :: scal_f_min , alam_min
+          ELSE
 
-                        REAL(wp) :: qj(n_vars)
+             WRITE(*,*) 'j,k',j,k
+             WRITE(*,*) 'dt',dt
+             WRITE(*,*) 'before erosion'
+             WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
+             WRITE(*,*) 'q',q(1:n_eqns,j,k) - dt * eqns_term(1:n_eqns)
+             WRITE(*,*) 'deposition_term',deposition_term
+             WRITE(*,*) 'erosion_term',erosion_term
+             WRITE(*,*) 'continuous_phase_loss_term',continuous_phase_loss_term
+             WRITE(*,*) 'eqns_term',eqns_term
+             WRITE(*,*) 'after erosion'
+             CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+             WRITE(*,*) 'q',q(1:n_eqns,j,k)
+             WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
+                
+             READ(*,*)
 
-                        ALF = 1.0e-4_wp
+          END IF
 
-                        IF ( size(grad_f) == size(desc_dir) .AND. size(grad_f) == size(qj_rel)      &
-                           .AND. size(qj_rel) == size(qj_rel_NR_old) ) THEN
+       END IF
 
-                           ndum = size(grad_f)
+       IF ( SUM(q(5:4+n_solid,j,k)) .GT. q(1,j,k) ) THEN
 
-                        ELSE
+          IF ( q(1,j,k) .LT. 1.0e-10_wp ) THEN
 
-                           WRITE(*,*) 'nrerror: an assert_eq failed with this tag:', 'lnsrch'
-                           STOP 'program terminated by assert_eq4'
+             q(5:4+n_solid,j,k) = q(5:4+n_solid,j,k)                            &
+                  / SUM(q(5:4+n_solid,j,k)) * q(1,j,k)
+             
+          ELSE
 
-                        END IF
+             WRITE(*,*) 'SUM SOLID > TOT'
+             WRITE(*,*) 'j,k',j,k
+             WRITE(*,*) 'dt',dt
+             WRITE(*,*) 'before erosion'
+             WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
+             WRITE(*,*) 'q',q(1:n_eqns,j,k) - dt * eqns_term(1:n_eqns)
+             WRITE(*,*) 'deposition_term',deposition_term
+             WRITE(*,*) 'erosion_term',erosion_term
+             WRITE(*,*) 'continuous_phase_loss_term',continuous_phase_loss_term
+             WRITE(*,*) 'after erosion'
+             CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+             WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
+             WRITE(*,*) 'q',q(1:n_eqns,j,k)          
+             READ(*,*)
+             
+          END IF
 
-                        check = .FALSE.
+       END IF
 
-                        desc_dir_abs = NORM2(desc_dir)
 
-                        IF ( desc_dir_abs > stpmax ) desc_dir(:) = desc_dir(:) * stpmax/desc_dir_abs
+       IF ( q(1,j,k) .GT. 0.0_wp ) THEN
 
-                        slope = DOT_PRODUCT(grad_f,desc_dir)
+          CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+          CALL mixt_var(qp(1:n_vars+2,j,k),r_Ri,r_rho_m,r_rho_c,r_red_grav,     &
+               sp_flag,r_sp_heat_c,r_sp_heat_mix)
 
-                        alamin = TOLX / MAXVAL(ABS( desc_dir(:))/MAX( ABS(qj_rel_NR_old(:)),1.0_wp ))
+       ELSE
 
-                        IF ( alamin .EQ. 0.0_wp ) THEN
+          qp(1:n_vars+2,j,k) = 0.0_wp
+          qp(4,j,k) = T_ambient
+          r_red_grav = 0.0_wp
 
-                           qj_rel(:) = qj_rel_NR_old(:)
+       END IF
 
-                           RETURN
+       IF ( r_red_grav .LE. 0.0_wp ) THEN
 
-                        END IF
+          q(1:n_vars,j,k) = 0.0_wp
 
-                        alam = 1.0_wp
+       END IF
 
-                        scal_f_min = scal_f_old
+    END DO
 
-                        optimal_step_search: DO
+    !$OMP END PARALLEL DO
 
-                           IF ( verbose_level .GE. 4 ) THEN
+    RETURN
 
-                              WRITE(*,*) 'alam',alam
+  END SUBROUTINE update_erosion_deposition_cell
 
-                           END IF
+  !******************************************************************************
+  !> \brief Semidiscrete finite volume central scheme
+  !
+  !> This subroutine compute the divergence part of the system of the eqns,
+  !> with a modified version of the finite volume scheme from Kurganov et al.  
+  !> 2001, where the reconstruction at the cells interfaces is applied to a
+  !> set of physical variables derived from the conservative vriables.
+  !
+  !> \param[in]     q_expl         conservative variables
+  !> \param[in]     qp_expl        conservative variables
+  !> \param[out]    divFlux_iRK    divergence term
+  !
+  !> \date 07/10/2016
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !******************************************************************************
 
-                           qj_rel = qj_rel_NR_old + alam * desc_dir
+  SUBROUTINE eval_hyperbolic_terms( q_expl , qp_expl , divFlux_iRK )
 
-                           qj = qj_rel * qj_org
+    ! External variables
+    USE parameters_2d, ONLY : solver_scheme
 
-                           CALL eval_f( qj , qj_old , a_diag , coeff_f , Rj_not_impl , Bprimej_x ,  &
-                              Bprimej_y, right_term , scal_f, Zij, fric_val )
+    IMPLICIT NONE
 
-                           IF ( verbose_level .GE. 4 ) THEN
+    REAL(wp), INTENT(IN) :: q_expl(n_vars,comp_cells_x,comp_cells_y)
+    REAL(wp), INTENT(IN) :: qp_expl(n_vars+2,comp_cells_x,comp_cells_y)
+    REAL(wp), INTENT(OUT) :: divFlux_iRK(n_eqns,comp_cells_x,comp_cells_y)
 
-                              WRITE(*,*) 'lnsrch: effe_old,effe',scal_f_old,scal_f
-                              READ(*,*)
+    INTEGER :: l , i, j, k      !< loop counters
 
-                           END IF
+    !WRITE(*,*) 'SUBROUTINE eval_hyperbolic_terms'
+    !WRITE(*,*) 'qp_expl(4,1,1)',qp_expl(4,1,1)
+    !WRITE(*,*)
+    
+    ! Linear reconstruction of the physical variables at the interfaces
+    CALL reconstruction(q_expl,qp_expl)
 
-                           IF ( scal_f .LT. scal_f_min ) THEN
+    ! Evaluation of the maximum local speeds at the interfaces
+    CALL eval_speeds
 
-                              scal_f_min = scal_f
-                              alam_min = alam
+    ! Evaluation of the numerical fluxes
+    SELECT CASE ( solver_scheme )
 
-                           END IF
+    CASE ("LxF")
 
-                           IF ( scal_f .LE. 0.9_wp * scal_f_old ) THEN
-                              ! sufficient function decrease
+       CALL eval_flux_LxF
 
-                              IF ( verbose_level .GE. 4 ) THEN
+    CASE ("GFORCE")
 
-                                 WRITE(*,*) 'sufficient function decrease'
+       CALL eval_flux_GFORCE
 
-                              END IF
+    CASE ("KT")
 
-                              EXIT optimal_step_search
+       CALL eval_flux_KT
 
-                           ELSE IF ( alam < alamin ) THEN
-                              ! convergence on Delta_x
+    CASE ("UP")
 
-                              IF ( verbose_level .GE. 4 ) THEN
+       CALL eval_flux_UP
 
-                                 WRITE(*,*) ' convergence on Delta_x',alam,alamin
+    END SELECT
 
-                              END IF
+    !$OMP PARALLEL DO private(l,j,k,i)
 
-                              qj_rel(:) = qj_rel_NR_old(:)
-                              scal_f = scal_f_old
-                              check = .TRUE.
+    cells_loop:DO l = 1,solve_cells
 
-                              EXIT optimal_step_search
+       j = j_cent(l)
+       k = k_cent(l)
 
-                              !       ELSE IF ( scal_f .LE. scal_f_old + ALF * alam * slope ) THEN
-                           ELSE
+       DO i=1,n_eqns
 
-                              IF ( alam .EQ. 1.0_wp ) THEN
+          divFlux_iRK(i,j,k) = 0.0_wp
 
-                                 tmplam = - slope / ( 2.0_wp * ( scal_f - scal_f_old - slope ) )
+          IF ( comp_cells_x .GT. 1 ) THEN
 
-                              ELSE
+             divFlux_iRK(i,j,k) = divFlux_iRK(i,j,k) +                          &
+                  ( H_interface_x(i,j+1,k) - H_interface_x(i,j,k) ) * one_by_dx
 
-                                 rhs1 = scal_f - scal_f_old - alam*slope
-                                 rhs2 = scal_f2 - scal_f_old - alam2*slope
+          END IF
 
-                                 a = ( rhs1/alam**2 - rhs2/alam2**2 ) / ( alam - alam2 )
-                                 b = ( -alam2*rhs1/alam**2 + alam*rhs2/alam2**2 ) / ( alam - alam2 )
+          IF ( comp_cells_y .GT. 1 ) THEN
 
-                                 IF ( a .EQ. 0.0_wp ) THEN
+             divFlux_iRK(i,j,k) = divFlux_iRK(i,j,k) +                          &
+                  ( H_interface_y(i,j,k+1) - H_interface_y(i,j,k) ) * one_by_dy
 
-                                    tmplam = - slope / ( 2.0_wp * b )
+          END IF
 
-                                 ELSE
+       END DO
 
-                                    disc = b*b - 3.0_wp*a*slope
+    END DO cells_loop
 
-                                    IF ( disc .LT. 0.0_wp ) THEN
+    !$OMP END PARALLEL DO
 
-                                       tmplam = 0.5_wp * alam
+    RETURN
 
-                                    ELSE IF ( b .LE. 0.0_wp ) THEN
+  END SUBROUTINE eval_hyperbolic_terms
 
-                                       tmplam = ( - b + SQRT(disc) ) / ( 3.0_wp * a )
+  !******************************************************************************
+  !> \brief Upwind numerical fluxes
+  !
+  !> This subroutine evaluates the numerical fluxes H at the 
+  !> cells interfaces with an upwind discretization.
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !> \date 2019/11/16
+  !******************************************************************************
+  
+  SUBROUTINE eval_flux_UP
 
-                                    ELSE
+    ! External procedures
+    USE constitutive_2d, ONLY : eval_fluxes
+    USE geometry_2d, ONLY : grav_coeff_stag_x , grav_coeff_stag_y
 
-                                       tmplam = - slope / ( b + SQRT(disc) )
+    IMPLICIT NONE
 
-                                    ENDIF
+    REAL(wp) :: fluxL(n_eqns)           !< Numerical fluxes from the eqns 
+    REAL(wp) :: fluxR(n_eqns)           !< Numerical fluxes from the eqns
+    REAL(wp) :: fluxB(n_eqns)           !< Numerical fluxes from the eqns 
+    REAL(wp) :: fluxT(n_eqns)           !< Numerical fluxes from the eqns
 
-                                 END IF
+    INTEGER :: j,k,l                  !< Loop counters
 
-                                 IF ( tmplam .GT. 0.5_wp * alam ) tmplam = 0.5_wp * alam
+    H_interface_x = 0.0_wp
+    H_interface_y = 0.0_wp
 
-                              END IF
+    IF ( comp_cells_x .GT. 1 ) THEN
 
-                           END IF
+       !$OMP PARALLEL DO private(l,j,k,fluxL,fluxR)
 
-                           alam2 = alam
-                           scal_f2 = scal_f
-                           alam = MAX( tmplam , 0.5_wp * alam )
+       DO l = 1,solve_interfaces_x
 
-                        END DO optimal_step_search
+          j = j_stag_x(l)
+          k = k_stag_x(l)
 
-                        RETURN
+          CALL eval_fluxes( q_interfaceL(1:n_vars,j,k) ,                        &
+               qp_interfaceL(1:n_vars+2,j,k) , B_prime_x_geom(j-1,k) ,          &
+               B_prime_y_geom(j-1,k) , grav_coeff_stag_x(j,k) , 1 , fluxL )
 
-                     END SUBROUTINE lnsrch
+          CALL eval_fluxes( q_interfaceR(1:n_vars,j,k) ,                        &
+               qp_interfaceR(1:n_vars+2,j,k) , B_prime_x_geom(j,k) ,            &
+               B_prime_y_geom(j,k) , grav_coeff_stag_x(j,k) , 1 , fluxR )
 
-                     !******************************************************************************
-                     !> \brief Evaluate the nonlinear system
-                     !
-                     !> This subroutine evaluate the value of the nonlinear system in the state
-                     !> defined by the variables qj.
-                     !> \param[in]    qj          conservative variables
-                     !> \param[in]    qj_old      conservative variables at the old time step
-                     !> \param[in]    a_diag      implicit coefficient for the non-hyperbolic term
-                     !> \param[in]    coeff_f     coefficient to rescale the nonlinear functions
-                     !> \param[in]    Rj_not_impl explicit terms
-                     !> \param[out]   f_nl        values of the nonlinear functions
-                     !> \param[out]   scal_f      value of the scalar function f=0.5*<F,F>
-                     !> \date 2019/12/16
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !******************************************************************************
+          IF ( ( qp_interfaceL(n_vars+1,j,k) .GT. 0.0_wp ) .AND.                &
+               ( qp_interfaceR(n_vars+1,j,k) .GE. 0.0_wp ) ) THEN
 
-                     SUBROUTINE eval_f( qj , qj_old , a_diag , coeff_f , Rj_not_impl , Bprimej_x , &
-                        Bprimej_y , f_nl , scal_f, Zij, fric_val )
+             H_interface_x(:,j,k) = fluxL
 
-                        USE constitutive_2d, ONLY : eval_implicit_terms
+          ELSEIF ( ( qp_interfaceL(n_vars+1,j,k) .LE. 0.0_wp ) .AND.            &
+               ( qp_interfaceR(n_vars+1,j,k) .LT. 0.0_wp ) ) THEN
 
-                        IMPLICIT NONE
+             H_interface_x(:,j,k) = fluxR
 
-                        REAL(wp), INTENT(IN) :: qj(n_vars)
-                        REAL(wp), INTENT(IN) :: qj_old(n_vars)
-                        REAL(wp), INTENT(IN) :: a_diag
-                        REAL(wp), INTENT(IN) :: coeff_f(n_eqns)
-                        REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns)
+          ELSE
 
-                        REAL(wp), INTENT(IN) :: Bprimej_x
-                        REAL(wp), INTENT(IN) :: Bprimej_y
+             H_interface_x(:,j,k) = 0.5_wp * ( fluxL + fluxR )
 
+          END IF
 
-                        REAL(wp), INTENT(OUT) :: f_nl(n_eqns)
-                        REAL(wp), INTENT(OUT) :: scal_f
+          IF ( (  q_interfaceL(n_vars+1,j,k) .EQ. 0.0_wp ) .AND.                &
+               (  q_interfaceR(n_vars+1,j,k) .EQ. 0.0_wp ) ) THEN
 
-                        REAL(wp), INTENT(IN):: Zij ! value stochastic process
-                        REAL(wp), INTENT(OUT) :: fric_val ! to save the value of the friction
+             H_interface_x(1,j,k) = 0.0_wp
+             H_interface_x(4:n_vars,j,k) = 0.0_wp
 
-                        REAL(wp) :: nh_term_impl(n_eqns)
-                        REAL(wp) :: Rj(n_eqns)
+          END IF
+               
+       END DO
 
-                        CALL eval_implicit_terms( Bprimej_x , Bprimej_y, Zij, fric_val, r_qj = qj , &
-                           r_nh_term_impl=nh_term_impl )
+       !$OMP END PARALLEL DO
 
-                        Rj = Rj_not_impl - a_diag * nh_term_impl
+    END IF
 
-                        f_nl = qj - qj_old + dt * Rj
+    IF ( comp_cells_y .GT. 1 ) THEN
 
-                        f_nl = coeff_f * f_nl
+       !$OMP PARALLEL DO private(l,j,k,fluxB,fluxT)
+       
+       DO l = 1,solve_interfaces_y
 
-                        scal_f = 0.5_wp * DOT_PRODUCT( f_nl , f_nl )
+          j = j_stag_y(l)
+          k = k_stag_y(l)
 
-                        RETURN
+          CALL eval_fluxes( q_interfaceB(1:n_vars,j,k) ,                        &
+               qp_interfaceB(1:n_vars+2,j,k) , B_prime_x_geom(j,k-1) ,          &
+               B_prime_y_geom(j,k-1) , grav_coeff_stag_y(j,k) , 2 , fluxB )
 
-                     END SUBROUTINE eval_f
+          CALL eval_fluxes( q_interfaceT(1:n_vars,j,k) ,                        &
+               qp_interfaceT(1:n_vars+2,j,k) , B_prime_x_geom(j,k) ,            &
+               B_prime_y_geom(j,k) , grav_coeff_stag_y(j,k) , 2 , fluxT )
 
-                     !******************************************************************************
-                     !> \brief Evaluate the jacobian
-                     !
-                     !> This subroutine evaluate the jacobian of the non-linear system
-                     !> with respect to the conservative variables.
-                     !
-                     !> \param[in]    qj_rel        relative variation (qj=qj_rel*qj_org)
-                     !> \param[in]    qj_org        conservative variables at the old time step
-                     !> \param[in]    coeff_f       coefficient to rescale the nonlinear functions
-                     !> \param[out]   left_matrix   matrix from the linearization of the system
-                     !
-                     !> \date 07/10/2016
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !******************************************************************************
+          IF ( ( q_interfaceB(3,j,k) .GT. 0.0_wp ) .AND.                        &
+               ( q_interfaceT(3,j,k) .GE. 0.0_wp ) ) THEN
 
-                     SUBROUTINE eval_jacobian( qj_rel , qj_org , coeff_f, Bprimej_x , Bprimej_y ,  &
-                        left_matrix, Zij, fric_val)
+             H_interface_y(:,j,k) = fluxB
 
-                        USE constitutive_2d, ONLY : eval_implicit_terms
+          ELSEIF ( ( q_interfaceB(3,j,k) .LE. 0.0_wp ) .AND.                    &
+               ( q_interfaceT(3,j,k) .LT. 0.0_wp ) ) THEN
 
-                        IMPLICIT NONE
+             H_interface_y(:,j,k) = fluxT
 
-                        REAL(wp), INTENT(IN) :: qj_rel(n_vars)
-                        REAL(wp), INTENT(IN) :: qj_org(n_vars)
-                        REAL(wp), INTENT(IN) :: coeff_f(n_eqns)
+          ELSE
 
-                        REAL(wp), INTENT(IN) :: Bprimej_x
-                        REAL(wp), INTENT(IN) :: Bprimej_y
+             H_interface_y(:,j,k) = 0.5_wp * ( fluxB + fluxT )
 
-                        REAL(wp), INTENT(OUT) :: left_matrix(n_eqns,n_vars)
+          END IF
 
-                        REAL(wp), INTENT(IN):: Zij ! value stochastic process
-                        REAL(wp), INTENT(OUT) :: fric_val ! to save the value of the friction
+          ! In the equation for mass and for trasnport (T,alphas) if the 
+          ! velocities at the interfaces are null, then the flux is null
+          IF ( (  q_interfaceB(3,j,k) .EQ. 0.0_wp ) .AND.                       &
+               (  q_interfaceT(3,j,k) .EQ. 0.0_wp ) ) THEN
 
-                        REAL(wp) :: Jacob_relax(n_eqns,n_vars)
-                        COMPLEX(wp) :: nh_terms_cmplx_impl(n_eqns)
-                        COMPLEX(wp) :: qj_cmplx(n_vars) , qj_rel_cmplx(n_vars)
-                        COMPLEX(wp) :: qj_rel_cmplx_init(n_vars)
+             H_interface_y(1,j,k) = 0.0_wp
+             H_interface_y(4:n_vars,j,k) = 0.0_wp
 
-                        INTEGER :: i
+          END IF
+          
+       END DO
 
-                        ! initialize the matrix of the linearized system and the Jacobian
+       !$OMP END PARALLEL DO
+       
+    END IF
 
-                        left_matrix(1:n_eqns,1:n_vars) = 0.0_wp
-                        Jacob_relax(1:n_eqns,1:n_vars) = 0.0_wp
+    RETURN
 
-                        ! evaluate the jacobian of the non-hyperbolic terms
+  END SUBROUTINE eval_flux_UP
 
-                        DO i=1,n_vars
 
-                           qj_rel_cmplx_init(i) = CMPLX(qj_rel(i),0.0_wp,wp)
+  !******************************************************************************
+  !> \brief Semidiscrete numerical fluxes
+  !
+  !> This subroutine evaluates the numerical fluxes H at the 
+  !> cells interfaces according to Kurganov et al. 2001. 
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !> \date 16/08/2011
+  !******************************************************************************
 
-                        END DO
+  SUBROUTINE eval_flux_KT
 
-                        DO i=1,n_vars
+    ! External procedures
+    USE constitutive_2d, ONLY : eval_fluxes
+    USE geometry_2d, ONLY : grav_coeff_stag_x , grav_coeff_stag_y
 
-                           left_matrix(i,i) = coeff_f(i) * qj_org(i)
+    IMPLICIT NONE
 
-                           IF ( implicit_flag(i) ) THEN
+    REAL(wp) :: fluxL(n_eqns)           !< Numerical fluxes from the eqns 
+    REAL(wp) :: fluxR(n_eqns)           !< Numerical fluxes from the eqns
+    REAL(wp) :: fluxB(n_eqns)           !< Numerical fluxes from the eqns 
+    REAL(wp) :: fluxT(n_eqns)           !< Numerical fluxes from the eqns
 
-                              qj_rel_cmplx(1:n_vars) = qj_rel_cmplx_init(1:n_vars)
-                              qj_rel_cmplx(i) = CMPLX(qj_rel(i), h,wp)
+    REAL(wp) :: flux_avg_x(n_eqns)   
+    REAL(wp) :: flux_avg_y(n_eqns)   
 
-                              qj_cmplx = qj_rel_cmplx * qj_org
+    INTEGER :: i,j,k,l                  !< Loop counters
 
-                              CALL eval_implicit_terms( Bprimej_x , Bprimej_y, Zij, fric_val,       &
-                                 c_qj = qj_cmplx , c_nh_term_impl = nh_terms_cmplx_impl )
+    ! WRITE(*,*) 'eval_flux_KT: qp_interfaceR(1,1,1)',qp_interfaceR(1,1,1)
 
-                              Jacob_relax(1:n_eqns,i) = coeff_f(i) *                                &
-                                 AIMAG(nh_terms_cmplx_impl) * one_by_h
 
-                              left_matrix(1:n_eqns,i) = left_matrix(1:n_eqns,i) - dt * a_diag       &
-                                 * Jacob_relax(1:n_eqns,i)
+    !H_interface_x = 0.0_wp
+    !H_interface_y = 0.0_wp
 
-                           END IF
+    !$OMP PARALLEL
 
-                        END DO
+    IF ( comp_cells_x .GT. 1 ) THEN
 
-                        RETURN
+       !$OMP DO private(j,k,i,fluxL,fluxR,flux_avg_x)
 
-                     END SUBROUTINE eval_jacobian
+       x_interfaces_loop:DO l = 1,solve_interfaces_x
 
-                     !******************************************************************************
-                     !> \brief Evaluate the eroion/deposition terms
-                     !
-                     !> This subroutine update the solution and the topography computing the
-                     !> erosion and deposition terms and the solution only because of entrainment.
-                     !
-                     !> \param[in]    dt      time step
-                     !
-                     !> \date 2019/11/08
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !******************************************************************************
+          j = j_stag_x(l)
+          k = k_stag_x(l)
 
-                     SUBROUTINE update_erosion_deposition_cell(dt)
+          CALL eval_fluxes( q_interfaceL(1:n_vars,j,k) ,                        &
+               qp_interfaceL(1:n_vars+2,j,k) ,                                  &
+               B_prime_x_geom(MAX(1,j-1),MIN(k,comp_cells_y)) ,                 &
+               B_prime_y_geom(MAX(1,j-1),MIN(k,comp_cells_y)) ,                 &
+               grav_coeff_stag_x(j,k) , 1 , fluxL )
 
-                        USE constitutive_2d, ONLY : erosion_coeff , settling_flag
-                        USE constitutive_2d, ONLY : maximum_solid_packing
+          CALL eval_fluxes( q_interfaceR(1:n_vars,j,k) ,                        &
+               qp_interfaceR(1:n_vars+2,j,k) ,                                  &
+               B_prime_x_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
+               B_prime_y_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
+               grav_coeff_stag_x(j,k) , 1 , fluxR )
 
-                        USE geometry_2d, ONLY : deposit , erosion , erodible
-                        USE geometry_2d, ONLY : B_zone
+          ! First term in Eq. 25 GMD paper
+          CALL average_KT( a_interface_xNeg(:,j,k), a_interface_xPos(:,j,k) ,   &
+               fluxL , fluxR , flux_avg_x )
 
-                        USE constitutive_2d, ONLY : eval_mass_exchange_terms
+          eqns_loop:DO i=1,n_eqns
 
-                        USE constitutive_2d, ONLY : qc_to_qp , mixt_var
-                        USE constitutive_2d, ONLY : entrainment_flag
-                        USE parameters_2d, ONLY : topo_change_flag , bottom_radial_source_flag
-                        USE parameters_2d, ONLY : erodible_deposit_flag
-                        USE parameters_2d, ONLY : pore_pressure_flag
+             IF ( a_interface_xNeg(i,j,k) .EQ. a_interface_xPos(i,j,k) ) THEN
 
-                        IMPLICIT NONE
+                H_interface_x(i,j,k) = 0.0_wp
 
-                        REAL(wp), INTENT(IN) :: dt
+             ELSE
 
-                        REAL(wp) :: erosion_term(n_solid)
-                        REAL(wp) :: deposition_term(n_solid)
-                        REAL(wp) :: continuous_phase_erosion_term
-                        REAL(wp) :: continuous_phase_loss_term
-                        REAL(wp) :: eqns_term(n_eqns)
-                        REAL(wp) :: topo_term
+                ! Eq. 25 from GMD paper
+                H_interface_x(i,j,k) = flux_avg_x(i)                            &
+                     + ( a_interface_xPos(i,j,k) * a_interface_xNeg(i,j,k) )    &
+                     / ( a_interface_xPos(i,j,k) - a_interface_xNeg(i,j,k) )    &
+                     * ( q_interfaceR(i,j,k) - q_interfaceL(i,j,k) )             
 
-                        REAL(wp) :: r_Ri , r_rho_m
-                        REAL(wp) :: r_rho_c      !< real-value carrier phase density [kg/m3]
-                        REAL(wp) :: r_red_grav   !< real-value reduced gravity
+             END IF
 
-                        INTEGER :: j,k,l
+          ENDDO eqns_loop
 
-                        REAL(wp) :: out_of_source_fraction
+          ! Fix to avoid sum of solid fluxes larger tham flux for mixture
+          IF ( ( SUM(H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k)) / &
+               H_interface_x(1,j,k) ) .GE. 1.0_wp ) THEN
 
-                        REAL(wp) :: p_dyn
+             H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k) =          &
+                  H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k) /     &
+                  ( SUM(H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k) &
+                  / H_interface_x(1,j,k) ) )
 
-                        LOGICAL :: sp_flag
-                        REAL(wp) :: r_sp_heat_c
-                        REAL(wp) :: r_sp_heat_mix
+          END IF
+          
+          ! In the equation for mass and for trasnport (T,alphas) if the 
+          ! velocities at the interfaces are null, then the flux is null
+          IF ( (  qp_interfaceL(2,j,k) .EQ. 0.0_wp ) .AND.                      &
+               (  qp_interfaceR(2,j,k) .EQ. 0.0_wp ) ) THEN
 
-                        sp_flag = .FALSE.
+             H_interface_x(1,j,k) = 0.0_wp
+             H_interface_x(4:n_vars,j,k) = 0.0_wp
 
+          END IF
+          
+       END DO x_interfaces_loop
+       
+       !$OMP END DO NOWAIT
 
-                        IF ( ( erosion_coeff .EQ. 0.0_wp ) .AND. ( .NOT.settling_flag ) &
-                           .AND. ( .NOT.pore_pressure_flag ) .AND. ( .NOT.entrainment_flag) ) RETURN
+    END IF
 
-                        !$OMP PARALLEL DO private(j,k,erosion_term,deposition_term,eqns_term,       &
-                        !$OMP & topo_term,r_Ri,r_rho_m,r_rho_c,r_red_grav,                          &
-                        !$OMP & continuous_phase_erosion_term,continuous_phase_loss_term)
+    IF ( comp_cells_y .GT. 1 ) THEN
 
-                        DO l = 1,solve_cells
+       !$OMP DO private(j,k,i,fluxB,fluxT,flux_avg_y)
+       
+       y_interfaces_loop:DO l = 1,solve_interfaces_y
 
-                           j = j_cent(l)
-                           k = k_cent(l)
+          j = j_stag_y(l)
+          k = k_stag_y(l)
 
-                           IF ( q(1,j,k) .GT. 0.0_wp ) THEN
+          CALL eval_fluxes( q_interfaceB(1:n_vars,j,k) ,                        &
+               qp_interfaceB(1:n_vars+2,j,k) ,                                  &
+               B_prime_x_geom(MIN(j,comp_cells_x),MAX(1,k-1)) ,                 &
+               B_prime_y_geom(MIN(j,comp_cells_x),MAX(1,k-1)) ,                 &
+               grav_coeff_stag_y(j,k) , 2 , fluxB )
 
-                              CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+          CALL eval_fluxes( q_interfaceT(1:n_vars,j,k) ,                        &
+               qp_interfaceT(1:n_vars+2,j,k) ,                                  &
+               B_prime_x_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
+               B_prime_y_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
+               grav_coeff_stag_y(j,k) , 2 , fluxT )
+          
+          CALL average_KT( a_interface_yNeg(:,j,k) ,                            &
+               a_interface_yPos(:,j,k) , fluxB , fluxT , flux_avg_y )
 
-                           ELSE
+          DO i=1,n_eqns
 
-                              qp(1:n_vars+2,j,k) = 0.0_wp
-                              qp(4,j,k) = T_ambient
+             IF ( a_interface_yNeg(i,j,k) .EQ. a_interface_yPos(i,j,k) ) THEN
 
-                           END IF
+                H_interface_y(i,j,k) = 0.0_wp
 
-                           CALL eval_mass_exchange_terms( qp(1:n_vars+2,j,k) , B_zone(j,k) ,           &
-                              B_prime_x_geom(j,k) , B_prime_y_geom(j,k) , erodible(1:n_solid,j,k) ,  &
-                              dt , erosion_term , deposition_term , continuous_phase_erosion_term ,  &
-                              continuous_phase_loss_term , eqns_term , topo_term  )
+             ELSE
 
-                           IF ( bottom_radial_source_flag ) THEN
+                H_interface_y(i,j,k) = flux_avg_y(i)                            &
+                     + ( a_interface_yPos(i,j,k) * a_interface_yNeg(i,j,k) )    &
+                     / ( a_interface_yPos(i,j,k) - a_interface_yNeg(i,j,k) )    &
+                     * ( q_interfaceT(i,j,k) - q_interfaceB(i,j,k) )             
 
-                              ! entrainment, erosion and deposition occurs only outside source
-                              out_of_source_fraction = 1.0_wp - cell_source_fractions(j,k)
-                              deposition_term = deposition_term * out_of_source_fraction
-                              erosion_term = erosion_term * out_of_source_fraction
-                              eqns_term = eqns_term * out_of_source_fraction
-                              topo_term = topo_term * out_of_source_fraction
+             END IF
 
-                           END IF
+          END DO
 
-                           IF ( verbose_level .GE. 2 ) THEN
+          ! Fix to avoid sum of solid fluxes larger tham flux for mixture
+          IF ( ( SUM(H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k)) / &
+               H_interface_y(1,j,k) ) .GT. 1.0_wp ) THEN
 
-                              WRITE(*,*) 'before update erosion/deposition: j,k,q(:,j,k),B(j,k)',   &
-                                 j,k,q(:,j,k),B_cent(j,k)
+             H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k) =          &
+                  H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k) /     &
+                  ( SUM(H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k))&
+                  / H_interface_y(1,j,k) )
 
-                           END IF
+          END IF
+          
+          ! In the equation for mass and for trasnport (T,alphas) if the 
+          ! velocities at the interfaces are null, then the flux is null
+          IF ( (  q_interfaceB(3,j,k) .EQ. 0.0_wp ) .AND.                       &
+               (  q_interfaceT(3,j,k) .EQ. 0.0_wp ) ) THEN
 
-                           ! Update the solution with erosion/deposition terms
-                           q(1:n_eqns,j,k) = q(1:n_eqns,j,k) + dt * eqns_term(1:n_eqns)
-                           q(5:4+n_solid,j,k) = MAX( 0.0_wp , q(5:4+n_solid,j,k) )
+             H_interface_y(1,j,k) = 0.0_wp
+             H_interface_y(4:n_vars,j,k) = 0.0_wp
 
-                           deposit(j,k,1:n_solid) = deposit(j,k,1:n_solid)                          &
-                              + dt * deposition_term(1:n_solid)
+          END IF
 
-                           erosion(j,k,1:n_solid) = erosion(j,k,1:n_solid)                          &
-                              + dt * erosion_term(1:n_solid)
+       END DO y_interfaces_loop
+       
+       !$OMP END DO
 
-                           erodible(1:n_solid,j,k) = erodible(1:n_solid,j,k)                        &
-                              - dt * erosion_term(1:n_solid)
+    END IF
 
-                           IF ( erodible_deposit_flag ) THEN
+    !$OMP END PARALLEL
 
-                              erodible(1:n_solid,j,k) = erodible(1:n_solid,j,k)                     &
-                                 + dt * deposition_term(1:n_solid)
+    RETURN
+    
+  END SUBROUTINE eval_flux_KT
 
-                           END IF
+  !******************************************************************************
+  !> \brief averaged KT flux
+  !
+  !> This subroutine compute n averaged flux from the fluxes at the two sides of
+  !> a cell interface and the max an min speed at the two sides.
+  !> \param[in]     a1            speed at one side of the interface
+  !> \param[in]     a2            speed at the other side of the interface
+  !> \param[in]     w1            fluxes at one side of the interface
+  !> \param[in]     w2            fluxes at the other side of the interface
+  !> \param[out]    w_avg         array of averaged fluxes
+  !> \date 2019/12/13
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !******************************************************************************
 
-                           ! Update the topography with erosion/deposition terms
-                           IF ( topo_change_flag ) THEN
+  SUBROUTINE average_KT( a1 , a2 , w1 , w2 , w_avg )
 
-                              B_cent(j,k) = B_cent(j,k) + dt * topo_term
+    IMPLICIT NONE
 
-                           END IF
+    REAL(wp), INTENT(IN) :: a1(:) , a2(:)
+    REAL(wp), INTENT(IN) :: w1(:) , w2(:)
+    REAL(wp), INTENT(OUT) :: w_avg(:)
 
-                           negative_alpha_check:IF ( ANY(q(5:4+n_solid,j,k) .LT. 0.0_wp ) ) THEN
+    INTEGER :: n
+    INTEGER :: i 
 
-                              WRITE(*,*) 'WARNINIG: negative solid mass'
-                              WRITE(*,*) 'j,k',j,k
-                              WRITE(*,*) 'dt',dt
-                              WRITE(*,*) 'before erosion: qc',q(1:n_vars,j,k) - dt * eqns_term(1:n_eqns)
-                              WRITE(*,*) 'deposition_term',deposition_term
-                              WRITE(*,*) 'erosion_term',erosion_term
-                              WRITE(*,*) 'after erosion: qc',q(1:n_vars,j,k)
+    n = SIZE( a1 )
 
-                              READ(*,*)
+    DO i=1,n
 
-                           END IF negative_alpha_check
+       IF ( a1(i) .EQ. a2(i) ) THEN
 
-                           ! Check for negative thickness
-                           IF ( q(1,j,k) .LE. 0.0_wp ) THEN
+          w_avg(i) = 0.5_wp * ( w1(i) + w2(i) )
+          w_avg(i) = 0.0_wp
 
-                              IF ( q(1,j,k) .GT. -1.0E-10_wp ) THEN
+       ELSE
 
-                                 q(1:n_vars,j,k) = 0.0_wp
+          w_avg(i) = ( a2(i) * w1(i) - a1(i) * w2(i) ) / ( a2(i) - a1(i) )  
 
-                              ELSE
+       END IF
 
-                                 WRITE(*,*) 'j,k',j,k
-                                 WRITE(*,*) 'dt',dt
-                                 WRITE(*,*) 'before erosion'
-                                 WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
-                                 WRITE(*,*) 'q',q(1:n_eqns,j,k) - dt * eqns_term(1:n_eqns)
-                                 WRITE(*,*) 'deposition_term',deposition_term
-                                 WRITE(*,*) 'erosion_term',erosion_term
-                                 WRITE(*,*) 'continuous_phase_loss_term',continuous_phase_loss_term
-                                 WRITE(*,*) 'eqns_term',eqns_term
-                                 WRITE(*,*) 'after erosion'
-                                 CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-                                 WRITE(*,*) 'q',q(1:n_eqns,j,k)
-                                 WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
+    END DO
 
-                                 READ(*,*)
+    RETURN
+    
+  END SUBROUTINE average_KT
 
-                              END IF
+  !******************************************************************************
+  !> \brief Numerical fluxes GFORCE
+  !> \date 07/10/2016
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !******************************************************************************
 
-                           END IF
+  SUBROUTINE eval_flux_GFORCE
 
-                           IF ( SUM(q(5:4+n_solid,j,k)) .GT. q(1,j,k) ) THEN
+    ! to be implemented
+    WRITE(*,*) 'method not yet implemented in 2-d case'
 
-                              IF ( q(1,j,k) .LT. 1.0e-10_wp ) THEN
+  END SUBROUTINE eval_flux_GFORCE
 
-                                 q(5:4+n_solid,j,k) = q(5:4+n_solid,j,k)                            &
-                                    / SUM(q(5:4+n_solid,j,k)) * q(1,j,k)
+  !******************************************************************************
+  !> \brief Numerical fluxes Lax-Friedrichs
+  !> \date 07/10/2016
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !******************************************************************************
 
-                              ELSE
+  SUBROUTINE eval_flux_LxF
 
-                                 WRITE(*,*) 'SUM SOLID > TOT'
-                                 WRITE(*,*) 'j,k',j,k
-                                 WRITE(*,*) 'dt',dt
-                                 WRITE(*,*) 'before erosion'
-                                 WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
-                                 WRITE(*,*) 'q',q(1:n_eqns,j,k) - dt * eqns_term(1:n_eqns)
-                                 WRITE(*,*) 'deposition_term',deposition_term
-                                 WRITE(*,*) 'erosion_term',erosion_term
-                                 WRITE(*,*) 'continuous_phase_loss_term',continuous_phase_loss_term
-                                 WRITE(*,*) 'after erosion'
-                                 CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-                                 WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
-                                 WRITE(*,*) 'q',q(1:n_eqns,j,k)
-                                 READ(*,*)
+    ! to be implemented
+    WRITE(*,*) 'method not yet implemented in 2-d case'
 
-                              END IF
+  END SUBROUTINE eval_flux_LxF
 
-                           END IF
 
+  !******************************************************************************
+  !> \brief Linear reconstruction
+  !
+  !> In this subroutine a linear reconstruction with slope limiters is
+  !> applied to a set of variables describing the state of the system.
+  !> In this way the values at the two sides of each cell interface are computed.
+  !> This subroutine is also used for the boundary condition, when the
+  !> reconstruction at the boundary interfaces are computed.
+  !> \param[in]     q_expl         center values of the conservative variables
+  !> \param[in]     qp_expl        center values of the physical variables
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !> \date 2019/11/11
+  !******************************************************************************
 
-                           IF ( q(1,j,k) .GT. 0.0_wp ) THEN
+  SUBROUTINE reconstruction(q_expl,qp_expl)
 
-                              CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-                              CALL mixt_var(qp(1:n_vars+2,j,k),r_Ri,r_rho_m,r_rho_c,r_red_grav,     &
-                                 sp_flag,r_sp_heat_c,r_sp_heat_mix)
+    ! External procedures
+    USE constitutive_2d, ONLY : qc_to_qp , qp_to_qc ,qp_to_qp2
+    USE constitutive_2d, ONLY : eval_source_bdry
+    USE parameters_2d, ONLY : limiter
 
-                           ELSE
+    ! External variables
+    USE constitutive_2d, ONLY : maximum_solid_packing
 
-                              qp(1:n_vars+2,j,k) = 0.0_wp
-                              qp(4,j,k) = T_ambient
-                              r_red_grav = 0.0_wp
+    USE geometry_2d, ONLY : x_comp , x_stag , y_comp , y_stag , dx2 , dy2
 
-                           END IF
+    USE geometry_2d, ONLY : sourceW , sourceE , sourceN , sourceS
+    USE geometry_2d, ONLY : sourceW_vect_x , sourceW_vect_y
+    USE geometry_2d, ONLY : sourceE_vect_x , sourceE_vect_y
+    USE geometry_2d, ONLY : sourceN_vect_x , sourceN_vect_y
+    USE geometry_2d, ONLY : sourceS_vect_x , sourceS_vect_y
 
-                           IF ( r_red_grav .LE. 0.0_wp ) THEN
+    USE parameters_2d, ONLY : alpha_flag
+    USE parameters_2d, ONLY : reconstr_coeff
 
-                              q(1:n_vars,j,k) = 0.0_wp
+    USE geometry_2d, ONLY : minmod
 
-                           END IF
+    IMPLICIT NONE
 
-                        END DO
+    REAL(wp), INTENT(IN) :: q_expl(:,:,:)
+    REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
 
-                        !$OMP END PARALLEL DO
+    REAL(wp) :: qrecW(n_vars+2) !< recons var at the west edge of the cells
+    REAL(wp) :: qrecE(n_vars+2) !< recons var at the east edge of the cells
+    REAL(wp) :: qrecS(n_vars+2) !< recons var at the south edge of the cells
+    REAL(wp) :: qrecN(n_vars+2) !< recons var at the north edge of the cells
 
-                        RETURN
+    REAL(wp) :: source_bdry(n_vars+2)
+    REAL(wp) :: qrec_prime_x(n_vars+2)      !< recons variables slope
+    REAL(wp) :: qrec_prime_y(n_vars+2)      !< recons variables slope
 
-                     END SUBROUTINE update_erosion_deposition_cell
+    REAL(wp) :: qp2recW(3) , qp2recE(3)
+    REAL(wp) :: qp2recS(3) , qp2recN(3) 
 
-                     !******************************************************************************
-                     !> \brief Semidiscrete finite volume central scheme
-                     !
-                     !> This subroutine compute the divergence part of the system of the eqns,
-                     !> with a modified version of the finite volume scheme from Kurganov et al.
-                     !> 2001, where the reconstruction at the cells interfaces is applied to a
-                     !> set of physical variables derived from the conservative vriables.
-                     !
-                     !> \param[in]     q_expl         conservative variables
-                     !> \param[in]     qp_expl        conservative variables
-                     !> \param[out]    divFlux_iRK    divergence term
-                     !
-                     !> \date 07/10/2016
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !******************************************************************************
+    REAL(wp) :: qrec_stencil(3) !< recons variables stencil for the limiter
+    REAL(wp) :: x_stencil(3)    !< grid stencil for the limiter
+    REAL(wp) :: y_stencil(3)    !< grid stencil for the limiter
 
-                     SUBROUTINE eval_hyperbolic_terms( q_expl , qp_expl , divFlux_iRK )
+    INTEGER :: l,j,k            !< loop counters (cells)
+    INTEGER :: i                !< loop counter (variables)
 
-                        ! External variables
-                        USE parameters_2d, ONLY : solver_scheme
+    REAL(wp) :: dq
 
-                        IMPLICIT NONE
+    LOGICAL :: diverging_flag
 
-                        REAL(wp), INTENT(IN) :: q_expl(n_vars,comp_cells_x,comp_cells_y)
-                        REAL(wp), INTENT(IN) :: qp_expl(n_vars+2,comp_cells_x,comp_cells_y)
-                        REAL(wp), INTENT(OUT) :: divFlux_iRK(n_eqns,comp_cells_x,comp_cells_y)
+    !WRITE(*,*) 'recontruction 0'
+    !WRITE(*,*) 'nvars',n_vars
+    !WRITE(*,*) 'qp_expl(:,1,1)',qp_expl(:,1,1)
+    
+    !$OMP PARALLEL DO private(j,k,i,qrecW,qrecE,qrecS,qrecN,x_stencil,y_stencil,&
+    !$OMP & qrec_stencil,qrec_prime_x,qrec_prime_y,qp2recW,qp2recE,qp2recS,     &
+    !$OMP & qp2recN,source_bdry,dq)
 
-                        INTEGER :: l , i, j, k      !< loop counters
+    DO l = 1,solve_cells
 
-                        !WRITE(*,*) 'SUBROUTINE eval_hyperbolic_terms'
-                        !WRITE(*,*) 'qp_expl(4,1,1)',qp_expl(4,1,1)
-                        !WRITE(*,*)
+       j = j_cent(l)
+       k = k_cent(l)
 
-                        ! Linear reconstruction of the physical variables at the interfaces
-                        CALL reconstruction(q_expl,qp_expl)
+       qrecW(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
+       qrecE(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
+       qrecS(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
+       qrecN(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
 
-                        ! Evaluation of the maximum local speeds at the interfaces
-                        CALL eval_speeds
+       ! Default: source boundary equals cell values (zero-gradient when source off)
+       source_bdry(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
 
-                        ! Evaluation of the numerical fluxes
-                        SELECT CASE ( solver_scheme )
+       x_stencil(2) = x_comp(j)
+       y_stencil(2) = y_comp(k)
 
-                         CASE ("LxF")
+       ! For the radial / lateral source the ring face is treated as a wall.
+       ! Mass and momentum are injected as a volume source in eval_expl_terms
+       ! so that the integrated emission equals MFR exactly. The
+       ! reconstruction stencil for source cells therefore uses the cell
+       ! value as the ring-side ghost (zero gradient), which is what the
+       ! source_bdry default initialisation above already provides. The wall
+       ! mirror that zeroes the normal-flux at the ring face is applied
+       ! later, where q_interfaceR/T are assembled.
+       !
+       ! (The previous implementation called eval_source_bdry here to fill
+       ! source_bdry with a state-controlled Dirichlet inflow. That delivered
+       ! ~1.43 x the user MFR because the KT reconstruction at the source-
+       ! cell boundary over-fluxed mass.)
+       
+       
+       vars_loop:DO i=1,n_vars
 
-                           CALL eval_flux_LxF
+          qrec_stencil(2) = qp_expl(i,j,k)
 
-                         CASE ("GFORCE")
+          ! x direction
+          check_comp_cells_x:IF ( comp_cells_x .GT. 1 ) THEN
 
-                           CALL eval_flux_GFORCE
+             ! west boundary
+             check_x_boundary:IF ( j .EQ. 1 ) THEN
 
-                         CASE ("KT")
+                x_stencil(1) = x_stag(1)
+                x_stencil(3) = x_comp(j+1)
 
-                           CALL eval_flux_KT
+                IF ( source_cell(j,k).EQ.2 ) THEN
 
-                         CASE ("UP")
+                   ! Dirichlet boundary condition 
+                   qrec_stencil(1) = source_bdry(i)
+                   qrec_stencil(3) = qp_expl(i,j+1,k)
 
-                           CALL eval_flux_UP
+                   CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
+                        qrec_prime_x(i) )
 
-                        END SELECT
+                ELSE
 
-                        !$OMP PARALLEL DO private(l,j,k,i)
+                   IF ( bcW(i)%flag .EQ. 0 ) THEN
 
-                        cells_loop:DO l = 1,solve_cells
+                      ! Dirichlet boundary condition 
+                      qrec_stencil(1) = bcW(i)%value
+                      qrec_stencil(3) = qp_expl(i,j+1,k)
 
-                           j = j_cent(l)
-                           k = k_cent(l)
+                      CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
+                           qrec_prime_x(i) ) 
+                      
+                   ELSEIF ( bcW(i)%flag .EQ. 1 ) THEN
+                      
+                      ! Neumann boundary condition 
+                      qrec_prime_x(i) = bcW(i)%value
+                      
+                   ELSEIF ( bcW(i)%flag .EQ. 2 ) THEN
+                      
+                      qrec_prime_x(i) = ( qp_expl(i,2,k) - qp_expl(i,1,k) )        &
+                           * one_by_dx
+                      
+                   END IF
 
-                           DO i=1,n_eqns
+                END IF
 
-                              divFlux_iRK(i,j,k) = 0.0_wp
+                !east boundary
+             ELSEIF ( j .EQ. comp_cells_x ) THEN
 
-                              IF ( comp_cells_x .GT. 1 ) THEN
+                x_stencil(3) = x_stag(comp_interfaces_x)
+                x_stencil(1) = x_comp(j-1)
 
-                                 divFlux_iRK(i,j,k) = divFlux_iRK(i,j,k) +                          &
-                                    ( H_interface_x(i,j+1,k) - H_interface_x(i,j,k) ) * one_by_dx
+                IF ( source_cell(j,k).EQ.2 ) THEN
 
-                              END IF
+                   ! Dirichlet boundary condition 
+                   qrec_stencil(3) = source_bdry(i)
+                   qrec_stencil(1)= qp_expl(i,j-1,k)
 
-                              IF ( comp_cells_y .GT. 1 ) THEN
+                   CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
+                        qrec_prime_x(i) )
 
-                                 divFlux_iRK(i,j,k) = divFlux_iRK(i,j,k) +                          &
-                                    ( H_interface_y(i,j,k+1) - H_interface_y(i,j,k) ) * one_by_dy
+                ELSE
+                
+                   IF ( bcE(i)%flag .EQ. 0 ) THEN
+                      
+                      ! Dirichlet boundary condition 
+                      qrec_stencil(3) = bcE(i)%value
+                      qrec_stencil(1)= qp_expl(i,j-1,k)
+                      
+                      CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
+                           qrec_prime_x(i) ) 
+                      
+                   ELSEIF ( bcE(i)%flag .EQ. 1 ) THEN
+                      
+                      ! Neumann boundary condition 
+                      qrec_prime_x(i) = bcE(i)%value
+                      
+                   ELSEIF ( bcE(i)%flag .EQ. 2 ) THEN
+                      
+                      qrec_prime_x(i) = ( qp_expl(i,comp_cells_x,k) -              &
+                           qp_expl(i,comp_cells_x-1,k) ) * one_by_dx
+                      
+                   END IF
 
-                              END IF
+                END IF
 
-                           END DO
+             ELSE
 
-                        END DO cells_loop
+                ! internal x cells
 
-                        !$OMP END PARALLEL DO
+                x_stencil(1) = x_comp(j-1)
+                x_stencil(3) = x_comp(j+1)
 
-                        RETURN
+                qrec_stencil(1) = qp_expl(i,j-1,k)
+                qrec_stencil(3) = qp_expl(i,j+1,k)
 
-                     END SUBROUTINE eval_hyperbolic_terms
+                ! correction for radial source inlet x-interfaces values 
+                ! used for the linear reconstruction
+                IF ( radial_source_flag .AND. ( source_cell(j,k).EQ.2 ) ) THEN
 
-                     !******************************************************************************
-                     !> \brief Upwind numerical fluxes
-                     !
-                     !> This subroutine evaluates the numerical fluxes H at the
-                     !> cells interfaces with an upwind discretization.
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !> \date 2019/11/16
-                     !******************************************************************************
+                   IF ( sourceE(j,k) ) THEN
 
-                     SUBROUTINE eval_flux_UP
+                      x_stencil(3) = x_stag(j+1)
+                      qrec_stencil(3) = source_bdry(i)
 
-                        ! External procedures
-                        USE constitutive_2d, ONLY : eval_fluxes
-                        USE geometry_2d, ONLY : grav_coeff_stag_x , grav_coeff_stag_y
+                   ELSEIF ( sourceW(j,k) ) THEN
 
-                        IMPLICIT NONE
+                      x_stencil(1) = x_stag(j)
+                      qrec_stencil(1) = source_bdry(i)
 
-                        REAL(wp) :: fluxL(n_eqns)           !< Numerical fluxes from the eqns
-                        REAL(wp) :: fluxR(n_eqns)           !< Numerical fluxes from the eqns
-                        REAL(wp) :: fluxB(n_eqns)           !< Numerical fluxes from the eqns
-                        REAL(wp) :: fluxT(n_eqns)           !< Numerical fluxes from the eqns
+                   END IF
 
-                        INTEGER :: j,k,l                  !< Loop counters
+                END IF
 
-                        H_interface_x = 0.0_wp
-                        H_interface_y = 0.0_wp
+                CALL limit( qrec_stencil , x_stencil , limiter(i) ,             &
+                     qrec_prime_x(i) )
 
-                        IF ( comp_cells_x .GT. 1 ) THEN
+             ENDIF check_x_boundary
 
-                           !$OMP PARALLEL DO private(l,j,k,fluxL,fluxR)
+             dq = reconstr_coeff* dx2 * qrec_prime_x(i) 
 
-                           DO l = 1,solve_interfaces_x
+             qrecW(i) = qrec_stencil(2) - dq
+             qrecE(i) = qrec_stencil(2) + dq
 
-                              j = j_stag_x(l)
-                              k = k_stag_x(l)
+             
+             IF ( j .EQ. 1 ) THEN
 
-                              CALL eval_fluxes( q_interfaceL(1:n_vars,j,k) ,                        &
-                                 qp_interfaceL(1:n_vars+2,j,k) , B_prime_x_geom(j-1,k) ,          &
-                                 B_prime_y_geom(j-1,k) , grav_coeff_stag_x(j,k) , 1 , fluxL )
+                IF ( source_cell(j,k).EQ.2 ) THEN
 
-                              CALL eval_fluxes( q_interfaceR(1:n_vars,j,k) ,                        &
-                                 qp_interfaceR(1:n_vars+2,j,k) , B_prime_x_geom(j,k) ,            &
-                                 B_prime_y_geom(j,k) , grav_coeff_stag_x(j,k) , 1 , fluxR )
+                   qrecW(i) = source_bdry(i)
 
-                              IF ( ( qp_interfaceL(n_vars+1,j,k) .GT. 0.0_wp ) .AND.                &
-                                 ( qp_interfaceR(n_vars+1,j,k) .GE. 0.0_wp ) ) THEN
+                ELSE
+                
+                   ! Dirichelet boundary condition at the west of the domain
+                   IF ( bcW(i)%flag .EQ. 0 ) THEN
+                      
+                      qrecW(i) = bcW(i)%value
+                      
+                   ELSE
+                      
+                      IF ( i .EQ. 2 ) qrecW(i) = MIN( qrecW(i) , 0.0_wp ) 
+                      
+                   END IF
 
-                                 H_interface_x(:,j,k) = fluxL
+                END IF
+                   
+             END IF
 
-                              ELSEIF ( ( qp_interfaceL(n_vars+1,j,k) .LE. 0.0_wp ) .AND.            &
-                                 ( qp_interfaceR(n_vars+1,j,k) .LT. 0.0_wp ) ) THEN
+             IF ( j .EQ. comp_cells_x ) THEN
 
-                                 H_interface_x(:,j,k) = fluxR
+                IF ( source_cell(j,k).EQ.2 ) THEN
 
-                              ELSE
+                   qrecE(i) = source_bdry(i)
 
-                                 H_interface_x(:,j,k) = 0.5_wp * ( fluxL + fluxR )
+                ELSE
+                
+                   ! Dirichelet boundary condition at the east of the domain
+                   IF ( bcE(i)%flag .EQ. 0 ) THEN
+                      
+                      qrecE(i) = bcE(i)%value 
+                      
+                   ELSE
+                      
+                      IF ( i .EQ. 2 ) qrecE(i) = MAX( qrecE(i) , 0.0_wp ) 
+                      
+                   END IF
 
-                              END IF
+                END IF
+                
+             END IF
+             
+          END IF check_comp_cells_x
 
-                              IF ( (  q_interfaceL(n_vars+1,j,k) .EQ. 0.0_wp ) .AND.                &
-                                 (  q_interfaceR(n_vars+1,j,k) .EQ. 0.0_wp ) ) THEN
+          ! y-direction
+          check_comp_cells_y:IF ( comp_cells_y .GT. 1 ) THEN
 
-                                 H_interface_x(1,j,k) = 0.0_wp
-                                 H_interface_x(4:n_vars,j,k) = 0.0_wp
+             ! South boundary
+             check_y_boundary:IF ( k .EQ. 1 ) THEN
 
-                              END IF
+                y_stencil(1) = y_stag(1)
+                y_stencil(3) = y_comp(k+1)
 
-                           END DO
+                IF ( bcS(i)%flag .EQ. 0 ) THEN
 
-                           !$OMP END PARALLEL DO
+                   ! Dirichlet boundary condition
+                   qrec_stencil(1) = bcS(i)%value
+                   qrec_stencil(3) = qp_expl(i,j,k+1)
 
-                        END IF
+                   CALL limit( qrec_stencil , y_stencil , limiter(i) ,          &
+                        qrec_prime_y(i) ) 
 
-                        IF ( comp_cells_y .GT. 1 ) THEN
+                ELSEIF ( bcS(i)%flag .EQ. 1 ) THEN
 
-                           !$OMP PARALLEL DO private(l,j,k,fluxB,fluxT)
+                   ! Neumann boundary condition 
+                   qrec_prime_y(i) = bcS(i)%value
 
-                           DO l = 1,solve_interfaces_y
+                ELSEIF ( bcS(i)%flag .EQ. 2 ) THEN
 
-                              j = j_stag_y(l)
-                              k = k_stag_y(l)
+                   qrec_prime_y(i) = ( qp_expl(i,j,2) - qp_expl(i,j,1) )        &
+                        * one_by_dy
 
-                              CALL eval_fluxes( q_interfaceB(1:n_vars,j,k) ,                        &
-                                 qp_interfaceB(1:n_vars+2,j,k) , B_prime_x_geom(j,k-1) ,          &
-                                 B_prime_y_geom(j,k-1) , grav_coeff_stag_y(j,k) , 2 , fluxB )
+                END IF
 
-                              CALL eval_fluxes( q_interfaceT(1:n_vars,j,k) ,                        &
-                                 qp_interfaceT(1:n_vars+2,j,k) , B_prime_x_geom(j,k) ,            &
-                                 B_prime_y_geom(j,k) , grav_coeff_stag_y(j,k) , 2 , fluxT )
+                ! North boundary
+             ELSEIF ( k .EQ. comp_cells_y ) THEN
 
-                              IF ( ( q_interfaceB(3,j,k) .GT. 0.0_wp ) .AND.                        &
-                                 ( q_interfaceT(3,j,k) .GE. 0.0_wp ) ) THEN
+                y_stencil(1) = y_comp(k-1)
+                y_stencil(3) = y_stag(comp_interfaces_y)
 
-                                 H_interface_y(:,j,k) = fluxB
+                IF ( bcN(i)%flag .EQ. 0 ) THEN
 
-                              ELSEIF ( ( q_interfaceB(3,j,k) .LE. 0.0_wp ) .AND.                    &
-                                 ( q_interfaceT(3,j,k) .LT. 0.0_wp ) ) THEN
+                   ! Dirichlet boundary condition
+                   qrec_stencil(1)= qp_expl(i,j,k-1)
+                   qrec_stencil(3) = bcN(i)%value
 
-                                 H_interface_y(:,j,k) = fluxT
+                   CALL limit( qrec_stencil , y_stencil , limiter(i) ,          &
+                        qrec_prime_y(i) ) 
 
-                              ELSE
+                ELSEIF ( bcN(i)%flag .EQ. 1 ) THEN
 
-                                 H_interface_y(:,j,k) = 0.5_wp * ( fluxB + fluxT )
+                   ! Neumann boundary condition 
+                   qrec_prime_y(i) = bcN(i)%value
 
-                              END IF
+                ELSEIF ( bcN(i)%flag .EQ. 2 ) THEN
 
-                              ! In the equation for mass and for trasnport (T,alphas) if the
-                              ! velocities at the interfaces are null, then the flux is null
-                              IF ( (  q_interfaceB(3,j,k) .EQ. 0.0_wp ) .AND.                       &
-                                 (  q_interfaceT(3,j,k) .EQ. 0.0_wp ) ) THEN
+                   qrec_prime_y(i) = ( qp_expl(i,j,comp_cells_y) -              &
+                        qp_expl(i,j,comp_cells_y-1) ) * one_by_dy 
 
-                                 H_interface_y(1,j,k) = 0.0_wp
-                                 H_interface_y(4:n_vars,j,k) = 0.0_wp
+                END IF
 
-                              END IF
+             ELSE
 
-                           END DO
+                ! Internal y cells
 
-                           !$OMP END PARALLEL DO
+                y_stencil(1) = y_comp(k-1)
+                y_stencil(3) = y_comp(k+1)
 
-                        END IF
+                qrec_stencil(1) = qp_expl(i,j,k-1)
+                qrec_stencil(3) = qp_expl(i,j,k+1)
 
-                        RETURN
+                ! correction for radial source inlet y-interfaces
+                ! used for the linear reconstruction
+                IF ( radial_source_flag .AND. ( source_cell(j,k).EQ.2 ) ) THEN
 
-                     END SUBROUTINE eval_flux_UP
+                   IF ( sourceS(j,k) ) THEN
 
+                      y_stencil(1) = y_stag(k)
+                      qrec_stencil(1) = source_bdry(i)
 
-                     !******************************************************************************
-                     !> \brief Semidiscrete numerical fluxes
-                     !
-                     !> This subroutine evaluates the numerical fluxes H at the
-                     !> cells interfaces according to Kurganov et al. 2001.
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !> \date 16/08/2011
-                     !******************************************************************************
+                   ELSEIF ( sourceN(j,k) ) THEN
 
-                     SUBROUTINE eval_flux_KT
+                      y_stencil(3) = y_stag(k+1)
+                      qrec_stencil(3) = source_bdry(i)
 
-                        ! External procedures
-                        USE constitutive_2d, ONLY : eval_fluxes
-                        USE geometry_2d, ONLY : grav_coeff_stag_x , grav_coeff_stag_y
+                   END IF
 
-                        IMPLICIT NONE
+                END IF
 
-                        REAL(wp) :: fluxL(n_eqns)           !< Numerical fluxes from the eqns
-                        REAL(wp) :: fluxR(n_eqns)           !< Numerical fluxes from the eqns
-                        REAL(wp) :: fluxB(n_eqns)           !< Numerical fluxes from the eqns
-                        REAL(wp) :: fluxT(n_eqns)           !< Numerical fluxes from the eqns
+                CALL limit( qrec_stencil , y_stencil , limiter(i) ,             &
+                     qrec_prime_y(i) )
 
-                        REAL(wp) :: flux_avg_x(n_eqns)
-                        REAL(wp) :: flux_avg_y(n_eqns)
+             ENDIF check_y_boundary
 
-                        INTEGER :: i,j,k,l                  !< Loop counters
+             dq = reconstr_coeff * dy2 * qrec_prime_y(i)
 
-                        ! WRITE(*,*) 'eval_flux_KT: qp_interfaceR(1,1,1)',qp_interfaceR(1,1,1)
+             qrecS(i) = qrec_stencil(2) - dq
+             qrecN(i) = qrec_stencil(2) + dq
 
+             IF ( k .EQ. 1 ) THEN
 
-                        !H_interface_x = 0.0_wp
-                        !H_interface_y = 0.0_wp
+                ! Dirichelet boundary condition at the south of the domain
+                IF ( bcS(i)%flag .EQ. 0 ) THEN
+                   
+                   qrecS(i) = bcS(i)%value 
+                   
+                ELSE
 
-                        !$OMP PARALLEL
+                   IF ( i .EQ. 3 ) qrecS(i) = MIN( qrecS(i) , 0.0_wp ) 
 
-                        IF ( comp_cells_x .GT. 1 ) THEN
+                END IF
 
-                           !$OMP DO private(j,k,i,fluxL,fluxR,flux_avg_x)
+             END IF
 
-                           x_interfaces_loop:DO l = 1,solve_interfaces_x
+             IF ( k .EQ. comp_cells_y ) THEN
+                
+                ! Dirichelet boundary condition at the north of the domain
+                IF ( bcN(i)%flag .EQ. 0 ) THEN
+                   
+                   qrecN(i) = bcN(i)%value 
+                   
+                ELSE
 
-                              j = j_stag_x(l)
-                              k = k_stag_x(l)
+                   IF ( i .EQ. 3 ) qrecN(i) = MAX( qrecN(i) , 0.0_wp ) 
 
-                              CALL eval_fluxes( q_interfaceL(1:n_vars,j,k) ,                        &
-                                 qp_interfaceL(1:n_vars+2,j,k) ,                                  &
-                                 B_prime_x_geom(MAX(1,j-1),MIN(k,comp_cells_y)) ,                 &
-                                 B_prime_y_geom(MAX(1,j-1),MIN(k,comp_cells_y)) ,                 &
-                                 grav_coeff_stag_x(j,k) , 1 , fluxL )
+                END IF
 
-                              CALL eval_fluxes( q_interfaceR(1:n_vars,j,k) ,                        &
-                                 qp_interfaceR(1:n_vars+2,j,k) ,                                  &
-                                 B_prime_x_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
-                                 B_prime_y_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
-                                 grav_coeff_stag_x(j,k) , 1 , fluxR )
+             END IF
+             
+          ENDIF check_comp_cells_y
 
-                              ! First term in Eq. 25 GMD paper
-                              CALL average_KT( a_interface_xNeg(:,j,k), a_interface_xPos(:,j,k) ,   &
-                                 fluxL , fluxR , flux_avg_x )
+       ENDDO vars_loop
 
-                              eqns_loop:DO i=1,n_eqns
+       add_vars_loop:DO i=n_vars+1,n_vars+2
+          ! reconstruction on u and v with same limiters of hu,hv
 
-                                 IF ( a_interface_xNeg(i,j,k) .EQ. a_interface_xPos(i,j,k) ) THEN
+          ! x direction
+          check_comp_cells_x2:IF ( comp_cells_x .GT. 1 ) THEN
 
-                                    H_interface_x(i,j,k) = 0.0_wp
+             qrec_stencil(2) = qp_expl(i,j,k)
 
-                                 ELSE
+             IF ( j .EQ. 1 ) THEN
+                
+                CALL qp_to_qp2( qrecW(1:n_vars) , B_cent(j,k) , qp2recW ) 
+                qrec_stencil(1) = qp2recW(i-n_vars+1)
+                qrec_stencil(3) = qp_expl(i,j+1,k)
+                
+             ELSEIF ( j .EQ. comp_cells_x ) THEN
+                
+                CALL qp_to_qp2( qrecE(1:n_vars) , B_cent(j,k) , qp2recE ) 
+                qrec_stencil(1) = qp_expl(i,j-1,k)
+                qrec_stencil(3) = qp2recE(i-n_vars+1)
+                         
+             ELSE
 
-                                    ! Eq. 25 from GMD paper
-                                    H_interface_x(i,j,k) = flux_avg_x(i)                            &
-                                       + ( a_interface_xPos(i,j,k) * a_interface_xNeg(i,j,k) )    &
-                                       / ( a_interface_xPos(i,j,k) - a_interface_xNeg(i,j,k) )    &
-                                       * ( q_interfaceR(i,j,k) - q_interfaceL(i,j,k) )
+                qrec_stencil(1) = qp_expl(i,j-1,k)
+                qrec_stencil(3) = qp_expl(i,j+1,k)
 
-                                 END IF
+                ! correction for radial source inlet x-interfaces values 
+                ! used for the linear reconstruction
+                IF ( radial_source_flag .AND. ( source_cell(j,k).EQ.2 ) ) THEN
 
-                              ENDDO eqns_loop
+                   IF ( sourceE(j,k) ) THEN
 
-                              ! Fix to avoid sum of solid fluxes larger tham flux for mixture
-                              IF ( ( SUM(H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k)) / &
-                                 H_interface_x(1,j,k) ) .GE. 1.0_wp ) THEN
+                      x_stencil(3) = x_stag(j+1)
+                      qrec_stencil(3) = source_bdry(i)
 
-                                 H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k) =          &
-                                    H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k) /     &
-                                    ( SUM(H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k) &
-                                    / H_interface_x(1,j,k) ) )
+                   ELSEIF ( sourceW(j,k) ) THEN
 
-                              END IF
+                      x_stencil(1) = x_stag(j)
+                      qrec_stencil(1) = source_bdry(i)
 
-                              ! In the equation for mass and for trasnport (T,alphas) if the
-                              ! velocities at the interfaces are null, then the flux is null
-                              IF ( (  qp_interfaceL(2,j,k) .EQ. 0.0_wp ) .AND.                      &
-                                 (  qp_interfaceR(2,j,k) .EQ. 0.0_wp ) ) THEN
+                   END IF
 
-                                 H_interface_x(1,j,k) = 0.0_wp
-                                 H_interface_x(4:n_vars,j,k) = 0.0_wp
+                END IF
 
-                              END IF
+             END IF
 
-                           END DO x_interfaces_loop
+             CALL limit( qrec_stencil , x_stencil , limiter(i) ,                &
+                  qrec_prime_x(i) )
+             
+             dq = reconstr_coeff*dx2*qrec_prime_x(i)
+             
+             qrecW(i) = qrec_stencil(2) - dq
+             qrecE(i) = qrec_stencil(2) + dq
 
-                           !$OMP END DO NOWAIT
+             IF ( j .EQ. 1 ) THEN
+                
+                CALL qp_to_qp2( qrecW(1:n_vars) , B_cent(j,k) , qp2recW ) 
+                qrecW(i) = qp2recW(i-n_vars+1)
 
-                        END IF
+             ELSEIF ( j .EQ. comp_cells_x ) THEN
 
-                        IF ( comp_cells_y .GT. 1 ) THEN
+                CALL qp_to_qp2( qrecE(1:n_vars) , B_cent(j,k) , qp2recE ) 
+                qrecE(i) = qp2recE(i-n_vars+1)
 
-                           !$OMP DO private(j,k,i,fluxB,fluxT,flux_avg_y)
+             ELSE
+                
+                ! correction for radial source inlet x-interfaces:
+                ! the physical variables at the x-interfaces qrecW or
+                ! qrecE are computed from the radial inlet values
+                IF ( radial_source_flag .AND. ( source_cell(j,k).EQ.2 ) ) THEN
+                
+                   IF ( sourceE(j,k) ) THEN
 
-                           y_interfaces_loop:DO l = 1,solve_interfaces_y
+                      qrecE(1:n_vars+2) = source_bdry(1:n_vars+2)
+                      
+                   ELSEIF ( sourceW(j,k) ) THEN
+                      
+                      qrecW(1:n_vars+2) = source_bdry(1:n_vars+2)
+                      
+                   END IF
+                   
+                END IF
+                
+             END IF
+             
+          END IF check_comp_cells_x2
 
-                              j = j_stag_y(l)
-                              k = k_stag_y(l)
+          ! y-direction
+          check_comp_cells_y2:IF ( comp_cells_y .GT. 1 ) THEN
 
-                              CALL eval_fluxes( q_interfaceB(1:n_vars,j,k) ,                        &
-                                 qp_interfaceB(1:n_vars+2,j,k) ,                                  &
-                                 B_prime_x_geom(MIN(j,comp_cells_x),MAX(1,k-1)) ,                 &
-                                 B_prime_y_geom(MIN(j,comp_cells_x),MAX(1,k-1)) ,                 &
-                                 grav_coeff_stag_y(j,k) , 2 , fluxB )
+             qrec_stencil(2) = qp_expl(i,j,k)
+             
+             IF ( k .EQ. 1 ) THEN
+                
+                CALL qp_to_qp2( qrecS(1:n_vars) , B_cent(j,k) , qp2recS ) 
+                qrec_stencil(1) = qp2recS(i-n_vars+1)
+                qrec_stencil(3) = qp_expl(i,j,k+1)
+                
+             ELSEIF ( k .EQ. comp_cells_y ) THEN
+                
+                CALL qp_to_qp2( qrecN(1:n_vars) , B_cent(j,k) , qp2recN ) 
+                qrec_stencil(1) = qp_expl(i,j,k-1)
+                qrec_stencil(3) = qp2recN(i-n_vars+1)
+                
+             ELSE
+                
+                qrec_stencil(1) = qp_expl(i,j,k-1)
+                qrec_stencil(3) = qp_expl(i,j,k+1)
 
-                              CALL eval_fluxes( q_interfaceT(1:n_vars,j,k) ,                        &
-                                 qp_interfaceT(1:n_vars+2,j,k) ,                                  &
-                                 B_prime_x_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
-                                 B_prime_y_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
-                                 grav_coeff_stag_y(j,k) , 2 , fluxT )
+                ! correction for radial source inlet y-interfaces
+                ! used for the linear reconstruction
+                IF ( radial_source_flag .AND. ( source_cell(j,k).EQ.2 ) ) THEN
 
-                              CALL average_KT( a_interface_yNeg(:,j,k) ,                            &
-                                 a_interface_yPos(:,j,k) , fluxB , fluxT , flux_avg_y )
+                   IF ( sourceS(j,k) ) THEN
 
-                              DO i=1,n_eqns
+                      y_stencil(1) = y_stag(k)
+                      qrec_stencil(1) = source_bdry(i)
 
-                                 IF ( a_interface_yNeg(i,j,k) .EQ. a_interface_yPos(i,j,k) ) THEN
+                   ELSEIF ( sourceN(j,k) ) THEN
 
-                                    H_interface_y(i,j,k) = 0.0_wp
+                      x_stencil(3) = y_stag(k+1)
+                      qrec_stencil(3) = source_bdry(i)
 
-                                 ELSE
+                   END IF
 
-                                    H_interface_y(i,j,k) = flux_avg_y(i)                            &
-                                       + ( a_interface_yPos(i,j,k) * a_interface_yNeg(i,j,k) )    &
-                                       / ( a_interface_yPos(i,j,k) - a_interface_yNeg(i,j,k) )    &
-                                       * ( q_interfaceT(i,j,k) - q_interfaceB(i,j,k) )
+                END IF
 
-                                 END IF
+             ENDIF
 
-                              END DO
+             CALL limit( qrec_stencil , y_stencil , limiter(i) ,                &
+                  qrec_prime_y(i) )
+             
+             dq = reconstr_coeff*dy2*qrec_prime_y(i) 
+             
+             qrecS(i) = qrec_stencil(2) - dq
+             qrecN(i) = qrec_stencil(2) + dq
 
-                              ! Fix to avoid sum of solid fluxes larger tham flux for mixture
-                              IF ( ( SUM(H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k)) / &
-                                 H_interface_y(1,j,k) ) .GT. 1.0_wp ) THEN
 
-                                 H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k) =          &
-                                    H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k) /     &
-                                    ( SUM(H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k))&
-                                    / H_interface_y(1,j,k) )
+             IF ( k .EQ. 1 ) THEN
+               
+                CALL qp_to_qp2( qrecS(1:n_vars) , B_cent(j,k) , qp2recS ) 
+                qrecS(i) = qp2recS(i-n_vars+1)
+                
+             ELSEIF ( k .EQ. comp_cells_y ) THEN
+                
+                CALL qp_to_qp2( qrecN(1:n_vars) , B_cent(j,k) , qp2recN ) 
+                qrecN(i) = qp2recN(i-n_vars+1)
 
-                              END IF
+             ELSE
 
-                              ! In the equation for mass and for trasnport (T,alphas) if the
-                              ! velocities at the interfaces are null, then the flux is null
-                              IF ( (  q_interfaceB(3,j,k) .EQ. 0.0_wp ) .AND.                       &
-                                 (  q_interfaceT(3,j,k) .EQ. 0.0_wp ) ) THEN
+                ! correction for radial source inlet y-interfaces:
+                ! the physical variables at the y-interfaces qrecS or
+                ! qrecN are computed from the radial inlet values
+                IF ( radial_source_flag .AND. ( source_cell(j,k) .EQ. 2 ) ) THEN
 
-                                 H_interface_y(1,j,k) = 0.0_wp
-                                 H_interface_y(4:n_vars,j,k) = 0.0_wp
+                   IF ( sourceS(j,k) ) THEN
 
-                              END IF
+                      qrecS(1:n_vars+2) = source_bdry(1:n_vars+2)
 
-                           END DO y_interfaces_loop
+                   ELSEIF ( sourceN(j,k) ) THEN
 
-                           !$OMP END DO
+                      qrecN(1:n_vars+2) = source_bdry(1:n_vars+2)
+                      
+                   END IF
+                   
+                END IF
 
-                        END IF
+             END IF
 
-                        !$OMP END PARALLEL
+          ENDIF check_comp_cells_y2
 
-                        RETURN
+       ENDDO add_vars_loop
 
-                     END SUBROUTINE eval_flux_KT
+       ! check if du/dx + dv/dy > 0 (flow locally diverges)
+       diverging_flag = ( ( qrec_prime_x(n_vars+1) + qrec_prime_y(n_vars+2) )   &
+            .GT. 0.0_wp )
 
-                     !******************************************************************************
-                     !> \brief averaged KT flux
-                     !
-                     !> This subroutine compute n averaged flux from the fluxes at the two sides of
-                     !> a cell interface and the max an min speed at the two sides.
-                     !> \param[in]     a1            speed at one side of the interface
-                     !> \param[in]     a2            speed at the other side of the interface
-                     !> \param[in]     w1            fluxes at one side of the interface
-                     !> \param[in]     w2            fluxes at the other side of the interface
-                     !> \param[out]    w_avg         array of averaged fluxes
-                     !> \date 2019/12/13
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !******************************************************************************
+       IF ( comp_cells_x .GT. 1 ) THEN
 
-                     SUBROUTINE average_KT( a1 , a2 , w1 , w2 , w_avg )
+          IF ( ( j .GT. 1 ) .AND. ( j .LT. comp_cells_x ) ) THEN
 
-                        IMPLICIT NONE
+             IF ( q_expl(1,j,k) .EQ. 0.0_wp ) THEN
 
-                        REAL(wp), INTENT(IN) :: a1(:) , a2(:)
-                        REAL(wp), INTENT(IN) :: w1(:) , w2(:)
-                        REAL(wp), INTENT(OUT) :: w_avg(:)
+                IF ( ( .NOT. radial_source_flag ) .OR.                          &
+                     ( ( radial_source_flag ) .AND.                             &
+                     ( source_cell(j,k) .EQ. 0 ) ) ) THEN
 
-                        INTEGER :: n
-                        INTEGER :: i
+                   ! In the internal cell, if thickness h is 0 at the center
+                   ! of the cell, then all the variables are 0 at the center
+                   ! and at the interfaces (no conversion back is needed from
+                   ! reconstructed to conservative)
+                   q_interfaceR(:,j,k) = 0.0_wp
+                   q_interfaceL(:,j+1,k) = 0.0_wp
 
-                        n = SIZE( a1 )
+                   qp_interfaceR(1:3,j,k) = 0.0_wp
+                   qp_interfaceR(4:n_vars,j,k) = qrecW(4:n_vars)
+                   qp_interfaceR(n_vars+1:n_vars+2,j,k) = 0.0_wp
 
-                        DO i=1,n
+                   qp_interfaceL(1:3,j+1,k) = 0.0_wp
+                   qp_interfaceL(4:n_vars,j+1,k) = qrecE(4:n_vars)
+                   qp_interfaceL(n_vars+1:n_vars+2,j+1,k) = 0.0_wp
 
-                           IF ( a1(i) .EQ. a2(i) ) THEN
+                   diverg_interfaceR(j,k) = .FALSE.
+                   diverg_interfaceL(j+1,k) = .FALSE.
+                   
+                END IF
 
-                              w_avg(i) = 0.5_wp * ( w1(i) + w2(i) )
-                              w_avg(i) = 0.0_wp
+             END IF
 
-                           ELSE
+          END IF
 
-                              w_avg(i) = ( a2(i) * w1(i) - a1(i) * w2(i) ) / ( a2(i) - a1(i) )
+          ! Correction for residual volume fraction of continuous phase
+          IF ( alpha_flag ) THEN
 
-                           END IF
+             !qrecW(5:4+n_solid) = qrecW(5:4+n_solid) *                          &
+             !     MIN( 1.0_wp , maximum_solid_packing /                         &
+             !     SUM( qrecW(5:4+n_solid) ) )
 
-                        END DO
+             !qrecE(5:4+n_solid) = qrecE(5:4+n_solid) *                          &
+             !     MIN( 1.0_wp , maximum_solid_packing /                         &
+             !     SUM( qrecE(5:4+n_solid) ) )
+             
+          ELSE
+             
+             !qrecW(5:4+n_solid) = qrecW(5:4+n_solid) *                          &
+             !     MIN( 1.0_wp , maximum_solid_packing * qrecW(1) /              &
+             !     SUM( qrecW(5:4+n_solid) ) )
 
-                        RETURN
+             !qrecE(5:4+n_solid) = qrecE(5:4+n_solid) *                          &
+             !     MIN( 1.0_wp , maximum_solid_packing * qrecE(1) /              &
+             !     SUM( qrecE(5:4+n_solid) ) )
+             
+          END IF
+          
+          CALL qp_to_qc( qrecW,q_interfaceR(:,j,k) )
+          CALL qp_to_qc( qrecE,q_interfaceL(:,j+1,k) )
 
-                     END SUBROUTINE average_KT
+          qp_interfaceR(1:n_vars+2,j,k) = qrecW(1:n_vars+2)
+          qp_interfaceL(1:n_vars+2,j+1,k) = qrecE(1:n_vars+2)
 
-                     !******************************************************************************
-                     !> \brief Numerical fluxes GFORCE
-                     !> \date 07/10/2016
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !******************************************************************************
+          diverg_interfaceR(j,k) = diverging_flag
+          diverg_interfaceL(j+1,k) = diverging_flag
+          
+          IF ( j.EQ.1 ) THEN
 
-                     SUBROUTINE eval_flux_GFORCE
+             ! Interface value at the left of first x-interface (external)
+             q_interfaceL(:,j,k) = q_interfaceR(:,j,k)
+             qp_interfaceL(:,j,k) = qp_interfaceR(:,j,k)
 
-                        ! to be implemented
-                        WRITE(*,*) 'method not yet implemented in 2-d case'
+             !WRITE(*,*) 'j,k',j,k
+             !WRITE(*,*) 'qp_interfaceL(:,j,k)',qp_interfaceL(:,j,k)
+             !READ(*,*)
 
-                     END SUBROUTINE eval_flux_GFORCE
+             diverg_interfaceR(j,k) = diverg_interfaceL(j,k)
 
-                     !******************************************************************************
-                     !> \brief Numerical fluxes Lax-Friedrichs
-                     !> \date 07/10/2016
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !******************************************************************************
+          ELSEIF ( j.EQ.comp_cells_x ) THEN
 
-                     SUBROUTINE eval_flux_LxF
+             ! Interface value at the right of last x-interface (external)
+             q_interfaceR(:,j+1,k) = q_interfaceL(:,j+1,k)
+             qp_interfaceR(:,j+1,k) = qp_interfaceL(:,j+1,k)
 
-                        ! to be implemented
-                        WRITE(*,*) 'method not yet implemented in 2-d case'
+             diverg_interfaceR(j+1,k) = diverg_interfaceL(j+1,k)
+             
+          ELSE
 
-                     END SUBROUTINE eval_flux_LxF
+             IF ( radial_source_flag .AND. ( source_cell(j,k) .EQ. 2 ) ) THEN
 
+                ! Wall BC at the ring face. The volume-source path in
+                ! eval_expl_terms injects mass + momentum directly into this
+                ! cell, so the ring face itself must transmit no net flux.
+                ! Mirroring the x-momentum at the face makes the KT mass
+                ! flux vanish and reflects the pressure force into the cell.
+                IF ( sourceE(j,k) ) THEN
 
-                     !******************************************************************************
-                     !> \brief Linear reconstruction
-                     !
-                     !> In this subroutine a linear reconstruction with slope limiters is
-                     !> applied to a set of variables describing the state of the system.
-                     !> In this way the values at the two sides of each cell interface are computed.
-                     !> This subroutine is also used for the boundary condition, when the
-                     !> reconstruction at the boundary interfaces are computed.
-                     !> \param[in]     q_expl         center values of the conservative variables
-                     !> \param[in]     qp_expl        center values of the physical variables
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !> \date 2019/11/11
-                     !******************************************************************************
+                   q_interfaceR(:,j+1,k) = q_interfaceL(:,j+1,k)
+                   q_interfaceR(2,j+1,k) = -q_interfaceL(2,j+1,k)  ! hu
+                   qp_interfaceR(:,j+1,k) = qp_interfaceL(:,j+1,k)
+                   qp_interfaceR(idx_u,j+1,k) = -qp_interfaceL(idx_u,j+1,k)
 
-                     SUBROUTINE reconstruction(q_expl,qp_expl)
+                ELSEIF ( sourceW(j,k) ) THEN
 
-                        ! External procedures
-                        USE constitutive_2d, ONLY : qc_to_qp , qp_to_qc ,qp_to_qp2
-                        USE constitutive_2d, ONLY : eval_source_bdry
-                        USE parameters_2d, ONLY : limiter
+                   q_interfaceL(:,j,k) = q_interfaceR(:,j,k)
+                   q_interfaceL(2,j,k) = -q_interfaceR(2,j,k)  ! hu
+                   qp_interfaceL(:,j,k) = qp_interfaceR(:,j,k)
+                   qp_interfaceL(idx_u,j,k) = -qp_interfaceR(idx_u,j,k)
 
-                        ! External variables
-                        USE constitutive_2d, ONLY : maximum_solid_packing
+                END IF
 
-                        USE geometry_2d, ONLY : x_comp , x_stag , y_comp , y_stag , dx2 , dy2
+             END IF
 
-                        USE geometry_2d, ONLY : sourceW , sourceE , sourceN , sourceS
-                        USE geometry_2d, ONLY : sourceW_vect_x , sourceW_vect_y
-                        USE geometry_2d, ONLY : sourceE_vect_x , sourceE_vect_y
-                        USE geometry_2d, ONLY : sourceN_vect_x , sourceN_vect_y
-                        USE geometry_2d, ONLY : sourceS_vect_x , sourceS_vect_y
+          END IF
 
-                        USE parameters_2d, ONLY : alpha_flag
-                        USE parameters_2d, ONLY : reconstr_coeff
+       ELSE
 
-                        USE geometry_2d, ONLY : minmod
+          ! for case comp_cells_x = 1
+          q_interfaceR(1:n_vars,j,k) = q_expl(1:n_vars,j,k)
+          q_interfaceL(1:n_vars,j+1,k) = q_expl(1:n_vars,j,k)
 
-                        IMPLICIT NONE
+          qp_interfaceR(1:n_vars+2,j,k) = qp_expl(1:n_vars+2,j,k)
+          qp_interfaceL(1:n_vars+2,j+1,k) = qp_expl(1:n_vars+2,j,k)
 
-                        REAL(wp), INTENT(IN) :: q_expl(:,:,:)
-                        REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
+          diverg_interfaceR(j,k) = diverging_flag
+          diverg_interfaceL(j+1,k) = diverging_flag
+          
+       END IF
 
-                        REAL(wp) :: qrecW(n_vars+2) !< recons var at the west edge of the cells
-                        REAL(wp) :: qrecE(n_vars+2) !< recons var at the east edge of the cells
-                        REAL(wp) :: qrecS(n_vars+2) !< recons var at the south edge of the cells
-                        REAL(wp) :: qrecN(n_vars+2) !< recons var at the north edge of the cells
+       IF ( comp_cells_y .GT. 1 ) THEN
 
-                        REAL(wp) :: source_bdry(n_vars+2)
-                        REAL(wp) :: qrec_prime_x(n_vars+2)      !< recons variables slope
-                        REAL(wp) :: qrec_prime_y(n_vars+2)      !< recons variables slope
+          IF ( ( k .GT. 1 ) .AND. ( k .LT. comp_cells_y ) ) THEN
 
-                        REAL(wp) :: qp2recW(3) , qp2recE(3)
-                        REAL(wp) :: qp2recS(3) , qp2recN(3)
+             IF ( q_expl(1,j,k) .EQ. 0.0_wp ) THEN
 
-                        REAL(wp) :: qrec_stencil(3) !< recons variables stencil for the limiter
-                        REAL(wp) :: x_stencil(3)    !< grid stencil for the limiter
-                        REAL(wp) :: y_stencil(3)    !< grid stencil for the limiter
+                IF ( ( .NOT. radial_source_flag ) .OR.                          &
+                     ( ( radial_source_flag ) .AND.                             &
+                     ( source_cell(j,k) .EQ. 0 ) ) ) THEN
 
-                        INTEGER :: l,j,k            !< loop counters (cells)
-                        INTEGER :: i                !< loop counter (variables)
+                   ! In the internal cell, if thickness h is 0 at the center
+                   ! of the cell, then all the variables are 0 at the center
+                   ! and at the interfaces (no conversion back is needed from
+                   ! reconstructed to conservative)
 
-                        REAL(wp) :: dq
+                   q_interfaceT(:,j,k) = 0.0_wp
+                   q_interfaceB(:,j,k+1) = 0.0_wp
 
-                        LOGICAL :: diverging_flag
+                   qp_interfaceT(1:3,j,k) = 0.0_wp
+                   qp_interfaceT(4:n_vars,j,k) = qrecS(4:n_vars)
+                   qp_interfaceT(n_vars+1:n_vars+2,j,k) = 0.0_wp
 
-                        !WRITE(*,*) 'recontruction 0'
-                        !WRITE(*,*) 'nvars',n_vars
-                        !WRITE(*,*) 'qp_expl(:,1,1)',qp_expl(:,1,1)
+                   qp_interfaceB(1:3,j,k+1) = 0.0_wp
+                   qp_interfaceB(4:n_vars,j,k+1) = qrecN(4:n_vars)
+                   qp_interfaceB(n_vars+1:n_vars+2,j,k+1) = 0.0_wp
 
-                        !$OMP PARALLEL DO private(j,k,i,qrecW,qrecE,qrecS,qrecN,x_stencil,y_stencil,&
-                        !$OMP & qrec_stencil,qrec_prime_x,qrec_prime_y,qp2recW,qp2recE,qp2recS,     &
-                        !$OMP & qp2recN,source_bdry,dq)
+                   diverg_interfaceT(j,k) = .FALSE.
+                   diverg_interfaceB(j,k+1) = .FALSE.
+                   
+                END IF
 
-                        DO l = 1,solve_cells
+             END IF
 
-                           j = j_cent(l)
-                           k = k_cent(l)
+          END IF
 
-                           qrecW(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
-                           qrecE(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
-                           qrecS(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
-                           qrecN(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
+          ! Correction for maximum solid packing
+          IF ( alpha_flag ) THEN
 
-                           x_stencil(2) = x_comp(j)
-                           y_stencil(2) = y_comp(k)
+             !qrecS(5:4+n_solid) = qrecS(5:4+n_solid) *                          &
+             !     MIN( 1.0_wp , maximum_solid_packing /                         &
+             !     SUM( qrecS(5:4+n_solid) ) )
 
-                           ! correction for radial source inlet x-interfaces values
-                           ! used for the linear reconstruction
-                           IF ( ( lateral_source_flag .OR. radial_source_flag ) .AND. ( source_cell(j,k).EQ.2 ) ) THEN
+             !qrecN(5:4+n_solid) = qrecN(5:4+n_solid) *                          &
+             !     MIN( 1.0_wp , maximum_solid_packing /                         &
+             !     SUM( qrecN(5:4+n_solid) ) )
+             
+          ELSE
+             
+             !qrecS(5:4+n_solid) = qrecS(5:4+n_solid) *                          &
+             !     MIN( 1.0_wp , maximum_solid_packing * qrecS(1) /              &
+             !     SUM( qrecS(5:4+n_solid) ) )
 
-                              IF ( sourceE(j,k) ) THEN
+             !qrecN(5:4+n_solid) = qrecN(5:4+n_solid) *                          &
+             !     MIN( 1.0_wp , maximum_solid_packing * qrecN(1) /              &
+             !     SUM( qrecN(5:4+n_solid) ) )
+             
+          END IF
+             
+          CALL qp_to_qc( qrecS, q_interfaceT(:,j,k) )
+          CALL qp_to_qc( qrecN, q_interfaceB(:,j,k+1) )
+          
+          qp_interfaceT(1:n_vars+2,j,k) = qrecS(1:n_vars+2)
+          qp_interfaceB(1:n_vars+2,j,k+1) = qrecN(1:n_vars+2)
 
-                                 CALL eval_source_bdry( t, sourceE_vect_x(j,k) ,           &
-                                    sourceE_vect_y(j,k) , source_bdry )
+          diverg_interfaceT(j,k) = diverging_flag
+          diverg_interfaceB(j,k+1) = diverging_flag
+          
+          IF ( k .EQ. 1 ) THEN
 
-                              ELSEIF ( sourceW(j,k) ) THEN
+             ! Interface value at the bottom of first y-interface (external)
+             q_interfaceB(:,j,k) = q_interfaceT(:,j,k)
+             qp_interfaceB(:,j,k) = qp_interfaceT(:,j,k)
 
-                                 CALL eval_source_bdry( t , sourceW_vect_x(j,k) ,          &
-                                    sourceW_vect_y(j,k) , source_bdry )
+             diverg_interfaceB(j,k) = diverg_interfaceT(j,k)
 
-                              ELSEIF ( sourceS(j,k) ) THEN
+          ELSEIF ( k .EQ. comp_cells_y ) THEN
 
-                                 CALL eval_source_bdry( t, sourceS_vect_x(j,k) ,           &
-                                    sourceS_vect_y(j,k) , source_bdry )
+             ! Interface value at the top of last y-interface (external)
+             q_interfaceT(:,j,k+1) = q_interfaceB(:,j,k+1)
+             qp_interfaceT(:,j,k+1) = qp_interfaceB(:,j,k+1)
 
-                              ELSEIF ( sourceN(j,k) ) THEN
+             diverg_interfaceT(j,k+1) = diverg_interfaceB(j,k+1)
+             
+          ELSE
 
-                                 CALL eval_source_bdry( t, sourceN_vect_x(j,k) ,           &
-                                    sourceN_vect_y(j,k) , source_bdry )
+             IF ( radial_source_flag .AND. ( source_cell(j,k) .EQ. 2 ) ) THEN
 
-                              END IF
+                ! Wall BC at the ring face (y-direction). Mirror the
+                ! y-momentum so the KT mass flux vanishes.
+                IF ( sourceS(j,k) ) THEN
 
-                           END IF
+                   q_interfaceB(:,j,k) = q_interfaceT(:,j,k)
+                   q_interfaceB(3,j,k) = -q_interfaceT(3,j,k)  ! hv
+                   qp_interfaceB(:,j,k) = qp_interfaceT(:,j,k)
+                   qp_interfaceB(idx_v,j,k) = -qp_interfaceT(idx_v,j,k)
 
+                ELSEIF ( sourceN(j,k) ) THEN
 
-                           vars_loop:DO i=1,n_vars
+                   q_interfaceT(:,j,k+1) = q_interfaceB(:,j,k+1)
+                   q_interfaceT(3,j,k+1) = -q_interfaceB(3,j,k+1)  ! hv
+                   qp_interfaceT(:,j,k+1) = qp_interfaceB(:,j,k+1)
+                   qp_interfaceT(idx_v,j,k+1) = -qp_interfaceB(idx_v,j,k+1)
 
-                              qrec_stencil(2) = qp_expl(i,j,k)
+                END IF
 
-                              ! x direction
-                              check_comp_cells_x:IF ( comp_cells_x .GT. 1 ) THEN
+             END IF
 
-                                 ! west boundary
-                                 check_x_boundary:IF ( j .EQ. 1 ) THEN
+          END IF
 
-                                    x_stencil(1) = x_stag(1)
-                                    x_stencil(3) = x_comp(j+1)
+       ELSE
 
-                                    IF ( source_cell(j,k).EQ.2 ) THEN
+          ! case comp_cells_y = 1
 
-                                       ! Dirichlet boundary condition
-                                       qrec_stencil(1) = source_bdry(i)
-                                       qrec_stencil(3) = qp_expl(i,j+1,k)
+          q_interfaceB(:,j,k) = q_expl(:,j,k)
+          q_interfaceT(:,j,k) = q_expl(:,j,k)
+          q_interfaceB(:,j,k+1) = q_expl(:,j,k)
+          q_interfaceT(:,j,k+1) = q_expl(:,j,k)
 
-                                       CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
-                                          qrec_prime_x(i) )
+          qp_interfaceB(:,j,k) = qp_expl(:,j,k)
+          qp_interfaceT(:,j,k) = qp_expl(:,j,k)
+          qp_interfaceB(:,j,k+1) = qp_expl(:,j,k)
+          qp_interfaceT(:,j,k+1) = qp_expl(:,j,k)
 
-                                    ELSE
+       END IF
+       
+    END DO
 
-                                       IF ( bcW(i)%flag .EQ. 0 ) THEN
+    !$OMP END PARALLEL DO
 
-                                          ! Dirichlet boundary condition
-                                          qrec_stencil(1) = bcW(i)%value
-                                          qrec_stencil(3) = qp_expl(i,j+1,k)
+    RETURN
 
-                                          CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
-                                             qrec_prime_x(i) )
+  END SUBROUTINE reconstruction
 
-                                       ELSEIF ( bcW(i)%flag .EQ. 1 ) THEN
 
-                                          ! Neumann boundary condition
-                                          qrec_prime_x(i) = bcW(i)%value
+  !******************************************************************************
+  !> \brief Characteristic speeds
+  !
+  !> This subroutine evaluates the largest characteristic speed at the
+  !> cells interfaces from the reconstructed states.
+  !> @author 
+  !> Mattia de' Michieli Vitturi
+  !> \date 2019/11/11
+  !******************************************************************************
 
-                                       ELSEIF ( bcW(i)%flag .EQ. 2 ) THEN
+  SUBROUTINE eval_speeds
 
-                                          qrec_prime_x(i) = ( qp_expl(i,2,k) - qp_expl(i,1,k) )        &
-                                             * one_by_dx
+    ! External procedures
+    USE constitutive_2d, ONLY : eval_local_speeds_x, eval_local_speeds_y 
 
-                                       END IF
+    IMPLICIT NONE
 
-                                    END IF
+    REAL(wp) :: abslambdaL_min(n_vars) , abslambdaL_max(n_vars)
+    REAL(wp) :: abslambdaR_min(n_vars) , abslambdaR_max(n_vars)
+    REAL(wp) :: abslambdaB_min(n_vars) , abslambdaB_max(n_vars)
+    REAL(wp) :: abslambdaT_min(n_vars) , abslambdaT_max(n_vars)
+    REAL(wp) :: min_r(n_vars) , max_r(n_vars)
 
-                                    !east boundary
-                                 ELSEIF ( j .EQ. comp_cells_x ) THEN
+    INTEGER :: j,k,l
 
-                                    x_stencil(3) = x_stag(comp_interfaces_x)
-                                    x_stencil(1) = x_comp(j-1)
+    !$OMP PARALLEL
 
-                                    IF ( source_cell(j,k).EQ.2 ) THEN
+    IF ( comp_cells_x .GT. 1 ) THEN
 
-                                       ! Dirichlet boundary condition
-                                       qrec_stencil(3) = source_bdry(i)
-                                       qrec_stencil(1)= qp_expl(i,j-1,k)
+       !$OMP DO private(j , k , abslambdaL_min , abslambdaL_max ,               &
+       !$OMP & abslambdaR_min , abslambdaR_max , min_r , max_r )
 
-                                       CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
-                                          qrec_prime_x(i) )
+       x_interfaces_loop:DO l = 1,solve_interfaces_x
 
-                                    ELSE
+          j = j_stag_x(l)
+          k = k_stag_x(l)
 
-                                       IF ( bcE(i)%flag .EQ. 0 ) THEN
+          CALL eval_local_speeds_x( qp_interfaceL(:,j,k) ,                      &
+               grav_coeff_stag_x(j,k) , abslambdaL_min , abslambdaL_max )
 
-                                          ! Dirichlet boundary condition
-                                          qrec_stencil(3) = bcE(i)%value
-                                          qrec_stencil(1)= qp_expl(i,j-1,k)
+          CALL eval_local_speeds_x( qp_interfaceR(:,j,k) ,                      &
+               grav_coeff_stag_x(j,k) , abslambdaR_min , abslambdaR_max )
 
-                                          CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
-                                             qrec_prime_x(i) )
+          min_r = MIN(abslambdaL_min , abslambdaR_min , 0.0_wp)
+          max_r = MAX(abslambdaL_max , abslambdaR_max , 0.0_wp)
 
-                                       ELSEIF ( bcE(i)%flag .EQ. 1 ) THEN
+          a_interface_xNeg(:,j,k) = min_r
+          a_interface_xPos(:,j,k) = max_r
 
-                                          ! Neumann boundary condition
-                                          qrec_prime_x(i) = bcE(i)%value
+       END DO x_interfaces_loop
 
-                                       ELSEIF ( bcE(i)%flag .EQ. 2 ) THEN
+       !$OMP END DO NOWAIT
 
-                                          qrec_prime_x(i) = ( qp_expl(i,comp_cells_x,k) -              &
-                                             qp_expl(i,comp_cells_x-1,k) ) * one_by_dx
+    END IF
 
-                                       END IF
+    IF ( comp_cells_y .GT. 1 ) THEN
 
-                                    END IF
+       !$OMP DO private(j , k , abslambdaB_min , abslambdaB_max ,               &
+       !$OMP & abslambdaT_min , abslambdaT_max , min_r , max_r )
 
-                                 ELSE
+       y_interfaces_loop:DO l = 1,solve_interfaces_y
 
-                                    ! internal x cells
+          j = j_stag_y(l)
+          k = k_stag_y(l)
 
-                                    x_stencil(1) = x_comp(j-1)
-                                    x_stencil(3) = x_comp(j+1)
+          CALL eval_local_speeds_y( qp_interfaceB(:,j,k) ,                      &
+               grav_coeff_stag_y(j,k) , abslambdaB_min , abslambdaB_max )
+          
+          CALL eval_local_speeds_y( qp_interfaceT(:,j,k) ,                      &
+               grav_coeff_stag_y(j,k) , abslambdaT_min , abslambdaT_max )
 
-                                    qrec_stencil(1) = qp_expl(i,j-1,k)
-                                    qrec_stencil(3) = qp_expl(i,j+1,k)
+          min_r = MIN(abslambdaB_min , abslambdaT_min , 0.0_wp)
+          max_r = MAX(abslambdaB_max , abslambdaT_max , 0.0_wp)
 
-                                    ! correction for radial source inlet x-interfaces values
-                                    ! used for the linear reconstruction
-                                    IF ( radial_source_flag .AND. ( source_cell(j,k).EQ.2 ) ) THEN
+          a_interface_yNeg(:,j,k) = min_r
+          a_interface_yPos(:,j,k) = max_r
 
-                                       IF ( sourceE(j,k) ) THEN
+       END DO y_interfaces_loop
 
-                                          x_stencil(3) = x_stag(j+1)
-                                          qrec_stencil(3) = source_bdry(i)
+       !$OMP END DO
 
-                                       ELSEIF ( sourceW(j,k) ) THEN
+    END IF
 
-                                          x_stencil(1) = x_stag(j)
-                                          qrec_stencil(1) = source_bdry(i)
+    !$OMP END PARALLEL
 
-                                       END IF
+    RETURN
+    
+  END SUBROUTINE eval_speeds
 
-                                    END IF
-
-                                    CALL limit( qrec_stencil , x_stencil , limiter(i) ,             &
-                                       qrec_prime_x(i) )
-
-                                 ENDIF check_x_boundary
-
-                                 dq = reconstr_coeff* dx2 * qrec_prime_x(i)
-
-                                 qrecW(i) = qrec_stencil(2) - dq
-                                 qrecE(i) = qrec_stencil(2) + dq
-
-
-                                 IF ( j .EQ. 1 ) THEN
-
-                                    IF ( source_cell(j,k).EQ.2 ) THEN
-
-                                       qrecW(i) = source_bdry(i)
-
-                                    ELSE
-
-                                       ! Dirichelet boundary condition at the west of the domain
-                                       IF ( bcW(i)%flag .EQ. 0 ) THEN
-
-                                          qrecW(i) = bcW(i)%value
-
-                                       ELSE
-
-                                          IF ( i .EQ. 2 ) qrecW(i) = MIN( qrecW(i) , 0.0_wp )
-
-                                       END IF
-
-                                    END IF
-
-                                 END IF
-
-                                 IF ( j .EQ. comp_cells_x ) THEN
-
-                                    IF ( source_cell(j,k).EQ.2 ) THEN
-
-                                       qrecE(i) = source_bdry(i)
-
-                                    ELSE
-
-                                       ! Dirichelet boundary condition at the east of the domain
-                                       IF ( bcE(i)%flag .EQ. 0 ) THEN
-
-                                          qrecE(i) = bcE(i)%value
-
-                                       ELSE
-
-                                          IF ( i .EQ. 2 ) qrecE(i) = MAX( qrecE(i) , 0.0_wp )
-
-                                       END IF
-
-                                    END IF
-
-                                 END IF
-
-                              END IF check_comp_cells_x
-
-                              ! y-direction
-                              check_comp_cells_y:IF ( comp_cells_y .GT. 1 ) THEN
-
-                                 ! South boundary
-                                 check_y_boundary:IF ( k .EQ. 1 ) THEN
-
-                                    y_stencil(1) = y_stag(1)
-                                    y_stencil(3) = y_comp(k+1)
-
-                                    IF ( bcS(i)%flag .EQ. 0 ) THEN
-
-                                       ! Dirichlet boundary condition
-                                       qrec_stencil(1) = bcS(i)%value
-                                       qrec_stencil(3) = qp_expl(i,j,k+1)
-
-                                       CALL limit( qrec_stencil , y_stencil , limiter(i) ,          &
-                                          qrec_prime_y(i) )
-
-                                    ELSEIF ( bcS(i)%flag .EQ. 1 ) THEN
-
-                                       ! Neumann boundary condition
-                                       qrec_prime_y(i) = bcS(i)%value
-
-                                    ELSEIF ( bcS(i)%flag .EQ. 2 ) THEN
-
-                                       qrec_prime_y(i) = ( qp_expl(i,j,2) - qp_expl(i,j,1) )        &
-                                          * one_by_dy
-
-                                    END IF
-
-                                    ! North boundary
-                                 ELSEIF ( k .EQ. comp_cells_y ) THEN
-
-                                    y_stencil(1) = y_comp(k-1)
-                                    y_stencil(3) = y_stag(comp_interfaces_y)
-
-                                    IF ( bcN(i)%flag .EQ. 0 ) THEN
-
-                                       ! Dirichlet boundary condition
-                                       qrec_stencil(1)= qp_expl(i,j,k-1)
-                                       qrec_stencil(3) = bcN(i)%value
-
-                                       CALL limit( qrec_stencil , y_stencil , limiter(i) ,          &
-                                          qrec_prime_y(i) )
-
-                                    ELSEIF ( bcN(i)%flag .EQ. 1 ) THEN
-
-                                       ! Neumann boundary condition
-                                       qrec_prime_y(i) = bcN(i)%value
-
-                                    ELSEIF ( bcN(i)%flag .EQ. 2 ) THEN
-
-                                       qrec_prime_y(i) = ( qp_expl(i,j,comp_cells_y) -              &
-                                          qp_expl(i,j,comp_cells_y-1) ) * one_by_dy
-
-                                    END IF
-
-                                 ELSE
-
-                                    ! Internal y cells
-
-                                    y_stencil(1) = y_comp(k-1)
-                                    y_stencil(3) = y_comp(k+1)
-
-                                    qrec_stencil(1) = qp_expl(i,j,k-1)
-                                    qrec_stencil(3) = qp_expl(i,j,k+1)
-
-                                    ! correction for radial source inlet y-interfaces
-                                    ! used for the linear reconstruction
-                                    IF ( radial_source_flag .AND. ( source_cell(j,k).EQ.2 ) ) THEN
-
-                                       IF ( sourceS(j,k) ) THEN
-
-                                          y_stencil(1) = y_stag(k)
-                                          qrec_stencil(1) = source_bdry(i)
-
-                                       ELSEIF ( sourceN(j,k) ) THEN
-
-                                          y_stencil(3) = y_stag(k+1)
-                                          qrec_stencil(3) = source_bdry(i)
-
-                                       END IF
-
-                                    END IF
-
-                                    CALL limit( qrec_stencil , y_stencil , limiter(i) ,             &
-                                       qrec_prime_y(i) )
-
-                                 ENDIF check_y_boundary
-
-                                 dq = reconstr_coeff * dy2 * qrec_prime_y(i)
-
-                                 qrecS(i) = qrec_stencil(2) - dq
-                                 qrecN(i) = qrec_stencil(2) + dq
-
-                                 IF ( k .EQ. 1 ) THEN
-
-                                    ! Dirichelet boundary condition at the south of the domain
-                                    IF ( bcS(i)%flag .EQ. 0 ) THEN
-
-                                       qrecS(i) = bcS(i)%value
-
-                                    ELSE
-
-                                       IF ( i .EQ. 3 ) qrecS(i) = MIN( qrecS(i) , 0.0_wp )
-
-                                    END IF
-
-                                 END IF
-
-                                 IF ( k .EQ. comp_cells_y ) THEN
-
-                                    ! Dirichelet boundary condition at the north of the domain
-                                    IF ( bcN(i)%flag .EQ. 0 ) THEN
-
-                                       qrecN(i) = bcN(i)%value
-
-                                    ELSE
-
-                                       IF ( i .EQ. 3 ) qrecN(i) = MAX( qrecN(i) , 0.0_wp )
-
-                                    END IF
-
-                                 END IF
-
-                              ENDIF check_comp_cells_y
-
-                           ENDDO vars_loop
-
-                           add_vars_loop:DO i=n_vars+1,n_vars+2
-                              ! reconstruction on u and v with same limiters of hu,hv
-
-                              ! x direction
-                              check_comp_cells_x2:IF ( comp_cells_x .GT. 1 ) THEN
-
-                                 qrec_stencil(2) = qp_expl(i,j,k)
-
-                                 IF ( j .EQ. 1 ) THEN
-
-                                    CALL qp_to_qp2( qrecW(1:n_vars) , B_cent(j,k) , qp2recW )
-                                    qrec_stencil(1) = qp2recW(i-n_vars+1)
-                                    qrec_stencil(3) = qp_expl(i,j+1,k)
-
-                                 ELSEIF ( j .EQ. comp_cells_x ) THEN
-
-                                    CALL qp_to_qp2( qrecE(1:n_vars) , B_cent(j,k) , qp2recE )
-                                    qrec_stencil(1) = qp_expl(i,j-1,k)
-                                    qrec_stencil(3) = qp2recE(i-n_vars+1)
-
-                                 ELSE
-
-                                    qrec_stencil(1) = qp_expl(i,j-1,k)
-                                    qrec_stencil(3) = qp_expl(i,j+1,k)
-
-                                    ! correction for radial source inlet x-interfaces values
-                                    ! used for the linear reconstruction
-                                    IF ( radial_source_flag .AND. ( source_cell(j,k).EQ.2 ) ) THEN
-
-                                       IF ( sourceE(j,k) ) THEN
-
-                                          x_stencil(3) = x_stag(j+1)
-                                          qrec_stencil(3) = source_bdry(i)
-
-                                       ELSEIF ( sourceW(j,k) ) THEN
-
-                                          x_stencil(1) = x_stag(j)
-                                          qrec_stencil(1) = source_bdry(i)
-
-                                       END IF
-
-                                    END IF
-
-                                 END IF
-
-                                 CALL limit( qrec_stencil , x_stencil , limiter(i) ,                &
-                                    qrec_prime_x(i) )
-
-                                 dq = reconstr_coeff*dx2*qrec_prime_x(i)
-
-                                 qrecW(i) = qrec_stencil(2) - dq
-                                 qrecE(i) = qrec_stencil(2) + dq
-
-                                 IF ( j .EQ. 1 ) THEN
-
-                                    CALL qp_to_qp2( qrecW(1:n_vars) , B_cent(j,k) , qp2recW )
-                                    qrecW(i) = qp2recW(i-n_vars+1)
-
-                                 ELSEIF ( j .EQ. comp_cells_x ) THEN
-
-                                    CALL qp_to_qp2( qrecE(1:n_vars) , B_cent(j,k) , qp2recE )
-                                    qrecE(i) = qp2recE(i-n_vars+1)
-
-                                 ELSE
-
-                                    ! correction for radial source inlet x-interfaces:
-                                    ! the physical variables at the x-interfaces qrecW or
-                                    ! qrecE are computed from the radial inlet values
-                                    IF ( radial_source_flag .AND. ( source_cell(j,k).EQ.2 ) ) THEN
-
-                                       IF ( sourceE(j,k) ) THEN
-
-                                          qrecE(1:n_vars+2) = source_bdry(1:n_vars+2)
-
-                                       ELSEIF ( sourceW(j,k) ) THEN
-
-                                          qrecW(1:n_vars+2) = source_bdry(1:n_vars+2)
-
-                                       END IF
-
-                                    END IF
-
-                                 END IF
-
-                              END IF check_comp_cells_x2
-
-                              ! y-direction
-                              check_comp_cells_y2:IF ( comp_cells_y .GT. 1 ) THEN
-
-                                 qrec_stencil(2) = qp_expl(i,j,k)
-
-                                 IF ( k .EQ. 1 ) THEN
-
-                                    CALL qp_to_qp2( qrecS(1:n_vars) , B_cent(j,k) , qp2recS )
-                                    qrec_stencil(1) = qp2recS(i-n_vars+1)
-                                    qrec_stencil(3) = qp_expl(i,j,k+1)
-
-                                 ELSEIF ( k .EQ. comp_cells_y ) THEN
-
-                                    CALL qp_to_qp2( qrecN(1:n_vars) , B_cent(j,k) , qp2recN )
-                                    qrec_stencil(1) = qp_expl(i,j,k-1)
-                                    qrec_stencil(3) = qp2recN(i-n_vars+1)
-
-                                 ELSE
-
-                                    qrec_stencil(1) = qp_expl(i,j,k-1)
-                                    qrec_stencil(3) = qp_expl(i,j,k+1)
-
-                                    ! correction for radial source inlet y-interfaces
-                                    ! used for the linear reconstruction
-                                    IF ( radial_source_flag .AND. ( source_cell(j,k).EQ.2 ) ) THEN
-
-                                       IF ( sourceS(j,k) ) THEN
-
-                                          y_stencil(1) = y_stag(k)
-                                          qrec_stencil(1) = source_bdry(i)
-
-                                       ELSEIF ( sourceN(j,k) ) THEN
-
-                                          x_stencil(3) = y_stag(k+1)
-                                          qrec_stencil(3) = source_bdry(i)
-
-                                       END IF
-
-                                    END IF
-
-                                 ENDIF
-
-                                 CALL limit( qrec_stencil , y_stencil , limiter(i) ,                &
-                                    qrec_prime_y(i) )
-
-                                 dq = reconstr_coeff*dy2*qrec_prime_y(i)
-
-                                 qrecS(i) = qrec_stencil(2) - dq
-                                 qrecN(i) = qrec_stencil(2) + dq
-
-
-                                 IF ( k .EQ. 1 ) THEN
-
-                                    CALL qp_to_qp2( qrecS(1:n_vars) , B_cent(j,k) , qp2recS )
-                                    qrecS(i) = qp2recS(i-n_vars+1)
-
-                                 ELSEIF ( k .EQ. comp_cells_y ) THEN
-
-                                    CALL qp_to_qp2( qrecN(1:n_vars) , B_cent(j,k) , qp2recN )
-                                    qrecN(i) = qp2recN(i-n_vars+1)
-
-                                 ELSE
-
-                                    ! correction for radial source inlet y-interfaces:
-                                    ! the physical variables at the y-interfaces qrecS or
-                                    ! qrecN are computed from the radial inlet values
-                                    IF ( radial_source_flag .AND. ( source_cell(j,k) .EQ. 2 ) ) THEN
-
-                                       IF ( sourceS(j,k) ) THEN
-
-                                          qrecS(1:n_vars+2) = source_bdry(1:n_vars+2)
-
-                                       ELSEIF ( sourceN(j,k) ) THEN
-
-                                          qrecN(1:n_vars+2) = source_bdry(1:n_vars+2)
-
-                                       END IF
-
-                                    END IF
-
-                                 END IF
-
-                              ENDIF check_comp_cells_y2
-
-                           ENDDO add_vars_loop
-
-                           ! check if du/dx + dv/dy > 0 (flow locally diverges)
-                           diverging_flag = ( ( qrec_prime_x(n_vars+1) + qrec_prime_y(n_vars+2) )   &
-                              .GT. 0.0_wp )
-
-                           IF ( comp_cells_x .GT. 1 ) THEN
-
-                              IF ( ( j .GT. 1 ) .AND. ( j .LT. comp_cells_x ) ) THEN
-
-                                 IF ( q_expl(1,j,k) .EQ. 0.0_wp ) THEN
-
-                                    IF ( ( .NOT. radial_source_flag ) .OR.                          &
-                                       ( ( radial_source_flag ) .AND.                             &
-                                       ( source_cell(j,k) .EQ. 0 ) ) ) THEN
-
-                                       ! In the internal cell, if thickness h is 0 at the center
-                                       ! of the cell, then all the variables are 0 at the center
-                                       ! and at the interfaces (no conversion back is needed from
-                                       ! reconstructed to conservative)
-                                       q_interfaceR(:,j,k) = 0.0_wp
-                                       q_interfaceL(:,j+1,k) = 0.0_wp
-
-                                       qp_interfaceR(1:3,j,k) = 0.0_wp
-                                       qp_interfaceR(4:n_vars,j,k) = qrecW(4:n_vars)
-                                       qp_interfaceR(n_vars+1:n_vars+2,j,k) = 0.0_wp
-
-                                       qp_interfaceL(1:3,j+1,k) = 0.0_wp
-                                       qp_interfaceL(4:n_vars,j+1,k) = qrecE(4:n_vars)
-                                       qp_interfaceL(n_vars+1:n_vars+2,j+1,k) = 0.0_wp
-
-                                       diverg_interfaceR(j,k) = .FALSE.
-                                       diverg_interfaceL(j+1,k) = .FALSE.
-
-                                    END IF
-
-                                 END IF
-
-                              END IF
-
-                              ! Correction for residual volume fraction of continuous phase
-                              IF ( alpha_flag ) THEN
-
-                                 !qrecW(5:4+n_solid) = qrecW(5:4+n_solid) *                          &
-                                 !     MIN( 1.0_wp , maximum_solid_packing /                         &
-                                 !     SUM( qrecW(5:4+n_solid) ) )
-
-                                 !qrecE(5:4+n_solid) = qrecE(5:4+n_solid) *                          &
-                                 !     MIN( 1.0_wp , maximum_solid_packing /                         &
-                                 !     SUM( qrecE(5:4+n_solid) ) )
-
-                              ELSE
-
-                                 !qrecW(5:4+n_solid) = qrecW(5:4+n_solid) *                          &
-                                 !     MIN( 1.0_wp , maximum_solid_packing * qrecW(1) /              &
-                                 !     SUM( qrecW(5:4+n_solid) ) )
-
-                                 !qrecE(5:4+n_solid) = qrecE(5:4+n_solid) *                          &
-                                 !     MIN( 1.0_wp , maximum_solid_packing * qrecE(1) /              &
-                                 !     SUM( qrecE(5:4+n_solid) ) )
-
-                              END IF
-
-                              CALL qp_to_qc( qrecW,q_interfaceR(:,j,k) )
-                              CALL qp_to_qc( qrecE,q_interfaceL(:,j+1,k) )
-
-                              qp_interfaceR(1:n_vars+2,j,k) = qrecW(1:n_vars+2)
-                              qp_interfaceL(1:n_vars+2,j+1,k) = qrecE(1:n_vars+2)
-
-                              diverg_interfaceR(j,k) = diverging_flag
-                              diverg_interfaceL(j+1,k) = diverging_flag
-
-                              IF ( j.EQ.1 ) THEN
-
-                                 ! Interface value at the left of first x-interface (external)
-                                 q_interfaceL(:,j,k) = q_interfaceR(:,j,k)
-                                 qp_interfaceL(:,j,k) = qp_interfaceR(:,j,k)
-
-                                 !WRITE(*,*) 'j,k',j,k
-                                 !WRITE(*,*) 'qp_interfaceL(:,j,k)',qp_interfaceL(:,j,k)
-                                 !READ(*,*)
-
-                                 diverg_interfaceR(j,k) = diverg_interfaceL(j,k)
-
-                              ELSEIF ( j.EQ.comp_cells_x ) THEN
-
-                                 ! Interface value at the right of last x-interface (external)
-                                 q_interfaceR(:,j+1,k) = q_interfaceL(:,j+1,k)
-                                 qp_interfaceR(:,j+1,k) = qp_interfaceL(:,j+1,k)
-
-                                 diverg_interfaceR(j+1,k) = diverg_interfaceL(j+1,k)
-
-                              ELSE
-
-                                 IF ( radial_source_flag .AND. ( source_cell(j,k) .EQ. 2 ) ) THEN
-
-                                    IF ( sourceE(j,k) ) THEN
-
-                                       q_interfaceR(:,j+1,k) = q_interfaceL(:,j+1,k)
-                                       qp_interfaceR(:,j+1,k) = qp_interfaceL(:,j+1,k)
-
-                                    ELSEIF ( sourceW(j,k) ) THEN
-
-                                       q_interfaceL(:,j,k) = q_interfaceR(:,j,k)
-                                       qp_interfaceL(:,j,k) = qp_interfaceR(:,j,k)
-
-                                    END IF
-
-                                 END IF
-
-                              END IF
-
-                           ELSE
-
-                              ! for case comp_cells_x = 1
-                              q_interfaceR(1:n_vars,j,k) = q_expl(1:n_vars,j,k)
-                              q_interfaceL(1:n_vars,j+1,k) = q_expl(1:n_vars,j,k)
-
-                              qp_interfaceR(1:n_vars+2,j,k) = qp_expl(1:n_vars+2,j,k)
-                              qp_interfaceL(1:n_vars+2,j+1,k) = qp_expl(1:n_vars+2,j,k)
-
-                              diverg_interfaceR(j,k) = diverging_flag
-                              diverg_interfaceL(j+1,k) = diverging_flag
-
-                           END IF
-
-                           IF ( comp_cells_y .GT. 1 ) THEN
-
-                              IF ( ( k .GT. 1 ) .AND. ( k .LT. comp_cells_y ) ) THEN
-
-                                 IF ( q_expl(1,j,k) .EQ. 0.0_wp ) THEN
-
-                                    IF ( ( .NOT. radial_source_flag ) .OR.                          &
-                                       ( ( radial_source_flag ) .AND.                             &
-                                       ( source_cell(j,k) .EQ. 0 ) ) ) THEN
-
-                                       ! In the internal cell, if thickness h is 0 at the center
-                                       ! of the cell, then all the variables are 0 at the center
-                                       ! and at the interfaces (no conversion back is needed from
-                                       ! reconstructed to conservative)
-
-                                       q_interfaceT(:,j,k) = 0.0_wp
-                                       q_interfaceB(:,j,k+1) = 0.0_wp
-
-                                       qp_interfaceT(1:3,j,k) = 0.0_wp
-                                       qp_interfaceT(4:n_vars,j,k) = qrecS(4:n_vars)
-                                       qp_interfaceT(n_vars+1:n_vars+2,j,k) = 0.0_wp
-
-                                       qp_interfaceB(1:3,j,k+1) = 0.0_wp
-                                       qp_interfaceB(4:n_vars,j,k+1) = qrecN(4:n_vars)
-                                       qp_interfaceB(n_vars+1:n_vars+2,j,k+1) = 0.0_wp
-
-                                       diverg_interfaceT(j,k) = .FALSE.
-                                       diverg_interfaceB(j,k+1) = .FALSE.
-
-                                    END IF
-
-                                 END IF
-
-                              END IF
-
-                              ! Correction for maximum solid packing
-                              IF ( alpha_flag ) THEN
-
-                                 !qrecS(5:4+n_solid) = qrecS(5:4+n_solid) *                          &
-                                 !     MIN( 1.0_wp , maximum_solid_packing /                         &
-                                 !     SUM( qrecS(5:4+n_solid) ) )
-
-                                 !qrecN(5:4+n_solid) = qrecN(5:4+n_solid) *                          &
-                                 !     MIN( 1.0_wp , maximum_solid_packing /                         &
-                                 !     SUM( qrecN(5:4+n_solid) ) )
-
-                              ELSE
-
-                                 !qrecS(5:4+n_solid) = qrecS(5:4+n_solid) *                          &
-                                 !     MIN( 1.0_wp , maximum_solid_packing * qrecS(1) /              &
-                                 !     SUM( qrecS(5:4+n_solid) ) )
-
-                                 !qrecN(5:4+n_solid) = qrecN(5:4+n_solid) *                          &
-                                 !     MIN( 1.0_wp , maximum_solid_packing * qrecN(1) /              &
-                                 !     SUM( qrecN(5:4+n_solid) ) )
-
-                              END IF
-
-                              CALL qp_to_qc( qrecS, q_interfaceT(:,j,k) )
-                              CALL qp_to_qc( qrecN, q_interfaceB(:,j,k+1) )
-
-                              qp_interfaceT(1:n_vars+2,j,k) = qrecS(1:n_vars+2)
-                              qp_interfaceB(1:n_vars+2,j,k+1) = qrecN(1:n_vars+2)
-
-                              diverg_interfaceT(j,k) = diverging_flag
-                              diverg_interfaceB(j,k+1) = diverging_flag
-
-                              IF ( k .EQ. 1 ) THEN
-
-                                 ! Interface value at the bottom of first y-interface (external)
-                                 q_interfaceB(:,j,k) = q_interfaceT(:,j,k)
-                                 qp_interfaceB(:,j,k) = qp_interfaceT(:,j,k)
-
-                                 diverg_interfaceB(j,k) = diverg_interfaceT(j,k)
-
-                              ELSEIF ( k .EQ. comp_cells_y ) THEN
-
-                                 ! Interface value at the top of last y-interface (external)
-                                 q_interfaceT(:,j,k+1) = q_interfaceB(:,j,k+1)
-                                 qp_interfaceT(:,j,k+1) = qp_interfaceB(:,j,k+1)
-
-                                 diverg_interfaceT(j,k+1) = diverg_interfaceB(j,k+1)
-
-                              ELSE
-
-                                 IF ( radial_source_flag .AND. ( source_cell(j,k) .EQ. 2 ) ) THEN
-
-                                    IF ( sourceS(j,k) ) THEN
-
-                                       q_interfaceB(:,j,k) = q_interfaceT(:,j,k)
-                                       qp_interfaceB(:,j,k) = qp_interfaceT(:,j,k)
-
-                                    ELSEIF ( sourceN(j,k) ) THEN
-
-                                       q_interfaceT(:,j,k+1) = q_interfaceB(:,j,k+1)
-                                       qp_interfaceT(:,j,k+1) = qp_interfaceB(:,j,k+1)
-
-                                    END IF
-
-                                 END IF
-
-                              END IF
-
-                           ELSE
-
-                              ! case comp_cells_y = 1
-
-                              q_interfaceB(:,j,k) = q_expl(:,j,k)
-                              q_interfaceT(:,j,k) = q_expl(:,j,k)
-                              q_interfaceB(:,j,k+1) = q_expl(:,j,k)
-                              q_interfaceT(:,j,k+1) = q_expl(:,j,k)
-
-                              qp_interfaceB(:,j,k) = qp_expl(:,j,k)
-                              qp_interfaceT(:,j,k) = qp_expl(:,j,k)
-                              qp_interfaceB(:,j,k+1) = qp_expl(:,j,k)
-                              qp_interfaceT(:,j,k+1) = qp_expl(:,j,k)
-
-                           END IF
-
-                        END DO
-
-                        !$OMP END PARALLEL DO
-
-                        RETURN
-
-                     END SUBROUTINE reconstruction
-
-
-                     !******************************************************************************
-                     !> \brief Characteristic speeds
-                     !
-                     !> This subroutine evaluates the largest characteristic speed at the
-                     !> cells interfaces from the reconstructed states.
-                     !> @author
-                     !> Mattia de' Michieli Vitturi
-                     !> \date 2019/11/11
-                     !******************************************************************************
-
-                     SUBROUTINE eval_speeds
-
-                        ! External procedures
-                        USE constitutive_2d, ONLY : eval_local_speeds_x, eval_local_speeds_y
-
-                        IMPLICIT NONE
-
-                        REAL(wp) :: abslambdaL_min(n_vars) , abslambdaL_max(n_vars)
-                        REAL(wp) :: abslambdaR_min(n_vars) , abslambdaR_max(n_vars)
-                        REAL(wp) :: abslambdaB_min(n_vars) , abslambdaB_max(n_vars)
-                        REAL(wp) :: abslambdaT_min(n_vars) , abslambdaT_max(n_vars)
-                        REAL(wp) :: min_r(n_vars) , max_r(n_vars)
-
-                        INTEGER :: j,k,l
-
-                        !$OMP PARALLEL
-
-                        IF ( comp_cells_x .GT. 1 ) THEN
-
-                           !$OMP DO private(j , k , abslambdaL_min , abslambdaL_max ,               &
-                           !$OMP & abslambdaR_min , abslambdaR_max , min_r , max_r )
-
-                           x_interfaces_loop:DO l = 1,solve_interfaces_x
-
-                              j = j_stag_x(l)
-                              k = k_stag_x(l)
-
-                              CALL eval_local_speeds_x( qp_interfaceL(:,j,k) ,                      &
-                                 grav_coeff_stag_x(j,k) , abslambdaL_min , abslambdaL_max )
-
-                              CALL eval_local_speeds_x( qp_interfaceR(:,j,k) ,                      &
-                                 grav_coeff_stag_x(j,k) , abslambdaR_min , abslambdaR_max )
-
-                              min_r = MIN(abslambdaL_min , abslambdaR_min , 0.0_wp)
-                              max_r = MAX(abslambdaL_max , abslambdaR_max , 0.0_wp)
-
-                              a_interface_xNeg(:,j,k) = min_r
-                              a_interface_xPos(:,j,k) = max_r
-
-                           END DO x_interfaces_loop
-
-                           !$OMP END DO NOWAIT
-
-                        END IF
-
-                        IF ( comp_cells_y .GT. 1 ) THEN
-
-                           !$OMP DO private(j , k , abslambdaB_min , abslambdaB_max ,               &
-                           !$OMP & abslambdaT_min , abslambdaT_max , min_r , max_r )
-
-                           y_interfaces_loop:DO l = 1,solve_interfaces_y
-
-                              j = j_stag_y(l)
-                              k = k_stag_y(l)
-
-                              CALL eval_local_speeds_y( qp_interfaceB(:,j,k) ,                      &
-                                 grav_coeff_stag_y(j,k) , abslambdaB_min , abslambdaB_max )
-
-                              CALL eval_local_speeds_y( qp_interfaceT(:,j,k) ,                      &
-                                 grav_coeff_stag_y(j,k) , abslambdaT_min , abslambdaT_max )
-
-                              min_r = MIN(abslambdaB_min , abslambdaT_min , 0.0_wp)
-                              max_r = MAX(abslambdaB_max , abslambdaT_max , 0.0_wp)
-
-                              a_interface_yNeg(:,j,k) = min_r
-                              a_interface_yPos(:,j,k) = max_r
-
-                           END DO y_interfaces_loop
-
-                           !$OMP END DO
-
-                        END IF
-
-                        !$OMP END PARALLEL
-
-                        RETURN
-
-                     END SUBROUTINE eval_speeds
-
-                  END MODULE solver_2d
+END MODULE solver_2d
