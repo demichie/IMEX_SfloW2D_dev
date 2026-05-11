@@ -3023,12 +3023,16 @@ CONTAINS
 
   SUBROUTINE eval_expl_terms( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy , &
        Bsecondj_yy, grav_coeff, d_grav_coeff_dx , d_grav_coeff_dy , source_xy , &
-       qpj, expl_term, time, cell_fract_jk )
+       qpj, expl_term, time, cell_fract_jk,                                    &
+       lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk )
 
     USE parameters_2d, ONLY : vel_source , T_source , alphas_source ,           &
          alphal_source , time_param , bottom_radial_source_flag , alphag_source,&
          pore_pressure_flag , pore_pres_fract ,                                &
-         n_intervals , t_intervals , vel_intervals
+         n_intervals , t_intervals , vel_intervals ,                            &
+         radial_source_flag , h_source
+
+    USE geometry_2d, ONLY : pi_g
 
 
     IMPLICIT NONE
@@ -3044,11 +3048,18 @@ CONTAINS
 
     REAL(wp), INTENT(IN) :: source_xy
 
-    REAL(wp), INTENT(IN) :: qpj(n_vars+2)      !< local physical variables 
-    REAL(wp), INTENT(OUT) :: expl_term(n_eqns) !< local explicit forces 
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2)      !< local physical variables
+    REAL(wp), INTENT(OUT) :: expl_term(n_eqns) !< local explicit forces
 
     REAL(wp), INTENT(IN) :: time
     REAL(wp), INTENT(IN) :: cell_fract_jk
+
+    !> Lateral radial-source per-cell geometry. Pass 0 to disable the lateral
+    !> injection.
+    REAL(wp), INTENT(IN) :: lat_arc_perim_jk
+    REAL(wp), INTENT(IN) :: lat_n_x_jk
+    REAL(wp), INTENT(IN) :: lat_n_y_jk
+    REAL(wp), INTENT(IN) :: cell_area_jk
 
     REAL(wp) :: r_h          !< real-value flow thickness
     REAL(wp) :: r_u          !< real-value x-velocity
@@ -3083,54 +3094,59 @@ CONTAINS
     sp_heat_flag = .TRUE.
 
     expl_term(1:n_eqns) = 0.0_wp
+    q1 = 0.0_wp
 
-    IF ( ( qpj(1) .LE. EPSILON(1.0_wp) ) .AND. ( cell_fract_jk .EQ. 0.0_wp ) )  &
-         RETURN
+    IF ( ( qpj(1) .LE. EPSILON(1.0_wp) ) .AND. ( cell_fract_jk .EQ. 0.0_wp )    &
+         .AND. ( lat_arc_perim_jk .EQ. 0.0_wp ) ) RETURN
 
-    r_h = qpj(1)
-    r_u = qpj(idx_u)
-    r_v = qpj(idx_v)
+    ! Gravity terms - only meaningful when the cell has mass.
+    IF ( qpj(1) .GT. EPSILON(1.0_wp) ) THEN
 
-    CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,sp_heat_flag,r_sp_heat_c, &
-         r_sp_heat_mix)
+       r_h = qpj(1)
+       r_u = qpj(idx_u)
+       r_v = qpj(idx_v)
 
-    q1 = r_h * r_rho_m
-        
-    IF ( curvature_term_flag ) THEN
+       CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,sp_heat_flag,         &
+            r_sp_heat_c,r_sp_heat_mix)
 
-       centr_force_term = Bsecondj_xx * r_u**2 + 2.0_wp*Bsecondj_xy*r_u * r_v + &
-            Bsecondj_yy * r_v**2
+       q1 = r_h * r_rho_m
 
-    ELSE
+       IF ( curvature_term_flag ) THEN
 
-       centr_force_term = 0.0_wp
+          centr_force_term = Bsecondj_xx * r_u**2 + 2.0_wp*Bsecondj_xy*r_u*r_v &
+               + Bsecondj_yy * r_v**2
+
+       ELSE
+
+          centr_force_term = 0.0_wp
+
+       END IF
+
+       r_tilde_grav = r_red_grav + centr_force_term
+
+       ! units of dqc(2)/dt [kg m-1 s-2]
+       expl_term(2) = - grav_coeff * r_rho_m * r_tilde_grav * r_h * Bprimej_x  &
+            + 0.5_wp * r_rho_m * r_red_grav * r_h**2 * d_grav_coeff_dx
+
+       ! units of dqc(3)/dt [kg m-1 s-2]
+       expl_term(3) = - grav_coeff * r_rho_m * r_tilde_grav * r_h * Bprimej_y  &
+            + 0.5_wp * r_rho_m * r_red_grav * r_h**2 * d_grav_coeff_dy
+
+       IF ( energy_flag ) THEN
+
+          expl_term(4) = expl_term(2) * r_u + expl_term(3) * r_v
+
+       ELSE
+
+          expl_term(4) = 0.0_wp
+
+       END IF
 
     END IF
 
-    r_tilde_grav = r_red_grav + centr_force_term
+    ! ----------- ADDITIONAL EXPLICIT TERMS FOR BOTTOM RADIAL SOURCE ------------
 
-    ! units of dqc(2)/dt [kg m-1 s-2]
-    expl_term(2) = - grav_coeff * r_rho_m * r_tilde_grav * r_h * Bprimej_x      &
-         + 0.5_wp * r_rho_m * r_red_grav * r_h**2 * d_grav_coeff_dx 
-
-    ! units of dqc(3)/dt [kg m-1 s-2]
-    expl_term(3) = - grav_coeff * r_rho_m * r_tilde_grav * r_h * Bprimej_y      &
-         + 0.5_wp * r_rho_m * r_red_grav * r_h**2 * d_grav_coeff_dy
-
-    IF ( energy_flag ) THEN
-
-       expl_term(4) = expl_term(2) * r_u + expl_term(3) * r_v
-       
-    ELSE
-
-       expl_term(4) = 0.0_wp
-
-    END IF
-
-    ! ----------- ADDITIONAL EXPLICIT TERMS FOR BOTTOM RADIAL SOURCE ------------ 
-
-    IF ( ( .NOT.bottom_radial_source_flag ) .OR.                                &
-         ( cell_fract_jk .EQ. 0.0_wp ) ) RETURN
+    IF ( bottom_radial_source_flag .AND. ( cell_fract_jk .GT. 0.0_wp ) ) THEN
 
     IF ( n_intervals .GT. 0 ) THEN
 
@@ -3279,7 +3295,7 @@ CONTAINS
     IF ( pore_pressure_flag ) THEN
 
        exc_pore_pres = qpj(idx_pore)
-       
+
        ! we multiply the pore pressure inlet rate by the rate for q1
        ! the units of this source term are: kg^2 m^-3 s^-3
        expl_term(idx_poreEqn) = expl_term(idx_poreEqn) +                       &
@@ -3287,7 +3303,129 @@ CONTAINS
             exc_pore_pres * h_dot * r_rho_m )
 
     END IF
-    
+
+    END IF   ! bottom_radial_source_flag
+
+    ! ----------- LATERAL RADIAL SOURCE (volume formulation) ------------------
+    !
+    ! Replaces the prior Dirichlet-BC implementation. For each in-arc ring
+    ! cell, inject mass + momentum at a rate that integrates to the user-
+    ! specified MFR. cell_arc_perim is rescaled in init_source so the
+    ! per-cell rate rho_source * h_source * vel_source * cell_arc_perim_jk
+    ! / cell_area_jk sums to MFR over all in-arc cells.
+
+    IF ( radial_source_flag .AND. ( lat_arc_perim_jk .GT. 0.0_wp ) .AND.       &
+         ( h_source .GT. 0.0_wp ) ) THEN
+
+       ! Time gate - matches the L1 eval_source_bdry logic.
+       IF ( time .GE. time_param(4) ) THEN
+
+          IF ( ( time_param(3) .GT. 0.0_wp ) .AND.                             &
+               ( time .LT. time_param(4) + time_param(3) ) ) THEN
+             t_coeff = 0.5_wp * ( 1.0_wp + COS( pi_g *                         &
+                  ( time - time_param(4) ) / time_param(3) ) )
+          ELSE
+             t_coeff = 0.0_wp
+          END IF
+
+       ELSE
+
+          t_rem = MOD( time , time_param(1) )
+          t_coeff = 0.0_wp
+
+          IF ( time_param(3) .EQ. 0.0_wp ) THEN
+             IF ( t_rem .LE. time_param(2) ) t_coeff = 1.0_wp
+          ELSE
+             IF ( t_rem .LT. time_param(3) ) THEN
+                t_coeff = 0.5_wp * ( 1.0_wp - COS( pi_g * t_rem /              &
+                     time_param(3) ) )
+             ELSEIF ( t_rem .LE. ( time_param(2) - time_param(3) ) ) THEN
+                t_coeff = 1.0_wp
+             ELSEIF ( t_rem .LE. time_param(2) ) THEN
+                t_coeff = 0.5_wp * ( 1.0_wp + COS( pi_g * ( ( t_rem -          &
+                     time_param(2) ) / time_param(3) + 1.0_wp ) ) )
+             END IF
+          END IF
+
+       END IF
+
+       IF ( t_coeff .GT. 0.0_wp ) THEN
+
+          qp_source(:) = 0.0_wp
+          qp_source(1) = 1.0_wp
+          qp_source(4) = T_source
+
+          IF ( alpha_flag ) THEN
+             qp_source(idx_alfas_first:idx_alfas_last) =                       &
+                  alphas_source(1:n_solid)
+             qp_source(idx_addGas_first:idx_addGas_last) =                     &
+                  alphag_source(1:n_add_gas)
+             IF ( gas_flag .AND. liquid_flag )                                 &
+                  qp_source(n_vars) = alphal_source
+          ELSE
+             qp_source(idx_alfas_first:idx_alfas_last) =                       &
+                  alphas_source(1:n_solid) * qp_source(1)
+             qp_source(idx_addGas_first:idx_addGas_last) =                     &
+                  alphag_source(1:n_add_gas) * qp_source(1)
+             IF ( gas_flag .AND. liquid_flag )                                 &
+                  qp_source(n_vars) = alphal_source * qp_source(1)
+          END IF
+
+          IF ( stoch_transport_flag ) qp_source(idx_stoch) = 0.0_wp
+          IF ( pore_pressure_flag )   qp_source(idx_poreEqn) = 0.0_wp
+
+          qp_source(idx_u) = 0.0_wp
+          qp_source(idx_v) = 0.0_wp
+
+          CALL mixt_var( qp_source, r_Ri, r_rho_m, r_rho_c, r_red_grav,        &
+               sp_heat_flag, r_sp_heat_c, r_sp_heat_mix )
+
+          ! Per-cell injection rate (m/s) - integrates to MFR over all cells.
+          h_dot = h_source * vel_source * lat_arc_perim_jk / cell_area_jk
+
+          ! Mass equation.
+          expl_term(1) = expl_term(1) + t_coeff * h_dot * r_rho_m
+
+          ! Momentum equations - emit along the cell's outward unit normal.
+          expl_term(2) = expl_term(2) + t_coeff * h_dot * r_rho_m * vel_source &
+               * lat_n_x_jk
+          expl_term(3) = expl_term(3) + t_coeff * h_dot * r_rho_m * vel_source &
+               * lat_n_y_jk
+
+          ! Energy equation.
+          expl_term(4) = expl_term(4) + t_coeff * h_dot * r_rho_m              &
+               * r_sp_heat_mix * T_source
+
+          ! Solid transport.
+          expl_term(idx_alfas_first:idx_alfas_last) =                          &
+               expl_term(idx_alfas_first:idx_alfas_last) +                     &
+               t_coeff * h_dot * alphas_source(1:n_solid) * rho_s(1:n_solid)
+
+          ! Additional gases.
+          r_rho_g(1:n_add_gas) = pres /                                        &
+               ( sp_gas_const_g(1:n_add_gas) * T_source )
+
+          expl_term(idx_addGasEqn_first:idx_addGasEqn_last) =                  &
+               expl_term(idx_addGasEqn_first:idx_addGasEqn_last) +             &
+               t_coeff * h_dot * alphag_source(1:n_add_gas)                    &
+               * r_rho_g(1:n_add_gas)
+
+          IF ( gas_flag .AND. liquid_flag ) THEN
+             expl_term(n_vars) = expl_term(n_vars) +                           &
+                  t_coeff * h_dot * alphal_source * rho_l
+          END IF
+
+          IF ( pore_pressure_flag ) THEN
+             exc_pore_pres = qpj(idx_pore)
+             expl_term(idx_poreEqn) = expl_term(idx_poreEqn) +                 &
+                  t_coeff * ( q1 * pore_pres_fract * h_dot * r_rho_m           &
+                  * r_red_grav + exc_pore_pres * h_dot * r_rho_m )
+          END IF
+
+       END IF
+
+    END IF
+
     RETURN
 
   END SUBROUTINE eval_expl_terms

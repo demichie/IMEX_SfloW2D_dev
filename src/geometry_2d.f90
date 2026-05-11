@@ -135,6 +135,19 @@ MODULE geometry_2d
 
   REAL(wp), ALLOCATABLE :: cell_source_fractions(:,:)
 
+  !> Per-cell aggregate arc-perimeter inside the directed emission sector,
+  !> summed across active source faces (E/W/N/S). Used by the volume-source
+  !> formulation of the lateral RADIAL_SOURCE injection so that the
+  !> integrated emission equals MFR exactly. Rescaled to match the analytical
+  !> source length so that h_source * vel_source * cell_arc_perim integrates
+  !> to MFR. Zero outside the arc or for non-source cells.
+  REAL(wp), ALLOCATABLE :: cell_arc_perim(:,:)
+
+  !> Cell-aggregate outward unit normal averaged over in-arc active faces,
+  !> weighted by face length. Direction along which momentum is injected.
+  REAL(wp), ALLOCATABLE :: cell_arc_n_x(:,:)
+  REAL(wp), ALLOCATABLE :: cell_arc_n_y(:,:)
+
   REAL(wp) :: pi_g
 
   INTEGER :: n_topography_profile_x, n_topography_profile_y
@@ -246,6 +259,13 @@ CONTAINS
     ALLOCATE( grav_coeff_stag_y(comp_cells_x,comp_interfaces_y) )
 
     ALLOCATE( cell_source_fractions(comp_cells_x,comp_cells_y) )
+
+    ALLOCATE( cell_arc_perim(comp_cells_x,comp_cells_y) )
+    ALLOCATE( cell_arc_n_x(comp_cells_x,comp_cells_y) )
+    ALLOCATE( cell_arc_n_y(comp_cells_x,comp_cells_y) )
+    cell_arc_perim(:,:) = 0.0_wp
+    cell_arc_n_x(:,:)   = 0.0_wp
+    cell_arc_n_y(:,:)   = 0.0_wp
 
     IF ( comp_cells_x .GT. 1 ) THEN
 
@@ -892,6 +912,9 @@ CONTAINS
     USE parameters_2d, ONLY : x1_source , x2_source
     USE parameters_2d, ONLY : y1_source , y2_source
     USE parameters_2d, ONLY : lateral_source_flag
+    USE parameters_2d, ONLY : radial_source_flag
+    USE parameters_2d, ONLY : azimuth_source , arc_width_source
+    USE parameters_2d, ONLY : r2_source
 
     IMPLICIT NONE
 
@@ -900,8 +923,20 @@ CONTAINS
     REAL(wp) :: side_fract
     REAL(wp) :: total_source
 
+    REAL(wp) :: face_len
+    REAL(wp) :: vx, vy, vmag, nx, ny
+    REAL(wp) :: ang_compass, ang_diff, half_arc
+    LOGICAL  :: in_arc
+    REAL(wp) :: arc_perim_total
+    REAL(wp) :: source_length_analytical
+    REAL(wp) :: h_ell, rescale
+
     ! cells where are equations are solved
     source_cell(1:comp_cells_x,1:comp_cells_y) = 0
+
+    cell_arc_perim(1:comp_cells_x,1:comp_cells_y) = 0.0_wp
+    cell_arc_n_x(1:comp_cells_x,1:comp_cells_y)   = 0.0_wp
+    cell_arc_n_y(1:comp_cells_x,1:comp_cells_y)   = 0.0_wp
 
     sourceE(1:comp_cells_x,1:comp_cells_y) = .FALSE.
     sourceW(1:comp_cells_x,1:comp_cells_y) = .FALSE.
@@ -1111,6 +1146,177 @@ CONTAINS
        END DO
 
     END DO
+
+    ! ----------------------------------------------------------------------
+    ! Volume-source weights for the lateral directed RADIAL_SOURCE.
+    !
+    ! The lateral source is reformulated as a volume source term in
+    ! eval_expl_terms to guarantee that the integrated MFR equals what the
+    ! user prescribes. For each ring-boundary cell (source_cell == 2),
+    ! accumulate the in-arc face-length contribution and a face-length-
+    ! weighted outward unit normal. cell_arc_perim is then rescaled to match
+    ! the analytical arc length so that the per-cell injection rate
+    ! rho_m * h * v * cell_arc_perim / cell_area integrates to MFR exactly.
+    ! ----------------------------------------------------------------------
+    IF ( radial_source_flag ) THEN
+
+       half_arc = 0.5_wp * arc_width_source
+
+       DO k = 1,comp_cells_y
+          DO j = 1,comp_cells_x
+
+             IF ( source_cell(j,k) .NE. 2 ) CYCLE
+
+             ! East face
+             IF ( sourceE(j,k) ) THEN
+                vx = sourceE_vect_x(j,k)
+                vy = sourceE_vect_y(j,k)
+                vmag = SQRT( vx*vx + vy*vy )
+                IF ( vmag .GT. 0.0_wp ) THEN
+                   nx = vx / vmag
+                   ny = vy / vmag
+                   IF ( arc_width_source .GE. 360.0_wp ) THEN
+                      in_arc = .TRUE.
+                   ELSE
+                      ang_compass = 90.0_wp - ATAN2(vy,vx) * 180.0_wp / pi_g
+                      ang_compass = MOD(ang_compass + 360.0_wp, 360.0_wp)
+                      ang_diff = MOD(ABS(ang_compass - azimuth_source)             &
+                           + 360.0_wp, 360.0_wp)
+                      IF ( ang_diff .GT. 180.0_wp ) ang_diff = 360.0_wp - ang_diff
+                      in_arc = ( ang_diff .LE. half_arc )
+                   END IF
+                   IF ( in_arc ) THEN
+                      face_len = dy
+                      cell_arc_perim(j,k) = cell_arc_perim(j,k) + face_len
+                      cell_arc_n_x(j,k)   = cell_arc_n_x(j,k)   + face_len * nx
+                      cell_arc_n_y(j,k)   = cell_arc_n_y(j,k)   + face_len * ny
+                   END IF
+                END IF
+             END IF
+
+             ! West face
+             IF ( sourceW(j,k) ) THEN
+                vx = sourceW_vect_x(j,k)
+                vy = sourceW_vect_y(j,k)
+                vmag = SQRT( vx*vx + vy*vy )
+                IF ( vmag .GT. 0.0_wp ) THEN
+                   nx = vx / vmag
+                   ny = vy / vmag
+                   IF ( arc_width_source .GE. 360.0_wp ) THEN
+                      in_arc = .TRUE.
+                   ELSE
+                      ang_compass = 90.0_wp - ATAN2(vy,vx) * 180.0_wp / pi_g
+                      ang_compass = MOD(ang_compass + 360.0_wp, 360.0_wp)
+                      ang_diff = MOD(ABS(ang_compass - azimuth_source)             &
+                           + 360.0_wp, 360.0_wp)
+                      IF ( ang_diff .GT. 180.0_wp ) ang_diff = 360.0_wp - ang_diff
+                      in_arc = ( ang_diff .LE. half_arc )
+                   END IF
+                   IF ( in_arc ) THEN
+                      face_len = dy
+                      cell_arc_perim(j,k) = cell_arc_perim(j,k) + face_len
+                      cell_arc_n_x(j,k)   = cell_arc_n_x(j,k)   + face_len * nx
+                      cell_arc_n_y(j,k)   = cell_arc_n_y(j,k)   + face_len * ny
+                   END IF
+                END IF
+             END IF
+
+             ! North face
+             IF ( sourceN(j,k) ) THEN
+                vx = sourceN_vect_x(j,k)
+                vy = sourceN_vect_y(j,k)
+                vmag = SQRT( vx*vx + vy*vy )
+                IF ( vmag .GT. 0.0_wp ) THEN
+                   nx = vx / vmag
+                   ny = vy / vmag
+                   IF ( arc_width_source .GE. 360.0_wp ) THEN
+                      in_arc = .TRUE.
+                   ELSE
+                      ang_compass = 90.0_wp - ATAN2(vy,vx) * 180.0_wp / pi_g
+                      ang_compass = MOD(ang_compass + 360.0_wp, 360.0_wp)
+                      ang_diff = MOD(ABS(ang_compass - azimuth_source)             &
+                           + 360.0_wp, 360.0_wp)
+                      IF ( ang_diff .GT. 180.0_wp ) ang_diff = 360.0_wp - ang_diff
+                      in_arc = ( ang_diff .LE. half_arc )
+                   END IF
+                   IF ( in_arc ) THEN
+                      face_len = dx
+                      cell_arc_perim(j,k) = cell_arc_perim(j,k) + face_len
+                      cell_arc_n_x(j,k)   = cell_arc_n_x(j,k)   + face_len * nx
+                      cell_arc_n_y(j,k)   = cell_arc_n_y(j,k)   + face_len * ny
+                   END IF
+                END IF
+             END IF
+
+             ! South face
+             IF ( sourceS(j,k) ) THEN
+                vx = sourceS_vect_x(j,k)
+                vy = sourceS_vect_y(j,k)
+                vmag = SQRT( vx*vx + vy*vy )
+                IF ( vmag .GT. 0.0_wp ) THEN
+                   nx = vx / vmag
+                   ny = vy / vmag
+                   IF ( arc_width_source .GE. 360.0_wp ) THEN
+                      in_arc = .TRUE.
+                   ELSE
+                      ang_compass = 90.0_wp - ATAN2(vy,vx) * 180.0_wp / pi_g
+                      ang_compass = MOD(ang_compass + 360.0_wp, 360.0_wp)
+                      ang_diff = MOD(ABS(ang_compass - azimuth_source)             &
+                           + 360.0_wp, 360.0_wp)
+                      IF ( ang_diff .GT. 180.0_wp ) ang_diff = 360.0_wp - ang_diff
+                      in_arc = ( ang_diff .LE. half_arc )
+                   END IF
+                   IF ( in_arc ) THEN
+                      face_len = dx
+                      cell_arc_perim(j,k) = cell_arc_perim(j,k) + face_len
+                      cell_arc_n_x(j,k)   = cell_arc_n_x(j,k)   + face_len * nx
+                      cell_arc_n_y(j,k)   = cell_arc_n_y(j,k)   + face_len * ny
+                   END IF
+                END IF
+             END IF
+
+             ! Normalize the cell-aggregate outward unit normal.
+             IF ( cell_arc_perim(j,k) .GT. 0.0_wp ) THEN
+                cell_arc_n_x(j,k) = cell_arc_n_x(j,k) / cell_arc_perim(j,k)
+                cell_arc_n_y(j,k) = cell_arc_n_y(j,k) / cell_arc_perim(j,k)
+                vmag = SQRT( cell_arc_n_x(j,k)**2 + cell_arc_n_y(j,k)**2 )
+                IF ( vmag .GT. 0.0_wp ) THEN
+                   cell_arc_n_x(j,k) = cell_arc_n_x(j,k) / vmag
+                   cell_arc_n_y(j,k) = cell_arc_n_y(j,k) / vmag
+                END IF
+             END IF
+
+          END DO
+       END DO
+
+       arc_perim_total = SUM( cell_arc_perim(1:comp_cells_x,1:comp_cells_y) )
+       WRITE(*,*) 'Radial source arc perimeter (discretized, m) = ',           &
+            arc_perim_total
+
+       ! Rescale cell_arc_perim so that its sum equals the analytical source
+       ! length used by inpout to derive h_source and vel_source. This makes
+       ! the per-cell injection rho_m * h * v * cell_arc_perim / cell_area
+       ! integrate to the user-prescribed MFR exactly.
+       h_ell = (r_source - r2_source)**2 / (r_source + r2_source)**2
+       source_length_analytical = pi_g * (r_source + r2_source) *              &
+            ( 1.0_wp + 0.25_wp * h_ell + h_ell**2 / 64.0_wp                    &
+              + h_ell**3 / 256.0_wp + h_ell**4 * 25.0_wp / 16384.0_wp          &
+              + h_ell**5 * 49.0_wp / 65536.0_wp )
+
+       IF ( arc_width_source .LT. 360.0_wp ) THEN
+          source_length_analytical = source_length_analytical                  &
+               * ( arc_width_source / 360.0_wp )
+       END IF
+
+       IF ( arc_perim_total .GT. 0.0_wp ) THEN
+          rescale = source_length_analytical / arc_perim_total
+          cell_arc_perim(:,:) = cell_arc_perim(:,:) * rescale
+          WRITE(*,*) 'Radial source analytical arc length (m) = ',             &
+               source_length_analytical
+          WRITE(*,*) 'Volume-source rescale factor              = ', rescale
+       END IF
+
+    END IF
 
     RETURN
 

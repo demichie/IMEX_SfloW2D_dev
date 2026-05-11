@@ -33,6 +33,7 @@ MODULE solver_2d
   USE geometry_2d, ONLY : d_grav_coeff_dx , d_grav_coeff_dy
   USE geometry_2d, ONLY : source_cell
   USE geometry_2d, ONLY : cell_source_fractions
+  USE geometry_2d, ONLY : cell_arc_perim , cell_arc_n_x , cell_arc_n_y
 
   USE parameters_2d, ONLY : wp , sp
 
@@ -1309,13 +1310,15 @@ CONTAINS
 
              END IF
 
-             ! Eval gravity term and radial bottom source terms
+             ! Eval gravity term and radial bottom + lateral source terms
              CALL eval_expl_terms( B_prime_x_geom(j,k) , B_prime_y_geom(j,k) ,  &
                   B_second_xx_geom(j,k) , B_second_xy_geom(j,k) ,               &
                   B_second_yy_geom(j,k) , grav_coeff(j,k), d_grav_coeff_dx(j,k),&
                   d_grav_coeff_dx(j,k) , source_xy(j,k),                        &
                   qp_rk(1:n_vars+2,j,k,i_RK), expl_terms(1:n_eqns,j,k,i_RK), t, &
-                  cell_source_fractions(j,k) )
+                  cell_source_fractions(j,k),                                   &
+                  cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k),    &
+                  dx * dy )
   
           END IF
 
@@ -3164,46 +3167,19 @@ CONTAINS
        x_stencil(2) = x_comp(j)
        y_stencil(2) = y_comp(k)
 
-       ! correction for radial source inlet x-interfaces values
-       ! used for the linear reconstruction
-       IF ( ( lateral_source_flag .OR. radial_source_flag ) .AND. ( source_cell(j,k).EQ.2 ) ) THEN
-
-           IF ( t .LT. time_param(4) + time_param(3) ) THEN
-
-              IF ( sourceE(j,k) ) THEN
-
-                 CALL eval_source_bdry( t, sourceE_vect_x(j,k) ,        &
-                      sourceE_vect_y(j,k) , source_bdry )
-
-              ELSEIF ( sourceW(j,k) ) THEN
-
-                 CALL eval_source_bdry( t , sourceW_vect_x(j,k) ,       &
-                      sourceW_vect_y(j,k) , source_bdry )
-
-              ELSEIF ( sourceS(j,k) ) THEN
-
-                 CALL eval_source_bdry( t, sourceS_vect_x(j,k) ,        &
-                      sourceS_vect_y(j,k) , source_bdry )
-
-              ELSEIF ( sourceN(j,k) ) THEN
-
-                 CALL eval_source_bdry( t, sourceN_vect_x(j,k) ,        &
-                      sourceN_vect_y(j,k) , source_bdry )
-
-              END IF
-
-           ELSE
-
-              ! Past cutoff+ramp: keep h from cell state, zero velocity.
-              ! Avoids h=0 shock while guaranteeing zero net injection.
-              source_bdry(2)     = 0.0_wp
-              source_bdry(3)     = 0.0_wp
-              source_bdry(idx_u) = 0.0_wp
-              source_bdry(idx_v) = 0.0_wp
-
-           END IF
-
-       END IF
+       ! For the radial / lateral source the ring face is treated as a wall.
+       ! Mass and momentum are injected as a volume source in eval_expl_terms
+       ! so that the integrated emission equals MFR exactly. The
+       ! reconstruction stencil for source cells therefore uses the cell
+       ! value as the ring-side ghost (zero gradient), which is what the
+       ! source_bdry default initialisation above already provides. The wall
+       ! mirror that zeroes the normal-flux at the ring face is applied
+       ! later, where q_interfaceR/T are assembled.
+       !
+       ! (The previous implementation called eval_source_bdry here to fill
+       ! source_bdry with a state-controlled Dirichlet inflow. That delivered
+       ! ~1.43 x the user MFR because the KT reconstruction at the source-
+       ! cell boundary over-fluxed mass.)
        
        
        vars_loop:DO i=1,n_vars
@@ -3775,15 +3751,24 @@ CONTAINS
 
              IF ( radial_source_flag .AND. ( source_cell(j,k) .EQ. 2 ) ) THEN
 
+                ! Wall BC at the ring face. The volume-source path in
+                ! eval_expl_terms injects mass + momentum directly into this
+                ! cell, so the ring face itself must transmit no net flux.
+                ! Mirroring the x-momentum at the face makes the KT mass
+                ! flux vanish and reflects the pressure force into the cell.
                 IF ( sourceE(j,k) ) THEN
 
                    q_interfaceR(:,j+1,k) = q_interfaceL(:,j+1,k)
+                   q_interfaceR(2,j+1,k) = -q_interfaceL(2,j+1,k)  ! hu
                    qp_interfaceR(:,j+1,k) = qp_interfaceL(:,j+1,k)
+                   qp_interfaceR(idx_u,j+1,k) = -qp_interfaceL(idx_u,j+1,k)
 
                 ELSEIF ( sourceW(j,k) ) THEN
 
                    q_interfaceL(:,j,k) = q_interfaceR(:,j,k)
+                   q_interfaceL(2,j,k) = -q_interfaceR(2,j,k)  ! hu
                    qp_interfaceL(:,j,k) = qp_interfaceR(:,j,k)
+                   qp_interfaceL(idx_u,j,k) = -qp_interfaceR(idx_u,j,k)
 
                 END IF
 
@@ -3793,7 +3778,7 @@ CONTAINS
 
        ELSE
 
-          ! for case comp_cells_x = 1 
+          ! for case comp_cells_x = 1
           q_interfaceR(1:n_vars,j,k) = q_expl(1:n_vars,j,k)
           q_interfaceL(1:n_vars,j+1,k) = q_expl(1:n_vars,j,k)
 
@@ -3892,15 +3877,21 @@ CONTAINS
 
              IF ( radial_source_flag .AND. ( source_cell(j,k) .EQ. 2 ) ) THEN
 
+                ! Wall BC at the ring face (y-direction). Mirror the
+                ! y-momentum so the KT mass flux vanishes.
                 IF ( sourceS(j,k) ) THEN
 
                    q_interfaceB(:,j,k) = q_interfaceT(:,j,k)
+                   q_interfaceB(3,j,k) = -q_interfaceT(3,j,k)  ! hv
                    qp_interfaceB(:,j,k) = qp_interfaceT(:,j,k)
+                   qp_interfaceB(idx_v,j,k) = -qp_interfaceT(idx_v,j,k)
 
                 ELSEIF ( sourceN(j,k) ) THEN
 
                    q_interfaceT(:,j,k+1) = q_interfaceB(:,j,k+1)
+                   q_interfaceT(3,j,k+1) = -q_interfaceB(3,j,k+1)  ! hv
                    qp_interfaceT(:,j,k+1) = qp_interfaceB(:,j,k+1)
+                   qp_interfaceT(idx_v,j,k+1) = -qp_interfaceB(idx_v,j,k+1)
 
                 END IF
 
