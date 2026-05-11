@@ -57,6 +57,7 @@ PROGRAM IMEX_SfloW2D
    USE inpout_2d, ONLY : restart, restart_file
    USE inpout_2d, ONLY : read_restart_file, write_restart_file
    USE inpout_2d, ONLY : output_runout_flag
+   USE inpout_2d, ONLY : runout_last
    USE inpout_2d, ONLY : output_cons_flag
    USE inpout_2d, ONLY : output_esri_flag
    USE inpout_2d, ONLY : output_phys_flag
@@ -378,12 +379,13 @@ PROGRAM IMEX_SfloW2D
    IF ( verbose_level .GE. 0 ) THEN
 
       WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
-      &ES11.3E3)")                                                          &
+      &ES11.3E3,A11,ES11.3E3)")                                                &
          't =',t,'dt =',dt,                                                    &
          ' mass = ',dx*dy*SUM(q(1,:,:)) ,                                      &
          ' volume = ',dx*dy*SUM(qp(1,:,:)) ,                                   &
          ' area = ',dx*dy*COUNT(q(1,:,:).GT.1.D-5) ,                           &
-         ' solid mass = ',dx*dy*SUM(q(5:4+n_solid,:,:))
+         ' solid mass = ',dx*dy*SUM(q(5:4+n_solid,:,:)),                       &
+         ' runout = ',runout_last
 
    END IF
 
@@ -531,12 +533,13 @@ PROGRAM IMEX_SfloW2D
 
 
          WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
-         &ES11.3E3)")                                                          &
+         &ES11.3E3,A11,ES11.3E3)")                                             &
             't =',t,'dt =',dt,                                                    &
             ' mass = ',dx*dy*SUM(q(1,:,:)) ,                                      &
             ' volume = ',dx*dy*SUM(qp(1,:,:)) ,                                   &
             ' area = ',dx*dy*COUNT(q(1,:,:).GT.1.D-7) ,                           &
-            ' solid mass = ',dx*dy*SUM(q(5:4+n_solid,:,:))
+            ' solid mass = ',dx*dy*SUM(q(5:4+n_solid,:,:)),                       &
+            ' runout = ',runout_last
 
       END IF
 
