@@ -1314,7 +1314,7 @@ CONTAINS
              CALL eval_expl_terms( B_prime_x_geom(j,k) , B_prime_y_geom(j,k) ,  &
                   B_second_xx_geom(j,k) , B_second_xy_geom(j,k) ,               &
                   B_second_yy_geom(j,k) , grav_coeff(j,k), d_grav_coeff_dx(j,k),&
-                  d_grav_coeff_dx(j,k) , source_xy(j,k),                        &
+                  d_grav_coeff_dy(j,k) , source_xy(j,k),                        &
                   qp_rk(1:n_vars+2,j,k,i_RK), expl_terms(1:n_eqns,j,k,i_RK), t, &
                   cell_source_fractions(j,k),                                   &
                   cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k),    &
