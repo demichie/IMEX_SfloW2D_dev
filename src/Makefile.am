@@ -17,6 +17,7 @@ IMEX_SfloW2D_SOURCES = \
                 constitutive_2d.f90 \
                 nonlinear_solver_2d.f90 \
                 reconstruction_2d.f90 \
+                hyperbolic_2d.f90 \
                 solver_2d.f90 \
                 init_2d.f90 \
                 stochastic_module.f90 \
@@ -32,4 +33,3 @@ FC              = gfortran
 MPFC            = gfortran
 LINKER          = gfortran
 NETCDF = @NETCDF@
-
