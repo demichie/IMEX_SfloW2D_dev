@@ -99,6 +99,8 @@ CONTAINS
     REAL(wp) :: scal_f_old
     REAL(wp) :: desc_dir(n_vars)
     REAL(wp) :: grad_f(n_vars)
+    REAL(wp) :: relative_step
+    REAL(wp) :: fric_val_before_jacobian
 
     INTEGER :: pivot(n_vars)
 
@@ -186,6 +188,8 @@ CONTAINS
        END IF
 
        ! ---- evaluate the descent direction ------------------------------------
+
+       fric_val_before_jacobian = fric_val
 
        CALL eval_jacobian( qj_rel , qj_org , dt_step , a_diag , coeff_f ,   &
             Bprimej_x , Bprimej_y , left_matrix, Zij, fric_val )
@@ -305,6 +309,20 @@ CONTAINS
        END IF
 
        IF ( verbose_level .GE. 3 ) WRITE(*,*) 'desc_dir',desc_dir
+
+       ! The correction is expressed in normalized variables. Unlike the old
+       ! EPSILON-based check on an accepted line-search step, this tests the
+       ! actual Newton direction and therefore does not turn a rejected step
+       ! into false convergence. Always perform at least one Newton update.
+       relative_step = MAXVAL( ABS(desc_dir) / MAX(ABS(qj_rel),1.0_wp) )
+
+       IF ( ( nl_iter .GT. 1 ) .AND. ( relative_step .LE. tol_rel ) ) THEN
+          fric_val = fric_val_before_jacobian
+          converged = .TRUE.
+          IF ( verbose_level .GE. 2 )                                         &
+               WRITE(*,*) 'solve_rk_step: converged on Newton correction'
+          EXIT newton_raphson_loop
+       END IF
 
        qj_rel_NR_old = qj_rel
        scal_f_old = scal_f

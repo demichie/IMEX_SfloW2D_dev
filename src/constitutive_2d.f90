@@ -3931,7 +3931,9 @@ CONTAINS
             gas_compressibility )
 
        ! Equation 12 from Gueugneau et al, 2017
-       IF ( ( REAL(exc_pore_pres) .GT. 0.0_wp )                                 &
+       ! At zero excess pressure the source value is still zero, but the
+       ! positive-side derivative is needed by the complex-step Jacobian.
+       IF ( ( REAL(exc_pore_pres) .GE. 0.0_wp )                                 &
             .AND. ( REAL(h) .GT. 0.0_wp) ) THEN
 
          
