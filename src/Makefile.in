@@ -100,7 +100,7 @@ am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
 am_IMEX_SfloW2D_OBJECTS = parameters_2d.$(OBJEXT) complexify.$(OBJEXT) \
 	geometry_2d.$(OBJEXT) constitutive_2d.$(OBJEXT) \
-	solver_2d.$(OBJEXT) init_2d.$(OBJEXT) \
+	nonlinear_solver_2d.$(OBJEXT) solver_2d.$(OBJEXT) init_2d.$(OBJEXT) \
 	stochastic_module.$(OBJEXT) inpout_2d.$(OBJEXT) \
 	IMEX_SfloW2D.$(OBJEXT)
 IMEX_SfloW2D_OBJECTS = $(am_IMEX_SfloW2D_OBJECTS)
@@ -248,6 +248,7 @@ IMEX_SfloW2D_SOURCES = \
                 complexify.f90 \
                 geometry_2d.f90 \
                 constitutive_2d.f90 \
+                nonlinear_solver_2d.f90 \
                 solver_2d.f90 \
                 init_2d.f90 \
                 stochastic_module.f90 \
