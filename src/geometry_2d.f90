@@ -135,16 +135,11 @@ MODULE geometry_2d
 
   REAL(wp), ALLOCATABLE :: cell_source_fractions(:,:)
 
-  !> Per-cell aggregate arc-perimeter inside the directed emission sector,
-  !> summed across active source faces (E/W/N/S). Used by the volume-source
-  !> formulation of the lateral RADIAL_SOURCE injection so that the
-  !> integrated emission equals MFR exactly. Rescaled to match the analytical
-  !> source length so that h_source * vel_source * cell_arc_perim integrates
-  !> to MFR. Zero outside the arc or for non-source cells.
+  !> Per-cell effective source-arc length used by the conservative lateral
+  !> radial-source volume injection. Zero outside active source-boundary cells.
   REAL(wp), ALLOCATABLE :: cell_arc_perim(:,:)
 
-  !> Cell-aggregate outward unit normal averaged over in-arc active faces,
-  !> weighted by face length. Direction along which momentum is injected.
+  !> Outward unit normal associated with the active source arc in each cell.
   REAL(wp), ALLOCATABLE :: cell_arc_n_x(:,:)
   REAL(wp), ALLOCATABLE :: cell_arc_n_y(:,:)
 
@@ -883,7 +878,7 @@ CONTAINS
        grav_coeff = 1.0_wp
 
        d_grav_coeff_dx = 0.0_wp
-       d_grav_coeff_dx = 0.0_wp
+       d_grav_coeff_dy = 0.0_wp
 
        grav_coeff_stag_x = 1.0_wp
        grav_coeff_stag_y = 1.0_wp
@@ -1968,7 +1963,8 @@ CONTAINS
 
              END WHERE
 
-             cell_fract(j,k) = REAL(SUM(check_subgrid))/n_points2
+             cell_fract(j,k) = REAL(SUM(check_subgrid),wp) / &
+                  REAL(n_points2,wp)
 
           END IF
 
@@ -2373,6 +2369,8 @@ CONTAINS
     !  Machine-dependent constants
     !
     data xmax/716.351d0/,xbig/701.84d0/
+
+    xinf = HUGE(1.0_wp)
     !
     ! Coefficients  for -1.0 <= X < 0.0
     !

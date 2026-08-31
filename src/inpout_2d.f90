@@ -66,9 +66,9 @@ MODULE inpout_2d
                            r2_source, angle_source, azimuth_source, arc_width_source, &
                            n_intervals, t_intervals, vel_intervals
 
-  ! -- Variables for the namelist PARTICLE_DISTRIBUTION_PARAMETERS
-  USE parameters_2d, ONLY: particle_distribution_flag, fractal_dim, &
-                           diam_min, diam_max, rho_s_min, rho_s_max, sigmoid_k, sigmoid_d0, &
+  ! -- Variables for the optional PARTICLE_DISTRIBUTION_PARAMETERS namelist
+  USE parameters_2d, ONLY: particle_distribution_flag, fractal_dim, diam_min,   &
+                           diam_max, rho_s_min, rho_s_max, sigmoid_k, sigmoid_d0,&
                            alphas_source_total
 
   ! -- Additional variables for the namelist LATERAL_SOURCE_PARAMETERS
@@ -87,9 +87,8 @@ MODULE inpout_2d
   USE parameters_2d, ONLY: rheology_model
   USE constitutive_2d, ONLY: mu, xi, tau, nu_ref, visc_par, T_ref, &
                              mu_0, mu_inf, Fr_0, U_w, mu_s, mu_2, I_0, &
-                             muI_inf, I_transition, A_drag, B_drag, &
+                             muI_inf, I_transition, A_drag, B_drag,        &
                              collective_settling_flag
-  
   USE constitutive_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td
   USE constitutive_2d, ONLY: friction_factor
   USE constitutive_2d, ONLY: tau0
@@ -277,8 +276,11 @@ MODULE inpout_2d
   REAL(wp) :: x0_runout, y0_runout, init_runout, init_runout_x, &
               init_runout_y, eps_stop
 
+
+  !> Optional minimum total solid fraction used by runout diagnostics
   REAL(wp) :: alphas_threshold
 
+  !> Most recently computed runout distance
   REAL(wp) :: runout_last
 
   ! absolute precentages of solids in the initial volume
@@ -294,7 +296,6 @@ MODULE inpout_2d
   REAL(wp) :: dyn_pres_levels0(10)
 
   REAL(wp) :: release_time(10)
-
 
   ! NC: Variabili condivise per la gestione del file NetCDF
   INTEGER             :: ncid              !< ID for NetCDF file
@@ -352,8 +353,8 @@ MODULE inpout_2d
     mfr_source, xs_source, xl_source, xg_source, azimuth_source, arc_width_source, &
     n_intervals, t_intervals, vel_intervals
 
-  NAMELIST /particle_distribution_parameters/ fractal_dim, &
-    diam_min, diam_max, rho_s_min, rho_s_max, sigmoid_k, sigmoid_d0, alphas_source_total
+  NAMELIST /particle_distribution_parameters/ fractal_dim, diam_min, diam_max, &
+    rho_s_min, rho_s_max, sigmoid_k, sigmoid_d0, alphas_source_total
 
   NAMELIST /lateral_source_parameters/ source_side, x1_source, x2_source, &
     y1_source, y2_source, vel_source, T_source, h_source, alphas_source, &
@@ -906,18 +907,19 @@ CONTAINS
     xs_source = -1.0_wp
     xg_source = -1.0_wp
     xl_source = -1.0_wp
-    azimuth_source = 0.0_wp      ! default: North (irrelevant when arc_width_source=360)
-    arc_width_source = 360.0_wp  ! default: full circle (no directional restriction)
+    azimuth_source = 0.0_wp
+    arc_width_source = 360.0_wp
 
-    !- Variables for the namelist PARTICLE_DISTRIBUTION_PARAMETERS
+
+    !- Variables for the optional PARTICLE_DISTRIBUTION_PARAMETERS namelist
     particle_distribution_flag = .FALSE.
-    fractal_dim     = -1.0_wp
-    diam_min        = -1.0_wp
-    diam_max        = -1.0_wp
-    rho_s_min       = -1.0_wp
-    rho_s_max       = -1.0_wp
-    sigmoid_k       = -1.474_wp      ! fitted default
-    sigmoid_d0      =  0.002316_wp   ! fitted default (m)
+    fractal_dim = -1.0_wp
+    diam_min = -1.0_wp
+    diam_max = -1.0_wp
+    rho_s_min = -1.0_wp
+    rho_s_max = -1.0_wp
+    sigmoid_k = -1.474_wp
+    sigmoid_d0 = 0.002316_wp
 
     !- Variable for the namelist LATERAL_SOURCE_PARAMETERS
     source_side = ''
@@ -1637,144 +1639,90 @@ CONTAINS
       END IF
 
 
-     ! ------- PARTICLE_DISTRIBUTION_PARAMETERS (optional) ----------------------
-  ! If this namelist is present in the input file, compute DIAM_S, RHO_S and
-  ! ALPHAS_SOURCE internally from lognormal + sigmoid parameters, overriding
-  ! any explicit values that may have been supplied in SOLID_TRANSPORT_PARAMETERS
-  ! and RADIAL/LATERAL_SOURCE_PARAMETERS.
+      ! ------- PARTICLE_DISTRIBUTION_PARAMETERS (optional) --------------------
+      ! If present, compute DIAM_S, RHO_S and ALPHAS_SOURCE from a classical
+      ! fractal weight distribution plus a sigmoid density law.
+      READ (input_unit, particle_distribution_parameters, IOSTAT=ios)
+      REWIND (input_unit)
 
-  READ (input_unit, particle_distribution_parameters, IOSTAT=ios)
-  REWIND (input_unit)
+      IF (ios .EQ. 0) THEN
 
-  IF (ios .EQ. 0) THEN
+        particle_distribution_flag = .TRUE.
 
-    particle_distribution_flag = .TRUE.
-
-    ! --- Validate inputs ---------------------------------------------------
-
-    IF (fractal_dim .LE. 0.0_wp) THEN
-      WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
-      WRITE (*, *) 'FRACTAL_DIM must be > 0 (typical natural range 2.5-4.0;'
-      WRITE (*, *) '  D=3 -> flat weight per log decade,'
-      WRITE (*, *) '  D>3 -> tail in fines, D<3 -> tail in coarse)'
-      STOP
-   END IF
-
-   IF (alphas_source_total .LE. 0.0_wp) THEN
-      WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
-      WRITE (*, *) 'ALPHAS_SOURCE_TOTAL must be > 0'
-      STOP
-    END IF
-
-    IF (diam_min .LE. 0.0_wp .OR. diam_max .LE. 0.0_wp) THEN
-      WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
-      WRITE (*, *) 'DIAM_MIN and DIAM_MAX must be > 0'
-      STOP
-    END IF
-
-    IF (diam_min .GE. diam_max) THEN
-      WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
-      WRITE (*, *) 'DIAM_MIN must be < DIAM_MAX'
-      STOP
-    END IF
-
-    IF (rho_s_min .LE. 0.0_wp .OR. rho_s_max .LE. 0.0_wp) THEN
-      WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
-      WRITE (*, *) 'RHO_S_MIN and RHO_S_MAX must be > 0'
-      STOP
-    END IF
-
-    IF (rho_s_min .GE. rho_s_max) THEN
-      WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
-      WRITE (*, *) 'RHO_S_MIN must be < RHO_S_MAX'
-      STOP
-    END IF
-
-    ! --- Compute bin centres: uniform in ln(d) space -----------------------
-
-    BLOCK
-      REAL(wp) :: log_min, log_max, log_step, log_ctr
-      REAL(wp), ALLOCATABLE :: w_frac(:), v_unnorm(:)
-      REAL(wp) :: total_w, total_v
-      INTEGER  :: i_s
-
-      log_min  = LOG(diam_min)
-      log_max  = LOG(diam_max)
-      log_step = (log_max - log_min) / REAL(n_solid, wp)
-
-      ALLOCATE(w_frac(n_solid), v_unnorm(n_solid))
-
-      total_w = 0.0_wp
-
-      DO i_s = 1, n_solid
-
-        ! Bin centre, uniform in ln d
-        log_ctr     = log_min + (REAL(i_s, wp) - 0.5_wp) * log_step
-        diam_s(i_s) = EXP(log_ctr)
-
-        ! Solid density: sigmoid in ln d
-        ! rho = rho_min + (rho_max - rho_min) / (1 + exp(-k*(ln d - ln d0)))
-        rho_s(i_s) = rho_s_min + (rho_s_max - rho_s_min) / &
-                     (1.0_wp + EXP(-sigmoid_k * (log_ctr - LOG(sigmoid_d0))))
-
-        ! Classical fractal WEIGHT distribution per uniform ln-d bin (Turcotte 1986):
-        !     w_i  proportional to  d_i ** (3 - fractal_dim)
-        w_frac(i_s) = diam_s(i_s) ** (3.0_wp - fractal_dim)
-        total_w     = total_w + w_frac(i_s)
-
-      END DO
-
-      ! Normalise weight fractions to sum = 1
-      w_frac(:) = w_frac(:) / total_w
-
-      ! Convert weight -> volume fractions using rho_s(d):
-      !     alpha_i = (w_i / rho_s_i) / sum_j (w_j / rho_s_j) * alphas_source_total
-      total_v = 0.0_wp
-      DO i_s = 1, n_solid
-        v_unnorm(i_s) = w_frac(i_s) / rho_s(i_s)
-        total_v       = total_v + v_unnorm(i_s)
-      END DO
-
-      DO i_s = 1, n_solid
-        alphas_source(i_s) = v_unnorm(i_s) / total_v * alphas_source_total
-      END DO
-
-      IF (verbose_level .GE. 0) THEN
-        WRITE (*, *)
-        WRITE (*, *) 'PARTICLE_DISTRIBUTION_PARAMETERS applied (classical fractal):'
-        WRITE (*, *) '  fractal_dim     =', fractal_dim
-        WRITE (*, *) '    weight exponent (3 - D_f) =', 3.0_wp - fractal_dim
-        IF (ABS(fractal_dim - 3.0_wp) .LT. 1.0e-6_wp) THEN
-          WRITE (*, *) '    -> flat (equal weight per log decade)'
-        ELSE IF (fractal_dim .GT. 3.0_wp) THEN
-          WRITE (*, *) '    -> tail in fines'
-        ELSE
-          WRITE (*, *) '    -> tail in coarse'
+        IF (fractal_dim .LE. 0.0_wp) THEN
+          WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
+          WRITE (*, *) 'FRACTAL_DIM must be > 0'
+          STOP
         END IF
-        WRITE (*, *) '  diam_min        =', diam_min, ' m'
-        WRITE (*, *) '  diam_max        =', diam_max, ' m'
-        WRITE (*, *) '  rho_s_min       =', rho_s_min, ' kg/m3'
-        WRITE (*, *) '  rho_s_max       =', rho_s_max, ' kg/m3'
-        WRITE (*, *) '  sigmoid_k       =', sigmoid_k
-        WRITE (*, *) '  sigmoid_d0      =', sigmoid_d0, ' m'
-        WRITE (*, *)
-        WRITE (*, *) '  Computed DIAM_S        (m)    :', diam_s(1:n_solid)
-        WRITE (*, *) '  Computed RHO_S         (kg/m3):', rho_s(1:n_solid)
-        WRITE (*, *) '  Computed W_FRAC        (-)    :', w_frac(1:n_solid)
-        WRITE (*, *) '  Computed ALPHAS_SOURCE (vol)  :', alphas_source(1:n_solid)
-        WRITE (*, *)
+        IF (alphas_source_total .LE. 0.0_wp) THEN
+          WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
+          WRITE (*, *) 'ALPHAS_SOURCE_TOTAL must be > 0'
+          STOP
+        END IF
+        IF (diam_min .LE. 0.0_wp .OR. diam_max .LE. 0.0_wp) THEN
+          WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
+          WRITE (*, *) 'DIAM_MIN and DIAM_MAX must be > 0'
+          STOP
+        END IF
+        IF (diam_min .GE. diam_max) THEN
+          WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
+          WRITE (*, *) 'DIAM_MIN must be < DIAM_MAX'
+          STOP
+        END IF
+        IF (rho_s_min .LE. 0.0_wp .OR. rho_s_max .LE. 0.0_wp) THEN
+          WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
+          WRITE (*, *) 'RHO_S_MIN and RHO_S_MAX must be > 0'
+          STOP
+        END IF
+        IF (rho_s_min .GE. rho_s_max) THEN
+          WRITE (*, *) 'ERROR: PARTICLE_DISTRIBUTION_PARAMETERS'
+          WRITE (*, *) 'RHO_S_MIN must be < RHO_S_MAX'
+          STOP
+        END IF
+
+        BLOCK
+          REAL(wp) :: log_min, log_max, log_step, log_ctr
+          REAL(wp), ALLOCATABLE :: w_frac(:), v_unnorm(:)
+          REAL(wp) :: total_w, total_v
+          INTEGER :: i_s
+
+          log_min = LOG(diam_min)
+          log_max = LOG(diam_max)
+          log_step = (log_max - log_min) / REAL(n_solid, wp)
+          ALLOCATE(w_frac(n_solid), v_unnorm(n_solid))
+          total_w = 0.0_wp
+
+          DO i_s = 1, n_solid
+            log_ctr = log_min + (REAL(i_s, wp) - 0.5_wp) * log_step
+            diam_s(i_s) = EXP(log_ctr)
+            rho_s(i_s) = rho_s_min + (rho_s_max - rho_s_min) /                &
+                 (1.0_wp + EXP(-sigmoid_k * (log_ctr - LOG(sigmoid_d0))))
+            w_frac(i_s) = diam_s(i_s) ** (3.0_wp - fractal_dim)
+            total_w = total_w + w_frac(i_s)
+          END DO
+
+          w_frac = w_frac / total_w
+          total_v = 0.0_wp
+          DO i_s = 1, n_solid
+            v_unnorm(i_s) = w_frac(i_s) / rho_s(i_s)
+            total_v = total_v + v_unnorm(i_s)
+          END DO
+          DO i_s = 1, n_solid
+            alphas_source(i_s) = v_unnorm(i_s) / total_v * alphas_source_total
+          END DO
+
+          IF (verbose_level .GE. 0) THEN
+            WRITE (*, *) 'PARTICLE_DISTRIBUTION_PARAMETERS applied'
+            WRITE (*, *) '  DIAM_S =', diam_s(1:n_solid)
+            WRITE (*, *) '  RHO_S =', rho_s(1:n_solid)
+            WRITE (*, *) '  ALPHAS_SOURCE =', alphas_source(1:n_solid)
+          END IF
+          DEALLOCATE(w_frac, v_unnorm)
+        END BLOCK
+
+      ELSE
+        particle_distribution_flag = .FALSE.
       END IF
-
-      DEALLOCATE(w_frac, v_unnorm)
-
-    END BLOCK
-
-  ELSE
-
-    particle_distribution_flag = .FALSE.
-
-  END IF
-      
 
       IF (ANY(rho_s(1:n_solid) .EQ. -1.0_wp)) THEN
 
@@ -1827,6 +1775,10 @@ CONTAINS
         IF (erosion_coeff .EQ. 0.0_wp) THEN
 
           erodible_porosity = 0.0_wp
+          ! derived from erodible_porosity; without this it stays
+          ! undefined and is still used by the deposition and
+          ! continuous-phase loss terms
+          coeff_porosity = 0.0_wp
           erodible_fract(1:n_solid) = 1.0_wp/n_solid
           T_erodible = 300.0_wp
           !subtract_init_flag = .FALSE.
@@ -1994,38 +1946,25 @@ CONTAINS
         WRITE (*, *) 'Please check the input file'
         STOP
 
-     END IF
+      END IF
 
-     IF (settling_flag) THEN
 
+      IF (settling_flag) THEN
         IF (collective_settling_flag) THEN
-
           IF (A_drag .EQ. -1.0_wp) THEN
-            WRITE (*, *) 'ERROR: problem with namelist SOLID_TRANSPORT_PARAMETERS'
-            WRITE (*, *) 'A_DRAG must be supplied when COLLECTIVE_SETTLING_FLAG = T'
+            WRITE (*, *) 'ERROR: A_DRAG must be supplied when COLLECTIVE_SETTLING_FLAG = T'
             STOP
           END IF
-
           IF (B_drag .EQ. -1.0_wp) THEN
-            WRITE (*, *) 'ERROR: problem with namelist SOLID_TRANSPORT_PARAMETERS'
-            WRITE (*, *) 'B_DRAG must be supplied when COLLECTIVE_SETTLING_FLAG = T'
+            WRITE (*, *) 'ERROR: B_DRAG must be supplied when COLLECTIVE_SETTLING_FLAG = T'
             STOP
           END IF
-
-          IF (verbose_level .GE. 0) THEN
-            WRITE (*, *) 'Settling: new collective-settling drag law'
-            WRITE (*, *) 'Drag law coefficients: A_DRAG =', A_drag, &
-                         ' B_DRAG =', B_drag
-          END IF
-
+          IF (verbose_level .GE. 0) WRITE (*, *)                              &
+               'Settling: collective drag law, A_DRAG/B_DRAG =', A_drag, B_drag
         ELSE
-
-          IF (verbose_level .GE. 0) THEN
-            WRITE (*, *) 'Settling: original Schiller-Naumann drag law'
-          END IF
-
+          IF (verbose_level .GE. 0) WRITE (*, *)                              &
+               'Settling: original Schiller-Naumann drag law'
         END IF
-
       END IF
 
       ! If alpha_trans was provided earlier in the pore-pressure namelist,
@@ -2040,7 +1979,6 @@ CONTAINS
       END IF
 
     END IF read_solid
-
 
     n_vars = n_vars + n_solid
     n_eqns = n_vars
@@ -2215,6 +2153,8 @@ CONTAINS
 
     ! ------- READ numeric_parameters NAMELIST ----------------------------------
 
+    ! Previous optional namelist reads may legitimately leave ios at end-of-file.
+    ! Reposition the input and always update ios for this mandatory namelist.
     REWIND (input_unit)
     READ (input_unit, numeric_parameters, IOSTAT=ios)
 
@@ -2234,9 +2174,22 @@ CONTAINS
     IF ((solver_scheme .NE. 'LxF') .AND. (solver_scheme .NE. 'KT') .AND. &
         (solver_scheme .NE. 'GFORCE') .AND. (solver_scheme .NE. 'UP')) THEN
 
-      WRITE (*, *) 'WARNING: no correct solver scheme selected', solver_scheme
+      WRITE (*, *) 'ERROR: no correct solver scheme selected', solver_scheme
       WRITE (*, *) 'Chose between: LxF, GFORCE or KT'
-      STOP
+      ERROR STOP 1
+
+    END IF
+
+    ! eval_flux_LxF and eval_flux_GFORCE are empty stubs: they print a
+    ! message and return without filling the interface flux arrays, so a
+    ! run would continue on uninitialised fluxes. Reject them at input
+    ! until they are implemented.
+    IF ((solver_scheme .EQ. 'LxF') .OR. (solver_scheme .EQ. 'GFORCE')) THEN
+
+      WRITE (*, *) 'ERROR: solver scheme ', TRIM(solver_scheme),              &
+           ' is not implemented in the 2-d case'
+      WRITE (*, *) 'Use SOLVER_SCHEME = "KT"'
+      ERROR STOP 1
 
     END IF
 
@@ -3983,6 +3936,12 @@ CONTAINS
 
       alphal_source = -1.0_wp
 
+      ! Rewind first: the preceding reads leave the file positioned
+      ! wherever they finished, and an absent optional group scans to
+      ! end of file, which made this read return IOSTAT = -1 for a
+      ! source namelist that is present.
+      REWIND (input_unit)
+
       IF (lateral_source_flag) THEN
 
         WRITE (*, *) 'Searching for namelist LATERAL_SOURCE_PARAMETERS'
@@ -4123,16 +4082,25 @@ CONTAINS
                                                        h_ell**4*25.0_wp/16384.0_wp + &
                                                        h_ell**5*49.0_wp/65536.0_wp)
 
-          ! Arc-sector correction: when a directional blast arc is requested,
-          ! scale source_length to the active arc fraction so that MFR_SOURCE
-          ! is matched exactly through that arc (higher h and vel, same total flux).
-          IF (arc_width_source .LT. 360.0_wp) THEN
-            source_length = source_length * (arc_width_source / 360.0_wp)
-            WRITE (*, *) 'Arc-sector source: azimuth =', azimuth_source, &
+          ! For a directional radial source, h_source is derived from the
+          ! active arc length rather than from the full ellipse perimeter.
+          IF ( radial_source_flag .AND. ( arc_width_source .LT. 360.0_wp ) ) THEN
+
+            IF ( arc_width_source .LE. 0.0_wp ) THEN
+              WRITE (*, *) 'ERROR: ARC_WIDTH_SOURCE must be in (0,360]'
+              WRITE (*, *) 'ARC_WIDTH_SOURCE =', arc_width_source
+              STOP
+            END IF
+
+            source_length = source_length * ( arc_width_source / 360.0_wp )
+            WRITE (*, *) 'Arc-sector radial source: azimuth =', azimuth_source, &
                          ' deg (N-clockwise), arc width =', arc_width_source, ' deg'
-            WRITE (*, *) 'Active arc source_length =', source_length, ' m'
+            WRITE (*, *) 'Active arc source_length = ', source_length, ' m'
+
           ELSE
-            WRITE (*, *) 'Full-circle radial source_length = ', source_length, ' m'
+
+            WRITE (*, *) 'source_length = ', source_length
+
           END IF
 
           ! source_length = 2.0 * pi_g * r_source
@@ -4426,92 +4394,44 @@ CONTAINS
 
           END IF
 
-       END IF
-
-        ! --- Enforce MFR_SOURCE * TIME_PARAM(2) = 1e14 ----------------------
-        ! Only applied when MFR_SOURCE is explicitly provided (> 0).
-        ! When the source is defined via H_SOURCE + VEL_SOURCE, MFR_SOURCE
-        ! is not set and TIME_PARAM(2) is used as given in the input.
-        IF (mfr_source .GT. 0.0_wp) THEN
-
-          time_param(2) = 1.0E14_wp / mfr_source
-
-          IF (verbose_level .GE. 0) THEN
-            WRITE (*, *)
-            WRITE (*, *) 'MFR constraint applied: MFR_SOURCE * TIME_PARAM(2) = 1e14'
-            WRITE (*, *) '  MFR_SOURCE    =', mfr_source,    ' kg/s  (from input)'
-            WRITE (*, *) '  TIME_PARAM(2) =', time_param(2), ' s     (derived)'
-            WRITE (*, *)
-          END IF
-
         END IF
-        ! --- End MFR constraint ----------------------------------------------
 
-        ! ----- Validation for variable velocity intervals -----
-        IF ( n_intervals .GT. 0 ) THEN
-
-           IF ( .NOT. bottom_radial_source_flag ) THEN
-
-              WRITE(*,*) 'ERROR: N_INTERVALS can only be used with'
-              WRITE(*,*) 'BOTTOM_RADIAL_SOURCE_FLAG = T'
+        ! Optional piecewise-constant velocity history for the bottom source
+        IF (n_intervals .GT. 0) THEN
+          IF (.NOT. bottom_radial_source_flag) THEN
+            WRITE (*, *) 'ERROR: N_INTERVALS can only be used with BOTTOM_RADIAL_SOURCE_FLAG = T'
+            STOP
+          END IF
+          IF (n_intervals .GT. 100) THEN
+            WRITE (*, *) 'ERROR: N_INTERVALS must be <= 100'
+            STOP
+          END IF
+          IF (t_intervals(1) .NE. 0.0_wp) THEN
+            WRITE (*, *) 'WARNING: source is off before T_INTERVALS(1) =',      &
+                 t_intervals(1)
+          END IF
+          DO i = 1, n_intervals
+            IF (t_intervals(i) .LT. 0.0_wp) THEN
+              WRITE (*, *) 'ERROR: T_INTERVALS(', i, ') must be >= 0'
               STOP
-
-           END IF
-
-           IF ( n_intervals .GT. 100 ) THEN
-
-              WRITE(*,*) 'ERROR: N_INTERVALS must be <= 100'
+            END IF
+            IF (vel_intervals(i) .LT. 0.0_wp) THEN
+              WRITE (*, *) 'ERROR: VEL_INTERVALS(', i, ') must be >= 0'
               STOP
-
-           END IF
-
-           IF ( t_intervals(1) .NE. 0.0_wp ) THEN
-
-              WRITE(*,*) 'WARNING: T_INTERVALS(1) is not 0.'
-              WRITE(*,*) 'Source will be off before T_INTERVALS(1) =',     &
-                   t_intervals(1)
-
-           END IF
-
-           DO i = 1, n_intervals
-
-              IF ( t_intervals(i) .LT. 0.0_wp ) THEN
-
-                 WRITE(*,*) 'ERROR: T_INTERVALS(',i,') must be >= 0'
-                 STOP
-
+            END IF
+            IF (i .GT. 1) THEN
+              IF (t_intervals(i) .LE. t_intervals(i-1)) THEN
+                WRITE (*, *) 'ERROR: T_INTERVALS must be monotonically increasing'
+                STOP
               END IF
-
-              IF ( vel_intervals(i) .LT. 0.0_wp ) THEN
-
-                 WRITE(*,*) 'ERROR: VEL_INTERVALS(',i,') must be >= 0'
-                 STOP
-
-              END IF
-
-              IF ( i .GT. 1 ) THEN
-
-                 IF ( t_intervals(i) .LE. t_intervals(i-1) ) THEN
-
-                    WRITE(*,*) 'ERROR: T_INTERVALS must be ',              &
-                         'monotonically increasing'
-                    WRITE(*,*) 'T_INTERVALS(',i-1,') =', t_intervals(i-1)
-                    WRITE(*,*) 'T_INTERVALS(',i,') =', t_intervals(i)
-                    STOP
-
-                 END IF
-
-              END IF
-
-           END DO
-
-           WRITE(*,*) 'Variable velocity intervals mode active'
-           WRITE(*,*) 'N_INTERVALS =', n_intervals
-           DO i = 1, n_intervals
-              WRITE(*,*) '  t =', t_intervals(i), '  vel =',              &
-                   vel_intervals(i)
-           END DO
-
+            END IF
+          END DO
+          IF (verbose_level .GE. 0) THEN
+            WRITE (*, *) 'Variable velocity intervals mode active'
+            DO i = 1, n_intervals
+              WRITE (*, *) '  t =', t_intervals(i), ' vel =', vel_intervals(i)
+            END DO
+          END IF
         END IF
 
         ALLOCATE (qp_source(n_vars + 2))
@@ -5316,6 +5236,14 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     thickness_init(:, :) = 0.0_wp
 
     restart_file = restart_files(1)
+
+    dot_idx = SCAN(restart_file, ".", .TRUE.)
+
+    IF ((dot_idx .EQ. 0) .OR. (dot_idx + 3 .GT. LEN_TRIM(restart_file))) THEN
+      WRITE (*, *) 'ERROR: restart file has no valid extension: ', &
+        TRIM(restart_file)
+      STOP
+    END IF
 
     check_file = restart_file(dot_idx + 1:dot_idx + 3)
 
@@ -7198,8 +7126,8 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     sX = size(x_comp)
     sY = size(y_comp)
 
-    ALLOCATE (X(sX, sY), Y(sX, sY), dist(sX, sY), dist_x(sX, sY), dist_y(sX, sY), &
-              alphas_tot(sX, sY))
+    ALLOCATE (X(sX, sY), Y(sX, sY), dist(sX, sY), dist_x(sX, sY),             &
+              dist_y(sX, sY), alphas_tot(sX, sY))
 
     ! This work with large
     !X(:,:) = SPREAD( x_comp, 2, sY )
@@ -7381,9 +7309,8 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     WRITE (runout_unit, '(F12.3,A,F12.3,A,F14.3,A,F14.3,A,F14.3)') time, ',', &
       runout_last, ',', area, ',', X(imax(1), imax(2)), ',', Y(imax(1), imax(2))
 
-    WRITE (*, '(A,F10.2,A,F12.2,A,F12.2)') &
-      ' runout(m) =', runout_last, '  at X =', X(imax(1), imax(2)), &
-      '  Y =', Y(imax(1), imax(2))
+    WRITE (*, '(A,F10.2,A,F12.2,A,F12.2)') ' runout(m) =', runout_last,       &
+      '  at X =', X(imax(1), imax(2)), '  Y =', Y(imax(1), imax(2))
 
     CALL flush (runout_unit)
 
@@ -7401,7 +7328,12 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       vel_radial_growth = ABS(SQRT(area) - SQRT(area_old))/dt_runout
 
-      area_new_rel = dx*dy*COUNT(hpos .AND. (.NOT. hpos_old))/COUNT(hpos)
+      IF ( COUNT(hpos) .GT. 0 ) THEN
+        area_new_rel = dx*dy*COUNT(hpos .AND. (.NOT. hpos_old))/COUNT(hpos)
+      ELSE
+        ! empty domain: nothing inundated, so no new fraction to report
+        area_new_rel = 0.0_wp
+      END IF
 
       x_mass_center_old = x_mass_center
       y_mass_center_old = y_mass_center
@@ -7442,8 +7374,8 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     INTEGER :: i
     CHARACTER(LEN=4) :: idx_string
-    LOGICAL :: file_exists       !< does an existing .nc file already exist?
-    INTEGER :: time_dim_len      !< number of frames already in the file (restart)
+    LOGICAL :: file_exists
+    INTEGER :: time_dim_len
 
     ALLOCATE (solid_varid(n_solid))
     ALLOCATE (gas_varid(n_add_gas))
@@ -7456,88 +7388,63 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     nc_filename = TRIM(run_name)//'.nc'
     INQUIRE(FILE=nc_filename, EXIST=file_exists)
 
-    ! --- Restart branch: append to an existing .nc instead of clobbering. ---
-    ! Opens the file for write, looks up the dim/var IDs that the original run
-    ! defined, and points nc_time_idx past the last frame so the next
-    ! write_netcdf_timestep() appends rather than overwrites.
-    IF ( restart .AND. file_exists ) THEN
-
-      IF (verbose_level >= 0) WRITE (*, *) 'Appending to existing NetCDF: ', &
+    ! On restart, append to a compatible existing NetCDF file rather than
+    ! clobbering it. Recover all dimension/variable IDs and continue the
+    ! unlimited time dimension at the next record.
+    IF (restart .AND. file_exists) THEN
+      IF (verbose_level >= 0) WRITE (*, *) 'Appending to existing NetCDF: ',   &
         TRIM(nc_filename)
-
       CALL check(nf90_open(nc_filename, NF90_WRITE, ncid))
-
-      ! Dimension IDs
-      CALL check(nf90_inq_dimid(ncid, 'x',    dimids(1)))
-      CALL check(nf90_inq_dimid(ncid, 'y',    dimids(2)))
+      CALL check(nf90_inq_dimid(ncid, 'x', dimids(1)))
+      CALL check(nf90_inq_dimid(ncid, 'y', dimids(2)))
       CALL check(nf90_inq_dimid(ncid, 'time', dimids(3)))
-
-      ! Existing frame count -> next write goes at slot len+1
       CALL check(nf90_inquire_dimension(ncid, dimids(3), len=time_dim_len))
       nc_time_idx = time_dim_len + 1
-      IF (verbose_level >= 0) WRITE (*, *) '  existing frames =', time_dim_len, &
-        '; next write at index', nc_time_idx
-
-      ! Coordinate + scalar variable IDs
-      CALL check(nf90_inq_varid(ncid, 'x',    x_varid))
-      CALL check(nf90_inq_varid(ncid, 'y',    y_varid))
+      CALL check(nf90_inq_varid(ncid, 'x', x_varid))
+      CALL check(nf90_inq_varid(ncid, 'y', y_varid))
       CALL check(nf90_inq_varid(ncid, 'time', t_varid))
-
-      ! 3D field variable IDs
-      CALL check(nf90_inq_varid(ncid, 'b',    b_varid))
-      CALL check(nf90_inq_varid(ncid, 'h',    h_varid))
-      CALL check(nf90_inq_varid(ncid, 'w',    w_varid))
-      CALL check(nf90_inq_varid(ncid, 'u',    u_varid))
-      CALL check(nf90_inq_varid(ncid, 'v',    v_varid))
-      CALL check(nf90_inq_varid(ncid, 'T',    Temp_varid))
-
+      CALL check(nf90_inq_varid(ncid, 'b', b_varid))
+      CALL check(nf90_inq_varid(ncid, 'h', h_varid))
+      CALL check(nf90_inq_varid(ncid, 'w', w_varid))
+      CALL check(nf90_inq_varid(ncid, 'u', u_varid))
+      CALL check(nf90_inq_varid(ncid, 'v', v_varid))
+      CALL check(nf90_inq_varid(ncid, 'T', Temp_varid))
       DO i = 1, n_solid
         WRITE (idx_string, '(I2.2)') i
-        CALL check(nf90_inq_varid(ncid, 'solid_frac_'//trim(idx_string), &
+        CALL check(nf90_inq_varid(ncid, 'solid_frac_'//TRIM(idx_string),       &
                                   solid_varid(i)))
-        CALL check(nf90_inq_varid(ncid, 'deposit__'//trim(idx_string),   &
+        CALL check(nf90_inq_varid(ncid, 'deposit__'//TRIM(idx_string),         &
                                   deposit_varid(i)))
-        CALL check(nf90_inq_varid(ncid, 'erosion_'//trim(idx_string),    &
+        CALL check(nf90_inq_varid(ncid, 'erosion_'//TRIM(idx_string),          &
                                   erosion_varid(i)))
       END DO
-
       DO i = 1, n_add_gas
         WRITE (idx_string, '(I2.2)') i
-        CALL check(nf90_inq_varid(ncid, 'add_gas_frac_'//trim(idx_string), &
+        CALL check(nf90_inq_varid(ncid, 'add_gas_frac_'//TRIM(idx_string),     &
                                   gas_varid(i)))
       END DO
-
-      IF (gas_flag .AND. liquid_flag) THEN
+      IF (gas_flag .AND. liquid_flag)                                           &
         CALL check(nf90_inq_varid(ncid, 'alphal', alphal_varid))
-      END IF
-
       DO i = 1, n_stoch_vars
         WRITE (idx_string, '(I2.2)') i
-        CALL check(nf90_inq_varid(ncid, 'Zs_'//trim(idx_string), stoch_varid(i)))
+        CALL check(nf90_inq_varid(ncid, 'Zs_'//TRIM(idx_string), stoch_varid(i)))
       END DO
-
       DO i = 1, n_pore_vars
         WRITE (idx_string, '(I2.2)') i
-        CALL check(nf90_inq_varid(ncid, 'PorePres_'//trim(idx_string), &
+        CALL check(nf90_inq_varid(ncid, 'PorePres_'//TRIM(idx_string),         &
                                   pore_varid(i)))
       END DO
-
-      CALL check(nf90_inq_varid(ncid, 'hMax',      hMax_varid))
-      CALL check(nf90_inq_varid(ncid, 'pDynMax',   pDynMax_varid))
+      CALL check(nf90_inq_varid(ncid, 'hMax', hMax_varid))
+      CALL check(nf90_inq_varid(ncid, 'pDynMax', pDynMax_varid))
       CALL check(nf90_inq_varid(ncid, 'modVelMax', modVelMax_varid))
-      CALL check(nf90_inq_varid(ncid, 'Ri',        Ri2D_varid))
-      CALL check(nf90_inq_varid(ncid, 'rhomix',    rho_m2D_varid))
-      CALL check(nf90_inq_varid(ncid, 'red grav',  red_grav2D_varid))
-
-      IF ((rheology_flag) .AND. (rheology_model .EQ. 1)) THEN
+      CALL check(nf90_inq_varid(ncid, 'Ri', Ri2D_varid))
+      CALL check(nf90_inq_varid(ncid, 'rhomix', rho_m2D_varid))
+      CALL check(nf90_inq_varid(ncid, 'red grav', red_grav2D_varid))
+      IF (rheology_flag .AND. rheology_model .EQ. 1)                            &
         CALL check(nf90_inq_varid(ncid, 'mu eff', muEff_varid))
-      END IF
-
-      RETURN  ! Done -- no define mode, no fresh create.
-
+      RETURN
     END IF
 
-    ! --- Fresh-run branch (original code path) ---
     IF (verbose_level >= 0) WRITE (*, *) 'Initializing NetCDF output file: ', &
       TRIM(nc_filename)
 

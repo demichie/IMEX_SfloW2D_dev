@@ -34,6 +34,12 @@ MODULE constitutive_2d
   REAL(wp) :: grav
   REAL(wp) :: inv_grav
 
+
+  !> Optional collective-settling drag-law coefficients
+  REAL(wp) :: A_drag
+  REAL(wp) :: B_drag
+  LOGICAL :: collective_settling_flag
+
   !> drag coefficients (Voellmy-Salm model)
   REAL(wp) :: mu
   REAL(wp) :: xi
@@ -62,15 +68,6 @@ MODULE constitutive_2d
 
   !> drag coefficients (plastic model)
   REAL(wp) :: tau
-
-  !> drag law coefficients for settling velocity (new drag law)
-  REAL(wp) :: A_drag
-  REAL(wp) :: B_drag
-
-  !> Flag to activate the new collective-settling drag law (A_drag, B_drag).
-  !> - T  => use new drag law formula (requires A_drag and B_drag in .inp)
-  !> - F  => use original Schiller-Naumann drag law (default, backwards-compatible)
-  LOGICAL :: collective_settling_flag
 
   !> evironment temperature [K]
   REAL(wp) :: T_env
@@ -637,6 +634,15 @@ CONTAINS
     REAL(wp) :: r_sp_heat_c_by_xc
 
     REAL(wp) :: dyn_visc_c
+    REAL(wp) :: kin_visc_c_local
+
+    ! Optional transported quantities must have a defined value even when
+    ! their corresponding model is disabled.
+    r_alphal = 0.0_wp
+    r_alphag = 0.0_wp
+    r_Zs = 0.0_wp
+    r_exc_pore_pres = 0.0_wp
+    r_xl = 0.0_wp
 
     ! compute solid mass fractions
     IF ( r_qj(1) .GT. EPSILON(1.0_wp) ) THEN
@@ -803,6 +809,8 @@ CONTAINS
     ! reduced gravity
     r_red_grav = ( r_rho_m - rho_a_amb ) * r_inv_rhom * grav
 
+    kin_visc_c_local = kin_visc_c
+
     IF ( vertical_profiles_flag ) THEN
 
        rhos_alfas_tot_u = r_xs_tot * r_qj(2) / r_h  
@@ -815,12 +823,12 @@ CONTAINS
           dyn_visc_c = muRef_Suth * ( r_T / Tref_Suth )**1.5_wp *               &
                ( Tref_Suth + S_mu ) / ( r_T + S_mu )
 
-          kin_visc_c = dyn_visc_c * r_inv_rho_c
+          kin_visc_c_local = dyn_visc_c * r_inv_rho_c
 
        END IF
                  
        ! Viscosity read from input file [m2 s-1]
-       inv_kin_visc = 1.0_wp / kin_visc_c
+       inv_kin_visc = 1.0_wp / kin_visc_c_local
 
        DO i_solid=1,n_solid
 
@@ -1165,7 +1173,7 @@ CONTAINS
     COMPLEX(wp), INTENT(OUT) :: T               !< temperature [K]
     COMPLEX(wp), INTENT(OUT) :: rho_m           !< mixture density [kg m-3]
     COMPLEX(wp), INTENT(OUT) :: alphas(n_solid) !< sediment volume fractions
-    COMPLEX(wp), INTENT(OUT) :: alphag(n_solid) !< sediment volume fractions
+    COMPLEX(wp), INTENT(OUT) :: alphag(n_add_gas) !< additional-gas volume fractions
     COMPLEX(wp), INTENT(OUT) :: inv_rhom        !< 1/mixture density [kg-1 m3]
     COMPLEX(wp), INTENT(OUT) :: Zs              !< stochastic variable
     COMPLEX(wp), INTENT(OUT) :: exc_pore_pres   !< excess pore pressure
@@ -1181,6 +1189,9 @@ CONTAINS
     COMPLEX(wp) :: inv_cqj1                !< reciprocal of 1st cons. variable
     COMPLEX(wp) :: inv_rho_c               !< carrier phase density reciprocal
     COMPLEX(wp) :: inv_rho_g(n_add_gas)    !< add. gas density reciprocal
+
+    Zs = CMPLX(0.0_wp,0.0_wp,wp)
+    exc_pore_pres = CMPLX(0.0_wp,0.0_wp,wp)
 
     ! compute solid mass fractions
     IF ( REAL(c_qj(1)) .GT.  EPSILON(1.0_wp) ) THEN
@@ -1408,7 +1419,8 @@ CONTAINS
     ELSE
 
        r_alphas(1:n_solid) = qpj(idx_alfas_first:idx_alfas_last) / qpj(1)
-       r_alphag(1:n_add_gas) = qpj(idx_addGas_first:idx_addGas_first) / qpj(1)
+       IF ( n_add_gas .GT. 0 ) r_alphag(1:n_add_gas) =                       &
+            qpj(idx_addGas_first:idx_addGas_last) / qpj(1)
 
     END IF
 
@@ -1797,6 +1809,11 @@ CONTAINS
     REAL(wp) :: u_log_avg
 
     REAL(wp) :: dyn_visc_c
+    REAL(wp) :: kin_visc_c_local
+
+    r_xl = 0.0_wp
+    r_Zs = 0.0_wp
+    r_exc_pore_pres = 0.0_wp
 
     r_h = qp(1)
 
@@ -1990,17 +2007,19 @@ CONTAINS
 
        shear_vel = SQRT( friction_factor ) * mod_vel
 
+       kin_visc_c_local = kin_visc_c
+
        IF ( gas_flag .AND. sutherland_flag ) THEN
           
           dyn_visc_c = muRef_Suth * ( r_T / Tref_Suth )**1.5_wp *               &
                ( Tref_Suth + S_mu ) / ( r_T + S_mu )
 
-          kin_visc_c = dyn_visc_c / r_rho_c
+          kin_visc_c_local = dyn_visc_c / r_rho_c
 
        END IF
                      
        ! Viscosity read from input file [m2 s-1]
-       inv_kin_visc = 1.0_wp / kin_visc_c
+       inv_kin_visc = 1.0_wp / kin_visc_c_local
        
        DO i_solid=1,n_solid
 
@@ -2409,14 +2428,20 @@ CONTAINS
                qcj(idx_alfas_first:idx_alfas_last) *                            &
                shape_coeff(idx_alfas_first:idx_alfas_last)
 
-          ! Solid flux can't be larger than total flux
-          IF ( ( flux(1) .GT. 0.0_wp ) .AND.                                    &
-               ( SUM(flux(idx_solidEqn_first:idx_solidEqn_last)) / flux(1)      &
-               .GT.1.0_wp ) ) THEN
+          ! Solid flux can't be larger than total flux.
+          ! Nested IF and a division-free comparison: Fortran does not
+          ! guarantee short-circuit .AND., so the combined test could
+          ! still evaluate the quotient when flux(1) = 0.
+          IF ( flux(1) .GT. 0.0_wp ) THEN
 
-             flux(idx_solidEqn_first:idx_solidEqn_last) =                       &
-                  flux(idx_solidEqn_first:idx_solidEqn_last) /                  &
-                  SUM(flux(idx_solidEqn_first:idx_solidEqn_last)) * flux(1)
+             IF ( SUM(flux(idx_solidEqn_first:idx_solidEqn_last))               &
+                  .GT. flux(1) ) THEN
+
+                flux(idx_solidEqn_first:idx_solidEqn_last) =                    &
+                     flux(idx_solidEqn_first:idx_solidEqn_last) /               &
+                     SUM(flux(idx_solidEqn_first:idx_solidEqn_last)) * flux(1)
+
+             END IF
 
           END IF
 
@@ -2471,14 +2496,20 @@ CONTAINS
                qcj(idx_alfas_first:idx_alfas_last) *                            &
                shape_coeff(idx_alfas_first:idx_alfas_last)
 
-          ! Solid flux can't be larger than total flux
-          IF ( ( flux(1) .GT. 0.0_wp ) .AND.                                    &
-               ( SUM(flux(idx_solidEqn_first:idx_solidEqn_last)) / flux(1)      &
-               .GT. 1.0_wp ) ) THEN
+          ! Solid flux can't be larger than total flux.
+          ! Nested IF and a division-free comparison: Fortran does not
+          ! guarantee short-circuit .AND., so the combined test could
+          ! still evaluate the quotient when flux(1) = 0.
+          IF ( flux(1) .GT. 0.0_wp ) THEN
 
-             flux(idx_solidEqn_first:idx_solidEqn_last) =                       &
-                  flux(idx_solidEqn_first:idx_solidEqn_last) /                  &
-                  SUM(flux(idx_solidEqn_first:idx_solidEqn_last)) * flux(1)
+             IF ( SUM(flux(idx_solidEqn_first:idx_solidEqn_last))               &
+                  .GT. flux(1) ) THEN
+
+                flux(idx_solidEqn_first:idx_solidEqn_last) =                    &
+                     flux(idx_solidEqn_first:idx_solidEqn_last) /               &
+                     SUM(flux(idx_solidEqn_first:idx_solidEqn_last)) * flux(1)
+
+             END IF
 
           END IF
 
@@ -2627,6 +2658,7 @@ CONTAINS
     REAL(wp) :: rhom_vel_vel
     REAL(wp) :: dyn_visc_c
     REAL(wp) :: r_inv_rho_c
+    REAL(wp) :: kin_visc_c_local
 
     shape_coeff(1:n_eqns) = 1.0_wp
 
@@ -2668,18 +2700,20 @@ CONTAINS
 
     shear_vel = SQRT( friction_factor ) * mod_vel
 
+    kin_visc_c_local = kin_visc_c
+
     IF ( gas_flag .AND. sutherland_flag ) THEN
           
        dyn_visc_c = muRef_Suth * ( r_T / Tref_Suth )**1.5_wp *               &
             ( Tref_Suth + S_mu ) / ( r_T + S_mu )
 
        r_inv_rho_c = sp_gas_const_a * r_T * inv_pres       
-       kin_visc_c = dyn_visc_c * r_inv_rho_c
+       kin_visc_c_local = dyn_visc_c * r_inv_rho_c
        
     END IF
                   
     ! Viscosity read from input file [m2 s-1]
-    inv_kin_visc = 1.0_wp / kin_visc_c
+    inv_kin_visc = 1.0_wp / kin_visc_c_local
 
     DO i_solid=1,n_solid
 
@@ -2899,6 +2933,7 @@ CONTAINS
     REAL(wp) :: z(n_quad)
     REAL(wp) :: w(n_quad)
     REAL(wp) :: dyn_visc_c
+    REAL(wp) :: kin_visc_c_local
 
     dep_coeff(1:n_solid) = 1.0_wp
 
@@ -2907,17 +2942,19 @@ CONTAINS
 
     shear_vel = SQRT( friction_factor ) * mod_vel
 
+    kin_visc_c_local = kin_visc_c
+
     IF ( gas_flag .AND. sutherland_flag ) THEN
           
        dyn_visc_c = muRef_Suth * ( r_T / Tref_Suth )**1.5_wp *               &
             ( Tref_Suth + S_mu ) / ( r_T + S_mu )
 
-       kin_visc_c = dyn_visc_c / r_rho_c
+       kin_visc_c_local = dyn_visc_c / r_rho_c
        
     END IF
     
     ! Viscosity read from input file [m2 s-1]
-    inv_kin_visc = 1.0_wp / kin_visc_c
+    inv_kin_visc = 1.0_wp / kin_visc_c_local
 
     DO i_solid=1,n_solid
 
@@ -3317,16 +3354,11 @@ CONTAINS
     IF ( radial_source_flag .AND. ( lat_arc_perim_jk .GT. 0.0_wp ) .AND.       &
          ( h_source .GT. 0.0_wp ) ) THEN
 
-       ! Time gate - matches the L1 eval_source_bdry logic.
+       ! Time gate: keep the current-main semantics used by eval_source_bdry.
+       ! TIME_PARAM(4) is an absolute cut-off for the lateral radial source.
        IF ( time .GE. time_param(4) ) THEN
 
-          IF ( ( time_param(3) .GT. 0.0_wp ) .AND.                             &
-               ( time .LT. time_param(4) + time_param(3) ) ) THEN
-             t_coeff = 0.5_wp * ( 1.0_wp + COS( pi_g *                         &
-                  ( time - time_param(4) ) / time_param(3) ) )
-          ELSE
-             t_coeff = 0.0_wp
-          END IF
+          t_coeff = 0.0_wp
 
        ELSE
 
@@ -3473,6 +3505,10 @@ CONTAINS
 
     mod_vel_hor = SQRT( r_u**2 + r_v**2 )
 
+    ! A cell at rest has no velocity for the friction to damp, and the
+    ! reciprocal below would divide by zero.
+    IF ( mod_vel_hor .LE. EPSILON(1.0_wp) ) RETURN
+
     mod_vel = 1.0_wp / ( 1.0_wp  / mod_vel_hor + friction_factor / r_h * dt )
 
     r_u = r_u * ( mod_vel / mod_vel_hor )
@@ -3539,7 +3575,7 @@ CONTAINS
     COMPLEX(wp) :: T                       !< temperature [K]
     COMPLEX(wp) :: rho_m                   !< mixture density [kg/m3]
     COMPLEX(wp) :: alphas(n_solid)         !< sediment volume fractions
-    COMPLEX(wp) :: alphag(n_solid)         !< add. gas volume fractions
+    COMPLEX(wp) :: alphag(n_add_gas)       !< add. gas volume fractions
     COMPLEX(wp) :: inv_rho_m               !< 1/mixture density [kg-1 m3]
 
     COMPLEX(wp) :: qj(n_vars)
@@ -3598,6 +3634,8 @@ CONTAINS
     COMPLEX(wp) :: f_inhibit
     COMPLEX(wp) :: dyn_visc_c
     COMPLEX(wp) :: red_grav
+    COMPLEX(wp) :: hydraulic_permeability_local
+    COMPLEX(wp) :: kin_visc_c_local
 
    
     !> calculation of permeability 
@@ -3635,6 +3673,7 @@ CONTAINS
 
     ! initialize the source terms
     source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)
+    f_inhibit = CMPLX(1.0_wp,0.0_wp,wp)
 
     IF (rheology_flag) THEN
 
@@ -3844,6 +3883,8 @@ CONTAINS
     IF ( pore_pressure_flag ) THEN
 
        h_threshold = 1.0E-10_wp
+       hydraulic_permeability_local = CMPLX(hydraulic_permeability,0.0_wp,wp)
+       kin_visc_c_local = CMPLX(kin_visc_c,0.0_wp,wp)
 
        gamma_gas = sp_heat_a / ( sp_heat_a - sp_gas_const_a )
        gas_compressibility = 1.0_wp / ( gamma_gas * pres )
@@ -3867,7 +3908,7 @@ CONTAINS
             sphericity_mean = sphericity_s(1)
          END IF
          ! calculating permeability using Carman-Kozeny equation with sphericity
-         hydraulic_permeability = ( porosity**3.0_wp * &
+         hydraulic_permeability_local = ( porosity**3.0_wp * &
                                    ( diam_sauter * sphericity_mean )**2.0_wp ) / &
                                    ( 150.0_wp * (1.0_wp - porosity)**2.0_wp )
          
@@ -3880,12 +3921,13 @@ CONTAINS
           dyn_visc_c = muRef_Suth * ( T / Tref_Suth )**1.5_wp *                 &
                ( Tref_Suth + S_mu ) / ( T + S_mu )
 
-          kin_visc_c = dyn_visc_c / rho_gas
+          kin_visc_c_local = dyn_visc_c / rho_gas
   
        END IF
        
        ! Eq. 7 from Gueugneau et al, 2017 
-       D_coeff = hydraulic_permeability / ( porosity * kin_visc_c * rho_gas *   &
+       D_coeff = hydraulic_permeability_local /                                &
+            ( porosity * kin_visc_c_local * rho_gas *                         &
             gas_compressibility )
 
        ! Equation 12 from Gueugneau et al, 2017
@@ -3951,7 +3993,8 @@ CONTAINS
             !-------------------------------------------------------------------!
 
             ! Calcualte dynamic alpha_trans based on height (from empirical fit)
-            alpha_trans_dynamic = 10_wp ** (-0.28_wp) * h ** 0.12_wp
+            alpha_trans_dynamic = 10.0_wp ** (-0.28_wp) *                       &
+                 REAL(h,wp) ** 0.12_wp
 
             ! Correct for alpha_trans_dynamic exceeding maximum_solid_packing
             if ( real(alpha_trans_dynamic) .GE. maximum_solid_packing ) then  
@@ -4087,7 +4130,8 @@ CONTAINS
     REAL(wp) :: rho_particle !< volume weighted mean density of particles
     REAL(wp) :: I !< inertial number
     REAL(wp) :: mu_I !< mu(I)
-    REAL(wp) :: shear_rate !< shear rate from full velocity magnitude
+    REAL(wp) :: shear_rate !< shear rate using horizontal velocity only
+    REAL(wp) :: tau_cosA !< shear stress projected to horizontal plane
     REAL(wp) :: vert_stress_eff !< effective vertical stress
     REAL(wp) :: eff_normal_stress !< effective normal stress
 
@@ -4102,9 +4146,20 @@ CONTAINS
 
     sp_heat_flag = .FALSE.
 
+    ! Set both INTENT(OUT) arguments up front: several rheology
+    ! branches never assign fric_val, leaving it undefined on return.
+    nh_semi_impl_term(1:n_eqns) = 0.0_wp
+    fric_val = 0.0_wp
+
+    ! A dry cell carries no friction source, and the
+    ! alpha_flag = .FALSE. branch below divides the solid and
+    ! additional-gas fractions by qpj(1). Without this guard a dry or
+    ! vanishing cell divides by zero.
+    IF ( qpj(1) .LE. EPSILON(1.0_wp) ) RETURN
 
     ! initialize and evaluate the forces terms
     source_term(1:n_eqns) = 0.0_wp
+    centr_force_term = 0.0_wp
 
     rheology_if:IF (rheology_flag) THEN
 
@@ -4389,10 +4444,10 @@ CONTAINS
             !mu_2 = 0.73_wp         ! friction at high inertial number above which flow accelerates
             !muI_inf = 1.2_wp        ! friction at high I to avoid plateau (Barker et al. 2017) doi:10.1017/jfm.2017.428
             !I_0 = 0.279_wp         ! reference inertial
-
+           
          IF ( mod_vel .GT. 0.0_wp ) THEN ! v>0 (avoid div by 0)
 
-            ! diameter and density of particles
+            ! diameter and density of particles 
             IF ( n_solid .GT. 1) THEN ! if more than one solid phase
                ! Sauter diameter
                diam_characteristic = sauter_diameter( r_alphas )
@@ -4407,6 +4462,9 @@ CONTAINS
             IF (r_h .LT. EPSILON(1.0_wp)) THEN
                r_h = EPSILON(1.0_wp)
             END IF
+            ! IF (r_h .LT. diam_characteristic) THEN
+            !    r_h = diam_characteristic
+            ! END IF
 
             ! Centrifugal force contribution (computed once, used consistently below).
             ! See Eq. (3) Xia & Liang, 2018 Eng.Geol.
@@ -4418,8 +4476,8 @@ CONTAINS
                centr_force_term = 0.0_wp
             END IF
 
-            ! Effective vertical stress: gravity + centrifugal - pore pressure
-            ! See Eq. (2) Gueugneau et al. 2017, GRL for pore pressure contribution
+            ! Effective vertical stress: gravity + centrifugal − pore pressure
+            ! See Eq. (2) Gueugneau et al. 2017, GRL for pore pressure contribution 
             IF ( pore_pressure_flag ) THEN
                ! pore pressure at the base (See Eq. (2) Gueugneau et al. 2017, GRL)
                exc_pore_pres = qpj(idx_pore)
@@ -4430,12 +4488,12 @@ CONTAINS
             END IF
             vert_stress_eff = MAX(vert_stress_eff, 0.0_wp)
 
-            ! Effective normal stress - computed unconditionally; independent of shear rate
+           ! Effective normal stress — computed unconditionally; independent of shear rate
             eff_normal_stress = MAX(0.0_wp, vert_stress_eff * SQRT(grav_coeff))
             IF (eff_normal_stress .LT. EPSILON(1.0_wp)) THEN
                eff_normal_stress = EPSILON(1.0_wp)
             END IF
-
+       
             ! Shear rate at the base (Bouchut et al. 2021, Eqn. 2.15)
             shear_rate = 5.0_wp/2.0_wp * mod_vel / (r_h * SQRT(grav_coeff))
 
@@ -4444,7 +4502,7 @@ CONTAINS
 
             ! mu(I) with regularisation
             mu_I = (mu_s * I_0 + mu_2 * I + muI_inf * I**2) / (I_0 + I)
-
+                       
             ! Friction force per unit horizontal area, parallel to full velocity
             ! vector (u,v,w), tangential to the topography.
             temp_term = mu_I * eff_normal_stress
@@ -4452,7 +4510,7 @@ CONTAINS
             ! Apply friction force to momentum equations (only if there's velocity)
             ! Friction force projected onto x direction, opposite to motion
             source_term(2) = source_term(2) - temp_term * (r_u / mod_vel)
-            ! Friction force projected onto y direction, opposite to motion
+            ! Friction force projected onto y direction, opposite to motion  
             source_term(3) = source_term(3) - temp_term * (r_v / mod_vel)
 
          END IF
@@ -4471,7 +4529,7 @@ CONTAINS
 
          IF ( mod_vel .GT. 0.0_wp ) THEN
 
-            ! diameter and density of particles
+            ! diameter and density of particles 
             IF ( n_solid .GT. 1) THEN ! if more than one solid phase
                ! Sauter diameter
                diam_characteristic = sauter_diameter( r_alphas )
@@ -4484,9 +4542,9 @@ CONTAINS
 
             !Flow thickness (avoid div by 0)
             IF (r_h .LT. EPSILON(1.0_wp)) THEN
-               r_h = EPSILON(1.0_wp)
+               r_h = EPSILON(1.0_wp) 
             END IF
-
+            
             ! Centrifugal force contribution (computed once, used consistently below).
             ! See Eq. (3) Xia & Liang, 2018 Eng.Geol.
             ! centrifugal force term: (u,v)^T * Hessian * (u,v)
@@ -4494,10 +4552,10 @@ CONTAINS
                centr_force_term = Bsecondj_xx * r_u**2 + 2.0_wp * Bsecondj_xy  &
                      * r_u * r_v + Bsecondj_yy * r_v**2
             ELSE
-                centr_force_term = 0.0_wp
+                centr_force_term = 0.0_wp 
             END IF
 
-            ! Effective vertical stress: gravity + centrifugal - pore pressure.
+            ! Effective vertical stress: gravity + centrifugal − pore pressure.
             ! See Eq. (2) Gueugneau et al. 2017, GRL for pore pressure contribution.
             IF ( pore_pressure_flag ) THEN
                exc_pore_pres = qpj(idx_pore)
@@ -4514,6 +4572,7 @@ CONTAINS
             IF (eff_normal_stress .LT. EPSILON(1.0_wp)) THEN
                eff_normal_stress = EPSILON(1.0_wp)
             END IF
+           
 
             !Shear rate at the base (Eqn. 2.15 from Bouchut et al. 2021)
             shear_rate = 5.0_wp/2.0_wp * mod_vel / (r_h * SQRT(grav_coeff))
@@ -4521,9 +4580,10 @@ CONTAINS
             !Inertial number
             I = diam_characteristic*shear_rate/SQRT(eff_normal_stress/rho_particle)
 
-            !Coefficient of friction -> accounting for regularisation
+            !Coefficient of friction -> accounting for regularisation 
             mu_I = (mu_s * I_0 + mu_2 * I + muI_inf * I**2) / ( I_0 + I )
-
+                              
+      
             ! Friction force per unit horizontal area, parallel to full velocity
             ! vector (u,v,w), tangential to the topography.
             temp_term = mu_I * eff_normal_stress
@@ -4674,6 +4734,8 @@ CONTAINS
 
     REAL(wp) :: dyn_visc_c
     REAL(wp) :: rho_c
+    REAL(wp) :: hydraulic_permeability_local
+    REAL(wp) :: kin_visc_c_local
 
     erosion_term(1:n_solid) = 0.0_wp
     deposition_term(1:n_solid) = 0.0_wp
@@ -4681,6 +4743,12 @@ CONTAINS
     continuous_phase_loss_term = 0.0_wp
     eqns_term(1:n_eqns) = 0.0_wp
     topo_term = 0.0_wp
+    hydraulic_permeability_local = hydraulic_permeability
+    kin_visc_c_local = kin_visc_c
+    r_Zs = 0.0_wp
+    r_exc_pore_pres = 0.0_wp
+    f_inhibit = 1.0_wp
+    pore_pressure_term = 0.0_wp
 
     IF ( qpj(1) .LE. epsilon(1.0_wp) ) THEN
 
@@ -4812,12 +4880,12 @@ CONTAINS
                ( Tref_Suth + S_mu ) / ( r_T + S_mu )
 
           rho_c = pres / ( sp_gas_const_a * r_T )
-          kin_visc_c = dyn_visc_c / rho_c
+          kin_visc_c_local = dyn_visc_c / rho_c
        
        END IF
        
        ! Viscosity read from input file [m2 s-1]
-       inv_kin_visc = 1.0_wp / kin_visc_c
+       inv_kin_visc = 1.0_wp / kin_visc_c_local
        ! Continuous phase density used for the settling velocity
        rhoc = r_rho_c
 
@@ -4945,7 +5013,7 @@ CONTAINS
                r_h = EPSILON(1.0_wp) ! avoid multiplying by something lower than working precision
             END IF
 
-            alpha_trans_dynamic = 10_wp ** (-0.28_wp) * r_h ** 0.12_wp
+            alpha_trans_dynamic = 10.0_wp ** (-0.28_wp) * r_h ** 0.12_wp
 
 
             ! Correct for alpha_trans_dynamic exceeding maximum_solid_packing
@@ -4981,21 +5049,28 @@ CONTAINS
          ! ------------------------------------------------------------------- !
 
    ! -------------------------------------------------------------------- !
-          IF (dynamic_permeability_flag) THEN
+          ! Guard on alphas_tot: Carman-Kozeny below divides by
+          ! alphas_tot**2, and the surface-area weights divide by a sum
+          ! that vanishes with it, so a gas-only or numerically depleted
+          ! cell would divide by zero.
+          IF (dynamic_permeability_flag .AND.                                  &
+              ( alphas_tot .GT. EPSILON(1.0_wp) )) THEN
          
             ! diameter and density of particles 
             IF ( n_solid .GT. 1) THEN ! if more than one solid phase
                diam_sauter = sauter_diameter( r_alphas )
-               ! Surface-area-weighted mean sphericity (consistent with Sauter diameter)
-               ! Sphericity is weighted by alpha_i * d_i^2 (proportional to surface area)
-               sphericity_mean = DOT_PRODUCT( r_alphas * diam_s**2 , sphericity_s ) / &
-                                 DOT_PRODUCT( r_alphas , diam_s**2 )
+               ! Surface-area-weighted mean sphericity, consistent with the
+               ! Sauter diameter used beside it: the surface area of class i
+               ! per unit bulk volume scales as alpha_i/d_i, not
+               ! alpha_i*d_i^2, which over-weights the coarse classes.
+               sphericity_mean = DOT_PRODUCT( r_alphas / diam_s , sphericity_s ) / &
+                                 SUM( r_alphas / diam_s )
             ELSE ! if only one solid phase
                diam_sauter = diam_s(1)
                sphericity_mean = sphericity_s(1)
             END IF
             ! calculating permeability using Carman-Kozeny equation with sphericity
-            hydraulic_permeability = ( (1.0_wp - alphas_tot)**3.0_wp * &
+            hydraulic_permeability_local = ( (1.0_wp - alphas_tot)**3.0_wp * &
                                       ( diam_sauter * sphericity_mean )**2.0_wp ) / &
                                       ( 150.0_wp * (alphas_tot)**2.0_wp )
             
@@ -5011,14 +5086,15 @@ CONTAINS
                   ( Tref_Suth + S_mu ) / ( r_T + S_mu )
              
              rho_c = pres / ( sp_gas_const_a * r_T )
-             kin_visc_c = dyn_visc_c / rho_c
+             kin_visc_c_local = dyn_visc_c / rho_c
              
           END IF
 	! -------------------------------------------------------------------- !
 
         ! velocity of gas loss due to pore pressure gradient
-        vel_loss_gas =  hydraulic_permeability /                              &
-               ( kin_visc_c * r_rho_c ) / MAX(1.e-5,r_h) * 0.5_wp * pi_g *      &
+        vel_loss_gas = hydraulic_permeability_local /                         &
+               ( kin_visc_c_local * r_rho_c ) / MAX(1.0e-5_wp,r_h) *          &
+               0.5_wp * pi_g *                                                &
                r_exc_pore_pres
 
 	! add pore pressure driven gas loss term, inhibited by f_inhibit
@@ -5174,7 +5250,7 @@ CONTAINS
   SUBROUTINE eval_source_bdry( time, vect_x , vect_y , source_bdry )
 
     USE parameters_2d, ONLY : h_source , vel_source , T_source , alphas_source ,&
-         alphag_source , alphal_source , time_param , azimuth_source , arc_width_source
+         alphag_source , alphal_source , time_param
 
     USE geometry_2d, ONLY : pi_g
 
@@ -5187,80 +5263,52 @@ CONTAINS
 
     REAL(wp) :: t_rem
     REAL(wp) :: t_coeff
-    REAL(wp) :: angle_out_compass , angle_diff
 
     IF ( time .GE. time_param(4) ) THEN
 
-       ! Absolute cutoff: apply trailing cosine ramp-down if time_param(3) > 0,
-       ! otherwise set t_coeff = 0 immediately (source off).
-       IF ( ( time_param(3) .GT. 0.0_wp ) .AND.                              &
-            ( time .LT. time_param(4) + time_param(3) ) ) THEN
+       ! The exponents of t_coeff are such that Ri does not depend on t_coeff
+       source_bdry(1) = 0.0_wp
+       source_bdry(2) = 0.0_wp
+       source_bdry(3) = 0.0_wp
+       source_bdry(4) = T_source
+       source_bdry(idx_solidEqn_first:idx_solidEqn_last) = 0.0_wp
 
-          t_coeff = 0.5_wp * ( 1.0_wp + COS( pi_g *                          &
-               ( time - time_param(4) ) / time_param(3) ) )
+       IF ( gas_flag .AND. liquid_flag ) THEN
 
-       ELSE
-
-          t_coeff = 0.0_wp
-
-       END IF
-
-    ELSE
-
-       t_rem = MOD( time , time_param(1) )
-
-       t_coeff = 0.0_wp
-
-       IF ( time_param(3) .EQ. 0.0_wp ) THEN
-
-          IF ( t_rem .LE. time_param(2) ) t_coeff = 1.0_wp
-
-       ELSE
-
-          IF ( t_rem .LT. time_param(3) ) THEN
-
-             t_coeff = 0.5_wp * ( 1.0_wp - COS( pi_g * t_rem / time_param(3) ) )
-
-          ELSEIF ( t_rem .LE. ( time_param(2) - time_param(3) ) ) THEN
-
-             t_coeff = 1.0_wp
-
-          ELSEIF ( t_rem .LE. time_param(2) ) THEN
-
-             t_coeff = 0.5_wp * ( 1.0_wp + COS( pi_g * ( ( t_rem -          &
-                  time_param(2) ) / time_param(3) + 1.0_wp ) ) )
-
-          END IF
+          source_bdry(n_vars) = alphal_source
 
        END IF
+
+       source_bdry(idx_u) = 0.0_wp
+       source_bdry(idx_v) = 0.0_wp
+
+       RETURN
 
     END IF
 
-    ! --- Directional arc gate ---
-    ! Check whether this boundary cell's outward normal falls inside the
-    ! requested emission sector.  When arc_width_source = 360 (default) the
-    ! test is always true and no extra cost is paid.
-    IF ( arc_width_source .LT. 360.0_wp ) THEN
+    t_rem = MOD( time , time_param(1) )
 
-       ! Convert the outward Cartesian unit vector to a compass bearing
-       ! (degrees, North = 0, clockwise).  Math convention: East = 0, CCW.
-       ! compass = 90 - atan2d(vect_y, vect_x)
-       angle_out_compass = 90.0_wp - ATAN2(vect_y, vect_x) * 180.0_wp / pi_g
+    t_coeff = 0.0_wp
 
-       ! Normalise to [0, 360)
-       angle_out_compass = MOD(angle_out_compass + 360.0_wp, 360.0_wp)
+    IF ( time_param(3) .EQ. 0.0_wp ) THEN
 
-       ! Shortest angular distance from the target azimuth
-       angle_diff = MOD(ABS(angle_out_compass - azimuth_source) + 360.0_wp, 360.0_wp)
-       IF ( angle_diff .GT. 180.0_wp ) angle_diff = 360.0_wp - angle_diff
+       IF ( t_rem .LE. time_param(2) ) t_coeff = 1.0_wp
 
-       ! If outside the half-arc, return a zero-flux (wall) boundary condition
-       IF ( angle_diff .GT. 0.5_wp * arc_width_source ) THEN
-          source_bdry        = 0.0_wp
-          source_bdry(4)     = T_source   ! keep temperature to avoid NaN in any T check
-          source_bdry(idx_u) = 0.0_wp
-          source_bdry(idx_v) = 0.0_wp
-          RETURN
+    ELSE
+
+       IF ( t_rem .LT. time_param(3) ) THEN
+
+          t_coeff = 0.5_wp * ( 1.0_wp - COS( pi_g * t_rem / time_param(3) ) )
+
+       ELSEIF ( t_rem .LE. ( time_param(2) - time_param(3) ) ) THEN
+
+          t_coeff = 1.0_wp
+
+       ELSEIF ( t_rem .LE. time_param(2) ) THEN
+
+          t_coeff = 0.5_wp * ( 1.0_wp + COS( pi_g * ( ( t_rem - time_param(2) ) &
+               / time_param(3) + 1.0_wp ) ) )
+
        END IF
 
     END IF
@@ -5352,7 +5400,7 @@ CONTAINS
 
     END IF
 
-    const_part = SQRT( (4.0_wp/3.0_wp) * ( rhos/rhoc - 1.0_wp ) * diam * grav )
+    const_part =  SQRT( (4.0_wp/3.0_wp) * ( rhos / rhoc - 1.0_wp ) * diam * grav )
 
     settling_velocity = const_part * inv_sqrt_C_D
 
@@ -5367,15 +5415,16 @@ CONTAINS
 
           IF ( collective_settling_flag ) THEN
 
-            !! New collective-settling drag law
-             inv_sqrt_C_D = SQRT(1.0_wp / ( 24.0_wp*( 1.0_wp +                &
-                  0.15_wp*Rey**(0.687_wp) )/Rey + A_drag*( LOG( Rey ) - B_drag ) ))
+             ! Optional collective-settling drag law from the development branch
+             inv_sqrt_C_D = SQRT( 1.0_wp / ( 24.0_wp * ( 1.0_wp +              &
+                  0.15_wp*Rey**(0.687_wp) ) / Rey +                             &
+                  A_drag * ( LOG(Rey) - B_drag ) ) )
 
           ELSE
 
-            !! Original Schiller-Naumann drag law
-            inv_sqrt_C_D = SQRT( Rey / ( 24.0_wp * ( 1.0_wp +               &
-              0.15_wp*Rey**(0.687_wp) ) ) )
+             ! Original Schiller-Naumann drag law
+             inv_sqrt_C_D = SQRT( Rey / ( 24.0_wp * ( 1.0_wp +                 &
+                  0.15_wp*Rey**(0.687_wp) ) ) )
 
           END IF
 
@@ -5404,5 +5453,3 @@ CONTAINS
   END FUNCTION settling_velocity
 
 END MODULE constitutive_2d
-
-
