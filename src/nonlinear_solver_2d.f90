@@ -378,8 +378,9 @@ CONTAINS
   !> \brief Solve a 2x2 linear system with partial pivoting
   !
   !> The matrix and right-hand side are overwritten with the elimination
-  !> factors and the solution, respectively. A nonzero info value identifies
-  !> the first numerically singular pivot.
+  !> factors and the solution, respectively. Rows are equilibrated before
+  !> elimination so that dimensional differences do not affect pivot tests.
+  !> A nonzero info value identifies the first numerically singular pivot.
   !******************************************************************************
 
   SUBROUTINE solve_2x2_pivoted( matrix, rhs, info )
@@ -390,20 +391,27 @@ CONTAINS
     REAL(wp), INTENT(INOUT) :: rhs(2)
     INTEGER, INTENT(OUT) :: info
 
+    INTEGER :: i
     REAL(wp) :: factor
-    REAL(wp) :: matrix_scale
     REAL(wp) :: pivot_tol
+    REAL(wp) :: row_scale
     REAL(wp) :: swap_value
 
     info = 0
-    matrix_scale = MAXVAL(ABS(matrix))
 
-    IF ( matrix_scale .LE. TINY(1.0_wp) ) THEN
-       info = 1
-       RETURN
-    END IF
+    DO i = 1,2
+       row_scale = MAXVAL(ABS(matrix(i,:)))
 
-    pivot_tol = pivot_tol_factor * EPSILON(1.0_wp) * matrix_scale
+       IF ( row_scale .LE. TINY(1.0_wp) ) THEN
+          info = i
+          RETURN
+       END IF
+
+       matrix(i,:) = matrix(i,:) / row_scale
+       rhs(i) = rhs(i) / row_scale
+    END DO
+
+    pivot_tol = pivot_tol_factor * EPSILON(1.0_wp)
 
     IF ( ABS(matrix(2,1)) .GT. ABS(matrix(1,1)) ) THEN
        swap_value = matrix(1,1)
@@ -446,8 +454,9 @@ CONTAINS
   !> \brief Solve a 3x3 linear system with partial pivoting
   !
   !> The matrix and right-hand side are overwritten with the elimination
-  !> factors and the solution, respectively. A nonzero info value identifies
-  !> the first singular pivot.
+  !> factors and the solution, respectively. Rows are equilibrated before
+  !> elimination so that dimensional differences do not affect pivot tests.
+  !> A nonzero info value identifies the first numerically singular pivot.
   !******************************************************************************
 
   SUBROUTINE solve_3x3_pivoted( matrix, rhs, info )
@@ -458,23 +467,30 @@ CONTAINS
     REAL(wp), INTENT(INOUT) :: rhs(3)
     INTEGER, INTENT(OUT) :: info
 
+    INTEGER :: i
     INTEGER :: j
     INTEGER :: pivot_row
     REAL(wp) :: factor
-    REAL(wp) :: matrix_scale
     REAL(wp) :: pivot_abs
     REAL(wp) :: pivot_tol
+    REAL(wp) :: row_scale
     REAL(wp) :: swap_value
 
     info = 0
-    matrix_scale = MAXVAL(ABS(matrix))
 
-    IF ( matrix_scale .LE. TINY(1.0_wp) ) THEN
-       info = 1
-       RETURN
-    END IF
+    DO i = 1,3
+       row_scale = MAXVAL(ABS(matrix(i,:)))
 
-    pivot_tol = pivot_tol_factor * EPSILON(1.0_wp) * matrix_scale
+       IF ( row_scale .LE. TINY(1.0_wp) ) THEN
+          info = i
+          RETURN
+       END IF
+
+       matrix(i,:) = matrix(i,:) / row_scale
+       rhs(i) = rhs(i) / row_scale
+    END DO
+
+    pivot_tol = pivot_tol_factor * EPSILON(1.0_wp)
 
     ! First elimination column.
     pivot_row = 1
