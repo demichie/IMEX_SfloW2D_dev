@@ -65,7 +65,7 @@ PROGRAM IMEX_SfloW2D
 
    USE solver_2d, ONLY : allocate_solver_variables
    USE solver_2d, ONLY : deallocate_solver_variables
-   USE solver_2d, ONLY : update_erosion_deposition_cell
+   USE mass_exchange_2d, ONLY : update_erosion_deposition_cell
    USE time_integration_2d, ONLY : timestep, imex_RK_solver
    USE domain_2d, ONLY : check_solve
 
@@ -438,7 +438,7 @@ PROGRAM IMEX_SfloW2D
 
       CALL imex_RK_solver(q, qp, t, dt, source_xy, Z_field, fric_array)
 
-      CALL update_erosion_deposition_cell(dt)
+      CALL update_erosion_deposition_cell(q, qp, dt)
 
       IF ( topo_change_flag ) CALL topography_reconstruction
 

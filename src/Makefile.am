@@ -16,6 +16,7 @@ IMEX_SfloW2D_SOURCES = \
                 geometry_2d.f90 \
                 domain_2d.f90 \
                 constitutive_2d.f90 \
+                mass_exchange_2d.f90 \
                 nonlinear_solver_2d.f90 \
                 reconstruction_2d.f90 \
                 hyperbolic_2d.f90 \
