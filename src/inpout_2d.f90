@@ -25,7 +25,7 @@ MODULE inpout_2d
   ! -- Variables for the namelist RUN_PARAMETERS
   USE parameters_2d, ONLY: t_start, t_end, t_output, dt_output
 
-  USE solver_2d, ONLY: verbose_level
+  USE parameters_2d, ONLY: verbose_level
 
   ! -- Variables for the namelist NEWRUN_PARAMETERS
   USE geometry_2d, ONLY: x0, y0, comp_cells_x, comp_cells_y, cell_size
@@ -5190,7 +5190,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     USE geometry_2d, ONLY: B_cent, erodible
     USE init_2d, ONLY: thickness_init, erodible_init
     USE parameters_2d, ONLY: n_vars
-    USE solver_2d, ONLY: q
+    USE state_2d, ONLY: q
 
     IMPLICIT none
 
@@ -5876,7 +5876,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     USE parameters_2d, ONLY: t_output, dt_output
     USE parameters_2d, ONLY: t_steady
 
-    USE solver_2d, ONLY: q, hmax, pdynmax, mod_vel_max
+    USE state_2d, ONLY: q, hmax, pdynmax, mod_vel_max
 
     IMPLICIT none
 
@@ -6366,7 +6366,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   SUBROUTINE output_max
 
     USE geometry_2d, ONLY: grid_output, grid_output_int
-    USE solver_2d, ONLY: hmax, vuln_table
+    USE state_2d, ONLY: hmax, vuln_table
 
     IMPLICIT NONE
 
@@ -6479,7 +6479,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     USE geometry_2d, ONLY: B_cent, grid_output, deposit, erosion, B_nodata
     USE geometry_2d, ONLY: deposit_tot, erosion_tot, B_zone
     ! USE geometry_2d, ONLY : comp_interfaces_x , comp_interfaces_y
-    USE solver_2d, ONLY: qp
+    USE state_2d, ONLY: qp
 
     IMPLICIT NONE
 
@@ -6856,7 +6856,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     USE geometry_2d, ONLY: x_comp, y_comp, deposit
     USE parameters_2d, ONLY: t_probes, n_vars
-    USE solver_2d, ONLY: q, qp
+    USE state_2d, ONLY: q, qp
 
     USE geometry_2d, ONLY: interp_2d_scalarB
 
@@ -7100,7 +7100,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     USE geometry_2d, ONLY: x_comp, y_comp, B_cent, dx, dy
     USE parameters_2d, ONLY: t_runout, n_solid
-    USE solver_2d, ONLY: qp, q, hpos, hpos_old
+    USE state_2d, ONLY: qp, q, hpos, hpos_old
 
     IMPLICIT NONE
 
@@ -7650,7 +7650,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     USE geometry_2d, ONLY: B_cent, comp_cells_x, comp_cells_y
     USE geometry_2d, ONLY: deposit, erosion, erodible
     USE parameters_2d, ONLY: n_vars
-    USE solver_2d, ONLY: qp, hmax, pdynmax, mod_vel_max
+    USE state_2d, ONLY: qp, hmax, pdynmax, mod_vel_max
 
     USE constitutive_2d, ONLY: mixt_var
 
@@ -7945,7 +7945,8 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   SUBROUTINE write_restart_file(filename)
     USE parameters_2d, ONLY: wp, n_vars, n_solid
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible, deposit, erosion
-    USE solver_2d, ONLY: t, dt, q, hmax, pdynmax, mod_vel_max, Z
+    USE solver_2d, ONLY: t, dt, Z
+    USE state_2d, ONLY: q, hmax, pdynmax, mod_vel_max
     USE parameters_2d, ONLY: stochastic_flag, topo_change_flag
 
     IMPLICIT NONE
@@ -8006,12 +8007,13 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   SUBROUTINE read_restart_file(filename)
     USE parameters_2d, ONLY: wp, n_vars, n_solid
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible, deposit, erosion
-    USE solver_2d, ONLY: t, dt, q, hmax, pdynmax, mod_vel_max, Z
+    USE solver_2d, ONLY: t, dt, Z
+    USE state_2d, ONLY: q, hmax, pdynmax, mod_vel_max
     USE parameters_2d, ONLY: stochastic_flag
 
     ! Modules needed to recalculate derived variables
     USE geometry_2d, ONLY: topography_reconstruction
-    USE solver_2d, ONLY: qp
+    USE state_2d, ONLY: qp
     USE domain_2d, ONLY: solve_cells, j_cent, k_cent
     USE constitutive_2d, ONLY: qc_to_qp
 

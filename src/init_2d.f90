@@ -33,7 +33,7 @@ CONTAINS
 
       USE parameters_2d, ONLY : n_vars
 
-      USE solver_2d, ONLY : q
+      USE state_2d, ONLY : q
 
       IMPLICIT NONE
 
@@ -86,7 +86,7 @@ CONTAINS
       USE parameters_2d, ONLY : x_collapse , y_collapse , r_collapse , T_collapse , &
          h_collapse , alphas_collapse , alphag_collapse
 
-      USE solver_2d, ONLY : q
+      USE state_2d, ONLY : q
 
       IMPLICIT NONE
 

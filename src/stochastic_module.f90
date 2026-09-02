@@ -18,7 +18,7 @@ MODULE stochastic_module
   
   USE solver_2d, ONLY : Z, conv_kernel
   USE domain_2d, ONLY: solve_cells, j_cent, k_cent
-  USE solver_2d, ONLY: q , qp
+  USE state_2d, ONLY: q, qp
   USE constitutive_2d, ONLY : T_ambient
   USE constitutive_2d, ONLY: qc_to_qp
   USE parameters_2d, ONLY : output_stoch_vars_flag, length_spatial_corr,        &
@@ -79,7 +79,6 @@ CONTAINS
   SUBROUTINE getSteadyStateZ
   ! should find a better way to understand when the process is stable.
   ! Since sigma is varing in space and time, the process may never be stable.
-    USE solver_2d, ONLY : comp_cells_x, comp_cells_y
     IMPLICIT none
     INTEGER :: j, k , l 
     INTEGER :: i, n_iter

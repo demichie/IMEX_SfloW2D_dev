@@ -94,9 +94,10 @@ PROGRAM IMEX_SfloW2D
    USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,          &
       thickness_levels , dyn_pres_levels
 
-   USE solver_2d, ONLY : q, qp, t, dt, source_xy, Z_field => Z, fric_array
-   USE solver_2d, ONLY : hmax , pdynmax , mod_vel_max
-   USE solver_2d, ONLY : thck_table ,  pdyn_table , vuln_table
+   USE solver_2d, ONLY : t, dt, source_xy, Z_field => Z, fric_array
+   USE state_2d, ONLY : q, qp
+   USE state_2d, ONLY : hmax, pdynmax, mod_vel_max
+   USE state_2d, ONLY : thck_table, pdyn_table, vuln_table
 
    USE constitutive_2d, ONLY : qc_to_qp
 
