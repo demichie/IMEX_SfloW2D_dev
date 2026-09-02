@@ -65,9 +65,8 @@ PROGRAM IMEX_SfloW2D
 
    USE solver_2d, ONLY : allocate_solver_variables
    USE solver_2d, ONLY : deallocate_solver_variables
-   USE solver_2d, ONLY : imex_RK_solver
    USE solver_2d, ONLY : update_erosion_deposition_cell
-   USE solver_2d, ONLY : timestep
+   USE time_integration_2d, ONLY : timestep, imex_RK_solver
    USE domain_2d, ONLY : check_solve
 
    USE inpout_2d, ONLY : restart
@@ -95,7 +94,7 @@ PROGRAM IMEX_SfloW2D
    USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,          &
       thickness_levels , dyn_pres_levels
 
-   USE solver_2d, ONLY : q , qp , t, dt
+   USE solver_2d, ONLY : q, qp, t, dt, source_xy, Z_field => Z, fric_array
    USE solver_2d, ONLY : hmax , pdynmax , mod_vel_max
    USE solver_2d, ONLY : thck_table ,  pdyn_table , vuln_table
 
@@ -411,7 +410,7 @@ PROGRAM IMEX_SfloW2D
 
       END IF
 
-      CALL timestep
+      CALL timestep(q, qp, t, dt)
 
       IF ( t_end - t_output < 1.0E-7_WP ) t_output = t_end
       IF ( t_end - t_runout < 1.0E-7_WP ) t_runout = t_end
@@ -437,7 +436,7 @@ PROGRAM IMEX_SfloW2D
       dt_old_old = dt_old
       dt_old = dt
 
-      CALL imex_RK_solver
+      CALL imex_RK_solver(q, qp, t, dt, source_xy, Z_field, fric_array)
 
       CALL update_erosion_deposition_cell(dt)
 

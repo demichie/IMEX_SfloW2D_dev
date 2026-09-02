@@ -19,6 +19,7 @@ IMEX_SfloW2D_SOURCES = \
                 nonlinear_solver_2d.f90 \
                 reconstruction_2d.f90 \
                 hyperbolic_2d.f90 \
+                time_integration_2d.f90 \
                 solver_2d.f90 \
                 init_2d.f90 \
                 stochastic_module.f90 \
