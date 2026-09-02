@@ -5182,7 +5182,8 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     ! External procedures
     USE geometry_2d, ONLY: interp_2d_scalarB, regrid_scalar
-    USE solver_2d, ONLY: allocate_solver_variables, solve_mask_time
+    USE solver_2d, ONLY: allocate_solver_variables
+    USE domain_2d, ONLY: solve_mask_time
 
     ! External variables
     USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0, dx, dy
@@ -8010,7 +8011,8 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     ! Modules needed to recalculate derived variables
     USE geometry_2d, ONLY: topography_reconstruction
-    USE solver_2d, ONLY: qp, solve_cells, j_cent, k_cent
+    USE solver_2d, ONLY: qp
+    USE domain_2d, ONLY: solve_cells, j_cent, k_cent
     USE constitutive_2d, ONLY: qc_to_qp
 
     IMPLICIT NONE

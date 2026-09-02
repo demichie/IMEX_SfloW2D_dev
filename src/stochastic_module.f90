@@ -17,7 +17,7 @@ MODULE stochastic_module
        n_stoch_vars , n_pore_vars
   
   USE solver_2d, ONLY : Z, conv_kernel
-  USE solver_2d, ONLY: solve_cells, j_cent, k_cent
+  USE domain_2d, ONLY: solve_cells, j_cent, k_cent
   USE solver_2d, ONLY: q , qp
   USE constitutive_2d, ONLY : T_ambient
   USE constitutive_2d, ONLY: qc_to_qp

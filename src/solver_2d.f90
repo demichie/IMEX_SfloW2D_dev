@@ -16,7 +16,7 @@ MODULE solver_2d
   USE constitutive_2d, ONLY : implicit_flag, implicit_map, rheology_model
   USE constitutive_2d, ONLY : T_ambient
     
-  USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,comp_cells_xy
+  USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
   USE geometry_2d, ONLY : comp_interfaces_x,comp_interfaces_y
 
   USE geometry_2d, ONLY : B_cent
@@ -73,6 +73,10 @@ MODULE solver_2d
        a_interface_yNeg, a_interface_yPos
   USE hyperbolic_2d, ONLY : H_interface_x, H_interface_y
 
+  USE domain_2d, ONLY : initialize_domain, finalize_domain
+  USE domain_2d, ONLY : solve_cells, solve_interfaces_x, solve_interfaces_y
+  USE domain_2d, ONLY : j_cent, k_cent, j_stag_x, k_stag_x, j_stag_y, k_stag_y
+
   IMPLICIT none
 
   !> time
@@ -107,18 +111,6 @@ MODULE solver_2d
 
   !> Array defining fraction of cells affected by source term
   REAL(wp), ALLOCATABLE :: source_xy(:,:)
-
-  REAL(wp), ALLOCATABLE :: solve_mask_time(:,:)
-
-
-  LOGICAL, ALLOCATABLE :: solve_mask(:,:)
-  LOGICAL, ALLOCATABLE :: solve_mask_temp(:,:)
-  LOGICAL, ALLOCATABLE :: solve_mask_x(:,:)
-  LOGICAL, ALLOCATABLE :: solve_mask_y(:,:)
-
-  INTEGER :: solve_cells
-  INTEGER :: solve_interfaces_x
-  INTEGER :: solve_interfaces_y
 
   !> Time step
   REAL(wp) :: dt
@@ -162,15 +154,6 @@ MODULE solver_2d
 
   !> Intermediate explicit terms of the Runge-Kutta scheme
   REAL(wp), ALLOCATABLE :: expl_terms(:,:,:,:)
-
-  INTEGER, ALLOCATABLE :: j_cent(:)
-  INTEGER, ALLOCATABLE :: k_cent(:)
-
-  INTEGER, ALLOCATABLE :: j_stag_x(:)
-  INTEGER, ALLOCATABLE :: k_stag_x(:)
-
-  INTEGER, ALLOCATABLE :: j_stag_y(:)
-  INTEGER, ALLOCATABLE :: k_stag_y(:)
 
   !> Stochastic Noise
   REAL(wp), ALLOCATABLE :: Z(:,:)
@@ -227,20 +210,7 @@ CONTAINS
 
     CALL initialize_reconstruction
     CALL initialize_hyperbolic
-   
-    ALLOCATE( solve_mask_time( comp_cells_x , comp_cells_y ) )
-    ALLOCATE( solve_mask( comp_cells_x , comp_cells_y ) )
-    ALLOCATE( solve_mask_temp( comp_cells_x , comp_cells_y ) )
-
-    solve_mask_time(1:comp_cells_x,1:comp_cells_y) = 0.0_wp
-
-    solve_mask(1,1:comp_cells_y) = .TRUE.
-    solve_mask(comp_cells_x,1:comp_cells_y) = .TRUE.
-    solve_mask(1:comp_cells_x,1) = .TRUE.
-    solve_mask(1:comp_cells_x,comp_cells_y) = .TRUE.
-
-    ALLOCATE( solve_mask_x( comp_interfaces_x , comp_cells_y ) )
-    ALLOCATE( solve_mask_y( comp_cells_x , comp_interfaces_y ) )
+    CALL initialize_domain
 
     ALLOCATE( source_xy( comp_cells_x , comp_cells_y ) )
 
@@ -353,17 +323,6 @@ CONTAINS
     ALLOCATE( SI_NH( n_eqns , comp_cells_x , comp_cells_y , n_RK ) )
     ALLOCATE( expl_terms( n_eqns , comp_cells_x , comp_cells_y , n_RK ) )
 
-    comp_cells_xy = comp_cells_x * comp_cells_y
-
-    ALLOCATE( j_cent( comp_cells_xy ) )
-    ALLOCATE( k_cent( comp_cells_xy ) )
-
-    ALLOCATE( j_stag_x( comp_interfaces_x * comp_cells_y ) )
-    ALLOCATE( k_stag_x( comp_interfaces_x * comp_cells_y ) )
-
-    ALLOCATE( j_stag_y( comp_cells_x * comp_interfaces_y ) )
-    ALLOCATE( k_stag_y( comp_cells_x * comp_interfaces_y ) )
-
     ! Allocate array containing the stochastic noise.
     ! Allocated unconditionally: Z(j,k) is passed as a scalar actual
     ! argument to the semi-implicit and implicit routines whatever
@@ -407,14 +366,9 @@ CONTAINS
 
     DEALLOCATE( thck_table ,  pdyn_table )
 
+    CALL finalize_domain
     CALL finalize_hyperbolic
     CALL finalize_reconstruction
-
-    DEALLOCATE( solve_mask_time )
-    DEALLOCATE( solve_mask )
-    DEALLOCATE( solve_mask_temp )
-    DEALLOCATE( solve_mask_x )
-    DEALLOCATE( solve_mask_y )
 
     DEALLOCATE( qp )
 
@@ -437,10 +391,6 @@ CONTAINS
 
     CALL finalize_nonlinear_solver
 
-    DEALLOCATE( j_cent , k_cent )
-    DEALLOCATE ( j_stag_x , k_stag_x )
-    DEALLOCATE ( j_stag_y , k_stag_y )
-
     IF ( ALLOCATED(implicit_flag) ) DEALLOCATE(implicit_flag)
     IF ( ALLOCATED(implicit_map) ) DEALLOCATE(implicit_map)
     IF ( ALLOCATED(Z) ) DEALLOCATE(Z)
@@ -452,212 +402,6 @@ CONTAINS
     
   END SUBROUTINE deallocate_solver_variables
 
-
-  !******************************************************************************
-  !> \brief Masking of cells to solve
-  !
-  !> This subroutine compute a 2D array of logicals defining the cells where the
-  !> systems of equations have to be solved. It is defined according to the 
-  !> positive thickness in the cell and in the neighbour cells
-  !
-  !> \date 20/04/2017
-  !> @author 
-  !> Mattia de' Michieli Vitturi
-  !
-  !******************************************************************************
-
-  SUBROUTINE check_solve(solve_all)
-
-    IMPLICIT NONE
-
-    LOGICAL, INTENT(IN) :: solve_all
-    
-    INTEGER :: i,j,k
-
-    !$OMP PARALLEL
-         
-    IF ( solve_all ) THEN
-
-       !$OMP WORKSHARE
-       solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE. 
-       !$OMP END WORKSHARE
-
-    ELSE
-       
-       !$OMP WORKSHARE
-       solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .FALSE.
-       !$OMP END WORKSHARE
-
-    END IF
-    !$OMP BARRIER
-    
-    !$OMP WORKSHARE
-    WHERE ( ( q(1,2:comp_cells_x-1,2:comp_cells_y-1) .GT. 0.0_wp ) .AND.        &
-         ( solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1) .LE. t ) )       & 
-         solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE.
-    !$OMP END WORKSHARE
-    
-    !$OMP BARRIER
-
-    IF ( bottom_radial_source_flag ) THEN
-
-       !$OMP WORKSHARE
-       WHERE ( cell_source_fractions .GT. 0.0_wp ) solve_mask = .TRUE.
-       !$OMP END WORKSHARE
-       
-       !$OMP BARRIER
-
-    END IF
-
-    IF ( radial_source_flag ) THEN
-             
-       !$OMP DO private(j,k)
-    
-       DO k = 2,comp_cells_y-1
-   
-          DO j = 2,comp_cells_x-1
-
-             IF ( source_cell(j,k) .EQ. 2 ) THEN
-                
-                solve_mask(j,k) = .TRUE.
-                
-             END IF
-
-          END DO
-          
-       END DO
-
-       !$OMP END DO
-
-    END IF
-
-    !$OMP BARRIER
-    !$OMP MASTER
-
-    DO i = 1,n_RK
-
-       solve_mask_temp = solve_mask 
-       
-       ! solution domain is extended to neighbours of positive-mass cells
-       solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
-            solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
-            solve_mask_temp(1:comp_cells_x-2,2:comp_cells_y-1)
-       
-       solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
-            solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
-            solve_mask_temp(3:comp_cells_x,2:comp_cells_y-1)
-       
-       solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
-            solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
-            solve_mask_temp(2:comp_cells_x-1,1:comp_cells_y-2)
-       
-       solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
-            solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
-            solve_mask_temp(2:comp_cells_x-1,3:comp_cells_y) 
-       
-    END DO
-
-    !$OMP END MASTER
-    !$OMP BARRIER
-
-    !$OMP DO private(j,k)
-    
-    DO k = 1,comp_cells_y
-       
-       DO j = 1,comp_cells_x
-          
-          IF ( radial_source_flag ) THEN
-             
-             IF ( source_cell(j,k) .EQ. 1 ) solve_mask(j,k) = .FALSE.
-             
-          END IF
-          
-       END DO
-       
-    END DO
-    
-    !$OMP END DO
-    !$OMP WORKSHARE
-
-    solve_mask_x(1:comp_interfaces_x,1:comp_cells_y) = .FALSE.
-    solve_mask_y(1:comp_cells_x,1:comp_interfaces_y) = .FALSE.
-
-    !$OMP END WORKSHARE
-
-    !$OMP END PARALLEL
-
-    !----- check for cells where computation is needed
-    i = 0
-        
-    DO k = 1,comp_cells_y
-
-       DO j = 1,comp_cells_x
-
-          IF ( solve_mask(j,k) ) THEN
-
-             i = i+1
-             j_cent(i) = j
-             k_cent(i) = k
-
-             solve_mask_x(j,k) = .TRUE.
-             solve_mask_x(j+1,k) = .TRUE.
-             solve_mask_y(j,k) = .TRUE.
-             solve_mask_y(j,k+1) = .TRUE.
-
-          END IF
-
-       END DO
-
-    END DO
-
-    solve_cells = i
-    
-    !----- check for y-interfaces where computation is needed
-    i = 0
-        
-    DO k = 1,comp_cells_y
-
-       DO j = 1,comp_interfaces_x
-
-          IF ( solve_mask_x(j,k) ) THEN
-
-             i = i+1
-             j_stag_x(i) = j
-             k_stag_x(i) = k
-
-          END IF
-
-       END DO
-
-    END DO
-
-    solve_interfaces_x = i
-   
-    !----- check for y-interfaces where computation is needed
-
-    i = 0
-        
-    DO k = 1,comp_interfaces_y
-
-       DO j = 1,comp_cells_x
-
-          IF ( solve_mask_y(j,k) ) THEN
-
-             i = i+1
-             j_stag_y(i) = j
-             k_stag_y(i) = k
-
-          END IF
-
-       END DO
-
-    END DO
-
-    solve_interfaces_y = i
-
-    RETURN
-
-  END SUBROUTINE check_solve
 
   !*****************************************************************************
   !> \brief Time-step computation

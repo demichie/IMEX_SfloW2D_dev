@@ -68,7 +68,7 @@ PROGRAM IMEX_SfloW2D
    USE solver_2d, ONLY : imex_RK_solver
    USE solver_2d, ONLY : update_erosion_deposition_cell
    USE solver_2d, ONLY : timestep
-   USE solver_2d, ONLY : check_solve
+   USE domain_2d, ONLY : check_solve
 
    USE inpout_2d, ONLY : restart
 
@@ -101,8 +101,8 @@ PROGRAM IMEX_SfloW2D
 
    USE constitutive_2d, ONLY : qc_to_qp
 
-   USE solver_2d, ONLY : solve_mask , solve_cells
-   USE solver_2d, ONLY : j_cent , k_cent
+   USE domain_2d, ONLY : solve_mask, solve_cells
+   USE domain_2d, ONLY : j_cent, k_cent
 
    USE constitutive_2d, ONLY : avg_profiles_mix
 
@@ -256,7 +256,7 @@ PROGRAM IMEX_SfloW2D
 
    IF ( radial_source_flag .OR. lateral_source_flag ) CALL init_source
 
-   CALL check_solve(.TRUE.)
+   CALL check_solve(q, t, .TRUE.)
 
    ! For a new run or a classic restart, initialize the stochastic field only
    ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
@@ -397,11 +397,11 @@ PROGRAM IMEX_SfloW2D
 
       IF ( t.EQ. t_start ) THEN
 
-         CALL check_solve(.FALSE.)
+         CALL check_solve(q, t, .FALSE.)
 
       ELSE
 
-         CALL check_solve(.FALSE.)
+         CALL check_solve(q, t, .FALSE.)
 
       END IF
 
