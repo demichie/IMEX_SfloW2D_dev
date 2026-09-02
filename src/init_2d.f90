@@ -33,7 +33,7 @@ CONTAINS
 
       USE parameters_2d, ONLY : n_vars
 
-      USE state_2d, ONLY : q
+      USE state_2d, ONLY : state
 
       IMPLICIT NONE
 
@@ -50,7 +50,7 @@ CONTAINS
 
          DO k = 1,comp_cells_y
 
-            CALL qp_to_qc( qp_init(1:n_vars+2) , q(1:n_vars,j,k) )
+            CALL qp_to_qc( qp_init(1:n_vars+2) , state%q(1:n_vars,j,k) )
 
 
          END DO
@@ -86,7 +86,7 @@ CONTAINS
       USE parameters_2d, ONLY : x_collapse , y_collapse , r_collapse , T_collapse , &
          h_collapse , alphas_collapse , alphag_collapse
 
-      USE state_2d, ONLY : q
+      USE state_2d, ONLY : state
 
       IMPLICIT NONE
 
@@ -148,11 +148,11 @@ CONTAINS
                qp_init(5+n_solid+n_add_gas+n_stoch_vars:4+n_solid+n_add_gas       &
                   +n_stoch_vars+n_pore_vars) = 1.0_wp
 
-               CALL qp_to_qc( qp_init(1:n_vars+2) , q(1:n_vars,j,k) )
+               CALL qp_to_qc( qp_init(1:n_vars+2) , state%q(1:n_vars,j,k) )
 
             ELSE
 
-               CALL qp_to_qc( qp0_init(1:n_vars+2) , q(1:n_vars,j,k) )
+               CALL qp_to_qc( qp0_init(1:n_vars+2) , state%q(1:n_vars,j,k) )
 
             END IF
 

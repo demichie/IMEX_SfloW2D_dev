@@ -18,7 +18,7 @@ MODULE stochastic_module
   
   USE solver_2d, ONLY : Z, conv_kernel
   USE domain_2d, ONLY: solve_cells, j_cent, k_cent
-  USE state_2d, ONLY: q, qp
+  USE state_2d, ONLY: state
   USE constitutive_2d, ONLY : T_ambient
   USE constitutive_2d, ONLY: qc_to_qp
   USE parameters_2d, ONLY : output_stoch_vars_flag, length_spatial_corr,        &
@@ -113,8 +113,8 @@ CONTAINS
           j = j_cent(l)
           k = k_cent(l)
           
-          qp(5+n_solid+n_add_gas,j,k) = Z(j,k)
-          q(5+n_solid+n_add_gas,j,k) = q(1,j,k) * Z(j,k)
+          state%qp(5+n_solid+n_add_gas,j,k) = Z(j,k)
+          state%q(5+n_solid+n_add_gas,j,k) = state%q(1,j,k) * Z(j,k)
           !WRITE(*,*) j,k,qp(5+n_solid+n_add_gas,j,k),q(5+n_solid+n_add_gas,j,k)
           !READ(*,*)
           
@@ -279,10 +279,10 @@ CONTAINS
     REAL(wp) :: p_dyn
     
     ! check that the thickness and velocity are > 0
-    IF ( ( q(1,j,k) .GT. 0.0_wp ) .AND. ( ( q(2,j,k)**2 + q(3,j,k)**2 ) .GT.    &
+    IF ( ( state%q(1,j,k) .GT. 0.0_wp ) .AND. ( ( state%q(2,j,k)**2 + state%q(3,j,k)**2 ) .GT.    &
          0.0_wp ) )  THEN
 
-       CALL r_phys_var(q(:,j,k) , r_h , r_u , r_v , r_alphas , r_rho_m , r_T ,  &
+       CALL r_phys_var(state%q(:,j,k) , r_h , r_u , r_v , r_alphas , r_rho_m , r_T ,  &
             r_alphal , r_alphag , r_red_grav , p_dyn , r_Zs , r_pore_pres )
 
        Fr = ( r_u**2 + r_v**2 ) / SQRT( r_red_grav * r_h )
@@ -319,10 +319,10 @@ CONTAINS
   REAL(wp) :: p_dyn
   
   ! check that the thickness and velocity are > 0
-  IF ( ( q(1,j,k) .GT. 0.0_wp ) .AND. ( ( q(2,j,k)**2 + q(3,j,k)**2 ) .GT.      &
+  IF ( ( state%q(1,j,k) .GT. 0.0_wp ) .AND. ( ( state%q(2,j,k)**2 + state%q(3,j,k)**2 ) .GT.      &
        0.0_wp ) )  THEN
 
-     CALL r_phys_var(q(:,j,k) , r_h , r_u , r_v , r_alphas , r_rho_m , r_T ,    &
+     CALL r_phys_var(state%q(:,j,k) , r_h , r_u , r_v , r_alphas , r_rho_m , r_T ,    &
           r_alphal , r_alphag , r_red_grav , p_dyn , r_Zs , r_pore_pres )
 
      VelocityNorm = r_u**2 + r_v**2 

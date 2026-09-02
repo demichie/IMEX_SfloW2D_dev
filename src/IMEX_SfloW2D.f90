@@ -95,9 +95,7 @@ PROGRAM IMEX_SfloW2D
       thickness_levels , dyn_pres_levels
 
    USE solver_2d, ONLY : t, dt, source_xy, Z_field => Z, fric_array
-   USE state_2d, ONLY : q, qp
-   USE state_2d, ONLY : hmax, pdynmax, mod_vel_max
-   USE state_2d, ONLY : thck_table, pdyn_table, vuln_table
+   USE state_2d, ONLY : state
 
    USE constitutive_2d, ONLY : qc_to_qp
 
@@ -256,7 +254,7 @@ PROGRAM IMEX_SfloW2D
 
    IF ( radial_source_flag .OR. lateral_source_flag ) CALL init_source
 
-   CALL check_solve(q, t, .TRUE.)
+   CALL check_solve(state%q, t, .TRUE.)
 
    ! For a new run or a classic restart, initialize the stochastic field only
    ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
@@ -275,8 +273,8 @@ PROGRAM IMEX_SfloW2D
 
    IF ( verbose_level .GE. 1 ) THEN
 
-      WRITE(*,*) 'Min q(1,:,:)=',MINVAL(q(1,:,:))
-      WRITE(*,*) 'Max q(1,:,:)=',MAXVAL(q(1,:,:))
+      WRITE(*,*) 'Min q(1,:,:)=',MINVAL(state%q(1,:,:))
+      WRITE(*,*) 'Max q(1,:,:)=',MAXVAL(state%q(1,:,:))
 
       WRITE(*,*) 'Min B(:,:)=',MINVAL(B_cent(:,:))
       WRITE(*,*) 'Max B(:,:)=',MAXVAL(B_cent(:,:))
@@ -284,7 +282,7 @@ PROGRAM IMEX_SfloW2D
 
       WRITE(*,*) 'size B_cent',size(B_cent,1),size(B_cent,2)
 
-      WRITE(*,*) 'SUM(q(1,:,:)=',SUM(q(1,:,:))
+      WRITE(*,*) 'SUM(q(1,:,:)=',SUM(state%q(1,:,:))
       WRITE(*,*) 'SUM(B_cent(:,:)=',SUM(B_cent(:,:))
 
    END IF
@@ -306,7 +304,7 @@ PROGRAM IMEX_SfloW2D
    t_steady = t_end
    stop_flag = .FALSE.
 
-   vuln_table = .FALSE.
+   state%vuln_table = .FALSE.
 
    !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2,    &
    !$OMP & mod_vel)
@@ -316,22 +314,22 @@ PROGRAM IMEX_SfloW2D
       j = j_cent(l)
       k = k_cent(l)
 
-      IF ( q(1,j,k) .GT. 0.0_wp ) THEN
+      IF ( state%q(1,j,k) .GT. 0.0_wp ) THEN
 
-         CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+         CALL qc_to_qp(state%q(1:n_vars,j,k) , state%qp(1:n_vars+2,j,k) , p_dyn )
 
-         hmax(j,k) = qp(1,j,k)
+         state%hmax(j,k) = state%qp(1,j,k)
 
-         r_u = qp(n_vars+1,j,k)
-         r_v = qp(n_vars+2,j,k)
+         r_u = state%qp(n_vars+1,j,k)
+         r_v = state%qp(n_vars+2,j,k)
 
          mod_vel2 = r_u**2 + r_v**2
          mod_vel = SQRT( mod_vel2 )
 
-         IF ( qp(1,j,k) .GT. 0.001_wp ) THEN
+         IF ( state%qp(1,j,k) .GT. 0.001_wp ) THEN
 
-            pdynmax(j,k) = p_dyn
-            mod_vel_max(j,k) = mod_vel
+            state%pdynmax(j,k) = p_dyn
+            state%mod_vel_max(j,k) = mod_vel
 
          END IF
 
@@ -339,15 +337,15 @@ PROGRAM IMEX_SfloW2D
 
          DO i_thk_lev=1,n_thickness_levels
 
-            thck_table(j,k) = ( qp(1,j,k) .GE. thickness_levels(i_thk_lev) )
+            state%thck_table(j,k) = ( state%qp(1,j,k) .GE. thickness_levels(i_thk_lev) )
 
             DO i_pdyn_lev=1,n_dyn_pres_levels
 
-               pdyn_table(j,k) = ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
+               state%pdyn_table(j,k) = ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
 
                i_table = i_table + 1
 
-               vuln_table(i_table,j,k) = ( thck_table(j,k) .AND. pdyn_table(j,k) )
+               state%vuln_table(i_table,j,k) = ( state%thck_table(j,k) .AND. state%pdyn_table(j,k) )
 
             END DO
 
@@ -355,10 +353,10 @@ PROGRAM IMEX_SfloW2D
 
       ELSE
 
-         qp(1:n_vars,j,k) = 0.0_wp
-         qp(4,j,k) = T_ambient
-         hmax(j,k) = 0.0_wp
-         pdynmax(j,k) = 0.0_wp
+         state%qp(1:n_vars,j,k) = 0.0_wp
+         state%qp(4,j,k) = T_ambient
+         state%hmax(j,k) = 0.0_wp
+         state%pdynmax(j,k) = 0.0_wp
 
       END IF
 
@@ -373,17 +371,17 @@ PROGRAM IMEX_SfloW2D
 
    IF ( n_probes .GT. 0 ) CALL output_probes(t)
 
-   IF ( SUM(q(1,:,:)) .EQ. 0.0_wp ) t_steady = t_end
+   IF ( SUM(state%q(1,:,:)) .EQ. 0.0_wp ) t_steady = t_end
 
    IF ( verbose_level .GE. 0 ) THEN
 
       WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
       &ES11.3E3,A11,ES11.3E3)")                                                &
          't =',t,'dt =',dt,                                                    &
-         ' mass = ',dx*dy*SUM(q(1,:,:)) ,                                      &
-         ' volume = ',dx*dy*SUM(qp(1,:,:)) ,                                   &
-         ' area = ',dx*dy*COUNT(q(1,:,:).GT.1.D-5) ,                           &
-         ' solid mass = ',dx*dy*SUM(q(5:4+n_solid,:,:)),                       &
+         ' mass = ',dx*dy*SUM(state%q(1,:,:)) ,                                      &
+         ' volume = ',dx*dy*SUM(state%qp(1,:,:)) ,                                   &
+         ' area = ',dx*dy*COUNT(state%q(1,:,:).GT.1.D-5) ,                           &
+         ' solid mass = ',dx*dy*SUM(state%q(5:4+n_solid,:,:)),                       &
          ' runout = ',runout_last
 
    END IF
@@ -397,11 +395,11 @@ PROGRAM IMEX_SfloW2D
 
       IF ( t.EQ. t_start ) THEN
 
-         CALL check_solve(q, t, .FALSE.)
+         CALL check_solve(state%q, t, .FALSE.)
 
       ELSE
 
-         CALL check_solve(q, t, .FALSE.)
+         CALL check_solve(state%q, t, .FALSE.)
 
       END IF
 
@@ -411,7 +409,7 @@ PROGRAM IMEX_SfloW2D
 
       END IF
 
-      CALL timestep(q, qp, t, dt)
+      CALL timestep(state%q, state%qp, t, dt)
 
       IF ( t_end - t_output < 1.0E-7_WP ) t_output = t_end
       IF ( t_end - t_runout < 1.0E-7_WP ) t_runout = t_end
@@ -437,9 +435,9 @@ PROGRAM IMEX_SfloW2D
       dt_old_old = dt_old
       dt_old = dt
 
-      CALL imex_RK_solver(q, qp, t, dt, source_xy, Z_field, fric_array)
+      CALL imex_RK_solver(state%q, state%qp, t, dt, source_xy, Z_field, fric_array)
 
-      CALL update_erosion_deposition_cell(q, qp, dt)
+      CALL update_erosion_deposition_cell(state%q, state%qp, dt)
 
       IF ( topo_change_flag ) CALL topography_reconstruction
 
@@ -454,22 +452,22 @@ PROGRAM IMEX_SfloW2D
          j = j_cent(l)
          k = k_cent(l)
 
-         IF ( q(1,j,k) .GT. 0.0_wp ) THEN
+         IF ( state%q(1,j,k) .GT. 0.0_wp ) THEN
 
-            CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+            CALL qc_to_qp(state%q(1:n_vars,j,k) , state%qp(1:n_vars+2,j,k) , p_dyn )
 
-            hmax(j,k) = MAX( hmax(j,k) , qp(1,j,k) )
+            state%hmax(j,k) = MAX( state%hmax(j,k) , state%qp(1,j,k) )
 
-            r_u = qp(n_vars+1,j,k)
-            r_v = qp(n_vars+2,j,k)
+            r_u = state%qp(n_vars+1,j,k)
+            r_v = state%qp(n_vars+2,j,k)
 
             mod_vel2 = r_u**2 + r_v**2
             mod_vel = SQRT( mod_vel2 )
 
-            IF ( qp(1,j,k) .GT. 0.001_wp ) THEN
+            IF ( state%qp(1,j,k) .GT. 0.001_wp ) THEN
 
-               pdynmax(j,k) = MAX( pdynmax(j,k) , p_dyn )
-               mod_vel_max(j,k) = MAX( mod_vel_max(j,k) , mod_vel )
+               state%pdynmax(j,k) = MAX( state%pdynmax(j,k) , p_dyn )
+               state%mod_vel_max(j,k) = MAX( state%mod_vel_max(j,k) , mod_vel )
 
             END IF
 
@@ -477,16 +475,16 @@ PROGRAM IMEX_SfloW2D
 
             DO i_thk_lev=1,n_thickness_levels
 
-               thck_table(j,k) = ( qp(1,j,k) .GE. thickness_levels(i_thk_lev) )
+               state%thck_table(j,k) = ( state%qp(1,j,k) .GE. thickness_levels(i_thk_lev) )
 
                DO i_pdyn_lev=1,n_dyn_pres_levels
 
-                  pdyn_table(j,k) = ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
+                  state%pdyn_table(j,k) = ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
 
                   i_table = i_table + 1
 
-                  vuln_table(i_table,j,k) = vuln_table(i_table,j,k) .OR.            &
-                     ( thck_table(j,k) .AND. pdyn_table(j,k) )
+                  state%vuln_table(i_table,j,k) = state%vuln_table(i_table,j,k) .OR.            &
+                     ( state%thck_table(j,k) .AND. state%pdyn_table(j,k) )
 
                END DO
 
@@ -494,8 +492,8 @@ PROGRAM IMEX_SfloW2D
 
          ELSE
 
-            qp(1:n_vars+2,j,k) = 0.0_wp
-            qp(4,j,k) = T_ambient
+            state%qp(1:n_vars+2,j,k) = 0.0_wp
+            state%qp(4,j,k) = T_ambient
 
          END IF
 
@@ -505,7 +503,7 @@ PROGRAM IMEX_SfloW2D
 
       IF ( verbose_level .GE. 0 ) THEN
 
-         vol = SUM(qp(1,:,:))
+         vol = SUM(state%qp(1,:,:))
 
          !IF ( IEEE_IS_NAN(vol) .OR. ( t.GE. 50.54) ) THEN
 
@@ -534,10 +532,10 @@ PROGRAM IMEX_SfloW2D
          WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
          &ES11.3E3,A11,ES11.3E3)")                                             &
             't =',t,'dt =',dt,                                                    &
-            ' mass = ',dx*dy*SUM(q(1,:,:)) ,                                      &
-            ' volume = ',dx*dy*SUM(qp(1,:,:)) ,                                   &
-            ' area = ',dx*dy*COUNT(q(1,:,:).GT.1.D-7) ,                           &
-            ' solid mass = ',dx*dy*SUM(q(5:4+n_solid,:,:)),                       &
+            ' mass = ',dx*dy*SUM(state%q(1,:,:)) ,                                      &
+            ' volume = ',dx*dy*SUM(state%qp(1,:,:)) ,                                   &
+            ' area = ',dx*dy*COUNT(state%q(1,:,:).GT.1.D-7) ,                           &
+            ' solid mass = ',dx*dy*SUM(state%q(5:4+n_solid,:,:)),                       &
             ' runout = ',runout_last
 
       END IF

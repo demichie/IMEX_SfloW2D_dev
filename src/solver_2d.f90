@@ -18,7 +18,7 @@ MODULE solver_2d
   USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
   USE parameters_2d, ONLY : wp
 
-  USE state_2d, ONLY : initialize_state, finalize_state
+  USE state_2d, ONLY : state
 
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,                 &
        finalize_nonlinear_solver
@@ -68,7 +68,7 @@ CONTAINS
     
     IMPLICIT NONE
 
-    CALL initialize_state
+    CALL state%initialize
 
     CALL initialize_reconstruction
     CALL initialize_hyperbolic
@@ -120,7 +120,7 @@ CONTAINS
     CALL finalize_hyperbolic
     CALL finalize_reconstruction
 
-    CALL finalize_state
+    CALL state%finalize
 
     DEALLOCATE( source_xy )
 

@@ -5190,7 +5190,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     USE geometry_2d, ONLY: B_cent, erodible
     USE init_2d, ONLY: thickness_init, erodible_init
     USE parameters_2d, ONLY: n_vars
-    USE state_2d, ONLY: q
+    USE state_2d, ONLY: state
 
     IMPLICIT none
 
@@ -5500,27 +5500,27 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       mass_fract = rho_s*alphas_init/rho_m
 
-      q(1, :, :) = thickness_init(:, :)*rho_m
+      state%q(1, :, :) = thickness_init(:, :)*rho_m
 
       IF (VERBOSE_LEVEL .GE. 0) THEN
 
         WRITE (*, *) 'Total volume on computational grid =', cell_size**2* &
           SUM(thickness_init(:, :))
         WRITE (*, *) 'Total mass on computational grid =', cell_size**2* &
-          SUM(q(1, :, :))
+          SUM(state%q(1, :, :))
 
       END IF
       ! rhom*h*u
-      q(2, :, :) = q(1, :, :)*u_init
+      state%q(2, :, :) = state%q(1, :, :)*u_init
       ! rhom*h*v
-      q(3, :, :) = q(1, :, :)*v_init
+      state%q(3, :, :) = state%q(1, :, :)*v_init
 
       ! energy (total or internal)
-      q(4, :, :) = 0.0_wp
+      state%q(4, :, :) = 0.0_wp
 
       WHERE (thickness_init .GT. 0.0_wp)
 
-        q(4, :, :) = q(1, :, :)*T_init*(SUM(mass_fract(1:n_solid)* &
+        state%q(4, :, :) = state%q(1, :, :)*T_init*(SUM(mass_fract(1:n_solid)* &
                                             sp_heat_s(1:n_solid)) + &
                                         (1.0_wp - SUM(mass_fract))*sp_heat_l)
 
@@ -5529,18 +5529,18 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
       DO solid_idx = 5, 4 + n_solid
 
         ! rhos*h*alphas
-        q(solid_idx, :, :) = 0.0_wp
+        state%q(solid_idx, :, :) = 0.0_wp
 
         WHERE (thickness_init .GT. 0.0_wp)
 
-          q(solid_idx, :, :) = thickness_init(:, :)*alphas_init(solid_idx - 4)* &
+          state%q(solid_idx, :, :) = thickness_init(:, :)*alphas_init(solid_idx - 4)* &
                                rho_s(solid_idx - 4)
 
         END WHERE
 
       END DO
 
-      WRITE (*, *) 'MAXVAL(q(5,:,:))', MAXVAL(q(5:4 + n_solid, :, :))
+      WRITE (*, *) 'MAXVAL(q(5,:,:))', MAXVAL(state%q(5:4 + n_solid, :, :))
 
       IF (VERBOSE_LEVEL .GE. 0) THEN
 
@@ -5552,11 +5552,11 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
       DO stoch_idx = 5 + n_solid + n_add_gas, 4 + n_solid + n_add_gas + n_stoch_vars
 
         ! rho_m*h*Zs
-        q(stoch_idx, :, :) = 0.0_wp
+        state%q(stoch_idx, :, :) = 0.0_wp
 
         WHERE (thickness_init .GT. 0.0_wp)
 
-          q(stoch_idx, :, :) = thickness_init(:, :)*rho_m*1.0_wp
+          state%q(stoch_idx, :, :) = thickness_init(:, :)*rho_m*1.0_wp
 
         END WHERE
 
@@ -5566,11 +5566,11 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
         + n_stoch_vars + n_pore_vars
 
         ! rho_m*h*Zs
-        q(pore_idx, :, :) = 0.0_wp
+        state%q(pore_idx, :, :) = 0.0_wp
 
         WHERE (thickness_init .GT. 0.0_wp)
 
-          q(pore_idx, :, :) = thickness_init(:, :)*rho_m*1.0_wp
+          state%q(pore_idx, :, :) = thickness_init(:, :)*rho_m*1.0_wp
 
         END WHERE
 
@@ -5580,9 +5580,9 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       IF (verbose_level .GE. 1) THEN
 
-        WRITE (*, *) 'Min q(1,:,:) =', MINVAL(q(1, :, :))
-        WRITE (*, *) 'Max q(1,:,:) =', MAXVAL(q(1, :, :))
-        WRITE (*, *) 'SUM(q(1,:,:)) =', SUM(q(1, :, :))
+        WRITE (*, *) 'Min q(1,:,:) =', MINVAL(state%q(1, :, :))
+        WRITE (*, *) 'Max q(1,:,:) =', MAXVAL(state%q(1, :, :))
+        WRITE (*, *) 'SUM(q(1,:,:)) =', SUM(state%q(1, :, :))
 
         DO k = 1, nrows
 
@@ -5609,13 +5609,13 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
         DO j = 1, comp_cells_x
 
           READ (restart_unit, '(2e20.12,100(e20.12))') xj, yk, &
-            (q(i_vars, j, k), i_vars=1, n_vars)
+            (state%q(i_vars, j, k), i_vars=1, n_vars)
 
-          IF (q(1, j, k) .LE. 0.0_wp) q(1:n_vars, j, k) = 0.0_wp
+          IF (state%q(1, j, k) .LE. 0.0_wp) state%q(1:n_vars, j, k) = 0.0_wp
 
           DO solid_idx = 5, 4 + n_solid
 
-            IF (q(solid_idx, j, k) .LE. 0.0_wp) q(solid_idx, j, k) = 0.0_wp
+            IF (state%q(solid_idx, j, k) .LE. 0.0_wp) state%q(solid_idx, j, k) = 0.0_wp
 
           END DO
 
@@ -5625,12 +5625,12 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       END DO
 
-      IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'Total mass =', dx*dy*SUM(q(1, :, :))
+      IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'Total mass =', dx*dy*SUM(state%q(1, :, :))
 
       DO solid_idx = 5, 4 + n_solid
 
         IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'Total sediment mass =', &
-          dx*dy*SUM(q(solid_idx, :, :))
+          dx*dy*SUM(state%q(solid_idx, :, :))
 
       END DO
 
@@ -5876,7 +5876,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     USE parameters_2d, ONLY: t_output, dt_output
     USE parameters_2d, ONLY: t_steady
 
-    USE state_2d, ONLY: q, hmax, pdynmax, mod_vel_max
+    USE state_2d, ONLY: state
 
     IMPLICIT none
 
@@ -5986,12 +5986,12 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
             ! Exponents with more than 2 digits cause problems reading
             ! into matlab... reset tiny values to zero:
-            IF (abs(q(i, j, k)) .LT. 1.0E-20_wp) q(i, j, k) = 0.0_wp
+            IF (abs(state%q(i, j, k)) .LT. 1.0E-20_wp) state%q(i, j, k) = 0.0_wp
 
           END DO
 
           WRITE (output_unit_2d, '(2e20.12,100(e20.12))') x_comp(j), y_comp(k), &
-            (q(i_vars, j, k), i_vars=1, n_vars)
+            (state%q(i_vars, j, k), i_vars=1, n_vars)
 
           IF (erosion_coeff .GT. 0.0_wp) THEN
 
@@ -6086,7 +6086,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
           mu_eff = 0.0_wp
           inertial_number = 0.0_wp
 
-          CALL qc_to_qp(q(1:n_vars, j, k), qp(1:n_vars + 2), p_dyn)
+          CALL qc_to_qp(state%q(1:n_vars, j, k), qp(1:n_vars + 2), p_dyn)
 
           CALL mixt_var(qp(1:n_vars + 2), r_Ri, r_rho_m, r_rho_c, r_red_grav, &
                         sp_flag, r_sp_heat_c, r_sp_heat_mix)
@@ -6318,7 +6318,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
             SUM(ERODIBLE(1:n_solid, j, k))/(1.0_wp - erodible_porosity), &
             r_alphal, shear_vel, r_Ri, Rouse_no(1:n_solid), &
             Zs(1:n_stoch_vars), pore_pres(1:n_pore_vars), mu_eff, &
-            hmax(j, k), pdynmax(j, k), mod_vel_max(j, k), inertial_number
+            state%hmax(j, k), state%pdynmax(j, k), state%mod_vel_max(j, k), inertial_number
 
         END DO
 
@@ -6366,7 +6366,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   SUBROUTINE output_max
 
     USE geometry_2d, ONLY: grid_output, grid_output_int
-    USE state_2d, ONLY: hmax, vuln_table
+    USE state_2d, ONLY: state
 
     IMPLICIT NONE
 
@@ -6384,9 +6384,9 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     grid_output = -9999
 
-    WHERE (hmax(:, :) .GE. 1.E-5_wp)
+    WHERE (state%hmax(:, :) .GE. 1.E-5_wp)
 
-      grid_output = hmax(:, :)
+      grid_output = state%hmax(:, :)
 
     END WHERE
 
@@ -6427,7 +6427,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
           WRITE (output_VT_unit, *) idx_string, '      ', &
             thickness_levels(i_thk_lev), dyn_pres_levels(i_pdyn_lev)
 
-          grid_output_int(:, :) = MERGE(1, -9999, vuln_table(i_table, :, :))
+          grid_output_int(:, :) = MERGE(1, -9999, state%vuln_table(i_table, :, :))
 
           output_max_file = TRIM(run_name)//'_VT_'//idx_string//'.asc'
           OPEN (output_max_unit, FILE=output_max_file, status='unknown', &
@@ -6479,7 +6479,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     USE geometry_2d, ONLY: B_cent, grid_output, deposit, erosion, B_nodata
     USE geometry_2d, ONLY: deposit_tot, erosion_tot, B_zone
     ! USE geometry_2d, ONLY : comp_interfaces_x , comp_interfaces_y
-    USE state_2d, ONLY: qp
+    USE state_2d, ONLY: state
 
     IMPLICIT NONE
 
@@ -6562,9 +6562,9 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     grid_output = -9999
 
-    WHERE (qp(1, :, :) .GE. 1.0E-5_wp)
+    WHERE (state%qp(1, :, :) .GE. 1.0E-5_wp)
 
-      grid_output = qp(1, :, :)
+      grid_output = state%qp(1, :, :)
 
     END WHERE
 
@@ -6592,9 +6592,9 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     grid_output = -9999
 
-    WHERE (qp(1, :, :) .GE. 1.0E-5_wp)
+    WHERE (state%qp(1, :, :) .GE. 1.0E-5_wp)
 
-      grid_output = qp(4, :, :)
+      grid_output = state%qp(4, :, :)
 
     END WHERE
 
@@ -6856,7 +6856,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     USE geometry_2d, ONLY: x_comp, y_comp, deposit
     USE parameters_2d, ONLY: t_probes, n_vars
-    USE state_2d, ONLY: q, qp
+    USE state_2d, ONLY: state
 
     USE geometry_2d, ONLY: interp_2d_scalarB
 
@@ -6967,38 +6967,38 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       WRITE (probes_unit, 1710, ADVANCE='no') time, ','
 
-      CALL interp_2d_scalarB(x_comp, y_comp, qp(1, :, :), &
+      CALL interp_2d_scalarB(x_comp, y_comp, state%qp(1, :, :), &
                              probes_coords(1, k), probes_coords(2, k), h_prb)
 
       WRITE (probes_unit, 1710, ADVANCE='no') h_prb, ','
 
       IF (h_prb .GT. 1.0E-5_wp) THEN
 
-        CALL interp_2d_scalarB(x_comp, y_comp, q(1, :, :), &
+        CALL interp_2d_scalarB(x_comp, y_comp, state%q(1, :, :), &
                                probes_coords(1, k), probes_coords(2, k), hrhom_prb)
 
         rhom_prb = hrhom_prb/h_prb
 
         WRITE (probes_unit, 1710, ADVANCE='no') rhom_prb, ','
 
-        CALL interp_2d_scalarB(x_comp, y_comp, qp(4, :, :), &
+        CALL interp_2d_scalarB(x_comp, y_comp, state%qp(4, :, :), &
                                probes_coords(1, k), probes_coords(2, k), T_prb)
 
         WRITE (probes_unit, 1710, ADVANCE='no') T_prb, ','
 
-        CALL interp_2d_scalarB(x_comp, y_comp, qp(n_vars + 1, :, :), &
+        CALL interp_2d_scalarB(x_comp, y_comp, state%qp(n_vars + 1, :, :), &
                                probes_coords(1, k), probes_coords(2, k), u_prb)
 
         WRITE (probes_unit, 1710, ADVANCE='no') u_prb, ','
 
-        CALL interp_2d_scalarB(x_comp, y_comp, qp(n_vars + 2, :, :), &
+        CALL interp_2d_scalarB(x_comp, y_comp, state%qp(n_vars + 2, :, :), &
                                probes_coords(1, k), probes_coords(2, k), v_prb)
 
         WRITE (probes_unit, 1710, ADVANCE='no') v_prb, ','
 
         DO i_solid = 1, n_solid
 
-          CALL interp_2d_scalarB(x_comp, y_comp, qp(4 + i_solid, :, :), &
+          CALL interp_2d_scalarB(x_comp, y_comp, state%qp(4 + i_solid, :, :), &
                                  probes_coords(1, k), probes_coords(2, k), alphas_prb(i_solid))
 
           IF (alpha_flag) THEN
@@ -7015,7 +7015,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
         DO i_gas = 1, n_add_gas
 
-          CALL interp_2d_scalarB(x_comp, y_comp, qp(4 + n_solid + i_gas, :, :), &
+          CALL interp_2d_scalarB(x_comp, y_comp, state%qp(4 + n_solid + i_gas, :, :), &
                                  probes_coords(1, k), probes_coords(2, k), alphag_prb(i_gas))
 
           IF (alpha_flag) THEN
@@ -7100,7 +7100,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     USE geometry_2d, ONLY: x_comp, y_comp, B_cent, dx, dy
     USE parameters_2d, ONLY: t_runout, n_solid
-    USE state_2d, ONLY: qp, q, hpos, hpos_old
+    USE state_2d, ONLY: state
 
     IMPLICIT NONE
 
@@ -7155,7 +7155,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     dist(:, :) = 0.0_wp
 
     IF (n_solid .GT. 0) THEN
-      alphas_tot = SUM(qp(5:4+n_solid, :, :), DIM=1)
+      alphas_tot = SUM(state%qp(5:4+n_solid, :, :), DIM=1)
     ELSE
       alphas_tot = 0.0_wp
     END IF
@@ -7171,7 +7171,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       CALL flush (runout_unit)
 
-      IF (MAXVAL(qp(1, :, :)) .EQ. 0.0_wp) THEN
+      IF (MAXVAL(state%qp(1, :, :)) .EQ. 0.0_wp) THEN
 
         IF (collapsing_volume_flag) THEN
 
@@ -7189,14 +7189,14 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       ELSE
 
-        x_mass_center = SUM(X*q(1, :, :))/SUM(q(1, :, :))
-        y_mass_center = SUM(Y*q(1, :, :))/SUM(q(1, :, :))
-        hpos = (qp(1, :, :) .GT. 1.0E-5_wp) .AND. &
+        x_mass_center = SUM(X*state%q(1, :, :))/SUM(state%q(1, :, :))
+        y_mass_center = SUM(Y*state%q(1, :, :))/SUM(state%q(1, :, :))
+        state%hpos = (state%qp(1, :, :) .GT. 1.0E-5_wp) .AND. &
                (alphas_tot .GE. alphas_threshold)
 
       END IF
 
-      hpos_old = (qp(1, :, :) .GT. 1.0E-5_wp) .AND. &
+      state%hpos_old = (state%qp(1, :, :) .GT. 1.0E-5_wp) .AND. &
                  (alphas_tot .GE. alphas_threshold)
 
       x_mass_center_old = x_mass_center
@@ -7204,7 +7204,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       IF ((x0_runout .EQ. -1) .AND. (y0_runout .EQ. -1)) THEN
 
-        WHERE (qp(1, :, :) > 1.0E-5_wp) dist = B_cent
+        WHERE (state%qp(1, :, :) > 1.0E-5_wp) dist = B_cent
         imin = MAXLOC(dist)
 
         x0_runout = X(imin(1), imin(2))
@@ -7215,7 +7215,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
         dist(:, :) = 0.0_wp
 
-        WHERE (hpos) dist = SQRT((X - x0_runout)**2 + (Y - y0_runout)**2)
+        WHERE (state%hpos) dist = SQRT((X - x0_runout)**2 + (Y - y0_runout)**2)
 
         imax = MAXLOC(dist)
 
@@ -7223,7 +7223,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
         dist_x(:, :) = 0.0_wp
 
-        WHERE (hpos) dist_x = SQRT((X - x0_runout)**2)
+        WHERE (state%hpos) dist_x = SQRT((X - x0_runout)**2)
 
         imax_x = MAXLOC(dist_x)
 
@@ -7231,7 +7231,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
         dist_y(:, :) = 0.0_wp
 
-        WHERE (hpos) dist_y = SQRT((Y - y0_runout)**2)
+        WHERE (state%hpos) dist_y = SQRT((Y - y0_runout)**2)
 
         imax_y = MAXLOC(dist_y)
 
@@ -7247,38 +7247,38 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     ELSE
 
-      IF (MAXVAL(qp(1, :, :)) .EQ. 0.0_wp) THEN
+      IF (MAXVAL(state%qp(1, :, :)) .EQ. 0.0_wp) THEN
 
         x_mass_center = x_mass_center_old
         y_mass_center = y_mass_center_old
 
       ELSE
 
-        x_mass_center = SUM(X*q(1, :, :))/SUM(q(1, :, :))
-        y_mass_center = SUM(Y*q(1, :, :))/SUM(q(1, :, :))
+        x_mass_center = SUM(X*state%q(1, :, :))/SUM(state%q(1, :, :))
+        y_mass_center = SUM(Y*state%q(1, :, :))/SUM(state%q(1, :, :))
 
       END IF
 
-      hpos = (qp(1, :, :) .GT. 1.0E-5_wp) .AND. &
+      state%hpos = (state%qp(1, :, :) .GT. 1.0E-5_wp) .AND. &
              (alphas_tot .GE. alphas_threshold)
 
     END IF
 
     dist(:, :) = 0.0_wp
 
-    WHERE (hpos) dist = SQRT((X - x0_runout)**2 + (Y - y0_runout)**2)
+    WHERE (state%hpos) dist = SQRT((X - x0_runout)**2 + (Y - y0_runout)**2)
 
     imax = MAXLOC(dist)
 
     dist_x(:, :) = 0.0_wp
 
-    WHERE (hpos) dist_x = SQRT((X - x0_runout)**2)
+    WHERE (state%hpos) dist_x = SQRT((X - x0_runout)**2)
 
     imax_x = MAXLOC(dist_x)
 
     dist_y(:, :) = 0.0_wp
 
-    WHERE (hpos) dist_y = SQRT((Y - y0_runout)**2)
+    WHERE (state%hpos) dist_y = SQRT((Y - y0_runout)**2)
 
     imax_y = MAXLOC(dist_y)
 
@@ -7302,8 +7302,8 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     CLOSE (dakota_unit)
 
-    area_old = dx*dy*COUNT(hpos_old)
-    area = dx*dy*COUNT(hpos)
+    area_old = dx*dy*COUNT(state%hpos_old)
+    area = dx*dy*COUNT(state%hpos)
 
     runout_last = dist(imax(1), imax(2)) - init_runout
 
@@ -7329,8 +7329,8 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       vel_radial_growth = ABS(SQRT(area) - SQRT(area_old))/dt_runout
 
-      IF ( COUNT(hpos) .GT. 0 ) THEN
-        area_new_rel = dx*dy*COUNT(hpos .AND. (.NOT. hpos_old))/COUNT(hpos)
+      IF ( COUNT(state%hpos) .GT. 0 ) THEN
+        area_new_rel = dx*dy*COUNT(state%hpos .AND. (.NOT. state%hpos_old))/COUNT(state%hpos)
       ELSE
         ! empty domain: nothing inundated, so no new fraction to report
         area_new_rel = 0.0_wp
@@ -7338,7 +7338,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       x_mass_center_old = x_mass_center
       y_mass_center_old = y_mass_center
-      hpos_old = hpos
+      state%hpos_old = state%hpos
 
       IF ((MAX(vel_mass_center, area_new_rel/dt_runout) .LT. eps_stop) &
           .AND. (.NOT. stop_flag)) THEN
@@ -7650,7 +7650,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     USE geometry_2d, ONLY: B_cent, comp_cells_x, comp_cells_y
     USE geometry_2d, ONLY: deposit, erosion, erodible
     USE parameters_2d, ONLY: n_vars
-    USE state_2d, ONLY: qp, hmax, pdynmax, mod_vel_max
+    USE state_2d, ONLY: state
 
     USE constitutive_2d, ONLY: mixt_var
 
@@ -7676,9 +7676,9 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     sp_flag = .FALSE.
 
-    ALLOCATE (Ri2D(SIZE(qp, 2), SIZE(qp, 3)))
-    ALLOCATE (rho_m2D(SIZE(qp, 2), SIZE(qp, 3)))
-    ALLOCATE (red_grav2D(SIZE(qp, 2), SIZE(qp, 3)))
+    ALLOCATE (Ri2D(SIZE(state%qp, 2), SIZE(state%qp, 3)))
+    ALLOCATE (rho_m2D(SIZE(state%qp, 2), SIZE(state%qp, 3)))
+    ALLOCATE (red_grav2D(SIZE(state%qp, 2), SIZE(state%qp, 3)))
 
     Ri2D = 0.0_wp
     rho_m2D = 0.0_wp
@@ -7688,9 +7688,9 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       DO k = 1, comp_cells_y
 
-        IF (qp(1, j, k) .GT. 1.0E-10_wp) THEN
+        IF (state%qp(1, j, k) .GT. 1.0E-10_wp) THEN
 
-          CALL mixt_var(qp(1:n_vars + 2, j, k), r_Ri, r_rho_m, r_rho_c, &
+          CALL mixt_var(state%qp(1:n_vars + 2, j, k), r_Ri, r_rho_m, r_rho_c, &
                         r_red_grav, sp_flag, r_sp_heat_c, r_sp_heat_mix)
 
         ELSE
@@ -7712,7 +7712,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     END DO
 
-    ALLOCATE (temp_array(SIZE(qp, 2), SIZE(qp, 3)))
+    ALLOCATE (temp_array(SIZE(state%qp, 2), SIZE(state%qp, 3)))
 
     temp_array = 0.0_wp   ! inizializza a zero
 
@@ -7731,24 +7731,24 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     CALL check(nf90_put_var(ncid, b_varid, B_cent, start=start, count=count))
 
     ! Write the flow thickness (h)
-    CALL check(nf90_put_var(ncid, h_varid, qp(1, :, :), start=start, count=count))
+    CALL check(nf90_put_var(ncid, h_varid, state%qp(1, :, :), start=start, count=count))
 
-    temp_array(:, :) = qp(1, :, :) + B_cent(:, :)
+    temp_array(:, :) = state%qp(1, :, :) + B_cent(:, :)
 
     ! Calculate and write the free surface elevation (w = h + b)
     CALL check(nf90_put_var(ncid, w_varid, temp_array, start=start, &
                             count=count))
 
     ! Write the velocity x-component (u)
-    CALL check(nf90_put_var(ncid, u_varid, qp(n_vars + 1, :, :), start=start, &
+    CALL check(nf90_put_var(ncid, u_varid, state%qp(n_vars + 1, :, :), start=start, &
                             count=count))
 
     ! Write the velocity y-component (v)
-    CALL check(nf90_put_var(ncid, v_varid, qp(n_vars + 2, :, :), start=start, &
+    CALL check(nf90_put_var(ncid, v_varid, state%qp(n_vars + 2, :, :), start=start, &
                             count=count))
 
     ! Write the flow temperature (T)
-    CALL check(nf90_put_var(ncid, Temp_varid, qp(4, :, :), start=start, &
+    CALL check(nf90_put_var(ncid, Temp_varid, state%qp(4, :, :), start=start, &
                             count=count))
 
     temp_array = 0.0_wp   ! initialize to zero
@@ -7758,14 +7758,14 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       IF (alpha_flag) THEN
 
-        WHERE (qp(1, :, :) .GE. 1.0E-10_wp)
-          temp_array = qp(4 + i, :, :)
+        WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
+          temp_array = state%qp(4 + i, :, :)
         END WHERE
 
       ELSE
 
-        WHERE (qp(1, :, :) .GE. 1.0E-10_wp)
-          temp_array = qp(4 + i, :, :)/qp(1, :, :)
+        WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
+          temp_array = state%qp(4 + i, :, :)/state%qp(1, :, :)
         END WHERE
 
       END IF
@@ -7788,19 +7788,19 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       IF (alpha_flag) THEN
 
-        WHERE (qp(1, :, :) .GE. 1.0E-10_wp)
-          temp_array = qp(4 + n_solid + i, :, :)
+        WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
+          temp_array = state%qp(4 + n_solid + i, :, :)
         END WHERE
 
       ELSE
 
-        WHERE (qp(1, :, :) .GE. 1.0E-10_wp)
-          temp_array = qp(4 + n_solid + i, :, :)/qp(1, :, :)
+        WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
+          temp_array = state%qp(4 + n_solid + i, :, :)/state%qp(1, :, :)
         END WHERE
 
       END IF
 
-      CALL check(nf90_put_var(ncid, gas_varid(i), qp(4 + n_solid + i, :, :), &
+      CALL check(nf90_put_var(ncid, gas_varid(i), state%qp(4 + n_solid + i, :, :), &
                               start=start, count=count))
     END DO
 
@@ -7810,14 +7810,14 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       IF (alpha_flag) THEN
 
-        WHERE (qp(1, :, :) .GE. 1.0E-10_wp)
-          temp_array = qp(n_vars, :, :)
+        WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
+          temp_array = state%qp(n_vars, :, :)
         END WHERE
 
       ELSE
 
-        WHERE (qp(1, :, :) .GE. 1.0E-10_wp)
-          temp_array = qp(n_vars, :, :)/qp(1, :, :)
+        WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
+          temp_array = state%qp(n_vars, :, :)/state%qp(1, :, :)
         END WHERE
 
       END IF
@@ -7833,13 +7833,13 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     ! Write stochastic variable
     DO i = 1, n_stoch_vars
       CALL check(nf90_put_var(ncid, stoch_varid(i), &
-                              qp(4 + n_solid + n_add_gas + i, :, :), start=start, count=count))
+                              state%qp(4 + n_solid + n_add_gas + i, :, :), start=start, count=count))
     END DO
 
     temp_array = pres   ! initialize with atmospheric pressure
 
-    WHERE (qp(1, :, :) .GE. 1.0E-10_wp)
-      temp_array = qp(4 + n_solid + n_add_gas + n_stoch_vars + i, :, :) + pres
+    WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
+      temp_array = state%qp(4 + n_solid + n_add_gas + n_stoch_vars + i, :, :) + pres
     END WHERE
 
     ! Write pore pressure variable
@@ -7851,14 +7851,14 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     temp_array = 0.0_wp   ! reset to zero
 
     ! Write the max thickness (hMax)
-    CALL check(nf90_put_var(ncid, hMax_varid, hmax, start=start, count=count))
+    CALL check(nf90_put_var(ncid, hMax_varid, state%hmax, start=start, count=count))
 
     ! Write the max dynamic pressure (pdynmax)
-    CALL check(nf90_put_var(ncid, PDynMax_varid, pdynmax, start=start, &
+    CALL check(nf90_put_var(ncid, PDynMax_varid, state%pdynmax, start=start, &
                             count=count))
 
     ! Write the max velocity magnitude
-    CALL check(nf90_put_var(ncid, ModVelMax_varid, mod_vel_max, start=start, &
+    CALL check(nf90_put_var(ncid, ModVelMax_varid, state%mod_vel_max, start=start, &
                             count=count))
 
     ! Write the Richardson number
@@ -7874,16 +7874,16 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     IF ((rheology_flag) .AND. (rheology_model .EQ. 1)) THEN
 
-      ALLOCATE (muEff(SIZE(qp, 2), SIZE(qp, 3)))
+      ALLOCATE (muEff(SIZE(state%qp, 2), SIZE(state%qp, 3)))
 
       muEff = 0.0_wp
 
-      WHERE (((rho_m2D(:, :)*qp(1, :, :)*red_grav2D(:, :)) /= 0.0_wp) .AND. &
-             (qp(1, :, :) .GE. 1.0E-10_wp))
+      WHERE (((rho_m2D(:, :)*state%qp(1, :, :)*red_grav2D(:, :)) /= 0.0_wp) .AND. &
+             (state%qp(1, :, :) .GE. 1.0E-10_wp))
 
         muEff = mu*MAX(0.0_wp, (1.0_wp - MAX(0.0_wp, &
-                                             qp(4 + n_solid + n_add_gas + n_stoch_vars + 1, :, :)) &
-                                /(rho_m2D(:, :)*qp(1, :, :)*red_grav2D(:, :))))
+                                             state%qp(4 + n_solid + n_add_gas + n_stoch_vars + 1, :, :)) &
+                                /(rho_m2D(:, :)*state%qp(1, :, :)*red_grav2D(:, :))))
 
       END WHERE
 
@@ -7946,7 +7946,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     USE parameters_2d, ONLY: wp, n_vars, n_solid
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible, deposit, erosion
     USE solver_2d, ONLY: t, dt, Z
-    USE state_2d, ONLY: q, hmax, pdynmax, mod_vel_max
+    USE state_2d, ONLY: state
     USE parameters_2d, ONLY: stochastic_flag, topo_change_flag
 
     IMPLICIT NONE
@@ -7970,7 +7970,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     WRITE (unit_rst) t, dt
 
     ! 3. Write main variables
-    WRITE (unit_rst) q
+    WRITE (unit_rst) state%q
 
     ! 4. Write grid variables (Topography and erosion)
     WRITE (unit_rst) B_cent
@@ -7979,9 +7979,9 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     WRITE (unit_rst) erosion
 
     ! 5. Write statistics/maximums
-    WRITE (unit_rst) hmax
-    WRITE (unit_rst) pdynmax
-    WRITE (unit_rst) mod_vel_max
+    WRITE (unit_rst) state%hmax
+    WRITE (unit_rst) state%pdynmax
+    WRITE (unit_rst) state%mod_vel_max
 
     ! 6. Write stochastic variables (IF ACTIVE)
     IF (stochastic_flag) THEN
@@ -8008,12 +8008,11 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     USE parameters_2d, ONLY: wp, n_vars, n_solid
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible, deposit, erosion
     USE solver_2d, ONLY: t, dt, Z
-    USE state_2d, ONLY: q, hmax, pdynmax, mod_vel_max
+    USE state_2d, ONLY: state
     USE parameters_2d, ONLY: stochastic_flag
 
     ! Modules needed to recalculate derived variables
     USE geometry_2d, ONLY: topography_reconstruction
-    USE state_2d, ONLY: qp
     USE domain_2d, ONLY: solve_cells, j_cent, k_cent
     USE constitutive_2d, ONLY: qc_to_qp
 
@@ -8046,7 +8045,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     READ (unit_rst) t, dt
 
     ! 3. Read main variables
-    READ (unit_rst) q
+    READ (unit_rst) state%q
 
     ! 4. Read grid variables
     READ (unit_rst) B_cent
@@ -8055,9 +8054,9 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     READ (unit_rst) erosion
 
     ! 5. Read maximums
-    READ (unit_rst) hmax
-    READ (unit_rst) pdynmax
-    READ (unit_rst) mod_vel_max
+    READ (unit_rst) state%hmax
+    READ (unit_rst) state%pdynmax
+    READ (unit_rst) state%mod_vel_max
 
     ! 6. Read stochastic
     IF (stochastic_flag) THEN
@@ -8073,10 +8072,10 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     DO l = 1, solve_cells
       j = j_cent(l)
       k = k_cent(l)
-      IF (q(1, j, k) > 0.0_wp) THEN
-        CALL qc_to_qp(q(1:n_vars, j, k), qp(1:n_vars + 2, j, k), p_dyn_dummy)
+      IF (state%q(1, j, k) > 0.0_wp) THEN
+        CALL qc_to_qp(state%q(1:n_vars, j, k), state%qp(1:n_vars + 2, j, k), p_dyn_dummy)
       ELSE
-        qp(:, j, k) = 0.0_wp
+        state%qp(:, j, k) = 0.0_wp
         ! Note: T_ambient must be accessible here or reset
       END IF
     END DO
