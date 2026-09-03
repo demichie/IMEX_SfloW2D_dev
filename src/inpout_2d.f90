@@ -5183,7 +5183,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     ! External procedures
     USE geometry_2d, ONLY: interp_2d_scalarB, regrid_scalar
     USE solver_2d, ONLY: allocate_solver_variables
-    USE domain_2d, ONLY: solve_mask_time
+    USE domain_2d, ONLY: domain
 
     ! External variables
     USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0, dx, dy
@@ -5421,7 +5421,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
             IF (thickness_interp .GT. 0.0_wp) THEN
 
               ! WRITE(*,*) 'j,k,thickness: ',j,k,thickness_init(j,k)
-              solve_mask_time(j, k) = release_time(i_file)
+              domain%solve_mask_time(j, k) = release_time(i_file)
 
             END IF
 
@@ -8013,7 +8013,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     ! Modules needed to recalculate derived variables
     USE geometry_2d, ONLY: topography_reconstruction
-    USE domain_2d, ONLY: solve_cells, j_cent, k_cent
+    USE domain_2d, ONLY: domain
     USE constitutive_2d, ONLY: qc_to_qp
 
     IMPLICIT NONE
@@ -8069,9 +8069,9 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     ! A. Recalculate physical variables (qp) from conservative ones (q)
     !$OMP PARALLEL DO PRIVATE(j,k,p_dyn_dummy)
-    DO l = 1, solve_cells
-      j = j_cent(l)
-      k = k_cent(l)
+    DO l = 1, domain%solve_cells
+      j = domain%j_cent(l)
+      k = domain%k_cent(l)
       IF (state%q(1, j, k) > 0.0_wp) THEN
         CALL qc_to_qp(state%q(1:n_vars, j, k), state%qp(1:n_vars + 2, j, k), p_dyn_dummy)
       ELSE

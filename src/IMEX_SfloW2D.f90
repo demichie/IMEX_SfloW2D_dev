@@ -67,7 +67,7 @@ PROGRAM IMEX_SfloW2D
    USE solver_2d, ONLY : deallocate_solver_variables
    USE mass_exchange_2d, ONLY : update_erosion_deposition_cell
    USE time_integration_2d, ONLY : timestep, imex_RK_solver
-   USE domain_2d, ONLY : check_solve
+   USE domain_2d, ONLY : domain
 
    USE inpout_2d, ONLY : restart
 
@@ -99,8 +99,6 @@ PROGRAM IMEX_SfloW2D
 
    USE constitutive_2d, ONLY : qc_to_qp
 
-   USE domain_2d, ONLY : solve_mask, solve_cells
-   USE domain_2d, ONLY : j_cent, k_cent
 
    USE constitutive_2d, ONLY : avg_profiles_mix
 
@@ -254,7 +252,7 @@ PROGRAM IMEX_SfloW2D
 
    IF ( radial_source_flag .OR. lateral_source_flag ) CALL init_source
 
-   CALL check_solve(state%q, t, .TRUE.)
+   CALL domain%check_solve(state%q, t, .TRUE.)
 
    ! For a new run or a classic restart, initialize the stochastic field only
    ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
@@ -309,10 +307,10 @@ PROGRAM IMEX_SfloW2D
    !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2,    &
    !$OMP & mod_vel)
 
-   DO l = 1,solve_cells
+   DO l = 1,domain%solve_cells
 
-      j = j_cent(l)
-      k = k_cent(l)
+      j = domain%j_cent(l)
+      k = domain%k_cent(l)
 
       IF ( state%q(1,j,k) .GT. 0.0_wp ) THEN
 
@@ -395,17 +393,17 @@ PROGRAM IMEX_SfloW2D
 
       IF ( t.EQ. t_start ) THEN
 
-         CALL check_solve(state%q, t, .FALSE.)
+         CALL domain%check_solve(state%q, t, .FALSE.)
 
       ELSE
 
-         CALL check_solve(state%q, t, .FALSE.)
+         CALL domain%check_solve(state%q, t, .FALSE.)
 
       END IF
 
       IF ( verbose_level .GE. 1 ) THEN
 
-         WRITE(*,*) 'cells to solve and reconstruct:' , COUNT(solve_mask)
+         WRITE(*,*) 'cells to solve and reconstruct:' , COUNT(domain%solve_mask)
 
       END IF
 
@@ -447,10 +445,10 @@ PROGRAM IMEX_SfloW2D
       !$OMP & mod_vel)
 
 
-      DO l = 1,solve_cells
+      DO l = 1,domain%solve_cells
 
-         j = j_cent(l)
-         k = k_cent(l)
+         j = domain%j_cent(l)
+         k = domain%k_cent(l)
 
          IF ( state%q(1,j,k) .GT. 0.0_wp ) THEN
 

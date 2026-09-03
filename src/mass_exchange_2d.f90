@@ -19,7 +19,7 @@ MODULE mass_exchange_2d
   USE parameters_2d, ONLY : verbose_level
   USE parameters_2d, ONLY : bottom_radial_source_flag
 
-  USE domain_2d, ONLY : solve_cells, j_cent, k_cent
+  USE domain_2d, ONLY : domain
 
   USE OMP_LIB
 
@@ -93,10 +93,10 @@ CONTAINS
     !$OMP & continuous_phase_erosion_term,continuous_phase_loss_term,           &
     !$OMP & out_of_source_fraction,p_dyn,r_sp_heat_c,r_sp_heat_mix)
 
-    DO l = 1,solve_cells
+    DO l = 1,domain%solve_cells
 
-       j = j_cent(l)
-       k = k_cent(l)
+       j = domain%j_cent(l)
+       k = domain%k_cent(l)
 
        IF ( q(1,j,k) .GT. 0.0_wp ) THEN
 

@@ -31,9 +31,7 @@ MODULE time_integration_2d
   USE hyperbolic_2d, ONLY : a_interface_yNeg, a_interface_yPos
   USE hyperbolic_2d, ONLY : H_interface_x, H_interface_y
 
-  USE domain_2d, ONLY : solve_cells, solve_interfaces_x, solve_interfaces_y
-  USE domain_2d, ONLY : j_cent, k_cent
-  USE domain_2d, ONLY : j_stag_x, k_stag_x, j_stag_y, k_stag_y
+  USE domain_2d, ONLY : domain
 
   IMPLICIT NONE
 
@@ -196,10 +194,10 @@ CONTAINS
 
        !$OMP PARALLEL DO private(j,k,p_dyn)
 
-       DO l = 1,solve_cells
+       DO l = 1,domain%solve_cells
 
-          j = j_cent(l)
-          k = k_cent(l)
+          j = domain%j_cent(l)
+          k = domain%k_cent(l)
 
           IF ( q(1,j,k) .GT. 0.0_wp ) THEN
 
@@ -220,11 +218,11 @@ CONTAINS
        !READ(*,*)
 
        ! Compute the physical and conservative variables at the interfaces
-       CALL reconstruction( q, qp, t, solve_cells, j_cent, k_cent )
+       CALL reconstruction( q, qp, t, domain%solve_cells, domain%j_cent, domain%k_cent )
 
        ! Compute the max/min eigenvalues at the interfaces
-       CALL eval_speeds( solve_interfaces_x, j_stag_x, k_stag_x,              &
-            solve_interfaces_y, j_stag_y, k_stag_y )
+       CALL eval_speeds( domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,              &
+            domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y )
 
        max_a_x = 0.0_wp
        max_a_y = 0.0_wp
@@ -234,10 +232,10 @@ CONTAINS
        ! those two maxima directly, avoiding full-domain scratch arrays and
        ! an atomic update of dt for every cell.
        !$OMP PARALLEL DO private(j,k) reduction(max:max_a_x,max_a_y)
-       DO l = 1,solve_cells
+       DO l = 1,domain%solve_cells
 
-          j = j_cent(l)
-          k = k_cent(l)
+          j = domain%j_cent(l)
+          k = domain%k_cent(l)
 
           max_a_x = MAX( max_a_x,                                               &
                MAXVAL(a_interface_xPos(1:n_vars,j,k)),                         &
@@ -343,10 +341,10 @@ CONTAINS
     !$OMP PARALLEL
  
     !$OMP DO private(j,k)
-    DO l = 1,solve_cells
+    DO l = 1,domain%solve_cells
 
-       j = j_cent(l)
-       k = k_cent(l)
+       j = domain%j_cent(l)
+       k = domain%k_cent(l)
 
        IF ( verbose_level .GE. 2 ) THEN
 
@@ -401,10 +399,10 @@ CONTAINS
        !$OMP & newton_iterations,newton_linear_info,newton_converged,          &
        !$OMP & newton_line_search_failed)
 
-       solve_cells_loop:DO l = 1,solve_cells
+       solve_cells_loop:DO l = 1,domain%solve_cells
 
-          j = j_cent(l)
-          k = k_cent(l)
+          j = domain%j_cent(l)
+          k = domain%k_cent(l)
 
           IF ( verbose_level .GE. 2 ) THEN
 
@@ -668,9 +666,9 @@ CONTAINS
           CALL eval_hyperbolic_terms(                                           &
                q_rk , qp_rk ,                                                   &
                divFlux(1:n_eqns,1:comp_cells_x,1:comp_cells_y,i_RK), t,        &
-               solve_cells, j_cent, k_cent,                                    &
-               solve_interfaces_x, j_stag_x, k_stag_x,                        &
-               solve_interfaces_y, j_stag_y, k_stag_y )
+               domain%solve_cells, domain%j_cent, domain%k_cent,                                    &
+               domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,                        &
+               domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y )
 
        END IF
 
@@ -679,10 +677,10 @@ CONTAINS
     !$OMP PARALLEL DO private(j,k,p_dyn,alpha_s,solid_excess_roundoff,          &
     !$OMP & residual_cell,q_old_cell)
 
-    assemble_sol:DO l = 1,solve_cells
+    assemble_sol:DO l = 1,domain%solve_cells
 
-       j = j_cent(l)
-       k = k_cent(l)
+       j = domain%j_cent(l)
+       k = domain%k_cent(l)
 
        ! q remains equal to Q^n throughout all RK stages. Preserve the old
        ! state locally before overwriting this cell during final assembly.

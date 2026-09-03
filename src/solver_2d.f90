@@ -28,7 +28,7 @@ MODULE solver_2d
 
   USE hyperbolic_2d, ONLY : initialize_hyperbolic, finalize_hyperbolic
 
-  USE domain_2d, ONLY : initialize_domain, finalize_domain
+  USE domain_2d, ONLY : domain
   USE time_integration_2d, ONLY : initialize_time_integration,                &
        finalize_time_integration
 
@@ -72,7 +72,7 @@ CONTAINS
 
     CALL initialize_reconstruction
     CALL initialize_hyperbolic
-    CALL initialize_domain
+    CALL domain%initialize
 
     ALLOCATE( source_xy( comp_cells_x , comp_cells_y ) )
 
@@ -115,7 +115,7 @@ CONTAINS
 
   SUBROUTINE deallocate_solver_variables
 
-    CALL finalize_domain
+    CALL domain%finalize
     CALL finalize_time_integration
     CALL finalize_hyperbolic
     CALL finalize_reconstruction

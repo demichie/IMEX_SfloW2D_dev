@@ -17,7 +17,7 @@ MODULE stochastic_module
        n_stoch_vars , n_pore_vars
   
   USE solver_2d, ONLY : Z, conv_kernel
-  USE domain_2d, ONLY: solve_cells, j_cent, k_cent
+  USE domain_2d, ONLY: domain
   USE state_2d, ONLY: state
   USE constitutive_2d, ONLY : T_ambient
   USE constitutive_2d, ONLY: qc_to_qp
@@ -108,10 +108,10 @@ CONTAINS
 
        !$OMP PARALLEL DO private(j,k)
 
-       DO l = 1,solve_cells
+       DO l = 1,domain%solve_cells
 
-          j = j_cent(l)
-          k = k_cent(l)
+          j = domain%j_cent(l)
+          k = domain%k_cent(l)
           
           state%qp(5+n_solid+n_add_gas,j,k) = Z(j,k)
           state%q(5+n_solid+n_add_gas,j,k) = state%q(1,j,k) * Z(j,k)
