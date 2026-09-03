@@ -1,8 +1,8 @@
 !********************************************************************************
-!> \brief Numerical solver
+!> \brief Numerical component lifecycle orchestration
 !
-!> This module contains the variables and the subroutines for the 
-!> numerical solution of the equations.  
+!> This module initializes and finalizes the components used by the solver.
+!> Scientific state and transient workspaces are owned by those components.
 !
 !> \date 07/10/2016
 !> @author 
@@ -11,12 +11,7 @@
 !********************************************************************************
 MODULE solver_2d
 
-  ! external variables
-
-  USE constitutive_2d, ONLY : implicit_flag, implicit_map
-    
-  USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
-  USE parameters_2d, ONLY : wp
+  USE constitutive_2d, ONLY : init_problem_param, finalize_problem_param
 
   USE state_2d, ONLY : state
 
@@ -29,20 +24,10 @@ MODULE solver_2d
 
   USE domain_2d, ONLY : domain
   USE time_integration_2d, ONLY : time_integration_workspace
+  USE stochastic_module, ONLY : stochastic_workspace
 
   IMPLICIT none
 
-  !> time
-  REAL(wp) :: t
-
-  !> Time step
-  REAL(wp) :: dt
-
-  !> Stochastic Noise
-  REAL(wp), ALLOCATABLE :: Z(:,:)
-  !> Array for kernel
-  REAL(wp), ALLOCATABLE :: conv_kernel(:,:)
-  
 CONTAINS
 
   !******************************************************************************
@@ -61,6 +46,8 @@ CONTAINS
     
     IMPLICIT NONE
 
+    CALL init_problem_param
+
     CALL state%initialize
 
     CALL reconstruction_workspace%initialize
@@ -70,13 +57,7 @@ CONTAINS
     CALL initialize_nonlinear_solver
     CALL time_integration_workspace%initialize
 
-    ! Allocate array containing the stochastic noise.
-    ! Allocated unconditionally: Z(j,k) is passed as a scalar actual
-    ! argument to the semi-implicit and implicit routines whatever
-    ! stochastic_flag is, so leaving it unallocated is invalid. With the
-    ! flag off the values stay zero and have no effect.
-    ALLOCATE ( Z(comp_cells_x , comp_cells_y) )
-    Z(1:comp_cells_x,1:comp_cells_y) = 0.0_wp
+    CALL stochastic_workspace%initialize
     
     WRITE(*,*) 'ALLOCATION OF ARRAYS COMPLETED'
     
@@ -107,10 +88,8 @@ CONTAINS
 
     CALL finalize_nonlinear_solver
 
-    IF ( ALLOCATED(implicit_flag) ) DEALLOCATE(implicit_flag)
-    IF ( ALLOCATED(implicit_map) ) DEALLOCATE(implicit_map)
-    IF ( ALLOCATED(Z) ) DEALLOCATE(Z)
-    IF ( ALLOCATED(conv_kernel) ) DEALLOCATE(conv_kernel)
+    CALL finalize_problem_param
+    CALL stochastic_workspace%finalize
     
     RETURN
     

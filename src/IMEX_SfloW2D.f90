@@ -29,7 +29,7 @@ PROGRAM IMEX_SfloW2D
    USE, intrinsic :: iso_fortran_env
    USE, intrinsic :: ieee_arithmetic
 
-   USE constitutive_2d, ONLY : init_problem_param , T_ambient
+   USE constitutive_2d, ONLY : T_ambient
 
 
    USE geometry_2d, ONLY : init_grid
@@ -68,6 +68,7 @@ PROGRAM IMEX_SfloW2D
    USE mass_exchange_2d, ONLY : update_erosion_deposition_cell
    USE time_integration_2d, ONLY : time_integrator => time_integration_workspace
    USE domain_2d, ONLY : domain
+   USE runtime_2d, ONLY : runtime
 
    USE inpout_2d, ONLY : restart
 
@@ -94,7 +95,6 @@ PROGRAM IMEX_SfloW2D
    USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,          &
       thickness_levels , dyn_pres_levels
 
-   USE solver_2d, ONLY : t, dt, Z_field => Z
    USE state_2d, ONLY : state
 
    USE constitutive_2d, ONLY : qc_to_qp
@@ -102,7 +102,8 @@ PROGRAM IMEX_SfloW2D
 
    USE constitutive_2d, ONLY : avg_profiles_mix
 
-   USE stochastic_module, ONLY : genConvolutionKernel, getSteadyStateZ
+   USE stochastic_module, ONLY : genConvolutionKernel, getSteadyStateZ,       &
+      stochastic_workspace
 
    USE OMP_LIB
 
@@ -193,12 +194,10 @@ PROGRAM IMEX_SfloW2D
 
    CALL init_grid
 
-   CALL init_problem_param
-
    CALL allocate_solver_variables
 
    is_binary_restart = .FALSE.
-   t = t_start
+   runtime%t = t_start
 
    IF ( restart ) THEN
 
@@ -252,7 +251,7 @@ PROGRAM IMEX_SfloW2D
 
    IF ( radial_source_flag .OR. lateral_source_flag ) CALL init_source
 
-   CALL domain%check_solve(state%q, t, .TRUE.)
+   CALL domain%check_solve(state%q, runtime%t, .TRUE.)
 
    ! For a new run or a classic restart, initialize the stochastic field only
    ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
@@ -289,12 +288,12 @@ PROGRAM IMEX_SfloW2D
    IF ( is_binary_restart ) THEN
       ! If it is a binary restart, 'dt' has already been loaded by read_restart_file.
       ! We initialize the history with the last valid dt for continuity.
-      dt_old = dt
-      dt_old_old = dt
-      WRITE(*,*) 'Restarting with saved timestep dt =', dt
+      dt_old = runtime%dt
+      dt_old_old = runtime%dt
+      WRITE(*,*) 'Restarting with saved timestep dt =', runtime%dt
    ELSE
       ! If it is a new simulation or a legacy restart, we use dt0 from the input
-      dt = dt0
+      runtime%dt = dt0
       dt_old = dt0
       dt_old_old = dt0
    END IF
@@ -362,12 +361,12 @@ PROGRAM IMEX_SfloW2D
 
    !$OMP END PARALLEL DO
 
-   IF ( output_runout_flag ) CALL output_runout(t,stop_flag)
+   IF ( output_runout_flag ) CALL output_runout(runtime%t,stop_flag)
 
    IF ( output_cons_flag .OR. output_esri_flag .OR. output_phys_flag .OR.        &
-      output_netcdf_flag ) CALL output_solution(t)
+      output_netcdf_flag ) CALL output_solution(runtime%t)
 
-   IF ( n_probes .GT. 0 ) CALL output_probes(t)
+   IF ( n_probes .GT. 0 ) CALL output_probes(runtime%t)
 
    IF ( SUM(state%q(1,:,:)) .EQ. 0.0_wp ) t_steady = t_end
 
@@ -375,7 +374,7 @@ PROGRAM IMEX_SfloW2D
 
       WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
       &ES11.3E3,A11,ES11.3E3)")                                                &
-         't =',t,'dt =',dt,                                                    &
+         't =',runtime%t,'dt =',runtime%dt,                                    &
          ' mass = ',dx*dy*SUM(state%q(1,:,:)) ,                                      &
          ' volume = ',dx*dy*SUM(state%qp(1,:,:)) ,                                   &
          ' area = ',dx*dy*COUNT(state%q(1,:,:).GT.1.D-5) ,                           &
@@ -387,17 +386,17 @@ PROGRAM IMEX_SfloW2D
    CALL cpu_time(t2)
    CALL system_clock (st2)
 
-   DO WHILE ( ( t .LT. t_end ) .AND. ( t .LT. t_steady ) )
+   DO WHILE ( ( runtime%t .LT. t_end ) .AND. ( runtime%t .LT. t_steady ) )
 
       CALL update_param
 
-      IF ( t.EQ. t_start ) THEN
+      IF ( runtime%t .EQ. t_start ) THEN
 
-         CALL domain%check_solve(state%q, t, .FALSE.)
+         CALL domain%check_solve(state%q, runtime%t, .FALSE.)
 
       ELSE
 
-         CALL domain%check_solve(state%q, t, .FALSE.)
+         CALL domain%check_solve(state%q, runtime%t, .FALSE.)
 
       END IF
 
@@ -407,39 +406,45 @@ PROGRAM IMEX_SfloW2D
 
       END IF
 
-      CALL time_integrator%compute_timestep(state%q, state%qp, t, dt)
+      CALL time_integrator%compute_timestep(state%q, state%qp, runtime%t,     &
+           runtime%dt)
 
       IF ( t_end - t_output < 1.0E-7_WP ) t_output = t_end
       IF ( t_end - t_runout < 1.0E-7_WP ) t_runout = t_end
       IF ( t_end - t_probes < 1.0E-7_WP ) t_probes = t_end
 
-      IF ( t+dt .GT. t_end ) dt = t_end - t
-      IF ( t+dt .GT. t_output ) dt = t_output - t
+      IF ( runtime%t+runtime%dt .GT. t_end ) runtime%dt = t_end - runtime%t
+      IF ( runtime%t+runtime%dt .GT. t_output )                              &
+           runtime%dt = t_output - runtime%t
 
       IF ( output_runout_flag ) THEN
 
-         IF ( t+dt .GT. t_runout ) dt = t_runout - t
+         IF ( runtime%t+runtime%dt .GT. t_runout )                           &
+              runtime%dt = t_runout - runtime%t
 
       END IF
 
       IF ( n_probes .GT. 0 ) THEN
 
-         IF ( t+dt .GT. t_probes ) dt = t_probes - t
+         IF ( runtime%t+runtime%dt .GT. t_probes )                           &
+              runtime%dt = t_probes - runtime%t
 
       END IF
 
-      dt = MIN(dt,1.1_wp * 0.5_wp * ( dt_old + dt_old_old ) )
+      runtime%dt = MIN(runtime%dt,1.1_wp * 0.5_wp *                          &
+           ( dt_old + dt_old_old ) )
 
       dt_old_old = dt_old
-      dt_old = dt
+      dt_old = runtime%dt
 
-      CALL time_integrator%advance(state%q, state%qp, t, dt, Z_field)
+      CALL time_integrator%advance(state%q, state%qp, runtime%t, runtime%dt,  &
+           stochastic_workspace%Z)
 
-      CALL update_erosion_deposition_cell(state%q, state%qp, dt)
+      CALL update_erosion_deposition_cell(state%q, state%qp, runtime%dt)
 
       IF ( topo_change_flag ) CALL topography_reconstruction
 
-      t = t+dt
+      runtime%t = runtime%t + runtime%dt
 
       !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2,    &
       !$OMP & mod_vel)
@@ -529,7 +534,7 @@ PROGRAM IMEX_SfloW2D
 
          WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
          &ES11.3E3,A11,ES11.3E3)")                                             &
-            't =',t,'dt =',dt,                                                    &
+            't =',runtime%t,'dt =',runtime%dt,                                &
             ' mass = ',dx*dy*SUM(state%q(1,:,:)) ,                                      &
             ' volume = ',dx*dy*SUM(state%qp(1,:,:)) ,                                   &
             ' area = ',dx*dy*COUNT(state%q(1,:,:).GT.1.D-7) ,                           &
@@ -540,11 +545,12 @@ PROGRAM IMEX_SfloW2D
 
       IF ( output_runout_flag ) THEN
 
-         IF ( ( t .GE. t_runout ) .OR. ( t .GE. t_steady ) ) THEN
+         IF ( ( runtime%t .GE. t_runout ) .OR.                               &
+              ( runtime%t .GE. t_steady ) ) THEN
 
             stop_flag_old = stop_flag
 
-            IF ( output_runout_flag ) CALL output_runout(t,stop_flag)
+            IF ( output_runout_flag ) CALL output_runout(runtime%t,stop_flag)
 
             IF ( ( stop_flag ) .AND. (.NOT.stop_flag_old) ) THEN
 
@@ -558,11 +564,11 @@ PROGRAM IMEX_SfloW2D
 
       IF ( n_probes .GT. 0 ) THEN
 
-         IF ( t .GE. t_probes ) CALL output_probes(t)
+         IF ( runtime%t .GE. t_probes ) CALL output_probes(runtime%t)
 
       END IF
 
-      IF ( ( t .GE. t_output ) .OR. ( t .GE. t_end ) ) THEN
+      IF ( ( runtime%t .GE. t_output ) .OR. ( runtime%t .GE. t_end ) ) THEN
 
          CALL cpu_time(t3)
          CALL system_clock(st3)
@@ -576,7 +582,7 @@ PROGRAM IMEX_SfloW2D
 
          IF ( output_cons_flag .OR. output_esri_flag .OR. output_phys_flag .OR. output_netcdf_flag ) THEN
 
-            CALL output_solution(t)
+            CALL output_solution(runtime%t)
             CALL write_restart_file('restart.bin')
 
          END IF

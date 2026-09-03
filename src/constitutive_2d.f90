@@ -524,6 +524,17 @@ CONTAINS
   END SUBROUTINE init_problem_param
 
   !******************************************************************************
+  !> \brief Finalize implicit-equation metadata
+  !******************************************************************************
+
+  SUBROUTINE finalize_problem_param
+
+    IF ( ALLOCATED(implicit_flag) ) DEALLOCATE(implicit_flag)
+    IF ( ALLOCATED(implicit_map) ) DEALLOCATE(implicit_map)
+
+  END SUBROUTINE finalize_problem_param
+
+  !******************************************************************************
   !> \brief Physical variables
   !
   !> This subroutine evaluates from the conservative local variables qj

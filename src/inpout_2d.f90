@@ -5182,7 +5182,6 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     ! External procedures
     USE geometry_2d, ONLY: interp_2d_scalarB, regrid_scalar
-    USE solver_2d, ONLY: allocate_solver_variables
     USE domain_2d, ONLY: domain
 
     ! External variables
@@ -5670,8 +5669,6 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     ! External procedures
     USE geometry_2d, ONLY: interp_2d_scalarB, regrid_scalar
-    USE solver_2d, ONLY: allocate_solver_variables
-
     ! External variables
     USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0
     USE geometry_2d, ONLY: erodible
@@ -7945,7 +7942,8 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   SUBROUTINE write_restart_file(filename)
     USE parameters_2d, ONLY: wp, n_vars, n_solid
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible, deposit, erosion
-    USE solver_2d, ONLY: t, dt, Z
+    USE runtime_2d, ONLY: runtime
+    USE stochastic_module, ONLY: stochastic_workspace
     USE state_2d, ONLY: state
     USE parameters_2d, ONLY: stochastic_flag, topo_change_flag
 
@@ -7961,13 +7959,13 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
       RETURN
     END IF
 
-    WRITE (*, *) 'Writing restart file: ', filename, ' at time ', t
+    WRITE (*, *) 'Writing restart file: ', filename, ' at time ', runtime%t
 
     ! 1. Write dimensions for consistency check
     WRITE (unit_rst) comp_cells_x, comp_cells_y, n_vars, n_solid
 
     ! 2. Write time scalars
-    WRITE (unit_rst) t, dt
+    WRITE (unit_rst) runtime%t, runtime%dt
 
     ! 3. Write main variables
     WRITE (unit_rst) state%q
@@ -7985,7 +7983,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     ! 6. Write stochastic variables (IF ACTIVE)
     IF (stochastic_flag) THEN
-      WRITE (unit_rst) Z
+      WRITE (unit_rst) stochastic_workspace%Z
     END IF
 
     CLOSE (unit_rst)
@@ -8007,7 +8005,8 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   SUBROUTINE read_restart_file(filename)
     USE parameters_2d, ONLY: wp, n_vars, n_solid
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible, deposit, erosion
-    USE solver_2d, ONLY: t, dt, Z
+    USE runtime_2d, ONLY: runtime
+    USE stochastic_module, ONLY: stochastic_workspace
     USE state_2d, ONLY: state
     USE parameters_2d, ONLY: stochastic_flag
 
@@ -8042,7 +8041,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     END IF
 
     ! 2. Read time scalars
-    READ (unit_rst) t, dt
+    READ (unit_rst) runtime%t, runtime%dt
 
     ! 3. Read main variables
     READ (unit_rst) state%q
@@ -8060,7 +8059,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     ! 6. Read stochastic
     IF (stochastic_flag) THEN
-      READ (unit_rst) Z
+      READ (unit_rst) stochastic_workspace%Z
     END IF
 
     CLOSE (unit_rst)
@@ -8084,7 +8083,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     ! B. Recalculate topography slopes and curvatures
     CALL topography_reconstruction
 
-    WRITE (*, *) 'Restart completed successfully at time t = ', t
+    WRITE (*, *) 'Restart completed successfully at time t = ', runtime%t
 
   END SUBROUTINE read_restart_file
 

@@ -16,7 +16,6 @@ MODULE stochastic_module
   USE parameters_2d, ONLY : n_eqns , n_vars , n_solid , n_add_gas , n_quad ,    &
        n_stoch_vars , n_pore_vars
   
-  USE solver_2d, ONLY : Z, conv_kernel
   USE domain_2d, ONLY: domain
   USE state_2d, ONLY: state
   USE constitutive_2d, ONLY : T_ambient
@@ -48,8 +47,44 @@ MODULE stochastic_module
   ! variables related to statistics
   REAL(wp) :: Z_min, Z_max, Z_mean, Z_std
   REAL(wp) :: percentiles(9) ! 5,10,20,30,50,70,80,90,95
+
+  TYPE :: stochastic_workspace_type
+
+     !> Stochastic field at cell centers
+     REAL(wp), ALLOCATABLE :: Z(:,:)
+
+     !> Spatial-correlation convolution kernel
+     REAL(wp), ALLOCATABLE :: conv_kernel(:,:)
+
+   CONTAINS
+
+     PROCEDURE :: initialize => initialize_stochastic_workspace
+     PROCEDURE :: finalize => finalize_stochastic_workspace
+
+  END TYPE stochastic_workspace_type
+
+  TYPE(stochastic_workspace_type) :: stochastic_workspace
   
 CONTAINS
+
+  SUBROUTINE initialize_stochastic_workspace(this)
+
+    CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
+
+    IF ( ALLOCATED(this%Z) ) DEALLOCATE(this%Z)
+    ALLOCATE(this%Z(comp_cells_x,comp_cells_y))
+    this%Z = 0.0_wp
+
+  END SUBROUTINE initialize_stochastic_workspace
+
+  SUBROUTINE finalize_stochastic_workspace(this)
+
+    CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
+
+    IF ( ALLOCATED(this%Z) ) DEALLOCATE(this%Z)
+    IF ( ALLOCATED(this%conv_kernel) ) DEALLOCATE(this%conv_kernel)
+
+  END SUBROUTINE finalize_stochastic_workspace
   
   REAL(wp) FUNCTION MeanFieldCorrection(g,h,Fr) ! working only in the case of mu(Fr)
     
@@ -86,7 +121,7 @@ CONTAINS
     REAL(wp) :: t_steady
     
     ! Initialize all stochastic process to zero
-    Z = 0.0_wp 
+    stochastic_workspace%Z = 0.0_wp
 
     ! Define how many iteration to do for the burn in
     t_steady = 10_wp * tau_stochastic 
@@ -113,8 +148,9 @@ CONTAINS
           j = domain%j_cent(l)
           k = domain%k_cent(l)
           
-          state%qp(5+n_solid+n_add_gas,j,k) = Z(j,k)
-          state%q(5+n_solid+n_add_gas,j,k) = state%q(1,j,k) * Z(j,k)
+          state%qp(5+n_solid+n_add_gas,j,k) = stochastic_workspace%Z(j,k)
+          state%q(5+n_solid+n_add_gas,j,k) = state%q(1,j,k) *               &
+               stochastic_workspace%Z(j,k)
           !WRITE(*,*) j,k,qp(5+n_solid+n_add_gas,j,k),q(5+n_solid+n_add_gas,j,k)
           !READ(*,*)
           
@@ -144,20 +180,24 @@ CONTAINS
       y_center = x_center 
 
       ! Allocate the output array
-      IF (ALLOCATED(conv_kernel)) DEALLOCATE(conv_kernel)
-      ALLOCATE(conv_kernel(n_nodes_per_dim, n_nodes_per_dim))
+      IF (ALLOCATED(stochastic_workspace%conv_kernel))                       &
+           DEALLOCATE(stochastic_workspace%conv_kernel)
+      ALLOCATE(stochastic_workspace%conv_kernel(n_nodes_per_dim,             &
+           n_nodes_per_dim))
 
       ! Compute 2D Gaussian values (at centers of cells)
       DO y_index = 1, n_nodes_per_dim 
         DO x_index = 1, n_nodes_per_dim
           x =  cell_size * (x_index-1) + 0.5_wp * cell_size
           y =  cell_size * (y_index-1) + 0.5_wp * cell_size
-          conv_kernel(x_index, y_index) =  evalGaussian2d(x, y, x_center, y_center)
+          stochastic_workspace%conv_kernel(x_index, y_index) =               &
+               evalGaussian2d(x, y, x_center, y_center)
         END DO
       END DO
 
       ! Renormalize values of the kernel
-      conv_kernel = conv_kernel / SUM(conv_kernel)
+      stochastic_workspace%conv_kernel = stochastic_workspace%conv_kernel / &
+           SUM(stochastic_workspace%conv_kernel)
 
   END SUBROUTINE genConvolutionKernel
 
@@ -201,7 +241,7 @@ CONTAINS
     ! Convolve the gaussian noise to introduce spatial correlation if needed
     IF (length_spatial_corr .GT. cell_size) THEN
         ! (for convenience, the conv_kernel is generated only once before the burn in)
-        CALL convolve_2d(noise, conv_kernel, conv_result) ! To fix (should swap indices?)!
+        CALL convolve_2d(noise, stochastic_workspace%conv_kernel, conv_result) ! To fix (should swap indices?)!
         noise = conv_result
     END IF
 
@@ -212,12 +252,16 @@ CONTAINS
        DO j = 1,comp_cells_x  
           ! Update the Ornstein-Uhlenback process
           sigma_noise = getSigmaNoise(j,k) 
-          Z(j,k) = EulerMaruyamaScheme(Z(j,k), dt, sigma_noise, noise(j,k))
+          stochastic_workspace%Z(j,k) = EulerMaruyamaScheme(                &
+               stochastic_workspace%Z(j,k), dt, sigma_noise, noise(j,k))
           ! apply non linear map to Z if needed (Z becomes asymmetric)
           IF (sym_noise .GT. 0.0_wp) THEN
-            Z(j,k) = ABS(Z(j,k)) ** noise_pow_val ! generate only positive fluctuations 
+            stochastic_workspace%Z(j,k) = ABS(stochastic_workspace%Z(j,k))  &
+                 ** noise_pow_val ! generate only positive fluctuations
           ELSEIF (sym_noise .LT. 0.0_wp) THEN
-            Z(j,k) = -(ABS(Z(j,k)) ** noise_pow_val) ! generate only negative fluctuations
+            ! Generate only negative fluctuations
+            stochastic_workspace%Z(j,k) =                                  &
+                 -(ABS(stochastic_workspace%Z(j,k)) ** noise_pow_val)
           END IF
        END DO
     END DO
@@ -226,7 +270,8 @@ CONTAINS
 
     ! Compute statistic in space at given time if needed as outputs
     IF (output_stoch_vars_flag) THEN
-        CALL OUBasicStatsInSpaceAtGivenTime(Z, Z_min, Z_mean, Z_max, Z_std)
+        CALL OUBasicStatsInSpaceAtGivenTime(stochastic_workspace%Z, Z_min,   &
+             Z_mean, Z_max, Z_std)
         percentiles(:) = 0.0_wp ! Percentiles set to 0 to avoid the computations
         ! The percentiles shold not be computed at each iteration otherwise is too slow
         !CALL percentilesArrayAtGivenTime(Z, percentiles) ! it is very slow!!!!!!!!!!
