@@ -25,7 +25,7 @@ MODULE solver_2d
 
   USE reconstruction_2d, ONLY : reconstruction_workspace
 
-  USE hyperbolic_2d, ONLY : initialize_hyperbolic, finalize_hyperbolic
+  USE hyperbolic_2d, ONLY : hyperbolic_workspace
 
   USE domain_2d, ONLY : domain
   USE time_integration_2d, ONLY : initialize_time_integration,                &
@@ -70,7 +70,7 @@ CONTAINS
     CALL state%initialize
 
     CALL reconstruction_workspace%initialize
-    CALL initialize_hyperbolic
+    CALL hyperbolic_workspace%initialize
     CALL domain%initialize
 
     ALLOCATE( source_xy( comp_cells_x , comp_cells_y ) )
@@ -116,7 +116,7 @@ CONTAINS
 
     CALL domain%finalize
     CALL finalize_time_integration
-    CALL finalize_hyperbolic
+    CALL hyperbolic_workspace%finalize
     CALL reconstruction_workspace%finalize
 
     CALL state%finalize

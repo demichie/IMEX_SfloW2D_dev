@@ -25,10 +25,7 @@ MODULE time_integration_2d
 
   USE reconstruction_2d, ONLY : recon => reconstruction_workspace
 
-  USE hyperbolic_2d, ONLY : eval_hyperbolic_terms, eval_speeds
-  USE hyperbolic_2d, ONLY : a_interface_xNeg, a_interface_xPos
-  USE hyperbolic_2d, ONLY : a_interface_yNeg, a_interface_yPos
-  USE hyperbolic_2d, ONLY : H_interface_x, H_interface_y
+  USE hyperbolic_2d, ONLY : hyper => hyperbolic_workspace
 
   USE domain_2d, ONLY : domain
 
@@ -221,7 +218,7 @@ CONTAINS
             domain%j_cent, domain%k_cent )
 
        ! Compute the max/min eigenvalues at the interfaces
-       CALL eval_speeds( domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,              &
+       CALL hyper%evaluate_speeds( domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,    &
             domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y )
 
        max_a_x = 0.0_wp
@@ -238,16 +235,16 @@ CONTAINS
           k = domain%k_cent(l)
 
           max_a_x = MAX( max_a_x,                                               &
-               MAXVAL(a_interface_xPos(1:n_vars,j,k)),                         &
-               MAXVAL(-a_interface_xNeg(1:n_vars,j,k)),                        &
-               MAXVAL(a_interface_xPos(1:n_vars,j+1,k)),                       &
-               MAXVAL(-a_interface_xNeg(1:n_vars,j+1,k)) )
+               MAXVAL(hyper%a_interface_xPos(1:n_vars,j,k)),                         &
+               MAXVAL(-hyper%a_interface_xNeg(1:n_vars,j,k)),                        &
+               MAXVAL(hyper%a_interface_xPos(1:n_vars,j+1,k)),                       &
+               MAXVAL(-hyper%a_interface_xNeg(1:n_vars,j+1,k)) )
 
           max_a_y = MAX( max_a_y,                                               &
-               MAXVAL(a_interface_yPos(1:n_vars,j,k)),                         &
-               MAXVAL(-a_interface_yNeg(1:n_vars,j,k)),                        &
-               MAXVAL(a_interface_yPos(1:n_vars,j,k+1)),                       &
-               MAXVAL(-a_interface_yNeg(1:n_vars,j,k+1)) )
+               MAXVAL(hyper%a_interface_yPos(1:n_vars,j,k)),                         &
+               MAXVAL(-hyper%a_interface_yNeg(1:n_vars,j,k)),                        &
+               MAXVAL(hyper%a_interface_yPos(1:n_vars,j,k+1)),                       &
+               MAXVAL(-hyper%a_interface_yNeg(1:n_vars,j,k+1)) )
 
        END DO
        !$OMP END PARALLEL DO
@@ -663,7 +660,7 @@ CONTAINS
        IF ( need_explicit_stage ) THEN
 
           ! Eval and store the explicit hyperbolic (fluxes) terms
-          CALL eval_hyperbolic_terms(                                           &
+          CALL hyper%evaluate_terms(                                            &
                q_rk , qp_rk ,                                                   &
                divFlux(1:n_eqns,1:comp_cells_x,1:comp_cells_y,i_RK), t,        &
                domain%solve_cells, domain%j_cent, domain%k_cent,                                    &
@@ -760,7 +757,7 @@ CONTAINS
 
              WRITE(*,*) 'divFlux(1,j,k,1:n_RK)',divFlux(1,j,k,1:n_RK) 
 
-             WRITE(*,*) H_interface_x(1,j+1,k), H_interface_x(1,j,k)
+             WRITE(*,*) hyper%H_interface_x(1,j+1,k), hyper%H_interface_x(1,j,k)
              WRITE(*,*) recon%qp_interfaceR(1:n_vars,j,k)
              WRITE(*,*) qp(1:n_vars,j,k)
              WRITE(*,*) recon%qp_interfaceL(1:n_vars,j+1,k)
@@ -794,12 +791,12 @@ CONTAINS
              WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
 
              WRITE(*,*) 'H_interface(1)'
-             WRITE(*,*) H_interface_x(1,j+1,k)/dx*dt, H_interface_x(1,j,k)/dx*dt
-             WRITE(*,*) H_interface_y(1,j,k+1)/dy*dt, H_interface_y(1,j,k)/dy*dt
+             WRITE(*,*) hyper%H_interface_x(1,j+1,k)/dx*dt, hyper%H_interface_x(1,j,k)/dx*dt
+             WRITE(*,*) hyper%H_interface_y(1,j,k+1)/dy*dt, hyper%H_interface_y(1,j,k)/dy*dt
              
              WRITE(*,*) 'H_interface(5)'
-             WRITE(*,*) H_interface_x(5,j+1,k)/dx*dt, H_interface_x(5,j,k)/dx*dt
-             WRITE(*,*) H_interface_y(5,j,k+1)/dy*dt, H_interface_y(5,j,k)/dy*dt
+             WRITE(*,*) hyper%H_interface_x(5,j+1,k)/dx*dt, hyper%H_interface_x(5,j,k)/dx*dt
+             WRITE(*,*) hyper%H_interface_y(5,j,k+1)/dy*dt, hyper%H_interface_y(5,j,k)/dy*dt
              
 
              READ(*,*)
@@ -892,10 +889,10 @@ CONTAINS
           WRITE(*,*) 'qc old',q_old_cell
 
           WRITE(*,*) 'H_interface(4)'
-          WRITE(*,*) H_interface_x(4,j+1,k)/dx*dt, H_interface_x(4,j,k)/dx*dt
-          WRITE(*,*) H_interface_y(4,j,k+1)/dy*dt, H_interface_y(4,j,k)/dy*dt
+          WRITE(*,*) hyper%H_interface_x(4,j+1,k)/dx*dt, hyper%H_interface_x(4,j,k)/dx*dt
+          WRITE(*,*) hyper%H_interface_y(4,j,k+1)/dy*dt, hyper%H_interface_y(4,j,k)/dy*dt
 
-          WRITE(*,*) H_interface_y(:,j,k)/dy*dt
+          WRITE(*,*) hyper%H_interface_y(:,j,k)/dy*dt
           READ(*,*)
 
        END IF
@@ -942,12 +939,12 @@ CONTAINS
              END IF
 
              WRITE(*,*) 'H_interface(1)'
-             WRITE(*,*) H_interface_x(1,j+1,k)/dx*dt, H_interface_x(1,j,k)/dx*dt
-             WRITE(*,*) H_interface_y(1,j,k+1)/dy*dt, H_interface_y(1,j,k)/dy*dt
+             WRITE(*,*) hyper%H_interface_x(1,j+1,k)/dx*dt, hyper%H_interface_x(1,j,k)/dx*dt
+             WRITE(*,*) hyper%H_interface_y(1,j,k+1)/dy*dt, hyper%H_interface_y(1,j,k)/dy*dt
              
              WRITE(*,*) 'H_interface(5)'
-             WRITE(*,*) H_interface_x(5,j+1,k)/dx*dt, H_interface_x(5,j,k)/dx*dt
-             WRITE(*,*) H_interface_y(5,j,k+1)/dy*dt, H_interface_y(5,j,k)/dy*dt
+             WRITE(*,*) hyper%H_interface_x(5,j+1,k)/dx*dt, hyper%H_interface_x(5,j,k)/dx*dt
+             WRITE(*,*) hyper%H_interface_y(5,j,k+1)/dy*dt, hyper%H_interface_y(5,j,k)/dy*dt
 
              WRITE(*,*) 'divFlux(1)',divFlux(1,j,k,1:n_RK)
              WRITE(*,*) 'expl_terms(1)', expl_terms(1,j,k,1:n_RK)

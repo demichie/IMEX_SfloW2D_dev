@@ -21,55 +21,57 @@ MODULE hyperbolic_2d
 
   PRIVATE
 
-  PUBLIC :: initialize_hyperbolic
-  PUBLIC :: finalize_hyperbolic
-  PUBLIC :: eval_hyperbolic_terms
-  PUBLIC :: eval_speeds
+  TYPE, PUBLIC :: hyperbolic_workspace_type
+     REAL(wp), ALLOCATABLE :: a_interface_xNeg(:,:,:)
+     REAL(wp), ALLOCATABLE :: a_interface_xPos(:,:,:)
+     REAL(wp), ALLOCATABLE :: a_interface_yNeg(:,:,:)
+     REAL(wp), ALLOCATABLE :: a_interface_yPos(:,:,:)
+     REAL(wp), ALLOCATABLE :: H_interface_x(:,:,:)
+     REAL(wp), ALLOCATABLE :: H_interface_y(:,:,:)
+   CONTAINS
+     PROCEDURE :: initialize => initialize_hyperbolic
+     PROCEDURE :: finalize => finalize_hyperbolic
+     PROCEDURE :: evaluate_terms => eval_hyperbolic_terms
+     PROCEDURE :: evaluate_speeds => eval_speeds
+  END TYPE hyperbolic_workspace_type
 
-  ! Transitional public workspace: timestep CFL evaluation and existing solver
-  ! diagnostics still consume these arrays directly.
-  PUBLIC :: a_interface_xNeg, a_interface_xPos
-  PUBLIC :: a_interface_yNeg, a_interface_yPos
-  PUBLIC :: H_interface_x, H_interface_y
-
-  REAL(wp), ALLOCATABLE :: a_interface_xNeg(:,:,:)
-  REAL(wp), ALLOCATABLE :: a_interface_xPos(:,:,:)
-  REAL(wp), ALLOCATABLE :: a_interface_yNeg(:,:,:)
-  REAL(wp), ALLOCATABLE :: a_interface_yPos(:,:,:)
-  REAL(wp), ALLOCATABLE :: H_interface_x(:,:,:)
-  REAL(wp), ALLOCATABLE :: H_interface_y(:,:,:)
+  TYPE(hyperbolic_workspace_type), PUBLIC :: hyperbolic_workspace
 
 CONTAINS
 
-  SUBROUTINE initialize_hyperbolic
+  SUBROUTINE initialize_hyperbolic( this )
 
-    ALLOCATE( a_interface_xNeg(n_eqns,comp_interfaces_x,comp_cells_y) )
-    ALLOCATE( a_interface_xPos(n_eqns,comp_interfaces_x,comp_cells_y) )
-    ALLOCATE( a_interface_yNeg(n_eqns,comp_cells_x,comp_interfaces_y) )
-    ALLOCATE( a_interface_yPos(n_eqns,comp_cells_x,comp_interfaces_y) )
+    CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
 
-    ALLOCATE( H_interface_x(n_eqns,comp_interfaces_x,comp_cells_y) )
-    ALLOCATE( H_interface_y(n_eqns,comp_cells_x,comp_interfaces_y) )
+    ALLOCATE( this%a_interface_xNeg(n_eqns,comp_interfaces_x,comp_cells_y) )
+    ALLOCATE( this%a_interface_xPos(n_eqns,comp_interfaces_x,comp_cells_y) )
+    ALLOCATE( this%a_interface_yNeg(n_eqns,comp_cells_x,comp_interfaces_y) )
+    ALLOCATE( this%a_interface_yPos(n_eqns,comp_cells_x,comp_interfaces_y) )
 
-    a_interface_xNeg = 0.0_wp
-    a_interface_xPos = 0.0_wp
-    a_interface_yNeg = 0.0_wp
-    a_interface_yPos = 0.0_wp
+    ALLOCATE( this%H_interface_x(n_eqns,comp_interfaces_x,comp_cells_y) )
+    ALLOCATE( this%H_interface_y(n_eqns,comp_cells_x,comp_interfaces_y) )
+
+    this%a_interface_xNeg = 0.0_wp
+    this%a_interface_xPos = 0.0_wp
+    this%a_interface_yNeg = 0.0_wp
+    this%a_interface_yPos = 0.0_wp
 
   END SUBROUTINE initialize_hyperbolic
 
-  SUBROUTINE finalize_hyperbolic
+  SUBROUTINE finalize_hyperbolic( this )
 
-    DEALLOCATE( a_interface_xNeg )
-    DEALLOCATE( a_interface_xPos )
-    DEALLOCATE( a_interface_yNeg )
-    DEALLOCATE( a_interface_yPos )
-    DEALLOCATE( H_interface_x )
-    DEALLOCATE( H_interface_y )
+    CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
+
+    DEALLOCATE( this%a_interface_xNeg )
+    DEALLOCATE( this%a_interface_xPos )
+    DEALLOCATE( this%a_interface_yNeg )
+    DEALLOCATE( this%a_interface_yPos )
+    DEALLOCATE( this%H_interface_x )
+    DEALLOCATE( this%H_interface_y )
 
   END SUBROUTINE finalize_hyperbolic
 
-  SUBROUTINE eval_hyperbolic_terms( q_expl, qp_expl, divFlux_iRK, t,         &
+  SUBROUTINE eval_hyperbolic_terms( this, q_expl, qp_expl, divFlux_iRK, t,   &
        solve_cells, j_cent, k_cent, solve_interfaces_x, j_stag_x, k_stag_x,   &
        solve_interfaces_y, j_stag_y, k_stag_y )
 
@@ -78,6 +80,7 @@ CONTAINS
 
     IMPLICIT NONE
 
+    CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
     REAL(wp), INTENT(IN) :: q_expl(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: qp_expl(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(OUT) :: divFlux_iRK(n_eqns,comp_cells_x,comp_cells_y)
@@ -99,7 +102,7 @@ CONTAINS
          j_cent, k_cent )
 
     ! Evaluation of the maximum local speeds at the interfaces
-    CALL eval_speeds( solve_interfaces_x, j_stag_x, k_stag_x,               &
+    CALL this%evaluate_speeds( solve_interfaces_x, j_stag_x, k_stag_x,      &
          solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! Evaluation of the numerical fluxes
@@ -115,12 +118,12 @@ CONTAINS
 
     CASE ("KT")
 
-       CALL eval_flux_KT( solve_interfaces_x, j_stag_x, k_stag_x,           &
+       CALL eval_flux_KT( this, solve_interfaces_x, j_stag_x, k_stag_x,     &
             solve_interfaces_y, j_stag_y, k_stag_y )
 
     CASE ("UP")
 
-       CALL eval_flux_UP( solve_interfaces_x, j_stag_x, k_stag_x,           &
+       CALL eval_flux_UP( this, solve_interfaces_x, j_stag_x, k_stag_x,     &
             solve_interfaces_y, j_stag_y, k_stag_y )
 
     END SELECT
@@ -139,14 +142,14 @@ CONTAINS
           IF ( comp_cells_x .GT. 1 ) THEN
 
              divFlux_iRK(i,j,k) = divFlux_iRK(i,j,k) +                          &
-                  ( H_interface_x(i,j+1,k) - H_interface_x(i,j,k) ) * one_by_dx
+                  ( this%H_interface_x(i,j+1,k) - this%H_interface_x(i,j,k) ) * one_by_dx
 
           END IF
 
           IF ( comp_cells_y .GT. 1 ) THEN
 
              divFlux_iRK(i,j,k) = divFlux_iRK(i,j,k) +                          &
-                  ( H_interface_y(i,j,k+1) - H_interface_y(i,j,k) ) * one_by_dy
+                  ( this%H_interface_y(i,j,k+1) - this%H_interface_y(i,j,k) ) * one_by_dy
 
           END IF
 
@@ -170,7 +173,7 @@ CONTAINS
   !> \date 2019/11/16
   !******************************************************************************
   
-  SUBROUTINE eval_flux_UP( solve_interfaces_x, j_stag_x, k_stag_x,          &
+  SUBROUTINE eval_flux_UP( this, solve_interfaces_x, j_stag_x, k_stag_x,    &
        solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! External procedures
@@ -179,6 +182,7 @@ CONTAINS
 
     IMPLICIT NONE
 
+    CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
     INTEGER, INTENT(IN) :: solve_interfaces_x, solve_interfaces_y
     INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
     INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
@@ -190,8 +194,8 @@ CONTAINS
 
     INTEGER :: j,k,l                  !< Loop counters
 
-    H_interface_x = 0.0_wp
-    H_interface_y = 0.0_wp
+    this%H_interface_x = 0.0_wp
+    this%H_interface_y = 0.0_wp
 
     IF ( comp_cells_x .GT. 1 ) THEN
 
@@ -217,24 +221,24 @@ CONTAINS
           IF ( ( recon%qp_interfaceL(n_vars+1,j,k) .GT. 0.0_wp ) .AND.                &
                ( recon%qp_interfaceR(n_vars+1,j,k) .GE. 0.0_wp ) ) THEN
 
-             H_interface_x(:,j,k) = fluxL
+             this%H_interface_x(:,j,k) = fluxL
 
           ELSEIF ( ( recon%qp_interfaceL(n_vars+1,j,k) .LE. 0.0_wp ) .AND.            &
                ( recon%qp_interfaceR(n_vars+1,j,k) .LT. 0.0_wp ) ) THEN
 
-             H_interface_x(:,j,k) = fluxR
+             this%H_interface_x(:,j,k) = fluxR
 
           ELSE
 
-             H_interface_x(:,j,k) = 0.5_wp * ( fluxL + fluxR )
+             this%H_interface_x(:,j,k) = 0.5_wp * ( fluxL + fluxR )
 
           END IF
 
           IF ( (  recon%qp_interfaceL(n_vars+1,j,k) .EQ. 0.0_wp ) .AND.               &
                (  recon%qp_interfaceR(n_vars+1,j,k) .EQ. 0.0_wp ) ) THEN
 
-             H_interface_x(1,j,k) = 0.0_wp
-             H_interface_x(4:n_vars,j,k) = 0.0_wp
+             this%H_interface_x(1,j,k) = 0.0_wp
+             this%H_interface_x(4:n_vars,j,k) = 0.0_wp
 
           END IF
                
@@ -268,16 +272,16 @@ CONTAINS
           IF ( ( recon%q_interfaceB(3,j,k) .GT. 0.0_wp ) .AND.                        &
                ( recon%q_interfaceT(3,j,k) .GE. 0.0_wp ) ) THEN
 
-             H_interface_y(:,j,k) = fluxB
+             this%H_interface_y(:,j,k) = fluxB
 
           ELSEIF ( ( recon%q_interfaceB(3,j,k) .LE. 0.0_wp ) .AND.                    &
                ( recon%q_interfaceT(3,j,k) .LT. 0.0_wp ) ) THEN
 
-             H_interface_y(:,j,k) = fluxT
+             this%H_interface_y(:,j,k) = fluxT
 
           ELSE
 
-             H_interface_y(:,j,k) = 0.5_wp * ( fluxB + fluxT )
+             this%H_interface_y(:,j,k) = 0.5_wp * ( fluxB + fluxT )
 
           END IF
 
@@ -286,8 +290,8 @@ CONTAINS
           IF ( (  recon%qp_interfaceB(n_vars+2,j,k) .EQ. 0.0_wp ) .AND.               &
                (  recon%qp_interfaceT(n_vars+2,j,k) .EQ. 0.0_wp ) ) THEN
 
-             H_interface_y(1,j,k) = 0.0_wp
-             H_interface_y(4:n_vars,j,k) = 0.0_wp
+             this%H_interface_y(1,j,k) = 0.0_wp
+             this%H_interface_y(4:n_vars,j,k) = 0.0_wp
 
           END IF
           
@@ -312,7 +316,7 @@ CONTAINS
   !> \date 16/08/2011
   !******************************************************************************
 
-  SUBROUTINE eval_flux_KT( solve_interfaces_x, j_stag_x, k_stag_x,          &
+  SUBROUTINE eval_flux_KT( this, solve_interfaces_x, j_stag_x, k_stag_x,    &
        solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! External procedures
@@ -321,6 +325,7 @@ CONTAINS
 
     IMPLICIT NONE
 
+    CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
     INTEGER, INTENT(IN) :: solve_interfaces_x, solve_interfaces_y
     INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
     INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
@@ -365,21 +370,21 @@ CONTAINS
                grav_coeff_stag_x(j,k) , 1 , fluxR )
 
           ! First term in Eq. 25 GMD paper
-          CALL average_KT( a_interface_xNeg(:,j,k), a_interface_xPos(:,j,k) ,   &
+          CALL average_KT( this%a_interface_xNeg(:,j,k), this%a_interface_xPos(:,j,k) ,   &
                fluxL , fluxR , flux_avg_x )
 
           eqns_loop:DO i=1,n_eqns
 
-             IF ( a_interface_xNeg(i,j,k) .EQ. a_interface_xPos(i,j,k) ) THEN
+             IF ( this%a_interface_xNeg(i,j,k) .EQ. this%a_interface_xPos(i,j,k) ) THEN
 
-                H_interface_x(i,j,k) = 0.0_wp
+                this%H_interface_x(i,j,k) = 0.0_wp
 
              ELSE
 
                 ! Eq. 25 from GMD paper
-                H_interface_x(i,j,k) = flux_avg_x(i)                            &
-                     + ( a_interface_xPos(i,j,k) * a_interface_xNeg(i,j,k) )    &
-                     / ( a_interface_xPos(i,j,k) - a_interface_xNeg(i,j,k) )    &
+                this%H_interface_x(i,j,k) = flux_avg_x(i)                            &
+                     + ( this%a_interface_xPos(i,j,k) * this%a_interface_xNeg(i,j,k) )    &
+                     / ( this%a_interface_xPos(i,j,k) - this%a_interface_xNeg(i,j,k) )    &
                      * ( recon%q_interfaceR(i,j,k) - recon%q_interfaceL(i,j,k) )
 
              END IF
@@ -389,15 +394,15 @@ CONTAINS
           ! Fix to avoid sum of solid fluxes larger tham flux for mixture.
           ! Guarded: H_interface_x(1,j,k) is zero at dry or zero-flux
           ! interfaces and the test used to divide by it unconditionally.
-          IF ( H_interface_x(1,j,k) .GT. 0.0_wp ) THEN
+          IF ( this%H_interface_x(1,j,k) .GT. 0.0_wp ) THEN
 
-             IF ( SUM(H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k))  &
-                  .GE. H_interface_x(1,j,k) ) THEN
+             IF ( SUM(this%H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k))  &
+                  .GE. this%H_interface_x(1,j,k) ) THEN
 
-                H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k) =       &
-                     H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k) /  &
-                     ( SUM(H_interface_x(idx_solidEqn_first:idx_solidEqn_last,  &
-                     j,k)) / H_interface_x(1,j,k) )
+                this%H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k) =       &
+                     this%H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k) /  &
+                     ( SUM(this%H_interface_x(idx_solidEqn_first:idx_solidEqn_last,  &
+                     j,k)) / this%H_interface_x(1,j,k) )
 
              END IF
 
@@ -408,8 +413,8 @@ CONTAINS
           IF ( (  recon%qp_interfaceL(2,j,k) .EQ. 0.0_wp ) .AND.                      &
                (  recon%qp_interfaceR(2,j,k) .EQ. 0.0_wp ) ) THEN
 
-             H_interface_x(1,j,k) = 0.0_wp
-             H_interface_x(4:n_vars,j,k) = 0.0_wp
+             this%H_interface_x(1,j,k) = 0.0_wp
+             this%H_interface_x(4:n_vars,j,k) = 0.0_wp
 
           END IF
           
@@ -440,20 +445,20 @@ CONTAINS
                B_prime_y_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
                grav_coeff_stag_y(j,k) , 2 , fluxT )
           
-          CALL average_KT( a_interface_yNeg(:,j,k) ,                            &
-               a_interface_yPos(:,j,k) , fluxB , fluxT , flux_avg_y )
+          CALL average_KT( this%a_interface_yNeg(:,j,k) ,                            &
+               this%a_interface_yPos(:,j,k) , fluxB , fluxT , flux_avg_y )
 
           DO i=1,n_eqns
 
-             IF ( a_interface_yNeg(i,j,k) .EQ. a_interface_yPos(i,j,k) ) THEN
+             IF ( this%a_interface_yNeg(i,j,k) .EQ. this%a_interface_yPos(i,j,k) ) THEN
 
-                H_interface_y(i,j,k) = 0.0_wp
+                this%H_interface_y(i,j,k) = 0.0_wp
 
              ELSE
 
-                H_interface_y(i,j,k) = flux_avg_y(i)                            &
-                     + ( a_interface_yPos(i,j,k) * a_interface_yNeg(i,j,k) )    &
-                     / ( a_interface_yPos(i,j,k) - a_interface_yNeg(i,j,k) )    &
+                this%H_interface_y(i,j,k) = flux_avg_y(i)                            &
+                     + ( this%a_interface_yPos(i,j,k) * this%a_interface_yNeg(i,j,k) )    &
+                     / ( this%a_interface_yPos(i,j,k) - this%a_interface_yNeg(i,j,k) )    &
                      * ( recon%q_interfaceT(i,j,k) - recon%q_interfaceB(i,j,k) )
 
              END IF
@@ -462,15 +467,15 @@ CONTAINS
 
           ! Fix to avoid sum of solid fluxes larger tham flux for mixture.
           ! Guarded: see the x-interface limiter above.
-          IF ( H_interface_y(1,j,k) .GT. 0.0_wp ) THEN
+          IF ( this%H_interface_y(1,j,k) .GT. 0.0_wp ) THEN
 
-             IF ( SUM(H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k))  &
-                  .GT. H_interface_y(1,j,k) ) THEN
+             IF ( SUM(this%H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k))  &
+                  .GT. this%H_interface_y(1,j,k) ) THEN
 
-                H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k) =       &
-                     H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k) /  &
-                     ( SUM(H_interface_y(idx_solidEqn_first:idx_solidEqn_last,  &
-                     j,k)) / H_interface_y(1,j,k) )
+                this%H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k) =       &
+                     this%H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k) /  &
+                     ( SUM(this%H_interface_y(idx_solidEqn_first:idx_solidEqn_last,  &
+                     j,k)) / this%H_interface_y(1,j,k) )
 
              END IF
 
@@ -481,8 +486,8 @@ CONTAINS
           IF ( (  recon%q_interfaceB(3,j,k) .EQ. 0.0_wp ) .AND.                       &
                (  recon%q_interfaceT(3,j,k) .EQ. 0.0_wp ) ) THEN
 
-             H_interface_y(1,j,k) = 0.0_wp
-             H_interface_y(4:n_vars,j,k) = 0.0_wp
+             this%H_interface_y(1,j,k) = 0.0_wp
+             this%H_interface_y(4:n_vars,j,k) = 0.0_wp
 
           END IF
 
@@ -584,7 +589,7 @@ CONTAINS
   !> \date 2019/11/11
   !******************************************************************************
 
-  SUBROUTINE eval_speeds( solve_interfaces_x, j_stag_x, k_stag_x,          &
+  SUBROUTINE eval_speeds( this, solve_interfaces_x, j_stag_x, k_stag_x,    &
        solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! External procedures
@@ -592,6 +597,7 @@ CONTAINS
 
     IMPLICIT NONE
 
+    CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
     INTEGER, INTENT(IN) :: solve_interfaces_x, solve_interfaces_y
     INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
     INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
@@ -625,8 +631,8 @@ CONTAINS
           min_r = MIN(abslambdaL_min , abslambdaR_min , 0.0_wp)
           max_r = MAX(abslambdaL_max , abslambdaR_max , 0.0_wp)
 
-          a_interface_xNeg(:,j,k) = min_r
-          a_interface_xPos(:,j,k) = max_r
+          this%a_interface_xNeg(:,j,k) = min_r
+          this%a_interface_xPos(:,j,k) = max_r
 
        END DO x_interfaces_loop
 
@@ -653,8 +659,8 @@ CONTAINS
           min_r = MIN(abslambdaB_min , abslambdaT_min , 0.0_wp)
           max_r = MAX(abslambdaB_max , abslambdaT_max , 0.0_wp)
 
-          a_interface_yNeg(:,j,k) = min_r
-          a_interface_yPos(:,j,k) = max_r
+          this%a_interface_yNeg(:,j,k) = min_r
+          this%a_interface_yPos(:,j,k) = max_r
 
        END DO y_interfaces_loop
 
