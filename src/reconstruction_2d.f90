@@ -22,71 +22,74 @@ MODULE reconstruction_2d
 
   PRIVATE
 
-  PUBLIC :: initialize_reconstruction
-  PUBLIC :: finalize_reconstruction
-  PUBLIC :: reconstruction
+  TYPE, PUBLIC :: reconstruction_workspace_type
+     REAL(wp), ALLOCATABLE :: q_interfaceL(:,:,:)
+     REAL(wp), ALLOCATABLE :: q_interfaceR(:,:,:)
+     REAL(wp), ALLOCATABLE :: q_interfaceB(:,:,:)
+     REAL(wp), ALLOCATABLE :: q_interfaceT(:,:,:)
 
-  PUBLIC :: q_interfaceL, q_interfaceR, q_interfaceB, q_interfaceT
-  PUBLIC :: qp_interfaceL, qp_interfaceR, qp_interfaceB, qp_interfaceT
-  PUBLIC :: diverg_interfaceL, diverg_interfaceR
-  PUBLIC :: diverg_interfaceB, diverg_interfaceT
+     REAL(wp), ALLOCATABLE :: qp_interfaceL(:,:,:)
+     REAL(wp), ALLOCATABLE :: qp_interfaceR(:,:,:)
+     REAL(wp), ALLOCATABLE :: qp_interfaceB(:,:,:)
+     REAL(wp), ALLOCATABLE :: qp_interfaceT(:,:,:)
 
-  REAL(wp), ALLOCATABLE :: q_interfaceL(:,:,:)
-  REAL(wp), ALLOCATABLE :: q_interfaceR(:,:,:)
-  REAL(wp), ALLOCATABLE :: q_interfaceB(:,:,:)
-  REAL(wp), ALLOCATABLE :: q_interfaceT(:,:,:)
+     LOGICAL, ALLOCATABLE :: diverg_interfaceL(:,:)
+     LOGICAL, ALLOCATABLE :: diverg_interfaceR(:,:)
+     LOGICAL, ALLOCATABLE :: diverg_interfaceB(:,:)
+     LOGICAL, ALLOCATABLE :: diverg_interfaceT(:,:)
+   CONTAINS
+     PROCEDURE :: initialize => initialize_reconstruction
+     PROCEDURE :: finalize => finalize_reconstruction
+     PROCEDURE :: reconstruct => reconstruction
+  END TYPE reconstruction_workspace_type
 
-  REAL(wp), ALLOCATABLE :: qp_interfaceL(:,:,:)
-  REAL(wp), ALLOCATABLE :: qp_interfaceR(:,:,:)
-  REAL(wp), ALLOCATABLE :: qp_interfaceB(:,:,:)
-  REAL(wp), ALLOCATABLE :: qp_interfaceT(:,:,:)
-
-  LOGICAL, ALLOCATABLE :: diverg_interfaceL(:,:)
-  LOGICAL, ALLOCATABLE :: diverg_interfaceR(:,:)
-  LOGICAL, ALLOCATABLE :: diverg_interfaceB(:,:)
-  LOGICAL, ALLOCATABLE :: diverg_interfaceT(:,:)
+  TYPE(reconstruction_workspace_type), PUBLIC :: reconstruction_workspace
 
 CONTAINS
 
-  SUBROUTINE initialize_reconstruction
+  SUBROUTINE initialize_reconstruction( this )
 
-    ALLOCATE( q_interfaceL( n_vars, comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( q_interfaceR( n_vars, comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( q_interfaceB( n_vars, comp_cells_x, comp_interfaces_y ) )
-    ALLOCATE( q_interfaceT( n_vars, comp_cells_x, comp_interfaces_y ) )
+    CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
 
-    ALLOCATE( qp_interfaceL( n_vars+2, comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( qp_interfaceR( n_vars+2, comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( qp_interfaceB( n_vars+2, comp_cells_x, comp_interfaces_y ) )
-    ALLOCATE( qp_interfaceT( n_vars+2, comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%q_interfaceL( n_vars, comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%q_interfaceR( n_vars, comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%q_interfaceB( n_vars, comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%q_interfaceT( n_vars, comp_cells_x, comp_interfaces_y ) )
 
-    ALLOCATE( diverg_interfaceL( comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( diverg_interfaceR( comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( diverg_interfaceB( comp_cells_x, comp_interfaces_y ) )
-    ALLOCATE( diverg_interfaceT( comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%qp_interfaceL( n_vars+2, comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%qp_interfaceR( n_vars+2, comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%qp_interfaceB( n_vars+2, comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%qp_interfaceT( n_vars+2, comp_cells_x, comp_interfaces_y ) )
+
+    ALLOCATE( this%diverg_interfaceL( comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%diverg_interfaceR( comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%diverg_interfaceB( comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%diverg_interfaceT( comp_cells_x, comp_interfaces_y ) )
 
   END SUBROUTINE initialize_reconstruction
 
-  SUBROUTINE finalize_reconstruction
+  SUBROUTINE finalize_reconstruction( this )
 
-    DEALLOCATE( q_interfaceL )
-    DEALLOCATE( q_interfaceR )
-    DEALLOCATE( q_interfaceB )
-    DEALLOCATE( q_interfaceT )
+    CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
 
-    DEALLOCATE( qp_interfaceL )
-    DEALLOCATE( qp_interfaceR )
-    DEALLOCATE( qp_interfaceB )
-    DEALLOCATE( qp_interfaceT )
+    DEALLOCATE( this%q_interfaceL )
+    DEALLOCATE( this%q_interfaceR )
+    DEALLOCATE( this%q_interfaceB )
+    DEALLOCATE( this%q_interfaceT )
 
-    DEALLOCATE( diverg_interfaceL )
-    DEALLOCATE( diverg_interfaceR )
-    DEALLOCATE( diverg_interfaceB )
-    DEALLOCATE( diverg_interfaceT )
+    DEALLOCATE( this%qp_interfaceL )
+    DEALLOCATE( this%qp_interfaceR )
+    DEALLOCATE( this%qp_interfaceB )
+    DEALLOCATE( this%qp_interfaceT )
+
+    DEALLOCATE( this%diverg_interfaceL )
+    DEALLOCATE( this%diverg_interfaceR )
+    DEALLOCATE( this%diverg_interfaceB )
+    DEALLOCATE( this%diverg_interfaceT )
 
   END SUBROUTINE finalize_reconstruction
 
-  SUBROUTINE reconstruction( q_expl, qp_expl, t, solve_cells, j_cent, k_cent )
+  SUBROUTINE reconstruction( this, q_expl, qp_expl, t, solve_cells, j_cent, k_cent )
 
     ! External procedures
     USE constitutive_2d, ONLY : qp_to_qc, qp_to_qp2
@@ -106,6 +109,7 @@ CONTAINS
 
     IMPLICIT NONE
 
+    CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
     REAL(wp), INTENT(IN) :: q_expl(:,:,:)
     REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
     REAL(wp), INTENT(IN) :: t
@@ -721,19 +725,19 @@ CONTAINS
                    ! of the cell, then all the variables are 0 at the center
                    ! and at the interfaces (no conversion back is needed from
                    ! reconstructed to conservative)
-                   q_interfaceR(:,j,k) = 0.0_wp
-                   q_interfaceL(:,j+1,k) = 0.0_wp
+                   this%q_interfaceR(:,j,k) = 0.0_wp
+                   this%q_interfaceL(:,j+1,k) = 0.0_wp
 
-                   qp_interfaceR(1:3,j,k) = 0.0_wp
-                   qp_interfaceR(4:n_vars,j,k) = qrecW(4:n_vars)
-                   qp_interfaceR(n_vars+1:n_vars+2,j,k) = 0.0_wp
+                   this%qp_interfaceR(1:3,j,k) = 0.0_wp
+                   this%qp_interfaceR(4:n_vars,j,k) = qrecW(4:n_vars)
+                   this%qp_interfaceR(n_vars+1:n_vars+2,j,k) = 0.0_wp
 
-                   qp_interfaceL(1:3,j+1,k) = 0.0_wp
-                   qp_interfaceL(4:n_vars,j+1,k) = qrecE(4:n_vars)
-                   qp_interfaceL(n_vars+1:n_vars+2,j+1,k) = 0.0_wp
+                   this%qp_interfaceL(1:3,j+1,k) = 0.0_wp
+                   this%qp_interfaceL(4:n_vars,j+1,k) = qrecE(4:n_vars)
+                   this%qp_interfaceL(n_vars+1:n_vars+2,j+1,k) = 0.0_wp
 
-                   diverg_interfaceR(j,k) = .FALSE.
-                   diverg_interfaceL(j+1,k) = .FALSE.
+                   this%diverg_interfaceR(j,k) = .FALSE.
+                   this%diverg_interfaceL(j+1,k) = .FALSE.
 
                 END IF
 
@@ -764,34 +768,34 @@ CONTAINS
 
           END IF
 
-          CALL qp_to_qc( qrecW,q_interfaceR(:,j,k) )
-          CALL qp_to_qc( qrecE,q_interfaceL(:,j+1,k) )
+          CALL qp_to_qc( qrecW,this%q_interfaceR(:,j,k) )
+          CALL qp_to_qc( qrecE,this%q_interfaceL(:,j+1,k) )
 
-          qp_interfaceR(1:n_vars+2,j,k) = qrecW(1:n_vars+2)
-          qp_interfaceL(1:n_vars+2,j+1,k) = qrecE(1:n_vars+2)
+          this%qp_interfaceR(1:n_vars+2,j,k) = qrecW(1:n_vars+2)
+          this%qp_interfaceL(1:n_vars+2,j+1,k) = qrecE(1:n_vars+2)
 
-          diverg_interfaceR(j,k) = diverging_flag
-          diverg_interfaceL(j+1,k) = diverging_flag
+          this%diverg_interfaceR(j,k) = diverging_flag
+          this%diverg_interfaceL(j+1,k) = diverging_flag
 
           IF ( j.EQ.1 ) THEN
 
              ! Interface value at the left of first x-interface (external)
-             q_interfaceL(:,j,k) = q_interfaceR(:,j,k)
-             qp_interfaceL(:,j,k) = qp_interfaceR(:,j,k)
+             this%q_interfaceL(:,j,k) = this%q_interfaceR(:,j,k)
+             this%qp_interfaceL(:,j,k) = this%qp_interfaceR(:,j,k)
 
              !WRITE(*,*) 'j,k',j,k
-             !WRITE(*,*) 'qp_interfaceL(:,j,k)',qp_interfaceL(:,j,k)
+             !WRITE(*,*) 'qp_interfaceL(:,j,k)',this%qp_interfaceL(:,j,k)
              !READ(*,*)
 
-             diverg_interfaceR(j,k) = diverg_interfaceL(j,k)
+             this%diverg_interfaceR(j,k) = this%diverg_interfaceL(j,k)
 
           ELSEIF ( j.EQ.comp_cells_x ) THEN
 
              ! Interface value at the right of last x-interface (external)
-             q_interfaceR(:,j+1,k) = q_interfaceL(:,j+1,k)
-             qp_interfaceR(:,j+1,k) = qp_interfaceL(:,j+1,k)
+             this%q_interfaceR(:,j+1,k) = this%q_interfaceL(:,j+1,k)
+             this%qp_interfaceR(:,j+1,k) = this%qp_interfaceL(:,j+1,k)
 
-             diverg_interfaceR(j+1,k) = diverg_interfaceL(j+1,k)
+             this%diverg_interfaceR(j+1,k) = this%diverg_interfaceL(j+1,k)
 
           ELSE
 
@@ -799,17 +803,17 @@ CONTAINS
 
                 IF ( sourceE(j,k) ) THEN
 
-                   q_interfaceR(:,j+1,k) = q_interfaceL(:,j+1,k)
-                   q_interfaceR(2,j+1,k) = -q_interfaceL(2,j+1,k)
-                   qp_interfaceR(:,j+1,k) = qp_interfaceL(:,j+1,k)
-                   qp_interfaceR(idx_u,j+1,k) = -qp_interfaceL(idx_u,j+1,k)
+                   this%q_interfaceR(:,j+1,k) = this%q_interfaceL(:,j+1,k)
+                   this%q_interfaceR(2,j+1,k) = -this%q_interfaceL(2,j+1,k)
+                   this%qp_interfaceR(:,j+1,k) = this%qp_interfaceL(:,j+1,k)
+                   this%qp_interfaceR(idx_u,j+1,k) = -this%qp_interfaceL(idx_u,j+1,k)
 
                 ELSEIF ( sourceW(j,k) ) THEN
 
-                   q_interfaceL(:,j,k) = q_interfaceR(:,j,k)
-                   q_interfaceL(2,j,k) = -q_interfaceR(2,j,k)
-                   qp_interfaceL(:,j,k) = qp_interfaceR(:,j,k)
-                   qp_interfaceL(idx_u,j,k) = -qp_interfaceR(idx_u,j,k)
+                   this%q_interfaceL(:,j,k) = this%q_interfaceR(:,j,k)
+                   this%q_interfaceL(2,j,k) = -this%q_interfaceR(2,j,k)
+                   this%qp_interfaceL(:,j,k) = this%qp_interfaceR(:,j,k)
+                   this%qp_interfaceL(idx_u,j,k) = -this%qp_interfaceR(idx_u,j,k)
 
                 END IF
 
@@ -820,14 +824,14 @@ CONTAINS
        ELSE
 
           ! for case comp_cells_x = 1
-          q_interfaceR(1:n_vars,j,k) = q_expl(1:n_vars,j,k)
-          q_interfaceL(1:n_vars,j+1,k) = q_expl(1:n_vars,j,k)
+          this%q_interfaceR(1:n_vars,j,k) = q_expl(1:n_vars,j,k)
+          this%q_interfaceL(1:n_vars,j+1,k) = q_expl(1:n_vars,j,k)
 
-          qp_interfaceR(1:n_vars+2,j,k) = qp_expl(1:n_vars+2,j,k)
-          qp_interfaceL(1:n_vars+2,j+1,k) = qp_expl(1:n_vars+2,j,k)
+          this%qp_interfaceR(1:n_vars+2,j,k) = qp_expl(1:n_vars+2,j,k)
+          this%qp_interfaceL(1:n_vars+2,j+1,k) = qp_expl(1:n_vars+2,j,k)
 
-          diverg_interfaceR(j,k) = diverging_flag
-          diverg_interfaceL(j+1,k) = diverging_flag
+          this%diverg_interfaceR(j,k) = diverging_flag
+          this%diverg_interfaceL(j+1,k) = diverging_flag
 
        END IF
 
@@ -846,19 +850,19 @@ CONTAINS
                    ! and at the interfaces (no conversion back is needed from
                    ! reconstructed to conservative)
 
-                   q_interfaceT(:,j,k) = 0.0_wp
-                   q_interfaceB(:,j,k+1) = 0.0_wp
+                   this%q_interfaceT(:,j,k) = 0.0_wp
+                   this%q_interfaceB(:,j,k+1) = 0.0_wp
 
-                   qp_interfaceT(1:3,j,k) = 0.0_wp
-                   qp_interfaceT(4:n_vars,j,k) = qrecS(4:n_vars)
-                   qp_interfaceT(n_vars+1:n_vars+2,j,k) = 0.0_wp
+                   this%qp_interfaceT(1:3,j,k) = 0.0_wp
+                   this%qp_interfaceT(4:n_vars,j,k) = qrecS(4:n_vars)
+                   this%qp_interfaceT(n_vars+1:n_vars+2,j,k) = 0.0_wp
 
-                   qp_interfaceB(1:3,j,k+1) = 0.0_wp
-                   qp_interfaceB(4:n_vars,j,k+1) = qrecN(4:n_vars)
-                   qp_interfaceB(n_vars+1:n_vars+2,j,k+1) = 0.0_wp
+                   this%qp_interfaceB(1:3,j,k+1) = 0.0_wp
+                   this%qp_interfaceB(4:n_vars,j,k+1) = qrecN(4:n_vars)
+                   this%qp_interfaceB(n_vars+1:n_vars+2,j,k+1) = 0.0_wp
 
-                   diverg_interfaceT(j,k) = .FALSE.
-                   diverg_interfaceB(j,k+1) = .FALSE.
+                   this%diverg_interfaceT(j,k) = .FALSE.
+                   this%diverg_interfaceB(j,k+1) = .FALSE.
 
                 END IF
 
@@ -889,30 +893,30 @@ CONTAINS
 
           END IF
 
-          CALL qp_to_qc( qrecS, q_interfaceT(:,j,k) )
-          CALL qp_to_qc( qrecN, q_interfaceB(:,j,k+1) )
+          CALL qp_to_qc( qrecS, this%q_interfaceT(:,j,k) )
+          CALL qp_to_qc( qrecN, this%q_interfaceB(:,j,k+1) )
 
-          qp_interfaceT(1:n_vars+2,j,k) = qrecS(1:n_vars+2)
-          qp_interfaceB(1:n_vars+2,j,k+1) = qrecN(1:n_vars+2)
+          this%qp_interfaceT(1:n_vars+2,j,k) = qrecS(1:n_vars+2)
+          this%qp_interfaceB(1:n_vars+2,j,k+1) = qrecN(1:n_vars+2)
 
-          diverg_interfaceT(j,k) = diverging_flag
-          diverg_interfaceB(j,k+1) = diverging_flag
+          this%diverg_interfaceT(j,k) = diverging_flag
+          this%diverg_interfaceB(j,k+1) = diverging_flag
 
           IF ( k .EQ. 1 ) THEN
 
              ! Interface value at the bottom of first y-interface (external)
-             q_interfaceB(:,j,k) = q_interfaceT(:,j,k)
-             qp_interfaceB(:,j,k) = qp_interfaceT(:,j,k)
+             this%q_interfaceB(:,j,k) = this%q_interfaceT(:,j,k)
+             this%qp_interfaceB(:,j,k) = this%qp_interfaceT(:,j,k)
 
-             diverg_interfaceB(j,k) = diverg_interfaceT(j,k)
+             this%diverg_interfaceB(j,k) = this%diverg_interfaceT(j,k)
 
           ELSEIF ( k .EQ. comp_cells_y ) THEN
 
              ! Interface value at the top of last y-interface (external)
-             q_interfaceT(:,j,k+1) = q_interfaceB(:,j,k+1)
-             qp_interfaceT(:,j,k+1) = qp_interfaceB(:,j,k+1)
+             this%q_interfaceT(:,j,k+1) = this%q_interfaceB(:,j,k+1)
+             this%qp_interfaceT(:,j,k+1) = this%qp_interfaceB(:,j,k+1)
 
-             diverg_interfaceT(j,k+1) = diverg_interfaceB(j,k+1)
+             this%diverg_interfaceT(j,k+1) = this%diverg_interfaceB(j,k+1)
 
           ELSE
 
@@ -920,17 +924,17 @@ CONTAINS
 
                 IF ( sourceS(j,k) ) THEN
 
-                   q_interfaceB(:,j,k) = q_interfaceT(:,j,k)
-                   q_interfaceB(3,j,k) = -q_interfaceT(3,j,k)
-                   qp_interfaceB(:,j,k) = qp_interfaceT(:,j,k)
-                   qp_interfaceB(idx_v,j,k) = -qp_interfaceT(idx_v,j,k)
+                   this%q_interfaceB(:,j,k) = this%q_interfaceT(:,j,k)
+                   this%q_interfaceB(3,j,k) = -this%q_interfaceT(3,j,k)
+                   this%qp_interfaceB(:,j,k) = this%qp_interfaceT(:,j,k)
+                   this%qp_interfaceB(idx_v,j,k) = -this%qp_interfaceT(idx_v,j,k)
 
                 ELSEIF ( sourceN(j,k) ) THEN
 
-                   q_interfaceT(:,j,k+1) = q_interfaceB(:,j,k+1)
-                   q_interfaceT(3,j,k+1) = -q_interfaceB(3,j,k+1)
-                   qp_interfaceT(:,j,k+1) = qp_interfaceB(:,j,k+1)
-                   qp_interfaceT(idx_v,j,k+1) = -qp_interfaceB(idx_v,j,k+1)
+                   this%q_interfaceT(:,j,k+1) = this%q_interfaceB(:,j,k+1)
+                   this%q_interfaceT(3,j,k+1) = -this%q_interfaceB(3,j,k+1)
+                   this%qp_interfaceT(:,j,k+1) = this%qp_interfaceB(:,j,k+1)
+                   this%qp_interfaceT(idx_v,j,k+1) = -this%qp_interfaceB(idx_v,j,k+1)
 
                 END IF
 
@@ -942,15 +946,15 @@ CONTAINS
 
           ! case comp_cells_y = 1
 
-          q_interfaceB(:,j,k) = q_expl(:,j,k)
-          q_interfaceT(:,j,k) = q_expl(:,j,k)
-          q_interfaceB(:,j,k+1) = q_expl(:,j,k)
-          q_interfaceT(:,j,k+1) = q_expl(:,j,k)
+          this%q_interfaceB(:,j,k) = q_expl(:,j,k)
+          this%q_interfaceT(:,j,k) = q_expl(:,j,k)
+          this%q_interfaceB(:,j,k+1) = q_expl(:,j,k)
+          this%q_interfaceT(:,j,k+1) = q_expl(:,j,k)
 
-          qp_interfaceB(:,j,k) = qp_expl(:,j,k)
-          qp_interfaceT(:,j,k) = qp_expl(:,j,k)
-          qp_interfaceB(:,j,k+1) = qp_expl(:,j,k)
-          qp_interfaceT(:,j,k+1) = qp_expl(:,j,k)
+          this%qp_interfaceB(:,j,k) = qp_expl(:,j,k)
+          this%qp_interfaceT(:,j,k) = qp_expl(:,j,k)
+          this%qp_interfaceB(:,j,k+1) = qp_expl(:,j,k)
+          this%qp_interfaceT(:,j,k+1) = qp_expl(:,j,k)
 
        END IF
 

@@ -23,8 +23,7 @@ MODULE time_integration_2d
 
   USE nonlinear_solver_2d, ONLY : solve_rk_step
 
-  USE reconstruction_2d, ONLY : reconstruction
-  USE reconstruction_2d, ONLY : qp_interfaceL, qp_interfaceR
+  USE reconstruction_2d, ONLY : recon => reconstruction_workspace
 
   USE hyperbolic_2d, ONLY : eval_hyperbolic_terms, eval_speeds
   USE hyperbolic_2d, ONLY : a_interface_xNeg, a_interface_xPos
@@ -218,7 +217,8 @@ CONTAINS
        !READ(*,*)
 
        ! Compute the physical and conservative variables at the interfaces
-       CALL reconstruction( q, qp, t, domain%solve_cells, domain%j_cent, domain%k_cent )
+       CALL recon%reconstruct( q, qp, t, domain%solve_cells, &
+            domain%j_cent, domain%k_cent )
 
        ! Compute the max/min eigenvalues at the interfaces
        CALL eval_speeds( domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,              &
@@ -761,9 +761,9 @@ CONTAINS
              WRITE(*,*) 'divFlux(1,j,k,1:n_RK)',divFlux(1,j,k,1:n_RK) 
 
              WRITE(*,*) H_interface_x(1,j+1,k), H_interface_x(1,j,k)
-             WRITE(*,*) qp_interfaceR(1:n_vars,j,k)
+             WRITE(*,*) recon%qp_interfaceR(1:n_vars,j,k)
              WRITE(*,*) qp(1:n_vars,j,k)
-             WRITE(*,*) qp_interfaceL(1:n_vars,j+1,k)
+             WRITE(*,*) recon%qp_interfaceL(1:n_vars,j+1,k)
 
              WRITE(*,*) 'expl_terms(1,j,k,1:n_RK)',expl_terms(1,j,k,1:n_RK) 
              WRITE(*,*) 'NH(1,j,k,1:n_RK)',NH(1,j,k,1:n_RK) 
@@ -999,4 +999,3 @@ CONTAINS
   END SUBROUTINE imex_RK_solver
 
 END MODULE time_integration_2d
-

@@ -15,11 +15,7 @@ MODULE hyperbolic_2d
   USE geometry_2d, ONLY : grav_coeff_stag_x, grav_coeff_stag_y
   USE geometry_2d, ONLY : one_by_dx, one_by_dy
 
-  USE reconstruction_2d, ONLY : reconstruction
-  USE reconstruction_2d, ONLY : q_interfaceL, q_interfaceR
-  USE reconstruction_2d, ONLY : q_interfaceB, q_interfaceT
-  USE reconstruction_2d, ONLY : qp_interfaceL, qp_interfaceR
-  USE reconstruction_2d, ONLY : qp_interfaceB, qp_interfaceT
+  USE reconstruction_2d, ONLY : recon => reconstruction_workspace
 
   IMPLICIT NONE
 
@@ -99,7 +95,8 @@ CONTAINS
     !WRITE(*,*)
     
     ! Linear reconstruction of the physical variables at the interfaces
-    CALL reconstruction( q_expl, qp_expl, t, solve_cells, j_cent, k_cent )
+    CALL recon%reconstruct( q_expl, qp_expl, t, solve_cells, &
+         j_cent, k_cent )
 
     ! Evaluation of the maximum local speeds at the interfaces
     CALL eval_speeds( solve_interfaces_x, j_stag_x, k_stag_x,               &
@@ -205,25 +202,25 @@ CONTAINS
           j = j_stag_x(l)
           k = k_stag_x(l)
 
-          CALL eval_fluxes( q_interfaceL(1:n_vars,j,k) ,                        &
-               qp_interfaceL(1:n_vars+2,j,k) ,                                  &
+          CALL eval_fluxes( recon%q_interfaceL(1:n_vars,j,k) ,                        &
+               recon%qp_interfaceL(1:n_vars+2,j,k) ,                                  &
                B_prime_x_geom(MAX(1,j-1),MIN(k,comp_cells_y)) ,                 &
                B_prime_y_geom(MAX(1,j-1),MIN(k,comp_cells_y)) ,                 &
                grav_coeff_stag_x(j,k) , 1 , fluxL )
 
-          CALL eval_fluxes( q_interfaceR(1:n_vars,j,k) ,                        &
-               qp_interfaceR(1:n_vars+2,j,k) ,                                  &
+          CALL eval_fluxes( recon%q_interfaceR(1:n_vars,j,k) ,                        &
+               recon%qp_interfaceR(1:n_vars+2,j,k) ,                                  &
                B_prime_x_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
                B_prime_y_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
                grav_coeff_stag_x(j,k) , 1 , fluxR )
 
-          IF ( ( qp_interfaceL(n_vars+1,j,k) .GT. 0.0_wp ) .AND.                &
-               ( qp_interfaceR(n_vars+1,j,k) .GE. 0.0_wp ) ) THEN
+          IF ( ( recon%qp_interfaceL(n_vars+1,j,k) .GT. 0.0_wp ) .AND.                &
+               ( recon%qp_interfaceR(n_vars+1,j,k) .GE. 0.0_wp ) ) THEN
 
              H_interface_x(:,j,k) = fluxL
 
-          ELSEIF ( ( qp_interfaceL(n_vars+1,j,k) .LE. 0.0_wp ) .AND.            &
-               ( qp_interfaceR(n_vars+1,j,k) .LT. 0.0_wp ) ) THEN
+          ELSEIF ( ( recon%qp_interfaceL(n_vars+1,j,k) .LE. 0.0_wp ) .AND.            &
+               ( recon%qp_interfaceR(n_vars+1,j,k) .LT. 0.0_wp ) ) THEN
 
              H_interface_x(:,j,k) = fluxR
 
@@ -233,8 +230,8 @@ CONTAINS
 
           END IF
 
-          IF ( (  qp_interfaceL(n_vars+1,j,k) .EQ. 0.0_wp ) .AND.               &
-               (  qp_interfaceR(n_vars+1,j,k) .EQ. 0.0_wp ) ) THEN
+          IF ( (  recon%qp_interfaceL(n_vars+1,j,k) .EQ. 0.0_wp ) .AND.               &
+               (  recon%qp_interfaceR(n_vars+1,j,k) .EQ. 0.0_wp ) ) THEN
 
              H_interface_x(1,j,k) = 0.0_wp
              H_interface_x(4:n_vars,j,k) = 0.0_wp
@@ -256,25 +253,25 @@ CONTAINS
           j = j_stag_y(l)
           k = k_stag_y(l)
 
-          CALL eval_fluxes( q_interfaceB(1:n_vars,j,k) ,                        &
-               qp_interfaceB(1:n_vars+2,j,k) ,                                  &
+          CALL eval_fluxes( recon%q_interfaceB(1:n_vars,j,k) ,                        &
+               recon%qp_interfaceB(1:n_vars+2,j,k) ,                                  &
                B_prime_x_geom(MIN(j,comp_cells_x),MAX(1,k-1)) ,                 &
                B_prime_y_geom(MIN(j,comp_cells_x),MAX(1,k-1)) ,                 &
                grav_coeff_stag_y(j,k) , 2 , fluxB )
 
-          CALL eval_fluxes( q_interfaceT(1:n_vars,j,k) ,                        &
-               qp_interfaceT(1:n_vars+2,j,k) ,                                  &
+          CALL eval_fluxes( recon%q_interfaceT(1:n_vars,j,k) ,                        &
+               recon%qp_interfaceT(1:n_vars+2,j,k) ,                                  &
                B_prime_x_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
                B_prime_y_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
                grav_coeff_stag_y(j,k) , 2 , fluxT )
 
-          IF ( ( q_interfaceB(3,j,k) .GT. 0.0_wp ) .AND.                        &
-               ( q_interfaceT(3,j,k) .GE. 0.0_wp ) ) THEN
+          IF ( ( recon%q_interfaceB(3,j,k) .GT. 0.0_wp ) .AND.                        &
+               ( recon%q_interfaceT(3,j,k) .GE. 0.0_wp ) ) THEN
 
              H_interface_y(:,j,k) = fluxB
 
-          ELSEIF ( ( q_interfaceB(3,j,k) .LE. 0.0_wp ) .AND.                    &
-               ( q_interfaceT(3,j,k) .LT. 0.0_wp ) ) THEN
+          ELSEIF ( ( recon%q_interfaceB(3,j,k) .LE. 0.0_wp ) .AND.                    &
+               ( recon%q_interfaceT(3,j,k) .LT. 0.0_wp ) ) THEN
 
              H_interface_y(:,j,k) = fluxT
 
@@ -286,8 +283,8 @@ CONTAINS
 
           ! In the equation for mass and for trasnport (T,alphas) if the 
           ! velocities at the interfaces are null, then the flux is null
-          IF ( (  qp_interfaceB(n_vars+2,j,k) .EQ. 0.0_wp ) .AND.               &
-               (  qp_interfaceT(n_vars+2,j,k) .EQ. 0.0_wp ) ) THEN
+          IF ( (  recon%qp_interfaceB(n_vars+2,j,k) .EQ. 0.0_wp ) .AND.               &
+               (  recon%qp_interfaceT(n_vars+2,j,k) .EQ. 0.0_wp ) ) THEN
 
              H_interface_y(1,j,k) = 0.0_wp
              H_interface_y(4:n_vars,j,k) = 0.0_wp
@@ -355,14 +352,14 @@ CONTAINS
           j = j_stag_x(l)
           k = k_stag_x(l)
 
-          CALL eval_fluxes( q_interfaceL(1:n_vars,j,k) ,                        &
-               qp_interfaceL(1:n_vars+2,j,k) ,                                  &
+          CALL eval_fluxes( recon%q_interfaceL(1:n_vars,j,k) ,                        &
+               recon%qp_interfaceL(1:n_vars+2,j,k) ,                                  &
                B_prime_x_geom(MAX(1,j-1),MIN(k,comp_cells_y)) ,                 &
                B_prime_y_geom(MAX(1,j-1),MIN(k,comp_cells_y)) ,                 &
                grav_coeff_stag_x(j,k) , 1 , fluxL )
 
-          CALL eval_fluxes( q_interfaceR(1:n_vars,j,k) ,                        &
-               qp_interfaceR(1:n_vars+2,j,k) ,                                  &
+          CALL eval_fluxes( recon%q_interfaceR(1:n_vars,j,k) ,                        &
+               recon%qp_interfaceR(1:n_vars+2,j,k) ,                                  &
                B_prime_x_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
                B_prime_y_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
                grav_coeff_stag_x(j,k) , 1 , fluxR )
@@ -383,7 +380,7 @@ CONTAINS
                 H_interface_x(i,j,k) = flux_avg_x(i)                            &
                      + ( a_interface_xPos(i,j,k) * a_interface_xNeg(i,j,k) )    &
                      / ( a_interface_xPos(i,j,k) - a_interface_xNeg(i,j,k) )    &
-                     * ( q_interfaceR(i,j,k) - q_interfaceL(i,j,k) )             
+                     * ( recon%q_interfaceR(i,j,k) - recon%q_interfaceL(i,j,k) )
 
              END IF
 
@@ -408,8 +405,8 @@ CONTAINS
           
           ! In the equation for mass and for trasnport (T,alphas) if the 
           ! velocities at the interfaces are null, then the flux is null
-          IF ( (  qp_interfaceL(2,j,k) .EQ. 0.0_wp ) .AND.                      &
-               (  qp_interfaceR(2,j,k) .EQ. 0.0_wp ) ) THEN
+          IF ( (  recon%qp_interfaceL(2,j,k) .EQ. 0.0_wp ) .AND.                      &
+               (  recon%qp_interfaceR(2,j,k) .EQ. 0.0_wp ) ) THEN
 
              H_interface_x(1,j,k) = 0.0_wp
              H_interface_x(4:n_vars,j,k) = 0.0_wp
@@ -431,14 +428,14 @@ CONTAINS
           j = j_stag_y(l)
           k = k_stag_y(l)
 
-          CALL eval_fluxes( q_interfaceB(1:n_vars,j,k) ,                        &
-               qp_interfaceB(1:n_vars+2,j,k) ,                                  &
+          CALL eval_fluxes( recon%q_interfaceB(1:n_vars,j,k) ,                        &
+               recon%qp_interfaceB(1:n_vars+2,j,k) ,                                  &
                B_prime_x_geom(MIN(j,comp_cells_x),MAX(1,k-1)) ,                 &
                B_prime_y_geom(MIN(j,comp_cells_x),MAX(1,k-1)) ,                 &
                grav_coeff_stag_y(j,k) , 2 , fluxB )
 
-          CALL eval_fluxes( q_interfaceT(1:n_vars,j,k) ,                        &
-               qp_interfaceT(1:n_vars+2,j,k) ,                                  &
+          CALL eval_fluxes( recon%q_interfaceT(1:n_vars,j,k) ,                        &
+               recon%qp_interfaceT(1:n_vars+2,j,k) ,                                  &
                B_prime_x_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
                B_prime_y_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
                grav_coeff_stag_y(j,k) , 2 , fluxT )
@@ -457,7 +454,7 @@ CONTAINS
                 H_interface_y(i,j,k) = flux_avg_y(i)                            &
                      + ( a_interface_yPos(i,j,k) * a_interface_yNeg(i,j,k) )    &
                      / ( a_interface_yPos(i,j,k) - a_interface_yNeg(i,j,k) )    &
-                     * ( q_interfaceT(i,j,k) - q_interfaceB(i,j,k) )             
+                     * ( recon%q_interfaceT(i,j,k) - recon%q_interfaceB(i,j,k) )
 
              END IF
 
@@ -481,8 +478,8 @@ CONTAINS
           
           ! In the equation for mass and for trasnport (T,alphas) if the 
           ! velocities at the interfaces are null, then the flux is null
-          IF ( (  q_interfaceB(3,j,k) .EQ. 0.0_wp ) .AND.                       &
-               (  q_interfaceT(3,j,k) .EQ. 0.0_wp ) ) THEN
+          IF ( (  recon%q_interfaceB(3,j,k) .EQ. 0.0_wp ) .AND.                       &
+               (  recon%q_interfaceT(3,j,k) .EQ. 0.0_wp ) ) THEN
 
              H_interface_y(1,j,k) = 0.0_wp
              H_interface_y(4:n_vars,j,k) = 0.0_wp
@@ -619,10 +616,10 @@ CONTAINS
           j = j_stag_x(l)
           k = k_stag_x(l)
 
-          CALL eval_local_speeds_x( qp_interfaceL(:,j,k) ,                      &
+          CALL eval_local_speeds_x( recon%qp_interfaceL(:,j,k) ,                      &
                grav_coeff_stag_x(j,k) , abslambdaL_min , abslambdaL_max )
 
-          CALL eval_local_speeds_x( qp_interfaceR(:,j,k) ,                      &
+          CALL eval_local_speeds_x( recon%qp_interfaceR(:,j,k) ,                      &
                grav_coeff_stag_x(j,k) , abslambdaR_min , abslambdaR_max )
 
           min_r = MIN(abslambdaL_min , abslambdaR_min , 0.0_wp)
@@ -647,10 +644,10 @@ CONTAINS
           j = j_stag_y(l)
           k = k_stag_y(l)
 
-          CALL eval_local_speeds_y( qp_interfaceB(:,j,k) ,                      &
+          CALL eval_local_speeds_y( recon%qp_interfaceB(:,j,k) ,                      &
                grav_coeff_stag_y(j,k) , abslambdaB_min , abslambdaB_max )
           
-          CALL eval_local_speeds_y( qp_interfaceT(:,j,k) ,                      &
+          CALL eval_local_speeds_y( recon%qp_interfaceT(:,j,k) ,                      &
                grav_coeff_stag_y(j,k) , abslambdaT_min , abslambdaT_max )
 
           min_r = MIN(abslambdaB_min , abslambdaT_min , 0.0_wp)
@@ -672,4 +669,3 @@ CONTAINS
   END SUBROUTINE eval_speeds
 
 END MODULE hyperbolic_2d
-

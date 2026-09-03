@@ -23,8 +23,7 @@ MODULE solver_2d
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,                 &
        finalize_nonlinear_solver
 
-  USE reconstruction_2d, ONLY : initialize_reconstruction,                    &
-       finalize_reconstruction
+  USE reconstruction_2d, ONLY : reconstruction_workspace
 
   USE hyperbolic_2d, ONLY : initialize_hyperbolic, finalize_hyperbolic
 
@@ -70,7 +69,7 @@ CONTAINS
 
     CALL state%initialize
 
-    CALL initialize_reconstruction
+    CALL reconstruction_workspace%initialize
     CALL initialize_hyperbolic
     CALL domain%initialize
 
@@ -118,7 +117,7 @@ CONTAINS
     CALL domain%finalize
     CALL finalize_time_integration
     CALL finalize_hyperbolic
-    CALL finalize_reconstruction
+    CALL reconstruction_workspace%finalize
 
     CALL state%finalize
 
