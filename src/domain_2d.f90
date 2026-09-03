@@ -45,7 +45,7 @@ MODULE domain_2d
 
   END TYPE domain_type
 
-  TYPE(domain_type), PUBLIC :: domain
+  TYPE(domain_type), PUBLIC, TARGET :: domain
 
 CONTAINS
 

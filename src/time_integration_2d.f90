@@ -55,7 +55,7 @@ MODULE time_integration_2d
      PROCEDURE, PUBLIC :: advance => imex_RK_solver
   END TYPE time_integration_workspace_type
 
-  TYPE(time_integration_workspace_type), PUBLIC :: time_integration_workspace
+  TYPE(time_integration_workspace_type), PUBLIC, TARGET :: time_integration_workspace
 
 CONTAINS
 

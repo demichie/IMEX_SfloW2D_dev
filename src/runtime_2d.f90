@@ -24,6 +24,6 @@ MODULE runtime_2d
 
   END TYPE runtime_state_type
 
-  TYPE(runtime_state_type) :: runtime
+  TYPE(runtime_state_type), TARGET :: runtime
 
 END MODULE runtime_2d

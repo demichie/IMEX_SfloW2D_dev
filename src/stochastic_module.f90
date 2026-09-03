@@ -63,7 +63,7 @@ MODULE stochastic_module
 
   END TYPE stochastic_workspace_type
 
-  TYPE(stochastic_workspace_type) :: stochastic_workspace
+  TYPE(stochastic_workspace_type), TARGET :: stochastic_workspace
   
 CONTAINS
 

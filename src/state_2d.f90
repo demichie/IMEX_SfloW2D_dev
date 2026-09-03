@@ -52,7 +52,7 @@ MODULE state_2d
 
   END TYPE state_type
 
-  TYPE(state_type), PUBLIC :: state
+  TYPE(state_type), PUBLIC, TARGET :: state
 
 CONTAINS
 

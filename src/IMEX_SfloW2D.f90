@@ -63,12 +63,8 @@ PROGRAM IMEX_SfloW2D
    USE inpout_2d, ONLY : output_phys_flag
    USE inpout_2d, ONLY : output_netcdf_flag
 
-   USE solver_2d, ONLY : allocate_solver_variables
-   USE solver_2d, ONLY : deallocate_solver_variables
    USE mass_exchange_2d, ONLY : update_erosion_deposition_cell
-   USE time_integration_2d, ONLY : time_integrator => time_integration_workspace
-   USE domain_2d, ONLY : domain
-   USE runtime_2d, ONLY : runtime
+   USE simulation_2d, ONLY : simulation
 
    USE inpout_2d, ONLY : restart
 
@@ -95,15 +91,12 @@ PROGRAM IMEX_SfloW2D
    USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,          &
       thickness_levels , dyn_pres_levels
 
-   USE state_2d, ONLY : state
-
    USE constitutive_2d, ONLY : qc_to_qp
 
 
    USE constitutive_2d, ONLY : avg_profiles_mix
 
-   USE stochastic_module, ONLY : genConvolutionKernel, getSteadyStateZ,       &
-      stochastic_workspace
+   USE stochastic_module, ONLY : genConvolutionKernel, getSteadyStateZ
 
    USE OMP_LIB
 
@@ -194,10 +187,10 @@ PROGRAM IMEX_SfloW2D
 
    CALL init_grid
 
-   CALL allocate_solver_variables
+   CALL simulation%initialize
 
    is_binary_restart = .FALSE.
-   runtime%t = t_start
+   simulation%runtime%t = t_start
 
    IF ( restart ) THEN
 
@@ -251,7 +244,8 @@ PROGRAM IMEX_SfloW2D
 
    IF ( radial_source_flag .OR. lateral_source_flag ) CALL init_source
 
-   CALL domain%check_solve(state%q, runtime%t, .TRUE.)
+   CALL simulation%domain%check_solve(simulation%state%q,                    &
+        simulation%runtime%t, .TRUE.)
 
    ! For a new run or a classic restart, initialize the stochastic field only
    ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
@@ -270,8 +264,8 @@ PROGRAM IMEX_SfloW2D
 
    IF ( verbose_level .GE. 1 ) THEN
 
-      WRITE(*,*) 'Min q(1,:,:)=',MINVAL(state%q(1,:,:))
-      WRITE(*,*) 'Max q(1,:,:)=',MAXVAL(state%q(1,:,:))
+      WRITE(*,*) 'Min q(1,:,:)=',MINVAL(simulation%state%q(1,:,:))
+      WRITE(*,*) 'Max q(1,:,:)=',MAXVAL(simulation%state%q(1,:,:))
 
       WRITE(*,*) 'Min B(:,:)=',MINVAL(B_cent(:,:))
       WRITE(*,*) 'Max B(:,:)=',MAXVAL(B_cent(:,:))
@@ -279,7 +273,7 @@ PROGRAM IMEX_SfloW2D
 
       WRITE(*,*) 'size B_cent',size(B_cent,1),size(B_cent,2)
 
-      WRITE(*,*) 'SUM(q(1,:,:)=',SUM(state%q(1,:,:))
+      WRITE(*,*) 'SUM(q(1,:,:)=',SUM(simulation%state%q(1,:,:))
       WRITE(*,*) 'SUM(B_cent(:,:)=',SUM(B_cent(:,:))
 
    END IF
@@ -288,12 +282,12 @@ PROGRAM IMEX_SfloW2D
    IF ( is_binary_restart ) THEN
       ! If it is a binary restart, 'dt' has already been loaded by read_restart_file.
       ! We initialize the history with the last valid dt for continuity.
-      dt_old = runtime%dt
-      dt_old_old = runtime%dt
-      WRITE(*,*) 'Restarting with saved timestep dt =', runtime%dt
+      dt_old = simulation%runtime%dt
+      dt_old_old = simulation%runtime%dt
+      WRITE(*,*) 'Restarting with saved timestep dt =', simulation%runtime%dt
    ELSE
       ! If it is a new simulation or a legacy restart, we use dt0 from the input
-      runtime%dt = dt0
+      simulation%runtime%dt = dt0
       dt_old = dt0
       dt_old_old = dt0
    END IF
@@ -301,32 +295,33 @@ PROGRAM IMEX_SfloW2D
    t_steady = t_end
    stop_flag = .FALSE.
 
-   state%vuln_table = .FALSE.
+   simulation%state%vuln_table = .FALSE.
 
    !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2,    &
    !$OMP & mod_vel)
 
-   DO l = 1,domain%solve_cells
+   DO l = 1,simulation%domain%solve_cells
 
-      j = domain%j_cent(l)
-      k = domain%k_cent(l)
+      j = simulation%domain%j_cent(l)
+      k = simulation%domain%k_cent(l)
 
-      IF ( state%q(1,j,k) .GT. 0.0_wp ) THEN
+      IF ( simulation%state%q(1,j,k) .GT. 0.0_wp ) THEN
 
-         CALL qc_to_qp(state%q(1:n_vars,j,k) , state%qp(1:n_vars+2,j,k) , p_dyn )
+         CALL qc_to_qp(simulation%state%q(1:n_vars,j,k),                    &
+              simulation%state%qp(1:n_vars+2,j,k), p_dyn)
 
-         state%hmax(j,k) = state%qp(1,j,k)
+         simulation%state%hmax(j,k) = simulation%state%qp(1,j,k)
 
-         r_u = state%qp(n_vars+1,j,k)
-         r_v = state%qp(n_vars+2,j,k)
+         r_u = simulation%state%qp(n_vars+1,j,k)
+         r_v = simulation%state%qp(n_vars+2,j,k)
 
          mod_vel2 = r_u**2 + r_v**2
          mod_vel = SQRT( mod_vel2 )
 
-         IF ( state%qp(1,j,k) .GT. 0.001_wp ) THEN
+         IF ( simulation%state%qp(1,j,k) .GT. 0.001_wp ) THEN
 
-            state%pdynmax(j,k) = p_dyn
-            state%mod_vel_max(j,k) = mod_vel
+            simulation%state%pdynmax(j,k) = p_dyn
+            simulation%state%mod_vel_max(j,k) = mod_vel
 
          END IF
 
@@ -334,15 +329,19 @@ PROGRAM IMEX_SfloW2D
 
          DO i_thk_lev=1,n_thickness_levels
 
-            state%thck_table(j,k) = ( state%qp(1,j,k) .GE. thickness_levels(i_thk_lev) )
+            simulation%state%thck_table(j,k) =                              &
+                 ( simulation%state%qp(1,j,k) .GE. thickness_levels(i_thk_lev) )
 
             DO i_pdyn_lev=1,n_dyn_pres_levels
 
-               state%pdyn_table(j,k) = ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
+               simulation%state%pdyn_table(j,k) =                           &
+                    ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
 
                i_table = i_table + 1
 
-               state%vuln_table(i_table,j,k) = ( state%thck_table(j,k) .AND. state%pdyn_table(j,k) )
+               simulation%state%vuln_table(i_table,j,k) =                   &
+                    ( simulation%state%thck_table(j,k) .AND.                 &
+                    simulation%state%pdyn_table(j,k) )
 
             END DO
 
@@ -350,10 +349,10 @@ PROGRAM IMEX_SfloW2D
 
       ELSE
 
-         state%qp(1:n_vars,j,k) = 0.0_wp
-         state%qp(4,j,k) = T_ambient
-         state%hmax(j,k) = 0.0_wp
-         state%pdynmax(j,k) = 0.0_wp
+         simulation%state%qp(1:n_vars,j,k) = 0.0_wp
+         simulation%state%qp(4,j,k) = T_ambient
+         simulation%state%hmax(j,k) = 0.0_wp
+         simulation%state%pdynmax(j,k) = 0.0_wp
 
       END IF
 
@@ -361,24 +360,24 @@ PROGRAM IMEX_SfloW2D
 
    !$OMP END PARALLEL DO
 
-   IF ( output_runout_flag ) CALL output_runout(runtime%t,stop_flag)
+   IF ( output_runout_flag ) CALL output_runout(simulation%runtime%t,stop_flag)
 
    IF ( output_cons_flag .OR. output_esri_flag .OR. output_phys_flag .OR.        &
-      output_netcdf_flag ) CALL output_solution(runtime%t)
+      output_netcdf_flag ) CALL output_solution(simulation%runtime%t)
 
-   IF ( n_probes .GT. 0 ) CALL output_probes(runtime%t)
+   IF ( n_probes .GT. 0 ) CALL output_probes(simulation%runtime%t)
 
-   IF ( SUM(state%q(1,:,:)) .EQ. 0.0_wp ) t_steady = t_end
+   IF ( SUM(simulation%state%q(1,:,:)) .EQ. 0.0_wp ) t_steady = t_end
 
    IF ( verbose_level .GE. 0 ) THEN
 
       WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
       &ES11.3E3,A11,ES11.3E3)")                                                &
-         't =',runtime%t,'dt =',runtime%dt,                                    &
-         ' mass = ',dx*dy*SUM(state%q(1,:,:)) ,                                      &
-         ' volume = ',dx*dy*SUM(state%qp(1,:,:)) ,                                   &
-         ' area = ',dx*dy*COUNT(state%q(1,:,:).GT.1.D-5) ,                           &
-         ' solid mass = ',dx*dy*SUM(state%q(5:4+n_solid,:,:)),                       &
+         't =',simulation%runtime%t,'dt =',simulation%runtime%dt,             &
+         ' mass = ',dx*dy*SUM(simulation%state%q(1,:,:)) ,                    &
+         ' volume = ',dx*dy*SUM(simulation%state%qp(1,:,:)) ,                 &
+         ' area = ',dx*dy*COUNT(simulation%state%q(1,:,:).GT.1.D-5) ,         &
+         ' solid mass = ',dx*dy*SUM(simulation%state%q(5:4+n_solid,:,:)),     &
          ' runout = ',runout_last
 
    END IF
@@ -386,91 +385,103 @@ PROGRAM IMEX_SfloW2D
    CALL cpu_time(t2)
    CALL system_clock (st2)
 
-   DO WHILE ( ( runtime%t .LT. t_end ) .AND. ( runtime%t .LT. t_steady ) )
+   DO WHILE ( ( simulation%runtime%t .LT. t_end ) .AND.                       &
+        ( simulation%runtime%t .LT. t_steady ) )
 
       CALL update_param
 
-      IF ( runtime%t .EQ. t_start ) THEN
+      IF ( simulation%runtime%t .EQ. t_start ) THEN
 
-         CALL domain%check_solve(state%q, runtime%t, .FALSE.)
+         CALL simulation%domain%check_solve(simulation%state%q,               &
+              simulation%runtime%t, .FALSE.)
 
       ELSE
 
-         CALL domain%check_solve(state%q, runtime%t, .FALSE.)
+         CALL simulation%domain%check_solve(simulation%state%q,               &
+              simulation%runtime%t, .FALSE.)
 
       END IF
 
       IF ( verbose_level .GE. 1 ) THEN
 
-         WRITE(*,*) 'cells to solve and reconstruct:' , COUNT(domain%solve_mask)
+         WRITE(*,*) 'cells to solve and reconstruct:' ,                       &
+              COUNT(simulation%domain%solve_mask)
 
       END IF
 
-      CALL time_integrator%compute_timestep(state%q, state%qp, runtime%t,     &
-           runtime%dt)
+      CALL simulation%time_integration%compute_timestep(                      &
+           simulation%state%q, simulation%state%qp, simulation%runtime%t,     &
+           simulation%runtime%dt)
 
       IF ( t_end - t_output < 1.0E-7_WP ) t_output = t_end
       IF ( t_end - t_runout < 1.0E-7_WP ) t_runout = t_end
       IF ( t_end - t_probes < 1.0E-7_WP ) t_probes = t_end
 
-      IF ( runtime%t+runtime%dt .GT. t_end ) runtime%dt = t_end - runtime%t
-      IF ( runtime%t+runtime%dt .GT. t_output )                              &
-           runtime%dt = t_output - runtime%t
+      IF ( simulation%runtime%t+simulation%runtime%dt .GT. t_end )            &
+           simulation%runtime%dt = t_end - simulation%runtime%t
+      IF ( simulation%runtime%t+simulation%runtime%dt .GT. t_output )         &
+           simulation%runtime%dt = t_output - simulation%runtime%t
 
       IF ( output_runout_flag ) THEN
 
-         IF ( runtime%t+runtime%dt .GT. t_runout )                           &
-              runtime%dt = t_runout - runtime%t
+         IF ( simulation%runtime%t+simulation%runtime%dt .GT. t_runout )      &
+              simulation%runtime%dt = t_runout - simulation%runtime%t
 
       END IF
 
       IF ( n_probes .GT. 0 ) THEN
 
-         IF ( runtime%t+runtime%dt .GT. t_probes )                           &
-              runtime%dt = t_probes - runtime%t
+         IF ( simulation%runtime%t+simulation%runtime%dt .GT. t_probes )      &
+              simulation%runtime%dt = t_probes - simulation%runtime%t
 
       END IF
 
-      runtime%dt = MIN(runtime%dt,1.1_wp * 0.5_wp *                          &
+      simulation%runtime%dt = MIN(simulation%runtime%dt,1.1_wp * 0.5_wp *    &
            ( dt_old + dt_old_old ) )
 
       dt_old_old = dt_old
-      dt_old = runtime%dt
+      dt_old = simulation%runtime%dt
 
-      CALL time_integrator%advance(state%q, state%qp, runtime%t, runtime%dt,  &
-           stochastic_workspace%Z)
+      CALL simulation%time_integration%advance(                              &
+           simulation%state%q, simulation%state%qp, simulation%runtime%t,    &
+           simulation%runtime%dt, simulation%stochastic%Z)
 
-      CALL update_erosion_deposition_cell(state%q, state%qp, runtime%dt)
+      CALL update_erosion_deposition_cell(simulation%state%q,                 &
+           simulation%state%qp, simulation%runtime%dt)
 
       IF ( topo_change_flag ) CALL topography_reconstruction
 
-      runtime%t = runtime%t + runtime%dt
+      simulation%runtime%t = simulation%runtime%t + simulation%runtime%dt
 
       !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2,    &
       !$OMP & mod_vel)
 
 
-      DO l = 1,domain%solve_cells
+      DO l = 1,simulation%domain%solve_cells
 
-         j = domain%j_cent(l)
-         k = domain%k_cent(l)
+         j = simulation%domain%j_cent(l)
+         k = simulation%domain%k_cent(l)
 
-         IF ( state%q(1,j,k) .GT. 0.0_wp ) THEN
+         IF ( simulation%state%q(1,j,k) .GT. 0.0_wp ) THEN
 
-            CALL qc_to_qp(state%q(1:n_vars,j,k) , state%qp(1:n_vars+2,j,k) , p_dyn )
+            CALL qc_to_qp(simulation%state%q(1:n_vars,j,k),                  &
+                 simulation%state%qp(1:n_vars+2,j,k), p_dyn)
 
-            state%hmax(j,k) = MAX( state%hmax(j,k) , state%qp(1,j,k) )
+            simulation%state%hmax(j,k) = MAX(simulation%state%hmax(j,k),     &
+                 simulation%state%qp(1,j,k))
 
-            r_u = state%qp(n_vars+1,j,k)
-            r_v = state%qp(n_vars+2,j,k)
+            r_u = simulation%state%qp(n_vars+1,j,k)
+            r_v = simulation%state%qp(n_vars+2,j,k)
 
             mod_vel2 = r_u**2 + r_v**2
             mod_vel = SQRT( mod_vel2 )
 
-            IF ( state%qp(1,j,k) .GT. 0.001_wp ) THEN
+            IF ( simulation%state%qp(1,j,k) .GT. 0.001_wp ) THEN
 
-               state%pdynmax(j,k) = MAX( state%pdynmax(j,k) , p_dyn )
-               state%mod_vel_max(j,k) = MAX( state%mod_vel_max(j,k) , mod_vel )
+               simulation%state%pdynmax(j,k) =                               &
+                    MAX(simulation%state%pdynmax(j,k), p_dyn)
+               simulation%state%mod_vel_max(j,k) =                           &
+                    MAX(simulation%state%mod_vel_max(j,k), mod_vel)
 
             END IF
 
@@ -478,16 +489,21 @@ PROGRAM IMEX_SfloW2D
 
             DO i_thk_lev=1,n_thickness_levels
 
-               state%thck_table(j,k) = ( state%qp(1,j,k) .GE. thickness_levels(i_thk_lev) )
+               simulation%state%thck_table(j,k) =                            &
+                    ( simulation%state%qp(1,j,k) .GE.                        &
+                    thickness_levels(i_thk_lev) )
 
                DO i_pdyn_lev=1,n_dyn_pres_levels
 
-                  state%pdyn_table(j,k) = ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
+                  simulation%state%pdyn_table(j,k) =                         &
+                       ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
 
                   i_table = i_table + 1
 
-                  state%vuln_table(i_table,j,k) = state%vuln_table(i_table,j,k) .OR.            &
-                     ( state%thck_table(j,k) .AND. state%pdyn_table(j,k) )
+                  simulation%state%vuln_table(i_table,j,k) =                 &
+                       simulation%state%vuln_table(i_table,j,k) .OR.          &
+                       ( simulation%state%thck_table(j,k) .AND.               &
+                       simulation%state%pdyn_table(j,k) )
 
                END DO
 
@@ -495,8 +511,8 @@ PROGRAM IMEX_SfloW2D
 
          ELSE
 
-            state%qp(1:n_vars+2,j,k) = 0.0_wp
-            state%qp(4,j,k) = T_ambient
+            simulation%state%qp(1:n_vars+2,j,k) = 0.0_wp
+            simulation%state%qp(4,j,k) = T_ambient
 
          END IF
 
@@ -506,7 +522,7 @@ PROGRAM IMEX_SfloW2D
 
       IF ( verbose_level .GE. 0 ) THEN
 
-         vol = SUM(state%qp(1,:,:))
+         vol = SUM(simulation%state%qp(1,:,:))
 
          !IF ( IEEE_IS_NAN(vol) .OR. ( t.GE. 50.54) ) THEN
 
@@ -534,23 +550,25 @@ PROGRAM IMEX_SfloW2D
 
          WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
          &ES11.3E3,A11,ES11.3E3)")                                             &
-            't =',runtime%t,'dt =',runtime%dt,                                &
-            ' mass = ',dx*dy*SUM(state%q(1,:,:)) ,                                      &
-            ' volume = ',dx*dy*SUM(state%qp(1,:,:)) ,                                   &
-            ' area = ',dx*dy*COUNT(state%q(1,:,:).GT.1.D-7) ,                           &
-            ' solid mass = ',dx*dy*SUM(state%q(5:4+n_solid,:,:)),                       &
+            't =',simulation%runtime%t,'dt =',simulation%runtime%dt,          &
+            ' mass = ',dx*dy*SUM(simulation%state%q(1,:,:)) ,                 &
+            ' volume = ',dx*dy*SUM(simulation%state%qp(1,:,:)) ,              &
+            ' area = ',dx*dy*COUNT(simulation%state%q(1,:,:).GT.1.D-7) ,      &
+            ' solid mass = ',dx*dy*SUM(                                      &
+            simulation%state%q(5:4+n_solid,:,:)),                            &
             ' runout = ',runout_last
 
       END IF
 
       IF ( output_runout_flag ) THEN
 
-         IF ( ( runtime%t .GE. t_runout ) .OR.                               &
-              ( runtime%t .GE. t_steady ) ) THEN
+         IF ( ( simulation%runtime%t .GE. t_runout ) .OR.                    &
+              ( simulation%runtime%t .GE. t_steady ) ) THEN
 
             stop_flag_old = stop_flag
 
-            IF ( output_runout_flag ) CALL output_runout(runtime%t,stop_flag)
+            IF ( output_runout_flag ) CALL output_runout(                    &
+                 simulation%runtime%t,stop_flag)
 
             IF ( ( stop_flag ) .AND. (.NOT.stop_flag_old) ) THEN
 
@@ -564,11 +582,13 @@ PROGRAM IMEX_SfloW2D
 
       IF ( n_probes .GT. 0 ) THEN
 
-         IF ( runtime%t .GE. t_probes ) CALL output_probes(runtime%t)
+         IF ( simulation%runtime%t .GE. t_probes )                           &
+              CALL output_probes(simulation%runtime%t)
 
       END IF
 
-      IF ( ( runtime%t .GE. t_output ) .OR. ( runtime%t .GE. t_end ) ) THEN
+      IF ( ( simulation%runtime%t .GE. t_output ) .OR.                       &
+           ( simulation%runtime%t .GE. t_end ) ) THEN
 
          CALL cpu_time(t3)
          CALL system_clock(st3)
@@ -582,7 +602,7 @@ PROGRAM IMEX_SfloW2D
 
          IF ( output_cons_flag .OR. output_esri_flag .OR. output_phys_flag .OR. output_netcdf_flag ) THEN
 
-            CALL output_solution(runtime%t)
+            CALL output_solution(simulation%runtime%t)
             CALL write_restart_file('restart.bin')
 
          END IF
@@ -591,7 +611,7 @@ PROGRAM IMEX_SfloW2D
 
    END DO
 
-   CALL deallocate_solver_variables
+   CALL simulation%finalize
 
    IF ( output_netcdf_flag ) CALL close_netcdf
 

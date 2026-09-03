@@ -105,7 +105,7 @@ am_IMEX_SfloW2D_OBJECTS = parameters_2d.$(OBJEXT) runtime_2d.$(OBJEXT) \
 	mass_exchange_2d.$(OBJEXT) \
 	nonlinear_solver_2d.$(OBJEXT) reconstruction_2d.$(OBJEXT) \
 	hyperbolic_2d.$(OBJEXT) time_integration_2d.$(OBJEXT) \
-	stochastic_module.$(OBJEXT) solver_2d.$(OBJEXT) \
+	stochastic_module.$(OBJEXT) simulation_2d.$(OBJEXT) \
 	init_2d.$(OBJEXT) inpout_2d.$(OBJEXT) \
 	IMEX_SfloW2D.$(OBJEXT)
 IMEX_SfloW2D_OBJECTS = $(am_IMEX_SfloW2D_OBJECTS)
@@ -262,7 +262,7 @@ IMEX_SfloW2D_SOURCES = \
                 hyperbolic_2d.f90 \
                 time_integration_2d.f90 \
                 stochastic_module.f90 \
-                solver_2d.f90 \
+                simulation_2d.f90 \
                 init_2d.f90 \
                 inpout_2d.f90 \
                 IMEX_SfloW2D.f90

@@ -43,7 +43,7 @@ MODULE reconstruction_2d
      PROCEDURE :: reconstruct => reconstruction
   END TYPE reconstruction_workspace_type
 
-  TYPE(reconstruction_workspace_type), PUBLIC :: reconstruction_workspace
+  TYPE(reconstruction_workspace_type), PUBLIC, TARGET :: reconstruction_workspace
 
 CONTAINS
 
