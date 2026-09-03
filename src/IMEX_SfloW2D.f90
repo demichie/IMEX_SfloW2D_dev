@@ -66,7 +66,7 @@ PROGRAM IMEX_SfloW2D
    USE solver_2d, ONLY : allocate_solver_variables
    USE solver_2d, ONLY : deallocate_solver_variables
    USE mass_exchange_2d, ONLY : update_erosion_deposition_cell
-   USE time_integration_2d, ONLY : timestep, imex_RK_solver
+   USE time_integration_2d, ONLY : time_integrator => time_integration_workspace
    USE domain_2d, ONLY : domain
 
    USE inpout_2d, ONLY : restart
@@ -407,7 +407,7 @@ PROGRAM IMEX_SfloW2D
 
       END IF
 
-      CALL timestep(state%q, state%qp, t, dt)
+      CALL time_integrator%compute_timestep(state%q, state%qp, t, dt)
 
       IF ( t_end - t_output < 1.0E-7_WP ) t_output = t_end
       IF ( t_end - t_runout < 1.0E-7_WP ) t_runout = t_end
@@ -433,7 +433,7 @@ PROGRAM IMEX_SfloW2D
       dt_old_old = dt_old
       dt_old = dt
 
-      CALL imex_RK_solver(state%q, state%qp, t, dt, source_xy, Z_field, fric_array)
+      CALL time_integrator%advance(state%q, state%qp, t, dt, source_xy, Z_field, fric_array)
 
       CALL update_erosion_deposition_cell(state%q, state%qp, dt)
 

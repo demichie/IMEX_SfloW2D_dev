@@ -33,133 +33,138 @@ MODULE time_integration_2d
 
   PRIVATE
 
-  PUBLIC :: initialize_time_integration
-  PUBLIC :: finalize_time_integration
-  PUBLIC :: timestep
-  PUBLIC :: imex_RK_solver
+  TYPE, PUBLIC :: time_integration_workspace_type
+     PRIVATE
 
-  INTEGER :: i_RK
+     REAL(wp), ALLOCATABLE :: a_tilde_ij(:,:)
+     REAL(wp), ALLOCATABLE :: a_dirk_ij(:,:)
+     REAL(wp), ALLOCATABLE :: omega_tilde(:)
+     REAL(wp), ALLOCATABLE :: omega(:)
+     REAL(wp), ALLOCATABLE :: a_tilde(:)
+     REAL(wp), ALLOCATABLE :: a_dirk(:)
+     REAL(wp), ALLOCATABLE :: q_rk(:,:,:)
+     REAL(wp), ALLOCATABLE :: qp_rk(:,:,:)
+     REAL(wp), ALLOCATABLE :: divFlux(:,:,:,:)
+     REAL(wp), ALLOCATABLE :: NH(:,:,:,:)
+     REAL(wp), ALLOCATABLE :: SI_NH(:,:,:,:)
+     REAL(wp), ALLOCATABLE :: expl_terms(:,:,:,:)
+   CONTAINS
+     PROCEDURE, PUBLIC :: initialize => initialize_time_integration
+     PROCEDURE, PUBLIC :: finalize => finalize_time_integration
+     PROCEDURE, NOPASS, PUBLIC :: compute_timestep => timestep
+     PROCEDURE, PUBLIC :: advance => imex_RK_solver
+  END TYPE time_integration_workspace_type
 
-  REAL(wp), ALLOCATABLE :: a_tilde_ij(:,:)
-  REAL(wp), ALLOCATABLE :: a_dirk_ij(:,:)
-  REAL(wp), ALLOCATABLE :: omega_tilde(:)
-  REAL(wp), ALLOCATABLE :: omega(:)
-  REAL(wp), ALLOCATABLE :: a_tilde(:)
-  REAL(wp), ALLOCATABLE :: a_dirk(:)
-  REAL(wp) :: a_diag
-
-  REAL(wp), ALLOCATABLE :: q_rk(:,:,:)
-  REAL(wp), ALLOCATABLE :: qp_rk(:,:,:)
-  REAL(wp), ALLOCATABLE :: divFlux(:,:,:,:)
-  REAL(wp), ALLOCATABLE :: NH(:,:,:,:)
-  REAL(wp), ALLOCATABLE :: SI_NH(:,:,:,:)
-  REAL(wp), ALLOCATABLE :: expl_terms(:,:,:,:)
+  TYPE(time_integration_workspace_type), PUBLIC :: time_integration_workspace
 
 CONTAINS
 
-  SUBROUTINE initialize_time_integration
+  SUBROUTINE initialize_time_integration( this )
 
+    CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
     REAL(wp) :: gamma, delta
 
-    ALLOCATE( a_tilde_ij(n_RK,n_RK) )
-    ALLOCATE( a_dirk_ij(n_RK,n_RK) )
-    ALLOCATE( omega_tilde(n_RK) )
-    ALLOCATE( omega(n_RK) )
+    ALLOCATE( this%a_tilde_ij(n_RK,n_RK) )
+    ALLOCATE( this%a_dirk_ij(n_RK,n_RK) )
+    ALLOCATE( this%omega_tilde(n_RK) )
+    ALLOCATE( this%omega(n_RK) )
 
     ! Initialize the coefficients for the IMEX Runge-Kutta scheme
     ! Please note that with respect to the schemes described in Pareschi & Russo
     ! (2000) we do not have the coefficient vectors c_tilde and c, because the
     ! explicit and implicit terms do not depend explicitly on time.
 
-    a_tilde_ij = 0.0_wp
-    omega_tilde = 0.0_wp
-    a_dirk_ij = 0.0_wp
-    omega = 0.0_wp
+    this%a_tilde_ij = 0.0_wp
+    this%omega_tilde = 0.0_wp
+    this%a_dirk_ij = 0.0_wp
+    this%omega = 0.0_wp
 
     gamma = 1.0_wp - 1.0_wp / SQRT(2.0_wp)
     delta = 1.0_wp - 1.0_wp / ( 2.0_wp * gamma )
 
     IF ( n_RK .EQ. 1 ) THEN
 
-       a_tilde_ij(1,1) = 1.0_wp
-       omega_tilde(1) = 1.0_wp
-       a_dirk_ij(1,1) = 0.0_wp
-       omega(1) = 0.0_wp
+       this%a_tilde_ij(1,1) = 1.0_wp
+       this%omega_tilde(1) = 1.0_wp
+       this%a_dirk_ij(1,1) = 0.0_wp
+       this%omega(1) = 0.0_wp
 
     ELSEIF ( n_RK .EQ. 2 ) THEN
 
-       a_tilde_ij(2,1) = 1.0_wp
-       omega_tilde(1) = 1.0_wp
-       omega_tilde(2) = 0.0_wp
-       a_dirk_ij(2,2) = 1.0_wp
-       omega(1) = 0.0_wp
-       omega(2) = 1.0_wp
+       this%a_tilde_ij(2,1) = 1.0_wp
+       this%omega_tilde(1) = 1.0_wp
+       this%omega_tilde(2) = 0.0_wp
+       this%a_dirk_ij(2,2) = 1.0_wp
+       this%omega(1) = 0.0_wp
+       this%omega(2) = 1.0_wp
 
     ELSEIF ( n_RK .EQ. 3 ) THEN
 
        ! Tableau for the IMEX-SSP(3,3,2) Stiffly Accurate Scheme
        ! from Pareschi & Russo (2005), Table IV
-       a_tilde_ij(2,1) = 0.5_wp
-       a_tilde_ij(3,1) = 0.5_wp
-       a_tilde_ij(3,2) = 0.5_wp
-       omega_tilde(1) = 1.0_wp / 3.0_wp
-       omega_tilde(2) = 1.0_wp / 3.0_wp
-       omega_tilde(3) = 1.0_wp / 3.0_wp
-       a_dirk_ij(1,1) = 0.25_wp
-       a_dirk_ij(2,2) = 0.25_wp
-       a_dirk_ij(3,1) = 1.0_wp / 3.0_wp
-       a_dirk_ij(3,2) = 1.0_wp / 3.0_wp
-       a_dirk_ij(3,3) = 1.0_wp / 3.0_wp
-       omega(1) = 1.0_wp / 3.0_wp
-       omega(2) = 1.0_wp / 3.0_wp
-       omega(3) = 1.0_wp / 3.0_wp
+       this%a_tilde_ij(2,1) = 0.5_wp
+       this%a_tilde_ij(3,1) = 0.5_wp
+       this%a_tilde_ij(3,2) = 0.5_wp
+       this%omega_tilde(1) = 1.0_wp / 3.0_wp
+       this%omega_tilde(2) = 1.0_wp / 3.0_wp
+       this%omega_tilde(3) = 1.0_wp / 3.0_wp
+       this%a_dirk_ij(1,1) = 0.25_wp
+       this%a_dirk_ij(2,2) = 0.25_wp
+       this%a_dirk_ij(3,1) = 1.0_wp / 3.0_wp
+       this%a_dirk_ij(3,2) = 1.0_wp / 3.0_wp
+       this%a_dirk_ij(3,3) = 1.0_wp / 3.0_wp
+       this%omega(1) = 1.0_wp / 3.0_wp
+       this%omega(2) = 1.0_wp / 3.0_wp
+       this%omega(3) = 1.0_wp / 3.0_wp
 
     ELSEIF ( n_RK .EQ. 4 ) THEN
 
        ! LRR(3,2,2) from Table 3 in Pareschi & Russo (2000)
-       a_tilde_ij(2,1) = 0.5_wp
-       a_tilde_ij(3,1) = 1.0_wp / 3.0_wp
-       a_tilde_ij(4,2) = 1.0_wp
-       omega_tilde(1) = 0.0_wp
-       omega_tilde(2) = 1.0_wp
-       omega_tilde(3) = 0.0_wp
-       omega_tilde(4) = 0.0_wp
-       a_dirk_ij(2,2) = 0.5_wp
-       a_dirk_ij(3,3) = 1.0_wp / 3.0_wp
-       a_dirk_ij(4,3) = 0.75_wp
-       a_dirk_ij(4,4) = 0.25_wp
-       omega(1) = 0.0_wp
-       omega(2) = 0.0_wp
-       omega(3) = 0.75_wp
-       omega(4) = 0.25_wp
+       this%a_tilde_ij(2,1) = 0.5_wp
+       this%a_tilde_ij(3,1) = 1.0_wp / 3.0_wp
+       this%a_tilde_ij(4,2) = 1.0_wp
+       this%omega_tilde(1) = 0.0_wp
+       this%omega_tilde(2) = 1.0_wp
+       this%omega_tilde(3) = 0.0_wp
+       this%omega_tilde(4) = 0.0_wp
+       this%a_dirk_ij(2,2) = 0.5_wp
+       this%a_dirk_ij(3,3) = 1.0_wp / 3.0_wp
+       this%a_dirk_ij(4,3) = 0.75_wp
+       this%a_dirk_ij(4,4) = 0.25_wp
+       this%omega(1) = 0.0_wp
+       this%omega(2) = 0.0_wp
+       this%omega(3) = 0.75_wp
+       this%omega(4) = 0.25_wp
 
     END IF
 
-    ALLOCATE( a_tilde(n_RK) )
-    ALLOCATE( a_dirk(n_RK) )
-    ALLOCATE( q_rk(n_vars,comp_cells_x,comp_cells_y) )
-    ALLOCATE( qp_rk(n_vars+2,comp_cells_x,comp_cells_y) )
-    ALLOCATE( divFlux(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
-    ALLOCATE( NH(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
-    ALLOCATE( SI_NH(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
-    ALLOCATE( expl_terms(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
+    ALLOCATE( this%a_tilde(n_RK) )
+    ALLOCATE( this%a_dirk(n_RK) )
+    ALLOCATE( this%q_rk(n_vars,comp_cells_x,comp_cells_y) )
+    ALLOCATE( this%qp_rk(n_vars+2,comp_cells_x,comp_cells_y) )
+    ALLOCATE( this%divFlux(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
+    ALLOCATE( this%NH(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
+    ALLOCATE( this%SI_NH(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
+    ALLOCATE( this%expl_terms(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
 
   END SUBROUTINE initialize_time_integration
 
-  SUBROUTINE finalize_time_integration
+  SUBROUTINE finalize_time_integration( this )
 
-    DEALLOCATE( a_tilde_ij )
-    DEALLOCATE( a_dirk_ij )
-    DEALLOCATE( omega_tilde )
-    DEALLOCATE( omega )
-    DEALLOCATE( a_tilde )
-    DEALLOCATE( a_dirk )
-    DEALLOCATE( q_rk )
-    DEALLOCATE( qp_rk )
-    DEALLOCATE( divFlux )
-    DEALLOCATE( NH )
-    DEALLOCATE( SI_NH )
-    DEALLOCATE( expl_terms )
+    CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
+
+    DEALLOCATE( this%a_tilde_ij )
+    DEALLOCATE( this%a_dirk_ij )
+    DEALLOCATE( this%omega_tilde )
+    DEALLOCATE( this%omega )
+    DEALLOCATE( this%a_tilde )
+    DEALLOCATE( this%a_dirk )
+    DEALLOCATE( this%q_rk )
+    DEALLOCATE( this%qp_rk )
+    DEALLOCATE( this%divFlux )
+    DEALLOCATE( this%NH )
+    DEALLOCATE( this%SI_NH )
+    DEALLOCATE( this%expl_terms )
 
   END SUBROUTINE finalize_time_integration
 
@@ -272,7 +277,7 @@ CONTAINS
   !
   !******************************************************************************
 
-  SUBROUTINE imex_RK_solver(q, qp, t, dt, source_xy, Z, fric_array)
+  SUBROUTINE imex_RK_solver(this, q, qp, t, dt, source_xy, Z, fric_array)
 
     USE constitutive_2d, ONLY : maximum_solid_packing
     
@@ -294,6 +299,7 @@ CONTAINS
     
     IMPLICIT NONE
 
+    CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
     REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: t, dt
@@ -306,9 +312,11 @@ CONTAINS
     REAL(wp) :: q_fv_cell(n_vars) !< finite-volume state for the current cell
     REAL(wp) :: residual_cell(n_vars) !< final RK residual for the current cell
     REAL(wp) :: q_old_cell(n_vars) !< state before the final RK assembly
+    INTEGER :: i_RK
     INTEGER :: j,k,l            !< loop counter over the grid volumes
     REAL(wp) :: Rj_not_impl(n_eqns)
 
+    REAL(wp) :: a_diag
     REAL(wp) :: p_dyn
 
     REAL(wp) :: alpha_s
@@ -351,15 +359,15 @@ CONTAINS
        END IF
 
        ! Initialization of the variables for the Runge-Kutta scheme
-       q_rk( 1:n_vars , j , k ) = 0.0_wp
-       qp_rk( 1:n_vars+2 , j , k ) = 0.0_wp
-       qp_rk( 4 , j , k ) = T_ambient
+       this%q_rk( 1:n_vars , j , k ) = 0.0_wp
+       this%qp_rk( 1:n_vars+2 , j , k ) = 0.0_wp
+       this%qp_rk( 4 , j , k ) = T_ambient
        
 
-       divFlux(1:n_eqns , j , k , 1:n_RK ) = 0.0_wp
-       NH( 1:n_eqns, j , k , 1:n_RK ) = 0.0_wp
-       SI_NH( 1:n_eqns , j , k , 1:n_RK ) = 0.0_wp
-       expl_terms(1:n_eqns , j , k , 1:n_RK) = 0.0_wp
+       this%divFlux(1:n_eqns , j , k , 1:n_RK ) = 0.0_wp
+       this%NH( 1:n_eqns, j , k , 1:n_RK ) = 0.0_wp
+       this%SI_NH( 1:n_eqns , j , k , 1:n_RK ) = 0.0_wp
+       this%expl_terms(1:n_eqns , j , k , 1:n_RK) = 0.0_wp
        
     END DO
     !$OMP END DO
@@ -372,23 +380,23 @@ CONTAINS
 
        ! An explicit stage is required not only when it contributes to the
        ! final RK assembly, but also when a later stage depends on it.
-       need_explicit_stage = ( omega_tilde(i_RK) .NE. 0.0_wp )
+       need_explicit_stage = ( this%omega_tilde(i_RK) .NE. 0.0_wp )
 
        IF ( i_RK .LT. n_RK ) THEN
           need_explicit_stage = need_explicit_stage .OR.                       &
-               ANY( a_tilde_ij(i_RK+1:n_RK,i_RK) .NE. 0.0_wp )
+               ANY( this%a_tilde_ij(i_RK+1:n_RK,i_RK) .NE. 0.0_wp )
        END IF
 
        ! define the explicits coefficients for the i-th step of the Runge-Kutta
-       a_tilde = 0.0_wp
-       a_dirk = 0.0_wp
+       this%a_tilde = 0.0_wp
+       this%a_dirk = 0.0_wp
 
        ! in the first step of the RK scheme all the coefficients remain to 0
-       a_tilde(1:i_RK-1) = a_tilde_ij(i_RK,1:i_RK-1)
-       a_dirk(1:i_RK-1) = a_dirk_ij(i_RK,1:i_RK-1)
+       this%a_tilde(1:i_RK-1) = this%a_tilde_ij(i_RK,1:i_RK-1)
+       this%a_dirk(1:i_RK-1) = this%a_dirk_ij(i_RK,1:i_RK-1)
 
        ! define the implicit coefficient for the i-th step of the Runge-Kutta
-       a_diag = a_dirk_ij(i_RK,i_RK)
+       a_diag = this%a_dirk_ij(i_RK,i_RK)
 
        !$OMP PARALLEL 
        !$OMP DO schedule(guided)                                                &
@@ -424,10 +432,10 @@ CONTAINS
           ! New solution at the i_RK step without the implicit  and
           ! semi-implicit term
           q_fv_cell(1:n_vars) = q( 1:n_vars , j , k )                            &
-               - dt * (MATMUL( divFlux(1:n_eqns,j,k,1:i_RK)                     &
-               - expl_terms(1:n_eqns,j,k,1:i_RK) , a_tilde(1:i_RK) )            &
-               - MATMUL( NH(1:n_eqns,j,k,1:i_RK) + SI_NH(1:n_eqns,j,k,1:i_RK) , &
-               a_dirk(1:i_RK) ) )
+               - dt * (MATMUL( this%divFlux(1:n_eqns,j,k,1:i_RK)                     &
+               - this%expl_terms(1:n_eqns,j,k,1:i_RK) , this%a_tilde(1:i_RK) )            &
+               - MATMUL( this%NH(1:n_eqns,j,k,1:i_RK) + this%SI_NH(1:n_eqns,j,k,1:i_RK) , &
+               this%a_dirk(1:i_RK) ) )
 
           CALL qc_to_qp(q_fv_cell , qp(1:n_vars+2,j,k) , p_dyn )
 
@@ -453,12 +461,12 @@ CONTAINS
                      B_prime_y_geom(j,k) , B_second_xx_geom(j,k) ,              &
                      B_second_xy_geom(j,k) , B_second_yy_geom(j,k) ,            &
                      grav_coeff(j,k) , q_fv_cell ,                              &
-                     qp( 1:n_vars , j , k ) , SI_NH(1:n_eqns,j,k,i_RK) ,        &
+                     qp( 1:n_vars , j , k ) , this%SI_NH(1:n_eqns,j,k,i_RK) ,        &
                      Z(j,k), fric_array(j,k) )
 
                 ! Assemble the initial guess for the implicit solver
                 q_si(1:n_vars) = q_fv_cell + dt * a_diag *                     &
-                     SI_NH(1:n_eqns,j,k,i_RK)
+                     this%SI_NH(1:n_eqns,j,k,i_RK)
 
                 IF ( ( q_fv_cell(2)**2 + q_fv_cell(3)**2 ) .EQ. 0.0_wp ) THEN
 
@@ -483,18 +491,18 @@ CONTAINS
 
                 ! Update the semi-implicit term accordingly with the
                 ! corrections above
-                SI_NH(1:n_eqns,j,k,i_RK) = ( q_si(1:n_vars) -                   &
+                this%SI_NH(1:n_eqns,j,k,i_RK) = ( q_si(1:n_vars) -                   &
                      q_fv_cell ) / ( dt*a_diag )
 
                 ! Initialize the guess for the NR solver
                 q_guess(1:n_vars) = q_si(1:n_vars)
 
 
-                Rj_not_impl =  ( MATMUL( divFlux(1:n_eqns,j,k,1:i_RK-1) -       &
-                     expl_terms(1:n_eqns,j,k,1:i_RK-1), a_tilde(1:i_RK-1) )     &
-                     - MATMUL( NH(1:n_eqns,j,k,1:i_RK-1)                        &
-                     + SI_NH(1:n_eqns,j,k,1:i_RK-1) , a_dirk(1:i_RK-1) ) )      &
-                     - a_diag * SI_NH(1:n_eqns,j,k,i_RK)
+                Rj_not_impl =  ( MATMUL( this%divFlux(1:n_eqns,j,k,1:i_RK-1) -       &
+                     this%expl_terms(1:n_eqns,j,k,1:i_RK-1), this%a_tilde(1:i_RK-1) )     &
+                     - MATMUL( this%NH(1:n_eqns,j,k,1:i_RK-1)                        &
+                     + this%SI_NH(1:n_eqns,j,k,1:i_RK-1) , this%a_dirk(1:i_RK-1) ) )      &
+                     - a_diag * this%SI_NH(1:n_eqns,j,k,i_RK)
 
                 ! Solve the implicit system to find the solution at the 
                 ! i_RK step of the IMEX RK procedure
@@ -554,7 +562,7 @@ CONTAINS
 
                 IF ( rheology_model .EQ. 8 ) THEN
                    
-                   NH(1:n_eqns,j,k,i_RK) = ( q_guess(1:n_vars)                  &
+                   this%NH(1:n_eqns,j,k,i_RK) = ( q_guess(1:n_vars)                  &
                         - q_si(1:n_vars) ) / ( dt*a_diag )
                    
                 ELSE
@@ -562,7 +570,7 @@ CONTAINS
                    ! Eval and store the implicit term at the i_RK step
                    CALL eval_implicit_terms( B_prime_x_geom(j,k) ,              &
                         B_prime_y_geom(j,k) , Z(j,k), fric_array(j,k),          &
-                        r_qj = q_guess , r_nh_term_impl = NH(1:n_eqns,j,k,i_RK) )
+                        r_qj = q_guess , r_nh_term_impl = this%NH(1:n_eqns,j,k,i_RK) )
                    
                    IF ( q_si(2)**2 + q_si(3)**2 .EQ. 0.0_wp ) THEN
                       
@@ -590,8 +598,8 @@ CONTAINS
                 ! If h=0 nothing has to be changed 
                 q_guess(1:n_vars) = q_fv_cell
                 q_si(1:n_vars) = q_fv_cell
-                SI_NH(1:n_eqns,j,k,i_RK) = 0.0_wp
-                NH(1:n_eqns,j,k,i_RK) = 0.0_wp
+                this%SI_NH(1:n_eqns,j,k,i_RK) = 0.0_wp
+                this%NH(1:n_eqns,j,k,i_RK) = 0.0_wp
 
              END IF pos_thick
 
@@ -600,7 +608,7 @@ CONTAINS
           IF ( a_diag .NE. 0.0_wp ) THEN
 
              ! Update the implicit term with correction on the new velocity
-             NH(1:n_vars,j,k,i_RK) = ( q_guess(1:n_vars) - q_si(1:n_vars))      &
+             this%NH(1:n_vars,j,k,i_RK) = ( q_guess(1:n_vars) - q_si(1:n_vars))      &
                   / ( dt*a_diag ) 
 
           END IF
@@ -608,7 +616,7 @@ CONTAINS
           ! Store the current stage. Previous stage states are no longer
           ! needed here: their evaluated terms are retained in divFlux, NH,
           ! SI_NH and expl_terms.
-          q_rk( 1:n_vars , j , k ) = q_guess
+          this%q_rk( 1:n_vars , j , k ) = q_guess
 
           IF ( verbose_level .GE. 2 ) THEN
 
@@ -628,15 +636,15 @@ CONTAINS
 
           IF ( need_explicit_stage ) THEN
           
-             IF ( q_rk(1,j,k) .GT. 0.0_wp ) THEN
+             IF ( this%q_rk(1,j,k) .GT. 0.0_wp ) THEN
 
-                CALL qc_to_qp( q_rk(1:n_vars,j,k) ,                             &
-                     qp_rk(1:n_vars+2,j,k) , p_dyn )
+                CALL qc_to_qp( this%q_rk(1:n_vars,j,k) ,                             &
+                     this%qp_rk(1:n_vars+2,j,k) , p_dyn )
 
              ELSE
 
-                qp_rk(1:n_vars+2,j,k) = 0.0_wp
-                qp_rk(4,j,k) = T_ambient
+                this%qp_rk(1:n_vars+2,j,k) = 0.0_wp
+                this%qp_rk(4,j,k) = T_ambient
 
              END IF
 
@@ -645,7 +653,7 @@ CONTAINS
                   B_second_xx_geom(j,k) , B_second_xy_geom(j,k) ,               &
                   B_second_yy_geom(j,k) , grav_coeff(j,k), d_grav_coeff_dx(j,k),&
                   d_grav_coeff_dy(j,k) , source_xy(j,k),                        &
-                  qp_rk(1:n_vars+2,j,k), expl_terms(1:n_eqns,j,k,i_RK), t,      &
+                  this%qp_rk(1:n_vars+2,j,k), this%expl_terms(1:n_eqns,j,k,i_RK), t,      &
                   cell_source_fractions(j,k),                                   &
                   cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k),    &
                   dx * dy )
@@ -661,8 +669,8 @@ CONTAINS
 
           ! Eval and store the explicit hyperbolic (fluxes) terms
           CALL hyper%evaluate_terms(                                            &
-               q_rk , qp_rk ,                                                   &
-               divFlux(1:n_eqns,1:comp_cells_x,1:comp_cells_y,i_RK), t,        &
+               this%q_rk , this%qp_rk ,                                                   &
+               this%divFlux(1:n_eqns,1:comp_cells_x,1:comp_cells_y,i_RK), t,        &
                domain%solve_cells, domain%j_cent, domain%k_cent,                                    &
                domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,                        &
                domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y )
@@ -683,10 +691,10 @@ CONTAINS
        ! state locally before overwriting this cell during final assembly.
        q_old_cell = q(1:n_vars,j,k)
 
-       residual_cell = MATMUL( divFlux(1:n_eqns,j,k,1:n_RK)                     &
-            - expl_terms(1:n_eqns,j,k,1:n_RK) , omega_tilde ) -                 &
-            MATMUL( NH(1:n_eqns,j,k,1:n_RK) + SI_NH(1:n_eqns,j,k,1:n_RK) ,      &
-            omega )
+       residual_cell = MATMUL( this%divFlux(1:n_eqns,j,k,1:n_RK)                     &
+            - this%expl_terms(1:n_eqns,j,k,1:n_RK) , this%omega_tilde ) -                 &
+            MATMUL( this%NH(1:n_eqns,j,k,1:n_RK) + this%SI_NH(1:n_eqns,j,k,1:n_RK) ,      &
+            this%omega )
 
 
        IF ( verbose_level .GE. 1 ) THEN
@@ -703,11 +711,11 @@ CONTAINS
 
        END IF
 
-       IF ( ( SUM(ABS( omega_tilde(:)-a_tilde_ij(n_RK,:))) .EQ. 0.0_wp  )       &
-            .AND. ( SUM(ABS(omega(:)-a_dirk_ij(n_RK,:))) .EQ. 0.0_wp ) ) THEN
+       IF ( ( SUM(ABS( this%omega_tilde(:)-this%a_tilde_ij(n_RK,:))) .EQ. 0.0_wp  )       &
+            .AND. ( SUM(ABS(this%omega(:)-this%a_dirk_ij(n_RK,:))) .EQ. 0.0_wp ) ) THEN
 
           ! The assembling coeffs are equal to the last step of the RK scheme
-          q(1:n_vars,j,k) = q_rk(1:n_vars,j,k)
+          q(1:n_vars,j,k) = this%q_rk(1:n_vars,j,k)
 
        ELSE
 
@@ -755,16 +763,16 @@ CONTAINS
              END IF
              WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
 
-             WRITE(*,*) 'divFlux(1,j,k,1:n_RK)',divFlux(1,j,k,1:n_RK) 
+             WRITE(*,*) 'divFlux(1,j,k,1:n_RK)',this%divFlux(1,j,k,1:n_RK)
 
              WRITE(*,*) hyper%H_interface_x(1,j+1,k), hyper%H_interface_x(1,j,k)
              WRITE(*,*) recon%qp_interfaceR(1:n_vars,j,k)
              WRITE(*,*) qp(1:n_vars,j,k)
              WRITE(*,*) recon%qp_interfaceL(1:n_vars,j+1,k)
 
-             WRITE(*,*) 'expl_terms(1,j,k,1:n_RK)',expl_terms(1,j,k,1:n_RK) 
-             WRITE(*,*) 'NH(1,j,k,1:n_RK)',NH(1,j,k,1:n_RK) 
-             WRITE(*,*) 'SI_NH(1,j,k,1:n_RK)',SI_NH(1,j,k,1:n_RK) 
+             WRITE(*,*) 'expl_terms(1,j,k,1:n_RK)',this%expl_terms(1,j,k,1:n_RK)
+             WRITE(*,*) 'NH(1,j,k,1:n_RK)',this%NH(1,j,k,1:n_RK)
+             WRITE(*,*) 'SI_NH(1,j,k,1:n_RK)',this%SI_NH(1,j,k,1:n_RK)
 
              WRITE(*,*) 'B_cent(j,k)',B_cent(j,k)
 
@@ -946,15 +954,15 @@ CONTAINS
              WRITE(*,*) hyper%H_interface_x(5,j+1,k)/dx*dt, hyper%H_interface_x(5,j,k)/dx*dt
              WRITE(*,*) hyper%H_interface_y(5,j,k+1)/dy*dt, hyper%H_interface_y(5,j,k)/dy*dt
 
-             WRITE(*,*) 'divFlux(1)',divFlux(1,j,k,1:n_RK)
-             WRITE(*,*) 'expl_terms(1)', expl_terms(1,j,k,1:n_RK)
-             WRITE(*,*) 'NH(1)', NH(1,j,k,1:n_RK)
-             WRITE(*,*) 'SI(1)', SI_NH(1,j,k,1:n_RK) 
+             WRITE(*,*) 'divFlux(1)',this%divFlux(1,j,k,1:n_RK)
+             WRITE(*,*) 'expl_terms(1)', this%expl_terms(1,j,k,1:n_RK)
+             WRITE(*,*) 'NH(1)', this%NH(1,j,k,1:n_RK)
+             WRITE(*,*) 'SI(1)', this%SI_NH(1,j,k,1:n_RK)
 
-             WRITE(*,*) 'divFlux(5)',divFlux(5,j,k,1:n_RK)
-             WRITE(*,*) 'expl_terms(5)', expl_terms(5,j,k,1:n_RK)
-             WRITE(*,*) 'NH(5)', NH(5,j,k,1:n_RK)
-             WRITE(*,*) 'SI(5)', SI_NH(5,j,k,1:n_RK) 
+             WRITE(*,*) 'divFlux(5)',this%divFlux(5,j,k,1:n_RK)
+             WRITE(*,*) 'expl_terms(5)', this%expl_terms(5,j,k,1:n_RK)
+             WRITE(*,*) 'NH(5)', this%NH(5,j,k,1:n_RK)
+             WRITE(*,*) 'SI(5)', this%SI_NH(5,j,k,1:n_RK)
              
 
              READ(*,*)

@@ -28,8 +28,7 @@ MODULE solver_2d
   USE hyperbolic_2d, ONLY : hyperbolic_workspace
 
   USE domain_2d, ONLY : domain
-  USE time_integration_2d, ONLY : initialize_time_integration,                &
-       finalize_time_integration
+  USE time_integration_2d, ONLY : time_integration_workspace
 
   IMPLICIT none
 
@@ -77,7 +76,7 @@ CONTAINS
 
 
     CALL initialize_nonlinear_solver
-    CALL initialize_time_integration
+    CALL time_integration_workspace%initialize
 
     ! Allocate array containing the stochastic noise.
     ! Allocated unconditionally: Z(j,k) is passed as a scalar actual
@@ -115,7 +114,7 @@ CONTAINS
   SUBROUTINE deallocate_solver_variables
 
     CALL domain%finalize
-    CALL finalize_time_integration
+    CALL time_integration_workspace%finalize
     CALL hyperbolic_workspace%finalize
     CALL reconstruction_workspace%finalize
 
