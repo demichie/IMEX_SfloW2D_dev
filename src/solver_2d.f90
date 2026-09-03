@@ -35,9 +35,6 @@ MODULE solver_2d
   !> time
   REAL(wp) :: t
 
-  !> Array defining fraction of cells affected by source term
-  REAL(wp), ALLOCATABLE :: source_xy(:,:)
-
   !> Time step
   REAL(wp) :: dt
 
@@ -69,9 +66,6 @@ CONTAINS
     CALL reconstruction_workspace%initialize
     CALL hyperbolic_workspace%initialize
     CALL domain%initialize
-
-    ALLOCATE( source_xy( comp_cells_x , comp_cells_y ) )
-
 
     CALL initialize_nonlinear_solver
     CALL time_integration_workspace%initialize
@@ -110,8 +104,6 @@ CONTAINS
     CALL reconstruction_workspace%finalize
 
     CALL state%finalize
-
-    DEALLOCATE( source_xy )
 
     CALL finalize_nonlinear_solver
 

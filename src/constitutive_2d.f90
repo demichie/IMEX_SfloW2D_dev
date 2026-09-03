@@ -3047,7 +3047,6 @@ CONTAINS
   !> \param[in]     grav_coeff         correction factor for topography slope
   !> \param[in]     d_grav_coeff_dx    x-derivative of grav_coeff
   !> \param[in]     d_grav_coeff_dy    y-derivative of grav_coeff
-  !> \param[in]     source_xy          local source of mass
   !> \param[in]     qpj                physical variables
   !> \param[in]     time               simlation time (needed for source)
   !> \param[in]     cell_fract_jk      fraction of cell contributing to source
@@ -3059,7 +3058,7 @@ CONTAINS
   !******************************************************************************
 
   SUBROUTINE eval_expl_terms( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy , &
-       Bsecondj_yy, grav_coeff, d_grav_coeff_dx , d_grav_coeff_dy , source_xy , &
+       Bsecondj_yy, grav_coeff, d_grav_coeff_dx , d_grav_coeff_dy ,             &
        qpj, expl_term, time, cell_fract_jk,                                    &
        lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk )
 
@@ -3082,8 +3081,6 @@ CONTAINS
     REAL(wp), INTENT(IN) :: grav_coeff
     REAL(wp), INTENT(IN) :: d_grav_coeff_dx
     REAL(wp), INTENT(IN) :: d_grav_coeff_dy
-
-    REAL(wp), INTENT(IN) :: source_xy
 
     REAL(wp), INTENT(IN) :: qpj(n_vars+2)      !< local physical variables
     REAL(wp), INTENT(OUT) :: expl_term(n_eqns) !< local explicit forces

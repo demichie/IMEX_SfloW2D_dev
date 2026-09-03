@@ -277,7 +277,7 @@ CONTAINS
   !
   !******************************************************************************
 
-  SUBROUTINE imex_RK_solver(this, q, qp, t, dt, source_xy, Z)
+  SUBROUTINE imex_RK_solver(this, q, qp, t, dt, Z)
 
     USE constitutive_2d, ONLY : maximum_solid_packing
     
@@ -303,7 +303,6 @@ CONTAINS
     REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: t, dt
-    REAL(wp), INTENT(IN) :: source_xy(comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: Z(comp_cells_x,comp_cells_y)
 
     REAL(wp) :: q_si(n_vars) !< solution after the semi-implicit step
@@ -651,7 +650,7 @@ CONTAINS
              CALL eval_expl_terms( B_prime_x_geom(j,k) , B_prime_y_geom(j,k) ,  &
                   B_second_xx_geom(j,k) , B_second_xy_geom(j,k) ,               &
                   B_second_yy_geom(j,k) , grav_coeff(j,k), d_grav_coeff_dx(j,k),&
-                  d_grav_coeff_dy(j,k) , source_xy(j,k),                        &
+                  d_grav_coeff_dy(j,k) ,                                       &
                   this%qp_rk(1:n_vars+2,j,k), this%expl_terms(1:n_eqns,j,k,i_RK), t,      &
                   cell_source_fractions(j,k),                                   &
                   cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k),    &
