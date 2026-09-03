@@ -277,7 +277,7 @@ CONTAINS
   !
   !******************************************************************************
 
-  SUBROUTINE imex_RK_solver(this, q, qp, t, dt, source_xy, Z, fric_array)
+  SUBROUTINE imex_RK_solver(this, q, qp, t, dt, source_xy, Z)
 
     USE constitutive_2d, ONLY : maximum_solid_packing
     
@@ -305,7 +305,6 @@ CONTAINS
     REAL(wp), INTENT(IN) :: t, dt
     REAL(wp), INTENT(IN) :: source_xy(comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: Z(comp_cells_x,comp_cells_y)
-    REAL(wp), INTENT(INOUT) :: fric_array(comp_cells_x,comp_cells_y)
 
     REAL(wp) :: q_si(n_vars) !< solution after the semi-implicit step
     REAL(wp) :: q_guess(n_vars) !< initial guess for the solution of the RK step
@@ -462,7 +461,7 @@ CONTAINS
                      B_second_xy_geom(j,k) , B_second_yy_geom(j,k) ,            &
                      grav_coeff(j,k) , q_fv_cell ,                              &
                      qp( 1:n_vars , j , k ) , this%SI_NH(1:n_eqns,j,k,i_RK) ,        &
-                     Z(j,k), fric_array(j,k) )
+                     Z(j,k) )
 
                 ! Assemble the initial guess for the implicit solver
                 q_si(1:n_vars) = q_fv_cell + dt * a_diag *                     &
@@ -508,7 +507,7 @@ CONTAINS
                 ! i_RK step of the IMEX RK procedure
                 CALL solve_rk_step( q_guess(1:n_vars) , q(1:n_vars,j,k ) ,      &
                      dt, a_diag , Rj_not_impl , B_prime_x_geom(j,k) ,            &
-                     B_prime_y_geom(j,k), Z(j,k), fric_array(j,k),              &
+                     B_prime_y_geom(j,k), Z(j,k),                              &
                      newton_iterations, newton_converged, newton_linear_info,   &
                      newton_line_search_failed )
 
@@ -569,7 +568,7 @@ CONTAINS
                    
                    ! Eval and store the implicit term at the i_RK step
                    CALL eval_implicit_terms( B_prime_x_geom(j,k) ,              &
-                        B_prime_y_geom(j,k) , Z(j,k), fric_array(j,k),          &
+                        B_prime_y_geom(j,k) , Z(j,k),                          &
                         r_qj = q_guess , r_nh_term_impl = this%NH(1:n_eqns,j,k,i_RK) )
                    
                    IF ( q_si(2)**2 + q_si(3)**2 .EQ. 0.0_wp ) THEN

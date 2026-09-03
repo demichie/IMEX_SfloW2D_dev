@@ -57,7 +57,7 @@ CONTAINS
   !******************************************************************************
 
   SUBROUTINE solve_rk_step( qj, qj_old, dt_step, a_diag, Rj_not_impl,          &
-       Bprimej_x, Bprimej_y, Zij, fric_val,                                    &
+       Bprimej_x, Bprimej_y, Zij,                                              &
        iterations_used, converged, linear_info, line_search_failed )
 
     USE parameters_2d, ONLY : max_nl_iter , tol_rel , tol_abs
@@ -76,7 +76,6 @@ CONTAINS
     REAL(wp), INTENT(IN) :: Bprimej_x
     REAL(wp), INTENT(IN) :: Bprimej_y
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
-    REAL(wp), INTENT(OUT) :: fric_val ! to save the value of the friction
     INTEGER, INTENT(OUT) :: iterations_used
     LOGICAL, INTENT(OUT) :: converged
     INTEGER, INTENT(OUT) :: linear_info
@@ -100,7 +99,6 @@ CONTAINS
     REAL(wp) :: desc_dir(n_vars)
     REAL(wp) :: grad_f(n_vars)
     REAL(wp) :: relative_step
-    REAL(wp) :: fric_val_before_jacobian
 
     INTEGER :: pivot(n_vars)
 
@@ -159,8 +157,7 @@ CONTAINS
        IF ( verbose_level .GE. 2 ) WRITE(*,*) 'solve_rk_step: nl_iter',nl_iter
 
        CALL eval_f( qj , qj_old , dt_step , a_diag , coeff_f ,             &
-            Rj_not_impl , Bprimej_x , Bprimej_y , right_term , scal_f , Zij ,   &
-            fric_val )
+            Rj_not_impl , Bprimej_x , Bprimej_y , right_term , scal_f , Zij )
 
        IF ( verbose_level .GE. 2 ) THEN
 
@@ -189,10 +186,8 @@ CONTAINS
 
        ! ---- evaluate the descent direction ------------------------------------
 
-       fric_val_before_jacobian = fric_val
-
        CALL eval_jacobian( qj_rel , qj_org , dt_step , a_diag , coeff_f ,   &
-            Bprimej_x , Bprimej_y , left_matrix, Zij, fric_val )
+            Bprimej_x , Bprimej_y , left_matrix, Zij )
 
        ! DGESV/SGESV overwrite the Jacobian with its LU factors in the fully
        ! implicit case. Form the line-search gradient before the linear solve.
@@ -317,7 +312,6 @@ CONTAINS
        relative_step = MAXVAL( ABS(desc_dir) / MAX(ABS(qj_rel),1.0_wp) )
 
        IF ( ( nl_iter .GT. 1 ) .AND. ( relative_step .LE. tol_rel ) ) THEN
-          fric_val = fric_val_before_jacobian
           converged = .TRUE.
           IF ( verbose_level .GE. 2 )                                         &
                WRITE(*,*) 'solve_rk_step: converged on Newton correction'
@@ -336,7 +330,7 @@ CONTAINS
           CALL lnsrch( qj_rel_NR_old , qj_org , qj_old , scal_f_old , grad_f ,  &
                desc_dir , coeff_f , qj_rel , scal_f , right_term , stpmax ,     &
                check , dt_step , a_diag , Rj_not_impl , Bprimej_x , Bprimej_y,  &
-               Zij, fric_val )
+               Zij )
 
           IF ( check ) THEN
              qj = qj_rel * qj_org
@@ -353,8 +347,7 @@ CONTAINS
           qj = qj_rel * qj_org
 
           CALL eval_f( qj , qj_old , dt_step , a_diag , coeff_f ,          &
-               Rj_not_impl , Bprimej_x , Bprimej_y , right_term , scal_f, Zij,  &
-               fric_val )
+               Rj_not_impl , Bprimej_x , Bprimej_y , right_term , scal_f, Zij )
 
        END IF
 
@@ -628,7 +621,7 @@ CONTAINS
 
   SUBROUTINE lnsrch( qj_rel_NR_old , qj_org , qj_old , scal_f_old , grad_f ,    &
        desc_dir , coeff_f , qj_rel , scal_f , right_term , stpmax , check ,     &
-       dt_step , a_diag , Rj_not_impl , Bprimej_x , Bprimej_y, Zij, fric_val )
+       dt_step , a_diag , Rj_not_impl , Bprimej_x , Bprimej_y, Zij )
 
     IMPLICIT NONE
 
@@ -676,7 +669,6 @@ CONTAINS
 
     ! vars for stochastic variable
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
-    REAL(wp), INTENT(INOUT) :: fric_val ! to save the value of the friction
     REAL(wp), PARAMETER :: TOLX=epsilon(qj_rel)
 
     INTEGER, DIMENSION(1) :: ndum
@@ -687,7 +679,6 @@ CONTAINS
 
     REAL(wp) :: qj(n_vars)
     REAL(wp) :: right_term_old(n_eqns)
-    REAL(wp) :: fric_val_old
 
     ALF = 1.0e-4_wp
 
@@ -705,7 +696,6 @@ CONTAINS
 
     check = .FALSE.
     right_term_old = right_term
-    fric_val_old = fric_val
 
     desc_dir_abs = NORM2(desc_dir)
 
@@ -717,7 +707,6 @@ CONTAINS
        qj_rel = qj_rel_NR_old
        scal_f = scal_f_old
        right_term = right_term_old
-       fric_val = fric_val_old
        check = .TRUE.
        RETURN
     END IF
@@ -729,7 +718,6 @@ CONTAINS
        qj_rel(:) = qj_rel_NR_old(:)
        scal_f = scal_f_old
        right_term = right_term_old
-       fric_val = fric_val_old
        check = .TRUE.
 
        RETURN
@@ -753,8 +741,7 @@ CONTAINS
        qj = qj_rel * qj_org
 
        CALL eval_f( qj , qj_old , dt_step , a_diag , coeff_f ,             &
-            Rj_not_impl , Bprimej_x , Bprimej_y, right_term , scal_f, Zij,      &
-            fric_val )
+            Rj_not_impl , Bprimej_x , Bprimej_y, right_term , scal_f, Zij )
 
        IF ( verbose_level .GE. 4 ) THEN
 
@@ -786,7 +773,6 @@ CONTAINS
           qj_rel(:) = qj_rel_NR_old(:)
           scal_f = scal_f_old
           right_term = right_term_old
-          fric_val = fric_val_old
           check = .TRUE.
 
           EXIT optimal_step_search
@@ -866,7 +852,7 @@ CONTAINS
 
   SUBROUTINE eval_f( qj , qj_old , dt_step, a_diag , coeff_f , Rj_not_impl ,    &
        Bprimej_x ,                                                              &
-       Bprimej_y , f_nl , scal_f, Zij, fric_val )
+       Bprimej_y , f_nl , scal_f, Zij )
 
     USE constitutive_2d, ONLY : eval_implicit_terms
 
@@ -887,12 +873,11 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: scal_f
 
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
-    REAL(wp), INTENT(OUT) :: fric_val ! to save the value of the friction
 
     REAL(wp) :: nh_term_impl(n_eqns)
     REAL(wp) :: Rj(n_eqns)
 
-    CALL eval_implicit_terms( Bprimej_x , Bprimej_y, Zij, fric_val, r_qj = qj , &
+    CALL eval_implicit_terms( Bprimej_x , Bprimej_y, Zij, r_qj = qj ,           &
          r_nh_term_impl=nh_term_impl )
 
     Rj = Rj_not_impl - a_diag * nh_term_impl
@@ -924,7 +909,7 @@ CONTAINS
   !******************************************************************************
 
   SUBROUTINE eval_jacobian( qj_rel , qj_org , dt_step, a_diag , coeff_f,   &
-       Bprimej_x , Bprimej_y , left_matrix, Zij, fric_val)
+       Bprimej_x , Bprimej_y , left_matrix, Zij )
 
     USE constitutive_2d, ONLY : eval_implicit_terms
 
@@ -942,7 +927,6 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: left_matrix(n_eqns,n_vars)
 
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
-    REAL(wp), INTENT(OUT) :: fric_val ! to save the value of the friction
 
     REAL(wp) :: Jacob_relax(n_eqns,n_vars)
     COMPLEX(wp) :: nh_terms_cmplx_impl(n_eqns)
@@ -975,7 +959,7 @@ CONTAINS
 
           qj_cmplx = qj_rel_cmplx * qj_org
 
-          CALL eval_implicit_terms( Bprimej_x , Bprimej_y, Zij, fric_val,       &
+          CALL eval_implicit_terms( Bprimej_x , Bprimej_y, Zij,                 &
                c_qj = qj_cmplx , c_nh_term_impl = nh_terms_cmplx_impl )
 
           Jacob_relax(1:n_eqns,i) = coeff_f(1:n_eqns) *                        &

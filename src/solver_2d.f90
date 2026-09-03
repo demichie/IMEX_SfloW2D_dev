@@ -45,8 +45,6 @@ MODULE solver_2d
   REAL(wp), ALLOCATABLE :: Z(:,:)
   !> Array for kernel
   REAL(wp), ALLOCATABLE :: conv_kernel(:,:)
-  !> Friction values at cells
-  REAL(wp), ALLOCATABLE :: fric_array(:,:)
   
 CONTAINS
 
@@ -86,13 +84,6 @@ CONTAINS
     ALLOCATE ( Z(comp_cells_x , comp_cells_y) )
     Z(1:comp_cells_x,1:comp_cells_y) = 0.0_wp
     
-    ! Allocate array containing the friction values.
-    ! Allocated unconditionally for the same reason as Z above:
-    ! fric_array(j,k) is passed as a scalar actual argument for every
-    ! rheology model, not only those that populate it.
-    ALLOCATE (fric_array(comp_cells_x , comp_cells_y))
-    fric_array(1:comp_cells_x,1:comp_cells_y) = 0.0_wp
-    
     WRITE(*,*) 'ALLOCATION OF ARRAYS COMPLETED'
     
     RETURN
@@ -128,8 +119,6 @@ CONTAINS
     IF ( ALLOCATED(implicit_map) ) DEALLOCATE(implicit_map)
     IF ( ALLOCATED(Z) ) DEALLOCATE(Z)
     IF ( ALLOCATED(conv_kernel) ) DEALLOCATE(conv_kernel)
-    IF ( ALLOCATED(fric_array) ) DEALLOCATE(fric_array)
-
     
     RETURN
     

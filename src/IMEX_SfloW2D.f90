@@ -94,7 +94,7 @@ PROGRAM IMEX_SfloW2D
    USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,          &
       thickness_levels , dyn_pres_levels
 
-   USE solver_2d, ONLY : t, dt, source_xy, Z_field => Z, fric_array
+   USE solver_2d, ONLY : t, dt, source_xy, Z_field => Z
    USE state_2d, ONLY : state
 
    USE constitutive_2d, ONLY : qc_to_qp
@@ -433,7 +433,7 @@ PROGRAM IMEX_SfloW2D
       dt_old_old = dt_old
       dt_old = dt
 
-      CALL time_integrator%advance(state%q, state%qp, t, dt, source_xy, Z_field, fric_array)
+      CALL time_integrator%advance(state%q, state%qp, t, dt, source_xy, Z_field)
 
       CALL update_erosion_deposition_cell(state%q, state%qp, dt)
 

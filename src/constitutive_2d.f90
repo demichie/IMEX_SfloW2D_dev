@@ -3546,7 +3546,7 @@ CONTAINS
   !
   !******************************************************************************
 
-  SUBROUTINE eval_implicit_terms( Bprimej_x, Bprimej_y, Zij, fric_val, c_qj,    &
+  SUBROUTINE eval_implicit_terms( Bprimej_x, Bprimej_y, Zij, c_qj,              &
        c_nh_term_impl, r_qj , r_nh_term_impl )
 
     USE COMPLEXIFY
@@ -3561,7 +3561,6 @@ CONTAINS
     REAL(wp), INTENT(IN) :: Bprimej_x
     REAL(wp), INTENT(IN) :: Bprimej_y
     REAL(wp), INTENT(IN):: Zij
-    REAL(wp), INTENT(OUT) :: fric_val
     COMPLEX(wp), INTENT(IN), OPTIONAL :: c_qj(n_vars)
     COMPLEX(wp), INTENT(OUT), OPTIONAL :: c_nh_term_impl(n_eqns)
     REAL(wp), INTENT(IN), OPTIONAL :: r_qj(n_vars)
@@ -3711,9 +3710,6 @@ CONTAINS
                xi_temp = xi
              END IF  
              
-             ! Store stoch value of xi
-             fric_val = xi_temp
-
              turb_stress = rho_m * red_grav / xi_temp * mod_vel2
 
              source_term(2) = source_term(2) - turb_stress * ( u / mod_vel )
@@ -4071,7 +4067,7 @@ CONTAINS
 
   SUBROUTINE eval_nh_semi_impl_terms( Bprimej_x , Bprimej_y , Bsecondj_xx ,     &
        Bsecondj_xy , Bsecondj_yy , grav_coeff , qcj , qpj , nh_semi_impl_term , &
-       Zj, fric_val )
+       Zj )
 
     USE parameters_2D, ONLY: pore_pressure_flag
     
@@ -4089,7 +4085,6 @@ CONTAINS
     REAL(wp), INTENT(IN) :: Zj ! value stochastic process
 
     REAL(wp), INTENT(OUT) :: nh_semi_impl_term(n_eqns)
-    REAL(wp), INTENT(OUT) :: fric_val
 
     REAL(wp) :: source_term(n_eqns)
 
@@ -4148,10 +4143,7 @@ CONTAINS
 
     sp_heat_flag = .FALSE.
 
-    ! Set both INTENT(OUT) arguments up front: several rheology
-    ! branches never assign fric_val, leaving it undefined on return.
     nh_semi_impl_term(1:n_eqns) = 0.0_wp
-    fric_val = 0.0_wp
 
     ! A dry cell carries no friction source, and the
     ! alpha_flag = .FALSE. branch below divides the solid and
@@ -4375,9 +4367,6 @@ CONTAINS
           
           END IF
          
-         ! Set value friction to output variable (so that it can be saved!)
-          fric_val = muF
-
       ELSEIF ( rheology_model .EQ. 10 ) THEN
 
           ! From Lucas et al. 2014 (DOI: 10.1038/ncomms4417)
@@ -4434,9 +4423,6 @@ CONTAINS
             muF = 0._wp
           
           END IF
-
-          ! Set value friction to output variable (so that it can be saved!)
-          fric_val = muF
 
       ELSEIF ( rheology_model .EQ. 11 ) THEN
          !    mu(I) rheology for dense granular flows   !
