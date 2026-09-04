@@ -23,11 +23,11 @@ MODULE time_integration_2d
 
   USE nonlinear_solver_2d, ONLY : solve_rk_step
 
-  USE reconstruction_2d, ONLY : recon => reconstruction_workspace
+  USE reconstruction_2d, ONLY : reconstruction_workspace_type
 
-  USE hyperbolic_2d, ONLY : hyper => hyperbolic_workspace
+  USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
 
-  USE domain_2d, ONLY : domain
+  USE domain_2d, ONLY : domain_type
 
   IMPLICIT NONE
 
@@ -168,7 +168,7 @@ CONTAINS
 
   END SUBROUTINE finalize_time_integration
 
-  SUBROUTINE timestep(q, qp, t, dt)
+  SUBROUTINE timestep(q, qp, t, dt, domain, recon, hyper)
 
     ! External variables
     USE geometry_2d, ONLY : dx,dy
@@ -182,6 +182,9 @@ CONTAINS
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: t
     REAL(wp), INTENT(OUT) :: dt
+    CLASS(domain_type), INTENT(IN) :: domain
+    CLASS(reconstruction_workspace_type), INTENT(INOUT) :: recon
+    CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: hyper
 
     INTEGER :: j,k,l          !< loop counter
 
@@ -223,8 +226,9 @@ CONTAINS
             domain%j_cent, domain%k_cent )
 
        ! Compute the max/min eigenvalues at the interfaces
-       CALL hyper%evaluate_speeds( domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,    &
-            domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y )
+       CALL hyper%evaluate_speeds( recon, domain%solve_interfaces_x,          &
+            domain%j_stag_x, domain%k_stag_x, domain%solve_interfaces_y,     &
+            domain%j_stag_y, domain%k_stag_y )
 
        max_a_x = 0.0_wp
        max_a_y = 0.0_wp
@@ -277,7 +281,7 @@ CONTAINS
   !
   !******************************************************************************
 
-  SUBROUTINE imex_RK_solver(this, q, qp, t, dt, Z)
+  SUBROUTINE imex_RK_solver(this, q, qp, t, dt, Z, domain, recon, hyper)
 
     USE constitutive_2d, ONLY : maximum_solid_packing
     
@@ -304,6 +308,9 @@ CONTAINS
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: t, dt
     REAL(wp), INTENT(IN) :: Z(comp_cells_x,comp_cells_y)
+    CLASS(domain_type), INTENT(IN) :: domain
+    CLASS(reconstruction_workspace_type), INTENT(INOUT) :: recon
+    CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: hyper
 
     REAL(wp) :: q_si(n_vars) !< solution after the semi-implicit step
     REAL(wp) :: q_guess(n_vars) !< initial guess for the solution of the RK step
@@ -666,11 +673,11 @@ CONTAINS
        IF ( need_explicit_stage ) THEN
 
           ! Eval and store the explicit hyperbolic (fluxes) terms
-          CALL hyper%evaluate_terms(                                            &
-               this%q_rk , this%qp_rk ,                                                   &
-               this%divFlux(1:n_eqns,1:comp_cells_x,1:comp_cells_y,i_RK), t,        &
-               domain%solve_cells, domain%j_cent, domain%k_cent,                                    &
-               domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,                        &
+          CALL hyper%evaluate_terms( recon,                                   &
+               this%q_rk , this%qp_rk ,                                      &
+               this%divFlux(1:n_eqns,1:comp_cells_x,1:comp_cells_y,i_RK), t,  &
+               domain%solve_cells, domain%j_cent, domain%k_cent,              &
+               domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,  &
                domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y )
 
        END IF

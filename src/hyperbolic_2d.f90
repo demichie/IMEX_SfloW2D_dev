@@ -15,7 +15,7 @@ MODULE hyperbolic_2d
   USE geometry_2d, ONLY : grav_coeff_stag_x, grav_coeff_stag_y
   USE geometry_2d, ONLY : one_by_dx, one_by_dy
 
-  USE reconstruction_2d, ONLY : recon => reconstruction_workspace
+  USE reconstruction_2d, ONLY : reconstruction_workspace_type
 
   IMPLICIT NONE
 
@@ -71,9 +71,9 @@ CONTAINS
 
   END SUBROUTINE finalize_hyperbolic
 
-  SUBROUTINE eval_hyperbolic_terms( this, q_expl, qp_expl, divFlux_iRK, t,   &
-       solve_cells, j_cent, k_cent, solve_interfaces_x, j_stag_x, k_stag_x,   &
-       solve_interfaces_y, j_stag_y, k_stag_y )
+  SUBROUTINE eval_hyperbolic_terms( this, recon, q_expl, qp_expl,             &
+       divFlux_iRK, t, solve_cells, j_cent, k_cent, solve_interfaces_x,       &
+       j_stag_x, k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! External variables
     USE parameters_2d, ONLY : solver_scheme
@@ -81,6 +81,7 @@ CONTAINS
     IMPLICIT NONE
 
     CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
+    CLASS(reconstruction_workspace_type), INTENT(INOUT) :: recon
     REAL(wp), INTENT(IN) :: q_expl(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: qp_expl(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(OUT) :: divFlux_iRK(n_eqns,comp_cells_x,comp_cells_y)
@@ -102,8 +103,8 @@ CONTAINS
          j_cent, k_cent )
 
     ! Evaluation of the maximum local speeds at the interfaces
-    CALL this%evaluate_speeds( solve_interfaces_x, j_stag_x, k_stag_x,      &
-         solve_interfaces_y, j_stag_y, k_stag_y )
+    CALL this%evaluate_speeds( recon, solve_interfaces_x, j_stag_x,          &
+         k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! Evaluation of the numerical fluxes
     SELECT CASE ( solver_scheme )
@@ -118,13 +119,13 @@ CONTAINS
 
     CASE ("KT")
 
-       CALL eval_flux_KT( this, solve_interfaces_x, j_stag_x, k_stag_x,     &
-            solve_interfaces_y, j_stag_y, k_stag_y )
+       CALL eval_flux_KT( this, recon, solve_interfaces_x, j_stag_x,         &
+            k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
     CASE ("UP")
 
-       CALL eval_flux_UP( this, solve_interfaces_x, j_stag_x, k_stag_x,     &
-            solve_interfaces_y, j_stag_y, k_stag_y )
+       CALL eval_flux_UP( this, recon, solve_interfaces_x, j_stag_x,         &
+            k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
     END SELECT
 
@@ -173,8 +174,8 @@ CONTAINS
   !> \date 2019/11/16
   !******************************************************************************
   
-  SUBROUTINE eval_flux_UP( this, solve_interfaces_x, j_stag_x, k_stag_x,    &
-       solve_interfaces_y, j_stag_y, k_stag_y )
+  SUBROUTINE eval_flux_UP( this, recon, solve_interfaces_x, j_stag_x,        &
+       k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! External procedures
     USE constitutive_2d, ONLY : eval_fluxes
@@ -183,6 +184,7 @@ CONTAINS
     IMPLICIT NONE
 
     CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
+    CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
     INTEGER, INTENT(IN) :: solve_interfaces_x, solve_interfaces_y
     INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
     INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
@@ -316,8 +318,8 @@ CONTAINS
   !> \date 16/08/2011
   !******************************************************************************
 
-  SUBROUTINE eval_flux_KT( this, solve_interfaces_x, j_stag_x, k_stag_x,    &
-       solve_interfaces_y, j_stag_y, k_stag_y )
+  SUBROUTINE eval_flux_KT( this, recon, solve_interfaces_x, j_stag_x,        &
+       k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! External procedures
     USE constitutive_2d, ONLY : eval_fluxes
@@ -326,6 +328,7 @@ CONTAINS
     IMPLICIT NONE
 
     CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
+    CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
     INTEGER, INTENT(IN) :: solve_interfaces_x, solve_interfaces_y
     INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
     INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
@@ -589,8 +592,8 @@ CONTAINS
   !> \date 2019/11/11
   !******************************************************************************
 
-  SUBROUTINE eval_speeds( this, solve_interfaces_x, j_stag_x, k_stag_x,    &
-       solve_interfaces_y, j_stag_y, k_stag_y )
+  SUBROUTINE eval_speeds( this, recon, solve_interfaces_x, j_stag_x,         &
+       k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! External procedures
     USE constitutive_2d, ONLY : eval_local_speeds_x, eval_local_speeds_y 
@@ -598,6 +601,7 @@ CONTAINS
     IMPLICIT NONE
 
     CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
+    CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
     INTEGER, INTENT(IN) :: solve_interfaces_x, solve_interfaces_y
     INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
     INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
