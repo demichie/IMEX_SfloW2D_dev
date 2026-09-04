@@ -229,11 +229,11 @@ PROGRAM IMEX_SfloW2D
 
       IF ( collapsing_volume_flag ) THEN
 
-         CALL collapsing_volume
+         CALL collapsing_volume(simulation%state)
 
       ELSE
 
-         CALL init_empty
+         CALL init_empty(simulation%state)
 
       END IF
 
@@ -454,7 +454,7 @@ PROGRAM IMEX_SfloW2D
            simulation%hyperbolic)
 
       CALL update_erosion_deposition_cell(simulation%state%q,                 &
-           simulation%state%qp, simulation%runtime%dt)
+           simulation%state%qp, simulation%runtime%dt, simulation%domain)
 
       IF ( topo_change_flag ) CALL topography_reconstruction
 

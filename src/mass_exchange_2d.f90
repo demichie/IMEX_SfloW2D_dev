@@ -19,7 +19,7 @@ MODULE mass_exchange_2d
   USE parameters_2d, ONLY : verbose_level
   USE parameters_2d, ONLY : bottom_radial_source_flag
 
-  USE domain_2d, ONLY : domain
+  USE domain_2d, ONLY : domain_type
 
   USE OMP_LIB
 
@@ -37,9 +37,10 @@ CONTAINS
   !> \param[in,out] q   conservative variables
   !> \param[in,out] qp  physical variables
   !> \param[in]     dt  time step
+  !> \param[in]     domain active-cell workset
   !******************************************************************************
 
-  SUBROUTINE update_erosion_deposition_cell(q, qp, dt)
+  SUBROUTINE update_erosion_deposition_cell(q, qp, dt, domain)
 
     USE constitutive_2d, ONLY : erosion_coeff , settling_flag
     USE constitutive_2d, ONLY : maximum_solid_packing
@@ -60,6 +61,7 @@ CONTAINS
     REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: dt
+    CLASS(domain_type), INTENT(IN) :: domain
 
     REAL(wp) :: erosion_term(n_solid)
     REAL(wp) :: deposition_term(n_solid)

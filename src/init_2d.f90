@@ -11,6 +11,7 @@ MODULE init_2d
    USE parameters_2d, ONLY : verbose_level
    USE parameters_2d, ONLY : n_solid , n_add_gas
    USE parameters_2d, ONLY : n_stoch_vars , n_pore_vars
+   USE state_2d, ONLY : state_type
 
    IMPLICIT none
 
@@ -23,7 +24,7 @@ MODULE init_2d
 
 CONTAINS
 
-   SUBROUTINE init_empty
+   SUBROUTINE init_empty(state)
 
       USE constitutive_2d, ONLY : T_ambient
 
@@ -33,9 +34,9 @@ CONTAINS
 
       USE parameters_2d, ONLY : n_vars
 
-      USE state_2d, ONLY : state
-
       IMPLICIT NONE
+
+      CLASS(state_type), INTENT(INOUT) :: state
 
       INTEGER :: j,k
 
@@ -73,7 +74,7 @@ CONTAINS
    !
    !******************************************************************************
 
-   SUBROUTINE collapsing_volume
+   SUBROUTINE collapsing_volume(state)
 
       USE constitutive_2d, ONLY : qp_to_qc
 
@@ -86,9 +87,9 @@ CONTAINS
       USE parameters_2d, ONLY : x_collapse , y_collapse , r_collapse , T_collapse , &
          h_collapse , alphas_collapse , alphag_collapse
 
-      USE state_2d, ONLY : state
-
       IMPLICIT NONE
+
+      CLASS(state_type), INTENT(INOUT) :: state
 
       INTEGER :: j,k
 
