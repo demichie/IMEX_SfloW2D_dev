@@ -16,8 +16,8 @@ MODULE stochastic_module
   USE parameters_2d, ONLY : n_eqns , n_vars , n_solid , n_add_gas , n_quad ,    &
        n_stoch_vars , n_pore_vars
   
-  USE domain_2d, ONLY: domain
-  USE state_2d, ONLY: state
+  USE domain_2d, ONLY: domain_type
+  USE state_2d, ONLY: state_type
   USE constitutive_2d, ONLY : T_ambient
   USE constitutive_2d, ONLY: qc_to_qp
   USE parameters_2d, ONLY : output_stoch_vars_flag, length_spatial_corr,        &
@@ -60,6 +60,9 @@ MODULE stochastic_module
 
      PROCEDURE :: initialize => initialize_stochastic_workspace
      PROCEDURE :: finalize => finalize_stochastic_workspace
+     PROCEDURE :: initialize_steady => getSteadyStateZ
+     PROCEDURE :: generate_kernel => genConvolutionKernel
+     PROCEDURE :: update => update_stochastic_variable
 
   END TYPE stochastic_workspace_type
 
@@ -111,17 +114,20 @@ CONTAINS
   END FUNCTION MeanFieldCorrection  
 
 
-  SUBROUTINE getSteadyStateZ
+  SUBROUTINE getSteadyStateZ(this, state, domain)
   ! should find a better way to understand when the process is stable.
   ! Since sigma is varing in space and time, the process may never be stable.
     IMPLICIT none
+    CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
+    CLASS(state_type), INTENT(INOUT) :: state
+    CLASS(domain_type), INTENT(IN) :: domain
     INTEGER :: j, k , l 
     INTEGER :: i, n_iter
     REAL(wp) :: dt
     REAL(wp) :: t_steady
     
     ! Initialize all stochastic process to zero
-    stochastic_workspace%Z = 0.0_wp
+    this%Z = 0.0_wp
 
     ! Define how many iteration to do for the burn in
     t_steady = 10_wp * tau_stochastic 
@@ -131,12 +137,12 @@ CONTAINS
 
     ! Allocate and compute convolution kernel if needed (will be keept in memory)
     IF (length_spatial_corr .GT. cell_size) THEN
-        CALL genConvolutionKernel()
+        CALL this%generate_kernel()
     END IF
     
     ! Compute n iterations to get to a steady state OU process
     DO i=1,n_iter
-       CALL update_stochastic_variable(dt)       
+       CALL this%update(state, dt)
     END DO
 
     IF (stoch_transport_flag) THEN
@@ -148,9 +154,9 @@ CONTAINS
           j = domain%j_cent(l)
           k = domain%k_cent(l)
           
-          state%qp(5+n_solid+n_add_gas,j,k) = stochastic_workspace%Z(j,k)
+          state%qp(5+n_solid+n_add_gas,j,k) = this%Z(j,k)
           state%q(5+n_solid+n_add_gas,j,k) = state%q(1,j,k) *               &
-               stochastic_workspace%Z(j,k)
+               this%Z(j,k)
           !WRITE(*,*) j,k,qp(5+n_solid+n_add_gas,j,k),q(5+n_solid+n_add_gas,j,k)
           !READ(*,*)
           
@@ -167,8 +173,9 @@ CONTAINS
   END SUBROUTINE getSteadyStateZ 
 
 
-  SUBROUTINE genConvolutionKernel()  
+  SUBROUTINE genConvolutionKernel(this)
       IMPLICIT none
+      CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
       INTEGER :: n_nodes_per_dim, x_index, y_index
       REAL(wp) :: x_center, y_center, x, y
 
@@ -180,9 +187,8 @@ CONTAINS
       y_center = x_center 
 
       ! Allocate the output array
-      IF (ALLOCATED(stochastic_workspace%conv_kernel))                       &
-           DEALLOCATE(stochastic_workspace%conv_kernel)
-      ALLOCATE(stochastic_workspace%conv_kernel(n_nodes_per_dim,             &
+      IF (ALLOCATED(this%conv_kernel)) DEALLOCATE(this%conv_kernel)
+      ALLOCATE(this%conv_kernel(n_nodes_per_dim,                             &
            n_nodes_per_dim))
 
       ! Compute 2D Gaussian values (at centers of cells)
@@ -190,14 +196,13 @@ CONTAINS
         DO x_index = 1, n_nodes_per_dim
           x =  cell_size * (x_index-1) + 0.5_wp * cell_size
           y =  cell_size * (y_index-1) + 0.5_wp * cell_size
-          stochastic_workspace%conv_kernel(x_index, y_index) =               &
+          this%conv_kernel(x_index, y_index) =                               &
                evalGaussian2d(x, y, x_center, y_center)
         END DO
       END DO
 
       ! Renormalize values of the kernel
-      stochastic_workspace%conv_kernel = stochastic_workspace%conv_kernel / &
-           SUM(stochastic_workspace%conv_kernel)
+      this%conv_kernel = this%conv_kernel / SUM(this%conv_kernel)
 
   END SUBROUTINE genConvolutionKernel
 
@@ -222,10 +227,12 @@ CONTAINS
   END FUNCTION evalGaussian2d
 
 
-  SUBROUTINE update_stochastic_variable(dt)
+  SUBROUTINE update_stochastic_variable(this, state, dt)
     ! UPDATE THE SOLUTION OF THE ORNSTEIN-UHLENBACK PROCESS USING EULER-MARUYAMA METHOD
     ! NOISE CAN BE TRANSPORTED, SOURCE TERM ADDED IN eval_mass_exchange_terms (IMPORTANT)
     IMPLICIT NONE
+    CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
+    CLASS(state_type), INTENT(IN) :: state
     INTEGER :: j,k
     INTEGER :: noise_size
     REAL(wp), INTENT(IN) :: dt
@@ -241,7 +248,7 @@ CONTAINS
     ! Convolve the gaussian noise to introduce spatial correlation if needed
     IF (length_spatial_corr .GT. cell_size) THEN
         ! (for convenience, the conv_kernel is generated only once before the burn in)
-        CALL convolve_2d(noise, stochastic_workspace%conv_kernel, conv_result) ! To fix (should swap indices?)!
+        CALL convolve_2d(noise, this%conv_kernel, conv_result) ! To fix (should swap indices?)!
         noise = conv_result
     END IF
 
@@ -251,17 +258,16 @@ CONTAINS
     DO k = 1,comp_cells_y
        DO j = 1,comp_cells_x  
           ! Update the Ornstein-Uhlenback process
-          sigma_noise = getSigmaNoise(j,k) 
-          stochastic_workspace%Z(j,k) = EulerMaruyamaScheme(                &
-               stochastic_workspace%Z(j,k), dt, sigma_noise, noise(j,k))
+          sigma_noise = getSigmaNoise(state,j,k)
+          this%Z(j,k) = EulerMaruyamaScheme(                                &
+               this%Z(j,k), dt, sigma_noise, noise(j,k))
           ! apply non linear map to Z if needed (Z becomes asymmetric)
           IF (sym_noise .GT. 0.0_wp) THEN
-            stochastic_workspace%Z(j,k) = ABS(stochastic_workspace%Z(j,k))  &
+            this%Z(j,k) = ABS(this%Z(j,k))                                  &
                  ** noise_pow_val ! generate only positive fluctuations
           ELSEIF (sym_noise .LT. 0.0_wp) THEN
             ! Generate only negative fluctuations
-            stochastic_workspace%Z(j,k) =                                  &
-                 -(ABS(stochastic_workspace%Z(j,k)) ** noise_pow_val)
+            this%Z(j,k) = -(ABS(this%Z(j,k)) ** noise_pow_val)
           END IF
        END DO
     END DO
@@ -270,7 +276,7 @@ CONTAINS
 
     ! Compute statistic in space at given time if needed as outputs
     IF (output_stoch_vars_flag) THEN
-        CALL OUBasicStatsInSpaceAtGivenTime(stochastic_workspace%Z, Z_min,   &
+        CALL OUBasicStatsInSpaceAtGivenTime(this%Z, Z_min,                   &
              Z_mean, Z_max, Z_std)
         percentiles(:) = 0.0_wp ! Percentiles set to 0 to avoid the computations
         ! The percentiles shold not be computed at each iteration otherwise is too slow
@@ -302,11 +308,12 @@ CONTAINS
   END FUNCTION GaussianNoise
 
   
-  REAL(wp) FUNCTION FroudeNumber(j,k)
+  REAL(wp) FUNCTION FroudeNumber(state,j,k)
     !> compute the froude number given the indices defining the location in the grid 
     USE parameters_2d, ONLY : n_solid , n_add_gas , n_stoch_vars , n_pore_vars
     USE constitutive_2d, ONLY: r_phys_var
     IMPLICIT NONE
+    CLASS(state_type), INTENT(IN) :: state
     INTEGER, INTENT(IN) :: j, k
     REAL(wp) :: Fr
     REAL(wp) :: r_h
@@ -343,11 +350,12 @@ CONTAINS
 
   END FUNCTION FroudeNumber
 
- REAL(wp) FUNCTION VelocityNorm(j,k)
+ REAL(wp) FUNCTION VelocityNorm(state,j,k)
   !> compute the norm of the velocity given the indices defining the location in the grid 
   USE parameters_2d, ONLY : n_solid , n_add_gas , n_stoch_vars , n_pore_vars
   USE constitutive_2d, ONLY: r_phys_var
   IMPLICIT NONE
+  CLASS(state_type), INTENT(IN) :: state
   INTEGER, INTENT(IN) :: j, k
   REAL(wp) :: r_h
   REAL(wp) :: r_u
@@ -382,19 +390,20 @@ CONTAINS
 END FUNCTION VelocityNorm
 
 
-  REAL(wp) FUNCTION getSigmaNoise(j,k)
+  REAL(wp) FUNCTION getSigmaNoise(state,j,k)
   ! Compute the intensity of the noise depending of the friction used
     IMPLICIT NONE
+    CLASS(state_type), INTENT(IN) :: state
     INTEGER, INTENT(IN) :: j, k
     REAL(wp) :: Fr
     REAL(wp) :: U_norm
     IF ( rheology_model .EQ. 9 ) THEN   
-      ! Fr = FroudeNumber(j,k)   ! OLD UNSTABLE
+      ! Fr = FroudeNumber(state,j,k)   ! OLD UNSTABLE
       ! getSigmaNoise = expFormNoise(Fr) ! OLD UNSTABLE
-      U_norm = VelocityNorm(j,k)
+      U_norm = VelocityNorm(state,j,k)
       getSigmaNoise = expFormNoise(U_norm*U_norm) !
     ELSEIF (rheology_model .EQ. 10) THEN 
-      U_norm = VelocityNorm(j,k)
+      U_norm = VelocityNorm(state,j,k)
       getSigmaNoise = expFormNoise(U_norm)
     ELSE
       getSigmaNoise = std_max

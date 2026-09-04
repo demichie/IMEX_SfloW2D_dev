@@ -13,6 +13,10 @@
 MODULE inpout_2d
 
   USE parameters_2d, ONLY: wp
+  USE runtime_2d, ONLY: runtime_state_type
+  USE state_2d, ONLY: state_type
+  USE domain_2d, ONLY: domain_type
+  USE stochastic_module, ONLY: stochastic_workspace_type
 
   USE parameters_2d, ONLY: idx_h, idx_hu, idx_hv, idx_T, idx_alfas_first, &
                            idx_alfas_last, idx_addGas_first, idx_addGas_last, idx_stoch, idx_pore, &
@@ -5178,20 +5182,19 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   !
   !******************************************************************************
 
-  SUBROUTINE read_solution
+  SUBROUTINE read_solution(state, domain)
 
     ! External procedures
     USE geometry_2d, ONLY: interp_2d_scalarB, regrid_scalar
-    USE domain_2d, ONLY: domain
-
     ! External variables
     USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0, dx, dy
     USE geometry_2d, ONLY: B_cent, erodible
     USE init_2d, ONLY: thickness_init, erodible_init
     USE parameters_2d, ONLY: n_vars
-    USE state_2d, ONLY: state
-
     IMPLICIT none
+
+    CLASS(state_type), INTENT(INOUT) :: state
+    CLASS(domain_type), INTENT(INOUT) :: domain
 
     CHARACTER(LEN=15) :: chara
 
@@ -5857,7 +5860,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   !
   !******************************************************************************
 
-  SUBROUTINE output_solution(time)
+  SUBROUTINE output_solution(time, state)
 
     ! external procedures
     USE constitutive_2d, ONLY: qc_to_qp, mixt_var, settling_velocity, vonK
@@ -5873,11 +5876,10 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     USE parameters_2d, ONLY: t_output, dt_output
     USE parameters_2d, ONLY: t_steady
 
-    USE state_2d, ONLY: state
-
     IMPLICIT none
 
     REAL(wp), INTENT(IN) :: time
+    CLASS(state_type), INTENT(INOUT) :: state
 
     CHARACTER(LEN=4) :: idx_string
 
@@ -5937,7 +5939,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     idx_string = lettera(output_idx - 1)
 
-    IF (output_netcdf_flag) CALL write_netcdf_timestep(time)
+    IF (output_netcdf_flag) CALL write_netcdf_timestep(time, state)
 
     IF (output_cons_flag) THEN
 
@@ -6336,11 +6338,11 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     IF (output_esri_flag) THEN
 
-      CALL output_esri(output_idx)
+      CALL output_esri(output_idx, state)
 
       IF ((time .GE. t_end) .OR. (time .GE. t_steady)) THEN
 
-        CALL output_max
+        CALL output_max(state)
 
       END IF
 
@@ -6360,12 +6362,12 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   !
   !******************************************************************************
 
-  SUBROUTINE output_max
+  SUBROUTINE output_max(state)
 
     USE geometry_2d, ONLY: grid_output, grid_output_int
-    USE state_2d, ONLY: state
-
     IMPLICIT NONE
+
+    CLASS(state_type), INTENT(IN) :: state
 
     CHARACTER(LEN=4) :: idx_string
 
@@ -6471,16 +6473,15 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   !
   !******************************************************************************
 
-  SUBROUTINE output_esri(output_idx)
+  SUBROUTINE output_esri(output_idx, state)
 
     USE geometry_2d, ONLY: B_cent, grid_output, deposit, erosion, B_nodata
     USE geometry_2d, ONLY: deposit_tot, erosion_tot, B_zone
     ! USE geometry_2d, ONLY : comp_interfaces_x , comp_interfaces_y
-    USE state_2d, ONLY: state
-
     IMPLICIT NONE
 
     INTEGER, INTENT(IN) :: output_idx
+    CLASS(state_type), INTENT(IN) :: state
 
     CHARACTER(LEN=4) :: idx_string
     CHARACTER(LEN=4) :: isolid_string
@@ -6849,17 +6850,16 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   !> \date 12/02/2018
   !******************************************************************************
 
-  SUBROUTINE output_probes(time)
+  SUBROUTINE output_probes(time, state)
 
     USE geometry_2d, ONLY: x_comp, y_comp, deposit
     USE parameters_2d, ONLY: t_probes, n_vars
-    USE state_2d, ONLY: state
-
     USE geometry_2d, ONLY: interp_2d_scalarB
 
     IMPLICIT NONE
 
     REAL(wp), INTENT(IN) :: time
+    CLASS(state_type), INTENT(IN) :: state
 
     CHARACTER(LEN=4) :: idx_string
 
@@ -7093,16 +7093,15 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   !> \date 12/02/2018
   !******************************************************************************
 
-  SUBROUTINE output_runout(time, stop_flag)
+  SUBROUTINE output_runout(time, stop_flag, state)
 
     USE geometry_2d, ONLY: x_comp, y_comp, B_cent, dx, dy
     USE parameters_2d, ONLY: t_runout, n_solid
-    USE state_2d, ONLY: state
-
     IMPLICIT NONE
 
     REAL(wp), INTENT(IN) :: time
     LOGICAL, INTENT(INOUT) :: stop_flag
+    CLASS(state_type), INTENT(INOUT) :: state
 
     REAL(wp), ALLOCATABLE :: X(:, :), Y(:, :)
     REAL(wp), ALLOCATABLE :: dist(:, :), dist_x(:, :), dist_y(:, :)
@@ -7642,17 +7641,16 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   !******************************************************************************
   !> \brief Writes the data for b and w for the current timestep.
   !******************************************************************************
-  SUBROUTINE write_netcdf_timestep(time_in)
+  SUBROUTINE write_netcdf_timestep(time_in, state)
     USE netcdf
     USE geometry_2d, ONLY: B_cent, comp_cells_x, comp_cells_y
     USE geometry_2d, ONLY: deposit, erosion, erodible
     USE parameters_2d, ONLY: n_vars
-    USE state_2d, ONLY: state
-
     USE constitutive_2d, ONLY: mixt_var
 
     IMPLICIT NONE
     REAL(wp), INTENT(IN) :: time_in
+    CLASS(state_type), INTENT(IN) :: state
 
     INTEGER :: start(3), count(3)
 
@@ -7939,16 +7937,16 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   !> @author
   !> Mattia de' Michieli Vitturi
   !******************************************************************************
-  SUBROUTINE write_restart_file(filename)
+  SUBROUTINE write_restart_file(filename, runtime, stochastic, state)
     USE parameters_2d, ONLY: wp, n_vars, n_solid
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible, deposit, erosion
-    USE runtime_2d, ONLY: runtime
-    USE stochastic_module, ONLY: stochastic_workspace
-    USE state_2d, ONLY: state
     USE parameters_2d, ONLY: stochastic_flag, topo_change_flag
 
     IMPLICIT NONE
     CHARACTER(LEN=*), INTENT(IN) :: filename
+    CLASS(runtime_state_type), INTENT(IN) :: runtime
+    CLASS(stochastic_workspace_type), INTENT(IN) :: stochastic
+    CLASS(state_type), INTENT(IN) :: state
     INTEGER :: unit_rst, ierr
 
     unit_rst = 33
@@ -7983,7 +7981,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     ! 6. Write stochastic variables (IF ACTIVE)
     IF (stochastic_flag) THEN
-      WRITE (unit_rst) stochastic_workspace%Z
+      WRITE (unit_rst) stochastic%Z
     END IF
 
     CLOSE (unit_rst)
@@ -8002,21 +8000,21 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   !> @author
   !> Mattia de' Michieli Vitturi
   !******************************************************************************
-  SUBROUTINE read_restart_file(filename)
+  SUBROUTINE read_restart_file(filename, runtime, stochastic, state, domain)
     USE parameters_2d, ONLY: wp, n_vars, n_solid
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible, deposit, erosion
-    USE runtime_2d, ONLY: runtime
-    USE stochastic_module, ONLY: stochastic_workspace
-    USE state_2d, ONLY: state
     USE parameters_2d, ONLY: stochastic_flag
 
     ! Modules needed to recalculate derived variables
     USE geometry_2d, ONLY: topography_reconstruction
-    USE domain_2d, ONLY: domain
     USE constitutive_2d, ONLY: qc_to_qp
 
     IMPLICIT NONE
     CHARACTER(LEN=*), INTENT(IN) :: filename
+    CLASS(runtime_state_type), INTENT(INOUT) :: runtime
+    CLASS(stochastic_workspace_type), INTENT(INOUT) :: stochastic
+    CLASS(state_type), INTENT(INOUT) :: state
+    CLASS(domain_type), INTENT(IN) :: domain
     INTEGER :: unit_rst, ierr
     INTEGER :: nx_check, ny_check, nvars_check, nsolid_check
     INTEGER :: j, k, l
@@ -8059,7 +8057,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     ! 6. Read stochastic
     IF (stochastic_flag) THEN
-      READ (unit_rst) stochastic_workspace%Z
+      READ (unit_rst) stochastic%Z
     END IF
 
     CLOSE (unit_rst)

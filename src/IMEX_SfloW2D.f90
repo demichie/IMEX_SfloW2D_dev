@@ -96,8 +96,6 @@ PROGRAM IMEX_SfloW2D
 
    USE constitutive_2d, ONLY : avg_profiles_mix
 
-   USE stochastic_module, ONLY : genConvolutionKernel, getSteadyStateZ
-
    USE OMP_LIB
 
    IMPLICIT NONE
@@ -207,14 +205,15 @@ PROGRAM IMEX_SfloW2D
          ! CASE 1: BINARY RESTART (Exact)
          ! ---------------------------------------------------------
          WRITE(*,*) 'Binary file (.bin) detected: Performing full restart.'
-         CALL read_restart_file(TRIM(restart_file))
+         CALL read_restart_file(TRIM(restart_file), simulation%runtime,      &
+              simulation%stochastic, simulation%state, simulation%domain)
 
          is_binary_restart = .TRUE.
 
          ! In a binary restart, Z is already loaded, but we need to allocate the kernel
          ! if spatial correlation is active
          IF (stochastic_flag .AND. length_spatial_corr > cell_size) THEN
-            CALL genConvolutionKernel()
+            CALL simulation%stochastic%generate_kernel()
          END IF
 
       ELSE
@@ -222,7 +221,7 @@ PROGRAM IMEX_SfloW2D
          ! CASE 2: CLASSIC INITIALIZATION (Python / ASCII)
          ! ---------------------------------------------------------
          WRITE(*,*) 'Standard format detected: Executing read_solution.'
-         CALL read_solution
+         CALL read_solution(simulation%state, simulation%domain)
 
       END IF
 
@@ -250,7 +249,9 @@ PROGRAM IMEX_SfloW2D
    ! For a new run or a classic restart, initialize the stochastic field only
    ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
    ! restart already contains Z and only needs its convolution kernel above.
-   IF ( stochastic_flag .AND. (.NOT. is_binary_restart) ) CALL getSteadyStateZ
+   IF ( stochastic_flag .AND. (.NOT. is_binary_restart) )                   &
+        CALL simulation%stochastic%initialize_steady(                        &
+        simulation%state, simulation%domain)
 
    IF ( topo_change_flag ) CALL topography_reconstruction
 
@@ -360,12 +361,15 @@ PROGRAM IMEX_SfloW2D
 
    !$OMP END PARALLEL DO
 
-   IF ( output_runout_flag ) CALL output_runout(simulation%runtime%t,stop_flag)
+   IF ( output_runout_flag ) CALL output_runout(                             &
+        simulation%runtime%t, stop_flag, simulation%state)
 
    IF ( output_cons_flag .OR. output_esri_flag .OR. output_phys_flag .OR.        &
-      output_netcdf_flag ) CALL output_solution(simulation%runtime%t)
+      output_netcdf_flag ) CALL output_solution(                             &
+      simulation%runtime%t, simulation%state)
 
-   IF ( n_probes .GT. 0 ) CALL output_probes(simulation%runtime%t)
+   IF ( n_probes .GT. 0 ) CALL output_probes(                               &
+        simulation%runtime%t, simulation%state)
 
    IF ( SUM(simulation%state%q(1,:,:)) .EQ. 0.0_wp ) t_steady = t_end
 
@@ -571,7 +575,7 @@ PROGRAM IMEX_SfloW2D
             stop_flag_old = stop_flag
 
             IF ( output_runout_flag ) CALL output_runout(                    &
-                 simulation%runtime%t,stop_flag)
+                 simulation%runtime%t, stop_flag, simulation%state)
 
             IF ( ( stop_flag ) .AND. (.NOT.stop_flag_old) ) THEN
 
@@ -586,7 +590,7 @@ PROGRAM IMEX_SfloW2D
       IF ( n_probes .GT. 0 ) THEN
 
          IF ( simulation%runtime%t .GE. t_probes )                           &
-              CALL output_probes(simulation%runtime%t)
+              CALL output_probes(simulation%runtime%t, simulation%state)
 
       END IF
 
@@ -605,8 +609,9 @@ PROGRAM IMEX_SfloW2D
 
          IF ( output_cons_flag .OR. output_esri_flag .OR. output_phys_flag .OR. output_netcdf_flag ) THEN
 
-            CALL output_solution(simulation%runtime%t)
-            CALL write_restart_file('restart.bin')
+            CALL output_solution(simulation%runtime%t, simulation%state)
+            CALL write_restart_file('restart.bin', simulation%runtime,       &
+                 simulation%stochastic, simulation%state)
 
          END IF
 
