@@ -1,11 +1,5 @@
 # Depth-averaged gas-particles model
 
-[![SQAaaS badge](https://github.com/EOSC-synergy/SQAaaS/raw/master/badges/badges_150x116/badge_software_gold.png)](https://api.eu.badgr.io/public/assertions/VYyqk62SQfq4Hx1E3CsHHg "SQAaaS gold badge achieved")
-
-[![SQAaaS badge shields.io](https://img.shields.io/badge/sqaaas%20software-gold-yellow)](https://api.eu.badgr.io/public/assertions/VYyqk62SQfq4Hx1E3CsHHg "SQAaaS gold badge achieved")
-
-[![DOI](https://zenodo.org/badge/218571198.svg)](https://zenodo.org/doi/10.5281/zenodo.7476736)
-
 Shallow water model for multiphase flow (gas+particles) with density of gas
 temperature-dependent.
 
