@@ -45,8 +45,6 @@ MODULE domain_2d
 
   END TYPE domain_type
 
-  TYPE(domain_type), PUBLIC, TARGET :: domain
-
 CONTAINS
 
   SUBROUTINE initialize_domain(this)

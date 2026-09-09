@@ -1,10 +1,8 @@
 !********************************************************************************
 !> \brief Simulation component aggregation and lifecycle
 !
-!> This module provides an explicit view of the state, runtime data and
-!> numerical workspaces that form one simulation. The context refers to the
-!> transitional module instances; numerical kernels can therefore be migrated
-!> incrementally without duplicating their allocatable data.
+!> This module owns the state, runtime data and numerical workspaces that form
+!> one simulation and coordinates their lifecycle.
 !********************************************************************************
 MODULE simulation_2d
 
@@ -13,17 +11,13 @@ MODULE simulation_2d
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,                &
        finalize_nonlinear_solver
 
-  USE runtime_2d, ONLY : runtime_state_type, runtime_instance => runtime
-  USE state_2d, ONLY : state_type, state_instance => state
-  USE domain_2d, ONLY : domain_type, domain_instance => domain
-  USE reconstruction_2d, ONLY : reconstruction_workspace_type,               &
-       reconstruction_instance => reconstruction_workspace
-  USE hyperbolic_2d, ONLY : hyperbolic_workspace_type,                        &
-       hyperbolic_instance => hyperbolic_workspace
-  USE time_integration_2d, ONLY : time_integration_workspace_type,            &
-       time_integration_instance => time_integration_workspace
-  USE stochastic_module, ONLY : stochastic_workspace_type,                   &
-       stochastic_instance => stochastic_workspace
+  USE runtime_2d, ONLY : runtime_state_type
+  USE state_2d, ONLY : state_type
+  USE domain_2d, ONLY : domain_type
+  USE reconstruction_2d, ONLY : reconstruction_workspace_type
+  USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
+  USE time_integration_2d, ONLY : time_integration_workspace_type
+  USE stochastic_module, ONLY : stochastic_workspace_type
 
   IMPLICIT NONE
 
@@ -34,17 +28,16 @@ MODULE simulation_2d
 
   TYPE :: simulation_context_type
 
-     TYPE(runtime_state_type), POINTER :: runtime => NULL()
-     TYPE(state_type), POINTER :: state => NULL()
-     TYPE(domain_type), POINTER :: domain => NULL()
-     TYPE(reconstruction_workspace_type), POINTER :: reconstruction => NULL()
-     TYPE(hyperbolic_workspace_type), POINTER :: hyperbolic => NULL()
-     TYPE(time_integration_workspace_type), POINTER :: time_integration => NULL()
-     TYPE(stochastic_workspace_type), POINTER :: stochastic => NULL()
+     TYPE(runtime_state_type) :: runtime
+     TYPE(state_type) :: state
+     TYPE(domain_type) :: domain
+     TYPE(reconstruction_workspace_type) :: reconstruction
+     TYPE(hyperbolic_workspace_type) :: hyperbolic
+     TYPE(time_integration_workspace_type) :: time_integration
+     TYPE(stochastic_workspace_type) :: stochastic
 
    CONTAINS
 
-     PROCEDURE, PRIVATE :: bind_components
      PROCEDURE :: initialize => initialize_simulation
      PROCEDURE :: finalize => finalize_simulation
 
@@ -54,25 +47,9 @@ MODULE simulation_2d
 
 CONTAINS
 
-  SUBROUTINE bind_components(this)
-
-    CLASS(simulation_context_type), INTENT(INOUT) :: this
-
-    this%runtime => runtime_instance
-    this%state => state_instance
-    this%domain => domain_instance
-    this%reconstruction => reconstruction_instance
-    this%hyperbolic => hyperbolic_instance
-    this%time_integration => time_integration_instance
-    this%stochastic => stochastic_instance
-
-  END SUBROUTINE bind_components
-
   SUBROUTINE initialize_simulation(this)
 
     CLASS(simulation_context_type), INTENT(INOUT) :: this
-
-    CALL this%bind_components
 
     CALL init_problem_param
 
@@ -106,14 +83,6 @@ CONTAINS
 
     CALL finalize_problem_param
     CALL this%stochastic%finalize
-
-    NULLIFY(this%runtime)
-    NULLIFY(this%state)
-    NULLIFY(this%domain)
-    NULLIFY(this%reconstruction)
-    NULLIFY(this%hyperbolic)
-    NULLIFY(this%time_integration)
-    NULLIFY(this%stochastic)
 
   END SUBROUTINE finalize_simulation
 

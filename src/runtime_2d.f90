@@ -12,7 +12,6 @@ MODULE runtime_2d
   PRIVATE
 
   PUBLIC :: runtime_state_type
-  PUBLIC :: runtime
 
   TYPE :: runtime_state_type
 
@@ -23,7 +22,5 @@ MODULE runtime_2d
      REAL(wp) :: dt = 0.0_wp
 
   END TYPE runtime_state_type
-
-  TYPE(runtime_state_type), TARGET :: runtime
 
 END MODULE runtime_2d

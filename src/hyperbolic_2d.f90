@@ -35,8 +35,6 @@ MODULE hyperbolic_2d
      PROCEDURE :: evaluate_speeds => eval_speeds
   END TYPE hyperbolic_workspace_type
 
-  TYPE(hyperbolic_workspace_type), PUBLIC, TARGET :: hyperbolic_workspace
-
 CONTAINS
 
   SUBROUTINE initialize_hyperbolic( this )
