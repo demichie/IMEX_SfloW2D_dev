@@ -4,7 +4,7 @@ PROGRAM test_hydrostatic_path
   USE geometry_2d, ONLY : B_cent, B_faceW, B_faceE, B_faceS, B_faceN
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, dx, dy, dx2, dy2
   USE geometry_2d, ONLY : reconstruct_topography_faces
-  USE well_balanced_2d, ONLY : eval_hydrostatic_path_integral
+  USE nonconservative_2d, ONLY : eval_path_contribution, PATH_DIR_X, PATH_DIR_Y
 
   IMPLICIT NONE
 
@@ -65,7 +65,8 @@ PROGRAM test_hydrostatic_path
         hS = H0 - B_faceS(j,k)
         hN = H0 - B_faceN(j,k)
 
-        CALL eval_hydrostatic_path_integral( hW, hE, gamma0, gamma0,          &
+        CALL eval_hydrostatic_path_integral( PATH_DIR_X, hW, hE, gamma0,     &
+             gamma0,                                                         &
              gravW, gravE, B_faceW(j,k), B_faceE(j,k), 0.0_wp, 0.0_wp,       &
              momentum_path, energy_path )
 
@@ -74,7 +75,8 @@ PROGRAM test_hydrostatic_path
         max_cell_error = MAX( max_cell_error,                                &
              ABS(momentum_path - (pressureR - pressureL)), ABS(energy_path) )
 
-        CALL eval_hydrostatic_path_integral( hS, hN, gamma0, gamma0,          &
+        CALL eval_hydrostatic_path_integral( PATH_DIR_Y, hS, hN, gamma0,     &
+             gamma0,                                                         &
              gravS, gravN, B_faceS(j,k), B_faceN(j,k), 0.0_wp, 0.0_wp,       &
              momentum_path, energy_path )
 
@@ -93,10 +95,12 @@ PROGRAM test_hydrostatic_path
      ERROR STOP 1
   END IF
 
-  CALL eval_hydrostatic_path_integral( 1.2_wp, 0.7_wp, 8.5E3_wp, 9.1E3_wp,  &
+  CALL eval_hydrostatic_path_integral( PATH_DIR_X, 1.2_wp, 0.7_wp,          &
+       8.5E3_wp, 9.1E3_wp,                                                   &
        0.81_wp, 0.93_wp, 2.4_wp, 2.9_wp, -0.3_wp, 1.1_wp,                  &
        momentum_path, energy_path )
-  CALL eval_hydrostatic_path_integral( 0.7_wp, 1.2_wp, 9.1E3_wp, 8.5E3_wp,  &
+  CALL eval_hydrostatic_path_integral( PATH_DIR_X, 0.7_wp, 1.2_wp,          &
+       9.1E3_wp, 8.5E3_wp,                                                   &
        0.93_wp, 0.81_wp, 2.9_wp, 2.4_wp, 1.1_wp, -0.3_wp,                  &
        reverse_momentum_path, reverse_energy_path )
 
@@ -109,7 +113,8 @@ PROGRAM test_hydrostatic_path
      ERROR STOP 1
   END IF
 
-  CALL eval_hydrostatic_path_integral( 1.2_wp, 0.7_wp, 8.5E3_wp, 9.1E3_wp,  &
+  CALL eval_hydrostatic_path_integral( PATH_DIR_X, 1.2_wp, 0.7_wp,          &
+       8.5E3_wp, 9.1E3_wp,                                                   &
        0.9_wp, 0.9_wp, 2.4_wp, 2.4_wp, -0.3_wp, 1.1_wp,                    &
        momentum_path, energy_path )
 
@@ -119,5 +124,59 @@ PROGRAM test_hydrostatic_path
   END IF
 
   WRITE(*,*) 'PASS: hydrostatic path identities verified'
+
+CONTAINS
+
+  SUBROUTINE eval_hydrostatic_path_integral( direction, hL, hR, gammaL,     &
+       gammaR,                                                               &
+       gravL, gravR, bedL, bedR, velL, velR, momentum_path, energy_path )
+
+    INTEGER, INTENT(IN) :: direction
+    REAL(wp), INTENT(IN) :: hL, hR
+    REAL(wp), INTENT(IN) :: gammaL, gammaR
+    REAL(wp), INTENT(IN) :: gravL, gravR
+    REAL(wp), INTENT(IN) :: bedL, bedR
+    REAL(wp), INTENT(IN) :: velL, velR
+    REAL(wp), INTENT(OUT) :: momentum_path
+    REAL(wp), INTENT(OUT) :: energy_path
+
+    REAL(wp) :: path_contribution(2)
+    REAL(wp) :: stateL(5), stateR(5)
+
+    stateL = [ hL, gammaL, gravL, bedL, velL ]
+    stateR = [ hR, gammaR, gravR, bedR, velR ]
+
+    CALL eval_path_contribution( direction, stateL, stateR,                  &
+         hydrostatic_integrand, path_contribution )
+
+    momentum_path = path_contribution(1)
+    energy_path = path_contribution(2)
+
+  END SUBROUTINE eval_hydrostatic_path_integral
+
+
+  SUBROUTINE hydrostatic_integrand( direction, path_state, dstate_ds,        &
+       integrand )
+
+    INTEGER, INTENT(IN) :: direction
+    REAL(wp), INTENT(IN) :: path_state(:)
+    REAL(wp), INTENT(IN) :: dstate_ds(:)
+    REAL(wp), INTENT(OUT) :: integrand(:)
+
+    REAL(wp) :: momentum_integrand
+
+    IF ( direction .NE. PATH_DIR_X .AND. direction .NE. PATH_DIR_Y ) THEN
+       ERROR STOP 'hydrostatic_integrand: unexpected direction'
+    END IF
+
+    momentum_integrand = -path_state(2) * path_state(3) * path_state(1)     &
+         * dstate_ds(4) + 0.5_wp * path_state(2) * path_state(1)**2         &
+         * dstate_ds(3)
+
+    integrand = 0.0_wp
+    integrand(1) = momentum_integrand
+    integrand(2) = path_state(5) * momentum_integrand
+
+  END SUBROUTINE hydrostatic_integrand
 
 END PROGRAM test_hydrostatic_path
