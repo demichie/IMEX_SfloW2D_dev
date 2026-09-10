@@ -464,7 +464,7 @@ CONTAINS
                      B_prime_y_geom(j,k) , B_second_xx_geom(j,k) ,              &
                      B_second_xy_geom(j,k) , B_second_yy_geom(j,k) ,            &
                      grav_coeff(j,k) , q_fv_cell ,                              &
-                     qp( 1:n_vars , j , k ) , this%SI_NH(1:n_eqns,j,k,i_RK) ,        &
+                     qp( 1:n_vars+2 , j , k ) , this%SI_NH(1:n_eqns,j,k,i_RK) ,      &
                      Z(j,k) )
 
                 ! Assemble the initial guess for the implicit solver

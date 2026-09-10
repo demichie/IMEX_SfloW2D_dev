@@ -541,13 +541,13 @@ CONTAINS
 
              IF ( j .EQ. 1 ) THEN
 
-                CALL qp_to_qp2( qrecW(1:n_vars) , B_cent(j,k) , qp2recW )
+                CALL qp_to_qp2( qrecW(1:n_vars+2) , B_cent(j,k) , qp2recW )
                 qrec_stencil(1) = qp2recW(i-n_vars+1)
                 qrec_stencil(3) = qp_expl(i,j+1,k)
 
              ELSEIF ( j .EQ. comp_cells_x ) THEN
 
-                CALL qp_to_qp2( qrecE(1:n_vars) , B_cent(j,k) , qp2recE )
+                CALL qp_to_qp2( qrecE(1:n_vars+2) , B_cent(j,k) , qp2recE )
                 qrec_stencil(1) = qp_expl(i,j-1,k)
                 qrec_stencil(3) = qp2recE(i-n_vars+1)
 
@@ -586,12 +586,12 @@ CONTAINS
 
              IF ( j .EQ. 1 ) THEN
 
-                CALL qp_to_qp2( qrecW(1:n_vars) , B_cent(j,k) , qp2recW )
+                CALL qp_to_qp2( qrecW(1:n_vars+2) , B_cent(j,k) , qp2recW )
                 qrecW(i) = qp2recW(i-n_vars+1)
 
              ELSEIF ( j .EQ. comp_cells_x ) THEN
 
-                CALL qp_to_qp2( qrecE(1:n_vars) , B_cent(j,k) , qp2recE )
+                CALL qp_to_qp2( qrecE(1:n_vars+2) , B_cent(j,k) , qp2recE )
                 qrecE(i) = qp2recE(i-n_vars+1)
 
              ELSE
@@ -624,13 +624,13 @@ CONTAINS
 
              IF ( k .EQ. 1 ) THEN
 
-                CALL qp_to_qp2( qrecS(1:n_vars) , B_cent(j,k) , qp2recS )
+                CALL qp_to_qp2( qrecS(1:n_vars+2) , B_cent(j,k) , qp2recS )
                 qrec_stencil(1) = qp2recS(i-n_vars+1)
                 qrec_stencil(3) = qp_expl(i,j,k+1)
 
              ELSEIF ( k .EQ. comp_cells_y ) THEN
 
-                CALL qp_to_qp2( qrecN(1:n_vars) , B_cent(j,k) , qp2recN )
+                CALL qp_to_qp2( qrecN(1:n_vars+2) , B_cent(j,k) , qp2recN )
                 qrec_stencil(1) = qp_expl(i,j,k-1)
                 qrec_stencil(3) = qp2recN(i-n_vars+1)
 
@@ -670,12 +670,12 @@ CONTAINS
 
              IF ( k .EQ. 1 ) THEN
 
-                CALL qp_to_qp2( qrecS(1:n_vars) , B_cent(j,k) , qp2recS )
+                CALL qp_to_qp2( qrecS(1:n_vars+2) , B_cent(j,k) , qp2recS )
                 qrecS(i) = qp2recS(i-n_vars+1)
 
              ELSEIF ( k .EQ. comp_cells_y ) THEN
 
-                CALL qp_to_qp2( qrecN(1:n_vars) , B_cent(j,k) , qp2recN )
+                CALL qp_to_qp2( qrecN(1:n_vars+2) , B_cent(j,k) , qp2recN )
                 qrecN(i) = qp2recN(i-n_vars+1)
 
              ELSE
