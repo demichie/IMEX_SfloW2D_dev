@@ -23,6 +23,8 @@ MODULE time_integration_2d
 
   USE nonlinear_solver_2d, ONLY : solve_rk_step
 
+  USE equation_metadata_2d, ONLY : equation_partition_type
+
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
 
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
@@ -279,7 +281,8 @@ CONTAINS
   !
   !******************************************************************************
 
-  SUBROUTINE imex_RK_solver(this, q, qp, t, dt, Z, domain, recon, hyper)
+  SUBROUTINE imex_RK_solver(this, q, qp, t, dt, Z, equation_partition,      &
+       domain, recon, hyper)
 
     USE constitutive_2d, ONLY : maximum_solid_packing
     
@@ -306,6 +309,7 @@ CONTAINS
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: t, dt
     REAL(wp), INTENT(IN) :: Z(comp_cells_x,comp_cells_y)
+    TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     CLASS(domain_type), INTENT(IN) :: domain
     CLASS(reconstruction_workspace_type), INTENT(INOUT) :: recon
     CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: hyper
@@ -336,6 +340,14 @@ CONTAINS
     INTEGER :: newton_failures_step
     INTEGER :: newton_linear_failures_step
     INTEGER :: newton_line_search_failures_step
+
+    IF ( .NOT. equation_partition%is_initialized() ) THEN
+       ERROR STOP 'imex_RK_solver: equation partition is not initialized'
+    END IF
+
+    IF ( equation_partition%n_equations .NE. n_eqns ) THEN
+       ERROR STOP 'imex_RK_solver: equation partition size mismatch'
+    END IF
 
     newton_calls_step = 0
     newton_iterations_step = 0
@@ -509,8 +521,9 @@ CONTAINS
 
                 ! Solve the implicit system to find the solution at the 
                 ! i_RK step of the IMEX RK procedure
-                CALL solve_rk_step( q_guess(1:n_vars) , q(1:n_vars,j,k ) ,      &
-                     dt, a_diag , Rj_not_impl , B_prime_x_geom(j,k) ,            &
+                CALL solve_rk_step( equation_partition, q_guess(1:n_vars),    &
+                     q(1:n_vars,j,k), dt, a_diag, Rj_not_impl,                &
+                     B_prime_x_geom(j,k),                                     &
                      B_prime_y_geom(j,k), Z(j,k),                              &
                      newton_iterations, newton_converged, newton_linear_info,   &
                      newton_line_search_failed )

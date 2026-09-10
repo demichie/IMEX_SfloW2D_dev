@@ -3,6 +3,8 @@
 !********************************************************************************
 MODULE constitutive_2d
 
+  USE equation_metadata_2d, ONLY : equation_partition_type
+
   USE parameters_2d, ONLY : wp, sp ,tolh
   USE parameters_2d, ONLY : n_eqns , n_vars , n_solid , n_add_gas , n_quad ,    &
        n_stoch_vars , n_pore_vars
@@ -20,12 +22,6 @@ MODULE constitutive_2d
        idx_addGasEqn_last, idx_stochEqn, idx_poreEqn
   
   IMPLICIT none
-
-  !> flag used for size of implicit non linear-system
-  LOGICAL, ALLOCATABLE :: implicit_flag(:)
-
-  !> map from implicit variables to original variables 
-  INTEGER, ALLOCATABLE :: implicit_map(:)
 
   !> flag to activate air entrainment
   LOGICAL :: entrainment_flag
@@ -472,67 +468,42 @@ CONTAINS
   !> \date 07/09/2012
   !******************************************************************************
 
-  SUBROUTINE init_problem_param
+  SUBROUTINE init_problem_param( equation_partition )
 
-    USE parameters_2d, ONLY : n_nh , pore_pressure_flag
+    USE parameters_2d, ONLY : pore_pressure_flag
     IMPLICIT NONE
 
-    integer :: i,j
+    TYPE(equation_partition_type), INTENT(INOUT) :: equation_partition
 
-    ALLOCATE( implicit_flag(n_eqns) )
+    LOGICAL :: implicit_mask(n_eqns)
 
-    implicit_flag(1:n_eqns) = .FALSE.
-    implicit_flag(2) = .TRUE.
-    implicit_flag(3) = .TRUE.
+    implicit_mask(1:n_eqns) = .FALSE.
+    implicit_mask(2) = .TRUE.
+    implicit_mask(3) = .TRUE.
 
     ! Temperature
     IF ( rheology_model .EQ. 3 ) THEN
 
-       implicit_flag(4) = .TRUE.
+       implicit_mask(4) = .TRUE.
 
     END IF
 
     ! Solid volume fraction
-    implicit_flag(idx_solidEqn_first:idx_solidEqn_last) = .FALSE.
+    implicit_mask(idx_solidEqn_first:idx_solidEqn_last) = .FALSE.
 
     IF ( pore_pressure_flag ) THEN
 
-       implicit_flag(idx_pore) = .TRUE.
+       implicit_mask(idx_pore) = .TRUE.
        
     END IF
     
-    n_nh = COUNT( implicit_flag )
+    CALL equation_partition%initialize( implicit_mask )
 
-    ALLOCATE( implicit_map(n_nh) )
-
-    j=0
-    DO i=1,n_eqns
-
-       IF ( implicit_flag(i) ) THEN
-
-          j=j+1
-          implicit_map(j) = i
-
-       END IF
-
-    END DO
-
-    WRITE(*,*) 'Implicit equations =',n_nh
+    WRITE(*,*) 'Implicit equations =',equation_partition%n_implicit
 
   RETURN
 
   END SUBROUTINE init_problem_param
-
-  !******************************************************************************
-  !> \brief Finalize implicit-equation metadata
-  !******************************************************************************
-
-  SUBROUTINE finalize_problem_param
-
-    IF ( ALLOCATED(implicit_flag) ) DEALLOCATE(implicit_flag)
-    IF ( ALLOCATED(implicit_map) ) DEALLOCATE(implicit_map)
-
-  END SUBROUTINE finalize_problem_param
 
   !******************************************************************************
   !> \brief Physical variables

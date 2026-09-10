@@ -6,7 +6,9 @@
 !********************************************************************************
 MODULE simulation_2d
 
-  USE constitutive_2d, ONLY : init_problem_param, finalize_problem_param
+  USE constitutive_2d, ONLY : init_problem_param
+
+  USE equation_metadata_2d, ONLY : equation_partition_type
 
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,                &
        finalize_nonlinear_solver
@@ -29,6 +31,7 @@ MODULE simulation_2d
   TYPE :: simulation_context_type
 
      TYPE(runtime_state_type) :: runtime
+     TYPE(equation_partition_type) :: equation_partition
      TYPE(state_type) :: state
      TYPE(domain_type) :: domain
      TYPE(reconstruction_workspace_type) :: reconstruction
@@ -51,7 +54,7 @@ CONTAINS
 
     CLASS(simulation_context_type), INTENT(INOUT) :: this
 
-    CALL init_problem_param
+    CALL init_problem_param( this%equation_partition )
 
     CALL this%state%initialize
 
@@ -81,7 +84,7 @@ CONTAINS
 
     CALL finalize_nonlinear_solver
 
-    CALL finalize_problem_param
+    CALL this%equation_partition%finalize
     CALL this%stochastic%finalize
 
   END SUBROUTINE finalize_simulation

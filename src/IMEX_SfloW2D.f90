@@ -450,6 +450,7 @@ PROGRAM IMEX_SfloW2D
       CALL simulation%time_integration%advance(                              &
            simulation%state%q, simulation%state%qp, simulation%runtime%t,    &
            simulation%runtime%dt, simulation%stochastic%Z,                   &
+           simulation%equation_partition,                                   &
            simulation%domain, simulation%reconstruction,                    &
            simulation%hyperbolic)
 

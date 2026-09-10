@@ -12,6 +12,7 @@ bindir=@bindir@
 # list of sources for the binary
 IMEX_SfloW2D_SOURCES = \
                 parameters_2d.f90 \
+                equation_metadata_2d.f90 \
                 runtime_2d.f90 \
                 complexify.f90 \
                 geometry_2d.f90 \

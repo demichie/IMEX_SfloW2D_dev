@@ -7,8 +7,9 @@
 !********************************************************************************
 MODULE nonlinear_solver_2d
 
-  USE parameters_2d, ONLY : wp, sp, n_eqns, n_vars, n_nh, verbose_level
-  USE constitutive_2d, ONLY : implicit_flag, implicit_map
+  USE parameters_2d, ONLY : wp, sp, n_eqns, n_vars, verbose_level
+
+  USE equation_metadata_2d, ONLY : equation_partition_type
 
   IMPLICIT NONE
 
@@ -16,9 +17,6 @@ MODULE nonlinear_solver_2d
   PUBLIC :: initialize_nonlinear_solver
   PUBLIC :: finalize_nonlinear_solver
   PUBLIC :: solve_rk_step
-
-  !> Map from explicit variables to the full system.
-  INTEGER, ALLOCATABLE :: explicit_map(:)
 
   !> Complex-step perturbation and its reciprocal.
   REAL(wp) :: h, one_by_h
@@ -30,33 +28,19 @@ CONTAINS
 
   SUBROUTINE initialize_nonlinear_solver
 
-    INTEGER :: i, j
-
     h = n_vars * EPSILON(1.0_wp)
     one_by_h = 1.0_wp / h
-
-    IF ( ALLOCATED(explicit_map) ) DEALLOCATE(explicit_map)
-    ALLOCATE( explicit_map(n_eqns-n_nh) )
-
-    j = 0
-    DO i = 1,n_eqns
-       IF ( .NOT.implicit_flag(i) ) THEN
-          j = j + 1
-          explicit_map(j) = i
-       END IF
-    END DO
 
   END SUBROUTINE initialize_nonlinear_solver
 
   SUBROUTINE finalize_nonlinear_solver
 
-    IF ( ALLOCATED(explicit_map) ) DEALLOCATE(explicit_map)
-
   END SUBROUTINE finalize_nonlinear_solver
 
   !******************************************************************************
 
-  SUBROUTINE solve_rk_step( qj, qj_old, dt_step, a_diag, Rj_not_impl,          &
+  SUBROUTINE solve_rk_step( equation_partition, qj, qj_old, dt_step, a_diag,  &
+       Rj_not_impl,                                                           &
        Bprimej_x, Bprimej_y, Zij,                                              &
        iterations_used, converged, linear_info, line_search_failed )
 
@@ -68,6 +52,7 @@ CONTAINS
 
     IMPLICIT NONE
 
+    TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
     REAL(wp), INTENT(IN) :: qj_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step
@@ -102,12 +87,13 @@ CONTAINS
 
     INTEGER :: pivot(n_vars)
 
-    REAL(wp) :: left_matrix_small22(n_nh,n_nh)
+    REAL(wp) :: left_matrix_small22(equation_partition%n_implicit,           &
+         equation_partition%n_implicit)
 
-    REAL(wp) :: desc_dir_small2(n_nh)
-    INTEGER :: pivot_small2(n_nh)
+    REAL(wp) :: desc_dir_small2(equation_partition%n_implicit)
+    INTEGER :: pivot_small2(equation_partition%n_implicit)
 
-    REAL(wp) :: desc_dir_small1(n_vars-n_nh)
+    REAL(wp) :: desc_dir_small1(equation_partition%n_explicit)
 
     INTEGER :: ok
 
@@ -186,14 +172,14 @@ CONTAINS
 
        ! ---- evaluate the descent direction ------------------------------------
 
-       CALL eval_jacobian( qj_rel , qj_org , dt_step , a_diag , coeff_f ,   &
-            Bprimej_x , Bprimej_y , left_matrix, Zij )
+       CALL eval_jacobian( equation_partition, qj_rel , qj_org , dt_step ,   &
+            a_diag , coeff_f , Bprimej_x , Bprimej_y , left_matrix, Zij )
 
        ! DGESV/SGESV overwrite the Jacobian with its LU factors in the fully
        ! implicit case. Form the line-search gradient before the linear solve.
        IF ( nl_iter .GT. 1 ) grad_f = MATMUL( right_term , left_matrix )
 
-       IF ( n_nh .EQ. n_eqns ) THEN
+       IF ( equation_partition%n_implicit .EQ. n_eqns ) THEN
 
           desc_dir_temp = - right_term
 
@@ -219,22 +205,23 @@ CONTAINS
 
        ELSE
 
-          DO i=1,n_nh
+          DO i=1,equation_partition%n_implicit
 
-             desc_dir_small2(i) = right_term(implicit_map(i))
+             desc_dir_small2(i) = right_term(equation_partition%implicit_map(i))
 
-             DO j=1,n_nh
+             DO j=1,equation_partition%n_implicit
                 left_matrix_small22(i,j) =                                     &
-                     left_matrix(implicit_map(i),implicit_map(j))
+                     left_matrix(equation_partition%implicit_map(i),           &
+                     equation_partition%implicit_map(j))
              END DO
 
           END DO
 
           ! Non-implicit columns are diagonal by construction in
           ! eval_jacobian; therefore the A21 block is identically zero.
-          DO i=1,n_vars-n_nh
+          DO i=1,equation_partition%n_explicit
 
-             idx = explicit_map(i)
+             idx = equation_partition%explicit_map(i)
              desc_dir_small1(i) = right_term(idx)
 
              IF ( ABS(left_matrix(idx,idx)) .LE. TINY(1.0_wp) ) THEN
@@ -247,7 +234,7 @@ CONTAINS
 
           END DO
 
-          IF ( n_nh .EQ. 2 ) THEN
+          IF ( equation_partition%n_implicit .EQ. 2 ) THEN
 
              CALL solve_2x2_pivoted( left_matrix_small22,                     &
                   desc_dir_small2, ok )
@@ -258,7 +245,7 @@ CONTAINS
                 RETURN
              END IF
 
-          ELSEIF ( n_nh .EQ. 3 ) THEN
+          ELSEIF ( equation_partition%n_implicit .EQ. 3 ) THEN
 
              CALL solve_3x3_pivoted( left_matrix_small22,                      &
                   desc_dir_small2, ok )
@@ -273,13 +260,17 @@ CONTAINS
 
              IF ( wp .EQ. sp ) THEN
 
-                CALL SGESV(n_nh,1, left_matrix_small22 , n_nh , pivot_small2 ,  &
-                     desc_dir_small2 , n_nh, ok)
+                CALL SGESV(equation_partition%n_implicit,1,                  &
+                     left_matrix_small22, equation_partition%n_implicit,     &
+                     pivot_small2, desc_dir_small2,                          &
+                     equation_partition%n_implicit, ok)
 
              ELSE
 
-                CALL DGESV(n_nh,1, left_matrix_small22 , n_nh , pivot_small2 ,  &
-                     desc_dir_small2 , n_nh, ok)
+                CALL DGESV(equation_partition%n_implicit,1,                  &
+                     left_matrix_small22, equation_partition%n_implicit,     &
+                     pivot_small2, desc_dir_small2,                          &
+                     equation_partition%n_implicit, ok)
 
              END IF
 
@@ -293,12 +284,12 @@ CONTAINS
 
           desc_dir = 0.0_wp
 
-          DO i=1,n_nh
-             desc_dir(implicit_map(i)) = -desc_dir_small2(i)
+          DO i=1,equation_partition%n_implicit
+             desc_dir(equation_partition%implicit_map(i)) = -desc_dir_small2(i)
           END DO
 
-          DO i=1,n_vars-n_nh
-             desc_dir(explicit_map(i)) = -desc_dir_small1(i)
+          DO i=1,equation_partition%n_explicit
+             desc_dir(equation_partition%explicit_map(i)) = -desc_dir_small1(i)
           END DO
 
        END IF
@@ -908,13 +899,14 @@ CONTAINS
   !> Mattia de' Michieli Vitturi
   !******************************************************************************
 
-  SUBROUTINE eval_jacobian( qj_rel , qj_org , dt_step, a_diag , coeff_f,   &
-       Bprimej_x , Bprimej_y , left_matrix, Zij )
+  SUBROUTINE eval_jacobian( equation_partition, qj_rel , qj_org , dt_step,  &
+       a_diag , coeff_f, Bprimej_x , Bprimej_y , left_matrix, Zij )
 
     USE constitutive_2d, ONLY : eval_implicit_terms
 
     IMPLICIT NONE
 
+    TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     REAL(wp), INTENT(IN) :: qj_rel(n_vars)
     REAL(wp), INTENT(IN) :: qj_org(n_vars)
     REAL(wp), INTENT(IN) :: dt_step
@@ -952,7 +944,7 @@ CONTAINS
 
        left_matrix(i,i) = coeff_f(i) * qj_org(i)
 
-       IF ( implicit_flag(i) ) THEN
+       IF ( equation_partition%implicit(i) ) THEN
 
           qj_rel_cmplx(1:n_vars) = qj_rel_cmplx_init(1:n_vars)
           qj_rel_cmplx(i) = CMPLX(qj_rel(i), h,wp)

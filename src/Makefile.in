@@ -98,7 +98,8 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am_IMEX_SfloW2D_OBJECTS = parameters_2d.$(OBJEXT) runtime_2d.$(OBJEXT) \
+am_IMEX_SfloW2D_OBJECTS = parameters_2d.$(OBJEXT) \
+	equation_metadata_2d.$(OBJEXT) runtime_2d.$(OBJEXT) \
     complexify.$(OBJEXT) \
 	geometry_2d.$(OBJEXT) nonconservative_2d.$(OBJEXT) domain_2d.$(OBJEXT) \
 	constitutive_2d.$(OBJEXT) state_2d.$(OBJEXT) \
@@ -250,6 +251,7 @@ AUTOMAKE_OPTIONS = foreign
 # list of sources for the binary
 IMEX_SfloW2D_SOURCES = \
                 parameters_2d.f90 \
+                equation_metadata_2d.f90 \
                 runtime_2d.f90 \
                 complexify.f90 \
                 geometry_2d.f90 \

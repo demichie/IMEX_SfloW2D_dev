@@ -332,8 +332,6 @@ MODULE parameters_2d
   INTEGER :: idx_stochEqn
   INTEGER :: idx_poreEqn
   
-  INTEGER :: n_nh     !< Number of non-hyperbolic terms
-
   INTEGER :: n_RK     !< Runge-Kutta order
   
   INTEGER, PARAMETER :: max_nl_iter = 100
