@@ -26,6 +26,13 @@ MODULE geometry_2d
   !> Topography at the centers of the control volumes 
   REAL(wp), ALLOCATABLE :: B_cent(:,:)
 
+  !> One-sided topography traces at the cell faces. These are reconstructed
+  !> with the same limiter and reconstruction coefficient used for h.
+  REAL(wp), ALLOCATABLE :: B_faceW(:,:)
+  REAL(wp), ALLOCATABLE :: B_faceE(:,:)
+  REAL(wp), ALLOCATABLE :: B_faceS(:,:)
+  REAL(wp), ALLOCATABLE :: B_faceN(:,:)
+
   !> Topography at the centers of the control volumes 
   REAL(wp), ALLOCATABLE :: B_cent_extended(:,:)
 
@@ -224,6 +231,10 @@ CONTAINS
     ALLOCATE( sourceN_vect_y(comp_cells_x,comp_cells_y) )
 
     ALLOCATE( B_cent(comp_cells_x,comp_cells_y) )
+    ALLOCATE( B_faceW(comp_cells_x,comp_cells_y) )
+    ALLOCATE( B_faceE(comp_cells_x,comp_cells_y) )
+    ALLOCATE( B_faceS(comp_cells_x,comp_cells_y) )
+    ALLOCATE( B_faceN(comp_cells_x,comp_cells_y) )
     ALLOCATE( B_cent_extended(comp_cells_x+2,comp_cells_y+2) )
 
     ALLOCATE( B_nodata(comp_cells_x,comp_cells_y) )
@@ -378,6 +389,102 @@ CONTAINS
     RETURN
 
   END SUBROUTINE init_grid
+
+  !******************************************************************************
+  !> \brief Reconstruct one-sided topography traces at all cell faces
+  !>
+  !> The well-balanced reconstruction requires the bed and flow thickness to
+  !> use the same odd limiter and reconstruction coefficient. The existing
+  !> B_prime_*_geom arrays intentionally use a different, centred construction
+  !> and are therefore kept separate from these face traces.
+  !******************************************************************************
+
+  SUBROUTINE reconstruct_topography_faces
+
+    USE parameters_2d, ONLY : limiter, reconstr_coeff
+
+    IMPLICIT NONE
+
+    REAL(wp) :: B_stencil(3)
+    REAL(wp) :: coord_stencil(3)
+    REAL(wp) :: slope
+    REAL(wp) :: delta_B
+
+    INTEGER :: j, k
+
+    DO k = 1, comp_cells_y
+
+       DO j = 1, comp_cells_x
+
+          IF ( comp_cells_x .GT. 1 ) THEN
+
+             IF ( j .EQ. 1 ) THEN
+
+                B_stencil(1) = 2.0_wp * B_cent(1,k) - B_cent(2,k)
+                B_stencil(2:3) = B_cent(1:2,k)
+
+             ELSEIF ( j .EQ. comp_cells_x ) THEN
+
+                B_stencil(1:2) = B_cent(comp_cells_x-1:comp_cells_x,k)
+                B_stencil(3) = 2.0_wp * B_cent(comp_cells_x,k)                 &
+                     - B_cent(comp_cells_x-1,k)
+
+             ELSE
+
+                B_stencil = B_cent(j-1:j+1,k)
+
+             END IF
+
+             coord_stencil = [ -dx, 0.0_wp, dx ]
+             CALL limit( B_stencil, coord_stencil, limiter(1), slope )
+             delta_B = reconstr_coeff * dx2 * slope
+             B_faceW(j,k) = B_cent(j,k) - delta_B
+             B_faceE(j,k) = B_cent(j,k) + delta_B
+
+          ELSE
+
+             B_faceW(j,k) = B_cent(j,k)
+             B_faceE(j,k) = B_cent(j,k)
+
+          END IF
+
+          IF ( comp_cells_y .GT. 1 ) THEN
+
+             IF ( k .EQ. 1 ) THEN
+
+                B_stencil(1) = 2.0_wp * B_cent(j,1) - B_cent(j,2)
+                B_stencil(2:3) = B_cent(j,1:2)
+
+             ELSEIF ( k .EQ. comp_cells_y ) THEN
+
+                B_stencil(1:2) = B_cent(j,comp_cells_y-1:comp_cells_y)
+                B_stencil(3) = 2.0_wp * B_cent(j,comp_cells_y)                 &
+                     - B_cent(j,comp_cells_y-1)
+
+             ELSE
+
+                B_stencil = B_cent(j,k-1:k+1)
+
+             END IF
+
+             coord_stencil = [ -dy, 0.0_wp, dy ]
+             CALL limit( B_stencil, coord_stencil, limiter(1), slope )
+             delta_B = reconstr_coeff * dy2 * slope
+             B_faceS(j,k) = B_cent(j,k) - delta_B
+             B_faceN(j,k) = B_cent(j,k) + delta_B
+
+          ELSE
+
+             B_faceS(j,k) = B_cent(j,k)
+             B_faceN(j,k) = B_cent(j,k)
+
+          END IF
+
+       END DO
+
+    END DO
+
+  END SUBROUTINE reconstruct_topography_faces
 
   !******************************************************************************
   !> \brief Topography zone identification
@@ -580,6 +687,8 @@ CONTAINS
     norm2_x = 7.0_wp * dx**2
     norm2_y = 7.0_wp * dy**2
     norm_xy = (10.0_wp * dx) * (10.0_wp * dy)
+
+    CALL reconstruct_topography_faces
 
     ! centered approximation for the topography slope
     limiterB = MAX(limiter(1),1)
