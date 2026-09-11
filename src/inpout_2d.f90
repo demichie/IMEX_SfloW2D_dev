@@ -200,12 +200,6 @@ MODULE inpout_2d
   !> .
   LOGICAL :: output_esri_flag
 
-  !> Flag to save the physical variables on file *.p_2d
-  !> - T     => write physical variables on file
-  !> - F     => do not write the physical variables
-  !> .
-  LOGICAL :: output_phys_flag
-
   !> Flag to save the conservative variables on file *.q_2d
   !> - T     => write conservative variables on file
   !> - F     => do not write the conservative variables
@@ -324,12 +318,16 @@ MODULE inpout_2d
   INTEGER             :: rho_m2D_varid     !> ID for flow density
   INTEGER             :: red_grav2D_varid  !> ID for reduced gravity
   INTEGER             :: muEff_varid       !> ID for effective mu
+  INTEGER             :: erodible_varid    !> ID for total erodible thickness
+  INTEGER             :: shearVel_varid    !> ID for shear velocity
+  INTEGER, ALLOCATABLE :: Rouse_varid(:)   !> ID for Rouse numbers
+  INTEGER             :: inertialNumber_varid !> ID for inertial number
 
   INTEGER             :: nc_time_idx       !< Counter for time
   CHARACTER(LEN=128)  :: nc_filename       !< NetCDF file name
 
   NAMELIST /run_parameters/ run_name, restart, t_start, t_end, dt_output, &
-    output_cons_flag, output_esri_flag, output_phys_flag, &
+    output_cons_flag, output_esri_flag, &
     output_netcdf_flag, output_runout_flag, verbose_level, serial_flag
 
   NAMELIST /restart_parameters/ n_restart_files, restart_files, release_time, &
@@ -429,7 +427,6 @@ CONTAINS
     dt_output = 5.0E-3_wp
     output_cons_flag = .FALSE.
     output_esri_flag = .FALSE.
-    output_phys_flag = .FALSE.
     output_netcdf_flag = .FALSE.
     output_runout_flag = .FALSE.
     verbose_level = 0
@@ -1122,7 +1119,7 @@ CONTAINS
     END IF
 
     IF ((.NOT. output_cons_flag) .AND. (.NOT. output_esri_flag) .AND. &
-        (.NOT. output_phys_flag) .AND. (.NOT. output_netcdf_flag)) &
+        (.NOT. output_netcdf_flag)) &
       dt_output = 2.0*(t_end - t_start)
 
     t_output = t_start + dt_output
@@ -5083,7 +5080,6 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     REAL(wp) :: t_end_org
     REAL(wp) :: dt_output_org
     LOGICAL :: output_cons_flag_org
-    LOGICAL :: output_phys_flag_org
     LOGICAL :: output_esri_flag_org
     INTEGER :: verbose_level_org
 
@@ -5093,7 +5089,6 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     t_end_org = t_end
     dt_output_org = dt_output
     output_cons_flag_org = output_cons_flag
-    output_phys_flag_org = output_phys_flag
     output_esri_flag_org = output_esri_flag
     verbose_level_org = verbose_level
 
@@ -5124,7 +5119,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     END IF
 
     IF ((.NOT. output_cons_flag) .AND. (.NOT. output_esri_flag) .AND. &
-        (.NOT. output_phys_flag) .AND. (.NOT. output_netcdf_flag)) THEN
+        (.NOT. output_netcdf_flag)) THEN
 
       dt_output = 2.0*(t_end - t_start)
 
@@ -5141,12 +5136,6 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     IF (output_cons_flag_org .NEQV. output_cons_flag) THEN
 
       WRITE (*, *) 'Modified input file: output_cons_flag =', output_cons_flag
-
-    END IF
-
-    IF (output_phys_flag_org .NEQV. output_phys_flag) THEN
-
-      WRITE (*, *) 'Modified input file: output_phys_flag =', output_phys_flag
 
     END IF
 
@@ -5862,15 +5851,8 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
   SUBROUTINE output_solution(time, state)
 
-    ! external procedures
-    USE constitutive_2d, ONLY: qc_to_qp, mixt_var, settling_velocity, vonK
-
-    ! external variables
-
-    USE constitutive_2d, ONLY: kin_visc_c, inv_pres
-
     USE geometry_2d, ONLY: comp_cells_x, B_cent, comp_cells_y, x_comp, &
-                           y_comp, deposit, erosion, erodible, B_prime_x, B_prime_y
+                           y_comp, deposit, erosion, erodible
 
     USE parameters_2d, ONLY: n_vars
     USE parameters_2d, ONLY: t_output, dt_output
@@ -5883,57 +5865,9 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     CHARACTER(LEN=4) :: idx_string
 
-    REAL(wp) :: qp(n_vars + 2)
-
-    REAL(wp) :: B_out
-
-    REAL(wp) :: r_u, r_v, r_h, r_alphas(n_solid), r_T, r_Ri, r_rho_m
-    REAL(wp) :: r_alphag(n_add_gas)
-    REAL(wp) :: r_alphal
-    REAL(wp) :: r_rho_c      !< real-value carrier phase density [kg/m3]
-    REAL(wp) :: r_red_grav   !< real-value reduced gravity
-    REAL(wp) :: p_dyn
-    REAL(wp) :: Zs(n_stoch_vars)
-    REAL(wp) :: pore_pres(n_pore_vars)
-
-    REAL(wp) :: r_w          !< vertical component of the velocity
-    REAL(wp) :: mod_vel, mod_vel2, mod_hor_vel
-    REAL(wp) :: shear_stress
-    REAL(wp) :: shear_vel    !< shear velocity
-
     INTEGER :: j, k
     INTEGER :: i
     INTEGER :: i_vars
-    INTEGER :: i_solid
-
-    LOGICAL :: sp_flag
-    REAL(wp) :: r_sp_heat_c
-    REAL(wp) :: r_sp_heat_mix
-
-    !> Hindered settling velocity (units: m s-1 )
-    REAL(wp) :: settling_vel
-
-    !> Inverse of kinematic viscosity of continuous phase
-    REAL(wp) :: inv_kin_visc
-
-    REAL(wp) :: Rouse_no(n_solid)
-
-    ! mu: coefficient of friction
-    REAL(wp) :: mu_eff
-    REAL(wp) :: dyn_visc_c
-    REAL(wp) :: r_inv_rho_c
-
-    ! mu(I) rheology variables
-    REAL(wp) :: diam_characteristic !< area weighted mean diameter of particles
-    REAL(wp) :: rho_particle !< volume weighted mean density of particles
-    REAL(wp) :: inertial_number !< inertial number
-    REAL(wp) :: shear_rate !< shear rate using horizontal velocity only
-    REAL(wp) :: vert_stress_eff !< effective vertical stress
-    REAL(wp) :: exc_pore_pres !< excess pore pressure
-    REAL(wp) :: grav_coeff !< correction for slope in vertical stress
-    REAL(wp) :: eff_normal_stress !< effective normal stress
-
-    sp_flag = .FALSE.
 
     output_idx = output_idx + 1
 
@@ -6067,272 +6001,6 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     END IF
 
-    IF (output_phys_flag) THEN
-
-      output_file_2d = TRIM(run_name)//'_'//idx_string//'.p_2d'
-
-      IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_file_2d
-
-      OPEN (output_unit_2d, FILE=output_file_2d, status='unknown', form='formatted')
-
-      r_alphal = 0.0_wp
-
-      DO k = 1, comp_cells_y
-
-        DO j = 1, comp_cells_x
-
-          ! Initialize variables for each cell
-          mu_eff = 0.0_wp
-          inertial_number = 0.0_wp
-
-          CALL qc_to_qp(state%q(1:n_vars, j, k), qp(1:n_vars + 2), p_dyn)
-
-          CALL mixt_var(qp(1:n_vars + 2), r_Ri, r_rho_m, r_rho_c, r_red_grav, &
-                        sp_flag, r_sp_heat_c, r_sp_heat_mix)
-
-          r_h = qp(1)
-          r_u = qp(n_vars + 1)
-          r_v = qp(n_vars + 2)
-          r_T = qp(4)
-
-          IF (slope_correction_flag) THEN
-
-            r_w = r_u*B_prime_x(j, k) + r_v*B_prime_y(j, k)
-            grav_coeff = 1.0_wp/(1.0_wp + B_prime_x(j, k)**2 + &
-                                 B_prime_y(j, k)**2)
-
-          ELSE
-
-            r_w = 0.0_wp
-            grav_coeff = 1.0_wp
-
-          END IF
-
-          mod_vel2 = r_u**2 + r_v**2 + r_w**2
-          mod_vel = SQRT(mod_vel2)
-          mod_hor_vel = SQRT(r_u**2 + r_v**2)
-
-          IF (rheology_model .EQ. 8) THEN
-
-            shear_stress = r_rho_m*friction_factor*mod_vel2
-
-            shear_vel = SQRT(shear_stress/r_rho_m)
-
-            IF (gas_flag .AND. sutherland_flag) THEN
-
-              dyn_visc_c = muRef_Suth*(r_T/Tref_Suth)**1.5_wp* &
-                           (Tref_Suth + S_mu)/(r_T + S_mu)
-
-              r_inv_rho_c = sp_gas_const_a*r_T*inv_pres
-              kin_visc_c = dyn_visc_c*r_inv_rho_c
-
-            END IF
-
-            ! Viscosity read from input file [m2 s-1]
-            inv_kin_visc = 1.0_wp/kin_visc_c
-
-            DO i_solid = 1, n_solid
-
-              settling_vel = settling_velocity(diam_s(i_solid), &
-                                               rho_s(i_solid), r_rho_c, inv_kin_visc)
-
-              IF (shear_vel .GT. 0.0_wp) THEN
-
-                Rouse_no(i_solid) = settling_vel/(vonK*shear_vel)
-
-              ELSE
-
-                Rouse_no(i_solid) = 0.0_wp
-
-              END IF
-
-            END DO
-
-          ELSE
-
-            Rouse_no(1:n_solid) = 0.0_wp
-            shear_vel = 0.0_wp
-
-          END IF
-
-          IF (r_h .GT. 0.0_wp) THEN
-
-            IF (alpha_flag) THEN
-
-              r_alphas(1:n_solid) = qp(5:4 + n_solid)
-              r_alphag(1:n_add_gas) = qp(4 + n_solid + 1:4 + n_solid + n_add_gas)
-
-              IF (gas_flag .AND. liquid_flag) THEN
-
-                r_alphal = qp(n_vars)
-
-              END IF
-
-            ELSE
-
-              r_alphas(1:n_solid) = qp(5:4 + n_solid)/r_h
-              r_alphag(1:n_add_gas) = qp(4 + n_solid + 1:4 + n_solid + n_add_gas) &
-                                      /r_h
-
-              IF (gas_flag .AND. liquid_flag) THEN
-
-                r_alphal = qp(n_vars)/r_h
-
-              END IF
-
-            END IF
-
-            Zs(1:n_stoch_vars) = qp(5 + n_solid + n_add_gas:4 + n_solid + n_add_gas &
-                                    + n_stoch_vars)
-
-            pore_pres(1:n_pore_vars) = qp(5 + n_solid + n_add_gas + n_stoch_vars: &
-                                        4 + n_solid + n_add_gas + n_stoch_vars + n_pore_vars) + pres
-
-            IF ((rheology_flag) .AND. (rheology_model .EQ. 1)) THEN
-
-              ! See Eq. (3) Gueugneau et al. 2017, GRL
-              mu_eff = mu*MAX(0.0_wp, (1.0_wp - MAX(0.0_wp, &
-                                                    (pore_pres(1) - pres)) &
-                                       /(r_rho_m*r_h*r_red_grav)))
-
-            ELSE
-
-              mu_eff = 0.0_wp
-
-            END IF
-
-            ! mu(I) rheology
-            IF ((rheology_flag) .AND. ((rheology_model .EQ. 11) .OR. (rheology_model .EQ. 12))) THEN
-
-              ! if time = 0 print excess pore pressure
-              IF (time .LT. 1.0E-10_wp) THEN
-                IF (pore_pressure_flag) THEN
-                  exc_pore_pres = qp(idx_pore)
-                ELSE
-                  exc_pore_pres = 0.0_wp
-                END IF
-
-              END IF
-
-              IF (mod_hor_vel .LT. EPSILON(1.0_wp)) THEN ! v = 0
-                mu_eff = mu_s
-                inertial_number = 0.0_wp
-
-              ELSE ! v > 0
-
-                ! flow thickness (avoid div by 0)
-                IF (r_h .LT. EPSILON(1.0_wp)) THEN
-                  r_h = EPSILON(1.0_wp)
-                END IF
-
-                ! effective vertical stress
-                IF (pore_pressure_flag) THEN
-                  ! pore pressure at the base (See Eq. (2) Gueugneau et al. 2017, GRL)
-                  exc_pore_pres = qp(idx_pore)
-                  vert_stress_eff = r_rho_m*r_red_grav*r_h - &
-                                    exc_pore_pres
-                ELSE
-                  vert_stress_eff = r_rho_m*r_red_grav*r_h
-                END IF
-
-                ! diameter and density of particles
-                IF (n_solid .GT. 1) THEN ! if more than one solid phase
-                  ! Sauter diameter
-                  diam_characteristic = sauter_diameter(r_alphas)
-                  ! Particle density
-                  rho_particle = average_density_solids(r_alphas)
-                ELSE ! if only one solid phase
-                  diam_characteristic = diam_s(1)
-                  rho_particle = rho_s(1)
-                END IF
-
-                ! shear rate at the base (Eqn. 2.15 from Bouchut et al. 2021)
-                shear_rate = 5.0_wp/2.0_wp*mod_hor_vel/r_h
-
-                ! pressure
-                eff_normal_stress = MAX(0.0_wp, vert_stress_eff*SQRT(grav_coeff))
-
-                ! inertial number
-                IF (eff_normal_stress .LT. EPSILON(1.0_wp)) THEN
-                  eff_normal_stress = EPSILON(1.0_wp)
-                END IF
-                inertial_number = diam_characteristic*shear_rate/ &
-                                  SQRT(eff_normal_stress &
-                                       /rho_particle)
-
-                !coefficient of friction -> accounting for regularisation
-     mu_eff = (mu_s*I_0 + mu_2*inertial_number + muI_inf*inertial_number**2)/(I_0 + inertial_number)
-
-              END IF
-
-            END IF
-
-          ELSE
-
-            r_alphas(1:n_solid) = 0.0_wp
-            r_alphag(1:n_add_gas) = 0.0_wp
-            r_alphal = 0.0_wp
-
-            Zs(1:n_stoch_vars) = 0.0_wp
-            pore_pres(1:n_pore_vars) = pres
-            mu_eff = 0.0_wp
-            inertial_number = 0.0_wp
-
-          END IF
-
-          IF (ABS(r_h) .LT. 1.0E-20_wp) r_h = 0.0_wp
-          IF (ABS(r_u) .LT. 1.0E-20_wp) r_u = 0.0_wp
-          IF (ABS(r_v) .LT. 1.0E-20_wp) r_v = 0.0_wp
-          IF (ABS(B_cent(j, k)) .LT. 1.0E-20_wp) THEN
-
-            B_out = 0.0_wp
-
-          ELSE
-
-            B_out = B_cent(j, k)
-
-          END IF
-
-          DO i = 1, n_solid
-
-            IF (ABS(r_alphas(i)) .LT. 1.0E-20_wp) r_alphas(i) = 0.0_wp
-            IF (ABS(DEPOSIT(j, k, i)) .LT. 1.0E-20_wp) &
-              DEPOSIT(j, k, i) = 0.0_wp
-            IF (ABS(EROSION(j, k, i)) .LT. 1.0E-20_wp) &
-              EROSION(j, k, i) = 0.0_wp
-
-          END DO
-
-          IF (ABS(r_T) .LT. 1.0E-20_wp) r_T = 0.0_wp
-          IF (ABS(r_rho_m) .LT. 1.0E-20_wp) r_rho_m = 0.0_wp
-          IF (ABS(r_red_grav) .LT. 1.0E-20_wp) r_red_grav = 0.0_wp
-
-          IF (ABS(r_alphal) .LT. 1.0E-20_wp) r_alphal = 0.0_wp
-          IF (ABS(mu_eff) .LT. 1.0E-20_wp) mu_eff = 0.0_wp
-          IF (ABS(inertial_number) .LT. 1.0E-20_wp) inertial_number = 0.0_wp
-
-          WRITE (output_unit_2d, 1010) x_comp(j), y_comp(k), r_h, r_u, r_v, &
-            B_out, r_h + B_out, r_alphas, r_alphag, r_T, r_rho_m, &
-            r_red_grav, DEPOSIT(j, k, :), EROSION(j, k, :), &
-            SUM(ERODIBLE(1:n_solid, j, k))/(1.0_wp - erodible_porosity), &
-            r_alphal, shear_vel, r_Ri, Rouse_no(1:n_solid), &
-            Zs(1:n_stoch_vars), pore_pres(1:n_pore_vars), mu_eff, &
-            state%hmax(j, k), state%pdynmax(j, k), state%mod_vel_max(j, k), inertial_number
-
-        END DO
-
-        WRITE (output_unit_2d, *) ' '
-
-      END DO
-
-      WRITE (output_unit_2d, *) ' '
-      WRITE (output_unit_2d, *) ' '
-
-      CLOSE (output_unit_2d)
-
-    END IF
-
-1010 FORMAT(100ES15.7E2)
 
     t_output = time + dt_output
 
@@ -7380,6 +7048,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     ALLOCATE (pore_varid(n_pore_vars))
     ALLOCATE (deposit_varid(n_solid))
     ALLOCATE (erosion_varid(n_solid))
+    ALLOCATE (Rouse_varid(n_solid))
 
     ! Set the output filename
     nc_filename = TRIM(run_name)//'.nc'
@@ -7437,8 +7106,15 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
       CALL check(nf90_inq_varid(ncid, 'Ri', Ri2D_varid))
       CALL check(nf90_inq_varid(ncid, 'rhomix', rho_m2D_varid))
       CALL check(nf90_inq_varid(ncid, 'red grav', red_grav2D_varid))
-      IF (rheology_flag .AND. rheology_model .EQ. 1)                            &
-        CALL check(nf90_inq_varid(ncid, 'mu eff', muEff_varid))
+      CALL check(nf90_inq_varid(ncid, 'mu eff', muEff_varid))
+      CALL check(nf90_inq_varid(ncid, 'erodible', erodible_varid))
+      CALL check(nf90_inq_varid(ncid, 'shear_velocity', shearVel_varid))
+      DO i = 1, n_solid
+        WRITE (idx_string, '(I2.2)') i
+        CALL check(nf90_inq_varid(ncid, 'Rouse_'//TRIM(idx_string),            &
+                                  Rouse_varid(i)))
+      END DO
+      CALL check(nf90_inq_varid(ncid, 'inertial_number', inertialNumber_varid))
       RETURN
     END IF
 
@@ -7610,19 +7286,43 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     CALL check(nf90_def_var(ncid, 'red grav', nf90_double, dimids, &
                             red_grav2D_varid, deflate_level=5, shuffle=.true.))
-    CALL check(nf90_put_att(ncid, rho_m2D_varid, 'units', 'm2/s'))
     CALL check(nf90_put_att(ncid, red_grav2D_varid, 'long_name', &
                             'reduced gravity'))
 
-    IF ((rheology_flag) .AND. (rheology_model .EQ. 1)) THEN
+    CALL check(nf90_put_att(ncid, red_grav2D_varid, 'units', 'm/s2'))
 
-      CALL check(nf90_def_var(ncid, 'mu eff', nf90_double, dimids, &
-                              muEff_varid, deflate_level=5, shuffle=.true.))
-      CALL check(nf90_put_att(ncid, muEff_varid, 'units', ''))
-      CALL check(nf90_put_att(ncid, muEff_varid, 'long_name', &
-                              'effective mu'))
+    CALL check(nf90_def_var(ncid, 'mu eff', nf90_double, dimids, &
+                            muEff_varid, deflate_level=5, shuffle=.true.))
+    CALL check(nf90_put_att(ncid, muEff_varid, 'units', ''))
+    CALL check(nf90_put_att(ncid, muEff_varid, 'long_name', &
+                            'effective friction coefficient'))
 
-    END IF
+    CALL check(nf90_def_var(ncid, 'erodible', nf90_double, dimids, &
+                            erodible_varid, deflate_level=5, shuffle=.true.))
+    CALL check(nf90_put_att(ncid, erodible_varid, 'units', 'meters'))
+    CALL check(nf90_put_att(ncid, erodible_varid, 'long_name', &
+                            'total available erodible thickness'))
+
+    CALL check(nf90_def_var(ncid, 'shear_velocity', nf90_double, dimids, &
+                            shearVel_varid, deflate_level=5, shuffle=.true.))
+    CALL check(nf90_put_att(ncid, shearVel_varid, 'units', 'm/s'))
+    CALL check(nf90_put_att(ncid, shearVel_varid, 'long_name', &
+                            'basal shear velocity'))
+
+    DO i = 1, n_solid
+      WRITE (idx_string, '(I2.2)') i
+      CALL check(nf90_def_var(ncid, 'Rouse_'//TRIM(idx_string), nf90_double, &
+                              dimids, Rouse_varid(i), deflate_level=5, shuffle=.true.))
+      CALL check(nf90_put_att(ncid, Rouse_varid(i), 'units', ''))
+      CALL check(nf90_put_att(ncid, Rouse_varid(i), 'long_name', &
+                              'Rouse number for solid class '//TRIM(idx_string)))
+    END DO
+
+    CALL check(nf90_def_var(ncid, 'inertial_number', nf90_double, dimids, &
+                            inertialNumber_varid, deflate_level=5, shuffle=.true.))
+    CALL check(nf90_put_att(ncid, inertialNumber_varid, 'units', ''))
+    CALL check(nf90_put_att(ncid, inertialNumber_varid, 'long_name', &
+                            'granular inertial number'))
 
     ! End define mode. This writes the header to the file.
     CALL check(nf90_enddef(ncid))
@@ -7643,10 +7343,10 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   !******************************************************************************
   SUBROUTINE write_netcdf_timestep(time_in, state)
     USE netcdf
-    USE geometry_2d, ONLY: B_cent, comp_cells_x, comp_cells_y
+    USE geometry_2d, ONLY: B_cent, B_prime_x, B_prime_y, comp_cells_x, comp_cells_y
     USE geometry_2d, ONLY: deposit, erosion, erodible
     USE parameters_2d, ONLY: n_vars
-    USE constitutive_2d, ONLY: mixt_var
+    USE constitutive_2d, ONLY: mixt_var, settling_velocity, kin_visc_c, inv_pres
 
     IMPLICIT NONE
     REAL(wp), INTENT(IN) :: time_in
@@ -7655,17 +7355,23 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     INTEGER :: start(3), count(3)
 
     INTEGER :: i, j, k
-    CHARACTER(LEN=4) :: idx_string
-
     INTEGER :: start1d(1), count1d(1)
 
     LOGICAL :: sp_flag
 
     REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c, r_sp_heat_mix
+    REAL(wp) :: r_h, r_u, r_v, r_T, r_w, mod_vel2, mod_hor_vel
+    REAL(wp) :: shear_stress, settling_vel, kin_visc_local, dyn_visc_c
+    REAL(wp) :: r_inv_rho_c, grav_coeff, vert_stress_eff, eff_normal_stress
+    REAL(wp) :: diam_characteristic, rho_particle, shear_rate
+    REAL(wp) :: exc_pore_pres
+    REAL(wp) :: r_alphas(n_solid)
 
     REAL(wp), ALLOCATABLE :: temp_array(:, :)
     REAL(wp), ALLOCATABLE :: Ri2D(:, :), rho_m2D(:, :), red_grav2D(:, :)
     REAL(wp), ALLOCATABLE :: muEff(:, :)
+    REAL(wp), ALLOCATABLE :: erodible2D(:, :), shearVel(:, :)
+    REAL(wp), ALLOCATABLE :: Rouse(:, :, :), inertialNumber(:, :)
 
     WRITE (*, *) 'Writing ', nc_filename
 
@@ -7674,10 +7380,21 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     ALLOCATE (Ri2D(SIZE(state%qp, 2), SIZE(state%qp, 3)))
     ALLOCATE (rho_m2D(SIZE(state%qp, 2), SIZE(state%qp, 3)))
     ALLOCATE (red_grav2D(SIZE(state%qp, 2), SIZE(state%qp, 3)))
+    ALLOCATE (muEff(SIZE(state%qp, 2), SIZE(state%qp, 3)))
+    ALLOCATE (erodible2D(SIZE(state%qp, 2), SIZE(state%qp, 3)))
+    ALLOCATE (shearVel(SIZE(state%qp, 2), SIZE(state%qp, 3)))
+    ALLOCATE (Rouse(n_solid, SIZE(state%qp, 2), SIZE(state%qp, 3)))
+    ALLOCATE (inertialNumber(SIZE(state%qp, 2), SIZE(state%qp, 3)))
 
     Ri2D = 0.0_wp
     rho_m2D = 0.0_wp
     red_grav2D = 0.0_wp
+    muEff = 0.0_wp
+    erodible2D = SUM(erodible(1:n_solid, :, :), DIM=1) / &
+                 (1.0_wp - erodible_porosity)
+    shearVel = 0.0_wp
+    Rouse = 0.0_wp
+    inertialNumber = 0.0_wp
 
     DO j = 1, comp_cells_x
 
@@ -7702,6 +7419,84 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
         Ri2D(j, k) = r_Ri
         rho_m2D(j, k) = r_rho_m
         red_grav2D(j, k) = r_red_grav
+
+        IF (state%qp(1, j, k) .LE. 1.0E-10_wp) CYCLE
+
+        r_h = state%qp(1, j, k)
+        r_u = state%qp(n_vars + 1, j, k)
+        r_v = state%qp(n_vars + 2, j, k)
+        r_T = state%qp(4, j, k)
+
+        IF (alpha_flag) THEN
+          r_alphas = state%qp(5:4 + n_solid, j, k)
+        ELSE
+          r_alphas = state%qp(5:4 + n_solid, j, k)/r_h
+        END IF
+
+        IF (slope_correction_flag) THEN
+          r_w = r_u*B_prime_x(j, k) + r_v*B_prime_y(j, k)
+          grav_coeff = 1.0_wp/(1.0_wp + B_prime_x(j, k)**2 + &
+                               B_prime_y(j, k)**2)
+        ELSE
+          r_w = 0.0_wp
+          grav_coeff = 1.0_wp
+        END IF
+
+        mod_vel2 = r_u**2 + r_v**2 + r_w**2
+        mod_hor_vel = SQRT(r_u**2 + r_v**2)
+
+        IF (rheology_model .EQ. 8) THEN
+          shear_stress = r_rho_m*friction_factor*mod_vel2
+          shearVel(j, k) = SQRT(shear_stress/r_rho_m)
+          kin_visc_local = kin_visc_c
+
+          IF (gas_flag .AND. sutherland_flag) THEN
+            dyn_visc_c = muRef_Suth*(r_T/Tref_Suth)**1.5_wp* &
+                         (Tref_Suth + S_mu)/(r_T + S_mu)
+            r_inv_rho_c = sp_gas_const_a*r_T*inv_pres
+            kin_visc_local = dyn_visc_c*r_inv_rho_c
+          END IF
+
+          DO i = 1, n_solid
+            settling_vel = settling_velocity(diam_s(i), rho_s(i), r_rho_c, &
+                                             1.0_wp/kin_visc_local)
+            IF (shearVel(j, k) .GT. 0.0_wp) &
+              Rouse(i, j, k) = settling_vel/(vonK*shearVel(j, k))
+          END DO
+        END IF
+
+        IF (rheology_flag .AND. rheology_model .EQ. 1) THEN
+          exc_pore_pres = 0.0_wp
+          IF (n_pore_vars .GT. 0) exc_pore_pres = state%qp(idx_pore, j, k)
+          muEff(j, k) = mu*MAX(0.0_wp, 1.0_wp - MAX(0.0_wp, exc_pore_pres) / &
+                               (r_rho_m*r_h*r_red_grav))
+        ELSE IF (rheology_flag .AND. &
+                 (rheology_model .EQ. 11 .OR. rheology_model .EQ. 12)) THEN
+          IF (mod_hor_vel .LT. EPSILON(1.0_wp)) THEN
+            muEff(j, k) = mu_s
+          ELSE
+            exc_pore_pres = 0.0_wp
+            IF (n_pore_vars .GT. 0) exc_pore_pres = state%qp(idx_pore, j, k)
+            vert_stress_eff = r_rho_m*r_red_grav*r_h - exc_pore_pres
+
+            IF (n_solid .GT. 1) THEN
+              diam_characteristic = sauter_diameter(r_alphas)
+              rho_particle = average_density_solids(r_alphas)
+            ELSE
+              diam_characteristic = diam_s(1)
+              rho_particle = rho_s(1)
+            END IF
+
+            shear_rate = 2.5_wp*mod_hor_vel/r_h
+            eff_normal_stress = MAX(EPSILON(1.0_wp), &
+                                    vert_stress_eff*SQRT(grav_coeff))
+            inertialNumber(j, k) = diam_characteristic*shear_rate / &
+                                   SQRT(eff_normal_stress/rho_particle)
+            muEff(j, k) = (mu_s*I_0 + mu_2*inertialNumber(j, k) + &
+                           muI_inf*inertialNumber(j, k)**2) / &
+                          (I_0 + inertialNumber(j, k))
+          END IF
+        END IF
 
       END DO
 
@@ -7795,7 +7590,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       END IF
 
-      CALL check(nf90_put_var(ncid, gas_varid(i), state%qp(4 + n_solid + i, :, :), &
+      CALL check(nf90_put_var(ncid, gas_varid(i), temp_array, &
                               start=start, count=count))
     END DO
 
@@ -7831,14 +7626,12 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
                               state%qp(4 + n_solid + n_add_gas + i, :, :), start=start, count=count))
     END DO
 
-    temp_array = pres   ! initialize with atmospheric pressure
-
-    WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
-      temp_array = state%qp(4 + n_solid + n_add_gas + n_stoch_vars + i, :, :) + pres
-    END WHERE
-
     ! Write pore pressure variable
     DO i = 1, n_pore_vars
+      temp_array = pres
+      WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
+        temp_array = state%qp(4 + n_solid + n_add_gas + n_stoch_vars + i, :, :) + pres
+      END WHERE
       CALL check(nf90_put_var(ncid, pore_varid(i), temp_array, start=start, &
                               count=count))
     END DO
@@ -7867,35 +7660,25 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     CALL check(nf90_put_var(ncid, red_grav2D_varid, red_grav2D, start=start, &
                             count=count))
 
-    IF ((rheology_flag) .AND. (rheology_model .EQ. 1)) THEN
-
-      ALLOCATE (muEff(SIZE(state%qp, 2), SIZE(state%qp, 3)))
-
-      muEff = 0.0_wp
-
-      WHERE (((rho_m2D(:, :)*state%qp(1, :, :)*red_grav2D(:, :)) /= 0.0_wp) .AND. &
-             (state%qp(1, :, :) .GE. 1.0E-10_wp))
-
-        muEff = mu*MAX(0.0_wp, (1.0_wp - MAX(0.0_wp, &
-                                             state%qp(4 + n_solid + n_add_gas + n_stoch_vars + 1, :, :)) &
-                                /(rho_m2D(:, :)*state%qp(1, :, :)*red_grav2D(:, :))))
-
-      END WHERE
-
-      ! Write the effective mu
-      CALL check(nf90_put_var(ncid, muEff_varid, muEff, start=start, &
-                              count=count))
-
-      DEALLOCATE (muEff)
-
-    END IF
+    CALL check(nf90_put_var(ncid, muEff_varid, muEff, start=start, count=count))
+    CALL check(nf90_put_var(ncid, erodible_varid, erodible2D, start=start, &
+                            count=count))
+    CALL check(nf90_put_var(ncid, shearVel_varid, shearVel, start=start, &
+                            count=count))
+    DO i = 1, n_solid
+      CALL check(nf90_put_var(ncid, Rouse_varid(i), Rouse(i, :, :), &
+                              start=start, count=count))
+    END DO
+    CALL check(nf90_put_var(ncid, inertialNumber_varid, inertialNumber, &
+                            start=start, count=count))
 
     ! Increment the time record counter for the next write operation
     nc_time_idx = nc_time_idx + 1
 
     CALL check(nf90_sync(ncid))
 
-    DEALLOCATE (Ri2D, rho_m2D, red_grav2D)
+    DEALLOCATE (Ri2D, rho_m2D, red_grav2D, muEff, erodible2D)
+    DEALLOCATE (shearVel, Rouse, inertialNumber)
     DEALLOCATE (temp_array)
 
     RETURN

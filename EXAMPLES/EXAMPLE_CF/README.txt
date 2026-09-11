@@ -10,16 +10,7 @@ Once the topography file is unzipped, launch the solver:
 
 Several output files are created as ESRI ascii files (*.asc) and they can be plotted with a GIS.
 
-A script to convert the output of the model in NetCDF4 format is provided in the UTILS folder.
-First create a simbolic link of the script in this folder:
-
->> ln -s ../../UTILS/p2d_to_netCDF4.py .
-
-Then, execute the python script
-
->> python p2d_to_netCDF4.py exampleCF.bak
-
-The new file can be plotted with Paraview.
+Native NetCDF output is enabled in the input file. The simulation writes `<run_name>.nc` directly; open it with ParaView or another NetCDF-compatible tool.
 
 
 [1] A fast, calibrated model for pyroclastic density currents kinematics and hazard

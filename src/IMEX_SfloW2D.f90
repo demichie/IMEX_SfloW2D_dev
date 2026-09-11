@@ -60,7 +60,6 @@ PROGRAM IMEX_SfloW2D
    USE inpout_2d, ONLY : runout_last
    USE inpout_2d, ONLY : output_cons_flag
    USE inpout_2d, ONLY : output_esri_flag
-   USE inpout_2d, ONLY : output_phys_flag
    USE inpout_2d, ONLY : output_netcdf_flag
 
    USE mass_exchange_2d, ONLY : update_erosion_deposition_cell
@@ -364,7 +363,7 @@ PROGRAM IMEX_SfloW2D
    IF ( output_runout_flag ) CALL output_runout(                             &
         simulation%runtime%t, stop_flag, simulation%state)
 
-   IF ( output_cons_flag .OR. output_esri_flag .OR. output_phys_flag .OR.        &
+   IF ( output_cons_flag .OR. output_esri_flag .OR.                            &
       output_netcdf_flag ) CALL output_solution(                             &
       simulation%runtime%t, simulation%state)
 
@@ -608,7 +607,7 @@ PROGRAM IMEX_SfloW2D
 
          END IF
 
-         IF ( output_cons_flag .OR. output_esri_flag .OR. output_phys_flag .OR. output_netcdf_flag ) THEN
+         IF ( output_cons_flag .OR. output_esri_flag .OR. output_netcdf_flag ) THEN
 
             CALL output_solution(simulation%runtime%t, simulation%state)
             CALL write_restart_file('restart.bin', simulation%runtime,       &

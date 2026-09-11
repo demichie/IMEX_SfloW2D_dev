@@ -21,21 +21,11 @@ Run the solver:
 
 >> ../../bin/IMEX_SfloW2D
 
-A script to convert the output of the model in NetCDF4 format is provided in the UTILS folder.
-First create a simbolic link of the script in this folder:
-
->> ln -s ../../UTILS/p2d_to_netCDF4.py .
-
-Then, execute the python script
-
->> python p2d_to_netCDF4.py example2D.bak
-
-The new file can be plotted with Paraview.
+Native NetCDF output is enabled in the input file. The simulation writes `<run_name>.nc` directly; open it with ParaView or another NetCDF-compatible tool.
 
 REFERENCES
 
 [1] Wang, Y., K. Hutter and S. P. Pudasaini, The Savage-Hutter theory: A system of partial differential equations for avalanche flows of snow, debris, and mud, ZAMM · Z. Angew. Math. Mech. 84, No. 8, 507 – 527 / DOI 10.1002/zamm.200310123, 2004.
 
 [2] Bursik, M. I. & Woods, A. W. The dynamics and thermodynamics of large ash flows. Bulletin of Volcanology, 1996, 58, 175-193 
-
 

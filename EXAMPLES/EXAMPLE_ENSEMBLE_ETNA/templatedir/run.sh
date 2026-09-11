@@ -9,6 +9,3 @@ export OMP_NUM_THREADS=1
 #python plot_overlay.py > postprocessing1.log
 #zip raster.zip *.asc
 #rm *.asc
-
-#python p2d_to_netCDF4.py > postprocessing2.log
-#rm *.p_2d

@@ -3,7 +3,7 @@ cd TEST_2D
 echo ""
 ./cleanFolder.sh
 ../../bin/IMEX_SfloW2D
-FILE=TEST_2D_0001.p_2d
+FILE=TEST_2D_0001.q_2d
 if test -f "$FILE"; then
     ./cleanFolder.sh
     echo "TEST_2D succesfully run"
@@ -19,7 +19,7 @@ cd TEST_BOX
 echo ""
 ./cleanFolder.sh
 ../../bin/IMEX_SfloW2D
-FILE=TEST_BOX_400_0001.p_2d
+FILE=TEST_BOX_400_0001.q_2d
 if test -f "$FILE"; then
     ./cleanFolder.sh
     echo "TEST_BOX succesfully run"
@@ -35,7 +35,7 @@ cd TEST_BW
 echo ""
 ./cleanFolder.sh
 ../../bin/IMEX_SfloW2D
-FILE=TEST_BW_400_0001.p_2d
+FILE=TEST_BW_400_0001.q_2d
 if test -f "$FILE"; then
     ./cleanFolder.sh
     echo "TEST_BW succesfully run"
@@ -54,7 +54,7 @@ echo ""
 cp ../../EXAMPLES/EXAMPLE_CF/topo.zip .
 unzip topo.zip
 ../../bin/IMEX_SfloW2D
-FILE=TEST_CF_0001.p_2d
+FILE=TEST_CF_0001.q_2d
 if test -f "$FILE"; then
     ./cleanFolder.sh
     echo "TEST_CF succesfully run"
@@ -71,7 +71,7 @@ echo ""
 ./cleanFolder.sh
 ln -s ../../EXAMPLES/EXAMPLE_TAAL/topography_dem.asc .
 ../../bin/IMEX_SfloW2D
-FILE=TEST_TAAL_0001.p_2d
+FILE=TEST_TAAL_0001.q_2d
 if test -f "$FILE"; then
     ./cleanFolder.sh
     echo "TEST_TAAL succesfully run"
@@ -95,7 +95,7 @@ for DIR in */ ; do
     # Run the executable
     ../../../bin/IMEX_SfloW2D
 
-    FILE="dambreak2D_0001.p_2d"
+    FILE="dambreak2D_0001.q_2d"
     if [ -f "$FILE" ]; then
         ./cleanFolder.sh
         echo "$DIR successfully run"
@@ -113,7 +113,6 @@ cd ..
 
 
 exit 0
-
 
 
 
