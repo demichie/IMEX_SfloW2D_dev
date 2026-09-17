@@ -66,11 +66,13 @@
 
     END IF
 
+    ! Do not use DOT_PRODUCT here or below: for a complex first argument it
+    ! applies conjugation and therefore corrupts complex-step derivatives.
     IF ( gas_flag ) THEN
 
        carrier_sp_heat_mass =                                                   &
             ( xc - SUM(xg(1:n_add_gas)) ) * sp_heat_a +                        &
-            DOT_PRODUCT(xg(1:n_add_gas), sp_heat_g(1:n_add_gas))
+            SUM(xg(1:n_add_gas) * sp_heat_g(1:n_add_gas))
 
     ELSE
 
@@ -78,7 +80,7 @@
 
     END IF
 
-    sp_heat_mix = DOT_PRODUCT(xs(1:n_solid), sp_heat_s(1:n_solid))
+    sp_heat_mix = SUM(xs(1:n_solid) * sp_heat_s(1:n_solid))
 
     IF ( gas_flag .AND. liquid_flag ) THEN
 
@@ -120,7 +122,7 @@
 
              sp_gas_const_c =                                                   &
                   ( (xc - SUM(xg(1:n_add_gas))) * sp_gas_const_a +             &
-                  DOT_PRODUCT(xg(1:n_add_gas),                                 &
+                  SUM(xg(1:n_add_gas) *                                        &
                   sp_gas_const_g(1:n_add_gas)) ) / xc
 
           ELSE
@@ -133,7 +135,7 @@
 
           sp_gas_const_c =                                                      &
                ( (xc - SUM(xg(1:n_add_gas))) * sp_gas_const_a +                &
-               DOT_PRODUCT(xg(1:n_add_gas),                                    &
+               SUM(xg(1:n_add_gas) *                                           &
                sp_gas_const_g(1:n_add_gas)) ) / xc
 
        END IF
@@ -158,7 +160,7 @@
 
     END IF
 
-    inv_rhom = DOT_PRODUCT(xs(1:n_solid), inv_rho_s(1:n_solid)) +              &
+    inv_rhom = SUM(xs(1:n_solid) * inv_rho_s(1:n_solid)) +                     &
          xc * inv_rho_c
 
     IF ( gas_flag .AND. liquid_flag ) inv_rhom = inv_rhom + xl * inv_rho_l

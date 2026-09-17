@@ -20,11 +20,9 @@ each carrier-component mass fraction now contributes exactly once to
 `c_p,mix`, and the corresponding `q -> qp -> q` and REAL/COMPLEX value checks
 must agree to round-off accuracy.
 
-One independent known difference remains: nine tested REAL/COMPLEX derivatives
-differ, although the corresponding unperturbed values agree. The cause is the
-implicit conjugation performed by Fortran `DOT_PRODUCT` when its first argument
-is complex; correcting those products belongs to a separate test-backed commit.
-
-The test reports those derivative differences as `KNOWN DISCREPANCY` and
-requires their count and magnitude to remain bounded until that correction is
-applied.
+The shared conversion formulas use explicit element-wise multiplication and
+`SUM` for composition-weighted quantities. Unlike Fortran `DOT_PRODUCT`, this
+does not conjugate a complex first argument, so the COMPLEX implementation is
+an analytic continuation of the REAL formulas. All tested complex-step
+derivatives must now agree with centered finite differences within the stated
+tolerance.

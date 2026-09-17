@@ -220,7 +220,7 @@ CONTAINS
 
   SUBROUTINE run_complex_step_check
 
-    INTEGER :: component, output_idx, discrepancy_count
+    INTEGER :: component, output_idx
     INTEGER :: components(6)
     REAL(wp), PARAMETER :: complex_step = 1.0E-30_wp
     REAL(wp) :: finite_step
@@ -237,8 +237,6 @@ CONTAINS
     CALL qp_to_qc(qp, q)
 
     components = [1, 2, 4, idx_alfas_first, idx_addGas_first, idx_pore]
-    discrepancy_count = 0
-
     DO component = 1, SIZE(components)
       finite_step = 1.0E-6_wp*MAX(1.0_wp, ABS(q(components(component))))
       q_plus = q
@@ -261,18 +259,10 @@ CONTAINS
         relative_difference = ABS(cs_derivative(output_idx) - &
                                   fd_derivative(output_idx)) / &
                               MAX(1.0_wp, ABS(fd_derivative(output_idx)))
-        IF (relative_difference .GT. 2.0E-6_wp) THEN
-          discrepancy_count = discrepancy_count + 1
-          WRITE (*, *) 'KNOWN DISCREPANCY: ', TRIM(derivative_label), &
-                       relative_difference
-          CALL assert_true(TRIM(derivative_label)//' discrepancy bounded', &
-                           relative_difference .LE. 6.0_wp)
-        END IF
+        CALL assert_true(TRIM(derivative_label), &
+                         relative_difference .LE. 2.0E-6_wp)
       END DO
     END DO
-
-    CALL assert_true('known REAL/COMPLEX derivative discrepancy count', &
-                     discrepancy_count .EQ. 9)
 
     DEALLOCATE (qp, q, q_plus, q_minus, cq)
 
