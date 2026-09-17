@@ -16,7 +16,7 @@ PROGRAM test_state_conversion
 
   CALL finalize_test_properties
 
-  WRITE (*, *) 'PASS: state conversion baseline verified'
+  WRITE (*, *) 'PASS: state conversion verified'
 
 CONTAINS
 
@@ -143,17 +143,8 @@ CONTAINS
     CALL qc_to_qp(q0, qp1, p_dyn)
     CALL qp_to_qc(qp1, q1)
 
-    IF (has_liquid) THEN
-      CALL assert_close_vector(TRIM(label)//' q-qp-q before energy', q1(1:3), &
-                               q0(1:3), 2.0E-12_wp)
-      CALL assert_close_vector(TRIM(label)//' q-qp-q after energy', q1(5:n_vars), &
-                               q0(5:n_vars), 2.0E-12_wp)
-      CALL assert_known_difference(TRIM(label)//' known liquid-energy discrepancy', &
-                                   q1(4), q0(4), 1.0E-5_wp, 1.0E-3_wp)
-    ELSE
-      CALL assert_close_vector(TRIM(label)//' q-qp-q', q1, q0, 2.0E-12_wp)
-      CALL assert_close_vector(TRIM(label)//' qp', qp1, qp0, 2.0E-12_wp)
-    END IF
+    CALL assert_close_vector(TRIM(label)//' q-qp-q', q1, q0, 2.0E-12_wp)
+    CALL assert_close_vector(TRIM(label)//' qp', qp1, qp0, 2.0E-12_wp)
     CALL assert_true(TRIM(label)//' dynamic pressure finite', &
                      ieee_is_finite(p_dyn) .AND. p_dyn .GE. 0.0_wp)
     CALL check_real_complex(TRIM(label), q0, 2.0E-12_wp)
@@ -200,10 +191,6 @@ CONTAINS
     REAL(wp) :: alphas(n_solid), alphag(n_add_gas)
     COMPLEX(wp) :: cq(n_vars), ch, cu, cv, cT, crho_m, cinv_rhom, cZs, cpore
     COMPLEX(wp) :: calphas(n_solid), calphag(n_add_gas)
-    REAL(wp) :: actual_thermo(3 + n_solid + n_add_gas)
-    REAL(wp) :: expected_thermo(3 + n_solid + n_add_gas)
-    REAL(wp) :: max_relative_difference
-
     cq = CMPLX(q, 0.0_wp, wp)
     CALL r_phys_var(q, h, u, v, alphas, rho_m, T, alphal, alphag, red_grav, &
                     p_dyn, Zs, pore)
@@ -217,24 +204,14 @@ CONTAINS
     CALL assert_close_scalar(TRIM(label)//' real-complex pore', REAL(cpore), pore, &
                              tolerance)
 
-    IF (liquid_flag) THEN
-      actual_thermo = [REAL(ch), REAL(cT), REAL(crho_m), REAL(calphas), REAL(calphag)]
-      expected_thermo = [h, T, rho_m, alphas, alphag]
-      max_relative_difference = MAXVAL(ABS(actual_thermo - expected_thermo) / &
-                                        MAX(1.0_wp, ABS(expected_thermo)))
-      CALL assert_true(TRIM(label)//' known liquid REAL/COMPLEX discrepancy', &
-                       max_relative_difference .GE. 1.0E-5_wp .AND. &
-                       max_relative_difference .LE. 1.0E-3_wp)
-    ELSE
-      CALL assert_close_scalar(TRIM(label)//' real-complex h', REAL(ch), h, tolerance)
-      CALL assert_close_scalar(TRIM(label)//' real-complex T', REAL(cT), T, tolerance)
-      CALL assert_close_scalar(TRIM(label)//' real-complex rho', REAL(crho_m), &
-                               rho_m, tolerance)
-      CALL assert_close_vector(TRIM(label)//' real-complex solids', REAL(calphas), &
-                               alphas, tolerance)
-      CALL assert_close_vector(TRIM(label)//' real-complex gases', REAL(calphag), &
-                               alphag, tolerance)
-    END IF
+    CALL assert_close_scalar(TRIM(label)//' real-complex h', REAL(ch), h, tolerance)
+    CALL assert_close_scalar(TRIM(label)//' real-complex T', REAL(cT), T, tolerance)
+    CALL assert_close_scalar(TRIM(label)//' real-complex rho', REAL(crho_m), &
+                             rho_m, tolerance)
+    CALL assert_close_vector(TRIM(label)//' real-complex solids', REAL(calphas), &
+                             alphas, tolerance)
+    CALL assert_close_vector(TRIM(label)//' real-complex gases', REAL(calphag), &
+                             alphag, tolerance)
     CALL assert_true(TRIM(label)//' zero imaginary baseline', &
                      ABS(AIMAG(ch)) + ABS(AIMAG(cu)) + ABS(AIMAG(cv)) + &
                      ABS(AIMAG(cT)) + ABS(AIMAG(crho_m)) .EQ. 0.0_wp)
@@ -355,19 +332,6 @@ CONTAINS
     END IF
 
   END SUBROUTINE assert_close_scalar
-
-  SUBROUTINE assert_known_difference(label, actual, expected, min_relative, &
-                                     max_relative)
-
-    CHARACTER(LEN=*), INTENT(IN) :: label
-    REAL(wp), INTENT(IN) :: actual, expected, min_relative, max_relative
-    REAL(wp) :: relative_difference
-
-    relative_difference = ABS(actual - expected)/MAX(1.0_wp, ABS(expected))
-    CALL assert_true(label, relative_difference .GE. min_relative .AND. &
-                     relative_difference .LE. max_relative)
-
-  END SUBROUTINE assert_known_difference
 
   SUBROUTINE assert_true(label, condition)
 

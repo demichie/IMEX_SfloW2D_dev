@@ -72,20 +72,9 @@
             ( xc - SUM(xg(1:n_add_gas)) ) * sp_heat_a +                        &
             DOT_PRODUCT(xg(1:n_add_gas), sp_heat_g(1:n_add_gas))
 
-       IF ( legacy_real_path ) THEN
-
-          carrier_sp_heat = 0.0_wp
-
-       ELSE
-
-          carrier_sp_heat = carrier_sp_heat_mass / xc
-
-       END IF
-
     ELSE
 
        carrier_sp_heat_mass = sp_heat_l * xc
-       carrier_sp_heat = sp_heat_l
 
     END IF
 
@@ -93,32 +82,13 @@
 
     IF ( gas_flag .AND. liquid_flag ) THEN
 
-       ! Preserve the historical REAL weighting for the structural M12 commit.
-       ! The COMPLEX path uses the mass-weighted carrier contribution.
-       IF ( legacy_real_path ) THEN
-
-          sp_heat_mix = sp_heat_mix + xl * sp_heat_l +                         &
-               xc * carrier_sp_heat_mass
-
-       ELSE
-
-          sp_heat_mix = sp_heat_mix + xl * sp_heat_l + xc * carrier_sp_heat
-
-       END IF
-
-    ELSE
-
-       IF ( legacy_real_path ) THEN
-
-          sp_heat_mix = sp_heat_mix + carrier_sp_heat_mass
-
-       ELSE
-
-          sp_heat_mix = sp_heat_mix + xc * carrier_sp_heat
-
-       END IF
+       sp_heat_mix = sp_heat_mix + xl * sp_heat_l
 
     END IF
+
+    ! carrier_sp_heat_mass is already weighted by the carrier-component mass
+    ! fractions, so it enters the mixture heat capacity exactly once.
+    sp_heat_mix = sp_heat_mix + carrier_sp_heat_mass
 
     IF ( REAL(qj(1), wp) .GT. eps_sing ) THEN
 

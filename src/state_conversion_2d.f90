@@ -384,7 +384,7 @@ CONTAINS
 
     REAL(wp) :: xs(n_solid), xg(n_add_gas)
     REAL(wp) :: xl, xc, inv_qj1
-    REAL(wp) :: carrier_sp_heat, carrier_sp_heat_mass, sp_heat_mix
+    REAL(wp) :: carrier_sp_heat_mass, sp_heat_mix
     REAL(wp) :: sp_gas_const_c, inv_rho_g(n_add_gas)
 
     INCLUDE 'state_conversion_phys_var.inc'
@@ -605,7 +605,7 @@ CONTAINS
 
     COMPLEX(wp) :: xs(n_solid), xg(n_add_gas)
     COMPLEX(wp) :: xl, xc, inv_qj1
-    COMPLEX(wp) :: carrier_sp_heat, carrier_sp_heat_mass, sp_heat_mix
+    COMPLEX(wp) :: carrier_sp_heat_mass, sp_heat_mix
     COMPLEX(wp) :: sp_gas_const_c, inv_rho_g(n_add_gas)
 
     INCLUDE 'state_conversion_phys_var.inc'
