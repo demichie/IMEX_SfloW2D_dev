@@ -13,7 +13,7 @@ MODULE stochastic_module
   ! external variables
   USE parameters_2d, ONLY : wp , sp, rheology_model
   
-  USE parameters_2d, ONLY : n_eqns , n_vars , n_solid , n_add_gas , n_quad ,    &
+  USE parameters_2d, ONLY : n_eqns , n_vars , n_solid , n_add_gas ,             &
        n_stoch_vars , n_pore_vars
   
   USE domain_2d, ONLY: domain_type

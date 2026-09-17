@@ -11,7 +11,6 @@ MODULE hyperbolic_2d
   USE parameters_2d, ONLY : idx_solidEqn_first, idx_solidEqn_last
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
-  USE geometry_2d, ONLY : B_prime_x_geom, B_prime_y_geom
   USE geometry_2d, ONLY : grav_coeff_stag_x, grav_coeff_stag_y
   USE geometry_2d, ONLY : one_by_dx, one_by_dy
 
@@ -208,14 +207,10 @@ CONTAINS
 
           CALL eval_fluxes( recon%q_interfaceL(1:n_vars,j,k) ,                        &
                recon%qp_interfaceL(1:n_vars+2,j,k) ,                                  &
-               B_prime_x_geom(MAX(1,j-1),MIN(k,comp_cells_y)) ,                 &
-               B_prime_y_geom(MAX(1,j-1),MIN(k,comp_cells_y)) ,                 &
                grav_coeff_stag_x(j,k) , 1 , fluxL )
 
           CALL eval_fluxes( recon%q_interfaceR(1:n_vars,j,k) ,                        &
                recon%qp_interfaceR(1:n_vars+2,j,k) ,                                  &
-               B_prime_x_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
-               B_prime_y_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
                grav_coeff_stag_x(j,k) , 1 , fluxR )
 
           IF ( ( recon%qp_interfaceL(n_vars+1,j,k) .GT. 0.0_wp ) .AND.                &
@@ -259,14 +254,10 @@ CONTAINS
 
           CALL eval_fluxes( recon%q_interfaceB(1:n_vars,j,k) ,                        &
                recon%qp_interfaceB(1:n_vars+2,j,k) ,                                  &
-               B_prime_x_geom(MIN(j,comp_cells_x),MAX(1,k-1)) ,                 &
-               B_prime_y_geom(MIN(j,comp_cells_x),MAX(1,k-1)) ,                 &
                grav_coeff_stag_y(j,k) , 2 , fluxB )
 
           CALL eval_fluxes( recon%q_interfaceT(1:n_vars,j,k) ,                        &
                recon%qp_interfaceT(1:n_vars+2,j,k) ,                                  &
-               B_prime_x_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
-               B_prime_y_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
                grav_coeff_stag_y(j,k) , 2 , fluxT )
 
           IF ( ( recon%q_interfaceB(3,j,k) .GT. 0.0_wp ) .AND.                        &
@@ -360,14 +351,10 @@ CONTAINS
 
           CALL eval_fluxes( recon%q_interfaceL(1:n_vars,j,k) ,                        &
                recon%qp_interfaceL(1:n_vars+2,j,k) ,                                  &
-               B_prime_x_geom(MAX(1,j-1),MIN(k,comp_cells_y)) ,                 &
-               B_prime_y_geom(MAX(1,j-1),MIN(k,comp_cells_y)) ,                 &
                grav_coeff_stag_x(j,k) , 1 , fluxL )
 
           CALL eval_fluxes( recon%q_interfaceR(1:n_vars,j,k) ,                        &
                recon%qp_interfaceR(1:n_vars+2,j,k) ,                                  &
-               B_prime_x_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
-               B_prime_y_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
                grav_coeff_stag_x(j,k) , 1 , fluxR )
 
           ! First term in Eq. 25 GMD paper
@@ -436,14 +423,10 @@ CONTAINS
 
           CALL eval_fluxes( recon%q_interfaceB(1:n_vars,j,k) ,                        &
                recon%qp_interfaceB(1:n_vars+2,j,k) ,                                  &
-               B_prime_x_geom(MIN(j,comp_cells_x),MAX(1,k-1)) ,                 &
-               B_prime_y_geom(MIN(j,comp_cells_x),MAX(1,k-1)) ,                 &
                grav_coeff_stag_y(j,k) , 2 , fluxB )
 
           CALL eval_fluxes( recon%q_interfaceT(1:n_vars,j,k) ,                        &
                recon%qp_interfaceT(1:n_vars+2,j,k) ,                                  &
-               B_prime_x_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
-               B_prime_y_geom(MIN(j,comp_cells_x),MIN(k,comp_cells_y)) ,        &
                grav_coeff_stag_y(j,k) , 2 , fluxT )
           
           CALL average_KT( this%a_interface_yNeg(:,j,k) ,                            &

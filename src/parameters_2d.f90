@@ -121,18 +121,6 @@ MODULE parameters_2d
   !> .  
   LOGICAL :: liquid_vaporization_flag
 
-  !> Flag for vertical velocity/concentration profiles
-  !> - T      => we use vertical profiles
-  !> - F      => constant vertical profiles
-  !> .  
-  LOGICAL :: vertical_profiles_flag
-  
-  !> Flag for deposition computed from vertical concentration profiles
-  !> - T      => we use bottom value
-  !> - F      => we use depthaverage value
-  !> .  
-  LOGICAL :: bottom_conc_flag
-
   LOGICAL :: stoch_transport_flag
 
   LOGICAL :: pore_pressure_flag
@@ -411,8 +399,5 @@ MODULE parameters_2d
   !> - gradient of the variable for Neumann boundary condition (bcN%flag=1).
   !> .
   TYPE(bc), ALLOCATABLE :: bcN(:)
-
-  !> quadrature points for integration of vertical profiles
-  INTEGER :: n_quad
 
 END MODULE parameters_2d

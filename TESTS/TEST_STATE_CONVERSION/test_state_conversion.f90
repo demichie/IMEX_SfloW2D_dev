@@ -53,7 +53,6 @@ CONTAINS
 
     eps_sing = 1.0E-8_wp
     eps_sing4 = eps_sing**4
-    vertical_profiles_flag = .FALSE.
     sutherland_flag = .FALSE.
     rheology_flag = .FALSE.
     slope_correction_flag = .FALSE.

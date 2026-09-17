@@ -40,3 +40,14 @@ The executable is copied in the bin folder.
 
 Several examples can be found in the EXAMPLES folder.
 
+## Vertical closure status
+
+The legacy velocity/concentration vertical-profile implementation has been
+removed. The current solver uses the standard depth-averaged equations, and
+the input options `VERTICAL_PROFILES_FLAG` and
+`VERTICAL_PROFILES_PARAMETERS` are no longer accepted.
+
+Vertical-structure effects will be reintroduced through a separate closure
+interface that maps conservative state and local context to coefficients used
+by the equation terms. This will allow analytical/quadrature and data-driven
+backends to share the same solver-facing contract.

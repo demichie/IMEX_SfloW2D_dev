@@ -39,7 +39,7 @@ MODULE inpout_2d
   USE parameters_2d, ONLY: rheology_flag, energy_flag, alpha_flag, &
                            topo_change_flag, radial_source_flag, collapsing_volume_flag, &
                            liquid_flag, gas_flag, subtract_init_flag, bottom_radial_source_flag, &
-                           vertical_profiles_flag, lateral_source_flag, serial_flag, &
+                           lateral_source_flag, serial_flag, &
                            stochastic_flag, stoch_transport_flag, mean_field_flag, &
                            pore_pressure_flag
 
@@ -100,7 +100,7 @@ MODULE inpout_2d
   USE constitutive_2d, ONLY: sauter_diameter, average_density_solids, precompute_pascal_coefficient
 
   ! --- Variables for the namelist SOLID_TRANSPORT_PARAMETERS
-  USE constitutive_2d, ONLY: rho_s, diam_s, sphericity_s, sp_heat_s
+  USE constitutive_2d, ONLY: rho_s, diam_s, sphericity_s, sp_heat_s, vonK
   USE constitutive_2d, ONLY: settling_flag, erosion_coeff, erodible_porosity
   USE constitutive_2d, ONLY: erodible_fract, T_erodible
   USE constitutive_2d, ONLY: alphastot_min
@@ -121,10 +121,6 @@ MODULE inpout_2d
   ! --- Variables for the namelist VULNERABILITY_TABLE_PARAMETERS
   USE parameters_2d, ONLY: n_thickness_levels, n_dyn_pres_levels, &
                            thickness_levels, dyn_pres_levels
-
-  ! --- Variables for the namelist VERTICAL_PROFILES_PARAMETERS
-  USE constitutive_2d, ONLY: vonK, k_s, Sc, z_dyn
-  USE parameters_2d, ONLY: bottom_conc_flag, n_quad
 
   ! --- Variables for the namelist STOCHASTIC_PARAMETERS
   USE stochastic_module, ONLY: sym_noise, &
@@ -338,7 +334,7 @@ MODULE inpout_2d
     energy_flag, liquid_flag, radial_source_flag, collapsing_volume_flag, &
     topo_change_flag, gas_flag, subtract_init_flag, n_add_gas, &
     bottom_radial_source_flag, slope_correction_flag, curvature_term_flag, &
-    vertical_profiles_flag, lateral_source_flag, stochastic_flag, &
+    lateral_source_flag, stochastic_flag, &
     pore_pressure_flag
 
   NAMELIST /initial_conditions/ released_volume, x_release, y_release, &
@@ -381,9 +377,6 @@ MODULE inpout_2d
     loss_rate
 
   NAMELIST /vulnerability_table_parameters/ thickness_levels0, dyn_pres_levels0
-
-  NAMELIST /vertical_profiles_parameters/ vonK, k_s, Sc, bottom_conc_flag, &
-    n_quad, z_dyn
 
   NAMELIST /stochastic_parameters/ &
     mean_field_flag, output_stoch_vars_flag, sym_noise, std_max, &
@@ -466,7 +459,6 @@ CONTAINS
     alpha_flag = .FALSE.
     slope_correction_flag = .FALSE.
     curvature_term_flag = .FALSE.
-    vertical_profiles_flag = .FALSE.
     serial_flag = .TRUE.
     stochastic_flag = .FALSE.
     stoch_transport_flag = .FALSE.
@@ -854,6 +846,7 @@ CONTAINS
     erodible_porosity = -1.0_wp
     alphastot_min = 0.0_wp
     maximum_solid_packing = 0.64_wp
+    vonK = 0.4_wp
 
     !- Variables for the namelist RHEOLOGY_PARAMETERS
     xi = -1.0_wp
@@ -942,14 +935,6 @@ CONTAINS
     thickness_levels0 = -1.0_wp
     dyn_pres_levels0 = -1.0_wp
 
-    !- Initial values for VERTICAL_PROFILES_PARAMETERS
-    vonK = -1
-    k_s = -1
-    Sc = -1
-    bottom_conc_flag = .FALSE.
-    n_quad = -1
-    z_dyn = -1
-
     !-- Variable for the namelist STOCHASTIC_PARAMETERS
     mean_field_flag = .FALSE.
     sym_noise = 0.0_wp
@@ -992,8 +977,7 @@ CONTAINS
     USE parameters_2d, ONLY: limiter
     USE parameters_2d, ONLY: bcW, bcE, bcS, bcN
 
-    USE geometry_2d, ONLY: deposit, deposit_tot, erosion, erodible, &
-                           erosion_tot, z_quad, w_quad
+    USE geometry_2d, ONLY: deposit, deposit_tot, erosion, erodible, erosion_tot
 
     USE constitutive_2d, ONLY: rho_a_amb
     USE constitutive_2d, ONLY: rho_c_sub
@@ -1006,14 +990,10 @@ CONTAINS
     USE constitutive_2d, ONLY: radiative_term_coeff, SBconst
     USE constitutive_2d, ONLY: convective_term_coeff
 
-    USE constitutive_2d, ONLY: H_crit_rel
-
     USE init_2d, ONLY: erodible_init
 
     ! External procedures
-    USE constitutive_2d, ONLY: mixt_var, eval_flux_coeffs
-
-    USE geometry_2d, ONLY: lambertw0, lambertwm1, gaulegf
+    USE constitutive_2d, ONLY: mixt_var
 
     IMPLICIT none
 
@@ -1037,7 +1017,7 @@ CONTAINS
       sp_heat_s, erosion_coeff, erodible_porosity, settling_flag, &
       T_erodible, erodible_file, erodible_fract, alphastot_min, &
       initial_erodible_thickness, erodible_deposit_flag, &
-      maximum_solid_packing, A_drag, B_drag, collective_settling_flag
+      maximum_solid_packing, A_drag, B_drag, collective_settling_flag, vonK
 
     NAMELIST /gas_transport_parameters/ sp_heat_a, sp_gas_const_a, kin_visc_a, &
       pres, T_ambient, entrainment_flag, sp_heat_g, sp_gas_const_g, &
@@ -1079,20 +1059,12 @@ CONTAINS
 
     REAL(wp) :: pi_g
 
-    REAL(wp) :: a_crit_rel
-
     REAL(wp), ALLOCATABLE :: inv_rho_g(:)
     REAL(wp) :: inv_rho_c
     REAL(wp) :: inv_rhom
     REAL(wp) :: sp_gas_const_c
     REAL(wp) :: xc
     REAL(wp) :: xs_tot
-    REAL(wp), ALLOCATABLE :: shape_coeff(:)
-
-    REAL(wp) :: lamb0, lamb1
-
-    INTEGER :: iter_source, iter_max
-
     ! parameter for elliptical source
     REAL(wp) :: h_ell
 
@@ -1759,6 +1731,15 @@ CONTAINS
 
         WRITE (*, *) 'ERROR: problem with namelist SOLID_TRANSPORT_PARAMETERS'
         WRITE (*, *) 'SP_HEAT_S =', sp_heat_s(1:n_solid)
+        WRITE (*, *) 'Please check the input file'
+        STOP
+
+      END IF
+
+      IF (vonK .LE. 0.0_wp) THEN
+
+        WRITE (*, *) 'ERROR: problem with namelist SOLID_TRANSPORT_PARAMETERS'
+        WRITE (*, *) 'VONK =', vonK
         WRITE (*, *) 'Please check the input file'
         STOP
 
@@ -3819,110 +3800,6 @@ CONTAINS
 
     END IF
 
-    ! ------------ READ vertical_profiles_parameters NAMELIST ------------------
-
-    IF (vertical_profiles_flag) THEN
-
-      IF (rheology_flag .AND. (rheology_model .NE. 8)) THEN
-
-        WRITE (*, *) 'ERROR: problem with input values'
-        WRITE (*, *) 'RHEOLOGY_model', rheology_model
-        WRITE (*, *) 'VERTICAL_PROFILES_FLAG', vertical_profiles_flag
-        WRITE (*, *) 'Vertical profiles can be used only with RHEOLOGY_FLAG = F'
-        WRITE (*, *) ' or with RHEOLOGY_MODEL = 8'
-        STOP
-
-      END IF
-
-      IF (energy_flag) THEN
-
-        WRITE (*, *) 'ERROR: problem with input values'
-        WRITE (*, *) 'ENERGY_flag', energy_flag
-        WRITE (*, *) 'VERTICAL_PROFILES_FLAG', vertical_profiles_flag
-        WRITE (*, *) 'Vertical profiles can be used only with ENERGY_FLAG = F'
-        STOP
-
-      END IF
-
-      REWIND (input_unit)
-      READ (input_unit, vertical_profiles_parameters, IOSTAT=ios)
-
-      IF (ios .NE. 0) THEN
-
-        WRITE (*, *) 'IOSTAT=', ios
-        WRITE (*, *) 'ERROR: problem with namelist VERTICAL_PROFILES_PARAMETERS'
-        WRITE (*, *) 'Please check the input file'
-        WRITE (*, vertical_profiles_parameters)
-        STOP
-
-      ELSE
-
-        REWIND (input_unit)
-
-        IF (vonK .LE. 0.0_wp) THEN
-
-          WRITE (*, *) 'ERROR: problem with namelist VERTICAL_PROFILES_PARAMETERS'
-          WRITE (*, *) 'vonK =', vonK
-          WRITE (*, *) 'Please check the input file'
-          STOP
-
-        END IF
-
-        IF (k_s .LE. 0.0_wp) THEN
-
-          WRITE (*, *) 'ERROR: problem with namelist VERTICAL_PROFILES_PARAMETERS'
-          WRITE (*, *) 'k_s =', k_s
-          WRITE (*, *) 'Please check the input file'
-          STOP
-
-        END IF
-
-        IF (N_quad .LE. 0) THEN
-
-          WRITE (*, *) 'ERROR: problem with namelist VERTICAL_PROFILES_PARAMETERS'
-          WRITE (*, *) 'N_QUAD =', n_quad
-          WRITE (*, *) 'Please check the input file'
-          STOP
-
-        ELSE
-
-          ALLOCATE (z_quad(N_quad), w_quad(N_quad))
-          CALL gaulegf(-1.0_wp, 1.0_wp, z_quad, w_quad, n_quad)
-
-        END IF
-
-        IF (Sc .LE. 0.0_wp) THEN
-
-          WRITE (*, *) 'ERROR: problem with namelist VERTICAL_PROFILES_PARAMETERS'
-          WRITE (*, *) 'Sc =', Sc
-          WRITE (*, *) 'Please check the input file'
-          STOP
-
-        END IF
-
-        IF (z_dyn .LE. 0.0_wp) THEN
-
-          WRITE (*, *) 'WARNING: problem with namelist VERTICAL_PROFILES_PARAMETERS'
-          WRITE (*, *) 'z_dyn =', z_dyn
-          WRITE (*, *) 'Dynamic pressure computed as depth-averaged value'
-
-        END IF
-
-        a_crit_rel = vonK/SQRT(friction_factor) + 1.0_wp
-
-        lamb0 = lambertw0(-a_crit_rel*EXP(-a_crit_rel))
-        lamb1 = lambertwm1(-a_crit_rel*EXP(-a_crit_rel))
-
-        H_crit_rel = 1.0_wp/30.0_wp*(-a_crit_rel/ &
-                                     MAX(lamb0, lamb1) - 1.0_wp)
-
-        WRITE (*, *) 'H_crit_rel', H_crit_rel
-        WRITE (*, *) 'H_crit', H_crit_rel*k_s
-
-      END IF
-
-    END IF
-
     ! ------- READ radial_source_parameters NAMELIST ----------------------------
 
     source_flag: IF ((radial_source_flag) .OR. (bottom_radial_source_flag) &
@@ -4554,30 +4431,12 @@ CONTAINS
           WRITE (*, *) 'Source density =', rho_m, '(kg/m3)'
           WRITE (*, *) 'Source reduced gravity =', red_grav, '(m/s2)'
 
-          ALLOCATE (shape_coeff(n_vars))
-
           IF (mfr_source .GE. 0.0_wp) THEN
 
             IF (Ri_source .GE. 0.0_wp) THEN
               ! mfr and Ri given as input
 
-              shape_coeff(1:n_vars) = 1.0_wp
-
-              IF (vertical_profiles_flag) THEN
-
-                iter_max = 500
-
-              ELSE
-
-                iter_max = 1
-
-              END IF
-
-              search_Ri_loop: DO iter_source = 1, iter_max
-
-                WRITE (*, *) 'iter_source', iter_source
-
-                h_source = (mfr_source/(source_length*rho_m*shape_coeff(1)) &
+                h_source = (mfr_source/(source_length*rho_m) &
                             *SQRT(Ri_source/red_grav))**(2.0_wp/3.0_wp)
 
                 qp_source(1) = h_source
@@ -4616,25 +4475,6 @@ CONTAINS
                 ! compute the correct velocity for the desired Richardson number
                 vel_source = SQRT(red_grav*h_source/Ri_source)
 
-                IF (ABS(Ri - Ri_source) < 1.0E-15_wp) EXIT search_Ri_loop
-
-                ! READ(*,*)
-
-                IF (vertical_profiles_flag) THEN
-
-                  CALL eval_flux_coeffs(qp_source, 0.0_wp, 0.0_wp, rho_c, &
-                                        rho_m, shape_coeff)
-
-                  ! WRITE(*,*) 'Mass flux coeff.',shape_coeff(1)
-
-                ELSE
-
-                  shape_coeff(1:n_vars) = 1.0_wp
-
-                END IF
-
-              END DO search_Ri_loop
-
             ELSE
 
               ! mfr and velocity
@@ -4642,22 +4482,8 @@ CONTAINS
               CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, &
                             sp_heat_flag, sp_heat_c, sp_heat_mix)
 
-              IF (vertical_profiles_flag) THEN
-
-                CALL eval_flux_coeffs(qp_source, 0.0_wp, 0.0_wp, rho_c, &
-                                      rho_m, shape_coeff)
-
-                WRITE (*, *) 'qp', qp_source
-                WRITE (*, *) 'Mass flux coeff.', shape_coeff(1)
-
-              ELSE
-
-                shape_coeff(1:n_vars) = 1.0_wp
-
-              END IF
-
               h_source = mfr_source/(source_length*rho_m* &
-                                     vel_source*shape_coeff(1))
+                                     vel_source)
 
             END IF
 
@@ -4680,24 +4506,11 @@ CONTAINS
           CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_flag, &
                         sp_heat_c, sp_heat_mix)
 
-          IF (vertical_profiles_flag) THEN
-
-            CALL eval_flux_coeffs(qp_source, 0.0_wp, 0.0_wp, rho_c, &
-                                  rho_m, shape_coeff)
-
-            WRITE (*, *) 'Mass flux coeff.', shape_coeff(1)
-
-          ELSE
-
-            shape_coeff(1:n_vars) = 1.0_wp
-
-          END IF
-
           WRITE (*, *) 'Source Richardson number =', Ri
           WRITE (*, *) 'Source velocity =', vel_source, ' (m/s)'
           WRITE (*, *) 'Source thickness =', h_source, '(m)'
 
-          mfr = rho_m*h_source*source_length*vel_source*shape_coeff(1)
+          mfr = rho_m*h_source*source_length*vel_source
           WRITE (*, *) 'Source mass flow rate =', mfr, '(kg/s)'
           WRITE (*, *)
           ! READ(*,*)
@@ -5024,8 +4837,6 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
       WRITE (backup_unit, vulnerability_table_parameters)
 
     END IF
-
-    IF (vertical_profiles_flag) WRITE (backup_unit, vertical_profiles_parameters)
 
     IF (n_probes .GT. 0) THEN
 

@@ -10,7 +10,7 @@ MODULE constitutive_2d
   USE equation_metadata_2d, ONLY : equation_partition_type
 
   USE parameters_2d, ONLY : wp, sp, tolh
-  USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas, n_quad,         &
+  USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
        n_stoch_vars, n_pore_vars
   USE parameters_2d, ONLY : rheology_flag, rheology_model, energy_flag,         &
        liquid_flag, gas_flag, alpha_flag, slope_correction_flag,                &

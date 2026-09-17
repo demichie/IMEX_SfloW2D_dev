@@ -223,18 +223,8 @@ MODULE constitutive_parameters_2d
   !> Fraction of heat lost by particles producing steam
   REAL(wp) :: gamma_steam
 
-  !> Von Karman constant
+  !> Von Karman constant used for the diagnostic Rouse number
   REAL(wp) :: vonK
-
-  !> Substrate Roughness (units: m)
-  REAL(wp) :: k_s
-
-  REAL(wp) :: H_crit_rel
-
-  !> Schmidt number: ratio of momentum and mass diffusivity
-  REAL(wp) :: Sc
-
-  REAL(wp) :: z_dyn
 
   !> Hydraulic permeability (units: m2)
   REAL(wp) :: hydraulic_permeability

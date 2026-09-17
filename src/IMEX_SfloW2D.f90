@@ -93,8 +93,6 @@ PROGRAM IMEX_SfloW2D
    USE constitutive_2d, ONLY : qc_to_qp
 
 
-   USE constitutive_2d, ONLY : avg_profiles_mix
-
    USE OMP_LIB
 
    IMPLICIT NONE
@@ -118,10 +116,6 @@ PROGRAM IMEX_SfloW2D
 
    !> Dynamic pressure
    REAL(wp) :: p_dyn
-
-   REAL(wp) :: w , z, u1,u2,u
-
-   REAL(wp) :: ans1
 
    REAL(wp) :: mod_vel , mod_vel2, r_u, r_v
 
@@ -168,19 +162,6 @@ PROGRAM IMEX_SfloW2D
       WRITE(*,*) 'Parallel run: number of threads used',n_threads
 
    END IF
-
-!!$
-!!$  !avg_profiles_mix( h , settling_vel , rho_alphas_avg,&
-!!$  !      u_guess , h0 , b , u_coeff , u_rel0 , rho_c , uRho_avg_new )
-!!$
-!!$  CALL avg_profiles_mix( 100.0_wp,(/ 1.0E-3_wp /), &
-!!$       (/ 1.0_wp /) , 10.0_wp , 3.8916_wp , 20.0_wp , 1.0_wp , &
-!!$       1.0918_wp , 1.2_wp, ans1)
-!!$
-!!$
-!!$  WRITE(*,*) 'ans1',ans1
-!!$
-!!$  STOP
 
    CALL init_grid
 
