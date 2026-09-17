@@ -27,13 +27,12 @@ CONTAINS
     n_stoch_vars = 1
     n_pore_vars = 1
 
-    ALLOCATE (rho_s(n_solid), inv_rho_s(n_solid), c_inv_rho_s(n_solid))
+    ALLOCATE (rho_s(n_solid), inv_rho_s(n_solid))
     ALLOCATE (diam_s(n_solid), sphericity_s(n_solid), sp_heat_s(n_solid))
     ALLOCATE (sp_heat_g(n_add_gas), sp_gas_const_g(n_add_gas))
 
     rho_s = [2500.0_wp, 1800.0_wp]
     inv_rho_s = 1.0_wp/rho_s
-    c_inv_rho_s = CMPLX(inv_rho_s, 0.0_wp, wp)
     diam_s = [1.0E-4_wp, 2.0E-4_wp]
     sphericity_s = 1.0_wp
     sp_heat_s = [900.0_wp, 1100.0_wp]
@@ -392,7 +391,7 @@ CONTAINS
 
   SUBROUTINE finalize_test_properties
 
-    DEALLOCATE (rho_s, inv_rho_s, c_inv_rho_s)
+    DEALLOCATE (rho_s, inv_rho_s)
     DEALLOCATE (diam_s, sphericity_s, sp_heat_s)
     DEALLOCATE (sp_heat_g, sp_gas_const_g)
 

@@ -171,9 +171,6 @@ MODULE constitutive_parameters_2d
   !> Reciprocal of density of sediments ( units: kg m-3 )
   REAL(wp), ALLOCATABLE :: inv_rho_s(:)
 
-  !> Reciprocal of density of sediments ( units: kg m-3 )
-  COMPLEX(wp), ALLOCATABLE :: c_inv_rho_s(:)
-
   !> Diameter of sediments ( units: m )
   REAL(wp), ALLOCATABLE :: diam_s(:)
 

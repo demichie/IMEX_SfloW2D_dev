@@ -1,7 +1,8 @@
 # State-conversion characterization test
 
-This test freezes the behavior of the state-conversion routines before the
-`constitutive_2d` module is split. It does not correct constitutive formulas.
+This test freezes the behavior of the state-conversion routines across the
+constitutive split and the introduction of the shared REAL/COMPLEX core. It
+does not correct constitutive formulas.
 
 The passing baseline covers:
 
@@ -21,5 +22,7 @@ Two existing differences are intentional expectations of this baseline:
    unperturbed gas-solid values agree.
 
 The test reports these as `KNOWN DISCREPANCY` and requires their count and
-magnitude to remain bounded. M12 can then change these expectations in the
-same commit that introduces the shared REAL/COMPLEX conversion core.
+magnitude to remain bounded. The structural M12 commit keeps these expectations
+unchanged while moving the common formulas to one include fragment. Each
+physical correction must update the corresponding expectation in a separate,
+test-backed commit.

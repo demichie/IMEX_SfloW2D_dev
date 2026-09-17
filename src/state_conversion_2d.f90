@@ -189,266 +189,59 @@ CONTAINS
   SUBROUTINE r_phys_var(r_qj , r_h , r_u , r_v , r_alphas , r_rho_m , r_T ,     &
        r_alphal , r_alphag , r_red_grav , p_dyn , r_Zs , r_exc_pore_pres)
 
-    USE geometry_2d, ONLY : lambertw , lambertw0 , lambertwm1
-    USE geometry_2d, ONLY : z_quad , w_quad
+    USE geometry_2d, ONLY : lambertw0, lambertwm1
+    USE geometry_2d, ONLY : z_quad, w_quad
+    USE parameters_2d, ONLY : vertical_profiles_flag
 
-    USE parameters_2d, ONLY : eps_sing , eps_sing4 , vertical_profiles_flag
-    IMPLICIT none
+    IMPLICIT NONE
 
-    REAL(wp), INTENT(IN) :: r_qj(n_vars)       !< real-value conservative var
-    REAL(wp), INTENT(OUT) :: r_h               !< real-value flow thickness
-    REAL(wp), INTENT(OUT) :: r_u               !< real-value x-velocity
-    REAL(wp), INTENT(OUT) :: r_v               !< real-value y-velocity
-    REAL(wp), INTENT(OUT) :: r_alphas(n_solid) !< real-value solid volume fracts
-    REAL(wp), INTENT(OUT) :: r_rho_m           !< real-value mixture density
-    REAL(wp), INTENT(OUT) :: r_T               !< real-value temperature
-    REAL(wp), INTENT(OUT) :: r_alphal          !< real-value liquid volume fract
-    REAL(wp), INTENT(OUT) :: r_alphag(n_add_gas) !< real-value gas volume fracts
-    REAL(wp), INTENT(OUT) :: r_red_grav        !< real-value reduced gravity
-    REAL(wp), INTENT(OUT) :: p_dyn
-    REAL(wp), INTENT(OUT) :: r_Zs              !< real-value stochastic variable
-    REAL(wp), INTENT(OUT) :: r_exc_pore_pres   !< real-value pore pressure
+    REAL(wp), INTENT(IN) :: r_qj(n_vars)
+    REAL(wp), INTENT(OUT) :: r_h, r_u, r_v
+    REAL(wp), INTENT(OUT) :: r_alphas(n_solid)
+    REAL(wp), INTENT(OUT) :: r_rho_m, r_T, r_alphal
+    REAL(wp), INTENT(OUT) :: r_alphag(n_add_gas)
+    REAL(wp), INTENT(OUT) :: r_red_grav, p_dyn, r_Zs, r_exc_pore_pres
 
     REAL(wp) :: r_inv_rhom
-    REAL(wp) :: r_xs(n_solid)     !< real-value solid mass fractions
-    REAL(wp) :: r_xg(n_add_gas)     !< real-value additional gas mass fractions
-    REAL(wp) :: r_xs_tot
+    REAL(wp) :: r_rho_c, r_inv_rho_c, r_xs_tot
+    LOGICAL :: is_wet
 
-    REAL(wp) :: r_Ri            !< real-value Richardson number
-    REAL(wp) :: r_xl            !< real-value liquid mass fraction
-    REAL(wp) :: r_xc            !< real-value carrier phase mass fraction
-    REAL(wp) :: r_alphac        !< real-value carrier phase volume fraction
-    REAL(wp) :: r_sp_heat_c     !< real-value specific heat of carrier phase
-    REAL(wp) :: r_sp_heat_mix   !< real-value specific heat of mixture
-    REAL(wp) :: r_sp_gas_const_c!< real-value gas constant of carrier phase
-    REAL(wp) :: r_rho_c         !< real-value carrier phase density [kg/m3]
-    REAL(wp) :: r_inv_rho_c
-    REAL(wp) :: r_inv_rho_g(n_add_gas)    !< add. gas density reciprocal
-
-    REAL(wp) :: inv_qj1
-
+    REAL(wp) :: r_Ri
     REAL(wp) :: rhos_alfas(n_solid)
-
-    REAL(wp) :: rhos_alfas_tot_u
-    REAL(wp) :: rhos_alfas_tot_v
-
+    REAL(wp) :: rhos_alfas_tot_u, rhos_alfas_tot_v
     REAL(wp) :: settling_vel(n_solid)
-
     REAL(wp) :: inv_kin_visc
-
-    !REAL(wp) :: a_crit_rel
     REAL(wp) :: h_rel
-
-    REAL(wp) :: a,b,c,d
-
-    REAL(wp) :: h0_rel
-    REAL(wp) :: h0_rel_1
-    REAL(wp) :: h0_rel_2
-
+    REAL(wp) :: a, b, c, d
+    REAL(wp) :: h0_rel, h0_rel_1, h0_rel_2
     REAL(wp) :: normalizing_coeff_u
-
-    REAL(wp) :: h0
-    REAL(wp) :: u_rel0
-
-    REAL(wp) :: uRho_avg
-    REAL(wp) :: uRho_avg_new
-
-    REAL(wp) :: u_avg_guess
-    REAL(wp) :: u_avg_new
-
+    REAL(wp) :: h0, u_rel0
+    REAL(wp) :: uRho_avg, uRho_avg_new
+    REAL(wp) :: u_avg_guess, u_avg_new
     REAL(wp) :: rhom_avg
-
-    REAL(wp) :: x0,x1,x2
-
+    REAL(wp) :: x0, x1, x2
     INTEGER :: i_aitken
-    REAL(wp) :: abs_tol , rel_tol
-    REAL(wp) :: denominator
-    REAL(wp) :: aitkenX
-    REAL(wp) :: lambda
-
+    REAL(wp) :: abs_tol, rel_tol, denominator, aitkenX, lambda
     INTEGER :: i_solid
-
-    REAL(wp) :: z(n_quad)
-    REAL(wp) :: w(n_quad)
-
+    REAL(wp) :: z(n_quad), w(n_quad)
     REAL(wp) :: u_log_avg
+    REAL(wp) :: dyn_visc_c, kin_visc_c_local
 
-    REAL(wp) :: r_sp_heat_c_by_xc
+    CALL phys_var_core_real(r_qj, .TRUE., r_h, r_u, r_v, r_T, r_rho_m,         &
+         r_alphas, r_alphag, r_inv_rhom, r_alphal, r_rho_c, r_inv_rho_c,       &
+         r_xs_tot, r_Zs, r_exc_pore_pres, is_wet)
 
-    REAL(wp) :: dyn_visc_c
-    REAL(wp) :: kin_visc_c_local
+    IF ( .NOT. is_wet ) THEN
 
-    ! Optional transported quantities must have a defined value even when
-    ! their corresponding model is disabled.
-    r_alphal = 0.0_wp
-    r_alphag = 0.0_wp
-    r_Zs = 0.0_wp
-    r_exc_pore_pres = 0.0_wp
-    r_xl = 0.0_wp
-
-    ! compute solid mass fractions
-    IF ( r_qj(1) .GT. EPSILON(1.0_wp) ) THEN
-
-       inv_qj1 = 1.0_wp / r_qj(1)
-
-       r_xs(1:n_solid) = r_qj(idx_alfas_first:idx_alfas_last) * inv_qj1
-
-       IF ( SUM( r_qj(idx_alfas_first:idx_alfas_last) ) .EQ. r_qj(1) ) THEN
-
-          r_xs(1:n_solid) = r_xs(1:n_solid) / SUM( r_xs(1:n_solid) )
-
-       END IF
-
-       IF ( n_add_gas .GT. 0 ) r_xg(1:n_add_gas) =                              &
-            r_qj(idx_addGas_first:idx_addGas_last) * inv_qj1
-
-       IF ( stoch_transport_flag ) r_Zs = r_qj(idx_stoch) * inv_qj1
-
-       IF ( pore_pressure_flag ) r_exc_pore_pres = r_qj(idx_pore) * inv_qj1
-
-    ELSE
-
-       r_h = 0.0_wp
-       r_u = 0.0_wp
-       r_v = 0.0_wp
-       r_alphas = 0.0_wp
-       r_rho_m = rho_a_amb
-       r_T = T_ambient
-       r_alphal = 0.0_wp
-       r_alphag = 0.0_wp
        r_red_grav = 0.0_wp
-       r_rho_c = rho_a_amb
        p_dyn = 0.0_wp
-       r_Zs = 0.0_wp
-       r_exc_pore_pres = 0.0_wp
-
        RETURN
 
     END IF
 
-    r_xs_tot = SUM(r_xs)
+    ! Preserve the historical update of the carrier specific heat.
+    IF ( .NOT. gas_flag ) sp_heat_c = sp_heat_l
 
-    IF ( gas_flag .AND. liquid_flag ) THEN
-
-       ! compute liquid mass fraction
-       r_xl = r_qj(n_vars) * inv_qj1
-
-       ! compute carrier phase (gas) mass fraction
-       r_xc =  1.0_wp - r_xs_tot - r_xl
-
-       ! compute specific heat of gas phase (weighted average of specific heat
-       ! of gas components, with weights given by mass fractions)
-       r_sp_heat_c_by_xc = ( ( r_xc - SUM( r_xg(1:n_add_gas) ) ) * sp_heat_a +  &
-            DOT_PRODUCT( r_xg(1:n_add_gas) , sp_heat_g(1:n_add_gas) ) )
-
-       ! specific heat of the mixutre: mass average of sp. heat pf phases
-       r_sp_heat_mix = DOT_PRODUCT( r_xs(1:n_solid) , sp_heat_s(1:n_solid) )    &
-            + r_xl * sp_heat_l + r_xc * r_sp_heat_c_by_xc
-
-    ELSE
-
-       ! compute carrier phase (gas or liquid) mass fraction
-       r_xc = 1.0_wp - r_xs_tot
-
-       IF ( gas_flag ) THEN
-
-          r_sp_heat_c_by_xc = ( ( r_xc - SUM( r_xg(1:n_add_gas) ) ) * sp_heat_a &
-               + DOT_PRODUCT( r_xg(1:n_add_gas) , sp_heat_g(1:n_add_gas) ) )
-
-       ELSE
-
-          r_sp_heat_c_by_xc = sp_heat_l * r_xc
-
-       END IF
-
-       ! specific heaf of the mixutre: mass average of sp. heat pf phases
-       r_sp_heat_mix = DOT_PRODUCT( r_xs(1:n_solid) , sp_heat_s(1:n_solid) )    &
-            + r_sp_heat_c_by_xc
-
-    END IF
-
-    ! compute temperature from energy
-    IF ( r_qj(1) .GT. eps_sing ) THEN
-
-       IF ( energy_flag ) THEN
-
-          r_T = ( r_qj(4) - 0.5_wp * ( r_qj(2)**2 + r_qj(3)**2 ) * inv_qj1 ) /  &
-               ( r_qj(1) * r_sp_heat_mix )
-
-       ELSE
-
-          r_T = r_qj(4) / ( r_qj(1) * r_sp_heat_mix )
-
-       END IF
-
-       IF ( r_T .LE. 0.0_wp ) r_T = T_ambient
-
-    ELSE
-
-       r_T = T_ambient
-
-    END IF
-
-    IF ( gas_flag ) THEN
-
-       ! carrier phase is gas
-       IF ( r_xc .GT. EPSILON(1.0_wp) ) THEN
-
-          r_sp_gas_const_c = ( ( r_xc - SUM( r_xg(1:n_add_gas) ) ) * sp_gas_const_a&
-               + DOT_PRODUCT( r_xg(1:n_add_gas) , sp_gas_const_g(1:n_add_gas) ) )  &
-               / r_xc
-
-       ELSE
-
-          r_sp_gas_const_c = sp_gas_const_a
-
-       END IF
-
-       r_rho_c =  pres / ( r_sp_gas_const_c * r_T )
-       r_inv_rho_c = r_sp_gas_const_c * r_T * inv_pres
-
-       r_inv_rho_g(1:n_add_gas) = sp_gas_const_g(1:n_add_gas) * r_T * inv_pres
-
-    ELSE
-
-       r_rho_c = rho_l
-       r_inv_rho_c = inv_rho_l
-       sp_heat_c = sp_heat_l
-
-    END IF
-
-    ! the liquid contribution (if present) is added below
-    r_inv_rhom = DOT_PRODUCT( r_xs(1:n_solid) , inv_rho_s(1:n_solid) )          &
-         + r_xc * r_inv_rho_c
-
-    IF ( gas_flag .AND. liquid_flag ) THEN
-
-       r_inv_rhom = r_inv_rhom + r_xl * inv_rho_l
-
-    END IF
-
-    ! mixture density
-    r_rho_m = 1.0_wp / r_inv_rhom
-
-    IF ( gas_flag .AND. liquid_flag ) THEN
-
-       r_alphal = r_xl * r_rho_m * inv_rho_l
-
-    END IF
-
-    ! convert from mass fraction to volume fraction
-    r_alphas(1:n_solid) = r_xs(1:n_solid) * r_rho_m * inv_rho_s(1:n_solid)
-
-    ! convert from mass fraction to volume fraction
-    r_alphag(1:n_add_gas) = r_xg(1:n_add_gas) * r_rho_m                         &
-         * r_inv_rho_g(1:n_add_gas)
-
-    ! convert from mass fraction to volume fraction
-    r_alphac = r_xc * r_rho_m * r_inv_rho_c
-
-    r_h = r_qj(1) * r_inv_rhom
-
-    ! reduced gravity
     r_red_grav = ( r_rho_m - rho_a_amb ) * r_inv_rhom * grav
 
     kin_visc_c_local = kin_visc_c
@@ -469,7 +262,6 @@ CONTAINS
 
        END IF
 
-       ! Viscosity read from input file [m2 s-1]
        inv_kin_visc = 1.0_wp / kin_visc_c_local
 
        DO i_solid=1,n_solid
@@ -479,23 +271,13 @@ CONTAINS
 
        END DO
 
-
-       ! The profile parameters depend on h/k_s, not on the absolute value of h
        h_rel = r_h / k_s
 
        IF ( h_rel .GT. H_crit_rel ) THEN
 
-          ! we search for h0_rel such that the average integral between 0 and
-          ! h_rel is equal to 1
-          ! For h_rel > H_crit_rel this integral is the sum of two pieces:
-          ! integral between 0 and h0_rel of the log profile
-          ! integral between h0_rel and h_rel of the costant profile
-
           a = h_rel * vonK / SQRT(friction_factor)
           b = 1.0_wp / 30.0_wp + h_rel
           c = 30.0_wp
-
-          ! solve b*log(c*z+1)-z=a for z
           d =  a / b - 1.0_wp / ( b*c )
 
           h0_rel_1 = -b*lambertw0( -EXP(d)/(b*c) ) - 1.0_wp / c
@@ -504,40 +286,24 @@ CONTAINS
 
        ELSE
 
-          ! when h_rel <= H_crit_rel we have only the log profile and we have to
-          ! rescale it in order to have the integral between o and h_rel equal to
-          ! 1
           h0_rel = h_rel
 
        END IF
 
        h0 = h0_rel * k_s
-
        b = 30.0_wp / k_s
 
-       ! Quadrature points and weights for the interval [0;h0]
        z = 0.5_wp * h0 * ( z_quad + 1.0_wp )
        w = 0.5_wp * h0 * w_quad
 
-       u_log_avg = ( SUM( w * u_log_profile(b,z) ) + u_log_profile(b,h0)*(r_h-h0) )  &
-            / r_h
-
-       !u_log_avg = ( SUM( w * LOG( b*z + 1.0_wp ) ) + LOG( b*h0 + 1.0_wp )*(r_h-h0) )  &
-       !     / r_h
-
+       u_log_avg = ( SUM( w * u_log_profile(b,z) ) +                           &
+            u_log_profile(b,h0)*(r_h-h0) ) / r_h
        normalizing_coeff_u = 1.0_wp / u_log_avg
-
-       ! velocity at h0
        u_rel0 = normalizing_coeff_u * u_log_profile(b,h0)
-       ! u_rel0 = normalizing_coeff_u * LOG( b*h0 + 1.0_wp )
 
        uRho_avg = SQRT( r_qj(2)**2 + r_qj(3)**2 ) / r_h
-
        u_avg_guess = uRho_avg / r_rho_m
        x0 = u_avg_guess
-
-       ! loop to compute the average velocity from average rho*alpha and average
-       ! uRho ( = 1/h*int( u*rhog*alphag + sum[u*rhos(i)*alphas(i)] ) )
 
        rel_tol = 1.e-8
        abs_tol = 1.e-8
@@ -550,30 +316,23 @@ CONTAINS
                u_avg_guess , h0 , b , u_rel0 , r_rho_c , rhom_avg ,             &
                uRho_avg_new , p_dyn )
 
-          u_avg_new = u_avg_guess * uRho_avg / ( uRho_avg_new)
-
+          u_avg_new = u_avg_guess * uRho_avg / uRho_avg_new
           x1 = u_avg_new
 
           CALL avg_profiles_mix( r_h , settling_vel , rhos_alfas(1:n_solid) ,   &
                u_avg_new , h0 , b , u_rel0 , r_rho_c , rhom_avg ,               &
                uRho_avg_new , p_dyn )
 
-          u_avg_new = u_avg_new * uRho_avg / ( uRho_avg_new)
-
+          u_avg_new = u_avg_new * uRho_avg / uRho_avg_new
           x2 = u_avg_new
 
-          IF (x1 .NE.  x0) THEN
-
-             lambda = ABS((x2 - x1)/(x1 - x0))
-
-          END IF
+          IF ( x1 .NE. x0 ) lambda = ABS((x2 - x1)/(x1 - x0))
 
           denominator = (x2 - x1) - (x1 - x0)
 
           IF ( ABS(denominator) .LT. 0.1*abs_tol ) EXIT aitken_loop
 
           aitkenX = x2 - ( (x2 - x1)**2 ) / denominator
-
           u_avg_new = aitkenX
 
           IF ( ( ABS(u_avg_guess-u_avg_new)/u_avg_guess < rel_tol ) .OR.        &
@@ -585,32 +344,15 @@ CONTAINS
 
           u_avg_guess = u_avg_new
 
-
        END DO aitken_loop
 
-       r_u = u_avg_new * r_qj(2) / ( SQRT( r_qj(2)**2 + r_qj(3)**2 ) )
-       r_v = u_avg_new * r_qj(3) / ( SQRT( r_qj(2)**2 + r_qj(3)**2 ) )
-
-    ELSE
-
-       ! velocity components
-       IF ( r_qj(1) .GT. eps_sing ) THEN
-
-          r_u = r_qj(2) * inv_qj1
-          r_v = r_qj(3) * inv_qj1
-
-       ELSE
-
-          r_u = SQRT(2.0_wp) * r_qj(1) * r_qj(2) / SQRT( r_qj(1)**4 + eps_sing4 )
-          r_v = SQRT(2.0_wp) * r_qj(1) * r_qj(3) / SQRT( r_qj(1)**4 + eps_sing4 )
-
-       END IF
+       r_u = u_avg_new * r_qj(2) / SQRT( r_qj(2)**2 + r_qj(3)**2 )
+       r_v = u_avg_new * r_qj(3) / SQRT( r_qj(2)**2 + r_qj(3)**2 )
 
     END IF
 
-    p_dyn = 0.5 * r_rho_m * ( r_u**2 + r_v**2 )
+    p_dyn = 0.5_wp * r_rho_m * ( r_u**2 + r_v**2 )
 
-    ! Richardson number
     IF ( ( r_u**2 + r_v**2 ) .GT. 0.0_wp ) THEN
 
        r_Ri = r_red_grav * r_h / ( r_u**2 + r_v**2 )
@@ -621,9 +363,33 @@ CONTAINS
 
     END IF
 
-    RETURN
-
   END SUBROUTINE r_phys_var
+
+
+  SUBROUTINE phys_var_core_real(qj, legacy_real_path, h, u, v, T, rho_m,        &
+       alphas, alphag, inv_rhom, alphal, rho_c, inv_rho_c, xs_tot, Zs,          &
+       exc_pore_pres, is_wet)
+
+    USE parameters_2d, ONLY : eps_sing, eps_sing4
+
+    IMPLICIT NONE
+
+    REAL(wp), INTENT(IN) :: qj(n_vars)
+    LOGICAL, INTENT(IN) :: legacy_real_path
+    REAL(wp), INTENT(OUT) :: h, u, v, T, rho_m
+    REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
+    REAL(wp), INTENT(OUT) :: inv_rhom, alphal, rho_c, inv_rho_c, xs_tot
+    REAL(wp), INTENT(OUT) :: Zs, exc_pore_pres
+    LOGICAL, INTENT(OUT) :: is_wet
+
+    REAL(wp) :: xs(n_solid), xg(n_add_gas)
+    REAL(wp) :: xl, xc, inv_qj1
+    REAL(wp) :: carrier_sp_heat, carrier_sp_heat_mass, sp_heat_mix
+    REAL(wp) :: sp_gas_const_c, inv_rho_g(n_add_gas)
+
+    INCLUDE 'state_conversion_phys_var.inc'
+
+  END SUBROUTINE phys_var_core_real
 
 
   SUBROUTINE avg_profiles_mix( h , settling_vel , rho_alphas_avg , u_guess ,    &
@@ -804,175 +570,47 @@ CONTAINS
   SUBROUTINE c_phys_var( c_qj , h , u , v , T , rho_m , alphas , alphag ,       &
        inv_rhom , Zs , exc_pore_pres )
 
-    USE COMPLEXIFY
-    USE parameters_2d, ONLY : eps_sing , eps_sing4
-    IMPLICIT none
+    IMPLICIT NONE
 
     COMPLEX(wp), INTENT(IN) :: c_qj(n_vars)
-    COMPLEX(wp), INTENT(OUT) :: h               !< height [m]
-    COMPLEX(wp), INTENT(OUT) :: u               !< velocity (x direction) [m s-1]
-    COMPLEX(wp), INTENT(OUT) :: v               !< velocity (y direction) [m s-1]
-    COMPLEX(wp), INTENT(OUT) :: T               !< temperature [K]
-    COMPLEX(wp), INTENT(OUT) :: rho_m           !< mixture density [kg m-3]
-    COMPLEX(wp), INTENT(OUT) :: alphas(n_solid) !< sediment volume fractions
-    COMPLEX(wp), INTENT(OUT) :: alphag(n_add_gas) !< additional-gas volume fractions
-    COMPLEX(wp), INTENT(OUT) :: inv_rhom        !< 1/mixture density [kg-1 m3]
-    COMPLEX(wp), INTENT(OUT) :: Zs              !< stochastic variable
-    COMPLEX(wp), INTENT(OUT) :: exc_pore_pres   !< excess pore pressure
+    COMPLEX(wp), INTENT(OUT) :: h, u, v, T, rho_m
+    COMPLEX(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
+    COMPLEX(wp), INTENT(OUT) :: inv_rhom, Zs, exc_pore_pres
 
-    COMPLEX(wp) :: xs(n_solid)             !< sediment mass fractions
-    COMPLEX(wp) :: xg(n_add_gas)           !< additional gas comp. mass fractions
-    COMPLEX(wp) :: xs_tot                  !< sum of solid mass fraction
-    COMPLEX(wp) :: xl                      !< liquid mass fraction
-    COMPLEX(wp) :: xc                      !< carrier phase mass fraction
-    COMPLEX(wp) :: sp_heat_c               !< Specific heat of carrier phase
-    COMPLEX(wp) :: sp_heat_mix             !< Specific heat of mixture
-    COMPLEX(wp) :: sp_gas_const_c          !< Gas constant of carrier phase
-    COMPLEX(wp) :: inv_cqj1                !< reciprocal of 1st cons. variable
-    COMPLEX(wp) :: inv_rho_c               !< carrier phase density reciprocal
-    COMPLEX(wp) :: inv_rho_g(n_add_gas)    !< add. gas density reciprocal
+    COMPLEX(wp) :: alphal, rho_c, inv_rho_c, xs_tot
+    LOGICAL :: is_wet
 
-    Zs = CMPLX(0.0_wp,0.0_wp,wp)
-    exc_pore_pres = CMPLX(0.0_wp,0.0_wp,wp)
-
-    ! compute solid mass fractions
-    IF ( REAL(c_qj(1)) .GT.  EPSILON(1.0_wp) ) THEN
-
-       inv_cqj1 = 1.0_wp / c_qj(1)
-       xs(1:n_solid) = c_qj(idx_alfas_first:idx_alfas_last) * inv_cqj1
-
-       xg(1:n_add_gas) = c_qj(idx_addGas_first:idx_addGas_last) * inv_cqj1
-
-       IF ( stoch_transport_flag ) Zs = c_qj(idx_stoch) * inv_cqj1
-
-       IF ( pore_pressure_flag) exc_pore_pres = c_qj(idx_pore) * inv_cqj1
-
-    ELSE
-
-       h = CMPLX(0.0_wp,0.0_wp,wp)
-       u = CMPLX(0.0_wp,0.0_wp,wp)
-       v = CMPLX(0.0_wp,0.0_wp,wp)
-       T = CMPLX(T_ambient,0.0_wp,wp)
-       rho_m = CMPLX(rho_a_amb,0.0_wp,wp)
-       alphas = CMPLX(0.0_wp,0.0_wp,wp)
-       alphag = CMPLX(0.0_wp,0.0_wp,wp)
-       inv_rhom = 1.0_wp / rho_m
-       Zs = 0.0_wp
-       exc_pore_pres = 0.0_wp
-
-       RETURN
-
-    END IF
-
-    xs_tot = SUM(xs)
-
-    IF ( gas_flag .AND. liquid_flag ) THEN
-
-       ! compute liquid mass fraction
-       xl = c_qj(n_vars) * inv_cqj1
-
-       ! compute carrier phase (gas) mass fraction
-       xc = 1.0_wp - xs_tot - xl
-
-       sp_heat_c = ( ( xc - SUM( xg(1:n_add_gas) ) ) * sp_heat_a +              &
-            DOT_PRODUCT( xg(1:n_add_gas) , sp_heat_g(1:n_add_gas) ) ) / xc
-
-       ! specific heat of the mixutre: mass average of sp. heat pf phases
-       sp_heat_mix = DOT_PRODUCT( xs(1:n_solid) , sp_heat_s(1:n_solid) )        &
-            + xl * sp_heat_l + xc * sp_heat_c
-
-    ELSE
-
-       ! compute carrier phase (gas or liquid) mass fraction
-       xc = 1.0_wp - xs_tot
-
-       IF ( gas_flag ) THEN
-
-          sp_heat_c = ( ( xc - SUM( xg(1:n_add_gas) ) ) * sp_heat_a +           &
-               DOT_PRODUCT( xg(1:n_add_gas) , sp_heat_g(1:n_add_gas) ) ) / xc
-
-       ELSE
-
-          sp_heat_c = CMPLX(sp_heat_l,0.0_wp,wp)
-
-       END IF
-
-       ! specific heaf of the mixutre: mass average of sp. heat pf phases
-       sp_heat_mix = DOT_PRODUCT( xs(1:n_solid) , sp_heat_s(1:n_solid) )        &
-            + xc * sp_heat_c
-
-    END IF
-
-    ! compute temperature from energy
-    IF ( REAL(c_qj(1)) .GT. eps_sing ) THEN
-
-       IF ( energy_flag ) THEN
-
-          T = ( c_qj(4) - 0.5_wp * ( c_qj(2)**2 + c_qj(3)**2 ) * inv_cqj1 ) /   &
-               ( c_qj(1) * sp_heat_mix )
-
-       ELSE
-
-          T = c_qj(4) / ( c_qj(1) * sp_heat_mix )
-
-       END IF
-
-       IF ( REAL(T) .LE. 0.0_wp ) T = CMPLX(T_ambient,0.0_wp,wp)
-
-    ELSE
-
-       T = CMPLX(T_ambient,0.0_wp,wp)
-
-    END IF
-
-    IF ( gas_flag ) THEN
-
-       ! carrier phase is gas
-       sp_gas_const_c = ( ( xc - SUM( xg(1:n_add_gas) ) ) * sp_gas_const_a      &
-            + DOT_PRODUCT( xg(1:n_add_gas) , sp_gas_const_g(1:n_add_gas) ) )    &
-            / xc
-
-       inv_rho_c = sp_gas_const_c * T * inv_pres
-
-       inv_rho_g(1:n_add_gas) = sp_gas_const_g(1:n_add_gas) * T * inv_pres
-
-    ELSE
-
-       inv_rho_c = CMPLX(inv_rho_l,0.0_wp,wp)
-
-    END IF
-
-    inv_rhom = DOT_PRODUCT( xs(1:n_solid) , c_inv_rho_s(1:n_solid) )            &
-         + xc * inv_rho_c
-
-    IF ( gas_flag .AND. liquid_flag ) inv_rhom = inv_rhom + xl * inv_rho_l
-
-    rho_m = 1.0_wp / inv_rhom
-
-    ! convert from mass fraction to volume fraction
-    alphas(1:n_solid) = rho_m * xs(1:n_solid) * c_inv_rho_s(1:n_solid)
-
-    ! convert from mass fraction to volume fraction
-    alphag(1:n_add_gas) = rho_m * xg(1:n_add_gas) * inv_rho_g(1:n_add_gas)
-
-    h = c_qj(1) * inv_rhom
-
-    ! velocity components
-    IF ( REAL( c_qj(1) ) .GT. eps_sing ) THEN
-
-       u = c_qj(2) * inv_cqj1
-       v = c_qj(3) * inv_cqj1
-
-    ELSE
-
-       u = SQRT(2.0_wp) * c_qj(1) * c_qj(2) / SQRT( c_qj(1)**4 + eps_sing4 )
-       v = SQRT(2.0_wp) * c_qj(1) * c_qj(3) / SQRT( c_qj(1)**4 + eps_sing4 )
-
-    END IF
-
-    RETURN
+    CALL phys_var_core_complex(c_qj, .FALSE., h, u, v, T, rho_m, alphas,       &
+         alphag, inv_rhom, alphal, rho_c, inv_rho_c, xs_tot, Zs,               &
+         exc_pore_pres, is_wet)
 
   END SUBROUTINE c_phys_var
+
+
+  SUBROUTINE phys_var_core_complex(qj, legacy_real_path, h, u, v, T, rho_m,     &
+       alphas, alphag, inv_rhom, alphal, rho_c, inv_rho_c, xs_tot, Zs,          &
+       exc_pore_pres, is_wet)
+
+    USE parameters_2d, ONLY : eps_sing, eps_sing4
+
+    IMPLICIT NONE
+
+    COMPLEX(wp), INTENT(IN) :: qj(n_vars)
+    LOGICAL, INTENT(IN) :: legacy_real_path
+    COMPLEX(wp), INTENT(OUT) :: h, u, v, T, rho_m
+    COMPLEX(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
+    COMPLEX(wp), INTENT(OUT) :: inv_rhom, alphal, rho_c, inv_rho_c, xs_tot
+    COMPLEX(wp), INTENT(OUT) :: Zs, exc_pore_pres
+    LOGICAL, INTENT(OUT) :: is_wet
+
+    COMPLEX(wp) :: xs(n_solid), xg(n_add_gas)
+    COMPLEX(wp) :: xl, xc, inv_qj1
+    COMPLEX(wp) :: carrier_sp_heat, carrier_sp_heat_mass, sp_heat_mix
+    COMPLEX(wp) :: sp_gas_const_c, inv_rho_g(n_add_gas)
+
+    INCLUDE 'state_conversion_phys_var.inc'
+
+  END SUBROUTINE phys_var_core_complex
 
 
   !******************************************************************************

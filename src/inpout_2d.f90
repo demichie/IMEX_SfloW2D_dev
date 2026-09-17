@@ -999,7 +999,7 @@ CONTAINS
     USE constitutive_2d, ONLY: rho_c_sub
     USE constitutive_2d, ONLY: kin_visc_c, sp_heat_c
 
-    USE constitutive_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s, c_inv_rho_s
+    USE constitutive_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
 
     USE constitutive_2d, ONLY: n_td2
     USE constitutive_2d, ONLY: coeff_porosity
@@ -2007,17 +2007,10 @@ CONTAINS
     bcN(1:n_vars)%flag = -1
 
     ALLOCATE (inv_rho_s(n_solid))
-    ALLOCATE (c_inv_rho_s(n_solid))
 
     ALLOCATE (alphas_init(n_solid))
 
     inv_rho_s(1:n_solid) = 1.0_wp/rho_s(1:n_solid)
-
-    DO i_solid = 1, n_solid
-
-      c_inv_rho_s(i_solid) = CMPLX(inv_rho_s(i_solid), 0.0_wp, wp)
-
-    END DO
 
     ALLOCATE (deposit(comp_cells_x, comp_cells_y, n_solid))
     deposit(1:comp_cells_x, 1:comp_cells_y, 1:n_solid) = 0.0_wp
