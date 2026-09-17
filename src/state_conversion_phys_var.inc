@@ -31,18 +31,6 @@
 
     xs(1:n_solid) = qj(idx_alfas_first:idx_alfas_last) * inv_qj1
 
-    ! The normalization is part of the legacy REAL path only. It remains
-    ! explicit until the REAL/COMPLEX discrepancy is resolved separately.
-    IF ( legacy_real_path ) THEN
-
-       IF ( SUM(qj(idx_alfas_first:idx_alfas_last)) .EQ. qj(1) ) THEN
-
-          xs(1:n_solid) = xs(1:n_solid) / SUM(xs(1:n_solid))
-
-       END IF
-
-    END IF
-
     IF ( n_add_gas .GT. 0 ) THEN
 
        xg(1:n_add_gas) = qj(idx_addGas_first:idx_addGas_last) * inv_qj1

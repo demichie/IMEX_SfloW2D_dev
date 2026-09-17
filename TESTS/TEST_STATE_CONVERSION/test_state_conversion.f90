@@ -166,9 +166,11 @@ CONTAINS
     q(1) = rho_s(1)
     q(2) = 0.2_wp*q(1)
     q(3) = -0.1_wp*q(1)
-    q(4) = q(1)*sp_heat_s(1)*test_temperature +                         &
+    q(idx_alfas_first) = 0.3_wp*q(1)
+    q(idx_alfas_last) = q(1) - q(idx_alfas_first)
+    q(4) = (q(idx_alfas_first)*sp_heat_s(1) +                            &
+            q(idx_alfas_last)*sp_heat_s(2))*test_temperature +           &
            0.5_wp*(q(2)**2 + q(3)**2)/q(1)
-    q(idx_alfas_first) = q(1)
 
     CALL real_conversion_outputs(q, real_outputs)
     cq = CMPLX(q, 0.0_wp, wp)

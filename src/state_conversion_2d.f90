@@ -94,7 +94,7 @@ CONTAINS
     REAL(wp) :: r_rho_c, r_inv_rho_c, r_xs_tot
     LOGICAL :: is_wet
 
-    CALL phys_var_core_real(r_qj, .TRUE., r_h, r_u, r_v, r_T, r_rho_m,         &
+    CALL phys_var_core_real(r_qj, r_h, r_u, r_v, r_T, r_rho_m,                 &
          r_alphas, r_alphag, r_inv_rhom, r_alphal, r_rho_c, r_inv_rho_c,       &
          r_xs_tot, r_Zs, r_exc_pore_pres, is_wet)
 
@@ -116,7 +116,7 @@ CONTAINS
   END SUBROUTINE r_phys_var
 
 
-  SUBROUTINE phys_var_core_real(qj, legacy_real_path, h, u, v, T, rho_m,        &
+  SUBROUTINE phys_var_core_real(qj, h, u, v, T, rho_m,                         &
        alphas, alphag, inv_rhom, alphal, rho_c, inv_rho_c, xs_tot, Zs,          &
        exc_pore_pres, is_wet)
 
@@ -125,7 +125,6 @@ CONTAINS
     IMPLICIT NONE
 
     REAL(wp), INTENT(IN) :: qj(n_vars)
-    LOGICAL, INTENT(IN) :: legacy_real_path
     REAL(wp), INTENT(OUT) :: h, u, v, T, rho_m
     REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
     REAL(wp), INTENT(OUT) :: inv_rhom, alphal, rho_c, inv_rho_c, xs_tot
@@ -175,14 +174,14 @@ CONTAINS
     COMPLEX(wp) :: alphal, rho_c, inv_rho_c, xs_tot
     LOGICAL :: is_wet
 
-    CALL phys_var_core_complex(c_qj, .FALSE., h, u, v, T, rho_m, alphas,       &
+    CALL phys_var_core_complex(c_qj, h, u, v, T, rho_m, alphas,                &
          alphag, inv_rhom, alphal, rho_c, inv_rho_c, xs_tot, Zs,               &
          exc_pore_pres, is_wet)
 
   END SUBROUTINE c_phys_var
 
 
-  SUBROUTINE phys_var_core_complex(qj, legacy_real_path, h, u, v, T, rho_m,     &
+  SUBROUTINE phys_var_core_complex(qj, h, u, v, T, rho_m,                      &
        alphas, alphag, inv_rhom, alphal, rho_c, inv_rho_c, xs_tot, Zs,          &
        exc_pore_pres, is_wet)
 
@@ -191,7 +190,6 @@ CONTAINS
     IMPLICIT NONE
 
     COMPLEX(wp), INTENT(IN) :: qj(n_vars)
-    LOGICAL, INTENT(IN) :: legacy_real_path
     COMPLEX(wp), INTENT(OUT) :: h, u, v, T, rho_m
     COMPLEX(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
     COMPLEX(wp), INTENT(OUT) :: inv_rhom, alphal, rho_c, inv_rho_c, xs_tot
