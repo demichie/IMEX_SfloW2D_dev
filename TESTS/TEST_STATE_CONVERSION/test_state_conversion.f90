@@ -11,6 +11,7 @@ PROGRAM test_state_conversion
   CALL run_wet_case('gas-solid h-alpha temperature', .FALSE., .FALSE., .FALSE.)
   CALL run_wet_case('gas-liquid-solid alpha energy', .TRUE., .TRUE., .TRUE.)
   CALL run_wet_case('gas-liquid-solid h-alpha temperature', .TRUE., .FALSE., .FALSE.)
+  CALL run_zero_carrier_case
   CALL run_dry_cases
   CALL run_complex_step_check
 
@@ -151,6 +152,39 @@ CONTAINS
     DEALLOCATE (qp0, qp1, q0, q1)
 
   END SUBROUTINE run_wet_case
+
+  SUBROUTINE run_zero_carrier_case
+
+    REAL(wp), ALLOCATABLE :: q(:), real_outputs(:)
+    COMPLEX(wp), ALLOCATABLE :: cq(:), complex_outputs(:)
+    REAL(wp), PARAMETER :: test_temperature = 400.0_wp
+
+    CALL configure_layout(.FALSE., .TRUE., .TRUE.)
+    ALLOCATE (q(n_vars), real_outputs(5), cq(n_vars), complex_outputs(5))
+
+    q = 0.0_wp
+    q(1) = rho_s(1)
+    q(2) = 0.2_wp*q(1)
+    q(3) = -0.1_wp*q(1)
+    q(4) = q(1)*sp_heat_s(1)*test_temperature +                         &
+           0.5_wp*(q(2)**2 + q(3)**2)/q(1)
+    q(idx_alfas_first) = q(1)
+
+    CALL real_conversion_outputs(q, real_outputs)
+    cq = CMPLX(q, 0.0_wp, wp)
+    CALL complex_conversion_outputs(cq, complex_outputs)
+
+    CALL assert_true('zero carrier real conversion finite',                    &
+                     ALL(ieee_is_finite(real_outputs)))
+    CALL assert_true('zero carrier complex conversion finite',                 &
+                     ALL(ieee_is_finite(REAL(complex_outputs))) .AND.          &
+                     ALL(ieee_is_finite(AIMAG(complex_outputs))))
+    CALL assert_close_vector('zero carrier real-complex agreement',            &
+                             REAL(complex_outputs), real_outputs, 2.0E-12_wp)
+
+    DEALLOCATE (q, real_outputs, cq, complex_outputs)
+
+  END SUBROUTINE run_zero_carrier_case
 
   SUBROUTINE run_dry_cases
 

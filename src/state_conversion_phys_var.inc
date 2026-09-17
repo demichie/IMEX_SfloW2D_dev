@@ -1,6 +1,5 @@
     ! This executable fragment is instantiated by the REAL and COMPLEX
-    ! phys_var cores. Keep type-specific declarations and vertical-profile
-    ! logic in the wrappers.
+    ! phys_var cores. Keep type-specific declarations in the wrappers.
 
     alphal = 0.0_wp
     alphag = 0.0_wp
@@ -115,42 +114,24 @@
 
     IF ( gas_flag ) THEN
 
-       ! Preserve the carrier-fraction guard of the historical REAL path.
-       IF ( legacy_real_path ) THEN
-
-          IF ( REAL(xc, wp) .GT. EPSILON(1.0_wp) ) THEN
-
-             sp_gas_const_c =                                                   &
-                  ( (xc - SUM(xg(1:n_add_gas))) * sp_gas_const_a +             &
-                  SUM(xg(1:n_add_gas) *                                        &
-                  sp_gas_const_g(1:n_add_gas)) ) / xc
-
-          ELSE
-
-             sp_gas_const_c = sp_gas_const_a
-
-          END IF
-
-       ELSE
+       ! Use the same carrier-fraction guard for REAL and COMPLEX arithmetic.
+       ! Testing the real part keeps the selected branch unchanged by an
+       ! infinitesimal complex-step perturbation.
+       IF ( REAL(xc, wp) .GT. EPSILON(1.0_wp) ) THEN
 
           sp_gas_const_c =                                                      &
                ( (xc - SUM(xg(1:n_add_gas))) * sp_gas_const_a +                &
                SUM(xg(1:n_add_gas) *                                           &
                sp_gas_const_g(1:n_add_gas)) ) / xc
 
+       ELSE
+
+          sp_gas_const_c = sp_gas_const_a
+
        END IF
 
        inv_rho_c = sp_gas_const_c * T * inv_pres
-
-       IF ( legacy_real_path ) THEN
-
-          rho_c = pres / ( sp_gas_const_c * T )
-
-       ELSE
-
-          rho_c = 1.0_wp / inv_rho_c
-
-       END IF
+       rho_c = 1.0_wp / inv_rho_c
        inv_rho_g(1:n_add_gas) = sp_gas_const_g(1:n_add_gas) * T * inv_pres
 
     ELSE
