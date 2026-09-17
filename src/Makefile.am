@@ -18,6 +18,7 @@ IMEX_SfloW2D_SOURCES = \
                 complexify.f90 \
                 geometry_2d.f90 \
                 state_conversion_2d.f90 \
+                equation_terms_2d.f90 \
                 nonconservative_2d.f90 \
                 domain_2d.f90 \
                 constitutive_2d.f90 \
