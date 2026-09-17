@@ -78,47 +78,8 @@ CONTAINS
   !> \date 2019/12/13
   !******************************************************************************
 
-  SUBROUTINE r_phys_var(r_qj , r_h , r_u , r_v , r_alphas , r_rho_m , r_T ,     &
-       r_alphal , r_alphag , r_red_grav , p_dyn , r_Zs , r_exc_pore_pres)
-
-    IMPLICIT NONE
-
-    REAL(wp), INTENT(IN) :: r_qj(n_vars)
-    REAL(wp), INTENT(OUT) :: r_h, r_u, r_v
-    REAL(wp), INTENT(OUT) :: r_alphas(n_solid)
-    REAL(wp), INTENT(OUT) :: r_rho_m, r_T, r_alphal
-    REAL(wp), INTENT(OUT) :: r_alphag(n_add_gas)
-    REAL(wp), INTENT(OUT) :: r_red_grav, p_dyn, r_Zs, r_exc_pore_pres
-
-    REAL(wp) :: r_inv_rhom
-    REAL(wp) :: r_rho_c, r_inv_rho_c, r_xs_tot
-    LOGICAL :: is_wet
-
-    CALL phys_var_core_real(r_qj, r_h, r_u, r_v, r_T, r_rho_m,                 &
-         r_alphas, r_alphag, r_inv_rhom, r_alphal, r_rho_c, r_inv_rho_c,       &
-         r_xs_tot, r_Zs, r_exc_pore_pres, is_wet)
-
-    IF ( .NOT. is_wet ) THEN
-
-       r_red_grav = 0.0_wp
-       p_dyn = 0.0_wp
-       RETURN
-
-    END IF
-
-    ! Preserve the historical update of the carrier specific heat.
-    IF ( .NOT. gas_flag ) sp_heat_c = sp_heat_l
-
-    r_red_grav = ( r_rho_m - rho_a_amb ) * r_inv_rhom * grav
-
-    p_dyn = 0.5_wp * r_rho_m * ( r_u**2 + r_v**2 )
-
-  END SUBROUTINE r_phys_var
-
-
-  SUBROUTINE phys_var_core_real(qj, h, u, v, T, rho_m,                         &
-       alphas, alphag, inv_rhom, alphal, rho_c, inv_rho_c, xs_tot, Zs,          &
-       exc_pore_pres, is_wet)
+  SUBROUTINE r_phys_var(qj, h, u, v, alphas, rho_m, T, alphal, alphag,          &
+       red_grav, p_dyn, Zs, exc_pore_pres)
 
     USE parameters_2d, ONLY : eps_sing, eps_sing4
 
@@ -127,18 +88,30 @@ CONTAINS
     REAL(wp), INTENT(IN) :: qj(n_vars)
     REAL(wp), INTENT(OUT) :: h, u, v, T, rho_m
     REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
-    REAL(wp), INTENT(OUT) :: inv_rhom, alphal, rho_c, inv_rho_c, xs_tot
-    REAL(wp), INTENT(OUT) :: Zs, exc_pore_pres
-    LOGICAL, INTENT(OUT) :: is_wet
+    REAL(wp), INTENT(OUT) :: alphal, red_grav, p_dyn, Zs, exc_pore_pres
 
+    REAL(wp) :: inv_rhom, rho_c, inv_rho_c, xs_tot
     REAL(wp) :: xs(n_solid), xg(n_add_gas)
     REAL(wp) :: xl, xc, inv_qj1
     REAL(wp) :: carrier_sp_heat_mass, sp_heat_mix
     REAL(wp) :: sp_gas_const_c, inv_rho_g(n_add_gas)
+    LOGICAL :: is_wet
+
+    ! The shared fragment returns immediately for a dry state, so initialize
+    ! the REAL-only derived outputs before entering it.
+    red_grav = 0.0_wp
+    p_dyn = 0.0_wp
 
     INCLUDE 'state_conversion_phys_var.inc'
 
-  END SUBROUTINE phys_var_core_real
+    ! Preserve the historical update of the carrier specific heat.
+    IF ( .NOT. gas_flag ) sp_heat_c = sp_heat_l
+
+    red_grav = ( rho_m - rho_a_amb ) * inv_rhom * grav
+
+    p_dyn = 0.5_wp * rho_m * ( u**2 + v**2 )
+
+  END SUBROUTINE r_phys_var
 
 
   !******************************************************************************
@@ -161,29 +134,8 @@ CONTAINS
   !> \date 2019/12/13
   !******************************************************************************
 
-  SUBROUTINE c_phys_var( c_qj , h , u , v , T , rho_m , alphas , alphag ,       &
-       inv_rhom , Zs , exc_pore_pres )
-
-    IMPLICIT NONE
-
-    COMPLEX(wp), INTENT(IN) :: c_qj(n_vars)
-    COMPLEX(wp), INTENT(OUT) :: h, u, v, T, rho_m
-    COMPLEX(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
-    COMPLEX(wp), INTENT(OUT) :: inv_rhom, Zs, exc_pore_pres
-
-    COMPLEX(wp) :: alphal, rho_c, inv_rho_c, xs_tot
-    LOGICAL :: is_wet
-
-    CALL phys_var_core_complex(c_qj, h, u, v, T, rho_m, alphas,                &
-         alphag, inv_rhom, alphal, rho_c, inv_rho_c, xs_tot, Zs,               &
-         exc_pore_pres, is_wet)
-
-  END SUBROUTINE c_phys_var
-
-
-  SUBROUTINE phys_var_core_complex(qj, h, u, v, T, rho_m,                      &
-       alphas, alphag, inv_rhom, alphal, rho_c, inv_rho_c, xs_tot, Zs,          &
-       exc_pore_pres, is_wet)
+  SUBROUTINE c_phys_var(qj, h, u, v, T, rho_m, alphas, alphag, inv_rhom, Zs,    &
+       exc_pore_pres)
 
     USE parameters_2d, ONLY : eps_sing, eps_sing4
 
@@ -192,18 +144,18 @@ CONTAINS
     COMPLEX(wp), INTENT(IN) :: qj(n_vars)
     COMPLEX(wp), INTENT(OUT) :: h, u, v, T, rho_m
     COMPLEX(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
-    COMPLEX(wp), INTENT(OUT) :: inv_rhom, alphal, rho_c, inv_rho_c, xs_tot
-    COMPLEX(wp), INTENT(OUT) :: Zs, exc_pore_pres
-    LOGICAL, INTENT(OUT) :: is_wet
+    COMPLEX(wp), INTENT(OUT) :: inv_rhom, Zs, exc_pore_pres
 
+    COMPLEX(wp) :: alphal, rho_c, inv_rho_c, xs_tot
     COMPLEX(wp) :: xs(n_solid), xg(n_add_gas)
     COMPLEX(wp) :: xl, xc, inv_qj1
     COMPLEX(wp) :: carrier_sp_heat_mass, sp_heat_mix
     COMPLEX(wp) :: sp_gas_const_c, inv_rho_g(n_add_gas)
+    LOGICAL :: is_wet
 
     INCLUDE 'state_conversion_phys_var.inc'
 
-  END SUBROUTINE phys_var_core_complex
+  END SUBROUTINE c_phys_var
 
 
   !******************************************************************************
