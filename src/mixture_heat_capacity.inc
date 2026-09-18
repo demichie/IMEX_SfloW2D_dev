@@ -1,3 +1,10 @@
+    !--------------------------------------------------------------------------
+    ! Shared executable core for carrier and whole-mixture heat capacities.
+    ! It is included by both the REAL and COMPLEX wrapper procedures in
+    ! state_conversion_2d; all declarations and type selection belong there.
+    ! Keep this fragment type-independent so both paths use identical formulas.
+    !--------------------------------------------------------------------------
+
     xc = 1.0_wp - SUM(xs)
     IF ( gas_flag .AND. liquid_flag ) xc = xc - xl
 

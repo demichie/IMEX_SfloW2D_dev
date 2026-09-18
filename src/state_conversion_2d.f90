@@ -22,10 +22,10 @@ MODULE state_conversion_2d
      MODULE PROCEDURE eval_mixture_heat_capacity_complex
   END INTERFACE eval_mixture_heat_capacity
 
-  INTERFACE eval_mixture_from_mass_fractions
-     MODULE PROCEDURE eval_mixture_from_mass_real
-     MODULE PROCEDURE eval_mixture_from_mass_complex
-  END INTERFACE eval_mixture_from_mass_fractions
+  INTERFACE eval_mixture_properties_from_mass_fractions
+     MODULE PROCEDURE eval_mixture_properties_from_mass_real
+     MODULE PROCEDURE eval_mixture_properties_from_mass_complex
+  END INTERFACE eval_mixture_properties_from_mass_fractions
 
   PUBLIC :: r_phys_var, c_phys_var
   PUBLIC :: qc_to_qp, qp_to_qc, qp_to_qp2
@@ -33,8 +33,8 @@ MODULE state_conversion_2d
   PUBLIC :: sauter_diameter, average_density_solids
   PUBLIC :: settling_velocity
   PUBLIC :: eval_mixture_heat_capacity
-  PUBLIC :: eval_mixture_from_mass_fractions
-  PUBLIC :: eval_mixture_from_volume_fractions
+  PUBLIC :: eval_mixture_properties_from_mass_fractions
+  PUBLIC :: eval_mixture_properties_from_volume_fractions
 
 CONTAINS
 
@@ -94,8 +94,8 @@ CONTAINS
   END SUBROUTINE eval_mixture_heat_capacity_complex
 
 
-  SUBROUTINE eval_mixture_from_mass_real(T, xs, xg, xl, rho_m, inv_rhom,       &
-       rho_c, inv_rho_c, alphas, alphag, alphal)
+  SUBROUTINE eval_mixture_properties_from_mass_real(T, xs, xg, xl, rho_m,     &
+       inv_rhom, rho_c, inv_rho_c, alphas, alphag, alphal)
 
     REAL(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas), xl
     REAL(wp), INTENT(OUT) :: rho_m, inv_rhom, rho_c, inv_rho_c
@@ -104,11 +104,11 @@ CONTAINS
 
     INCLUDE 'mixture_from_mass.inc'
 
-  END SUBROUTINE eval_mixture_from_mass_real
+  END SUBROUTINE eval_mixture_properties_from_mass_real
 
 
-  SUBROUTINE eval_mixture_from_mass_complex(T, xs, xg, xl, rho_m, inv_rhom,    &
-       rho_c, inv_rho_c, alphas, alphag, alphal)
+  SUBROUTINE eval_mixture_properties_from_mass_complex(T, xs, xg, xl, rho_m,  &
+       inv_rhom, rho_c, inv_rho_c, alphas, alphag, alphal)
 
     COMPLEX(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas), xl
     COMPLEX(wp), INTENT(OUT) :: rho_m, inv_rhom, rho_c, inv_rho_c
@@ -117,11 +117,12 @@ CONTAINS
 
     INCLUDE 'mixture_from_mass.inc'
 
-  END SUBROUTINE eval_mixture_from_mass_complex
+  END SUBROUTINE eval_mixture_properties_from_mass_complex
 
 
-  SUBROUTINE eval_mixture_from_volume_fractions(T, alphas, alphag, alphal,     &
-       rho_m, inv_rhom, rho_c, xs, xg, xl, xc, sp_heat_c_mix, sp_heat_mix)
+  SUBROUTINE eval_mixture_properties_from_volume_fractions(T, alphas, alphag, &
+       alphal, rho_m, inv_rhom, rho_c, xs, xg, xl, xc, sp_heat_c_mix,          &
+       sp_heat_mix)
 
     REAL(wp), INTENT(IN) :: T
     REAL(wp), INTENT(INOUT) :: alphas(n_solid), alphag(n_add_gas), alphal
@@ -183,7 +184,7 @@ CONTAINS
     CALL eval_mixture_heat_capacity_real(xs, xg, xl, xc, sp_heat_c_mix,        &
          sp_heat_mix)
 
-  END SUBROUTINE eval_mixture_from_volume_fractions
+  END SUBROUTINE eval_mixture_properties_from_volume_fractions
 
   !******************************************************************************
   !> \brief Physical variables
@@ -386,7 +387,8 @@ CONTAINS
 
     END IF
 
-    CALL eval_mixture_from_volume_fractions(r_T, r_alphas, r_alphag, r_alphal, &
+    CALL eval_mixture_properties_from_volume_fractions(r_T, r_alphas,          &
+         r_alphag, r_alphal,                                                   &
          r_rho_m, r_inv_rhom, r_rho_c, r_xs, r_xg, r_xl, r_xc,                &
          r_sp_heat_c, r_sp_heat_mix)
 
@@ -600,7 +602,8 @@ CONTAINS
 
     END IF
 
-    CALL eval_mixture_from_volume_fractions(r_T, r_alphas, r_alphag, r_alphal, &
+    CALL eval_mixture_properties_from_volume_fractions(r_T, r_alphas,          &
+         r_alphag, r_alphal,                                                   &
          r_rho_m, r_inv_rhom, r_rho_c, r_xs, r_xg, r_xl, r_xc,                &
          r_sp_heat_c, r_sp_heat_mix)
 

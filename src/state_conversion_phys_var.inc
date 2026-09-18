@@ -1,5 +1,9 @@
-    ! This executable fragment is instantiated by the REAL and COMPLEX
-    ! phys_var cores. Keep type-specific declarations in the wrappers.
+    !--------------------------------------------------------------------------
+    ! Shared executable core that derives the physical state from conservative
+    ! variables. It is included by both r_phys_var and c_phys_var; declarations
+    ! and type selection belong to those REAL and COMPLEX wrapper procedures.
+    ! Keep this fragment type-independent so both paths use identical formulas.
+    !--------------------------------------------------------------------------
 
     alphal = 0.0_wp
     alphag = 0.0_wp
@@ -69,8 +73,8 @@
 
     END IF
 
-    CALL eval_mixture_from_mass_fractions(T, xs, xg, xl, rho_m, inv_rhom,       &
-         rho_c, inv_rho_c, alphas, alphag, alphal)
+    CALL eval_mixture_properties_from_mass_fractions(T, xs, xg, xl, rho_m,     &
+         inv_rhom, rho_c, inv_rho_c, alphas, alphag, alphal)
 
     h = qj(1) * inv_rhom
 

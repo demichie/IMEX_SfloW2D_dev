@@ -984,7 +984,7 @@ CONTAINS
     USE constitutive_2d, ONLY: kin_visc_c, sp_heat_c
 
     USE constitutive_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
-    USE state_conversion_2d, ONLY: eval_mixture_from_mass_fractions
+    USE state_conversion_2d, ONLY: eval_mixture_properties_from_mass_fractions
 
     USE constitutive_2d, ONLY: n_td2
     USE constitutive_2d, ONLY: coeff_porosity
@@ -4322,7 +4322,8 @@ CONTAINS
 
           IF (ANY(xs_source(1:n_solid) .GT. -1.0_wp)) THEN
 
-            CALL eval_mixture_from_mass_fractions(T_source, xs_source,         &
+            CALL eval_mixture_properties_from_mass_fractions(T_source,         &
+                 xs_source,                                                    &
                  xg_source, xl_source, rho_m, inv_rhom, rho_c, inv_rho_c,     &
                  alphas_source, alphag_source, alphal_source)
 
@@ -4921,7 +4922,8 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     ! External procedures
     USE geometry_2d, ONLY: interp_2d_scalarB, regrid_scalar
-    USE state_conversion_2d, ONLY: eval_mixture_from_volume_fractions
+    USE state_conversion_2d, ONLY:                                             &
+         eval_mixture_properties_from_volume_fractions
     ! External variables
     USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0, dx, dy
     USE geometry_2d, ONLY: B_cent, erodible
@@ -5224,7 +5226,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       alphag_init_local = 0.0_wp
       alphal_init_local = 0.0_wp
-      CALL eval_mixture_from_volume_fractions(T_init, alphas_init,             &
+      CALL eval_mixture_properties_from_volume_fractions(T_init, alphas_init, &
            alphag_init_local, alphal_init_local, rho_m, inv_rhom, rho_c,       &
            mass_fract, xg_init, xl_init, xc_init, sp_heat_c, sp_heat_mix)
 
