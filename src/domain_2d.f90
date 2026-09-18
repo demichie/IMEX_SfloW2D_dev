@@ -59,6 +59,11 @@ CONTAINS
 
     this%solve_mask_time = 0.0_wp
 
+    this%solve_mask = .FALSE.
+    this%solve_mask_temp = .FALSE.
+    this%solve_mask_x = .FALSE.
+    this%solve_mask_y = .FALSE.
+
     this%solve_mask(1,1:comp_cells_y) = .TRUE.
     this%solve_mask(comp_cells_x,1:comp_cells_y) = .TRUE.
     this%solve_mask(1:comp_cells_x,1) = .TRUE.
@@ -72,6 +77,17 @@ CONTAINS
     ALLOCATE( this%k_stag_x(comp_interfaces_x*comp_cells_y) )
     ALLOCATE( this%j_stag_y(comp_cells_x*comp_interfaces_y) )
     ALLOCATE( this%k_stag_y(comp_cells_x*comp_interfaces_y) )
+
+    this%solve_cells = 0
+    this%solve_interfaces_x = 0
+    this%solve_interfaces_y = 0
+
+    this%j_cent = 0
+    this%k_cent = 0
+    this%j_stag_x = 0
+    this%k_stag_x = 0
+    this%j_stag_y = 0
+    this%k_stag_y = 0
 
   END SUBROUTINE initialize_domain
 

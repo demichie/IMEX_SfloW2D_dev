@@ -77,11 +77,21 @@ CONTAINS
     ALLOCATE( this%pdynmax(comp_cells_x,comp_cells_y) )
     ALLOCATE( this%mod_vel_max(comp_cells_x,comp_cells_y) )
 
+    this%hpos = .FALSE.
+    this%hpos_old = .FALSE.
+    this%hmax = 0.0_wp
+    this%pdynmax = 0.0_wp
+    this%mod_vel_max = 0.0_wp
+
     ALLOCATE( this%vuln_table(n_thickness_levels*n_dyn_pres_levels,         &
          comp_cells_x,comp_cells_y) )
 
     ALLOCATE( this%thck_table(comp_cells_x,comp_cells_y) )
     ALLOCATE( this%pdyn_table(comp_cells_x,comp_cells_y) )
+
+    this%vuln_table = .FALSE.
+    this%thck_table = .FALSE.
+    this%pdyn_table = .FALSE.
 
   END SUBROUTINE initialize_state
 
