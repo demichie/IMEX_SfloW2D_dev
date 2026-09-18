@@ -13,6 +13,7 @@ bindir=@bindir@
 IMEX_SfloW2D_SOURCES = \
                 parameters_2d.f90 \
                 diagnostics_2d.f90 \
+                lapack_interfaces_2d.f90 \
                 constitutive_parameters_2d.f90 \
                 equation_metadata_2d.f90 \
                 runtime_2d.f90 \

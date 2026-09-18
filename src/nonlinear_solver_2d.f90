@@ -9,7 +9,9 @@ MODULE nonlinear_solver_2d
 
   USE diagnostics_2d, ONLY : debug_pause
 
-  USE parameters_2d, ONLY : wp, sp, n_eqns, n_vars, verbose_level
+  USE lapack_interfaces_2d, ONLY : solve_dense_system
+
+  USE parameters_2d, ONLY : wp, n_eqns, n_vars, verbose_level
 
   USE equation_metadata_2d, ONLY : equation_partition_type
 
@@ -185,17 +187,7 @@ CONTAINS
 
           desc_dir_temp = - right_term
 
-          IF ( wp .EQ. sp ) THEN
-
-             CALL SGESV(n_eqns,1, left_matrix , n_eqns, pivot, desc_dir_temp ,  &
-                  n_eqns, ok)
-
-          ELSE
-
-             CALL DGESV(n_eqns,1, left_matrix , n_eqns, pivot, desc_dir_temp ,  &
-                  n_eqns, ok)
-
-          END IF
+          CALL solve_dense_system(left_matrix, desc_dir_temp, pivot, ok)
 
           IF ( ok .NE. 0 ) THEN
              linear_info = ok
@@ -260,21 +252,8 @@ CONTAINS
 
           ELSE
 
-             IF ( wp .EQ. sp ) THEN
-
-                CALL SGESV(equation_partition%n_implicit,1,                  &
-                     left_matrix_small22, equation_partition%n_implicit,     &
-                     pivot_small2, desc_dir_small2,                          &
-                     equation_partition%n_implicit, ok)
-
-             ELSE
-
-                CALL DGESV(equation_partition%n_implicit,1,                  &
-                     left_matrix_small22, equation_partition%n_implicit,     &
-                     pivot_small2, desc_dir_small2,                          &
-                     equation_partition%n_implicit, ok)
-
-             END IF
+             CALL solve_dense_system(left_matrix_small22, desc_dir_small2,  &
+                  pivot_small2, ok)
 
              IF ( ok .NE. 0 ) THEN
                 linear_info = ok
