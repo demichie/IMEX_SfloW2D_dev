@@ -190,10 +190,17 @@ CONTAINS
     xl = 0.0_wp
     IF (gas_flag .AND. liquid_flag) xl = q(n_vars)/q(1)
 
-    CALL eval_mixture_properties_from_mass_fractions(qp(4), xs, xg, xl,       &
-         rho_mass, inv_rho_mass, rho_c_mass, inv_rho_c_mass, alphas_mass,      &
-         alphag_mass, alphal_mass)
-    CALL eval_mixture_heat_capacity(xs, xg, xl, xc, cp_c_mass, cp_mix_mass)
+    CALL eval_mixture_properties_from_mass_fractions(                          &
+         ! IN
+         qp(4), xs, xg, xl,                                                    &
+         ! OUT
+         rho_mass, inv_rho_mass, rho_c_mass, inv_rho_c_mass,                   &
+         alphas_mass, alphag_mass, alphal_mass)
+    CALL eval_mixture_heat_capacity(                                           &
+         ! IN
+         xs, xg, xl,                                                           &
+         ! OUT
+         xc, cp_c_mass, cp_mix_mass)
 
     CALL mixt_var(qp, Ri, rho_mix, rho_c_mix, red_grav, cp_c_mix, cp_mix)
 

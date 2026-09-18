@@ -4322,9 +4322,11 @@ CONTAINS
 
           IF (ANY(xs_source(1:n_solid) .GT. -1.0_wp)) THEN
 
-            CALL eval_mixture_properties_from_mass_fractions(T_source,         &
-                 xs_source,                                                    &
-                 xg_source, xl_source, rho_m, inv_rhom, rho_c, inv_rho_c,     &
+            CALL eval_mixture_properties_from_mass_fractions(                  &
+                 ! IN
+                 T_source, xs_source, xg_source, xl_source,                    &
+                 ! OUT
+                 rho_m, inv_rhom, rho_c, inv_rho_c,                            &
                  alphas_source, alphag_source, alphal_source)
 
           END IF
@@ -5226,8 +5228,13 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       alphag_init_local = 0.0_wp
       alphal_init_local = 0.0_wp
-      CALL eval_mixture_properties_from_volume_fractions(T_init, alphas_init, &
-           alphag_init_local, alphal_init_local, rho_m, inv_rhom, rho_c,       &
+      CALL eval_mixture_properties_from_volume_fractions(                      &
+           ! IN
+           T_init, alphag_init_local,                                          &
+           ! INOUT
+           alphas_init, alphal_init_local,                                     &
+           ! OUT
+           rho_m, inv_rhom, rho_c,                                             &
            mass_fract, xg_init, xl_init, xc_init, sp_heat_c, sp_heat_mix)
 
       state%q(1, :, :) = thickness_init(:, :)*rho_m

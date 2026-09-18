@@ -17,11 +17,30 @@ MODULE state_conversion_2d
 
   PRIVATE
 
+  !> \brief Evaluate carrier and whole-mixture specific heat capacities.
+  !> \param[in]  xs            Solid mass fractions.
+  !> \param[in]  xg            Additional-gas mass fractions.
+  !> \param[in]  xl            Liquid mass fraction.
+  !> \param[out] xc            Total carrier mass fraction.
+  !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity.
+  !> \param[out] sp_heat_mix   Whole-mixture specific heat capacity.
   INTERFACE eval_mixture_heat_capacity
      MODULE PROCEDURE eval_mixture_heat_capacity_real
      MODULE PROCEDURE eval_mixture_heat_capacity_complex
   END INTERFACE eval_mixture_heat_capacity
 
+  !> \brief Evaluate mixture properties from component mass fractions.
+  !> \param[in]  T         Mixture temperature.
+  !> \param[in]  xs        Solid mass fractions.
+  !> \param[in]  xg        Additional-gas mass fractions.
+  !> \param[in]  xl        Liquid mass fraction.
+  !> \param[out] rho_m     Mixture density.
+  !> \param[out] inv_rhom  Inverse mixture density.
+  !> \param[out] rho_c     Carrier density.
+  !> \param[out] inv_rho_c Inverse carrier density.
+  !> \param[out] alphas    Solid volume fractions.
+  !> \param[out] alphag    Additional-gas volume fractions.
+  !> \param[out] alphal    Liquid volume fraction.
   INTERFACE eval_mixture_properties_from_mass_fractions
      MODULE PROCEDURE eval_mixture_properties_from_mass_real
      MODULE PROCEDURE eval_mixture_properties_from_mass_complex
@@ -120,12 +139,29 @@ CONTAINS
   END SUBROUTINE eval_mixture_properties_from_mass_complex
 
 
-  SUBROUTINE eval_mixture_properties_from_volume_fractions(T, alphas, alphag, &
+  !> \brief Evaluate mixture properties from component volume fractions.
+  !> \param[in]     T             Mixture temperature.
+  !> \param[in]     alphag        Additional-gas volume fractions.
+  !> \param[in,out] alphas        Solid volume fractions; normalized if their
+  !>                              dispersed-phase sum exceeds one.
+  !> \param[in,out] alphal        Liquid volume fraction; normalized together
+  !>                              with the solids when present.
+  !> \param[out]    rho_m         Mixture density.
+  !> \param[out]    inv_rhom      Inverse mixture density.
+  !> \param[out]    rho_c         Carrier density.
+  !> \param[out]    xs            Solid mass fractions.
+  !> \param[out]    xg            Additional-gas mass fractions.
+  !> \param[out]    xl            Liquid mass fraction.
+  !> \param[out]    xc            Total carrier mass fraction.
+  !> \param[out]    sp_heat_c_mix Carrier-mixture specific heat capacity.
+  !> \param[out]    sp_heat_mix   Whole-mixture specific heat capacity.
+  SUBROUTINE eval_mixture_properties_from_volume_fractions(T, alphag, alphas, &
        alphal, rho_m, inv_rhom, rho_c, xs, xg, xl, xc, sp_heat_c_mix,          &
        sp_heat_mix)
 
     REAL(wp), INTENT(IN) :: T
-    REAL(wp), INTENT(INOUT) :: alphas(n_solid), alphag(n_add_gas), alphal
+    REAL(wp), INTENT(IN) :: alphag(n_add_gas)
+    REAL(wp), INTENT(INOUT) :: alphas(n_solid), alphal
     REAL(wp), INTENT(OUT) :: rho_m, inv_rhom, rho_c
     REAL(wp), INTENT(OUT) :: xs(n_solid), xg(n_add_gas), xl, xc
     REAL(wp), INTENT(OUT) :: sp_heat_c_mix, sp_heat_mix
@@ -181,8 +217,11 @@ CONTAINS
     xl = 0.0_wp
     IF ( gas_flag .AND. liquid_flag ) xl = alphal * rho_l * inv_rhom
 
-    CALL eval_mixture_heat_capacity_real(xs, xg, xl, xc, sp_heat_c_mix,        &
-         sp_heat_mix)
+    CALL eval_mixture_heat_capacity_real(                                      &
+         ! IN
+         xs, xg, xl,                                                           &
+         ! OUT
+         xc, sp_heat_c_mix, sp_heat_mix)
 
   END SUBROUTINE eval_mixture_properties_from_volume_fractions
 
@@ -387,10 +426,14 @@ CONTAINS
 
     END IF
 
-    CALL eval_mixture_properties_from_volume_fractions(r_T, r_alphas,          &
-         r_alphag, r_alphal,                                                   &
-         r_rho_m, r_inv_rhom, r_rho_c, r_xs, r_xg, r_xl, r_xc,                &
-         r_sp_heat_c, r_sp_heat_mix)
+    CALL eval_mixture_properties_from_volume_fractions(                        &
+         ! IN
+         r_T, r_alphag,                                                        &
+         ! INOUT
+         r_alphas, r_alphal,                                                   &
+         ! OUT
+         r_rho_m, r_inv_rhom, r_rho_c,                                        &
+         r_xs, r_xg, r_xl, r_xc, r_sp_heat_c, r_sp_heat_mix)
 
     ! reduced gravity
     r_red_grav = ( r_rho_m - rho_a_amb ) / r_rho_m * grav
@@ -602,10 +645,14 @@ CONTAINS
 
     END IF
 
-    CALL eval_mixture_properties_from_volume_fractions(r_T, r_alphas,          &
-         r_alphag, r_alphal,                                                   &
-         r_rho_m, r_inv_rhom, r_rho_c, r_xs, r_xg, r_xl, r_xc,                &
-         r_sp_heat_c, r_sp_heat_mix)
+    CALL eval_mixture_properties_from_volume_fractions(                        &
+         ! IN
+         r_T, r_alphag,                                                        &
+         ! INOUT
+         r_alphas, r_alphal,                                                   &
+         ! OUT
+         r_rho_m, r_inv_rhom, r_rho_c,                                        &
+         r_xs, r_xg, r_xl, r_xc, r_sp_heat_c, r_sp_heat_mix)
 
     IF ( stoch_transport_flag) r_Zs = qp(idx_stoch)
 

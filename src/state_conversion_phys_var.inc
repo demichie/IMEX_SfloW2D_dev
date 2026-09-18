@@ -49,8 +49,11 @@
 
     END IF
 
-    CALL eval_mixture_heat_capacity(xs, xg, xl, xc, mixture_sp_heat_c,          &
-         sp_heat_mix)
+    CALL eval_mixture_heat_capacity(                                           &
+         ! IN
+         xs, xg, xl,                                                           &
+         ! OUT
+         xc, mixture_sp_heat_c, sp_heat_mix)
 
     IF ( REAL(qj(1), wp) .GT. eps_sing ) THEN
 
@@ -73,8 +76,11 @@
 
     END IF
 
-    CALL eval_mixture_properties_from_mass_fractions(T, xs, xg, xl, rho_m,     &
-         inv_rhom, rho_c, inv_rho_c, alphas, alphag, alphal)
+    CALL eval_mixture_properties_from_mass_fractions(                          &
+         ! IN
+         T, xs, xg, xl,                                                        &
+         ! OUT
+         rho_m, inv_rhom, rho_c, inv_rho_c, alphas, alphag, alphal)
 
     h = qj(1) * inv_rhom
 
