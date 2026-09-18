@@ -21,7 +21,6 @@
        inv_rhom = 1.0_wp / rho_m
        rho_c = rho_a_amb
        inv_rho_c = 1.0_wp / rho_c
-       xs_tot = 0.0_wp
 
        RETURN
 
@@ -40,44 +39,14 @@
     IF ( stoch_transport_flag ) Zs = qj(idx_stoch) * inv_qj1
     IF ( pore_pressure_flag ) exc_pore_pres = qj(idx_pore) * inv_qj1
 
-    xs_tot = SUM(xs)
-
     IF ( gas_flag .AND. liquid_flag ) THEN
 
        xl = qj(n_vars) * inv_qj1
-       xc = 1.0_wp - xs_tot - xl
-
-    ELSE
-
-       xc = 1.0_wp - xs_tot
 
     END IF
 
-    ! Do not use DOT_PRODUCT here or below: for a complex first argument it
-    ! applies conjugation and therefore corrupts complex-step derivatives.
-    IF ( gas_flag ) THEN
-
-       carrier_sp_heat_mass =                                                   &
-            ( xc - SUM(xg(1:n_add_gas)) ) * sp_heat_a +                        &
-            SUM(xg(1:n_add_gas) * sp_heat_g(1:n_add_gas))
-
-    ELSE
-
-       carrier_sp_heat_mass = sp_heat_l * xc
-
-    END IF
-
-    sp_heat_mix = SUM(xs(1:n_solid) * sp_heat_s(1:n_solid))
-
-    IF ( gas_flag .AND. liquid_flag ) THEN
-
-       sp_heat_mix = sp_heat_mix + xl * sp_heat_l
-
-    END IF
-
-    ! carrier_sp_heat_mass is already weighted by the carrier-component mass
-    ! fractions, so it enters the mixture heat capacity exactly once.
-    sp_heat_mix = sp_heat_mix + carrier_sp_heat_mass
+    CALL eval_mixture_heat_capacity(xs, xg, xl, xc, mixture_sp_heat_c,          &
+         sp_heat_mix)
 
     IF ( REAL(qj(1), wp) .GT. eps_sing ) THEN
 
@@ -100,46 +69,8 @@
 
     END IF
 
-    IF ( gas_flag ) THEN
-
-       ! Use the same carrier-fraction guard for REAL and COMPLEX arithmetic.
-       ! Testing the real part keeps the selected branch unchanged by an
-       ! infinitesimal complex-step perturbation.
-       IF ( REAL(xc, wp) .GT. EPSILON(1.0_wp) ) THEN
-
-          sp_gas_const_c =                                                      &
-               ( (xc - SUM(xg(1:n_add_gas))) * sp_gas_const_a +                &
-               SUM(xg(1:n_add_gas) *                                           &
-               sp_gas_const_g(1:n_add_gas)) ) / xc
-
-       ELSE
-
-          sp_gas_const_c = sp_gas_const_a
-
-       END IF
-
-       inv_rho_c = sp_gas_const_c * T * inv_pres
-       rho_c = 1.0_wp / inv_rho_c
-       inv_rho_g(1:n_add_gas) = sp_gas_const_g(1:n_add_gas) * T * inv_pres
-
-    ELSE
-
-       rho_c = rho_l
-       inv_rho_c = inv_rho_l
-
-    END IF
-
-    inv_rhom = SUM(xs(1:n_solid) * inv_rho_s(1:n_solid)) +                     &
-         xc * inv_rho_c
-
-    IF ( gas_flag .AND. liquid_flag ) inv_rhom = inv_rhom + xl * inv_rho_l
-
-    rho_m = 1.0_wp / inv_rhom
-
-    IF ( gas_flag .AND. liquid_flag ) alphal = xl * rho_m * inv_rho_l
-
-    alphas(1:n_solid) = xs(1:n_solid) * rho_m * inv_rho_s(1:n_solid)
-    alphag(1:n_add_gas) = xg(1:n_add_gas) * rho_m * inv_rho_g(1:n_add_gas)
+    CALL eval_mixture_from_mass_fractions(T, xs, xg, xl, rho_m, inv_rhom,       &
+         rho_c, inv_rho_c, alphas, alphag, alphal)
 
     h = qj(1) * inv_rhom
 

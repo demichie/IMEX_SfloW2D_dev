@@ -124,7 +124,6 @@ MODULE constitutive_parameters_2d
   REAL(wp) :: sp_heat_c  ! ( initialized from input)
 
   !> Specific gas constant of gas mixture (units: J kg-1 K-1)
-  REAL(wp) :: sp_gas_const_c
 
   !> Density of carrier phase in substrate ( units: kg m-3 )
   REAL(wp) :: rho_c_sub

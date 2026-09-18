@@ -984,6 +984,7 @@ CONTAINS
     USE constitutive_2d, ONLY: kin_visc_c, sp_heat_c
 
     USE constitutive_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
+    USE state_conversion_2d, ONLY: eval_mixture_from_mass_fractions
 
     USE constitutive_2d, ONLY: n_td2
     USE constitutive_2d, ONLY: coeff_porosity
@@ -1053,18 +1054,13 @@ CONTAINS
     REAL(wp) :: rho_c
     REAL(wp) :: rho_m
     REAL(wp) :: Ri
-    LOGICAL :: sp_heat_flag
     REAL(wp) :: sp_heat_mix
     REAL(wp) :: mfr
 
     REAL(wp) :: pi_g
 
-    REAL(wp), ALLOCATABLE :: inv_rho_g(:)
     REAL(wp) :: inv_rho_c
     REAL(wp) :: inv_rhom
-    REAL(wp) :: sp_gas_const_c
-    REAL(wp) :: xc
-    REAL(wp) :: xs_tot
     ! parameter for elliptical source
     REAL(wp) :: h_ell
 
@@ -4326,61 +4322,9 @@ CONTAINS
 
           IF (ANY(xs_source(1:n_solid) .GT. -1.0_wp)) THEN
 
-            ALLOCATE (inv_rho_g(n_add_gas))
-
-            xs_tot = SUM(xs_source(1:n_solid))
-
-            IF (gas_flag .AND. liquid_flag) THEN
-
-              ! compute carrier phase (gas) mass fraction
-              xc = 1.0_wp - xs_tot - xl_source
-
-            ELSE
-
-              ! compute carrier phase (gas or liquid) mass fraction
-              xc = 1.0_wp - xs_tot
-
-            END IF
-
-            IF (gas_flag) THEN
-
-              ! carrier phase is gas
-              sp_gas_const_c = ((xc - SUM(xg_source(1:n_add_gas)))* &
-                                sp_gas_const_a + DOT_PRODUCT(xg_source(1:n_add_gas), &
-                                                             sp_gas_const_g(1:n_add_gas)))/xc
-
-              inv_rho_c = sp_gas_const_c*T_source*inv_pres
-              inv_rho_g(1:n_add_gas) = sp_gas_const_g(1:n_add_gas)* &
-                                       T_source*inv_pres
-
-            ELSE
-
-              inv_rho_c = inv_rho_l
-
-            END IF
-
-            inv_rhom = DOT_PRODUCT(xs_source(1:n_solid), &
-                                   inv_rho_s(1:n_solid)) + xc*inv_rho_c
-
-            IF (gas_flag .AND. liquid_flag) inv_rhom = inv_rhom &
-                                                       + xl_source*inv_rho_l
-
-            rho_m = 1.0_wp/inv_rhom
-
-            ! convert from mass fraction to volume fraction
-            alphas_source(1:n_solid) = rho_m*xs_source(1:n_solid)* &
-                                       inv_rho_s(1:n_solid)
-
-            ! convert from mass fraction to volume fraction
-            alphag_source(1:n_add_gas) = rho_m*xg_source(1:n_solid)* &
-                                         inv_rho_g(1:n_add_gas)
-
-            IF (liquid_flag) THEN
-
-              ! convert from mass fraction to volume fraction
-              alphal_source = rho_m*xl_source*inv_rho_l
-
-            END IF
+            CALL eval_mixture_from_mass_fractions(T_source, xs_source,         &
+                 xg_source, xl_source, rho_m, inv_rhom, rho_c, inv_rho_c,     &
+                 alphas_source, alphag_source, alphal_source)
 
           END IF
 
@@ -4422,11 +4366,9 @@ CONTAINS
           qp_source(n_vars + 1) = vel_source
           qp_source(n_vars + 2) = 0.0_wp
 
-          sp_heat_flag = .FALSE.
-
           ! compute the Richardson number for vel = 1.0 (or vel from input)
-          CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_flag, &
-                        sp_heat_c, sp_heat_mix)
+          CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c,     &
+                        sp_heat_mix)
 
           WRITE (*, *) 'Source density =', rho_m, '(kg/m3)'
           WRITE (*, *) 'Source reduced gravity =', red_grav, '(m/s2)'
@@ -4469,8 +4411,8 @@ CONTAINS
                 qp_source(n_vars + 2) = 0.0_wp
 
                 ! compute the Richardson number for vel = 1.0
-                CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, &
-                              sp_heat_flag, sp_heat_c, sp_heat_mix)
+                CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav,          &
+                              sp_heat_c, sp_heat_mix)
 
                 ! compute the correct velocity for the desired Richardson number
                 vel_source = SQRT(red_grav*h_source/Ri_source)
@@ -4479,8 +4421,8 @@ CONTAINS
 
               ! mfr and velocity
 
-              CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, &
-                            sp_heat_flag, sp_heat_c, sp_heat_mix)
+              CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav,            &
+                            sp_heat_c, sp_heat_mix)
 
               h_source = mfr_source/(source_length*rho_m* &
                                      vel_source)
@@ -4503,8 +4445,8 @@ CONTAINS
           qp_source(n_vars + 1) = vel_source
 
           ! Check that the Richardson number is correct
-          CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_flag, &
-                        sp_heat_c, sp_heat_mix)
+          CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c,     &
+                        sp_heat_mix)
 
           WRITE (*, *) 'Source Richardson number =', Ri
           WRITE (*, *) 'Source velocity =', vel_source, ' (m/s)'
@@ -4979,6 +4921,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     ! External procedures
     USE geometry_2d, ONLY: interp_2d_scalarB, regrid_scalar
+    USE state_conversion_2d, ONLY: eval_mixture_from_volume_fractions
     ! External variables
     USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0, dx, dy
     USE geometry_2d, ONLY: B_cent, erodible
@@ -5015,9 +4958,10 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     REAL(wp) :: xl, xr, yl, yr
 
-    REAL(wp) :: rho_c, rho_m, mass_fract(n_solid)
-
-    REAL(wp) :: sp_heat_c
+    REAL(wp) :: rho_c, rho_m, inv_rhom, mass_fract(n_solid)
+    REAL(wp) :: alphag_init_local(n_add_gas), alphal_init_local
+    REAL(wp) :: xg_init(n_add_gas), xl_init, xc_init
+    REAL(wp) :: sp_heat_c, sp_heat_mix
 
     INTEGER :: solid_idx
 
@@ -5278,22 +5222,11 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       !----- END NEW INITIALIZATION OF THICKNESS FROM RESTART
 
-      IF (gas_flag) THEN
-
-        rho_c = pres/(sp_gas_const_a*T_init)
-        sp_heat_c = sp_heat_a
-
-      ELSE
-
-        rho_c = rho_l
-        sp_heat_c = sp_heat_l
-
-      END IF
-
-      rho_m = SUM(rho_s(1:n_solid)*alphas_init(1:n_solid)) + (1.0_wp - &
-                                                              SUM(alphas_init(1:n_solid)))*rho_c
-
-      mass_fract = rho_s*alphas_init/rho_m
+      alphag_init_local = 0.0_wp
+      alphal_init_local = 0.0_wp
+      CALL eval_mixture_from_volume_fractions(T_init, alphas_init,             &
+           alphag_init_local, alphal_init_local, rho_m, inv_rhom, rho_c,       &
+           mass_fract, xg_init, xl_init, xc_init, sp_heat_c, sp_heat_mix)
 
       state%q(1, :, :) = thickness_init(:, :)*rho_m
 
@@ -5315,9 +5248,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
       WHERE (thickness_init .GT. 0.0_wp)
 
-        state%q(4, :, :) = state%q(1, :, :)*T_init*(SUM(mass_fract(1:n_solid)* &
-                                            sp_heat_s(1:n_solid)) + &
-                                        (1.0_wp - SUM(mass_fract))*sp_heat_l)
+        state%q(4, :, :) = state%q(1, :, :)*T_init*sp_heat_mix
 
       END WHERE
 
@@ -7161,7 +7092,6 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     INTEGER :: i, j, k
     INTEGER :: start1d(1), count1d(1)
 
-    LOGICAL :: sp_flag
 
     REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c, r_sp_heat_mix
     REAL(wp) :: r_h, r_u, r_v, r_T, r_w, mod_vel2, mod_hor_vel
@@ -7179,7 +7109,6 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
 
     WRITE (*, *) 'Writing ', nc_filename
 
-    sp_flag = .FALSE.
 
     ALLOCATE (Ri2D(SIZE(state%qp, 2), SIZE(state%qp, 3)))
     ALLOCATE (rho_m2D(SIZE(state%qp, 2), SIZE(state%qp, 3)))
@@ -7207,7 +7136,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
         IF (state%qp(1, j, k) .GT. 1.0E-10_wp) THEN
 
           CALL mixt_var(state%qp(1:n_vars + 2, j, k), r_Ri, r_rho_m, r_rho_c, &
-                        r_red_grav, sp_flag, r_sp_heat_c, r_sp_heat_mix)
+                        r_red_grav, r_sp_heat_c, r_sp_heat_mix)
 
         ELSE
 

@@ -113,13 +113,10 @@ CONTAINS
     REAL(wp) :: r_rho_c      !< real-value carrier phase density [kg m-3]
     REAL(wp) :: r_red_grav   !< real-value reduced gravity [m s-2]
     REAL(wp) :: r_celerity
-    LOGICAL :: sp_heat_flag
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
 
-    sp_heat_flag = .FALSE.
-
-    CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,sp_heat_flag,r_sp_heat_c, &
+    CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,             &
          r_sp_heat_mix)
 
     r_h = qpj(1)
@@ -172,13 +169,10 @@ CONTAINS
     REAL(wp) :: r_rho_c      !< real-value carrier phase density [kg/m3]
     REAL(wp) :: r_red_grav   !< real-value reduced gravity
     REAL(wp) :: r_celerity
-    LOGICAL :: sp_heat_flag
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
 
-    sp_heat_flag = .FALSE.
-
-    CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,sp_heat_flag,r_sp_heat_c, &
+    CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,             &
          r_sp_heat_mix)
 
     r_h = qpj(1)
@@ -236,11 +230,8 @@ CONTAINS
     REAL(wp) :: r_rho_m      !< real-value mixture density [kg m-3]
     REAL(wp) :: r_rho_c      !< real-value carrier phase density [kg m-3]
     REAL(wp) :: r_red_grav   !< real-value reduced gravity [m s-2]
-    LOGICAL :: sp_heat_flag
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
-
-    sp_heat_flag = .FALSE.
 
     pos_thick:IF ( qpj(1) .GT. EPSILON(1.0_wp) ) THEN
 
@@ -248,7 +239,7 @@ CONTAINS
        r_u = qpj(idx_u)
        r_v = qpj(idx_v)
 
-       CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,sp_heat_flag,          &
+       CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,                      &
             r_sp_heat_c,r_sp_heat_mix)
 
        IF ( dir .EQ. 1 ) THEN
@@ -487,9 +478,6 @@ CONTAINS
     REAL(wp) :: vel_local
     INTEGER :: i_int
 
-    LOGICAL :: sp_heat_flag
-
-    sp_heat_flag = .TRUE.
 
     expl_term(1:n_eqns) = 0.0_wp
     q1 = 0.0_wp
@@ -504,7 +492,7 @@ CONTAINS
        r_u = qpj(idx_u)
        r_v = qpj(idx_v)
 
-       CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,sp_heat_flag,         &
+       CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,                      &
             r_sp_heat_c,r_sp_heat_mix)
 
        q1 = r_h * r_rho_m
@@ -651,7 +639,7 @@ CONTAINS
     qp_source(idx_v) = 0.0_wp
 
 
-    CALL mixt_var(qp_source,r_Ri,r_rho_m,r_rho_c,r_red_grav,sp_heat_flag,       &
+    CALL mixt_var(qp_source,r_Ri,r_rho_m,r_rho_c,r_red_grav,                   &
          r_sp_heat_c,r_sp_heat_mix)
 
     expl_term(1) = expl_term(1) + t_coeff * h_dot * r_rho_m
@@ -771,7 +759,7 @@ CONTAINS
           qp_source(idx_v) = 0.0_wp
 
           CALL mixt_var( qp_source, r_Ri, r_rho_m, r_rho_c, r_red_grav,        &
-               sp_heat_flag, r_sp_heat_c, r_sp_heat_mix )
+               r_sp_heat_c, r_sp_heat_mix )
 
           ! Per-cell injection rate (m/s) - integrates to MFR over all cells.
           h_dot = h_source * vel_source * lat_arc_perim_jk / cell_area_jk
@@ -1496,13 +1484,10 @@ CONTAINS
     REAL(wp) :: temp_term
     REAL(wp) :: centr_force_term
 
-    LOGICAL :: sp_heat_flag
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
 
     REAL(wp) :: exc_pore_pres       !< excess pore pressure
-
-    sp_heat_flag = .FALSE.
 
     nh_semi_impl_term(1:n_eqns) = 0.0_wp
 
@@ -1552,7 +1537,7 @@ CONTAINS
 
        r_T = qpj(4)
 
-       CALL mixt_var(qpj, r_Ri, r_rho_m, r_rho_c, r_red_grav, sp_heat_flag,     &
+       CALL mixt_var(qpj, r_Ri, r_rho_m, r_rho_c, r_red_grav,                  &
             r_sp_heat_c, r_sp_heat_mix)
 
 
@@ -2045,7 +2030,6 @@ CONTAINS
     !> Hindered settling velocity (units: m s-1 )
     REAL(wp) :: settling_vel
 
-    LOGICAL :: sp_heat_flag
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
 
@@ -2175,9 +2159,7 @@ CONTAINS
 
     r_T = qpj(4)
 
-    sp_heat_flag = .TRUE.
-
-    CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,sp_heat_flag,r_sp_heat_c, &
+    CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,             &
          r_sp_heat_mix)
 
     IF ( rheology_model .EQ. 4 ) THEN

@@ -34,9 +34,12 @@ IMEX_SfloW2D_SOURCES = \
                 inpout_2d.f90 \
                 IMEX_SfloW2D.f90
 
-EXTRA_DIST = state_conversion_phys_var.inc
+EXTRA_DIST = state_conversion_phys_var.inc mixture_heat_capacity.inc          \
+             mixture_from_mass.inc
 
-state_conversion_2d.$(OBJEXT): state_conversion_phys_var.inc
+state_conversion_2d.$(OBJEXT): state_conversion_phys_var.inc                  \
+                               mixture_heat_capacity.inc                      \
+                               mixture_from_mass.inc
 
 FCFLAGS         = -fopenmp -Ofast -funroll-all-loops -I@NETCDF@/include -lnetcdff
 FCDEBUGFLAGS    = -Wall -g

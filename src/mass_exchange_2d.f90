@@ -80,11 +80,9 @@ CONTAINS
 
     REAL(wp) :: p_dyn
 
-    LOGICAL :: sp_flag
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
 
-    sp_flag = .FALSE.
 
 
     IF ( ( erosion_coeff .EQ. 0.0_wp ) .AND. ( .NOT.settling_flag ) &
@@ -236,8 +234,8 @@ CONTAINS
        IF ( q(1,j,k) .GT. 0.0_wp ) THEN
 
           CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-          CALL mixt_var(qp(1:n_vars+2,j,k),r_Ri,r_rho_m,r_rho_c,r_red_grav,     &
-               sp_flag,r_sp_heat_c,r_sp_heat_mix)
+          CALL mixt_var(qp(1:n_vars+2,j,k),r_Ri,r_rho_m,r_rho_c,r_red_grav,    &
+               r_sp_heat_c,r_sp_heat_mix)
 
        ELSE
 

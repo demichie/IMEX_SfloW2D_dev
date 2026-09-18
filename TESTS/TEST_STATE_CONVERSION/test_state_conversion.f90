@@ -12,6 +12,7 @@ PROGRAM test_state_conversion
   CALL run_wet_case('gas-liquid-solid alpha energy', .TRUE., .TRUE., .TRUE.)
   CALL run_wet_case('gas-liquid-solid h-alpha temperature', .TRUE., .FALSE., .FALSE.)
   CALL run_zero_carrier_case
+  CALL run_overfilled_volume_case
   CALL run_dry_cases
   CALL run_complex_step_check
 
@@ -148,10 +149,63 @@ CONTAINS
     CALL assert_true(TRIM(label)//' dynamic pressure finite', &
                      ieee_is_finite(p_dyn) .AND. p_dyn .GE. 0.0_wp)
     CALL check_real_complex(TRIM(label), q0, 2.0E-12_wp)
+    CALL check_thermodynamic_kernels(TRIM(label), qp0, q0, 2.0E-12_wp)
 
     DEALLOCATE (qp0, qp1, q0, q1)
 
   END SUBROUTINE run_wet_case
+
+  SUBROUTINE check_thermodynamic_kernels(label, qp, q, tolerance)
+
+    CHARACTER(LEN=*), INTENT(IN) :: label
+    REAL(wp), INTENT(IN) :: qp(n_vars + 2), q(n_vars), tolerance
+
+    REAL(wp) :: alphas_qp(n_solid), alphag_qp(n_add_gas), alphal_qp
+    REAL(wp) :: alphas_mass(n_solid), alphag_mass(n_add_gas), alphal_mass
+    REAL(wp) :: xs(n_solid), xg(n_add_gas), xl, xc
+    REAL(wp) :: rho_mass, inv_rho_mass, rho_c_mass
+    REAL(wp) :: rho_mix, rho_c_mix, red_grav, Ri
+    REAL(wp) :: cp_c_mass, cp_mix_mass, cp_c_mix, cp_mix
+    REAL(wp) :: inv_rho_c_mass
+
+    IF (alpha_flag) THEN
+      alphas_qp = qp(idx_alfas_first:idx_alfas_last)
+      alphag_qp = qp(idx_addGas_first:idx_addGas_last)
+    ELSE
+      alphas_qp = qp(idx_alfas_first:idx_alfas_last)/qp(1)
+      alphag_qp = qp(idx_addGas_first:idx_addGas_last)/qp(1)
+    END IF
+
+    alphal_qp = 0.0_wp
+    IF (gas_flag .AND. liquid_flag) THEN
+      IF (alpha_flag) THEN
+        alphal_qp = qp(n_vars)
+      ELSE
+        alphal_qp = qp(n_vars)/qp(1)
+      END IF
+    END IF
+
+    xs = q(idx_alfas_first:idx_alfas_last)/q(1)
+    xg = q(idx_addGas_first:idx_addGas_last)/q(1)
+    xl = 0.0_wp
+    IF (gas_flag .AND. liquid_flag) xl = q(n_vars)/q(1)
+
+    CALL eval_mixture_from_mass_fractions(qp(4), xs, xg, xl, rho_mass,         &
+         inv_rho_mass, rho_c_mass, inv_rho_c_mass, alphas_mass, alphag_mass,   &
+         alphal_mass)
+    CALL eval_mixture_heat_capacity(xs, xg, xl, xc, cp_c_mass, cp_mix_mass)
+
+    CALL mixt_var(qp, Ri, rho_mix, rho_c_mix, red_grav, cp_c_mix, cp_mix)
+
+    CALL assert_close_scalar(label//' kernel rho_m', rho_mix, rho_mass, tolerance)
+    CALL assert_close_scalar(label//' kernel rho_c', rho_c_mix, rho_c_mass, tolerance)
+    CALL assert_close_scalar(label//' kernel cp_c', cp_c_mix, cp_c_mass, tolerance)
+    CALL assert_close_scalar(label//' kernel cp_mix', cp_mix, cp_mix_mass, tolerance)
+    CALL assert_close_vector(label//' kernel alphas', alphas_mass, alphas_qp, tolerance)
+    CALL assert_close_vector(label//' kernel alphag', alphag_mass, alphag_qp, tolerance)
+    CALL assert_close_scalar(label//' kernel alphal', alphal_mass, alphal_qp, tolerance)
+
+  END SUBROUTINE check_thermodynamic_kernels
 
   SUBROUTINE run_zero_carrier_case
 
@@ -187,6 +241,48 @@ CONTAINS
     DEALLOCATE (q, real_outputs, cq, complex_outputs)
 
   END SUBROUTINE run_zero_carrier_case
+
+  SUBROUTINE run_overfilled_volume_case
+
+    REAL(wp), ALLOCATABLE :: qp(:), qp_corrected(:), q(:)
+    REAL(wp) :: expected_alphas(n_solid), expected_alphal
+    REAL(wp) :: Ri, rho_m, rho_c, red_grav, cp_c, cp_mix, p_dyn
+    REAL(wp) :: dispersed_total
+
+    CALL configure_layout(.TRUE., .TRUE., .TRUE.)
+    ALLOCATE (qp(n_vars + 2), qp_corrected(n_vars + 2), q(n_vars))
+
+    qp = 0.0_wp
+    qp(1) = 1.0_wp
+    qp(2) = 0.2_wp
+    qp(3) = -0.1_wp
+    qp(4) = 400.0_wp
+    qp(idx_alfas_first:idx_alfas_last) = [0.8_wp, 0.4_wp]
+    qp(idx_addGas_first:idx_addGas_last) = 0.0_wp
+    qp(n_vars) = 0.2_wp
+    qp(idx_u) = qp(2)/qp(1)
+    qp(idx_v) = qp(3)/qp(1)
+
+    dispersed_total = SUM(qp(idx_alfas_first:idx_alfas_last)) + qp(n_vars)
+    expected_alphas = qp(idx_alfas_first:idx_alfas_last)/dispersed_total
+    expected_alphal = qp(n_vars)/dispersed_total
+
+    CALL qp_to_qc(qp, q)
+    CALL qc_to_qp(q, qp_corrected, p_dyn)
+    CALL mixt_var(qp, Ri, rho_m, rho_c, red_grav, cp_c, cp_mix)
+
+    CALL assert_close_vector('overfilled corrected solids',                    &
+         qp_corrected(idx_alfas_first:idx_alfas_last), expected_alphas,        &
+         2.0E-12_wp)
+    CALL assert_close_scalar('overfilled corrected liquid',                    &
+         qp_corrected(n_vars), expected_alphal, 2.0E-12_wp)
+    CALL assert_true('overfilled thermodynamics finite',                       &
+         ALL(ieee_is_finite(q)) .AND. ieee_is_finite(rho_m) .AND.              &
+         ieee_is_finite(rho_c) .AND. ieee_is_finite(cp_mix))
+
+    DEALLOCATE (qp, qp_corrected, q)
+
+  END SUBROUTINE run_overfilled_volume_case
 
   SUBROUTINE run_dry_cases
 
