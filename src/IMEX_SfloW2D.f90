@@ -102,7 +102,6 @@ PROGRAM IMEX_SfloW2D
    REAL(wp) :: rate
    INTEGER :: st1 , st2 , st3 , cr , cm
 
-   REAL(wp) :: dt_old , dt_old_old
    LOGICAL :: stop_flag
    LOGICAL :: stop_flag_old
 
@@ -261,22 +260,19 @@ PROGRAM IMEX_SfloW2D
 
 
    IF ( is_binary_restart ) THEN
-      ! If it is a binary restart, 'dt' has already been loaded by read_restart_file.
-      ! We initialize the history with the last valid dt for continuity.
-      dt_old = simulation%runtime%dt
-      dt_old_old = simulation%runtime%dt
+      ! The current step and its history were restored by read_restart_file.
       WRITE(*,*) 'Restarting with saved timestep dt =', simulation%runtime%dt
    ELSE
       ! If it is a new simulation or a legacy restart, we use dt0 from the input
       simulation%runtime%dt = dt0
-      dt_old = dt0
-      dt_old_old = dt0
+      simulation%runtime%dt_old = dt0
+      simulation%runtime%dt_old_old = dt0
    END IF
 
    t_steady = t_end
    stop_flag = .FALSE.
 
-   simulation%state%vuln_table = .FALSE.
+   IF ( .NOT. is_binary_restart ) simulation%state%vuln_table = .FALSE.
 
    !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2,    &
    !$OMP & mod_vel)
@@ -291,7 +287,8 @@ PROGRAM IMEX_SfloW2D
          CALL qc_to_qp(simulation%state%q(1:n_vars,j,k),                    &
               simulation%state%qp(1:n_vars+2,j,k), p_dyn)
 
-         simulation%state%hmax(j,k) = simulation%state%qp(1,j,k)
+         IF ( .NOT. is_binary_restart )                                     &
+              simulation%state%hmax(j,k) = simulation%state%qp(1,j,k)
 
          r_u = simulation%state%qp(n_vars+1,j,k)
          r_v = simulation%state%qp(n_vars+2,j,k)
@@ -299,41 +296,50 @@ PROGRAM IMEX_SfloW2D
          mod_vel2 = r_u**2 + r_v**2
          mod_vel = SQRT( mod_vel2 )
 
-         IF ( simulation%state%qp(1,j,k) .GT. 0.001_wp ) THEN
+         IF ( ( .NOT. is_binary_restart ) .AND.                             &
+              ( simulation%state%qp(1,j,k) .GT. 0.001_wp ) ) THEN
 
             simulation%state%pdynmax(j,k) = p_dyn
             simulation%state%mod_vel_max(j,k) = mod_vel
 
          END IF
 
-         i_table = 0
+         IF ( .NOT. is_binary_restart ) THEN
 
-         DO i_thk_lev=1,n_thickness_levels
+            i_table = 0
 
-            simulation%state%thck_table(j,k) =                              &
-                 ( simulation%state%qp(1,j,k) .GE. thickness_levels(i_thk_lev) )
+            DO i_thk_lev=1,n_thickness_levels
 
-            DO i_pdyn_lev=1,n_dyn_pres_levels
+               simulation%state%thck_table(j,k) =                           &
+                    ( simulation%state%qp(1,j,k) .GE.                       &
+                    thickness_levels(i_thk_lev) )
 
-               simulation%state%pdyn_table(j,k) =                           &
-                    ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
+               DO i_pdyn_lev=1,n_dyn_pres_levels
 
-               i_table = i_table + 1
+                  simulation%state%pdyn_table(j,k) =                        &
+                       ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
 
-               simulation%state%vuln_table(i_table,j,k) =                   &
-                    ( simulation%state%thck_table(j,k) .AND.                 &
-                    simulation%state%pdyn_table(j,k) )
+                  i_table = i_table + 1
+
+                  simulation%state%vuln_table(i_table,j,k) =                &
+                       ( simulation%state%thck_table(j,k) .AND.              &
+                       simulation%state%pdyn_table(j,k) )
+
+               END DO
 
             END DO
 
-         END DO
+         END IF
 
       ELSE
 
          simulation%state%qp(1:n_vars,j,k) = 0.0_wp
          simulation%state%qp(4,j,k) = T_ambient
-         simulation%state%hmax(j,k) = 0.0_wp
-         simulation%state%pdynmax(j,k) = 0.0_wp
+         IF ( .NOT. is_binary_restart ) THEN
+            simulation%state%hmax(j,k) = 0.0_wp
+            simulation%state%pdynmax(j,k) = 0.0_wp
+            simulation%state%mod_vel_max(j,k) = 0.0_wp
+         END IF
 
       END IF
 
@@ -341,14 +347,18 @@ PROGRAM IMEX_SfloW2D
 
    !$OMP END PARALLEL DO
 
-   IF ( output_runout_flag ) CALL output_runout(                             &
+   IF ( output_runout_flag .AND. (.NOT. is_binary_restart) )                &
+        CALL output_runout(                                                  &
         simulation%runtime%t, stop_flag, simulation%state)
 
    IF ( output_cons_flag .OR. output_esri_flag .OR.                            &
-      output_netcdf_flag ) CALL output_solution(                             &
+      output_netcdf_flag ) THEN
+      IF ( .NOT. is_binary_restart ) CALL output_solution(                   &
       simulation%runtime%t, simulation%state)
+   END IF
 
-   IF ( n_probes .GT. 0 ) CALL output_probes(                               &
+   IF ( ( n_probes .GT. 0 ) .AND. (.NOT. is_binary_restart) )               &
+        CALL output_probes(                                                  &
         simulation%runtime%t, simulation%state)
 
    IF ( SUM(simulation%state%q(1,:,:)) .EQ. 0.0_wp ) t_steady = t_end
@@ -422,10 +432,10 @@ PROGRAM IMEX_SfloW2D
       END IF
 
       simulation%runtime%dt = MIN(simulation%runtime%dt,1.1_wp * 0.5_wp *    &
-           ( dt_old + dt_old_old ) )
+           ( simulation%runtime%dt_old + simulation%runtime%dt_old_old ) )
 
-      dt_old_old = dt_old
-      dt_old = simulation%runtime%dt
+      simulation%runtime%dt_old_old = simulation%runtime%dt_old
+      simulation%runtime%dt_old = simulation%runtime%dt
 
       CALL simulation%time_integration%advance(                              &
            simulation%state%q, simulation%state%qp, simulation%runtime%t,    &
@@ -592,7 +602,7 @@ PROGRAM IMEX_SfloW2D
 
             CALL output_solution(simulation%runtime%t, simulation%state)
             CALL write_restart_file('restart.bin', simulation%runtime,       &
-                 simulation%stochastic, simulation%state)
+                 simulation%stochastic, simulation%state, simulation%domain)
 
          END IF
 

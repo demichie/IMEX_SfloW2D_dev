@@ -21,6 +21,10 @@ MODULE runtime_2d
      !> Current time step
      REAL(wp) :: dt = 0.0_wp
 
+     !> Time steps used by the temporal smoothing limiter
+     REAL(wp) :: dt_old = 0.0_wp
+     REAL(wp) :: dt_old_old = 0.0_wp
+
   END TYPE runtime_state_type
 
 END MODULE runtime_2d

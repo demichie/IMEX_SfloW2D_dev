@@ -27,7 +27,8 @@ MODULE inpout_2d
                            idx_addGasEqn_last, idx_stochEqn, idx_poreEqn
 
   ! -- Variables for the namelist RUN_PARAMETERS
-  USE parameters_2d, ONLY: t_start, t_end, t_output, dt_output
+  USE parameters_2d, ONLY: t_start, t_end, t_output, dt_output, t_runout,    &
+                           t_probes
 
   USE parameters_2d, ONLY: verbose_level
 
@@ -180,6 +181,9 @@ MODULE inpout_2d
   INTEGER, PARAMETER :: output_unit_erodible = 26
   INTEGER, PARAMETER :: output_unit_deposit = 27
   INTEGER, PARAMETER :: output_unit_B = 28
+
+  CHARACTER(LEN=16), PARAMETER :: restart_format_magic = 'IMEX_SFLOW2D_RST'
+  INTEGER, PARAMETER :: restart_format_version = 1
 
   !> Counter for the output files
   INTEGER :: output_idx
@@ -418,6 +422,8 @@ CONTAINS
     t_start = 0.0
     t_end = 5.0E-2_wp
     dt_output = 5.0E-3_wp
+    t_runout = 0.0_wp
+    t_probes = 0.0_wp
     output_cons_flag = .FALSE.
     output_esri_flag = .FALSE.
     output_netcdf_flag = .FALSE.
@@ -7462,9 +7468,11 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   !> @author
   !> Mattia de' Michieli Vitturi
   !******************************************************************************
-  SUBROUTINE write_restart_file(filename, runtime, stochastic, state)
-    USE parameters_2d, ONLY: wp, n_vars, n_solid
-    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible, deposit, erosion
+  SUBROUTINE write_restart_file(filename, runtime, stochastic, state, domain)
+    USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,     &
+                             n_pore_vars
+    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible,    &
+                           deposit, erosion
     USE parameters_2d, ONLY: stochastic_flag, topo_change_flag
 
     IMPLICIT NONE
@@ -7472,44 +7480,88 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     CLASS(runtime_state_type), INTENT(IN) :: runtime
     CLASS(stochastic_workspace_type), INTENT(IN) :: stochastic
     CLASS(state_type), INTENT(IN) :: state
+    CLASS(domain_type), INTENT(IN) :: domain
     INTEGER :: unit_rst, ierr
+    INTEGER :: seed_size
+    INTEGER, ALLOCATABLE :: random_seed_state(:)
+    CHARACTER(LEN=256) :: io_message
 
-    unit_rst = 33
-      OPEN(UNIT=unit_rst, FILE=filename, FORM='UNFORMATTED', STATUS='REPLACE', ACTION='WRITE', IOSTAT=ierr)
-
-    IF (ierr /= 0) THEN
-      WRITE (*, *) 'ERROR: Unable to create restart file: ', filename
-      RETURN
-    END IF
+    OPEN(NEWUNIT=unit_rst, FILE=filename, FORM='UNFORMATTED',                &
+         STATUS='REPLACE', ACTION='WRITE', IOSTAT=ierr, IOMSG=io_message)
+    CALL check_restart_io(ierr, io_message, 'opening', filename)
 
     WRITE (*, *) 'Writing restart file: ', filename, ' at time ', runtime%t
 
-    ! 1. Write dimensions for consistency check
-    WRITE (unit_rst) comp_cells_x, comp_cells_y, n_vars, n_solid
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) restart_format_magic
+    CALL check_restart_io(ierr, io_message, 'writing header to', filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) restart_format_version
+    CALL check_restart_io(ierr, io_message, 'writing version to', filename)
 
-    ! 2. Write time scalars
-    WRITE (unit_rst) runtime%t, runtime%dt
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) comp_cells_x,           &
+         comp_cells_y, n_vars, n_solid, n_add_gas, n_stoch_vars,           &
+         n_pore_vars, n_thickness_levels, n_dyn_pres_levels
+    CALL check_restart_io(ierr, io_message, 'writing dimensions to', filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic_flag,        &
+         topo_change_flag
+    CALL check_restart_io(ierr, io_message, 'writing model flags to', filename)
 
-    ! 3. Write main variables
-    WRITE (unit_rst) state%q
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) runtime%t, runtime%dt,  &
+         runtime%dt_old, runtime%dt_old_old
+    CALL check_restart_io(ierr, io_message, 'writing time state to', filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) output_idx, t_output,   &
+         t_runout, t_probes
+    CALL check_restart_io(ierr, io_message, 'writing output state to', filename)
 
-    ! 4. Write grid variables (Topography and erosion)
-    WRITE (unit_rst) B_cent
-    WRITE (unit_rst) erodible
-    WRITE (unit_rst) deposit
-    WRITE (unit_rst) erosion
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
+    CALL check_restart_io(ierr, io_message, 'writing conservative state to', &
+         filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) B_cent
+    CALL check_restart_io(ierr, io_message, 'writing topography to', filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) erodible
+    CALL check_restart_io(ierr, io_message, 'writing erodible material to', &
+         filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) deposit
+    CALL check_restart_io(ierr, io_message, 'writing deposits to', filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) erosion
+    CALL check_restart_io(ierr, io_message, 'writing erosion to', filename)
 
-    ! 5. Write statistics/maximums
-    WRITE (unit_rst) state%hmax
-    WRITE (unit_rst) state%pdynmax
-    WRITE (unit_rst) state%mod_vel_max
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%hmax
+    CALL check_restart_io(ierr, io_message, 'writing maximum thickness to', &
+         filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%pdynmax
+    CALL check_restart_io(ierr, io_message, 'writing maximum pressure to', &
+         filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%mod_vel_max
+    CALL check_restart_io(ierr, io_message, 'writing maximum velocity to', &
+         filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%vuln_table
+    CALL check_restart_io(ierr, io_message, 'writing vulnerability state to', &
+         filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%hpos, state%hpos_old
+    CALL check_restart_io(ierr, io_message, 'writing runout masks to', filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) domain%solve_mask_time
+    CALL check_restart_io(ierr, io_message, 'writing release-time mask to', &
+         filename)
 
-    ! 6. Write stochastic variables (IF ACTIVE)
-    IF (stochastic_flag) THEN
-      WRITE (unit_rst) stochastic%Z
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic%Z
+    CALL check_restart_io(ierr, io_message, 'writing stochastic field to', &
+         filename)
+
+    seed_size = 0
+    IF (stochastic_flag) CALL random_seed(SIZE=seed_size)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) seed_size
+    CALL check_restart_io(ierr, io_message, 'writing random-seed size to', &
+         filename)
+    IF (seed_size > 0) THEN
+      ALLOCATE(random_seed_state(seed_size))
+      CALL random_seed(GET=random_seed_state)
+      WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) random_seed_state
+      CALL check_restart_io(ierr, io_message, 'writing random state to', filename)
+      DEALLOCATE(random_seed_state)
     END IF
 
-    CLOSE (unit_rst)
+    CLOSE (unit_rst, IOSTAT=ierr, IOMSG=io_message)
+    CALL check_restart_io(ierr, io_message, 'closing', filename)
 
   END SUBROUTINE write_restart_file
 
@@ -7526,88 +7578,165 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
   !> Mattia de' Michieli Vitturi
   !******************************************************************************
   SUBROUTINE read_restart_file(filename, runtime, stochastic, state, domain)
-    USE parameters_2d, ONLY: wp, n_vars, n_solid
-    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible, deposit, erosion
-    USE parameters_2d, ONLY: stochastic_flag
-
-    ! Modules needed to recalculate derived variables
+    USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,     &
+                             n_pore_vars
+    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible,    &
+                           deposit, erosion
+    USE parameters_2d, ONLY: stochastic_flag, topo_change_flag
     USE geometry_2d, ONLY: topography_reconstruction
-    USE constitutive_2d, ONLY: qc_to_qp
 
     IMPLICIT NONE
     CHARACTER(LEN=*), INTENT(IN) :: filename
     CLASS(runtime_state_type), INTENT(INOUT) :: runtime
     CLASS(stochastic_workspace_type), INTENT(INOUT) :: stochastic
     CLASS(state_type), INTENT(INOUT) :: state
-    CLASS(domain_type), INTENT(IN) :: domain
+    CLASS(domain_type), INTENT(INOUT) :: domain
     INTEGER :: unit_rst, ierr
-    INTEGER :: nx_check, ny_check, nvars_check, nsolid_check
-    INTEGER :: j, k, l
-    REAL(wp) :: p_dyn_dummy
+    INTEGER :: format_version
+    INTEGER :: nx_check, ny_check, nvars_check, nsolid_check, naddgas_check
+    INTEGER :: nstoch_check, npore_check, nthickness_check, ndynpres_check
+    INTEGER :: seed_size, current_seed_size
+    INTEGER, ALLOCATABLE :: random_seed_state(:)
+    LOGICAL :: stochastic_check, topo_change_check
+    CHARACTER(LEN=16) :: format_magic
+    CHARACTER(LEN=256) :: io_message
 
-    unit_rst = 33
-   OPEN (UNIT=unit_rst, FILE=filename, FORM='UNFORMATTED', STATUS='OLD', ACTION='READ', IOSTAT=ierr)
-
-    IF (ierr /= 0) THEN
-      WRITE (*, *) 'CRITICAL ERROR: Restart file not found: ', filename
-      STOP
-    END IF
+    OPEN(NEWUNIT=unit_rst, FILE=filename, FORM='UNFORMATTED', STATUS='OLD',   &
+         ACTION='READ', IOSTAT=ierr, IOMSG=io_message)
+    CALL check_restart_io(ierr, io_message, 'opening', filename)
 
     WRITE (*, *) 'Reading restart file: ', filename
 
-    ! 1. Read and check dimensions
-    READ (unit_rst) nx_check, ny_check, nvars_check, nsolid_check
-
-    IF (nx_check /= comp_cells_x .OR. ny_check /= comp_cells_y) THEN
-      WRITE (*, *) 'ERROR: Grid dimensions in restart file do not match!'
-      STOP
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) format_magic
+    CALL check_restart_io(ierr, io_message, 'reading header from', filename)
+    IF (format_magic /= restart_format_magic) THEN
+      WRITE(*,*) 'ERROR: Unsupported or legacy binary restart file: ',      &
+           TRIM(filename)
+      ERROR STOP 1
     END IF
 
-    ! 2. Read time scalars
-    READ (unit_rst) runtime%t, runtime%dt
-
-    ! 3. Read main variables
-    READ (unit_rst) state%q
-
-    ! 4. Read grid variables
-    READ (unit_rst) B_cent
-    READ (unit_rst) erodible
-    READ (unit_rst) deposit
-    READ (unit_rst) erosion
-
-    ! 5. Read maximums
-    READ (unit_rst) state%hmax
-    READ (unit_rst) state%pdynmax
-    READ (unit_rst) state%mod_vel_max
-
-    ! 6. Read stochastic
-    IF (stochastic_flag) THEN
-      READ (unit_rst) stochastic%Z
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) format_version
+    CALL check_restart_io(ierr, io_message, 'reading version from', filename)
+    IF (format_version /= restart_format_version) THEN
+      WRITE(*,*) 'ERROR: Unsupported restart format version:', format_version
+      ERROR STOP 1
     END IF
 
-    CLOSE (unit_rst)
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) nx_check, ny_check,       &
+         nvars_check, nsolid_check, naddgas_check, nstoch_check,            &
+         npore_check, nthickness_check, ndynpres_check
+    CALL check_restart_io(ierr, io_message, 'reading dimensions from', filename)
+    IF (nx_check /= comp_cells_x .OR. ny_check /= comp_cells_y .OR.         &
+         nvars_check /= n_vars .OR. nsolid_check /= n_solid .OR.           &
+         naddgas_check /= n_add_gas .OR. nstoch_check /= n_stoch_vars .OR. &
+         npore_check /= n_pore_vars .OR.                                   &
+         nthickness_check /= n_thickness_levels .OR.                       &
+         ndynpres_check /= n_dyn_pres_levels) THEN
+      WRITE(*,*) 'ERROR: Restart dimensions or equation layout do not match.'
+      ERROR STOP 1
+    END IF
 
-    ! --- CRUCIAL PHASE: UPDATE DERIVED VARIABLES ---
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic_check,        &
+         topo_change_check
+    CALL check_restart_io(ierr, io_message, 'reading model flags from', filename)
+    IF (stochastic_check .NEQV. stochastic_flag .OR.                       &
+         topo_change_check .NEQV. topo_change_flag) THEN
+      WRITE(*,*) 'ERROR: Restart stochastic/topography flags do not match.'
+      ERROR STOP 1
+    END IF
 
-    ! A. Recalculate physical variables (qp) from conservative ones (q)
-    !$OMP PARALLEL DO PRIVATE(j,k,p_dyn_dummy)
-    DO l = 1, domain%solve_cells
-      j = domain%j_cent(l)
-      k = domain%k_cent(l)
-      IF (state%q(1, j, k) > 0.0_wp) THEN
-        CALL qc_to_qp(state%q(1:n_vars, j, k), state%qp(1:n_vars + 2, j, k), p_dyn_dummy)
-      ELSE
-        state%qp(:, j, k) = 0.0_wp
-        ! Note: T_ambient must be accessible here or reset
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) runtime%t, runtime%dt,   &
+         runtime%dt_old, runtime%dt_old_old
+    CALL check_restart_io(ierr, io_message, 'reading time state from', filename)
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) output_idx, t_output,    &
+         t_runout, t_probes
+    CALL check_restart_io(ierr, io_message, 'reading output state from', filename)
+
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
+    CALL check_restart_io(ierr, io_message, 'reading conservative state from', &
+         filename)
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) B_cent
+    CALL check_restart_io(ierr, io_message, 'reading topography from', filename)
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) erodible
+    CALL check_restart_io(ierr, io_message, 'reading erodible material from', &
+         filename)
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) deposit
+    CALL check_restart_io(ierr, io_message, 'reading deposits from', filename)
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) erosion
+    CALL check_restart_io(ierr, io_message, 'reading erosion from', filename)
+
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%hmax
+    CALL check_restart_io(ierr, io_message, 'reading maximum thickness from', &
+         filename)
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%pdynmax
+    CALL check_restart_io(ierr, io_message, 'reading maximum pressure from', &
+         filename)
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%mod_vel_max
+    CALL check_restart_io(ierr, io_message, 'reading maximum velocity from', &
+         filename)
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%vuln_table
+    CALL check_restart_io(ierr, io_message, 'reading vulnerability state from', &
+         filename)
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%hpos, state%hpos_old
+    CALL check_restart_io(ierr, io_message, 'reading runout masks from', filename)
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) domain%solve_mask_time
+    CALL check_restart_io(ierr, io_message, 'reading release-time mask from', &
+         filename)
+
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic%Z
+    CALL check_restart_io(ierr, io_message, 'reading stochastic field from', &
+         filename)
+
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) seed_size
+    CALL check_restart_io(ierr, io_message, 'reading random-seed size from', &
+         filename)
+    IF ((stochastic_flag .AND. seed_size <= 0) .OR.                        &
+         ((.NOT. stochastic_flag) .AND. seed_size /= 0)) THEN
+      WRITE(*,*) 'ERROR: Invalid random-seed state in restart:', seed_size
+      ERROR STOP 1
+    END IF
+    IF (seed_size > 0) THEN
+      CALL random_seed(SIZE=current_seed_size)
+      IF (seed_size /= current_seed_size) THEN
+        WRITE(*,*) 'ERROR: Restart random-seed size does not match:',        &
+             seed_size, current_seed_size
+        ERROR STOP 1
       END IF
-    END DO
-    !$OMP END PARALLEL DO
+      ALLOCATE(random_seed_state(seed_size))
+      READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) random_seed_state
+      CALL check_restart_io(ierr, io_message, 'reading random state from', &
+           filename)
+      CALL random_seed(PUT=random_seed_state)
+      DEALLOCATE(random_seed_state)
+    END IF
 
-    ! B. Recalculate topography slopes and curvatures
+    CLOSE (unit_rst, IOSTAT=ierr, IOMSG=io_message)
+    CALL check_restart_io(ierr, io_message, 'closing', filename)
+
+    ! Physical variables are reconstructed in the main program after
+    ! check_solve has populated the compact cell lists.
     CALL topography_reconstruction
 
     WRITE (*, *) 'Restart completed successfully at time t = ', runtime%t
 
   END SUBROUTINE read_restart_file
+
+  !******************************************************************************
+  !> \brief Abort after a failed binary-restart I/O operation.
+  !******************************************************************************
+  SUBROUTINE check_restart_io(status, message, operation, filename)
+
+    INTEGER, INTENT(IN) :: status
+    CHARACTER(LEN=*), INTENT(IN) :: message
+    CHARACTER(LEN=*), INTENT(IN) :: operation
+    CHARACTER(LEN=*), INTENT(IN) :: filename
+
+    IF (status /= 0) THEN
+      WRITE(*,*) 'ERROR: Failed ', TRIM(operation), ' restart file ',       &
+           TRIM(filename), ': ', TRIM(message)
+      ERROR STOP 1
+    END IF
+
+  END SUBROUTINE check_restart_io
 
 END MODULE inpout_2d
