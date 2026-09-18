@@ -6,6 +6,8 @@
 !********************************************************************************
 MODULE time_integration_2d
 
+  USE diagnostics_2d, ONLY : debug_pause, fatal_error
+
   USE parameters_2d, ONLY : wp
   USE parameters_2d, ONLY : n_eqns, n_vars, n_RK, n_solid
   USE parameters_2d, ONLY : verbose_level
@@ -645,7 +647,7 @@ CONTAINS
 
              END IF
              
-             READ(*,*)
+             CALL debug_pause('IMEX Runge-Kutta stage state')
 
           END IF
 
@@ -753,7 +755,7 @@ CONTAINS
           END IF
           WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
           
-          READ(*,*)
+          CALL fatal_error('NaN detected after IMEX Runge-Kutta update')
           
        END IF
        
@@ -792,7 +794,7 @@ CONTAINS
 
              WRITE(*,*) 'B_cent(j,k)',B_cent(j,k)
 
-             READ(*,*)
+             CALL fatal_error('negative thickness after IMEX Runge-Kutta update')
 
           END IF
 
@@ -823,7 +825,7 @@ CONTAINS
              WRITE(*,*) hyper%H_interface_y(5,j,k+1)/dy*dt, hyper%H_interface_y(5,j,k)/dy*dt
              
 
-             READ(*,*)
+             CALL fatal_error('negative solid mass after IMEX Runge-Kutta update')
 
           ELSE
 
@@ -917,7 +919,7 @@ CONTAINS
           WRITE(*,*) hyper%H_interface_y(4,j,k+1)/dy*dt, hyper%H_interface_y(4,j,k)/dy*dt
 
           WRITE(*,*) hyper%H_interface_y(:,j,k)/dy*dt
-          READ(*,*)
+          CALL fatal_error('temperature below the admissible threshold')
 
        END IF
           
@@ -981,14 +983,14 @@ CONTAINS
              WRITE(*,*) 'SI(5)', this%SI_NH(5,j,k,1:n_RK)
              
 
-             READ(*,*)
+             CALL fatal_error('solid mass exceeds total mass after IMEX update')
 
           END IF
 
           IF ( verbose_level .GE. 1 ) THEN
 
              WRITE(*,*) 'h new',q(1,j,k) 
-             READ(*,*)
+             CALL debug_pause('solid-mass roundoff correction applied')
 
           END IF
 

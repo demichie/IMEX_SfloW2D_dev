@@ -7,6 +7,8 @@
 !********************************************************************************
 MODULE mass_exchange_2d
 
+  USE diagnostics_2d, ONLY : fatal_error
+
   USE constitutive_2d, ONLY : T_ambient
 
   USE geometry_2d, ONLY : B_cent
@@ -169,7 +171,7 @@ CONTAINS
           WRITE(*,*) 'erosion_term',erosion_term
           WRITE(*,*) 'after erosion: qc',q(1:n_vars,j,k)
 
-          READ(*,*)
+          CALL fatal_error('negative solid mass after mass exchange')
           
        END IF negative_alpha_check
        
@@ -196,7 +198,7 @@ CONTAINS
              WRITE(*,*) 'q',q(1:n_eqns,j,k)
              WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
                 
-             READ(*,*)
+             CALL fatal_error('negative total mass after mass exchange')
 
           END IF
 
@@ -224,7 +226,7 @@ CONTAINS
              CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
              WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
              WRITE(*,*) 'q',q(1:n_eqns,j,k)          
-             READ(*,*)
+             CALL fatal_error('solid mass exceeds total mass after mass exchange')
              
           END IF
 

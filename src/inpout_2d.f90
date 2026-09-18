@@ -12,6 +12,8 @@
 
 MODULE inpout_2d
 
+  USE diagnostics_2d, ONLY : interactive_debug_flag, debug_pause, fatal_error
+
   USE parameters_2d, ONLY: wp
   USE runtime_2d, ONLY: runtime_state_type
   USE state_2d, ONLY: state_type
@@ -328,7 +330,8 @@ MODULE inpout_2d
 
   NAMELIST /run_parameters/ run_name, restart, t_start, t_end, dt_output, &
     output_cons_flag, output_esri_flag, &
-    output_netcdf_flag, output_runout_flag, verbose_level, serial_flag
+    output_netcdf_flag, output_runout_flag, verbose_level, serial_flag,     &
+    interactive_debug_flag
 
   NAMELIST /restart_parameters/ n_restart_files, restart_files, release_time, &
     T_init, T_ambient, u_init, v_init, sed_vol_perc
@@ -428,6 +431,7 @@ CONTAINS
     output_esri_flag = .FALSE.
     output_netcdf_flag = .FALSE.
     output_runout_flag = .FALSE.
+    interactive_debug_flag = .FALSE.
     verbose_level = 0
 
     alphas_source_total = -1.0_wp
@@ -2192,7 +2196,7 @@ CONTAINS
 
       WRITE (*, *) 'WARNING: wrong value of cfl ', cfl
       WRITE (*, *) 'Choose a value between 0.0 and ', max_cfl
-      READ (*, *)
+      CALL fatal_error('CFL value outside the admissible interval')
 
     END IF
 
@@ -2230,7 +2234,7 @@ CONTAINS
 
       WRITE (*, *) 'WARNING: wrong value of reconstr_coeff ', reconstr_coeff
       WRITE (*, *) 'Change the value between 0.0 and 1.0 in the input file'
-      READ (*, *)
+      CALL fatal_error('reconstruction coefficient outside [0,1]')
 
     END IF
 
@@ -3249,8 +3253,7 @@ CONTAINS
           IF (visc_par .NE. -1.0_wp) WRITE (*, *) 'visc_par =', visc_par
           IF (tau .NE. -1.0_wp) WRITE (*, *) 'tau =', tau
           IF (tau0 .NE. -1.0_wp) WRITE (*, *) 'tau0 =', tau0
-          WRITE (*, *) 'Press ENTER to continue'
-          READ (*, *)
+          CALL debug_pause('unused parameters for rheology model 1')
 
         END IF
 
@@ -3276,8 +3279,7 @@ CONTAINS
           IF (visc_par .NE. -1.0_wp) WRITE (*, *) 'visc_par =', visc_par
           IF (mu .NE. -1.0_wp) WRITE (*, *) 'mu =', mu
           IF (xi .NE. -1.0_wp) WRITE (*, *) 'xi =', xi
-          WRITE (*, *) 'Press ENTER to continue'
-          READ (*, *)
+          CALL debug_pause('unused parameters for rheology model 2')
 
         END IF
 
@@ -3312,8 +3314,7 @@ CONTAINS
 
           WRITE (*, *) 'WARNING: temperature and momentum uncoupled'
           WRITE (*, *) 'VISC_PAR =', visc_par
-          WRITE (*, *) 'Press ENTER to continue'
-          READ (*, *)
+          CALL debug_pause('temperature and momentum are uncoupled')
 
         ELSE
 
@@ -3335,8 +3336,7 @@ CONTAINS
           IF (mu .NE. -1.0_wp) WRITE (*, *) 'mu =', mu
           IF (xi .NE. -1.0_wp) WRITE (*, *) 'xi =', xi
           IF (tau .NE. -1.0_wp) WRITE (*, *) 'tau =', tau
-          WRITE (*, *) 'Press ENTER to continue'
-          READ (*, *)
+          CALL debug_pause('unused parameters for rheology model 3')
 
         END IF
 
@@ -5328,12 +5328,12 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
         DO k = 1, nrows
 
           WRITE (*, *) k, B_cent(:, k)
-          READ (*, *)
+          CALL debug_pause('initial topography row')
 
         END DO
 
         WRITE (*, *) 'SUM(B_cent(:,:)) =', SUM(B_cent(:, :))
-        READ (*, *)
+        CALL debug_pause('initial topography summary')
 
       END IF
 

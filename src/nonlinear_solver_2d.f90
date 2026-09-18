@@ -7,6 +7,8 @@
 !********************************************************************************
 MODULE nonlinear_solver_2d
 
+  USE diagnostics_2d, ONLY : debug_pause
+
   USE parameters_2d, ONLY : wp, sp, n_eqns, n_vars, verbose_level
 
   USE equation_metadata_2d, ONLY : equation_partition_type
@@ -737,7 +739,7 @@ CONTAINS
        IF ( verbose_level .GE. 4 ) THEN
 
           WRITE(*,*) 'lnsrch: effe_old,effe',scal_f_old,scal_f
-          READ(*,*)
+          CALL debug_pause('nonlinear line-search iteration')
 
        END IF
 

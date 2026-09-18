@@ -3,6 +3,8 @@
 !********************************************************************************
 MODULE equation_terms_2d
 
+  USE diagnostics_2d, ONLY : fatal_error
+
   USE constitutive_parameters_2d
   USE state_conversion_2d
 
@@ -2246,7 +2248,7 @@ CONTAINS
 
              WRITE(*,*) 'eval_erosion_dep_term'
              WRITE(*,*) 'deposition_term(i_solid)',deposition_term(i_solid)
-             READ(*,*)
+             CALL fatal_error('negative solid deposition rate')
 
           END IF
 

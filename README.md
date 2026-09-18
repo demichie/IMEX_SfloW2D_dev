@@ -40,6 +40,22 @@ The executable is copied in the bin folder.
 
 Several examples can be found in the EXAMPLES folder.
 
+## Runtime diagnostics
+
+`VERBOSE_LEVEL` controls how much diagnostic information is printed and never
+pauses an execution. Interactive debug pauses can be enabled independently in
+the `RUN_PARAMETERS` namelist:
+
+```fortran
+INTERACTIVE_DEBUG_FLAG = T,
+```
+
+The flag defaults to `F` and should remain disabled for batch and production
+runs. Interactive pauses requested inside an active OpenMP parallel region are
+skipped to avoid unsafe concurrent access to standard input. Invalid input and
+nonphysical solver states terminate with a nonzero error status after printing
+their diagnostic context.
+
 ## Vertical closure status
 
 The legacy velocity/concentration vertical-profile implementation has been
