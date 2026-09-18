@@ -129,6 +129,7 @@ MODULE inpout_2d
   USE stochastic_module, ONLY: sym_noise, &
                                std_min, std_max, std_slope_factor, tau_stochastic, noise_pow_val, &
                                Z_min, Z_max, Z_mean, Z_std, percentiles
+  USE stochastic_random_2d, ONLY: stochastic_seed
   USE parameters_2d, ONLY: output_stoch_vars_flag, length_spatial_corr
 
   ! --- Variables for the namelist PORE_PRESSURE_PARAMETERS
@@ -387,7 +388,8 @@ MODULE inpout_2d
 
   NAMELIST /stochastic_parameters/ &
     mean_field_flag, output_stoch_vars_flag, sym_noise, std_max, &
-    tau_stochastic, length_spatial_corr, noise_pow_val, stoch_transport_flag
+    tau_stochastic, length_spatial_corr, noise_pow_val, stoch_transport_flag, &
+    stochastic_seed
 
   NAMELIST /pore_pressure_parameters/ hydraulic_permeability, pore_pres_fract, &
     gas_loss_flag, alpha_trans, N_inh, f_inhibit_mode, &
@@ -533,8 +535,9 @@ CONTAINS
     std_max = -1.0_wp
     std_slope_factor = -1.0_wp
     tau_stochastic = -1.0_wp
-    length_spatial_corr = -1.0_wp
+    length_spatial_corr = 0.0_wp
     noise_pow_val = -1.0_wp
+    stochastic_seed = -1
 
     !-- Inizialization of the Variables for the namelist PORE_PRESSURE_PARAMETERS
     hydraulic_permeability = 0.0_wp
@@ -953,8 +956,9 @@ CONTAINS
     std_max = -1.0_wp
     std_slope_factor = -1.0_wp
     tau_stochastic = -1.0_wp
-    length_spatial_corr = -1.0_wp
+    length_spatial_corr = 0.0_wp
     noise_pow_val = -1.0_wp
+    stochastic_seed = -1
 
     !-- Variable for the namelist PORE_PRESSURE_PARAMETERS
     hydraulic_permeability = 0.0_wp
@@ -4629,20 +4633,27 @@ CONTAINS
       WRITE (*, *) ' '
       WRITE (*, *) 'START PARSING THE STOCASTIC PARAMETERS...'
 
-      ! Stop the program if the parameters are not positive double-precision floating-point numbers (real numbers).
-      IF ((std_max .LT. 0.0_wp) .AND. (tau_stochastic .LT. 0.0_wp)) THEN
-        WRITE (*, *) 'ERROR: problem with namelist STOCHASTIC_PARAMETERS'
-        WRITE (*, *) 'std_max =', std_max, 'tau_stochastic = ', tau_stochastic
-        WRITE (*, *) 'All these values must be >0! Please check the input file'
-        STOP
+      IF ((std_max < 0.0_wp) .OR. (tau_stochastic <= 0.0_wp)) THEN
+        CALL fatal_error('STOCHASTIC_PARAMETERS requires std_max >= 0 and '// &
+             'tau_stochastic > 0')
       END IF
 
-      ! Stop the program if the power value is negative (only important for asymmetric noises)
-      IF (noise_pow_val .LT. 0.0_wp) THEN
-        WRITE (*, *) 'ERROR: problem with namelist STOCHASTIC_PARAMETERS'
-        WRITE (*, *) 'noise_pow_val =', noise_pow_val
-        WRITE (*, *) 'Required noise_pow_val > 0. ! Please correct the input file'
-        STOP
+      IF ((sym_noise /= 0.0_wp) .AND. (noise_pow_val <= 0.0_wp)) THEN
+        CALL fatal_error('asymmetric stochastic noise requires '//          &
+             'noise_pow_val > 0')
+      END IF
+
+      IF ((sym_noise /= -1.0_wp) .AND. (sym_noise /= 0.0_wp) .AND.          &
+          (sym_noise /= 1.0_wp)) THEN
+        CALL fatal_error('sym_noise must be -1, 0, or 1')
+      END IF
+
+      IF (length_spatial_corr < 0.0_wp) THEN
+        CALL fatal_error('length_spatial_corr must be >= 0')
+      END IF
+
+      IF (mean_field_flag) THEN
+        CALL fatal_error('mean_field_flag is not implemented')
       END IF
 
       ! Setting facctor controlling the slope of the noise
@@ -4675,30 +4686,26 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
         'length_spatial_corr = ', length_spatial_corr
       write (*, *) 'sym_noise =', sym_noise, 'noise_pow_val =', noise_pow_val
 
-      ! Say if using mean field approx of stochastic noise
-      IF (mean_field_flag) THEN
-        WRITE (*, *) 'Using the mean field approximation (that is deterministic) !'
-        WRITE (*, *) 'WARNING : The maen field approximation is not yet implemented !'
-        WRITE (*, *) 'STOPPING THE PROGRAMME !'
-      ELSE
-        ! Say if noise is symmetric or not
-        IF (sym_noise == 1.0_wp) THEN
-          WRITE (*, *) 'The noise will asymmetric and positive!'
-        ELSEIF (sym_noise == -1.0_wp) THEN
-          WRITE (*, *) 'The noise will asymmetric and negative!'
-        ELSEIF (sym_noise == 0.0_wp) THEN
-          WRITE (*, *) 'The noise will symmetric (positive and negative)!'
-        ELSE
-          WRITE (*, *) 'The pameters sym_noise must be 0 (for sym noise),              &
-&                  1 (for positive noise) or -1 (for negative noise)!'
-        END IF
+      ! Say if noise is symmetric or not
+      IF (sym_noise == 1.0_wp) THEN
+        WRITE (*, *) 'The noise will asymmetric and positive!'
+      ELSEIF (sym_noise == -1.0_wp) THEN
+        WRITE (*, *) 'The noise will asymmetric and negative!'
+      ELSEIF (sym_noise == 0.0_wp) THEN
+        WRITE (*, *) 'The noise will symmetric (positive and negative)!'
+      END IF
 
-        ! Say if noise is transported or not
-        IF (stoch_transport_flag) THEN
-          WRITE (*, *) 'The noise will be transported by the flow!'
-        ELSE
-          WRITE (*, *) 'The noise will not be transported by the flow!'
-        END IF
+      ! Say if noise is transported or not
+      IF (stoch_transport_flag) THEN
+        WRITE (*, *) 'The noise will be transported by the flow!'
+      ELSE
+        WRITE (*, *) 'The noise will not be transported by the flow!'
+      END IF
+
+      IF (stochastic_seed >= 0) THEN
+        WRITE (*, *) 'Using reproducible stochastic seed:', stochastic_seed
+      ELSE
+        WRITE (*, *) 'Using processor-generated stochastic seed'
       END IF
 
       ! Say where the stochastic variables will be saved

@@ -30,6 +30,7 @@ IMEX_SfloW2D_SOURCES = \
                 reconstruction_2d.f90 \
                 hyperbolic_2d.f90 \
                 time_integration_2d.f90 \
+                stochastic_random_2d.f90 \
                 stochastic_module.f90 \
                 simulation_2d.f90 \
                 init_2d.f90 \

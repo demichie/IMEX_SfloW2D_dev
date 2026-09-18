@@ -21,8 +21,9 @@ MODULE stochastic_module
   USE constitutive_2d, ONLY : T_ambient
   USE constitutive_2d, ONLY: qc_to_qp
   USE parameters_2d, ONLY : output_stoch_vars_flag, length_spatial_corr,        &
-        stoch_transport_flag
+        stochastic_flag, stoch_transport_flag
   USE geometry_2d, ONLY : cell_size, comp_cells_x, comp_cells_y
+  USE stochastic_random_2d, ONLY : initialize_stochastic_rng, gaussian_noise
   USE OMP_LIB
      
   ! variables related to OU process
@@ -75,6 +76,8 @@ CONTAINS
     IF ( ALLOCATED(this%Z) ) DEALLOCATE(this%Z)
     ALLOCATE(this%Z(comp_cells_x,comp_cells_y))
     this%Z = 0.0_wp
+
+    IF (stochastic_flag) CALL initialize_stochastic_rng
 
   END SUBROUTINE initialize_stochastic_workspace
 
@@ -241,7 +244,8 @@ CONTAINS
 
     ! Generate standard gaussian noise over entire domain-> N(0,1)
     noise_size = comp_cells_x*comp_cells_y
-    noise = reshape(GaussianNoise( noise_size ), [comp_cells_x, comp_cells_y])
+    noise = RESHAPE(gaussian_noise(noise_size),                              &
+         [comp_cells_x, comp_cells_y])
 
     ! Convolve the gaussian noise to introduce spatial correlation if needed
     IF (length_spatial_corr .GT. cell_size) THEN
@@ -286,26 +290,6 @@ CONTAINS
   END SUBROUTINE update_stochastic_variable
 
 
-  FUNCTION GaussianNoise(noise_size)
-    !> Generate a sample from a normal standard random distribution (mean=0, var=1)   
-    !> Use Box-Muller transform : (https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform)
-    ! this is an uncorrelated noise: we will need to correlate it ?!!!!
-    ! Correction to avoid leg(0.0): https://masuday.github.io/fortran_tutorial/random.html
-    implicit none
-    INTEGER :: noise_size
-    REAL(wp) :: r(noise_size,2)
-    REAL(wp) :: pi_g
-    REAL(wp) :: GaussianNoise(noise_size)
-    
-    pi_g = 4.0_wp*ATAN(1.0_wp)
-    CALL random_seed() ! = CALL random_seed(size=noise_size)  
-    CALL random_number(r)
-    GaussianNoise = sqrt ( - 2.0D+00 * log ( (1.0_wp-r(:,1)) ) ) * cos ( 2.0D+00 * pi_g * r(:,2) )
-        
-    RETURN
-  END FUNCTION GaussianNoise
-
-  
   REAL(wp) FUNCTION FroudeNumber(state,j,k)
     !> compute the froude number given the indices defining the location in the grid 
     USE parameters_2d, ONLY : n_solid , n_add_gas , n_stoch_vars , n_pore_vars
