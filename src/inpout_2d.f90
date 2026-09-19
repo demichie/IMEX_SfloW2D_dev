@@ -128,7 +128,7 @@ MODULE inpout_2d
   ! --- Variables for the namelist STOCHASTIC_PARAMETERS
   USE stochastic_module, ONLY: sym_noise, &
                                std_min, std_max, std_slope_factor, tau_stochastic, noise_pow_val, &
-                               Z_min, Z_max, Z_mean, Z_std, percentiles
+                               noise_activation_velocity, Z_min, Z_max, Z_mean, Z_std, percentiles
   USE stochastic_random_2d, ONLY: stochastic_seed
   USE parameters_2d, ONLY: output_stoch_vars_flag, length_spatial_corr
 
@@ -186,7 +186,7 @@ MODULE inpout_2d
   INTEGER, PARAMETER :: output_unit_B = 28
 
   CHARACTER(LEN=16), PARAMETER :: restart_format_magic = 'IMEX_SFLOW2D_RST'
-  INTEGER, PARAMETER :: restart_format_version = 1
+  INTEGER, PARAMETER :: restart_format_version = 2
 
   !> Counter for the output files
   INTEGER :: output_idx
@@ -389,7 +389,7 @@ MODULE inpout_2d
   NAMELIST /stochastic_parameters/ &
     mean_field_flag, output_stoch_vars_flag, sym_noise, std_max, &
     tau_stochastic, length_spatial_corr, noise_pow_val, stoch_transport_flag, &
-    stochastic_seed
+    stochastic_seed, noise_activation_velocity
 
   NAMELIST /pore_pressure_parameters/ hydraulic_permeability, pore_pres_fract, &
     gas_loss_flag, alpha_trans, N_inh, f_inhibit_mode, &
@@ -538,6 +538,7 @@ CONTAINS
     length_spatial_corr = 0.0_wp
     noise_pow_val = -1.0_wp
     stochastic_seed = -1
+    noise_activation_velocity = -1.0_wp
 
     !-- Inizialization of the Variables for the namelist PORE_PRESSURE_PARAMETERS
     hydraulic_permeability = 0.0_wp
@@ -959,6 +960,7 @@ CONTAINS
     length_spatial_corr = 0.0_wp
     noise_pow_val = -1.0_wp
     stochastic_seed = -1
+    noise_activation_velocity = -1.0_wp
 
     !-- Variable for the namelist PORE_PRESSURE_PARAMETERS
     hydraulic_permeability = 0.0_wp
@@ -4656,17 +4658,24 @@ CONTAINS
         CALL fatal_error('mean_field_flag is not implemented')
       END IF
 
-      ! Setting facctor controlling the slope of the noise
-WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheology_model chosen ...'
+      ! Set the velocity-dependent intensity law. For legacy inputs, use the
+      ! corresponding rheology scale when u_0 is not specified explicitly.
+      WRITE (*, *) 'Setting stochastic intensity parameters...'
       if (rheology_model .EQ. 9) THEN
         std_min = 0.0_wp !std_max * (mu_0/mu_inf) ! mu_0 < mu_inf in mu(Fr)
-        std_slope_factor = Fr_0*Fr_0
-        WRITE (*, *) 'Set : std_min= 0 ; std_slope_factor = Fr_0*Fr_0 !'
-        !WRITE(*,*) 'Set : std_min= std_max * (mu_0/mu_inf) ; std_slope_factor = Fr_0 !'
+        IF (noise_activation_velocity <= 0.0_wp)                              &
+             noise_activation_velocity = Fr_0
+        std_slope_factor = noise_activation_velocity**2
       ELSEIF (rheology_model .EQ. 10) THEN
         std_min = std_max*(mu_inf/mu_0) ! mu_0 > mu_inf in mu(U)
-        std_slope_factor = U_w
-        WRITE (*, *) 'Set : std_min = std_max * (mu_inf/mu_0) ; std_slope_factor = U_w !'
+        IF (noise_activation_velocity <= 0.0_wp)                              &
+             noise_activation_velocity = U_w
+        std_slope_factor = noise_activation_velocity**2
+      END IF
+
+      IF (((rheology_model == 9) .OR. (rheology_model == 10)) .AND.          &
+          (noise_activation_velocity <= 0.0_wp)) THEN
+        CALL fatal_error('noise_activation_velocity must be > 0')
       END IF
 
       ! Stop the program if std_min > std_max
@@ -4684,6 +4693,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
       WRITE (*, *) 'std_min =', std_min, 'std_max =', std_max, &
         'std_slope_factor = ', std_slope_factor, 'tau_stochastic = ', tau_stochastic, &
         'length_spatial_corr = ', length_spatial_corr
+      WRITE (*, *) 'noise_activation_velocity =', noise_activation_velocity
       write (*, *) 'sym_noise =', sym_noise, 'noise_pow_val =', noise_pow_val
 
       ! Say if noise is symmetric or not
@@ -7693,6 +7703,7 @@ WRITE (*, *) 'Setting <std_min> and <std_slope_factor> in function of the rheolo
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic%Z
     CALL check_restart_io(ierr, io_message, 'reading stochastic field from', &
          filename)
+    CALL stochastic%refresh_effective
 
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) seed_size
     CALL check_restart_io(ierr, io_message, 'reading random-seed size from', &

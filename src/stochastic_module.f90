@@ -11,20 +11,14 @@
 MODULE stochastic_module
   
   ! external variables
-  USE parameters_2d, ONLY : wp , sp, rheology_model
-  
-  USE parameters_2d, ONLY : n_eqns , n_vars , n_solid , n_add_gas ,             &
-       n_stoch_vars , n_pore_vars
+  USE parameters_2d, ONLY : wp, rheology_model, idx_stoch, idx_u, idx_v
   
   USE domain_2d, ONLY: domain_type
   USE state_2d, ONLY: state_type
-  USE constitutive_2d, ONLY : T_ambient
-  USE constitutive_2d, ONLY: qc_to_qp
   USE parameters_2d, ONLY : output_stoch_vars_flag, length_spatial_corr,        &
         stochastic_flag, stoch_transport_flag
   USE geometry_2d, ONLY : cell_size, comp_cells_x, comp_cells_y
   USE stochastic_random_2d, ONLY : initialize_stochastic_rng, gaussian_noise
-  USE OMP_LIB
      
   ! variables related to OU process
   
@@ -42,6 +36,9 @@ MODULE stochastic_module
   REAL(wp) :: std_max, std_min
 
   REAL(wp) :: std_slope_factor ! Fr_0_stochastic
+
+  !> Velocity scale u_0 in the stochastic intensity law.
+  REAL(wp) :: noise_activation_velocity
   
   REAL(wp) :: noise_pow_val !(|Z|^power)
   
@@ -54,6 +51,10 @@ MODULE stochastic_module
      !> Stochastic field at cell centers
      REAL(wp), ALLOCATABLE :: Z(:,:)
 
+     !> Possibly transformed fluctuation passed to the friction law. Z remains
+     !> the Gaussian OU state transported through the conservative variable hZ.
+     REAL(wp), ALLOCATABLE :: effective_Z(:,:)
+
      !> Spatial-correlation convolution kernel
      REAL(wp), ALLOCATABLE :: conv_kernel(:,:)
 
@@ -64,6 +65,8 @@ MODULE stochastic_module
      PROCEDURE :: initialize_steady => getSteadyStateZ
      PROCEDURE :: generate_kernel => genConvolutionKernel
      PROCEDURE :: update => update_stochastic_variable
+     PROCEDURE :: prepare_timestep => prepare_stochastic_timestep
+     PROCEDURE :: refresh_effective => refresh_effective_stochastic_field
 
   END TYPE stochastic_workspace_type
 
@@ -77,6 +80,10 @@ CONTAINS
     ALLOCATE(this%Z(comp_cells_x,comp_cells_y))
     this%Z = 0.0_wp
 
+    IF ( ALLOCATED(this%effective_Z) ) DEALLOCATE(this%effective_Z)
+    ALLOCATE(this%effective_Z(comp_cells_x,comp_cells_y))
+    this%effective_Z = 0.0_wp
+
     IF (stochastic_flag) CALL initialize_stochastic_rng
 
   END SUBROUTINE initialize_stochastic_workspace
@@ -86,6 +93,7 @@ CONTAINS
     CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
 
     IF ( ALLOCATED(this%Z) ) DEALLOCATE(this%Z)
+    IF ( ALLOCATED(this%effective_Z) ) DEALLOCATE(this%effective_Z)
     IF ( ALLOCATED(this%conv_kernel) ) DEALLOCATE(this%conv_kernel)
 
   END SUBROUTINE finalize_stochastic_workspace
@@ -137,7 +145,7 @@ CONTAINS
     ! WRITE(*,*) 'dt,n_inter',dt,n_iter
 
     ! Allocate and compute convolution kernel if needed (will be keept in memory)
-    IF (length_spatial_corr .GT. cell_size) THEN
+    IF (length_spatial_corr > 0.0_wp) THEN
         CALL this%generate_kernel()
     END IF
     
@@ -155,11 +163,9 @@ CONTAINS
           j = domain%j_cent(l)
           k = domain%k_cent(l)
           
-          state%qp(5+n_solid+n_add_gas,j,k) = this%Z(j,k)
-          state%q(5+n_solid+n_add_gas,j,k) = state%q(1,j,k) *               &
+          state%qp(idx_stoch,j,k) = this%Z(j,k)
+          state%q(idx_stoch,j,k) = state%q(1,j,k) *                         &
                this%Z(j,k)
-          !WRITE(*,*) j,k,qp(5+n_solid+n_add_gas,j,k),q(5+n_solid+n_add_gas,j,k)
-          !READ(*,*)
           
        END DO
        
@@ -177,15 +183,15 @@ CONTAINS
   SUBROUTINE genConvolutionKernel(this)
       IMPLICIT none
       CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
-      INTEGER :: n_nodes_per_dim, x_index, y_index
-      REAL(wp) :: x_center, y_center, x, y
+      INTEGER :: half_width, n_nodes_per_dim, x_index, y_index
+      REAL(wp) :: bandwidth, x, y
 
-      ! Calculate grid dimensions (assuming square grid)
-      n_nodes_per_dim = CEILING(length_spatial_corr / cell_size)
-
-      ! Get center of the grid (assuming square grid)
-      x_center = (cell_size * REAL(n_nodes_per_dim))  / 2._wp  
-      y_center = x_center 
+      ! The thesis defines length_spatial_corr as l and the kernel bandwidth
+      ! as l/2 (Eq. D.32).
+      bandwidth = 0.5_wp * length_spatial_corr
+      ! Four bandwidths on either side retain all but a negligible Gaussian tail.
+      half_width = MAX(1, CEILING(4.0_wp * bandwidth / cell_size))
+      n_nodes_per_dim = 2 * half_width + 1
 
       ! Allocate the output array
       IF (ALLOCATED(this%conv_kernel)) DEALLOCATE(this%conv_kernel)
@@ -195,10 +201,9 @@ CONTAINS
       ! Compute 2D Gaussian values (at centers of cells)
       DO y_index = 1, n_nodes_per_dim 
         DO x_index = 1, n_nodes_per_dim
-          x =  cell_size * (x_index-1) + 0.5_wp * cell_size
-          y =  cell_size * (y_index-1) + 0.5_wp * cell_size
-          this%conv_kernel(x_index, y_index) =                               &
-               evalGaussian2d(x, y, x_center, y_center)
+          x = cell_size * REAL(x_index - half_width - 1, wp)
+          y = cell_size * REAL(y_index - half_width - 1, wp)
+          this%conv_kernel(x_index, y_index) = evalGaussian2d(x, y)
         END DO
       END DO
 
@@ -207,23 +212,16 @@ CONTAINS
 
   END SUBROUTINE genConvolutionKernel
 
-  REAL(wp) FUNCTION evalGaussian2d(x, y, x_center, y_center)
-      ! Sampling a 2D gaussian with centered at (x_center, y_center)
-      ! The covariance matrix is [[s,0],[0,s]] (so it is simmetric)
-      ! s = length_spatial_corr 
+  REAL(wp) FUNCTION evalGaussian2d(x, y)
+      ! Sample the centered isotropic Gaussian kernel Q^(1/2).
       IMPLICIT none
-      REAL(wp), INTENT(IN) :: x, y, x_center, y_center
-      REAL(wp) :: dx, dy, s, PI
+      REAL(wp), INTENT(IN) :: x, y
+      REAL(wp) :: s, PI
 
-      ! Calculate distances from the center
-      dx = x - x_center
-      dy = y - y_center
-
-      ! Standard 2D Gaussian formula (with sigma=1 for standard Gaussian)
-      s = length_spatial_corr
-      PI = 4.0_wp * ACOS(-1.0_wp)
-      evalGaussian2d = EXP(-0.5_wp * (((dx/s)**2._wp) + ((dy/s)**2._wp))) /           &
-                        (2._wp * PI* s**2._wp) 
+      s = 0.5_wp * length_spatial_corr
+      PI = ACOS(-1.0_wp)
+      evalGaussian2d = EXP(-0.5_wp * (((x/s)**2) + ((y/s)**2))) /             &
+                        (2.0_wp * PI * s**2)
 
   END FUNCTION evalGaussian2d
 
@@ -237,10 +235,9 @@ CONTAINS
     INTEGER :: j,k
     INTEGER :: noise_size
     REAL(wp), INTENT(IN) :: dt
-    REAL(wp) :: Fr
     REAL(wp) :: sigma_noise
     REAL(wp):: noise(comp_cells_x, comp_cells_y)
-    REAL(wp):: conv_result(comp_cells_x, comp_cells_y) ! should swap idx?
+    REAL(wp):: conv_result(comp_cells_x, comp_cells_y)
 
     ! Generate standard gaussian noise over entire domain-> N(0,1)
     noise_size = comp_cells_x*comp_cells_y
@@ -248,29 +245,21 @@ CONTAINS
          [comp_cells_x, comp_cells_y])
 
     ! Convolve the gaussian noise to introduce spatial correlation if needed
-    IF (length_spatial_corr .GT. cell_size) THEN
+    IF (length_spatial_corr > 0.0_wp) THEN
         ! (for convenience, the conv_kernel is generated only once before the burn in)
-        CALL convolve_2d(noise, this%conv_kernel, conv_result) ! To fix (should swap indices?)!
+        CALL convolve_2d(noise, this%conv_kernel, conv_result)
         noise = conv_result
     END IF
 
     ! Loop over the entire grid to update stochastic process
     !$OMP PARALLEL
-    !$OMP DO private(j,k)
+    !$OMP DO private(j,k,sigma_noise)
     DO k = 1,comp_cells_y
        DO j = 1,comp_cells_x  
           ! Update the Ornstein-Uhlenback process
           sigma_noise = getSigmaNoise(state,j,k)
           this%Z(j,k) = EulerMaruyamaScheme(                                &
                this%Z(j,k), dt, sigma_noise, noise(j,k))
-          ! apply non linear map to Z if needed (Z becomes asymmetric)
-          IF (sym_noise .GT. 0.0_wp) THEN
-            this%Z(j,k) = ABS(this%Z(j,k))                                  &
-                 ** noise_pow_val ! generate only positive fluctuations
-          ELSEIF (sym_noise .LT. 0.0_wp) THEN
-            ! Generate only negative fluctuations
-            this%Z(j,k) = -(ABS(this%Z(j,k)) ** noise_pow_val)
-          END IF
        END DO
     END DO
     !$OMP END DO
@@ -285,91 +274,70 @@ CONTAINS
         !CALL percentilesArrayAtGivenTime(Z, percentiles) ! it is very slow!!!!!!!!!!
     END IF
     
-    RETURN
+    CALL this%refresh_effective
    
   END SUBROUTINE update_stochastic_variable
 
 
-  REAL(wp) FUNCTION FroudeNumber(state,j,k)
-    !> compute the froude number given the indices defining the location in the grid 
-    USE parameters_2d, ONLY : n_solid , n_add_gas , n_stoch_vars , n_pore_vars
-    USE constitutive_2d, ONLY: r_phys_var
-    IMPLICIT NONE
-    CLASS(state_type), INTENT(IN) :: state
-    INTEGER, INTENT(IN) :: j, k
-    REAL(wp) :: Fr
-    REAL(wp) :: r_h
-    REAL(wp) :: r_u
-    REAL(wp) :: r_v
-    REAL(wp) :: r_alphas(n_solid)
-    REAL(wp) :: r_rho_m
-    REAL(wp) :: r_T
-    REAL(wp) :: r_alphal
-    REAL(wp) :: r_alphag(n_add_gas)
-    REAL(wp) :: r_red_grav
-    REAL(wp) :: R_ri
-    REAL(wp) :: r_Zs
-    REAL(wp) :: r_pore_pres
-    REAL(wp) :: p_dyn
-    
-    ! check that the thickness and velocity are > 0
-    IF ( ( state%q(1,j,k) .GT. 0.0_wp ) .AND. ( ( state%q(2,j,k)**2 + state%q(3,j,k)**2 ) .GT.    &
-         0.0_wp ) )  THEN
+  SUBROUTINE prepare_stochastic_timestep(this, state, dt)
+    !> Apply the OU fractional step and initialize hZ for conservative transport.
+    CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
+    CLASS(state_type), INTENT(INOUT) :: state
+    REAL(wp), INTENT(IN) :: dt
 
-       CALL r_phys_var(state%q(:,j,k) , r_h , r_u , r_v , r_alphas , r_rho_m , r_T ,  &
-            r_alphal , r_alphag , r_red_grav , p_dyn , r_Zs , r_pore_pres )
-
-       Fr = ( r_u**2 + r_v**2 ) / SQRT( r_red_grav * r_h )
-
-    ELSE
-
-       ! set to Fr=0 if h and ||u|| are null
-       Fr = 0.0_wp 
-
+    IF (stoch_transport_flag) THEN
+       ! In wet cells, the OU process starts from the value transported during
+       ! the previous timestep. Dry cells retain their independently evolving Z.
+       WHERE (state%q(1,:,:) > EPSILON(1.0_wp))
+          this%Z = state%q(idx_stoch,:,:) / state%q(1,:,:)
+       END WHERE
     END IF
 
-    FroudeNumber = Fr
+    CALL this%update(state, dt)
 
-  END FUNCTION FroudeNumber
+    IF (stoch_transport_flag) THEN
+       WHERE (state%q(1,:,:) > EPSILON(1.0_wp))
+          state%q(idx_stoch,:,:) = state%q(1,:,:) * this%Z
+          state%qp(idx_stoch,:,:) = this%Z
+       ELSEWHERE
+          state%q(idx_stoch,:,:) = 0.0_wp
+          state%qp(idx_stoch,:,:) = 0.0_wp
+       END WHERE
+    END IF
 
- REAL(wp) FUNCTION VelocityNorm(state,j,k)
-  !> compute the norm of the velocity given the indices defining the location in the grid 
-  USE parameters_2d, ONLY : n_solid , n_add_gas , n_stoch_vars , n_pore_vars
-  USE constitutive_2d, ONLY: r_phys_var
+  END SUBROUTINE prepare_stochastic_timestep
+
+
+  SUBROUTINE refresh_effective_stochastic_field(this)
+    !> Derive the fluctuation used by friction without modifying the OU state.
+    CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
+
+    IF (sym_noise > 0.0_wp) THEN
+       this%effective_Z = ABS(this%Z)**noise_pow_val
+    ELSEIF (sym_noise < 0.0_wp) THEN
+       this%effective_Z = -(ABS(this%Z)**noise_pow_val)
+    ELSE
+       this%effective_Z = this%Z
+    END IF
+
+  END SUBROUTINE refresh_effective_stochastic_field
+
+
+ REAL(wp) FUNCTION VelocitySquared(state,j,k)
+  !> Compute |u|^2 at the cell center.
   IMPLICIT NONE
   CLASS(state_type), INTENT(IN) :: state
   INTEGER, INTENT(IN) :: j, k
-  REAL(wp) :: r_h
-  REAL(wp) :: r_u
-  REAL(wp) :: r_v
-  REAL(wp) :: r_alphas(n_solid)
-  REAL(wp) :: r_rho_m
-  REAL(wp) :: r_T
-  REAL(wp) :: r_alphal
-  REAL(wp) :: r_alphag(n_add_gas)
-  REAL(wp) :: r_red_grav
-  REAL(wp) :: R_ri
-  REAL(wp) :: r_Zs
-  REAL(wp) :: r_pore_pres
-  REAL(wp) :: p_dyn
-  
-  ! check that the thickness and velocity are > 0
-  IF ( ( state%q(1,j,k) .GT. 0.0_wp ) .AND. ( ( state%q(2,j,k)**2 + state%q(3,j,k)**2 ) .GT.      &
-       0.0_wp ) )  THEN
 
-     CALL r_phys_var(state%q(:,j,k) , r_h , r_u , r_v , r_alphas , r_rho_m , r_T ,    &
-          r_alphal , r_alphag , r_red_grav , p_dyn , r_Zs , r_pore_pres )
-
-     VelocityNorm = r_u**2 + r_v**2 
-
+  IF (state%q(1,j,k) > EPSILON(1.0_wp)) THEN
+     ! qp already stores the physical velocities associated with q. Reusing
+     ! them avoids repeating the full thermodynamic conversion in every cell.
+     VelocitySquared = state%qp(idx_u,j,k)**2 + state%qp(idx_v,j,k)**2
   ELSE
-
-     ! set to VelocityNorm=0 if h and ||u|| are null
-     VelocityNorm = 0.0_wp 
-
+     VelocitySquared = 0.0_wp
   END IF
 
-END FUNCTION VelocityNorm
+END FUNCTION VelocitySquared
 
 
   REAL(wp) FUNCTION getSigmaNoise(state,j,k)
@@ -377,16 +345,14 @@ END FUNCTION VelocityNorm
     IMPLICIT NONE
     CLASS(state_type), INTENT(IN) :: state
     INTEGER, INTENT(IN) :: j, k
-    REAL(wp) :: Fr
-    REAL(wp) :: U_norm
-    IF ( rheology_model .EQ. 9 ) THEN   
-      ! Fr = FroudeNumber(state,j,k)   ! OLD UNSTABLE
-      ! getSigmaNoise = expFormNoise(Fr) ! OLD UNSTABLE
-      U_norm = VelocityNorm(state,j,k)
-      getSigmaNoise = expFormNoise(U_norm*U_norm) !
-    ELSEIF (rheology_model .EQ. 10) THEN 
-      U_norm = VelocityNorm(state,j,k)
-      getSigmaNoise = expFormNoise(U_norm)
+    REAL(wp) :: velocity_squared
+
+    IF (state%q(1,j,k) <= EPSILON(1.0_wp)) THEN
+      ! Keep fluctuations available when flow enters a previously dry cell.
+      getSigmaNoise = std_max
+    ELSEIF ((rheology_model == 9) .OR. (rheology_model == 10)) THEN
+      velocity_squared = VelocitySquared(state,j,k)
+      getSigmaNoise = expFormNoise(velocity_squared)
     ELSE
       getSigmaNoise = std_max
     END IF  
@@ -411,15 +377,14 @@ END FUNCTION VelocityNorm
   END FUNCTION
 
 subroutine convolve_2d(input_signal, kernel, result)
-  ! Should work also if arrays have not the same size
-  ! dimension expected: (y,x)
+  !> Zero-padded two-dimensional convolution.
+  !> All arrays follow the solver convention (x,y).
   implicit none
   real(wp), dimension(:,:), intent(in) :: input_signal, kernel
   real(wp), dimension(:,:), intent(out) :: result
   integer :: len_kernel_x, len_kernel_y, len_inp_sig_x,                 &
   len_inp_sig_y
-  integer :: half_len_inp_sig_x, half_len_inp_sig_y,                    &
-  half_len_k_x, half_len_k_y
+  integer :: half_len_k_x, half_len_k_y
   integer :: left_padding, right_padding, south_padding,                &
   north_padding
   integer :: inx_x, inx_y, idx_centre_x, idx_centre_y,                  &
@@ -428,14 +393,11 @@ subroutine convolve_2d(input_signal, kernel, result)
   real(wp) :: sum_at_position
   
   ! Get shape inp signal (should be moved outside)
-  len_inp_sig_y = size(input_signal, 1)
-  len_inp_sig_x = size(input_signal, 2)
-  half_len_inp_sig_x = (len_inp_sig_x - 1) / 2
-  half_len_inp_sig_y = (len_inp_sig_y - 1) / 2
-  
+  len_inp_sig_x = size(input_signal, 1)
+  len_inp_sig_y = size(input_signal, 2)
   ! Get shape kernel (should be moved outside)
-  len_kernel_y = size(kernel, 1)
-  len_kernel_x = size(kernel, 2)
+  len_kernel_x = size(kernel, 1)
+  len_kernel_y = size(kernel, 2)
   half_len_k_x = (len_kernel_x - 1) / 2
   half_len_k_y = (len_kernel_y - 1) / 2
 
@@ -447,13 +409,13 @@ subroutine convolve_2d(input_signal, kernel, result)
   north_padding = (len_kernel_y - 1) - south_padding
 
   ! Allocate array for padded inp signal
-  allocate(padded_signal(len_inp_sig_y + south_padding + north_padding, &
-   len_inp_sig_x + left_padding + right_padding))
+  allocate(padded_signal(len_inp_sig_x + left_padding + right_padding, &
+   len_inp_sig_y + south_padding + north_padding))
   
   ! Pad the input signal with zeros
   padded_signal = 0._wp
-  padded_signal(south_padding + 1:south_padding + len_inp_sig_y,        &
-  left_padding + 1:left_padding + len_inp_sig_x) = input_signal
+  padded_signal(left_padding + 1:left_padding + len_inp_sig_x,          &
+  south_padding + 1:south_padding + len_inp_sig_y) = input_signal
   
   ! Initialize to zero the result
   result = 0._wp
@@ -477,7 +439,7 @@ subroutine convolve_2d(input_signal, kernel, result)
           ! sum_at_position = 0.1_wp
 
           ! here there may be a bug in the indexing (segmentation fault-invalid memory reference) 
-          if ((idx_centre_y + shift_y .LT. 1) .or.  (idx_centre_y + shift_y .GT. size(padded_signal,1))) THEN
+          if ((idx_centre_y + shift_y .LT. 1) .or.  (idx_centre_y + shift_y .GT. size(padded_signal,2))) THEN
             
             print*,"problem y idx"
             print*,shape(kernel)
@@ -489,7 +451,7 @@ subroutine convolve_2d(input_signal, kernel, result)
             print*,idx_centre_y + shift_y
             STOP
           END if
-          if ((idx_centre_x + shift_x .LT. 1) .or.  (idx_centre_x + shift_x .GT. size(padded_signal,2))) THEN
+          if ((idx_centre_x + shift_x .LT. 1) .or.  (idx_centre_x + shift_x .GT. size(padded_signal,1))) THEN
             print*,"problem x idx"
             print*,shape(kernel)
             print*,shape(input_signal)
@@ -502,12 +464,12 @@ subroutine convolve_2d(input_signal, kernel, result)
           END if  
 
           sum_at_position = sum_at_position +                          &
-          padded_signal(idx_centre_y + shift_y, idx_centre_x + shift_x)&
-          * kernel(idx_k_y, idx_k_x)
+          padded_signal(idx_centre_x + shift_x, idx_centre_y + shift_y)&
+          * kernel(idx_k_x, idx_k_y)
         end do
       end do
 
-      result(inx_y, inx_x) = sum_at_position
+      result(inx_x, inx_y) = sum_at_position
     end do
   end do
 
@@ -631,7 +593,7 @@ integer function partition(Array1d, start_idx, end_idx)
     implicit none
     real(wp), intent(in out) :: Array1d(:)
     integer, intent(in) :: start_idx, end_idx
-    integer :: pi, i, j
+    integer :: i, j
     ! pivot and temp hold elements of the REAL array Array1d; declaring
     ! them INTEGER truncated every value that passed through them
     real(wp) :: pivot, temp

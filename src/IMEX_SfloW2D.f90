@@ -191,9 +191,11 @@ PROGRAM IMEX_SfloW2D
 
          ! In a binary restart, Z is already loaded, but we need to allocate the kernel
          ! if spatial correlation is active
-         IF (stochastic_flag .AND. length_spatial_corr > cell_size) THEN
+         IF (stochastic_flag .AND. length_spatial_corr > 0.0_wp) THEN
             CALL simulation%stochastic%generate_kernel()
          END IF
+
+         IF (stochastic_flag) CALL simulation%stochastic%refresh_effective()
 
       ELSE
          ! ---------------------------------------------------------
@@ -437,9 +439,14 @@ PROGRAM IMEX_SfloW2D
       simulation%runtime%dt_old_old = simulation%runtime%dt_old
       simulation%runtime%dt_old = simulation%runtime%dt
 
+      ! Fractional stochastic step: recover transported Z in wet cells,
+      ! evolve the OU process everywhere, and initialize hZ for advection.
+      IF (stochastic_flag) CALL simulation%stochastic%prepare_timestep(       &
+           simulation%state, simulation%runtime%dt)
+
       CALL simulation%time_integration%advance(                              &
            simulation%state%q, simulation%state%qp, simulation%runtime%t,    &
-           simulation%runtime%dt, simulation%stochastic%Z,                   &
+           simulation%runtime%dt, simulation%stochastic%effective_Z,         &
            simulation%equation_partition,                                   &
            simulation%domain, simulation%reconstruction,                    &
            simulation%hyperbolic)
