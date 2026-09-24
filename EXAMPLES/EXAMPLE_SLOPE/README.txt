@@ -1,6 +1,6 @@
 This example simulate a supercritical flow (Ri<1) entering from the left of the domain. An initial slope is followed by a flat topography and a discontinuity. There is no sedimentation and no entrainment.
 No friction is considered in this test (RHEOLOGY_FLAG=F).
-Instead of the total energy equation, a simpler transport equation (pure advection) for the temperature is solved (ENERGY_FLAG=F).
+The retained thermal-energy equation is transported by pure advection in the hyperbolic operator.
 
 A Python script is provided to create the input file for this example. 
 Please provide four arguments:

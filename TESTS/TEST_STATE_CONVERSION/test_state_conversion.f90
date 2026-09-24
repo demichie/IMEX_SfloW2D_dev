@@ -3,15 +3,16 @@ PROGRAM test_state_conversion
   USE parameters_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
+  USE equation_terms_2d, ONLY : eval_fluxes
 
   IMPLICIT NONE
 
   CALL initialize_test_properties
 
-  CALL run_wet_case('gas-solid alpha energy', .FALSE., .TRUE., .TRUE.)
-  CALL run_wet_case('gas-solid h-alpha temperature', .FALSE., .FALSE., .FALSE.)
-  CALL run_wet_case('gas-liquid-solid alpha energy', .TRUE., .TRUE., .TRUE.)
-  CALL run_wet_case('gas-liquid-solid h-alpha temperature', .TRUE., .FALSE., .FALSE.)
+  CALL run_wet_case('gas-solid alpha thermal', .FALSE., .TRUE.)
+  CALL run_wet_case('gas-solid h-alpha thermal', .FALSE., .FALSE.)
+  CALL run_wet_case('gas-liquid-solid alpha thermal', .TRUE., .TRUE.)
+  CALL run_wet_case('gas-liquid-solid h-alpha thermal', .TRUE., .FALSE.)
   CALL run_zero_carrier_case
   CALL run_overfilled_volume_case
   CALL run_dry_cases
@@ -67,12 +68,11 @@ CONTAINS
 
   END SUBROUTINE initialize_test_properties
 
-  SUBROUTINE configure_layout(has_liquid, has_energy, stores_alpha)
+  SUBROUTINE configure_layout(has_liquid, stores_alpha)
 
-    LOGICAL, INTENT(IN) :: has_liquid, has_energy, stores_alpha
+    LOGICAL, INTENT(IN) :: has_liquid, stores_alpha
 
     liquid_flag = has_liquid
-    energy_flag = has_energy
     alpha_flag = stores_alpha
 
     idx_h = 1
@@ -85,6 +85,17 @@ CONTAINS
     idx_addGas_last = idx_addGas_first + n_add_gas - 1
     idx_stoch = idx_addGas_last + 1
     idx_pore = idx_stoch + 1
+
+    idx_totMassEqn = 1
+    idx_uEqn = 2
+    idx_vEqn = 3
+    idx_engyEqn = 4
+    idx_solidEqn_first = idx_alfas_first
+    idx_solidEqn_last = idx_alfas_last
+    idx_addGasEqn_first = idx_addGas_first
+    idx_addGasEqn_last = idx_addGas_last
+    idx_stochEqn = idx_stoch
+    idx_poreEqn = idx_pore
 
     n_vars = 4 + n_solid + n_add_gas + n_stoch_vars + n_pore_vars
     IF (liquid_flag) n_vars = n_vars + 1
@@ -129,16 +140,18 @@ CONTAINS
 
   END SUBROUTINE make_wet_state
 
-  SUBROUTINE run_wet_case(label, has_liquid, has_energy, stores_alpha)
+  SUBROUTINE run_wet_case(label, has_liquid, stores_alpha)
 
     CHARACTER(LEN=*), INTENT(IN) :: label
-    LOGICAL, INTENT(IN) :: has_liquid, has_energy, stores_alpha
+    LOGICAL, INTENT(IN) :: has_liquid, stores_alpha
 
     REAL(wp), ALLOCATABLE :: qp0(:), qp1(:), q0(:), q1(:)
+    REAL(wp), ALLOCATABLE :: flux_x(:), flux_y(:)
     REAL(wp) :: p_dyn
 
-    CALL configure_layout(has_liquid, has_energy, stores_alpha)
+    CALL configure_layout(has_liquid, stores_alpha)
     ALLOCATE (qp0(n_vars + 2), qp1(n_vars + 2), q0(n_vars), q1(n_vars))
+    ALLOCATE (flux_x(n_eqns), flux_y(n_eqns))
 
     CALL make_wet_state(qp0)
     CALL qp_to_qc(qp0, q0)
@@ -149,10 +162,18 @@ CONTAINS
     CALL assert_close_vector(TRIM(label)//' qp', qp1, qp0, 2.0E-12_wp)
     CALL assert_true(TRIM(label)//' dynamic pressure finite', &
                      ieee_is_finite(p_dyn) .AND. p_dyn .GE. 0.0_wp)
+
+    CALL eval_fluxes(q0, qp0, 0.37_wp, 1, flux_x)
+    CALL eval_fluxes(q0, qp0, 0.37_wp, 2, flux_y)
+    CALL assert_close_scalar(TRIM(label)//' x thermal flux', flux_x(4),       &
+         qp0(idx_u)*q0(4), 2.0E-12_wp)
+    CALL assert_close_scalar(TRIM(label)//' y thermal flux', flux_y(4),       &
+         qp0(idx_v)*q0(4), 2.0E-12_wp)
+
     CALL check_real_complex(TRIM(label), q0, 2.0E-12_wp)
     CALL check_thermodynamic_kernels(TRIM(label), qp0, q0, 2.0E-12_wp)
 
-    DEALLOCATE (qp0, qp1, q0, q1)
+    DEALLOCATE (qp0, qp1, q0, q1, flux_x, flux_y)
 
   END SUBROUTINE run_wet_case
 
@@ -209,6 +230,8 @@ CONTAINS
     CALL assert_close_scalar(label//' kernel rho_c', rho_c_mix, rho_c_mass, tolerance)
     CALL assert_close_scalar(label//' kernel cp_c', cp_c_mix, cp_c_mass, tolerance)
     CALL assert_close_scalar(label//' kernel cp_mix', cp_mix, cp_mix_mass, tolerance)
+    CALL assert_close_scalar(label//' thermal conservative variable', q(4),  &
+         q(1)*cp_mix_mass*qp(4), tolerance)
     CALL assert_close_vector(label//' kernel alphas', alphas_mass, alphas_qp, tolerance)
     CALL assert_close_vector(label//' kernel alphag', alphag_mass, alphag_qp, tolerance)
     CALL assert_close_scalar(label//' kernel alphal', alphal_mass, alphal_qp, tolerance)
@@ -221,7 +244,7 @@ CONTAINS
     COMPLEX(wp), ALLOCATABLE :: cq(:), complex_outputs(:)
     REAL(wp), PARAMETER :: test_temperature = 400.0_wp
 
-    CALL configure_layout(.FALSE., .TRUE., .TRUE.)
+    CALL configure_layout(.FALSE., .TRUE.)
     ALLOCATE (q(n_vars), real_outputs(5), cq(n_vars), complex_outputs(5))
 
     q = 0.0_wp
@@ -231,8 +254,7 @@ CONTAINS
     q(idx_alfas_first) = 0.3_wp*q(1)
     q(idx_alfas_last) = q(1) - q(idx_alfas_first)
     q(4) = (q(idx_alfas_first)*sp_heat_s(1) +                            &
-            q(idx_alfas_last)*sp_heat_s(2))*test_temperature +           &
-           0.5_wp*(q(2)**2 + q(3)**2)/q(1)
+            q(idx_alfas_last)*sp_heat_s(2))*test_temperature
 
     CALL real_conversion_outputs(q, real_outputs)
     cq = CMPLX(q, 0.0_wp, wp)
@@ -257,7 +279,7 @@ CONTAINS
     REAL(wp) :: Ri, rho_m, rho_c, red_grav, cp_c, cp_mix, p_dyn
     REAL(wp) :: dispersed_total
 
-    CALL configure_layout(.TRUE., .TRUE., .TRUE.)
+    CALL configure_layout(.TRUE., .TRUE.)
     ALLOCATE (qp(n_vars + 2), qp_corrected(n_vars + 2), q(n_vars))
 
     qp = 0.0_wp
@@ -297,7 +319,7 @@ CONTAINS
     REAL(wp), ALLOCATABLE :: q0(:), q1(:), qp(:)
     REAL(wp) :: p_dyn
 
-    CALL configure_layout(.FALSE., .TRUE., .TRUE.)
+    CALL configure_layout(.FALSE., .TRUE.)
     ALLOCATE (q0(n_vars), q1(n_vars), qp(n_vars + 2))
 
     q0 = 0.0_wp
@@ -370,7 +392,7 @@ CONTAINS
     COMPLEX(wp) :: cf(5)
     CHARACTER(LEN=80) :: derivative_label
 
-    CALL configure_layout(.FALSE., .TRUE., .TRUE.)
+    CALL configure_layout(.FALSE., .TRUE.)
     ALLOCATE (qp(n_vars + 2), q(n_vars), q_plus(n_vars), q_minus(n_vars), cq(n_vars))
     CALL make_wet_state(qp)
     CALL qp_to_qc(qp, q)

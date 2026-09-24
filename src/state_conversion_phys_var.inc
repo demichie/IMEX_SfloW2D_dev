@@ -57,16 +57,7 @@
 
     IF ( REAL(qj(1), wp) .GT. eps_sing ) THEN
 
-       IF ( energy_flag ) THEN
-
-          T = ( qj(4) - 0.5_wp * (qj(2)**2 + qj(3)**2) * inv_qj1 ) /           &
-               ( qj(1) * sp_heat_mix )
-
-       ELSE
-
-          T = qj(4) / ( qj(1) * sp_heat_mix )
-
-       END IF
+       T = qj(4) / ( qj(1) * sp_heat_mix )
 
        IF ( REAL(T, wp) .LE. 0.0_wp ) T = T_ambient
 

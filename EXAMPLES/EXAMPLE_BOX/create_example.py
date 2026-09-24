@@ -163,7 +163,7 @@ q0[1, :] = 0.0
 q0[2, :] = rho_m * (w_cent - B_cent)
 q0[3, :] = rho_m * (w_cent - B_cent) * u_cent
 q0[4, :] = 0.0
-q0[5, :] = rho_m * (w_cent - B_cent) * (SP_HEAT_MIX * T + 0.5 * u_cent**2)
+q0[5, :] = rho_m * (w_cent - B_cent) * SP_HEAT_MIX * T
 
 for i in range(n_solid):
     q0[6 + i, :] = rho_s * (w_cent - B_cent) * alfas / n_solid

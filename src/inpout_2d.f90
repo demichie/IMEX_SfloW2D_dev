@@ -40,7 +40,7 @@ MODULE inpout_2d
                          n_topography_profile_y, nodata_topo
   USE parameters_2d, ONLY: n_layers, n_solid, n_add_gas, n_stoch_vars,       &
                            n_pore_vars
-  USE parameters_2d, ONLY: rheology_flag, energy_flag, alpha_flag, &
+  USE parameters_2d, ONLY: rheology_flag, alpha_flag, &
                            topo_change_flag, radial_source_flag, collapsing_volume_flag, &
                            liquid_flag, gas_flag, subtract_init_flag, bottom_radial_source_flag, &
                            lateral_source_flag, serial_flag, &
@@ -186,7 +186,8 @@ MODULE inpout_2d
   INTEGER, PARAMETER :: output_unit_B = 28
 
   CHARACTER(LEN=16), PARAMETER :: restart_format_magic = 'IMEX_SFLOW2D_RST'
-  INTEGER, PARAMETER :: restart_format_version = 2
+  ! Version 3 fixes the fourth conservative variable to thermal energy.
+  INTEGER, PARAMETER :: restart_format_version = 3
 
   !> Counter for the output files
   INTEGER :: output_idx
@@ -339,7 +340,7 @@ MODULE inpout_2d
 
   NAMELIST /newrun_parameters/ n_solid, topography_file, x0, y0, &
     comp_cells_x, comp_cells_y, cell_size, rheology_flag, alpha_flag, &
-    energy_flag, liquid_flag, radial_source_flag, collapsing_volume_flag, &
+    liquid_flag, radial_source_flag, collapsing_volume_flag, &
     topo_change_flag, gas_flag, subtract_init_flag, n_add_gas, &
     bottom_radial_source_flag, slope_correction_flag, curvature_term_flag, &
     lateral_source_flag, stochastic_flag, n_layers, &
@@ -460,7 +461,6 @@ CONTAINS
     n_solid = -1
     n_add_gas = -1
     rheology_flag = .FALSE.
-    energy_flag = .FALSE.
     topo_change_flag = .FALSE.
     radial_source_flag = .FALSE.
     lateral_source_flag = .FALSE.

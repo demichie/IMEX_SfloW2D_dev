@@ -12,7 +12,7 @@ MODULE constitutive_2d
   USE parameters_2d, ONLY : wp, sp, tolh
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
        n_stoch_vars, n_pore_vars
-  USE parameters_2d, ONLY : rheology_flag, rheology_model, energy_flag,         &
+  USE parameters_2d, ONLY : rheology_flag, rheology_model,                      &
        liquid_flag, gas_flag, alpha_flag, slope_correction_flag,                &
        curvature_term_flag, stochastic_flag, mean_field_flag,                  &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag

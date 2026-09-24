@@ -7,7 +7,7 @@ MODULE state_conversion_2d
 
   USE parameters_2d, ONLY : wp
   USE parameters_2d, ONLY : n_vars, n_solid, n_add_gas
-  USE parameters_2d, ONLY : energy_flag, liquid_flag, gas_flag, alpha_flag,     &
+  USE parameters_2d, ONLY : liquid_flag, gas_flag, alpha_flag,                  &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag
 
   USE parameters_2d, ONLY : idx_alfas_first, idx_alfas_last, idx_addGas_first,  &
@@ -663,26 +663,9 @@ CONTAINS
     qc(2) = r_rho_m * r_hu
     qc(3) = r_rho_m * r_hv
 
-    IF ( energy_flag ) THEN
-
-       IF ( r_h .GT. 0.0_wp ) THEN
-
-          ! total energy (internal and kinetic)
-          qc(4) = r_h * r_rho_m * ( r_sp_heat_mix * r_T                         &
-               + 0.5_wp * ( r_u**2 + r_v**2 ) )
-
-       ELSE
-
-          qc(4) = 0.0_wp
-
-       END IF
-
-    ELSE
-
-       ! internal energy
-       qc(4) = r_h * r_rho_m * r_sp_heat_mix * r_T
-
-    END IF
+    ! Thermal energy per unit horizontal area. Kinetic energy is not part of
+    ! the fourth conservative variable.
+    qc(4) = r_h * r_rho_m * r_sp_heat_mix * r_T
 
     qc(idx_alfas_first:idx_alfas_last) = r_xs * qc(1)
     qc(idx_addGas_first:idx_addGas_last) = r_xg * qc(1)

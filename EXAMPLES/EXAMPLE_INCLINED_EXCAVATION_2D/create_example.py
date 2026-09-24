@@ -165,7 +165,7 @@ def main():
 
     # Restart format follows EXAMPLE_2D / EXAMPLE_BUMP conventions. With
     # N_SOLID=0, N_ADD_GAS=0, LIQUID_FLAG=T, we write 6 columns:
-    # x, y, rho*h, rho*h*u, rho*h*v, rho*h*(cp*T + kinetic energy).
+    # x, y, rho*h, rho*h*u, rho*h*v, rho*h*cp*T.
     init_file = outdir / "inclined_excavation_2D_0000.q_2d"
     with init_file.open("w") as f:
         for j in range(ny_cells):
@@ -175,9 +175,7 @@ def main():
             q0[2, :] = rho_l * H[j, :]
             q0[3, :] = rho_l * H[j, :] * U[j, :]
             q0[4, :] = rho_l * H[j, :] * V[j, :]
-            q0[5, :] = rho_l * H[j, :] * (
-                sp_heat_l * temperature + 0.5 * (U[j, :]**2 + V[j, :]**2)
-            )
+            q0[5, :] = rho_l * H[j, :] * sp_heat_l * temperature
             np.savetxt(f, q0.T, fmt="%19.12e")
             f.write(" \n")
 

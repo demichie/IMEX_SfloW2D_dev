@@ -53,12 +53,6 @@ MODULE parameters_2d
   !> .
   LOGICAL :: topography_demfile
 
-  !> Flag to choose the equation for temperature to solve
-  !> - T      => solve the full energy equation
-  !> - F      => solve for a simpler transport equation (advection) for temperature
-  !> .
-  LOGICAL :: energy_flag
-
   !> Flag to choose if we add the rheology
   !> - T      => rheology activated
   !> - F      => no rheology

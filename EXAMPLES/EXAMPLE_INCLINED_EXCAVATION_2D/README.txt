@@ -63,7 +63,7 @@ Model configuration
   LIQUID_FLAG = T
   GAS_FLAG = F
   RHEOLOGY_FLAG = F
-  ENERGY_FLAG = F
+  fourth equation = thermal energy
   ENTRAINMENT_FLAG = F
   LOSS_RATE = 0
   SOLVER_SCHEME = KT

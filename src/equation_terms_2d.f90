@@ -13,7 +13,7 @@ MODULE equation_terms_2d
   USE parameters_2d, ONLY : wp, sp, tolh
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
        n_stoch_vars, n_pore_vars
-  USE parameters_2d, ONLY : rheology_flag, rheology_model, energy_flag,         &
+  USE parameters_2d, ONLY : rheology_flag, rheology_model,                      &
        liquid_flag, gas_flag, alpha_flag, slope_correction_flag,                &
        curvature_term_flag, stochastic_flag, mean_field_flag,                  &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag
@@ -256,18 +256,9 @@ CONTAINS
           ! y-momentum flux in x-direction: u * ( rho * h * v )
           flux(3) = r_u * qcj(3)
 
-          IF ( energy_flag ) THEN
-
-             ! ENERGY flux in x-direction
-             flux(4) = r_u * ( qcj(4) + 0.5_wp * r_rho_m                        &
-                  * grav_coeff * r_red_grav * r_h**2 )
-
-          ELSE
-
-             ! Temperature flux in x-direction: u * ( rhom * Cp * h * T )
-             flux(4) = r_u * qcj(4)
-
-          END IF
+          ! Thermal-energy flux in x-direction: u * (rhom * Cp * h * T).
+          ! Hydrostatic pressure work is not part of the retained equation.
+          flux(4) = r_u * qcj(4)
 
           ! Mass flux of solid in x-direction: u * ( h * alphas * rhos )
           flux(idx_solidEqn_first:idx_solidEqn_last) = r_u *                    &
@@ -321,18 +312,9 @@ CONTAINS
           flux(3) = r_v * qcj(3) + 0.5_wp * r_rho_m *                           &
                grav_coeff * r_red_grav * r_h**2
 
-          IF ( energy_flag ) THEN
-
-             ! ENERGY flux in x-direction
-             flux(4) = r_v * ( qcj(4) + 0.5_wp * r_rho_m *                      &
-                  grav_coeff * r_red_grav * r_h**2 )
-
-          ELSE
-
-             ! Temperature flux in y-direction
-             flux(4) = r_v * qcj(4)
-
-          END IF
+          ! Thermal-energy flux in y-direction: v * (rhom * Cp * h * T).
+          ! Hydrostatic pressure work is not part of the retained equation.
+          flux(4) = r_v * qcj(4)
 
           ! Mass flux of solid in y-direction: v * ( h * alphas * rhos )
           flux(idx_solidEqn_first:idx_solidEqn_last) = r_v *                    &
@@ -520,15 +502,8 @@ CONTAINS
        expl_term(3) = - grav_coeff * r_rho_m * r_tilde_grav * r_h * Bprimej_y  &
             + 0.5_wp * r_rho_m * r_red_grav * r_h**2 * d_grav_coeff_dy
 
-       IF ( energy_flag ) THEN
-
-          expl_term(4) = expl_term(2) * r_u + expl_term(3) * r_v
-
-       ELSE
-
-          expl_term(4) = 0.0_wp
-
-       END IF
+       ! The hydrostatic path/source has no thermal-energy component.
+       expl_term(4) = 0.0_wp
 
     END IF
 
@@ -648,17 +623,8 @@ CONTAINS
     expl_term(2) = expl_term(2) + 0.0_wp
     expl_term(3) = expl_term(3) + 0.0_wp
 
-    IF ( energy_flag ) THEN
-
-       expl_term(4) = expl_term(4) + t_coeff * h_dot * r_rho_m * r_sp_heat_mix  &
-            * t_source
-
-    ELSE
-
-       expl_term(4) = expl_term(4) + t_coeff * h_dot * r_rho_m * r_sp_heat_mix  &
-            * t_source
-
-    END IF
+    expl_term(4) = expl_term(4) + t_coeff * h_dot * r_rho_m * r_sp_heat_mix    &
+         * t_source
 
     ! source terms for the solid equations
     expl_term(idx_alfas_first:idx_alfas_last) =                                 &
@@ -775,7 +741,7 @@ CONTAINS
           expl_term(3) = expl_term(3) + t_coeff * h_dot * r_rho_m * vel_source &
                * lat_n_y_jk
 
-          ! Energy equation.
+       ! Thermal-energy equation.
           expl_term(4) = expl_term(4) + t_coeff * h_dot * r_rho_m              &
                * r_sp_heat_mix * T_source
 
@@ -2479,27 +2445,13 @@ CONTAINS
     ! any momentum inside the flow
     eqns_term(3) = - r_v * ( rho_dep_tot + r_rho_c * continuous_phase_loss_term )
 
-    ! Temperature/Energy equation source term [kg s-3]:
+    ! Thermal-energy equation source term [kg s-3]:
     ! deposition, erosion and entrainment are considered
-    IF ( energy_flag ) THEN
-
-       eqns_term(4) = - r_T * ( SUM( rho_s * sp_heat_s * deposition_term )      &
-            + r_rho_c * r_sp_heat_c * continuous_phase_loss_term )              &
-            - 0.5_wp * mod_vel2 * ( rho_dep_tot + r_rho_c *                     &
-            continuous_phase_loss_term )                                        &
-            + T_erodible * ( SUM( rho_s * sp_heat_s * erosion_term )            &
-            + rho_c_sub * r_sp_heat_c * continuous_phase_erosion_term )         &
-            + T_ambient * sp_heat_a * rho_a_amb * air_entr
-
-    ELSE
-
-       eqns_term(4) = - r_T * ( SUM( rho_s * sp_heat_s * deposition_term )      &
-            + r_rho_c * r_sp_heat_c * continuous_phase_loss_term )              &
-            + T_erodible * ( SUM( rho_s * sp_heat_s * erosion_term )            &
-            + rho_c_sub * r_sp_heat_c * continuous_phase_erosion_term )         &
-            + T_ambient * sp_heat_a * rho_a_amb * air_entr
-
-    END IF
+    eqns_term(4) = - r_T * ( SUM( rho_s * sp_heat_s * deposition_term )        &
+         + r_rho_c * r_sp_heat_c * continuous_phase_loss_term )                &
+         + T_erodible * ( SUM( rho_s * sp_heat_s * erosion_term )              &
+         + rho_c_sub * r_sp_heat_c * continuous_phase_erosion_term )           &
+         + T_ambient * sp_heat_a * rho_a_amb * air_entr
 
     ! solid phase mass equation source term [kg m-2 s-1]:
     ! due to solid erosion and deposition

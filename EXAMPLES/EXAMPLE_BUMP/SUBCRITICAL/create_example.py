@@ -136,7 +136,7 @@ q0[1, :] = 0.0
 q0[2, :] = rho_l * (w_cent - B_cent)
 q0[3, :] = rho_l * (w_cent - B_cent) * u_cent
 q0[4, :] = 0.0
-q0[5, :] = rho_l * (w_cent - B_cent) * (SP_HEAT_L * T + 0.5 * u_cent**2)
+q0[5, :] = rho_l * (w_cent - B_cent) * SP_HEAT_L * T
 
 init_file = 'exampleSubcritical_0000.q_2d'
 

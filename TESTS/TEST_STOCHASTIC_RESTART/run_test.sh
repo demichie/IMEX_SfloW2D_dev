@@ -42,7 +42,7 @@ prepare_case() {
         /^ RESTART_FILES=/ {
             print " RESTART_FILES=\"INIT_STOCHASTIC_0000.q_2d\","; next
         }
-        /^ ENERGY_FLAG = T,/ {
+        /^ LIQUID_FLAG = F,/ {
             print
             print " STOCHASTIC_FLAG = T,"
             next
