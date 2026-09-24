@@ -289,6 +289,9 @@ MODULE parameters_2d
   INTEGER :: n_vars   !< Number of conservative variables
   INTEGER :: n_eqns   !< Number of equations
 
+  !> Number of material layers. Only the single-layer layout is implemented.
+  INTEGER :: n_layers
+
   INTEGER :: n_solid  !< Number of solid classes
 
   INTEGER :: n_add_gas  !< Number of additional gas components

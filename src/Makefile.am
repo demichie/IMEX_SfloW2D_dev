@@ -15,6 +15,7 @@ IMEX_SfloW2D_SOURCES = \
                 diagnostics_2d.f90 \
                 lapack_interfaces_2d.f90 \
                 constitutive_parameters_2d.f90 \
+                model_layout_2d.f90 \
                 equation_metadata_2d.f90 \
                 runtime_2d.f90 \
                 complexify.f90 \

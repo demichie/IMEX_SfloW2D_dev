@@ -4,7 +4,8 @@ PROGRAM test_state_initialization
   USE domain_2d, ONLY : domain_type
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_interfaces_x,     &
        comp_interfaces_y
-  USE parameters_2d, ONLY : wp, n_vars, n_thickness_levels,                 &
+  USE model_layout_2d, ONLY : model_layout_type
+  USE parameters_2d, ONLY : wp, n_thickness_levels,                         &
        n_dyn_pres_levels
   USE state_2d, ONLY : state_type
 
@@ -12,18 +13,19 @@ PROGRAM test_state_initialization
 
   TYPE(state_type) :: state
   TYPE(domain_type) :: domain
+  TYPE(model_layout_type) :: model_layout
 
   comp_cells_x = 5
   comp_cells_y = 4
   comp_interfaces_x = comp_cells_x + 1
   comp_interfaces_y = comp_cells_y + 1
 
-  n_vars = 4
   n_thickness_levels = 2
   n_dyn_pres_levels = 3
   T_ambient = 273.15_wp
 
-  CALL state%initialize
+  CALL model_layout%initialize(1, 4, 4, 0, 0, 0, 0, .FALSE.)
+  CALL state%initialize(model_layout)
   CALL domain%initialize
 
   CALL assert_true('conservative state', ALL(state%q .EQ. 0.0_wp))
@@ -67,6 +69,7 @@ PROGRAM test_state_initialization
 
   CALL domain%finalize
   CALL state%finalize
+  CALL model_layout%finalize
 
   WRITE(*,*) 'PASS: state and domain initialization verified'
 

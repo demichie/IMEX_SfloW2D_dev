@@ -102,6 +102,7 @@ am_IMEX_SfloW2D_OBJECTS = parameters_2d.$(OBJEXT) \
 	diagnostics_2d.$(OBJEXT) \
 	lapack_interfaces_2d.$(OBJEXT) \
 	constitutive_parameters_2d.$(OBJEXT) \
+	model_layout_2d.$(OBJEXT) \
 	equation_metadata_2d.$(OBJEXT) runtime_2d.$(OBJEXT) \
     complexify.$(OBJEXT) \
 	geometry_2d.$(OBJEXT) state_conversion_2d.$(OBJEXT) \
@@ -260,6 +261,7 @@ IMEX_SfloW2D_SOURCES = \
                 diagnostics_2d.f90 \
                 lapack_interfaces_2d.f90 \
                 constitutive_parameters_2d.f90 \
+                model_layout_2d.f90 \
                 equation_metadata_2d.f90 \
                 runtime_2d.f90 \
                 complexify.f90 \

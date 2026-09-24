@@ -9,9 +9,9 @@ MODULE state_2d
   USE constitutive_2d, ONLY : T_ambient
 
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
+  USE model_layout_2d, ONLY : model_layout_type
 
   USE parameters_2d, ONLY : wp
-  USE parameters_2d, ONLY : n_vars
   USE parameters_2d, ONLY : n_thickness_levels, n_dyn_pres_levels
 
   IMPLICIT NONE
@@ -58,19 +58,25 @@ CONTAINS
   !> \brief Allocate the prognostic state and diagnostic arrays.
   !******************************************************************************
 
-  SUBROUTINE initialize_state(this)
+  SUBROUTINE initialize_state(this, model_layout)
 
     CLASS(state_type), INTENT(INOUT) :: this
+    TYPE(model_layout_type), INTENT(IN) :: model_layout
 
-    ALLOCATE( this%q(n_vars,comp_cells_x,comp_cells_y) )
+    IF (.NOT. model_layout%is_initialized()) THEN
+       ERROR STOP 'State allocation requires an initialized model layout'
+    END IF
+
+    ALLOCATE( this%q(model_layout%n_variables,comp_cells_x,comp_cells_y) )
 
     ALLOCATE( this%hpos(comp_cells_x,comp_cells_y),                         &
          this%hpos_old(comp_cells_x,comp_cells_y) )
 
-    ALLOCATE( this%qp(n_vars+2,comp_cells_x,comp_cells_y) )
+    ALLOCATE( this%qp(model_layout%n_physical_variables,comp_cells_x,        &
+         comp_cells_y) )
 
-    this%q(1:n_vars,1:comp_cells_x,1:comp_cells_y) = 0.0_wp
-    this%qp(1:n_vars+2,1:comp_cells_x,1:comp_cells_y) = 0.0_wp
+    this%q = 0.0_wp
+    this%qp = 0.0_wp
     this%qp(4,1:comp_cells_x,1:comp_cells_y) = T_ambient
 
     ALLOCATE( this%hmax(comp_cells_x,comp_cells_y) )

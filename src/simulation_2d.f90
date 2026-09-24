@@ -9,6 +9,10 @@ MODULE simulation_2d
   USE constitutive_2d, ONLY : init_problem_param
 
   USE equation_metadata_2d, ONLY : equation_partition_type
+  USE model_layout_2d, ONLY : model_layout_type
+
+  USE parameters_2d, ONLY : n_layers, n_vars, n_eqns, n_solid, n_add_gas,   &
+       n_stoch_vars, n_pore_vars, liquid_flag, gas_flag
 
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,                &
        finalize_nonlinear_solver
@@ -31,6 +35,7 @@ MODULE simulation_2d
   TYPE :: simulation_context_type
 
      TYPE(runtime_state_type) :: runtime
+     TYPE(model_layout_type) :: model_layout
      TYPE(equation_partition_type) :: equation_partition
      TYPE(state_type) :: state
      TYPE(domain_type) :: domain
@@ -54,9 +59,12 @@ CONTAINS
 
     CLASS(simulation_context_type), INTENT(INOUT) :: this
 
+    CALL this%model_layout%initialize( n_layers, n_vars, n_eqns, n_solid,   &
+         n_add_gas, n_stoch_vars, n_pore_vars, liquid_flag .AND. gas_flag )
+
     CALL init_problem_param( this%equation_partition )
 
-    CALL this%state%initialize
+    CALL this%state%initialize( this%model_layout )
 
     CALL this%reconstruction%initialize
     CALL this%hyperbolic%initialize
@@ -85,6 +93,7 @@ CONTAINS
     CALL finalize_nonlinear_solver
 
     CALL this%equation_partition%finalize
+    CALL this%model_layout%finalize
     CALL this%stochastic%finalize
 
   END SUBROUTINE finalize_simulation

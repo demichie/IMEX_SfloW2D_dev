@@ -2,6 +2,7 @@ PROGRAM test_stochastic_evolution
 
   USE constitutive_parameters_2d, ONLY : T_ambient
   USE geometry_2d, ONLY : cell_size, comp_cells_x, comp_cells_y
+  USE model_layout_2d, ONLY : model_layout_type
   USE parameters_2d, ONLY : wp, idx_stoch, length_spatial_corr,             &
        n_add_gas, n_dyn_pres_levels, n_eqns, n_pore_vars, n_solid,         &
        n_stoch_vars, n_thickness_levels, n_vars, output_stoch_vars_flag,   &
@@ -15,6 +16,7 @@ PROGRAM test_stochastic_evolution
 
   TYPE(state_type) :: state
   TYPE(stochastic_workspace_type) :: stochastic
+  TYPE(model_layout_type) :: model_layout
   REAL(wp), PARAMETER :: tolerance = 64.0_wp * EPSILON(1.0_wp)
   REAL(wp) :: expected_sigma
   REAL(wp) :: rectangular_field(3,2), identity_kernel(1,1)
@@ -45,7 +47,9 @@ PROGRAM test_stochastic_evolution
   sym_noise = 1.0_wp
   noise_pow_val = 2.0_wp
 
-  CALL state%initialize
+  CALL model_layout%initialize(1, n_vars, n_eqns, n_solid, n_add_gas,      &
+       n_stoch_vars, n_pore_vars, .FALSE.)
+  CALL state%initialize(model_layout)
   CALL stochastic%initialize
 
   state%q = 0.0_wp
@@ -116,6 +120,7 @@ PROGRAM test_stochastic_evolution
 
   CALL stochastic%finalize
   CALL state%finalize
+  CALL model_layout%finalize
 
   WRITE(*,*) 'PASS: stochastic OU evolution and transport coupling verified'
 

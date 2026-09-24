@@ -38,7 +38,8 @@ MODULE inpout_2d
   USE geometry_2d, ONLY: x0, y0, comp_cells_x, comp_cells_y, cell_size
   USE geometry_2d, ONLY: topography_profile, n_topography_profile_x, &
                          n_topography_profile_y, nodata_topo
-  USE parameters_2d, ONLY: n_solid, n_add_gas, n_stoch_vars, n_pore_vars
+  USE parameters_2d, ONLY: n_layers, n_solid, n_add_gas, n_stoch_vars,       &
+                           n_pore_vars
   USE parameters_2d, ONLY: rheology_flag, energy_flag, alpha_flag, &
                            topo_change_flag, radial_source_flag, collapsing_volume_flag, &
                            liquid_flag, gas_flag, subtract_init_flag, bottom_radial_source_flag, &
@@ -342,7 +343,7 @@ MODULE inpout_2d
     energy_flag, liquid_flag, radial_source_flag, collapsing_volume_flag, &
     topo_change_flag, gas_flag, subtract_init_flag, n_add_gas, &
     bottom_radial_source_flag, slope_correction_flag, curvature_term_flag, &
-    lateral_source_flag, stochastic_flag, &
+    lateral_source_flag, stochastic_flag, n_layers, &
     pore_pressure_flag
 
   NAMELIST /initial_conditions/ released_volume, x_release, y_release, &
@@ -420,6 +421,7 @@ CONTAINS
     INTEGER :: ios
 
     n_vars = 3
+    n_layers = 1
 
     !-- Inizialization of the Variables for the namelist RUN_PARAMETERS
     run_name = 'default'
@@ -587,6 +589,10 @@ CONTAINS
         WRITE (*, *) 'Please check the input file'
         STOP
 
+      END IF
+
+      IF (n_layers .NE. 1) THEN
+        CALL fatal_error('Only N_LAYERS=1 is currently supported')
       END IF
 
       idx_alfas_first = 5
