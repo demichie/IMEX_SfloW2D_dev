@@ -76,13 +76,14 @@ CONTAINS
 
    SUBROUTINE collapsing_volume(state)
 
-      USE state_conversion_2d, ONLY : qp_to_qc
+      USE state_conversion_2d, ONLY : qp_to_qc,                               &
+           eval_mixture_properties_from_volume_fractions
 
       USE geometry_2d, ONLY : compute_cell_fract
 
       USE geometry_2d, ONLY : comp_cells_x , comp_cells_y
 
-      USE parameters_2d, ONLY : n_vars , alpha_flag
+      USE parameters_2d, ONLY : n_vars
 
       USE parameters_2d, ONLY : x_collapse , y_collapse , r_collapse , T_collapse , &
          h_collapse , alphas_collapse , alphag_collapse
@@ -94,6 +95,9 @@ CONTAINS
       INTEGER :: j,k
 
       REAL(wp) :: qp_init(n_vars+2) ,  qp0_init(n_vars+2)
+      REAL(wp) :: xs_collapse(n_solid), xg_collapse(n_add_gas), xl_collapse
+      REAL(wp) :: alphas_local(n_solid), alphal_local
+      REAL(wp) :: rho_m, inv_rhom, rho_c, xc, sp_heat_c, sp_heat_mix
 
       REAL(wp), ALLOCATABLE :: cell_fract(:,:)
 
@@ -102,23 +106,35 @@ CONTAINS
       CALL compute_cell_fract(x_collapse,y_collapse,r_collapse,r_collapse,0.0_wp,cell_fract)
 
       ! values outside the collapsing volume
+      qp0_init = 0.0_wp
       qp0_init(1) = 0.0_wp                  ! h
       qp0_init(2) = 0.0_wp                  ! hu
       qp0_init(3) = 0.0_wp                  ! hv
       qp0_init(4) = T_collapse              ! T
-      qp0_init(5:4+n_solid) = 0.0_wp        ! alphas
-      qp0_init(4+n_solid+1:4+n_solid+n_add_gas) = 0.0_wp        ! alphag
+      qp0_init(5:4+n_solid) = 0.0_wp        ! solid mass fractions
+      qp0_init(4+n_solid+1:4+n_solid+n_add_gas) = 0.0_wp        ! gas mass fractions
       qp0_init(5+n_solid+n_add_gas:4+n_solid+n_add_gas+n_stoch_vars) = 0.0_wp
       qp0_init(5+n_solid+n_add_gas+n_stoch_vars:4+n_solid+n_add_gas+n_stoch_vars+ &
          n_pore_vars) =  0.0_wp
       qp0_init(n_vars+1:n_vars+2) = 0.0_wp  ! u,v
 
       ! values within the collapsing volume
+      qp_init = 0.0_wp
       qp_init(2) = 0.0_wp
       qp_init(3) = 0.0_wp
       qp_init(4) = T_collapse
 
       qp_init(n_vars+1:n_vars+2) = 0.0_wp
+
+      alphas_local = alphas_collapse(1:n_solid)
+      alphal_local = 0.0_wp
+      CALL eval_mixture_properties_from_volume_fractions(                     &
+           T_collapse, alphag_collapse(1:n_add_gas), alphas_local,            &
+           alphal_local, rho_m, inv_rhom, rho_c, xs_collapse, xg_collapse,    &
+           xl_collapse, xc, sp_heat_c, sp_heat_mix)
+
+      qp_init(5:4+n_solid) = xs_collapse
+      qp_init(4+n_solid+1:4+n_solid+n_add_gas) = xg_collapse
 
       DO j = 1,comp_cells_x
 
@@ -127,21 +143,6 @@ CONTAINS
             IF ( cell_fract(j,k) .GT. 0.0_wp ) THEN
 
                qp_init(1) = cell_fract(j,k) * h_collapse
-
-               IF ( alpha_flag ) THEN
-
-                  qp_init(5:4+n_solid) = cell_fract(j,k)*alphas_collapse(1:n_solid)
-                  qp_init(4+n_solid+1:4+n_solid+n_add_gas) = cell_fract(j,k) *    &
-                     alphag_collapse(1:n_add_gas)
-
-               ELSE
-
-                  qp_init(5:4+n_solid) = cell_fract(j,k) * h_collapse *           &
-                     alphas_collapse(1:n_solid)
-                  qp_init(4+n_solid+1:4+n_solid+n_add_gas) = cell_fract(j,k) *    &
-                     h_collapse * alphag_collapse(1:n_add_gas)
-
-               END IF
 
                qp_init(5+n_solid+n_add_gas:4+n_solid+n_add_gas+n_stoch_vars) =    &
                   1.0_wp

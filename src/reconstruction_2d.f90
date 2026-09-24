@@ -90,7 +90,9 @@ CONTAINS
   SUBROUTINE reconstruction( this, q_expl, qp_expl, t, solve_cells, j_cent, k_cent )
 
     ! External procedures
-    USE state_conversion_2d, ONLY : qp_to_qc, qp_to_qp2
+    USE state_conversion_2d, ONLY : qp_to_qc, qp_to_qp2,                      &
+         enforce_primitive_mass_fraction_closure, velocity_from_conservative
+    USE constitutive_parameters_2d, ONLY : T_ambient
     USE equation_terms_2d, ONLY : eval_source_bdry
     USE parameters_2d, ONLY : limiter
 
@@ -102,7 +104,6 @@ CONTAINS
     USE geometry_2d, ONLY : sourceN_vect_x , sourceN_vect_y
     USE geometry_2d, ONLY : sourceS_vect_x , sourceS_vect_y
 
-    USE parameters_2d, ONLY : alpha_flag
     USE parameters_2d, ONLY : reconstr_coeff
 
     IMPLICIT NONE
@@ -743,31 +744,27 @@ CONTAINS
 
           END IF
 
-          ! Correction for residual volume fraction of continuous phase
-          IF ( alpha_flag ) THEN
-
-             !qrecW(5:4+n_solid) = qrecW(5:4+n_solid) *                          &
-             !     MIN( 1.0_wp , maximum_solid_packing /                         &
-             !     SUM( qrecW(5:4+n_solid) ) )
-
-             !qrecE(5:4+n_solid) = qrecE(5:4+n_solid) *                          &
-             !     MIN( 1.0_wp , maximum_solid_packing /                         &
-             !     SUM( qrecE(5:4+n_solid) ) )
-
+          IF (qrecW(1) .LE. EPSILON(1.0_wp)) THEN
+             qrecW = 0.0_wp
+             qrecW(4) = T_ambient
           ELSE
+             CALL enforce_primitive_mass_fraction_closure(qrecW)
+          END IF
 
-             !qrecW(5:4+n_solid) = qrecW(5:4+n_solid) *                          &
-             !     MIN( 1.0_wp , maximum_solid_packing * qrecW(1) /              &
-             !     SUM( qrecW(5:4+n_solid) ) )
-
-             !qrecE(5:4+n_solid) = qrecE(5:4+n_solid) *                          &
-             !     MIN( 1.0_wp , maximum_solid_packing * qrecE(1) /              &
-             !     SUM( qrecE(5:4+n_solid) ) )
-
+          IF (qrecE(1) .LE. EPSILON(1.0_wp)) THEN
+             qrecE = 0.0_wp
+             qrecE(4) = T_ambient
+          ELSE
+             CALL enforce_primitive_mass_fraction_closure(qrecE)
           END IF
 
           CALL qp_to_qc( qrecW,this%q_interfaceR(:,j,k) )
           CALL qp_to_qc( qrecE,this%q_interfaceL(:,j+1,k) )
+
+          CALL velocity_from_conservative(this%q_interfaceR(:,j,k),          &
+               qrecW(idx_u), qrecW(idx_v))
+          CALL velocity_from_conservative(this%q_interfaceL(:,j+1,k),        &
+               qrecE(idx_u), qrecE(idx_v))
 
           this%qp_interfaceR(1:n_vars+2,j,k) = qrecW(1:n_vars+2)
           this%qp_interfaceL(1:n_vars+2,j+1,k) = qrecE(1:n_vars+2)
@@ -868,31 +865,27 @@ CONTAINS
 
           END IF
 
-          ! Correction for maximum solid packing
-          IF ( alpha_flag ) THEN
-
-             !qrecS(5:4+n_solid) = qrecS(5:4+n_solid) *                          &
-             !     MIN( 1.0_wp , maximum_solid_packing /                         &
-             !     SUM( qrecS(5:4+n_solid) ) )
-
-             !qrecN(5:4+n_solid) = qrecN(5:4+n_solid) *                          &
-             !     MIN( 1.0_wp , maximum_solid_packing /                         &
-             !     SUM( qrecN(5:4+n_solid) ) )
-
+          IF (qrecS(1) .LE. EPSILON(1.0_wp)) THEN
+             qrecS = 0.0_wp
+             qrecS(4) = T_ambient
           ELSE
+             CALL enforce_primitive_mass_fraction_closure(qrecS)
+          END IF
 
-             !qrecS(5:4+n_solid) = qrecS(5:4+n_solid) *                          &
-             !     MIN( 1.0_wp , maximum_solid_packing * qrecS(1) /              &
-             !     SUM( qrecS(5:4+n_solid) ) )
-
-             !qrecN(5:4+n_solid) = qrecN(5:4+n_solid) *                          &
-             !     MIN( 1.0_wp , maximum_solid_packing * qrecN(1) /              &
-             !     SUM( qrecN(5:4+n_solid) ) )
-
+          IF (qrecN(1) .LE. EPSILON(1.0_wp)) THEN
+             qrecN = 0.0_wp
+             qrecN(4) = T_ambient
+          ELSE
+             CALL enforce_primitive_mass_fraction_closure(qrecN)
           END IF
 
           CALL qp_to_qc( qrecS, this%q_interfaceT(:,j,k) )
           CALL qp_to_qc( qrecN, this%q_interfaceB(:,j,k+1) )
+
+          CALL velocity_from_conservative(this%q_interfaceT(:,j,k),          &
+               qrecS(idx_u), qrecS(idx_v))
+          CALL velocity_from_conservative(this%q_interfaceB(:,j,k+1),        &
+               qrecN(idx_u), qrecN(idx_v))
 
           this%qp_interfaceT(1:n_vars+2,j,k) = qrecS(1:n_vars+2)
           this%qp_interfaceB(1:n_vars+2,j,k+1) = qrecN(1:n_vars+2)

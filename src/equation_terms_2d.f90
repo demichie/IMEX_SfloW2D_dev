@@ -14,12 +14,12 @@ MODULE equation_terms_2d
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
        n_stoch_vars, n_pore_vars
   USE parameters_2d, ONLY : rheology_flag, rheology_model,                      &
-       liquid_flag, gas_flag, alpha_flag, slope_correction_flag,                &
+       liquid_flag, gas_flag, slope_correction_flag,                            &
        curvature_term_flag, stochastic_flag, mean_field_flag,                  &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag
 
-  USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T, idx_alfas_first,      &
-       idx_alfas_last, idx_addGas_first, idx_addGas_last, idx_stoch, idx_pore,  &
+  USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T, idx_solid_first,      &
+       idx_solid_last, idx_add_gas_first, idx_add_gas_last, idx_stoch, idx_pore,  &
        idx_u, idx_v
 
   USE parameters_2d, ONLY : idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn,    &
@@ -33,11 +33,37 @@ MODULE equation_terms_2d
   PUBLIC :: init_problem_param
   PUBLIC :: eval_local_speeds_x, eval_local_speeds_y
   PUBLIC :: eval_fluxes
+  PUBLIC :: limit_component_mass_flux
   PUBLIC :: eval_expl_terms, integrate_friction_term
   PUBLIC :: eval_implicit_terms, eval_nh_semi_impl_terms
   PUBLIC :: eval_mass_exchange_terms, eval_source_bdry
 
 CONTAINS
+
+  !> Bound the signed sum of all independently transported component-mass
+  !> fluxes by the signed total-mixture mass flux. A single common factor
+  !> preserves the relative component proportions.
+  SUBROUTINE limit_component_mass_flux(flux)
+
+    REAL(wp), INTENT(INOUT) :: flux(n_eqns)
+    REAL(wp) :: component_flux, scale
+
+    component_flux = SUM(flux(idx_solidEqn_first:idx_solidEqn_last))          &
+         + SUM(flux(idx_addGasEqn_first:idx_addGasEqn_last))
+    IF (gas_flag .AND. liquid_flag) component_flux = component_flux           &
+         + flux(n_vars)
+
+    IF ((flux(1) .GT. 0.0_wp .AND. component_flux .GT. flux(1)) .OR.          &
+        (flux(1) .LT. 0.0_wp .AND. component_flux .LT. flux(1))) THEN
+       scale = flux(1) / component_flux
+       flux(idx_solidEqn_first:idx_solidEqn_last) =                           &
+            scale * flux(idx_solidEqn_first:idx_solidEqn_last)
+       flux(idx_addGasEqn_first:idx_addGasEqn_last) =                         &
+            scale * flux(idx_addGasEqn_first:idx_addGasEqn_last)
+       IF (gas_flag .AND. liquid_flag) flux(n_vars) = scale * flux(n_vars)
+    END IF
+
+  END SUBROUTINE limit_component_mass_flux
 
   !******************************************************************************
   !> \brief Initialization of relaxation flags
@@ -67,7 +93,7 @@ CONTAINS
 
     END IF
 
-    ! Solid volume fraction
+    ! Transported solid-component masses are explicit equations.
     implicit_mask(idx_solidEqn_first:idx_solidEqn_last) = .FALSE.
 
     IF ( pore_pressure_flag ) THEN
@@ -260,30 +286,13 @@ CONTAINS
           ! Hydrostatic pressure work is not part of the retained equation.
           flux(4) = r_u * qcj(4)
 
-          ! Mass flux of solid in x-direction: u * ( h * alphas * rhos )
+          ! Solid-component mass flux in x-direction.
           flux(idx_solidEqn_first:idx_solidEqn_last) = r_u *                    &
-               qcj(idx_alfas_first:idx_alfas_last)
+               qcj(idx_solid_first:idx_solid_last)
 
-          ! Solid flux can't be larger than total flux.
-          ! Nested IF and a division-free comparison: Fortran does not
-          ! guarantee short-circuit .AND., so the combined test could
-          ! still evaluate the quotient when flux(1) = 0.
-          IF ( flux(1) .GT. 0.0_wp ) THEN
-
-             IF ( SUM(flux(idx_solidEqn_first:idx_solidEqn_last))               &
-                  .GT. flux(1) ) THEN
-
-                flux(idx_solidEqn_first:idx_solidEqn_last) =                    &
-                     flux(idx_solidEqn_first:idx_solidEqn_last) /               &
-                     SUM(flux(idx_solidEqn_first:idx_solidEqn_last)) * flux(1)
-
-             END IF
-
-          END IF
-
-          ! Mass flux of add.gas in x-direction: u * ( h * alphag * rhog )
+          ! Additional-gas component mass flux in x-direction.
           flux(idx_addGasEqn_first:idx_addGasEqn_last) = r_u *                  &
-               qcj(idx_addGas_first:idx_addGas_last)
+               qcj(idx_add_gas_first:idx_add_gas_last)
 
           IF ( stoch_transport_flag) THEN
 
@@ -316,30 +325,13 @@ CONTAINS
           ! Hydrostatic pressure work is not part of the retained equation.
           flux(4) = r_v * qcj(4)
 
-          ! Mass flux of solid in y-direction: v * ( h * alphas * rhos )
+          ! Solid-component mass flux in y-direction.
           flux(idx_solidEqn_first:idx_solidEqn_last) = r_v *                    &
-               qcj(idx_alfas_first:idx_alfas_last)
+               qcj(idx_solid_first:idx_solid_last)
 
-          ! Solid flux can't be larger than total flux.
-          ! Nested IF and a division-free comparison: Fortran does not
-          ! guarantee short-circuit .AND., so the combined test could
-          ! still evaluate the quotient when flux(1) = 0.
-          IF ( flux(1) .GT. 0.0_wp ) THEN
-
-             IF ( SUM(flux(idx_solidEqn_first:idx_solidEqn_last))               &
-                  .GT. flux(1) ) THEN
-
-                flux(idx_solidEqn_first:idx_solidEqn_last) =                    &
-                     flux(idx_solidEqn_first:idx_solidEqn_last) /               &
-                     SUM(flux(idx_solidEqn_first:idx_solidEqn_last)) * flux(1)
-
-             END IF
-
-          END IF
-
-          ! Mass flux of add.gas in x-direction: v * ( h * alphag * rhog )
+          ! Additional-gas component mass flux in y-direction.
           flux(idx_addGasEqn_first:idx_addGasEqn_last) = r_v *                  &
-               qcj(idx_addGas_first:idx_addGas_last)
+               qcj(idx_add_gas_first:idx_add_gas_last)
 
           IF ( stoch_transport_flag) THEN
 
@@ -401,8 +393,8 @@ CONTAINS
        qpj, expl_term, time, cell_fract_jk,                                    &
        lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk )
 
-    USE parameters_2d, ONLY : vel_source , T_source , alphas_source ,           &
-         alphal_source , time_param , bottom_radial_source_flag , alphag_source,&
+    USE parameters_2d, ONLY : vel_source , T_source , xs_source , xg_source,    &
+         xl_source , time_param , bottom_radial_source_flag,                    &
          pore_pressure_flag , pore_pres_fract ,                                &
          n_intervals , t_intervals , vel_intervals ,                            &
          radial_source_flag , h_source
@@ -440,7 +432,6 @@ CONTAINS
     REAL(wp) :: r_Ri         !< real-value Richardson number
     REAL(wp) :: r_rho_m      !< real-value mixture density [kg/m3]
     REAL(wp) :: r_rho_c      !< real-value carrier phase density [kg/m3]
-    REAL(wp) :: r_rho_g(n_add_gas) !< real-value add.gas densities [kg/m3]
     REAL(wp) :: r_red_grav   !< real-value reduced gravity
 
     REAL(wp) :: r_sp_heat_mix !< real_value mixture specific heat
@@ -585,27 +576,15 @@ CONTAINS
 
     END IF
 
+    qp_source = 0.0_wp
     qp_source(1) = 1.0_wp
     qp_source(2) = 0.0_wp
     qp_source(3) = 0.0_wp
     qp_source(4) = t_source
 
-    IF ( alpha_flag ) THEN
-
-       qp_source(idx_alfas_first:idx_alfas_last) = alphas_source(1:n_solid)
-       qp_source(idx_addGas_first:idx_addGas_last) = alphag_source(1:n_add_gas)
-       IF ( gas_flag .AND. liquid_flag ) qp_source(n_vars) = alphal_source
-
-    ELSE
-
-       qp_source(idx_alfas_first:idx_alfas_last) = alphas_source(1:n_solid)     &
-            * qp_source(1)
-       qp_source(idx_addGas_first:idx_addGas_last) = alphag_source(1:n_add_gas) &
-            * qp_source(1)
-       IF ( gas_flag .AND. liquid_flag ) qp_source(n_vars) = alphal_source      &
-            * qp_source(1)
-
-    END IF
+    qp_source(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)
+    qp_source(idx_add_gas_first:idx_add_gas_last) = xg_source(1:n_add_gas)
+    IF ( gas_flag .AND. liquid_flag ) qp_source(n_vars) = xl_source
 
     ! Source term transport stochastic equation
     IF ( stoch_transport_flag) qp_source(idx_stoch) = 0.0_wp
@@ -627,22 +606,20 @@ CONTAINS
          * t_source
 
     ! source terms for the solid equations
-    expl_term(idx_alfas_first:idx_alfas_last) =                                 &
-         expl_term(idx_alfas_first:idx_alfas_last) + t_coeff                   &
-         * h_dot * alphas_source(1:n_solid) * rho_s(1:n_solid)
-
-    r_rho_g(1:n_add_gas) = pres / ( sp_gas_const_g(1:n_add_gas) * t_source )
+    expl_term(idx_solidEqn_first:idx_solidEqn_last) =                          &
+         expl_term(idx_solidEqn_first:idx_solidEqn_last) + t_coeff             &
+         * h_dot * r_rho_m * xs_source(1:n_solid)
 
     ! source terms for the additional gas equations
     expl_term(idx_addGasEqn_first:idx_addGasEqn_last) =                         &
          expl_term(idx_addGasEqn_first:idx_addGasEqn_last) + t_coeff            &
-         * h_dot * alphag_source(1:n_add_gas) * r_rho_g(1:n_add_gas)
+         * h_dot * r_rho_m * xg_source(1:n_add_gas)
 
     IF ( gas_flag .AND. liquid_flag ) THEN
 
        ! source term for the liquid phase
-       expl_term(n_vars) = expl_term(n_vars) + t_coeff * h_dot * alphal_source  &
-            * rho_l
+       expl_term(n_vars) = expl_term(n_vars) + t_coeff * h_dot * r_rho_m       &
+            * xl_source
 
     END IF
 
@@ -704,21 +681,9 @@ CONTAINS
           qp_source(1) = 1.0_wp
           qp_source(4) = T_source
 
-          IF ( alpha_flag ) THEN
-             qp_source(idx_alfas_first:idx_alfas_last) =                       &
-                  alphas_source(1:n_solid)
-             qp_source(idx_addGas_first:idx_addGas_last) =                     &
-                  alphag_source(1:n_add_gas)
-             IF ( gas_flag .AND. liquid_flag )                                 &
-                  qp_source(n_vars) = alphal_source
-          ELSE
-             qp_source(idx_alfas_first:idx_alfas_last) =                       &
-                  alphas_source(1:n_solid) * qp_source(1)
-             qp_source(idx_addGas_first:idx_addGas_last) =                     &
-                  alphag_source(1:n_add_gas) * qp_source(1)
-             IF ( gas_flag .AND. liquid_flag )                                 &
-                  qp_source(n_vars) = alphal_source * qp_source(1)
-          END IF
+          qp_source(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)
+          qp_source(idx_add_gas_first:idx_add_gas_last) = xg_source(1:n_add_gas)
+          IF ( gas_flag .AND. liquid_flag ) qp_source(n_vars) = xl_source
 
           IF ( stoch_transport_flag ) qp_source(idx_stoch) = 0.0_wp
           IF ( pore_pressure_flag )   qp_source(idx_poreEqn) = 0.0_wp
@@ -746,22 +711,19 @@ CONTAINS
                * r_sp_heat_mix * T_source
 
           ! Solid transport.
-          expl_term(idx_alfas_first:idx_alfas_last) =                          &
-               expl_term(idx_alfas_first:idx_alfas_last) +                     &
-               t_coeff * h_dot * alphas_source(1:n_solid) * rho_s(1:n_solid)
+          expl_term(idx_solidEqn_first:idx_solidEqn_last) =                   &
+               expl_term(idx_solidEqn_first:idx_solidEqn_last) +              &
+               t_coeff * h_dot * r_rho_m * xs_source(1:n_solid)
 
           ! Additional gases.
-          r_rho_g(1:n_add_gas) = pres /                                        &
-               ( sp_gas_const_g(1:n_add_gas) * T_source )
 
           expl_term(idx_addGasEqn_first:idx_addGasEqn_last) =                  &
                expl_term(idx_addGasEqn_first:idx_addGasEqn_last) +             &
-               t_coeff * h_dot * alphag_source(1:n_add_gas)                    &
-               * r_rho_g(1:n_add_gas)
+               t_coeff * h_dot * r_rho_m * xg_source(1:n_add_gas)
 
           IF ( gas_flag .AND. liquid_flag ) THEN
              expl_term(n_vars) = expl_term(n_vars) +                           &
-                  t_coeff * h_dot * alphal_source * rho_l
+                  t_coeff * h_dot * r_rho_m * xl_source
           END IF
 
           IF ( pore_pressure_flag ) THEN
@@ -1459,10 +1421,7 @@ CONTAINS
 
     nh_semi_impl_term(1:n_eqns) = 0.0_wp
 
-    ! A dry cell carries no friction source, and the
-    ! alpha_flag = .FALSE. branch below divides the solid and
-    ! additional-gas fractions by qpj(1). Without this guard a dry or
-    ! vanishing cell divides by zero.
+    ! A dry cell carries no friction source.
     IF ( qpj(1) .LE. EPSILON(1.0_wp) ) RETURN
 
     ! initialize and evaluate the forces terms
@@ -1475,33 +1434,7 @@ CONTAINS
        r_u = qpj(idx_u)
        r_v = qpj(idx_v)
 
-       IF ( alpha_flag ) THEN
-
-          r_alphas(1:n_solid) = qpj(idx_alfas_first:idx_alfas_last)
-          r_alphag(1:n_add_gas) = qpj(idx_addGas_first:idx_addGas_last)
-
-       ELSE
-
-          r_alphas(1:n_solid) = qpj(idx_alfas_first:idx_alfas_last) / qpj(1)
-          r_alphag(1:n_add_gas) = qpj(idx_addGas_first:idx_addGas_last) / qpj(1)
-
-       END IF
-
-       r_alphal = 0.0_wp
-
-       IF ( gas_flag .AND. liquid_flag ) THEN
-
-          IF ( alpha_flag ) THEN
-
-             r_alphal = qpj(n_vars)
-
-          ELSE
-
-             r_alphal = qpj(n_vars) / qpj(1)
-
-          END IF
-
-       END IF
+       CALL primitive_to_volume_fractions(qpj, r_alphas, r_alphag, r_alphal)
 
        r_T = qpj(4)
 
@@ -1974,6 +1907,7 @@ CONTAINS
     REAL(wp) :: r_W          !< real-value z-velocity
     REAL(wp) :: r_alphas(n_solid) !< real-value solid volume fractions
     REAL(wp) :: r_alphag(n_add_gas) !< real-value add.gas volume fractions
+    REAL(wp) :: r_alphal          !< real-value liquid volume fraction
     REAL(wp) :: r_rho_c      !< real-value carrier phase density [kg/m3]
     REAL(wp) :: r_T          !< real-value mixture temperature [K]
     REAL(wp) :: r_rho_m      !< real-value mixture density [kg/m3]
@@ -2064,17 +1998,7 @@ CONTAINS
     r_u = qpj(idx_u)
     r_v = qpj(idx_v)
 
-    IF ( alpha_flag ) THEN
-
-       r_alphas(1:n_solid) = qpj(idx_alfas_first:idx_alfas_last)
-       r_alphag(1:n_add_gas) = qpj(idx_addGas_first:idx_addGas_last)
-
-    ELSE
-
-       r_alphas(1:n_solid) = qpj(idx_alfas_first:idx_alfas_last) / qpj(1)
-       r_alphag(1:n_add_gas) = qpj(idx_addGas_first:idx_addGas_last) / qpj(1)
-
-    END IF
+    CALL primitive_to_volume_fractions(qpj, r_alphas, r_alphag, r_alphal)
 
     alphas_tot = SUM(r_alphas)
 
@@ -2520,8 +2444,8 @@ CONTAINS
 
   SUBROUTINE eval_source_bdry( time, vect_x , vect_y , source_bdry )
 
-    USE parameters_2d, ONLY : h_source , vel_source , T_source , alphas_source ,&
-         alphag_source , alphal_source , time_param
+    USE parameters_2d, ONLY : h_source , vel_source , T_source , xs_source,    &
+         xg_source, xl_source, time_param
 
     USE geometry_2d, ONLY : pi_g
 
@@ -2535,23 +2459,10 @@ CONTAINS
     REAL(wp) :: t_rem
     REAL(wp) :: t_coeff
 
+    source_bdry = 0.0_wp
+    source_bdry(4) = T_source
+
     IF ( time .GE. time_param(4) ) THEN
-
-       ! The exponents of t_coeff are such that Ri does not depend on t_coeff
-       source_bdry(1) = 0.0_wp
-       source_bdry(2) = 0.0_wp
-       source_bdry(3) = 0.0_wp
-       source_bdry(4) = T_source
-       source_bdry(idx_solidEqn_first:idx_solidEqn_last) = 0.0_wp
-
-       IF ( gas_flag .AND. liquid_flag ) THEN
-
-          source_bdry(n_vars) = alphal_source
-
-       END IF
-
-       source_bdry(idx_u) = 0.0_wp
-       source_bdry(idx_v) = 0.0_wp
 
        RETURN
 
@@ -2584,40 +2495,19 @@ CONTAINS
 
     END IF
 
+    ! Preserve the common dry-state convention while the periodic source is
+    ! inactive. In particular, no composition is attached to zero thickness.
+    IF (t_coeff .LE. EPSILON(1.0_wp)) RETURN
+
     ! The exponents of t_coeff are such that Ri does not depend on t_coeff
     source_bdry(1) = t_coeff * h_source
     source_bdry(2) = t_coeff**1.5_wp * h_source * vel_source * vect_x
     source_bdry(3) = t_coeff**1.5_wp * h_source * vel_source * vect_y
     source_bdry(4) = T_source
 
-    IF ( alpha_flag ) THEN
-
-       source_bdry(idx_solidEqn_first:idx_solidEqn_last) =                      &
-            alphas_source(1:n_solid)
-       source_bdry(idx_addGasEqn_first:idx_addGasEqn_last) =                    &
-            alphag_source(1:n_add_gas)
-
-       IF ( gas_flag .AND. liquid_flag ) THEN
-
-          source_bdry(n_vars) = alphal_source
-
-       END IF
-
-    ELSE
-
-       source_bdry(idx_solidEqn_first:idx_solidEqn_last) =                      &
-            t_coeff * h_source * alphas_source(1:n_solid)
-
-       source_bdry(idx_addGasEqn_first:idx_addGasEqn_last) =                    &
-            t_coeff * h_source * alphag_source(1:n_add_gas)
-
-       IF ( gas_flag .AND. liquid_flag ) THEN
-
-          source_bdry(n_vars) = t_coeff * h_source * alphal_source
-
-       END IF
-
-    END IF
+    source_bdry(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)
+    source_bdry(idx_add_gas_first:idx_add_gas_last) = xg_source(1:n_add_gas)
+    IF ( gas_flag .AND. liquid_flag ) source_bdry(n_vars) = xl_source
 
     source_bdry(idx_u) = t_coeff**0.5_wp * vel_source * vect_x
     source_bdry(idx_v) = t_coeff**0.5_wp * vel_source * vect_y

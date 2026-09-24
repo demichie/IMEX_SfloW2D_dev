@@ -9,7 +9,7 @@ MODULE time_integration_2d
   USE diagnostics_2d, ONLY : debug_pause, fatal_error
 
   USE parameters_2d, ONLY : wp
-  USE parameters_2d, ONLY : n_eqns, n_vars, n_RK, n_solid
+  USE parameters_2d, ONLY : n_eqns, n_vars, n_RK, n_solid, n_add_gas
   USE parameters_2d, ONLY : verbose_level
 
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
@@ -293,7 +293,7 @@ CONTAINS
 
     USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms
 
-    USE state_conversion_2d, ONLY : qc_to_qp
+    USE state_conversion_2d, ONLY : qc_to_qp, primitive_to_volume_fractions
 
     USE equation_terms_2d, ONLY : eval_expl_terms
 
@@ -301,8 +301,6 @@ CONTAINS
 
     USE geometry_2d, ONLY : B_nodata
 
-    USE parameters_2d, ONLY : alpha_flag
-    
 !!$    USE parameters_2d, ONLY : time_param , bottom_radial_source_flag
     
     IMPLICIT NONE
@@ -330,6 +328,7 @@ CONTAINS
     REAL(wp) :: p_dyn
 
     REAL(wp) :: alpha_s
+    REAL(wp) :: alphas_local(n_solid), alphag_local(n_add_gas), alphal_local
     LOGICAL :: solid_excess_roundoff
     LOGICAL :: need_explicit_stage
 
@@ -698,7 +697,8 @@ CONTAINS
 
     END DO runge_kutta
 
-    !$OMP PARALLEL DO private(j,k,p_dyn,alpha_s,solid_excess_roundoff,          &
+    !$OMP PARALLEL DO private(j,k,p_dyn,alpha_s,alphas_local,alphag_local,     &
+    !$OMP & alphal_local,solid_excess_roundoff,                                &
     !$OMP & residual_cell,q_old_cell)
 
     assemble_sol:DO l = 1,domain%solve_cells
@@ -842,15 +842,9 @@ CONTAINS
 
        IF ( qp(1,j,k) .GT. 1.e-10_wp ) THEN
        
-          IF ( alpha_flag ) THEN
-             
-             alpha_s = SUM(qp(5:4+n_solid,j,k))
-             
-          ELSE
-             
-             alpha_s = SUM(qp(5:4+n_solid,j,k)) / qp(1,j,k)
-             
-          END IF
+          CALL primitive_to_volume_fractions(qp(1:n_vars+2,j,k),              &
+               alphas_local, alphag_local, alphal_local)
+          alpha_s = SUM(alphas_local)
 
        ELSE
 

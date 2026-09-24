@@ -13,12 +13,12 @@ MODULE constitutive_2d
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
        n_stoch_vars, n_pore_vars
   USE parameters_2d, ONLY : rheology_flag, rheology_model,                      &
-       liquid_flag, gas_flag, alpha_flag, slope_correction_flag,                &
+       liquid_flag, gas_flag, slope_correction_flag,                            &
        curvature_term_flag, stochastic_flag, mean_field_flag,                  &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag
 
-  USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T, idx_alfas_first,      &
-       idx_alfas_last, idx_addGas_first, idx_addGas_last, idx_stoch, idx_pore,  &
+  USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T, idx_solid_first,      &
+       idx_solid_last, idx_add_gas_first, idx_add_gas_last, idx_stoch, idx_pore,  &
        idx_u, idx_v
 
   USE parameters_2d, ONLY : idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn,    &

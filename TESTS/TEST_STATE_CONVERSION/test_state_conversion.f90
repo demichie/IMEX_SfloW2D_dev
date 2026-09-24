@@ -3,18 +3,20 @@ PROGRAM test_state_conversion
   USE parameters_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE equation_terms_2d, ONLY : eval_fluxes
+  USE equation_terms_2d, ONLY : eval_fluxes, limit_component_mass_flux,       &
+       eval_source_bdry
 
   IMPLICIT NONE
 
   CALL initialize_test_properties
 
-  CALL run_wet_case('gas-solid alpha thermal', .FALSE., .TRUE.)
-  CALL run_wet_case('gas-solid h-alpha thermal', .FALSE., .FALSE.)
-  CALL run_wet_case('gas-liquid-solid alpha thermal', .TRUE., .TRUE.)
-  CALL run_wet_case('gas-liquid-solid h-alpha thermal', .TRUE., .FALSE.)
+  CALL run_wet_case('gas-solid mass fractions', .FALSE.)
+  CALL run_wet_case('gas-liquid-solid mass fractions', .TRUE.)
   CALL run_zero_carrier_case
-  CALL run_overfilled_volume_case
+  CALL run_overfilled_mass_fraction_case
+  CALL run_temperature_dependent_volume_fraction_case
+  CALL run_component_flux_limiter_cases
+  CALL run_source_boundary_cases
   CALL run_dry_cases
   CALL run_complex_step_check
 
@@ -68,32 +70,31 @@ CONTAINS
 
   END SUBROUTINE initialize_test_properties
 
-  SUBROUTINE configure_layout(has_liquid, stores_alpha)
+  SUBROUTINE configure_layout(has_liquid)
 
-    LOGICAL, INTENT(IN) :: has_liquid, stores_alpha
+    LOGICAL, INTENT(IN) :: has_liquid
 
     liquid_flag = has_liquid
-    alpha_flag = stores_alpha
 
     idx_h = 1
     idx_hu = 2
     idx_hv = 3
     idx_T = 4
-    idx_alfas_first = 5
-    idx_alfas_last = 4 + n_solid
-    idx_addGas_first = idx_alfas_last + 1
-    idx_addGas_last = idx_addGas_first + n_add_gas - 1
-    idx_stoch = idx_addGas_last + 1
+    idx_solid_first = 5
+    idx_solid_last = 4 + n_solid
+    idx_add_gas_first = idx_solid_last + 1
+    idx_add_gas_last = idx_add_gas_first + n_add_gas - 1
+    idx_stoch = idx_add_gas_last + 1
     idx_pore = idx_stoch + 1
 
     idx_totMassEqn = 1
     idx_uEqn = 2
     idx_vEqn = 3
     idx_engyEqn = 4
-    idx_solidEqn_first = idx_alfas_first
-    idx_solidEqn_last = idx_alfas_last
-    idx_addGasEqn_first = idx_addGas_first
-    idx_addGasEqn_last = idx_addGas_last
+    idx_solidEqn_first = idx_solid_first
+    idx_solidEqn_last = idx_solid_last
+    idx_addGasEqn_first = idx_add_gas_first
+    idx_addGasEqn_last = idx_add_gas_last
     idx_stochEqn = idx_stoch
     idx_poreEqn = idx_pore
 
@@ -112,10 +113,10 @@ CONTAINS
     REAL(wp), PARAMETER :: h = 2.0_wp
     REAL(wp), PARAMETER :: u = 1.5_wp
     REAL(wp), PARAMETER :: v = -0.25_wp
-    REAL(wp) :: alphas(n_solid), alphag(n_add_gas)
+    REAL(wp) :: xs(n_solid), xg(n_add_gas)
 
-    alphas = [0.10_wp, 0.05_wp]
-    alphag = [0.08_wp]
+    xs = [0.15_wp, 0.10_wp]
+    xg = [0.05_wp]
 
     qp = 0.0_wp
     qp(1) = h
@@ -123,15 +124,9 @@ CONTAINS
     qp(3) = h*v
     qp(4) = 450.0_wp
 
-    IF (alpha_flag) THEN
-      qp(idx_alfas_first:idx_alfas_last) = alphas
-      qp(idx_addGas_first:idx_addGas_last) = alphag
-      IF (liquid_flag) qp(n_vars) = 0.20_wp
-    ELSE
-      qp(idx_alfas_first:idx_alfas_last) = h*alphas
-      qp(idx_addGas_first:idx_addGas_last) = h*alphag
-      IF (liquid_flag) qp(n_vars) = h*0.20_wp
-    END IF
+    qp(idx_solid_first:idx_solid_last) = xs
+    qp(idx_add_gas_first:idx_add_gas_last) = xg
+    IF (liquid_flag) qp(n_vars) = 0.20_wp
 
     qp(idx_stoch) = 0.37_wp
     qp(idx_pore) = 1250.0_wp
@@ -140,16 +135,16 @@ CONTAINS
 
   END SUBROUTINE make_wet_state
 
-  SUBROUTINE run_wet_case(label, has_liquid, stores_alpha)
+  SUBROUTINE run_wet_case(label, has_liquid)
 
     CHARACTER(LEN=*), INTENT(IN) :: label
-    LOGICAL, INTENT(IN) :: has_liquid, stores_alpha
+    LOGICAL, INTENT(IN) :: has_liquid
 
     REAL(wp), ALLOCATABLE :: qp0(:), qp1(:), q0(:), q1(:)
     REAL(wp), ALLOCATABLE :: flux_x(:), flux_y(:)
     REAL(wp) :: p_dyn
 
-    CALL configure_layout(has_liquid, stores_alpha)
+    CALL configure_layout(has_liquid)
     ALLOCATE (qp0(n_vars + 2), qp1(n_vars + 2), q0(n_vars), q1(n_vars))
     ALLOCATE (flux_x(n_eqns), flux_y(n_eqns))
 
@@ -190,25 +185,10 @@ CONTAINS
     REAL(wp) :: cp_c_mass, cp_mix_mass, cp_c_mix, cp_mix
     REAL(wp) :: inv_rho_c_mass
 
-    IF (alpha_flag) THEN
-      alphas_qp = qp(idx_alfas_first:idx_alfas_last)
-      alphag_qp = qp(idx_addGas_first:idx_addGas_last)
-    ELSE
-      alphas_qp = qp(idx_alfas_first:idx_alfas_last)/qp(1)
-      alphag_qp = qp(idx_addGas_first:idx_addGas_last)/qp(1)
-    END IF
+    CALL primitive_to_volume_fractions(qp, alphas_qp, alphag_qp, alphal_qp)
 
-    alphal_qp = 0.0_wp
-    IF (gas_flag .AND. liquid_flag) THEN
-      IF (alpha_flag) THEN
-        alphal_qp = qp(n_vars)
-      ELSE
-        alphal_qp = qp(n_vars)/qp(1)
-      END IF
-    END IF
-
-    xs = q(idx_alfas_first:idx_alfas_last)/q(1)
-    xg = q(idx_addGas_first:idx_addGas_last)/q(1)
+    xs = q(idx_solid_first:idx_solid_last)/q(1)
+    xg = q(idx_add_gas_first:idx_add_gas_last)/q(1)
     xl = 0.0_wp
     IF (gas_flag .AND. liquid_flag) xl = q(n_vars)/q(1)
 
@@ -244,17 +224,17 @@ CONTAINS
     COMPLEX(wp), ALLOCATABLE :: cq(:), complex_outputs(:)
     REAL(wp), PARAMETER :: test_temperature = 400.0_wp
 
-    CALL configure_layout(.FALSE., .TRUE.)
+    CALL configure_layout(.FALSE.)
     ALLOCATE (q(n_vars), real_outputs(5), cq(n_vars), complex_outputs(5))
 
     q = 0.0_wp
     q(1) = rho_s(1)
     q(2) = 0.2_wp*q(1)
     q(3) = -0.1_wp*q(1)
-    q(idx_alfas_first) = 0.3_wp*q(1)
-    q(idx_alfas_last) = q(1) - q(idx_alfas_first)
-    q(4) = (q(idx_alfas_first)*sp_heat_s(1) +                            &
-            q(idx_alfas_last)*sp_heat_s(2))*test_temperature
+    q(idx_solid_first) = 0.3_wp*q(1)
+    q(idx_solid_last) = q(1) - q(idx_solid_first)
+    q(4) = (q(idx_solid_first)*sp_heat_s(1) +                            &
+            q(idx_solid_last)*sp_heat_s(2))*test_temperature
 
     CALL real_conversion_outputs(q, real_outputs)
     cq = CMPLX(q, 0.0_wp, wp)
@@ -272,14 +252,14 @@ CONTAINS
 
   END SUBROUTINE run_zero_carrier_case
 
-  SUBROUTINE run_overfilled_volume_case
+  SUBROUTINE run_overfilled_mass_fraction_case
 
     REAL(wp), ALLOCATABLE :: qp(:), qp_corrected(:), q(:)
-    REAL(wp) :: expected_alphas(n_solid), expected_alphal
+    REAL(wp) :: expected_xs(n_solid), expected_xg(n_add_gas), expected_xl
     REAL(wp) :: Ri, rho_m, rho_c, red_grav, cp_c, cp_mix, p_dyn
-    REAL(wp) :: dispersed_total
+    REAL(wp) :: explicit_total
 
-    CALL configure_layout(.TRUE., .TRUE.)
+    CALL configure_layout(.TRUE.)
     ALLOCATE (qp(n_vars + 2), qp_corrected(n_vars + 2), q(n_vars))
 
     qp = 0.0_wp
@@ -287,39 +267,171 @@ CONTAINS
     qp(2) = 0.2_wp
     qp(3) = -0.1_wp
     qp(4) = 400.0_wp
-    qp(idx_alfas_first:idx_alfas_last) = [0.8_wp, 0.4_wp]
-    qp(idx_addGas_first:idx_addGas_last) = 0.0_wp
+    qp(idx_solid_first:idx_solid_last) = [0.8_wp, 0.4_wp]
+    qp(idx_add_gas_first:idx_add_gas_last) = 0.1_wp
     qp(n_vars) = 0.2_wp
     qp(idx_u) = qp(2)/qp(1)
     qp(idx_v) = qp(3)/qp(1)
 
-    dispersed_total = SUM(qp(idx_alfas_first:idx_alfas_last)) + qp(n_vars)
-    expected_alphas = qp(idx_alfas_first:idx_alfas_last)/dispersed_total
-    expected_alphal = qp(n_vars)/dispersed_total
+    explicit_total = SUM(qp(idx_solid_first:idx_solid_last))                   &
+         + SUM(qp(idx_add_gas_first:idx_add_gas_last)) + qp(n_vars)
+    expected_xs = qp(idx_solid_first:idx_solid_last)/explicit_total
+    expected_xg = qp(idx_add_gas_first:idx_add_gas_last)/explicit_total
+    expected_xl = qp(n_vars)/explicit_total
 
     CALL qp_to_qc(qp, q)
     CALL qc_to_qp(q, qp_corrected, p_dyn)
     CALL mixt_var(qp, Ri, rho_m, rho_c, red_grav, cp_c, cp_mix)
 
-    CALL assert_close_vector('overfilled corrected solids',                    &
-         qp_corrected(idx_alfas_first:idx_alfas_last), expected_alphas,        &
+    CALL assert_close_vector('overfilled corrected solid mass fractions',     &
+         qp_corrected(idx_solid_first:idx_solid_last), expected_xs,            &
          2.0E-12_wp)
-    CALL assert_close_scalar('overfilled corrected liquid',                    &
-         qp_corrected(n_vars), expected_alphal, 2.0E-12_wp)
+    CALL assert_close_vector('overfilled corrected gas mass fractions',       &
+         qp_corrected(idx_add_gas_first:idx_add_gas_last), expected_xg,          &
+         2.0E-12_wp)
+    CALL assert_close_scalar('overfilled corrected liquid mass fraction',     &
+         qp_corrected(n_vars), expected_xl, 2.0E-12_wp)
     CALL assert_true('overfilled thermodynamics finite',                       &
          ALL(ieee_is_finite(q)) .AND. ieee_is_finite(rho_m) .AND.              &
          ieee_is_finite(rho_c) .AND. ieee_is_finite(cp_mix))
 
     DEALLOCATE (qp, qp_corrected, q)
 
-  END SUBROUTINE run_overfilled_volume_case
+  END SUBROUTINE run_overfilled_mass_fraction_case
+
+  SUBROUTINE run_temperature_dependent_volume_fraction_case
+
+    REAL(wp), ALLOCATABLE :: qp_cold(:), qp_hot(:), q(:), qp_roundtrip(:)
+    REAL(wp) :: alphas_cold(n_solid), alphas_hot(n_solid)
+    REAL(wp) :: alphag_cold(n_add_gas), alphag_hot(n_add_gas)
+    REAL(wp) :: alphal_cold, alphal_hot, p_dyn
+
+    CALL configure_layout(.TRUE.)
+    ALLOCATE (qp_cold(n_vars+2), qp_hot(n_vars+2), q(n_vars),                  &
+              qp_roundtrip(n_vars+2))
+
+    CALL make_wet_state(qp_cold)
+    qp_hot = qp_cold
+    qp_cold(4) = 300.0_wp
+    qp_hot(4) = 600.0_wp
+
+    CALL primitive_to_volume_fractions(qp_cold, alphas_cold, alphag_cold,     &
+         alphal_cold)
+    CALL primitive_to_volume_fractions(qp_hot, alphas_hot, alphag_hot,        &
+         alphal_hot)
+
+    CALL assert_true('volume fractions depend on temperature',               &
+         MAXVAL(ABS(alphas_hot-alphas_cold)) .GT. 1.0E-8_wp)
+
+    CALL qp_to_qc(qp_hot, q)
+    CALL qc_to_qp(q, qp_roundtrip, p_dyn)
+    CALL assert_close_vector('temperature case preserves solid Y',           &
+         qp_roundtrip(idx_solid_first:idx_solid_last),                        &
+         qp_hot(idx_solid_first:idx_solid_last), 2.0E-12_wp)
+    CALL assert_close_vector('temperature case preserves gas Y',             &
+         qp_roundtrip(idx_add_gas_first:idx_add_gas_last),                      &
+         qp_hot(idx_add_gas_first:idx_add_gas_last), 2.0E-12_wp)
+    CALL assert_close_scalar('temperature case preserves liquid Y',          &
+         qp_roundtrip(n_vars), qp_hot(n_vars), 2.0E-12_wp)
+
+    DEALLOCATE (qp_cold, qp_hot, q, qp_roundtrip)
+
+  END SUBROUTINE run_temperature_dependent_volume_fraction_case
+
+  SUBROUTINE run_component_flux_limiter_cases
+
+    REAL(wp), ALLOCATABLE :: flux(:), original(:)
+    REAL(wp) :: component_sum
+
+    CALL configure_layout(.TRUE.)
+    ALLOCATE (flux(n_eqns), original(n_eqns))
+
+    flux = 0.0_wp
+    flux(1) = 2.0_wp
+    flux(2:4) = [3.0_wp, -4.0_wp, 7.0_wp]
+    flux(idx_solidEqn_first:idx_solidEqn_last) = [1.2_wp, 0.6_wp]
+    flux(idx_addGasEqn_first:idx_addGasEqn_last) = 0.6_wp
+    flux(n_vars) = 0.6_wp
+    original = flux
+    CALL limit_component_mass_flux(flux)
+    component_sum = SUM(flux(idx_solidEqn_first:idx_solidEqn_last))           &
+         + SUM(flux(idx_addGasEqn_first:idx_addGasEqn_last)) + flux(n_vars)
+    CALL assert_close_scalar('positive component flux sum', component_sum,    &
+         flux(1), 2.0E-12_wp)
+    CALL assert_close_scalar('positive component flux common scale',         &
+         flux(idx_solidEqn_first)/original(idx_solidEqn_first),               &
+         flux(n_vars)/original(n_vars), 2.0E-12_wp)
+    CALL assert_close_vector('positive limiter preserves non-mass fluxes',    &
+         flux(2:4), original(2:4), 0.0_wp)
+
+    flux = -original
+    flux(2:4) = original(2:4)
+    original = flux
+    CALL limit_component_mass_flux(flux)
+    component_sum = SUM(flux(idx_solidEqn_first:idx_solidEqn_last))           &
+         + SUM(flux(idx_addGasEqn_first:idx_addGasEqn_last)) + flux(n_vars)
+    CALL assert_close_scalar('negative component flux sum', component_sum,    &
+         flux(1), 2.0E-12_wp)
+    CALL assert_close_scalar('negative component flux common scale',         &
+         flux(idx_solidEqn_first)/original(idx_solidEqn_first),               &
+         flux(n_vars)/original(n_vars), 2.0E-12_wp)
+    CALL assert_close_vector('negative limiter preserves non-mass fluxes',    &
+         flux(2:4), original(2:4), 0.0_wp)
+
+    DEALLOCATE (flux, original)
+
+  END SUBROUTINE run_component_flux_limiter_cases
+
+  SUBROUTINE run_source_boundary_cases
+
+    REAL(wp), ALLOCATABLE :: source_state(:), expected(:)
+
+    CALL configure_layout(.TRUE.)
+    ALLOCATE (source_state(n_vars+2), expected(n_vars+2))
+
+    h_source = 2.0_wp
+    vel_source = 3.0_wp
+    T_source = 400.0_wp
+    xs_source = 0.0_wp
+    xg_source = 0.0_wp
+    xs_source(1:n_solid) = [0.20_wp, 0.10_wp]
+    xg_source(1:n_add_gas) = [0.05_wp]
+    xl_source = 0.15_wp
+    time_param = [10.0_wp, 4.0_wp, 0.0_wp, 100.0_wp]
+
+    expected = 0.0_wp
+    expected(1:4) = [2.0_wp, 3.6_wp, 4.8_wp, T_source]
+    expected(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)
+    expected(idx_add_gas_first:idx_add_gas_last) = xg_source(1:n_add_gas)
+    expected(n_vars) = xl_source
+    expected(idx_u) = 1.8_wp
+    expected(idx_v) = 2.4_wp
+
+    CALL eval_source_bdry(1.0_wp, 0.6_wp, 0.8_wp, source_state)
+    CALL assert_close_vector('active source uses mass fractions',             &
+         source_state, expected, 2.0E-12_wp)
+
+    expected = 0.0_wp
+    expected(4) = T_source
+    CALL eval_source_bdry(5.0_wp, 0.6_wp, 0.8_wp, source_state)
+    CALL assert_close_vector('periodically inactive source is dry',           &
+         source_state, expected, 0.0_wp)
+
+    time_param(4) = 3.0_wp
+    CALL eval_source_bdry(3.0_wp, 0.6_wp, 0.8_wp, source_state)
+    CALL assert_close_vector('source after cutoff is dry', source_state,      &
+         expected, 0.0_wp)
+
+    DEALLOCATE (source_state, expected)
+
+  END SUBROUTINE run_source_boundary_cases
 
   SUBROUTINE run_dry_cases
 
     REAL(wp), ALLOCATABLE :: q0(:), q1(:), qp(:)
     REAL(wp) :: p_dyn
 
-    CALL configure_layout(.FALSE., .TRUE.)
+    CALL configure_layout(.FALSE.)
     ALLOCATE (q0(n_vars), q1(n_vars), qp(n_vars + 2))
 
     q0 = 0.0_wp
@@ -392,12 +504,12 @@ CONTAINS
     COMPLEX(wp) :: cf(5)
     CHARACTER(LEN=80) :: derivative_label
 
-    CALL configure_layout(.FALSE., .TRUE.)
+    CALL configure_layout(.FALSE.)
     ALLOCATE (qp(n_vars + 2), q(n_vars), q_plus(n_vars), q_minus(n_vars), cq(n_vars))
     CALL make_wet_state(qp)
     CALL qp_to_qc(qp, q)
 
-    components = [1, 2, 4, idx_alfas_first, idx_addGas_first, idx_pore]
+    components = [1, 2, 4, idx_solid_first, idx_add_gas_first, idx_pore]
     DO component = 1, SIZE(components)
       finite_step = 1.0E-6_wp*MAX(1.0_wp, ABS(q(components(component))))
       q_plus = q

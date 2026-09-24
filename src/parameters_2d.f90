@@ -85,12 +85,6 @@ MODULE parameters_2d
   !> .
   LOGICAL :: subtract_init_flag
 
-  !> Flag to choose the variable for the linear reconstruction and the boundary condition
-  !> - T      => alpha 
-  !> - F      => h*alpha
-  !> .
-  LOGICAL :: alpha_flag
-  
   !> Flag to correct for the topography slope when computing pressure forces
   !> - T      => correction active
   !> - F      => correction not active
@@ -297,10 +291,10 @@ MODULE parameters_2d
   INTEGER :: idx_hu
   INTEGER :: idx_hv
   INTEGER :: idx_T
-  INTEGER :: idx_alfas_first
-  INTEGER :: idx_alfas_last
-  INTEGER :: idx_addGas_first
-  INTEGER :: idx_addGas_last
+  INTEGER :: idx_solid_first
+  INTEGER :: idx_solid_last
+  INTEGER :: idx_add_gas_first
+  INTEGER :: idx_add_gas_last
   INTEGER :: idx_stoch
   INTEGER :: idx_pore
   INTEGER :: idx_u

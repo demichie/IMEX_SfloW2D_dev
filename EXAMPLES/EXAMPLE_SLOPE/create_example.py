@@ -192,6 +192,7 @@ filedata = filedata.replace('restartfile', init_file)
 filedata = filedata.replace('x_left', str(x_left))
 filedata = filedata.replace('n_cells', str(n_cells))
 filedata = filedata.replace('dx', str(dx))
+filedata = filedata.replace('solid_mass_fraction', str(xs))
 
 # Write the file out again
 with open('IMEX_SfloW2D.inp', 'w') as file:

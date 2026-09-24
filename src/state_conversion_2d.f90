@@ -7,11 +7,12 @@ MODULE state_conversion_2d
 
   USE parameters_2d, ONLY : wp
   USE parameters_2d, ONLY : n_vars, n_solid, n_add_gas
-  USE parameters_2d, ONLY : liquid_flag, gas_flag, alpha_flag,                  &
+  USE parameters_2d, ONLY : eps_sing, eps_sing4
+  USE parameters_2d, ONLY : liquid_flag, gas_flag,                              &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag
 
-  USE parameters_2d, ONLY : idx_alfas_first, idx_alfas_last, idx_addGas_first,  &
-       idx_addGas_last, idx_stoch, idx_pore, idx_u, idx_v
+  USE parameters_2d, ONLY : idx_solid_first, idx_solid_last, idx_add_gas_first,  &
+       idx_add_gas_last, idx_stoch, idx_pore, idx_u, idx_v
 
   IMPLICIT NONE
 
@@ -46,6 +47,13 @@ MODULE state_conversion_2d
      MODULE PROCEDURE eval_mixture_properties_from_mass_complex
   END INTERFACE eval_mixture_properties_from_mass_fractions
 
+  !> Recover velocity from conservative mass and momenta with the same
+  !> near-dry desingularization in the REAL and COMPLEX code paths.
+  INTERFACE velocity_from_conservative
+     MODULE PROCEDURE velocity_from_conservative_real
+     MODULE PROCEDURE velocity_from_conservative_complex
+  END INTERFACE velocity_from_conservative
+
   PUBLIC :: r_phys_var, c_phys_var
   PUBLIC :: qc_to_qp, qp_to_qc, qp_to_qp2
   PUBLIC :: mixt_var
@@ -54,8 +62,118 @@ MODULE state_conversion_2d
   PUBLIC :: eval_mixture_heat_capacity
   PUBLIC :: eval_mixture_properties_from_mass_fractions
   PUBLIC :: eval_mixture_properties_from_volume_fractions
+  PUBLIC :: enforce_mass_fraction_closure
+  PUBLIC :: enforce_primitive_mass_fraction_closure
+  PUBLIC :: primitive_to_volume_fractions
+  PUBLIC :: velocity_from_conservative
 
 CONTAINS
+
+  SUBROUTINE velocity_from_conservative_real(qc, u, v)
+
+    REAL(wp), INTENT(IN) :: qc(n_vars)
+    REAL(wp), INTENT(OUT) :: u, v
+
+    INCLUDE 'velocity_from_conservative.inc'
+
+  END SUBROUTINE velocity_from_conservative_real
+
+
+  SUBROUTINE velocity_from_conservative_complex(qc, u, v)
+
+    COMPLEX(wp), INTENT(IN) :: qc(n_vars)
+    COMPLEX(wp), INTENT(OUT) :: u, v
+
+    INCLUDE 'velocity_from_conservative.inc'
+
+  END SUBROUTINE velocity_from_conservative_complex
+
+  !> Enforce the admissible closure of the independently transported mass
+  !> fractions. Roundoff-sized negative values are clipped; material negative
+  !> values indicate a reconstruction/configuration error. If the explicit
+  !> component sum exceeds one, all components are normalized proportionally.
+  SUBROUTINE enforce_mass_fraction_closure(xs, xg, xl)
+
+    REAL(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas), xl
+    REAL(wp), PARAMETER :: negative_tolerance = 100.0_wp * EPSILON(1.0_wp)
+    REAL(wp) :: explicit_mass_fraction
+
+    IF (n_solid .GT. 0) THEN
+       IF (ANY(xs .LT. -negative_tolerance))                                  &
+            ERROR STOP 'Material negative solid mass fraction'
+       xs = MAX(xs, 0.0_wp)
+    END IF
+
+    IF (n_add_gas .GT. 0) THEN
+       IF (ANY(xg .LT. -negative_tolerance))                                  &
+            ERROR STOP 'Material negative additional-gas mass fraction'
+       xg = MAX(xg, 0.0_wp)
+    END IF
+
+    IF (gas_flag .AND. liquid_flag) THEN
+       IF (xl .LT. -negative_tolerance)                                       &
+            ERROR STOP 'Material negative liquid mass fraction'
+       xl = MAX(xl, 0.0_wp)
+    ELSE
+       xl = 0.0_wp
+    END IF
+
+    explicit_mass_fraction = SUM(xs) + SUM(xg) + xl
+    IF (explicit_mass_fraction .GT. 1.0_wp) THEN
+       xs = xs / explicit_mass_fraction
+       xg = xg / explicit_mass_fraction
+       xl = xl / explicit_mass_fraction
+    END IF
+
+  END SUBROUTINE enforce_mass_fraction_closure
+
+
+  !> Apply the mass-fraction closure directly to a primitive state vector.
+  SUBROUTINE enforce_primitive_mass_fraction_closure(qp)
+
+    REAL(wp), INTENT(INOUT) :: qp(n_vars+2)
+    REAL(wp) :: xs(n_solid), xg(n_add_gas), xl
+
+    xs = qp(idx_solid_first:idx_solid_last)
+    xg = qp(idx_add_gas_first:idx_add_gas_last)
+    xl = 0.0_wp
+    IF (gas_flag .AND. liquid_flag) xl = qp(n_vars)
+
+    CALL enforce_mass_fraction_closure(xs, xg, xl)
+
+    qp(idx_solid_first:idx_solid_last) = xs
+    qp(idx_add_gas_first:idx_add_gas_last) = xg
+    IF (gas_flag .AND. liquid_flag) qp(n_vars) = xl
+
+  END SUBROUTINE enforce_primitive_mass_fraction_closure
+
+
+  !> Derive volume fractions from the canonical primitive mass fractions.
+  SUBROUTINE primitive_to_volume_fractions(qp, alphas, alphag, alphal)
+
+    REAL(wp), INTENT(IN) :: qp(n_vars+2)
+    REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas), alphal
+
+    REAL(wp) :: xs(n_solid), xg(n_add_gas), xl
+    REAL(wp) :: rho_m, inv_rhom, rho_c, inv_rho_c
+
+    alphas = 0.0_wp
+    alphag = 0.0_wp
+    alphal = 0.0_wp
+
+    IF (qp(1) .LE. EPSILON(1.0_wp)) RETURN
+
+    xs = qp(idx_solid_first:idx_solid_last)
+    xg = qp(idx_add_gas_first:idx_add_gas_last)
+    xl = 0.0_wp
+    IF (gas_flag .AND. liquid_flag) xl = qp(n_vars)
+
+    CALL enforce_mass_fraction_closure(xs, xg, xl)
+    CALL eval_mixture_properties_from_mass_fractions(                         &
+         qp(4), xs, xg, xl, rho_m, inv_rhom, rho_c, inv_rho_c,               &
+         alphas, alphag, alphal)
+
+  END SUBROUTINE primitive_to_volume_fractions
 
   !> Function that calculates the Sauter diameter
   FUNCTION sauter_diameter(alpha_solids)
@@ -249,8 +367,6 @@ CONTAINS
   SUBROUTINE r_phys_var(qj, h, u, v, alphas, rho_m, T, alphal, alphag,          &
        red_grav, p_dyn, Zs, exc_pore_pres)
 
-    USE parameters_2d, ONLY : eps_sing, eps_sing4
-
     IMPLICIT NONE
 
     REAL(wp), INTENT(IN) :: qj(n_vars)
@@ -303,8 +419,6 @@ CONTAINS
 
   SUBROUTINE c_phys_var(qj, h, u, v, T, rho_m, alphas, alphag, inv_rhom, Zs,    &
        exc_pore_pres)
-
-    USE parameters_2d, ONLY : eps_sing, eps_sing4
 
     IMPLICIT NONE
 
@@ -362,7 +476,7 @@ CONTAINS
     REAL(wp) :: r_alphag(n_add_gas)       !< real-value add.gas volume fractions
     REAL(wp) :: r_T                       !< real-value temperature [K]
     REAL(wp) :: r_alphal                  !< real-value liquid volume fraction
-    REAL(wp) :: r_inv_rhom
+    REAL(wp) :: r_inv_rhom, r_inv_rho_c
     REAL(wp) :: r_xs(n_solid), r_xg(n_add_gas)
     REAL(wp) :: r_xl, r_xc
 
@@ -397,43 +511,22 @@ CONTAINS
     r_v = qpj(idx_v)
     r_T = qpj(4)
 
-    IF ( alpha_flag ) THEN
+    r_xs = qpj(idx_solid_first:idx_solid_last)
+    r_xg = qpj(idx_add_gas_first:idx_add_gas_last)
+    r_xl = 0.0_wp
+    IF ( gas_flag .AND. liquid_flag ) r_xl = qpj(n_vars)
 
-       r_alphas(1:n_solid) = qpj(idx_alfas_first:idx_alfas_last)
-       r_alphag(1:n_add_gas) = qpj(idx_addGas_first:idx_addGas_last)
+    CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl)
 
-    ELSE
-
-       r_alphas(1:n_solid) = qpj(idx_alfas_first:idx_alfas_last) / qpj(1)
-       IF ( n_add_gas .GT. 0 ) r_alphag(1:n_add_gas) =                       &
-            qpj(idx_addGas_first:idx_addGas_last) / qpj(1)
-
-    END IF
-
-    r_alphal = 0.0_wp
-
-    IF ( gas_flag .AND. liquid_flag ) THEN
-
-       IF ( alpha_flag ) THEN
-
-          r_alphal = qpj(n_vars)
-
-       ELSE
-
-          r_alphal = qpj(n_vars) / qpj(1)
-
-       END IF
-
-    END IF
-
-    CALL eval_mixture_properties_from_volume_fractions(                        &
+    CALL eval_mixture_properties_from_mass_fractions(                          &
          ! IN
-         r_T, r_alphag,                                                        &
-         ! INOUT
-         r_alphas, r_alphal,                                                   &
+         r_T, r_xs, r_xg, r_xl,                                                &
          ! OUT
-         r_rho_m, r_inv_rhom, r_rho_c,                                        &
-         r_xs, r_xg, r_xl, r_xc, r_sp_heat_c, r_sp_heat_mix)
+         r_rho_m, r_inv_rhom, r_rho_c, r_inv_rho_c,                           &
+         r_alphas, r_alphag, r_alphal)
+
+    CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xl, r_xc,                   &
+         r_sp_heat_c, r_sp_heat_mix)
 
     ! reduced gravity
     r_red_grav = ( r_rho_m - rho_a_amb ) / r_rho_m * grav
@@ -462,9 +555,9 @@ CONTAINS
   !> - qp(2) = \f$ hu \f$
   !> - qp(3) = \f$ hv \f$
   !> - qp(4) = \f$ T \f$
-  !> - qp(idx_alfas_first:idx_alfas_last) = \f$ alphas(1:n_solid) \f$
-  !> - qp(idx_addGas_first:idx_addGas_last) = \f$ alphas(1:n_add_gas) \f$
-  !> - qp(n_vars) = \f$ alphal \f$
+  !> - qp(idx_solid_first:idx_solid_last) = \f$ Ys(1:n_solid) \f$
+  !> - qp(idx_add_gas_first:idx_add_gas_last) = \f$ Yg(1:n_add_gas) \f$
+  !> - qp(n_vars) = \f$ Yl \f$ when liquid is independently transported
   !> - qp(idx_u) = \f$ u \f$
   !> - qp(idx_v) = \f$ v \f$
   !> .
@@ -500,6 +593,9 @@ CONTAINS
     REAL(wp) :: r_red_grav
     REAL(wp) :: r_Zs             !< real-value stochastic variable
     REAL(wp) :: r_exc_pore_pres  !< real-value pore pressure
+    REAL(wp) :: r_xs(n_solid), r_xg(n_add_gas), r_xl
+
+    qp = 0.0_wp
 
     CALL r_phys_var( qc , r_h , r_u , r_v , r_alphas , r_rho_m , r_T ,          &
          r_alphal , r_alphag , r_red_grav , p_dyn , r_Zs , r_exc_pore_pres )
@@ -511,19 +607,19 @@ CONTAINS
 
     qp(4) = r_T
 
-    IF ( alpha_flag ) THEN
-
-       qp(idx_alfas_first:idx_alfas_last) = r_alphas(1:n_solid)
-       qp(idx_addGas_first:idx_addGas_last) = r_alphag(1:n_add_gas)
-       IF ( gas_flag .AND. liquid_flag ) qp(n_vars) = r_alphal
-
-    ELSE
-
-       qp(idx_alfas_first:idx_alfas_last) = r_alphas(1:n_solid) * r_h
-       qp(idx_addGas_first:idx_addGas_last) = r_alphag(1:n_add_gas) * r_h
-       IF ( gas_flag .AND. liquid_flag ) qp(n_vars) = r_alphal * r_h
-
+    r_xs = 0.0_wp
+    r_xg = 0.0_wp
+    r_xl = 0.0_wp
+    IF ( qc(1) .GT. EPSILON(1.0_wp) ) THEN
+       r_xs = qc(idx_solid_first:idx_solid_last) / qc(1)
+       r_xg = qc(idx_add_gas_first:idx_add_gas_last) / qc(1)
+       IF ( gas_flag .AND. liquid_flag ) r_xl = qc(n_vars) / qc(1)
+       CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl)
     END IF
+
+    qp(idx_solid_first:idx_solid_last) = r_xs
+    qp(idx_add_gas_first:idx_add_gas_last) = r_xg
+    IF ( gas_flag .AND. liquid_flag ) qp(n_vars) = r_xl
 
     IF ( stoch_transport_flag) qp(idx_stoch) = r_Zs
 
@@ -545,9 +641,9 @@ CONTAINS
   !> - qp(2) = \f$ h*u \f$
   !> - qp(3) = \f$ h*v \f$
   !> - qp(4) = \f$ T \f$
-  !> - qp(idx_alfas_first:idx_alfas_last) = \f$ alphas(1:n_s) \f$
-  !> - qp(idx_addGas_first:idx_addGas_last) = \f$ alphas(1:n_g) \f$
-  !> - qp(n_vars) = \f$ alphal \f$
+  !> - qp(idx_solid_first:idx_solid_last) = \f$ Ys(1:n_s) \f$
+  !> - qp(idx_add_gas_first:idx_add_gas_last) = \f$ Yg(1:n_g) \f$
+  !> - qp(n_vars) = \f$ Yl \f$ when liquid is independently transported
   !> - qp(idx_u) = \f$ u \f$
   !> - qp(idx_v) = \f$ v \f$
   !> .
@@ -592,7 +688,7 @@ CONTAINS
 
     REAL(wp) :: r_sp_heat_c
 
-    REAL(wp) :: r_inv_rhom
+    REAL(wp) :: r_inv_rhom, r_inv_rho_c
 
     r_xl = 0.0_wp
     r_Zs = 0.0_wp
@@ -617,42 +713,21 @@ CONTAINS
 
     r_T  = qp(4)
 
-    IF ( alpha_flag ) THEN
+    r_xs = qp(idx_solid_first:idx_solid_last)
+    r_xg = qp(idx_add_gas_first:idx_add_gas_last)
+    IF ( gas_flag .AND. liquid_flag ) r_xl = qp(n_vars)
 
-       r_alphas(1:n_solid) = qp(idx_alfas_first:idx_alfas_last)
-       r_alphag(1:n_add_gas) = qp(idx_addGas_first:idx_addGas_last)
+    CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl)
 
-    ELSE
-
-       r_alphas(1:n_solid) = qp(idx_alfas_first:idx_alfas_last) / qp(1)
-       r_alphag(1:n_add_gas) = qp(idx_addGas_first:idx_addGas_last) / qp(1)
-
-    END IF
-
-    r_alphal = 0.0_wp
-
-    IF ( gas_flag .AND. liquid_flag ) THEN
-
-       IF ( alpha_flag ) THEN
-
-          r_alphal = qp(n_vars)
-
-       ELSE
-
-          r_alphal = qp(n_vars) / qp(1)
-
-       END IF
-
-    END IF
-
-    CALL eval_mixture_properties_from_volume_fractions(                        &
+    CALL eval_mixture_properties_from_mass_fractions(                          &
          ! IN
-         r_T, r_alphag,                                                        &
-         ! INOUT
-         r_alphas, r_alphal,                                                   &
+         r_T, r_xs, r_xg, r_xl,                                                &
          ! OUT
-         r_rho_m, r_inv_rhom, r_rho_c,                                        &
-         r_xs, r_xg, r_xl, r_xc, r_sp_heat_c, r_sp_heat_mix)
+         r_rho_m, r_inv_rhom, r_rho_c, r_inv_rho_c,                           &
+         r_alphas, r_alphag, r_alphal)
+
+    CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xl, r_xc, r_sp_heat_c,      &
+         r_sp_heat_mix)
 
     IF ( stoch_transport_flag) r_Zs = qp(idx_stoch)
 
@@ -667,8 +742,8 @@ CONTAINS
     ! the fourth conservative variable.
     qc(4) = r_h * r_rho_m * r_sp_heat_mix * r_T
 
-    qc(idx_alfas_first:idx_alfas_last) = r_xs * qc(1)
-    qc(idx_addGas_first:idx_addGas_last) = r_xg * qc(1)
+    qc(idx_solid_first:idx_solid_last) = r_xs * qc(1)
+    qc(idx_add_gas_first:idx_add_gas_last) = r_xg * qc(1)
 
     IF ( stoch_transport_flag ) qc(idx_stoch) = r_Zs * qc(1)
 

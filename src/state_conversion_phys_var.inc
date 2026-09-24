@@ -32,11 +32,11 @@
 
     inv_qj1 = 1.0_wp / qj(1)
 
-    xs(1:n_solid) = qj(idx_alfas_first:idx_alfas_last) * inv_qj1
+    xs(1:n_solid) = qj(idx_solid_first:idx_solid_last) * inv_qj1
 
     IF ( n_add_gas .GT. 0 ) THEN
 
-       xg(1:n_add_gas) = qj(idx_addGas_first:idx_addGas_last) * inv_qj1
+       xg(1:n_add_gas) = qj(idx_add_gas_first:idx_add_gas_last) * inv_qj1
 
     END IF
 
@@ -75,14 +75,4 @@
 
     h = qj(1) * inv_rhom
 
-    IF ( REAL(qj(1), wp) .GT. eps_sing ) THEN
-
-       u = qj(2) * inv_qj1
-       v = qj(3) * inv_qj1
-
-    ELSE
-
-       u = SQRT(2.0_wp) * qj(1) * qj(2) / SQRT(qj(1)**4 + eps_sing4)
-       v = SQRT(2.0_wp) * qj(1) * qj(3) / SQRT(qj(1)**4 + eps_sing4)
-
-    END IF
+    CALL velocity_from_conservative(qj, u, v)

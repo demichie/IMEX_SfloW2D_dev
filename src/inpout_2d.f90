@@ -20,8 +20,8 @@ MODULE inpout_2d
   USE domain_2d, ONLY: domain_type
   USE stochastic_module, ONLY: stochastic_workspace_type
 
-  USE parameters_2d, ONLY: idx_h, idx_hu, idx_hv, idx_T, idx_alfas_first, &
-                           idx_alfas_last, idx_addGas_first, idx_addGas_last, idx_stoch, idx_pore, &
+  USE parameters_2d, ONLY: idx_h, idx_hu, idx_hv, idx_T, idx_solid_first, &
+                           idx_solid_last, idx_add_gas_first, idx_add_gas_last, idx_stoch, idx_pore, &
                            idx_u, idx_v
 
   USE parameters_2d, ONLY: idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn, &
@@ -40,7 +40,7 @@ MODULE inpout_2d
                          n_topography_profile_y, nodata_topo
   USE parameters_2d, ONLY: n_layers, n_solid, n_add_gas, n_stoch_vars,       &
                            n_pore_vars
-  USE parameters_2d, ONLY: rheology_flag, alpha_flag, &
+  USE parameters_2d, ONLY: rheology_flag, &
                            topo_change_flag, radial_source_flag, collapsing_volume_flag, &
                            liquid_flag, gas_flag, subtract_init_flag, bottom_radial_source_flag, &
                            lateral_source_flag, serial_flag, &
@@ -220,41 +220,33 @@ MODULE inpout_2d
 
   ! -- Variables for the namelists WEST_BOUNDARY_CONDITIONS
   TYPE(bc) :: h_bcW, hu_bcW, hv_bcW, T_bcW
-  TYPE(bc), ALLOCATABLE :: alphas_bcW(:)
-  TYPE(bc), ALLOCATABLE :: halphas_bcW(:)
-  TYPE(bc), ALLOCATABLE :: alphag_bcW(:)
-  TYPE(bc), ALLOCATABLE :: halphag_bcW(:)
-  TYPE(bc) :: alphal_bcW, halphal_bcW
+  TYPE(bc), ALLOCATABLE :: xs_bcW(:)
+  TYPE(bc), ALLOCATABLE :: xg_bcW(:)
+  TYPE(bc) :: xl_bcW
   TYPE(bc), ALLOCATABLE :: stoch_bcW(:)
   TYPE(bc), ALLOCATABLE :: pore_bcW(:)
 
   ! -- Variables for the namelists EAST_BOUNDARY_CONDITIONS
   TYPE(bc) :: h_bcE, hu_bcE, hv_bcE, T_bcE
-  TYPE(bc), ALLOCATABLE :: alphas_bcE(:)
-  TYPE(bc), ALLOCATABLE :: halphas_bcE(:)
-  TYPE(bc), ALLOCATABLE :: alphag_bcE(:)
-  TYPE(bc), ALLOCATABLE :: halphag_bcE(:)
-  TYPE(bc) :: alphal_bcE, halphal_bcE
+  TYPE(bc), ALLOCATABLE :: xs_bcE(:)
+  TYPE(bc), ALLOCATABLE :: xg_bcE(:)
+  TYPE(bc) :: xl_bcE
   TYPE(bc), ALLOCATABLE :: stoch_bcE(:)
   TYPE(bc), ALLOCATABLE :: pore_bcE(:)
 
   ! -- Variables for the namelists SOUTH_BOUNDARY_CONDITIONS
   TYPE(bc) :: h_bcS, hu_bcS, hv_bcS, T_bcS
-  TYPE(bc), ALLOCATABLE :: alphas_bcS(:)
-  TYPE(bc), ALLOCATABLE :: halphas_bcS(:)
-  TYPE(bc), ALLOCATABLE :: alphag_bcS(:)
-  TYPE(bc), ALLOCATABLE :: halphag_bcS(:)
-  TYPE(bc) :: alphal_bcS, halphal_bcS
+  TYPE(bc), ALLOCATABLE :: xs_bcS(:)
+  TYPE(bc), ALLOCATABLE :: xg_bcS(:)
+  TYPE(bc) :: xl_bcS
   TYPE(bc), ALLOCATABLE :: stoch_bcS(:)
   TYPE(bc), ALLOCATABLE :: pore_bcS(:)
 
   ! -- Variables for the namelists NORTH_BOUNDARY_CONDITIONS
   TYPE(bc) :: h_bcN, hu_bcN, hv_bcN, T_bcN
-  TYPE(bc), ALLOCATABLE :: alphas_bcN(:)
-  TYPE(bc), ALLOCATABLE :: halphas_bcN(:)
-  TYPE(bc), ALLOCATABLE :: alphag_bcN(:)
-  TYPE(bc), ALLOCATABLE :: halphag_bcN(:)
-  TYPE(bc) :: alphal_bcN, halphal_bcN
+  TYPE(bc), ALLOCATABLE :: xs_bcN(:)
+  TYPE(bc), ALLOCATABLE :: xg_bcN(:)
+  TYPE(bc) :: xl_bcN
   TYPE(bc), ALLOCATABLE :: stoch_bcN(:)
   TYPE(bc), ALLOCATABLE :: pore_bcN(:)
 
@@ -339,7 +331,7 @@ MODULE inpout_2d
     T_init, T_ambient, u_init, v_init, sed_vol_perc
 
   NAMELIST /newrun_parameters/ n_solid, topography_file, x0, y0, &
-    comp_cells_x, comp_cells_y, cell_size, rheology_flag, alpha_flag, &
+    comp_cells_x, comp_cells_y, cell_size, rheology_flag, &
     liquid_flag, radial_source_flag, collapsing_volume_flag, &
     topo_change_flag, gas_flag, subtract_init_flag, n_add_gas, &
     bottom_radial_source_flag, slope_correction_flag, curvature_term_flag, &
@@ -469,7 +461,6 @@ CONTAINS
     liquid_flag = .FALSE.
     gas_flag = .TRUE.
     subtract_init_flag = .FALSE.
-    alpha_flag = .FALSE.
     slope_correction_flag = .FALSE.
     curvature_term_flag = .FALSE.
     serial_flag = .TRUE.
@@ -594,21 +585,16 @@ CONTAINS
         CALL fatal_error('Only N_LAYERS=1 is currently supported')
       END IF
 
-      idx_alfas_first = 5
-      idx_alfas_last = 4 + n_solid
+      idx_solid_first = 5
+      idx_solid_last = 4 + n_solid
 
       idx_solidEqn_first = 5
       idx_solidEqn_last = 4 + n_solid
 
-      ALLOCATE (alphas_bcW(n_solid))
-      ALLOCATE (alphas_bcE(n_solid))
-      ALLOCATE (alphas_bcS(n_solid))
-      ALLOCATE (alphas_bcN(n_solid))
-
-      ALLOCATE (halphas_bcW(n_solid))
-      ALLOCATE (halphas_bcE(n_solid))
-      ALLOCATE (halphas_bcS(n_solid))
-      ALLOCATE (halphas_bcN(n_solid))
+      ALLOCATE (xs_bcW(n_solid))
+      ALLOCATE (xs_bcE(n_solid))
+      ALLOCATE (xs_bcS(n_solid))
+      ALLOCATE (xs_bcN(n_solid))
 
       ALLOCATE (sed_vol_perc(n_solid))
       sed_vol_perc(1:n_solid) = -1.0_wp
@@ -628,21 +614,16 @@ CONTAINS
 
       END IF
 
-      idx_addGas_first = 5 + n_solid
-      idx_addGas_last = 4 + n_solid + n_add_gas
+      idx_add_gas_first = 5 + n_solid
+      idx_add_gas_last = 4 + n_solid + n_add_gas
 
       idx_addGasEqn_first = 5 + n_solid
       idx_addGasEqn_last = 4 + n_solid + n_add_gas
 
-      ALLOCATE (alphag_bcW(n_add_gas))
-      ALLOCATE (alphag_bcE(n_add_gas))
-      ALLOCATE (alphag_bcS(n_add_gas))
-      ALLOCATE (alphag_bcN(n_add_gas))
-
-      ALLOCATE (halphag_bcW(n_add_gas))
-      ALLOCATE (halphag_bcE(n_add_gas))
-      ALLOCATE (halphag_bcS(n_add_gas))
-      ALLOCATE (halphag_bcN(n_add_gas))
+      ALLOCATE (xg_bcW(n_add_gas))
+      ALLOCATE (xg_bcE(n_add_gas))
+      ALLOCATE (xg_bcS(n_add_gas))
+      ALLOCATE (xg_bcN(n_add_gas))
 
       ALLOCATE (sp_heat_g(n_add_gas))
       ALLOCATE (sp_gas_const_g(n_add_gas))
@@ -753,12 +734,9 @@ CONTAINS
     h_bcW%flag = -1
     hu_bcW%flag = -1
     hv_bcW%flag = -1
-    alphas_bcW%flag = -1
-    halphas_bcW%flag = -1
-    alphag_bcW%flag = -1
-    halphag_bcW%flag = -1
-    alphal_bcW%flag = -1
-    halphal_bcW%flag = -1
+    xs_bcW%flag = -1
+    xg_bcW%flag = -1
+    xl_bcW%flag = -1
     T_bcW%flag = -1
     stoch_bcW%flag = -1
     pore_bcW%flag = -1
@@ -766,12 +744,9 @@ CONTAINS
     h_bcE%flag = -1
     hu_bcE%flag = -1
     hv_bcE%flag = -1
-    alphas_bcE%flag = -1
-    halphas_bcE%flag = -1
-    alphag_bcE%flag = -1
-    halphag_bcE%flag = -1
-    alphal_bcE%flag = -1
-    halphal_bcE%flag = -1
+    xs_bcE%flag = -1
+    xg_bcE%flag = -1
+    xl_bcE%flag = -1
     T_bcE%flag = -1
     stoch_bcE%flag = -1
     pore_bcE%flag = -1
@@ -779,12 +754,9 @@ CONTAINS
     h_bcS%flag = -1
     hu_bcS%flag = -1
     hv_bcS%flag = -1
-    alphas_bcS%flag = -1
-    halphas_bcS%flag = -1
-    alphag_bcS%flag = -1
-    halphag_bcS%flag = -1
-    alphal_bcS%flag = -1
-    halphal_bcS%flag = -1
+    xs_bcS%flag = -1
+    xg_bcS%flag = -1
+    xl_bcS%flag = -1
     T_bcS%flag = -1
     stoch_bcS%flag = -1
     pore_bcS%flag = -1
@@ -792,12 +764,9 @@ CONTAINS
     h_bcN%flag = -1
     hu_bcN%flag = -1
     hv_bcN%flag = -1
-    alphas_bcN%flag = -1
-    halphas_bcN%flag = -1
-    alphag_bcN%flag = -1
-    halphag_bcN%flag = -1
-    alphal_bcN%flag = -1
-    halphal_bcN%flag = -1
+    xs_bcN%flag = -1
+    xg_bcN%flag = -1
+    xl_bcN%flag = -1
     T_bcN%flag = -1
     stoch_bcN%flag = -1
     pore_bcN%flag = -1
@@ -1004,7 +973,9 @@ CONTAINS
          sp_heat_c
 
     USE constitutive_parameters_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
-    USE state_conversion_2d, ONLY: eval_mixture_properties_from_mass_fractions
+    USE state_conversion_2d, ONLY: eval_mixture_properties_from_mass_fractions, &
+         eval_mixture_properties_from_volume_fractions,                         &
+         enforce_mass_fraction_closure
 
     USE constitutive_parameters_2d, ONLY: n_td2, coeff_porosity,            &
          radiative_term_coeff, SBconst, convective_term_coeff
@@ -1017,20 +988,16 @@ CONTAINS
     IMPLICIT none
 
     NAMELIST /west_boundary_conditions/ h_bcW, hu_bcW, hv_bcW, &
-      alphas_bcW, halphas_bcW, T_bcW, alphag_bcW, halphag_bcW, &
-      alphal_bcW, halphal_bcW, stoch_bcW, pore_bcW
+      xs_bcW, T_bcW, xg_bcW, xl_bcW, stoch_bcW, pore_bcW
 
     NAMELIST /east_boundary_conditions/ h_bcE, hu_bcE, hv_bcE, &
-      alphas_bcE, halphas_bcE, T_bcE, alphag_bcE, halphag_bcE, &
-      alphal_bcE, halphal_bcE, stoch_bcE, pore_bcE
+      xs_bcE, T_bcE, xg_bcE, xl_bcE, stoch_bcE, pore_bcE
 
     NAMELIST /south_boundary_conditions/ h_bcS, hu_bcS, hv_bcS, &
-      alphas_bcS, halphas_bcS, T_bcS, alphag_bcS, halphag_bcS, &
-      alphal_bcS, halphal_bcS, stoch_bcS, pore_bcS
+      xs_bcS, T_bcS, xg_bcS, xl_bcS, stoch_bcS, pore_bcS
 
     NAMELIST /north_boundary_conditions/ h_bcN, hu_bcN, hv_bcN, &
-      alphas_bcN, halphas_bcN, T_bcN, alphag_bcN, halphag_bcN, &
-      alphal_bcN, halphal_bcN, stoch_bcN, pore_bcN
+      xs_bcN, T_bcN, xg_bcN, xl_bcN, stoch_bcN, pore_bcN
 
     NAMELIST /solid_transport_parameters/ rho_s, diam_s, sphericity_s, &
       sp_heat_s, erosion_coeff, erodible_porosity, settling_flag, &
@@ -1079,6 +1046,7 @@ CONTAINS
 
     REAL(wp) :: inv_rho_c
     REAL(wp) :: inv_rhom
+    REAL(wp) :: xc_source
     ! parameter for elliptical source
     REAL(wp) :: h_ell
 
@@ -1323,15 +1291,11 @@ CONTAINS
 
     END IF
 
-    alphag_bcW(1:n_add_gas)%flag = -1
-    alphag_bcE(1:n_add_gas)%flag = -1
-    alphag_bcS(1:n_add_gas)%flag = -1
-    alphag_bcN(1:n_add_gas)%flag = -1
+    xg_bcW(1:n_add_gas)%flag = -1
+    xg_bcE(1:n_add_gas)%flag = -1
+    xg_bcS(1:n_add_gas)%flag = -1
+    xg_bcN(1:n_add_gas)%flag = -1
 
-    halphag_bcW(1:n_add_gas)%flag = -1
-    halphag_bcE(1:n_add_gas)%flag = -1
-    halphag_bcS(1:n_add_gas)%flag = -1
-    halphag_bcN(1:n_add_gas)%flag = -1
 
     IF (pres .EQ. -1.0_wp) THEN
 
@@ -1984,15 +1948,11 @@ CONTAINS
 
     WRITE (*, *) 'Model variables = ', n_vars
 
-    alphas_bcW(1:n_solid)%flag = -1
-    alphas_bcE(1:n_solid)%flag = -1
-    alphas_bcS(1:n_solid)%flag = -1
-    alphas_bcN(1:n_solid)%flag = -1
+    xs_bcW(1:n_solid)%flag = -1
+    xs_bcE(1:n_solid)%flag = -1
+    xs_bcS(1:n_solid)%flag = -1
+    xs_bcN(1:n_solid)%flag = -1
 
-    halphas_bcW(1:n_solid)%flag = -1
-    halphas_bcE(1:n_solid)%flag = -1
-    halphas_bcS(1:n_solid)%flag = -1
-    halphas_bcN(1:n_solid)%flag = -1
 
     ALLOCATE (bcW(n_vars), bcE(n_vars), bcS(n_vars), bcN(n_vars))
 
@@ -2222,20 +2182,20 @@ CONTAINS
 
     END IF
 
+    ! Component mass fractions must be reconstructed with a monotone limiter.
+    ! Options 5--7 are one-sided/centred slopes and can create material
+    ! negative face compositions before the closure guard is applied.
+    IF (MAXVAL(limiter(idx_solid_first:idx_solid_last)) .GT. 4 .OR.           &
+        MAXVAL(limiter(idx_add_gas_first:idx_add_gas_last)) .GT. 4 .OR.         &
+        ((gas_flag .AND. liquid_flag) .AND. limiter(n_vars) .GT. 4)) THEN
+
+      CALL fatal_error('mass fractions require limiter options 0 through 4')
+
+    END IF
+
     IF (verbose_level .GE. 0) THEN
-
-      IF (alpha_flag) THEN
-
-        WRITE (*, *) 'Linear reconstruction and b. c. applied to variables:'
-        WRITE (*, *) 'h,hu,hv,T,alphas'
-
-      ELSE
-
-        WRITE (*, *) 'Linear reconstruction and b. c. applied to variables:'
-        WRITE (*, *) 'h,hu,hv,T,halphas'
-
-      END IF
-
+      WRITE (*, *) 'Linear reconstruction and b. c. applied to variables:'
+      WRITE (*, *) 'h,hu,hv,T,mass fractions'
     END IF
 
     IF ((reconstr_coeff .GT. 1.0_wp) .OR. (reconstr_coeff .LT. 0.0_wp)) THEN
@@ -2313,81 +2273,38 @@ CONTAINS
 
       END IF
 
-      IF (alpha_flag) THEN
+      IF (ANY(xs_bcW(1:n_solid)%flag .EQ. -1)) THEN
 
-        IF (ANY(alphas_bcW(1:n_solid)%flag .EQ. -1)) THEN
+        WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
+        WRITE (*, *) 'B.C. for solid mass fractions not set properly'
+        WRITE (*, *) 'Please check the input file'
+        WRITE (*, *) 'xs_bcW'
+        WRITE (*, *) xs_bcW(1:n_solid)
+        STOP
 
-          WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-          WRITE (*, *) 'B.C. for sediment conentration not set properly'
-          WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'alphas_bcW'
-          WRITE (*, *) alphas_bcW(1:n_solid)
-          STOP
+      END IF
 
-        END IF
+      IF (ANY(xg_bcW(1:n_add_gas)%flag .EQ. -1)) THEN
 
-        IF (ANY(alphag_bcW(1:n_add_gas)%flag .EQ. -1)) THEN
+        WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
+        WRITE (*, *) 'B.C. for additional-gas mass fractions not set properly'
+        WRITE (*, *) 'Please check the input file'
+        WRITE (*, *) 'xg_bcW'
+        WRITE (*, *) xg_bcW(1:n_add_gas)
+        STOP
 
-          WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-          WRITE (*, *) 'B.C. for additional gas components not set properly'
-          WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'alphag_bcW'
-          WRITE (*, *) alphag_bcW(1:n_add_gas)
-          STOP
+      END IF
 
-        END IF
+      IF (gas_flag .AND. liquid_flag) THEN
 
-        IF (gas_flag .AND. liquid_flag) THEN
-
-          IF (alphal_bcW%flag .EQ. -1) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-            WRITE (*, *) 'B.C. for additional gas components not set properly'
-            WRITE (*, *) 'Please check the input file'
-            WRITE (*, *) 'alphal_bcW'
-            WRITE (*, *) alphal_bcW
-            STOP
-
-          END IF
-
-        END IF
-
-      ELSE
-
-        IF (ANY(halphas_bcW(1:n_solid)%flag .EQ. -1)) THEN
+        IF (xl_bcW%flag .EQ. -1) THEN
 
           WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-          WRITE (*, *) 'B.C. for sediment conentration not set properly'
+          WRITE (*, *) 'B.C. for liquid mass fraction not set properly'
           WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'halphas_bcW'
-          WRITE (*, *) halphas_bcW(1:n_solid)
+          WRITE (*, *) 'xl_bcW'
+          WRITE (*, *) xl_bcW
           STOP
-
-        END IF
-
-        IF (ANY(halphag_bcW(1:n_add_gas)%flag .EQ. -1)) THEN
-
-          WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-          WRITE (*, *) 'B.C. for additional gas components not set properly'
-          WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'halphag_bcW'
-          WRITE (*, *) halphag_bcW(1:n_add_gas)
-          STOP
-
-        END IF
-
-        IF (gas_flag .AND. liquid_flag) THEN
-
-          IF (halphal_bcW%flag .EQ. -1) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-            WRITE (*, *) 'B.C. for additional gas components not set properly'
-            WRITE (*, *) 'Please check the input file'
-            WRITE (*, *) 'halphal_bcW'
-            WRITE (*, *) halphal_bcW
-            STOP
-
-          END IF
 
         END IF
 
@@ -2500,83 +2417,40 @@ CONTAINS
 
       END IF
 
-      IF (alpha_flag) THEN
-
-        IF (ANY(alphas_bcE(1:n_solid)%flag .EQ. -1)) THEN
+      IF (ANY(xs_bcE(1:n_solid)%flag .EQ. -1)) THEN
 
           WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
           WRITE (*, *) 'B.C. for sediment concentration not set properly'
           WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'alphas_bcE'
-          WRITE (*, *) alphas_bcE(1:n_solid)
+          WRITE (*, *) 'xs_bcE'
+          WRITE (*, *) xs_bcE(1:n_solid)
           STOP
 
-        END IF
+      END IF
 
-        IF (ANY(alphag_bcE(1:n_add_gas)%flag .EQ. -1)) THEN
+      IF (ANY(xg_bcE(1:n_add_gas)%flag .EQ. -1)) THEN
 
           WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
           WRITE (*, *) 'B.C. for additional gas components not set properly'
           WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'alphag_bcE'
-          WRITE (*, *) alphag_bcE(1:n_add_gas)
+          WRITE (*, *) 'xg_bcE'
+          WRITE (*, *) xg_bcE(1:n_add_gas)
           STOP
 
-        END IF
+      END IF
 
-        IF (gas_flag .AND. liquid_flag) THEN
+      IF (gas_flag .AND. liquid_flag) THEN
 
-          IF (alphal_bcE%flag .EQ. -1) THEN
+          IF (xl_bcE%flag .EQ. -1) THEN
 
             WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
             WRITE (*, *) 'B.C. for additional gas components not set properly'
             WRITE (*, *) 'Please check the input file'
-            WRITE (*, *) 'alphal_bcE'
-            WRITE (*, *) alphal_bcE
+            WRITE (*, *) 'xl_bcE'
+            WRITE (*, *) xl_bcE
             STOP
 
           END IF
-
-        END IF
-
-      ELSE
-
-        IF (ANY(halphas_bcE(1:n_solid)%flag .EQ. -1)) THEN
-
-          WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
-          WRITE (*, *) 'B.C. for sediment concentration not set properly'
-          WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'halphas_bcE'
-          WRITE (*, *) halphas_bcE(1:n_solid)
-          STOP
-
-        END IF
-
-        IF (ANY(halphag_bcE(1:n_add_gas)%flag .EQ. -1)) THEN
-
-          WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
-          WRITE (*, *) 'B.C. for additional gas components not set properly'
-          WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'halphag_bcE'
-          WRITE (*, *) halphag_bcE(1:n_add_gas)
-          STOP
-
-        END IF
-
-        IF (gas_flag .AND. liquid_flag) THEN
-
-          IF (halphal_bcE%flag .EQ. -1) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
-            WRITE (*, *) 'B.C. for additional gas components not set properly'
-            WRITE (*, *) 'Please check the input file'
-            WRITE (*, *) 'halphal_bcE'
-            WRITE (*, *) halphal_bcE
-            STOP
-
-          END IF
-
-        END IF
 
       END IF
 
@@ -2689,83 +2563,40 @@ CONTAINS
 
       END IF
 
-      IF (alpha_flag) THEN
-
-        IF (ANY(alphas_bcS(1:n_solid)%flag .EQ. -1)) THEN
+      IF (ANY(xs_bcS(1:n_solid)%flag .EQ. -1)) THEN
 
           WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
           WRITE (*, *) 'B.C. for sediment concentrations not set properly'
           WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'alphas_bcS'
-          WRITE (*, *) alphas_bcS(1:n_solid)
+          WRITE (*, *) 'xs_bcS'
+          WRITE (*, *) xs_bcS(1:n_solid)
           STOP
 
-        END IF
+      END IF
 
-        IF (ANY(alphag_bcS(1:n_add_gas)%flag .EQ. -1)) THEN
+      IF (ANY(xg_bcS(1:n_add_gas)%flag .EQ. -1)) THEN
 
           WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
           WRITE (*, *) 'B.C. for additional gas components not set properly'
           WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'alphag_bcS'
-          WRITE (*, *) alphag_bcS(1:n_add_gas)
+          WRITE (*, *) 'xg_bcS'
+          WRITE (*, *) xg_bcS(1:n_add_gas)
           STOP
 
-        END IF
+      END IF
 
-        IF (gas_flag .AND. liquid_flag) THEN
+      IF (gas_flag .AND. liquid_flag) THEN
 
-          IF (alphal_bcS%flag .EQ. -1) THEN
+          IF (xl_bcS%flag .EQ. -1) THEN
 
             WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
             WRITE (*, *) 'B.C. for additional gas components not set properly'
             WRITE (*, *) 'Please check the input file'
-            WRITE (*, *) 'alphal_bcS'
-            WRITE (*, *) alphal_bcS
+            WRITE (*, *) 'xl_bcS'
+            WRITE (*, *) xl_bcS
             STOP
 
           END IF
-
-        END IF
-
-      ELSE
-
-        IF (ANY(halphas_bcS(1:n_solid)%flag .EQ. -1)) THEN
-
-          WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
-          WRITE (*, *) 'B.C. for sediment concentrations not set properly'
-          WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'halphas_bcS'
-          WRITE (*, *) halphas_bcS(1:n_solid)
-          STOP
-
-        END IF
-
-        IF (ANY(halphag_bcS(1:n_add_gas)%flag .EQ. -1)) THEN
-
-          WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
-          WRITE (*, *) 'B.C. for additional gas components not set properly'
-          WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'halphag_bcS'
-          WRITE (*, *) halphag_bcS(1:n_add_gas)
-          STOP
-
-        END IF
-
-        IF (gas_flag .AND. liquid_flag) THEN
-
-          IF (halphal_bcS%flag .EQ. -1) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
-            WRITE (*, *) 'B.C. for additional gas components not set properly'
-            WRITE (*, *) 'Please check the input file'
-            WRITE (*, *) 'halphal_bcS'
-            WRITE (*, *) halphal_bcS
-            STOP
-
-          END IF
-
-        END IF
 
       END IF
 
@@ -2874,83 +2705,40 @@ CONTAINS
 
       END IF
 
-      IF (alpha_flag) THEN
-
-        IF (ANY(alphas_bcN(1:n_solid)%flag .EQ. -1)) THEN
+      IF (ANY(xs_bcN(1:n_solid)%flag .EQ. -1)) THEN
 
           WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
           WRITE (*, *) 'B.C. for sediment concentrations not set properly'
           WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'alphas_bcN'
-          WRITE (*, *) alphas_bcN(1:n_solid)
+          WRITE (*, *) 'xs_bcN'
+          WRITE (*, *) xs_bcN(1:n_solid)
           STOP
 
-        END IF
+      END IF
 
-        IF (ANY(alphag_bcN(1:n_add_gas)%flag .EQ. -1)) THEN
+      IF (ANY(xg_bcN(1:n_add_gas)%flag .EQ. -1)) THEN
 
           WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
           WRITE (*, *) 'B.C. for additional gas components not set properly'
           WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'alphag_bcN'
-          WRITE (*, *) alphag_bcN(1:n_add_gas)
+          WRITE (*, *) 'xg_bcN'
+          WRITE (*, *) xg_bcN(1:n_add_gas)
           STOP
 
-        END IF
+      END IF
 
-        IF (gas_flag .AND. liquid_flag) THEN
+      IF (gas_flag .AND. liquid_flag) THEN
 
-          IF (alphal_bcN%flag .EQ. -1) THEN
+          IF (xl_bcN%flag .EQ. -1) THEN
 
             WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
             WRITE (*, *) 'B.C. for additional gas components not set properly'
             WRITE (*, *) 'Please check the input file'
-            WRITE (*, *) 'alphal_bcN'
-            WRITE (*, *) alphal_bcN
+            WRITE (*, *) 'xl_bcN'
+            WRITE (*, *) xl_bcN
             STOP
 
           END IF
-
-        END IF
-
-      ELSE
-
-        IF (ANY(halphas_bcN(1:n_solid)%flag .EQ. -1)) THEN
-
-          WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
-          WRITE (*, *) 'B.C. for sediment concentrations not set properly'
-          WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'halphas_bcN'
-          WRITE (*, *) halphas_bcN(1:n_solid)
-          STOP
-
-        END IF
-
-        IF (ANY(halphag_bcN(1:n_add_gas)%flag .EQ. -1)) THEN
-
-          WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
-          WRITE (*, *) 'B.C. for additional gas components not set properly'
-          WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'halphag_bcN'
-          WRITE (*, *) halphag_bcN(1:n_add_gas)
-          STOP
-
-        END IF
-
-        IF (gas_flag .AND. liquid_flag) THEN
-
-          IF (halphal_bcN%flag .EQ. -1) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
-            WRITE (*, *) 'B.C. for additional gas components not set properly'
-            WRITE (*, *) 'Please check the input file'
-            WRITE (*, *) 'halphal_bcN'
-            WRITE (*, *) halphal_bcN
-            STOP
-
-          END IF
-
-        END IF
 
       END IF
 
@@ -3004,31 +2792,15 @@ CONTAINS
     bcS(4) = T_bcS
     bcN(4) = T_bcN
 
-    IF (alpha_flag) THEN
+    bcW(5:4 + n_solid) = xs_bcW(1:n_solid)
+    bcE(5:4 + n_solid) = xs_bcE(1:n_solid)
+    bcS(5:4 + n_solid) = xs_bcS(1:n_solid)
+    bcN(5:4 + n_solid) = xs_bcN(1:n_solid)
 
-      bcW(5:4 + n_solid) = alphas_bcW(1:n_solid)
-      bcE(5:4 + n_solid) = alphas_bcE(1:n_solid)
-      bcS(5:4 + n_solid) = alphas_bcS(1:n_solid)
-      bcN(5:4 + n_solid) = alphas_bcN(1:n_solid)
-
-      bcW(4 + n_solid + 1:4 + n_solid + n_add_gas) = alphag_bcW(1:n_add_gas)
-      bcE(4 + n_solid + 1:4 + n_solid + n_add_gas) = alphag_bcE(1:n_add_gas)
-      bcS(4 + n_solid + 1:4 + n_solid + n_add_gas) = alphag_bcS(1:n_add_gas)
-      bcN(4 + n_solid + 1:4 + n_solid + n_add_gas) = alphag_bcN(1:n_add_gas)
-
-    ELSE
-
-      bcW(5:4 + n_solid) = halphas_bcW(1:n_solid)
-      bcE(5:4 + n_solid) = halphas_bcE(1:n_solid)
-      bcS(5:4 + n_solid) = halphas_bcS(1:n_solid)
-      bcN(5:4 + n_solid) = halphas_bcN(1:n_solid)
-
-      bcW(4 + n_solid + 1:4 + n_solid + n_add_gas) = halphag_bcW(1:n_add_gas)
-      bcE(4 + n_solid + 1:4 + n_solid + n_add_gas) = halphag_bcE(1:n_add_gas)
-      bcS(4 + n_solid + 1:4 + n_solid + n_add_gas) = halphag_bcS(1:n_add_gas)
-      bcN(4 + n_solid + 1:4 + n_solid + n_add_gas) = halphag_bcN(1:n_add_gas)
-
-    END IF
+    bcW(4 + n_solid + 1:4 + n_solid + n_add_gas) = xg_bcW(1:n_add_gas)
+    bcE(4 + n_solid + 1:4 + n_solid + n_add_gas) = xg_bcE(1:n_add_gas)
+    bcS(4 + n_solid + 1:4 + n_solid + n_add_gas) = xg_bcS(1:n_add_gas)
+    bcN(4 + n_solid + 1:4 + n_solid + n_add_gas) = xg_bcN(1:n_add_gas)
 
     IF ((stochastic_flag) .AND. (stoch_transport_flag)) THEN
 
@@ -3052,23 +2824,10 @@ CONTAINS
 
     END IF
     IF (gas_flag .AND. liquid_flag) THEN
-
-      IF (alpha_flag) THEN
-
-        bcW(n_vars) = alphal_bcW
-        bcE(n_vars) = alphal_bcE
-        bcS(n_vars) = alphal_bcS
-        bcN(n_vars) = alphal_bcN
-
-      ELSE
-
-        bcW(n_vars) = halphal_bcW
-        bcE(n_vars) = halphal_bcE
-        bcS(n_vars) = halphal_bcS
-        bcN(n_vars) = halphal_bcN
-
-      END IF
-
+      bcW(n_vars) = xl_bcW
+      bcE(n_vars) = xl_bcE
+      bcS(n_vars) = xl_bcS
+      bcN(n_vars) = xl_bcN
     END IF
 
     ! ------- READ expl_terms_parameters NAMELIST -------------------------------
@@ -4181,6 +3940,17 @@ CONTAINS
 
         IF (gas_flag .AND. liquid_flag) THEN
 
+          IF ((alphal_source .EQ. -1.0_wp) .AND.                              &
+              (xl_source .EQ. -1.0_wp)) THEN
+
+            WRITE (*, *) 'ERROR: problem with namelist ', TRIM(source_name)
+            WRITE (*, *) 'Define the liquid source volume or mass fraction'
+            WRITE (*, *) 'alphal_source =', alphal_source
+            WRITE (*, *) 'xl_source =', xl_source
+            STOP
+
+          END IF
+
           IF ((ANY(alphag_source(1:n_add_gas) .GT. -1.0_wp)) .AND. &
               (xl_source .GT. -1.0_wp)) THEN
 
@@ -4328,22 +4098,38 @@ CONTAINS
 
           ! define the physical variable from the source values and the
           ! initial velocity
+          qp_source = 0.0_wp
           qp_source(1) = h_source
           qp_source(2) = h_source*vel_source
           qp_source(3) = 0.0_wp
 
           qp_source(4) = T_source
 
-          IF (ANY(xs_source(1:n_solid) .GT. -1.0_wp)) THEN
+          IF (.NOT. ANY(xs_source(1:n_solid) .GT. -1.0_wp)) THEN
 
-            CALL eval_mixture_properties_from_mass_fractions(                  &
+            CALL eval_mixture_properties_from_volume_fractions(                &
                  ! IN
-                 T_source, xs_source, xg_source, xl_source,                    &
+                 T_source, alphag_source(1:n_add_gas),                         &
+                 ! INOUT
+                 alphas_source(1:n_solid), alphal_source,                      &
                  ! OUT
-                 rho_m, inv_rhom, rho_c, inv_rho_c,                            &
-                 alphas_source, alphag_source, alphal_source)
+                 rho_m, inv_rhom, rho_c, xs_source(1:n_solid),                 &
+                 xg_source(1:n_add_gas), xl_source, xc_source, sp_heat_c,      &
+                 sp_heat_mix)
 
           END IF
+
+          ! From this point onward the source composition is canonical: only
+          ! mass fractions are stored and used by the governing equations.
+          CALL enforce_mass_fraction_closure(                                  &
+               xs_source(1:n_solid), xg_source(1:n_add_gas), xl_source)
+
+          CALL eval_mixture_properties_from_mass_fractions(                    &
+               ! IN
+               T_source, xs_source, xg_source, xl_source,                      &
+               ! OUT
+               rho_m, inv_rhom, rho_c, inv_rho_c,                              &
+               alphas_source, alphag_source, alphal_source)
 
           WRITE (*, *) 'Source solid volume fraction =', alphas_source(1:n_solid)
 
@@ -4360,25 +4146,10 @@ CONTAINS
 
           END IF
 
-          IF (alpha_flag) THEN
-
-            qp_source(5:4 + n_solid) = alphas_source(1:n_solid)
-            qp_source(4 + n_solid + 1:4 + n_solid + n_add_gas) = &
-              alphag_source(1:n_add_gas)
-
-            IF (gas_flag .AND. liquid_flag) qp_source(n_vars) = &
-              alphal_source
-
-          ELSE
-
-            qp_source(5:4 + n_solid) = alphas_source(1:n_solid)*h_source
-            qp_source(4 + n_solid + 1:4 + n_solid + n_add_gas) = &
-              alphag_source(1:n_add_gas)*h_source
-
-            IF (gas_flag .AND. liquid_flag) qp_source(n_vars) = &
-              alphal_source*h_source
-
-          END IF
+          qp_source(5:4 + n_solid) = xs_source(1:n_solid)
+          qp_source(4 + n_solid + 1:4 + n_solid + n_add_gas) =                &
+               xg_source(1:n_add_gas)
+          IF (gas_flag .AND. liquid_flag) qp_source(n_vars) = xl_source
 
           qp_source(n_vars + 1) = vel_source
           qp_source(n_vars + 2) = 0.0_wp
@@ -4404,25 +4175,10 @@ CONTAINS
 
                 qp_source(4) = T_source
 
-                IF (alpha_flag) THEN
-
-                  qp_source(5:4 + n_solid) = alphas_source(1:n_solid)
-                  qp_source(4 + n_solid + 1:4 + n_solid + n_add_gas) = &
-                    alphag_source(1:n_add_gas)
-
-                  IF (gas_flag .AND. liquid_flag) qp_source(n_vars) = &
-                    alphal_source
-
-                ELSE
-
-                  qp_source(5:4 + n_solid) = alphas_source(1:n_solid)*h_source
-                  qp_source(4 + n_solid + 1:4 + n_solid + n_add_gas) = &
-                    alphag_source(1:n_add_gas)*h_source
-
-                  IF (gas_flag .AND. liquid_flag) qp_source(n_vars) = &
-                    alphal_source*h_source
-
-                END IF
+                qp_source(5:4 + n_solid) = xs_source(1:n_solid)
+                qp_source(4 + n_solid + 1:4 + n_solid + n_add_gas) =          &
+                     xg_source(1:n_add_gas)
+                IF (gas_flag .AND. liquid_flag) qp_source(n_vars) = xl_source
 
                 qp_source(n_vars + 1) = vel_source
                 qp_source(n_vars + 2) = 0.0_wp
@@ -6292,6 +6048,7 @@ CONTAINS
     USE geometry_2d, ONLY: x_comp, y_comp, deposit
     USE parameters_2d, ONLY: t_probes, n_vars
     USE geometry_2d, ONLY: interp_2d_scalarB
+    USE state_conversion_2d, ONLY: primitive_to_volume_fractions
 
     IMPLICIT NONE
 
@@ -6310,6 +6067,8 @@ CONTAINS
 
     REAL(wp) :: alphas_prb(n_solid)
     REAL(wp) :: alphag_prb(n_add_gas)
+    REAL(wp) :: alphal_prb
+    REAL(wp) :: qp_prb(n_vars+2)
     REAL(wp) :: dep_probe(n_solid)
 
     INTEGER :: k
@@ -6430,38 +6189,40 @@ CONTAINS
 
         WRITE (probes_unit, 1710, ADVANCE='no') v_prb, ','
 
+        qp_prb = 0.0_wp
+        qp_prb(1) = h_prb
+        qp_prb(4) = T_prb
+
         DO i_solid = 1, n_solid
 
           CALL interp_2d_scalarB(x_comp, y_comp, state%qp(4 + i_solid, :, :), &
-                                 probes_coords(1, k), probes_coords(2, k), alphas_prb(i_solid))
-
-          IF (alpha_flag) THEN
-
-            WRITE (probes_unit, 1710, ADVANCE='no') alphas_prb(i_solid), ','
-
-          ELSE
-
-            WRITE (probes_unit, 1710, ADVANCE='no') alphas_prb(i_solid)/h_prb, ','
-
-          END IF
+                                 probes_coords(1, k), probes_coords(2, k),     &
+                                 qp_prb(4 + i_solid))
 
         END DO
 
         DO i_gas = 1, n_add_gas
 
           CALL interp_2d_scalarB(x_comp, y_comp, state%qp(4 + n_solid + i_gas, :, :), &
-                                 probes_coords(1, k), probes_coords(2, k), alphag_prb(i_gas))
+                                 probes_coords(1, k), probes_coords(2, k),     &
+                                 qp_prb(4 + n_solid + i_gas))
 
-          IF (alpha_flag) THEN
+        END DO
 
-            WRITE (probes_unit, 1710, ADVANCE='no') alphag_prb(i_gas), ','
+        IF (gas_flag .AND. liquid_flag) THEN
+          CALL interp_2d_scalarB(x_comp, y_comp, state%qp(n_vars, :, :),      &
+               probes_coords(1, k), probes_coords(2, k), qp_prb(n_vars))
+        END IF
 
-          ELSE
+        CALL primitive_to_volume_fractions(qp_prb, alphas_prb, alphag_prb,    &
+             alphal_prb)
 
-            WRITE (probes_unit, 1710, ADVANCE='no') alphag_prb(i_gas)/h_prb, ','
+        DO i_solid = 1, n_solid
+          WRITE (probes_unit, 1710, ADVANCE='no') alphas_prb(i_solid), ','
+        END DO
 
-          END IF
-
+        DO i_gas = 1, n_add_gas
+          WRITE (probes_unit, 1710, ADVANCE='no') alphag_prb(i_gas), ','
         END DO
 
         pDyn_prb = 0.5*rhom_prb*(u_prb**2 + v_prb**2)
@@ -6533,7 +6294,8 @@ CONTAINS
   SUBROUTINE output_runout(time, stop_flag, state)
 
     USE geometry_2d, ONLY: x_comp, y_comp, B_cent, dx, dy
-    USE parameters_2d, ONLY: t_runout, n_solid
+    USE parameters_2d, ONLY: t_runout, n_solid, n_vars
+    USE state_conversion_2d, ONLY: primitive_to_volume_fractions
     IMPLICIT NONE
 
     REAL(wp), INTENT(IN) :: time
@@ -6556,6 +6318,7 @@ CONTAINS
 
     CHARACTER(18) :: txt_string
     REAL(wp) :: old_runout
+    REAL(wp) :: alphas_local(n_solid), alphag_local(n_add_gas), alphal_local
 
     sX = size(x_comp)
     sY = size(y_comp)
@@ -6588,7 +6351,13 @@ CONTAINS
     dist(:, :) = 0.0_wp
 
     IF (n_solid .GT. 0) THEN
-      alphas_tot = SUM(state%qp(5:4+n_solid, :, :), DIM=1)
+      DO j = 1, sX
+        DO k = 1, sY
+          CALL primitive_to_volume_fractions(state%qp(1:n_vars+2,j,k),        &
+               alphas_local, alphag_local, alphal_local)
+          alphas_tot(j,k) = SUM(alphas_local)
+        END DO
+      END DO
     ELSE
       alphas_tot = 0.0_wp
     END IF
@@ -7115,7 +6884,8 @@ CONTAINS
     USE geometry_2d, ONLY: B_cent, B_prime_x, B_prime_y, comp_cells_x, comp_cells_y
     USE geometry_2d, ONLY: deposit, erosion, erodible
     USE parameters_2d, ONLY: n_vars
-    USE state_conversion_2d, ONLY: mixt_var, settling_velocity
+    USE state_conversion_2d, ONLY: mixt_var, settling_velocity,               &
+         primitive_to_volume_fractions
     USE constitutive_parameters_2d, ONLY: kin_visc_c, inv_pres
 
     IMPLICIT NONE
@@ -7134,13 +6904,14 @@ CONTAINS
     REAL(wp) :: r_inv_rho_c, grav_coeff, vert_stress_eff, eff_normal_stress
     REAL(wp) :: diam_characteristic, rho_particle, shear_rate
     REAL(wp) :: exc_pore_pres
-    REAL(wp) :: r_alphas(n_solid)
+    REAL(wp) :: r_alphas(n_solid), r_alphag(n_add_gas), r_alphal
 
     REAL(wp), ALLOCATABLE :: temp_array(:, :)
     REAL(wp), ALLOCATABLE :: Ri2D(:, :), rho_m2D(:, :), red_grav2D(:, :)
     REAL(wp), ALLOCATABLE :: muEff(:, :)
     REAL(wp), ALLOCATABLE :: erodible2D(:, :), shearVel(:, :)
     REAL(wp), ALLOCATABLE :: Rouse(:, :, :), inertialNumber(:, :)
+    REAL(wp), ALLOCATABLE :: alphas2D(:, :, :), alphag2D(:, :, :), alphal2D(:, :)
 
     WRITE (*, *) 'Writing ', nc_filename
 
@@ -7153,6 +6924,9 @@ CONTAINS
     ALLOCATE (shearVel(SIZE(state%qp, 2), SIZE(state%qp, 3)))
     ALLOCATE (Rouse(n_solid, SIZE(state%qp, 2), SIZE(state%qp, 3)))
     ALLOCATE (inertialNumber(SIZE(state%qp, 2), SIZE(state%qp, 3)))
+    ALLOCATE (alphas2D(n_solid,SIZE(state%qp, 2),SIZE(state%qp, 3)))
+    ALLOCATE (alphag2D(n_add_gas,SIZE(state%qp, 2),SIZE(state%qp, 3)))
+    ALLOCATE (alphal2D(SIZE(state%qp, 2),SIZE(state%qp, 3)))
 
     Ri2D = 0.0_wp
     rho_m2D = 0.0_wp
@@ -7163,6 +6937,9 @@ CONTAINS
     shearVel = 0.0_wp
     Rouse = 0.0_wp
     inertialNumber = 0.0_wp
+    alphas2D = 0.0_wp
+    alphag2D = 0.0_wp
+    alphal2D = 0.0_wp
 
     DO j = 1, comp_cells_x
 
@@ -7195,11 +6972,11 @@ CONTAINS
         r_v = state%qp(n_vars + 2, j, k)
         r_T = state%qp(4, j, k)
 
-        IF (alpha_flag) THEN
-          r_alphas = state%qp(5:4 + n_solid, j, k)
-        ELSE
-          r_alphas = state%qp(5:4 + n_solid, j, k)/r_h
-        END IF
+        CALL primitive_to_volume_fractions(state%qp(1:n_vars+2,j,k),          &
+             r_alphas, r_alphag, r_alphal)
+        alphas2D(:,j,k) = r_alphas
+        alphag2D(:,j,k) = r_alphag
+        alphal2D(j,k) = r_alphal
 
         IF (slope_correction_flag) THEN
           r_w = r_u*B_prime_x(j, k) + r_v*B_prime_y(j, k)
@@ -7314,19 +7091,7 @@ CONTAINS
     ! Write solid fractions
     DO i = 1, n_solid
 
-      IF (alpha_flag) THEN
-
-        WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
-          temp_array = state%qp(4 + i, :, :)
-        END WHERE
-
-      ELSE
-
-        WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
-          temp_array = state%qp(4 + i, :, :)/state%qp(1, :, :)
-        END WHERE
-
-      END IF
+      temp_array = alphas2D(i,:,:)
 
       CALL check(nf90_put_var(ncid, solid_varid(i), temp_array, start=start, &
                               count=count))
@@ -7344,19 +7109,7 @@ CONTAINS
     ! Write additional gas fractions
     DO i = 1, n_add_gas
 
-      IF (alpha_flag) THEN
-
-        WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
-          temp_array = state%qp(4 + n_solid + i, :, :)
-        END WHERE
-
-      ELSE
-
-        WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
-          temp_array = state%qp(4 + n_solid + i, :, :)/state%qp(1, :, :)
-        END WHERE
-
-      END IF
+      temp_array = alphag2D(i,:,:)
 
       CALL check(nf90_put_var(ncid, gas_varid(i), temp_array, &
                               start=start, count=count))
@@ -7366,19 +7119,7 @@ CONTAINS
 
     IF (gas_flag .AND. liquid_flag) THEN
 
-      IF (alpha_flag) THEN
-
-        WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
-          temp_array = state%qp(n_vars, :, :)
-        END WHERE
-
-      ELSE
-
-        WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
-          temp_array = state%qp(n_vars, :, :)/state%qp(1, :, :)
-        END WHERE
-
-      END IF
+      temp_array = alphal2D
 
       ! Write the liquid volume fraction (alphal)
       CALL check(nf90_put_var(ncid, alphal_varid, temp_array, start=start, &
@@ -7447,6 +7188,7 @@ CONTAINS
 
     DEALLOCATE (Ri2D, rho_m2D, red_grav2D, muEff, erodible2D)
     DEALLOCATE (shearVel, Rouse, inertialNumber)
+    DEALLOCATE (alphas2D, alphag2D, alphal2D)
     DEALLOCATE (temp_array)
 
     RETURN

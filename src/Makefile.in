@@ -284,10 +284,11 @@ IMEX_SfloW2D_SOURCES = \
                 inpout_2d.f90 \
                 IMEX_SfloW2D.f90
 
-EXTRA_DIST = state_conversion_phys_var.inc mixture_heat_capacity.inc          \
-             mixture_from_mass.inc
+EXTRA_DIST = state_conversion_phys_var.inc velocity_from_conservative.inc     \
+             mixture_heat_capacity.inc mixture_from_mass.inc
 
 state_conversion_2d.$(OBJEXT): state_conversion_phys_var.inc                  \
+                               velocity_from_conservative.inc                 \
                                mixture_heat_capacity.inc                      \
                                mixture_from_mass.inc
 

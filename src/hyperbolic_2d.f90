@@ -8,7 +8,6 @@
 MODULE hyperbolic_2d
 
   USE parameters_2d, ONLY : wp, n_eqns, n_vars
-  USE parameters_2d, ONLY : idx_solidEqn_first, idx_solidEqn_last
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
   USE geometry_2d, ONLY : grav_coeff_stag_x, grav_coeff_stag_y
@@ -276,8 +275,7 @@ CONTAINS
 
           END IF
 
-          ! In the equation for mass and for trasnport (T,alphas) if the 
-          ! velocities at the interfaces are null, then the flux is null
+          ! Null total-mass and transported-scalar fluxes at a static face.
           IF ( (  recon%qp_interfaceB(n_vars+2,j,k) .EQ. 0.0_wp ) .AND.               &
                (  recon%qp_interfaceT(n_vars+2,j,k) .EQ. 0.0_wp ) ) THEN
 
@@ -311,7 +309,7 @@ CONTAINS
        k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! External procedures
-    USE equation_terms_2d, ONLY : eval_fluxes
+    USE equation_terms_2d, ONLY : eval_fluxes, limit_component_mass_flux
     USE geometry_2d, ONLY : grav_coeff_stag_x , grav_coeff_stag_y
 
     IMPLICIT NONE
@@ -379,25 +377,9 @@ CONTAINS
 
           ENDDO eqns_loop
 
-          ! Fix to avoid sum of solid fluxes larger tham flux for mixture.
-          ! Guarded: H_interface_x(1,j,k) is zero at dry or zero-flux
-          ! interfaces and the test used to divide by it unconditionally.
-          IF ( this%H_interface_x(1,j,k) .GT. 0.0_wp ) THEN
-
-             IF ( SUM(this%H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k))  &
-                  .GE. this%H_interface_x(1,j,k) ) THEN
-
-                this%H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k) =       &
-                     this%H_interface_x(idx_solidEqn_first:idx_solidEqn_last,j,k) /  &
-                     ( SUM(this%H_interface_x(idx_solidEqn_first:idx_solidEqn_last,  &
-                     j,k)) / this%H_interface_x(1,j,k) )
-
-             END IF
-
-          END IF
+          CALL limit_component_mass_flux(this%H_interface_x(:,j,k))
           
-          ! In the equation for mass and for trasnport (T,alphas) if the 
-          ! velocities at the interfaces are null, then the flux is null
+          ! Null total-mass and transported-scalar fluxes at a static face.
           IF ( (  recon%qp_interfaceL(2,j,k) .EQ. 0.0_wp ) .AND.                      &
                (  recon%qp_interfaceR(2,j,k) .EQ. 0.0_wp ) ) THEN
 
@@ -449,24 +431,9 @@ CONTAINS
 
           END DO
 
-          ! Fix to avoid sum of solid fluxes larger tham flux for mixture.
-          ! Guarded: see the x-interface limiter above.
-          IF ( this%H_interface_y(1,j,k) .GT. 0.0_wp ) THEN
-
-             IF ( SUM(this%H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k))  &
-                  .GT. this%H_interface_y(1,j,k) ) THEN
-
-                this%H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k) =       &
-                     this%H_interface_y(idx_solidEqn_first:idx_solidEqn_last,j,k) /  &
-                     ( SUM(this%H_interface_y(idx_solidEqn_first:idx_solidEqn_last,  &
-                     j,k)) / this%H_interface_y(1,j,k) )
-
-             END IF
-
-          END IF
+          CALL limit_component_mass_flux(this%H_interface_y(:,j,k))
           
-          ! In the equation for mass and for trasnport (T,alphas) if the 
-          ! velocities at the interfaces are null, then the flux is null
+          ! Null total-mass and transported-scalar fluxes at a static face.
           IF ( (  recon%q_interfaceB(3,j,k) .EQ. 0.0_wp ) .AND.                       &
                (  recon%q_interfaceT(3,j,k) .EQ. 0.0_wp ) ) THEN
 
