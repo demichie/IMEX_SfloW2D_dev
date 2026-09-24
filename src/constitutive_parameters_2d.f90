@@ -7,6 +7,37 @@ MODULE constitutive_parameters_2d
 
   IMPLICIT NONE
 
+  PRIVATE
+
+  ! Public constitutive-model configuration. Keep this list explicit so that
+  ! implementation details and names imported from other modules are not
+  ! re-exported accidentally.
+  PUBLIC :: entrainment_flag
+  PUBLIC :: grav, inv_grav
+  PUBLIC :: A_drag, B_drag, collective_settling_flag
+  PUBLIC :: mu, xi, xi_temp, mu_0, mu_inf, Fr_0, U_w
+  PUBLIC :: I_0, mu_2, mu_s, muI_inf, I_transition
+  PUBLIC :: alpha_trans, N_inh, f_inhibit_mode
+  PUBLIC :: friction_factor, tau
+  PUBLIC :: T_env, T_ref, nu_ref, visc_par, tau0, emme, c_p
+  PUBLIC :: convective_term_coeff, atm_heat_transf_coeff, exp_area_fract
+  PUBLIC :: radiative_term_coeff, SBconst, emissivity, enne, T_ground
+  PUBLIC :: thermal_conductivity
+  PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
+  PUBLIC :: sp_heat_c, rho_c_sub, rho_a_amb
+  PUBLIC :: sp_heat_a, sp_gas_const_a, kin_visc_a
+  PUBLIC :: sp_heat_g, sp_gas_const_g
+  PUBLIC :: kin_visc_l, kin_visc_c, Tref_Suth, muRef_Suth, S_mu, T_ambient
+  PUBLIC :: rho_s, inv_rho_s, diam_s, sphericity_s, sp_heat_s
+  PUBLIC :: settling_flag, alphastot_min
+  PUBLIC :: erosion_coeff, loss_rate, erodible_fract, erodible_porosity
+  PUBLIC :: coeff_porosity, T_erodible
+  PUBLIC :: pres, inv_pres, rho_l, inv_rho_l, sp_heat_l, gamma_steam, vonK
+  PUBLIC :: hydraulic_permeability, dynamic_permeability_flag
+  PUBLIC :: maximum_solid_packing
+  PUBLIC :: pascal_coeff, pascal_coeff_precomputed
+  PUBLIC :: precompute_pascal_coefficient
+
   !> flag to activate air entrainment
   LOGICAL :: entrainment_flag
 
