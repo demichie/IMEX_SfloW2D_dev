@@ -1,7 +1,8 @@
 PROGRAM test_state_conversion
 
   USE parameters_2d
-  USE constitutive_2d
+  USE constitutive_parameters_2d
+  USE state_conversion_2d
 
   IMPLICIT NONE
 

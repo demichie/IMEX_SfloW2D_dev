@@ -21,7 +21,8 @@ MODULE time_integration_2d
   USE geometry_2d, ONLY : cell_source_fractions
   USE geometry_2d, ONLY : cell_arc_perim, cell_arc_n_x, cell_arc_n_y
 
-  USE constitutive_2d, ONLY : rheology_model, T_ambient
+  USE constitutive_parameters_2d, ONLY : T_ambient
+  USE parameters_2d, ONLY : rheology_model
 
   USE nonlinear_solver_2d, ONLY : solve_rk_step
 
@@ -176,7 +177,7 @@ CONTAINS
     USE geometry_2d, ONLY : dx,dy
     USE parameters_2d, ONLY : max_dt , cfl
 
-    USE constitutive_2d, ONLY : qc_to_qp
+    USE state_conversion_2d, ONLY : qc_to_qp
 
     IMPLICIT none
 
@@ -286,17 +287,17 @@ CONTAINS
   SUBROUTINE imex_RK_solver(this, q, qp, t, dt, Z, equation_partition,      &
        domain, recon, hyper)
 
-    USE constitutive_2d, ONLY : maximum_solid_packing
+    USE constitutive_parameters_2d, ONLY : maximum_solid_packing
     
-    USE constitutive_2d, ONLY : eval_implicit_terms
+    USE equation_terms_2d, ONLY : eval_implicit_terms
 
-    USE constitutive_2d, ONLY : eval_nh_semi_impl_terms
+    USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms
 
-    USE constitutive_2d, ONLY : qc_to_qp
+    USE state_conversion_2d, ONLY : qc_to_qp
 
-    USE constitutive_2d, ONLY : eval_expl_terms
+    USE equation_terms_2d, ONLY : eval_expl_terms
 
-    USE constitutive_2d, ONLY : T_ambient
+    USE constitutive_parameters_2d, ONLY : T_ambient
 
     USE geometry_2d, ONLY : B_nodata
 

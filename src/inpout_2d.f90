@@ -65,7 +65,7 @@ MODULE inpout_2d
                            reconstr_coeff, interfaces_relaxation, n_RK
 
   ! -- Variables for the namelist EXPL_TERMS_PARAMETERS
-  USE constitutive_2d, ONLY: grav, inv_grav
+  USE constitutive_parameters_2d, ONLY: grav, inv_grav
 
   ! -- Variables for the namelist RADIAL_SOURCE_PARAMETERS
   USE parameters_2d, ONLY: x_source, y_source, r_source, vel_source, &
@@ -88,39 +88,37 @@ MODULE inpout_2d
                            h_collapse, alphas_collapse, alphag_collapse
 
   ! -- Variables for the namelist TEMPERATURE_PARAMETERS
-  USE constitutive_2d, ONLY: emissivity, exp_area_fract, enne, emme, &
-                             atm_heat_transf_coeff, thermal_conductivity, T_env, T_ground, c_p
+  USE constitutive_parameters_2d, ONLY: emissivity, exp_area_fract, enne,   &
+       emme, atm_heat_transf_coeff, thermal_conductivity, T_env, T_ground, c_p
 
   ! -- Variables for the namelist RHEOLOGY_PARAMETERS
   USE parameters_2d, ONLY: rheology_model
-  USE constitutive_2d, ONLY: mu, xi, tau, nu_ref, visc_par, T_ref, &
-                             mu_0, mu_inf, Fr_0, U_w, mu_s, mu_2, I_0, &
-                             muI_inf, I_transition, A_drag, B_drag,        &
-                             collective_settling_flag
-  USE constitutive_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td
-  USE constitutive_2d, ONLY: friction_factor
-  USE constitutive_2d, ONLY: tau0
+  USE constitutive_parameters_2d, ONLY: mu, xi, tau, nu_ref, visc_par,     &
+       T_ref, mu_0, mu_inf, Fr_0, U_w, mu_s, mu_2, I_0, muI_inf,          &
+       I_transition, A_drag, B_drag, collective_settling_flag
+  USE constitutive_parameters_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, &
+       Kappa, n_td, friction_factor, tau0
   ! -- Functions used in the rheology calculations
-  USE constitutive_2d, ONLY: sauter_diameter, average_density_solids, precompute_pascal_coefficient
+  USE state_conversion_2d, ONLY: sauter_diameter, average_density_solids
+  USE constitutive_parameters_2d, ONLY: precompute_pascal_coefficient
 
   ! --- Variables for the namelist SOLID_TRANSPORT_PARAMETERS
-  USE constitutive_2d, ONLY: rho_s, diam_s, sphericity_s, sp_heat_s, vonK
-  USE constitutive_2d, ONLY: settling_flag, erosion_coeff, erodible_porosity
-  USE constitutive_2d, ONLY: erodible_fract, T_erodible
-  USE constitutive_2d, ONLY: alphastot_min
+  USE constitutive_parameters_2d, ONLY: rho_s, diam_s, sphericity_s,       &
+       sp_heat_s, vonK, settling_flag, erosion_coeff, erodible_porosity,   &
+       erodible_fract, T_erodible, alphastot_min
   USE parameters_2d, ONLY: erodible_deposit_flag
-  USE constitutive_2d, ONLY: maximum_solid_packing
+  USE constitutive_parameters_2d, ONLY: maximum_solid_packing
 
   ! --- Variables for the namelist GAS_TRANSPORT_PARAMETERS
-  USE constitutive_2d, ONLY: sp_heat_a, sp_gas_const_a, kin_visc_a, pres, &
-                             T_ambient, entrainment_flag, sp_heat_g, sp_gas_const_g, gamma_steam, &
-                             Tref_Suth, muRef_Suth, S_mu
+  USE constitutive_parameters_2d, ONLY: sp_heat_a, sp_gas_const_a,         &
+       kin_visc_a, pres, T_ambient, entrainment_flag, sp_heat_g,           &
+       sp_gas_const_g, gamma_steam, Tref_Suth, muRef_Suth, S_mu
 
   USE parameters_2d, ONLY: liquid_vaporization_flag, sutherland_flag, &
                            water_level
 
   ! --- Variables for the namelist LIQUID_TRANSPORT_PARAMETERS
-  USE constitutive_2d, ONLY: sp_heat_l, rho_l, kin_visc_l, loss_rate
+  USE constitutive_parameters_2d, ONLY: sp_heat_l, rho_l, kin_visc_l, loss_rate
 
   ! --- Variables for the namelist VULNERABILITY_TABLE_PARAMETERS
   USE parameters_2d, ONLY: n_thickness_levels, n_dyn_pres_levels, &
@@ -134,8 +132,9 @@ MODULE inpout_2d
   USE parameters_2d, ONLY: output_stoch_vars_flag, length_spatial_corr
 
   ! --- Variables for the namelist PORE_PRESSURE_PARAMETERS
-  USE constitutive_2d, ONLY: hydraulic_permeability, dynamic_permeability_flag
-  USE constitutive_2d, ONLY: alpha_trans, N_inh, f_inhibit_mode, pascal_coeff_precomputed ! for f_inhibit
+  USE constitutive_parameters_2d, ONLY: hydraulic_permeability,             &
+       dynamic_permeability_flag, alpha_trans, N_inh, f_inhibit_mode,       &
+       pascal_coeff_precomputed
   USE parameters_2d, ONLY: pore_pres_fract
   USE parameters_2d, ONLY: gas_loss_flag
 
@@ -1001,22 +1000,19 @@ CONTAINS
 
     USE geometry_2d, ONLY: deposit, deposit_tot, erosion, erodible, erosion_tot
 
-    USE constitutive_2d, ONLY: rho_a_amb
-    USE constitutive_2d, ONLY: rho_c_sub
-    USE constitutive_2d, ONLY: kin_visc_c, sp_heat_c
+    USE constitutive_parameters_2d, ONLY: rho_a_amb, rho_c_sub, kin_visc_c, &
+         sp_heat_c
 
-    USE constitutive_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
+    USE constitutive_parameters_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
     USE state_conversion_2d, ONLY: eval_mixture_properties_from_mass_fractions
 
-    USE constitutive_2d, ONLY: n_td2
-    USE constitutive_2d, ONLY: coeff_porosity
-    USE constitutive_2d, ONLY: radiative_term_coeff, SBconst
-    USE constitutive_2d, ONLY: convective_term_coeff
+    USE constitutive_parameters_2d, ONLY: n_td2, coeff_porosity,            &
+         radiative_term_coeff, SBconst, convective_term_coeff
 
     USE init_2d, ONLY: erodible_init
 
     ! External procedures
-    USE constitutive_2d, ONLY: mixt_var
+    USE state_conversion_2d, ONLY: mixt_var
 
     IMPLICIT none
 
@@ -7119,7 +7115,8 @@ CONTAINS
     USE geometry_2d, ONLY: B_cent, B_prime_x, B_prime_y, comp_cells_x, comp_cells_y
     USE geometry_2d, ONLY: deposit, erosion, erodible
     USE parameters_2d, ONLY: n_vars
-    USE constitutive_2d, ONLY: mixt_var, settling_velocity, kin_visc_c, inv_pres
+    USE state_conversion_2d, ONLY: mixt_var, settling_velocity
+    USE constitutive_parameters_2d, ONLY: kin_visc_c, inv_pres
 
     IMPLICIT NONE
     REAL(wp), INTENT(IN) :: time_in

@@ -50,9 +50,9 @@ CONTAINS
 
     USE parameters_2d, ONLY : max_nl_iter , tol_rel , tol_abs
 
-    USE constitutive_2d, ONLY : rheology_model
+    USE parameters_2d, ONLY : rheology_model
 
-    USE constitutive_2d, ONLY : integrate_friction_term
+    USE equation_terms_2d, ONLY : integrate_friction_term
 
     IMPLICIT NONE
 
@@ -826,7 +826,7 @@ CONTAINS
        Bprimej_x ,                                                              &
        Bprimej_y , f_nl , scal_f, Zij )
 
-    USE constitutive_2d, ONLY : eval_implicit_terms
+    USE equation_terms_2d, ONLY : eval_implicit_terms
 
     IMPLICIT NONE
 
@@ -883,7 +883,7 @@ CONTAINS
   SUBROUTINE eval_jacobian( equation_partition, qj_rel , qj_org , dt_step,  &
        a_diag , coeff_f, Bprimej_x , Bprimej_y , left_matrix, Zij )
 
-    USE constitutive_2d, ONLY : eval_implicit_terms
+    USE equation_terms_2d, ONLY : eval_implicit_terms
 
     IMPLICIT NONE
 

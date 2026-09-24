@@ -175,7 +175,7 @@ CONTAINS
        k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! External procedures
-    USE constitutive_2d, ONLY : eval_fluxes
+    USE equation_terms_2d, ONLY : eval_fluxes
     USE geometry_2d, ONLY : grav_coeff_stag_x , grav_coeff_stag_y
 
     IMPLICIT NONE
@@ -311,7 +311,7 @@ CONTAINS
        k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! External procedures
-    USE constitutive_2d, ONLY : eval_fluxes
+    USE equation_terms_2d, ONLY : eval_fluxes
     USE geometry_2d, ONLY : grav_coeff_stag_x , grav_coeff_stag_y
 
     IMPLICIT NONE
@@ -577,7 +577,7 @@ CONTAINS
        k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! External procedures
-    USE constitutive_2d, ONLY : eval_local_speeds_x, eval_local_speeds_y 
+    USE equation_terms_2d, ONLY : eval_local_speeds_x, eval_local_speeds_y
 
     IMPLICIT NONE
 

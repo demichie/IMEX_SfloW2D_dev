@@ -90,8 +90,8 @@ CONTAINS
   SUBROUTINE reconstruction( this, q_expl, qp_expl, t, solve_cells, j_cent, k_cent )
 
     ! External procedures
-    USE constitutive_2d, ONLY : qp_to_qc, qp_to_qp2
-    USE constitutive_2d, ONLY : eval_source_bdry
+    USE state_conversion_2d, ONLY : qp_to_qc, qp_to_qp2
+    USE equation_terms_2d, ONLY : eval_source_bdry
     USE parameters_2d, ONLY : limiter
 
     USE geometry_2d, ONLY : x_comp , x_stag , y_comp , y_stag , dx2 , dy2

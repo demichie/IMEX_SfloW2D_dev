@@ -29,7 +29,7 @@ PROGRAM IMEX_SfloW2D
    USE, intrinsic :: iso_fortran_env
    USE, intrinsic :: ieee_arithmetic
 
-   USE constitutive_2d, ONLY : T_ambient
+   USE constitutive_parameters_2d, ONLY : T_ambient
 
 
    USE geometry_2d, ONLY : init_grid
@@ -90,7 +90,7 @@ PROGRAM IMEX_SfloW2D
    USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,          &
       thickness_levels , dyn_pres_levels
 
-   USE constitutive_2d, ONLY : qc_to_qp
+   USE state_conversion_2d, ONLY : qc_to_qp
 
 
    USE OMP_LIB

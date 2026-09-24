@@ -6,7 +6,7 @@
 !********************************************************************************
 MODULE state_2d
 
-  USE constitutive_2d, ONLY : T_ambient
+  USE constitutive_parameters_2d, ONLY : T_ambient
 
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE model_layout_2d, ONLY : model_layout_type

@@ -26,9 +26,9 @@ CONTAINS
 
    SUBROUTINE init_empty(state)
 
-      USE constitutive_2d, ONLY : T_ambient
+      USE constitutive_parameters_2d, ONLY : T_ambient
 
-      USE constitutive_2d, ONLY : qp_to_qc
+      USE state_conversion_2d, ONLY : qp_to_qc
 
       USE geometry_2d, ONLY : comp_cells_x , comp_cells_y
 
@@ -76,7 +76,7 @@ CONTAINS
 
    SUBROUTINE collapsing_volume(state)
 
-      USE constitutive_2d, ONLY : qp_to_qc
+      USE state_conversion_2d, ONLY : qp_to_qc
 
       USE geometry_2d, ONLY : compute_cell_fract
 

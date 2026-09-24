@@ -9,7 +9,7 @@ MODULE mass_exchange_2d
 
   USE diagnostics_2d, ONLY : fatal_error
 
-  USE constitutive_2d, ONLY : T_ambient
+  USE constitutive_parameters_2d, ONLY : T_ambient
 
   USE geometry_2d, ONLY : B_cent
   USE geometry_2d, ONLY : B_prime_x_geom, B_prime_y_geom
@@ -44,16 +44,15 @@ CONTAINS
 
   SUBROUTINE update_erosion_deposition_cell(q, qp, dt, domain)
 
-    USE constitutive_2d, ONLY : erosion_coeff , settling_flag
-    USE constitutive_2d, ONLY : maximum_solid_packing
+    USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,    &
+         maximum_solid_packing, entrainment_flag
     
     USE geometry_2d, ONLY : deposit , erosion , erodible
     USE geometry_2d, ONLY : B_zone
 
-    USE constitutive_2d, ONLY : eval_mass_exchange_terms
+    USE equation_terms_2d, ONLY : eval_mass_exchange_terms
 
-    USE constitutive_2d, ONLY : qc_to_qp , mixt_var
-    USE constitutive_2d, ONLY : entrainment_flag
+    USE state_conversion_2d, ONLY : qc_to_qp, mixt_var
     USE parameters_2d, ONLY : topo_change_flag , bottom_radial_source_flag
     USE parameters_2d, ONLY : erodible_deposit_flag
     USE parameters_2d, ONLY : pore_pressure_flag

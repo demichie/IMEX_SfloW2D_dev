@@ -6,7 +6,7 @@
 !********************************************************************************
 MODULE simulation_2d
 
-  USE constitutive_2d, ONLY : init_problem_param
+  USE equation_terms_2d, ONLY : init_problem_param
 
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE model_layout_2d, ONLY : model_layout_type
