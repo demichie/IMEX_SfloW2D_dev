@@ -28,6 +28,7 @@ IMEX_SfloW2D_SOURCES = \
                 state_2d.f90 \
                 mass_exchange_2d.f90 \
                 nonlinear_solver_2d.f90 \
+                hp_reconstruction_2d.f90 \
                 reconstruction_2d.f90 \
                 hyperbolic_2d.f90 \
                 time_integration_2d.f90 \

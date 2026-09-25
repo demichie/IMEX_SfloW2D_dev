@@ -13,10 +13,13 @@ MODULE reconstruction_2d
 
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
-  USE geometry_2d, ONLY : B_cent
+  USE geometry_2d, ONLY : B_cent, B_face_x, B_face_y
   USE geometry_2d, ONLY : source_cell
   USE geometry_2d, ONLY : one_by_dx, one_by_dy
   USE geometry_2d, ONLY : limit
+
+  USE hp_reconstruction_2d, ONLY : reconstruct_hp_line
+  USE hp_reconstruction_2d, ONLY : hp_dry_tolerance
 
   IMPLICIT NONE
 
@@ -32,6 +35,22 @@ MODULE reconstruction_2d
      REAL(wp), ALLOCATABLE :: qp_interfaceR(:,:,:)
      REAL(wp), ALLOCATABLE :: qp_interfaceB(:,:,:)
      REAL(wp), ALLOCATABLE :: qp_interfaceT(:,:,:)
+
+     ! Direct cell-side candidates retained until the line-wise HP blend can
+     ! compare continuity errors across adjacent interfaces.
+     REAL(wp), ALLOCATABLE :: qp_cellW(:,:,:)
+     REAL(wp), ALLOCATABLE :: qp_cellE(:,:,:)
+     REAL(wp), ALLOCATABLE :: qp_cellS(:,:,:)
+     REAL(wp), ALLOCATABLE :: qp_cellN(:,:,:)
+
+     ! Final free-surface traces.  Both cell-side and face-oriented forms are
+     ! stored because the following PCCU path discretization needs both views.
+     REAL(wp), ALLOCATABLE :: eta_cellW(:,:), eta_cellE(:,:)
+     REAL(wp), ALLOCATABLE :: eta_cellS(:,:), eta_cellN(:,:)
+     REAL(wp), ALLOCATABLE :: eta_interfaceL(:,:), eta_interfaceR(:,:)
+     REAL(wp), ALLOCATABLE :: eta_interfaceB(:,:), eta_interfaceT(:,:)
+
+     REAL(wp), ALLOCATABLE :: w_eta_x(:,:), w_eta_y(:,:)
 
      LOGICAL, ALLOCATABLE :: diverg_interfaceL(:,:)
      LOGICAL, ALLOCATABLE :: diverg_interfaceR(:,:)
@@ -59,6 +78,22 @@ CONTAINS
     ALLOCATE( this%qp_interfaceB( n_vars+2, comp_cells_x, comp_interfaces_y ) )
     ALLOCATE( this%qp_interfaceT( n_vars+2, comp_cells_x, comp_interfaces_y ) )
 
+    ALLOCATE( this%qp_cellW( n_vars+2, comp_cells_x, comp_cells_y ) )
+    ALLOCATE( this%qp_cellE( n_vars+2, comp_cells_x, comp_cells_y ) )
+    ALLOCATE( this%qp_cellS( n_vars+2, comp_cells_x, comp_cells_y ) )
+    ALLOCATE( this%qp_cellN( n_vars+2, comp_cells_x, comp_cells_y ) )
+
+    ALLOCATE( this%eta_cellW( comp_cells_x, comp_cells_y ) )
+    ALLOCATE( this%eta_cellE( comp_cells_x, comp_cells_y ) )
+    ALLOCATE( this%eta_cellS( comp_cells_x, comp_cells_y ) )
+    ALLOCATE( this%eta_cellN( comp_cells_x, comp_cells_y ) )
+    ALLOCATE( this%eta_interfaceL( comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%eta_interfaceR( comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%eta_interfaceB( comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%eta_interfaceT( comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%w_eta_x( comp_cells_x, comp_cells_y ) )
+    ALLOCATE( this%w_eta_y( comp_cells_x, comp_cells_y ) )
+
     ALLOCATE( this%diverg_interfaceL( comp_interfaces_x, comp_cells_y ) )
     ALLOCATE( this%diverg_interfaceR( comp_interfaces_x, comp_cells_y ) )
     ALLOCATE( this%diverg_interfaceB( comp_cells_x, comp_interfaces_y ) )
@@ -79,6 +114,22 @@ CONTAINS
     DEALLOCATE( this%qp_interfaceR )
     DEALLOCATE( this%qp_interfaceB )
     DEALLOCATE( this%qp_interfaceT )
+
+    DEALLOCATE( this%qp_cellW )
+    DEALLOCATE( this%qp_cellE )
+    DEALLOCATE( this%qp_cellS )
+    DEALLOCATE( this%qp_cellN )
+
+    DEALLOCATE( this%eta_cellW )
+    DEALLOCATE( this%eta_cellE )
+    DEALLOCATE( this%eta_cellS )
+    DEALLOCATE( this%eta_cellN )
+    DEALLOCATE( this%eta_interfaceL )
+    DEALLOCATE( this%eta_interfaceR )
+    DEALLOCATE( this%eta_interfaceB )
+    DEALLOCATE( this%eta_interfaceT )
+    DEALLOCATE( this%w_eta_x )
+    DEALLOCATE( this%w_eta_y )
 
     DEALLOCATE( this%diverg_interfaceL )
     DEALLOCATE( this%diverg_interfaceR )
@@ -139,6 +190,18 @@ CONTAINS
 
     LOGICAL :: diverging_flag
     LOGICAL :: regular_interior
+
+    ! Every cell has a defined constant candidate.  Active cells overwrite it
+    ! below with the ordinary limited reconstruction.  This also gives the HP
+    ! continuity indicator a well-defined neighbour at solve-mask boundaries.
+    DO k = 1, comp_cells_y
+       DO j = 1, comp_cells_x
+          this%qp_cellW(:,j,k) = qp_expl(:,j,k)
+          this%qp_cellE(:,j,k) = qp_expl(:,j,k)
+          this%qp_cellS(:,j,k) = qp_expl(:,j,k)
+          this%qp_cellN(:,j,k) = qp_expl(:,j,k)
+       END DO
+    END DO
 
     !WRITE(*,*) 'recontruction 0'
     !WRITE(*,*) 'nvars',n_vars
@@ -710,6 +773,11 @@ CONTAINS
        diverging_flag = ( ( qrec_prime_x(n_vars+1) + qrec_prime_y(n_vars+2) )   &
             .GT. 0.0_wp )
 
+       this%qp_cellW(:,j,k) = qrecW
+       this%qp_cellE(:,j,k) = qrecE
+       this%qp_cellS(:,j,k) = qrecS
+       this%qp_cellN(:,j,k) = qrecN
+
        IF ( comp_cells_x .GT. 1 ) THEN
 
           IF ( ( j .GT. 1 ) .AND. ( j .LT. comp_cells_x ) ) THEN
@@ -953,8 +1021,301 @@ CONTAINS
 
     !$OMP END PARALLEL DO
 
+    CALL apply_hp_reconstruction( this, qp_expl, solve_cells, j_cent, k_cent )
+
     RETURN
 
   END SUBROUTINE reconstruction
+
+  !******************************************************************************
+  !> \brief Replace direct cell traces with the final HP face states
+  !>
+  !> The first reconstruction pass supplies direct limited candidates.  This
+  !> second, line-wise pass can evaluate the neighbouring face mismatches used
+  !> by the parameter-free h/eta blend.  It then rebuilds thermodynamics and
+  !> conservative states from the final thickness and momenta.
+  !******************************************************************************
+  SUBROUTINE apply_hp_reconstruction( this, qp_center, solve_cells, j_cent,    &
+       k_cent )
+
+    USE state_conversion_2d, ONLY : qp_to_qc
+    USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
+    USE state_conversion_2d, ONLY : velocity_from_conservative
+    USE constitutive_parameters_2d, ONLY : T_ambient
+    USE parameters_2d, ONLY : limiter, reconstr_coeff
+    USE geometry_2d, ONLY : sourceW, sourceE, sourceS, sourceN
+
+    IMPLICIT NONE
+
+    CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
+    REAL(wp), INTENT(IN) :: qp_center(:,:,:)
+    INTEGER, INTENT(IN) :: solve_cells
+    INTEGER, INTENT(IN) :: j_cent(:), k_cent(:)
+
+    REAL(wp), ALLOCATABLE :: h_center(:), u_center(:)
+    REAL(wp), ALLOCATABLE :: B_minus(:), B_plus(:)
+    REAL(wp), ALLOCATABLE :: h_minus_direct(:), h_plus_direct(:)
+    REAL(wp), ALLOCATABLE :: hu_minus_direct(:), hu_plus_direct(:)
+    REAL(wp), ALLOCATABLE :: u_minus_candidate(:), u_plus_candidate(:)
+    REAL(wp), ALLOCATABLE :: h_minus(:), h_plus(:)
+    REAL(wp), ALLOCATABLE :: hu_minus(:), hu_plus(:)
+    REAL(wp), ALLOCATABLE :: eta_minus(:), eta_plus(:), weight(:)
+
+    REAL(wp) :: q_final(n_vars), qp_final(n_vars+2)
+    INTEGER :: j, k, l, line_size, maximum_line_size
+
+    maximum_line_size = MAX( comp_cells_x, comp_cells_y )
+    ALLOCATE( h_center(maximum_line_size), u_center(maximum_line_size) )
+    ALLOCATE( B_minus(maximum_line_size), B_plus(maximum_line_size) )
+    ALLOCATE( h_minus_direct(maximum_line_size) )
+    ALLOCATE( h_plus_direct(maximum_line_size) )
+    ALLOCATE( hu_minus_direct(maximum_line_size) )
+    ALLOCATE( hu_plus_direct(maximum_line_size) )
+    ALLOCATE( u_minus_candidate(maximum_line_size) )
+    ALLOCATE( u_plus_candidate(maximum_line_size) )
+    ALLOCATE( h_minus(maximum_line_size), h_plus(maximum_line_size) )
+    ALLOCATE( hu_minus(maximum_line_size), hu_plus(maximum_line_size) )
+    ALLOCATE( eta_minus(maximum_line_size), eta_plus(maximum_line_size) )
+    ALLOCATE( weight(maximum_line_size) )
+
+    line_size = comp_cells_x
+    DO k = 1, comp_cells_y
+
+       h_center(1:line_size) = qp_center(1,:,k)
+       u_center(1:line_size) = qp_center(idx_u,:,k)
+       B_minus(1:line_size) = B_face_x(1:comp_cells_x,k)
+       B_plus(1:line_size) = B_face_x(2:comp_interfaces_x,k)
+       h_minus_direct(1:line_size) = this%qp_cellW(1,:,k)
+       h_plus_direct(1:line_size) = this%qp_cellE(1,:,k)
+       hu_minus_direct(1:line_size) = this%qp_cellW(2,:,k)
+       hu_plus_direct(1:line_size) = this%qp_cellE(2,:,k)
+       u_minus_candidate(1:line_size) = this%qp_cellW(idx_u,:,k)
+       u_plus_candidate(1:line_size) = this%qp_cellE(idx_u,:,k)
+
+       CALL reconstruct_hp_line(                                                &
+            h_center(1:line_size), u_center(1:line_size),                      &
+            B_minus(1:line_size), B_plus(1:line_size),                         &
+            h_minus_direct(1:line_size), h_plus_direct(1:line_size),           &
+            hu_minus_direct(1:line_size), hu_plus_direct(1:line_size),         &
+            u_minus_candidate(1:line_size), u_plus_candidate(1:line_size),     &
+            limiter(1), reconstr_coeff, h_minus(1:line_size),                  &
+            h_plus(1:line_size), hu_minus(1:line_size), hu_plus(1:line_size),  &
+            eta_minus(1:line_size), eta_plus(1:line_size),                     &
+            weight(1:line_size) )
+
+       this%eta_cellW(:,k) = eta_minus(1:line_size)
+       this%eta_cellE(:,k) = eta_plus(1:line_size)
+       this%w_eta_x(:,k) = weight(1:line_size)
+
+       DO j = 1, comp_cells_x
+          this%qp_cellW(1,j,k) = h_minus(j)
+          this%qp_cellE(1,j,k) = h_plus(j)
+          this%qp_cellW(2,j,k) = hu_minus(j)
+          this%qp_cellE(2,j,k) = hu_plus(j)
+          this%qp_cellW(3,j,k) = h_minus(j) * this%qp_cellW(idx_v,j,k)
+          this%qp_cellE(3,j,k) = h_plus(j) * this%qp_cellE(idx_v,j,k)
+          this%qp_cellW(idx_u,j,k) = safe_velocity(hu_minus(j),h_minus(j))
+          this%qp_cellE(idx_u,j,k) = safe_velocity(hu_plus(j),h_plus(j))
+       END DO
+
+    END DO
+
+    line_size = comp_cells_y
+    DO j = 1, comp_cells_x
+
+       h_center(1:line_size) = qp_center(1,j,:)
+       u_center(1:line_size) = qp_center(idx_v,j,:)
+       B_minus(1:line_size) = B_face_y(j,1:comp_cells_y)
+       B_plus(1:line_size) = B_face_y(j,2:comp_interfaces_y)
+       h_minus_direct(1:line_size) = this%qp_cellS(1,j,:)
+       h_plus_direct(1:line_size) = this%qp_cellN(1,j,:)
+       hu_minus_direct(1:line_size) = this%qp_cellS(3,j,:)
+       hu_plus_direct(1:line_size) = this%qp_cellN(3,j,:)
+       u_minus_candidate(1:line_size) = this%qp_cellS(idx_v,j,:)
+       u_plus_candidate(1:line_size) = this%qp_cellN(idx_v,j,:)
+
+       CALL reconstruct_hp_line(                                                &
+            h_center(1:line_size), u_center(1:line_size),                      &
+            B_minus(1:line_size), B_plus(1:line_size),                         &
+            h_minus_direct(1:line_size), h_plus_direct(1:line_size),           &
+            hu_minus_direct(1:line_size), hu_plus_direct(1:line_size),         &
+            u_minus_candidate(1:line_size), u_plus_candidate(1:line_size),     &
+            limiter(1), reconstr_coeff, h_minus(1:line_size),                  &
+            h_plus(1:line_size), hu_minus(1:line_size), hu_plus(1:line_size),  &
+            eta_minus(1:line_size), eta_plus(1:line_size),                     &
+            weight(1:line_size) )
+
+       this%eta_cellS(j,:) = eta_minus(1:line_size)
+       this%eta_cellN(j,:) = eta_plus(1:line_size)
+       this%w_eta_y(j,:) = weight(1:line_size)
+
+       DO k = 1, comp_cells_y
+          this%qp_cellS(1,j,k) = h_minus(k)
+          this%qp_cellN(1,j,k) = h_plus(k)
+          this%qp_cellS(2,j,k) = h_minus(k) * this%qp_cellS(idx_u,j,k)
+          this%qp_cellN(2,j,k) = h_plus(k) * this%qp_cellN(idx_u,j,k)
+          this%qp_cellS(3,j,k) = hu_minus(k)
+          this%qp_cellN(3,j,k) = hu_plus(k)
+          this%qp_cellS(idx_v,j,k) = safe_velocity(hu_minus(k),h_minus(k))
+          this%qp_cellN(idx_v,j,k) = safe_velocity(hu_plus(k),h_plus(k))
+       END DO
+
+    END DO
+
+    ! Map all eta cell traces to their oriented face storage.  Conservative
+    ! and primitive states below are restricted to the active solve mask.
+    DO k = 1, comp_cells_y
+       DO j = 1, comp_cells_x
+          this%eta_interfaceR(j,k) = this%eta_cellW(j,k)
+          this%eta_interfaceL(j+1,k) = this%eta_cellE(j,k)
+       END DO
+       this%eta_interfaceL(1,k) = this%eta_interfaceR(1,k)
+       this%eta_interfaceR(comp_interfaces_x,k) =                             &
+            this%eta_interfaceL(comp_interfaces_x,k)
+    END DO
+
+    DO j = 1, comp_cells_x
+       DO k = 1, comp_cells_y
+          this%eta_interfaceT(j,k) = this%eta_cellS(j,k)
+          this%eta_interfaceB(j,k+1) = this%eta_cellN(j,k)
+       END DO
+       this%eta_interfaceB(j,1) = this%eta_interfaceT(j,1)
+       this%eta_interfaceT(j,comp_interfaces_y) =                             &
+            this%eta_interfaceB(j,comp_interfaces_y)
+    END DO
+
+    DO l = 1, solve_cells
+
+       j = j_cent(l)
+       k = k_cent(l)
+
+       CALL final_hp_state( this%qp_cellW(:,j,k), q_final, qp_final )
+       this%q_interfaceR(:,j,k) = q_final
+       this%qp_interfaceR(:,j,k) = qp_final
+
+       CALL final_hp_state( this%qp_cellE(:,j,k), q_final, qp_final )
+       this%q_interfaceL(:,j+1,k) = q_final
+       this%qp_interfaceL(:,j+1,k) = qp_final
+
+       CALL final_hp_state( this%qp_cellS(:,j,k), q_final, qp_final )
+       this%q_interfaceT(:,j,k) = q_final
+       this%qp_interfaceT(:,j,k) = qp_final
+
+       CALL final_hp_state( this%qp_cellN(:,j,k), q_final, qp_final )
+       this%q_interfaceB(:,j,k+1) = q_final
+       this%qp_interfaceB(:,j,k+1) = qp_final
+
+    END DO
+
+    ! Preserve the solver's existing external ghost convention after replacing
+    ! the cell-owned traces.
+    DO k = 1, comp_cells_y
+       this%q_interfaceL(:,1,k) = this%q_interfaceR(:,1,k)
+       this%qp_interfaceL(:,1,k) = this%qp_interfaceR(:,1,k)
+       this%q_interfaceR(:,comp_interfaces_x,k) =                             &
+            this%q_interfaceL(:,comp_interfaces_x,k)
+       this%qp_interfaceR(:,comp_interfaces_x,k) =                            &
+            this%qp_interfaceL(:,comp_interfaces_x,k)
+    END DO
+
+    DO j = 1, comp_cells_x
+       this%q_interfaceB(:,j,1) = this%q_interfaceT(:,j,1)
+       this%qp_interfaceB(:,j,1) = this%qp_interfaceT(:,j,1)
+       this%q_interfaceT(:,j,comp_interfaces_y) =                             &
+            this%q_interfaceB(:,j,comp_interfaces_y)
+       this%qp_interfaceT(:,j,comp_interfaces_y) =                            &
+            this%qp_interfaceB(:,j,comp_interfaces_y)
+    END DO
+
+    ! Rebuild the internal reflecting side of radial-source cells from the new
+    ! HP state.  The volumetric momentum and auxiliary normal velocity are both
+    ! reflected so qp and q remain consistent.
+    IF ( radial_source_flag ) THEN
+       DO l = 1, solve_cells
+          j = j_cent(l)
+          k = k_cent(l)
+          IF ( source_cell(j,k) .NE. 2 ) CYCLE
+
+          IF ( sourceE(j,k) ) THEN
+             this%q_interfaceR(:,j+1,k) = this%q_interfaceL(:,j+1,k)
+             this%q_interfaceR(2,j+1,k) = -this%q_interfaceR(2,j+1,k)
+             this%qp_interfaceR(:,j+1,k) = this%qp_interfaceL(:,j+1,k)
+             this%qp_interfaceR(2,j+1,k) = -this%qp_interfaceR(2,j+1,k)
+             this%qp_interfaceR(idx_u,j+1,k) =                               &
+                  -this%qp_interfaceR(idx_u,j+1,k)
+             this%eta_interfaceR(j+1,k) = this%eta_interfaceL(j+1,k)
+          ELSEIF ( sourceW(j,k) ) THEN
+             this%q_interfaceL(:,j,k) = this%q_interfaceR(:,j,k)
+             this%q_interfaceL(2,j,k) = -this%q_interfaceL(2,j,k)
+             this%qp_interfaceL(:,j,k) = this%qp_interfaceR(:,j,k)
+             this%qp_interfaceL(2,j,k) = -this%qp_interfaceL(2,j,k)
+             this%qp_interfaceL(idx_u,j,k) = -this%qp_interfaceL(idx_u,j,k)
+             this%eta_interfaceL(j,k) = this%eta_interfaceR(j,k)
+          END IF
+
+          IF ( sourceN(j,k) ) THEN
+             this%q_interfaceT(:,j,k+1) = this%q_interfaceB(:,j,k+1)
+             this%q_interfaceT(3,j,k+1) = -this%q_interfaceT(3,j,k+1)
+             this%qp_interfaceT(:,j,k+1) = this%qp_interfaceB(:,j,k+1)
+             this%qp_interfaceT(3,j,k+1) = -this%qp_interfaceT(3,j,k+1)
+             this%qp_interfaceT(idx_v,j,k+1) =                               &
+                  -this%qp_interfaceT(idx_v,j,k+1)
+             this%eta_interfaceT(j,k+1) = this%eta_interfaceB(j,k+1)
+          ELSEIF ( sourceS(j,k) ) THEN
+             this%q_interfaceB(:,j,k) = this%q_interfaceT(:,j,k)
+             this%q_interfaceB(3,j,k) = -this%q_interfaceB(3,j,k)
+             this%qp_interfaceB(:,j,k) = this%qp_interfaceT(:,j,k)
+             this%qp_interfaceB(3,j,k) = -this%qp_interfaceB(3,j,k)
+             this%qp_interfaceB(idx_v,j,k) = -this%qp_interfaceB(idx_v,j,k)
+             this%eta_interfaceB(j,k) = this%eta_interfaceT(j,k)
+          END IF
+       END DO
+    END IF
+
+    DEALLOCATE( h_center, u_center, B_minus, B_plus )
+    DEALLOCATE( h_minus_direct, h_plus_direct )
+    DEALLOCATE( hu_minus_direct, hu_plus_direct )
+    DEALLOCATE( u_minus_candidate, u_plus_candidate )
+    DEALLOCATE( h_minus, h_plus, hu_minus, hu_plus )
+    DEALLOCATE( eta_minus, eta_plus, weight )
+
+  CONTAINS
+
+    PURE FUNCTION safe_velocity(momentum,thickness) RESULT(velocity)
+
+      REAL(wp), INTENT(IN) :: momentum, thickness
+      REAL(wp) :: velocity
+
+      IF ( thickness .GT. hp_dry_tolerance ) THEN
+         velocity = momentum / thickness
+      ELSE
+         velocity = 0.0_wp
+      END IF
+
+    END FUNCTION safe_velocity
+
+    SUBROUTINE final_hp_state(qp_candidate,q_conservative,qp_reconstructed)
+
+      REAL(wp), INTENT(IN) :: qp_candidate(n_vars+2)
+      REAL(wp), INTENT(OUT) :: q_conservative(n_vars)
+      REAL(wp), INTENT(OUT) :: qp_reconstructed(n_vars+2)
+
+      qp_reconstructed = qp_candidate
+
+      IF ( qp_reconstructed(1) .LE. hp_dry_tolerance ) THEN
+         qp_reconstructed = 0.0_wp
+         qp_reconstructed(4) = T_ambient
+         q_conservative = 0.0_wp
+         RETURN
+      END IF
+
+      CALL enforce_primitive_mass_fraction_closure(qp_reconstructed)
+      CALL qp_to_qc(qp_reconstructed,q_conservative)
+      CALL velocity_from_conservative(q_conservative,                        &
+           qp_reconstructed(idx_u),qp_reconstructed(idx_v))
+
+    END SUBROUTINE final_hp_state
+
+  END SUBROUTINE apply_hp_reconstruction
 
 END MODULE reconstruction_2d
