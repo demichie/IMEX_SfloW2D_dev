@@ -1,182 +1,85 @@
 PROGRAM test_hydrostatic_path
 
-  USE parameters_2d, ONLY : wp, limiter, reconstr_coeff, theta
-  USE geometry_2d, ONLY : B_cent, B_faceW, B_faceE, B_faceS, B_faceN
-  USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, dx, dy, dx2, dy2
-  USE geometry_2d, ONLY : reconstruct_topography_faces
-  USE nonconservative_2d, ONLY : eval_path_contribution, PATH_DIR_X, PATH_DIR_Y
+  USE parameters_2d, ONLY : wp
+  USE geometry_2d, ONLY : B_vertex, B_face_x, B_face_y, B_cent
+  USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
+  USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
+  USE geometry_2d, ONLY : derive_topography_from_vertices
+  USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
+  USE pccu_2d, ONLY : eval_hydrostatic_path
 
   IMPLICIT NONE
 
   REAL(wp), PARAMETER :: H0 = 20.0_wp
   REAL(wp), PARAMETER :: gamma0 = 9.0E3_wp
 
-  REAL(wp) :: energy_path
-  REAL(wp) :: max_cell_error
-  REAL(wp) :: momentum_path
-  REAL(wp) :: pressureL, pressureR
-  REAL(wp) :: reverse_energy_path
-  REAL(wp) :: reverse_momentum_path
-  REAL(wp) :: tolerance
-  REAL(wp) :: gravW, gravE, gravS, gravN
-  REAL(wp) :: hW, hE, hS, hN
-
+  REAL(wp) :: path(6), reverse_path(6)
+  REAL(wp) :: max_cell_error, tolerance
+  REAL(wp) :: x, y, h_minus, h_plus
   INTEGER :: j, k
 
   comp_cells_x = 8
   comp_cells_y = 7
-  dx = 0.75_wp
-  dy = 1.25_wp
-  dx2 = 0.5_wp * dx
-  dy2 = 0.5_wp * dy
+  comp_interfaces_x = comp_cells_x + 1
+  comp_interfaces_y = comp_cells_y + 1
 
-  limiter(1) = 3
-  reconstr_coeff = 1.0_wp
-  theta = 1.3_wp
-
+  ALLOCATE( B_vertex(comp_interfaces_x,comp_interfaces_y) )
+  ALLOCATE( B_face_x(comp_interfaces_x,comp_cells_y) )
+  ALLOCATE( B_face_y(comp_cells_x,comp_interfaces_y) )
   ALLOCATE( B_cent(comp_cells_x,comp_cells_y) )
-  ALLOCATE( B_faceW(comp_cells_x,comp_cells_y) )
-  ALLOCATE( B_faceE(comp_cells_x,comp_cells_y) )
-  ALLOCATE( B_faceS(comp_cells_x,comp_cells_y) )
-  ALLOCATE( B_faceN(comp_cells_x,comp_cells_y) )
 
-  DO k = 1, comp_cells_y
-     DO j = 1, comp_cells_x
-        B_cent(j,k) = 2.0_wp + 0.17_wp * REAL(j,wp)                           &
-             - 0.11_wp * REAL(k,wp) + 0.013_wp * REAL(j*j,wp)                &
-             + 0.007_wp * REAL(j*k,wp) - 0.009_wp * REAL(k*k,wp)
+  DO k = 1, comp_interfaces_y
+     y = REAL(k-1,wp)
+     DO j = 1, comp_interfaces_x
+        x = REAL(j-1,wp)
+        B_vertex(j,k) = 2.0_wp + 0.17_wp*x - 0.11_wp*y                    &
+             + 0.013_wp*x*x + 0.007_wp*x*y - 0.009_wp*y*y
      END DO
   END DO
-
-  CALL reconstruct_topography_faces
+  CALL derive_topography_from_vertices
 
   max_cell_error = 0.0_wp
-
   DO k = 1, comp_cells_y
      DO j = 1, comp_cells_x
+        h_minus = H0-B_face_x(j,k)
+        h_plus = H0-B_face_x(j+1,k)
+        CALL eval_hydrostatic_path(PATH_DIR_X,h_minus,gamma0,H0,            &
+             h_plus,gamma0,H0,path)
+        max_cell_error = MAX(max_cell_error,MAXVAL(ABS(path)))
 
-        gravW = 0.75_wp + 0.01_wp * REAL(j-1,wp) + 0.004_wp * REAL(k,wp)
-        gravE = 0.75_wp + 0.01_wp * REAL(j,wp) + 0.004_wp * REAL(k,wp)
-        gravS = 0.80_wp + 0.006_wp * REAL(j,wp) + 0.008_wp * REAL(k-1,wp)
-        gravN = 0.80_wp + 0.006_wp * REAL(j,wp) + 0.008_wp * REAL(k,wp)
-
-        hW = H0 - B_faceW(j,k)
-        hE = H0 - B_faceE(j,k)
-        hS = H0 - B_faceS(j,k)
-        hN = H0 - B_faceN(j,k)
-
-        CALL eval_hydrostatic_path_integral( PATH_DIR_X, hW, hE, gamma0,     &
-             gamma0,                                                         &
-             gravW, gravE, B_faceW(j,k), B_faceE(j,k), 0.0_wp, 0.0_wp,       &
-             momentum_path, energy_path )
-
-        pressureL = 0.5_wp * gamma0 * gravW * hW**2
-        pressureR = 0.5_wp * gamma0 * gravE * hE**2
-        max_cell_error = MAX( max_cell_error,                                &
-             ABS(momentum_path - (pressureR - pressureL)), ABS(energy_path) )
-
-        CALL eval_hydrostatic_path_integral( PATH_DIR_Y, hS, hN, gamma0,     &
-             gamma0,                                                         &
-             gravS, gravN, B_faceS(j,k), B_faceN(j,k), 0.0_wp, 0.0_wp,       &
-             momentum_path, energy_path )
-
-        pressureL = 0.5_wp * gamma0 * gravS * hS**2
-        pressureR = 0.5_wp * gamma0 * gravN * hN**2
-        max_cell_error = MAX( max_cell_error,                                &
-             ABS(momentum_path - (pressureR - pressureL)), ABS(energy_path) )
-
+        h_minus = H0-B_face_y(j,k)
+        h_plus = H0-B_face_y(j,k+1)
+        CALL eval_hydrostatic_path(PATH_DIR_Y,h_minus,gamma0,H0,            &
+             h_plus,gamma0,H0,path)
+        max_cell_error = MAX(max_cell_error,MAXVAL(ABS(path)))
      END DO
   END DO
 
-  tolerance = 4096.0_wp * EPSILON(1.0_wp) * gamma0 * H0**2
+  tolerance = 4096.0_wp*EPSILON(1.0_wp)*gamma0*H0**2
+  CALL assert_small('lake-at-rest cell paths',max_cell_error,tolerance)
 
-  IF ( max_cell_error .GT. tolerance ) THEN
-     WRITE(*,*) 'FAIL: lake-at-rest cell path error = ', max_cell_error
-     ERROR STOP 1
-  END IF
+  CALL eval_hydrostatic_path(PATH_DIR_X,1.2_wp,8.5E3_wp,2.4_wp,            &
+       0.7_wp,9.1E3_wp,2.9_wp,path)
+  CALL eval_hydrostatic_path(PATH_DIR_X,0.7_wp,9.1E3_wp,2.9_wp,            &
+       1.2_wp,8.5E3_wp,2.4_wp,reverse_path)
+  tolerance = 4096.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,MAXVAL(ABS(path)))
+  CALL assert_small('path antisymmetry',MAXVAL(ABS(path+reverse_path)),tolerance)
+  CALL assert_small('thermal path component',ABS(path(4)),0.0_wp)
 
-  CALL eval_hydrostatic_path_integral( PATH_DIR_X, 1.2_wp, 0.7_wp,          &
-       8.5E3_wp, 9.1E3_wp,                                                   &
-       0.81_wp, 0.93_wp, 2.4_wp, 2.9_wp, -0.3_wp, 1.1_wp,                  &
-       momentum_path, energy_path )
-  CALL eval_hydrostatic_path_integral( PATH_DIR_X, 0.7_wp, 1.2_wp,          &
-       9.1E3_wp, 8.5E3_wp,                                                   &
-       0.93_wp, 0.81_wp, 2.9_wp, 2.4_wp, 1.1_wp, -0.3_wp,                  &
-       reverse_momentum_path, reverse_energy_path )
-
-  tolerance = 4096.0_wp * EPSILON(1.0_wp)                                  &
-       * MAX(1.0_wp, ABS(momentum_path), ABS(energy_path))
-
-  IF ( ABS(momentum_path + reverse_momentum_path) .GT. tolerance .OR.       &
-       ABS(energy_path + reverse_energy_path) .GT. tolerance ) THEN
-     WRITE(*,*) 'FAIL: reversed path is not antisymmetric'
-     ERROR STOP 1
-  END IF
-
-  CALL eval_hydrostatic_path_integral( PATH_DIR_X, 1.2_wp, 0.7_wp,          &
-       8.5E3_wp, 9.1E3_wp,                                                   &
-       0.9_wp, 0.9_wp, 2.4_wp, 2.4_wp, -0.3_wp, 1.1_wp,                    &
-       momentum_path, energy_path )
-
-  IF ( momentum_path .NE. 0.0_wp .OR. energy_path .NE. 0.0_wp ) THEN
-     WRITE(*,*) 'FAIL: constant geometry path is not zero'
-     ERROR STOP 1
-  END IF
-
-  WRITE(*,*) 'PASS: hydrostatic path identities verified'
+  WRITE(*,*) 'PASS: production hydrostatic path identities verified'
 
 CONTAINS
 
-  SUBROUTINE eval_hydrostatic_path_integral( direction, hL, hR, gammaL,     &
-       gammaR,                                                               &
-       gravL, gravR, bedL, bedR, velL, velR, momentum_path, energy_path )
+  SUBROUTINE assert_small(label,value,limit_value)
 
-    INTEGER, INTENT(IN) :: direction
-    REAL(wp), INTENT(IN) :: hL, hR
-    REAL(wp), INTENT(IN) :: gammaL, gammaR
-    REAL(wp), INTENT(IN) :: gravL, gravR
-    REAL(wp), INTENT(IN) :: bedL, bedR
-    REAL(wp), INTENT(IN) :: velL, velR
-    REAL(wp), INTENT(OUT) :: momentum_path
-    REAL(wp), INTENT(OUT) :: energy_path
+    CHARACTER(LEN=*), INTENT(IN) :: label
+    REAL(wp), INTENT(IN) :: value, limit_value
 
-    REAL(wp) :: path_contribution(2)
-    REAL(wp) :: stateL(5), stateR(5)
-
-    stateL = [ hL, gammaL, gravL, bedL, velL ]
-    stateR = [ hR, gammaR, gravR, bedR, velR ]
-
-    CALL eval_path_contribution( direction, stateL, stateR,                  &
-         hydrostatic_integrand, path_contribution )
-
-    momentum_path = path_contribution(1)
-    energy_path = path_contribution(2)
-
-  END SUBROUTINE eval_hydrostatic_path_integral
-
-
-  SUBROUTINE hydrostatic_integrand( direction, path_state, dstate_ds,        &
-       integrand )
-
-    INTEGER, INTENT(IN) :: direction
-    REAL(wp), INTENT(IN) :: path_state(:)
-    REAL(wp), INTENT(IN) :: dstate_ds(:)
-    REAL(wp), INTENT(OUT) :: integrand(:)
-
-    REAL(wp) :: momentum_integrand
-
-    IF ( direction .NE. PATH_DIR_X .AND. direction .NE. PATH_DIR_Y ) THEN
-       ERROR STOP 'hydrostatic_integrand: unexpected direction'
+    IF (value .GT. limit_value) THEN
+       WRITE(*,*) 'FAIL: ',TRIM(label),value,' > ',limit_value
+       ERROR STOP 1
     END IF
 
-    momentum_integrand = -path_state(2) * path_state(3) * path_state(1)     &
-         * dstate_ds(4) + 0.5_wp * path_state(2) * path_state(1)**2         &
-         * dstate_ds(3)
-
-    integrand = 0.0_wp
-    integrand(1) = momentum_integrand
-    integrand(2) = path_state(5) * momentum_integrand
-
-  END SUBROUTINE hydrostatic_integrand
+  END SUBROUTINE assert_small
 
 END PROGRAM test_hydrostatic_path

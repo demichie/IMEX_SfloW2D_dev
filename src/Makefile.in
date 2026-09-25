@@ -107,6 +107,7 @@ am_IMEX_SfloW2D_OBJECTS = parameters_2d.$(OBJEXT) \
     complexify.$(OBJEXT) \
 	geometry_2d.$(OBJEXT) state_conversion_2d.$(OBJEXT) \
 	equation_terms_2d.$(OBJEXT) nonconservative_2d.$(OBJEXT) \
+	pccu_2d.$(OBJEXT) \
 	domain_2d.$(OBJEXT) \
 	constitutive_2d.$(OBJEXT) state_2d.$(OBJEXT) \
 	mass_exchange_2d.$(OBJEXT) \
@@ -270,6 +271,7 @@ IMEX_SfloW2D_SOURCES = \
                 state_conversion_2d.f90 \
                 equation_terms_2d.f90 \
                 nonconservative_2d.f90 \
+                pccu_2d.f90 \
                 domain_2d.f90 \
                 constitutive_2d.f90 \
                 state_2d.f90 \

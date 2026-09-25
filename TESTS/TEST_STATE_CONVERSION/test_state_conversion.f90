@@ -3,8 +3,8 @@ PROGRAM test_state_conversion
   USE parameters_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE equation_terms_2d, ONLY : eval_fluxes, limit_component_mass_flux,       &
-       eval_source_bdry
+  USE equation_terms_2d, ONLY : eval_fluxes, eval_inertial_flux,              &
+       limit_component_mass_flux, eval_source_bdry
 
   IMPLICIT NONE
 
@@ -164,6 +164,13 @@ CONTAINS
          qp0(idx_u)*q0(4), 2.0E-12_wp)
     CALL assert_close_scalar(TRIM(label)//' y thermal flux', flux_y(4),       &
          qp0(idx_v)*q0(4), 2.0E-12_wp)
+
+    CALL eval_inertial_flux(q0, qp0, 1, flux_x)
+    CALL eval_inertial_flux(q0, qp0, 2, flux_y)
+    CALL assert_close_vector(TRIM(label)//' x inertial flux', flux_x,         &
+         qp0(idx_u)*q0, 2.0E-12_wp)
+    CALL assert_close_vector(TRIM(label)//' y inertial flux', flux_y,         &
+         qp0(idx_v)*q0, 2.0E-12_wp)
 
     CALL check_real_complex(TRIM(label), q0, 2.0E-12_wp)
     CALL check_thermodynamic_kernels(TRIM(label), qp0, q0, 2.0E-12_wp)

@@ -33,6 +33,7 @@ MODULE equation_terms_2d
   PUBLIC :: init_problem_param
   PUBLIC :: eval_local_speeds_x, eval_local_speeds_y
   PUBLIC :: eval_fluxes
+  PUBLIC :: eval_inertial_flux, eval_hydrostatic_coefficient
   PUBLIC :: limit_component_mass_flux
   PUBLIC :: eval_expl_terms, integrate_friction_term
   PUBLIC :: eval_implicit_terms, eval_nh_semi_impl_terms
@@ -223,6 +224,58 @@ CONTAINS
     RETURN
 
   END SUBROUTINE eval_local_speeds_y
+
+  !******************************************************************************
+  !> \brief Thermodynamic coefficient of the hydrostatic path
+  !>
+  !> Gamma=rho_m*g' is recomputed from the final reconstructed primitive state;
+  !> no derived thermodynamic quantity is reconstructed independently.
+  !******************************************************************************
+  SUBROUTINE eval_hydrostatic_coefficient(qpj,reduced_gravity,gamma)
+
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2)
+    REAL(wp), INTENT(OUT) :: reduced_gravity, gamma
+
+    REAL(wp) :: Richardson, rho_m, rho_c
+    REAL(wp) :: sp_heat_c, sp_heat_mix
+
+    CALL mixt_var(qpj,Richardson,rho_m,rho_c,reduced_gravity,sp_heat_c,       &
+         sp_heat_mix)
+    gamma = rho_m * reduced_gravity
+
+  END SUBROUTINE eval_hydrostatic_coefficient
+
+  !******************************************************************************
+  !> \brief Pressure-free conservative flux used by HP-PCCU
+  !>
+  !> Every retained conservative component is transported by the normal face
+  !> velocity.  Hydrostatic pressure is represented exclusively by the path
+  !> contribution and must not appear in this flux.
+  !******************************************************************************
+  SUBROUTINE eval_inertial_flux(qcj,qpj,dir,flux)
+
+    REAL(wp), INTENT(IN) :: qcj(n_vars)
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2)
+    INTEGER, INTENT(IN) :: dir
+    REAL(wp), INTENT(OUT) :: flux(n_eqns)
+
+    REAL(wp) :: normal_velocity
+
+    flux = 0.0_wp
+    IF ( qpj(1) .LE. EPSILON(1.0_wp) ) RETURN
+
+    SELECT CASE ( dir )
+    CASE ( 1 )
+       normal_velocity = qpj(idx_u)
+    CASE ( 2 )
+       normal_velocity = qpj(idx_v)
+    CASE DEFAULT
+       ERROR STOP 'eval_inertial_flux: invalid direction'
+    END SELECT
+
+    flux = normal_velocity * qcj(1:n_eqns)
+
+  END SUBROUTINE eval_inertial_flux
 
   !******************************************************************************
   !> \brief Hyperbolic Fluxes
@@ -483,15 +536,17 @@ CONTAINS
 
        END IF
 
-       r_tilde_grav = r_red_grav + centr_force_term
+       ! Hydrostatic pressure and the ordinary bed-slope source are represented
+       ! together by the HP path in hyperbolic_2d.  Only the velocity-dependent
+       ! curvature force remains here.  Gate E uses G=1; the validated G-weight
+       ! is introduced in the following slope-correction gate.
+       r_tilde_grav = centr_force_term
 
        ! units of dqc(2)/dt [kg m-1 s-2]
-       expl_term(2) = - grav_coeff * r_rho_m * r_tilde_grav * r_h * Bprimej_x  &
-            + 0.5_wp * r_rho_m * r_red_grav * r_h**2 * d_grav_coeff_dx
+       expl_term(2) = - r_rho_m * r_tilde_grav * r_h * Bprimej_x
 
        ! units of dqc(3)/dt [kg m-1 s-2]
-       expl_term(3) = - grav_coeff * r_rho_m * r_tilde_grav * r_h * Bprimej_y  &
-            + 0.5_wp * r_rho_m * r_red_grav * r_h**2 * d_grav_coeff_dy
+       expl_term(3) = - r_rho_m * r_tilde_grav * r_h * Bprimej_y
 
        ! The hydrostatic path/source has no thermal-energy component.
        expl_term(4) = 0.0_wp

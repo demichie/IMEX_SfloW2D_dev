@@ -2128,44 +2128,19 @@ CONTAINS
 
     END IF
 
-    IF ((solver_scheme .NE. 'LxF') .AND. (solver_scheme .NE. 'KT') .AND. &
-        (solver_scheme .NE. 'GFORCE') .AND. (solver_scheme .NE. 'UP')) THEN
-
-      WRITE (*, *) 'ERROR: no correct solver scheme selected', solver_scheme
-      WRITE (*, *) 'Chose between: LxF, GFORCE or KT'
+    ! HP-PCCU is the only production spatial operator.  Keep the historical
+    ! value "KT" in the namelist for compatibility with existing input files;
+    ! it no longer selects the legacy KT implementation.
+    IF (solver_scheme .NE. 'KT') THEN
+      WRITE (*, *) 'ERROR: only the HP-PCCU spatial operator is supported'
+      WRITE (*, *) 'Use the compatibility input SOLVER_SCHEME = "KT"'
       ERROR STOP 1
-
     END IF
 
-    ! eval_flux_LxF and eval_flux_GFORCE are empty stubs: they print a
-    ! message and return without filling the interface flux arrays, so a
-    ! run would continue on uninitialised fluxes. Reject them at input
-    ! until they are implemented.
-    IF ((solver_scheme .EQ. 'LxF') .OR. (solver_scheme .EQ. 'GFORCE')) THEN
-
-      WRITE (*, *) 'ERROR: solver scheme ', TRIM(solver_scheme),              &
-           ' is not implemented in the 2-d case'
-      WRITE (*, *) 'Use SOLVER_SCHEME = "KT"'
-      ERROR STOP 1
-
-    END IF
-
-    IF ((solver_scheme .EQ. 'LxF') .OR. (solver_scheme .EQ. 'GFORCE')) THEN
-
-      max_cfl = 1.0
-
+    IF ((comp_cells_x .EQ. 1) .OR. (comp_cells_y .EQ. 1)) THEN
+      max_cfl = 0.50_wp
     ELSE
-
-      IF ((comp_cells_x .EQ. 1) .OR. (comp_cells_y .EQ. 1)) THEN
-
-        max_cfl = 0.50_wp
-
-      ELSE
-
-        max_cfl = 0.25_wp
-
-      END IF
-
+      max_cfl = 0.25_wp
     END IF
 
     IF ((cfl .GT. max_cfl) .OR. (cfl .LT. 0.0_wp)) THEN

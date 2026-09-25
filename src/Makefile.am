@@ -23,6 +23,7 @@ IMEX_SfloW2D_SOURCES = \
                 state_conversion_2d.f90 \
                 equation_terms_2d.f90 \
                 nonconservative_2d.f90 \
+                pccu_2d.f90 \
                 domain_2d.f90 \
                 constitutive_2d.f90 \
                 state_2d.f90 \

@@ -26,13 +26,15 @@ Default grid:
     dx = dy = 0.25 m
     ny = 80
 
-A rectangular region is excavated by a constant 2 m:
+A rectangular interior is excavated by 2 m. Each side is connected to the
+surrounding plane by a continuous one-cell Q1 ramp:
 
     x in [10,20) m
     y in [-5,5) m.
 
-Inside that region the initial water thickness is exactly 2 m; outside it is
-zero. Therefore inside the wet region
+On the interior plateau the initial water thickness is exactly 2 m. On the
+four side ramps and bilinear corner patches it is h=B0-B; outside it is zero.
+Therefore throughout the wet region
 
     eta = B + h = B0,
 
@@ -42,19 +44,13 @@ original, unexcavated topography.
 The slope descends toward +x (east). The physically expected initial
 acceleration is therefore toward +x. There is no free-surface gradient in y.
 
-Why the DEM format differs slightly from old example generators
----------------------------------------------------------------
-The DEM is written at the computational CELL CENTERS with
-
-    xllcorner = x_min
-    yllcorner = y_min
-    ncols = nx_cells
-    nrows = ny_cells.
-
-This matches the current reader coordinates
-x = xllcorner + (j-0.5)*cellsize and makes the 2 m excavation jump fall exactly
-between computational cells. This is useful here because the test is meant to
-study a true numerical topographic step.
+Why the DEM format differs from old example generators
+------------------------------------------------------
+The padded DEM is aligned with the computational VERTICES. Its interior
+samples are exactly the authoritative B_vertex values used by the continuous
+HP geometry. Cell centers and shared face elevations are derived from that
+single Q1 field; no discontinuous pair of bed values exists at an internal
+face.
 
 Model configuration
 -------------------
@@ -66,7 +62,7 @@ Model configuration
   fourth equation = thermal energy
   ENTRAINMENT_FLAG = F
   LOSS_RATE = 0
-  SOLVER_SCHEME = KT
+  SOLVER_SCHEME = KT       (legacy input label for the sole HP-PCCU operator)
   CFL = 0.24
   LIMITER = generalized minmod (3)
   THETA = 1.3
@@ -94,13 +90,9 @@ This creates:
     initial_thickness.png          (with --plot)
     initial_centerline.png         (with --plot)
 
-Expected behavior: current scheme
----------------------------------
-At t=0, u=v=0. At the wet/dry excavation walls the dissipative part of the KT
-mass flux can move water into dry cells even before the physical downslope
-velocity develops.
-
-The most important signatures are:
+Expected behavior
+-----------------
+At t=0, u=v=0. The most important signatures are:
 
   1. WEST / upslope wall (x=10 m):
        water appearing for x < 10 m is spurious uphill leakage.
@@ -110,22 +102,13 @@ The most important signatures are:
        because the initial free-surface gradient has no y component.
 
   3. EAST / downslope wall (x=20 m):
-       the current scheme may also leak immediately by numerical diffusion.
-       Physically, with a vertical 2 m wall and zero initial velocity, the water
-       should first accelerate inside the excavation, accumulate at the east
-       wall, and only then overtop it.
+       water should first accelerate inside the excavation, accumulate near
+       the east ramp, and only then cross the outer crest.
 
-Expected behavior: proposed hydrostatic reconstruction
-------------------------------------------------------
-With
-
-    B* = max(B_L,B_R),
-    h*_L = max(0, eta_L-B*),
-    h*_R = max(0, eta_R-B*),
-
-the corrected initial water depth at all four vertical excavation walls is
-zero because the initial free surface equals the surrounding unexcavated bed.
-Thus all four initial mass fluxes through the vertical step should be zero.
+The HP reconstruction uses the unique shared Q1 face bed and the
+positivity-limited eta-B candidate. At each outer crest the reconstructed wet
+and dry endpoint thicknesses are initially zero, so the PCCU mass transport
+through all four outer faces is zero without a special step classifier.
 
 Gravity still accelerates water internally toward +x. The west/north/south
 walls should remain dry. The east wall should start discharging only after the

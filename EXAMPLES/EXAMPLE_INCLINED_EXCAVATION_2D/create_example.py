@@ -4,13 +4,12 @@
 The unexcavated bed is a plane descending in +x:
     B0(x) = z_ref - tan(slope_angle) * x.
 
-Inside a rectangular patch, a constant thickness d is excavated:
-    B = B0 - d.
+Inside a rectangular patch the nodal Q1 bed is excavated by d.  Each wall is
+represented by the continuous one-cell ramp required by the HP geometry
+contract; the four corner patches are bilinear.
 
-The excavation is filled with pure water to h=d, so the initial free surface is
-    eta = B + h = B0
-inside the excavation. Thus eta is the same constant-slope plane as the
-original unexcavated topography.
+The excavation is filled to h=B0-B, so the initial free surface satisfies
+eta=B+h=B0 at every wet cell center.
 
 Expected physics:
   * initial acceleration is in +x (downslope);
@@ -20,11 +19,9 @@ Expected physics:
   * water should move internally toward the east/downhill wall and eventually
     overtop it.
 
-The DEM contains a one-cell ghost ring around the computational domain.  Its
-interior raster sample centers coincide exactly with the computational cell
-centers, so the excavation step remains aligned with cell interfaces while the
-DEM still extends far enough to satisfy the domain-coverage checks in
-IMEX_SfloW2D.
+The DEM contains a one-sample ghost ring and its interior raster sample centers
+coincide with the computational vertices.  The solver therefore recovers the
+authoritative nodal excavation without first passing through cell centers.
 """
 
 from pathlib import Path
@@ -32,9 +29,16 @@ import argparse
 import numpy as np
 
 
-def write_esri_cell_centered(path, z_comp, x_min, y_min, dx, slope, z_ref,
-                             x1, x2, y1, y2, depth):
-    """Write a padded ESRI ASCII DEM aligned with computational cell centers.
+def excavation_weight(x, y, x1, x2, y1, y2, dx):
+    """Continuous Q1 excavation weight with one-cell side ramps."""
+    wx = np.minimum((x - x1) / dx, (x2 - x) / dx)
+    wy = np.minimum((y - y1) / dx, (y2 - y) / dx)
+    return np.clip(wx, 0.0, 1.0) * np.clip(wy, 0.0, 1.0)
+
+
+def write_esri_vertex_aligned(path, z_vertex, x_min, x_max, y_min, y_max, dx,
+                              slope, z_ref, x1, x2, y1, y2, depth):
+    """Write a padded ESRI ASCII DEM aligned with computational vertices.
 
     IMEX_SfloW2D requires the DEM to cover the computational *boundaries*, not
     only the computational cell centers.  A DEM whose first raster center is at
@@ -42,36 +46,35 @@ def write_esri_cell_centered(path, z_comp, x_min, y_min, dx, slope, z_ref,
 
         x0 >= xllcorner + 0.5*cellsize.
 
-    We solve this by adding one DEM sample center on every side.  The DEM sample
-    centers are then
+    We add one DEM sample center outside every boundary.  The samples are
 
-        x_min-dx/2, x_min+dx/2, ..., x_max-dx/2, x_max+dx/2,
+        x_min-dx, x_min, ..., x_max, x_max+dx,
 
-    and similarly in y.  The interior DEM centers coincide exactly with the
-    computational centers, so no interpolation smears the excavation step.
+    and similarly in y.  Interior samples coincide exactly with vertices.
     """
-    ny, nx = z_comp.shape
+    nx_vertices = z_vertex.shape[1]
+    ny_vertices = z_vertex.shape[0]
 
-    x_dem = x_min - 0.5 * dx + np.arange(nx + 2) * dx
-    y_dem = y_min - 0.5 * dx + np.arange(ny + 2) * dx
+    x_dem = x_min - dx + np.arange(nx_vertices + 2) * dx
+    y_dem = y_min - dx + np.arange(ny_vertices + 2) * dx
     Xd, Yd = np.meshgrid(x_dem, y_dem)
 
     B0_dem = z_ref - slope * Xd
-    mask_dem = (Xd >= x1) & (Xd < x2) & (Yd >= y1) & (Yd < y2)
-    z_dem = B0_dem.copy()
-    z_dem[mask_dem] -= depth
+    z_dem = B0_dem - depth * excavation_weight(
+        Xd, Yd, x1, x2, y1, y2, dx
+    )
 
     # Sanity check: the interior DEM samples must reproduce the computational
-    # topography exactly.
-    if not np.allclose(z_dem[1:-1, 1:-1], z_comp, rtol=0.0, atol=1.0e-12):
-        raise RuntimeError("Padded DEM interior is not aligned with computational cells")
+    # nodal topography exactly.
+    if not np.allclose(z_dem[1:-1, 1:-1], z_vertex, rtol=0.0, atol=1.0e-12):
+        raise RuntimeError("Padded DEM interior is not aligned with grid vertices")
 
-    header = f"ncols     {nx + 2}\n"
-    header += f"nrows    {ny + 2}\n"
+    header = f"ncols     {nx_vertices + 2}\n"
+    header += f"nrows    {ny_vertices + 2}\n"
     # ESRI xllcorner/yllcorner refer to the lower-left raster EDGE.  Since the
-    # first DEM center is x_min-dx/2, the lower-left edge is x_min-dx.
-    header += f"xllcorner {x_min - dx}\n"
-    header += f"yllcorner {y_min - dx}\n"
+    # first DEM center is x_min-dx, so the raster edge is x_min-1.5*dx.
+    header += f"xllcorner {x_min - 1.5*dx}\n"
+    header += f"yllcorner {y_min - 1.5*dx}\n"
     header += f"cellsize {dx}\n"
     header += "NODATA_value -9999\n"
 
@@ -113,25 +116,30 @@ def main():
     x_cent = x_min + (np.arange(nx_cells) + 0.5) * dx
     y_cent = y_min + (np.arange(ny_cells) + 0.5) * dx
     Xc, Yc = np.meshgrid(x_cent, y_cent)
+    x_vertex = x_min + np.arange(nx_cells + 1) * dx
+    y_vertex = y_min + np.arange(ny_cells + 1) * dx
+    Xv, Yv = np.meshgrid(x_vertex, y_vertex)
 
     # Original plane: keep all elevations positive because the current geometry
     # initialization clips negative DEM elevations to zero.
     slope = np.tan(np.deg2rad(args.slope_deg))
     z_ref = 10.0
     B0 = z_ref - slope * Xc
+    B0_vertex = z_ref - slope * Xv
 
     # Rectangular excavation, finite in both x and y.
     x1, x2 = 10.0, 20.0
     y1, y2 = -5.0, 5.0
     depth = args.depth
 
-    mask = (Xc >= x1) & (Xc < x2) & (Yc >= y1) & (Yc < y2)
-
-    B = B0.copy()
-    B[mask] -= depth
-
-    H = np.zeros_like(B)
-    H[mask] = depth
+    weight_vertex = excavation_weight(Xv, Yv, x1, x2, y1, y2, dx)
+    B_vertex = B0_vertex - depth * weight_vertex
+    B = 0.25 * (
+        B_vertex[:-1, :-1] + B_vertex[:-1, 1:]
+        + B_vertex[1:, :-1] + B_vertex[1:, 1:]
+    )
+    H = B0 - B
+    mask = H > 1.0e-14
 
     U = np.zeros_like(B)
     V = np.zeros_like(B)
@@ -140,14 +148,14 @@ def main():
     # Exact intended relation in the wet region: eta = original plane B0.
     err = np.max(np.abs(eta[mask] - B0[mask])) if np.any(mask) else np.nan
 
-    # Keep the test geometrically well resolved and the nominal step exactly at
-    # computational interfaces whenever the default dimensions are used.
+    # Keep the test geometrically well resolved and align each one-cell ramp
+    # with the computational grid whenever the default dimensions are used.
     print(f"nx_cells = {nx_cells}")
     print(f"ny_cells = {ny_cells}")
     print(f"dx = dy = {dx:.12g} m")
     print(f"slope angle = {args.slope_deg:.6g} deg")
     print(f"excavation depth = {depth:.6g} m")
-    print(f"excavation: x=[{x1},{x2}), y=[{y1},{y2})")
+    print(f"excavation: x=[{x1},{x2}], y=[{y1},{y2}]")
     print(f"max |eta-B0| in wet cells = {err:.3e} m")
     print(f"initial water volume = {np.sum(H) * dx * dx:.12g} m^3")
 
@@ -159,8 +167,9 @@ def main():
 
     outdir = Path(__file__).resolve().parent
     topo_file = outdir / "topography_dem.asc"
-    write_esri_cell_centered(
-        topo_file, B, x_min, y_min, dx, slope, z_ref, x1, x2, y1, y2, depth
+    write_esri_vertex_aligned(
+        topo_file, B_vertex, x_min, x_max, y_min, y_max, dx, slope, z_ref,
+        x1, x2, y1, y2, depth
     )
 
     # Restart format follows EXAMPLE_2D / EXAMPLE_BUMP conventions. With
@@ -196,6 +205,7 @@ def main():
         y=y_cent,
         B0=B0,
         B=B,
+        B_vertex=B_vertex,
         H=H,
         eta=eta,
         mask=mask,
