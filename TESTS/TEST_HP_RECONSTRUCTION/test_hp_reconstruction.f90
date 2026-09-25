@@ -11,6 +11,7 @@ PROGRAM test_hp_reconstruction
 
   CALL check_lake_at_rest
   CALL check_shoreline_positivity
+  CALL check_wet_center_endpoint_blend
   CALL check_momentum_admissibility
   CALL check_flat_bed_non_regression
   CALL check_direction_independence
@@ -87,6 +88,48 @@ CONTAINS
     END IF
 
   END SUBROUTINE check_shoreline_positivity
+
+  SUBROUTINE check_wet_center_endpoint_blend
+
+    INTEGER, PARAMETER :: n = 3
+    REAL(wp) :: Bm(n), Bp(n), h(n), u(n)
+    REAL(wp) :: hm0(n), hp0(n), hum0(n), hup0(n), um0(n), up0(n)
+    REAL(wp) :: hm(n), hp(n), hum(n), hup(n), etam(n), etap(n), w(n)
+    REAL(wp) :: tolerance
+
+    ! The middle cell is wet at its centre but its eta reconstruction reaches
+    ! zero depth at the high endpoint of a one-cell ramp.  The continuous
+    ! direct candidate has the smaller interface defect.  A dry endpoint must
+    ! therefore not override the continuity blend for the whole cell.
+    Bm = [ 0.0_wp, 0.0_wp, 2.0_wp ]
+    Bp = [ 0.0_wp, 2.0_wp, 2.0_wp ]
+    h = 0.2_wp
+    u = 0.0_wp
+    hm0 = h
+    hp0 = h
+    hum0 = 0.0_wp
+    hup0 = 0.0_wp
+    um0 = 0.0_wp
+    up0 = 0.0_wp
+
+    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,3,        &
+         1.0_wp,hm,hp,hum,hup,etam,etap,w)
+
+    tolerance = 256.0_wp*EPSILON(1.0_wp)
+    CALL assert_small('wet-center dry eta endpoint',                         &
+         ABS(etap(2)-Bp(2)),tolerance)
+    CALL assert_small('wet-center continuity weight',ABS(w(2)),tolerance)
+    CALL assert_small('wet-center final high trace',ABS(hp(2)-h(2)),        &
+         tolerance)
+    CALL assert_small('wet-center thickness mean',                          &
+         MAXVAL(ABS(0.5_wp*(hm+hp)-h)),tolerance)
+
+    IF ( MIN(MINVAL(hm),MINVAL(hp)) .LT. 0.0_wp ) THEN
+       WRITE(*,*) 'FAIL: wet-center blend produced negative h'
+       ERROR STOP 1
+    END IF
+
+  END SUBROUTINE check_wet_center_endpoint_blend
 
   SUBROUTINE check_momentum_admissibility
 

@@ -140,9 +140,13 @@ CONTAINS
           w_eta(i) = 0.5_wp
        END IF
 
-       IF ( ( h_minus_eta(i) .LE. hp_dry_tolerance ) .OR.                    &
-            ( h_plus_eta(i) .LE. hp_dry_tolerance ) .OR.                     &
-            ( h_center(i) .LE. hp_dry_tolerance ) ) w_eta(i) = 1.0_wp
+       ! A zero eta-based endpoint on a steep bed does not by itself make the
+       ! cell dry.  Forcing the whole directional reconstruction to w_eta=1 in
+       ! that case creates row/column-aligned dry barriers on rough 2-D DEMs.
+       ! Both candidates are already non-negative, so let the continuity
+       ! indicator blend wet-centred cells and reserve the hard eta selection
+       ! for genuinely dry cell averages.
+       IF ( h_center(i) .LE. hp_dry_tolerance ) w_eta(i) = 1.0_wp
 
        h_minus(i) = ( 1.0_wp-w_eta(i) ) * h_minus_orig(i)                    &
             + w_eta(i) * h_minus_eta(i)
