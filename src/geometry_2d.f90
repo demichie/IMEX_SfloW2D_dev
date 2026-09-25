@@ -23,11 +23,18 @@ MODULE geometry_2d
   !> Location of the boundaries (x) of the control volumes of the domain
   REAL(wp), ALLOCATABLE :: y_stag(:)
 
-  !> Topography at the centers of the control volumes 
+  !> Authoritative continuous topography at Cartesian grid vertices.
+  REAL(wp), ALLOCATABLE :: B_vertex(:,:)
+
+  !> Unique Q1 bed elevation at x-normal and y-normal Cartesian faces.
+  REAL(wp), ALLOCATABLE :: B_face_x(:,:)
+  REAL(wp), ALLOCATABLE :: B_face_y(:,:)
+
+  !> Topography at cell centers, derived from B_vertex.
   REAL(wp), ALLOCATABLE :: B_cent(:,:)
 
-  !> One-sided topography traces at the cell faces. These are reconstructed
-  !> with the same limiter and reconstruction coefficient used for h.
+  !> Legacy one-sided topography traces used by the pre-HP reconstruction.
+  !> HP reconstruction must use the unique B_face_x/B_face_y arrays instead.
   REAL(wp), ALLOCATABLE :: B_faceW(:,:)
   REAL(wp), ALLOCATABLE :: B_faceE(:,:)
   REAL(wp), ALLOCATABLE :: B_faceS(:,:)
@@ -227,6 +234,9 @@ CONTAINS
     ALLOCATE( sourceN_vect_x(comp_cells_x,comp_cells_y) )
     ALLOCATE( sourceN_vect_y(comp_cells_x,comp_cells_y) )
 
+    ALLOCATE( B_vertex(comp_interfaces_x,comp_interfaces_y) )
+    ALLOCATE( B_face_x(comp_interfaces_x,comp_cells_y) )
+    ALLOCATE( B_face_y(comp_cells_x,comp_interfaces_y) )
     ALLOCATE( B_cent(comp_cells_x,comp_cells_y) )
     ALLOCATE( B_faceW(comp_cells_x,comp_cells_y) )
     ALLOCATE( B_faceE(comp_cells_x,comp_cells_y) )
@@ -352,21 +362,21 @@ CONTAINS
 
     topography_profile(3,:,:) = MAX(0.0_wp,topography_profile(3,:,:))
 
-    DO k=1,comp_cells_y
+    ! Sample the input topography directly at computational vertices. All
+    ! center and face elevations are derived from this continuous Q1 field.
+    DO k=1,comp_interfaces_y
 
-       DO j=1,comp_cells_x
+       DO j=1,comp_interfaces_x
 
           CALL interp_2d_scalar( topography_profile(1,:,:) ,                    &
                topography_profile(2,:,:), topography_profile(3,:,:) ,           &
-               x_comp(j), y_comp(k) , B_cent(j,k) )
+               x_stag(j), y_stag(k) , B_vertex(j,k) )
 
        END DO
 
     ENDDO
 
-    ! This subroutine compute the partial derivatives of the topography at the
-    ! cell centers and 
-    CALL topography_reconstruction
+    CALL refresh_topography_geometry
 
     ALLOCATE(  B_zone(comp_cells_x,comp_cells_y) )
 
@@ -388,12 +398,86 @@ CONTAINS
   END SUBROUTINE init_grid
 
   !******************************************************************************
-  !> \brief Reconstruct one-sided topography traces at all cell faces
+  !> \brief Derive all Q1 center and shared-face elevations from B_vertex.
+  !>
+  !> B_vertex is the only authoritative bed elevation. The two cells adjacent
+  !> to an internal Cartesian face access the same stored B_face_x/B_face_y
+  !> value, so face continuity is an exact storage identity.
+  !******************************************************************************
+
+  SUBROUTINE derive_topography_from_vertices
+
+    IMPLICIT NONE
+
+    B_face_x(:,:) = 0.5_wp * ( B_vertex(:,1:comp_cells_y)                     &
+         + B_vertex(:,2:comp_interfaces_y) )
+    B_face_y(:,:) = 0.5_wp * ( B_vertex(1:comp_cells_x,:)                     &
+         + B_vertex(2:comp_interfaces_x,:) )
+
+    B_cent(:,:) = 0.25_wp * ( B_vertex(1:comp_cells_x,1:comp_cells_y)         &
+         + B_vertex(2:comp_interfaces_x,1:comp_cells_y)                       &
+         + B_vertex(1:comp_cells_x,2:comp_interfaces_y)                       &
+         + B_vertex(2:comp_interfaces_x,2:comp_interfaces_y) )
+
+  END SUBROUTINE derive_topography_from_vertices
+
+  !******************************************************************************
+  !> \brief Project a cell-centered scalar field to continuous Q1 vertices.
+  !>
+  !> Each vertex receives the arithmetic mean of all adjacent physical cells.
+  !> This is the uniform-grid Q1 mass-lumped projection. It preserves the
+  !> domain integral when the projected nodal field is averaged back to cells.
+  !******************************************************************************
+
+  SUBROUTINE project_cell_field_to_vertices( cell_field, vertex_field )
+
+    IMPLICIT NONE
+
+    REAL(wp), INTENT(IN) :: cell_field(comp_cells_x,comp_cells_y)
+    REAL(wp), INTENT(OUT) :: vertex_field(comp_interfaces_x,comp_interfaces_y)
+
+    REAL(wp), ALLOCATABLE :: vertex_weight(:,:)
+    INTEGER :: j, k
+
+    ALLOCATE( vertex_weight(comp_interfaces_x,comp_interfaces_y) )
+    vertex_field = 0.0_wp
+    vertex_weight = 0.0_wp
+
+    DO k = 1, comp_cells_y
+       DO j = 1, comp_cells_x
+          vertex_field(j:j+1,k:k+1) = vertex_field(j:j+1,k:k+1)              &
+               + cell_field(j,k)
+          vertex_weight(j:j+1,k:k+1) = vertex_weight(j:j+1,k:k+1) + 1.0_wp
+       END DO
+    END DO
+
+    vertex_field = vertex_field / vertex_weight
+    DEALLOCATE( vertex_weight )
+
+  END SUBROUTINE project_cell_field_to_vertices
+
+  !******************************************************************************
+  !> \brief Regenerate every derived geometric field from B_vertex.
+  !******************************************************************************
+
+  SUBROUTINE refresh_topography_geometry
+
+    IMPLICIT NONE
+
+    CALL derive_topography_from_vertices
+    CALL topography_reconstruction
+
+  END SUBROUTINE refresh_topography_geometry
+
+  !******************************************************************************
+  !> \brief Reconstruct legacy one-sided topography traces at cell faces
   !>
   !> The well-balanced reconstruction requires the bed and flow thickness to
   !> use the same odd limiter and reconstruction coefficient. The existing
   !> B_prime_*_geom arrays intentionally use a different, centred construction
-  !> and are therefore kept separate from these face traces.
+  !> and are therefore kept separate from these face traces. This routine is
+  !> retained only until the HP reconstruction is installed; it must not be
+  !> used to define the shared Q1 face geometry.
   !******************************************************************************
 
   SUBROUTINE reconstruct_topography_faces

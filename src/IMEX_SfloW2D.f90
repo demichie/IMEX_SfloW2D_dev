@@ -34,7 +34,7 @@ PROGRAM IMEX_SfloW2D
 
    USE geometry_2d, ONLY : init_grid
    USE geometry_2d, ONLY : init_source
-   USE geometry_2d, ONLY : topography_reconstruction
+   USE geometry_2d, ONLY : refresh_topography_geometry
 
    USE geometry_2d, ONLY : dx,dy,B_cent, cell_size
    ! USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
@@ -234,7 +234,7 @@ PROGRAM IMEX_SfloW2D
         CALL simulation%stochastic%initialize_steady(                        &
         simulation%state, simulation%domain)
 
-   IF ( topo_change_flag ) CALL topography_reconstruction
+   IF ( topo_change_flag ) CALL refresh_topography_geometry
 
    IF ( verbose_level .GE. 0 ) THEN
 
@@ -454,7 +454,7 @@ PROGRAM IMEX_SfloW2D
       CALL update_erosion_deposition_cell(simulation%state%q,                 &
            simulation%state%qp, simulation%runtime%dt, simulation%domain)
 
-      IF ( topo_change_flag ) CALL topography_reconstruction
+      IF ( topo_change_flag ) CALL refresh_topography_geometry
 
       simulation%runtime%t = simulation%runtime%t + simulation%runtime%dt
 

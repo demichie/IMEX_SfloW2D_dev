@@ -187,7 +187,7 @@ MODULE inpout_2d
 
   CHARACTER(LEN=16), PARAMETER :: restart_format_magic = 'IMEX_SFLOW2D_RST'
   ! Version 3 fixes the fourth conservative variable to thermal energy.
-  INTEGER, PARAMETER :: restart_format_version = 3
+  INTEGER, PARAMETER :: restart_format_version = 4
 
   !> Counter for the output files
   INTEGER :: output_idx
@@ -583,6 +583,14 @@ CONTAINS
 
       IF (n_layers .NE. 1) THEN
         CALL fatal_error('Only N_LAYERS=1 is currently supported')
+      END IF
+
+      ! B_vertex is now the authoritative bed. The vertex-first mass-exchange
+      ! update is introduced only after the hydrodynamic HP-PCCU gates; do not
+      ! silently let the legacy cell-centered update desynchronize the geometry.
+      IF (topo_change_flag) THEN
+        CALL fatal_error('TOPO_CHANGE_FLAG is temporarily unavailable until '// &
+             'the vertex-first bed update is enabled')
       END IF
 
       idx_solid_first = 5
@@ -4709,7 +4717,9 @@ CONTAINS
          eval_mixture_properties_from_volume_fractions
     ! External variables
     USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0, dx, dy
-    USE geometry_2d, ONLY: B_cent, erodible
+    USE geometry_2d, ONLY: B_cent, B_vertex, erodible
+    USE geometry_2d, ONLY: project_cell_field_to_vertices,                    &
+         refresh_topography_geometry
     USE init_2d, ONLY: thickness_init, erodible_init
     USE parameters_2d, ONLY: n_vars
     IMPLICIT none
@@ -4738,6 +4748,7 @@ CONTAINS
     REAL(wp) :: thickness_interp
 
     REAL(wp), ALLOCATABLE :: thickness_input(:, :)
+    REAL(wp), ALLOCATABLE :: thickness_vertex(:, :)
 
     REAL(wp), ALLOCATABLE :: x1(:), y1(:)
 
@@ -4967,8 +4978,12 @@ CONTAINS
 
       IF (subtract_init_flag) THEN
 
-        WRITE (*, *) 'Subtricting initial thickness from DEM'
-        B_cent(:, :) = B_cent(:, :) - thickness_init(:, :)
+        WRITE (*, *) 'Subtracting initial thickness from nodal topography'
+        ALLOCATE( thickness_vertex(comp_cells_x+1,comp_cells_y+1) )
+        CALL project_cell_field_to_vertices(thickness_init, thickness_vertex)
+        B_vertex = B_vertex - thickness_vertex
+        DEALLOCATE( thickness_vertex )
+        CALL refresh_topography_geometry
 
         IF (erosion_coeff .GT. 0.0_wp) THEN
 
@@ -7233,7 +7248,7 @@ CONTAINS
   SUBROUTINE write_restart_file(filename, runtime, stochastic, state, domain)
     USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,     &
                              n_pore_vars
-    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible,    &
+    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex, erodible,  &
                            deposit, erosion
     USE parameters_2d, ONLY: stochastic_flag, topo_change_flag
 
@@ -7277,8 +7292,9 @@ CONTAINS
     WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
     CALL check_restart_io(ierr, io_message, 'writing conservative state to', &
          filename)
-    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) B_cent
-    CALL check_restart_io(ierr, io_message, 'writing topography to', filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) B_vertex
+    CALL check_restart_io(ierr, io_message, 'writing nodal topography to',  &
+         filename)
     WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) erodible
     CALL check_restart_io(ierr, io_message, 'writing erodible material to', &
          filename)
@@ -7342,10 +7358,10 @@ CONTAINS
   SUBROUTINE read_restart_file(filename, runtime, stochastic, state, domain)
     USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,     &
                              n_pore_vars
-    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_cent, erodible,    &
+    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex, erodible,  &
                            deposit, erosion
     USE parameters_2d, ONLY: stochastic_flag, topo_change_flag
-    USE geometry_2d, ONLY: topography_reconstruction
+    USE geometry_2d, ONLY: refresh_topography_geometry
 
     IMPLICIT NONE
     CHARACTER(LEN=*), INTENT(IN) :: filename
@@ -7417,8 +7433,9 @@ CONTAINS
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
     CALL check_restart_io(ierr, io_message, 'reading conservative state from', &
          filename)
-    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) B_cent
-    CALL check_restart_io(ierr, io_message, 'reading topography from', filename)
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) B_vertex
+    CALL check_restart_io(ierr, io_message, 'reading nodal topography from', &
+         filename)
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) erodible
     CALL check_restart_io(ierr, io_message, 'reading erodible material from', &
          filename)
@@ -7478,7 +7495,7 @@ CONTAINS
 
     ! Physical variables are reconstructed in the main program after
     ! check_solve has populated the compact cell lists.
-    CALL topography_reconstruction
+    CALL refresh_topography_geometry
 
     WRITE (*, *) 'Restart completed successfully at time t = ', runtime%t
 
