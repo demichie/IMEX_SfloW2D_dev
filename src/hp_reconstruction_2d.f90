@@ -38,7 +38,7 @@ CONTAINS
        u_minus_candidate, u_plus_candidate, hydrostatic_residual,              &
        topographic_relief_ratio, limiter_id, reconstruction_coefficient,       &
        h_minus, h_plus, hu_minus, hu_plus,                                     &
-       eta_minus, eta_plus, w_eta )
+       eta_minus, eta_plus, w_eta, line_scratch )
 
     REAL(wp), INTENT(IN) :: h_center(:)
     REAL(wp), INTENT(IN) :: u_center(:)
@@ -62,24 +62,42 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: eta_minus(:)
     REAL(wp), INTENT(OUT) :: eta_plus(:)
     REAL(wp), INTENT(OUT) :: w_eta(:)
+   REAL(wp), OPTIONAL, TARGET, INTENT(INOUT) :: line_scratch(:,:)
 
-    REAL(wp) :: eta_center(SIZE(h_center))
-    REAL(wp) :: h_minus_eta(SIZE(h_center))
-    REAL(wp) :: h_plus_eta(SIZE(h_center))
-    REAL(wp) :: h_minus_orig(SIZE(h_center))
-    REAL(wp) :: h_plus_orig(SIZE(h_center))
-    REAL(wp) :: Eh(SIZE(h_center)), Eeta(SIZE(h_center))
+   REAL(wp), TARGET :: local_scratch(SIZE(h_center),8)
+   REAL(wp), POINTER :: scratch(:,:)
+   REAL(wp), POINTER :: eta_center(:), h_minus_eta(:), h_plus_eta(:)
+   REAL(wp), POINTER :: h_minus_orig(:), h_plus_orig(:), Eh(:), Eeta(:)
+   REAL(wp), POINTER :: u_center_safe(:)
     REAL(wp) :: eta_stencil(3), coordinate_stencil(3)
     REAL(wp) :: eta_slope, slope_min, slope_max
     REAL(wp) :: denominator, distribution_tolerance
     REAL(wp) :: momentum_weight, dm_target, dm_lower, dm_upper, dm
     REAL(wp) :: u_min, u_max
-    REAL(wp) :: u_center_safe(SIZE(h_center))
     INTEGER :: i, number_of_cells
 
     number_of_cells = SIZE(h_center)
 
     IF ( number_of_cells .LE. 0 ) RETURN
+
+    IF ( PRESENT(line_scratch) ) THEN
+       IF ( ( SIZE(line_scratch,1) .LT. number_of_cells ) .OR.                &
+            ( SIZE(line_scratch,2) .LT. 8 ) ) THEN
+          ERROR STOP 'reconstruct_hp_line: insufficient scratch size'
+       END IF
+       scratch => line_scratch
+    ELSE
+       scratch => local_scratch
+    END IF
+
+    eta_center => scratch(1:number_of_cells,1)
+    h_minus_eta => scratch(1:number_of_cells,2)
+    h_plus_eta => scratch(1:number_of_cells,3)
+    h_minus_orig => scratch(1:number_of_cells,4)
+    h_plus_orig => scratch(1:number_of_cells,5)
+    Eh => scratch(1:number_of_cells,6)
+    Eeta => scratch(1:number_of_cells,7)
+    u_center_safe => scratch(1:number_of_cells,8)
 
     IF ( ( SIZE(u_center) .NE. number_of_cells ) .OR.                         &
          ( SIZE(B_minus) .NE. number_of_cells ) .OR.                          &

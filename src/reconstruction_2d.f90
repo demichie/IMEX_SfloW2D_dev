@@ -20,10 +20,21 @@ MODULE reconstruction_2d
 
   USE hp_reconstruction_2d, ONLY : reconstruct_hp_line
   USE hp_reconstruction_2d, ONLY : hp_dry_tolerance
+   USE omp_lib, ONLY : omp_get_max_threads, omp_get_thread_num
 
   IMPLICIT NONE
 
   PRIVATE
+
+   INTEGER, PARAMETER :: hp_h_center = 1, hp_u_center = 2
+   INTEGER, PARAMETER :: hp_B_minus = 3, hp_B_plus = 4
+   INTEGER, PARAMETER :: hp_h_minus_direct = 5, hp_h_plus_direct = 6
+   INTEGER, PARAMETER :: hp_hu_minus_direct = 7, hp_hu_plus_direct = 8
+   INTEGER, PARAMETER :: hp_u_minus_candidate = 9, hp_u_plus_candidate = 10
+   INTEGER, PARAMETER :: hp_h_minus = 11, hp_h_plus = 12
+   INTEGER, PARAMETER :: hp_hu_minus = 13, hp_hu_plus = 14
+   INTEGER, PARAMETER :: hp_eta_minus = 15, hp_eta_plus = 16, hp_weight = 17
+   INTEGER, PARAMETER :: hp_scratch_first = 18, hp_scratch_last = 25
 
   TYPE, PUBLIC :: reconstruction_workspace_type
      REAL(wp), ALLOCATABLE :: q_interfaceL(:,:,:)
@@ -51,6 +62,10 @@ MODULE reconstruction_2d
      REAL(wp), ALLOCATABLE :: eta_interfaceB(:,:), eta_interfaceT(:,:)
 
      REAL(wp), ALLOCATABLE :: w_eta_x(:,:), w_eta_y(:,:)
+
+       REAL(wp), ALLOCATABLE :: hydrostatic_residual_2d(:,:)
+       REAL(wp), ALLOCATABLE :: topographic_relief_ratio_2d(:,:)
+       REAL(wp), ALLOCATABLE :: hp_scratch(:,:,:)
 
      LOGICAL, ALLOCATABLE :: diverg_interfaceL(:,:)
      LOGICAL, ALLOCATABLE :: diverg_interfaceR(:,:)
@@ -94,6 +109,11 @@ CONTAINS
     ALLOCATE( this%w_eta_x( comp_cells_x, comp_cells_y ) )
     ALLOCATE( this%w_eta_y( comp_cells_x, comp_cells_y ) )
 
+    ALLOCATE( this%hydrostatic_residual_2d(comp_cells_x,comp_cells_y) )
+    ALLOCATE( this%topographic_relief_ratio_2d(comp_cells_x,comp_cells_y) )
+    ALLOCATE( this%hp_scratch(MAX(comp_cells_x,comp_cells_y),                &
+         hp_scratch_last,MAX(1,omp_get_max_threads())) )
+
     ALLOCATE( this%diverg_interfaceL( comp_interfaces_x, comp_cells_y ) )
     ALLOCATE( this%diverg_interfaceR( comp_interfaces_x, comp_cells_y ) )
     ALLOCATE( this%diverg_interfaceB( comp_cells_x, comp_interfaces_y ) )
@@ -131,6 +151,10 @@ CONTAINS
     DEALLOCATE( this%w_eta_x )
     DEALLOCATE( this%w_eta_y )
 
+      DEALLOCATE( this%hydrostatic_residual_2d )
+      DEALLOCATE( this%topographic_relief_ratio_2d )
+      DEALLOCATE( this%hp_scratch )
+
     DEALLOCATE( this%diverg_interfaceL )
     DEALLOCATE( this%diverg_interfaceR )
     DEALLOCATE( this%diverg_interfaceB )
@@ -141,9 +165,7 @@ CONTAINS
   SUBROUTINE reconstruction( this, q_expl, qp_expl, t, solve_cells, j_cent, k_cent )
 
     ! External procedures
-    USE state_conversion_2d, ONLY : qp_to_qc, qp_to_qp2,                      &
-         enforce_primitive_mass_fraction_closure, velocity_from_conservative
-    USE constitutive_parameters_2d, ONLY : T_ambient
+      USE state_conversion_2d, ONLY : qp_to_qp2
     USE equation_terms_2d, ONLY : eval_source_bdry
     USE parameters_2d, ONLY : limiter
 
@@ -194,14 +216,10 @@ CONTAINS
     ! Every cell has a defined constant candidate.  Active cells overwrite it
     ! below with the ordinary limited reconstruction.  This also gives the HP
     ! continuity indicator a well-defined neighbour at solve-mask boundaries.
-    DO k = 1, comp_cells_y
-       DO j = 1, comp_cells_x
-          this%qp_cellW(:,j,k) = qp_expl(:,j,k)
-          this%qp_cellE(:,j,k) = qp_expl(:,j,k)
-          this%qp_cellS(:,j,k) = qp_expl(:,j,k)
-          this%qp_cellN(:,j,k) = qp_expl(:,j,k)
-       END DO
-    END DO
+    this%qp_cellW = qp_expl
+    this%qp_cellE = qp_expl
+    this%qp_cellS = qp_expl
+    this%qp_cellN = qp_expl
 
     !WRITE(*,*) 'recontruction 0'
     !WRITE(*,*) 'nvars',n_vars
@@ -780,118 +798,24 @@ CONTAINS
 
        IF ( comp_cells_x .GT. 1 ) THEN
 
-          IF ( ( j .GT. 1 ) .AND. ( j .LT. comp_cells_x ) ) THEN
-
-             IF ( q_expl(1,j,k) .EQ. 0.0_wp ) THEN
-
-                IF ( ( .NOT. radial_source_flag ) .OR.                          &
-                     ( ( radial_source_flag ) .AND.                             &
-                     ( source_cell(j,k) .EQ. 0 ) ) ) THEN
-
-                   ! In the internal cell, if thickness h is 0 at the center
-                   ! of the cell, then all the variables are 0 at the center
-                   ! and at the interfaces (no conversion back is needed from
-                   ! reconstructed to conservative)
-                   this%q_interfaceR(:,j,k) = 0.0_wp
-                   this%q_interfaceL(:,j+1,k) = 0.0_wp
-
-                   this%qp_interfaceR(1:3,j,k) = 0.0_wp
-                   this%qp_interfaceR(4:n_vars,j,k) = qrecW(4:n_vars)
-                   this%qp_interfaceR(n_vars+1:n_vars+2,j,k) = 0.0_wp
-
-                   this%qp_interfaceL(1:3,j+1,k) = 0.0_wp
-                   this%qp_interfaceL(4:n_vars,j+1,k) = qrecE(4:n_vars)
-                   this%qp_interfaceL(n_vars+1:n_vars+2,j+1,k) = 0.0_wp
-
-                   this%diverg_interfaceR(j,k) = .FALSE.
-                   this%diverg_interfaceL(j+1,k) = .FALSE.
-
-                END IF
-
-             END IF
-
-          END IF
-
-          IF (qrecW(1) .LE. EPSILON(1.0_wp)) THEN
-             qrecW = 0.0_wp
-             qrecW(4) = T_ambient
-          ELSE
-             CALL enforce_primitive_mass_fraction_closure(qrecW)
-          END IF
-
-          IF (qrecE(1) .LE. EPSILON(1.0_wp)) THEN
-             qrecE = 0.0_wp
-             qrecE(4) = T_ambient
-          ELSE
-             CALL enforce_primitive_mass_fraction_closure(qrecE)
-          END IF
-
-          CALL qp_to_qc( qrecW,this%q_interfaceR(:,j,k) )
-          CALL qp_to_qc( qrecE,this%q_interfaceL(:,j+1,k) )
-
-          CALL velocity_from_conservative(this%q_interfaceR(:,j,k),          &
-               qrecW(idx_u), qrecW(idx_v))
-          CALL velocity_from_conservative(this%q_interfaceL(:,j+1,k),        &
-               qrecE(idx_u), qrecE(idx_v))
-
-          this%qp_interfaceR(1:n_vars+2,j,k) = qrecW(1:n_vars+2)
-          this%qp_interfaceL(1:n_vars+2,j+1,k) = qrecE(1:n_vars+2)
-
           this%diverg_interfaceR(j,k) = diverging_flag
           this%diverg_interfaceL(j+1,k) = diverging_flag
 
           IF ( j.EQ.1 ) THEN
 
              ! Interface value at the left of first x-interface (external)
-             this%q_interfaceL(:,j,k) = this%q_interfaceR(:,j,k)
-             this%qp_interfaceL(:,j,k) = this%qp_interfaceR(:,j,k)
-
-             !WRITE(*,*) 'j,k',j,k
-             !WRITE(*,*) 'qp_interfaceL(:,j,k)',this%qp_interfaceL(:,j,k)
-             !READ(*,*)
-
              this%diverg_interfaceR(j,k) = this%diverg_interfaceL(j,k)
 
           ELSEIF ( j.EQ.comp_cells_x ) THEN
 
              ! Interface value at the right of last x-interface (external)
-             this%q_interfaceR(:,j+1,k) = this%q_interfaceL(:,j+1,k)
-             this%qp_interfaceR(:,j+1,k) = this%qp_interfaceL(:,j+1,k)
-
              this%diverg_interfaceR(j+1,k) = this%diverg_interfaceL(j+1,k)
 
           ELSE
 
-             IF ( radial_source_flag .AND. ( source_cell(j,k) .EQ. 2 ) ) THEN
-
-                IF ( sourceE(j,k) ) THEN
-
-                   this%q_interfaceR(:,j+1,k) = this%q_interfaceL(:,j+1,k)
-                   this%q_interfaceR(2,j+1,k) = -this%q_interfaceL(2,j+1,k)
-                   this%qp_interfaceR(:,j+1,k) = this%qp_interfaceL(:,j+1,k)
-                   this%qp_interfaceR(idx_u,j+1,k) = -this%qp_interfaceL(idx_u,j+1,k)
-
-                ELSEIF ( sourceW(j,k) ) THEN
-
-                   this%q_interfaceL(:,j,k) = this%q_interfaceR(:,j,k)
-                   this%q_interfaceL(2,j,k) = -this%q_interfaceR(2,j,k)
-                   this%qp_interfaceL(:,j,k) = this%qp_interfaceR(:,j,k)
-                   this%qp_interfaceL(idx_u,j,k) = -this%qp_interfaceR(idx_u,j,k)
-
-                END IF
-
-             END IF
-
           END IF
 
        ELSE
-
-          ! for case comp_cells_x = 1
-          this%q_interfaceR(1:n_vars,j,k) = q_expl(1:n_vars,j,k)
-          this%q_interfaceL(1:n_vars,j+1,k) = q_expl(1:n_vars,j,k)
-
-          this%qp_interfaceR(1:n_vars+2,j,k) = qp_expl(1:n_vars+2,j,k)
-          this%qp_interfaceL(1:n_vars+2,j+1,k) = qp_expl(1:n_vars+2,j,k)
 
           this%diverg_interfaceR(j,k) = diverging_flag
           this%diverg_interfaceL(j+1,k) = diverging_flag
@@ -900,120 +824,24 @@ CONTAINS
 
        IF ( comp_cells_y .GT. 1 ) THEN
 
-          IF ( ( k .GT. 1 ) .AND. ( k .LT. comp_cells_y ) ) THEN
-
-             IF ( q_expl(1,j,k) .EQ. 0.0_wp ) THEN
-
-                IF ( ( .NOT. radial_source_flag ) .OR.                          &
-                     ( ( radial_source_flag ) .AND.                             &
-                     ( source_cell(j,k) .EQ. 0 ) ) ) THEN
-
-                   ! In the internal cell, if thickness h is 0 at the center
-                   ! of the cell, then all the variables are 0 at the center
-                   ! and at the interfaces (no conversion back is needed from
-                   ! reconstructed to conservative)
-
-                   this%q_interfaceT(:,j,k) = 0.0_wp
-                   this%q_interfaceB(:,j,k+1) = 0.0_wp
-
-                   this%qp_interfaceT(1:3,j,k) = 0.0_wp
-                   this%qp_interfaceT(4:n_vars,j,k) = qrecS(4:n_vars)
-                   this%qp_interfaceT(n_vars+1:n_vars+2,j,k) = 0.0_wp
-
-                   this%qp_interfaceB(1:3,j,k+1) = 0.0_wp
-                   this%qp_interfaceB(4:n_vars,j,k+1) = qrecN(4:n_vars)
-                   this%qp_interfaceB(n_vars+1:n_vars+2,j,k+1) = 0.0_wp
-
-                   this%diverg_interfaceT(j,k) = .FALSE.
-                   this%diverg_interfaceB(j,k+1) = .FALSE.
-
-                END IF
-
-             END IF
-
-          END IF
-
-          IF (qrecS(1) .LE. EPSILON(1.0_wp)) THEN
-             qrecS = 0.0_wp
-             qrecS(4) = T_ambient
-          ELSE
-             CALL enforce_primitive_mass_fraction_closure(qrecS)
-          END IF
-
-          IF (qrecN(1) .LE. EPSILON(1.0_wp)) THEN
-             qrecN = 0.0_wp
-             qrecN(4) = T_ambient
-          ELSE
-             CALL enforce_primitive_mass_fraction_closure(qrecN)
-          END IF
-
-          CALL qp_to_qc( qrecS, this%q_interfaceT(:,j,k) )
-          CALL qp_to_qc( qrecN, this%q_interfaceB(:,j,k+1) )
-
-          CALL velocity_from_conservative(this%q_interfaceT(:,j,k),          &
-               qrecS(idx_u), qrecS(idx_v))
-          CALL velocity_from_conservative(this%q_interfaceB(:,j,k+1),        &
-               qrecN(idx_u), qrecN(idx_v))
-
-          this%qp_interfaceT(1:n_vars+2,j,k) = qrecS(1:n_vars+2)
-          this%qp_interfaceB(1:n_vars+2,j,k+1) = qrecN(1:n_vars+2)
-
           this%diverg_interfaceT(j,k) = diverging_flag
           this%diverg_interfaceB(j,k+1) = diverging_flag
 
           IF ( k .EQ. 1 ) THEN
 
              ! Interface value at the bottom of first y-interface (external)
-             this%q_interfaceB(:,j,k) = this%q_interfaceT(:,j,k)
-             this%qp_interfaceB(:,j,k) = this%qp_interfaceT(:,j,k)
-
              this%diverg_interfaceB(j,k) = this%diverg_interfaceT(j,k)
 
           ELSEIF ( k .EQ. comp_cells_y ) THEN
 
              ! Interface value at the top of last y-interface (external)
-             this%q_interfaceT(:,j,k+1) = this%q_interfaceB(:,j,k+1)
-             this%qp_interfaceT(:,j,k+1) = this%qp_interfaceB(:,j,k+1)
-
              this%diverg_interfaceT(j,k+1) = this%diverg_interfaceB(j,k+1)
 
           ELSE
 
-             IF ( radial_source_flag .AND. ( source_cell(j,k) .EQ. 2 ) ) THEN
-
-                IF ( sourceS(j,k) ) THEN
-
-                   this%q_interfaceB(:,j,k) = this%q_interfaceT(:,j,k)
-                   this%q_interfaceB(3,j,k) = -this%q_interfaceT(3,j,k)
-                   this%qp_interfaceB(:,j,k) = this%qp_interfaceT(:,j,k)
-                   this%qp_interfaceB(idx_v,j,k) = -this%qp_interfaceT(idx_v,j,k)
-
-                ELSEIF ( sourceN(j,k) ) THEN
-
-                   this%q_interfaceT(:,j,k+1) = this%q_interfaceB(:,j,k+1)
-                   this%q_interfaceT(3,j,k+1) = -this%q_interfaceB(3,j,k+1)
-                   this%qp_interfaceT(:,j,k+1) = this%qp_interfaceB(:,j,k+1)
-                   this%qp_interfaceT(idx_v,j,k+1) = -this%qp_interfaceB(idx_v,j,k+1)
-
-                END IF
-
-             END IF
-
           END IF
 
        ELSE
-
-          ! case comp_cells_y = 1
-
-          this%q_interfaceB(:,j,k) = q_expl(:,j,k)
-          this%q_interfaceT(:,j,k) = q_expl(:,j,k)
-          this%q_interfaceB(:,j,k+1) = q_expl(:,j,k)
-          this%q_interfaceT(:,j,k+1) = q_expl(:,j,k)
-
-          this%qp_interfaceB(:,j,k) = qp_expl(:,j,k)
-          this%qp_interfaceT(:,j,k) = qp_expl(:,j,k)
-          this%qp_interfaceB(:,j,k+1) = qp_expl(:,j,k)
-          this%qp_interfaceT(:,j,k+1) = qp_expl(:,j,k)
 
        END IF
 
@@ -1052,156 +880,167 @@ CONTAINS
     INTEGER, INTENT(IN) :: solve_cells
     INTEGER, INTENT(IN) :: j_cent(:), k_cent(:)
 
-    REAL(wp), ALLOCATABLE :: h_center(:), u_center(:)
-    REAL(wp), ALLOCATABLE :: B_minus(:), B_plus(:)
-    REAL(wp), ALLOCATABLE :: h_minus_direct(:), h_plus_direct(:)
-    REAL(wp), ALLOCATABLE :: hu_minus_direct(:), hu_plus_direct(:)
-    REAL(wp), ALLOCATABLE :: u_minus_candidate(:), u_plus_candidate(:)
-    REAL(wp), ALLOCATABLE :: h_minus(:), h_plus(:)
-    REAL(wp), ALLOCATABLE :: hu_minus(:), hu_plus(:)
-    REAL(wp), ALLOCATABLE :: eta_minus(:), eta_plus(:), weight(:)
-    REAL(wp), ALLOCATABLE :: hydrostatic_residual_2d(:,:)
-    REAL(wp), ALLOCATABLE :: topographic_relief_ratio_2d(:,:)
-
     REAL(wp) :: q_final(n_vars), qp_final(n_vars+2)
     REAL(wp) :: relief2d
-    INTEGER :: j, k, l, line_size, maximum_line_size
+   INTEGER :: j, k, l, line_size, thread_id
 
-    maximum_line_size = MAX( comp_cells_x, comp_cells_y )
-    ALLOCATE( h_center(maximum_line_size), u_center(maximum_line_size) )
-    ALLOCATE( B_minus(maximum_line_size), B_plus(maximum_line_size) )
-    ALLOCATE( h_minus_direct(maximum_line_size) )
-    ALLOCATE( h_plus_direct(maximum_line_size) )
-    ALLOCATE( hu_minus_direct(maximum_line_size) )
-    ALLOCATE( hu_plus_direct(maximum_line_size) )
-    ALLOCATE( u_minus_candidate(maximum_line_size) )
-    ALLOCATE( u_plus_candidate(maximum_line_size) )
-    ALLOCATE( h_minus(maximum_line_size), h_plus(maximum_line_size) )
-    ALLOCATE( hu_minus(maximum_line_size), hu_plus(maximum_line_size) )
-    ALLOCATE( eta_minus(maximum_line_size), eta_plus(maximum_line_size) )
-    ALLOCATE( weight(maximum_line_size) )
-    ALLOCATE( hydrostatic_residual_2d(comp_cells_x,comp_cells_y) )
-    ALLOCATE( topographic_relief_ratio_2d(comp_cells_x,comp_cells_y) )
-
+   !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(j,k,relief2d)
     DO k = 1, comp_cells_y
        DO j = 1, comp_cells_x
-          hydrostatic_residual_2d(j,k) = local_hydrostatic_residual(j,k)
+          this%hydrostatic_residual_2d(j,k) = local_hydrostatic_residual(j,k)
           relief2d = MAX( B_face_x(j,k), B_face_x(j+1,k),                    &
                B_face_y(j,k), B_face_y(j,k+1) ) -                           &
                MIN( B_face_x(j,k), B_face_x(j+1,k),                         &
                B_face_y(j,k), B_face_y(j,k+1) )
-          topographic_relief_ratio_2d(j,k) = relief2d /                      &
+          this%topographic_relief_ratio_2d(j,k) = relief2d /                 &
                MAX(qp_center(1,j,k),hp_dry_tolerance)
        END DO
     END DO
+    !$OMP END PARALLEL DO
 
     line_size = comp_cells_x
+    !$OMP PARALLEL DO PRIVATE(thread_id)
     DO k = 1, comp_cells_y
 
-       h_center(1:line_size) = qp_center(1,:,k)
-       u_center(1:line_size) = qp_center(idx_u,:,k)
-       B_minus(1:line_size) = B_face_x(1:comp_cells_x,k)
-       B_plus(1:line_size) = B_face_x(2:comp_interfaces_x,k)
-       h_minus_direct(1:line_size) = this%qp_cellW(1,:,k)
-       h_plus_direct(1:line_size) = this%qp_cellE(1,:,k)
-       hu_minus_direct(1:line_size) = this%qp_cellW(2,:,k)
-       hu_plus_direct(1:line_size) = this%qp_cellE(2,:,k)
-       u_minus_candidate(1:line_size) = this%qp_cellW(idx_u,:,k)
-       u_plus_candidate(1:line_size) = this%qp_cellE(idx_u,:,k)
+      thread_id = omp_get_thread_num() + 1
+      this%hp_scratch(1:line_size,hp_h_center,thread_id) = qp_center(1,:,k)
+      this%hp_scratch(1:line_size,hp_u_center,thread_id) = qp_center(idx_u,:,k)
+      this%hp_scratch(1:line_size,hp_B_minus,thread_id) = B_face_x(1:comp_cells_x,k)
+      this%hp_scratch(1:line_size,hp_B_plus,thread_id) = B_face_x(2:comp_interfaces_x,k)
+      this%hp_scratch(1:line_size,hp_h_minus_direct,thread_id) = this%qp_cellW(1,:,k)
+      this%hp_scratch(1:line_size,hp_h_plus_direct,thread_id) = this%qp_cellE(1,:,k)
+      this%hp_scratch(1:line_size,hp_hu_minus_direct,thread_id) = this%qp_cellW(2,:,k)
+      this%hp_scratch(1:line_size,hp_hu_plus_direct,thread_id) = this%qp_cellE(2,:,k)
+      this%hp_scratch(1:line_size,hp_u_minus_candidate,thread_id) = this%qp_cellW(idx_u,:,k)
+      this%hp_scratch(1:line_size,hp_u_plus_candidate,thread_id) = this%qp_cellE(idx_u,:,k)
 
        CALL reconstruct_hp_line(                                                &
-            h_center(1:line_size), u_center(1:line_size),                      &
-            B_minus(1:line_size), B_plus(1:line_size),                         &
-            h_minus_direct(1:line_size), h_plus_direct(1:line_size),           &
-            hu_minus_direct(1:line_size), hu_plus_direct(1:line_size),         &
-            u_minus_candidate(1:line_size), u_plus_candidate(1:line_size),     &
-            hydrostatic_residual_2d(:,k), topographic_relief_ratio_2d(:,k),     &
-            limiter(1), reconstr_coeff, h_minus(1:line_size),                    &
-            h_plus(1:line_size), hu_minus(1:line_size), hu_plus(1:line_size),  &
-            eta_minus(1:line_size), eta_plus(1:line_size),                     &
-            weight(1:line_size) )
+           this%hp_scratch(1:line_size,hp_h_center,thread_id),              &
+           this%hp_scratch(1:line_size,hp_u_center,thread_id),               &
+           this%hp_scratch(1:line_size,hp_B_minus,thread_id),                &
+           this%hp_scratch(1:line_size,hp_B_plus,thread_id),                 &
+           this%hp_scratch(1:line_size,hp_h_minus_direct,thread_id),         &
+           this%hp_scratch(1:line_size,hp_h_plus_direct,thread_id),          &
+           this%hp_scratch(1:line_size,hp_hu_minus_direct,thread_id),        &
+           this%hp_scratch(1:line_size,hp_hu_plus_direct,thread_id),         &
+           this%hp_scratch(1:line_size,hp_u_minus_candidate,thread_id),      &
+           this%hp_scratch(1:line_size,hp_u_plus_candidate,thread_id),       &
+           this%hydrostatic_residual_2d(:,k),                               &
+           this%topographic_relief_ratio_2d(:,k), limiter(1),                &
+           reconstr_coeff, this%hp_scratch(1:line_size,hp_h_minus,thread_id),&
+           this%hp_scratch(1:line_size,hp_h_plus,thread_id),                 &
+           this%hp_scratch(1:line_size,hp_hu_minus,thread_id),               &
+           this%hp_scratch(1:line_size,hp_hu_plus,thread_id),                &
+           this%hp_scratch(1:line_size,hp_eta_minus,thread_id),              &
+           this%hp_scratch(1:line_size,hp_eta_plus,thread_id),               &
+           this%hp_scratch(1:line_size,hp_weight,thread_id),                 &
+           this%hp_scratch(1:line_size,hp_scratch_first:hp_scratch_last,     &
+           thread_id) )
 
-       this%eta_cellW(:,k) = eta_minus(1:line_size)
-       this%eta_cellE(:,k) = eta_plus(1:line_size)
-       this%w_eta_x(:,k) = weight(1:line_size)
+      this%eta_cellW(:,k) = this%hp_scratch(1:line_size,hp_eta_minus,thread_id)
+      this%eta_cellE(:,k) = this%hp_scratch(1:line_size,hp_eta_plus,thread_id)
+      this%w_eta_x(:,k) = this%hp_scratch(1:line_size,hp_weight,thread_id)
 
-       DO j = 1, comp_cells_x
-          this%qp_cellW(1,j,k) = h_minus(j)
-          this%qp_cellE(1,j,k) = h_plus(j)
-          this%qp_cellW(2,j,k) = hu_minus(j)
-          this%qp_cellE(2,j,k) = hu_plus(j)
-          this%qp_cellW(3,j,k) = h_minus(j) * this%qp_cellW(idx_v,j,k)
-          this%qp_cellE(3,j,k) = h_plus(j) * this%qp_cellE(idx_v,j,k)
-          this%qp_cellW(idx_u,j,k) = safe_velocity(hu_minus(j),h_minus(j))
-          this%qp_cellE(idx_u,j,k) = safe_velocity(hu_plus(j),h_plus(j))
-       END DO
+        this%qp_cellW(1,:,k) = this%hp_scratch(1:line_size,hp_h_minus,thread_id)
+        this%qp_cellE(1,:,k) = this%hp_scratch(1:line_size,hp_h_plus,thread_id)
+        this%qp_cellW(2,:,k) = this%hp_scratch(1:line_size,hp_hu_minus,thread_id)
+        this%qp_cellE(2,:,k) = this%hp_scratch(1:line_size,hp_hu_plus,thread_id)
+        this%qp_cellW(3,:,k) = this%hp_scratch(1:line_size,hp_h_minus,thread_id) &
+           * this%qp_cellW(idx_v,:,k)
+        this%qp_cellE(3,:,k) = this%hp_scratch(1:line_size,hp_h_plus,thread_id)  &
+           * this%qp_cellE(idx_v,:,k)
+        this%qp_cellW(idx_u,:,k) = safe_velocity(                            &
+           this%hp_scratch(1:line_size,hp_hu_minus,thread_id),              &
+           this%hp_scratch(1:line_size,hp_h_minus,thread_id))
+        this%qp_cellE(idx_u,:,k) = safe_velocity(                            &
+           this%hp_scratch(1:line_size,hp_hu_plus,thread_id),               &
+           this%hp_scratch(1:line_size,hp_h_plus,thread_id))
 
     END DO
+    !$OMP END PARALLEL DO
 
     line_size = comp_cells_y
+    !$OMP PARALLEL DO PRIVATE(thread_id)
     DO j = 1, comp_cells_x
 
-       h_center(1:line_size) = qp_center(1,j,:)
-       u_center(1:line_size) = qp_center(idx_v,j,:)
-       B_minus(1:line_size) = B_face_y(j,1:comp_cells_y)
-       B_plus(1:line_size) = B_face_y(j,2:comp_interfaces_y)
-       h_minus_direct(1:line_size) = this%qp_cellS(1,j,:)
-       h_plus_direct(1:line_size) = this%qp_cellN(1,j,:)
-       hu_minus_direct(1:line_size) = this%qp_cellS(3,j,:)
-       hu_plus_direct(1:line_size) = this%qp_cellN(3,j,:)
-       u_minus_candidate(1:line_size) = this%qp_cellS(idx_v,j,:)
-       u_plus_candidate(1:line_size) = this%qp_cellN(idx_v,j,:)
+      thread_id = omp_get_thread_num() + 1
+      this%hp_scratch(1:line_size,hp_h_center,thread_id) = qp_center(1,j,:)
+      this%hp_scratch(1:line_size,hp_u_center,thread_id) = qp_center(idx_v,j,:)
+      this%hp_scratch(1:line_size,hp_B_minus,thread_id) = B_face_y(j,1:comp_cells_y)
+      this%hp_scratch(1:line_size,hp_B_plus,thread_id) = B_face_y(j,2:comp_interfaces_y)
+      this%hp_scratch(1:line_size,hp_h_minus_direct,thread_id) = this%qp_cellS(1,j,:)
+      this%hp_scratch(1:line_size,hp_h_plus_direct,thread_id) = this%qp_cellN(1,j,:)
+      this%hp_scratch(1:line_size,hp_hu_minus_direct,thread_id) = this%qp_cellS(3,j,:)
+      this%hp_scratch(1:line_size,hp_hu_plus_direct,thread_id) = this%qp_cellN(3,j,:)
+      this%hp_scratch(1:line_size,hp_u_minus_candidate,thread_id) = this%qp_cellS(idx_v,j,:)
+      this%hp_scratch(1:line_size,hp_u_plus_candidate,thread_id) = this%qp_cellN(idx_v,j,:)
 
        CALL reconstruct_hp_line(                                                &
-            h_center(1:line_size), u_center(1:line_size),                      &
-            B_minus(1:line_size), B_plus(1:line_size),                         &
-            h_minus_direct(1:line_size), h_plus_direct(1:line_size),           &
-            hu_minus_direct(1:line_size), hu_plus_direct(1:line_size),         &
-            u_minus_candidate(1:line_size), u_plus_candidate(1:line_size),     &
-            hydrostatic_residual_2d(j,:), topographic_relief_ratio_2d(j,:),     &
-            limiter(1), reconstr_coeff, h_minus(1:line_size),                    &
-            h_plus(1:line_size), hu_minus(1:line_size), hu_plus(1:line_size),  &
-            eta_minus(1:line_size), eta_plus(1:line_size),                     &
-            weight(1:line_size) )
+           this%hp_scratch(1:line_size,hp_h_center,thread_id),              &
+           this%hp_scratch(1:line_size,hp_u_center,thread_id),               &
+           this%hp_scratch(1:line_size,hp_B_minus,thread_id),                &
+           this%hp_scratch(1:line_size,hp_B_plus,thread_id),                 &
+           this%hp_scratch(1:line_size,hp_h_minus_direct,thread_id),         &
+           this%hp_scratch(1:line_size,hp_h_plus_direct,thread_id),          &
+           this%hp_scratch(1:line_size,hp_hu_minus_direct,thread_id),        &
+           this%hp_scratch(1:line_size,hp_hu_plus_direct,thread_id),         &
+           this%hp_scratch(1:line_size,hp_u_minus_candidate,thread_id),      &
+           this%hp_scratch(1:line_size,hp_u_plus_candidate,thread_id),       &
+           this%hydrostatic_residual_2d(j,:),                               &
+           this%topographic_relief_ratio_2d(j,:), limiter(1),                &
+           reconstr_coeff, this%hp_scratch(1:line_size,hp_h_minus,thread_id),&
+           this%hp_scratch(1:line_size,hp_h_plus,thread_id),                 &
+           this%hp_scratch(1:line_size,hp_hu_minus,thread_id),               &
+           this%hp_scratch(1:line_size,hp_hu_plus,thread_id),                &
+           this%hp_scratch(1:line_size,hp_eta_minus,thread_id),              &
+           this%hp_scratch(1:line_size,hp_eta_plus,thread_id),               &
+           this%hp_scratch(1:line_size,hp_weight,thread_id),                 &
+           this%hp_scratch(1:line_size,hp_scratch_first:hp_scratch_last,     &
+           thread_id) )
 
-       this%eta_cellS(j,:) = eta_minus(1:line_size)
-       this%eta_cellN(j,:) = eta_plus(1:line_size)
-       this%w_eta_y(j,:) = weight(1:line_size)
+      this%eta_cellS(j,:) = this%hp_scratch(1:line_size,hp_eta_minus,thread_id)
+      this%eta_cellN(j,:) = this%hp_scratch(1:line_size,hp_eta_plus,thread_id)
+      this%w_eta_y(j,:) = this%hp_scratch(1:line_size,hp_weight,thread_id)
 
-       DO k = 1, comp_cells_y
-          this%qp_cellS(1,j,k) = h_minus(k)
-          this%qp_cellN(1,j,k) = h_plus(k)
-          this%qp_cellS(2,j,k) = h_minus(k) * this%qp_cellS(idx_u,j,k)
-          this%qp_cellN(2,j,k) = h_plus(k) * this%qp_cellN(idx_u,j,k)
-          this%qp_cellS(3,j,k) = hu_minus(k)
-          this%qp_cellN(3,j,k) = hu_plus(k)
-          this%qp_cellS(idx_v,j,k) = safe_velocity(hu_minus(k),h_minus(k))
-          this%qp_cellN(idx_v,j,k) = safe_velocity(hu_plus(k),h_plus(k))
-       END DO
+        this%qp_cellS(1,j,:) = this%hp_scratch(1:line_size,hp_h_minus,thread_id)
+        this%qp_cellN(1,j,:) = this%hp_scratch(1:line_size,hp_h_plus,thread_id)
+        this%qp_cellS(2,j,:) = this%hp_scratch(1:line_size,hp_h_minus,thread_id) &
+           * this%qp_cellS(idx_u,j,:)
+        this%qp_cellN(2,j,:) = this%hp_scratch(1:line_size,hp_h_plus,thread_id)  &
+           * this%qp_cellN(idx_u,j,:)
+        this%qp_cellS(3,j,:) = this%hp_scratch(1:line_size,hp_hu_minus,thread_id)
+        this%qp_cellN(3,j,:) = this%hp_scratch(1:line_size,hp_hu_plus,thread_id)
+        this%qp_cellS(idx_v,j,:) = safe_velocity(                            &
+           this%hp_scratch(1:line_size,hp_hu_minus,thread_id),              &
+           this%hp_scratch(1:line_size,hp_h_minus,thread_id))
+        this%qp_cellN(idx_v,j,:) = safe_velocity(                            &
+           this%hp_scratch(1:line_size,hp_hu_plus,thread_id),               &
+           this%hp_scratch(1:line_size,hp_h_plus,thread_id))
 
-    END DO
+   END DO
+   !$OMP END PARALLEL DO
 
     ! Map all eta cell traces to their oriented face storage.  Conservative
     ! and primitive states below are restricted to the active solve mask.
+    !$OMP PARALLEL DO
     DO k = 1, comp_cells_y
-       DO j = 1, comp_cells_x
-          this%eta_interfaceR(j,k) = this%eta_cellW(j,k)
-          this%eta_interfaceL(j+1,k) = this%eta_cellE(j,k)
-       END DO
+       this%eta_interfaceR(1:comp_cells_x,k) = this%eta_cellW(:,k)
+       this%eta_interfaceL(2:comp_interfaces_x,k) = this%eta_cellE(:,k)
        this%eta_interfaceL(1,k) = this%eta_interfaceR(1,k)
        this%eta_interfaceR(comp_interfaces_x,k) =                             &
             this%eta_interfaceL(comp_interfaces_x,k)
     END DO
+    !$OMP END PARALLEL DO
 
+    !$OMP PARALLEL DO
     DO j = 1, comp_cells_x
-       DO k = 1, comp_cells_y
-          this%eta_interfaceT(j,k) = this%eta_cellS(j,k)
-          this%eta_interfaceB(j,k+1) = this%eta_cellN(j,k)
-       END DO
+       this%eta_interfaceT(j,1:comp_cells_y) = this%eta_cellS(j,:)
+       this%eta_interfaceB(j,2:comp_interfaces_y) = this%eta_cellN(j,:)
        this%eta_interfaceB(j,1) = this%eta_interfaceT(j,1)
        this%eta_interfaceT(j,comp_interfaces_y) =                             &
             this%eta_interfaceB(j,comp_interfaces_y)
     END DO
+    !$OMP END PARALLEL DO
 
     DO l = 1, solve_cells
 
@@ -1291,15 +1130,6 @@ CONTAINS
        END DO
     END IF
 
-    DEALLOCATE( h_center, u_center, B_minus, B_plus )
-    DEALLOCATE( h_minus_direct, h_plus_direct )
-    DEALLOCATE( hu_minus_direct, hu_plus_direct )
-    DEALLOCATE( u_minus_candidate, u_plus_candidate )
-    DEALLOCATE( h_minus, h_plus, hu_minus, hu_plus )
-    DEALLOCATE( eta_minus, eta_plus, weight )
-    DEALLOCATE( hydrostatic_residual_2d )
-    DEALLOCATE( topographic_relief_ratio_2d )
-
   CONTAINS
 
     FUNCTION local_hydrostatic_residual(jc,kc) RESULT(residual)
@@ -1349,7 +1179,7 @@ CONTAINS
 
     END FUNCTION local_hydrostatic_residual
 
-    PURE FUNCTION safe_velocity(momentum,thickness) RESULT(velocity)
+   PURE ELEMENTAL FUNCTION safe_velocity(momentum,thickness) RESULT(velocity)
 
       REAL(wp), INTENT(IN) :: momentum, thickness
       REAL(wp) :: velocity
