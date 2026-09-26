@@ -8,15 +8,16 @@
 !********************************************************************************
 MODULE hp_reconstruction_2d
 
-  USE parameters_2d, ONLY : wp
+  USE parameters_2d, ONLY : wp, dry_thickness_tolerance
   USE geometry_2d, ONLY : limit
 
   IMPLICIT NONE
 
   PRIVATE
 
-  REAL(wp), PARAMETER, PUBLIC :: hp_dry_tolerance = 1.0E-10_wp
+  REAL(wp), PARAMETER, PUBLIC :: hp_dry_tolerance = dry_thickness_tolerance
   REAL(wp), PARAMETER, PUBLIC :: hp_bed_step_tolerance = 1.0E-12_wp
+  REAL(wp), PARAMETER, PUBLIC :: hp_dynamic_residual_threshold = 0.90_wp
 
   PUBLIC :: reconstruct_hp_line
 
@@ -34,8 +35,9 @@ CONTAINS
   !******************************************************************************
   SUBROUTINE reconstruct_hp_line( h_center, u_center, B_minus, B_plus,          &
        h_minus_direct, h_plus_direct, hu_minus_direct, hu_plus_direct,          &
-       u_minus_candidate, u_plus_candidate, limiter_id,                        &
-       reconstruction_coefficient, h_minus, h_plus, hu_minus, hu_plus,         &
+       u_minus_candidate, u_plus_candidate, hydrostatic_residual,              &
+       topographic_relief_ratio, limiter_id, reconstruction_coefficient,       &
+       h_minus, h_plus, hu_minus, hu_plus,                                     &
        eta_minus, eta_plus, w_eta )
 
     REAL(wp), INTENT(IN) :: h_center(:)
@@ -48,6 +50,8 @@ CONTAINS
     REAL(wp), INTENT(IN) :: hu_plus_direct(:)
     REAL(wp), INTENT(IN) :: u_minus_candidate(:)
     REAL(wp), INTENT(IN) :: u_plus_candidate(:)
+    REAL(wp), INTENT(IN) :: hydrostatic_residual(:)
+    REAL(wp), INTENT(IN) :: topographic_relief_ratio(:)
     INTEGER, INTENT(IN) :: limiter_id
     REAL(wp), INTENT(IN) :: reconstruction_coefficient
 
@@ -70,6 +74,7 @@ CONTAINS
     REAL(wp) :: denominator, distribution_tolerance
     REAL(wp) :: momentum_weight, dm_target, dm_lower, dm_upper, dm
     REAL(wp) :: u_min, u_max
+    REAL(wp) :: u_center_safe(SIZE(h_center))
     INTEGER :: i, number_of_cells
 
     number_of_cells = SIZE(h_center)
@@ -85,6 +90,8 @@ CONTAINS
          ( SIZE(hu_plus_direct) .NE. number_of_cells ) .OR.                   &
          ( SIZE(u_minus_candidate) .NE. number_of_cells ) .OR.                &
          ( SIZE(u_plus_candidate) .NE. number_of_cells ) .OR.                 &
+         ( SIZE(hydrostatic_residual) .NE. number_of_cells ) .OR.             &
+         ( SIZE(topographic_relief_ratio) .NE. number_of_cells ) .OR.        &
          ( SIZE(h_minus) .NE. number_of_cells ) .OR.                          &
          ( SIZE(h_plus) .NE. number_of_cells ) .OR.                           &
          ( SIZE(hu_minus) .NE. number_of_cells ) .OR.                         &
@@ -97,6 +104,8 @@ CONTAINS
 
     eta_center = h_center + 0.5_wp * ( B_minus + B_plus )
     coordinate_stencil = [ -1.0_wp, 0.0_wp, 1.0_wp ]
+    u_center_safe = u_center
+    WHERE ( h_center .LE. hp_dry_tolerance ) u_center_safe = 0.0_wp
 
     DO i = 1, number_of_cells
 
@@ -140,13 +149,26 @@ CONTAINS
           w_eta(i) = 0.5_wp
        END IF
 
-       ! A zero eta-based endpoint on a steep bed does not by itself make the
-       ! cell dry.  Forcing the whole directional reconstruction to w_eta=1 in
-       ! that case creates row/column-aligned dry barriers on rough 2-D DEMs.
-       ! Both candidates are already non-negative, so let the continuity
-       ! indicator blend wet-centred cells and reserve the hard eta selection
-       ! for genuinely dry cell averages.
-       IF ( h_center(i) .LE. hp_dry_tolerance ) w_eta(i) = 1.0_wp
+       ! A dry cell average must always use the hydrostatic eta candidate.
+       ! For a wet cell whose eta candidate merely touches the bed at one
+       ! endpoint, distinguish local hydrostatic compensation from dynamic
+       ! drainage using the dimensionless 2-D residual supplied by the caller.
+       IF ( h_center(i) .LE. hp_dry_tolerance ) THEN
+          w_eta(i) = 1.0_wp
+       ELSEIF ( ( h_minus_eta(i) .LE. hp_dry_tolerance ) .OR.                &
+            ( h_plus_eta(i) .LE. hp_dry_tolerance ) ) THEN
+          IF ( hydrostatic_residual(i) .GT. hp_dynamic_residual_threshold ) THEN
+             w_eta(i) = 0.0_wp
+          ELSE
+             w_eta(i) = 1.0_wp
+          END IF
+       ELSEIF ( ( hydrostatic_residual(i) .GT. hp_dynamic_residual_threshold ) .AND. &
+            ( topographic_relief_ratio(i) .GT. 1.0_wp ) ) THEN
+          ! Fully wet dynamic shallow flow over rough topography.  Suppress
+          ! eta only when the 2-D within-cell bed relief exceeds the local
+          ! thickness.  Both tests are dimensionless and direction-independent.
+          w_eta(i) = 0.0_wp
+       END IF
 
        h_minus(i) = ( 1.0_wp-w_eta(i) ) * h_minus_orig(i)                    &
             + w_eta(i) * h_minus_eta(i)
@@ -164,19 +186,19 @@ CONTAINS
        hu_plus(i) = ( 1.0_wp-momentum_weight ) * hu_plus_direct(i)           &
             + momentum_weight * h_plus_eta(i) * u_plus_candidate(i)
 
-       u_min = MINVAL( u_center(MAX(1,i-1):MIN(number_of_cells,i+1)) )
-       u_max = MAXVAL( u_center(MAX(1,i-1):MIN(number_of_cells,i+1)) )
+       u_min = MINVAL( u_center_safe(MAX(1,i-1):MIN(number_of_cells,i+1)) )
+       u_max = MAXVAL( u_center_safe(MAX(1,i-1):MIN(number_of_cells,i+1)) )
 
        dm_target = 0.5_wp * ( hu_plus(i)-hu_minus(i) )                       &
-            - u_center(i) * 0.5_wp * ( h_plus(i)-h_minus(i) )
-       dm_lower = MAX( ( u_center(i)-u_max ) * h_minus(i),                   &
-            ( u_min-u_center(i) ) * h_plus(i) )
-       dm_upper = MIN( ( u_center(i)-u_min ) * h_minus(i),                   &
-            ( u_max-u_center(i) ) * h_plus(i) )
+            - u_center_safe(i) * 0.5_wp * ( h_plus(i)-h_minus(i) )
+       dm_lower = MAX( ( u_center_safe(i)-u_max ) * h_minus(i),              &
+            ( u_min-u_center_safe(i) ) * h_plus(i) )
+       dm_upper = MIN( ( u_center_safe(i)-u_min ) * h_minus(i),              &
+            ( u_max-u_center_safe(i) ) * h_plus(i) )
        dm = MIN( MAX( dm_target, dm_lower ), dm_upper )
 
-       hu_minus(i) = u_center(i) * h_minus(i) - dm
-       hu_plus(i) = u_center(i) * h_plus(i) + dm
+       hu_minus(i) = u_center_safe(i) * h_minus(i) - dm
+       hu_plus(i) = u_center_safe(i) * h_plus(i) + dm
 
     END DO
 

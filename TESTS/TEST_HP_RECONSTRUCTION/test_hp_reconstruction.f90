@@ -27,6 +27,7 @@ CONTAINS
     REAL(wp) :: B_face(n+1), Bm(n), Bp(n), h(n), u(n)
     REAL(wp) :: hm0(n), hp0(n), hum0(n), hup0(n), um0(n), up0(n)
     REAL(wp) :: hm(n), hp(n), hum(n), hup(n), etam(n), etap(n), w(n)
+    REAL(wp) :: hydrostatic_residual(n), relief_ratio(n)
     REAL(wp) :: tolerance
 
     B_face = [ 0.0_wp, 0.2_wp, 0.45_wp, 1.35_wp, 1.35_wp,                  &
@@ -41,8 +42,11 @@ CONTAINS
     hup0 = 0.0_wp
     um0 = 0.0_wp
     up0 = 0.0_wp
+    hydrostatic_residual = 0.0_wp
+    relief_ratio = 0.0_wp
 
-    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,3,        &
+    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,          &
+         hydrostatic_residual,relief_ratio,3,                               &
          1.0_wp,hm,hp,hum,hup,etam,etap,w)
 
     tolerance = 256.0_wp*EPSILON(1.0_wp)*H0
@@ -62,6 +66,7 @@ CONTAINS
     REAL(wp) :: B_face(n+1), Bm(n), Bp(n), h(n), u(n)
     REAL(wp) :: hm0(n), hp0(n), hum0(n), hup0(n), um0(n), up0(n)
     REAL(wp) :: hm(n), hp(n), hum(n), hup(n), etam(n), etap(n), w(n)
+    REAL(wp) :: hydrostatic_residual(n), relief_ratio(n)
 
     B_face = [ 0.0_wp, 0.4_wp, 0.9_wp, 1.35_wp, 1.55_wp, 1.8_wp, 2.1_wp ]
     Bm = B_face(1:n)
@@ -74,8 +79,11 @@ CONTAINS
     hup0 = 0.0_wp
     um0 = 0.0_wp
     up0 = 0.0_wp
+    hydrostatic_residual = 0.0_wp
+    relief_ratio = 0.0_wp
 
-    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,3,        &
+    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,          &
+         hydrostatic_residual,relief_ratio,3,                               &
          1.0_wp,hm,hp,hum,hup,etam,etap,w)
 
     IF ( MIN(MINVAL(hm),MINVAL(hp)) .LT. 0.0_wp ) THEN
@@ -95,6 +103,7 @@ CONTAINS
     REAL(wp) :: Bm(n), Bp(n), h(n), u(n)
     REAL(wp) :: hm0(n), hp0(n), hum0(n), hup0(n), um0(n), up0(n)
     REAL(wp) :: hm(n), hp(n), hum(n), hup(n), etam(n), etap(n), w(n)
+    REAL(wp) :: hydrostatic_residual(n), relief_ratio(n)
     REAL(wp) :: tolerance
 
     ! The middle cell is wet at its centre but its eta reconstruction reaches
@@ -111,8 +120,11 @@ CONTAINS
     hup0 = 0.0_wp
     um0 = 0.0_wp
     up0 = 0.0_wp
+    hydrostatic_residual = 1.0_wp
+    relief_ratio = 10.0_wp
 
-    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,3,        &
+    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,          &
+         hydrostatic_residual,relief_ratio,3,                               &
          1.0_wp,hm,hp,hum,hup,etam,etap,w)
 
     tolerance = 256.0_wp*EPSILON(1.0_wp)
@@ -137,6 +149,7 @@ CONTAINS
     REAL(wp) :: Bm(n), Bp(n), h(n), u(n)
     REAL(wp) :: hm0(n), hp0(n), hum0(n), hup0(n), um0(n), up0(n)
     REAL(wp) :: hm(n), hp(n), hum(n), hup(n), etam(n), etap(n), w(n)
+    REAL(wp) :: hydrostatic_residual(n), relief_ratio(n)
     REAL(wp) :: umin, umax, tolerance, mean_error, velocity_error
     INTEGER :: i
 
@@ -150,8 +163,11 @@ CONTAINS
     hup0 = 2.0_wp*h*u-hum0
     um0 = u - 0.35_wp
     up0 = u + 0.35_wp
+    hydrostatic_residual = 0.0_wp
+    relief_ratio = 0.0_wp
 
-    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,3,        &
+    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,          &
+         hydrostatic_residual,relief_ratio,3,                               &
          1.0_wp,hm,hp,hum,hup,etam,etap,w)
 
     tolerance = 1024.0_wp*EPSILON(1.0_wp)
@@ -183,6 +199,7 @@ CONTAINS
     REAL(wp) :: Bm(n), Bp(n), h(n), u(n)
     REAL(wp) :: hm0(n), hp0(n), hum0(n), hup0(n), um0(n), up0(n)
     REAL(wp) :: hm(n), hp(n), hum(n), hup(n), etam(n), etap(n), w(n)
+    REAL(wp) :: hydrostatic_residual(n), relief_ratio(n)
     REAL(wp) :: hu(n), tolerance
 
     Bm = 2.0_wp
@@ -193,8 +210,11 @@ CONTAINS
     CALL direct_candidates(h,hm0,hp0,3,1.0_wp)
     CALL direct_candidates(hu,hum0,hup0,3,1.0_wp)
     CALL direct_candidates(u,um0,up0,3,1.0_wp)
+    hydrostatic_residual = 1.0_wp
+    relief_ratio = 0.0_wp
 
-    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,3,        &
+    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,          &
+         hydrostatic_residual,relief_ratio,3,                               &
          1.0_wp,hm,hp,hum,hup,etam,etap,w)
 
     tolerance = 512.0_wp*EPSILON(1.0_wp)
@@ -212,6 +232,7 @@ CONTAINS
     REAL(wp) :: hum0(n), hup0(n), um0(n), up0(n)
     REAL(wp) :: hm_x(n), hp_x(n), hum_x(n), hup_x(n), em_x(n), ep_x(n), w_x(n)
     REAL(wp) :: hm_y(n), hp_y(n), hum_y(n), hup_y(n), em_y(n), ep_y(n), w_y(n)
+    REAL(wp) :: hydrostatic_residual(n), relief_ratio(n)
 
     Bm = [ 0.2_wp, 0.7_wp, 0.9_wp ]
     Bp = [ 0.7_wp, 0.9_wp, 0.4_wp ]
@@ -220,10 +241,14 @@ CONTAINS
     CALL direct_candidates(h,hm0,hp0,3,1.0_wp)
     CALL direct_candidates(h*u,hum0,hup0,3,1.0_wp)
     CALL direct_candidates(u,um0,up0,3,1.0_wp)
+    hydrostatic_residual = 0.5_wp
+    relief_ratio = 2.0_wp
 
-    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,3,        &
+    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,          &
+         hydrostatic_residual,relief_ratio,3,                               &
          1.0_wp,hm_x,hp_x,hum_x,hup_x,em_x,ep_x,w_x)
-    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,3,        &
+    CALL reconstruct_hp_line(h,u,Bm,Bp,hm0,hp0,hum0,hup0,um0,up0,          &
+         hydrostatic_residual,relief_ratio,3,                               &
          1.0_wp,hm_y,hp_y,hum_y,hup_y,em_y,ep_y,w_y)
 
     CALL assert_small('row/column HP core',MAX(                             &

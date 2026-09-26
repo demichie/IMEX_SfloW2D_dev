@@ -14,6 +14,7 @@ MODULE hyperbolic_2d
   USE geometry_2d, ONLY : one_by_dx, one_by_dy
 
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
+  USE hp_reconstruction_2d, ONLY : hp_dry_tolerance
 
   IMPLICIT NONE
 
@@ -257,6 +258,8 @@ CONTAINS
                reduced_gravity_left, gamma_left )
           CALL eval_hydrostatic_coefficient( recon%qp_interfaceR(:,j,k),     &
                reduced_gravity_right, gamma_right )
+          CALL regularize_dry_gamma_pair( recon%qp_interfaceL(1,j,k), gamma_left, &
+               recon%qp_interfaceR(1,j,k), gamma_right )
           CALL eval_hydrostatic_path( PATH_DIR_X,                            &
                recon%qp_interfaceL(1,j,k), gamma_left,                       &
                recon%eta_interfaceL(j,k), recon%qp_interfaceR(1,j,k),        &
@@ -305,6 +308,8 @@ CONTAINS
                reduced_gravity_left, gamma_left )
           CALL eval_hydrostatic_coefficient( recon%qp_interfaceT(:,j,k),     &
                reduced_gravity_right, gamma_right )
+          CALL regularize_dry_gamma_pair( recon%qp_interfaceB(1,j,k), gamma_left, &
+               recon%qp_interfaceT(1,j,k), gamma_right )
           CALL eval_hydrostatic_path( PATH_DIR_Y,                            &
                recon%qp_interfaceB(1,j,k), gamma_left,                       &
                recon%eta_interfaceB(j,k), recon%qp_interfaceT(1,j,k),        &
@@ -358,6 +363,8 @@ CONTAINS
                reduced_gravity_minus, gamma_minus )
           CALL eval_hydrostatic_coefficient( recon%qp_interfaceL(:,j+1,k),   &
                reduced_gravity_plus, gamma_plus )
+          CALL regularize_dry_gamma_pair( recon%qp_interfaceR(1,j,k), gamma_minus, &
+               recon%qp_interfaceL(1,j+1,k), gamma_plus )
           CALL eval_hydrostatic_path( PATH_DIR_X,                            &
                recon%qp_interfaceR(1,j,k), gamma_minus,                      &
                recon%eta_cellW(j,k), recon%qp_interfaceL(1,j+1,k),           &
@@ -369,6 +376,8 @@ CONTAINS
                reduced_gravity_minus, gamma_minus )
           CALL eval_hydrostatic_coefficient( recon%qp_interfaceB(:,j,k+1),   &
                reduced_gravity_plus, gamma_plus )
+          CALL regularize_dry_gamma_pair( recon%qp_interfaceT(1,j,k), gamma_minus, &
+               recon%qp_interfaceB(1,j,k+1), gamma_plus )
           CALL eval_hydrostatic_path( PATH_DIR_Y,                            &
                recon%qp_interfaceT(1,j,k), gamma_minus,                      &
                recon%eta_cellS(j,k), recon%qp_interfaceB(1,j,k+1),           &
@@ -379,6 +388,27 @@ CONTAINS
     !$OMP END PARALLEL DO
 
   END SUBROUTINE eval_cell_hydrostatic_paths
+
+  !******************************************************************************
+  !> \brief Continue the material hydrostatic coefficient to a dry trace
+  !>
+  !> Gamma is a material coefficient, not a thickness variable.  A dry final
+  !> trace carries no composition and eval_hydrostatic_coefficient therefore
+  !> returns Gamma=0.  Along a wet/dry shoreline this artificial jump would
+  !> create a spurious -0.5*h^2*dGamma contribution in the hydrostatic path.
+  !> Use the wet-side limiting value at the dry endpoint instead.
+  !******************************************************************************
+  PURE SUBROUTINE regularize_dry_gamma_pair(h_left,gamma_left,h_right,gamma_right)
+    REAL(wp), INTENT(IN) :: h_left,h_right
+    REAL(wp), INTENT(INOUT) :: gamma_left,gamma_right
+    IF ( ( h_left .LE. hp_dry_tolerance ) .AND.                              &
+         ( h_right .GT. hp_dry_tolerance ) ) THEN
+       gamma_left = gamma_right
+    ELSEIF ( ( h_right .LE. hp_dry_tolerance ) .AND.                         &
+         ( h_left .GT. hp_dry_tolerance ) ) THEN
+       gamma_right = gamma_left
+    END IF
+  END SUBROUTINE regularize_dry_gamma_pair
 
   !******************************************************************************
   !> \brief Upwind numerical fluxes

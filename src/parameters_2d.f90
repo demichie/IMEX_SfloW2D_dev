@@ -21,6 +21,9 @@ MODULE parameters_2d
 
   REAL(wp), PARAMETER :: tolh = 10.0_wp * EPSILON(1.0_wp)
 
+  !> Thickness below which a cell is treated as numerically dry [m].
+  REAL(wp), PARAMETER :: dry_thickness_tolerance = 1.0E-10_wp
+
   REAL(wp) :: eps_newton        !< threshold for the convergence of the
                                 !< Newton's method 
 

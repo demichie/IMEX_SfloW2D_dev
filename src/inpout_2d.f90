@@ -14,7 +14,7 @@ MODULE inpout_2d
 
   USE diagnostics_2d, ONLY : interactive_debug_flag, debug_pause, fatal_error
 
-  USE parameters_2d, ONLY: wp
+  USE parameters_2d, ONLY: wp, dry_thickness_tolerance
   USE runtime_2d, ONLY: runtime_state_type
   USE state_2d, ONLY: state_type
   USE domain_2d, ONLY: domain_type
@@ -6935,7 +6935,7 @@ CONTAINS
 
       DO k = 1, comp_cells_y
 
-        IF (state%qp(1, j, k) .GT. 1.0E-10_wp) THEN
+        IF (state%qp(1, j, k) .GT. dry_thickness_tolerance) THEN
 
           CALL mixt_var(state%qp(1:n_vars + 2, j, k), r_Ri, r_rho_m, r_rho_c, &
                         r_red_grav, r_sp_heat_c, r_sp_heat_mix)
@@ -6955,7 +6955,7 @@ CONTAINS
         rho_m2D(j, k) = r_rho_m
         red_grav2D(j, k) = r_red_grav
 
-        IF (state%qp(1, j, k) .LE. 1.0E-10_wp) CYCLE
+        IF (state%qp(1, j, k) .LE. dry_thickness_tolerance) CYCLE
 
         r_h = state%qp(1, j, k)
         r_u = state%qp(n_vars + 1, j, k)
@@ -7064,13 +7064,19 @@ CONTAINS
     CALL check(nf90_put_var(ncid, w_varid, temp_array, start=start, &
                             count=count))
 
-    ! Write the velocity x-component (u)
-    CALL check(nf90_put_var(ncid, u_varid, state%qp(n_vars + 1, :, :), start=start, &
-                            count=count))
+    ! Write velocity components.  A cell classified as numerically dry has no
+    ! meaningful physical velocity; mask residual q/rho-h ratios in the output.
+    temp_array = 0.0_wp
+    WHERE (state%qp(1, :, :) .GT. dry_thickness_tolerance)
+      temp_array = state%qp(n_vars + 1, :, :)
+    END WHERE
+    CALL check(nf90_put_var(ncid, u_varid, temp_array, start=start, count=count))
 
-    ! Write the velocity y-component (v)
-    CALL check(nf90_put_var(ncid, v_varid, state%qp(n_vars + 2, :, :), start=start, &
-                            count=count))
+    temp_array = 0.0_wp
+    WHERE (state%qp(1, :, :) .GT. dry_thickness_tolerance)
+      temp_array = state%qp(n_vars + 2, :, :)
+    END WHERE
+    CALL check(nf90_put_var(ncid, v_varid, temp_array, start=start, count=count))
 
     ! Write the flow temperature (T)
     CALL check(nf90_put_var(ncid, Temp_varid, state%qp(4, :, :), start=start, &
@@ -7128,7 +7134,7 @@ CONTAINS
     ! Write pore pressure variable
     DO i = 1, n_pore_vars
       temp_array = pres
-      WHERE (state%qp(1, :, :) .GE. 1.0E-10_wp)
+      WHERE (state%qp(1, :, :) .GE. dry_thickness_tolerance)
         temp_array = state%qp(4 + n_solid + n_add_gas + n_stoch_vars + i, :, :) + pres
       END WHERE
       CALL check(nf90_put_var(ncid, pore_varid(i), temp_array, start=start, &

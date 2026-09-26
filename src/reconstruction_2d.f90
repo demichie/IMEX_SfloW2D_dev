@@ -1060,8 +1060,11 @@ CONTAINS
     REAL(wp), ALLOCATABLE :: h_minus(:), h_plus(:)
     REAL(wp), ALLOCATABLE :: hu_minus(:), hu_plus(:)
     REAL(wp), ALLOCATABLE :: eta_minus(:), eta_plus(:), weight(:)
+    REAL(wp), ALLOCATABLE :: hydrostatic_residual_2d(:,:)
+    REAL(wp), ALLOCATABLE :: topographic_relief_ratio_2d(:,:)
 
     REAL(wp) :: q_final(n_vars), qp_final(n_vars+2)
+    REAL(wp) :: relief2d
     INTEGER :: j, k, l, line_size, maximum_line_size
 
     maximum_line_size = MAX( comp_cells_x, comp_cells_y )
@@ -1077,6 +1080,20 @@ CONTAINS
     ALLOCATE( hu_minus(maximum_line_size), hu_plus(maximum_line_size) )
     ALLOCATE( eta_minus(maximum_line_size), eta_plus(maximum_line_size) )
     ALLOCATE( weight(maximum_line_size) )
+    ALLOCATE( hydrostatic_residual_2d(comp_cells_x,comp_cells_y) )
+    ALLOCATE( topographic_relief_ratio_2d(comp_cells_x,comp_cells_y) )
+
+    DO k = 1, comp_cells_y
+       DO j = 1, comp_cells_x
+          hydrostatic_residual_2d(j,k) = local_hydrostatic_residual(j,k)
+          relief2d = MAX( B_face_x(j,k), B_face_x(j+1,k),                    &
+               B_face_y(j,k), B_face_y(j,k+1) ) -                           &
+               MIN( B_face_x(j,k), B_face_x(j+1,k),                         &
+               B_face_y(j,k), B_face_y(j,k+1) )
+          topographic_relief_ratio_2d(j,k) = relief2d /                      &
+               MAX(qp_center(1,j,k),hp_dry_tolerance)
+       END DO
+    END DO
 
     line_size = comp_cells_x
     DO k = 1, comp_cells_y
@@ -1098,7 +1115,8 @@ CONTAINS
             h_minus_direct(1:line_size), h_plus_direct(1:line_size),           &
             hu_minus_direct(1:line_size), hu_plus_direct(1:line_size),         &
             u_minus_candidate(1:line_size), u_plus_candidate(1:line_size),     &
-            limiter(1), reconstr_coeff, h_minus(1:line_size),                  &
+            hydrostatic_residual_2d(:,k), topographic_relief_ratio_2d(:,k),     &
+            limiter(1), reconstr_coeff, h_minus(1:line_size),                    &
             h_plus(1:line_size), hu_minus(1:line_size), hu_plus(1:line_size),  &
             eta_minus(1:line_size), eta_plus(1:line_size),                     &
             weight(1:line_size) )
@@ -1140,7 +1158,8 @@ CONTAINS
             h_minus_direct(1:line_size), h_plus_direct(1:line_size),           &
             hu_minus_direct(1:line_size), hu_plus_direct(1:line_size),         &
             u_minus_candidate(1:line_size), u_plus_candidate(1:line_size),     &
-            limiter(1), reconstr_coeff, h_minus(1:line_size),                  &
+            hydrostatic_residual_2d(j,:), topographic_relief_ratio_2d(j,:),     &
+            limiter(1), reconstr_coeff, h_minus(1:line_size),                    &
             h_plus(1:line_size), hu_minus(1:line_size), hu_plus(1:line_size),  &
             eta_minus(1:line_size), eta_plus(1:line_size),                     &
             weight(1:line_size) )
@@ -1278,8 +1297,57 @@ CONTAINS
     DEALLOCATE( u_minus_candidate, u_plus_candidate )
     DEALLOCATE( h_minus, h_plus, hu_minus, hu_plus )
     DEALLOCATE( eta_minus, eta_plus, weight )
+    DEALLOCATE( hydrostatic_residual_2d )
+    DEALLOCATE( topographic_relief_ratio_2d )
 
   CONTAINS
+
+    FUNCTION local_hydrostatic_residual(jc,kc) RESULT(residual)
+
+      INTEGER, INTENT(IN) :: jc, kc
+      REAL(wp) :: residual
+      REAL(wp) :: h0, eta0, numerator, denominator, scale
+      REAL(wp) :: hn, etan
+      INTEGER :: jj, kk
+
+      h0 = qp_center(1,jc,kc)
+      eta0 = h0 + B_cent(jc,kc)
+      numerator = 0.0_wp
+      denominator = 0.0_wp
+
+      IF ( jc .GT. 1 ) THEN
+         jj = jc-1; kk = kc
+         hn = qp_center(1,jj,kk); etan = hn + B_cent(jj,kk)
+         numerator = numerator + ABS(etan-eta0)
+         denominator = denominator + ABS(hn-h0) + ABS(B_cent(jj,kk)-B_cent(jc,kc))
+      END IF
+      IF ( jc .LT. comp_cells_x ) THEN
+         jj = jc+1; kk = kc
+         hn = qp_center(1,jj,kk); etan = hn + B_cent(jj,kk)
+         numerator = numerator + ABS(etan-eta0)
+         denominator = denominator + ABS(hn-h0) + ABS(B_cent(jj,kk)-B_cent(jc,kc))
+      END IF
+      IF ( kc .GT. 1 ) THEN
+         jj = jc; kk = kc-1
+         hn = qp_center(1,jj,kk); etan = hn + B_cent(jj,kk)
+         numerator = numerator + ABS(etan-eta0)
+         denominator = denominator + ABS(hn-h0) + ABS(B_cent(jj,kk)-B_cent(jc,kc))
+      END IF
+      IF ( kc .LT. comp_cells_y ) THEN
+         jj = jc; kk = kc+1
+         hn = qp_center(1,jj,kk); etan = hn + B_cent(jj,kk)
+         numerator = numerator + ABS(etan-eta0)
+         denominator = denominator + ABS(hn-h0) + ABS(B_cent(jj,kk)-B_cent(jc,kc))
+      END IF
+
+      scale = 128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,ABS(eta0),ABS(h0),ABS(B_cent(jc,kc)))
+      IF ( denominator .GT. scale ) THEN
+         residual = MIN(1.0_wp,MAX(0.0_wp,numerator/denominator))
+      ELSE
+         residual = 0.0_wp
+      END IF
+
+    END FUNCTION local_hydrostatic_residual
 
     PURE FUNCTION safe_velocity(momentum,thickness) RESULT(velocity)
 
