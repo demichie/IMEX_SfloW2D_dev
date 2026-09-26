@@ -18,23 +18,14 @@ MODULE reconstruction_2d
   USE geometry_2d, ONLY : one_by_dx, one_by_dy
   USE geometry_2d, ONLY : limit
 
-  USE hp_reconstruction_2d, ONLY : reconstruct_hp_line
-  USE hp_reconstruction_2d, ONLY : hp_dry_tolerance
+   USE hp_reconstruction_2d, ONLY : hp_dry_tolerance
+   USE hp_reconstruction_2d, ONLY : reconstruct_hp_line
+   USE hp_reconstruction_2d, ONLY : hp_dynamic_residual_threshold
    USE omp_lib, ONLY : omp_get_max_threads, omp_get_thread_num
 
   IMPLICIT NONE
 
   PRIVATE
-
-   INTEGER, PARAMETER :: hp_h_center = 1, hp_u_center = 2
-   INTEGER, PARAMETER :: hp_B_minus = 3, hp_B_plus = 4
-   INTEGER, PARAMETER :: hp_h_minus_direct = 5, hp_h_plus_direct = 6
-   INTEGER, PARAMETER :: hp_hu_minus_direct = 7, hp_hu_plus_direct = 8
-   INTEGER, PARAMETER :: hp_u_minus_candidate = 9, hp_u_plus_candidate = 10
-   INTEGER, PARAMETER :: hp_h_minus = 11, hp_h_plus = 12
-   INTEGER, PARAMETER :: hp_hu_minus = 13, hp_hu_plus = 14
-   INTEGER, PARAMETER :: hp_eta_minus = 15, hp_eta_plus = 16, hp_weight = 17
-   INTEGER, PARAMETER :: hp_scratch_first = 18, hp_scratch_last = 25
 
   TYPE, PUBLIC :: reconstruction_workspace_type
      REAL(wp), ALLOCATABLE :: q_interfaceL(:,:,:)
@@ -47,8 +38,8 @@ MODULE reconstruction_2d
      REAL(wp), ALLOCATABLE :: qp_interfaceB(:,:,:)
      REAL(wp), ALLOCATABLE :: qp_interfaceT(:,:,:)
 
-     ! Direct cell-side candidates retained until the line-wise HP blend can
-     ! compare continuity errors across adjacent interfaces.
+   ! Direct cell-side candidates retained until the local HP blend can
+   ! compare continuity errors across adjacent interfaces.
      REAL(wp), ALLOCATABLE :: qp_cellW(:,:,:)
      REAL(wp), ALLOCATABLE :: qp_cellE(:,:,:)
      REAL(wp), ALLOCATABLE :: qp_cellS(:,:,:)
@@ -65,6 +56,10 @@ MODULE reconstruction_2d
 
        REAL(wp), ALLOCATABLE :: hydrostatic_residual_2d(:,:)
        REAL(wp), ALLOCATABLE :: topographic_relief_ratio_2d(:,:)
+       LOGICAL, ALLOCATABLE :: hp_eta_mask(:,:)
+       INTEGER, ALLOCATABLE :: hp_eta_j(:), hp_eta_k(:)
+       INTEGER :: hp_eta_cells
+       REAL(wp), ALLOCATABLE :: hp_blended(:,:,:,:)
        REAL(wp), ALLOCATABLE :: hp_scratch(:,:,:)
 
      LOGICAL, ALLOCATABLE :: diverg_interfaceL(:,:)
@@ -111,8 +106,13 @@ CONTAINS
 
     ALLOCATE( this%hydrostatic_residual_2d(comp_cells_x,comp_cells_y) )
     ALLOCATE( this%topographic_relief_ratio_2d(comp_cells_x,comp_cells_y) )
-    ALLOCATE( this%hp_scratch(MAX(comp_cells_x,comp_cells_y),                &
-         hp_scratch_last,MAX(1,omp_get_max_threads())) )
+      ALLOCATE( this%hp_eta_mask(comp_cells_x,comp_cells_y) )
+      ALLOCATE( this%hp_eta_j(comp_cells_x*comp_cells_y) )
+      ALLOCATE( this%hp_eta_k(comp_cells_x*comp_cells_y) )
+      ALLOCATE( this%hp_blended(4,comp_cells_x,comp_cells_y,2) )
+      ALLOCATE( this%hp_scratch(5,8,MAX(1,omp_get_max_threads())) )
+      this%hp_eta_mask = .FALSE.
+      this%hp_eta_cells = 0
 
     ALLOCATE( this%diverg_interfaceL( comp_interfaces_x, comp_cells_y ) )
     ALLOCATE( this%diverg_interfaceR( comp_interfaces_x, comp_cells_y ) )
@@ -153,6 +153,10 @@ CONTAINS
 
       DEALLOCATE( this%hydrostatic_residual_2d )
       DEALLOCATE( this%topographic_relief_ratio_2d )
+      DEALLOCATE( this%hp_eta_mask )
+      DEALLOCATE( this%hp_eta_j )
+      DEALLOCATE( this%hp_eta_k )
+      DEALLOCATE( this%hp_blended )
       DEALLOCATE( this%hp_scratch )
 
     DEALLOCATE( this%diverg_interfaceL )
@@ -162,7 +166,46 @@ CONTAINS
 
   END SUBROUTINE finalize_reconstruction
 
-  SUBROUTINE reconstruction( this, q_expl, qp_expl, t, solve_cells, j_cent, k_cent )
+   SUBROUTINE build_hp_workset(this, solve_cells, j_cent, k_cent)
+
+      CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
+      INTEGER, INTENT(IN) :: solve_cells
+      INTEGER, INTENT(IN) :: j_cent(:), k_cent(:)
+      INTEGER :: l, j, k
+
+      DO l = 1, this%hp_eta_cells
+          this%hp_eta_mask(this%hp_eta_j(l),this%hp_eta_k(l)) = .FALSE.
+      END DO
+      this%hp_eta_cells = 0
+
+      DO l = 1, solve_cells
+          j = j_cent(l)
+          k = k_cent(l)
+          CALL append_eta_cell(j,k)
+          IF ( j .GT. 1 ) CALL append_eta_cell(j-1,k)
+          IF ( j .LT. comp_cells_x ) CALL append_eta_cell(j+1,k)
+          IF ( k .GT. 1 ) CALL append_eta_cell(j,k-1)
+          IF ( k .LT. comp_cells_y ) CALL append_eta_cell(j,k+1)
+      END DO
+
+   CONTAINS
+
+      SUBROUTINE append_eta_cell(j_cell,k_cell)
+
+         INTEGER, INTENT(IN) :: j_cell, k_cell
+
+         IF ( this%hp_eta_mask(j_cell,k_cell) ) RETURN
+
+         this%hp_eta_mask(j_cell,k_cell) = .TRUE.
+         this%hp_eta_cells = this%hp_eta_cells + 1
+         this%hp_eta_j(this%hp_eta_cells) = j_cell
+         this%hp_eta_k(this%hp_eta_cells) = k_cell
+
+      END SUBROUTINE append_eta_cell
+
+   END SUBROUTINE build_hp_workset
+
+   SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent )
 
     ! External procedures
       USE state_conversion_2d, ONLY : qp_to_qp2
@@ -182,7 +225,6 @@ CONTAINS
     IMPLICIT NONE
 
     CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
-    REAL(wp), INTENT(IN) :: q_expl(:,:,:)
     REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
     REAL(wp), INTENT(IN) :: t
     INTEGER, INTENT(IN) :: solve_cells
@@ -213,13 +255,20 @@ CONTAINS
     LOGICAL :: diverging_flag
     LOGICAL :: regular_interior
 
-    ! Every cell has a defined constant candidate.  Active cells overwrite it
-    ! below with the ordinary limited reconstruction.  This also gives the HP
-    ! continuity indicator a well-defined neighbour at solve-mask boundaries.
-    this%qp_cellW = qp_expl
-    this%qp_cellE = qp_expl
-    this%qp_cellS = qp_expl
-    this%qp_cellN = qp_expl
+    ! Keep the same constant candidates for inactive neighbours, but initialize
+    ! only cells that can contribute to an active HP trace.
+    CALL build_hp_workset(this, solve_cells, j_cent, k_cent)
+
+    !$OMP PARALLEL DO PRIVATE(l,j,k)
+    DO l = 1, this%hp_eta_cells
+       j = this%hp_eta_j(l)
+       k = this%hp_eta_k(l)
+       this%qp_cellW(:,j,k) = qp_expl(:,j,k)
+       this%qp_cellE(:,j,k) = qp_expl(:,j,k)
+       this%qp_cellS(:,j,k) = qp_expl(:,j,k)
+       this%qp_cellN(:,j,k) = qp_expl(:,j,k)
+    END DO
+    !$OMP END PARALLEL DO
 
     !WRITE(*,*) 'recontruction 0'
     !WRITE(*,*) 'nvars',n_vars
@@ -858,10 +907,9 @@ CONTAINS
   !******************************************************************************
   !> \brief Replace direct cell traces with the final HP face states
   !>
-  !> The first reconstruction pass supplies direct limited candidates.  This
-  !> second, line-wise pass can evaluate the neighbouring face mismatches used
-  !> by the parameter-free h/eta blend.  It then rebuilds thermodynamics and
-  !> conservative states from the final thickness and momenta.
+   !> The first reconstruction pass supplies direct limited candidates. The HP
+   !> phases build local eta traces, evaluate continuity weights, then apply
+   !> blended thickness and momentum on the active target cells.
   !******************************************************************************
   SUBROUTINE apply_hp_reconstruction( this, qp_center, solve_cells, j_cent,    &
        k_cent )
@@ -882,162 +930,74 @@ CONTAINS
 
     REAL(wp) :: q_final(n_vars), qp_final(n_vars+2)
     REAL(wp) :: relief2d
-   INTEGER :: j, k, l, line_size, thread_id
+    INTEGER :: j, k, l
 
-   !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(j,k,relief2d)
-    DO k = 1, comp_cells_y
-       DO j = 1, comp_cells_x
-          this%hydrostatic_residual_2d(j,k) = local_hydrostatic_residual(j,k)
-          relief2d = MAX( B_face_x(j,k), B_face_x(j+1,k),                    &
-               B_face_y(j,k), B_face_y(j,k+1) ) -                           &
-               MIN( B_face_x(j,k), B_face_x(j+1,k),                         &
-               B_face_y(j,k), B_face_y(j,k+1) )
-          this%topographic_relief_ratio_2d(j,k) = relief2d /                 &
-               MAX(qp_center(1,j,k),hp_dry_tolerance)
-       END DO
+    ! Phase 1: compute the cell-local indicators and eta traces for cells
+    ! adjacent to the solve mask.
+    !$OMP PARALLEL DO PRIVATE(l,j,k,relief2d)
+    DO l = 1, solve_cells
+       j = j_cent(l)
+       k = k_cent(l)
+       this%hydrostatic_residual_2d(j,k) = local_hydrostatic_residual(j,k)
+       relief2d = MAX( B_face_x(j,k), B_face_x(j+1,k),                      &
+            B_face_y(j,k), B_face_y(j,k+1) ) -                              &
+            MIN( B_face_x(j,k), B_face_x(j+1,k),                            &
+            B_face_y(j,k), B_face_y(j,k+1) )
+       this%topographic_relief_ratio_2d(j,k) = relief2d /                    &
+            MAX(qp_center(1,j,k),hp_dry_tolerance)
     END DO
     !$OMP END PARALLEL DO
 
-    line_size = comp_cells_x
-    !$OMP PARALLEL DO PRIVATE(thread_id)
-    DO k = 1, comp_cells_y
-
-      thread_id = omp_get_thread_num() + 1
-      this%hp_scratch(1:line_size,hp_h_center,thread_id) = qp_center(1,:,k)
-      this%hp_scratch(1:line_size,hp_u_center,thread_id) = qp_center(idx_u,:,k)
-      this%hp_scratch(1:line_size,hp_B_minus,thread_id) = B_face_x(1:comp_cells_x,k)
-      this%hp_scratch(1:line_size,hp_B_plus,thread_id) = B_face_x(2:comp_interfaces_x,k)
-      this%hp_scratch(1:line_size,hp_h_minus_direct,thread_id) = this%qp_cellW(1,:,k)
-      this%hp_scratch(1:line_size,hp_h_plus_direct,thread_id) = this%qp_cellE(1,:,k)
-      this%hp_scratch(1:line_size,hp_hu_minus_direct,thread_id) = this%qp_cellW(2,:,k)
-      this%hp_scratch(1:line_size,hp_hu_plus_direct,thread_id) = this%qp_cellE(2,:,k)
-      this%hp_scratch(1:line_size,hp_u_minus_candidate,thread_id) = this%qp_cellW(idx_u,:,k)
-      this%hp_scratch(1:line_size,hp_u_plus_candidate,thread_id) = this%qp_cellE(idx_u,:,k)
-
-       CALL reconstruct_hp_line(                                                &
-           this%hp_scratch(1:line_size,hp_h_center,thread_id),              &
-           this%hp_scratch(1:line_size,hp_u_center,thread_id),               &
-           this%hp_scratch(1:line_size,hp_B_minus,thread_id),                &
-           this%hp_scratch(1:line_size,hp_B_plus,thread_id),                 &
-           this%hp_scratch(1:line_size,hp_h_minus_direct,thread_id),         &
-           this%hp_scratch(1:line_size,hp_h_plus_direct,thread_id),          &
-           this%hp_scratch(1:line_size,hp_hu_minus_direct,thread_id),        &
-           this%hp_scratch(1:line_size,hp_hu_plus_direct,thread_id),         &
-           this%hp_scratch(1:line_size,hp_u_minus_candidate,thread_id),      &
-           this%hp_scratch(1:line_size,hp_u_plus_candidate,thread_id),       &
-           this%hydrostatic_residual_2d(:,k),                               &
-           this%topographic_relief_ratio_2d(:,k), limiter(1),                &
-           reconstr_coeff, this%hp_scratch(1:line_size,hp_h_minus,thread_id),&
-           this%hp_scratch(1:line_size,hp_h_plus,thread_id),                 &
-           this%hp_scratch(1:line_size,hp_hu_minus,thread_id),               &
-           this%hp_scratch(1:line_size,hp_hu_plus,thread_id),                &
-           this%hp_scratch(1:line_size,hp_eta_minus,thread_id),              &
-           this%hp_scratch(1:line_size,hp_eta_plus,thread_id),               &
-           this%hp_scratch(1:line_size,hp_weight,thread_id),                 &
-           this%hp_scratch(1:line_size,hp_scratch_first:hp_scratch_last,     &
-           thread_id) )
-
-      this%eta_cellW(:,k) = this%hp_scratch(1:line_size,hp_eta_minus,thread_id)
-      this%eta_cellE(:,k) = this%hp_scratch(1:line_size,hp_eta_plus,thread_id)
-      this%w_eta_x(:,k) = this%hp_scratch(1:line_size,hp_weight,thread_id)
-
-        this%qp_cellW(1,:,k) = this%hp_scratch(1:line_size,hp_h_minus,thread_id)
-        this%qp_cellE(1,:,k) = this%hp_scratch(1:line_size,hp_h_plus,thread_id)
-        this%qp_cellW(2,:,k) = this%hp_scratch(1:line_size,hp_hu_minus,thread_id)
-        this%qp_cellE(2,:,k) = this%hp_scratch(1:line_size,hp_hu_plus,thread_id)
-        this%qp_cellW(3,:,k) = this%hp_scratch(1:line_size,hp_h_minus,thread_id) &
-           * this%qp_cellW(idx_v,:,k)
-        this%qp_cellE(3,:,k) = this%hp_scratch(1:line_size,hp_h_plus,thread_id)  &
-           * this%qp_cellE(idx_v,:,k)
-        this%qp_cellW(idx_u,:,k) = safe_velocity(                            &
-           this%hp_scratch(1:line_size,hp_hu_minus,thread_id),              &
-           this%hp_scratch(1:line_size,hp_h_minus,thread_id))
-        this%qp_cellE(idx_u,:,k) = safe_velocity(                            &
-           this%hp_scratch(1:line_size,hp_hu_plus,thread_id),               &
-           this%hp_scratch(1:line_size,hp_h_plus,thread_id))
-
+    !$OMP PARALLEL DO PRIVATE(l,j,k)
+    DO l = 1, this%hp_eta_cells
+       j = this%hp_eta_j(l)
+       k = this%hp_eta_k(l)
+       CALL compute_eta_traces(j,k)
     END DO
     !$OMP END PARALLEL DO
 
-    line_size = comp_cells_y
-    !$OMP PARALLEL DO PRIVATE(thread_id)
-    DO j = 1, comp_cells_x
+    ! Phase 2: compare the direct and eta thickness jumps at each target cell.
+    !$OMP PARALLEL DO PRIVATE(l,j,k)
+    DO l = 1, solve_cells
+       j = j_cent(l)
+       k = k_cent(l)
+       CALL compute_cell_weights(j,k)
+    END DO
+    !$OMP END PARALLEL DO
 
-      thread_id = omp_get_thread_num() + 1
-      this%hp_scratch(1:line_size,hp_h_center,thread_id) = qp_center(1,j,:)
-      this%hp_scratch(1:line_size,hp_u_center,thread_id) = qp_center(idx_v,j,:)
-      this%hp_scratch(1:line_size,hp_B_minus,thread_id) = B_face_y(j,1:comp_cells_y)
-      this%hp_scratch(1:line_size,hp_B_plus,thread_id) = B_face_y(j,2:comp_interfaces_y)
-      this%hp_scratch(1:line_size,hp_h_minus_direct,thread_id) = this%qp_cellS(1,j,:)
-      this%hp_scratch(1:line_size,hp_h_plus_direct,thread_id) = this%qp_cellN(1,j,:)
-      this%hp_scratch(1:line_size,hp_hu_minus_direct,thread_id) = this%qp_cellS(3,j,:)
-      this%hp_scratch(1:line_size,hp_hu_plus_direct,thread_id) = this%qp_cellN(3,j,:)
-      this%hp_scratch(1:line_size,hp_u_minus_candidate,thread_id) = this%qp_cellS(idx_v,j,:)
-      this%hp_scratch(1:line_size,hp_u_plus_candidate,thread_id) = this%qp_cellN(idx_v,j,:)
+    ! Phase 3: blend thickness and normal momentum only on solve_cells.
+    !$OMP PARALLEL DO PRIVATE(l,j,k)
+    DO l = 1, solve_cells
+       j = j_cent(l)
+       k = k_cent(l)
+       CALL evaluate_hp_cell_x(j,k)
+       CALL evaluate_hp_cell_y(j,k)
+    END DO
+    !$OMP END PARALLEL DO
 
-       CALL reconstruct_hp_line(                                                &
-           this%hp_scratch(1:line_size,hp_h_center,thread_id),              &
-           this%hp_scratch(1:line_size,hp_u_center,thread_id),               &
-           this%hp_scratch(1:line_size,hp_B_minus,thread_id),                &
-           this%hp_scratch(1:line_size,hp_B_plus,thread_id),                 &
-           this%hp_scratch(1:line_size,hp_h_minus_direct,thread_id),         &
-           this%hp_scratch(1:line_size,hp_h_plus_direct,thread_id),          &
-           this%hp_scratch(1:line_size,hp_hu_minus_direct,thread_id),        &
-           this%hp_scratch(1:line_size,hp_hu_plus_direct,thread_id),         &
-           this%hp_scratch(1:line_size,hp_u_minus_candidate,thread_id),      &
-           this%hp_scratch(1:line_size,hp_u_plus_candidate,thread_id),       &
-           this%hydrostatic_residual_2d(j,:),                               &
-           this%topographic_relief_ratio_2d(j,:), limiter(1),                &
-           reconstr_coeff, this%hp_scratch(1:line_size,hp_h_minus,thread_id),&
-           this%hp_scratch(1:line_size,hp_h_plus,thread_id),                 &
-           this%hp_scratch(1:line_size,hp_hu_minus,thread_id),               &
-           this%hp_scratch(1:line_size,hp_hu_plus,thread_id),                &
-           this%hp_scratch(1:line_size,hp_eta_minus,thread_id),              &
-           this%hp_scratch(1:line_size,hp_eta_plus,thread_id),               &
-           this%hp_scratch(1:line_size,hp_weight,thread_id),                 &
-           this%hp_scratch(1:line_size,hp_scratch_first:hp_scratch_last,     &
-           thread_id) )
-
-      this%eta_cellS(j,:) = this%hp_scratch(1:line_size,hp_eta_minus,thread_id)
-      this%eta_cellN(j,:) = this%hp_scratch(1:line_size,hp_eta_plus,thread_id)
-      this%w_eta_y(j,:) = this%hp_scratch(1:line_size,hp_weight,thread_id)
-
-        this%qp_cellS(1,j,:) = this%hp_scratch(1:line_size,hp_h_minus,thread_id)
-        this%qp_cellN(1,j,:) = this%hp_scratch(1:line_size,hp_h_plus,thread_id)
-        this%qp_cellS(2,j,:) = this%hp_scratch(1:line_size,hp_h_minus,thread_id) &
-           * this%qp_cellS(idx_u,j,:)
-        this%qp_cellN(2,j,:) = this%hp_scratch(1:line_size,hp_h_plus,thread_id)  &
-           * this%qp_cellN(idx_u,j,:)
-        this%qp_cellS(3,j,:) = this%hp_scratch(1:line_size,hp_hu_minus,thread_id)
-        this%qp_cellN(3,j,:) = this%hp_scratch(1:line_size,hp_hu_plus,thread_id)
-        this%qp_cellS(idx_v,j,:) = safe_velocity(                            &
-           this%hp_scratch(1:line_size,hp_hu_minus,thread_id),              &
-           this%hp_scratch(1:line_size,hp_h_minus,thread_id))
-        this%qp_cellN(idx_v,j,:) = safe_velocity(                            &
-           this%hp_scratch(1:line_size,hp_hu_plus,thread_id),               &
-           this%hp_scratch(1:line_size,hp_h_plus,thread_id))
-
-   END DO
-   !$OMP END PARALLEL DO
+    !$OMP PARALLEL DO PRIVATE(l,j,k)
+    DO l = 1, solve_cells
+       j = j_cent(l)
+       k = k_cent(l)
+       CALL commit_hp_cell(j,k)
+    END DO
+    !$OMP END PARALLEL DO
 
     ! Map all eta cell traces to their oriented face storage.  Conservative
-    ! and primitive states below are restricted to the active solve mask.
-    !$OMP PARALLEL DO
-    DO k = 1, comp_cells_y
-       this%eta_interfaceR(1:comp_cells_x,k) = this%eta_cellW(:,k)
-       this%eta_interfaceL(2:comp_interfaces_x,k) = this%eta_cellE(:,k)
-       this%eta_interfaceL(1,k) = this%eta_interfaceR(1,k)
-       this%eta_interfaceR(comp_interfaces_x,k) =                             &
+    ! only workset cells can contribute to an active interface.
+    !$OMP PARALLEL DO PRIVATE(l,j,k)
+    DO l = 1, this%hp_eta_cells
+       j = this%hp_eta_j(l)
+       k = this%hp_eta_k(l)
+       this%eta_interfaceR(j,k) = this%eta_cellW(j,k)
+       this%eta_interfaceL(j+1,k) = this%eta_cellE(j,k)
+       this%eta_interfaceT(j,k) = this%eta_cellS(j,k)
+       this%eta_interfaceB(j,k+1) = this%eta_cellN(j,k)
+       IF ( j .EQ. 1 ) this%eta_interfaceL(1,k) = this%eta_interfaceR(1,k)
+       IF ( j .EQ. comp_cells_x ) this%eta_interfaceR(comp_interfaces_x,k) = &
             this%eta_interfaceL(comp_interfaces_x,k)
-    END DO
-    !$OMP END PARALLEL DO
-
-    !$OMP PARALLEL DO
-    DO j = 1, comp_cells_x
-       this%eta_interfaceT(j,1:comp_cells_y) = this%eta_cellS(j,:)
-       this%eta_interfaceB(j,2:comp_interfaces_y) = this%eta_cellN(j,:)
-       this%eta_interfaceB(j,1) = this%eta_interfaceT(j,1)
-       this%eta_interfaceT(j,comp_interfaces_y) =                             &
+       IF ( k .EQ. 1 ) this%eta_interfaceB(j,1) = this%eta_interfaceT(j,1)
+       IF ( k .EQ. comp_cells_y ) this%eta_interfaceT(j,comp_interfaces_y) = &
             this%eta_interfaceB(j,comp_interfaces_y)
     END DO
     !$OMP END PARALLEL DO
@@ -1131,6 +1091,305 @@ CONTAINS
     END IF
 
   CONTAINS
+
+    SUBROUTINE compute_eta_traces(jc,kc)
+
+    INTEGER, INTENT(IN) :: jc, kc
+    REAL(wp) :: eta_left, eta_center, eta_right
+
+    eta_center = qp_center(1,jc,kc) +                                     &
+       0.5_wp * ( B_face_x(jc,kc) + B_face_x(jc+1,kc) )
+    eta_left = eta_center
+    eta_right = eta_center
+    IF ( ( jc .GT. 1 ) .AND. ( jc .LT. comp_cells_x ) ) THEN
+       eta_left = qp_center(1,jc-1,kc) +                                  &
+          0.5_wp * ( B_face_x(jc-1,kc) + B_face_x(jc,kc) )
+       eta_right = qp_center(1,jc+1,kc) +                                 &
+          0.5_wp * ( B_face_x(jc+1,kc) + B_face_x(jc+2,kc) )
+    END IF
+    CALL hp_eta_face_pair( eta_left, eta_center, eta_right,                &
+       B_face_x(jc,kc), B_face_x(jc+1,kc),                              &
+       ( jc .EQ. 1 ) .OR. ( jc .EQ. comp_cells_x ),                     &
+       this%eta_cellW(jc,kc), this%eta_cellE(jc,kc) )
+
+    eta_center = qp_center(1,jc,kc) +                                     &
+       0.5_wp * ( B_face_y(jc,kc) + B_face_y(jc,kc+1) )
+    eta_left = eta_center
+    eta_right = eta_center
+    IF ( ( kc .GT. 1 ) .AND. ( kc .LT. comp_cells_y ) ) THEN
+       eta_left = qp_center(1,jc,kc-1) +                                  &
+          0.5_wp * ( B_face_y(jc,kc-1) + B_face_y(jc,kc) )
+       eta_right = qp_center(1,jc,kc+1) +                                 &
+          0.5_wp * ( B_face_y(jc,kc+1) + B_face_y(jc,kc+2) )
+    END IF
+    CALL hp_eta_face_pair( eta_left, eta_center, eta_right,                &
+       B_face_y(jc,kc), B_face_y(jc,kc+1),                              &
+       ( kc .EQ. 1 ) .OR. ( kc .EQ. comp_cells_y ),                     &
+       this%eta_cellS(jc,kc), this%eta_cellN(jc,kc) )
+
+    END SUBROUTINE compute_eta_traces
+
+    SUBROUTINE hp_eta_face_pair( eta_left, eta_center, eta_right,            &
+       B_minus, B_plus, at_boundary, eta_minus, eta_plus )
+
+    REAL(wp), INTENT(IN) :: eta_left, eta_center, eta_right
+    REAL(wp), INTENT(IN) :: B_minus, B_plus
+    LOGICAL, INTENT(IN) :: at_boundary
+    REAL(wp), INTENT(OUT) :: eta_minus, eta_plus
+    REAL(wp) :: eta_stencil(3), coordinate_stencil(3)
+    REAL(wp) :: eta_slope, slope_min, slope_max
+
+    eta_slope = 0.0_wp
+    IF ( .NOT. at_boundary ) THEN
+       eta_stencil = [ eta_left, eta_center, eta_right ]
+       coordinate_stencil = [ -1.0_wp, 0.0_wp, 1.0_wp ]
+       CALL limit( eta_stencil, coordinate_stencil, limiter(1), eta_slope )
+       eta_slope = reconstr_coeff * eta_slope
+    END IF
+
+    slope_min = 2.0_wp * ( B_plus - eta_center )
+    slope_max = 2.0_wp * ( eta_center - B_minus )
+    eta_slope = MIN( MAX( eta_slope, slope_min ), slope_max )
+
+    eta_minus = eta_center - 0.5_wp * eta_slope
+    eta_plus = eta_center + 0.5_wp * eta_slope
+
+    END SUBROUTINE hp_eta_face_pair
+
+    SUBROUTINE compute_cell_weights(jc,kc)
+
+    INTEGER, INTENT(IN) :: jc, kc
+    REAL(wp) :: Eh, Eeta, h_minus_eta, h_plus_eta
+
+    Eh = 0.0_wp
+    Eeta = 0.0_wp
+    h_minus_eta = MAX( this%eta_cellW(jc,kc) - B_face_x(jc,kc), 0.0_wp )
+    h_plus_eta = MAX( this%eta_cellE(jc,kc) - B_face_x(jc+1,kc), 0.0_wp )
+
+    IF ( jc .GT. 1 ) THEN
+       Eh = Eh + ABS( MAX(this%qp_cellE(1,jc-1,kc),0.0_wp) -              &
+          MAX(this%qp_cellW(1,jc,kc),0.0_wp) )
+       Eeta = Eeta + ABS(                                               &
+          MAX(this%eta_cellE(jc-1,kc)-B_face_x(jc,kc),0.0_wp) -       &
+          MAX(this%eta_cellW(jc,kc)-B_face_x(jc,kc),0.0_wp) )
+    END IF
+    IF ( jc .LT. comp_cells_x ) THEN
+       Eh = Eh + ABS( MAX(this%qp_cellE(1,jc,kc),0.0_wp) -              &
+          MAX(this%qp_cellW(1,jc+1,kc),0.0_wp) )
+       Eeta = Eeta + ABS(                                               &
+          MAX(this%eta_cellE(jc,kc)-B_face_x(jc+1,kc),0.0_wp) -       &
+          MAX(this%eta_cellW(jc+1,kc)-B_face_x(jc+1,kc),0.0_wp) )
+    END IF
+    this%w_eta_x(jc,kc) = continuity_weight(                             &
+       qp_center(1,jc,kc), Eh, Eeta, h_minus_eta, h_plus_eta,          &
+       this%hydrostatic_residual_2d(jc,kc),                            &
+       this%topographic_relief_ratio_2d(jc,kc) )
+
+    Eh = 0.0_wp
+    Eeta = 0.0_wp
+    h_minus_eta = MAX( this%eta_cellS(jc,kc) - B_face_y(jc,kc), 0.0_wp )
+    h_plus_eta = MAX( this%eta_cellN(jc,kc) - B_face_y(jc,kc+1), 0.0_wp )
+
+    IF ( kc .GT. 1 ) THEN
+       Eh = Eh + ABS( MAX(this%qp_cellN(1,jc,kc-1),0.0_wp) -            &
+          MAX(this%qp_cellS(1,jc,kc),0.0_wp) )
+       Eeta = Eeta + ABS(                                               &
+          MAX(this%eta_cellN(jc,kc-1)-B_face_y(jc,kc),0.0_wp) -       &
+          MAX(this%eta_cellS(jc,kc)-B_face_y(jc,kc),0.0_wp) )
+    END IF
+    IF ( kc .LT. comp_cells_y ) THEN
+       Eh = Eh + ABS( MAX(this%qp_cellN(1,jc,kc),0.0_wp) -              &
+          MAX(this%qp_cellS(1,jc,kc+1),0.0_wp) )
+       Eeta = Eeta + ABS(                                               &
+          MAX(this%eta_cellN(jc,kc)-B_face_y(jc,kc+1),0.0_wp) -       &
+          MAX(this%eta_cellS(jc,kc+1)-B_face_y(jc,kc+1),0.0_wp) )
+    END IF
+    this%w_eta_y(jc,kc) = continuity_weight(                             &
+       qp_center(1,jc,kc), Eh, Eeta, h_minus_eta, h_plus_eta,          &
+       this%hydrostatic_residual_2d(jc,kc),                            &
+       this%topographic_relief_ratio_2d(jc,kc) )
+
+    END SUBROUTINE compute_cell_weights
+
+    FUNCTION continuity_weight(h_center,Eh,Eeta,h_minus_eta,h_plus_eta,    &
+       hydrostatic_residual,topographic_relief_ratio) RESULT(weight)
+
+    REAL(wp), INTENT(IN) :: h_center, Eh, Eeta
+    REAL(wp), INTENT(IN) :: h_minus_eta, h_plus_eta
+    REAL(wp), INTENT(IN) :: hydrostatic_residual, topographic_relief_ratio
+    REAL(wp) :: weight, denominator, distribution_tolerance
+
+    denominator = Eh + Eeta
+    distribution_tolerance = 1.0E-14_wp * MAX(1.0_wp,h_center)
+    IF ( denominator .GT. distribution_tolerance ) THEN
+       weight = Eh / denominator
+    ELSE
+       weight = 0.5_wp
+    END IF
+
+    IF ( h_center .LE. hp_dry_tolerance ) THEN
+       weight = 1.0_wp
+    ELSEIF ( ( h_minus_eta .LE. hp_dry_tolerance ) .OR.                   &
+       ( h_plus_eta .LE. hp_dry_tolerance ) ) THEN
+       IF ( hydrostatic_residual .GT. hp_dynamic_residual_threshold ) THEN
+        weight = 0.0_wp
+       ELSE
+        weight = 1.0_wp
+       END IF
+    ELSEIF ( ( hydrostatic_residual .GT. hp_dynamic_residual_threshold ) .AND. &
+       ( topographic_relief_ratio .GT. 1.0_wp ) ) THEN
+       weight = 0.0_wp
+    END IF
+
+    END FUNCTION continuity_weight
+
+       SUBROUTINE evaluate_hp_cell_x(jc,kc)
+
+       INTEGER, INTENT(IN) :: jc, kc
+       REAL(wp) :: h_line(5), u_line(5), Bm_line(5), Bp_line(5)
+       REAL(wp) :: hm_direct(5), hp_direct(5), hum_direct(5), hup_direct(5)
+       REAL(wp) :: um_candidate(5), up_candidate(5)
+       REAL(wp) :: residual_line(5), relief_line(5)
+       REAL(wp) :: hm_line(5), hp_line(5), hum_line(5), hup_line(5)
+       REAL(wp) :: eta_m_line(5), eta_p_line(5), weight_line(5)
+       INTEGER :: j_start, j_end, line_size, center, offset, jj, thread_id
+
+       j_start = MAX(1,jc-2)
+       j_end = MIN(comp_cells_x,jc+2)
+       line_size = j_end-j_start+1
+       center = jc-j_start+1
+       residual_line = 0.0_wp
+       relief_line = 0.0_wp
+
+       DO offset = 1, line_size
+          jj = j_start+offset-1
+          h_line(offset) = qp_center(1,jj,kc)
+          u_line(offset) = qp_center(idx_u,jj,kc)
+          Bm_line(offset) = B_face_x(jj,kc)
+          Bp_line(offset) = B_face_x(jj+1,kc)
+          IF ( this%hp_eta_mask(jj,kc) ) THEN
+           hm_direct(offset) = this%qp_cellW(1,jj,kc)
+           hp_direct(offset) = this%qp_cellE(1,jj,kc)
+           hum_direct(offset) = this%qp_cellW(2,jj,kc)
+           hup_direct(offset) = this%qp_cellE(2,jj,kc)
+           um_candidate(offset) = this%qp_cellW(idx_u,jj,kc)
+           up_candidate(offset) = this%qp_cellE(idx_u,jj,kc)
+          ELSE
+           hm_direct(offset) = qp_center(1,jj,kc)
+           hp_direct(offset) = qp_center(1,jj,kc)
+           hum_direct(offset) = qp_center(2,jj,kc)
+           hup_direct(offset) = qp_center(2,jj,kc)
+           um_candidate(offset) = qp_center(idx_u,jj,kc)
+           up_candidate(offset) = qp_center(idx_u,jj,kc)
+          END IF
+       END DO
+       residual_line(center) = this%hydrostatic_residual_2d(jc,kc)
+       relief_line(center) = this%topographic_relief_ratio_2d(jc,kc)
+       thread_id = omp_get_thread_num()+1
+
+       CALL reconstruct_hp_line( h_line(1:line_size),u_line(1:line_size),    &
+          Bm_line(1:line_size),Bp_line(1:line_size),                       &
+          hm_direct(1:line_size),hp_direct(1:line_size),                   &
+          hum_direct(1:line_size),hup_direct(1:line_size),                 &
+          um_candidate(1:line_size),up_candidate(1:line_size),             &
+          residual_line(1:line_size),relief_line(1:line_size),             &
+          limiter(1),reconstr_coeff,hm_line(1:line_size),                 &
+          hp_line(1:line_size),hum_line(1:line_size),hup_line(1:line_size),&
+          eta_m_line(1:line_size),eta_p_line(1:line_size),                 &
+          weight_line(1:line_size),this%hp_scratch(1:line_size,:,thread_id) )
+
+       this%hp_blended(:,jc,kc,1) = [ hm_line(center),hp_line(center),      &
+          hum_line(center),hup_line(center) ]
+
+       END SUBROUTINE evaluate_hp_cell_x
+
+       SUBROUTINE evaluate_hp_cell_y(jc,kc)
+
+       INTEGER, INTENT(IN) :: jc, kc
+       REAL(wp) :: h_line(5), u_line(5), Bm_line(5), Bp_line(5)
+       REAL(wp) :: hm_direct(5), hp_direct(5), hum_direct(5), hup_direct(5)
+       REAL(wp) :: um_candidate(5), up_candidate(5)
+       REAL(wp) :: residual_line(5), relief_line(5)
+       REAL(wp) :: hm_line(5), hp_line(5), hum_line(5), hup_line(5)
+       REAL(wp) :: eta_m_line(5), eta_p_line(5), weight_line(5)
+       INTEGER :: k_start, k_end, line_size, center, offset, kk, thread_id
+
+       k_start = MAX(1,kc-2)
+       k_end = MIN(comp_cells_y,kc+2)
+       line_size = k_end-k_start+1
+       center = kc-k_start+1
+       residual_line = 0.0_wp
+       relief_line = 0.0_wp
+
+       DO offset = 1, line_size
+          kk = k_start+offset-1
+          h_line(offset) = qp_center(1,jc,kk)
+          u_line(offset) = qp_center(idx_v,jc,kk)
+          Bm_line(offset) = B_face_y(jc,kk)
+          Bp_line(offset) = B_face_y(jc,kk+1)
+          IF ( this%hp_eta_mask(jc,kk) ) THEN
+           hm_direct(offset) = this%qp_cellS(1,jc,kk)
+           hp_direct(offset) = this%qp_cellN(1,jc,kk)
+           hum_direct(offset) = this%qp_cellS(3,jc,kk)
+           hup_direct(offset) = this%qp_cellN(3,jc,kk)
+           um_candidate(offset) = this%qp_cellS(idx_v,jc,kk)
+           up_candidate(offset) = this%qp_cellN(idx_v,jc,kk)
+          ELSE
+           hm_direct(offset) = qp_center(1,jc,kk)
+           hp_direct(offset) = qp_center(1,jc,kk)
+           hum_direct(offset) = qp_center(3,jc,kk)
+           hup_direct(offset) = qp_center(3,jc,kk)
+           um_candidate(offset) = qp_center(idx_v,jc,kk)
+           up_candidate(offset) = qp_center(idx_v,jc,kk)
+          END IF
+       END DO
+       residual_line(center) = this%hydrostatic_residual_2d(jc,kc)
+       relief_line(center) = this%topographic_relief_ratio_2d(jc,kc)
+       thread_id = omp_get_thread_num()+1
+
+       CALL reconstruct_hp_line( h_line(1:line_size),u_line(1:line_size),    &
+          Bm_line(1:line_size),Bp_line(1:line_size),                       &
+          hm_direct(1:line_size),hp_direct(1:line_size),                   &
+          hum_direct(1:line_size),hup_direct(1:line_size),                 &
+          um_candidate(1:line_size),up_candidate(1:line_size),             &
+          residual_line(1:line_size),relief_line(1:line_size),             &
+          limiter(1),reconstr_coeff,hm_line(1:line_size),                 &
+          hp_line(1:line_size),hum_line(1:line_size),hup_line(1:line_size),&
+          eta_m_line(1:line_size),eta_p_line(1:line_size),                 &
+          weight_line(1:line_size),this%hp_scratch(1:line_size,:,thread_id) )
+
+       this%hp_blended(:,jc,kc,2) = [ hm_line(center),hp_line(center),      &
+          hum_line(center),hup_line(center) ]
+
+       END SUBROUTINE evaluate_hp_cell_y
+
+       SUBROUTINE commit_hp_cell(jc,kc)
+
+       INTEGER, INTENT(IN) :: jc, kc
+
+       this%qp_cellW(1,jc,kc) = this%hp_blended(1,jc,kc,1)
+       this%qp_cellE(1,jc,kc) = this%hp_blended(2,jc,kc,1)
+       this%qp_cellW(2,jc,kc) = this%hp_blended(3,jc,kc,1)
+       this%qp_cellE(2,jc,kc) = this%hp_blended(4,jc,kc,1)
+       this%qp_cellW(3,jc,kc) = this%qp_cellW(1,jc,kc)*this%qp_cellW(idx_v,jc,kc)
+       this%qp_cellE(3,jc,kc) = this%qp_cellE(1,jc,kc)*this%qp_cellE(idx_v,jc,kc)
+       this%qp_cellW(idx_u,jc,kc) = safe_velocity(this%qp_cellW(2,jc,kc),   &
+          this%qp_cellW(1,jc,kc))
+       this%qp_cellE(idx_u,jc,kc) = safe_velocity(this%qp_cellE(2,jc,kc),   &
+          this%qp_cellE(1,jc,kc))
+
+       this%qp_cellS(1,jc,kc) = this%hp_blended(1,jc,kc,2)
+       this%qp_cellN(1,jc,kc) = this%hp_blended(2,jc,kc,2)
+       this%qp_cellS(3,jc,kc) = this%hp_blended(3,jc,kc,2)
+       this%qp_cellN(3,jc,kc) = this%hp_blended(4,jc,kc,2)
+       this%qp_cellS(2,jc,kc) = this%qp_cellS(1,jc,kc)*this%qp_cellS(idx_u,jc,kc)
+       this%qp_cellN(2,jc,kc) = this%qp_cellN(1,jc,kc)*this%qp_cellN(idx_u,jc,kc)
+       this%qp_cellS(idx_v,jc,kc) = safe_velocity(this%qp_cellS(3,jc,kc),   &
+          this%qp_cellS(1,jc,kc))
+       this%qp_cellN(idx_v,jc,kc) = safe_velocity(this%qp_cellN(3,jc,kc),   &
+          this%qp_cellN(1,jc,kc))
+
+       END SUBROUTINE commit_hp_cell
 
     FUNCTION local_hydrostatic_residual(jc,kc) RESULT(residual)
 

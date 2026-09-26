@@ -127,7 +127,7 @@ CONTAINS
     !WRITE(*,*)
     
     ! Linear reconstruction of the physical variables at the interfaces
-    CALL recon%reconstruct( q_expl, qp_expl, t, solve_cells, &
+     CALL recon%reconstruct( qp_expl, t, solve_cells, &
          j_cent, k_cent )
 
     ! Evaluation of the maximum local speeds at the interfaces

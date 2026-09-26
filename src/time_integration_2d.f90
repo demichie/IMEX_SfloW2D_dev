@@ -225,7 +225,7 @@ CONTAINS
        !READ(*,*)
 
        ! Compute the physical and conservative variables at the interfaces
-       CALL recon%reconstruct( q, qp, t, domain%solve_cells, &
+        CALL recon%reconstruct( qp, t, domain%solve_cells, &
             domain%j_cent, domain%k_cent )
 
        ! Compute the max/min eigenvalues at the interfaces
