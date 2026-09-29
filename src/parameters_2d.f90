@@ -329,11 +329,8 @@ MODULE parameters_2d
   !> .
   INTEGER :: limiter(30) = -1
 
-  !> Finite volume method:\n
-  !> - 'LxF'       => lax-friedrichs scheme;
-  !> - 'GFORCE '   => gforce scheme;
-  !> - 'KT'        => Kurganov and Tadmor semidiscrete scheme;
-  !> .
+  !> Compatibility input selector; only 'KT' is accepted. The active spatial
+  !> operator is HP-PCCU and is not selected by this value.
   CHARACTER(LEN=20) :: solver_scheme     
 
   REAL(wp) :: theta             !< Van Leer limiter parameter

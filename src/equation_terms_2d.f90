@@ -32,7 +32,6 @@ MODULE equation_terms_2d
 
   PUBLIC :: init_problem_param
   PUBLIC :: eval_local_speeds_x, eval_local_speeds_y
-  PUBLIC :: eval_fluxes
   PUBLIC :: eval_inertial_flux, eval_hydrostatic_coefficient
   PUBLIC :: limit_component_mass_flux
   PUBLIC :: eval_expl_terms, integrate_friction_term
@@ -276,145 +275,6 @@ CONTAINS
     flux = normal_velocity * qcj(1:n_eqns)
 
   END SUBROUTINE eval_inertial_flux
-
-  !******************************************************************************
-  !> \brief Hyperbolic Fluxes
-  !
-  !> This subroutine evaluates the numerical fluxes given the conservative
-  !> variables qcj and physical variables qpj.
-  !> \date 01/06/2012
-  !> \param[in]     qcj      real local conservative variables
-  !> \param[in]     qpj      real local physical variables
-  !> \param[in]     dir      direction of the flux (1=x,2=y)
-  !> \param[out]    flux     real  fluxes
-  !
-  !> @author
-  !> Mattia de' Michieli Vitturi
-  !
-  !******************************************************************************
-
-  SUBROUTINE eval_fluxes(qcj,qpj,grav_coeff,dir,flux)
-
-    IMPLICIT none
-
-    REAL(wp), INTENT(IN) :: qcj(n_vars)
-    REAL(wp), INTENT(IN) :: qpj(n_vars+2)
-    REAL(wp), INTENT(IN) :: grav_coeff
-    INTEGER, INTENT(IN) :: dir
-
-    REAL(wp), INTENT(OUT) :: flux(n_eqns)
-
-    REAL(wp) :: r_h          !< real-value flow thickness [m]
-    REAL(wp) :: r_u          !< real-value x-velocity [m s-1]
-    REAL(wp) :: r_v          !< real-value y-velocity [m s-1]
-    REAL(wp) :: r_Ri         !< real-value Richardson number
-    REAL(wp) :: r_rho_m      !< real-value mixture density [kg m-3]
-    REAL(wp) :: r_rho_c      !< real-value carrier phase density [kg m-3]
-    REAL(wp) :: r_red_grav   !< real-value reduced gravity [m s-2]
-    REAL(wp) :: r_sp_heat_c
-    REAL(wp) :: r_sp_heat_mix
-
-    pos_thick:IF ( qpj(1) .GT. EPSILON(1.0_wp) ) THEN
-
-       r_h = qpj(1)
-       r_u = qpj(idx_u)
-       r_v = qpj(idx_v)
-
-       CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,                      &
-            r_sp_heat_c,r_sp_heat_mix)
-
-       IF ( dir .EQ. 1 ) THEN
-
-          ! Mass flux in x-direction: u * ( rhom * h )
-          flux(1) = r_u * qcj(1)
-
-          ! x-momentum flux in x-direction + hydrostatic pressure term
-          flux(2) = r_u * qcj(2) + 0.5_wp * r_rho_m *                           &
-               grav_coeff * r_red_grav * r_h**2
-
-          ! y-momentum flux in x-direction: u * ( rho * h * v )
-          flux(3) = r_u * qcj(3)
-
-          ! Thermal-energy flux in x-direction: u * (rhom * Cp * h * T).
-          ! Hydrostatic pressure work is not part of the retained equation.
-          flux(4) = r_u * qcj(4)
-
-          ! Solid-component mass flux in x-direction.
-          flux(idx_solidEqn_first:idx_solidEqn_last) = r_u *                    &
-               qcj(idx_solid_first:idx_solid_last)
-
-          ! Additional-gas component mass flux in x-direction.
-          flux(idx_addGasEqn_first:idx_addGasEqn_last) = r_u *                  &
-               qcj(idx_add_gas_first:idx_add_gas_last)
-
-          IF ( stoch_transport_flag) THEN
-
-             ! Flux of stochastic variables
-             flux(idx_stochEqn) = r_u * qcj(idx_stoch)
-
-          END IF
-
-          IF ( pore_pressure_flag) THEN
-
-             ! Flux of pore pressure
-             flux(idx_poreEqn) = r_u * qcj(idx_Pore)
-
-          END IF
-
-          ! Mass flux of liquid in x-direction: u * ( h * alphal * rhol )
-          IF ( gas_flag .AND. liquid_flag ) flux(n_vars) = r_u * qcj(n_vars)
-
-       ELSEIF ( dir .EQ. 2 ) THEN
-
-          ! flux G (derivated wrt y in the equations)
-          flux(1) = r_v * qcj(1)
-
-          flux(2) = r_v * qcj(2)
-
-          flux(3) = r_v * qcj(3) + 0.5_wp * r_rho_m *                           &
-               grav_coeff * r_red_grav * r_h**2
-
-          ! Thermal-energy flux in y-direction: v * (rhom * Cp * h * T).
-          ! Hydrostatic pressure work is not part of the retained equation.
-          flux(4) = r_v * qcj(4)
-
-          ! Solid-component mass flux in y-direction.
-          flux(idx_solidEqn_first:idx_solidEqn_last) = r_v *                    &
-               qcj(idx_solid_first:idx_solid_last)
-
-          ! Additional-gas component mass flux in y-direction.
-          flux(idx_addGasEqn_first:idx_addGasEqn_last) = r_v *                  &
-               qcj(idx_add_gas_first:idx_add_gas_last)
-
-          IF ( stoch_transport_flag) THEN
-
-             ! Flux of stochastic variables
-             flux(idx_stochEqn) = r_v * qcj(idx_stoch)
-
-          END IF
-
-          IF ( pore_pressure_flag ) THEN
-
-             ! Flux of pore pressure
-             flux(idx_poreEqn) = r_v * qcj(idx_pore)
-
-          END IF
-
-          ! Mass flux of liquid in x-direction: u * ( h * alphal * rhol )
-          IF ( gas_flag .AND. liquid_flag ) flux(n_vars) = r_v * qcj(n_vars)
-
-       END IF
-
-    ELSE
-
-       flux(1:n_eqns) = 0.0_wp
-
-    ENDIF pos_thick
-
-    RETURN
-
-  END SUBROUTINE eval_fluxes
-
 
   !******************************************************************************
   !> \brief Explicit source term
@@ -999,7 +859,7 @@ CONTAINS
 
     ELSE
 
-       WRITE(*,*) 'Constitutive, eval_fluxes: problem with arguments'
+      WRITE(*,*) 'Constitutive, eval_implicit_terms: problem with arguments'
        STOP
 
     END IF
