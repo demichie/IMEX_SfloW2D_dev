@@ -296,7 +296,7 @@ MODULE inpout_2d
   INTEGER             :: dimids(3)         !< ID for size of [x, y, time]
   INTEGER             :: solid_dimid       !< ID for size of solids
   INTEGER             :: x_varid, y_varid, t_varid !< ID for x,y
-  INTEGER             :: b_varid, w_varid  !< ID for b and w
+  INTEGER             :: b_varid, eta_varid, w_varid !< IDs for bed, surface, vertical velocity
   INTEGER             :: h_varid           !> ID for h
   INTEGER             :: u_varid, v_varid  !> ID for u and v
   INTEGER             :: Temp_varid        !> ID for T
@@ -6569,6 +6569,7 @@ CONTAINS
     CHARACTER(LEN=4) :: idx_string
     LOGICAL :: file_exists
     INTEGER :: time_dim_len
+    INTEGER :: status
 
     ALLOCATE (solid_varid(n_solid))
     ALLOCATE (gas_varid(n_add_gas))
@@ -6599,9 +6600,17 @@ CONTAINS
       CALL check(nf90_inq_varid(ncid, 'time', t_varid))
       CALL check(nf90_inq_varid(ncid, 'b', b_varid))
       CALL check(nf90_inq_varid(ncid, 'h', h_varid))
-      CALL check(nf90_inq_varid(ncid, 'w', w_varid))
+      status = nf90_inq_varid(ncid, 'eta', eta_varid)
+      IF (status .EQ. nf90_enotvar) THEN
+        WRITE (*, *) 'ERROR: cannot append to a legacy NetCDF file.'
+        WRITE (*, *) 'Its variable w stores free-surface elevation; the current schema uses eta for elevation and w for vertical velocity.'
+        WRITE (*, *) 'Start a new NetCDF output file to continue with the current schema.'
+        STOP
+      END IF
+      CALL check(status)
       CALL check(nf90_inq_varid(ncid, 'u', u_varid))
       CALL check(nf90_inq_varid(ncid, 'v', v_varid))
+      CALL check(nf90_inq_varid(ncid, 'w', w_varid))
       CALL check(nf90_inq_varid(ncid, 'T', Temp_varid))
       DO i = 1, n_solid
         WRITE (idx_string, '(I2.2)') i
@@ -6672,7 +6681,7 @@ CONTAINS
     CALL check(nf90_put_att(ncid, y_varid, 'long_name', 'y-coordinate'))
     CALL check(nf90_put_att(ncid, t_varid, 'long_name', 'time'))
 
-    ! --- Define Data Variables: b , h and w ---
+    ! --- Define Data Variables: b, h, eta, and velocity components ---
     ! We pass the full 'dimids' array (x, y, time) because these are 3D variables
     CALL check(nf90_def_var(ncid, 'b', nf90_double, dimids, b_varid, &
                             deflate_level=5, shuffle=.true.))
@@ -6684,10 +6693,10 @@ CONTAINS
     CALL check(nf90_put_att(ncid, h_varid, 'units', 'meters'))
     CALL check(nf90_put_att(ncid, h_varid, 'long_name', 'flow thickness'))
 
-    CALL check(nf90_def_var(ncid, 'w', nf90_double, dimids, w_varid, &
+    CALL check(nf90_def_var(ncid, 'eta', nf90_double, dimids, eta_varid, &
                             deflate_level=5, shuffle=.true.))
-    CALL check(nf90_put_att(ncid, w_varid, 'units', 'meters'))
-    CALL check(nf90_put_att(ncid, w_varid, 'long_name', &
+    CALL check(nf90_put_att(ncid, eta_varid, 'units', 'meters'))
+    CALL check(nf90_put_att(ncid, eta_varid, 'long_name', &
                             'free surface elevation'))
 
     CALL check(nf90_def_var(ncid, 'u', nf90_double, dimids, u_varid, &
@@ -6701,6 +6710,12 @@ CONTAINS
     CALL check(nf90_put_att(ncid, v_varid, 'units', 'meters/seconds'))
     CALL check(nf90_put_att(ncid, v_varid, 'long_name', &
                             'velocity y-component'))
+
+    CALL check(nf90_def_var(ncid, 'w', nf90_double, dimids, w_varid, &
+                deflate_level=5, shuffle=.true.))
+    CALL check(nf90_put_att(ncid, w_varid, 'units', 'meters/seconds'))
+    CALL check(nf90_put_att(ncid, w_varid, 'long_name', &
+                'velocity z-component'))
 
     CALL check(nf90_def_var(ncid, 'T', nf90_double, dimids, Temp_varid, &
                             deflate_level=5, shuffle=.true.))
@@ -6867,7 +6882,7 @@ CONTAINS
   END SUBROUTINE init_netcdf_output
 
   !******************************************************************************
-  !> \brief Writes the data for b and w for the current timestep.
+  !> \brief Writes the physical fields for the current timestep.
   !******************************************************************************
   SUBROUTINE write_netcdf_timestep(time_in, state)
     USE netcdf
@@ -6897,6 +6912,7 @@ CONTAINS
     REAL(wp) :: r_alphas(n_solid), r_alphag(n_add_gas), r_alphal
 
     REAL(wp), ALLOCATABLE :: temp_array(:, :)
+    REAL(wp), ALLOCATABLE :: vertical_velocity(:, :)
     REAL(wp), ALLOCATABLE :: Ri2D(:, :), rho_m2D(:, :), red_grav2D(:, :)
     REAL(wp), ALLOCATABLE :: muEff(:, :)
     REAL(wp), ALLOCATABLE :: erodible2D(:, :), shearVel(:, :)
@@ -6917,6 +6933,7 @@ CONTAINS
     ALLOCATE (alphas2D(n_solid,SIZE(state%qp, 2),SIZE(state%qp, 3)))
     ALLOCATE (alphag2D(n_add_gas,SIZE(state%qp, 2),SIZE(state%qp, 3)))
     ALLOCATE (alphal2D(SIZE(state%qp, 2),SIZE(state%qp, 3)))
+    ALLOCATE (vertical_velocity(SIZE(state%qp, 2),SIZE(state%qp, 3)))
 
     Ri2D = 0.0_wp
     rho_m2D = 0.0_wp
@@ -6930,6 +6947,7 @@ CONTAINS
     alphas2D = 0.0_wp
     alphag2D = 0.0_wp
     alphal2D = 0.0_wp
+    vertical_velocity = 0.0_wp
 
     DO j = 1, comp_cells_x
 
@@ -6961,6 +6979,7 @@ CONTAINS
         r_u = state%qp(n_vars + 1, j, k)
         r_v = state%qp(n_vars + 2, j, k)
         r_T = state%qp(4, j, k)
+        vertical_velocity(j, k) = r_u*B_prime_x(j, k) + r_v*B_prime_y(j, k)
 
         CALL primitive_to_volume_fractions(state%qp(1:n_vars+2,j,k),          &
              r_alphas, r_alphag, r_alphal)
@@ -7060,9 +7079,13 @@ CONTAINS
 
     temp_array(:, :) = state%qp(1, :, :) + B_cent(:, :)
 
-    ! Calculate and write the free surface elevation (w = h + b)
-    CALL check(nf90_put_var(ncid, w_varid, temp_array, start=start, &
+    ! Calculate and write the free surface elevation (eta = h + b)
+    CALL check(nf90_put_var(ncid, eta_varid, temp_array, start=start, &
                             count=count))
+
+    ! Write vertical velocity from horizontal velocity and bed slope.
+    CALL check(nf90_put_var(ncid, w_varid, vertical_velocity, start=start, &
+                count=count))
 
     ! Write velocity components.  A cell classified as numerically dry has no
     ! meaningful physical velocity; mask residual q/rho-h ratios in the output.
@@ -7185,6 +7208,7 @@ CONTAINS
     DEALLOCATE (Ri2D, rho_m2D, red_grav2D, muEff, erodible2D)
     DEALLOCATE (shearVel, Rouse, inertialNumber)
     DEALLOCATE (alphas2D, alphag2D, alphal2D)
+    DEALLOCATE (vertical_velocity)
     DEALLOCATE (temp_array)
 
     RETURN

@@ -19,8 +19,8 @@ variables; all physical fields have dimensions `(x, y, time)`.
 | --- | --- |
 | `x`, `y` | `x`, `y` |
 | flow thickness | `h` |
-| velocity components | `u`, `v` |
-| bed and free surface | `b`, `w` |
+| bed and free surface | `b`, `eta` |
+| velocity components | `u`, `v`, `w` |
 | solid fractions | `solid_frac_XX` |
 | additional-gas fractions | `add_gas_frac_XX` |
 | liquid fraction | `alphal` |
@@ -44,3 +44,11 @@ variables; all physical fields have dimensions `(x, y, time)`.
 `XX` is the one-based, zero-padded class or variable index. Fields that are
 not active for a selected physical model are retained in the schema and
 written as zero, matching the former fixed-column output behavior.
+
+The free-surface elevation is `eta = b + h`. The vertical velocity `w` is
+computed at cell centers as `u * db/dx + v * db/dy` from the horizontal
+velocity and the bed-slope fields.
+
+NetCDF files written with the previous schema, where `w` stored free-surface
+elevation, cannot be appended to with the current schema. Use a new output
+filename when continuing a run from one of those files.
