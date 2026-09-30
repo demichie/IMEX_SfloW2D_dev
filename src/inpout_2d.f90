@@ -7053,6 +7053,8 @@ CONTAINS
     REAL(wp), ALLOCATABLE :: Rouse(:, :, :), inertialNumber(:, :)
     REAL(wp), ALLOCATABLE :: alphas2D(:, :, :), alphag2D(:, :, :), alphal2D(:, :)
 
+    REAL(wp) :: denom
+
     WRITE (*, *) 'Writing ', nc_filename
 
 
@@ -7091,6 +7093,18 @@ CONTAINS
 
           CALL mixt_var(state%qp(1:n_vars + 2, j, k), r_Ri, r_rho_m, r_rho_c, &
                         r_red_grav, r_sp_heat_c, r_sp_heat_mix)
+
+          denom = state%q(2,j,k)**2 + state%q(3,j,k)**2
+
+IF (denom .GT. EPSILON(1.0_wp)) THEN
+
+   r_Ri = r_red_grav / r_rho_m * state%q(1,j,k)**3 / denom
+
+ELSE
+
+   r_Ri = 0.0_wp
+
+END IF
 
         ELSE
 
