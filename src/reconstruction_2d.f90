@@ -1002,10 +1002,10 @@ CONTAINS
     END DO
     !$OMP END PARALLEL DO
 
-    DO l = 1, solve_cells
+    DO l = 1, this%hp_eta_cells
 
-       j = j_cent(l)
-       k = k_cent(l)
+   j = this%hp_eta_j(l)
+   k = this%hp_eta_k(l)
 
        CALL final_hp_state( this%qp_cellW(:,j,k), q_final, qp_final )
        this%q_interfaceR(:,j,k) = q_final

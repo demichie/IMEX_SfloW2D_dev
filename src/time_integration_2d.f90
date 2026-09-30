@@ -391,6 +391,16 @@ CONTAINS
 
     !$OMP END PARALLEL
 
+this%q_rk(:,:,:) = 0.0_wp
+
+this%qp_rk(:,:,:) = 0.0_wp
+this%qp_rk(4,:,:) = T_ambient
+
+this%divFlux(:,:,:,:) = 0.0_wp
+this%NH(:,:,:,:) = 0.0_wp
+this%SI_NH(:,:,:,:) = 0.0_wp
+this%expl_terms(:,:,:,:) = 0.0_wp
+
     runge_kutta:DO i_RK = 1,n_RK
 
        IF ( verbose_level .GE. 1 ) WRITE(*,*) 'solver, imex_RK_solver: i_RK',i_RK
