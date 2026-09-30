@@ -10,7 +10,7 @@ The conditions are defined in the following namelist:
  ANGLE_SOURCE = 135.0 ,
  VEL_SOURCE = 10.0D0 ,
  T_SOURCE = 350.0D0 ,
- ALPHAS_SOURCE = 0.02D0 , 
+ XS_SOURCE = 0.976D0, 
  TIME_PARAM = 30.D0 , 20.D0 , 0.0D0, 150.D0 ,
 
 The last four parameters define the pulsating flow:
