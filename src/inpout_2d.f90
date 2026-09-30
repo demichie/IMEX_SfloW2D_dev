@@ -4068,6 +4068,25 @@ CONTAINS
           END IF
         END IF
 
+        IF (.NOT. ANY(xs_source(1:n_solid) .GT. -1.0_wp)) THEN
+
+          CALL eval_mixture_properties_from_volume_fractions(                &
+               ! IN
+               T_source, alphag_source(1:n_add_gas),                         &
+               ! INOUT
+               alphas_source(1:n_solid), alphal_source,                      &
+               ! OUT
+               rho_m, inv_rhom, rho_c, xs_source(1:n_solid),                 &
+               xg_source(1:n_add_gas), xl_source, xc_source, sp_heat_c,      &
+               sp_heat_mix)
+
+        END IF
+
+        ! Source composition is canonical from here on, including for the
+        ! bottom radial source, which does not enter the source-flow setup.
+        CALL enforce_mass_fraction_closure(                                  &
+             xs_source(1:n_solid), xg_source(1:n_add_gas), xl_source)
+
         ALLOCATE (qp_source(n_vars + 2))
 
         IF (lateral_source_flag .OR. radial_source_flag) THEN
@@ -4087,25 +4106,6 @@ CONTAINS
           qp_source(3) = 0.0_wp
 
           qp_source(4) = T_source
-
-          IF (.NOT. ANY(xs_source(1:n_solid) .GT. -1.0_wp)) THEN
-
-            CALL eval_mixture_properties_from_volume_fractions(                &
-                 ! IN
-                 T_source, alphag_source(1:n_add_gas),                         &
-                 ! INOUT
-                 alphas_source(1:n_solid), alphal_source,                      &
-                 ! OUT
-                 rho_m, inv_rhom, rho_c, xs_source(1:n_solid),                 &
-                 xg_source(1:n_add_gas), xl_source, xc_source, sp_heat_c,      &
-                 sp_heat_mix)
-
-          END IF
-
-          ! From this point onward the source composition is canonical: only
-          ! mass fractions are stored and used by the governing equations.
-          CALL enforce_mass_fraction_closure(                                  &
-               xs_source(1:n_solid), xg_source(1:n_add_gas), xl_source)
 
           CALL eval_mixture_properties_from_mass_fractions(                    &
                ! IN
