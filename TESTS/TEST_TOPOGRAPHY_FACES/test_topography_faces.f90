@@ -6,6 +6,7 @@ PROGRAM test_topography_faces
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
   USE geometry_2d, ONLY : dx, dy, dx2, dy2
+   USE geometry_2d, ONLY : x_stag, y_stag, compute_cell_fissure_fraction
   USE geometry_2d, ONLY : limit, derive_topography_from_vertices
   USE geometry_2d, ONLY : reconstruct_topography_faces
   USE geometry_2d, ONLY : project_cell_field_to_vertices
@@ -16,6 +17,7 @@ PROGRAM test_topography_faces
 
   REAL(wp), ALLOCATABLE :: cell_field(:,:), vertex_field(:,:)
   REAL(wp) :: tolerance
+   INTEGER :: coordinate_index
 
   comp_cells_x = 8
   comp_cells_y = 7
@@ -38,9 +40,18 @@ PROGRAM test_topography_faces
   ALLOCATE( B_faceE(comp_cells_x,comp_cells_y) )
   ALLOCATE( B_faceS(comp_cells_x,comp_cells_y) )
   ALLOCATE( B_faceN(comp_cells_x,comp_cells_y) )
+  ALLOCATE( x_stag(comp_interfaces_x), y_stag(comp_interfaces_y) )
   ALLOCATE( cell_field(comp_cells_x,comp_cells_y) )
   ALLOCATE( vertex_field(comp_interfaces_x,comp_interfaces_y) )
 
+  DO coordinate_index = 1, comp_interfaces_x
+     x_stag(coordinate_index) = REAL(coordinate_index-1,wp) * dx
+  END DO
+  DO coordinate_index = 1, comp_interfaces_y
+     y_stag(coordinate_index) = REAL(coordinate_index-1,wp) * dy
+  END DO
+
+  CALL check_fissure_intersections
   CALL check_analytic_bed(.FALSE.)
   CALL check_analytic_bed(.TRUE.)
   CALL check_one_cell_excavation
@@ -83,6 +94,32 @@ CONTAINS
     CALL assert_small('analytic Q1 center values',max_error,tolerance)
 
   END SUBROUTINE check_analytic_bed
+
+  SUBROUTINE check_fissure_intersections
+
+    REAL(wp) :: cell_fraction(comp_cells_x,comp_cells_y)
+    REAL(wp) :: expected(comp_cells_x,comp_cells_y)
+    REAL(wp) :: area_error, expected_area
+
+    CALL compute_cell_fissure_fraction(                                       &
+       [0.75_wp,3.0_wp], [3.125_wp,3.125_wp], 1.25_wp, cell_fraction)
+    expected = 0.0_wp
+    expected(2:4,3) = 1.0_wp
+    CALL assert_small('axis-aligned fissure cell coverage',                   &
+       MAXVAL(ABS(cell_fraction-expected)),tolerance)
+    expected_area = 2.25_wp * 1.25_wp
+    area_error = ABS(SUM(cell_fraction)*dx*dy-expected_area)
+    CALL assert_small('axis-aligned fissure area conservation',               &
+       area_error,tolerance)
+
+    CALL compute_cell_fissure_fraction(                                       &
+       [1.5_wp,3.0_wp], [1.5_wp,3.0_wp], 0.5_wp, cell_fraction)
+    expected_area = SQRT(4.5_wp) * 0.5_wp
+    area_error = ABS(SUM(cell_fraction)*dx*dy-expected_area)
+    CALL assert_small('diagonal fissure area conservation',                   &
+       area_error,tolerance)
+
+  END SUBROUTINE check_fissure_intersections
 
   PURE FUNCTION analytic_bed(x,y,curved) RESULT(value)
 

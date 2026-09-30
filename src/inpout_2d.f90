@@ -44,6 +44,7 @@ MODULE inpout_2d
                            topo_change_flag, radial_source_flag, collapsing_volume_flag, &
                            liquid_flag, gas_flag, subtract_init_flag, bottom_radial_source_flag, &
                            lateral_source_flag, serial_flag, &
+                           bottom_fissural_source_flag, n_fissures, &
                            stochastic_flag, stoch_transport_flag, mean_field_flag, &
                            pore_pressure_flag
 
@@ -73,6 +74,10 @@ MODULE inpout_2d
                            time_param, Ri_source, mfr_source, xs_source, xl_source, xg_source, &
                            r2_source, angle_source, azimuth_source, arc_width_source, &
                            n_intervals, t_intervals, vel_intervals
+
+  USE parameters_2d, ONLY: x_fissures_end_points, y_fissures_end_points,        &
+                           width_fissures, linear_vel_fissures, T_fissures,    &
+                           time_param_fissures
 
   ! -- Variables for the optional PARTICLE_DISTRIBUTION_PARAMETERS namelist
   USE parameters_2d, ONLY: particle_distribution_flag, fractal_dim, diam_min,   &
@@ -335,7 +340,8 @@ MODULE inpout_2d
     liquid_flag, radial_source_flag, collapsing_volume_flag, &
     topo_change_flag, gas_flag, subtract_init_flag, n_add_gas, &
     bottom_radial_source_flag, slope_correction_flag, curvature_term_flag, &
-    lateral_source_flag, stochastic_flag, n_layers, &
+    lateral_source_flag, bottom_fissural_source_flag, n_fissures, &
+    stochastic_flag, n_layers, &
     pore_pressure_flag
 
   NAMELIST /initial_conditions/ released_volume, x_release, y_release, &
@@ -359,6 +365,11 @@ MODULE inpout_2d
     y1_source, y2_source, vel_source, T_source, h_source, alphas_source, &
     alphal_source, alphag_source, time_param, Ri_source, mfr_source, &
     xs_source, xl_source, xg_source
+
+  NAMELIST /fissural_source_parameters/ x_fissures_end_points,                &
+      y_fissures_end_points, width_fissures, linear_vel_fissures,              &
+      T_fissures, time_param_fissures, alphas_source, alphag_source,           &
+      alphal_source, xs_source, xg_source, xl_source
 
   NAMELIST /collapsing_volume_parameters/ x_collapse, y_collapse, &
     r_collapse, T_collapse, h_collapse, alphas_collapse, alphag_collapse
@@ -458,6 +469,8 @@ CONTAINS
     lateral_source_flag = .FALSE.
     collapsing_volume_flag = .FALSE.
     bottom_radial_source_flag = .FALSE.
+    bottom_fissural_source_flag = .FALSE.
+    n_fissures = 0
     liquid_flag = .FALSE.
     gas_flag = .TRUE.
     subtract_init_flag = .FALSE.
@@ -572,6 +585,8 @@ CONTAINS
 
       END IF
 
+      IF (.NOT. bottom_fissural_source_flag) n_fissures = 0
+
       IF (n_solid .LT. 0) THEN
 
         WRITE (*, *) 'ERROR: problem with namelist NEWRUN_PARAMETERS'
@@ -656,7 +671,8 @@ CONTAINS
         idx_pore = 5 + n_solid + n_add_gas + n_stoch_vars
         idx_poreEqn = idx_pore
 
-        IF (radial_source_flag .OR. bottom_radial_source_flag) THEN
+        IF (radial_source_flag .OR. bottom_radial_source_flag .OR.          &
+          bottom_fissural_source_flag) THEN
 
           IF (pore_pres_fract .LE. 0.0_wp) THEN
 
@@ -888,6 +904,12 @@ CONTAINS
     Ri_source = -1.0_wp
     mfr_source = -1.0_wp
     time_param(1:4) = -1.0_wp
+    x_fissures_end_points = -1.0_wp
+    y_fissures_end_points = -1.0_wp
+    width_fissures = -1.0_wp
+    linear_vel_fissures = -1.0_wp
+    T_fissures = -1.0_wp
+    time_param_fissures = -1.0_wp
     n_intervals = 0
     t_intervals(1:100) = -1.0_wp
     vel_intervals(1:100) = -1.0_wp
@@ -3555,7 +3577,8 @@ CONTAINS
     ! ------- READ radial_source_parameters NAMELIST ----------------------------
 
     source_flag: IF ((radial_source_flag) .OR. (bottom_radial_source_flag) &
-                     .OR. (lateral_source_flag)) THEN
+                     .OR. (lateral_source_flag) .OR.                        &
+                     (bottom_fissural_source_flag)) THEN
 
       alphal_source = -1.0_wp
 
@@ -3565,7 +3588,23 @@ CONTAINS
       ! source namelist that is present.
       REWIND (input_unit)
 
-      IF (lateral_source_flag) THEN
+      IF (bottom_fissural_source_flag) THEN
+
+        IF (radial_source_flag .OR. bottom_radial_source_flag .OR.           &
+            lateral_source_flag) THEN
+          WRITE (*, *) 'ERROR: BOTTOM_FISSURAL_SOURCE_FLAG cannot be combined with another source flag.'
+          STOP
+        END IF
+
+        IF ((n_fissures .LT. 1) .OR. (n_fissures .GT. 100)) THEN
+          WRITE (*, *) 'ERROR: N_FISSURES must be in [1,100].', n_fissures
+          STOP
+        END IF
+
+        READ (input_unit, fissural_source_parameters, IOSTAT=ios)
+        source_name = 'FISSURAL_SOURCE_PARAMETERS'
+
+      ELSEIF (lateral_source_flag) THEN
 
         WRITE (*, *) 'Searching for namelist LATERAL_SOURCE_PARAMETERS'
         READ (input_unit, lateral_source_parameters, IOSTAT=ios)
@@ -3587,6 +3626,10 @@ CONTAINS
 
           WRITE (*, lateral_source_parameters)
 
+        ELSEIF (bottom_fissural_source_flag) THEN
+
+          WRITE (*, fissural_source_parameters)
+
         ELSE
 
           WRITE (*, radial_source_parameters)
@@ -3599,7 +3642,69 @@ CONTAINS
 
         REWIND (input_unit)
 
-        IF (t_source .EQ. -1.0_wp) THEN
+        IF (bottom_fissural_source_flag) THEN
+          DO i = 1, n_fissures
+            IF (ANY(x_fissures_end_points(:,i) .EQ. -1.0_wp) .OR.             &
+                ANY(y_fissures_end_points(:,i) .EQ. -1.0_wp)) THEN
+              WRITE (*, *) 'ERROR: define both endpoints for fissure ', i
+              STOP
+            END IF
+            IF (width_fissures(i) .LE. 0.0_wp) THEN
+              WRITE (*, *) 'ERROR: WIDTH_FISSURES must be positive for fissure ', i
+              STOP
+            END IF
+            IF (linear_vel_fissures(i) .LT. 0.0_wp) THEN
+              WRITE (*, *) 'ERROR: LINEAR_VEL_FISSURES must be non-negative for fissure ', i
+              STOP
+            END IF
+            IF (T_fissures(i) .LE. 0.0_wp) THEN
+              WRITE (*, *) 'ERROR: T_FISSURES must be positive for fissure ', i
+              STOP
+            END IF
+            IF (SQRT((x_fissures_end_points(2,i) - x_fissures_end_points(1,i))**2 + &
+                     (y_fissures_end_points(2,i) - y_fissures_end_points(1,i))**2) &
+                .LE. EPSILON(1.0_wp)) THEN
+              WRITE (*, *) 'ERROR: fissure endpoints must be distinct for fissure ', i
+              STOP
+            END IF
+
+            IF ((MINVAL(x_fissures_end_points(:,i)) - 0.5_wp*width_fissures(i) &
+                 .LE. X0 + cell_size) .OR.                                    &
+                (MAXVAL(x_fissures_end_points(:,i)) + 0.5_wp*width_fissures(i) &
+                 .GE. X0 + (comp_cells_x - 1)*cell_size) .OR.                  &
+                (MINVAL(y_fissures_end_points(:,i)) - 0.5_wp*width_fissures(i) &
+                 .LE. Y0 + cell_size) .OR.                                     &
+                (MAXVAL(y_fissures_end_points(:,i)) + 0.5_wp*width_fissures(i) &
+                 .GE. Y0 + (comp_cells_y - 1)*cell_size)) THEN
+              WRITE (*, *) 'ERROR: fissure ', i, ' must remain inside the interior domain'
+              STOP
+            END IF
+
+            IF (ANY(time_param_fissures(:,i) .LT. 0.0_wp)) THEN
+              time_param_fissures(1,i) = t_end
+              time_param_fissures(2,i) = t_end
+              time_param_fissures(3,i) = 0.0_wp
+              time_param_fissures(4,i) = 0.0_wp
+            END IF
+
+            IF ((time_param_fissures(1,i) .LE. 0.0_wp) .OR.                  &
+                (time_param_fissures(2,i) .LT. 0.0_wp) .OR.                  &
+                (time_param_fissures(2,i) .GT. time_param_fissures(1,i)) .OR. &
+                (time_param_fissures(3,i) .LT. 0.0_wp) .OR.                  &
+                (time_param_fissures(3,i) .GT. 0.5_wp*time_param_fissures(2,i)) .OR. &
+                (time_param_fissures(4,i) .LT. 0.0_wp)) THEN
+              WRITE (*, *) 'ERROR: invalid TIME_PARAM_FISSURES for fissure ', i
+              WRITE (*, *) 'Expected period>0, active in [0,period], ramp in [0,active/2], phase>=0.'
+              STOP
+            END IF
+          END DO
+
+          ! Composition is shared by all fissures; use the first fissure's
+          ! temperature when converting volume fractions to mass fractions.
+          T_source = T_fissures(1)
+        END IF
+
+        IF ((.NOT. bottom_fissural_source_flag) .AND. (t_source .EQ. -1.0_wp)) THEN
 
           WRITE (*, *) 'ERROR: problem with namelist ', TRIM(source_name)
           WRITE (*, *) 'PLEASE CHECK VALUE OF T_SOURCE', t_source
@@ -3608,7 +3713,8 @@ CONTAINS
         END IF
 
         IF (((h_source .EQ. -1.0_wp) .AND. (mfr_source .EQ. -1)) &
-            .AND. (.NOT. bottom_radial_source_flag)) THEN
+          .AND. (.NOT. bottom_radial_source_flag) .AND.                    &
+          (.NOT. bottom_fissural_source_flag)) THEN
 
           WRITE (*, *) 'ERROR: problem with namelist ', TRIM(source_name)
           WRITE (*, *) 'PLEASE ASSIGN A VALUE TO H_SOURCE OR MFR_SOURCE'
@@ -3995,6 +4101,8 @@ CONTAINS
 
         END IF
 
+        IF (.NOT. bottom_fissural_source_flag) THEN
+
         IF (ANY(time_param .LT. 0.0_wp)) THEN
 
           WRITE (*, *)
@@ -4030,8 +4138,10 @@ CONTAINS
 
         END IF
 
+        END IF
+
         ! Optional piecewise-constant velocity history for the bottom source
-        IF (n_intervals .GT. 0) THEN
+        IF ((n_intervals .GT. 0) .AND. (.NOT. bottom_fissural_source_flag)) THEN
           IF (.NOT. bottom_radial_source_flag) THEN
             WRITE (*, *) 'ERROR: N_INTERVALS can only be used with BOTTOM_RADIAL_SOURCE_FLAG = T'
             STOP
@@ -4261,6 +4371,16 @@ CONTAINS
           WRITE (*, *) 'x0_runout =', x0_runout
           WRITE (*, *) 'y0_runout =', y0_runout
 
+          ELSEIF (bottom_fissural_source_flag) THEN
+
+          x0_runout = SUM(x_fissures_end_points(:,1:n_fissures)) /           &
+            REAL(2*n_fissures,wp)
+          y0_runout = SUM(y_fissures_end_points(:,1:n_fissures)) /           &
+            REAL(2*n_fissures,wp)
+          WRITE (*, *) 'New runout reference location defined from fissures'
+          WRITE (*, *) 'x0_runout =', x0_runout
+          WRITE (*, *) 'y0_runout =', y0_runout
+
         END IF
 
       ELSE
@@ -4482,6 +4602,8 @@ CONTAINS
 
       WRITE (backup_unit, newrun_parameters)
       WRITE (backup_unit, restart_parameters)
+      IF (bottom_fissural_source_flag)                                      &
+        WRITE (backup_unit, fissural_source_parameters)
 
     ELSE
 
@@ -4492,6 +4614,10 @@ CONTAINS
         alphal_source = -1.0_wp
 
         WRITE (backup_unit, radial_source_parameters)
+
+      ELSEIF (bottom_fissural_source_flag) THEN
+
+        WRITE (backup_unit, fissural_source_parameters)
 
       ELSEIF (lateral_source_flag) THEN
 
@@ -6372,10 +6498,18 @@ CONTAINS
 
         END IF
 
-        IF (radial_source_flag .OR. bottom_radial_source_flag) THEN
+        IF (radial_source_flag .OR. bottom_radial_source_flag .OR.          &
+            bottom_fissural_source_flag) THEN
 
-          x_mass_center = x_source
-          y_mass_center = y_source
+          IF (bottom_fissural_source_flag) THEN
+            x_mass_center = SUM(x_fissures_end_points(:,1:n_fissures)) /     &
+                 REAL(2*n_fissures,wp)
+            y_mass_center = SUM(y_fissures_end_points(:,1:n_fissures)) /     &
+                 REAL(2*n_fissures,wp)
+          ELSE
+            x_mass_center = x_source
+            y_mass_center = y_source
+          END IF
 
         END IF
 

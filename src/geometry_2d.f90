@@ -149,6 +149,9 @@ MODULE geometry_2d
 
   REAL(wp), ALLOCATABLE :: cell_source_fractions(:,:)
 
+   ! Cell-coverage fractions kept separate for each fissure.
+   REAL(wp), ALLOCATABLE :: cell_fissure_fractions(:,:,:)
+
   !> Per-cell effective source-arc length used by the conservative lateral
   !> radial-source volume injection. Zero outside active source-boundary cells.
   REAL(wp), ALLOCATABLE :: cell_arc_perim(:,:)
@@ -193,8 +196,11 @@ CONTAINS
 
     USE parameters_2d, ONLY: eps_sing , eps_sing4
     USE parameters_2d, ONLY : bottom_radial_source_flag
+      USE parameters_2d, ONLY : bottom_fissural_source_flag, n_fissures
     USE parameters_2d, ONLY : x_source , y_source , r_source , r2_source ,      &
          angle_source
+      USE parameters_2d, ONLY : x_fissures_end_points, y_fissures_end_points,     &
+          width_fissures
     USE parameters_2d, ONLY : liquid_vaporization_flag
 
     IMPLICIT none
@@ -272,6 +278,9 @@ CONTAINS
     ALLOCATE( grav_coeff_stag_y(comp_cells_x,comp_interfaces_y) )
 
     ALLOCATE( cell_source_fractions(comp_cells_x,comp_cells_y) )
+      ALLOCATE( cell_fissure_fractions(comp_cells_x,comp_cells_y,n_fissures) )
+      cell_source_fractions = 0.0_wp
+      cell_fissure_fractions = 0.0_wp
 
     ALLOCATE( cell_arc_perim(comp_cells_x,comp_cells_y) )
     ALLOCATE( cell_arc_n_x(comp_cells_x,comp_cells_y) )
@@ -390,6 +399,18 @@ CONTAINS
 
        CALL compute_cell_fract(x_source,y_source,r_source,r2_source,            &
             angle_source,cell_source_fractions)
+
+    END IF
+
+    IF ( bottom_fissural_source_flag ) THEN
+
+       DO j = 1, n_fissures
+          CALL compute_cell_fissure_fraction(                                  &
+               x_fissures_end_points(:,j), y_fissures_end_points(:,j),         &
+               width_fissures(j), cell_fissure_fractions(:,:,j))
+          cell_source_fractions = MAX(cell_source_fractions,                   &
+               cell_fissure_fractions(:,:,j))
+       END DO
 
     END IF
 
@@ -2080,6 +2101,156 @@ CONTAINS
     END IF
 
   END function maxmod
+
+  ! Fissural rectangle/cell intersections follow the segment-and-width source
+  ! geometry introduced by Elisa Biagioli in BiElisa/IMEX_LavaFlow.
+  SUBROUTINE compute_cell_fissure_fraction(endpoints_x, endpoints_y, width,   &
+       cell_fraction)
+
+    IMPLICIT NONE
+
+    REAL(wp), INTENT(IN) :: endpoints_x(2), endpoints_y(2), width
+    REAL(wp), INTENT(OUT) :: cell_fraction(comp_cells_x,comp_cells_y)
+
+    REAL(wp) :: polygon_x(16), polygon_y(16)
+    REAL(wp) :: clipped_x(16), clipped_y(16)
+    REAL(wp) :: segment_x, segment_y, segment_length
+    REAL(wp) :: normal_x, normal_y, half_width
+    REAL(wp) :: min_x, max_x, min_y, max_y
+    REAL(wp) :: boundary, previous_coordinate, current_coordinate
+    REAL(wp) :: fraction, intersection_x, intersection_y, area_twice
+    REAL(wp) :: denominator
+    INTEGER :: cell_x, cell_y, vertex, next_vertex, edge
+    INTEGER :: vertex_count, clipped_count, previous_vertex, axis
+    LOGICAL :: keep_greater, previous_inside, current_inside
+
+    cell_fraction = 0.0_wp
+    segment_x = endpoints_x(2) - endpoints_x(1)
+    segment_y = endpoints_y(2) - endpoints_y(1)
+    segment_length = SQRT(segment_x**2 + segment_y**2)
+    IF (segment_length .LE. EPSILON(1.0_wp)) RETURN
+
+    normal_x = -segment_y / segment_length
+    normal_y = segment_x / segment_length
+    half_width = 0.5_wp * width
+
+    min_x = MINVAL(endpoints_x) - half_width * ABS(normal_x)
+    max_x = MAXVAL(endpoints_x) + half_width * ABS(normal_x)
+    min_y = MINVAL(endpoints_y) - half_width * ABS(normal_y)
+    max_y = MAXVAL(endpoints_y) + half_width * ABS(normal_y)
+
+    DO cell_y = 1, comp_cells_y
+       IF (y_stag(cell_y+1) .LT. min_y .OR. y_stag(cell_y) .GT. max_y) CYCLE
+
+       DO cell_x = 1, comp_cells_x
+          IF (x_stag(cell_x+1) .LT. min_x .OR. x_stag(cell_x) .GT. max_x) CYCLE
+
+          vertex_count = 4
+          polygon_x(1) = endpoints_x(1) + normal_x * half_width
+          polygon_y(1) = endpoints_y(1) + normal_y * half_width
+          polygon_x(2) = endpoints_x(2) + normal_x * half_width
+          polygon_y(2) = endpoints_y(2) + normal_y * half_width
+          polygon_x(3) = endpoints_x(2) - normal_x * half_width
+          polygon_y(3) = endpoints_y(2) - normal_y * half_width
+          polygon_x(4) = endpoints_x(1) - normal_x * half_width
+          polygon_y(4) = endpoints_y(1) - normal_y * half_width
+
+          ! Clip the fissure polygon against the cell's four axis-aligned edges.
+          DO edge = 1, 4
+             SELECT CASE (edge)
+             CASE (1)
+                axis = 1
+                boundary = x_stag(cell_x)
+                keep_greater = .TRUE.
+             CASE (2)
+                axis = 1
+                boundary = x_stag(cell_x+1)
+                keep_greater = .FALSE.
+             CASE (3)
+                axis = 2
+                boundary = y_stag(cell_y)
+                keep_greater = .TRUE.
+             CASE (4)
+                axis = 2
+                boundary = y_stag(cell_y+1)
+                keep_greater = .FALSE.
+             END SELECT
+
+             clipped_count = 0
+             previous_vertex = vertex_count
+             IF (axis .EQ. 1) THEN
+                previous_coordinate = polygon_x(previous_vertex)
+             ELSE
+                previous_coordinate = polygon_y(previous_vertex)
+             END IF
+             IF (keep_greater) THEN
+                previous_inside = previous_coordinate .GE. boundary
+             ELSE
+                previous_inside = previous_coordinate .LE. boundary
+             END IF
+
+             DO vertex = 1, vertex_count
+                IF (axis .EQ. 1) THEN
+                   current_coordinate = polygon_x(vertex)
+                ELSE
+                   current_coordinate = polygon_y(vertex)
+                END IF
+                IF (keep_greater) THEN
+                   current_inside = current_coordinate .GE. boundary
+                ELSE
+                   current_inside = current_coordinate .LE. boundary
+                END IF
+
+                IF (current_inside .NEQV. previous_inside) THEN
+                   IF (axis .EQ. 1) THEN
+                      denominator = polygon_x(vertex) - polygon_x(previous_vertex)
+                      fraction = (boundary - polygon_x(previous_vertex)) / denominator
+                      intersection_x = boundary
+                      intersection_y = polygon_y(previous_vertex) + fraction * &
+                           (polygon_y(vertex) - polygon_y(previous_vertex))
+                   ELSE
+                      denominator = polygon_y(vertex) - polygon_y(previous_vertex)
+                      fraction = (boundary - polygon_y(previous_vertex)) / denominator
+                      intersection_x = polygon_x(previous_vertex) + fraction * &
+                           (polygon_x(vertex) - polygon_x(previous_vertex))
+                      intersection_y = boundary
+                   END IF
+                   clipped_count = clipped_count + 1
+                   clipped_x(clipped_count) = intersection_x
+                   clipped_y(clipped_count) = intersection_y
+                END IF
+
+                IF (current_inside) THEN
+                   clipped_count = clipped_count + 1
+                   clipped_x(clipped_count) = polygon_x(vertex)
+                   clipped_y(clipped_count) = polygon_y(vertex)
+                END IF
+
+                previous_vertex = vertex
+                previous_inside = current_inside
+             END DO
+
+             vertex_count = clipped_count
+             IF (vertex_count .EQ. 0) EXIT
+             polygon_x(1:vertex_count) = clipped_x(1:vertex_count)
+             polygon_y(1:vertex_count) = clipped_y(1:vertex_count)
+          END DO
+
+          IF (vertex_count .LT. 3) CYCLE
+
+          area_twice = 0.0_wp
+          DO vertex = 1, vertex_count
+             next_vertex = MOD(vertex, vertex_count) + 1
+             area_twice = area_twice + polygon_x(vertex) * polygon_y(next_vertex) &
+                  - polygon_x(next_vertex) * polygon_y(vertex)
+          END DO
+          cell_fraction(cell_x,cell_y) = MIN(1.0_wp,                          &
+               0.5_wp * ABS(area_twice) / (dx * dy))
+       END DO
+    END DO
+
+  END SUBROUTINE compute_cell_fissure_fraction
+
 
   SUBROUTINE compute_cell_fract(xs,ys,rs,r2s,angles,cell_fract)
 

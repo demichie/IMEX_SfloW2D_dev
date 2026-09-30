@@ -7,11 +7,12 @@
 MODULE domain_2d
 
   USE parameters_2d, ONLY : wp, n_RK
-  USE parameters_2d, ONLY : radial_source_flag, bottom_radial_source_flag
+  USE parameters_2d, ONLY : radial_source_flag, bottom_radial_source_flag,   &
+     bottom_fissural_source_flag
 
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_cells_xy
   USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
-  USE geometry_2d, ONLY : source_cell, cell_source_fractions
+   USE geometry_2d, ONLY : source_cell, cell_source_fractions
 
   IMPLICIT NONE
 
@@ -143,7 +144,7 @@ CONTAINS
     
     !$OMP BARRIER
 
-    IF ( bottom_radial_source_flag ) THEN
+      IF ( bottom_radial_source_flag .OR. bottom_fissural_source_flag ) THEN
 
        !$OMP WORKSHARE
        WHERE ( cell_source_fractions .GT. 0.0_wp ) this%solve_mask = .TRUE.

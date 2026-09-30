@@ -241,6 +241,17 @@ MODULE parameters_2d
   REAL(wp) :: alphag_collapse(100)
 
   LOGICAL :: bottom_radial_source_flag
+
+  ! Elisa Biagioli's fissural-source input model, adapted for per-fissure
+  ! cell fractions and linear injection velocities.
+  LOGICAL :: bottom_fissural_source_flag
+  INTEGER :: n_fissures
+  REAL(wp) :: x_fissures_end_points(2,100)
+  REAL(wp) :: y_fissures_end_points(2,100)
+  REAL(wp) :: width_fissures(100)
+  REAL(wp) :: linear_vel_fissures(100)
+  REAL(wp) :: T_fissures(100)
+  REAL(wp) :: time_param_fissures(4,100)
   
   !> Initial volume of the flow
   REAL(wp) :: released_volume
