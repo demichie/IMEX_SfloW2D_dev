@@ -277,7 +277,7 @@ PROGRAM IMEX_SfloW2D
    IF ( .NOT. is_binary_restart ) simulation%state%vuln_table = .FALSE.
 
    !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2,    &
-   !$OMP & mod_vel)
+   !$OMP & mod_vel,r_u,r_v)
 
    DO l = 1,simulation%domain%solve_cells
 
@@ -459,7 +459,7 @@ PROGRAM IMEX_SfloW2D
       simulation%runtime%t = simulation%runtime%t + simulation%runtime%dt
 
       !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2,    &
-      !$OMP & mod_vel)
+      !$OMP & mod_vel,r_u,r_v)
 
 
       DO l = 1,simulation%domain%solve_cells

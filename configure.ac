@@ -4,6 +4,12 @@ AC_INIT([IMEX_SfloW2D], [1.0], [mattia.demichielivitturi@ingv.it])
 # check if the source folder is available
 AC_CONFIG_SRCDIR([src/IMEX_SfloW2D.f90])
 
+# Preserve the historical optimized default without overriding FCFLAGS supplied
+# by the user at configure time.
+if test -z "$FCFLAGS"; then
+  FCFLAGS="-Ofast -funroll-all-loops"
+fi
+
 # check for fortran compiler
 AC_PROG_FC
 

@@ -102,7 +102,7 @@ CONTAINS
 
   END SUBROUTINE finalize_hyperbolic
 
-  SUBROUTINE eval_hyperbolic_terms( this, recon, q_expl, qp_expl,             &
+  SUBROUTINE eval_hyperbolic_terms( this, recon, qp_expl,                     &
        divFlux_iRK, t, solve_cells, j_cent, k_cent, solve_interfaces_x,       &
        j_stag_x, k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
@@ -110,7 +110,6 @@ CONTAINS
 
     CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
     CLASS(reconstruction_workspace_type), INTENT(INOUT) :: recon
-    REAL(wp), INTENT(IN) :: q_expl(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: qp_expl(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(OUT) :: divFlux_iRK(n_eqns,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: t
@@ -211,15 +210,6 @@ CONTAINS
     REAL(wp) :: reduced_gravity_left, reduced_gravity_right
     REAL(wp) :: a_minus, a_plus
     INTEGER :: j, k, l
-
-    this%H_interface_x = 0.0_wp
-    this%H_interface_y = 0.0_wp
-    this%G_interface_xL = 0.0_wp
-    this%G_interface_xR = 0.0_wp
-    this%G_interface_yB = 0.0_wp
-    this%G_interface_yT = 0.0_wp
-    this%P_interface_x = 0.0_wp
-    this%P_interface_y = 0.0_wp
 
     IF ( comp_cells_x .GT. 1 ) THEN
 
@@ -345,9 +335,6 @@ CONTAINS
     REAL(wp) :: gamma_minus, gamma_plus
     REAL(wp) :: reduced_gravity_minus, reduced_gravity_plus
     INTEGER :: j, k, l
-
-    this%P_cell_x = 0.0_wp
-    this%P_cell_y = 0.0_wp
 
     !$OMP PARALLEL DO private(l,j,k,gamma_minus,gamma_plus,                   &
     !$OMP & reduced_gravity_minus,reduced_gravity_plus)

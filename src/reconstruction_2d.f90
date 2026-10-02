@@ -52,8 +52,6 @@ MODULE reconstruction_2d
      REAL(wp), ALLOCATABLE :: eta_interfaceL(:,:), eta_interfaceR(:,:)
      REAL(wp), ALLOCATABLE :: eta_interfaceB(:,:), eta_interfaceT(:,:)
 
-     REAL(wp), ALLOCATABLE :: w_eta_x(:,:), w_eta_y(:,:)
-
        REAL(wp), ALLOCATABLE :: hydrostatic_residual_2d(:,:)
        REAL(wp), ALLOCATABLE :: topographic_relief_ratio_2d(:,:)
        LOGICAL, ALLOCATABLE :: hp_eta_mask(:,:)
@@ -62,10 +60,6 @@ MODULE reconstruction_2d
        REAL(wp), ALLOCATABLE :: hp_blended(:,:,:,:)
        REAL(wp), ALLOCATABLE :: hp_scratch(:,:,:)
 
-     LOGICAL, ALLOCATABLE :: diverg_interfaceL(:,:)
-     LOGICAL, ALLOCATABLE :: diverg_interfaceR(:,:)
-     LOGICAL, ALLOCATABLE :: diverg_interfaceB(:,:)
-     LOGICAL, ALLOCATABLE :: diverg_interfaceT(:,:)
    CONTAINS
      PROCEDURE :: initialize => initialize_reconstruction
      PROCEDURE :: finalize => finalize_reconstruction
@@ -101,8 +95,6 @@ CONTAINS
     ALLOCATE( this%eta_interfaceR( comp_interfaces_x, comp_cells_y ) )
     ALLOCATE( this%eta_interfaceB( comp_cells_x, comp_interfaces_y ) )
     ALLOCATE( this%eta_interfaceT( comp_cells_x, comp_interfaces_y ) )
-    ALLOCATE( this%w_eta_x( comp_cells_x, comp_cells_y ) )
-    ALLOCATE( this%w_eta_y( comp_cells_x, comp_cells_y ) )
 
     ALLOCATE( this%hydrostatic_residual_2d(comp_cells_x,comp_cells_y) )
     ALLOCATE( this%topographic_relief_ratio_2d(comp_cells_x,comp_cells_y) )
@@ -114,10 +106,6 @@ CONTAINS
       this%hp_eta_mask = .FALSE.
       this%hp_eta_cells = 0
 
-    ALLOCATE( this%diverg_interfaceL( comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( this%diverg_interfaceR( comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( this%diverg_interfaceB( comp_cells_x, comp_interfaces_y ) )
-    ALLOCATE( this%diverg_interfaceT( comp_cells_x, comp_interfaces_y ) )
 
   END SUBROUTINE initialize_reconstruction
 
@@ -148,8 +136,6 @@ CONTAINS
     DEALLOCATE( this%eta_interfaceR )
     DEALLOCATE( this%eta_interfaceB )
     DEALLOCATE( this%eta_interfaceT )
-    DEALLOCATE( this%w_eta_x )
-    DEALLOCATE( this%w_eta_y )
 
       DEALLOCATE( this%hydrostatic_residual_2d )
       DEALLOCATE( this%topographic_relief_ratio_2d )
@@ -159,10 +145,6 @@ CONTAINS
       DEALLOCATE( this%hp_blended )
       DEALLOCATE( this%hp_scratch )
 
-    DEALLOCATE( this%diverg_interfaceL )
-    DEALLOCATE( this%diverg_interfaceR )
-    DEALLOCATE( this%diverg_interfaceB )
-    DEALLOCATE( this%diverg_interfaceT )
 
   END SUBROUTINE finalize_reconstruction
 
@@ -252,7 +234,6 @@ CONTAINS
 
     REAL(wp) :: dq
 
-    LOGICAL :: diverging_flag
     LOGICAL :: regular_interior
 
     ! Keep the same constant candidates for inactive neighbours, but initialize
@@ -276,7 +257,7 @@ CONTAINS
 
     !$OMP PARALLEL DO private(j,k,i,qrecW,qrecE,qrecS,qrecN,x_stencil,y_stencil,&
     !$OMP & qrec_stencil,qrec_prime_x,qrec_prime_y,qp2recW,qp2recE,qp2recS,     &
-    !$OMP & qp2recN,source_bdry,dq,diverging_flag,regular_interior)
+    !$OMP & qp2recN,source_bdry,dq,regular_interior)
 
     DO l = 1,solve_cells
 
@@ -836,63 +817,10 @@ CONTAINS
 
        END IF
 
-       ! check if du/dx + dv/dy > 0 (flow locally diverges)
-       diverging_flag = ( ( qrec_prime_x(n_vars+1) + qrec_prime_y(n_vars+2) )   &
-            .GT. 0.0_wp )
-
        this%qp_cellW(:,j,k) = qrecW
        this%qp_cellE(:,j,k) = qrecE
        this%qp_cellS(:,j,k) = qrecS
        this%qp_cellN(:,j,k) = qrecN
-
-       IF ( comp_cells_x .GT. 1 ) THEN
-
-          this%diverg_interfaceR(j,k) = diverging_flag
-          this%diverg_interfaceL(j+1,k) = diverging_flag
-
-          IF ( j.EQ.1 ) THEN
-
-             ! Interface value at the left of first x-interface (external)
-             this%diverg_interfaceR(j,k) = this%diverg_interfaceL(j,k)
-
-          ELSEIF ( j.EQ.comp_cells_x ) THEN
-
-             ! Interface value at the right of last x-interface (external)
-             this%diverg_interfaceR(j+1,k) = this%diverg_interfaceL(j+1,k)
-
-          ELSE
-
-          END IF
-
-       ELSE
-
-          this%diverg_interfaceR(j,k) = diverging_flag
-          this%diverg_interfaceL(j+1,k) = diverging_flag
-
-       END IF
-
-       IF ( comp_cells_y .GT. 1 ) THEN
-
-          this%diverg_interfaceT(j,k) = diverging_flag
-          this%diverg_interfaceB(j,k+1) = diverging_flag
-
-          IF ( k .EQ. 1 ) THEN
-
-             ! Interface value at the bottom of first y-interface (external)
-             this%diverg_interfaceB(j,k) = this%diverg_interfaceT(j,k)
-
-          ELSEIF ( k .EQ. comp_cells_y ) THEN
-
-             ! Interface value at the top of last y-interface (external)
-             this%diverg_interfaceT(j,k+1) = this%diverg_interfaceB(j,k+1)
-
-          ELSE
-
-          END IF
-
-       ELSE
-
-       END IF
 
     END DO
 
@@ -932,9 +860,11 @@ CONTAINS
     REAL(wp) :: relief2d
     INTEGER :: j, k, l
 
-    ! Phase 1: compute the cell-local indicators and eta traces for cells
-    ! adjacent to the solve mask.
-    !$OMP PARALLEL DO PRIVATE(l,j,k,relief2d)
+    ! Reuse one thread team across all dependent HP phases. Each END DO keeps
+    ! its implicit barrier because the following phase consumes its results.
+    !$OMP PARALLEL PRIVATE(l,j,k,relief2d,q_final,qp_final)
+
+    !$OMP DO
     DO l = 1, solve_cells
        j = j_cent(l)
        k = k_cent(l)
@@ -946,46 +876,37 @@ CONTAINS
        this%topographic_relief_ratio_2d(j,k) = relief2d /                    &
             MAX(qp_center(1,j,k),hp_dry_tolerance)
     END DO
-    !$OMP END PARALLEL DO
+    !$OMP END DO
 
-    !$OMP PARALLEL DO PRIVATE(l,j,k)
+    !$OMP DO
     DO l = 1, this%hp_eta_cells
        j = this%hp_eta_j(l)
        k = this%hp_eta_k(l)
        CALL compute_eta_traces(j,k)
     END DO
-    !$OMP END PARALLEL DO
+    !$OMP END DO
 
-    ! Phase 2: compare the direct and eta thickness jumps at each target cell.
-    !$OMP PARALLEL DO PRIVATE(l,j,k)
-    DO l = 1, solve_cells
-       j = j_cent(l)
-       k = k_cent(l)
-       CALL compute_cell_weights(j,k)
-    END DO
-    !$OMP END PARALLEL DO
-
-    ! Phase 3: blend thickness and normal momentum only on solve_cells.
-    !$OMP PARALLEL DO PRIVATE(l,j,k)
+    ! Blend thickness and normal momentum only on solve_cells.
+    !$OMP DO
     DO l = 1, solve_cells
        j = j_cent(l)
        k = k_cent(l)
        CALL evaluate_hp_cell_x(j,k)
        CALL evaluate_hp_cell_y(j,k)
     END DO
-    !$OMP END PARALLEL DO
+    !$OMP END DO
 
-    !$OMP PARALLEL DO PRIVATE(l,j,k)
+    !$OMP DO
     DO l = 1, solve_cells
        j = j_cent(l)
        k = k_cent(l)
        CALL commit_hp_cell(j,k)
     END DO
-    !$OMP END PARALLEL DO
+    !$OMP END DO
 
     ! Map all eta cell traces to their oriented face storage.  Conservative
     ! only workset cells can contribute to an active interface.
-    !$OMP PARALLEL DO PRIVATE(l,j,k)
+    !$OMP DO
     DO l = 1, this%hp_eta_cells
        j = this%hp_eta_j(l)
        k = this%hp_eta_k(l)
@@ -1000,8 +921,9 @@ CONTAINS
        IF ( k .EQ. comp_cells_y ) this%eta_interfaceT(j,comp_interfaces_y) = &
             this%eta_interfaceB(j,comp_interfaces_y)
     END DO
-    !$OMP END PARALLEL DO
+    !$OMP END DO
 
+    !$OMP DO
     DO l = 1, this%hp_eta_cells
 
    j = this%hp_eta_j(l)
@@ -1024,9 +946,11 @@ CONTAINS
        this%qp_interfaceB(:,j,k+1) = qp_final
 
     END DO
+    !$OMP END DO
 
     ! Preserve the solver's existing external ghost convention after replacing
     ! the cell-owned traces.
+    !$OMP DO
     DO k = 1, comp_cells_y
        this%q_interfaceL(:,1,k) = this%q_interfaceR(:,1,k)
        this%qp_interfaceL(:,1,k) = this%qp_interfaceR(:,1,k)
@@ -1035,7 +959,9 @@ CONTAINS
        this%qp_interfaceR(:,comp_interfaces_x,k) =                            &
             this%qp_interfaceL(:,comp_interfaces_x,k)
     END DO
+    !$OMP END DO
 
+    !$OMP DO
     DO j = 1, comp_cells_x
        this%q_interfaceB(:,j,1) = this%q_interfaceT(:,j,1)
        this%qp_interfaceB(:,j,1) = this%qp_interfaceT(:,j,1)
@@ -1044,11 +970,13 @@ CONTAINS
        this%qp_interfaceT(:,j,comp_interfaces_y) =                            &
             this%qp_interfaceB(:,j,comp_interfaces_y)
     END DO
+    !$OMP END DO
 
     ! Rebuild the internal reflecting side of radial-source cells from the new
     ! HP state.  The volumetric momentum and auxiliary normal velocity are both
     ! reflected so qp and q remain consistent.
     IF ( radial_source_flag ) THEN
+       !$OMP DO
        DO l = 1, solve_cells
           j = j_cent(l)
           k = k_cent(l)
@@ -1088,7 +1016,10 @@ CONTAINS
              this%eta_interfaceB(j,k) = this%eta_interfaceT(j,k)
           END IF
        END DO
+       !$OMP END DO
     END IF
+
+    !$OMP END PARALLEL
 
   CONTAINS
 
@@ -1155,93 +1086,6 @@ CONTAINS
     eta_plus = eta_center + 0.5_wp * eta_slope
 
     END SUBROUTINE hp_eta_face_pair
-
-    SUBROUTINE compute_cell_weights(jc,kc)
-
-    INTEGER, INTENT(IN) :: jc, kc
-    REAL(wp) :: Eh, Eeta, h_minus_eta, h_plus_eta
-
-    Eh = 0.0_wp
-    Eeta = 0.0_wp
-    h_minus_eta = MAX( this%eta_cellW(jc,kc) - B_face_x(jc,kc), 0.0_wp )
-    h_plus_eta = MAX( this%eta_cellE(jc,kc) - B_face_x(jc+1,kc), 0.0_wp )
-
-    IF ( jc .GT. 1 ) THEN
-       Eh = Eh + ABS( MAX(this%qp_cellE(1,jc-1,kc),0.0_wp) -              &
-          MAX(this%qp_cellW(1,jc,kc),0.0_wp) )
-       Eeta = Eeta + ABS(                                               &
-          MAX(this%eta_cellE(jc-1,kc)-B_face_x(jc,kc),0.0_wp) -       &
-          MAX(this%eta_cellW(jc,kc)-B_face_x(jc,kc),0.0_wp) )
-    END IF
-    IF ( jc .LT. comp_cells_x ) THEN
-       Eh = Eh + ABS( MAX(this%qp_cellE(1,jc,kc),0.0_wp) -              &
-          MAX(this%qp_cellW(1,jc+1,kc),0.0_wp) )
-       Eeta = Eeta + ABS(                                               &
-          MAX(this%eta_cellE(jc,kc)-B_face_x(jc+1,kc),0.0_wp) -       &
-          MAX(this%eta_cellW(jc+1,kc)-B_face_x(jc+1,kc),0.0_wp) )
-    END IF
-    this%w_eta_x(jc,kc) = continuity_weight(                             &
-       qp_center(1,jc,kc), Eh, Eeta, h_minus_eta, h_plus_eta,          &
-       this%hydrostatic_residual_2d(jc,kc),                            &
-       this%topographic_relief_ratio_2d(jc,kc) )
-
-    Eh = 0.0_wp
-    Eeta = 0.0_wp
-    h_minus_eta = MAX( this%eta_cellS(jc,kc) - B_face_y(jc,kc), 0.0_wp )
-    h_plus_eta = MAX( this%eta_cellN(jc,kc) - B_face_y(jc,kc+1), 0.0_wp )
-
-    IF ( kc .GT. 1 ) THEN
-       Eh = Eh + ABS( MAX(this%qp_cellN(1,jc,kc-1),0.0_wp) -            &
-          MAX(this%qp_cellS(1,jc,kc),0.0_wp) )
-       Eeta = Eeta + ABS(                                               &
-          MAX(this%eta_cellN(jc,kc-1)-B_face_y(jc,kc),0.0_wp) -       &
-          MAX(this%eta_cellS(jc,kc)-B_face_y(jc,kc),0.0_wp) )
-    END IF
-    IF ( kc .LT. comp_cells_y ) THEN
-       Eh = Eh + ABS( MAX(this%qp_cellN(1,jc,kc),0.0_wp) -              &
-          MAX(this%qp_cellS(1,jc,kc+1),0.0_wp) )
-       Eeta = Eeta + ABS(                                               &
-          MAX(this%eta_cellN(jc,kc)-B_face_y(jc,kc+1),0.0_wp) -       &
-          MAX(this%eta_cellS(jc,kc+1)-B_face_y(jc,kc+1),0.0_wp) )
-    END IF
-    this%w_eta_y(jc,kc) = continuity_weight(                             &
-       qp_center(1,jc,kc), Eh, Eeta, h_minus_eta, h_plus_eta,          &
-       this%hydrostatic_residual_2d(jc,kc),                            &
-       this%topographic_relief_ratio_2d(jc,kc) )
-
-    END SUBROUTINE compute_cell_weights
-
-    FUNCTION continuity_weight(h_center,Eh,Eeta,h_minus_eta,h_plus_eta,    &
-       hydrostatic_residual,topographic_relief_ratio) RESULT(weight)
-
-    REAL(wp), INTENT(IN) :: h_center, Eh, Eeta
-    REAL(wp), INTENT(IN) :: h_minus_eta, h_plus_eta
-    REAL(wp), INTENT(IN) :: hydrostatic_residual, topographic_relief_ratio
-    REAL(wp) :: weight, denominator, distribution_tolerance
-
-    denominator = Eh + Eeta
-    distribution_tolerance = 1.0E-14_wp * MAX(1.0_wp,h_center)
-    IF ( denominator .GT. distribution_tolerance ) THEN
-       weight = Eh / denominator
-    ELSE
-       weight = 0.5_wp
-    END IF
-
-    IF ( h_center .LE. hp_dry_tolerance ) THEN
-       weight = 1.0_wp
-    ELSEIF ( ( h_minus_eta .LE. hp_dry_tolerance ) .OR.                   &
-       ( h_plus_eta .LE. hp_dry_tolerance ) ) THEN
-       IF ( hydrostatic_residual .GT. hp_dynamic_residual_threshold ) THEN
-        weight = 0.0_wp
-       ELSE
-        weight = 1.0_wp
-       END IF
-    ELSEIF ( ( hydrostatic_residual .GT. hp_dynamic_residual_threshold ) .AND. &
-       ( topographic_relief_ratio .GT. 1.0_wp ) ) THEN
-       weight = 0.0_wp
-    END IF
-
-    END FUNCTION continuity_weight
 
        SUBROUTINE evaluate_hp_cell_x(jc,kc)
 

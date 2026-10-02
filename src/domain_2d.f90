@@ -24,15 +24,19 @@ MODULE domain_2d
 
      LOGICAL, ALLOCATABLE :: solve_mask(:,:)
      LOGICAL, ALLOCATABLE :: solve_mask_temp(:,:)
+     LOGICAL, ALLOCATABLE :: reconstruction_mask(:,:)
      LOGICAL, ALLOCATABLE :: solve_mask_x(:,:)
      LOGICAL, ALLOCATABLE :: solve_mask_y(:,:)
 
      INTEGER :: solve_cells
+     INTEGER :: reconstruction_cells
      INTEGER :: solve_interfaces_x
      INTEGER :: solve_interfaces_y
 
      INTEGER, ALLOCATABLE :: j_cent(:)
      INTEGER, ALLOCATABLE :: k_cent(:)
+     INTEGER, ALLOCATABLE :: j_reconstruction(:)
+     INTEGER, ALLOCATABLE :: k_reconstruction(:)
      INTEGER, ALLOCATABLE :: j_stag_x(:)
      INTEGER, ALLOCATABLE :: k_stag_x(:)
      INTEGER, ALLOCATABLE :: j_stag_y(:)
@@ -55,6 +59,7 @@ CONTAINS
     ALLOCATE( this%solve_mask_time(comp_cells_x,comp_cells_y) )
     ALLOCATE( this%solve_mask(comp_cells_x,comp_cells_y) )
     ALLOCATE( this%solve_mask_temp(comp_cells_x,comp_cells_y) )
+    ALLOCATE( this%reconstruction_mask(comp_cells_x,comp_cells_y) )
     ALLOCATE( this%solve_mask_x(comp_interfaces_x,comp_cells_y) )
     ALLOCATE( this%solve_mask_y(comp_cells_x,comp_interfaces_y) )
 
@@ -62,6 +67,7 @@ CONTAINS
 
     this%solve_mask = .FALSE.
     this%solve_mask_temp = .FALSE.
+    this%reconstruction_mask = .FALSE.
     this%solve_mask_x = .FALSE.
     this%solve_mask_y = .FALSE.
 
@@ -74,17 +80,22 @@ CONTAINS
 
     ALLOCATE( this%j_cent(comp_cells_xy) )
     ALLOCATE( this%k_cent(comp_cells_xy) )
+    ALLOCATE( this%j_reconstruction(comp_cells_xy) )
+    ALLOCATE( this%k_reconstruction(comp_cells_xy) )
     ALLOCATE( this%j_stag_x(comp_interfaces_x*comp_cells_y) )
     ALLOCATE( this%k_stag_x(comp_interfaces_x*comp_cells_y) )
     ALLOCATE( this%j_stag_y(comp_cells_x*comp_interfaces_y) )
     ALLOCATE( this%k_stag_y(comp_cells_x*comp_interfaces_y) )
 
     this%solve_cells = 0
+    this%reconstruction_cells = 0
     this%solve_interfaces_x = 0
     this%solve_interfaces_y = 0
 
     this%j_cent = 0
     this%k_cent = 0
+    this%j_reconstruction = 0
+    this%k_reconstruction = 0
     this%j_stag_x = 0
     this%k_stag_x = 0
     this%j_stag_y = 0
@@ -99,10 +110,12 @@ CONTAINS
     DEALLOCATE( this%solve_mask_time )
     DEALLOCATE( this%solve_mask )
     DEALLOCATE( this%solve_mask_temp )
+    DEALLOCATE( this%reconstruction_mask )
     DEALLOCATE( this%solve_mask_x )
     DEALLOCATE( this%solve_mask_y )
 
     DEALLOCATE( this%j_cent, this%k_cent )
+    DEALLOCATE( this%j_reconstruction, this%k_reconstruction )
     DEALLOCATE( this%j_stag_x, this%k_stag_x )
     DEALLOCATE( this%j_stag_y, this%k_stag_y )
 
@@ -256,6 +269,42 @@ CONTAINS
     END DO
 
     this%solve_cells = i
+
+    ! HP reconstruction reads a two-cell stencil around every evolved cell.
+    ! Keep this read-only halo separate from solve_mask so no additional cells
+    ! are advanced by the time integrator.
+    this%reconstruction_mask = this%solve_mask
+    DO i = 1,2
+       this%solve_mask_temp = this%reconstruction_mask
+       IF ( comp_cells_x .GT. 1 ) THEN
+          this%reconstruction_mask(2:comp_cells_x,:) =                       &
+               this%reconstruction_mask(2:comp_cells_x,:) .OR.              &
+               this%solve_mask_temp(1:comp_cells_x-1,:)
+          this%reconstruction_mask(1:comp_cells_x-1,:) =                     &
+               this%reconstruction_mask(1:comp_cells_x-1,:) .OR.            &
+               this%solve_mask_temp(2:comp_cells_x,:)
+       END IF
+       IF ( comp_cells_y .GT. 1 ) THEN
+          this%reconstruction_mask(:,2:comp_cells_y) =                       &
+               this%reconstruction_mask(:,2:comp_cells_y) .OR.              &
+               this%solve_mask_temp(:,1:comp_cells_y-1)
+          this%reconstruction_mask(:,1:comp_cells_y-1) =                     &
+               this%reconstruction_mask(:,1:comp_cells_y-1) .OR.            &
+               this%solve_mask_temp(:,2:comp_cells_y)
+       END IF
+    END DO
+
+    i = 0
+    DO k = 1,comp_cells_y
+       DO j = 1,comp_cells_x
+          IF ( this%reconstruction_mask(j,k) ) THEN
+             i = i+1
+             this%j_reconstruction(i) = j
+             this%k_reconstruction(i) = k
+          END IF
+       END DO
+    END DO
+    this%reconstruction_cells = i
     
     !----- check for y-interfaces where computation is needed
     i = 0

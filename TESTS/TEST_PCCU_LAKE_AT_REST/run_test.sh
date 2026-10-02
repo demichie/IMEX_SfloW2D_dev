@@ -27,8 +27,11 @@ cp "$test_dir/generate_case.py" "$work_dir/"
 (
     cd "$work_dir"
     python3 generate_case.py
-    "$executable" > run.log
+    OMP_NUM_THREADS=1 "$executable" > run_1_thread.log
+    cp lakeRest_0001.q_2d lakeRest_0001.1thread.q_2d
+    OMP_NUM_THREADS=4 "$executable" > run_4_threads.log
+    cmp lakeRest_0001.1thread.q_2d lakeRest_0001.q_2d
     python3 generate_case.py --check lakeRest_0001.q_2d
 )
 
-echo "PASS: end-to-end PCCU lake at rest preserved to roundoff"
+echo "PASS: end-to-end PCCU lake at rest is thread-reproducible and preserved to roundoff"

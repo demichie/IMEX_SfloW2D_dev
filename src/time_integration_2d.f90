@@ -201,10 +201,10 @@ CONTAINS
 
        !$OMP PARALLEL DO private(j,k,p_dyn)
 
-       DO l = 1,domain%solve_cells
+       DO l = 1,domain%reconstruction_cells
 
-          j = domain%j_cent(l)
-          k = domain%k_cent(l)
+          j = domain%j_reconstruction(l)
+          k = domain%k_reconstruction(l)
 
           IF ( q(1,j,k) .GT. 0.0_wp ) THEN
 
@@ -360,9 +360,21 @@ CONTAINS
     
     IF ( verbose_level .GE. 1 ) WRITE(*,*) 'solver, imex_RK_solver: beginning'
 
-    !$OMP PARALLEL
- 
-    !$OMP DO private(j,k)
+    !$OMP PARALLEL PRIVATE(j,k)
+
+    ! The HP stencil reads two cells beyond solve_cells. Initialize its
+    ! read-only halo to the physical dry state before active stages overwrite
+    ! their own primitive variables.
+    !$OMP DO
+    DO l = 1,domain%reconstruction_cells
+       j = domain%j_reconstruction(l)
+       k = domain%k_reconstruction(l)
+       this%qp_rk(:,j,k) = 0.0_wp
+       this%qp_rk(4,j,k) = T_ambient
+    END DO
+    !$OMP END DO
+
+    !$OMP DO
     DO l = 1,domain%solve_cells
 
        j = domain%j_cent(l)
@@ -377,10 +389,6 @@ CONTAINS
 
        ! Initialization of the variables for the Runge-Kutta scheme
        this%q_rk( 1:n_vars , j , k ) = 0.0_wp
-       this%qp_rk( 1:n_vars+2 , j , k ) = 0.0_wp
-       this%qp_rk( 4 , j , k ) = T_ambient
-       
-
        this%divFlux(1:n_eqns , j , k , 1:n_RK ) = 0.0_wp
        this%NH( 1:n_eqns, j , k , 1:n_RK ) = 0.0_wp
        this%SI_NH( 1:n_eqns , j , k , 1:n_RK ) = 0.0_wp
@@ -390,16 +398,6 @@ CONTAINS
     !$OMP END DO
 
     !$OMP END PARALLEL
-
-this%q_rk(:,:,:) = 0.0_wp
-
-this%qp_rk(:,:,:) = 0.0_wp
-this%qp_rk(4,:,:) = T_ambient
-
-this%divFlux(:,:,:,:) = 0.0_wp
-this%NH(:,:,:,:) = 0.0_wp
-this%SI_NH(:,:,:,:) = 0.0_wp
-this%expl_terms(:,:,:,:) = 0.0_wp
 
     runge_kutta:DO i_RK = 1,n_RK
 
@@ -696,8 +694,7 @@ this%expl_terms(:,:,:,:) = 0.0_wp
        IF ( need_explicit_stage ) THEN
 
           ! Eval and store the explicit hyperbolic (fluxes) terms
-          CALL hyper%evaluate_terms( recon,                                   &
-               this%q_rk , this%qp_rk ,                                      &
+          CALL hyper%evaluate_terms( recon, this%qp_rk,                       &
                this%divFlux(1:n_eqns,1:comp_cells_x,1:comp_cells_y,i_RK), t,  &
                domain%solve_cells, domain%j_cent, domain%k_cent,              &
                domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,  &

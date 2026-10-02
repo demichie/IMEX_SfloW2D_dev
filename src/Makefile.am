@@ -48,7 +48,87 @@ state_conversion_2d.$(OBJEXT): state_conversion_phys_var.inc                  \
                                mixture_heat_capacity.inc                      \
                                mixture_from_mass.inc
 
-FCFLAGS         = -fopenmp -Ofast -funroll-all-loops -I@NETCDF@/include -lnetcdff
+lapack_interfaces_2d.$(OBJEXT): parameters_2d.$(OBJEXT)
+constitutive_parameters_2d.$(OBJEXT): parameters_2d.$(OBJEXT)
+runtime_2d.$(OBJEXT): parameters_2d.$(OBJEXT)
+complexify.$(OBJEXT): parameters_2d.$(OBJEXT)
+geometry_2d.$(OBJEXT): parameters_2d.$(OBJEXT)
+state_conversion_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                         \
+                               constitutive_parameters_2d.$(OBJEXT)
+equation_terms_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                           \
+                             constitutive_parameters_2d.$(OBJEXT)              \
+                             diagnostics_2d.$(OBJEXT)                          \
+                             equation_metadata_2d.$(OBJEXT)                    \
+                             complexify.$(OBJEXT) geometry_2d.$(OBJEXT)        \
+                             state_conversion_2d.$(OBJEXT)
+nonconservative_2d.$(OBJEXT): parameters_2d.$(OBJEXT)
+pccu_2d.$(OBJEXT): parameters_2d.$(OBJEXT) nonconservative_2d.$(OBJEXT)
+domain_2d.$(OBJEXT): parameters_2d.$(OBJEXT) geometry_2d.$(OBJEXT)
+constitutive_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                             \
+                           constitutive_parameters_2d.$(OBJEXT)                \
+                           equation_metadata_2d.$(OBJEXT)                      \
+                           equation_terms_2d.$(OBJEXT)                         \
+                           state_conversion_2d.$(OBJEXT)
+state_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                                   \
+                    constitutive_parameters_2d.$(OBJEXT)                      \
+                    geometry_2d.$(OBJEXT) model_layout_2d.$(OBJEXT)
+mass_exchange_2d.$(OBJEXT): parameters_2d.$(OBJEXT) diagnostics_2d.$(OBJEXT)  \
+                            domain_2d.$(OBJEXT) equation_terms_2d.$(OBJEXT)    \
+                            geometry_2d.$(OBJEXT) state_conversion_2d.$(OBJEXT)
+nonlinear_solver_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                        \
+                               diagnostics_2d.$(OBJEXT)                       \
+                               equation_metadata_2d.$(OBJEXT)                 \
+                               equation_terms_2d.$(OBJEXT)                    \
+                               lapack_interfaces_2d.$(OBJEXT)
+hp_reconstruction_2d.$(OBJEXT): parameters_2d.$(OBJEXT) geometry_2d.$(OBJEXT)
+reconstruction_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                          \
+                              constitutive_parameters_2d.$(OBJEXT)             \
+                              equation_terms_2d.$(OBJEXT) geometry_2d.$(OBJEXT)\
+                              hp_reconstruction_2d.$(OBJEXT)                   \
+                              state_conversion_2d.$(OBJEXT)
+hyperbolic_2d.$(OBJEXT): parameters_2d.$(OBJEXT) equation_terms_2d.$(OBJEXT)  \
+                          geometry_2d.$(OBJEXT) hp_reconstruction_2d.$(OBJEXT) \
+                          nonconservative_2d.$(OBJEXT) pccu_2d.$(OBJEXT)       \
+                          reconstruction_2d.$(OBJEXT)
+time_integration_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                        \
+                               constitutive_parameters_2d.$(OBJEXT)           \
+                               diagnostics_2d.$(OBJEXT) domain_2d.$(OBJEXT)   \
+                               equation_metadata_2d.$(OBJEXT)                 \
+                               equation_terms_2d.$(OBJEXT) geometry_2d.$(OBJEXT)\
+                               hyperbolic_2d.$(OBJEXT)                         \
+                               nonlinear_solver_2d.$(OBJEXT)                  \
+                               reconstruction_2d.$(OBJEXT)                    \
+                               state_conversion_2d.$(OBJEXT)
+stochastic_random_2d.$(OBJEXT): parameters_2d.$(OBJEXT)
+stochastic_module.$(OBJEXT): parameters_2d.$(OBJEXT) domain_2d.$(OBJEXT)     \
+                              geometry_2d.$(OBJEXT) state_2d.$(OBJEXT)        \
+                              stochastic_random_2d.$(OBJEXT)
+simulation_2d.$(OBJEXT): parameters_2d.$(OBJEXT) domain_2d.$(OBJEXT)          \
+                          equation_metadata_2d.$(OBJEXT)                      \
+                          equation_terms_2d.$(OBJEXT) hyperbolic_2d.$(OBJEXT) \
+                          model_layout_2d.$(OBJEXT)                           \
+                          nonlinear_solver_2d.$(OBJEXT)                       \
+                          reconstruction_2d.$(OBJEXT) runtime_2d.$(OBJEXT)    \
+                          state_2d.$(OBJEXT) stochastic_module.$(OBJEXT)      \
+                          time_integration_2d.$(OBJEXT)
+init_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                                   \
+                    constitutive_parameters_2d.$(OBJEXT) geometry_2d.$(OBJEXT)\
+                    state_2d.$(OBJEXT) state_conversion_2d.$(OBJEXT)
+inpout_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                                 \
+                      constitutive_parameters_2d.$(OBJEXT)                    \
+                      diagnostics_2d.$(OBJEXT) domain_2d.$(OBJEXT)            \
+                      geometry_2d.$(OBJEXT) init_2d.$(OBJEXT)                 \
+                      runtime_2d.$(OBJEXT) state_2d.$(OBJEXT)                 \
+                      state_conversion_2d.$(OBJEXT)                           \
+                      stochastic_module.$(OBJEXT)                             \
+                      stochastic_random_2d.$(OBJEXT)
+IMEX_SfloW2D.$(OBJEXT): parameters_2d.$(OBJEXT)                              \
+                         constitutive_parameters_2d.$(OBJEXT)                 \
+                         geometry_2d.$(OBJEXT) init_2d.$(OBJEXT)              \
+                         inpout_2d.$(OBJEXT) mass_exchange_2d.$(OBJEXT)       \
+                         simulation_2d.$(OBJEXT) state_conversion_2d.$(OBJEXT)
+
+AM_FCFLAGS      = -fopenmp -I@NETCDF@/include
 FCDEBUGFLAGS    = -Wall -g
 
 LIBS            = -lm -llapack -L@NETCDF@/lib -lnetcdff 

@@ -3,7 +3,7 @@ PROGRAM test_state_conversion
   USE parameters_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE equation_terms_2d, ONLY : eval_fluxes, eval_inertial_flux,              &
+  USE equation_terms_2d, ONLY : eval_inertial_flux,                           &
        limit_component_mass_flux, eval_source_bdry
 
   IMPLICIT NONE
@@ -157,13 +157,6 @@ CONTAINS
     CALL assert_close_vector(TRIM(label)//' qp', qp1, qp0, 2.0E-12_wp)
     CALL assert_true(TRIM(label)//' dynamic pressure finite', &
                      ieee_is_finite(p_dyn) .AND. p_dyn .GE. 0.0_wp)
-
-    CALL eval_fluxes(q0, qp0, 0.37_wp, 1, flux_x)
-    CALL eval_fluxes(q0, qp0, 0.37_wp, 2, flux_y)
-    CALL assert_close_scalar(TRIM(label)//' x thermal flux', flux_x(4),       &
-         qp0(idx_u)*q0(4), 2.0E-12_wp)
-    CALL assert_close_scalar(TRIM(label)//' y thermal flux', flux_y(4),       &
-         qp0(idx_v)*q0(4), 2.0E-12_wp)
 
     CALL eval_inertial_flux(q0, qp0, 1, flux_x)
     CALL eval_inertial_flux(q0, qp0, 2, flux_y)

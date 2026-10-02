@@ -1930,6 +1930,12 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 # check if the source folder is available
 
 
+# Preserve the historical optimized default without overriding FCFLAGS supplied
+# by the user at configure time.
+if test -z "$FCFLAGS"; then
+  FCFLAGS="-Ofast -funroll-all-loops"
+fi
+
 # check for fortran compiler
 ac_ext=${ac_fc_srcext-f}
 ac_compile='$FC -c $FCFLAGS $ac_fcflags_srcext conftest.$ac_ext >&5'
