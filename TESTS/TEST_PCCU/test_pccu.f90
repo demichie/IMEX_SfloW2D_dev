@@ -9,10 +9,11 @@ PROGRAM test_pccu
   IMPLICIT NONE
 
   CALL check_hydrostatic_path
+  CALL check_slope_corrected_path
   CALL check_oriented_identity
   CALL check_degenerate_pair
 
-  WRITE(*,*) 'PASS: G=1 HP-PCCU algebra verified'
+  WRITE(*,*) 'PASS: slope-corrected HP-PCCU algebra verified'
 
 CONTAINS
 
@@ -29,8 +30,10 @@ CONTAINS
     etaL = 2.4_wp
     etaR = 2.9_wp
 
-    CALL eval_hydrostatic_path(PATH_DIR_X,hL,gammaL,etaL,hR,gammaR,etaR,path_x)
-    CALL eval_hydrostatic_path(PATH_DIR_Y,hL,gammaL,etaL,hR,gammaR,etaR,path_y)
+    CALL eval_hydrostatic_path(PATH_DIR_X,hL,gammaL,etaL,1.0_wp,             &
+         hR,gammaR,etaR,1.0_wp,path_x)
+    CALL eval_hydrostatic_path(PATH_DIR_Y,hL,gammaL,etaL,1.0_wp,             &
+         hR,gammaR,etaR,1.0_wp,path_y)
 
     mean_h_squared = (hL*hL+hL*hR+hR*hR)/3.0_wp
     expected = -(etaR-etaL) * ( gammaL*hL                            &
@@ -50,6 +53,52 @@ CONTAINS
     CALL assert_small('thermal path component y',ABS(path_y(4)),0.0_wp)
 
   END SUBROUTINE check_hydrostatic_path
+
+  SUBROUTINE check_slope_corrected_path
+
+    REAL(wp) :: path_face(6), path_cell(6)
+    REAL(wp) :: hL, hR, gammaL, gammaR, etaL, etaR, GL, GR
+    REAL(wp) :: dh, d_gamma, d_eta, dG, expected, tolerance
+    REAL(wp) :: p0, p1, p2, p3, q0, q1, q2, q3
+
+    hL = 0.8_wp
+    hR = 1.7_wp
+    gammaL = 8700.0_wp
+    gammaR = 9400.0_wp
+    etaL = 2.2_wp
+    etaR = 3.1_wp
+    GL = 0.35_wp
+    GR = 0.75_wp
+    dh = hR-hL
+    d_gamma = gammaR-gammaL
+    d_eta = etaR-etaL
+    dG = GR-GL
+
+    CALL eval_hydrostatic_path(PATH_DIR_X,hL,gammaL,etaL,GL,                &
+         hR,gammaL,etaR,GL,path_face)
+    expected = -GL*gammaL*d_eta*(hL+0.5_wp*dh)
+    tolerance = 2048.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,ABS(expected))
+    CALL assert_small('constant-G face path',ABS(path_face(2)-expected),tolerance)
+
+    CALL eval_hydrostatic_path(PATH_DIR_X,hL,gammaL,etaL,GL,                &
+         hR,gammaR,etaR,GR,path_cell)
+    p0 = GL*gammaL*hL
+    p1 = dG*gammaL*hL + GL*d_gamma*hL + GL*gammaL*dh
+    p2 = dG*d_gamma*hL + dG*gammaL*dh + GL*d_gamma*dh
+    p3 = dG*d_gamma*dh
+    q0 = GL*hL*hL
+    q1 = 2.0_wp*GL*hL*dh + dG*hL*hL
+    q2 = GL*dh*dh + 2.0_wp*dG*hL*dh
+    q3 = dG*dh*dh
+    expected = -d_eta*(p0+0.5_wp*p1+p2/3.0_wp+0.25_wp*p3)                  &
+         -0.5_wp*d_gamma*(q0+0.5_wp*q1+q2/3.0_wp+0.25_wp*q3)
+    tolerance = 2048.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,ABS(expected))
+    CALL assert_small('linearly varying-G cell path',                       &
+         ABS(path_cell(2)-expected),tolerance)
+    CALL assert_small('slope path non-normal components',                   &
+         MAXVAL(ABS(path_cell([1,3,4,5,6]))),tolerance)
+
+  END SUBROUTINE check_slope_corrected_path
 
   SUBROUTINE check_oriented_identity
 

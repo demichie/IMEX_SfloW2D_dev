@@ -38,28 +38,40 @@ cp "$example_dir/create_example.py" "$example_dir/IMEX_SfloW2D.template" "$work_
     cp inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.1thread.q_2d
     OMP_NUM_THREADS=4 "$executable" > run_4_threads.log
     cmp inclinedExcavation2D_0001.1thread.q_2d inclinedExcavation2D_0001.q_2d
+    cp inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.G1.q_2d
+
+    sed -i.bak -e 's/SLOPE_CORRECTION_FLAG=F/SLOPE_CORRECTION_FLAG=T/' \
+        IMEX_SfloW2D.inp
+    rm -f inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.1thread.q_2d
+    OMP_NUM_THREADS=1 "$executable" > run_slope_1_thread.log
+    cp inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.1thread.q_2d
+    OMP_NUM_THREADS=4 "$executable" > run_slope_4_threads.log
+    cmp inclinedExcavation2D_0001.1thread.q_2d inclinedExcavation2D_0001.q_2d
+    cp inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.slope.q_2d
+
     python3 - <<'PY'
 import numpy as np
 
-state = np.loadtxt("inclinedExcavation2D_0001.q_2d")
-x, y, mass = state[:, 0], state[:, 1], state[:, 2]
-regions = {
-    "uphill": x < 10.0,
-    "south": (y < -5.0) & (x >= 10.0) & (x < 20.0),
-    "north": (y >= 5.0) & (x >= 10.0) & (x < 20.0),
-    "downhill": x >= 20.0,
-}
-outside = {name: float(np.sum(mass[mask])) for name, mask in regions.items()}
-total = float(np.sum(mass))
-relative_outside = sum(abs(value) for value in outside.values()) / max(total, 1.0)
-if np.min(mass) < -1.0e-12 or relative_outside > 2.0e-12:
-    raise SystemExit(
-        f"inclined-excavation leakage: regions={outside}, "
-        f"relative={relative_outside:.3e}, min_mass={np.min(mass):.3e}"
-    )
-print(f"outside masses [kg]: {outside}")
-print(f"relative outside mass: {relative_outside:.3e}")
+for label in ("G1", "slope"):
+    state = np.loadtxt(f"inclinedExcavation2D_0001.{label}.q_2d")
+    x, y, mass = state[:, 0], state[:, 1], state[:, 2]
+    regions = {
+        "uphill": x < 10.0,
+        "south": (y < -5.0) & (x >= 10.0) & (x < 20.0),
+        "north": (y >= 5.0) & (x >= 10.0) & (x < 20.0),
+        "downhill": x >= 20.0,
+    }
+    outside = {name: float(np.sum(mass[mask])) for name, mask in regions.items()}
+    total = float(np.sum(mass))
+    relative_outside = sum(abs(value) for value in outside.values()) / max(total, 1.0)
+    if np.min(mass) < -1.0e-12 or relative_outside > 2.0e-12:
+        raise SystemExit(
+            f"{label} inclined-excavation leakage: regions={outside}, "
+            f"relative={relative_outside:.3e}, min_mass={np.min(mass):.3e}"
+        )
+    print(f"{label} outside masses [kg]: {outside}")
+    print(f"{label} relative outside mass: {relative_outside:.3e}")
 PY
 )
 
-echo "PASS: thread-reproducible run with no resolved uphill/lateral transport across the Q1 excavation crest"
+echo "PASS: G=1 and slope-corrected runs are thread-reproducible with no resolved uphill/lateral transport across the Q1 excavation crest"

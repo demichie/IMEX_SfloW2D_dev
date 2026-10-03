@@ -1,10 +1,10 @@
 !********************************************************************************
 !> \brief Path-conservative central-upwind algebra
 !>
-!> This module contains the model-independent G=1 PCCU building blocks.  The
-!> thermodynamic endpoint coefficient Gamma is supplied by equation_terms_2d;
-!> this module only integrates the hydrostatic one-form and builds the oriented
-!> face pair.
+!> This module contains the model-independent PCCU building blocks.  The
+!> thermodynamic endpoint coefficient Gamma and the slope coefficient G are
+!> supplied by the caller; this module integrates the slope-corrected
+!> hydrostatic one-form and builds the oriented face pair.
 !********************************************************************************
 MODULE pccu_2d
 
@@ -25,24 +25,28 @@ MODULE pccu_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Integrate the G=1 hydrostatic path between two endpoint states
+  !> \brief Integrate the slope-corrected hydrostatic path between endpoints
   !>
   !> The returned vector is zero except in the momentum component normal to the
   !> selected direction.  In particular, the thermal component is identically
-  !> zero by construction.
+  !> zero by construction.  A face path passes the same shared G at both
+  !> endpoints; a cell-internal path passes its two shared face values so that
+  !> G varies linearly along the quadrature path.  The integrated one-form is
+  !> -G*(Gamma*h*deta + 0.5*h**2*dGamma).
   !******************************************************************************
   SUBROUTINE eval_hydrostatic_path( direction, h_left, gamma_left, eta_left,   &
-       h_right, gamma_right, eta_right, path_contribution )
+       grav_coeff_left, h_right, gamma_right, eta_right, grav_coeff_right,    &
+       path_contribution )
 
     INTEGER, INTENT(IN) :: direction
-    REAL(wp), INTENT(IN) :: h_left, gamma_left, eta_left
-    REAL(wp), INTENT(IN) :: h_right, gamma_right, eta_right
+    REAL(wp), INTENT(IN) :: h_left, gamma_left, eta_left, grav_coeff_left
+    REAL(wp), INTENT(IN) :: h_right, gamma_right, eta_right, grav_coeff_right
     REAL(wp), INTENT(OUT) :: path_contribution(:)
 
-    REAL(wp) :: state_left(3), state_right(3)
+    REAL(wp) :: state_left(4), state_right(4)
 
-    state_left = [ h_left, gamma_left, eta_left ]
-    state_right = [ h_right, gamma_right, eta_right ]
+    state_left = [ h_left, gamma_left, eta_left, grav_coeff_left ]
+    state_right = [ h_right, gamma_right, eta_right, grav_coeff_right ]
 
     CALL eval_path_contribution( direction, state_left, state_right,          &
          hydrostatic_integrand, path_contribution, n_quad=3 )
@@ -115,11 +119,11 @@ CONTAINS
     REAL(wp), INTENT(IN) :: path_state(:), dstate_ds(:)
     REAL(wp), INTENT(OUT) :: integrand(:)
 
-    REAL(wp) :: h, gamma
+    REAL(wp) :: h, gamma, grav_coeff
     INTEGER :: normal_momentum
 
-    IF ( SIZE(path_state) .NE. 3 .OR. SIZE(dstate_ds) .NE. 3 ) THEN
-       ERROR STOP 'hydrostatic_integrand: expected state (h,Gamma,eta)'
+    IF ( SIZE(path_state) .NE. 4 .OR. SIZE(dstate_ds) .NE. 4 ) THEN
+       ERROR STOP 'hydrostatic_integrand: expected state (h,Gamma,eta,G)'
     END IF
 
     SELECT CASE ( direction )
@@ -137,8 +141,9 @@ CONTAINS
 
     h = path_state(1)
     gamma = path_state(2)
+    grav_coeff = path_state(4)
     integrand = 0.0_wp
-    integrand(normal_momentum) = -( gamma*h*dstate_ds(3)                     &
+    integrand(normal_momentum) = -grav_coeff * ( gamma*h*dstate_ds(3)        &
          + 0.5_wp*h*h*dstate_ds(2) )
 
   END SUBROUTINE hydrostatic_integrand

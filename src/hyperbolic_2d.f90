@@ -179,7 +179,7 @@ CONTAINS
   END SUBROUTINE eval_hyperbolic_terms
 
   !******************************************************************************
-  !> \brief Evaluate the G=1 HP-PCCU oriented face values
+  !> \brief Evaluate the slope-corrected HP-PCCU oriented face values
   !>
   !> The conservative endpoint flux is purely inertial.  Hydrostatic pressure
   !> and bed geometry enter only through the path contribution used to form the
@@ -250,8 +250,10 @@ CONTAINS
                recon%qp_interfaceR(1,j,k), gamma_right )
           CALL eval_hydrostatic_path( PATH_DIR_X,                            &
                recon%qp_interfaceL(1,j,k), gamma_left,                       &
-               recon%eta_interfaceL(j,k), recon%qp_interfaceR(1,j,k),        &
-               gamma_right, recon%eta_interfaceR(j,k), path_contribution )
+               recon%eta_interfaceL(j,k), grav_coeff_stag_x(j,k),            &
+               recon%qp_interfaceR(1,j,k), gamma_right,                      &
+               recon%eta_interfaceR(j,k), grav_coeff_stag_x(j,k),            &
+               path_contribution )
 
           this%P_interface_x(:,j,k) = path_contribution
           CALL eval_oriented_pccu_pair( this%H_interface_x(:,j,k),           &
@@ -300,8 +302,10 @@ CONTAINS
                recon%qp_interfaceT(1,j,k), gamma_right )
           CALL eval_hydrostatic_path( PATH_DIR_Y,                            &
                recon%qp_interfaceB(1,j,k), gamma_left,                       &
-               recon%eta_interfaceB(j,k), recon%qp_interfaceT(1,j,k),        &
-               gamma_right, recon%eta_interfaceT(j,k), path_contribution )
+               recon%eta_interfaceB(j,k), grav_coeff_stag_y(j,k),            &
+               recon%qp_interfaceT(1,j,k), gamma_right,                      &
+               recon%eta_interfaceT(j,k), grav_coeff_stag_y(j,k),            &
+               path_contribution )
 
           this%P_interface_y(:,j,k) = path_contribution
           CALL eval_oriented_pccu_pair( this%H_interface_y(:,j,k),           &
@@ -352,8 +356,10 @@ CONTAINS
                recon%qp_interfaceL(1,j+1,k), gamma_plus )
           CALL eval_hydrostatic_path( PATH_DIR_X,                            &
                recon%qp_interfaceR(1,j,k), gamma_minus,                      &
-               recon%eta_cellW(j,k), recon%qp_interfaceL(1,j+1,k),           &
-               gamma_plus, recon%eta_cellE(j,k), this%P_cell_x(:,j,k) )
+               recon%eta_cellW(j,k), grav_coeff_stag_x(j,k),                 &
+               recon%qp_interfaceL(1,j+1,k), gamma_plus,                     &
+               recon%eta_cellE(j,k), grav_coeff_stag_x(j+1,k),               &
+               this%P_cell_x(:,j,k) )
        END IF
 
        IF ( comp_cells_y .GT. 1 ) THEN
@@ -365,8 +371,10 @@ CONTAINS
                recon%qp_interfaceB(1,j,k+1), gamma_plus )
           CALL eval_hydrostatic_path( PATH_DIR_Y,                            &
                recon%qp_interfaceT(1,j,k), gamma_minus,                      &
-               recon%eta_cellS(j,k), recon%qp_interfaceB(1,j,k+1),           &
-               gamma_plus, recon%eta_cellN(j,k), this%P_cell_y(:,j,k) )
+               recon%eta_cellS(j,k), grav_coeff_stag_y(j,k),                 &
+               recon%qp_interfaceB(1,j,k+1), gamma_plus,                     &
+               recon%eta_cellN(j,k), grav_coeff_stag_y(j,k+1),               &
+               this%P_cell_y(:,j,k) )
        END IF
 
     END DO
@@ -440,10 +448,10 @@ CONTAINS
           k = k_stag_x(l)
 
           CALL eval_local_speeds_x( recon%qp_interfaceL(:,j,k) ,             &
-               1.0_wp, abslambdaL_min , abslambdaL_max )
+               grav_coeff_stag_x(j,k), abslambdaL_min , abslambdaL_max )
 
           CALL eval_local_speeds_x( recon%qp_interfaceR(:,j,k) ,             &
-               1.0_wp, abslambdaR_min , abslambdaR_max )
+               grav_coeff_stag_x(j,k), abslambdaR_min , abslambdaR_max )
 
           min_r = MIN(abslambdaL_min , abslambdaR_min , 0.0_wp)
           max_r = MAX(abslambdaL_max , abslambdaR_max , 0.0_wp)
@@ -468,10 +476,10 @@ CONTAINS
           k = k_stag_y(l)
 
           CALL eval_local_speeds_y( recon%qp_interfaceB(:,j,k) ,             &
-               1.0_wp, abslambdaB_min , abslambdaB_max )
+               grav_coeff_stag_y(j,k), abslambdaB_min , abslambdaB_max )
           
           CALL eval_local_speeds_y( recon%qp_interfaceT(:,j,k) ,             &
-               1.0_wp, abslambdaT_min , abslambdaT_max )
+               grav_coeff_stag_y(j,k), abslambdaT_min , abslambdaT_max )
 
           min_r = MIN(abslambdaB_min , abslambdaT_min , 0.0_wp)
           max_r = MAX(abslambdaB_max , abslambdaT_max , 0.0_wp)

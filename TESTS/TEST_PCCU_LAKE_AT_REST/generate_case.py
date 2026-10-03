@@ -15,15 +15,32 @@ TEMP = 300.0
 ETA0 = 6.0
 
 
-def bed(x, y):
-    return 1.3 + 0.07 * x - 0.045 * y
+def bed(x, y, bed_mode):
+    if bed_mode == "planar":
+        return 1.3 + 0.07 * x - 0.045 * y
+    if bed_mode == "one-cell":
+        # A steep continuous transition sampled by the input DEM.
+        ramp_x = np.clip(x - 5.0, 0.0, 1.0)
+        ramp_y = np.clip(y - 3.0, 0.0, 1.0)
+        return 1.0 + 1.8 * ramp_x + 1.2 * ramp_y
+    raise ValueError(f"unknown bed mode {bed_mode}")
 
 
-def write_case():
+def write_case(slope_correction=False, bed_mode="planar"):
     x = X0 + (np.arange(NX) + 0.5) * DX
     y = Y0 + (np.arange(NY) + 0.5) * DX
     X, Y = np.meshgrid(x, y)
-    h = ETA0 - bed(X, Y)
+    xd = X0 - 0.5 * DX + np.arange(NX + 2) * DX
+    yd = Y0 - 0.5 * DX + np.arange(NY + 2) * DX
+    Xd, Yd = np.meshgrid(xd, yd)
+    dem = bed(Xd, Yd, bed_mode)
+
+    # Match the solver's DEM -> vertex -> Q1 cell-centre construction exactly.
+    bed_vertex = 0.25 * (dem[:-1, :-1] + dem[:-1, 1:] +
+                         dem[1:, :-1] + dem[1:, 1:])
+    bed_center = 0.25 * (bed_vertex[:-1, :-1] + bed_vertex[:-1, 1:] +
+                         bed_vertex[1:, :-1] + bed_vertex[1:, 1:])
+    h = ETA0 - bed_center
 
     initial = np.zeros((NX * NY, 6))
     initial[:, 0] = X.ravel()
@@ -35,12 +52,8 @@ def write_case():
             start = row * NX
             np.savetxt(stream, initial[start:start + NX], fmt="%19.12e")
             stream.write(" \n")
-    np.save("lake_rest_reference.npy", initial)
+    np.save(f"lake_rest_reference_{bed_mode}.npy", initial)
 
-    xd = X0 - 0.5 * DX + np.arange(NX + 2) * DX
-    yd = Y0 - 0.5 * DX + np.arange(NY + 2) * DX
-    Xd, Yd = np.meshgrid(xd, yd)
-    dem = bed(Xd, Yd)
     header = (
         f"ncols {NX + 2}\n"
         f"nrows {NY + 2}\n"
@@ -71,7 +84,7 @@ def write_case():
  N_SOLID=0, N_ADD_GAS=0,
  RHEOLOGY_FLAG=F, GAS_FLAG=F, LIQUID_FLAG=T,
  RADIAL_SOURCE_FLAG=F, COLLAPSING_VOLUME_FLAG=F,
- TOPO_CHANGE_FLAG=F, SLOPE_CORRECTION_FLAG=F,
+ TOPO_CHANGE_FLAG=F, SLOPE_CORRECTION_FLAG={'T' if slope_correction else 'F'},
  CURVATURE_TERM_FLAG=F,
  /
 &RESTART_PARAMETERS
@@ -127,8 +140,8 @@ def write_case():
 """)
 
 
-def check_case(output_name):
-    reference = np.load("lake_rest_reference.npy")
+def check_case(output_name, bed_mode="planar"):
+    reference = np.load(f"lake_rest_reference_{bed_mode}.npy")
     result = np.loadtxt(output_name)
     if result.shape != reference.shape:
         raise SystemExit(f"unexpected output shape {result.shape}")
@@ -154,8 +167,11 @@ def check_case(output_name):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", metavar="OUTPUT")
+    parser.add_argument("--slope-correction", action="store_true")
+    parser.add_argument("--bed-mode", choices=("planar", "one-cell"),
+                        default="planar")
     args = parser.parse_args()
     if args.check:
-        check_case(args.check)
+        check_case(args.check, args.bed_mode)
     else:
-        write_case()
+        write_case(args.slope_correction, args.bed_mode)

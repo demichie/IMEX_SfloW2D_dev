@@ -44,13 +44,13 @@ PROGRAM test_hydrostatic_path
         h_minus = H0-B_face_x(j,k)
         h_plus = H0-B_face_x(j+1,k)
         CALL eval_hydrostatic_path(PATH_DIR_X,h_minus,gamma0,H0,            &
-             h_plus,gamma0,H0,path)
+             0.63_wp,h_plus,gamma0,H0,0.41_wp,path)
         max_cell_error = MAX(max_cell_error,MAXVAL(ABS(path)))
 
         h_minus = H0-B_face_y(j,k)
         h_plus = H0-B_face_y(j,k+1)
         CALL eval_hydrostatic_path(PATH_DIR_Y,h_minus,gamma0,H0,            &
-             h_plus,gamma0,H0,path)
+             0.29_wp,h_plus,gamma0,H0,0.77_wp,path)
         max_cell_error = MAX(max_cell_error,MAXVAL(ABS(path)))
      END DO
   END DO
@@ -59,9 +59,9 @@ PROGRAM test_hydrostatic_path
   CALL assert_small('lake-at-rest cell paths',max_cell_error,tolerance)
 
   CALL eval_hydrostatic_path(PATH_DIR_X,1.2_wp,8.5E3_wp,2.4_wp,            &
-       0.7_wp,9.1E3_wp,2.9_wp,path)
+       0.37_wp,0.7_wp,9.1E3_wp,2.9_wp,0.81_wp,path)
   CALL eval_hydrostatic_path(PATH_DIR_X,0.7_wp,9.1E3_wp,2.9_wp,            &
-       1.2_wp,8.5E3_wp,2.4_wp,reverse_path)
+       0.81_wp,1.2_wp,8.5E3_wp,2.4_wp,0.37_wp,reverse_path)
   tolerance = 4096.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,MAXVAL(ABS(path)))
   CALL assert_small('path antisymmetry',MAXVAL(ABS(path+reverse_path)),tolerance)
   CALL assert_small('thermal path component',ABS(path(4)),0.0_wp)
