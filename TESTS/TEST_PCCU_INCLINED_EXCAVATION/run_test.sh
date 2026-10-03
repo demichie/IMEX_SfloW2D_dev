@@ -49,10 +49,20 @@ cp "$example_dir/create_example.py" "$example_dir/IMEX_SfloW2D.template" "$work_
     cmp inclinedExcavation2D_0001.1thread.q_2d inclinedExcavation2D_0001.q_2d
     cp inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.slope.q_2d
 
+    sed -i.bak -e 's/CURVATURE_TERM_FLAG=F/CURVATURE_TERM_FLAG=T/' \
+        IMEX_SfloW2D.inp
+    rm -f inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.1thread.q_2d
+    OMP_NUM_THREADS=1 "$executable" > run_slope_curvature_1_thread.log
+    cp inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.1thread.q_2d
+    OMP_NUM_THREADS=4 "$executable" > run_slope_curvature_4_threads.log
+    cmp inclinedExcavation2D_0001.1thread.q_2d inclinedExcavation2D_0001.q_2d
+    cp inclinedExcavation2D_0001.q_2d \
+        inclinedExcavation2D_0001.slope_curvature.q_2d
+
     python3 - <<'PY'
 import numpy as np
 
-for label in ("G1", "slope"):
+for label in ("G1", "slope", "slope_curvature"):
     state = np.loadtxt(f"inclinedExcavation2D_0001.{label}.q_2d")
     x, y, mass = state[:, 0], state[:, 1], state[:, 2]
     regions = {
@@ -74,4 +84,4 @@ for label in ("G1", "slope"):
 PY
 )
 
-echo "PASS: G=1 and slope-corrected runs are thread-reproducible with no resolved uphill/lateral transport across the Q1 excavation crest"
+echo "PASS: G=1, slope, and slope-plus-curvature runs are thread-reproducible with no resolved uphill/lateral transport across the Q1 excavation crest"

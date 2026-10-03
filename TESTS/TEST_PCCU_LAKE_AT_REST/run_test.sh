@@ -26,28 +26,34 @@ cp "$test_dir/generate_case.py" "$work_dir/"
 
 (
     cd "$work_dir"
-    python3 generate_case.py
-    OMP_NUM_THREADS=1 "$executable" > run_1_thread.log
-    cp lakeRest_0001.q_2d lakeRest_0001.1thread.q_2d
-    OMP_NUM_THREADS=4 "$executable" > run_4_threads.log
-    cmp lakeRest_0001.1thread.q_2d lakeRest_0001.q_2d
-    python3 generate_case.py --check lakeRest_0001.q_2d
 
-    rm -f lakeRest_0001.q_2d lakeRest_0001.1thread.q_2d
-    python3 generate_case.py --slope-correction
-    OMP_NUM_THREADS=1 "$executable" > run_slope_1_thread.log
-    cp lakeRest_0001.q_2d lakeRest_0001.1thread.q_2d
-    OMP_NUM_THREADS=4 "$executable" > run_slope_4_threads.log
-    cmp lakeRest_0001.1thread.q_2d lakeRest_0001.q_2d
-    python3 generate_case.py --check lakeRest_0001.q_2d
+    run_case() {
+        label=$1
+        bed_mode=$2
+        shift 2
+        rm -f lakeRest_0001.q_2d lakeRest_0001.1thread.q_2d
+        python3 generate_case.py --bed-mode "$bed_mode" "$@"
+        OMP_NUM_THREADS=1 "$executable" > "run_${label}_1_thread.log"
+        cp lakeRest_0001.q_2d lakeRest_0001.1thread.q_2d
+        OMP_NUM_THREADS=4 "$executable" > "run_${label}_4_threads.log"
+        cmp lakeRest_0001.1thread.q_2d lakeRest_0001.q_2d
+        python3 generate_case.py --check lakeRest_0001.q_2d \
+            --bed-mode "$bed_mode"
+        cp lakeRest_0001.q_2d "lakeRest_${label}.q_2d"
+    }
 
-    rm -f lakeRest_0001.q_2d lakeRest_0001.1thread.q_2d
-    python3 generate_case.py --slope-correction --bed-mode one-cell
-    OMP_NUM_THREADS=1 "$executable" > run_one_cell_slope_1_thread.log
-    cp lakeRest_0001.q_2d lakeRest_0001.1thread.q_2d
-    OMP_NUM_THREADS=4 "$executable" > run_one_cell_slope_4_threads.log
-    cmp lakeRest_0001.1thread.q_2d lakeRest_0001.q_2d
-    python3 generate_case.py --check lakeRest_0001.q_2d --bed-mode one-cell
+    for bed_mode in planar one-cell; do
+        run_case "${bed_mode}_G1" "$bed_mode"
+        run_case "${bed_mode}_curvature" "$bed_mode" --curvature
+        cmp "lakeRest_${bed_mode}_G1.q_2d" \
+            "lakeRest_${bed_mode}_curvature.q_2d"
+
+        run_case "${bed_mode}_slope" "$bed_mode" --slope-correction
+        run_case "${bed_mode}_slope_curvature" "$bed_mode" \
+            --slope-correction --curvature
+        cmp "lakeRest_${bed_mode}_slope.q_2d" \
+            "lakeRest_${bed_mode}_slope_curvature.q_2d"
+    done
 )
 
-echo "PASS: G=1 and slope-corrected PCCU lake at rest, including one-cell ramps, are thread-reproducible and preserved to roundoff"
+echo "PASS: lake at rest is thread-reproducible and unchanged for all slope/curvature combinations on planar and one-cell-ramp beds"

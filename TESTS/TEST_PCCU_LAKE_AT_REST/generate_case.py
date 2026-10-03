@@ -26,7 +26,7 @@ def bed(x, y, bed_mode):
     raise ValueError(f"unknown bed mode {bed_mode}")
 
 
-def write_case(slope_correction=False, bed_mode="planar"):
+def write_case(slope_correction=False, curvature=False, bed_mode="planar"):
     x = X0 + (np.arange(NX) + 0.5) * DX
     y = Y0 + (np.arange(NY) + 0.5) * DX
     X, Y = np.meshgrid(x, y)
@@ -85,7 +85,7 @@ def write_case(slope_correction=False, bed_mode="planar"):
  RHEOLOGY_FLAG=F, GAS_FLAG=F, LIQUID_FLAG=T,
  RADIAL_SOURCE_FLAG=F, COLLAPSING_VOLUME_FLAG=F,
  TOPO_CHANGE_FLAG=F, SLOPE_CORRECTION_FLAG={'T' if slope_correction else 'F'},
- CURVATURE_TERM_FLAG=F,
+ CURVATURE_TERM_FLAG={'T' if curvature else 'F'},
  /
 &RESTART_PARAMETERS
  RESTART_FILES="lake_rest_0000.q_2d",
@@ -168,10 +168,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", metavar="OUTPUT")
     parser.add_argument("--slope-correction", action="store_true")
+    parser.add_argument("--curvature", action="store_true")
     parser.add_argument("--bed-mode", choices=("planar", "one-cell"),
                         default="planar")
     args = parser.parse_args()
     if args.check:
         check_case(args.check, args.bed_mode)
     else:
-        write_case(args.slope_correction, args.bed_mode)
+        write_case(args.slope_correction, args.curvature, args.bed_mode)
