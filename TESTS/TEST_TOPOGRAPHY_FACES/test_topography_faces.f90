@@ -183,6 +183,46 @@ CONTAINS
     CALL assert_small('cell-to-node interior average',                        &
          ABS(vertex_field(3,3)-0.25_wp*SUM(cell_field(2:3,2:3))),tolerance)
 
+    ! A compact wet/inactive pattern checks that zero-proposal cells remain in
+    ! the geometric stencil rather than being removed by wet-only weighting.
+    cell_field = 0.0_wp
+    cell_field(4,4) = 3.0_wp
+    cell_field(5,4) = -1.0_wp
+    cell_field(4,5) = 2.0_wp
+
+    CALL project_cell_field_to_vertices(cell_field,vertex_field)
+    B_vertex = vertex_field
+    CALL derive_topography_from_vertices
+
+    projection_error = ABS(SUM(B_cent)-SUM(cell_field))
+    CALL assert_small('wet/dry mass-lumped integral',projection_error,       &
+         tolerance*REAL(comp_cells_x*comp_cells_y,wp))
+    CALL assert_small('inactive cells retained in vertex stencil',           &
+         ABS(vertex_field(4,4)-0.75_wp),tolerance)
+    CALL assert_small('all-inactive vertex proposal',ABS(vertex_field(1,1)), &
+         tolerance)
+
+    ! A deterministic rough field exercises cancellations between positive
+    ! and negative proposals while retaining a nonzero local mismatch.
+    DO k = 1, comp_cells_y
+       DO j = 1, comp_cells_x
+          cell_field(j,k) = REAL(MOD(37*j+101*k+17*j*k,211),wp)              &
+               / 211.0_wp - 0.5_wp
+       END DO
+    END DO
+
+    CALL project_cell_field_to_vertices(cell_field,vertex_field)
+    B_vertex = vertex_field
+    CALL derive_topography_from_vertices
+
+    projection_error = ABS(SUM(B_cent-cell_field))
+    CALL assert_small('rough-field signed mismatch integral',projection_error,&
+         tolerance*REAL(comp_cells_x*comp_cells_y,wp))
+    IF (MAXVAL(ABS(B_cent-cell_field)) .LE. 1.0e-3_wp) THEN
+       WRITE(*,*) 'FAIL: rough-field local mismatch was not resolved'
+       ERROR STOP 1
+    END IF
+
   END SUBROUTINE check_cell_to_vertex_projection
 
   SUBROUTINE check_q1_identities

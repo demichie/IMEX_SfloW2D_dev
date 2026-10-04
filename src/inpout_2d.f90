@@ -600,14 +600,6 @@ CONTAINS
         CALL fatal_error('Only N_LAYERS=1 is currently supported')
       END IF
 
-      ! B_vertex is now the authoritative bed. The vertex-first mass-exchange
-      ! update is introduced only after the hydrodynamic HP-PCCU gates; do not
-      ! silently let the legacy cell-centered update desynchronize the geometry.
-      IF (topo_change_flag) THEN
-        CALL fatal_error('TOPO_CHANGE_FLAG is temporarily unavailable until '// &
-             'the vertex-first bed update is enabled')
-      END IF
-
       idx_solid_first = 5
       idx_solid_last = 4 + n_solid
 

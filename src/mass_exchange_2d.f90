@@ -11,10 +11,14 @@ MODULE mass_exchange_2d
 
   USE constitutive_parameters_2d, ONLY : T_ambient
 
-  USE geometry_2d, ONLY : B_cent
+  USE geometry_2d, ONLY : B_cent, B_vertex
   USE geometry_2d, ONLY : B_prime_x_geom, B_prime_y_geom
   USE geometry_2d, ONLY : cell_source_fractions
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
+  USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
+  USE geometry_2d, ONLY : dx, dy
+  USE geometry_2d, ONLY : project_cell_field_to_vertices
+  USE geometry_2d, ONLY : refresh_topography_geometry
 
   USE parameters_2d, ONLY : wp
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid
@@ -30,6 +34,20 @@ MODULE mass_exchange_2d
   PRIVATE
 
   PUBLIC :: update_erosion_deposition_cell
+
+  ! Persistent work arrays for the vertex-first evolving-bed update. Inactive
+  ! and dry cells retain a zero proposal but remain in the geometric stencil.
+  REAL(wp), ALLOCATABLE, PUBLIC :: topography_rate_cell(:,:)
+  REAL(wp), ALLOCATABLE, PUBLIC :: topography_rate_vertex(:,:)
+  REAL(wp), ALLOCATABLE, PUBLIC :: topography_rate_geometric(:,:)
+  REAL(wp), ALLOCATABLE, PUBLIC :: topography_rate_mismatch(:,:)
+
+  ! Diagnostics for the conservative cell-to-vertex projection.
+  REAL(wp), PUBLIC :: topography_volume_rate_cell = 0.0_wp
+  REAL(wp), PUBLIC :: topography_volume_rate_geometric = 0.0_wp
+  REAL(wp), PUBLIC :: topography_mismatch_integral = 0.0_wp
+  REAL(wp), PUBLIC :: topography_mismatch_l1 = 0.0_wp
+  REAL(wp), PUBLIC :: topography_mismatch_linf = 0.0_wp
 
 CONTAINS
 
@@ -88,6 +106,17 @@ CONTAINS
 
     IF ( ( erosion_coeff .EQ. 0.0_wp ) .AND. ( .NOT.settling_flag ) &
          .AND. ( .NOT.pore_pressure_flag ) .AND. ( .NOT.entrainment_flag) ) RETURN
+
+    IF ( topo_change_flag ) THEN
+       CALL ensure_topography_workspace
+       !$OMP PARALLEL DO COLLAPSE(2)
+       DO k = 1, comp_cells_y
+          DO j = 1, comp_cells_x
+             topography_rate_cell(j,k) = 0.0_wp
+          END DO
+       END DO
+       !$OMP END PARALLEL DO
+    END IF
 
     !$OMP PARALLEL DO private(j,k,erosion_term,deposition_term,eqns_term,       &
     !$OMP & topo_term,r_Ri,r_rho_m,r_rho_c,r_red_grav,                          &
@@ -153,12 +182,9 @@ CONTAINS
 
        END IF
        
-       ! Update the topography with erosion/deposition terms
-       IF ( topo_change_flag ) THEN
-
-          B_cent(j,k) = B_cent(j,k) + dt * topo_term
-
-       END IF
+       ! Store the final, already limited cell proposal. The nodal bed is
+       ! assembled only after every cell-local flow/inventory update is done.
+       IF ( topo_change_flag ) topography_rate_cell(j,k) = topo_term
 
        negative_alpha_check:IF ( ANY(q(5:4+n_solid,j,k) .LT. 0.0_wp ) ) THEN
 
@@ -256,8 +282,101 @@ CONTAINS
 
     !$OMP END PARALLEL DO
 
+    IF ( topo_change_flag ) CALL apply_vertex_first_topography_update(dt)
+
     RETURN
 
   END SUBROUTINE update_erosion_deposition_cell
+
+  !******************************************************************************
+  !> Allocate the evolving-topography workspace once per grid.
+  !******************************************************************************
+
+  SUBROUTINE ensure_topography_workspace
+
+    IMPLICIT NONE
+
+    LOGICAL :: grid_size_changed
+
+    grid_size_changed = .FALSE.
+    IF ( ALLOCATED(topography_rate_cell) ) THEN
+       grid_size_changed = ( SIZE(topography_rate_cell,1) .NE. comp_cells_x ) &
+            .OR. ( SIZE(topography_rate_cell,2) .NE. comp_cells_y )
+    END IF
+
+    IF ( grid_size_changed ) THEN
+       DEALLOCATE(topography_rate_cell, topography_rate_vertex,               &
+            topography_rate_geometric, topography_rate_mismatch)
+    END IF
+
+    IF ( .NOT.ALLOCATED(topography_rate_cell) ) THEN
+       ALLOCATE(topography_rate_cell(comp_cells_x,comp_cells_y))
+       ALLOCATE(topography_rate_vertex(comp_interfaces_x,comp_interfaces_y))
+       ALLOCATE(topography_rate_geometric(comp_cells_x,comp_cells_y))
+       ALLOCATE(topography_rate_mismatch(comp_cells_x,comp_cells_y))
+    END IF
+
+  END SUBROUTINE ensure_topography_workspace
+
+  !******************************************************************************
+  !> \brief Conservatively assemble cell bed-rate proposals at Q1 vertices.
+  !>
+  !> Only B_vertex is advanced. All center, face, slope and curvature fields
+  !> are regenerated once from that authoritative nodal bed after the update.
+  !******************************************************************************
+
+  SUBROUTINE apply_vertex_first_topography_update(dt)
+
+    IMPLICIT NONE
+
+    REAL(wp), INTENT(IN) :: dt
+    REAL(wp) :: cell_area
+    INTEGER :: j, k
+
+    CALL project_cell_field_to_vertices(topography_rate_cell,                 &
+         topography_rate_vertex)
+
+    !$OMP PARALLEL DO COLLAPSE(2)
+    DO k = 1, comp_cells_y
+       DO j = 1, comp_cells_x
+          topography_rate_geometric(j,k) = 0.25_wp *                          &
+               ( topography_rate_vertex(j,k)                                 &
+               + topography_rate_vertex(j+1,k)                               &
+               + topography_rate_vertex(j,k+1)                               &
+               + topography_rate_vertex(j+1,k+1) )
+          topography_rate_mismatch(j,k) = topography_rate_geometric(j,k)     &
+               - topography_rate_cell(j,k)
+       END DO
+    END DO
+    !$OMP END PARALLEL DO
+
+    cell_area = dx * dy
+    topography_volume_rate_cell = cell_area * SUM(topography_rate_cell)
+    topography_volume_rate_geometric = cell_area *                           &
+         SUM(topography_rate_geometric)
+    topography_mismatch_integral = cell_area *                               &
+         SUM(topography_rate_mismatch)
+    topography_mismatch_l1 = cell_area * SUM(ABS(topography_rate_mismatch))
+    topography_mismatch_linf = MAXVAL(ABS(topography_rate_mismatch))
+
+    !$OMP PARALLEL DO COLLAPSE(2)
+    DO k = 1, comp_interfaces_y
+       DO j = 1, comp_interfaces_x
+          B_vertex(j,k) = B_vertex(j,k) + dt * topography_rate_vertex(j,k)
+       END DO
+    END DO
+    !$OMP END PARALLEL DO
+
+    CALL refresh_topography_geometry
+
+    IF ( verbose_level .GE. 2 ) THEN
+       WRITE(*,*) 'evolving-topography volume-rate cell/geometric:',         &
+            topography_volume_rate_cell, topography_volume_rate_geometric
+       WRITE(*,*) 'evolving-topography mismatch integral/L1/Linf:',          &
+            topography_mismatch_integral, topography_mismatch_l1,            &
+            topography_mismatch_linf
+    END IF
+
+  END SUBROUTINE apply_vertex_first_topography_update
 
 END MODULE mass_exchange_2d

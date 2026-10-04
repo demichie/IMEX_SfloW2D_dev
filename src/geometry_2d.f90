@@ -457,23 +457,27 @@ CONTAINS
     REAL(wp), INTENT(IN) :: cell_field(comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(OUT) :: vertex_field(comp_interfaces_x,comp_interfaces_y)
 
-    REAL(wp), ALLOCATABLE :: vertex_weight(:,:)
     INTEGER :: j, k
+    INTEGER :: j_first, j_last, k_first, k_last
+    INTEGER :: adjacent_cells
 
-    ALLOCATE( vertex_weight(comp_interfaces_x,comp_interfaces_y) )
-    vertex_field = 0.0_wp
-    vertex_weight = 0.0_wp
-
-    DO k = 1, comp_cells_y
-       DO j = 1, comp_cells_x
-          vertex_field(j:j+1,k:k+1) = vertex_field(j:j+1,k:k+1)              &
-               + cell_field(j,k)
-          vertex_weight(j:j+1,k:k+1) = vertex_weight(j:j+1,k:k+1) + 1.0_wp
+    ! Gather at vertices instead of scattering from cells. This is race-free,
+    ! needs no temporary weights, and gives bitwise-identical results for any
+    ! OpenMP thread count because each vertex is evaluated by one iteration.
+    !$OMP PARALLEL DO COLLAPSE(2)                                             &
+    !$OMP & PRIVATE(j_first,j_last,k_first,k_last,adjacent_cells)
+    DO k = 1, comp_interfaces_y
+       DO j = 1, comp_interfaces_x
+          j_first = MAX(1,j-1)
+          j_last = MIN(comp_cells_x,j)
+          k_first = MAX(1,k-1)
+          k_last = MIN(comp_cells_y,k)
+          adjacent_cells = (j_last-j_first+1) * (k_last-k_first+1)
+          vertex_field(j,k) = SUM(cell_field(j_first:j_last,k_first:k_last)) &
+               / REAL(adjacent_cells,wp)
        END DO
     END DO
-
-    vertex_field = vertex_field / vertex_weight
-    DEALLOCATE( vertex_weight )
+    !$OMP END PARALLEL DO
 
   END SUBROUTINE project_cell_field_to_vertices
 

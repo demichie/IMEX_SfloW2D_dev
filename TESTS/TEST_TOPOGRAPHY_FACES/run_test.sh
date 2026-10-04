@@ -8,13 +8,14 @@ trap 'rm -rf "$build_dir"' EXIT HUP INT TERM
 
 cd "$build_dir"
 
-gfortran -O0 -g -fcheck=all -fbacktrace -c \
+gfortran -O0 -g -fcheck=all -fbacktrace -fopenmp -c \
     "$repo_dir/src/parameters_2d.f90" \
     "$repo_dir/src/geometry_2d.f90" \
     "$test_dir/test_topography_faces.f90"
 
-gfortran -O0 -g -fcheck=all -fbacktrace \
+gfortran -O0 -g -fcheck=all -fbacktrace -fopenmp \
     parameters_2d.o geometry_2d.o test_topography_faces.o \
     -llapack -o test_topography_faces
 
-./test_topography_faces
+OMP_NUM_THREADS=1 ./test_topography_faces
+OMP_NUM_THREADS=4 ./test_topography_faces

@@ -454,8 +454,6 @@ PROGRAM IMEX_SfloW2D
       CALL update_erosion_deposition_cell(simulation%state%q,                 &
            simulation%state%qp, simulation%runtime%dt, simulation%domain)
 
-      IF ( topo_change_flag ) CALL refresh_topography_geometry
-
       simulation%runtime%t = simulation%runtime%t + simulation%runtime%dt
 
       !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2,    &
