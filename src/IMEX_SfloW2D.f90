@@ -6,9 +6,9 @@
 !> The model is discretized in time with an explicit-implicit Runge-Kutta
 !> method where the hyperbolic part is solved explicetely and the other
 !> terms (relaxation and surce) are treated implicitely.\n
-!> The finite volume solver for the hyperbolic part of the system is based
-!> on a semidiscrete central scheme and it is not tied on the specific
-!> eigenstructure of the model.\n
+!> The hyperbolic part uses the hydrostatic-path, path-conservative
+!> central-upwind (HP-PCCU) finite-volume operator; it does not require the
+!> complete eigenstructure of the model.\n
 !> The implicit part is solved with a Newton-Raphson method where the
 !> elements of the Jacobian of the nonlinear system are evaluated
 !> numerically with a complex step derivative technique.\n
@@ -36,7 +36,7 @@ PROGRAM IMEX_SfloW2D
    USE geometry_2d, ONLY : init_source
    USE geometry_2d, ONLY : refresh_topography_geometry
 
-   USE geometry_2d, ONLY : dx,dy,B_cent, cell_size
+   USE geometry_2d, ONLY : dx,dy,B_cent
    ! USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
 
    USE init_2d, ONLY : collapsing_volume

@@ -38,12 +38,6 @@ MODULE parameters_2d
 
   REAL(wp) :: reconstr_coeff    !< Slope coefficient in the linear reconstruction
 
-  !> Flag to add the relaxation terms after the linear reconstruction:\n
-  !> - T      => evaluate the relaxation terms
-  !> - F      => reconstruction without the relaxation 
-  !> .
-  LOGICAL :: interfaces_relaxation
-
   !> Flag to choose in which way we upload the topography
   !> - T      => through a function
   !> - F      => through points
@@ -339,10 +333,6 @@ MODULE parameters_2d
   !> - 'van_leer' => monotonized central-difference limiter (van Leer, 1977)
   !> .
   INTEGER :: limiter(30) = -1
-
-  !> Compatibility input selector; only 'KT' is accepted. The active spatial
-  !> operator is HP-PCCU and is not selected by this value.
-  CHARACTER(LEN=20) :: solver_scheme     
 
   REAL(wp) :: theta             !< Van Leer limiter parameter
   REAL(wp) :: t_start           !< initial time for the run

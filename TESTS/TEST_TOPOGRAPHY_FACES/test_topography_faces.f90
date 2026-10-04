@@ -1,19 +1,15 @@
 PROGRAM test_topography_faces
 
-  USE parameters_2d, ONLY : wp, limiter, reconstr_coeff, theta
+  USE parameters_2d, ONLY : wp
   USE geometry_2d, ONLY : B_vertex, B_face_x, B_face_y, B_cent
-  USE geometry_2d, ONLY : B_faceW, B_faceE, B_faceS, B_faceN
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
   USE geometry_2d, ONLY : dx, dy, dx2, dy2
    USE geometry_2d, ONLY : x_stag, y_stag, compute_cell_fissure_fraction
-  USE geometry_2d, ONLY : limit, derive_topography_from_vertices
-  USE geometry_2d, ONLY : reconstruct_topography_faces
+  USE geometry_2d, ONLY : derive_topography_from_vertices
   USE geometry_2d, ONLY : project_cell_field_to_vertices
 
   IMPLICIT NONE
-
-  REAL(wp), PARAMETER :: H0 = 20.0_wp
 
   REAL(wp), ALLOCATABLE :: cell_field(:,:), vertex_field(:,:)
   REAL(wp) :: tolerance
@@ -28,18 +24,12 @@ PROGRAM test_topography_faces
   dx2 = 0.5_wp * dx
   dy2 = 0.5_wp * dy
 
-  reconstr_coeff = 1.0_wp
-  theta = 1.3_wp
-  tolerance = 512.0_wp * EPSILON(1.0_wp) * H0
+  tolerance = 512.0_wp * EPSILON(1.0_wp) * 20.0_wp
 
   ALLOCATE( B_vertex(comp_interfaces_x,comp_interfaces_y) )
   ALLOCATE( B_face_x(comp_interfaces_x,comp_cells_y) )
   ALLOCATE( B_face_y(comp_cells_x,comp_interfaces_y) )
   ALLOCATE( B_cent(comp_cells_x,comp_cells_y) )
-  ALLOCATE( B_faceW(comp_cells_x,comp_cells_y) )
-  ALLOCATE( B_faceE(comp_cells_x,comp_cells_y) )
-  ALLOCATE( B_faceS(comp_cells_x,comp_cells_y) )
-  ALLOCATE( B_faceN(comp_cells_x,comp_cells_y) )
   ALLOCATE( x_stag(comp_interfaces_x), y_stag(comp_interfaces_y) )
   ALLOCATE( cell_field(comp_cells_x,comp_cells_y) )
   ALLOCATE( vertex_field(comp_interfaces_x,comp_interfaces_y) )
@@ -56,8 +46,6 @@ PROGRAM test_topography_faces
   CALL check_analytic_bed(.TRUE.)
   CALL check_one_cell_excavation
   CALL check_cell_to_vertex_projection
-  CALL check_legacy_lake_at_rest
-
   WRITE(*,*) 'PASS: continuous shared Q1 topography verified'
 
 CONTAINS
@@ -245,94 +233,6 @@ CONTAINS
     CALL assert_small('Q1 center/face identities',center_error,tolerance)
 
   END SUBROUTINE check_q1_identities
-
-  SUBROUTINE check_legacy_lake_at_rest
-
-    REAL(wp) :: equilibrium_error, center_error
-    INTEGER :: limiter_id
-
-    DO limiter_id = 0, 7
-       limiter(1) = limiter_id
-       CALL reconstruct_topography_faces
-       CALL evaluate_legacy_errors(equilibrium_error,center_error)
-       CALL assert_small('legacy lake-at-rest reconstruction',                &
-            equilibrium_error,tolerance)
-       CALL assert_small('legacy reconstructed center identity',              &
-            center_error,tolerance)
-    END DO
-
-  END SUBROUTINE check_legacy_lake_at_rest
-
-  SUBROUTINE evaluate_legacy_errors(equilibrium_error,center_error)
-
-    REAL(wp), INTENT(OUT) :: equilibrium_error, center_error
-    REAL(wp) :: h_stencil(3), coord_stencil(3)
-    REAL(wp) :: hW, hE, hS, hN, slope
-    INTEGER :: j, k
-
-    equilibrium_error = 0.0_wp
-    center_error = 0.0_wp
-
-    DO k = 1, comp_cells_y
-       DO j = 1, comp_cells_x
-          CALL x_stencil_at_cell(j,k,h_stencil)
-          coord_stencil = [ -dx, 0.0_wp, dx ]
-          CALL limit(h_stencil,coord_stencil,limiter(1),slope)
-          hW = H0-B_cent(j,k)-reconstr_coeff*dx2*slope
-          hE = H0-B_cent(j,k)+reconstr_coeff*dx2*slope
-
-          CALL y_stencil_at_cell(j,k,h_stencil)
-          coord_stencil = [ -dy, 0.0_wp, dy ]
-          CALL limit(h_stencil,coord_stencil,limiter(1),slope)
-          hS = H0-B_cent(j,k)-reconstr_coeff*dy2*slope
-          hN = H0-B_cent(j,k)+reconstr_coeff*dy2*slope
-
-          equilibrium_error = MAX(equilibrium_error,                          &
-               ABS(hW+B_faceW(j,k)-H0),ABS(hE+B_faceE(j,k)-H0),               &
-               ABS(hS+B_faceS(j,k)-H0),ABS(hN+B_faceN(j,k)-H0))
-          center_error = MAX(center_error,                                    &
-               ABS(0.5_wp*(B_faceW(j,k)+B_faceE(j,k))-B_cent(j,k)),           &
-               ABS(0.5_wp*(B_faceS(j,k)+B_faceN(j,k))-B_cent(j,k)))
-       END DO
-    END DO
-
-  END SUBROUTINE evaluate_legacy_errors
-
-  SUBROUTINE x_stencil_at_cell(j_cell,k_cell,values)
-
-    INTEGER, INTENT(IN) :: j_cell, k_cell
-    REAL(wp), INTENT(OUT) :: values(3)
-
-    IF (j_cell .EQ. 1) THEN
-       values(1) = H0-(2.0_wp*B_cent(1,k_cell)-B_cent(2,k_cell))
-       values(2:3) = H0-B_cent(1:2,k_cell)
-    ELSEIF (j_cell .EQ. comp_cells_x) THEN
-       values(1:2) = H0-B_cent(comp_cells_x-1:comp_cells_x,k_cell)
-       values(3) = H0-(2.0_wp*B_cent(comp_cells_x,k_cell)                    &
-            - B_cent(comp_cells_x-1,k_cell))
-    ELSE
-       values = H0-B_cent(j_cell-1:j_cell+1,k_cell)
-    END IF
-
-  END SUBROUTINE x_stencil_at_cell
-
-  SUBROUTINE y_stencil_at_cell(j_cell,k_cell,values)
-
-    INTEGER, INTENT(IN) :: j_cell, k_cell
-    REAL(wp), INTENT(OUT) :: values(3)
-
-    IF (k_cell .EQ. 1) THEN
-       values(1) = H0-(2.0_wp*B_cent(j_cell,1)-B_cent(j_cell,2))
-       values(2:3) = H0-B_cent(j_cell,1:2)
-    ELSEIF (k_cell .EQ. comp_cells_y) THEN
-       values(1:2) = H0-B_cent(j_cell,comp_cells_y-1:comp_cells_y)
-       values(3) = H0-(2.0_wp*B_cent(j_cell,comp_cells_y)                    &
-            - B_cent(j_cell,comp_cells_y-1))
-    ELSE
-       values = H0-B_cent(j_cell,k_cell-1:k_cell+1)
-    END IF
-
-  END SUBROUTINE y_stencil_at_cell
 
   SUBROUTINE assert_small(label,value,limit_value)
 

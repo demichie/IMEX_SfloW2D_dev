@@ -332,8 +332,6 @@ CONTAINS
   !> \param[in]     B_secondj_xy       local 2nd derivative in xy-direction
   !> \param[in]     B_secondj_yy       local 2nd derivative in y-direction
   !> \param[in]     grav_coeff         correction factor for topography slope
-  !> \param[in]     d_grav_coeff_dx    x-derivative of grav_coeff
-  !> \param[in]     d_grav_coeff_dy    y-derivative of grav_coeff
   !> \param[in]     qpj                physical variables
   !> \param[in]     time               simlation time (needed for source)
   !> \param[in]     cell_fract_jk      fraction of cell contributing to source
@@ -345,8 +343,8 @@ CONTAINS
   !******************************************************************************
 
   SUBROUTINE eval_expl_terms( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy , &
-       Bsecondj_yy, grav_coeff, d_grav_coeff_dx , d_grav_coeff_dy ,             &
-         qpj, expl_term, time, cell_fract_jk, cell_fissure_fract,                &
+       Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,             &
+       cell_fissure_fract,                                                       &
        lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk )
 
     USE parameters_2d, ONLY : vel_source , T_source , xs_source , xg_source,    &
@@ -367,8 +365,6 @@ CONTAINS
     REAL(wp), INTENT(IN) :: Bsecondj_xy
     REAL(wp), INTENT(IN) :: Bsecondj_yy
     REAL(wp), INTENT(IN) :: grav_coeff
-    REAL(wp), INTENT(IN) :: d_grav_coeff_dx
-    REAL(wp), INTENT(IN) :: d_grav_coeff_dy
 
     REAL(wp), INTENT(IN) :: qpj(n_vars+2)      !< local physical variables
     REAL(wp), INTENT(OUT) :: expl_term(n_eqns) !< local explicit forces
@@ -883,9 +879,7 @@ CONTAINS
     COMPLEX(wp) :: mod_vel_hor
     COMPLEX(wp) :: mod_vel2
     COMPLEX(wp) :: gamma
-    COMPLEX(wp) :: rho_g(n_add_gas)
     REAL(wp) :: h_threshold
-    COMPLEX(wp) :: rho_c
 
     INTEGER :: i
 
@@ -924,8 +918,6 @@ CONTAINS
     COMPLEX(wp) :: gas_compressibility
 
     COMPLEX(wp) :: rho_gas
-
-    COMPLEX(wp) :: coeff_porosity
 
     COMPLEX(wp) :: porosity
     COMPLEX(wp) :: f_inhibit
@@ -1323,8 +1315,8 @@ CONTAINS
          end select
          ! -------------------------------------------------------------------!
 
-	 ! calculate source term for pore pressure equatio
-	 source_term(idx_poreEqn) = - rho_m * ( pi_g / 2.0_wp )**2 *           &
+         ! Calculate the source term for the pore-pressure equation.
+         source_term(idx_poreEqn) = - rho_m * ( pi_g / 2.0_wp )**2 *           &
                D_coeff / MAX(h_threshold,h) * exc_pore_pres * f_inhibit
 
        END IF
@@ -1355,7 +1347,6 @@ CONTAINS
   !> appears in the friction terms.
   !> \date 20/01/2018
   !> \param[in]     grav3_surf         gravity correction
-  !> \param[in]     qcj                real conservative variables
   !> \param[out]    nh_semi_impl_term  real non-hyperbolic terms
   !
   !> @author
@@ -1364,7 +1355,7 @@ CONTAINS
   !******************************************************************************
 
   SUBROUTINE eval_nh_semi_impl_terms( Bprimej_x , Bprimej_y , Bsecondj_xx ,     &
-       Bsecondj_xy , Bsecondj_yy , grav_coeff , qcj , qpj , nh_semi_impl_term , &
+       Bsecondj_xy , Bsecondj_yy , grav_coeff , qpj , nh_semi_impl_term ,       &
        Zj )
 
     USE parameters_2D, ONLY: pore_pressure_flag
@@ -1378,7 +1369,6 @@ CONTAINS
     REAL(wp), INTENT(IN) :: Bsecondj_yy
     REAL(wp), INTENT(IN) :: grav_coeff
 
-    REAL(wp), INTENT(IN) :: qcj(n_vars)
     REAL(wp), INTENT(IN) :: qpj(n_vars+2)
     REAL(wp), INTENT(IN) :: Zj ! value stochastic process
 
@@ -1426,7 +1416,6 @@ CONTAINS
     REAL(wp) :: I !< inertial number
     REAL(wp) :: mu_I !< mu(I)
     REAL(wp) :: shear_rate !< shear rate using horizontal velocity only
-    REAL(wp) :: tau_cosA !< shear stress projected to horizontal plane
     REAL(wp) :: vert_stress_eff !< effective vertical stress
     REAL(wp) :: eff_normal_stress !< effective normal stress
 
@@ -2304,10 +2293,9 @@ CONTAINS
 
 
           END IF
-	! -------------------------------------------------------------------- !
+          ! ------------------------------------------------------------------ !
 
-	! -------------------------------------------------------------------- !
-	 ! kinetic viscosity
+          ! Kinematic viscosity
           IF ( gas_flag .AND. sutherland_flag ) THEN
 
              dyn_visc_c = muRef_Suth * ( r_T / Tref_Suth )**1.5_wp *            &
@@ -2317,7 +2305,7 @@ CONTAINS
              kin_visc_c_local = dyn_visc_c / rho_c
 
           END IF
-	! -------------------------------------------------------------------- !
+          ! ------------------------------------------------------------------ !
 
         ! velocity of gas loss due to pore pressure gradient
         vel_loss_gas = hydraulic_permeability_local /                         &
@@ -2325,7 +2313,7 @@ CONTAINS
                0.5_wp * pi_g *                                                &
                r_exc_pore_pres
 
-	! add pore pressure driven gas loss term, inhibited by f_inhibit
+         ! Add the pore-pressure-driven gas loss, inhibited by f_inhibit.
          pore_pressure_term = vel_loss_gas * f_inhibit
 
          continuous_phase_loss_term = continuous_phase_loss_term +             &

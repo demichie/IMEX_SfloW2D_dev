@@ -62,8 +62,7 @@ MODULE inpout_2d
   USE parameters_2d, ONLY: bc
 
   ! -- Variables for the namelist NUMERIC_PARAMETERS
-  USE parameters_2d, ONLY: solver_scheme, dt0, max_dt, cfl, limiter, theta, &
-                           reconstr_coeff, interfaces_relaxation, n_RK
+  USE parameters_2d, ONLY: dt0, max_dt, cfl, limiter, theta, reconstr_coeff, n_RK
 
   ! -- Variables for the namelist EXPL_TERMS_PARAMETERS
   USE constitutive_parameters_2d, ONLY: grav, inv_grav
@@ -347,8 +346,8 @@ MODULE inpout_2d
   NAMELIST /initial_conditions/ released_volume, x_release, y_release, &
     velocity_mod_release, velocity_ang_release, T_init, T_ambient
 
-  NAMELIST /numeric_parameters/ solver_scheme, dt0, max_dt, cfl, limiter, &
-    theta, reconstr_coeff, interfaces_relaxation, n_RK
+  NAMELIST /numeric_parameters/ dt0, max_dt, cfl, limiter, theta,             &
+    reconstr_coeff, n_RK
 
   NAMELIST /expl_terms_parameters/ grav
 
@@ -484,7 +483,6 @@ CONTAINS
     !-- Inizialization of the Variables for the namelist NUMERIC_PARAMETERS
     dt0 = 1.0E-4_wp
     max_dt = 1.0E-3_wp
-    solver_scheme = 'KT'
     n_RK = 2
     cfl = 0.24_wp
     limiter(1:n_vars + 2) = 1
@@ -2140,15 +2138,6 @@ CONTAINS
 
       REWIND (input_unit)
 
-    END IF
-
-    ! HP-PCCU is the only production spatial operator.  Keep the historical
-    ! value "KT" in the namelist for compatibility with existing input files;
-    ! it no longer selects the legacy KT implementation.
-    IF (solver_scheme .NE. 'KT') THEN
-      WRITE (*, *) 'ERROR: only the HP-PCCU spatial operator is supported'
-      WRITE (*, *) 'Use the compatibility input SOLVER_SCHEME = "KT"'
-      ERROR STOP 1
     END IF
 
     IF ((comp_cells_x .EQ. 1) .OR. (comp_cells_y .EQ. 1)) THEN
@@ -4146,7 +4135,15 @@ CONTAINS
             WRITE (*, *) 'WARNING: source is off before T_INTERVALS(1) =',      &
                  t_intervals(1)
           END IF
-          DO i = 1, n_intervals
+          IF (t_intervals(1) .LT. 0.0_wp) THEN
+            WRITE (*, *) 'ERROR: T_INTERVALS(1) must be >= 0'
+            STOP
+          END IF
+          IF (vel_intervals(1) .LT. 0.0_wp) THEN
+            WRITE (*, *) 'ERROR: VEL_INTERVALS(1) must be >= 0'
+            STOP
+          END IF
+          DO i = 2, n_intervals
             IF (t_intervals(i) .LT. 0.0_wp) THEN
               WRITE (*, *) 'ERROR: T_INTERVALS(', i, ') must be >= 0'
               STOP
@@ -4155,11 +4152,9 @@ CONTAINS
               WRITE (*, *) 'ERROR: VEL_INTERVALS(', i, ') must be >= 0'
               STOP
             END IF
-            IF (i .GT. 1) THEN
-              IF (t_intervals(i) .LE. t_intervals(i-1)) THEN
-                WRITE (*, *) 'ERROR: T_INTERVALS must be monotonically increasing'
-                STOP
-              END IF
+            IF (t_intervals(i) .LE. t_intervals(i-1)) THEN
+              WRITE (*, *) 'ERROR: T_INTERVALS must be monotonically increasing'
+              STOP
             END IF
           END DO
           IF (verbose_level .GE. 0) THEN
@@ -5296,7 +5291,6 @@ CONTAINS
     USE geometry_2d, ONLY: interp_2d_scalarB, regrid_scalar
     ! External variables
     USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0
-    USE geometry_2d, ONLY: erodible
     USE init_2d, ONLY: erodible_init
 
     IMPLICIT none
@@ -5320,8 +5314,6 @@ CONTAINS
     REAL(wp), ALLOCATABLE :: x1(:), y1(:)
 
     REAL(wp) :: xl, xr, yl, yr
-
-    INTEGER :: i_solid
 
     INQUIRE (FILE=erodible_file, exist=lexist)
 
@@ -5384,12 +5376,12 @@ CONTAINS
 
     END IF
 
-    IF (x0 + cell_size*(comp_cells_x + 1) - (xllcorner + cellsize*(ncols + 1)) &
+    IF (y0 + cell_size*(comp_cells_y + 1) - (yllcorner + cellsize*(nrows + 1)) &
         .GT. 1.E-5_wp*cellsize) THEN
 
       WRITE (*, *)
       WRITE (*, *) 'WARNING: initial solution and domain extent'
-      WRITE (*, *) 'yllcorner greater then y0', yllcorner, y0
+      WRITE (*, *) 'upper y extent of erodible layer smaller than domain'
 
     END IF
 
@@ -7012,7 +7004,8 @@ CONTAINS
   !******************************************************************************
   SUBROUTINE write_netcdf_timestep(time_in, state)
     USE netcdf
-    USE geometry_2d, ONLY: B_cent, B_prime_x, B_prime_y, comp_cells_x, comp_cells_y
+    USE geometry_2d, ONLY: B_cent, B_prime_x_geom, B_prime_y_geom
+    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y
     USE geometry_2d, ONLY: deposit, erosion, erodible
     USE parameters_2d, ONLY: n_vars
     USE state_conversion_2d, ONLY: mixt_var, settling_velocity,               &
@@ -7119,7 +7112,8 @@ END IF
         r_u = state%qp(n_vars + 1, j, k)
         r_v = state%qp(n_vars + 2, j, k)
         r_T = state%qp(4, j, k)
-        vertical_velocity(j, k) = r_u*B_prime_x(j, k) + r_v*B_prime_y(j, k)
+        vertical_velocity(j, k) = r_u*B_prime_x_geom(j, k)                    &
+                               + r_v*B_prime_y_geom(j, k)
 
         CALL primitive_to_volume_fractions(state%qp(1:n_vars+2,j,k),          &
              r_alphas, r_alphag, r_alphal)
@@ -7128,9 +7122,9 @@ END IF
         alphal2D(j,k) = r_alphal
 
         IF (slope_correction_flag) THEN
-          r_w = r_u*B_prime_x(j, k) + r_v*B_prime_y(j, k)
-          grav_coeff = 1.0_wp/(1.0_wp + B_prime_x(j, k)**2 + &
-                               B_prime_y(j, k)**2)
+          r_w = r_u*B_prime_x_geom(j, k) + r_v*B_prime_y_geom(j, k)
+          grav_coeff = 1.0_wp/(1.0_wp + B_prime_x_geom(j, k)**2 +             &
+                               B_prime_y_geom(j, k)**2)
         ELSE
           r_w = 0.0_wp
           grav_coeff = 1.0_wp

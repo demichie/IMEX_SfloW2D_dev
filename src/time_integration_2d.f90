@@ -17,7 +17,7 @@ MODULE time_integration_2d
   USE geometry_2d, ONLY : B_cent
   USE geometry_2d, ONLY : B_prime_x_geom, B_prime_y_geom
   USE geometry_2d, ONLY : B_second_xx_geom, B_second_xy_geom, B_second_yy_geom
-  USE geometry_2d, ONLY : grav_coeff, d_grav_coeff_dx, d_grav_coeff_dy
+  USE geometry_2d, ONLY : grav_coeff
    USE geometry_2d, ONLY : cell_source_fractions, cell_fissure_fractions
   USE geometry_2d, ONLY : cell_arc_perim, cell_arc_n_x, cell_arc_n_y
 
@@ -485,7 +485,7 @@ CONTAINS
                 CALL eval_nh_semi_impl_terms( B_prime_x_geom(j,k) ,             &
                      B_prime_y_geom(j,k) , B_second_xx_geom(j,k) ,              &
                      B_second_xy_geom(j,k) , B_second_yy_geom(j,k) ,            &
-                     grav_coeff(j,k) , q_fv_cell ,                              &
+                     grav_coeff(j,k) ,                                         &
                      qp( 1:n_vars+2 , j , k ) , this%SI_NH(1:n_eqns,j,k,i_RK) ,      &
                      Z(j,k) )
 
@@ -677,8 +677,7 @@ CONTAINS
              ! Eval gravity term and radial bottom source terms
              CALL eval_expl_terms( B_prime_x_geom(j,k) , B_prime_y_geom(j,k) ,  &
                   B_second_xx_geom(j,k) , B_second_xy_geom(j,k) ,               &
-                  B_second_yy_geom(j,k) , grav_coeff(j,k), d_grav_coeff_dx(j,k),&
-                  d_grav_coeff_dy(j,k) ,                                       &
+                  B_second_yy_geom(j,k) , grav_coeff(j,k),                      &
                   this%qp_rk(1:n_vars+2,j,k), this%expl_terms(1:n_eqns,j,k,i_RK), t,      &
                   cell_source_fractions(j,k), cell_fissure_fractions(j,k,:),    &
                   cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k),    &

@@ -4,7 +4,7 @@ IMEX_SfloW2D_dev - 2-D inclined excavation / wet-dry step test
 Purpose
 -------
 This test is designed to expose spurious numerical transport across wet/dry
-interfaces on a sloping topography and to compare the current KT scheme with a
+interfaces on a sloping topography and to test the HP-PCCU scheme with a
 hydrostatic/well-balanced interface reconstruction.
 
 It is based on:
@@ -62,7 +62,6 @@ Model configuration
   fourth equation = thermal energy
   ENTRAINMENT_FLAG = F
   LOSS_RATE = 0
-  SOLVER_SCHEME = KT       (legacy input label for the sole HP-PCCU operator)
   CFL = 0.24
   LIMITER = generalized minmod (3)
   THETA = 1.3
@@ -124,7 +123,7 @@ excavation in four regions:
     M_south   : y < -5 m with 10 <= x < 20
     M_north   : y >= 5 m with 10 <= x < 20
 
-For the hydrostatic scheme, M_uphill, M_south, and M_north should remain zero
+For HP-PCCU, M_uphill, M_south, and M_north should remain zero
 (up to roundoff) until a physically driven flow actually reaches/overtops those
 walls. M_downhill should remain zero at the first instant and then increase as
 the downslope-moving water overtops the east wall.

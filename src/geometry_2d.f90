@@ -33,35 +33,10 @@ MODULE geometry_2d
   !> Topography at cell centers, derived from B_vertex.
   REAL(wp), ALLOCATABLE :: B_cent(:,:)
 
-  !> Legacy one-sided topography traces used by the pre-HP reconstruction.
-  !> HP reconstruction must use the unique B_face_x/B_face_y arrays instead.
-  REAL(wp), ALLOCATABLE :: B_faceW(:,:)
-  REAL(wp), ALLOCATABLE :: B_faceE(:,:)
-  REAL(wp), ALLOCATABLE :: B_faceS(:,:)
-  REAL(wp), ALLOCATABLE :: B_faceN(:,:)
-
-  !> Topography at the centers of the control volumes 
-  REAL(wp), ALLOCATABLE :: B_cent_extended(:,:)
-
   LOGICAL, ALLOCATABLE :: B_nodata(:,:)
 
   INTEGER, ALLOCATABLE :: B_zone(:,:)
 
-
-  !> Topography slope (x direction) at the centers of the control volumes 
-  REAL(wp), ALLOCATABLE :: B_prime_x(:,:)
-
-  !> Topography 2nd x-derivative at the centers of the control volumes 
-  REAL(wp), ALLOCATABLE :: B_second_xx(:,:)
-
-  !> Topography slope (y direction) at the centers of the control volumes 
-  REAL(wp), ALLOCATABLE :: B_prime_y(:,:)
-
-  !> Topography 2nd y-derivative at the centers of the control volumes 
-  REAL(wp), ALLOCATABLE :: B_second_yy(:,:)
-
-  !> Topography 2nd xy-derivative at the centers of the control volumes 
-  REAL(wp), ALLOCATABLE :: B_second_xy(:,:)
 
   ! TERMS FOR SLOPE AND AND CURVATURE CORRECTIONS
 
@@ -90,20 +65,11 @@ MODULE geometry_2d
   !> gravity coefficient (accounting for slope) at cell centers
   REAL(wp), ALLOCATABLE :: grav_coeff(:,:)
 
-  !> 1st x-derivative of gravity coefficient
-  REAL(wp), ALLOCATABLE :: d_grav_coeff_dx(:,:)
-
-  !> 1st y-derivative of gravity coefficient
-  REAL(wp), ALLOCATABLE :: d_grav_coeff_dy(:,:)
-
   !> modified gravity at cell x-faces
   REAL(wp), ALLOCATABLE :: grav_coeff_stag_x(:,:)
 
   !> modified gravity at cell y-faces
   REAL(wp), ALLOCATABLE :: grav_coeff_stag_y(:,:)
-
-  !> curvature wrt mixed directions for each cell
-  REAL(wp), ALLOCATABLE :: curv_xy(:,:)
 
   !> deposit for the different classes
   REAL(wp), ALLOCATABLE :: deposit(:,:,:)
@@ -244,20 +210,8 @@ CONTAINS
     ALLOCATE( B_face_x(comp_interfaces_x,comp_cells_y) )
     ALLOCATE( B_face_y(comp_cells_x,comp_interfaces_y) )
     ALLOCATE( B_cent(comp_cells_x,comp_cells_y) )
-    ALLOCATE( B_faceW(comp_cells_x,comp_cells_y) )
-    ALLOCATE( B_faceE(comp_cells_x,comp_cells_y) )
-    ALLOCATE( B_faceS(comp_cells_x,comp_cells_y) )
-    ALLOCATE( B_faceN(comp_cells_x,comp_cells_y) )
-    ALLOCATE( B_cent_extended(comp_cells_x+2,comp_cells_y+2) )
 
     ALLOCATE( B_nodata(comp_cells_x,comp_cells_y) )
-
-    ALLOCATE( B_prime_x(comp_cells_x,comp_cells_y) )
-    ALLOCATE( B_prime_y(comp_cells_x,comp_cells_y) )
-
-    ALLOCATE( B_second_xx(comp_cells_x,comp_cells_y) )
-    ALLOCATE( B_second_yy(comp_cells_x,comp_cells_y) )
-    ALLOCATE( B_second_xy(comp_cells_x,comp_cells_y) )
 
     ALLOCATE( B_prime_x_geom(comp_cells_x,comp_cells_y) )
     ALLOCATE( B_prime_y_geom(comp_cells_x,comp_cells_y) )
@@ -271,8 +225,6 @@ CONTAINS
     ALLOCATE( grid_output_int(comp_cells_x,comp_cells_y) )
 
     ALLOCATE( grav_coeff(comp_cells_x,comp_cells_y) )
-    ALLOCATE( d_grav_coeff_dx(comp_cells_x,comp_cells_y) )
-    ALLOCATE( d_grav_coeff_dy(comp_cells_x,comp_cells_y) )
 
     ALLOCATE( grav_coeff_stag_x(comp_interfaces_x,comp_cells_y) )
     ALLOCATE( grav_coeff_stag_y(comp_cells_x,comp_interfaces_y) )
@@ -495,104 +447,6 @@ CONTAINS
   END SUBROUTINE refresh_topography_geometry
 
   !******************************************************************************
-  !> \brief Reconstruct legacy one-sided topography traces at cell faces
-  !>
-  !> The well-balanced reconstruction requires the bed and flow thickness to
-  !> use the same odd limiter and reconstruction coefficient. The existing
-  !> B_prime_*_geom arrays intentionally use a different, centred construction
-  !> and are therefore kept separate from these face traces. This routine is
-  !> retained only until the HP reconstruction is installed; it must not be
-  !> used to define the shared Q1 face geometry.
-  !******************************************************************************
-
-  SUBROUTINE reconstruct_topography_faces
-
-    USE parameters_2d, ONLY : limiter, reconstr_coeff
-
-    IMPLICIT NONE
-
-    REAL(wp) :: B_stencil(3)
-    REAL(wp) :: coord_stencil(3)
-    REAL(wp) :: slope
-    REAL(wp) :: delta_B
-
-    INTEGER :: j, k
-
-    DO k = 1, comp_cells_y
-
-       DO j = 1, comp_cells_x
-
-          IF ( comp_cells_x .GT. 1 ) THEN
-
-             IF ( j .EQ. 1 ) THEN
-
-                B_stencil(1) = 2.0_wp * B_cent(1,k) - B_cent(2,k)
-                B_stencil(2:3) = B_cent(1:2,k)
-
-             ELSEIF ( j .EQ. comp_cells_x ) THEN
-
-                B_stencil(1:2) = B_cent(comp_cells_x-1:comp_cells_x,k)
-                B_stencil(3) = 2.0_wp * B_cent(comp_cells_x,k)                 &
-                     - B_cent(comp_cells_x-1,k)
-
-             ELSE
-
-                B_stencil = B_cent(j-1:j+1,k)
-
-             END IF
-
-             coord_stencil = [ -dx, 0.0_wp, dx ]
-             CALL limit( B_stencil, coord_stencil, limiter(1), slope )
-             delta_B = reconstr_coeff * dx2 * slope
-             B_faceW(j,k) = B_cent(j,k) - delta_B
-             B_faceE(j,k) = B_cent(j,k) + delta_B
-
-          ELSE
-
-             B_faceW(j,k) = B_cent(j,k)
-             B_faceE(j,k) = B_cent(j,k)
-
-          END IF
-
-          IF ( comp_cells_y .GT. 1 ) THEN
-
-             IF ( k .EQ. 1 ) THEN
-
-                B_stencil(1) = 2.0_wp * B_cent(j,1) - B_cent(j,2)
-                B_stencil(2:3) = B_cent(j,1:2)
-
-             ELSEIF ( k .EQ. comp_cells_y ) THEN
-
-                B_stencil(1:2) = B_cent(j,comp_cells_y-1:comp_cells_y)
-                B_stencil(3) = 2.0_wp * B_cent(j,comp_cells_y)                 &
-                     - B_cent(j,comp_cells_y-1)
-
-             ELSE
-
-                B_stencil = B_cent(j,k-1:k+1)
-
-             END IF
-
-             coord_stencil = [ -dy, 0.0_wp, dy ]
-             CALL limit( B_stencil, coord_stencil, limiter(1), slope )
-             delta_B = reconstr_coeff * dy2 * slope
-             B_faceS(j,k) = B_cent(j,k) - delta_B
-             B_faceN(j,k) = B_cent(j,k) + delta_B
-
-          ELSE
-
-             B_faceS(j,k) = B_cent(j,k)
-             B_faceN(j,k) = B_cent(j,k)
-
-          END IF
-
-       END DO
-
-    END DO
-
-  END SUBROUTINE reconstruct_topography_faces
-
-  !******************************************************************************
   !> \brief Topography zone identification
   !
   !> This subroutine search for the connected zones where topography elevation
@@ -749,12 +603,13 @@ CONTAINS
   END SUBROUTINE topography_zones
 
   !******************************************************************************
-  !> \brief Topography slope recontruction
+  !> \brief Filtered topography derivatives and slope corrections
   !
-  !> In this subroutine a linear reconstruction with slope limiters is
-  !> applied to compute dB_dx and dB_dy at the cell centers. The second
-  !> derivative of slope and the correction factor to the gravity to account
-  !> for the slope gradient are also computer here
+  !> A five-point polynomial least-squares filter computes the first and
+  !> second bed derivatives at cell centers. The two-cell boundary band uses
+  !> zero-order extrapolation from the nearest filtered interior value. The
+  !> resulting slopes define the large-slope gravity correction at centers
+  !> and shared Cartesian faces.
   !> @author 
   !> Mattia de' Michieli Vitturi
   !> \date 2019/11/08
@@ -762,16 +617,9 @@ CONTAINS
 
   SUBROUTINE topography_reconstruction
 
-    USE parameters_2d, ONLY : limiter
     USE parameters_2d, ONLY : slope_correction_flag
 
     IMPLICIT NONE
-
-    REAL(wp) :: B_stencil(3)    !< recons variables stencil for the limiter
-    REAL(wp) :: x_stencil(3)    !< grid stencil for the limiter
-    REAL(wp) :: y_stencil(3)    !< grid stencil for the limiter
-
-    INTEGER :: limiterB
 
     INTEGER :: j,k,kk,kj
     REAL(wp) :: weighted_sum
@@ -794,142 +642,11 @@ CONTAINS
     norm2_y = 7.0_wp * dy**2
     norm_xy = (10.0_wp * dx) * (10.0_wp * dy)
 
-    CALL reconstruct_topography_faces
-
-    ! centered approximation for the topography slope
-    limiterB = MAX(limiter(1),1)
-    limiterB = 5
-
-    B_cent_extended(2:comp_cells_x+1,2:comp_cells_y+1) = B_cent
-
-    B_cent_extended(1,1) = 3.0_wp * B_cent(1,1) - B_cent(MIN(comp_cells_x,2),1) &
-         - B_cent(1,MIN(comp_cells_y,2))
-
-    B_cent_extended(1,comp_cells_y+2) = 3.0_wp * B_cent(1,comp_cells_y)         &
-         - B_cent(MIN(comp_cells_x,2),comp_cells_y)                             &
-         - B_cent(1,MAX(comp_cells_y-1,1))
-
-    B_cent_extended(comp_cells_x+2,1) = 3.0_wp * B_cent(comp_cells_x,1)         &
-         - B_cent(comp_cells_x,MIN(comp_cells_y,2))                             &
-         - B_cent(MAX(comp_cells_x-1,1),1)
-
-    B_cent_extended(comp_cells_x+2,comp_cells_y+2) =                            &
-         3.0_wp * B_cent_extended(comp_cells_x,comp_cells_y)                    &
-         - B_cent_extended(MAX(comp_cells_x-1,1),comp_cells_y)                  &
-         - B_cent_extended(comp_cells_x,MAX(comp_cells_y-1,1))
-
-    y_loop:DO k = 1,comp_cells_y
-
-       x_loop:DO j = 1,comp_cells_x
-
-          ! x direction
-          check_comp_cells_x:IF ( comp_cells_x .GT. 1 ) THEN
-
-             check_x_boundary:IF (j.EQ.1) THEN
-
-                ! west boundary
-
-                x_stencil(1) = 2.0_wp * x_comp(1) - x_comp(2)
-                x_stencil(2:3) = x_comp(1:2)
-
-                B_stencil(1) = 2.0_wp * B_cent(1,k) - B_cent(2,k) 
-                B_stencil(2:3) = B_cent(1:2,k)
-
-                B_cent_extended(1,k+1) = B_stencil(1)
-
-             ELSEIF (j.EQ.comp_cells_x) THEN
-
-                !east boundary
-
-                x_stencil(3) = 2.0_wp * x_comp(comp_cells_x)                    &
-                     - x_comp(comp_cells_x-1)
-                x_stencil(1:2) = x_comp(comp_cells_x-1:comp_cells_x)
-
-                B_stencil(3) = 2.0_wp * B_cent(comp_cells_x,k)                  &
-                     - B_cent(comp_cells_x-1,k)
-                B_stencil(1:2) = B_cent(comp_cells_x-1:comp_cells_x,k)
-
-                B_cent_extended(comp_cells_x+2,k+1) = B_stencil(3)
-
-             ELSE
-
-                ! Internal x interfaces
-                x_stencil(1:3) = x_comp(j-1:j+1)
-                B_stencil = B_cent(j-1:j+1,k)
-
-             ENDIF check_x_boundary
-
-             B_second_xx(j,k) = ( B_stencil(3) - 2.0_wp * B_stencil(2)          &
-                  + B_stencil(1) ) / dx**2  
-             CALL limit( B_stencil , x_stencil , limiterB , B_prime_x(j,k) )
-
-          ELSE
-
-             B_prime_x(j,k) = 0.0_wp
-             B_second_xx(j,k) = 0.0_wp
-             B_cent_extended(1,2:comp_cells_y+1) = B_cent(1,1:comp_cells_y)
-             B_cent_extended(comp_cells_x+2,2:comp_cells_y+1) =                 &
-                  B_cent(comp_cells_x,1:comp_cells_y)
-
-          END IF check_comp_cells_x
-
-          ! y-direction
-          check_comp_cells_y:IF ( comp_cells_y .GT. 1 ) THEN
-
-             check_y_boundary:IF (k.EQ.1) THEN
-
-                ! South boundary
-                y_stencil(1) = 2.0_wp * y_comp(1) - y_comp(2)
-                y_stencil(2:3) = y_comp(1:2)
-
-                B_stencil(1) = 2.0_wp * B_cent(j,1) - B_cent(j,2)
-                B_stencil(2:3) = B_cent(j,1:2)
-
-                B_cent_extended(j+1,1) = B_stencil(1)
-
-             ELSEIF ( k .EQ. comp_cells_y ) THEN
-
-                ! North boundary
-                y_stencil(3) = 2.0_wp * y_comp(comp_cells_y)                    &
-                     - y_comp(comp_cells_y-1)
-                y_stencil(1:2) = y_comp(comp_cells_y-1:comp_cells_y)
-
-                B_stencil(3) = 2.0_wp * B_cent(j,comp_cells_y)                  &
-                     - B_cent(j,comp_cells_y-1)
-                B_stencil(1:2) = B_cent(j,comp_cells_y-1:comp_cells_y)
-
-                B_cent_extended(j+1,comp_cells_y+2) = B_stencil(3)
-
-             ELSE
-
-                ! Internal y interfaces
-                y_stencil(1:3) = y_comp(k-1:k+1)
-                B_stencil = B_cent(j,k-1:k+1)
-
-             ENDIF check_y_boundary
-
-             B_second_yy(j,k) = ( B_stencil(3) - 2.0_wp * B_stencil(2)          &
-                  + B_stencil(1) ) / dy**2  
-             CALL limit( B_stencil , y_stencil , limiterB , B_prime_y(j,k) ) 
-
-          ELSE
-
-             B_prime_y(j,k) = 0.0_wp
-             B_second_yy(j,k) = 0.0_wp
-             B_cent_extended(2:comp_cells_x+1,1) = B_cent(1:comp_cells_x,1)
-             B_cent_extended(2:comp_cells_x+1,comp_cells_y+2) =                 &
-                  B_cent(1:comp_cells_x,comp_cells_y)
-
-          ENDIF check_comp_cells_y
-
-       END DO x_loop
-
-    END DO y_loop
-
     IF ( comp_cells_y .EQ. 1 ) THEN
 
        k = 1
 
+       !$OMP PARALLEL DO PRIVATE(j,kj)
        DO j = 3, comp_cells_x - 2
 
           B_prime_x_geom(j,k)   = 0.0_wp
@@ -952,9 +669,11 @@ CONTAINS
           B_second_xy_geom(j,k) = 0.0_wp
 
        END DO
+       !$OMP END PARALLEL DO
 
     END IF
 
+    !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(j,k,kj,kk,weighted_sum)
     DO k = 3, comp_cells_y - 2
 
        DO j = 3, comp_cells_x - 2
@@ -991,6 +710,7 @@ CONTAINS
 
        END DO
     END DO
+    !$OMP END PARALLEL DO
 
     !=======================================================================
     !  2. HANDLE BOUNDARY CELLS
@@ -1001,6 +721,7 @@ CONTAINS
     !=======================================================================
 
     ! --- Handle left and right boundaries (columns j=1, 2, comp_cells_x-1, comp_cells_x) ---
+    !$OMP PARALLEL DO PRIVATE(k)
     DO k = 1, comp_cells_y ! Loop over all rows
        ! Left boundary
        B_prime_x_geom(1,k)   = B_prime_x_geom(3,k)
@@ -1026,10 +747,12 @@ CONTAINS
        B_second_xy_geom(comp_cells_x-1,k) = B_second_xy_geom(comp_cells_x-2,k)
        B_second_xy_geom(comp_cells_x,k)   = B_second_xy_geom(comp_cells_x-2,k)
     END DO
+    !$OMP END PARALLEL DO
 
     IF ( comp_cells_y .GT. 1 ) THEN
 
        ! --- Handle top and bottom boundaries (rows k=1, 2, comp_cells_y-1, comp_cells_y) ---
+       !$OMP PARALLEL DO PRIVATE(j)
        DO j = 1, comp_cells_x ! Loop over all columns
           ! Top boundary
           B_prime_x_geom(j,1)   = B_prime_x_geom(j,3)
@@ -1055,29 +778,16 @@ CONTAINS
           B_second_xy_geom(j,comp_cells_y-1) = B_second_xy_geom(j,comp_cells_y-2)
           B_second_xy_geom(j,comp_cells_y)   = B_second_xy_geom(j,comp_cells_y-2)
        END DO
+       !$OMP END PARALLEL DO
 
     END IF
 
-    B_second_xy = ( B_cent_extended(3:comp_cells_x+2,3:comp_cells_y+2)          &
-         - B_cent_extended(3:comp_cells_x+2,1:comp_cells_y)                     &
-         - B_cent_extended(1:comp_cells_x,3:comp_cells_y+2)                     &
-         + B_cent_extended(1:comp_cells_x,1:comp_cells_y) ) / ( 4.0_wp*dx*dy )
-
     IF ( slope_correction_flag ) THEN
 
-       ! Calculate grav_coeff using the ROBUST 1st derivatives.
+       ! Calculate grav_coeff using the retained LS first derivatives.
        grav_coeff = 1.0_wp / ( 1.0_wp + B_prime_x_geom**2 + B_prime_y_geom**2 )
 
-       ! Calculate the derivatives of grav_coeff using the ROBUST 1st AND 2nd derivatives.
-       ! This is crucial for mathematical consistency.
-       d_grav_coeff_dx = - 2.0_wp * grav_coeff**2 * ( B_prime_x_geom * B_second_xx_geom   &
-            + B_prime_y_geom * B_second_xy_geom ) 
-
-       d_grav_coeff_dy = - 2.0_wp * grav_coeff**2 * ( B_prime_x_geom * B_second_xy_geom   &
-            + B_prime_y_geom * B_second_yy_geom ) 
-
-       ! The interpolation to the staggered grid remains the same,
-       ! but it now operates on the new, more stable grav_coeff values.
+       ! Interpolate the cell coefficient to the shared Cartesian faces.
        grav_coeff_stag_x(1,:) = grav_coeff(1,:)
        grav_coeff_stag_x(2:comp_interfaces_x-1,:) = 0.5_wp *                    &
             ( grav_coeff(1:comp_cells_x-1,:) + grav_coeff(2:comp_cells_x,:) )
@@ -1091,9 +801,6 @@ CONTAINS
     ELSE
 
        grav_coeff = 1.0_wp
-
-       d_grav_coeff_dx = 0.0_wp
-       d_grav_coeff_dy = 0.0_wp
 
        grav_coeff_stag_x = 1.0_wp
        grav_coeff_stag_y = 1.0_wp

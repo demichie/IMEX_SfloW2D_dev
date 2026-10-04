@@ -63,7 +63,7 @@ CONTAINS
   SUBROUTINE update_erosion_deposition_cell(q, qp, dt, domain)
 
     USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,    &
-         maximum_solid_packing, entrainment_flag
+         entrainment_flag
     
     USE geometry_2d, ONLY : deposit , erosion , erodible
     USE geometry_2d, ONLY : B_zone
