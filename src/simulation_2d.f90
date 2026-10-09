@@ -20,8 +20,7 @@ MODULE simulation_2d
   USE runtime_2d, ONLY : runtime_state_type
   USE state_2d, ONLY : state_type
   USE domain_2d, ONLY : domain_type
-  USE reconstruction_2d, ONLY : reconstruction_workspace_type
-  USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
+  USE spatial_operator_2d, ONLY : spatial_operator_type
   USE time_integration_2d, ONLY : time_integration_workspace_type
   USE stochastic_module, ONLY : stochastic_workspace_type
 
@@ -39,8 +38,7 @@ MODULE simulation_2d
      TYPE(equation_partition_type) :: equation_partition
      TYPE(state_type) :: state
      TYPE(domain_type) :: domain
-     TYPE(reconstruction_workspace_type) :: reconstruction
-     TYPE(hyperbolic_workspace_type) :: hyperbolic
+     TYPE(spatial_operator_type) :: spatial_operator
      TYPE(time_integration_workspace_type) :: time_integration
      TYPE(stochastic_workspace_type) :: stochastic
 
@@ -66,8 +64,7 @@ CONTAINS
 
     CALL this%state%initialize( this%model_layout )
 
-    CALL this%reconstruction%initialize
-    CALL this%hyperbolic%initialize
+    CALL this%spatial_operator%initialize
     CALL this%domain%initialize
 
     CALL initialize_nonlinear_solver
@@ -85,8 +82,7 @@ CONTAINS
 
     CALL this%domain%finalize
     CALL this%time_integration%finalize
-    CALL this%hyperbolic%finalize
-    CALL this%reconstruction%finalize
+    CALL this%spatial_operator%finalize
 
     CALL this%state%finalize
 

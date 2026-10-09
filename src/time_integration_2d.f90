@@ -2,7 +2,7 @@
 !> \brief IMEX Runge-Kutta time integration
 !>
 !> This module owns the IMEX tableau and Runge-Kutta stage workspace and
-!> orchestrates timestep selection and explicit/implicit stage advancement.
+!> orchestrates explicit/implicit stage advancement.
 !********************************************************************************
 MODULE time_integration_2d
 
@@ -28,9 +28,7 @@ MODULE time_integration_2d
 
   USE equation_metadata_2d, ONLY : equation_partition_type
 
-  USE reconstruction_2d, ONLY : reconstruction_workspace_type
-
-  USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
+  USE spatial_operator_2d, ONLY : spatial_operator_type
 
   USE domain_2d, ONLY : domain_type
 
@@ -49,14 +47,13 @@ MODULE time_integration_2d
      REAL(wp), ALLOCATABLE :: a_dirk(:)
      REAL(wp), ALLOCATABLE :: q_rk(:,:,:)
      REAL(wp), ALLOCATABLE :: qp_rk(:,:,:)
-     REAL(wp), ALLOCATABLE :: divFlux(:,:,:,:)
+     REAL(wp), ALLOCATABLE :: spatial_terms(:,:,:,:)
      REAL(wp), ALLOCATABLE :: NH(:,:,:,:)
      REAL(wp), ALLOCATABLE :: SI_NH(:,:,:,:)
      REAL(wp), ALLOCATABLE :: expl_terms(:,:,:,:)
    CONTAINS
      PROCEDURE, PUBLIC :: initialize => initialize_time_integration
      PROCEDURE, PUBLIC :: finalize => finalize_time_integration
-     PROCEDURE, NOPASS, PUBLIC :: compute_timestep => timestep
      PROCEDURE, PUBLIC :: advance => imex_RK_solver
   END TYPE time_integration_workspace_type
 
@@ -145,7 +142,7 @@ CONTAINS
     ALLOCATE( this%a_dirk(n_RK) )
     ALLOCATE( this%q_rk(n_vars,comp_cells_x,comp_cells_y) )
     ALLOCATE( this%qp_rk(n_vars+2,comp_cells_x,comp_cells_y) )
-    ALLOCATE( this%divFlux(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
+    ALLOCATE( this%spatial_terms(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
     ALLOCATE( this%NH(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
     ALLOCATE( this%SI_NH(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
     ALLOCATE( this%expl_terms(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
@@ -164,119 +161,18 @@ CONTAINS
     DEALLOCATE( this%a_dirk )
     DEALLOCATE( this%q_rk )
     DEALLOCATE( this%qp_rk )
-    DEALLOCATE( this%divFlux )
+    DEALLOCATE( this%spatial_terms )
     DEALLOCATE( this%NH )
     DEALLOCATE( this%SI_NH )
     DEALLOCATE( this%expl_terms )
 
   END SUBROUTINE finalize_time_integration
 
-  SUBROUTINE timestep(q, qp, t, dt, domain, recon, hyper)
-
-    ! External variables
-    USE geometry_2d, ONLY : dx,dy
-    USE parameters_2d, ONLY : max_dt , cfl
-
-    USE state_conversion_2d, ONLY : qc_to_qp
-
-    IMPLICIT none
-
-    REAL(wp), INTENT(IN) :: q(n_vars,comp_cells_x,comp_cells_y)
-    REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
-    REAL(wp), INTENT(IN) :: t
-    REAL(wp), INTENT(OUT) :: dt
-    CLASS(domain_type), INTENT(IN) :: domain
-    CLASS(reconstruction_workspace_type), INTENT(INOUT) :: recon
-    CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: hyper
-
-    INTEGER :: j,k,l          !< loop counter
-
-    REAL(wp) :: max_a_x
-    REAL(wp) :: max_a_y
-    REAL(wp) p_dyn
-
-    dt = max_dt
-
-    IF ( cfl .NE. -1.0_wp ) THEN
-
-       !$OMP PARALLEL DO private(j,k,p_dyn)
-
-       DO l = 1,domain%reconstruction_cells
-
-          j = domain%j_reconstruction(l)
-          k = domain%k_reconstruction(l)
-
-          IF ( q(1,j,k) .GT. 0.0_wp ) THEN
-
-             CALL qc_to_qp( q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-
-          ELSE
-
-             qp(1:n_vars+2,j,k) = 0.0_wp
-             qp(4,j,k) = T_ambient
-
-          END IF
-
-       END DO
-
-       !$OMP END PARALLEL DO
-
-       !WRITE(*,*) 'qp(1:n_vars+2,1,1)',qp(1:n_vars+2,1,1)
-       !READ(*,*)
-
-       ! Compute the physical and conservative variables at the interfaces
-        CALL recon%reconstruct( qp, t, domain%solve_cells, &
-            domain%j_cent, domain%k_cent )
-
-       ! Compute the max/min eigenvalues at the interfaces
-       CALL hyper%evaluate_speeds( recon, domain%solve_interfaces_x,          &
-            domain%j_stag_x, domain%k_stag_x, domain%solve_interfaces_y,     &
-            domain%j_stag_y, domain%k_stag_y )
-
-       max_a_x = 0.0_wp
-       max_a_y = 0.0_wp
-
-       ! The minimum CFL step over all active cells is determined by the
-       ! maximum characteristic speed on their adjacent interfaces.  Compute
-       ! those two maxima directly, avoiding full-domain scratch arrays and
-       ! an atomic update of dt for every cell.
-       !$OMP PARALLEL DO private(j,k) reduction(max:max_a_x,max_a_y)
-       DO l = 1,domain%solve_cells
-
-          j = domain%j_cent(l)
-          k = domain%k_cent(l)
-
-          max_a_x = MAX( max_a_x,                                               &
-               MAXVAL(hyper%a_interface_xPos(1:n_vars,j,k)),                         &
-               MAXVAL(-hyper%a_interface_xNeg(1:n_vars,j,k)),                        &
-               MAXVAL(hyper%a_interface_xPos(1:n_vars,j+1,k)),                       &
-               MAXVAL(-hyper%a_interface_xNeg(1:n_vars,j+1,k)) )
-
-          max_a_y = MAX( max_a_y,                                               &
-               MAXVAL(hyper%a_interface_yPos(1:n_vars,j,k)),                         &
-               MAXVAL(-hyper%a_interface_yNeg(1:n_vars,j,k)),                        &
-               MAXVAL(hyper%a_interface_yPos(1:n_vars,j,k+1)),                       &
-               MAXVAL(-hyper%a_interface_yNeg(1:n_vars,j,k+1)) )
-
-       END DO
-       !$OMP END PARALLEL DO
-
-       IF ( max_a_x .GT. 0.0_wp ) dt = MIN(dt,cfl*dx/max_a_x)
-       IF ( max_a_y .GT. 0.0_wp ) dt = MIN(dt,cfl*dy/max_a_y)
-
-    END IF
-
-    RETURN
-
-  END SUBROUTINE timestep
-
   !******************************************************************************
   !> \brief Runge-Kutta integration
   !
-  !> This subroutine integrate the hyperbolic conservation law with
-  !> non-hyperbolic terms using an implicit-explicit runge-kutta scheme.
-  !> The fluxes are integrated explicitely while the non-hyperbolic terms
-  !> are integrated implicitely.
+  !> This subroutine integrates the explicit spatial and local source terms
+  !> together with the implicit terms using an IMEX Runge-Kutta scheme.
   !
   !> \date 07/10/2016
   !> @author 
@@ -285,7 +181,7 @@ CONTAINS
   !******************************************************************************
 
   SUBROUTINE imex_RK_solver(this, q, qp, t, dt, Z, equation_partition,      &
-       domain, recon, hyper)
+       domain, spatial_operator)
 
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
     
@@ -312,8 +208,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: Z(comp_cells_x,comp_cells_y)
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     CLASS(domain_type), INTENT(IN) :: domain
-    CLASS(reconstruction_workspace_type), INTENT(INOUT) :: recon
-    CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: hyper
+    CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
 
     REAL(wp) :: q_si(n_vars) !< solution after the semi-implicit step
     REAL(wp) :: q_guess(n_vars) !< initial guess for the solution of the RK step
@@ -389,7 +284,7 @@ CONTAINS
 
        ! Initialization of the variables for the Runge-Kutta scheme
        this%q_rk( 1:n_vars , j , k ) = 0.0_wp
-       this%divFlux(1:n_eqns , j , k , 1:n_RK ) = 0.0_wp
+       this%spatial_terms(1:n_eqns,j,k,1:n_RK) = 0.0_wp
        this%NH( 1:n_eqns, j , k , 1:n_RK ) = 0.0_wp
        this%SI_NH( 1:n_eqns , j , k , 1:n_RK ) = 0.0_wp
        this%expl_terms(1:n_eqns , j , k , 1:n_RK) = 0.0_wp
@@ -457,7 +352,7 @@ CONTAINS
           ! New solution at the i_RK step without the implicit  and
           ! semi-implicit term
           q_fv_cell(1:n_vars) = q( 1:n_vars , j , k )                            &
-               - dt * (MATMUL( this%divFlux(1:n_eqns,j,k,1:i_RK)                     &
+               - dt * (MATMUL( this%spatial_terms(1:n_eqns,j,k,1:i_RK)       &
                - this%expl_terms(1:n_eqns,j,k,1:i_RK) , this%a_tilde(1:i_RK) )            &
                - MATMUL( this%NH(1:n_eqns,j,k,1:i_RK) + this%SI_NH(1:n_eqns,j,k,1:i_RK) , &
                this%a_dirk(1:i_RK) ) )
@@ -523,7 +418,8 @@ CONTAINS
                 q_guess(1:n_vars) = q_si(1:n_vars)
 
 
-                Rj_not_impl =  ( MATMUL( this%divFlux(1:n_eqns,j,k,1:i_RK-1) -       &
+                Rj_not_impl = ( MATMUL(                                    &
+                     this%spatial_terms(1:n_eqns,j,k,1:i_RK-1) -            &
                      this%expl_terms(1:n_eqns,j,k,1:i_RK-1), this%a_tilde(1:i_RK-1) )     &
                      - MATMUL( this%NH(1:n_eqns,j,k,1:i_RK-1)                        &
                      + this%SI_NH(1:n_eqns,j,k,1:i_RK-1) , this%a_dirk(1:i_RK-1) ) )      &
@@ -640,8 +536,8 @@ CONTAINS
           END IF
 
           ! Store the current stage. Previous stage states are no longer
-          ! needed here: their evaluated terms are retained in divFlux, NH,
-          ! SI_NH and expl_terms.
+          ! needed here: their evaluated terms are retained in spatial_terms,
+          ! NH, SI_NH and expl_terms.
           this%q_rk( 1:n_vars , j , k ) = q_guess
 
           IF ( verbose_level .GE. 2 ) THEN
@@ -692,12 +588,10 @@ CONTAINS
 
        IF ( need_explicit_stage ) THEN
 
-          ! Eval and store the explicit hyperbolic (fluxes) terms
-          CALL hyper%evaluate_terms( recon, this%qp_rk,                       &
-               this%divFlux(1:n_eqns,1:comp_cells_x,1:comp_cells_y,i_RK), t,  &
-               domain%solve_cells, domain%j_cent, domain%k_cent,              &
-               domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,  &
-               domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y )
+          ! Evaluate the complete explicit spatial term. The time integrator
+          ! is independent of the HP-PCCU backend and its internal workspaces.
+          CALL spatial_operator%evaluate( this%qp_rk,                       &
+               this%spatial_terms(:,:,:,i_RK), t, domain )
 
        END IF
 
@@ -716,7 +610,7 @@ CONTAINS
        ! state locally before overwriting this cell during final assembly.
        q_old_cell = q(1:n_vars,j,k)
 
-       residual_cell = MATMUL( this%divFlux(1:n_eqns,j,k,1:n_RK)                     &
+       residual_cell = MATMUL( this%spatial_terms(1:n_eqns,j,k,1:n_RK)       &
             - this%expl_terms(1:n_eqns,j,k,1:n_RK) , this%omega_tilde ) -                 &
             MATMUL( this%NH(1:n_eqns,j,k,1:n_RK) + this%SI_NH(1:n_eqns,j,k,1:n_RK) ,      &
             this%omega )
@@ -788,12 +682,9 @@ CONTAINS
              END IF
              WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
 
-             WRITE(*,*) 'divFlux(1,j,k,1:n_RK)',this%divFlux(1,j,k,1:n_RK)
-
-             WRITE(*,*) hyper%H_interface_x(1,j+1,k), hyper%H_interface_x(1,j,k)
-             WRITE(*,*) recon%qp_interfaceR(1:n_vars,j,k)
+             WRITE(*,*) 'spatial_terms(1,j,k,1:n_RK)',                       &
+                  this%spatial_terms(1,j,k,1:n_RK)
              WRITE(*,*) qp(1:n_vars,j,k)
-             WRITE(*,*) recon%qp_interfaceL(1:n_vars,j+1,k)
 
              WRITE(*,*) 'expl_terms(1,j,k,1:n_RK)',this%expl_terms(1,j,k,1:n_RK)
              WRITE(*,*) 'NH(1,j,k,1:n_RK)',this%NH(1,j,k,1:n_RK)
@@ -823,13 +714,10 @@ CONTAINS
              END IF
              WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
 
-             WRITE(*,*) 'H_interface(1)'
-             WRITE(*,*) hyper%H_interface_x(1,j+1,k)/dx*dt, hyper%H_interface_x(1,j,k)/dx*dt
-             WRITE(*,*) hyper%H_interface_y(1,j,k+1)/dy*dt, hyper%H_interface_y(1,j,k)/dy*dt
-             
-             WRITE(*,*) 'H_interface(5)'
-             WRITE(*,*) hyper%H_interface_x(5,j+1,k)/dx*dt, hyper%H_interface_x(5,j,k)/dx*dt
-             WRITE(*,*) hyper%H_interface_y(5,j,k+1)/dy*dt, hyper%H_interface_y(5,j,k)/dy*dt
+             WRITE(*,*) 'spatial mass terms',                               &
+                  this%spatial_terms(1,j,k,1:n_RK)
+             WRITE(*,*) 'spatial solid-mass terms',                         &
+                  this%spatial_terms(5,j,k,1:n_RK)
              
 
              CALL fatal_error('negative solid mass after IMEX Runge-Kutta update')
@@ -878,20 +766,14 @@ CONTAINS
              !CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
              !WRITE(*,*) 'after imex_RK_solver: qp',qp(1:n_vars+2,j,k)
              
-             !WRITE(*,*) 'H_interface(1)'
-             !WRITE(*,*) H_interface_x(1,j+1,k)/dx*dt, H_interface_x(1,j,k)/dx*dt
-             !WRITE(*,*) H_interface_y(1,j,k+1)/dy*dt, H_interface_y(1,j,k)/dy*dt
-             
-             !WRITE(*,*) 'H_interface(5)'
-             !WRITE(*,*) H_interface_x(5,j+1,k)/dx*dt, H_interface_x(5,j,k)/dx*dt
-             !WRITE(*,*) H_interface_y(5,j,k+1)/dy*dt, H_interface_y(5,j,k)/dy*dt
-             
-             !WRITE(*,*) 'divFlux(1)',divFlux(1,j,k,1:n_RK)
+             !WRITE(*,*) 'spatial_terms(1)',                                 &
+             !     this%spatial_terms(1,j,k,1:n_RK)
              !WRITE(*,*) 'expl_terms(1)', expl_terms(1,j,k,1:n_RK)
              !WRITE(*,*) 'NH(1)', NH(1,j,k,1:n_RK)
              !WRITE(*,*) 'SI(1)', SI_NH(1,j,k,1:n_RK) 
              
-             !WRITE(*,*) 'divFlux(5)',divFlux(5,j,k,1:n_RK)
+             !WRITE(*,*) 'spatial_terms(5)',                                 &
+             !     this%spatial_terms(5,j,k,1:n_RK)
              !WRITE(*,*) 'expl_terms(5)', expl_terms(5,j,k,1:n_RK)
              !WRITE(*,*) 'NH(5)', NH(5,j,k,1:n_RK)
              !WRITE(*,*) 'SI(5)', SI_NH(5,j,k,1:n_RK)
@@ -915,11 +797,8 @@ CONTAINS
           WRITE(*,*) 'qp old',qp(1:n_vars+2,j,k)
           WRITE(*,*) 'qc old',q_old_cell
 
-          WRITE(*,*) 'H_interface(4)'
-          WRITE(*,*) hyper%H_interface_x(4,j+1,k)/dx*dt, hyper%H_interface_x(4,j,k)/dx*dt
-          WRITE(*,*) hyper%H_interface_y(4,j,k+1)/dy*dt, hyper%H_interface_y(4,j,k)/dy*dt
-
-          WRITE(*,*) hyper%H_interface_y(:,j,k)/dy*dt
+          WRITE(*,*) 'spatial thermal-energy terms',                        &
+               this%spatial_terms(4,j,k,1:n_RK)
           CALL fatal_error('temperature below the admissible threshold')
 
        END IF
@@ -965,20 +844,14 @@ CONTAINS
 
              END IF
 
-             WRITE(*,*) 'H_interface(1)'
-             WRITE(*,*) hyper%H_interface_x(1,j+1,k)/dx*dt, hyper%H_interface_x(1,j,k)/dx*dt
-             WRITE(*,*) hyper%H_interface_y(1,j,k+1)/dy*dt, hyper%H_interface_y(1,j,k)/dy*dt
-             
-             WRITE(*,*) 'H_interface(5)'
-             WRITE(*,*) hyper%H_interface_x(5,j+1,k)/dx*dt, hyper%H_interface_x(5,j,k)/dx*dt
-             WRITE(*,*) hyper%H_interface_y(5,j,k+1)/dy*dt, hyper%H_interface_y(5,j,k)/dy*dt
-
-             WRITE(*,*) 'divFlux(1)',this%divFlux(1,j,k,1:n_RK)
+             WRITE(*,*) 'spatial_terms(1)',                                 &
+                  this%spatial_terms(1,j,k,1:n_RK)
              WRITE(*,*) 'expl_terms(1)', this%expl_terms(1,j,k,1:n_RK)
              WRITE(*,*) 'NH(1)', this%NH(1,j,k,1:n_RK)
              WRITE(*,*) 'SI(1)', this%SI_NH(1,j,k,1:n_RK)
 
-             WRITE(*,*) 'divFlux(5)',this%divFlux(5,j,k,1:n_RK)
+             WRITE(*,*) 'spatial_terms(5)',                                 &
+                  this%spatial_terms(5,j,k,1:n_RK)
              WRITE(*,*) 'expl_terms(5)', this%expl_terms(5,j,k,1:n_RK)
              WRITE(*,*) 'NH(5)', this%NH(5,j,k,1:n_RK)
              WRITE(*,*) 'SI(5)', this%SI_NH(5,j,k,1:n_RK)

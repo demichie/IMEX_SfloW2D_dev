@@ -32,6 +32,7 @@ IMEX_SfloW2D_SOURCES = \
                 hp_reconstruction_2d.f90 \
                 reconstruction_2d.f90 \
                 hyperbolic_2d.f90 \
+                spatial_operator_2d.f90 \
                 time_integration_2d.f90 \
                 stochastic_random_2d.f90 \
                 stochastic_module.f90 \
@@ -90,14 +91,19 @@ hyperbolic_2d.$(OBJEXT): parameters_2d.$(OBJEXT) equation_terms_2d.$(OBJEXT)  \
                           geometry_2d.$(OBJEXT) hp_reconstruction_2d.$(OBJEXT) \
                           nonconservative_2d.$(OBJEXT) pccu_2d.$(OBJEXT)       \
                           reconstruction_2d.$(OBJEXT)
+spatial_operator_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                       \
+                                constitutive_parameters_2d.$(OBJEXT)          \
+                                domain_2d.$(OBJEXT) geometry_2d.$(OBJEXT)     \
+                                hyperbolic_2d.$(OBJEXT)                       \
+                                reconstruction_2d.$(OBJEXT)                  \
+                                state_conversion_2d.$(OBJEXT)
 time_integration_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                        \
                                constitutive_parameters_2d.$(OBJEXT)           \
                                diagnostics_2d.$(OBJEXT) domain_2d.$(OBJEXT)   \
                                equation_metadata_2d.$(OBJEXT)                 \
                                equation_terms_2d.$(OBJEXT) geometry_2d.$(OBJEXT)\
-                               hyperbolic_2d.$(OBJEXT)                         \
                                nonlinear_solver_2d.$(OBJEXT)                  \
-                               reconstruction_2d.$(OBJEXT)                    \
+                               spatial_operator_2d.$(OBJEXT)                  \
                                state_conversion_2d.$(OBJEXT)
 stochastic_random_2d.$(OBJEXT): parameters_2d.$(OBJEXT)
 stochastic_module.$(OBJEXT): parameters_2d.$(OBJEXT) domain_2d.$(OBJEXT)     \
@@ -105,10 +111,11 @@ stochastic_module.$(OBJEXT): parameters_2d.$(OBJEXT) domain_2d.$(OBJEXT)     \
                               stochastic_random_2d.$(OBJEXT)
 simulation_2d.$(OBJEXT): parameters_2d.$(OBJEXT) domain_2d.$(OBJEXT)          \
                           equation_metadata_2d.$(OBJEXT)                      \
-                          equation_terms_2d.$(OBJEXT) hyperbolic_2d.$(OBJEXT) \
+                          equation_terms_2d.$(OBJEXT)                         \
                           model_layout_2d.$(OBJEXT)                           \
                           nonlinear_solver_2d.$(OBJEXT)                       \
-                          reconstruction_2d.$(OBJEXT) runtime_2d.$(OBJEXT)    \
+                          runtime_2d.$(OBJEXT)                                \
+                          spatial_operator_2d.$(OBJEXT)                       \
                           state_2d.$(OBJEXT) stochastic_module.$(OBJEXT)      \
                           time_integration_2d.$(OBJEXT)
 init_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                                   \

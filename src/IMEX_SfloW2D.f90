@@ -405,10 +405,9 @@ PROGRAM IMEX_SfloW2D
 
       END IF
 
-      CALL simulation%time_integration%compute_timestep(                      &
+      CALL simulation%spatial_operator%compute_timestep(                      &
            simulation%state%q, simulation%state%qp, simulation%runtime%t,     &
-           simulation%runtime%dt, simulation%domain,                         &
-           simulation%reconstruction, simulation%hyperbolic)
+           simulation%runtime%dt, simulation%domain)
 
       IF ( t_end - t_output < 1.0E-7_WP ) t_output = t_end
       IF ( t_end - t_runout < 1.0E-7_WP ) t_runout = t_end
@@ -448,8 +447,8 @@ PROGRAM IMEX_SfloW2D
            simulation%state%q, simulation%state%qp, simulation%runtime%t,    &
            simulation%runtime%dt, simulation%stochastic%effective_Z,         &
            simulation%equation_partition,                                   &
-           simulation%domain, simulation%reconstruction,                    &
-           simulation%hyperbolic)
+           simulation%domain,                                               &
+           simulation%spatial_operator)
 
       CALL update_erosion_deposition_cell(simulation%state%q,                 &
            simulation%state%qp, simulation%runtime%dt, simulation%domain)
