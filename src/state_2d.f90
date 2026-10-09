@@ -3,7 +3,11 @@
 !>
 !> This module owns the conservative and physical state arrays together with
 !> diagnostics that evolve during a simulation.
+!>
+!> Stores conservative/physical cell states and accumulated hazard/runout diagnostics. Configuration
+!> and numerical scratch storage belong to other modules.
 !********************************************************************************
+
 MODULE state_2d
 
   USE constitutive_parameters_2d, ONLY : T_ambient
@@ -18,12 +22,15 @@ MODULE state_2d
 
   PRIVATE
 
+  !> \brief Owned cell states and diagnostics for one simulation.
+  !> \details State arrays use (component,x-cell,y-cell); diagnostic maps use
+  !>          (x-cell,y-cell). The model layout fixes component counts and indices.
   TYPE, PUBLIC :: state_type
 
-     !> Conservative variables
+     !> Conservative variables: M=rho_m*h, M*u, M*v, M*cp*T, then transported masses.
      REAL(wp), ALLOCATABLE :: q(:,:,:)
 
-     !> Physical variables
+     !> Physical variables: h, h*u, h*v, T, mass fractions, and appended u and v.
      REAL(wp), ALLOCATABLE :: qp(:,:,:)
 
      !> Map of positive thickness
@@ -53,7 +60,10 @@ MODULE state_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Allocate the prognostic state and diagnostic arrays.
+  !> \brief Allocate and reset cell states and accumulated diagnostics for one model layout.
+  !>
+  !> \param[in,out] this Allocated conservative/physical cell state and accumulated diagnostics.
+  !> \param[in] model_layout Validated variable counts and canonical component indices.
   !******************************************************************************
 
   SUBROUTINE initialize_state(this, model_layout)
@@ -96,7 +106,9 @@ CONTAINS
   END SUBROUTINE initialize_state
 
   !******************************************************************************
-  !> \brief Deallocate the prognostic state and diagnostic arrays.
+  !> \brief Release the physical/conservative state and diagnostic fields.
+  !>
+  !> \param[in,out] this Allocated conservative/physical cell state and accumulated diagnostics.
   !******************************************************************************
 
   SUBROUTINE finalize_state(this)

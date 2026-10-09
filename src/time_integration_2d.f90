@@ -4,6 +4,7 @@
 !> This module owns the IMEX tableau and Runge-Kutta stage workspace and
 !> orchestrates explicit/implicit stage advancement.
 !********************************************************************************
+
 MODULE time_integration_2d
 
   USE diagnostics_2d, ONLY : debug_pause, fatal_error
@@ -36,6 +37,9 @@ MODULE time_integration_2d
 
   PRIVATE
 
+  !> \brief Persistent IMEX tableaux, current-stage states and stage source arrays.
+  !> \details Only the current stage state is retained; previously evaluated
+  !>          terms are stored along the Runge-Kutta stage index for assembly.
   TYPE, PUBLIC :: time_integration_workspace_type
      PRIVATE
 
@@ -58,6 +62,10 @@ MODULE time_integration_2d
   END TYPE time_integration_workspace_type
 
 CONTAINS
+
+  !> \brief Build the selected IMEX tableau and allocate Runge-Kutta stage storage.
+  !>
+  !> \param[in,out] this Persistent IMEX tableau and Runge-Kutta stage workspace.
 
   SUBROUTINE initialize_time_integration( this )
 
@@ -149,6 +157,10 @@ CONTAINS
 
   END SUBROUTINE initialize_time_integration
 
+  !> \brief Release the IMEX tableau and stage work arrays.
+  !>
+  !> \param[in,out] this Persistent IMEX tableau and Runge-Kutta stage workspace.
+
   SUBROUTINE finalize_time_integration( this )
 
     CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
@@ -169,7 +181,7 @@ CONTAINS
   END SUBROUTINE finalize_time_integration
 
   !******************************************************************************
-  !> \brief Runge-Kutta integration
+  !> \brief Advance the conservative state through all explicit/implicit Runge-Kutta stages.
   !
   !> This subroutine integrates the explicit spatial and local source terms
   !> together with the implicit terms using an IMEX Runge-Kutta scheme.
@@ -178,6 +190,18 @@ CONTAINS
   !> @author 
   !> Mattia de' Michieli Vitturi
   !
+  !>
+  !> \param[in,out] this Persistent IMEX tableau and Runge-Kutta stage workspace.
+  !> \param[in,out] q Cell-centered conservative states, indexed as (variable,x-cell,y-cell).
+  !> \param[in,out] qp Canonical physical states: h, hu, hv, T, component mass fractions, then
+  !>                   appended u and v.
+  !> \param[in] t Current simulation or stage time [s].
+  !> \param[in] dt Time increment [s].
+  !> \param[in] Z Coordinates of the three-point limiter stencil.
+  !> \param[in] equation_partition Explicit/implicit equation mask and compact index maps.
+  !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
+  !> \param[in,out] spatial_operator Spatial operator and its persistent reconstruction/HP-PCCU
+  !>                                 workspaces.
   !******************************************************************************
 
   SUBROUTINE imex_RK_solver(this, q, qp, t, dt, Z, equation_partition,      &
@@ -349,8 +373,9 @@ CONTAINS
 
           END IF
 
-          ! New solution at the i_RK step without the implicit  and
-          ! semi-implicit term
+          ! Known part of the stage: assemble earlier spatial/explicit and
+          ! implicit/semi-implicit contributions with their respective tableaux.
+          ! The current diagonal implicit contribution is solved below.
           q_fv_cell(1:n_vars) = q( 1:n_vars , j , k )                            &
                - dt * (MATMUL( this%spatial_terms(1:n_eqns,j,k,1:i_RK)       &
                - this%expl_terms(1:n_eqns,j,k,1:i_RK) , this%a_tilde(1:i_RK) )            &
@@ -570,7 +595,8 @@ CONTAINS
 
              END IF
 
-             ! Eval gravity term and radial bottom source terms
+             ! Evaluate local explicit sources separately from the spatial
+             ! hydrostatic path contribution handled by spatial_operator.
              CALL eval_expl_terms( B_prime_x_geom(j,k) , B_prime_y_geom(j,k) ,  &
                   B_second_xx_geom(j,k) , B_second_xy_geom(j,k) ,               &
                   B_second_yy_geom(j,k) , grav_coeff(j,k),                      &

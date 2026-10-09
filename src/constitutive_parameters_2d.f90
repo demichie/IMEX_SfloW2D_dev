@@ -1,6 +1,10 @@
 !********************************************************************************
 !> \brief Constitutive model parameters
+!>
+!> Stores material properties and constitutive-law coefficients read during setup. Solver kernels
+!> consume these shared parameters; this module does not advance the flow.
 !********************************************************************************
+
 MODULE constitutive_parameters_2d
 
   USE parameters_2d, ONLY : wp
@@ -269,10 +273,17 @@ MODULE constitutive_parameters_2d
 
 CONTAINS
 
+  !> \brief Precompute binomial coefficients for constitutive polynomial expansions.
+  !>
   !> Function that calculates the pascal coefficients for the smooth transition of f_inhibit
+  !>
+  !> \param[in] N_order Nonnegative transition-polynomial order; coefficients use indices 0:N_order.
+  !>
+  !> \note Writes pascal_coeff(0:N_order) and pascal_coeff_precomputed in this module.
+
   SUBROUTINE precompute_pascal_coefficient(N_order)
     !! Computes the two Pascal-like coefficients for each n = 0..N
-    !! Returns coeff(2, N+1)
+    !! Stores their product in the module array pascal_coeff(0:N_order).
     IMPLICIT NONE
     INTEGER, INTENT(IN) :: N_order
     INTEGER :: n, k

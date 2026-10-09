@@ -2,7 +2,11 @@
 !> \brief Runtime state ownership
 !
 !> This module owns the mutable time state of a simulation.
+!>
+!> Groups the current simulation time and timestep history independently of physical state arrays.
+!> Binary restarts preserve this history together with the output schedule.
 !********************************************************************************
+
 MODULE runtime_2d
 
   USE parameters_2d, ONLY : wp
@@ -13,6 +17,7 @@ MODULE runtime_2d
 
   PUBLIC :: runtime_state_type
 
+  !> \brief Mutable clock, timestep history and runout bookkeeping for one run.
   TYPE :: runtime_state_type
 
      !> Current simulation time

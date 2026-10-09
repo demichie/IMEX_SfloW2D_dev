@@ -4,7 +4,11 @@
 !> This module owns characteristic speeds and semidiscrete numerical interface
 !> fluxes. Active-cell and active-interface lists are supplied explicitly by
 !> the solver driver.
+!>
+!> Owns one wave-speed bound per face and oriented HP-PCCU face values. Active-cell and face index
+!> lists restrict evaluation to flow plus the required reconstruction halo.
 !********************************************************************************
+
 MODULE hyperbolic_2d
 
   USE parameters_2d, ONLY : wp, n_eqns, n_vars
@@ -20,6 +24,10 @@ MODULE hyperbolic_2d
 
   PRIVATE
 
+  !> \brief Persistent wave speeds, oriented face contributions and cell paths.
+  !> \details Face arrays distinguish the contribution seen by either adjacent
+  !>          cell; hydrostatic pressure belongs to the path terms, not the
+  !>          inertial endpoint flux.
   TYPE, PUBLIC :: hyperbolic_workspace_type
      ! One common characteristic bound per face and sign, not per equation.
      REAL(wp), ALLOCATABLE :: a_interface_xNeg(:,:)
@@ -40,6 +48,10 @@ MODULE hyperbolic_2d
   END TYPE hyperbolic_workspace_type
 
 CONTAINS
+
+  !> \brief Allocate and zero wave-speed and oriented HP-PCCU work arrays.
+  !>
+  !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
 
   SUBROUTINE initialize_hyperbolic( this )
 
@@ -70,6 +82,10 @@ CONTAINS
 
   END SUBROUTINE initialize_hyperbolic
 
+  !> \brief Release the hyperbolic workspace arrays.
+  !>
+  !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
+
   SUBROUTINE finalize_hyperbolic( this )
 
     CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
@@ -86,6 +102,25 @@ CONTAINS
     DEALLOCATE( this%P_cell_y )
 
   END SUBROUTINE finalize_hyperbolic
+
+  !> \brief Assemble the complete HP-PCCU spatial term on active cells.
+  !>
+  !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
+  !> \param[in,out] recon Reconstructed cell-owned and face-oriented physical/conservative traces.
+  !> \param[in] qp_expl Cell-centered physical states at the explicit stage, including the required
+  !>                    stencil halo.
+  !> \param[out] divFlux_iRK Complete stage spatial term, including face and cell paths, indexed
+  !>                         (equation,x,y).
+  !> \param[in] t Current simulation or stage time [s].
+  !> \param[in] solve_cells Number of entries in the active-cell index lists.
+  !> \param[in] j_cent X indices of active cells; only the first solve_cells entries are used.
+  !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
+  !> \param[in] solve_interfaces_x Number of active x-normal faces.
+  !> \param[in] j_stag_x X-face indices paired with k_stag_x.
+  !> \param[in] k_stag_x Y-cell indices of active x-normal faces.
+  !> \param[in] solve_interfaces_y Number of active y-normal faces.
+  !> \param[in] j_stag_y X-cell indices of active y-normal faces.
+  !> \param[in] k_stag_y Y-face indices paired with j_stag_y.
 
   SUBROUTINE eval_hyperbolic_terms( this, recon, qp_expl,                     &
        divFlux_iRK, t, solve_cells, j_cent, k_cent, solve_interfaces_x,       &
@@ -124,6 +159,9 @@ CONTAINS
 
     CALL eval_cell_hydrostatic_paths( this, recon, solve_cells, j_cent, k_cent )
 
+    ! Assemble each cell from its outward-oriented face values, then subtract
+    ! the within-cell hydrostatic path. This cancellation is essential for
+    ! lake-at-rest balance; adding a separate bed-force source would count it twice.
     !$OMP PARALLEL DO private(l,j,k,i)
 
     cells_loop:DO l = 1,solve_cells
@@ -164,12 +202,22 @@ CONTAINS
   END SUBROUTINE eval_hyperbolic_terms
 
   !******************************************************************************
-  !> \brief Evaluate the slope-corrected HP-PCCU oriented face values
+  !> \brief Build both oriented HP-PCCU values at every active face.
   !>
   !> The conservative endpoint flux is purely inertial.  Hydrostatic pressure
   !> and bed geometry enter only through the path contribution used to form the
   !> two oriented values at each face.
+  !>
+  !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
+  !> \param[in] recon Reconstructed cell-owned and face-oriented physical/conservative traces.
+  !> \param[in] solve_interfaces_x Number of active x-normal faces.
+  !> \param[in] j_stag_x X-face indices paired with k_stag_x.
+  !> \param[in] k_stag_x Y-cell indices of active x-normal faces.
+  !> \param[in] solve_interfaces_y Number of active y-normal faces.
+  !> \param[in] j_stag_y X-cell indices of active y-normal faces.
+  !> \param[in] k_stag_y Y-face indices paired with j_stag_y.
   !******************************************************************************
+
   SUBROUTINE eval_flux_PCCU( this, recon, solve_interfaces_x, j_stag_x,       &
        k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
@@ -305,8 +353,15 @@ CONTAINS
   END SUBROUTINE eval_flux_PCCU
 
   !******************************************************************************
-  !> \brief Evaluate the HP path joining the two final traces of every cell
+  !> \brief Integrate the hydrostatic path between the final traces of each active cell.
+  !>
+  !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
+  !> \param[in] recon Reconstructed cell-owned and face-oriented physical/conservative traces.
+  !> \param[in] solve_cells Number of entries in the active-cell index lists.
+  !> \param[in] j_cent X indices of active cells; only the first solve_cells entries are used.
+  !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
   !******************************************************************************
+
   SUBROUTINE eval_cell_hydrostatic_paths( this, recon, solve_cells, j_cent,   &
        k_cent )
 
@@ -368,14 +423,22 @@ CONTAINS
   END SUBROUTINE eval_cell_hydrostatic_paths
 
   !******************************************************************************
-  !> \brief Continue the material hydrostatic coefficient to a dry trace
+  !> \brief Use the wet endpoint pressure coefficient on a wet/dry path.
   !>
   !> Gamma is a material coefficient, not a thickness variable.  A dry final
   !> trace carries no composition and eval_hydrostatic_coefficient therefore
   !> returns Gamma=0.  Along a wet/dry shoreline this artificial jump would
   !> create a spurious -0.5*h^2*dGamma contribution in the hydrostatic path.
   !> Use the wet-side limiting value at the dry endpoint instead.
+  !>
+  !> \param[in] h_left Depth at the negative/left path endpoint [m].
+  !> \param[in,out] gamma_left Left coefficient, replaced by the right one if only the left trace is
+  !>                           dry.
+  !> \param[in] h_right Depth at the positive/right path endpoint [m].
+  !> \param[in,out] gamma_right Right coefficient, replaced by the left one if only the right trace
+  !>                            is dry.
   !******************************************************************************
+
   PURE SUBROUTINE regularize_dry_gamma_pair(h_left,gamma_left,h_right,gamma_right)
     REAL(wp), INTENT(IN) :: h_left,h_right
     REAL(wp), INTENT(INOUT) :: gamma_left,gamma_right
@@ -389,13 +452,22 @@ CONTAINS
   END SUBROUTINE regularize_dry_gamma_pair
 
   !******************************************************************************
-  !> \brief Characteristic speeds
+  !> \brief Evaluate facewise characteristic bounds from the reconstructed endpoint states.
   !
   !> This subroutine evaluates the largest characteristic speed at the
   !> cells interfaces from the reconstructed states.
   !> @author 
   !> Mattia de' Michieli Vitturi
   !> \date 2019/11/11
+  !>
+  !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
+  !> \param[in] recon Reconstructed cell-owned and face-oriented physical/conservative traces.
+  !> \param[in] solve_interfaces_x Number of active x-normal faces.
+  !> \param[in] j_stag_x X-face indices paired with k_stag_x.
+  !> \param[in] k_stag_x Y-cell indices of active x-normal faces.
+  !> \param[in] solve_interfaces_y Number of active y-normal faces.
+  !> \param[in] j_stag_y X-cell indices of active y-normal faces.
+  !> \param[in] k_stag_y Y-face indices paired with j_stag_y.
   !******************************************************************************
 
   SUBROUTINE eval_speeds( this, recon, solve_interfaces_x, j_stag_x,         &

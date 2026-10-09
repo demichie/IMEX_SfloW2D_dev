@@ -3,7 +3,11 @@
 !>
 !> This module owns the masks and compact index lists that identify cells and
 !> interfaces requiring numerical work.
+!>
+!> Builds compact cell/face worksets from wet cells, inlet cells and stencil halos. Spatial kernels
+!> consume these lists rather than scanning the entire domain.
 !********************************************************************************
+
 MODULE domain_2d
 
   USE parameters_2d, ONLY : wp, n_RK
@@ -18,6 +22,9 @@ MODULE domain_2d
 
   PRIVATE
 
+  !> \brief Active-cell/face indices and the wider reconstruction halo.
+  !> \details Solve lists determine where equations are advanced; reconstruction
+  !>          lists also contain neighbouring dry cells read by the HP stencil.
   TYPE, PUBLIC :: domain_type
 
      REAL(wp), ALLOCATABLE :: solve_mask_time(:,:)
@@ -51,6 +58,10 @@ MODULE domain_2d
   END TYPE domain_type
 
 CONTAINS
+
+  !> \brief Allocate and reset active-cell, halo and face worksets.
+  !>
+  !> \param[in,out] this Active-domain masks and compact cell/face worksets.
 
   SUBROUTINE initialize_domain(this)
 
@@ -103,6 +114,10 @@ CONTAINS
 
   END SUBROUTINE initialize_domain
 
+  !> \brief Release active-domain masks and compact index lists.
+  !>
+  !> \param[in,out] this Active-domain masks and compact cell/face worksets.
+
   SUBROUTINE finalize_domain(this)
 
     CLASS(domain_type), INTENT(INOUT) :: this
@@ -120,6 +135,14 @@ CONTAINS
     DEALLOCATE( this%j_stag_y, this%k_stag_y )
 
   END SUBROUTINE finalize_domain
+
+  !> \brief Rebuild active-cell and face worksets from the current flow and source geometry.
+  !>
+  !> \param[in,out] this Active-domain masks and compact cell/face worksets.
+  !> \param[in] q Cell-centered conservative states, indexed as (variable,x-cell,y-cell).
+  !> \param[in] t Current simulation or stage time [s].
+  !> \param[in] solve_all When true, include the complete domain instead of only flow/source cells
+  !>                      and halos.
 
   SUBROUTINE check_solve(this, q, t, solve_all)
 

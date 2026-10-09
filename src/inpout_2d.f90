@@ -2,12 +2,15 @@
 !> \brief Input/Output module
 !
 !> This module contains all the input/output subroutine and the
-!> realted variables.
+!> related variables.
 !
 !> \date 07/10/2016
 !> @author
 !> Mattia de' Michieli Vitturi
 !
+!>
+!> Owns input namelists, output schedules, NetCDF handles and versioned binary restart I/O. Several
+!> no-argument setup routines update shared parameter and geometry modules.
 !********************************************************************************
 
 MODULE inpout_2d
@@ -390,7 +393,7 @@ MODULE inpout_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Initialization of the variables read from the input file
+  !> \brief Initialize input defaults, output bookkeeping and boundary descriptors.
   !
   !> This subroutine initialize the input variables with default values
   !> that solve for a Riemann problem. If the input file does not exist
@@ -400,6 +403,9 @@ CONTAINS
   !> Mattia de' Michieli Vitturi
   !> \date 07/10/2016
   !
+  !>
+  !> \note Writes shared run defaults and input/output bookkeeping. No physical state arrays are
+  !>       advanced.
   !******************************************************************************
 
   SUBROUTINE init_param
@@ -953,7 +959,7 @@ CONTAINS
   END SUBROUTINE init_param
 
   !******************************************************************************
-  !> \brief Read the input file
+  !> \brief Read and validate input namelists, material properties, source settings and DEM data.
   !
   !> This subroutine read the input parameters from the file
   !> "two_phases.inp" and write a backup file of the input parameters
@@ -964,6 +970,9 @@ CONTAINS
   !> @author
   !> Mattia de' Michieli Vitturi
   !
+  !>
+  !> \note Populates parameters_2d, constitutive_parameters_2d and input geometry/erodible fields.
+  !>       Invalid model combinations terminate before solver initialization.
   !******************************************************************************
 
   SUBROUTINE read_param
@@ -4657,7 +4666,7 @@ CONTAINS
   END SUBROUTINE read_param
 
   !******************************************************************************
-  !> \brief Read the input file
+  !> \brief Reread the run-control namelist while a simulation is running.
   !
   !> This subroutine read the input parameters from the file
   !> "two_phases.inp" and write a backup file of the input parameters
@@ -4668,6 +4677,9 @@ CONTAINS
   !> @author
   !> Mattia de' Michieli Vitturi
   !
+  !>
+  !> \note Reads input_file and updates shared run-control/output settings; model structure and
+  !>       state-array allocation are not rebuilt.
   !******************************************************************************
 
   SUBROUTINE update_param
@@ -4762,7 +4774,7 @@ CONTAINS
   END SUBROUTINE update_param
 
   !******************************************************************************
-  !> \brief Read the solution from the restart unit
+  !> \brief Load and map text/ESRI initial-state files onto the computational grid.
   !
   !> This subroutine is called when the parameter "restart" in the input
   !> file is TRUE. Then the initial solution is read from a file.
@@ -4771,6 +4783,9 @@ CONTAINS
   !> @author
   !> Mattia de' Michieli Vitturi
   !
+  !>
+  !> \param[in,out] state Simulation cell states and accumulated diagnostics.
+  !> \param[in,out] domain Active-cell/face lists and reconstruction halo for this simulation.
   !******************************************************************************
 
   SUBROUTINE read_solution(state, domain)
@@ -5250,7 +5265,7 @@ CONTAINS
   END SUBROUTINE read_solution
 
   !******************************************************************************
-  !> \brief Read the solution from the restart unit
+  !> \brief Read and overlap-average the erodible-layer raster onto computational cells.
   !
   !> This subroutine is called when the parameter "restart" in the input
   !> file is TRUE. Then the initial solution is read from a file.
@@ -5259,6 +5274,9 @@ CONTAINS
   !> @author
   !> Mattia de' Michieli Vitturi
   !
+  !>
+  !> \note Reads erodible_file and grid coordinates. Writes the temporary erodible_init raster used
+  !>       during startup.
   !******************************************************************************
 
   SUBROUTINE read_erodible
@@ -5435,19 +5453,21 @@ CONTAINS
   END SUBROUTINE read_erodible
 
   !******************************************************************************
-  !> \brief Write the solution on the output unit
+  !> \brief Write the scheduled solution snapshots and advance the output schedule.
   !
   !> This subroutine write the parameters of the grid, the output time
   !> and the solution to a file with the name "run_name.q****", where
   !> run_name is the name of the run read from the input file and ****
   !> is the counter of the output.
   !
-  !> \param[in]   t      output time
   !
   !> @author
   !> Mattia de' Michieli Vitturi
   !> \date 07/10/2016
   !
+  !>
+  !> \param[in] time Current simulation time [s].
+  !> \param[in,out] state Current state; its physical cache is refreshed for output when needed.
   !******************************************************************************
 
   SUBROUTINE output_solution(time, state)
@@ -5620,7 +5640,7 @@ CONTAINS
   END SUBROUTINE output_solution
 
   !******************************************************************************
-  !> \brief Write the maximum thickness in ESRI format
+  !> \brief Write accumulated maximum thickness, pressure and velocity fields.
   !
   !> This subroutine write the maximum thickness in the ascii ESRI format.
   !> A masking is applied to the region with thickness less than 1E-5.
@@ -5629,6 +5649,8 @@ CONTAINS
   !> Mattia de' Michieli Vitturi
   !> \date 08/12/2018
   !
+  !>
+  !> \param[in] state Simulation cell states and accumulated diagnostics.
   !******************************************************************************
 
   SUBROUTINE output_max(state)
@@ -5729,17 +5751,19 @@ CONTAINS
   END SUBROUTINE output_max
 
   !******************************************************************************
-  !> \brief Write the thickness in ESRI format
+  !> \brief Export physical state and deposit fields as ESRI rasters.
   !
   !> This subroutine write the thickness in the ascii ESRI format.
   !> A masking is applied to the region with thickness less than 1E-5.
   !
-  !> \param[in]   output_idx      output index
   !
   !> @author
   !> Mattia de' Michieli Vitturi
   !> \date 15/12/2016
   !
+  !>
+  !> \param[in] output_idx Snapshot index used in raster filenames.
+  !> \param[in] state Simulation cell states and accumulated diagnostics.
   !******************************************************************************
 
   SUBROUTINE output_esri(output_idx, state)
@@ -6050,7 +6074,7 @@ CONTAINS
   END SUBROUTINE output_esri
 
   !******************************************************************************
-  !> \brief Close output units
+  !> \brief Close the configured formatted-output units.
   !
   !> This subroutine closes the units used for runout and mass center output
   !> if the output_runout_flag is active.
@@ -6058,7 +6082,11 @@ CONTAINS
   !> @author
   !> Mattia de' Michieli Vitturi
   !> \date 12/02/2018
+  !>
+  !> \note Closes formatted file handles stored in this module; the NetCDF handle has a separate
+  !>       close routine.
   !******************************************************************************
+
   SUBROUTINE close_units
 
     IMPLICIT NONE
@@ -6073,17 +6101,19 @@ CONTAINS
   END SUBROUTINE close_units
 
   !******************************************************************************
-  !> \brief Numeric to String conversion
+  !> \brief Convert an output index into a four-character numeric filename suffix.
   !
   !> This function convert the integer in input into a numeric string for
   !> the subfix of the output files.
   !
-  !> \param[in]   k      integer to convert
   !
   !> \date 07/10/2016
   !> @author
   !> Mattia de' Michieli Vitturi
   !
+  !>
+  !> \param[in] k Nonnegative output index from 0 to 9999.
+  !> \return Four-digit, zero-padded character suffix; the caller supplies an index from 0 to 9999.
   !******************************************************************************
 
   CHARACTER(LEN=4) FUNCTION lettera(k)
@@ -6108,15 +6138,17 @@ CONTAINS
   END FUNCTION lettera
 
   !******************************************************************************
-  !> \brief Write solution at selected points on file
+  !> \brief Interpolate the current solution at configured probes and write their records.
   !
   !> This subroutine writes on a file the thickness at selected points, defined
   !> by an appropriate card in the input file.
   !> in the initial solution.
-  !> \param[in]   output_idx      output index
   !> @author
   !> Mattia de' Michieli Vitturi
   !> \date 12/02/2018
+  !>
+  !> \param[in] time Current simulation time [s].
+  !> \param[in] state Simulation cell states and accumulated diagnostics.
   !******************************************************************************
 
   SUBROUTINE output_probes(time, state)
@@ -6355,16 +6387,19 @@ CONTAINS
   END SUBROUTINE output_probes
 
   !******************************************************************************
-  !> \brief Write runout on file
+  !> \brief Update runout diagnostics, write their records and check the steady-stop condition.
   !
   !> This subroutine writes on a file the flow runout. It is calculated as the
   !> linear horizontal distance from the point with the highest topography value
   !> in the initial solution.
-  !> \param[in]     time             actual time
-  !> \param[inout]  stop_flag        logical to check if flow has stopped
   !> @author
   !> Mattia de' Michieli Vitturi
   !> \date 12/02/2018
+  !>
+  !> \param[in] time Current simulation time [s].
+  !> \param[in,out] stop_flag Run-control flag updated when the configured steady/runout criterion
+  !>                          is reached.
+  !> \param[in,out] state Simulation cell states and accumulated diagnostics.
   !******************************************************************************
 
   SUBROUTINE output_runout(time, stop_flag, state)
@@ -6650,8 +6685,12 @@ CONTAINS
   ! ============================================================================
 
   !******************************************************************************
-  !> \brief Initializes the NetCDF file, defining dimensions and variables.
+  !> \brief Create the NetCDF output file and define coordinates, dimensions and fields.
+  !>
+  !> \note Reads shared model/grid metadata and writes the NetCDF file handle, dimension IDs and
+  !>       variable IDs retained by this module.
   !******************************************************************************
+
   SUBROUTINE init_netcdf_output
 
     USE netcdf
@@ -6976,8 +7015,12 @@ CONTAINS
   END SUBROUTINE init_netcdf_output
 
   !******************************************************************************
-  !> \brief Writes the physical fields for the current timestep.
+  !> \brief Append one time record of physical, topographic and transport fields to NetCDF.
+  !>
+  !> \param[in] time_in Simulation time associated with the appended NetCDF record [s].
+  !> \param[in] state Simulation cell states and accumulated diagnostics.
   !******************************************************************************
+
   SUBROUTINE write_netcdf_timestep(time_in, state)
     USE netcdf
     USE geometry_2d, ONLY: B_cent, B_prime_x_geom, B_prime_y_geom
@@ -7326,8 +7369,11 @@ END IF
   END SUBROUTINE write_netcdf_timestep
 
   !******************************************************************************
-  !> \brief Closes the NetCDF file.
+  !> \brief Close the currently open NetCDF output file.
+  !>
+  !> \note Consumes the module-owned ncid; call only after successful NetCDF initialization.
   !******************************************************************************
+
   SUBROUTINE close_netcdf
     USE netcdf
     IMPLICIT NONE
@@ -7337,8 +7383,11 @@ END IF
   END SUBROUTINE close_netcdf
 
   !******************************************************************************
-  !> \brief Checks the status of a NetCDF operation and stops on error.
+  !> \brief Validate a NetCDF status code and stop on an I/O error.
+  !>
+  !> \param[in] status Status code returned by the checked I/O operation.
   !******************************************************************************
+
   SUBROUTINE check(status)
     USE netcdf
     INTEGER, INTENT(IN) :: status
@@ -7349,17 +7398,27 @@ END IF
   END SUBROUTINE check
 
   !******************************************************************************
-  !> \brief Write a binary restart file
+  !> \brief Write a versioned checkpoint including conservative state, geometry and RNG history.
   !
   !> This subroutine writes the current state of the simulation to a binary file
   !> to allow restarting the simulation later. It saves dimensions, time,
   !> conservative variables, grid variables, and statistics.
   !
-  !> \param[in]   filename      Name of the restart file to write
   !
   !> @author
   !> Mattia de' Michieli Vitturi
+  !>
+  !> \param[in] filename Path to the binary checkpoint file.
+  !> \param[in] runtime Current time, timestep and previous timestep history.
+  !> \param[in] stochastic OU state, effective friction fluctuation and spatial-correlation
+  !>                       workspace.
+  !> \param[in] state Simulation cell states and accumulated diagnostics.
+  !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
+  !>
+  !> \note Also serializes shared bed/substrate fields, output schedules and RNG state. The
+  !>       unformatted file format depends on compatible compiler/platform record conventions.
   !******************************************************************************
+
   SUBROUTINE write_restart_file(filename, runtime, stochastic, state, domain)
     USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,     &
                              n_pore_vars
@@ -7459,17 +7518,27 @@ END IF
   END SUBROUTINE write_restart_file
 
   !******************************************************************************
-  !> \brief Read a binary restart file
+  !> \brief Validate and restore a versioned checkpoint into an initialized simulation.
   !
   !> This subroutine reads the state of the simulation from a binary file.
   !> It restores dimensions, time, conservative variables, grid variables,
   !> and statistics, and recalculates derived variables.
   !
-  !> \param[in]   filename      Name of the restart file to read
   !
   !> @author
   !> Mattia de' Michieli Vitturi
+  !>
+  !> \param[in] filename Path to the binary checkpoint file.
+  !> \param[in,out] runtime Current time, timestep and previous timestep history.
+  !> \param[in,out] stochastic OU state, effective friction fluctuation and spatial-correlation
+  !>                           workspace.
+  !> \param[in,out] state Simulation cell states and accumulated diagnostics.
+  !> \param[in,out] domain Active-cell/face lists and reconstruction halo for this simulation.
+  !>
+  !> \note Also restores shared bed/substrate fields, output schedules and RNG state, then rebuilds
+  !>       dependent geometry. Dimensions/model flags must match the configured simulation.
   !******************************************************************************
+
   SUBROUTINE read_restart_file(filename, runtime, stochastic, state, domain)
     USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,     &
                              n_pore_vars
@@ -7515,6 +7584,8 @@ END IF
       ERROR STOP 1
     END IF
 
+    ! Reject incompatible grid/component layouts before reading array payloads.
+    ! The checkpoint stores canonical conservative states, not a qp cache.
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) nx_check, ny_check,       &
          nvars_check, nsolid_check, naddgas_check, nstoch_check,            &
          npore_check, nthickness_check, ndynpres_check
@@ -7548,6 +7619,8 @@ END IF
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
     CALL check_restart_io(ierr, io_message, 'reading conservative state from', &
          filename)
+    ! Restore the authoritative nodal bed; shared face/centre elevations and
+    ! derivative fields are regenerated later rather than checkpointed separately.
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) B_vertex
     CALL check_restart_io(ierr, io_message, 'reading nodal topography from', &
          filename)
@@ -7617,8 +7690,14 @@ END IF
   END SUBROUTINE read_restart_file
 
   !******************************************************************************
-  !> \brief Abort after a failed binary-restart I/O operation.
+  !> \brief Attach operation and filename context to binary-restart I/O failures.
+  !>
+  !> \param[in] status Status code returned by the checked I/O operation.
+  !> \param[in] message Diagnostic text describing the operation or failure.
+  !> \param[in] operation Human-readable name of the restart operation being checked.
+  !> \param[in] filename Path to the binary checkpoint file.
   !******************************************************************************
+
   SUBROUTINE check_restart_io(status, message, operation, filename)
 
     INTEGER, INTENT(IN) :: status

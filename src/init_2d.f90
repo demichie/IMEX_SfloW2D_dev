@@ -3,6 +3,9 @@
 !
 !> This module contains the variables and the subroutine for the
 !> initialization of the solution for a Riemann problem.
+!>
+!> Builds empty or collapsing-volume initial states and owns temporary input rasters. Those rasters
+!> are released after the conservative state and substrate have been assembled.
 !********************************************************************************
 
 MODULE init_2d
@@ -25,12 +28,21 @@ CONTAINS
 
    ! Initial raster fields are not used after the conservative state and
    ! erodible substrate have been assembled. Safe for every startup branch.
+   !> \brief Release temporary initial-thickness and erodible-layer rasters.
+   !>
+   !> \note Deallocates thickness_init and erodible_init if allocated. Does not alter the
+   !>       conservative state or authoritative bed; repeated calls are safe.
+
    SUBROUTINE release_initialization_fields
 
       IF (ALLOCATED(thickness_init)) DEALLOCATE(thickness_init)
       IF (ALLOCATED(erodible_init)) DEALLOCATE(erodible_init)
 
    END SUBROUTINE release_initialization_fields
+
+   !> \brief Initialize a dry state with ambient temperature and zero transport.
+   !>
+   !> \param[in,out] state Allocated state whose conservative vector q is initialized to zero.
 
    SUBROUTINE init_empty(state)
 
@@ -71,7 +83,7 @@ CONTAINS
    END SUBROUTINE init_empty
 
    !******************************************************************************
-   !> \brief Collapsing volume initialization
+   !> \brief Build the configured collapsing-volume conservative initial condition.
    !
    !> This subroutine initialize the solution for a collpasing volume. Values for
    !>  the initial state (x, y, r, T, h, alphas) are read from the input file.
@@ -80,6 +92,9 @@ CONTAINS
    !> @author
    !> Mattia de' Michieli Vitturi
    !
+   !>
+   !> \param[in,out] state Allocated conservative state filled with the configured collapsing
+   !>                      volume.
    !******************************************************************************
 
    SUBROUTINE collapsing_volume(state)

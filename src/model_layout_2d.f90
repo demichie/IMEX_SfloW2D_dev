@@ -5,6 +5,7 @@
 !> workspaces are allocated. State arrays remain three-dimensional in this
 !> phase; the explicit layer count prepares the later rank migration.
 !********************************************************************************
+
 MODULE model_layout_2d
 
   IMPLICIT NONE
@@ -14,6 +15,9 @@ MODULE model_layout_2d
   PUBLIC :: model_layout_type
   PUBLIC :: supported_layer_count
 
+  !> \brief Validated component indices shared by states and numerical workspaces.
+  !> \details Zero optional indices mean that the corresponding transported
+  !>          variable is absent. Appended physical velocities are not equations.
   TYPE :: model_layout_type
 
      INTEGER :: n_layers = 0
@@ -52,8 +56,12 @@ MODULE model_layout_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Report whether a layer count is implemented by the current solver
+  !> \brief Report whether the requested layer count is implemented.
+  !>
+  !> \param[in] n_layers Requested material-layer count; only one layer is currently supported.
+  !> \return True only for the currently implemented single-layer model.
   !******************************************************************************
+
   PURE LOGICAL FUNCTION supported_layer_count( n_layers )
 
     INTEGER, INTENT(IN) :: n_layers
@@ -64,8 +72,19 @@ CONTAINS
 
 
   !******************************************************************************
-  !> \brief Build and validate the structural model layout
+  !> \brief Validate variable counts and build the canonical component index layout.
+  !>
+  !> \param[in,out] this Canonical model variable-count and component-index descriptor.
+  !> \param[in] n_layers Requested material-layer count; only one layer is currently supported.
+  !> \param[in] n_variables Number of conservative variables in each cell state.
+  !> \param[in] n_equations Number of balance equations; currently equal to n_variables.
+  !> \param[in] n_solid Number of independently transported solid classes.
+  !> \param[in] n_additional_gas Number of additional gas components, excluding ambient air.
+  !> \param[in] n_stochastic Number of transported stochastic variables, zero or one.
+  !> \param[in] n_pore_pressure Number of transported pore-pressure variables, zero or one.
+  !> \param[in] has_liquid_fraction True when a liquid mass fraction is independently transported.
   !******************************************************************************
+
   SUBROUTINE initialize_model_layout( this, n_layers, n_variables,           &
        n_equations, n_solid, n_additional_gas, n_stochastic,                &
        n_pore_pressure, has_liquid_fraction )
@@ -152,8 +171,11 @@ CONTAINS
 
 
   !******************************************************************************
-  !> \brief Reset the descriptor to its uninitialized state
+  !> \brief Reset all counts and indices to the uninitialized state.
+  !>
+  !> \param[in,out] this Canonical model variable-count and component-index descriptor.
   !******************************************************************************
+
   SUBROUTINE finalize_model_layout( this )
 
     CLASS(model_layout_type), INTENT(INOUT) :: this
@@ -186,8 +208,12 @@ CONTAINS
 
 
   !******************************************************************************
-  !> \brief Check that the descriptor contains a complete supported layout
+  !> \brief Check that all layout counts and indices are mutually consistent.
+  !>
+  !> \param[in] this Canonical model variable-count and component-index descriptor.
+  !> \return True when the descriptor contains a complete supported layout.
   !******************************************************************************
+
   LOGICAL FUNCTION model_layout_is_initialized( this )
 
     CLASS(model_layout_type), INTENT(IN) :: this

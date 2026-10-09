@@ -1,3 +1,11 @@
+    !> \file state_conversion_phys_var.inc
+    !> \brief Shared REAL/COMPLEX conservative-to-physical state decoder.
+    !> \details Included by r_phys_var and c_phys_var, which own typed declarations.
+    !> \par Inputs
+    !> qj, component indices, phase flags, ambient state and material parameters.
+    !> \par Outputs
+    !> h, u, v, T, rho_m, rho_c, their reciprocals, alphas, alphag, alphal,
+    !> Zs and exc_pore_pres. Temporary fractions and heat capacities are local.
     !--------------------------------------------------------------------------
     ! Shared executable core that derives the physical state from conservative
     ! variables. It is included by both r_phys_var and c_phys_var; declarations
@@ -12,6 +20,8 @@
     xl = 0.0_wp
     xg = 0.0_wp
 
+    ! Branch on the real base state, but retain imaginary perturbations in the
+    ! algebra below so the COMPLEX wrapper can supply complex-step derivatives.
     is_wet = REAL(qj(1), wp) .GT. EPSILON(1.0_wp)
 
     IF ( .NOT. is_wet ) THEN
@@ -30,6 +40,7 @@
 
     END IF
 
+    ! The dry return above must precede every division by column mass M=qj(1).
     inv_qj1 = 1.0_wp / qj(1)
 
     xs(1:n_solid) = qj(idx_solid_first:idx_solid_last) * inv_qj1
@@ -55,6 +66,8 @@
          ! OUT
          xc, mixture_sp_heat_c, sp_heat_mix)
 
+    ! qj(4)=M*cp*T contains thermal energy only, with no kinetic-energy term.
+    ! The near-dry temperature fallback avoids amplification by negligible mass.
     IF ( REAL(qj(1), wp) .GT. eps_sing ) THEN
 
        T = qj(4) / ( qj(1) * sp_heat_mix )

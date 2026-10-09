@@ -3,7 +3,12 @@
 !
 !> This module contains the variables and the subroutines related to 
 !> the computational grid
+!>
+!> Owns grid coordinates, source geometry and the authoritative nodal bed B_vertex. Shared Q1
+!> elevations feed HP-PCCU; separately filtered slopes and curvatures feed geometric corrections and
+!> local rheology.
 !*********************************************************************
+
 MODULE geometry_2d
 
   USE parameters_2d, ONLY : wp , sp, xinf
@@ -20,7 +25,7 @@ MODULE geometry_2d
   !> Location of the centers (y) of the control volume of the domain
   REAL(wp), ALLOCATABLE :: y_comp(:)
 
-  !> Location of the boundaries (x) of the control volumes of the domain
+  !> Location of the boundaries (y) of the control volumes of the domain
   REAL(wp), ALLOCATABLE :: y_stag(:)
 
   !> Authoritative continuous topography at Cartesian grid vertices.
@@ -146,10 +151,13 @@ MODULE geometry_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Finite volume grid initialization
+  !> \brief Allocate grid geometry and interpolate the input DEM to the authoritative nodal bed.
   !
   !> This subroutine initialize the grids for the finite volume solver.
   !> \date 16/08/2011
+  !>
+  !> \note Reads the configured domain and input topography_profile. Writes grid/bed/source
+  !>       geometry, refreshes derived elevations and frees the input DEM after interpolation.
   !******************************************************************************
 
   SUBROUTINE init_grid
@@ -365,11 +373,14 @@ CONTAINS
   END SUBROUTINE init_grid
 
   !******************************************************************************
-  !> \brief Derive all Q1 center and shared-face elevations from B_vertex.
+  !> \brief Derive shared Q1 face and cell elevations from B_vertex.
   !>
   !> B_vertex is the only authoritative bed elevation. The two cells adjacent
   !> to an internal Cartesian face access the same stored B_face_x/B_face_y
   !> value, so face continuity is an exact storage identity.
+  !>
+  !> \note Reads B_vertex and writes B_face_x, B_face_y and B_cent without smoothing the
+  !>       authoritative bed.
   !******************************************************************************
 
   SUBROUTINE derive_topography_from_vertices
@@ -389,11 +400,15 @@ CONTAINS
   END SUBROUTINE derive_topography_from_vertices
 
   !******************************************************************************
-  !> \brief Project a cell-centered scalar field to continuous Q1 vertices.
+  !> \brief Average adjacent cell values onto the shared vertex grid.
   !>
   !> Each vertex receives the arithmetic mean of all adjacent physical cells.
   !> This is the uniform-grid Q1 mass-lumped projection. It preserves the
   !> domain integral when the projected nodal field is averaged back to cells.
+  !>
+  !> \param[in] cell_field Cell-centered scalar proposal to be projected to the nodal grid.
+  !> \param[out] vertex_field Vertex values obtained from the adjacent cells, including one-sided
+  !>                          boundaries.
   !******************************************************************************
 
   SUBROUTINE project_cell_field_to_vertices( cell_field, vertex_field )
@@ -428,20 +443,25 @@ CONTAINS
   END SUBROUTINE project_cell_field_to_vertices
 
   !******************************************************************************
-  !> \brief Regenerate every derived geometric field from B_vertex.
+  !> \brief Recompute Q1 elevations and filtered geometric derivatives after a bed update.
+  !>
+  !> \note Reads the current B_vertex and grid spacing. Updates all derived elevations, fitted
+  !>       slopes/curvatures and centre/face gravity coefficients.
   !******************************************************************************
 
   SUBROUTINE refresh_topography_geometry
 
     IMPLICIT NONE
 
+    ! Refresh shared Q1 elevations first. The derivative filter acts on the
+    ! derived bed only; it must never overwrite the authoritative B_vertex.
     CALL derive_topography_from_vertices
     CALL topography_reconstruction
 
   END SUBROUTINE refresh_topography_geometry
 
   !******************************************************************************
-  !> \brief Topography zone identification
+  !> \brief Identify the largest connected region at the configured water elevation.
   !
   !> This subroutine search for the connected zones where topography elevation
   !> corresponds to a fixed value assigned in the input file (water_level). 
@@ -450,8 +470,9 @@ CONTAINS
   !> @author 
   !> Mattia de' Michieli Vitturi
   !> \date 2021/07/21
+  !>
+  !> \note Reads B_cent and water_level; writes the connected-region indicator B_zone.
   !******************************************************************************
-
 
   SUBROUTINE topography_zones
 
@@ -597,7 +618,7 @@ CONTAINS
   END SUBROUTINE topography_zones
 
   !******************************************************************************
-  !> \brief Filtered topography derivatives and slope corrections
+  !> \brief Compute filtered bed slopes, curvatures and large-slope gravity coefficients.
   !
   !> A five-point polynomial least-squares filter computes the first and
   !> second bed derivatives at cell centers. The two-cell boundary band uses
@@ -607,6 +628,9 @@ CONTAINS
   !> @author 
   !> Mattia de' Michieli Vitturi
   !> \date 2019/11/08
+  !>
+  !> \note Reads B_cent, grid spacing and slope_correction_flag. Writes filtered derivative arrays
+  !>       and G at cell centres/shared faces; it does not change B_vertex.
   !******************************************************************************
 
   SUBROUTINE topography_reconstruction
@@ -618,6 +642,9 @@ CONTAINS
     INTEGER :: j,k,kk,kj
     REAL(wp) :: weighted_sum
 
+    ! Five-point polynomial-fit coefficients differentiate the bed without
+    ! changing the Q1 elevations used by HP-PCCU. These filtered derivatives
+    ! enter large-slope/curvature corrections and local rheology instead.
     ! 1D Coefficients for 1st derivative: [-2, -1, 0, 1, 2]
     REAL(wp), PARAMETER :: c1(5) = [ -2.0_wp, -1.0_wp, 0.0_wp, 1.0_wp, 2.0_wp ]
     REAL(wp) :: norm1_x
@@ -806,13 +833,16 @@ CONTAINS
   END SUBROUTINE topography_reconstruction
 
   !******************************************************************************
-  !> \brief Radial source initialization
+  !> \brief Identify inlet cells and build their radial/lateral emission directions.
   !
   !> In this subroutine the source of mass is initialized. The cells belonging
   !> to the source are are identified ( source_cell(j,k) = 2 ).
   !> @author 
   !> Mattia de' Michieli Vitturi
   !> \date 2021/04/30
+  !>
+  !> \note Reads radial/lateral source parameters and coordinates. Writes source masks, inlet
+  !>       direction vectors and the integrated source perimeter.
   !******************************************************************************
 
   SUBROUTINE init_source
@@ -1232,17 +1262,20 @@ CONTAINS
   END SUBROUTINE init_source
 
   !-----------------------------------------------------------------------------
+  !> \brief Bilinearly interpolate a scalar on a grid supplied as coordinate matrices.
+  !>
   !> Scalar interpolation (2D)
   !
   !> This subroutine interpolate the values of the  array f1, defined on the 
   !> grid points (x1,y1), at the point (x2,y2). The value are saved in f2
   !> \date OCTOBER 2016
-  !> \param[in]    x1           original grid       
-  !> \param[in]    y1           original grid
-  !> \param[in]    f1           original values
-  !> \param[in]    x2           new point
-  !> \param[in]    y2           new point
-  !> \param[out]   f2           interpolated value
+  !>
+  !> \param[in] x1 X coordinates of the original interpolation grid.
+  !> \param[in] y1 Y coordinates of the original interpolation grid.
+  !> \param[in] f1 Scalar values on the original grid.
+  !> \param[in] x2 X coordinate of the requested interpolation point [m].
+  !> \param[in] y2 Y coordinate of the requested interpolation point [m].
+  !> \param[out] f2 Interpolated scalar value at (x2,y2).
   !-----------------------------------------------------------------------------
 
   SUBROUTINE interp_2d_scalar(x1, y1, f1, x2, y2, f2)
@@ -1300,17 +1333,20 @@ CONTAINS
   END SUBROUTINE interp_2d_scalar
 
   !-----------------------------------------------------------------------------
+  !> \brief Check whether a bilinear interpolation stencil includes missing DEM data.
+  !>
   !> Scalar interpolation (2D)
   !
   !> This subroutine interpolate the values of the  array f1, defined on the 
   !> grid points (x1,y1), at the point (x2,y2). The value are saved in f2
   !> \date OCTOBER 2016
-  !> \param[in]    x1           original grid          
-  !> \param[in]    y1           original grid          
-  !> \param[in]    f1           original values      
-  !> \param[in]    x2           new point            
-  !> \param[in]    y2           new point            
-  !> \param[out]   f2           interpolated value     
+  !>
+  !> \param[in] x1 X coordinates of the original interpolation grid.
+  !> \param[in] y1 Y coordinates of the original interpolation grid.
+  !> \param[in] f1 Scalar values on the original grid.
+  !> \param[in] x2 X coordinate of the requested interpolation point [m].
+  !> \param[in] y2 Y coordinate of the requested interpolation point [m].
+  !> \param[out] f2 True if any required input stencil value equals nodata_topo.
   !-----------------------------------------------------------------------------
 
   SUBROUTINE interp_2d_nodata(x1, y1, f1, x2, y2, f2)
@@ -1371,18 +1407,21 @@ CONTAINS
 
 
   !-----------------------------------------------------------------------------
+  !> \brief Bilinearly interpolate a scalar using one-dimensional coordinate arrays.
+  !>
   !> Scalar interpolation (2D)
   !
   !> This subroutine interpolate the values of the  array f1, defined on the 
   !> grid points (x1,y1), at the point (x2,y2). The value are saved in f2.
   !> In this case x1 and y1 are 1d arrays.
   !> \date OCTOBER 2016
-  !> \param[in]    x1           original grid              
-  !> \param[in]    y1           original grid            
-  !> \param[in]    f1           original values           
-  !> \param[in]    x2           new point                
-  !> \param[in]    y2           new point               
-  !> \param[out]   f2           interpolated value       
+  !>
+  !> \param[in] x1 X coordinates of the original interpolation grid.
+  !> \param[in] y1 Y coordinates of the original interpolation grid.
+  !> \param[in] f1 Scalar values on the original grid.
+  !> \param[in] x2 X coordinate of the requested interpolation point [m].
+  !> \param[in] y2 Y coordinate of the requested interpolation point [m].
+  !> \param[out] f2 Interpolated scalar value at (x2,y2).
   !-----------------------------------------------------------------------------
 
   SUBROUTINE interp_2d_scalarB(x1, y1, f1, x2, y2, f2)
@@ -1453,20 +1492,23 @@ CONTAINS
 
 
   !-----------------------------------------------------------------------------
+  !> \brief Average an input raster over one target control volume using overlap weights.
+  !>
   !> Scalar regrid (2D)
   !
   !> This subroutine interpolate the values of the  array f1, defined on the 
   !> grid points (x1,y1), at the point (x2,y2). The value are saved in f2.
   !> In this case x1 and y1 are 1d arrays.
   !> \date OCTOBER 2016
-  !> \param[in]    x1           original grid
-  !> \param[in]    y1           original grid
-  !> \param[in]    f1           original values
-  !> \param[in]    xl           new point
-  !> \param[in]    xr           new point
-  !> \param[in]    yl           new point
-  !> \param[in]    yr           new point
-  !> \param[out]   f2           interpolated value
+  !>
+  !> \param[in] xin X coordinates of the input raster grid [m].
+  !> \param[in] yin Y coordinates of the input raster grid [m].
+  !> \param[in] fin Input raster values to average over the target cell.
+  !> \param[in] xl Left boundary of the target cell [m].
+  !> \param[in] xr Right boundary of the target cell [m].
+  !> \param[in] yl Lower boundary of the target cell [m].
+  !> \param[in] yr Upper boundary of the target cell [m].
+  !> \param[out] fout Overlap-weighted scalar average over the target cell.
   !-----------------------------------------------------------------------------
 
   SUBROUTINE regrid_scalar(xin, yin, fin, xl, xr , yl, yr, fout)
@@ -1515,7 +1557,7 @@ CONTAINS
   END SUBROUTINE regrid_scalar
 
   !******************************************************************************
-  !> \brief Slope limiter
+  !> \brief Apply the configured slope limiter to a three-point stencil.
   !
   !> This subroutine limits the slope of the linear reconstruction of 
   !> the physical variables, accordingly to the parameter "solve_limiter":\n
@@ -1524,13 +1566,14 @@ CONTAINS
   !> - 'superbee' => superbee limiter (Roe, 1985);
   !> - 'van_leer' => monotonized central-difference limiter (van Leer, 1977)
   !> .
-  !> \param[in]     v             3-point stencil value array 
-  !> \param[in]     z             3-point stencil location array 
-  !> \param[in]     limiter       integer defining the limiter choice
-  !> \param[out]    slope_lim     limited slope         
   !> \date 07/10/2016
   !> @author 
   !> Mattia de' Michieli Vitturi
+  !>
+  !> \param[in] v Scalar values at the three stencil points.
+  !> \param[in] z Coordinates of the three stencil points.
+  !> \param[in] limiter Limiter selector; the supported cases are defined by this routine.
+  !> \param[out] slope_lim Limited derivative along the stencil coordinate.
   !******************************************************************************
 
   SUBROUTINE limit( v , z , limiter , slope_lim )
@@ -1601,15 +1644,16 @@ CONTAINS
   END SUBROUTINE limit
 
   !******************************************************************************
-  !> \brief Minmod limiter
+  !> \brief Return the smaller same-sign slope, or zero for incompatible slopes.
   !
   !> This function compute the minmod between two real numbers
-  !> \param[in]     a: 1st value
-  !> \param[in]     b: 2nd value
-  !> \result        the minmod between a and b
   !> \date 2021/04/30
   !> @author 
   !> Mattia de' Michieli Vitturi
+  !>
+  !> \param[in] a First candidate slope.
+  !> \param[in] b Second candidate slope.
+  !> \return Same-sign minimum-magnitude slope, or zero near zero/opposite signs.
   !******************************************************************************
 
   REAL(wp) FUNCTION minmod(a,b)
@@ -1635,6 +1679,12 @@ CONTAINS
 
   END FUNCTION minmod
 
+  !> \brief Return the larger same-sign slope, or zero for incompatible slopes.
+  !>
+  !> \param[in] a First candidate slope.
+  !> \param[in] b Second candidate slope.
+  !> \return Same-sign maximum-magnitude slope, or zero near zero/opposite signs.
+
   REAL(wp) function maxmod(a,b)
 
     IMPLICIT none
@@ -1658,6 +1708,13 @@ CONTAINS
 
   ! Fissural rectangle/cell intersections follow the segment-and-width source
   ! geometry introduced by Elisa Biagioli in BiElisa/IMEX_LavaFlow.
+  !> \brief Compute each cell overlap fraction with a finite-width fissure rectangle.
+  !>
+  !> \param[in] endpoints_x X coordinates of the two fissure segment endpoints [m].
+  !> \param[in] endpoints_y Y coordinates of the two fissure segment endpoints [m].
+  !> \param[in] width Full width of the fissure rectangle [m].
+  !> \param[out] cell_fraction Rectangle overlap divided by cell area, one value per cell.
+
   SUBROUTINE compute_cell_fissure_fraction(endpoints_x, endpoints_y, width,   &
        cell_fraction)
 
@@ -1805,6 +1862,14 @@ CONTAINS
 
   END SUBROUTINE compute_cell_fissure_fraction
 
+  !> \brief Estimate cell coverage by an elliptical source using subcell sampling.
+  !>
+  !> \param[in] xs X coordinate of the ellipse centre [m].
+  !> \param[in] ys Y coordinate of the ellipse centre [m].
+  !> \param[in] rs First semi-axis of the elliptical source [m].
+  !> \param[in] r2s Second semi-axis of the elliptical source [m].
+  !> \param[in] angles Clockwise angle of the ellipse relative to the x axis [degrees].
+  !> \param[out] cell_fract Source-covered fraction of each computational cell.
 
   SUBROUTINE compute_cell_fract(xs,ys,rs,r2s,angles,cell_fract)
 

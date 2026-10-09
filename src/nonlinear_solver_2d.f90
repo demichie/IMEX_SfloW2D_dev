@@ -5,6 +5,7 @@
 !> linear solves.  This module is intentionally independent of the spatial
 !> domain and operates on one cell state at a time.
 !********************************************************************************
+
 MODULE nonlinear_solver_2d
 
   USE diagnostics_2d, ONLY : debug_pause
@@ -30,6 +31,11 @@ MODULE nonlinear_solver_2d
 
 CONTAINS
 
+  !> \brief Set the complex-step perturbation and its reciprocal.
+  !>
+  !> \note Writes h and one_by_h, used to differentiate the implicit source with a complex
+  !>       perturbation.
+
   SUBROUTINE initialize_nonlinear_solver
 
     h = n_vars * EPSILON(1.0_wp)
@@ -37,10 +43,30 @@ CONTAINS
 
   END SUBROUTINE initialize_nonlinear_solver
 
+  !> \brief Provide the matching lifecycle hook for the cell-local nonlinear solver.
+  !>
+  !> \note Currently a no-op: the nonlinear solver owns scalar constants, not allocated arrays.
+
   SUBROUTINE finalize_nonlinear_solver
 
   END SUBROUTINE finalize_nonlinear_solver
 
+  !> \brief Solve one cell-local implicit Runge-Kutta stage with scaled Newton iteration.
+  !>
+  !> \param[in] equation_partition Explicit/implicit equation mask and compact index maps.
+  !> \param[in,out] qj Local conservative state vector; mass and momenta are per unit horizontal
+  !>                   area.
+  !> \param[in] qj_old Cell conservative reference state used in the implicit-stage residual.
+  !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
+  !> \param[in] a_diag Diagonal coefficient of the current implicit Runge-Kutta stage.
+  !> \param[in] Rj_not_impl Already known stage contribution excluding the current implicit source.
+  !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
+  !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
+  !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
+  !> \param[out] iterations_used Number of Newton iterations attempted for this cell/stage.
+  !> \param[out] converged True when the implicit-stage solve meets its convergence criteria.
+  !> \param[out] linear_info Linear-solver status: zero for success, nonzero for a failed solve.
+  !> \param[out] line_search_failed True when backtracking fails to accept a step.
   !******************************************************************************
 
   SUBROUTINE solve_rk_step( equation_partition, qj, qj_old, dt_step, a_diag,  &
@@ -358,12 +384,17 @@ CONTAINS
   END SUBROUTINE solve_rk_step
 
   !******************************************************************************
-  !> \brief Solve a 2x2 linear system with partial pivoting
+  !> \brief Solve a two-equation dense system with guarded partial pivoting.
   !
   !> The matrix and right-hand side are overwritten with the elimination
   !> factors and the solution, respectively. Rows are equilibrated before
   !> elimination so that dimensional differences do not affect pivot tests.
   !> A nonzero info value identifies the first numerically singular pivot.
+  !>
+  !> \param[in,out] matrix Coefficient matrix; overwritten by row scaling and elimination.
+  !> \param[in,out] rhs Right-hand side on entry; solution vector on successful exit.
+  !> \param[out] info Zero on success; positive for a singular pivot, negative for invalid
+  !>                  arguments/shapes.
   !******************************************************************************
 
   SUBROUTINE solve_2x2_pivoted( matrix, rhs, info )
@@ -434,12 +465,17 @@ CONTAINS
 
 
   !******************************************************************************
-  !> \brief Solve a 3x3 linear system with partial pivoting
+  !> \brief Solve a three-equation dense system with guarded partial pivoting.
   !
   !> The matrix and right-hand side are overwritten with the elimination
   !> factors and the solution, respectively. Rows are equilibrated before
   !> elimination so that dimensional differences do not affect pivot tests.
   !> A nonzero info value identifies the first numerically singular pivot.
+  !>
+  !> \param[in,out] matrix Coefficient matrix; overwritten by row scaling and elimination.
+  !> \param[in,out] rhs Right-hand side on entry; solution vector on successful exit.
+  !> \param[out] info Zero on success; positive for a singular pivot, negative for invalid
+  !>                  arguments/shapes.
   !******************************************************************************
 
   SUBROUTINE solve_3x3_pivoted( matrix, rhs, info )
@@ -569,26 +605,33 @@ CONTAINS
   END SUBROUTINE solve_3x3_pivoted
 
   !******************************************************************************
-  !> \brief Search the descent stepsize
+  !> \brief Backtrack a Newton direction until the scaled residual merit function decreases.
   !
   !> This subroutine search for the lenght of the descent step in order to have
   !> a decrease in the nonlinear function.
-  !> \param[in]     qj_rel_NR_old
-  !> \param[in]     qj_org
-  !> \param[in]     qj_old
-  !> \param[in]     scal_f_old
-  !> \param[in]     grad_f
-  !> \param[in,out] desc_dir
-  !> \param[in]     coeff_f
-  !> \param[out]    qj_rel
-  !> \param[out]    scal_f
-  !> \param[out]    right_term
-  !> \param[in]     stpmax
-  !> \param[out]    check
-  !> \param[in]     RJ_not_impl
   !> @author
   !> Mattia de' Michieli Vitturi
   !> \date 2019/12/16
+  !>
+  !> \param[in] qj_rel_NR_old Normalized state at the start of the current line search.
+  !> \param[in] qj_org Per-variable scaling factors for normalized Newton variables.
+  !> \param[in] qj_old Cell conservative reference state used in the implicit-stage residual.
+  !> \param[in] scal_f_old Initial value of the half-squared scaled residual norm.
+  !> \param[in] grad_f Gradient of the scalar residual merit function at the starting point.
+  !> \param[in,out] desc_dir Newton descent direction, limited to the maximum permitted step length.
+  !> \param[in] coeff_f Per-equation scaling factors applied to the stage residual.
+  !> \param[out] qj_rel Dimensionless normalized conservative state, qj=qj_rel*qj_org.
+  !> \param[out] scal_f Half the squared Euclidean norm of the scaled nonlinear residual.
+  !> \param[in,out] right_term Initial residual on entry; residual of the accepted line-search state
+  !>                           on exit.
+  !> \param[in] stpmax Maximum Euclidean length of the normalized trial step.
+  !> \param[out] check True when the line search cannot find a usable decrease.
+  !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
+  !> \param[in] a_diag Diagonal coefficient of the current implicit Runge-Kutta stage.
+  !> \param[in] Rj_not_impl Already known stage contribution excluding the current implicit source.
+  !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
+  !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
+  !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !******************************************************************************
 
   SUBROUTINE lnsrch( qj_rel_NR_old , qj_org , qj_old , scal_f_old , grad_f ,    &
@@ -806,20 +849,25 @@ CONTAINS
   END SUBROUTINE lnsrch
 
   !******************************************************************************
-  !> \brief Evaluate the nonlinear system
+  !> \brief Evaluate the scaled implicit-stage residual and its scalar merit function.
   !
   !> This subroutine evaluate the value of the nonlinear system in the state
   !> defined by the variables qj.
-  !> \param[in]    qj          conservative variables
-  !> \param[in]    qj_old      conservative variables at the old time step
-  !> \param[in]    a_diag      implicit coefficient for the non-hyperbolic term
-  !> \param[in]    coeff_f     coefficient to rescale the nonlinear functions
-  !> \param[in]    Rj_not_impl explicit terms
-  !> \param[out]   f_nl        values of the nonlinear functions
-  !> \param[out]   scal_f      value of the scalar function f=0.5*<F,F>
   !> \date 2019/12/16
   !> @author
   !> Mattia de' Michieli Vitturi
+  !>
+  !> \param[in] qj Local conservative state vector; mass and momenta are per unit horizontal area.
+  !> \param[in] qj_old Cell conservative reference state used in the implicit-stage residual.
+  !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
+  !> \param[in] a_diag Diagonal coefficient of the current implicit Runge-Kutta stage.
+  !> \param[in] coeff_f Per-equation scaling factors applied to the stage residual.
+  !> \param[in] Rj_not_impl Already known stage contribution excluding the current implicit source.
+  !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
+  !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
+  !> \param[out] f_nl Scaled nonlinear stage residual, one entry per equation.
+  !> \param[out] scal_f Half the squared Euclidean norm of the scaled nonlinear residual.
+  !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !******************************************************************************
 
   SUBROUTINE eval_f( qj , qj_old , dt_step, a_diag , coeff_f , Rj_not_impl ,    &
@@ -865,19 +913,26 @@ CONTAINS
   END SUBROUTINE eval_f
 
   !******************************************************************************
-  !> \brief Evaluate the jacobian
+  !> \brief Build the scaled implicit-stage Jacobian using complex-step differentiation.
   !
   !> This subroutine evaluate the jacobian of the non-linear system
   !> with respect to the conservative variables.
   !
-  !> \param[in]    qj_rel        relative variation (qj=qj_rel*qj_org)
-  !> \param[in]    qj_org        conservative variables at the old time step
-  !> \param[in]    coeff_f       coefficient to rescale the nonlinear functions
-  !> \param[out]   left_matrix   matrix from the linearization of the system
   !
   !> \date 07/10/2016
   !> @author
   !> Mattia de' Michieli Vitturi
+  !>
+  !> \param[in] equation_partition Explicit/implicit equation mask and compact index maps.
+  !> \param[in] qj_rel Dimensionless normalized conservative state, qj=qj_rel*qj_org.
+  !> \param[in] qj_org Per-variable scaling factors for normalized Newton variables.
+  !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
+  !> \param[in] a_diag Diagonal coefficient of the current implicit Runge-Kutta stage.
+  !> \param[in] coeff_f Per-equation scaling factors applied to the stage residual.
+  !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
+  !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
+  !> \param[out] left_matrix Jacobian of the scaled residual with respect to the normalized state.
+  !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !******************************************************************************
 
   SUBROUTINE eval_jacobian( equation_partition, qj_rel , qj_org , dt_step,  &
@@ -913,7 +968,9 @@ CONTAINS
     left_matrix(1:n_eqns,1:n_vars) = 0.0_wp
     Jacob_relax(1:n_eqns,1:n_vars) = 0.0_wp
 
-    ! evaluate the jacobian of the non-hyperbolic terms
+    ! Differentiate only implicit columns. A tiny imaginary perturbation of
+    ! one normalized conservative variable produces a derivative without
+    ! subtracting nearly equal residuals; the typed closures must retain it.
 
     DO i=1,n_vars
 

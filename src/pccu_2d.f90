@@ -6,6 +6,7 @@
 !> supplied by the caller; this module integrates the slope-corrected
 !> hydrostatic one-form and builds the oriented face pair.
 !********************************************************************************
+
 MODULE pccu_2d
 
   USE parameters_2d, ONLY : wp
@@ -25,7 +26,7 @@ MODULE pccu_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Integrate the slope-corrected hydrostatic path between endpoints
+  !> \brief Integrate the slope-corrected hydrostatic one-form between two endpoints.
   !>
   !> The returned vector is zero except in the momentum component normal to the
   !> selected direction.  In particular, the thermal component is identically
@@ -33,7 +34,22 @@ CONTAINS
   !> endpoints; a cell-internal path passes its two shared face values so that
   !> G varies linearly along the quadrature path.  The integrated one-form is
   !> -G*(Gamma*h*deta + 0.5*h**2*dGamma).
+  !>
+  !> \param[in] direction Cartesian path direction: PATH_DIR_X or PATH_DIR_Y.
+  !> \param[in] h_left Depth at the negative/left path endpoint [m].
+  !> \param[in] gamma_left Hydrostatic coefficient Gamma at the negative/left endpoint.
+  !> \param[in] eta_left Free-surface elevation at the negative/left endpoint or stencil neighbour
+  !>                     [m].
+  !> \param[in] grav_coeff_left Large-slope factor G at the negative/left endpoint.
+  !> \param[in] h_right Depth at the positive/right path endpoint [m].
+  !> \param[in] gamma_right Hydrostatic coefficient Gamma at the positive/right endpoint.
+  !> \param[in] eta_right Free-surface elevation at the positive/right endpoint or stencil neighbour
+  !>                      [m].
+  !> \param[in] grav_coeff_right Large-slope factor G at the positive/right endpoint.
+  !> \param[out] path_contribution Integrated nonconservative path contribution, one entry per
+  !>                               equation.
   !******************************************************************************
+
   SUBROUTINE eval_hydrostatic_path( direction, h_left, gamma_left, eta_left,   &
        grav_coeff_left, h_right, gamma_right, eta_right, grav_coeff_right,    &
        path_contribution )
@@ -54,8 +70,17 @@ CONTAINS
   END SUBROUTINE eval_hydrostatic_path
 
   !******************************************************************************
-  !> \brief Central-upwind flux built from inertial endpoint fluxes
+  !> \brief Combine inertial endpoint fluxes with central-upwind dissipation.
+  !>
+  !> \param[in] a_minus Nonpositive lower characteristic bound at the face [m s^-1].
+  !> \param[in] a_plus Nonnegative upper characteristic bound at the face [m s^-1].
+  !> \param[in] flux_left Inertial conservative flux of the negative/left endpoint state.
+  !> \param[in] flux_right Inertial conservative flux of the positive/right endpoint state.
+  !> \param[in] state_left Conservative state at the negative/left endpoint.
+  !> \param[in] state_right Conservative state at the positive/right endpoint.
+  !> \param[out] numerical_flux Central-upwind conservative flux before the path split.
   !******************************************************************************
+
   SUBROUTINE eval_central_upwind_flux( a_minus, a_plus, flux_left, flux_right, &
        state_left, state_right, numerical_flux )
 
@@ -84,8 +109,17 @@ CONTAINS
   END SUBROUTINE eval_central_upwind_flux
 
   !******************************************************************************
-  !> \brief Form the two oriented PCCU values seen by adjacent cells
+  !> \brief Split a numerical flux and path jump into the two cell-facing values.
+  !>
+  !> \param[in] numerical_flux Central-upwind conservative flux before the path split.
+  !> \param[in] path_contribution Integrated nonconservative path contribution, one entry per
+  !>                              equation.
+  !> \param[in] a_minus Nonpositive lower characteristic bound at the face [m s^-1].
+  !> \param[in] a_plus Nonnegative upper characteristic bound at the face [m s^-1].
+  !> \param[out] value_left Oriented face value consumed by the negative/left adjacent cell.
+  !> \param[out] value_right Oriented face value consumed by the positive/right adjacent cell.
   !******************************************************************************
+
   SUBROUTINE eval_oriented_pccu_pair( numerical_flux, path_contribution,       &
        a_minus, a_plus, value_left, value_right )
 
@@ -111,6 +145,14 @@ CONTAINS
     END IF
 
   END SUBROUTINE eval_oriented_pccu_pair
+
+  !> \brief Evaluate the hydrostatic momentum one-form at a quadrature state.
+  !>
+  !> \param[in] direction Cartesian path direction: PATH_DIR_X or PATH_DIR_Y.
+  !> \param[in] path_state Extended state evaluated at the current path quadrature coordinate.
+  !> \param[in] dstate_ds Derivative of the extended path state with respect to its unit-interval
+  !>                      coordinate.
+  !> \param[out] integrand Model one-form contracted with the path tangent, one entry per equation.
 
   SUBROUTINE hydrostatic_integrand( direction, path_state, dstate_ds,         &
        integrand )

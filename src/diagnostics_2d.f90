@@ -6,6 +6,7 @@
 !> an OpenMP parallel region. Fatal conditions always terminate with a nonzero
 !> status so batch executions cannot remain blocked on standard input.
 !********************************************************************************
+
 MODULE diagnostics_2d
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit
@@ -23,11 +24,14 @@ MODULE diagnostics_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Pause for interactive inspection when explicitly enabled.
+  !> \brief Print an optional debug message and pause only when interactive debugging is enabled.
   !>
   !> Pauses requested from an OpenMP parallel region are skipped because stdin
   !> access from worker threads is unsafe and can deadlock a batch execution.
+  !>
+  !> \param[in] message Diagnostic text describing the operation or failure.
   !******************************************************************************
+
   SUBROUTINE debug_pause(message)
 
     CHARACTER(LEN=*), INTENT(IN) :: message
@@ -59,8 +63,11 @@ CONTAINS
   END SUBROUTINE debug_pause
 
   !******************************************************************************
-  !> \brief Report an unrecoverable condition and terminate with failure status.
+  !> \brief Report an unrecoverable error and terminate without interactive input.
+  !>
+  !> \param[in] message Diagnostic text describing the operation or failure.
   !******************************************************************************
+
   SUBROUTINE fatal_error(message)
 
     CHARACTER(LEN=*), INTENT(IN) :: message

@@ -3,7 +3,11 @@
 !
 !> This module owns the state, runtime data and numerical workspaces that form
 !> one simulation and coordinates their lifecycle.
+!>
+!> Owns state, runtime, domain, layout, equation partition and numerical workspaces. Initialization
+!> follows their dependency order; finalization releases their storage.
 !********************************************************************************
+
 MODULE simulation_2d
 
   USE equation_terms_2d, ONLY : init_problem_param
@@ -33,6 +37,9 @@ MODULE simulation_2d
   PUBLIC :: simulation_context_type
   PUBLIC :: simulation
 
+  !> \brief Ownership root for runtime, states and reusable numerical workspaces.
+  !> \details Initialization follows the model-layout dependencies; finalization
+  !>          releases the owned storage without moving it into global facades.
   TYPE :: simulation_context_type
 
      TYPE(runtime_state_type) :: runtime
@@ -54,6 +61,10 @@ MODULE simulation_2d
   TYPE(simulation_context_type) :: simulation
 
 CONTAINS
+
+  !> \brief Initialize model metadata and simulation-owned numerical workspaces.
+  !>
+  !> \param[in,out] this Simulation-owned state, configuration descriptors and numerical workspaces.
 
   SUBROUTINE initialize_simulation(this)
 
@@ -77,6 +88,10 @@ CONTAINS
     WRITE(*,*) 'ALLOCATION OF ARRAYS COMPLETED'
 
   END SUBROUTINE initialize_simulation
+
+  !> \brief Release the simulation state, metadata and solver workspaces.
+  !>
+  !> \param[in,out] this Simulation-owned state, configuration descriptors and numerical workspaces.
 
   SUBROUTINE finalize_simulation(this)
 

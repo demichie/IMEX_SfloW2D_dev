@@ -5,6 +5,7 @@
 !> initialization.  A non-negative stochastic_seed gives reproducible runs;
 !> the default negative value requests processor-dependent initialization.
 !********************************************************************************
+
 MODULE stochastic_random_2d
 
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
@@ -20,6 +21,11 @@ MODULE stochastic_random_2d
   PUBLIC :: gaussian_noise
 
 CONTAINS
+
+  !> \brief Initialize the intrinsic generator from the configured stochastic seed.
+  !>
+  !> \note Reads stochastic_seed and changes the intrinsic RNG state. A negative seed requests
+  !>       processor-dependent initialization.
 
   SUBROUTINE initialize_stochastic_rng
 
@@ -46,6 +52,14 @@ CONTAINS
     DEALLOCATE(seed_state)
 
   END SUBROUTINE initialize_stochastic_rng
+
+  !> \brief Generate independent standard-normal samples with the Box-Muller transform.
+  !>
+  !> \param[in] noise_size Number of independent standard-normal values to generate.
+  !> \return Vector of noise_size independent, zero-mean, unit-variance Gaussian samples.
+  !>
+  !> \note Advances the intrinsic RNG state; generate samples outside OpenMP cell loops to avoid
+  !>       schedule-dependent random draws.
 
   FUNCTION gaussian_noise(noise_size) RESULT(noise)
 

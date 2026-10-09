@@ -6,6 +6,7 @@
 !> reconstruction_2d; fluxes and source terms deliberately remain outside this
 !> module.
 !********************************************************************************
+
 MODULE hp_reconstruction_2d
 
   USE parameters_2d, ONLY : wp, dry_thickness_tolerance
@@ -24,7 +25,7 @@ MODULE hp_reconstruction_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Apply the HP reconstruction to one row or column of cells
+  !> \brief Blend direct and hydrostatic reconstructions while preserving depth positivity.
   !>
   !> Direct reconstructions of h, h*u_n and u_n are supplied by the caller.
   !> This routine reconstructs eta=h+B, enforces non-negative endpoint depths,
@@ -32,7 +33,38 @@ CONTAINS
   !> volumetric momentum while preserving its cell mean.
   !>
   !> Boundary eta slopes use the frozen-reference zero-gradient convention.
+  !>
+  !> \param[in] h_center Cell-centered depths along the local row/column stencil [m].
+  !> \param[in] u_center Cell-centered normal velocities along the local stencil [m s^-1].
+  !> \param[in] B_minus Bed elevations at the negative-side cell faces [m].
+  !> \param[in] B_plus Bed elevations at the positive-side cell faces [m].
+  !> \param[in] h_minus_direct Direct negative-side reconstructed depths [m].
+  !> \param[in] h_plus_direct Direct positive-side reconstructed depths [m].
+  !> \param[in] hu_minus_direct Direct negative-side reconstructed volumetric normal momenta h*u_n.
+  !> \param[in] hu_plus_direct Direct positive-side reconstructed volumetric normal momenta h*u_n.
+  !> \param[in] u_minus_candidate Negative-side normal-velocity candidates from the direct
+  !>                              reconstruction.
+  !> \param[in] u_plus_candidate Positive-side normal-velocity candidates from the direct
+  !>                             reconstruction.
+  !> \param[in] hydrostatic_residual Dimensionless local 2-D hydrostatic-disequilibrium indicator
+  !>                                 per stencil cell.
+  !> \param[in] topographic_relief_ratio Local face-bed elevation range divided by the cell depth.
+  !> \param[in] limiter_id Selector for the free-surface slope limiter.
+  !> \param[in] reconstruction_coefficient Multiplier applied to the limited free-surface slope.
+  !> \param[out] h_minus Final positivity-preserving negative-side depth [m].
+  !> \param[out] h_plus Final positivity-preserving positive-side depth [m].
+  !> \param[out] hu_minus Final limited negative-side volumetric normal momentum h*u_n.
+  !> \param[out] hu_plus Final limited positive-side volumetric normal momentum h*u_n.
+  !> \param[out] eta_minus Negative-side hydrostatic free-surface candidate [m].
+  !> \param[out] eta_plus Positive-side hydrostatic free-surface candidate [m].
+  !> \param[out] w_eta Hydrostatic-candidate blending weight per cell, in [0,1].
+  !> \param[in,out] line_scratch Optional reusable scratch with at least (number_of_cells,8)
+  !>                             entries; contents are overwritten.
+  !>
+  !> \note Negative/positive sides mean west/east in x or south/north in y. The blend limits normal
+  !>       momentum while keeping its cell mean; supplied scratch is private to one calling thread.
   !******************************************************************************
+
   SUBROUTINE reconstruct_hp_line( h_center, u_center, B_minus, B_plus,          &
        h_minus_direct, h_plus_direct, hu_minus_direct, hu_plus_direct,          &
        u_minus_candidate, u_plus_candidate, hydrostatic_residual,              &
@@ -150,6 +182,8 @@ CONTAINS
     h_minus_orig = MAX( h_minus_direct, 0.0_wp )
     h_plus_orig = MAX( h_plus_direct, 0.0_wp )
 
+    ! Compare jumps in the direct-depth and free-surface candidates at common
+    ! faces. Both adjacent cells receive the same interface mismatch contribution.
     Eh = 0.0_wp
     Eeta = 0.0_wp
     DO i = 1, number_of_cells-1
@@ -161,6 +195,8 @@ CONTAINS
 
     DO i = 1, number_of_cells
 
+       ! Prefer the candidate with the smaller jump; unresolved ties are blended
+       ! equally. The wet/dry and rough-bed guards below can override this weight.
        denominator = Eh(i) + Eeta(i)
        distribution_tolerance = 1.0E-14_wp * MAX( 1.0_wp, h_center(i) )
        IF ( denominator .GT. distribution_tolerance ) THEN

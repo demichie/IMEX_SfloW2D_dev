@@ -1,6 +1,11 @@
 !********************************************************************************
 !> \brief State conversion and directly derived physical quantities
+!>
+!> Conservative states store mixture mass, momenta and thermal energy per unit area. Reconstructed
+!> states store h, hu, hv, T, component mass fractions and appended u/v. Volume fractions are
+!> derived only where constitutive laws require them.
 !********************************************************************************
+
 MODULE state_conversion_2d
 
   USE constitutive_parameters_2d
@@ -69,6 +74,13 @@ MODULE state_conversion_2d
 
 CONTAINS
 
+  !> \brief Recover real velocities from mixture mass and momenta with dry-state regularization.
+  !>
+  !> \param[in] qc Local conservative vector: mixture mass, momenta, thermal energy and transported
+  !>               component masses.
+  !> \param[out] u Cartesian depth-averaged x velocity [m s^-1].
+  !> \param[out] v Cartesian depth-averaged y velocity [m s^-1].
+
   SUBROUTINE velocity_from_conservative_real(qc, u, v)
 
     REAL(wp), INTENT(IN) :: qc(n_vars)
@@ -78,6 +90,12 @@ CONTAINS
 
   END SUBROUTINE velocity_from_conservative_real
 
+  !> \brief Recover complex-step velocities using the same real-path regularization.
+  !>
+  !> \param[in] qc Local conservative vector: mixture mass, momenta, thermal energy and transported
+  !>               component masses.
+  !> \param[out] u Cartesian depth-averaged x velocity [m s^-1].
+  !> \param[out] v Cartesian depth-averaged y velocity [m s^-1].
 
   SUBROUTINE velocity_from_conservative_complex(qc, u, v)
 
@@ -88,10 +106,18 @@ CONTAINS
 
   END SUBROUTINE velocity_from_conservative_complex
 
+  !> \brief Clip roundoff negatives and proportionally close explicit component fractions.
+  !>
   !> Enforce the admissible closure of the independently transported mass
   !> fractions. Roundoff-sized negative values are clipped; material negative
   !> values indicate a reconstruction/configuration error. If the explicit
   !> component sum exceeds one, all components are normalized proportionally.
+  !>
+  !> \param[in,out] xs Solid mass fractions, one entry per solid class.
+  !> \param[in,out] xg Additional-gas mass fractions, excluding ambient air.
+  !> \param[in,out] xl Liquid mass fraction; independently transported only when gas and liquid are
+  !>                   both present.
+
   SUBROUTINE enforce_mass_fraction_closure(xs, xg, xl)
 
     REAL(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas), xl
@@ -128,7 +154,13 @@ CONTAINS
   END SUBROUTINE enforce_mass_fraction_closure
 
 
+  !> \brief Apply admissible mass-fraction closure to a physical state vector.
+  !>
   !> Apply the mass-fraction closure directly to a primitive state vector.
+  !>
+  !> \param[in,out] qp Canonical physical states: h, hu, hv, T, component mass fractions, then
+  !>                   appended u and v.
+
   SUBROUTINE enforce_primitive_mass_fraction_closure(qp)
 
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2)
@@ -148,7 +180,16 @@ CONTAINS
   END SUBROUTINE enforce_primitive_mass_fraction_closure
 
 
+  !> \brief Derive constitutive volume fractions from canonical physical mass fractions.
+  !>
   !> Derive volume fractions from the canonical primitive mass fractions.
+  !>
+  !> \param[in] qp Canonical physical states: h, hu, hv, T, component mass fractions, then appended
+  !>               u and v.
+  !> \param[out] alphas Solid volume fractions, one entry per solid class.
+  !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
+  !> \param[out] alphal Liquid volume fraction.
+
   SUBROUTINE primitive_to_volume_fractions(qp, alphas, alphag, alphal)
 
     REAL(wp), INTENT(IN) :: qp(n_vars+2)
@@ -175,7 +216,13 @@ CONTAINS
 
   END SUBROUTINE primitive_to_volume_fractions
 
+  !> \brief Compute the volume-weighted Sauter diameter of the solid mixture.
+  !>
   !> Function that calculates the Sauter diameter
+  !>
+  !> \param[in] alpha_solids Depth-averaged solid volume fractions used as mixture weights.
+  !> \return Sauter diameter [m]; an unweighted mean diameter when solid volume is negligible.
+
   FUNCTION sauter_diameter(alpha_solids)
       !> Sauter diameter
       REAL(wp) :: sauter_diameter
@@ -191,7 +238,13 @@ CONTAINS
 
   END FUNCTION sauter_diameter
 
+  !> \brief Compute the volume-weighted mean density of the solid phases.
+  !>
    !> Function that calculates the average density of solid phases
+  !>
+  !> \param[in] alpha_solids Depth-averaged solid volume fractions used as mixture weights.
+  !> \return Solid mixture density [kg m^-3]; an unweighted mean when solid volume is negligible.
+
   FUNCTION average_density_solids(alpha_solids)
       !> Average density
       REAL(wp) :: average_density_solids
@@ -207,6 +260,16 @@ CONTAINS
 
   END FUNCTION average_density_solids
 
+  !> \brief Evaluate real carrier and whole-mixture specific heat capacities.
+  !>
+  !> \param[in] xs Solid mass fractions, one entry per solid class.
+  !> \param[in] xg Additional-gas mass fractions, excluding ambient air.
+  !> \param[in] xl Liquid mass fraction; independently transported only when gas and liquid are both
+  !>               present.
+  !> \param[out] xc Total carrier mass fraction, including any additional gas components.
+  !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity [J kg^-1 K^-1].
+  !> \param[out] sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
+
   SUBROUTINE eval_mixture_heat_capacity_real(xs, xg, xl, xc, sp_heat_c_mix,     &
        sp_heat_mix)
 
@@ -218,6 +281,15 @@ CONTAINS
 
   END SUBROUTINE eval_mixture_heat_capacity_real
 
+  !> \brief Evaluate complex-step carrier and whole-mixture specific heat capacities.
+  !>
+  !> \param[in] xs Solid mass fractions, one entry per solid class.
+  !> \param[in] xg Additional-gas mass fractions, excluding ambient air.
+  !> \param[in] xl Liquid mass fraction; independently transported only when gas and liquid are both
+  !>               present.
+  !> \param[out] xc Total carrier mass fraction, including any additional gas components.
+  !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity [J kg^-1 K^-1].
+  !> \param[out] sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
 
   SUBROUTINE eval_mixture_heat_capacity_complex(xs, xg, xl, xc,                &
        sp_heat_c_mix, sp_heat_mix)
@@ -230,6 +302,20 @@ CONTAINS
 
   END SUBROUTINE eval_mixture_heat_capacity_complex
 
+  !> \brief Derive real densities and volume fractions from component mass fractions.
+  !>
+  !> \param[in] T Mixture temperature [K].
+  !> \param[in] xs Solid mass fractions, one entry per solid class.
+  !> \param[in] xg Additional-gas mass fractions, excluding ambient air.
+  !> \param[in] xl Liquid mass fraction; independently transported only when gas and liquid are both
+  !>               present.
+  !> \param[out] rho_m Whole-mixture density [kg m^-3].
+  !> \param[out] inv_rhom Reciprocal of the whole-mixture density [m^3 kg^-1].
+  !> \param[out] rho_c Density of the carrier mixture [kg m^-3].
+  !> \param[out] inv_rho_c Reciprocal of carrier-mixture density [m^3 kg^-1].
+  !> \param[out] alphas Solid volume fractions, one entry per solid class.
+  !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
+  !> \param[out] alphal Liquid volume fraction.
 
   SUBROUTINE eval_mixture_properties_from_mass_real(T, xs, xg, xl, rho_m,     &
        inv_rhom, rho_c, inv_rho_c, alphas, alphag, alphal)
@@ -243,6 +329,20 @@ CONTAINS
 
   END SUBROUTINE eval_mixture_properties_from_mass_real
 
+  !> \brief Derive complex-step densities and volume fractions from mass fractions.
+  !>
+  !> \param[in] T Mixture temperature [K].
+  !> \param[in] xs Solid mass fractions, one entry per solid class.
+  !> \param[in] xg Additional-gas mass fractions, excluding ambient air.
+  !> \param[in] xl Liquid mass fraction; independently transported only when gas and liquid are both
+  !>               present.
+  !> \param[out] rho_m Whole-mixture density [kg m^-3].
+  !> \param[out] inv_rhom Reciprocal of the whole-mixture density [m^3 kg^-1].
+  !> \param[out] rho_c Density of the carrier mixture [kg m^-3].
+  !> \param[out] inv_rho_c Reciprocal of carrier-mixture density [m^3 kg^-1].
+  !> \param[out] alphas Solid volume fractions, one entry per solid class.
+  !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
+  !> \param[out] alphal Liquid volume fraction.
 
   SUBROUTINE eval_mixture_properties_from_mass_complex(T, xs, xg, xl, rho_m,  &
        inv_rhom, rho_c, inv_rho_c, alphas, alphag, alphal)
@@ -257,22 +357,25 @@ CONTAINS
   END SUBROUTINE eval_mixture_properties_from_mass_complex
 
 
-  !> \brief Evaluate mixture properties from component volume fractions.
-  !> \param[in]     T             Mixture temperature.
-  !> \param[in]     alphag        Additional-gas volume fractions.
-  !> \param[in,out] alphas        Solid volume fractions; normalized if their
-  !>                              dispersed-phase sum exceeds one.
-  !> \param[in,out] alphal        Liquid volume fraction; normalized together
-  !>                              with the solids when present.
-  !> \param[out]    rho_m         Mixture density.
-  !> \param[out]    inv_rhom      Inverse mixture density.
-  !> \param[out]    rho_c         Carrier density.
-  !> \param[out]    xs            Solid mass fractions.
-  !> \param[out]    xg            Additional-gas mass fractions.
-  !> \param[out]    xl            Liquid mass fraction.
-  !> \param[out]    xc            Total carrier mass fraction.
-  !> \param[out]    sp_heat_c_mix Carrier-mixture specific heat capacity.
-  !> \param[out]    sp_heat_mix   Whole-mixture specific heat capacity.
+  !> \brief Convert volume fractions to mass fractions, densities and heat capacities.
+  !>
+  !> \param[in] T Mixture temperature [K].
+  !> \param[in] alphag Additional-gas volume fractions, excluding ambient air.
+  !> \param[in,out] alphas Solid volume fractions; rescaled if the dispersed sum exceeds one,
+  !>                       or reset if that sum is negative.
+  !> \param[in,out] alphal Liquid volume fraction, normalized with alphas when independent;
+  !>                       otherwise reset to zero.
+  !> \param[out] rho_m Whole-mixture density [kg m^-3].
+  !> \param[out] inv_rhom Reciprocal of the whole-mixture density [m^3 kg^-1].
+  !> \param[out] rho_c Density of the carrier mixture [kg m^-3].
+  !> \param[out] xs Solid mass fractions, one entry per solid class.
+  !> \param[out] xg Additional-gas mass fractions, excluding ambient air.
+  !> \param[out] xl Liquid mass fraction; independently transported only when gas and liquid are
+  !>                both present.
+  !> \param[out] xc Total carrier mass fraction, including any additional gas components.
+  !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity [J kg^-1 K^-1].
+  !> \param[out] sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
+
   SUBROUTINE eval_mixture_properties_from_volume_fractions(T, alphag, alphas, &
        alphal, rho_m, inv_rhom, rho_c, xs, xg, xl, xc, sp_heat_c_mix,          &
        sp_heat_mix)
@@ -344,24 +447,30 @@ CONTAINS
   END SUBROUTINE eval_mixture_properties_from_volume_fractions
 
   !******************************************************************************
-  !> \brief Physical variables
+  !> \brief Decode conservative variables into real thermodynamic and kinematic quantities.
   !
   !> This subroutine evaluates from the conservative local variables qj
   !> the local physical variables  (\f$h,u,v,\alpha_s,\rho_m,T,\alpha_l \f$).
-  !> \param[in]    r_qj        real conservative variables
-  !> \param[out]   r_h         real-value flow thickness
-  !> \param[out]   r_u         real-value flow x-velocity
-  !> \param[out]   r_v         real-value flow y-velocity
-  !> \param[out]   r_alphas    real-value solid volume fractions
-  !> \param[out]   r_rho_m     real-value flow density
-  !> \param[out]   r_T         real-value flow temperature
-  !> \param[out]   r_alphal    real-value liquid volume fraction
-  !> \param[out]   r_red_grav  real-value reduced gravity
   !
   !> @author
   !> Mattia de' Michieli Vitturi
   !
   !> \date 2019/12/13
+  !>
+  !> \param[in] qj Local conservative state vector; mass and momenta are per unit horizontal area.
+  !> \param[out] h Flow depth [m].
+  !> \param[out] u Cartesian depth-averaged x velocity [m s^-1].
+  !> \param[out] v Cartesian depth-averaged y velocity [m s^-1].
+  !> \param[out] alphas Solid volume fractions, one entry per solid class.
+  !> \param[out] rho_m Whole-mixture density [kg m^-3].
+  !> \param[out] T Mixture temperature [K].
+  !> \param[out] alphal Liquid volume fraction.
+  !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
+  !> \param[out] red_grav Buoyancy-reduced gravitational acceleration [m s^-2].
+  !> \param[out] p_dyn Dynamic pressure rho_m*(u^2+v^2)/2 [Pa].
+  !> \param[out] Zs Transported scalar stochastic fluctuation decoded from its conservative mass.
+  !> \param[out] exc_pore_pres Transported excess pore pressure decoded from its conservative
+  !>                           variable.
   !******************************************************************************
 
   SUBROUTINE r_phys_var(qj, h, u, v, alphas, rho_m, T, alphal, alphag,          &
@@ -398,23 +507,28 @@ CONTAINS
 
 
   !******************************************************************************
-  !> \brief Physical variables
+  !> \brief Decode a perturbed conservative state for complex-step source differentiation.
   !
   !> This subroutine evaluates from the conservative local variables qj
-  !> the local physical variables  (\f$h,u,v,T,\rho_m,red grav,\alpha_s \f$).
-  !> \param[in]    c_qj      complex conservative variables
-  !> \param[out]   h         complex-value flow thickness
-  !> \param[out]   u         complex-value flow x-velocity
-  !> \param[out]   v         complex-value flow y-velocity
-  !> \param[out]   T         complex-value flow temperature
-  !> \param[out]   rho_m     complex-value flow density
-  !> \param[out]   alphas    complex-value solid volume fractions
-  !> \param[out]   inv_rhom  complex-value mixture density reciprocal
+  !> the complex thermodynamic and kinematic variables used for Jacobian evaluation.
   !
   !> @author
   !> Mattia de' Michieli Vitturi
   !
   !> \date 2019/12/13
+  !>
+  !> \param[in] qj Local conservative state vector; mass and momenta are per unit horizontal area.
+  !> \param[out] h Flow depth [m].
+  !> \param[out] u Cartesian depth-averaged x velocity [m s^-1].
+  !> \param[out] v Cartesian depth-averaged y velocity [m s^-1].
+  !> \param[out] T Mixture temperature [K].
+  !> \param[out] rho_m Whole-mixture density [kg m^-3].
+  !> \param[out] alphas Solid volume fractions, one entry per solid class.
+  !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
+  !> \param[out] inv_rhom Reciprocal of the whole-mixture density [m^3 kg^-1].
+  !> \param[out] Zs Transported scalar stochastic fluctuation decoded from its conservative mass.
+  !> \param[out] exc_pore_pres Transported excess pore pressure decoded from its conservative
+  !>                           variable.
   !******************************************************************************
 
   SUBROUTINE c_phys_var(qj, h, u, v, T, rho_m, alphas, alphag, inv_rhom, Zs,    &
@@ -439,20 +553,24 @@ CONTAINS
 
 
   !******************************************************************************
-  !> \brief Mixture variables
+  !> \brief Evaluate density, reduced gravity, heat capacities and Richardson number from a physical
+  !>        state.
   !
   !> This subroutine evaluates from the physical real-value local variables qpj,
   !> some mixture variable.
-  !> \param[in]    qpj          real-valued physical variables
-  !> \param[out]   r_Ri         real-valued Richardson number
-  !> \param[out]   r_rho_m      real-valued mixture density
-  !> \param[out]   r_rho_c      real-valued carrier phase density
-  !> \param[out]   r_red_grav   real-valued reduced gravity
   !
   !> @author
   !> Mattia de' Michieli Vitturi
   !
   !> \date 10/10/2019
+  !>
+  !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
+  !> \param[out] r_Ri Local dimensionless Richardson number.
+  !> \param[out] r_rho_m Whole-mixture density [kg m^-3].
+  !> \param[out] r_rho_c Carrier-mixture density [kg m^-3].
+  !> \param[out] r_red_grav Buoyancy-reduced gravitational acceleration [m s^-2].
+  !> \param[out] r_sp_heat_c Carrier-mixture specific heat capacity [J kg^-1 K^-1].
+  !> \param[out] r_sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
   !******************************************************************************
 
   SUBROUTINE mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,         &
@@ -547,7 +665,7 @@ CONTAINS
   END SUBROUTINE mixt_var
 
   !******************************************************************************
-  !> \brief Conservative to physical variables
+  !> \brief Convert a local conservative state into the canonical physical reconstruction state.
   !
   !> This subroutine evaluates from the conservative variables qc the
   !> array of physical variables qp:\n
@@ -563,15 +681,18 @@ CONTAINS
   !> .
   !> The physical variables are those used for the linear reconstruction at the
   !> cell interfaces. Limiters are applied to the reconstructed slopes.
-  !> \param[in]     qc     local conservative variables
-  !> \param[out]    qp     local physical variables
-  !> \param[out]    p_dyn  local dynamic pressure
   !
   !> \date 2019/11/11
   !
   !> @author
   !> Mattia de' Michieli Vitturi
   !
+  !>
+  !> \param[in] qc Local conservative vector: mixture mass, momenta, thermal energy and transported
+  !>               component masses.
+  !> \param[out] qp Canonical physical states: h, hu, hv, T, component mass fractions, then appended
+  !>                u and v.
+  !> \param[out] p_dyn Dynamic pressure rho_m*(u^2+v^2)/2 [Pa].
   !******************************************************************************
 
   SUBROUTINE qc_to_qp(qc,qp,p_dyn)
@@ -633,7 +754,8 @@ CONTAINS
   END SUBROUTINE qc_to_qp
 
   !******************************************************************************
-  !> \brief Physical to conservative variables
+  !> \brief Convert a physical mass-fraction state into conservative mass, momenta and thermal
+  !>        energy.
   !
   !> This subroutine evaluates the conservative real_value variables qc from the
   !> array of real_valued physical variables qp:\n
@@ -647,15 +769,17 @@ CONTAINS
   !> - qp(idx_u) = \f$ u \f$
   !> - qp(idx_v) = \f$ v \f$
   !> .
-  !> \param[in]    qp      physical variables
-  !> \param[in]    B       local topography
-  !> \param[out]   qc      conservative variables
   !
   !> \date 2019/11/18
   !
   !> @author
   !> Mattia de' Michieli Vitturi
   !
+  !>
+  !> \param[in] qp Canonical physical states: h, hu, hv, T, component mass fractions, then appended
+  !>               u and v.
+  !> \param[out] qc Local conservative vector: mixture mass, momenta, thermal energy and transported
+  !>                component masses.
   !******************************************************************************
 
   SUBROUTINE qp_to_qc(qp,qc)
@@ -756,16 +880,17 @@ CONTAINS
   END SUBROUTINE qp_to_qc
 
   !******************************************************************************
-  !> \brief Additional Physical variables
+  !> \brief Convert a physical state to the auxiliary free-surface reconstruction representation.
   !
-  !> This subroutine evaluates from the physical local variables qpj, the two
+  !> This subroutine evaluates from the physical local variables qpj, the three
   !> additional local variables qp2j = (h+B,u,v).
-  !> \param[in]    qpj    real-valued physical variables
-  !> \param[in]    Bj     real-valued local topography
-  !> \param[out]   qp2j   real-valued physical variables
   !> @author
   !> Mattia de' Michieli Vitturi
   !> \date 10/10/2019
+  !>
+  !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
+  !> \param[in] Bj Local bed elevation [m].
+  !> \param[out] qp2j Three-component auxiliary vector [eta,u,v], with eta=h+B.
   !******************************************************************************
 
   SUBROUTINE qp_to_qp2(qpj,Bj,qp2j)
@@ -795,19 +920,23 @@ CONTAINS
   END SUBROUTINE qp_to_qp2
 
   !------------------------------------------------------------------------------
+  !> \brief Evaluate particle terminal settling speed with the configured drag correlation.
+  !>
   !> Settling velocity function
   !
   !> This subroutine compute the settling velocity of the particles, as a
   !> function of diameter, density of particles and carrier phase and viscosity.
   !> \date 2019/11/11
-  !> \param[in]    diam          particle diameter
-  !> \param[in]    rhos          particle density
-  !> \param[in]    rhoc          carrier phase density
-  !> \param[in]    inv_kin_visc  reciprocal of kinetic viscosity
   !
   !> @author
   !> Mattia de' Michieli Vitturi
   !
+  !>
+  !> \param[in] diam Particle diameter [m].
+  !> \param[in] rhos Particle material density [kg m^-3].
+  !> \param[in] rhoc Carrier-fluid density [kg m^-3].
+  !> \param[in] inv_kin_visc Reciprocal of the carrier kinematic viscosity [s m^-2].
+  !> \return Terminal settling speed [m s^-1].
   !------------------------------------------------------------------------------
 
   REAL(wp) FUNCTION settling_velocity(diam,rhos,rhoc,inv_kin_visc)

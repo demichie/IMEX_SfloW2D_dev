@@ -2,8 +2,13 @@
 !> \brief Reconstruction of cell states at computational interfaces
 !>
 !> This module owns the reconstructed conservative/physical interface states
-!> and the corresponding divergence flags.
+!> together with free-surface traces and reusable HP scratch storage.
+!>
+!> West/east/south/north arrays are cell-owned traces; left/right/bottom/top arrays are
+!> face-oriented traces. HP evaluation retains separate candidate and commit phases to avoid reading
+!> partially updated neighbours.
 !********************************************************************************
+
 MODULE reconstruction_2d
 
   USE parameters_2d, ONLY : wp, n_vars
@@ -27,6 +32,10 @@ MODULE reconstruction_2d
 
   PRIVATE
 
+  !> \brief Persistent cell/face traces and thread-local storage for HP reconstruction.
+  !> \details Arrays are indexed by component, x and y; hp_scratch uses its last
+  !>          index to select the OpenMP thread. Allocation occurs at initialization,
+  !>          not on each reconstruction call.
   TYPE, PUBLIC :: reconstruction_workspace_type
      REAL(wp), ALLOCATABLE :: q_interfaceL(:,:,:)
      REAL(wp), ALLOCATABLE :: q_interfaceR(:,:,:)
@@ -65,6 +74,10 @@ MODULE reconstruction_2d
   END TYPE reconstruction_workspace_type
 
 CONTAINS
+
+  !> \brief Allocate interface traces, HP candidates and per-thread scratch storage.
+  !>
+  !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
 
   SUBROUTINE initialize_reconstruction( this )
 
@@ -105,6 +118,10 @@ CONTAINS
 
   END SUBROUTINE initialize_reconstruction
 
+  !> \brief Release all reconstructed-state and HP work arrays.
+  !>
+  !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
+
   SUBROUTINE finalize_reconstruction( this )
 
     CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
@@ -142,6 +159,16 @@ CONTAINS
 
   END SUBROUTINE finalize_reconstruction
 
+   !> \brief Build a deduplicated eta workset containing active cells and immediate neighbours.
+   !>
+   !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
+   !> \param[in] solve_cells Number of entries in the active-cell index lists.
+   !> \param[in] j_cent X indices of active cells; only the first solve_cells entries are used.
+   !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
+   !>
+   !> \note Writes only the parent workspace eta mask/list; immediate neighbours provide the
+   !>       additional continuity stencil needed by active cells.
+
    SUBROUTINE build_hp_workset(this, solve_cells, j_cent, k_cent)
 
       CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
@@ -166,6 +193,13 @@ CONTAINS
 
    CONTAINS
 
+      !> \brief Append one cell to the parent eta workset only if it is not already present.
+      !>
+      !> \param[in] j_cell X index of the cell appended to the parent eta workset.
+      !> \param[in] k_cell Y index of the cell appended to the parent eta workset.
+      !>
+      !> \note Updates the host-associated this workspace; the active-cell workset is not modified.
+
       SUBROUTINE append_eta_cell(j_cell,k_cell)
 
          INTEGER, INTENT(IN) :: j_cell, k_cell
@@ -180,6 +214,16 @@ CONTAINS
       END SUBROUTINE append_eta_cell
 
    END SUBROUTINE build_hp_workset
+
+   !> \brief Reconstruct physical traces, apply boundary conditions and finalize HP states.
+   !>
+   !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
+   !> \param[in] qp_expl Cell-centered physical states at the explicit stage, including the required
+   !>                    stencil halo.
+   !> \param[in] t Current simulation or stage time [s].
+   !> \param[in] solve_cells Number of entries in the active-cell index lists.
+   !> \param[in] j_cent X indices of active cells; only the first solve_cells entries are used.
+   !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
 
    SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent )
 
@@ -827,12 +871,19 @@ CONTAINS
   END SUBROUTINE reconstruction
 
   !******************************************************************************
-  !> \brief Replace direct cell traces with the final HP face states
+  !> \brief Evaluate hydrostatic candidates, blend them and commit final cell/face traces.
   !>
    !> The first reconstruction pass supplies direct limited candidates. The HP
    !> phases build local eta traces, evaluate continuity weights, then apply
    !> blended thickness and momentum on the active target cells.
+  !>
+  !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
+  !> \param[in] qp_center Unmodified cell-centered physical states used by all HP candidate phases.
+  !> \param[in] solve_cells Number of entries in the active-cell index lists.
+  !> \param[in] j_cent X indices of active cells; only the first solve_cells entries are used.
+  !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
   !******************************************************************************
+
   SUBROUTINE apply_hp_reconstruction( this, qp_center, solve_cells, j_cent,    &
        k_cent )
 
@@ -1010,6 +1061,14 @@ CONTAINS
 
   CONTAINS
 
+    !> \brief Compute positivity-constrained free-surface traces for one parent-workset cell.
+    !>
+    !> \param[in] jc X index of the current cell in the parent reconstruction.
+    !> \param[in] kc Y index of the current cell in the parent reconstruction.
+    !>
+    !> \note Reads the host qp_center and shared face bed; writes only this cell eta candidates in
+    !>       the parent workspace.
+
     SUBROUTINE compute_eta_traces(jc,kc)
 
     INTEGER, INTENT(IN) :: jc, kc
@@ -1047,6 +1106,19 @@ CONTAINS
 
     END SUBROUTINE compute_eta_traces
 
+    !> \brief Limit a three-cell free-surface slope against both endpoint bed elevations.
+    !>
+    !> \param[in] eta_left Free-surface elevation at the negative/left endpoint or stencil neighbour
+    !>                     [m].
+    !> \param[in] eta_center Free-surface elevation at the central stencil cell [m].
+    !> \param[in] eta_right Free-surface elevation at the positive/right endpoint or stencil
+    !>                      neighbour [m].
+    !> \param[in] B_minus Bed elevations at the negative-side cell faces [m].
+    !> \param[in] B_plus Bed elevations at the positive-side cell faces [m].
+    !> \param[in] at_boundary True to use the zero-gradient boundary eta-slope convention.
+    !> \param[out] eta_minus Negative-side hydrostatic free-surface candidate [m].
+    !> \param[out] eta_plus Positive-side hydrostatic free-surface candidate [m].
+
     SUBROUTINE hp_eta_face_pair( eta_left, eta_center, eta_right,            &
        B_minus, B_plus, at_boundary, eta_minus, eta_plus )
 
@@ -1073,6 +1145,16 @@ CONTAINS
     eta_plus = eta_center + 0.5_wp * eta_slope
 
     END SUBROUTINE hp_eta_face_pair
+
+       !> \brief Evaluate the x-direction HP blend without overwriting neighbouring candidates.
+       !>
+       !> \param[in] jc X index of the current cell in the parent reconstruction.
+       !> \param[in] kc Y index of the current cell in the parent reconstruction.
+       !> \param[in] residual Dimensionless 2-D hydrostatic residual for the current cell.
+       !> \param[in] relief Dimensionless local bed-relief/depth ratio for the current cell.
+       !>
+       !> \note Uses host-associated direct/eta traces and per-thread scratch. Writes the x slice of
+       !>       hp_blended; final traces are committed only after the OpenMP barrier.
 
        SUBROUTINE evaluate_hp_cell_x(jc,kc,residual,relief)
 
@@ -1135,6 +1217,16 @@ CONTAINS
 
        END SUBROUTINE evaluate_hp_cell_x
 
+       !> \brief Evaluate the y-direction HP blend without overwriting neighbouring candidates.
+       !>
+       !> \param[in] jc X index of the current cell in the parent reconstruction.
+       !> \param[in] kc Y index of the current cell in the parent reconstruction.
+       !> \param[in] residual Dimensionless 2-D hydrostatic residual for the current cell.
+       !> \param[in] relief Dimensionless local bed-relief/depth ratio for the current cell.
+       !>
+       !> \note Uses host-associated direct/eta traces and per-thread scratch. Writes the y slice of
+       !>       hp_blended; final traces are committed only after the OpenMP barrier.
+
        SUBROUTINE evaluate_hp_cell_y(jc,kc,residual,relief)
 
        INTEGER, INTENT(IN) :: jc, kc
@@ -1196,6 +1288,14 @@ CONTAINS
 
        END SUBROUTINE evaluate_hp_cell_y
 
+       !> \brief Commit both directional HP blends to the final traces of one cell.
+       !>
+       !> \param[in] jc X index of the current cell in the parent reconstruction.
+       !> \param[in] kc Y index of the current cell in the parent reconstruction.
+       !>
+       !> \note Consumes both host hp_blended slices after candidate evaluation and writes the
+       !>       cell-owned physical traces.
+
        SUBROUTINE commit_hp_cell(jc,kc)
 
        INTEGER, INTENT(IN) :: jc, kc
@@ -1223,6 +1323,15 @@ CONTAINS
           this%qp_cellN(1,jc,kc))
 
        END SUBROUTINE commit_hp_cell
+
+    !> \brief Measure local free-surface disequilibrium relative to bed/depth variation.
+    !>
+    !> \param[in] jc X index of the current cell in the parent reconstruction.
+    !> \param[in] kc Y index of the current cell in the parent reconstruction.
+    !> \return Dimensionless residual in [0,1]; zero denotes local hydrostatic compensation.
+    !>
+    !> \note Reads neighbouring host qp_center values and B_cent; boundary cells use only existing
+    !>       neighbours.
 
     FUNCTION local_hydrostatic_residual(jc,kc) RESULT(residual)
 
@@ -1271,6 +1380,12 @@ CONTAINS
 
     END FUNCTION local_hydrostatic_residual
 
+   !> \brief Recover a trace velocity only when its thickness exceeds the dry tolerance.
+   !>
+   !> \param[in] momentum Volumetric normal momentum h*u_n of the reconstructed trace.
+   !> \param[in] thickness Depth of the reconstructed trace [m].
+   !> \return Momentum/thickness [m s^-1], or zero for a numerically dry trace.
+
    PURE ELEMENTAL FUNCTION safe_velocity(momentum,thickness) RESULT(velocity)
 
       REAL(wp), INTENT(IN) :: momentum, thickness
@@ -1283,6 +1398,13 @@ CONTAINS
       END IF
 
     END FUNCTION safe_velocity
+
+    !> \brief Close component fractions and convert a final HP candidate into conservative form.
+    !>
+    !> \param[in] qp_candidate Final HP physical candidate before composition closure.
+    !> \param[out] q_conservative Conservative state obtained from the closed physical candidate.
+    !> \param[out] qp_reconstructed Closed physical state with velocities consistent with the
+    !>                              conservative momenta.
 
     SUBROUTINE final_hp_state(qp_candidate,q_conservative,qp_reconstructed)
 

@@ -1,6 +1,7 @@
 !********************************************************************************
 !> \brief Immutable equation-partition metadata for one configured model
 !********************************************************************************
+
 MODULE equation_metadata_2d
 
   IMPLICIT NONE
@@ -9,6 +10,9 @@ MODULE equation_metadata_2d
 
   PUBLIC :: equation_partition_type
 
+  !> \brief Equation masks and compact indices for the local implicit solve.
+  !> \details The partition separates explicit-only equations from implicit
+  !>          unknowns without changing the canonical state component order.
   TYPE :: equation_partition_type
 
      !> Total number of equations in the configured model
@@ -40,8 +44,12 @@ MODULE equation_metadata_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Configure the immutable explicit/implicit equation partition
+  !> \brief Build explicit/implicit equation masks and compact index maps.
+  !>
+  !> \param[in,out] this Explicit/implicit equation masks and compact index maps.
+  !> \param[in] implicit_mask One flag per equation; true selects implicit treatment.
   !******************************************************************************
+
   SUBROUTINE initialize_equation_partition( this, implicit_mask )
 
     CLASS(equation_partition_type), INTENT(INOUT) :: this
@@ -82,8 +90,11 @@ CONTAINS
 
 
   !******************************************************************************
-  !> \brief Release equation-partition storage
+  !> \brief Release and reset the equation-partition descriptor.
+  !>
+  !> \param[in,out] this Explicit/implicit equation masks and compact index maps.
   !******************************************************************************
+
   SUBROUTINE finalize_equation_partition( this )
 
     CLASS(equation_partition_type), INTENT(INOUT) :: this
@@ -100,8 +111,12 @@ CONTAINS
 
 
   !******************************************************************************
-  !> \brief Report whether the partition has been configured
+  !> \brief Check the consistency of the stored equation partition.
+  !>
+  !> \param[in] this Explicit/implicit equation masks and compact index maps.
+  !> \return True when equation counts, masks and compact maps are consistent.
   !******************************************************************************
+
   LOGICAL FUNCTION equation_partition_is_initialized( this )
 
     CLASS(equation_partition_type), INTENT(IN) :: this

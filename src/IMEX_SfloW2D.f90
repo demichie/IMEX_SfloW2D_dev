@@ -23,7 +23,8 @@
 !>     E-mail: mattia.demichielivitturi@ingv.it \n
 !********************************************************************************
 
-!> \brief Main Program
+!> \brief Initialize, advance and write one depth-averaged flow simulation.
+
 PROGRAM IMEX_SfloW2D
 
    USE, intrinsic :: iso_fortran_env
@@ -441,7 +442,7 @@ PROGRAM IMEX_SfloW2D
       simulation%runtime%dt_old = simulation%runtime%dt
 
       ! Fractional stochastic step: recover transported Z in wet cells,
-      ! evolve the OU process everywhere, and initialize hZ for advection.
+      ! evolve the OU process everywhere, and initialize M*Z for advection.
       IF (stochastic_flag) CALL simulation%stochastic%prepare_timestep(       &
            simulation%state, simulation%runtime%dt)
 
@@ -452,6 +453,8 @@ PROGRAM IMEX_SfloW2D
            simulation%domain,                                               &
            simulation%spatial_operator)
 
+      ! Mass exchange is a separate fractional step after the IMEX update.
+      ! It updates inventories first and refreshes the nodal bed if enabled.
       CALL update_erosion_deposition_cell(simulation%state%q,                 &
            simulation%state%qp, simulation%runtime%dt, simulation%domain)
 

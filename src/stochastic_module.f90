@@ -1,13 +1,18 @@
 !********************************************************************************
 !> \brief Stochastic module
 !
-!> This moduel contains all the procedures for the stochastic variable
+!> This module contains all the procedures for the stochastic variable
 !
 !> \date 11/06/2025
 !> @author 
 !> Zeno Geddo
 !
+!>
+!> Separates the Gaussian Ornstein-Uhlenbeck state Z, its conservative transport, and the
+!> transformed effective_Z used by friction. Random samples are generated outside parallel cell
+!> updates.
 !********************************************************************************
+
 MODULE stochastic_module
   
   ! external variables
@@ -43,13 +48,16 @@ MODULE stochastic_module
   REAL(wp) :: noise_pow_val !(|Z|^power)
   
 
+  !> \brief Gaussian OU state, friction-only transformation and correlation kernel.
+  !> \details Z and effective_Z are cell maps; only Z is conservatively transported
+  !>          and checkpointed. Friction receives the separately derived effective_Z.
   TYPE :: stochastic_workspace_type
 
      !> Stochastic field at cell centers
      REAL(wp), ALLOCATABLE :: Z(:,:)
 
      !> Possibly transformed fluctuation passed to the friction law. Z remains
-     !> the Gaussian OU state transported through the conservative variable hZ.
+     !> the Gaussian OU state transported through the conservative variable M*Z.
      REAL(wp), ALLOCATABLE :: effective_Z(:,:)
 
      !> Spatial-correlation convolution kernel
@@ -69,6 +77,10 @@ MODULE stochastic_module
 
 CONTAINS
 
+  !> \brief Allocate OU/friction fields and seed the generator when stochastic physics is enabled.
+  !>
+  !> \param[in,out] this Gaussian OU field, effective-friction field and correlation kernel.
+
   SUBROUTINE initialize_stochastic_workspace(this)
 
     CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
@@ -85,6 +97,10 @@ CONTAINS
 
   END SUBROUTINE initialize_stochastic_workspace
 
+  !> \brief Release OU, effective-friction and convolution-kernel fields.
+  !>
+  !> \param[in,out] this Gaussian OU field, effective-friction field and correlation kernel.
+
   SUBROUTINE finalize_stochastic_workspace(this)
 
     CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
@@ -95,6 +111,15 @@ CONTAINS
 
   END SUBROUTINE finalize_stochastic_workspace
 
+  !> \brief Burn in the OU field and initialize the transported stochastic state when configured.
+  !>
+  !> \param[in,out] this Gaussian OU field, effective-friction field and correlation kernel.
+  !> \param[in,out] state Current flow state; stochastic q/qp entries are initialized after burn-in
+  !>                      when transport is enabled.
+  !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
+  !>
+  !> \note This is a finite burn-in, not a proof of statistical stationarity when the
+  !>       velocity-dependent noise intensity changes.
 
   SUBROUTINE getSteadyStateZ(this, state, domain)
   ! should find a better way to understand when the process is stable.
@@ -152,6 +177,12 @@ CONTAINS
     
   END SUBROUTINE getSteadyStateZ 
 
+  !> \brief Build the normalized spatial-correlation convolution kernel.
+  !>
+  !> \param[in,out] this Gaussian OU field, effective-friction field and correlation kernel.
+  !>
+  !> \note Reads length_spatial_corr and cell_size; writes this%conv_kernel for subsequent spatial
+  !>       filtering of Gaussian samples.
 
   SUBROUTINE genConvolutionKernel(this)
       IMPLICIT none
@@ -185,6 +216,14 @@ CONTAINS
 
   END SUBROUTINE genConvolutionKernel
 
+  !> \brief Sample the centered Gaussian used to construct the spatial-correlation kernel.
+  !>
+  !> \param[in] x X displacement from the correlation-kernel centre [m].
+  !> \param[in] y Y displacement from the correlation-kernel centre [m].
+  !> \return Gaussian kernel value at the requested spatial offset.
+  !>
+  !> \note Uses standard deviation length_spatial_corr/2; called for positive correlation length.
+
   REAL(wp) FUNCTION evalGaussian2d(x, y)
       ! Sample the centered isotropic Gaussian kernel Q^(1/2).
       IMPLICIT none
@@ -198,10 +237,14 @@ CONTAINS
 
   END FUNCTION evalGaussian2d
 
+  !> \brief Advance the OU field by Euler-Maruyama using velocity-dependent noise intensity.
+  !>
+  !> \param[in,out] this Gaussian OU field, effective-friction field and correlation kernel.
+  !> \param[in] state Simulation cell states and accumulated diagnostics.
+  !> \param[in] dt Time increment [s].
 
   SUBROUTINE update_stochastic_variable(this, state, dt)
-    ! UPDATE THE SOLUTION OF THE ORNSTEIN-UHLENBACK PROCESS USING EULER-MARUYAMA METHOD
-    ! NOISE CAN BE TRANSPORTED, SOURCE TERM ADDED IN eval_mass_exchange_terms (IMPORTANT)
+    ! OU evolution is a fractional step distinct from conservative transport.
     IMPLICIT NONE
     CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
     CLASS(state_type), INTENT(IN) :: state
@@ -212,7 +255,9 @@ CONTAINS
     REAL(wp):: noise(comp_cells_x, comp_cells_y)
     REAL(wp):: conv_result(comp_cells_x, comp_cells_y)
 
-    ! Generate standard gaussian noise over entire domain-> N(0,1)
+    ! Draw random numbers serially before the OpenMP update: thread scheduling
+    ! must not change the random stream associated with a fixed seed.
+    ! Generate standard Gaussian noise over the entire domain: N(0,1).
     noise_size = comp_cells_x*comp_cells_y
     noise = RESHAPE(gaussian_noise(noise_size),                              &
          [comp_cells_x, comp_cells_y])
@@ -224,7 +269,8 @@ CONTAINS
         noise = conv_result
     END IF
 
-    ! Loop over the entire grid to update stochastic process
+    ! Evolve dry cells too, so an OU state exists when they become wet later.
+    ! Parallelism here changes neither random-number generation nor ownership.
     !$OMP PARALLEL
     !$OMP DO private(j,k,sigma_noise)
     DO k = 1,comp_cells_y
@@ -243,9 +289,15 @@ CONTAINS
    
   END SUBROUTINE update_stochastic_variable
 
+  !> \brief Apply the OU fractional step and initialize conservative stochastic transport.
+  !>
+  !> \param[in,out] this Gaussian OU field, effective-friction field and correlation kernel.
+  !> \param[in,out] state Current flow state; transported stochastic q/qp entries are updated after
+  !>                      the OU step.
+  !> \param[in] dt Time increment [s].
 
   SUBROUTINE prepare_stochastic_timestep(this, state, dt)
-    !> Apply the OU fractional step and initialize hZ for conservative transport.
+    ! Apply the OU fractional step and initialize M*Z for conservative transport.
     CLASS(stochastic_workspace_type), INTENT(INOUT) :: this
     CLASS(state_type), INTENT(INOUT) :: state
     REAL(wp), INTENT(IN) :: dt
@@ -272,6 +324,12 @@ CONTAINS
 
   END SUBROUTINE prepare_stochastic_timestep
 
+  !> \brief Derive the friction fluctuation from Z without changing the Gaussian OU state.
+  !>
+  !> \param[in,out] this Gaussian OU field, effective-friction field and correlation kernel.
+  !>
+  !> \note The transformed fluctuation is for friction only; conservative transport and restart
+  !>       retain the Gaussian OU state.
 
   SUBROUTINE refresh_effective_stochastic_field(this)
     !> Derive the fluctuation used by friction without modifying the OU state.
@@ -287,6 +345,12 @@ CONTAINS
 
   END SUBROUTINE refresh_effective_stochastic_field
 
+ !> \brief Return squared cell speed from the current physical velocities.
+ !>
+ !> \param[in] state Simulation cell states and accumulated diagnostics.
+ !> \param[in] j X index of the current computational cell.
+ !> \param[in] k Y index of the current computational cell.
+ !> \return Squared speed [m^2 s^-2], or zero when the cell mass is negligible.
 
  REAL(wp) FUNCTION VelocitySquared(state,j,k)
   !> Compute |u|^2 at the cell center.
@@ -304,6 +368,12 @@ CONTAINS
 
 END FUNCTION VelocitySquared
 
+  !> \brief Evaluate the configured noise intensity for a wet or dry cell.
+  !>
+  !> \param[in] state Simulation cell states and accumulated diagnostics.
+  !> \param[in] j X index of the current computational cell.
+  !> \param[in] k Y index of the current computational cell.
+  !> \return Local OU noise intensity; dry cells use std_max.
 
   REAL(wp) FUNCTION getSigmaNoise(state,j,k)
   ! Compute the intensity of the noise depending of the friction used
@@ -324,12 +394,25 @@ END FUNCTION VelocitySquared
     RETURN
   END FUNCTION getSigmaNoise
 
+  !> \brief Evaluate the exponential transition between minimum and maximum noise intensities.
+  !>
+  !> \param[in] val Squared velocity entering the noise-intensity transition [m^2 s^-2].
+  !> \return Noise intensity std_max+(std_min-std_max)*exp(-val/std_slope_factor).
+
   REAL(wp) FUNCTION expFormNoise(val)
     ! Compute the bounded intensity of the noise of the stochastic process
     IMPLICIT NONE
     REAL(wp), INTENT(IN) :: val
     expFormNoise = std_max + ( std_min - std_max) * exp(- val / std_slope_factor )
   END FUNCTION expFormNoise
+
+  !> \brief Apply one Euler-Maruyama step to a scalar Ornstein-Uhlenbeck state.
+  !>
+  !> \param[in] Zij Current Gaussian OU state before this stochastic update.
+  !> \param[in] dt Time increment [s].
+  !> \param[in] sigma Local OU noise intensity.
+  !> \param[in] noise_ij Standard-normal forcing sample for the current cell.
+  !> \return Updated Gaussian OU state after damping and stochastic forcing.
 
   REAL(wp) FUNCTION EulerMaruyamaScheme(Zij, dt, sigma, noise_ij)
     ! Update the Ornstein-Uhlenback process using EULER-MARUYAMA Method
@@ -340,6 +423,12 @@ END FUNCTION VelocitySquared
     EulerMaruyamaScheme = Zij - (dt / tau_stochastic) * Zij +             &
             sigma * SQRT(2.0_wp * (dt / tau_stochastic)) * noise_ij
   END FUNCTION
+
+!> \brief Convolve a cell-centered signal using a centred kernel and zero padding.
+!>
+!> \param[in] input_signal Cell-centered input field indexed as (x,y).
+!> \param[in] kernel Centred convolution weights indexed as (x-offset,y-offset).
+!> \param[out] result Convolved field with the same shape as input_signal.
 
 subroutine convolve_2d(input_signal, kernel, result)
   !> Zero-padded two-dimensional convolution.

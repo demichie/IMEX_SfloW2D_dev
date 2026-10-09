@@ -6,6 +6,7 @@
 !> exposes only complete spatial-term and CFL evaluations.  Time integration
 !> therefore does not depend on flux, path-contribution, or wave-speed storage.
 !********************************************************************************
+
 MODULE spatial_operator_2d
 
   USE parameters_2d, ONLY : wp, n_eqns, n_vars, max_dt, cfl
@@ -20,6 +21,9 @@ MODULE spatial_operator_2d
 
   PRIVATE
 
+  !> \brief Numerical backend owned by one model-facing spatial operator.
+  !> \details Its private reconstruction/flux workspaces are reused by both
+  !>          spatial-term evaluation and the CFL calculation.
   TYPE, PUBLIC :: spatial_operator_type
      PRIVATE
      TYPE(reconstruction_workspace_type) :: reconstruction
@@ -33,6 +37,10 @@ MODULE spatial_operator_2d
 
 CONTAINS
 
+  !> \brief Initialize the reconstruction and HP-PCCU backend owned by this operator.
+  !>
+  !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
+
   SUBROUTINE initialize_spatial_operator( this )
 
     CLASS(spatial_operator_type), INTENT(INOUT) :: this
@@ -41,6 +49,10 @@ CONTAINS
     CALL this%hp_pccu%initialize
 
   END SUBROUTINE initialize_spatial_operator
+
+  !> \brief Release the reconstruction and HP-PCCU backend storage.
+  !>
+  !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
 
   SUBROUTINE finalize_spatial_operator( this )
 
@@ -52,12 +64,24 @@ CONTAINS
   END SUBROUTINE finalize_spatial_operator
 
   !******************************************************************************
-  !> \brief Evaluate the complete explicit spatial term on active cells
+  !> \brief Evaluate the complete explicit spatial term on the active domain.
   !>
   !> The returned term includes conservative interface transport and the
   !> cell/interface path contributions assembled by HP-PCCU.  Its sign follows
   !> q_t + spatial_term = local_sources.
+  !>
+  !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
+  !> \param[in] qp Canonical physical states: h, hu, hv, T, component mass fractions, then appended
+  !>               u and v.
+  !> \param[out] spatial_term Complete explicit spatial term with sign
+  !>                          q_t+spatial_term=local_sources.
+  !> \param[in] time Current simulation time [s].
+  !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
+  !>
+  !> \note The sign convention is q_t+spatial_term=local_sources; hydrostatic pressure/topography
+  !>       are already included through path terms.
   !******************************************************************************
+
   SUBROUTINE evaluate_spatial_operator( this, qp, spatial_term, time, domain )
 
     CLASS(spatial_operator_type), INTENT(INOUT) :: this
@@ -74,8 +98,16 @@ CONTAINS
   END SUBROUTINE evaluate_spatial_operator
 
   !******************************************************************************
-  !> \brief Compute the CFL timestep required by the active spatial operator
+  !> \brief Refresh the reconstruction states and compute the face-speed CFL timestep.
+  !>
+  !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
+  !> \param[in] q Cell-centered conservative states, indexed as (variable,x-cell,y-cell).
+  !> \param[in,out] qp Physical state cache refreshed from q on the reconstruction workset.
+  !> \param[in] time Current simulation time [s].
+  !> \param[out] dt Returned CFL-limited timestep, bounded by max_dt [s].
+  !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
   !******************************************************************************
+
   SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain )
 
     CLASS(spatial_operator_type), INTENT(INOUT) :: this
@@ -91,8 +123,11 @@ CONTAINS
 
     dt = max_dt
 
+    ! The sentinel selects the prescribed max_dt without evaluating face speeds.
     IF ( cfl .EQ. -1.0_wp ) RETURN
 
+    ! Refresh wet cells and the dry halo: the HP stencil reads beyond solve_cells.
+    ! The end-of-loop barrier makes every cache entry available to reconstruction.
     !$OMP PARALLEL DO PRIVATE(j,k,dynamic_pressure)
     DO l = 1, domain%reconstruction_cells
        j = domain%j_reconstruction(l)
@@ -107,6 +142,7 @@ CONTAINS
     END DO
     !$OMP END PARALLEL DO
 
+    ! CFL speeds must use the same final HP traces as the spatial operator.
     CALL this%reconstruction%reconstruct( qp, time, domain%solve_cells,      &
          domain%j_cent, domain%k_cent )
 
@@ -117,6 +153,8 @@ CONTAINS
     max_a_x = 0.0_wp
     max_a_y = 0.0_wp
 
+    ! Each active cell contributes all of its faces; a global maximum gives
+    ! one timestep valid for every participating OpenMP thread.
     !$OMP PARALLEL DO PRIVATE(j,k) REDUCTION(MAX:max_a_x,max_a_y)
     DO l = 1, domain%solve_cells
        j = domain%j_cent(l)

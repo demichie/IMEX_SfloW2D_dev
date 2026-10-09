@@ -3,7 +3,11 @@
 !
 !> This module contains the parameters for numerical solution of the
 !> model.
+!>
+!> Shared run configuration, equation indices and boundary-condition descriptors. Input setup
+!> establishes these values before layouts and numerical workspaces are allocated.
 !********************************************************************************
+
 MODULE parameters_2d
 
   IMPLICIT NONE
