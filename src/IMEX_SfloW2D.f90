@@ -40,7 +40,7 @@ PROGRAM IMEX_SfloW2D
    ! USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
 
    USE init_2d, ONLY : collapsing_volume
-   USE init_2d, ONLY : init_empty
+   USE init_2d, ONLY : init_empty, release_initialization_fields
 
    USE inpout_2d, ONLY : init_param
    USE inpout_2d, ONLY : read_param
@@ -103,6 +103,7 @@ PROGRAM IMEX_SfloW2D
    INTEGER :: st1 , st2 , st3 , cr , cm
 
    LOGICAL :: stop_flag
+   LOGICAL :: thickness_exceeds, pressure_exceeds
    LOGICAL :: stop_flag_old
 
    INTEGER :: j,k,l
@@ -117,8 +118,6 @@ PROGRAM IMEX_SfloW2D
    REAL(wp) :: p_dyn
 
    REAL(wp) :: mod_vel , mod_vel2, r_u, r_v
-
-   REAL(wp) :: vol
 
    INTEGER :: len_fname
    CHARACTER(LEN=4) :: ext
@@ -220,6 +219,8 @@ PROGRAM IMEX_SfloW2D
 
    END IF
 
+   CALL release_initialization_fields
+
    IF ( output_netcdf_flag ) CALL init_netcdf_output
 
    IF ( radial_source_flag .OR. lateral_source_flag ) CALL init_source
@@ -276,7 +277,8 @@ PROGRAM IMEX_SfloW2D
 
    IF ( .NOT. is_binary_restart ) simulation%state%vuln_table = .FALSE.
 
-   !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2,    &
+   !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2, &
+   !$OMP & thickness_exceeds,pressure_exceeds, &
    !$OMP & mod_vel,r_u,r_v)
 
    DO l = 1,simulation%domain%solve_cells
@@ -312,20 +314,20 @@ PROGRAM IMEX_SfloW2D
 
             DO i_thk_lev=1,n_thickness_levels
 
-               simulation%state%thck_table(j,k) =                           &
+               thickness_exceeds = &
                     ( simulation%state%qp(1,j,k) .GE.                       &
                     thickness_levels(i_thk_lev) )
 
                DO i_pdyn_lev=1,n_dyn_pres_levels
 
-                  simulation%state%pdyn_table(j,k) =                        &
+                  pressure_exceeds = &
                        ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
 
                   i_table = i_table + 1
 
                   simulation%state%vuln_table(i_table,j,k) =                &
-                       ( simulation%state%thck_table(j,k) .AND.              &
-                       simulation%state%pdyn_table(j,k) )
+                       ( thickness_exceeds .AND. &
+                       pressure_exceeds )
 
                END DO
 
@@ -455,7 +457,8 @@ PROGRAM IMEX_SfloW2D
 
       simulation%runtime%t = simulation%runtime%t + simulation%runtime%dt
 
-      !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2,    &
+      !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2, &
+      !$OMP & thickness_exceeds,pressure_exceeds, &
       !$OMP & mod_vel,r_u,r_v)
 
 
@@ -491,21 +494,21 @@ PROGRAM IMEX_SfloW2D
 
             DO i_thk_lev=1,n_thickness_levels
 
-               simulation%state%thck_table(j,k) =                            &
+               thickness_exceeds = &
                     ( simulation%state%qp(1,j,k) .GE.                        &
                     thickness_levels(i_thk_lev) )
 
                DO i_pdyn_lev=1,n_dyn_pres_levels
 
-                  simulation%state%pdyn_table(j,k) =                         &
+                  pressure_exceeds = &
                        ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
 
                   i_table = i_table + 1
 
                   simulation%state%vuln_table(i_table,j,k) =                 &
                        simulation%state%vuln_table(i_table,j,k) .OR.          &
-                       ( simulation%state%thck_table(j,k) .AND.               &
-                       simulation%state%pdyn_table(j,k) )
+                       ( thickness_exceeds .AND. &
+                       pressure_exceeds )
 
                END DO
 
@@ -523,32 +526,6 @@ PROGRAM IMEX_SfloW2D
       !$OMP END PARALLEL DO
 
       IF ( verbose_level .GE. 0 ) THEN
-
-         vol = SUM(simulation%state%qp(1,:,:))
-
-         !IF ( IEEE_IS_NAN(vol) .OR. ( t.GE. 50.54) ) THEN
-
-         !   WRITE(*,*) 'WARNING: volume = ',dx*dy*SUM(qp(1,:,:))
-
-         !   DO l = 1,solve_cells
-
-         !      j = j_cent(l)
-         !      k = k_cent(l)
-
-         !      IF ( (j.EQ.1270) .AND. (k.EQ.1317) ) THEN
-
-         !         WRITE(*,*) 'j,k',j,k,qp(1,j,k)
-         !         WRITE(*,*) 'qc: ',q(1:n_vars,j,k)
-         !         WRITE(*,*) 'qp: ',qp(1:n_vars+2,j,k)
-
-         !      END IF
-
-         !   END DO
-
-         !   READ(*,*)
-
-         !END IF
-
 
          WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
          &ES11.3E3,A11,ES11.3E3)")                                             &

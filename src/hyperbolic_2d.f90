@@ -21,18 +21,15 @@ MODULE hyperbolic_2d
   PRIVATE
 
   TYPE, PUBLIC :: hyperbolic_workspace_type
-     REAL(wp), ALLOCATABLE :: a_interface_xNeg(:,:,:)
-     REAL(wp), ALLOCATABLE :: a_interface_xPos(:,:,:)
-     REAL(wp), ALLOCATABLE :: a_interface_yNeg(:,:,:)
-     REAL(wp), ALLOCATABLE :: a_interface_yPos(:,:,:)
-     REAL(wp), ALLOCATABLE :: H_interface_x(:,:,:)
-     REAL(wp), ALLOCATABLE :: H_interface_y(:,:,:)
+     ! One common characteristic bound per face and sign, not per equation.
+     REAL(wp), ALLOCATABLE :: a_interface_xNeg(:,:)
+     REAL(wp), ALLOCATABLE :: a_interface_xPos(:,:)
+     REAL(wp), ALLOCATABLE :: a_interface_yNeg(:,:)
+     REAL(wp), ALLOCATABLE :: a_interface_yPos(:,:)
      REAL(wp), ALLOCATABLE :: G_interface_xL(:,:,:)
      REAL(wp), ALLOCATABLE :: G_interface_xR(:,:,:)
      REAL(wp), ALLOCATABLE :: G_interface_yB(:,:,:)
      REAL(wp), ALLOCATABLE :: G_interface_yT(:,:,:)
-     REAL(wp), ALLOCATABLE :: P_interface_x(:,:,:)
-     REAL(wp), ALLOCATABLE :: P_interface_y(:,:,:)
      REAL(wp), ALLOCATABLE :: P_cell_x(:,:,:)
      REAL(wp), ALLOCATABLE :: P_cell_y(:,:,:)
    CONTAINS
@@ -48,19 +45,15 @@ CONTAINS
 
     CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
 
-    ALLOCATE( this%a_interface_xNeg(n_eqns,comp_interfaces_x,comp_cells_y) )
-    ALLOCATE( this%a_interface_xPos(n_eqns,comp_interfaces_x,comp_cells_y) )
-    ALLOCATE( this%a_interface_yNeg(n_eqns,comp_cells_x,comp_interfaces_y) )
-    ALLOCATE( this%a_interface_yPos(n_eqns,comp_cells_x,comp_interfaces_y) )
+    ALLOCATE( this%a_interface_xNeg(comp_interfaces_x,comp_cells_y) )
+    ALLOCATE( this%a_interface_xPos(comp_interfaces_x,comp_cells_y) )
+    ALLOCATE( this%a_interface_yNeg(comp_cells_x,comp_interfaces_y) )
+    ALLOCATE( this%a_interface_yPos(comp_cells_x,comp_interfaces_y) )
 
-    ALLOCATE( this%H_interface_x(n_eqns,comp_interfaces_x,comp_cells_y) )
-    ALLOCATE( this%H_interface_y(n_eqns,comp_cells_x,comp_interfaces_y) )
     ALLOCATE( this%G_interface_xL(n_eqns,comp_interfaces_x,comp_cells_y) )
     ALLOCATE( this%G_interface_xR(n_eqns,comp_interfaces_x,comp_cells_y) )
     ALLOCATE( this%G_interface_yB(n_eqns,comp_cells_x,comp_interfaces_y) )
     ALLOCATE( this%G_interface_yT(n_eqns,comp_cells_x,comp_interfaces_y) )
-    ALLOCATE( this%P_interface_x(n_eqns,comp_interfaces_x,comp_cells_y) )
-    ALLOCATE( this%P_interface_y(n_eqns,comp_cells_x,comp_interfaces_y) )
     ALLOCATE( this%P_cell_x(n_eqns,comp_cells_x,comp_cells_y) )
     ALLOCATE( this%P_cell_y(n_eqns,comp_cells_x,comp_cells_y) )
 
@@ -68,14 +61,10 @@ CONTAINS
     this%a_interface_xPos = 0.0_wp
     this%a_interface_yNeg = 0.0_wp
     this%a_interface_yPos = 0.0_wp
-    this%H_interface_x = 0.0_wp
-    this%H_interface_y = 0.0_wp
     this%G_interface_xL = 0.0_wp
     this%G_interface_xR = 0.0_wp
     this%G_interface_yB = 0.0_wp
     this%G_interface_yT = 0.0_wp
-    this%P_interface_x = 0.0_wp
-    this%P_interface_y = 0.0_wp
     this%P_cell_x = 0.0_wp
     this%P_cell_y = 0.0_wp
 
@@ -89,14 +78,10 @@ CONTAINS
     DEALLOCATE( this%a_interface_xPos )
     DEALLOCATE( this%a_interface_yNeg )
     DEALLOCATE( this%a_interface_yPos )
-    DEALLOCATE( this%H_interface_x )
-    DEALLOCATE( this%H_interface_y )
     DEALLOCATE( this%G_interface_xL )
     DEALLOCATE( this%G_interface_xR )
     DEALLOCATE( this%G_interface_yB )
     DEALLOCATE( this%G_interface_yT )
-    DEALLOCATE( this%P_interface_x )
-    DEALLOCATE( this%P_interface_y )
     DEALLOCATE( this%P_cell_x )
     DEALLOCATE( this%P_cell_y )
 
@@ -205,7 +190,7 @@ CONTAINS
     INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
 
     REAL(wp) :: flux_left(n_eqns), flux_right(n_eqns)
-    REAL(wp) :: path_contribution(n_eqns)
+    REAL(wp) :: path_contribution(n_eqns), interface_flux(n_eqns)
     REAL(wp) :: gamma_left, gamma_right
     REAL(wp) :: reduced_gravity_left, reduced_gravity_right
     REAL(wp) :: a_minus, a_plus
@@ -214,6 +199,7 @@ CONTAINS
     IF ( comp_cells_x .GT. 1 ) THEN
 
        !$OMP PARALLEL DO private(l,j,k,flux_left,flux_right,path_contribution,&
+       !$OMP & interface_flux,                                               &
        !$OMP & gamma_left,gamma_right,reduced_gravity_left,                   &
        !$OMP & reduced_gravity_right,a_minus,a_plus)
        DO l = 1, solve_interfaces_x
@@ -226,20 +212,20 @@ CONTAINS
           CALL eval_inertial_flux( recon%q_interfaceR(:,j,k),                &
                recon%qp_interfaceR(:,j,k), PATH_DIR_X, flux_right )
 
-          a_minus = this%a_interface_xNeg(1,j,k)
-          a_plus = this%a_interface_xPos(1,j,k)
+          a_minus = this%a_interface_xNeg(j,k)
+          a_plus = this%a_interface_xPos(j,k)
           CALL eval_central_upwind_flux( a_minus, a_plus, flux_left,         &
                flux_right, recon%q_interfaceL(:,j,k),                        &
-               recon%q_interfaceR(:,j,k), this%H_interface_x(:,j,k) )
+               recon%q_interfaceR(:,j,k), interface_flux )
 
-          CALL limit_component_mass_flux(this%H_interface_x(:,j,k))
+          CALL limit_component_mass_flux(interface_flux)
 
           ! Match the frozen baseline: a face at exact rest transports neither
           ! total mass nor thermal/composition scalars.
           IF ( ( recon%qp_interfaceL(2,j,k) .EQ. 0.0_wp ) .AND.             &
                ( recon%qp_interfaceR(2,j,k) .EQ. 0.0_wp ) ) THEN
-             this%H_interface_x(1,j,k) = 0.0_wp
-             this%H_interface_x(4:n_vars,j,k) = 0.0_wp
+             interface_flux(1) = 0.0_wp
+             interface_flux(4:n_vars) = 0.0_wp
           END IF
 
           CALL eval_hydrostatic_coefficient( recon%qp_interfaceL(:,j,k),     &
@@ -255,8 +241,7 @@ CONTAINS
                recon%eta_interfaceR(j,k), grav_coeff_stag_x(j,k),            &
                path_contribution )
 
-          this%P_interface_x(:,j,k) = path_contribution
-          CALL eval_oriented_pccu_pair( this%H_interface_x(:,j,k),           &
+          CALL eval_oriented_pccu_pair( interface_flux,                       &
                path_contribution, a_minus, a_plus,                           &
                this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k) )
 
@@ -268,6 +253,7 @@ CONTAINS
     IF ( comp_cells_y .GT. 1 ) THEN
 
        !$OMP PARALLEL DO private(l,j,k,flux_left,flux_right,path_contribution,&
+       !$OMP & interface_flux,                                               &
        !$OMP & gamma_left,gamma_right,reduced_gravity_left,                   &
        !$OMP & reduced_gravity_right,a_minus,a_plus)
        DO l = 1, solve_interfaces_y
@@ -280,18 +266,18 @@ CONTAINS
           CALL eval_inertial_flux( recon%q_interfaceT(:,j,k),                &
                recon%qp_interfaceT(:,j,k), PATH_DIR_Y, flux_right )
 
-          a_minus = this%a_interface_yNeg(1,j,k)
-          a_plus = this%a_interface_yPos(1,j,k)
+          a_minus = this%a_interface_yNeg(j,k)
+          a_plus = this%a_interface_yPos(j,k)
           CALL eval_central_upwind_flux( a_minus, a_plus, flux_left,         &
                flux_right, recon%q_interfaceB(:,j,k),                        &
-               recon%q_interfaceT(:,j,k), this%H_interface_y(:,j,k) )
+               recon%q_interfaceT(:,j,k), interface_flux )
 
-          CALL limit_component_mass_flux(this%H_interface_y(:,j,k))
+          CALL limit_component_mass_flux(interface_flux)
 
           IF ( ( recon%qp_interfaceB(3,j,k) .EQ. 0.0_wp ) .AND.             &
                ( recon%qp_interfaceT(3,j,k) .EQ. 0.0_wp ) ) THEN
-             this%H_interface_y(1,j,k) = 0.0_wp
-             this%H_interface_y(4:n_vars,j,k) = 0.0_wp
+             interface_flux(1) = 0.0_wp
+             interface_flux(4:n_vars) = 0.0_wp
           END IF
 
           CALL eval_hydrostatic_coefficient( recon%qp_interfaceB(:,j,k),     &
@@ -307,8 +293,7 @@ CONTAINS
                recon%eta_interfaceT(j,k), grav_coeff_stag_y(j,k),            &
                path_contribution )
 
-          this%P_interface_y(:,j,k) = path_contribution
-          CALL eval_oriented_pccu_pair( this%H_interface_y(:,j,k),           &
+          CALL eval_oriented_pccu_pair( interface_flux,                       &
                path_contribution, a_minus, a_plus,                           &
                this%G_interface_yB(:,j,k), this%G_interface_yT(:,j,k) )
 
@@ -427,11 +412,11 @@ CONTAINS
     INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
     INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
 
-    REAL(wp) :: abslambdaL_min(n_vars) , abslambdaL_max(n_vars)
-    REAL(wp) :: abslambdaR_min(n_vars) , abslambdaR_max(n_vars)
-    REAL(wp) :: abslambdaB_min(n_vars) , abslambdaB_max(n_vars)
-    REAL(wp) :: abslambdaT_min(n_vars) , abslambdaT_max(n_vars)
-    REAL(wp) :: min_r(n_vars) , max_r(n_vars)
+    REAL(wp) :: abslambdaL_min , abslambdaL_max
+    REAL(wp) :: abslambdaR_min , abslambdaR_max
+    REAL(wp) :: abslambdaB_min , abslambdaB_max
+    REAL(wp) :: abslambdaT_min , abslambdaT_max
+    REAL(wp) :: min_r , max_r
 
     INTEGER :: j,k,l
 
@@ -456,8 +441,8 @@ CONTAINS
           min_r = MIN(abslambdaL_min , abslambdaR_min , 0.0_wp)
           max_r = MAX(abslambdaL_max , abslambdaR_max , 0.0_wp)
 
-          this%a_interface_xNeg(:,j,k) = min_r
-          this%a_interface_xPos(:,j,k) = max_r
+          this%a_interface_xNeg(j,k) = min_r
+          this%a_interface_xPos(j,k) = max_r
 
        END DO x_interfaces_loop
 
@@ -484,8 +469,8 @@ CONTAINS
           min_r = MIN(abslambdaB_min , abslambdaT_min , 0.0_wp)
           max_r = MAX(abslambdaB_max , abslambdaT_max , 0.0_wp)
 
-          this%a_interface_yNeg(:,j,k) = min_r
-          this%a_interface_yPos(:,j,k) = max_r
+          this%a_interface_yNeg(j,k) = min_r
+          this%a_interface_yPos(j,k) = max_r
 
        END DO y_interfaces_loop
 

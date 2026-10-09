@@ -25,7 +25,6 @@ IMEX_SfloW2D_SOURCES = \
                 nonconservative_2d.f90 \
                 pccu_2d.f90 \
                 domain_2d.f90 \
-                constitutive_2d.f90 \
                 state_2d.f90 \
                 mass_exchange_2d.f90 \
                 nonlinear_solver_2d.f90 \
@@ -65,11 +64,6 @@ equation_terms_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                           \
 nonconservative_2d.$(OBJEXT): parameters_2d.$(OBJEXT)
 pccu_2d.$(OBJEXT): parameters_2d.$(OBJEXT) nonconservative_2d.$(OBJEXT)
 domain_2d.$(OBJEXT): parameters_2d.$(OBJEXT) geometry_2d.$(OBJEXT)
-constitutive_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                             \
-                           constitutive_parameters_2d.$(OBJEXT)                \
-                           equation_metadata_2d.$(OBJEXT)                      \
-                           equation_terms_2d.$(OBJEXT)                         \
-                           state_conversion_2d.$(OBJEXT)
 state_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                                   \
                     constitutive_parameters_2d.$(OBJEXT)                      \
                     geometry_2d.$(OBJEXT) model_layout_2d.$(OBJEXT)
@@ -110,6 +104,7 @@ stochastic_module.$(OBJEXT): parameters_2d.$(OBJEXT) domain_2d.$(OBJEXT)     \
                               geometry_2d.$(OBJEXT) state_2d.$(OBJEXT)        \
                               stochastic_random_2d.$(OBJEXT)
 simulation_2d.$(OBJEXT): parameters_2d.$(OBJEXT) domain_2d.$(OBJEXT)          \
+                          mass_exchange_2d.$(OBJEXT)                         \
                           equation_metadata_2d.$(OBJEXT)                      \
                           equation_terms_2d.$(OBJEXT)                         \
                           model_layout_2d.$(OBJEXT)                           \

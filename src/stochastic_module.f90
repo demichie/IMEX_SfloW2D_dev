@@ -15,7 +15,7 @@ MODULE stochastic_module
   
   USE domain_2d, ONLY: domain_type
   USE state_2d, ONLY: state_type
-  USE parameters_2d, ONLY : output_stoch_vars_flag, length_spatial_corr,        &
+  USE parameters_2d, ONLY : length_spatial_corr,        &
         stochastic_flag, stoch_transport_flag
   USE geometry_2d, ONLY : cell_size, comp_cells_x, comp_cells_y
   USE stochastic_random_2d, ONLY : initialize_stochastic_rng, gaussian_noise
@@ -42,9 +42,6 @@ MODULE stochastic_module
   
   REAL(wp) :: noise_pow_val !(|Z|^power)
   
-  ! variables related to statistics
-  REAL(wp) :: Z_min, Z_max, Z_mean, Z_std
-  REAL(wp) :: percentiles(9) ! 5,10,20,30,50,70,80,90,95
 
   TYPE :: stochastic_workspace_type
 
@@ -97,30 +94,6 @@ CONTAINS
     IF ( ALLOCATED(this%conv_kernel) ) DEALLOCATE(this%conv_kernel)
 
   END SUBROUTINE finalize_stochastic_workspace
-  
-  REAL(wp) FUNCTION MeanFieldCorrection(g,h,Fr) ! working only in the case of mu(Fr)
-    
-    !> Compute the mean field correction 
-    REAL(wp), INTENT(IN) :: g,h,Fr
-    REAL(wp) :: factor, sFR, dsFR_dFr, spatial_corr
-    
-    ! Compute a normalization factor
-    factor = (g**2._wp) / SQRT(g*h)
-    
-    ! Compute the intensity of the noise (std of the process)  
-    sFR = std_max + ( std_min - std_max) * EXP(- Fr / std_slope_factor )
-    
-    ! Compute the derivative of the intensity of the noise
-    dsFR_dFr = -(std_min - std_max) / std_slope_factor *                        &
-         EXP(-Fr / std_slope_factor)
-    
-    ! Compute factor for spatial correlation
-    spatial_corr = 2._wp * tau_stochastic ! ... will introduce correlation 
-    
-    ! Compute mean field correction
-    MeanFieldCorrection = - factor * sFR * dsFR_dFr * spatial_corr
-
-  END FUNCTION MeanFieldCorrection  
 
 
   SUBROUTINE getSteadyStateZ(this, state, domain)
@@ -265,14 +238,6 @@ CONTAINS
     !$OMP END DO
     !$OMP END PARALLEL
 
-    ! Compute statistic in space at given time if needed as outputs
-    IF (output_stoch_vars_flag) THEN
-        CALL OUBasicStatsInSpaceAtGivenTime(this%Z, Z_min,                   &
-             Z_mean, Z_max, Z_std)
-        percentiles(:) = 0.0_wp ! Percentiles set to 0 to avoid the computations
-        ! The percentiles shold not be computed at each iteration otherwise is too slow
-        !CALL percentilesArrayAtGivenTime(Z, percentiles) ! it is very slow!!!!!!!!!!
-    END IF
     
     CALL this%refresh_effective
    
@@ -475,159 +440,6 @@ subroutine convolve_2d(input_signal, kernel, result)
 
   deallocate(padded_signal)
 end subroutine convolve_2d
-
-
-subroutine OUBasicStatsInSpaceAtGivenTime(OUSolution, min_val, mean_val, max_val, std_dev)
-  !> Computes statistics (in space) of a given array representing the solution (at a given time) of an Ornstein-Uhlenbeck process.
-  !> Contains the entire domain, where many values may be zero !  
-  !> This subroutine calculates the minimum, maximum, mean, standard deviation for the provided array.
-  !>
-  !> INPUT:
-  !> - OUSolution: Array representing the time series of an Ornstein-Uhlenbeck process.
-  !>
-  !> OUTPUT:
-  !> - min_val: Minimum value of the array.
-  !> - max_val: Maximum value of the array.
-  !> - mean_val: Mean value of the array.
-  !> - std_dev: Standard deviation of the array.
-
-  implicit none
-  real(wp), dimension(:,:), intent(in) :: OUSolution
-  real(wp), intent(out) :: min_val, mean_val, max_val, std_dev 
-  real(wp) :: sumSol, sum_sq
-  integer :: n
-
-  ! Get array size
-  n = size(OUSolution)
-
-  ! Check for empty array
-  if (n == 0) then
-    write(*, *) "Error: Empty array passed to statsOUAtGivenTime"
-    stop
-  end if
-
-  ! Calculate min and max
-  min_val = minval(OUSolution)
-  max_val = maxval(OUSolution)
-
-  ! Calculate mean
-  sumSol = sum(OUSolution)
-  mean_val = sumSol / real(n)
-
-  ! Calculate standard deviation
-  sum_sq = sum((OUSolution - mean_val)**2)
-  std_dev = sqrt(sum_sq / real(n))
-
-  !WRITE(*,*) 'min_val',min_val
-  !WRITE(*,*) 'max_val',max_val
-  !WRITE(*,*) 'mean_val',mean_val
-end subroutine OUBasicStatsInSpaceAtGivenTime
-
-
-subroutine percentilesArrayAtGivenTime(Array2d, percentiles)
-!> Compute the percentile of the OU solutions at actual time
-!> Percentiles found using the quicksort algoritm
-!> Should add a flag to conside only the cells where h>0
-  implicit none
-  real(wp), dimension(:, :), intent(in) :: Array2d
-  real(wp), dimension(9), intent(out) :: percentiles
-  real(wp), dimension(:), allocatable :: flatArray
-  integer :: n
-
-  ! Get total number of elements
-  n = size(Array2d) 
-
-  ! Check for empty array
-  if (n == 0) then
-    write(*, *) "Error: Empty array passed to statsOUAtGivenTime"
-    stop
-  end if
-
-  ! Flatten the 2D array
-  allocate(flatArray(n))
-  flatArray = reshape(Array2d, shape(flatArray))
-
-  ! Sort Flattened array
-  call quickSort(flatArray, 1, n)
-
-  ! Calculate percentiles
-  percentiles(1) = flatArray(percentileIndex(n, 5._wp))
-  percentiles(2) = flatArray(percentileIndex(n, 10._wp))
-  percentiles(3) = flatArray(percentileIndex(n, 20._wp))
-  percentiles(4) = flatArray(percentileIndex(n, 30._wp))
-  percentiles(5) = flatArray(percentileIndex(n, 50._wp))
-  percentiles(6) = flatArray(percentileIndex(n, 70._wp))
-  percentiles(7) = flatArray(percentileIndex(n, 80._wp))
-  percentiles(8) = flatArray(percentileIndex(n, 90._wp))
-  percentiles(9) = flatArray(percentileIndex(n, 95._wp))
-
-  ! Deallocate temporary array
-  deallocate(flatArray)
-
-end subroutine percentilesArrayAtGivenTime
-
-
-subroutine quickSort(Array1d, start_idx, end_idx)
-!> Sort the given array using the QuickSort algorithm
-!> Run-time complexity : 
-!> 1) Best case O(n log(n))
-!> 2) Average case O(n log(n))
-!> 3) Worst case O(n**2)
-    implicit none
-    real(wp), intent(in out) :: Array1d(:)
-    integer, intent(in) :: start_idx, end_idx ! idx array
-    integer :: pivot ! partition index
-
-    ! Check if there are more than one element in the array
-    if (start_idx < end_idx) then 
-        pivot = partition(Array1d, start_idx, end_idx)
-        ! Recursively apply quickSort to the left and right subarrays
-        call quickSort(Array1d, start_idx, pivot - 1)
-        call quickSort(Array1d, pivot + 1, end_idx)
-    end if
-end subroutine quickSort
-
-
-integer function partition(Array1d, start_idx, end_idx)
-!> Helper function of the quickSort algorithm
-    implicit none
-    real(wp), intent(in out) :: Array1d(:)
-    integer, intent(in) :: start_idx, end_idx
-    integer :: i, j
-    ! pivot and temp hold elements of the REAL array Array1d; declaring
-    ! them INTEGER truncated every value that passed through them
-    real(wp) :: pivot, temp
-
-    ! Get the pivot element 
-    pivot = Array1d(end_idx)
-    ! Initialize the index of the smaller element
-    i = start_idx - 1
-    ! Loop through the array and rearrange elements based on the pivot value
-    do j = start_idx, end_idx - 1
-        if (Array1d(j) <= pivot) then
-            ! Swap arr(i+1) and arr(j)
-            i = i + 1
-            temp = Array1d(i)
-            Array1d(i) = Array1d(j)
-            Array1d(j) = temp
-        end if
-    end do
-
-    ! Swap arr(i+1) and arr(high) to place the pivot in its correct position
-    i = i + 1
-    temp = Array1d(i)
-    Array1d(i) = Array1d(end_idx)
-    Array1d(end_idx) = temp
-    partition = i
-end function partition
-
-
-integer function percentileIndex(size_arr, p)
-!> Find the index of the percentile p in array of size n
-  integer, intent(in) :: size_arr
-  real(wp), intent(in) :: p
-  percentileIndex = max(1, min(size_arr, ceiling(real(size_arr) * p / 100._wp)))
-end function percentileIndex
   
 
 END MODULE stochastic_module

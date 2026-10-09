@@ -40,9 +40,7 @@ PROGRAM test_state_initialization
        ALL(state%pdynmax .EQ. 0.0_wp) .AND.                               &
        ALL(state%mod_vel_max .EQ. 0.0_wp))
   CALL assert_true('vulnerability diagnostics',                           &
-       .NOT. ANY(state%vuln_table) .AND.                                  &
-       .NOT. ANY(state%thck_table) .AND.                                  &
-       .NOT. ANY(state%pdyn_table))
+       .NOT. ANY(state%vuln_table))
 
   CALL assert_true('domain counters', domain%solve_cells .EQ. 0 .AND.     &
        domain%solve_interfaces_x .EQ. 0 .AND.                             &

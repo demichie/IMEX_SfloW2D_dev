@@ -10,12 +10,12 @@ MODULE equation_terms_2d
 
   USE equation_metadata_2d, ONLY : equation_partition_type
 
-  USE parameters_2d, ONLY : wp, sp, tolh
+  USE parameters_2d, ONLY : wp, sp
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
        n_stoch_vars, n_pore_vars
   USE parameters_2d, ONLY : rheology_flag, rheology_model,                      &
        liquid_flag, gas_flag, slope_correction_flag,                            &
-       curvature_term_flag, stochastic_flag, mean_field_flag,                  &
+       curvature_term_flag, stochastic_flag,                  &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag
 
   USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T, idx_solid_first,      &
@@ -174,7 +174,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: qpj(n_vars+2)
     REAL(wp), INTENT(IN) :: grav_coeff
 
-    REAL(wp), INTENT(OUT) :: vel_min(n_vars) , vel_max(n_vars)
+    REAL(wp), INTENT(OUT) :: vel_min , vel_max
 
     REAL(wp) :: r_h          !< real-value flow thickness [m]
     REAL(wp) :: r_u          !< real-value x-velocity [m s-1]
@@ -196,14 +196,14 @@ CONTAINS
 
     IF ( r_red_grav * r_h .LT. 0.0_wp ) THEN
 
-       vel_min(1:n_eqns) = r_u
-       vel_max(1:n_eqns) = r_u
+       vel_min = r_u
+       vel_max = r_u
 
     ELSE
 
        r_celerity = SQRT( r_red_grav * r_h * grav_coeff )
-       vel_min(1:n_eqns) = r_u - r_celerity
-       vel_max(1:n_eqns) = r_u + r_celerity
+       vel_min = r_u - r_celerity
+       vel_max = r_u + r_celerity
 
     END IF
 
@@ -230,7 +230,7 @@ CONTAINS
 
     REAL(wp), INTENT(IN)  :: qpj(n_vars+2)
     REAL(wp), INTENT(IN) :: grav_coeff
-    REAL(wp), INTENT(OUT) :: vel_min(n_vars) , vel_max(n_vars)
+    REAL(wp), INTENT(OUT) :: vel_min , vel_max
 
     REAL(wp) :: r_h          !< real-value flow thickness
     REAL(wp) :: r_u          !< real-value x-velocity
@@ -252,14 +252,14 @@ CONTAINS
 
     IF ( r_red_grav * r_h .LT. 0.0_wp ) THEN
 
-       vel_min(1:n_eqns) = r_v
-       vel_max(1:n_eqns) = r_v
+       vel_min = r_v
+       vel_max = r_v
 
     ELSE
 
        r_celerity = SQRT( grav_coeff * r_red_grav * r_h )
-       vel_min(1:n_eqns) = r_v - r_celerity
-       vel_max(1:n_eqns) = r_v + r_celerity
+       vel_min = r_v - r_celerity
+       vel_max = r_v + r_celerity
 
     END IF
 
@@ -1590,13 +1590,8 @@ CONTAINS
 
              ! Mofidy deterministic Fr if needed
              IF ( stochastic_flag ) THEN
-               ! Add mean field correction or stochastic noise
-               IF (mean_field_flag) THEN
-                  Fr = Fr !+ MeanFieldCorrection(grav, r_h, Fr) ! TEMP MODEL, DO NOT USE IT
-               ELSE
-                  IF (r_h .GT. 0.01_wp) THEN
-                     Fr = Fr + Zj
-                  END IF
+               IF (r_h .GT. 0.01_wp) THEN
+                  Fr = Fr + Zj
                END IF
                ! Set Foude number to zero if negative
                IF (Fr .LT. 0._wp) Fr = 0._wp
@@ -1635,12 +1630,7 @@ CONTAINS
 
              ! Mofidy deterministic U if needed
              IF ( stochastic_flag ) THEN
-               ! Add mean field correction or stochastic noise
-               IF (mean_field_flag) THEN
-                  U_f = mod_vel !TEMP MODEL, DO NOT USE IT
-               ELSE
-                  U_f = mod_vel + Zj
-               END IF
+               U_f = mod_vel + Zj
              ELSE
                U_f = mod_vel
              END IF

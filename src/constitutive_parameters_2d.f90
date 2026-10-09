@@ -16,7 +16,7 @@ MODULE constitutive_parameters_2d
   PUBLIC :: grav, inv_grav
   PUBLIC :: A_drag, B_drag, collective_settling_flag
   PUBLIC :: mu, xi, xi_temp, mu_0, mu_inf, Fr_0, U_w
-  PUBLIC :: I_0, mu_2, mu_s, muI_inf, I_transition
+  PUBLIC :: I_0, mu_2, mu_s, muI_inf
   PUBLIC :: alpha_trans, N_inh, f_inhibit_mode
   PUBLIC :: friction_factor, tau
   PUBLIC :: T_env, T_ref, nu_ref, visc_par, tau0, emme, c_p
@@ -67,7 +67,6 @@ MODULE constitutive_parameters_2d
   REAL(wp) :: mu_2 !< friction at high inertial number above which flow accelerates
   REAL(wp) :: mu_s !< static friction coefficient
   REAL(wp) :: muI_inf !< friction at high I to avoid plateau (Barker et al. 2017)
-  REAL(wp) :: I_transition = 4.0d-3 !< transition inertial number
 
    !> f_inhibit
    REAL(wp) :: alpha_trans !< solid volume fraction at which f_inhibit starts decreasing

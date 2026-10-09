@@ -19,13 +19,10 @@ MODULE parameters_2d
   REAL(wp), PARAMETER :: four_thirds = 4.0_wp / 3.0_wp
   REAL(wp), PARAMETER :: neg_four_thirds = -4.0_wp / 3.0_wp
 
-  REAL(wp), PARAMETER :: tolh = 10.0_wp * EPSILON(1.0_wp)
 
   !> Thickness below which a cell is treated as numerically dry [m].
   REAL(wp), PARAMETER :: dry_thickness_tolerance = 1.0E-10_wp
 
-  REAL(wp) :: eps_newton        !< threshold for the convergence of the
-                                !< Newton's method 
 
   REAL(wp) :: dt0               !< Initial time step
 
@@ -37,18 +34,6 @@ MODULE parameters_2d
   REAL(wp) :: eps_sing4         !< parameter for desingularization**4
 
   REAL(wp) :: reconstr_coeff    !< Slope coefficient in the linear reconstruction
-
-  !> Flag to choose in which way we upload the topography
-  !> - T      => through a function
-  !> - F      => through points
-  !> .
-  LOGICAL :: topography_function_flag
-
-  !> Flag for uploading topography from a different file (topography_dem.asc)
-  !> - T      => from dem
-  !> - F      => from points in file.inp
-  !> .
-  LOGICAL :: topography_demfile
 
   !> Flag to choose if we add the rheology
   !> - T      => rheology activated
@@ -115,19 +100,6 @@ MODULE parameters_2d
   !> - F      => we use deterministic friction model
   !> . 
   LOGICAL :: stochastic_flag
-
-  !> Flag for mean field friction model
-  !> - T      => we use mean field friction model
-  !> - F      => we use mean field friction model
-  !> . 
-  LOGICAL :: mean_field_flag
-
-  !> Flag to save the stochastic variables at times
-  !> - T     => write stochastic variables on file
-  !> - F     => do not write stochastic variables on file
-  !> .
-  LOGICAL :: output_stoch_vars_flag
-
 
   !> Flag to use the Sutherland's law for gas viscosity
   !> - T     => use Sutherland's law
@@ -247,24 +219,6 @@ MODULE parameters_2d
   REAL(wp) :: T_fissures(100)
   REAL(wp) :: time_param_fissures(4,100)
   
-  !> Initial volume of the flow
-  REAL(wp) :: released_volume
-
-  !> Initial x-coordiante of the pile
-  REAL(wp) :: x_release
-
-  !> Initial y-coordinate of the pile
-  REAL(wp) :: y_release
-  
-    !> Initial velocity module of the pile
-  REAL(wp) :: velocity_mod_release
-
-  !> Initial velocity direction (angle in degree):\n
-  !> - >=0    => departing from positive x-axis
-  !> - <0     => departign from maximum slope direction
-  !. 
-  REAL(wp) :: velocity_ang_release
-
   !> Initial temperature of the pile of material
   REAL(wp) :: T_init
 
@@ -272,7 +226,7 @@ MODULE parameters_2d
   REAL(wp) :: u_init
 
 
-  !> Initial W-E velocity of the pile of material
+  !> Initial S-N velocity of the pile of material
   REAL(wp) :: v_init
   
   !> Initial sediment concentration in the pile of material

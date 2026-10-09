@@ -52,8 +52,6 @@ MODULE reconstruction_2d
      REAL(wp), ALLOCATABLE :: eta_interfaceL(:,:), eta_interfaceR(:,:)
      REAL(wp), ALLOCATABLE :: eta_interfaceB(:,:), eta_interfaceT(:,:)
 
-       REAL(wp), ALLOCATABLE :: hydrostatic_residual_2d(:,:)
-       REAL(wp), ALLOCATABLE :: topographic_relief_ratio_2d(:,:)
        LOGICAL, ALLOCATABLE :: hp_eta_mask(:,:)
        INTEGER, ALLOCATABLE :: hp_eta_j(:), hp_eta_k(:)
        INTEGER :: hp_eta_cells
@@ -96,8 +94,6 @@ CONTAINS
     ALLOCATE( this%eta_interfaceB( comp_cells_x, comp_interfaces_y ) )
     ALLOCATE( this%eta_interfaceT( comp_cells_x, comp_interfaces_y ) )
 
-    ALLOCATE( this%hydrostatic_residual_2d(comp_cells_x,comp_cells_y) )
-    ALLOCATE( this%topographic_relief_ratio_2d(comp_cells_x,comp_cells_y) )
       ALLOCATE( this%hp_eta_mask(comp_cells_x,comp_cells_y) )
       ALLOCATE( this%hp_eta_j(comp_cells_x*comp_cells_y) )
       ALLOCATE( this%hp_eta_k(comp_cells_x*comp_cells_y) )
@@ -137,8 +133,6 @@ CONTAINS
     DEALLOCATE( this%eta_interfaceB )
     DEALLOCATE( this%eta_interfaceT )
 
-      DEALLOCATE( this%hydrostatic_residual_2d )
-      DEALLOCATE( this%topographic_relief_ratio_2d )
       DEALLOCATE( this%hp_eta_mask )
       DEALLOCATE( this%hp_eta_j )
       DEALLOCATE( this%hp_eta_k )
@@ -857,26 +851,12 @@ CONTAINS
     INTEGER, INTENT(IN) :: j_cent(:), k_cent(:)
 
     REAL(wp) :: q_final(n_vars), qp_final(n_vars+2)
-    REAL(wp) :: relief2d
+    REAL(wp) :: relief2d, residual2d
     INTEGER :: j, k, l
 
     ! Reuse one thread team across all dependent HP phases. Each END DO keeps
     ! its implicit barrier because the following phase consumes its results.
-    !$OMP PARALLEL PRIVATE(l,j,k,relief2d,q_final,qp_final)
-
-    !$OMP DO
-    DO l = 1, solve_cells
-       j = j_cent(l)
-       k = k_cent(l)
-       this%hydrostatic_residual_2d(j,k) = local_hydrostatic_residual(j,k)
-       relief2d = MAX( B_face_x(j,k), B_face_x(j+1,k),                      &
-            B_face_y(j,k), B_face_y(j,k+1) ) -                              &
-            MIN( B_face_x(j,k), B_face_x(j+1,k),                            &
-            B_face_y(j,k), B_face_y(j,k+1) )
-       this%topographic_relief_ratio_2d(j,k) = relief2d /                    &
-            MAX(qp_center(1,j,k),hp_dry_tolerance)
-    END DO
-    !$OMP END DO
+    !$OMP PARALLEL PRIVATE(l,j,k,relief2d,residual2d,q_final,qp_final)
 
     !$OMP DO
     DO l = 1, this%hp_eta_cells
@@ -891,8 +871,15 @@ CONTAINS
     DO l = 1, solve_cells
        j = j_cent(l)
        k = k_cent(l)
-       CALL evaluate_hp_cell_x(j,k)
-       CALL evaluate_hp_cell_y(j,k)
+       residual2d = local_hydrostatic_residual(j,k)
+       relief2d = MAX( B_face_x(j,k), B_face_x(j+1,k),                      &
+            B_face_y(j,k), B_face_y(j,k+1) ) -                              &
+            MIN( B_face_x(j,k), B_face_x(j+1,k),                            &
+            B_face_y(j,k), B_face_y(j,k+1) )
+       relief2d = relief2d /                                                &
+            MAX(qp_center(1,j,k),hp_dry_tolerance)
+       CALL evaluate_hp_cell_x(j,k,residual2d,relief2d)
+       CALL evaluate_hp_cell_y(j,k,residual2d,relief2d)
     END DO
     !$OMP END DO
 
@@ -1087,9 +1074,10 @@ CONTAINS
 
     END SUBROUTINE hp_eta_face_pair
 
-       SUBROUTINE evaluate_hp_cell_x(jc,kc)
+       SUBROUTINE evaluate_hp_cell_x(jc,kc,residual,relief)
 
        INTEGER, INTENT(IN) :: jc, kc
+       REAL(wp), INTENT(IN) :: residual, relief
        REAL(wp) :: h_line(5), u_line(5), Bm_line(5), Bp_line(5)
        REAL(wp) :: hm_direct(5), hp_direct(5), hum_direct(5), hup_direct(5)
        REAL(wp) :: um_candidate(5), up_candidate(5)
@@ -1127,8 +1115,8 @@ CONTAINS
            up_candidate(offset) = qp_center(idx_u,jj,kc)
           END IF
        END DO
-       residual_line(center) = this%hydrostatic_residual_2d(jc,kc)
-       relief_line(center) = this%topographic_relief_ratio_2d(jc,kc)
+       residual_line(center) = residual
+       relief_line(center) = relief
        thread_id = omp_get_thread_num()+1
 
        CALL reconstruct_hp_line( h_line(1:line_size),u_line(1:line_size),    &
@@ -1147,9 +1135,10 @@ CONTAINS
 
        END SUBROUTINE evaluate_hp_cell_x
 
-       SUBROUTINE evaluate_hp_cell_y(jc,kc)
+       SUBROUTINE evaluate_hp_cell_y(jc,kc,residual,relief)
 
        INTEGER, INTENT(IN) :: jc, kc
+       REAL(wp), INTENT(IN) :: residual, relief
        REAL(wp) :: h_line(5), u_line(5), Bm_line(5), Bp_line(5)
        REAL(wp) :: hm_direct(5), hp_direct(5), hum_direct(5), hup_direct(5)
        REAL(wp) :: um_candidate(5), up_candidate(5)
@@ -1187,8 +1176,8 @@ CONTAINS
            up_candidate(offset) = qp_center(idx_v,jc,kk)
           END IF
        END DO
-       residual_line(center) = this%hydrostatic_residual_2d(jc,kc)
-       relief_line(center) = this%topographic_relief_ratio_2d(jc,kc)
+       residual_line(center) = residual
+       relief_line(center) = relief
        thread_id = omp_get_thread_num()+1
 
        CALL reconstruct_hp_line( h_line(1:line_size),u_line(1:line_size),    &

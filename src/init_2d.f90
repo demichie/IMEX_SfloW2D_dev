@@ -15,7 +15,6 @@ MODULE init_2d
 
    IMPLICIT none
 
-   REAL(wp), ALLOCATABLE :: q_init(:,:,:)
 
    REAL(wp), ALLOCATABLE :: thickness_init(:,:)
 
@@ -23,6 +22,15 @@ MODULE init_2d
    REAL(wp), ALLOCATABLE :: erodible_init(:,:)
 
 CONTAINS
+
+   ! Initial raster fields are not used after the conservative state and
+   ! erodible substrate have been assembled. Safe for every startup branch.
+   SUBROUTINE release_initialization_fields
+
+      IF (ALLOCATED(thickness_init)) DEALLOCATE(thickness_init)
+      IF (ALLOCATED(erodible_init)) DEALLOCATE(erodible_init)
+
+   END SUBROUTINE release_initialization_fields
 
    SUBROUTINE init_empty(state)
 

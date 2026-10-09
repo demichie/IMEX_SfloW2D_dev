@@ -64,7 +64,8 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: w_eta(:)
    REAL(wp), OPTIONAL, TARGET, INTENT(INOUT) :: line_scratch(:,:)
 
-   REAL(wp), TARGET :: local_scratch(SIZE(h_center),8)
+   ! Allocate fallback storage only for callers without persistent scratch.
+   REAL(wp), ALLOCATABLE, TARGET :: local_scratch(:,:)
    REAL(wp), POINTER :: scratch(:,:)
    REAL(wp), POINTER :: eta_center(:), h_minus_eta(:), h_plus_eta(:)
    REAL(wp), POINTER :: h_minus_orig(:), h_plus_orig(:), Eh(:), Eeta(:)
@@ -87,6 +88,7 @@ CONTAINS
        END IF
        scratch => line_scratch
     ELSE
+       ALLOCATE(local_scratch(number_of_cells,8))
        scratch => local_scratch
     END IF
 

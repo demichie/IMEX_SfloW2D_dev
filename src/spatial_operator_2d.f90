@@ -123,16 +123,16 @@ CONTAINS
        k = domain%k_cent(l)
 
        max_a_x = MAX( max_a_x,                                               &
-            MAXVAL(this%hp_pccu%a_interface_xPos(1:n_vars,j,k)),             &
-            MAXVAL(-this%hp_pccu%a_interface_xNeg(1:n_vars,j,k)),            &
-            MAXVAL(this%hp_pccu%a_interface_xPos(1:n_vars,j+1,k)),           &
-            MAXVAL(-this%hp_pccu%a_interface_xNeg(1:n_vars,j+1,k)) )
+            this%hp_pccu%a_interface_xPos(j,k),                              &
+            -this%hp_pccu%a_interface_xNeg(j,k),                             &
+            this%hp_pccu%a_interface_xPos(j+1,k),                            &
+            -this%hp_pccu%a_interface_xNeg(j+1,k) )
 
        max_a_y = MAX( max_a_y,                                               &
-            MAXVAL(this%hp_pccu%a_interface_yPos(1:n_vars,j,k)),             &
-            MAXVAL(-this%hp_pccu%a_interface_yNeg(1:n_vars,j,k)),            &
-            MAXVAL(this%hp_pccu%a_interface_yPos(1:n_vars,j,k+1)),           &
-            MAXVAL(-this%hp_pccu%a_interface_yNeg(1:n_vars,j,k+1)) )
+            this%hp_pccu%a_interface_yPos(j,k),                              &
+            -this%hp_pccu%a_interface_yNeg(j,k),                             &
+            this%hp_pccu%a_interface_yPos(j,k+1),                            &
+            -this%hp_pccu%a_interface_yNeg(j,k+1) )
     END DO
     !$OMP END PARALLEL DO
 

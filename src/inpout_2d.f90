@@ -45,14 +45,12 @@ MODULE inpout_2d
                            liquid_flag, gas_flag, subtract_init_flag, bottom_radial_source_flag, &
                            lateral_source_flag, serial_flag, &
                            bottom_fissural_source_flag, n_fissures, &
-                           stochastic_flag, stoch_transport_flag, mean_field_flag, &
+                           stochastic_flag, stoch_transport_flag, &
                            pore_pressure_flag
 
   USE parameters_2d, ONLY: slope_correction_flag, curvature_term_flag
 
   ! -- Variables for the namelist INITIAL_CONDITIONS
-  USE parameters_2d, ONLY: released_volume, x_release, y_release
-  USE parameters_2d, ONLY: velocity_mod_release, velocity_ang_release
   USE parameters_2d, ONLY: alphas_init
   USE parameters_2d, ONLY: T_init
   USE parameters_2d, ONLY: u_init
@@ -99,7 +97,7 @@ MODULE inpout_2d
   USE parameters_2d, ONLY: rheology_model
   USE constitutive_parameters_2d, ONLY: mu, xi, tau, nu_ref, visc_par,     &
        T_ref, mu_0, mu_inf, Fr_0, U_w, mu_s, mu_2, I_0, muI_inf,          &
-       I_transition, A_drag, B_drag, collective_settling_flag
+       A_drag, B_drag, collective_settling_flag
   USE constitutive_parameters_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, &
        Kappa, n_td, friction_factor, tau0
   ! -- Functions used in the rheology calculations
@@ -131,9 +129,9 @@ MODULE inpout_2d
   ! --- Variables for the namelist STOCHASTIC_PARAMETERS
   USE stochastic_module, ONLY: sym_noise, &
                                std_min, std_max, std_slope_factor, tau_stochastic, noise_pow_val, &
-                               noise_activation_velocity, Z_min, Z_max, Z_mean, Z_std, percentiles
+                               noise_activation_velocity
   USE stochastic_random_2d, ONLY: stochastic_seed
-  USE parameters_2d, ONLY: output_stoch_vars_flag, length_spatial_corr
+  USE parameters_2d, ONLY: length_spatial_corr
 
   ! --- Variables for the namelist PORE_PRESSURE_PARAMETERS
   USE constitutive_parameters_2d, ONLY: hydraulic_permeability,             &
@@ -150,7 +148,6 @@ MODULE inpout_2d
   CHARACTER(LEN=40) :: run_name           !< Name of the run
   CHARACTER(LEN=40) :: bak_name           !< Backup file for the parameters
   CHARACTER(LEN=40) :: input_file         !< File with the run parameters
-  CHARACTER(LEN=40) :: output_file        !< Name of the output files
   CHARACTER(LEN=40) :: restart_file       !< Name of the restart file
   CHARACTER(LEN=40) :: probes_file        !< Name of the probes file
   CHARACTER(LEN=40) :: output_file_2d     !< Name of the output files
@@ -180,10 +177,6 @@ MODULE inpout_2d
   INTEGER, PARAMETER :: erodible_unit = 18
   INTEGER, PARAMETER :: output_VT_unit = 19
   INTEGER, PARAMETER :: mass_center_unit = 20
-  INTEGER, PARAMETER :: stats_ou_unit = 21
-  INTEGER, PARAMETER :: fric_unit = 22
-  INTEGER, PARAMETER :: stats_fric_unit = 23
-  INTEGER, PARAMETER :: conv_kern_unit = 24
   INTEGER, PARAMETER :: output_unit_erosion = 25
   INTEGER, PARAMETER :: output_unit_erodible = 26
   INTEGER, PARAMETER :: output_unit_deposit = 27
@@ -259,7 +252,6 @@ MODULE inpout_2d
 
   REAL(wp) :: xllcorner, yllcorner, cellsize
 
-  LOGICAL :: write_first_q
 
   INTEGER :: n_probes
 
@@ -286,7 +278,6 @@ MODULE inpout_2d
 
   REAL(wp) :: initial_erodible_thickness
 
-  REAL(wp) :: alphas0_E(10), alphas0_W(10)
 
   REAL(wp) :: alpha1_ref
 
@@ -298,7 +289,6 @@ MODULE inpout_2d
   ! NC: Variabili condivise per la gestione del file NetCDF
   INTEGER             :: ncid              !< ID for NetCDF file
   INTEGER             :: dimids(3)         !< ID for size of [x, y, time]
-  INTEGER             :: solid_dimid       !< ID for size of solids
   INTEGER             :: x_varid, y_varid, t_varid !< ID for x,y
   INTEGER             :: b_varid, eta_varid, w_varid !< IDs for bed, surface, vertical velocity
   INTEGER             :: h_varid           !> ID for h
@@ -343,8 +333,7 @@ MODULE inpout_2d
     stochastic_flag, n_layers, &
     pore_pressure_flag
 
-  NAMELIST /initial_conditions/ released_volume, x_release, y_release, &
-    velocity_mod_release, velocity_ang_release, T_init, T_ambient
+  NAMELIST /initial_conditions/ T_init, T_ambient
 
   NAMELIST /numeric_parameters/ dt0, max_dt, cfl, limiter, theta,             &
     reconstr_coeff, n_RK
@@ -390,7 +379,7 @@ MODULE inpout_2d
   NAMELIST /vulnerability_table_parameters/ thickness_levels0, dyn_pres_levels0
 
   NAMELIST /stochastic_parameters/ &
-    mean_field_flag, output_stoch_vars_flag, sym_noise, std_max, &
+    sym_noise, std_max, &
     tau_stochastic, length_spatial_corr, noise_pow_val, stoch_transport_flag, &
     stochastic_seed, noise_activation_velocity
 
@@ -531,9 +520,7 @@ CONTAINS
     runout_last = -1.0_wp
 
     !-- Inizialization of the Variables for the namelist STOCHASTIC_PARAMETERS
-    mean_field_flag = .FALSE.
     sym_noise = 0.0_wp
-    output_stoch_vars_flag = .FALSE.
     std_min = -1.0_wp
     std_max = -1.0_wp
     std_slope_factor = -1.0_wp
@@ -944,9 +931,7 @@ CONTAINS
     dyn_pres_levels0 = -1.0_wp
 
     !-- Variable for the namelist STOCHASTIC_PARAMETERS
-    mean_field_flag = .FALSE.
     sym_noise = 0.0_wp
-    output_stoch_vars_flag = .FALSE.
     std_min = -1.0_wp
     std_max = -1.0_wp
     std_slope_factor = -1.0_wp
@@ -4502,9 +4487,6 @@ CONTAINS
         CALL fatal_error('length_spatial_corr must be >= 0')
       END IF
 
-      IF (mean_field_flag) THEN
-        CALL fatal_error('mean_field_flag is not implemented')
-      END IF
 
       ! Set the velocity-dependent intensity law. For legacy inputs, use the
       ! corresponding rheology scale when u_0 is not specified explicitly.
@@ -4566,12 +4548,6 @@ CONTAINS
         WRITE (*, *) 'Using processor-generated stochastic seed'
       END IF
 
-      ! Say where the stochastic variables will be saved
-      IF (output_stoch_vars_flag) THEN
-        WRITE (*, *) 'The stochastic variables will be saved on a file!'
-      ELSE
-        WRITE (*, *) 'The stochastic variables will NOT be saved on a file!'
-      END IF
 
     END IF
 

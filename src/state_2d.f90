@@ -42,8 +42,6 @@ MODULE state_2d
      REAL(wp), ALLOCATABLE :: mod_vel_max(:,:)
 
      LOGICAL, ALLOCATABLE :: vuln_table(:,:,:)
-     LOGICAL, ALLOCATABLE :: thck_table(:,:)
-     LOGICAL, ALLOCATABLE :: pdyn_table(:,:)
 
    CONTAINS
 
@@ -92,12 +90,8 @@ CONTAINS
     ALLOCATE( this%vuln_table(n_thickness_levels*n_dyn_pres_levels,         &
          comp_cells_x,comp_cells_y) )
 
-    ALLOCATE( this%thck_table(comp_cells_x,comp_cells_y) )
-    ALLOCATE( this%pdyn_table(comp_cells_x,comp_cells_y) )
 
     this%vuln_table = .FALSE.
-    this%thck_table = .FALSE.
-    this%pdyn_table = .FALSE.
 
   END SUBROUTINE initialize_state
 
@@ -115,7 +109,6 @@ CONTAINS
 
     DEALLOCATE( this%vuln_table )
 
-    DEALLOCATE( this%thck_table, this%pdyn_table )
 
     DEALLOCATE( this%qp )
 

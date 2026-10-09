@@ -17,6 +17,8 @@ MODULE simulation_2d
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,                &
        finalize_nonlinear_solver
 
+  USE mass_exchange_2d, ONLY : release_topography_workspace
+
   USE runtime_2d, ONLY : runtime_state_type
   USE state_2d, ONLY : state_type
   USE domain_2d, ONLY : domain_type
@@ -91,6 +93,7 @@ CONTAINS
     CALL this%equation_partition%finalize
     CALL this%model_layout%finalize
     CALL this%stochastic%finalize
+    CALL release_topography_workspace
 
   END SUBROUTINE finalize_simulation
 

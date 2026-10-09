@@ -33,21 +33,13 @@ MODULE mass_exchange_2d
 
   PRIVATE
 
-  PUBLIC :: update_erosion_deposition_cell
+  PUBLIC :: update_erosion_deposition_cell, release_topography_workspace
 
   ! Persistent work arrays for the vertex-first evolving-bed update. Inactive
   ! and dry cells retain a zero proposal but remain in the geometric stencil.
-  REAL(wp), ALLOCATABLE, PUBLIC :: topography_rate_cell(:,:)
-  REAL(wp), ALLOCATABLE, PUBLIC :: topography_rate_vertex(:,:)
-  REAL(wp), ALLOCATABLE, PUBLIC :: topography_rate_geometric(:,:)
-  REAL(wp), ALLOCATABLE, PUBLIC :: topography_rate_mismatch(:,:)
+  REAL(wp), ALLOCATABLE :: topography_rate_cell(:,:)
+  REAL(wp), ALLOCATABLE :: topography_rate_vertex(:,:)
 
-  ! Diagnostics for the conservative cell-to-vertex projection.
-  REAL(wp), PUBLIC :: topography_volume_rate_cell = 0.0_wp
-  REAL(wp), PUBLIC :: topography_volume_rate_geometric = 0.0_wp
-  REAL(wp), PUBLIC :: topography_mismatch_integral = 0.0_wp
-  REAL(wp), PUBLIC :: topography_mismatch_l1 = 0.0_wp
-  REAL(wp), PUBLIC :: topography_mismatch_linf = 0.0_wp
 
 CONTAINS
 
@@ -305,15 +297,12 @@ CONTAINS
     END IF
 
     IF ( grid_size_changed ) THEN
-       DEALLOCATE(topography_rate_cell, topography_rate_vertex,               &
-            topography_rate_geometric, topography_rate_mismatch)
+       CALL release_topography_workspace
     END IF
 
     IF ( .NOT.ALLOCATED(topography_rate_cell) ) THEN
        ALLOCATE(topography_rate_cell(comp_cells_x,comp_cells_y))
        ALLOCATE(topography_rate_vertex(comp_interfaces_x,comp_interfaces_y))
-       ALLOCATE(topography_rate_geometric(comp_cells_x,comp_cells_y))
-       ALLOCATE(topography_rate_mismatch(comp_cells_x,comp_cells_y))
     END IF
 
   END SUBROUTINE ensure_topography_workspace
@@ -330,34 +319,43 @@ CONTAINS
     IMPLICIT NONE
 
     REAL(wp), INTENT(IN) :: dt
-    REAL(wp) :: cell_area
+    REAL(wp) :: cell_area, geometric_rate, mismatch
+    REAL(wp) :: volume_cell, volume_geometric
+    REAL(wp) :: mismatch_integral, mismatch_l1, mismatch_linf
     INTEGER :: j, k
 
     CALL project_cell_field_to_vertices(topography_rate_cell,                 &
          topography_rate_vertex)
 
-    !$OMP PARALLEL DO COLLAPSE(2)
-    DO k = 1, comp_cells_y
-       DO j = 1, comp_cells_x
-          topography_rate_geometric(j,k) = 0.25_wp *                          &
-               ( topography_rate_vertex(j,k)                                 &
-               + topography_rate_vertex(j+1,k)                               &
-               + topography_rate_vertex(j,k+1)                               &
-               + topography_rate_vertex(j+1,k+1) )
-          topography_rate_mismatch(j,k) = topography_rate_geometric(j,k)     &
-               - topography_rate_cell(j,k)
+    ! Diagnostic reductions do not need full-domain geometric/mismatch fields.
+    IF (verbose_level >= 2) THEN
+       cell_area = dx * dy
+       volume_cell = cell_area * SUM(topography_rate_cell)
+       volume_geometric = 0.0_wp
+       mismatch_integral = 0.0_wp
+       mismatch_l1 = 0.0_wp
+       mismatch_linf = 0.0_wp
+       !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(geometric_rate,mismatch) &
+       !$OMP & REDUCTION(+:volume_geometric,mismatch_integral,mismatch_l1) &
+       !$OMP & REDUCTION(MAX:mismatch_linf)
+       DO k = 1, comp_cells_y
+          DO j = 1, comp_cells_x
+             geometric_rate = 0.25_wp * (topography_rate_vertex(j,k) &
+                  + topography_rate_vertex(j+1,k) &
+                  + topography_rate_vertex(j,k+1) &
+                  + topography_rate_vertex(j+1,k+1))
+             mismatch = geometric_rate - topography_rate_cell(j,k)
+             volume_geometric = volume_geometric + geometric_rate
+             mismatch_integral = mismatch_integral + mismatch
+             mismatch_l1 = mismatch_l1 + ABS(mismatch)
+             mismatch_linf = MAX(mismatch_linf,ABS(mismatch))
+          END DO
        END DO
-    END DO
-    !$OMP END PARALLEL DO
-
-    cell_area = dx * dy
-    topography_volume_rate_cell = cell_area * SUM(topography_rate_cell)
-    topography_volume_rate_geometric = cell_area *                           &
-         SUM(topography_rate_geometric)
-    topography_mismatch_integral = cell_area *                               &
-         SUM(topography_rate_mismatch)
-    topography_mismatch_l1 = cell_area * SUM(ABS(topography_rate_mismatch))
-    topography_mismatch_linf = MAXVAL(ABS(topography_rate_mismatch))
+       !$OMP END PARALLEL DO
+       volume_geometric = cell_area * volume_geometric
+       mismatch_integral = cell_area * mismatch_integral
+       mismatch_l1 = cell_area * mismatch_l1
+    END IF
 
     !$OMP PARALLEL DO COLLAPSE(2)
     DO k = 1, comp_interfaces_y
@@ -371,12 +369,17 @@ CONTAINS
 
     IF ( verbose_level .GE. 2 ) THEN
        WRITE(*,*) 'evolving-topography volume-rate cell/geometric:',         &
-            topography_volume_rate_cell, topography_volume_rate_geometric
+            volume_cell, volume_geometric
        WRITE(*,*) 'evolving-topography mismatch integral/L1/Linf:',          &
-            topography_mismatch_integral, topography_mismatch_l1,            &
-            topography_mismatch_linf
+            mismatch_integral, mismatch_l1, mismatch_linf
     END IF
 
   END SUBROUTINE apply_vertex_first_topography_update
+
+  ! Idempotent release of the lazy evolving-bed workspace.
+  SUBROUTINE release_topography_workspace
+    IF (ALLOCATED(topography_rate_cell)) DEALLOCATE(topography_rate_cell)
+    IF (ALLOCATED(topography_rate_vertex)) DEALLOCATE(topography_rate_vertex)
+  END SUBROUTINE release_topography_workspace
 
 END MODULE mass_exchange_2d
