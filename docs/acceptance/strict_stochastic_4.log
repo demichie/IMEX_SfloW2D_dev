@@ -1,0 +1,43 @@
+ ---------------------
+ IMEX_SfloW2D 2.0
+ ---------------------
+ NOTE: PORE_PRESSURE_FLAG is FALSE. Pore pressure equation will not be solved.
+ HYDRAULIC_PERMEABILITY, F_INHIBIT_MODE, ALPHA_TRANS, and PORE_PRESSURE_FRACTION will not be accounted for.
+ GAS_LOSS_FLAG and DYNAMIC_PERMEABILITY_FLAG will be set to FALSE.
+ Run name: TEST_2D                                 
+ Model variables =            6
+ WARNING: minimum total solid fraction = 0
+ RHEOLOGY_MODEL =           9
+ MU_0 =  0.10000000000000001       MU_inf =  0.50000000000000000      Fr_0 =    1.0000000000000000     
+  
+ START PARSING THE STOCASTIC PARAMETERS...
+ Setting stochastic intensity parameters...
+ IMPUT PARAMETERS FOR THE STOCHASTIC MODEL :
+ std_min =   0.0000000000000000      std_max =   5.0000000000000003E-002 std_slope_factor =    1.0000000000000000      tau_stochastic =    1.0000000000000000      length_spatial_corr =    0.0000000000000000     
+ noise_activation_velocity =   1.0000000000000000     
+ sym_noise =   0.0000000000000000      noise_pow_val =  -1.0000000000000000     
+ The noise will symmetric (positive and negative)!
+ The noise will be transported by the flow!
+ Using reproducible stochastic seed:       24680
+ OpenMP program
+ Parallel run: number of threads used           4
+ Implicit equations =           2
+ ALLOCATION OF ARRAYS COMPLETED
+ Standard format detected: Executing read_solution.
+ n_restart_files           1
+
+ Release time:    0.0000000000000000     
+ end stochastic initialization
+
+Program received signal SIGILL: Illegal instruction.
+
+Backtrace for this error:
+#0  0x102a66103
+#1  0x102a65083
+#2  0x18a7f1743
+#3  0x10223af87
+#4  0x1022f29ab
+#5  0x102506a53
+#6  0x1022e4343
+#7  0x1023ca5d3
+#8  0x1023cc21b
