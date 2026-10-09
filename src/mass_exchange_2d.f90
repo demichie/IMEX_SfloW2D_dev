@@ -58,7 +58,7 @@ CONTAINS
   SUBROUTINE update_erosion_deposition_cell(q, qp, dt, domain)
 
     USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,    &
-         entrainment_flag
+         entrainment_flag, loss_rate
     
     USE geometry_2d, ONLY : deposit , erosion , erodible
     USE geometry_2d, ONLY : B_zone
@@ -66,9 +66,11 @@ CONTAINS
     USE equation_terms_2d, ONLY : eval_mass_exchange_terms
 
     USE state_conversion_2d, ONLY : qc_to_qp, mixt_var
-    USE parameters_2d, ONLY : topo_change_flag , bottom_radial_source_flag
+    USE parameters_2d, ONLY : topo_change_flag, bottom_radial_source_flag, &
+         bottom_fissural_source_flag
     USE parameters_2d, ONLY : erodible_deposit_flag
     USE parameters_2d, ONLY : pore_pressure_flag
+    USE parameters_2d, ONLY : liquid_flag
 
     IMPLICIT NONE
 
@@ -96,11 +98,20 @@ CONTAINS
 
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
+    LOGICAL :: liquid_loss_active
 
 
 
+    ! Carrier loss is a mass exchange even without erosion or settling. Use
+    ! nested guards: Fortran does not require short-circuit evaluation, and
+    ! gas-only configurations need not allocate the liquid loss parameter.
+    liquid_loss_active = .FALSE.
+    IF ( liquid_flag ) THEN
+       IF ( ALLOCATED(loss_rate) ) liquid_loss_active = loss_rate .GT. 0.0_wp
+    END IF
     IF ( ( erosion_coeff .EQ. 0.0_wp ) .AND. ( .NOT.settling_flag ) &
-         .AND. ( .NOT.pore_pressure_flag ) .AND. ( .NOT.entrainment_flag) ) RETURN
+         .AND. ( .NOT.pore_pressure_flag ) .AND. ( .NOT.entrainment_flag) &
+         .AND. ( .NOT.liquid_loss_active ) ) RETURN
 
     IF ( topo_change_flag ) THEN
        CALL ensure_topography_workspace
@@ -139,9 +150,11 @@ CONTAINS
             dt , erosion_term , deposition_term , continuous_phase_erosion_term ,  &
             continuous_phase_loss_term , eqns_term , topo_term  )
           
-       IF ( bottom_radial_source_flag ) THEN
+       IF ( bottom_radial_source_flag .OR. bottom_fissural_source_flag ) THEN
 
-          ! entrainment, erosion and deposition occurs only outside source
+          ! Both bottom-source geometries contribute to this shared coverage
+          ! fraction. Apply the same mask to all increments before recording
+          ! inventories or projecting the limited proposal onto the nodal bed.
           out_of_source_fraction = 1.0_wp - cell_source_fractions(j,k)
           deposition_term = deposition_term * out_of_source_fraction
           erosion_term = erosion_term * out_of_source_fraction

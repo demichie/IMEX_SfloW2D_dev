@@ -1941,6 +1941,9 @@ CONTAINS
   !> \param[out] continuous_phase_loss_term Carrier-phase volume loss rate [m s^-1].
   !> \param[out] eqns_term Conservative source vector for the local mass-exchange update.
   !> \param[out] topo_term Proposed cell bed-elevation rate, positive for bed growth [m s^-1].
+  !> \note The solid-fraction cutoff suppresses the whole exchange transaction: all rates and
+  !>       equation/bed proposals remain zero. Substrate temperature is selected locally so
+  !>       parallel calls never mutate the shared material configuration.
   !******************************************************************************
 
   SUBROUTINE eval_mass_exchange_terms( qpj , B_zone , B_prime_x , B_prime_y ,   &
@@ -2022,6 +2025,7 @@ CONTAINS
 
     REAL(wp) :: T_liquid
     REAL(wp) :: T_boiling
+    REAL(wp) :: T_erodible_local !< cell-local substrate temperature [K]
     REAL(wp) :: sp_latent_heat
     REAL(wp) :: sp_heat_liq_water
     REAL(wp) :: mass_vap_rate
@@ -2079,6 +2083,11 @@ CONTAINS
 
     alphas_tot = SUM(r_alphas)
 
+    ! Below the configured cutoff no conservative or bed source is applied.
+    ! Return before proposing any erosion too: otherwise the caller would
+    ! consume substrate inventory while eqns_term and topo_term stay zero.
+    IF ( alphas_tot .LE. alphastot_min ) RETURN
+
     IF ( stoch_transport_flag ) r_Zs = qpj(idx_stoch)
 
     IF ( pore_pressure_flag ) r_exc_pore_pres = qpj(idx_pore)
@@ -2123,8 +2132,6 @@ CONTAINS
     tot_erosion = tot_solid_erosion / ( 1.0_wp - erodible_porosity )
 
     continuous_phase_erosion_term = tot_erosion * erodible_porosity
-
-    IF ( alphas_tot .LE. alphastot_min ) RETURN
 
     r_T = qpj(4)
 
@@ -2396,13 +2403,18 @@ CONTAINS
     continuous_phase_loss_term = MIN( continuous_phase_loss_term ,              &
          r_h * MAX( 0.0_wp , maximum_solid_packing - SUM(r_alphas) ) / dt )
 
-    ! loss of continuous phase cannot
+    ! Limit to the available carrier after reserving the pore volume of the
+    ! remaining solids. An already exhausted reserve is zero, not negative:
+    ! a nonnegative requested loss must not become a spurious carrier gain.
     continuous_phase_loss_term = MIN( continuous_phase_loss_term ,              &
-         ( r_h *  ( 1.0_wp - SUM(r_alphas) ) - coeff_porosity * ( r_h *         &
-         SUM(r_alphas) - dt * SUM( deposition_term(1:n_solid) ) ) ) / dt )
+         MAX(0.0_wp, ( r_h * ( 1.0_wp - SUM(r_alphas) ) - coeff_porosity *      &
+         ( r_h * SUM(r_alphas) - dt * SUM(deposition_term(1:n_solid)) ) ) / dt) )
 
 
-    IF ( erodible_deposit_flag ) T_erodible = r_T
+    ! Re-erodible deposits use the current flow temperature by model policy,
+    ! but the configured substrate temperature is shared read-only state.
+    T_erodible_local = T_erodible
+    IF ( erodible_deposit_flag ) T_erodible_local = r_T
 
     IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                      &
          ( r_Ri .GT. 0.0_wp ) ) THEN
@@ -2449,7 +2461,7 @@ CONTAINS
     ! deposition, erosion and entrainment are considered
     eqns_term(4) = - r_T * ( SUM( rho_s * sp_heat_s * deposition_term )        &
          + r_rho_c * r_sp_heat_c * continuous_phase_loss_term )                &
-         + T_erodible * ( SUM( rho_s * sp_heat_s * erosion_term )              &
+         + T_erodible_local * ( SUM( rho_s * sp_heat_s * erosion_term )        &
          + rho_c_sub * r_sp_heat_c * continuous_phase_erosion_term )           &
          + T_ambient * sp_heat_a * rho_a_amb * air_entr
 
