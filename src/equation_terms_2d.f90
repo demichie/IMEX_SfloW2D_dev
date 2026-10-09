@@ -1423,6 +1423,9 @@ CONTAINS
   !> \param[out] nh_semi_impl_term Cell-source vector handled by the semi-implicit part of the time
   !>                               scheme.
   !> \param[in] Zj Local effective stochastic fluctuation supplied to the rheology.
+  !> \note The Froude-dependent law (model 9) requires positive reduced gravity.
+  !>       Neutral or buoyant mixtures have no compressive buoyancy load in this law and receive
+  !>       no basal friction; their Froude denominator must not be evaluated.
   !******************************************************************************
 
   SUBROUTINE eval_nh_semi_impl_terms( Bprimej_x , Bprimej_y , Bsecondj_xx ,     &
@@ -1651,10 +1654,13 @@ CONTAINS
           ! should also use rho or alpha?
           ! must add something for curvature or temperature?
 
-          ! Compute friction only if mass is flowing (this implies that there
-          ! is mass)
-
-          IF ( mod_vel .GT. 0.0_wp ) THEN
+          ! Model 9 needs a positive buoyancy load as well as a moving wet
+          ! state. Ambient gas can retain tiny mass/momentum after transport:
+          ! g'=0 then makes Fr undefined even though its speed is nonzero.
+          ! Buoyant gas (g'<0) is outside this basal-contact friction law too.
+          ! Do not manufacture a positive gravity or evaluate sqrt/division in
+          ! either case; keep the initialized zero source instead.
+          IF ( mod_vel .GT. 0.0_wp .AND. r_red_grav .GT. 0.0_wp ) THEN
              ! Computing froude number (The definition in Zhu 2020 et Roche 2021
              ! is sligtlhy different!)
              Fr = mod_vel / SQRT(r_red_grav * r_h)
@@ -1682,7 +1688,7 @@ CONTAINS
              ! units of dqc(3)/dt=d(rho h v)/dt (kg m-1 s-2)
              source_term(3) = source_term(3) - temp_term * r_v / mod_hor_vel
 
-          ELSE ! If ||u|| = 0 then there will be no friction in this code
+          ELSE ! At rest or without a positive buoyancy load: no basal friction.
 
             muF = 0._wp
 

@@ -25,6 +25,13 @@ roadmap hash; `--reference-zip FILE.zip` verifies the two dry-safe core hashes
 listed in the pinned Gate-H README. That hash check does not execute the external
 Python scientific-reference suite.
 
+For a candidate not yet committed, add `--working-tree` and use the current HEAD
+as `--revision`. This explicitly overlays tracked and nonignored untracked files
+in the temporary export; ignored build artifacts are excluded. The manifest
+labels the Git SHA as a **base revision only**, retains the candidate patch and
+hashes the exported source/test files. It does not create a Git commit. Without
+this option, uncommitted edits are deliberately not tested.
+
 The audit requires Git, tar, Autotools, make, gfortran, NetCDF Fortran, LAPACK,
 Python 3 and NumPy. Compiler portability and CI integration belong to M12c;
 this driver does not remove the existing hard-coded compiler settings.

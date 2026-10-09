@@ -68,15 +68,45 @@ def execute(command, cwd, log, environment, timeout):
 def export_revision(repo, revision, destination):
     """Export tracked sources only, without stale objects or uncommitted edits."""
     destination.mkdir()
-    archive = subprocess.Popen(["git", "-C", str(repo), "archive", revision],
-                               stdout=subprocess.PIPE)
-    try:
-        subprocess.run(["tar", "-xf", "-", "-C", str(destination)],
-                       stdin=archive.stdout, check=True)
-    finally:
-        archive.stdout.close()
-    if archive.wait() != 0:
-        raise RuntimeError("git archive failed")
+    # BSD tar may stop after the tar end marker before consuming Git's padded
+    # pipe output, causing a spurious SIGPIPE from an otherwise valid archive.
+    # Retain an archive file instead, then extract only after Git has finished.
+    archive = destination.parent / "revision.tar"
+    subprocess.run(["git", "-C", str(repo), "archive", "--format=tar",
+                    f"--output={archive}", revision], check=True)
+    subprocess.run(["tar", "-xf", str(archive), "-C", str(destination)], check=True)
+
+
+def overlay_worktree(repo, destination):
+    """Snapshot tracked/nonignored candidate files, without objects or a Git commit.
+
+    The revision in the manifest is a base revision, not the candidate identity.
+    Exported file hashes and the recorded diff identify the tested candidate.
+    """
+    tracked = subprocess.check_output(
+        ["git", "-C", str(repo), "ls-files", "-z"])
+    untracked = subprocess.check_output(
+        ["git", "-C", str(repo), "ls-files", "--others", "--exclude-standard", "-z"])
+    paths = sorted(set(os.fsdecode(name) for name in (tracked + untracked).split(b"\0")
+                       if name))
+    for name in paths:
+        source, target = repo / name, destination / name
+        if source.is_file() or source.is_symlink():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.is_symlink():
+                target.unlink()
+            shutil.copy2(source, target, follow_symlinks=False)
+        elif target.is_file() or target.is_symlink():
+            # A tracked file removed in the candidate must not survive export.
+            target.unlink()
+    diff = subprocess.check_output(
+        ["git", "-C", str(repo), "diff", "HEAD", "--binary"])
+    (destination.parent / "candidate.patch").write_bytes(diff)
+    return {"base_revision_only": True, "snapshot_files": len(paths),
+            "git_status": subprocess.check_output(
+                ["git", "-C", str(repo), "status", "--short"], text=True),
+            "patch_sha256": sha256(diff).hexdigest(),
+            "policy": "Tracked files and nonignored untracked files; ignored build artifacts excluded."}
 
 
 def run_test(source, root, executable, profile, name, threads, timeout):
@@ -142,6 +172,8 @@ def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("--repo", type=Path, default=TOOLS.parents[1])
     cli.add_argument("--revision", default="HEAD")
+    cli.add_argument("--working-tree", action="store_true",
+                     help="explicitly snapshot an uncommitted candidate over HEAD; record diff/hashes")
     cli.add_argument("--output", type=Path, required=True,
                      help="new evidence directory outside the source repository")
     cli.add_argument("--netcdf", type=Path, required=True,
@@ -161,10 +193,16 @@ def main():
     revision = subprocess.check_output(
         ["git", "-C", str(repo), "rev-parse", f"{args.revision}^{{commit}}"],
         text=True).strip()
+    if args.working_tree:
+        head = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"],
+                                       text=True).strip()
+        if revision != head:
+            cli.error("--working-tree must use the current HEAD as its base revision")
     plan_path = TOOLS / "acceptance_plan.json"
     plan = json.loads(plan_path.read_text())
     source = root / "source"
     export_revision(repo, revision, source)
+    candidate = overlay_worktree(repo, source) if args.working_tree else None
     adapter = root / "adapter"
     adapter.mkdir()
     for name in ("capture_solver.py", "capture_solver.sh"):
@@ -172,7 +210,9 @@ def main():
     (adapter / "capture_solver.sh").chmod(0o755)
     manifest = {
         "schema_version": 1, "started_utc": datetime.now(timezone.utc).isoformat(),
-        "solver_git_revision": revision, "source_export": "git archive of tracked HEAD",
+        "solver_git_revision": revision,
+        "source_export": "git archive plus explicit working-tree snapshot" if candidate
+                         else "git archive of the tracked pinned revision",
         "platform": platform.platform(), "python": sys.version,
         "audit_tools": {p.name: digest(p) for p in TOOLS.iterdir()
                         if p.is_file() and p.suffix in (".py", ".sh", ".json")},
@@ -191,6 +231,8 @@ def main():
         "unit_flag_policy": "Unit scripts compile independently with their own fixed flags; not relabeled as either production profile.",
         "profiles": {}, "tests": [], "criteria": plan["criteria"],
         "n9_decision": "open", "sign_off": "not granted by the audit runner"}
+    if candidate:
+        manifest["working_tree_candidate"] = candidate
     if args.roadmap:
         manifest["roadmap"] = {"filename": args.roadmap.name,
                                "sha256": digest(args.roadmap)}

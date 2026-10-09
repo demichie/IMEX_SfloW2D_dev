@@ -9,6 +9,7 @@
     "TEST_STATE_CONVERSION", "TEST_TOPOGRAPHY_FACES", "TEST_HP_RECONSTRUCTION",
     "TEST_PCCU", "TEST_HYDROSTATIC_PATH", "TEST_CURVATURE_SOURCE",
     "TEST_NONCONSERVATIVE_PATH", "TEST_STOCHASTIC_RANDOM", "TEST_STOCHASTIC_EVOLUTION",
+    "TEST_RHEOLOGY_FROUDE",
     "TEST_MODEL_LAYOUT", "TEST_EQUATION_METADATA", "TEST_STATE_INITIALIZATION",
     "TEST_WORKSPACE_LIFECYCLE", "TEST_DIAGNOSTICS", "TEST_LAPACK_INTERFACES",
     "TEST_SOURCE_DOCUMENTATION"
@@ -29,7 +30,7 @@
     {"id": "N7-06", "requirement": "Production semidiscrete residual, CFL and time integration against clean reference", "tests": ["TEST_PCCU", "TEST_HYDROSTATIC_PATH", "TEST_PCCU_GATE_H"], "coverage": "partial", "gap": "Path algebra and aggregate finite-time fingerprints do not provide complete residual/CFL/full-field reference comparisons."},
     {"id": "N7-07", "requirement": "Mass conservation and symmetry", "tests": ["TEST_PCCU_GATE_H"], "coverage": "partial", "gap": "Current tolerances cover Gate-H mass and G=1 lateral symmetry; include component budgets, other boundary/source cases and analytical 1-D dynamics."},
     {"id": "N7-08", "requirement": "Real one/four-thread equivalence", "tests": ["TEST_PCCU_LAKE_AT_REST", "TEST_PCCU_INCLINED_EXCAVATION", "TEST_PCCU_GATE_H", "TEST_BINARY_RESTART", "TEST_STOCHASTIC_RESTART"], "coverage": "partial", "gap": "Audit must verify actual teams, not just OMP_NUM_THREADS; failing trajectories cannot supply equivalence evidence."},
-    {"id": "N7-09", "requirement": "Exact deterministic and stochastic continuation", "tests": ["TEST_BINARY_RESTART", "TEST_STOCHASTIC_RESTART"], "coverage": "test_defined", "gap": "Require both original-duration trajectories to finish; do not replace a failed long stochastic run with a shortened one."},
+    {"id": "N7-09", "requirement": "Exact deterministic and stochastic continuation", "tests": ["TEST_BINARY_RESTART", "TEST_STOCHASTIC_RESTART", "TEST_RHEOLOGY_FROUDE"], "coverage": "test_defined", "gap": "Require both original-duration trajectories to finish; do not replace a failed long stochastic run with a shortened one."},
     {"id": "N8-01", "requirement": "Solid availability, substrate inventory and source-mask limits before nodal averaging", "tests": ["TEST_STATE_CONVERSION", "TEST_BINARY_RESTART"], "coverage": "partial", "gap": "No isolated production mass-exchange test saturates erosion/deposition/loss limits and checks q/deposit/erosion/erodible together."},
     {"id": "N8-02", "requirement": "Mass-lumped global bed-volume identity including dry cells and boundaries", "tests": ["TEST_TOPOGRAPHY_FACES"], "coverage": "partial", "gap": "Projection algebra is covered; assert the same identity for limited production mass-exchange proposals with weighted nodal quadrature and the cell integral dx*dy*SUM(rate_cell)."},
     {"id": "N8-03", "requirement": "Exact B_vertex restart with bed evolution", "tests": ["TEST_BINARY_RESTART"], "coverage": "test_defined", "gap": "Whole checkpoint comparison includes B_vertex; passing scope remains one configured evolving-bed case."},

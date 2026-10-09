@@ -6,7 +6,7 @@ import tempfile
 import unittest
 
 from capture_solver import digest, fortran_float
-from run_acceptance import compare_threads, execute
+from run_acceptance import compare_threads, execute, overlay_worktree
 
 
 class AuditToolsTests(unittest.TestCase):
@@ -66,6 +66,28 @@ class AuditToolsTests(unittest.TestCase):
         names = plan["unit_tests"] + [test["name"] for test in plan["solver_tests"]]
         for name in names:
             self.assertTrue((tools.parents[1] / "TESTS" / name / "run_test.sh").is_file())
+
+    def test_candidate_overlay_excludes_ignored_and_tracks_removals(self):
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory(prefix="imex-audit-overlay-") as temporary:
+            root = Path(temporary)
+            repo, export = root / "repo", root / "export"
+            repo.mkdir()
+            export.mkdir()
+            (repo / "source.f90").write_text("candidate source\n")
+            (repo / "new_test.f90").write_text("new test\n")
+            (repo / "ignored.o").write_bytes(b"stale object")
+            (export / "removed.f90").write_text("old source\n")
+            answers = [b"source.f90\0removed.f90\0", b"new_test.f90\0",
+                       b"candidate patch", " M source.f90\n D removed.f90\n?? new_test.f90\n"]
+            with patch("run_acceptance.subprocess.check_output", side_effect=answers):
+                metadata = overlay_worktree(repo, export)
+            self.assertEqual((export / "source.f90").read_text(), "candidate source\n")
+            self.assertTrue((export / "new_test.f90").is_file())
+            self.assertFalse((export / "removed.f90").exists())
+            self.assertFalse((export / "ignored.o").exists())
+            self.assertTrue(metadata["base_revision_only"])
+            self.assertEqual(metadata["patch_sha256"], digest(root / "candidate.patch"))
 
 
 if __name__ == "__main__":
