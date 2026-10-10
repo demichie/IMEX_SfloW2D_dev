@@ -10,6 +10,7 @@ PROGRAM test_mass_exchange
   USE runtime_2d, ONLY : runtime_state_type
   USE stochastic_module, ONLY : stochastic_workspace_type, sym_noise, noise_pow_val
   USE state_conversion_2d, ONLY : qc_to_qp, settling_velocity
+  USE equation_terms_2d, ONLY : eval_mass_exchange_terms
   USE mass_exchange_2d, ONLY : update_erosion_deposition_cell, release_topography_workspace
   USE inpout_2d, ONLY : write_restart_file, read_restart_file, output_idx, &
        t_output, t_runout, t_probes
@@ -19,7 +20,8 @@ PROGRAM test_mass_exchange
 
   IMPLICIT NONE
 
-  INTEGER, PARAMETER :: nx=8, ny=7, ns=2, nq=6
+  INTEGER, PARAMETER :: nx=8, ny=7, ns=2
+  INTEGER :: nq=6
   REAL(wp), PARAMETER :: tol=2048.0_wp*EPSILON(1.0_wp)
   TYPE(state_type) :: state
   TYPE(domain_type) :: domain
@@ -27,7 +29,7 @@ PROGRAM test_mass_exchange
   TYPE(runtime_state_type) :: runtime
   TYPE(stochastic_workspace_type) :: stochastic
   CHARACTER(LEN=64) :: selected, argument
-  INTEGER :: actual_threads, requested_threads, status, snapshot_unit
+  INTEGER :: actual_threads, requested_threads, status, snapshot_unit, extension_unit
 
   CALL get_command_argument(1, argument)
   READ(argument,*) requested_threads
@@ -43,6 +45,8 @@ PROGRAM test_mass_exchange
   IF (status /= 0) selected = 'all'
   CALL initialize_fixture
   OPEN(NEWUNIT=snapshot_unit, FILE='snapshot.bin', ACCESS='STREAM',      &
+       FORM='UNFORMATTED', STATUS='REPLACE')
+  OPEN(NEWUNIT=extension_unit, FILE='flat_evaluations.bin', ACCESS='STREAM', &
        FORM='UNFORMATTED', STATUS='REPLACE')
 
   SELECT CASE(TRIM(selected))
@@ -66,6 +70,8 @@ PROGRAM test_mass_exchange
   END SELECT
 
   CLOSE(snapshot_unit)
+  IF (TRIM(selected)=='all') CALL run_gas_cases
+  CLOSE(extension_unit)
   CALL release_topography_workspace
   CALL release_topography_workspace
   CALL stochastic%finalize
@@ -137,7 +143,8 @@ CONTAINS
   SUBROUTINE reset_fixture
     INTEGER :: j,k
     REAL(wp) :: h, phi(ns), temperature, x,y
-    erosion_coeff=0.0_wp; settling_flag=.FALSE.; loss_rate=0.0_wp
+    erosion_coeff=0.0_wp; settling_flag=.FALSE.
+    IF (ALLOCATED(loss_rate)) loss_rate=0.0_wp
     alphastot_min=0.0_wp; erodible_porosity=0.25_wp
     coeff_porosity=erodible_porosity/(1.0_wp-erodible_porosity)
     erodible_deposit_flag=.FALSE.; bottom_radial_source_flag=.FALSE.
@@ -173,13 +180,19 @@ CONTAINS
   SUBROUTINE set_cell(j,k,h,phi,temperature)
     INTEGER, INTENT(IN) :: j,k
     REAL(wp), INTENT(IN) :: h, phi(ns), temperature
-    REAL(wp) :: liquid_mass
-    liquid_mass=rho_l*h*(1.0_wp-SUM(phi))
+    REAL(wp) :: carrier_mass, carrier_density, carrier_heat
+    carrier_density=rho_l; carrier_heat=sp_heat_l
+    IF (gas_flag) THEN
+       carrier_density=pres/(sp_gas_const_a*temperature)
+       carrier_heat=sp_heat_a
+    END IF
+    carrier_mass=carrier_density*h*(1.0_wp-SUM(phi))
     state%q(5:6,j,k)=rho_s*h*phi
-    state%q(1,j,k)=liquid_mass+SUM(state%q(5:6,j,k))
+    state%q(1,j,k)=carrier_mass+SUM(state%q(5:6,j,k))
     state%q(2,j,k)=state%q(1,j,k)*(1.0_wp+0.01_wp*REAL(j,wp))
     state%q(3,j,k)=state%q(1,j,k)*(-0.3_wp+0.01_wp*REAL(k,wp))
-    state%q(4,j,k)=temperature*(liquid_mass*sp_heat_l+DOT_PRODUCT(state%q(5:6,j,k),sp_heat_s))
+    state%q(4,j,k)=temperature*(carrier_mass*carrier_heat+DOT_PRODUCT(state%q(5:6,j,k),sp_heat_s))
+    IF (pore_pressure_flag) state%q(idx_pore,j,k)=state%q(1,j,k)*1000.0_wp
   END SUBROUTINE set_cell
 
   !> \brief Select a saturation/guard case and apply the real production transaction.
@@ -227,7 +240,109 @@ CONTAINS
     CALL check_update(name,dt)
   END SUBROUTINE run_case
 
-  !> \brief Compute independently limited exchange increments for the liquid two-solid fixture.
+  !> \brief Exercise the existing signed pore-pressure loss law with an independent gas fixture.
+  SUBROUTINE run_gas_cases
+    INTEGER :: j,k,c
+    REAL(wp) :: dt,phi(ns)
+    CHARACTER(LEN=16), PARAMETER :: names(6)=[CHARACTER(LEN=16) :: &
+         'gas_packing','gas_reserve','gas_exhausted','gas_inflow','gas_combined','gas_masked']
+    CALL state%finalize
+    CALL layout%finalize
+    nq=7; n_vars=nq; n_eqns=nq; n_pore_vars=1
+    idx_pore=7; idx_poreEqn=7; idx_u=8; idx_v=9
+    gas_flag=.TRUE.; liquid_flag=.FALSE.; pore_pressure_flag=.TRUE.; gas_loss_flag=.TRUE.
+    dynamic_permeability_flag=.FALSE.; f_inhibit_mode='OFF'
+    kin_visc_c=1.0E-5_wp; hydraulic_permeability=1.0E-6_wp
+    rho_c_sub=1.2_wp; pi_g=ACOS(-1.0_wp)
+    ! Gas-only execution must not require the optional liquid-loss allocation.
+    DEALLOCATE(loss_rate)
+    CALL layout%initialize(1,nq,nq,ns,0,0,1,.FALSE.)
+    CALL state%initialize(layout)
+    OPEN(NEWUNIT=snapshot_unit,FILE='gas_snapshot.bin',ACCESS='STREAM', &
+         FORM='UNFORMATTED',STATUS='REPLACE')
+    DO c=1,SIZE(names)
+       CALL reset_fixture
+       dt=1.0_wp
+       SELECT CASE(TRIM(names(c)))
+       CASE('gas_reserve','gas_exhausted')
+          phi=[0.25_wp,0.15_wp]; erodible_porosity=0.55_wp
+          IF (names(c)=='gas_exhausted') THEN
+             phi=[0.38_wp,0.17_wp]; erodible_porosity=0.7_wp
+          END IF
+          coeff_porosity=erodible_porosity/(1.0_wp-erodible_porosity)
+          DO k=1,ny
+             DO j=1,nx
+                IF (state%q(1,j,k)>0.0_wp) CALL set_cell(j,k,0.8_wp,phi,350.0_wp)
+             END DO
+          END DO
+       CASE('gas_inflow')
+          state%q(idx_pore,:,:)=-0.01_wp*state%q(1,:,:)
+       CASE('gas_combined','gas_masked')
+          erosion_coeff=100.0_wp; settling_flag=.TRUE.; erodible_deposit_flag=.TRUE.
+          dt=1.0E6_wp
+          IF (names(c)=='gas_masked') THEN
+             bottom_radial_source_flag=.TRUE.
+             cell_source_fractions(1,1)=1.0_wp
+             cell_source_fractions(2,1)=0.5_wp
+             cell_source_fractions(3,1)=0.25_wp
+          END IF
+       END SELECT
+       CALL check_update(TRIM(names(c)),dt)
+    END DO
+    CLOSE(snapshot_unit)
+  END SUBROUTINE run_gas_cases
+
+  !> \brief Compare one flat-cell evaluation with four identical vertex evaluations, including guards.
+  !> \param[in] name Case label.
+  !> \param[in] dt Transaction duration [s].
+  SUBROUTINE check_flat_evaluations(name,dt)
+    CHARACTER(LEN=*), INTENT(IN) :: name
+    REAL(wp), INTENT(IN) :: dt
+    REAL(wp) :: qp0(nq+2), qp_saved(nq+2), inventory(ns), saved_inventory(ns), p_dyn
+    REAL(wp) :: one(2*ns+2+nq+1), four(2*ns+2+nq+1,4), config(8), saved_config(8)
+    INTEGER :: vertex, guard
+    DO guard=1,2
+       CALL qc_to_qp(state%q(:,1,1),qp0,p_dyn)
+       IF (guard==2) qp0(1)=0.0_wp
+       inventory=erodible(:,1,1); qp_saved=qp0; saved_inventory=inventory
+       saved_config=[T_erodible,kin_visc_c,hydraulic_permeability,rho_c_sub, &
+            erosion_coeff,erodible_porosity,coeff_porosity,maximum_solid_packing]
+       CALL evaluate_local(qp0,inventory,dt,one)
+       !$OMP PARALLEL DO DEFAULT(NONE) SHARED(qp0,inventory,dt,four) PRIVATE(vertex)
+       DO vertex=1,4
+          CALL evaluate_local(qp0,inventory,dt,four(:,vertex))
+       END DO
+       !$OMP END PARALLEL DO
+       DO vertex=1,4
+          CALL same_bits('flat identical vertex',four(:,vertex),one)
+       END DO
+       CALL assert_small('flat quarter-weighted sum',MAXVAL(ABS(0.25_wp*SUM(four,DIM=2)-one)), &
+            MAXVAL(ABS(one)))
+       IF (guard==2) CALL assert_small('dry flat outputs',MAXVAL(ABS(one)),1.0_wp)
+       config=[T_erodible,kin_visc_c,hydraulic_permeability,rho_c_sub, &
+            erosion_coeff,erodible_porosity,coeff_porosity,maximum_solid_packing]
+       CALL same_bits('read-only flat configuration',config,saved_config)
+       CALL same_bits('read-only physical input',qp0,qp_saved)
+       CALL same_bits('read-only erodible input',inventory,saved_inventory)
+       WRITE(extension_unit) one,four
+    END DO
+    WRITE(*,*) 'N8_FLAT_EQUIVALENCE ',name
+  END SUBROUTINE check_flat_evaluations
+
+  !> \brief Pack all production outputs evaluated with zero slope and identical cell inputs.
+  !> \param[in] qp0 Physical base state, including velocity and optional pore pressure.
+  !> \param[in] inventory Available solid substrate [m].
+  !> \param[in] dt Transaction duration [s].
+  !> \param[out] packed Erosion, deposition, carrier rates, equation rates and bed rate.
+  SUBROUTINE evaluate_local(qp0,inventory,dt,packed)
+    REAL(wp), INTENT(IN) :: qp0(n_vars+2),inventory(ns),dt
+    REAL(wp), INTENT(OUT) :: packed(2*ns+2+n_eqns+1)
+    CALL eval_mass_exchange_terms(qp0,0,0.0_wp,0.0_wp,inventory,dt, &
+         packed(1:ns),packed(ns+1:2*ns),packed(2*ns+1),packed(2*ns+2), &
+         packed(2*ns+3:2*ns+2+n_eqns),packed(2*ns+3+n_eqns))
+  END SUBROUTINE evaluate_local
+
+  !> \brief Independently limit two-solid liquid or signed pore-pressure gas exchange increments.
   !> \param[in] q0 Conservative base state.
   !> \param[in] inventory Available solid volume per area [m].
   !> \param[in] bx,by Filtered slopes used in the existing erosion law.
@@ -238,31 +353,44 @@ CONTAINS
   SUBROUTINE reference_exchange(q0,inventory,bx,by,dt,dep,ers,loss,h,u,v,temperature)
     REAL(wp), INTENT(IN) :: q0(nq),inventory(ns),bx,by,dt
     REAL(wp), INTENT(OUT) :: dep(ns),ers(ns),loss,h,u,v,temperature
-    REAL(wp) :: solid_volume(ns), phi(ns), carrier_mass, speed, settling, reserve
+    REAL(wp) :: solid_volume(ns), phi(ns), carrier_mass, speed, settling, reserve, carrier_density, carrier_heat
     INTEGER :: i
     dep=0.0_wp; ers=0.0_wp; loss=0.0_wp
     h=0.0_wp; u=0.0_wp; v=0.0_wp; temperature=T_ambient
     IF (q0(1)<=0.0_wp) RETURN
     solid_volume=q0(5:6)/rho_s
     carrier_mass=q0(1)-SUM(q0(5:6))
-    h=SUM(solid_volume)+carrier_mass/rho_l
+    carrier_density=rho_l; carrier_heat=sp_heat_l
+    IF (gas_flag) THEN
+       carrier_heat=sp_heat_a
+       temperature=q0(4)/(carrier_mass*carrier_heat+DOT_PRODUCT(q0(5:6),sp_heat_s))
+       carrier_density=pres/(sp_gas_const_a*temperature)
+    END IF
+    h=SUM(solid_volume)+carrier_mass/carrier_density
     phi=solid_volume/h
     u=q0(2)/q0(1); v=q0(3)/q0(1)
-    temperature=q0(4)/(carrier_mass*sp_heat_l+DOT_PRODUCT(q0(5:6),sp_heat_s))
+    temperature=q0(4)/(carrier_mass*carrier_heat+DOT_PRODUCT(q0(5:6),sp_heat_s))
     IF (SUM(phi)<=alphastot_min) RETURN
     speed=SQRT(u*u+v*v+(u*bx+v*by)**2)
     ers=MAX(0.0_wp,MIN(inventory,dt*erosion_coeff*speed*h*(1.0_wp-SUM(phi)) &
          *(1.0_wp-erodible_porosity)*erodible_fract))
     IF (settling_flag) THEN
        DO i=1,ns
-          settling=settling_velocity(diam_s(i),rho_s(i),rho_l,1.0_wp/kin_visc_c)
+          settling=settling_velocity(diam_s(i),rho_s(i),carrier_density,1.0_wp/kin_visc_c)
           dep(i)=MIN(solid_volume(i),dt*phi(i)*settling                    &
                *(1.0_wp-MIN(1.0_wp,SUM(phi)/0.6_wp))**4.65_wp)
        END DO
     END IF
-    reserve=carrier_mass/rho_l-coeff_porosity*(SUM(solid_volume)-SUM(dep))
-    loss=MAX(0.0_wp,MIN(dt*loss_rate+coeff_porosity*SUM(dep),              &
-         h*MAX(0.0_wp,maximum_solid_packing-SUM(phi)),reserve))
+    reserve=carrier_mass/carrier_density-coeff_porosity*(SUM(solid_volume)-SUM(dep))
+    IF (gas_flag) THEN
+       ! Keep the signed Darcy request: a negative pressure is carrier inflow.
+       loss=coeff_porosity*SUM(dep)+dt*hydraulic_permeability/(kin_visc_c*carrier_density) &
+            /MAX(1.0E-5_wp,h)*0.5_wp*ACOS(-1.0_wp)*q0(idx_pore)/q0(1)
+       loss=MIN(loss,h*MAX(0.0_wp,maximum_solid_packing-SUM(phi)),MAX(0.0_wp,reserve))
+    ELSE
+       loss=MAX(0.0_wp,MIN(dt*loss_rate+coeff_porosity*SUM(dep), &
+            h*MAX(0.0_wp,maximum_solid_packing-SUM(phi)),reserve))
+    END IF
   END SUBROUTINE reference_exchange
 
   !> \brief Assert the complete production transaction and projection after all cell-local limits.
@@ -276,8 +404,9 @@ CONTAINS
     REAL(wp) :: dep_expected(nx,ny,ns), ers_expected(nx,ny,ns), cell_delta(nx,ny)
     REAL(wp) :: vertex_delta(nx+1,ny+1), geom_delta(nx,ny), mismatch(nx,ny)
     REAL(wp) :: dep(ns),ers(ns),loss,h,u,v,temperature,substrate_temperature,mask
-    REAL(wp) :: outgoing_mass, entering_mass, weight, nodal_volume, diagnostics(5)
-    INTEGER :: j,k,l,j0,j1,k0,k1
+    REAL(wp) :: outgoing_mass, entering_mass, weight, nodal_volume, diagnostics(5), carrier_density, carrier_heat
+    INTEGER :: j,k,l,j0,j1,k0,k1,i
+    CALL check_flat_evaluations(name,dt)
     q0=state%q; bed0=B_vertex; dep0=deposit; ers0=erosion; inv0=erodible
     q_expected=q0; dep_expected=dep0; ers_expected=ers0; inv_expected=inv0
     cell_delta=0.0_wp
@@ -296,6 +425,25 @@ CONTAINS
           END SELECT
           IF (name=='loss_only' .AND. loss<=tol) ERROR STOP 'carrier loss not exercised'
           IF (name=='loss_reserve' .AND. loss/=0.0_wp) ERROR STOP 'carrier reserve not exhausted'
+          SELECT CASE(name)
+          CASE('gas_packing')
+             CALL assert_small('gas packing cap active',ABS(loss-(h*maximum_solid_packing- &
+                  SUM(q0(5:6,j,k)/rho_s))),1.0_wp)
+             IF (loss<=tol) ERROR STOP 'gas packing loss not exercised'
+          CASE('gas_reserve')
+             CALL assert_small('gas available reserve active',ABS(loss-h*(1.0_wp- &
+                  (1.0_wp+coeff_porosity)*0.4_wp)),1.0_wp)
+             IF (loss<=tol .OR. loss>=h*(maximum_solid_packing-0.4_wp)) &
+                  ERROR STOP 'gas available reserve not limiting'
+          CASE('gas_exhausted')
+             IF (loss/=0.0_wp) ERROR STOP 'gas exhausted reserve became a gain'
+          CASE('gas_inflow')
+             IF (loss>=-tol) ERROR STOP 'signed gas inflow not exercised'
+          CASE('gas_combined','gas_masked')
+             CALL assert_small('gas saturated deposition',MAXVAL(ABS(dep-q0(5:6,j,k)/rho_s)),1.0_wp)
+             CALL assert_small('gas saturated erosion',MAXVAL(ABS(ers-inv0(:,j,k))),1.0_wp)
+             IF (loss<=tol) ERROR STOP 'combined gas loss not exercised'
+          END SELECT
        END IF
        mask=1.0_wp
        IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) &
@@ -305,17 +453,23 @@ CONTAINS
        ers_expected(j,k,:)=ers0(j,k,:)+ers
        inv_expected(:,j,k)=inv0(:,j,k)-ers
        IF (erodible_deposit_flag) inv_expected(:,j,k)=inv_expected(:,j,k)+dep
-       outgoing_mass=DOT_PRODUCT(rho_s,dep)+rho_l*loss
+       carrier_density=rho_l; carrier_heat=sp_heat_l
+       IF (gas_flag) THEN
+          carrier_density=pres/(sp_gas_const_a*temperature); carrier_heat=sp_heat_a
+       END IF
+       outgoing_mass=DOT_PRODUCT(rho_s,dep)+carrier_density*loss
        entering_mass=DOT_PRODUCT(rho_s,ers)+rho_c_sub*coeff_porosity*SUM(ers)
        q_expected(1,j,k)=q0(1,j,k)+entering_mass-outgoing_mass
        q_expected(2:3,j,k)=q0(2:3,j,k)-outgoing_mass*[u,v]
        substrate_temperature=T_erodible
        IF (erodible_deposit_flag) substrate_temperature=temperature
        q_expected(4,j,k)=q0(4,j,k)                                      &
-            -temperature*(DOT_PRODUCT(rho_s*sp_heat_s,dep)+rho_l*sp_heat_l*loss) &
+            -temperature*(DOT_PRODUCT(rho_s*sp_heat_s,dep)+carrier_density*carrier_heat*loss) &
             +substrate_temperature*(DOT_PRODUCT(rho_s*sp_heat_s,ers)     &
-            +rho_c_sub*sp_heat_l*coeff_porosity*SUM(ers))
+            +rho_c_sub*carrier_heat*coeff_porosity*SUM(ers))
        q_expected(5:6,j,k)=q0(5:6,j,k)+rho_s*(ers-dep)
+       IF (pore_pressure_flag .AND. q0(1,j,k)>0.0_wp) &
+            q_expected(idx_pore,j,k)=q0(idx_pore,j,k)+(entering_mass-outgoing_mass)*q0(idx_pore,j,k)/q0(1,j,k)
        cell_delta(j,k)=SUM(dep-ers)/(1.0_wp-erodible_porosity)
     END DO
     DO k=1,ny+1
@@ -326,6 +480,15 @@ CONTAINS
     END DO
     CALL update_erosion_deposition_cell(state%q,state%qp,dt,domain)
     CALL assert_small(name//' conservative transaction',MAXVAL(ABS(state%q-q_expected)),MAXVAL(ABS(q0)))
+    IF (gas_flag) THEN
+       ! Compare each equation separately: thermal-energy magnitudes must not
+       ! hide a momentum or carrier error. Dry/inactive states are included.
+       DO i=1,nq
+          CALL assert_small(name//' individual equation',MAXVAL(ABS(state%q(i,:,:)-q_expected(i,:,:))), &
+               MAXVAL(ABS(q0(i,:,:))))
+       END DO
+       IF (MINVAL(state%q(1,:,:)-SUM(state%q(5:6,:,:),DIM=1))<-tol) ERROR STOP 'negative gas carrier'
+    END IF
     CALL assert_small(name//' deposit',MAXVAL(ABS(deposit-dep_expected)),1.0_wp)
     CALL assert_small(name//' erosion',MAXVAL(ABS(erosion-ers_expected)),1.0_wp)
     CALL assert_small(name//' erodible',MAXVAL(ABS(erodible-inv_expected)),1.0_wp)

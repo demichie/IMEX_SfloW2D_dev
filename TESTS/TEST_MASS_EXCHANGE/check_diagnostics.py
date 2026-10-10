@@ -12,9 +12,12 @@ def check(path, profile=None, requested=None):
     checks = 0
     actual_threads = None
     evidence = []
+    flat_cases = []
     for line in path.read_text().splitlines():
         if "Actual OpenMP team:" in line:
             actual_threads = int(line.rsplit(":", 1)[1])
+        elif "N8_FLAT_EQUIVALENCE " in line:
+            flat_cases.append(line.split()[-1])
         elif "evolving-topography volume-rate cell/geometric:" in line:
             volume = [float(v) for v in line.split(":", 1)[1].split()]
         elif "evolving-topography mismatch integral/L1/Linf:" in line:
@@ -27,7 +30,8 @@ def check(path, profile=None, requested=None):
             if len(actual) != 5 or len(expected) != 5:
                 raise AssertionError("incorrect diagnostic field count")
             for value, reference in zip(actual, expected):
-                if not math.isfinite(value) or abs(value-reference) > 2e-12*max(1.0, abs(reference)):
+                if (not math.isfinite(value) or not math.isfinite(reference)
+                        or abs(value-reference) > 2e-12*max(1.0, abs(reference))):
                     raise AssertionError(f"diagnostic {value} != expected {reference}")
             checks += 1
             evidence.append({"case": line.split()[1], "production": actual, "reference": expected})
@@ -36,14 +40,19 @@ def check(path, profile=None, requested=None):
         raise AssertionError("no diagnostic comparisons executed")
     print(f"PASS: {checks} production bed-volume/mismatch diagnostic comparisons")
     if profile is not None:
-        if checks != 12 or actual_threads != requested:
+        required = ["deposition", "erosion", "combined", "masked", "masked_fissural",
+                    "cutoff", "loss_only", "loss_reserve", "thermal", "restart_first",
+                    "restart_continuous", "restart_resumed", "gas_packing", "gas_reserve",
+                    "gas_exhausted", "gas_inflow", "gas_combined", "gas_masked"]
+        if ([item["case"] for item in evidence] != required or flat_cases != required
+                or actual_threads != requested):
             raise AssertionError("incomplete N8 case set or incorrect actual OpenMP team")
         hashes = {}
-        for filename in ("snapshot.bin", "checkpoint.bin"):
+        for filename in ("snapshot.bin", "checkpoint.bin", "gas_snapshot.bin", "flat_evaluations.bin"):
             hashes[filename] = hashlib.sha256((path.parent / filename).read_bytes()).hexdigest()
         print("N8_PRODUCTION_EVIDENCE " + json.dumps({
             "profile": profile, "actual_threads": actual_threads,
-            "sha256": hashes, "diagnostics": evidence,
+            "sha256": hashes, "diagnostics": evidence, "flat_cases": flat_cases,
         }, sort_keys=True))
 
 

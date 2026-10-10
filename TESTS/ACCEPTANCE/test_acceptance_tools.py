@@ -1,6 +1,7 @@
 """Focused checks of audit parsing and evidence classification, not model physics."""
 
 import json
+import math
 from pathlib import Path
 import tempfile
 import unittest
@@ -72,8 +73,12 @@ class AuditToolsTests(unittest.TestCase):
         tools = Path(__file__).resolve().parent
         execution = json.loads((tools / "acceptance_plan.json").read_text())
         closure = json.loads((tools / execution["closure_plan"]).read_text())
-        actions = {item["id"]: item for item in closure["remaining_actions"]}
-        self.assertEqual(len(actions), len(closure["remaining_actions"]))
+        remaining = closure["remaining_actions"]
+        completed = closure.get("completed_actions", [])
+        actions = {item["id"]: item for item in remaining + completed}
+        self.assertEqual(len(actions), len(remaining) + len(completed))
+        remaining_ids = {item["id"] for item in remaining}
+        self.assertTrue(all(item["status"] == "satisfied" for item in completed))
         self.assertEqual(sum(a["kind"] == "test" for a in actions.values()), 6)
         self.assertEqual(sum(a["kind"] == "decision" for a in actions.values()), 2)
         self.assertEqual(closure["milestone_status"]["N9"], "open")
@@ -101,7 +106,7 @@ class AuditToolsTests(unittest.TestCase):
                 self.assertEqual(item["remaining_actions"], [], item["id"])
             else:
                 self.assertTrue(item["remaining_actions"], item["id"])
-            self.assertTrue(set(item["remaining_actions"]) <= set(actions), item["id"])
+            self.assertTrue(set(item["remaining_actions"]) <= remaining_ids, item["id"])
         for item in execution["criteria"]:
             if item["id"] in criteria:
                 for field in ("closure_status", "remaining_actions"):
@@ -112,7 +117,10 @@ class AuditToolsTests(unittest.TestCase):
             self.assertTrue(set(action["normative_items"]) <= required_ids)
             self.assertTrue(action["exit_conditions"])
             for criterion in action["criteria"]:
-                self.assertIn(action["id"], criteria[criterion]["remaining_actions"])
+                if action["id"] in remaining_ids:
+                    self.assertIn(action["id"], criteria[criterion]["remaining_actions"])
+                else:
+                    self.assertNotIn(action["id"], criteria[criterion]["remaining_actions"])
 
     def test_closure_evidence_provenance(self):
         """Validate archived evidence hashes and links without claiming a fresh solver execution."""
@@ -168,6 +176,53 @@ class AuditToolsTests(unittest.TestCase):
             self.assertFalse((export / "ignored.o").exists())
             self.assertTrue(metadata["base_revision_only"])
             self.assertEqual(metadata["patch_sha256"], digest(root / "candidate.patch"))
+
+    def test_n8_a_completion_evidence(self):
+        """Close only the bounded cell-law package and preserve historical payloads and limits."""
+        repo = Path(__file__).resolve().parents[2]
+        closure = json.loads((repo / "TESTS/ACCEPTANCE/n7_n8_closure_plan.json").read_text())
+        evidence = json.loads((repo / closure["evidence_artifacts"]["n8_a"]["path"]).read_text())
+        latest = json.loads((repo / closure["evidence_artifacts"]["latest"]["path"]).read_text())
+        historical = json.loads((repo / closure["evidence_artifacts"]["n8"]["path"]).read_text())
+        self.assertEqual([a["id"] for a in closure["completed_actions"]], ["N8-A"])
+        self.assertEqual(closure["completed_actions"][0]["evidence"], ["n8_a"])
+        self.assertEqual(next(c for c in closure["criteria"] if c["id"] == "N8-01")["closure_status"],
+                         "satisfied")
+        self.assertFalse(evidence["summary"]["solver_changes"])
+        self.assertFalse(evidence["summary"]["full_36_run_audit_repeated"])
+        for name, value in evidence["source_and_fixture_sha256"].items():
+            if name.startswith("src/"):
+                self.assertEqual(value, latest["source_and_fixture_sha256"][name])
+        records = evidence["mass_exchange_production_evidence"]["records"]
+        self.assertEqual({(r["profile"], r["actual_threads"]) for r in records},
+                         {("strict", 1), ("strict", 4), ("optimized", 1), ("optimized", 4)})
+        self.assertEqual(len(records), 4)
+        for record in records:
+            old = next(r for r in historical["mass_exchange_production_evidence"]["records"]
+                       if (r["profile"], r["actual_threads"]) == (record["profile"], record["actual_threads"]))
+            self.assertEqual(len(record["diagnostics"]), 18)
+            cases = [d["case"] for d in record["diagnostics"]]
+            self.assertEqual(cases[:12], [d["case"] for d in old["diagnostics"]])
+            self.assertEqual(cases[12:], ["gas_packing", "gas_reserve", "gas_exhausted", "gas_inflow",
+                                          "gas_combined", "gas_masked"])
+            self.assertEqual(record["flat_cases"], cases)
+            for name, value in old["sha256"].items():
+                self.assertEqual(record["sha256"][name], value)
+            for diagnostic in record["diagnostics"]:
+                self.assertEqual(len(diagnostic["production"]), 5)
+                self.assertEqual(len(diagnostic["reference"]), 5)
+                for actual, reference in zip(diagnostic["production"], diagnostic["reference"]):
+                    self.assertTrue(math.isfinite(actual) and math.isfinite(reference))
+                    self.assertLessEqual(abs(actual-reference), 2e-12*max(1.0, abs(reference)))
+        for profile in ("strict", "optimized"):
+            pair = [r for r in records if r["profile"] == profile]
+            self.assertEqual(pair[0]["sha256"], pair[1]["sha256"])
+        self.assertEqual({c["case"] for c in evidence["negative_controls"]},
+                         {"missing_flat_assertion", "missing_gas_case", "wrong_actual_team",
+                          "corrupt_volume_diagnostic", "nonfinite_reference"})
+        self.assertTrue(all(c["status"] == "rejected" for c in evidence["negative_controls"]))
+        for milestone in ("N7", "N8", "N9"):
+            self.assertEqual(evidence["summary"][milestone], "open")
 
 
 if __name__ == "__main__":

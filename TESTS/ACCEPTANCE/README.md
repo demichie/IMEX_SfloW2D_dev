@@ -50,7 +50,11 @@ original contracts, mandatory missing tests and broader coverage limitations.
 `closure_status` and `remaining_actions` in the execution criteria mirror that
 plan. `satisfied` does not assert universal model coverage or N9 sign-off;
 `execution_status=pass_for_tested_scope` alone never closes an open requirement.
-The checklist reconciles existing runs, without reporting a new numerical audit.
+The checklist retains historical audits and separately records each bounded
+completion run. N8-A is completed by the
+[cell-exchange report](../../docs/acceptance/N8_A_CELL_EXCHANGE_2026_10_10.md).
+It is retained in `completed_actions`, not `remaining_actions`; N8-B is next.
+N7, N8 and N9 remain open.
 
 `manifest.json` contains the solver Git SHA, tool probes, compiler flags,
 executable and source checksums, test results and coverage criteria. Each test

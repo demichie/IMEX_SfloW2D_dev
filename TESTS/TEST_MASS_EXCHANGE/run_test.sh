@@ -50,5 +50,8 @@ for profile in strict optimized; do
         )
     done
     cmp threads-1/snapshot.bin threads-4/snapshot.bin
+    cmp threads-1/checkpoint.bin threads-4/checkpoint.bin
+    cmp threads-1/gas_snapshot.bin threads-4/gas_snapshot.bin
+    cmp threads-1/flat_evaluations.bin threads-4/flat_evaluations.bin
     echo "PASS: $profile mass exchange and checkpoint continuation, actual 1/4 threads"
 done

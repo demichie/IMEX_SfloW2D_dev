@@ -34,6 +34,10 @@
     "latest": {
       "path": "docs/acceptance/results_stage_count_contract_2026_10_10.json",
       "sha256": "585261d20c18541774173caeb6712ca1a81b8348f9cbe1e406dd9ecafc2901d5"
+    },
+    "n8_a": {
+      "path": "docs/acceptance/results_n8_a_2026_10_10.json",
+      "sha256": "f4223305d9890d00b3c51401a616f3e54bf4e6f43a354eb6291db0e3b0f3bbd5"
     }
   },
   "milestone_status": {
@@ -162,7 +166,8 @@
       "evidence": [
         "spatial",
         "n8",
-        "latest"
+        "latest",
+        "n8_a"
       ]
     },
     {
@@ -178,16 +183,17 @@
     },
     {
       "id": "N8-01",
-      "closure_status": "partial",
-      "remaining_actions": [
-        "N8-A"
-      ],
+      "closure_status": "satisfied",
+      "remaining_actions": [],
       "verified_contracts": [
-        "Two-solid liquid saturation, exhausted carrier reserve, cutoff, local thermal source and full/partial radial/fissural masking pass before projection."
+        "Two-solid liquid saturation, exhausted carrier reserve, cutoff, local thermal source and full/partial radial/fissural masking pass before projection.",
+        "Flat-cell single/four identical vertex outputs agree bitwise; quarter-weighted sums, dry returns and read-only input/shared configuration pass.",
+        "Fixed-permeability gas/pore-pressure packing and carrier-reserve caps, exhausted reserve and signed inflow pass independent conservative/thermal/pore-pressure, inventory and bed assertions, including combined exchange and masks."
       ],
       "evidence": [
         "n8",
-        "latest"
+        "latest",
+        "n8_a"
       ]
     },
     {
@@ -202,7 +208,8 @@
       ],
       "evidence": [
         "n8",
-        "latest"
+        "latest",
+        "n8_a"
       ]
     },
     {
@@ -215,7 +222,8 @@
       ],
       "evidence": [
         "n8",
-        "latest"
+        "latest",
+        "n8_a"
       ]
     },
     {
@@ -229,7 +237,8 @@
       ],
       "evidence": [
         "n8",
-        "latest"
+        "latest",
+        "n8_a"
       ]
     },
     {
@@ -243,7 +252,8 @@
       ],
       "evidence": [
         "n8",
-        "latest"
+        "latest",
+        "n8_a"
       ]
     }
   ],
@@ -252,10 +262,8 @@
       {
         "id": "I01",
         "requirement": "Flat cell state: one constitutive evaluation equals four identical vertex evaluations",
-        "status": "partial",
-        "remaining_actions": [
-          "N8-A"
-        ],
+        "status": "satisfied",
+        "remaining_actions": [],
         "evidence_tests": [
           "TEST_MASS_EXCHANGE"
         ]
@@ -528,26 +536,6 @@
   },
   "remaining_actions": [
     {
-      "id": "N8-A",
-      "kind": "test",
-      "title": "Complete cell-local exchange assertions",
-      "normative_items": [
-        "I01",
-        "I03",
-        "I04",
-        "I05"
-      ],
-      "criteria": [
-        "N8-01"
-      ],
-      "change_scope": "Extend TEST_MASS_EXCHANGE only; no new exchange law.",
-      "exit_conditions": [
-        "Compare one flat cell evaluation with four identical vertex evaluations without shared-configuration mutation.",
-        "Exercise the existing gas/pore-pressure carrier loss branch with saturated positive loss, exhausted reserve and signed inflow; check the same limited conservative transaction and bed proposal.",
-        "Retain existing solid/liquid saturation, radial/fissural mask, dry/inactive and checkpoint assertions; strict/optimized, actual 1/4 threads."
-      ]
-    },
-    {
       "id": "N8-B",
       "kind": "test",
       "title": "Complete nodal projection refinement and repeated-update tests",
@@ -712,5 +700,31 @@
     "Nonautonomous inlet/fissure source timing and end-to-end injection budgets, source overlap geometry, NetCDF metadata and long-run provenance: retain in N9/model characterization.",
     "M12c build/CI modernization, A1/A2 source organization, layers, local domains, MPI and GPU work.",
     "New nonuniform production mesh support or a replacement spatial/time integration method."
+  ],
+  "completed_actions": [
+    {
+      "id": "N8-A",
+      "kind": "test",
+      "title": "Complete cell-local exchange assertions",
+      "normative_items": [
+        "I01",
+        "I03",
+        "I04",
+        "I05"
+      ],
+      "criteria": [
+        "N8-01"
+      ],
+      "change_scope": "Extend TEST_MASS_EXCHANGE only; no new exchange law.",
+      "exit_conditions": [
+        "Compare one flat cell evaluation with four identical vertex evaluations without shared-configuration mutation.",
+        "Exercise the existing gas/pore-pressure carrier loss branch with saturated positive loss, exhausted reserve and signed inflow; check the same limited conservative transaction and bed proposal.",
+        "Retain existing solid/liquid saturation, radial/fissural mask, dry/inactive and checkpoint assertions; strict/optimized, actual 1/4 threads."
+      ],
+      "status": "satisfied",
+      "evidence": [
+        "n8_a"
+      ]
+    }
   ]
 }
