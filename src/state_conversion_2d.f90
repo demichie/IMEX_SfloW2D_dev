@@ -597,6 +597,7 @@ CONTAINS
     REAL(wp) :: r_inv_rhom, r_inv_rho_c
     REAL(wp) :: r_xs(n_solid), r_xg(n_add_gas)
     REAL(wp) :: r_xl, r_xc
+    REAL(wp) :: speed_squared, buoyancy_depth
 
     r_h = qpj(1)
 
@@ -649,10 +650,18 @@ CONTAINS
     ! reduced gravity
     r_red_grav = ( r_rho_m - rho_a_amb ) / r_rho_m * grav
 
-    ! Richardson number
-    IF ( ( r_u**2 + r_v**2 ) .GT. 0.0_wp ) THEN
+    ! Apply the existing upper cap BEFORE division: almost-resting wet cells
+    ! can have a positive subnormal speed_squared whose reciprocal overflows.
+    ! MIN(cap,numerator/denominator) evaluates that overflowing quotient first.
+    speed_squared = r_u**2 + r_v**2
+    buoyancy_depth = r_red_grav * r_h
+    IF ( speed_squared .GT. 0.0_wp ) THEN
 
-       r_Ri = MIN(1.E15_wp,r_red_grav * r_h / ( r_u**2 + r_v**2 ))
+       IF ( buoyancy_depth / 1.E15_wp .GT. speed_squared ) THEN
+          r_Ri = 1.E15_wp
+       ELSE
+          r_Ri = MIN(1.E15_wp,buoyancy_depth / speed_squared)
+       END IF
 
     ELSE
 

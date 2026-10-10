@@ -15,10 +15,33 @@ PROGRAM test_hp_reconstruction
   CALL check_momentum_admissibility
   CALL check_flat_bed_non_regression
   CALL check_direction_independence
+  CALL check_exact_zero_momentum_bound
 
   WRITE(*,*) 'PASS: HP reconstruction invariants verified'
 
 CONTAINS
+
+  !> \brief Preserve exact zero discharge at a clipped velocity bound in optimized builds.
+  SUBROUTINE check_exact_zero_momentum_bound
+    INTEGER, PARAMETER :: n = 3
+    REAL(wp) :: h(n), u(n), bed(n), hum0(n), hup0(n), zero(n), residual(n)
+    REAL(wp) :: hm(n), hp(n), hum(n), hup(n), etam(n), etap(n), weight(n)
+    INTEGER :: sign_id
+    h = 1.1_wp
+    bed = 0.0_wp
+    zero = 0.0_wp
+    residual = 1.0_wp
+    DO sign_id = -1, 1, 2
+       u = REAL(sign_id,wp)*[0.5_wp,0.123456789_wp,0.0_wp]
+       hum0 = REAL(sign_id,wp)
+       hup0 = -REAL(sign_id,wp)
+       CALL reconstruct_hp_line(h,u,bed,bed,h,h,hum0,hup0,u,u,residual,zero, &
+            3,1.0_wp,hm,hp,hum,hup,etam,etap,weight)
+       IF (hup(2) /= 0.0_wp) ERROR STOP 'zero velocity bound left a fused-roundoff discharge'
+       CALL assert_small('zero-bound momentum mean',ABS(0.5_wp*(hum(2)+hup(2))-h(2)*u(2)), &
+            128.0_wp*EPSILON(1.0_wp))
+    END DO
+  END SUBROUTINE check_exact_zero_momentum_bound
 
   SUBROUTINE check_lake_at_rest
 

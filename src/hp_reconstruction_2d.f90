@@ -107,6 +107,7 @@ CONTAINS
     REAL(wp) :: denominator, distribution_tolerance
     REAL(wp) :: momentum_weight, dm_target, dm_lower, dm_upper, dm
     REAL(wp) :: u_min, u_max
+    REAL(wp), VOLATILE :: mean_momentum_minus, mean_momentum_plus
     INTEGER :: i, number_of_cells
 
     number_of_cells = SIZE(h_center)
@@ -253,8 +254,15 @@ CONTAINS
             ( u_max-u_center_safe(i) ) * h_plus(i) )
        dm = MIN( MAX( dm_target, dm_lower ), dm_upper )
 
-       hu_minus(i) = u_center_safe(i) * h_minus(i) - dm
-       hu_plus(i) = u_center_safe(i) * h_plus(i) + dm
+       ! Round the products before the final addition/subtraction. At a zero
+       ! velocity bound, dm is the opposite rounded product and cancellation
+       ! must be exact. Fused multiply-add can leave a tiny nonzero discharge,
+       ! spuriously disabling the exact-rest scalar-flux guard downstream.
+       ! These local volatile scalars are private to each calling thread.
+       mean_momentum_minus = u_center_safe(i) * h_minus(i)
+       mean_momentum_plus = u_center_safe(i) * h_plus(i)
+       hu_minus(i) = mean_momentum_minus - dm
+       hu_plus(i) = mean_momentum_plus + dm
 
     END DO
 

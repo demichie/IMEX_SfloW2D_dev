@@ -1,0 +1,4439 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "base_revision": "026061feff641a4fc42d2970cec295d23b5330e8",
+  "scope": "Bounded N7-A; not N7 completion or N9 baseline sign-off.",
+  "summary": {
+    "N7_A": "satisfied",
+    "N7": "open",
+    "N8": "satisfied",
+    "N9": "open",
+    "cases_per_profile": 102,
+    "production_solver_runs": 408,
+    "bitwise_thread_pairs": 204,
+    "observed_steps": 27360,
+    "full_audit_passed": 37,
+    "full_audit_failed": 0,
+    "baseline_bitwise_unchanged": 9,
+    "baseline_compared": 16
+  },
+  "contract": {
+    "schema_version": 1,
+    "package": "N7-A",
+    "frozen_before_execution": "2026-10-10",
+    "production_driver": "TESTS/TEST_IMEX_STAGES/test_imex_stages.f90",
+    "stages": [
+      2,
+      3,
+      4
+    ],
+    "profiles": [
+      "strict",
+      "optimized"
+    ],
+    "actual_threads": [
+      1,
+      4
+    ],
+    "lake": {
+      "nx": 32,
+      "ny_2d": 24,
+      "dx": 0.25,
+      "dy": 0.25,
+      "beds": [
+        "smooth",
+        "one-cell",
+        "parabolic"
+      ],
+      "eta": 6,
+      "dt": 0.001,
+      "steps": 20,
+      "flags": [
+        [
+          false,
+          false
+        ],
+        [
+          false,
+          true
+        ],
+        [
+          true,
+          false
+        ],
+        [
+          true,
+          true
+        ]
+      ]
+    },
+    "advection": {
+      "nx": [
+        64,
+        128,
+        256
+      ],
+      "length": 16,
+      "time": 0.4,
+      "velocity": 1,
+      "temperature_base": 300,
+      "temperature_amplitude": 15,
+      "center": 6,
+      "width": 1,
+      "limiter": 0,
+      "dt_dx_factor": 0.01,
+      "maximum_L1_temperature_error": 2,
+      "maximum_Linf_temperature_error": 8,
+      "maximum_refinement_ratio": 0.9
+    },
+    "ritter": {
+      "nx": [
+        40,
+        80,
+        160
+      ],
+      "length": 20,
+      "dam_x": 10,
+      "left_h": 1,
+      "time": 0.2,
+      "dt_dx_factor": 0.01,
+      "maximum_mean_h_error": 0.12,
+      "maximum_mean_scaled_momentum_error": 0.15,
+      "maximum_refinement_ratio": 0.9
+    },
+    "excavation": {
+      "nx": 60,
+      "length": 30,
+      "walls": [
+        10,
+        20
+      ],
+      "depth": 2,
+      "slope_degrees": 10,
+      "dt": 0.0001,
+      "steps": 100
+    },
+    "roundoff_epsilon_multiplier": 32768,
+    "finite_time_field_limit": "32768 * float64_epsilon * steps, with separate initial mass, momentum, thermal and solid scales",
+    "raw_positivity_limit": "32768 * float64_epsilon in thickness units",
+    "mass_budget_limit": "32768 * float64_epsilon * initial_total_mass",
+    "uphill_limit": "32768 * float64_epsilon * initial_total_mass",
+    "reference_policy": "Unchanged clean spatial kernels, independently assembled current explicit IMEX tableaux. No SSPRK2 trajectory equality or CFL-policy approval."
+  },
+  "source_and_fixture_sha256": {
+    "src/IMEX_SfloW2D.f90": "2f7e868a3f37ef2718853e605453befc3596565c393f3bdc68256990be0f281b",
+    "src/complexify.f90": "f6de6fb8f4c59be820b342cc3a8c31d45601dc850b92132cb9c7796876f985cf",
+    "src/constitutive_parameters_2d.f90": "bbb8fb6a5ecda75cdfbd9dbd57650bd8d22736318e5140072bc3401511a87de3",
+    "src/diagnostics_2d.f90": "16b8c59ac2f90b5c99e7c5cfffc337d2da0dceefaec091efe36fb8c5cb80e759",
+    "src/domain_2d.f90": "6afd4e62d52dbd23ec429514dfb33ab3f8988887a88150197bd55f6a66bf6a5f",
+    "src/equation_metadata_2d.f90": "1dbcece9f777f6e742980924937413e74a5cb4fc431c856dc12a47b76ca9154e",
+    "src/equation_terms_2d.f90": "ca8c71c4f64e8d293af68d6eb653badf29415b2602c2a00e5017b22f3d47f31a",
+    "src/geometry_2d.f90": "eb96fab849222360744552d11f382911d010f71b32f3a3bb005e5d921947d56f",
+    "src/hp_reconstruction_2d.f90": "7bc35bd8f767c53ca5135a2ed79a7d46f7593c41be41a4db25c195fb0ebb75df",
+    "src/hyperbolic_2d.f90": "1d5af9f9d5e1936acd1f37003b448f2cd94005de82ad573e505d7b7ff9342ee3",
+    "src/init_2d.f90": "03451193df8e652b8eccf27644564e40fb05d929c094d2ba0172a0c4372140ca",
+    "src/inpout_2d.f90": "0ea85224622c7184d902ec1a5a682f570e023510c48c0c4fa660d57b713f66d8",
+    "src/lapack_interfaces_2d.f90": "2891985b5e521538e6871568aa8b708fdf01455b1908c7805cf2b6cfd3b5d952",
+    "src/mass_exchange_2d.f90": "89b5fa471e8599cd3205873d74126daf7cabfa9efd8d222ea783cbf010902cd8",
+    "src/mixture_from_mass.inc": "da6131a86aa691dc043a77e2d3f50ed2f753d077590c081e7ee97d5bd4b20a5d",
+    "src/mixture_heat_capacity.inc": "c112e1dc64aebba6e282b1fc220377abe229948062da8168b563b382822ea1aa",
+    "src/model_layout_2d.f90": "ab60e9de67fc2d5fbc3d15d5536ceaa22f859ed3ec0e76652ad7a5e43a352cce",
+    "src/nonconservative_2d.f90": "44f659c71d192e3e285cd8fb962f66ca11dd383d3a5a9a2c24e9b7aef97d691e",
+    "src/nonlinear_solver_2d.f90": "d20659ab9067f5890069cf440fa4fd9ab0db4cd32b461284839f31ef8fd7ec3a",
+    "src/parameters_2d.f90": "3350e8db2356f91206936ff1fc5fd335a58c1b1120e1ef5b4d6ed07998c116ba",
+    "src/pccu_2d.f90": "2d037f0ad8a48f31eb00ac3645f04ad554408ba749bec9875b8b01b393affc59",
+    "src/reconstruction_2d.f90": "5bb41fbc49202860c4489aed618deadad45fd2a7b9357f93d26754be41f4956e",
+    "src/runtime_2d.f90": "afc7d054d0f2c033c5809519b51568f92e18c7bbc9b6ec13300c6d16d2422aef",
+    "src/simulation_2d.f90": "0ed05c045960933096f8cdd4fe5267d0919ab5621ddf5093a33b0363dc0a59b9",
+    "src/spatial_operator_2d.f90": "5b009b02f13aa478db09c073df0beeeeff06cd9d209aface8e6005f7a95de45e",
+    "src/state_2d.f90": "cdb80ac4b5357a25f36f28555e595764127e234096c67cedeb4585fa2881ccda",
+    "src/state_conversion_2d.f90": "d718257f8c2e732d87e687eea0e1e00860d2484cfc62aa0398413272b463cebe",
+    "src/state_conversion_phys_var.inc": "d9f63dcbe2ceb3b62131c01dbda1da2ffbaa793a7604382d3dad4ca450bc1729",
+    "src/stochastic_module.f90": "77090048c7cb80fa9f00d1e429326bc9c2c97af21fc31be2b007a1870f29663b",
+    "src/stochastic_random_2d.f90": "39066c274a98949e1a5f636c763ee3b7572379dbea7951ef72b11448035beb00",
+    "src/time_integration_2d.f90": "6c5751712117e3e166da34847b9d796959064bc79b981105921829ffecb44020",
+    "src/velocity_from_conservative.inc": "552515c233b09171e4965e9f1866dfeedb5f37c1dce195ba02f18bcc7cd5671a",
+    "TESTS/TEST_HP_RECONSTRUCTION/test_hp_reconstruction.f90": "2e24c7a3f57982a715125444f5c8627474e725fa17f142f6003c65ed865dc636",
+    "TESTS/TEST_IMEX_STAGES/compare_stages.py": "e9e145c3dd609dc800d1b4776e6182fe20eda48198c0517a8eb301d691ef66be",
+    "TESTS/TEST_IMEX_STAGES/test_imex_stages.f90": "0552f0acf857c9b69346a7ed70562d0b4a30da53dd81bccb66950a03221dc4b2",
+    "TESTS/TEST_N7_EQUILIBRIUM/check_cases.py": "c480ecb274e2540870765d610750b05646b6c6970d0db2dff112e427575bc16f",
+    "TESTS/TEST_N7_EQUILIBRIUM/contract.json": "31e9bd844620c89c4b0412cf641b25bf13ef77df117d7bdb16d6e336afa0b0af",
+    "TESTS/TEST_N7_EQUILIBRIUM/run_test.sh": "4d5aa4d617e139852ece520265c65200e2786385c18ac870c9d00c938500a14a",
+    "TESTS/TEST_N7_EQUILIBRIUM/test_checker.py": "71c1239df7fc3df92de60e912290a4de877273d7d6b38808b27243c91b821c7d",
+    "TESTS/TEST_SPATIAL_OPERATOR/compare_reference.py": "055f5562cc660ba78fba0436905084cddc6c5239d9e24793fb837803753b13c7",
+    "TESTS/TEST_SPATIAL_OPERATOR/reference/hp_pccu_1d_core.py": "ffcb695ff8d8d2bd06e433d70b2a519c0b0012d959eb664b617deea83e8f64e2",
+    "TESTS/TEST_SPATIAL_OPERATOR/reference/hp_pccu_2d_core.py": "c63331366cadf9f04d802a3f058088b9c175399b2d6dc7015068a0ad110f1577",
+    "TESTS/TEST_STATE_CONVERSION/test_state_conversion.f90": "531015df0ee836e029e2163532b1dc7c03c2f75fc02645075238a59c7a6c626d"
+  },
+  "production_changes": {
+    "src/hp_reconstruction_2d.f90": {
+      "before": "cf6cc6ee62eb872496a6fe33e8d4e2e640e3ea4ffc05050f8121d099ae2e4af1",
+      "after": "7bc35bd8f767c53ca5135a2ed79a7d46f7593c41be41a4db25c195fb0ebb75df"
+    },
+    "src/state_conversion_2d.f90": {
+      "before": "f8dcda9f78c9ec0df7687c059c733698e7f46a39d53a83307583c83a34c8d1f9",
+      "after": "d718257f8c2e732d87e687eea0e1e00860d2484cfc62aa0398413272b463cebe"
+    }
+  },
+  "case_inventory": [
+    "lake-smooth-1D-S0C0-RK2",
+    "lake-smooth-1D-S0C0-RK3",
+    "lake-smooth-1D-S0C0-RK4",
+    "lake-smooth-1D-S0C1-RK2",
+    "lake-smooth-1D-S0C1-RK3",
+    "lake-smooth-1D-S0C1-RK4",
+    "lake-smooth-1D-S1C0-RK2",
+    "lake-smooth-1D-S1C0-RK3",
+    "lake-smooth-1D-S1C0-RK4",
+    "lake-smooth-1D-S1C1-RK2",
+    "lake-smooth-1D-S1C1-RK3",
+    "lake-smooth-1D-S1C1-RK4",
+    "lake-smooth-2D-S0C0-RK2",
+    "lake-smooth-2D-S0C0-RK3",
+    "lake-smooth-2D-S0C0-RK4",
+    "lake-smooth-2D-S0C1-RK2",
+    "lake-smooth-2D-S0C1-RK3",
+    "lake-smooth-2D-S0C1-RK4",
+    "lake-smooth-2D-S1C0-RK2",
+    "lake-smooth-2D-S1C0-RK3",
+    "lake-smooth-2D-S1C0-RK4",
+    "lake-smooth-2D-S1C1-RK2",
+    "lake-smooth-2D-S1C1-RK3",
+    "lake-smooth-2D-S1C1-RK4",
+    "lake-one-cell-1D-S0C0-RK2",
+    "lake-one-cell-1D-S0C0-RK3",
+    "lake-one-cell-1D-S0C0-RK4",
+    "lake-one-cell-1D-S0C1-RK2",
+    "lake-one-cell-1D-S0C1-RK3",
+    "lake-one-cell-1D-S0C1-RK4",
+    "lake-one-cell-1D-S1C0-RK2",
+    "lake-one-cell-1D-S1C0-RK3",
+    "lake-one-cell-1D-S1C0-RK4",
+    "lake-one-cell-1D-S1C1-RK2",
+    "lake-one-cell-1D-S1C1-RK3",
+    "lake-one-cell-1D-S1C1-RK4",
+    "lake-one-cell-2D-S0C0-RK2",
+    "lake-one-cell-2D-S0C0-RK3",
+    "lake-one-cell-2D-S0C0-RK4",
+    "lake-one-cell-2D-S0C1-RK2",
+    "lake-one-cell-2D-S0C1-RK3",
+    "lake-one-cell-2D-S0C1-RK4",
+    "lake-one-cell-2D-S1C0-RK2",
+    "lake-one-cell-2D-S1C0-RK3",
+    "lake-one-cell-2D-S1C0-RK4",
+    "lake-one-cell-2D-S1C1-RK2",
+    "lake-one-cell-2D-S1C1-RK3",
+    "lake-one-cell-2D-S1C1-RK4",
+    "lake-parabolic-1D-S0C0-RK2",
+    "lake-parabolic-1D-S0C0-RK3",
+    "lake-parabolic-1D-S0C0-RK4",
+    "lake-parabolic-1D-S0C1-RK2",
+    "lake-parabolic-1D-S0C1-RK3",
+    "lake-parabolic-1D-S0C1-RK4",
+    "lake-parabolic-1D-S1C0-RK2",
+    "lake-parabolic-1D-S1C0-RK3",
+    "lake-parabolic-1D-S1C0-RK4",
+    "lake-parabolic-1D-S1C1-RK2",
+    "lake-parabolic-1D-S1C1-RK3",
+    "lake-parabolic-1D-S1C1-RK4",
+    "lake-parabolic-2D-S0C0-RK2",
+    "lake-parabolic-2D-S0C0-RK3",
+    "lake-parabolic-2D-S0C0-RK4",
+    "lake-parabolic-2D-S0C1-RK2",
+    "lake-parabolic-2D-S0C1-RK3",
+    "lake-parabolic-2D-S0C1-RK4",
+    "lake-parabolic-2D-S1C0-RK2",
+    "lake-parabolic-2D-S1C0-RK3",
+    "lake-parabolic-2D-S1C0-RK4",
+    "lake-parabolic-2D-S1C1-RK2",
+    "lake-parabolic-2D-S1C1-RK3",
+    "lake-parabolic-2D-S1C1-RK4",
+    "advection-nx64-RK2",
+    "advection-nx128-RK2",
+    "advection-nx256-RK2",
+    "advection-nx64-RK3",
+    "advection-nx128-RK3",
+    "advection-nx256-RK3",
+    "advection-nx64-RK4",
+    "advection-nx128-RK4",
+    "advection-nx256-RK4",
+    "ritter-nx40-RK2",
+    "ritter-nx80-RK2",
+    "ritter-nx160-RK2",
+    "ritter-nx40-RK3",
+    "ritter-nx80-RK3",
+    "ritter-nx160-RK3",
+    "ritter-nx40-RK4",
+    "ritter-nx80-RK4",
+    "ritter-nx160-RK4",
+    "excavation-S0C0-RK2",
+    "excavation-S0C0-RK3",
+    "excavation-S0C0-RK4",
+    "excavation-S0C1-RK2",
+    "excavation-S0C1-RK3",
+    "excavation-S0C1-RK4",
+    "excavation-S1C0-RK2",
+    "excavation-S1C0-RK3",
+    "excavation-S1C0-RK4",
+    "excavation-S1C1-RK2",
+    "excavation-S1C1-RK3",
+    "excavation-S1C1-RK4"
+  ],
+  "records": [
+    {
+      "profile": "strict",
+      "actual_threads": [
+        1,
+        4
+      ],
+      "case_count": 102,
+      "solver_runs": 204,
+      "raw_evidence_path": "/tmp/imex-n7-equilibrium.KLJhWH/strict/evidence.json",
+      "raw_evidence_sha256": "630e72bcf19c23782bd81d14bfcc0ebed089d5e9a56ec70315f41a7178482181",
+      "case_fingerprints_sha256": "e8e45e2c3da00951545d52f1f036c40b584473b41d9f232d9d038e3e56c2654c",
+      "executable_sha256": "a16f00df2d6cafbe1337a5b7c0cf7401b02d010525e154b828f7d6e8e6ce3617",
+      "groups": {
+        "lake": {
+          "cases": 72,
+          "one_team_steps": 1440,
+          "admissibility_envelope": {
+            "minimum_known_h": {
+              "minimum": 3,
+              "maximum": 4.85114550958213
+            },
+            "minimum_solved_h": {
+              "minimum": 3,
+              "maximum": 4.85114550958213
+            },
+            "minimum_raw_final_h": {
+              "minimum": 3,
+              "maximum": 4.85114550958213
+            },
+            "maximum_final_repair": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "failed_local_solves": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "converged_local_solves": {
+              "minimum": 640,
+              "maximum": 46080
+            },
+            "minimum_raw_temperature": {
+              "minimum": 300,
+              "maximum": 300
+            },
+            "minimum_solid_fraction": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_carrier_fraction": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "maximum_relative_mass_drift": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "maximum_dt_over_CFL": {
+              "minimum": 0.11664408876565575,
+              "maximum": 0.11888868040957878
+            }
+          },
+          "maximum_equilibrium_error": 1.208691885060243e-16,
+          "maximum_production_residual": 1.389377239121631e-16,
+          "maximum_reference_residual": 2.0167001973058579e-16
+        },
+        "advection": {
+          "cases": 9,
+          "one_team_steps": 3360,
+          "admissibility_envelope": {
+            "minimum_known_h": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "minimum_solved_h": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "minimum_raw_final_h": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "maximum_final_repair": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "failed_local_solves": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "converged_local_solves": {
+              "minimum": 10240,
+              "maximum": 491520
+            },
+            "minimum_raw_temperature": {
+              "minimum": 300,
+              "maximum": 300
+            },
+            "minimum_solid_fraction": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_carrier_fraction": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "maximum_relative_mass_drift": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "maximum_dt_over_CFL": {
+              "minimum": 0.1720921722244371,
+              "maximum": 0.1720921722244371
+            }
+          },
+          "maximum_reference_errors": {
+            "final": [
+              0,
+              0,
+              0,
+              2.4083804179624243e-14,
+              0
+            ],
+            "known": [
+              0,
+              0,
+              0,
+              2.3902722945190976e-14,
+              0
+            ],
+            "solved": [
+              0,
+              0,
+              0,
+              2.3902722945190976e-14,
+              0
+            ],
+            "raw_final": [
+              0,
+              0,
+              0,
+              2.4083804179624243e-14,
+              0
+            ]
+          },
+          "maximum_field_error_over_frozen_limit": 0.000005171957565737711,
+          "maximum_analytic_L1": 0.3832374270124248
+        },
+        "ritter": {
+          "cases": 9,
+          "one_team_steps": 840,
+          "admissibility_envelope": {
+            "minimum_known_h": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_solved_h": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_raw_final_h": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "maximum_final_repair": {
+              "minimum": 0,
+              "maximum": 24.495569999999997
+            },
+            "failed_local_solves": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "converged_local_solves": {
+              "minimum": 1057,
+              "maximum": 44428
+            },
+            "minimum_raw_temperature": {
+              "minimum": 299.9999999999996,
+              "maximum": 299.99999999999983
+            },
+            "minimum_solid_fraction": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_carrier_fraction": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "maximum_relative_mass_drift": {
+              "minimum": 3.637978807091713e-16,
+              "maximum": 9.094947017729283e-16
+            },
+            "maximum_dt_over_CFL": {
+              "minimum": 0.17195460126873557,
+              "maximum": 0.21965277833830749
+            }
+          },
+          "maximum_reference_errors": {
+            "final": [
+              1.6581595907717427e-11,
+              1.740338990624519e-11,
+              0,
+              1.658159590771738e-11,
+              0
+            ],
+            "known": [
+              1.6580540439017396e-11,
+              1.740228769352298e-11,
+              0,
+              1.6580540439017348e-11,
+              0
+            ],
+            "solved": [
+              1.6580540439017396e-11,
+              1.740228769352298e-11,
+              0,
+              1.6580540439017348e-11,
+              0
+            ],
+            "raw_final": [
+              1.6581595907717427e-11,
+              1.740338990624519e-11,
+              0,
+              1.658159590771738e-11,
+              0
+            ],
+            "dry_cleanup": 0
+          },
+          "maximum_field_error_over_frozen_limit": 0.02078509184749029,
+          "maximum_analytic_L1": 0.006205176132959972
+        },
+        "excavation": {
+          "cases": 12,
+          "one_team_steps": 1200,
+          "admissibility_envelope": {
+            "minimum_known_h": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_solved_h": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_raw_final_h": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "maximum_final_repair": {
+              "minimum": 0,
+              "maximum": 1.4749643599217702e-8
+            },
+            "failed_local_solves": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "converged_local_solves": {
+              "minimum": 2000,
+              "maximum": 6297
+            },
+            "minimum_raw_temperature": {
+              "minimum": 299.99999999999943,
+              "maximum": 299.9999999999997
+            },
+            "minimum_solid_fraction": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_carrier_fraction": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "maximum_relative_mass_drift": {
+              "minimum": 1.914725687943007e-16,
+              "maximum": 3.829451375886014e-16
+            },
+            "maximum_dt_over_CFL": {
+              "minimum": 0.0036467701860487317,
+              "maximum": 0.0037033091880904366
+            }
+          },
+          "maximum_reference_errors": {
+            "final": [
+              4.810658538190182e-13,
+              2.239712243542832e-13,
+              0,
+              4.810199402926261e-13,
+              0
+            ],
+            "known": [
+              4.812932274944615e-13,
+              2.239712243542832e-13,
+              0,
+              4.812100667512398e-13,
+              0
+            ],
+            "solved": [
+              4.812932274944615e-13,
+              2.239712243542832e-13,
+              0,
+              4.812100667512398e-13,
+              0
+            ],
+            "raw_final": [
+              4.810658538190182e-13,
+              2.239712243542832e-13,
+              0,
+              4.810199402926261e-13,
+              0
+            ],
+            "dry_cleanup": 1.34079750177838e-23
+          },
+          "maximum_field_error_over_frozen_limit": 0.0006614843750000001,
+          "maximum_relative_uphill_mass": 0
+        }
+      },
+      "refinements": [
+        {
+          "case": "advection",
+          "n_RK": 2,
+          "L1": [
+            0.3826767577480137,
+            0.21739893572121272,
+            0.11645209990575878
+          ],
+          "ratios": [
+            0.5681007046274974,
+            0.5356608555577025
+          ]
+        },
+        {
+          "case": "advection",
+          "n_RK": 3,
+          "L1": [
+            0.38323652149601983,
+            0.217909962567866,
+            0.11678740093709616
+          ],
+          "ratios": [
+            0.5686043744401567,
+            0.5359433756991439
+          ]
+        },
+        {
+          "case": "advection",
+          "n_RK": 4,
+          "L1": [
+            0.3832374270124248,
+            0.21791018720496913,
+            0.11678743764866595
+          ],
+          "ratios": [
+            0.5686036170937562,
+            0.53594299168223
+          ]
+        },
+        {
+          "case": "ritter",
+          "n_RK": 2,
+          "L1": [
+            0.006205176132959972,
+            0.004275193501489512,
+            0.002647348635028698
+          ],
+          "ratios": [
+            0.6889721435594729,
+            0.6192348098644751
+          ]
+        },
+        {
+          "case": "ritter",
+          "n_RK": 3,
+          "L1": [
+            0.005566841433627039,
+            0.0034814376655561583,
+            0.0022069592549355753
+          ],
+          "ratios": [
+            0.6253883296416888,
+            0.6339218067209066
+          ]
+        },
+        {
+          "case": "ritter",
+          "n_RK": 4,
+          "L1": [
+            0.006178998784823708,
+            0.004211798242746636,
+            0.0026168094274496923
+          ],
+          "ratios": [
+            0.6816311815906599,
+            0.6213045536918204
+          ]
+        }
+      ]
+    },
+    {
+      "profile": "optimized",
+      "actual_threads": [
+        1,
+        4
+      ],
+      "case_count": 102,
+      "solver_runs": 204,
+      "raw_evidence_path": "/tmp/imex-n7-equilibrium.KLJhWH/optimized/evidence.json",
+      "raw_evidence_sha256": "96874968b99e84683b3106c9a808dae97cd629506587c92b359b21862b549b98",
+      "case_fingerprints_sha256": "01925fa1558f4f79ce80aa6c7d374406a7f74d6129d1e2e0c4228155acd2d92d",
+      "executable_sha256": "a599ab97c17060421b8ab93a38e097939178d150658b1d52c23be3de7be5b6fb",
+      "groups": {
+        "lake": {
+          "cases": 72,
+          "one_team_steps": 1440,
+          "admissibility_envelope": {
+            "minimum_known_h": {
+              "minimum": 3,
+              "maximum": 4.85114550958213
+            },
+            "minimum_solved_h": {
+              "minimum": 3,
+              "maximum": 4.85114550958213
+            },
+            "minimum_raw_final_h": {
+              "minimum": 3,
+              "maximum": 4.85114550958213
+            },
+            "maximum_final_repair": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "failed_local_solves": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "converged_local_solves": {
+              "minimum": 640,
+              "maximum": 46080
+            },
+            "minimum_raw_temperature": {
+              "minimum": 300,
+              "maximum": 300
+            },
+            "minimum_solid_fraction": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_carrier_fraction": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "maximum_relative_mass_drift": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "maximum_dt_over_CFL": {
+              "minimum": 0.11664408876565575,
+              "maximum": 0.11888868040957878
+            }
+          },
+          "maximum_equilibrium_error": 1.2086918850602428e-16,
+          "maximum_production_residual": 1.389377239121631e-16,
+          "maximum_reference_residual": 2.0167001973058579e-16
+        },
+        "advection": {
+          "cases": 9,
+          "one_team_steps": 3360,
+          "admissibility_envelope": {
+            "minimum_known_h": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "minimum_solved_h": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "minimum_raw_final_h": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "maximum_final_repair": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "failed_local_solves": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "converged_local_solves": {
+              "minimum": 10240,
+              "maximum": 491520
+            },
+            "minimum_raw_temperature": {
+              "minimum": 300,
+              "maximum": 300
+            },
+            "minimum_solid_fraction": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_carrier_fraction": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "maximum_relative_mass_drift": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "maximum_dt_over_CFL": {
+              "minimum": 0.1720921722244371,
+              "maximum": 0.1720921722244371
+            }
+          },
+          "maximum_reference_errors": {
+            "final": [
+              0,
+              0,
+              0,
+              2.4083804179624243e-14,
+              0
+            ],
+            "known": [
+              0,
+              0,
+              0,
+              2.4083804179624243e-14,
+              0
+            ],
+            "solved": [
+              0,
+              0,
+              0,
+              2.4083804179624243e-14,
+              0
+            ],
+            "raw_final": [
+              0,
+              0,
+              0,
+              2.4083804179624243e-14,
+              0
+            ]
+          },
+          "maximum_field_error_over_frozen_limit": 0.000005171957565737711,
+          "maximum_analytic_L1": 0.3832374270124346
+        },
+        "ritter": {
+          "cases": 9,
+          "one_team_steps": 840,
+          "admissibility_envelope": {
+            "minimum_known_h": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_solved_h": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_raw_final_h": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "maximum_final_repair": {
+              "minimum": 0,
+              "maximum": 24.495569999999994
+            },
+            "failed_local_solves": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "converged_local_solves": {
+              "minimum": 1057,
+              "maximum": 44428
+            },
+            "minimum_raw_temperature": {
+              "minimum": 299.9999999999996,
+              "maximum": 299.99999999999983
+            },
+            "minimum_solid_fraction": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_carrier_fraction": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "maximum_relative_mass_drift": {
+              "minimum": 3.637978807091713e-16,
+              "maximum": 9.094947017729283e-16
+            },
+            "maximum_dt_over_CFL": {
+              "minimum": 0.17195460126873557,
+              "maximum": 0.2196527783383074
+            }
+          },
+          "maximum_reference_errors": {
+            "final": [
+              1.6581595907716632e-11,
+              1.740338990624414e-11,
+              0,
+              1.6581595907716674e-11,
+              0
+            ],
+            "known": [
+              1.65805404390166e-11,
+              1.7402287693521862e-11,
+              0,
+              1.6580540439016595e-11,
+              0
+            ],
+            "solved": [
+              1.65805404390166e-11,
+              1.7402287693521898e-11,
+              0,
+              1.6580540439016595e-11,
+              0
+            ],
+            "raw_final": [
+              1.6581595907716632e-11,
+              1.740338990624414e-11,
+              0,
+              1.6581595907716674e-11,
+              0
+            ],
+            "dry_cleanup": 1.1342941818066181e-18
+          },
+          "maximum_field_error_over_frozen_limit": 0.020785091847487617,
+          "maximum_analytic_L1": 0.006205176132959971
+        },
+        "excavation": {
+          "cases": 12,
+          "one_team_steps": 1200,
+          "admissibility_envelope": {
+            "minimum_known_h": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_solved_h": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_raw_final_h": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "maximum_final_repair": {
+              "minimum": 0,
+              "maximum": 1.4749643599217702e-8
+            },
+            "failed_local_solves": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "converged_local_solves": {
+              "minimum": 2000,
+              "maximum": 6297
+            },
+            "minimum_raw_temperature": {
+              "minimum": 299.99999999999943,
+              "maximum": 299.9999999999997
+            },
+            "minimum_solid_fraction": {
+              "minimum": 0,
+              "maximum": 0
+            },
+            "minimum_carrier_fraction": {
+              "minimum": 1,
+              "maximum": 1
+            },
+            "maximum_relative_mass_drift": {
+              "minimum": 1.914725687943007e-16,
+              "maximum": 3.829451375886014e-16
+            },
+            "maximum_dt_over_CFL": {
+              "minimum": 0.00364677018604873,
+              "maximum": 0.0037033091880904366
+            }
+          },
+          "maximum_reference_errors": {
+            "final": [
+              4.810658538190182e-13,
+              2.2397363055560664e-13,
+              0,
+              4.810199402926261e-13,
+              0
+            ],
+            "known": [
+              4.812932274944615e-13,
+              2.2397322952205275e-13,
+              0,
+              4.812100667512398e-13,
+              0
+            ],
+            "solved": [
+              4.812932274944615e-13,
+              2.2397363055560664e-13,
+              0,
+              4.812100667512398e-13,
+              0
+            ],
+            "raw_final": [
+              4.810658538190182e-13,
+              2.2397363055560664e-13,
+              0,
+              4.810199402926261e-13,
+              0
+            ],
+            "dry_cleanup": 1.34079750177838e-23
+          },
+          "maximum_field_error_over_frozen_limit": 0.0006614843750000001,
+          "maximum_relative_uphill_mass": 0
+        }
+      },
+      "refinements": [
+        {
+          "case": "advection",
+          "n_RK": 2,
+          "L1": [
+            0.38267675774804477,
+            0.21739893572122648,
+            0.11645209990574368
+          ],
+          "ratios": [
+            0.5681007046274873,
+            0.5356608555575991
+          ]
+        },
+        {
+          "case": "advection",
+          "n_RK": 3,
+          "L1": [
+            0.3832365214960163,
+            0.21790996256787976,
+            0.11678740093709417
+          ],
+          "ratios": [
+            0.5686043744401978,
+            0.5359433756991008
+          ]
+        },
+        {
+          "case": "advection",
+          "n_RK": 4,
+          "L1": [
+            0.3832374270124346,
+            0.2179101872050011,
+            0.11678743764867971
+          ],
+          "ratios": [
+            0.5686036170938251,
+            0.5359429916822145
+          ]
+        },
+        {
+          "case": "ritter",
+          "n_RK": 2,
+          "L1": [
+            0.006205176132959971,
+            0.004275193501489513,
+            0.002647348635028702
+          ],
+          "ratios": [
+            0.6889721435594731,
+            0.619234809864476
+          ]
+        },
+        {
+          "case": "ritter",
+          "n_RK": 3,
+          "L1": [
+            0.005566841433627042,
+            0.0034814376655561614,
+            0.0022069592549355784
+          ],
+          "ratios": [
+            0.6253883296416891,
+            0.6339218067209069
+          ]
+        },
+        {
+          "case": "ritter",
+          "n_RK": 4,
+          "L1": [
+            0.006178998784823704,
+            0.004211798242746629,
+            0.0026168094274496923
+          ],
+          "ratios": [
+            0.6816311815906593,
+            0.6213045536918215
+          ]
+        }
+      ]
+    }
+  ],
+  "full_audit": {
+    "manifest_path": "/tmp/imex-n7-a-acceptance-20261010-final/manifest.json",
+    "manifest_sha256": "323d93a283f5b15fcf4ac317e92b4d9ddef9f4dfaa1d47ad55088c49519454f4",
+    "summary": {
+      "test_runs": 37,
+      "failed": 0,
+      "passed": 37,
+      "n9_accepted": false
+    },
+    "tools": {
+      "compiler": {
+        "command": [
+          "gfortran",
+          "--version"
+        ],
+        "returncode": 0,
+        "output": "GNU Fortran (Homebrew GCC 15.2.0) 15.2.0\nCopyright (C) 2025 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+      },
+      "autoconf": {
+        "command": [
+          "autoconf",
+          "--version"
+        ],
+        "returncode": 0,
+        "output": "autoconf (GNU Autoconf) 2.72\nCopyright (C) 2023 Free Software Foundation, Inc.\nLicense GPLv3+/Autoconf: GNU GPL version 3 or later\n<https://gnu.org/licenses/gpl.html>, <https://gnu.org/licenses/exceptions.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by David J. MacKenzie and Akim Demaille."
+      },
+      "automake": {
+        "command": [
+          "automake",
+          "--version"
+        ],
+        "returncode": 0,
+        "output": "automake (GNU automake) 1.18\nFeatures: subsecond-mtime\n\nCopyright (C) 2025 Free Software Foundation, Inc.\nLicense GPLv2+: GNU GPL version 2 or later\n  <https://gnu.org/licenses/gpl-2.0.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by Tom Tromey <tromey@redhat.com>\n       and Alexandre Duret-Lutz <adl@gnu.org>."
+      },
+      "netcdf_fortran": {
+        "command": [
+          "nf-config",
+          "--version"
+        ],
+        "returncode": 0,
+        "output": "4.6.1"
+      },
+      "netcdf_fortran_fflags": {
+        "command": [
+          "nf-config",
+          "--fflags"
+        ],
+        "returncode": 0,
+        "output": "-I/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1/include -I/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1/include"
+      },
+      "netcdf_fortran_flibs": {
+        "command": [
+          "nf-config",
+          "--flibs"
+        ],
+        "returncode": 0,
+        "output": "-L/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1/lib -lnetcdff -lnetcdf -lnetcdf"
+      },
+      "netcdf_c": {
+        "command": [
+          "nc-config",
+          "--all"
+        ],
+        "returncode": 0,
+        "output": "This netCDF 4.9.2 has been built with the following features: \n\n  --cc            -> clang\n  --cflags        -> -I/opt/homebrew/Cellar/netcdf/4.9.2_2/include\n  --libs          -> -L/opt/homebrew/Cellar/netcdf/4.9.2_2/lib -lnetcdf\n  --static        -> -lhdf5_hl-shared -lhdf5-shared -lm -lz -lzstd -lbz2 -lcurl -lxml2\n\n\n  --has-dap          -> yes\n  --has-dap2         -> yes\n  --has-dap4         -> yes\n  --has-nc2          -> yes\n  --has-nc4          -> yes\n  --has-hdf5         -> yes\n  --has-hdf4         -> no\n  --has-logging      -> no\n  --has-pnetcdf      -> no\n  --has-szlib        -> no\n  --has-cdf5         -> yes\n  --has-parallel4    -> no\n  --has-parallel     -> no\n  --has-nczarr       -> yes\n  --has-zstd         -> yes\n  --has-benchmarks   -> no\n  --has-multifilters -> no\n  --has-stdfilters   -> deflate szip zstd bz2\n  --has-quantize     -> no\n\n  --prefix        -> /opt/homebrew/Cellar/netcdf/4.9.2_2\n  --includedir    -> /opt/homebrew/Cellar/netcdf/4.9.2_2/include\n  --libdir        -> /opt/homebrew/Cellar/netcdf/4.9.2_2/lib\n  --plugindir     -> \n  --version       -> netCDF 4.9.2"
+      }
+    },
+    "thread_comparisons": [
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_BINARY_RESTART",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_PCCU_GATE_H",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_STOCHASTIC_RESTART",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_BINARY_RESTART",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_PCCU_GATE_H",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_STOCHASTIC_RESTART",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      }
+    ],
+    "tests": [
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 1,
+        "status": "pass",
+        "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d"
+      },
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 4,
+        "status": "pass",
+        "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "historical_optimized",
+        "outer_threads": 1,
+        "status": "pass",
+        "log_sha256": "24128bde6b502cf5a1f81b774ea6fdfa51ce5c562c4b414d1af1f3888cc247ca"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "historical_optimized",
+        "outer_threads": 4,
+        "status": "pass",
+        "log_sha256": "24128bde6b502cf5a1f81b774ea6fdfa51ce5c562c4b414d1af1f3888cc247ca"
+      },
+      {
+        "test": "TEST_PCCU_INCLINED_EXCAVATION",
+        "profile": "historical_optimized",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "066f1e22d7b0949343d6d810e5664f456a3ce26bb6c743b898f3eb1c1e105cd8"
+      },
+      {
+        "test": "TEST_PCCU_LAKE_AT_REST",
+        "profile": "historical_optimized",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "72f5c63ea215a47816f2f5eaf05c6c67976ffda17a0762257c025ac5cb415ce3"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 1,
+        "status": "pass",
+        "log_sha256": "404ed3b1f2c92d7ce070fce7f3ca4f7140a418a2b3574b2fa82cebb6af9cc0e7"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 4,
+        "status": "pass",
+        "log_sha256": "7e5408cd873fad055d3402d05bbe4d705429ac1af8b49583b4e3db6a7f33dcab"
+      },
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 1,
+        "status": "pass",
+        "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d"
+      },
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 4,
+        "status": "pass",
+        "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "strict_debug",
+        "outer_threads": 1,
+        "status": "pass",
+        "log_sha256": "6cd88a1198efbc830b34c12cbcdfbc9c70df0250b78ed992d22a6498e848b2fe"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "strict_debug",
+        "outer_threads": 4,
+        "status": "pass",
+        "log_sha256": "6cd88a1198efbc830b34c12cbcdfbc9c70df0250b78ed992d22a6498e848b2fe"
+      },
+      {
+        "test": "TEST_PCCU_INCLINED_EXCAVATION",
+        "profile": "strict_debug",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "cc5dd58087a29fde99c5a4e1dc334cbb1f73d1ac1e19996fa37cfe5b4404acaa"
+      },
+      {
+        "test": "TEST_PCCU_LAKE_AT_REST",
+        "profile": "strict_debug",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "72f5c63ea215a47816f2f5eaf05c6c67976ffda17a0762257c025ac5cb415ce3"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 1,
+        "status": "pass",
+        "log_sha256": "9df294ee2ba7af4f3e5693c4a5ecc9494eef7f700740ddfdfcbfffaa7f1d2884"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 4,
+        "status": "pass",
+        "log_sha256": "0ab2774e01be82b00ef3c3755c3ac91f29c53e0c4199307e92808bf921e402e5"
+      },
+      {
+        "test": "TEST_CURVATURE_SOURCE",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "896806d4e56101e2d96fd2561c629807e931a43e274d228b3e1ec4dac45535dd"
+      },
+      {
+        "test": "TEST_DIAGNOSTICS",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "9dab51a0e28e463b0b46b2cc4b1717f4268fae30cbf3bf16a56bcf1cc270bc8a"
+      },
+      {
+        "test": "TEST_EQUATION_METADATA",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "e40e9672aceb9e47646aa5191d18c4a2781704f2e5acef086751c89615c1efa7"
+      },
+      {
+        "test": "TEST_HP_RECONSTRUCTION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "3c619d86f72c72ca958a02cc14c137978e313aed1452966026171b67e5944a81"
+      },
+      {
+        "test": "TEST_HYDROSTATIC_PATH",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "742dba46e726b0f52beb680ee084ae156a0733c7faec165fdb81400945082e37"
+      },
+      {
+        "test": "TEST_IMEX_STAGES",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "3f6a495c97062d267b451362bdd742e81e03fb129a3192aa54eb29d1f54d085e"
+      },
+      {
+        "test": "TEST_LAPACK_INTERFACES",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "6d71bec5c90ff26b1f876f5eb149a0d3cf132cbc1288840774682b4bb5dbf4ac"
+      },
+      {
+        "test": "TEST_MASS_EXCHANGE",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "2ce7939622889a26e1b6bbf4b99f3eb450d398b165bc18416f547d026d786fd5"
+      },
+      {
+        "test": "TEST_MODEL_LAYOUT",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "0b6cd443a9bd2f79576c714f52460d54d644fd040162b8adc8408ebd890353e3"
+      },
+      {
+        "test": "TEST_N7_EQUILIBRIUM",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "ed0f405c5284926e633611c4d90a268f0f0b781dba3e4a9dcce1992bd63d1377"
+      },
+      {
+        "test": "TEST_NONCONSERVATIVE_PATH",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "67583a32e7cf44d12bda24432d9a670c4847c3f06bab0a9381d618fd730837f3"
+      },
+      {
+        "test": "TEST_PCCU",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "a4adf25853b86fe96c546449a1775abd15420e8d5e015548243a7327de53051a"
+      },
+      {
+        "test": "TEST_RHEOLOGY_FROUDE",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "d1dec382c4f567c3acb674c6bd3a8fa356a4c95cd20f2b1641457f63c0bb6eb9"
+      },
+      {
+        "test": "TEST_SOURCE_DOCUMENTATION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "3cebd68078eb4add1b125f30de2866a0ca79e25ec5927874a919f67cab449757"
+      },
+      {
+        "test": "TEST_SPATIAL_OPERATOR",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "5f0bcfe90a02a209ea088d43f489a935c088b1f3511564c8ea20343c376ed4b6"
+      },
+      {
+        "test": "TEST_STATE_CONVERSION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "37aaf4c0197997a0c827d2f3a81696cceae943f4215ee7816a940f14404b2261"
+      },
+      {
+        "test": "TEST_STATE_INITIALIZATION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "7c12661c2e61a63fac89c3f4dc5da34b70dbbdcd0591f22bd52cce1ca040f610"
+      },
+      {
+        "test": "TEST_STOCHASTIC_EVOLUTION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "f162daa14ab4ab2b519ee69a92be0dfcd4aded2478b00932394381ca52f3bab4"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RANDOM",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "adfd25d313f98ca8d8e7392e266a67d674ce2a6fc2ea0088fbc2c795d19df88a"
+      },
+      {
+        "test": "TEST_TOPOGRAPHY_FACES",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "6793c2a285742ecafe7c1b24116cc0bb81b085c7c4153c9f83fd29795647e278"
+      },
+      {
+        "test": "TEST_WORKSPACE_LIFECYCLE",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "log_sha256": "3279bc0b941bba665df070c6f47966059520a6afef9b00bdc26fed2afd688e54"
+      }
+    ]
+  },
+  "comparison_to_N8_B": {
+    "manifest_sha256": "2f3179ae30e58eeabcc2c982aa7f4bcd0f7baaa6725c0e33b0927c4fede3cec7",
+    "cases": [
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_BINARY_RESTART",
+        "threads": 1,
+        "status": "changed",
+        "solver_calls": 3,
+        "baseline_canonical_sha256": "34eba7a4e5b1b1cfe6224c868e9cc2db170db700c6cb02fc0ebedce1cf1f6c01",
+        "candidate_canonical_sha256": "863ac93f03483c64aede83bbcd921b72e49e6e87e3d17e26c21a10ac3520e2ca"
+      },
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_BINARY_RESTART",
+        "threads": 4,
+        "status": "changed",
+        "solver_calls": 3,
+        "baseline_canonical_sha256": "34eba7a4e5b1b1cfe6224c868e9cc2db170db700c6cb02fc0ebedce1cf1f6c01",
+        "candidate_canonical_sha256": "863ac93f03483c64aede83bbcd921b72e49e6e87e3d17e26c21a10ac3520e2ca"
+      },
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_PCCU_GATE_H",
+        "threads": 1,
+        "status": "changed",
+        "solver_calls": 6,
+        "baseline_canonical_sha256": "d2b083068324540dff5bde5f9871934e1860f0ec3a12bc1127160875e7d3dc20",
+        "candidate_canonical_sha256": "20286920462959d3591d061f00413c8a7d12ccdf234f00ba406b5984ebbb4117"
+      },
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_PCCU_GATE_H",
+        "threads": 4,
+        "status": "changed",
+        "solver_calls": 6,
+        "baseline_canonical_sha256": "d2b083068324540dff5bde5f9871934e1860f0ec3a12bc1127160875e7d3dc20",
+        "candidate_canonical_sha256": "20286920462959d3591d061f00413c8a7d12ccdf234f00ba406b5984ebbb4117"
+      },
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_PCCU_INCLINED_EXCAVATION",
+        "threads": null,
+        "status": "changed",
+        "solver_calls": 6,
+        "baseline_canonical_sha256": "7753ddb941d66f6c29e9fbc0c90c68f4221ba42054e1ed1ede820f67013002ed",
+        "candidate_canonical_sha256": "b01df8e328539040c7cbb7bc1be7f1c721d3bc79708e708113ad06ce59e02ebc"
+      },
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_PCCU_LAKE_AT_REST",
+        "threads": null,
+        "status": "unchanged",
+        "solver_calls": 16,
+        "baseline_canonical_sha256": "6db9af1ca4386522545757d352349d43aa3096b7987926a39a0af1e3ba405b5c",
+        "candidate_canonical_sha256": "6db9af1ca4386522545757d352349d43aa3096b7987926a39a0af1e3ba405b5c"
+      },
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_STOCHASTIC_RESTART",
+        "threads": 1,
+        "status": "changed",
+        "solver_calls": 3,
+        "baseline_canonical_sha256": "f5d8d45a52c6244611772586562b9b1f0b45651e6b4094f12c82d77537a33b2b",
+        "candidate_canonical_sha256": "8f7cef3f1569dc7ad6a7d58c92769a7612b61b7117c732e2874168994221eee1"
+      },
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_STOCHASTIC_RESTART",
+        "threads": 4,
+        "status": "changed",
+        "solver_calls": 3,
+        "baseline_canonical_sha256": "f5d8d45a52c6244611772586562b9b1f0b45651e6b4094f12c82d77537a33b2b",
+        "candidate_canonical_sha256": "8f7cef3f1569dc7ad6a7d58c92769a7612b61b7117c732e2874168994221eee1"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_BINARY_RESTART",
+        "threads": 1,
+        "status": "unchanged",
+        "solver_calls": 3,
+        "baseline_canonical_sha256": "dae9558f7c292552c0be96ba14b5855dd37a1259d4883d97e4f20ab71f038123",
+        "candidate_canonical_sha256": "dae9558f7c292552c0be96ba14b5855dd37a1259d4883d97e4f20ab71f038123"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_BINARY_RESTART",
+        "threads": 4,
+        "status": "unchanged",
+        "solver_calls": 3,
+        "baseline_canonical_sha256": "dae9558f7c292552c0be96ba14b5855dd37a1259d4883d97e4f20ab71f038123",
+        "candidate_canonical_sha256": "dae9558f7c292552c0be96ba14b5855dd37a1259d4883d97e4f20ab71f038123"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_PCCU_GATE_H",
+        "threads": 1,
+        "status": "unchanged",
+        "solver_calls": 6,
+        "baseline_canonical_sha256": "7e66a0f6c519b74f0de24482645bce4b0a7b1016c6b63d81109870762fac4d0d",
+        "candidate_canonical_sha256": "7e66a0f6c519b74f0de24482645bce4b0a7b1016c6b63d81109870762fac4d0d"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_PCCU_GATE_H",
+        "threads": 4,
+        "status": "unchanged",
+        "solver_calls": 6,
+        "baseline_canonical_sha256": "7e66a0f6c519b74f0de24482645bce4b0a7b1016c6b63d81109870762fac4d0d",
+        "candidate_canonical_sha256": "7e66a0f6c519b74f0de24482645bce4b0a7b1016c6b63d81109870762fac4d0d"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_PCCU_INCLINED_EXCAVATION",
+        "threads": null,
+        "status": "unchanged",
+        "solver_calls": 6,
+        "baseline_canonical_sha256": "cc158fe9609283a953023121be4cf682ae34a13760bc6c116a5d6bcec218d362",
+        "candidate_canonical_sha256": "cc158fe9609283a953023121be4cf682ae34a13760bc6c116a5d6bcec218d362"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_PCCU_LAKE_AT_REST",
+        "threads": null,
+        "status": "unchanged",
+        "solver_calls": 16,
+        "baseline_canonical_sha256": "6db9af1ca4386522545757d352349d43aa3096b7987926a39a0af1e3ba405b5c",
+        "candidate_canonical_sha256": "6db9af1ca4386522545757d352349d43aa3096b7987926a39a0af1e3ba405b5c"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_STOCHASTIC_RESTART",
+        "threads": 1,
+        "status": "unchanged",
+        "solver_calls": 3,
+        "baseline_canonical_sha256": "685783e033a4137910e4c2d14a3b6a59e1e4a53d8bf4bac6a49ebd2f30f8cfa8",
+        "candidate_canonical_sha256": "685783e033a4137910e4c2d14a3b6a59e1e4a53d8bf4bac6a49ebd2f30f8cfa8"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_STOCHASTIC_RESTART",
+        "threads": 4,
+        "status": "unchanged",
+        "solver_calls": 3,
+        "baseline_canonical_sha256": "685783e033a4137910e4c2d14a3b6a59e1e4a53d8bf4bac6a49ebd2f30f8cfa8",
+        "candidate_canonical_sha256": "685783e033a4137910e4c2d14a3b6a59e1e4a53d8bf4bac6a49ebd2f30f8cfa8"
+      }
+    ]
+  },
+  "optimized_field_characterization": {
+    "policy": "Descriptive full-field norms, not newly fitted acceptance limits.",
+    "raw_directory": "/tmp/imex-n7-a-field-replay",
+    "records": [
+      {
+        "test": "TEST_BINARY_RESTART",
+        "actual_threads": 1,
+        "compared_snapshots": 27,
+        "maximum_old_new_Linf": 0.009179797258333991,
+        "maximum_old_optimized_to_strict_Linf": 0.009415812139057142,
+        "maximum_new_optimized_to_strict_Linf": 0.006952217538648824,
+        "snapshots": [
+          {
+            "snapshot": "call-001/INIT_2D_0000.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_0000.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "fbf02bc41228e0e9d37f4a87fe22f708486a16e5d8d18dbcb6501d3fe9277de4",
+              "fbf02bc41228e0e9d37f4a87fe22f708486a16e5d8d18dbcb6501d3fe9277de4",
+              "fbf02bc41228e0e9d37f4a87fe22f708486a16e5d8d18dbcb6501d3fe9277de4"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_0001.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "e8ae0b545da274924a64da05786fa7b7b422baa4f2702389b2826ca485c264bc",
+              "a91a53cb69c6724b4dec825f1125c342d061a753200fef678fd05142659797e7",
+              "ed68656e6c30e05335b42f907518d05367f4487b66843448d5ce05bb965f669b"
+            ],
+            "old_new_component_Linf": [
+              0.004126841941083895,
+              0.005812093343812007,
+              0.002985530783510099,
+              0.004123848692479699,
+              0.004119009206249437
+            ],
+            "old_new_component_mean_L1": [
+              0.00013646244094462,
+              0.0001348720804148726,
+              0.00011321474810737672,
+              0.0001337170713475419,
+              0.00012975218429879393
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0035103458265605997,
+              0.0033782603024185296,
+              0.002483688906687733,
+              0.0035109136332492122,
+              0.003511967162791593
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.004002943516918102,
+              0.0034056810737053108,
+              0.0023824027517269928,
+              0.004007470666201059,
+              0.004014794671237445
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_0002.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "8a6996e079173f4a96ef1a16c80372efb58b4b2a4d5ef5c6e92ddf9a6150db3a",
+              "03c048bb9eabe927df2c3b9fdd42a0ff771d04c23d8a63de36e3ce934b6ad202",
+              "2fa8ad6f42b5797871cf3a56c0e1138bb48a31831f1bc1762fbee500abb70e34"
+            ],
+            "old_new_component_Linf": [
+              0.009179797258333991,
+              0.004031425178004259,
+              0.006407556358640726,
+              0.0058470109407639794,
+              0.0034852046511229156
+            ],
+            "old_new_component_mean_L1": [
+              0.00035805221141892103,
+              0.00027458274471715106,
+              0.00033080260082077925,
+              0.0003124614315405801,
+              0.00023352024160843153
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.009415812139057142,
+              0.004186350761226471,
+              0.00647337683735662,
+              0.005997361876482266,
+              0.00366199514674025
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.006952217538648824,
+              0.0030419884591502684,
+              0.005701967253497214,
+              0.0044281772418627435,
+              0.002498672868931459
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_B_0000.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "9250729dd53cc84763ff61b5fe4e66dcdc0c9463caaef69257b37fe83e42b58b",
+              "9250729dd53cc84763ff61b5fe4e66dcdc0c9463caaef69257b37fe83e42b58b",
+              "dab71e865ddf6f4946632dda43ca0c36cccf59ba44ccc1524f5391362ae5d363"
+            ],
+            "old_new_component_Linf": [
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              8.940753537854407e-13
+            ],
+            "new_optimized_to_strict_Linf": [
+              8.940753537854407e-13
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_B_0001.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "a6c17fbc9dcea3f598b85719c1668f1c47f818ee5aaf8a2187a634a5a3dc295d",
+              "4f6233f9ca41f3848ea354c97afb8a780111f16a15fb168fedd59c64d8f9cfac",
+              "a28018da7fdc741a7d55666f438d308b883aa24922019b13cccc7fbd2780fdc0"
+            ],
+            "old_new_component_Linf": [
+              0.000026638694904423336
+            ],
+            "old_new_component_mean_L1": [
+              2.856610932738681e-7
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.00003658729495582478
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.000034793649409625925
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_B_0002.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "1921abb1ae76406093f21eacdb4ae65c2a615f5da930aa8aea2aa1e76c217eef",
+              "88f3542dc959e564891d5fdf5a24fd0364c60119d686c495eb3cb71ca8fbba07",
+              "b7a89d430f051980386e20b8681f7fba3c7d279a2b0a1288839e2b2ae58fc3db"
+            ],
+            "old_new_component_Linf": [
+              0.000026638724408989423
+            ],
+            "old_new_component_mean_L1": [
+              3.4626523142479227e-7
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.00003755825802752636
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.00003502167168665035
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_deposit_0000.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f",
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f",
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f"
+            ],
+            "old_new_component_Linf": [
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_deposit_0001.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "8f6a87284f6918628f19cd21b004e07173f6ea326a1203430f97db30e7632e89",
+              "99ffba9370097e0eb28cf4378161e9adb9c91ded9c96a46bb4a792b89f4c4f7a",
+              "980c31d7dd3fe6651579daf31798fc6aef2109b2b31df7cad727a66444a2b070"
+            ],
+            "old_new_component_Linf": [
+              0.0008546426098599998
+            ],
+            "old_new_component_mean_L1": [
+              0.000005202874038171674
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0008011744871000001
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.00063879760124
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_deposit_0002.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "6c7d681fe261bc4e179087830db8cc3357765a8fd4d74144c28946cf2d7e37bb",
+              "de24171f7b2e17228b04bba419de49e475e993170e142365b58ef954480a49b4",
+              "02af5cad2f081f03263759ccdadd40d4e8964864ddfef5bc92adb9c822ea6b3d"
+            ],
+            "old_new_component_Linf": [
+              0.0008546426098599998
+            ],
+            "old_new_component_mean_L1": [
+              0.0000059002529210337965
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0008011744871000001
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.0006449125143300006
+            ]
+          },
+          {
+            "snapshot": "call-002/INIT_2D_0000.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-002/TEST_2D_0000.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "fbf02bc41228e0e9d37f4a87fe22f708486a16e5d8d18dbcb6501d3fe9277de4",
+              "fbf02bc41228e0e9d37f4a87fe22f708486a16e5d8d18dbcb6501d3fe9277de4",
+              "fbf02bc41228e0e9d37f4a87fe22f708486a16e5d8d18dbcb6501d3fe9277de4"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-002/TEST_2D_0001.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "e8ae0b545da274924a64da05786fa7b7b422baa4f2702389b2826ca485c264bc",
+              "a91a53cb69c6724b4dec825f1125c342d061a753200fef678fd05142659797e7",
+              "ed68656e6c30e05335b42f907518d05367f4487b66843448d5ce05bb965f669b"
+            ],
+            "old_new_component_Linf": [
+              0.004126841941083895,
+              0.005812093343812007,
+              0.002985530783510099,
+              0.004123848692479699,
+              0.004119009206249437
+            ],
+            "old_new_component_mean_L1": [
+              0.00013646244094462,
+              0.0001348720804148726,
+              0.00011321474810737672,
+              0.0001337170713475419,
+              0.00012975218429879393
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0035103458265605997,
+              0.0033782603024185296,
+              0.002483688906687733,
+              0.0035109136332492122,
+              0.003511967162791593
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.004002943516918102,
+              0.0034056810737053108,
+              0.0023824027517269928,
+              0.004007470666201059,
+              0.004014794671237445
+            ]
+          },
+          {
+            "snapshot": "call-002/TEST_2D_B_0000.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "9250729dd53cc84763ff61b5fe4e66dcdc0c9463caaef69257b37fe83e42b58b",
+              "9250729dd53cc84763ff61b5fe4e66dcdc0c9463caaef69257b37fe83e42b58b",
+              "dab71e865ddf6f4946632dda43ca0c36cccf59ba44ccc1524f5391362ae5d363"
+            ],
+            "old_new_component_Linf": [
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              8.940753537854407e-13
+            ],
+            "new_optimized_to_strict_Linf": [
+              8.940753537854407e-13
+            ]
+          },
+          {
+            "snapshot": "call-002/TEST_2D_B_0001.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "a6c17fbc9dcea3f598b85719c1668f1c47f818ee5aaf8a2187a634a5a3dc295d",
+              "4f6233f9ca41f3848ea354c97afb8a780111f16a15fb168fedd59c64d8f9cfac",
+              "a28018da7fdc741a7d55666f438d308b883aa24922019b13cccc7fbd2780fdc0"
+            ],
+            "old_new_component_Linf": [
+              0.000026638694904423336
+            ],
+            "old_new_component_mean_L1": [
+              2.856610932738681e-7
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.00003658729495582478
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.000034793649409625925
+            ]
+          },
+          {
+            "snapshot": "call-002/TEST_2D_deposit_0000.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f",
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f",
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f"
+            ],
+            "old_new_component_Linf": [
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0
+            ]
+          },
+          {
+            "snapshot": "call-002/TEST_2D_deposit_0001.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "8f6a87284f6918628f19cd21b004e07173f6ea326a1203430f97db30e7632e89",
+              "99ffba9370097e0eb28cf4378161e9adb9c91ded9c96a46bb4a792b89f4c4f7a",
+              "980c31d7dd3fe6651579daf31798fc6aef2109b2b31df7cad727a66444a2b070"
+            ],
+            "old_new_component_Linf": [
+              0.0008546426098599998
+            ],
+            "old_new_component_mean_L1": [
+              0.000005202874038171674
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0008011744871000001
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.00063879760124
+            ]
+          },
+          {
+            "snapshot": "call-003/INIT_2D_0000.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_0000.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "fbf02bc41228e0e9d37f4a87fe22f708486a16e5d8d18dbcb6501d3fe9277de4",
+              "fbf02bc41228e0e9d37f4a87fe22f708486a16e5d8d18dbcb6501d3fe9277de4",
+              "fbf02bc41228e0e9d37f4a87fe22f708486a16e5d8d18dbcb6501d3fe9277de4"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_0001.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "e8ae0b545da274924a64da05786fa7b7b422baa4f2702389b2826ca485c264bc",
+              "a91a53cb69c6724b4dec825f1125c342d061a753200fef678fd05142659797e7",
+              "ed68656e6c30e05335b42f907518d05367f4487b66843448d5ce05bb965f669b"
+            ],
+            "old_new_component_Linf": [
+              0.004126841941083895,
+              0.005812093343812007,
+              0.002985530783510099,
+              0.004123848692479699,
+              0.004119009206249437
+            ],
+            "old_new_component_mean_L1": [
+              0.00013646244094462,
+              0.0001348720804148726,
+              0.00011321474810737672,
+              0.0001337170713475419,
+              0.00012975218429879393
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0035103458265605997,
+              0.0033782603024185296,
+              0.002483688906687733,
+              0.0035109136332492122,
+              0.003511967162791593
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.004002943516918102,
+              0.0034056810737053108,
+              0.0023824027517269928,
+              0.004007470666201059,
+              0.004014794671237445
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_0002.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "8a6996e079173f4a96ef1a16c80372efb58b4b2a4d5ef5c6e92ddf9a6150db3a",
+              "03c048bb9eabe927df2c3b9fdd42a0ff771d04c23d8a63de36e3ce934b6ad202",
+              "2fa8ad6f42b5797871cf3a56c0e1138bb48a31831f1bc1762fbee500abb70e34"
+            ],
+            "old_new_component_Linf": [
+              0.009179797258333991,
+              0.004031425178004259,
+              0.006407556358640726,
+              0.0058470109407639794,
+              0.0034852046511229156
+            ],
+            "old_new_component_mean_L1": [
+              0.00035805221141892103,
+              0.00027458274471715106,
+              0.00033080260082077925,
+              0.0003124614315405801,
+              0.00023352024160843153
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.009415812139057142,
+              0.004186350761226471,
+              0.00647337683735662,
+              0.005997361876482266,
+              0.00366199514674025
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.006952217538648824,
+              0.0030419884591502684,
+              0.005701967253497214,
+              0.0044281772418627435,
+              0.002498672868931459
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_B_0000.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "9250729dd53cc84763ff61b5fe4e66dcdc0c9463caaef69257b37fe83e42b58b",
+              "9250729dd53cc84763ff61b5fe4e66dcdc0c9463caaef69257b37fe83e42b58b",
+              "dab71e865ddf6f4946632dda43ca0c36cccf59ba44ccc1524f5391362ae5d363"
+            ],
+            "old_new_component_Linf": [
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              8.940753537854407e-13
+            ],
+            "new_optimized_to_strict_Linf": [
+              8.940753537854407e-13
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_B_0001.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "a6c17fbc9dcea3f598b85719c1668f1c47f818ee5aaf8a2187a634a5a3dc295d",
+              "4f6233f9ca41f3848ea354c97afb8a780111f16a15fb168fedd59c64d8f9cfac",
+              "a28018da7fdc741a7d55666f438d308b883aa24922019b13cccc7fbd2780fdc0"
+            ],
+            "old_new_component_Linf": [
+              0.000026638694904423336
+            ],
+            "old_new_component_mean_L1": [
+              2.856610932738681e-7
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.00003658729495582478
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.000034793649409625925
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_B_0002.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "1921abb1ae76406093f21eacdb4ae65c2a615f5da930aa8aea2aa1e76c217eef",
+              "88f3542dc959e564891d5fdf5a24fd0364c60119d686c495eb3cb71ca8fbba07",
+              "b7a89d430f051980386e20b8681f7fba3c7d279a2b0a1288839e2b2ae58fc3db"
+            ],
+            "old_new_component_Linf": [
+              0.000026638724408989423
+            ],
+            "old_new_component_mean_L1": [
+              3.4626523142479227e-7
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.00003755825802752636
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.00003502167168665035
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_deposit_0000.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f",
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f",
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f"
+            ],
+            "old_new_component_Linf": [
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_deposit_0001.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "8f6a87284f6918628f19cd21b004e07173f6ea326a1203430f97db30e7632e89",
+              "99ffba9370097e0eb28cf4378161e9adb9c91ded9c96a46bb4a792b89f4c4f7a",
+              "980c31d7dd3fe6651579daf31798fc6aef2109b2b31df7cad727a66444a2b070"
+            ],
+            "old_new_component_Linf": [
+              0.0008546426098599998
+            ],
+            "old_new_component_mean_L1": [
+              0.000005202874038171674
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0008011744871000001
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.00063879760124
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_deposit_0002.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "6c7d681fe261bc4e179087830db8cc3357765a8fd4d74144c28946cf2d7e37bb",
+              "de24171f7b2e17228b04bba419de49e475e993170e142365b58ef954480a49b4",
+              "02af5cad2f081f03263759ccdadd40d4e8964864ddfef5bc92adb9c822ea6b3d"
+            ],
+            "old_new_component_Linf": [
+              0.0008546426098599998
+            ],
+            "old_new_component_mean_L1": [
+              0.0000059002529210337965
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0008011744871000001
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.0006449125143300006
+            ]
+          }
+        ]
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "actual_threads": 1,
+        "compared_snapshots": 12,
+        "maximum_old_new_Linf": 0.01581865299537335,
+        "maximum_old_optimized_to_strict_Linf": 0.015819059999984182,
+        "maximum_new_optimized_to_strict_Linf": 0.0015761793808400822,
+        "snapshots": [
+          {
+            "snapshot": "call-001/gateH_0000.q_2d",
+            "shape": [
+              546,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 5.55111512313e-17,
+            "sha256": [
+              "639a0e9392daf71085a1bdd3566fab053e80c2258196efa80633477398cfcdc0",
+              "639a0e9392daf71085a1bdd3566fab053e80c2258196efa80633477398cfcdc0",
+              "080eabe68553c12f65a0177e9c6a69bf14fbfe05dc56575fdc421078c5af850f"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-001/gateH_0001.q_2d",
+            "shape": [
+              546,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 5.55111512313e-17,
+            "sha256": [
+              "998cbf96b08689dc8613174a6c399980c84f996e4d7eb265c0c1cbb0bc6571f1",
+              "be6eafcd3cfa7990e6266c45746aed4843be182781913aa544743e8986a64ec5",
+              "83a87367ac325d78e7962cb19db3c2033187d09804958ee8b66e46b80a97b774"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              1.050861700926478e-13,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              9.213520513019744e-16,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              4.995800137248246e-16,
+              2.8801105952848593e-15,
+              1.0508558675050623e-12,
+              4.559758383885545e-16
+            ],
+            "new_optimized_to_strict_Linf": [
+              4.995800137248246e-16,
+              2.8801105952848593e-15,
+              1.0508558675050623e-12,
+              4.559758383885545e-16
+            ]
+          },
+          {
+            "snapshot": "call-002/gateH_0000.q_2d",
+            "shape": [
+              2184,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "865e68d9bec1dafca0431a39d042128dced4839b3b245b71d0778244ed7f8a85",
+              "865e68d9bec1dafca0431a39d042128dced4839b3b245b71d0778244ed7f8a85",
+              "865e68d9bec1dafca0431a39d042128dced4839b3b245b71d0778244ed7f8a85"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-002/gateH_0001.q_2d",
+            "shape": [
+              2184,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "3ebc4db4a3bf4bb795a8e73e5beba1bd968be8554204a370bf72aaad87445219",
+              "71e719439551a4ff4e4a43a3f54f02f4f5bbc7e8037e3e3e646d16b096a59525",
+              "8a50ee5b1e087e34658c761c0d2ab6d30bee8de8528d261b8b932318d0b49622"
+            ],
+            "old_new_component_Linf": [
+              2.286576959307207e-11,
+              6.506669859232689e-10,
+              7.822287829719567e-9,
+              2.3670656744311993e-11
+            ],
+            "old_new_component_mean_L1": [
+              1.2157372555826763e-13,
+              3.4724182968979666e-12,
+              5.414594051119685e-11,
+              1.5708975225301837e-13
+            ],
+            "old_optimized_to_strict_Linf": [
+              2.3859923660298908e-11,
+              6.506669859232689e-10,
+              7.974645016830708e-9,
+              2.3670656744311993e-11
+            ],
+            "new_optimized_to_strict_Linf": [
+              9.941540672268396e-12,
+              1.4953928262114835e-10,
+              2.7472310822640447e-9,
+              7.890187561952307e-12
+            ]
+          },
+          {
+            "snapshot": "call-003/gateH_0000.q_2d",
+            "shape": [
+              8736,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "f56f2184eab4e6e87656beb883ab81c2f887b838be355c2707c315f02fecbc03",
+              "f56f2184eab4e6e87656beb883ab81c2f887b838be355c2707c315f02fecbc03",
+              "f56f2184eab4e6e87656beb883ab81c2f887b838be355c2707c315f02fecbc03"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-003/gateH_0001.q_2d",
+            "shape": [
+              8736,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "91960a078fd941fa5566c84b2cc8b9ab5be204c8265dfeee6d04ea93b2218b10",
+              "63b9a604268657e3f2877317a5babef1a8374bde1d35a46cd7e5b127902497d8",
+              "e4853f0a4b4006d666989fdfb4f67654c25b92905d609f35fa4f0bd5ae894125"
+            ],
+            "old_new_component_Linf": [
+              0.0000071478750365443875,
+              0.000809276950820915,
+              0.0005817994286878149,
+              0.00000714787713323871
+            ],
+            "old_new_component_mean_L1": [
+              7.496341197816039e-9,
+              4.467156078874131e-7,
+              3.7892388392430116e-7,
+              7.496344265600747e-9
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.000007147835897556562,
+              0.0008092763770163323,
+              0.000581795206382157,
+              0.000007147838304835247
+            ],
+            "new_optimized_to_strict_Linf": [
+              1.3844956044745705e-10,
+              1.3274583218279116e-9,
+              8.209451026182681e-9,
+              1.384622193607923e-10
+            ]
+          },
+          {
+            "snapshot": "call-004/gateH_0000.q_2d",
+            "shape": [
+              546,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 5.55111512313e-17,
+            "sha256": [
+              "639a0e9392daf71085a1bdd3566fab053e80c2258196efa80633477398cfcdc0",
+              "639a0e9392daf71085a1bdd3566fab053e80c2258196efa80633477398cfcdc0",
+              "080eabe68553c12f65a0177e9c6a69bf14fbfe05dc56575fdc421078c5af850f"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-004/gateH_0001.q_2d",
+            "shape": [
+              546,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 5.55111512313e-17,
+            "sha256": [
+              "de013661a6841caa9aef030d38b9695dc7df2e2cc521f6faaf647eb575868128",
+              "2c2b717984bfbd2fd8f6d6c4486660b761e1cbc5181202e6b2b29b8ec08ccf06",
+              "51666111dfa468abb26e77029ce91640452cefaaeb18086259c54eb26e767c49"
+            ],
+            "old_new_component_Linf": [
+              0.00005415276300963846,
+              0.007437054479438426,
+              0.01581865299537335,
+              0.00005415276466784939
+            ],
+            "old_new_component_mean_L1": [
+              0.0000018693161394682204,
+              0.0002198203623655919,
+              0.0004241921122095155,
+              0.00000186931611803413
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.00005415276247274654,
+              0.007437054479416242,
+              0.015819059999984182,
+              0.00005415276413099595
+            ],
+            "new_optimized_to_strict_Linf": [
+              9.94911272028488e-13,
+              1.8492728098147914e-11,
+              3.1352570828851877e-10,
+              3.948192720946001e-12
+            ]
+          },
+          {
+            "snapshot": "call-005/gateH_0000.q_2d",
+            "shape": [
+              2184,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "865e68d9bec1dafca0431a39d042128dced4839b3b245b71d0778244ed7f8a85",
+              "865e68d9bec1dafca0431a39d042128dced4839b3b245b71d0778244ed7f8a85",
+              "865e68d9bec1dafca0431a39d042128dced4839b3b245b71d0778244ed7f8a85"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-005/gateH_0001.q_2d",
+            "shape": [
+              2184,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "08e8c16960931d3662ad4eb15aa16fb279d7b764bfaf7f94bf65446bd78af03d",
+              "e16a059a2725d3c24ee3c08b1d12c5453611038df4a29f083009d832d02304dd",
+              "9f4190186e42bd997c8b309fd1937b2e6f17c84e5ca6d294d45b3a4a43a593bb"
+            ],
+            "old_new_component_Linf": [
+              0.00008383559096133367,
+              0.0054045846855979825,
+              0.005852362183849852,
+              0.0000838355920590039
+            ],
+            "old_new_component_mean_L1": [
+              9.127917942552863e-7,
+              0.00005051547300576227,
+              0.000060609886260180216,
+              9.127917891124458e-7
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0000838355914740153,
+              0.0054045846855979825,
+              0.005836471795883321,
+              0.0000838355925713963
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.00002571666630037144,
+              0.00038291097664249125,
+              0.0015761793808400822,
+              0.000025716665743637334
+            ]
+          },
+          {
+            "snapshot": "call-006/gateH_0000.q_2d",
+            "shape": [
+              8736,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "f56f2184eab4e6e87656beb883ab81c2f887b838be355c2707c315f02fecbc03",
+              "f56f2184eab4e6e87656beb883ab81c2f887b838be355c2707c315f02fecbc03",
+              "f56f2184eab4e6e87656beb883ab81c2f887b838be355c2707c315f02fecbc03"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-006/gateH_0001.q_2d",
+            "shape": [
+              8736,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "8ce1cb3621555542616e6842c9e590a9662cce3d0630e41e76016a4af4d18af4",
+              "7aa2a0509ea9baaef9267c9f84222c438adf18d01f90a4fec332c015131eafe2",
+              "8b69fc41a3fb02a6266a2e576e699d80419919ba295bb367d1e3dd1fd6ae3348"
+            ],
+            "old_new_component_Linf": [
+              0.00006252903123699508,
+              0.002003099675279247,
+              0.002262258414323138,
+              0.00006252903504235277
+            ],
+            "old_new_component_mean_L1": [
+              2.77202965226487e-7,
+              0.000008104474942702782,
+              0.000004943268594162719,
+              2.772029555779026e-7
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0000625290312568806,
+              0.002003099675279247,
+              0.0022630674696754415,
+              0.00006252903506250535
+            ],
+            "new_optimized_to_strict_Linf": [
+              9.785246573309271e-12,
+              2.246050385690088e-10,
+              1.6635364429267982e-9,
+              1.1649082713041344e-11
+            ]
+          }
+        ]
+      },
+      {
+        "test": "TEST_PCCU_INCLINED_EXCAVATION",
+        "actual_threads": 1,
+        "compared_snapshots": 18,
+        "maximum_old_new_Linf": 2.9613827013687925e-12,
+        "maximum_old_optimized_to_strict_Linf": 2.9613827013687925e-12,
+        "maximum_new_optimized_to_strict_Linf": 2.8939649888212383e-23,
+        "snapshots": [
+          {
+            "snapshot": "call-001/inclinedExcavation2D_0000.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4",
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4",
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-001/inclinedExcavation2D_0001.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "89b734f38e6e6d5aa678547439703bbb1a295d6b62a3631bf4012482119e3ff0",
+              "d853c7c2daef697643be2244bdc99bd45fb0deb150ddd63468985550e5114a77",
+              "853a3b3b272d2d1bb5176d6b09ff72418d531efadd0569cee28084a0a7b44330"
+            ],
+            "old_new_component_Linf": [
+              4.9999966096533454e-24,
+              1.7363930196509938e-23,
+              1.0000391236230722e-30,
+              3.9681799508875306e-24
+            ],
+            "old_new_component_mean_L1": [
+              3.33333107310223e-26,
+              1.8328339731514296e-25,
+              3.333463745410241e-33,
+              4.100449747657399e-26
+            ],
+            "old_optimized_to_strict_Linf": [
+              1.9999986438613382e-23,
+              4.0515369579914834e-23,
+              0,
+              1.9841243945603485e-23
+            ],
+            "new_optimized_to_strict_Linf": [
+              1.9999986438613382e-23,
+              2.8939649888212383e-23,
+              1.0000391236230722e-30,
+              1.5873063994715955e-23
+            ]
+          },
+          {
+            "snapshot": "call-001/inclined_excavation_2D_0000.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d",
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d",
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-002/inclinedExcavation2D_0000.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4",
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4",
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-002/inclinedExcavation2D_0001.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "89b734f38e6e6d5aa678547439703bbb1a295d6b62a3631bf4012482119e3ff0",
+              "d853c7c2daef697643be2244bdc99bd45fb0deb150ddd63468985550e5114a77",
+              "853a3b3b272d2d1bb5176d6b09ff72418d531efadd0569cee28084a0a7b44330"
+            ],
+            "old_new_component_Linf": [
+              4.9999966096533454e-24,
+              1.7363930196509938e-23,
+              1.0000391236230722e-30,
+              3.9681799508875306e-24
+            ],
+            "old_new_component_mean_L1": [
+              3.33333107310223e-26,
+              1.8328339731514296e-25,
+              3.333463745410241e-33,
+              4.100449747657399e-26
+            ],
+            "old_optimized_to_strict_Linf": [
+              1.9999986438613382e-23,
+              4.0515369579914834e-23,
+              0,
+              1.9841243945603485e-23
+            ],
+            "new_optimized_to_strict_Linf": [
+              1.9999986438613382e-23,
+              2.8939649888212383e-23,
+              1.0000391236230722e-30,
+              1.5873063994715955e-23
+            ]
+          },
+          {
+            "snapshot": "call-002/inclined_excavation_2D_0000.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d",
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d",
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-003/inclinedExcavation2D_0000.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4",
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4",
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-003/inclinedExcavation2D_0001.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "01f54525138b294bb6a0275b06ac8bc9f424c630e8482c74b2d2165c190a2b53",
+              "55b7ebf2d409c91c5ee0ed01780860a06c1699803a2e893e92b66d824e2e57f6",
+              "55b7ebf2d409c91c5ee0ed01780860a06c1699803a2e893e92b66d824e2e57f6"
+            ],
+            "old_new_component_Linf": [
+              4.724433949791622e-13,
+              2.9613827013687925e-12,
+              9.622909999646123e-13,
+              4.724433949766933e-13
+            ],
+            "old_new_component_mean_L1": [
+              4.696109264050608e-15,
+              9.872950612366604e-15,
+              4.714529946127037e-15,
+              4.6961092640301135e-15
+            ],
+            "old_optimized_to_strict_Linf": [
+              4.724433949791622e-13,
+              2.9613827013687925e-12,
+              9.622909999646123e-13,
+              4.724433949766933e-13
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-003/inclined_excavation_2D_0000.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d",
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d",
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-004/inclinedExcavation2D_0000.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4",
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4",
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-004/inclinedExcavation2D_0001.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "01f54525138b294bb6a0275b06ac8bc9f424c630e8482c74b2d2165c190a2b53",
+              "55b7ebf2d409c91c5ee0ed01780860a06c1699803a2e893e92b66d824e2e57f6",
+              "55b7ebf2d409c91c5ee0ed01780860a06c1699803a2e893e92b66d824e2e57f6"
+            ],
+            "old_new_component_Linf": [
+              4.724433949791622e-13,
+              2.9613827013687925e-12,
+              9.622909999646123e-13,
+              4.724433949766933e-13
+            ],
+            "old_new_component_mean_L1": [
+              4.696109264050608e-15,
+              9.872950612366604e-15,
+              4.714529946127037e-15,
+              4.6961092640301135e-15
+            ],
+            "old_optimized_to_strict_Linf": [
+              4.724433949791622e-13,
+              2.9613827013687925e-12,
+              9.622909999646123e-13,
+              4.724433949766933e-13
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-004/inclined_excavation_2D_0000.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d",
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d",
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-005/inclinedExcavation2D_0000.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4",
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4",
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-005/inclinedExcavation2D_0001.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "6591a66a0c42162f721602ef7dccdd850c6334d69a1efa97f8b7defc9c9cc971",
+              "4e59cf00dc41e450cc3a469cfb646d80090ee0737d4187b75a92a84faaa5c057",
+              "4e59cf00dc41e450cc3a469cfb646d80090ee0737d4187b75a92a84faaa5c057"
+            ],
+            "old_new_component_Linf": [
+              4.724433914916623e-13,
+              5.011755826130373e-16,
+              9.582849999922204e-13,
+              4.724433914885982e-13
+            ],
+            "old_new_component_mean_L1": [
+              4.696109668732956e-15,
+              1.6749239109333776e-18,
+              4.699850154774917e-15,
+              4.696109668709551e-15
+            ],
+            "old_optimized_to_strict_Linf": [
+              4.724433914916623e-13,
+              5.011755826130373e-16,
+              9.582849999922204e-13,
+              4.724433914885982e-13
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-005/inclined_excavation_2D_0000.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d",
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d",
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-006/inclinedExcavation2D_0000.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4",
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4",
+              "aff07c86a16785e7d4591222fb6d8a101decb0b6a917f9a75e68d558553625d4"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-006/inclinedExcavation2D_0001.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "6591a66a0c42162f721602ef7dccdd850c6334d69a1efa97f8b7defc9c9cc971",
+              "4e59cf00dc41e450cc3a469cfb646d80090ee0737d4187b75a92a84faaa5c057",
+              "4e59cf00dc41e450cc3a469cfb646d80090ee0737d4187b75a92a84faaa5c057"
+            ],
+            "old_new_component_Linf": [
+              4.724433914916623e-13,
+              5.011755826130373e-16,
+              9.582849999922204e-13,
+              4.724433914885982e-13
+            ],
+            "old_new_component_mean_L1": [
+              4.696109668732956e-15,
+              1.6749239109333776e-18,
+              4.699850154774917e-15,
+              4.696109668709551e-15
+            ],
+            "old_optimized_to_strict_Linf": [
+              4.724433914916623e-13,
+              5.011755826130373e-16,
+              9.582849999922204e-13,
+              4.724433914885982e-13
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-006/inclined_excavation_2D_0000.q_2d",
+            "shape": [
+              600,
+              6
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d",
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d",
+              "a88bb467f9554a0a6e5790b256445a5303612b77e115d0663a97d9601182fb3d"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "actual_threads": 1,
+        "compared_snapshots": 22,
+        "maximum_old_new_Linf": 0.011714156439859841,
+        "maximum_old_optimized_to_strict_Linf": 1.3225706894421998,
+        "maximum_new_optimized_to_strict_Linf": 1.3232491246210751,
+        "snapshots": [
+          {
+            "snapshot": "call-001/INIT_2D_0000.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-001/INIT_STOCHASTIC_0000.q_2d",
+            "shape": [
+              6800,
+              8
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "e21683fff9a56f2d8027328bf8393bf1282e9c322c3cec5ed562480682485a08",
+              "e21683fff9a56f2d8027328bf8393bf1282e9c322c3cec5ed562480682485a08",
+              "e21683fff9a56f2d8027328bf8393bf1282e9c322c3cec5ed562480682485a08"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_0000.q_2d",
+            "shape": [
+              6800,
+              8
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "51030a2f38a827b351488838ef7cb39318db821e2c0f4cae4927a5d7000517d6",
+              "51030a2f38a827b351488838ef7cb39318db821e2c0f4cae4927a5d7000517d6",
+              "51030a2f38a827b351488838ef7cb39318db821e2c0f4cae4927a5d7000517d6"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_0001.q_2d",
+            "shape": [
+              6800,
+              8
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "7cbe7ed355570db68287eb64bd12cbca9bdedcd158e3349181b9971466ae6033",
+              "610b24ab9a46ca67737fba069f62066ad35a0f97f2ac520fc9dbcf9523e02afa",
+              "b58f4f8a346a605c555f6a352905a5c3fde2be87298095aa7e16c4acc36bdac7"
+            ],
+            "old_new_component_Linf": [
+              0.0032627737773013848,
+              0.0027804167116207324,
+              0.002253124394558112,
+              0.0032654541688555425,
+              0.0032694047689299866,
+              0.003115371452032908
+            ],
+            "old_new_component_mean_L1": [
+              0.00004138626333671253,
+              0.000050122853177854515,
+              0.00005509469483509185,
+              0.00004114604704612646,
+              0.00004075880360904969,
+              0.0000950644661743875
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0044400522222002746,
+              0.0061245144649380535,
+              0.010891567154586682,
+              0.004442903668036149,
+              0.004445864193476791,
+              1.3225706894421998
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.005082636801424199,
+              0.00602052664141966,
+              0.010352188544587408,
+              0.005086198426083588,
+              0.005089796345725376,
+              1.3232491246210751
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_0002.q_2d",
+            "shape": [
+              6800,
+              8
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "339b7519421c9b38bf4a25ff2d711bc66666622fe7db32ee19720e494a70c67b",
+              "0183f6b056b83e89b9f168567c55f69b65b0f53c7a77c9129152ed25ad03ea11",
+              "564d7a4434ec1dd14e3c53794474d3976f6b7628e9ed493cc8a38f1bfcf096d6"
+            ],
+            "old_new_component_Linf": [
+              0.001680574243780281,
+              0.0012589694073337082,
+              0.003246518223924885,
+              0.0016822897355059253,
+              0.0016849356634697885,
+              0.011714156439859841
+            ],
+            "old_new_component_mean_L1": [
+              0.0000407498176701615,
+              0.000038766559846036346,
+              0.00012517633627666432,
+              0.000039510909228498995,
+              0.00003792722892592922,
+              0.000400109187432427
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.00607738456700814,
+              0.005905297027402536,
+              0.03404222030371177,
+              0.006082976021896706,
+              0.00609205840933871,
+              1.2742814869491101
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.006081159672286305,
+              0.005791551759016231,
+              0.031072508672771573,
+              0.00608604986811612,
+              0.006093895311717297,
+              1.2759290709578017
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_deposit_0000.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f",
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f",
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f"
+            ],
+            "old_new_component_Linf": [
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_deposit_0001.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "570d4682a140cc1c0ec215ac12e1d5e0a61708cc38769767931b39967078d454",
+              "8793bbb97211d34a0f702229b5e478621a9e77ad07f736b4b77b6ee59383ca6d",
+              "ef2ee9b12a68a9089dfe9dd6fc4f39b3b1215c35df407e783626a5e146f63a9b"
+            ],
+            "old_new_component_Linf": [
+              0.001643618101710001
+            ],
+            "old_new_component_mean_L1": [
+              0.000003954099824170254
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.00278216020598
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.0028842441480600002
+            ]
+          },
+          {
+            "snapshot": "call-001/TEST_2D_deposit_0002.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "960657c597291d79c7e5848e0fddfa83640962481bdd56620b7a103ee9dfb94e",
+              "f192cf2852181ee0904c549fd9f264b71fe272fc321a4f8c70727fb1ec8aa023",
+              "ef33ae63e17235fa4be78b7f8906137cf3199aa812522119352d03cd67f733c6"
+            ],
+            "old_new_component_Linf": [
+              0.0016436181017000003
+            ],
+            "old_new_component_mean_L1": [
+              0.000004764664658111827
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0027821602059499998
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.0028842441480600002
+            ]
+          },
+          {
+            "snapshot": "call-002/INIT_2D_0000.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-002/INIT_STOCHASTIC_0000.q_2d",
+            "shape": [
+              6800,
+              8
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "e21683fff9a56f2d8027328bf8393bf1282e9c322c3cec5ed562480682485a08",
+              "e21683fff9a56f2d8027328bf8393bf1282e9c322c3cec5ed562480682485a08",
+              "e21683fff9a56f2d8027328bf8393bf1282e9c322c3cec5ed562480682485a08"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-002/TEST_2D_0000.q_2d",
+            "shape": [
+              6800,
+              8
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "51030a2f38a827b351488838ef7cb39318db821e2c0f4cae4927a5d7000517d6",
+              "51030a2f38a827b351488838ef7cb39318db821e2c0f4cae4927a5d7000517d6",
+              "51030a2f38a827b351488838ef7cb39318db821e2c0f4cae4927a5d7000517d6"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-002/TEST_2D_0001.q_2d",
+            "shape": [
+              6800,
+              8
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "7cbe7ed355570db68287eb64bd12cbca9bdedcd158e3349181b9971466ae6033",
+              "610b24ab9a46ca67737fba069f62066ad35a0f97f2ac520fc9dbcf9523e02afa",
+              "b58f4f8a346a605c555f6a352905a5c3fde2be87298095aa7e16c4acc36bdac7"
+            ],
+            "old_new_component_Linf": [
+              0.0032627737773013848,
+              0.0027804167116207324,
+              0.002253124394558112,
+              0.0032654541688555425,
+              0.0032694047689299866,
+              0.003115371452032908
+            ],
+            "old_new_component_mean_L1": [
+              0.00004138626333671253,
+              0.000050122853177854515,
+              0.00005509469483509185,
+              0.00004114604704612646,
+              0.00004075880360904969,
+              0.0000950644661743875
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0044400522222002746,
+              0.0061245144649380535,
+              0.010891567154586682,
+              0.004442903668036149,
+              0.004445864193476791,
+              1.3225706894421998
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.005082636801424199,
+              0.00602052664141966,
+              0.010352188544587408,
+              0.005086198426083588,
+              0.005089796345725376,
+              1.3232491246210751
+            ]
+          },
+          {
+            "snapshot": "call-002/TEST_2D_deposit_0000.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f",
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f",
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f"
+            ],
+            "old_new_component_Linf": [
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0
+            ]
+          },
+          {
+            "snapshot": "call-002/TEST_2D_deposit_0001.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "570d4682a140cc1c0ec215ac12e1d5e0a61708cc38769767931b39967078d454",
+              "8793bbb97211d34a0f702229b5e478621a9e77ad07f736b4b77b6ee59383ca6d",
+              "ef2ee9b12a68a9089dfe9dd6fc4f39b3b1215c35df407e783626a5e146f63a9b"
+            ],
+            "old_new_component_Linf": [
+              0.001643618101710001
+            ],
+            "old_new_component_mean_L1": [
+              0.000003954099824170254
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.00278216020598
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.0028842441480600002
+            ]
+          },
+          {
+            "snapshot": "call-003/INIT_2D_0000.q_2d",
+            "shape": [
+              6800,
+              7
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+              "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-003/INIT_STOCHASTIC_0000.q_2d",
+            "shape": [
+              6800,
+              8
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "e21683fff9a56f2d8027328bf8393bf1282e9c322c3cec5ed562480682485a08",
+              "e21683fff9a56f2d8027328bf8393bf1282e9c322c3cec5ed562480682485a08",
+              "e21683fff9a56f2d8027328bf8393bf1282e9c322c3cec5ed562480682485a08"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_0000.q_2d",
+            "shape": [
+              6800,
+              8
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "51030a2f38a827b351488838ef7cb39318db821e2c0f4cae4927a5d7000517d6",
+              "51030a2f38a827b351488838ef7cb39318db821e2c0f4cae4927a5d7000517d6",
+              "51030a2f38a827b351488838ef7cb39318db821e2c0f4cae4927a5d7000517d6"
+            ],
+            "old_new_component_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0,
+              0,
+              0,
+              0,
+              0,
+              0
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_0001.q_2d",
+            "shape": [
+              6800,
+              8
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "7cbe7ed355570db68287eb64bd12cbca9bdedcd158e3349181b9971466ae6033",
+              "610b24ab9a46ca67737fba069f62066ad35a0f97f2ac520fc9dbcf9523e02afa",
+              "b58f4f8a346a605c555f6a352905a5c3fde2be87298095aa7e16c4acc36bdac7"
+            ],
+            "old_new_component_Linf": [
+              0.0032627737773013848,
+              0.0027804167116207324,
+              0.002253124394558112,
+              0.0032654541688555425,
+              0.0032694047689299866,
+              0.003115371452032908
+            ],
+            "old_new_component_mean_L1": [
+              0.00004138626333671253,
+              0.000050122853177854515,
+              0.00005509469483509185,
+              0.00004114604704612646,
+              0.00004075880360904969,
+              0.0000950644661743875
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0044400522222002746,
+              0.0061245144649380535,
+              0.010891567154586682,
+              0.004442903668036149,
+              0.004445864193476791,
+              1.3225706894421998
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.005082636801424199,
+              0.00602052664141966,
+              0.010352188544587408,
+              0.005086198426083588,
+              0.005089796345725376,
+              1.3232491246210751
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_0002.q_2d",
+            "shape": [
+              6800,
+              8
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "339b7519421c9b38bf4a25ff2d711bc66666622fe7db32ee19720e494a70c67b",
+              "0183f6b056b83e89b9f168567c55f69b65b0f53c7a77c9129152ed25ad03ea11",
+              "564d7a4434ec1dd14e3c53794474d3976f6b7628e9ed493cc8a38f1bfcf096d6"
+            ],
+            "old_new_component_Linf": [
+              0.001680574243780281,
+              0.0012589694073337082,
+              0.003246518223924885,
+              0.0016822897355059253,
+              0.0016849356634697885,
+              0.011714156439859841
+            ],
+            "old_new_component_mean_L1": [
+              0.0000407498176701615,
+              0.000038766559846036346,
+              0.00012517633627666432,
+              0.000039510909228498995,
+              0.00003792722892592922,
+              0.000400109187432427
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.00607738456700814,
+              0.005905297027402536,
+              0.03404222030371177,
+              0.006082976021896706,
+              0.00609205840933871,
+              1.2742814869491101
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.006081159672286305,
+              0.005791551759016231,
+              0.031072508672771573,
+              0.00608604986811612,
+              0.006093895311717297,
+              1.2759290709578017
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_deposit_0000.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f",
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f",
+              "70634d32d3f821c31443441cf7e1fcdc125e6bf12f1a8678d9cbdb264a01975f"
+            ],
+            "old_new_component_Linf": [
+              0
+            ],
+            "old_new_component_mean_L1": [
+              0
+            ],
+            "old_optimized_to_strict_Linf": [
+              0
+            ],
+            "new_optimized_to_strict_Linf": [
+              0
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_deposit_0001.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "570d4682a140cc1c0ec215ac12e1d5e0a61708cc38769767931b39967078d454",
+              "8793bbb97211d34a0f702229b5e478621a9e77ad07f736b4b77b6ee59383ca6d",
+              "ef2ee9b12a68a9089dfe9dd6fc4f39b3b1215c35df407e783626a5e146f63a9b"
+            ],
+            "old_new_component_Linf": [
+              0.001643618101710001
+            ],
+            "old_new_component_mean_L1": [
+              0.000003954099824170254
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.00278216020598
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.0028842441480600002
+            ]
+          },
+          {
+            "snapshot": "call-003/TEST_2D_deposit_0002.q_2d",
+            "shape": [
+              6800,
+              3
+            ],
+            "strict_coordinate_roundoff_Linf": 0,
+            "sha256": [
+              "960657c597291d79c7e5848e0fddfa83640962481bdd56620b7a103ee9dfb94e",
+              "f192cf2852181ee0904c549fd9f264b71fe272fc321a4f8c70727fb1ec8aa023",
+              "ef33ae63e17235fa4be78b7f8906137cf3199aa812522119352d03cd67f733c6"
+            ],
+            "old_new_component_Linf": [
+              0.0016436181017000003
+            ],
+            "old_new_component_mean_L1": [
+              0.000004764664658111827
+            ],
+            "old_optimized_to_strict_Linf": [
+              0.0027821602059499998
+            ],
+            "new_optimized_to_strict_Linf": [
+              0.0028842441480600002
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "initial_failures": {
+    "Richardson": {
+      "source": "mixt_var, state_conversion_2d.f90:655 at base revision",
+      "operation": "MIN upper cap evaluated after an overflowing near-rest quotient",
+      "raw_log_sha256": "7f5653a93e2798e7ea85bb233200a63db1cc36d3bd68071c9cbbfd6c5ffa8e5a",
+      "resolution": "Cap before division; ordinary and exact-rest conventions unchanged."
+    },
+    "optimized_zero_bound": {
+      "scaled_mass_error": 2.30490299e-8,
+      "frozen_field_limit": 7.275957614183426e-10,
+      "initial_full_manifest_sha256": "571e821d3a5ba3a58421ee7bc74783a65906b37a8ed244a8f99b292063304688",
+      "initial_full_summary": {
+        "test_runs": 37,
+        "failed": 1,
+        "passed": 36,
+        "n9_accepted": false
+      },
+      "diagnostic_no_FMA": "Compiling only the old HP helper with -ffp-contract=off removes the discrepancy.",
+      "negative_control": "Exact-zero-bound unit test fails with the old optimized HP object and passes with the localized product rounding."
+    }
+  },
+  "verification_note": "Production and numerical fixtures match the full-audit export. README/report documentation, closure metadata and acceptance-tool assertions are finalized after execution. The full manifest retains the executed documentation hashes. Optimized output changes are explicitly characterized; no neutrality or N9 approval is claimed."
+}

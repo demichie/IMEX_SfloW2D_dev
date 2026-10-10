@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-10-10",
-  "solver_revision": "40df4dfe6f70d9b96161e27ea726993e098bbc6e",
+  "solver_revision": "026061feff641a4fc42d2970cec295d23b5330e8",
   "report": "docs/acceptance/N7_N8_CLOSURE_2026_10_10.md",
   "scope": "Reconcile the original N7/N8 gates, not a new numerical audit or N9 scientific sign-off.",
   "normative_sources": {
@@ -46,6 +46,10 @@
     "n8_b_full": {
       "path": "docs/acceptance/results_n8_b_acceptance_2026_10_10.json",
       "sha256": "c5b357ba9d5dacd22312876d651a6a8d5e877ecf436aa6c49e64eb98b64fab55"
+    },
+    "n7_a": {
+      "path": "docs/acceptance/results_n7_a_2026_10_10.json",
+      "sha256": "51b4d4931f7fdb393198d0992f4aa27fa9b1909bda4195dd8107808af4a052ed"
     }
   },
   "milestone_status": {
@@ -62,32 +66,33 @@
   "criteria": [
     {
       "id": "N7-01",
-      "closure_status": "partial",
-      "remaining_actions": [
-        "N7-A"
-      ],
+      "closure_status": "satisfied",
+      "remaining_actions": [],
       "verified_contracts": [
-        "2D lake residuals and finite-time lakes cover smooth/rough/ramp beds and all slope/curvature flags."
+        "2D lake residuals and finite-time lakes cover smooth/rough/ramp beds and all slope/curvature flags.",
+        "Dedicated fully wet parabolic, smooth and one-cell lake matrices pass in 1D/2D, all four flags and N_RK=2,3,4, including raw stages and force-scaled residuals."
       ],
       "evidence": [
         "spatial",
         "latest",
-        "n8_b_full"
+        "n8_b_full",
+        "n7_a"
       ]
     },
     {
       "id": "N7-02",
       "closure_status": "partial",
       "remaining_actions": [
-        "N7-A",
         "N7-D"
       ],
       "verified_contracts": [
-        "Four-sided excavation has three refinements, unchanged zero-uphill limits and passing metrics."
+        "Four-sided excavation has three refinements, unchanged zero-uphill limits and passing metrics.",
+        "Finite-time one-cell 1D excavation agrees with unchanged reference fields for all flags/stages, with exact zero uphill mass and independently checked mass budget."
       ],
       "evidence": [
         "latest",
-        "n8_b_full"
+        "n8_b_full",
+        "n7_a"
       ]
     },
     {
@@ -110,16 +115,17 @@
       "id": "N7-04",
       "closure_status": "partial",
       "remaining_actions": [
-        "N7-A",
         "N7-C"
       ],
       "verified_contracts": [
-        "Seeded 2D smooth/rough/drainage/compact residuals and one-step states are verified."
+        "Seeded 2D smooth/rough/drainage/compact residuals and one-step states are verified.",
+        "Finite-time 1D smooth thermal transport and Ritter wet/dry trajectories pass full-field, analytic refinement and raw-state checks."
       ],
       "evidence": [
         "spatial",
         "latest",
-        "n8_b_full"
+        "n8_b_full",
+        "n7_a"
       ]
     },
     {
@@ -140,20 +146,21 @@
       "id": "N7-06",
       "closure_status": "partial",
       "remaining_actions": [
-        "N7-A",
         "N7-C",
         "N7-D",
         "D-N7-CFL"
       ],
       "verified_contracts": [
         "Complete covered residuals and directional bounds agree with clean cores.",
-        "Autonomous explicit/implicit/mixed temporal orders and raw stages pass for N_RK=2,3,4; unsupported counts are rejected."
+        "Autonomous explicit/implicit/mixed temporal orders and raw stages pass for N_RK=2,3,4; unsupported counts are rejected.",
+        "Finite-time 1D full fields and raw stages agree with independent current-IMEX assembly, without asserting SSPRK2 trajectory or timestep-policy equality."
       ],
       "evidence": [
         "spatial",
         "imex",
         "latest",
-        "n8_b_full"
+        "n8_b_full",
+        "n7_a"
       ]
     },
     {
@@ -176,7 +183,8 @@
       "closure_status": "satisfied",
       "remaining_actions": [],
       "verified_contracts": [
-        "Actual 1/4 teams and bitwise outputs pass for covered spatial/stage/exchange fixtures and all six full Gate-H/restart pairs."
+        "Actual 1/4 teams and bitwise outputs pass for covered spatial/stage/exchange fixtures and all six full Gate-H/restart pairs.",
+        "All 204 additional N7-A actual 1/4-thread pairs have bitwise-identical complete payloads; six full Gate-H/restart pairs remain passing."
       ],
       "evidence": [
         "spatial",
@@ -184,7 +192,8 @@
         "latest",
         "n8_a",
         "n8_b_full",
-        "n8_b"
+        "n8_b",
+        "n7_a"
       ]
     },
     {
@@ -192,11 +201,13 @@
       "closure_status": "satisfied",
       "remaining_actions": [],
       "verified_contracts": [
-        "Original-duration deterministic and stochastic continuation passes in strict/optimized builds with actual 1/4 threads."
+        "Original-duration deterministic and stochastic continuation passes in strict/optimized builds with actual 1/4 threads.",
+        "The new 37-run strict/optimized full audit retains original-duration exact deterministic/stochastic continuation after both bounded corrections."
       ],
       "evidence": [
         "latest",
-        "n8_b_full"
+        "n8_b_full",
+        "n7_a"
       ]
     },
     {
@@ -408,31 +419,30 @@
       {
         "id": "H01",
         "requirement": "Flat-bed smooth advection",
-        "status": "partial",
-        "remaining_actions": [
-          "N7-A"
-        ],
+        "status": "satisfied",
+        "remaining_actions": [],
         "evidence_tests": [
-          "TEST_IMEX_STAGES"
+          "TEST_IMEX_STAGES",
+          "TEST_N7_EQUILIBRIUM"
         ]
       },
       {
         "id": "H02",
         "requirement": "Flat-bed wet/dry dam break or Ritter case",
-        "status": "missing",
-        "remaining_actions": [
-          "N7-A"
-        ],
-        "evidence_tests": []
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_N7_EQUILIBRIUM"
+        ]
       },
       {
         "id": "H03",
         "requirement": "Fully wet parabolic lake at rest",
-        "status": "missing",
-        "remaining_actions": [
-          "N7-A"
-        ],
-        "evidence_tests": []
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_N7_EQUILIBRIUM"
+        ]
       },
       {
         "id": "H04",
@@ -467,11 +477,11 @@
       {
         "id": "H07",
         "requirement": "1D continuous one-cell excavation",
-        "status": "missing",
-        "remaining_actions": [
-          "N7-A"
-        ],
-        "evidence_tests": []
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_N7_EQUILIBRIUM"
+        ]
       },
       {
         "id": "H08",
@@ -504,13 +514,12 @@
       {
         "id": "H11",
         "requirement": "Smooth/one-cell 1D/2D lake matrix for all four slope/curvature combinations",
-        "status": "partial",
-        "remaining_actions": [
-          "N7-A"
-        ],
+        "status": "satisfied",
+        "remaining_actions": [],
         "evidence_tests": [
           "TEST_SPATIAL_OPERATOR",
-          "TEST_PCCU_LAKE_AT_REST"
+          "TEST_PCCU_LAKE_AT_REST",
+          "TEST_N7_EQUILIBRIUM"
         ]
       },
       {
@@ -549,30 +558,6 @@
     ]
   },
   "remaining_actions": [
-    {
-      "id": "N7-A",
-      "kind": "test",
-      "title": "Complete the 1D and equilibrium regression cases",
-      "normative_items": [
-        "H01",
-        "H02",
-        "H03",
-        "H07",
-        "H11"
-      ],
-      "criteria": [
-        "N7-01",
-        "N7-02",
-        "N7-04",
-        "N7-06"
-      ],
-      "change_scope": "Extend the production/reference harness, using the existing IMEX tableaux and unchanged reference kernels.",
-      "exit_conditions": [
-        "Run finite-time smooth flat-bed transport, wet/dry Ritter-type dam break, fully wet parabolic lake and continuous one-cell 1D excavation.",
-        "Complete smooth/one-cell 1D/2D lake matrix with all four slope/curvature combinations, actual 1/4 threads and strict/optimized profiles.",
-        "Check raw mass positivity, lake residual, full fields, zero uphill transfer and mass budget; freeze fixture-specific oracle/error criteria before execution."
-      ]
-    },
     {
       "id": "N7-B",
       "kind": "test",
@@ -751,7 +736,35 @@
       ],
       "user_resolution": "Sì, test algebrico separato e produzione uniforme",
       "resolution_scope": "Unequal-area synthetic algebra only; supported production grid remains uniform Cartesian."
+    },
+    {
+      "id": "N7-A",
+      "kind": "test",
+      "title": "Complete the 1D and equilibrium regression cases",
+      "normative_items": [
+        "H01",
+        "H02",
+        "H03",
+        "H07",
+        "H11"
+      ],
+      "criteria": [
+        "N7-01",
+        "N7-02",
+        "N7-04",
+        "N7-06"
+      ],
+      "change_scope": "Extend the production/reference harness, using the existing IMEX tableaux and unchanged reference kernels. Required regressions exposed near-rest Richardson overflow and a fused-roundoff nonzero HP discharge at a clipped zero velocity bound; bounded fixes preserve formulas, limits, OpenMP and CFL policy.",
+      "exit_conditions": [
+        "Run finite-time smooth flat-bed transport, wet/dry Ritter-type dam break, fully wet parabolic lake and continuous one-cell 1D excavation.",
+        "Complete smooth/one-cell 1D/2D lake matrix with all four slope/curvature combinations, actual 1/4 threads and strict/optimized profiles.",
+        "Check raw mass positivity, lake residual, full fields, zero uphill transfer and mass budget; freeze fixture-specific oracle/error criteria before execution."
+      ],
+      "status": "satisfied",
+      "evidence": [
+        "n7_a"
+      ]
     }
   ],
-  "solver_revision_role": "Base revision only; candidate production/test hashes are pinned by N8-B evidence."
+  "solver_revision_role": "Base revision only; candidate production/numerical fixture hashes are pinned by N7-A evidence. Historical aliases retain their original provenance."
 }

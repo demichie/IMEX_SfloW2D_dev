@@ -55,7 +55,11 @@ completion run. N8-A is completed by the
 [cell-exchange report](../../docs/acceptance/N8_A_CELL_EXCHANGE_2026_10_10.md).
 The [projection report](../../docs/acceptance/N8_B_PROJECTION_2026_10_10.md)
 completes N8-B and the user-approved area interpretation. N8 is satisfied;
-N8-A/N8-B/D-N8-AREA are in `completed_actions`. N7-A is next; N7 and N9 remain open.
+N8-A/N8-B/D-N8-AREA are in `completed_actions`. The
+[equilibrium and 1D report](../../docs/acceptance/N7_A_EQUILIBRIUM_2026_10_10.md)
+completes N7-A with 408 production runs and a new 37/37 full audit. It explicitly
+records two bounded production corrections and changed optimized dynamic
+fingerprints; output neutrality is not claimed. N7-B is next; N7 and N9 remain open.
 
 `manifest.json` contains the solver Git SHA, tool probes, compiler flags,
 executable and source checksums, test results and coverage criteria. Each test

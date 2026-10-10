@@ -19,12 +19,40 @@ PROGRAM test_state_conversion
   CALL run_source_boundary_cases
   CALL run_dry_cases
   CALL run_complex_step_check
+  CALL run_richardson_near_rest_cases
 
   CALL finalize_test_properties
 
   WRITE (*, *) 'PASS: state conversion verified'
 
 CONTAINS
+
+  !> \brief Verify the existing Richardson upper cap before an overflowing near-rest quotient.
+  SUBROUTINE run_richardson_near_rest_cases
+    REAL(wp), ALLOCATABLE :: qp(:)
+    REAL(wp) :: Ri, density, carrier_density, reduced_gravity
+    REAL(wp) :: carrier_heat_capacity, mixture_heat_capacity, expected
+    CALL configure_layout(.TRUE.)
+    ALLOCATE(qp(n_vars+2))
+    CALL make_wet_state(qp)
+    CALL mixt_var(qp, Ri, density, carrier_density, reduced_gravity, &
+         carrier_heat_capacity, mixture_heat_capacity)
+    expected = reduced_gravity * qp(1) / (qp(idx_u)**2 + qp(idx_v)**2)
+    IF (ABS(Ri-expected) > 128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,ABS(expected))) &
+         ERROR STOP 'ordinary Richardson formula changed'
+    qp(idx_u) = 1.0E-155_wp
+    qp(idx_v) = 0.0_wp
+    qp(2) = qp(1)*qp(idx_u)
+    qp(3) = 0.0_wp
+    CALL mixt_var(qp, Ri, density, carrier_density, reduced_gravity, &
+         carrier_heat_capacity, mixture_heat_capacity)
+    IF (Ri /= 1.E15_wp) ERROR STOP 'near-rest Richardson cap failed'
+    qp(idx_u) = 0.0_wp
+    qp(2) = 0.0_wp
+    CALL mixt_var(qp, Ri, density, carrier_density, reduced_gravity, &
+         carrier_heat_capacity, mixture_heat_capacity)
+    IF (Ri /= 0.0_wp) ERROR STOP 'exact-rest Richardson convention changed'
+  END SUBROUTINE run_richardson_near_rest_cases
 
   SUBROUTINE initialize_test_properties
 

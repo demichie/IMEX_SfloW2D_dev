@@ -263,6 +263,104 @@ class AuditToolsTests(unittest.TestCase):
             if filename.startswith("src/"):
                 self.assertEqual(value, full["source_and_fixture_sha256"][filename])
 
+    def test_n7_a_completion_evidence(self):
+        """Close the frozen N7-A cases, retaining output changes and remaining gates explicitly."""
+        repo = Path(__file__).resolve().parents[2]
+        closure = json.loads((repo / "TESTS/ACCEPTANCE/n7_n8_closure_plan.json").read_text())
+        evidence = json.loads((repo / closure["evidence_artifacts"]["n7_a"]["path"]).read_text())
+        spatial = json.loads((repo / closure["evidence_artifacts"]["spatial"]["path"]).read_text())
+        action = next(a for a in closure["completed_actions"] if a["id"] == "N7-A")
+        self.assertEqual(action["status"], "satisfied")
+        self.assertEqual(action["evidence"], ["n7_a"])
+        self.assertEqual(closure["milestone_status"], {"N7": "open", "N8": "satisfied", "N9": "open"})
+        self.assertEqual({a["id"] for a in closure["remaining_actions"]},
+                         {"N7-B", "N7-C", "N7-D", "D-N7-CFL"})
+        self.assertEqual(next(c for c in closure["criteria"] if c["id"] == "N7-01")["closure_status"],
+                         "satisfied")
+        for item in closure["required_tests"]["hydrodynamics"]:
+            if item["id"] in {"H01", "H02", "H03", "H07", "H11"}:
+                self.assertEqual(item["status"], "satisfied")
+                self.assertEqual(item["remaining_actions"], [])
+                self.assertIn("TEST_N7_EQUILIBRIUM", item["evidence_tests"])
+        summary = evidence["summary"]
+        self.assertEqual(summary["N7_A"], "satisfied")
+        self.assertEqual(summary["production_solver_runs"], 408)
+        self.assertEqual(summary["bitwise_thread_pairs"], 204)
+        self.assertEqual(summary["observed_steps"], 27360)
+        self.assertEqual(len(evidence["case_inventory"]), 102)
+        self.assertEqual(len(set(evidence["case_inventory"])), 102)
+        contract = json.loads((repo / "TESTS/TEST_N7_EQUILIBRIUM/contract.json").read_text())
+        self.assertEqual(evidence["contract"], contract)
+        self.assertEqual(contract["stages"], [2, 3, 4])
+        self.assertEqual(contract["roundoff_epsilon_multiplier"], 32768)
+        roundoff = 32768 * 2.220446049250313e-16
+        records = evidence["records"]
+        self.assertEqual({r["profile"] for r in records}, {"strict", "optimized"})
+        self.assertEqual(len(records), 2)
+        self.assertEqual(sum(r["solver_runs"] for r in records), 408)
+        self.assertEqual(2*sum(g["one_team_steps"] for r in records for g in r["groups"].values()),
+                         27360)
+        for record in records:
+            self.assertEqual(record["actual_threads"], [1, 4])
+            self.assertEqual(record["case_count"], 102)
+            self.assertEqual({name: g["cases"] for name, g in record["groups"].items()},
+                             {"lake": 72, "advection": 9, "ritter": 9, "excavation": 12})
+            for name, group in record["groups"].items():
+                diagnostics = group["admissibility_envelope"]
+                for state in ("known", "solved", "raw_final"):
+                    self.assertGreaterEqual(diagnostics[f"minimum_{state}_h"]["minimum"], -roundoff)
+                self.assertEqual(diagnostics["failed_local_solves"]["maximum"], 0)
+                self.assertLessEqual(diagnostics["maximum_relative_mass_drift"]["maximum"], roundoff)
+                self.assertLessEqual(diagnostics["maximum_dt_over_CFL"]["maximum"], 1+roundoff)
+                for interval in diagnostics.values():
+                    self.assertTrue(all(math.isfinite(v) for v in interval.values()))
+                if name == "lake":
+                    for field in ("maximum_equilibrium_error", "maximum_production_residual",
+                                  "maximum_reference_residual"):
+                        self.assertLessEqual(group[field], roundoff)
+                    self.assertEqual(diagnostics["maximum_final_repair"]["maximum"], 0)
+                else:
+                    self.assertLessEqual(group["maximum_field_error_over_frozen_limit"], 1)
+                if name == "excavation":
+                    self.assertEqual(group["maximum_relative_uphill_mass"], 0)
+            self.assertEqual(len(record["refinements"]), 6)
+            for series in record["refinements"]:
+                self.assertEqual(len(series["L1"]), 3)
+                limit = contract[series["case"]]["maximum_refinement_ratio"]
+                self.assertTrue(all(0 < ratio < limit for ratio in series["ratios"]))
+        full = evidence["full_audit"]
+        self.assertEqual(full["summary"],
+                         {"test_runs": 37, "failed": 0, "passed": 37, "n9_accepted": False})
+        self.assertEqual(len(full["tests"]), 37)
+        self.assertTrue(all(t["status"] == "pass" for t in full["tests"]))
+        self.assertEqual(len(full["thread_comparisons"]), 6)
+        self.assertTrue(all(p["status"] == "pass" for p in full["thread_comparisons"]))
+        self.assertEqual(set(evidence["production_changes"]),
+                         {"src/hp_reconstruction_2d.f90", "src/state_conversion_2d.f90"})
+        for name in ("hp_pccu_1d_core.py", "hp_pccu_2d_core.py"):
+            path = "TESTS/TEST_SPATIAL_OPERATOR/reference/"+name
+            self.assertEqual(evidence["source_and_fixture_sha256"][path],
+                             spatial["source_and_fixture_sha256"][path])
+        comparisons = evidence["comparison_to_N8_B"]["cases"]
+        self.assertEqual(len(comparisons), 16)
+        self.assertEqual(sum(c["status"] == "unchanged" for c in comparisons), 9)
+        self.assertEqual(sum(c["status"] == "changed" for c in comparisons), 7)
+        strict = [c for c in comparisons if c["profile"] == "strict_debug"]
+        self.assertEqual(len(strict), 8)
+        self.assertTrue(all(c["status"] == "unchanged" for c in strict))
+        replays = evidence["optimized_field_characterization"]["records"]
+        self.assertEqual(len(replays), 4)
+        for replay in replays:
+            self.assertEqual(len(replay["snapshots"]), replay["compared_snapshots"])
+            self.assertGreater(replay["compared_snapshots"], 0)
+            self.assertTrue(math.isfinite(replay["maximum_old_new_Linf"]))
+            for snapshot in replay["snapshots"]:
+                width = snapshot["shape"][1]-2
+                for field in ("old_new_component_Linf", "old_new_component_mean_L1",
+                              "old_optimized_to_strict_Linf", "new_optimized_to_strict_Linf"):
+                    self.assertEqual(len(snapshot[field]), width)
+                    self.assertTrue(all(math.isfinite(v) and v >= 0 for v in snapshot[field]))
+
 
 if __name__ == "__main__":
     unittest.main()

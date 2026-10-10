@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "package": "N7-A",
+  "frozen_before_execution": "2026-10-10",
+  "production_driver": "TESTS/TEST_IMEX_STAGES/test_imex_stages.f90",
+  "stages": [2, 3, 4],
+  "profiles": ["strict", "optimized"],
+  "actual_threads": [1, 4],
+  "lake": {
+    "nx": 32, "ny_2d": 24, "dx": 0.25, "dy": 0.25,
+    "beds": ["smooth", "one-cell", "parabolic"],
+    "eta": 6.0, "dt": 0.001, "steps": 20,
+    "flags": [[false, false], [false, true], [true, false], [true, true]]
+  },
+  "advection": {
+    "nx": [64, 128, 256], "length": 16.0, "time": 0.4,
+    "velocity": 1.0, "temperature_base": 300.0,
+    "temperature_amplitude": 15.0, "center": 6.0, "width": 1.0,
+    "limiter": 0, "dt_dx_factor": 0.01,
+    "maximum_L1_temperature_error": 2.0,
+    "maximum_Linf_temperature_error": 8.0,
+    "maximum_refinement_ratio": 0.9
+  },
+  "ritter": {
+    "nx": [40, 80, 160], "length": 20.0, "dam_x": 10.0,
+    "left_h": 1.0, "time": 0.2, "dt_dx_factor": 0.01,
+    "maximum_mean_h_error": 0.12,
+    "maximum_mean_scaled_momentum_error": 0.15,
+    "maximum_refinement_ratio": 0.9
+  },
+  "excavation": {
+    "nx": 60, "length": 30.0, "walls": [10.0, 20.0],
+    "depth": 2.0, "slope_degrees": 10.0,
+    "dt": 0.0001, "steps": 100
+  },
+  "roundoff_epsilon_multiplier": 32768,
+  "finite_time_field_limit": "32768 * float64_epsilon * steps, with separate initial mass, momentum, thermal and solid scales",
+  "raw_positivity_limit": "32768 * float64_epsilon in thickness units",
+  "mass_budget_limit": "32768 * float64_epsilon * initial_total_mass",
+  "uphill_limit": "32768 * float64_epsilon * initial_total_mass",
+  "reference_policy": "Unchanged clean spatial kernels, independently assembled current explicit IMEX tableaux. No SSPRK2 trajectory equality or CFL-policy approval."
+}
