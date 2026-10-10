@@ -1,0 +1,54 @@
+{
+  "schema_version": 3,
+  "package": "N7-B-H05",
+  "frozen_before_execution": "2026-10-10",
+  "previous_contract": "contract.json",
+  "previous_contract_sha256": "dd9c4401652e2b9ad874f15702e5f5f3cfc9796e6fdbd77f96f506bccfd330fb",
+  "revision_reason": "The v2 central comparison is isolated, but the velocity transition still reaches boundary cells numerically and violates the unchanged no-boundary-flux criterion. Extend both the central constant-velocity interval and the initially resting wall buffers. Preserve every dx, timestep, final time, pulse/compared-interval width and acceptance limit; assert both dependency-cone separations before execution.",
+  "nx": [
+    480,
+    960,
+    1920
+  ],
+  "length": 480.0,
+  "directions": [
+    -1,
+    1
+  ],
+  "velocity": 1.0,
+  "time": 0.1,
+  "dt_dx_factor": 0.02,
+  "axes": [
+    "x",
+    "y"
+  ],
+  "y_refinements": [
+    960
+  ],
+  "profile_center": 240.0,
+  "profile_half_width": 4.0,
+  "comparison_interval": [
+    232.0,
+    248.0
+  ],
+  "velocity_transition_intervals": [
+    [
+      110.0,
+      115.0
+    ],
+    [
+      365.0,
+      370.0
+    ]
+  ],
+  "limiter": 3,
+  "theta": 1.3,
+  "maximum_profile_L1": 0.1,
+  "maximum_profile_Linf": 0.3,
+  "maximum_refinement_ratio": 0.9,
+  "dependency_radius_per_rhs": 4,
+  "isolation_policy": "Distance in cells from the compared interval to every nonuniform-velocity cell exceeds 4*n_RK*steps plus one cell. Distance of nonzero initial velocity to either physical boundary also exceeds that cone. Four conservatively bounds local flat-bed HP/reconstruction/flux dependencies for fully wet explicit fixtures with a prescribed timestep. Budgets/positivity/TVD cover the entire closed, initially quiescent-boundary domain.",
+  "expected_contact_cases": 72,
+  "criteria_policy": "Original contract.json supplies unchanged roundoff, thermal, fraction, budget and full-field limits; no production or CFL change for transport.",
+  "previous_contact_contract": "contact_contract_v2.json"
+}

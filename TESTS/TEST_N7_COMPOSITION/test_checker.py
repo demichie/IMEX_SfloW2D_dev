@@ -7,6 +7,30 @@ import check_cases as checker
 
 
 class CheckerTests(unittest.TestCase):
+    def test_revised_contact_preserves_resolution_and_limits(self):
+        original = checker.CONTRACT['contact']; revised = checker.CONTACT
+        self.assertEqual(hashlib.sha256((checker.HERE/'contract.json').read_bytes()).hexdigest(),
+                         revised['previous_contract_sha256'])
+        np.testing.assert_array_equal(original['length']/np.array(original['nx']),
+                                      revised['length']/np.array(revised['nx']))
+        self.assertEqual(original['comparison_interval'][1]-original['comparison_interval'][0],
+                         revised['comparison_interval'][1]-revised['comparison_interval'][0])
+        for key in ('time','dt_dx_factor','limiter','theta','maximum_profile_L1',
+                    'maximum_profile_Linf','maximum_refinement_ratio','profile_half_width'):
+            self.assertEqual(original[key], revised[key])
+        for count in revised['nx']:
+            dx=revised['length']/count; coordinates=(np.arange(count)+.5)*dx
+            a,b=revised['velocity_transition_intervals']
+            rise=np.clip((coordinates-a[0])/(a[1]-a[0]),0,1)
+            fall=np.clip((b[1]-coordinates)/(b[1]-b[0]),0,1)
+            velocity=rise**2*(3-2*rise)*fall**2*(3-2*fall)
+            steps=int(np.ceil(revised['time']/(revised['dt_dx_factor']*dx)))
+            for n in checker.CONTRACT['stages']:
+                _,evidence=checker.contact_isolation(coordinates,velocity,n,steps)
+                self.assertGreater(evidence['remaining_guard_cells'],0)
+            with self.assertRaises(AssertionError):
+                checker.contact_isolation(coordinates,velocity,4,100*steps)
+
     def test_stationary_guard_contract_and_reference_pin(self):
         guard=json.loads((checker.HERE/'roundoff_guard_contract.json').read_text())
         reference=checker.HERE.parent/'TEST_HYDROSTATIC_ROUNDOFF/reference/hyperbolic_2d.f90'
@@ -52,15 +76,15 @@ class CheckerTests(unittest.TestCase):
                 checker.decode(name, bad)
 
     def test_analytic_pulse_and_signed_scalar_transport(self):
-        q = checker.pulse_cell_means(160)
-        self.assertAlmostEqual(float(q.sum()*40/160), 3.0, places=8)
-        x = (np.arange(160)+0.5)*40/160
+        q = checker.pulse_cell_means(1920)
+        self.assertAlmostEqual(float(q.sum()*480/1920), 3.0, places=8)
+        x = (np.arange(1920)+0.5)*480/1920
         for sign in (-1, 1):
             rhs = checker.scalar_rhs(q, 0.25, sign, 3)
             self.assertAlmostEqual(float(rhs.sum()), 0, places=12)
             self.assertAlmostEqual(float(np.sum(x*rhs)/q.sum()), sign, places=10)
-        np.testing.assert_allclose(checker.pulse_cell_means(160, 0.1),
-                                   checker.pulse_cell_means(160, -0.1)[::-1], atol=1e-13, rtol=0)
+        np.testing.assert_allclose(checker.pulse_cell_means(1920, 0.1),
+                                   checker.pulse_cell_means(1920, -0.1)[::-1], atol=1e-13, rtol=0)
 
     def test_all_step_budget_face_and_admissibility_corruptions(self):
         name = "gas-liquid"

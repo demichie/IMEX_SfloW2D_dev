@@ -1,5 +1,10 @@
 # Stationary hydrostatic roundoff correction
 
+This records the earlier stationary-only milestone. The subsequent
+[geometry and transport package](N7_B_GEOMETRY_AND_TRANSPORT_2026_10_10.md)
+fixes the y-directed geometry defect and closes N7-B with the full isolated
+contact matrix. The original results and scope below retain their provenance.
+
 The variable-composition hydrostatic equilibrium subset now passes: all 90
 original equilibria in both strict and optimized builds retain exactly zero
 state changes, component/carrier budget errors and force-scaled momentum

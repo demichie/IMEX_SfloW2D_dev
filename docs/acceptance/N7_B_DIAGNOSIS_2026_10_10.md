@@ -1,6 +1,9 @@
 # N7 variable composition equilibrium diagnosis
 
-This is the historical pre-correction diagnosis. N7-B is not complete. A defined variable-composition equilibrium failed in both
+This is the historical pre-correction diagnosis, when N7-B was not complete.
+The subsequent [geometry and transport completion](N7_B_GEOMETRY_AND_TRANSPORT_2026_10_10.md)
+closes the full gate without reinterpreting these failed constructions.
+A defined variable-composition equilibrium failed in both
 strict and optimized builds of `e4333a5c`, with identical results between actual
 one/four-thread teams within each build. Production sources were unchanged
 during this diagnosis. The subsequently approved correction and its passing

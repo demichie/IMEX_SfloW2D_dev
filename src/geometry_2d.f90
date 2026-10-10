@@ -16,6 +16,8 @@ MODULE geometry_2d
 
   IMPLICIT NONE
 
+  PRIVATE :: reconstruct_short_1d_line
+
   !> Location of the centers (x) of the control volume of the domain
   REAL(wp), ALLOCATABLE :: x_comp(:)
 
@@ -625,6 +627,9 @@ CONTAINS
   !> zero-order extrapolation from the nearest filtered interior value. The
   !> resulting slopes define the large-slope gravity correction at centers
   !> and shared Cartesian faces.
+  !> In 1D the inactive and mixed derivatives are zero. Lines shorter than
+  !> five cells use a degree min(2,n-1) least-squares fit over their available
+  !> centers; a single cell has no resolved slope or curvature.
   !> @author 
   !> Mattia de' Michieli Vitturi
   !> \date 2019/11/08
@@ -666,9 +671,22 @@ CONTAINS
     norm2_y = 7.0_wp * dy**2
     norm_xy = (10.0_wp * dx) * (10.0_wp * dy)
 
+    ! Degenerate grids have no derivative in the inactive direction. Clear
+    ! every cache explicitly so repeated bed refreshes cannot retain old data.
+    IF ( MIN(comp_cells_x,comp_cells_y) .EQ. 1 ) THEN
+       B_prime_x_geom = 0.0_wp
+       B_prime_y_geom = 0.0_wp
+       B_second_xx_geom = 0.0_wp
+       B_second_yy_geom = 0.0_wp
+       B_second_xy_geom = 0.0_wp
+    END IF
+
     IF ( comp_cells_y .EQ. 1 ) THEN
 
        k = 1
+
+       IF (comp_cells_x .LT. 5) CALL reconstruct_short_1d_line(             &
+            B_cent(:,k),dx,B_prime_x_geom(:,k),B_second_xx_geom(:,k))
 
        ! Keep scalar stencil accumulation independent of OpenMP chunk sizes.
        ! Only the 1D accumulators are volatile; 2D kernels are unchanged.
@@ -694,6 +712,26 @@ CONTAINS
 
           B_second_xy_geom(j,k) = 0.0_wp
 
+       END DO
+       !$OMP END PARALLEL DO
+
+    ELSEIF ( comp_cells_x .EQ. 1 ) THEN
+
+       j = 1
+       IF (comp_cells_y .LT. 5) CALL reconstruct_short_1d_line(             &
+            B_cent(j,:),dy,B_prime_y_geom(j,:),B_second_yy_geom(j,:))
+       ! The rotated 1D kernel uses the same coefficients and accumulation
+       ! order as x. Do not read a nonexistent third x column on this grid.
+       !$OMP PARALLEL DO PRIVATE(k,kk,first_derivative_sum,second_derivative_sum)
+       DO k = 3, comp_cells_y - 2
+          first_derivative_sum = 0.0_wp
+          second_derivative_sum = 0.0_wp
+          DO kk = 1, 5
+             first_derivative_sum = first_derivative_sum + c1(kk) * B_cent(j,k+kk-3)
+             second_derivative_sum = second_derivative_sum + c2(kk) * B_cent(j,k+kk-3)
+          END DO
+          B_prime_y_geom(j,k) = first_derivative_sum / norm1_y
+          B_second_yy_geom(j,k) = second_derivative_sum / norm2_y
        END DO
        !$OMP END PARALLEL DO
 
@@ -747,6 +785,7 @@ CONTAINS
     !=======================================================================
 
     ! --- Handle left and right boundaries (columns j=1, 2, comp_cells_x-1, comp_cells_x) ---
+    IF (comp_cells_x .GE. 5) THEN
     !$OMP PARALLEL DO PRIVATE(k)
     DO k = 1, comp_cells_y ! Loop over all rows
        ! Left boundary
@@ -775,7 +814,9 @@ CONTAINS
     END DO
     !$OMP END PARALLEL DO
 
-    IF ( comp_cells_y .GT. 1 ) THEN
+    END IF
+
+    IF ( comp_cells_y .GE. 5 ) THEN
 
        ! --- Handle top and bottom boundaries (rows k=1, 2, comp_cells_y-1, comp_cells_y) ---
        !$OMP PARALLEL DO PRIVATE(j)
@@ -836,6 +877,37 @@ CONTAINS
     RETURN
 
   END SUBROUTINE topography_reconstruction
+
+  !> \brief Fit a resolved polynomial on a one-dimensional line shorter than five cells.
+  !> \details Symmetric centered coordinates separate the linear term from the
+  !> quadratic term. One cell returns zero, two resolve a line, and three/four
+  !> resolve a quadratic. This fallback does not replace the five-point filter.
+  !> \param[in] bed Cell-center bed elevations [m], with one through four entries.
+  !> \param[in] spacing Uniform positive cell spacing [m].
+  !> \param[out] first Filtered first derivative at each available center.
+  !> \param[out] second Filtered second derivative at each available center [m^-1].
+  PURE SUBROUTINE reconstruct_short_1d_line(bed,spacing,first,second)
+    REAL(wp), INTENT(IN) :: bed(:),spacing
+    REAL(wp), INTENT(OUT) :: first(:),second(:)
+    REAL(wp) :: coordinate(SIZE(bed)),quadratic_basis(SIZE(bed))
+    REAL(wp) :: linear,quadratic
+    INTEGER :: i,n
+
+    n = SIZE(bed)
+    first = 0.0_wp; second = 0.0_wp
+    IF (n .LE. 1) RETURN
+    DO i=1,n
+       coordinate(i) = (REAL(i-1,wp)-0.5_wp*REAL(n-1,wp))*spacing
+    END DO
+    linear = SUM(coordinate*bed)/SUM(coordinate**2)
+    first = linear
+    IF (n .GE. 3) THEN
+       quadratic_basis = coordinate**2-SUM(coordinate**2)/REAL(n,wp)
+       quadratic = SUM(quadratic_basis*bed)/SUM(quadratic_basis**2)
+       first = linear+2.0_wp*quadratic*coordinate
+       second = 2.0_wp*quadratic
+    END IF
+  END SUBROUTINE reconstruct_short_1d_line
 
   !******************************************************************************
   !> \brief Identify inlet cells and build their radial/lateral emission directions.

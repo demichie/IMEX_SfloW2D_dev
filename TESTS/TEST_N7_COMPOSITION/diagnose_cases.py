@@ -9,6 +9,10 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import check_cases as c
 
+# Reproduce the archived diagnostic construction, not the revised acceptance
+# contact. Its failed original comparison must remain observable.
+c.CONTACT = c.CONTRACT['contact']
+
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('executable', type=Path)
 parser.add_argument('profile', choices=c.CONTRACT['profiles'])

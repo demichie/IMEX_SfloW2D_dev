@@ -19,6 +19,7 @@ sys.path.insert(0, str(HERE.parent / "TEST_IMEX_STAGES"))
 import compare_stages as stages
 
 CONTRACT = json.loads((HERE / "contract.json").read_text())
+CONTACT = json.loads((HERE / "contact_contract_v3.json").read_text())
 P = CONTRACT["properties"]
 ROUND = CONTRACT["roundoff_epsilon_multiplier"] * np.finfo(float).eps
 RHO_A = P["pressure"] / (P["R_a"] * P["temperature"])
@@ -105,7 +106,7 @@ def compare(label, observed, expected, initial, limit):
 
 def pulse_cell_means(nx, shift=0.0):
     """Independent analytic translated cos^4 pulse, averaged with 32-point quadrature."""
-    settings = CONTRACT["contact"]
+    settings = CONTACT
     nodes, weights = np.polynomial.legendre.leggauss(32)
     dx = settings["length"]/nx
     x = (np.arange(nx)+0.5)*dx
@@ -119,7 +120,7 @@ def scalar_rhs(value, dx, velocity, sound):
     slope = np.zeros_like(value)
     a, b = value[2:]-value[1:-1], value[1:-1]-value[:-2]
     c = 0.5*(value[2:]-value[:-2])
-    theta = CONTRACT["contact"]["theta"]
+    theta = CONTACT["theta"]
     slope[1:-1] = np.where((a*b > 0) & (a*c > 0),
                            np.sign(c)*np.minimum(np.abs(c), theta*np.minimum(np.abs(a), np.abs(b))), 0)
     minus, plus = value-0.5*slope, value+0.5*slope
@@ -144,6 +145,29 @@ def scalar_reference(profile, dx, velocity, sound, dt, count, n):
         for weight, rhs in zip(be, terms):
             value += dt*weight*rhs
     return value, np.array(known)
+
+
+def contact_isolation(coordinates, velocity, n, steps):
+    """Reject a comparison reached by the discrete dependency cone, before execution."""
+    settings = CONTACT
+    interior = (coordinates >= settings["comparison_interval"][0]) & (coordinates <= settings["comparison_interval"][1])
+    inside = np.flatnonzero(interior)
+    nonuniform = np.flatnonzero(np.abs(velocity) != settings["velocity"])
+    if inside.size == 0 or nonuniform.size == 0:
+        raise AssertionError("invalid isolated closed-domain contact construction")
+    distance = int(np.min(np.abs(inside[:, None]-nonuniform[None, :])))
+    radius = settings["dependency_radius_per_rhs"]*n*steps
+    if distance <= radius+1:
+        raise AssertionError(f"contact comparison not isolated: distance {distance}, cone {radius}")
+    moving = np.flatnonzero(velocity != 0)
+    boundary_distance = int(min(moving[0], len(coordinates)-1-moving[-1]))
+    if boundary_distance <= radius+1:
+        raise AssertionError(f"contact boundary not isolated: distance {boundary_distance}, cone {radius}")
+    return interior, {"nearest_nonuniform_velocity_distance_cells": distance,
+                      "maximum_dependency_radius_cells": radius,
+                      "remaining_guard_cells": distance-radius-1,
+                      "boundary_buffer_cells": boundary_distance,
+                      "remaining_boundary_guard_cells": boundary_distance-radius-1}
 
 
 def read_payload(path, nx, ny, nv, n, steps):
@@ -320,7 +344,7 @@ def run(args):
         }, indent=2, allow_nan=False)+"\n")
         print(f"PASS: {args.profile} N7-B equilibrium subset, 90 cases, actual 1/4 threads", flush=True)
         return
-    settings = CONTRACT["contact"]
+    settings = CONTACT
     for name in CONTRACT["closures"]:
         for axis in settings["axes"]:
             for sign in settings["directions"]:
@@ -333,15 +357,17 @@ def run(args):
                         rho0, _, _ = properties(name, base, P["temperature"])
                         sound = np.sqrt(P["gravity"]*(1-RHO_A/rho0))
                         coordinates = (np.arange(count)+0.5)*dx
-                        rise = np.clip((coordinates-5)/5, 0, 1)
-                        fall = np.clip((35-coordinates)/5, 0, 1)
+                        lower, upper = settings["velocity_transition_intervals"]
+                        rise = np.clip((coordinates-lower[0])/(lower[1]-lower[0]), 0, 1)
+                        fall = np.clip((upper[1]-coordinates)/(upper[1]-upper[0]), 0, 1)
                         velocity = sign*settings["velocity"]*(rise*rise*(3-2*rise))*(fall*fall*(3-2*fall))
+                        steps = int(np.ceil(settings["time"]/(settings["dt_dx_factor"]*dx)))
+                        interior, isolation = contact_isolation(coordinates, velocity, n, steps)
                         fractions = fractions[None] if axis == "x" else fractions[:, None]
                         vel = velocity[None] if axis == "x" else velocity[:, None]
                         initial = conservative(name, fractions, np.ones(vel.shape), vel, axis)
                         nx, ny = initial.shape[1], initial.shape[0]
                         vertices = np.zeros((ny+1, nx+1))
-                        steps = int(np.ceil(settings["time"]/(settings["dt_dx_factor"]*dx)))
                         dt = settings["time"]/steps
                         label = f"contact-{name}-{axis}-sign{sign}-nx{count}-RK{n}"
                         fields, fingerprints = launch(args.executable, label, name, initial, vertices, n, steps,
@@ -349,7 +375,6 @@ def run(args):
                         diagnostics = validate(name, fields, initial, steps)
                         expected_profile, known_profile = scalar_reference(profile, dx, sign*settings["velocity"],
                                                                            sound, dt, steps, n)
-                        interior = (coordinates >= settings["comparison_interval"][0]) & (coordinates <= settings["comparison_interval"][1])
                         mask = interior[None] if axis == "x" else interior[:, None]
 
                         def lift(values):
@@ -381,7 +406,8 @@ def run(args):
                         series.append(l1)
                         records.append({"case": label, "steps": steps, "fingerprints": fingerprints,
                                         "diagnostics": diagnostics, "reference_errors": errors,
-                                        "analytic_L1": l1, "analytic_Linf": linf, "centroid_displacement": mean1-mean0})
+                                        "analytic_L1": l1, "analytic_Linf": linf, "centroid_displacement": mean1-mean0,
+                                        "isolation": isolation})
                         print("PASS:", label, flush=True)
                     if axis == "x":
                         ratios = (np.array(series[1:])/series[:-1]).tolist()
@@ -391,7 +417,8 @@ def run(args):
     expected_count = 90+72
     if len(records) != expected_count:
         raise AssertionError("incomplete frozen N7-B inventory")
-    evidence = {"profile": args.profile, "contract": CONTRACT, "cases": records, "refinements": refinements}
+    evidence = {"profile": args.profile, "contract": CONTRACT, "contact_contract": CONTACT,
+                "cases": records, "refinements": refinements}
     Path("evidence.json").write_text(json.dumps(evidence, indent=2, allow_nan=False)+"\n")
     print(f"PASS: {args.profile} N7-B, {len(records)} cases, actual 1/4 threads", flush=True)
 
@@ -415,5 +442,6 @@ if __name__ == "__main__":
             "expected_inventory": 162,
             "contract_sha256": hashlib.sha256((HERE/"contract.json").read_bytes()).hexdigest(),
             "contract": CONTRACT,
+            "contact_contract": CONTACT,
         }, indent=2, allow_nan=False)+"\n")
         raise

@@ -1,0 +1,3591 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "base_revision": "a8148e4e6eaee2473e334da9281cc66db72351dc",
+  "production_changes": [
+    "src/geometry_2d.f90"
+  ],
+  "summary": {
+    "N7_B": "satisfied",
+    "N7": "open",
+    "N8": "satisfied",
+    "N9": "open",
+    "N7_B_cases_per_profile": 162,
+    "N7_B_solver_runs": 648,
+    "N7_B_bitwise_thread_pairs": 324,
+    "geometry_cases_per_profile": 112,
+    "geometry_solver_runs": 448,
+    "geometry_bitwise_thread_pairs": 224,
+    "full_audit": {
+      "test_runs": 40,
+      "failed": 0,
+      "passed": 40,
+      "n9_accepted": false
+    },
+    "preceding_full_case_fingerprints_identical": 16
+  },
+  "original_contract": {
+    "schema_version": 1,
+    "package": "N7-B",
+    "frozen_before_execution": "2026-10-10",
+    "stages": [
+      2,
+      3,
+      4
+    ],
+    "profiles": [
+      "strict",
+      "optimized"
+    ],
+    "actual_threads": [
+      1,
+      4
+    ],
+    "closures": [
+      "liquid",
+      "gas",
+      "gas-liquid"
+    ],
+    "properties": {
+      "rho_s": [
+        2500,
+        1800
+      ],
+      "cp_s": [
+        900,
+        1100
+      ],
+      "rho_l": 1000,
+      "cp_l": 4180,
+      "cp_a": 1005,
+      "R_a": 287.05,
+      "cp_g": 1850,
+      "R_g": 461.5,
+      "pressure": 101325,
+      "temperature": 300,
+      "gravity": 9.81
+    },
+    "equilibrium": {
+      "nx": 20,
+      "ny_2d": 12,
+      "spacing": 0.5,
+      "eta": 6,
+      "dt": 0.001,
+      "steps": 20,
+      "flags": [
+        [
+          false,
+          false
+        ],
+        [
+          false,
+          true
+        ],
+        [
+          true,
+          false
+        ],
+        [
+          true,
+          true
+        ]
+      ],
+      "families": [
+        "constant-density-Q1",
+        "constant-pressure-flat"
+      ],
+      "pressure_flat_flags": [
+        [
+          false,
+          false
+        ]
+      ],
+      "pressure_flat_limiter": 0,
+      "density_limiter": 3
+    },
+    "contact": {
+      "nx": [
+        40,
+        80,
+        160
+      ],
+      "length": 40,
+      "directions": [
+        -1,
+        1
+      ],
+      "velocity": 1,
+      "time": 0.1,
+      "dt_dx_factor": 0.02,
+      "axes": [
+        "x",
+        "y"
+      ],
+      "y_refinements": [
+        80
+      ],
+      "profile_center": 20,
+      "profile_half_width": 4,
+      "comparison_interval": [
+        12,
+        28
+      ],
+      "velocity_transition_intervals": [
+        [
+          5,
+          10
+        ],
+        [
+          30,
+          35
+        ]
+      ],
+      "limiter": 3,
+      "theta": 1.3,
+      "maximum_profile_L1": 0.1,
+      "maximum_profile_Linf": 0.3,
+      "maximum_refinement_ratio": 0.9
+    },
+    "roundoff_epsilon_multiplier": 32768,
+    "finite_time_field_limit": "32768*float64_epsilon*steps; separate component scales, compare contact interior only",
+    "equilibrium_limit": "32768*float64_epsilon; unchanged components and force-scaled residual",
+    "budget_limit": "32768*float64_epsilon times initial component inventory; every raw stage/final, closed boundaries",
+    "face_limit": "32768*float64_epsilon for fractions and stencil monotonicity; independent thermal/mass closure",
+    "oracle_policy": "Independent multicomponent specific-volume/heat-capacity closures, equilibrium identities, analytic translating cell averages and scalar CU/TVD current-IMEX assembly; the one-solid prototype is not a gas reference.",
+    "CFL_policy": "Unchanged; D-N7-CFL remains pending."
+  },
+  "contact_contract": {
+    "schema_version": 3,
+    "package": "N7-B-H05",
+    "frozen_before_execution": "2026-10-10",
+    "previous_contract": "contract.json",
+    "previous_contract_sha256": "dd9c4401652e2b9ad874f15702e5f5f3cfc9796e6fdbd77f96f506bccfd330fb",
+    "revision_reason": "The v2 central comparison is isolated, but the velocity transition still reaches boundary cells numerically and violates the unchanged no-boundary-flux criterion. Extend both the central constant-velocity interval and the initially resting wall buffers. Preserve every dx, timestep, final time, pulse/compared-interval width and acceptance limit; assert both dependency-cone separations before execution.",
+    "nx": [
+      480,
+      960,
+      1920
+    ],
+    "length": 480,
+    "directions": [
+      -1,
+      1
+    ],
+    "velocity": 1,
+    "time": 0.1,
+    "dt_dx_factor": 0.02,
+    "axes": [
+      "x",
+      "y"
+    ],
+    "y_refinements": [
+      960
+    ],
+    "profile_center": 240,
+    "profile_half_width": 4,
+    "comparison_interval": [
+      232,
+      248
+    ],
+    "velocity_transition_intervals": [
+      [
+        110,
+        115
+      ],
+      [
+        365,
+        370
+      ]
+    ],
+    "limiter": 3,
+    "theta": 1.3,
+    "maximum_profile_L1": 0.1,
+    "maximum_profile_Linf": 0.3,
+    "maximum_refinement_ratio": 0.9,
+    "dependency_radius_per_rhs": 4,
+    "isolation_policy": "Distance in cells from the compared interval to every nonuniform-velocity cell exceeds 4*n_RK*steps plus one cell. Distance of nonzero initial velocity to either physical boundary also exceeds that cone. Four conservatively bounds local flat-bed HP/reconstruction/flux dependencies for fully wet explicit fixtures with a prescribed timestep. Budgets/positivity/TVD cover the entire closed, initially quiescent-boundary domain.",
+    "expected_contact_cases": 72,
+    "criteria_policy": "Original contract.json supplies unchanged roundoff, thermal, fraction, budget and full-field limits; no production or CFL change for transport.",
+    "previous_contact_contract": "contact_contract_v2.json"
+  },
+  "contract_sha256": {
+    "TESTS/TEST_N7_COMPOSITION/contract.json": "dd9c4401652e2b9ad874f15702e5f5f3cfc9796e6fdbd77f96f506bccfd330fb",
+    "TESTS/TEST_N7_COMPOSITION/contact_contract_v2.json": "fd6394d437a9f99ad94324b771b4d483716bfa1fd62723a0a147788c600e2594",
+    "TESTS/TEST_N7_COMPOSITION/contact_contract_v3.json": "4adfa94d9506269ff7cee41b071cea0570752295be415a05aafe565f24751796",
+    "TESTS/TEST_GEOMETRY_1D/contract.json": "4c2c7b48186263e47fe1f1072a0de6146b992e0d0b7450945b5a6b2fb7745219"
+  },
+  "composition_profiles": [
+    {
+      "profile": "strict",
+      "case_count": 162,
+      "actual_threads": [
+        1,
+        4
+      ],
+      "raw_evidence_path": "/tmp/imex-n7-composition.HrHntr/strict/evidence.json",
+      "raw_evidence_sha256": "4355f46d7479c49f0c164993048c25afb72b1b08c9b6c24f774bbe108caac2b3",
+      "equilibrium_count": 90,
+      "contact_count": 72,
+      "maximum_equilibrium_error": 0,
+      "maximum_force_scaled_equilibrium_residual": 0,
+      "maximum_contact_reference_error": 1.0714489600915896e-15,
+      "maximum_contact_error_over_frozen_limit": 0.000019734373078682467,
+      "maximum_analytic_L1": 0.007793910702979947,
+      "maximum_analytic_Linf": 0.045906470703342084,
+      "absolute_centroid_displacement_range": [
+        0.09959091159311129,
+        0.10008386717254325
+      ],
+      "minimum_central_guard_cells": 37,
+      "minimum_boundary_guard_cells": 29,
+      "maximum_component_carrier_budget": 6.541100161795386e-15,
+      "maximum_boundary_mass_flux": 0,
+      "maximum_face_violation": 0,
+      "maximum_face_closure_error": 8.461924299307585e-16,
+      "maximum_dt_over_CFL": 0.34420805270127447,
+      "raw_minima": {
+        "component": 0.04999999999999997,
+        "carrier": 0.3211854692716112,
+        "temperature": 299.9999999999997,
+        "h": 0.9506433257611225
+      },
+      "refinements": [
+        {
+          "closure": "liquid",
+          "sign": -1,
+          "n_RK": 2,
+          "L1": [
+            0.0077939107029799315,
+            0.0016300697784284311,
+            0.0004755878466373443
+          ],
+          "ratios": [
+            0.20914658129264796,
+            0.2917591951774383
+          ]
+        },
+        {
+          "closure": "liquid",
+          "sign": -1,
+          "n_RK": 3,
+          "L1": [
+            0.0077210576954898835,
+            0.0016054767712595061,
+            0.0004751206250611012
+          ],
+          "ratios": [
+            0.2079348237738615,
+            0.2959374022511495
+          ]
+        },
+        {
+          "closure": "liquid",
+          "sign": -1,
+          "n_RK": 4,
+          "L1": [
+            0.007720118601098328,
+            0.0016054348215359848,
+            0.0004751723974846196
+          ],
+          "ratios": [
+            0.20795468366348444,
+            0.29597738326742085
+          ]
+        },
+        {
+          "closure": "liquid",
+          "sign": 1,
+          "n_RK": 2,
+          "L1": [
+            0.007793910702979947,
+            0.0016300697784284307,
+            0.0004755878466373801
+          ],
+          "ratios": [
+            0.20914658129264746,
+            0.29175919517746035
+          ]
+        },
+        {
+          "closure": "liquid",
+          "sign": 1,
+          "n_RK": 3,
+          "L1": [
+            0.007721057695489899,
+            0.0016054767712595074,
+            0.000475120625061189
+          ],
+          "ratios": [
+            0.20793482377386124,
+            0.29593740225120396
+          ]
+        },
+        {
+          "closure": "liquid",
+          "sign": 1,
+          "n_RK": 4,
+          "L1": [
+            0.007720118601098344,
+            0.0016054348215359861,
+            0.0004751723974846207
+          ],
+          "ratios": [
+            0.20795468366348419,
+            0.2959773832674213
+          ]
+        },
+        {
+          "closure": "gas",
+          "sign": -1,
+          "n_RK": 2,
+          "L1": [
+            0.0044522376813581266,
+            0.0011413248134276028,
+            0.000327910731361338
+          ],
+          "ratios": [
+            0.2563485813451561,
+            0.28730710793587616
+          ]
+        },
+        {
+          "closure": "gas",
+          "sign": -1,
+          "n_RK": 3,
+          "L1": [
+            0.0044755831642354004,
+            0.001112670927019243,
+            0.0003294466733253461
+          ],
+          "ratios": [
+            0.248609150179724,
+            0.2960863498140529
+          ]
+        },
+        {
+          "closure": "gas",
+          "sign": -1,
+          "n_RK": 4,
+          "L1": [
+            0.00447555367317539,
+            0.0011127405183039916,
+            0.0003294985093091674
+          ],
+          "ratios": [
+            0.24862633755758448,
+            0.2961144165140854
+          ]
+        },
+        {
+          "closure": "gas",
+          "sign": 1,
+          "n_RK": 2,
+          "L1": [
+            0.004452237681358142,
+            0.0011413248134276024,
+            0.0003279107313613408
+          ],
+          "ratios": [
+            0.2563485813451551,
+            0.2873071079358787
+          ]
+        },
+        {
+          "closure": "gas",
+          "sign": 1,
+          "n_RK": 3,
+          "L1": [
+            0.004475583164235416,
+            0.0011126709270192078,
+            0.00032944667332534714
+          ],
+          "ratios": [
+            0.24860915017971527,
+            0.2960863498140632
+          ]
+        },
+        {
+          "closure": "gas",
+          "sign": 1,
+          "n_RK": 4,
+          "L1": [
+            0.004475553673175405,
+            0.0011127405183040259,
+            0.0003294985093091684
+          ],
+          "ratios": [
+            0.24862633755759128,
+            0.29611441651407716
+          ]
+        },
+        {
+          "closure": "gas-liquid",
+          "sign": -1,
+          "n_RK": 2,
+          "L1": [
+            0.005671875833585797,
+            0.0012395255784288315,
+            0.00036777173480516173
+          ],
+          "ratios": [
+            0.218538912838858,
+            0.2967036269403437
+          ]
+        },
+        {
+          "closure": "gas-liquid",
+          "sign": -1,
+          "n_RK": 3,
+          "L1": [
+            0.005664138970414906,
+            0.0012096426387159943,
+            0.0003670035738120254
+          ],
+          "ratios": [
+            0.21356161016426936,
+            0.30339834432555274
+          ]
+        },
+        {
+          "closure": "gas-liquid",
+          "sign": -1,
+          "n_RK": 4,
+          "L1": [
+            0.005663899424780467,
+            0.00120972796466376,
+            0.0003670601720637184
+          ],
+          "ratios": [
+            0.213585707290459,
+            0.30342373061181704
+          ]
+        },
+        {
+          "closure": "gas-liquid",
+          "sign": 1,
+          "n_RK": 2,
+          "L1": [
+            0.005671875833585812,
+            0.0012395255784289005,
+            0.00036777173480516276
+          ],
+          "ratios": [
+            0.21853891283886956,
+            0.296703626940328
+          ]
+        },
+        {
+          "closure": "gas-liquid",
+          "sign": 1,
+          "n_RK": 3,
+          "L1": [
+            0.005664138970414922,
+            0.0012096426387159939,
+            0.00036700357381202645
+          ],
+          "ratios": [
+            0.2135616101642687,
+            0.3033983443255537
+          ]
+        },
+        {
+          "closure": "gas-liquid",
+          "sign": 1,
+          "n_RK": 4,
+          "L1": [
+            0.0056638994247804825,
+            0.0012097279646637595,
+            0.00036706017206371945
+          ],
+          "ratios": [
+            0.21358570729045834,
+            0.303423730611818
+          ]
+        }
+      ]
+    },
+    {
+      "profile": "optimized",
+      "case_count": 162,
+      "actual_threads": [
+        1,
+        4
+      ],
+      "raw_evidence_path": "/tmp/imex-n7-composition.HrHntr/optimized/evidence.json",
+      "raw_evidence_sha256": "499958d888028f5112e5d57078cc36d733020f859a8934224f2e40b02c73f318",
+      "equilibrium_count": 90,
+      "contact_count": 72,
+      "maximum_equilibrium_error": 0,
+      "maximum_force_scaled_equilibrium_residual": 0,
+      "maximum_contact_reference_error": 8.938319024070487e-16,
+      "maximum_contact_error_over_frozen_limit": 0.000019734373078682467,
+      "maximum_analytic_L1": 0.007793910702979878,
+      "maximum_analytic_Linf": 0.045906470703342084,
+      "absolute_centroid_displacement_range": [
+        0.09959091159305444,
+        0.10008386717251483
+      ],
+      "minimum_central_guard_cells": 37,
+      "minimum_boundary_guard_cells": 29,
+      "maximum_component_carrier_budget": 6.541100161795386e-15,
+      "maximum_boundary_mass_flux": 0,
+      "maximum_face_violation": 0,
+      "maximum_face_closure_error": 8.549833076368232e-16,
+      "maximum_dt_over_CFL": 0.34420805270127447,
+      "raw_minima": {
+        "component": 0.049999999999999975,
+        "carrier": 0.3211854692716112,
+        "temperature": 299.9999999999996,
+        "h": 0.9506433257611225
+      },
+      "refinements": [
+        {
+          "closure": "liquid",
+          "sign": -1,
+          "n_RK": 2,
+          "L1": [
+            0.007793910702979793,
+            0.0016300697784288128,
+            0.0004755878466373443
+          ],
+          "ratios": [
+            0.20914658129270064,
+            0.29175919517737003
+          ]
+        },
+        {
+          "closure": "liquid",
+          "sign": -1,
+          "n_RK": 3,
+          "L1": [
+            0.007721057695489814,
+            0.0016054767712593327,
+            0.0004751206250610665
+          ],
+          "ratios": [
+            0.2079348237738409,
+            0.29593740225115983
+          ]
+        },
+        {
+          "closure": "liquid",
+          "sign": -1,
+          "n_RK": 4,
+          "L1": [
+            0.007720118601098397,
+            0.0016054348215359155,
+            0.0004751723974845502
+          ],
+          "ratios": [
+            0.20795468366347358,
+            0.2959773832673904
+          ]
+        },
+        {
+          "closure": "liquid",
+          "sign": 1,
+          "n_RK": 2,
+          "L1": [
+            0.007793910702979878,
+            0.0016300697784288123,
+            0.0004755878466375015
+          ],
+          "ratios": [
+            0.2091465812926983,
+            0.29175919517746657
+          ]
+        },
+        {
+          "closure": "liquid",
+          "sign": 1,
+          "n_RK": 3,
+          "L1": [
+            0.00772105769548983,
+            0.001605476771259438,
+            0.00047512062506117165
+          ],
+          "ratios": [
+            0.20793482377385414,
+            0.2959374022512059
+          ]
+        },
+        {
+          "closure": "liquid",
+          "sign": 1,
+          "n_RK": 4,
+          "L1": [
+            0.007720118601098413,
+            0.0016054348215359168,
+            0.000475172397484586
+          ],
+          "ratios": [
+            0.20795468366347333,
+            0.29597738326741246
+          ]
+        },
+        {
+          "closure": "gas",
+          "sign": -1,
+          "n_RK": 2,
+          "L1": [
+            0.0044522376813581266,
+            0.0011413248134274987,
+            0.0003279107313617023
+          ],
+          "ratios": [
+            0.2563485813451327,
+            0.28730710793622155
+          ]
+        },
+        {
+          "closure": "gas",
+          "sign": -1,
+          "n_RK": 3,
+          "L1": [
+            0.004475583164235539,
+            0.0011126709270192082,
+            0.00032944667332543285
+          ],
+          "ratios": [
+            0.24860915017970853,
+            0.2960863498141401
+          ]
+        },
+        {
+          "closure": "gas",
+          "sign": -1,
+          "n_RK": 4,
+          "L1": [
+            0.004475553673175598,
+            0.001112740518304061,
+            0.0003294985093094276
+          ],
+          "ratios": [
+            0.24862633755758842,
+            0.2961144165143007
+          ]
+        },
+        {
+          "closure": "gas",
+          "sign": 1,
+          "n_RK": 2,
+          "L1": [
+            0.004452237681358142,
+            0.0011413248134274983,
+            0.00032791073136172243
+          ],
+          "ratios": [
+            0.2563485813451317,
+            0.2873071079362393
+          ]
+        },
+        {
+          "closure": "gas",
+          "sign": 1,
+          "n_RK": 3,
+          "L1": [
+            0.004475583164235624,
+            0.001112670927019173,
+            0.00032944667332538184
+          ],
+          "ratios": [
+            0.24860915017969595,
+            0.29608634981410364
+          ]
+        },
+        {
+          "closure": "gas",
+          "sign": 1,
+          "n_RK": 4,
+          "L1": [
+            0.004475553673175544,
+            0.0011127405183040606,
+            0.00032949850930932454
+          ],
+          "ratios": [
+            0.2486263375575913,
+            0.2961144165142082
+          ]
+        },
+        {
+          "closure": "gas-liquid",
+          "sign": -1,
+          "n_RK": 2,
+          "L1": [
+            0.005671875833585658,
+            0.0012395255784289356,
+            0.00036777173480509234
+          ],
+          "ratios": [
+            0.21853891283888172,
+            0.29670362694026275
+          ]
+        },
+        {
+          "closure": "gas-liquid",
+          "sign": -1,
+          "n_RK": 3,
+          "L1": [
+            0.005664138970414906,
+            0.0012096426387159943,
+            0.000367003573811904
+          ],
+          "ratios": [
+            0.21356161016426936,
+            0.3033983443254524
+          ]
+        },
+        {
+          "closure": "gas-liquid",
+          "sign": -1,
+          "n_RK": 4,
+          "L1": [
+            0.005663899424780189,
+            0.001209727964663864,
+            0.0003670601720636317
+          ],
+          "ratios": [
+            0.21358570729048784,
+            0.30342373061171923
+          ]
+        },
+        {
+          "closure": "gas-liquid",
+          "sign": 1,
+          "n_RK": 2,
+          "L1": [
+            0.005671875833585673,
+            0.0012395255784287964,
+            0.00036777173480504133
+          ],
+          "ratios": [
+            0.21853891283885657,
+            0.2967036269402549
+          ]
+        },
+        {
+          "closure": "gas-liquid",
+          "sign": 1,
+          "n_RK": 3,
+          "L1": [
+            0.005664138970414991,
+            0.0012096426387159245,
+            0.000367003573811905
+          ],
+          "ratios": [
+            0.21356161016425385,
+            0.3033983443254707
+          ]
+        },
+        {
+          "closure": "gas-liquid",
+          "sign": 1,
+          "n_RK": 4,
+          "L1": [
+            0.005663899424780274,
+            0.001209727964663482,
+            0.0003670601720635286
+          ],
+          "ratios": [
+            0.2135857072904172,
+            0.3034237306117299
+          ]
+        }
+      ]
+    }
+  ],
+  "geometry_profiles": [
+    {
+      "profile": "strict",
+      "case_count": 112,
+      "actual_threads": [
+        1,
+        4
+      ],
+      "raw_evidence_path": "/tmp/imex-geometry-1d.WxqaZx/strict/evidence.json",
+      "raw_evidence_sha256": "05ee694df472d50abafcee3c9836559ef9e990458c18ef98d5f86fc3b5d3a1ca",
+      "maximum_relative_field_error": 2.4293067557579207e-14,
+      "preceding_x_and_2d_controls": {
+        "case_count": 32,
+        "all_fingerprints_identical": true,
+        "raw_evidence_path": "/tmp/imex-geometry-1d.HHd3Xj/strict/evidence.json",
+        "raw_evidence_sha256": "c17bb62acdfdc02c19b564ad2c93d7f94ad5dfbeeaa4dbff2793dcfd7e9e58c5"
+      },
+      "cases": [
+        {
+          "case": "grid-1-1-bed-0-S0",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-0-S1",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-1-S0",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-1-S1",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-2-S0",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-2-S1",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-3-S0",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-3-S1",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-2-1-bed-0-S0",
+          "error": 3.675252375590763e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e08723174c3258fc29c00faf2a480188ffa85d88eb83b99debeb81ec51d967af"
+        },
+        {
+          "case": "grid-2-1-bed-0-S1",
+          "error": 3.675252375590763e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e08723174c3258fc29c00faf2a480188ffa85d88eb83b99debeb81ec51d967af"
+        },
+        {
+          "case": "grid-2-1-bed-1-S0",
+          "error": 9.43689570931383e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "2cea5d8b88169706556afa9d2eb1f8323b7d6d00ecc0beeaa6be3fd808529e9a"
+        },
+        {
+          "case": "grid-2-1-bed-1-S1",
+          "error": 9.43689570931383e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "8087ad206bd2cc41b0f6b7a39b8cf0466a565ee34cdd0a1cf5b3b032f574a930"
+        },
+        {
+          "case": "grid-2-1-bed-2-S0",
+          "error": 2.498001805406602e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "cf222a3f8113ff22ff2f343283efd025657170e6ca61e00f161569b52abb7775"
+        },
+        {
+          "case": "grid-2-1-bed-2-S1",
+          "error": 2.498001805406602e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "8d9628d5897bf623ed176d6bb032547b91cf132dfc567bde9b149ec624a4eaa5"
+        },
+        {
+          "case": "grid-2-1-bed-3-S0",
+          "error": 1.5543122344752192e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "051b90d7da424584769694412d9612adb3a738d22b4bacc2cad3c46b21d1dc21"
+        },
+        {
+          "case": "grid-2-1-bed-3-S1",
+          "error": 1.5543122344752192e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "abfeb3bf5554485e93e48ffae27f0d908bc1a64fc208676a411dd33340a1d6c5"
+        },
+        {
+          "case": "grid-3-1-bed-0-S0",
+          "error": 6.711397491591017e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "d0c496e972c49009d56ae2ea448854dbad01ea3a022795831ef7352db1f7fe94"
+        },
+        {
+          "case": "grid-3-1-bed-0-S1",
+          "error": 6.711397491591017e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "d0c496e972c49009d56ae2ea448854dbad01ea3a022795831ef7352db1f7fe94"
+        },
+        {
+          "case": "grid-3-1-bed-1-S0",
+          "error": 1.501551806321081e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ff97d9f06e4f7f5409cfc20211011563dba8771a9084a2959624805268935c0c"
+        },
+        {
+          "case": "grid-3-1-bed-1-S1",
+          "error": 1.501551806321081e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "1587f7e16e21874502efa58d800e5c7bb4ec54b59797d01ab5700f4579bd0ec8"
+        },
+        {
+          "case": "grid-3-1-bed-2-S0",
+          "error": 2.4293067557579207e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "979f0352ed079487f616b15e8ff686ef011bbb5c26ca8a9f0739f90905d125d7"
+        },
+        {
+          "case": "grid-3-1-bed-2-S1",
+          "error": 2.4293067557579207e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "aa8da78104a1a5a3f0beeb7fe066cb190a8890d1d38dcdecc4c3b8884bbf6236"
+        },
+        {
+          "case": "grid-3-1-bed-3-S0",
+          "error": 1.371819324802459e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "1b29f290957f1343d0adf141ff24a792d15121a26ca5dbea7ca5e515149ac464"
+        },
+        {
+          "case": "grid-3-1-bed-3-S1",
+          "error": 1.371819324802459e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "fe69cabee4d05728435d15f85b932c7a40e751824b910a66699faee1579ca757"
+        },
+        {
+          "case": "grid-4-1-bed-0-S0",
+          "error": 4.653452396429302e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "93e9fe9183be8b0aad38e9635d80a8861bedfedcac4e046b20b7abfaae3fb243"
+        },
+        {
+          "case": "grid-4-1-bed-0-S1",
+          "error": 4.653452396429302e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "93e9fe9183be8b0aad38e9635d80a8861bedfedcac4e046b20b7abfaae3fb243"
+        },
+        {
+          "case": "grid-4-1-bed-1-S0",
+          "error": 3.3029134982598407e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "da639baae9f4e7f4f03f0583ee3e4d10fb4eec6a6d7075c849dfcc585c6d951c"
+        },
+        {
+          "case": "grid-4-1-bed-1-S1",
+          "error": 3.3029134982598407e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "a429dd868923d93153b77768b81770e8e44806ded15e3d0fe2717f3058b67259"
+        },
+        {
+          "case": "grid-4-1-bed-2-S0",
+          "error": 7.382983113757291e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "d6a7e03f009750699ddeb5bf6d5cca39b9f34b9ebb145ce7ba3a60fad329080b"
+        },
+        {
+          "case": "grid-4-1-bed-2-S1",
+          "error": 7.382983113757291e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e2b95ba1c13b5ec39afd2d2a356023bbb2b53df989a1a46897df182f774e28e8"
+        },
+        {
+          "case": "grid-4-1-bed-3-S0",
+          "error": 7.147060721024445e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "30deecb4d8d738a483992b0d46ac7dd7cb01c850e4010b75a52a3c467120c1ed"
+        },
+        {
+          "case": "grid-4-1-bed-3-S1",
+          "error": 7.147060721024445e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "5ed6c7a83f1c2da111f9d5f21bb48488fa58961b58e5724c8c0784b3db2ffede"
+        },
+        {
+          "case": "grid-5-1-bed-0-S0",
+          "error": 3.4403519406048114e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "6fcfcfe94e5f71a6ed7ab17889a05d010c60008a55871fc1e4d4f5dfe14ea3ff"
+        },
+        {
+          "case": "grid-5-1-bed-0-S1",
+          "error": 3.4403519406048114e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "6fcfcfe94e5f71a6ed7ab17889a05d010c60008a55871fc1e4d4f5dfe14ea3ff"
+        },
+        {
+          "case": "grid-5-1-bed-1-S0",
+          "error": 1.8639822863440825e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "aad04ebb0c13c8ab0e06d7ffce8d6ca7549b37d93c95171de7d49f656154200a"
+        },
+        {
+          "case": "grid-5-1-bed-1-S1",
+          "error": 1.8639822863440825e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "165ccf95816aea8e05f0c00d7438ef99c3b92ddb87fed7ded4ca46fa52832ad4"
+        },
+        {
+          "case": "grid-5-1-bed-2-S0",
+          "error": 1.3808398868775384e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "378325a966628467ce07ec8dbb2f8417afdca91c6919b2a170158f219eb1b603"
+        },
+        {
+          "case": "grid-5-1-bed-2-S1",
+          "error": 1.3808398868775384e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "8cc55a5e0e96de817977aed9ecc12c94e611e58cdb50f08b48344523734c7ecc"
+        },
+        {
+          "case": "grid-5-1-bed-3-S0",
+          "error": 4.53109771925142e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "d0b146d06d270c271df4affeff99530feab5b109f45d606771b0c7d52edb4c1d"
+        },
+        {
+          "case": "grid-5-1-bed-3-S1",
+          "error": 4.53109771925142e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "fbb94b10c38ab86a9d6109713062724f5923e66be53077d984974e4e9879eca8"
+        },
+        {
+          "case": "grid-9-1-bed-0-S0",
+          "error": 3.4403519406048114e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "edd7d2168bb871731e79cea1f8c36b30171da8ac15481b3e3d6a010520657c4e"
+        },
+        {
+          "case": "grid-9-1-bed-0-S1",
+          "error": 3.4403519406048114e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "edd7d2168bb871731e79cea1f8c36b30171da8ac15481b3e3d6a010520657c4e"
+        },
+        {
+          "case": "grid-9-1-bed-1-S0",
+          "error": 5.71400449470679e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "57ca2600978bb4622b288965c28e5347190e238ea61a9e9e7a52fff13c41df46"
+        },
+        {
+          "case": "grid-9-1-bed-1-S1",
+          "error": 5.71400449470679e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "356cb0593756d02793094faba532b47b82a165733821d20a361fb6c812404ddb"
+        },
+        {
+          "case": "grid-9-1-bed-2-S0",
+          "error": 7.993605777301127e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ffcc9d4cf47597b7ce1ab8b2bb5bc30512c7f5db17abec50b54bfb0f539c7da1"
+        },
+        {
+          "case": "grid-9-1-bed-2-S1",
+          "error": 7.993605777301127e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "dc790c5f3146f765c816e4868b739e50506dfcf13eeeb31571bc8c6e1d3db396"
+        },
+        {
+          "case": "grid-9-1-bed-3-S0",
+          "error": 8.494940861858424e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "fd842de2f9fa725b89cae9288c6b8c7f1516911784a84ba353f6756a8ea43111"
+        },
+        {
+          "case": "grid-9-1-bed-3-S1",
+          "error": 8.494940861858424e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "9a7696addff84ac4cce1f9d369b66efcfa5e9f2f317df66521ae4299f1f7241c"
+        },
+        {
+          "case": "grid-17-1-bed-0-S0",
+          "error": 3.4403519406048114e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "019340eefa1afefa6e7f10d2244d89833dda6f1ff726ef6fcc03ad4afcd2c109"
+        },
+        {
+          "case": "grid-17-1-bed-0-S1",
+          "error": 3.4403519406048114e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "019340eefa1afefa6e7f10d2244d89833dda6f1ff726ef6fcc03ad4afcd2c109"
+        },
+        {
+          "case": "grid-17-1-bed-1-S0",
+          "error": 1.0676312436782612e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "55bacc0bebcacd5070638a2693fd80af469fce5cbad83bb95ad20abc2015b916"
+        },
+        {
+          "case": "grid-17-1-bed-1-S1",
+          "error": 1.0676312436782612e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "d2d5291b4e4b2ef8849325d2d8258e3704da417ab568b8a14ec3e8698965438c"
+        },
+        {
+          "case": "grid-17-1-bed-2-S0",
+          "error": 8.770761894538737e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "d4b553410eb4e3a6c54543699799d489278bd1ea5cffda255d76333d238efca6"
+        },
+        {
+          "case": "grid-17-1-bed-2-S1",
+          "error": 8.770761894538737e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "3a03545e452abf11562720529d45eccff6ccbb488ad6b30d70434d2253c97497"
+        },
+        {
+          "case": "grid-17-1-bed-3-S0",
+          "error": 1.1463052729254741e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "5579a3089470f2f4e29c939a2dcd268f5bce62c1d3b77fdcc601ec3f1ff9c6e6"
+        },
+        {
+          "case": "grid-17-1-bed-3-S1",
+          "error": 1.1463052729254741e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "dc02ea1a8701fa9ffa0ce65227a4da3868fc19a4e7562b287d7477e8d0d4a705"
+        },
+        {
+          "case": "grid-1-2-bed-0-S0",
+          "error": 2.450168250393842e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e08723174c3258fc29c00faf2a480188ffa85d88eb83b99debeb81ec51d967af"
+        },
+        {
+          "case": "grid-1-2-bed-0-S1",
+          "error": 2.450168250393842e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e08723174c3258fc29c00faf2a480188ffa85d88eb83b99debeb81ec51d967af"
+        },
+        {
+          "case": "grid-1-2-bed-1-S0",
+          "error": 4.718447854656915e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "403a7b96bcd7bc60511d1272c8ebe26730fd6f8ba921cd0d28cff6ea7be07d8b"
+        },
+        {
+          "case": "grid-1-2-bed-1-S1",
+          "error": 4.718447854656915e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "93e18ec48599c5f921f5d2c2444bb316d454be847acd57543e6cf968ba096269"
+        },
+        {
+          "case": "grid-1-2-bed-2-S0",
+          "error": 1.3877787807814457e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "9faa2c3260998c3122e9f47fb5516e36e817b09edf57a7ea1c7c786db20fdda9"
+        },
+        {
+          "case": "grid-1-2-bed-2-S1",
+          "error": 1.3877787807814457e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "b8e8ba20f8a7e28cb4f63dc2ef66a02a5ceec653a1ded1668429559761e9deee"
+        },
+        {
+          "case": "grid-1-2-bed-3-S0",
+          "error": 1.8041124150158794e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "c38787678447220f7522eb6acbe49f59730e6e50d76ce7c54f4727c1428e9cbe"
+        },
+        {
+          "case": "grid-1-2-bed-3-S1",
+          "error": 1.8041124150158794e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "5dea5b4406707019dfa799a2f4d87cb5933703d4617103899c386832791e03d4"
+        },
+        {
+          "case": "grid-1-3-bed-0-S0",
+          "error": 1.194416388380913e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "5ca383e3f42ebca0819fd0cbfbfc63eb2ede844e1afc6eb31698de00a879cd45"
+        },
+        {
+          "case": "grid-1-3-bed-0-S1",
+          "error": 1.194416388380913e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "5ca383e3f42ebca0819fd0cbfbfc63eb2ede844e1afc6eb31698de00a879cd45"
+        },
+        {
+          "case": "grid-1-3-bed-1-S0",
+          "error": 1.2384635201085298e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "dda48dd75981ca2cf0e03478caa1b34f7bf9a282dad71d84b067c5616da2db39"
+        },
+        {
+          "case": "grid-1-3-bed-1-S1",
+          "error": 1.2384635201085298e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "c7aa9b610e580f5fa5d04a58fb20ce719920a6ebf550267499651cc063ecbeb5"
+        },
+        {
+          "case": "grid-1-3-bed-2-S0",
+          "error": 1.285430095698814e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "a5ea6bf0bef78c45d6cbe5c46181b9adca4b44f3759b06327f16f559735d714a"
+        },
+        {
+          "case": "grid-1-3-bed-2-S1",
+          "error": 1.285430095698814e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "df98af29db9173c3cb53403f2edf0e1d4dafc5cd86228d7a1968a7d4f071ef71"
+        },
+        {
+          "case": "grid-1-3-bed-3-S0",
+          "error": 9.797718192317006e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "c1b99816e517935efc09141e43f0996b5c8f42fb1dc1a7806a02dd3b6c7bd9e0"
+        },
+        {
+          "case": "grid-1-3-bed-3-S1",
+          "error": 9.797718192317006e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "63b5cfa70b52abd97b5059893285e6bd0c3e45bde2874f3dfbc9f43bbbf9d6d1"
+        },
+        {
+          "case": "grid-1-4-bed-0-S0",
+          "error": 2.7708154080647135e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "93e9fe9183be8b0aad38e9635d80a8861bedfedcac4e046b20b7abfaae3fb243"
+        },
+        {
+          "case": "grid-1-4-bed-0-S1",
+          "error": 2.7708154080647135e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "93e9fe9183be8b0aad38e9635d80a8861bedfedcac4e046b20b7abfaae3fb243"
+        },
+        {
+          "case": "grid-1-4-bed-1-S0",
+          "error": 1.4849232954361469e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "7124a8a078ea3e52ba20cae65127e8b3c300ad4baf6daec0e9bbe7bb125e96c7"
+        },
+        {
+          "case": "grid-1-4-bed-1-S1",
+          "error": 1.4849232954361469e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ce922cdd6f7e77e8f127908671d6625c65f007814c630e8ee170050b89f09192"
+        },
+        {
+          "case": "grid-1-4-bed-2-S0",
+          "error": 3.1225022567582528e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ac3d989eca23399511c8d0b912b335da6015febc82c08b561a03c46153493210"
+        },
+        {
+          "case": "grid-1-4-bed-2-S1",
+          "error": 3.1225022567582528e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "2b8aa30a55f6072545976c7ea1a361bdf975d5be01ff7b31974b8875df64c6dc"
+        },
+        {
+          "case": "grid-1-4-bed-3-S0",
+          "error": 1.0033640585049852e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "f949859c99619f0915d720a46f12a0a60859fee970b73bb507872bcc4cb2eed0"
+        },
+        {
+          "case": "grid-1-4-bed-3-S1",
+          "error": 1.0033640585049852e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "bd7b9070dba720138cd6c707b182ec285430cd6d1058bf680503ecacacbe3a1d"
+        },
+        {
+          "case": "grid-1-5-bed-0-S0",
+          "error": 9.106627930476304e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "6fcfcfe94e5f71a6ed7ab17889a05d010c60008a55871fc1e4d4f5dfe14ea3ff"
+        },
+        {
+          "case": "grid-1-5-bed-0-S1",
+          "error": 9.106627930476304e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "6fcfcfe94e5f71a6ed7ab17889a05d010c60008a55871fc1e4d4f5dfe14ea3ff"
+        },
+        {
+          "case": "grid-1-5-bed-1-S0",
+          "error": 2.0809879182782234e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "2bac3871d0d489223632b7ce4e138fec37d5d68adf3eaaf3b4ee9a96cbc0499a"
+        },
+        {
+          "case": "grid-1-5-bed-1-S1",
+          "error": 2.0809879182782234e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "13318b411689f244e1f2a3402175f5a1e63119f3742d9edb60771b4018da2ef7"
+        },
+        {
+          "case": "grid-1-5-bed-2-S0",
+          "error": 9.610368056911511e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "90b300745582cc14805f01c297fef94b4f7585744375243cc18c724c01e9c5fe"
+        },
+        {
+          "case": "grid-1-5-bed-2-S1",
+          "error": 9.610368056911511e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "bedccb99ebf5bd68dbe92a65c5da086f266f0e9eb0e680f8e2170b7ec8e61b5b"
+        },
+        {
+          "case": "grid-1-5-bed-3-S0",
+          "error": 1.106753577673203e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee3533b09ff878c3020c4921e0b33df98888fa3167f793ea068dbd7a72533806"
+        },
+        {
+          "case": "grid-1-5-bed-3-S1",
+          "error": 1.106753577673203e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "5684c4101f3c3dfd5e693a110273500700c0639f14677aa4292935a7285760c5"
+        },
+        {
+          "case": "grid-1-9-bed-0-S0",
+          "error": 9.106627930476304e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "edd7d2168bb871731e79cea1f8c36b30171da8ac15481b3e3d6a010520657c4e"
+        },
+        {
+          "case": "grid-1-9-bed-0-S1",
+          "error": 9.106627930476304e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "edd7d2168bb871731e79cea1f8c36b30171da8ac15481b3e3d6a010520657c4e"
+        },
+        {
+          "case": "grid-1-9-bed-1-S0",
+          "error": 2.0809879182782234e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "7c4034bb7232e41d93aba7f75ac9962743b684ec0cb777f7d337c2713c190e92"
+        },
+        {
+          "case": "grid-1-9-bed-1-S1",
+          "error": 2.0809879182782234e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "f02ff8f1dc589742122f4aed1e4e02b69f2e675879d30941a1a72aea2d04051d"
+        },
+        {
+          "case": "grid-1-9-bed-2-S0",
+          "error": 1.3704315460216776e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "9e19ef44a2c89b71e32af4b82f6f885730ce9902f0b278a3d40cc75cdc42141a"
+        },
+        {
+          "case": "grid-1-9-bed-2-S1",
+          "error": 1.3704315460216776e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "5856384746bdc399c0efccd25bc539147b38d44b6d6e3e3c20cb2aa863f2db5c"
+        },
+        {
+          "case": "grid-1-9-bed-3-S0",
+          "error": 2.1788126858268697e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "728787e179daac8d51de078b2d4aa80e89542b7caccfdfb079acb3c2da155500"
+        },
+        {
+          "case": "grid-1-9-bed-3-S1",
+          "error": 2.1788126858268697e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "8b4e7e473bd0204fa704c191da72bded56f87f2912a96b4597ce4437f5ed488f"
+        },
+        {
+          "case": "grid-1-17-bed-0-S0",
+          "error": 9.106627930476304e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "019340eefa1afefa6e7f10d2244d89833dda6f1ff726ef6fcc03ad4afcd2c109"
+        },
+        {
+          "case": "grid-1-17-bed-0-S1",
+          "error": 9.106627930476304e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "019340eefa1afefa6e7f10d2244d89833dda6f1ff726ef6fcc03ad4afcd2c109"
+        },
+        {
+          "case": "grid-1-17-bed-1-S0",
+          "error": 2.0809879182782234e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "6cd73aa3dada5b87d0c9788a5012520adcf3723f5ae2cac76899b3e74a152d1b"
+        },
+        {
+          "case": "grid-1-17-bed-1-S1",
+          "error": 2.0809879182782234e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "7755b926a69463b53a7b5772087e488230399ab9d02e031ddc8d30b05550fb43"
+        },
+        {
+          "case": "grid-1-17-bed-2-S0",
+          "error": 1.7069679003611782e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "c9fcff5c316faa1093e7777622a73e5b184fb51a065a00c28d239fafe11a3263"
+        },
+        {
+          "case": "grid-1-17-bed-2-S1",
+          "error": 1.7069679003611782e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "1a0dc4491d671520f546e42896b3ed01266fb22c3dfe8d8ff432231714c38aae"
+        },
+        {
+          "case": "grid-1-17-bed-3-S0",
+          "error": 2.1788126858268697e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "8bf22a77a147465ea40fe94c2ebda84fc6ce75632c1c4bfdcc0c004a814cd167"
+        },
+        {
+          "case": "grid-1-17-bed-3-S1",
+          "error": 2.1788126858268697e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "13b6bddbb91623eea60e8a5eb2f9fade34a4a36a2eb5aeadf399396414375705"
+        },
+        {
+          "case": "grid-7-9-bed-0-S0",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "dbc93f6453da63e2432406049ed52a37e08d5a4fbe46ae6e722540eb51145b8a"
+        },
+        {
+          "case": "grid-7-9-bed-0-S1",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "dbc93f6453da63e2432406049ed52a37e08d5a4fbe46ae6e722540eb51145b8a"
+        },
+        {
+          "case": "grid-7-9-bed-1-S0",
+          "error": 4.0602442043434294e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "56e4e5f2f20de43dd8201c5e7f1033708395533a9d8b423ff23aa7d5d0a80858"
+        },
+        {
+          "case": "grid-7-9-bed-1-S1",
+          "error": 4.0602442043434294e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "85fd53439061a0e647c07bfc1b168b591e14477b5d8233275371f7a2eb086a65"
+        },
+        {
+          "case": "grid-7-9-bed-2-S0",
+          "error": 2.706168622523819e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "59a557bd1f79f4bfc31980ecc36352e006117a5d367bee86396dc77e705f10ee"
+        },
+        {
+          "case": "grid-7-9-bed-2-S1",
+          "error": 2.706168622523819e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ff2d5fffbf2bd7b29e3c9850a2f6e8af8919d513d3eecf4f8a1ea6ac15332854"
+        },
+        {
+          "case": "grid-7-9-bed-3-S0",
+          "error": 4.062722380737682e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "d1d3a6273ecca679e933058941e3812f48357d6e25140e3285b071dd416aa454"
+        },
+        {
+          "case": "grid-7-9-bed-3-S1",
+          "error": 4.062722380737682e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "0020ffc8220d7db6f1f784ca10082e22c18e930aa23772452fde7dc314541252"
+        }
+      ]
+    },
+    {
+      "profile": "optimized",
+      "case_count": 112,
+      "actual_threads": [
+        1,
+        4
+      ],
+      "raw_evidence_path": "/tmp/imex-geometry-1d.WxqaZx/optimized/evidence.json",
+      "raw_evidence_sha256": "4b335f3d788a79aa5a6cc7676e8187d58bbdfb90f2b4d4150081411a75d319c3",
+      "maximum_relative_field_error": 2.508410146262463e-14,
+      "preceding_x_and_2d_controls": {
+        "case_count": 32,
+        "all_fingerprints_identical": true,
+        "raw_evidence_path": "/tmp/imex-geometry-1d.HHd3Xj/optimized/evidence.json",
+        "raw_evidence_sha256": "1734896a56301b8ab113ffb9aa6c384377cfac49781f340f949dbcccb72c57c5"
+      },
+      "cases": [
+        {
+          "case": "grid-1-1-bed-0-S0",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-0-S1",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-1-S0",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-1-S1",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-2-S0",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-2-S1",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-3-S0",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-1-1-bed-3-S1",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee8cf95f2c79bd714b3cc3a1b43829276132e154436d785242ba5d7a277f0c83"
+        },
+        {
+          "case": "grid-2-1-bed-0-S0",
+          "error": 3.675252375590763e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e08723174c3258fc29c00faf2a480188ffa85d88eb83b99debeb81ec51d967af"
+        },
+        {
+          "case": "grid-2-1-bed-0-S1",
+          "error": 3.675252375590763e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e08723174c3258fc29c00faf2a480188ffa85d88eb83b99debeb81ec51d967af"
+        },
+        {
+          "case": "grid-2-1-bed-1-S0",
+          "error": 9.43689570931383e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "2cea5d8b88169706556afa9d2eb1f8323b7d6d00ecc0beeaa6be3fd808529e9a"
+        },
+        {
+          "case": "grid-2-1-bed-1-S1",
+          "error": 9.43689570931383e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "8087ad206bd2cc41b0f6b7a39b8cf0466a565ee34cdd0a1cf5b3b032f574a930"
+        },
+        {
+          "case": "grid-2-1-bed-2-S0",
+          "error": 2.498001805406602e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "cf222a3f8113ff22ff2f343283efd025657170e6ca61e00f161569b52abb7775"
+        },
+        {
+          "case": "grid-2-1-bed-2-S1",
+          "error": 2.498001805406602e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "8d9628d5897bf623ed176d6bb032547b91cf132dfc567bde9b149ec624a4eaa5"
+        },
+        {
+          "case": "grid-2-1-bed-3-S0",
+          "error": 1.5543122344752192e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "051b90d7da424584769694412d9612adb3a738d22b4bacc2cad3c46b21d1dc21"
+        },
+        {
+          "case": "grid-2-1-bed-3-S1",
+          "error": 1.5543122344752192e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "abfeb3bf5554485e93e48ffae27f0d908bc1a64fc208676a411dd33340a1d6c5"
+        },
+        {
+          "case": "grid-3-1-bed-0-S0",
+          "error": 8.222621924867912e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "8d734c999387a2ba19a1212dfaba341789a26b66dd216c28b8016a56a1d99813"
+        },
+        {
+          "case": "grid-3-1-bed-0-S1",
+          "error": 8.222621924867912e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "8d734c999387a2ba19a1212dfaba341789a26b66dd216c28b8016a56a1d99813"
+        },
+        {
+          "case": "grid-3-1-bed-1-S0",
+          "error": 1.75967865954643e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "5f2b3af7894607c5e549ef8011c82e50d49b6b8d4ef76859901e6d196d2d3113"
+        },
+        {
+          "case": "grid-3-1-bed-1-S1",
+          "error": 1.75967865954643e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "3c763066cbe870bc83a26b9775d888182317be7a3846ff630f754c979ad02925"
+        },
+        {
+          "case": "grid-3-1-bed-2-S0",
+          "error": 2.508410146262463e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "7a64814a43352f770a58828c665728483d1ab1ff60189cd2acbb98ac742b8931"
+        },
+        {
+          "case": "grid-3-1-bed-2-S1",
+          "error": 2.508410146262463e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ee4e29f031780fce494f12b3b495f9bb88e12294158a3f06aeca9543ca903b64"
+        },
+        {
+          "case": "grid-3-1-bed-3-S0",
+          "error": 1.6257828416854636e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "9f0121398332506daae9abbe3c2d76603af24c7bbc0f0de1529daeba5485bb0a"
+        },
+        {
+          "case": "grid-3-1-bed-3-S1",
+          "error": 1.6257828416854636e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "a158c975d8f01d78362d34a6a62012e754193cb40e4cb870591a4a0aa0ae8a2d"
+        },
+        {
+          "case": "grid-4-1-bed-0-S0",
+          "error": 4.653452396429302e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "93e9fe9183be8b0aad38e9635d80a8861bedfedcac4e046b20b7abfaae3fb243"
+        },
+        {
+          "case": "grid-4-1-bed-0-S1",
+          "error": 4.653452396429302e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "93e9fe9183be8b0aad38e9635d80a8861bedfedcac4e046b20b7abfaae3fb243"
+        },
+        {
+          "case": "grid-4-1-bed-1-S0",
+          "error": 2.581268532253489e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "61b2346da7cca736846c412dee17dfb5b696fa1fdce4b537456b52571b42002f"
+        },
+        {
+          "case": "grid-4-1-bed-1-S1",
+          "error": 2.581268532253489e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "5351fbafe667636fce3571bdf623290d99e8c437623f37123734d90542a928a1"
+        },
+        {
+          "case": "grid-4-1-bed-2-S0",
+          "error": 7.382983113757291e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "d6a7e03f009750699ddeb5bf6d5cca39b9f34b9ebb145ce7ba3a60fad329080b"
+        },
+        {
+          "case": "grid-4-1-bed-2-S1",
+          "error": 7.382983113757291e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e2b95ba1c13b5ec39afd2d2a356023bbb2b53df989a1a46897df182f774e28e8"
+        },
+        {
+          "case": "grid-4-1-bed-3-S0",
+          "error": 7.147060721024445e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "30deecb4d8d738a483992b0d46ac7dd7cb01c850e4010b75a52a3c467120c1ed"
+        },
+        {
+          "case": "grid-4-1-bed-3-S1",
+          "error": 7.147060721024445e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "5ed6c7a83f1c2da111f9d5f21bb48488fa58961b58e5724c8c0784b3db2ffede"
+        },
+        {
+          "case": "grid-5-1-bed-0-S0",
+          "error": 3.4403519406048114e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "6fcfcfe94e5f71a6ed7ab17889a05d010c60008a55871fc1e4d4f5dfe14ea3ff"
+        },
+        {
+          "case": "grid-5-1-bed-0-S1",
+          "error": 3.4403519406048114e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "6fcfcfe94e5f71a6ed7ab17889a05d010c60008a55871fc1e4d4f5dfe14ea3ff"
+        },
+        {
+          "case": "grid-5-1-bed-1-S0",
+          "error": 1.8639822863440825e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "734aba9ce6c93da8949de5d441b4acb007078fcaff4ee7abeb820a54d7833e63"
+        },
+        {
+          "case": "grid-5-1-bed-1-S1",
+          "error": 1.8639822863440825e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "bb1bb5fa08573c3f382ee99fa9214ee6f8ce27edcb8d4cd692d86dd93dc30f8d"
+        },
+        {
+          "case": "grid-5-1-bed-2-S0",
+          "error": 1.3808398868775384e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "f7918718dc83fce9a18251c3c91f788aa87b352ab0af07c70fffe785d9279e1a"
+        },
+        {
+          "case": "grid-5-1-bed-2-S1",
+          "error": 1.3808398868775384e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "7705799848a78856af4f32a14e48a1bd499911be01771314f8d017a7f2878ce5"
+        },
+        {
+          "case": "grid-5-1-bed-3-S0",
+          "error": 4.53109771925142e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "d0b146d06d270c271df4affeff99530feab5b109f45d606771b0c7d52edb4c1d"
+        },
+        {
+          "case": "grid-5-1-bed-3-S1",
+          "error": 4.53109771925142e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "fbb94b10c38ab86a9d6109713062724f5923e66be53077d984974e4e9879eca8"
+        },
+        {
+          "case": "grid-9-1-bed-0-S0",
+          "error": 3.4403519406048114e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "edd7d2168bb871731e79cea1f8c36b30171da8ac15481b3e3d6a010520657c4e"
+        },
+        {
+          "case": "grid-9-1-bed-0-S1",
+          "error": 3.4403519406048114e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "edd7d2168bb871731e79cea1f8c36b30171da8ac15481b3e3d6a010520657c4e"
+        },
+        {
+          "case": "grid-9-1-bed-1-S0",
+          "error": 5.71400449470679e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "87574e496c3e035f7fec47d6f94a8966bb848c1879b5396fa3b119e919bedd88"
+        },
+        {
+          "case": "grid-9-1-bed-1-S1",
+          "error": 5.71400449470679e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e90758025fe04e026e9c0f6304b19c6f386f44ec774c646f4c83f328da146041"
+        },
+        {
+          "case": "grid-9-1-bed-2-S0",
+          "error": 8.000544671205034e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "a350ac85b7ed0ebb345e3c23a9c778b92f73591343f99ea5a686943dcb1e8e57"
+        },
+        {
+          "case": "grid-9-1-bed-2-S1",
+          "error": 8.000544671205034e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e2a0e38b57b93cd1360a5cc5d3243b63859fb5b9974c6cad2724be5158bc3b7a"
+        },
+        {
+          "case": "grid-9-1-bed-3-S0",
+          "error": 8.495808223596413e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "9865cb38078cd7f8e06ecabdf17099f149ee6fd0a961b4125332d9fe1eb96bb2"
+        },
+        {
+          "case": "grid-9-1-bed-3-S1",
+          "error": 8.495808223596413e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "1c44b2c7d34989da53281f7984a48529e6dd0f6c164dd46831dfb8e9d0198196"
+        },
+        {
+          "case": "grid-17-1-bed-0-S0",
+          "error": 3.4403519406048114e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "019340eefa1afefa6e7f10d2244d89833dda6f1ff726ef6fcc03ad4afcd2c109"
+        },
+        {
+          "case": "grid-17-1-bed-0-S1",
+          "error": 3.4403519406048114e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "019340eefa1afefa6e7f10d2244d89833dda6f1ff726ef6fcc03ad4afcd2c109"
+        },
+        {
+          "case": "grid-17-1-bed-1-S0",
+          "error": 1.0676312436782612e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e3349e72839c9d39d450ff1d230a0abd20c1555612e73d6d2120098bca5c53f6"
+        },
+        {
+          "case": "grid-17-1-bed-1-S1",
+          "error": 1.0676312436782612e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "083ab9ace5b0034caa27b926f3908e304cf169c79a62dcbb4e241e8a975c4fcc"
+        },
+        {
+          "case": "grid-17-1-bed-2-S0",
+          "error": 8.770761894538737e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "3a2552ad818f3134caf85f1378ed730cca84ee492267b88aa5965d654eb283bf"
+        },
+        {
+          "case": "grid-17-1-bed-2-S1",
+          "error": 8.770761894538737e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "de20f476324d404e974b78a499b333b5f5041136e5323b98cfcfec088fdb454d"
+        },
+        {
+          "case": "grid-17-1-bed-3-S0",
+          "error": 1.3503087537003466e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "d972b173c8e8b28e717927d040de58c54ba86531db7cbb87d03e1cb7b270d9bc"
+        },
+        {
+          "case": "grid-17-1-bed-3-S1",
+          "error": 1.3503087537003466e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "5f501ee8f3b982af3584b06bdab0a44af07ba40bee6739c68dab2a96452daad1"
+        },
+        {
+          "case": "grid-1-2-bed-0-S0",
+          "error": 2.450168250393842e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e08723174c3258fc29c00faf2a480188ffa85d88eb83b99debeb81ec51d967af"
+        },
+        {
+          "case": "grid-1-2-bed-0-S1",
+          "error": 2.450168250393842e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e08723174c3258fc29c00faf2a480188ffa85d88eb83b99debeb81ec51d967af"
+        },
+        {
+          "case": "grid-1-2-bed-1-S0",
+          "error": 1.2628786905111156e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "c55561b138a2bad06629fe154bac89eae16f88c74b76a21d133197f8a67b518e"
+        },
+        {
+          "case": "grid-1-2-bed-1-S1",
+          "error": 1.2628786905111156e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "205b604974f6e497425f79b882ddf830c5fa92ac287c78636560dd3a7c9b7642"
+        },
+        {
+          "case": "grid-1-2-bed-2-S0",
+          "error": 1.3877787807814457e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "9faa2c3260998c3122e9f47fb5516e36e817b09edf57a7ea1c7c786db20fdda9"
+        },
+        {
+          "case": "grid-1-2-bed-2-S1",
+          "error": 1.3877787807814457e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "b8e8ba20f8a7e28cb4f63dc2ef66a02a5ceec653a1ded1668429559761e9deee"
+        },
+        {
+          "case": "grid-1-2-bed-3-S0",
+          "error": 1.0130785099704553e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "715e8962bd1a170e54edddedd9770e8f6beabed66de5f7ff902d541e5fa28bcf"
+        },
+        {
+          "case": "grid-1-2-bed-3-S1",
+          "error": 1.0130785099704553e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "83e59aeb0f2c57efc9fde137dafcbeee0f43e5621792f2998c2550dae11b2aa7"
+        },
+        {
+          "case": "grid-1-3-bed-0-S0",
+          "error": 1.194416388380913e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "5ca383e3f42ebca0819fd0cbfbfc63eb2ede844e1afc6eb31698de00a879cd45"
+        },
+        {
+          "case": "grid-1-3-bed-0-S1",
+          "error": 1.194416388380913e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "5ca383e3f42ebca0819fd0cbfbfc63eb2ede844e1afc6eb31698de00a879cd45"
+        },
+        {
+          "case": "grid-1-3-bed-1-S0",
+          "error": 1.0279323391425742e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "db78ac47d917371ca05348b31d2ea6f8bf3272ce33dbc18a023e0f0b94623df8"
+        },
+        {
+          "case": "grid-1-3-bed-1-S1",
+          "error": 1.0279323391425742e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "4bf57e935f41de2b4732a01afa27399c1c361b74ae9327455337347e391a03c0"
+        },
+        {
+          "case": "grid-1-3-bed-2-S0",
+          "error": 1.285430095698814e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "a5ea6bf0bef78c45d6cbe5c46181b9adca4b44f3759b06327f16f559735d714a"
+        },
+        {
+          "case": "grid-1-3-bed-2-S1",
+          "error": 1.285430095698814e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "df98af29db9173c3cb53403f2edf0e1d4dafc5cd86228d7a1968a7d4f071ef71"
+        },
+        {
+          "case": "grid-1-3-bed-3-S0",
+          "error": 1.1379786002407855e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "617d577dd84ce67cef625720774055a7fd70ba2324e0cee125761d0a3173f8e0"
+        },
+        {
+          "case": "grid-1-3-bed-3-S1",
+          "error": 1.1379786002407855e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "38fc68342d831f2b7e60690cddf1b164e9e7a5450dca85913d42808633521403"
+        },
+        {
+          "case": "grid-1-4-bed-0-S0",
+          "error": 2.7708154080647135e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "93e9fe9183be8b0aad38e9635d80a8861bedfedcac4e046b20b7abfaae3fb243"
+        },
+        {
+          "case": "grid-1-4-bed-0-S1",
+          "error": 2.7708154080647135e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "93e9fe9183be8b0aad38e9635d80a8861bedfedcac4e046b20b7abfaae3fb243"
+        },
+        {
+          "case": "grid-1-4-bed-1-S0",
+          "error": 1.2490009027033011e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "7e97735486e32a6e8cf465b2ec75722397eb331cae09ddc6f4b2bd889689dd37"
+        },
+        {
+          "case": "grid-1-4-bed-1-S1",
+          "error": 1.2490009027033011e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "56594a888c15909ee82a1c19f3052db89b1a65169025a55684a83efa355ef27a"
+        },
+        {
+          "case": "grid-1-4-bed-2-S0",
+          "error": 2.942091015256665e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "212bacf04e7689dcd6c96c8fc0b688c069d34e804ad988504112558aa9e42824"
+        },
+        {
+          "case": "grid-1-4-bed-2-S1",
+          "error": 2.942091015256665e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "9196d7dc9deea8f5f8d0c593f81deac61f1053ca0dc2b4b49132a3cd1a459be9"
+        },
+        {
+          "case": "grid-1-4-bed-3-S0",
+          "error": 1.0824674490095276e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "d4410231981abca28bfe7b0792907394711f71a8c57861316dc3adb6b1ae60b6"
+        },
+        {
+          "case": "grid-1-4-bed-3-S1",
+          "error": 1.0824674490095276e-14,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ef6e49c822c0325815c04a8de0f37057759f1b951f398cf11496d77fadc7e4c7"
+        },
+        {
+          "case": "grid-1-5-bed-0-S0",
+          "error": 9.106627930476304e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "6fcfcfe94e5f71a6ed7ab17889a05d010c60008a55871fc1e4d4f5dfe14ea3ff"
+        },
+        {
+          "case": "grid-1-5-bed-0-S1",
+          "error": 9.106627930476304e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "6fcfcfe94e5f71a6ed7ab17889a05d010c60008a55871fc1e4d4f5dfe14ea3ff"
+        },
+        {
+          "case": "grid-1-5-bed-1-S0",
+          "error": 2.0809879182782234e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "2bac3871d0d489223632b7ce4e138fec37d5d68adf3eaaf3b4ee9a96cbc0499a"
+        },
+        {
+          "case": "grid-1-5-bed-1-S1",
+          "error": 2.0809879182782234e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "13318b411689f244e1f2a3402175f5a1e63119f3742d9edb60771b4018da2ef7"
+        },
+        {
+          "case": "grid-1-5-bed-2-S0",
+          "error": 9.610368056911511e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "90b300745582cc14805f01c297fef94b4f7585744375243cc18c724c01e9c5fe"
+        },
+        {
+          "case": "grid-1-5-bed-2-S1",
+          "error": 9.610368056911511e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "bedccb99ebf5bd68dbe92a65c5da086f266f0e9eb0e680f8e2170b7ec8e61b5b"
+        },
+        {
+          "case": "grid-1-5-bed-3-S0",
+          "error": 1.1102230246251565e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "05443e055d6de053db5c557e8afea4bf4f3949c1a168a6b4aa49b772e3d1cf25"
+        },
+        {
+          "case": "grid-1-5-bed-3-S1",
+          "error": 1.1102230246251565e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "838833d8fcdfc82b2e671b3475dc5f83511e9bf1199f64b6b61de329bc748eb6"
+        },
+        {
+          "case": "grid-1-9-bed-0-S0",
+          "error": 9.106627930476304e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "edd7d2168bb871731e79cea1f8c36b30171da8ac15481b3e3d6a010520657c4e"
+        },
+        {
+          "case": "grid-1-9-bed-0-S1",
+          "error": 9.106627930476304e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "edd7d2168bb871731e79cea1f8c36b30171da8ac15481b3e3d6a010520657c4e"
+        },
+        {
+          "case": "grid-1-9-bed-1-S0",
+          "error": 2.0809879182782234e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "7c4034bb7232e41d93aba7f75ac9962743b684ec0cb777f7d337c2713c190e92"
+        },
+        {
+          "case": "grid-1-9-bed-1-S1",
+          "error": 2.0809879182782234e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "f02ff8f1dc589742122f4aed1e4e02b69f2e675879d30941a1a72aea2d04051d"
+        },
+        {
+          "case": "grid-1-9-bed-2-S0",
+          "error": 1.3704315460216776e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "fd8a378ae20bff0d64d5a13a2c89831c8aa74faf49074fd8e28ac179f7f13bd5"
+        },
+        {
+          "case": "grid-1-9-bed-2-S1",
+          "error": 1.3704315460216776e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "49725bd70d36d51da48a9a878e7a0905c28b0a1e50470abf65bfbeadd73c1be7"
+        },
+        {
+          "case": "grid-1-9-bed-3-S0",
+          "error": 2.942091015256665e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "4b43bcfc70573e2fed65caef356150a8a88efe7f00059f7dcad2ff7de29d8539"
+        },
+        {
+          "case": "grid-1-9-bed-3-S1",
+          "error": 2.942091015256665e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "e5ec158d45f569030dd58652cf8463bf490f0edbd159427d622d10435b563b3c"
+        },
+        {
+          "case": "grid-1-17-bed-0-S0",
+          "error": 9.106627930476304e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "019340eefa1afefa6e7f10d2244d89833dda6f1ff726ef6fcc03ad4afcd2c109"
+        },
+        {
+          "case": "grid-1-17-bed-0-S1",
+          "error": 9.106627930476304e-16,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "019340eefa1afefa6e7f10d2244d89833dda6f1ff726ef6fcc03ad4afcd2c109"
+        },
+        {
+          "case": "grid-1-17-bed-1-S0",
+          "error": 2.0809879182782234e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "8c84ade39ab10cb5f8994a6c86278696dabe8efe4543616ffd266380dc77df41"
+        },
+        {
+          "case": "grid-1-17-bed-1-S1",
+          "error": 2.0809879182782234e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "7c4841880e913c8a22582d0b094dced65098e82ca51f4094d05bf58bf26d44b2"
+        },
+        {
+          "case": "grid-1-17-bed-2-S0",
+          "error": 2.0469737016526324e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "2d82318f6581e2343aabd7cc92352dbd6aae919886ea9ec1158ebdc71a00f88b"
+        },
+        {
+          "case": "grid-1-17-bed-2-S1",
+          "error": 2.0469737016526324e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "1c69b5157ce668f8c9696d8f8e68beb54da045d01419bbc443486b862ce4f3eb"
+        },
+        {
+          "case": "grid-1-17-bed-3-S0",
+          "error": 2.942091015256665e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "f7b90df20c207c00276c834443db608f310c30617d74f4f4af05dcc768521f8b"
+        },
+        {
+          "case": "grid-1-17-bed-3-S1",
+          "error": 2.942091015256665e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "43659d87cf260fa3685c8d68eafdd3a9908aa56f6f560bd2e5eed451a3d7c124"
+        },
+        {
+          "case": "grid-7-9-bed-0-S0",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "dbc93f6453da63e2432406049ed52a37e08d5a4fbe46ae6e722540eb51145b8a"
+        },
+        {
+          "case": "grid-7-9-bed-0-S1",
+          "error": 0,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "dbc93f6453da63e2432406049ed52a37e08d5a4fbe46ae6e722540eb51145b8a"
+        },
+        {
+          "case": "grid-7-9-bed-1-S0",
+          "error": 6.090366306515144e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "20a758d2898c247bd262127e5065a90d470b93c8342077c23a754640a3a3e17c"
+        },
+        {
+          "case": "grid-7-9-bed-1-S1",
+          "error": 6.090366306515144e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "fa7e2f8ba8a27ed2fa5998757e25e123637d16126a0d2863e7cc61bf42f7b445"
+        },
+        {
+          "case": "grid-7-9-bed-2-S0",
+          "error": 6.0923488476305465e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "ba9cc0a5998e399f4de0ef4635936faea94c49c69e344cf242f8eedd510a5910"
+        },
+        {
+          "case": "grid-7-9-bed-2-S1",
+          "error": 6.0923488476305465e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "c6ee67e44bbcf13cdc23addffcf412a0f24c7d91b24880217ac665ae88797cd2"
+        },
+        {
+          "case": "grid-7-9-bed-3-S0",
+          "error": 4.0609876572617054e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "9cf03e03503cd417d6adb6127a99334ff41468962d423d6036925820f35b4b2c"
+        },
+        {
+          "case": "grid-7-9-bed-3-S1",
+          "error": 4.0609876572617054e-15,
+          "actual_threads": [
+            1,
+            4
+          ],
+          "sha256": "dc1897905b8af54af1e4760021edf00664268de77de5884432449caa7102f96e"
+        }
+      ]
+    }
+  ],
+  "retained_raw_directories": [
+    "/tmp/imex-n7-composition.HrHntr",
+    "/tmp/imex-geometry-1d.WxqaZx",
+    "/tmp/imex-geometry-1d.HHd3Xj",
+    "/tmp/imex-n7-composition.lUAlJn"
+  ],
+  "remaining_actions": [
+    "N7-C",
+    "N7-D",
+    "D-N7-CFL"
+  ],
+  "next_implementation_batch": [
+    "N7-C",
+    "N7-D"
+  ],
+  "case_inventory": [
+    "lake-constant-density-Q1-liquid-1D-S0C0-RK2",
+    "lake-constant-density-Q1-liquid-1D-S0C0-RK3",
+    "lake-constant-density-Q1-liquid-1D-S0C0-RK4",
+    "lake-constant-density-Q1-liquid-1D-S0C1-RK2",
+    "lake-constant-density-Q1-liquid-1D-S0C1-RK3",
+    "lake-constant-density-Q1-liquid-1D-S0C1-RK4",
+    "lake-constant-density-Q1-liquid-1D-S1C0-RK2",
+    "lake-constant-density-Q1-liquid-1D-S1C0-RK3",
+    "lake-constant-density-Q1-liquid-1D-S1C0-RK4",
+    "lake-constant-density-Q1-liquid-1D-S1C1-RK2",
+    "lake-constant-density-Q1-liquid-1D-S1C1-RK3",
+    "lake-constant-density-Q1-liquid-1D-S1C1-RK4",
+    "lake-constant-pressure-flat-liquid-1D-S0C0-RK2",
+    "lake-constant-pressure-flat-liquid-1D-S0C0-RK3",
+    "lake-constant-pressure-flat-liquid-1D-S0C0-RK4",
+    "lake-constant-density-Q1-liquid-2D-S0C0-RK2",
+    "lake-constant-density-Q1-liquid-2D-S0C0-RK3",
+    "lake-constant-density-Q1-liquid-2D-S0C0-RK4",
+    "lake-constant-density-Q1-liquid-2D-S0C1-RK2",
+    "lake-constant-density-Q1-liquid-2D-S0C1-RK3",
+    "lake-constant-density-Q1-liquid-2D-S0C1-RK4",
+    "lake-constant-density-Q1-liquid-2D-S1C0-RK2",
+    "lake-constant-density-Q1-liquid-2D-S1C0-RK3",
+    "lake-constant-density-Q1-liquid-2D-S1C0-RK4",
+    "lake-constant-density-Q1-liquid-2D-S1C1-RK2",
+    "lake-constant-density-Q1-liquid-2D-S1C1-RK3",
+    "lake-constant-density-Q1-liquid-2D-S1C1-RK4",
+    "lake-constant-pressure-flat-liquid-2D-S0C0-RK2",
+    "lake-constant-pressure-flat-liquid-2D-S0C0-RK3",
+    "lake-constant-pressure-flat-liquid-2D-S0C0-RK4",
+    "lake-constant-density-Q1-gas-1D-S0C0-RK2",
+    "lake-constant-density-Q1-gas-1D-S0C0-RK3",
+    "lake-constant-density-Q1-gas-1D-S0C0-RK4",
+    "lake-constant-density-Q1-gas-1D-S0C1-RK2",
+    "lake-constant-density-Q1-gas-1D-S0C1-RK3",
+    "lake-constant-density-Q1-gas-1D-S0C1-RK4",
+    "lake-constant-density-Q1-gas-1D-S1C0-RK2",
+    "lake-constant-density-Q1-gas-1D-S1C0-RK3",
+    "lake-constant-density-Q1-gas-1D-S1C0-RK4",
+    "lake-constant-density-Q1-gas-1D-S1C1-RK2",
+    "lake-constant-density-Q1-gas-1D-S1C1-RK3",
+    "lake-constant-density-Q1-gas-1D-S1C1-RK4",
+    "lake-constant-pressure-flat-gas-1D-S0C0-RK2",
+    "lake-constant-pressure-flat-gas-1D-S0C0-RK3",
+    "lake-constant-pressure-flat-gas-1D-S0C0-RK4",
+    "lake-constant-density-Q1-gas-2D-S0C0-RK2",
+    "lake-constant-density-Q1-gas-2D-S0C0-RK3",
+    "lake-constant-density-Q1-gas-2D-S0C0-RK4",
+    "lake-constant-density-Q1-gas-2D-S0C1-RK2",
+    "lake-constant-density-Q1-gas-2D-S0C1-RK3",
+    "lake-constant-density-Q1-gas-2D-S0C1-RK4",
+    "lake-constant-density-Q1-gas-2D-S1C0-RK2",
+    "lake-constant-density-Q1-gas-2D-S1C0-RK3",
+    "lake-constant-density-Q1-gas-2D-S1C0-RK4",
+    "lake-constant-density-Q1-gas-2D-S1C1-RK2",
+    "lake-constant-density-Q1-gas-2D-S1C1-RK3",
+    "lake-constant-density-Q1-gas-2D-S1C1-RK4",
+    "lake-constant-pressure-flat-gas-2D-S0C0-RK2",
+    "lake-constant-pressure-flat-gas-2D-S0C0-RK3",
+    "lake-constant-pressure-flat-gas-2D-S0C0-RK4",
+    "lake-constant-density-Q1-gas-liquid-1D-S0C0-RK2",
+    "lake-constant-density-Q1-gas-liquid-1D-S0C0-RK3",
+    "lake-constant-density-Q1-gas-liquid-1D-S0C0-RK4",
+    "lake-constant-density-Q1-gas-liquid-1D-S0C1-RK2",
+    "lake-constant-density-Q1-gas-liquid-1D-S0C1-RK3",
+    "lake-constant-density-Q1-gas-liquid-1D-S0C1-RK4",
+    "lake-constant-density-Q1-gas-liquid-1D-S1C0-RK2",
+    "lake-constant-density-Q1-gas-liquid-1D-S1C0-RK3",
+    "lake-constant-density-Q1-gas-liquid-1D-S1C0-RK4",
+    "lake-constant-density-Q1-gas-liquid-1D-S1C1-RK2",
+    "lake-constant-density-Q1-gas-liquid-1D-S1C1-RK3",
+    "lake-constant-density-Q1-gas-liquid-1D-S1C1-RK4",
+    "lake-constant-pressure-flat-gas-liquid-1D-S0C0-RK2",
+    "lake-constant-pressure-flat-gas-liquid-1D-S0C0-RK3",
+    "lake-constant-pressure-flat-gas-liquid-1D-S0C0-RK4",
+    "lake-constant-density-Q1-gas-liquid-2D-S0C0-RK2",
+    "lake-constant-density-Q1-gas-liquid-2D-S0C0-RK3",
+    "lake-constant-density-Q1-gas-liquid-2D-S0C0-RK4",
+    "lake-constant-density-Q1-gas-liquid-2D-S0C1-RK2",
+    "lake-constant-density-Q1-gas-liquid-2D-S0C1-RK3",
+    "lake-constant-density-Q1-gas-liquid-2D-S0C1-RK4",
+    "lake-constant-density-Q1-gas-liquid-2D-S1C0-RK2",
+    "lake-constant-density-Q1-gas-liquid-2D-S1C0-RK3",
+    "lake-constant-density-Q1-gas-liquid-2D-S1C0-RK4",
+    "lake-constant-density-Q1-gas-liquid-2D-S1C1-RK2",
+    "lake-constant-density-Q1-gas-liquid-2D-S1C1-RK3",
+    "lake-constant-density-Q1-gas-liquid-2D-S1C1-RK4",
+    "lake-constant-pressure-flat-gas-liquid-2D-S0C0-RK2",
+    "lake-constant-pressure-flat-gas-liquid-2D-S0C0-RK3",
+    "lake-constant-pressure-flat-gas-liquid-2D-S0C0-RK4",
+    "contact-liquid-x-sign-1-nx480-RK2",
+    "contact-liquid-x-sign-1-nx960-RK2",
+    "contact-liquid-x-sign-1-nx1920-RK2",
+    "contact-liquid-x-sign-1-nx480-RK3",
+    "contact-liquid-x-sign-1-nx960-RK3",
+    "contact-liquid-x-sign-1-nx1920-RK3",
+    "contact-liquid-x-sign-1-nx480-RK4",
+    "contact-liquid-x-sign-1-nx960-RK4",
+    "contact-liquid-x-sign-1-nx1920-RK4",
+    "contact-liquid-x-sign1-nx480-RK2",
+    "contact-liquid-x-sign1-nx960-RK2",
+    "contact-liquid-x-sign1-nx1920-RK2",
+    "contact-liquid-x-sign1-nx480-RK3",
+    "contact-liquid-x-sign1-nx960-RK3",
+    "contact-liquid-x-sign1-nx1920-RK3",
+    "contact-liquid-x-sign1-nx480-RK4",
+    "contact-liquid-x-sign1-nx960-RK4",
+    "contact-liquid-x-sign1-nx1920-RK4",
+    "contact-liquid-y-sign-1-nx960-RK2",
+    "contact-liquid-y-sign-1-nx960-RK3",
+    "contact-liquid-y-sign-1-nx960-RK4",
+    "contact-liquid-y-sign1-nx960-RK2",
+    "contact-liquid-y-sign1-nx960-RK3",
+    "contact-liquid-y-sign1-nx960-RK4",
+    "contact-gas-x-sign-1-nx480-RK2",
+    "contact-gas-x-sign-1-nx960-RK2",
+    "contact-gas-x-sign-1-nx1920-RK2",
+    "contact-gas-x-sign-1-nx480-RK3",
+    "contact-gas-x-sign-1-nx960-RK3",
+    "contact-gas-x-sign-1-nx1920-RK3",
+    "contact-gas-x-sign-1-nx480-RK4",
+    "contact-gas-x-sign-1-nx960-RK4",
+    "contact-gas-x-sign-1-nx1920-RK4",
+    "contact-gas-x-sign1-nx480-RK2",
+    "contact-gas-x-sign1-nx960-RK2",
+    "contact-gas-x-sign1-nx1920-RK2",
+    "contact-gas-x-sign1-nx480-RK3",
+    "contact-gas-x-sign1-nx960-RK3",
+    "contact-gas-x-sign1-nx1920-RK3",
+    "contact-gas-x-sign1-nx480-RK4",
+    "contact-gas-x-sign1-nx960-RK4",
+    "contact-gas-x-sign1-nx1920-RK4",
+    "contact-gas-y-sign-1-nx960-RK2",
+    "contact-gas-y-sign-1-nx960-RK3",
+    "contact-gas-y-sign-1-nx960-RK4",
+    "contact-gas-y-sign1-nx960-RK2",
+    "contact-gas-y-sign1-nx960-RK3",
+    "contact-gas-y-sign1-nx960-RK4",
+    "contact-gas-liquid-x-sign-1-nx480-RK2",
+    "contact-gas-liquid-x-sign-1-nx960-RK2",
+    "contact-gas-liquid-x-sign-1-nx1920-RK2",
+    "contact-gas-liquid-x-sign-1-nx480-RK3",
+    "contact-gas-liquid-x-sign-1-nx960-RK3",
+    "contact-gas-liquid-x-sign-1-nx1920-RK3",
+    "contact-gas-liquid-x-sign-1-nx480-RK4",
+    "contact-gas-liquid-x-sign-1-nx960-RK4",
+    "contact-gas-liquid-x-sign-1-nx1920-RK4",
+    "contact-gas-liquid-x-sign1-nx480-RK2",
+    "contact-gas-liquid-x-sign1-nx960-RK2",
+    "contact-gas-liquid-x-sign1-nx1920-RK2",
+    "contact-gas-liquid-x-sign1-nx480-RK3",
+    "contact-gas-liquid-x-sign1-nx960-RK3",
+    "contact-gas-liquid-x-sign1-nx1920-RK3",
+    "contact-gas-liquid-x-sign1-nx480-RK4",
+    "contact-gas-liquid-x-sign1-nx960-RK4",
+    "contact-gas-liquid-x-sign1-nx1920-RK4",
+    "contact-gas-liquid-y-sign-1-nx960-RK2",
+    "contact-gas-liquid-y-sign-1-nx960-RK3",
+    "contact-gas-liquid-y-sign-1-nx960-RK4",
+    "contact-gas-liquid-y-sign1-nx960-RK2",
+    "contact-gas-liquid-y-sign1-nx960-RK3",
+    "contact-gas-liquid-y-sign1-nx960-RK4"
+  ],
+  "failed_contact_v2": {
+    "failure_path": "/tmp/imex-n7-composition.lUAlJn/strict/failure.json",
+    "sha256": "398e804aec11123057dc28b2e1e608466cbc631f3a092b03a494a285968d4264",
+    "error": "closed boundary leaks mass",
+    "boundary_flux_first_failed_case": 8.199062253847358e-8,
+    "unchanged_limit_policy": "No acceptance limit relaxed; v3 changes domain/quiet buffers and asserts both separations before execution."
+  },
+  "source_and_fixture_sha256": {
+    "src/IMEX_SfloW2D.f90": "2f7e868a3f37ef2718853e605453befc3596565c393f3bdc68256990be0f281b",
+    "src/Makefile.am": "22de4a6f4a6e14b9ef84a74e98c2959ed00c044b5e2a374a4f1738e5ce4292c2",
+    "src/Makefile.in": "b35085f7169593f2475bacf9192d2f77ad6dd7133cff4df6fb99b9c82a93ee4d",
+    "src/complexify.f90": "f6de6fb8f4c59be820b342cc3a8c31d45601dc850b92132cb9c7796876f985cf",
+    "src/constitutive_parameters_2d.f90": "bbb8fb6a5ecda75cdfbd9dbd57650bd8d22736318e5140072bc3401511a87de3",
+    "src/diagnostics_2d.f90": "16b8c59ac2f90b5c99e7c5cfffc337d2da0dceefaec091efe36fb8c5cb80e759",
+    "src/domain_2d.f90": "6afd4e62d52dbd23ec429514dfb33ab3f8988887a88150197bd55f6a66bf6a5f",
+    "src/equation_metadata_2d.f90": "1dbcece9f777f6e742980924937413e74a5cb4fc431c856dc12a47b76ca9154e",
+    "src/equation_terms_2d.f90": "ca8c71c4f64e8d293af68d6eb653badf29415b2602c2a00e5017b22f3d47f31a",
+    "src/geometry_2d.f90": "a6066b7f5a3e7a78a8a3c8a0f39f6ef060d3862242f187221eb688d3f9d4db54",
+    "src/hp_reconstruction_2d.f90": "7bc35bd8f767c53ca5135a2ed79a7d46f7593c41be41a4db25c195fb0ebb75df",
+    "src/hyperbolic_2d.f90": "84aebe39459630ef7570305aae984fff172e67e4b8f46e759a63bb7c0cf881e6",
+    "src/init_2d.f90": "03451193df8e652b8eccf27644564e40fb05d929c094d2ba0172a0c4372140ca",
+    "src/inpout_2d.f90": "0ea85224622c7184d902ec1a5a682f570e023510c48c0c4fa660d57b713f66d8",
+    "src/lapack_interfaces_2d.f90": "2891985b5e521538e6871568aa8b708fdf01455b1908c7805cf2b6cfd3b5d952",
+    "src/mass_exchange_2d.f90": "89b5fa471e8599cd3205873d74126daf7cabfa9efd8d222ea783cbf010902cd8",
+    "src/mixture_from_mass.inc": "da6131a86aa691dc043a77e2d3f50ed2f753d077590c081e7ee97d5bd4b20a5d",
+    "src/mixture_heat_capacity.inc": "c112e1dc64aebba6e282b1fc220377abe229948062da8168b563b382822ea1aa",
+    "src/model_layout_2d.f90": "ab60e9de67fc2d5fbc3d15d5536ceaa22f859ed3ec0e76652ad7a5e43a352cce",
+    "src/nonconservative_2d.f90": "44f659c71d192e3e285cd8fb962f66ca11dd383d3a5a9a2c24e9b7aef97d691e",
+    "src/nonlinear_solver_2d.f90": "d20659ab9067f5890069cf440fa4fd9ab0db4cd32b461284839f31ef8fd7ec3a",
+    "src/parameters_2d.f90": "3350e8db2356f91206936ff1fc5fd335a58c1b1120e1ef5b4d6ed07998c116ba",
+    "src/pccu_2d.f90": "2d037f0ad8a48f31eb00ac3645f04ad554408ba749bec9875b8b01b393affc59",
+    "src/reconstruction_2d.f90": "5bb41fbc49202860c4489aed618deadad45fd2a7b9357f93d26754be41f4956e",
+    "src/runtime_2d.f90": "afc7d054d0f2c033c5809519b51568f92e18c7bbc9b6ec13300c6d16d2422aef",
+    "src/simulation_2d.f90": "0ed05c045960933096f8cdd4fe5267d0919ab5621ddf5093a33b0363dc0a59b9",
+    "src/spatial_operator_2d.f90": "5b009b02f13aa478db09c073df0beeeeff06cd9d209aface8e6005f7a95de45e",
+    "src/state_2d.f90": "cdb80ac4b5357a25f36f28555e595764127e234096c67cedeb4585fa2881ccda",
+    "src/state_conversion_2d.f90": "d718257f8c2e732d87e687eea0e1e00860d2484cfc62aa0398413272b463cebe",
+    "src/state_conversion_phys_var.inc": "d9f63dcbe2ceb3b62131c01dbda1da2ffbaa793a7604382d3dad4ca450bc1729",
+    "src/stochastic_module.f90": "77090048c7cb80fa9f00d1e429326bc9c2c97af21fc31be2b007a1870f29663b",
+    "src/stochastic_random_2d.f90": "39066c274a98949e1a5f636c763ee3b7572379dbea7951ef72b11448035beb00",
+    "src/time_integration_2d.f90": "6c5751712117e3e166da34847b9d796959064bc79b981105921829ffecb44020",
+    "src/velocity_from_conservative.inc": "552515c233b09171e4965e9f1866dfeedb5f37c1dce195ba02f18bcc7cd5671a",
+    "TESTS/TEST_GEOMETRY_1D/check_cases.py": "1a246618af5ffc65b36b44720aed63a6e64dc33a3c4906b6fdb55408af90fc2f",
+    "TESTS/TEST_GEOMETRY_1D/contract.json": "4c2c7b48186263e47fe1f1072a0de6146b992e0d0b7450945b5a6b2fb7745219",
+    "TESTS/TEST_GEOMETRY_1D/run_test.sh": "b7471ae4c748750ec99cc96a41bf078ad5264beb056d2ae213fdaf6f5bb3a1df",
+    "TESTS/TEST_GEOMETRY_1D/test_geometry_1d.f90": "eecfd7fdb756616fe174541604fb830fff2c9b58aa3d3d7dd36b0899ce60675f",
+    "TESTS/TEST_IMEX_STAGES/compare_stages.py": "e9e145c3dd609dc800d1b4776e6182fe20eda48198c0517a8eb301d691ef66be",
+    "TESTS/TEST_IMEX_STAGES/run_test.sh": "614b1663f785db55b7b081f1e0d86dbd02a6ef90b5183fef38338b659331e1d1",
+    "TESTS/TEST_IMEX_STAGES/test_imex_stages.f90": "9e6272199fcdaf5d38cf2f3a2018cbcdebff7ce8ebf481b9df21228cb5f24d88",
+    "TESTS/TEST_IMEX_STAGES/test_stage_count.f90": "57ddd4e6a7e0b20d61742e52a729270c406c430313bfc0de6cd163232bd7df90",
+    "TESTS/TEST_N7_COMPOSITION/check_cases.py": "537abe6ee3b7aca8543f43b8e59eab85074e539afca3a545806e121a8d89b845",
+    "TESTS/TEST_N7_COMPOSITION/check_roundoff_guard.py": "22890905e1730083457f3b37b2c8d3835e3067a2302f0ab2674bbd10b5f83019",
+    "TESTS/TEST_N7_COMPOSITION/contact_contract_v2.json": "fd6394d437a9f99ad94324b771b4d483716bfa1fd62723a0a147788c600e2594",
+    "TESTS/TEST_N7_COMPOSITION/contact_contract_v3.json": "4adfa94d9506269ff7cee41b071cea0570752295be415a05aafe565f24751796",
+    "TESTS/TEST_N7_COMPOSITION/contract.json": "dd9c4401652e2b9ad874f15702e5f5f3cfc9796e6fdbd77f96f506bccfd330fb",
+    "TESTS/TEST_N7_COMPOSITION/diagnose_cases.py": "ef509efe09d03780137ab68ea56acad6802d30a67814dc8e8362bd4666dbde91",
+    "TESTS/TEST_N7_COMPOSITION/roundoff_guard_contract.json": "2b5176a10a588cf9906c55367ba338a5de8566012aaa560a355feb15f330c939",
+    "TESTS/TEST_N7_COMPOSITION/roundoff_guard_contract_v1.json": "6a64c1c9fff10fca730fb1e7f99a897b0fe42bcb19be01dd557d87625d841839",
+    "TESTS/TEST_N7_COMPOSITION/roundoff_guard_contract_v2.json": "e291f551f82a00912684d3e3496135dd896868a018ac9b3c60462c69f3080360",
+    "TESTS/TEST_N7_COMPOSITION/roundoff_guard_contract_v3.json": "55f78d07abb07cd2e5452ed06daae492e697b4c9dbaf937a93a5c03ff91e869f",
+    "TESTS/TEST_N7_COMPOSITION/run_test.sh": "8bea3621dd72661261fb49e9ab47131c5a8a3f0814335a91a2edde269e29b445",
+    "TESTS/TEST_N7_COMPOSITION/test_checker.py": "2b274f71e932b0f03bcc74fd4f385dc0819580d3fb85940b3c572651d4af17d7"
+  },
+  "old_geometry_y_failure": {
+    "directory": "/tmp/imex-geometry-old-y-failure.eXbC5P",
+    "returncode": 2,
+    "output": "At line 753 of file /Users/demichie/Codes/GIT/IMEX_SfloW2D_dev/src/geometry_2d.f90\nFortran runtime error: Index '3' of dimension 1 of array 'b_prime_x_geom' above upper bound of 1\n\nError termination. Backtrace:\n#0  0x103386103\n#1  0x103386cd7\n#2  0x103387077\n#3  0x102ee32af\n#4  0x102f86a53\n#5  0x102ec7e87\n#6  0x102ecf2cb\n#7  0x102ee964b\n#8  0x102ee995b\n"
+  },
+  "full_audit": {
+    "manifest_path": "/tmp/imex-n7-b-geometry-acceptance-20261010/manifest.json",
+    "manifest_sha256": "9aaca1f002a29cb17a594fc7236075035b7d7985310e7dc980dd69d0463237e3",
+    "summary": {
+      "test_runs": 40,
+      "failed": 0,
+      "passed": 40,
+      "n9_accepted": false
+    },
+    "tests": [
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 1,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d"
+      },
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 4,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "historical_optimized",
+        "outer_threads": 1,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "e7903b8b02debb3c2d6a297b9e4ca3178bb84485d52cb6e3523c0a7d6ccaf319"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "historical_optimized",
+        "outer_threads": 4,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "e7903b8b02debb3c2d6a297b9e4ca3178bb84485d52cb6e3523c0a7d6ccaf319"
+      },
+      {
+        "test": "TEST_PCCU_INCLINED_EXCAVATION",
+        "profile": "historical_optimized",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "066f1e22d7b0949343d6d810e5664f456a3ce26bb6c743b898f3eb1c1e105cd8"
+      },
+      {
+        "test": "TEST_PCCU_LAKE_AT_REST",
+        "profile": "historical_optimized",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "72f5c63ea215a47816f2f5eaf05c6c67976ffda17a0762257c025ac5cb415ce3"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 1,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "8a781f9a758332728d812e58ab8b1ee9bb3ba3f0dd07fa8f8eae85c9e41d2f73"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 4,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "8a781f9a758332728d812e58ab8b1ee9bb3ba3f0dd07fa8f8eae85c9e41d2f73"
+      },
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 1,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d"
+      },
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 4,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "strict_debug",
+        "outer_threads": 1,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "541d700b888f6615fb9abae476f5a62e8ef6bbf7ef231c7703c2041563f06cd5"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "strict_debug",
+        "outer_threads": 4,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "541d700b888f6615fb9abae476f5a62e8ef6bbf7ef231c7703c2041563f06cd5"
+      },
+      {
+        "test": "TEST_PCCU_INCLINED_EXCAVATION",
+        "profile": "strict_debug",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "cc5dd58087a29fde99c5a4e1dc334cbb1f73d1ac1e19996fa37cfe5b4404acaa"
+      },
+      {
+        "test": "TEST_PCCU_LAKE_AT_REST",
+        "profile": "strict_debug",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "72f5c63ea215a47816f2f5eaf05c6c67976ffda17a0762257c025ac5cb415ce3"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 1,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "8a781f9a758332728d812e58ab8b1ee9bb3ba3f0dd07fa8f8eae85c9e41d2f73"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 4,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "8a781f9a758332728d812e58ab8b1ee9bb3ba3f0dd07fa8f8eae85c9e41d2f73"
+      },
+      {
+        "test": "TEST_CURVATURE_SOURCE",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "896806d4e56101e2d96fd2561c629807e931a43e274d228b3e1ec4dac45535dd"
+      },
+      {
+        "test": "TEST_DIAGNOSTICS",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "9dab51a0e28e463b0b46b2cc4b1717f4268fae30cbf3bf16a56bcf1cc270bc8a"
+      },
+      {
+        "test": "TEST_EQUATION_METADATA",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "e40e9672aceb9e47646aa5191d18c4a2781704f2e5acef086751c89615c1efa7"
+      },
+      {
+        "test": "TEST_GEOMETRY_1D",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "ad0976de4c6c18c78b08a957f5b6e98db7440c030e84e01846c880ef4b7c1767"
+      },
+      {
+        "test": "TEST_HP_RECONSTRUCTION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "3c619d86f72c72ca958a02cc14c137978e313aed1452966026171b67e5944a81"
+      },
+      {
+        "test": "TEST_HYDROSTATIC_PATH",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "742dba46e726b0f52beb680ee084ae156a0733c7faec165fdb81400945082e37"
+      },
+      {
+        "test": "TEST_HYDROSTATIC_ROUNDOFF",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "72adba3e5e8032f6808eadce1e0cb0d7b6da307366207e32926f4d7b940b60e4"
+      },
+      {
+        "test": "TEST_IMEX_STAGES",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "4a467dd3b8ed8c43b8a137dda302c7d494bf76d7a542f48d0cb0ebf25b9d2fab"
+      },
+      {
+        "test": "TEST_LAPACK_INTERFACES",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "6d71bec5c90ff26b1f876f5eb149a0d3cf132cbc1288840774682b4bb5dbf4ac"
+      },
+      {
+        "test": "TEST_MASS_EXCHANGE",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "96e5b43e12d66d1d16ca0574c13b8a269fd0d38a8bcb26e592a39d7037889f67"
+      },
+      {
+        "test": "TEST_MODEL_LAYOUT",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "0b6cd443a9bd2f79576c714f52460d54d644fd040162b8adc8408ebd890353e3"
+      },
+      {
+        "test": "TEST_N7_COMPOSITION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "c6a04b0eebcd1efc8bbb480d6f088287579ddde1f21f98291b535d1b1073fd5b"
+      },
+      {
+        "test": "TEST_N7_EQUILIBRIUM",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "44da92f7ba32c1ac12f3b572067241ad89594e223a9320fe0ea741932c27da17"
+      },
+      {
+        "test": "TEST_NONCONSERVATIVE_PATH",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "67583a32e7cf44d12bda24432d9a670c4847c3f06bab0a9381d618fd730837f3"
+      },
+      {
+        "test": "TEST_PCCU",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "a4adf25853b86fe96c546449a1775abd15420e8d5e015548243a7327de53051a"
+      },
+      {
+        "test": "TEST_RHEOLOGY_FROUDE",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "d1dec382c4f567c3acb674c6bd3a8fa356a4c95cd20f2b1641457f63c0bb6eb9"
+      },
+      {
+        "test": "TEST_SOURCE_DOCUMENTATION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "88afc5ee16cb5dc2b4d85364d955264a3340fd02cb0501a49cd2913daa04604e"
+      },
+      {
+        "test": "TEST_SPATIAL_OPERATOR",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "cb2677e2c62ee075e074c3df06cf951fcc0a6ed07a6c5cc1c0823f388b7257ac"
+      },
+      {
+        "test": "TEST_STATE_CONVERSION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "37aaf4c0197997a0c827d2f3a81696cceae943f4215ee7816a940f14404b2261"
+      },
+      {
+        "test": "TEST_STATE_INITIALIZATION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "0a22c50728a0117c89a88ddc089c7c6175c553e90963855bbfd4700ceb9b4b03"
+      },
+      {
+        "test": "TEST_STOCHASTIC_EVOLUTION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "8d41026c6b183085fb28533753069e31dd2eed8309793b055c8caacab17ecfc9"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RANDOM",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "adfd25d313f98ca8d8e7392e266a67d674ce2a6fc2ea0088fbc2c795d19df88a"
+      },
+      {
+        "test": "TEST_TOPOGRAPHY_FACES",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "6793c2a285742ecafe7c1b24116cc0bb81b085c7c4153c9f83fd29795647e278"
+      },
+      {
+        "test": "TEST_WORKSPACE_LIFECYCLE",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "03ce4c669793713c7a580d4275d279222179f2e5719b0a467a198146b94afad9"
+      }
+    ],
+    "thread_comparisons": [
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_BINARY_RESTART",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_PCCU_GATE_H",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_STOCHASTIC_RESTART",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_BINARY_RESTART",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_PCCU_GATE_H",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_STOCHASTIC_RESTART",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      }
+    ],
+    "comparison_to_parent": {
+      "manifest_path": "/tmp/imex-acceptance-rest-fix-final-20261010/manifest.json",
+      "manifest_sha256": "2d68b494afd45c4770b9d03c987b2bd759bc07a8941d01ba8ff5803727ed9f82",
+      "canonical_output_policy": "All captured q_2d fields and restart.bin; each pair also has identical effective input bytes.",
+      "cases": [
+        {
+          "profile": "historical_optimized",
+          "test": "TEST_BINARY_RESTART",
+          "outer_threads": 1,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "74003c2ed81316f5f3a22c029d84402d7f8ff57dd23ecefffa9118f48a54b196"
+        },
+        {
+          "profile": "historical_optimized",
+          "test": "TEST_BINARY_RESTART",
+          "outer_threads": 4,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "74003c2ed81316f5f3a22c029d84402d7f8ff57dd23ecefffa9118f48a54b196"
+        },
+        {
+          "profile": "historical_optimized",
+          "test": "TEST_PCCU_GATE_H",
+          "outer_threads": 1,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "fdbe20ed3a0ad2bd3b278183d573545bec828832a53fd4f1060202a489ec4143"
+        },
+        {
+          "profile": "historical_optimized",
+          "test": "TEST_PCCU_GATE_H",
+          "outer_threads": 4,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "fdbe20ed3a0ad2bd3b278183d573545bec828832a53fd4f1060202a489ec4143"
+        },
+        {
+          "profile": "historical_optimized",
+          "test": "TEST_PCCU_INCLINED_EXCAVATION",
+          "outer_threads": null,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "15e82127964746e5a8940eb12c9a8eda94b4fdc9bdf5513a22095af7faadb449"
+        },
+        {
+          "profile": "historical_optimized",
+          "test": "TEST_PCCU_LAKE_AT_REST",
+          "outer_threads": null,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "f395fde964792b65f99f8651cd3bdfe2808cbaa204b90451d1b4d601622e62d1"
+        },
+        {
+          "profile": "historical_optimized",
+          "test": "TEST_STOCHASTIC_RESTART",
+          "outer_threads": 1,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "c08fe07e947e7e16e7738b8e19353bf5da8eda49472e9d4d9e3abf25989dfd7e"
+        },
+        {
+          "profile": "historical_optimized",
+          "test": "TEST_STOCHASTIC_RESTART",
+          "outer_threads": 4,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "c08fe07e947e7e16e7738b8e19353bf5da8eda49472e9d4d9e3abf25989dfd7e"
+        },
+        {
+          "profile": "strict_debug",
+          "test": "TEST_BINARY_RESTART",
+          "outer_threads": 1,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "0ddcb4b2e5c9f732718cc70e88e0d74d5750d4641e88ef72e9bdd82b9bc0ed93"
+        },
+        {
+          "profile": "strict_debug",
+          "test": "TEST_BINARY_RESTART",
+          "outer_threads": 4,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "0ddcb4b2e5c9f732718cc70e88e0d74d5750d4641e88ef72e9bdd82b9bc0ed93"
+        },
+        {
+          "profile": "strict_debug",
+          "test": "TEST_PCCU_GATE_H",
+          "outer_threads": 1,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "4846189639ea41b70bc6fe02450ed9e719523db9eed0271342d41d5ea8e21e81"
+        },
+        {
+          "profile": "strict_debug",
+          "test": "TEST_PCCU_GATE_H",
+          "outer_threads": 4,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "4846189639ea41b70bc6fe02450ed9e719523db9eed0271342d41d5ea8e21e81"
+        },
+        {
+          "profile": "strict_debug",
+          "test": "TEST_PCCU_INCLINED_EXCAVATION",
+          "outer_threads": null,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "1fcfbcce576e54cde476722d5468ac8b6b97fed0d7e3f57eaaf06510f15e09bd"
+        },
+        {
+          "profile": "strict_debug",
+          "test": "TEST_PCCU_LAKE_AT_REST",
+          "outer_threads": null,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "f395fde964792b65f99f8651cd3bdfe2808cbaa204b90451d1b4d601622e62d1"
+        },
+        {
+          "profile": "strict_debug",
+          "test": "TEST_STOCHASTIC_RESTART",
+          "outer_threads": 1,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "423118f6331c1dc44d5e4e85353767b867d35af5766ae90c54f1c8372a9eea63"
+        },
+        {
+          "profile": "strict_debug",
+          "test": "TEST_STOCHASTIC_RESTART",
+          "outer_threads": 4,
+          "status": "identical",
+          "input_and_canonical_output_sha256": "423118f6331c1dc44d5e4e85353767b867d35af5766ae90c54f1c8372a9eea63"
+        }
+      ]
+    },
+    "parent_geometry_sha256": "eb96fab849222360744552d11f382911d010f71b32f3a3bb005e5d921947d56f"
+  },
+  "parent_geometry_sha256": "eb96fab849222360744552d11f382911d010f71b32f3a3bb005e5d921947d56f"
+}

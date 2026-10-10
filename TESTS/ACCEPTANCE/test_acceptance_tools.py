@@ -272,13 +272,15 @@ class AuditToolsTests(unittest.TestCase):
         self.assertEqual(digest(repo / record["path"]), record["sha256"])
         self.assertEqual(closure["milestone_status"], {"N7": "open", "N8": "satisfied", "N9": "open"})
         self.assertEqual({a["id"] for a in closure["remaining_actions"]},
-                         {"N7-B", "N7-C", "N7-D", "D-N7-CFL"})
+                         {"N7-C", "N7-D", "D-N7-CFL"})
         cases = {c["id"]: c for c in closure["required_tests"]["hydrodynamics"]}
         self.assertEqual(cases["H04"]["status"], "satisfied")
         self.assertEqual(cases["H04"]["remaining_actions"], [])
-        self.assertEqual(cases["H04"]["evidence_tests"], ["TEST_HYDROSTATIC_ROUNDOFF"])
-        self.assertEqual(cases["H05"]["status"], "missing")
-        self.assertEqual(cases["H05"]["remaining_actions"], ["N7-B"])
+        self.assertIn("TEST_HYDROSTATIC_ROUNDOFF", cases["H04"]["evidence_tests"])
+        self.assertEqual(cases["H05"]["status"], "satisfied")
+        self.assertEqual(cases["H05"]["remaining_actions"], [])
+        # The archived correction was only a stationary subset. Current
+        # contact closure is separately established by the later N7-B record.
         self.assertEqual(evidence["summary"]["N7_B"], "open")
         self.assertEqual(evidence["production_changes"], ["src/hyperbolic_2d.f90"])
         contract = evidence["guard_contract"]
@@ -308,6 +310,73 @@ class AuditToolsTests(unittest.TestCase):
         self.assertEqual({t["test"] for t in comparisons if t["status"] == "changed"},
                          {"TEST_PCCU_GATE_H", "TEST_PCCU_INCLINED_EXCAVATION"})
 
+    def test_n7_b_and_geometry_completion_evidence(self):
+        """Close the full isolated transport gate without silently closing 2D/CFL/N9 work."""
+        repo = Path(__file__).resolve().parents[2]
+        closure = json.loads((repo / "TESTS/ACCEPTANCE/n7_n8_closure_plan.json").read_text())
+        record = closure["evidence_artifacts"]["n7_b"]
+        evidence = json.loads((repo / record["path"]).read_text())
+        self.assertEqual(digest(repo / record["path"]), record["sha256"])
+        action = next(a for a in closure["completed_actions"] if a["id"] == "N7-B")
+        self.assertEqual(action["status"], "satisfied")
+        self.assertEqual(action["evidence"], ["n7_b"])
+        self.assertEqual({a["id"] for a in closure["remaining_actions"]},
+                         {"N7-C", "N7-D", "D-N7-CFL"})
+        self.assertEqual(closure["next_implementation_batch"], ["N7-C", "N7-D"])
+        criterion = next(c for c in closure["criteria"] if c["id"] == "N7-05")
+        self.assertEqual(criterion["closure_status"], "satisfied")
+        self.assertEqual(criterion["remaining_actions"], [])
+        self.assertEqual(evidence["summary"]["N7_B"], "satisfied")
+        self.assertEqual(evidence["summary"]["N7_B_solver_runs"], 648)
+        self.assertEqual(evidence["summary"]["geometry_solver_runs"], 448)
+        self.assertEqual(len(evidence["case_inventory"]), 162)
+        self.assertEqual(len(set(evidence["case_inventory"])), 162)
+        self.assertEqual(evidence["production_changes"], ["src/geometry_2d.f90"])
+        for name, expected in evidence["source_and_fixture_sha256"].items():
+            self.assertEqual(digest(repo / name), expected, name)
+        original = evidence["original_contract"]; contact = evidence["contact_contract"]
+        self.assertEqual(original["stages"], [2, 3, 4])
+        self.assertEqual(original["roundoff_epsilon_multiplier"], 32768)
+        for key in ("time", "dt_dx_factor", "limiter", "theta", "profile_half_width",
+                    "maximum_profile_L1", "maximum_profile_Linf", "maximum_refinement_ratio"):
+            self.assertEqual(original["contact"][key], contact[key])
+        self.assertEqual(contact["schema_version"], 3)
+        self.assertEqual(contact["dependency_radius_per_rhs"], 4)
+        roundoff = 32768 * 2.220446049250313e-16
+        self.assertEqual({r["profile"] for r in evidence["composition_profiles"]}, {"strict", "optimized"})
+        for profile in evidence["composition_profiles"]:
+            self.assertEqual(profile["actual_threads"], [1, 4])
+            self.assertEqual((profile["equilibrium_count"], profile["contact_count"]), (90, 72))
+            self.assertEqual(profile["maximum_equilibrium_error"], 0)
+            self.assertEqual(profile["maximum_force_scaled_equilibrium_residual"], 0)
+            self.assertEqual(profile["maximum_boundary_mass_flux"], 0)
+            self.assertLessEqual(profile["maximum_contact_error_over_frozen_limit"], 1)
+            for metric in ("maximum_component_carrier_budget", "maximum_face_violation",
+                           "maximum_face_closure_error"):
+                self.assertLessEqual(profile[metric], roundoff)
+            self.assertLessEqual(profile["maximum_dt_over_CFL"], 1+roundoff)
+            self.assertGreater(profile["minimum_central_guard_cells"], 0)
+            self.assertGreater(profile["minimum_boundary_guard_cells"], 0)
+            self.assertEqual(len(profile["refinements"]), 18)
+            self.assertTrue(all(max(r["ratios"]) < contact["maximum_refinement_ratio"]
+                                for r in profile["refinements"]))
+        self.assertEqual(len(evidence["geometry_profiles"]), 2)
+        for profile in evidence["geometry_profiles"]:
+            self.assertEqual(profile["case_count"], 112)
+            self.assertEqual(profile["actual_threads"], [1, 4])
+            self.assertLessEqual(profile["maximum_relative_field_error"], 2048*2.220446049250313e-16)
+            self.assertEqual(profile["preceding_x_and_2d_controls"]["case_count"], 32)
+            self.assertTrue(profile["preceding_x_and_2d_controls"]["all_fingerprints_identical"])
+        full = evidence["full_audit"]
+        self.assertEqual(full["summary"],
+                         {"test_runs": 40, "failed": 0, "passed": 40, "n9_accepted": False})
+        self.assertEqual(len(full["tests"]), 40)
+        self.assertTrue(all(t["status"] == "pass" for t in full["tests"]))
+        self.assertEqual(len(full["thread_comparisons"]), 6)
+        self.assertTrue(all(t["status"] == "pass" for t in full["thread_comparisons"]))
+        self.assertEqual(len(full["comparison_to_parent"]["cases"]), 16)
+        self.assertTrue(all(t["status"] == "identical" for t in full["comparison_to_parent"]["cases"]))
+
     def test_n7_a_completion_evidence(self):
         """Close the frozen N7-A cases, retaining output changes and remaining gates explicitly."""
         repo = Path(__file__).resolve().parents[2]
@@ -319,7 +388,7 @@ class AuditToolsTests(unittest.TestCase):
         self.assertEqual(action["evidence"], ["n7_a"])
         self.assertEqual(closure["milestone_status"], {"N7": "open", "N8": "satisfied", "N9": "open"})
         self.assertEqual({a["id"] for a in closure["remaining_actions"]},
-                         {"N7-B", "N7-C", "N7-D", "D-N7-CFL"})
+                         {"N7-C", "N7-D", "D-N7-CFL"})
         self.assertEqual(next(c for c in closure["criteria"] if c["id"] == "N7-01")["closure_status"],
                          "satisfied")
         for item in closure["required_tests"]["hydrodynamics"]:

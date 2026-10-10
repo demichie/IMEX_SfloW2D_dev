@@ -1,11 +1,26 @@
-# N7 variable composition equilibrium and transport diagnostics
+# N7 variable composition equilibrium and transport regression
 
-The 90-case equilibrium subset now passes after a bounded correction in
-`hyperbolic_2d`. N7-B remains open because the moving-contact reference needs a
-better isolated fixture. This package does not certify the full planned
-equilibrium/transport inventory. The CFL and clean reference kernels are
-unchanged. See the [historical diagnosis](../../docs/acceptance/N7_B_DIAGNOSIS_2026_10_10.md)
-and [correction report](../../docs/acceptance/HYDROSTATIC_ROUNDOFF_2026_10_10.md).
+The full acceptance inventory checks 90 equilibria and 72 signed moving
+contacts per compiler profile, with actual one/four-thread teams. It uses
+independent thermodynamic identities, analytic translated cell averages and a
+scalar CU/TVD reference with the current IMEX weights. CFL and the clean reference
+kernels are unchanged. The complete matrix passes in the
+[geometry and transport completion](../../docs/acceptance/N7_B_GEOMETRY_AND_TRANSPORT_2026_10_10.md).
+The original failed contact and its diagnostic evidence
+remain archived separately; they are not relabeled as passing tests.
+
+## Run the full acceptance inventory
+
+From the repository root:
+
+```sh
+KEEP_TEST_WORKDIR=1 sh TESTS/TEST_N7_COMPOSITION/run_test.sh
+```
+
+The script requires all 162 cases in each profile before writing `evidence.json`.
+Any failure exits nonzero and writes `failure.json`; a partial diagnostic or
+equilibrium-only execution cannot close N7-B. The general acceptance plan runs
+this full gate as well as the separate stationary-roundoff controls.
 
 ## Run the verified equilibrium subset
 
@@ -22,11 +37,10 @@ and real-pressure-force controls against the checksum-pinned old hyperbolic
 module, using identical other current objects. Both scripts retain actual
 one/four-thread binary comparisons.
 
-Without an option, `run_test.sh` attempts the original full inventory; its
-contact comparison is still a draft and must not be treated as a valid solver
-acceptance gate. It exits nonzero on the mismatch and stores `failure.json`.
-The pre-correction equilibrium failure is archived in the historical diagnosis,
-not relabeled as a failure of the corrected equilibrium subset.
+The original equilibrium construction and limits are unchanged. See the
+[historical diagnosis](../../docs/acceptance/N7_B_DIAGNOSIS_2026_10_10.md) and
+[stationary correction](../../docs/acceptance/HYDROSTATIC_ROUNDOFF_2026_10_10.md)
+for the preceding failure and its bounded production fix.
 
 ## Run the partial investigation
 
@@ -34,7 +48,8 @@ not relabeled as a failure of the corrected equilibrium subset.
 KEEP_TEST_WORKDIR=1 sh TESTS/TEST_N7_COMPOSITION/run_test.sh --diagnose
 ```
 
-This mode builds both strict and historical optimized production modules and
+This mode retains the original contact construction in `contract.json`, not
+the revised acceptance contact. It builds strict and historical optimized modules and
 runs 36 diagnostic cases per profile with actual one/four-thread teams. It
 records failing criteria in `diagnosis.json` without stopping at the first
 failure. A successful diagnostic command only means the investigation ran;
@@ -51,9 +66,11 @@ rotation are outside this diagnostic subset. Complete `result.bin` and
 
 [`contract.json`](contract.json) fixes the numerical cases and limits before
 execution. Its 162-case inventory per profile consists of 90 equilibria and
-72 contacts. Only the equilibrium subset is verified. The general acceptance
-plan runs it through `TEST_HYDROSTATIC_ROUNDOFF`; it does not run the draft
-contact comparison as a passing gate.
+72 contacts. The current contact construction is separately fixed in
+[`contact_contract_v3.json`](contact_contract_v3.json); the original contract
+is not overwritten, so the historical evidence and equilibrium hashes remain
+valid. The failed intermediate construction remains in
+[`contact_contract_v2.json`](contact_contract_v2.json).
 
 The three current closures use two solids with distinct densities and heat
 capacities: liquid carrier; ambient-air carrier with one added gas; and the
@@ -73,13 +90,24 @@ fixed `32768*float64_epsilon` limits. Moving-contact field comparisons retain
 that limit multiplied by the step count, plus the frozen analytic-error and
 refinement gates. No criterion is relaxed after a failure.
 
-The moving contact uses an independently integrated scalar CU/TVD reference
-with the current explicit IMEX weights, not the one-solid prototype as a gas
-reference. Its prescribed velocity tapers to zero away from the pulse for
-closed boundaries. The current comparison interval is insufficiently isolated
-from that taper at roundoff-level precision; this is a fixture/reference defect,
-not evidence of a production contact defect. A revised reference contract must
-preserve this failed construction and be justified before a new run.
+The revised moving contact translates the same pulse and the complete 16 m
+comparison interval into a 480 m domain. Longitudinal grids have 480/960/1920
+cells along x and 960 cells along y, preserving the original spacings 1/0.5/0.25 m,
+time 0.1 s, timestep rule, limiter and all acceptance limits. The velocity
+transitions occupy 110--115 m and 365--370 m. No comparison cells are removed.
+
+Before launching each solver, an index-space check requires both the comparison
+interval and physical boundaries to lie outside a conservative dependency cone
+of `4*n_RK*steps` cells. Fully wet flat-bed reconstruction and fluxes have local
+stencils; the prescribed timestep removes global timestep dependence. The
+initially quiet boundary buffers must remain quiet throughout the test, which
+still checks zero boundary flux and budgets over the entire domain. This is a
+finite-time isolated transport fixture, not a general boundary-condition test.
+
+The v2 attempt isolated the central interval but retained transitions too near
+the physical boundaries; its measured nonzero boundary flux failed the unchanged
+criterion. V3 extends the quiet boundary buffers as well. Each revised
+construction was frozen before its execution; no tolerance was enlarged.
 
 ## Observation format
 
@@ -95,8 +123,10 @@ Known, solved and raw-final states are observed before final repair. A separate
 test-only workspace reconstructs each solved stage, checks fractions before
 thermodynamic closure and independently verifies the final conservative faces.
 It does not change the production spatial operator or per-cell source laws.
-Five checker unit tests exercise equilibrium identities, each component,
+Six checker unit tests exercise equilibrium identities, each component,
 analytic signed transport, deliberate diagnostic corruption and the fixed
-roundoff/reference contract.
+roundoff/reference contract, plus preservation of resolution/limits and rejection
+of an insufficient dependency-cone separation.
 
-N7-B, D-N7-CFL and N9 remain unresolved by these diagnostics.
+Only a full passing inventory establishes N7-B within its defined fixtures.
+D-N7-CFL and N9 remain separate decisions.

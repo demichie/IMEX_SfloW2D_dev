@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "frozen_before_execution": "2026-10-10",
+  "lengths": [1, 2, 3, 4, 5, 9, 17],
+  "axes": ["x", "y"],
+  "beds": [0, 1, 2, 3],
+  "slope_flags": [false, true],
+  "control_2d": [7, 9],
+  "spacing": [0.5, 0.75],
+  "roundoff_epsilon_multiplier": 2048,
+  "short_line_policy": "Degree min(2,n-1) least-squares polynomial over the available line; one cell has zero derivatives. Inactive and mixed derivatives are exactly zero.",
+  "retained_policy": "Five-point filter and nearest-interior extrapolation are unchanged for lines of at least five cells and existing 2D controls.",
+  "comparison": "Independent Q1 and polynomial/stencil derivatives plus G at centers/faces. All output bytes match actual one/four-thread teams in strict and optimized profiles."
+}

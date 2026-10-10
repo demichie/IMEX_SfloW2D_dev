@@ -54,6 +54,10 @@
     "hydrostatic_roundoff": {
       "path": "docs/acceptance/results_hydrostatic_roundoff_2026_10_10.json",
       "sha256": "f6f25268aaec5f7abb642d6ae2276be03b53d34610fd91b15a9fedf4f535d0a0"
+    },
+    "n7_b": {
+      "path": "docs/acceptance/results_n7_b_2026_10_10.json",
+      "sha256": "fa3cae602df3d105ba9b37b4357233773b00ef98d811d0c805ff86096989dbbd"
     }
   },
   "milestone_status": {
@@ -103,18 +107,19 @@
       "id": "N7-03",
       "closure_status": "partial",
       "remaining_actions": [
-        "N7-B",
         "N7-C"
       ],
       "verified_contracts": [
         "Production liquid HP face traces, compatible momenta and velocities agree with pinned cores.",
-        "All 90 stationary variable-composition cases per profile pass raw cell/face positivity, TVD mass fractions and conservative closure with actual one/four-thread equality."
+        "All 90 stationary variable-composition cases per profile pass raw cell/face positivity, TVD mass fractions and conservative closure with actual one/four-thread equality.",
+        "Full liquid/gas/gas-liquid stationary and moving-contact cell/face positivity, TVD mass fractions, compatible conservative closure and actual one/four-thread payloads pass in the defined N7-B fixtures."
       ],
       "evidence": [
         "spatial",
         "latest",
         "n8_b_full",
-        "hydrostatic_roundoff"
+        "hydrostatic_roundoff",
+        "n7_b"
       ]
     },
     {
@@ -136,18 +141,18 @@
     },
     {
       "id": "N7-05",
-      "closure_status": "partial",
-      "remaining_actions": [
-        "N7-B"
-      ],
+      "closure_status": "satisfied",
+      "remaining_actions": [],
       "verified_contracts": [
         "Local gas/solid/liquid conversion and positive/negative component-flux rescaling tests pass.",
-        "The original 90 liquid/gas/gas-liquid equilibria pass unchanged stationary component/carrier budgets, thermal closure and force criteria after the bounded exactly-resting roundoff correction; moving-contact validation remains open."
+        "The original 90 liquid/gas/gas-liquid equilibria pass unchanged stationary component/carrier budgets, thermal closure and force criteria after the bounded exactly-resting roundoff correction; moving-contact validation remains open.",
+        "The complete 90-equilibrium/72-contact matrix per profile passes independent conservative/thermal fields, analytic refinement, signed transport along x/y and each raw-stage component/residual-carrier budget; the revised reference is isolated before execution without relaxed limits."
       ],
       "evidence": [
         "latest",
         "n8_b_full",
-        "hydrostatic_roundoff"
+        "hydrostatic_roundoff",
+        "n7_b"
       ]
     },
     {
@@ -175,17 +180,18 @@
       "id": "N7-07",
       "closure_status": "partial",
       "remaining_actions": [
-        "N7-B",
         "N7-C"
       ],
       "verified_contracts": [
         "Existing Gate-H total-mass and G=1 lateral-symmetry limits pass.",
-        "Independent stationary component/carrier inventories and boundary mass fluxes are exactly unchanged in all 90 equilibria per profile; moving-contact budgets and circular/orientation symmetry remain open."
+        "Independent stationary component/carrier inventories and boundary mass fluxes are exactly unchanged in all 90 equilibria per profile; moving-contact budgets and circular/orientation symmetry remain open.",
+        "Whole-domain component/carrier raw-stage and final inventories and zero boundary mass flux pass all 162 N7-B cases per profile. Circular/orientation symmetry remains in N7-C."
       ],
       "evidence": [
         "latest",
         "n8_b_full",
-        "hydrostatic_roundoff"
+        "hydrostatic_roundoff",
+        "n7_b"
       ]
     },
     {
@@ -195,7 +201,8 @@
       "verified_contracts": [
         "Actual 1/4 teams and bitwise outputs pass for covered spatial/stage/exchange fixtures and all six full Gate-H/restart pairs.",
         "All 204 additional N7-A actual 1/4-thread pairs have bitwise-identical complete payloads; six full Gate-H/restart pairs remain passing.",
-        "All 90 new equilibria and 36 slow-motion/real-force controls per profile retain bitwise actual one/four-thread payload equality; six full Gate-H/restart pairs pass."
+        "All 90 new equilibria and 36 slow-motion/real-force controls per profile retain bitwise actual one/four-thread payload equality; six full Gate-H/restart pairs pass.",
+        "All 324 N7-B and 224 new geometry profile/case pairs have bitwise complete actual one/four-thread payloads; the 40-script full audit retains six passing full Gate-H/restart pairs."
       ],
       "evidence": [
         "spatial",
@@ -205,7 +212,8 @@
         "n8_b_full",
         "n8_b",
         "n7_a",
-        "hydrostatic_roundoff"
+        "hydrostatic_roundoff",
+        "n7_b"
       ]
     },
     {
@@ -215,13 +223,15 @@
       "verified_contracts": [
         "Original-duration deterministic and stochastic continuation passes in strict/optimized builds with actual 1/4 threads.",
         "The new 37-run strict/optimized full audit retains original-duration exact deterministic/stochastic continuation after both bounded corrections.",
-        "The 38-script correction audit retains original-duration deterministic/stochastic continuation in both profiles with actual one/four-thread teams."
+        "The 38-script correction audit retains original-duration deterministic/stochastic continuation in both profiles with actual one/four-thread teams.",
+        "The 40-script geometry/N7-B audit retains exact original-duration deterministic/stochastic continuation; all 16 full-case canonical output/checkpoint fingerprints and effective input bytes equal the preceding audit."
       ],
       "evidence": [
         "latest",
         "n8_b_full",
         "n7_a",
-        "hydrostatic_roundoff"
+        "hydrostatic_roundoff",
+        "n7_b"
       ]
     },
     {
@@ -464,17 +474,18 @@
         "status": "satisfied",
         "remaining_actions": [],
         "evidence_tests": [
-          "TEST_HYDROSTATIC_ROUNDOFF"
+          "TEST_HYDROSTATIC_ROUNDOFF",
+          "TEST_N7_COMPOSITION"
         ]
       },
       {
         "id": "H05",
         "requirement": "Smooth moving material contact with variable composition",
-        "status": "missing",
-        "remaining_actions": [
-          "N7-B"
-        ],
-        "evidence_tests": []
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_N7_COMPOSITION"
+        ]
       },
       {
         "id": "H06",
@@ -572,27 +583,6 @@
     ]
   },
   "remaining_actions": [
-    {
-      "id": "N7-B",
-      "kind": "test",
-      "title": "Complete variable-composition equilibrium and transport tests",
-      "normative_items": [
-        "H04",
-        "H05"
-      ],
-      "criteria": [
-        "N7-03",
-        "N7-05",
-        "N7-07"
-      ],
-      "change_scope": "Test canonical mass fractions and current closures; no new material or source law.",
-      "exit_conditions": [
-        "Use a defined hydrostatic equilibrium for variable composition; do not assume constant eta is sufficient when the hydrostatic coefficient varies.",
-        "Run a smooth moving material contact with nonconstant component mass fractions, including current liquid/solid and gas-containing closures.",
-        "Check each conservative component and residual carrier budget, raw face and stage admissibility, monotone face fractions and signed transport in both directions; closed boundaries isolate transport.",
-        "Use independent conservation/transport oracles rather than treating the prototype one-solid layout as the full gas/liquid/multicomponent reference."
-      ]
-    },
     {
       "id": "N7-C",
       "kind": "test",
@@ -778,7 +768,36 @@
       "evidence": [
         "n7_a"
       ]
+    },
+    {
+      "id": "N7-B",
+      "kind": "test",
+      "title": "Complete variable-composition equilibrium and transport tests",
+      "normative_items": [
+        "H04",
+        "H05"
+      ],
+      "criteria": [
+        "N7-03",
+        "N7-05",
+        "N7-07"
+      ],
+      "change_scope": "Canonical fractions/current closures with an independently isolated contact reference. A missing y-directed 1D fit and invalid short-line boundary extrapolation required a bounded geometry fix; no flux, thermodynamic, IMEX or CFL change.",
+      "exit_conditions": [
+        "Use a defined hydrostatic equilibrium for variable composition; do not assume constant eta is sufficient when the hydrostatic coefficient varies.",
+        "Run a smooth moving material contact with nonconstant component mass fractions, including current liquid/solid and gas-containing closures.",
+        "Check each conservative component and residual carrier budget, raw face and stage admissibility, monotone face fractions and signed transport in both directions; closed boundaries isolate transport.",
+        "Use independent conservation/transport oracles rather than treating the prototype one-solid layout as the full gas/liquid/multicomponent reference."
+      ],
+      "status": "satisfied",
+      "evidence": [
+        "n7_b"
+      ]
     }
   ],
-  "solver_revision_role": "Historical base revision only; current bounded correction and numerical fixtures are pinned by hydrostatic_roundoff evidence. Historical aliases retain their original provenance."
+  "solver_revision_role": "Historical base revision only; current geometry correction and full N7-B fixtures are pinned by n7_b evidence. Historical aliases retain their original provenance.",
+  "next_implementation_batch": [
+    "N7-C",
+    "N7-D"
+  ]
 }
