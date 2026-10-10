@@ -1,0 +1,1323 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "base_revision": "e4333a5cf0575d23287a32a082fe18fbd939bcbe",
+  "scope": "Exactly stationary hydrostatic cancellation; N7-B equilibrium subset, not contact closure or N9 sign-off",
+  "production_changes": [
+    "src/hyperbolic_2d.f90"
+  ],
+  "summary": {
+    "N7_B": "open",
+    "N8": "satisfied",
+    "N9": "open",
+    "equilibrium_cases_per_profile": 90,
+    "control_cases_per_profile": 36,
+    "focused_solver_runs": 648,
+    "candidate_vs_baseline_payload_comparisons": 144
+  },
+  "guard_contract": {
+    "schema_version": 4,
+    "previous_contract": "roundoff_guard_contract_v3.json",
+    "revision_reason": "The baseline one-column y derivative extrapolation is out of bounds even on a flat bed. Resolve both axes in ALL controls, with at least five transverse cells for the retained fitting stencil. Prior failed constructions remain archived; conditions, velocities, criteria and tolerances are unchanged.",
+    "frozen_before_execution": "2026-10-10",
+    "scope": "Bounded stationary hydrostatic roundoff correction, not completion of N7-B",
+    "baseline_revision": "e4333a5cf0575d23287a32a082fe18fbd939bcbe",
+    "baseline_module_sha256": "1d5af9f9d5e1936acd1f37003b448f2cd94005de82ad573e505d7b7ff9342ee3",
+    "baseline_role": "Checksum-pinned pre-correction hyperbolic module linked against the same other current objects and observer; only the changed operator is contrasted.",
+    "correction": {
+      "stationarity": "Both cell momenta and both momenta of every adjacent face endpoint must equal zero exactly.",
+      "roundoff_multiplier": 64,
+      "path_scale": "max over adjacent directional endpoints of abs(G*Gamma)*h*max(h,abs(eta))",
+      "bound": "64*epsilon(wp)*path_scale/spacing for the normal momentum component only",
+      "exclusions": "No correction for any nonzero cell/endpoint momentum; no scalar flux modification; no CFL modification."
+    },
+    "controls": {
+      "closures": [
+        "liquid",
+        "gas",
+        "gas-liquid"
+      ],
+      "axes": [
+        "x",
+        "y"
+      ],
+      "directions": [
+        -1,
+        1
+      ],
+      "velocities": [
+        1e-20,
+        1e-12
+      ],
+      "tangential_velocity": 1e-20,
+      "transverse_cells": 5,
+      "bed": 0,
+      "unperturbed_depth": 1,
+      "cells": 20,
+      "spacing": 0.5,
+      "dt": 0.001,
+      "steps": 2,
+      "n_RK": 2,
+      "limiter": 3,
+      "nonequilibrium_depth_perturbation": 0.000001,
+      "minimum_nonequilibrium_speed": 1e-10,
+      "expected_cases": 36,
+      "comparison": "Bitwise candidate/HEAD result.bin and composition.bin for every slow-motion and nonequilibrium case; actual one/four-thread equality separately.",
+      "equilibrium_matrix": "All original 90 N7-B equilibrium cases, unchanged states and tolerances, strict and optimized."
+    }
+  },
+  "equilibrium_contract_sha256": "dd9c4401652e2b9ad874f15702e5f5f3cfc9796e6fdbd77f96f506bccfd330fb",
+  "profiles": {
+    "strict": {
+      "equilibrium_evidence_sha256": "8f08f56409c547400d7898c8b44af5c1ab9120a191cbfa4aa1846ccde22a3bb5",
+      "guard_evidence_sha256": "fffb4a8d01f0cb69b914891c2c56419dce2a814f32964de19ccc3ad9a6566090",
+      "equilibrium_count": 90,
+      "control_count": 36,
+      "maximum_equilibrium_error": 0,
+      "maximum_force_scaled_residual": 0,
+      "maximum_component_budget": 0,
+      "maximum_boundary_mass_flux": 0,
+      "minimum_physical_nonequilibrium_speed": 7.826870061760692e-9,
+      "control_case_names": [
+        "guard-liquid-x-slow-1e-20-sign-1",
+        "guard-liquid-x-slow-1e-20-sign1",
+        "guard-liquid-x-slow-1e-12-sign-1",
+        "guard-liquid-x-slow-1e-12-sign1",
+        "guard-liquid-x-tangential",
+        "guard-liquid-x-pressure-nonequilibrium",
+        "guard-liquid-y-slow-1e-20-sign-1",
+        "guard-liquid-y-slow-1e-20-sign1",
+        "guard-liquid-y-slow-1e-12-sign-1",
+        "guard-liquid-y-slow-1e-12-sign1",
+        "guard-liquid-y-tangential",
+        "guard-liquid-y-pressure-nonequilibrium",
+        "guard-gas-x-slow-1e-20-sign-1",
+        "guard-gas-x-slow-1e-20-sign1",
+        "guard-gas-x-slow-1e-12-sign-1",
+        "guard-gas-x-slow-1e-12-sign1",
+        "guard-gas-x-tangential",
+        "guard-gas-x-pressure-nonequilibrium",
+        "guard-gas-y-slow-1e-20-sign-1",
+        "guard-gas-y-slow-1e-20-sign1",
+        "guard-gas-y-slow-1e-12-sign-1",
+        "guard-gas-y-slow-1e-12-sign1",
+        "guard-gas-y-tangential",
+        "guard-gas-y-pressure-nonequilibrium",
+        "guard-gas-liquid-x-slow-1e-20-sign-1",
+        "guard-gas-liquid-x-slow-1e-20-sign1",
+        "guard-gas-liquid-x-slow-1e-12-sign-1",
+        "guard-gas-liquid-x-slow-1e-12-sign1",
+        "guard-gas-liquid-x-tangential",
+        "guard-gas-liquid-x-pressure-nonequilibrium",
+        "guard-gas-liquid-y-slow-1e-20-sign-1",
+        "guard-gas-liquid-y-slow-1e-20-sign1",
+        "guard-gas-liquid-y-slow-1e-12-sign-1",
+        "guard-gas-liquid-y-slow-1e-12-sign1",
+        "guard-gas-liquid-y-tangential",
+        "guard-gas-liquid-y-pressure-nonequilibrium"
+      ],
+      "equilibrium_case_names": [
+        "lake-constant-density-Q1-liquid-1D-S0C0-RK2",
+        "lake-constant-density-Q1-liquid-1D-S0C0-RK3",
+        "lake-constant-density-Q1-liquid-1D-S0C0-RK4",
+        "lake-constant-density-Q1-liquid-1D-S0C1-RK2",
+        "lake-constant-density-Q1-liquid-1D-S0C1-RK3",
+        "lake-constant-density-Q1-liquid-1D-S0C1-RK4",
+        "lake-constant-density-Q1-liquid-1D-S1C0-RK2",
+        "lake-constant-density-Q1-liquid-1D-S1C0-RK3",
+        "lake-constant-density-Q1-liquid-1D-S1C0-RK4",
+        "lake-constant-density-Q1-liquid-1D-S1C1-RK2",
+        "lake-constant-density-Q1-liquid-1D-S1C1-RK3",
+        "lake-constant-density-Q1-liquid-1D-S1C1-RK4",
+        "lake-constant-pressure-flat-liquid-1D-S0C0-RK2",
+        "lake-constant-pressure-flat-liquid-1D-S0C0-RK3",
+        "lake-constant-pressure-flat-liquid-1D-S0C0-RK4",
+        "lake-constant-density-Q1-liquid-2D-S0C0-RK2",
+        "lake-constant-density-Q1-liquid-2D-S0C0-RK3",
+        "lake-constant-density-Q1-liquid-2D-S0C0-RK4",
+        "lake-constant-density-Q1-liquid-2D-S0C1-RK2",
+        "lake-constant-density-Q1-liquid-2D-S0C1-RK3",
+        "lake-constant-density-Q1-liquid-2D-S0C1-RK4",
+        "lake-constant-density-Q1-liquid-2D-S1C0-RK2",
+        "lake-constant-density-Q1-liquid-2D-S1C0-RK3",
+        "lake-constant-density-Q1-liquid-2D-S1C0-RK4",
+        "lake-constant-density-Q1-liquid-2D-S1C1-RK2",
+        "lake-constant-density-Q1-liquid-2D-S1C1-RK3",
+        "lake-constant-density-Q1-liquid-2D-S1C1-RK4",
+        "lake-constant-pressure-flat-liquid-2D-S0C0-RK2",
+        "lake-constant-pressure-flat-liquid-2D-S0C0-RK3",
+        "lake-constant-pressure-flat-liquid-2D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-1D-S0C0-RK2",
+        "lake-constant-density-Q1-gas-1D-S0C0-RK3",
+        "lake-constant-density-Q1-gas-1D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-1D-S0C1-RK2",
+        "lake-constant-density-Q1-gas-1D-S0C1-RK3",
+        "lake-constant-density-Q1-gas-1D-S0C1-RK4",
+        "lake-constant-density-Q1-gas-1D-S1C0-RK2",
+        "lake-constant-density-Q1-gas-1D-S1C0-RK3",
+        "lake-constant-density-Q1-gas-1D-S1C0-RK4",
+        "lake-constant-density-Q1-gas-1D-S1C1-RK2",
+        "lake-constant-density-Q1-gas-1D-S1C1-RK3",
+        "lake-constant-density-Q1-gas-1D-S1C1-RK4",
+        "lake-constant-pressure-flat-gas-1D-S0C0-RK2",
+        "lake-constant-pressure-flat-gas-1D-S0C0-RK3",
+        "lake-constant-pressure-flat-gas-1D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-2D-S0C0-RK2",
+        "lake-constant-density-Q1-gas-2D-S0C0-RK3",
+        "lake-constant-density-Q1-gas-2D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-2D-S0C1-RK2",
+        "lake-constant-density-Q1-gas-2D-S0C1-RK3",
+        "lake-constant-density-Q1-gas-2D-S0C1-RK4",
+        "lake-constant-density-Q1-gas-2D-S1C0-RK2",
+        "lake-constant-density-Q1-gas-2D-S1C0-RK3",
+        "lake-constant-density-Q1-gas-2D-S1C0-RK4",
+        "lake-constant-density-Q1-gas-2D-S1C1-RK2",
+        "lake-constant-density-Q1-gas-2D-S1C1-RK3",
+        "lake-constant-density-Q1-gas-2D-S1C1-RK4",
+        "lake-constant-pressure-flat-gas-2D-S0C0-RK2",
+        "lake-constant-pressure-flat-gas-2D-S0C0-RK3",
+        "lake-constant-pressure-flat-gas-2D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-liquid-1D-S0C0-RK2",
+        "lake-constant-density-Q1-gas-liquid-1D-S0C0-RK3",
+        "lake-constant-density-Q1-gas-liquid-1D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-liquid-1D-S0C1-RK2",
+        "lake-constant-density-Q1-gas-liquid-1D-S0C1-RK3",
+        "lake-constant-density-Q1-gas-liquid-1D-S0C1-RK4",
+        "lake-constant-density-Q1-gas-liquid-1D-S1C0-RK2",
+        "lake-constant-density-Q1-gas-liquid-1D-S1C0-RK3",
+        "lake-constant-density-Q1-gas-liquid-1D-S1C0-RK4",
+        "lake-constant-density-Q1-gas-liquid-1D-S1C1-RK2",
+        "lake-constant-density-Q1-gas-liquid-1D-S1C1-RK3",
+        "lake-constant-density-Q1-gas-liquid-1D-S1C1-RK4",
+        "lake-constant-pressure-flat-gas-liquid-1D-S0C0-RK2",
+        "lake-constant-pressure-flat-gas-liquid-1D-S0C0-RK3",
+        "lake-constant-pressure-flat-gas-liquid-1D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-liquid-2D-S0C0-RK2",
+        "lake-constant-density-Q1-gas-liquid-2D-S0C0-RK3",
+        "lake-constant-density-Q1-gas-liquid-2D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-liquid-2D-S0C1-RK2",
+        "lake-constant-density-Q1-gas-liquid-2D-S0C1-RK3",
+        "lake-constant-density-Q1-gas-liquid-2D-S0C1-RK4",
+        "lake-constant-density-Q1-gas-liquid-2D-S1C0-RK2",
+        "lake-constant-density-Q1-gas-liquid-2D-S1C0-RK3",
+        "lake-constant-density-Q1-gas-liquid-2D-S1C0-RK4",
+        "lake-constant-density-Q1-gas-liquid-2D-S1C1-RK2",
+        "lake-constant-density-Q1-gas-liquid-2D-S1C1-RK3",
+        "lake-constant-density-Q1-gas-liquid-2D-S1C1-RK4",
+        "lake-constant-pressure-flat-gas-liquid-2D-S0C0-RK2",
+        "lake-constant-pressure-flat-gas-liquid-2D-S0C0-RK3",
+        "lake-constant-pressure-flat-gas-liquid-2D-S0C0-RK4"
+      ]
+    },
+    "optimized": {
+      "equilibrium_evidence_sha256": "a58531022d6765f809a30adb539e93c256d5ed5aa738a9104f29ab7c022366ab",
+      "guard_evidence_sha256": "ece9e08e8853b5990ba554b820ec3d0af8aabd0fb8dc7d2ebbb98e69292d9986",
+      "equilibrium_count": 90,
+      "control_count": 36,
+      "maximum_equilibrium_error": 0,
+      "maximum_force_scaled_residual": 0,
+      "maximum_component_budget": 0,
+      "maximum_boundary_mass_flux": 0,
+      "minimum_physical_nonequilibrium_speed": 7.826870066586259e-9,
+      "control_case_names": [
+        "guard-liquid-x-slow-1e-20-sign-1",
+        "guard-liquid-x-slow-1e-20-sign1",
+        "guard-liquid-x-slow-1e-12-sign-1",
+        "guard-liquid-x-slow-1e-12-sign1",
+        "guard-liquid-x-tangential",
+        "guard-liquid-x-pressure-nonequilibrium",
+        "guard-liquid-y-slow-1e-20-sign-1",
+        "guard-liquid-y-slow-1e-20-sign1",
+        "guard-liquid-y-slow-1e-12-sign-1",
+        "guard-liquid-y-slow-1e-12-sign1",
+        "guard-liquid-y-tangential",
+        "guard-liquid-y-pressure-nonequilibrium",
+        "guard-gas-x-slow-1e-20-sign-1",
+        "guard-gas-x-slow-1e-20-sign1",
+        "guard-gas-x-slow-1e-12-sign-1",
+        "guard-gas-x-slow-1e-12-sign1",
+        "guard-gas-x-tangential",
+        "guard-gas-x-pressure-nonequilibrium",
+        "guard-gas-y-slow-1e-20-sign-1",
+        "guard-gas-y-slow-1e-20-sign1",
+        "guard-gas-y-slow-1e-12-sign-1",
+        "guard-gas-y-slow-1e-12-sign1",
+        "guard-gas-y-tangential",
+        "guard-gas-y-pressure-nonequilibrium",
+        "guard-gas-liquid-x-slow-1e-20-sign-1",
+        "guard-gas-liquid-x-slow-1e-20-sign1",
+        "guard-gas-liquid-x-slow-1e-12-sign-1",
+        "guard-gas-liquid-x-slow-1e-12-sign1",
+        "guard-gas-liquid-x-tangential",
+        "guard-gas-liquid-x-pressure-nonequilibrium",
+        "guard-gas-liquid-y-slow-1e-20-sign-1",
+        "guard-gas-liquid-y-slow-1e-20-sign1",
+        "guard-gas-liquid-y-slow-1e-12-sign-1",
+        "guard-gas-liquid-y-slow-1e-12-sign1",
+        "guard-gas-liquid-y-tangential",
+        "guard-gas-liquid-y-pressure-nonequilibrium"
+      ],
+      "equilibrium_case_names": [
+        "lake-constant-density-Q1-liquid-1D-S0C0-RK2",
+        "lake-constant-density-Q1-liquid-1D-S0C0-RK3",
+        "lake-constant-density-Q1-liquid-1D-S0C0-RK4",
+        "lake-constant-density-Q1-liquid-1D-S0C1-RK2",
+        "lake-constant-density-Q1-liquid-1D-S0C1-RK3",
+        "lake-constant-density-Q1-liquid-1D-S0C1-RK4",
+        "lake-constant-density-Q1-liquid-1D-S1C0-RK2",
+        "lake-constant-density-Q1-liquid-1D-S1C0-RK3",
+        "lake-constant-density-Q1-liquid-1D-S1C0-RK4",
+        "lake-constant-density-Q1-liquid-1D-S1C1-RK2",
+        "lake-constant-density-Q1-liquid-1D-S1C1-RK3",
+        "lake-constant-density-Q1-liquid-1D-S1C1-RK4",
+        "lake-constant-pressure-flat-liquid-1D-S0C0-RK2",
+        "lake-constant-pressure-flat-liquid-1D-S0C0-RK3",
+        "lake-constant-pressure-flat-liquid-1D-S0C0-RK4",
+        "lake-constant-density-Q1-liquid-2D-S0C0-RK2",
+        "lake-constant-density-Q1-liquid-2D-S0C0-RK3",
+        "lake-constant-density-Q1-liquid-2D-S0C0-RK4",
+        "lake-constant-density-Q1-liquid-2D-S0C1-RK2",
+        "lake-constant-density-Q1-liquid-2D-S0C1-RK3",
+        "lake-constant-density-Q1-liquid-2D-S0C1-RK4",
+        "lake-constant-density-Q1-liquid-2D-S1C0-RK2",
+        "lake-constant-density-Q1-liquid-2D-S1C0-RK3",
+        "lake-constant-density-Q1-liquid-2D-S1C0-RK4",
+        "lake-constant-density-Q1-liquid-2D-S1C1-RK2",
+        "lake-constant-density-Q1-liquid-2D-S1C1-RK3",
+        "lake-constant-density-Q1-liquid-2D-S1C1-RK4",
+        "lake-constant-pressure-flat-liquid-2D-S0C0-RK2",
+        "lake-constant-pressure-flat-liquid-2D-S0C0-RK3",
+        "lake-constant-pressure-flat-liquid-2D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-1D-S0C0-RK2",
+        "lake-constant-density-Q1-gas-1D-S0C0-RK3",
+        "lake-constant-density-Q1-gas-1D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-1D-S0C1-RK2",
+        "lake-constant-density-Q1-gas-1D-S0C1-RK3",
+        "lake-constant-density-Q1-gas-1D-S0C1-RK4",
+        "lake-constant-density-Q1-gas-1D-S1C0-RK2",
+        "lake-constant-density-Q1-gas-1D-S1C0-RK3",
+        "lake-constant-density-Q1-gas-1D-S1C0-RK4",
+        "lake-constant-density-Q1-gas-1D-S1C1-RK2",
+        "lake-constant-density-Q1-gas-1D-S1C1-RK3",
+        "lake-constant-density-Q1-gas-1D-S1C1-RK4",
+        "lake-constant-pressure-flat-gas-1D-S0C0-RK2",
+        "lake-constant-pressure-flat-gas-1D-S0C0-RK3",
+        "lake-constant-pressure-flat-gas-1D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-2D-S0C0-RK2",
+        "lake-constant-density-Q1-gas-2D-S0C0-RK3",
+        "lake-constant-density-Q1-gas-2D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-2D-S0C1-RK2",
+        "lake-constant-density-Q1-gas-2D-S0C1-RK3",
+        "lake-constant-density-Q1-gas-2D-S0C1-RK4",
+        "lake-constant-density-Q1-gas-2D-S1C0-RK2",
+        "lake-constant-density-Q1-gas-2D-S1C0-RK3",
+        "lake-constant-density-Q1-gas-2D-S1C0-RK4",
+        "lake-constant-density-Q1-gas-2D-S1C1-RK2",
+        "lake-constant-density-Q1-gas-2D-S1C1-RK3",
+        "lake-constant-density-Q1-gas-2D-S1C1-RK4",
+        "lake-constant-pressure-flat-gas-2D-S0C0-RK2",
+        "lake-constant-pressure-flat-gas-2D-S0C0-RK3",
+        "lake-constant-pressure-flat-gas-2D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-liquid-1D-S0C0-RK2",
+        "lake-constant-density-Q1-gas-liquid-1D-S0C0-RK3",
+        "lake-constant-density-Q1-gas-liquid-1D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-liquid-1D-S0C1-RK2",
+        "lake-constant-density-Q1-gas-liquid-1D-S0C1-RK3",
+        "lake-constant-density-Q1-gas-liquid-1D-S0C1-RK4",
+        "lake-constant-density-Q1-gas-liquid-1D-S1C0-RK2",
+        "lake-constant-density-Q1-gas-liquid-1D-S1C0-RK3",
+        "lake-constant-density-Q1-gas-liquid-1D-S1C0-RK4",
+        "lake-constant-density-Q1-gas-liquid-1D-S1C1-RK2",
+        "lake-constant-density-Q1-gas-liquid-1D-S1C1-RK3",
+        "lake-constant-density-Q1-gas-liquid-1D-S1C1-RK4",
+        "lake-constant-pressure-flat-gas-liquid-1D-S0C0-RK2",
+        "lake-constant-pressure-flat-gas-liquid-1D-S0C0-RK3",
+        "lake-constant-pressure-flat-gas-liquid-1D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-liquid-2D-S0C0-RK2",
+        "lake-constant-density-Q1-gas-liquid-2D-S0C0-RK3",
+        "lake-constant-density-Q1-gas-liquid-2D-S0C0-RK4",
+        "lake-constant-density-Q1-gas-liquid-2D-S0C1-RK2",
+        "lake-constant-density-Q1-gas-liquid-2D-S0C1-RK3",
+        "lake-constant-density-Q1-gas-liquid-2D-S0C1-RK4",
+        "lake-constant-density-Q1-gas-liquid-2D-S1C0-RK2",
+        "lake-constant-density-Q1-gas-liquid-2D-S1C0-RK3",
+        "lake-constant-density-Q1-gas-liquid-2D-S1C0-RK4",
+        "lake-constant-density-Q1-gas-liquid-2D-S1C1-RK2",
+        "lake-constant-density-Q1-gas-liquid-2D-S1C1-RK3",
+        "lake-constant-density-Q1-gas-liquid-2D-S1C1-RK4",
+        "lake-constant-pressure-flat-gas-liquid-2D-S0C0-RK2",
+        "lake-constant-pressure-flat-gas-liquid-2D-S0C0-RK3",
+        "lake-constant-pressure-flat-gas-liquid-2D-S0C0-RK4"
+      ]
+    }
+  },
+  "source_and_fixture_sha256": {
+    "src/IMEX_SfloW2D.f90": "2f7e868a3f37ef2718853e605453befc3596565c393f3bdc68256990be0f281b",
+    "src/Makefile.am": "22de4a6f4a6e14b9ef84a74e98c2959ed00c044b5e2a374a4f1738e5ce4292c2",
+    "src/Makefile.in": "b35085f7169593f2475bacf9192d2f77ad6dd7133cff4df6fb99b9c82a93ee4d",
+    "src/complexify.f90": "f6de6fb8f4c59be820b342cc3a8c31d45601dc850b92132cb9c7796876f985cf",
+    "src/constitutive_parameters_2d.f90": "bbb8fb6a5ecda75cdfbd9dbd57650bd8d22736318e5140072bc3401511a87de3",
+    "src/diagnostics_2d.f90": "16b8c59ac2f90b5c99e7c5cfffc337d2da0dceefaec091efe36fb8c5cb80e759",
+    "src/domain_2d.f90": "6afd4e62d52dbd23ec429514dfb33ab3f8988887a88150197bd55f6a66bf6a5f",
+    "src/equation_metadata_2d.f90": "1dbcece9f777f6e742980924937413e74a5cb4fc431c856dc12a47b76ca9154e",
+    "src/equation_terms_2d.f90": "ca8c71c4f64e8d293af68d6eb653badf29415b2602c2a00e5017b22f3d47f31a",
+    "src/geometry_2d.f90": "eb96fab849222360744552d11f382911d010f71b32f3a3bb005e5d921947d56f",
+    "src/hp_reconstruction_2d.f90": "7bc35bd8f767c53ca5135a2ed79a7d46f7593c41be41a4db25c195fb0ebb75df",
+    "src/hyperbolic_2d.f90": "84aebe39459630ef7570305aae984fff172e67e4b8f46e759a63bb7c0cf881e6",
+    "src/init_2d.f90": "03451193df8e652b8eccf27644564e40fb05d929c094d2ba0172a0c4372140ca",
+    "src/inpout_2d.f90": "0ea85224622c7184d902ec1a5a682f570e023510c48c0c4fa660d57b713f66d8",
+    "src/lapack_interfaces_2d.f90": "2891985b5e521538e6871568aa8b708fdf01455b1908c7805cf2b6cfd3b5d952",
+    "src/mass_exchange_2d.f90": "89b5fa471e8599cd3205873d74126daf7cabfa9efd8d222ea783cbf010902cd8",
+    "src/mixture_from_mass.inc": "da6131a86aa691dc043a77e2d3f50ed2f753d077590c081e7ee97d5bd4b20a5d",
+    "src/mixture_heat_capacity.inc": "c112e1dc64aebba6e282b1fc220377abe229948062da8168b563b382822ea1aa",
+    "src/model_layout_2d.f90": "ab60e9de67fc2d5fbc3d15d5536ceaa22f859ed3ec0e76652ad7a5e43a352cce",
+    "src/nonconservative_2d.f90": "44f659c71d192e3e285cd8fb962f66ca11dd383d3a5a9a2c24e9b7aef97d691e",
+    "src/nonlinear_solver_2d.f90": "d20659ab9067f5890069cf440fa4fd9ab0db4cd32b461284839f31ef8fd7ec3a",
+    "src/parameters_2d.f90": "3350e8db2356f91206936ff1fc5fd335a58c1b1120e1ef5b4d6ed07998c116ba",
+    "src/pccu_2d.f90": "2d037f0ad8a48f31eb00ac3645f04ad554408ba749bec9875b8b01b393affc59",
+    "src/reconstruction_2d.f90": "5bb41fbc49202860c4489aed618deadad45fd2a7b9357f93d26754be41f4956e",
+    "src/runtime_2d.f90": "afc7d054d0f2c033c5809519b51568f92e18c7bbc9b6ec13300c6d16d2422aef",
+    "src/simulation_2d.f90": "0ed05c045960933096f8cdd4fe5267d0919ab5621ddf5093a33b0363dc0a59b9",
+    "src/spatial_operator_2d.f90": "5b009b02f13aa478db09c073df0beeeeff06cd9d209aface8e6005f7a95de45e",
+    "src/state_2d.f90": "cdb80ac4b5357a25f36f28555e595764127e234096c67cedeb4585fa2881ccda",
+    "src/state_conversion_2d.f90": "d718257f8c2e732d87e687eea0e1e00860d2484cfc62aa0398413272b463cebe",
+    "src/state_conversion_phys_var.inc": "d9f63dcbe2ceb3b62131c01dbda1da2ffbaa793a7604382d3dad4ca450bc1729",
+    "src/stochastic_module.f90": "77090048c7cb80fa9f00d1e429326bc9c2c97af21fc31be2b007a1870f29663b",
+    "src/stochastic_random_2d.f90": "39066c274a98949e1a5f636c763ee3b7572379dbea7951ef72b11448035beb00",
+    "src/time_integration_2d.f90": "6c5751712117e3e166da34847b9d796959064bc79b981105921829ffecb44020",
+    "src/velocity_from_conservative.inc": "552515c233b09171e4965e9f1866dfeedb5f37c1dce195ba02f18bcc7cd5671a",
+    "TESTS/TEST_HYDROSTATIC_ROUNDOFF/reference/hyperbolic_2d.f90": "1d5af9f9d5e1936acd1f37003b448f2cd94005de82ad573e505d7b7ff9342ee3",
+    "TESTS/TEST_HYDROSTATIC_ROUNDOFF/run_test.sh": "450c4c195ee6a118cc50f760060cbb25be1007f62ae3960ca45a4ba532b6da08",
+    "TESTS/TEST_IMEX_STAGES/test_imex_stages.f90": "9e6272199fcdaf5d38cf2f3a2018cbcdebff7ce8ebf481b9df21228cb5f24d88",
+    "TESTS/TEST_N7_COMPOSITION/README.md": "c9d85f745bd345c0cf4fb4058a5738b7b19eb9650acf24bbfe6c49c4a717cdce",
+    "TESTS/TEST_N7_COMPOSITION/check_cases.py": "a51dc6e1ab785fcefad3e4b21cc6323ea8d1fe08ba1d701156faf6434547e162",
+    "TESTS/TEST_N7_COMPOSITION/check_roundoff_guard.py": "22890905e1730083457f3b37b2c8d3835e3067a2302f0ab2674bbd10b5f83019",
+    "TESTS/TEST_N7_COMPOSITION/contract.json": "dd9c4401652e2b9ad874f15702e5f5f3cfc9796e6fdbd77f96f506bccfd330fb",
+    "TESTS/TEST_N7_COMPOSITION/diagnose_cases.py": "f186f8df34a92b12ba741aa4d2df9150760987fc0413b5a8a929227736e5087b",
+    "TESTS/TEST_N7_COMPOSITION/roundoff_guard_contract.json": "2b5176a10a588cf9906c55367ba338a5de8566012aaa560a355feb15f330c939",
+    "TESTS/TEST_N7_COMPOSITION/roundoff_guard_contract_v1.json": "6a64c1c9fff10fca730fb1e7f99a897b0fe42bcb19be01dd557d87625d841839",
+    "TESTS/TEST_N7_COMPOSITION/roundoff_guard_contract_v2.json": "e291f551f82a00912684d3e3496135dd896868a018ac9b3c60462c69f3080360",
+    "TESTS/TEST_N7_COMPOSITION/roundoff_guard_contract_v3.json": "55f78d07abb07cd2e5452ed06daae492e697b4c9dbaf937a93a5c03ff91e869f",
+    "TESTS/TEST_N7_COMPOSITION/run_test.sh": "8bea3621dd72661261fb49e9ab47131c5a8a3f0814335a91a2edde269e29b445",
+    "TESTS/TEST_N7_COMPOSITION/test_checker.py": "f99b9aa85f7117b2c33bc263c914b7fb3a7dc25340cce13258bdda5482231571"
+  },
+  "full_audit": {
+    "manifest_path": "/tmp/imex-acceptance-rest-fix-final-20261010/manifest.json",
+    "manifest_sha256": "2d68b494afd45c4770b9d03c987b2bd759bc07a8941d01ba8ff5803727ed9f82",
+    "summary": {
+      "test_runs": 38,
+      "failed": 0,
+      "passed": 38,
+      "n9_accepted": false
+    },
+    "source_and_fixture_digest": "936a0b7f2426770222d0ba88c5bdc47e3b5ec3cf65f88297bc3c71368578bf45",
+    "tests": [
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 1,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d"
+      },
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 4,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "historical_optimized",
+        "outer_threads": 1,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "e7903b8b02debb3c2d6a297b9e4ca3178bb84485d52cb6e3523c0a7d6ccaf319"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "historical_optimized",
+        "outer_threads": 4,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "e7903b8b02debb3c2d6a297b9e4ca3178bb84485d52cb6e3523c0a7d6ccaf319"
+      },
+      {
+        "test": "TEST_PCCU_INCLINED_EXCAVATION",
+        "profile": "historical_optimized",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "066f1e22d7b0949343d6d810e5664f456a3ce26bb6c743b898f3eb1c1e105cd8"
+      },
+      {
+        "test": "TEST_PCCU_LAKE_AT_REST",
+        "profile": "historical_optimized",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "72f5c63ea215a47816f2f5eaf05c6c67976ffda17a0762257c025ac5cb415ce3"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 1,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "8a781f9a758332728d812e58ab8b1ee9bb3ba3f0dd07fa8f8eae85c9e41d2f73"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 4,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "8a781f9a758332728d812e58ab8b1ee9bb3ba3f0dd07fa8f8eae85c9e41d2f73"
+      },
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 1,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d"
+      },
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 4,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "strict_debug",
+        "outer_threads": 1,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "541d700b888f6615fb9abae476f5a62e8ef6bbf7ef231c7703c2041563f06cd5"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "strict_debug",
+        "outer_threads": 4,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "541d700b888f6615fb9abae476f5a62e8ef6bbf7ef231c7703c2041563f06cd5"
+      },
+      {
+        "test": "TEST_PCCU_INCLINED_EXCAVATION",
+        "profile": "strict_debug",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "cc5dd58087a29fde99c5a4e1dc334cbb1f73d1ac1e19996fa37cfe5b4404acaa"
+      },
+      {
+        "test": "TEST_PCCU_LAKE_AT_REST",
+        "profile": "strict_debug",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "72f5c63ea215a47816f2f5eaf05c6c67976ffda17a0762257c025ac5cb415ce3"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 1,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "8a781f9a758332728d812e58ab8b1ee9bb3ba3f0dd07fa8f8eae85c9e41d2f73"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 4,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "8a781f9a758332728d812e58ab8b1ee9bb3ba3f0dd07fa8f8eae85c9e41d2f73"
+      },
+      {
+        "test": "TEST_CURVATURE_SOURCE",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "896806d4e56101e2d96fd2561c629807e931a43e274d228b3e1ec4dac45535dd"
+      },
+      {
+        "test": "TEST_DIAGNOSTICS",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "9dab51a0e28e463b0b46b2cc4b1717f4268fae30cbf3bf16a56bcf1cc270bc8a"
+      },
+      {
+        "test": "TEST_EQUATION_METADATA",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "e40e9672aceb9e47646aa5191d18c4a2781704f2e5acef086751c89615c1efa7"
+      },
+      {
+        "test": "TEST_HP_RECONSTRUCTION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "3c619d86f72c72ca958a02cc14c137978e313aed1452966026171b67e5944a81"
+      },
+      {
+        "test": "TEST_HYDROSTATIC_PATH",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "742dba46e726b0f52beb680ee084ae156a0733c7faec165fdb81400945082e37"
+      },
+      {
+        "test": "TEST_HYDROSTATIC_ROUNDOFF",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "c247a8baec91d193917e568096ac16e42fc0e7f566876973ea49543aab9f909a"
+      },
+      {
+        "test": "TEST_IMEX_STAGES",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "4edf6b55639096ef317fd75fea0278117df0784ea540f29c0a16b0b1830253b6"
+      },
+      {
+        "test": "TEST_LAPACK_INTERFACES",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "6d71bec5c90ff26b1f876f5eb149a0d3cf132cbc1288840774682b4bb5dbf4ac"
+      },
+      {
+        "test": "TEST_MASS_EXCHANGE",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "5b7e693cd0d2f5eb527d4e9052d8423abbdc09654e798d5f98019bbf1819be54"
+      },
+      {
+        "test": "TEST_MODEL_LAYOUT",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "0b6cd443a9bd2f79576c714f52460d54d644fd040162b8adc8408ebd890353e3"
+      },
+      {
+        "test": "TEST_N7_EQUILIBRIUM",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "502b7dc74f2cb9876696af90a6fc88447de598fb9466301937fff1b82a6dfed3"
+      },
+      {
+        "test": "TEST_NONCONSERVATIVE_PATH",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "67583a32e7cf44d12bda24432d9a670c4847c3f06bab0a9381d618fd730837f3"
+      },
+      {
+        "test": "TEST_PCCU",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "a4adf25853b86fe96c546449a1775abd15420e8d5e015548243a7327de53051a"
+      },
+      {
+        "test": "TEST_RHEOLOGY_FROUDE",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "d1dec382c4f567c3acb674c6bd3a8fa356a4c95cd20f2b1641457f63c0bb6eb9"
+      },
+      {
+        "test": "TEST_SOURCE_DOCUMENTATION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "72a456543e472cb839de1320064cdea50fd265f300f1a5d4565ca3f1118843f7"
+      },
+      {
+        "test": "TEST_SPATIAL_OPERATOR",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "cb2677e2c62ee075e074c3df06cf951fcc0a6ed07a6c5cc1c0823f388b7257ac"
+      },
+      {
+        "test": "TEST_STATE_CONVERSION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "37aaf4c0197997a0c827d2f3a81696cceae943f4215ee7816a940f14404b2261"
+      },
+      {
+        "test": "TEST_STATE_INITIALIZATION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "476537b49b4d8d52c0f458a38f58c3aaccec86b5e16c3ee866286c997dd96fee"
+      },
+      {
+        "test": "TEST_STOCHASTIC_EVOLUTION",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "e1f267949ebc54e582337b925b19183799cd2436529e5c5f7662eb4bcdfbbc6d"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RANDOM",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "adfd25d313f98ca8d8e7392e266a67d674ce2a6fc2ea0088fbc2c795d19df88a"
+      },
+      {
+        "test": "TEST_TOPOGRAPHY_FACES",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "6793c2a285742ecafe7c1b24116cc0bb81b085c7c4153c9f83fd29795647e278"
+      },
+      {
+        "test": "TEST_WORKSPACE_LIFECYCLE",
+        "profile": "unit_script",
+        "outer_threads": null,
+        "status": "pass",
+        "returncode": 0,
+        "log_sha256": "b15202dacab01f5e8604444d0c4a096384221600920d26bdcc67ca22d4eb76c4"
+      }
+    ],
+    "thread_comparisons": [
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_BINARY_RESTART",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_PCCU_GATE_H",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "historical_optimized",
+        "test": "TEST_STOCHASTIC_RESTART",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_BINARY_RESTART",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_PCCU_GATE_H",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      },
+      {
+        "profile": "strict_debug",
+        "test": "TEST_STOCHASTIC_RESTART",
+        "status": "pass",
+        "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+      }
+    ]
+  },
+  "comparison_to_parent_full_audit": [
+    {
+      "profile": "historical_optimized",
+      "test": "TEST_BINARY_RESTART",
+      "outer_threads": 1,
+      "status": "identical",
+      "effective_inputs_identical": true,
+      "identical_files": 30,
+      "changed_files": [],
+      "previous_sha256": "863ac93f03483c64aede83bbcd921b72e49e6e87e3d17e26c21a10ac3520e2ca",
+      "candidate_sha256": "863ac93f03483c64aede83bbcd921b72e49e6e87e3d17e26c21a10ac3520e2ca"
+    },
+    {
+      "profile": "historical_optimized",
+      "test": "TEST_BINARY_RESTART",
+      "outer_threads": 4,
+      "status": "identical",
+      "effective_inputs_identical": true,
+      "identical_files": 30,
+      "changed_files": [],
+      "previous_sha256": "863ac93f03483c64aede83bbcd921b72e49e6e87e3d17e26c21a10ac3520e2ca",
+      "candidate_sha256": "863ac93f03483c64aede83bbcd921b72e49e6e87e3d17e26c21a10ac3520e2ca"
+    },
+    {
+      "profile": "historical_optimized",
+      "test": "TEST_PCCU_GATE_H",
+      "outer_threads": 1,
+      "status": "changed",
+      "effective_inputs_identical": true,
+      "identical_files": 6,
+      "changed_files": [
+        {
+          "call": 1,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 1,
+          "file": "restart.bin"
+        },
+        {
+          "call": 2,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 2,
+          "file": "restart.bin"
+        },
+        {
+          "call": 3,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 3,
+          "file": "restart.bin"
+        },
+        {
+          "call": 4,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 4,
+          "file": "restart.bin"
+        },
+        {
+          "call": 5,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 5,
+          "file": "restart.bin"
+        },
+        {
+          "call": 6,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 6,
+          "file": "restart.bin"
+        }
+      ],
+      "previous_sha256": "20286920462959d3591d061f00413c8a7d12ccdf234f00ba406b5984ebbb4117",
+      "candidate_sha256": "ae19b94fe256fc06b987feb409f1127039b29d167d5ee26b810f4dc763b4433c"
+    },
+    {
+      "profile": "historical_optimized",
+      "test": "TEST_PCCU_GATE_H",
+      "outer_threads": 4,
+      "status": "changed",
+      "effective_inputs_identical": true,
+      "identical_files": 6,
+      "changed_files": [
+        {
+          "call": 1,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 1,
+          "file": "restart.bin"
+        },
+        {
+          "call": 2,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 2,
+          "file": "restart.bin"
+        },
+        {
+          "call": 3,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 3,
+          "file": "restart.bin"
+        },
+        {
+          "call": 4,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 4,
+          "file": "restart.bin"
+        },
+        {
+          "call": 5,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 5,
+          "file": "restart.bin"
+        },
+        {
+          "call": 6,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 6,
+          "file": "restart.bin"
+        }
+      ],
+      "previous_sha256": "20286920462959d3591d061f00413c8a7d12ccdf234f00ba406b5984ebbb4117",
+      "candidate_sha256": "ae19b94fe256fc06b987feb409f1127039b29d167d5ee26b810f4dc763b4433c"
+    },
+    {
+      "profile": "historical_optimized",
+      "test": "TEST_PCCU_INCLINED_EXCAVATION",
+      "outer_threads": null,
+      "status": "changed",
+      "effective_inputs_identical": true,
+      "identical_files": 12,
+      "changed_files": [
+        {
+          "call": 1,
+          "file": "inclinedExcavation2D_0001.q_2d"
+        },
+        {
+          "call": 1,
+          "file": "restart.bin"
+        },
+        {
+          "call": 2,
+          "file": "inclinedExcavation2D_0001.1thread.q_2d"
+        },
+        {
+          "call": 2,
+          "file": "inclinedExcavation2D_0001.q_2d"
+        },
+        {
+          "call": 2,
+          "file": "restart.bin"
+        },
+        {
+          "call": 3,
+          "file": "inclinedExcavation2D_0001.G1.q_2d"
+        },
+        {
+          "call": 3,
+          "file": "inclinedExcavation2D_0001.q_2d"
+        },
+        {
+          "call": 3,
+          "file": "restart.bin"
+        },
+        {
+          "call": 4,
+          "file": "inclinedExcavation2D_0001.1thread.q_2d"
+        },
+        {
+          "call": 4,
+          "file": "inclinedExcavation2D_0001.G1.q_2d"
+        },
+        {
+          "call": 4,
+          "file": "inclinedExcavation2D_0001.q_2d"
+        },
+        {
+          "call": 4,
+          "file": "restart.bin"
+        },
+        {
+          "call": 5,
+          "file": "inclinedExcavation2D_0001.G1.q_2d"
+        },
+        {
+          "call": 5,
+          "file": "inclinedExcavation2D_0001.q_2d"
+        },
+        {
+          "call": 5,
+          "file": "inclinedExcavation2D_0001.slope.q_2d"
+        },
+        {
+          "call": 5,
+          "file": "restart.bin"
+        },
+        {
+          "call": 6,
+          "file": "inclinedExcavation2D_0001.1thread.q_2d"
+        },
+        {
+          "call": 6,
+          "file": "inclinedExcavation2D_0001.G1.q_2d"
+        },
+        {
+          "call": 6,
+          "file": "inclinedExcavation2D_0001.q_2d"
+        },
+        {
+          "call": 6,
+          "file": "inclinedExcavation2D_0001.slope.q_2d"
+        },
+        {
+          "call": 6,
+          "file": "restart.bin"
+        }
+      ],
+      "previous_sha256": "8c5cc5ccb08b2aa905608822f819558ad98103cb709ed3cd4ecafdb2115e2afe",
+      "candidate_sha256": "fa53b3daee102d145f1c020d1ac77bffdd195cb8556a693f8a4d64cb28298504"
+    },
+    {
+      "profile": "historical_optimized",
+      "test": "TEST_PCCU_LAKE_AT_REST",
+      "outer_threads": null,
+      "status": "identical",
+      "effective_inputs_identical": true,
+      "identical_files": 128,
+      "changed_files": [],
+      "previous_sha256": "16d771fd17b842c0cde4780819f85090c30905689615406adc74e0c148ed5846",
+      "candidate_sha256": "16d771fd17b842c0cde4780819f85090c30905689615406adc74e0c148ed5846"
+    },
+    {
+      "profile": "historical_optimized",
+      "test": "TEST_STOCHASTIC_RESTART",
+      "outer_threads": 1,
+      "status": "identical",
+      "effective_inputs_identical": true,
+      "identical_files": 25,
+      "changed_files": [],
+      "previous_sha256": "8f7cef3f1569dc7ad6a7d58c92769a7612b61b7117c732e2874168994221eee1",
+      "candidate_sha256": "8f7cef3f1569dc7ad6a7d58c92769a7612b61b7117c732e2874168994221eee1"
+    },
+    {
+      "profile": "historical_optimized",
+      "test": "TEST_STOCHASTIC_RESTART",
+      "outer_threads": 4,
+      "status": "identical",
+      "effective_inputs_identical": true,
+      "identical_files": 25,
+      "changed_files": [],
+      "previous_sha256": "8f7cef3f1569dc7ad6a7d58c92769a7612b61b7117c732e2874168994221eee1",
+      "candidate_sha256": "8f7cef3f1569dc7ad6a7d58c92769a7612b61b7117c732e2874168994221eee1"
+    },
+    {
+      "profile": "strict_debug",
+      "test": "TEST_BINARY_RESTART",
+      "outer_threads": 1,
+      "status": "identical",
+      "effective_inputs_identical": true,
+      "identical_files": 30,
+      "changed_files": [],
+      "previous_sha256": "dae9558f7c292552c0be96ba14b5855dd37a1259d4883d97e4f20ab71f038123",
+      "candidate_sha256": "dae9558f7c292552c0be96ba14b5855dd37a1259d4883d97e4f20ab71f038123"
+    },
+    {
+      "profile": "strict_debug",
+      "test": "TEST_BINARY_RESTART",
+      "outer_threads": 4,
+      "status": "identical",
+      "effective_inputs_identical": true,
+      "identical_files": 30,
+      "changed_files": [],
+      "previous_sha256": "dae9558f7c292552c0be96ba14b5855dd37a1259d4883d97e4f20ab71f038123",
+      "candidate_sha256": "dae9558f7c292552c0be96ba14b5855dd37a1259d4883d97e4f20ab71f038123"
+    },
+    {
+      "profile": "strict_debug",
+      "test": "TEST_PCCU_GATE_H",
+      "outer_threads": 1,
+      "status": "changed",
+      "effective_inputs_identical": true,
+      "identical_files": 6,
+      "changed_files": [
+        {
+          "call": 1,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 1,
+          "file": "restart.bin"
+        },
+        {
+          "call": 2,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 2,
+          "file": "restart.bin"
+        },
+        {
+          "call": 3,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 3,
+          "file": "restart.bin"
+        },
+        {
+          "call": 4,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 4,
+          "file": "restart.bin"
+        },
+        {
+          "call": 5,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 5,
+          "file": "restart.bin"
+        },
+        {
+          "call": 6,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 6,
+          "file": "restart.bin"
+        }
+      ],
+      "previous_sha256": "7e66a0f6c519b74f0de24482645bce4b0a7b1016c6b63d81109870762fac4d0d",
+      "candidate_sha256": "4523b0a55b3ce3123f8384f03916752ff690627f1656ae29ed03d4c19af4fe63"
+    },
+    {
+      "profile": "strict_debug",
+      "test": "TEST_PCCU_GATE_H",
+      "outer_threads": 4,
+      "status": "changed",
+      "effective_inputs_identical": true,
+      "identical_files": 6,
+      "changed_files": [
+        {
+          "call": 1,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 1,
+          "file": "restart.bin"
+        },
+        {
+          "call": 2,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 2,
+          "file": "restart.bin"
+        },
+        {
+          "call": 3,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 3,
+          "file": "restart.bin"
+        },
+        {
+          "call": 4,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 4,
+          "file": "restart.bin"
+        },
+        {
+          "call": 5,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 5,
+          "file": "restart.bin"
+        },
+        {
+          "call": 6,
+          "file": "gateH_0001.q_2d"
+        },
+        {
+          "call": 6,
+          "file": "restart.bin"
+        }
+      ],
+      "previous_sha256": "7e66a0f6c519b74f0de24482645bce4b0a7b1016c6b63d81109870762fac4d0d",
+      "candidate_sha256": "4523b0a55b3ce3123f8384f03916752ff690627f1656ae29ed03d4c19af4fe63"
+    },
+    {
+      "profile": "strict_debug",
+      "test": "TEST_PCCU_INCLINED_EXCAVATION",
+      "outer_threads": null,
+      "status": "changed",
+      "effective_inputs_identical": true,
+      "identical_files": 12,
+      "changed_files": [
+        {
+          "call": 1,
+          "file": "inclinedExcavation2D_0001.q_2d"
+        },
+        {
+          "call": 1,
+          "file": "restart.bin"
+        },
+        {
+          "call": 2,
+          "file": "inclinedExcavation2D_0001.1thread.q_2d"
+        },
+        {
+          "call": 2,
+          "file": "inclinedExcavation2D_0001.q_2d"
+        },
+        {
+          "call": 2,
+          "file": "restart.bin"
+        },
+        {
+          "call": 3,
+          "file": "inclinedExcavation2D_0001.G1.q_2d"
+        },
+        {
+          "call": 3,
+          "file": "inclinedExcavation2D_0001.q_2d"
+        },
+        {
+          "call": 3,
+          "file": "restart.bin"
+        },
+        {
+          "call": 4,
+          "file": "inclinedExcavation2D_0001.1thread.q_2d"
+        },
+        {
+          "call": 4,
+          "file": "inclinedExcavation2D_0001.G1.q_2d"
+        },
+        {
+          "call": 4,
+          "file": "inclinedExcavation2D_0001.q_2d"
+        },
+        {
+          "call": 4,
+          "file": "restart.bin"
+        },
+        {
+          "call": 5,
+          "file": "inclinedExcavation2D_0001.G1.q_2d"
+        },
+        {
+          "call": 5,
+          "file": "inclinedExcavation2D_0001.q_2d"
+        },
+        {
+          "call": 5,
+          "file": "inclinedExcavation2D_0001.slope.q_2d"
+        },
+        {
+          "call": 5,
+          "file": "restart.bin"
+        },
+        {
+          "call": 6,
+          "file": "inclinedExcavation2D_0001.1thread.q_2d"
+        },
+        {
+          "call": 6,
+          "file": "inclinedExcavation2D_0001.G1.q_2d"
+        },
+        {
+          "call": 6,
+          "file": "inclinedExcavation2D_0001.q_2d"
+        },
+        {
+          "call": 6,
+          "file": "inclinedExcavation2D_0001.slope.q_2d"
+        },
+        {
+          "call": 6,
+          "file": "restart.bin"
+        }
+      ],
+      "previous_sha256": "d73eb1cbc2cba570d849ef16e3ea929f138b64b54744f979413878ca3c38c236",
+      "candidate_sha256": "532bcaa8abc41fc1d76b7f5526e0af6ea2f8ea85a684343353f05b70bca7600c"
+    },
+    {
+      "profile": "strict_debug",
+      "test": "TEST_PCCU_LAKE_AT_REST",
+      "outer_threads": null,
+      "status": "identical",
+      "effective_inputs_identical": true,
+      "identical_files": 128,
+      "changed_files": [],
+      "previous_sha256": "16d771fd17b842c0cde4780819f85090c30905689615406adc74e0c148ed5846",
+      "candidate_sha256": "16d771fd17b842c0cde4780819f85090c30905689615406adc74e0c148ed5846"
+    },
+    {
+      "profile": "strict_debug",
+      "test": "TEST_STOCHASTIC_RESTART",
+      "outer_threads": 1,
+      "status": "identical",
+      "effective_inputs_identical": true,
+      "identical_files": 25,
+      "changed_files": [],
+      "previous_sha256": "685783e033a4137910e4c2d14a3b6a59e1e4a53d8bf4bac6a49ebd2f30f8cfa8",
+      "candidate_sha256": "685783e033a4137910e4c2d14a3b6a59e1e4a53d8bf4bac6a49ebd2f30f8cfa8"
+    },
+    {
+      "profile": "strict_debug",
+      "test": "TEST_STOCHASTIC_RESTART",
+      "outer_threads": 4,
+      "status": "identical",
+      "effective_inputs_identical": true,
+      "identical_files": 25,
+      "changed_files": [],
+      "previous_sha256": "685783e033a4137910e4c2d14a3b6a59e1e4a53d8bf4bac6a49ebd2f30f8cfa8",
+      "candidate_sha256": "685783e033a4137910e4c2d14a3b6a59e1e4a53d8bf4bac6a49ebd2f30f8cfa8"
+    }
+  ],
+  "parent_manifest": {
+    "path": "/tmp/imex-n7-a-acceptance-20261010-final/manifest.json",
+    "sha256": "323d93a283f5b15fcf4ac317e92b4d9ddef9f4dfaa1d47ad55088c49519454f4",
+    "comparison_role": "Full manifests with captured per-call file hashes, not compact test-summary records. Same effective input bytes. Changed outputs are descriptive fingerprints, not quantified field norms or N9 approval."
+  },
+  "earlier_failed_full_audit": {
+    "manifest_path": "/tmp/imex-acceptance-rest-fix-20261010/manifest.json",
+    "reason": "Initial new test runner needed .git inside exported sources; solver regressions passed but test runner failed. Corrected with the checksum-pinned test-only module."
+  },
+  "retained_raw_directories": [
+    "/tmp/imex-hydrostatic-roundoff.sunn1c",
+    "/tmp/imex-n7-composition.St9KPm",
+    "/tmp/imex-n7-a-rest-fix-20261010.log",
+    "/tmp/imex-stages-rest-fix-20261010.log"
+  ],
+  "known_remaining_work": [
+    "Draft contact reference has incompatible velocity-transition influence; preserve the failed original contract before revising it.",
+    "Pinned baseline geometry fit is out of bounds for nx=1,ny>1 at geometry_2d line 753; not fixed by this patch.",
+    "N7-C/N7-D/D-N7-CFL/N9 remain open; long ETNA/lava reruns are not executed here."
+  ]
+}

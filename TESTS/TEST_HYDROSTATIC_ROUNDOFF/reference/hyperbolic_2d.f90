@@ -193,18 +193,6 @@ CONTAINS
 
        END DO
 
-       ! Only a completely stationary stencil may discard hydrostatic
-       ! cancellation noise. Never classify a nonzero physical velocity as
-       ! rest: even tiny motion must retain the unmodified spatial operator.
-       ! A pressure-scaled roundoff residual otherwise creates a tiny discharge
-       ! which disables the exact-rest scalar-flux guard at the next stage.
-       IF ( exactly_resting_stencil(recon,qp_expl(:,j,k),j,k) ) THEN
-          IF ( comp_cells_x .GT. 1 ) CALL cancel_resting_roundoff(             &
-               recon,j,k,1,divFlux_iRK(2,j,k) )
-          IF ( comp_cells_y .GT. 1 ) CALL cancel_resting_roundoff(             &
-               recon,j,k,2,divFlux_iRK(3,j,k) )
-       END IF
-
     END DO cells_loop
 
     !$OMP END PARALLEL DO
@@ -212,92 +200,6 @@ CONTAINS
     RETURN
 
   END SUBROUTINE eval_hyperbolic_terms
-
-  !> \brief Require exact stationarity of a cell and every adjacent face endpoint.
-  !> \param[in] recon Final reconstructed physical interface states.
-  !> \param[in] qp_cell Physical cell state; entries 2:3 are volumetric momenta.
-  !> \param[in] j Cell x index.
-  !> \param[in] k Cell y index.
-  !> \return True only when all participating momenta are exactly zero.
-  PURE FUNCTION exactly_resting_stencil(recon,qp_cell,j,k) RESULT(resting)
-    CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
-    REAL(wp), INTENT(IN) :: qp_cell(:)
-    INTEGER, INTENT(IN) :: j,k
-    LOGICAL :: resting
-
-    resting = ALL(qp_cell(2:3) .EQ. 0.0_wp)
-    IF ( .NOT. resting ) RETURN
-    IF ( comp_cells_x .GT. 1 ) THEN
-       resting = ALL(recon%qp_interfaceL(2:3,j:j+1,k) .EQ. 0.0_wp) .AND. &
-            ALL(recon%qp_interfaceR(2:3,j:j+1,k) .EQ. 0.0_wp)
-       IF ( .NOT. resting ) RETURN
-    END IF
-    IF ( comp_cells_y .GT. 1 ) THEN
-       resting = ALL(recon%qp_interfaceB(2:3,j,k:k+1) .EQ. 0.0_wp) .AND. &
-            ALL(recon%qp_interfaceT(2:3,j,k:k+1) .EQ. 0.0_wp)
-    END IF
-  END FUNCTION exactly_resting_stencil
-
-  !> \brief Remove only pressure-scaled arithmetic noise from stationary momentum balance.
-  !> \details Called only for an exactly stationary stencil. The fixed 64-epsilon
-  !>          allowance covers closure, path quadrature and the three-term
-  !>          cancellation; the scale retains sensitivity to absolute eta in
-  !>          path differences. It has no absolute force or velocity floor.
-  !>          Scalar fluxes and moving states are never modified here.
-  !> \param[in] recon Final face states and free-surface traces.
-  !> \param[in] j Cell x index.
-  !> \param[in] k Cell y index.
-  !> \param[in] axis One for x momentum, two for y momentum.
-  !> \param[in,out] residual Assembled normal-momentum spatial term.
-  SUBROUTINE cancel_resting_roundoff(recon,j,k,axis,residual)
-    CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
-    INTEGER, INTENT(IN) :: j,k,axis
-    REAL(wp), INTENT(INOUT) :: residual
-    REAL(wp) :: scale, inverse_spacing
-
-    IF (axis .EQ. 1) THEN
-       scale = MAX(                                                      &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceL(:,j,k),       &
-            recon%eta_interfaceL(j,k),grav_coeff_stag_x(j,k)),             &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceR(:,j,k),       &
-            recon%eta_interfaceR(j,k),grav_coeff_stag_x(j,k)),             &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceL(:,j+1,k),     &
-            recon%eta_interfaceL(j+1,k),grav_coeff_stag_x(j+1,k)),          &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceR(:,j+1,k),     &
-            recon%eta_interfaceR(j+1,k),grav_coeff_stag_x(j+1,k)) )
-       inverse_spacing = one_by_dx
-    ELSE
-       scale = MAX(                                                      &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceB(:,j,k),       &
-            recon%eta_interfaceB(j,k),grav_coeff_stag_y(j,k)),             &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceT(:,j,k),       &
-            recon%eta_interfaceT(j,k),grav_coeff_stag_y(j,k)),             &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceB(:,j,k+1),     &
-            recon%eta_interfaceB(j,k+1),grav_coeff_stag_y(j,k+1)),          &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceT(:,j,k+1),     &
-            recon%eta_interfaceT(j,k+1),grav_coeff_stag_y(j,k+1)) )
-       inverse_spacing = one_by_dy
-    END IF
-    IF ( ABS(residual) .LE. 64.0_wp*EPSILON(1.0_wp)*scale*inverse_spacing ) &
-         residual = 0.0_wp
-  END SUBROUTINE cancel_resting_roundoff
-
-  !> \brief Estimate the pressure scale underlying one hydrostatic endpoint calculation.
-  !> \param[in] qp_face Reconstructed physical state, with depth in entry one.
-  !> \param[in] eta Face free surface [m], included for subtraction roundoff.
-  !> \param[in] gravity_factor Dimensionless large-slope factor at the face.
-  !> \return Absolute path arithmetic scale [kg s^-2]; zero for a dry endpoint.
-  FUNCTION hydrostatic_arithmetic_scale(qp_face,eta,gravity_factor) RESULT(scale)
-    USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
-    REAL(wp), INTENT(IN) :: qp_face(:),eta,gravity_factor
-    REAL(wp) :: scale,gamma,reduced_gravity,h
-
-    h = MAX(0.0_wp,qp_face(1))
-    scale = 0.0_wp
-    IF (h .EQ. 0.0_wp) RETURN
-    CALL eval_hydrostatic_coefficient(qp_face,reduced_gravity,gamma)
-    scale = ABS(gravity_factor*gamma)*h*MAX(h,ABS(eta))
-  END FUNCTION hydrostatic_arithmetic_scale
 
   !******************************************************************************
   !> \brief Build both oriented HP-PCCU values at every active face.

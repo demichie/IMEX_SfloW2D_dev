@@ -42,6 +42,9 @@ PROGRAM test_imex_stages
   USE time_integration_2d, ONLY : time_integration_workspace_type
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, finalize_nonlinear_solver
+  USE state_conversion_2d, ONLY : qc_to_qp
+  USE reconstruction_2d, ONLY : reconstruction_workspace_type
+  USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   USE imex_test_observer
   USE omp_lib
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
@@ -50,17 +53,27 @@ PROGRAM test_imex_stages
   TYPE(spatial_operator_type) :: spatial
   TYPE(time_integration_workspace_type) :: integration
   TYPE(equation_partition_type) :: partition
+  TYPE(reconstruction_workspace_type) :: audit_reconstruction
+  TYPE(hyperbolic_workspace_type) :: audit_hyperbolic
   REAL(wp), ALLOCATABLE :: q(:,:,:),q0(:,:,:),qp(:,:,:),Z(:,:),statistics(:,:),initial_mask(:,:)
   REAL(wp) :: dt,dt_bound,dt_requested,t,mass0,repair
+  REAL(wp), ALLOCATABLE :: composition_audit(:,:), audit_qp(:,:,:), audit_rhs(:,:,:), inventory0(:)
   CHARACTER(LEN=32) :: argument
   INTEGER :: nx,ny,slope,curvature,limiter_id,input_unit,output_unit,j,k,i,step
   INTEGER :: threads,actual_threads,stages,steps,drag,observe,l
+  INTEGER :: composition_mode
 
   CALL get_command_argument(1,argument); READ(argument,*) threads
   CALL get_command_argument(2,argument); READ(argument,*) stages
   CALL get_command_argument(3,argument); READ(argument,*) steps
   CALL get_command_argument(4,argument); READ(argument,*) drag
   CALL get_command_argument(5,argument); READ(argument,*) observe
+  ! The optional sixth control extends the observer, not the production API.
+  ! Omitted/zero retains the original liquid payload and numerical fixtures.
+  composition_mode=0
+  CALL get_command_argument(6,argument)
+  IF (LEN_TRIM(argument)>0) READ(argument,*) composition_mode
+  IF (composition_mode<0 .OR. composition_mode>3) ERROR STOP 'invalid composition fixture mode'
   IF (stages<2 .OR. stages>4 .OR. steps<1) ERROR STOP 'invalid test controls'
   !$OMP PARALLEL
   !$OMP SINGLE
@@ -82,6 +95,17 @@ PROGRAM test_imex_stages
   ALLOCATE(seen(3,nx,ny,n_RK),implicit_statuses(nx,ny,n_RK),statistics(15,steps),initial_mask(nx,ny))
   CALL refresh_topography_geometry
   mass0=SUM(q(1,:,:))
+  IF (composition_mode>0) THEN
+     ALLOCATE(composition_audit(2*(n_vars+1)+5,steps),inventory0(n_vars+1))
+     ALLOCATE(audit_qp(n_vars+2,nx,ny),audit_rhs(n_eqns,nx,ny))
+     composition_audit=0.0_wp
+     DO i=1,n_vars
+        inventory0(i)=SUM(q(i,:,:))
+     END DO
+     inventory0(n_vars+1)=SUM(q(1,:,:))-SUM(q(5:n_vars,:,:))
+     CALL audit_reconstruction%initialize
+     CALL audit_hyperbolic%initialize
+  END IF
   DO step=1,steps
      CALL domain%check_solve(q,t,.FALSE.)
      IF (step==1) initial_mask=MERGE(1.0_wp,0.0_wp,domain%solve_mask)
@@ -132,12 +156,26 @@ PROGRAM test_imex_stages
      statistics(10,step)=SUM(q(1,:,:))-mass0
      statistics(11,step)=REAL(domain%solve_cells,wp)
      statistics(12,step)=t+dt
+     IF (composition_mode>0) CALL audit_composition_step
      t=t+dt
   END DO
   OPEN(NEWUNIT=output_unit,FILE='result.bin',ACCESS='STREAM',FORM='UNFORMATTED',STATUS='REPLACE')
   WRITE(output_unit) q0,q,qp,initial_mask,known,solved,raw_final
   WRITE(output_unit) REAL(implicit_statuses,wp),statistics
   CLOSE(output_unit)
+  IF (composition_mode>0) THEN
+     OPEN(NEWUNIT=output_unit,FILE='composition.bin',ACCESS='STREAM',FORM='UNFORMATTED',STATUS='REPLACE')
+     WRITE(output_unit) composition_audit
+     ! Last-stage traces are retained without primitive postprocessing in Python.
+     WRITE(output_unit) audit_reconstruction%qp_cellW,audit_reconstruction%qp_cellE
+     WRITE(output_unit) audit_reconstruction%qp_cellS,audit_reconstruction%qp_cellN
+     WRITE(output_unit) audit_reconstruction%q_interfaceL,audit_reconstruction%q_interfaceR
+     WRITE(output_unit) audit_reconstruction%q_interfaceB,audit_reconstruction%q_interfaceT
+     WRITE(output_unit) audit_rhs
+     CLOSE(output_unit)
+     CALL audit_hyperbolic%finalize
+     CALL audit_reconstruction%finalize
+  END IF
   CALL integration%finalize
   CALL spatial%finalize
   CALL partition%finalize
@@ -151,7 +189,21 @@ CONTAINS
   SUBROUTINE admissibility_values(cell,minima)
     REAL(wp), INTENT(IN) :: cell(:)
     REAL(wp), INTENT(INOUT) :: minima(3)
-    IF (cell(1)>0.0_wp) THEN
+    REAL(wp) :: capacity, residual_carrier
+    IF (cell(1)>0.0_wp .AND. composition_mode>0) THEN
+       residual_carrier=cell(1)-SUM(cell(5:n_vars))
+       capacity=DOT_PRODUCT(cell(5:6),sp_heat_s)
+       IF (gas_flag) THEN
+          capacity=capacity+cell(7)*sp_heat_g(1)+residual_carrier*sp_heat_a
+          IF (liquid_flag) capacity=capacity+cell(8)*sp_heat_l
+       ELSE
+          capacity=capacity+residual_carrier*sp_heat_l
+       END IF
+       IF (capacity<=0.0_wp) ERROR STOP 'nonpositive raw mixture heat capacity'
+       minima(1)=MIN(minima(1),cell(4)/capacity)
+       minima(2)=MIN(minima(2),MINVAL(cell(5:n_vars))/cell(1))
+       minima(3)=MIN(minima(3),residual_carrier/cell(1))
+    ELSEIF (cell(1)>0.0_wp) THEN
        minima(1)=MIN(minima(1),cell(4)/(sp_heat_l*cell(1)))
        minima(2)=MIN(minima(2),cell(5)/cell(1))
        minima(3)=MIN(minima(3),1.0_wp-cell(5)/cell(1))
@@ -186,9 +238,34 @@ CONTAINS
     cfl=0.24_wp; max_dt=1.0E6_wp; maximum_solid_packing=0.6_wp
     ALLOCATE(rho_s(1),inv_rho_s(1),sp_heat_s(1),sp_heat_g(0),sp_gas_const_g(0))
     rho_s=2500.0_wp; inv_rho_s=1.0_wp/rho_s; sp_heat_s=1100.0_wp
+    IF (composition_mode>0) THEN
+       ! Genuine current closures: two distinct solids, optionally additional
+       ! gas and explicit liquid. The untransported remainder is liquid or air.
+       n_solid=2; n_add_gas=0
+       gas_flag=composition_mode>=2; liquid_flag=composition_mode/=2
+       IF (gas_flag) n_add_gas=1
+       n_vars=4+n_solid+n_add_gas
+       IF (gas_flag .AND. liquid_flag) n_vars=n_vars+1
+       n_eqns=n_vars; idx_u=n_vars+1; idx_v=n_vars+2
+       idx_solid_last=6; idx_solidEqn_last=6
+       idx_add_gas_first=7; idx_add_gas_last=6+n_add_gas
+       idx_addGasEqn_first=7; idx_addGasEqn_last=6+n_add_gas
+       idx_totMassEqn=1; idx_uEqn=2; idx_vEqn=3; idx_engyEqn=4
+       DEALLOCATE(rho_s,inv_rho_s,sp_heat_s,sp_heat_g,sp_gas_const_g)
+       ALLOCATE(rho_s(2),inv_rho_s(2),sp_heat_s(2),sp_heat_g(n_add_gas),sp_gas_const_g(n_add_gas))
+       rho_s=[2500.0_wp,1800.0_wp]; inv_rho_s=1.0_wp/rho_s
+       sp_heat_s=[900.0_wp,1100.0_wp]
+       sp_heat_a=1005.0_wp; pres=101325.0_wp; inv_pres=1.0_wp/pres
+       rho_a_amb=pres/(sp_gas_const_a*T_ambient)
+       sp_heat_g=1850.0_wp; sp_gas_const_g=461.5_wp
+    END IF
     ALLOCATE(bcW(n_vars),bcE(n_vars),bcS(n_vars),bcN(n_vars))
     bcW%flag=1; bcW%value=0.0_wp; bcE%flag=1; bcE%value=0.0_wp
     bcS%flag=1; bcS%value=0.0_wp; bcN%flag=1; bcN%value=0.0_wp
+    IF (composition_mode>0) THEN
+       bcW(2)%flag=0; bcE(2)%flag=0
+       bcS(3)%flag=0; bcN(3)%flag=0
+    END IF
     ALLOCATE(q(n_vars,nx,ny),q0(n_vars,nx,ny),qp(n_vars+2,nx,ny))
     ALLOCATE(Z(nx,ny))
     ALLOCATE(B_vertex(nx+1,ny+1),B_cent(nx,ny),B_face_x(nx+1,ny),B_face_y(nx,ny+1))
@@ -214,12 +291,132 @@ CONTAINS
     IF (drag/=0) THEN
        rheology_flag=.TRUE.; rheology_model=6; friction_factor=1.0_wp
     END IF
-    CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.,.FALSE.])
+    IF (composition_mode==0) THEN
+       CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.,.FALSE.])
+    ELSE
+       BLOCK
+         LOGICAL :: mask(n_vars)
+         mask=.FALSE.; mask(2:3)=.TRUE.
+         CALL partition%initialize(mask)
+       END BLOCK
+    END IF
     CALL initialize_nonlinear_solver
     CALL integration%initialize
     CALL domain%initialize
     CALL spatial%initialize
   END SUBROUTINE initialize_fixture
+
+  !> \brief Audit all raw-stage inventories and independent reconstructed traces for one step.
+  !> \details Test-only workspace is allocated once. Serial diagnostics do not
+  !>          write production stage/source storage or change the active workset.
+  SUBROUTINE audit_composition_step
+    REAL(wp) :: pressure_dynamic, face_error, boundary_flux
+    INTEGER :: stage_id, cell_j, cell_k
+    IF (observe==0 .OR. domain%solve_cells/=nx*ny) ERROR STOP 'composition audit requires wet observed cells'
+    DO stage_id=1,n_RK
+       CALL audit_inventory(known(:,:,:,stage_id),1)
+       CALL audit_inventory(solved(:,:,:,stage_id),1)
+       DO cell_k=1,ny
+          DO cell_j=1,nx
+             CALL qc_to_qp(solved(:,cell_j,cell_k,stage_id),audit_qp(:,cell_j,cell_k),pressure_dynamic)
+          END DO
+       END DO
+       audit_rhs=0.0_wp
+       CALL audit_hyperbolic%evaluate_terms(audit_reconstruction,audit_qp,audit_rhs,t, &
+            domain%solve_cells,domain%j_cent,domain%k_cent,domain%solve_interfaces_x, &
+            domain%j_stag_x,domain%k_stag_x,domain%solve_interfaces_y,domain%j_stag_y,domain%k_stag_y)
+       ! Test reconstructed fractions BEFORE final_hp_state closure, plus
+       ! conservative face admissibility after the actual production conversion.
+       face_error=0.0_wp
+       DO cell_k=1,ny
+          DO cell_j=1,nx
+             CALL audit_face(audit_reconstruction%qp_cellW(:,cell_j,cell_k),cell_j,cell_k,1,face_error)
+             CALL audit_face(audit_reconstruction%qp_cellE(:,cell_j,cell_k),cell_j,cell_k,1,face_error)
+             CALL audit_face(audit_reconstruction%qp_cellS(:,cell_j,cell_k),cell_j,cell_k,2,face_error)
+             CALL audit_face(audit_reconstruction%qp_cellN(:,cell_j,cell_k),cell_j,cell_k,2,face_error)
+          END DO
+       END DO
+       composition_audit(2*(n_vars+1)+1,step)=MAX(composition_audit(2*(n_vars+1)+1,step),face_error)
+       boundary_flux=0.0_wp
+       IF (nx>1) boundary_flux=MAX(MAXVAL(ABS(audit_hyperbolic%G_interface_xL(1,1,:))), &
+            MAXVAL(ABS(audit_hyperbolic%G_interface_xR(1,nx+1,:))))
+       IF (ny>1) boundary_flux=MAX(boundary_flux,MAXVAL(ABS(audit_hyperbolic%G_interface_yB(1,:,1))), &
+            MAXVAL(ABS(audit_hyperbolic%G_interface_yT(1,:,ny+1))))
+       composition_audit(2*(n_vars+1)+2,step)=MAX(composition_audit(2*(n_vars+1)+2,step),boundary_flux)
+       composition_audit(2*(n_vars+1)+3,step)=MAX(composition_audit(2*(n_vars+1)+3,step), &
+            MAXVAL(ABS(audit_rhs(2:3,:,:))))
+       DO cell_k=1,ny
+          DO cell_j=1,nx+1
+             CALL audit_conservative_face(audit_reconstruction%q_interfaceL(:,cell_j,cell_k))
+             CALL audit_conservative_face(audit_reconstruction%q_interfaceR(:,cell_j,cell_k))
+          END DO
+       END DO
+       DO cell_k=1,ny+1
+          DO cell_j=1,nx
+             CALL audit_conservative_face(audit_reconstruction%q_interfaceB(:,cell_j,cell_k))
+             CALL audit_conservative_face(audit_reconstruction%q_interfaceT(:,cell_j,cell_k))
+          END DO
+       END DO
+    END DO
+    CALL audit_inventory(raw_final,1)
+    CALL audit_inventory(q,2)
+  END SUBROUTINE audit_composition_step
+
+  !> \brief Record maximum raw/final signed inventory errors including the untransported carrier.
+  !> \param[in] state Conservative state at one audit point.
+  !> \param[in] block_id One for raw stages/final; two for the assembled final state.
+  SUBROUTINE audit_inventory(state,block_id)
+    REAL(wp), INTENT(IN) :: state(:,:,:)
+    INTEGER, INTENT(IN) :: block_id
+    REAL(wp) :: total(n_vars+1)
+    INTEGER :: component, first
+    DO component=1,n_vars
+       total(component)=SUM(state(component,:,:))
+    END DO
+    total(n_vars+1)=SUM(state(1,:,:))-SUM(state(5:n_vars,:,:))
+    first=(block_id-1)*(n_vars+1)+1
+    composition_audit(first:first+n_vars,step)=MAX(composition_audit(first:first+n_vars,step),ABS(total-inventory0))
+  END SUBROUTINE audit_inventory
+
+  !> \brief Measure positivity, carrier closure and local TVD bounds of pre-closure face fractions.
+  !> \param[in] physical Raw cell-owned primitive face trace.
+  !> \param[in] cell_j Owner x index.
+  !> \param[in] cell_k Owner y index.
+  !> \param[in] axis Normal coordinate, one for x and two for y.
+  !> \param[in,out] error Maximum absolute fraction-bound violation over faces.
+  SUBROUTINE audit_face(physical,cell_j,cell_k,axis,error)
+    REAL(wp), INTENT(IN) :: physical(:)
+    INTEGER, INTENT(IN) :: cell_j,cell_k,axis
+    REAL(wp), INTENT(INOUT) :: error
+    REAL(wp) :: low,high
+    INTEGER :: component
+    IF (.NOT.ALL(ieee_is_finite(physical))) ERROR STOP 'nonfinite primitive face'
+    error=MAX(error,-physical(1),-MINVAL(physical(5:n_vars)),SUM(physical(5:n_vars))-1.0_wp)
+    DO component=5,n_vars
+       IF (axis==1) THEN
+          low=MINVAL(audit_qp(component,MAX(1,cell_j-1):MIN(nx,cell_j+1),cell_k))
+          high=MAXVAL(audit_qp(component,MAX(1,cell_j-1):MIN(nx,cell_j+1),cell_k))
+       ELSE
+          low=MINVAL(audit_qp(component,cell_j,MAX(1,cell_k-1):MIN(ny,cell_k+1)))
+          high=MAXVAL(audit_qp(component,cell_j,MAX(1,cell_k-1):MIN(ny,cell_k+1)))
+       END IF
+       error=MAX(error,low-physical(component),physical(component)-high)
+    END DO
+  END SUBROUTINE audit_face
+
+  !> \brief Record fraction and temperature admissibility of conservative face states.
+  !> \param[in] state Conservative face after production primitive closure/conversion.
+  SUBROUTINE audit_conservative_face(state)
+    REAL(wp), INTENT(IN) :: state(:)
+    REAL(wp) :: minima(3)
+    IF (.NOT.ALL(ieee_is_finite(state))) ERROR STOP 'nonfinite conservative face'
+    minima=[HUGE(1.0_wp),1.0_wp,1.0_wp]
+    CALL admissibility_values(state,minima)
+    composition_audit(2*(n_vars+1)+4,step)=MAX(composition_audit(2*(n_vars+1)+4,step), &
+         -MIN(minima(2),minima(3)),-state(1)/MAX(1.0_wp,MAXVAL(q0(1,:,:))))
+    composition_audit(2*(n_vars+1)+5,step)=MAX(composition_audit(2*(n_vars+1)+5,step), &
+         MAX(0.0_wp,273.0_wp-minima(1)))
+  END SUBROUTINE audit_conservative_face
 
 END PROGRAM test_imex_stages
 

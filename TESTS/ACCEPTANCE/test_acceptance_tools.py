@@ -263,6 +263,51 @@ class AuditToolsTests(unittest.TestCase):
             if filename.startswith("src/"):
                 self.assertEqual(value, full["source_and_fixture_sha256"][filename])
 
+    def test_stationary_composition_correction_evidence(self):
+        """Keep the verified stationary subset distinct from contact and CFL acceptance."""
+        repo = Path(__file__).resolve().parents[2]
+        closure = json.loads((repo / "TESTS/ACCEPTANCE/n7_n8_closure_plan.json").read_text())
+        record = closure["evidence_artifacts"]["hydrostatic_roundoff"]
+        evidence = json.loads((repo / record["path"]).read_text())
+        self.assertEqual(digest(repo / record["path"]), record["sha256"])
+        self.assertEqual(closure["milestone_status"], {"N7": "open", "N8": "satisfied", "N9": "open"})
+        self.assertEqual({a["id"] for a in closure["remaining_actions"]},
+                         {"N7-B", "N7-C", "N7-D", "D-N7-CFL"})
+        cases = {c["id"]: c for c in closure["required_tests"]["hydrodynamics"]}
+        self.assertEqual(cases["H04"]["status"], "satisfied")
+        self.assertEqual(cases["H04"]["remaining_actions"], [])
+        self.assertEqual(cases["H04"]["evidence_tests"], ["TEST_HYDROSTATIC_ROUNDOFF"])
+        self.assertEqual(cases["H05"]["status"], "missing")
+        self.assertEqual(cases["H05"]["remaining_actions"], ["N7-B"])
+        self.assertEqual(evidence["summary"]["N7_B"], "open")
+        self.assertEqual(evidence["production_changes"], ["src/hyperbolic_2d.f90"])
+        contract = evidence["guard_contract"]
+        self.assertEqual(contract["correction"]["roundoff_multiplier"], 64)
+        self.assertEqual(contract["controls"]["velocities"], [1e-20, 1e-12])
+        self.assertEqual(contract["controls"]["transverse_cells"], 5)
+        frozen = repo / "TESTS/TEST_N7_COMPOSITION/contract.json"
+        self.assertEqual(digest(frozen), evidence["equilibrium_contract_sha256"])
+        for profile in evidence["profiles"].values():
+            self.assertEqual(profile["equilibrium_count"], 90)
+            self.assertEqual(profile["control_count"], 36)
+            for metric in ("maximum_equilibrium_error", "maximum_force_scaled_residual",
+                           "maximum_component_budget", "maximum_boundary_mass_flux"):
+                self.assertEqual(profile[metric], 0)
+            self.assertGreater(profile["minimum_physical_nonequilibrium_speed"], 1e-10)
+        full = evidence["full_audit"]
+        self.assertEqual(full["summary"],
+                         {"test_runs": 38, "failed": 0, "passed": 38, "n9_accepted": False})
+        self.assertEqual(len(full["tests"]), 38)
+        self.assertTrue(all(t["status"] == "pass" for t in full["tests"]))
+        self.assertEqual(len(full["thread_comparisons"]), 6)
+        self.assertTrue(all(t["status"] == "pass" for t in full["thread_comparisons"]))
+        comparisons = evidence["comparison_to_parent_full_audit"]
+        self.assertEqual(len(comparisons), 16)
+        self.assertTrue(all(t["effective_inputs_identical"] for t in comparisons))
+        self.assertEqual(sum(t["status"] == "identical" for t in comparisons), 10)
+        self.assertEqual({t["test"] for t in comparisons if t["status"] == "changed"},
+                         {"TEST_PCCU_GATE_H", "TEST_PCCU_INCLINED_EXCAVATION"})
+
     def test_n7_a_completion_evidence(self):
         """Close the frozen N7-A cases, retaining output changes and remaining gates explicitly."""
         repo = Path(__file__).resolve().parents[2]

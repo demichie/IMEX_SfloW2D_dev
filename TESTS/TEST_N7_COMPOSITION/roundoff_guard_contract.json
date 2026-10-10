@@ -1,0 +1,38 @@
+{
+  "schema_version": 4,
+  "previous_contract": "roundoff_guard_contract_v3.json",
+  "revision_reason": "The baseline one-column y derivative extrapolation is out of bounds even on a flat bed. Resolve both axes in ALL controls, with at least five transverse cells for the retained fitting stencil. Prior failed constructions remain archived; conditions, velocities, criteria and tolerances are unchanged.",
+  "frozen_before_execution": "2026-10-10",
+  "scope": "Bounded stationary hydrostatic roundoff correction, not completion of N7-B",
+  "baseline_revision": "e4333a5cf0575d23287a32a082fe18fbd939bcbe",
+  "baseline_module_sha256": "1d5af9f9d5e1936acd1f37003b448f2cd94005de82ad573e505d7b7ff9342ee3",
+  "baseline_role": "Checksum-pinned pre-correction hyperbolic module linked against the same other current objects and observer; only the changed operator is contrasted.",
+  "correction": {
+    "stationarity": "Both cell momenta and both momenta of every adjacent face endpoint must equal zero exactly.",
+    "roundoff_multiplier": 64,
+    "path_scale": "max over adjacent directional endpoints of abs(G*Gamma)*h*max(h,abs(eta))",
+    "bound": "64*epsilon(wp)*path_scale/spacing for the normal momentum component only",
+    "exclusions": "No correction for any nonzero cell/endpoint momentum; no scalar flux modification; no CFL modification."
+  },
+  "controls": {
+    "closures": ["liquid", "gas", "gas-liquid"],
+    "axes": ["x", "y"],
+    "directions": [-1, 1],
+    "velocities": [1e-20, 1e-12],
+    "tangential_velocity": 1e-20,
+    "transverse_cells": 5,
+    "bed": 0.0,
+    "unperturbed_depth": 1.0,
+    "cells": 20,
+    "spacing": 0.5,
+    "dt": 0.001,
+    "steps": 2,
+    "n_RK": 2,
+    "limiter": 3,
+    "nonequilibrium_depth_perturbation": 1e-6,
+    "minimum_nonequilibrium_speed": 1e-10,
+    "expected_cases": 36,
+    "comparison": "Bitwise candidate/HEAD result.bin and composition.bin for every slow-motion and nonequilibrium case; actual one/four-thread equality separately.",
+    "equilibrium_matrix": "All original 90 N7-B equilibrium cases, unchanged states and tolerances, strict and optimized."
+  }
+}

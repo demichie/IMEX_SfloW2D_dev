@@ -1,0 +1,1225 @@
+{
+  "status": "N7-B open; failed equilibrium gate and draft contact reference",
+  "date": "2026-10-10",
+  "base_revision": "e4333a5cf0575d23287a32a082fe18fbd939bcbe",
+  "production_unchanged": true,
+  "contract": {
+    "schema_version": 1,
+    "package": "N7-B",
+    "frozen_before_execution": "2026-10-10",
+    "stages": [
+      2,
+      3,
+      4
+    ],
+    "profiles": [
+      "strict",
+      "optimized"
+    ],
+    "actual_threads": [
+      1,
+      4
+    ],
+    "closures": [
+      "liquid",
+      "gas",
+      "gas-liquid"
+    ],
+    "properties": {
+      "rho_s": [
+        2500,
+        1800
+      ],
+      "cp_s": [
+        900,
+        1100
+      ],
+      "rho_l": 1000,
+      "cp_l": 4180,
+      "cp_a": 1005,
+      "R_a": 287.05,
+      "cp_g": 1850,
+      "R_g": 461.5,
+      "pressure": 101325,
+      "temperature": 300,
+      "gravity": 9.81
+    },
+    "equilibrium": {
+      "nx": 20,
+      "ny_2d": 12,
+      "spacing": 0.5,
+      "eta": 6,
+      "dt": 0.001,
+      "steps": 20,
+      "flags": [
+        [
+          false,
+          false
+        ],
+        [
+          false,
+          true
+        ],
+        [
+          true,
+          false
+        ],
+        [
+          true,
+          true
+        ]
+      ],
+      "families": [
+        "constant-density-Q1",
+        "constant-pressure-flat"
+      ],
+      "pressure_flat_flags": [
+        [
+          false,
+          false
+        ]
+      ],
+      "pressure_flat_limiter": 0,
+      "density_limiter": 3
+    },
+    "contact": {
+      "nx": [
+        40,
+        80,
+        160
+      ],
+      "length": 40,
+      "directions": [
+        -1,
+        1
+      ],
+      "velocity": 1,
+      "time": 0.1,
+      "dt_dx_factor": 0.02,
+      "axes": [
+        "x",
+        "y"
+      ],
+      "y_refinements": [
+        80
+      ],
+      "profile_center": 20,
+      "profile_half_width": 4,
+      "comparison_interval": [
+        12,
+        28
+      ],
+      "velocity_transition_intervals": [
+        [
+          5,
+          10
+        ],
+        [
+          30,
+          35
+        ]
+      ],
+      "limiter": 3,
+      "theta": 1.3,
+      "maximum_profile_L1": 0.1,
+      "maximum_profile_Linf": 0.3,
+      "maximum_refinement_ratio": 0.9
+    },
+    "roundoff_epsilon_multiplier": 32768,
+    "finite_time_field_limit": "32768*float64_epsilon*steps; separate component scales, compare contact interior only",
+    "equilibrium_limit": "32768*float64_epsilon; unchanged components and force-scaled residual",
+    "budget_limit": "32768*float64_epsilon times initial component inventory; every raw stage/final, closed boundaries",
+    "face_limit": "32768*float64_epsilon for fractions and stencil monotonicity; independent thermal/mass closure",
+    "oracle_policy": "Independent multicomponent specific-volume/heat-capacity closures, equilibrium identities, analytic translating cell averages and scalar CU/TVD current-IMEX assembly; the one-solid prototype is not a gas reference.",
+    "CFL_policy": "Unchanged; D-N7-CFL remains pending."
+  },
+  "scope": "Partial 1D S0C0 diagnostics, not the complete 162-case/profile inventory.",
+  "profiles": {
+    "strict": {
+      "liquid_equilibrium_witnesses": [
+        {
+          "case": "constant-density-Q1-liquid-RK2-steps1",
+          "acceptance_case": false,
+          "threads": {
+            "sha256": {
+              "result.bin": "be42bece3bc64db9b781ebbfec4648fedb2130970a939b58bda6803eaaeb57b3",
+              "composition.bin": "7be650d08fd5d2d1ff406ab751c143108b29e7ae6dea925361d2dc0c8d47c00a",
+              "input": "fa435b5074efd3f12283081fe2bc10c292a752bd30ddfff570680455288adb58"
+            },
+            "actual_threads": [
+              1,
+              4
+            ]
+          },
+          "component_scaled_final_errors": [
+            0,
+            1.664212143939946e-18,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "diagnostics": {
+            "max_component_budget": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "budget_components": [
+              0,
+              3,
+              4,
+              5,
+              6
+            ],
+            "raw_minima": {
+              "component": 0.06974925692032775,
+              "carrier": 0.7543516761752556,
+              "temperature": 299.99999999999994,
+              "h": 4.9
+            },
+            "max_preclosure_face_violation": 0,
+            "max_boundary_mass_flux": 7.443769664242515e-14,
+            "max_momentum_residual": 7.453859845620037e-11,
+            "max_dt_over_CFL": 0.058912821434567456
+          },
+          "max_velocity": 1.2719709238265404e-17,
+          "max_temperature_change": 0,
+          "max_fraction_changes": [
+            0,
+            0
+          ],
+          "nonzero_normal_velocity_faces": 19,
+          "max_raw_CU_diffusion_nonrest": [
+            6.429707875348044e-12,
+            2.585352202009752e-13,
+            0,
+            3808009.671746643,
+            14.457136187351932,
+            19.517133852925706
+          ],
+          "flux_diagnosis": {
+            "advective_component_max": [
+              7.443769664242515e-14,
+              9.468258576578528e-31,
+              0,
+              7.578029629964776e-8,
+              1.2306398248180994e-14,
+              5.903765599289264e-15
+            ],
+            "diffusive_component_max": [
+              6.429707875348044e-12,
+              2.585352202009752e-13,
+              0,
+              3941288.111353266,
+              14.96312874468954,
+              20.20022380533135
+            ],
+            "limiter_active_faces": [
+              4,
+              6,
+              9,
+              10,
+              11,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19
+            ],
+            "scaled_scalar_spatial_term_discrepancy": [
+              1.942434751656989e-20,
+              4.4917129955452015e-19,
+              9.058232014286425e-19
+            ]
+          }
+        },
+        {
+          "case": "constant-density-Q1-liquid-RK2-steps2",
+          "acceptance_case": false,
+          "threads": {
+            "sha256": {
+              "result.bin": "4b4d2912cafa86f1fbde27aad908194f0028b40579d881811d4c284dade34c83",
+              "composition.bin": "f0bf81107c6fdfc4dd8f9a2b0e466596759efc9c21c8f707813ad65f1320de59",
+              "input": "fa435b5074efd3f12283081fe2bc10c292a752bd30ddfff570680455288adb58"
+            },
+            "actual_threads": [
+              1,
+              4
+            ]
+          },
+          "component_scaled_final_errors": [
+            0,
+            3.3238141897459127e-18,
+            0,
+            0.000001270762336924874,
+            0.00000283392791338714,
+            0.000007715321165710881
+          ],
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "diagnostics": {
+            "max_component_budget": [
+              0,
+              2.5835228311613757e-16,
+              0,
+              0,
+              0
+            ],
+            "budget_components": [
+              0,
+              3,
+              4,
+              5,
+              6
+            ],
+            "raw_minima": {
+              "component": 0.06974925692032775,
+              "carrier": 0.7543516761752556,
+              "temperature": 299.99961701489696,
+              "h": 4.9
+            },
+            "max_preclosure_face_violation": 0,
+            "max_boundary_mass_flux": 1.4866919055544554e-13,
+            "max_momentum_residual": 7.453859845620037e-11,
+            "max_dt_over_CFL": 0.058912821434567456
+          },
+          "max_velocity": 2.5404183120246687e-17,
+          "max_temperature_change": 0.0003829851030445752,
+          "max_fraction_changes": [
+            4.876295303934963e-7,
+            6.582998660353834e-7
+          ],
+          "nonzero_normal_velocity_faces": 20,
+          "max_raw_CU_diffusion_nonrest": [
+            1.2686709115469e-11,
+            5.120557955405688e-13,
+            0,
+            3942196.1738789394,
+            14.96657621060537,
+            20.204877884317447
+          ]
+        },
+        {
+          "case": "constant-density-Q1-liquid-RK2-steps20",
+          "acceptance_case": true,
+          "threads": {
+            "sha256": {
+              "result.bin": "9bf3b37d44d43adbeda18704f18f9bacd67bd5c69cdb0a756e5472c6b00ded09",
+              "composition.bin": "8b2efb8f9b4b875f1fc9c9b7f0b162e4df1125629d7c20631c516718a49f9091",
+              "input": "fa435b5074efd3f12283081fe2bc10c292a752bd30ddfff570680455288adb58"
+            },
+            "actual_threads": [
+              1,
+              4
+            ]
+          },
+          "component_scaled_final_errors": [
+            0,
+            2.989570513037044e-17,
+            0,
+            0.000021430564613920284,
+            0.00017650457727876861,
+            0.0004805307483176094
+          ],
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "diagnostics": {
+            "max_component_budget": [
+              0,
+              2.5835228311613757e-16,
+              1.873839577576825e-16,
+              2.0505385142926536e-16,
+              0
+            ],
+            "budget_components": [
+              0,
+              3,
+              4,
+              5,
+              6
+            ],
+            "raw_minima": {
+              "component": 0.06974925692032775,
+              "carrier": 0.7543516761752556,
+              "temperature": 299.993541210061,
+              "h": 4.9
+            },
+            "max_preclosure_face_violation": 0,
+            "max_boundary_mass_flux": 1.337189755230035e-12,
+            "max_momentum_residual": 2.2887916836483476e-10,
+            "max_dt_over_CFL": 0.058912821434567456
+          },
+          "max_velocity": 2.284953142037361e-16,
+          "max_temperature_change": 0.006458789939017606,
+          "max_fraction_changes": [
+            0.00003081943946478538,
+            0.00004160624327748108
+          ],
+          "nonzero_normal_velocity_faces": 21,
+          "max_raw_CU_diffusion_nonrest": [
+            1.2858368982311324e-11,
+            3.757091594611573e-12,
+            0,
+            3137982.717037042,
+            14.48204858936682,
+            19.550765595642538
+          ]
+        }
+      ],
+      "case_findings": [
+        {
+          "case": "constant-density-Q1-liquid-RK2-steps1",
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 1.664212143939946e-18
+        },
+        {
+          "case": "constant-density-Q1-liquid-RK2-steps2",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.000007715321165710881
+        },
+        {
+          "case": "constant-density-Q1-liquid-RK2-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.0004805307483176094
+        },
+        {
+          "case": "constant-density-Q1-liquid-RK3-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.00016304918918002274
+        },
+        {
+          "case": "constant-density-Q1-liquid-RK4-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.00024415157817418465
+        },
+        {
+          "case": "constant-pressure-flat-liquid-RK2-steps1",
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 9.188097626475713e-19
+        },
+        {
+          "case": "constant-pressure-flat-liquid-RK2-steps2",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.000008764393090023606
+        },
+        {
+          "case": "constant-pressure-flat-liquid-RK2-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.00016127970685700716
+        },
+        {
+          "case": "constant-pressure-flat-liquid-RK3-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.00016644846104308866
+        },
+        {
+          "case": "constant-pressure-flat-liquid-RK4-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.00016918212838825335
+        },
+        {
+          "case": "constant-density-Q1-gas-RK2-steps1",
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 6.41147667495692e-18
+        },
+        {
+          "case": "constant-density-Q1-gas-RK2-steps2",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.000016663689830664907
+        },
+        {
+          "case": "constant-density-Q1-gas-RK2-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.00027365006797053226
+        },
+        {
+          "case": "constant-density-Q1-gas-RK3-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.0002918467141236336
+        },
+        {
+          "case": "constant-density-Q1-gas-RK4-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.0002870534781672651
+        },
+        {
+          "case": "constant-pressure-flat-gas-RK2-steps1",
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 6.259345437044872e-19
+        },
+        {
+          "case": "constant-pressure-flat-gas-RK2-steps2",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.0000036527254310692037
+        },
+        {
+          "case": "constant-pressure-flat-gas-RK2-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "closed boundary leaks mass"
+          ],
+          "maximum_scaled_final_error": 0.00006816054070296618
+        },
+        {
+          "case": "constant-pressure-flat-gas-RK3-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "closed boundary leaks mass"
+          ],
+          "maximum_scaled_final_error": 0.00007043770489256751
+        },
+        {
+          "case": "constant-pressure-flat-gas-RK4-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "closed boundary leaks mass"
+          ],
+          "maximum_scaled_final_error": 0.00007161102014213716
+        },
+        {
+          "case": "constant-density-Q1-gas-liquid-RK2-steps1",
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 1.184283706705742e-17
+        },
+        {
+          "case": "constant-density-Q1-gas-liquid-RK2-steps2",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.000012615624744443307
+        },
+        {
+          "case": "constant-density-Q1-gas-liquid-RK2-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.0012763129847994622
+        },
+        {
+          "case": "constant-density-Q1-gas-liquid-RK3-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.0013590392064600336
+        },
+        {
+          "case": "constant-density-Q1-gas-liquid-RK4-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.0013368341041245992
+        },
+        {
+          "case": "constant-pressure-flat-gas-liquid-RK2-steps1",
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 8.616301007461113e-19
+        },
+        {
+          "case": "constant-pressure-flat-gas-liquid-RK2-steps2",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.0000011406218943799118
+        },
+        {
+          "case": "constant-pressure-flat-gas-liquid-RK2-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.000021188714739661663
+        },
+        {
+          "case": "constant-pressure-flat-gas-liquid-RK3-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.000021886548841054676
+        },
+        {
+          "case": "constant-pressure-flat-gas-liquid-RK4-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.00002224939674511095
+        },
+        {
+          "case": "contact-liquid-x-sign-1-nx80-RK3",
+          "equilibrium_gate_pass": null,
+          "other_gate_failures": [
+            "q: independent scalar contact mismatch",
+            "known: independent scalar contact mismatch",
+            "solved: independent scalar contact mismatch",
+            "raw_final: independent scalar contact mismatch"
+          ],
+          "maximum_scaled_final_error": 4.0768098544801655e-8
+        },
+        {
+          "case": "contact-liquid-x-sign1-nx80-RK3",
+          "equilibrium_gate_pass": null,
+          "other_gate_failures": [
+            "q: independent scalar contact mismatch",
+            "known: independent scalar contact mismatch",
+            "solved: independent scalar contact mismatch",
+            "raw_final: independent scalar contact mismatch"
+          ],
+          "maximum_scaled_final_error": 4.0768098544801655e-8
+        },
+        {
+          "case": "contact-gas-x-sign-1-nx80-RK3",
+          "equilibrium_gate_pass": null,
+          "other_gate_failures": [
+            "q: independent scalar contact mismatch",
+            "known: independent scalar contact mismatch",
+            "solved: independent scalar contact mismatch",
+            "raw_final: independent scalar contact mismatch"
+          ],
+          "maximum_scaled_final_error": 6.62276301912852e-9
+        },
+        {
+          "case": "contact-gas-x-sign1-nx80-RK3",
+          "equilibrium_gate_pass": null,
+          "other_gate_failures": [
+            "q: independent scalar contact mismatch",
+            "known: independent scalar contact mismatch",
+            "solved: independent scalar contact mismatch",
+            "raw_final: independent scalar contact mismatch"
+          ],
+          "maximum_scaled_final_error": 6.62276301912852e-9
+        },
+        {
+          "case": "contact-gas-liquid-x-sign-1-nx80-RK3",
+          "equilibrium_gate_pass": null,
+          "other_gate_failures": [
+            "q: independent scalar contact mismatch",
+            "known: independent scalar contact mismatch",
+            "solved: independent scalar contact mismatch",
+            "raw_final: independent scalar contact mismatch"
+          ],
+          "maximum_scaled_final_error": 1.2976725706306537e-8
+        },
+        {
+          "case": "contact-gas-liquid-x-sign1-nx80-RK3",
+          "equilibrium_gate_pass": null,
+          "other_gate_failures": [
+            "q: independent scalar contact mismatch",
+            "known: independent scalar contact mismatch",
+            "solved: independent scalar contact mismatch",
+            "raw_final: independent scalar contact mismatch"
+          ],
+          "maximum_scaled_final_error": 1.2976725706306537e-8
+        }
+      ],
+      "failed_frozen_gate": {
+        "status": "failed; N7-B remains open",
+        "profile": "strict",
+        "error": "lake-constant-density-Q1-liquid-1D-S0C0-RK2: equilibrium q: component errors [0.00000000e+00 2.98957051e-17 0.00000000e+00 2.14305646e-05\n 1.76504577e-04 4.80530748e-04], frozen limit 7.275957614183426e-12",
+        "expected_inventory": 162,
+        "contract_sha256": "dd9c4401652e2b9ad874f15702e5f5f3cfc9796e6fdbd77f96f506bccfd330fb"
+      },
+      "diagnostic_json_sha256": "eefe77e3c06278dd61a18028ea9727d625ab84d63a4d2ab55458c6f74337977d",
+      "production_sources_digest": "4c9542a873c248799a46683a96fbc09a9e00c9235ba50301132d6c87de87b576",
+      "test_sha256": {
+        "TESTS/TEST_N7_COMPOSITION/contract.json": "dd9c4401652e2b9ad874f15702e5f5f3cfc9796e6fdbd77f96f506bccfd330fb",
+        "TESTS/TEST_N7_COMPOSITION/check_cases.py": "8bbe5c86dada6308702796e4ccc39cb68ce23c6b99ae075f0405c773f4cadc5d",
+        "TESTS/TEST_N7_COMPOSITION/diagnose_cases.py": "f186f8df34a92b12ba741aa4d2df9150760987fc0413b5a8a929227736e5087b",
+        "TESTS/TEST_IMEX_STAGES/test_imex_stages.f90": "9e6272199fcdaf5d38cf2f3a2018cbcdebff7ce8ebf481b9df21228cb5f24d88"
+      }
+    },
+    "optimized": {
+      "liquid_equilibrium_witnesses": [
+        {
+          "case": "constant-density-Q1-liquid-RK2-steps1",
+          "acceptance_case": false,
+          "threads": {
+            "sha256": {
+              "result.bin": "7e6a8fdd56d60b0bcee729228de1d55312dffe77ed149cea9c4ba38e6328fb3a",
+              "composition.bin": "8114cf3de4098b3b897045f69714fc82f819cc039a40511fe7168d0cbf75c103",
+              "input": "fa435b5074efd3f12283081fe2bc10c292a752bd30ddfff570680455288adb58"
+            },
+            "actual_threads": [
+              1,
+              4
+            ]
+          },
+          "component_scaled_final_errors": [
+            0,
+            1.6724452710381125e-18,
+            0,
+            0,
+            0,
+            0
+          ],
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "diagnostics": {
+            "max_component_budget": [
+              0,
+              0,
+              0,
+              0,
+              0
+            ],
+            "budget_components": [
+              0,
+              3,
+              4,
+              5,
+              6
+            ],
+            "raw_minima": {
+              "component": 0.06974925692032775,
+              "carrier": 0.7543516761752556,
+              "temperature": 299.99999999999994,
+              "h": 4.9
+            },
+            "max_preclosure_face_violation": 0,
+            "max_boundary_mass_flux": 0,
+            "max_momentum_residual": 7.490735297889975e-11,
+            "max_dt_over_CFL": 0.058912821434567456
+          },
+          "max_velocity": 1.2717386634062612e-17,
+          "max_temperature_change": 0,
+          "max_fraction_changes": [
+            0,
+            0
+          ],
+          "nonzero_normal_velocity_faces": 18,
+          "max_raw_CU_diffusion_nonrest": [
+            9.644561813022067e-12,
+            3.5227035220579133e-13,
+            0,
+            3808009.671746643,
+            14.457136187352331,
+            19.517133852925507
+          ],
+          "flux_diagnosis": {
+            "advective_component_max": [
+              6.456832612756013e-14,
+              7.258084207625971e-31,
+              0,
+              6.568419217317815e-8,
+              1.048976478789705e-14,
+              5.370736189925922e-15
+            ],
+            "diffusive_component_max": [
+              9.644561813022067e-12,
+              3.5227035220579133e-13,
+              0,
+              3941288.1113499613,
+              14.96312874468954,
+              20.20022380533135
+            ],
+            "limiter_active_faces": [
+              4,
+              5,
+              6,
+              8,
+              9,
+              10,
+              11,
+              14,
+              15,
+              16,
+              17
+            ],
+            "scaled_scalar_spatial_term_discrepancy": [
+              3.884869503313978e-20,
+              4.4917129955452015e-19,
+              1.449317122285828e-17
+            ]
+          }
+        },
+        {
+          "case": "constant-density-Q1-liquid-RK2-steps2",
+          "acceptance_case": false,
+          "threads": {
+            "sha256": {
+              "result.bin": "92bdcf3ec008bfc3aac3cfdde0d02c0a080cc16932f4f6f9ff9bfaeb3f130a4a",
+              "composition.bin": "be3728ee68c4c8ade24833afc60b538573677af6990bc4103b787c08761483c8",
+              "input": "fa435b5074efd3f12283081fe2bc10c292a752bd30ddfff570680455288adb58"
+            },
+            "actual_threads": [
+              1,
+              4
+            ]
+          },
+          "component_scaled_final_errors": [
+            0,
+            3.338058984231295e-18,
+            0,
+            0.000001270762336924874,
+            0.000029245162931533403,
+            0.00007961946508603812
+          ],
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "diagnostics": {
+            "max_component_budget": [
+              0,
+              2.5835228311613757e-16,
+              0,
+              0,
+              0
+            ],
+            "budget_components": [
+              0,
+              3,
+              4,
+              5,
+              6
+            ],
+            "raw_minima": {
+              "component": 0.06974925692032775,
+              "carrier": 0.7543516761752556,
+              "temperature": 299.9999157481632,
+              "h": 4.9
+            },
+            "max_preclosure_face_violation": 0,
+            "max_boundary_mass_flux": 1.6582368245573406e-16,
+            "max_momentum_residual": 9.268475022262665e-11,
+            "max_dt_over_CFL": 0.058912821434567456
+          },
+          "max_velocity": 2.5382825641538307e-17,
+          "max_temperature_change": 0.00008566931285258761,
+          "max_fraction_changes": [
+            0.000004934103203707574,
+            0.0000066610393250066124
+          ],
+          "nonzero_normal_velocity_faces": 20,
+          "max_raw_CU_diffusion_nonrest": [
+            9.641583108912444e-12,
+            6.962856674552481e-13,
+            0,
+            3942196.173875634,
+            14.966576210604583,
+            20.204877884317447
+          ]
+        },
+        {
+          "case": "constant-density-Q1-liquid-RK2-steps20",
+          "acceptance_case": true,
+          "threads": {
+            "sha256": {
+              "result.bin": "ccc3f116ef24eae461dd81f65994993c7eee7198be342c105614652afc20a268",
+              "composition.bin": "a98d099185fceace5efdbdab41745238a4b5d5b4779e1b47a3a63dddb9ca49bf",
+              "input": "fa435b5074efd3f12283081fe2bc10c292a752bd30ddfff570680455288adb58"
+            },
+            "actual_threads": [
+              1,
+              4
+            ]
+          },
+          "component_scaled_final_errors": [
+            0,
+            2.3631115357034456e-17,
+            0,
+            0.000021570953639476528,
+            0.00017645414914152084,
+            0.0004803934585600654
+          ],
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "diagnostics": {
+            "max_component_budget": [
+              0,
+              2.5835228311613757e-16,
+              1.873839577576825e-16,
+              2.0505385142926536e-16,
+              1.6596032745933736e-16
+            ],
+            "budget_components": [
+              0,
+              3,
+              4,
+              5,
+              6
+            ],
+            "raw_minima": {
+              "component": 0.06974925692032775,
+              "carrier": 0.7543516761752556,
+              "temperature": 299.99500350681745,
+              "h": 4.9
+            },
+            "max_preclosure_face_violation": 0,
+            "max_boundary_mass_flux": 7.824633531796797e-13,
+            "max_momentum_residual": 9.939074543166324e-11,
+            "max_dt_over_CFL": 0.058912821434567456
+          },
+          "max_velocity": 1.799855808986176e-16,
+          "max_temperature_change": 0.004996493182488848,
+          "max_fraction_changes": [
+            0.00003081063421481178,
+            0.000041594356189972315
+          ],
+          "nonzero_normal_velocity_faces": 21,
+          "max_raw_CU_diffusion_nonrest": [
+            9.515031836601751e-12,
+            5.930936203988295e-12,
+            0,
+            3139933.5483015394,
+            14.023154787141388,
+            18.931258962641127
+          ]
+        }
+      ],
+      "case_findings": [
+        {
+          "case": "constant-density-Q1-liquid-RK2-steps1",
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 1.6724452710381125e-18
+        },
+        {
+          "case": "constant-density-Q1-liquid-RK2-steps2",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.00007961946508603812
+        },
+        {
+          "case": "constant-density-Q1-liquid-RK2-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.0004803934585600654
+        },
+        {
+          "case": "constant-density-Q1-liquid-RK3-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.0002701526290508304
+        },
+        {
+          "case": "constant-density-Q1-liquid-RK4-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.00015782199532672273
+        },
+        {
+          "case": "constant-pressure-flat-liquid-RK2-steps1",
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 9.187897772409318e-19
+        },
+        {
+          "case": "constant-pressure-flat-liquid-RK2-steps2",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.000008764393090023606
+        },
+        {
+          "case": "constant-pressure-flat-liquid-RK2-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.00016127970685700716
+        },
+        {
+          "case": "constant-pressure-flat-liquid-RK3-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.00016644846104308866
+        },
+        {
+          "case": "constant-pressure-flat-liquid-RK4-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.00016918212838825335
+        },
+        {
+          "case": "constant-density-Q1-gas-RK2-steps1",
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 4.919205281794109e-18
+        },
+        {
+          "case": "constant-density-Q1-gas-RK2-steps2",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.000016663689830664907
+        },
+        {
+          "case": "constant-density-Q1-gas-RK2-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.00028798430021481636
+        },
+        {
+          "case": "constant-density-Q1-gas-RK3-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.0002965820259819285
+        },
+        {
+          "case": "constant-density-Q1-gas-RK4-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.00030130579109077793
+        },
+        {
+          "case": "constant-pressure-flat-gas-RK2-steps1",
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 2.5495070206031786e-19
+        },
+        {
+          "case": "constant-pressure-flat-gas-RK2-steps2",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.0000036527254310692037
+        },
+        {
+          "case": "constant-pressure-flat-gas-RK2-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "closed boundary leaks mass"
+          ],
+          "maximum_scaled_final_error": 0.00006816054070296618
+        },
+        {
+          "case": "constant-pressure-flat-gas-RK3-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "closed boundary leaks mass"
+          ],
+          "maximum_scaled_final_error": 0.00007043770489256751
+        },
+        {
+          "case": "constant-pressure-flat-gas-RK4-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "closed boundary leaks mass"
+          ],
+          "maximum_scaled_final_error": 0.00007161102014213716
+        },
+        {
+          "case": "constant-density-Q1-gas-liquid-RK2-steps1",
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 1.00901412088241e-17
+        },
+        {
+          "case": "constant-density-Q1-gas-liquid-RK2-steps2",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.000012535257096850766
+        },
+        {
+          "case": "constant-density-Q1-gas-liquid-RK2-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.001276433654645099
+        },
+        {
+          "case": "constant-density-Q1-gas-liquid-RK3-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.0013590760905717327
+        },
+        {
+          "case": "constant-density-Q1-gas-liquid-RK4-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.0013369458572642767
+        },
+        {
+          "case": "constant-pressure-flat-gas-liquid-RK2-steps1",
+          "equilibrium_gate_pass": true,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 4.594265087542623e-19
+        },
+        {
+          "case": "constant-pressure-flat-gas-liquid-RK2-steps2",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [],
+          "maximum_scaled_final_error": 0.0000011406218943799118
+        },
+        {
+          "case": "constant-pressure-flat-gas-liquid-RK2-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.000021188714739661663
+        },
+        {
+          "case": "constant-pressure-flat-gas-liquid-RK3-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.000021886548841054676
+        },
+        {
+          "case": "constant-pressure-flat-gas-liquid-RK4-steps20",
+          "equilibrium_gate_pass": false,
+          "other_gate_failures": [
+            "raw/final component or residual-carrier budget"
+          ],
+          "maximum_scaled_final_error": 0.00002224939674511095
+        },
+        {
+          "case": "contact-liquid-x-sign-1-nx80-RK3",
+          "equilibrium_gate_pass": null,
+          "other_gate_failures": [
+            "q: independent scalar contact mismatch",
+            "known: independent scalar contact mismatch",
+            "solved: independent scalar contact mismatch",
+            "raw_final: independent scalar contact mismatch"
+          ],
+          "maximum_scaled_final_error": 4.07680984863431e-8
+        },
+        {
+          "case": "contact-liquid-x-sign1-nx80-RK3",
+          "equilibrium_gate_pass": null,
+          "other_gate_failures": [
+            "q: independent scalar contact mismatch",
+            "known: independent scalar contact mismatch",
+            "solved: independent scalar contact mismatch",
+            "raw_final: independent scalar contact mismatch"
+          ],
+          "maximum_scaled_final_error": 4.07680984863431e-8
+        },
+        {
+          "case": "contact-gas-x-sign-1-nx80-RK3",
+          "equilibrium_gate_pass": null,
+          "other_gate_failures": [
+            "q: independent scalar contact mismatch",
+            "known: independent scalar contact mismatch",
+            "solved: independent scalar contact mismatch",
+            "raw_final: independent scalar contact mismatch"
+          ],
+          "maximum_scaled_final_error": 6.62276301912852e-9
+        },
+        {
+          "case": "contact-gas-x-sign1-nx80-RK3",
+          "equilibrium_gate_pass": null,
+          "other_gate_failures": [
+            "q: independent scalar contact mismatch",
+            "known: independent scalar contact mismatch",
+            "solved: independent scalar contact mismatch",
+            "raw_final: independent scalar contact mismatch"
+          ],
+          "maximum_scaled_final_error": 6.62276301912852e-9
+        },
+        {
+          "case": "contact-gas-liquid-x-sign-1-nx80-RK3",
+          "equilibrium_gate_pass": null,
+          "other_gate_failures": [
+            "q: independent scalar contact mismatch",
+            "known: independent scalar contact mismatch",
+            "solved: independent scalar contact mismatch",
+            "raw_final: independent scalar contact mismatch"
+          ],
+          "maximum_scaled_final_error": 1.2976725474548296e-8
+        },
+        {
+          "case": "contact-gas-liquid-x-sign1-nx80-RK3",
+          "equilibrium_gate_pass": null,
+          "other_gate_failures": [
+            "q: independent scalar contact mismatch",
+            "known: independent scalar contact mismatch",
+            "solved: independent scalar contact mismatch",
+            "raw_final: independent scalar contact mismatch"
+          ],
+          "maximum_scaled_final_error": 1.2976725358669176e-8
+        }
+      ],
+      "failed_frozen_gate": {
+        "status": "failed; N7-B remains open",
+        "profile": "optimized",
+        "error": "lake-constant-density-Q1-liquid-1D-S0C0-RK2: equilibrium q: component errors [0.00000000e+00 2.36311154e-17 0.00000000e+00 2.15709536e-05\n 1.76454149e-04 4.80393459e-04], frozen limit 7.275957614183426e-12",
+        "expected_inventory": 162,
+        "contract_sha256": "dd9c4401652e2b9ad874f15702e5f5f3cfc9796e6fdbd77f96f506bccfd330fb"
+      },
+      "diagnostic_json_sha256": "08604915d746a3ac1cbabc6fabd2c54f1ecc25953e36b5b07506e4713f3933bc",
+      "production_sources_digest": "4c9542a873c248799a46683a96fbc09a9e00c9235ba50301132d6c87de87b576",
+      "test_sha256": {
+        "TESTS/TEST_N7_COMPOSITION/contract.json": "dd9c4401652e2b9ad874f15702e5f5f3cfc9796e6fdbd77f96f506bccfd330fb",
+        "TESTS/TEST_N7_COMPOSITION/check_cases.py": "8bbe5c86dada6308702796e4ccc39cb68ce23c6b99ae075f0405c773f4cadc5d",
+        "TESTS/TEST_N7_COMPOSITION/diagnose_cases.py": "f186f8df34a92b12ba741aa4d2df9150760987fc0413b5a8a929227736e5087b",
+        "TESTS/TEST_IMEX_STAGES/test_imex_stages.f90": "9e6272199fcdaf5d38cf2f3a2018cbcdebff7ce8ebf481b9df21228cb5f24d88"
+      }
+    }
+  },
+  "existing_regressions": {
+    "strict": {
+      "IMEX_STAGES": "passed",
+      "N7_A": "passed, 102 cases with actual one/four teams",
+      "HEAD_driver_payload_comparisons": 198,
+      "HEAD_driver_payload_differences": [],
+      "comparison_digest": "7a027b0e4dd58c402a9623d9a1951c452c83eb56e1522a4d2c313bccca9263ea"
+    },
+    "optimized": {
+      "IMEX_STAGES": "passed",
+      "N7_A": "passed, 102 cases with actual one/four teams",
+      "HEAD_driver_payload_comparisons": 198,
+      "HEAD_driver_payload_differences": [],
+      "comparison_digest": "d6f2e4f2392da61396b5510f065bff9ac32576d4d53ec342bbb7f60a3d6654e8"
+    }
+  },
+  "toolchain": "GNU Fortran (Homebrew GCC 15.2.0) 15.2.0",
+  "checker_tests": "four unit tests passed, including deliberate raw budget/face/state corruption",
+  "retained_raw_directories": [
+    "/tmp/imex-n7-composition.fckFhb",
+    "/tmp/imex-stages.qW0SCh",
+    "/tmp/imex-n7-b-head-compatibility-20261010",
+    "/tmp/imex-n7-equilibrium.x3Wvua"
+  ]
+}

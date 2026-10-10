@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "package": "N7-B",
+  "frozen_before_execution": "2026-10-10",
+  "stages": [2, 3, 4],
+  "profiles": ["strict", "optimized"],
+  "actual_threads": [1, 4],
+  "closures": ["liquid", "gas", "gas-liquid"],
+  "properties": {
+    "rho_s": [2500.0, 1800.0], "cp_s": [900.0, 1100.0],
+    "rho_l": 1000.0, "cp_l": 4180.0,
+    "cp_a": 1005.0, "R_a": 287.05, "cp_g": 1850.0, "R_g": 461.5,
+    "pressure": 101325.0, "temperature": 300.0, "gravity": 9.81
+  },
+  "equilibrium": {
+    "nx": 20, "ny_2d": 12, "spacing": 0.5,
+    "eta": 6.0, "dt": 0.001, "steps": 20,
+    "flags": [[false, false], [false, true], [true, false], [true, true]],
+    "families": ["constant-density-Q1", "constant-pressure-flat"],
+    "pressure_flat_flags": [[false, false]],
+    "pressure_flat_limiter": 0,
+    "density_limiter": 3
+  },
+  "contact": {
+    "nx": [40, 80, 160], "length": 40.0,
+    "directions": [-1, 1], "velocity": 1.0,
+    "time": 0.1, "dt_dx_factor": 0.02,
+    "axes": ["x", "y"], "y_refinements": [80],
+    "profile_center": 20.0, "profile_half_width": 4.0,
+    "comparison_interval": [12.0, 28.0],
+    "velocity_transition_intervals": [[5.0, 10.0], [30.0, 35.0]],
+    "limiter": 3, "theta": 1.3,
+    "maximum_profile_L1": 0.1,
+    "maximum_profile_Linf": 0.3,
+    "maximum_refinement_ratio": 0.9
+  },
+  "roundoff_epsilon_multiplier": 32768,
+  "finite_time_field_limit": "32768*float64_epsilon*steps; separate component scales, compare contact interior only",
+  "equilibrium_limit": "32768*float64_epsilon; unchanged components and force-scaled residual",
+  "budget_limit": "32768*float64_epsilon times initial component inventory; every raw stage/final, closed boundaries",
+  "face_limit": "32768*float64_epsilon for fractions and stencil monotonicity; independent thermal/mass closure",
+  "oracle_policy": "Independent multicomponent specific-volume/heat-capacity closures, equilibrium identities, analytic translating cell averages and scalar CU/TVD current-IMEX assembly; the one-solid prototype is not a gas reference.",
+  "CFL_policy": "Unchanged; D-N7-CFL remains pending."
+}

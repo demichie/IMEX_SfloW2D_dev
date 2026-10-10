@@ -1,0 +1,35 @@
+{
+  "schema_version": 2,
+  "previous_contract": "roundoff_guard_contract_v1.json",
+  "revision_reason": "The 1D IMEX inactive-direction logic zeroes tangential momentum in some cells. Tangential moving-state controls therefore require both coordinate dimensions to be resolved. The failed v1 fixture is retained; no criterion, tolerance or production condition changes.",
+  "frozen_before_execution": "2026-10-10",
+  "scope": "Bounded stationary hydrostatic roundoff correction, not completion of N7-B",
+  "baseline_revision": "e4333a5cf0575d23287a32a082fe18fbd939bcbe",
+  "correction": {
+    "stationarity": "Both cell momenta and both momenta of every adjacent face endpoint must equal zero exactly.",
+    "roundoff_multiplier": 64,
+    "path_scale": "max over adjacent directional endpoints of abs(G*Gamma)*h*max(h,abs(eta))",
+    "bound": "64*epsilon(wp)*path_scale/spacing for the normal momentum component only",
+    "exclusions": "No correction for any nonzero cell/endpoint momentum; no scalar flux modification; no CFL modification."
+  },
+  "controls": {
+    "closures": ["liquid", "gas", "gas-liquid"],
+    "axes": ["x", "y"],
+    "directions": [-1, 1],
+    "velocities": [1e-20, 1e-12],
+    "tangential_velocity": 1e-20,
+    "tangential_transverse_cells": 3,
+    "cells": 20,
+    "spacing": 0.5,
+    "dt": 0.001,
+    "steps": 2,
+    "n_RK": 2,
+    "limiter": 3,
+    "nonequilibrium_depth_perturbation": 1e-6,
+    "minimum_nonequilibrium_speed": 1e-10,
+    "expected_cases": 36,
+    "comparison": "Bitwise candidate/HEAD result.bin and composition.bin for every slow-motion and nonequilibrium case; actual one/four-thread equality separately.",
+    "equilibrium_matrix": "All original 90 N7-B equilibrium cases, unchanged states and tolerances, strict and optimized."
+  }
+}
+

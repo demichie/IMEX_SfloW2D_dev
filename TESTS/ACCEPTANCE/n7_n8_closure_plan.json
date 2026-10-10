@@ -50,6 +50,10 @@
     "n7_a": {
       "path": "docs/acceptance/results_n7_a_2026_10_10.json",
       "sha256": "51b4d4931f7fdb393198d0992f4aa27fa9b1909bda4195dd8107808af4a052ed"
+    },
+    "hydrostatic_roundoff": {
+      "path": "docs/acceptance/results_hydrostatic_roundoff_2026_10_10.json",
+      "sha256": "f6f25268aaec5f7abb642d6ae2276be03b53d34610fd91b15a9fedf4f535d0a0"
     }
   },
   "milestone_status": {
@@ -103,12 +107,14 @@
         "N7-C"
       ],
       "verified_contracts": [
-        "Production liquid HP face traces, compatible momenta and velocities agree with pinned cores."
+        "Production liquid HP face traces, compatible momenta and velocities agree with pinned cores.",
+        "All 90 stationary variable-composition cases per profile pass raw cell/face positivity, TVD mass fractions and conservative closure with actual one/four-thread equality."
       ],
       "evidence": [
         "spatial",
         "latest",
-        "n8_b_full"
+        "n8_b_full",
+        "hydrostatic_roundoff"
       ]
     },
     {
@@ -135,11 +141,13 @@
         "N7-B"
       ],
       "verified_contracts": [
-        "Local gas/solid/liquid conversion and positive/negative component-flux rescaling tests pass."
+        "Local gas/solid/liquid conversion and positive/negative component-flux rescaling tests pass.",
+        "The original 90 liquid/gas/gas-liquid equilibria pass unchanged stationary component/carrier budgets, thermal closure and force criteria after the bounded exactly-resting roundoff correction; moving-contact validation remains open."
       ],
       "evidence": [
         "latest",
-        "n8_b_full"
+        "n8_b_full",
+        "hydrostatic_roundoff"
       ]
     },
     {
@@ -171,11 +179,13 @@
         "N7-C"
       ],
       "verified_contracts": [
-        "Existing Gate-H total-mass and G=1 lateral-symmetry limits pass."
+        "Existing Gate-H total-mass and G=1 lateral-symmetry limits pass.",
+        "Independent stationary component/carrier inventories and boundary mass fluxes are exactly unchanged in all 90 equilibria per profile; moving-contact budgets and circular/orientation symmetry remain open."
       ],
       "evidence": [
         "latest",
-        "n8_b_full"
+        "n8_b_full",
+        "hydrostatic_roundoff"
       ]
     },
     {
@@ -184,7 +194,8 @@
       "remaining_actions": [],
       "verified_contracts": [
         "Actual 1/4 teams and bitwise outputs pass for covered spatial/stage/exchange fixtures and all six full Gate-H/restart pairs.",
-        "All 204 additional N7-A actual 1/4-thread pairs have bitwise-identical complete payloads; six full Gate-H/restart pairs remain passing."
+        "All 204 additional N7-A actual 1/4-thread pairs have bitwise-identical complete payloads; six full Gate-H/restart pairs remain passing.",
+        "All 90 new equilibria and 36 slow-motion/real-force controls per profile retain bitwise actual one/four-thread payload equality; six full Gate-H/restart pairs pass."
       ],
       "evidence": [
         "spatial",
@@ -193,7 +204,8 @@
         "n8_a",
         "n8_b_full",
         "n8_b",
-        "n7_a"
+        "n7_a",
+        "hydrostatic_roundoff"
       ]
     },
     {
@@ -202,12 +214,14 @@
       "remaining_actions": [],
       "verified_contracts": [
         "Original-duration deterministic and stochastic continuation passes in strict/optimized builds with actual 1/4 threads.",
-        "The new 37-run strict/optimized full audit retains original-duration exact deterministic/stochastic continuation after both bounded corrections."
+        "The new 37-run strict/optimized full audit retains original-duration exact deterministic/stochastic continuation after both bounded corrections.",
+        "The 38-script correction audit retains original-duration deterministic/stochastic continuation in both profiles with actual one/four-thread teams."
       ],
       "evidence": [
         "latest",
         "n8_b_full",
-        "n7_a"
+        "n7_a",
+        "hydrostatic_roundoff"
       ]
     },
     {
@@ -447,11 +461,11 @@
       {
         "id": "H04",
         "requirement": "Variable-composition hydrostatic equilibrium in canonical mass fractions",
-        "status": "missing",
-        "remaining_actions": [
-          "N7-B"
-        ],
-        "evidence_tests": []
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_HYDROSTATIC_ROUNDOFF"
+        ]
       },
       {
         "id": "H05",
@@ -734,7 +748,7 @@
         "n8_b",
         "n8_b_full"
       ],
-      "user_resolution": "Sì, test algebrico separato e produzione uniforme",
+      "user_resolution": "S\u00ec, test algebrico separato e produzione uniforme",
       "resolution_scope": "Unequal-area synthetic algebra only; supported production grid remains uniform Cartesian."
     },
     {
@@ -766,5 +780,5 @@
       ]
     }
   ],
-  "solver_revision_role": "Base revision only; candidate production/numerical fixture hashes are pinned by N7-A evidence. Historical aliases retain their original provenance."
+  "solver_revision_role": "Historical base revision only; current bounded correction and numerical fixtures are pinned by hydrostatic_roundoff evidence. Historical aliases retain their original provenance."
 }
