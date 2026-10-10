@@ -1,0 +1,1006 @@
+{
+  "schema_version": 1,
+  "scope": "Full numerical regression after the N8-B 1D geometric-cache reproducibility correction; not N9 approval.",
+  "solver_base_revision": "40df4dfe6f70d9b96161e27ea726993e098bbc6e",
+  "raw_manifest": {
+    "path": "/tmp/imex-n8-b-acceptance-20261010/manifest.json",
+    "sha256": "2f3179ae30e58eeabcc2c982aa7f4bcd0f7baaa6725c0e33b0927c4fede3cec7"
+  },
+  "comparison_to_baseline": {
+    "artifact": "docs/acceptance/results_stage_count_contract_2026_10_10.json",
+    "artifact_sha256": "585261d20c18541774173caeb6712ca1a81b8348f9cbe1e406dd9ecafc2901d5",
+    "cases": [
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 1,
+        "status": "unchanged",
+        "canonical_output_count": 30,
+        "canonical_fingerprint_sha256": "34eba7a4e5b1b1cfe6224c868e9cc2db170db700c6cb02fc0ebedce1cf1f6c01"
+      },
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 4,
+        "status": "unchanged",
+        "canonical_output_count": 30,
+        "canonical_fingerprint_sha256": "34eba7a4e5b1b1cfe6224c868e9cc2db170db700c6cb02fc0ebedce1cf1f6c01"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "historical_optimized",
+        "outer_threads": 1,
+        "status": "unchanged",
+        "canonical_output_count": 18,
+        "canonical_fingerprint_sha256": "d2b083068324540dff5bde5f9871934e1860f0ec3a12bc1127160875e7d3dc20"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "historical_optimized",
+        "outer_threads": 4,
+        "status": "unchanged",
+        "canonical_output_count": 18,
+        "canonical_fingerprint_sha256": "d2b083068324540dff5bde5f9871934e1860f0ec3a12bc1127160875e7d3dc20"
+      },
+      {
+        "test": "TEST_PCCU_INCLINED_EXCAVATION",
+        "profile": "historical_optimized",
+        "outer_threads": null,
+        "status": "unchanged",
+        "canonical_output_count": 24,
+        "canonical_fingerprint_sha256": "7753ddb941d66f6c29e9fbc0c90c68f4221ba42054e1ed1ede820f67013002ed"
+      },
+      {
+        "test": "TEST_PCCU_LAKE_AT_REST",
+        "profile": "historical_optimized",
+        "outer_threads": null,
+        "status": "unchanged",
+        "canonical_output_count": 64,
+        "canonical_fingerprint_sha256": "6db9af1ca4386522545757d352349d43aa3096b7987926a39a0af1e3ba405b5c"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 1,
+        "status": "unchanged",
+        "canonical_output_count": 25,
+        "canonical_fingerprint_sha256": "f5d8d45a52c6244611772586562b9b1f0b45651e6b4094f12c82d77537a33b2b"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "historical_optimized",
+        "outer_threads": 4,
+        "status": "unchanged",
+        "canonical_output_count": 25,
+        "canonical_fingerprint_sha256": "f5d8d45a52c6244611772586562b9b1f0b45651e6b4094f12c82d77537a33b2b"
+      },
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 1,
+        "status": "unchanged",
+        "canonical_output_count": 30,
+        "canonical_fingerprint_sha256": "dae9558f7c292552c0be96ba14b5855dd37a1259d4883d97e4f20ab71f038123"
+      },
+      {
+        "test": "TEST_BINARY_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 4,
+        "status": "unchanged",
+        "canonical_output_count": 30,
+        "canonical_fingerprint_sha256": "dae9558f7c292552c0be96ba14b5855dd37a1259d4883d97e4f20ab71f038123"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "strict_debug",
+        "outer_threads": 1,
+        "status": "unchanged",
+        "canonical_output_count": 18,
+        "canonical_fingerprint_sha256": "7e66a0f6c519b74f0de24482645bce4b0a7b1016c6b63d81109870762fac4d0d"
+      },
+      {
+        "test": "TEST_PCCU_GATE_H",
+        "profile": "strict_debug",
+        "outer_threads": 4,
+        "status": "unchanged",
+        "canonical_output_count": 18,
+        "canonical_fingerprint_sha256": "7e66a0f6c519b74f0de24482645bce4b0a7b1016c6b63d81109870762fac4d0d"
+      },
+      {
+        "test": "TEST_PCCU_INCLINED_EXCAVATION",
+        "profile": "strict_debug",
+        "outer_threads": null,
+        "status": "unchanged",
+        "canonical_output_count": 24,
+        "canonical_fingerprint_sha256": "cc158fe9609283a953023121be4cf682ae34a13760bc6c116a5d6bcec218d362"
+      },
+      {
+        "test": "TEST_PCCU_LAKE_AT_REST",
+        "profile": "strict_debug",
+        "outer_threads": null,
+        "status": "unchanged",
+        "canonical_output_count": 64,
+        "canonical_fingerprint_sha256": "6db9af1ca4386522545757d352349d43aa3096b7987926a39a0af1e3ba405b5c"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 1,
+        "status": "unchanged",
+        "canonical_output_count": 25,
+        "canonical_fingerprint_sha256": "685783e033a4137910e4c2d14a3b6a59e1e4a53d8bf4bac6a49ebd2f30f8cfa8"
+      },
+      {
+        "test": "TEST_STOCHASTIC_RESTART",
+        "profile": "strict_debug",
+        "outer_threads": 4,
+        "status": "unchanged",
+        "canonical_output_count": 25,
+        "canonical_fingerprint_sha256": "685783e033a4137910e4c2d14a3b6a59e1e4a53d8bf4bac6a49ebd2f30f8cfa8"
+      }
+    ]
+  },
+  "summary": {
+    "test_runs": 36,
+    "failed": 0,
+    "passed": 36,
+    "n9_accepted": false
+  },
+  "source_and_fixture_sha256": {
+    "src/IMEX_SfloW2D.f90": "2f7e868a3f37ef2718853e605453befc3596565c393f3bdc68256990be0f281b",
+    "src/Makefile.am": "22de4a6f4a6e14b9ef84a74e98c2959ed00c044b5e2a374a4f1738e5ce4292c2",
+    "src/Makefile.in": "b35085f7169593f2475bacf9192d2f77ad6dd7133cff4df6fb99b9c82a93ee4d",
+    "src/complexify.f90": "f6de6fb8f4c59be820b342cc3a8c31d45601dc850b92132cb9c7796876f985cf",
+    "src/constitutive_parameters_2d.f90": "bbb8fb6a5ecda75cdfbd9dbd57650bd8d22736318e5140072bc3401511a87de3",
+    "src/diagnostics_2d.f90": "16b8c59ac2f90b5c99e7c5cfffc337d2da0dceefaec091efe36fb8c5cb80e759",
+    "src/domain_2d.f90": "6afd4e62d52dbd23ec429514dfb33ab3f8988887a88150197bd55f6a66bf6a5f",
+    "src/equation_metadata_2d.f90": "1dbcece9f777f6e742980924937413e74a5cb4fc431c856dc12a47b76ca9154e",
+    "src/equation_terms_2d.f90": "ca8c71c4f64e8d293af68d6eb653badf29415b2602c2a00e5017b22f3d47f31a",
+    "src/geometry_2d.f90": "eb96fab849222360744552d11f382911d010f71b32f3a3bb005e5d921947d56f",
+    "src/hp_reconstruction_2d.f90": "cf6cc6ee62eb872496a6fe33e8d4e2e640e3ea4ffc05050f8121d099ae2e4af1",
+    "src/hyperbolic_2d.f90": "1d5af9f9d5e1936acd1f37003b448f2cd94005de82ad573e505d7b7ff9342ee3",
+    "src/init_2d.f90": "03451193df8e652b8eccf27644564e40fb05d929c094d2ba0172a0c4372140ca",
+    "src/inpout_2d.f90": "0ea85224622c7184d902ec1a5a682f570e023510c48c0c4fa660d57b713f66d8",
+    "src/lapack_interfaces_2d.f90": "2891985b5e521538e6871568aa8b708fdf01455b1908c7805cf2b6cfd3b5d952",
+    "src/mass_exchange_2d.f90": "89b5fa471e8599cd3205873d74126daf7cabfa9efd8d222ea783cbf010902cd8",
+    "src/mixture_from_mass.inc": "da6131a86aa691dc043a77e2d3f50ed2f753d077590c081e7ee97d5bd4b20a5d",
+    "src/mixture_heat_capacity.inc": "c112e1dc64aebba6e282b1fc220377abe229948062da8168b563b382822ea1aa",
+    "src/model_layout_2d.f90": "ab60e9de67fc2d5fbc3d15d5536ceaa22f859ed3ec0e76652ad7a5e43a352cce",
+    "src/nonconservative_2d.f90": "44f659c71d192e3e285cd8fb962f66ca11dd383d3a5a9a2c24e9b7aef97d691e",
+    "src/nonlinear_solver_2d.f90": "d20659ab9067f5890069cf440fa4fd9ab0db4cd32b461284839f31ef8fd7ec3a",
+    "src/parameters_2d.f90": "3350e8db2356f91206936ff1fc5fd335a58c1b1120e1ef5b4d6ed07998c116ba",
+    "src/pccu_2d.f90": "2d037f0ad8a48f31eb00ac3645f04ad554408ba749bec9875b8b01b393affc59",
+    "src/reconstruction_2d.f90": "5bb41fbc49202860c4489aed618deadad45fd2a7b9357f93d26754be41f4956e",
+    "src/runtime_2d.f90": "afc7d054d0f2c033c5809519b51568f92e18c7bbc9b6ec13300c6d16d2422aef",
+    "src/simulation_2d.f90": "0ed05c045960933096f8cdd4fe5267d0919ab5621ddf5093a33b0363dc0a59b9",
+    "src/spatial_operator_2d.f90": "5b009b02f13aa478db09c073df0beeeeff06cd9d209aface8e6005f7a95de45e",
+    "src/state_2d.f90": "cdb80ac4b5357a25f36f28555e595764127e234096c67cedeb4585fa2881ccda",
+    "src/state_conversion_2d.f90": "f8dcda9f78c9ec0df7687c059c733698e7f46a39d53a83307583c83a34c8d1f9",
+    "src/state_conversion_phys_var.inc": "d9f63dcbe2ceb3b62131c01dbda1da2ffbaa793a7604382d3dad4ca450bc1729",
+    "src/stochastic_module.f90": "77090048c7cb80fa9f00d1e429326bc9c2c97af21fc31be2b007a1870f29663b",
+    "src/stochastic_random_2d.f90": "39066c274a98949e1a5f636c763ee3b7572379dbea7951ef72b11448035beb00",
+    "src/time_integration_2d.f90": "6c5751712117e3e166da34847b9d796959064bc79b981105921829ffecb44020",
+    "src/velocity_from_conservative.inc": "552515c233b09171e4965e9f1866dfeedb5f37c1dce195ba02f18bcc7cd5671a",
+    "TESTS/ACCEPTANCE/README.md": "7c818e7f4ffcbc68935e1aecd3a4af91572fbf82d7d2d0b967712caedc9daee8",
+    "TESTS/ACCEPTANCE/acceptance_plan.json": "44d77af3a6c7ff0fe70065ca1152eecd0bc4206bd76803bae184080234e821e5",
+    "TESTS/ACCEPTANCE/capture_solver.py": "c511b18873fdf0dd530ea020e5946ae672cf646ca81222b011efbb977f690780",
+    "TESTS/ACCEPTANCE/capture_solver.sh": "82456fa601cbd3bb805451250c2cd50e037c93ce0675c2ab07b225c35ca15f1e",
+    "TESTS/ACCEPTANCE/n7_n8_closure_plan.json": "3ff5c5d91c6adec78a48d0898ee5f30b4f4f75ce42f54d4b064eb833857472fc",
+    "TESTS/ACCEPTANCE/run_acceptance.py": "00c9ac59da6c97d53f1e5ebeacbfca6d985ac57cd666ce3ff4792abdd2022ba4",
+    "TESTS/ACCEPTANCE/test_acceptance_tools.py": "30f827ee3fca433c497ae626672c06b4af79ad73f9b21f5b0010f0e1fd05e9ec",
+    "TESTS/TEST_2D/IMEX_sfloW2D.inp": "fa671515b9e481fb930dabaf9b078ca576b2a4517a02cef7aeb77ed04712ab55",
+    "TESTS/TEST_2D/INIT_2D_0000.q_2d": "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+    "TESTS/TEST_2D/cleanFolder.sh": "34fd8fd5f326bd5ea481537251be389e989497893d1621b9e7b8e55788c06232",
+    "TESTS/TEST_2D/topography_dem.asc": "c1c737239ff1422dc8c9d96df92a56e3d92d33b8732ea4f4ffc0a4e5406eac12",
+    "TESTS/TEST_BINARY_RESTART/run_test.sh": "9b1608537a348f73a166a83b548a75dec30ba6acd803a7efb13fc2f7e26e83a6",
+    "TESTS/TEST_BOX/IMEX_sfloW2D.inp": "f9cc97ba231516df865beb2df2e8114e9f064742e84b4d44fc042d1bd7b3db67",
+    "TESTS/TEST_BOX/INIT_BOX_0000.q_2d": "47537e74328a3583709d36f72c442204f6fa42793a4a882b85ace006d290e46a",
+    "TESTS/TEST_BOX/cleanFolder.sh": "5c30e29da721937734a896ed1881de298422133b7948abad1704912d5f34cc83",
+    "TESTS/TEST_BOX/topography_dem.asc": "fa40ebcb26fb7791e92cc17a1030b88f2ff54fc7dd589c66f1492a6acbf0023d",
+    "TESTS/TEST_BW/IMEX_sfloW2D.inp": "3aef5688051f7bbf780a2e3dab19bca3562d8f4a168f2b15c19c53405ad8480e",
+    "TESTS/TEST_BW/INIT_BW_0000.q_2d": "5824e024ff2e6448d1ffc5cd911d8396394941e5e06c50a4524237c0e0e74fba",
+    "TESTS/TEST_BW/cleanFolder.sh": "7da0e8958695c945a13bdc0095e9d0146b0eaa559c57a21f453f52723dde85c7",
+    "TESTS/TEST_BW/topography_dem.asc": "81875fb22ff476b6d51d3232ea045cf63e31e09a9bb59379c9e792153acde00b",
+    "TESTS/TEST_CF/IMEX_sfloW2D.inp": "be83019ec84fa6f9f87e960ac09fa3133a8252e6b6e795d31e20adccbb8e8b78",
+    "TESTS/TEST_CF/cleanFolder.sh": "e4190dae20a320a432ad28b2b5005fd5ef95ebeb5ebfe4757ee122ad0c8f1aa7",
+    "TESTS/TEST_CURVATURE_SOURCE/run_test.sh": "e937a24a1d0f2a119423b09712adb5dd56e887a1e0c5ce6b3244e5b94b0682aa",
+    "TESTS/TEST_CURVATURE_SOURCE/test_curvature_source.f90": "821f64d28f162e219f3b6cf05b0117f7c0c7048a7c534853078d227a8a9829aa",
+    "TESTS/TEST_DAMBREAK/TEST_DYNAMIC_FINH/IMEX_SfloW2D.inp": "60fef8cc93f3fb3fddc5e34be901238fad5bc3ec65582df1613789ede7fd0497",
+    "TESTS/TEST_DAMBREAK/TEST_DYNAMIC_FINH/cleanFolder.sh": "199872e3f3f4d87ed7d3e8f5e535dcf61f687594d3d989f339f69988e1e9102a",
+    "TESTS/TEST_DAMBREAK/TEST_DYNAMIC_FINH/example_2D_0000.q_2d": "b33efedcf1e3c880509977a58695406a05d6c71f7e0d97801740afd1d6847322",
+    "TESTS/TEST_DAMBREAK/TEST_DYNAMIC_FINH/topography_dem.asc": "14d1fb32f40a5c975af23fcb48ea34b2df3ef7654270b079edfee7f6be9707a5",
+    "TESTS/TEST_DAMBREAK/TEST_OFF_FINH/IMEX_SfloW2D.inp": "4ddae8625cd73a6ed0f364a4e9162005d77d8b73d697fadd6ed2af72ca889580",
+    "TESTS/TEST_DAMBREAK/TEST_OFF_FINH/cleanFolder.sh": "199872e3f3f4d87ed7d3e8f5e535dcf61f687594d3d989f339f69988e1e9102a",
+    "TESTS/TEST_DAMBREAK/TEST_OFF_FINH/example_2D_0000.q_2d": "b33efedcf1e3c880509977a58695406a05d6c71f7e0d97801740afd1d6847322",
+    "TESTS/TEST_DAMBREAK/TEST_OFF_FINH/topography_dem.asc": "14d1fb32f40a5c975af23fcb48ea34b2df3ef7654270b079edfee7f6be9707a5",
+    "TESTS/TEST_DAMBREAK/TEST_STATIC_FINH/IMEX_SfloW2D.inp": "da15db3a5fc1459e4d4d9c397906777be1e428cd1a3abb822c2db5d86592512b",
+    "TESTS/TEST_DAMBREAK/TEST_STATIC_FINH/cleanFolder.sh": "199872e3f3f4d87ed7d3e8f5e535dcf61f687594d3d989f339f69988e1e9102a",
+    "TESTS/TEST_DAMBREAK/TEST_STATIC_FINH/example_2D_0000.q_2d": "b33efedcf1e3c880509977a58695406a05d6c71f7e0d97801740afd1d6847322",
+    "TESTS/TEST_DAMBREAK/TEST_STATIC_FINH/topography_dem.asc": "14d1fb32f40a5c975af23fcb48ea34b2df3ef7654270b079edfee7f6be9707a5",
+    "TESTS/TEST_DAMBREAK/TEST_STEP_FINH/IMEX_SfloW2D.inp": "27c088d8dcf96d41ac28a4adc6c6da59b1d5364ba36f623a150b470423c988cd",
+    "TESTS/TEST_DAMBREAK/TEST_STEP_FINH/cleanFolder.sh": "199872e3f3f4d87ed7d3e8f5e535dcf61f687594d3d989f339f69988e1e9102a",
+    "TESTS/TEST_DAMBREAK/TEST_STEP_FINH/example_2D_0000.q_2d": "b33efedcf1e3c880509977a58695406a05d6c71f7e0d97801740afd1d6847322",
+    "TESTS/TEST_DAMBREAK/TEST_STEP_FINH/topography_dem.asc": "14d1fb32f40a5c975af23fcb48ea34b2df3ef7654270b079edfee7f6be9707a5",
+    "TESTS/TEST_DIAGNOSTICS/run_test.sh": "adc477680b62ff49b336d95debd40a0ca62a10145a5d40fcab9165e754b1c616",
+    "TESTS/TEST_DIAGNOSTICS/test_diagnostics.f90": "e86fb3818e0f4f328310298c02eeebdcd1291be07fe569a47068fc6c6a552099",
+    "TESTS/TEST_EQUATION_METADATA/run_test.sh": "e364f84d56eee06d31234359df65466727751c53f967a86b1c014896a25b8832",
+    "TESTS/TEST_EQUATION_METADATA/test_equation_metadata.f90": "702b23051d13401dea6a8ca9f11f2fbddb168ca5dc23ffbbe1bf5167eece53e4",
+    "TESTS/TEST_HP_RECONSTRUCTION/run_test.sh": "3e127f9e612fa7cbe0a973865f680761b4fd2c04ce4db79c7c7b2b6fc66ab0a6",
+    "TESTS/TEST_HP_RECONSTRUCTION/test_hp_reconstruction.f90": "89ad194d92e5f440d2df55fa37116bf532ae84f890bf313e9d805a0b5ab644e1",
+    "TESTS/TEST_HYDROSTATIC_PATH/run_test.sh": "e45c5aa714203031a098545bde453ed841e83eb2b8d3babe8d549f40ee76fad3",
+    "TESTS/TEST_HYDROSTATIC_PATH/test_hydrostatic_path.f90": "6402149b0c4c6d73c6e560d586b2dacc1fcdff0a5900a4c9a9b4c7509a384c20",
+    "TESTS/TEST_IMEX_STAGES/compare_stages.py": "e9e145c3dd609dc800d1b4776e6182fe20eda48198c0517a8eb301d691ef66be",
+    "TESTS/TEST_IMEX_STAGES/run_test.sh": "614b1663f785db55b7b081f1e0d86dbd02a6ef90b5183fef38338b659331e1d1",
+    "TESTS/TEST_IMEX_STAGES/test_imex_stages.f90": "0552f0acf857c9b69346a7ed70562d0b4a30da53dd81bccb66950a03221dc4b2",
+    "TESTS/TEST_IMEX_STAGES/test_stage_count.f90": "57ddd4e6a7e0b20d61742e52a729270c406c430313bfc0de6cd163232bd7df90",
+    "TESTS/TEST_LAPACK_INTERFACES/run_test.sh": "ced858e51cb2913e06196f46bc5caa6e76466af4faef8db4e9cf5600a7618413",
+    "TESTS/TEST_LAPACK_INTERFACES/test_lapack_interfaces.f90": "31b3d429dd9a840848aa02f8f5e0b21edddd9728cf05757e544901c250bd8b8b",
+    "TESTS/TEST_MASS_EXCHANGE/check_diagnostics.py": "dbf55999c45237f0088c29c4f6628d3a109b7fe4a6682c25aa48cd62a43cdbe9",
+    "TESTS/TEST_MASS_EXCHANGE/check_projection_stress.py": "f0e0790fac2dbdb6a51f0ef6a71e30dbe0c9d6977c083a464722d9ffca7c7ffe",
+    "TESTS/TEST_MASS_EXCHANGE/run_test.sh": "4f832c7ec84303e6276a4f426bbfb4742b2378bc242ae596efbed17d34b7b20f",
+    "TESTS/TEST_MASS_EXCHANGE/test_mass_exchange.f90": "c54e363e4b9814da8f3836e2e89366384d82b56a321d0e02e822c3ec37290fcc",
+    "TESTS/TEST_MASS_EXCHANGE/test_projection_stress.f90": "0f5754cd041736d8a818be6169ee4005310dfbb77c4cfc5209e65dfe9eb67c25",
+    "TESTS/TEST_MODEL_LAYOUT/run_test.sh": "73291beacc8ab8c66ee67ee2e80ab87995127fae14950b4b55b9efd3dd844524",
+    "TESTS/TEST_MODEL_LAYOUT/test_model_layout.f90": "2f320115a1052c87e13cdd664487ce590e3fcdab1e673460840d3175b03dcd4f",
+    "TESTS/TEST_MODEL_LAYOUT/test_model_layout_reject.f90": "527c181bd504282f749205cab82609893933c8106c5a681f03e065278e182dea",
+    "TESTS/TEST_NONCONSERVATIVE_PATH/run_test.sh": "6696bfb601f53db3c9f09138210eb61c77064082992c32e4090dc9efb3a0c37a",
+    "TESTS/TEST_NONCONSERVATIVE_PATH/test_nonconservative_path.f90": "99a1f6f662317a8c59b0c09290635589c5367ffd31616245fbc529ca957f8abd",
+    "TESTS/TEST_PCCU/run_test.sh": "73292455de4b897841f2f6ae06387fffc9d5424e7d3bb9adc629172f975ce88a",
+    "TESTS/TEST_PCCU/test_pccu.f90": "bd8c1795f325b2ffdebebd88a04ae63b7cecdad732c926cdc068add9beb93531",
+    "TESTS/TEST_PCCU_GATE_H/README.md": "84471848146c5bebc8b2e438cb345027a0c479c9349aee00a80a3ae0623466ec",
+    "TESTS/TEST_PCCU_GATE_H/analyze_case.py": "28005167ce5da283f224c68dbcc664d5739c3abf82db8caf73523454758af4a0",
+    "TESTS/TEST_PCCU_GATE_H/generate_case.py": "4af41dae9515489b3bc8d61e7dc6828f11101a9f501f8b3f3773723eeeb9bdaa",
+    "TESTS/TEST_PCCU_GATE_H/reference_metrics.csv": "83945e67ddcca5be30f4a3a6fa346fda6c35d4b6a9fea6579cf9993dc4764126",
+    "TESTS/TEST_PCCU_GATE_H/run_test.sh": "8b7565614d8baec40da613c49b2573dbe4bf1e676130f4a3f053926b781b2bfe",
+    "TESTS/TEST_PCCU_INCLINED_EXCAVATION/run_test.sh": "cfeb814cadcef9909c0298ec73ac66fefa72a20fbd422bb9e0215a1210084693",
+    "TESTS/TEST_PCCU_LAKE_AT_REST/generate_case.py": "8a1cfbcc0332585f695e3ada0684da79643420a1eb5cf4e9f05dafac2d567f3c",
+    "TESTS/TEST_PCCU_LAKE_AT_REST/run_test.sh": "1dba5431c4fb510eac0f410d882102dd02fb05e61476381d3fd9f60a101e1f8e",
+    "TESTS/TEST_RHEOLOGY_FROUDE/run_test.sh": "95e54dfa38b5f522ed105535bca9789fe6decd7fa6f7162baf745d88f4e31dab",
+    "TESTS/TEST_RHEOLOGY_FROUDE/test_rheology_froude.f90": "570eb426622a9fc41a076d908ba3dd40db1a3f4884984e716b2c0c9f3d40a08c",
+    "TESTS/TEST_SOURCE_DOCUMENTATION/check_documentation.py": "6c4e5850c2dd02d5cc34376215a00017d19c73add3bc5cb0efc4f3a422cb49a0",
+    "TESTS/TEST_SOURCE_DOCUMENTATION/run_test.sh": "b014d74e122a08faf686a3dbe3ada002df924fc9190e4e8ce174dc4f9862cb49",
+    "TESTS/TEST_SPATIAL_OPERATOR/compare_reference.py": "055f5562cc660ba78fba0436905084cddc6c5239d9e24793fb837803753b13c7",
+    "TESTS/TEST_SPATIAL_OPERATOR/reference/hp_pccu_1d_core.py": "ffcb695ff8d8d2bd06e433d70b2a519c0b0012d959eb664b617deea83e8f64e2",
+    "TESTS/TEST_SPATIAL_OPERATOR/reference/hp_pccu_2d_core.py": "c63331366cadf9f04d802a3f058088b9c175399b2d6dc7015068a0ad110f1577",
+    "TESTS/TEST_SPATIAL_OPERATOR/run_test.sh": "5621c55e9c455df91a07f487b71e6be762b04a7cb9d07fb30cd350e1c6ba5680",
+    "TESTS/TEST_SPATIAL_OPERATOR/test_spatial_operator.f90": "3fd64eeee79e8e8ca4904bb408f9c66f4e8d1e1ce72e17e35c874ea111114480",
+    "TESTS/TEST_STATE_CONVERSION/README.md": "d617381bcbc21ce32005bff3d9b59cf06a24ad4b647d020a7523e5d9a07e3592",
+    "TESTS/TEST_STATE_CONVERSION/run_test.sh": "cc6a3221d5a1254c00b2a20e4a086de9859bd0ba5b68c56151f685680f62283c",
+    "TESTS/TEST_STATE_CONVERSION/test_state_conversion.f90": "f560947a532abd3842a45a777d1a1511f71eae277f763e36e800ea3a78882cae",
+    "TESTS/TEST_STATE_INITIALIZATION/run_test.sh": "e53486817e5e783d0c418202b9aa7fbf0af0090f7b16bea2966d9f3d12f65217",
+    "TESTS/TEST_STATE_INITIALIZATION/test_state_initialization.f90": "526d9217c7639139b41a67e2b06c39de605620588039608376b9f302b4e56ed4",
+    "TESTS/TEST_STOCHASTIC_EVOLUTION/run_test.sh": "3c75d1c1f09a7951eb061840d23b2f29ef2f8087fbfe048c2395255e208dcf72",
+    "TESTS/TEST_STOCHASTIC_EVOLUTION/test_stochastic_evolution.f90": "f63e4f6177c3aa4c3097588e8d9b76abeefa7c1ff1decd0c54b45df2c76ccd0e",
+    "TESTS/TEST_STOCHASTIC_RANDOM/run_test.sh": "3ba0d025485477f288856720c5f2a037e2c29c30b35729cc5c9306e22329fd84",
+    "TESTS/TEST_STOCHASTIC_RANDOM/test_stochastic_random.f90": "5b0e48372bb45b7907a81ac16801245aff9fc882b73474d226939de69bde9b6c",
+    "TESTS/TEST_STOCHASTIC_RESTART/run_test.sh": "1f0cd503b22a1daa4c4a0a0422fb1477b018ea5fab95a766ec9eb59eca68c4d1",
+    "TESTS/TEST_TAAL/IMEX_sfloW2D.inp": "c69b63a00d404eceb42a8fd33ca7ed995aef89310bdb4c75cc1d644f226372de",
+    "TESTS/TEST_TAAL/cleanFolder.sh": "673a85c7b21073b455ecf74b338fd8387cf94168cebe0a3876fe140b87df1ef3",
+    "TESTS/TEST_TOPOGRAPHY_FACES/run_test.sh": "d1e749dd20123b3b9971de59497723ad3172cd97edfeddb069aa1a0ead5471e5",
+    "TESTS/TEST_TOPOGRAPHY_FACES/test_topography_faces.f90": "1c6d8a8b95597ad32a9d543417dc33618c468f1a6aa8f5cdbcbc8c1b86f27e5e",
+    "TESTS/TEST_WORKSPACE_LIFECYCLE/run_test.sh": "a3ca0f7a4543ae04506fdbb05c784f3b6407a293dd179efb07f89a16a1b8a62e",
+    "TESTS/TEST_WORKSPACE_LIFECYCLE/test_workspace_lifecycle.f90": "1a17e546463968e48caa51fdbddd693472de0def6cbd546e96b341aeeeaf81ec",
+    "TESTS/run_tests.sh": "8eb57d084aad8acb333b3423dedd36a17c03ddb7bca1a7774e9be9f7d05afaad"
+  },
+  "production_changes": {
+    "src/geometry_2d.f90": {
+      "old": "4e4eafe8e64c335a5eccea608fec929c6c3b155af3317d6176e06ea1fbdf30a4",
+      "new": "eb96fab849222360744552d11f382911d010f71b32f3a3bb005e5d921947d56f"
+    }
+  },
+  "test_results": [
+    {
+      "test": "TEST_BINARY_RESTART",
+      "profile": "historical_optimized",
+      "outer_threads": 1,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 29.906,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/historical_optimized-TEST_BINARY_RESTART-1/test.log",
+      "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d",
+      "canonical_output_count": 30,
+      "canonical_fingerprint_sha256": "34eba7a4e5b1b1cfe6224c868e9cc2db170db700c6cb02fc0ebedce1cf1f6c01",
+      "actual_teams": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "test": "TEST_BINARY_RESTART",
+      "profile": "historical_optimized",
+      "outer_threads": 4,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 11.67,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/historical_optimized-TEST_BINARY_RESTART-4/test.log",
+      "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d",
+      "canonical_output_count": 30,
+      "canonical_fingerprint_sha256": "34eba7a4e5b1b1cfe6224c868e9cc2db170db700c6cb02fc0ebedce1cf1f6c01",
+      "actual_teams": [
+        4,
+        4,
+        4
+      ]
+    },
+    {
+      "test": "TEST_PCCU_GATE_H",
+      "profile": "historical_optimized",
+      "outer_threads": 1,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 6.864,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/historical_optimized-TEST_PCCU_GATE_H-1/test.log",
+      "log_sha256": "1cb773c7306996fe28adc5c968c3543ebb26fa145a05848871b44d5cf4355063",
+      "canonical_output_count": 18,
+      "canonical_fingerprint_sha256": "d2b083068324540dff5bde5f9871934e1860f0ec3a12bc1127160875e7d3dc20",
+      "actual_teams": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "test": "TEST_PCCU_GATE_H",
+      "profile": "historical_optimized",
+      "outer_threads": 4,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 4.674,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/historical_optimized-TEST_PCCU_GATE_H-4/test.log",
+      "log_sha256": "1cb773c7306996fe28adc5c968c3543ebb26fa145a05848871b44d5cf4355063",
+      "canonical_output_count": 18,
+      "canonical_fingerprint_sha256": "d2b083068324540dff5bde5f9871934e1860f0ec3a12bc1127160875e7d3dc20",
+      "actual_teams": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ]
+    },
+    {
+      "test": "TEST_PCCU_INCLINED_EXCAVATION",
+      "profile": "historical_optimized",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 1.476,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/historical_optimized-TEST_PCCU_INCLINED_EXCAVATION-embedded/test.log",
+      "log_sha256": "dddcfdca6a3038a2f4d6a9ab7d40f3044d1814f0a7a430dfb4b4b022c888eefa",
+      "canonical_output_count": 24,
+      "canonical_fingerprint_sha256": "7753ddb941d66f6c29e9fbc0c90c68f4221ba42054e1ed1ede820f67013002ed",
+      "actual_teams": [
+        1,
+        4,
+        1,
+        4,
+        1,
+        4
+      ]
+    },
+    {
+      "test": "TEST_PCCU_LAKE_AT_REST",
+      "profile": "historical_optimized",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 5.819,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/historical_optimized-TEST_PCCU_LAKE_AT_REST-embedded/test.log",
+      "log_sha256": "72f5c63ea215a47816f2f5eaf05c6c67976ffda17a0762257c025ac5cb415ce3",
+      "canonical_output_count": 64,
+      "canonical_fingerprint_sha256": "6db9af1ca4386522545757d352349d43aa3096b7987926a39a0af1e3ba405b5c",
+      "actual_teams": [
+        1,
+        4,
+        1,
+        4,
+        1,
+        4,
+        1,
+        4,
+        1,
+        4,
+        1,
+        4,
+        1,
+        4,
+        1,
+        4
+      ]
+    },
+    {
+      "test": "TEST_STOCHASTIC_RESTART",
+      "profile": "historical_optimized",
+      "outer_threads": 1,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 14.248,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/historical_optimized-TEST_STOCHASTIC_RESTART-1/test.log",
+      "log_sha256": "481c5d287f5a2b363cc374ee4560412247dfcb8e18d7c82c45e37ef41c1cd98e",
+      "canonical_output_count": 25,
+      "canonical_fingerprint_sha256": "f5d8d45a52c6244611772586562b9b1f0b45651e6b4094f12c82d77537a33b2b",
+      "actual_teams": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "test": "TEST_STOCHASTIC_RESTART",
+      "profile": "historical_optimized",
+      "outer_threads": 4,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 6.753,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/historical_optimized-TEST_STOCHASTIC_RESTART-4/test.log",
+      "log_sha256": "2147ff93d77c6ff8e13f869de274b8a89054cbf37da30cd040dfcad3e03b784c",
+      "canonical_output_count": 25,
+      "canonical_fingerprint_sha256": "f5d8d45a52c6244611772586562b9b1f0b45651e6b4094f12c82d77537a33b2b",
+      "actual_teams": [
+        4,
+        4,
+        4
+      ]
+    },
+    {
+      "test": "TEST_BINARY_RESTART",
+      "profile": "strict_debug",
+      "outer_threads": 1,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 160.542,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/strict_debug-TEST_BINARY_RESTART-1/test.log",
+      "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d",
+      "canonical_output_count": 30,
+      "canonical_fingerprint_sha256": "dae9558f7c292552c0be96ba14b5855dd37a1259d4883d97e4f20ab71f038123",
+      "actual_teams": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "test": "TEST_BINARY_RESTART",
+      "profile": "strict_debug",
+      "outer_threads": 4,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 63.844,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/strict_debug-TEST_BINARY_RESTART-4/test.log",
+      "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d",
+      "canonical_output_count": 30,
+      "canonical_fingerprint_sha256": "dae9558f7c292552c0be96ba14b5855dd37a1259d4883d97e4f20ab71f038123",
+      "actual_teams": [
+        4,
+        4,
+        4
+      ]
+    },
+    {
+      "test": "TEST_PCCU_GATE_H",
+      "profile": "strict_debug",
+      "outer_threads": 1,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 30.295,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/strict_debug-TEST_PCCU_GATE_H-1/test.log",
+      "log_sha256": "6cd88a1198efbc830b34c12cbcdfbc9c70df0250b78ed992d22a6498e848b2fe",
+      "canonical_output_count": 18,
+      "canonical_fingerprint_sha256": "7e66a0f6c519b74f0de24482645bce4b0a7b1016c6b63d81109870762fac4d0d",
+      "actual_teams": [
+        1,
+        1,
+        1,
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "test": "TEST_PCCU_GATE_H",
+      "profile": "strict_debug",
+      "outer_threads": 4,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 15.683,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/strict_debug-TEST_PCCU_GATE_H-4/test.log",
+      "log_sha256": "6cd88a1198efbc830b34c12cbcdfbc9c70df0250b78ed992d22a6498e848b2fe",
+      "canonical_output_count": 18,
+      "canonical_fingerprint_sha256": "7e66a0f6c519b74f0de24482645bce4b0a7b1016c6b63d81109870762fac4d0d",
+      "actual_teams": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ]
+    },
+    {
+      "test": "TEST_PCCU_INCLINED_EXCAVATION",
+      "profile": "strict_debug",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 1.598,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/strict_debug-TEST_PCCU_INCLINED_EXCAVATION-embedded/test.log",
+      "log_sha256": "cc5dd58087a29fde99c5a4e1dc334cbb1f73d1ac1e19996fa37cfe5b4404acaa",
+      "canonical_output_count": 24,
+      "canonical_fingerprint_sha256": "cc158fe9609283a953023121be4cf682ae34a13760bc6c116a5d6bcec218d362",
+      "actual_teams": [
+        1,
+        4,
+        1,
+        4,
+        1,
+        4
+      ]
+    },
+    {
+      "test": "TEST_PCCU_LAKE_AT_REST",
+      "profile": "strict_debug",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 7.172,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/strict_debug-TEST_PCCU_LAKE_AT_REST-embedded/test.log",
+      "log_sha256": "72f5c63ea215a47816f2f5eaf05c6c67976ffda17a0762257c025ac5cb415ce3",
+      "canonical_output_count": 64,
+      "canonical_fingerprint_sha256": "6db9af1ca4386522545757d352349d43aa3096b7987926a39a0af1e3ba405b5c",
+      "actual_teams": [
+        1,
+        4,
+        1,
+        4,
+        1,
+        4,
+        1,
+        4,
+        1,
+        4,
+        1,
+        4,
+        1,
+        4,
+        1,
+        4
+      ]
+    },
+    {
+      "test": "TEST_STOCHASTIC_RESTART",
+      "profile": "strict_debug",
+      "outer_threads": 1,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 91.177,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/strict_debug-TEST_STOCHASTIC_RESTART-1/test.log",
+      "log_sha256": "93ad2cb70eb01d5b7ae576546b8dec1c69669f06776530728562ad6178613cd9",
+      "canonical_output_count": 25,
+      "canonical_fingerprint_sha256": "685783e033a4137910e4c2d14a3b6a59e1e4a53d8bf4bac6a49ebd2f30f8cfa8",
+      "actual_teams": [
+        1,
+        1,
+        1
+      ]
+    },
+    {
+      "test": "TEST_STOCHASTIC_RESTART",
+      "profile": "strict_debug",
+      "outer_threads": 4,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 37.461,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/strict_debug-TEST_STOCHASTIC_RESTART-4/test.log",
+      "log_sha256": "916dcf92820c9631533b459e98bf1f4cccd45474fd043156c8411bff96b2d869",
+      "canonical_output_count": 25,
+      "canonical_fingerprint_sha256": "685783e033a4137910e4c2d14a3b6a59e1e4a53d8bf4bac6a49ebd2f30f8cfa8",
+      "actual_teams": [
+        4,
+        4,
+        4
+      ]
+    },
+    {
+      "test": "TEST_CURVATURE_SOURCE",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 2.679,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_CURVATURE_SOURCE-embedded/test.log",
+      "log_sha256": "896806d4e56101e2d96fd2561c629807e931a43e274d228b3e1ec4dac45535dd"
+    },
+    {
+      "test": "TEST_DIAGNOSTICS",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 0.622,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_DIAGNOSTICS-embedded/test.log",
+      "log_sha256": "9dab51a0e28e463b0b46b2cc4b1717f4268fae30cbf3bf16a56bcf1cc270bc8a"
+    },
+    {
+      "test": "TEST_EQUATION_METADATA",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 0.623,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_EQUATION_METADATA-embedded/test.log",
+      "log_sha256": "e40e9672aceb9e47646aa5191d18c4a2781704f2e5acef086751c89615c1efa7"
+    },
+    {
+      "test": "TEST_HP_RECONSTRUCTION",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 1.984,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_HP_RECONSTRUCTION-embedded/test.log",
+      "log_sha256": "3c619d86f72c72ca958a02cc14c137978e313aed1452966026171b67e5944a81"
+    },
+    {
+      "test": "TEST_HYDROSTATIC_PATH",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 1.988,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_HYDROSTATIC_PATH-embedded/test.log",
+      "log_sha256": "742dba46e726b0f52beb680ee084ae156a0733c7faec165fdb81400945082e37"
+    },
+    {
+      "test": "TEST_IMEX_STAGES",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 86.76,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_IMEX_STAGES-embedded/test.log",
+      "log_sha256": "cda36419db96b7c2984b02534ae9d0c4b9e7033d244d81db56ad85dcc81abd32"
+    },
+    {
+      "test": "TEST_LAPACK_INTERFACES",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 0.675,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_LAPACK_INTERFACES-embedded/test.log",
+      "log_sha256": "6d71bec5c90ff26b1f876f5eb149a0d3cf132cbc1288840774682b4bb5dbf4ac"
+    },
+    {
+      "test": "TEST_MASS_EXCHANGE",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 48.737,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_MASS_EXCHANGE-embedded/test.log",
+      "log_sha256": "1f1682889d7423f9f1847187f6276ff02fa4243feaadb0e0abb947684163eab1"
+    },
+    {
+      "test": "TEST_MODEL_LAYOUT",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 1.046,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_MODEL_LAYOUT-embedded/test.log",
+      "log_sha256": "0b6cd443a9bd2f79576c714f52460d54d644fd040162b8adc8408ebd890353e3"
+    },
+    {
+      "test": "TEST_NONCONSERVATIVE_PATH",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 0.783,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_NONCONSERVATIVE_PATH-embedded/test.log",
+      "log_sha256": "67583a32e7cf44d12bda24432d9a670c4847c3f06bab0a9381d618fd730837f3"
+    },
+    {
+      "test": "TEST_PCCU",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 0.835,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_PCCU-embedded/test.log",
+      "log_sha256": "a4adf25853b86fe96c546449a1775abd15420e8d5e015548243a7327de53051a"
+    },
+    {
+      "test": "TEST_RHEOLOGY_FROUDE",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 7.604,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_RHEOLOGY_FROUDE-embedded/test.log",
+      "log_sha256": "d1dec382c4f567c3acb674c6bd3a8fa356a4c95cd20f2b1641457f63c0bb6eb9"
+    },
+    {
+      "test": "TEST_SOURCE_DOCUMENTATION",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 0.188,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_SOURCE_DOCUMENTATION-embedded/test.log",
+      "log_sha256": "3cebd68078eb4add1b125f30de2866a0ca79e25ec5927874a919f67cab449757"
+    },
+    {
+      "test": "TEST_SPATIAL_OPERATOR",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 52.814,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_SPATIAL_OPERATOR-embedded/test.log",
+      "log_sha256": "3e769ce513264c9dd30edc6d24535ee183b27b17ffc387b556ab0d6a6356d6d6"
+    },
+    {
+      "test": "TEST_STATE_CONVERSION",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 2.914,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_STATE_CONVERSION-embedded/test.log",
+      "log_sha256": "37aaf4c0197997a0c827d2f3a81696cceae943f4215ee7816a940f14404b2261"
+    },
+    {
+      "test": "TEST_STATE_INITIALIZATION",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 3.241,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_STATE_INITIALIZATION-embedded/test.log",
+      "log_sha256": "cf6da90cc7f8fb167680759940e3f33c44fd97f155e39b657f7b40fcb0366133"
+    },
+    {
+      "test": "TEST_STOCHASTIC_EVOLUTION",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 3.569,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_STOCHASTIC_EVOLUTION-embedded/test.log",
+      "log_sha256": "2569dc6ded126a4e5bc740a3fcc83a9948c800f64a1016bf92dd8b958d193905"
+    },
+    {
+      "test": "TEST_STOCHASTIC_RANDOM",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 0.678,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_STOCHASTIC_RANDOM-embedded/test.log",
+      "log_sha256": "adfd25d313f98ca8d8e7392e266a67d674ce2a6fc2ea0088fbc2c795d19df88a"
+    },
+    {
+      "test": "TEST_TOPOGRAPHY_FACES",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 1.713,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_TOPOGRAPHY_FACES-embedded/test.log",
+      "log_sha256": "6793c2a285742ecafe7c1b24116cc0bb81b085c7c4153c9f83fd29795647e278"
+    },
+    {
+      "test": "TEST_WORKSPACE_LIFECYCLE",
+      "profile": "unit_script",
+      "outer_threads": null,
+      "status": "pass",
+      "returncode": 0,
+      "seconds": 5.411,
+      "log": "/private/tmp/imex-n8-b-acceptance-20261010/tests/unit_script-TEST_WORKSPACE_LIFECYCLE-embedded/test.log",
+      "log_sha256": "709bfd35a1477968f5882e63bf538aa68f50a770d6888ba831c31faea3a971ce"
+    }
+  ],
+  "profiles": {
+    "strict_debug": {
+      "flags": "-O0 -g -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow",
+      "configure": {
+        "command": [
+          "/private/tmp/imex-n8-b-acceptance-20261010/source/configure",
+          "--with-netcdf=/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1"
+        ],
+        "returncode": 0,
+        "seconds": 3.002,
+        "log": "/private/tmp/imex-n8-b-acceptance-20261010/strict_debug/configure.log",
+        "log_sha256": "28a0d606cd2ec303872c155f437aed458943b51102ae599bd93eaddfac6903c5"
+      },
+      "make": {
+        "command": [
+          "make",
+          "-j3",
+          "FCFLAGS=-O0 -g -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow"
+        ],
+        "returncode": 0,
+        "seconds": 7.213,
+        "log": "/private/tmp/imex-n8-b-acceptance-20261010/strict_debug/make.log",
+        "log_sha256": "49e647ce582c20dca5787b07c134b7396be76949fd89b49961c45a6cb311242b"
+      },
+      "executable_sha256": "46a14a63344d8e0530875fe90964c0bc6c34544cac8345cab4e0553deafd5a19",
+      "executable_bytes": 2719872,
+      "linked_libraries": {
+        "command": [
+          "otool",
+          "-L",
+          "/private/tmp/imex-n8-b-acceptance-20261010/strict_debug/src/IMEX_SfloW2D"
+        ],
+        "returncode": 0,
+        "output": "/private/tmp/imex-n8-b-acceptance-20261010/strict_debug/src/IMEX_SfloW2D:\n\t/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libLAPACK.dylib (compatibility version 1.0.0, current version 1.0.0)\n\t/opt/homebrew/opt/netcdf-fortran/lib/libnetcdff.7.dylib (compatibility version 7.0.0, current version 7.1.0)\n\t/opt/homebrew/opt/gcc/lib/gcc/current/libgfortran.5.dylib (compatibility version 6.0.0, current version 6.0.0)\n\t/opt/homebrew/opt/gcc/lib/gcc/current/libgomp.1.dylib (compatibility version 2.0.0, current version 2.0.0)\n\t/opt/homebrew/opt/gcc/lib/gcc/current/libquadmath.0.dylib (compatibility version 1.0.0, current version 1.0.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1351.0.0)"
+      },
+      "status": "pass"
+    },
+    "historical_optimized": {
+      "flags": "-Ofast -funroll-all-loops",
+      "configure": {
+        "command": [
+          "/private/tmp/imex-n8-b-acceptance-20261010/source/configure",
+          "--with-netcdf=/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1"
+        ],
+        "returncode": 0,
+        "seconds": 2.233,
+        "log": "/private/tmp/imex-n8-b-acceptance-20261010/historical_optimized/configure.log",
+        "log_sha256": "28a0d606cd2ec303872c155f437aed458943b51102ae599bd93eaddfac6903c5"
+      },
+      "make": {
+        "command": [
+          "make",
+          "-j3",
+          "FCFLAGS=-Ofast -funroll-all-loops"
+        ],
+        "returncode": 0,
+        "seconds": 28.421,
+        "log": "/private/tmp/imex-n8-b-acceptance-20261010/historical_optimized/make.log",
+        "log_sha256": "a966e5dada42f700917c503eeb6b31e3396a68284aa536f79c2ad9f9b3419a75"
+      },
+      "executable_sha256": "e1631a46c0921a4f56047069f403756022cb2886d929a83e83d43557328e37b3",
+      "executable_bytes": 1035056,
+      "linked_libraries": {
+        "command": [
+          "otool",
+          "-L",
+          "/private/tmp/imex-n8-b-acceptance-20261010/historical_optimized/src/IMEX_SfloW2D"
+        ],
+        "returncode": 0,
+        "output": "/private/tmp/imex-n8-b-acceptance-20261010/historical_optimized/src/IMEX_SfloW2D:\n\t/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libLAPACK.dylib (compatibility version 1.0.0, current version 1.0.0)\n\t/opt/homebrew/opt/netcdf-fortran/lib/libnetcdff.7.dylib (compatibility version 7.0.0, current version 7.1.0)\n\t/opt/homebrew/opt/gcc/lib/gcc/current/libgfortran.5.dylib (compatibility version 6.0.0, current version 6.0.0)\n\t/opt/homebrew/opt/gcc/lib/gcc/current/libgomp.1.dylib (compatibility version 2.0.0, current version 2.0.0)\n\t/opt/homebrew/opt/gcc/lib/gcc/current/libquadmath.0.dylib (compatibility version 1.0.0, current version 1.0.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1351.0.0)"
+      },
+      "status": "pass"
+    }
+  },
+  "thread_comparisons": [
+    {
+      "profile": "historical_optimized",
+      "test": "TEST_BINARY_RESTART",
+      "status": "pass",
+      "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+    },
+    {
+      "profile": "historical_optimized",
+      "test": "TEST_PCCU_GATE_H",
+      "status": "pass",
+      "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+    },
+    {
+      "profile": "historical_optimized",
+      "test": "TEST_STOCHASTIC_RESTART",
+      "status": "pass",
+      "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+    },
+    {
+      "profile": "strict_debug",
+      "test": "TEST_BINARY_RESTART",
+      "status": "pass",
+      "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+    },
+    {
+      "profile": "strict_debug",
+      "test": "TEST_PCCU_GATE_H",
+      "status": "pass",
+      "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+    },
+    {
+      "profile": "strict_debug",
+      "test": "TEST_STOCHASTIC_RESTART",
+      "status": "pass",
+      "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin"
+    }
+  ],
+  "external_reference": {
+    "filename": "HP_PCCU_clean_reference_cores_2026-09-26_drySafe_rebase.zip",
+    "sha256": "5e6ede02d39a5b40055af174f6799cb4e4788d01923c010aada911aa4229782a",
+    "members": {
+      "hp_pccu_1d_core.py": "ffcb695ff8d8d2bd06e433d70b2a519c0b0012d959eb664b617deea83e8f64e2",
+      "hp_pccu_2d_core.py": "c63331366cadf9f04d802a3f058088b9c175399b2d6dc7015068a0ad110f1577"
+    },
+    "expected_from_gate_h_readme": {
+      "hp_pccu_1d_core.py": "ffcb695ff8d8d2bd06e433d70b2a519c0b0012d959eb664b617deea83e8f64e2",
+      "hp_pccu_2d_core.py": "c63331366cadf9f04d802a3f058088b9c175399b2d6dc7015068a0ad110f1577"
+    },
+    "matches_gate_h_readme": true,
+    "full_reference_suite_executed": false
+  },
+  "roadmap": {
+    "filename": "IMEX_SfloW2D_Development_Roadmap_2026-10-09_Updated.docx",
+    "sha256": "31d98d84a60b1c3c465da1acf10cf0fd13c59b0acacfdb295526fc6f89980d3e"
+  },
+  "tools": {
+    "compiler": {
+      "command": [
+        "gfortran",
+        "--version"
+      ],
+      "returncode": 0,
+      "output": "GNU Fortran (Homebrew GCC 15.2.0) 15.2.0\nCopyright (C) 2025 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+    },
+    "autoconf": {
+      "command": [
+        "autoconf",
+        "--version"
+      ],
+      "returncode": 0,
+      "output": "autoconf (GNU Autoconf) 2.72\nCopyright (C) 2023 Free Software Foundation, Inc.\nLicense GPLv3+/Autoconf: GNU GPL version 3 or later\n<https://gnu.org/licenses/gpl.html>, <https://gnu.org/licenses/exceptions.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by David J. MacKenzie and Akim Demaille."
+    },
+    "automake": {
+      "command": [
+        "automake",
+        "--version"
+      ],
+      "returncode": 0,
+      "output": "automake (GNU automake) 1.18\nFeatures: subsecond-mtime\n\nCopyright (C) 2025 Free Software Foundation, Inc.\nLicense GPLv2+: GNU GPL version 2 or later\n  <https://gnu.org/licenses/gpl-2.0.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by Tom Tromey <tromey@redhat.com>\n       and Alexandre Duret-Lutz <adl@gnu.org>."
+    },
+    "netcdf_fortran": {
+      "command": [
+        "nf-config",
+        "--version"
+      ],
+      "returncode": 0,
+      "output": "4.6.1"
+    },
+    "netcdf_fortran_fflags": {
+      "command": [
+        "nf-config",
+        "--fflags"
+      ],
+      "returncode": 0,
+      "output": "-I/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1/include -I/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1/include"
+    },
+    "netcdf_fortran_flibs": {
+      "command": [
+        "nf-config",
+        "--flibs"
+      ],
+      "returncode": 0,
+      "output": "-L/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1/lib -lnetcdff -lnetcdf -lnetcdf"
+    },
+    "netcdf_c": {
+      "command": [
+        "nc-config",
+        "--all"
+      ],
+      "returncode": 0,
+      "output": "This netCDF 4.9.2 has been built with the following features: \n\n  --cc            -> clang\n  --cflags        -> -I/opt/homebrew/Cellar/netcdf/4.9.2_2/include\n  --libs          -> -L/opt/homebrew/Cellar/netcdf/4.9.2_2/lib -lnetcdf\n  --static        -> -lhdf5_hl-shared -lhdf5-shared -lm -lz -lzstd -lbz2 -lcurl -lxml2\n\n\n  --has-dap          -> yes\n  --has-dap2         -> yes\n  --has-dap4         -> yes\n  --has-nc2          -> yes\n  --has-nc4          -> yes\n  --has-hdf5         -> yes\n  --has-hdf4         -> no\n  --has-logging      -> no\n  --has-pnetcdf      -> no\n  --has-szlib        -> no\n  --has-cdf5         -> yes\n  --has-parallel4    -> no\n  --has-parallel     -> no\n  --has-nczarr       -> yes\n  --has-zstd         -> yes\n  --has-benchmarks   -> no\n  --has-multifilters -> no\n  --has-stdfilters   -> deflate szip zstd bz2\n  --has-quantize     -> no\n\n  --prefix        -> /opt/homebrew/Cellar/netcdf/4.9.2_2\n  --includedir    -> /opt/homebrew/Cellar/netcdf/4.9.2_2/include\n  --libdir        -> /opt/homebrew/Cellar/netcdf/4.9.2_2/lib\n  --plugindir     -> \n  --version       -> netCDF 4.9.2"
+    }
+  },
+  "working_tree_candidate": {
+    "base_revision_only": true,
+    "snapshot_files": 282,
+    "git_status": " M TESTS/TEST_MASS_EXCHANGE/run_test.sh\n M src/geometry_2d.f90\n?? TESTS/TEST_MASS_EXCHANGE/check_projection_stress.py\n?? TESTS/TEST_MASS_EXCHANGE/test_projection_stress.f90\n",
+    "patch_sha256": "8d90bd04dd7b6d6bc348e1fcd97118b27a7a00108ba4937a44d560d67db32e04",
+    "policy": "Tracked files and nonignored untracked files; ignored build artifacts excluded."
+  },
+  "focused_evidence": "docs/acceptance/results_n8_b_projection_2026_10_10.json",
+  "verification_note": "All final production sources match this audit export. The final test wrapper additionally invokes four parser negative-control self-tests, separately passed; numeric drivers/checkers are unchanged."
+}

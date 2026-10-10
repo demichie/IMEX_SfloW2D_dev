@@ -641,6 +641,9 @@ CONTAINS
 
     INTEGER :: j,k,kk,kj
     REAL(wp) :: weighted_sum
+    ! Thread-private scalar stores preserve the 1D stencil accumulation
+    ! sequence even when -Ofast would vectorize/reassociate OpenMP chunks.
+    REAL(wp), VOLATILE :: first_derivative_sum, second_derivative_sum
 
     ! Five-point polynomial-fit coefficients differentiate the bed without
     ! changing the Q1 elevations used by HP-PCCU. These filtered derivatives
@@ -667,24 +670,26 @@ CONTAINS
 
        k = 1
 
-       !$OMP PARALLEL DO PRIVATE(j,kj)
+       ! Keep scalar stencil accumulation independent of OpenMP chunk sizes.
+       ! Only the 1D accumulators are volatile; 2D kernels are unchanged.
+       !$OMP PARALLEL DO PRIVATE(j,kj,first_derivative_sum,second_derivative_sum)
        DO j = 3, comp_cells_x - 2
 
-          B_prime_x_geom(j,k)   = 0.0_wp
+          first_derivative_sum = 0.0_wp
+          second_derivative_sum = 0.0_wp
           B_prime_y_geom(j,k)   = 0.0_wp
-          B_second_xx_geom(j,k) = 0.0_wp
           B_second_yy_geom(j,k) = 0.0_wp
 
           DO kj = 1, 5 ! Stencil in x-direction
 
-             B_prime_x_geom(j,k)   = B_prime_x_geom(j,k)   + c1(kj) * B_cent(j + kj - 3, k)
-             B_second_xx_geom(j,k) = B_second_xx_geom(j,k) + c2(kj) * B_cent(j + kj - 3, k)
+             first_derivative_sum = first_derivative_sum + c1(kj) * B_cent(j + kj - 3, k)
+             second_derivative_sum = second_derivative_sum + c2(kj) * B_cent(j + kj - 3, k)
 
           END DO
 
-          B_prime_x_geom(j,k)   = B_prime_x_geom(j,k)   / norm1_x
+          B_prime_x_geom(j,k)   = first_derivative_sum / norm1_x
           B_prime_y_geom(j,k)   = B_prime_y_geom(j,k)   / norm1_y
-          B_second_xx_geom(j,k) = B_second_xx_geom(j,k) / norm2_x
+          B_second_xx_geom(j,k) = second_derivative_sum / norm2_x
           B_second_yy_geom(j,k) = B_second_yy_geom(j,k) / norm2_y
 
           B_second_xy_geom(j,k) = 0.0_wp

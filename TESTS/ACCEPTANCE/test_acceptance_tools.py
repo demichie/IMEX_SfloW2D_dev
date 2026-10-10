@@ -184,8 +184,8 @@ class AuditToolsTests(unittest.TestCase):
         evidence = json.loads((repo / closure["evidence_artifacts"]["n8_a"]["path"]).read_text())
         latest = json.loads((repo / closure["evidence_artifacts"]["latest"]["path"]).read_text())
         historical = json.loads((repo / closure["evidence_artifacts"]["n8"]["path"]).read_text())
-        self.assertEqual([a["id"] for a in closure["completed_actions"]], ["N8-A"])
-        self.assertEqual(closure["completed_actions"][0]["evidence"], ["n8_a"])
+        action = next(a for a in closure["completed_actions"] if a["id"] == "N8-A")
+        self.assertEqual(action["evidence"], ["n8_a"])
         self.assertEqual(next(c for c in closure["criteria"] if c["id"] == "N8-01")["closure_status"],
                          "satisfied")
         self.assertFalse(evidence["summary"]["solver_changes"])
@@ -223,6 +223,45 @@ class AuditToolsTests(unittest.TestCase):
         self.assertTrue(all(c["status"] == "rejected" for c in evidence["negative_controls"]))
         for milestone in ("N7", "N8", "N9"):
             self.assertEqual(evidence["summary"][milestone], "open")
+
+    def test_n8_b_completion_evidence(self):
+        """Close N8 only after refinement, repeated geometry, area approval and full regression."""
+        repo = Path(__file__).resolve().parents[2]
+        closure = json.loads((repo / "TESTS/ACCEPTANCE/n7_n8_closure_plan.json").read_text())
+        evidence = json.loads((repo / closure["evidence_artifacts"]["n8_b"]["path"]).read_text())
+        full = json.loads((repo / closure["evidence_artifacts"]["n8_b_full"]["path"]).read_text())
+        self.assertEqual(closure["milestone_status"], {"N7": "open", "N8": "satisfied", "N9": "open"})
+        completed = {a["id"] for a in closure["completed_actions"]}
+        self.assertTrue({"N8-A", "N8-B", "D-N8-AREA"} <= completed)
+        self.assertEqual(evidence["area_decision"]["status"], "accepted_by_user")
+        self.assertTrue(evidence["area_decision"]["algebra"]["wrong_weights_rejected"])
+        self.assertEqual(len(evidence["area_decision"]["algebra"]["records"]), 3)
+        self.assertEqual(full["summary"]["passed"], 36)
+        self.assertEqual(full["summary"]["failed"], 0)
+        self.assertFalse(full["summary"]["n9_accepted"])
+        self.assertEqual(set(full["production_changes"]), {"src/geometry_2d.f90"})
+        self.assertEqual(len(full["comparison_to_baseline"]["cases"]), 16)
+        self.assertTrue(all(c["status"] == "unchanged" for c in full["comparison_to_baseline"]["cases"]))
+        records = evidence["records"]
+        self.assertEqual({(r["profile"], r["actual_threads"]) for r in records},
+                         {("strict", 1), ("strict", 4), ("optimized", 1), ("optimized", 4)})
+        self.assertEqual(len(records), 4)
+        self.assertEqual(sum(r["record_count"] for r in records), 2352)
+        for profile in ("strict", "optimized"):
+            pair = sorted((r for r in records if r["profile"] == profile), key=lambda r: r["actual_threads"])
+            self.assertEqual(pair[0]["snapshot_sha256"], pair[1]["snapshot_sha256"])
+            self.assertEqual(pair[1]["identical_metrics_reference"], profile+":1")
+            self.assertEqual(len(pair[0]["groups"]), 24)
+            self.assertEqual(sum(g["updates"] for g in pair[0]["groups"]), 588)
+            for series in pair[0]["refinements"]:
+                self.assertEqual(len(series["L1"]), 3)
+                self.assertTrue(all(0 < ratio < 0.8 for ratio in series["L1_ratios"]))
+            for group in pair[0]["groups"]:
+                self.assertLessEqual(group["max_volume_balance_error"], 2048*2.220446049250313e-16)
+                self.assertTrue(all(math.isfinite(v) for v in group["metrics_min"]+group["metrics_max"]))
+        for filename, value in evidence["source_and_fixture_sha256"].items():
+            if filename.startswith("src/"):
+                self.assertEqual(value, full["source_and_fixture_sha256"][filename])
 
 
 if __name__ == "__main__":

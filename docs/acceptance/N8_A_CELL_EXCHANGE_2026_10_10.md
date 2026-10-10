@@ -2,8 +2,9 @@
 
 N8-A and criterion N8-01 are satisfied by the extended production exchange
 tests. No production source, exchange law or acceptance tolerance changes.
-N8 remains open for nodal refinement and repeated-update tests in N8-B,
-including the explicit D-N8-AREA interpretation. N7 and N9 remain open.
+At this package's completion, N8 remained open for N8-B and D-N8-AREA.
+The subsequent [projection package](N8_B_PROJECTION_2026_10_10.md) closes those
+requirements and N8. N7 and N9 remain open.
 
 The [execution evidence](results_n8_a_2026_10_10.json) records the candidate
 base revision, compiler, flags, source/fixture hashes, diagnostic values and

@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "date": "2026-10-10",
-  "solver_revision": "502246730bd546359d9cfb3ee5aafbb8f06129f6",
+  "solver_revision": "40df4dfe6f70d9b96161e27ea726993e098bbc6e",
   "report": "docs/acceptance/N7_N8_CLOSURE_2026_10_10.md",
   "scope": "Reconcile the original N7/N8 gates, not a new numerical audit or N9 scientific sign-off.",
   "normative_sources": {
@@ -38,11 +38,19 @@
     "n8_a": {
       "path": "docs/acceptance/results_n8_a_2026_10_10.json",
       "sha256": "f4223305d9890d00b3c51401a616f3e54bf4e6f43a354eb6291db0e3b0f3bbd5"
+    },
+    "n8_b": {
+      "path": "docs/acceptance/results_n8_b_projection_2026_10_10.json",
+      "sha256": "1d337b9286eb7584a64ecb3b26626a5e97c059de19bf5717e19293cec72303be"
+    },
+    "n8_b_full": {
+      "path": "docs/acceptance/results_n8_b_acceptance_2026_10_10.json",
+      "sha256": "c5b357ba9d5dacd22312876d651a6a8d5e877ecf436aa6c49e64eb98b64fab55"
     }
   },
   "milestone_status": {
     "N7": "open",
-    "N8": "open",
+    "N8": "satisfied",
     "N9": "open"
   },
   "status_meaning": {
@@ -63,7 +71,8 @@
       ],
       "evidence": [
         "spatial",
-        "latest"
+        "latest",
+        "n8_b_full"
       ]
     },
     {
@@ -77,7 +86,8 @@
         "Four-sided excavation has three refinements, unchanged zero-uphill limits and passing metrics."
       ],
       "evidence": [
-        "latest"
+        "latest",
+        "n8_b_full"
       ]
     },
     {
@@ -92,7 +102,8 @@
       ],
       "evidence": [
         "spatial",
-        "latest"
+        "latest",
+        "n8_b_full"
       ]
     },
     {
@@ -107,7 +118,8 @@
       ],
       "evidence": [
         "spatial",
-        "latest"
+        "latest",
+        "n8_b_full"
       ]
     },
     {
@@ -120,7 +132,8 @@
         "Local gas/solid/liquid conversion and positive/negative component-flux rescaling tests pass."
       ],
       "evidence": [
-        "latest"
+        "latest",
+        "n8_b_full"
       ]
     },
     {
@@ -139,7 +152,8 @@
       "evidence": [
         "spatial",
         "imex",
-        "latest"
+        "latest",
+        "n8_b_full"
       ]
     },
     {
@@ -153,7 +167,8 @@
         "Existing Gate-H total-mass and G=1 lateral-symmetry limits pass."
       ],
       "evidence": [
-        "latest"
+        "latest",
+        "n8_b_full"
       ]
     },
     {
@@ -167,7 +182,9 @@
         "spatial",
         "n8",
         "latest",
-        "n8_a"
+        "n8_a",
+        "n8_b_full",
+        "n8_b"
       ]
     },
     {
@@ -178,7 +195,8 @@
         "Original-duration deterministic and stochastic continuation passes in strict/optimized builds with actual 1/4 threads."
       ],
       "evidence": [
-        "latest"
+        "latest",
+        "n8_b_full"
       ]
     },
     {
@@ -193,23 +211,25 @@
       "evidence": [
         "n8",
         "latest",
-        "n8_a"
+        "n8_a",
+        "n8_b_full",
+        "n8_b"
       ]
     },
     {
       "id": "N8-02",
-      "closure_status": "partial",
-      "remaining_actions": [
-        "N8-B",
-        "D-N8-AREA"
-      ],
+      "closure_status": "satisfied",
+      "remaining_actions": [],
       "verified_contracts": [
-        "Independent Q1 weighted global volume balance passes for actual limited proposals, edges/corners and dry/inactive zero contributors."
+        "Independent Q1 weighted global volume balance passes for actual limited proposals, edges/corners and dry/inactive zero contributors.",
+        "Six supported 1D/2D grids preserve weighted global volume over 2352 bed updates. User accepts a separate unequal-area AC/4 algebra test; it passes without claiming nonuniform production support."
       ],
       "evidence": [
         "n8",
         "latest",
-        "n8_a"
+        "n8_a",
+        "n8_b_full",
+        "n8_b"
       ]
     },
     {
@@ -223,37 +243,41 @@
       "evidence": [
         "n8",
         "latest",
-        "n8_a"
+        "n8_a",
+        "n8_b_full",
+        "n8_b"
       ]
     },
     {
       "id": "N8-04",
-      "closure_status": "partial",
-      "remaining_actions": [
-        "N8-B"
-      ],
+      "closure_status": "satisfied",
+      "remaining_actions": [],
       "verified_contracts": [
-        "Q1 centers/faces, LS slopes/Hessian and G are checked after each controlled transaction and real restart."
+        "Q1 centers/faces, LS slopes/Hessian and G are checked after each controlled transaction and real restart.",
+        "Independent Q1 faces/centers, LS slopes/Hessian and G pass after every seeded signed projection and retained-state production transaction; intermediate fields agree bitwise between actual 1/4-thread teams after the bounded 1D accumulation correction."
       ],
       "evidence": [
         "n8",
         "latest",
-        "n8_a"
+        "n8_a",
+        "n8_b_full",
+        "n8_b"
       ]
     },
     {
       "id": "N8-05",
-      "closure_status": "partial",
-      "remaining_actions": [
-        "N8-B"
-      ],
+      "closure_status": "satisfied",
+      "remaining_actions": [],
       "verified_contracts": [
-        "Independent signed/L1/Linf mismatch and volume-rate units pass, including nonzero local mismatch in dry/inactive cells."
+        "Independent signed/L1/Linf mismatch and volume-rate units pass, including nonzero local mismatch in dry/inactive cells.",
+        "Three refinements in both dimensions decrease smooth and wet/dry area-L1 mismatch; Linf and front localization are recorded. Cell-scale rough stress preserves volume/finite geometry without a convergence requirement."
       ],
       "evidence": [
         "n8",
         "latest",
-        "n8_a"
+        "n8_a",
+        "n8_b_full",
+        "n8_b"
       ]
     }
   ],
@@ -307,11 +331,8 @@
       {
         "id": "I06",
         "requirement": "Interior/boundary AC/4 gathering plus unequal-area synthetic case",
-        "status": "partial",
-        "remaining_actions": [
-          "N8-B",
-          "D-N8-AREA"
-        ],
+        "status": "satisfied",
+        "remaining_actions": [],
         "evidence_tests": [
           "TEST_MASS_EXCHANGE",
           "TEST_TOPOGRAPHY_FACES"
@@ -338,19 +359,17 @@
       {
         "id": "I09",
         "requirement": "Smooth prescribed-rate mismatch decreases under refinement",
-        "status": "missing",
-        "remaining_actions": [
-          "N8-B"
-        ],
-        "evidence_tests": []
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_MASS_EXCHANGE"
+        ]
       },
       {
         "id": "I10",
         "requirement": "Wet/dry mismatch localizes and decreases under refinement without dry flow injection",
-        "status": "partial",
-        "remaining_actions": [
-          "N8-B"
-        ],
+        "status": "satisfied",
+        "remaining_actions": [],
         "evidence_tests": [
           "TEST_MASS_EXCHANGE"
         ]
@@ -358,21 +377,18 @@
       {
         "id": "I11",
         "requirement": "Seeded cell-scale rough-rate stress: global conservation and finite geometry",
-        "status": "partial",
-        "remaining_actions": [
-          "N8-B"
-        ],
+        "status": "satisfied",
+        "remaining_actions": [],
         "evidence_tests": [
-          "TEST_TOPOGRAPHY_FACES"
+          "TEST_TOPOGRAPHY_FACES",
+          "TEST_MASS_EXCHANGE"
         ]
       },
       {
         "id": "I12",
         "requirement": "Many seeded nodal updates preserve faces/centers and refresh LS/Hessian/G",
-        "status": "partial",
-        "remaining_actions": [
-          "N8-B"
-        ],
+        "status": "satisfied",
+        "remaining_actions": [],
         "evidence_tests": [
           "TEST_MASS_EXCHANGE"
         ]
@@ -523,10 +539,8 @@
       {
         "id": "H14",
         "requirement": "Evolving-bed seeded 1D/2D repeated updates and mismatch diagnostics",
-        "status": "partial",
-        "remaining_actions": [
-          "N8-B"
-        ],
+        "status": "satisfied",
+        "remaining_actions": [],
         "evidence_tests": [
           "TEST_MASS_EXCHANGE",
           "TEST_TOPOGRAPHY_FACES"
@@ -535,33 +549,6 @@
     ]
   },
   "remaining_actions": [
-    {
-      "id": "N8-B",
-      "kind": "test",
-      "title": "Complete nodal projection refinement and repeated-update tests",
-      "normative_items": [
-        "I06",
-        "I07",
-        "I08",
-        "I09",
-        "I10",
-        "I11",
-        "I12",
-        "H14"
-      ],
-      "criteria": [
-        "N8-02",
-        "N8-04",
-        "N8-05"
-      ],
-      "change_scope": "Extend existing projection/mass-exchange tests on the supported Cartesian grid; do not enable nonuniform production meshes.",
-      "exit_conditions": [
-        "Use fixed seeds and at least three refinements in 1D and 2D: area-weighted L1 mismatch decreases for smooth rates and prescribed wet/dry fronts; quantify Linf and localization.",
-        "For cell-scale random rates do not require convergence: require finite geometry and global weighted volume balance.",
-        "After repeated seeded bed updates check independent Q1 faces/centers, LS slopes/Hessian and G after every update; keep dry flow sources zero.",
-        "Keep existing roundoff and byte-comparison limits; resolve D-N8-AREA before marking the unequal-area subtest satisfied."
-      ]
-    },
     {
       "id": "N7-A",
       "kind": "test",
@@ -651,22 +638,6 @@
       ]
     },
     {
-      "id": "D-N8-AREA",
-      "kind": "decision",
-      "title": "Resolve the original unequal-area synthetic test",
-      "normative_items": [
-        "I06"
-      ],
-      "criteria": [
-        "N8-02"
-      ],
-      "change_scope": "Clarify acceptance interpretation, not production mesh support.",
-      "exit_conditions": [
-        "Section 15.3.6 requests unequal synthetic cell areas, while the production projection accepts a uniform Cartesian grid and no area array.",
-        "Explicitly agree whether this is an independent weighted-stencil algebra test within the current uniform-grid contract or requires a separately authorized area-aware production helper. Do not silently omit it or claim a mathematical oracle tests unsupported production meshes."
-      ]
-    },
-    {
       "id": "D-N7-CFL",
       "kind": "decision",
       "title": "Approve the production IMEX timestep comparison contract",
@@ -725,6 +696,62 @@
       "evidence": [
         "n8_a"
       ]
+    },
+    {
+      "id": "N8-B",
+      "kind": "test",
+      "title": "Complete nodal projection refinement and repeated-update tests",
+      "normative_items": [
+        "I06",
+        "I07",
+        "I08",
+        "I09",
+        "I10",
+        "I11",
+        "I12",
+        "H14"
+      ],
+      "criteria": [
+        "N8-02",
+        "N8-04",
+        "N8-05"
+      ],
+      "change_scope": "Extend existing projection/mass-exchange tests on the supported Cartesian grid; do not enable nonuniform production meshes. A required byte-comparison failure justified thread-private VOLATILE accumulators in the existing 1D LS kernel; no coefficient, physics or compiler-policy change.",
+      "exit_conditions": [
+        "Use fixed seeds and at least three refinements in 1D and 2D: area-weighted L1 mismatch decreases for smooth rates and prescribed wet/dry fronts; quantify Linf and localization.",
+        "For cell-scale random rates do not require convergence: require finite geometry and global weighted volume balance.",
+        "After repeated seeded bed updates check independent Q1 faces/centers, LS slopes/Hessian and G after every update; keep dry flow sources zero.",
+        "Keep existing roundoff and byte-comparison limits; resolve D-N8-AREA before marking the unequal-area subtest satisfied."
+      ],
+      "status": "satisfied",
+      "evidence": [
+        "n8_b",
+        "n8_b_full"
+      ]
+    },
+    {
+      "id": "D-N8-AREA",
+      "kind": "decision",
+      "title": "Resolve the original unequal-area synthetic test",
+      "normative_items": [
+        "I06"
+      ],
+      "criteria": [
+        "N8-02"
+      ],
+      "change_scope": "Clarify acceptance interpretation, not production mesh support.",
+      "exit_conditions": [
+        "Section 15.3.6 requests unequal synthetic cell areas, while the production projection accepts a uniform Cartesian grid and no area array.",
+        "Explicitly agree whether this is an independent weighted-stencil algebra test within the current uniform-grid contract or requires a separately authorized area-aware production helper. Do not silently omit it or claim a mathematical oracle tests unsupported production meshes."
+      ],
+      "status": "satisfied",
+      "evidence": [
+        "n8_b",
+        "n8_b_full"
+      ],
+      "user_resolution": "Sì, test algebrico separato e produzione uniforme",
+      "resolution_scope": "Unequal-area synthetic algebra only; supported production grid remains uniform Cartesian."
     }
-  ]
+  ],
+  "solver_revision_role": "Base revision only; candidate production/test hashes are pinned by N8-B evidence."
 }
