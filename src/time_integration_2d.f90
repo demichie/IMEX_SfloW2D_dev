@@ -37,6 +37,8 @@ MODULE time_integration_2d
 
   PRIVATE
 
+  PUBLIC :: validate_runge_kutta_stages
+
   ABSTRACT INTERFACE
      !> \brief Observe an unmodified cell state at a specified IMEX audit point.
      !> \param[in] event 1: known stage state before closure; 2: solved stage; 3: raw final assembly.
@@ -80,14 +82,29 @@ MODULE time_integration_2d
 
 CONTAINS
 
+  !> \brief Reject unsupported stage counts before any Runge-Kutta allocation.
+  !> \param[in] stages Number of stages requested by input or a direct workspace caller.
+  !> \note Only 2, 3 and 4 stages are supported; this is not the temporal order.
+  SUBROUTINE validate_runge_kutta_stages(stages)
+    INTEGER, INTENT(IN) :: stages
+
+    IF (stages < 2 .OR. stages > 4) THEN
+       WRITE(*,*) 'Invalid N_RK:', stages
+       CALL fatal_error('N_RK must be 2, 3 or 4')
+    END IF
+  END SUBROUTINE validate_runge_kutta_stages
+
   !> \brief Build the selected IMEX tableau and allocate Runge-Kutta stage storage.
   !>
   !> \param[in,out] this Persistent IMEX tableau and Runge-Kutta stage workspace.
+  !> \note Validates N_RK before allocation, including callers bypassing input parsing.
 
   SUBROUTINE initialize_time_integration( this )
 
     CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
     REAL(wp) :: gamma, delta
+
+    CALL validate_runge_kutta_stages(n_RK)
 
     ALLOCATE( this%a_tilde_ij(n_RK,n_RK) )
     ALLOCATE( this%a_dirk_ij(n_RK,n_RK) )
@@ -107,14 +124,7 @@ CONTAINS
     gamma = 1.0_wp - 1.0_wp / SQRT(2.0_wp)
     delta = 1.0_wp - 1.0_wp / ( 2.0_wp * gamma )
 
-    IF ( n_RK .EQ. 1 ) THEN
-
-       this%a_tilde_ij(1,1) = 1.0_wp
-       this%omega_tilde(1) = 1.0_wp
-       this%a_dirk_ij(1,1) = 0.0_wp
-       this%omega(1) = 0.0_wp
-
-    ELSEIF ( n_RK .EQ. 2 ) THEN
+    IF ( n_RK .EQ. 2 ) THEN
 
        this%a_tilde_ij(2,1) = 1.0_wp
        this%omega_tilde(1) = 1.0_wp

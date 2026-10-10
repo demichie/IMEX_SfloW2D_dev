@@ -16,6 +16,7 @@
 MODULE inpout_2d
 
   USE diagnostics_2d, ONLY : interactive_debug_flag, debug_pause, fatal_error
+  USE time_integration_2d, ONLY : validate_runge_kutta_stages
 
   USE parameters_2d, ONLY: wp, dry_thickness_tolerance
   USE runtime_2d, ONLY: runtime_state_type
@@ -2133,6 +2134,9 @@ CONTAINS
       REWIND (input_unit)
 
     END IF
+
+    ! Reject unsupported tableaux here, before simulation workspace initialization.
+    CALL validate_runge_kutta_stages(n_RK)
 
     IF ((comp_cells_x .EQ. 1) .OR. (comp_cells_y .EQ. 1)) THEN
       max_cfl = 0.50_wp

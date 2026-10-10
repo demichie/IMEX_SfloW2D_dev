@@ -1,5 +1,44 @@
 # IMEX stage admissibility and temporal order audit
 
+## Current stage-count contract
+
+Following the audit below (committed as `51d5d13b`), the supported input values
+are restricted to **`N_RK=2,3,4`**. The default remains `2`. The single-stage
+branch is removed, not repaired or reinterpreted as another numerical method.
+The same validator rejects unsupported counts while reading
+`NUMERIC_PARAMETERS` and before allocating a directly initialized time workspace.
+Invalid counts terminate with nonzero status and `N_RK must be 2, 3 or 4`.
+
+The updated stage suite requires rejection of `-1,0,1,5,6` through both entry
+points, accepts `2,3,4`, and verifies the omitted-input default. Numerical stage
+and temporal-order comparisons cover only the supported values. The obsolete
+`--require-design-order` switch and no-op characterization tests are removed;
+supported-stage correctness is checked by the normal test command. CFL,
+nonlinear tolerances and the three retained tableaux are unchanged. N9 remains
+open for the other coverage gaps in the acceptance plan.
+
+Verification of the uncommitted candidate based on `51d5d13b` passes all 36
+audit runs and seven audit-tool self-tests. All 16 full-solver cases retain
+identical canonical conservative-output and checkpoint fingerprints; all six
+cross-thread Gate-H/restart pairs pass. The 96 supported-stage comparisons and
+18 temporal-order series also retain their previous payload fingerprints.
+The contract test has 40 rejected executions and 28 accepted/default executions
+across strict/optimized profiles and one/four-thread environments. Validation
+itself occurs outside parallel loops; numerical fixtures check actual teams.
+Six observer-off pairs per profile remain byte-identical.
+
+Follow-up evidence is archived in
+[`results_stage_count_contract_2026_10_10.json`](results_stage_count_contract_2026_10_10.json).
+Raw full-audit logs are in `/tmp/imex-stage-count-acceptance-20261010-final`;
+these temporary paths are not a permanent raw-output archive. Reproduction uses
+the unchanged test commands below, without the removed design-order switch.
+
+The following sections and original JSON artifact record the **historical**
+audit before this contract change. Their single-stage defect and failing-gate
+evidence remain intact; they no longer describe the current admissible input.
+
+## Original audit findings
+
 The covered production IMEX states remain admissible and reproduce the
 independent stage calculations for `N_RK=2,3,4`. Temporal refinement confirms
 order one for two stages and order two for three/four stages, including a
@@ -117,7 +156,7 @@ The default suite checks this known behavior as characterization; it does not
 declare `N_RK=1` scientifically valid. The separate
 `--require-design-order` gate fails with an assertion naming the defect.
 
-The next numerical correction should remove this erroneous assembly selection
+At the time of this audit, the proposed next correction was to remove this erroneous assembly selection
 and update the regression to require Euler advancement. Whether a one-stage
 option should integrate implicit physics or reject such configurations is a
 separate policy choice: its existing implicit weights are zero.
@@ -153,7 +192,7 @@ acceptance manifest, stage/order records, input/output fingerprints, the
 design-gate failure, and comparisons with the preceding baseline. Observed
 hashes are not approved golden references.
 
-From the repository root:
+From the repository root (the same command runs the updated supported-stage suite):
 
 ```sh
 sh TESTS/TEST_IMEX_STAGES/run_test.sh
@@ -162,15 +201,16 @@ sh TESTS/TEST_IMEX_STAGES/run_test.sh
 Use `KEEP_TEST_WORKDIR=1` to retain generated fixtures, executables and payloads.
 The test requires gfortran, LAPACK, Python 3 with NumPy, `nf-config` and
 `nc-config`. With a retained executable, the comparator's `--section order`
-isolates temporal tests; adding `--require-design-order` reproduces the expected
-scientific-gate failure. Run it from a fresh temporary directory.
+isolates temporal tests. On the historical `51d5d13b` revision only, adding
+`--require-design-order` reproduces the expected scientific-gate failure.
+Run it from a fresh temporary directory.
 
 Full audit logs remain in `/tmp/imex-stages-acceptance-20261010-final` and the
 separate design-gate log in `/tmp/imex-stages-design-gate-20261010.log`.
 These are temporary, not permanent raw-output archives. The
-[acceptance plan](../../TESTS/ACCEPTANCE/acceptance_plan.json) keeps the
-single-stage defect, CFL policy, nonautonomous-source and mixed-composition
-requirements open before N9 or the layer migration.
+[acceptance plan](../../TESTS/ACCEPTANCE/acceptance_plan.json) now excludes the
+single-stage option; CFL policy, nonautonomous-source and mixed-composition
+requirements remain open before N9 or the layer migration.
 
 The complete audit passes 20 unit/documentation scripts and 16 full-solver
 runs, 36 in total; seven audit-tool self-tests and all six Gate-H/restart

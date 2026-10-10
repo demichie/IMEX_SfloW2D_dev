@@ -1,4 +1,4 @@
-"""Characterize production IMEX stages, CFL policies and temporal order.
+"""Validate supported IMEX stages, CFL policies, temporal order and input rejection.
 
 Reference tableaux are independent of private production storage. Spatial RHS
 calls use the unchanged, checksum-pinned cores from TEST_SPATIAL_OPERATOR.
@@ -20,6 +20,7 @@ import compare_reference as spatial
 
 CP = 4180.0
 RHO = 1000.0
+SUPPORTED_STAGES = (2, 3, 4)
 EPS = np.finfo(float).eps
 LEVELS = (8, 16, 32, 64, 128)
 
@@ -28,10 +29,7 @@ def tableaux(n):
     """Return effective strictly lower explicit and lower implicit production tableaux."""
     ae = np.zeros((n, n)); ai = np.zeros((n, n))
     be = np.zeros(n); bi = np.zeros(n)
-    if n == 1:
-        # The stored explicit diagonal is unused by stage assembly.
-        be[0] = 1.0
-    elif n == 2:
+    if n == 2:
         ae[1, 0] = 1.0; be[0] = 1.0; ai[1, 1] = 1.0; bi[1] = 1.0
     elif n == 3:
         ae[1, 0] = 0.5; ae[2, :2] = 0.5; be[:] = 1/3
@@ -46,14 +44,11 @@ def tableaux(n):
 
 def check_order_conditions():
     """Check first/second order and both mixed colored-tree conditions independently."""
-    for n in range(1, 5):
+    for n in SUPPORTED_STAGES:
         ae, ai, be, bi = tableaux(n)
         ce, ci = ae.sum(axis=1), ai.sum(axis=1)
         assert abs(be.sum()-1) < 8*EPS
-        if n == 1:
-            assert bi.sum() == 0  # No implicit source participates in this option.
-        else:
-            assert abs(bi.sum()-1) < 8*EPS
+        assert abs(bi.sum()-1) < 8*EPS
         if n >= 3:
             for weight in (be, bi):
                 for abscissa in (ce, ci):
@@ -364,7 +359,7 @@ def order_suite(args):
                     error = np.max(np.abs(fields["qp"][..., 3]-expected_t))
                 errors.append(float(error))
             rates = np.log2(np.array(errors[:-1])/errors[1:])
-            target = 1 if n == 2 or n == 1 else 2
+            target = 1 if n == 2 else 2
             if not np.all((rates[-2:] > target-0.25) & (rates[-2:] < target+0.25)):
                 raise AssertionError(f"temporal order {kind} RK{n}: errors={errors}, rates={rates}")
             record = {"profile": args.profile, "kind": kind, "n_RK": n, "expected_order": target,
@@ -374,31 +369,53 @@ def order_suite(args):
                       "oracle": "exact constant-coefficient thermal MOL exponential" if kind == "thermal" else
                       "analytic quadratic drag" if kind == "drag" else "independent thermal MOL RK4 plus analytic drag"}
             print("IMEX_ORDER_EVIDENCE "+json.dumps(record, sort_keys=True, allow_nan=False), flush=True)
-    # N_RK=1 has zero implicit weights: it must not be claimed to integrate drag.
-    vertices, q0, _, _ = manufactured("drag")
-    fields, hashes = launch(args.executable, Path("RK1-implicit-disabled"), vertices, q0, 1, 8, 0.05, drag=1, limiter=0)
-    close("N_RK=1 does not integrate implicit friction", fields["q"], q0)
-    if np.any(fields["implicit_statuses"] != 0):
-        raise AssertionError("unexpected N_RK=1 implicit solve")
-    print("PASS: N_RK=1 implicit contribution is disabled by its retained tableau", flush=True)
-    # Reproduce the separate explicit defect without declaring Euler agreement.
-    vertices, q0, initial_t, mode = manufactured("thermal")
-    fields, hashes = launch(args.executable, Path("RK1-explicit-noop"), vertices, q0, 1, 8, 0.05, limiter=0)
-    if fields["q"].tobytes() != q0.tobytes():
-        raise AssertionError("N_RK=1 known no-op changed; update the explicit defect gate")
-    print("IMEX_KNOWN_DEFECT "+json.dumps({"profile": args.profile, "n_RK": 1,
-          "defect": "stored explicit diagonal incorrectly selects stiffly-accurate assembly; explicit update is skipped",
-          "intended_forward_Euler_matches": False, **hashes}), flush=True)
+
+
+def stage_count_suite(executable, profile):
+    """Require nonzero, diagnostic-specific rejection through both production entry points."""
+    generator = Path(__file__).resolve().parent.parent / "TEST_PCCU_LAKE_AT_REST/generate_case.py"
+    for mode in ("input", "workspace"):
+        for stages in (-1, 0, 1, 2, 3, 4, 5, 6, None):
+            if stages is None and mode == "workspace":
+                continue  # Omission is a namelist default, not a workspace request.
+            directory = Path(f"stage-count-{mode}-{stages}")
+            directory.mkdir()
+            if mode == "input":
+                subprocess.run([sys.executable, str(generator)], cwd=directory, check=True)
+                inp = directory / "IMEX_SfloW2D.inp"
+                content = inp.read_text()
+                assert content.count("N_RK=2,") == 1
+                inp.write_text(content.replace("N_RK=2,", "" if stages is None else f"N_RK={stages},"))
+            expected = 2 if stages is None else stages
+            accepted = expected in SUPPORTED_STAGES
+            evidence = []
+            for threads in (1, 4):
+                env = {**os.environ, "OMP_NUM_THREADS": str(threads), "OMP_DYNAMIC": "FALSE"}
+                run = subprocess.run([str(executable), mode, str(expected)], cwd=directory, env=env,
+                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=30)
+                (directory / f"threads-{threads}.log").write_text(run.stdout)
+                if accepted:
+                    if run.returncode != 0 or "PASS: stage count accepted:" not in run.stdout:
+                        raise AssertionError(f"{directory}: valid stage count rejected\n{run.stdout}")
+                elif run.returncode == 0 or "FATAL ERROR: N_RK must be 2, 3 or 4" not in run.stdout:
+                    raise AssertionError(f"{directory}: missing explicit stage-count rejection\n{run.stdout}")
+                evidence.append({"requested_threads": threads, "returncode": run.returncode,
+                                 "log_sha256": hashlib.sha256(run.stdout.encode()).hexdigest()})
+            print("IMEX_STAGE_COUNT_EVIDENCE "+json.dumps({"profile": profile, "entry": mode,
+                  "requested_n_RK": stages, "effective_n_RK": expected, "accepted": accepted,
+                  "runs": evidence}, sort_keys=True), flush=True)
+    print("PASS: unsupported N_RK rejected by input and workspace; default remains 2", flush=True)
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("executable", type=Path); parser.add_argument("profile")
+    parser.add_argument("--stage-count-executable", type=Path)
     parser.add_argument("--section", choices=("stages", "order"))
-    parser.add_argument("--require-design-order", action="store_true",
-                        help="fail on characterized numerical defects, not just unexpected regressions")
     args = parser.parse_args(); args.executable = args.executable.resolve()
     check_order_conditions()
+    if args.stage_count_executable:
+        stage_count_suite(args.stage_count_executable.resolve(), args.profile)
     if args.section != "order":
         cases = ("lake_rough", "dynamic_smooth", "dynamic_drainage", "dynamic_compact")
         for name in cases:
@@ -408,19 +425,12 @@ def main():
                                                    slope_correction=slope, curvature_term=curvature)
                 harmonic, diagnostic = spatial.core.max_dt2d(q, bed, spatial.DX, spatial.DY, 0.0, params)
                 bound = min(diagnostic["dt_x"], diagnostic["dt_y"])
-                for n in range(1, 5):
+                for n in SUPPORTED_STAGES:
                     for policy, requested, dt in (("retained", 0.0, bound), ("harmonic", harmonic, harmonic)):
                         expected, final, stage_cfl = explicit_stages(q, bed, params, n, dt)
                         tag = f"{name}-G{int(slope)}-C{int(curvature)}-RK{n}-{policy}"
                         fields, hashes = launch(args.executable, Path(tag), vertices, lift(q), n, 1, requested,
                                                 slope=slope, curvature=curvature, limiter=params.limiter)
-                        intended_final = final
-                        if n == 1:
-                            # Keep the reference Euler result as evidence; production
-                            # currently returns Q^n due to its diagonal/stiff-accuracy test.
-                            final = lift(q)
-                            if fields["q"].tobytes() != lift(q).tobytes():
-                                raise AssertionError("N_RK=1 no-op defect changed; re-evaluate its gate")
                         errors = validate_stages(fields, expected, final, dt, bound, name.startswith("lake"))
                         record = {"profile": args.profile, "case": tag, "n_RK": n, "policy": policy,
                                   "dt_used": dt, "dt_directional_minimum": bound, "dt_harmonic": harmonic,
@@ -428,10 +438,9 @@ def main():
                                   "stage_CFL_diagnostics": stage_cfl,
                                   "admissibility": admissibility(fields), **hashes}
                         record["intended_final_component_scaled_errors"] = {
-                            label: float(np.max(np.abs(fields["raw_final"][..., i]-intended_final[..., i]))) /
-                            max(1.0, float(np.max(np.abs(intended_final[..., i]))))
+                            label: float(np.max(np.abs(fields["raw_final"][..., i]-final[..., i]))) /
+                            max(1.0, float(np.max(np.abs(final[..., i]))))
                             for i, label in enumerate(("mass", "mx", "my", "thermal", "solid"))}
-                        record["known_RK1_noop"] = n == 1
                         print("IMEX_STAGE_EVIDENCE "+json.dumps(record, sort_keys=True, allow_nan=False), flush=True)
                         if name == "dynamic_smooth" and slope and n == 3 and policy == "retained":
                             negative_controls(fields, expected, final, dt, bound)
@@ -444,8 +453,6 @@ def main():
         print("PASS: production raw stages and assembly, both CFL policies, actual 1/4 threads", flush=True)
     if args.section != "stages":
         order_suite(args)
-    if args.require_design_order:
-        raise AssertionError("N_RK=1 skips its intended explicit update; design-order acceptance remains open")
 
 
 if __name__ == "__main__":

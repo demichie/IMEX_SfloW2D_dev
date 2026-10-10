@@ -117,6 +117,7 @@ init_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                                   \
                     constitutive_parameters_2d.$(OBJEXT) geometry_2d.$(OBJEXT)\
                     state_2d.$(OBJEXT) state_conversion_2d.$(OBJEXT)
 inpout_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                                 \
+                      time_integration_2d.$(OBJEXT)                           \
                       constitutive_parameters_2d.$(OBJEXT)                    \
                       diagnostics_2d.$(OBJEXT) domain_2d.$(OBJEXT)            \
                       geometry_2d.$(OBJEXT) init_2d.$(OBJEXT)                 \

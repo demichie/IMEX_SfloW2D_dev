@@ -1,0 +1,3665 @@
+{
+  "audit_tool_self_tests": {
+    "failed": 0,
+    "passed": 7
+  },
+  "comparison_to_baseline": {
+    "artifact": "docs/acceptance/results_imex_stages_2026_10_10.json",
+    "artifact_sha256": "bf049f31651cd3ce5956587e45ad1c2524ffb0f7d3612a82f5c021855e83477c",
+    "cases": [
+      {
+        "canonical_output_count": 30,
+        "outer_threads": 1,
+        "profile": "historical_optimized",
+        "status": "unchanged",
+        "test": "TEST_BINARY_RESTART"
+      },
+      {
+        "canonical_output_count": 30,
+        "outer_threads": 4,
+        "profile": "historical_optimized",
+        "status": "unchanged",
+        "test": "TEST_BINARY_RESTART"
+      },
+      {
+        "canonical_output_count": 18,
+        "outer_threads": 1,
+        "profile": "historical_optimized",
+        "status": "unchanged",
+        "test": "TEST_PCCU_GATE_H"
+      },
+      {
+        "canonical_output_count": 18,
+        "outer_threads": 4,
+        "profile": "historical_optimized",
+        "status": "unchanged",
+        "test": "TEST_PCCU_GATE_H"
+      },
+      {
+        "canonical_output_count": 24,
+        "outer_threads": null,
+        "profile": "historical_optimized",
+        "status": "unchanged",
+        "test": "TEST_PCCU_INCLINED_EXCAVATION"
+      },
+      {
+        "canonical_output_count": 64,
+        "outer_threads": null,
+        "profile": "historical_optimized",
+        "status": "unchanged",
+        "test": "TEST_PCCU_LAKE_AT_REST"
+      },
+      {
+        "canonical_output_count": 25,
+        "outer_threads": 1,
+        "profile": "historical_optimized",
+        "status": "unchanged",
+        "test": "TEST_STOCHASTIC_RESTART"
+      },
+      {
+        "canonical_output_count": 25,
+        "outer_threads": 4,
+        "profile": "historical_optimized",
+        "status": "unchanged",
+        "test": "TEST_STOCHASTIC_RESTART"
+      },
+      {
+        "canonical_output_count": 30,
+        "outer_threads": 1,
+        "profile": "strict_debug",
+        "status": "unchanged",
+        "test": "TEST_BINARY_RESTART"
+      },
+      {
+        "canonical_output_count": 30,
+        "outer_threads": 4,
+        "profile": "strict_debug",
+        "status": "unchanged",
+        "test": "TEST_BINARY_RESTART"
+      },
+      {
+        "canonical_output_count": 18,
+        "outer_threads": 1,
+        "profile": "strict_debug",
+        "status": "unchanged",
+        "test": "TEST_PCCU_GATE_H"
+      },
+      {
+        "canonical_output_count": 18,
+        "outer_threads": 4,
+        "profile": "strict_debug",
+        "status": "unchanged",
+        "test": "TEST_PCCU_GATE_H"
+      },
+      {
+        "canonical_output_count": 24,
+        "outer_threads": null,
+        "profile": "strict_debug",
+        "status": "unchanged",
+        "test": "TEST_PCCU_INCLINED_EXCAVATION"
+      },
+      {
+        "canonical_output_count": 64,
+        "outer_threads": null,
+        "profile": "strict_debug",
+        "status": "unchanged",
+        "test": "TEST_PCCU_LAKE_AT_REST"
+      },
+      {
+        "canonical_output_count": 25,
+        "outer_threads": 1,
+        "profile": "strict_debug",
+        "status": "unchanged",
+        "test": "TEST_STOCHASTIC_RESTART"
+      },
+      {
+        "canonical_output_count": 25,
+        "outer_threads": 4,
+        "profile": "strict_debug",
+        "status": "unchanged",
+        "test": "TEST_STOCHASTIC_RESTART"
+      }
+    ],
+    "supported_stage_payloads": [
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G0-C0-RK2-retained",
+        "input_sha256": "1fb3255abb9aecf70a81cc1c7810792ff12b4c1aecf37e680f10d92c62d6a830",
+        "n_RK": 2,
+        "output_sha256": "1425ce8a7b620203580afe68fe9ba901828e24bf577fc2967b4ca9fbf83a93ee",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G0-C0-RK2-harmonic",
+        "input_sha256": "dbbf9affd4d8880a778f09535a94e75a09eaef2f4aaa22e61eaa09ecbc014d53",
+        "n_RK": 2,
+        "output_sha256": "22c160ab30f380304b5c5f357d08fcaad379d87b2dd8de07505905f7287f8168",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G0-C0-RK3-retained",
+        "input_sha256": "1fb3255abb9aecf70a81cc1c7810792ff12b4c1aecf37e680f10d92c62d6a830",
+        "n_RK": 3,
+        "output_sha256": "f9269771b4aefedecece78da6634866f5a5d42b664982e6ede3dd4235f0188c7",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G0-C0-RK3-harmonic",
+        "input_sha256": "dbbf9affd4d8880a778f09535a94e75a09eaef2f4aaa22e61eaa09ecbc014d53",
+        "n_RK": 3,
+        "output_sha256": "79e65c172b5b21b2fae793a2fbba2b089439a25abb890b13ce6b963d9eefcc0e",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G0-C0-RK4-retained",
+        "input_sha256": "1fb3255abb9aecf70a81cc1c7810792ff12b4c1aecf37e680f10d92c62d6a830",
+        "n_RK": 4,
+        "output_sha256": "b1b78d0ce3e39fe2682089ff106bf1b7ad495ecf515719050c7f5962955e8da2",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G0-C0-RK4-harmonic",
+        "input_sha256": "dbbf9affd4d8880a778f09535a94e75a09eaef2f4aaa22e61eaa09ecbc014d53",
+        "n_RK": 4,
+        "output_sha256": "5e2bd2c19499f7baf1b64db0c17098879229d5a6c67258c30af3eedb239f0113",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G1-C1-RK2-retained",
+        "input_sha256": "9165ffeb230ff26860bb945819e7da9dcebd6db808cfdabe58e7df566d146f79",
+        "n_RK": 2,
+        "output_sha256": "b0107195a992750c7990c0281498a114f2f3fb45a8165faf78dbc67654a5f706",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G1-C1-RK2-harmonic",
+        "input_sha256": "408caeeddf05b4ad8016f44f311d62b29e136db3d6498a907b6d0aef7ae4408a",
+        "n_RK": 2,
+        "output_sha256": "70008f05b0496f224441dfd9bcbd8358821da4950c2ea92972911a282b7c075b",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G1-C1-RK3-retained",
+        "input_sha256": "9165ffeb230ff26860bb945819e7da9dcebd6db808cfdabe58e7df566d146f79",
+        "n_RK": 3,
+        "output_sha256": "d622f4ede4243784bacb35c25ad689c745b77da67a2d3c302ed3091766bee44f",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G1-C1-RK3-harmonic",
+        "input_sha256": "408caeeddf05b4ad8016f44f311d62b29e136db3d6498a907b6d0aef7ae4408a",
+        "n_RK": 3,
+        "output_sha256": "4b23e45ee830781dab6e8831cb5cf97f6c5b092b772deb0e7521bd68c31c988d",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G1-C1-RK4-retained",
+        "input_sha256": "9165ffeb230ff26860bb945819e7da9dcebd6db808cfdabe58e7df566d146f79",
+        "n_RK": 4,
+        "output_sha256": "301bbd32771ded1f13f8a6e473d0034e588309b62caa415a1448faa28abc16e2",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G1-C1-RK4-harmonic",
+        "input_sha256": "408caeeddf05b4ad8016f44f311d62b29e136db3d6498a907b6d0aef7ae4408a",
+        "n_RK": 4,
+        "output_sha256": "241633493d332fcce32496746341a33ab8bc4fbd3495d327e46d4bedd2ca59e2",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G0-C0-RK2-retained",
+        "input_sha256": "24a2b0d36c64c35b345a4b8f0d683afe2d08ecb47090059ca1a15d5ebb43c458",
+        "n_RK": 2,
+        "output_sha256": "189df3293f895145395ba8c15e1195a47a4c8ef26463d2da8ac6890a6cb7684a",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G0-C0-RK2-harmonic",
+        "input_sha256": "dcacda5e3d288f55ac48763b007a5a1ff5dcad2ab1c374ac86696c9e3d6779ad",
+        "n_RK": 2,
+        "output_sha256": "782272511742d0228e6775d331b7d639ecf0b4324990bcc937af1db0a0b5d628",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G0-C0-RK3-retained",
+        "input_sha256": "24a2b0d36c64c35b345a4b8f0d683afe2d08ecb47090059ca1a15d5ebb43c458",
+        "n_RK": 3,
+        "output_sha256": "83c15fa20cf3e93628d96c032c6076e5ecca05f7989c7472642275747cd0520d",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G0-C0-RK3-harmonic",
+        "input_sha256": "dcacda5e3d288f55ac48763b007a5a1ff5dcad2ab1c374ac86696c9e3d6779ad",
+        "n_RK": 3,
+        "output_sha256": "205290ec2cb555753ca8aa4638ed95293aeeb4c36bf3ff7e96860eafc1bf29e5",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G0-C0-RK4-retained",
+        "input_sha256": "24a2b0d36c64c35b345a4b8f0d683afe2d08ecb47090059ca1a15d5ebb43c458",
+        "n_RK": 4,
+        "output_sha256": "216725cac9f1bfebb65029ab52ff762c596a034634c40fc1fb17e2f0c0ed2f52",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G0-C0-RK4-harmonic",
+        "input_sha256": "dcacda5e3d288f55ac48763b007a5a1ff5dcad2ab1c374ac86696c9e3d6779ad",
+        "n_RK": 4,
+        "output_sha256": "ab2f9f4176745471dde99903970980af1116f8af6b45b94f0e6b98a80622ccc4",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G1-C1-RK2-retained",
+        "input_sha256": "b69107a3ca6b8a9557f9786e5ed87f23652218cac0d7f73284d7549f9d61c095",
+        "n_RK": 2,
+        "output_sha256": "b5f42788d0cc3408a99c19272b8c2730cf3c39224312e4c56b4d8e86ccc3960a",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G1-C1-RK2-harmonic",
+        "input_sha256": "8b12735bff7f0ee5caf30179d517ef4e45bb9d9ce65e4a9250df3552214459f4",
+        "n_RK": 2,
+        "output_sha256": "b84e0ae8234aef188e05b55352aa736f03251dd41e4e2c860c20a7ba10107df7",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G1-C1-RK3-retained",
+        "input_sha256": "b69107a3ca6b8a9557f9786e5ed87f23652218cac0d7f73284d7549f9d61c095",
+        "n_RK": 3,
+        "output_sha256": "452a85384e79923cb14ec8d1f0684c0c26350e365b4d39a0a5018bc6b61f2bd3",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G1-C1-RK3-harmonic",
+        "input_sha256": "8b12735bff7f0ee5caf30179d517ef4e45bb9d9ce65e4a9250df3552214459f4",
+        "n_RK": 3,
+        "output_sha256": "2d96776b35128439553c8e3157d9abbcd28c986e0cd1d3ed2503e40860558c53",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G1-C1-RK4-retained",
+        "input_sha256": "b69107a3ca6b8a9557f9786e5ed87f23652218cac0d7f73284d7549f9d61c095",
+        "n_RK": 4,
+        "output_sha256": "0dd9b779933ffc63acbbc3aba91d734515bcc7853dcbc3ec04efba393f3b3242",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G1-C1-RK4-harmonic",
+        "input_sha256": "8b12735bff7f0ee5caf30179d517ef4e45bb9d9ce65e4a9250df3552214459f4",
+        "n_RK": 4,
+        "output_sha256": "7d134c602d6bde0b8d1b663786555cfa582aaa7a6f3c1961d175722e4cff5fd6",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G0-C0-RK2-retained",
+        "input_sha256": "f40b01706cd8b1d4b91258aa33154375689df161ff680a67c50a94087be88dfd",
+        "n_RK": 2,
+        "output_sha256": "1ef307d8f651b2457d6d465d88d0b517e753f0fb1f60c071ca699c8e4a8f1c5e",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G0-C0-RK2-harmonic",
+        "input_sha256": "9ae2d1a3955e3787bad493e9e777c5d8851ebcf765e73b400beda5912da342fb",
+        "n_RK": 2,
+        "output_sha256": "07965665179e43a8e4588bb3cf8aa434dee50d168dae29f68e8036254890ad15",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G0-C0-RK3-retained",
+        "input_sha256": "f40b01706cd8b1d4b91258aa33154375689df161ff680a67c50a94087be88dfd",
+        "n_RK": 3,
+        "output_sha256": "d7267506ee96a346157e4ec984c51407490b563a0e2d1e42b0af9ab678ba12ed",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G0-C0-RK3-harmonic",
+        "input_sha256": "9ae2d1a3955e3787bad493e9e777c5d8851ebcf765e73b400beda5912da342fb",
+        "n_RK": 3,
+        "output_sha256": "ad5dc056494782e2fb5bff78fc41e950b0636b50772f1187ffbea2aa16f974f8",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G0-C0-RK4-retained",
+        "input_sha256": "f40b01706cd8b1d4b91258aa33154375689df161ff680a67c50a94087be88dfd",
+        "n_RK": 4,
+        "output_sha256": "11926818df8ba3d56e882effefb72aabe024a115f7a24e2c6303235327a82f69",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G0-C0-RK4-harmonic",
+        "input_sha256": "9ae2d1a3955e3787bad493e9e777c5d8851ebcf765e73b400beda5912da342fb",
+        "n_RK": 4,
+        "output_sha256": "9685338c850fc45f1df86d602744618df55a3bf8c8c3006331c77a11b7622a87",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G1-C1-RK2-retained",
+        "input_sha256": "73251d0b146b3d5c9bf064f17d05323b6a671afa19e093daf0772d80c2199bf4",
+        "n_RK": 2,
+        "output_sha256": "095f4119c0985c11cbb97da81204e0c2ec73765010bc1cc93182725461cc8cb3",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G1-C1-RK2-harmonic",
+        "input_sha256": "673c1f8a9db30ef21d026858d2b999db2b0d06ca7309e0f8a68e18c2558dc2d3",
+        "n_RK": 2,
+        "output_sha256": "ec12cf772e2e1c3514d198b7f17a0e7109f9d4b66019001b8b87c3ad21f8eb39",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G1-C1-RK3-retained",
+        "input_sha256": "73251d0b146b3d5c9bf064f17d05323b6a671afa19e093daf0772d80c2199bf4",
+        "n_RK": 3,
+        "output_sha256": "112554e262467bc36eca54b169ff3eacab557d28d67ce3d1ee734824b2f8cbf2",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G1-C1-RK3-harmonic",
+        "input_sha256": "673c1f8a9db30ef21d026858d2b999db2b0d06ca7309e0f8a68e18c2558dc2d3",
+        "n_RK": 3,
+        "output_sha256": "9d79971cd652dbe8e9adddc954c3726878d88a768646f06f33ba705317d8ce49",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G1-C1-RK4-retained",
+        "input_sha256": "73251d0b146b3d5c9bf064f17d05323b6a671afa19e093daf0772d80c2199bf4",
+        "n_RK": 4,
+        "output_sha256": "85503f084c8929743ea5cfd874fd8aae536007703b632decc31c271965cb5601",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G1-C1-RK4-harmonic",
+        "input_sha256": "673c1f8a9db30ef21d026858d2b999db2b0d06ca7309e0f8a68e18c2558dc2d3",
+        "n_RK": 4,
+        "output_sha256": "51bd46d10eb692bc4c1d005dffa269243d4e13bddcaed995c5d02b3f5a2640ea",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G0-C0-RK2-retained",
+        "input_sha256": "0f6056efcca1ab48ed9a36dc34c986ea1f6c4a477c53e867b622775bbc7a8374",
+        "n_RK": 2,
+        "output_sha256": "a100e4ff70d43887250fa656a909910299a81a62fc3e66af9a585b6c81613c48",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G0-C0-RK2-harmonic",
+        "input_sha256": "bda4e620cb6510a767c735168e3100078f53c5f08bbfbac6c7f5f9f174faf2c8",
+        "n_RK": 2,
+        "output_sha256": "37a57a272c43408316eb469f4a2712872e0dd88530b8bfc2eea3f32e5854b4bb",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G0-C0-RK3-retained",
+        "input_sha256": "0f6056efcca1ab48ed9a36dc34c986ea1f6c4a477c53e867b622775bbc7a8374",
+        "n_RK": 3,
+        "output_sha256": "03febb31c9a367a62529d8cda47dca33d9b52de6ac269114eb9b53c93ffb9eae",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G0-C0-RK3-harmonic",
+        "input_sha256": "bda4e620cb6510a767c735168e3100078f53c5f08bbfbac6c7f5f9f174faf2c8",
+        "n_RK": 3,
+        "output_sha256": "a84a120c2043592f0e4b207ee5342705f2f172d3cd0cc2bb3834d8a39be04421",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G0-C0-RK4-retained",
+        "input_sha256": "0f6056efcca1ab48ed9a36dc34c986ea1f6c4a477c53e867b622775bbc7a8374",
+        "n_RK": 4,
+        "output_sha256": "acd614ae106defa430769186fe83b43bdc9499703b446cc57aed2fdc4f3a514e",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G0-C0-RK4-harmonic",
+        "input_sha256": "bda4e620cb6510a767c735168e3100078f53c5f08bbfbac6c7f5f9f174faf2c8",
+        "n_RK": 4,
+        "output_sha256": "443b430f3708e383198e6b07000b56ac7a751b746e486e0fe9ca28a4f295399e",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G1-C1-RK2-retained",
+        "input_sha256": "1d1c44e30da69b2fdc5f711bf1105162e00c6529ff9a69934d8807cc177e9bd7",
+        "n_RK": 2,
+        "output_sha256": "e19039976f576707f18989530e7cca737fec4d8703da78ff3de68964581ba69f",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G1-C1-RK2-harmonic",
+        "input_sha256": "91705517ab27161e2e6d089ab20a6eac86d046a7e0384e0d7ce62a5d4ddfd628",
+        "n_RK": 2,
+        "output_sha256": "0e731545c3e981634e36ec8f777c61086ae32bb819bd2177ecafef8659b99e19",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G1-C1-RK3-retained",
+        "input_sha256": "1d1c44e30da69b2fdc5f711bf1105162e00c6529ff9a69934d8807cc177e9bd7",
+        "n_RK": 3,
+        "output_sha256": "0b70b0c78f88327a06efb4299b27480e910391a64ef037bd0ebc72ed23bb4ef8",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G1-C1-RK3-harmonic",
+        "input_sha256": "91705517ab27161e2e6d089ab20a6eac86d046a7e0384e0d7ce62a5d4ddfd628",
+        "n_RK": 3,
+        "output_sha256": "086cdf5175a8655328591bf3b2e7f3145f94a2794c197fa7f4ddb32abfcab54f",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G1-C1-RK4-retained",
+        "input_sha256": "1d1c44e30da69b2fdc5f711bf1105162e00c6529ff9a69934d8807cc177e9bd7",
+        "n_RK": 4,
+        "output_sha256": "f397fa2b3df97fa17a9c025efd08a87ee2bef20aaf6b810b9fa410b7283ae74b",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G1-C1-RK4-harmonic",
+        "input_sha256": "91705517ab27161e2e6d089ab20a6eac86d046a7e0384e0d7ce62a5d4ddfd628",
+        "n_RK": 4,
+        "output_sha256": "4047b408fcb6adfaa8fe8ae34e97b6d358f48311505b70f98f9e8b0079304225",
+        "profile": "strict"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G0-C0-RK2-retained",
+        "input_sha256": "1fb3255abb9aecf70a81cc1c7810792ff12b4c1aecf37e680f10d92c62d6a830",
+        "n_RK": 2,
+        "output_sha256": "91291f1b09817b3dd016355e75fb331fcd555a50a422350302fc7d6d98dc06db",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G0-C0-RK2-harmonic",
+        "input_sha256": "dbbf9affd4d8880a778f09535a94e75a09eaef2f4aaa22e61eaa09ecbc014d53",
+        "n_RK": 2,
+        "output_sha256": "71c5a728c0960066c995e17cabb583926245c66cb252352f552230bdc4a1ec6c",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G0-C0-RK3-retained",
+        "input_sha256": "1fb3255abb9aecf70a81cc1c7810792ff12b4c1aecf37e680f10d92c62d6a830",
+        "n_RK": 3,
+        "output_sha256": "5c3031065c094e781cb5ac29ead79628e37e3a09278982290e24f1e842082717",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G0-C0-RK3-harmonic",
+        "input_sha256": "dbbf9affd4d8880a778f09535a94e75a09eaef2f4aaa22e61eaa09ecbc014d53",
+        "n_RK": 3,
+        "output_sha256": "258b2cc6d54ab3a0a502af8c8bbdede3487d4e5a831c79ce2cc8bbafcf8dd5f5",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G0-C0-RK4-retained",
+        "input_sha256": "1fb3255abb9aecf70a81cc1c7810792ff12b4c1aecf37e680f10d92c62d6a830",
+        "n_RK": 4,
+        "output_sha256": "ce6b04ddb4447a70313b1d3260bb2be54b995c8c15e2027cd6d24e1b570f2c1d",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G0-C0-RK4-harmonic",
+        "input_sha256": "dbbf9affd4d8880a778f09535a94e75a09eaef2f4aaa22e61eaa09ecbc014d53",
+        "n_RK": 4,
+        "output_sha256": "c927018593bd49b19dced003b1785fefb30a2e0a4686719e72545fa3533c31f7",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G1-C1-RK2-retained",
+        "input_sha256": "9165ffeb230ff26860bb945819e7da9dcebd6db808cfdabe58e7df566d146f79",
+        "n_RK": 2,
+        "output_sha256": "b494803919a2a64b04fe29596cd6168bb00a36747b6a719f3466ddbb90b405bd",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G1-C1-RK2-harmonic",
+        "input_sha256": "408caeeddf05b4ad8016f44f311d62b29e136db3d6498a907b6d0aef7ae4408a",
+        "n_RK": 2,
+        "output_sha256": "a0284a539409512258d4fe797ea5eb00e4886402b2372c0488889050bb98c329",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G1-C1-RK3-retained",
+        "input_sha256": "9165ffeb230ff26860bb945819e7da9dcebd6db808cfdabe58e7df566d146f79",
+        "n_RK": 3,
+        "output_sha256": "bbad47dcb82e885bda78199a04203086ccb9cea582eabaeac8058e727e98d892",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G1-C1-RK3-harmonic",
+        "input_sha256": "408caeeddf05b4ad8016f44f311d62b29e136db3d6498a907b6d0aef7ae4408a",
+        "n_RK": 3,
+        "output_sha256": "8eb838fc6824d6df16de7f190ff8c64dcbadd205e43225e5ea2067435d1d114b",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G1-C1-RK4-retained",
+        "input_sha256": "9165ffeb230ff26860bb945819e7da9dcebd6db808cfdabe58e7df566d146f79",
+        "n_RK": 4,
+        "output_sha256": "cd65d11375333739200fce92dbef19cbad9b7ecaacdd6e999b35366ad9d0a234",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "lake_rough-G1-C1-RK4-harmonic",
+        "input_sha256": "408caeeddf05b4ad8016f44f311d62b29e136db3d6498a907b6d0aef7ae4408a",
+        "n_RK": 4,
+        "output_sha256": "3a73c31137da9727c7f54c093135efdac4169fd35fe26ef0c34a74382fd308ea",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G0-C0-RK2-retained",
+        "input_sha256": "24a2b0d36c64c35b345a4b8f0d683afe2d08ecb47090059ca1a15d5ebb43c458",
+        "n_RK": 2,
+        "output_sha256": "97b04667dde923ec71c25791c0999fae65d9451bdbc93c191b67ce4ea0e042a5",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G0-C0-RK2-harmonic",
+        "input_sha256": "dcacda5e3d288f55ac48763b007a5a1ff5dcad2ab1c374ac86696c9e3d6779ad",
+        "n_RK": 2,
+        "output_sha256": "6f19abac23c1c22f003ad4fdc1279252f7a3c2e2a559e84b670619434a4e3a36",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G0-C0-RK3-retained",
+        "input_sha256": "24a2b0d36c64c35b345a4b8f0d683afe2d08ecb47090059ca1a15d5ebb43c458",
+        "n_RK": 3,
+        "output_sha256": "76eeb2d19a887db992fd43b7a021c225bac86bc9e92250fdf1a28e6fffc72418",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G0-C0-RK3-harmonic",
+        "input_sha256": "dcacda5e3d288f55ac48763b007a5a1ff5dcad2ab1c374ac86696c9e3d6779ad",
+        "n_RK": 3,
+        "output_sha256": "1166640041135a852fee84d7b578133d7c201ce96772b81f95fa5ae86f1aa6f8",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G0-C0-RK4-retained",
+        "input_sha256": "24a2b0d36c64c35b345a4b8f0d683afe2d08ecb47090059ca1a15d5ebb43c458",
+        "n_RK": 4,
+        "output_sha256": "b11af3c147e71a17bf287f1bf2e20cf97368aa04f18da92bbed7b9037fa2881e",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G0-C0-RK4-harmonic",
+        "input_sha256": "dcacda5e3d288f55ac48763b007a5a1ff5dcad2ab1c374ac86696c9e3d6779ad",
+        "n_RK": 4,
+        "output_sha256": "10b3da83a33d2ae6109fef281afc620237ec9fa2ad60697f2eefc1d7ca165464",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G1-C1-RK2-retained",
+        "input_sha256": "b69107a3ca6b8a9557f9786e5ed87f23652218cac0d7f73284d7549f9d61c095",
+        "n_RK": 2,
+        "output_sha256": "39f56e0dfd9e96b572320101bde1f2fa43ad829e470265925b670a302aa78f36",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G1-C1-RK2-harmonic",
+        "input_sha256": "8b12735bff7f0ee5caf30179d517ef4e45bb9d9ce65e4a9250df3552214459f4",
+        "n_RK": 2,
+        "output_sha256": "c6653607b595002d0b62c11d54f22eecb74fe5ecd04b63d15372c1cc805ac47f",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G1-C1-RK3-retained",
+        "input_sha256": "b69107a3ca6b8a9557f9786e5ed87f23652218cac0d7f73284d7549f9d61c095",
+        "n_RK": 3,
+        "output_sha256": "7908af8039c3dadd6562d2a21eaaed274b88d3d37dbaa83ef2f61bc0cdd708f9",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G1-C1-RK3-harmonic",
+        "input_sha256": "8b12735bff7f0ee5caf30179d517ef4e45bb9d9ce65e4a9250df3552214459f4",
+        "n_RK": 3,
+        "output_sha256": "f5e4b4e142e123f884a5320c1a8805ef8d6e470a643455a8460897dc779c9abe",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G1-C1-RK4-retained",
+        "input_sha256": "b69107a3ca6b8a9557f9786e5ed87f23652218cac0d7f73284d7549f9d61c095",
+        "n_RK": 4,
+        "output_sha256": "d348b4dd305d1f67f3d080f201e8ad15d6d539435f471bcdea8f691ad35f046e",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_smooth-G1-C1-RK4-harmonic",
+        "input_sha256": "8b12735bff7f0ee5caf30179d517ef4e45bb9d9ce65e4a9250df3552214459f4",
+        "n_RK": 4,
+        "output_sha256": "1563401ae3c15ef06d369e964ef0a451b0d71b9c6e0d4798fee3cb8ed7e2b82e",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G0-C0-RK2-retained",
+        "input_sha256": "f40b01706cd8b1d4b91258aa33154375689df161ff680a67c50a94087be88dfd",
+        "n_RK": 2,
+        "output_sha256": "5c6f9114daefaf646d0fc3f6b82d8878c5f58b2c4e1293b95e6199450abe2d66",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G0-C0-RK2-harmonic",
+        "input_sha256": "9ae2d1a3955e3787bad493e9e777c5d8851ebcf765e73b400beda5912da342fb",
+        "n_RK": 2,
+        "output_sha256": "8db5d5c4ef427af7862a71ee8e1fab2ea69cc53a606e942a8bde8f92f99639c1",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G0-C0-RK3-retained",
+        "input_sha256": "f40b01706cd8b1d4b91258aa33154375689df161ff680a67c50a94087be88dfd",
+        "n_RK": 3,
+        "output_sha256": "24ceb60387abf52c98f90450bf835d4b5483082958ac6f550ab818bc56f04090",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G0-C0-RK3-harmonic",
+        "input_sha256": "9ae2d1a3955e3787bad493e9e777c5d8851ebcf765e73b400beda5912da342fb",
+        "n_RK": 3,
+        "output_sha256": "b69c9b32b358fc3c21391fbdc5684e7134394bb71708a4e9a9da8fbea6cd132a",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G0-C0-RK4-retained",
+        "input_sha256": "f40b01706cd8b1d4b91258aa33154375689df161ff680a67c50a94087be88dfd",
+        "n_RK": 4,
+        "output_sha256": "cdfc5ecbb9fe46de1035b013bfe998085aef1b1d1a48a613df67b32d15904c8b",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G0-C0-RK4-harmonic",
+        "input_sha256": "9ae2d1a3955e3787bad493e9e777c5d8851ebcf765e73b400beda5912da342fb",
+        "n_RK": 4,
+        "output_sha256": "fb27c92f1d117fd3c8abb7099bc325e8cf4f6be968a4343af15e12f4f612866d",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G1-C1-RK2-retained",
+        "input_sha256": "73251d0b146b3d5c9bf064f17d05323b6a671afa19e093daf0772d80c2199bf4",
+        "n_RK": 2,
+        "output_sha256": "04dd91d5976dff3cf8cbf7c7ad0fc282d568d014484ecaa01893ddc6de054b78",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G1-C1-RK2-harmonic",
+        "input_sha256": "673c1f8a9db30ef21d026858d2b999db2b0d06ca7309e0f8a68e18c2558dc2d3",
+        "n_RK": 2,
+        "output_sha256": "58f551942938b0f6e53025baf4b060a4306c6e8c8d0346d061f9a8380b66f978",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G1-C1-RK3-retained",
+        "input_sha256": "73251d0b146b3d5c9bf064f17d05323b6a671afa19e093daf0772d80c2199bf4",
+        "n_RK": 3,
+        "output_sha256": "4fdbfe170090b1e2f3b1c1f5a9cc5eb5eef2f4a3787d024764566c0cca1cf074",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G1-C1-RK3-harmonic",
+        "input_sha256": "673c1f8a9db30ef21d026858d2b999db2b0d06ca7309e0f8a68e18c2558dc2d3",
+        "n_RK": 3,
+        "output_sha256": "d03b512fb8229bd4cf2fb9d399f86666bb0ca0ae5fc83a946bff5bb15f0a2d8b",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G1-C1-RK4-retained",
+        "input_sha256": "73251d0b146b3d5c9bf064f17d05323b6a671afa19e093daf0772d80c2199bf4",
+        "n_RK": 4,
+        "output_sha256": "65922c8c51ee84050f8749b2e6823c0a1b1c88fc538a5fa70b37b24d749d014e",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_drainage-G1-C1-RK4-harmonic",
+        "input_sha256": "673c1f8a9db30ef21d026858d2b999db2b0d06ca7309e0f8a68e18c2558dc2d3",
+        "n_RK": 4,
+        "output_sha256": "8ee7ea90b457924c861e71e5aa7159297e95f9f1d17ddbdce1970962dc802c20",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G0-C0-RK2-retained",
+        "input_sha256": "0f6056efcca1ab48ed9a36dc34c986ea1f6c4a477c53e867b622775bbc7a8374",
+        "n_RK": 2,
+        "output_sha256": "fb2ff45bee0893ee201a8bb6e6c0a3c4a8a4a46fcf3ee6938c82cd8dd51436ed",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G0-C0-RK2-harmonic",
+        "input_sha256": "bda4e620cb6510a767c735168e3100078f53c5f08bbfbac6c7f5f9f174faf2c8",
+        "n_RK": 2,
+        "output_sha256": "d1d22d58066ffa012a8dd3bc5f77eb808d36ddd92c3b8c55669709cf64efaa99",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G0-C0-RK3-retained",
+        "input_sha256": "0f6056efcca1ab48ed9a36dc34c986ea1f6c4a477c53e867b622775bbc7a8374",
+        "n_RK": 3,
+        "output_sha256": "00ef5aa97e2d85efcc3019a2509f7e6d673b882568350a3f4398247a29df0f9c",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G0-C0-RK3-harmonic",
+        "input_sha256": "bda4e620cb6510a767c735168e3100078f53c5f08bbfbac6c7f5f9f174faf2c8",
+        "n_RK": 3,
+        "output_sha256": "972e956c867ab6a100c4c50824e7d3d432d5cd9b618d77e820f205cbefed2ab5",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G0-C0-RK4-retained",
+        "input_sha256": "0f6056efcca1ab48ed9a36dc34c986ea1f6c4a477c53e867b622775bbc7a8374",
+        "n_RK": 4,
+        "output_sha256": "3fcdc5bc593555ac47ea712facd964aa647c1577a9ea540d560b877b1720e6be",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G0-C0-RK4-harmonic",
+        "input_sha256": "bda4e620cb6510a767c735168e3100078f53c5f08bbfbac6c7f5f9f174faf2c8",
+        "n_RK": 4,
+        "output_sha256": "7a191877343349c0ddfd9e048b1f2d1ef441ad8b41b7cf60afc1e97d4bd94e12",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G1-C1-RK2-retained",
+        "input_sha256": "1d1c44e30da69b2fdc5f711bf1105162e00c6529ff9a69934d8807cc177e9bd7",
+        "n_RK": 2,
+        "output_sha256": "3bfad2fcb00a37758c01697274e4ffec41fbd6d36d7ffe9e3bbdc623c71999b1",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G1-C1-RK2-harmonic",
+        "input_sha256": "91705517ab27161e2e6d089ab20a6eac86d046a7e0384e0d7ce62a5d4ddfd628",
+        "n_RK": 2,
+        "output_sha256": "420fe6c3a3ef2258aa2d6e6a12f003e092efc9a1b1c4202e41b0c28bf9e16f78",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G1-C1-RK3-retained",
+        "input_sha256": "1d1c44e30da69b2fdc5f711bf1105162e00c6529ff9a69934d8807cc177e9bd7",
+        "n_RK": 3,
+        "output_sha256": "5e81c24034f52d1188f089c2747186a1eebe90a129b0af52adfec5b27a62f4bf",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G1-C1-RK3-harmonic",
+        "input_sha256": "91705517ab27161e2e6d089ab20a6eac86d046a7e0384e0d7ce62a5d4ddfd628",
+        "n_RK": 3,
+        "output_sha256": "48012aaca923a76e0dd0ae89ffc20105f2a30c55f63866b4e5cf403478460931",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G1-C1-RK4-retained",
+        "input_sha256": "1d1c44e30da69b2fdc5f711bf1105162e00c6529ff9a69934d8807cc177e9bd7",
+        "n_RK": 4,
+        "output_sha256": "9b450f12d26bf95da1630d4bb88257053f7b106f6ba0948d7cb80b26f418cb7b",
+        "profile": "optimized"
+      },
+      {
+        "actual_threads": [
+          1,
+          4
+        ],
+        "case": "dynamic_compact-G1-C1-RK4-harmonic",
+        "input_sha256": "91705517ab27161e2e6d089ab20a6eac86d046a7e0384e0d7ce62a5d4ddfd628",
+        "n_RK": 4,
+        "output_sha256": "5b603967b1ed1b8dc2da3ce985eb6c735c1f0ecf48d8f113d318805eac009a0f",
+        "profile": "optimized"
+      }
+    ],
+    "temporal_series": [
+      {
+        "errors": [
+          0.03789570084177285,
+          0.01879259142015144,
+          0.00935792630485821,
+          0.004669423549842122,
+          0.0023323333249436473
+        ],
+        "expected_order": 1,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ee1b9811400e61fd41c52dee1b81f2e4f2838b10e8e0ec7debd636c9192a8d",
+            "output_sha256": "9303e5dad9cb407a6cbe40202918d433ba9c0007d140644d695e20d67914ea0a"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "29f1d93e74db378886f8d2a0e534c241b018d04088396031d9640fca030af55d",
+            "output_sha256": "1f33c419bcee28378b26affbd39747fd5ab6f44fdd70d970fc91782d0f701e2e"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bc8ace1607ab301bbfc9a80c056965140a8a4cfa5db1d2806ffda6a682d47f37",
+            "output_sha256": "0d5baf24a6ca432069d5616325f67b7c3aba277ebdfa8c0455bac1cadcac8f3a"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "84ee3e5b748a7102c3c5631e86c510e0a888749d0c18d5db2e1bc34a18d65260",
+            "output_sha256": "aa7335f612914eee62a660fd745ef3f3e24f38e57034d78faad0ea3566d352ab"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "16ba0d51da9e612c826383ea89f60f510152f0f21e30945e502e7836e845429a",
+            "output_sha256": "54a60b0050ef5fae4a391ae43e920b588ed25bc151bcb330f761346691cc3e4f"
+          }
+        ],
+        "kind": "thermal",
+        "n_RK": 2,
+        "observed_orders": [
+          1.011870165959912,
+          1.0059032497130092,
+          1.0029444101019316,
+          1.001470471448661
+        ],
+        "profile": "strict"
+      },
+      {
+        "errors": [
+          0.00028529639354246683,
+          0.00006954821014915069,
+          0.00001717232908049482,
+          0.000004266686062237568,
+          0.0000010633989973030111
+        ],
+        "expected_order": 2,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ee1b9811400e61fd41c52dee1b81f2e4f2838b10e8e0ec7debd636c9192a8d",
+            "output_sha256": "d50a0eb4a5e9b913d46cf0e48a3266ea19c040d84795cd588e9b6fc2e8e26a58"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "29f1d93e74db378886f8d2a0e534c241b018d04088396031d9640fca030af55d",
+            "output_sha256": "fd0655c73747f26f909b85aa8c7bf6ecaee34a365e713e453556e9d0a86082ba"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bc8ace1607ab301bbfc9a80c056965140a8a4cfa5db1d2806ffda6a682d47f37",
+            "output_sha256": "149b99e6d7d43b7a54cc44aa28774b0d9f7f4f9fea12523c220ff36894bb820d"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "84ee3e5b748a7102c3c5631e86c510e0a888749d0c18d5db2e1bc34a18d65260",
+            "output_sha256": "2ca41871117ffcb2b86e63edc8b9fff6e8e0ea29ac3e7f239e5e5253a9ecfc1a"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "16ba0d51da9e612c826383ea89f60f510152f0f21e30945e502e7836e845429a",
+            "output_sha256": "c48605ad6578b587f9c4501eee68c35b3948650a72728d1e190367932aec1a9e"
+          }
+        ],
+        "kind": "thermal",
+        "n_RK": 3,
+        "observed_orders": [
+          2.036376217769084,
+          2.0179276617853223,
+          2.008897857383657,
+          2.004432951440613
+        ],
+        "profile": "strict"
+      },
+      {
+        "errors": [
+          0.000586077071204727,
+          0.00014088602546280526,
+          0.00003456009210367483,
+          0.000008559808804875502,
+          0.0000021300731418705254
+        ],
+        "expected_order": 2,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ee1b9811400e61fd41c52dee1b81f2e4f2838b10e8e0ec7debd636c9192a8d",
+            "output_sha256": "87405a9f59909efd76a95130f767c7063867f8ac6512945e9216fa52d4157747"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "29f1d93e74db378886f8d2a0e534c241b018d04088396031d9640fca030af55d",
+            "output_sha256": "29eb48ec4937fec8a64dc5c1c827a607056d63e538ff9755b37681b1eb693f06"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bc8ace1607ab301bbfc9a80c056965140a8a4cfa5db1d2806ffda6a682d47f37",
+            "output_sha256": "919f6fa184039137813824bd5bb7107839ac338cee4ecb738136f8f83cb55015"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "84ee3e5b748a7102c3c5631e86c510e0a888749d0c18d5db2e1bc34a18d65260",
+            "output_sha256": "af4c0a99e8e00fea4e29bdd1149dd974b32ac239dbef19563d1bc4a844e01ce6"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "16ba0d51da9e612c826383ea89f60f510152f0f21e30945e502e7836e845429a",
+            "output_sha256": "2982fbfe24b5e75599a42d9d6d57eee9806a43ed4e01a0d516a8e7a23154c691"
+          }
+        ],
+        "kind": "thermal",
+        "n_RK": 4,
+        "observed_orders": [
+          2.056561879328829,
+          2.027349549842863,
+          2.0134565848144903,
+          2.006675602234183
+        ],
+        "profile": "strict"
+      },
+      {
+        "errors": [
+          0.004907216489982829,
+          0.0025433033993726897,
+          0.0012732394404098386,
+          0.0006369946659320931,
+          0.0003185882902951107
+        ],
+        "expected_order": 1,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "e50285c769a57683fbdd100cf1d3d152f16a93c2ad539a51c2682c6af205be72",
+            "output_sha256": "f20a7938e59ede44ffccc6efca93b8b24dee520949343fa04f195234a6384007"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bcdd99da68836d8c91df08a19f8be0f6207dd641cd415683bbab284de4b4e5e9",
+            "output_sha256": "8930608787bde9d19ac41f896740f5faf20a7a478b8967bb8b5b6ddfb0289f6e"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ffb92f4a5ea05448a3f978fb48c9eddb0ea32351ab93a4b51c6b826c21e70f",
+            "output_sha256": "429e43e2ae1eed52ee49efa44f363ec201cad3316a8ccca3d3b262d36d8d0494"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "d772e919ab99f4d7cf35f8d4ff37d5b688344f56593d25f6c7621c4d31826784",
+            "output_sha256": "f34a2319a0827330a97ceca274ccd4f77f42a77b8c57efbcbbb3cc3169862d08"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "9c4c4e7815028edd0835314055135938d0e7ea3d922f11abcf414eefae679db8",
+            "output_sha256": "6cf2effe6ec40525ea9dfd80fe21a03b09f1b36f2f62fb3d39ecae905487873b"
+          }
+        ],
+        "kind": "drag",
+        "n_RK": 2,
+        "observed_orders": [
+          0.9482013433646849,
+          0.9981998240088817,
+          0.9991505555170995,
+          0.9995880500715326
+        ],
+        "profile": "strict"
+      },
+      {
+        "errors": [
+          0.000023298748559000158,
+          0.000005798014045467425,
+          0.000001446176846002345,
+          3.6112877057803417e-7,
+          9.02302833765134e-8
+        ],
+        "expected_order": 2,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "e50285c769a57683fbdd100cf1d3d152f16a93c2ad539a51c2682c6af205be72",
+            "output_sha256": "0944da0135a16d83b6d71078791e46510c0b11b7fbe13d2047555ee991e9f986"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bcdd99da68836d8c91df08a19f8be0f6207dd641cd415683bbab284de4b4e5e9",
+            "output_sha256": "9fe41c45e49ff6b6110090266a74dba3cb78d8e4a222671ef54ed68ae2fb009f"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ffb92f4a5ea05448a3f978fb48c9eddb0ea32351ab93a4b51c6b826c21e70f",
+            "output_sha256": "7ccf4c1417d45cebd3ff35b86660ff744cabfa26c96a2d9f9be5eca27c0f45d6"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "d772e919ab99f4d7cf35f8d4ff37d5b688344f56593d25f6c7621c4d31826784",
+            "output_sha256": "ab48c31c0711e1e456f2dac7b80409374aec28966c1babb665336e7778633bce"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "9c4c4e7815028edd0835314055135938d0e7ea3d922f11abcf414eefae679db8",
+            "output_sha256": "796b0374abb70491a4e1764f1da2fbc770d5e993160d34ca720b994a8c5e7a1e"
+          }
+        ],
+        "kind": "drag",
+        "n_RK": 3,
+        "observed_orders": [
+          2.0066217323819933,
+          2.003314844971275,
+          2.001658716015777,
+          2.0008297403839097
+        ],
+        "profile": "strict"
+      },
+      {
+        "errors": [
+          0.000012117810131826445,
+          0.0000030219990849218447,
+          7.545671618345295e-7,
+          1.8852513323963648e-7,
+          4.7116699079197135e-8
+        ],
+        "expected_order": 2,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "e50285c769a57683fbdd100cf1d3d152f16a93c2ad539a51c2682c6af205be72",
+            "output_sha256": "5c6a08626ffada6fc530ba3a9a42a2cdad1eec26fe56ba590b68eb846331d224"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bcdd99da68836d8c91df08a19f8be0f6207dd641cd415683bbab284de4b4e5e9",
+            "output_sha256": "c95e5d1700136f005c1189f68fc0673234079ee8c2d2e57e7185450fc4583da0"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ffb92f4a5ea05448a3f978fb48c9eddb0ea32351ab93a4b51c6b826c21e70f",
+            "output_sha256": "1a61d33c2d63793f4c07e538605eab2a4b81f93548fc056b9f9fb8cf1b5c1468"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "d772e919ab99f4d7cf35f8d4ff37d5b688344f56593d25f6c7621c4d31826784",
+            "output_sha256": "79b6113f3240b816e36c26c58fe9ad73a765ac24572f7e9ea7ca746c5af283ca"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "9c4c4e7815028edd0835314055135938d0e7ea3d922f11abcf414eefae679db8",
+            "output_sha256": "4fe3c17a22553a38a5a30edd93abbcc3226db1f88ddd0c8dc7d9130d7be10d9e"
+          }
+        ],
+        "kind": "drag",
+        "n_RK": 4,
+        "observed_orders": [
+          2.003553877196374,
+          2.001782001965874,
+          2.000892447275312,
+          2.0004464943855123
+        ],
+        "profile": "strict"
+      },
+      {
+        "errors": [
+          0.05588457517842471,
+          0.02781283772480947,
+          0.013856038578637708,
+          0.006915398794376415,
+          0.0034553144864162277
+        ],
+        "expected_order": 1,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ee1b9811400e61fd41c52dee1b81f2e4f2838b10e8e0ec7debd636c9192a8d",
+            "output_sha256": "3746007649ace6ec698b8793d084d4b9c7b3dd81ec54606c0d8402fac5fb448b"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "29f1d93e74db378886f8d2a0e534c241b018d04088396031d9640fca030af55d",
+            "output_sha256": "f39d5668f556e3907ffa4e518915b4d442f7c8c4e3df67bdacbb8494ef81f9de"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bc8ace1607ab301bbfc9a80c056965140a8a4cfa5db1d2806ffda6a682d47f37",
+            "output_sha256": "e14de55f82a848a4b7999511db1a4e5c1c9c4492b09dde157945a9bff20e6368"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "84ee3e5b748a7102c3c5631e86c510e0a888749d0c18d5db2e1bc34a18d65260",
+            "output_sha256": "b372a9ae84df1d83a390c695de127aac317370eafad6784d604751f1cdf2b852"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "16ba0d51da9e612c826383ea89f60f510152f0f21e30945e502e7836e845429a",
+            "output_sha256": "78186a405ad8f257a89ddacf69103af791aa78a1364b1f3748ca61b47a6dfed0"
+          }
+        ],
+        "kind": "mixed",
+        "n_RK": 2,
+        "observed_orders": [
+          1.006699187274396,
+          1.0052360973799543,
+          1.0026304963703596,
+          1.0009954266368128
+        ],
+        "profile": "strict"
+      },
+      {
+        "errors": [
+          0.00037200767906142573,
+          0.00009096359093518913,
+          0.000022495610778605624,
+          0.000005593815444626671,
+          0.0000013947256434221345
+        ],
+        "expected_order": 2,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ee1b9811400e61fd41c52dee1b81f2e4f2838b10e8e0ec7debd636c9192a8d",
+            "output_sha256": "df8198a9a231ea18612f59c2ee644585da5223704a2e204d78b8ed19dbe6231d"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "29f1d93e74db378886f8d2a0e534c241b018d04088396031d9640fca030af55d",
+            "output_sha256": "555725553bd2f19f3a1f535f9553483d3b36716c5ddbdf78241c5ce145b3e74d"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bc8ace1607ab301bbfc9a80c056965140a8a4cfa5db1d2806ffda6a682d47f37",
+            "output_sha256": "bac245c8a21f38cb11f6ef730a46c0832673a3ac147a856008ddfd2f683c5abe"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "84ee3e5b748a7102c3c5631e86c510e0a888749d0c18d5db2e1bc34a18d65260",
+            "output_sha256": "2f02caea1b66aacc7fd341f304b4814f617acdb0790bad3f83461e5cdbd5f2c2"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "16ba0d51da9e612c826383ea89f60f510152f0f21e30945e502e7836e845429a",
+            "output_sha256": "b65312758e7386cce43751ec092776ad68b4666f4a614c437d5946adf7acc1c3"
+          }
+        ],
+        "kind": "mixed",
+        "n_RK": 3,
+        "observed_orders": [
+          2.0319712888656647,
+          2.015645669999877,
+          2.0077389768493097,
+          2.00385129879575
+        ],
+        "profile": "strict"
+      },
+      {
+        "errors": [
+          0.0007784883276826804,
+          0.00018532316511254976,
+          0.00004522286087649263,
+          0.000011170404093263642,
+          0.0000027758824785450997
+        ],
+        "expected_order": 2,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ee1b9811400e61fd41c52dee1b81f2e4f2838b10e8e0ec7debd636c9192a8d",
+            "output_sha256": "bf405423a31dfe49d092e5cebd1d68dd17a57c63e402aec86d2fb4ae148b9155"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "29f1d93e74db378886f8d2a0e534c241b018d04088396031d9640fca030af55d",
+            "output_sha256": "a31fa0651a8be1b70b24658a035135ad7e26295812ba61ba0188b0369a8871db"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bc8ace1607ab301bbfc9a80c056965140a8a4cfa5db1d2806ffda6a682d47f37",
+            "output_sha256": "1317cd0c8f675c14c8a1281d2d5543c9d57124106ff69140c1030e6999f1bd96"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "84ee3e5b748a7102c3c5631e86c510e0a888749d0c18d5db2e1bc34a18d65260",
+            "output_sha256": "2441c0cbb88d952a1712f299f36d7e91db1921b886413f6c77f6c29fcdd7eb91"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "16ba0d51da9e612c826383ea89f60f510152f0f21e30945e502e7836e845429a",
+            "output_sha256": "44533c95516cd2efc84c44fa25bda341d6a21303eaffa3b8b4c328382efcc89a"
+          }
+        ],
+        "kind": "mixed",
+        "n_RK": 4,
+        "observed_orders": [
+          2.070632181007712,
+          2.034919059837522,
+          2.017370885601593,
+          2.008662981257581
+        ],
+        "profile": "strict"
+      },
+      {
+        "errors": [
+          0.03789570084177285,
+          0.01879259142015144,
+          0.009357926304915054,
+          0.004669423549842122,
+          0.0023323333249436473
+        ],
+        "expected_order": 1,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ee1b9811400e61fd41c52dee1b81f2e4f2838b10e8e0ec7debd636c9192a8d",
+            "output_sha256": "5b000b80829fa349ed1c6b377367605a1347fce4117745dd982847e9cba68f44"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "29f1d93e74db378886f8d2a0e534c241b018d04088396031d9640fca030af55d",
+            "output_sha256": "42a3b043a2a3306bc17f4c7cc3404781df5e5e472a8b1c032894b87bccfde20b"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bc8ace1607ab301bbfc9a80c056965140a8a4cfa5db1d2806ffda6a682d47f37",
+            "output_sha256": "cda202b6bbfd8f746b873f4f84486e10a0c4925c8264299edfce037b82de8b2b"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "84ee3e5b748a7102c3c5631e86c510e0a888749d0c18d5db2e1bc34a18d65260",
+            "output_sha256": "50269274b111fa127a3fc6bfb0148486183705223ba4134c09b7ff7868813bef"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "16ba0d51da9e612c826383ea89f60f510152f0f21e30945e502e7836e845429a",
+            "output_sha256": "4d51020c27cae7371bec89e1e1a93c67e29f7e162fe68209deb3034a315fc518"
+          }
+        ],
+        "kind": "thermal",
+        "n_RK": 2,
+        "observed_orders": [
+          1.011870165959912,
+          1.0059032497042455,
+          1.0029444101106952,
+          1.001470471448661
+        ],
+        "profile": "optimized"
+      },
+      {
+        "errors": [
+          0.00028529639354246683,
+          0.00006954821014915069,
+          0.00001717232908049482,
+          0.000004266686005394149,
+          0.0000010633989973030111
+        ],
+        "expected_order": 2,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ee1b9811400e61fd41c52dee1b81f2e4f2838b10e8e0ec7debd636c9192a8d",
+            "output_sha256": "b3d6ad0e7d8e11079fc15585055fa39b7c1884864bac7f0ac4b47ae613683471"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "29f1d93e74db378886f8d2a0e534c241b018d04088396031d9640fca030af55d",
+            "output_sha256": "9c85bc1789a359d3173674d1da7b3e9846324db9b43c680ef85a5439e477ef2e"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bc8ace1607ab301bbfc9a80c056965140a8a4cfa5db1d2806ffda6a682d47f37",
+            "output_sha256": "e2a58d3e3827feb75830a6397e3318e303441be73d8cebf13eb660fa3473b675"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "84ee3e5b748a7102c3c5631e86c510e0a888749d0c18d5db2e1bc34a18d65260",
+            "output_sha256": "d9769e426b545b95f86c8e9ae4839ed0f6588111250fcfd229916c063213aea1"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "16ba0d51da9e612c826383ea89f60f510152f0f21e30945e502e7836e845429a",
+            "output_sha256": "d14304cceb316bded5a1d2bfc8677bc7cef099baffc292c866881185f766bb1e"
+          }
+        ],
+        "kind": "thermal",
+        "n_RK": 3,
+        "observed_orders": [
+          2.036376217769084,
+          2.0179276617853223,
+          2.008897876604129,
+          2.004432932220141
+        ],
+        "profile": "optimized"
+      },
+      {
+        "errors": [
+          0.000586077071204727,
+          0.00014088602546280526,
+          0.00003456009210367483,
+          0.000008559808804875502,
+          0.0000021300731987139443
+        ],
+        "expected_order": 2,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ee1b9811400e61fd41c52dee1b81f2e4f2838b10e8e0ec7debd636c9192a8d",
+            "output_sha256": "e28b344db46a0f3fce6ef9677f9f35a71c4b1734700170f86deec5a2da03618e"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "29f1d93e74db378886f8d2a0e534c241b018d04088396031d9640fca030af55d",
+            "output_sha256": "6eb98e2435ed696a833a22e035305fdf6014ff53b6cdc107a41cb903b7b312c3"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bc8ace1607ab301bbfc9a80c056965140a8a4cfa5db1d2806ffda6a682d47f37",
+            "output_sha256": "dd1a833e132c29308a771a93978616c6041296c3ff2bf39c9b88bd6ab18e207d"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "84ee3e5b748a7102c3c5631e86c510e0a888749d0c18d5db2e1bc34a18d65260",
+            "output_sha256": "c5f56327e1ab8b4eb18191459ae86b73477fac541d8990c77598bb929981326e"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "16ba0d51da9e612c826383ea89f60f510152f0f21e30945e502e7836e845429a",
+            "output_sha256": "cb2fe5a6b66d905aecbf78a9b1035a59c6ac5f728c54c57f0c7b5e2aabf72c2c"
+          }
+        ],
+        "kind": "thermal",
+        "n_RK": 4,
+        "observed_orders": [
+          2.056561879328829,
+          2.027349549842863,
+          2.0134565848144903,
+          2.006675563734229
+        ],
+        "profile": "optimized"
+      },
+      {
+        "errors": [
+          0.0049072164899824884,
+          0.002543303399372462,
+          0.0012732394404093839,
+          0.0006369946659305015,
+          0.0003185882902948833
+        ],
+        "expected_order": 1,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "e50285c769a57683fbdd100cf1d3d152f16a93c2ad539a51c2682c6af205be72",
+            "output_sha256": "b6489170b58b1bfc91dca7243242d82acb95b14fec09c7262a526ddda9b6fc94"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bcdd99da68836d8c91df08a19f8be0f6207dd641cd415683bbab284de4b4e5e9",
+            "output_sha256": "a94cd534b4a12502bc217ed5737439e6994f820c1fad687c7f87a7de36a7ca02"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ffb92f4a5ea05448a3f978fb48c9eddb0ea32351ab93a4b51c6b826c21e70f",
+            "output_sha256": "962eb3c3be2017a583110f0cbaa3dac0401ef08251ccfe3c822293a19b2a0bfc"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "d772e919ab99f4d7cf35f8d4ff37d5b688344f56593d25f6c7621c4d31826784",
+            "output_sha256": "3525418ac5b7402afbac3836a9d4d1a3279d3939d7fb023b7e96100e0e5a9ae0"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "9c4c4e7815028edd0835314055135938d0e7ea3d922f11abcf414eefae679db8",
+            "output_sha256": "9169b8059a2c1e2489835d8a86f4a168e8b949b00928160eea895bbb40fb4756"
+          }
+        ],
+        "kind": "drag",
+        "n_RK": 2,
+        "observed_orders": [
+          0.948201343364714,
+          0.9981998240092679,
+          0.9991505555201889,
+          0.9995880500689578
+        ],
+        "profile": "optimized"
+      },
+      {
+        "errors": [
+          0.000023298748559795966,
+          0.000005798014045467425,
+          0.000001446176848730829,
+          3.6112876875904474e-7,
+          9.023028405863442e-8
+        ],
+        "expected_order": 2,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "e50285c769a57683fbdd100cf1d3d152f16a93c2ad539a51c2682c6af205be72",
+            "output_sha256": "88c743400af1f8b5b52727662aeb26580cbf0454fbd73196515ead27764ddd89"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bcdd99da68836d8c91df08a19f8be0f6207dd641cd415683bbab284de4b4e5e9",
+            "output_sha256": "b1f0ede455a2571005fb93d4e73aa38da1ad4f3e1ef35f99f512ef2caa56cd53"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ffb92f4a5ea05448a3f978fb48c9eddb0ea32351ab93a4b51c6b826c21e70f",
+            "output_sha256": "3afed6d83aa9ead8f41a4e39113c91ea7b637ddb06039b5fc03798abc3ffab6e"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "d772e919ab99f4d7cf35f8d4ff37d5b688344f56593d25f6c7621c4d31826784",
+            "output_sha256": "5a28602e4f0f0b1f3de5ba50c095b40ed52fcd9dd08f51c7960a743b43c768e3"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "9c4c4e7815028edd0835314055135938d0e7ea3d922f11abcf414eefae679db8",
+            "output_sha256": "53c43a3a658555f863a220e4bb7f44f71c866b17d9d1eb6a4d0625a3fae47883"
+          }
+        ],
+        "kind": "drag",
+        "n_RK": 3,
+        "observed_orders": [
+          2.0066217324312703,
+          2.00331484224936,
+          2.0016587260044822,
+          2.0008297222106632
+        ],
+        "profile": "optimized"
+      },
+      {
+        "errors": [
+          0.000012117810132053819,
+          0.0000030219990845807843,
+          7.545671612660953e-7,
+          1.885251350586259e-7,
+          4.7116697146520894e-8
+        ],
+        "expected_order": 2,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "e50285c769a57683fbdd100cf1d3d152f16a93c2ad539a51c2682c6af205be72",
+            "output_sha256": "15d11e73720f24a910954ba125bdc60c0792f7aea342b78028cf0badbda3060c"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bcdd99da68836d8c91df08a19f8be0f6207dd641cd415683bbab284de4b4e5e9",
+            "output_sha256": "0e2f59d22d24cff3f5e7e12fb720cfd669d82ee3be967275b7f02e818e9913a9"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ffb92f4a5ea05448a3f978fb48c9eddb0ea32351ab93a4b51c6b826c21e70f",
+            "output_sha256": "a744ac09a611ff4e338fccac4e82d65dda458c55ce67fa59cb0a34c9cbcf737c"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "d772e919ab99f4d7cf35f8d4ff37d5b688344f56593d25f6c7621c4d31826784",
+            "output_sha256": "38da552153dcc6ceedb4c56ca458b70b54c540d31e94aad024815ad52893f0ac"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "9c4c4e7815028edd0835314055135938d0e7ea3d922f11abcf414eefae679db8",
+            "output_sha256": "9449843d6f1754354188beeab5e4f9516ff9cbe2ee2000d7069e27b1f644afc3"
+          }
+        ],
+        "kind": "drag",
+        "n_RK": 4,
+        "observed_orders": [
+          2.003553877386265,
+          2.001782002889871,
+          2.0008924322686155,
+          2.0004465674831886
+        ],
+        "profile": "optimized"
+      },
+      {
+        "errors": [
+          0.05588457517836787,
+          0.027812837724752626,
+          0.013856038578239804,
+          0.006915398793637451,
+          0.003455314484938299
+        ],
+        "expected_order": 1,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ee1b9811400e61fd41c52dee1b81f2e4f2838b10e8e0ec7debd636c9192a8d",
+            "output_sha256": "ddf6f04c480a869cc4798004acee2df38db6987257d8d7d52b2956b3a040a6e0"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "29f1d93e74db378886f8d2a0e534c241b018d04088396031d9640fca030af55d",
+            "output_sha256": "03418a5f4f5621e582172f94f970f7753c4245fcd72dca868791351e8d5e1c2b"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bc8ace1607ab301bbfc9a80c056965140a8a4cfa5db1d2806ffda6a682d47f37",
+            "output_sha256": "202024907052f58da5d0951f431ffce192fb47abedb8fd6ab8ec5e55d2ff2ff0"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "84ee3e5b748a7102c3c5631e86c510e0a888749d0c18d5db2e1bc34a18d65260",
+            "output_sha256": "9fbd4ad92fee4d019656ea48e88c7997133fbc35cfd590bad3e9e86659e3e737"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "16ba0d51da9e612c826383ea89f60f510152f0f21e30945e502e7836e845429a",
+            "output_sha256": "78662fe9706fe9bf2256f6bc9d7363ab44a2d5ba6cdfe4b3d9fbaf0f5fe8664f"
+          }
+        ],
+        "kind": "mixed",
+        "n_RK": 2,
+        "observed_orders": [
+          1.006699187275877,
+          1.0052360974184356,
+          1.0026304964830928,
+          1.0009954270997283
+        ],
+        "profile": "optimized"
+      },
+      {
+        "errors": [
+          0.00037200767917511257,
+          0.00009096359138993648,
+          0.000022495611233352975,
+          0.000005593817434146331,
+          0.000001394729054027266
+        ],
+        "expected_order": 2,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ee1b9811400e61fd41c52dee1b81f2e4f2838b10e8e0ec7debd636c9192a8d",
+            "output_sha256": "d67788e2db169fb775d92c808cd2401ec1520a71d3e9d9d4dc71d9f800550982"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "29f1d93e74db378886f8d2a0e534c241b018d04088396031d9640fca030af55d",
+            "output_sha256": "8429b7359fd886c56d1870f8e1cdd5e48cf70ca1c27b20c056955529e0062e86"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bc8ace1607ab301bbfc9a80c056965140a8a4cfa5db1d2806ffda6a682d47f37",
+            "output_sha256": "bfe44a9f33ed2350c67fe9dc767b24cbd4fadcb987a59b23b4288624efc615ef"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "84ee3e5b748a7102c3c5631e86c510e0a888749d0c18d5db2e1bc34a18d65260",
+            "output_sha256": "7efb4ad5f2e708ce54abe2c281c6a789894c5ac15d85353b7dd445dc85a08ca7"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "16ba0d51da9e612c826383ea89f60f510152f0f21e30945e502e7836e845429a",
+            "output_sha256": "a4497425ccc6831b584aa79d16ebb1653485284d4c0ab795742747c934ec0c68"
+          }
+        ],
+        "kind": "mixed",
+        "n_RK": 3,
+        "observed_orders": [
+          2.0319712820942017,
+          2.0156456480482436,
+          2.007738492898473,
+          2.003848284007352
+        ],
+        "profile": "optimized"
+      },
+      {
+        "errors": [
+          0.0007784883275121501,
+          0.00018532316448727215,
+          0.000045222859682780836,
+          0.000011170401421622955,
+          0.0000027758773626374023
+        ],
+        "expected_order": 2,
+        "fingerprints": [
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "03ee1b9811400e61fd41c52dee1b81f2e4f2838b10e8e0ec7debd636c9192a8d",
+            "output_sha256": "01663eb8a58da71e5df7cba5d8d06114984d307287c09b31f8e03101456e3523"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "29f1d93e74db378886f8d2a0e534c241b018d04088396031d9640fca030af55d",
+            "output_sha256": "4964321696f2d46f72f95cfd44647434e33e6efa85679f96a2d8a409cd96e967"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "bc8ace1607ab301bbfc9a80c056965140a8a4cfa5db1d2806ffda6a682d47f37",
+            "output_sha256": "514e2b22fd974da04f2b7f8644874d0f19b939d6bbc4f5b2e695a5856ae3a60f"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "84ee3e5b748a7102c3c5631e86c510e0a888749d0c18d5db2e1bc34a18d65260",
+            "output_sha256": "d76a6d56a6503d0aeab6033016c9df0b9feef48f7945138c6e58af39737e09c4"
+          },
+          {
+            "actual_threads": [
+              1,
+              4
+            ],
+            "input_sha256": "16ba0d51da9e612c826383ea89f60f510152f0f21e30945e502e7836e845429a",
+            "output_sha256": "c2b24496ab1624b66e055cd0e6b8a34d50251bd1cad3dfcb00f49ef67211b9d5"
+          }
+        ],
+        "kind": "mixed",
+        "n_RK": 4,
+        "observed_orders": [
+          2.070632185559317,
+          2.034919093051561,
+          2.017371192571291,
+          2.0086652950729045
+        ],
+        "profile": "optimized"
+      }
+    ]
+  },
+  "external_reference": {
+    "expected_from_gate_h_readme": {
+      "hp_pccu_1d_core.py": "ffcb695ff8d8d2bd06e433d70b2a519c0b0012d959eb664b617deea83e8f64e2",
+      "hp_pccu_2d_core.py": "c63331366cadf9f04d802a3f058088b9c175399b2d6dc7015068a0ad110f1577"
+    },
+    "filename": "HP_PCCU_clean_reference_cores_2026-09-26_drySafe_rebase.zip",
+    "full_reference_suite_executed": false,
+    "matches_gate_h_readme": true,
+    "members": {
+      "hp_pccu_1d_core.py": "ffcb695ff8d8d2bd06e433d70b2a519c0b0012d959eb664b617deea83e8f64e2",
+      "hp_pccu_2d_core.py": "c63331366cadf9f04d802a3f058088b9c175399b2d6dc7015068a0ad110f1577"
+    },
+    "sha256": "5e6ede02d39a5b40055af174f6799cb4e4788d01923c010aada911aa4229782a"
+  },
+  "finished_utc": "2026-10-10T06:24:45.545819+00:00",
+  "focused_test_summary": {
+    "actual_thread_teams": [
+      1,
+      4
+    ],
+    "failed_local_solves": 0,
+    "maximum_final_repair": 0,
+    "maximum_scaled_stage_error": 9.355390132379785e-13,
+    "negative_controls_per_profile": 7,
+    "numerical_driver_invocations": 396,
+    "observer_off_pairs": 12,
+    "order_series_count": 18,
+    "record_log": "/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_IMEX_STAGES-embedded/test.log",
+    "record_log_sha256": "19687b52e0ea5eb7b5882ebe5bdcccd7a515723b7725ce758e5ad9ae0f2b7848",
+    "stage_count_driver_invocations": 68,
+    "stage_pair_count": 96
+  },
+  "profiles": {
+    "historical_optimized": {
+      "configure": {
+        "command": [
+          "/private/tmp/imex-stage-count-acceptance-20261010-final/source/configure",
+          "--with-netcdf=/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1"
+        ],
+        "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/historical_optimized/configure.log",
+        "log_sha256": "28a0d606cd2ec303872c155f437aed458943b51102ae599bd93eaddfac6903c5",
+        "returncode": 0,
+        "seconds": 2.129
+      },
+      "executable_bytes": 1035056,
+      "executable_sha256": "89de0f012ef1ab6da125ce805e9f2572359003ed71454e28fafd71a4f42f6ece",
+      "flags": "-Ofast -funroll-all-loops",
+      "linked_libraries": {
+        "command": [
+          "otool",
+          "-L",
+          "/private/tmp/imex-stage-count-acceptance-20261010-final/historical_optimized/src/IMEX_SfloW2D"
+        ],
+        "output": "/private/tmp/imex-stage-count-acceptance-20261010-final/historical_optimized/src/IMEX_SfloW2D:\n\t/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libLAPACK.dylib (compatibility version 1.0.0, current version 1.0.0)\n\t/opt/homebrew/opt/netcdf-fortran/lib/libnetcdff.7.dylib (compatibility version 7.0.0, current version 7.1.0)\n\t/opt/homebrew/opt/gcc/lib/gcc/current/libgfortran.5.dylib (compatibility version 6.0.0, current version 6.0.0)\n\t/opt/homebrew/opt/gcc/lib/gcc/current/libgomp.1.dylib (compatibility version 2.0.0, current version 2.0.0)\n\t/opt/homebrew/opt/gcc/lib/gcc/current/libquadmath.0.dylib (compatibility version 1.0.0, current version 1.0.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1351.0.0)",
+        "returncode": 0
+      },
+      "make": {
+        "command": [
+          "make",
+          "-j3",
+          "FCFLAGS=-Ofast -funroll-all-loops"
+        ],
+        "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/historical_optimized/make.log",
+        "log_sha256": "73f32f1ab45b4be279ae9ab2d9616137c6ea8bc5260b4c8340edd9acdfb534f6",
+        "returncode": 0,
+        "seconds": 28.465
+      },
+      "status": "pass"
+    },
+    "strict_debug": {
+      "configure": {
+        "command": [
+          "/private/tmp/imex-stage-count-acceptance-20261010-final/source/configure",
+          "--with-netcdf=/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1"
+        ],
+        "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/strict_debug/configure.log",
+        "log_sha256": "28a0d606cd2ec303872c155f437aed458943b51102ae599bd93eaddfac6903c5",
+        "returncode": 0,
+        "seconds": 2.526
+      },
+      "executable_bytes": 2753648,
+      "executable_sha256": "1a4ac9d7e3583f4a8c43a1ab2bf61623e77389ec069b3521bf91daf7de8c4ac4",
+      "flags": "-O0 -g -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow",
+      "linked_libraries": {
+        "command": [
+          "otool",
+          "-L",
+          "/private/tmp/imex-stage-count-acceptance-20261010-final/strict_debug/src/IMEX_SfloW2D"
+        ],
+        "output": "/private/tmp/imex-stage-count-acceptance-20261010-final/strict_debug/src/IMEX_SfloW2D:\n\t/System/Library/Frameworks/Accelerate.framework/Versions/A/Frameworks/vecLib.framework/Versions/A/libLAPACK.dylib (compatibility version 1.0.0, current version 1.0.0)\n\t/opt/homebrew/opt/netcdf-fortran/lib/libnetcdff.7.dylib (compatibility version 7.0.0, current version 7.1.0)\n\t/opt/homebrew/opt/gcc/lib/gcc/current/libgfortran.5.dylib (compatibility version 6.0.0, current version 6.0.0)\n\t/opt/homebrew/opt/gcc/lib/gcc/current/libgomp.1.dylib (compatibility version 2.0.0, current version 2.0.0)\n\t/opt/homebrew/opt/gcc/lib/gcc/current/libquadmath.0.dylib (compatibility version 1.0.0, current version 1.0.0)\n\t/usr/lib/libSystem.B.dylib (compatibility version 1.0.0, current version 1351.0.0)",
+        "returncode": 0
+      },
+      "make": {
+        "command": [
+          "make",
+          "-j3",
+          "FCFLAGS=-O0 -g -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow"
+        ],
+        "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/strict_debug/make.log",
+        "log_sha256": "0a5075ab6f5c9988087314f8b7290b9e81876114f82b016e379cbc385182cef6",
+        "returncode": 0,
+        "seconds": 7.12
+      },
+      "status": "pass"
+    }
+  },
+  "raw_manifest": {
+    "path": "/tmp/imex-stage-count-acceptance-20261010-final/manifest.json",
+    "sha256": "8214d74cd526423c85c2a119a7b16478a6e3a8ee2ad3e3e54a321a260570d539"
+  },
+  "remaining_gaps": "CFL policy and tightening stage bounds, general admissibility/retry, nonautonomous sources and mixed-composition transport remain open. Retained tableaux, nonlinear tolerances and timestep selection unchanged; N9 not accepted.",
+  "roadmap": {
+    "filename": "IMEX_SfloW2D_Development_Roadmap_2026-10-09_Updated.docx",
+    "sha256": "31d98d84a60b1c3c465da1acf10cf0fd13c59b0acacfdb295526fc6f89980d3e"
+  },
+  "schema_version": 1,
+  "scope": "Restrict N_RK to 2,3,4; rejection contract and unchanged supported numerical behavior, not N9 approval",
+  "solver_base_revision": "51d5d13b5b28e6efa5f6a0aab150785a1d118f2e",
+  "source_and_fixture_sha256": {
+    "TESTS/ACCEPTANCE/README.md": "e7e208414452b850644294426a785787263303640c7ee4cb1a032f2094b70564",
+    "TESTS/ACCEPTANCE/acceptance_plan.json": "304adc43cae574148883ffd09e3c70da46e32248c26c96631dd42cc4ad3f70fa",
+    "TESTS/ACCEPTANCE/capture_solver.py": "c511b18873fdf0dd530ea020e5946ae672cf646ca81222b011efbb977f690780",
+    "TESTS/ACCEPTANCE/capture_solver.sh": "82456fa601cbd3bb805451250c2cd50e037c93ce0675c2ab07b225c35ca15f1e",
+    "TESTS/ACCEPTANCE/run_acceptance.py": "00c9ac59da6c97d53f1e5ebeacbfca6d985ac57cd666ce3ff4792abdd2022ba4",
+    "TESTS/ACCEPTANCE/test_acceptance_tools.py": "f8dac39d1b55d2bb8475359dfffa56b9f58cacd4f10fd662ba6c4f6001cb9cd0",
+    "TESTS/TEST_2D/IMEX_sfloW2D.inp": "fa671515b9e481fb930dabaf9b078ca576b2a4517a02cef7aeb77ed04712ab55",
+    "TESTS/TEST_2D/INIT_2D_0000.q_2d": "10f2e12a1a48fcebbf262f2b041343498ffc357bcffab965f57395b79a758063",
+    "TESTS/TEST_2D/cleanFolder.sh": "34fd8fd5f326bd5ea481537251be389e989497893d1621b9e7b8e55788c06232",
+    "TESTS/TEST_2D/topography_dem.asc": "c1c737239ff1422dc8c9d96df92a56e3d92d33b8732ea4f4ffc0a4e5406eac12",
+    "TESTS/TEST_BINARY_RESTART/run_test.sh": "9b1608537a348f73a166a83b548a75dec30ba6acd803a7efb13fc2f7e26e83a6",
+    "TESTS/TEST_BOX/IMEX_sfloW2D.inp": "f9cc97ba231516df865beb2df2e8114e9f064742e84b4d44fc042d1bd7b3db67",
+    "TESTS/TEST_BOX/INIT_BOX_0000.q_2d": "47537e74328a3583709d36f72c442204f6fa42793a4a882b85ace006d290e46a",
+    "TESTS/TEST_BOX/cleanFolder.sh": "5c30e29da721937734a896ed1881de298422133b7948abad1704912d5f34cc83",
+    "TESTS/TEST_BOX/topography_dem.asc": "fa40ebcb26fb7791e92cc17a1030b88f2ff54fc7dd589c66f1492a6acbf0023d",
+    "TESTS/TEST_BW/IMEX_sfloW2D.inp": "3aef5688051f7bbf780a2e3dab19bca3562d8f4a168f2b15c19c53405ad8480e",
+    "TESTS/TEST_BW/INIT_BW_0000.q_2d": "5824e024ff2e6448d1ffc5cd911d8396394941e5e06c50a4524237c0e0e74fba",
+    "TESTS/TEST_BW/cleanFolder.sh": "7da0e8958695c945a13bdc0095e9d0146b0eaa559c57a21f453f52723dde85c7",
+    "TESTS/TEST_BW/topography_dem.asc": "81875fb22ff476b6d51d3232ea045cf63e31e09a9bb59379c9e792153acde00b",
+    "TESTS/TEST_CF/IMEX_sfloW2D.inp": "be83019ec84fa6f9f87e960ac09fa3133a8252e6b6e795d31e20adccbb8e8b78",
+    "TESTS/TEST_CF/cleanFolder.sh": "e4190dae20a320a432ad28b2b5005fd5ef95ebeb5ebfe4757ee122ad0c8f1aa7",
+    "TESTS/TEST_CURVATURE_SOURCE/run_test.sh": "e937a24a1d0f2a119423b09712adb5dd56e887a1e0c5ce6b3244e5b94b0682aa",
+    "TESTS/TEST_CURVATURE_SOURCE/test_curvature_source.f90": "821f64d28f162e219f3b6cf05b0117f7c0c7048a7c534853078d227a8a9829aa",
+    "TESTS/TEST_DAMBREAK/TEST_DYNAMIC_FINH/IMEX_SfloW2D.inp": "60fef8cc93f3fb3fddc5e34be901238fad5bc3ec65582df1613789ede7fd0497",
+    "TESTS/TEST_DAMBREAK/TEST_DYNAMIC_FINH/cleanFolder.sh": "199872e3f3f4d87ed7d3e8f5e535dcf61f687594d3d989f339f69988e1e9102a",
+    "TESTS/TEST_DAMBREAK/TEST_DYNAMIC_FINH/example_2D_0000.q_2d": "b33efedcf1e3c880509977a58695406a05d6c71f7e0d97801740afd1d6847322",
+    "TESTS/TEST_DAMBREAK/TEST_DYNAMIC_FINH/topography_dem.asc": "14d1fb32f40a5c975af23fcb48ea34b2df3ef7654270b079edfee7f6be9707a5",
+    "TESTS/TEST_DAMBREAK/TEST_OFF_FINH/IMEX_SfloW2D.inp": "4ddae8625cd73a6ed0f364a4e9162005d77d8b73d697fadd6ed2af72ca889580",
+    "TESTS/TEST_DAMBREAK/TEST_OFF_FINH/cleanFolder.sh": "199872e3f3f4d87ed7d3e8f5e535dcf61f687594d3d989f339f69988e1e9102a",
+    "TESTS/TEST_DAMBREAK/TEST_OFF_FINH/example_2D_0000.q_2d": "b33efedcf1e3c880509977a58695406a05d6c71f7e0d97801740afd1d6847322",
+    "TESTS/TEST_DAMBREAK/TEST_OFF_FINH/topography_dem.asc": "14d1fb32f40a5c975af23fcb48ea34b2df3ef7654270b079edfee7f6be9707a5",
+    "TESTS/TEST_DAMBREAK/TEST_STATIC_FINH/IMEX_SfloW2D.inp": "da15db3a5fc1459e4d4d9c397906777be1e428cd1a3abb822c2db5d86592512b",
+    "TESTS/TEST_DAMBREAK/TEST_STATIC_FINH/cleanFolder.sh": "199872e3f3f4d87ed7d3e8f5e535dcf61f687594d3d989f339f69988e1e9102a",
+    "TESTS/TEST_DAMBREAK/TEST_STATIC_FINH/example_2D_0000.q_2d": "b33efedcf1e3c880509977a58695406a05d6c71f7e0d97801740afd1d6847322",
+    "TESTS/TEST_DAMBREAK/TEST_STATIC_FINH/topography_dem.asc": "14d1fb32f40a5c975af23fcb48ea34b2df3ef7654270b079edfee7f6be9707a5",
+    "TESTS/TEST_DAMBREAK/TEST_STEP_FINH/IMEX_SfloW2D.inp": "27c088d8dcf96d41ac28a4adc6c6da59b1d5364ba36f623a150b470423c988cd",
+    "TESTS/TEST_DAMBREAK/TEST_STEP_FINH/cleanFolder.sh": "199872e3f3f4d87ed7d3e8f5e535dcf61f687594d3d989f339f69988e1e9102a",
+    "TESTS/TEST_DAMBREAK/TEST_STEP_FINH/example_2D_0000.q_2d": "b33efedcf1e3c880509977a58695406a05d6c71f7e0d97801740afd1d6847322",
+    "TESTS/TEST_DAMBREAK/TEST_STEP_FINH/topography_dem.asc": "14d1fb32f40a5c975af23fcb48ea34b2df3ef7654270b079edfee7f6be9707a5",
+    "TESTS/TEST_DIAGNOSTICS/run_test.sh": "adc477680b62ff49b336d95debd40a0ca62a10145a5d40fcab9165e754b1c616",
+    "TESTS/TEST_DIAGNOSTICS/test_diagnostics.f90": "e86fb3818e0f4f328310298c02eeebdcd1291be07fe569a47068fc6c6a552099",
+    "TESTS/TEST_EQUATION_METADATA/run_test.sh": "e364f84d56eee06d31234359df65466727751c53f967a86b1c014896a25b8832",
+    "TESTS/TEST_EQUATION_METADATA/test_equation_metadata.f90": "702b23051d13401dea6a8ca9f11f2fbddb168ca5dc23ffbbe1bf5167eece53e4",
+    "TESTS/TEST_HP_RECONSTRUCTION/run_test.sh": "3e127f9e612fa7cbe0a973865f680761b4fd2c04ce4db79c7c7b2b6fc66ab0a6",
+    "TESTS/TEST_HP_RECONSTRUCTION/test_hp_reconstruction.f90": "89ad194d92e5f440d2df55fa37116bf532ae84f890bf313e9d805a0b5ab644e1",
+    "TESTS/TEST_HYDROSTATIC_PATH/run_test.sh": "e45c5aa714203031a098545bde453ed841e83eb2b8d3babe8d549f40ee76fad3",
+    "TESTS/TEST_HYDROSTATIC_PATH/test_hydrostatic_path.f90": "6402149b0c4c6d73c6e560d586b2dacc1fcdff0a5900a4c9a9b4c7509a384c20",
+    "TESTS/TEST_IMEX_STAGES/compare_stages.py": "e9e145c3dd609dc800d1b4776e6182fe20eda48198c0517a8eb301d691ef66be",
+    "TESTS/TEST_IMEX_STAGES/run_test.sh": "614b1663f785db55b7b081f1e0d86dbd02a6ef90b5183fef38338b659331e1d1",
+    "TESTS/TEST_IMEX_STAGES/test_imex_stages.f90": "0552f0acf857c9b69346a7ed70562d0b4a30da53dd81bccb66950a03221dc4b2",
+    "TESTS/TEST_IMEX_STAGES/test_stage_count.f90": "57ddd4e6a7e0b20d61742e52a729270c406c430313bfc0de6cd163232bd7df90",
+    "TESTS/TEST_LAPACK_INTERFACES/run_test.sh": "ced858e51cb2913e06196f46bc5caa6e76466af4faef8db4e9cf5600a7618413",
+    "TESTS/TEST_LAPACK_INTERFACES/test_lapack_interfaces.f90": "31b3d429dd9a840848aa02f8f5e0b21edddd9728cf05757e544901c250bd8b8b",
+    "TESTS/TEST_MASS_EXCHANGE/check_diagnostics.py": "d54b486072e403214a0b2a8b2215599d66103d6139469c3a66f9aa48584982f1",
+    "TESTS/TEST_MASS_EXCHANGE/run_test.sh": "489b6f4dd0f732755b8f6c3ddf6134aa59b419b09f03c3172b20d208b6591744",
+    "TESTS/TEST_MASS_EXCHANGE/test_mass_exchange.f90": "37f9397c68bd3dc78838aca65617d68686db491bda1fae751fe5cf0226c4698e",
+    "TESTS/TEST_MODEL_LAYOUT/run_test.sh": "73291beacc8ab8c66ee67ee2e80ab87995127fae14950b4b55b9efd3dd844524",
+    "TESTS/TEST_MODEL_LAYOUT/test_model_layout.f90": "2f320115a1052c87e13cdd664487ce590e3fcdab1e673460840d3175b03dcd4f",
+    "TESTS/TEST_MODEL_LAYOUT/test_model_layout_reject.f90": "527c181bd504282f749205cab82609893933c8106c5a681f03e065278e182dea",
+    "TESTS/TEST_NONCONSERVATIVE_PATH/run_test.sh": "6696bfb601f53db3c9f09138210eb61c77064082992c32e4090dc9efb3a0c37a",
+    "TESTS/TEST_NONCONSERVATIVE_PATH/test_nonconservative_path.f90": "99a1f6f662317a8c59b0c09290635589c5367ffd31616245fbc529ca957f8abd",
+    "TESTS/TEST_PCCU/run_test.sh": "73292455de4b897841f2f6ae06387fffc9d5424e7d3bb9adc629172f975ce88a",
+    "TESTS/TEST_PCCU/test_pccu.f90": "bd8c1795f325b2ffdebebd88a04ae63b7cecdad732c926cdc068add9beb93531",
+    "TESTS/TEST_PCCU_GATE_H/README.md": "84471848146c5bebc8b2e438cb345027a0c479c9349aee00a80a3ae0623466ec",
+    "TESTS/TEST_PCCU_GATE_H/analyze_case.py": "28005167ce5da283f224c68dbcc664d5739c3abf82db8caf73523454758af4a0",
+    "TESTS/TEST_PCCU_GATE_H/generate_case.py": "4af41dae9515489b3bc8d61e7dc6828f11101a9f501f8b3f3773723eeeb9bdaa",
+    "TESTS/TEST_PCCU_GATE_H/reference_metrics.csv": "83945e67ddcca5be30f4a3a6fa346fda6c35d4b6a9fea6579cf9993dc4764126",
+    "TESTS/TEST_PCCU_GATE_H/run_test.sh": "8b7565614d8baec40da613c49b2573dbe4bf1e676130f4a3f053926b781b2bfe",
+    "TESTS/TEST_PCCU_INCLINED_EXCAVATION/run_test.sh": "cfeb814cadcef9909c0298ec73ac66fefa72a20fbd422bb9e0215a1210084693",
+    "TESTS/TEST_PCCU_LAKE_AT_REST/generate_case.py": "8a1cfbcc0332585f695e3ada0684da79643420a1eb5cf4e9f05dafac2d567f3c",
+    "TESTS/TEST_PCCU_LAKE_AT_REST/run_test.sh": "1dba5431c4fb510eac0f410d882102dd02fb05e61476381d3fd9f60a101e1f8e",
+    "TESTS/TEST_RHEOLOGY_FROUDE/run_test.sh": "95e54dfa38b5f522ed105535bca9789fe6decd7fa6f7162baf745d88f4e31dab",
+    "TESTS/TEST_RHEOLOGY_FROUDE/test_rheology_froude.f90": "570eb426622a9fc41a076d908ba3dd40db1a3f4884984e716b2c0c9f3d40a08c",
+    "TESTS/TEST_SOURCE_DOCUMENTATION/check_documentation.py": "6c4e5850c2dd02d5cc34376215a00017d19c73add3bc5cb0efc4f3a422cb49a0",
+    "TESTS/TEST_SOURCE_DOCUMENTATION/run_test.sh": "b014d74e122a08faf686a3dbe3ada002df924fc9190e4e8ce174dc4f9862cb49",
+    "TESTS/TEST_SPATIAL_OPERATOR/compare_reference.py": "055f5562cc660ba78fba0436905084cddc6c5239d9e24793fb837803753b13c7",
+    "TESTS/TEST_SPATIAL_OPERATOR/reference/hp_pccu_1d_core.py": "ffcb695ff8d8d2bd06e433d70b2a519c0b0012d959eb664b617deea83e8f64e2",
+    "TESTS/TEST_SPATIAL_OPERATOR/reference/hp_pccu_2d_core.py": "c63331366cadf9f04d802a3f058088b9c175399b2d6dc7015068a0ad110f1577",
+    "TESTS/TEST_SPATIAL_OPERATOR/run_test.sh": "5621c55e9c455df91a07f487b71e6be762b04a7cb9d07fb30cd350e1c6ba5680",
+    "TESTS/TEST_SPATIAL_OPERATOR/test_spatial_operator.f90": "3fd64eeee79e8e8ca4904bb408f9c66f4e8d1e1ce72e17e35c874ea111114480",
+    "TESTS/TEST_STATE_CONVERSION/README.md": "d617381bcbc21ce32005bff3d9b59cf06a24ad4b647d020a7523e5d9a07e3592",
+    "TESTS/TEST_STATE_CONVERSION/run_test.sh": "cc6a3221d5a1254c00b2a20e4a086de9859bd0ba5b68c56151f685680f62283c",
+    "TESTS/TEST_STATE_CONVERSION/test_state_conversion.f90": "f560947a532abd3842a45a777d1a1511f71eae277f763e36e800ea3a78882cae",
+    "TESTS/TEST_STATE_INITIALIZATION/run_test.sh": "e53486817e5e783d0c418202b9aa7fbf0af0090f7b16bea2966d9f3d12f65217",
+    "TESTS/TEST_STATE_INITIALIZATION/test_state_initialization.f90": "526d9217c7639139b41a67e2b06c39de605620588039608376b9f302b4e56ed4",
+    "TESTS/TEST_STOCHASTIC_EVOLUTION/run_test.sh": "3c75d1c1f09a7951eb061840d23b2f29ef2f8087fbfe048c2395255e208dcf72",
+    "TESTS/TEST_STOCHASTIC_EVOLUTION/test_stochastic_evolution.f90": "f63e4f6177c3aa4c3097588e8d9b76abeefa7c1ff1decd0c54b45df2c76ccd0e",
+    "TESTS/TEST_STOCHASTIC_RANDOM/run_test.sh": "3ba0d025485477f288856720c5f2a037e2c29c30b35729cc5c9306e22329fd84",
+    "TESTS/TEST_STOCHASTIC_RANDOM/test_stochastic_random.f90": "5b0e48372bb45b7907a81ac16801245aff9fc882b73474d226939de69bde9b6c",
+    "TESTS/TEST_STOCHASTIC_RESTART/run_test.sh": "1f0cd503b22a1daa4c4a0a0422fb1477b018ea5fab95a766ec9eb59eca68c4d1",
+    "TESTS/TEST_TAAL/IMEX_sfloW2D.inp": "c69b63a00d404eceb42a8fd33ca7ed995aef89310bdb4c75cc1d644f226372de",
+    "TESTS/TEST_TAAL/cleanFolder.sh": "673a85c7b21073b455ecf74b338fd8387cf94168cebe0a3876fe140b87df1ef3",
+    "TESTS/TEST_TOPOGRAPHY_FACES/run_test.sh": "d1e749dd20123b3b9971de59497723ad3172cd97edfeddb069aa1a0ead5471e5",
+    "TESTS/TEST_TOPOGRAPHY_FACES/test_topography_faces.f90": "1c6d8a8b95597ad32a9d543417dc33618c468f1a6aa8f5cdbcbc8c1b86f27e5e",
+    "TESTS/TEST_WORKSPACE_LIFECYCLE/run_test.sh": "a3ca0f7a4543ae04506fdbb05c784f3b6407a293dd179efb07f89a16a1b8a62e",
+    "TESTS/TEST_WORKSPACE_LIFECYCLE/test_workspace_lifecycle.f90": "1a17e546463968e48caa51fdbddd693472de0def6cbd546e96b341aeeeaf81ec",
+    "TESTS/run_tests.sh": "8eb57d084aad8acb333b3423dedd36a17c03ddb7bca1a7774e9be9f7d05afaad",
+    "src/IMEX_SfloW2D.f90": "2f7e868a3f37ef2718853e605453befc3596565c393f3bdc68256990be0f281b",
+    "src/Makefile.am": "22de4a6f4a6e14b9ef84a74e98c2959ed00c044b5e2a374a4f1738e5ce4292c2",
+    "src/Makefile.in": "b35085f7169593f2475bacf9192d2f77ad6dd7133cff4df6fb99b9c82a93ee4d",
+    "src/complexify.f90": "f6de6fb8f4c59be820b342cc3a8c31d45601dc850b92132cb9c7796876f985cf",
+    "src/constitutive_parameters_2d.f90": "bbb8fb6a5ecda75cdfbd9dbd57650bd8d22736318e5140072bc3401511a87de3",
+    "src/diagnostics_2d.f90": "16b8c59ac2f90b5c99e7c5cfffc337d2da0dceefaec091efe36fb8c5cb80e759",
+    "src/domain_2d.f90": "6afd4e62d52dbd23ec429514dfb33ab3f8988887a88150197bd55f6a66bf6a5f",
+    "src/equation_metadata_2d.f90": "1dbcece9f777f6e742980924937413e74a5cb4fc431c856dc12a47b76ca9154e",
+    "src/equation_terms_2d.f90": "ca8c71c4f64e8d293af68d6eb653badf29415b2602c2a00e5017b22f3d47f31a",
+    "src/geometry_2d.f90": "4e4eafe8e64c335a5eccea608fec929c6c3b155af3317d6176e06ea1fbdf30a4",
+    "src/hp_reconstruction_2d.f90": "cf6cc6ee62eb872496a6fe33e8d4e2e640e3ea4ffc05050f8121d099ae2e4af1",
+    "src/hyperbolic_2d.f90": "1d5af9f9d5e1936acd1f37003b448f2cd94005de82ad573e505d7b7ff9342ee3",
+    "src/init_2d.f90": "03451193df8e652b8eccf27644564e40fb05d929c094d2ba0172a0c4372140ca",
+    "src/inpout_2d.f90": "0ea85224622c7184d902ec1a5a682f570e023510c48c0c4fa660d57b713f66d8",
+    "src/lapack_interfaces_2d.f90": "2891985b5e521538e6871568aa8b708fdf01455b1908c7805cf2b6cfd3b5d952",
+    "src/mass_exchange_2d.f90": "89b5fa471e8599cd3205873d74126daf7cabfa9efd8d222ea783cbf010902cd8",
+    "src/mixture_from_mass.inc": "da6131a86aa691dc043a77e2d3f50ed2f753d077590c081e7ee97d5bd4b20a5d",
+    "src/mixture_heat_capacity.inc": "c112e1dc64aebba6e282b1fc220377abe229948062da8168b563b382822ea1aa",
+    "src/model_layout_2d.f90": "ab60e9de67fc2d5fbc3d15d5536ceaa22f859ed3ec0e76652ad7a5e43a352cce",
+    "src/nonconservative_2d.f90": "44f659c71d192e3e285cd8fb962f66ca11dd383d3a5a9a2c24e9b7aef97d691e",
+    "src/nonlinear_solver_2d.f90": "d20659ab9067f5890069cf440fa4fd9ab0db4cd32b461284839f31ef8fd7ec3a",
+    "src/parameters_2d.f90": "3350e8db2356f91206936ff1fc5fd335a58c1b1120e1ef5b4d6ed07998c116ba",
+    "src/pccu_2d.f90": "2d037f0ad8a48f31eb00ac3645f04ad554408ba749bec9875b8b01b393affc59",
+    "src/reconstruction_2d.f90": "5bb41fbc49202860c4489aed618deadad45fd2a7b9357f93d26754be41f4956e",
+    "src/runtime_2d.f90": "afc7d054d0f2c033c5809519b51568f92e18c7bbc9b6ec13300c6d16d2422aef",
+    "src/simulation_2d.f90": "0ed05c045960933096f8cdd4fe5267d0919ab5621ddf5093a33b0363dc0a59b9",
+    "src/spatial_operator_2d.f90": "5b009b02f13aa478db09c073df0beeeeff06cd9d209aface8e6005f7a95de45e",
+    "src/state_2d.f90": "cdb80ac4b5357a25f36f28555e595764127e234096c67cedeb4585fa2881ccda",
+    "src/state_conversion_2d.f90": "f8dcda9f78c9ec0df7687c059c733698e7f46a39d53a83307583c83a34c8d1f9",
+    "src/state_conversion_phys_var.inc": "d9f63dcbe2ceb3b62131c01dbda1da2ffbaa793a7604382d3dad4ca450bc1729",
+    "src/stochastic_module.f90": "77090048c7cb80fa9f00d1e429326bc9c2c97af21fc31be2b007a1870f29663b",
+    "src/stochastic_random_2d.f90": "39066c274a98949e1a5f636c763ee3b7572379dbea7951ef72b11448035beb00",
+    "src/time_integration_2d.f90": "6c5751712117e3e166da34847b9d796959064bc79b981105921829ffecb44020",
+    "src/velocity_from_conservative.inc": "552515c233b09171e4965e9f1866dfeedb5f37c1dce195ba02f18bcc7cd5671a"
+  },
+  "stage_count_contract": {
+    "default": 2,
+    "invalid_executions": 40,
+    "records": [
+      {
+        "accepted": false,
+        "effective_n_RK": -1,
+        "entry": "input",
+        "profile": "strict",
+        "requested_n_RK": -1,
+        "runs": [
+          {
+            "log_sha256": "8578d452c29a34faa20ebe190a3ca96ad4e82d03d9da7c7cfa4de6126a5b2afa",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "efee3088739bc45984c57f13d43ba319e316aa3bfdffbbd066dd1b83f59e987b",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 0,
+        "entry": "input",
+        "profile": "strict",
+        "requested_n_RK": 0,
+        "runs": [
+          {
+            "log_sha256": "0f2d5e2b0722ca9b4e72f91bec7029c2c8427c5254d536a5070cbd3d7dff5d10",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "1e6a07e7a25257b14ed30919aeb5b627d3169533aa9735b8bf84b860e2f3d6ff",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 1,
+        "entry": "input",
+        "profile": "strict",
+        "requested_n_RK": 1,
+        "runs": [
+          {
+            "log_sha256": "fe050dae15c4a16fbe1a7c060a619c357ecba2a4bef5fb5ef8e2248500a82448",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "b6c549817431d1be84c50735494c96b89dd80dfacde64a81e7921f4ec67674dc",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 2,
+        "entry": "input",
+        "profile": "strict",
+        "requested_n_RK": 2,
+        "runs": [
+          {
+            "log_sha256": "e6998fe55aa0e24c04bfe5cf0693ae51f5b178232091b3b10e605ae1f878ee3e",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "e6998fe55aa0e24c04bfe5cf0693ae51f5b178232091b3b10e605ae1f878ee3e",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 3,
+        "entry": "input",
+        "profile": "strict",
+        "requested_n_RK": 3,
+        "runs": [
+          {
+            "log_sha256": "868b90a5bffed0a91a8082cebae8844fecc734904f9f7803725f325b328e6715",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "868b90a5bffed0a91a8082cebae8844fecc734904f9f7803725f325b328e6715",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 4,
+        "entry": "input",
+        "profile": "strict",
+        "requested_n_RK": 4,
+        "runs": [
+          {
+            "log_sha256": "82dbc1186a5d1392e640f95142f82a42423567fb1793e5d569f469c00cd10bdf",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "82dbc1186a5d1392e640f95142f82a42423567fb1793e5d569f469c00cd10bdf",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 5,
+        "entry": "input",
+        "profile": "strict",
+        "requested_n_RK": 5,
+        "runs": [
+          {
+            "log_sha256": "b5ca42005270ed7e54e8d6e33c4d14f01f28493c9832f12f9138f334f9fff219",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "fa535453e436f3fc23730f854af42ca20bb296dc6676cd8beab651ab024bd568",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 6,
+        "entry": "input",
+        "profile": "strict",
+        "requested_n_RK": 6,
+        "runs": [
+          {
+            "log_sha256": "f5b85edcbd75188002916c99ab33eb3109f441ea80ec179dff9acbc2dc32b6cd",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "6cdc685ced49e331c04b95432ce5074bc66ffe987f5077db68cfd4900737f3f6",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 2,
+        "entry": "input",
+        "profile": "strict",
+        "requested_n_RK": null,
+        "runs": [
+          {
+            "log_sha256": "e6998fe55aa0e24c04bfe5cf0693ae51f5b178232091b3b10e605ae1f878ee3e",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "e6998fe55aa0e24c04bfe5cf0693ae51f5b178232091b3b10e605ae1f878ee3e",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": -1,
+        "entry": "workspace",
+        "profile": "strict",
+        "requested_n_RK": -1,
+        "runs": [
+          {
+            "log_sha256": "b1557d3d374da4424460182031905d67526fab450f321aad0e170a1ee6b597e8",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "b659077d7d4bc86d648749ce123a0d6d0c1d5c299e3f8ad1a705710d3c7278ba",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 0,
+        "entry": "workspace",
+        "profile": "strict",
+        "requested_n_RK": 0,
+        "runs": [
+          {
+            "log_sha256": "c38e65c2be281f3b9e768dc119022b28e2d938b6019d071c9d170e9ea0561f03",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "82d07613e1c8e67dbc74d5373196ab21257a6f3d952a6252738e0671ed99eb17",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 1,
+        "entry": "workspace",
+        "profile": "strict",
+        "requested_n_RK": 1,
+        "runs": [
+          {
+            "log_sha256": "c643c65f5e4e4abe6d98530dd65648e5af7c13d40326a928a4dba1b942b65eb0",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "30922da609a55320a3f5b377538ebe4e42dbbdd5ec4f956a3a070b57971474a9",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 2,
+        "entry": "workspace",
+        "profile": "strict",
+        "requested_n_RK": 2,
+        "runs": [
+          {
+            "log_sha256": "fe87b5c7cb432b56151dfcdb3293209320797c266043a1c8ec9d98a037084f64",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "fe87b5c7cb432b56151dfcdb3293209320797c266043a1c8ec9d98a037084f64",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 3,
+        "entry": "workspace",
+        "profile": "strict",
+        "requested_n_RK": 3,
+        "runs": [
+          {
+            "log_sha256": "fec388128a107054e630358794cf55678efdb92ef31313cf23763f6b32b7f05b",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "fec388128a107054e630358794cf55678efdb92ef31313cf23763f6b32b7f05b",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 4,
+        "entry": "workspace",
+        "profile": "strict",
+        "requested_n_RK": 4,
+        "runs": [
+          {
+            "log_sha256": "ed50935e8486e6bb7ed43cfb895981b7e2e6ae348b6ec8a42d44bbf05d1bff4e",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "ed50935e8486e6bb7ed43cfb895981b7e2e6ae348b6ec8a42d44bbf05d1bff4e",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 5,
+        "entry": "workspace",
+        "profile": "strict",
+        "requested_n_RK": 5,
+        "runs": [
+          {
+            "log_sha256": "dd6bbf07bba298900c2181074b166e83b6d719a880cf097874dc4bae2eb1e368",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "784bd897e17cd2b17af59e8b1bc543016b89b475d49bedcfb6f75da3abd664e2",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 6,
+        "entry": "workspace",
+        "profile": "strict",
+        "requested_n_RK": 6,
+        "runs": [
+          {
+            "log_sha256": "3cbeb4bb78c853ba5941328e0fd56bf2209d98f4eb60120cb131595b16cbccb4",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "5320738309117cd68674e5aa13af1fdefd123ecb99e1221c131dd0fec389b3e5",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": -1,
+        "entry": "input",
+        "profile": "optimized",
+        "requested_n_RK": -1,
+        "runs": [
+          {
+            "log_sha256": "bef3105987dfedd0b057f8335ce55c4617c743831ad82a9090c4fd02c65d5c19",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "26095a3f3f7b5ff539393e4b63e63de43a00bbbcd09f8144549de569d6623d58",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 0,
+        "entry": "input",
+        "profile": "optimized",
+        "requested_n_RK": 0,
+        "runs": [
+          {
+            "log_sha256": "81a0960277e8759e61c94411404d28c6530fae719ba80a0b99a1e2c2d4a759fd",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "8a78d09ac27cc3b3af5023454ffc15b6f5c3362c651397dac3615421675ba00f",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 1,
+        "entry": "input",
+        "profile": "optimized",
+        "requested_n_RK": 1,
+        "runs": [
+          {
+            "log_sha256": "eab13a680180037bf1111b9559a4d2ebb081a8e06b79dbd5a68e2dcc0f796d57",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "fedc1e404f1d80bab2b75e27ab823ead551de275ede5d23db18957a6235b046e",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 2,
+        "entry": "input",
+        "profile": "optimized",
+        "requested_n_RK": 2,
+        "runs": [
+          {
+            "log_sha256": "e6998fe55aa0e24c04bfe5cf0693ae51f5b178232091b3b10e605ae1f878ee3e",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "e6998fe55aa0e24c04bfe5cf0693ae51f5b178232091b3b10e605ae1f878ee3e",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 3,
+        "entry": "input",
+        "profile": "optimized",
+        "requested_n_RK": 3,
+        "runs": [
+          {
+            "log_sha256": "868b90a5bffed0a91a8082cebae8844fecc734904f9f7803725f325b328e6715",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "868b90a5bffed0a91a8082cebae8844fecc734904f9f7803725f325b328e6715",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 4,
+        "entry": "input",
+        "profile": "optimized",
+        "requested_n_RK": 4,
+        "runs": [
+          {
+            "log_sha256": "82dbc1186a5d1392e640f95142f82a42423567fb1793e5d569f469c00cd10bdf",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "82dbc1186a5d1392e640f95142f82a42423567fb1793e5d569f469c00cd10bdf",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 5,
+        "entry": "input",
+        "profile": "optimized",
+        "requested_n_RK": 5,
+        "runs": [
+          {
+            "log_sha256": "e04ea415fe2794f6250c3629a6cd991dda337fea1f99f1b72b8c8f7ef61a9c5e",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "dd07d2b87595161e468050110887b77fb8c802b528146965fd718aef9403d190",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 6,
+        "entry": "input",
+        "profile": "optimized",
+        "requested_n_RK": 6,
+        "runs": [
+          {
+            "log_sha256": "7e762626f2568c76adf2d2057fd9c255e9ff42a62b7220558ca164c58118ce75",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "77fac98d95a84d3408948c5fc84f2fedf5e4eda03255a21b08430ba891678a9f",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 2,
+        "entry": "input",
+        "profile": "optimized",
+        "requested_n_RK": null,
+        "runs": [
+          {
+            "log_sha256": "e6998fe55aa0e24c04bfe5cf0693ae51f5b178232091b3b10e605ae1f878ee3e",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "e6998fe55aa0e24c04bfe5cf0693ae51f5b178232091b3b10e605ae1f878ee3e",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": -1,
+        "entry": "workspace",
+        "profile": "optimized",
+        "requested_n_RK": -1,
+        "runs": [
+          {
+            "log_sha256": "55882fd2261b9600d45798abf1c47385d46d162670f6c1032e30e06a8b74a705",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "1cc43828861976f629f6c39c2c22406478c03daf4f33150b42f0a1f588df5f6d",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 0,
+        "entry": "workspace",
+        "profile": "optimized",
+        "requested_n_RK": 0,
+        "runs": [
+          {
+            "log_sha256": "8eb4d614d2153295e847a6948ebd5fee4cbb4f6ac2d48eb04c281888700564d8",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "8617ef78ea83c89063848c7b4dd2cb6ad15b54107cc208e984365eaa6dd7d16c",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 1,
+        "entry": "workspace",
+        "profile": "optimized",
+        "requested_n_RK": 1,
+        "runs": [
+          {
+            "log_sha256": "7dfa40bab78f3cda3be5876bb376a2e1c033928858325221e5fe8d2dfb62e012",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "a74b1314d85531faf80c0162d01e6be5f06ffa3f2fe24ea32c82c80090b9d013",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 2,
+        "entry": "workspace",
+        "profile": "optimized",
+        "requested_n_RK": 2,
+        "runs": [
+          {
+            "log_sha256": "fe87b5c7cb432b56151dfcdb3293209320797c266043a1c8ec9d98a037084f64",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "fe87b5c7cb432b56151dfcdb3293209320797c266043a1c8ec9d98a037084f64",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 3,
+        "entry": "workspace",
+        "profile": "optimized",
+        "requested_n_RK": 3,
+        "runs": [
+          {
+            "log_sha256": "fec388128a107054e630358794cf55678efdb92ef31313cf23763f6b32b7f05b",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "fec388128a107054e630358794cf55678efdb92ef31313cf23763f6b32b7f05b",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": true,
+        "effective_n_RK": 4,
+        "entry": "workspace",
+        "profile": "optimized",
+        "requested_n_RK": 4,
+        "runs": [
+          {
+            "log_sha256": "ed50935e8486e6bb7ed43cfb895981b7e2e6ae348b6ec8a42d44bbf05d1bff4e",
+            "requested_threads": 1,
+            "returncode": 0
+          },
+          {
+            "log_sha256": "ed50935e8486e6bb7ed43cfb895981b7e2e6ae348b6ec8a42d44bbf05d1bff4e",
+            "requested_threads": 4,
+            "returncode": 0
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 5,
+        "entry": "workspace",
+        "profile": "optimized",
+        "requested_n_RK": 5,
+        "runs": [
+          {
+            "log_sha256": "83d608daed0cc2f9d778ac6744f05af684a1cbc6e6513a263ceab82140a5901f",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "046fca0a681b6f2cfd21a9eb93aaf049eb71b2f0d690238e8e78511a96d4ca69",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      },
+      {
+        "accepted": false,
+        "effective_n_RK": 6,
+        "entry": "workspace",
+        "profile": "optimized",
+        "requested_n_RK": 6,
+        "runs": [
+          {
+            "log_sha256": "db7e6acdc4cac07606672c1dd5257b7739ca1545afd78ed83ae870cb644ff7a4",
+            "requested_threads": 1,
+            "returncode": 1
+          },
+          {
+            "log_sha256": "52d77987197daca4a073d3c8aa095bfc670bee81b8e45913b9e5d2521066abdd",
+            "requested_threads": 4,
+            "returncode": 1
+          }
+        ]
+      }
+    ],
+    "removed_single_stage_branch": true,
+    "supported": [
+      2,
+      3,
+      4
+    ],
+    "thread_policy": "Requested 1/4-thread environments; validation occurs outside parallel loops",
+    "valid_or_default_executions": 28
+  },
+  "started_utc": "2026-10-10T06:19:57.787781+00:00",
+  "summary": {
+    "failed": 0,
+    "n9_accepted": false,
+    "passed": 36,
+    "test_runs": 36
+  },
+  "test_results": [
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/historical_optimized-TEST_BINARY_RESTART-1/test.log",
+      "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d",
+      "outer_threads": 1,
+      "profile": "historical_optimized",
+      "returncode": 0,
+      "seconds": 29.706,
+      "status": "pass",
+      "test": "TEST_BINARY_RESTART"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/historical_optimized-TEST_BINARY_RESTART-4/test.log",
+      "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d",
+      "outer_threads": 4,
+      "profile": "historical_optimized",
+      "returncode": 0,
+      "seconds": 11.672,
+      "status": "pass",
+      "test": "TEST_BINARY_RESTART"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/historical_optimized-TEST_PCCU_GATE_H-1/test.log",
+      "log_sha256": "1cb773c7306996fe28adc5c968c3543ebb26fa145a05848871b44d5cf4355063",
+      "outer_threads": 1,
+      "profile": "historical_optimized",
+      "returncode": 0,
+      "seconds": 6.774,
+      "status": "pass",
+      "test": "TEST_PCCU_GATE_H"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/historical_optimized-TEST_PCCU_GATE_H-4/test.log",
+      "log_sha256": "1cb773c7306996fe28adc5c968c3543ebb26fa145a05848871b44d5cf4355063",
+      "outer_threads": 4,
+      "profile": "historical_optimized",
+      "returncode": 0,
+      "seconds": 4.494,
+      "status": "pass",
+      "test": "TEST_PCCU_GATE_H"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/historical_optimized-TEST_PCCU_INCLINED_EXCAVATION-embedded/test.log",
+      "log_sha256": "dddcfdca6a3038a2f4d6a9ab7d40f3044d1814f0a7a430dfb4b4b022c888eefa",
+      "outer_threads": null,
+      "profile": "historical_optimized",
+      "returncode": 0,
+      "seconds": 1.38,
+      "status": "pass",
+      "test": "TEST_PCCU_INCLINED_EXCAVATION"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/historical_optimized-TEST_PCCU_LAKE_AT_REST-embedded/test.log",
+      "log_sha256": "72f5c63ea215a47816f2f5eaf05c6c67976ffda17a0762257c025ac5cb415ce3",
+      "outer_threads": null,
+      "profile": "historical_optimized",
+      "returncode": 0,
+      "seconds": 5.655,
+      "status": "pass",
+      "test": "TEST_PCCU_LAKE_AT_REST"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/historical_optimized-TEST_STOCHASTIC_RESTART-1/test.log",
+      "log_sha256": "8a781f9a758332728d812e58ab8b1ee9bb3ba3f0dd07fa8f8eae85c9e41d2f73",
+      "outer_threads": 1,
+      "profile": "historical_optimized",
+      "returncode": 0,
+      "seconds": 14.126,
+      "status": "pass",
+      "test": "TEST_STOCHASTIC_RESTART"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/historical_optimized-TEST_STOCHASTIC_RESTART-4/test.log",
+      "log_sha256": "8a781f9a758332728d812e58ab8b1ee9bb3ba3f0dd07fa8f8eae85c9e41d2f73",
+      "outer_threads": 4,
+      "profile": "historical_optimized",
+      "returncode": 0,
+      "seconds": 6.867,
+      "status": "pass",
+      "test": "TEST_STOCHASTIC_RESTART"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/strict_debug-TEST_BINARY_RESTART-1/test.log",
+      "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d",
+      "outer_threads": 1,
+      "profile": "strict_debug",
+      "returncode": 0,
+      "seconds": 158.446,
+      "status": "pass",
+      "test": "TEST_BINARY_RESTART"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/strict_debug-TEST_BINARY_RESTART-4/test.log",
+      "log_sha256": "1addd4bf8720aa849b8a60047aea9fa589a6d5819e466ce2a41c7201380fe76d",
+      "outer_threads": 4,
+      "profile": "strict_debug",
+      "returncode": 0,
+      "seconds": 66.556,
+      "status": "pass",
+      "test": "TEST_BINARY_RESTART"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/strict_debug-TEST_PCCU_GATE_H-1/test.log",
+      "log_sha256": "6cd88a1198efbc830b34c12cbcdfbc9c70df0250b78ed992d22a6498e848b2fe",
+      "outer_threads": 1,
+      "profile": "strict_debug",
+      "returncode": 0,
+      "seconds": 30.417,
+      "status": "pass",
+      "test": "TEST_PCCU_GATE_H"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/strict_debug-TEST_PCCU_GATE_H-4/test.log",
+      "log_sha256": "6cd88a1198efbc830b34c12cbcdfbc9c70df0250b78ed992d22a6498e848b2fe",
+      "outer_threads": 4,
+      "profile": "strict_debug",
+      "returncode": 0,
+      "seconds": 16.397,
+      "status": "pass",
+      "test": "TEST_PCCU_GATE_H"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/strict_debug-TEST_PCCU_INCLINED_EXCAVATION-embedded/test.log",
+      "log_sha256": "cc5dd58087a29fde99c5a4e1dc334cbb1f73d1ac1e19996fa37cfe5b4404acaa",
+      "outer_threads": null,
+      "profile": "strict_debug",
+      "returncode": 0,
+      "seconds": 2.072,
+      "status": "pass",
+      "test": "TEST_PCCU_INCLINED_EXCAVATION"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/strict_debug-TEST_PCCU_LAKE_AT_REST-embedded/test.log",
+      "log_sha256": "72f5c63ea215a47816f2f5eaf05c6c67976ffda17a0762257c025ac5cb415ce3",
+      "outer_threads": null,
+      "profile": "strict_debug",
+      "returncode": 0,
+      "seconds": 7.937,
+      "status": "pass",
+      "test": "TEST_PCCU_LAKE_AT_REST"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/strict_debug-TEST_STOCHASTIC_RESTART-1/test.log",
+      "log_sha256": "8a781f9a758332728d812e58ab8b1ee9bb3ba3f0dd07fa8f8eae85c9e41d2f73",
+      "outer_threads": 1,
+      "profile": "strict_debug",
+      "returncode": 0,
+      "seconds": 90.79,
+      "status": "pass",
+      "test": "TEST_STOCHASTIC_RESTART"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/strict_debug-TEST_STOCHASTIC_RESTART-4/test.log",
+      "log_sha256": "8a781f9a758332728d812e58ab8b1ee9bb3ba3f0dd07fa8f8eae85c9e41d2f73",
+      "outer_threads": 4,
+      "profile": "strict_debug",
+      "returncode": 0,
+      "seconds": 37.323,
+      "status": "pass",
+      "test": "TEST_STOCHASTIC_RESTART"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_CURVATURE_SOURCE-embedded/test.log",
+      "log_sha256": "896806d4e56101e2d96fd2561c629807e931a43e274d228b3e1ec4dac45535dd",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 2.997,
+      "status": "pass",
+      "test": "TEST_CURVATURE_SOURCE"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_DIAGNOSTICS-embedded/test.log",
+      "log_sha256": "9dab51a0e28e463b0b46b2cc4b1717f4268fae30cbf3bf16a56bcf1cc270bc8a",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 0.612,
+      "status": "pass",
+      "test": "TEST_DIAGNOSTICS"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_EQUATION_METADATA-embedded/test.log",
+      "log_sha256": "e40e9672aceb9e47646aa5191d18c4a2781704f2e5acef086751c89615c1efa7",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 0.623,
+      "status": "pass",
+      "test": "TEST_EQUATION_METADATA"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_HP_RECONSTRUCTION-embedded/test.log",
+      "log_sha256": "3c619d86f72c72ca958a02cc14c137978e313aed1452966026171b67e5944a81",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 2.279,
+      "status": "pass",
+      "test": "TEST_HP_RECONSTRUCTION"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_HYDROSTATIC_PATH-embedded/test.log",
+      "log_sha256": "742dba46e726b0f52beb680ee084ae156a0733c7faec165fdb81400945082e37",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 2.053,
+      "status": "pass",
+      "test": "TEST_HYDROSTATIC_PATH"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_IMEX_STAGES-embedded/test.log",
+      "log_sha256": "19687b52e0ea5eb7b5882ebe5bdcccd7a515723b7725ce758e5ad9ae0f2b7848",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 94.23,
+      "status": "pass",
+      "test": "TEST_IMEX_STAGES"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_LAPACK_INTERFACES-embedded/test.log",
+      "log_sha256": "6d71bec5c90ff26b1f876f5eb149a0d3cf132cbc1288840774682b4bb5dbf4ac",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 0.771,
+      "status": "pass",
+      "test": "TEST_LAPACK_INTERFACES"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_MASS_EXCHANGE-embedded/test.log",
+      "log_sha256": "0505f9382c1f1e75fc4d3014c42f5a50e27eca5b4b636e02aa9b7ce3f70a158c",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 44.66,
+      "status": "pass",
+      "test": "TEST_MASS_EXCHANGE"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_MODEL_LAYOUT-embedded/test.log",
+      "log_sha256": "0b6cd443a9bd2f79576c714f52460d54d644fd040162b8adc8408ebd890353e3",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 1.047,
+      "status": "pass",
+      "test": "TEST_MODEL_LAYOUT"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_NONCONSERVATIVE_PATH-embedded/test.log",
+      "log_sha256": "67583a32e7cf44d12bda24432d9a670c4847c3f06bab0a9381d618fd730837f3",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 1.155,
+      "status": "pass",
+      "test": "TEST_NONCONSERVATIVE_PATH"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_PCCU-embedded/test.log",
+      "log_sha256": "a4adf25853b86fe96c546449a1775abd15420e8d5e015548243a7327de53051a",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 0.938,
+      "status": "pass",
+      "test": "TEST_PCCU"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_RHEOLOGY_FROUDE-embedded/test.log",
+      "log_sha256": "d1dec382c4f567c3acb674c6bd3a8fa356a4c95cd20f2b1641457f63c0bb6eb9",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 7.91,
+      "status": "pass",
+      "test": "TEST_RHEOLOGY_FROUDE"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_SOURCE_DOCUMENTATION-embedded/test.log",
+      "log_sha256": "3cebd68078eb4add1b125f30de2866a0ca79e25ec5927874a919f67cab449757",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 0.182,
+      "status": "pass",
+      "test": "TEST_SOURCE_DOCUMENTATION"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_SPATIAL_OPERATOR-embedded/test.log",
+      "log_sha256": "d258beecd2bb3ebac9593d760d045b6c3a198125278710e932b37e3bd7890d26",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 54.11,
+      "status": "pass",
+      "test": "TEST_SPATIAL_OPERATOR"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_STATE_CONVERSION-embedded/test.log",
+      "log_sha256": "37aaf4c0197997a0c827d2f3a81696cceae943f4215ee7816a940f14404b2261",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 3.47,
+      "status": "pass",
+      "test": "TEST_STATE_CONVERSION"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_STATE_INITIALIZATION-embedded/test.log",
+      "log_sha256": "c24e72359538fd5e0276195e116a2d4640be2330f0ca513ea9f9d07586d94377",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 3.313,
+      "status": "pass",
+      "test": "TEST_STATE_INITIALIZATION"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_STOCHASTIC_EVOLUTION-embedded/test.log",
+      "log_sha256": "9be7b9fd6dfa562af8e79db097801b3a9d4ce04a317c493c3771225012b10348",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 3.788,
+      "status": "pass",
+      "test": "TEST_STOCHASTIC_EVOLUTION"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_STOCHASTIC_RANDOM-embedded/test.log",
+      "log_sha256": "adfd25d313f98ca8d8e7392e266a67d674ce2a6fc2ea0088fbc2c795d19df88a",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 0.817,
+      "status": "pass",
+      "test": "TEST_STOCHASTIC_RANDOM"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_TOPOGRAPHY_FACES-embedded/test.log",
+      "log_sha256": "6793c2a285742ecafe7c1b24116cc0bb81b085c7c4153c9f83fd29795647e278",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 2.007,
+      "status": "pass",
+      "test": "TEST_TOPOGRAPHY_FACES"
+    },
+    {
+      "log": "/private/tmp/imex-stage-count-acceptance-20261010-final/tests/unit_script-TEST_WORKSPACE_LIFECYCLE-embedded/test.log",
+      "log_sha256": "10645fe7ce7ece7169ae3c50e6ec8dd4dec07b702ae023551de8661bc15fd17f",
+      "outer_threads": null,
+      "profile": "unit_script",
+      "returncode": 0,
+      "seconds": 5.579,
+      "status": "pass",
+      "test": "TEST_WORKSPACE_LIFECYCLE"
+    }
+  ],
+  "thread_comparisons": [
+    {
+      "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin",
+      "profile": "historical_optimized",
+      "status": "pass",
+      "test": "TEST_BINARY_RESTART"
+    },
+    {
+      "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin",
+      "profile": "historical_optimized",
+      "status": "pass",
+      "test": "TEST_PCCU_GATE_H"
+    },
+    {
+      "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin",
+      "profile": "historical_optimized",
+      "status": "pass",
+      "test": "TEST_STOCHASTIC_RESTART"
+    },
+    {
+      "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin",
+      "profile": "strict_debug",
+      "status": "pass",
+      "test": "TEST_BINARY_RESTART"
+    },
+    {
+      "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin",
+      "profile": "strict_debug",
+      "status": "pass",
+      "test": "TEST_PCCU_GATE_H"
+    },
+    {
+      "comparison": "bitwise SHA-256 of canonical q snapshots and restart.bin",
+      "profile": "strict_debug",
+      "status": "pass",
+      "test": "TEST_STOCHASTIC_RESTART"
+    }
+  ],
+  "tools": {
+    "autoconf": {
+      "command": [
+        "autoconf",
+        "--version"
+      ],
+      "output": "autoconf (GNU Autoconf) 2.72\nCopyright (C) 2023 Free Software Foundation, Inc.\nLicense GPLv3+/Autoconf: GNU GPL version 3 or later\n<https://gnu.org/licenses/gpl.html>, <https://gnu.org/licenses/exceptions.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by David J. MacKenzie and Akim Demaille.",
+      "returncode": 0
+    },
+    "automake": {
+      "command": [
+        "automake",
+        "--version"
+      ],
+      "output": "automake (GNU automake) 1.18\nFeatures: subsecond-mtime\n\nCopyright (C) 2025 Free Software Foundation, Inc.\nLicense GPLv2+: GNU GPL version 2 or later\n  <https://gnu.org/licenses/gpl-2.0.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by Tom Tromey <tromey@redhat.com>\n       and Alexandre Duret-Lutz <adl@gnu.org>.",
+      "returncode": 0
+    },
+    "compiler": {
+      "command": [
+        "gfortran",
+        "--version"
+      ],
+      "output": "GNU Fortran (Homebrew GCC 15.2.0) 15.2.0\nCopyright (C) 2025 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+      "returncode": 0
+    },
+    "netcdf_c": {
+      "command": [
+        "nc-config",
+        "--all"
+      ],
+      "output": "This netCDF 4.9.2 has been built with the following features: \n\n  --cc            -> clang\n  --cflags        -> -I/opt/homebrew/Cellar/netcdf/4.9.2_2/include\n  --libs          -> -L/opt/homebrew/Cellar/netcdf/4.9.2_2/lib -lnetcdf\n  --static        -> -lhdf5_hl-shared -lhdf5-shared -lm -lz -lzstd -lbz2 -lcurl -lxml2\n\n\n  --has-dap          -> yes\n  --has-dap2         -> yes\n  --has-dap4         -> yes\n  --has-nc2          -> yes\n  --has-nc4          -> yes\n  --has-hdf5         -> yes\n  --has-hdf4         -> no\n  --has-logging      -> no\n  --has-pnetcdf      -> no\n  --has-szlib        -> no\n  --has-cdf5         -> yes\n  --has-parallel4    -> no\n  --has-parallel     -> no\n  --has-nczarr       -> yes\n  --has-zstd         -> yes\n  --has-benchmarks   -> no\n  --has-multifilters -> no\n  --has-stdfilters   -> deflate szip zstd bz2\n  --has-quantize     -> no\n\n  --prefix        -> /opt/homebrew/Cellar/netcdf/4.9.2_2\n  --includedir    -> /opt/homebrew/Cellar/netcdf/4.9.2_2/include\n  --libdir        -> /opt/homebrew/Cellar/netcdf/4.9.2_2/lib\n  --plugindir     -> \n  --version       -> netCDF 4.9.2",
+      "returncode": 0
+    },
+    "netcdf_fortran": {
+      "command": [
+        "nf-config",
+        "--version"
+      ],
+      "output": "4.6.1",
+      "returncode": 0
+    },
+    "netcdf_fortran_fflags": {
+      "command": [
+        "nf-config",
+        "--fflags"
+      ],
+      "output": "-I/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1/include -I/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1/include",
+      "returncode": 0
+    },
+    "netcdf_fortran_flibs": {
+      "command": [
+        "nf-config",
+        "--flibs"
+      ],
+      "output": "-L/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1/lib -lnetcdff -lnetcdf -lnetcdf",
+      "returncode": 0
+    }
+  },
+  "working_tree_candidate": {
+    "base_revision_only": true,
+    "git_status": " M TESTS/ACCEPTANCE/acceptance_plan.json\n M TESTS/TEST_IMEX_STAGES/compare_stages.py\n M TESTS/TEST_IMEX_STAGES/run_test.sh\n M TESTS/TEST_IMEX_STAGES/test_imex_stages.f90\n M docs/acceptance/IMEX_STAGES_2026_10_10.md\n M src/Makefile.am\n M src/Makefile.in\n M src/inpout_2d.f90\n M src/parameters_2d.f90\n M src/time_integration_2d.f90\n?? TESTS/TEST_IMEX_STAGES/test_stage_count.f90\n",
+    "patch_sha256": "aa785de30dea3c801f99951e8ab18118c261745fb2272b6246db5292df80454c",
+    "policy": "Tracked files and nonignored untracked files; ignored build artifacts excluded.",
+    "snapshot_files": 275
+  }
+}

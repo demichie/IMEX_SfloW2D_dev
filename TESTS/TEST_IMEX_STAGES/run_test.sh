@@ -23,14 +23,21 @@ for profile in strict optimized; do
         strict) flags='-O0 -g -fcheck=all' ;;
         optimized) flags='-Ofast -funroll-all-loops' ;;
     esac
+    objects=''
     for source in $sources; do
         gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
             $netcdf_fflags -c "$repo_dir/src/$source"
+        objects="$objects ${source%.f90}.o"
     done
     gfortran -O0 -g -fcheck=all -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
         $netcdf_fflags -c "$test_dir/test_imex_stages.f90"
     gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
-        ./*.o -llapack $netcdf_flibs $netcdf_clibs -o test_imex_stages
+        $objects test_imex_stages.o -llapack $netcdf_flibs $netcdf_clibs -o test_imex_stages
+    gfortran -O0 -g -fcheck=all -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+        $netcdf_fflags -c "$test_dir/test_stage_count.f90"
+    gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+        $objects test_stage_count.o -llapack $netcdf_flibs $netcdf_clibs -o test_stage_count
     PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/compare_stages.py" \
-        "$build_dir/$profile/test_imex_stages" "$profile"
+        "$build_dir/$profile/test_imex_stages" "$profile" \
+        --stage-count-executable "$build_dir/$profile/test_stage_count"
 done

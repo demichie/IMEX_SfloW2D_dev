@@ -61,7 +61,7 @@ PROGRAM test_imex_stages
   CALL get_command_argument(3,argument); READ(argument,*) steps
   CALL get_command_argument(4,argument); READ(argument,*) drag
   CALL get_command_argument(5,argument); READ(argument,*) observe
-  IF (stages<1 .OR. stages>4 .OR. steps<1) ERROR STOP 'invalid test controls'
+  IF (stages<2 .OR. stages>4 .OR. steps<1) ERROR STOP 'invalid test controls'
   !$OMP PARALLEL
   !$OMP SINGLE
   actual_threads=omp_get_num_threads()
