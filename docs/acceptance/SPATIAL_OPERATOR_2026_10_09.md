@@ -7,6 +7,11 @@ source or numerical tolerance was changed. The combined 2-D timestep remains
 different from the explicit reference: this is documented, not accepted as
 agreement. N7 is still partial and N9 remains open.
 
+The subsequent [IMEX stage and order audit](IMEX_STAGES_2026_10_10.md)
+validates the covered autonomous two/three/four-stage cases, reproduces a
+single-stage assembly defect and measures tightening stage CFL bounds. Its
+characterization results do not close the combined-CFL or N9 decision.
+
 ## Scope and independent reference
 
 [`TEST_SPATIAL_OPERATOR`](../../TESTS/TEST_SPATIAL_OPERATOR/run_test.sh) exercises

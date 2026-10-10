@@ -277,7 +277,7 @@ MODULE parameters_2d
   INTEGER :: idx_stochEqn
   INTEGER :: idx_poreEqn
   
-  INTEGER :: n_RK     !< Runge-Kutta order
+  INTEGER :: n_RK     !< Number of Runge-Kutta stages, not the temporal order
   
   INTEGER, PARAMETER :: max_nl_iter = 100
 

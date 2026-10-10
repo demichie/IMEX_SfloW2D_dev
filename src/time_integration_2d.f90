@@ -37,6 +37,23 @@ MODULE time_integration_2d
 
   PRIVATE
 
+  ABSTRACT INTERFACE
+     !> \brief Observe an unmodified cell state at a specified IMEX audit point.
+     !> \param[in] event 1: known stage state before closure; 2: solved stage; 3: raw final assembly.
+     !> \param[in] stage Runge-Kutta stage index; zero for the final assembly.
+     !> \param[in] j Cell x index in the active solve list.
+     !> \param[in] k Cell y index in the active solve list.
+     !> \param[in] q_cell Conservative cell state, before subsequent conversions or final clipping.
+     !> \param[in] implicit_status 0: no local solve; 1: converged; -1: failed local solve.
+     !> \note Called concurrently from OpenMP cell loops. Implementations must be
+     !>       thread-safe and must not alter solver configuration or input states.
+     SUBROUTINE imex_state_observer(event, stage, j, k, q_cell, implicit_status)
+       IMPORT :: wp
+       INTEGER, INTENT(IN) :: event, stage, j, k, implicit_status
+       REAL(wp), INTENT(IN) :: q_cell(:)
+     END SUBROUTINE imex_state_observer
+  END INTERFACE
+
   !> \brief Persistent IMEX tableaux, current-stage states and stage source arrays.
   !> \details Only the current stage state is retained; previously evaluated
   !>          terms are stored along the Runge-Kutta stage index for assembly.
@@ -202,10 +219,12 @@ CONTAINS
   !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
   !> \param[in,out] spatial_operator Spatial operator and its persistent reconstruction/HP-PCCU
   !>                                 workspaces.
+  !> \param[in] observer Optional thread-safe read-only stage audit callback. When absent,
+  !>                    no diagnostic storage is allocated and no callbacks are made.
   !******************************************************************************
 
   SUBROUTINE imex_RK_solver(this, q, qp, t, dt, Z, equation_partition,      &
-       domain, spatial_operator)
+       domain, spatial_operator, observer)
 
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
     
@@ -233,6 +252,7 @@ CONTAINS
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     CLASS(domain_type), INTENT(IN) :: domain
     CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
+    PROCEDURE(imex_state_observer), OPTIONAL :: observer
 
     REAL(wp) :: q_si(n_vars) !< solution after the semi-implicit step
     REAL(wp) :: q_guess(n_vars) !< initial guess for the solution of the RK step
@@ -256,6 +276,7 @@ CONTAINS
     LOGICAL :: newton_converged
     LOGICAL :: newton_line_search_failed
     INTEGER :: newton_calls_step
+    INTEGER :: implicit_status
     INTEGER :: newton_iterations_step
     INTEGER :: newton_iterations_max_step
     INTEGER :: newton_failures_step
@@ -346,12 +367,13 @@ CONTAINS
        !$OMP DO schedule(guided)                                                &
        !$OMP & private(j,k,q_guess,q_si,q_fv_cell,Rj_not_impl,p_dyn,           &
        !$OMP & newton_iterations,newton_linear_info,newton_converged,          &
-       !$OMP & newton_line_search_failed)
+       !$OMP & newton_line_search_failed,implicit_status)
 
        solve_cells_loop:DO l = 1,domain%solve_cells
 
           j = domain%j_cent(l)
           k = domain%k_cent(l)
+          implicit_status = 0
 
           IF ( verbose_level .GE. 2 ) THEN
 
@@ -381,6 +403,10 @@ CONTAINS
                - this%expl_terms(1:n_eqns,j,k,1:i_RK) , this%a_tilde(1:i_RK) )            &
                - MATMUL( this%NH(1:n_eqns,j,k,1:i_RK) + this%SI_NH(1:n_eqns,j,k,1:i_RK) , &
                this%a_dirk(1:i_RK) ) )
+
+          ! Capture the algebraic state before qc_to_qp can desingularize or
+          ! map an inadmissible conservative state to a dry primitive state.
+          IF ( PRESENT(observer) ) CALL observer(1, i_RK, j, k, q_fv_cell, 0)
 
           CALL qc_to_qp(q_fv_cell , qp(1:n_vars+2,j,k) , p_dyn )
 
@@ -458,6 +484,8 @@ CONTAINS
                      B_prime_y_geom(j,k), Z(j,k),                              &
                      newton_iterations, newton_converged, newton_linear_info,   &
                      newton_line_search_failed )
+
+                implicit_status = MERGE(1, -1, newton_converged)
 
                 IF ( ( verbose_level .GE. 1 ) .OR.                             &
                      ( .NOT. newton_converged ) ) THEN
@@ -564,6 +592,7 @@ CONTAINS
           ! needed here: their evaluated terms are retained in spatial_terms,
           ! NH, SI_NH and expl_terms.
           this%q_rk( 1:n_vars , j , k ) = q_guess
+          IF ( PRESENT(observer) ) CALL observer(2, i_RK, j, k, q_guess, implicit_status)
 
           IF ( verbose_level .GE. 2 ) THEN
 
@@ -668,6 +697,10 @@ CONTAINS
           q(1:n_vars,j,k) = q_old_cell - dt*residual_cell
 
        END IF
+
+       ! Record the final conservative assembly before any roundoff clipping,
+       ! component repair or primitive-state conversion below.
+       IF ( PRESENT(observer) ) CALL observer(3, 0, j, k, q(:,j,k), 0)
 
        IF ( ANY(ISNAN(q(:,j,k))) ) THEN
           
