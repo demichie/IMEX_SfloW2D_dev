@@ -44,6 +44,14 @@ be adjusted with `--timeout`; a timeout is a failure, not a skipped test.
 
 ## Evidence and interpretation
 
+The [N7/N8 closure checklist](../../docs/acceptance/N7_N8_CLOSURE_2026_10_10.md)
+and [machine-readable plan](n7_n8_closure_plan.json) distinguish satisfied
+original contracts, mandatory missing tests and broader coverage limitations.
+`closure_status` and `remaining_actions` in the execution criteria mirror that
+plan. `satisfied` does not assert universal model coverage or N9 sign-off;
+`execution_status=pass_for_tested_scope` alone never closes an open requirement.
+The checklist reconciles existing runs, without reporting a new numerical audit.
+
 `manifest.json` contains the solver Git SHA, tool probes, compiler flags,
 executable and source checksums, test results and coverage criteria. Each test
 has a log; each solver invocation has its own input snapshots, full solver log,

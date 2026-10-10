@@ -67,6 +67,86 @@ class AuditToolsTests(unittest.TestCase):
         for name in names:
             self.assertTrue((tools.parents[1] / "TESTS" / name / "run_test.sh").is_file())
 
+    def test_closure_inventory_and_action_mapping(self):
+        """Keep the original inventories complete and satisfied contracts free of new blockers."""
+        tools = Path(__file__).resolve().parent
+        execution = json.loads((tools / "acceptance_plan.json").read_text())
+        closure = json.loads((tools / execution["closure_plan"]).read_text())
+        actions = {item["id"]: item for item in closure["remaining_actions"]}
+        self.assertEqual(len(actions), len(closure["remaining_actions"]))
+        self.assertEqual(sum(a["kind"] == "test" for a in actions.values()), 6)
+        self.assertEqual(sum(a["kind"] == "decision" for a in actions.values()), 2)
+        self.assertEqual(closure["milestone_status"]["N9"], "open")
+        records = []
+        for group, prefix, count in (("mass_exchange", "I", 13), ("hydrodynamics", "H", 14)):
+            items = closure["required_tests"][group]
+            self.assertEqual([i["id"] for i in items], [f"{prefix}{n:02}" for n in range(1, count + 1)])
+            records.extend(items)
+        criteria = {item["id"]: item for item in closure["criteria"]}
+        expected = {f"N7-{n:02}" for n in range(1, 10)} | {f"N8-{n:02}" for n in range(1, 6)}
+        self.assertEqual(set(criteria), expected)
+        self.assertEqual(len(criteria), len(closure["criteria"]))
+        for milestone, group in (("N7", "hydrodynamics"), ("N8", "mass_exchange")):
+            contracts_closed = all(c["closure_status"] == "satisfied" for c in criteria.values()
+                                   if c["id"].startswith(milestone + "-"))
+            cases_closed = all(c["status"] == "satisfied" for c in closure["required_tests"][group]
+                               if not (milestone == "N7" and c["id"] == "H14"))
+            self.assertEqual(closure["milestone_status"][milestone],
+                             "satisfied" if contracts_closed and cases_closed else "open")
+        records.extend(criteria.values())
+        for item in records:
+            status = item.get("closure_status", item.get("status"))
+            self.assertIn(status, ("satisfied", "partial", "missing", "decision"))
+            if status == "satisfied":
+                self.assertEqual(item["remaining_actions"], [], item["id"])
+            else:
+                self.assertTrue(item["remaining_actions"], item["id"])
+            self.assertTrue(set(item["remaining_actions"]) <= set(actions), item["id"])
+        for item in execution["criteria"]:
+            if item["id"] in criteria:
+                for field in ("closure_status", "remaining_actions"):
+                    self.assertEqual(item[field], criteria[item["id"]][field])
+        required_ids = {item["id"] for group in closure["required_tests"].values() for item in group}
+        for action in actions.values():
+            self.assertTrue(set(action["criteria"]) <= set(criteria))
+            self.assertTrue(set(action["normative_items"]) <= required_ids)
+            self.assertTrue(action["exit_conditions"])
+            for criterion in action["criteria"]:
+                self.assertIn(action["id"], criteria[criterion]["remaining_actions"])
+
+    def test_closure_evidence_provenance(self):
+        """Validate archived evidence hashes and links without claiming a fresh solver execution."""
+        tools = Path(__file__).resolve().parent
+        repo = tools.parents[1]
+        closure = json.loads((tools / "n7_n8_closure_plan.json").read_text())
+        self.assertTrue((repo / closure["report"]).is_file())
+        artifacts = {}
+        for name, record in closure["evidence_artifacts"].items():
+            path = repo / record["path"]
+            self.assertEqual(digest(path), record["sha256"])
+            artifacts[name] = json.loads(path.read_text())
+        for criterion in closure["criteria"]:
+            self.assertTrue(set(criterion["evidence"]) <= set(artifacts))
+        latest = artifacts["latest"]
+        self.assertEqual(latest["summary"]["failed"], 0)
+        self.assertEqual(latest["summary"]["passed"], 36)
+        self.assertFalse(latest["summary"]["n9_accepted"])
+        self.assertEqual(len(latest["thread_comparisons"]), 6)
+        self.assertTrue(all(p["status"] == "pass" for p in latest["thread_comparisons"]))
+        n8 = artifacts["n8"]
+        records = n8["mass_exchange_production_evidence"]["records"]
+        self.assertEqual({(r["profile"], r["actual_threads"]) for r in records},
+                         {("strict", 1), ("strict", 4), ("optimized", 1), ("optimized", 4)})
+        self.assertEqual([len(r["diagnostics"]) for r in records], [12] * 4)
+        for filename in ("src/equation_terms_2d.f90", "src/mass_exchange_2d.f90",
+                         "src/geometry_2d.f90", "TESTS/TEST_MASS_EXCHANGE/test_mass_exchange.f90"):
+            self.assertEqual(n8["source_and_fixture_sha256"][filename],
+                             latest["source_and_fixture_sha256"][filename])
+        for group in closure["required_tests"].values():
+            for item in group:
+                for test in item["evidence_tests"]:
+                    self.assertTrue((repo / "TESTS" / test / "run_test.sh").is_file())
+
     def test_candidate_overlay_excludes_ignored_and_tracks_removals(self):
         from unittest.mock import patch
         with tempfile.TemporaryDirectory(prefix="imex-audit-overlay-") as temporary:

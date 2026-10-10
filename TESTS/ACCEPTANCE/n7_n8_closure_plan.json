@@ -1,0 +1,716 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "solver_revision": "502246730bd546359d9cfb3ee5aafbb8f06129f6",
+  "report": "docs/acceptance/N7_N8_CLOSURE_2026_10_10.md",
+  "scope": "Reconcile the original N7/N8 gates, not a new numerical audit or N9 scientific sign-off.",
+  "normative_sources": {
+    "roadmap": {
+      "filename": "IMEX_SfloW2D_Development_Roadmap_2026-10-09_Updated.docx",
+      "sha256": "31d98d84a60b1c3c465da1acf10cf0fd13c59b0acacfdb295526fc6f89980d3e"
+    },
+    "workplan": {
+      "filename": "HP_PCCU_IMEX_detailed_workplan_2026-09-23.pdf",
+      "sha256": "8e130592af4bac9d6b2f61587c96ee6e566a19473c32d6a746d7b21a3cdbbd0d"
+    }
+  },
+  "normative_sections": [
+    "Roadmap R7 and retained 4.9/4.10",
+    "Workplan Gate H/Gate I and sections 15.3/15.6"
+  ],
+  "evidence_artifacts": {
+    "n8": {
+      "path": "docs/acceptance/results_n8_mass_exchange_2026_10_09.json",
+      "sha256": "40eeccef626b4a86a4656a0b5cef6631b48d94ae2561ef678bda860c1f7d4c95"
+    },
+    "spatial": {
+      "path": "docs/acceptance/results_spatial_operator_2026_10_09.json",
+      "sha256": "b33cc7c5cdd77c589f90a574703e608e0b3d42363c68662e1b5c4827a5ea55a6"
+    },
+    "imex": {
+      "path": "docs/acceptance/results_imex_stages_2026_10_10.json",
+      "sha256": "bf049f31651cd3ce5956587e45ad1c2524ffb0f7d3612a82f5c021855e83477c"
+    },
+    "latest": {
+      "path": "docs/acceptance/results_stage_count_contract_2026_10_10.json",
+      "sha256": "585261d20c18541774173caeb6712ca1a81b8348f9cbe1e406dd9ecafc2901d5"
+    }
+  },
+  "milestone_status": {
+    "N7": "open",
+    "N8": "open",
+    "N9": "open"
+  },
+  "status_meaning": {
+    "satisfied": "The named original contract has direct passing evidence in the stated fixtures; not a universal theorem or N9 sign-off.",
+    "partial": "Some named original assertions pass; only the linked remaining actions are mandatory for closure.",
+    "missing": "No automated production evidence establishes this specific original required case.",
+    "decision": "An explicit acceptance-policy/scope choice remains, not a new implementation authorization."
+  },
+  "criteria": [
+    {
+      "id": "N7-01",
+      "closure_status": "partial",
+      "remaining_actions": [
+        "N7-A"
+      ],
+      "verified_contracts": [
+        "2D lake residuals and finite-time lakes cover smooth/rough/ramp beds and all slope/curvature flags."
+      ],
+      "evidence": [
+        "spatial",
+        "latest"
+      ]
+    },
+    {
+      "id": "N7-02",
+      "closure_status": "partial",
+      "remaining_actions": [
+        "N7-A",
+        "N7-D"
+      ],
+      "verified_contracts": [
+        "Four-sided excavation has three refinements, unchanged zero-uphill limits and passing metrics."
+      ],
+      "evidence": [
+        "latest"
+      ]
+    },
+    {
+      "id": "N7-03",
+      "closure_status": "partial",
+      "remaining_actions": [
+        "N7-B",
+        "N7-C"
+      ],
+      "verified_contracts": [
+        "Production liquid HP face traces, compatible momenta and velocities agree with pinned cores."
+      ],
+      "evidence": [
+        "spatial",
+        "latest"
+      ]
+    },
+    {
+      "id": "N7-04",
+      "closure_status": "partial",
+      "remaining_actions": [
+        "N7-A",
+        "N7-C"
+      ],
+      "verified_contracts": [
+        "Seeded 2D smooth/rough/drainage/compact residuals and one-step states are verified."
+      ],
+      "evidence": [
+        "spatial",
+        "latest"
+      ]
+    },
+    {
+      "id": "N7-05",
+      "closure_status": "partial",
+      "remaining_actions": [
+        "N7-B"
+      ],
+      "verified_contracts": [
+        "Local gas/solid/liquid conversion and positive/negative component-flux rescaling tests pass."
+      ],
+      "evidence": [
+        "latest"
+      ]
+    },
+    {
+      "id": "N7-06",
+      "closure_status": "partial",
+      "remaining_actions": [
+        "N7-A",
+        "N7-C",
+        "N7-D",
+        "D-N7-CFL"
+      ],
+      "verified_contracts": [
+        "Complete covered residuals and directional bounds agree with clean cores.",
+        "Autonomous explicit/implicit/mixed temporal orders and raw stages pass for N_RK=2,3,4; unsupported counts are rejected."
+      ],
+      "evidence": [
+        "spatial",
+        "imex",
+        "latest"
+      ]
+    },
+    {
+      "id": "N7-07",
+      "closure_status": "partial",
+      "remaining_actions": [
+        "N7-B",
+        "N7-C"
+      ],
+      "verified_contracts": [
+        "Existing Gate-H total-mass and G=1 lateral-symmetry limits pass."
+      ],
+      "evidence": [
+        "latest"
+      ]
+    },
+    {
+      "id": "N7-08",
+      "closure_status": "satisfied",
+      "remaining_actions": [],
+      "verified_contracts": [
+        "Actual 1/4 teams and bitwise outputs pass for covered spatial/stage/exchange fixtures and all six full Gate-H/restart pairs."
+      ],
+      "evidence": [
+        "spatial",
+        "n8",
+        "latest"
+      ]
+    },
+    {
+      "id": "N7-09",
+      "closure_status": "satisfied",
+      "remaining_actions": [],
+      "verified_contracts": [
+        "Original-duration deterministic and stochastic continuation passes in strict/optimized builds with actual 1/4 threads."
+      ],
+      "evidence": [
+        "latest"
+      ]
+    },
+    {
+      "id": "N8-01",
+      "closure_status": "partial",
+      "remaining_actions": [
+        "N8-A"
+      ],
+      "verified_contracts": [
+        "Two-solid liquid saturation, exhausted carrier reserve, cutoff, local thermal source and full/partial radial/fissural masking pass before projection."
+      ],
+      "evidence": [
+        "n8",
+        "latest"
+      ]
+    },
+    {
+      "id": "N8-02",
+      "closure_status": "partial",
+      "remaining_actions": [
+        "N8-B",
+        "D-N8-AREA"
+      ],
+      "verified_contracts": [
+        "Independent Q1 weighted global volume balance passes for actual limited proposals, edges/corners and dry/inactive zero contributors."
+      ],
+      "evidence": [
+        "n8",
+        "latest"
+      ]
+    },
+    {
+      "id": "N8-03",
+      "closure_status": "satisfied",
+      "remaining_actions": [],
+      "verified_contracts": [
+        "True checkpoint reload restores B_vertex/inventories bitwise, refreshes poisoned caches and matches a nonzero resumed second exchange.",
+        "Full evolving-bed deterministic restart also passes."
+      ],
+      "evidence": [
+        "n8",
+        "latest"
+      ]
+    },
+    {
+      "id": "N8-04",
+      "closure_status": "partial",
+      "remaining_actions": [
+        "N8-B"
+      ],
+      "verified_contracts": [
+        "Q1 centers/faces, LS slopes/Hessian and G are checked after each controlled transaction and real restart."
+      ],
+      "evidence": [
+        "n8",
+        "latest"
+      ]
+    },
+    {
+      "id": "N8-05",
+      "closure_status": "partial",
+      "remaining_actions": [
+        "N8-B"
+      ],
+      "verified_contracts": [
+        "Independent signed/L1/Linf mismatch and volume-rate units pass, including nonzero local mismatch in dry/inactive cells."
+      ],
+      "evidence": [
+        "n8",
+        "latest"
+      ]
+    }
+  ],
+  "required_tests": {
+    "mass_exchange": [
+      {
+        "id": "I01",
+        "requirement": "Flat cell state: one constitutive evaluation equals four identical vertex evaluations",
+        "status": "partial",
+        "remaining_actions": [
+          "N8-A"
+        ],
+        "evidence_tests": [
+          "TEST_MASS_EXCHANGE"
+        ]
+      },
+      {
+        "id": "I02",
+        "requirement": "Dry cell has zero exchange proposal and receives no flow source from nodal sharing",
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_MASS_EXCHANGE"
+        ]
+      },
+      {
+        "id": "I03",
+        "requirement": "Per-solid deposition limited by flow inventory",
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_MASS_EXCHANGE"
+        ]
+      },
+      {
+        "id": "I04",
+        "requirement": "Erosion limited by erodible inventory, including repeated updates",
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_MASS_EXCHANGE"
+        ]
+      },
+      {
+        "id": "I05",
+        "requirement": "Source mask applied before both conservative and nodal proposals",
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_MASS_EXCHANGE"
+        ]
+      },
+      {
+        "id": "I06",
+        "requirement": "Interior/boundary AC/4 gathering plus unequal-area synthetic case",
+        "status": "partial",
+        "remaining_actions": [
+          "N8-B",
+          "D-N8-AREA"
+        ],
+        "evidence_tests": [
+          "TEST_MASS_EXCHANGE",
+          "TEST_TOPOGRAPHY_FACES"
+        ]
+      },
+      {
+        "id": "I07",
+        "requirement": "Global weighted bed-volume balance after actual updates",
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_MASS_EXCHANGE"
+        ]
+      },
+      {
+        "id": "I08",
+        "requirement": "Signed/L1/Linf local mismatch diagnostics with correct units",
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_MASS_EXCHANGE"
+        ]
+      },
+      {
+        "id": "I09",
+        "requirement": "Smooth prescribed-rate mismatch decreases under refinement",
+        "status": "missing",
+        "remaining_actions": [
+          "N8-B"
+        ],
+        "evidence_tests": []
+      },
+      {
+        "id": "I10",
+        "requirement": "Wet/dry mismatch localizes and decreases under refinement without dry flow injection",
+        "status": "partial",
+        "remaining_actions": [
+          "N8-B"
+        ],
+        "evidence_tests": [
+          "TEST_MASS_EXCHANGE"
+        ]
+      },
+      {
+        "id": "I11",
+        "requirement": "Seeded cell-scale rough-rate stress: global conservation and finite geometry",
+        "status": "partial",
+        "remaining_actions": [
+          "N8-B"
+        ],
+        "evidence_tests": [
+          "TEST_TOPOGRAPHY_FACES"
+        ]
+      },
+      {
+        "id": "I12",
+        "requirement": "Many seeded nodal updates preserve faces/centers and refresh LS/Hessian/G",
+        "status": "partial",
+        "remaining_actions": [
+          "N8-B"
+        ],
+        "evidence_tests": [
+          "TEST_MASS_EXCHANGE"
+        ]
+      },
+      {
+        "id": "I13",
+        "requirement": "Evolving-bed restart agrees with continuous state and refreshed geometry",
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_MASS_EXCHANGE",
+          "TEST_BINARY_RESTART"
+        ]
+      }
+    ],
+    "hydrodynamics": [
+      {
+        "id": "H01",
+        "requirement": "Flat-bed smooth advection",
+        "status": "partial",
+        "remaining_actions": [
+          "N7-A"
+        ],
+        "evidence_tests": [
+          "TEST_IMEX_STAGES"
+        ]
+      },
+      {
+        "id": "H02",
+        "requirement": "Flat-bed wet/dry dam break or Ritter case",
+        "status": "missing",
+        "remaining_actions": [
+          "N7-A"
+        ],
+        "evidence_tests": []
+      },
+      {
+        "id": "H03",
+        "requirement": "Fully wet parabolic lake at rest",
+        "status": "missing",
+        "remaining_actions": [
+          "N7-A"
+        ],
+        "evidence_tests": []
+      },
+      {
+        "id": "H04",
+        "requirement": "Variable-composition hydrostatic equilibrium in canonical mass fractions",
+        "status": "missing",
+        "remaining_actions": [
+          "N7-B"
+        ],
+        "evidence_tests": []
+      },
+      {
+        "id": "H05",
+        "requirement": "Smooth moving material contact with variable composition",
+        "status": "missing",
+        "remaining_actions": [
+          "N7-B"
+        ],
+        "evidence_tests": []
+      },
+      {
+        "id": "H06",
+        "requirement": "Continuous rough inclined topography with near-dry fronts",
+        "status": "partial",
+        "remaining_actions": [
+          "N7-C"
+        ],
+        "evidence_tests": [
+          "TEST_SPATIAL_OPERATOR",
+          "TEST_IMEX_STAGES"
+        ]
+      },
+      {
+        "id": "H07",
+        "requirement": "1D continuous one-cell excavation",
+        "status": "missing",
+        "remaining_actions": [
+          "N7-A"
+        ],
+        "evidence_tests": []
+      },
+      {
+        "id": "H08",
+        "requirement": "Oblique one-cell ramp or orientation test",
+        "status": "missing",
+        "remaining_actions": [
+          "N7-C"
+        ],
+        "evidence_tests": []
+      },
+      {
+        "id": "H09",
+        "requirement": "Circular 2D wet/dry isotropy",
+        "status": "missing",
+        "remaining_actions": [
+          "N7-C"
+        ],
+        "evidence_tests": []
+      },
+      {
+        "id": "H10",
+        "requirement": "Four-sided 2D one-cell inclined excavation",
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_PCCU_GATE_H",
+          "TEST_PCCU_INCLINED_EXCAVATION"
+        ]
+      },
+      {
+        "id": "H11",
+        "requirement": "Smooth/one-cell 1D/2D lake matrix for all four slope/curvature combinations",
+        "status": "partial",
+        "remaining_actions": [
+          "N7-A"
+        ],
+        "evidence_tests": [
+          "TEST_SPATIAL_OPERATOR",
+          "TEST_PCCU_LAKE_AT_REST"
+        ]
+      },
+      {
+        "id": "H12",
+        "requirement": "Dynamic curvature differential with nonzero mixed Hessian term",
+        "status": "partial",
+        "remaining_actions": [
+          "N7-C"
+        ],
+        "evidence_tests": [
+          "TEST_CURVATURE_SOURCE",
+          "TEST_SPATIAL_OPERATOR"
+        ]
+      },
+      {
+        "id": "H13",
+        "requirement": "2D one-cell refinement with reproducible direct fields and reference metrics",
+        "status": "partial",
+        "remaining_actions": [
+          "N7-D"
+        ],
+        "evidence_tests": [
+          "TEST_PCCU_GATE_H"
+        ]
+      },
+      {
+        "id": "H14",
+        "requirement": "Evolving-bed seeded 1D/2D repeated updates and mismatch diagnostics",
+        "status": "partial",
+        "remaining_actions": [
+          "N8-B"
+        ],
+        "evidence_tests": [
+          "TEST_MASS_EXCHANGE",
+          "TEST_TOPOGRAPHY_FACES"
+        ]
+      }
+    ]
+  },
+  "remaining_actions": [
+    {
+      "id": "N8-A",
+      "kind": "test",
+      "title": "Complete cell-local exchange assertions",
+      "normative_items": [
+        "I01",
+        "I03",
+        "I04",
+        "I05"
+      ],
+      "criteria": [
+        "N8-01"
+      ],
+      "change_scope": "Extend TEST_MASS_EXCHANGE only; no new exchange law.",
+      "exit_conditions": [
+        "Compare one flat cell evaluation with four identical vertex evaluations without shared-configuration mutation.",
+        "Exercise the existing gas/pore-pressure carrier loss branch with saturated positive loss, exhausted reserve and signed inflow; check the same limited conservative transaction and bed proposal.",
+        "Retain existing solid/liquid saturation, radial/fissural mask, dry/inactive and checkpoint assertions; strict/optimized, actual 1/4 threads."
+      ]
+    },
+    {
+      "id": "N8-B",
+      "kind": "test",
+      "title": "Complete nodal projection refinement and repeated-update tests",
+      "normative_items": [
+        "I06",
+        "I07",
+        "I08",
+        "I09",
+        "I10",
+        "I11",
+        "I12",
+        "H14"
+      ],
+      "criteria": [
+        "N8-02",
+        "N8-04",
+        "N8-05"
+      ],
+      "change_scope": "Extend existing projection/mass-exchange tests on the supported Cartesian grid; do not enable nonuniform production meshes.",
+      "exit_conditions": [
+        "Use fixed seeds and at least three refinements in 1D and 2D: area-weighted L1 mismatch decreases for smooth rates and prescribed wet/dry fronts; quantify Linf and localization.",
+        "For cell-scale random rates do not require convergence: require finite geometry and global weighted volume balance.",
+        "After repeated seeded bed updates check independent Q1 faces/centers, LS slopes/Hessian and G after every update; keep dry flow sources zero.",
+        "Keep existing roundoff and byte-comparison limits; resolve D-N8-AREA before marking the unequal-area subtest satisfied."
+      ]
+    },
+    {
+      "id": "N7-A",
+      "kind": "test",
+      "title": "Complete the 1D and equilibrium regression cases",
+      "normative_items": [
+        "H01",
+        "H02",
+        "H03",
+        "H07",
+        "H11"
+      ],
+      "criteria": [
+        "N7-01",
+        "N7-02",
+        "N7-04",
+        "N7-06"
+      ],
+      "change_scope": "Extend the production/reference harness, using the existing IMEX tableaux and unchanged reference kernels.",
+      "exit_conditions": [
+        "Run finite-time smooth flat-bed transport, wet/dry Ritter-type dam break, fully wet parabolic lake and continuous one-cell 1D excavation.",
+        "Complete smooth/one-cell 1D/2D lake matrix with all four slope/curvature combinations, actual 1/4 threads and strict/optimized profiles.",
+        "Check raw mass positivity, lake residual, full fields, zero uphill transfer and mass budget; freeze fixture-specific oracle/error criteria before execution."
+      ]
+    },
+    {
+      "id": "N7-B",
+      "kind": "test",
+      "title": "Complete variable-composition equilibrium and transport tests",
+      "normative_items": [
+        "H04",
+        "H05"
+      ],
+      "criteria": [
+        "N7-03",
+        "N7-05",
+        "N7-07"
+      ],
+      "change_scope": "Test canonical mass fractions and current closures; no new material or source law.",
+      "exit_conditions": [
+        "Use a defined hydrostatic equilibrium for variable composition; do not assume constant eta is sufficient when the hydrostatic coefficient varies.",
+        "Run a smooth moving material contact with nonconstant component mass fractions, including current liquid/solid and gas-containing closures.",
+        "Check each conservative component and residual carrier budget, raw face and stage admissibility, monotone face fractions and signed transport in both directions; closed boundaries isolate transport.",
+        "Use independent conservation/transport oracles rather than treating the prototype one-solid layout as the full gas/liquid/multicomponent reference."
+      ]
+    },
+    {
+      "id": "N7-C",
+      "kind": "test",
+      "title": "Complete finite-time 2D geometry and symmetry cases",
+      "normative_items": [
+        "H06",
+        "H08",
+        "H09",
+        "H12"
+      ],
+      "criteria": [
+        "N7-03",
+        "N7-04",
+        "N7-06",
+        "N7-07"
+      ],
+      "change_scope": "Reuse seeded rough/drainage fixtures; add only the original orientation/isotropy cases.",
+      "exit_conditions": [
+        "Advance continuous rough inclined Q1 beds with near-dry fronts to fixed comparison times rather than checking a single residual/stage only.",
+        "Run an oblique one-cell ramp and a circular wet/dry case; quantify rotation/symmetry, mass, positivity and finite-time field errors.",
+        "Compare dynamic curvature ON/OFF at fixed slope flag with a nonzero mixed Hessian term; preserve resting-state balance.",
+        "Use common initial states and the same temporal assembly for independent IMEX comparisons; account explicitly for any SSPRK2/IMEX time-discretization difference."
+      ]
+    },
+    {
+      "id": "N7-D",
+      "kind": "test",
+      "title": "Complete the reproducible Gate-H full-field comparison",
+      "normative_items": [
+        "H10",
+        "H13"
+      ],
+      "criteria": [
+        "N7-02",
+        "N7-06"
+      ],
+      "change_scope": "Keep existing Gate-H metrics/limits and add a reproducible field comparator.",
+      "exit_conditions": [
+        "Retain all existing metrics and zero-uphill assertions at dx=dy=0.4,0.2,0.1.",
+        "Compare complete thickness/free-surface arrays with the controlled Python reference at the same resolutions, with approved error limits fixed before execution.",
+        "Distinguish archived port-audit field norms from an executable current-Fortran full-field comparison; record temporal-policy and dry-safe rebase provenance."
+      ]
+    },
+    {
+      "id": "D-N8-AREA",
+      "kind": "decision",
+      "title": "Resolve the original unequal-area synthetic test",
+      "normative_items": [
+        "I06"
+      ],
+      "criteria": [
+        "N8-02"
+      ],
+      "change_scope": "Clarify acceptance interpretation, not production mesh support.",
+      "exit_conditions": [
+        "Section 15.3.6 requests unequal synthetic cell areas, while the production projection accepts a uniform Cartesian grid and no area array.",
+        "Explicitly agree whether this is an independent weighted-stencil algebra test within the current uniform-grid contract or requires a separately authorized area-aware production helper. Do not silently omit it or claim a mathematical oracle tests unsupported production meshes."
+      ]
+    },
+    {
+      "id": "D-N7-CFL",
+      "kind": "decision",
+      "title": "Approve the production IMEX timestep comparison contract",
+      "normative_items": [
+        "H01",
+        "H02",
+        "H06",
+        "H13"
+      ],
+      "criteria": [
+        "N7-06"
+      ],
+      "change_scope": "No automatic change to CFL or addition of adaptive retry.",
+      "exit_conditions": [
+        "Use the existing directional-bound agreement, combined-timestep difference and actual-tableau order/stage evidence.",
+        "Confirm the accepted retained IMEX policy or explicitly authorize a separate targeted correction if the remaining finite-time tests expose a failure.",
+        "Do not require SSPRK2 timestep equality merely to call an IMEX test successful, and do not label the documented mismatch as reference agreement."
+      ]
+    }
+  ],
+  "acceptance_rules": [
+    "Preserve existing numerical tolerances, mandatory original-duration restart tests and raw conservative-state checks.",
+    "For new fixtures define seeds, comparison times, independent oracles and acceptance limits before executing the test; do not tune limits after failures.",
+    "New numerical fixtures use strict/optimized builds and real 1/4-thread comparisons; passing newly added cases updates the relevant original requirement only.",
+    "Reuse current evidence when source/test hashes match; do not rerun the full solver suite for this metadata/documentation-only reconciliation.",
+    "No N7/N8 milestone closes while its mapped mandatory actions or decisions remain unresolved; N9 remains a separate approval."
+  ],
+  "outside_this_closure": [
+    "A universal positivity proof or a new adaptive whole-step retry mechanism.",
+    "Exhaustive characterization of every rheology, pore-pressure inhibition model, entrainment or vaporization law beyond the availability/transport contracts above.",
+    "Nonautonomous inlet/fissure source timing and end-to-end injection budgets, source overlap geometry, NetCDF metadata and long-run provenance: retain in N9/model characterization.",
+    "M12c build/CI modernization, A1/A2 source organization, layers, local domains, MPI and GPU work.",
+    "New nonuniform production mesh support or a replacement spatial/time integration method."
+  ]
+}

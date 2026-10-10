@@ -1,5 +1,10 @@
 # N8 mass exchange and evolving bed validation
 
+The [N7/N8 closure checklist](N7_N8_CLOSURE_2026_10_10.md) reconciles these
+passing transaction assertions with the original required refinement and
+repeated-update tests. Broader physical-model coverage boundaries below do not
+automatically add new mandatory N8 tests.
+
 Production erosion/deposition tests now verify limited cell inventories,
 conservative sources, global bed volume, refreshed geometry and exact restart.
 They exposed five defects corrected in this candidate. All 34 acceptance runs
