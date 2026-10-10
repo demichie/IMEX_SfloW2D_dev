@@ -1,0 +1,130 @@
+{
+  "schema_version": 4,
+  "package": "N7-C and N7-D common-time reference support",
+  "frozen_before_execution": "2026-10-10",
+  "stages": [
+    2,
+    3,
+    4
+  ],
+  "profiles": [
+    "strict",
+    "optimized"
+  ],
+  "actual_threads": [
+    1,
+    4
+  ],
+  "roundoff_epsilon_multiplier": 32768,
+  "field_limit": "32768 * float64_epsilon * steps, independently scaled conservative components",
+  "reference_policy": "Unmodified checksum-pinned dry-safe spatial cores, independently assembled explicit IMEX tableaux; no SSPRK2/CFL-policy equality assumed",
+  "seeded": {
+    "fixtures": [
+      "dynamic_rough",
+      "dynamic_drainage",
+      "dynamic_compact"
+    ],
+    "seed": 20261009,
+    "pad_cells": 12,
+    "dt": 0.002,
+    "steps": 10,
+    "flags": [
+      [
+        false,
+        false
+      ],
+      [
+        true,
+        false
+      ]
+    ]
+  },
+  "mixed": {
+    "nx": 24,
+    "ny": 24,
+    "dx": 0.5,
+    "dy": 0.5,
+    "dt": 0.002,
+    "steps": 10,
+    "flags": [
+      [
+        false,
+        false
+      ],
+      [
+        false,
+        true
+      ],
+      [
+        true,
+        false
+      ],
+      [
+        true,
+        true
+      ]
+    ],
+    "minimum_curvature_differential": 1e-8,
+    "pad_cells": 12
+  },
+  "ramp": {
+    "nx": 24,
+    "length": 12,
+    "height": 0.4,
+    "angles_degrees": [
+      0,
+      45
+    ],
+    "rotations": [
+      0,
+      1
+    ],
+    "dt": 0.002,
+    "steps": 10
+  },
+  "circular": {
+    "nx": [
+      24,
+      48,
+      72
+    ],
+    "length": 12,
+    "radius": 2.5,
+    "time": 0.1,
+    "dt": 0.005,
+    "maximum_fourfold_anisotropy": 0.04,
+    "refinement_metric": "abs(signed final fourfold moment - signed initial fourfold moment)",
+    "maximum_finest_over_coarsest_evolution_anisotropy": 1,
+    "measurement_user_approved": "2026-10-10 explicit reply: use the contribution introduced during evolution, retain absolute final bound"
+  },
+  "production_changes_authorized_by_contract": true,
+  "combined_CFL_decision": "pending; prescribed diagnostic dt must not exceed the retained production bound",
+  "supersedes": "contract_v3.json; same cases, times, isotropy measure and limits, plus the explicitly authorized dry auxiliary reconstruction correction",
+  "v1_failure": {
+    "mixed_RK2_relative_mass_drift": 8.344287253035012e-11,
+    "unchanged_limit": 7.275957614183426e-12,
+    "reason": "Finite-time outgoing mass reached the open boundary; extend the quiet collar, do not loosen the budget"
+  },
+  "reference_adapter_contract": "reference_adapter_contract.json",
+  "face_audit": "Production spatial observer on every last-step raw solved stage, actual 1/4 threads, full active faces and independent current-policy traces",
+  "v2_failure": {
+    "RK2_final_anisotropy": [
+      0.00005924999384883116,
+      0.0002803230124242242,
+      0.0000948415971988883
+    ],
+    "RK2_initial_anisotropy": [
+      0.0008726080403339063,
+      0.00017634979155001142,
+      0.000048945026292195885
+    ],
+    "reason": "Initial sampling harmonic can cancel the evolution harmonic; retain signed initial/final and the failed old final-only refinement metric."
+  },
+  "authorized_correction": {
+    "user_approved": "2026-10-10 explicit reply: correct and verify both comparisons",
+    "scope": "Use zero auxiliary u/v in direct reconstruction at the EXISTING dry depth threshold; retain raw conservative cells, volumetric momenta and all other physical variables",
+    "CFL_changed": false,
+    "field_limits_changed": false,
+    "dry_depth_threshold_changed": false
+  }
+}

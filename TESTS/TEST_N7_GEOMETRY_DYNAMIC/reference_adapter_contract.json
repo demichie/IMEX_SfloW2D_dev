@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "scope": "Common production-policy Python comparator; clean cores remain unchanged, including the historical SSPRK2 oracle",
+  "cell_projection": "Validate raw mass before preparing caches with q_is_sanitized=True; retain positive cell mass until final machine-epsilon cleanup",
+  "normal_momentum_admissibility": "Use u_safe=0 for h<=1e-10 ONLY in the final compatible HP interval; retain original raw velocity in direct reconstruction",
+  "authorized_dry_auxiliary_correction": "User-approved 2026-10-10: zero auxiliary u/v candidates from h<=1e-10 centres in both direct and tangential reconstruction; retain raw conservative cell mass and original volumetric h*u candidates. The preceding normal_momentum_admissibility entry records the diagnosed pre-correction policy.",
+  "authorized_dry_curvature_correction": "User-approved 2026-10-10: evaluate only the explicit local curvature source at h>existing 1e-10 dry depth, selecting resolved cells before squaring velocities; retain conservative mass, other sources, CFL and numerical limits",
+  "rest_mass_flux": "Require exactly zero normal momenta, rest_flux_tol=0; do not suppress tiny physical motion",
+  "stationary_pressure_roundoff": "Apply the existing 64-epsilon pressure-scaled momentum cancellation only when the cell and all adjacent face endpoints have exactly zero momenta in both components; never cancel nonzero motion",
+  "final_dry_momenta": "Zero hu diagnostics when the corresponding final face conservative state is dry, matching final_hp_state",
+  "external_ghosts": "Copy the final reconstructed interior state, auxiliary velocities and eta, not the raw cell average, at transmissive domain faces; recompute fluxes and characteristic bounds after the copy",
+  "LS_boundary_strip": "Retain clean five-point LS interior coefficients, copy ALL derivative fields through the production two-cell boundary strip, then compute G and face averages. The prototype uses direction-only copying for pure derivatives.",
+  "unchanged": ["Q1 geometry", "LS interior kernels", "eta positivity", "h/eta blend weights", "face dry tolerance", "flux kernels", "hydrostatic path quadrature", "IMEX tableaux", "production CFL", "all numerical error limits"],
+  "audit_against_production": ["Every final conservative field", "Every raw last-step stage", "Raw positivity and budgets every step", "Sparse near-dry reference traces against the spatial observer"],
+  "initial_failed_comparators": {
+    "projected_cells": {"compact_RK2_scaled_h_error": 2.34456586e-9, "limit": 7.275957614183426e-11},
+    "raw_cells_without_safe_momentum_bounds": {"compact_RK2_scaled_h_error": 7.05204950e-7, "limit": 7.275957614183426e-11}
+  },
+  "status": "These failures diagnose reference-policy mismatches, not a relaxed acceptance limit. Clean SSPRK2 fields are compared separately under explicitly approved non-roundoff limits."
+}

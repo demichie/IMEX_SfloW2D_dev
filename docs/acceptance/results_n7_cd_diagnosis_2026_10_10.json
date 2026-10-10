@@ -1,0 +1,229 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "base_revision": "aed31540",
+  "report": "docs/acceptance/N7_CD_DIAGNOSTICS_2026_10_10.md",
+  "production_unchanged_during_diagnosis": true,
+  "N7_D_status": "satisfied_at_common_times_and_historical_limits",
+  "approved_roundoff_limit_unchanged": true,
+  "source_trace_changes": "Temporary main program writes states immediately before and after advance; no numerical module changed",
+  "accepted_steps": 65,
+  "canonical_final_trace_matches_unmodified": true,
+  "one_step_maximum_errors_conservative": [
+    2.2737367544323206e-13,
+    5.115907697472721e-13,
+    5.142791235728493e-13
+  ],
+  "first_different_face_guard": {
+    "step": 21,
+    "t": 0.00427287130950639,
+    "h_error_before": 3.865352482534945e-15,
+    "mom_error_before": 1.0659065883825558e-9,
+    "rest_mask_mismatches": {
+      "x": 2,
+      "y": 0
+    }
+  },
+  "next_trajectory_state": {
+    "step": 22,
+    "t": 0.004663571154152331,
+    "h_error_before": 3.2285538509313483e-10,
+    "mom_error_before": 1.0811201089921951e-7,
+    "rest_mask_mismatches": {
+      "x": 2,
+      "y": 0
+    }
+  },
+  "first_faces": [
+    {
+      "step": 21,
+      "j": 4,
+      "face": 24,
+      "actual_rest": true,
+      "reference_rest": false,
+      "actual_hu": [
+        0,
+        0
+      ],
+      "reference_hu": [
+        9.244795272147946e-8,
+        0
+      ],
+      "actual_face_h": [
+        0.00004174601775341888,
+        0
+      ],
+      "reference_face_h": [
+        0.0000417460177494776,
+        0
+      ],
+      "actual_unfiltered_mass_flux": 0.00023813191357298922,
+      "reference_unfiltered_mass_flux": 0.0002843558899000055
+    },
+    {
+      "step": 21,
+      "j": 17,
+      "face": 24,
+      "actual_rest": true,
+      "reference_rest": false,
+      "actual_hu": [
+        0,
+        0
+      ],
+      "reference_hu": [
+        9.244800027089782e-8,
+        0
+      ],
+      "actual_face_h": [
+        0.00004174603925166655,
+        0
+      ],
+      "reference_face_h": [
+        0.000041746039248058325,
+        0
+      ],
+      "actual_unfiltered_mass_flux": 0.00023813209752177473,
+      "reference_unfiltered_mass_flux": 0.00028435609762635
+    }
+  ],
+  "slope_curvature_dx04_maximum_h_error_m": 0.00005271758894859202,
+  "slope_curvature_dx04_limit_m": 9.458744898438454e-10,
+  "artifacts": {
+    "/tmp/imex-gate-full-trace.Hh0s8u/gateH_0001.q_2d": "b0bcba958d0f8446f95bd1d5ff7ffbed3709633f69a6a74552fb653ca622fa40",
+    "/tmp/imex-gate-full-trace.Hh0s8u/local_one_step_all_component_errors.npz": "2411f059c42de1aa6ede4c6ae0d92026dde524ada48ef30706c3464aabc08a72",
+    "/tmp/imex-gate-full-trace.Hh0s8u/branch_sensitivity.json": "afe390561a0e12e4dcc965e5152ecaf11b9bcb7c83b879b505fc0dac9cc8017d",
+    "/tmp/imex-gate-full-trace.Hh0s8u/first_rest_branch_details.json": "4532095c38f84d51b8e8ba8290d833ec2133138a6184734335bb6b9561cf50e9",
+    "/tmp/imex_n7_gate_trace_main.f90": "8479c9c8e7f4eb5e57c7badc95b01f8c4768f4f4dd3701ddaeac8db39b00f732"
+  },
+  "proposed_fix": "Zero auxiliary reconstruction velocities at the existing dry depth threshold without projecting conservative cell mass",
+  "proposed_fix_status": "User-authorized auxiliary, explicit curvature and accepted-state dry-only moment corrections implemented; all 41 candidate audit groups and six cross-thread groups pass.",
+  "CFL_changed": false,
+  "historical_comparison_limits_changed": false,
+  "uphill_limit_changed": false,
+  "auxiliary_only_candidate": {
+    "full_audit": "/tmp/imex-n7-cd-dry-aux-acceptance-20261010/manifest.json",
+    "test_runs": 41,
+    "passed": 37,
+    "failed": 4,
+    "slope_curvature_dx04_h_Linf_m": 0.00001158556016522816,
+    "slope_curvature_dx02": "Floating-point overflow in squared velocity; not accepted"
+  },
+  "combined_candidate": {
+    "source_files": [
+      "src/reconstruction_2d.f90",
+      "src/equation_terms_2d.f90"
+    ],
+    "autonomous_coarse": {
+      "h_Linf_m": 6.747236532564458e-9,
+      "limit_m": 2.3137545213103294e-9,
+      "status": "failed"
+    },
+    "autonomous_intermediate": {
+      "h_Linf_m": 0.00003256048475674955,
+      "limit_m": 2.6775524020195007e-9,
+      "status": "failed"
+    },
+    "autonomous_fine": {
+      "h_Linf_m": 6.2534724065699265e-9,
+      "limit_m": 1.3533281162381172e-9,
+      "status": "failed"
+    },
+    "common_time_coarse": {
+      "h_Linf_m": 2.2401858146281484e-11,
+      "limit_m": 2.3137545213103294e-9,
+      "status": "passed",
+      "accepted_steps": 159,
+      "canonical_trace_output_identical": true
+    },
+    "separation_user_approved": "2026-10-10 explicit reply: separate the checks and keep autonomous CFL open",
+    "autonomous_CFL_action": "D-N7-CFL",
+    "maximum_coarse_accepted_dt_difference_s": 0.0000016440846853510438,
+    "common_time_full_audit": {
+      "path": "/tmp/imex-n7-cd-common-times-acceptance-20261010/manifest.json",
+      "passed": 37,
+      "failed": 4,
+      "slope_curvature_intermediate_h_Linf_m": 0.00003255999514450991,
+      "strict_limit_m": 2.6775524020195007e-9,
+      "all_historical_fields_passed": true,
+      "status": "not_satisfied"
+    }
+  },
+  "dry_conservative_momentum_memory": {
+    "trace_path": "/tmp/imex-guard-common-dx0p2.5st_mqop",
+    "cell_zero_based_row_column": [
+      37,
+      46
+    ],
+    "dry_h_m": 2.196349023712712e-15,
+    "momenta_before_step_47": [
+      0.000005110335133501846,
+      0.00000813422639620255
+    ],
+    "h_error_before_step_48_m": 5.776882971986197e-12,
+    "h_error_before_step_49_m": 1.3148296488907362e-8,
+    "curvature_guard_mask_mismatches": 0,
+    "normal_exact_rest_face_mismatches_step_48": {
+      "x": 0,
+      "y": 0
+    },
+    "maximum_sampled_actual_state_one_step_mass_error": 2.2737367544323206e-13,
+    "maximum_sampled_actual_state_one_step_momentum_error": 7.853336037033642e-13,
+    "scope": "Local replay diagnoses conditioning; does not replace independent finite-time trajectory"
+  },
+  "authorized_final_dry_momentum_candidate": {
+    "user_approved": "2026-10-10 explicit reply: zero only dry moments and verify everything",
+    "scope": "Only accepted-state momenta after raw final checks; mass/thermal/components, raw stages and implicit solve unchanged",
+    "trace": {
+      "steps": 150,
+      "output_byte_identical": true,
+      "output_sha256": "5c93b9c5aa2c5632b6b00e98031f2ab8e20bbfd499d72cda64732ca8bc8ceb88",
+      "trace_sha256": "6368b10b0e7c05af73ce8e83a7ad497cad1da3c1ac11783ec920439a08c74f71",
+      "maximum_accepted_dry_momentum": 0,
+      "retained_positive_dry_mass_observations": 1770,
+      "formerly_problem_cell": {
+        "row": 37,
+        "column": 46,
+        "maximum_accepted_dry_momentum": 0,
+        "maximum_retained_positive_dry_mass": 2.196349023712712e-12
+      }
+    },
+    "trace_path": "/tmp/imex-dry-momentum-trace-dx02.cmgu0dg2",
+    "focused_field_evidence_path": "/tmp/imex-dry-momentum-dx02.dpxbmrjs/field_evidence.json",
+    "full_audit_path": "/tmp/imex-n7-cd-dry-momentum-acceptance-20261010/manifest.json",
+    "full_audit_status": "passed",
+    "full_audit_summary": {
+      "test_runs": 41,
+      "failed": 0,
+      "passed": 41,
+      "n9_accepted": false
+    },
+    "full_audit_manifest_sha256": "aeba91f0d5e0c2a3dda6a8bf694a836656171cfb81700c7295dbf59e5b7df493",
+    "focused_common_time_fields": {
+      "cells_compared": 2184,
+      "limit_m": 2.1827872842550278e-9,
+      "h_Linf_m": 6.179501355063621e-12,
+      "eta_Linf_m": 6.179945444273471e-12,
+      "h_L1_m": 1.0444818401948774e-12,
+      "eta_L1_m": 1.044481147888223e-12
+    },
+    "supplementary_autonomous_diagnostic": {
+      "status": "passed",
+      "executed_in_this_run": true,
+      "closure_action": "D-N7-CFL",
+      "N7_D_assertion": false,
+      "reason": "Autonomous adaptive trajectories are an explicitly separated unresolved diagnostic",
+      "assessment": {
+        "cells_compared": 2184,
+        "limit_m": 2.1827872842550278e-9,
+        "h_Linf_m": 4.0520568929101907e-10,
+        "eta_Linf_m": 4.0520564681401083e-10,
+        "h_L1_m": 1.7329352236435468e-11,
+        "eta_L1_m": 1.7329371962649525e-11
+      }
+    },
+    "completion_evidence": "docs/acceptance/results_n7_cd_2026_10_10.json",
+    "remaining_action": "D-N7-CFL",
+    "N9_accepted": false
+  },
+  "diagnosis_scope": "Initial unmodified temporary-trace phase; subsequent authorized production corrections are recorded separately."
+}

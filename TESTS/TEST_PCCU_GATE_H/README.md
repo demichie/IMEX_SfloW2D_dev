@@ -1,42 +1,57 @@
-# HP-PCCU Gate-H refinement regression
+# Gate-H full-field excavation comparisons
 
-This test reproduces the compact four-sided one-cell inclined excavation from
-the frozen HP-PCCU validation package on the three square grids
-`dx = dy = 0.4, 0.2, 0.1 m`. The nominal 8 m by 6 m excavation is translated
-by half a cell in both directions and constructed from one globally continuous
-Q1 vertex field. Its initial thickness is the exact Q1 cell average, so the
-initial free surface is the unexcavated inclined plane.
+The compact four-sided one-cell excavation uses `dx = dy = 0.4, 0.2, 0.1 m`.
+The nominal 8 m by 6 m depression is translated by half a cell in each
+direction and built from one globally continuous Q1 vertex field. Initial
+thickness is its exact cell average, giving the unexcavated inclined plane
+as the initial free surface.
 
-Two layers are exercised:
+The test retains the existing three grids, G=1 and slope-plus-curvature
+modes, aggregate limits and zero-uphill requirement. It additionally checks
+every final thickness and free-surface cell against two independent initial
+value trajectories: current-policy IMEX at common accepted times and the
+unchanged historical SSPRK2 prototype under its separately approved limits.
+`reference_metrics.csv` remains the aggregate regression: positivity,
+conservation, uphill transfer, G=1 lateral symmetry, mass partitions, moments,
+total variation and extrema. Passing these aggregates alone is not proof of
+full-field agreement. Both clean-core checksums are frozen in the contracts.
 
-- baseline HP-PCCU with `G=1`;
-- slope correction and the separate curvature source both enabled.
+The test-only observational main records accepted times immediately before
+the production IMEX call. It reuses the tested numerical objects and compiler
+flags when available, changes no production source, and must produce
+byte-identical canonical conservative output. The accepted-time stream and
+canonical output hashes are checked before comparison. The reference uses
+those times and common initial fields, never actual intermediate states.
 
-`reference_metrics.csv` contains field fingerprints generated with
-`HP_PCCU_clean_reference_cores_2026-09-26_drySafe_rebase.zip`. The test checks
-positivity, conservation, zero uphill transfer, the G=1 lateral symmetry, mass
-partitions, thickness moments, total variation and extrema. Aggregate
-fingerprints keep the regression small while making it sensitive to changes in
-the complete 2-D thickness field.
+`field_contract.json` preserves the original autonomous adaptive comparison.
+`field_contract_v2.json` records the user-approved separation from the
+common-time spatial/stage gate; all error limits are unchanged. The autonomous
+CFL comparison remains non-satisfied under `D-N7-CFL`, not a passing N7-D
+assertion. Add `--autonomous` to `compare_fields.py` to reproduce and record
+that diagnostic separately; its failure is retained in field evidence.
 
-The reference core SHA-256 hashes, as recorded in the package, are:
+The current `field_contract_v3.json` also records the user-authorized dry-only
+momentum projection of the accepted final IMEX state. Only the two momenta
+are reset at the unchanged shared depth threshold; conservative mass, thermal
+energy and components remain intact. The current-policy reference explicitly
+matches this mapping, while the historical SSPRK2 core remains unchanged.
 
-- `ffcb695ff8d8d2bd06e433d70b2a519c0b0012d959eb664b617deea83e8f64e2`
-  for `hp_pccu_1d_core.py`;
-- `c63331366cadf9f04d802a3f058088b9c175399b2d6dc7015068a0ad110f1577`
-  for `hp_pccu_2d_core.py`.
+Run from the repository root to retain fields, accepted times and evidence:
 
-During the port audit the complete Fortran and Python arrays were also compared.
-For slope plus curvature, the normalized errors were:
+```sh
+KEEP_TEST_WORKDIR=1 OMP_NUM_THREADS=4 sh TESTS/TEST_PCCU_GATE_H/run_test.sh /path/to/IMEX_SfloW2D
+```
 
-| dx | L1(h) | L1(eta) | Linf(h) [m] |
-|---:|---:|---:|---:|
+The harness respects the requested thread team;
+the full acceptance runner checks actual one/four-thread runs in both compiler
+profiles. Compilation of the observation-only main requires gfortran and the
+configured NetCDF development libraries, as do the other solver tests.
+
+For provenance, the earlier port audit reported the following historical
+slope-plus-curvature differences; these are not current acceptance limits:
+
+| dx [m] | L1(h) | L1(eta) | Linf(h) [m] |
+| ---: | ---: | ---: | ---: |
 | 0.4 | 7.1697e-5 | 2.7927e-5 | 1.0116e-3 |
 | 0.2 | 6.5239e-5 | 2.5412e-5 | 8.6013e-4 |
 | 0.1 | 6.4436e-5 | 2.5099e-5 | 1.2830e-3 |
-
-Run from the repository root with:
-
-```sh
-TESTS/TEST_PCCU_GATE_H/run_test.sh /path/to/IMEX_SfloW2D
-```

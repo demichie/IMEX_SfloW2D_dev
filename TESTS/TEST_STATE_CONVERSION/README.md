@@ -6,6 +6,9 @@ mixture heat-capacity weighting.
 
 The passing baseline covers:
 
+- Dry-only accepted-state momentum projection below, at and immediately above
+  the shared depth cutoff: exact preservation of mass, thermal energy and all
+  transported entries; idempotence and absence of old momentum on rewetting.
 - `q -> qp -> q` round trips with `alpha` and `h*alpha` storage;
 - energy and temperature-transport configurations;
 - gas, two solid classes, one additional gas, liquid, stochastic transport,

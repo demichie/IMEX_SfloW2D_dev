@@ -242,7 +242,9 @@ CONTAINS
 
     USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms
 
-    USE state_conversion_2d, ONLY : qc_to_qp, primitive_to_volume_fractions
+    USE state_conversion_2d, ONLY : qc_to_qp, primitive_to_volume_fractions, &
+         project_dry_cell_momenta
+    USE parameters_2d, ONLY : dry_thickness_tolerance, idx_u, idx_v
 
     USE equation_terms_2d, ONLY : eval_expl_terms
 
@@ -802,6 +804,17 @@ CONTAINS
        END IF negative_alpha_check
 
        CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+
+       ! Do not carry unresolved momentum into a later rewetting event.
+       ! The raw assembly has already been observed and checked above. Unlike
+       ! the existing machine-epsilon cleanup, this projection retains mass,
+       ! thermal energy and every transported component. Keep qp consistent
+       ! without repeating the thermodynamic conversion (depth is unchanged).
+       CALL project_dry_cell_momenta(q(:,j,k), qp(1,j,k))
+       IF (qp(1,j,k) <= dry_thickness_tolerance) THEN
+          qp(2:3,j,k) = 0.0_wp
+          qp(idx_u:idx_v,j,k) = 0.0_wp
+       END IF
 
        IF ( qp(1,j,k) .GT. 1.e-10_wp ) THEN
        

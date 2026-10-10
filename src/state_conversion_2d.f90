@@ -12,7 +12,7 @@ MODULE state_conversion_2d
 
   USE parameters_2d, ONLY : wp
   USE parameters_2d, ONLY : n_vars, n_solid, n_add_gas
-  USE parameters_2d, ONLY : eps_sing, eps_sing4
+  USE parameters_2d, ONLY : eps_sing, eps_sing4, dry_thickness_tolerance
   USE parameters_2d, ONLY : liquid_flag, gas_flag,                              &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag
 
@@ -71,8 +71,24 @@ MODULE state_conversion_2d
   PUBLIC :: enforce_primitive_mass_fraction_closure
   PUBLIC :: primitive_to_volume_fractions
   PUBLIC :: velocity_from_conservative
+  PUBLIC :: project_dry_cell_momenta
 
 CONTAINS
+
+  !> \brief Remove unresolved cell momenta without discarding conservative mass.
+  !> \param[in,out] qc Conservative cell state; only entries 2 and 3 may change.
+  !> \param[in] h Depth recovered with the current mixture thermodynamic closure.
+  !> \details At h <= the existing shared dry-depth threshold, reset both
+  !>          momenta to zero. Mass, thermal energy and transported components
+  !>          are bitwise unchanged. Wet momenta are also unchanged.
+  !> \note Apply after observing/checking the raw final IMEX assembly, not inside
+  !>       the differentiable real/complex closure or the implicit Newton solve.
+  PURE SUBROUTINE project_dry_cell_momenta(qc, h)
+    REAL(wp), INTENT(INOUT) :: qc(:)
+    REAL(wp), INTENT(IN) :: h
+
+    IF (h <= dry_thickness_tolerance) qc(2:3) = 0.0_wp
+  END SUBROUTINE project_dry_cell_momenta
 
   !> \brief Recover real velocities from mixture mass and momenta with dry-state regularization.
   !>

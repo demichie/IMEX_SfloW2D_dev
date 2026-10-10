@@ -1,8 +1,10 @@
 """Focused checks of audit parsing and evidence classification, not model physics."""
 
 import json
+from hashlib import sha256
 import math
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 
@@ -272,7 +274,7 @@ class AuditToolsTests(unittest.TestCase):
         self.assertEqual(digest(repo / record["path"]), record["sha256"])
         self.assertEqual(closure["milestone_status"], {"N7": "open", "N8": "satisfied", "N9": "open"})
         self.assertEqual({a["id"] for a in closure["remaining_actions"]},
-                         {"N7-C", "N7-D", "D-N7-CFL"})
+                         {"D-N7-CFL"})
         cases = {c["id"]: c for c in closure["required_tests"]["hydrodynamics"]}
         self.assertEqual(cases["H04"]["status"], "satisfied")
         self.assertEqual(cases["H04"]["remaining_actions"], [])
@@ -321,8 +323,9 @@ class AuditToolsTests(unittest.TestCase):
         self.assertEqual(action["status"], "satisfied")
         self.assertEqual(action["evidence"], ["n7_b"])
         self.assertEqual({a["id"] for a in closure["remaining_actions"]},
-                         {"N7-C", "N7-D", "D-N7-CFL"})
-        self.assertEqual(closure["next_implementation_batch"], ["N7-C", "N7-D"])
+                         {"D-N7-CFL"})
+        self.assertEqual(closure["next_implementation_batch"], [])
+        self.assertEqual(closure["next_decision"], "D-N7-CFL")
         criterion = next(c for c in closure["criteria"] if c["id"] == "N7-05")
         self.assertEqual(criterion["closure_status"], "satisfied")
         self.assertEqual(criterion["remaining_actions"], [])
@@ -333,7 +336,16 @@ class AuditToolsTests(unittest.TestCase):
         self.assertEqual(len(set(evidence["case_inventory"])), 162)
         self.assertEqual(evidence["production_changes"], ["src/geometry_2d.f90"])
         for name, expected in evidence["source_and_fixture_sha256"].items():
-            self.assertEqual(digest(repo / name), expected, name)
+            if name.startswith("src/"):
+                # N7-B is archived evidence, not a promise that later approved
+                # numerical changes leave every current source byte unchanged.
+                # Its completion commit pins the actual audited source; the
+                # latest package must independently pin current production.
+                archived = subprocess.check_output(
+                    ["git", "show", "aed31540:"+name], cwd=repo)
+                self.assertEqual(sha256(archived).hexdigest(), expected, name)
+            else:
+                self.assertEqual(digest(repo / name), expected, name)
         original = evidence["original_contract"]; contact = evidence["contact_contract"]
         self.assertEqual(original["stages"], [2, 3, 4])
         self.assertEqual(original["roundoff_epsilon_multiplier"], 32768)
@@ -388,7 +400,7 @@ class AuditToolsTests(unittest.TestCase):
         self.assertEqual(action["evidence"], ["n7_a"])
         self.assertEqual(closure["milestone_status"], {"N7": "open", "N8": "satisfied", "N9": "open"})
         self.assertEqual({a["id"] for a in closure["remaining_actions"]},
-                         {"N7-C", "N7-D", "D-N7-CFL"})
+                         {"D-N7-CFL"})
         self.assertEqual(next(c for c in closure["criteria"] if c["id"] == "N7-01")["closure_status"],
                          "satisfied")
         for item in closure["required_tests"]["hydrodynamics"]:
@@ -474,6 +486,77 @@ class AuditToolsTests(unittest.TestCase):
                               "old_optimized_to_strict_Linf", "new_optimized_to_strict_Linf"):
                     self.assertEqual(len(snapshot[field]), width)
                     self.assertTrue(all(math.isfinite(v) and v >= 0 for v in snapshot[field]))
+
+
+    def test_n7_cd_completion_preserves_cfl_and_n9_scope(self):
+        """Close bounded geometry/field gates, not autonomous CFL or baseline approval."""
+        repo = Path(__file__).resolve().parents[2]
+        closure = json.loads((repo / "TESTS/ACCEPTANCE/n7_n8_closure_plan.json").read_text())
+        record = closure["evidence_artifacts"]["n7_cd"]
+        evidence = json.loads((repo / record["path"]).read_text())
+        self.assertEqual(digest(repo / record["path"]), record["sha256"])
+        self.assertTrue((repo / evidence["report"]).is_file())
+        self.assertEqual({a["id"] for a in closure["remaining_actions"]}, {"D-N7-CFL"})
+        for action_id in ("N7-C", "N7-D"):
+            action = next(a for a in closure["completed_actions"] if a["id"] == action_id)
+            self.assertEqual((action["status"], action["evidence"]), ("satisfied", ["n7_cd"]))
+        self.assertEqual(closure["milestone_status"], {"N7": "open", "N8": "satisfied", "N9": "open"})
+        self.assertFalse(evidence["summary"]["scientific_baseline_approved"])
+        full = evidence["full_audit"]
+        self.assertEqual(full["summary"], {"test_runs": 41, "failed": 0, "passed": 41, "n9_accepted": False})
+        self.assertEqual(len(full["tests"]), 41)
+        self.assertTrue(all(t["status"] == "pass" for t in full["tests"]))
+        self.assertEqual(len(full["thread_comparisons"]), 6)
+        self.assertTrue(all(t["status"] == "pass" for t in full["thread_comparisons"]))
+        for name, value in evidence["source_sha256"].items():
+            self.assertEqual(digest(repo/name), value, name)
+        for name, value in evidence["repository_fixture_sha256"].items():
+            self.assertEqual(digest(repo/name), value, name)
+        policy = evidence["authorized_policy"]
+        for name in ("CFL_policy_changed", "dry_threshold_changed", "field_limits_changed",
+                     "historical_reference_kernels_changed", "raw_IMEX_stage_projection_added",
+                     "implicit_Newton_projection_added"):
+            self.assertFalse(policy[name], name)
+        for profile in evidence["dynamic_profiles"]:
+            self.assertEqual((profile["case_count"], profile["solver_runs"]), (69, 138))
+            self.assertEqual(profile["status"], "passed")
+            self.assertFalse(profile["failures"])
+            for case in profile["cases"]:
+                self.assertEqual(case["fingerprints"]["actual_threads"], [1, 4])
+                self.assertEqual(len(case["last_step_stage_face_audits"]), case["n_RK"])
+                self.assertTrue(all(a["actual_threads"] == [1, 4]
+                                    for a in case["last_step_stage_face_audits"]))
+            self.assertEqual(len(profile["curvature_differentials"]), 6)
+            self.assertTrue(all(d["maximum_scaled_differential"] > 1e-8
+                                for d in profile["curvature_differentials"]))
+            for entry in profile["isotropy_refinements"]:
+                self.assertLessEqual(entry["evolution_finest_over_coarsest"], 1)
+                self.assertLessEqual(max(entry["anisotropy"]), 0.04)
+        records = evidence["Gate_H_records"]
+        self.assertEqual(len(records), 24)
+        self.assertEqual({(r["profile"], r["actual_threads"], r["mode"], r["dx"])
+                          for r in records},
+                         {(p, t, m, dx) for p in ("strict_debug", "historical_optimized")
+                          for t in (1, 4) for m in ("g1", "slope_curvature") for dx in (0.4, 0.2, 0.1)})
+        for item in records:
+            current = item["current_IMEX"]
+            self.assertTrue(all(math.isfinite(v) for v in current.values()))
+            self.assertLessEqual(current["h_Linf_m"], current["limit_m"])
+            self.assertLessEqual(current["eta_Linf_m"], current["limit_m"])
+            historical = item["historical_SSPRK2"]
+            self.assertLessEqual(historical["normalized_L1_h"], 2e-4)
+            self.assertLessEqual(historical["normalized_L1_eta"], 1e-4)
+            self.assertLessEqual(historical["Linf_m"], 0.003)
+            observer = item["accepted_time_observer"]
+            self.assertTrue(observer["canonical_output_byte_identical"])
+            self.assertEqual(observer["actual_threads"], item["actual_threads"])
+            self.assertFalse(observer["numerical_modules_instrumented"])
+        trace = evidence["dry_projection_trace"]
+        self.assertEqual(trace["maximum_accepted_dry_momentum"], 0)
+        self.assertGreater(trace["retained_positive_dry_mass_observations"], 0)
+        self.assertTrue(trace["output_byte_identical"])
+        self.assertEqual(evidence["Gate_H_field_contract"]["autonomous_CFL"]["status"], "not_satisfied")
+        self.assertFalse(evidence["supplementary_autonomous_diagnostic"]["N7_D_assertion"])
 
 
 if __name__ == "__main__":

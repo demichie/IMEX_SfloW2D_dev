@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "package": "N7-C and N7-D common-time reference support",
+  "frozen_before_execution": "2026-10-10",
+  "stages": [2, 3, 4],
+  "profiles": ["strict", "optimized"],
+  "actual_threads": [1, 4],
+  "roundoff_epsilon_multiplier": 32768,
+  "field_limit": "32768 * float64_epsilon * steps, independently scaled conservative components",
+  "reference_policy": "Unmodified checksum-pinned dry-safe spatial cores, independently assembled explicit IMEX tableaux; no SSPRK2/CFL-policy equality assumed",
+  "seeded": {
+    "fixtures": ["dynamic_rough", "dynamic_drainage", "dynamic_compact"],
+    "seed": 20261009, "pad_cells": 12,
+    "dt": 0.002, "steps": 10,
+    "flags": [[false, false], [true, false]]
+  },
+  "mixed": {
+    "nx": 24, "ny": 24, "dx": 0.5, "dy": 0.5,
+    "dt": 0.002, "steps": 10,
+    "flags": [[false, false], [false, true], [true, false], [true, true]],
+    "minimum_curvature_differential": 1e-8
+  },
+  "ramp": {
+    "nx": 24, "length": 12.0, "height": 0.4,
+    "angles_degrees": [0, 45], "rotations": [0, 1],
+    "dt": 0.002, "steps": 10
+  },
+  "circular": {
+    "nx": [24, 48, 72], "length": 12.0, "radius": 2.5,
+    "time": 0.1, "dt": 0.005,
+    "maximum_fourfold_anisotropy": 0.04,
+    "maximum_finest_over_coarsest_anisotropy": 1.0
+  },
+  "production_changes_authorized_by_contract": false,
+  "combined_CFL_decision": "pending; prescribed diagnostic dt must not exceed the retained production bound"
+}

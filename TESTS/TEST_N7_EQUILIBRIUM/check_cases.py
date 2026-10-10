@@ -137,12 +137,13 @@ def reference_1d(initial, vertices, dx, dt, count, n, slope=False, curvature=Fal
         if minimum < -ROUND:
             raise AssertionError("negative raw reference final before next kernel sanitization")
         raw = lift(state)
-        # Production's existing final canonicalization discards momentum only
-        # when total mass is below machine epsilon (not the interface h cutoff).
-        # Capture and compare raw states BEFORE this explicitly audited mapping.
+        # Observe raw assembly before the existing machine-epsilon cleanup
+        # and the user-authorized accepted-state dry-only momentum projection.
         dry = state[:, 0] < np.finfo(float).eps
-        dry_repairs.append(float(np.max(np.abs(raw[0, dry]))) if np.any(dry) else 0.0)
         state[dry] = 0
+        unresolved = core1.raw_thickness(state, params) <= params.dry_h_tol
+        state[unresolved, 1] = 0
+        dry_repairs.append(float(np.max(np.abs(raw-lift(state)))))
     return lift(state), np.array(known), minimum, raw, np.array(dry_repairs)
 
 

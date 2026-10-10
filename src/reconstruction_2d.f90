@@ -283,9 +283,12 @@ CONTAINS
        j = this%hp_eta_j(l)
        k = this%hp_eta_k(l)
        this%qp_cellW(:,j,k) = qp_expl(:,j,k)
-       this%qp_cellE(:,j,k) = qp_expl(:,j,k)
-       this%qp_cellS(:,j,k) = qp_expl(:,j,k)
-       this%qp_cellN(:,j,k) = qp_expl(:,j,k)
+       IF (qp_expl(1,j,k) .LE. hp_dry_tolerance) THEN
+          this%qp_cellW(idx_u:idx_v,j,k) = 0.0_wp
+       END IF
+       this%qp_cellE(:,j,k) = this%qp_cellW(:,j,k)
+       this%qp_cellS(:,j,k) = this%qp_cellW(:,j,k)
+       this%qp_cellN(:,j,k) = this%qp_cellW(:,j,k)
     END DO
     !$OMP END PARALLEL DO
 
@@ -302,10 +305,10 @@ CONTAINS
        j = j_cent(l)
        k = k_cent(l)
 
-       qrecW(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
-       qrecE(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
-       qrecS(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
-       qrecN(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
+       qrecW(1:n_vars+2) = this%qp_cellW(1:n_vars+2,j,k)
+       qrecE(1:n_vars+2) = this%qp_cellE(1:n_vars+2,j,k)
+       qrecS(1:n_vars+2) = this%qp_cellS(1:n_vars+2,j,k)
+       qrecN(1:n_vars+2) = this%qp_cellN(1:n_vars+2,j,k)
 
        x_stencil(2) = x_comp(j)
        y_stencil(2) = y_comp(k)
@@ -354,10 +357,10 @@ CONTAINS
 
           fast_vars_loop:DO i=1,n_vars+2
 
-             qrec_stencil(2) = qp_expl(i,j,k)
+             qrec_stencil(2) = reconstruction_cell_value(qp_expl,i,j,k)
 
-             qrec_stencil(1) = qp_expl(i,j-1,k)
-             qrec_stencil(3) = qp_expl(i,j+1,k)
+             qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j-1,k)
+             qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j+1,k)
              CALL limit( qrec_stencil , x_stencil , limiter(i) ,               &
                   qrec_prime_x(i) )
 
@@ -365,8 +368,8 @@ CONTAINS
              qrecW(i) = qrec_stencil(2) - dq
              qrecE(i) = qrec_stencil(2) + dq
 
-             qrec_stencil(1) = qp_expl(i,j,k-1)
-             qrec_stencil(3) = qp_expl(i,j,k+1)
+             qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j,k-1)
+             qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j,k+1)
              CALL limit( qrec_stencil , y_stencil , limiter(i) ,               &
                   qrec_prime_y(i) )
 
@@ -380,7 +383,7 @@ CONTAINS
 
        vars_loop:DO i=1,n_vars
 
-          qrec_stencil(2) = qp_expl(i,j,k)
+          qrec_stencil(2) = reconstruction_cell_value(qp_expl,i,j,k)
 
           ! x direction
           check_comp_cells_x:IF ( comp_cells_x .GT. 1 ) THEN
@@ -395,7 +398,7 @@ CONTAINS
 
                    ! Dirichlet boundary condition
                    qrec_stencil(1) = source_bdry(i)
-                   qrec_stencil(3) = qp_expl(i,j+1,k)
+                   qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j+1,k)
 
                    CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
                         qrec_prime_x(i) )
@@ -406,7 +409,7 @@ CONTAINS
 
                       ! Dirichlet boundary condition
                       qrec_stencil(1) = bcW(i)%value
-                      qrec_stencil(3) = qp_expl(i,j+1,k)
+                      qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j+1,k)
 
                       CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
                            qrec_prime_x(i) )
@@ -418,7 +421,9 @@ CONTAINS
 
                    ELSEIF ( bcW(i)%flag .EQ. 2 ) THEN
 
-                      qrec_prime_x(i) = ( qp_expl(i,2,k) - qp_expl(i,1,k) )        &
+                      qrec_prime_x(i) = (                                   &
+                           reconstruction_cell_value(qp_expl,i,2,k) -     &
+                           reconstruction_cell_value(qp_expl,i,1,k) )     &
                            * one_by_dx
 
                    END IF
@@ -435,7 +440,7 @@ CONTAINS
 
                    ! Dirichlet boundary condition
                    qrec_stencil(3) = source_bdry(i)
-                   qrec_stencil(1)= qp_expl(i,j-1,k)
+                   qrec_stencil(1)= reconstruction_cell_value(qp_expl,i,j-1,k)
 
                    CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
                         qrec_prime_x(i) )
@@ -446,7 +451,7 @@ CONTAINS
 
                       ! Dirichlet boundary condition
                       qrec_stencil(3) = bcE(i)%value
-                      qrec_stencil(1)= qp_expl(i,j-1,k)
+                      qrec_stencil(1)= reconstruction_cell_value(qp_expl,i,j-1,k)
 
                       CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
                            qrec_prime_x(i) )
@@ -458,8 +463,8 @@ CONTAINS
 
                    ELSEIF ( bcE(i)%flag .EQ. 2 ) THEN
 
-                      qrec_prime_x(i) = ( qp_expl(i,comp_cells_x,k) -              &
-                           qp_expl(i,comp_cells_x-1,k) ) * one_by_dx
+                      qrec_prime_x(i) = ( reconstruction_cell_value(qp_expl,i,comp_cells_x,k) -              &
+                           reconstruction_cell_value(qp_expl,i,comp_cells_x-1,k) ) * one_by_dx
 
                    END IF
 
@@ -472,8 +477,8 @@ CONTAINS
                 x_stencil(1) = x_comp(j-1)
                 x_stencil(3) = x_comp(j+1)
 
-                qrec_stencil(1) = qp_expl(i,j-1,k)
-                qrec_stencil(3) = qp_expl(i,j+1,k)
+                qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j-1,k)
+                qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j+1,k)
 
                 ! correction for radial source inlet x-interfaces values
                 ! used for the linear reconstruction
@@ -565,7 +570,7 @@ CONTAINS
 
                    ! Dirichlet boundary condition
                    qrec_stencil(1) = bcS(i)%value
-                   qrec_stencil(3) = qp_expl(i,j,k+1)
+                   qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j,k+1)
 
                    CALL limit( qrec_stencil , y_stencil , limiter(i) ,          &
                         qrec_prime_y(i) )
@@ -577,7 +582,9 @@ CONTAINS
 
                 ELSEIF ( bcS(i)%flag .EQ. 2 ) THEN
 
-                   qrec_prime_y(i) = ( qp_expl(i,j,2) - qp_expl(i,j,1) )        &
+                   qrec_prime_y(i) = (                                      &
+                        reconstruction_cell_value(qp_expl,i,j,2) -        &
+                        reconstruction_cell_value(qp_expl,i,j,1) )        &
                         * one_by_dy
 
                 END IF
@@ -591,7 +598,7 @@ CONTAINS
                 IF ( bcN(i)%flag .EQ. 0 ) THEN
 
                    ! Dirichlet boundary condition
-                   qrec_stencil(1)= qp_expl(i,j,k-1)
+                   qrec_stencil(1)= reconstruction_cell_value(qp_expl,i,j,k-1)
                    qrec_stencil(3) = bcN(i)%value
 
                    CALL limit( qrec_stencil , y_stencil , limiter(i) ,          &
@@ -604,8 +611,8 @@ CONTAINS
 
                 ELSEIF ( bcN(i)%flag .EQ. 2 ) THEN
 
-                   qrec_prime_y(i) = ( qp_expl(i,j,comp_cells_y) -              &
-                        qp_expl(i,j,comp_cells_y-1) ) * one_by_dy
+                   qrec_prime_y(i) = ( reconstruction_cell_value(qp_expl,i,j,comp_cells_y) -              &
+                        reconstruction_cell_value(qp_expl,i,j,comp_cells_y-1) ) * one_by_dy
 
                 END IF
 
@@ -616,8 +623,8 @@ CONTAINS
                 y_stencil(1) = y_comp(k-1)
                 y_stencil(3) = y_comp(k+1)
 
-                qrec_stencil(1) = qp_expl(i,j,k-1)
-                qrec_stencil(3) = qp_expl(i,j,k+1)
+                qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j,k-1)
+                qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j,k+1)
 
                 ! correction for radial source inlet y-interfaces
                 ! used for the linear reconstruction
@@ -687,24 +694,24 @@ CONTAINS
           ! x direction
           check_comp_cells_x2:IF ( comp_cells_x .GT. 1 ) THEN
 
-             qrec_stencil(2) = qp_expl(i,j,k)
+             qrec_stencil(2) = reconstruction_cell_value(qp_expl,i,j,k)
 
              IF ( j .EQ. 1 ) THEN
 
                 CALL qp_to_qp2( qrecW(1:n_vars+2) , B_cent(j,k) , qp2recW )
                 qrec_stencil(1) = qp2recW(i-n_vars+1)
-                qrec_stencil(3) = qp_expl(i,j+1,k)
+                qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j+1,k)
 
              ELSEIF ( j .EQ. comp_cells_x ) THEN
 
                 CALL qp_to_qp2( qrecE(1:n_vars+2) , B_cent(j,k) , qp2recE )
-                qrec_stencil(1) = qp_expl(i,j-1,k)
+                qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j-1,k)
                 qrec_stencil(3) = qp2recE(i-n_vars+1)
 
              ELSE
 
-                qrec_stencil(1) = qp_expl(i,j-1,k)
-                qrec_stencil(3) = qp_expl(i,j+1,k)
+                qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j-1,k)
+                qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j+1,k)
 
                 ! correction for radial source inlet x-interfaces values
                 ! used for the linear reconstruction
@@ -770,24 +777,24 @@ CONTAINS
           ! y-direction
           check_comp_cells_y2:IF ( comp_cells_y .GT. 1 ) THEN
 
-             qrec_stencil(2) = qp_expl(i,j,k)
+             qrec_stencil(2) = reconstruction_cell_value(qp_expl,i,j,k)
 
              IF ( k .EQ. 1 ) THEN
 
                 CALL qp_to_qp2( qrecS(1:n_vars+2) , B_cent(j,k) , qp2recS )
                 qrec_stencil(1) = qp2recS(i-n_vars+1)
-                qrec_stencil(3) = qp_expl(i,j,k+1)
+                qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j,k+1)
 
              ELSEIF ( k .EQ. comp_cells_y ) THEN
 
                 CALL qp_to_qp2( qrecN(1:n_vars+2) , B_cent(j,k) , qp2recN )
-                qrec_stencil(1) = qp_expl(i,j,k-1)
+                qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j,k-1)
                 qrec_stencil(3) = qp2recN(i-n_vars+1)
 
              ELSE
 
-                qrec_stencil(1) = qp_expl(i,j,k-1)
-                qrec_stencil(3) = qp_expl(i,j,k+1)
+                qrec_stencil(1) = reconstruction_cell_value(qp_expl,i,j,k-1)
+                qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j,k+1)
 
                 ! correction for radial source inlet y-interfaces
                 ! used for the linear reconstruction
@@ -869,6 +876,29 @@ CONTAINS
     RETURN
 
   END SUBROUTINE reconstruction
+
+  !> \brief Read one centre value for a direct reconstruction stencil.
+  !> \details Only auxiliary u/v are zeroed at the existing HP dry-depth
+  !>          threshold. Roundoff-scale positive mass must not supply a finite
+  !>          desingularized velocity to a neighbouring wet-cell limiter.
+  !>          Depth, volumetric momenta, temperature and composition remain
+  !>          unchanged; neither the input physical nor conservative state is
+  !>          modified. The function is allocation-free and thread-safe.
+  !> \param[in] qp_center Read-only physical centre fields, including halo.
+  !> \param[in] component Physical variable index; idx_u/idx_v are auxiliary velocities.
+  !> \param[in] j X index of the centre stencil entry.
+  !> \param[in] k Y index of the centre stencil entry.
+  !> \return Original centre value, or zero for a dry auxiliary velocity.
+  PURE FUNCTION reconstruction_cell_value(qp_center,component,j,k) RESULT(value)
+    REAL(wp), INTENT(IN) :: qp_center(:,:,:)
+    INTEGER, INTENT(IN) :: component,j,k
+    REAL(wp) :: value
+
+    value = qp_center(component,j,k)
+    IF ((component .EQ. idx_u) .OR. (component .EQ. idx_v)) THEN
+       IF (qp_center(1,j,k) .LE. hp_dry_tolerance) value = 0.0_wp
+    END IF
+  END FUNCTION reconstruction_cell_value
 
   !******************************************************************************
   !> \brief Evaluate hydrostatic candidates, blend them and commit final cell/face traces.

@@ -58,6 +58,10 @@
     "n7_b": {
       "path": "docs/acceptance/results_n7_b_2026_10_10.json",
       "sha256": "fa3cae602df3d105ba9b37b4357233773b00ef98d811d0c805ff86096989dbbd"
+    },
+    "n7_cd": {
+      "path": "docs/acceptance/results_n7_cd_2026_10_10.json",
+      "sha256": "ab3e00f540821bb3badcd0355732b000d91c4c26acfaeed43c612d8dc8145458"
     }
   },
   "milestone_status": {
@@ -89,54 +93,54 @@
     },
     {
       "id": "N7-02",
-      "closure_status": "partial",
-      "remaining_actions": [
-        "N7-D"
-      ],
+      "closure_status": "satisfied",
+      "remaining_actions": [],
       "verified_contracts": [
         "Four-sided excavation has three refinements, unchanged zero-uphill limits and passing metrics.",
-        "Finite-time one-cell 1D excavation agrees with unchanged reference fields for all flags/stages, with exact zero uphill mass and independently checked mass budget."
+        "Finite-time one-cell 1D excavation agrees with unchanged reference fields for all flags/stages, with exact zero uphill mass and independently checked mass budget.",
+        "All 24 current Gate-H grid/mode/profile/team fields pass independent common-time IMEX and approved historical SSPRK2 comparisons; existing aggregate and zero-uphill limits remain unchanged."
       ],
       "evidence": [
         "latest",
         "n8_b_full",
-        "n7_a"
+        "n7_a",
+        "n7_cd"
       ]
     },
     {
       "id": "N7-03",
-      "closure_status": "partial",
-      "remaining_actions": [
-        "N7-C"
-      ],
+      "closure_status": "satisfied",
+      "remaining_actions": [],
       "verified_contracts": [
         "Production liquid HP face traces, compatible momenta and velocities agree with pinned cores.",
         "All 90 stationary variable-composition cases per profile pass raw cell/face positivity, TVD mass fractions and conservative closure with actual one/four-thread equality.",
-        "Full liquid/gas/gas-liquid stationary and moving-contact cell/face positivity, TVD mass fractions, compatible conservative closure and actual one/four-thread payloads pass in the defined N7-B fixtures."
+        "Full liquid/gas/gas-liquid stationary and moving-contact cell/face positivity, TVD mass fractions, compatible conservative closure and actual one/four-thread payloads pass in the defined N7-B fixtures.",
+        "All 138 finite-time dynamic geometry cases pass raw stage/final positivity and compatible normal/tangential face-state audits; accepted-state dry-only momentum projection is independently predicted without discarding positive mass."
       ],
       "evidence": [
         "spatial",
         "latest",
         "n8_b_full",
         "hydrostatic_roundoff",
-        "n7_b"
+        "n7_b",
+        "n7_cd"
       ]
     },
     {
       "id": "N7-04",
-      "closure_status": "partial",
-      "remaining_actions": [
-        "N7-C"
-      ],
+      "closure_status": "satisfied",
+      "remaining_actions": [],
       "verified_contracts": [
         "Seeded 2D smooth/rough/drainage/compact residuals and one-step states are verified.",
-        "Finite-time 1D smooth thermal transport and Ritter wet/dry trajectories pass full-field, analytic refinement and raw-state checks."
+        "Finite-time 1D smooth thermal transport and Ritter wet/dry trajectories pass full-field, analytic refinement and raw-state checks.",
+        "Seeded rough/inclined near-dry 2D fronts, axial/oblique one-cell ramps and circular three-grid dynamics pass full-field/reference and rotation checks at fixed comparison times for N_RK=2,3,4."
       ],
       "evidence": [
         "spatial",
         "latest",
         "n8_b_full",
-        "n7_a"
+        "n7_a",
+        "n7_cd"
       ]
     },
     {
@@ -145,7 +149,7 @@
       "remaining_actions": [],
       "verified_contracts": [
         "Local gas/solid/liquid conversion and positive/negative component-flux rescaling tests pass.",
-        "The original 90 liquid/gas/gas-liquid equilibria pass unchanged stationary component/carrier budgets, thermal closure and force criteria after the bounded exactly-resting roundoff correction; moving-contact validation remains open.",
+        "The original 90 liquid/gas/gas-liquid equilibria pass unchanged stationary component/carrier budgets, thermal closure and force criteria after the bounded exactly-resting roundoff correction.",
         "The complete 90-equilibrium/72-contact matrix per profile passes independent conservative/thermal fields, analytic refinement, signed transport along x/y and each raw-stage component/residual-carrier budget; the revised reference is isolated before execution without relaxed limits."
       ],
       "evidence": [
@@ -159,39 +163,39 @@
       "id": "N7-06",
       "closure_status": "partial",
       "remaining_actions": [
-        "N7-C",
-        "N7-D",
         "D-N7-CFL"
       ],
       "verified_contracts": [
         "Complete covered residuals and directional bounds agree with clean cores.",
         "Autonomous explicit/implicit/mixed temporal orders and raw stages pass for N_RK=2,3,4; unsupported counts are rejected.",
-        "Finite-time 1D full fields and raw stages agree with independent current-IMEX assembly, without asserting SSPRK2 trajectory or timestep-policy equality."
+        "Finite-time 1D full fields and raw stages agree with independent current-IMEX assembly, without asserting SSPRK2 trajectory or timestep-policy equality.",
+        "Independent full fields and raw stages pass for the 2D geometry hierarchy and all Gate-H grids at common accepted times; separately approved historical temporal-error limits pass. Autonomous adaptive-control interpretation remains only in D-N7-CFL."
       ],
       "evidence": [
         "spatial",
         "imex",
         "latest",
         "n8_b_full",
-        "n7_a"
+        "n7_a",
+        "n7_cd"
       ]
     },
     {
       "id": "N7-07",
-      "closure_status": "partial",
-      "remaining_actions": [
-        "N7-C"
-      ],
+      "closure_status": "satisfied",
+      "remaining_actions": [],
       "verified_contracts": [
         "Existing Gate-H total-mass and G=1 lateral-symmetry limits pass.",
-        "Independent stationary component/carrier inventories and boundary mass fluxes are exactly unchanged in all 90 equilibria per profile; moving-contact budgets and circular/orientation symmetry remain open.",
-        "Whole-domain component/carrier raw-stage and final inventories and zero boundary mass flux pass all 162 N7-B cases per profile. Circular/orientation symmetry remains in N7-C."
+        "Independent stationary component/carrier inventories and boundary mass fluxes are exactly unchanged in all 90 equilibria per profile.",
+        "Whole-domain component/carrier raw-stage and final inventories and zero boundary mass flux pass all 162 N7-B cases per profile.",
+        "Quarter-turn covariance, the user-approved evolution-induced fourth spatial harmonic refinement and unchanged absolute bound pass; raw/final mass budgets and actual 1/4-thread payloads pass all 138 dynamic cases."
       ],
       "evidence": [
         "latest",
         "n8_b_full",
         "hydrostatic_roundoff",
-        "n7_b"
+        "n7_b",
+        "n7_cd"
       ]
     },
     {
@@ -490,13 +494,15 @@
       {
         "id": "H06",
         "requirement": "Continuous rough inclined topography with near-dry fronts",
-        "status": "partial",
-        "remaining_actions": [
-          "N7-C"
-        ],
+        "status": "satisfied",
+        "remaining_actions": [],
         "evidence_tests": [
           "TEST_SPATIAL_OPERATOR",
-          "TEST_IMEX_STAGES"
+          "TEST_IMEX_STAGES",
+          "TEST_N7_GEOMETRY_DYNAMIC"
+        ],
+        "completion_evidence": [
+          "n7_cd"
         ]
       },
       {
@@ -511,20 +517,26 @@
       {
         "id": "H08",
         "requirement": "Oblique one-cell ramp or orientation test",
-        "status": "missing",
-        "remaining_actions": [
-          "N7-C"
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_N7_GEOMETRY_DYNAMIC"
         ],
-        "evidence_tests": []
+        "completion_evidence": [
+          "n7_cd"
+        ]
       },
       {
         "id": "H09",
         "requirement": "Circular 2D wet/dry isotropy",
-        "status": "missing",
-        "remaining_actions": [
-          "N7-C"
+        "status": "satisfied",
+        "remaining_actions": [],
+        "evidence_tests": [
+          "TEST_N7_GEOMETRY_DYNAMIC"
         ],
-        "evidence_tests": []
+        "completion_evidence": [
+          "n7_cd"
+        ]
       },
       {
         "id": "H10",
@@ -550,24 +562,27 @@
       {
         "id": "H12",
         "requirement": "Dynamic curvature differential with nonzero mixed Hessian term",
-        "status": "partial",
-        "remaining_actions": [
-          "N7-C"
-        ],
+        "status": "satisfied",
+        "remaining_actions": [],
         "evidence_tests": [
           "TEST_CURVATURE_SOURCE",
-          "TEST_SPATIAL_OPERATOR"
+          "TEST_SPATIAL_OPERATOR",
+          "TEST_N7_GEOMETRY_DYNAMIC"
+        ],
+        "completion_evidence": [
+          "n7_cd"
         ]
       },
       {
         "id": "H13",
         "requirement": "2D one-cell refinement with reproducible direct fields and reference metrics",
-        "status": "partial",
-        "remaining_actions": [
-          "N7-D"
-        ],
+        "status": "satisfied",
+        "remaining_actions": [],
         "evidence_tests": [
           "TEST_PCCU_GATE_H"
+        ],
+        "completion_evidence": [
+          "n7_cd"
         ]
       },
       {
@@ -583,49 +598,6 @@
     ]
   },
   "remaining_actions": [
-    {
-      "id": "N7-C",
-      "kind": "test",
-      "title": "Complete finite-time 2D geometry and symmetry cases",
-      "normative_items": [
-        "H06",
-        "H08",
-        "H09",
-        "H12"
-      ],
-      "criteria": [
-        "N7-03",
-        "N7-04",
-        "N7-06",
-        "N7-07"
-      ],
-      "change_scope": "Reuse seeded rough/drainage fixtures; add only the original orientation/isotropy cases.",
-      "exit_conditions": [
-        "Advance continuous rough inclined Q1 beds with near-dry fronts to fixed comparison times rather than checking a single residual/stage only.",
-        "Run an oblique one-cell ramp and a circular wet/dry case; quantify rotation/symmetry, mass, positivity and finite-time field errors.",
-        "Compare dynamic curvature ON/OFF at fixed slope flag with a nonzero mixed Hessian term; preserve resting-state balance.",
-        "Use common initial states and the same temporal assembly for independent IMEX comparisons; account explicitly for any SSPRK2/IMEX time-discretization difference."
-      ]
-    },
-    {
-      "id": "N7-D",
-      "kind": "test",
-      "title": "Complete the reproducible Gate-H full-field comparison",
-      "normative_items": [
-        "H10",
-        "H13"
-      ],
-      "criteria": [
-        "N7-02",
-        "N7-06"
-      ],
-      "change_scope": "Keep existing Gate-H metrics/limits and add a reproducible field comparator.",
-      "exit_conditions": [
-        "Retain all existing metrics and zero-uphill assertions at dx=dy=0.4,0.2,0.1.",
-        "Compare complete thickness/free-surface arrays with the controlled Python reference at the same resolutions, with approved error limits fixed before execution.",
-        "Distinguish archived port-audit field norms from an executable current-Fortran full-field comparison; record temporal-policy and dry-safe rebase provenance."
-      ]
-    },
     {
       "id": "D-N7-CFL",
       "kind": "decision",
@@ -738,7 +710,7 @@
         "n8_b",
         "n8_b_full"
       ],
-      "user_resolution": "S\u00ec, test algebrico separato e produzione uniforme",
+      "user_resolution": "Sì, test algebrico separato e produzione uniforme",
       "resolution_scope": "Unequal-area synthetic algebra only; supported production grid remains uniform Cartesian."
     },
     {
@@ -793,11 +765,61 @@
       "evidence": [
         "n7_b"
       ]
+    },
+    {
+      "id": "N7-C",
+      "kind": "test",
+      "title": "Complete finite-time 2D geometry and symmetry cases",
+      "normative_items": [
+        "H06",
+        "H08",
+        "H09",
+        "H12"
+      ],
+      "criteria": [
+        "N7-03",
+        "N7-04",
+        "N7-06",
+        "N7-07"
+      ],
+      "change_scope": "Complete the original finite-time geometry hierarchy with independent fields/face audits, user-approved evolution-induced isotropy measure and explicitly authorized dry auxiliary/curvature/final-momentum corrections; no numerical limits, CFL, dry threshold or implicit-stage changes.",
+      "exit_conditions": [
+        "Advance continuous rough inclined Q1 beds with near-dry fronts to fixed comparison times rather than checking a single residual/stage only.",
+        "Run an oblique one-cell ramp and a circular wet/dry case; quantify rotation/symmetry, mass, positivity and finite-time field errors.",
+        "Compare dynamic curvature ON/OFF at fixed slope flag with a nonzero mixed Hessian term; preserve resting-state balance.",
+        "Use common initial states and the same temporal assembly for independent IMEX comparisons; account explicitly for any SSPRK2/IMEX time-discretization difference."
+      ],
+      "status": "satisfied",
+      "evidence": [
+        "n7_cd"
+      ]
+    },
+    {
+      "id": "N7-D",
+      "kind": "test",
+      "title": "Complete the reproducible Gate-H full-field comparison",
+      "normative_items": [
+        "H10",
+        "H13"
+      ],
+      "criteria": [
+        "N7-02",
+        "N7-06"
+      ],
+      "change_scope": "Keep Gate-H grids, aggregate/uphill limits and approved full-field limits; compare independent IMEX initial-value trajectories at observational common accepted times, retaining the separately regenerated historical SSPRK2 fields. Autonomous adaptive-control remains open in D-N7-CFL.",
+      "exit_conditions": [
+        "Retain all existing metrics and zero-uphill assertions at dx=dy=0.4,0.2,0.1.",
+        "Compare complete thickness/free-surface arrays with the controlled Python reference at the same resolutions, with approved error limits fixed before execution.",
+        "Distinguish archived port-audit field norms from an executable current-Fortran full-field comparison; record temporal-policy and dry-safe rebase provenance.",
+        "User-approved common-time operator/stage verification is separate from the autonomous adaptive-control decision; closing N7-D does not resolve D-N7-CFL."
+      ],
+      "status": "satisfied",
+      "evidence": [
+        "n7_cd"
+      ]
     }
   ],
-  "solver_revision_role": "Historical base revision only; current geometry correction and full N7-B fixtures are pinned by n7_b evidence. Historical aliases retain their original provenance.",
-  "next_implementation_batch": [
-    "N7-C",
-    "N7-D"
-  ]
+  "solver_revision_role": "Historical base revision only; each completed numerical package pins its tested sources. Current N7-C/N7-D sources and full 41-group audit are pinned by n7_cd; no N9 baseline approval is implied.",
+  "next_implementation_batch": [],
+  "next_decision": "D-N7-CFL"
 }

@@ -14,7 +14,7 @@ MODULE equation_terms_2d
 
   USE equation_metadata_2d, ONLY : equation_partition_type
 
-  USE parameters_2d, ONLY : wp, sp
+  USE parameters_2d, ONLY : wp, sp, dry_thickness_tolerance
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
        n_stoch_vars, n_pore_vars
   USE parameters_2d, ONLY : rheology_flag, rheology_model,                      &
@@ -375,6 +375,8 @@ CONTAINS
   !> in the IMEX scheme. Hydrostatic pressure and bed forcing belong to the
   !> spatial path operator, not to this local-source evaluation. The sign of the
   !> terms is taken with the terms on the right-hand side of the equations.
+  !> Curvature is evaluated only above the shared dry-depth threshold; positive
+  !> conservative mass below that threshold is retained, as are other sources.
   !> \date 2019/12/13
   !
   !> @author
@@ -481,11 +483,14 @@ CONTAINS
 
        q1 = r_h * r_rho_m
 
-       IF ( curvature_term_flag ) THEN
+       IF ( curvature_term_flag .AND. r_h .GT. dry_thickness_tolerance ) THEN
 
           ! Hydrostatic pressure and the ordinary bed-slope source are already
           ! represented by the HP path. Curvature remains a separate,
           ! velocity-dependent cell source using the fitted Hessian and G_c.
+          ! Below the shared dry threshold the auxiliary velocity is not a
+          ! resolved physical velocity: do not square it in this source.
+          ! This guard neither discards mass nor disables external injection.
           CALL eval_curvature_momentum_source( Bprimej_x, Bprimej_y,         &
                Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, q1,        &
                r_u, r_v, expl_term(2), expl_term(3) )

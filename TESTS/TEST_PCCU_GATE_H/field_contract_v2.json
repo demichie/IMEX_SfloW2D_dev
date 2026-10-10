@@ -1,0 +1,55 @@
+{
+  "schema_version": 2,
+  "package": "N7-D",
+  "frozen_before_execution": "2026-10-10",
+  "grids": [
+    0.4,
+    0.2,
+    0.1
+  ],
+  "modes": [
+    "g1",
+    "slope_curvature"
+  ],
+  "time": 0.1,
+  "current_IMEX": {
+    "n_RK": 2,
+    "dt0": 0.0001,
+    "max_dt": 0.02,
+    "growth": "min(CFL directional minimum, max_dt, remaining time, 1.1*(dt_old+dt_old_old)/2)",
+    "roundoff_epsilon_multiplier": 32768,
+    "field_limit": "32768 * float64_epsilon * accepted_steps * max(1, initial_h_max)",
+    "ambient_density": "101300 / (287.051 * 300)",
+    "eps_sing": 1e-10,
+    "comparison_times": "Independent trajectory from common initial fields using actual accepted dt, captured by an observational main whose final canonical output must be byte-identical to the uninstrumented solver"
+  },
+  "historical_SSPRK2": {
+    "maximum_normalized_L1_h": 0.0002,
+    "maximum_normalized_L1_eta": 0.0001,
+    "maximum_Linf_m": 0.003,
+    "user_approved": "2026-10-10, explicit reply before execution",
+    "rho_a": 0,
+    "eps_sing": 1e-10,
+    "dt_cap": 0.02,
+    "policy": "Unchanged clean step_ssprk2_2d, harmonic directional CFL and stage retry policy; not the production IMEX assembly"
+  },
+  "reference_package": "HP_PCCU_clean_reference_cores_2026-09-26_drySafe_rebase.zip",
+  "reference_core_sha256": {
+    "hp_pccu_1d_core.py": "ffcb695ff8d8d2bd06e433d70b2a519c0b0012d959eb664b617deea83e8f64e2",
+    "hp_pccu_2d_core.py": "c63331366cadf9f04d802a3f058088b9c175399b2d6dc7015068a0ad110f1577"
+  },
+  "existing_metric_limits_changed": false,
+  "existing_uphill_limit_changed": false,
+  "production_CFL_policy_changed": false,
+  "authorized_dry_auxiliary_correction": "2026-10-10 explicit user approval: direct reconstruction uses zero auxiliary velocities at the unchanged HP dry depth threshold; raw conservative mass and all error limits retained",
+  "supersedes": "field_contract.json: unchanged field and historical limits; user-authorized separation of common accepted times and autonomous CFL",
+  "comparison_separation_user_approved": "2026-10-10 explicit reply: separate the checks and keep autonomous CFL comparison open",
+  "autonomous_CFL": {
+    "status": "not_satisfied",
+    "closure_action": "D-N7-CFL",
+    "policy": "min(CFL directional minimum, max_dt, remaining time, 1.1*(dt_old+dt_old_old)/2)",
+    "scope": "Separate diagnostic: each solver selects its own accepted dt. Not a passing N7-D assertion or a change to production CFL.",
+    "diagnostic_option": "compare_fields.py --autonomous; preserves failures and directional bounds"
+  },
+  "authorized_dry_curvature_correction": "2026-10-10 explicit user approval: local explicit curvature only for h above existing dry depth threshold; retain mass, other sources, CFL and limits"
+}

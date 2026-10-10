@@ -18,6 +18,7 @@ PROGRAM test_state_conversion
   CALL run_component_flux_limiter_cases
   CALL run_source_boundary_cases
   CALL run_dry_cases
+  CALL run_dry_momentum_projection_cases
   CALL run_complex_step_check
   CALL run_richardson_near_rest_cases
 
@@ -26,6 +27,41 @@ PROGRAM test_state_conversion
   WRITE (*, *) 'PASS: state conversion verified'
 
 CONTAINS
+
+  !> \brief Check dry-only momentum projection at/below/above the shared cutoff.
+  !> \details Exact array equality protects mass, thermal energy, components
+  !>          and wet momenta, including repeated application and rewetting.
+  SUBROUTINE run_dry_momentum_projection_cases
+    REAL(wp) :: original(9), actual(9), expected(9), h
+    INTEGER :: i
+    original = [2.196349023712712E-12_wp, 5.110335133501846E-6_wp, &
+         8.13422639620255E-6_wp, 1.0E-6_wp, 1.0E-13_wp, &
+         2.0E-13_wp, 3.0E-13_wp, 4.0E-13_wp, 5.0E-13_wp]
+    expected = original
+    expected(2:3) = 0.0_wp
+    DO i = 1, 3
+       SELECT CASE (i)
+       CASE (1)
+          h = 2.196349023712712E-15_wp
+       CASE (2)
+          h = NEAREST(dry_thickness_tolerance, -1.0_wp)
+       CASE (3)
+          h = dry_thickness_tolerance
+       END SELECT
+       actual = original
+       CALL project_dry_cell_momenta(actual, h)
+       CALL assert_true('dry projection changes only moments', ALL(actual == expected))
+       CALL project_dry_cell_momenta(actual, h)
+       CALL assert_true('dry projection is idempotent', ALL(actual == expected))
+    END DO
+    actual = original
+    CALL project_dry_cell_momenta(actual, NEAREST(dry_thickness_tolerance, 1.0_wp))
+    CALL assert_true('resolved wet moments unchanged', ALL(actual == original))
+    CALL project_dry_cell_momenta(actual, 0.0_wp)
+    actual(1) = 1.0_wp
+    CALL project_dry_cell_momenta(actual, 1.0E-3_wp)
+    CALL assert_true('rewetting cannot restore old dry moments', ALL(actual(2:3) == 0.0_wp))
+  END SUBROUTINE run_dry_momentum_projection_cases
 
   !> \brief Verify the existing Richardson upper cap before an overflowing near-rest quotient.
   SUBROUTINE run_richardson_near_rest_cases

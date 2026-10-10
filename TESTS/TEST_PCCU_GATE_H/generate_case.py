@@ -149,6 +149,7 @@ def main():
         x=x_center,
         y=y_center,
         bed=bed_center,
+        bed_vertex=bed_vertex,
         h0=thickness,
         dx=dx,
         x_outer_left=x1,
