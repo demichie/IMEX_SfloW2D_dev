@@ -6128,12 +6128,15 @@ CONTAINS
   !******************************************************************************
   SUBROUTINE validate_runout_csv(filename, header, expected_row, exists)
     USE, INTRINSIC :: ieee_arithmetic, ONLY: ieee_is_finite
+    USE, INTRINSIC :: ieee_exceptions, ONLY: ieee_get_flag, ieee_get_halting_mode, &
+         ieee_overflow, ieee_set_flag, ieee_set_halting_mode
     USE, INTRINSIC :: iso_fortran_env, ONLY: iostat_end
     CHARACTER(LEN=*), INTENT(IN) :: filename, header, expected_row
     LOGICAL, INTENT(OUT) :: exists
     INTEGER :: unit_csv, ierr, i, rows
     REAL(wp) :: values(5), previous_time
     CHARACTER(LEN=512) :: line, last_line, message
+    LOGICAL :: overflow_halting, overflow_flag
 
     INQUIRE(FILE=filename, EXIST=exists)
     IF (.NOT. exists) RETURN
@@ -6154,7 +6157,13 @@ CONTAINS
       IF (COUNT([(line(i:i) == ',', i=1,LEN_TRIM(line))]) /= 4 .OR. &
            VERIFY(TRIM(line), ' +-0123456789.,eEdD') /= 0) &
            CALL fatal_error('Malformed diagnostic CSV row: '//TRIM(filename))
+      CALL ieee_get_halting_mode(ieee_overflow, overflow_halting)
+      CALL ieee_get_flag(ieee_overflow, overflow_flag)
+      CALL ieee_set_halting_mode(ieee_overflow, .FALSE.)
+      CALL ieee_set_flag(ieee_overflow, .FALSE.)
       READ(line, *, IOSTAT=ierr) values
+      CALL ieee_set_flag(ieee_overflow, overflow_flag)
+      CALL ieee_set_halting_mode(ieee_overflow, overflow_halting)
       IF (ierr /= 0) CALL fatal_error('Malformed diagnostic CSV values: '//TRIM(filename))
       IF (.NOT. ALL(ieee_is_finite(values))) &
            CALL fatal_error('Nonfinite diagnostic CSV values: '//TRIM(filename))
