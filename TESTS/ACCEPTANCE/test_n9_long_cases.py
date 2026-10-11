@@ -1,0 +1,128 @@
+"""Check N9 observation helpers without running or mutating the solver."""
+import hashlib
+import json
+from pathlib import Path
+import struct
+import tempfile
+import unittest
+
+import numpy as np
+import n9_long_cases as n9
+
+
+REPO = Path(__file__).resolve().parents[2]
+
+
+class N9Helpers(unittest.TestCase):
+    def test_dated_evidence_retains_physical_success_and_diagnostic_failure(self):
+        evidence = json.loads((REPO/'docs/acceptance/results_n9_long_cases_2026_10_11.json').read_text())
+        self.assertFalse(evidence['scientific_baseline_approved'])
+        self.assertFalse(evidence['production_sources_changed'])
+        self.assertEqual(evidence['summary']['physical_continuations_passed'],8)
+        self.assertEqual(evidence['summary']['diagnostic_continuations_failed'],8)
+        self.assertEqual(evidence['summary']['failed'],8)
+        self.assertEqual(len(evidence['thread_pairs']),4)
+        self.assertTrue(all(v['status']=='pass' for v in evidence['thread_pairs']))
+        self.assertEqual(evidence['runner_sha256'],n9.digest(Path(n9.__file__)))
+        self.assertTrue((REPO/evidence['report']).is_file())
+        for name,value in evidence['retained_acceptance_contract_sha256'].items():
+            self.assertEqual(n9.digest(REPO/name),value)
+        self.assertTrue(evidence['clean_reference_provenance']['matches_frozen_repository_cores'])
+        self.assertTrue(all(evidence['ETNA_fixture']['prior_user_raster_comparison'].values()))
+        self.assertEqual({(r['case'],r['profile'],r['requested_threads']) for r in evidence['runs']},
+                         {(c,p,t) for c in ('ETNA','ETNA_LAVA')
+                          for p in ('historical_optimized','strict_debug') for t in (1,4)})
+        for record in evidence['runs']:
+            self.assertEqual(record['physical_continuation_status'],'pass')
+            self.assertEqual(record['status'],'fail')
+            self.assertTrue(record['ESRI_rasters_bitwise_equal'])
+            self.assertTrue(record['checkpoint_bitwise_equal'])
+            self.assertTrue(record['decoded_fields_bitwise_equal'])
+            self.assertTrue(record['netcdf_schema_bitwise_equal'])
+            self.assertTrue(all(value==0 for value in record['field_differences'].values()))
+            for csv in record['diagnostic_csv'].values():
+                self.assertEqual(csv['status'],'fail')
+                self.assertFalse(csv['history_complete'])
+            if record['case']=='ETNA_LAVA':
+                budget=record['reference']['budget']
+                self.assertEqual(budget['last_precontact_output_s'],3180)
+                self.assertEqual(budget['first_boundary_positive_output_s'],3240)
+                self.assertFalse(budget['exact_first_contact_time_known'])
+                self.assertFalse(budget['mass_tolerance_changed'])
+                self.assertFalse(budget['new_scientific_budget_threshold_approved'])
+
+    def test_parameter_override_is_unique_and_does_not_match_restart_files(self):
+        text = '&RUN_PARAMETERS\n RESTART=F,\n T_END=3600,\n/\n&RESTART_PARAMETERS\n RESTART_FILES="a.asc",\n/\n'
+        changed = n9.changed_parameter(text, 'RESTART', 'T')
+        self.assertIn(' RESTART= T,', changed)
+        self.assertIn(' RESTART_FILES="a.asc",', changed)
+        with self.assertRaises(AssertionError):
+            n9.changed_parameter(text+' T_END=100,\n', 'T_END', '200')
+        with self.assertRaises(AssertionError):
+            n9.changed_parameter(text, 'ABSENT_PARAMETER', '0')
+
+    def records(self, path, *, version=4, bad_tail=False):
+        q = np.zeros((4,2,3), dtype='<f8')
+        q[0] = 2
+        records = [b'IMEX_SFLOW2D_RST', struct.pack('<i',version),
+                   struct.pack('<9i',2,3,4,0,0,0,0,6,5), struct.pack('<2i',0,0),
+                   struct.pack('<4d',3600,.1,.1,.2), b'output schedule',
+                   q.tobytes(order='F'), np.zeros((3,4),dtype='<f8').tobytes(order='F')]
+        with path.open('wb') as stream:
+            for i, record in enumerate(records):
+                marker = struct.pack('<i',len(record))
+                stream.write(marker+record+(b'bad!' if bad_tail and i==7 else marker))
+        return q
+
+    def test_checkpoint_header_layout_and_fortran_order(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)/'checkpoint.bin'
+            expected = self.records(path)
+            info, actual = n9.checkpoint(path)
+            self.assertEqual(info['magic'], 'IMEX_SFLOW2D_RST')
+            self.assertEqual(info['version'], 4)
+            self.assertEqual(info['layout'][:3], [2,3,4])
+            self.assertTrue(np.array_equal(actual,expected))
+            self.assertEqual(info['conservative_sha256'],
+                             hashlib.sha256(expected.tobytes(order='F')).hexdigest())
+
+    def test_bad_checkpoint_version_and_record_markers_fail(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)/'checkpoint.bin'
+            for options in ({'version':3},{'bad_tail':True}):
+                self.records(path,**options)
+                with self.assertRaises(AssertionError):
+                    n9.checkpoint(path)
+
+    def test_headerless_csv_is_read_but_lost_history_and_values_fail(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary); full=root/'full';split=root/'split'
+            full.mkdir();split.mkdir()
+            for suffix in ('runout','mass_center'):
+                (full/f'case_{suffix}.csv').write_text('Time (s), a,b,c,d\n0,0,1,2,3\n1,2,3,4,5\n')
+                (split/f'case_{suffix}.csv').write_text('1,4000000,3,4,5\n')
+            result = n9.diagnostic_comparison(full,split,'case')
+            for item in result.values():
+                self.assertEqual(item['status'],'fail')
+                self.assertFalse(item['history_complete'])
+                self.assertFalse(item['resumed_has_header'])
+                self.assertEqual(item['common_time_Linf_by_column'][1],3999998)
+
+    def test_exact_csv_and_nonfinite_or_duplicate_controls(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);full=root/'full';split=root/'split'
+            full.mkdir();split.mkdir()
+            for directory in (full,split):
+                for suffix in ('runout','mass_center'):
+                    (directory/f'case_{suffix}.csv').write_text('Time (s), a,b,c,d\n0,0,1,2,3\n1,2,3,4,5\n')
+            result=n9.diagnostic_comparison(full,split,'case')
+            self.assertTrue(all(v['status']=='pass' for v in result.values()))
+            path=split/'bad.csv'
+            for content in ('0,nan,1,2,3\n','0,0,1,2,3\n0,0,1,2,3\n'):
+                path.write_text(content)
+                with self.assertRaises(AssertionError):
+                    n9.diagnostic_csv(path)
+
+
+if __name__ == '__main__':
+    unittest.main()

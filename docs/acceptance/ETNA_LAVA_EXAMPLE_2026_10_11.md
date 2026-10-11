@@ -63,8 +63,11 @@ integrated, so outflow remains a hypothesis requiring the balance check, not
 a declared explanation or an approved budget tolerance. No domain extension,
 shortened duration, parameter change or tolerance relaxation is used here.
 
-N9 still requires the companion ETNA long-case evidence, boundary/source budget
-closure, applicable restart continuation/schema checks and explicit scientific
-baseline approval. Writing and cross-thread equality of this checkpoint do not
-alone prove restart continuation. The original-source files and fixtures are
-ready for that acceptance package.
+The subsequent [N9 long-case checks](N9_LONG_CASES_2026_10_11.md) include ETNA and
+actual full-duration continuation. The user limits the lava budget to the last
+saved output with dry boundary cells (3180 s), before the first positive-boundary
+output at 3240 s. That precontact volume budget agrees at roundoff scale; the
+postcontact final-domain difference is outside the authorized mass-check scope.
+Physical fields, ESRI rasters and checkpoints match uninterrupted runs exactly,
+but diagnostic CSV history fails on continuation. N9 remains open for the
+diagnostic correction and explicit scientific baseline approval.

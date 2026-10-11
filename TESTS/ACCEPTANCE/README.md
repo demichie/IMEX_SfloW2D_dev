@@ -103,6 +103,44 @@ physical input values are not altered by the adapter.
 Conservative output parsing accepts Fortran `D` exponents and three-digit
 exponents with an omitted `E`. It does not rewrite or relax the field data.
 
+## Characterize the N9 long cases
+
+The selected cases are ETNA (200 s) and ETNA_LAVA (3600 s). The lava mass check
+uses saved outputs only through 3180 s, the last output before boundary contact.
+This does not shorten its full-field or restart checks. The
+[N9 report](../../docs/acceptance/N9_LONG_CASES_2026_10_11.md) separates exact
+physical continuation from the currently failing diagnostic CSV continuation;
+it does not approve N9 or waive those failures.
+
+Using executables and source hashes from a retained clean acceptance build:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 TESTS/ACCEPTANCE/n9_long_cases.py \
+  --repo /absolute/path/to/IMEX_SfloW2D_dev \
+  --build-audit /absolute/path/to/clean-acceptance-build \
+  --lava-evidence /absolute/path/to/retained-lava-evidence.json \
+  --reference-zip /absolute/path/to/HP_PCCU_clean_reference_cores_2026-09-26_drySafe_rebase.zip \
+  --output /tmp/imex-n9-new-run
+```
+
+The lava evidence must still point to retained full-run payloads, with matching
+NetCDF/checkpoint hashes. The driver independently runs ETNA and both split
+trajectories in each build/team configuration. Numeric ASCII parsing uses NumPy
+in place of the preprocessing script's pandas table reader; its geometry and
+formatters are unchanged. Generated-data checksums remain in the evidence.
+Native NetCDF is decoded sequentially through the installed C library.
+
+To independently recharacterize retained completed full/split payloads without
+rerunning or overwriting any of them, add
+`--characterize-completed /absolute/path/to/retained-case-root` and choose a new
+`--output` directory. `--reuse-first-halves` is a separate, explicitly mutating
+recovery mode for continuing verified completed first legs in that temporary
+case root; do not combine the two options. The completed characterization
+checks final effective inputs, actual teams, schedules, intermediate checkpoint
+time/schema, full decoded fields, rasters and final checkpoints. It reports
+lost CSV history and wrong common-time values as failures and returns nonzero.
+That nonzero result must not be relabeled as scientific baseline acceptance.
+
 ## Test the audit tools
 
 ```sh
