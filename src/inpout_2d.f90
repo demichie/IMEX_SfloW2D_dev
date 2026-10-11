@@ -3468,7 +3468,8 @@ CONTAINS
 
       END IF
 
-      READ (2001, *) topography_profile(3, :, n_topography_profile_y - k + 1)
+      READ (2001, *) (topography_profile(3, j, n_topography_profile_y - k + 1), &
+                 j = 1, n_topography_profile_x)
 
     END DO
 
