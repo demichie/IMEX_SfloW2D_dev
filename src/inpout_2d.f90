@@ -3554,8 +3554,21 @@ CONTAINS
 
     IF (verbose_level .GE. 0) THEN
 
-      WRITE (*, *) 'thickness_levels', n_thickness_levels, thickness_levels
-      WRITE (*, *) 'dyn_pres_levels', n_dyn_pres_levels, dyn_pres_levels
+      WRITE (*, *) 'n_thickness_levels', n_thickness_levels
+
+      IF (ALLOCATED(thickness_levels)) THEN
+        WRITE (*, *) 'thickness_levels', thickness_levels
+      ELSE
+        WRITE (*, *) 'thickness_levels: not allocated'
+      END IF
+
+      WRITE (*, *) 'n_dyn_pres_levels', n_dyn_pres_levels
+
+      IF (ALLOCATED(dyn_pres_levels)) THEN
+        WRITE (*, *) 'dyn_pres_levels', dyn_pres_levels
+      ELSE
+        WRITE (*, *) 'dyn_pres_levels: not allocated'
+      END IF
 
     END IF
 
