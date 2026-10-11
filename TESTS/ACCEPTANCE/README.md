@@ -154,8 +154,9 @@ That nonzero result must not be relabeled as scientific baseline acceptance.
 
 The separate M12c build-system work and its current verification status are
 tracked in the [M12c progress report](../../docs/acceptance/M12C_BUILD_SYSTEM_PROGRESS_2026_10_11.md).
-Its clean Linux CI matrix is complete; Docker and toolchain-portability
-criteria remain open, so the milestone is not yet accepted.
+M12c is complete and accepted for the tested Linux configurations; see its
+[reproducibility manifest](../../docs/acceptance/M12C_REPRODUCIBILITY_MANIFEST_2026_10_11.json)
+for the validated compiler, Docker and CI scope.
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \

@@ -1,6 +1,6 @@
 # M12c build-system progress
 
-Status: **in progress; not accepted**.
+Status: **complete; accepted**.
 
 This report records M12c build/test infrastructure work after the N9-approved
 solver baseline `3f7329c85d2e30e33cf68348721329f7726b01c1`. The work includes
@@ -45,8 +45,8 @@ NetCDF-Fortran installation:
 ## Remote CI verification
 
 The GitHub Actions run
-[`38151328516`](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/38151328516)
-completed successfully for all four `solver` matrix jobs:
+[`38154444911`](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/38154444911)
+completed successfully for all four GNU Fortran `solver` matrix jobs:
 
 - optimized, one thread;
 - optimized, four threads;
@@ -58,15 +58,28 @@ validation, stochastic restart validation, and HP-PCCU Gate-H validation.
 This closes the remote-CI gate and confirms both restart profiles/thread
 counts, including strict-debug CSV overflow rejection.
 
-Docker is not installed in the local environment, and a non-GNU Fortran
-compiler has not been tested. Therefore M12c remains **in progress; not
-accepted**, and these CI results do not establish compiler portability.
+## Docker and compiler portability
 
-## Remaining M12c gates
+The Docker validation run
+[`38158816015`](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/38158816015)
+passed the optimized and strict-debug container build/run matrix with one and
+four threads on revision `fdef1356c00ee0273d3649ebdbabf07201bdcbde`. The user
+also confirmed manual Docker verification for the current repository state
+`9ccb349e2dd2b82ebe6b218fc655f3881b966bff`.
 
-1. Verify Docker build/run, or record and explicitly accept a concrete
-   environment limitation.
-2. Confirm compiler portability and document the supported toolchains and
-   dependency versions.
-3. Freeze a reproducibility manifest for the accepted build configuration,
-   then update the roadmap status only after all acceptance criteria pass.
+Intel ifx portability was verified by the successful
+[`38168602274`](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/38168602274)
+run on revision `9ccb349e2dd2b82ebe6b218fc655f3881b966bff`. Its Ubuntu 24.04
+matrix built with Intel oneAPI ifx 2025.1 and a matching NetCDF-Fortran 4.6.2,
+and passed integration, binary/runout restart, stochastic restart, and Gate-H
+validation in optimized and diagnostic profiles with one and four threads.
+
+The tested support scope is GNU Fortran and Intel ifx on Linux; it does not
+claim compatibility with every Fortran compiler. The Docker base uses the
+`ubuntu:24.04` tag and system package repositories rather than immutable image
+and package digests. The exact tested source revision, profiles, toolchains,
+and evidence references are frozen in the
+[M12c reproducibility manifest](M12C_REPRODUCIBILITY_MANIFEST_2026_10_11.json).
+
+All defined M12c gates are complete. This milestone is accepted for the tested
+Linux toolchain/configuration scope above.

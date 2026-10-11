@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "milestone": "M12c",
+  "status": "complete_and_accepted",
+  "accepted_date": "2026-10-11",
+  "tested_source_revision": "9ccb349e2dd2b82ebe6b218fc655f3881b966bff",
+  "scope": {
+    "operating_system": "Linux",
+    "supported_compilers_tested": [
+      {
+        "compiler": "GNU Fortran",
+        "profiles": [
+          "optimized",
+          "strict-debug"
+        ],
+        "thread_counts": [
+          1,
+          4
+        ],
+        "successful_ci_run": "https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/38154444911",
+        "tested_revision": "403a71a457792058eb0df1ee2a1045ad6856c6a6"
+      },
+      {
+        "compiler": "Intel oneAPI ifx",
+        "version": "2025.1",
+        "profiles": [
+          "optimized",
+          "diagnostic"
+        ],
+        "thread_counts": [
+          1,
+          4
+        ],
+        "netcdf_fortran": {
+          "version": "4.6.2",
+          "built_with": "ifx"
+        },
+        "successful_ci_run": "https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/38168602274",
+        "tested_revision": "9ccb349e2dd2b82ebe6b218fc655f3881b966bff"
+      }
+    ],
+    "docker": {
+      "base_image": "ubuntu:24.04",
+      "profiles": [
+        "optimized",
+        "strict-debug"
+      ],
+      "thread_counts": [
+        1,
+        4
+      ],
+      "successful_ci_run": "https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/38158816015",
+      "ci_tested_revision": "fdef1356c00ee0273d3649ebdbabf07201bdcbde",
+      "current_revision_verification": {
+        "result": "pass",
+        "source": "user-reported manual verification",
+        "revision": "9ccb349e2dd2b82ebe6b218fc655f3881b966bff",
+        "profile_and_thread_details": "Not separately recorded"
+      }
+    },
+    "validated_tests": [
+      "make check",
+      "binary and runout restart",
+      "stochastic restart",
+      "HP-PCCU Gate-H"
+    ]
+  },
+  "reproducibility_notes": [
+    "The Docker base image is referenced by the ubuntu:24.04 tag, not an immutable digest.",
+    "Ubuntu system package versions are installed from the configured package repositories and are not individually pinned.",
+    "Compiler portability claims are limited to the GNU Fortran and Intel ifx configurations recorded above."
+  ]
+}
