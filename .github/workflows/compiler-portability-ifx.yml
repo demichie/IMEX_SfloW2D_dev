@@ -32,8 +32,8 @@ jobs:
         threads: [1, 4]
 
     env:
-      # An intentionally experimental portability gate; GNU acceptance remains
-      # authoritative. NetCDF-Fortran must be built with the same Fortran compiler.
+      # This is an experimental portability test, not a replacement for GNU CI.
+      # NetCDF-Fortran must be compiled with ifx to provide compatible .mod files.
       NETCDF_FORTRAN_TAG: v4.6.2
       FC: ifx
       CC: gcc
@@ -50,9 +50,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --yes --no-install-recommends \
-            autoconf automake make gcc g++ gfortran \
+            autoconf automake libtool libtool-bin m4 make gcc g++ gfortran \
             libnetcdf-dev liblapack-dev libblas-dev \
-            python3 python3-numpy unzip curl ca-certificates pkg-config
+            python3 python3-numpy unzip curl ca-certificates pkg-config file
 
       - name: Install Intel oneAPI ifx
         uses: fortran-lang/setup-fortran@v1
@@ -76,25 +76,31 @@ jobs:
         run: |
           set -euxo pipefail
           prefix="$RUNNER_TEMP/netcdf-ifx"
-          mkdir -p "$prefix" "$RUNNER_TEMP/netcdf-src"
+          source_dir="$RUNNER_TEMP/netcdf-src"
+          mkdir -p "$prefix" "$source_dir"
+
+          # v4.6.2 has no release-uploaded tar.gz asset. Use the tag source
+          # archive and generate the Autotools configure script ourselves.
           curl -fL --retry 3 \
-            "https://github.com/Unidata/netcdf-fortran/releases/download/${NETCDF_FORTRAN_TAG}/netcdf-fortran-${NETCDF_FORTRAN_TAG#v}.tar.gz" \
+            "https://github.com/Unidata/netcdf-fortran/archive/refs/tags/${NETCDF_FORTRAN_TAG}.tar.gz" \
             -o "$RUNNER_TEMP/netcdf-fortran.tar.gz"
           tar -xzf "$RUNNER_TEMP/netcdf-fortran.tar.gz" \
-            -C "$RUNNER_TEMP/netcdf-src" --strip-components=1
-          cd "$RUNNER_TEMP/netcdf-src"
-          # Use the distro netCDF-C library, but build all Fortran modules with ifx.
-          # --disable-fortran-type-check avoids configure-time mixed-compiler checks.
+            -C "$source_dir" --strip-components=1
+          cd "$source_dir"
+          autoreconf -fi
+
+          # Use Ubuntu netCDF-C but build netCDF-Fortran modules with ifx.
           CC=gcc FC=ifx F77=ifx \
             CPPFLAGS='-I/usr/include' \
             LDFLAGS='-L/usr/lib/x86_64-linux-gnu' \
             ./configure --prefix="$prefix" --disable-fortran-type-check
           make -j2
           make install
+
           test -f "$prefix/include/netcdf.mod"
           "$prefix/bin/nf-config" --version
           echo "NETCDF_IFX_PREFIX=$prefix" >> "$GITHUB_ENV"
-          echo "LD_LIBRARY_PATH=$prefix/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$prefix/lib:$prefix/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
 
       - name: Select ifx build flags
         shell: bash
@@ -115,7 +121,7 @@ jobs:
           ./configure --with-netcdf="$NETCDF_IFX_PREFIX" \
             NETCDF_LIBS="-L$NETCDF_IFX_PREFIX/lib -lnetcdff -lnetcdf" \
             LAPACK_LIBS='-llapack -lblas'
-          grep -E '^(FC|FCFLAGS|OPENMP_FCFLAGS|NETCDF)\s*=' src/Makefile || true
+          grep -E '^(FC|FCFLAGS|OPENMP_FCFLAGS|NETCDF)[[:space:]]*=' src/Makefile || true
 
       - name: Build IMEX with ifx
         run: make -j2
