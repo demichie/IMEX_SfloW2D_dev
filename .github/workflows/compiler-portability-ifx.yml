@@ -1,0 +1,162 @@
+name: Intel ifx portability (experimental)
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - '.github/workflows/compiler-portability-ifx.yml'
+      - 'configure.ac'
+      - 'Makefile.am'
+      - 'src/**'
+      - 'TESTS/**'
+  push:
+    paths:
+      - '.github/workflows/compiler-portability-ifx.yml'
+      - 'configure.ac'
+      - 'Makefile.am'
+      - 'src/**'
+      - 'TESTS/**'
+
+permissions:
+  contents: read
+
+jobs:
+  ifx:
+    name: ifx / ${{ matrix.profile }} / ${{ matrix.threads }} thread(s)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [optimized, diagnostic]
+        threads: [1, 4]
+
+    env:
+      # An intentionally experimental portability gate; GNU acceptance remains
+      # authoritative. NetCDF-Fortran must be built with the same Fortran compiler.
+      NETCDF_FORTRAN_TAG: v4.6.2
+      FC: ifx
+      CC: gcc
+      OPENMP_FCFLAGS: -qopenmp
+      OMP_NUM_THREADS: ${{ matrix.threads }}
+      OMP_DYNAMIC: 'FALSE'
+      IMEX_AUDIT_FORCE_THREADS: ${{ matrix.threads }}
+
+    steps:
+      - name: Checkout IMEX_SfloW2D_dev
+        uses: actions/checkout@v4
+
+      - name: Install Ubuntu dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            autoconf automake make gcc g++ gfortran \
+            libnetcdf-dev liblapack-dev libblas-dev \
+            python3 python3-numpy unzip curl ca-certificates pkg-config
+
+      - name: Install Intel oneAPI ifx
+        uses: fortran-lang/setup-fortran@v1
+        with:
+          compiler: intel
+          version: '2025.1'
+
+      - name: Record environment and validate Intel compiler
+        shell: bash
+        run: |
+          set -euxo pipefail
+          command -v ifx
+          ifx --version
+          gcc --version | head -1
+          nc-config --version
+          python3 --version
+          printf 'Git SHA: %s\n' "$GITHUB_SHA"
+
+      - name: Build compiler-compatible NetCDF-Fortran
+        shell: bash
+        run: |
+          set -euxo pipefail
+          prefix="$RUNNER_TEMP/netcdf-ifx"
+          mkdir -p "$prefix" "$RUNNER_TEMP/netcdf-src"
+          curl -fL --retry 3 \
+            "https://github.com/Unidata/netcdf-fortran/releases/download/${NETCDF_FORTRAN_TAG}/netcdf-fortran-${NETCDF_FORTRAN_TAG#v}.tar.gz" \
+            -o "$RUNNER_TEMP/netcdf-fortran.tar.gz"
+          tar -xzf "$RUNNER_TEMP/netcdf-fortran.tar.gz" \
+            -C "$RUNNER_TEMP/netcdf-src" --strip-components=1
+          cd "$RUNNER_TEMP/netcdf-src"
+          # Use the distro netCDF-C library, but build all Fortran modules with ifx.
+          # --disable-fortran-type-check avoids configure-time mixed-compiler checks.
+          CC=gcc FC=ifx F77=ifx \
+            CPPFLAGS='-I/usr/include' \
+            LDFLAGS='-L/usr/lib/x86_64-linux-gnu' \
+            ./configure --prefix="$prefix" --disable-fortran-type-check
+          make -j2
+          make install
+          test -f "$prefix/include/netcdf.mod"
+          "$prefix/bin/nf-config" --version
+          echo "NETCDF_IFX_PREFIX=$prefix" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$prefix/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+
+      - name: Select ifx build flags
+        shell: bash
+        run: |
+          if [ '${{ matrix.profile }}' = diagnostic ]; then
+            echo 'FCFLAGS=-O0 -g -traceback -check all' >> "$GITHUB_ENV"
+          else
+            echo 'FCFLAGS=-O2' >> "$GITHUB_ENV"
+          fi
+
+      - name: Generate build system
+        run: autoreconf -fi
+
+      - name: Configure IMEX with ifx and matching NetCDF
+        shell: bash
+        run: |
+          set -euxo pipefail
+          ./configure --with-netcdf="$NETCDF_IFX_PREFIX" \
+            NETCDF_LIBS="-L$NETCDF_IFX_PREFIX/lib -lnetcdff -lnetcdf" \
+            LAPACK_LIBS='-llapack -lblas'
+          grep -E '^(FC|FCFLAGS|OPENMP_FCFLAGS|NETCDF)\s*=' src/Makefile || true
+
+      - name: Build IMEX with ifx
+        run: make -j2
+
+      - name: Check binary linkage
+        shell: bash
+        run: |
+          set -euxo pipefail
+          file src/IMEX_SfloW2D
+          ldd src/IMEX_SfloW2D
+
+      - name: Legacy integration tests (make check)
+        run: make check
+
+      - name: Binary restart and runout regression
+        run: TESTS/TEST_BINARY_RESTART/run_test.sh src/IMEX_SfloW2D
+
+      - name: Stochastic restart regression
+        run: TESTS/TEST_STOCHASTIC_RESTART/run_test.sh src/IMEX_SfloW2D
+
+      - name: HP-PCCU Gate-H validation
+        run: TESTS/TEST_PCCU_GATE_H/run_test.sh src/IMEX_SfloW2D
+
+      - name: Collect diagnostic logs if a step fails
+        if: failure()
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/ifx-diagnostics"
+          for f in config.log src/Makefile "$RUNNER_TEMP/netcdf-src/config.log"; do
+            if [ -f "$f" ]; then
+              cp "$f" "$RUNNER_TEMP/ifx-diagnostics/$(basename "$(dirname "$f")")-$(basename "$f")"
+            fi
+          done
+          if [ -f src/IMEX_SfloW2D ]; then
+            ldd src/IMEX_SfloW2D > "$RUNNER_TEMP/ifx-diagnostics/ldd.txt" 2>&1 || true
+          fi
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ifx-diagnostics-${{ matrix.profile }}-${{ matrix.threads }}
+          path: ${{ runner.temp }}/ifx-diagnostics/
+          if-no-files-found: ignore
