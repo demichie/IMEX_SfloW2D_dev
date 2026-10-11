@@ -2,10 +2,10 @@
 
 Status: **in progress; not accepted**.
 
-This report records the initial M12c build/test infrastructure work after the
-N9-approved solver baseline `3f7329c85d2e30e33cf68348721329f7726b01c1`.
-It changes build and test orchestration only; no solver source or numerical
-contract is changed.
+This report records M12c build/test infrastructure work after the N9-approved
+solver baseline `3f7329c85d2e30e33cf68348721329f7726b01c1`. The work includes
+test-harness corrections and robust rejection of overflowing diagnostic CSV
+values in strict-debug builds; it does not change the numerical contract.
 
 ## Changes in this increment
 
@@ -42,22 +42,31 @@ NetCDF-Fortran installation:
 - strict-debug HP-PCCU Gate-H: full six-case numerical matrix passed with
   requested thread count four.
 
-The new GitHub Actions workflow has not yet run remotely. Docker is not
-installed in the local environment, and a non-GNU Fortran compiler and
-strict-debug/one-thread Gate-H run have not been tested locally. Consequently
-this increment is **not** evidence of complete M12c acceptance or compiler
-portability.
+## Remote CI verification
+
+The GitHub Actions run
+[`38151328516`](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/38151328516)
+completed successfully for all four `solver` matrix jobs:
+
+- optimized, one thread;
+- optimized, four threads;
+- strict-debug, one thread;
+- strict-debug, four threads.
+
+Each job completed the clean Linux build, `make check`, binary/runout restart
+validation, stochastic restart validation, and HP-PCCU Gate-H validation.
+This closes the remote-CI gate and confirms both restart profiles/thread
+counts, including strict-debug CSV overflow rejection.
+
+Docker is not installed in the local environment, and a non-GNU Fortran
+compiler has not been tested. Therefore M12c remains **in progress; not
+accepted**, and these CI results do not establish compiler portability.
 
 ## Remaining M12c gates
 
-1. Exercise strict-debug Gate-H with one thread, and decide whether the
-   configured restart tests need a separate strict-debug/one-thread run beyond
-   the previously accepted v5 evidence.
-2. Observe a successful GitHub Actions run on a clean Linux checkout for both
-   profiles and thread counts.
-3. Verify Docker build/run, or record and explicitly accept a concrete
+1. Verify Docker build/run, or record and explicitly accept a concrete
    environment limitation.
-4. Confirm compiler portability and document the supported toolchains and
+2. Confirm compiler portability and document the supported toolchains and
    dependency versions.
-5. Freeze a reproducibility manifest for the accepted build configuration,
+3. Freeze a reproducibility manifest for the accepted build configuration,
    then update the roadmap status only after all acceptance criteria pass.

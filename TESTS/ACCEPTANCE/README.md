@@ -32,9 +32,10 @@ labels the Git SHA as a **base revision only**, retains the candidate patch and
 hashes the exported source/test files. It does not create a Git commit. Without
 this option, uncommitted edits are deliberately not tested.
 
-The audit requires Git, tar, Autotools, make, gfortran, NetCDF Fortran, LAPACK,
-Python 3 and NumPy. Compiler portability and CI integration belong to M12c;
-this driver does not remove the existing hard-coded compiler settings.
+The audit requires Git, tar, Autotools, make, a configured Fortran compiler,
+NetCDF Fortran, LAPACK, Python 3 and NumPy. M12c made the build compiler
+configurable and added CI integration; this driver tests the selected local
+toolchain but does not by itself establish portability to other compilers.
 
 It returns nonzero for failed builds, failed test runs, failed available
 one/four-thread comparisons or a supplied reference-package mismatch. The JSON
@@ -153,8 +154,8 @@ That nonzero result must not be relabeled as scientific baseline acceptance.
 
 The separate M12c build-system work and its current verification status are
 tracked in the [M12c progress report](../../docs/acceptance/M12C_BUILD_SYSTEM_PROGRESS_2026_10_11.md).
-That milestone is not accepted until its clean-build, CI, Docker and
-toolchain-portability criteria are verified.
+Its clean Linux CI matrix is complete; Docker and toolchain-portability
+criteria remain open, so the milestone is not yet accepted.
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
