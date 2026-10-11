@@ -67,7 +67,7 @@ def main():
     def prepare(name, source=text):
         case = root/name
         shutil.copytree(fixture, case)
-        (case/'IMEX_sfloW2D.inp').write_text(source)
+        (case/'IMEX_SfloW2D.inp').write_text(source)
         return case
 
     def run(case, logname, expected_error=None):
@@ -90,7 +90,7 @@ def main():
             return path
         details = [f'Missing expected output: {path}',
                    f'Files created: {sorted(p.name for p in case.iterdir())}']
-        inp = case/'IMEX_sfloW2D.inp'
+        inp = case/'IMEX_SfloW2D.inp'
         if inp.is_file():
             relevant_input = [line for line in inp.read_text().splitlines()
                               if any(key in line.upper() for key in
@@ -106,7 +106,7 @@ def main():
         raise AssertionError('\n'.join(details))
 
     def continuation(case, end=0.03):
-        inp = case/'IMEX_sfloW2D.inp'
+        inp = case/'IMEX_SfloW2D.inp'
         value = parameter(inp.read_text(), 'T_END', str(end))
         inp.write_text(parameter(value, 'RESTART_FILES', '"restart.bin"'))
 
@@ -184,7 +184,7 @@ def main():
         case = prepare('reject-'+name)
         shutil.copy2(source_case/'split_checkpoint.bin', case/'restart.bin')
         continuation(case)
-        inp = case/'IMEX_sfloW2D.inp'
+        inp = case/'IMEX_SfloW2D.inp'
         content = inp.read_text()
         content = parameter(content, key, value) if name != 'origin' else content.replace(
             ' EPS_STOP=0,', ' EPS_STOP=0,\n X0_RUNOUT=6,\n Y0_RUNOUT=0,')
