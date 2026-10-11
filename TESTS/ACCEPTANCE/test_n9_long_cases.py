@@ -15,6 +15,7 @@ REPO = Path(__file__).resolve().parents[2]
 
 class N9Helpers(unittest.TestCase):
     def test_dated_evidence_retains_physical_success_and_diagnostic_failure(self):
+        """Keep the original v4 failure report as immutable historical evidence."""
         evidence = json.loads((REPO/'docs/acceptance/results_n9_long_cases_2026_10_11.json').read_text())
         self.assertFalse(evidence['scientific_baseline_approved'])
         self.assertFalse(evidence['production_sources_changed'])
@@ -50,6 +51,62 @@ class N9Helpers(unittest.TestCase):
                 self.assertFalse(budget['exact_first_contact_time_known'])
                 self.assertFalse(budget['mass_tolerance_changed'])
                 self.assertFalse(budget['new_scientific_budget_threshold_approved'])
+
+    def test_v5_restart_matrix_supersedes_historical_diagnostic_failures(self):
+        evidence_path = REPO/'docs/acceptance/results_n9_restart_v5_2026_10_11.json'
+        evidence = json.loads(evidence_path.read_text())
+        self.assertEqual(evidence['summary'], {'passed': 8, 'failed': 0})
+        self.assertTrue(evidence['scientific_baseline_approved'])
+        sign_off = evidence['scientific_sign_off']
+        self.assertEqual(sign_off['status'], 'approved')
+        self.assertEqual(sign_off['approved_revision'], '3f7329c85d2e30e33cf68348721329f7726b01c1')
+        self.assertIn('3180 s', sign_off['budget_policy']['ETNA_LAVA'])
+        self.assertIn('not required', sign_off['raw_output_retention'])
+        self.assertFalse(evidence['solver_tolerances_changed'])
+        self.assertEqual(evidence['source_base_revision'], '0bab7d29daebe84c49d574ab2e6d6d0e293af5ac')
+        for name, digest in evidence['source_sha256'].items():
+            self.assertEqual(n9.digest(REPO/name), digest, name)
+        self.assertEqual(n9.digest(REPO/'TESTS/ACCEPTANCE/n9_restart_validation.py'),
+                         evidence['runner_sha256'])
+        self.assertEqual(len(evidence['runs']), 8)
+        self.assertEqual(len(evidence['thread_pairs']), 4)
+        self.assertTrue(all(pair['status'] == 'pass' for pair in evidence['thread_pairs']))
+        for record in evidence['runs']:
+            self.assertEqual(record['status'], 'pass')
+            self.assertTrue(record['native_fields_restart_exact'])
+            self.assertTrue(record['native_fields_prechange_exact'])
+            self.assertTrue(record['checkpoint_v5_restart_exact'])
+            self.assertTrue(record['canonical_records_prechange_exact'])
+            self.assertTrue(record['CSV_prechange_full_exact'])
+            self.assertTrue(record['ESRI_restart_and_prechange_exact'])
+            for diagnostic in record['diagnostic_csv'].values():
+                self.assertEqual(diagnostic['status'], 'pass')
+                self.assertTrue(diagnostic['history_complete'])
+                self.assertTrue(diagnostic['common_time_values_equal'])
+        stochastic = evidence['stochastic_restart_matrix']
+        self.assertTrue(stochastic['all_passed'])
+        self.assertTrue(stochastic['actual_threads_checked_in_reference_first_and_resumed_runs'])
+        self.assertEqual(stochastic['test_runner_sha256'],
+                         n9.digest(REPO/'TESTS/TEST_STOCHASTIC_RESTART/run_test.sh'))
+        self.assertEqual({(run['profile'], run['actual_threads']) for run in stochastic['runs']},
+                         {(profile, threads) for profile in ('historical_optimized', 'strict_debug')
+                          for threads in (1, 4)})
+        self.assertTrue(all(run['status'] == 'pass' and run['requested_threads'] == run['actual_threads']
+                            for run in stochastic['runs']))
+        for profile in ('historical_optimized', 'strict_debug'):
+            pair = [run for run in stochastic['runs'] if run['profile'] == profile]
+            self.assertEqual(len(pair), 2)
+            self.assertEqual(pair[0]['checkpoint_sha256'], pair[1]['checkpoint_sha256'])
+            self.assertEqual(pair[0]['snapshot_sha256'], pair[1]['snapshot_sha256'])
+            self.assertTrue(all(len(run['harness_log_sha256']) == 64 for run in pair))
+            long_run = next(run for run in evidence['runs'] if run['profile'] == profile)
+            self.assertEqual(pair[0]['executable_sha256'], long_run['executable_sha256'])
+        plan = json.loads((REPO/'TESTS/ACCEPTANCE/acceptance_plan.json').read_text())
+        criteria = {criterion['id']: criterion for criterion in plan['criteria']}
+        self.assertIn('results_n9_restart_v5_2026_10_11.json', criteria['N9-06']['gap'])
+        self.assertEqual(criteria['N9-06']['coverage'], 'approved')
+        self.assertIn('approved', criteria['N9-01']['coverage'])
+        self.assertIn('runout origin/initial offsets', criteria['N9-07']['gap'])
 
     def test_parameter_override_is_unique_and_does_not_match_restart_files(self):
         text = '&RUN_PARAMETERS\n RESTART=F,\n T_END=3600,\n/\n&RESTART_PARAMETERS\n RESTART_FILES="a.asc",\n/\n'

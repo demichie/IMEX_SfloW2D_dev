@@ -64,8 +64,10 @@ The subsequent N7-B/N7-C/N7-D packages are completed. The
 [CFL completion report](../../docs/acceptance/CFL_POLICY_COMPLETION_2026_10_11.md)
 records the authorized dual-policy contract, 45/45 full-audit groups, bitwise
 retained-default compatibility and additional original-duration `combined`
-restart checks. N7 and N8 are satisfied; N9 scientific-baseline approval remains
-the next separate gate, not an automatic consequence of passing scripts.
+restart checks. N7 and N8 are satisfied. N9 scientific-baseline approval is a
+separate owner decision, now recorded for the pinned v5 scope in the
+[v5 report](../../docs/acceptance/N9_RESTART_V5_2026_10_11.md) and
+[machine-readable evidence](../../docs/acceptance/results_n9_restart_v5_2026_10_11.json).
 
 `IMEX_AUDIT_CFL_POLICY=combined` explicitly selects the optional policy in
 supplementary restart fixtures through the capture adapter. Every override is
@@ -79,8 +81,9 @@ actual thread count, output SHA-256 fingerprints and conservative-field
 finiteness checks. These files remain in the output directory after completion.
 The existing shell tests may remove their temporary solver fixtures; the audit
 does not retain every raw field or restart payload. Reproducing the fingerprints
-requires rerunning the pinned revision. Archived approved golden outputs remain
-a separate N9 requirement.
+requires rerunning the pinned revision. The scientific owner approved checksum-
+and metadata-based evidence retention for the recorded v5 baseline; bulky raw
+payloads are not required to remain archived.
 
 The two full-executable profiles are:
 
@@ -108,9 +111,14 @@ exponents with an omitted `E`. It does not rewrite or relax the field data.
 The selected cases are ETNA (200 s) and ETNA_LAVA (3600 s). The lava mass check
 uses saved outputs only through 3180 s, the last output before boundary contact.
 This does not shorten its full-field or restart checks. The
-[N9 report](../../docs/acceptance/N9_LONG_CASES_2026_10_11.md) separates exact
-physical continuation from the currently failing diagnostic CSV continuation;
-it does not approve N9 or waive those failures.
+[historical v4 report](../../docs/acceptance/N9_LONG_CASES_2026_10_11.md)
+preserves the originally observed CSV continuation failures. The
+[v5 report](../../docs/acceptance/N9_RESTART_V5_2026_10_11.md) records the
+subsequent correction and passing 8/8 full/split comparisons, while the
+[versioned v5 evidence](../../docs/acceptance/results_n9_restart_v5_2026_10_11.json)
+retains their source, executable, input and output hashes and records the
+separate scientific owner approval for its pinned revision and scope. A fresh
+audit run does not by itself extend that approval to a different revision.
 
 Using executables and source hashes from a retained clean acceptance build:
 

@@ -20,7 +20,12 @@ case "$executable" in
     *) executable=$(CDPATH= cd -- "$(dirname -- "$executable")" && pwd)/$(basename -- "$executable") ;;
 esac
 
-work_dir=$(mktemp -d /tmp/imex-stochastic-restart.XXXXXX)
+    OMP_NUM_THREADS=${OMP_NUM_THREADS:-1}
+    OMP_DYNAMIC=FALSE
+    export OMP_NUM_THREADS OMP_DYNAMIC
+    expected_threads=$OMP_NUM_THREADS
+
+    work_dir=$(mktemp -d /tmp/imex-stochastic-restart.XXXXXX)
 if [ "${KEEP_TEST_WORKDIR:-0}" = 1 ]; then
     echo "Keeping test work directory: $work_dir"
 else
@@ -39,6 +44,11 @@ prepare_case() {
         "$case_dir/INIT_STOCHASTIC_0000.q_2d"
 
     awk '
+        /^ RUN_NAME=/ {
+            print
+            print " SERIAL_FLAG=F,"
+            next
+        }
         /^ RESTART_FILES=/ {
             print " RESTART_FILES=\"INIT_STOCHASTIC_0000.q_2d\","; next
         }
@@ -101,6 +111,15 @@ prepare_case() {
     mv "$case_dir/IMEX_sfloW2D.inp.new" "$case_dir/IMEX_sfloW2D.inp"
 }
 
+check_threads() {
+    log_file=$1
+    actual_threads=$(sed -n 's/.*number of threads used[[:space:]]*//p' "$log_file" | tail -1 | tr -d ' ')
+    if [ "$actual_threads" != "$expected_threads" ]; then
+        echo "FAIL: expected $expected_threads OpenMP threads in $log_file, got ${actual_threads:-none}" >&2
+        exit 1
+    fi
+}
+
 reference_dir="$work_dir/reference"
 resumed_dir="$work_dir/resumed"
 prepare_case "$reference_dir"
@@ -113,16 +132,19 @@ sed -i.bak -e 's/^ T_END=.*/ T_END=  3.000000000000000E+000,/' \
 (
     cd "$reference_dir"
     "$executable" > run.log
+    check_threads run.log
 )
 
 (
     cd "$resumed_dir"
     "$executable" > first_run.log
+    check_threads first_run.log
     sed -i.bak \
         -e 's/^ T_END=.*/ T_END=  3.000000000000000E+000,/' \
         -e 's/^ RESTART_FILES=.*/ RESTART_FILES="restart.bin",/' \
         IMEX_sfloW2D.inp
     "$executable" > resumed_run.log
+    check_threads resumed_run.log
 )
 
 if [ ! -f "$reference_dir/restart.bin" ] || \

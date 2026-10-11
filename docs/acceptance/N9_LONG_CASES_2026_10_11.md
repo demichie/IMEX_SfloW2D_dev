@@ -1,5 +1,14 @@
 # N9 long cases and restart diagnostics
 
+> Historical v4 characterization: this report preserves the diagnostic
+> continuation failures observed before checkpoint v5. The defects were
+> subsequently corrected and revalidated; see
+> [the v5 restart report](N9_RESTART_V5_2026_10_11.md) and
+> [v5 evidence](results_n9_restart_v5_2026_10_11.json). Do not interpret the
+> failures below as the current v5 result.
+
+## Historical v4 results (superseded for restart diagnostics)
+
 The selected ETNA and ETNA_LAVA cases preserve their full durations, physical
 inputs and default `directional_min` CFL policy. All eight physical restart
 comparisons pass, but the runout and mass-centre CSV continuation checks fail.
