@@ -1,0 +1,13 @@
+/DEM/Etna2014_crop.asc
+/dem_esri.asc
+/dem_esri_nodata.asc
+/exampleEtna_lava*.asc
+/exampleEtna_lava*.nc
+/exampleEtna_lava*.q_2d
+/exampleEtna_lava*.p_2d
+/exampleEtna_lava*.bak
+/exampleEtna_lava*.csv
+/restart.bin
+/runout.txt
+/run.log
+/__pycache__/

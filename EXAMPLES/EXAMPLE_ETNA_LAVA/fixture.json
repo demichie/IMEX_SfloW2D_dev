@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "example": "EXAMPLE_ETNA_LAVA",
+  "input": {
+    "path": "IMEX_SfloW2D.inp",
+    "origin": "User-supplied Etna lava input, 2026-10-11",
+    "sha256": "37437d1325d7cd9bbdc79d40de639b1bc2b695c674fbbc7acac390644268fa80",
+    "parameters_changed_on_import": false
+  },
+  "DEM": {
+    "archive": "../EXAMPLE_ETNA/DEM/Etna2014_crop.zip",
+    "archive_sha256": "b2fc0de68cede0f432b7cd31c940499fc96515f9716ee49d6df7653711392277",
+    "member": "Etna2014_crop.asc",
+    "member_sha256": "072cfd4961f08bf858afc25c76fc5d37c19e52da477ec0cc95392ab881587bae",
+    "bytes": 102076267,
+    "preprocessing": "none; original raster, before ellipsoid excavation",
+    "source_example_raster_byte_identical": true
+  },
+  "run": {
+    "t_start_s": 0.0,
+    "t_end_s": 3600.0,
+    "output_interval_s": 60.0,
+    "cells_x": 250,
+    "cells_y": 150,
+    "cell_size_m": 10.0,
+    "rheology_model": 3,
+    "fissures": 2,
+    "CFL": 0.24,
+    "CFL_POLICY": "directional_min (parameter omitted)",
+    "n_RK": 2,
+    "slope_correction": false,
+    "curvature_term": false
+  },
+  "N9": {
+    "selected_long_examples": ["EXAMPLE_ETNA", "EXAMPLE_ETNA_LAVA"],
+    "replaces_long_lava_case": "EXAMPLE_LAVA_IMO",
+    "scientific_baseline_approved": false
+  }
+}

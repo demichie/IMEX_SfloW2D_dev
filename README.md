@@ -40,6 +40,11 @@ The executable is copied in the bin folder.
 
 Several examples can be found in the EXAMPLES folder.
 
+The [Etna lava example](EXAMPLES/EXAMPLE_ETNA_LAVA/README.md) uses two bottom
+fissures and the original Etna DEM before avalanche preprocessing. Together
+with `EXAMPLE_ETNA`, it is selected for the N9 long-case validation; it replaces
+`EXAMPLE_LAVA_IMO` in that selection without removing the existing IMO example.
+
 ## CFL timestep policies
 
 `NUMERIC_PARAMETERS` accepts `CFL_POLICY='directional_min'` (the default,

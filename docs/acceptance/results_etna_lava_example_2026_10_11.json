@@ -1,0 +1,1582 @@
+{
+  "schema_version": 1,
+  "started_utc": "2026-10-11T07:01:37.691165+00:00",
+  "repository_revision": "8fc540eba791dabd7dfa39c305513f52ded2c5a3",
+  "fixture": {
+    "schema_version": 1,
+    "example": "EXAMPLE_ETNA_LAVA",
+    "input": {
+      "path": "IMEX_SfloW2D.inp",
+      "origin": "User-supplied Etna lava input, 2026-10-11",
+      "sha256": "37437d1325d7cd9bbdc79d40de639b1bc2b695c674fbbc7acac390644268fa80",
+      "parameters_changed_on_import": false
+    },
+    "DEM": {
+      "archive": "../EXAMPLE_ETNA/DEM/Etna2014_crop.zip",
+      "archive_sha256": "b2fc0de68cede0f432b7cd31c940499fc96515f9716ee49d6df7653711392277",
+      "member": "Etna2014_crop.asc",
+      "member_sha256": "072cfd4961f08bf858afc25c76fc5d37c19e52da477ec0cc95392ab881587bae",
+      "bytes": 102076267,
+      "preprocessing": "none; original raster, before ellipsoid excavation",
+      "source_example_raster_byte_identical": true
+    },
+    "run": {
+      "t_start_s": 0,
+      "t_end_s": 3600,
+      "output_interval_s": 60,
+      "cells_x": 250,
+      "cells_y": 150,
+      "cell_size_m": 10,
+      "rheology_model": 3,
+      "fissures": 2,
+      "CFL": 0.24,
+      "CFL_POLICY": "directional_min (parameter omitted)",
+      "n_RK": 2,
+      "slope_correction": false,
+      "curvature_term": false
+    },
+    "N9": {
+      "selected_long_examples": [
+        "EXAMPLE_ETNA",
+        "EXAMPLE_ETNA_LAVA"
+      ],
+      "replaces_long_lava_case": "EXAMPLE_LAVA_IMO",
+      "scientific_baseline_approved": false
+    }
+  },
+  "source_sha256": {
+    "src/IMEX_SfloW2D.f90": "2f7e868a3f37ef2718853e605453befc3596565c393f3bdc68256990be0f281b",
+    "src/Makefile.am": "cf832e70ea9dbaef0775b69c8671db7a290051c4f5a15462e2af5b54f3a17bed",
+    "src/Makefile.in": "3a511152bacc941bd6a23889137e29b632b4a2cf1ada94ea5a76ac2ca99a97c1",
+    "src/complexify.f90": "f6de6fb8f4c59be820b342cc3a8c31d45601dc850b92132cb9c7796876f985cf",
+    "src/constitutive_parameters_2d.f90": "bbb8fb6a5ecda75cdfbd9dbd57650bd8d22736318e5140072bc3401511a87de3",
+    "src/diagnostics_2d.f90": "16b8c59ac2f90b5c99e7c5cfffc337d2da0dceefaec091efe36fb8c5cb80e759",
+    "src/domain_2d.f90": "6afd4e62d52dbd23ec429514dfb33ab3f8988887a88150197bd55f6a66bf6a5f",
+    "src/equation_metadata_2d.f90": "1dbcece9f777f6e742980924937413e74a5cb4fc431c856dc12a47b76ca9154e",
+    "src/equation_terms_2d.f90": "4f4b8b69ea9041cb31c107625d9253adee0ddb522f1e38630d6751fe10ba3910",
+    "src/geometry_2d.f90": "a6066b7f5a3e7a78a8a3c8a0f39f6ef060d3862242f187221eb688d3f9d4db54",
+    "src/hp_reconstruction_2d.f90": "7bc35bd8f767c53ca5135a2ed79a7d46f7593c41be41a4db25c195fb0ebb75df",
+    "src/hyperbolic_2d.f90": "84aebe39459630ef7570305aae984fff172e67e4b8f46e759a63bb7c0cf881e6",
+    "src/init_2d.f90": "03451193df8e652b8eccf27644564e40fb05d929c094d2ba0172a0c4372140ca",
+    "src/inpout_2d.f90": "e222ea0cb37352dd1f3120b03fd6f6c0f8311836a49cf2fb675e0430f3bf9917",
+    "src/lapack_interfaces_2d.f90": "2891985b5e521538e6871568aa8b708fdf01455b1908c7805cf2b6cfd3b5d952",
+    "src/mass_exchange_2d.f90": "89b5fa471e8599cd3205873d74126daf7cabfa9efd8d222ea783cbf010902cd8",
+    "src/mixture_from_mass.inc": "da6131a86aa691dc043a77e2d3f50ed2f753d077590c081e7ee97d5bd4b20a5d",
+    "src/mixture_heat_capacity.inc": "c112e1dc64aebba6e282b1fc220377abe229948062da8168b563b382822ea1aa",
+    "src/model_layout_2d.f90": "ab60e9de67fc2d5fbc3d15d5536ceaa22f859ed3ec0e76652ad7a5e43a352cce",
+    "src/nonconservative_2d.f90": "44f659c71d192e3e285cd8fb962f66ca11dd383d3a5a9a2c24e9b7aef97d691e",
+    "src/nonlinear_solver_2d.f90": "d20659ab9067f5890069cf440fa4fd9ab0db4cd32b461284839f31ef8fd7ec3a",
+    "src/parameters_2d.f90": "3fff3046c90d3f1f78b0fe77245f0c5285d81da5deb06b8100e4ff0fff2118cb",
+    "src/pccu_2d.f90": "2d037f0ad8a48f31eb00ac3645f04ad554408ba749bec9875b8b01b393affc59",
+    "src/reconstruction_2d.f90": "8b9611285064e0347f929022a84f1e0540b073170d75eca17f0cdc789b407141",
+    "src/runtime_2d.f90": "afc7d054d0f2c033c5809519b51568f92e18c7bbc9b6ec13300c6d16d2422aef",
+    "src/simulation_2d.f90": "0ed05c045960933096f8cdd4fe5267d0919ab5621ddf5093a33b0363dc0a59b9",
+    "src/spatial_operator_2d.f90": "5bab1f7760dddeda3f458a296ba83789c0061806fe4bc50ea77d37c94294b0ae",
+    "src/state_2d.f90": "cdb80ac4b5357a25f36f28555e595764127e234096c67cedeb4585fa2881ccda",
+    "src/state_conversion_2d.f90": "8026b8f0322fdc2b37cec4abea514e7439f50c980255a5d24a33c590b5528504",
+    "src/state_conversion_phys_var.inc": "d9f63dcbe2ceb3b62131c01dbda1da2ffbaa793a7604382d3dad4ca450bc1729",
+    "src/stochastic_module.f90": "77090048c7cb80fa9f00d1e429326bc9c2c97af21fc31be2b007a1870f29663b",
+    "src/stochastic_random_2d.f90": "39066c274a98949e1a5f636c763ee3b7572379dbea7951ef72b11448035beb00",
+    "src/time_integration_2d.f90": "fad5792694a930fb967297f9ce25e3a5d07f155dfc2643f27aeee3ff29ce9d28",
+    "src/velocity_from_conservative.inc": "552515c233b09171e4965e9f1866dfeedb5f37c1dce195ba02f18bcc7cd5671a"
+  },
+  "reused_build_manifest_sha256": "272bd2ba760c855c72cc9786a087d80b00f1be83258ccdd286cce77683f2f497",
+  "tools": {
+    "compiler": {
+      "command": [
+        "gfortran",
+        "--version"
+      ],
+      "returncode": 0,
+      "output": "GNU Fortran (Homebrew GCC 15.2.0) 15.2.0\nCopyright (C) 2025 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE."
+    },
+    "autoconf": {
+      "command": [
+        "autoconf",
+        "--version"
+      ],
+      "returncode": 0,
+      "output": "autoconf (GNU Autoconf) 2.72\nCopyright (C) 2023 Free Software Foundation, Inc.\nLicense GPLv3+/Autoconf: GNU GPL version 3 or later\n<https://gnu.org/licenses/gpl.html>, <https://gnu.org/licenses/exceptions.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by David J. MacKenzie and Akim Demaille."
+    },
+    "automake": {
+      "command": [
+        "automake",
+        "--version"
+      ],
+      "returncode": 0,
+      "output": "automake (GNU automake) 1.18\nFeatures: subsecond-mtime\n\nCopyright (C) 2025 Free Software Foundation, Inc.\nLicense GPLv2+: GNU GPL version 2 or later\n  <https://gnu.org/licenses/gpl-2.0.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by Tom Tromey <tromey@redhat.com>\n       and Alexandre Duret-Lutz <adl@gnu.org>."
+    },
+    "netcdf_fortran": {
+      "command": [
+        "nf-config",
+        "--version"
+      ],
+      "returncode": 0,
+      "output": "4.6.1"
+    },
+    "netcdf_fortran_fflags": {
+      "command": [
+        "nf-config",
+        "--fflags"
+      ],
+      "returncode": 0,
+      "output": "-I/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1/include -I/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1/include"
+    },
+    "netcdf_fortran_flibs": {
+      "command": [
+        "nf-config",
+        "--flibs"
+      ],
+      "returncode": 0,
+      "output": "-L/opt/homebrew/Cellar/netcdf-fortran/4.6.1_1/lib -lnetcdff -lnetcdf -lnetcdf"
+    },
+    "netcdf_c": {
+      "command": [
+        "nc-config",
+        "--all"
+      ],
+      "returncode": 0,
+      "output": "This netCDF 4.9.2 has been built with the following features: \n\n  --cc            -> clang\n  --cflags        -> -I/opt/homebrew/Cellar/netcdf/4.9.2_2/include\n  --libs          -> -L/opt/homebrew/Cellar/netcdf/4.9.2_2/lib -lnetcdf\n  --static        -> -lhdf5_hl-shared -lhdf5-shared -lm -lz -lzstd -lbz2 -lcurl -lxml2\n\n\n  --has-dap          -> yes\n  --has-dap2         -> yes\n  --has-dap4         -> yes\n  --has-nc2          -> yes\n  --has-nc4          -> yes\n  --has-hdf5         -> yes\n  --has-hdf4         -> no\n  --has-logging      -> no\n  --has-pnetcdf      -> no\n  --has-szlib        -> no\n  --has-cdf5         -> yes\n  --has-parallel4    -> no\n  --has-parallel     -> no\n  --has-nczarr       -> yes\n  --has-zstd         -> yes\n  --has-benchmarks   -> no\n  --has-multifilters -> no\n  --has-stdfilters   -> deflate szip zstd bz2\n  --has-quantize     -> no\n\n  --prefix        -> /opt/homebrew/Cellar/netcdf/4.9.2_2\n  --includedir    -> /opt/homebrew/Cellar/netcdf/4.9.2_2/include\n  --libdir        -> /opt/homebrew/Cellar/netcdf/4.9.2_2/lib\n  --plugindir     -> \n  --version       -> netCDF 4.9.2"
+    }
+  },
+  "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+  "results": [
+    {
+      "profile": "historical_optimized",
+      "actual_threads": 4,
+      "requested_threads": 4,
+      "directory": "/tmp/imex-etna-lava-validation-tzq87gsk/historical_optimized-threads-4",
+      "returncode": 0,
+      "seconds": 34.20602049998706,
+      "executable_sha256": "8cc12ac772f224d1a799e4ce0b369c17385671aa8edbcf95c31f3183b07b7918",
+      "flags": "-Ofast -funroll-all-loops",
+      "input_sha256": "37437d1325d7cd9bbdc79d40de639b1bc2b695c674fbbc7acac390644268fa80",
+      "DEM_sha256": "072cfd4961f08bf858afc25c76fc5d37c19e52da477ec0cc95392ab881587bae",
+      "log_sha256": "125e9cd04364255ff28c3768b6e4ccb1550800b7e51e1eeff2fb232fecc5ce08",
+      "final_logged_time_s": 3600,
+      "status": "pass_for_example_validation",
+      "numeric_variables_finite_without_fill": 20,
+      "metadata": {
+        "x": {
+          "shape": [
+            250
+          ],
+          "dimensions": [
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 499818,
+          "maximum": 502308
+        },
+        "y": {
+          "shape": [
+            150
+          ],
+          "dimensions": [
+            "y"
+          ],
+          "units": "meters",
+          "minimum": 4176705,
+          "maximum": 4178195
+        },
+        "time": {
+          "shape": [
+            61
+          ],
+          "dimensions": [
+            "time"
+          ],
+          "units": "seconds",
+          "minimum": 0,
+          "maximum": 3600
+        },
+        "b": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 2128.0835571289062,
+          "maximum": 3332.7918243408203
+        },
+        "h": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 0,
+          "maximum": 0.425030776360337
+        },
+        "eta": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 2128.0835571289062,
+          "maximum": 3332.7918243408203
+        },
+        "u": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters/seconds",
+          "minimum": -0.054770434792594865,
+          "maximum": 1.2750955605497516
+        },
+        "v": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters/seconds",
+          "minimum": -0.9184007267142922,
+          "maximum": 0.15208742409641074
+        },
+        "w": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters/seconds",
+          "minimum": -0.8696539594176964,
+          "maximum": 0
+        },
+        "T": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "kelvin",
+          "minimum": 300,
+          "maximum": 1523.455663556527
+        },
+        "hMax": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 0,
+          "maximum": 0.425030776360337
+        },
+        "pDynMax": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "Pa",
+          "minimum": 0,
+          "maximum": 2156.2437846449247
+        },
+        "modVelMax": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "m/s",
+          "minimum": 0,
+          "maximum": 1.2878855015534107
+        },
+        "Ri": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "",
+          "minimum": 0,
+          "maximum": 14613145299308.178
+        },
+        "rhomix": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "kg/m3",
+          "minimum": 0,
+          "maximum": 2600
+        },
+        "red grav": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "m/s2",
+          "minimum": 0,
+          "maximum": 9.805561616898418
+        },
+        "mu eff": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "",
+          "minimum": 0,
+          "maximum": 0
+        },
+        "erodible": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 0,
+          "maximum": 0
+        },
+        "shear_velocity": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "m/s",
+          "minimum": 0,
+          "maximum": 0
+        },
+        "inertial_number": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "",
+          "minimum": 0,
+          "maximum": 0
+        }
+      },
+      "decoded_sha256": {
+        "x": "3e4343a4a7cd5036617ef5042248892375ce2248ac0d1a841a189b218ed9c425",
+        "y": "15e18a03d291606653e9cd4a13bf20f62257c744f0018980d5b479a0dc13bf8a",
+        "time": "eecd6889f7400b841e8332ded543c144aa34517008474e29a62c6e7262325161",
+        "b": "df1815b5e4bff0996117333d51cf4ead51d1fc326352c16247f4c0a7c83c1315",
+        "h": "02a4d6705b16dcb73d5e70270078af238e5f9f625e997f2408014fd31dddd108",
+        "eta": "e3d58268b60e864a4699b65c20c4f5941ccf46cb50e5ed9f45157b467caf96c9",
+        "u": "7959c7da65976edc417f72e717ff2f41d1da95d590c7a79ddf93067bd2c91300",
+        "v": "1b6048c128c3ebc26c86879e990289bd67220dc0764a1d722ad77ec99836c22b",
+        "w": "2a20387067717db2dd17858a498adb1f823357cbcfa17af542ea837e26d607ae",
+        "T": "1a0822467cc470865dc2e787c205f65af0f1774c1fb59d13d373cd91a5eec159",
+        "hMax": "563e42bb26c83da6314f667b7cc563a29faae7df503c0f07ed24803e7e2b411b",
+        "pDynMax": "9864ca13b4ef164ed6774efabcdc236fbce2970d250a97f26e5217f9665c1129",
+        "modVelMax": "adcde11620621af2789ec18be92349bb27905476ae10682babd1c9ec2b4490f0",
+        "Ri": "3e3b82b60df5d6b2aaa95317c142544d660d319d49287f1728cce88384ed1870",
+        "rhomix": "933597c7e2ad0ad15f39b36c8df6b8823ca03d8d1070c890048eca609fcadd4d",
+        "red grav": "5aeff680b755368515666ac912bdfc0ca74329a6163c26fb2f63e06a01540c71",
+        "mu eff": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361",
+        "erodible": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361",
+        "shear_velocity": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361",
+        "inertial_number": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361"
+      },
+      "NetCDF_sha256": "917569db4c406ae1280803ae23e8f97d43f004ed1d527a74dd712dba476495ca",
+      "restart_sha256": "4eec92c1580d1f90795297a5c382afab11128c0f90f33bbd858ca1b313467958",
+      "esri_thickness_snapshots": 61,
+      "esri_temperature_snapshots": 61,
+      "eta_identity_Linf_m": 0,
+      "maximum_boundary_thickness_m": 0.1708475179142459,
+      "source_budget_observation": {
+        "nominal_rectangular_area_m2": 1100,
+        "nominal_volume_rate_m3_s": 9.24,
+        "nominal_injected_volume_m3": 33264,
+        "final_volume_m3": 32734.013059587778,
+        "final_mass_kg": 85108433.95492822,
+        "maximum_volume_difference_m3": 529.9869404122219,
+        "interpretation": "Observed, not a newly approved N9 tolerance; outflow must be included if boundary flow is nonzero."
+      }
+    },
+    {
+      "profile": "historical_optimized",
+      "actual_threads": 1,
+      "requested_threads": 1,
+      "directory": "/tmp/imex-etna-lava-validation-tzq87gsk/historical_optimized-threads-1",
+      "returncode": 0,
+      "seconds": 76.2781038749963,
+      "executable_sha256": "8cc12ac772f224d1a799e4ce0b369c17385671aa8edbcf95c31f3183b07b7918",
+      "flags": "-Ofast -funroll-all-loops",
+      "input_sha256": "37437d1325d7cd9bbdc79d40de639b1bc2b695c674fbbc7acac390644268fa80",
+      "DEM_sha256": "072cfd4961f08bf858afc25c76fc5d37c19e52da477ec0cc95392ab881587bae",
+      "log_sha256": "98ef76a4b9f6bb27737192f16420d7a32c239bb9255cc9e23766c17d3f161d25",
+      "final_logged_time_s": 3600,
+      "status": "pass_for_example_validation",
+      "numeric_variables_finite_without_fill": 20,
+      "metadata": {
+        "x": {
+          "shape": [
+            250
+          ],
+          "dimensions": [
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 499818,
+          "maximum": 502308
+        },
+        "y": {
+          "shape": [
+            150
+          ],
+          "dimensions": [
+            "y"
+          ],
+          "units": "meters",
+          "minimum": 4176705,
+          "maximum": 4178195
+        },
+        "time": {
+          "shape": [
+            61
+          ],
+          "dimensions": [
+            "time"
+          ],
+          "units": "seconds",
+          "minimum": 0,
+          "maximum": 3600
+        },
+        "b": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 2128.0835571289062,
+          "maximum": 3332.7918243408203
+        },
+        "h": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 0,
+          "maximum": 0.425030776360337
+        },
+        "eta": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 2128.0835571289062,
+          "maximum": 3332.7918243408203
+        },
+        "u": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters/seconds",
+          "minimum": -0.054770434792594865,
+          "maximum": 1.2750955605497516
+        },
+        "v": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters/seconds",
+          "minimum": -0.9184007267142922,
+          "maximum": 0.15208742409641074
+        },
+        "w": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters/seconds",
+          "minimum": -0.8696539594176964,
+          "maximum": 0
+        },
+        "T": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "kelvin",
+          "minimum": 300,
+          "maximum": 1523.455663556527
+        },
+        "hMax": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 0,
+          "maximum": 0.425030776360337
+        },
+        "pDynMax": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "Pa",
+          "minimum": 0,
+          "maximum": 2156.2437846449247
+        },
+        "modVelMax": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "m/s",
+          "minimum": 0,
+          "maximum": 1.2878855015534107
+        },
+        "Ri": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "",
+          "minimum": 0,
+          "maximum": 14613145299308.178
+        },
+        "rhomix": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "kg/m3",
+          "minimum": 0,
+          "maximum": 2600
+        },
+        "red grav": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "m/s2",
+          "minimum": 0,
+          "maximum": 9.805561616898418
+        },
+        "mu eff": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "",
+          "minimum": 0,
+          "maximum": 0
+        },
+        "erodible": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 0,
+          "maximum": 0
+        },
+        "shear_velocity": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "m/s",
+          "minimum": 0,
+          "maximum": 0
+        },
+        "inertial_number": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "",
+          "minimum": 0,
+          "maximum": 0
+        }
+      },
+      "decoded_sha256": {
+        "x": "3e4343a4a7cd5036617ef5042248892375ce2248ac0d1a841a189b218ed9c425",
+        "y": "15e18a03d291606653e9cd4a13bf20f62257c744f0018980d5b479a0dc13bf8a",
+        "time": "eecd6889f7400b841e8332ded543c144aa34517008474e29a62c6e7262325161",
+        "b": "df1815b5e4bff0996117333d51cf4ead51d1fc326352c16247f4c0a7c83c1315",
+        "h": "02a4d6705b16dcb73d5e70270078af238e5f9f625e997f2408014fd31dddd108",
+        "eta": "e3d58268b60e864a4699b65c20c4f5941ccf46cb50e5ed9f45157b467caf96c9",
+        "u": "7959c7da65976edc417f72e717ff2f41d1da95d590c7a79ddf93067bd2c91300",
+        "v": "1b6048c128c3ebc26c86879e990289bd67220dc0764a1d722ad77ec99836c22b",
+        "w": "2a20387067717db2dd17858a498adb1f823357cbcfa17af542ea837e26d607ae",
+        "T": "1a0822467cc470865dc2e787c205f65af0f1774c1fb59d13d373cd91a5eec159",
+        "hMax": "563e42bb26c83da6314f667b7cc563a29faae7df503c0f07ed24803e7e2b411b",
+        "pDynMax": "9864ca13b4ef164ed6774efabcdc236fbce2970d250a97f26e5217f9665c1129",
+        "modVelMax": "adcde11620621af2789ec18be92349bb27905476ae10682babd1c9ec2b4490f0",
+        "Ri": "3e3b82b60df5d6b2aaa95317c142544d660d319d49287f1728cce88384ed1870",
+        "rhomix": "933597c7e2ad0ad15f39b36c8df6b8823ca03d8d1070c890048eca609fcadd4d",
+        "red grav": "5aeff680b755368515666ac912bdfc0ca74329a6163c26fb2f63e06a01540c71",
+        "mu eff": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361",
+        "erodible": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361",
+        "shear_velocity": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361",
+        "inertial_number": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361"
+      },
+      "NetCDF_sha256": "917569db4c406ae1280803ae23e8f97d43f004ed1d527a74dd712dba476495ca",
+      "restart_sha256": "4eec92c1580d1f90795297a5c382afab11128c0f90f33bbd858ca1b313467958",
+      "esri_thickness_snapshots": 61,
+      "esri_temperature_snapshots": 61,
+      "eta_identity_Linf_m": 0,
+      "maximum_boundary_thickness_m": 0.1708475179142459,
+      "source_budget_observation": {
+        "nominal_rectangular_area_m2": 1100,
+        "nominal_volume_rate_m3_s": 9.24,
+        "nominal_injected_volume_m3": 33264,
+        "final_volume_m3": 32734.013059587778,
+        "final_mass_kg": 85108433.95492822,
+        "maximum_volume_difference_m3": 529.9869404122219,
+        "interpretation": "Observed, not a newly approved N9 tolerance; outflow must be included if boundary flow is nonzero."
+      }
+    },
+    {
+      "profile": "strict_debug",
+      "actual_threads": 4,
+      "requested_threads": 4,
+      "directory": "/tmp/imex-etna-lava-validation-tzq87gsk/strict_debug-threads-4",
+      "returncode": 0,
+      "seconds": 181.68952624994563,
+      "executable_sha256": "da673d7d8936e8194d9b709322c59a838f16cbdc1acdf8e37babc6a7c9de096f",
+      "flags": "-O0 -g -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow",
+      "input_sha256": "37437d1325d7cd9bbdc79d40de639b1bc2b695c674fbbc7acac390644268fa80",
+      "DEM_sha256": "072cfd4961f08bf858afc25c76fc5d37c19e52da477ec0cc95392ab881587bae",
+      "log_sha256": "75f931331f82e7ba67dc6ec6d213d00e8d95b919eb525ca36dd1089050012d12",
+      "final_logged_time_s": 3600,
+      "status": "pass_for_example_validation",
+      "numeric_variables_finite_without_fill": 20,
+      "metadata": {
+        "x": {
+          "shape": [
+            250
+          ],
+          "dimensions": [
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 499818,
+          "maximum": 502308
+        },
+        "y": {
+          "shape": [
+            150
+          ],
+          "dimensions": [
+            "y"
+          ],
+          "units": "meters",
+          "minimum": 4176705,
+          "maximum": 4178195
+        },
+        "time": {
+          "shape": [
+            61
+          ],
+          "dimensions": [
+            "time"
+          ],
+          "units": "seconds",
+          "minimum": 0,
+          "maximum": 3600
+        },
+        "b": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 2128.0835571289062,
+          "maximum": 3332.7918243408203
+        },
+        "h": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 0,
+          "maximum": 0.42503077636027947
+        },
+        "eta": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 2128.0835571289062,
+          "maximum": 3332.7918243408203
+        },
+        "u": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters/seconds",
+          "minimum": -0.054770434792597134,
+          "maximum": 1.275095560549752
+        },
+        "v": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters/seconds",
+          "minimum": -0.9184007267148486,
+          "maximum": 0.15208742409703385
+        },
+        "w": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters/seconds",
+          "minimum": -0.8696539594176963,
+          "maximum": 0
+        },
+        "T": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "kelvin",
+          "minimum": 300,
+          "maximum": 1523.4556635565275
+        },
+        "hMax": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 0,
+          "maximum": 0.42503077636027947
+        },
+        "pDynMax": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "Pa",
+          "minimum": 0,
+          "maximum": 2156.2437846449266
+        },
+        "modVelMax": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "m/s",
+          "minimum": 0,
+          "maximum": 1.2878855015534114
+        },
+        "Ri": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "",
+          "minimum": 0,
+          "maximum": 14613138732835.896
+        },
+        "rhomix": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "kg/m3",
+          "minimum": 0,
+          "maximum": 2600
+        },
+        "red grav": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "m/s2",
+          "minimum": 0,
+          "maximum": 9.805561616898418
+        },
+        "mu eff": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "",
+          "minimum": 0,
+          "maximum": 0
+        },
+        "erodible": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 0,
+          "maximum": 0
+        },
+        "shear_velocity": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "m/s",
+          "minimum": 0,
+          "maximum": 0
+        },
+        "inertial_number": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "",
+          "minimum": 0,
+          "maximum": 0
+        }
+      },
+      "decoded_sha256": {
+        "x": "3e4343a4a7cd5036617ef5042248892375ce2248ac0d1a841a189b218ed9c425",
+        "y": "15e18a03d291606653e9cd4a13bf20f62257c744f0018980d5b479a0dc13bf8a",
+        "time": "eecd6889f7400b841e8332ded543c144aa34517008474e29a62c6e7262325161",
+        "b": "df1815b5e4bff0996117333d51cf4ead51d1fc326352c16247f4c0a7c83c1315",
+        "h": "4851c7d6b38207d82c1b4000555f333f4bacf8343790ca6c1d74d5669d618153",
+        "eta": "d758a9a518c98c05766aa6f42e30b907b4881ad5ef178cc3fc4e2951da056cd6",
+        "u": "15efeec654cc53d0dbeced898b529c70e89593fe752135b6b0728eae6bac6478",
+        "v": "ee094c67735f90c1339628b56aa49f54ae8d9a6e2aa20aa6eaab084398655578",
+        "w": "6ffeda2f1f9e33ab94cf42852b4662a79d61ed1d88eb3ededc029507737dfdef",
+        "T": "c2319ffe7c36692fece7938b692056b9203a730882160574f4711ea15e3369aa",
+        "hMax": "d80be9f54fedd9eaf0a1ac70ced4e432d90a9851a089935adbffdc6f21e4d8c2",
+        "pDynMax": "7dec4466f0c1852d5e3eb56740470de56b674fc381d4da5fff746544156f9724",
+        "modVelMax": "0f75cac58028d3e04a640a268f4ab994667817de9fac2e7686de0441d3da8d04",
+        "Ri": "3ab83bf8222ed40ebcd26b117d89a06861270b65d95133773cd7ac10412f8a5c",
+        "rhomix": "933597c7e2ad0ad15f39b36c8df6b8823ca03d8d1070c890048eca609fcadd4d",
+        "red grav": "5aeff680b755368515666ac912bdfc0ca74329a6163c26fb2f63e06a01540c71",
+        "mu eff": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361",
+        "erodible": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361",
+        "shear_velocity": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361",
+        "inertial_number": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361"
+      },
+      "NetCDF_sha256": "9acdcedb7ddf3b24f43cf2f0c05193fcd9b0864a32e8e3e0b0d78e728210ad1e",
+      "restart_sha256": "ff082d1e547201791aea4354e48a8be24e86fbc52a9f5d8f300eeae89f040019",
+      "esri_thickness_snapshots": 61,
+      "esri_temperature_snapshots": 61,
+      "eta_identity_Linf_m": 0,
+      "maximum_boundary_thickness_m": 0.17084751791428188,
+      "source_budget_observation": {
+        "nominal_rectangular_area_m2": 1100,
+        "nominal_volume_rate_m3_s": 9.24,
+        "nominal_injected_volume_m3": 33264,
+        "final_volume_m3": 32734.01305958772,
+        "final_mass_kg": 85108433.9549281,
+        "maximum_volume_difference_m3": 529.9869404122801,
+        "interpretation": "Observed, not a newly approved N9 tolerance; outflow must be included if boundary flow is nonzero."
+      }
+    },
+    {
+      "profile": "strict_debug",
+      "actual_threads": 1,
+      "requested_threads": 1,
+      "directory": "/tmp/imex-etna-lava-validation-tzq87gsk/strict_debug-threads-1",
+      "returncode": 0,
+      "seconds": 459.8802337500383,
+      "executable_sha256": "da673d7d8936e8194d9b709322c59a838f16cbdc1acdf8e37babc6a7c9de096f",
+      "flags": "-O0 -g -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow",
+      "input_sha256": "37437d1325d7cd9bbdc79d40de639b1bc2b695c674fbbc7acac390644268fa80",
+      "DEM_sha256": "072cfd4961f08bf858afc25c76fc5d37c19e52da477ec0cc95392ab881587bae",
+      "log_sha256": "de0ba1e4a3abcf08fd601f37387b6b58543962bc28adb4f9edc391d1f9228b55",
+      "final_logged_time_s": 3600,
+      "status": "pass_for_example_validation",
+      "numeric_variables_finite_without_fill": 20,
+      "metadata": {
+        "x": {
+          "shape": [
+            250
+          ],
+          "dimensions": [
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 499818,
+          "maximum": 502308
+        },
+        "y": {
+          "shape": [
+            150
+          ],
+          "dimensions": [
+            "y"
+          ],
+          "units": "meters",
+          "minimum": 4176705,
+          "maximum": 4178195
+        },
+        "time": {
+          "shape": [
+            61
+          ],
+          "dimensions": [
+            "time"
+          ],
+          "units": "seconds",
+          "minimum": 0,
+          "maximum": 3600
+        },
+        "b": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 2128.0835571289062,
+          "maximum": 3332.7918243408203
+        },
+        "h": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 0,
+          "maximum": 0.42503077636027947
+        },
+        "eta": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 2128.0835571289062,
+          "maximum": 3332.7918243408203
+        },
+        "u": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters/seconds",
+          "minimum": -0.054770434792597134,
+          "maximum": 1.275095560549752
+        },
+        "v": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters/seconds",
+          "minimum": -0.9184007267148486,
+          "maximum": 0.15208742409703385
+        },
+        "w": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters/seconds",
+          "minimum": -0.8696539594176963,
+          "maximum": 0
+        },
+        "T": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "kelvin",
+          "minimum": 300,
+          "maximum": 1523.4556635565275
+        },
+        "hMax": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 0,
+          "maximum": 0.42503077636027947
+        },
+        "pDynMax": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "Pa",
+          "minimum": 0,
+          "maximum": 2156.2437846449266
+        },
+        "modVelMax": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "m/s",
+          "minimum": 0,
+          "maximum": 1.2878855015534114
+        },
+        "Ri": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "",
+          "minimum": 0,
+          "maximum": 14613138732835.896
+        },
+        "rhomix": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "kg/m3",
+          "minimum": 0,
+          "maximum": 2600
+        },
+        "red grav": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "m/s2",
+          "minimum": 0,
+          "maximum": 9.805561616898418
+        },
+        "mu eff": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "",
+          "minimum": 0,
+          "maximum": 0
+        },
+        "erodible": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "meters",
+          "minimum": 0,
+          "maximum": 0
+        },
+        "shear_velocity": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "m/s",
+          "minimum": 0,
+          "maximum": 0
+        },
+        "inertial_number": {
+          "shape": [
+            61,
+            150,
+            250
+          ],
+          "dimensions": [
+            "time",
+            "y",
+            "x"
+          ],
+          "units": "",
+          "minimum": 0,
+          "maximum": 0
+        }
+      },
+      "decoded_sha256": {
+        "x": "3e4343a4a7cd5036617ef5042248892375ce2248ac0d1a841a189b218ed9c425",
+        "y": "15e18a03d291606653e9cd4a13bf20f62257c744f0018980d5b479a0dc13bf8a",
+        "time": "eecd6889f7400b841e8332ded543c144aa34517008474e29a62c6e7262325161",
+        "b": "df1815b5e4bff0996117333d51cf4ead51d1fc326352c16247f4c0a7c83c1315",
+        "h": "4851c7d6b38207d82c1b4000555f333f4bacf8343790ca6c1d74d5669d618153",
+        "eta": "d758a9a518c98c05766aa6f42e30b907b4881ad5ef178cc3fc4e2951da056cd6",
+        "u": "15efeec654cc53d0dbeced898b529c70e89593fe752135b6b0728eae6bac6478",
+        "v": "ee094c67735f90c1339628b56aa49f54ae8d9a6e2aa20aa6eaab084398655578",
+        "w": "6ffeda2f1f9e33ab94cf42852b4662a79d61ed1d88eb3ededc029507737dfdef",
+        "T": "c2319ffe7c36692fece7938b692056b9203a730882160574f4711ea15e3369aa",
+        "hMax": "d80be9f54fedd9eaf0a1ac70ced4e432d90a9851a089935adbffdc6f21e4d8c2",
+        "pDynMax": "7dec4466f0c1852d5e3eb56740470de56b674fc381d4da5fff746544156f9724",
+        "modVelMax": "0f75cac58028d3e04a640a268f4ab994667817de9fac2e7686de0441d3da8d04",
+        "Ri": "3ab83bf8222ed40ebcd26b117d89a06861270b65d95133773cd7ac10412f8a5c",
+        "rhomix": "933597c7e2ad0ad15f39b36c8df6b8823ca03d8d1070c890048eca609fcadd4d",
+        "red grav": "5aeff680b755368515666ac912bdfc0ca74329a6163c26fb2f63e06a01540c71",
+        "mu eff": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361",
+        "erodible": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361",
+        "shear_velocity": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361",
+        "inertial_number": "21e0e48e8b403b51a10699962856a5d9ea39a70ee83c0eac8aba76fafc7f6361"
+      },
+      "NetCDF_sha256": "9acdcedb7ddf3b24f43cf2f0c05193fcd9b0864a32e8e3e0b0d78e728210ad1e",
+      "restart_sha256": "ff082d1e547201791aea4354e48a8be24e86fbc52a9f5d8f300eeae89f040019",
+      "esri_thickness_snapshots": 61,
+      "esri_temperature_snapshots": 61,
+      "eta_identity_Linf_m": 0,
+      "maximum_boundary_thickness_m": 0.17084751791428188,
+      "source_budget_observation": {
+        "nominal_rectangular_area_m2": 1100,
+        "nominal_volume_rate_m3_s": 9.24,
+        "nominal_injected_volume_m3": 33264,
+        "final_volume_m3": 32734.01305958772,
+        "final_mass_kg": 85108433.9549281,
+        "maximum_volume_difference_m3": 529.9869404122801,
+        "interpretation": "Observed, not a newly approved N9 tolerance; outflow must be included if boundary flow is nonzero."
+      }
+    }
+  ],
+  "scientific_baseline_approved": false,
+  "scope": "Exact-input example validation only. No ETNA run or N9 sign-off; no shortened duration or changed input/output flags.",
+  "thread_comparisons": [
+    {
+      "profile": "strict_debug",
+      "status": "pass",
+      "decoded_NetCDF_bitwise_equal": true,
+      "checkpoint_bitwise_equal": true
+    },
+    {
+      "profile": "historical_optimized",
+      "status": "pass",
+      "decoded_NetCDF_bitwise_equal": true,
+      "checkpoint_bitwise_equal": true
+    }
+  ],
+  "summary": {
+    "runs": 4,
+    "failed": 0,
+    "passed": 4,
+    "thread_pairs": 2,
+    "N9_approved": false
+  },
+  "finished_utc": "2026-10-11T07:24:21.333426+00:00",
+  "report": "docs/acceptance/ETNA_LAVA_EXAMPLE_2026_10_11.md",
+  "fixture_sha256": {
+    "EXAMPLES/EXAMPLE_ETNA_LAVA/IMEX_SfloW2D.inp": "37437d1325d7cd9bbdc79d40de639b1bc2b695c674fbbc7acac390644268fa80",
+    "EXAMPLES/EXAMPLE_ETNA_LAVA/prepare.py": "e4dbe2bc8b8ab76e97db433d7734928f9e055e6094c354509554050dda832459",
+    "EXAMPLES/EXAMPLE_ETNA_LAVA/fixture.json": "725be976ea5fd8e06cd74c314293b05f021633c98705c1b3f872b74ccf7a0b15",
+    "TESTS/TEST_EXAMPLE_ETNA_LAVA/test_setup.py": "5da41e76e0d31abfbae5654e734e2235d6ed52912edfd7da6f3cdd22eb22ef0e"
+  },
+  "validation_driver": {
+    "path": "/tmp/validate_etna_lava.py",
+    "sha256": "90b3bfd3be04de4a0531fa93dbe351b4c40e557346c0558d99812cbeb0898bd9"
+  },
+  "preparation_tests": {
+    "command": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s TESTS/TEST_EXAMPLE_ETNA_LAVA -p test_setup.py -v",
+    "passed": 8,
+    "failed": 0
+  },
+  "acceptance_tools_tests": {
+    "passed": 16,
+    "failed": 0
+  },
+  "validation_contract": {
+    "full_duration_unchanged": true,
+    "actual_threads": [
+      1,
+      4
+    ],
+    "compiler_profiles": [
+      "strict_debug",
+      "historical_optimized"
+    ],
+    "decoded_numeric_fields_finite_and_no_fill": true,
+    "all_61_output_times_verified": true,
+    "nonnegative_decoded_thickness": true,
+    "constant_bed_verified": true,
+    "free_surface_identity_verified": true,
+    "thread_field_and_checkpoint_equivalence": "bitwise",
+    "restart_continuation_tested_for_this_case": false,
+    "boundary_flux_integrated": false,
+    "source_budget_tolerance_approved": false,
+    "scientific_baseline_approved": false
+  }
+}
