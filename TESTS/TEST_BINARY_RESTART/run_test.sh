@@ -29,14 +29,24 @@ mkdir "$reference_dir" "$resumed_dir"
 cp -R "$repo_dir/TESTS/TEST_2D/." "$reference_dir/"
 cp -R "$repo_dir/TESTS/TEST_2D/." "$resumed_dir/"
 
+prepare_solver_input() {
+    case_dir=$1
+    input_tmp="$case_dir/IMEX_SfloW2D.inp.new"
+    cat "$case_dir/IMEX_sfloW2D.inp" > "$input_tmp"
+    rm "$case_dir/IMEX_sfloW2D.inp"
+    mv "$input_tmp" "$case_dir/IMEX_SfloW2D.inp"
+}
+prepare_solver_input "$reference_dir"
+prepare_solver_input "$resumed_dir"
+
 # Enable the evolving bed in both trajectories. The reference run crosses the
 # same output boundary used to write the intermediate restart, so both paths
 # have identical step clipping and exercise B_vertex restart fidelity.
 sed -i.bak -e 's/^ T_END=.*/ T_END=  3.000000000000000E+000,/' \
     -e 's/^ TOPO_CHANGE_FLAG = F,/ TOPO_CHANGE_FLAG = T,/' \
-    "$reference_dir/IMEX_sfloW2D.inp"
+    "$reference_dir/IMEX_SfloW2D.inp"
 sed -i.bak -e 's/^ TOPO_CHANGE_FLAG = F,/ TOPO_CHANGE_FLAG = T,/' \
-    "$resumed_dir/IMEX_sfloW2D.inp"
+    "$resumed_dir/IMEX_SfloW2D.inp"
 (
     cd "$reference_dir"
     "$executable" > run.log
@@ -49,7 +59,7 @@ sed -i.bak -e 's/^ TOPO_CHANGE_FLAG = F,/ TOPO_CHANGE_FLAG = T,/' \
     sed -i.bak \
         -e 's/^ T_END=.*/ T_END=  3.000000000000000E+000,/' \
         -e 's/^ RESTART_FILES=.*/ RESTART_FILES="restart.bin",/' \
-        IMEX_sfloW2D.inp
+        IMEX_SfloW2D.inp
     "$executable" > resumed_run.log
 )
 

@@ -107,8 +107,9 @@ prepare_case() {
             next
         }
         { print }
-    ' "$case_dir/IMEX_sfloW2D.inp" > "$case_dir/IMEX_sfloW2D.inp.new"
-    mv "$case_dir/IMEX_sfloW2D.inp.new" "$case_dir/IMEX_sfloW2D.inp"
+    ' "$case_dir/IMEX_sfloW2D.inp" > "$case_dir/IMEX_SfloW2D.inp.new"
+    rm "$case_dir/IMEX_sfloW2D.inp"
+    mv "$case_dir/IMEX_SfloW2D.inp.new" "$case_dir/IMEX_SfloW2D.inp"
 }
 
 check_threads() {
@@ -128,7 +129,7 @@ prepare_case "$resumed_dir"
 # Both trajectories cross the same output boundary so timestep clipping is
 # identical. The second trajectory is interrupted and resumed at that boundary.
 sed -i.bak -e 's/^ T_END=.*/ T_END=  3.000000000000000E+000,/' \
-    "$reference_dir/IMEX_sfloW2D.inp"
+    "$reference_dir/IMEX_SfloW2D.inp"
 (
     cd "$reference_dir"
     "$executable" > run.log
@@ -142,7 +143,7 @@ sed -i.bak -e 's/^ T_END=.*/ T_END=  3.000000000000000E+000,/' \
     sed -i.bak \
         -e 's/^ T_END=.*/ T_END=  3.000000000000000E+000,/' \
         -e 's/^ RESTART_FILES=.*/ RESTART_FILES="restart.bin",/' \
-        IMEX_sfloW2D.inp
+        IMEX_SfloW2D.inp
     "$executable" > resumed_run.log
     check_threads resumed_run.log
 )
