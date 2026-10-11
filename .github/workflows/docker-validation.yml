@@ -1,0 +1,57 @@
+name: Docker validation
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - Dockerfile
+      - .dockerignore
+      - .github/workflows/docker-validation.yml
+      - configure.ac
+      - Makefile.am
+      - src/**
+      - TESTS/**
+      - EXAMPLES/**
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docker-validation:
+    name: Docker ${{ matrix.profile }} / ${{ matrix.threads }} threads
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [optimized, strict-debug]
+        threads: [1, 4]
+
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@v4
+
+      - name: Build image from this revision
+        run: |
+          docker build --pull \
+            --build-arg BUILD_PROFILE="${{ matrix.profile }}" \
+            --label "org.opencontainers.image.revision=${{ github.sha }}" \
+            -t "imex-sflow2d:${{ matrix.profile }}" .
+
+      - name: Record image and toolchain
+        run: |
+          echo "Commit: ${{ github.sha }}"
+          docker image inspect "imex-sflow2d:${{ matrix.profile }}" --format 'Image ID: {{.Id}}'
+          docker run --rm --entrypoint /bin/sh "imex-sflow2d:${{ matrix.profile }}" \
+            -c 'gfortran --version | head -1; nf-config --version || true'
+
+      - name: Run complete solver validation inside container
+        run: |
+          docker run --rm \
+            --cpus=4 \
+            -e OMP_NUM_THREADS="${{ matrix.threads }}" \
+            -e OMP_DYNAMIC=FALSE \
+            -e IMEX_AUDIT_FORCE_THREADS="${{ matrix.threads }}" \
+            "imex-sflow2d:${{ matrix.profile }}"

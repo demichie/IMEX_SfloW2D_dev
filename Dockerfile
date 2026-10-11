@@ -1,47 +1,36 @@
-# Use phusion/baseimage as base image. To make your builds reproducible, make
-# sure you lock down to a specific version, not to `latest`!
-# See https://github.com/phusion/baseimage-docker/blob/master/Changelog.md for
-# a list of version numbers.
-FROM phusion/baseimage:bionic-1.0.0
+# IMEX_SfloW2D_dev - reproducible Linux build/test environment.
+# Builds the checked-out repository supplied as the Docker build context.
+# For long-term reproducibility, pin the Ubuntu image to a tested digest.
+FROM ubuntu:24.04
 
-# Use baseimage-docker's init system.
-CMD ["/sbin/my_init"]
+ARG DEBIAN_FRONTEND=noninteractive
+ARG BUILD_PROFILE=optimized
 
-# install packages
-RUN apt-get update
-RUN apt-get install -y autoconf automake gfortran nano gdb make curl python3-numpy liblapack-dev libopenmpi-dev unzip python3-netcdf4 python3-matplotlib python3-numpy
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+       autoconf automake gfortran make \
+       liblapack-dev libblas-dev libnetcdff-dev libnetcdf-dev \
+       python3 python3-numpy unzip ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /root/.config/matplotlib
-RUN echo "backend : Agg" > /root/.config/matplotlib/matplotlibrc
+WORKDIR /opt/IMEX_SfloW2D
+COPY . .
 
-# Clean up APT when done.
-RUN apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+# Match .github/workflows/solver-validation.yml: generate, configure, build.
+RUN autoreconf -fi \
+    && case "$BUILD_PROFILE" in \
+         optimized) ./configure --with-netcdf=/usr FC=gfortran ;; \
+         strict-debug) ./configure --with-netcdf=/usr FC=gfortran --enable-strict-debug ;; \
+         *) echo "Unsupported BUILD_PROFILE: $BUILD_PROFILE" >&2; exit 2 ;; \
+       esac \
+    && make -j2 \
+    && test -x src/IMEX_SfloW2D
 
-# add user and create group
-RUN adduser --disabled-password user_sw
+ENV OMP_NUM_THREADS=1 \
+    OMP_DYNAMIC=FALSE \
+    IMEX_AUDIT_FORCE_THREADS=1 \
+    PYTHONDONTWRITEBYTECODE=1
 
-# install the code
-USER user_sw
-WORKDIR /home/user_sw
-
-RUN curl -LOk https://github.com/demichie/IMEX_SfloW2D_v2/archive/master.zip \
-    && unzip *.zip \
-    && cp /home/user_sw/IMEX_SfloW2D_v2-master/TESTS/run_tests.sh . \
-    && echo 'cd /home/user_sw/IMEX_SfloW2D_v2-master/TESTS/' | cat - run_tests.sh > temp \
-    && mv temp run_tests.sh \
-    && chmod +x run_tests.sh \
-    && cd /home/user_sw/IMEX_SfloW2D_v2-master \
-    && touch README \
-    && autoreconf \
-    && ./configure \
-    && make \
-    && make install \
-    && cd /home/user_sw/ \
-    && rm *.zip \
-    && echo 'alias python=python3' >> .bash_aliases \
-    && mkdir /home/user_sw/scripts \
-    && mv /home/user_sw/IMEX_SfloW2D_v2-master/commands.sh /home/user_sw/scripts/commands.sh \
-    && chmod +x /home/user_sw/scripts/commands.sh
-
-ENTRYPOINT ["/home/user_sw/scripts/commands.sh"]
-
+# The same four test stages executed by the existing solver CI job.
+# Override this CMD to use the compiled executable in a mounted case directory.
+CMD ["/bin/sh", "-ec", "make check; TESTS/TEST_BINARY_RESTART/run_test.sh src/IMEX_SfloW2D; TESTS/TEST_STOCHASTIC_RESTART/run_test.sh src/IMEX_SfloW2D; TESTS/TEST_PCCU_GATE_H/run_test.sh src/IMEX_SfloW2D"]
