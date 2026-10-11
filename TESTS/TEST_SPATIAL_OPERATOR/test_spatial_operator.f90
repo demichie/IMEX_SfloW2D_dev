@@ -19,8 +19,10 @@ PROGRAM test_spatial_operator
   TYPE(hyperbolic_workspace_type) :: hyperbolic
   REAL(wp), ALLOCATABLE :: q(:,:,:), q0(:,:,:), qp(:,:,:), term(:,:,:), direct(:,:,:), cell_sources(:,:,:)
   REAL(wp) :: dt, repeated_dt, saved_cfl, capped_dt, no_fissures(0)
+  !> Independent rate derived from the public backend face payload [1/s].
+  REAL(wp) :: lambda_x, lambda_y, expected_dt, combined_dt, saved_max_dt, rate
   CHARACTER(LEN=32) :: argument
-  INTEGER :: nx,ny,slope,curvature,limiter_id,input_unit,output_unit,j,k,threads,actual_threads
+  INTEGER :: nx,ny,slope,curvature,limiter_id,input_unit,output_unit,j,k,l,threads,actual_threads
 
   CALL get_command_argument(1,argument)
   READ(argument,*) threads
@@ -102,6 +104,64 @@ PROGRAM test_spatial_operator
   CALL same_bits('prescribed timestep sentinel',[capped_dt],[max_dt])
   cfl=saved_cfl
 
+  ! Both policies consume the same face speeds. Check their algebra separately
+  ! from the pinned reference, including collapsed axes, caps and no propagation.
+  saved_max_dt=max_dt
+  max_dt=1.0E6_wp
+  lambda_x=0.0_wp; lambda_y=0.0_wp
+  DO l=1,domain%solve_cells
+     j=domain%j_cent(l); k=domain%k_cent(l)
+     lambda_x=MAX(lambda_x,hyperbolic%a_interface_xPos(j,k), &
+          -hyperbolic%a_interface_xNeg(j,k),hyperbolic%a_interface_xPos(j+1,k), &
+          -hyperbolic%a_interface_xNeg(j+1,k))
+     lambda_y=MAX(lambda_y,hyperbolic%a_interface_yPos(j,k), &
+          -hyperbolic%a_interface_yNeg(j,k),hyperbolic%a_interface_yPos(j,k+1), &
+          -hyperbolic%a_interface_yNeg(j,k+1))
+  END DO
+  rate=0.0_wp
+  IF (nx>1) rate=lambda_x/dx
+  IF (ny>1) rate=rate+lambda_y/dy
+  expected_dt=max_dt
+  IF (rate>0.0_wp) expected_dt=MIN(max_dt,cfl/rate)
+  IF (nx==1 .OR. ny==1) expected_dt=dt
+  cfl_policy='combined'
+  CALL spatial%compute_timestep(q,qp,0.0_wp,combined_dt,domain)
+  CALL same_bits('combined CFL algebra',[combined_dt],[expected_dt])
+  IF (nx>1 .AND. ny>1) THEN
+     IF (combined_dt>dt) ERROR STOP 'combined step exceeds directional minimum'
+  ELSE
+     CALL same_bits('one-dimensional policies agree',[combined_dt],[dt])
+  END IF
+  max_dt=0.5_wp*combined_dt
+  CALL spatial%compute_timestep(q,qp,0.0_wp,capped_dt,domain)
+  CALL same_bits('combined max_dt cap',[capped_dt],[max_dt])
+  cfl=-1.0_wp
+  qp=-999.0_wp
+  CALL spatial%compute_timestep(q,qp,0.0_wp,capped_dt,domain)
+  CALL same_bits('combined prescribed timestep sentinel',[capped_dt],[max_dt])
+  IF (ANY(qp/=-999.0_wp)) ERROR STOP 'sentinel unexpectedly refreshed face states'
+  cfl=saved_cfl; cfl_policy='directional_min'; max_dt=1.0E6_wp
+  CALL spatial%compute_timestep(q,qp,0.0_wp,repeated_dt,domain)
+  CALL same_bits('policy roundtrip preserves default',[dt],[repeated_dt])
+  ! A wholly dry workset has no propagation in either direction. Empty lists
+  ! must return the cap, not divide by zero, independent of policy.
+  q=0.0_wp
+  CALL domain%check_solve(q,0.0_wp,.FALSE.)
+  DO j=1,2
+     IF (j==1) cfl_policy='directional_min'
+     IF (j==2) cfl_policy='combined'
+     CALL spatial%compute_timestep(q,qp,0.0_wp,capped_dt,domain)
+     CALL same_bits('empty propagation returns max_dt',[capped_dt],[max_dt])
+  END DO
+  q=q0; cfl_policy='directional_min'; max_dt=saved_max_dt
+  CALL domain%check_solve(q,0.0_wp,.FALSE.)
+  CALL spatial%compute_timestep(q,qp,0.0_wp,repeated_dt,domain)
+
+  OPEN(NEWUNIT=output_unit,FILE='cfl_policies.bin',ACCESS='STREAM', &
+       FORM='UNFORMATTED',STATUS='REPLACE')
+  WRITE(output_unit) dt,combined_dt
+  CLOSE(output_unit)
+
   CALL normalize_inactive_face_payloads
   OPEN(NEWUNIT=output_unit,FILE='result.bin',ACCESS='STREAM',           &
        FORM='UNFORMATTED',STATUS='REPLACE')
@@ -133,6 +193,8 @@ PROGRAM test_spatial_operator
 CONTAINS
 
   !> \brief Configure a one-solid liquid model with zero solid fraction and no physical source except curvature.
+  !> \details Initializes shared read-only configuration and owns all fixture arrays;
+  !> called serially before OpenMP evaluation. The finalizer releases backend storage.
   SUBROUTINE initialize_fixture
     INTEGER :: i
     comp_cells_x=nx; comp_cells_y=ny; comp_interfaces_x=nx+1; comp_interfaces_y=ny+1

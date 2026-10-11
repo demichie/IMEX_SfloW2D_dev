@@ -33,4 +33,6 @@ for profile in strict optimized; do
         ./*.o -llapack $netcdf_flibs $netcdf_clibs -o test_spatial_operator
     PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/compare_reference.py" \
         "$build_dir/$profile/test_spatial_operator" "$profile"
+    PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/check_cfl_axes.py" \
+        "$build_dir/$profile/test_spatial_operator" "$profile"
 done

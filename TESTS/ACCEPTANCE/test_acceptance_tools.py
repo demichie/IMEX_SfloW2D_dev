@@ -232,7 +232,7 @@ class AuditToolsTests(unittest.TestCase):
         closure = json.loads((repo / "TESTS/ACCEPTANCE/n7_n8_closure_plan.json").read_text())
         evidence = json.loads((repo / closure["evidence_artifacts"]["n8_b"]["path"]).read_text())
         full = json.loads((repo / closure["evidence_artifacts"]["n8_b_full"]["path"]).read_text())
-        self.assertEqual(closure["milestone_status"], {"N7": "open", "N8": "satisfied", "N9": "open"})
+        self.assertEqual(closure["milestone_status"], {"N7": "satisfied", "N8": "satisfied", "N9": "open"})
         completed = {a["id"] for a in closure["completed_actions"]}
         self.assertTrue({"N8-A", "N8-B", "D-N8-AREA"} <= completed)
         self.assertEqual(evidence["area_decision"]["status"], "accepted_by_user")
@@ -272,9 +272,9 @@ class AuditToolsTests(unittest.TestCase):
         record = closure["evidence_artifacts"]["hydrostatic_roundoff"]
         evidence = json.loads((repo / record["path"]).read_text())
         self.assertEqual(digest(repo / record["path"]), record["sha256"])
-        self.assertEqual(closure["milestone_status"], {"N7": "open", "N8": "satisfied", "N9": "open"})
+        self.assertEqual(closure["milestone_status"], {"N7": "satisfied", "N8": "satisfied", "N9": "open"})
         self.assertEqual({a["id"] for a in closure["remaining_actions"]},
-                         {"D-N7-CFL"})
+                         set())
         cases = {c["id"]: c for c in closure["required_tests"]["hydrodynamics"]}
         self.assertEqual(cases["H04"]["status"], "satisfied")
         self.assertEqual(cases["H04"]["remaining_actions"], [])
@@ -323,9 +323,9 @@ class AuditToolsTests(unittest.TestCase):
         self.assertEqual(action["status"], "satisfied")
         self.assertEqual(action["evidence"], ["n7_b"])
         self.assertEqual({a["id"] for a in closure["remaining_actions"]},
-                         {"D-N7-CFL"})
+                         set())
         self.assertEqual(closure["next_implementation_batch"], [])
-        self.assertEqual(closure["next_decision"], "D-N7-CFL")
+        self.assertEqual(closure["next_decision"], "N9")
         criterion = next(c for c in closure["criteria"] if c["id"] == "N7-05")
         self.assertEqual(criterion["closure_status"], "satisfied")
         self.assertEqual(criterion["remaining_actions"], [])
@@ -398,9 +398,9 @@ class AuditToolsTests(unittest.TestCase):
         action = next(a for a in closure["completed_actions"] if a["id"] == "N7-A")
         self.assertEqual(action["status"], "satisfied")
         self.assertEqual(action["evidence"], ["n7_a"])
-        self.assertEqual(closure["milestone_status"], {"N7": "open", "N8": "satisfied", "N9": "open"})
+        self.assertEqual(closure["milestone_status"], {"N7": "satisfied", "N8": "satisfied", "N9": "open"})
         self.assertEqual({a["id"] for a in closure["remaining_actions"]},
-                         {"D-N7-CFL"})
+                         set())
         self.assertEqual(next(c for c in closure["criteria"] if c["id"] == "N7-01")["closure_status"],
                          "satisfied")
         for item in closure["required_tests"]["hydrodynamics"]:
@@ -488,6 +488,95 @@ class AuditToolsTests(unittest.TestCase):
                     self.assertTrue(all(math.isfinite(v) and v >= 0 for v in snapshot[field]))
 
 
+    def test_cfl_completion_preserves_default_and_n9_scope(self):
+        """Validate the authorized dual-policy contract, not scientific baseline approval."""
+        repo = Path(__file__).resolve().parents[2]
+        closure = json.loads((repo / "TESTS/ACCEPTANCE/n7_n8_closure_plan.json").read_text())
+        artifact = closure["evidence_artifacts"]["cfl_policy"]
+        self.assertEqual(digest(repo / artifact["path"]), artifact["sha256"])
+        evidence = json.loads((repo / artifact["path"]).read_text())
+        self.assertTrue((repo / evidence["report"]).is_file())
+        self.assertEqual(closure["milestone_status"],
+                         {"N7": "satisfied", "N8": "satisfied", "N9": "open"})
+        self.assertEqual(closure["remaining_actions"], [])
+        self.assertEqual(closure["next_decision"], "N9")
+        action = next(a for a in closure["completed_actions"] if a["id"] == "D-N7-CFL")
+        self.assertEqual((action["status"], action["evidence"]), ("satisfied", ["cfl_policy"]))
+        for group in ("source_sha256", "fixture_sha256"):
+            for name, value in evidence[group].items():
+                self.assertEqual(digest(repo / name), value, name)
+        contract = evidence["authorized_contract"]
+        self.assertEqual(contract["default"], "directional_min")
+        self.assertEqual(contract["options"], ["directional_min", "combined"])
+        for name in ("CFL_limits_changed", "IMEX_tableaux_changed", "retry_added",
+                     "event_growth_algorithm_changed", "general_IMEX_stability_proof",
+                     "universal_autonomous_roundoff_agreement_claimed"):
+            self.assertFalse(contract[name], name)
+        self.assertTrue(contract["sentinel_input_acceptance_added"])
+        self.assertFalse(evidence["summary"]["scientific_baseline_approved"])
+        full = evidence["full_audit"]
+        self.assertEqual(full["summary"],
+                         {"test_runs": 45, "failed": 0, "passed": 45, "n9_accepted": False})
+        self.assertEqual(len(full["tests"]), 45)
+        self.assertTrue(all(t["status"] == "pass" for t in full["tests"]))
+        self.assertEqual(len(full["thread_comparisons"]), 8)
+        self.assertTrue(all(t["status"] == "pass" for t in full["thread_comparisons"]))
+        original = evidence["original_solver_comparisons"]
+        self.assertEqual(len(original), 16)
+        self.assertTrue(all(t["canonical_q_checkpoint_byte_identical"] for t in original))
+        self.assertEqual(evidence["spatial"]["comparisons"], 128)
+        self.assertTrue(evidence["spatial"]["combined_agreement"])
+        self.assertLessEqual(evidence["spatial"]["maximum_scaled_combined_error"],
+                             8192 * 2.220446049250313e-16)
+        axes = evidence["axes"]
+        self.assertEqual(len(axes), 12)
+        self.assertEqual({(r["profile"], r["actual_threads"], r["axis"]) for r in axes},
+                         {(p, t, a) for p in ("strict", "optimized")
+                          for t in (1, 4) for a in ("x", "y", "point")})
+        self.assertTrue(all(r["dt_directional"] == r["dt_combined"] for r in axes))
+        temporal = evidence["temporal_cases"]
+        self.assertEqual(len(temporal), 72)
+        contexts = {(p, t) for p in ("strict_debug", "historical_optimized") for t in (1, 4)}
+        for profile, threads in contexts:
+            records = [r for r in temporal if (r["profile"], r["actual_threads"]) == (profile, threads)]
+            self.assertEqual({(r["n_RK"], r["sentinel"], r["parameter_omitted"], r["policy"])
+                              for r in records},
+                             {(n, sentinel, omitted, policy) for n in (2, 3, 4)
+                              for sentinel in (False, True)
+                              for omitted, policy in ((True, "directional_min"),
+                                                      (False, "directional_min"), (False, "combined"))})
+        for item in temporal:
+            self.assertTrue(item["observer_byte_identical"])
+            self.assertLessEqual(item["mass_drift"], item["mass_limit"])
+            self.assertGreater(item["growth_hits"], 0)
+            self.assertEqual((item["output_hits"], item["final_hits"]), (3, 1))
+            if item["parameter_omitted"] and not item["sentinel"]:
+                self.assertTrue(item["historical_baseline_byte_identical"])
+        for profile in ("strict_debug", "historical_optimized"):
+            one = {r["case"]: r for r in temporal if r["profile"] == profile and r["actual_threads"] == 1}
+            four = {r["case"]: r for r in temporal if r["profile"] == profile and r["actual_threads"] == 4}
+            self.assertEqual(set(one), set(four))
+            for case in one:
+                for key in ("canonical_sha256", "accepted_times_sha256"):
+                    self.assertEqual(one[case][key], four[case][key], (profile, case, key))
+        historical = evidence["historical_time_comparisons"]
+        self.assertEqual(len(historical), 4)
+        for group in historical:
+            self.assertEqual({r["n_RK"] for r in group["records"]}, {2, 3, 4})
+            self.assertTrue(all(r["historical_observer_byte_identical"] and
+                                r["accepted_and_proposed_steps_byte_identical"] for r in group["records"]))
+        restarts = evidence["combined_restarts"]
+        self.assertTrue(restarts["original_durations_preserved"])
+        self.assertEqual(len(restarts["results"]), 8)
+        self.assertTrue(all(r["status"] == "pass" for r in restarts["results"]))
+        self.assertEqual(len(restarts["thread_comparisons"]), 4)
+        self.assertTrue(all(r["status"] == "pass" for r in restarts["thread_comparisons"]))
+        diagnostic = evidence["retained_diagnostics"]
+        self.assertEqual(diagnostic["frozen_Gate_H_padding"], 0)
+        self.assertEqual(diagnostic["temporal_padding_cells_per_side"], 8)
+        self.assertGreater(abs(diagnostic["compact_fixture_mass_drift_kg_per_m2_sum"]),
+                           diagnostic["unchanged_budget_bound"])
+
     def test_n7_cd_completion_preserves_cfl_and_n9_scope(self):
         """Close bounded geometry/field gates, not autonomous CFL or baseline approval."""
         repo = Path(__file__).resolve().parents[2]
@@ -496,11 +585,11 @@ class AuditToolsTests(unittest.TestCase):
         evidence = json.loads((repo / record["path"]).read_text())
         self.assertEqual(digest(repo / record["path"]), record["sha256"])
         self.assertTrue((repo / evidence["report"]).is_file())
-        self.assertEqual({a["id"] for a in closure["remaining_actions"]}, {"D-N7-CFL"})
+        self.assertEqual({a["id"] for a in closure["remaining_actions"]}, set())
         for action_id in ("N7-C", "N7-D"):
             action = next(a for a in closure["completed_actions"] if a["id"] == action_id)
             self.assertEqual((action["status"], action["evidence"]), ("satisfied", ["n7_cd"]))
-        self.assertEqual(closure["milestone_status"], {"N7": "open", "N8": "satisfied", "N9": "open"})
+        self.assertEqual(closure["milestone_status"], {"N7": "satisfied", "N8": "satisfied", "N9": "open"})
         self.assertFalse(evidence["summary"]["scientific_baseline_approved"])
         full = evidence["full_audit"]
         self.assertEqual(full["summary"], {"test_runs": 41, "failed": 0, "passed": 41, "n9_accepted": False})
@@ -509,9 +598,13 @@ class AuditToolsTests(unittest.TestCase):
         self.assertEqual(len(full["thread_comparisons"]), 6)
         self.assertTrue(all(t["status"] == "pass" for t in full["thread_comparisons"]))
         for name, value in evidence["source_sha256"].items():
-            self.assertEqual(digest(repo/name), value, name)
+            # This completed package deliberately predates the authorized dual
+            # CFL policy. Verify its frozen completion revision, not live bytes.
+            archived=subprocess.check_output(["git","show","691a3e21:"+name],cwd=repo)
+            self.assertEqual(sha256(archived).hexdigest(), value, name)
         for name, value in evidence["repository_fixture_sha256"].items():
-            self.assertEqual(digest(repo/name), value, name)
+            archived=subprocess.check_output(["git","show","691a3e21:"+name],cwd=repo)
+            self.assertEqual(sha256(archived).hexdigest(), value, name)
         policy = evidence["authorized_policy"]
         for name in ("CFL_policy_changed", "dry_threshold_changed", "field_limits_changed",
                      "historical_reference_kernels_changed", "raw_IMEX_stage_projection_added",

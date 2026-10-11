@@ -23,14 +23,20 @@ def main():
     parser.add_argument("mode", choices=("g1", "slope_curvature"))
     parser.add_argument("outdir", type=Path)
     parser.add_argument("template", type=Path)
+    parser.add_argument("--pad-cells", type=int, default=0,
+                        help="extra quiet dry collar; default preserves the frozen Gate-H domain")
     args = parser.parse_args()
 
     dx = args.dx
+    if args.pad_cells < 0:
+        raise ValueError("negative dry-collar width")
     outdir = args.outdir
     outdir.mkdir(parents=True, exist_ok=True)
 
     x_min, x_max = 10.8, 21.2
     y_min, y_max = -4.2, 4.2
+    x_min -= args.pad_cells*dx; x_max += args.pad_cells*dx
+    y_min -= args.pad_cells*dx; y_max += args.pad_cells*dx
     nx = round((x_max - x_min) / dx)
     ny = round((y_max - y_min) / dx)
     if not np.isclose(x_min + nx * dx, x_max):

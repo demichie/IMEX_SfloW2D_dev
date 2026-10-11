@@ -12,7 +12,7 @@ import shlex
 import subprocess
 
 
-def instrument(source):
+def instrument(source, include_spatial=False):
     """Insert I/O immediately before the single production IMEX advance call."""
     marker = "      CALL simulation%time_integration%advance("
     if source.count(marker) != 1:
@@ -25,6 +25,19 @@ def instrument(source):
          CLOSE(accepted_time_unit)
       END BLOCK
 """
+    if include_spatial:
+        # Test-only capture immediately AFTER the spatial proposal, BEFORE
+        # event/growth clipping. No numerical operation in the main is changed.
+        declaration = "  IMPLICIT NONE"
+        if source.count(declaration) != 1:
+            raise AssertionError("unexpected main declaration")
+        source = source.replace(declaration, declaration+"\n  REAL(wp) :: observed_spatial_dt", 1)
+        proposal = "           simulation%runtime%dt, simulation%domain)"
+        if source.count(proposal) != 1:
+            raise AssertionError("unexpected spatial proposal hook")
+        source = source.replace(proposal, proposal+"\n      observed_spatial_dt = simulation%runtime%dt", 1)
+        hook = hook.replace("simulation%runtime%t, simulation%runtime%dt",
+                            "simulation%runtime%t, simulation%runtime%dt, observed_spatial_dt")
     return source.replace(marker, hook+marker)
 
 
@@ -38,7 +51,7 @@ def configured_flags(directory):
     return ["-O0", "-g", "-fcheck=all", "-fbacktrace", "-ffpe-trap=invalid,zero,overflow"]
 
 
-def build(executable, directory, repository):
+def build(executable, directory, repository, include_spatial=False):
     """Link an observational main against the original numerical object files."""
     executable = Path(os.environ.get("IMEX_AUDIT_SOLVER", str(executable))).resolve()
     directory.mkdir()
@@ -64,7 +77,7 @@ def build(executable, directory, repository):
     else:
         module_directory = executable.parent
     main = directory/"observed_main.f90"
-    main.write_text(instrument((source/"IMEX_SfloW2D.f90").read_text()))
+    main.write_text(instrument((source/"IMEX_SfloW2D.f90").read_text(), include_spatial))
     output = directory/"observe_accepted_times"
     subprocess.run(["gfortran", *flags, *includes, "-I"+str(module_directory),
                     str(main), *(str(path) for path in objects), *libraries,
@@ -77,5 +90,7 @@ if __name__ == "__main__":
     cli.add_argument("executable", type=Path)
     cli.add_argument("directory", type=Path)
     cli.add_argument("repository", type=Path)
+    cli.add_argument("--include-spatial", action="store_true",
+                     help="also record spatial proposals before event/growth clipping")
     args = cli.parse_args()
-    build(args.executable.resolve(), args.directory.resolve(), args.repository.resolve())
+    build(args.executable.resolve(), args.directory.resolve(), args.repository.resolve(), args.include_spatial)

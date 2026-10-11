@@ -9,7 +9,8 @@
 
 MODULE spatial_operator_2d
 
-  USE parameters_2d, ONLY : wp, n_eqns, n_vars, max_dt, cfl
+  USE parameters_2d, ONLY : wp, n_eqns, n_vars, max_dt, cfl, cfl_policy
+  USE diagnostics_2d, ONLY : fatal_error
   USE constitutive_parameters_2d, ONLY : T_ambient
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, dx, dy
   USE state_conversion_2d, ONLY : qc_to_qp
@@ -119,7 +120,7 @@ CONTAINS
 
     INTEGER :: j, k, l
     REAL(wp) :: max_a_x, max_a_y
-    REAL(wp) :: dynamic_pressure
+    REAL(wp) :: dynamic_pressure, propagation_rate
 
     dt = max_dt
 
@@ -174,8 +175,29 @@ CONTAINS
     END DO
     !$OMP END PARALLEL DO
 
-    IF ( max_a_x .GT. 0.0_wp ) dt = MIN(dt,cfl*dx/max_a_x)
-    IF ( max_a_y .GT. 0.0_wp ) dt = MIN(dt,cfl*dy/max_a_y)
+    ! Combine the SAME reconstructed face speeds, without another backend
+    ! pass. Keep the legacy operation order exactly in the default branch.
+    ! This is a spatial suggestion, not a general IMEX stability guarantee;
+    ! the main loop subsequently caps accepted steps at events and growth.
+    SELECT CASE (TRIM(cfl_policy))
+    CASE ('directional_min')
+       IF ( max_a_x .GT. 0.0_wp ) dt = MIN(dt,cfl*dx/max_a_x)
+       IF ( max_a_y .GT. 0.0_wp ) dt = MIN(dt,cfl*dy/max_a_y)
+    CASE ('combined')
+       ! Use the legacy division order in 1D: mathematical equivalence alone
+       ! would allow a one-ulp difference from cfl/(lambda/dx).
+       IF ( comp_cells_y .EQ. 1 ) THEN
+          IF ( comp_cells_x .GT. 1 .AND. max_a_x .GT. 0.0_wp ) dt = MIN(dt,cfl*dx/max_a_x)
+       ELSEIF ( comp_cells_x .EQ. 1 ) THEN
+          IF ( max_a_y .GT. 0.0_wp ) dt = MIN(dt,cfl*dy/max_a_y)
+       ELSE
+          propagation_rate = max_a_x/dx + max_a_y/dy
+          IF ( propagation_rate .GT. 0.0_wp ) dt = MIN(dt,cfl/propagation_rate)
+       END IF
+    CASE DEFAULT
+       ! Also protect callers that configure the module without input I/O.
+       CALL fatal_error('CFL_POLICY must be directional_min or combined')
+    END SELECT
 
   END SUBROUTINE compute_spatial_timestep
 

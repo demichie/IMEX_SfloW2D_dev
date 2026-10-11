@@ -303,6 +303,12 @@ def main():
                                          +(directory/"solver.log").read_text())
                 paths.append(directory/"result.bin")
                 record = compare(read_payload(paths[-1]), q, bed, params, name)
+                policy_steps=np.fromfile(directory/"cfl_policies.bin",dtype=np.float64)
+                reference_dt=record["dt_reference_SSPRK2"]
+                if policy_steps.shape != (2,) or abs(policy_steps[1]-reference_dt)>8192*EPS*max(1.0,reference_dt):
+                    raise AssertionError("combined CFL option disagrees with clean reference")
+                record.update(dt_combined_option=float(policy_steps[1]),
+                              combined_CFL_option_matches_reference=True)
                 record.update(case=tag, profile=args.profile, actual_threads=threads,
                               reference_core_sha256=CORE_HASHES,
                               input_sha256=hashlib.sha256((directory/"fixture.inp").read_bytes()).hexdigest(),

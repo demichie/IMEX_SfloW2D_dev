@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "date": "2026-10-10",
-  "solver_revision": "026061feff641a4fc42d2970cec295d23b5330e8",
+  "date": "2026-10-11",
+  "solver_revision": "691a3e21365ba4e46832e1d18a91689ea33b7838",
   "report": "docs/acceptance/N7_N8_CLOSURE_2026_10_10.md",
-  "scope": "Reconcile the original N7/N8 gates, not a new numerical audit or N9 scientific sign-off.",
+  "scope": "Retain the original N7/N8 gates and close the authorized dual-CFL contract with direct numerical evidence; N9 scientific sign-off remains separate.",
   "normative_sources": {
     "roadmap": {
       "filename": "IMEX_SfloW2D_Development_Roadmap_2026-10-09_Updated.docx",
@@ -12,11 +12,16 @@
     "workplan": {
       "filename": "HP_PCCU_IMEX_detailed_workplan_2026-09-23.pdf",
       "sha256": "8e130592af4bac9d6b2f61587c96ee6e566a19473c32d6a746d7b21a3cdbbd0d"
+    },
+    "cfl_roadmap": {
+      "filename": "IMEX_SfloW2D_Development_Roadmap_2026-10-11_N9_P9_CFL_REVISED.docx",
+      "sha256": "b18d7e9ce6333426fb1e57fe3d0537c156f290164fb730ac1f261012cfe147b1"
     }
   },
   "normative_sections": [
     "Roadmap R7 and retained 4.9/4.10",
-    "Workplan Gate H/Gate I and sections 15.3/15.6"
+    "Workplan Gate H/Gate I and sections 15.3/15.6",
+    "2026-10-11 revised CFL contract and separate N9 approval gate"
   ],
   "evidence_artifacts": {
     "n8": {
@@ -62,10 +67,14 @@
     "n7_cd": {
       "path": "docs/acceptance/results_n7_cd_2026_10_10.json",
       "sha256": "ab3e00f540821bb3badcd0355732b000d91c4c26acfaeed43c612d8dc8145458"
+    },
+    "cfl_policy": {
+      "path": "docs/acceptance/results_cfl_policy_2026_10_11.json",
+      "sha256": "811c328bdcb115b97aeb2595cae8de6583afcc4177229b55e6de11dfdbc77ccc"
     }
   },
   "milestone_status": {
-    "N7": "open",
+    "N7": "satisfied",
     "N8": "satisfied",
     "N9": "open"
   },
@@ -161,15 +170,15 @@
     },
     {
       "id": "N7-06",
-      "closure_status": "partial",
-      "remaining_actions": [
-        "D-N7-CFL"
-      ],
+      "closure_status": "satisfied",
+      "remaining_actions": [],
       "verified_contracts": [
         "Complete covered residuals and directional bounds agree with clean cores.",
         "Autonomous explicit/implicit/mixed temporal orders and raw stages pass for N_RK=2,3,4; unsupported counts are rejected.",
         "Finite-time 1D full fields and raw stages agree with independent current-IMEX assembly, without asserting SSPRK2 trajectory or timestep-policy equality.",
-        "Independent full fields and raw stages pass for the 2D geometry hierarchy and all Gate-H grids at common accepted times; separately approved historical temporal-error limits pass. Autonomous adaptive-control interpretation remains only in D-N7-CFL."
+        "Independent full fields and raw stages pass for the 2D geometry hierarchy and all Gate-H grids at common accepted times; separately approved historical temporal-error limits pass. The subsequently authorized D-N7-CFL contract is now closed separately.",
+        "Both selectable policies use one face-speed payload. The default preserves historical fields/checkpoints and proposed/accepted times bitwise; combined agrees with the pinned independent spatial bound, including collapsed x/y axes.",
+        "All N_RK=2,3,4 policy/sentinel cases pass unchanged event/growth algebra and mass bounds in strict/optimized builds with actual 1/4 teams. No general IMEX stability theorem or universal autonomous Python/Fortran roundoff equality is asserted."
       ],
       "evidence": [
         "spatial",
@@ -177,7 +186,8 @@
         "latest",
         "n8_b_full",
         "n7_a",
-        "n7_cd"
+        "n7_cd",
+        "cfl_policy"
       ]
     },
     {
@@ -206,7 +216,8 @@
         "Actual 1/4 teams and bitwise outputs pass for covered spatial/stage/exchange fixtures and all six full Gate-H/restart pairs.",
         "All 204 additional N7-A actual 1/4-thread pairs have bitwise-identical complete payloads; six full Gate-H/restart pairs remain passing.",
         "All 90 new equilibria and 36 slow-motion/real-force controls per profile retain bitwise actual one/four-thread payload equality; six full Gate-H/restart pairs pass.",
-        "All 324 N7-B and 224 new geometry profile/case pairs have bitwise complete actual one/four-thread payloads; the 40-script full audit retains six passing full Gate-H/restart pairs."
+        "All 324 N7-B and 224 new geometry profile/case pairs have bitwise complete actual one/four-thread payloads; the 40-script full audit retains six passing full Gate-H/restart pairs.",
+        "The 45-group CFL audit passes eight full cross-thread pairs; 36 additional policy trajectories have identical fields/checkpoints and proposed/accepted times, and four combined restart pairs pass."
       ],
       "evidence": [
         "spatial",
@@ -217,7 +228,8 @@
         "n8_b",
         "n7_a",
         "hydrostatic_roundoff",
-        "n7_b"
+        "n7_b",
+        "cfl_policy"
       ]
     },
     {
@@ -228,14 +240,16 @@
         "Original-duration deterministic and stochastic continuation passes in strict/optimized builds with actual 1/4 threads.",
         "The new 37-run strict/optimized full audit retains original-duration exact deterministic/stochastic continuation after both bounded corrections.",
         "The 38-script correction audit retains original-duration deterministic/stochastic continuation in both profiles with actual one/four-thread teams.",
-        "The 40-script geometry/N7-B audit retains exact original-duration deterministic/stochastic continuation; all 16 full-case canonical output/checkpoint fingerprints and effective input bytes equal the preceding audit."
+        "The 40-script geometry/N7-B audit retains exact original-duration deterministic/stochastic continuation; all 16 full-case canonical output/checkpoint fingerprints and effective input bytes equal the preceding audit.",
+        "Original-duration deterministic/stochastic continuation passes for both CFL policies in strict/optimized builds with actual one/four-thread teams; all 16 preceding full-case canonical fields/checkpoints remain byte-identical under the retained default."
       ],
       "evidence": [
         "latest",
         "n8_b_full",
         "n7_a",
         "hydrostatic_roundoff",
-        "n7_b"
+        "n7_b",
+        "cfl_policy"
       ]
     },
     {
@@ -597,28 +611,7 @@
       }
     ]
   },
-  "remaining_actions": [
-    {
-      "id": "D-N7-CFL",
-      "kind": "decision",
-      "title": "Approve the production IMEX timestep comparison contract",
-      "normative_items": [
-        "H01",
-        "H02",
-        "H06",
-        "H13"
-      ],
-      "criteria": [
-        "N7-06"
-      ],
-      "change_scope": "No automatic change to CFL or addition of adaptive retry.",
-      "exit_conditions": [
-        "Use the existing directional-bound agreement, combined-timestep difference and actual-tableau order/stage evidence.",
-        "Confirm the accepted retained IMEX policy or explicitly authorize a separate targeted correction if the remaining finite-time tests expose a failure.",
-        "Do not require SSPRK2 timestep equality merely to call an IMEX test successful, and do not label the documented mismatch as reference agreement."
-      ]
-    }
-  ],
+  "remaining_actions": [],
   "acceptance_rules": [
     "Preserve existing numerical tolerances, mandatory original-duration restart tests and raw conservative-state checks.",
     "For new fixtures define seeds, comparison times, independent oracles and acceptance limits before executing the test; do not tune limits after failures.",
@@ -817,9 +810,34 @@
       "evidence": [
         "n7_cd"
       ]
+    },
+    {
+      "id": "D-N7-CFL",
+      "kind": "decision",
+      "title": "Approve and verify the selectable production IMEX CFL contract",
+      "normative_items": [
+        "H01",
+        "H02",
+        "H06",
+        "H13"
+      ],
+      "criteria": [
+        "N7-06"
+      ],
+      "change_scope": "Explicitly authorized directional_min default and optional combined policy using unchanged HP face speeds; accept precisely CFL=-1. No CFL limit, IMEX tableau, dry threshold, event/growth or retry change.",
+      "exit_conditions": [
+        "Both formulas, 1D x/y equivalence, zero propagation, caps and the sentinel agree with independent algebra and the pinned clean combined spatial bound.",
+        "Retain historical default fields/checkpoints and proposed/accepted times bitwise; do not require historical SSPRK2 trajectory or universal autonomous roundoff equality.",
+        "Verify N_RK=2,3,4 in strict/optimized builds with actual 1/4 teams, unchanged budget/event/growth limits and original-duration restart tests for both policies."
+      ],
+      "status": "satisfied",
+      "evidence": [
+        "cfl_policy"
+      ],
+      "user_resolution": "The updated 2026-10-11 roadmap and explicit 'ok procedi' authorize the dual-policy implementation and its bounded verification."
     }
   ],
-  "solver_revision_role": "Historical base revision only; each completed numerical package pins its tested sources. Current N7-C/N7-D sources and full 41-group audit are pinned by n7_cd; no N9 baseline approval is implied.",
+  "solver_revision_role": "Historical base revision only; the current working-tree candidate, exact production sources, fixtures and full 45-group audit are pinned by cfl_policy. Historical packages retain their own source pins; no N9 baseline approval is implied.",
   "next_implementation_batch": [],
-  "next_decision": "D-N7-CFL"
+  "next_decision": "N9"
 }

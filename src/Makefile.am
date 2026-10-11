@@ -86,6 +86,7 @@ hyperbolic_2d.$(OBJEXT): parameters_2d.$(OBJEXT) equation_terms_2d.$(OBJEXT)  \
                           nonconservative_2d.$(OBJEXT) pccu_2d.$(OBJEXT)       \
                           reconstruction_2d.$(OBJEXT)
 spatial_operator_2d.$(OBJEXT): parameters_2d.$(OBJEXT)                       \
+                                diagnostics_2d.$(OBJEXT)                      \
                                 constitutive_parameters_2d.$(OBJEXT)          \
                                 domain_2d.$(OBJEXT) geometry_2d.$(OBJEXT)     \
                                 hyperbolic_2d.$(OBJEXT)                       \

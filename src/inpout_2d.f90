@@ -64,7 +64,7 @@ MODULE inpout_2d
   USE parameters_2d, ONLY: bc
 
   ! -- Variables for the namelist NUMERIC_PARAMETERS
-  USE parameters_2d, ONLY: dt0, max_dt, cfl, limiter, theta, reconstr_coeff, n_RK
+  USE parameters_2d, ONLY: dt0, max_dt, cfl, cfl_policy, limiter, theta, reconstr_coeff, n_RK
 
   ! -- Variables for the namelist EXPL_TERMS_PARAMETERS
   USE constitutive_parameters_2d, ONLY: grav, inv_grav
@@ -339,7 +339,7 @@ MODULE inpout_2d
 
   NAMELIST /initial_conditions/ T_init, T_ambient
 
-  NAMELIST /numeric_parameters/ dt0, max_dt, cfl, limiter, theta,             &
+  NAMELIST /numeric_parameters/ dt0, max_dt, cfl, cfl_policy, limiter, theta, &
     reconstr_coeff, n_RK
 
   NAMELIST /expl_terms_parameters/ grav
@@ -481,6 +481,7 @@ CONTAINS
     max_dt = 1.0E-3_wp
     n_RK = 2
     cfl = 0.24_wp
+    cfl_policy = 'directional_min'
     limiter(1:n_vars + 2) = 1
     theta = 1.0
     reconstr_coeff = 1.0
@@ -2144,10 +2145,23 @@ CONTAINS
       max_cfl = 0.25_wp
     END IF
 
-    IF ((cfl .GT. max_cfl) .OR. (cfl .LT. 0.0_wp)) THEN
+    ! Configuration is validated once, outside cell/face loops. Omission
+    ! retains the historical directional minimum; accept only named policies.
+    SELECT CASE (TRIM(cfl_policy))
+    CASE ('directional_min', 'combined')
+      CONTINUE
+    CASE DEFAULT
+      CALL fatal_error('CFL_POLICY must be directional_min or combined')
+    END SELECT
+
+    ! Precisely -1 prescribes max_dt at the spatial-operator boundary.
+    ! Output/final-time caps and the existing growth limiter still apply.
+    IF ((cfl .NE. -1.0_wp) .AND. &
+        ((cfl .GT. max_cfl) .OR. (cfl .LT. 0.0_wp))) THEN
 
       WRITE (*, *) 'WARNING: wrong value of cfl ', cfl
       WRITE (*, *) 'Choose a value between 0.0 and ', max_cfl
+      WRITE (*, *) 'or precisely -1 for a prescribed MAX_DT'
       CALL fatal_error('CFL value outside the admissible interval')
 
     END IF

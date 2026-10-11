@@ -34,6 +34,11 @@ MODULE parameters_2d
 
   REAL(wp) :: cfl               !< Courant-Friedrichs-Lewy parameter 
 
+  !> Face-speed timestep policy: 'directional_min' (legacy default) or 'combined'.
+  !> Selected during input setup, then read-only in the spatial operator.
+  !> Both policies retain the configured CFL limits and all integrator time caps.
+  CHARACTER(LEN=32) :: cfl_policy = 'directional_min'
+
   REAL(wp) :: eps_sing          !< parameter for desingularization
   REAL(wp) :: eps_sing4         !< parameter for desingularization**4
 

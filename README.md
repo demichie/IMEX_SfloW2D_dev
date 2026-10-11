@@ -40,6 +40,27 @@ The executable is copied in the bin folder.
 
 Several examples can be found in the EXAMPLES folder.
 
+## CFL timestep policies
+
+`NUMERIC_PARAMETERS` accepts `CFL_POLICY='directional_min'` (the default,
+including when omitted) or `CFL_POLICY='combined'`. Both use the same final
+HP-PCCU face speeds. With nonnegative directional speed maxima `lambda_x/y`,
+the spatial suggestion is respectively:
+
+- `min(MAX_DT, CFL*dx/lambda_x, CFL*dy/lambda_y)`, ignoring zero-speed directions;
+- `min(MAX_DT, CFL/(lambda_x/dx + lambda_y/dy))`, using only active directions.
+
+If no direction propagates, the suggestion is `MAX_DT`. Both policies agree
+on a one-dimensional x/y grid. The existing admissible CFL range remains
+`0 <= CFL <= 0.5` in 1D and `0 <= CFL <= 0.25` in 2D. Precisely `CFL=-1`
+is also accepted: it returns `MAX_DT` without evaluating reconstruction/speeds.
+Other negative values and unknown policy names are rejected.
+
+The accepted timestep still obeys output/runout/probe events, the final time
+and the existing growth limiter. Neither policy is a general stability proof
+for IMEX stages; the supported stage counts remain `N_RK=2,3,4`. The selected
+policy is written to the effective input backup (`RUN_NAME.bak`).
+
 ## Runtime diagnostics
 
 `VERBOSE_LEVEL` controls how much diagnostic information is printed and never

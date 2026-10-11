@@ -58,6 +58,19 @@ def main():
                                   "&RUN_PARAMETERS\n SERIAL_FLAG=F,", original)
         if count != 1:
             raise RuntimeError("missing/ambiguous RUN_PARAMETERS namelist")
+    overrides={"SERIAL_FLAG": False}
+    selected_policy=os.environ.get("IMEX_AUDIT_CFL_POLICY")
+    if selected_policy:
+        # Explicit opt-in for supplementary combined-policy restart tests.
+        # Never alter the default audit's fixture or hide an input override.
+        if selected_policy not in ("directional_min","combined"):
+            raise RuntimeError("invalid explicit audit CFL policy override")
+        effective=re.sub(r"(?im)^\s*CFL_POLICY\s*=.*\n", "", effective)
+        effective,count=re.subn(r"(?i)&NUMERIC_PARAMETERS\b",
+            f"&NUMERIC_PARAMETERS\n CFL_POLICY='{selected_policy}',",effective)
+        if count!=1:
+            raise RuntimeError("missing/ambiguous NUMERIC_PARAMETERS namelist")
+        overrides["CFL_POLICY"]=selected_policy
     input_path.write_text(effective)
     (call / "input.effective.inp").write_text(effective)
     environment = dict(os.environ)
@@ -100,12 +113,24 @@ def main():
                 fields[path.name].update(
                     min_column_mass=float(values[:, 2].min()),
                     sum_column_mass=float(values[:, 2].sum()))
+    # Effective namelist backups include initialized defaults even when the
+    # user's input omits CFL_POLICY. Keep that selection in every run manifest.
+    policies=[]
+    for backup in Path.cwd().glob("*.bak"):
+        match=re.search(r"CFL_POLICY\s*=\s*[\"']([^\"']+)[\"']", backup.read_text(), re.I)
+        if match:
+            policies.append(match[1].strip())
+    if len(set(policies))>1:
+        problems.append("ambiguous effective CFL_POLICY backups")
+    policy=policies[0] if policies else "directional_min"
     record = {"working_directory": str(Path.cwd()), "command": command,
               "returncode": returncode, "requested_threads": requested,
-              "actual_threads": actual, "fixture_override": {"SERIAL_FLAG": False},
+              "actual_threads": actual, "fixture_override": overrides,
               "input_original_sha256": sha256(original.encode()).hexdigest(),
               "input_effective_sha256": sha256(effective.encode()).hexdigest(),
-              "files": files, "conservative_fields": fields, "problems": problems}
+              "files": files, "conservative_fields": fields, "problems": problems,
+              "numerical_configuration": {"CFL_POLICY": policy,
+                                           "read_from_effective_backup": bool(policies)}}
     (call / "evidence.json").write_text(json.dumps(record, indent=2, allow_nan=False) + "\n")
     if problems:
         print("AUDIT FAIL: " + "; ".join(problems), file=sys.stderr)
