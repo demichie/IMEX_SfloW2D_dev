@@ -32,8 +32,6 @@ jobs:
         threads: [1, 4]
 
     env:
-      # This is an experimental portability test, not a replacement for GNU CI.
-      # NetCDF-Fortran must be compiled with ifx to provide compatible .mod files.
       NETCDF_FORTRAN_TAG: v4.6.2
       FC: ifx
       CC: gcc
@@ -78,9 +76,6 @@ jobs:
           prefix="$RUNNER_TEMP/netcdf-ifx"
           source_dir="$RUNNER_TEMP/netcdf-src"
           mkdir -p "$prefix" "$source_dir"
-
-          # v4.6.2 has no release-uploaded tar.gz asset. Use the tag source
-          # archive and generate the Autotools configure script ourselves.
           curl -fL --retry 3 \
             "https://github.com/Unidata/netcdf-fortran/archive/refs/tags/${NETCDF_FORTRAN_TAG}.tar.gz" \
             -o "$RUNNER_TEMP/netcdf-fortran.tar.gz"
@@ -88,19 +83,27 @@ jobs:
             -C "$source_dir" --strip-components=1
           cd "$source_dir"
           autoreconf -fi
-
-          # Use Ubuntu netCDF-C but build netCDF-Fortran modules with ifx.
           CC=gcc FC=ifx F77=ifx \
             CPPFLAGS='-I/usr/include' \
             LDFLAGS='-L/usr/lib/x86_64-linux-gnu' \
             ./configure --prefix="$prefix" --disable-fortran-type-check
           make -j2
           make install
-
           test -f "$prefix/include/netcdf.mod"
           "$prefix/bin/nf-config" --version
           echo "NETCDF_IFX_PREFIX=$prefix" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=$prefix/lib:$prefix/lib64:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
+          echo "$prefix/bin" >> "$GITHUB_PATH"
+
+      - name: Confirm matching NetCDF-Fortran configuration
+        shell: bash
+        run: |
+          set -euxo pipefail
+          command -v nf-config
+          nf-config --version
+          nf-config --fc
+          nf-config --fflags
+          nf-config --flibs
 
       - name: Select ifx build flags
         shell: bash
