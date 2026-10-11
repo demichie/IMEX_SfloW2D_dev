@@ -54,8 +54,32 @@ sed -i.bak -e 's/^ TOPO_CHANGE_FLAG = F,/ TOPO_CHANGE_FLAG = T,/' \
 )
 
 cmp "$reference_dir/restart.bin" "$resumed_dir/restart.bin"
-cmp "$reference_dir/TEST_2D_0002.q_2d" \
-    "$resumed_dir/TEST_2D_0002.q_2d"
+
+latest_snapshot() {
+    snapshot_dir=$1
+    set -- "$snapshot_dir"/TEST_2D_[0-9][0-9][0-9][0-9].q_2d
+    if [ ! -f "$1" ]; then
+        echo "FAIL: no conservative snapshots found in $snapshot_dir" >&2
+        ls -la "$snapshot_dir" >&2
+        cat "$snapshot_dir/run.log" "$snapshot_dir/resumed_run.log" 2>/dev/null || true
+        exit 1
+    fi
+    latest_snapshot_file=
+    for snapshot in "$@"; do
+        latest_snapshot_file=$snapshot
+    done
+    printf '%s\n' "$latest_snapshot_file"
+}
+
+reference_snapshot=$(latest_snapshot "$reference_dir")
+resumed_snapshot=$(latest_snapshot "$resumed_dir")
+if [ "$(basename "$reference_snapshot")" != "$(basename "$resumed_snapshot")" ]; then
+    echo "FAIL: full and resumed runs ended at different output indices" >&2
+    echo "  reference: $reference_snapshot" >&2
+    echo "  resumed:   $resumed_snapshot" >&2
+    exit 1
+fi
+cmp "$reference_snapshot" "$resumed_snapshot"
 
 echo "PASS: evolving-topography binary restart is bit-for-bit identical"
 
