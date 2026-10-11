@@ -6853,7 +6853,8 @@ CONTAINS
       status = nf90_inq_varid(ncid, 'eta', eta_varid)
       IF (status .EQ. nf90_enotvar) THEN
         WRITE (*, *) 'ERROR: cannot append to a legacy NetCDF file.'
-        WRITE (*, *) 'Its variable w stores free-surface elevation; the current schema uses eta for elevation and w for vertical velocity.'
+        WRITE (*, *) 'Its variable w stores free-surface elevation; the current schema uses ' // &
+                     'eta for elevation and w for vertical velocity.'
         WRITE (*, *) 'Start a new NetCDF output file to continue with the current schema.'
         STOP
       END IF
