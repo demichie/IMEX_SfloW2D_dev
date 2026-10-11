@@ -20,23 +20,33 @@ To compile:
 
 > autoreconf -i
 
-Then on linux (replace USERNAME with you user account):
+The build uses the Fortran compiler selected by `FC` and the NetCDF Fortran
+library. For a Conda environment, pass its prefix as `--with-netcdf`:
 
-> ./configure --with-netcdf=/home/USERNAME/anaconda3/envs/fortran_env
+> ./configure --with-netcdf=/path/to/fortran_env
 
-On OSX (replace USERNAME with you user account):
+The historical optimized profile is the default. To enable runtime checks and
+floating-point traps:
 
-> ./configure --with-netcdf=/USERS/USERNAME/anaconda3/envs/fortran_env
+> ./configure --with-netcdf=/path/to/fortran_env --enable-strict-debug
 
-To compile the code with OpenMP add the following flag in src/Makefile:
-1) with gfortran: -fopenmp
-2) with intel: -qopenmp
+`FCFLAGS` supplied by the environment is respected. Non-GNU toolchains can
+override `OPENMP_FCFLAGS`; `NETCDF_LIBS` and `LAPACK_LIBS` can likewise be
+provided when their library names or link dependencies differ from the
+defaults.
 
 > make
+
+> make check
 
 > make install
 
 The executable is copied in the bin folder.
+
+`make check` runs the legacy example integration cases in temporary
+directories, leaving the source fixtures untouched. The CI workflow also runs
+binary/stochastic restart and HP-PCCU Gate-H checks with actual one- and
+four-thread OpenMP teams in both build profiles.
 
 Several examples can be found in the EXAMPLES folder.
 

@@ -1,0 +1,60 @@
+name: Solver validation
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  solver:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [optimized, strict-debug]
+        threads: [1, 4]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            autoconf automake gfortran make \
+            liblapack-dev libnetcdff-dev python3-numpy unzip
+
+      - name: Generate build system
+        run: autoreconf -fi
+
+      - name: Configure
+        env:
+          FC: gfortran
+        run: |
+          if [ "${{ matrix.profile }}" = strict-debug ]; then
+            ./configure --with-netcdf=/usr --enable-strict-debug
+          else
+            ./configure --with-netcdf=/usr
+          fi
+
+      - name: Build in parallel
+        run: make -j2
+
+      - name: Run integration tests
+        run: make check
+
+      - name: Verify binary restart and runout diagnostics
+        env:
+          OMP_NUM_THREADS: ${{ matrix.threads }}
+          OMP_DYNAMIC: "FALSE"
+        run: TESTS/TEST_BINARY_RESTART/run_test.sh src/IMEX_SfloW2D
+
+      - name: Verify stochastic restart
+        env:
+          OMP_NUM_THREADS: ${{ matrix.threads }}
+          OMP_DYNAMIC: "FALSE"
+        run: TESTS/TEST_STOCHASTIC_RESTART/run_test.sh src/IMEX_SfloW2D
+
+      - name: Verify HP-PCCU Gate-H
+        env:
+          IMEX_AUDIT_FORCE_THREADS: ${{ matrix.threads }}
+        run: TESTS/TEST_PCCU_GATE_H/run_test.sh src/IMEX_SfloW2D

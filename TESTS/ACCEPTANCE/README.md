@@ -151,6 +151,11 @@ That nonzero result must not be relabeled as scientific baseline acceptance.
 
 ## Test the audit tools
 
+The separate M12c build-system work and its current verification status are
+tracked in the [M12c progress report](../../docs/acceptance/M12C_BUILD_SYSTEM_PROGRESS_2026_10_11.md).
+That milestone is not accepted until its clean-build, CI, Docker and
+toolchain-portability criteria are verified.
+
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
   -s TESTS/ACCEPTANCE -p 'test_*.py' -v

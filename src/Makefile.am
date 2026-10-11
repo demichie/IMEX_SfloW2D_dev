@@ -132,12 +132,6 @@ IMEX_SfloW2D.$(OBJEXT): parameters_2d.$(OBJEXT)                              \
                          inpout_2d.$(OBJEXT) mass_exchange_2d.$(OBJEXT)       \
                          simulation_2d.$(OBJEXT) state_conversion_2d.$(OBJEXT)
 
-AM_FCFLAGS      = -fopenmp -I@NETCDF@/include
-FCDEBUGFLAGS    = -Wall -g
-
-LIBS            = -lm -llapack -L@NETCDF@/lib -lnetcdff 
-
-FC              = gfortran
-MPFC            = gfortran
-LINKER          = gfortran
-NETCDF = @NETCDF@
+AM_FCFLAGS = @OPENMP_FCFLAGS@ @NETCDF_CPPFLAGS@
+IMEX_SfloW2D_LDFLAGS = @OPENMP_FCFLAGS@ @NETCDF_LDFLAGS@
+IMEX_SfloW2D_LDADD = @NETCDF_LIBS@ @LAPACK_LIBS@ -lm

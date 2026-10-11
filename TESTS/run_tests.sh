@@ -1,118 +1,74 @@
-# run TEST_2D
-cd TEST_2D
-echo ""
-./cleanFolder.sh
-../../bin/IMEX_SfloW2D
-FILE=TEST_2D_0001.q_2d
-if test -f "$FILE"; then
-    ./cleanFolder.sh
-    echo "TEST_2D succesfully run"
-else
-    ./cleanFolder.sh
-    echo "Problems with TEST_2D"
-    exit 1
+#!/bin/sh
+set -eu
+
+test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+repo_dir=$(CDPATH= cd -- "$test_dir/.." && pwd)
+
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 /path/to/IMEX_SfloW2D" >&2
+    exit 2
 fi
-cd ..
 
-# run TEST_BOX
-cd TEST_BOX
-echo ""
-./cleanFolder.sh
-../../bin/IMEX_SfloW2D
-FILE=TEST_BOX_400_0001.q_2d
-if test -f "$FILE"; then
-    ./cleanFolder.sh
-    echo "TEST_BOX succesfully run"
-else
-    ./cleanFolder.sh
-    echo "Problems with TEST_BOX"
-    exit 1
+executable=$1
+case "$executable" in
+    /*) ;;
+    *)
+        executable=$(CDPATH= cd -- "$(dirname -- "$executable")" && pwd)/$(basename -- "$executable")
+        ;;
+esac
+if [ ! -x "$executable" ]; then
+    echo "Solver executable is missing or not executable: $executable" >&2
+    exit 2
 fi
-cd ..
 
-# run TEST_BW
-cd TEST_BW
-echo ""
-./cleanFolder.sh
-../../bin/IMEX_SfloW2D
-FILE=TEST_BW_400_0001.q_2d
-if test -f "$FILE"; then
-    ./cleanFolder.sh
-    echo "TEST_BW succesfully run"
-else
-    ./cleanFolder.sh
-    echo "Problems with TEST_BW"
-    exit 1
-fi
-cd ..
+work_dir=$(mktemp -d "${TMPDIR:-/tmp}/imex-integration-tests.XXXXXX")
+trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
 
-
-# run TEST_CF
-cd TEST_CF
-echo ""
-./cleanFolder.sh
-cp ../../EXAMPLES/EXAMPLE_CF/topo.zip .
-unzip topo.zip
-../../bin/IMEX_SfloW2D
-FILE=TEST_CF_0001.q_2d
-if test -f "$FILE"; then
-    ./cleanFolder.sh
-    echo "TEST_CF succesfully run"
-else
-    ./cleanFolder.sh
-    echo "Problems with TEST_CF"
-    exit 1
-fi
-cd ..
-
-# run TEST_TAAL
-cd TEST_TAAL
-echo ""
-./cleanFolder.sh
-ln -s ../../EXAMPLES/EXAMPLE_TAAL/topography_dem.asc .
-../../bin/IMEX_SfloW2D
-FILE=TEST_TAAL_0001.q_2d
-if test -f "$FILE"; then
-    ./cleanFolder.sh
-    echo "TEST_TAAL succesfully run"
-else
-    ./cleanFolder.sh
-    echo "Problems with TEST_TAAL"
-    exit 1
-fi
-cd ..
-
-# run tests in TEST_DAMBREAK
-cd TEST_DAMBREAK
-echo ""
-for DIR in */ ; do
-    # Skip if not a directory
-    [ -d "$DIR" ] || continue
-    echo "Running test in: $DIR"
-    cd "$DIR"
-    # Clean the folder
-    ./cleanFolder.sh
-    # Run the executable
-    ../../../bin/IMEX_SfloW2D
-
-    FILE="dambreak2D_0001.q_2d"
-    if [ -f "$FILE" ]; then
-        ./cleanFolder.sh
-        echo "$DIR successfully run"
-    else
-        ./cleanFolder.sh
-        echo "Problems with $DIR"
-        cd ..
-        exit 1
-    fi
-    cd ..
+for test_name in TEST_2D TEST_BOX TEST_BW TEST_CF TEST_TAAL TEST_DAMBREAK; do
+    cp -R "$test_dir/$test_name" "$work_dir/"
 done
-echo "All TEST_DAMBREAK tests completed."
-cd ..
 
+run_case() {
+    case_dir=$1
+    expected_output=$2
+    fixture=${3:-}
+    (
+        cd "$case_dir"
+        sh ./cleanFolder.sh
+        case "$fixture" in
+            cf)
+                unzip -q "$repo_dir/EXAMPLES/EXAMPLE_CF/topo.zip"
+                ;;
+            taal)
+                cp "$repo_dir/EXAMPLES/EXAMPLE_TAAL/topography_dem.asc" .
+                ;;
+        esac
+        if ! "$executable" > solver.log 2>&1; then
+            echo "FAIL: solver exited unsuccessfully in $case_dir" >&2
+            cat solver.log >&2
+            exit 1
+        fi
+        if [ ! -f "$expected_output" ]; then
+            echo "FAIL: expected output was not created in $case_dir: $expected_output" >&2
+            cat solver.log >&2
+            exit 1
+        fi
+        sh ./cleanFolder.sh
+    )
+    echo "PASS: $(basename "$case_dir")"
+}
 
+run_case "$work_dir/TEST_2D" "TEST_2D_0001.q_2d"
+run_case "$work_dir/TEST_BOX" "TEST_BOX_400_0001.q_2d"
+run_case "$work_dir/TEST_BW" "TEST_BW_400_0001.q_2d"
 
-exit 0
+run_case "$work_dir/TEST_CF" "TEST_CF_0001.q_2d" cf
 
+run_case "$work_dir/TEST_TAAL" "TEST_TAAL_0001.q_2d" taal
 
+for case_dir in "$work_dir"/TEST_DAMBREAK/*/; do
+    [ -d "$case_dir" ] || continue
+    run_case "$case_dir" "dambreak2D_0001.q_2d"
+done
 
+echo "PASS: legacy solver integration tests"
