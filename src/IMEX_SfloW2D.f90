@@ -48,6 +48,7 @@ PROGRAM IMEX_SfloW2D
    USE inpout_2d, ONLY : update_param
    USE inpout_2d, ONLY : output_solution
    USE inpout_2d, ONLY : output_runout
+   USE inpout_2d, ONLY : open_runout_outputs
    USE inpout_2d, ONLY : read_solution
    USE inpout_2d, ONLY : close_units
    USE inpout_2d, ONLY : n_probes
@@ -58,7 +59,6 @@ PROGRAM IMEX_SfloW2D
    USE inpout_2d, ONLY : restart, restart_file
    USE inpout_2d, ONLY : read_restart_file, write_restart_file
    USE inpout_2d, ONLY : output_runout_flag
-   USE inpout_2d, ONLY : runout_last
    USE inpout_2d, ONLY : output_cons_flag
    USE inpout_2d, ONLY : output_esri_flag
    USE inpout_2d, ONLY : output_netcdf_flag
@@ -275,6 +275,11 @@ PROGRAM IMEX_SfloW2D
 
    t_steady = t_end
    stop_flag = .FALSE.
+   IF (is_binary_restart) THEN
+      stop_flag = simulation%runtime%stop_requested
+      IF (stop_flag) t_steady = simulation%runtime%steady_deadline
+   END IF
+   simulation%runtime%steady_deadline = t_steady
 
    IF ( .NOT. is_binary_restart ) simulation%state%vuln_table = .FALSE.
 
@@ -352,9 +357,11 @@ PROGRAM IMEX_SfloW2D
 
    !$OMP END PARALLEL DO
 
+   CALL open_runout_outputs(simulation%runtime, is_binary_restart)
+
    IF ( output_runout_flag .AND. (.NOT. is_binary_restart) )                &
         CALL output_runout(                                                  &
-        simulation%runtime%t, stop_flag, simulation%state)
+        simulation%runtime%t, stop_flag, simulation%state, simulation%runtime)
 
    IF ( output_cons_flag .OR. output_esri_flag .OR.                            &
       output_netcdf_flag ) THEN
@@ -377,7 +384,7 @@ PROGRAM IMEX_SfloW2D
          ' volume = ',dx*dy*SUM(simulation%state%qp(1,:,:)) ,                 &
          ' area = ',dx*dy*COUNT(simulation%state%q(1,:,:).GT.1.D-5) ,         &
          ' solid mass = ',dx*dy*SUM(simulation%state%q(5:4+n_solid,:,:)),     &
-         ' runout = ',runout_last
+         ' runout = ',simulation%runtime%runout%last_distance
 
    END IF
 
@@ -538,7 +545,7 @@ PROGRAM IMEX_SfloW2D
             ' area = ',dx*dy*COUNT(simulation%state%q(1,:,:).GT.1.D-7) ,      &
             ' solid mass = ',dx*dy*SUM(                                      &
             simulation%state%q(5:4+n_solid,:,:)),                            &
-            ' runout = ',runout_last
+            ' runout = ',simulation%runtime%runout%last_distance
 
       END IF
 
@@ -550,11 +557,12 @@ PROGRAM IMEX_SfloW2D
             stop_flag_old = stop_flag
 
             IF ( output_runout_flag ) CALL output_runout(                    &
-                 simulation%runtime%t, stop_flag, simulation%state)
+                 simulation%runtime%t, stop_flag, simulation%state, simulation%runtime)
 
             IF ( ( stop_flag ) .AND. (.NOT.stop_flag_old) ) THEN
 
                t_steady = MIN(t_end,t_output)
+               simulation%runtime%steady_deadline = t_steady
 
             END IF
 

@@ -66,6 +66,39 @@ and the existing growth limiter. Neither policy is a general stability proof
 for IMEX stages; the supported stage counts remain `N_RK=2,3,4`. The selected
 policy is written to the effective input backup (`RUN_NAME.bak`).
 
+## Runout and binary continuation
+
+The binary checkpoint format is now **v5**. It preserves the original runout
+origin and initial extents, previous barycentre, diagnostic sampling history,
+maximum runout and steady-stop state together with the physical state.
+Earlier binary formats, including v4, are rejected: they cannot provide an
+exact diagnostic continuation. ASCII initial conditions remain supported and
+are not treated as a binary continuation merely because `RESTART=T`.
+
+Runout is written only to `RUN_NAME_runout.csv`; the accompanying barycentre
+and directional extents remain in `RUN_NAME_mass_center.csv`. Their existing
+five-column schemas and formatting are unchanged. `runout.txt` is neither read
+nor written. Existing legacy files are not automatically deleted.
+
+For a binary continuation, both existing CSVs are checked before either is
+opened for append. Headers, finite ordered records and the exact last row must
+match the restored diagnostic history. The last sample need not occur at the
+checkpoint time. No header or checkpoint-time row is duplicated. A missing
+CSV starts a new segment with a header; its earlier rows cannot be recovered
+from a checkpoint.
+
+Incompatible, incomplete or later CSV histories cause an error without
+truncation or overwriting. Use matching histories or a new execution directory
+to start a segment. Keep the runout origin configuration, `DT_RUNOUT`,
+`ALPHAS_THRESHOLD`, `EPS_STOP` and `OUTPUT_RUNOUT_FLAG` unchanged for an exact
+continuation. Changes to the simulation end time are allowed; an already
+requested steady stop retains its original deadline.
+
+This policy applies to the runout and mass-centre CSVs. Probe CSV handling is
+unchanged by this package. See the
+[restart verification](docs/acceptance/N9_RESTART_V5_2026_10_11.md) for the
+verified cases and remaining acceptance scope.
+
 ## Runtime diagnostics
 
 `VERBOSE_LEVEL` controls how much diagnostic information is printed and never

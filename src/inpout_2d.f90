@@ -177,7 +177,6 @@ MODULE inpout_2d
   INTEGER, PARAMETER :: output_max_unit = 14  !< Esri max thick. output unit
   INTEGER, PARAMETER :: dem_esri_unit = 15   !< Computational grid Esri fmt unit
   INTEGER, PARAMETER :: runout_unit = 16
-  INTEGER, PARAMETER :: dakota_unit = 17
   INTEGER, PARAMETER :: erodible_unit = 18
   INTEGER, PARAMETER :: output_VT_unit = 19
   INTEGER, PARAMETER :: mass_center_unit = 20
@@ -187,8 +186,8 @@ MODULE inpout_2d
   INTEGER, PARAMETER :: output_unit_B = 28
 
   CHARACTER(LEN=16), PARAMETER :: restart_format_magic = 'IMEX_SFLOW2D_RST'
-  ! Version 3 fixes the fourth conservative variable to thermal energy.
-  INTEGER, PARAMETER :: restart_format_version = 4
+  ! Version 5 adds self-contained runout and steady-stop diagnostic history.
+  INTEGER, PARAMETER :: restart_format_version = 5
 
   !> Counter for the output files
   INTEGER :: output_idx
@@ -265,17 +264,11 @@ MODULE inpout_2d
 
   REAL(wp) :: dt_probes
 
-  REAL(wp) :: x_mass_center_old, y_mass_center_old
-
-  REAL(wp) :: x0_runout, y0_runout, init_runout, init_runout_x, &
-              init_runout_y, eps_stop
+  REAL(wp) :: x0_runout, y0_runout, eps_stop
 
 
   !> Optional minimum total solid fraction used by runout diagnostics
   REAL(wp) :: alphas_threshold
-
-  !> Most recently computed runout distance
-  REAL(wp) :: runout_last
 
   ! absolute precentages of solids in the initial volume
   REAL(wp), ALLOCATABLE :: sed_vol_perc(:)
@@ -525,7 +518,6 @@ CONTAINS
     dt_runout = 60
     eps_stop = 0.0_wp
     alphas_threshold = 0.0_wp
-    runout_last = -1.0_wp
 
     !-- Inizialization of the Variables for the namelist STOCHASTIC_PARAMETERS
     sym_noise = 0.0_wp
@@ -4422,11 +4414,9 @@ CONTAINS
 
       runout_file = TRIM(run_name)//'_runout'//'.csv'
 
-      OPEN (runout_unit, FILE=runout_file, STATUS='unknown', form='formatted')
-
       mass_center_file = TRIM(run_name)//'_mass_center'//'.csv'
 
-      OPEN (mass_center_unit, FILE=mass_center_file, STATUS='unknown', form='formatted')
+      ! Opening is deferred until the binary-restart time/history are known.
 
     END IF
 
@@ -6092,19 +6082,128 @@ CONTAINS
   END SUBROUTINE output_esri
 
   !******************************************************************************
-  !> \brief Close the configured formatted-output units.
-  !
-  !> This subroutine closes the units used for runout and mass center output
-  !> if the output_runout_flag is active.
-  !
-  !> @author
-  !> Mattia de' Michieli Vitturi
-  !> \date 12/02/2018
-  !>
-  !> \note Closes formatted file handles stored in this module; the NetCDF handle has a separate
-  !>       close routine.
+  !> \brief Open runout CSVs only after restoring the checkpoint history.
+  !> \param[in,out] runtime Runout origin on a new run; restored history on restart.
+  !> \param[in] binary_restart True only for a versioned binary continuation.
+  !> \note Existing histories are both validated before either file is opened
+  !> for append. Missing files start new segments with the same CSV schema.
   !******************************************************************************
+  SUBROUTINE open_runout_outputs(runtime, binary_restart)
+    CLASS(runtime_state_type), INTENT(INOUT) :: runtime
+    LOGICAL, INTENT(IN) :: binary_restart
+    CHARACTER(LEN=128) :: runout_header, mass_header
+    LOGICAL :: runout_exists, mass_exists
 
+    IF (.NOT. output_runout_flag) RETURN
+    WRITE(runout_header, '(A13,A13,A13,A17,A17)') 'Time (s),', 'Runout (m),', &
+         ' Area (m2),', 'X_runout (m),', 'Y_runout (m)'
+    WRITE(mass_header, '(A18,A18,A18,A18,A18)') 'Time (s),', &
+         'Barycenter-x (m),', 'Barycenter-y (m),', 'Baricenter-dx (m),', &
+         'Baricenter-dy (m)'
+    runout_exists = .FALSE.
+    mass_exists = .FALSE.
+    IF (binary_restart) THEN
+      IF (.NOT. runtime%runout%initialized) &
+           CALL fatal_error('Binary restart has no initialized runout history.')
+      CALL validate_runout_csv(runout_file, runout_header, &
+           runtime%runout%runout_row, runout_exists)
+      CALL validate_runout_csv(mass_center_file, mass_header, &
+           runtime%runout%mass_center_row, mass_exists)
+    ELSE
+      runtime%runout%origin_x = x0_runout
+      runtime%runout%origin_y = y0_runout
+    END IF
+    CALL open_runout_csv(runout_unit, runout_file, runout_header, runout_exists, binary_restart)
+    CALL open_runout_csv(mass_center_unit, mass_center_file, mass_header, mass_exists, binary_restart)
+  END SUBROUTINE open_runout_outputs
+
+  !******************************************************************************
+  !> \brief Check schema, finite ordered samples and exact checkpoint CSV tail.
+  !> \param[in] filename Existing history to validate without writing.
+  !> \param[in] header Expected formatted column names.
+  !> \param[in] expected_row Last diagnostic row retained in the checkpoint.
+  !> \param[out] exists Whether the file exists; absent histories are new segments.
+  !> \note No automatic truncation, repair or overwriting is performed. The
+  !> expected row refers to the last diagnostic sample, not the checkpoint time.
+  !******************************************************************************
+  SUBROUTINE validate_runout_csv(filename, header, expected_row, exists)
+    USE, INTRINSIC :: ieee_arithmetic, ONLY: ieee_is_finite
+    USE, INTRINSIC :: iso_fortran_env, ONLY: iostat_end
+    CHARACTER(LEN=*), INTENT(IN) :: filename, header, expected_row
+    LOGICAL, INTENT(OUT) :: exists
+    INTEGER :: unit_csv, ierr, i, rows
+    REAL(wp) :: values(5), previous_time
+    CHARACTER(LEN=512) :: line, last_line, message
+
+    INQUIRE(FILE=filename, EXIST=exists)
+    IF (.NOT. exists) RETURN
+    OPEN(NEWUNIT=unit_csv, FILE=filename, STATUS='OLD', ACTION='READ', &
+         IOSTAT=ierr, IOMSG=message)
+    IF (ierr /= 0) CALL fatal_error('Cannot read diagnostic CSV '//TRIM(filename)//': '//TRIM(message))
+    READ(unit_csv, '(A)', IOSTAT=ierr) line
+    IF (ierr /= 0 .OR. TRIM(line) /= TRIM(header)) &
+         CALL fatal_error('Diagnostic CSV header does not match: '//TRIM(filename))
+    rows = 0
+    previous_time = -HUGE(1.0_wp)
+    last_line = ''
+    DO
+      READ(unit_csv, '(A)', IOSTAT=ierr) line
+      IF (ierr == iostat_end) EXIT
+      IF (ierr /= 0) CALL fatal_error('Cannot read diagnostic CSV row: '//TRIM(filename))
+      ! Reject missing columns and textual NaN/Inf even under -ffast-math.
+      IF (COUNT([(line(i:i) == ',', i=1,LEN_TRIM(line))]) /= 4 .OR. &
+           VERIFY(TRIM(line), ' +-0123456789.,eEdD') /= 0) &
+           CALL fatal_error('Malformed diagnostic CSV row: '//TRIM(filename))
+      READ(line, *, IOSTAT=ierr) values
+      IF (ierr /= 0) CALL fatal_error('Malformed diagnostic CSV values: '//TRIM(filename))
+      IF (.NOT. ALL(ieee_is_finite(values))) &
+           CALL fatal_error('Nonfinite diagnostic CSV values: '//TRIM(filename))
+      IF (values(1) <= previous_time) &
+           CALL fatal_error('Duplicate or unordered diagnostic CSV times: '//TRIM(filename))
+      previous_time = values(1)
+      last_line = line
+      rows = rows + 1
+    END DO
+    CLOSE(unit_csv)
+    IF (rows == 0 .OR. TRIM(last_line) /= TRIM(expected_row)) &
+         CALL fatal_error('Diagnostic CSV tail does not match checkpoint: '//TRIM(filename)// &
+         '. Use matching history or a new output directory; files were not modified.')
+  END SUBROUTINE validate_runout_csv
+
+  !******************************************************************************
+  !> \brief Append a validated CSV or create a header for a new output segment.
+  !> \param[in] unit_csv Fortran output unit.
+  !> \param[in] filename Destination CSV path.
+  !> \param[in] header Formatted column names, unchanged from the original schema.
+  !> \param[in] append_history True only after successful read-only validation.
+  !> \param[in] binary_restart Whether a missing file represents a restart segment.
+  !******************************************************************************
+  SUBROUTINE open_runout_csv(unit_csv, filename, header, append_history, binary_restart)
+    INTEGER, INTENT(IN) :: unit_csv
+    CHARACTER(LEN=*), INTENT(IN) :: filename, header
+    LOGICAL, INTENT(IN) :: append_history, binary_restart
+    INTEGER :: ierr
+    CHARACTER(LEN=256) :: message
+
+    IF (append_history) THEN
+      OPEN(UNIT=unit_csv, FILE=filename, STATUS='OLD', POSITION='APPEND', &
+           ACTION='WRITE', IOSTAT=ierr, IOMSG=message)
+    ELSE
+      OPEN(UNIT=unit_csv, FILE=filename, STATUS='REPLACE', ACTION='WRITE', &
+           IOSTAT=ierr, IOMSG=message)
+    END IF
+    IF (ierr /= 0) CALL fatal_error('Cannot open diagnostic CSV '//TRIM(filename)//': '//TRIM(message))
+    IF (.NOT. append_history) THEN
+      WRITE(unit_csv, '(A)') TRIM(header)
+      FLUSH(unit_csv)
+      IF (binary_restart) WRITE(*,*) 'New diagnostic CSV segment (earlier history absent): ', TRIM(filename)
+    END IF
+  END SUBROUTINE open_runout_csv
+
+  !******************************************************************************
+  !> \brief Close runout and barycentre CSV units when configured.
+  !> \note The NetCDF handle has a separate close routine.
+  !******************************************************************************
   SUBROUTINE close_units
 
     IMPLICIT NONE
@@ -6420,7 +6519,8 @@ CONTAINS
   !> \param[in,out] state Simulation cell states and accumulated diagnostics.
   !******************************************************************************
 
-  SUBROUTINE output_runout(time, stop_flag, state)
+  !> \param[in,out] runtime Original runout references, last sample and stopping history.
+  SUBROUTINE output_runout(time, stop_flag, state, runtime)
 
     USE geometry_2d, ONLY: x_comp, y_comp, B_cent, dx, dy
     USE parameters_2d, ONLY: t_runout, n_solid, n_vars
@@ -6430,6 +6530,8 @@ CONTAINS
     REAL(wp), INTENT(IN) :: time
     LOGICAL, INTENT(INOUT) :: stop_flag
     CLASS(state_type), INTENT(INOUT) :: state
+    CLASS(runtime_state_type), INTENT(INOUT) :: runtime
+    LOGICAL :: had_history
 
     REAL(wp), ALLOCATABLE :: X(:, :), Y(:, :)
     REAL(wp), ALLOCATABLE :: dist(:, :), dist_x(:, :), dist_y(:, :)
@@ -6445,9 +6547,20 @@ CONTAINS
 
     REAL(wp) :: vel_mass_center, vel_radial_growth
 
-    CHARACTER(18) :: txt_string
-    REAL(wp) :: old_runout
     REAL(wp) :: alphas_local(n_solid), alphag_local(n_add_gas), alphal_local
+
+    had_history = runtime%runout%initialized
+
+    ! The input origin is copied once by open_runout_outputs. All evolving
+    ! history belongs to the simulation runtime and survives binary restart.
+    ASSOCIATE (x0_runout => runtime%runout%origin_x, &
+         y0_runout => runtime%runout%origin_y, &
+         init_runout => runtime%runout%initial_distance, &
+         init_runout_x => runtime%runout%initial_distance_x, &
+         init_runout_y => runtime%runout%initial_distance_y, &
+         x_mass_center_old => runtime%runout%previous_center_x, &
+         y_mass_center_old => runtime%runout%previous_center_y, &
+         runout_last => runtime%runout%last_distance)
 
     sX = size(x_comp)
     sY = size(y_comp)
@@ -6491,18 +6604,13 @@ CONTAINS
       alphas_tot = 0.0_wp
     END IF
 
-    IF (time .EQ. t_start) THEN
-
-      WRITE (runout_unit, '(A13,A13,A13,A17,A17)') 'Time (s),', 'Runout (m),', &
-        ' Area (m2),', 'X_runout (m),', 'Y_runout (m)'
-
-      WRITE (mass_center_unit, '(A18,A18,A18,A18,A18)') 'Time (s),', &
-        'Barycenter-x (m),', 'Barycenter-y (m),', 'Baricenter-dx (m),', &
-        'Baricenter-dy (m)'
-
-      CALL flush (runout_unit)
+    IF (.NOT. had_history) THEN
 
       IF (MAXVAL(state%qp(1, :, :)) .EQ. 0.0_wp) THEN
+
+        ! An empty, source-free domain still has a defined diagnostic centre.
+        x_mass_center = 0.5_wp*(x_comp(1) + x_comp(sX))
+        y_mass_center = 0.5_wp*(y_comp(1) + y_comp(sY))
 
         IF (collapsing_volume_flag) THEN
 
@@ -6538,6 +6646,7 @@ CONTAINS
       state%hpos_old = (state%qp(1, :, :) .GT. 1.0E-5_wp) .AND. &
                  (alphas_tot .GE. alphas_threshold)
 
+      state%hpos = state%hpos_old
       x_mass_center_old = x_mass_center
       y_mass_center_old = y_mass_center
 
@@ -6621,47 +6730,31 @@ CONTAINS
 
     imax_y = MAXLOC(dist_y)
 
-    IF (time .GT. t_start) THEN
-
-      OPEN (dakota_unit, FILE='runout.txt', status='old', form='formatted')
-      READ (dakota_unit, '(A18,F12.3)') txt_string, old_runout
-      CLOSE (dakota_unit)
-
-    ELSE
-
-      old_runout = 0.0_wp
-
-    END IF
-
-    OPEN (dakota_unit, FILE='runout.txt', status='replace', form='formatted')
-    WRITE (dakota_unit, '(A18,F12.3)') 'maximum runout =', &
-      MAX(old_runout, dist(imax(1), imax(2)) - init_runout)
-    WRITE (dakota_unit, '(A18,F12.3)') 'final runout =', dist(imax(1), imax(2)) - &
-      init_runout
-
-    CLOSE (dakota_unit)
-
     area_old = dx*dy*COUNT(state%hpos_old)
     area = dx*dy*COUNT(state%hpos)
 
     runout_last = dist(imax(1), imax(2)) - init_runout
 
-    WRITE (runout_unit, '(F12.3,A,F12.3,A,F14.3,A,F14.3,A,F14.3)') time, ',', &
+    WRITE (runtime%runout%runout_row, '(F12.3,A,F12.3,A,F14.3,A,F14.3,A,F14.3)') time, ',', &
       runout_last, ',', area, ',', X(imax(1), imax(2)), ',', Y(imax(1), imax(2))
+
+    WRITE (runout_unit, '(A)') TRIM(runtime%runout%runout_row)
 
     WRITE (*, '(A,F10.2,A,F12.2,A,F12.2)') ' runout(m) =', runout_last,       &
       '  at X =', X(imax(1), imax(2)), '  Y =', Y(imax(1), imax(2))
 
     CALL flush (runout_unit)
 
-    WRITE (mass_center_unit, '(F17.3,A,F17.3,A,F17.3,A,F17.3,A,F17.3)') time, &
+    WRITE (runtime%runout%mass_center_row, '(F17.3,A,F17.3,A,F17.3,A,F17.3,A,F17.3)') time, &
       ',', x_mass_center, ',', y_mass_center, ',', &
       dist_x(imax_x(1), imax_x(2)) - init_runout_x, ',', &
       dist_y(imax_y(1), imax_y(2)) - init_runout_y
 
+    WRITE (mass_center_unit, '(A)') TRIM(runtime%runout%mass_center_row)
+
     CALL flush (mass_center_unit)
 
-    IF (time .GT. t_start) THEN
+    IF (had_history) THEN
 
       vel_mass_center = SQRT((x_mass_center_old - x_mass_center)**2 + &
                              (y_mass_center_old - y_mass_center)**2)/dt_runout
@@ -6693,6 +6786,12 @@ CONTAINS
     END IF
 
     DEALLOCATE (X, Y, dist, dist_x, dist_y, alphas_tot)
+
+    runtime%runout%last_time = time
+    runtime%runout%maximum_distance = MAX(runtime%runout%maximum_distance, runout_last)
+    runtime%runout%initialized = .TRUE.
+    runtime%stop_requested = stop_flag
+    END ASSOCIATE
 
     t_runout = time + dt_runout
 
@@ -7530,6 +7629,21 @@ END IF
       DEALLOCATE(random_seed_state)
     END IF
 
+    ! Append-only extension: canonical physical payload record indices stay
+    ! unchanged. Diagnostic configuration must match for exact continuation.
+    WRITE(unit_rst, IOSTAT=ierr, IOMSG=io_message) output_runout_flag, &
+         dt_runout, eps_stop, alphas_threshold, x0_runout, y0_runout, &
+         runtime%stop_requested, runtime%steady_deadline
+    CALL check_restart_io(ierr, io_message, 'writing diagnostic configuration to', filename)
+    WRITE(unit_rst, IOSTAT=ierr, IOMSG=io_message) runtime%runout%initialized, &
+         runtime%runout%origin_x, runtime%runout%origin_y, &
+         runtime%runout%initial_distance, runtime%runout%initial_distance_x, &
+         runtime%runout%initial_distance_y, runtime%runout%previous_center_x, &
+         runtime%runout%previous_center_y, runtime%runout%last_time, &
+         runtime%runout%last_distance, runtime%runout%maximum_distance, &
+         runtime%runout%runout_row, runtime%runout%mass_center_row
+    CALL check_restart_io(ierr, io_message, 'writing runout history to', filename)
+
     CLOSE (unit_rst, IOSTAT=ierr, IOMSG=io_message)
     CALL check_restart_io(ierr, io_message, 'closing', filename)
 
@@ -7577,7 +7691,8 @@ END IF
     INTEGER :: nstoch_check, npore_check, nthickness_check, ndynpres_check
     INTEGER :: seed_size, current_seed_size
     INTEGER, ALLOCATABLE :: random_seed_state(:)
-    LOGICAL :: stochastic_check, topo_change_check
+    LOGICAL :: stochastic_check, topo_change_check, runout_check
+    REAL(wp) :: dt_runout_check, eps_stop_check, threshold_check, origin_check(2)
     CHARACTER(LEN=16) :: format_magic
     CHARACTER(LEN=256) :: io_message
 
@@ -7599,6 +7714,7 @@ END IF
     CALL check_restart_io(ierr, io_message, 'reading version from', filename)
     IF (format_version /= restart_format_version) THEN
       WRITE(*,*) 'ERROR: Unsupported restart format version:', format_version
+      WRITE(*,*) 'Version 5 is required: earlier checkpoints lack complete runout/stop history.'
       ERROR STOP 1
     END IF
 
@@ -7695,6 +7811,29 @@ END IF
       CALL random_seed(PUT=random_seed_state)
       DEALLOCATE(random_seed_state)
     END IF
+
+    READ(unit_rst, IOSTAT=ierr, IOMSG=io_message) runout_check, &
+         dt_runout_check, eps_stop_check, threshold_check, origin_check, &
+         runtime%stop_requested, runtime%steady_deadline
+    CALL check_restart_io(ierr, io_message, 'reading diagnostic configuration from', filename)
+    IF (runout_check .NEQV. output_runout_flag) &
+         CALL fatal_error('Restart runout output flag does not match the configured run.')
+    IF (output_runout_flag) THEN
+      IF (dt_runout_check /= dt_runout .OR. eps_stop_check /= eps_stop .OR. &
+           threshold_check /= alphas_threshold .OR. &
+           ANY(origin_check /= [x0_runout, y0_runout])) &
+           CALL fatal_error('Restart runout cadence, stopping threshold or origin configuration changed.')
+    END IF
+    READ(unit_rst, IOSTAT=ierr, IOMSG=io_message) runtime%runout%initialized, &
+         runtime%runout%origin_x, runtime%runout%origin_y, &
+         runtime%runout%initial_distance, runtime%runout%initial_distance_x, &
+         runtime%runout%initial_distance_y, runtime%runout%previous_center_x, &
+         runtime%runout%previous_center_y, runtime%runout%last_time, &
+         runtime%runout%last_distance, runtime%runout%maximum_distance, &
+         runtime%runout%runout_row, runtime%runout%mass_center_row
+    CALL check_restart_io(ierr, io_message, 'reading runout history from', filename)
+    IF (output_runout_flag .AND. .NOT. runtime%runout%initialized) &
+         CALL fatal_error('Restart is missing initialized runout diagnostic history.')
 
     CLOSE (unit_rst, IOSTAT=ierr, IOMSG=io_message)
     CALL check_restart_io(ierr, io_message, 'closing', filename)

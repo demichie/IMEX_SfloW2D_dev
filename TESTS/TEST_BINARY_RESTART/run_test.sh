@@ -58,3 +58,7 @@ cmp "$reference_dir/TEST_2D_0002.q_2d" \
     "$resumed_dir/TEST_2D_0002.q_2d"
 
 echo "PASS: evolving-topography binary restart is bit-for-bit identical"
+
+# Also exercise original runout references, complete/segmented CSV histories,
+# read-only refusal of incompatible files and restored positive-EPS_STOP state.
+PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/test_runout_restart.py" "$executable"

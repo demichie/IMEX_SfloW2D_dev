@@ -504,7 +504,12 @@ class AuditToolsTests(unittest.TestCase):
         self.assertEqual((action["status"], action["evidence"]), ("satisfied", ["cfl_policy"]))
         for group in ("source_sha256", "fixture_sha256"):
             for name, value in evidence[group].items():
-                self.assertEqual(digest(repo / name), value, name)
+                # This is archived CFL evidence, not a freeze of the evolving
+                # worktree. Validate its committed solver/fixtures; the v5
+                # candidate has separate fresh restart/regression evidence.
+                archived = subprocess.check_output(
+                    ["git", "show", "8fc540eba791dabd7dfa39c305513f52ded2c5a3:"+name], cwd=repo)
+                self.assertEqual(sha256(archived).hexdigest(), value, name)
         contract = evidence["authorized_contract"]
         self.assertEqual(contract["default"], "directional_min")
         self.assertEqual(contract["options"], ["directional_min", "combined"])
