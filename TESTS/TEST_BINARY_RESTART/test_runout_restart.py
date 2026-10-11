@@ -84,6 +84,27 @@ def main():
             assert not (case/'runout.txt').exists()
         return output
 
+    def require_output(case, filename):
+        path = case/filename
+        if path.is_file():
+            return path
+        details = [f'Missing expected output: {path}',
+                   f'Files created: {sorted(p.name for p in case.iterdir())}']
+        inp = case/'IMEX_sfloW2D.inp'
+        if inp.is_file():
+            relevant_input = [line for line in inp.read_text().splitlines()
+                              if any(key in line.upper() for key in
+                                     ('RUN_NAME', 'OUTPUT_RUNOUT_FLAG', 'SERIAL_FLAG',
+                                      'T_END', 'DT_OUTPUT', 'RUNOUT_PARAMETERS',
+                                      'DT_RUNOUT', 'EPS_STOP'))]
+            details.extend(['Effective input parameters:', *relevant_input])
+        for logname in ('full.log', 'first.log', 'resumed.log'):
+            logfile = case/logname
+            if logfile.is_file():
+                details.extend([f'Last lines of {logname}:',
+                                *logfile.read_text(errors='replace').splitlines()[-60:]])
+        raise AssertionError('\n'.join(details))
+
     def continuation(case, end=0.03):
         inp = case/'IMEX_sfloW2D.inp'
         value = parameter(inp.read_text(), 'T_END', str(end))
@@ -104,7 +125,8 @@ def main():
         assert records(full/'restart.bin') == records(split/'restart.bin')
         for suffix in ('runout', 'mass_center'):
             filename = 'TEST_2D_'+suffix+'.csv'
-            assert (full/filename).read_bytes() == (split/filename).read_bytes()
+            assert require_output(full, filename).read_bytes() == \
+                require_output(split, filename).read_bytes()
         assert (full/'TEST_2D_0002.q_2d').read_bytes() == (split/'TEST_2D_0002.q_2d').read_bytes()
         passed(mode+' origin: exact checkpoint, physical output and complete CSV history')
 
