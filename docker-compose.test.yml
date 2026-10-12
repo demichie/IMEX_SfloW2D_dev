@@ -1,4 +1,0 @@
-sut:
-  build: .
-  command: /bin/sh /home/user_sw/run_tests.sh
-
