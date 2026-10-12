@@ -28,8 +28,10 @@ for profile in strict optimized; do
     objects=''
     for source in $sources; do
         gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+            -I"$repo_dir/src/state" \
             $netcdf_fflags -c "$repo_dir/src/$source"
-        objects="$objects ${source%.f90}.o"
+        object=${source##*/}
+        objects="$objects ${object%.f90}.o"
     done
     # Run the targeted Richardson regression with traps against BOTH sets of
     # production objects; a post-division MIN alone would not survive this case.

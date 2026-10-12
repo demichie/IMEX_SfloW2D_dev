@@ -167,7 +167,7 @@ def main():
         help="also require executable lines and directives to match a Git revision")
     args = cli.parse_args()
     source_dir = args.source_dir.resolve()
-    paths = sorted(source_dir.glob("*.f90"))
+    paths = sorted(source_dir.rglob("*.f90"))
     if not paths:
         cli.error(f"no .f90 sources found in {source_dir}")
 
@@ -179,7 +179,7 @@ def main():
             for message in validate_header(entity):
                 errors.append(f"{path.name}:{entity['start']+1}: {entity['name']}: {message}")
 
-    fragments = sorted(source_dir.glob("*.inc"))
+    fragments = sorted(source_dir.rglob("*.inc"))
     for path in fragments:
         header = path.read_text()
         if not re.search(r"[\\@]file\s+" + re.escape(path.name), header):
@@ -190,10 +190,17 @@ def main():
     if args.check_against_git:
         repo = source_dir.parent
         for path in paths + fragments:
-            reference = subprocess.check_output(
-                ["git", "-C", str(repo), "show",
-                 f"{args.check_against_git}:{path.relative_to(repo).as_posix()}"],
-                text=True)
+            reference_path = path.relative_to(repo).as_posix()
+            try:
+                reference = subprocess.check_output(
+                    ["git", "-C", str(repo), "show",
+                     f"{args.check_against_git}:{reference_path}"],
+                    text=True, stderr=subprocess.DEVNULL)
+            except subprocess.CalledProcessError:
+                reference = subprocess.check_output(
+                    ["git", "-C", str(repo), "show",
+                     f"{args.check_against_git}:src/{path.name}"],
+                    text=True)
             if executable_lines(reference) != executable_lines(path.read_text()):
                 errors.append(f"{path.name}: executable code/directives differ from {args.check_against_git}")
 

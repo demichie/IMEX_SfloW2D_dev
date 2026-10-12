@@ -18,15 +18,15 @@ for profile in strict optimized; do
     mkdir "$profile"
     cd "$profile"
     gfortran $profile_flags -fopenmp -fbacktrace \
-        -ffpe-trap=invalid,zero,overflow -c \
-        "$repo_dir/src/parameters_2d.f90" \
-        "$repo_dir/src/diagnostics_2d.f90" \
-        "$repo_dir/src/constitutive_parameters_2d.f90" \
-        "$repo_dir/src/equation_metadata_2d.f90" \
-        "$repo_dir/src/complexify.f90" \
-        "$repo_dir/src/geometry_2d.f90" \
-        "$repo_dir/src/state_conversion_2d.f90" \
-        "$repo_dir/src/equation_terms_2d.f90"
+        -ffpe-trap=invalid,zero,overflow -I"$repo_dir/src/state" -c \
+        "$repo_dir/src/core/parameters_2d.f90" \
+        "$repo_dir/src/core/diagnostics_2d.f90" \
+        "$repo_dir/src/core/constitutive_parameters_2d.f90" \
+        "$repo_dir/src/numerics/equation_metadata_2d.f90" \
+        "$repo_dir/src/core/complexify.f90" \
+        "$repo_dir/src/geometry/geometry_2d.f90" \
+        "$repo_dir/src/state/state_conversion_2d.f90" \
+        "$repo_dir/src/physics/equation_terms_2d.f90"
 
     # Keep assertion/IEEE checks strict even when the numerical modules use
     # -Ofast, which otherwise permits optimizing away NaN/Inf checks.

@@ -24,7 +24,8 @@ sources=$(awk '
 ' "$repo_dir/src/Makefile.am")
 production_objects=''
 for source in $sources; do
-    production_objects="$production_objects ${source%.f90}.o"
+    object=${source##*/}
+    production_objects="$production_objects ${object%.f90}.o"
 done
 
 for profile in strict optimized; do
@@ -36,6 +37,7 @@ for profile in strict optimized; do
     esac
     for source in $sources; do
         gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+            -I"$repo_dir/src/state" \
             $netcdf_fflags -c "$repo_dir/src/$source"
     done
     # Assertion/reference arithmetic must not inherit finite-math assumptions.

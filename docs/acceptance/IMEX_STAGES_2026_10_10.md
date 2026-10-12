@@ -48,7 +48,7 @@ The combined CFL policy also remains a scientific decision; N9 stays open.
 
 ## Changes and observation contract
 
-[`time_integration_2d.f90`](../../src/time_integration_2d.f90) has an optional
+[`time_integration_2d.f90`](../../src/numerics/time_integration_2d.f90) has an optional
 read-only `observer` argument on `advance`. Its three events expose the known
 conservative stage before primitive conversion, the solved stage, and the
 raw final assembly before clipping or component repair. A solved-stage status

@@ -88,9 +88,10 @@ def build(executable, directory, repository, include_spatial=False):
         # Never link objects from a different compiler. Rebuild when necessary.
         objects = []
         for name in numerical:
-            subprocess.run([*compiler, *flags, *includes, "-c", str(source / name)],
+            subprocess.run([*compiler, *flags, *includes, "-I" + str(source / "state"),
+                            "-c", str(source / name)],
                            cwd=directory, check=True)
-            objects.append(directory / Path(name).with_suffix(".o"))
+            objects.append(directory / Path(name).name.replace(".f90", ".o"))
         module_directory = directory
     else:
         module_directory = executable.parent

@@ -32,6 +32,17 @@ def digest(path):
     return result.hexdigest()
 
 
+def current_source_path(repo, historical_path):
+    path = repo / historical_path
+    if path.exists():
+        return path
+    if str(historical_path).startswith('src/'):
+        matches = list((repo / 'src').rglob(Path(historical_path).name))
+        if len(matches) == 1:
+            return matches[0]
+    return path
+
+
 def changed_parameter(text, name, value):
     result, count = re.subn(r'(?mi)^(\s*' + name + r'\s*=)[^\n]*',
                             lambda m: m[1] + ' ' + value + ',', text)
@@ -293,7 +304,7 @@ def main():
     audit = json.loads((args.build_audit/'manifest.json').read_text())
     lava = json.loads(args.lava_evidence.read_text())
     for name, value in lava['source_sha256'].items():
-        assert digest(repo/name) == value, ('changed production source', name)
+        assert digest(current_source_path(repo, name)) == value, ('changed production source', name)
         assert audit['source_and_fixture_sha256'][name] == value, ('build provenance mismatch', name)
     manifest = {'schema_version': 1, 'started_utc': datetime.now(timezone.utc).isoformat(),
                 'source_revision': subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip(),

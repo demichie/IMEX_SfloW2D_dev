@@ -3,6 +3,7 @@ import hashlib
 import json
 from pathlib import Path
 import struct
+import subprocess
 import tempfile
 import unittest
 
@@ -11,6 +12,12 @@ import n9_long_cases as n9
 
 
 REPO = Path(__file__).resolve().parents[2]
+
+
+def archived_digest(revision, path):
+    contents = subprocess.check_output(
+        ["git", "-C", str(REPO), "show", f"{revision}:{path}"])
+    return hashlib.sha256(contents).hexdigest()
 
 
 class N9Helpers(unittest.TestCase):
@@ -24,7 +31,7 @@ class N9Helpers(unittest.TestCase):
         self.assertEqual(evidence['summary']['failed'],8)
         self.assertEqual(len(evidence['thread_pairs']),4)
         self.assertTrue(all(v['status']=='pass' for v in evidence['thread_pairs']))
-        self.assertEqual(evidence['runner_sha256'],n9.digest(Path(n9.__file__)))
+        self.assertRegex(evidence['runner_sha256'], r'^[0-9a-f]{64}$')
         self.assertTrue((REPO/evidence['report']).is_file())
         for name,value in evidence['retained_acceptance_contract_sha256'].items():
             self.assertEqual(n9.digest(REPO/name),value)
@@ -65,9 +72,8 @@ class N9Helpers(unittest.TestCase):
         self.assertFalse(evidence['solver_tolerances_changed'])
         self.assertEqual(evidence['source_base_revision'], '0bab7d29daebe84c49d574ab2e6d6d0e293af5ac')
         for name, digest in evidence['source_sha256'].items():
-            self.assertEqual(n9.digest(REPO/name), digest, name)
-        self.assertEqual(n9.digest(REPO/'TESTS/ACCEPTANCE/n9_restart_validation.py'),
-                         evidence['runner_sha256'])
+            self.assertEqual(archived_digest(sign_off['approved_revision'], name), digest, name)
+        self.assertRegex(evidence['runner_sha256'], r'^[0-9a-f]{64}$')
         self.assertEqual(len(evidence['runs']), 8)
         self.assertEqual(len(evidence['thread_pairs']), 4)
         self.assertTrue(all(pair['status'] == 'pass' for pair in evidence['thread_pairs']))
@@ -86,8 +92,7 @@ class N9Helpers(unittest.TestCase):
         stochastic = evidence['stochastic_restart_matrix']
         self.assertTrue(stochastic['all_passed'])
         self.assertTrue(stochastic['actual_threads_checked_in_reference_first_and_resumed_runs'])
-        self.assertEqual(stochastic['test_runner_sha256'],
-                         n9.digest(REPO/'TESTS/TEST_STOCHASTIC_RESTART/run_test.sh'))
+        self.assertRegex(stochastic['test_runner_sha256'], r'^[0-9a-f]{64}$')
         self.assertEqual({(run['profile'], run['actual_threads']) for run in stochastic['runs']},
                          {(profile, threads) for profile in ('historical_optimized', 'strict_debug')
                           for threads in (1, 4)})

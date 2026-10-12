@@ -15,8 +15,8 @@ the broader N7/N9 acceptance requirements remain open.
 ## Production corrections
 
 The changes are confined to
-[`equation_terms_2d.f90`](../../src/equation_terms_2d.f90) and
-[`mass_exchange_2d.f90`](../../src/mass_exchange_2d.f90).
+[`equation_terms_2d.f90`](../../src/physics/equation_terms_2d.f90) and
+[`mass_exchange_2d.f90`](../../src/physics/mass_exchange_2d.f90).
 
 | Defect | Correction |
 | --- | --- |

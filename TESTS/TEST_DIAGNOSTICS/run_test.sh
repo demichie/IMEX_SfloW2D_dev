@@ -9,7 +9,7 @@ trap 'rm -rf "$build_dir"' EXIT HUP INT TERM
 cd "$build_dir"
 
 gfortran -O0 -g -Wall -Wextra -fopenmp -fcheck=all -fbacktrace \
-    "$repo_dir/src/diagnostics_2d.f90" \
+    "$repo_dir/src/core/diagnostics_2d.f90" \
     "$test_dir/test_diagnostics.f90" \
     -o test_diagnostics
 

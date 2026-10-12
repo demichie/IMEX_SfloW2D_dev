@@ -29,7 +29,7 @@ intermediate arithmetic valid under the strict floating-point contract.
 ## Correction and physical domain
 
 The production change is confined to
-[`equation_terms_2d.f90`](../../src/equation_terms_2d.f90): model 9 evaluates its
+[`equation_terms_2d.f90`](../../src/physics/equation_terms_2d.f90): model 9 evaluates its
 Froude-dependent basal friction only when both speed and reduced gravity are
 positive. Neutral mixtures have no buoyancy load in this law; buoyant mixtures
 are outside its compressive basal-contact domain. Both retain the initialized
@@ -74,7 +74,7 @@ exact restart and exact one/four-thread agreement.
 The tested candidate is an uncommitted working-tree snapshot based on
 `5051d017ab5ecf9010e29ce80e12cdf70b294d39`, not an executable built from that
 commit alone. Its numerical sources differ from the previous `752b47fe`
-baseline only in `src/equation_terms_2d.f90`. The candidate file SHA-256 is
+baseline only in `src/physics/equation_terms_2d.f90`. The candidate file SHA-256 is
 `f5d4cd0512fe00db79c8774b785c493a474d951da4766a2627dfc9fcf1ff7625`.
 
 [`results_froude_fix_2026_10_09.json`](results_froude_fix_2026_10_09.json)

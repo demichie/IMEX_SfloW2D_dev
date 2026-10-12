@@ -25,6 +25,7 @@ for profile in strict optimized; do
     esac
     for source in $sources; do
         gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+            -I"$repo_dir/src/state" \
             $netcdf_fflags -c "$repo_dir/src/$source"
     done
     gfortran -O0 -g -fcheck=all -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \

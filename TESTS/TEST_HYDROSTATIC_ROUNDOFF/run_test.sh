@@ -32,8 +32,10 @@ build_observer() {
     objects=''
     for source in $sources; do
         gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+            -I"$source_dir/state" \
             $netcdf_fflags -c "$source_dir/$source"
-        objects="$objects ${source%.f90}.o"
+        object=${source##*/}
+        objects="$objects ${object%.f90}.o"
     done
     # Use the same current observer for both production revisions.
     gfortran -O0 -g -fcheck=all -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
@@ -51,8 +53,9 @@ for profile in strict optimized; do
     build_observer "$repo_dir/src" "$build_dir/$profile/candidate"
     shared_objects=''
     for source in $sources; do
-        if [ "$source" != hyperbolic_2d.f90 ]; then
-            shared_objects="$shared_objects $build_dir/$profile/candidate/${source%.f90}.o"
+        object=${source##*/}
+        if [ "$object" != hyperbolic_2d.f90 ]; then
+            shared_objects="$shared_objects $build_dir/$profile/candidate/${object%.f90}.o"
         fi
     done
     cd "$build_dir/$profile/baseline"

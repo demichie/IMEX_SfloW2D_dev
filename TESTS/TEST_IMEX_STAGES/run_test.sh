@@ -26,8 +26,10 @@ for profile in strict optimized; do
     objects=''
     for source in $sources; do
         gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+            -I"$repo_dir/src/state" \
             $netcdf_fflags -c "$repo_dir/src/$source"
-        objects="$objects ${source%.f90}.o"
+        object=${source##*/}
+        objects="$objects ${object%.f90}.o"
     done
     gfortran -O0 -g -fcheck=all -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
         $netcdf_fflags -c "$test_dir/test_imex_stages.f90"

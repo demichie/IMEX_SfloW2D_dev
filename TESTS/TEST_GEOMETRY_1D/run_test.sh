@@ -16,7 +16,7 @@ for profile in strict optimized; do
         optimized) flags='-Ofast -funroll-all-loops' ;;
     esac
     gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow -c \
-        "$repo_dir/src/parameters_2d.f90" "$repo_dir/src/geometry_2d.f90" \
+        "$repo_dir/src/core/parameters_2d.f90" "$repo_dir/src/geometry/geometry_2d.f90" \
         "$test_dir/test_geometry_1d.f90"
     gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
         parameters_2d.o geometry_2d.o test_geometry_1d.o -llapack -o test_geometry_1d

@@ -14,7 +14,7 @@ laws, reconstruction and the clean reference kernels are unchanged.
 The [machine-readable evidence](results_hydrostatic_roundoff_2026_10_10.json)
 pins the source and numerical fixtures, contracts, focused results and full
 audit. The base revision is `e4333a5cf0575d23287a32a082fe18fbd939bcbe`.
-Only `src/hyperbolic_2d.f90` changes in production.
+Only `src/spatial/hyperbolic_2d.f90` changes in production.
 
 ## Correction and exclusions
 

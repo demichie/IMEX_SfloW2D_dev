@@ -38,8 +38,9 @@ def main():
     root.mkdir()
     prior = json.loads(args.prior_evidence.read_text())
     assert prior['summary']['physical_continuations_passed'] == 8
-    source_hashes = {str(p.relative_to(repo)):n9.digest(p) for p in (repo/'src').glob('*')
+    source_hashes = {str(p.relative_to(repo)):n9.digest(p) for p in (repo/'src').rglob('*')
                      if p.suffix in ('.f90','.inc')}
+    source_hashes_by_basename = {Path(name).name: digest for name, digest in source_hashes.items()}
     evidence = {'schema_version':1, 'started_utc':datetime.now(timezone.utc).isoformat(),
         'source_base_revision':subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip(),
         'source_sha256':source_hashes, 'prior_evidence_sha256':n9.digest(args.prior_evidence),
@@ -47,8 +48,9 @@ def main():
         'scientific_baseline_approved':False, 'solver_tolerances_changed':False,
         'contract':'exact same-build full/restart CSVs and checkpoints; native fields and canonical records exact against pre-change physical baseline'}
     for name, value in prior['source_sha256'].items():
-        if name not in ('src/IMEX_SfloW2D.f90','src/inpout_2d.f90','src/runtime_2d.f90') and name in source_hashes:
-            assert source_hashes[name] == value, ('unexpected numerical source change',name)
+        basename = Path(name).name
+        if basename not in ('IMEX_SfloW2D.f90','inpout_2d.f90','runtime_2d.f90') and basename in source_hashes_by_basename:
+            assert source_hashes_by_basename[basename] == value, ('unexpected numerical source change',name)
     data = root/'ETNA-data'
     data.mkdir(); (data/'DEM').mkdir()
     for name in ('IMEX_SfloW2D.inp','create_input_ellipsoid.py','input_ellipsoid.py'):
