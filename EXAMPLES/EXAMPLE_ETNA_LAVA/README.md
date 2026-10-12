@@ -1,64 +1,58 @@
-# Etna lava example
+---
+title: "Etna Lava Flow with Two Bottom Fissures"
+summary: "One-hour lava-flow simulation on original Etna DEM with temperature-dependent rheology."
+category: "Volcanic flows"
+tags:
+  - "Etna"
+  - "lava"
+  - "fissures"
+  - "thermal rheology"
+---
 
-This one-hour lava simulation uses two bottom fissures and temperature-dependent
-rheology 3. It replaces `EXAMPLE_LAVA_IMO` as the lava case selected for N9,
-alongside the existing `EXAMPLE_ETNA` avalanche case. Scientific-baseline
-approval remains a separate N9 decision.
+# Etna Lava Flow with Two Bottom Fissures
 
-The supplied input is preserved byte for byte: 250 by 150 cells at 10 m,
-`T_END=3600 s`, outputs every 60 s, liquid density 2600 kg/m3 and fissure
-temperature 1538 K. Slope correction and curvature are OFF, as supplied.
-`CFL_POLICY` is omitted and therefore selects `directional_min`; `N_RK=2`.
-Parameter values and input/DEM checksums are recorded in [fixture.json](fixture.json).
+## Overview
 
-## Prepare the original DEM
+A one-hour lava-flow simulation using two bottom fissural sources and temperature-dependent rheology model 3. This example replaces the previous `EXAMPLE_LAVA_IMO` selection for the N9 lava validation case. Unlike the Etna avalanche example, it uses the original topography rather than excavating an initial volume.
 
-From the repository root:
+## Main parameters
+
+| Parameter | Value |
+| --- | --- |
+| Grid | 250 × 150 cells |
+| Cell size | 10 m |
+| Duration / output cadence | 3600 s / 60 s |
+| Liquid density | 2600 kg/m³ |
+| Fissure temperature | 1538 K |
+| Number of fissures | 2 |
+| Rheology | Model 3, temperature-dependent |
+| `N_RK` / CFL policy | 2 / `directional_min` (default) |
+| Slope correction / curvature | Disabled |
+
+## How to run
+
+From the repository root, run:
 
 ```sh
 cd EXAMPLES/EXAMPLE_ETNA_LAVA
 python3 prepare.py
-```
-
-The preparation script extracts `Etna2014_crop.asc` from the existing
-`../EXAMPLE_ETNA/DEM/Etna2014_crop.zip` into `./DEM/`. It verifies both archive
-and raster SHA-256 checksums and accepts an existing DEM only if identical.
-The source raster is 3000 by 2000 pixels at 1 m; the simulation grid lies
-inside its extent. Only the Python standard library is required.
-
-Do not run `create_input_ellipsoid.py` for this lava example. That avalanche
-preprocessing excavates a niche and generates a different bed and initial
-volume; this case starts from the original topography with fissural injection.
-The solver still performs its normal topography import onto the simulation grid.
-
-## Run the simulation
-
-After building the solver in this repository, from the example directory:
-
-```sh
 OMP_NUM_THREADS=4 OMP_DYNAMIC=FALSE ../../bin/IMEX_SfloW2D
 ```
 
-The input enables native NetCDF, ESRI thickness/temperature rasters and runout
-diagnostics. Open `exampleEtna_lava.nc` directly in ParaView. Conservative text
-output is disabled in the supplied input; the solver writes `restart.bin`.
-Generated DEM and run outputs are ignored by Git, but are not deleted.
+`prepare.py` extracts `Etna2014_crop.asc` from `../EXAMPLE_ETNA/DEM/Etna2014_crop.zip`, verifying both archive and raster SHA-256 checksums. Only the Python standard library is needed. For a separate clean run, call `python3 EXAMPLES/EXAMPLE_ETNA_LAVA/prepare.py --directory /absolute/path/to/new-run` from the repository root, then run the executable by absolute path from the prepared directory. **Do not run `create_input_ellipsoid.py` for this lava case**: it changes the initial topography and volume.
 
-For an isolated validation directory, without running inside the repository:
+## Expected output
 
-```sh
-python3 EXAMPLES/EXAMPLE_ETNA_LAVA/prepare.py --directory /absolute/path/to/new-run
-```
+The run creates `exampleEtna_lava.nc`, ESRI rasters of thickness/temperature, runout diagnostics and `restart.bin`. Conservative text output is disabled in the supplied input. Open the NetCDF file in ParaView; generated DEM and output files are ignored by Git but not deleted.
 
-This copies the unchanged input and original DEM into the selected directory.
-Existing differing input/DEM files are never overwritten. Run the compiled
-executable there by its absolute path.
+## Validation evidence and limits
 
-## Validation evidence
+The original README points to [the ETNA_LAVA validation report](../../docs/acceptance/ETNA_LAVA_EXAMPLE_2026_10_11.md) and to [`fixture.json`](fixture.json), which retains input/DEM checksums and relevant parameter values. The 3600 s runs were checked under strict/optimized profiles and actual one/four-thread teams, with bitwise-equal decoded fields/checkpoints within each profile. The lava front reaches the domain boundary, so a full mass budget must include boundary fluxes; the retained N9 closed-domain mass check ends at the last output before contact. Scientific N9 approval is documented separately from successful execution of this example.
 
-The [validation report](../../docs/acceptance/ETNA_LAVA_EXAMPLE_2026_10_11.md)
-records full 3600 s runs in strict/optimized builds with actual one/four-thread
-teams and bitwise-equal decoded fields/checkpoints within each profile.
-The flow reaches the domain boundary: the N9 mass budget must include numerical
-boundary fluxes rather than treating the domain as closed. N9 approval remains
-separate from successful example execution.
+## Documentation verification note
+
+**N9 scientific signoff.** The older README was authored before N9 signoff. The independent N9 v5 acceptance documentation now records approval of its pinned scope. The included validation notes are retained and must not be interpreted as approval of changed input data.
+
+## Additional original README details
+
+The DEM source raster is **3000 × 2000 pixels at 1 m** and the computational grid lies within its extent. The preparation script verifies SHA-256 checksums, and accepts an existing DEM only if identical; it does not overwrite differing existing inputs/DEMs. The solver imports the original terrain to the computational grid. Files generated during the example run are ignored by Git but not deleted. The documented N9 mass check uses saved output only up to 3180 s, the last snapshot before domain-boundary contact; the complete field and restart tests continue to 3600 s.

@@ -1,0 +1,105 @@
+{
+  "revision": "2bb0efff87ee8f8fb93815fc7e050011c3949acf",
+  "examples": [
+    {
+      "example": "EXAMPLE_2D",
+      "changed": true,
+      "note": "The tracked Python generator is `create_example.py`; the legacy mention of `create_example4.py` is a stale filename."
+    },
+    {
+      "example": "EXAMPLE_2D_PP",
+      "changed": true,
+      "note": "First-pass content retained; original README.txt retained unchanged."
+    },
+    {
+      "example": "EXAMPLE_BOX",
+      "changed": true,
+      "note": "First-pass content retained; original README.txt retained unchanged."
+    },
+    {
+      "example": "EXAMPLE_BUMP/SUBCRITICAL",
+      "changed": true,
+      "note": "First-pass content retained; original README.txt retained unchanged."
+    },
+    {
+      "example": "EXAMPLE_BUMP/SUPERCRITICAL",
+      "changed": true,
+      "note": "First-pass content retained; original README.txt retained unchanged."
+    },
+    {
+      "example": "EXAMPLE_BUMP/TRANSCRITICAL_WITHOUT_SHOCK",
+      "changed": true,
+      "note": "First-pass content retained; original README.txt retained unchanged."
+    },
+    {
+      "example": "EXAMPLE_BUMP/TRANSCRITICAL_WITH_SHOCK",
+      "changed": true,
+      "note": "First-pass content retained; original README.txt retained unchanged."
+    },
+    {
+      "example": "EXAMPLE_BW",
+      "changed": true,
+      "note": "First-pass content retained; original README.txt retained unchanged."
+    },
+    {
+      "example": "EXAMPLE_BW2D",
+      "changed": true,
+      "note": "The documented invocation supplies **eight** arguments. The explicit `TIME_PARAM = 600, 100, 50, 50` describes a 600 s period with a 100 s pulse and 50 s ramps; the contradictory 30/20 s prose is retained as a historical inconsistency, not as a second active configuration."
+    },
+    {
+      "example": "EXAMPLE_CF",
+      "changed": true,
+      "note": "The tracked input enables NetCDF but sets `OUTPUT_ESRI_FLAG=F`; ESRI rasters are not enabled in the committed input even though the old README describes them."
+    },
+    {
+      "example": "EXAMPLE_DAMBREAK",
+      "changed": true,
+      "note": "The existing setup program is `create_dambreak.py` (the names `create_dambreak_static.py` and `create_example_Roche_static.py` are historical references in the source/README). The supplied CLI has 10 positional arguments. Any alternative names in embedded docstrings are not working paths."
+    },
+    {
+      "example": "EXAMPLE_ENGWELL2016",
+      "changed": true,
+      "note": "The last generator argument is named `xs_init` in the script and is therefore documented here as a source solid **mass fraction**, rather than an unspecified volume fraction. The README originally uses both terms; the definition must be checked against the source-to-conservative-variable conversion before claiming the formula."
+    },
+    {
+      "example": "EXAMPLE_ENSEMBLE_ETNA",
+      "changed": true,
+      "note": "The placeholder prefix used by `create_inputfiles.py` is `ENSEMBLE_` (not the typo `ENSAMBLE_`). The generation sequence retains symbolic links, template copies, per-member `run.sh`, raster aggregation and probability plotting."
+    },
+    {
+      "example": "EXAMPLE_ETNA",
+      "changed": true,
+      "note": "The tracked cleanup utility is `cleanFolder.sh` (case sensitive); the old `cleanfolder.sh` spelling is not the tracked filename."
+    },
+    {
+      "example": "EXAMPLE_ETNA_LAVA",
+      "changed": true,
+      "note": "The older README was authored before N9 signoff. The independent N9 v5 acceptance documentation now records approval of its pinned scope. The included validation notes are retained and must not be interpreted as approval of changed input data."
+    },
+    {
+      "example": "EXAMPLE_INCLINED_EXCAVATION_2D",
+      "changed": true,
+      "note": "First-pass content retained; original README.txt retained unchanged."
+    },
+    {
+      "example": "EXAMPLE_LATERAL_SOURCE",
+      "changed": true,
+      "note": "The third `create_example.py` argument is the **source mass-flow rate**, not initial thickness. The legacy README lists incompatible descriptions and units. Use the source mass-flow-rate designation; the precise SI unit and how the generator converts it to inflow state should be confirmed against the full script."
+    },
+    {
+      "example": "EXAMPLE_SLOPE",
+      "changed": true,
+      "note": "First-pass content retained; original README.txt retained unchanged."
+    },
+    {
+      "example": "EXAMPLE_TAAL",
+      "changed": true,
+      "note": "The tracked input enables NetCDF but sets `OUTPUT_ESRI_FLAG=F`; therefore ESRI raster outputs should not be promised as enabled by default."
+    },
+    {
+      "example": "EXAMPLE_TAAL_BOTTOM",
+      "changed": true,
+      "note": "The tracked input enables NetCDF and runout output, with `OUTPUT_ESRI_FLAG=F`; generated ESRI files should not be promised as default outputs."
+    }
+  ]
+}
