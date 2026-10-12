@@ -1,0 +1,55 @@
+site_name: IMEX_SfloW2D
+site_description: Scientific documentation and reproducible examples for IMEX_SfloW2D
+site_url: https://demichie.github.io/IMEX_SfloW2D_dev/
+repo_url: https://github.com/demichie/IMEX_SfloW2D_dev
+repo_name: demichie/IMEX_SfloW2D_dev
+edit_uri: edit/master/docs/website/
+
+theme:
+  name: material
+  language: en
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - content.code.copy
+    - search.highlight
+    - search.suggest
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+
+nav:
+# GENERATED_NAVIGATION
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+extra:
+  generator: false

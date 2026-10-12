@@ -1,0 +1,116 @@
+name: Publish documentation (MkDocs + Doxygen)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - '*'
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: documentation-pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out selected documentation revision
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'release' && github.event.release.tag_name || github.ref }}
+          persist-credentials: false
+
+      - name: Record source revision
+        id: revision
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Install documentation dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install MkDocs
+        run: python -m pip install -r requirements-docs.txt
+
+      - name: Generate Examples catalogue and MkDocs configuration
+        run: |
+          python tools/docs/build_examples.py --repo . --output build/docs-generated \
+            --revision '${{ steps.revision.outputs.sha }}'
+          cat build/docs-generated/example-audit.txt
+
+      - name: Build MkDocs HTML
+        run: mkdocs build --strict -f build/docs-generated/mkdocs.generated.yml -d "${{ github.workspace }}/build/site"
+
+      - name: Generate Doxygen HTML under /doxygen/
+        shell: bash
+        run: |
+          mkdir -p build/site/doxygen
+          {
+            cat template.doxy
+            echo 'OUTPUT_DIRECTORY = build/site'
+            echo 'HTML_OUTPUT = doxygen'
+            echo 'GENERATE_HTML = YES'
+            echo 'GENERATE_LATEX = NO'
+            echo 'INPUT = ./src'
+            echo 'RECURSIVE = YES'
+            echo 'PROJECT_BRIEF = Fortran source documentation'
+          } > build/doxygen-pages.conf
+          doxygen build/doxygen-pages.conf > build/doxygen.log 2>&1 || {
+            tail -n 100 build/doxygen.log
+            exit 1
+          }
+          test -s build/site/doxygen/index.html
+          tail -n 20 build/doxygen.log
+
+      - name: Match Doxygen colours to MkDocs
+        run: |
+          python tools/docs/style_doxygen.py build/site/doxygen
+
+      - name: Verify site links and output
+        run: |
+          test -s build/site/index.html
+          test -s build/site/examples/index.html
+          test -s build/site/doxygen/index.html
+          echo 'Documentation generation successful'
+
+      - name: Upload documentation diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: documentation-build-logs
+          path: |
+            build/docs-generated/example-audit.txt
+            build/doxygen.log
+          if-no-files-found: ignore
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: build/site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy complete website
+        id: deployment
+        uses: actions/deploy-pages@v4

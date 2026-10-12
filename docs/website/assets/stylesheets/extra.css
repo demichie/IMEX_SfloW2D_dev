@@ -1,0 +1,15 @@
+:root {
+  --md-primary-fg-color: #153B5B;
+  --md-primary-fg-color--light: #247D98;
+  --md-primary-fg-color--dark: #102D45;
+  --md-accent-fg-color: #247D98;
+}
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #153B5B;
+  --md-primary-fg-color--light: #247D98;
+  --md-accent-fg-color: #58B9CB;
+  --md-default-bg-color: #111D29;
+}
+.md-typeset a:not(.md-button) { text-decoration-thickness: 1px; }
+.md-typeset .md-button--primary { background: #247D98; border-color: #247D98; }
+.md-typeset .md-button--primary:hover { background: #153B5B; border-color: #153B5B; }
