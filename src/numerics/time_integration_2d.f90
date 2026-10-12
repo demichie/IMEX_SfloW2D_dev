@@ -152,24 +152,47 @@ CONTAINS
        this%omega(2) = 1.0_wp / 3.0_wp
        this%omega(3) = 1.0_wp / 3.0_wp
 
+
     ELSEIF ( n_RK .EQ. 4 ) THEN
 
-       ! LRR(3,2,2) from Table 3 in Pareschi & Russo (2000)
-       this%a_tilde_ij(2,1) = 0.5_wp
-       this%a_tilde_ij(3,1) = 1.0_wp / 3.0_wp
-       this%a_tilde_ij(4,2) = 1.0_wp
+       ! IMEX-SSP3(4,3,3), Pareschi & Russo (2005)
+       ! Third-order, four-stage IMEX scheme.
+       ! Explicit SSP(3,3) and L-stable implicit part.
+
+       gamma = 0.24169426078821_wp
+       delta = 0.06042356519705_wp
+       ! eta is stored locally through the expression below.
+
+       ! Explicit tableau
+       this%a_tilde_ij(3,2) = 1.0_wp
+       this%a_tilde_ij(4,2) = 0.25_wp
+       this%a_tilde_ij(4,3) = 0.25_wp
+
        this%omega_tilde(1) = 0.0_wp
-       this%omega_tilde(2) = 1.0_wp
-       this%omega_tilde(3) = 0.0_wp
-       this%omega_tilde(4) = 0.0_wp
-       this%a_dirk_ij(2,2) = 0.5_wp
-       this%a_dirk_ij(3,3) = 1.0_wp / 3.0_wp
-       this%a_dirk_ij(4,3) = 0.75_wp
-       this%a_dirk_ij(4,4) = 0.25_wp
+       this%omega_tilde(2) = 1.0_wp / 6.0_wp
+       this%omega_tilde(3) = 1.0_wp / 6.0_wp
+       this%omega_tilde(4) = 2.0_wp / 3.0_wp
+
+       ! Implicit tableau
+       this%a_dirk_ij(1,1) = gamma
+
+       this%a_dirk_ij(2,1) = -gamma
+       this%a_dirk_ij(2,2) = gamma
+
+       this%a_dirk_ij(3,2) = 1.0_wp - gamma
+       this%a_dirk_ij(3,3) = gamma
+
+       this%a_dirk_ij(4,1) = delta
+       this%a_dirk_ij(4,2) = 0.12915286960590_wp
+       this%a_dirk_ij(4,3) = 0.5_wp - delta  &
+            - 0.12915286960590_wp - gamma
+       this%a_dirk_ij(4,4) = gamma
+
        this%omega(1) = 0.0_wp
-       this%omega(2) = 0.0_wp
-       this%omega(3) = 0.75_wp
-       this%omega(4) = 0.25_wp
+       this%omega(2) = 1.0_wp / 6.0_wp
+       this%omega(3) = 1.0_wp / 6.0_wp
+       this%omega(4) = 2.0_wp / 3.0_wp
+
 
     END IF
 
