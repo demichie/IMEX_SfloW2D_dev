@@ -423,7 +423,7 @@ CONTAINS
          n_fissures, linear_vel_fissures, T_fissures, time_param_fissures,      &
          xs_fissures, xg_fissures, xl_fissures
 
-    USE geometry_2d, ONLY : pi_g
+    USE geometry_2d, ONLY : pi_g , bottom_source_area_ratio
 
 
     IMPLICIT NONE
@@ -547,7 +547,7 @@ CONTAINS
 
        END IF
 
-       h_dot = cell_fract_jk * vel_local
+       h_dot = cell_fract_jk * vel_local * bottom_source_area_ratio
 
     ELSE
 
@@ -591,7 +591,7 @@ CONTAINS
 
        IF ( bottom_coeff_step .GE. 0.0_wp ) t_coeff = bottom_coeff_step
 
-       h_dot = cell_fract_jk * vel_source
+       h_dot = cell_fract_jk * vel_source * bottom_source_area_ratio
 
     END IF
 

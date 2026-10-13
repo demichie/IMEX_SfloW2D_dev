@@ -118,6 +118,10 @@ MODULE geometry_2d
 
   REAL(wp), ALLOCATABLE :: cell_source_fractions(:,:)
 
+  ! Exact area of the bottom radial source over its sampled cell coverage;
+  ! the injection is scaled by it so that VEL_SOURCE acts on the exact area.
+  REAL(wp) :: bottom_source_area_ratio = 1.0_wp
+
    ! Cell-coverage fractions kept separate for each fissure.
    REAL(wp), ALLOCATABLE :: cell_fissure_fractions(:,:,:)
 
@@ -353,6 +357,12 @@ CONTAINS
 
        CALL compute_cell_fract(x_source,y_source,r_source,r2_source,            &
             angle_source,cell_source_fractions)
+
+       ! The sub-cell sampling misses the ellipse area by up to a few parts in
+       ! 1e5. Inject over the exact area pi*R_SOURCE*R2_SOURCE instead.
+       IF ( SUM( cell_source_fractions ) .GT. 0.0_wp )                       &
+            bottom_source_area_ratio = pi_g * r_source * r2_source /           &
+            ( dx * dy * SUM( cell_source_fractions ) )
 
     END IF
 
