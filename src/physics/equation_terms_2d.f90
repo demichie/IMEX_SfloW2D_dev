@@ -410,7 +410,8 @@ CONTAINS
          pore_pressure_flag , pore_pres_fract ,                                &
          n_intervals , t_intervals , vel_intervals ,                            &
          radial_source_flag , h_source, bottom_fissural_source_flag,            &
-         n_fissures, linear_vel_fissures, T_fissures, time_param_fissures
+         n_fissures, linear_vel_fissures, T_fissures, time_param_fissures,      &
+         xs_fissures, xg_fissures, xl_fissures
 
     USE geometry_2d, ONLY : pi_g
 
@@ -641,8 +642,8 @@ CONTAINS
 
     END IF   ! bottom_radial_source_flag
 
-    ! Each fissure uses its own clipped cell coverage, pulse and temperature.
-    ! The composition is shared with the other source types.
+    ! Each fissure uses its own clipped cell coverage, pulse and temperature,
+    ! and the source composition converted at that temperature.
     IF ( bottom_fissural_source_flag ) THEN
 
        DO i_fissure = 1, n_fissures
@@ -676,9 +677,12 @@ CONTAINS
           qp_source = 0.0_wp
           qp_source(1) = 1.0_wp
           qp_source(4) = T_fissures(i_fissure)
-          qp_source(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)
-          qp_source(idx_add_gas_first:idx_add_gas_last) = xg_source(1:n_add_gas)
-          IF (gas_flag .AND. liquid_flag) qp_source(n_vars) = xl_source
+          qp_source(idx_solid_first:idx_solid_last) =                          &
+               xs_fissures(1:n_solid,i_fissure)
+          qp_source(idx_add_gas_first:idx_add_gas_last) =                      &
+               xg_fissures(1:n_add_gas,i_fissure)
+          IF (gas_flag .AND. liquid_flag) qp_source(n_vars) =                  &
+               xl_fissures(i_fissure)
           IF (stoch_transport_flag) qp_source(idx_stoch) = 0.0_wp
           IF (pore_pressure_flag) qp_source(idx_poreEqn) = 0.0_wp
           qp_source(idx_u) = 0.0_wp
@@ -692,14 +696,14 @@ CONTAINS
                * r_sp_heat_mix * T_fissures(i_fissure)
           expl_term(idx_solidEqn_first:idx_solidEqn_last) =                   &
                expl_term(idx_solidEqn_first:idx_solidEqn_last) +              &
-               t_coeff * h_dot * r_rho_m * xs_source(1:n_solid)
+               t_coeff * h_dot * r_rho_m * xs_fissures(1:n_solid,i_fissure)
           expl_term(idx_addGasEqn_first:idx_addGasEqn_last) =                  &
                expl_term(idx_addGasEqn_first:idx_addGasEqn_last) +             &
-               t_coeff * h_dot * r_rho_m * xg_source(1:n_add_gas)
+               t_coeff * h_dot * r_rho_m * xg_fissures(1:n_add_gas,i_fissure)
 
           IF (gas_flag .AND. liquid_flag) THEN
              expl_term(n_vars) = expl_term(n_vars) + t_coeff * h_dot         &
-                  * r_rho_m * xl_source
+                  * r_rho_m * xl_fissures(i_fissure)
           END IF
 
           IF (pore_pressure_flag) THEN

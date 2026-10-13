@@ -227,6 +227,12 @@ MODULE parameters_2d
   REAL(wp) :: linear_vel_fissures(100)
   REAL(wp) :: T_fissures(100)
   REAL(wp) :: time_param_fissures(4,100)
+  ! Composition of each fissure as mass fractions. A composition given as
+  ! volume fractions is converted at each fissure's own temperature, so all
+  ! fissures carry the same volume fractions.
+  REAL(wp), ALLOCATABLE :: xs_fissures(:,:)
+  REAL(wp), ALLOCATABLE :: xg_fissures(:,:)
+  REAL(wp), ALLOCATABLE :: xl_fissures(:)
   
   !> Initial temperature of the pile of material
   REAL(wp) :: T_init
