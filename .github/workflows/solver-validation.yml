@@ -58,3 +58,9 @@ jobs:
         env:
           IMEX_AUDIT_FORCE_THREADS: ${{ matrix.threads }}
         run: TESTS/TEST_PCCU_GATE_H/run_test.sh src/IMEX_SfloW2D
+
+      - name: Verify source mass injection
+        env:
+          OMP_NUM_THREADS: ${{ matrix.threads }}
+          OMP_DYNAMIC: "FALSE"
+        run: TESTS/TEST_SOURCE_MASS/run_test.sh src/IMEX_SfloW2D

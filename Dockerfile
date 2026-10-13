@@ -31,6 +31,6 @@ ENV OMP_NUM_THREADS=1 \
     IMEX_AUDIT_FORCE_THREADS=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# The same four test stages executed by the existing solver CI job.
+# The same five test stages executed by the existing solver CI job.
 # Override this CMD to use the compiled executable in a mounted case directory.
-CMD ["/bin/sh", "-ec", "make check; TESTS/TEST_BINARY_RESTART/run_test.sh src/IMEX_SfloW2D; TESTS/TEST_STOCHASTIC_RESTART/run_test.sh src/IMEX_SfloW2D; TESTS/TEST_PCCU_GATE_H/run_test.sh src/IMEX_SfloW2D"]
+CMD ["/bin/sh", "-ec", "make check; TESTS/TEST_BINARY_RESTART/run_test.sh src/IMEX_SfloW2D; TESTS/TEST_STOCHASTIC_RESTART/run_test.sh src/IMEX_SfloW2D; TESTS/TEST_PCCU_GATE_H/run_test.sh src/IMEX_SfloW2D; TESTS/TEST_SOURCE_MASS/run_test.sh src/IMEX_SfloW2D"]

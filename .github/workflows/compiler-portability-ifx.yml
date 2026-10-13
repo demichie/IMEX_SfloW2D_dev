@@ -148,6 +148,9 @@ jobs:
       - name: HP-PCCU Gate-H validation
         run: TESTS/TEST_PCCU_GATE_H/run_test.sh src/IMEX_SfloW2D
 
+      - name: Source mass injection
+        run: TESTS/TEST_SOURCE_MASS/run_test.sh src/IMEX_SfloW2D
+
       - name: Collect diagnostic logs if a step fails
         if: failure()
         shell: bash
