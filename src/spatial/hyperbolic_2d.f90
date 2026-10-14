@@ -319,6 +319,73 @@ CONTAINS
   SUBROUTINE eval_flux_PCCU( this, recon, solve_interfaces_x, j_stag_x,       &
        k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
+    USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
+
+    IMPLICIT NONE
+
+    CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
+    CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
+    INTEGER, INTENT(IN) :: solve_interfaces_x, solve_interfaces_y
+    INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
+    INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
+
+    REAL(wp) :: a_minus, a_plus
+    INTEGER :: j, k, l
+
+    IF ( comp_cells_x .GT. 1 ) THEN
+
+       !$OMP PARALLEL DO private(l,j,k,a_minus,a_plus)
+       DO l = 1, solve_interfaces_x
+
+          j = j_stag_x(l)
+          k = k_stag_x(l)
+
+          a_minus = this%a_interface_xNeg(j,k)
+          a_plus = this%a_interface_xPos(j,k)
+          CALL eval_pccu_interface( recon%q_interfaceL(:,j,k),               &
+               recon%qp_interfaceL(:,j,k), recon%eta_interfaceL(j,k),        &
+               recon%q_interfaceR(:,j,k), recon%qp_interfaceR(:,j,k),        &
+               recon%eta_interfaceR(j,k), grav_coeff_stag_x(j,k),            &
+               a_minus, a_plus, PATH_DIR_X, 2,                               &
+               this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k) )
+
+       END DO
+       !$OMP END PARALLEL DO
+
+    END IF
+
+    IF ( comp_cells_y .GT. 1 ) THEN
+
+       !$OMP PARALLEL DO private(l,j,k,a_minus,a_plus)
+       DO l = 1, solve_interfaces_y
+
+          j = j_stag_y(l)
+          k = k_stag_y(l)
+
+          a_minus = this%a_interface_yNeg(j,k)
+          a_plus = this%a_interface_yPos(j,k)
+          CALL eval_pccu_interface( recon%q_interfaceB(:,j,k),               &
+               recon%qp_interfaceB(:,j,k), recon%eta_interfaceB(j,k),        &
+               recon%q_interfaceT(:,j,k), recon%qp_interfaceT(:,j,k),        &
+               recon%eta_interfaceT(j,k), grav_coeff_stag_y(j,k),            &
+               a_minus, a_plus, PATH_DIR_Y, 3,                               &
+               this%G_interface_yB(:,j,k), this%G_interface_yT(:,j,k) )
+
+       END DO
+       !$OMP END PARALLEL DO
+
+    END IF
+
+  END SUBROUTINE eval_flux_PCCU
+
+  !> \brief Evaluate both oriented PCCU values for one interface.
+  !>
+  !> The operation order is shared by x and y faces; the caller supplies their
+  !> orientation, normal momentum slot, endpoint traces and output arrays.
+  SUBROUTINE eval_pccu_interface(q_left,qp_left,eta_left,q_right,qp_right,   &
+       eta_right,grav_coeff,a_minus,a_plus,direction,normal_momentum_index,  &
+       value_left,value_right)
+
     USE equation_terms_2d, ONLY : eval_inertial_flux
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
     USE equation_terms_2d, ONLY : limit_component_mass_flux
@@ -329,126 +396,42 @@ CONTAINS
 
     IMPLICIT NONE
 
-    CLASS(hyperbolic_workspace_type), INTENT(INOUT) :: this
-    CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
-    INTEGER, INTENT(IN) :: solve_interfaces_x, solve_interfaces_y
-    INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
-    INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
+    REAL(wp), INTENT(IN) :: q_left(:), qp_left(:), eta_left
+    REAL(wp), INTENT(IN) :: q_right(:), qp_right(:), eta_right
+    REAL(wp), INTENT(IN) :: grav_coeff, a_minus, a_plus
+    INTEGER, INTENT(IN) :: direction, normal_momentum_index
+    REAL(wp), INTENT(OUT) :: value_left(:), value_right(:)
 
     REAL(wp) :: flux_left(n_eqns), flux_right(n_eqns)
     REAL(wp) :: path_contribution(n_eqns), interface_flux(n_eqns)
     REAL(wp) :: gamma_left, gamma_right
     REAL(wp) :: reduced_gravity_left, reduced_gravity_right
-    REAL(wp) :: a_minus, a_plus
-    INTEGER :: j, k, l
 
-    IF ( comp_cells_x .GT. 1 ) THEN
+    CALL eval_inertial_flux(q_left,qp_left,direction,flux_left)
+    CALL eval_inertial_flux(q_right,qp_right,direction,flux_right)
 
-       !$OMP PARALLEL DO private(l,j,k,flux_left,flux_right,path_contribution,&
-       !$OMP & interface_flux,                                               &
-       !$OMP & gamma_left,gamma_right,reduced_gravity_left,                   &
-       !$OMP & reduced_gravity_right,a_minus,a_plus)
-       DO l = 1, solve_interfaces_x
+    CALL eval_central_upwind_flux(a_minus,a_plus,flux_left,flux_right,       &
+         q_left,q_right,interface_flux)
 
-          j = j_stag_x(l)
-          k = k_stag_x(l)
+    CALL limit_component_mass_flux(interface_flux)
 
-          CALL eval_inertial_flux( recon%q_interfaceL(:,j,k),                &
-               recon%qp_interfaceL(:,j,k), PATH_DIR_X, flux_left )
-          CALL eval_inertial_flux( recon%q_interfaceR(:,j,k),                &
-               recon%qp_interfaceR(:,j,k), PATH_DIR_X, flux_right )
-
-          a_minus = this%a_interface_xNeg(j,k)
-          a_plus = this%a_interface_xPos(j,k)
-          CALL eval_central_upwind_flux( a_minus, a_plus, flux_left,         &
-               flux_right, recon%q_interfaceL(:,j,k),                        &
-               recon%q_interfaceR(:,j,k), interface_flux )
-
-          CALL limit_component_mass_flux(interface_flux)
-
-          ! Match the frozen baseline: a face at exact rest transports neither
-          ! total mass nor thermal/composition scalars.
-          IF ( ( recon%qp_interfaceL(2,j,k) .EQ. 0.0_wp ) .AND.             &
-               ( recon%qp_interfaceR(2,j,k) .EQ. 0.0_wp ) ) THEN
-             interface_flux(1) = 0.0_wp
-             interface_flux(4:n_vars) = 0.0_wp
-          END IF
-
-          CALL eval_hydrostatic_coefficient( recon%qp_interfaceL(:,j,k),     &
-               reduced_gravity_left, gamma_left )
-          CALL eval_hydrostatic_coefficient( recon%qp_interfaceR(:,j,k),     &
-               reduced_gravity_right, gamma_right )
-          CALL regularize_dry_gamma_pair( recon%qp_interfaceL(1,j,k), gamma_left, &
-               recon%qp_interfaceR(1,j,k), gamma_right )
-          CALL eval_hydrostatic_path( PATH_DIR_X,                            &
-               recon%qp_interfaceL(1,j,k), gamma_left,                       &
-               recon%eta_interfaceL(j,k), grav_coeff_stag_x(j,k),            &
-               recon%qp_interfaceR(1,j,k), gamma_right,                      &
-               recon%eta_interfaceR(j,k), grav_coeff_stag_x(j,k),            &
-               path_contribution )
-
-          CALL eval_oriented_pccu_pair( interface_flux,                       &
-               path_contribution, a_minus, a_plus,                           &
-               this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k) )
-
-       END DO
-       !$OMP END PARALLEL DO
-
+    IF ( ( qp_left(normal_momentum_index) .EQ. 0.0_wp ) .AND.               &
+         ( qp_right(normal_momentum_index) .EQ. 0.0_wp ) ) THEN
+       interface_flux(1) = 0.0_wp
+       interface_flux(4:n_vars) = 0.0_wp
     END IF
 
-    IF ( comp_cells_y .GT. 1 ) THEN
+    CALL eval_hydrostatic_coefficient(qp_left,reduced_gravity_left,gamma_left)
+    CALL eval_hydrostatic_coefficient(qp_right,reduced_gravity_right,gamma_right)
+    CALL regularize_dry_gamma_pair(qp_left(1),gamma_left,qp_right(1),gamma_right)
+    CALL eval_hydrostatic_path(direction,qp_left(1),gamma_left,eta_left,     &
+         grav_coeff,qp_right(1),gamma_right,eta_right,grav_coeff,            &
+         path_contribution)
 
-       !$OMP PARALLEL DO private(l,j,k,flux_left,flux_right,path_contribution,&
-       !$OMP & interface_flux,                                               &
-       !$OMP & gamma_left,gamma_right,reduced_gravity_left,                   &
-       !$OMP & reduced_gravity_right,a_minus,a_plus)
-       DO l = 1, solve_interfaces_y
+    CALL eval_oriented_pccu_pair(interface_flux,path_contribution,a_minus,   &
+         a_plus,value_left,value_right)
 
-          j = j_stag_y(l)
-          k = k_stag_y(l)
-
-          CALL eval_inertial_flux( recon%q_interfaceB(:,j,k),                &
-               recon%qp_interfaceB(:,j,k), PATH_DIR_Y, flux_left )
-          CALL eval_inertial_flux( recon%q_interfaceT(:,j,k),                &
-               recon%qp_interfaceT(:,j,k), PATH_DIR_Y, flux_right )
-
-          a_minus = this%a_interface_yNeg(j,k)
-          a_plus = this%a_interface_yPos(j,k)
-          CALL eval_central_upwind_flux( a_minus, a_plus, flux_left,         &
-               flux_right, recon%q_interfaceB(:,j,k),                        &
-               recon%q_interfaceT(:,j,k), interface_flux )
-
-          CALL limit_component_mass_flux(interface_flux)
-
-          IF ( ( recon%qp_interfaceB(3,j,k) .EQ. 0.0_wp ) .AND.             &
-               ( recon%qp_interfaceT(3,j,k) .EQ. 0.0_wp ) ) THEN
-             interface_flux(1) = 0.0_wp
-             interface_flux(4:n_vars) = 0.0_wp
-          END IF
-
-          CALL eval_hydrostatic_coefficient( recon%qp_interfaceB(:,j,k),     &
-               reduced_gravity_left, gamma_left )
-          CALL eval_hydrostatic_coefficient( recon%qp_interfaceT(:,j,k),     &
-               reduced_gravity_right, gamma_right )
-          CALL regularize_dry_gamma_pair( recon%qp_interfaceB(1,j,k), gamma_left, &
-               recon%qp_interfaceT(1,j,k), gamma_right )
-          CALL eval_hydrostatic_path( PATH_DIR_Y,                            &
-               recon%qp_interfaceB(1,j,k), gamma_left,                       &
-               recon%eta_interfaceB(j,k), grav_coeff_stag_y(j,k),            &
-               recon%qp_interfaceT(1,j,k), gamma_right,                      &
-               recon%eta_interfaceT(j,k), grav_coeff_stag_y(j,k),            &
-               path_contribution )
-
-          CALL eval_oriented_pccu_pair( interface_flux,                       &
-               path_contribution, a_minus, a_plus,                           &
-               this%G_interface_yB(:,j,k), this%G_interface_yT(:,j,k) )
-
-       END DO
-       !$OMP END PARALLEL DO
-
-    END IF
-
-  END SUBROUTINE eval_flux_PCCU
+  END SUBROUTINE eval_pccu_interface
 
   !******************************************************************************
   !> \brief Integrate the hydrostatic path between the final traces of each active cell.
