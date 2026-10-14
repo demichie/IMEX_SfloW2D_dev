@@ -389,7 +389,6 @@ CONTAINS
     USE equation_terms_2d, ONLY : eval_inertial_flux
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
     USE equation_terms_2d, ONLY : limit_component_mass_flux
-    USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
     USE pccu_2d, ONLY : eval_hydrostatic_path
     USE pccu_2d, ONLY : eval_central_upwind_flux
     USE pccu_2d, ONLY : eval_oriented_pccu_pair
@@ -446,9 +445,7 @@ CONTAINS
   SUBROUTINE eval_cell_hydrostatic_paths( this, recon, solve_cells, j_cent,   &
        k_cent )
 
-    USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
     USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
-    USE pccu_2d, ONLY : eval_hydrostatic_path
 
     IMPLICIT NONE
 
@@ -457,51 +454,64 @@ CONTAINS
     INTEGER, INTENT(IN) :: solve_cells
     INTEGER, INTENT(IN) :: j_cent(:), k_cent(:)
 
-    REAL(wp) :: gamma_minus, gamma_plus
-    REAL(wp) :: reduced_gravity_minus, reduced_gravity_plus
     INTEGER :: j, k, l
 
-    !$OMP PARALLEL DO private(l,j,k,gamma_minus,gamma_plus,                   &
-    !$OMP & reduced_gravity_minus,reduced_gravity_plus)
+    !$OMP PARALLEL DO private(l,j,k)
     DO l = 1, solve_cells
 
        j = j_cent(l)
        k = k_cent(l)
 
        IF ( comp_cells_x .GT. 1 ) THEN
-          CALL eval_hydrostatic_coefficient( recon%qp_interfaceR(:,j,k),     &
-               reduced_gravity_minus, gamma_minus )
-          CALL eval_hydrostatic_coefficient( recon%qp_interfaceL(:,j+1,k),   &
-               reduced_gravity_plus, gamma_plus )
-          CALL regularize_dry_gamma_pair( recon%qp_interfaceR(1,j,k), gamma_minus, &
-               recon%qp_interfaceL(1,j+1,k), gamma_plus )
-          CALL eval_hydrostatic_path( PATH_DIR_X,                            &
-               recon%qp_interfaceR(1,j,k), gamma_minus,                      &
-               recon%eta_cellW(j,k), grav_coeff_stag_x(j,k),                 &
-               recon%qp_interfaceL(1,j+1,k), gamma_plus,                     &
-               recon%eta_cellE(j,k), grav_coeff_stag_x(j+1,k),               &
-               this%P_cell_x(:,j,k) )
+          CALL eval_cell_hydrostatic_path( recon%qp_interfaceR(:,j,k),       &
+               recon%eta_cellW(j,k),grav_coeff_stag_x(j,k),                 &
+               recon%qp_interfaceL(:,j+1,k),recon%eta_cellE(j,k),           &
+               grav_coeff_stag_x(j+1,k),PATH_DIR_X,this%P_cell_x(:,j,k) )
        END IF
 
        IF ( comp_cells_y .GT. 1 ) THEN
-          CALL eval_hydrostatic_coefficient( recon%qp_interfaceT(:,j,k),     &
-               reduced_gravity_minus, gamma_minus )
-          CALL eval_hydrostatic_coefficient( recon%qp_interfaceB(:,j,k+1),   &
-               reduced_gravity_plus, gamma_plus )
-          CALL regularize_dry_gamma_pair( recon%qp_interfaceT(1,j,k), gamma_minus, &
-               recon%qp_interfaceB(1,j,k+1), gamma_plus )
-          CALL eval_hydrostatic_path( PATH_DIR_Y,                            &
-               recon%qp_interfaceT(1,j,k), gamma_minus,                      &
-               recon%eta_cellS(j,k), grav_coeff_stag_y(j,k),                 &
-               recon%qp_interfaceB(1,j,k+1), gamma_plus,                     &
-               recon%eta_cellN(j,k), grav_coeff_stag_y(j,k+1),               &
-               this%P_cell_y(:,j,k) )
+          CALL eval_cell_hydrostatic_path( recon%qp_interfaceT(:,j,k),       &
+               recon%eta_cellS(j,k),grav_coeff_stag_y(j,k),                 &
+               recon%qp_interfaceB(:,j,k+1),recon%eta_cellN(j,k),           &
+               grav_coeff_stag_y(j,k+1),PATH_DIR_Y,this%P_cell_y(:,j,k) )
+
        END IF
 
     END DO
     !$OMP END PARALLEL DO
 
   END SUBROUTINE eval_cell_hydrostatic_paths
+
+  !> \brief Compute the hydrostatic path through one cell in either direction.
+  !>
+  !> Endpoint ordering is negative-to-positive: west-to-east in x and
+  !> south-to-north in y. The cell-specific trace and gravity mapping stays in
+  !> the caller, alongside its direction-specific output array.
+  SUBROUTINE eval_cell_hydrostatic_path(qp_minus,eta_minus,grav_minus,       &
+       qp_plus,eta_plus,grav_plus,direction,path)
+
+    USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
+    USE pccu_2d, ONLY : eval_hydrostatic_path
+
+    IMPLICIT NONE
+
+    REAL(wp), INTENT(IN) :: qp_minus(:),eta_minus,grav_minus
+    REAL(wp), INTENT(IN) :: qp_plus(:),eta_plus,grav_plus
+    INTEGER, INTENT(IN) :: direction
+    REAL(wp), INTENT(OUT) :: path(:)
+
+    REAL(wp) :: gamma_minus,gamma_plus
+    REAL(wp) :: reduced_gravity_minus,reduced_gravity_plus
+
+    CALL eval_hydrostatic_coefficient(qp_minus,reduced_gravity_minus,       &
+         gamma_minus)
+    CALL eval_hydrostatic_coefficient(qp_plus,reduced_gravity_plus,gamma_plus)
+    CALL regularize_dry_gamma_pair(qp_minus(1),gamma_minus,qp_plus(1),       &
+         gamma_plus)
+    CALL eval_hydrostatic_path(direction,qp_minus(1),gamma_minus,eta_minus, &
+         grav_minus,qp_plus(1),gamma_plus,eta_plus,grav_plus,path)
+
+  END SUBROUTINE eval_cell_hydrostatic_path
 
   !******************************************************************************
   !> \brief Use the wet endpoint pressure coefficient on a wet/dry path.
@@ -565,11 +575,7 @@ CONTAINS
     INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
     INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
 
-    REAL(wp) :: abslambdaL_min , abslambdaL_max
-    REAL(wp) :: abslambdaR_min , abslambdaR_max
-    REAL(wp) :: abslambdaB_min , abslambdaB_max
-    REAL(wp) :: abslambdaT_min , abslambdaT_max
-    REAL(wp) :: min_r , max_r
+    REAL(wp) :: min_r, max_r
 
     INTEGER :: j,k,l
 
@@ -577,22 +583,16 @@ CONTAINS
 
     IF ( comp_cells_x .GT. 1 ) THEN
 
-       !$OMP DO private(j , k , abslambdaL_min , abslambdaL_max ,               &
-       !$OMP & abslambdaR_min , abslambdaR_max , min_r , max_r )
+       !$OMP DO private(j,k,min_r,max_r)
 
        x_interfaces_loop:DO l = 1,solve_interfaces_x
 
           j = j_stag_x(l)
           k = k_stag_x(l)
 
-          CALL eval_local_speeds_direction( recon%qp_interfaceL(:,j,k) ,    &
-               grav_coeff_stag_x(j,k), idx_u, abslambdaL_min, abslambdaL_max )
-
-          CALL eval_local_speeds_direction( recon%qp_interfaceR(:,j,k) ,    &
-               grav_coeff_stag_x(j,k), idx_u, abslambdaR_min, abslambdaR_max )
-
-          min_r = MIN(abslambdaL_min , abslambdaR_min , 0.0_wp)
-          max_r = MAX(abslambdaL_max , abslambdaR_max , 0.0_wp)
+          CALL eval_interface_speed_bounds( recon%qp_interfaceL(:,j,k),     &
+               recon%qp_interfaceR(:,j,k),grav_coeff_stag_x(j,k),idx_u,     &
+               min_r,max_r )
 
           this%a_interface_xNeg(j,k) = min_r
           this%a_interface_xPos(j,k) = max_r
@@ -605,22 +605,16 @@ CONTAINS
 
     IF ( comp_cells_y .GT. 1 ) THEN
 
-       !$OMP DO private(j , k , abslambdaB_min , abslambdaB_max ,               &
-       !$OMP & abslambdaT_min , abslambdaT_max , min_r , max_r )
+       !$OMP DO private(j,k,min_r,max_r)
 
        y_interfaces_loop:DO l = 1,solve_interfaces_y
 
           j = j_stag_y(l)
           k = k_stag_y(l)
 
-          CALL eval_local_speeds_direction( recon%qp_interfaceB(:,j,k) ,    &
-               grav_coeff_stag_y(j,k), idx_v, abslambdaB_min, abslambdaB_max )
-          
-          CALL eval_local_speeds_direction( recon%qp_interfaceT(:,j,k) ,    &
-               grav_coeff_stag_y(j,k), idx_v, abslambdaT_min, abslambdaT_max )
-
-          min_r = MIN(abslambdaB_min , abslambdaT_min , 0.0_wp)
-          max_r = MAX(abslambdaB_max , abslambdaT_max , 0.0_wp)
+          CALL eval_interface_speed_bounds( recon%qp_interfaceB(:,j,k),     &
+               recon%qp_interfaceT(:,j,k),grav_coeff_stag_y(j,k),idx_v,     &
+               min_r,max_r )
 
           this%a_interface_yNeg(j,k) = min_r
           this%a_interface_yPos(j,k) = max_r
@@ -636,5 +630,32 @@ CONTAINS
     RETURN
     
   END SUBROUTINE eval_speeds
+
+  !> \brief Reduce the characteristic bounds from both endpoints of one face.
+  !>
+  !> The caller supplies the face-normal velocity component and keeps its
+  !> x/y-specific face list and output storage separate.
+  SUBROUTINE eval_interface_speed_bounds(qp_minus,qp_plus,grav_coeff,       &
+       normal_velocity_index,speed_minus,speed_plus)
+
+    USE equation_terms_2d, ONLY : eval_local_speeds_direction
+
+    IMPLICIT NONE
+
+    REAL(wp), INTENT(IN) :: qp_minus(:),qp_plus(:),grav_coeff
+    INTEGER, INTENT(IN) :: normal_velocity_index
+    REAL(wp), INTENT(OUT) :: speed_minus,speed_plus
+
+    REAL(wp) :: minus_min,minus_max,plus_min,plus_max
+
+    CALL eval_local_speeds_direction(qp_minus,grav_coeff,                   &
+         normal_velocity_index,minus_min,minus_max)
+    CALL eval_local_speeds_direction(qp_plus,grav_coeff,                    &
+         normal_velocity_index,plus_min,plus_max)
+
+    speed_minus = MIN(minus_min,plus_min,0.0_wp)
+    speed_plus = MAX(minus_max,plus_max,0.0_wp)
+
+  END SUBROUTINE eval_interface_speed_bounds
 
 END MODULE hyperbolic_2d
