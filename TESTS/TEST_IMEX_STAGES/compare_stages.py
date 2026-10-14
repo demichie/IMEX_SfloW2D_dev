@@ -35,8 +35,19 @@ def tableaux(n):
         ae[1, 0] = 0.5; ae[2, :2] = 0.5; be[:] = 1/3
         ai[0, 0] = ai[1, 1] = 0.25; ai[2, :] = 1/3; bi[:] = 1/3
     elif n == 4:
-        ae[1, 0] = 0.5; ae[2, 0] = 1/3; ae[3, 1] = 1.0; be[1] = 1.0
-        ai[1, 1] = 0.5; ai[2, 2] = 1/3; ai[3, 2:] = (0.75, 0.25); bi[2:] = (0.75, 0.25)
+        # IMEX-SSP3(4,3,3), independently restated from the published
+        # tableau used by the production n_RK=4 implementation.
+        gamma = 0.24169426078821
+        delta = 0.06042356519705
+        ae[2, 1] = 1.0
+        ae[3, 1:3] = (0.25, 0.25)
+        be[1:] = (1/6, 1/6, 2/3)
+        ai[0, 0] = gamma
+        ai[1, 0:2] = (-gamma, gamma)
+        ai[2, 1:3] = (1.0-gamma, gamma)
+        ai[3, :] = (delta, 0.12915286960590,
+                    0.5-delta-0.12915286960590-gamma, gamma)
+        bi[:] = be
     else:
         raise AssertionError("unsupported tableau")
     return ae, ai, be, bi
@@ -359,7 +370,7 @@ def order_suite(args):
                     error = np.max(np.abs(fields["qp"][..., 3]-expected_t))
                 errors.append(float(error))
             rates = np.log2(np.array(errors[:-1])/errors[1:])
-            target = 1 if n == 2 else 2
+            target = 1 if n == 2 else (3 if n == 4 else 2)
             if not np.all((rates[-2:] > target-0.25) & (rates[-2:] < target+0.25)):
                 raise AssertionError(f"temporal order {kind} RK{n}: errors={errors}, rates={rates}")
             record = {"profile": args.profile, "kind": kind, "n_RK": n, "expected_order": target,

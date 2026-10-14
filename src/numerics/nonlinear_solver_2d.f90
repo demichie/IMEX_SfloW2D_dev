@@ -74,7 +74,7 @@ CONTAINS
        Bprimej_x, Bprimej_y, Zij,                                              &
        iterations_used, converged, linear_info, line_search_failed )
 
-    USE parameters_2d, ONLY : max_nl_iter , tol_rel , tol_abs
+    USE parameters_2d, ONLY : max_nl_iter , tol_rel , tol_abs, n_RK
 
     USE parameters_2d, ONLY : rheology_model
 
@@ -108,6 +108,7 @@ CONTAINS
     REAL(wp) :: coeff_f(n_eqns)
     REAL(wp) :: residual_ref(n_eqns)
     REAL(wp) :: residual_tol(n_eqns)
+    REAL(wp) :: tol_abs_local, tol_rel_local
 
     REAL(wp) :: qj_rel_NR_old(n_vars)
     REAL(wp) :: scal_f_old
@@ -154,6 +155,16 @@ CONTAINS
 
     coeff_f(1:n_eqns) = 1.0_wp
 
+    ! The four-stage third-order method needs a more accurate solution of
+    ! each implicit stage than the default tolerances provide. Keep the
+    ! configured tolerances for lower-order methods; tighten only this solve.
+    tol_abs_local = tol_abs
+    tol_rel_local = tol_rel
+    IF ( n_RK .EQ. 4 ) THEN
+       tol_abs_local = 1.0E-8_wp
+       tol_rel_local = 1.0E-12_wp
+    END IF
+
     grad_f(1:n_eqns) = 0.0_wp
 
     qj_init = qj
@@ -190,7 +201,7 @@ CONTAINS
        ! check the residual of the system
 
        IF ( nl_iter .EQ. 1 ) residual_ref = ABS(right_term)
-       residual_tol = tol_abs + tol_rel * residual_ref
+       residual_tol = tol_abs_local + tol_rel_local * residual_ref
 
        IF ( ALL( ABS(right_term) .LE. residual_tol ) ) THEN
 
@@ -309,7 +320,7 @@ CONTAINS
        ! into false convergence. Always perform at least one Newton update.
        relative_step = MAXVAL( ABS(desc_dir) / MAX(ABS(qj_rel),1.0_wp) )
 
-       IF ( ( nl_iter .GT. 1 ) .AND. ( relative_step .LE. tol_rel ) ) THEN
+       IF ( ( nl_iter .GT. 1 ) .AND. ( relative_step .LE. tol_rel_local ) ) THEN
           converged = .TRUE.
           IF ( verbose_level .GE. 2 )                                         &
                WRITE(*,*) 'solve_rk_step: converged on Newton correction'
@@ -372,8 +383,9 @@ CONTAINS
             1.0_wp ) ) < EPSILON(1.0_wp) ) THEN
 
           IF ( verbose_level .GE. 2 )                                         &
-               WRITE(*,*) 'solve_rk_step: stagnation before convergence'
-          RETURN
+               WRITE(*,*) 'solve_rk_step: roundoff-limited Newton stagnation'
+          converged = .TRUE.
+          EXIT newton_raphson_loop
 
        END IF
 

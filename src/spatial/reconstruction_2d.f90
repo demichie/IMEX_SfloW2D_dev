@@ -959,8 +959,8 @@ CONTAINS
             B_face_y(j,k), B_face_y(j,k+1) )
        relief2d = relief2d /                                                &
             MAX(qp_center(1,j,k),hp_dry_tolerance)
-       CALL evaluate_hp_cell_x(j,k,residual2d,relief2d)
-       CALL evaluate_hp_cell_y(j,k,residual2d,relief2d)
+       CALL evaluate_hp_cell(j,k,residual2d,relief2d,1)
+       CALL evaluate_hp_cell(j,k,residual2d,relief2d,2)
     END DO
     !$OMP END DO
 
@@ -1176,19 +1176,18 @@ CONTAINS
 
     END SUBROUTINE hp_eta_face_pair
 
-       !> \brief Evaluate the x-direction HP blend without overwriting neighbouring candidates.
-       !>
-       !> \param[in] jc X index of the current cell in the parent reconstruction.
-       !> \param[in] kc Y index of the current cell in the parent reconstruction.
-       !> \param[in] residual Dimensionless 2-D hydrostatic residual for the current cell.
-       !> \param[in] relief Dimensionless local bed-relief/depth ratio for the current cell.
-       !>
-       !> \note Uses host-associated direct/eta traces and per-thread scratch. Writes the x slice of
-       !>       hp_blended; final traces are committed only after the OpenMP barrier.
+       !> \brief Evaluate the HP blend in either Cartesian direction.
+       !> \param[in] jc X index of the current cell.
+       !> \param[in] kc Y index of the current cell.
+       !> \param[in] residual Dimensionless 2-D hydrostatic residual.
+       !> \param[in] relief Dimensionless local bed-relief/depth ratio.
+       !> \param[in] direction 1 for x (W/E), 2 for y (S/N).
+       !> \details Reads immutable neighbouring candidates, uses the calling thread's
+       !>          scratch slice, and writes one direction of hp_blended. Final traces
+       !>          are committed after the existing OpenMP barrier.
+       SUBROUTINE evaluate_hp_cell(jc,kc,residual,relief,direction)
 
-       SUBROUTINE evaluate_hp_cell_x(jc,kc,residual,relief)
-
-       INTEGER, INTENT(IN) :: jc, kc
+       INTEGER, INTENT(IN) :: jc, kc, direction
        REAL(wp), INTENT(IN) :: residual, relief
        REAL(wp) :: h_line(5), u_line(5), Bm_line(5), Bp_line(5)
        REAL(wp) :: hm_direct(5), hp_direct(5), hum_direct(5), hup_direct(5)
@@ -1196,35 +1195,71 @@ CONTAINS
        REAL(wp) :: residual_line(5), relief_line(5)
        REAL(wp) :: hm_line(5), hp_line(5), hum_line(5), hup_line(5)
        REAL(wp) :: eta_m_line(5), eta_p_line(5), weight_line(5)
-       INTEGER :: j_start, j_end, line_size, center, offset, jj, thread_id
+       INTEGER :: line_start, line_end, line_size, center, offset
+       INTEGER :: line_index, line_j, line_k, thread_id
 
-       j_start = MAX(1,jc-2)
-       j_end = MIN(comp_cells_x,jc+2)
-       line_size = j_end-j_start+1
-       center = jc-j_start+1
+       SELECT CASE(direction)
+       CASE(1)
+          line_start = MAX(1,jc-2)
+          line_end = MIN(comp_cells_x,jc+2)
+          center = jc-line_start+1
+       CASE(2)
+          line_start = MAX(1,kc-2)
+          line_end = MIN(comp_cells_y,kc+2)
+          center = kc-line_start+1
+       CASE DEFAULT
+          ERROR STOP 'evaluate_hp_cell: invalid direction'
+       END SELECT
+       line_size = line_end-line_start+1
        residual_line = 0.0_wp
        relief_line = 0.0_wp
 
        DO offset = 1, line_size
-          jj = j_start+offset-1
-          h_line(offset) = qp_center(1,jj,kc)
-          u_line(offset) = qp_center(idx_u,jj,kc)
-          Bm_line(offset) = B_face_x(jj,kc)
-          Bp_line(offset) = B_face_x(jj+1,kc)
-          IF ( this%hp_eta_mask(jj,kc) ) THEN
-           hm_direct(offset) = this%qp_cellW(1,jj,kc)
-           hp_direct(offset) = this%qp_cellE(1,jj,kc)
-           hum_direct(offset) = this%qp_cellW(2,jj,kc)
-           hup_direct(offset) = this%qp_cellE(2,jj,kc)
-           um_candidate(offset) = this%qp_cellW(idx_u,jj,kc)
-           up_candidate(offset) = this%qp_cellE(idx_u,jj,kc)
+          line_index = line_start+offset-1
+          IF ( direction .EQ. 1 ) THEN
+             line_j = line_index
+             line_k = kc
+             h_line(offset) = qp_center(1,line_j,line_k)
+             u_line(offset) = qp_center(idx_u,line_j,line_k)
+             Bm_line(offset) = B_face_x(line_j,line_k)
+             Bp_line(offset) = B_face_x(line_j+1,line_k)
+             IF ( this%hp_eta_mask(line_j,line_k) ) THEN
+                hm_direct(offset) = this%qp_cellW(1,line_j,line_k)
+                hp_direct(offset) = this%qp_cellE(1,line_j,line_k)
+                hum_direct(offset) = this%qp_cellW(2,line_j,line_k)
+                hup_direct(offset) = this%qp_cellE(2,line_j,line_k)
+                um_candidate(offset) = this%qp_cellW(idx_u,line_j,line_k)
+                up_candidate(offset) = this%qp_cellE(idx_u,line_j,line_k)
+             ELSE
+                hm_direct(offset) = qp_center(1,line_j,line_k)
+                hp_direct(offset) = qp_center(1,line_j,line_k)
+                hum_direct(offset) = qp_center(2,line_j,line_k)
+                hup_direct(offset) = qp_center(2,line_j,line_k)
+                um_candidate(offset) = qp_center(idx_u,line_j,line_k)
+                up_candidate(offset) = qp_center(idx_u,line_j,line_k)
+             END IF
           ELSE
-           hm_direct(offset) = qp_center(1,jj,kc)
-           hp_direct(offset) = qp_center(1,jj,kc)
-           hum_direct(offset) = qp_center(2,jj,kc)
-           hup_direct(offset) = qp_center(2,jj,kc)
-           um_candidate(offset) = qp_center(idx_u,jj,kc)
-           up_candidate(offset) = qp_center(idx_u,jj,kc)
+             line_j = jc
+             line_k = line_index
+             h_line(offset) = qp_center(1,line_j,line_k)
+             u_line(offset) = qp_center(idx_v,line_j,line_k)
+             Bm_line(offset) = B_face_y(line_j,line_k)
+             Bp_line(offset) = B_face_y(line_j,line_k+1)
+             IF ( this%hp_eta_mask(line_j,line_k) ) THEN
+                hm_direct(offset) = this%qp_cellS(1,line_j,line_k)
+                hp_direct(offset) = this%qp_cellN(1,line_j,line_k)
+                hum_direct(offset) = this%qp_cellS(3,line_j,line_k)
+                hup_direct(offset) = this%qp_cellN(3,line_j,line_k)
+                um_candidate(offset) = this%qp_cellS(idx_v,line_j,line_k)
+                up_candidate(offset) = this%qp_cellN(idx_v,line_j,line_k)
+             ELSE
+                hm_direct(offset) = qp_center(1,line_j,line_k)
+                hp_direct(offset) = qp_center(1,line_j,line_k)
+                hum_direct(offset) = qp_center(3,line_j,line_k)
+                hup_direct(offset) = qp_center(3,line_j,line_k)
+                um_candidate(offset) = qp_center(idx_v,line_j,line_k)
+                up_candidate(offset) = qp_center(idx_v,line_j,line_k)
+             END IF
           END IF
        END DO
        residual_line(center) = residual
@@ -1242,81 +1277,10 @@ CONTAINS
           eta_m_line(1:line_size),eta_p_line(1:line_size),                 &
           weight_line(1:line_size),this%hp_scratch(1:line_size,:,thread_id) )
 
-       this%hp_blended(:,jc,kc,1) = [ hm_line(center),hp_line(center),      &
+       this%hp_blended(:,jc,kc,direction) = [ hm_line(center),hp_line(center), &
           hum_line(center),hup_line(center) ]
 
-       END SUBROUTINE evaluate_hp_cell_x
-
-       !> \brief Evaluate the y-direction HP blend without overwriting neighbouring candidates.
-       !>
-       !> \param[in] jc X index of the current cell in the parent reconstruction.
-       !> \param[in] kc Y index of the current cell in the parent reconstruction.
-       !> \param[in] residual Dimensionless 2-D hydrostatic residual for the current cell.
-       !> \param[in] relief Dimensionless local bed-relief/depth ratio for the current cell.
-       !>
-       !> \note Uses host-associated direct/eta traces and per-thread scratch. Writes the y slice of
-       !>       hp_blended; final traces are committed only after the OpenMP barrier.
-
-       SUBROUTINE evaluate_hp_cell_y(jc,kc,residual,relief)
-
-       INTEGER, INTENT(IN) :: jc, kc
-       REAL(wp), INTENT(IN) :: residual, relief
-       REAL(wp) :: h_line(5), u_line(5), Bm_line(5), Bp_line(5)
-       REAL(wp) :: hm_direct(5), hp_direct(5), hum_direct(5), hup_direct(5)
-       REAL(wp) :: um_candidate(5), up_candidate(5)
-       REAL(wp) :: residual_line(5), relief_line(5)
-       REAL(wp) :: hm_line(5), hp_line(5), hum_line(5), hup_line(5)
-       REAL(wp) :: eta_m_line(5), eta_p_line(5), weight_line(5)
-       INTEGER :: k_start, k_end, line_size, center, offset, kk, thread_id
-
-       k_start = MAX(1,kc-2)
-       k_end = MIN(comp_cells_y,kc+2)
-       line_size = k_end-k_start+1
-       center = kc-k_start+1
-       residual_line = 0.0_wp
-       relief_line = 0.0_wp
-
-       DO offset = 1, line_size
-          kk = k_start+offset-1
-          h_line(offset) = qp_center(1,jc,kk)
-          u_line(offset) = qp_center(idx_v,jc,kk)
-          Bm_line(offset) = B_face_y(jc,kk)
-          Bp_line(offset) = B_face_y(jc,kk+1)
-          IF ( this%hp_eta_mask(jc,kk) ) THEN
-           hm_direct(offset) = this%qp_cellS(1,jc,kk)
-           hp_direct(offset) = this%qp_cellN(1,jc,kk)
-           hum_direct(offset) = this%qp_cellS(3,jc,kk)
-           hup_direct(offset) = this%qp_cellN(3,jc,kk)
-           um_candidate(offset) = this%qp_cellS(idx_v,jc,kk)
-           up_candidate(offset) = this%qp_cellN(idx_v,jc,kk)
-          ELSE
-           hm_direct(offset) = qp_center(1,jc,kk)
-           hp_direct(offset) = qp_center(1,jc,kk)
-           hum_direct(offset) = qp_center(3,jc,kk)
-           hup_direct(offset) = qp_center(3,jc,kk)
-           um_candidate(offset) = qp_center(idx_v,jc,kk)
-           up_candidate(offset) = qp_center(idx_v,jc,kk)
-          END IF
-       END DO
-       residual_line(center) = residual
-       relief_line(center) = relief
-       thread_id = omp_get_thread_num()+1
-
-       CALL reconstruct_hp_line( h_line(1:line_size),u_line(1:line_size),    &
-          Bm_line(1:line_size),Bp_line(1:line_size),                       &
-          hm_direct(1:line_size),hp_direct(1:line_size),                   &
-          hum_direct(1:line_size),hup_direct(1:line_size),                 &
-          um_candidate(1:line_size),up_candidate(1:line_size),             &
-          residual_line(1:line_size),relief_line(1:line_size),             &
-          limiter(1),reconstr_coeff,hm_line(1:line_size),                 &
-          hp_line(1:line_size),hum_line(1:line_size),hup_line(1:line_size),&
-          eta_m_line(1:line_size),eta_p_line(1:line_size),                 &
-          weight_line(1:line_size),this%hp_scratch(1:line_size,:,thread_id) )
-
-       this%hp_blended(:,jc,kc,2) = [ hm_line(center),hp_line(center),      &
-          hum_line(center),hup_line(center) ]
-
-       END SUBROUTINE evaluate_hp_cell_y
+       END SUBROUTINE evaluate_hp_cell
 
        !> \brief Commit both directional HP blends to the final traces of one cell.
        !>

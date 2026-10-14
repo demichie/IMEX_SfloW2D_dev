@@ -35,7 +35,7 @@ MODULE equation_terms_2d
   PRIVATE
 
   PUBLIC :: init_problem_param
-  PUBLIC :: eval_local_speeds_x, eval_local_speeds_y
+  PUBLIC :: eval_local_speeds_direction
   PUBLIC :: eval_inertial_flux, eval_hydrostatic_coefficient
   PUBLIC :: limit_component_mass_flux
   PUBLIC :: curvature_acceleration, eval_curvature_momentum_source
@@ -188,122 +188,34 @@ CONTAINS
   END SUBROUTINE init_problem_param
 
 
-  !******************************************************************************
-  !> \brief Compute the common lower and upper characteristic speeds in x.
-  !
-  !> This subroutine computes from the physical variable evaluates the largest
-  !> positive and negative characteristic speed in the x-direction.
-  !> @author
-  !> Mattia de' Michieli Vitturi
-  !> \date 05/12/2017
-  !>
-  !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
-  !> \param[in] grav_coeff Large-slope gravity factor G at the supplied state location.
-  !> \param[out] vel_min Common lower characteristic speed in the selected direction [m s^-1].
-  !> \param[out] vel_max Common upper characteristic speed in the selected direction [m s^-1].
-  !******************************************************************************
+  !> \brief Shared characteristic-speed calculation for a Cartesian direction.
+  !> \param[in] qpj Local physical state with component mass fractions.
+  !> \param[in] grav_coeff Large-slope gravity factor at this state location.
+  !> \param[in] normal_velocity_index Index of the velocity normal to the direction.
+  !> \param[out] vel_min Lower characteristic speed [m s^-1].
+  !> \param[out] vel_max Upper characteristic speed [m s^-1].
+  SUBROUTINE eval_local_speeds_direction(qpj,grav_coeff,normal_velocity_index, &
+       vel_min,vel_max)
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), grav_coeff
+    INTEGER, INTENT(IN) :: normal_velocity_index
+    REAL(wp), INTENT(OUT) :: vel_min, vel_max
+    REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
+    REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, r_h, normal_velocity, celerity
 
-  SUBROUTINE eval_local_speeds_x(qpj,grav_coeff,vel_min,vel_max)
-
-    IMPLICIT none
-
-    REAL(wp), INTENT(IN) :: qpj(n_vars+2)
-    REAL(wp), INTENT(IN) :: grav_coeff
-
-    REAL(wp), INTENT(OUT) :: vel_min , vel_max
-
-    REAL(wp) :: r_h          !< real-value flow thickness [m]
-    REAL(wp) :: r_u          !< real-value x-velocity [m s-1]
-    REAL(wp) :: r_v          !< real-value y-velocity [m s-1]
-    REAL(wp) :: r_Ri         !< real-value Richardson number
-    REAL(wp) :: r_rho_m      !< real-value mixture density [kg m-3]
-    REAL(wp) :: r_rho_c      !< real-value carrier phase density [kg m-3]
-    REAL(wp) :: r_red_grav   !< real-value reduced gravity [m s-2]
-    REAL(wp) :: r_celerity
-    REAL(wp) :: r_sp_heat_c
-    REAL(wp) :: r_sp_heat_mix
-
-    CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,             &
+    CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,          &
          r_sp_heat_mix)
-
     r_h = qpj(1)
-    r_u = qpj(idx_u)
-    r_v = qpj(idx_v)
+    normal_velocity = qpj(normal_velocity_index)
 
     IF ( r_red_grav * r_h .LT. 0.0_wp ) THEN
-
-       vel_min = r_u
-       vel_max = r_u
-
+       vel_min = normal_velocity
+       vel_max = normal_velocity
     ELSE
-
-       r_celerity = SQRT( r_red_grav * r_h * grav_coeff )
-       vel_min = r_u - r_celerity
-       vel_max = r_u + r_celerity
-
+       celerity = SQRT( grav_coeff * r_red_grav * r_h )
+       vel_min = normal_velocity - celerity
+       vel_max = normal_velocity + celerity
     END IF
-
-    RETURN
-
-  END SUBROUTINE eval_local_speeds_x
-
-  !******************************************************************************
-  !> \brief Compute the common lower and upper characteristic speeds in y.
-  !
-  !> This subroutine computes from the physical variable evaluates the largest
-  !> positive and negative characteristic speed in the y-direction.
-  !> @author
-  !> Mattia de' Michieli Vitturi
-  !> \date 05/12/2017
-  !>
-  !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
-  !> \param[in] grav_coeff Large-slope gravity factor G at the supplied state location.
-  !> \param[out] vel_min Common lower characteristic speed in the selected direction [m s^-1].
-  !> \param[out] vel_max Common upper characteristic speed in the selected direction [m s^-1].
-  !******************************************************************************
-
-  SUBROUTINE eval_local_speeds_y(qpj,grav_coeff,vel_min,vel_max)
-
-    IMPLICIT none
-
-    REAL(wp), INTENT(IN)  :: qpj(n_vars+2)
-    REAL(wp), INTENT(IN) :: grav_coeff
-    REAL(wp), INTENT(OUT) :: vel_min , vel_max
-
-    REAL(wp) :: r_h          !< real-value flow thickness
-    REAL(wp) :: r_u          !< real-value x-velocity
-    REAL(wp) :: r_v          !< real-value y-velocity
-    REAL(wp) :: r_Ri         !< real-value Richardson number
-    REAL(wp) :: r_rho_m      !< real-value mixture density [kg/m3]
-    REAL(wp) :: r_rho_c      !< real-value carrier phase density [kg/m3]
-    REAL(wp) :: r_red_grav   !< real-value reduced gravity
-    REAL(wp) :: r_celerity
-    REAL(wp) :: r_sp_heat_c
-    REAL(wp) :: r_sp_heat_mix
-
-    CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,             &
-         r_sp_heat_mix)
-
-    r_h = qpj(1)
-    r_u = qpj(idx_u)
-    r_v = qpj(idx_v)
-
-    IF ( r_red_grav * r_h .LT. 0.0_wp ) THEN
-
-       vel_min = r_v
-       vel_max = r_v
-
-    ELSE
-
-       r_celerity = SQRT( grav_coeff * r_red_grav * r_h )
-       vel_min = r_v - r_celerity
-       vel_max = r_v + r_celerity
-
-    END IF
-
-    RETURN
-
-  END SUBROUTINE eval_local_speeds_y
+  END SUBROUTINE eval_local_speeds_direction
 
   !******************************************************************************
   !> \brief Derive reduced gravity and the pressure coefficient Gamma from a physical state.

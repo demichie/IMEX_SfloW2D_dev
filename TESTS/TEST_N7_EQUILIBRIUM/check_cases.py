@@ -247,9 +247,19 @@ def run(args):
                     record["equilibrium_errors"] = field_error("unchanged lake", fields["q"], initial, initial, ROUND)
                     for key in ("known", "solved", "raw_final"):
                         field_error(key, fields[key], initial, initial, ROUND)
-                    # Stage 2's known value is q_start + dt*a21*R(q_start).
+                    # Infer a nonzero production spatial residual from the
+                    # earliest stage row with a nonzero explicit coefficient.
+                    # IMEX-SSP3(4,3,3) has a zero second explicit row, so the
+                    # former hard-coded stage-2 formula divided by zero for
+                    # n_RK=4.
                     ae = stages.tableaux(n)[0]
-                    inferred = (fields["known"][1] - fields["known"][0]) / (dt * ae[1, 0])
+                    stage_row = next(i for i in range(1, n)
+                                     if np.any(ae[i, :i] != 0.0))
+                    stage_col = int(np.flatnonzero(ae[stage_row, :stage_row])[0])
+                    if np.count_nonzero(ae[stage_row, :stage_row]) != 1:
+                        raise AssertionError("lake residual inference requires a single active explicit coefficient")
+                    inferred = (fields["known"][stage_row] - fields["known"][0]) / (
+                        dt * ae[stage_row, stage_col])
                     record["production_lake_residual_scaled"] = float(np.max(np.abs(inferred[..., :3])) / force_scale)
                     record["reference_lake_residual_scaled"] = float(np.max(np.abs(residual)) / force_scale)
                     if record["production_lake_residual_scaled"] > ROUND:
