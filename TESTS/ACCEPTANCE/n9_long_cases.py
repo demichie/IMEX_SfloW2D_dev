@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import traceback
 from zipfile import ZipFile
 import numpy as np
 
@@ -53,6 +54,27 @@ def current_source_path(repo, historical_path):
         if len(matches) == 1:
             return matches[0]
     return path
+
+
+def audited_current_source_hashes(repo, audit):
+    """Require an exact current production-source inventory from the build audit."""
+    suffixes = {'.c', '.f90', '.inc'}
+    audited = {
+        name: value for name, value in audit['source_and_fixture_sha256'].items()
+        if name.startswith('src/') and Path(name).suffix.lower() in suffixes
+    }
+    current = {
+        str(path.relative_to(repo)): path
+        for path in (repo/'src').rglob('*')
+        if path.is_file() and path.suffix.lower() in suffixes
+    }
+    assert current and set(current) == set(audited), (
+        'build audit source inventory does not match the current production tree',
+        sorted(set(current) - set(audited)), sorted(set(audited) - set(current)))
+    for name, path in current.items():
+        actual = digest(path)
+        assert actual == audited[name], ('build source differs from current tree', name)
+    return audited
 
 
 def changed_parameter(text, name, value):
@@ -140,14 +162,15 @@ def checkpoint(path):
             assert len(record) == length and stream.read(4) == marker
             records.append(record)
     assert records[0] == b'IMEX_SFLOW2D_RST'
-    assert struct.unpack('<i', records[1])[0] == 4
+    version = struct.unpack('<i', records[1])[0]
+    assert version in (4, 5)
     dims = struct.unpack('<9i', records[2])
     nx, ny, nv, ns, ng, nz, npore, nth, npress = dims
     state = np.frombuffer(records[6], '<f8').reshape((nv, nx, ny), order='F')
     bed = np.frombuffer(records[7], '<f8').reshape((nx+1, ny+1), order='F')
     assert np.isfinite(state).all() and np.isfinite(bed).all()
     assert state[0].min() >= 0
-    return {'magic': records[0].decode().rstrip(), 'version': 4,
+    return {'magic': records[0].decode().rstrip(), 'version': version,
             'layout': list(dims), 'model_flags': list(struct.unpack('<2i', records[3])),
             'time_state': list(struct.unpack('<4d', records[4])),
             'records': len(records), 'sha256': digest(path),
@@ -171,8 +194,10 @@ def diagnostic_comparison(full, resumed, run_name):
     checks = {}
     for suffix in ('runout', 'mass_center'):
         filename = run_name+'_'+suffix+'.csv'
-        left, left_header = diagnostic_csv(output_file(full, run_name, 'diagnostics', filename))
-        right, right_header = diagnostic_csv(output_file(resumed, run_name, 'diagnostics', filename))
+        left_path = output_file(full, run_name, 'diagnostics', filename)
+        right_path = output_file(resumed, run_name, 'diagnostics', filename)
+        left, left_header = diagnostic_csv(left_path)
+        right, right_header = diagnostic_csv(right_path)
         common, il, ir = np.intersect1d(left[:,0],right[:,0],return_indices=True)
         errors = np.max(np.abs(left[il]-right[ir]),axis=0) if len(common) else np.full(5,np.inf)
         same_history = left.shape == right.shape and np.array_equal(left[:,0],right[:,0])
@@ -181,7 +206,7 @@ def diagnostic_comparison(full, resumed, run_name):
             'full_has_header':left_header,'resumed_has_header':right_header,
             'history_complete':same_history,'common_time_values_equal':same_values,
             'common_times':len(common), 'common_time_Linf_by_column':errors.tolist() if len(common) else None,
-            'full_sha256':digest(full/filename),'resumed_sha256':digest(resumed/filename),
+            'full_sha256':digest(left_path),'resumed_sha256':digest(right_path),
             'status':'pass' if same_history and same_values and left_header==right_header else 'fail'}
     return checks
 
@@ -297,7 +322,11 @@ def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument('--repo', type=Path, required=True)
     cli.add_argument('--build-audit', type=Path, required=True)
-    cli.add_argument('--lava-evidence', type=Path, required=True)
+    provenance = cli.add_mutually_exclusive_group(required=True)
+    provenance.add_argument('--lava-evidence', type=Path,
+                            help='current-revision evidence linked to retained baseline payloads')
+    provenance.add_argument('--diagnostic-current-source', action='store_true',
+                            help='use exact source hashes from the build audit; never claim baseline approval')
     cli.add_argument('--preprocess-adapter', type=Path,
                      default=Path(__file__).with_name('n9_etna_preprocess.py'))
     cli.add_argument('--reuse-first-halves', type=Path,
@@ -311,27 +340,41 @@ def main():
     if args.reuse_first_halves and args.characterize_completed:
         cli.error('choose one recovery mode only')
     repo, root = args.repo.resolve(), args.output.resolve()
-    assert not root.exists() and repo not in root.parents
+    assert root != repo and not root.exists() and repo not in root.parents
+    audit_root = args.build_audit.resolve()
+    audit = json.loads((audit_root/'manifest.json').read_text())
+    if args.diagnostic_current_source:
+        source_hashes = audited_current_source_hashes(repo, audit)
+    else:
+        lava = json.loads(args.lava_evidence.read_text())
+        source_hashes = lava['source_sha256']
+        for name, value in source_hashes.items():
+            assert digest(current_source_path(repo, name)) == value, ('changed production source', name)
+            assert audit['source_and_fixture_sha256'][name] == value, ('build provenance mismatch', name)
     root.mkdir()
-    audit = json.loads((args.build_audit/'manifest.json').read_text())
-    lava = json.loads(args.lava_evidence.read_text())
-    for name, value in lava['source_sha256'].items():
-        assert digest(current_source_path(repo, name)) == value, ('changed production source', name)
-        assert audit['source_and_fixture_sha256'][name] == value, ('build provenance mismatch', name)
     manifest = {'schema_version': 1, 'started_utc': datetime.now(timezone.utc).isoformat(),
                 'source_revision': subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip(),
-                'source_sha256': lava['source_sha256'], 'production_sources_changed': False,
+                'source_sha256': source_hashes,
+                'production_sources_changed': args.diagnostic_current_source,
+                'source_provenance_mode': ('current_build_audit_diagnostic'
+                                           if args.diagnostic_current_source
+                                           else 'retained_lava_evidence'),
                 'tools': audit['tools'], 'platform': audit['platform'],
-                'build_audit_sha256': digest(args.build_audit/'manifest.json'),
-                'prior_lava_evidence_sha256': digest(args.lava_evidence),
+                'build_audit_sha256': digest(audit_root/'manifest.json'),
+                'prior_lava_evidence_sha256': (None if args.diagnostic_current_source
+                                               else digest(args.lava_evidence)),
                 'runner_sha256': digest(Path(__file__)),
                 'runs': [], 'continuations': [], 'thread_pairs': [],
                 'N9_scientific_approval': False,
+                'n9_decision': 'open',
                 'comparison_contract': {'same_profile_thread_fields': 'bitwise',
                     'same_profile_continuation_fields': 'bitwise',
                     'checkpoint_records': 'bitwise', 'cross_profile': 'observations only',
                     'budget': 'raw absolute/scaled residuals; no new scientific threshold',
-                    'lava_budget_end_s': 3180, 'roundoff_identity_multiplier': 8192}}
+                    'lava_budget_end_s': 3180, 'roundoff_identity_multiplier': 8192,
+                    'historical_baseline_comparison': (
+                        'not performed; diagnostic results do not extend prior approval'
+                        if args.diagnostic_current_source else 'linked through retained lava evidence')}}
     if args.reference_zip:
         expected = json.loads((repo/'TESTS/TEST_PCCU_GATE_H/field_contract_v3.json').read_text())['reference_core_sha256']
         with ZipFile(args.reference_zip) as archive:
@@ -444,6 +487,9 @@ def main():
             else:
                 prepare(case,reference)
                 full_run = run(exe,reference,threads,'run.log')
+        elif args.diagnostic_current_source:
+            prepare(case,reference)
+            full_run = run(exe,reference,threads,'run.log')
         else:
             prior = next(r for r in lava['results'] if r['profile']==profile and r['actual_threads']==threads)
             reference = Path(prior['directory'])
@@ -513,7 +559,8 @@ def main():
             except Exception as error:
                 case, profile, threads = futures[future]
                 manifest['runs'].append({'case':case,'profile':profile,
-                    'requested_threads':threads,'status':'fail','error':repr(error)})
+                    'requested_threads':threads,'status':'fail','error':repr(error),
+                    'traceback':traceback.format_exc()})
                 save(); print('FAILED RUN',futures[future],repr(error),flush=True)
                 continue
             case = result['case']; name = 'exampleEtna' if case == 'ETNA' else 'exampleEtna_lava'
@@ -529,7 +576,7 @@ def main():
                 result['reference'] = observations(left,lm,full_checkpoint,case)
                 result['resumed'] = observations(right,rm,resumed_checkpoint,case)
             except Exception as error:
-                result.update(status='fail',error=repr(error))
+                result.update(status='fail',error=repr(error),traceback=traceback.format_exc())
                 manifest['runs'].append(result);save()
                 print('FAILED OBSERVATION',case,result['profile'],repr(error),flush=True)
                 continue

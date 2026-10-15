@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 from pathlib import Path
 import re
 import shutil
@@ -57,6 +58,7 @@ def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument('executable', type=Path)
     cli.add_argument('--netcdf-helper', type=Path, required=True)
+    cli.add_argument('--fault-injector', type=Path, required=True)
     cli.add_argument('--threads', type=int, default=int(os.environ.get('OMP_NUM_THREADS', 1)))
     cli.add_argument('--output', type=Path)
     args = cli.parse_args()
@@ -95,6 +97,30 @@ def main():
             assert proc.returncode == 0, (case, output[-3000:])
             assert re.search(r'number of threads used\s+'+str(args.threads)+r'\b', output)
             assert not (case/'runout.txt').exists()
+        return output
+
+    def run_fault(case, logname, *, write_match=None, write_occurrence=1,
+                  netcdf_time_occurrence=None):
+        env = {**os.environ, 'OMP_NUM_THREADS':str(args.threads), 'OMP_DYNAMIC':'FALSE'}
+        if platform.system() == 'Darwin':
+            env['DYLD_INSERT_LIBRARIES'] = str(args.fault_injector.resolve())
+        elif platform.system() == 'Linux':
+            existing = env.get('LD_PRELOAD')
+            env['LD_PRELOAD'] = str(args.fault_injector.resolve()) + (
+                ':'+existing if existing else '')
+        else:
+            raise AssertionError('fault injection supports macOS and Linux only')
+        if write_match is not None:
+            env['IMEX_FAULT_WRITE_MATCH'] = write_match
+            env['IMEX_FAULT_WRITE_OCCURRENCE'] = str(write_occurrence)
+        if netcdf_time_occurrence is not None:
+            env['IMEX_FAULT_NETCDF_TIME_OCCURRENCE'] = str(netcdf_time_occurrence)
+        with (case/logname).open('w') as log:
+            proc = subprocess.run([str(exe)], cwd=case, timeout=120,
+                                  env=env, stdout=log, stderr=subprocess.STDOUT)
+        output = (case/logname).read_text()
+        assert proc.returncode == 86 and 'fault injector:' in output, (
+            case, proc.returncode, output[-3000:])
         return output
 
     def require_output(case, filename):
@@ -377,6 +403,165 @@ def main():
         run(case, 'rejected.log', 'Restart runout cadence')
         assert not list((case/'OUTPUT'/'TEST_2D'/'diagnostics').glob('*.csv'))
         passed('reject incompatible '+name+' before opening CSVs')
+
+    fault_control = prepare('fault-control', parameter(text, 'T_END', '0.045'))
+    run(fault_control, 'full.log')
+
+    case = prepare('fault-injected-snapshot')
+    run(case, 'snapshot-initial.log')
+    diagnostic_dir = diagnostics(case)
+    intact_diagnostics = {path.name:path.read_bytes()
+                          for path in diagnostic_dir.glob('*.csv')}
+    continuation(case, end=0.045)
+    run_fault(case, 'snapshot-interruption.log',
+              write_match='TEST_2D_0002.q_2d')
+    partial_snapshot = snapshot(case, 'TEST_2D_0002.q_2d')
+    complete_snapshot = snapshot(fault_control, 'TEST_2D_0002.q_2d')
+    assert 0 < partial_snapshot.stat().st_size < complete_snapshot.stat().st_size
+    assert partial_snapshot.read_bytes() != complete_snapshot.read_bytes()
+    manifest_path = case/'OUTPUT'/'TEST_2D'/'metadata'/'output_manifest.csv'
+    manifest_before = manifest_path.read_bytes()
+    hashes_before = tree_hashes(case/'OUTPUT'/'TEST_2D')
+    continuation(case, end=0.045)
+    run(case, 'snapshot-orphan-rejected.log', 'uncommitted snapshot directory')
+    assert tree_hashes(case/'OUTPUT'/'TEST_2D') == hashes_before
+    assert manifest_path.read_bytes() == manifest_before
+    assert any((diagnostic_dir/name).read_bytes() != content
+               for name, content in intact_diagnostics.items())
+    shutil.rmtree(partial_snapshot.parent)
+    for name, content in intact_diagnostics.items():
+        (diagnostic_dir/name).write_bytes(content)
+    run(case, 'snapshot-recovered.log')
+    assert records(checkpoint(fault_control)) == records(checkpoint(case))
+    assert snapshot(fault_control, 'TEST_2D_0003.q_2d').read_bytes() == \
+        snapshot(case, 'TEST_2D_0003.q_2d').read_bytes()
+    assert manifest_path.read_bytes() == (fault_control/'OUTPUT'/'TEST_2D'/
+                                          'metadata'/'output_manifest.csv').read_bytes()
+    for filename in ('TEST_2D_runout.csv', 'TEST_2D_mass_center.csv'):
+        assert (diagnostic_dir/filename).read_bytes() == \
+            require_output(fault_control, filename).read_bytes()
+    passed('real snapshot interruption: partial file preserved, rejected, then recovered')
+
+    case = prepare('fault-injected-manifest')
+    run(case, 'manifest-initial.log')
+    intact_manifest = (case/'OUTPUT'/'TEST_2D'/'metadata'/
+                       'output_manifest.csv').read_bytes()
+    diagnostic_dir = diagnostics(case)
+    intact_diagnostics = {path.name:path.read_bytes()
+                          for path in diagnostic_dir.glob('*.csv')}
+    continuation(case, end=0.045)
+    run_fault(case, 'manifest-interruption.log',
+              write_match='output_manifest.csv')
+    manifest_path = case/'OUTPUT'/'TEST_2D'/'metadata'/'output_manifest.csv'
+    manifest_after_fault = manifest_path.read_bytes()
+    assert manifest_after_fault.endswith(b'\n') is False
+    hashes_before = tree_hashes(case/'OUTPUT'/'TEST_2D')
+    checkpoint_time = struct.unpack('<4d', records(checkpoint(case))[4])[0]
+    continuation(case, end=0.045)
+    run(case, 'manifest-fault-rejected.log', 'manifest')
+    assert tree_hashes(case/'OUTPUT'/'TEST_2D') == hashes_before
+
+    checkpoint_payloads = records(checkpoint(case))
+    next_output_index = struct.unpack('<i', checkpoint_payloads[5][:4])[0]
+    recovered_rows = intact_manifest.decode().splitlines()
+    assert len(recovered_rows) == next_output_index+1
+    assert float(recovered_rows[-1].split(',')[1]) == checkpoint_time
+    manifest_path.write_text('\n'.join(recovered_rows)+'\n')
+    for directory in (case/'OUTPUT'/'TEST_2D'/'snapshots').iterdir():
+        match = re.match(r'(\d+)_t_', directory.name)
+        if match and int(match[1]) >= next_output_index:
+            shutil.rmtree(directory)
+    for name, content in intact_diagnostics.items():
+        (diagnostic_dir/name).write_bytes(content)
+    run(case, 'manifest-recovered.log')
+    assert records(checkpoint(fault_control)) == records(checkpoint(case))
+    assert (fault_control/'OUTPUT'/'TEST_2D'/'metadata'/
+            'output_manifest.csv').read_bytes() == manifest_path.read_bytes()
+    assert snapshot(case, 'TEST_2D_0003.q_2d').read_bytes() == \
+        snapshot(fault_control, 'TEST_2D_0003.q_2d').read_bytes()
+    for filename in ('TEST_2D_runout.csv', 'TEST_2D_mass_center.csv'):
+        assert (diagnostic_dir/filename).read_bytes() == \
+            require_output(fault_control, filename).read_bytes()
+    passed('real manifest interruption: partial row rejected, then repaired and recovered')
+
+    case = prepare('fault-injected-csv')
+    run(case, 'csv-initial.log')
+    diagnostic_dir = diagnostics(case)
+    intact_diagnostics = {path.name:path.read_bytes()
+                          for path in diagnostic_dir.glob('*.csv')}
+    manifest_path = case/'OUTPUT'/'TEST_2D'/'metadata'/'output_manifest.csv'
+    manifest_before = manifest_path.read_bytes()
+    checkpoint_before = sha(checkpoint(case))
+    continuation(case, end=0.045)
+    run_fault(case, 'csv-interruption.log',
+              write_match='TEST_2D_runout.csv')
+    runout_path = diagnostic_dir/'TEST_2D_runout.csv'
+    partial_runout = runout_path.read_bytes()
+    assert partial_runout.startswith(intact_diagnostics[runout_path.name])
+    assert len(partial_runout) > len(intact_diagnostics[runout_path.name])
+    assert not partial_runout.endswith(b'\n')
+    assert manifest_path.read_bytes() == manifest_before
+    assert sha(checkpoint(case)) == checkpoint_before
+    hashes_before = tree_hashes(case/'OUTPUT'/'TEST_2D')
+    continuation(case, end=0.045)
+    run(case, 'csv-fault-rejected.log', 'Diagnostic CSV')
+    assert tree_hashes(case/'OUTPUT'/'TEST_2D') == hashes_before
+    for name, content in intact_diagnostics.items():
+        (diagnostic_dir/name).write_bytes(content)
+    run(case, 'csv-recovered.log')
+    assert records(checkpoint(fault_control)) == records(checkpoint(case))
+    assert manifest_path.read_bytes() == (fault_control/'OUTPUT'/'TEST_2D'/
+                                          'metadata'/'output_manifest.csv').read_bytes()
+    for filename in ('TEST_2D_runout.csv', 'TEST_2D_mass_center.csv'):
+        assert (diagnostic_dir/filename).read_bytes() == \
+            require_output(fault_control, filename).read_bytes()
+    assert snapshot(case, 'TEST_2D_0003.q_2d').read_bytes() == \
+        snapshot(fault_control, 'TEST_2D_0003.q_2d').read_bytes()
+    passed('real CSV write interruption: partial row rejected, repaired, and recovered')
+
+    netcdf_fault_source = netcdf_source
+    netcdf_fault_control = prepare(
+        'netcdf-fault-control', parameter(netcdf_fault_source, 'T_END', '0.045'))
+    run(netcdf_fault_control, 'full.log')
+    case = prepare('fault-injected-netcdf', netcdf_fault_source)
+    run(case, 'netcdf-initial.log')
+    diagnostic_dir = diagnostics(case)
+    intact_diagnostics = {path.name:path.read_bytes()
+                          for path in diagnostic_dir.glob('*.csv')}
+    continuation(case, end=0.045)
+    run_fault(case, 'netcdf-interruption.log', netcdf_time_occurrence=1)
+    netcdf_helper('partial-check', netcdf_path(case), '0.03')
+    netcdf_hash_before = sha(netcdf_path(case))
+    manifest_before = (case/'OUTPUT'/'TEST_2D'/'metadata'/
+                       'output_manifest.csv').read_bytes()
+    checkpoint_before = sha(checkpoint(case))
+    output_hashes_before = tree_hashes(case/'OUTPUT'/'TEST_2D')
+    run(case, 'netcdf-fault-orphan-rejected.log',
+        'uncommitted snapshot directory')
+    assert tree_hashes(case/'OUTPUT'/'TEST_2D') == output_hashes_before
+    next_output_index = struct.unpack('<i', records(checkpoint(case))[5][:4])[0]
+    for directory in (case/'OUTPUT'/'TEST_2D'/'snapshots').iterdir():
+        match = re.match(r'(\d+)_t_', directory.name)
+        if match and int(match[1]) >= next_output_index:
+            shutil.rmtree(directory)
+    for name, content in intact_diagnostics.items():
+        (diagnostic_dir/name).write_bytes(content)
+    run(case, 'netcdf-fault-recovered.log')
+    assert sha(netcdf_path(case)) != netcdf_hash_before
+    assert (case/'OUTPUT'/'TEST_2D'/'metadata'/'output_manifest.csv').read_bytes() != \
+        manifest_before
+    assert sha(checkpoint(case)) != checkpoint_before
+    assert records(checkpoint(netcdf_fault_control)) == records(checkpoint(case))
+    netcdf_helper('compare', netcdf_path(netcdf_fault_control), netcdf_path(case))
+    assert (case/'OUTPUT'/'TEST_2D'/'metadata'/'output_manifest.csv').read_bytes() == \
+        (netcdf_fault_control/'OUTPUT'/'TEST_2D'/'metadata'/
+         'output_manifest.csv').read_bytes()
+    assert snapshot(case, 'TEST_2D_0003.q_2d').read_bytes() == \
+        snapshot(netcdf_fault_control, 'TEST_2D_0003.q_2d').read_bytes()
+    for filename in ('TEST_2D_runout.csv', 'TEST_2D_mass_center.csv'):
+        assert require_output(netcdf_fault_control, filename).read_bytes() == \
+            require_output(case, filename).read_bytes()
+    passed('real NetCDF interruption after synced time record: partial field repaired and recovered')
 
     case = prepare('reject-v4')
     payloads = records(source_case/'split_checkpoint.bin')

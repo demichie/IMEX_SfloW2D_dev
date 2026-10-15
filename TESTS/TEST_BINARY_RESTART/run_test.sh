@@ -215,5 +215,23 @@ command -v nc-config >/dev/null 2>&1 || {
 }
 ${CC:-cc} $(nc-config --cflags) "$test_dir/netcdf_restart_helper.c" \
     -o "$work_dir/netcdf_restart_helper" $(nc-config --libs)
-PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/test_runout_restart.py" \
-    "$executable" --netcdf-helper "$work_dir/netcdf_restart_helper"
+case "$(uname -s)" in
+    Darwin)
+        fault_injector="$work_dir/output_fault_injector.dylib"
+        ${CC:-cc} $(nc-config --cflags) -dynamiclib -fPIC \
+            "$test_dir/output_fault_injector.c" -o "$fault_injector" \
+            $(nc-config --libs)
+        ;;
+    Linux)
+        fault_injector="$work_dir/output_fault_injector.so"
+        ${CC:-cc} $(nc-config --cflags) -shared -fPIC \
+            "$test_dir/output_fault_injector.c" -o "$fault_injector" -ldl
+        ;;
+    *)
+        echo "FAIL: fault injection requires macOS or Linux" >&2
+        exit 2
+        ;;
+esac
+PYTHONDONTWRITEBYTECODE=1 ${PYTHON:-python3} "$test_dir/test_runout_restart.py" \
+    "$executable" --netcdf-helper "$work_dir/netcdf_restart_helper" \
+    --fault-injector "$fault_injector"

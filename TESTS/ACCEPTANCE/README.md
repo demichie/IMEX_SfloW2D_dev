@@ -142,6 +142,25 @@ in place of the preprocessing script's pandas table reader; its geometry and
 formatters are unchanged. Generated-data checksums remain in the evidence.
 Native NetCDF is decoded sequentially through the installed C library.
 
+When source hashes differ from the signed baseline and no current lava
+revalidation is available, a fresh current-source diagnostic can be run
+without reusing that approval:
+
+```sh
+PYTHONDONTWRITEBYTECODE=1 python3 TESTS/ACCEPTANCE/n9_long_cases.py \
+  --repo /absolute/path/to/IMEX_SfloW2D_dev \
+  --build-audit /absolute/path/to/current-acceptance-build \
+  --diagnostic-current-source \
+  --output /tmp/imex-n9-current-diagnostic
+```
+
+This mode requires every current `src/` Fortran, include and C source hash to
+match the supplied build audit. It records fresh full/split, thread,
+checkpoint, NetCDF, raster and diagnostic observations, but does not compare
+against the historical scientific baseline or approve N9; `n9_decision`
+remains `open`. A scientific owner must review and sign off any extension of
+the prior baseline approval separately.
+
 To independently recharacterize retained completed full/split payloads without
 rerunning or overwriting any of them, add
 `--characterize-completed /absolute/path/to/retained-case-root` and choose a new

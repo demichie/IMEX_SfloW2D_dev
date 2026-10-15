@@ -923,16 +923,24 @@ Il confronto con la baseline A11 è stato eseguito sul commit `3f7329c85d2e30e33
 
 Acceptance r4 è stata eseguita sul candidato working-tree basato su `6b7ff8dd56acbe9b1eaa518c1313fad0f8e15aad` (snapshot di 414 file, SHA-256 della patch `87bdfd72edf3fe067e5bdac6de051733dd4d588acdeeba12bf5ef1f0b2124669`), su macOS arm64, con profili `strict_debug` e `historical_optimized`: build riuscite, 45/45 esecuzioni passate e 8 confronti bitwise tra thread passati. Manifest locale: `/tmp/imex-c03-acceptance-6b7ff8dd-20261015-r4/manifest.json` (SHA-256 `ae8ca4bcfb6be5ba03c91cca5fe28f9e7aa83f89244cd5a9337738c4496c1b06`). Il risultato riporta tuttavia `n9_accepted=false` e `n9_decision=open`: i casi N9 long non sono stati rieseguiti, perché l’harness rifiuta l’evidenza v5 con hash sorgente non corrispondenti al candidato. Non trasferire quindi al candidato la precedente decisione/evidenza N9. I test Python `TESTS/ACCEPTANCE` risultano 23/24; l’unico fallimento è il controllo storico dell’hash del fixture `TESTS/TEST_GEOMETRY_1D/run_test.sh`, che non è stato modificato.
 
-Queste evidenze non chiudono C03: restano la campagna N9 sulla revisione corrente e la relativa decisione scientifica separata, i fault injection reali durante scrittura/ripresa di snapshot e manifest e durante append NetCDF/CSV (il controllo NetCDF parziale attuale è sintetico), oltre agli audit end-to-end ancora indicati nella checklist.
+#### Fault injection end-to-end — 15 ottobre 2026
+
+`TESTS/TEST_BINARY_RESTART/run_test.sh` è stata eseguita sul build audit `historical_optimized` con un thread effettivo: **29/29 controlli PASS**. Il helper d'interposizione è compilabile per macOS/Linux; questa esecuzione è stata validata su macOS arm64. Per snapshot, manifest e CSV interrompe una vera chiamata `write` sul file aperto dopo aver scritto metà del buffer; per NetCDF si arresta dopo la sincronizzazione del record `time`, prima dei campi del record. Il restart rifiuta i file incompleti senza ulteriori modifiche; dopo la riparazione esplicita dei soli artefatti incoerenti, checkpoint, manifest, snapshot, CSV e dati NetCDF recuperati corrispondono alla traiettoria di controllo. Evidenza: `/var/folders/gh/4whp2yg162q27q7q47ng3s200000gn/T/imex-runout-restart-40gdlxoa/evidence.json` (SHA-256 `965840b1451a1e24b9bf3e769736f486614e7713d2928f013053d0aa4b5d345b`); eseguibile SHA-256 `d9c01b6ee47b565df6022757de6d60b5cb68ceac4891476f9d5c67ba68afc722`. Questo risultato è limitato al build, al sistema operativo e al thread indicati; non sostituisce la matrice multi-toolchain/thread né chiude C03.
+
+#### Acceptance/N9 diagnostica r4 — sorgenti correnti
+
+La campagna diagnostica N9 è stata completata sul build audit r4 e sulla revisione sorgente `0a46c555bdaa8a9337213a8dfa0231dedaf522a9`, in modalità `current_build_audit_diagnostic`. Risultato: **8/8 continuazioni fisiche PASS**, nessun fallimento, nessuna anomalia diagnostica e **4/4 confronti di thread PASS** per ETNA ed ETNA_LAVA nei profili `historical_optimized` e `strict_debug`. Evidenza: `/tmp/imex-c03-n9-diagnostic-0a46c555-r4/evidence.json` (SHA-256 `350a7e5540089cc075d06ab12b4ba2504dbf4e384545d548841daf42b347fd49`). È una verifica diagnostica sui sorgenti correnti, non un confronto scientifico approvativo con la baseline: `n9_decision=open` e `N9_scientific_approval=false` restano invariati.
+
+Queste evidenze non chiudono C03: resta la decisione scientifica N9 separata, oltre agli audit end-to-end ancora indicati nella checklist.
 
 #### Checklist consolidata per la chiusura di C03 (inclusi i requisiti già previsti)
 
 - [ ] Audit completo di tutte le scritture del solver e controllo che nessun output venga creato fuori da `<OUTPUT_BASE_DIRECTORY>/<RUN_NAME>/`.
 - [x] Confronti quantitativi/bitwise appropriati con A11 per campi, diagnostiche, file e tempi di output, senza estendere lo scope scientifico A11.
-- [ ] Esecuzione completa dell'Acceptance/N9 adattato ai nuovi percorsi; `n9_decision` resta una decisione separata.
+- [ ] Valutazione scientifica e decisione N9 sulla revisione corrente; la campagna diagnostica r4 non costituisce sign-off.
 - [ ] Matrice restart v5 in-place/esterno, append NetCDF/CSV, interruzione e ripresa senza perdita o sovrascrittura di risultati validi.
 - [ ] Multi-run, collisioni, `RUN_NAME`, overwrite, traversal, symlink/hard link, percorsi relativi/assoluti e scratch HPC.
-- [ ] Verifiche aggiuntive C03-R1–R4 e registrazione di risultati e riproducibilità.
+- [x] Verifiche aggiuntive C03-R1–R4 e registrazione di risultati e riproducibilità.
 - [ ] Audit e prova end-to-end di EXAMPLES, script di post-processing, manifest e documentazione GitHub Pages.
 - [ ] Avvio di C04–C06 solo dopo l'accettazione di C03, secondo il sequenziamento esistente.
 

@@ -46,6 +46,123 @@ static int append_partial_time_record(const char *path, double time_value)
     return report_netcdf_error(status, "close");
 }
 
+static int verify_partial_time_record(const char *path, double expected_time)
+{
+    int ncid, time_dimid, time_varid, field_varid, status;
+    int field_rank, field_dimids[NC_MAX_VAR_DIMS], time_axis = -1;
+    size_t time_length, start[NC_MAX_VAR_DIMS], count[NC_MAX_VAR_DIMS];
+    size_t record_values = 1;
+    size_t axis, i;
+    double *times = NULL, *field_values = NULL;
+    double fill_value = NC_FILL_DOUBLE;
+    char dimension_name[NC_MAX_NAME + 1];
+    int result = 1, has_written_field_value = 0;
+
+    status = nc_open(path, NC_NOWRITE, &ncid);
+    if (report_netcdf_error(status, "open partially written dataset")) return 1;
+    status = nc_inq_dimid(ncid, "time", &time_dimid);
+    if (report_netcdf_error(status, "find partial time dimension")) goto done;
+    status = nc_inq_dimlen(ncid, time_dimid, &time_length);
+    if (report_netcdf_error(status, "read partial time dimension")) goto done;
+    if (time_length != 3) {
+        fprintf(stderr, "expected 3 time records after injected interruption, got %zu\n",
+                time_length);
+        goto done;
+    }
+    status = nc_inq_varid(ncid, "time", &time_varid);
+    if (report_netcdf_error(status, "find partial time variable")) goto done;
+    times = malloc(time_length * sizeof(*times));
+    if (times == NULL) {
+        fprintf(stderr, "cannot allocate partial time buffer\n");
+        goto done;
+    }
+    status = nc_get_var_double(ncid, time_varid, times);
+    if (report_netcdf_error(status, "read partial time records")) goto done;
+    if (!isfinite(times[2]) || fabs(times[2] - expected_time) > 1.e-12) {
+        fprintf(stderr, "unexpected interrupted time record: %.17g vs %.17g\n",
+                times[2], expected_time);
+        goto done;
+    }
+
+    status = nc_inq_varid(ncid, "h", &field_varid);
+    if (report_netcdf_error(status, "find partial field variable")) goto done;
+    status = nc_inq_var(ncid, field_varid, NULL, NULL, &field_rank,
+                        field_dimids, NULL);
+    if (report_netcdf_error(status, "inspect partial field variable")) goto done;
+    if (field_rank < 1 || field_rank > NC_MAX_VAR_DIMS) {
+        fprintf(stderr, "invalid partial field rank: %d\n", field_rank);
+        goto done;
+    }
+    for (axis = 0; axis < (size_t)field_rank; ++axis) {
+        size_t dimension_length;
+        status = nc_inq_dim(ncid, field_dimids[axis], dimension_name,
+                            &dimension_length);
+        if (report_netcdf_error(status, "inspect partial field dimension")) goto done;
+        start[axis] = 0;
+        count[axis] = dimension_length;
+        if (strcmp(dimension_name, "time") == 0) {
+            if (time_axis >= 0) {
+                fprintf(stderr, "partial field has multiple time dimensions\n");
+                goto done;
+            }
+            time_axis = (int)axis;
+            count[axis] = 1;
+        } else {
+            if (dimension_length != 0 &&
+                record_values > SIZE_MAX / dimension_length) {
+                fprintf(stderr, "partial field record exceeds addressable size\n");
+                goto done;
+            }
+            record_values *= dimension_length;
+        }
+    }
+    if (time_axis < 0 || record_values == 0 ||
+        record_values > SIZE_MAX / sizeof(*field_values)) {
+        fprintf(stderr, "partial field has no usable time slice\n");
+        goto done;
+    }
+    status = nc_get_att_double(ncid, field_varid, "_FillValue", &fill_value);
+    if (status != NC_NOERR && status != NC_ENOTATT) {
+        report_netcdf_error(status, "read partial field fill value");
+        goto done;
+    }
+    field_values = malloc(record_values * sizeof(*field_values));
+    if (field_values == NULL) {
+        fprintf(stderr, "cannot allocate partial field buffer\n");
+        goto done;
+    }
+    status = nc_get_vara_double(ncid, field_varid, start, count, field_values);
+    if (report_netcdf_error(status, "read completed field record")) goto done;
+    for (i = 0; i < record_values; ++i) {
+        if (!isfinite(field_values[i])) {
+            fprintf(stderr, "completed field record contains a non-finite value\n");
+            goto done;
+        }
+        if (field_values[i] != fill_value) has_written_field_value = 1;
+    }
+    if (!has_written_field_value) {
+        fprintf(stderr, "completed field record contains only fill values\n");
+        goto done;
+    }
+
+    start[time_axis] = time_length - 1;
+    status = nc_get_vara_double(ncid, field_varid, start, count, field_values);
+    if (report_netcdf_error(status, "read interrupted field record")) goto done;
+    for (i = 0; i < record_values; ++i) {
+        if (field_values[i] != fill_value) {
+            fprintf(stderr, "interrupted field record contains written data at %zu\n", i);
+            goto done;
+        }
+    }
+    result = 0;
+
+done:
+    free(field_values);
+    free(times);
+    nc_close(ncid);
+    return result;
+}
+
 static int compare_variable_data(int left_ncid, int right_ncid,
                                  const char *name, size_t value_count)
 {
@@ -187,10 +304,19 @@ int main(int argc, char **argv)
         }
         return append_partial_time_record(argv[2], time_value);
     }
+    if (argc == 4 && strcmp(argv[1], "partial-check") == 0) {
+        time_value = strtod(argv[3], &end);
+        if (end == argv[3] || *end != '\0' || !isfinite(time_value)) {
+            fprintf(stderr, "invalid expected partial time value\n");
+            return 2;
+        }
+        return verify_partial_time_record(argv[2], time_value);
+    }
     if (argc == 4 && strcmp(argv[1], "compare") == 0) {
         return compare_outputs(argv[2], argv[3]);
     }
-    fprintf(stderr, "Usage: %s partial FILE TIME | compare REFERENCE RESUMED\n",
+    fprintf(stderr, "Usage: %s partial FILE TIME | partial-check FILE TIME | "
+            "compare REFERENCE RESUMED\n",
             argv[0]);
     return 2;
 }

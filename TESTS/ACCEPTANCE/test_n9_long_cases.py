@@ -21,6 +21,27 @@ def archived_digest(revision, path):
 
 
 class N9Helpers(unittest.TestCase):
+    def test_current_diagnostic_source_hashes_require_exact_build_inventory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            repo = Path(temporary)
+            source = repo/'src/io/output_paths.f90'
+            source.parent.mkdir(parents=True)
+            source.write_text('module output_paths\nend module\n')
+            source_hash = n9.digest(source)
+            audit = {'source_and_fixture_sha256': {
+                'src/io/output_paths.f90': source_hash,
+                'src/io/output_dirs.c': '0'*64,
+            }}
+            (repo/'src/io/output_dirs.c').write_text('int output_dirs(void) { return 0; }\n')
+            audit['source_and_fixture_sha256']['src/io/output_dirs.c'] = n9.digest(
+                repo/'src/io/output_dirs.c')
+
+            self.assertEqual(n9.audited_current_source_hashes(repo, audit),
+                             audit['source_and_fixture_sha256'])
+            source.write_text('module changed_output_paths\nend module\n')
+            with self.assertRaises(AssertionError):
+                n9.audited_current_source_hashes(repo, audit)
+
     def test_dated_evidence_retains_physical_success_and_diagnostic_failure(self):
         """Keep the original v4 failure report as immutable historical evidence."""
         evidence = json.loads((REPO/'docs/acceptance/results_n9_long_cases_2026_10_11.json').read_text())
@@ -130,6 +151,8 @@ class N9Helpers(unittest.TestCase):
                    struct.pack('<9i',2,3,4,0,0,0,0,6,5), struct.pack('<2i',0,0),
                    struct.pack('<4d',3600,.1,.1,.2), b'output schedule',
                    q.tobytes(order='F'), np.zeros((3,4),dtype='<f8').tobytes(order='F')]
+        if version == 5:
+            records.extend([b'v5 extension record']*13)
         with path.open('wb') as stream:
             for i, record in enumerate(records):
                 marker = struct.pack('<i',len(record))
@@ -139,14 +162,15 @@ class N9Helpers(unittest.TestCase):
     def test_checkpoint_header_layout_and_fortran_order(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary)/'checkpoint.bin'
-            expected = self.records(path)
-            info, actual = n9.checkpoint(path)
-            self.assertEqual(info['magic'], 'IMEX_SFLOW2D_RST')
-            self.assertEqual(info['version'], 4)
-            self.assertEqual(info['layout'][:3], [2,3,4])
-            self.assertTrue(np.array_equal(actual,expected))
-            self.assertEqual(info['conservative_sha256'],
-                             hashlib.sha256(expected.tobytes(order='F')).hexdigest())
+            for version in (4, 5):
+                expected = self.records(path,version=version)
+                info, actual = n9.checkpoint(path)
+                self.assertEqual(info['magic'], 'IMEX_SFLOW2D_RST')
+                self.assertEqual(info['version'], version)
+                self.assertEqual(info['layout'][:3], [2,3,4])
+                self.assertTrue(np.array_equal(actual,expected))
+                self.assertEqual(info['conservative_sha256'],
+                                 hashlib.sha256(expected.tobytes(order='F')).hexdigest())
 
     def test_bad_checkpoint_version_and_record_markers_fail(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -175,11 +199,13 @@ class N9Helpers(unittest.TestCase):
             root=Path(temporary);full=root/'full';split=root/'split'
             full.mkdir();split.mkdir()
             for directory in (full,split):
+                output = directory/'OUTPUT'/'case'/'diagnostics'
+                output.mkdir(parents=True)
                 for suffix in ('runout','mass_center'):
-                    (directory/f'case_{suffix}.csv').write_text('Time (s), a,b,c,d\n0,0,1,2,3\n1,2,3,4,5\n')
+                    (output/f'case_{suffix}.csv').write_text('Time (s), a,b,c,d\n0,0,1,2,3\n1,2,3,4,5\n')
             result=n9.diagnostic_comparison(full,split,'case')
             self.assertTrue(all(v['status']=='pass' for v in result.values()))
-            path=split/'bad.csv'
+            path=split/'OUTPUT'/'case'/'diagnostics'/'bad.csv'
             for content in ('0,nan,1,2,3\n','0,0,1,2,3\n0,0,1,2,3\n'):
                 path.write_text(content)
                 with self.assertRaises(AssertionError):
