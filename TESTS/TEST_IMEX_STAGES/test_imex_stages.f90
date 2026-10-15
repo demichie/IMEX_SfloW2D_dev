@@ -61,7 +61,7 @@ PROGRAM test_imex_stages
   CHARACTER(LEN=32) :: argument
   INTEGER :: nx,ny,slope,curvature,limiter_id,input_unit,output_unit,j,k,i,step
   INTEGER :: threads,actual_threads,stages,steps,drag,observe,l
-  INTEGER :: composition_mode
+  INTEGER :: composition_mode,boundary_test_mode
 
   CALL get_command_argument(1,argument); READ(argument,*) threads
   CALL get_command_argument(2,argument); READ(argument,*) stages
@@ -74,6 +74,10 @@ PROGRAM test_imex_stages
   CALL get_command_argument(6,argument)
   IF (LEN_TRIM(argument)>0) READ(argument,*) composition_mode
   IF (composition_mode<0 .OR. composition_mode>3) ERROR STOP 'invalid composition fixture mode'
+  boundary_test_mode=0
+  CALL get_command_argument(7,argument)
+  IF (LEN_TRIM(argument)>0) READ(argument,*) boundary_test_mode
+  IF (boundary_test_mode<0 .OR. boundary_test_mode>1) ERROR STOP 'invalid boundary test mode'
   IF (stages<2 .OR. stages>4 .OR. steps<1) ERROR STOP 'invalid test controls'
   !$OMP PARALLEL
   !$OMP SINGLE
@@ -91,9 +95,13 @@ PROGRAM test_imex_stages
   READ(input_unit,*) q
   CLOSE(input_unit)
   q0=q; qp=0.0_wp; qp(4,:,:)=T_ambient; Z=0.0_wp; t=0.0_wp
+  CALL refresh_topography_geometry
+  IF (boundary_test_mode==1) THEN
+     CALL run_boundary_reconstruction_tests
+     STOP 0
+  END IF
   ALLOCATE(known(n_vars,nx,ny,n_RK),solved(n_vars,nx,ny,n_RK),raw_final(n_vars,nx,ny))
   ALLOCATE(seen(3,nx,ny,n_RK),implicit_statuses(nx,ny,n_RK),statistics(15,steps),initial_mask(nx,ny))
-  CALL refresh_topography_geometry
   mass0=SUM(q(1,:,:))
   IF (composition_mode>0) THEN
      ALLOCATE(composition_audit(2*(n_vars+1)+5,steps),inventory0(n_vars+1))
@@ -209,6 +217,266 @@ CONTAINS
        minima(3)=MIN(minima(3),1.0_wp-cell(5)/cell(1))
     END IF
   END SUBROUTINE admissibility_values
+
+  !> \brief Exercise production linear boundary slopes, source traces and collapsed axes.
+  SUBROUTINE run_boundary_reconstruction_tests
+    USE equation_terms_2d, ONLY : eval_source_bdry
+    TYPE(reconstruction_workspace_type) :: boundary_reconstruction
+    REAL(wp), ALLOCATABLE :: boundary_qp(:,:,:)
+    INTEGER, ALLOCATABLE :: boundary_j(:),boundary_k(:)
+    REAL(wp) :: x_gradient,y_gradient,center_value,boundary_value,slope_value,expected
+    REAL(wp) :: source_temperature,source_state(n_vars+2)
+    INTEGER :: cell_j,cell_k,cell_l,side,boundary_flag,side_index,unit
+
+    ALLOCATE(boundary_qp(n_vars+2,nx,ny),boundary_j(nx*ny),boundary_k(nx*ny))
+    x_gradient=2.0_wp
+    y_gradient=3.0_wp
+    DO cell_k=1,ny
+       DO cell_j=1,nx
+          boundary_qp(:,cell_j,cell_k)=0.0_wp
+          boundary_qp(1,cell_j,cell_k)=1.0_wp
+          boundary_qp(2,cell_j,cell_k)=0.3_wp
+          boundary_qp(3,cell_j,cell_k)=-0.2_wp
+          boundary_qp(idx_T,cell_j,cell_k)=T_ambient+x_gradient*x_comp(cell_j)+ &
+               y_gradient*y_comp(cell_k)
+          boundary_qp(idx_solid_first,cell_j,cell_k)=0.2_wp
+          boundary_qp(idx_u,cell_j,cell_k)=0.3_wp
+          boundary_qp(idx_v,cell_j,cell_k)=-0.2_wp
+          cell_l=cell_j+(cell_k-1)*nx
+          boundary_j(cell_l)=cell_j
+          boundary_k(cell_l)=cell_k
+       END DO
+    END DO
+
+    limiter(idx_T)=5
+    CALL boundary_reconstruction%initialize
+    source_cell=0
+    sourceW=.FALSE.; sourceE=.FALSE.; sourceS=.FALSE.; sourceN=.FALSE.
+    lateral_source_flag=.FALSE.; radial_source_flag=.FALSE.
+
+    DO side=1,4
+       IF ((side<=2 .AND. nx<=1) .OR. (side>=3 .AND. ny<=1)) CYCLE
+       DO boundary_flag=0,2
+          bcW%flag=1; bcE%flag=1; bcS%flag=1; bcN%flag=1
+          bcW%value=0.0_wp; bcE%value=0.0_wp
+          bcS%value=0.0_wp; bcN%value=0.0_wp
+          SELECT CASE(side)
+          CASE(1)
+             side_index=MAX(1,MIN(ny,(ny+1)/2))
+             boundary_value=T_ambient+y_gradient*y_comp(side_index)
+             bcW(idx_T)%flag=boundary_flag; bcW(idx_T)%value=boundary_value
+             cell_j=1; cell_k=side_index; slope_value=x_gradient
+          CASE(2)
+             side_index=MAX(1,MIN(ny,(ny+1)/2))
+             boundary_value=T_ambient+x_gradient*x_stag(nx+1)+y_gradient*y_comp(side_index)
+             bcE(idx_T)%flag=boundary_flag; bcE(idx_T)%value=boundary_value
+             cell_j=nx; cell_k=side_index; slope_value=x_gradient
+          CASE(3)
+             side_index=MAX(1,MIN(nx,(nx+1)/2))
+             boundary_value=T_ambient+x_gradient*x_comp(side_index)
+             bcS(idx_T)%flag=boundary_flag; bcS(idx_T)%value=boundary_value
+             cell_j=side_index; cell_k=1; slope_value=y_gradient
+          CASE(4)
+             side_index=MAX(1,MIN(nx,(nx+1)/2))
+             boundary_value=T_ambient+x_gradient*x_comp(side_index)+y_gradient*y_stag(ny+1)
+             bcN(idx_T)%flag=boundary_flag; bcN(idx_T)%value=boundary_value
+             cell_j=side_index; cell_k=ny; slope_value=y_gradient
+          END SELECT
+          IF (boundary_flag==1) THEN
+             SELECT CASE(side)
+             CASE(1)
+                bcW(idx_T)%value=slope_value
+             CASE(2)
+                bcE(idx_T)%value=slope_value
+             CASE(3)
+                bcS(idx_T)%value=slope_value
+             CASE(4)
+                bcN(idx_T)%value=slope_value
+             END SELECT
+          END IF
+
+          CALL boundary_reconstruction%reconstruct(boundary_qp,0.0_wp,nx*ny, &
+               boundary_j,boundary_k)
+          center_value=boundary_qp(idx_T,cell_j,cell_k)
+          SELECT CASE(side)
+          CASE(1)
+             expected=center_value-reconstr_coeff*dx2*slope_value
+             IF (boundary_flag==0) expected=boundary_value
+             CALL assert_boundary_value('west trace', &
+                  boundary_reconstruction%qp_cellW(idx_T,cell_j,cell_k),expected)
+             expected=center_value+reconstr_coeff*dx2*slope_value
+             CALL assert_boundary_value('west interior trace', &
+                  boundary_reconstruction%qp_cellE(idx_T,cell_j,cell_k),expected)
+          CASE(2)
+             expected=center_value+reconstr_coeff*dx2*slope_value
+             IF (boundary_flag==0) expected=boundary_value
+             CALL assert_boundary_value('east trace', &
+                  boundary_reconstruction%qp_cellE(idx_T,cell_j,cell_k),expected)
+             expected=center_value-reconstr_coeff*dx2*slope_value
+             CALL assert_boundary_value('east interior trace', &
+                  boundary_reconstruction%qp_cellW(idx_T,cell_j,cell_k),expected)
+          CASE(3)
+             expected=center_value-reconstr_coeff*dy2*slope_value
+             IF (boundary_flag==0) expected=boundary_value
+             CALL assert_boundary_value('south trace', &
+                  boundary_reconstruction%qp_cellS(idx_T,cell_j,cell_k),expected)
+             expected=center_value+reconstr_coeff*dy2*slope_value
+             CALL assert_boundary_value('south interior trace', &
+                  boundary_reconstruction%qp_cellN(idx_T,cell_j,cell_k),expected)
+          CASE(4)
+             expected=center_value+reconstr_coeff*dy2*slope_value
+             IF (boundary_flag==0) expected=boundary_value
+             CALL assert_boundary_value('north trace', &
+                  boundary_reconstruction%qp_cellN(idx_T,cell_j,cell_k),expected)
+             expected=center_value-reconstr_coeff*dy2*slope_value
+             CALL assert_boundary_value('north interior trace', &
+                  boundary_reconstruction%qp_cellS(idx_T,cell_j,cell_k),expected)
+          END SELECT
+       END DO
+    END DO
+
+    IF (nx==1) THEN
+       CALL boundary_reconstruction%reconstruct(boundary_qp,0.0_wp,nx*ny, &
+            boundary_j,boundary_k)
+       DO cell_k=1,ny
+          CALL assert_boundary_value('collapsed x west', &
+               boundary_reconstruction%qp_cellW(idx_T,1,cell_k), &
+               boundary_qp(idx_T,1,cell_k))
+          CALL assert_boundary_value('collapsed x east', &
+               boundary_reconstruction%qp_cellE(idx_T,1,cell_k), &
+               boundary_qp(idx_T,1,cell_k))
+       END DO
+    END IF
+    IF (ny==1) THEN
+       CALL boundary_reconstruction%reconstruct(boundary_qp,0.0_wp,nx*ny, &
+            boundary_j,boundary_k)
+       DO cell_j=1,nx
+          CALL assert_boundary_value('collapsed y south', &
+               boundary_reconstruction%qp_cellS(idx_T,cell_j,1), &
+               boundary_qp(idx_T,cell_j,1))
+          CALL assert_boundary_value('collapsed y north', &
+               boundary_reconstruction%qp_cellN(idx_T,cell_j,1), &
+               boundary_qp(idx_T,cell_j,1))
+       END DO
+    END IF
+
+    IF (nx>=3 .AND. ny>=3) THEN
+       CALL allocate_boundary_source_vectors
+       lateral_source_flag=.TRUE.; radial_source_flag=.FALSE.
+       h_source=2.0_wp; vel_source=0.25_wp; T_source=350.0_wp
+       xs_source(1:n_solid)=0.2_wp
+       time_param=[1.0_wp,1.0_wp,0.0_wp,10.0_wp]
+       source_temperature=T_source
+       CALL eval_source_bdry(0.0_wp,1.0_wp,0.0_wp,source_state)
+       CALL assert_boundary_value('source boundary helper temperature', &
+            source_state(idx_T),source_temperature)
+       DO side=1,2
+          source_cell=0
+          sourceW=.FALSE.; sourceE=.FALSE.; sourceS=.FALSE.; sourceN=.FALSE.
+          sourceW_vect_x=0.0_wp; sourceW_vect_y=0.0_wp
+          sourceE_vect_x=0.0_wp; sourceE_vect_y=0.0_wp
+          sourceS_vect_x=0.0_wp; sourceS_vect_y=0.0_wp
+          sourceN_vect_x=0.0_wp; sourceN_vect_y=0.0_wp
+          SELECT CASE(side)
+          CASE(1)
+             cell_j=1; cell_k=(ny+1)/2
+             sourceW(cell_j,cell_k)=.TRUE.; sourceW_vect_x(cell_j,cell_k)=1.0_wp
+          CASE(2)
+             cell_j=nx; cell_k=(ny+1)/2
+             sourceE(cell_j,cell_k)=.TRUE.; sourceE_vect_x(cell_j,cell_k)=-1.0_wp
+          END SELECT
+          source_cell(cell_j,cell_k)=2
+          CALL boundary_reconstruction%reconstruct(boundary_qp,0.0_wp,nx*ny, &
+               boundary_j,boundary_k)
+          SELECT CASE(side)
+          CASE(1)
+             expected=boundary_reconstruction%qp_interfaceR(idx_T,cell_j,cell_k)
+          CASE(2)
+             expected=boundary_reconstruction%qp_interfaceL(idx_T,cell_j+1,cell_k)
+          END SELECT
+          CALL assert_boundary_value('lateral source trace',expected,source_temperature)
+       END DO
+
+       lateral_source_flag=.FALSE.; radial_source_flag=.TRUE.
+       DO side=1,4
+          source_cell=0
+          sourceW=.FALSE.; sourceE=.FALSE.; sourceS=.FALSE.; sourceN=.FALSE.
+          SELECT CASE(side)
+          CASE(1)
+             cell_j=2; cell_k=(ny+1)/2; sourceW(cell_j,cell_k)=.TRUE.
+          CASE(2)
+             cell_j=nx-1; cell_k=(ny+1)/2; sourceE(cell_j,cell_k)=.TRUE.
+          CASE(3)
+             cell_j=(nx+1)/2; cell_k=2; sourceS(cell_j,cell_k)=.TRUE.
+          CASE(4)
+             cell_j=(nx+1)/2; cell_k=ny-1; sourceN(cell_j,cell_k)=.TRUE.
+          END SELECT
+          source_cell(cell_j,cell_k)=2
+          CALL boundary_reconstruction%reconstruct(boundary_qp,0.0_wp,nx*ny, &
+               boundary_j,boundary_k)
+          SELECT CASE(side)
+          CASE(1)
+             CALL assert_boundary_value('radial west momentum reflection', &
+                  boundary_reconstruction%qp_interfaceL(2,cell_j,cell_k), &
+                  -boundary_reconstruction%qp_interfaceR(2,cell_j,cell_k))
+             CALL assert_boundary_value('radial west velocity reflection', &
+                  boundary_reconstruction%qp_interfaceL(idx_u,cell_j,cell_k), &
+                  -boundary_reconstruction%qp_interfaceR(idx_u,cell_j,cell_k))
+          CASE(2)
+             CALL assert_boundary_value('radial east momentum reflection', &
+                  boundary_reconstruction%qp_interfaceR(2,cell_j+1,cell_k), &
+                  -boundary_reconstruction%qp_interfaceL(2,cell_j+1,cell_k))
+             CALL assert_boundary_value('radial east velocity reflection', &
+                  boundary_reconstruction%qp_interfaceR(idx_u,cell_j+1,cell_k), &
+                  -boundary_reconstruction%qp_interfaceL(idx_u,cell_j+1,cell_k))
+          CASE(3)
+             CALL assert_boundary_value('radial south momentum reflection', &
+                  boundary_reconstruction%qp_interfaceB(3,cell_j,cell_k), &
+                  -boundary_reconstruction%qp_interfaceT(3,cell_j,cell_k))
+             CALL assert_boundary_value('radial south velocity reflection', &
+                  boundary_reconstruction%qp_interfaceB(idx_v,cell_j,cell_k), &
+                  -boundary_reconstruction%qp_interfaceT(idx_v,cell_j,cell_k))
+          CASE(4)
+             CALL assert_boundary_value('radial north momentum reflection', &
+                  boundary_reconstruction%qp_interfaceT(3,cell_j,cell_k+1), &
+                  -boundary_reconstruction%qp_interfaceB(3,cell_j,cell_k+1))
+             CALL assert_boundary_value('radial north velocity reflection', &
+                  boundary_reconstruction%qp_interfaceT(idx_v,cell_j,cell_k+1), &
+                  -boundary_reconstruction%qp_interfaceB(idx_v,cell_j,cell_k+1))
+          END SELECT
+       END DO
+    END IF
+
+    OPEN(NEWUNIT=unit,FILE='boundary_traces.bin',ACCESS='STREAM', &
+         FORM='UNFORMATTED',STATUS='REPLACE')
+    WRITE(unit) boundary_reconstruction%qp_cellW,boundary_reconstruction%qp_cellE
+    WRITE(unit) boundary_reconstruction%qp_cellS,boundary_reconstruction%qp_cellN
+    WRITE(unit) boundary_reconstruction%qp_interfaceL,boundary_reconstruction%qp_interfaceR
+    WRITE(unit) boundary_reconstruction%qp_interfaceB,boundary_reconstruction%qp_interfaceT
+    CLOSE(unit)
+    CALL boundary_reconstruction%finalize
+    WRITE(*,*) 'PASS: W/E/S/N boundary modes, sources and collapsed-axis reconstruction'
+  END SUBROUTINE run_boundary_reconstruction_tests
+
+  SUBROUTINE allocate_boundary_source_vectors
+    IF (.NOT.ALLOCATED(sourceW_vect_x)) THEN
+       ALLOCATE(sourceW_vect_x(nx,ny),sourceW_vect_y(nx,ny))
+       ALLOCATE(sourceE_vect_x(nx,ny),sourceE_vect_y(nx,ny))
+       ALLOCATE(sourceS_vect_x(nx,ny),sourceS_vect_y(nx,ny))
+       ALLOCATE(sourceN_vect_x(nx,ny),sourceN_vect_y(nx,ny))
+    END IF
+  END SUBROUTINE allocate_boundary_source_vectors
+
+  SUBROUTINE assert_boundary_value(label,actual,expected)
+    CHARACTER(LEN=*), INTENT(IN) :: label
+    REAL(wp), INTENT(IN) :: actual,expected
+    REAL(wp) :: tolerance
+    tolerance=512.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,ABS(expected))
+    IF (ABS(actual-expected)>tolerance) THEN
+       WRITE(*,*) 'FAIL: ',TRIM(label),actual,expected
+       ERROR STOP 1
+    END IF
+  END SUBROUTINE assert_boundary_value
 
   !> \brief Initialize a liquid model and all geometry/source arrays consumed by real IMEX stages.
   SUBROUTINE initialize_fixture
@@ -419,4 +687,3 @@ CONTAINS
   END SUBROUTINE audit_conservative_face
 
 END PROGRAM test_imex_stages
-

@@ -42,4 +42,6 @@ for profile in strict optimized; do
     PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/compare_stages.py" \
         "$build_dir/$profile/test_imex_stages" "$profile" \
         --stage-count-executable "$build_dir/$profile/test_stage_count"
+    PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/test_reconstruction_boundaries.py" \
+        "$build_dir/$profile/test_imex_stages" "$profile"
 done

@@ -396,37 +396,19 @@ CONTAINS
 
                 IF ( source_cell(j,k).EQ.2 ) THEN
 
-                   ! Dirichlet boundary condition
-                   qrec_stencil(1) = source_bdry(i)
-                   qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j+1,k)
-
-                   CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
-                        qrec_prime_x(i) )
+                   CALL boundary_reconstruction_slope(                         &
+                        qrec_stencil(2), reconstruction_cell_value(qp_expl,i,j+1,k), &
+                        x_stag(1), x_comp(j), x_comp(j+1), 0, source_bdry(i),   &
+                        one_by_dx,                                              &
+                        limiter(i), .TRUE., qrec_prime_x(i))
 
                 ELSE
 
-                   IF ( bcW(i)%flag .EQ. 0 ) THEN
-
-                      ! Dirichlet boundary condition
-                      qrec_stencil(1) = bcW(i)%value
-                      qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j+1,k)
-
-                      CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
-                           qrec_prime_x(i) )
-
-                   ELSEIF ( bcW(i)%flag .EQ. 1 ) THEN
-
-                      ! Neumann boundary condition
-                      qrec_prime_x(i) = bcW(i)%value
-
-                   ELSEIF ( bcW(i)%flag .EQ. 2 ) THEN
-
-                      qrec_prime_x(i) = (                                   &
-                           reconstruction_cell_value(qp_expl,i,2,k) -     &
-                           reconstruction_cell_value(qp_expl,i,1,k) )     &
-                           * one_by_dx
-
-                   END IF
+                   CALL boundary_reconstruction_slope(                         &
+                        qrec_stencil(2), reconstruction_cell_value(qp_expl,i,j+1,k), &
+                        x_stag(1), x_comp(j), x_comp(j+1), bcW(i)%flag,         &
+                        bcW(i)%value, one_by_dx, limiter(i), .TRUE.,            &
+                        qrec_prime_x(i))
 
                 END IF
 
@@ -438,35 +420,19 @@ CONTAINS
 
                 IF ( source_cell(j,k).EQ.2 ) THEN
 
-                   ! Dirichlet boundary condition
-                   qrec_stencil(3) = source_bdry(i)
-                   qrec_stencil(1)= reconstruction_cell_value(qp_expl,i,j-1,k)
-
-                   CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
-                        qrec_prime_x(i) )
+                   CALL boundary_reconstruction_slope(                         &
+                        qrec_stencil(2), reconstruction_cell_value(qp_expl,i,j-1,k), &
+                        x_stag(comp_interfaces_x), x_comp(j), x_comp(j-1), 0,  &
+                        source_bdry(i), one_by_dx, limiter(i), .FALSE.,         &
+                        qrec_prime_x(i))
 
                 ELSE
 
-                   IF ( bcE(i)%flag .EQ. 0 ) THEN
-
-                      ! Dirichlet boundary condition
-                      qrec_stencil(3) = bcE(i)%value
-                      qrec_stencil(1)= reconstruction_cell_value(qp_expl,i,j-1,k)
-
-                      CALL limit( qrec_stencil , x_stencil , limiter(i) ,          &
-                           qrec_prime_x(i) )
-
-                   ELSEIF ( bcE(i)%flag .EQ. 1 ) THEN
-
-                      ! Neumann boundary condition
-                      qrec_prime_x(i) = bcE(i)%value
-
-                   ELSEIF ( bcE(i)%flag .EQ. 2 ) THEN
-
-                      qrec_prime_x(i) = ( reconstruction_cell_value(qp_expl,i,comp_cells_x,k) -              &
-                           reconstruction_cell_value(qp_expl,i,comp_cells_x-1,k) ) * one_by_dx
-
-                   END IF
+                   CALL boundary_reconstruction_slope(                         &
+                        qrec_stencil(2), reconstruction_cell_value(qp_expl,i,j-1,k), &
+                        x_stag(comp_interfaces_x), x_comp(j), x_comp(j-1),     &
+                        bcE(i)%flag, bcE(i)%value, one_by_dx, limiter(i), .FALSE., &
+                        qrec_prime_x(i))
 
                 END IF
 
@@ -566,55 +532,23 @@ CONTAINS
                 y_stencil(1) = y_stag(1)
                 y_stencil(3) = y_comp(k+1)
 
-                IF ( bcS(i)%flag .EQ. 0 ) THEN
-
-                   ! Dirichlet boundary condition
-                   qrec_stencil(1) = bcS(i)%value
-                   qrec_stencil(3) = reconstruction_cell_value(qp_expl,i,j,k+1)
-
-                   CALL limit( qrec_stencil , y_stencil , limiter(i) ,          &
-                        qrec_prime_y(i) )
-
-                ELSEIF ( bcS(i)%flag .EQ. 1 ) THEN
-
-                   ! Neumann boundary condition
-                   qrec_prime_y(i) = bcS(i)%value
-
-                ELSEIF ( bcS(i)%flag .EQ. 2 ) THEN
-
-                   qrec_prime_y(i) = (                                      &
-                        reconstruction_cell_value(qp_expl,i,j,2) -        &
-                        reconstruction_cell_value(qp_expl,i,j,1) )        &
-                        * one_by_dy
-
-                END IF
+                CALL boundary_reconstruction_slope(                            &
+                     qrec_stencil(2), reconstruction_cell_value(qp_expl,i,j,k+1), &
+                     y_stag(1), y_comp(k), y_comp(k+1), bcS(i)%flag,            &
+                     bcS(i)%value,                                              &
+                     one_by_dy, limiter(i), .TRUE., qrec_prime_y(i))
 
                 ! North boundary
              ELSEIF ( k .EQ. comp_cells_y ) THEN
 
-                y_stencil(1) = y_comp(k-1)
-                y_stencil(3) = y_stag(comp_interfaces_y)
+                   y_stencil(1) = y_comp(k-1)
+                   y_stencil(3) = y_stag(comp_interfaces_y)
 
-                IF ( bcN(i)%flag .EQ. 0 ) THEN
-
-                   ! Dirichlet boundary condition
-                   qrec_stencil(1)= reconstruction_cell_value(qp_expl,i,j,k-1)
-                   qrec_stencil(3) = bcN(i)%value
-
-                   CALL limit( qrec_stencil , y_stencil , limiter(i) ,          &
-                        qrec_prime_y(i) )
-
-                ELSEIF ( bcN(i)%flag .EQ. 1 ) THEN
-
-                   ! Neumann boundary condition
-                   qrec_prime_y(i) = bcN(i)%value
-
-                ELSEIF ( bcN(i)%flag .EQ. 2 ) THEN
-
-                   qrec_prime_y(i) = ( reconstruction_cell_value(qp_expl,i,j,comp_cells_y) -              &
-                        reconstruction_cell_value(qp_expl,i,j,comp_cells_y-1) ) * one_by_dy
-
-                END IF
+                   CALL boundary_reconstruction_slope(                            &
+                     qrec_stencil(2), reconstruction_cell_value(qp_expl,i,j,k-1), &
+                     y_stag(comp_interfaces_y), y_comp(k), y_comp(k-1),        &
+                     bcN(i)%flag, bcN(i)%value, one_by_dy, limiter(i), .FALSE., &
+                     qrec_prime_y(i))
 
              ELSE
 
@@ -876,6 +810,58 @@ CONTAINS
     RETURN
 
   END SUBROUTINE reconstruction
+
+  !> \brief Apply one side's boundary condition to the linear reconstruction slope.
+  !> \details Flag 0 limits a Dirichlet boundary stencil, flag 1 prescribes the
+  !>          Neumann slope, and flag 2 uses the adjacent-cell secant.
+  !> \param[in] center_value Value in the boundary-adjacent cell.
+  !> \param[in] adjacent_value Value in the next cell inward from the boundary.
+  !> \param[in] boundary_coordinate Coordinate of the physical boundary.
+  !> \param[in] adjacent_coordinate Coordinate of the next cell inward.
+  !> \param[in] boundary_flag Boundary mode (Dirichlet, Neumann or secant).
+  !> \param[in] boundary_value Dirichlet value or Neumann derivative.
+  !> \param[in] inverse_spacing Inverse uniform grid spacing for secant mode.
+  !> \param[in] limiter_id Limiter selector.
+  !> \param[in] lower_boundary True for west/south, false for east/north.
+  !> \param[out] slope Limited or prescribed derivative.
+  SUBROUTINE boundary_reconstruction_slope(center_value,adjacent_value,       &
+       boundary_coordinate,center_coordinate,adjacent_coordinate,             &
+       boundary_flag,boundary_value,inverse_spacing,limiter_id,               &
+       lower_boundary,slope)
+    REAL(wp), INTENT(IN) :: center_value,adjacent_value
+    REAL(wp), INTENT(IN) :: boundary_coordinate,center_coordinate
+    REAL(wp), INTENT(IN) :: adjacent_coordinate
+    REAL(wp), INTENT(IN) :: boundary_value,inverse_spacing
+    INTEGER, INTENT(IN) :: boundary_flag,limiter_id
+    LOGICAL, INTENT(IN) :: lower_boundary
+    REAL(wp), INTENT(OUT) :: slope
+    REAL(wp) :: stencil_values(3),stencil_coordinates(3)
+
+    IF (boundary_flag .EQ. 0) THEN
+       stencil_values(2)=center_value
+       stencil_coordinates(2)=center_coordinate
+       IF (lower_boundary) THEN
+          stencil_values(1)=boundary_value
+          stencil_values(3)=adjacent_value
+          stencil_coordinates(1)=boundary_coordinate
+          stencil_coordinates(3)=adjacent_coordinate
+       ELSE
+          stencil_values(1)=adjacent_value
+          stencil_values(3)=boundary_value
+          stencil_coordinates(1)=adjacent_coordinate
+          stencil_coordinates(3)=boundary_coordinate
+       END IF
+       CALL limit(stencil_values,stencil_coordinates,limiter_id,slope)
+    ELSEIF (boundary_flag .EQ. 1) THEN
+       slope=boundary_value
+    ELSEIF (boundary_flag .EQ. 2) THEN
+       IF (lower_boundary) THEN
+          slope=(adjacent_value-center_value)*inverse_spacing
+       ELSE
+          slope=(center_value-adjacent_value)*inverse_spacing
+       END IF
+    END IF
+  END SUBROUTINE boundary_reconstruction_slope
 
   !> \brief Read one centre value for a direct reconstruction stencil.
   !> \details Only auxiliary u/v are zeroed at the existing HP dry-depth

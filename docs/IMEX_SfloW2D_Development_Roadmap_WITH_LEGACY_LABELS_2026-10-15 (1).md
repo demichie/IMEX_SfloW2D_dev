@@ -120,10 +120,12 @@ Stati: COMPLETATO = verifiche e gate accettati; IMPLEMENTATO = codice presente m
 | B06 | XY-2          | Ricostruzione HP sulle linee                   | IMPLEMENTATO              |
 | B07 | XY-3          | Flusso PCCU di interfaccia                     | IMPLEMENTATO              |
 | B08 | XY-4          | Velocita faccia e path idrostatici di cella    | IMPLEMENTATO, GATE APERTO |
-| B09 | XY-5          | Condizioni al contorno e ricostruzione lineare | DA FARE                   |
+| B09 | XY-5          | Condizioni al contorno e ricostruzione lineare | PARZIALE                  |
 | B10 | XY-6          | Derivate e halo geometrici                     | DA FARE                   |
 | B11 | XY-7          | Riduzione CFL direzionale                      | DA FARE                   |
 | B12 | XY-GATE       | Accettazione complessiva x/y                   | GATE                      |
+
+Evidenza B05–B09 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-4 sono implementate nei commit indicati nelle rispettive schede; XY-5 è parziale, con test mirati W/E/S/N, sorgenti e dimensioni collassate passati. Sono passate le regressioni spaziali e dinamiche strict/optimized, incluse prove a 1/4 thread, composizione variabile e fixture ruotate; i confronti binari contro la baseline pre-refactoring sono stati eseguiti sui casi esplicitamente elencati sotto. Per B09 resta il confronto pre/post refactoring dei payload sulle configurazioni supportate; B10–B11 restano da eseguire. Queste evidenze non chiudono B12, che richiede la matrice d’accettazione complessiva.
 
 ## Fase C — Output e distribuzione
 
@@ -630,6 +632,8 @@ Attività: Sostituire eval_local_speeds_x/y con un kernel direzionale condiviso,
 
 Criteri di accettazione: Stesse velocità min/max per entrambi gli assi, anche con dry/wet e gravità ridotta non positiva; confronto unitario su x/y e regressioni CFL/HP.
 
+Evidenza: implementato nel commit 00400001. La suite TEST_SPATIAL_OPERATOR è passata in profilo strict e optimized con verifiche CFL direzionali e team OpenMP effettivi da 1/4 thread; TEST_N7_GEOMETRY_DYNAMIC è passata con 69 casi per profilo, inclusi stati dry/wet e casi x/y ruotati. Queste regressioni supportano lo step; il confronto esplicito isolato delle velocità per il caso di gravità ridotta non positiva resta da includere nella matrice B12.
+
 ### B06 — Ricostruzione HP sulle linee
 
 Stato ufficiale: IMPLEMENTATO
@@ -640,7 +644,7 @@ Attività: Consolidare evaluate_hp_cell_x/y in un kernel che prepari gli stencil
 
 Criteri di accettazione: Tracce HP, mean momentum, positività, quiet-water e controlli x↔y invariati; output deterministici 1/4 thread bitwise dove previsto.
 
-Stato aggiornato al commit fd43e4ca: il refactoring della ricostruzione HP su linee è implementato. La precedente dicitura «DA IMPLEMENTARE» descriveva uno stato superato e non è applicabile.
+Stato aggiornato: implementato nel commit 00400001. TEST_HP_RECONSTRUCTION passa i controlli di quiet-water, positività, media del momento e indipendenza direzionale; TEST_N7_GEOMETRY_DYNAMIC passa con 69 casi per profilo e output binari identici tra 1 e 4 thread. La precedente dicitura «DA IMPLEMENTARE» descriveva uno stato superato e non è applicabile.
 
 ### B07 — Flusso PCCU di interfaccia
 
@@ -652,7 +656,7 @@ Attività: Estrarre la sequenza comune eval_inertial_flux, central-upwind, limit
 
 Criteri di accettazione: Flussi, path e residual identici rispetto alla baseline per gli stessi input; conservare l’ordine delle operazioni numeriche e il guard di riposo esatto introdotto nei commit recenti.
 
-Stato aggiornato: kernel PCCU comune implementato nel commit f2065730; verificare la relativa matrice di accettazione.
+Stato aggiornato: kernel PCCU comune implementato nel commit f2065730. In entrambi i profili strict e optimized, i payload spaziali completi sono risultati bitwise identici alla baseline pre-refactoring per dynamic_rough, dynamic_drainage e lake_ramp, a 1 e 4 thread. TEST_PCCU, TEST_SPATIAL_OPERATOR e TEST_N7_GEOMETRY_DYNAMIC (69 casi per profilo) sono passati. Il test storico TEST_HYDROSTATIC_ROUNDOFF non è compatibile con l’interfaccia post-XY-1 perché il suo modulo di riferimento importa i wrapper x/y rimossi; l’equivalenza è stata verificata con un confronto diretto HEAD/candidato. B12 resta aperto per l’accettazione complessiva.
 
 ### B08 — Velocita faccia e path idrostatici di cella
 
@@ -664,17 +668,19 @@ Attività: Centralizzare i due stati di faccia, riduzione min/max, percorso idro
 
 Criteri di accettazione: Equivalenza x/y su casi 1D ruotati, 2D e composizione variabile; assenza di differenze su CFL direzionali.
 
-Stato aggiornato: velocità di faccia e cell hydrostatic path consolidati nel commit fd43e4ca. Il gate di approvazione resta separato dalla sola implementazione.
+Stato aggiornato: velocità di faccia e cell hydrostatic path consolidati nel commit fd43e4ca. I payload spaziali completi sono risultati bitwise identici alla baseline pre-XY-4 per dynamic_rough, dynamic_drainage e lake_ramp, in strict e optimized, con 1/4 thread. TEST_N7_GEOMETRY_DYNAMIC è passata (69 casi per profilo); TEST_N7_COMPOSITION è passata (162 casi per profilo, composizione variabile e confronti a 1/4 thread); TEST_SPATIAL_OPERATOR ha passato controlli di tracce, residui e CFL direzionale, inclusi casi x/y ruotati. B08 rimane IMPLEMENTATO, GATE APERTO fino all’accettazione formale in B12.
 
 ### B09 — Condizioni al contorno e ricostruzione lineare
 
-Stato ufficiale: DA FARE
+Stato ufficiale: PARZIALE
 
 File interessati: src/reconstruction_2d.f90; src/geometry_2d.f90; src/equation_terms_2d.f90.
 
 Attività: Estrarre logica riutilizzabile dei casi Dirichlet/Neumann/interpolazione per lato senza cancellare semantica dei boundary source, radial source o lateral source; nessuna modifica simultanea allo schema.
 
 Criteri di accettazione: Tests mirati W/E/S/N e sorgenti, incluso nx=1/ny=1; output identici sulle configurazioni supportate.
+
+Stato aggiornato al 15 ottobre 2026: in `reconstruction_2d.f90` è stato estratto `boundary_reconstruction_slope`, kernel comune per le pendenze Dirichlet, Neumann e secante sui lati W/E/S/N. Il nuovo test di ricostruzione in `TEST_IMEX_STAGES` verifica in strict e optimized i valori analitici delle tracce per tutte le tre modalità su ciascun lato; verifica lateral-source W/E, riflessioni radial-source W/E/S/N e griglie 5x5, 1x5, 5x1 e 1x1. I payload delle tracce sono identici bitwise tra 1/4 thread per ogni fixture. `TEST_HP_RECONSTRUCTION`, `TEST_SPATIAL_OPERATOR` e `TEST_IMEX_STAGES` sono passati. Le condizioni alle tracce di bordo e i percorsi boundary/radial/lateral source sono mantenuti separati; resta da confrontare pre/post refactoring il payload di ricostruzione sulle configurazioni supportate e completare la relativa matrice di accettazione. B09 rimane PARZIALE fino a tali verifiche.
 
 | Revisione               | Modifica / evidenza                                  | Interpretazione per roadmap                                                |
 |-------------------------|------------------------------------------------------|----------------------------------------------------------------------------|
