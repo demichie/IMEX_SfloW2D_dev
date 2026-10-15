@@ -24,9 +24,17 @@ for profile in strict optimized; do
         optimized) flags='-Ofast -funroll-all-loops' ;;
     esac
     for source in $sources; do
-        gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
-            -I"$repo_dir/src/state" \
-            $netcdf_fflags -c "$repo_dir/src/$source"
+        case "$source" in
+            *.c)
+                object=${source##*/}
+                cc -c "$repo_dir/src/$source" -o "$object.o"
+                ;;
+            *)
+                gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+                    -I"$repo_dir/src/state" \
+                    $netcdf_fflags -c "$repo_dir/src/$source"
+                ;;
+        esac
     done
     gfortran -O0 -g -fcheck=all -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
         $netcdf_fflags -c "$test_dir/test_spatial_operator.f90"

@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import os.path
+from pathlib import Path
 
 if len(sys.argv) == 2:
 
@@ -40,7 +41,7 @@ ax1.set_xlabel('time [s]')
 ax1.set_ylabel('runout [m]', color='g')
 ax2.set_ylabel('area [m2]', color='b')
 
-fig.savefig(runout_file.replace('csv', 'png'))
+fig.savefig(Path(runout_file).with_suffix('.png'))
 
 idx = int(np.argmax(runout))
 print('time', time[idx])

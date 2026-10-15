@@ -154,16 +154,18 @@ def compare_threads(results):
         item = {"profile": profile, "test": name, "status": "not_completed"}
         if len(pair) == 2 and all(r["status"] == "pass" for r in pair.values()):
             def fingerprints(result):
+                successful = [call for call in result["calls"] if call["returncode"] == 0]
                 return [{name: record["sha256"] for name, record in call["files"].items()
                          if Path(name).name == "restart.bin" or
-                         re.search(r"_\d{4}\.q_2d$", Path(name).name)}
-                        for call in result["calls"]]
-            left, right = fingerprints(pair[1]), fingerprints(pair[4])
+                         re.search(r"_\d{4,}\.q_2d$", Path(name).name)}
+                        for call in successful], successful
+            left, left_calls = fingerprints(pair[1])
+            right, right_calls = fingerprints(pair[4])
             has_outputs = bool(left) and all(left) and bool(right) and all(right)
-            teams_match = all(
-                result["calls"] and all(call["actual_threads"] == threads
-                                         for call in result["calls"])
-                for threads, result in pair.items())
+            teams_match = (
+                bool(left_calls) and bool(right_calls) and
+                all(call["actual_threads"] == 1 for call in left_calls) and
+                all(call["actual_threads"] == 4 for call in right_calls))
             item["status"] = "pass" if has_outputs and teams_match and left == right else "fail"
             item["comparison"] = "bitwise SHA-256 of canonical q snapshots and restart.bin"
         comparisons.append(item)

@@ -209,4 +209,11 @@ echo "PASS: long external restart paths and explicit output reuse policy"
 
 # Also exercise original runout references, complete/segmented CSV histories,
 # read-only refusal of incompatible files and restored positive-EPS_STOP state.
-PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/test_runout_restart.py" "$executable"
+command -v nc-config >/dev/null 2>&1 || {
+    echo "FAIL: nc-config is required for NetCDF restart integrity tests" >&2
+    exit 2
+}
+${CC:-cc} $(nc-config --cflags) "$test_dir/netcdf_restart_helper.c" \
+    -o "$work_dir/netcdf_restart_helper" $(nc-config --libs)
+PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/test_runout_restart.py" \
+    "$executable" --netcdf-helper "$work_dir/netcdf_restart_helper"

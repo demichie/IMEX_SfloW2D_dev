@@ -43,7 +43,7 @@ OMP_NUM_THREADS=4 OMP_DYNAMIC=FALSE ../../bin/IMEX_SfloW2D
 
 ## Expected output
 
-The run creates `exampleEtna_lava.nc`, ESRI rasters of thickness/temperature, runout diagnostics and `restart.bin`. Conservative text output is disabled in the supplied input. Open the NetCDF file in ParaView; generated DEM and output files are ignored by Git but not deleted.
+The solver writes under `OUTPUT/exampleEtna_lava/`: the time-series NetCDF is in `fields/exampleEtna_lava.nc`, ESRI snapshots are in indexed directories under `snapshots/`, terrain exports are in `terrain/`, runout diagnostics are in `diagnostics/`, and the binary checkpoint is in `restart/restart.bin`. Conservative text output is disabled in the supplied input. Open `OUTPUT/exampleEtna_lava/fields/exampleEtna_lava.nc` in ParaView; generated DEM and output files are ignored by Git but not deleted.
 
 ## Validation evidence and limits
 

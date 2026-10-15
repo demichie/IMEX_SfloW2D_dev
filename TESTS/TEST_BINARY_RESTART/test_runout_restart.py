@@ -56,6 +56,7 @@ def parameter(text, name, value):
 def main():
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument('executable', type=Path)
+    cli.add_argument('--netcdf-helper', type=Path, required=True)
     cli.add_argument('--threads', type=int, default=int(os.environ.get('OMP_NUM_THREADS', 1)))
     cli.add_argument('--output', type=Path)
     args = cli.parse_args()
@@ -132,6 +133,14 @@ def main():
     def checkpoint(case):
         return case/'OUTPUT'/'TEST_2D'/'restart'/'restart.bin'
 
+    def netcdf_path(case):
+        return case/'OUTPUT'/'TEST_2D'/'fields'/'TEST_2D.nc'
+
+    def netcdf_helper(*arguments):
+        proc = subprocess.run([str(args.netcdf_helper.resolve()), *map(str, arguments)],
+                              capture_output=True, text=True, timeout=30)
+        assert proc.returncode == 0, proc.stderr or proc.stdout
+
     def diagnostics(case):
         path = case/'OUTPUT'/'TEST_2D'/'diagnostics'
         path.mkdir(parents=True, exist_ok=True)
@@ -200,6 +209,81 @@ def main():
     assert list((case/'OUTPUT'/'TEST_2D'/'snapshots').glob(
         '10000_t_*/TEST_2D_10000.q_2d'))
     passed('high-index restart: manifest and snapshot append at index 10000')
+
+    snapshot_names = list((case/'OUTPUT'/'TEST_2D'/'snapshots').glob('10000_t_*'))
+    assert len(snapshot_names) == 1
+    time_label = snapshot_names[0].name.split('_t_', 1)[1]
+    case = prepare('interrupted-snapshot', parameter(text, 'T_END', '0.045'))
+    (case/'OUTPUT').mkdir()
+    shutil.copytree(source_case/'OUTPUT'/'TEST_2D', case/'OUTPUT'/'TEST_2D')
+    snapshot_dir = case/'OUTPUT'/'TEST_2D'/'snapshots'/f'0003_t_{time_label}'
+    snapshot_dir.mkdir()
+    partial_snapshot = snapshot_dir/'TEST_2D_0003.q_2d'
+    partial_snapshot.write_bytes(b'partial snapshot from interrupted output\n')
+    output_hashes_before = tree_hashes(case/'OUTPUT'/'TEST_2D')
+    intact_manifest = (case/'OUTPUT'/'TEST_2D'/'metadata'/'output_manifest.csv').read_bytes()
+    checkpoint_before = sha(checkpoint(case))
+    continuation(case, end=0.045)
+    run(case, 'snapshot-rejected.log', 'uncommitted snapshot directory')
+    assert tree_hashes(case/'OUTPUT'/'TEST_2D') == output_hashes_before
+    assert (case/'OUTPUT'/'TEST_2D'/'metadata'/'output_manifest.csv').read_bytes() == \
+        intact_manifest
+    assert sha(checkpoint(case)) == checkpoint_before
+
+    shutil.rmtree(snapshot_dir)
+    run(case, 'snapshot-recovered.log')
+    assert list((case/'OUTPUT'/'TEST_2D'/'snapshots').glob(
+        '0003_t_*/TEST_2D_0003.q_2d'))
+    resumed_manifest_rows = (case/'OUTPUT'/'TEST_2D'/'metadata'/
+                             'output_manifest.csv').read_text().splitlines()
+    assert resumed_manifest_rows[-1].split(',')[0] == '3'
+    passed('interrupted snapshot: preserve orphan, then resume after explicit cleanup')
+
+    netcdf_source, netcdf_flag_count = re.subn(
+        r'(?mi)^(\s*OUTPUT_CONS_FLAG\s*=[^\n]*)',
+        lambda match: ' OUTPUT_NETCDF_FLAG= T,\n'+match[1], text)
+    assert netcdf_flag_count == 1
+    netcdf_split = prepare('netcdf-interrupted-append', netcdf_source)
+    run(netcdf_split, 'netcdf-first.log')
+    continuation(netcdf_split, end=0.03)
+    run(netcdf_split, 'netcdf-second.log')
+
+    netcdf_control = prepare('netcdf-control',
+                             parameter(netcdf_source, 'T_END', '0.045'))
+    (netcdf_control/'OUTPUT').mkdir()
+    shutil.copytree(netcdf_split/'OUTPUT'/'TEST_2D',
+                    netcdf_control/'OUTPUT'/'TEST_2D')
+    continuation(netcdf_control, end=0.045)
+    run(netcdf_control, 'netcdf-control.log')
+
+    nc_file = netcdf_path(netcdf_split)
+    netcdf_helper('partial', nc_file, '0.045')
+    partial_netcdf_hash = sha(nc_file)
+    manifest_before = (netcdf_split/'OUTPUT'/'TEST_2D'/'metadata'/
+                       'output_manifest.csv').read_bytes()
+    checkpoint_before = sha(checkpoint(netcdf_split))
+    continuation(netcdf_split, end=0.045)
+    run(netcdf_split, 'netcdf-recovered.log')
+    assert sha(nc_file) != partial_netcdf_hash
+    assert (netcdf_split/'OUTPUT'/'TEST_2D'/'metadata'/'output_manifest.csv').read_bytes() != \
+        manifest_before
+    assert sha(checkpoint(netcdf_split)) != checkpoint_before
+    assert records(checkpoint(netcdf_control)) == records(checkpoint(netcdf_split))
+    netcdf_helper('compare', netcdf_path(netcdf_control), nc_file)
+    passed('interrupted NetCDF append: overwrite one uncommitted record and match full run')
+
+    case = prepare('reject-multiple-netcdf-tails',
+                   parameter(netcdf_source, 'T_END', '0.045'))
+    (case/'OUTPUT').mkdir()
+    shutil.copytree(netcdf_split/'OUTPUT'/'TEST_2D', case/'OUTPUT'/'TEST_2D')
+    nc_file = netcdf_path(case)
+    netcdf_helper('partial', nc_file, '0.06')
+    netcdf_helper('partial', nc_file, '0.075')
+    netcdf_hash_before = sha(nc_file)
+    continuation(case, end=0.06)
+    run(case, 'netcdf-rejected.log', 'more than one uncommitted time record')
+    assert sha(nc_file) == netcdf_hash_before
+    passed('reject multiple uncommitted NetCDF records without modifying the dataset')
 
     case = prepare('interrupted-manifest', parameter(text, 'T_END', '0.045'))
     (case/'OUTPUT').mkdir()

@@ -48,3 +48,9 @@ overwrite permission.
 Input rasters and externally prepared files remain at their configured paths.
 The solver does not relocate topography, erodibility, or externally supplied
 restart files.
+
+Post-processing scripts are separate from solver output management. The
+`UTILS/plot_overlay.py`, `plot_runout.py` and `plot_probes.py` utilities save
+figures beside the input file they process; pass files from the appropriate
+run subdirectory to keep those figures with the run. `flip_texture.py` writes
+its derived images in the current working directory.

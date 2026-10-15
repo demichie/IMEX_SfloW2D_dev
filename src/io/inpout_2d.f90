@@ -24,7 +24,8 @@ MODULE inpout_2d
   USE domain_2d, ONLY: domain_type
   USE stochastic_module, ONLY: stochastic_workspace_type
   USE output_paths, ONLY: initialize_output_paths, output_file_path, &
-                          begin_snapshot, snapshot_file_path, snapshot_index_label
+                          begin_snapshot, snapshot_file_path, snapshot_index_label, &
+                          validate_snapshot_index
 
   USE parameters_2d, ONLY: idx_h, idx_hu, idx_hv, idx_T, idx_solid_first, &
                            idx_solid_last, idx_add_gas_first, idx_add_gas_last, idx_stoch, idx_pore, &
@@ -5565,7 +5566,7 @@ CONTAINS
 
     idx_string = snapshot_index_label(output_idx - 1)
     IF (output_cons_flag .OR. output_esri_flag) &
-         CALL begin_snapshot(output_idx - 1, time)
+         CALL begin_snapshot(output_idx - 1, time, binary_restart_output)
 
     IF (output_netcdf_flag) CALL write_netcdf_timestep(time, state)
 
@@ -5771,9 +5772,9 @@ CONTAINS
     IF (.NOT. binary_restart_output) RETURN
     filename = output_file_path('metadata', 'output_manifest.csv')
     INQUIRE(FILE=TRIM(filename), EXIST=exists)
-    IF (.NOT. exists) RETURN
-
-    CALL validate_output_manifest(filename, 'snapshot_index,time_seconds', output_idx, t_output)
+    IF (exists) &
+         CALL validate_output_manifest(filename, 'snapshot_index,time_seconds', output_idx, t_output)
+    IF (output_cons_flag .OR. output_esri_flag) CALL validate_snapshot_index(output_idx)
   END SUBROUTINE validate_restart_output_manifest
 
   !******************************************************************************
@@ -7052,7 +7053,7 @@ CONTAINS
     INTEGER :: i
     CHARACTER(LEN=4) :: idx_string
     LOGICAL :: file_exists
-    INTEGER :: time_dim_len
+    INTEGER :: time_dim_len, expected_time_index
     INTEGER :: status
 
     ALLOCATE (solid_varid(n_solid))
@@ -7067,9 +7068,8 @@ CONTAINS
     nc_filename = output_file_path('fields', TRIM(run_name)//'.nc')
     INQUIRE(FILE=nc_filename, EXIST=file_exists)
 
-    ! On restart, append to a compatible existing NetCDF file rather than
-    ! clobbering it. Recover all dimension/variable IDs and continue the
-    ! unlimited time dimension at the next record.
+    ! On restart, reuse at most one uncommitted record left by an interrupted
+    ! append; the checkpoint's output index is the commit boundary.
     IF (restart .AND. file_exists) THEN
       IF (verbose_level >= 0) WRITE (*, *) 'Appending to existing NetCDF: ',   &
         TRIM(nc_filename)
@@ -7078,7 +7078,14 @@ CONTAINS
       CALL check(nf90_inq_dimid(ncid, 'y', dimids(2)))
       CALL check(nf90_inq_dimid(ncid, 'time', dimids(3)))
       CALL check(nf90_inquire_dimension(ncid, dimids(3), len=time_dim_len))
-      nc_time_idx = time_dim_len + 1
+      IF (output_idx < 0 .OR. output_idx == HUGE(output_idx)) &
+           CALL fatal_error('Binary restart has an invalid NetCDF output index')
+      expected_time_index = output_idx + 1
+      IF (time_dim_len < output_idx) &
+           CALL fatal_error('NetCDF history is shorter than the binary restart checkpoint')
+      IF (time_dim_len > expected_time_index) &
+           CALL fatal_error('NetCDF history has more than one uncommitted time record')
+      nc_time_idx = expected_time_index
       CALL check(nf90_inq_varid(ncid, 'x', x_varid))
       CALL check(nf90_inq_varid(ncid, 'y', y_varid))
       CALL check(nf90_inq_varid(ncid, 'time', t_varid))

@@ -89,7 +89,7 @@ def main():
     match = re.search(r"Parallel run: number of threads used\s+(\d+)", log_text)
     actual = int(match.group(1)) if match else None
     problems = []
-    if actual != requested:
+    if returncode == 0 and actual != requested:
         problems.append(f"actual OpenMP team {actual} != requested {requested}")
     files = {}
     fields = {}
@@ -99,7 +99,7 @@ def main():
                                or path.name == "restart.bin"):
             relative_path = str(path.relative_to(Path.cwd()))
             files[relative_path] = {"sha256": digest(path), "bytes": path.stat().st_size}
-        if path.name.endswith(".q_2d"):
+        if returncode == 0 and path.name.endswith(".q_2d"):
             try:
                 values = np.loadtxt(path, ndmin=2, converters=fortran_float)
             except (ValueError, OSError) as error:

@@ -5,6 +5,7 @@ from matplotlib.colors import BoundaryNorm
 import matplotlib.ticker as ticker
 import glob
 import os
+from pathlib import Path
 from matplotlib.colors import LightSource
 
 topography_file = '../DEM/Etna2014_crop.asc'
@@ -340,7 +341,7 @@ for dir in glob.glob("result*"):
         plt.xlim([plt_xmin, plt_xmax])
         plt.ylim([plt_ymin, plt_ymax])
         plt.tight_layout()
-        plt.savefig(source2.replace('asc', 'png'), dpi=200)
+        plt.savefig(Path(source2).with_suffix('.png'), dpi=200)
         plt.close(fig)
 
     os.chdir(current_dir)

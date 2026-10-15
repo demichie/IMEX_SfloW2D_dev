@@ -214,9 +214,54 @@ int imex_prepare_run_directory(const char *base, const char *run_name,
     return 0;
 }
 
-int imex_ensure_directory(const char *path, char *error_message,
-                          size_t error_capacity)
+int imex_ensure_directory(const char *path, int reject_existing,
+                          char *error_message, size_t error_capacity)
 {
     int existed;
-    return ensure_directory(path, &existed, 0, error_message, error_capacity);
+    int status = ensure_directory(path, &existed, 0, error_message,
+                                  error_capacity);
+    if (status != 0) {
+        return status;
+    }
+    if (reject_existing && existed) {
+        return set_error(error_message, error_capacity,
+                         "refusing to reuse an existing snapshot directory during binary restart");
+    }
+    return 0;
+}
+
+int imex_snapshot_prefix_exists(const char *directory, const char *prefix,
+                                char *error_message, size_t error_capacity)
+{
+    DIR *entries;
+    int directory_fd;
+    struct dirent *entry;
+    size_t prefix_length;
+
+    if (directory == NULL || prefix == NULL || directory[0] == '\0' ||
+        prefix[0] == '\0') {
+        return set_error(error_message, error_capacity,
+                         "invalid snapshot directory or index prefix");
+    }
+    directory_fd = open(directory, O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+    if (directory_fd < 0) {
+        return set_error(error_message, error_capacity,
+                         "cannot inspect snapshot output directory");
+    }
+    entries = fdopendir(directory_fd);
+    if (entries == NULL) {
+        close(directory_fd);
+        return set_error(error_message, error_capacity,
+                         "cannot scan snapshot output directory");
+    }
+
+    prefix_length = strlen(prefix);
+    while ((entry = readdir(entries)) != NULL) {
+        if (strncmp(entry->d_name, prefix, prefix_length) == 0) {
+            closedir(entries);
+            return 1;
+        }
+    }
+    closedir(entries);
+    return 0;
 }

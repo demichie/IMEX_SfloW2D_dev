@@ -31,10 +31,17 @@ build_observer() {
     ' "$source_dir/Makefile.am")
     objects=''
     for source in $sources; do
-        gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
-            -I"$source_dir/state" \
-            $netcdf_fflags -c "$source_dir/$source"
         object=${source##*/}
+        case "$source" in
+            *.c)
+                cc -c "$source_dir/$source" -o "$object.o"
+                ;;
+            *)
+                gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+                    -I"$source_dir/state" \
+                    $netcdf_fflags -c "$source_dir/$source"
+                ;;
+        esac
         objects="$objects ${object%.f90}.o"
     done
     # Use the same current observer for both production revisions.

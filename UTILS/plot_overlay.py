@@ -6,6 +6,7 @@ import matplotlib.ticker as ticker
 import csv
 import glob
 import os
+from pathlib import Path
 from matplotlib.colors import LightSource
 
 
@@ -600,5 +601,5 @@ for file in glob.glob("*.asc"):
     plt.xlim([plt_xmin, plt_xmax])
     plt.ylim([plt_ymin, plt_ymax])
     plt.tight_layout()
-    plt.savefig(source2.replace('asc', 'png'), dpi=200)
+    plt.savefig(Path(source2).with_suffix('.png'), dpi=200)
     plt.close(fig)

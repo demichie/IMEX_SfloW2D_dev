@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 import os.path
+from pathlib import Path
 
 if len(sys.argv) == 2:
 
@@ -60,9 +61,9 @@ for i in range(len(vars) - 1):
 
     plt.tight_layout()
 
-    fig_name = prb_file.replace(
-        '.csv', '_' + (vars[i + 1].strip().replace('.', '_')) + '.pdf')
-    fig_name = fig_name.replace('_.', '.')
+    prb_path = Path(prb_file)
+    variable_name = vars[i + 1].strip().replace('.', '_')
+    fig_name = prb_path.with_name(f'{prb_path.stem}_{variable_name}.pdf')
     plt.savefig(fig_name)
 
     if rate:
@@ -79,7 +80,7 @@ for i in range(len(vars) - 1):
         ax2.set_ylabel(label)
         ax2.tick_params(axis='y', color='C1', labelcolor='C1')
 
-        fig_name = fig_name.replace('.pdf', '_B.pdf')
+        fig_name = fig_name.with_name(f'{fig_name.stem}_B.pdf')
         plt.tight_layout()
         plt.savefig(fig_name)
 

@@ -87,11 +87,20 @@ def build(executable, directory, repository, include_spatial=False):
     if not all(path.exists() for path in objects):
         # Never link objects from a different compiler. Rebuild when necessary.
         objects = []
+        c_compiler = shlex.split(os.environ.get("CC", "cc"))
+        if not c_compiler:
+            raise ValueError("CC cannot be empty")
         for name in numerical:
-            subprocess.run([*compiler, *flags, *includes, "-I" + str(source / "state"),
-                            "-c", str(source / name)],
-                           cwd=directory, check=True)
-            objects.append(directory / Path(name).name.replace(".f90", ".o"))
+            object_path = directory / (Path(name).stem + ".o")
+            if name.endswith(".c"):
+                subprocess.run([*c_compiler, "-c", str(source / name),
+                                "-o", str(object_path)],
+                               cwd=directory, check=True)
+            else:
+                subprocess.run([*compiler, *flags, *includes, "-I" + str(source / "state"),
+                                "-c", str(source / name)],
+                               cwd=directory, check=True)
+            objects.append(object_path)
         module_directory = directory
     else:
         module_directory = executable.parent

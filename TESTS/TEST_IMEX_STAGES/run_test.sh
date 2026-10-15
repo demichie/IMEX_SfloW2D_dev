@@ -29,10 +29,17 @@ for profile in strict optimized; do
     objects=''
     reference_objects=''
     for source in $sources; do
-        gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
-            -I"$repo_dir/src/state" \
-            $netcdf_fflags -c "$repo_dir/src/$source"
         object=${source##*/}
+        case "$source" in
+            *.c)
+                cc -c "$repo_dir/src/$source" -o "$object.o"
+                ;;
+            *)
+                gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+                    -I"$repo_dir/src/state" \
+                    $netcdf_fflags -c "$repo_dir/src/$source"
+                ;;
+        esac
         objects="$objects ${object%.f90}.o"
         if [ "$source" != "spatial/reconstruction_2d.f90" ]; then
             reference_objects="$reference_objects $build_dir/$profile/${object%.f90}.o"

@@ -25,7 +25,7 @@ class AuditToolsTests(unittest.TestCase):
     def pair():
         return [
             {"profile": "strict", "test": "case", "outer_threads": threads,
-             "status": "pass", "calls": [{"actual_threads": threads,
+             "status": "pass", "calls": [{"returncode": 0, "actual_threads": threads,
                  "files": {"case_0001.q_2d": {"sha256": "same"}}}]}
             for threads in (1, 4)]
 
@@ -42,6 +42,12 @@ class AuditToolsTests(unittest.TestCase):
         for value in values:
             value["calls"][0]["files"] = {}
         self.assertEqual(compare_threads(values)[0]["status"], "fail")
+
+    def test_failed_preflight_calls_are_excluded_from_thread_comparison(self):
+        values = self.pair()
+        for value in values:
+            value["calls"].append({"returncode": 2, "actual_threads": None, "files": {}})
+        self.assertEqual(compare_threads(values)[0]["status"], "pass")
 
     def test_failed_trajectory_is_not_equivalence(self):
         values = self.pair()

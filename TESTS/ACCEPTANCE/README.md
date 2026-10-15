@@ -97,12 +97,15 @@ run once and are labeled `unit_script`; they must not be counted as testing both
 production profiles.
 
 The adapter changes only `SERIAL_FLAG` to `F` in temporary test inputs and
-disables dynamic OpenMP teams. It stores the original/effective input hashes and
-checks the solver's reported team. Lake-at-rest and short-excavation scripts
-retain their internal one/four-thread comparisons. Gate-H and both restart
-scripts run separately with one and four actual threads; canonical q snapshots
-and checkpoints are compared across completed pairs. Floating-point flags and
-physical input values are not altered by the adapter.
+disables dynamic OpenMP teams. It stores the original/effective input hashes
+and checks the solver's reported team and conservative fields on successful
+invocations. Expected preflight rejections are retained as evidence without
+being mistaken for completed solver runs. Lake-at-rest and short-excavation
+scripts retain their internal one/four-thread comparisons. Gate-H and both
+restart scripts run separately with one and four actual threads; canonical q
+snapshots and checkpoints from successful invocations are compared across
+completed pairs. Floating-point flags and physical input values are not
+altered by the adapter.
 
 Conservative output parsing accepts Fortran `D` exponents and three-digit
 exponents with an omitted `E`. It does not rewrite or relax the field data.
