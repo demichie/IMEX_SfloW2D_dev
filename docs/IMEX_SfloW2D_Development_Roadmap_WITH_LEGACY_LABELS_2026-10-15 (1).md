@@ -90,6 +90,36 @@ Sviluppare IMEX_SfloW2D mantenendo la baseline scientifica HP-PCCU, l’equivale
 
 Stati: COMPLETATO = verifiche e gate accettati; IMPLEMENTATO = codice presente ma gate non ancora approvato; PARZIALE = attività iniziata o copertura incompleta; DA FARE = non implementato; GATE = verifica/approvazione da effettuare. Lo stato non equivale alla descrizione storica di una vecchia roadmap.
 
+## Regola generale vincolante — Validazione proporzionata al rischio (risk-based regression testing)
+
+> **PRINCIPIO TRASVERSALE PER TUTTE LE FASI A–I.** Ogni modifica viene verificata in funzione del suo impatto tecnico e scientifico; **non è richiesto ripetere automaticamente l'intera suite numerica ad ogni modifica**. La validazione completa è riservata ai gate scientifici pertinenti, alle modifiche trasversali ad alto rischio e alle release. Un gate già approvato resta approvato nel proprio perimetro storico: le modifiche successive richiedono una nuova verifica d'impatto, non la riapertura retroattiva del gate.
+
+### Classi di verifica e quando eseguirle
+
+| Livello | Momento e finalità | Contenuto minimo | Non implica |
+|---|---|---|---|
+| **T1 — Mirato** | Ogni piccola modifica durante lo sviluppo | Compilazione/lint dei componenti toccati quando applicabile; test unitari, di contratto, negativi e edge case direttamente coinvolti | Riesecuzione di tutte le simulazioni scientifiche |
+| **T2 — Integrazione** | Fine di una modifica funzionale e prima della revisione del relativo step | Un numero contenuto di casi end-to-end pertinenti; compatibilità delle interfacce, restart/I/O o output numerici secondo la superficie modificata | Campagna A11/N9 completa |
+| **T3 — Regressione selettiva di gate** | Per accettazione di step o gate, e per modifiche trasversali | Sottoinsieme rappresentativo, congelato e riproducibile di regressioni che copre i percorsi realmente impattati; strict/optimized, 1/4 thread o toolchain aggiuntive **solo se pertinenti** | Riesecuzione automatica di ogni test storico |
+| **T4 — Campagna estesa/scientifica e release** | Nuovi modelli fisici, cambiamenti numerici importanti, HPC con nuovi ordini/riduzioni, gate scientifici o release | Matrici, benchmark, conservazione, comparatori indipendenti, riproducibilità e CI secondo lo scope formalmente approvato | Approvazione scientifica oltre il perimetro effettivamente testato |
+
+### Procedura obbligatoria per ogni change set
+
+1. **Classificare la modifica**: solo documentazione, packaging, I/O/path, interfaccia/stato/restart, algoritmo numerico, fisica, parallelismo; includere dipendenze indirette reali. Se un file contiene più responsabilità (es. `inpout_2d.f90`), valutare *le routine e i flussi di dati modificati*, non soltanto il nome del file.
+2. **Definire prima dei test la matrice minima**: T1 sempre ove applicabile, T2 quando cambia un comportamento osservabile, T3/T4 solo per rischi e gate motivati. Annotare motivazione dei test inclusi **e di quelli costosi esclusi**. Non usare l'assenza di modifiche alle equazioni come unica prova di equivalenza: percorsi I/O, checkpoint, scheduling e stato globale possono avere effetti indiretti.
+3. **Usare comparatori appropriati**: bitwise se formato, ordine delle operazioni e ambiente lo consentono; confronti numerici con tolleranze dichiarate altrimenti; per I/O distinguere bytes scientifici/metadati intenzionalmente variati (path, manifest, timestamp). Conservare il riferimento alla baseline A11 con revisioni, input e checksum.
+4. **Escalation guidata**: ampliare i test se un controllo fallisce, cambiano precisione/ordine delle operazioni, OpenMP/MPI, bilanci, discretizzazione, stato/restart, o emergono modifiche collaterali non previste. Non dichiarare un gate chiuso con soli smoke test.
+5. **Registrare l'evidenza**: revisione Git, toolchain, profilo, conteggio thread/rank se pertinente, comando o workflow, casi, comparatore, risultato, esclusioni motivate, limiti e responsabile della decisione. Le evidenze storiche non sono automaticamente test eseguiti sul nuovo HEAD.
+6. **Separare frequenze**: T1/T2 su sviluppo/PR; T3 nei gate e, ove conveniente, nella CI; T4 per release o milestone scientifiche. È lecito eseguire una suite ampia in CI a basso costo, ma ciò non è un requisito per ogni micro-commit o per ogni revisione locale.
+
+### Prescrizione specifica per modifiche esclusivamente di I/O (Fase C)
+
+Per C01/C02 sono richiesti test di naming, sicurezza directory, overwrite, manifest, serializzazione, output NetCDF/ASCII/CSV e almeno un caso full/split/restart con append. È richiesta almeno una regressione end-to-end breve sul contenuto scientifico, confrontando output omogenei dopo normalizzazione dei soli metadati deliberatamente cambiati. **I test specifici di ricostruzione HP, PCCU, Jacobiani, reologie e schemi RK non si ripetono tutti** se non sono stati toccati percorsi numerici/stato e i confronti end-to-end selezionati sono positivi. La chiusura C03 richiede il proprio gate I/O e la relativa evidenza; non riapre A11 o B12.
+
+### Applicazione alle schede operative
+
+Le voci **"Test proporzionati"** inserite sotto le schede A01–I09 sono *matrici prospettiche di selezione* e non dichiarazioni di test già eseguiti. I gate, gli stati ufficiali e gli esiti storici riportati nel testo originale restano invariati. Per gli step già completati queste voci valgono per eventuali modifiche future che li riguardino, non come richieste retroattive di nuova validazione.
+
 # 3. Master Development Plan — ordine e stato corrente
 
 ## Fase A — Fondamenti numerici e baseline scientifica
@@ -220,6 +250,8 @@ Evidenza B05–B12 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-7 e
 
 ### A01 — Baseline, test di riferimento e manifest complessivo
 
+**Test proporzionati (nuove modifiche a questo step):** T1 manifest/checksum, harness e reference; T2 riproduzione di un caso di riferimento; T3 audit della baseline solo se cambia il contratto di riferimento. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: PARZIALE
 
 test/reference presenti; manifest di accettazione complessivo da chiudere
@@ -244,29 +276,43 @@ Focused state-conversion/path/geometry tests available before production edits.
 
 ### A02 — Primitive canoniche e mass fractions
 
+**Test proporzionati (nuove modifiche a questo step):** T1 round-trip q/qp, mass fractions e wet/dry; T2 bilanci di componenti con sorgenti/BC; T3 reference e composizione variabile solo per cambi al mapping. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: COMPLETATO
 
 ### A03 — Topografia Q1 e geometria B_vertex
+
+**Test proporzionati (nuove modifiche a questo step):** T1 identità Q1 facce/centri e refresh; T2 fondo variabile/restart; T3 regressioni geometriche e 1/4 thread se cambia accesso o riduzione. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: COMPLETATO
 
 ### A04 — Ricostruzione HP
 
+**Test proporzionati (nuove modifiche a questo step):** T1 positività, velocity interval, momenti e bordi; T2 caso 1D/2D wet/dry; T3 operator/reference se varia la ricostruzione. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: COMPLETATO
 
 ### A05 — Operatore HP-PCCU, G=1
+
+**Test proporzionati (nuove modifiche a questo step):** T1 flussi/path/residui e quiet water; T2 dam-break e topografia continua; T3 confronto con reference HP-PCCU per modifiche all’operatore. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: COMPLETATO
 
 ### A06 — Slope correction
 
+**Test proporzionati (nuove modifiche a questo step):** T1 G_center/G_face e path corretto; T2 lake-at-rest su pendii; T3 confronto residui/CFL se cambiano le formule. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: COMPLETATO
 
 ### A07 — Curvature source
 
+**Test proporzionati (nuove modifiche a questo step):** T1 sorgente a riposo, termine misto Bxy uv; T2 caso dinamico curvo; T3 regressione fisica se cambia la sorgente. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: COMPLETATO
 
 ### A08 — Validazione idrodinamica 1D e 2D
+
+**Test proporzionati (nuove modifiche a questo step):** T1 comparatori e controlli di bilancio; T2 casi rappresentativi 1D/2D; T3/T4 matrice scientifica N7 solo quando si modifica il suo scope. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: COMPLETATO
 
@@ -534,13 +580,19 @@ Restano esplicitamente nel piano anche: sorgenti fessurali e accoppiamenti ingre
 
 ### A09 — Due policy CFL
 
+**Test proporzionati (nuove modifiche a questo step):** T1 due formule CFL, sentinel e input non valido; T2 traiettorie N_RK 2/3/4 rappresentative; T3 profili/thread selezionati se cambia scheduling. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: COMPLETATO
 
 ### A10 — Topografia evolutiva e scambio di massa
 
+**Test proporzionati (nuove modifiche a questo step):** T1 rate locale, disponibilità e assemblaggio nodale; T2 fondo evolutivo e restart B_vertex; T3 bilanci/1-4 thread se cambiano le riduzioni. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: COMPLETATO
 
 ### A11 — Cutover e baseline scientifica
+
+**Test proporzionati (nuove modifiche a questo step):** T1 integrità comparatori, manifest e checksum; T2 casi ETNA/ETNA_LAVA selezionati; T4 solo per nuova decisione scientifica esplicita, senza riaprire il gate storico. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: APPROVATO
 
@@ -572,6 +624,8 @@ Exact B_vertex restart when evolving topography is enabled.
 
 ### B01 — Build, CI e portabilita
 
+**Test proporzionati (nuove modifiche a questo step):** T1 configure/build e make check mirato; T2 build GNU nel profilo modificato; T3 GNU/ifx/Docker soltanto quando cambia portabilità/build/release. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: COMPLETATO
 
 commit 05989f5e7a del 2026-10-11. Verifiche Linux GNU Fortran optimized/strict-debug (1,4 thread), Docker optimized/strict-debug (1,4 thread) e Intel oneAPI ifx 2025.1 optimized/diagnostic (1,4 thread). Evidenze e scope: docs/acceptance/M12C_BUILD_SYSTEM_PROGRESS_2026_10_11.md e M12C_REPRODUCIBILITY_MANIFEST_2026_10_11.json.
@@ -598,9 +652,13 @@ Current warning baseline is measured and correctness/portability warnings are fi
 
 ### B02 — Mappa dipendenze e relocation path-only
 
+**Test proporzionati (nuove modifiche a questo step):** T1 inventario dei sorgenti, riferimenti ai path e dependency graph; T2 build pulita e out-of-tree; T3 matrice di toolchain se il relocation cambia build. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: COMPLETATO
 
 ### B03 — Stocastico OU, RNG e restart seriale
+
+**Test proporzionati (nuove modifiche a questo step):** T1 sequenza RNG/OU e celle asciutte; T2 full/split restart stocastico; T3 1/4 thread se cambia ordine o ownership RNG. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: IMPLEMENTATO
 
@@ -612,6 +670,8 @@ Stato ufficiale: IMPLEMENTATO
 
 ### B04 — Model layout, N_LAYERS=1
 
+**Test proporzionati (nuove modifiche a questo step):** T1 layout, indici e rifiuto N_LAYERS>1; T2 smoke del solver; T3 regressione di stato se cambia memoria o serializzazione. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: IMPLEMENTATO
 
 **Attività previste:** Conservare model_layout_type quale unica autorità su n_layers, variabili ed indici; rifiutare N_LAYERS\>1 finché la fisica multilayer non esiste; usare metadati per G01 anziché crearne una seconda copia.
@@ -621,6 +681,8 @@ Stato ufficiale: IMPLEMENTATO
 **Criteri di accettazione:** Layout N_LAYERS=1 coerente con dimensioni e indici; rifiuto esplicito configurazioni non supportate; nessuna variazione dei risultati.
 
 ### B05 — Velocita caratteristiche comuni
+
+**Test proporzionati (nuove modifiche a questo step):** T1 velocità x/y, dry/wet e g’ non positiva; T2 residui/CFL ruotati; T3 bitwise strict/optimized se si modifica nuovamente il kernel. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: IMPLEMENTATO
 
@@ -636,6 +698,8 @@ Evidenza: implementato nel commit 00400001. La suite TEST_SPATIAL_OPERATOR è pa
 
 ### B06 — Ricostruzione HP sulle linee
 
+**Test proporzionati (nuove modifiche a questo step):** T1 tracce HP, quiet-water, positività e indici x/y; T2 caso dinamico ruotato; T3 payload bitwise se cambia la ricostruzione. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: IMPLEMENTATO
 
 File interessati: src/reconstruction_2d.f90; src/hp_reconstruction_2d.f90.
@@ -647,6 +711,8 @@ Criteri di accettazione: Tracce HP, mean momentum, positività, quiet-water e co
 Stato aggiornato: implementato nel commit 00400001. TEST_HP_RECONSTRUCTION passa i controlli di quiet-water, positività, media del momento e indipendenza direzionale; TEST_N7_GEOMETRY_DYNAMIC passa con 69 casi per profilo e output binari identici tra 1 e 4 thread. La precedente dicitura «DA IMPLEMENTARE» descriveva uno stato superato e non è applicabile.
 
 ### B07 — Flusso PCCU di interfaccia
+
+**Test proporzionati (nuove modifiche a questo step):** T1 PCCU/path e guard exact rest; T2 casi rough/drainage/lake; T3 confronto pre/post e thread se cambiano i kernel. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: IMPLEMENTATO
 
@@ -660,6 +726,8 @@ Stato aggiornato: kernel PCCU comune implementato nel commit f2065730. In entram
 
 ### B08 — Velocita faccia e path idrostatici di cella
 
+**Test proporzionati (nuove modifiche a questo step):** T1 segnali di faccia, orientazioni e path di cella; T2 griglie ruotate/composizione; T3 confronti bitwise solo per nuovi cambi ai kernel; B12 storico invariato. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: IMPLEMENTATO, GATE APERTO
 
 File interessati: src/hyperbolic_2d.f90.
@@ -671,6 +739,8 @@ Criteri di accettazione: Equivalenza x/y su casi 1D ruotati, 2D e composizione v
 Stato aggiornato: velocità di faccia e cell hydrostatic path consolidati nel commit fd43e4ca. I payload spaziali completi sono risultati bitwise identici alla baseline pre-XY-4 per dynamic_rough, dynamic_drainage e lake_ramp, in strict e optimized, con 1/4 thread. TEST_N7_GEOMETRY_DYNAMIC è passata (69 casi per profilo); TEST_N7_COMPOSITION è passata (162 casi per profilo, composizione variabile e confronti a 1/4 thread); TEST_SPATIAL_OPERATOR ha passato controlli di tracce, residui e CFL direzionale, inclusi casi x/y ruotati. B08 è COMPLETATO con la chiusura del gate B12.
 
 ### B09 — Condizioni al contorno e ricostruzione lineare
+
+**Test proporzionati (nuove modifiche a questo step):** T1 Dirichlet/Neumann/secante W/E/S/N e dimensioni 1xN; T2 lateral/radial source; T3 payload bitwise se si interviene di nuovo sulle BC. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: IMPLEMENTATO, GATE APERTO
 
@@ -695,6 +765,8 @@ CI e pubblicazione: relocation: https://github.com/demichie/IMEX_SfloW2D_dev/act
 
 ### B10 — Derivate e halo geometrici
 
+**Test proporzionati (nuove modifiche a questo step):** T1 geometria 1D x/y, 2D e halo; T2 topo dinamica; T3 bitwise 1/4 thread se cambiano ordine, copie o somme. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: IMPLEMENTATO, GATE APERTO
 
 File interessati: src/geometry/geometry_2d.f90.
@@ -706,6 +778,8 @@ Criteri di accettazione: TEST_GEOMETRY_1D per x e y e fixture 2D, ricostruzione 
 Stato aggiornato al 15 ottobre 2026: le copie dei bordi dei campi derivati sono state estratte in utility private x/y; i loop 2D, le formule e le somme miste non sono stati modificati. L'estrazione del kernel aritmetico 1D è stata scartata perché il confronto bitwise ha rilevato differenze in optimized; mantenere i loop scalari originali conserva l'ordine numerico. `TEST_GEOMETRY_1D` è passato in strict e optimized (112 casi per profilo, fixture 1D x/y e 2D, cache avvelenate e snapshot identici a 1/4 thread); `TEST_TOPOGRAPHY_FACES` è passato in entrambi i profili. Il confronto A/B con il sorgente pre-B10 ha confermato payload identici bitwise su griglie 5x1, 9x1, 17x1, 5x5 e 7x9, tutti i quattro profili di topografia e slope-correction OFF/ON, a 1 e 4 thread, in strict e optimized. B10 è COMPLETATO con la chiusura del gate B12.
 
 ### B11 — Riduzione CFL direzionale
+
+**Test proporzionati (nuove modifiche a questo step):** T1 directional_min/combined, CFL=-1, MAX_DT; T2 N_RK e output temporali; T3 thread/profili se si modifica la riduzione. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: IMPLEMENTATO, GATE APERTO
 
@@ -719,6 +793,8 @@ Stato aggiornato al 15 ottobre 2026: la raccolta dei quattro segnali di velocit�
 
 ### B12 — Accettazione complessiva x/y
 
+**Test proporzionati (nuove modifiche a questo step):** T3 matrice x/y e comparatori strict/optimized nel perimetro del gate; T4 non implicito: non riaprire B12 per modifiche I/O o documentazione. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: COMPLETATO
 
 #### Sequenziamento e disciplina di regressione
@@ -730,6 +806,8 @@ Evidenza aggiornata al 15 ottobre 2026: l'audit completo sul candidato basato su
 ## Fase C — Output e distribuzione
 
 ### C01 — Output segregati per run
+
+**Test proporzionati (nuove modifiche a questo step):** T1 layout di directory, naming, indice/tempo snapshot e manifest; T2 output NetCDF/ASCII/CSV, multi-run e assenza di file solver nella cwd; T3 confronto scientifico breve pre/post paths. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: PARZIALE
 
@@ -779,6 +857,8 @@ La documentazione introduttiva e la pagina website “Output files and formats�
 
 ### C02 — Contratto di configurazione e sicurezza
 
+**Test proporzionati (nuove modifiche a questo step):** T1 input RUN_NAME, path relativi/assoluti, traversal, symlink/hardlink, overwrite; T2 existing-run/restart esterno, directory HPC lunghe; T3 stress/race pertinenti al gate C03. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: IMPLEMENTATO, GATE APERTO
 
 #### Contratto di configurazione e sicurezza
@@ -802,6 +882,8 @@ Tutti i file scritti direttamente dal solver, inclusi backup di input, DEM espor
 Centralizzare la costruzione/validazione dei percorsi di output in un componente I/O dedicato. Definire eventuale modalità legacy temporanea solo per il periodo di validazione e migrazione degli script di post-processing.
 
 ### C03 — Accettazione I/O per run
+
+**Test proporzionati (nuove modifiche a questo step):** T1 tutti i negativi di path e collisione; T2 full/split/external restart, append NetCDF/CSV, snapshot interrotto; T3 2-3 scenari numerici rappresentativi con baseline A11; nessuna campagna HP-PCCU completa automatica. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: GATE
 
@@ -854,6 +936,8 @@ Queste prove non chiudono C03: restano da completare il test del manifest oltre 
 
 ### C04 — Autotools policy B
 
+**Test proporzionati (nuove modifiche a questo step):** T1 autoreconf e manifest EXTRA_DIST; T2 configure/make/check da checkout; T3 make distcheck e GNU/ifx/Docker al gate packaging, non a ogni modifica documentale. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 #### Milestone post-XY — Politica Autotools B e distribuzione con due archivi
@@ -872,9 +956,13 @@ Gate di accettazione: (a) build/test da clone Git con autoreconf -fi; (b) config
 
 ### C05 — Doppio archivio di distribuzione
 
+**Test proporzionati (nuove modifiche a questo step):** T1 versioni, checksum e inventario di entrambi gli archivi; T2 esempi estratti; T3 coerenza stessa revisione/tag prima del rilascio. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 ### C06 — Validazione distributiva
+
+**Test proporzionati (nuove modifiche a questo step):** T3 sorgente Autotools e Examples estratti, installazione, GNU/ifx/Docker, assenza dipendenze Git; T4 release solo dopo gate distributivo. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: GATE
 
@@ -885,6 +973,8 @@ Pubblicazione unificata: solo il workflow publish-documentation.yml deve distrib
 ## Fase D — Reologie e solver IMEX
 
 ### D01 — Inventario formule e rami REAL/COMPLEX
+
+**Test proporzionati (nuove modifiche a questo step):** T1 inventario branch REAL/COMPLEX, formule e proprietari; nessun run numerico se l’intervento è solo documentale. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: PARZIALE
 
@@ -910,9 +1000,13 @@ Questi sono approfondimenti implementativi, non motivi per cambiare la struttura
 
 ### D02 — Caratterizzazione numerica cell-local
 
+**Test proporzionati (nuove modifiche a questo step):** T1 test cell-local di valore/derivata e finite/complex step, casi degeneri; T2 integrazione della sorgente; T3 tolleranze e confronti indipendenti se cambiano formule. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 ### D03 — Audit e ownership di parametri, variabili e stato condiviso
+
+**Test proporzionati (nuove modifiche a questo step):** T1 audit dipendenze, ownership e accessi globali; T2 inizializzazione e serializzazione; T3 integrazione se cambia stato persistente. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: DA FARE
 
@@ -966,6 +1060,8 @@ Manifest completo e revisionato, dependency graph aciclico, piano di migrazione 
 
 ### D04 — Eliminazione reologia 8
 
+**Test proporzionati (nuove modifiche a questo step):** T1 rifiuto reologia 8, riferimenti e parsing; T2 un esempio con reologia supportata; T3 regressione altre reologie solo se toccate. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 Questa decisione è definitiva.
@@ -999,6 +1095,8 @@ Rimuovere rheology_model==8 da nonlinear_solver_2d, time_integration_2d, inpout_
 Decisione approvata: eliminare completamente il modello reologico 8, mantenere il modello 6 per la legge Bursik–Woods; la soluzione algebrica ANALYTIC dello stage DIRK verrà introdotta separatamente in D13. L’implementazione nel repository non è ancora stata rimossa.
 
 ### D05 — Estrazione moduli reologici
+
+**Test proporzionati (nuove modifiche a questo step):** T1 contratti di ogni modulo reologico e REAL/COMPLEX; T2 un caso per modello toccato; T3 confronto pre/post se il refactoring cambia il percorso numerico. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Prerequisito: audit D03. Durante l’estrazione dei moduli reologici, trasferire agli owner di legge mu/xi, parametri lava, lahar, plastic, quadratic, Froude, Lucas e mu(I); non trascinare proprietà fisiche non reologiche in un generico modulo reologico. Registrare read/write e mantenere la numerica REAL/COMPLEX.
 
@@ -1116,9 +1214,13 @@ Questo è il piano consolidato che utilizzerei come riferimento per l’implemen
 
 ### D06 — Sorgenti termiche e pore pressure
 
+**Test proporzionati (nuove modifiche a questo step):** T1 sorgenti termiche/pore pressure e limiti sottili; T2 casi lava/raffreddamento; T3 energia e stiff RK se cambiano i termini. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 ### D07 — Migrazione progressiva dei parametri non reologici
+
+**Test proporzionati (nuove modifiche a questo step):** T1 ownership parametri, inizializzazione e default; T2 input/restart rappresentativi; T3 solo se mutano effetti numerici. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: DA FARE
 
@@ -1139,6 +1241,8 @@ Parametri letti da namelist convalidati una volta; grandezze derivate calcolate 
 Compilazione GNU e ifx, OpenMP 1/4 thread, test di input/restart, confronto numerico strict/optimized e casi fisici mirati. Registrare symbol manifest before/after, dependency graph, confronto di default e prestazioni; ogni modifica alla semantica delle fonti/risultati e un task scientifico separato. Aggiornare Doxygen per ogni simbolo e procedura alterati.
 
 ### D08 — RHEOLOGY_MODEL da numeri a stringhe
+
+**Test proporzionati (nuove modifiche a questo step):** T1 parsing nomi e compatibilità input/errori; T2 un caso per modello attivo; T3 non necessario per mera rinomina senza cambi di dispatch. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: DA FARE
 
@@ -1204,6 +1308,8 @@ Per i vecchi file di input numerici prevederei un errore esplicito con indicazio
 
 ### D09 — Correzione del solo attrito
 
+**Test proporzionati (nuove modifiche a questo step):** T1 isolamento frizione e segno dei termini; T2 casi dissipativi/non dissipativi; T3 conservazione e regressione reologica se cambia forza effettiva. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 La nuova procedura:
@@ -1231,6 +1337,8 @@ La scelta precisa dell’algoritmo di proiezione e arresto sarà validata median
 correct_friction_momentum vive in rheology_2d.f90 ed opera solo sul contributo della frizione isolato: m_after = alpha\*m_before, 0 \<= alpha \<= 1, con arresto ammissibile e nessuna rotazione/inversione. L'interfaccia deve rendere espliciti momentum_before_friction e momentum_after_friction e impedire di applicare questo vincolo allo stato globale derivante da altre sorgenti o dal solve accoppiato. SI, NEWTON e ANALYTIC possono usare il correttore esclusivamente nel sottopasso di frizione definito; i gruppi misti richiedono una prova separata del contributo isolato.
 
 ### D10 — EX_terms / IM_terms
+
+**Test proporzionati (nuove modifiche a questo step):** T1 contratto EX_terms/IM_terms e consistenza delle somme; T2 uno step IMEX con tutte le componenti; T3 casi stiff se cambia partizione. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: DA FARE
 
@@ -1261,6 +1369,8 @@ Nel default un unico gruppo NEWTON deve riprodurre in sequenza la parte SI, lo s
 Con tau=0, lo stage non effettua un solve implicito: evitare divisioni per zero e definire il contributo/stage coerentemente con il tableau e la sua necessità nel passo. I tableau IMEX e la distinzione sorgenti esplicite/operatore spaziale non vengono modificati.
 
 ### D11 — IM_group e metadati
+
+**Test proporzionati (nuove modifiche a questo step):** T1 metadati e copertura IM_group; T2 selezioni e subset; T3 regressioni RK quando cambia il raggruppamento. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: DA FARE
 
@@ -1317,6 +1427,8 @@ Ogni gruppo utilizza i valori più aggiornati disponibili delle variabili estern
 
 ### D12 — Newton per gruppo e Jacobiano ridotto
 
+**Test proporzionati (nuove modifiche a questo step):** T1 Jacobiani ridotti, complex step e convergenza Newton; T2 problemi stiff; T3 full/split e profili se cambiano traiettorie. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 #### Jacobiano Newton
@@ -1343,6 +1455,8 @@ Per NEWTON, costruire il residuo locale R_g(x_g) e il Jacobiano J_g = dR_g/dx_g 
 
 ### D13 — Algebriche ANALYTIC per stage DIRK
 
+**Test proporzionati (nuove modifiche a questo step):** T1 variabili ANALYTIC per stage DIRK e derivate; T2 casi con/algebriche senza; T3 N_RK 2/3/4 se cambia stage coupling. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 #### Limitazioni di ANALYTIC
@@ -1367,9 +1481,13 @@ Ricostruire il momento mantenendo il verso di riferimento, con casi robusti U\*=
 
 ### D14 — Gruppi misti e validazione
 
+**Test proporzionati (nuove modifiche a questo step):** T1 gruppi misti e fallback; T2 combinazioni rappresentative; T3 confronto delle traiettorie se cambia la strategia implicita. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 ### D15 — Acceptance della nuova architettura
+
+**Test proporzionati (nuove modifiche a questo step):** T3/T4 gate architetturale: matrice reologie e IMEX, conservazione, REAL/COMPLEX, restart, baseline A11 e variazioni numeriche autorizzate; decisione scientifica autonoma. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: GATE
 
@@ -1380,6 +1498,8 @@ Ogni commit funzionale porta evidenza di compilazione pulita, test associati, SH
 ## Fase E — Architettura e robustezza del passo
 
 ### E01 — Audit dipendenze e ownership stato
+
+**Test proporzionati (nuove modifiche a questo step):** T1 audit import/dipendenze e ownership; T2 inizializzazione e stato condiviso; T3 solo per cambi strutturali con effetti runtime. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Questo audit resta un gate INDIPENDENTE dopo D15: verificare che D03 e D07 abbiano effettivamente risolto ownership e dipendenze e che non vi siano stati globali o temporanei introdotti dai refactoring. Non usare E01 come primo inventario dei parametri.
 
@@ -1416,6 +1536,8 @@ Le attività preparatorie e i test esplorativi possono proseguire prima di E03, 
 
 ### E02 — Architecture fitness checks
 
+**Test proporzionati (nuove modifiche a questo step):** T1 check statici automatici, lint/dep graph e negative fixtures; T2 CI dei contratti; nessuna campagna scientifica solo per check statici. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 #### Prove di estensione (architecture fitness checks)
@@ -1425,6 +1547,8 @@ Prima del via libera, svolgere almeno tre analisi di impatto su casi realistici:
 Per il percorso verso G01–H05 verificare inoltre che l’organizzazione dello stato e della geometria non ostacoli domain decomposition, halo exchange, tile/local domain, MPI, Parallel NetCDF e futuri acceleratori. Non si richiede adesso di implementare MPI o GPU.
 
 ### E03 — Architecture readiness
+
+**Test proporzionati (nuove modifiche a questo step):** T3 gate di fitness architetturale e dipendenze; casi end-to-end minimi e decisione motivata. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: GATE
 
@@ -1438,6 +1562,8 @@ Criterio di uscita: “Il codice e il repository sono sufficientemente organizza
 
 ### E04 — Policy timestep e input
 
+**Test proporzionati (nuove modifiche a questo step):** T1 priorità e validazione policy Δt; T2 sequenza di passi e output times; T3 CFL/RK rappresentativi se cambia il controller. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 Introdurre enable_step_retry, retry_dt_factor (default candidato 0.5, 0\<factor\<1), max_step_retries (default candidato 10), min_time_step \[s\] configurabile e parametri di diagnostica. min_time_step è il limite assoluto di timestep: nessun tentativo può essere lanciato con Δt inferiore al minimo; se la prossima riduzione lo violasse, la simulazione termina con un errore controllato. Validare valori finiti, consistenza con il timestep iniziale e compatibilità con il controllo CFL; non accettare un timestep che ecceda il limite temporale di output/fine run per effetto del controllore. I default numerici proposti sono da finalizzare durante l’implementazione, non da presentare come soglie fisiche universali.
@@ -1445,6 +1571,8 @@ Introdurre enable_step_retry, retry_dt_factor (default candidato 0.5, 0\<factor\
 La policy per il passo successivo rimane quella del calcolo CFL esistente. Un retry modifica solamente Δt del tentativo corrente: non è un controller adattativo di accuratezza basato su stime embedded. Registrare accepted_dt, proposed_dt, rejected_attempts e minimum_accepted_dt nelle diagnostiche; definire i contatori in modo coerente con il restart.
 
 ### E05 — Bounds primitive e override
+
+**Test proporzionati (nuove modifiche a questo step):** T1 limiti/precedenza configurazioni e casi invalide; T2 celle dry/wet e varianti reologiche; T3 solo se il bound modifica la dinamica. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: DA FARE
 
@@ -1456,6 +1584,8 @@ Lo sviluppo comprende un inventario completo delle primitive effettivamente espo
 
 ### E06 — Controlli di ammissibilita cell-local
 
+**Test proporzionati (nuove modifiche a questo step):** T1 ammissibilità dopo stadi/finale, nessun clipping; T2 caso che attiva la guardia; T3 integrazione numerica se influisce sugli step. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 Contratto concettuale: CALL check_primitive_bounds(state, valid, failure_info). La routine non ha effetti collaterali: legge unicamente lo stato primitivo di cella e i bounds risolti, restituisce il flag e un record diagnostico con variabile/indice, (j,k), valore, limite, tipo di violazione e identificatore di stadio o finale. Non stampa, non clippa e non invoca fatal_error. Il chiamante determina il retry e la messaggistica.
@@ -1466,6 +1596,8 @@ time_integration_2d.f90 conserva this%q_rk per ogni cella risolta dopo lo stage.
 
 ### E07 — Error propagation, rollback e retry
 
+**Test proporzionati (nuove modifiche a questo step):** T1 rollback completo stato/RNG e limiti retry; T2 fallimento recuperabile + ripartenza; T3 traiettorie 1/4 thread se mutano stadi. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 Separare esplicitamente i fallimenti recuperabili (Newton non convergente, solve lineare fallito, stato di cella non ammissibile, NaN/Inf riconducibile al tentativo) dagli errori strutturali (input incoerente, file mancanti, allocazione e incompatibilità di configurazione/restart). Le routine coinvolte dovranno restituire status/failure_info invece di arrestare incondizionatamente il processo per le sole condizioni recuperabili. I fallimenti dei thread OpenMP vanno raccolti senza race e senza I/O concorrente non controllato; interrompere il passo solo dopo una sincronizzazione sicura, evitando sottopassi successivi su workspace parziali.
@@ -1475,6 +1607,8 @@ All’inizio del timestep salvare lo stato persistente necessario a ripetere il 
 Se un tentativo fallisce: registrare failure_info; ripristinare lo snapshot; calcolare Δt_new=factor·Δt_old; validare min_time_step e limite retry; ripetere tutti gli stadi IMEX dall’inizio. Nessuna modifica alle equazioni di bilancio o ai pesi RK. Il comportamento deve essere deterministico rispetto al tentativo effettivamente accettato, entro la policy di RNG documentata per l’attivazione stocastica.
 
 ### E08 — Test del timestep controller
+
+**Test proporzionati (nuove modifiche a questo step):** T1 unità del controller e decisioni accept/reject; T2 scenari provocati e terminal failure; T3 casi stiff rappresentativi. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: DA FARE
 
@@ -1494,33 +1628,47 @@ Per l’implementazione: creare un gate E09 indipendente dalle ottimizzazioni de
 
 ### E09 — Gate timestep
 
+**Test proporzionati (nuove modifiche a questo step):** T3 gate timestep con budget, conservation/restart e benchmark strict/optimized; T4 solo per nuove garanzie scientifiche. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: GATE
 
 ## Fase F — Interfacce per chiusure future
 
 ### F01 — Interfaccia closure verticali
 
+**Test proporzionati (nuove modifiche a questo step):** T1 schema di input/output vertical closure, limiti e fallback; T2 backend stub; niente test 3D finché l’API è solo neutrale. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 ### F02 — Interfaccia subgrid terreno
+
+**Test proporzionati (nuove modifiche a questo step):** T1 contratto DEM fine/coarse e topografia dinamica; T2 backend neutro; T3 solo per chiusure subgrid attivate. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: DA FARE
 
 ### F03 — Backend ML/NN opzionale
 
+**Test proporzionati (nuove modifiche a questo step):** T1 feature schema/versione, NaN/OOD e fallback; T2 inferenza stub opzionale; T3 determinismo/batch quando attivo. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 ### F04 — Test di neutralita API
 
+**Test proporzionati (nuove modifiche a questo step):** T1/T2 test di neutralità con backend disattivato e stati identici; T3 breve confronto numerico, non una nuova validazione scientifica. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 ### F05 — Architecture closure readiness
+
+**Test proporzionati (nuove modifiche a questo step):** T3 gate contract API/portabilità, senza confondere con validazione fisica di ML o closure. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: GATE
 
 ## Fase G — Migrazione layer-aware
 
 ### G01 — Storage rank-4 con N_LAYERS=1
+
+**Test proporzionati (nuove modifiche a questo step):** T1 indicizzazione rank-4, allocation e N_LAYERS=1; T2 confronto con storage precedente; T3 restart/thread se lo stato cambia. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 G01 non parte senza (1) baseline scientifica HP-PCCU A11 approvata e congelata e (2) accettazione D15 della nuova architettura reologica/IMEX. D15 include due gate distinti: equivalenza del gruppo unico NEWTON rispetto alla baseline e accuratezza dei gruppi multipli ordinati, con effetti numerici documentati. G02 adatta restart e I/O allo stato layer-aware senza cambiare la fisica per N_LAYERS=1.
 
@@ -1556,6 +1704,8 @@ Only B_vertex is authoritative for the evolving bed. Face, center, derivative an
 
 ### G02 — Activity/restart/I-O layer-aware
 
+**Test proporzionati (nuove modifiche a questo step):** T1 halo/activity e schema di restart/I-O layer-aware; T2 full/split; T3 confronto di serializzazione e campi su 1 layer. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 Attività e verifiche operative: Maschere di attività spaziali non per-layer; restart binario e NetCDF seriale layer-aware; serializzare B_vertex autoritativo e rigenerare geometry; test multistrato sintetici senza fisica.
@@ -1581,6 +1731,8 @@ Continue the incremental inpout_2d split along model-input, restart, scientific 
 The active spatial workset remains distinct from the layer dimension and from vertex ownership. With N_LAYERS=1 it must reproduce current compact lists during G01/G02. Wet/dry activity affects mass-exchange proposals, but physical dry cells remain part of the geometric mass-lumped vertex stencil with zero proposal.
 
 ### G03 — Architecture freeze
+
+**Test proporzionati (nuove modifiche a questo step):** T3 freeze architettura, ABI/API, serializzazione e N_LAYERS=1; T4 non sostituisce la validazione fisica I01. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: GATE
 
@@ -1620,6 +1772,8 @@ No batch-blocking interactive input remains.
 
 ### H01 — Local domain e halo abstraction
 
+**Test proporzionati (nuove modifiche a questo step):** T1 indici dominio locale/halo e ghost; T2 1 vs partizioni multiple; T3 equivalenza bilanci/campi se cambia ownership. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 Attività e verifiche operative: Introdurre local_domain (global/local/storage), halo espliciti a larghezza adeguata alla derivata LS (±2); local==global per primo; separare boundary fill fisico da exchange.
@@ -1643,6 +1797,8 @@ Keep physical-boundary filling separate from future inter-rank halo exchange.
 The halo width must be derived from active stencils. HP face reconstruction is local, but the retained five-point quadratic LS slope/Hessian operator uses j-2…j+2 or k-2…k+2. The local-domain design therefore needs at least the corresponding two-cell derivative reach unless the operator is reorganized with an equivalent communication/reconstruction strategy that passes the same numerical regressions.
 
 ### H02 — Gerarchia active tiles
+
+**Test proporzionati (nuove modifiche a questo step):** T1 selezione tile, attività e bordi; T2 confronti active/full; T3 timing più conservazione se cambiano riduzioni. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: DA FARE
 
@@ -1676,6 +1832,8 @@ Add tile-vs-compact-list regressions before removing any old traversal path.
 
 ### H03 — Decomposizione MPI
 
+**Test proporzionati (nuove modifiche a questo step):** T1 MPI exchange e partizioni; T2 1/2/4 rank; T3 conservazione e regressioni rank-invariant selezionate. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 Attività e verifiche operative: Decomposizione cartesiana MPI e halo exchange generico; B_vertex ownership condivisa e gather nodale across rank; continuità correlazioni stocastiche ai rank boundaries.
@@ -1699,6 +1857,8 @@ Use global reductions only for true global quantities such as CFL extrema, conse
 Validate np=1 through the MPI path, then 2- and 4-rank square and non-square decompositions.
 
 ### H04 — MPI+OpenMP e Parallel NetCDF
+
+**Test proporzionati (nuove modifiche a questo step):** T1 halo ibridi e parallel NetCDF; T2 MPI+OpenMP e restart; T3 portabilità/rank/thread al gate. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: DA FARE
 
@@ -1742,6 +1902,8 @@ Define distributed restart ownership and validate continuation, including evolvi
 
 ### H05 — Tuning e GPU readiness
 
+**Test proporzionati (nuove modifiche a questo step):** T1 profiling e correttezza kernel accelerati; T2 benchmark rappresentativi; T3 confronti numerici e performance con hardware documentato. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: DA FARE
 
 Attività e verifiche operative: Profilare hot spots/NUMA/bandwidth/SIMD e tile sizes; documentare percorso GPU-ready senza introdurre dipendenze sul target acceleratore; non precalcolare topografia assunta statica.
@@ -1764,17 +1926,25 @@ Preserve CPU/MPI reference execution and the same model/layout/local-domain cont
 
 ### I01 — Formulazione fisica due strati
 
+**Test proporzionati (nuove modifiche a questo step):** T1 bilanci per layer, limite 1 layer e wet/dry; T2 benchmark a due strati; T4 validazione fisica dedicata. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: FUTURO
 
 ### I02 — Scambi interstrato
+
+**Test proporzionati (nuove modifiche a questo step):** T1 scambi interstrato massa/momento/energia; T2 limiti analitici; T4 conservazione e comparatori indipendenti. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: FUTURO
 
 ### I03 — Validazione due strati
 
+**Test proporzionati (nuove modifiche a questo step):** T4 gate scientifico a due strati, test convergenza e bilanci; non riutilizzare automaticamente il gate A11 come prova multilayer. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: GATE
 
 ### I04 — Closure verticali fisiche/analitiche
+
+**Test proporzionati (nuove modifiche a questo step):** T1 quadrature e ricostruzione profili, frazioni e positività; T2 confronto reference verticale; T4 se cambia closure fisica. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: FUTURO
 
@@ -1784,9 +1954,13 @@ Implementazioni alternative: closure analitica, fisica, semiempirica e ML/NN sot
 
 ### I05 — Validazione verticale
 
+**Test proporzionati (nuove modifiche a questo step):** T4 gate verticale con dati indipendenti, accuratezza e limiti di applicabilità. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: GATE
 
 ### I06 — Subgrid topografia fine/coarse
+
+**Test proporzionati (nuove modifiche a questo step):** T1 coarse-graining DEM, casi uniformi e invarianza; T2 fine/coarse; T4 validazione su DEM indipendenti. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: FUTURO
 
@@ -1796,9 +1970,13 @@ Separare training/calibrazione da verifica su terreni e condizioni non visti. Pr
 
 ### I07 — Validazione subgrid
 
+**Test proporzionati (nuove modifiche a questo step):** T4 gate subgrid: conservazione, generalizzazione, scale/rotazioni e casi indipendenti. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
 Stato ufficiale: GATE
 
 ### I08 — Inferenza ML/NN delle closure
+
+**Test proporzionati (nuove modifiche a questo step):** T1 versionamento feature/weights, fallback e OOD; T2 inferenza riproducibile; T4 benchmark indipendenti quando impiegata nella fisica. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: FUTURO
 
@@ -1811,6 +1989,8 @@ Un output ML non finito o fuori dal dominio fisico deve essere intercettato da r
 Non pianificare coupling runtime bidirezionale o orchestrazione numerica con altri codici di simulazione. Modelli 3D o osservazioni esterne possono alimentare dataset offline per la chiusura verticale; questa attività non crea una dipendenza esecutiva del solver. Le interfacce input, dati, meteorologia e forcing già approvate restano distinte dal coupling fra simulatori.
 
 ### I09 — Validazione ML/NN
+
+**Test proporzionati (nuove modifiche a questo step):** T4 gate ML su test non visti, errore, robustezza, costo e fallback; distinguere accuratezza del modello e del solver. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: GATE
 
