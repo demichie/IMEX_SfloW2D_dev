@@ -11,6 +11,7 @@ MODULE output_paths
   PRIVATE
 
   PUBLIC :: initialize_output_paths, output_file_path, begin_snapshot, snapshot_file_path
+  PUBLIC :: snapshot_index_label
   PUBLIC :: ensure_output_directory
 
   CHARACTER(LEN=1024), SAVE :: run_output_directory = ''
@@ -111,11 +112,11 @@ CONTAINS
   SUBROUTINE begin_snapshot(index, time)
     INTEGER, INTENT(IN) :: index
     REAL(wp), INTENT(IN) :: time
-    CHARACTER(LEN=4) :: index_string
+    CHARACTER(LEN=:), ALLOCATABLE :: index_string
     CHARACTER(LEN=32) :: time_label
     INTEGER :: i
 
-    WRITE(index_string, '(I4.4)') index
+    index_string = snapshot_index_label(index)
     WRITE(time_label, '(ES24.16E3)') time
     time_label = ADJUSTL(time_label)
     DO i = 1, LEN_TRIM(time_label)
@@ -137,6 +138,25 @@ CONTAINS
          TRIM(index_string)//'_t_'//TRIM(time_label)
     CALL ensure_output_directory(active_snapshot_directory)
   END SUBROUTINE begin_snapshot
+
+  !> \brief Format a zero-based snapshot index with at least four digits.
+  !> \param[in] index Nonnegative snapshot index.
+  !> \return Zero-padded legacy label, extended naturally beyond 9999.
+  FUNCTION snapshot_index_label(index) RESULT(label)
+    INTEGER, INTENT(IN) :: index
+    CHARACTER(LEN=:), ALLOCATABLE :: label
+    CHARACTER(LEN=32) :: integer_text
+    INTEGER :: digit_count
+
+    IF (index < 0) CALL fail('Snapshot index must be nonnegative')
+    WRITE(integer_text, '(I0)') index
+    digit_count = LEN_TRIM(integer_text)
+    IF (digit_count < 4) THEN
+      label = REPEAT('0', 4 - digit_count)//TRIM(integer_text)
+    ELSE
+      label = TRIM(integer_text)
+    END IF
+  END FUNCTION snapshot_index_label
 
   !> \brief Construct a path inside the active snapshot directory.
   !> \param[in] filename Basename of the snapshot file.

@@ -94,6 +94,85 @@ cmp "$reference_snapshot" "$resumed_snapshot"
 
 echo "PASS: evolving-topography binary restart is bit-for-bit identical"
 
+# An external checkpoint may use a long absolute path containing spaces. It
+# starts a fresh output run but must not authorize reuse of an existing run.
+external_case="$work_dir/external-restart-case"
+external_checkpoint_dir="$work_dir/external restart checkpoint directory with a path longer than forty characters"
+external_checkpoint="$external_checkpoint_dir/saved restart checkpoint.bin"
+external_output_base="external output base with spaces"
+mkdir -p "$external_checkpoint_dir" "$external_case"
+cp "$reference_dir/OUTPUT/TEST_2D/restart/restart.bin" "$external_checkpoint"
+cp -R "$repo_dir/TESTS/TEST_2D/." "$external_case/"
+prepare_solver_input "$external_case"
+[ "${#external_checkpoint}" -gt 40 ] || {
+    echo "FAIL: external checkpoint fixture path is not longer than 40 characters" >&2
+    exit 1
+}
+(
+    cd "$external_case"
+    awk -v checkpoint="$external_checkpoint" -v output_base="$external_output_base" '
+        /RESTART_FILES=/ {
+            print " RESTART_FILES=\"" checkpoint "\","
+            next
+        }
+        /^ T_END=/ {
+            print " T_END=  4.000000000000000E+000,"
+            next
+        }
+        /RUN_NAME=/ {
+            print
+            printf " OUTPUT_BASE_DIRECTORY=\"%s\",\n", output_base
+            next
+        }
+        /^ TOPO_CHANGE_FLAG =/ {
+            print " TOPO_CHANGE_FLAG = T,"
+            next
+        }
+        { print }
+    ' IMEX_SfloW2D.inp > external.inp
+    mv external.inp IMEX_SfloW2D.inp
+    "$executable" > external-run.log 2>&1 || {
+        echo "FAIL: external restart with a long path containing spaces failed" >&2
+        cat external-run.log >&2
+        exit 1
+    }
+    run_output="$external_output_base/TEST_2D"
+    [ -f "$run_output/restart/restart.bin" ] || {
+        echo "FAIL: external restart did not write into OUTPUT_BASE_DIRECTORY" >&2
+        exit 1
+    }
+    manifest_checksum=$(cksum "$run_output/metadata/output_manifest.csv")
+    restart_checksum=$(cksum "$run_output/restart/restart.bin")
+
+    if "$executable" > external-collision.log 2>&1; then
+        echo "FAIL: external checkpoint implicitly authorized existing output reuse" >&2
+        exit 1
+    fi
+    grep -q 'run output directory already exists' external-collision.log || {
+        echo "FAIL: external restart collision did not report the expected error" >&2
+        cat external-collision.log >&2
+        exit 1
+    }
+    [ "$manifest_checksum" = "$(cksum "$run_output/metadata/output_manifest.csv")" ] || {
+        echo "FAIL: rejected external restart changed the existing manifest" >&2
+        exit 1
+    }
+    [ "$restart_checksum" = "$(cksum "$run_output/restart/restart.bin")" ] || {
+        echo "FAIL: rejected external restart changed the existing checkpoint" >&2
+        exit 1
+    }
+
+    awk '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_OVERWRITE=T," }' \
+        IMEX_SfloW2D.inp > overwrite.inp
+    mv overwrite.inp IMEX_SfloW2D.inp
+    "$executable" > external-overwrite.log 2>&1 || {
+        echo "FAIL: explicit OUTPUT_OVERWRITE did not allow external restart output reuse" >&2
+        cat external-overwrite.log >&2
+        exit 1
+    }
+)
+echo "PASS: long external restart paths and explicit output reuse policy"
+
 # Also exercise original runout references, complete/segmented CSV histories,
 # read-only refusal of incompatible files and restored positive-EPS_STOP state.
 PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/test_runout_restart.py" "$executable"

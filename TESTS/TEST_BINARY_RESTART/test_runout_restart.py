@@ -110,6 +110,13 @@ def main():
         value = parameter(inp.read_text(), 'T_END', str(end))
         inp.write_text(parameter(value, 'RESTART_FILES', '"restart.bin"'))
 
+    def allow_output_reuse(case):
+        inp = case/'IMEX_SfloW2D.inp'
+        source, count = re.subn(r'(?mi)^&RUN_PARAMETERS\s*$',
+                                '&RUN_PARAMETERS\n OUTPUT_OVERWRITE=T,', inp.read_text())
+        assert count == 1
+        inp.write_text(source)
+
     def checkpoint(case):
         return case/'OUTPUT'/'TEST_2D'/'restart'/'restart.bin'
 
@@ -154,7 +161,10 @@ def main():
             original = require_output(full, 'TEST_2D_runout.csv').read_text().splitlines(keepends=True)
             prefix = [original[0]]+[line for line in original[1:] if float(line.split(',')[0]) <= 0.015]
             (diagnostics(case)/'TEST_2D_runout.csv').write_text(''.join(prefix))
-        continuation(case); run(case, 'resumed.log')
+        continuation(case)
+        if mode == 'one_missing':
+            allow_output_reuse(case)
+        run(case, 'resumed.log')
         for suffix in ('runout', 'mass_center'):
             filename = 'TEST_2D_'+suffix+'.csv'
             original = require_output(full, filename).read_text().splitlines()
@@ -188,6 +198,7 @@ def main():
                 content = mutate(content)
             (diagnostics(case)/filename).write_text(content)
         continuation(case)
+        allow_output_reuse(case)
         before = {p.name: sha(p) for p in (case/'OUTPUT'/'TEST_2D'/'diagnostics').glob('*.csv')}
         checkpoint_before = sha(case/'restart.bin')
         run(case, 'rejected.log', 'Diagnostic CSV')

@@ -24,7 +24,7 @@ MODULE inpout_2d
   USE domain_2d, ONLY: domain_type
   USE stochastic_module, ONLY: stochastic_workspace_type
   USE output_paths, ONLY: initialize_output_paths, output_file_path, &
-                          begin_snapshot, snapshot_file_path
+                          begin_snapshot, snapshot_file_path, snapshot_index_label
 
   USE parameters_2d, ONLY: idx_h, idx_hu, idx_hv, idx_T, idx_solid_first, &
                            idx_solid_last, idx_add_gas_first, idx_add_gas_last, idx_stoch, idx_pore, &
@@ -149,14 +149,14 @@ MODULE inpout_2d
   IMPLICIT NONE
 
   INTEGER :: n_restart_files
-  CHARACTER(LEN=40), dimension(10) :: restart_files
+  CHARACTER(LEN=2048), dimension(10) :: restart_files
 
   CHARACTER(LEN=40) :: run_name           !< Name of the run
   CHARACTER(LEN=1024) :: output_base_directory
   LOGICAL :: output_overwrite
   CHARACTER(LEN=2048) :: bak_name         !< Backup file for the parameters
   CHARACTER(LEN=40) :: input_file         !< File with the run parameters
-  CHARACTER(LEN=40) :: restart_file       !< Name of the restart file
+  CHARACTER(LEN=2048) :: restart_file     !< Name of the restart file
   CHARACTER(LEN=2048) :: probes_file      !< Name of the probes file
   CHARACTER(LEN=2048) :: output_file_2d   !< Name of the output files
   CHARACTER(LEN=2048) :: output_file_erosion
@@ -1042,6 +1042,7 @@ CONTAINS
     INTEGER :: dot_idx
     CHARACTER(LEN=4) :: restart_extension
     CHARACTER(LEN=2048) :: in_place_restart_path
+    LOGICAL :: allow_in_place_restart
 
     CHARACTER(LEN=3) :: check_file
 
@@ -4606,12 +4607,23 @@ CONTAINS
       IF (dot_idx >= 4) restart_extension = restart_file(dot_idx-3:dot_idx)
     END IF
     binary_restart_output = restart .AND. restart_extension == '.bin'
+    allow_in_place_restart = .FALSE.
+    IF (binary_restart_output .AND. TRIM(restart_file) == 'restart.bin') THEN
+      IF (LEN_TRIM(output_base_directory) > 0) THEN
+        in_place_restart_path = TRIM(output_base_directory)
+        IF (in_place_restart_path(LEN_TRIM(in_place_restart_path): &
+                                  LEN_TRIM(in_place_restart_path)) /= '/') &
+             in_place_restart_path = TRIM(in_place_restart_path)//'/'
+        in_place_restart_path = TRIM(in_place_restart_path)//TRIM(run_name)// &
+                                '/restart/restart.bin'
+        INQUIRE(FILE=TRIM(in_place_restart_path), EXIST=allow_in_place_restart)
+      END IF
+    END IF
     CALL initialize_output_paths(output_base_directory, run_name, &
-         output_overwrite, binary_restart_output)
-    IF (binary_restart_output .AND. INDEX(TRIM(restart_file), '/') == 0) THEN
+         output_overwrite, allow_in_place_restart)
+    IF (allow_in_place_restart) THEN
       in_place_restart_path = output_file_path('restart', 'restart.bin')
-      INQUIRE(FILE=TRIM(in_place_restart_path), EXIST=lexist)
-      IF (lexist) restart_file = TRIM(in_place_restart_path)
+      restart_file = TRIM(in_place_restart_path)
     END IF
 
     bak_name = output_file_path('metadata', TRIM(run_name)//'.bak')
@@ -5537,7 +5549,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: time
     CLASS(state_type), INTENT(INOUT) :: state
 
-    CHARACTER(LEN=4) :: idx_string
+    CHARACTER(LEN=:), ALLOCATABLE :: idx_string
 
     INTEGER :: j, k
     INTEGER :: i
@@ -5545,7 +5557,7 @@ CONTAINS
 
     output_idx = output_idx + 1
 
-    idx_string = lettera(output_idx - 1)
+    idx_string = snapshot_index_label(output_idx - 1)
     IF (output_cons_flag .OR. output_esri_flag) &
          CALL begin_snapshot(output_idx - 1, time)
 
@@ -5770,7 +5782,7 @@ CONTAINS
 
     CLASS(state_type), INTENT(IN) :: state
 
-    CHARACTER(LEN=4) :: idx_string
+    CHARACTER(LEN=:), ALLOCATABLE :: idx_string
 
     INTEGER :: j
     INTEGER :: i_pdyn_lev, i_thk_lev, i_table
@@ -5956,7 +5968,7 @@ CONTAINS
 
     END IF
 
-    idx_string = lettera(output_idx - 1)
+    idx_string = snapshot_index_label(output_idx - 1)
 
     !Save thickness
     output_esri_file = snapshot_file_path(TRIM(run_name)//'_'//idx_string//'.asc')

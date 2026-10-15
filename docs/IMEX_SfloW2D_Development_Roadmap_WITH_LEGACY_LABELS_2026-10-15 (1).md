@@ -831,6 +831,14 @@ Le verifiche seguenti **integrano** i criteri C03 già elencati, senza sostituir
 
 **C03-R4 — Integrità di output, riuso e interruzioni.** I controlli su tipo di file, symlink e hard link in `src/io/output_dirs.c` non attestano da soli la compatibilità dei contenuti di un run esistente. Definire i controlli obbligatori su checkpoint, manifest, snapshot e append NetCDF/CSV; simulare interruzioni durante creazione snapshot, scrittura manifest e append, quindi riprendere verificando indici univoci, tempi coerenti/monotoni, dati validi preservati e nessuna sovrascrittura indebita.
 
+#### Evidenze locali aggiuntive
+
+Le correzioni C03 in corso estendono `snapshot_index_label` oltre quattro cifre e usano la stessa etichetta per directory e nomi snapshot; i buffer dei checkpoint sono stati allungati e il riuso automatico è limitato al restart binario interno al run. `TESTS/TEST_OUTPUT_PATHS/run_test.sh` verifica le etichette e crea directory distinte per gli indici 0, 9999, 10000 e 10001. La serializzazione del manifest per indici oltre 9999 non è ancora verificata end-to-end.
+
+Sono passati localmente con GNU Fortran, in build out-of-tree, `make check` (che esegue `TESTS/TEST_OUTPUT_PATHS/run_test.sh` e `TESTS/run_tests.sh`) e `TESTS/TEST_BINARY_RESTART/run_test.sh`. Quest'ultimo confronta bit per bit il restart in-place, prova un checkpoint esterno con percorso assoluto lungo e spazi, verifica il rifiuto della collisione senza `OUTPUT_OVERWRITE=T` e il riuso esplicito; i casi runout verificano inoltre append CSV valido e rifiuto senza modifica di storie non valide. La prova restart è stata aggiornata per autorizzare esplicitamente il riuso nei casi in cui il test predispone CSV preesistenti. Nessuna GitHub Actions/CI è stata avviata.
+
+Queste prove non chiudono C03: restano da completare il test del manifest oltre quattro cifre, la matrice di interruzione/ripresa per snapshot e manifest, append NetCDF, il confronto baseline A11, Acceptance/N9 integrale e gli audit end-to-end indicati nella checklist.
+
 #### Checklist consolidata per la chiusura di C03 (inclusi i requisiti già previsti)
 
 - [ ] Audit completo di tutte le scritture del solver e controllo che nessun output venga creato fuori da `<OUTPUT_BASE_DIRECTORY>/<RUN_NAME>/`.
