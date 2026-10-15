@@ -1,8 +1,8 @@
 """Run production boundary reconstruction checks on 2-D and collapsed grids."""
+import argparse
 import os
 from pathlib import Path
 import subprocess
-import sys
 import tempfile
 
 import numpy as np
@@ -27,47 +27,75 @@ def write_fixture(path, nx, ny):
         np.savetxt(stream, state.reshape(-1, 1), fmt="%.17g")
 
 
-def run_case(executable, root, profile, nx, ny):
+def run_case(executables, root, profile, nx, ny):
     case = root / f"{profile}-{nx}x{ny}"
     case.mkdir()
     write_fixture(case / "fixture.inp", nx, ny)
-    outputs = []
+    outputs = {}
     for threads in (1, 4):
-        work = case / f"threads-{threads}"
-        work.mkdir()
-        (work / "fixture.inp").write_bytes((case / "fixture.inp").read_bytes())
-        environment = {
-            **os.environ,
-            "OMP_NUM_THREADS": str(threads),
-            "OMP_DYNAMIC": "FALSE",
-        }
-        run = subprocess.run(
-            [str(executable), str(threads), "2", "1", "0", "0", "0", "1"],
-            cwd=work,
-            env=environment,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            timeout=90,
+        for label, executable in executables.items():
+            work = case / label / f"threads-{threads}"
+            work.mkdir(parents=True)
+            (work / "fixture.inp").write_bytes((case / "fixture.inp").read_bytes())
+            environment = {
+                **os.environ,
+                "OMP_NUM_THREADS": str(threads),
+                "OMP_DYNAMIC": "FALSE",
+            }
+            run = subprocess.run(
+                [str(executable), str(threads), "2", "1", "0", "0", "0", "1"],
+                cwd=work,
+                env=environment,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                timeout=90,
+            )
+            if run.returncode:
+                raise AssertionError(
+                    f"{case.name}, {label}, threads={threads}:\n{run.stdout}"
+                )
+            if "PASS: W/E/S/N boundary modes" not in run.stdout:
+                raise AssertionError(f"boundary test completion marker missing:\n{run.stdout}")
+            outputs[label, threads] = (work / "boundary_traces.bin").read_bytes()
+    for label in executables:
+        if outputs[label, 1] != outputs[label, 4]:
+            raise AssertionError(
+                f"{case.name}, {label}: boundary traces differ between 1 and 4 threads"
+            )
+    if "baseline" in executables:
+        for threads in (1, 4):
+            if outputs["candidate", threads] != outputs["baseline", threads]:
+                raise AssertionError(
+                    f"{case.name}: candidate differs from baseline at {threads} threads"
+                )
+        print(
+            f"PASS: {profile} baseline-identical W/E/S/N and source traces, "
+            f"nx={nx}, ny={ny}, 1/4 threads",
+            flush=True,
         )
-        if run.returncode:
-            raise AssertionError(f"{case.name}, threads={threads}:\n{run.stdout}")
-        if "PASS: W/E/S/N boundary modes" not in run.stdout:
-            raise AssertionError(f"boundary test completion marker missing:\n{run.stdout}")
-        outputs.append((work / "boundary_traces.bin").read_bytes())
-    if outputs[0] != outputs[1]:
-        raise AssertionError(f"{case.name}: boundary traces differ between 1 and 4 threads")
-    print(f"PASS: {profile} W/E/S/N and source reconstruction, nx={nx}, ny={ny}, 1/4 threads",
-          flush=True)
+    else:
+        print(
+            f"PASS: {profile} W/E/S/N and source reconstruction, "
+            f"nx={nx}, ny={ny}, 1/4 threads",
+            flush=True,
+        )
 
 
 def main():
-    parser_executable = Path(sys.argv[1]).resolve()
-    profile = sys.argv[2]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("executable", type=Path)
+    parser.add_argument("profile")
+    parser.add_argument("--baseline-executable", type=Path)
+    args = parser.parse_args()
+    executables = {"candidate": args.executable.resolve()}
+    if args.baseline_executable:
+        executables["baseline"] = args.baseline_executable.resolve()
+    profile = args.profile
     with tempfile.TemporaryDirectory(prefix="imex-boundary-reconstruction-") as temp:
         root = Path(temp)
         for nx, ny in ((5, 5), (1, 5), (5, 1), (1, 1)):
-            run_case(parser_executable, root, profile, nx, ny)
+            run_case(executables, root, profile, nx, ny)
 
 
 if __name__ == "__main__":

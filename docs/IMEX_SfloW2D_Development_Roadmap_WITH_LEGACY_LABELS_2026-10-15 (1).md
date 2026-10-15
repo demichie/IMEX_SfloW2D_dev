@@ -120,12 +120,12 @@ Stati: COMPLETATO = verifiche e gate accettati; IMPLEMENTATO = codice presente m
 | B06 | XY-2          | Ricostruzione HP sulle linee                   | IMPLEMENTATO              |
 | B07 | XY-3          | Flusso PCCU di interfaccia                     | IMPLEMENTATO              |
 | B08 | XY-4          | Velocita faccia e path idrostatici di cella    | IMPLEMENTATO, GATE APERTO |
-| B09 | XY-5          | Condizioni al contorno e ricostruzione lineare | PARZIALE                  |
+| B09 | XY-5          | Condizioni al contorno e ricostruzione lineare | IMPLEMENTATO, GATE APERTO |
 | B10 | XY-6          | Derivate e halo geometrici                     | DA FARE                   |
 | B11 | XY-7          | Riduzione CFL direzionale                      | DA FARE                   |
 | B12 | XY-GATE       | Accettazione complessiva x/y                   | GATE                      |
 
-Evidenza B05–B09 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-4 sono implementate nei commit indicati nelle rispettive schede; XY-5 è parziale, con test mirati W/E/S/N, sorgenti e dimensioni collassate passati. Sono passate le regressioni spaziali e dinamiche strict/optimized, incluse prove a 1/4 thread, composizione variabile e fixture ruotate; i confronti binari contro la baseline pre-refactoring sono stati eseguiti sui casi esplicitamente elencati sotto. Per B09 resta il confronto pre/post refactoring dei payload sulle configurazioni supportate; B10–B11 restano da eseguire. Queste evidenze non chiudono B12, che richiede la matrice d’accettazione complessiva.
+Evidenza B05–B09 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-5 sono implementate con le evidenze elencate nelle rispettive schede. Sono passate le regressioni spaziali e dinamiche strict/optimized, incluse prove a 1/4 thread, composizione variabile, fixture ruotate e confronti binari pre/post refactoring sui casi esplicitamente elencati. B10–B11 restano da eseguire. I gate dei singoli step non sostituiscono B12, che richiede la matrice d’accettazione complessiva.
 
 ## Fase C — Output e distribuzione
 
@@ -680,7 +680,7 @@ Attività: Estrarre logica riutilizzabile dei casi Dirichlet/Neumann/interpolazi
 
 Criteri di accettazione: Tests mirati W/E/S/N e sorgenti, incluso nx=1/ny=1; output identici sulle configurazioni supportate.
 
-Stato aggiornato al 15 ottobre 2026: in `reconstruction_2d.f90` è stato estratto `boundary_reconstruction_slope`, kernel comune per le pendenze Dirichlet, Neumann e secante sui lati W/E/S/N. Il nuovo test di ricostruzione in `TEST_IMEX_STAGES` verifica in strict e optimized i valori analitici delle tracce per tutte le tre modalità su ciascun lato; verifica lateral-source W/E, riflessioni radial-source W/E/S/N e griglie 5x5, 1x5, 5x1 e 1x1. I payload delle tracce sono identici bitwise tra 1/4 thread per ogni fixture. `TEST_HP_RECONSTRUCTION`, `TEST_SPATIAL_OPERATOR` e `TEST_IMEX_STAGES` sono passati. Le condizioni alle tracce di bordo e i percorsi boundary/radial/lateral source sono mantenuti separati; resta da confrontare pre/post refactoring il payload di ricostruzione sulle configurazioni supportate e completare la relativa matrice di accettazione. B09 rimane PARZIALE fino a tali verifiche.
+Stato aggiornato al 15 ottobre 2026: in `reconstruction_2d.f90` è stato estratto `boundary_reconstruction_slope`, kernel comune per le pendenze Dirichlet, Neumann e secante sui lati W/E/S/N. Il test in `TEST_IMEX_STAGES` verifica in strict e optimized i valori analitici delle tracce per le tre modalità su ciascun lato; verifica lateral-source W/E, riflessioni radial-source W/E/S/N e griglie 5x5, 1x5, 5x1 e 1x1. Per tutti i casi, i payload completi di ricostruzione sono bitwise identici alla baseline pre-XY-5 (sorgente `reconstruction_2d.f90` del commit c648e9c5356c65d68d0624369d408cec781f0816, SHA-256 90d5d50923069798cd6135f18a940cdaa423a7d26644044ca9989e483d6bfd43), sia in strict sia in optimized, a 1 e 4 thread; i payload sono inoltre identici fra i due conteggi di thread. `TEST_HP_RECONSTRUCTION`, `TEST_SPATIAL_OPERATOR` e `TEST_IMEX_STAGES` sono passati. B09 è IMPLEMENTATO; il gate formale di accettazione complessiva resta in B12.
 
 | Revisione               | Modifica / evidenza                                  | Interpretazione per roadmap                                                |
 |-------------------------|------------------------------------------------------|----------------------------------------------------------------------------|
