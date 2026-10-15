@@ -131,8 +131,8 @@ Evidenza B05–B12 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-7 e
 
 |     | Vecchia label | Attività                                | Stato   |
 |-----|---------------|-----------------------------------------|---------|
-| C01 | IO-1          | Output segregati per run                | DA FARE |
-| C02 | IO-2          | Contratto di configurazione e sicurezza | DA FARE |
+| C01 | IO-1          | Output segregati per run                | PARZIALE |
+| C02 | IO-2          | Contratto di configurazione e sicurezza | IMPLEMENTATO, GATE APERTO |
 | C03 | IO-GATE       | Accettazione I/O per run                | GATE    |
 | C04 | DIST-1        | Autotools policy B                      | DA FARE |
 | C05 | DIST-2        | Doppio archivio di distribuzione        | DA FARE |
@@ -818,6 +818,31 @@ Confronto quantitativo/bitwise, quando applicabile, con baseline A11 per verific
 Aggiornamento di EXAMPLES e script in UTILS, regressioni e documentazione GitHub Pages: nuova pagina “Output files and formats”, naming, manifest, semantica overwrite e restart.
 
 Solo dopo accettazione della riorganizzazione dell’I/O procedere con politica Autotools B, make distcheck e distribuzione di archivi distinti codice/examples dallo stesso tag.
+
+#### Verifiche integrative della code review — 15 ottobre 2026 (C03-R1–R4)
+
+Le verifiche seguenti **integrano** i criteri C03 già elencati, senza sostituirli né riaprire le attività B08–B12. Sono osservazioni di revisione statica sui file locali forniti (`IMEX_changes.patch` e quattro nuovi file): **non costituiscono regressioni osservate né test eseguiti durante la revisione**. La loro chiusura richiede evidenze riproducibili; la milestone C03 resta GATE.
+
+**C03-R1 — Indici degli snapshot oltre quattro cifre.** In `src/io/output_paths.f90`, `begin_snapshot` usa `CHARACTER(LEN=4) :: index_string` e `WRITE(index_string, '(I4.4)') index`. Per indici maggiori di 9999 la rappresentazione può produrre asterischi, con nomi errati o collisioni. Verificare e, se necessario, rimuovere il limite mantenendo i nomi già validi; testare almeno gli indici 0, 9999, 10000 e 10001, l'unicità delle cartelle, il manifest e l'assenza di sovrascritture.
+
+**C03-R2 — Lunghezza dei nomi di checkpoint.** `src/io/inpout_2d.f90` conserva `CHARACTER(LEN=40) :: restart_file`, a fronte del supporto a percorsi assoluti e basi HPC più lunghi. La dichiarazione non prova da sola un guasto, ma richiede di tracciare parsing, array `restart_files`, copie intermedie e chiamate di apertura. Provare checkpoint esterni con nome assoluto oltre 40 caratteri, con spazi e con `OUTPUT_BASE_DIRECTORY` lungo; correggere eventuali troncamenti.
+
+**C03-R3 — Restart esterno e autorizzazione al riuso.** Verificare end-to-end quando il restart binario, riconosciuto anche tramite estensione `.bin`, abilita il riuso di una directory esistente. Distinguere: checkpoint interno dello stesso run; checkpoint esterno con nuovo output assente; checkpoint esterno con output già esistente e `OUTPUT_OVERWRITE=FALSE`; medesimo caso con overwrite esplicito; checkpoint mancante/incompatibile. L'uso di un checkpoint esterno non deve autorizzare implicitamente la scrittura su output preesistenti senza la semantica di restart in-place verificata. Controllare anche l'assenza di nuovi output nella working directory.
+
+**C03-R4 — Integrità di output, riuso e interruzioni.** I controlli su tipo di file, symlink e hard link in `src/io/output_dirs.c` non attestano da soli la compatibilità dei contenuti di un run esistente. Definire i controlli obbligatori su checkpoint, manifest, snapshot e append NetCDF/CSV; simulare interruzioni durante creazione snapshot, scrittura manifest e append, quindi riprendere verificando indici univoci, tempi coerenti/monotoni, dati validi preservati e nessuna sovrascrittura indebita.
+
+#### Checklist consolidata per la chiusura di C03 (inclusi i requisiti già previsti)
+
+- [ ] Audit completo di tutte le scritture del solver e controllo che nessun output venga creato fuori da `<OUTPUT_BASE_DIRECTORY>/<RUN_NAME>/`.
+- [ ] Confronti quantitativi/bitwise appropriati con A11 per campi, diagnostiche, file e tempi di output, senza estendere lo scope scientifico A11.
+- [ ] Esecuzione completa dell'Acceptance/N9 adattato ai nuovi percorsi; `n9_decision` resta una decisione separata.
+- [ ] Matrice restart v5 in-place/esterno, append NetCDF/CSV, interruzione e ripresa senza perdita o sovrascrittura di risultati validi.
+- [ ] Multi-run, collisioni, `RUN_NAME`, overwrite, traversal, symlink/hard link, percorsi relativi/assoluti e scratch HPC.
+- [ ] Verifiche aggiuntive C03-R1–R4 e registrazione di risultati e riproducibilità.
+- [ ] Audit e prova end-to-end di EXAMPLES, script di post-processing, manifest e documentazione GitHub Pages.
+- [ ] Avvio di C04–C06 solo dopo l'accettazione di C03, secondo il sequenziamento esistente.
+
+**Stato ed evidenze:** l'implementazione C01/C02 e i test GNU selezionati sono descritti sopra e risultano *riportati* nella roadmap; non sono stati rieseguiti in questa revisione. Non dichiarare C03 accettato prima della chiusura e della registrazione degli esiti.
 
 ### C04 — Autotools policy B
 
