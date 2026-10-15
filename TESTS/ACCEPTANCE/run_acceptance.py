@@ -109,13 +109,14 @@ def overlay_worktree(repo, destination):
             "policy": "Tracked files and nonignored untracked files; ignored build artifacts excluded."}
 
 
-def run_test(source, root, executable, profile, name, threads, timeout):
+def run_test(source, root, executable, profile, name, threads, timeout, baseline_repo):
     """Run an existing test; the adapter records each solver invocation before cleanup."""
     tag = f"{profile}-{name}-{threads if threads else 'embedded'}"
     case = root / "tests" / tag
     case.mkdir(parents=True)
     environment = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1",
-                   "OMP_NUM_THREADS": str(threads or 1), "OMP_DYNAMIC": "FALSE"}
+                   "OMP_NUM_THREADS": str(threads or 1), "OMP_DYNAMIC": "FALSE",
+                   "IMEX_BASELINE_REPOSITORY": str(baseline_repo)}
     command = ["sh", str(source / "TESTS" / name / "run_test.sh")]
     if executable:
         environment.update(IMEX_AUDIT_SOLVER=str(executable),
@@ -289,7 +290,7 @@ def main():
                 tasks.append((executable, profile, test["name"], threads))
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         pending = {pool.submit(run_test, source, root, executable, profile, name,
-                               threads, args.timeout): (profile, name, threads)
+                               threads, args.timeout, repo): (profile, name, threads)
                    for executable, profile, name, threads in tasks}
         for future in as_completed(pending):
             try:

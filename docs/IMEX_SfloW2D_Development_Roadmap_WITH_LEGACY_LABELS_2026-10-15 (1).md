@@ -119,13 +119,13 @@ Stati: COMPLETATO = verifiche e gate accettati; IMPLEMENTATO = codice presente m
 | B05 | XY-1          | Velocita caratteristiche comuni                | IMPLEMENTATO              |
 | B06 | XY-2          | Ricostruzione HP sulle linee                   | IMPLEMENTATO              |
 | B07 | XY-3          | Flusso PCCU di interfaccia                     | IMPLEMENTATO              |
-| B08 | XY-4          | Velocita faccia e path idrostatici di cella    | IMPLEMENTATO, GATE APERTO |
-| B09 | XY-5          | Condizioni al contorno e ricostruzione lineare | IMPLEMENTATO, GATE APERTO |
-| B10 | XY-6          | Derivate e halo geometrici                     | IMPLEMENTATO, GATE APERTO |
-| B11 | XY-7          | Riduzione CFL direzionale                      | IMPLEMENTATO, GATE APERTO |
-| B12 | XY-GATE       | Accettazione complessiva x/y                   | GATE                      |
+| B08 | XY-4          | Velocita faccia e path idrostatici di cella    | COMPLETATO                |
+| B09 | XY-5          | Condizioni al contorno e ricostruzione lineare | COMPLETATO                |
+| B10 | XY-6          | Derivate e halo geometrici                     | COMPLETATO                |
+| B11 | XY-7          | Riduzione CFL direzionale                      | COMPLETATO                |
+| B12 | XY-GATE       | Accettazione complessiva x/y                   | COMPLETATO                |
 
-Evidenza B05–B11 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-7 sono implementate con le evidenze elencate nelle rispettive schede. Sono passate le regressioni spaziali e dinamiche strict/optimized, incluse prove a 1/4 thread, composizione variabile, fixture ruotate e confronti binari pre/post refactoring sui casi esplicitamente elencati. B12 resta aperto per l’accettazione complessiva.
+Evidenza B05–B12 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-7 e il gate complessivo x/y sono completati nel perimetro verificato. Sono passate le regressioni spaziali e dinamiche strict/optimized, incluse prove a 1/4 thread, composizione variabile, fixture ruotate e confronti binari pre/post refactoring sui casi esplicitamente elencati. L'accettazione B12 non estende l'approvazione scientifica A11 oltre la revisione e lo scope approvati, né chiude D15.
 
 ## Fase C — Output e distribuzione
 
@@ -668,7 +668,7 @@ Attività: Centralizzare i due stati di faccia, riduzione min/max, percorso idro
 
 Criteri di accettazione: Equivalenza x/y su casi 1D ruotati, 2D e composizione variabile; assenza di differenze su CFL direzionali.
 
-Stato aggiornato: velocità di faccia e cell hydrostatic path consolidati nel commit fd43e4ca. I payload spaziali completi sono risultati bitwise identici alla baseline pre-XY-4 per dynamic_rough, dynamic_drainage e lake_ramp, in strict e optimized, con 1/4 thread. TEST_N7_GEOMETRY_DYNAMIC è passata (69 casi per profilo); TEST_N7_COMPOSITION è passata (162 casi per profilo, composizione variabile e confronti a 1/4 thread); TEST_SPATIAL_OPERATOR ha passato controlli di tracce, residui e CFL direzionale, inclusi casi x/y ruotati. B08 rimane IMPLEMENTATO, GATE APERTO fino all’accettazione formale in B12.
+Stato aggiornato: velocità di faccia e cell hydrostatic path consolidati nel commit fd43e4ca. I payload spaziali completi sono risultati bitwise identici alla baseline pre-XY-4 per dynamic_rough, dynamic_drainage e lake_ramp, in strict e optimized, con 1/4 thread. TEST_N7_GEOMETRY_DYNAMIC è passata (69 casi per profilo); TEST_N7_COMPOSITION è passata (162 casi per profilo, composizione variabile e confronti a 1/4 thread); TEST_SPATIAL_OPERATOR ha passato controlli di tracce, residui e CFL direzionale, inclusi casi x/y ruotati. B08 è COMPLETATO con la chiusura del gate B12.
 
 ### B09 — Condizioni al contorno e ricostruzione lineare
 
@@ -680,7 +680,7 @@ Attività: Estrarre logica riutilizzabile dei casi Dirichlet/Neumann/interpolazi
 
 Criteri di accettazione: Tests mirati W/E/S/N e sorgenti, incluso nx=1/ny=1; output identici sulle configurazioni supportate.
 
-Stato aggiornato al 15 ottobre 2026: in `reconstruction_2d.f90` è stato estratto `boundary_reconstruction_slope`, kernel comune per le pendenze Dirichlet, Neumann e secante sui lati W/E/S/N. Il test in `TEST_IMEX_STAGES` verifica in strict e optimized i valori analitici delle tracce per le tre modalità su ciascun lato; verifica lateral-source W/E, riflessioni radial-source W/E/S/N e griglie 5x5, 1x5, 5x1 e 1x1. Per tutti i casi, i payload completi di ricostruzione sono bitwise identici alla baseline pre-XY-5 (sorgente `reconstruction_2d.f90` del commit c648e9c5356c65d68d0624369d408cec781f0816, SHA-256 90d5d50923069798cd6135f18a940cdaa423a7d26644044ca9989e483d6bfd43), sia in strict sia in optimized, a 1 e 4 thread; i payload sono inoltre identici fra i due conteggi di thread. `TEST_HP_RECONSTRUCTION`, `TEST_SPATIAL_OPERATOR` e `TEST_IMEX_STAGES` sono passati. B09 è IMPLEMENTATO; il gate formale di accettazione complessiva resta in B12.
+Stato aggiornato al 15 ottobre 2026: in `reconstruction_2d.f90` è stato estratto `boundary_reconstruction_slope`, kernel comune per le pendenze Dirichlet, Neumann e secante sui lati W/E/S/N. Il test in `TEST_IMEX_STAGES` verifica in strict e optimized i valori analitici delle tracce per le tre modalità su ciascun lato; verifica lateral-source W/E, riflessioni radial-source W/E/S/N e griglie 5x5, 1x5, 5x1 e 1x1. Per tutti i casi, i payload completi di ricostruzione sono bitwise identici alla baseline pre-XY-5 (sorgente `reconstruction_2d.f90` del commit c648e9c5356c65d68d0624369d408cec781f0816, SHA-256 90d5d50923069798cd6135f18a940cdaa423a7d26644044ca9989e483d6bfd43), sia in strict sia in optimized, a 1 e 4 thread; i payload sono inoltre identici fra i due conteggi di thread. `TEST_HP_RECONSTRUCTION`, `TEST_SPATIAL_OPERATOR` e `TEST_IMEX_STAGES` sono passati. B09 è COMPLETATO con la chiusura del gate B12.
 
 | Revisione               | Modifica / evidenza                                  | Interpretazione per roadmap                                                |
 |-------------------------|------------------------------------------------------|----------------------------------------------------------------------------|
@@ -703,7 +703,7 @@ Attività: Valutare line kernels per derivate prime e seconde e utility di copia
 
 Criteri di accettazione: TEST_GEOMETRY_1D per x e y e fixture 2D, ricostruzione dopo aggiornamenti B_vertex, confronto 1/4 thread e output di topografia invariati.
 
-Stato aggiornato al 15 ottobre 2026: le copie dei bordi dei campi derivati sono state estratte in utility private x/y; i loop 2D, le formule e le somme miste non sono stati modificati. L'estrazione del kernel aritmetico 1D è stata scartata perché il confronto bitwise ha rilevato differenze in optimized; mantenere i loop scalari originali conserva l'ordine numerico. `TEST_GEOMETRY_1D` è passato in strict e optimized (112 casi per profilo, fixture 1D x/y e 2D, cache avvelenate e snapshot identici a 1/4 thread); `TEST_TOPOGRAPHY_FACES` è passato in entrambi i profili. Il confronto A/B con il sorgente pre-B10 ha confermato payload identici bitwise su griglie 5x1, 9x1, 17x1, 5x5 e 7x9, tutti i quattro profili di topografia e slope-correction OFF/ON, a 1 e 4 thread, in strict e optimized. B10 è IMPLEMENTATO; il gate formale resta in B12.
+Stato aggiornato al 15 ottobre 2026: le copie dei bordi dei campi derivati sono state estratte in utility private x/y; i loop 2D, le formule e le somme miste non sono stati modificati. L'estrazione del kernel aritmetico 1D è stata scartata perché il confronto bitwise ha rilevato differenze in optimized; mantenere i loop scalari originali conserva l'ordine numerico. `TEST_GEOMETRY_1D` è passato in strict e optimized (112 casi per profilo, fixture 1D x/y e 2D, cache avvelenate e snapshot identici a 1/4 thread); `TEST_TOPOGRAPHY_FACES` è passato in entrambi i profili. Il confronto A/B con il sorgente pre-B10 ha confermato payload identici bitwise su griglie 5x1, 9x1, 17x1, 5x5 e 7x9, tutti i quattro profili di topografia e slope-correction OFF/ON, a 1 e 4 thread, in strict e optimized. B10 è COMPLETATO con la chiusura del gate B12.
 
 ### B11 — Riduzione CFL direzionale
 
@@ -715,15 +715,17 @@ Attivita: dopo A11, fattorizzare ove utile la raccolta dei massimi direzionali s
 
 Criteri di accettazione: stesso risultato numerico per ciascuna delle due policy prima e dopo il refactoring, conservando comportamento CFL=-1, MAX_DT, griglie 1D x/y e ordine di operazioni appropriato. Nessuna variazione di default.
 
-Stato aggiornato al 15 ottobre 2026: la raccolta dei quattro segnali di velocità di faccia per cella è stata estratta in una utility privata; le due riduzioni `MAX` mantengono lo stesso ordine di operandi e la riduzione OpenMP, mentre le formule `directional_min`/`combined`, il default e i loro rami 1D non cambiano. `TEST_SPATIAL_OPERATOR` è passato in strict e optimized: verifica le due formule, griglie x/y/point, propagazione nulla, cap `MAX_DT`, sentinel `CFL=-1` e team effettivi 1/4. `TEST_CFL_POLICY` è passato con solver strict e optimized, 18 traiettorie per profilo a 4 thread (N_RK=2,3,4; policy omessa, directional_min, combined; CFL adattivo e sentinel), confrontando output canonici, checkpoint e tempi accettati; sono passati anche i tre controlli di input non valido. B11 è IMPLEMENTATO; il gate complessivo resta in B12.
+Stato aggiornato al 15 ottobre 2026: la raccolta dei quattro segnali di velocità di faccia per cella è stata estratta in una utility privata; le due riduzioni `MAX` mantengono lo stesso ordine di operandi e la riduzione OpenMP, mentre le formule `directional_min`/`combined`, il default e i loro rami 1D non cambiano. `TEST_SPATIAL_OPERATOR` è passato in strict e optimized: verifica le due formule, griglie x/y/point, propagazione nulla, cap `MAX_DT`, sentinel `CFL=-1` e team effettivi 1/4. `TEST_CFL_POLICY` è passato con solver strict e optimized, 18 traiettorie per profilo a 4 thread (N_RK=2,3,4; policy omessa, directional_min, combined; CFL adattivo e sentinel), confrontando output canonici, checkpoint e tempi accettati; sono passati anche i tre controlli di input non valido. B11 è COMPLETATO con la chiusura del gate B12.
 
 ### B12 — Accettazione complessiva x/y
 
-Stato ufficiale: GATE
+Stato ufficiale: COMPLETATO
 
 #### Sequenziamento e disciplina di regressione
 
 Gate di ingresso: A11 \[APPROVATO\] e B01 \[ACCETTATO\]. Prima eseguire la relocation path-only con manifest sorgenti e dipendenze, senza modifica di istruzioni o ordine floating-point. Successivamente sviluppare in commit separati le fattorizzazioni x/y e la riorganizzazione reologica/IMEX; eseguire CI GNU, Docker e Intel, oltre ai confronti A11 pertinenti. Non confondere la riuscita dei test di compilazione con l'accettazione scientifica D15.
+
+Evidenza aggiornata al 15 ottobre 2026: l'audit completo sul candidato basato sul commit `f3f6240ede126c8c577b7e3f2da3ca638bec0352` ha superato 45/45 test, con build `strict_debug` e `historical_optimized` e 8/8 confronti di thread. Il patch candidato di codice/test verificato (prima di questa annotazione in roadmap) è identificato da SHA-256 `9e7fac3ed441b77dd3ed5afe2f2e7facac7193df22c2b6bb35ac55d46720f091`; include solo documentazione e adattamenti dei test/audit, senza variazioni numeriche del solver. Le workflow Solver validation, Docker validation e Intel ifx portability sono tutte concluse con successo sul commit B11 `f3f6240e` (run 38699985072, 38699985147 e 38699985170). B08–B11 e B12 sono quindi COMPLETATI nel perimetro x/y verificato. L'audit mantiene esplicitamente `n9_decision=open` e non concede sign-off: A11 resta limitato al proprio scope approvato e D15 resta separato.
 
 ## Fase C — Output e distribuzione
 

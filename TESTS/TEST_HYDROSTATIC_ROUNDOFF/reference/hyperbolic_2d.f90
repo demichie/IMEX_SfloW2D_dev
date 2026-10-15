@@ -11,7 +11,7 @@
 
 MODULE hyperbolic_2d
 
-  USE parameters_2d, ONLY : wp, n_eqns, n_vars
+  USE parameters_2d, ONLY : wp, n_eqns, n_vars, idx_u, idx_v
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
   USE geometry_2d, ONLY : grav_coeff_stag_x, grav_coeff_stag_y
@@ -474,7 +474,7 @@ CONTAINS
        k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
     ! External procedures
-    USE equation_terms_2d, ONLY : eval_local_speeds_x, eval_local_speeds_y
+    USE equation_terms_2d, ONLY : eval_local_speeds_direction
 
     IMPLICIT NONE
 
@@ -504,11 +504,11 @@ CONTAINS
           j = j_stag_x(l)
           k = k_stag_x(l)
 
-          CALL eval_local_speeds_x( recon%qp_interfaceL(:,j,k) ,             &
-               grav_coeff_stag_x(j,k), abslambdaL_min , abslambdaL_max )
+          CALL eval_local_speeds_direction(recon%qp_interfaceL(:,j,k),       &
+               grav_coeff_stag_x(j,k),idx_u,abslambdaL_min,abslambdaL_max)
 
-          CALL eval_local_speeds_x( recon%qp_interfaceR(:,j,k) ,             &
-               grav_coeff_stag_x(j,k), abslambdaR_min , abslambdaR_max )
+          CALL eval_local_speeds_direction(recon%qp_interfaceR(:,j,k),       &
+               grav_coeff_stag_x(j,k),idx_u,abslambdaR_min,abslambdaR_max)
 
           min_r = MIN(abslambdaL_min , abslambdaR_min , 0.0_wp)
           max_r = MAX(abslambdaL_max , abslambdaR_max , 0.0_wp)
@@ -532,11 +532,11 @@ CONTAINS
           j = j_stag_y(l)
           k = k_stag_y(l)
 
-          CALL eval_local_speeds_y( recon%qp_interfaceB(:,j,k) ,             &
-               grav_coeff_stag_y(j,k), abslambdaB_min , abslambdaB_max )
+          CALL eval_local_speeds_direction(recon%qp_interfaceB(:,j,k),       &
+               grav_coeff_stag_y(j,k),idx_v,abslambdaB_min,abslambdaB_max)
           
-          CALL eval_local_speeds_y( recon%qp_interfaceT(:,j,k) ,             &
-               grav_coeff_stag_y(j,k), abslambdaT_min , abslambdaT_max )
+          CALL eval_local_speeds_direction(recon%qp_interfaceT(:,j,k),       &
+               grav_coeff_stag_y(j,k),idx_v,abslambdaT_min,abslambdaT_max)
 
           min_r = MIN(abslambdaB_min , abslambdaT_min , 0.0_wp)
           max_r = MAX(abslambdaB_max , abslambdaT_max , 0.0_wp)

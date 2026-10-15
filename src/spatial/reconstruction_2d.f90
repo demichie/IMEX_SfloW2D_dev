@@ -817,6 +817,7 @@ CONTAINS
   !> \param[in] center_value Value in the boundary-adjacent cell.
   !> \param[in] adjacent_value Value in the next cell inward from the boundary.
   !> \param[in] boundary_coordinate Coordinate of the physical boundary.
+  !> \param[in] center_coordinate Coordinate of the boundary-adjacent cell center.
   !> \param[in] adjacent_coordinate Coordinate of the next cell inward.
   !> \param[in] boundary_flag Boundary mode (Dirichlet, Neumann or secant).
   !> \param[in] boundary_value Dirichlet value or Neumann derivative.

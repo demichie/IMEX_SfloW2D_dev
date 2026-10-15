@@ -382,6 +382,19 @@ CONTAINS
   !>
   !> The operation order is shared by x and y faces; the caller supplies their
   !> orientation, normal momentum slot, endpoint traces and output arrays.
+  !> \param[in] q_left Conservative state at the negative-side endpoint.
+  !> \param[in] qp_left Physical state at the negative-side endpoint.
+  !> \param[in] eta_left Free-surface elevation at the negative-side endpoint.
+  !> \param[in] q_right Conservative state at the positive-side endpoint.
+  !> \param[in] qp_right Physical state at the positive-side endpoint.
+  !> \param[in] eta_right Free-surface elevation at the positive-side endpoint.
+  !> \param[in] grav_coeff Large-slope gravity factor at the interface.
+  !> \param[in] a_minus Negative face speed bound.
+  !> \param[in] a_plus Positive face speed bound.
+  !> \param[in] direction Cartesian face orientation.
+  !> \param[in] normal_momentum_index Normal momentum slot in physical state.
+  !> \param[out] value_left PCCU contribution assigned to the negative-side cell.
+  !> \param[out] value_right PCCU contribution assigned to the positive-side cell.
   SUBROUTINE eval_pccu_interface(q_left,qp_left,eta_left,q_right,qp_right,   &
        eta_right,grav_coeff,a_minus,a_plus,direction,normal_momentum_index,  &
        value_left,value_right)
@@ -487,6 +500,14 @@ CONTAINS
   !> Endpoint ordering is negative-to-positive: west-to-east in x and
   !> south-to-north in y. The cell-specific trace and gravity mapping stays in
   !> the caller, alongside its direction-specific output array.
+  !> \param[in] qp_minus Physical state at the negative path endpoint.
+  !> \param[in] eta_minus Free-surface elevation at the negative path endpoint.
+  !> \param[in] grav_minus Large-slope gravity factor at the negative endpoint.
+  !> \param[in] qp_plus Physical state at the positive path endpoint.
+  !> \param[in] eta_plus Free-surface elevation at the positive path endpoint.
+  !> \param[in] grav_plus Large-slope gravity factor at the positive endpoint.
+  !> \param[in] direction Cartesian path orientation.
+  !> \param[out] path Hydrostatic path contribution across the cell.
   SUBROUTINE eval_cell_hydrostatic_path(qp_minus,eta_minus,grav_minus,       &
        qp_plus,eta_plus,grav_plus,direction,path)
 
@@ -635,6 +656,12 @@ CONTAINS
   !>
   !> The caller supplies the face-normal velocity component and keeps its
   !> x/y-specific face list and output storage separate.
+  !> \param[in] qp_minus Physical state at the negative-side face endpoint.
+  !> \param[in] qp_plus Physical state at the positive-side face endpoint.
+  !> \param[in] grav_coeff Large-slope gravity factor at the face.
+  !> \param[in] normal_velocity_index Index of the face-normal velocity.
+  !> \param[out] speed_minus Minimum wave speed, bounded above by zero.
+  !> \param[out] speed_plus Maximum wave speed, bounded below by zero.
   SUBROUTINE eval_interface_speed_bounds(qp_minus,qp_plus,grav_coeff,       &
        normal_velocity_index,speed_minus,speed_plus)
 

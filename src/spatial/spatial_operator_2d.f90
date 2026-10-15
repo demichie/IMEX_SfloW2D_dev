@@ -194,6 +194,11 @@ CONTAINS
 
   !> \brief Include all four reconstructed face speeds for one active cell.
   !> \details The MAX operand order is kept identical to the original CFL loop.
+  !> \param[in] speeds Reconstructed face-speed arrays.
+  !> \param[in] j X index of the active cell.
+  !> \param[in] k Y index of the active cell.
+  !> \param[in,out] max_a_x Maximum outward wave speed in x.
+  !> \param[in,out] max_a_y Maximum outward wave speed in y.
   SUBROUTINE accumulate_directional_face_speeds(speeds,j,k,max_a_x,max_a_y)
     CLASS(hyperbolic_workspace_type), INTENT(IN) :: speeds
     INTEGER, INTENT(IN) :: j,k

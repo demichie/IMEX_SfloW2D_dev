@@ -5,7 +5,7 @@
   "frozen_before_execution": "2026-10-10",
   "scope": "Bounded stationary hydrostatic roundoff correction, not completion of N7-B",
   "baseline_revision": "e4333a5cf0575d23287a32a082fe18fbd939bcbe",
-  "baseline_module_sha256": "1d5af9f9d5e1936acd1f37003b448f2cd94005de82ad573e505d7b7ff9342ee3",
+  "baseline_module_sha256": "51b370b5d10ee2d149dd75630631b82603f18633bec121f2d14c86ef3c140703",
   "baseline_role": "Checksum-pinned pre-correction hyperbolic module linked against the same other current objects and observer; only the changed operator is contrasted.",
   "correction": {
     "stationarity": "Both cell momenta and both momenta of every adjacent face endpoint must equal zero exactly.",

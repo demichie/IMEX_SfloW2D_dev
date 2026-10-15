@@ -15,6 +15,7 @@ sources=$(awk '
 ' "$repo_dir/src/Makefile.am")
 baseline_revision=c648e9c5356c65d68d0624369d408cec781f0816
 baseline_sha256=90d5d50923069798cd6135f18a940cdaa423a7d26644044ca9989e483d6bfd43
+baseline_repo=${IMEX_BASELINE_REPOSITORY:-$repo_dir}
 netcdf_fflags=$(nf-config --fflags)
 netcdf_flibs=$(nf-config --flibs)
 netcdf_clibs=$(nc-config --libs)
@@ -43,7 +44,7 @@ for profile in strict optimized; do
         $objects test_imex_stages.o -llapack $netcdf_flibs $netcdf_clibs -o test_imex_stages
     reference_dir="$build_dir/$profile/reference"
     mkdir "$reference_dir"
-    git -C "$repo_dir" show \
+    git -C "$baseline_repo" show \
         "$baseline_revision:src/spatial/reconstruction_2d.f90" \
         > "$reference_dir/reconstruction_2d.f90"
     actual_baseline_sha256=$(shasum -a 256 "$reference_dir/reconstruction_2d.f90" | awk '{print $1}')
