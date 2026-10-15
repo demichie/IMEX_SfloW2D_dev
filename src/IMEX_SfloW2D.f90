@@ -58,6 +58,8 @@ PROGRAM IMEX_SfloW2D
    USE inpout_2d, ONLY : close_netcdf
    USE inpout_2d, ONLY : restart, restart_file
    USE inpout_2d, ONLY : read_restart_file, write_restart_file
+   USE inpout_2d, ONLY : validate_restart_output_manifest
+   USE inpout_2d, ONLY : write_param_backup
    USE output_paths, ONLY : output_file_path
    USE inpout_2d, ONLY : output_runout_flag
    USE inpout_2d, ONLY : output_cons_flag
@@ -187,8 +189,10 @@ PROGRAM IMEX_SfloW2D
          WRITE(*,*) 'Binary file (.bin) detected: Performing full restart.'
          CALL read_restart_file(TRIM(restart_file), simulation%runtime,      &
               simulation%stochastic, simulation%state, simulation%domain)
+         CALL validate_restart_output_manifest()
 
          is_binary_restart = .TRUE.
+         CALL write_param_backup()
 
          ! In a binary restart, Z is already loaded, but we need to allocate the kernel
          ! if spatial correlation is active

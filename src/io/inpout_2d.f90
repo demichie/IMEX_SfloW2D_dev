@@ -392,6 +392,24 @@ MODULE inpout_2d
     gas_loss_flag, alpha_trans, N_inh, f_inhibit_mode, &
     dynamic_permeability_flag
 
+  NAMELIST /west_boundary_conditions/ h_bcW, hu_bcW, hv_bcW, &
+    xs_bcW, T_bcW, xg_bcW, xl_bcW, stoch_bcW, pore_bcW
+  NAMELIST /east_boundary_conditions/ h_bcE, hu_bcE, hv_bcE, &
+    xs_bcE, T_bcE, xg_bcE, xl_bcE, stoch_bcE, pore_bcE
+  NAMELIST /south_boundary_conditions/ h_bcS, hu_bcS, hv_bcS, &
+    xs_bcS, T_bcS, xg_bcS, xl_bcS, stoch_bcS, pore_bcS
+  NAMELIST /north_boundary_conditions/ h_bcN, hu_bcN, hv_bcN, &
+    xs_bcN, T_bcN, xg_bcN, xl_bcN, stoch_bcN, pore_bcN
+  NAMELIST /solid_transport_parameters/ rho_s, diam_s, sphericity_s, &
+    sp_heat_s, erosion_coeff, erodible_porosity, settling_flag, &
+    T_erodible, erodible_file, erodible_fract, alphastot_min, &
+    initial_erodible_thickness, erodible_deposit_flag, &
+    maximum_solid_packing, A_drag, B_drag, collective_settling_flag, vonK
+  NAMELIST /gas_transport_parameters/ sp_heat_a, sp_gas_const_a, kin_visc_a, &
+    pres, T_ambient, entrainment_flag, sp_heat_g, sp_gas_const_g, &
+    liquid_vaporization_flag, water_level, gamma_steam, sutherland_flag, &
+    Tref_Suth, muRef_Suth, S_mu
+
 CONTAINS
 
   !******************************************************************************
@@ -970,7 +988,8 @@ CONTAINS
   !> This subroutine read the input parameters from the file
   !> "two_phases.inp" and write a backup file of the input parameters
   !> with name "run_name.bak", where run_name is read from the input
-  !> file.
+  !> file. For binary restarts, the backup is deferred until the existing
+  !> output manifest has passed validation.
   !
   !> \date 07/10/2016
   !> @author
@@ -1006,29 +1025,6 @@ CONTAINS
     USE state_conversion_2d, ONLY: mixt_var
 
     IMPLICIT none
-
-    NAMELIST /west_boundary_conditions/ h_bcW, hu_bcW, hv_bcW, &
-      xs_bcW, T_bcW, xg_bcW, xl_bcW, stoch_bcW, pore_bcW
-
-    NAMELIST /east_boundary_conditions/ h_bcE, hu_bcE, hv_bcE, &
-      xs_bcE, T_bcE, xg_bcE, xl_bcE, stoch_bcE, pore_bcE
-
-    NAMELIST /south_boundary_conditions/ h_bcS, hu_bcS, hv_bcS, &
-      xs_bcS, T_bcS, xg_bcS, xl_bcS, stoch_bcS, pore_bcS
-
-    NAMELIST /north_boundary_conditions/ h_bcN, hu_bcN, hv_bcN, &
-      xs_bcN, T_bcN, xg_bcN, xl_bcN, stoch_bcN, pore_bcN
-
-    NAMELIST /solid_transport_parameters/ rho_s, diam_s, sphericity_s, &
-      sp_heat_s, erosion_coeff, erodible_porosity, settling_flag, &
-      T_erodible, erodible_file, erodible_fract, alphastot_min, &
-      initial_erodible_thickness, erodible_deposit_flag, &
-      maximum_solid_packing, A_drag, B_drag, collective_settling_flag, vonK
-
-    NAMELIST /gas_transport_parameters/ sp_heat_a, sp_gas_const_a, kin_visc_a, &
-      pres, T_ambient, entrainment_flag, sp_heat_g, sp_gas_const_g, &
-      liquid_vaporization_flag, water_level, gamma_steam, sutherland_flag, &
-      Tref_Suth, muRef_Suth, S_mu
 
     REAL(wp) :: max_cfl
 
@@ -4631,6 +4627,16 @@ CONTAINS
     mass_center_file = output_file_path('diagnostics', &
          TRIM(run_name)//'_mass_center.csv')
 
+    IF (.NOT. binary_restart_output) CALL write_param_backup()
+
+  END SUBROUTINE read_param
+
+  !******************************************************************************
+  !> \brief Write the effective input backup after output paths are initialized.
+  !******************************************************************************
+  SUBROUTINE write_param_backup()
+    INTEGER :: k
+
     OPEN (backup_unit, file=bak_name, status='replace', delim='quote')
 
     WRITE (backup_unit, run_parameters)
@@ -4728,7 +4734,7 @@ CONTAINS
 
     CLOSE (backup_unit)
 
-  END SUBROUTINE read_param
+  END SUBROUTINE write_param_backup
 
   !******************************************************************************
   !> \brief Reread the run-control namelist while a simulation is running.
@@ -5721,7 +5727,7 @@ CONTAINS
     INTEGER, INTENT(IN) :: index
     REAL(wp), INTENT(IN) :: time
     CHARACTER(LEN=2048) :: filename
-    CHARACTER(LEN=128) :: header, existing_header
+    CHARACTER(LEN=128) :: header
     CHARACTER(LEN=512) :: message
     LOGICAL :: exists
     INTEGER :: ios
@@ -5732,13 +5738,7 @@ CONTAINS
 
     IF (.NOT. output_manifest_initialized) THEN
       IF (binary_restart_output .AND. exists) THEN
-        OPEN(UNIT=output_manifest_unit, FILE=TRIM(filename), STATUS='OLD', &
-             ACTION='READ', IOSTAT=ios, IOMSG=message)
-        IF (ios /= 0) CALL fatal_error('Cannot read output manifest: '//TRIM(message))
-        READ(output_manifest_unit, '(A)', IOSTAT=ios) existing_header
-        CLOSE(output_manifest_unit)
-        IF (ios /= 0 .OR. TRIM(existing_header) /= TRIM(header)) &
-             CALL fatal_error('Output manifest header is invalid: '//TRIM(filename))
+        CALL validate_output_manifest(filename, header, index, time)
         OPEN(UNIT=output_manifest_unit, FILE=TRIM(filename), STATUS='OLD', &
              POSITION='APPEND', ACTION='WRITE', IOSTAT=ios, IOMSG=message)
       ELSE
@@ -5760,6 +5760,112 @@ CONTAINS
     CLOSE(output_manifest_unit, IOSTAT=ios, IOMSG=message)
     IF (ios /= 0) CALL fatal_error('Cannot close output manifest: '//TRIM(message))
   END SUBROUTINE record_output_manifest
+
+  !******************************************************************************
+  !> \brief Validate restart manifest before opening mutable output histories.
+  !******************************************************************************
+  SUBROUTINE validate_restart_output_manifest()
+    CHARACTER(LEN=2048) :: filename
+    LOGICAL :: exists
+
+    IF (.NOT. binary_restart_output) RETURN
+    filename = output_file_path('metadata', 'output_manifest.csv')
+    INQUIRE(FILE=TRIM(filename), EXIST=exists)
+    IF (.NOT. exists) RETURN
+
+    CALL validate_output_manifest(filename, 'snapshot_index,time_seconds', output_idx, t_output)
+  END SUBROUTINE validate_restart_output_manifest
+
+  !******************************************************************************
+  !> \brief Validate existing manifest history before appending a restart output.
+  !> \param[in] filename Manifest path.
+  !> \param[in] header Expected CSV header.
+  !> \param[in] next_index Index to be appended.
+  !> \param[in] next_time Time to be appended.
+  !> \note Invalid histories are refused without automatic repair or truncation.
+  !******************************************************************************
+  SUBROUTINE validate_output_manifest(filename, header, next_index, next_time)
+    USE, INTRINSIC :: ieee_arithmetic, ONLY: ieee_is_finite
+    USE, INTRINSIC :: ieee_exceptions, ONLY: ieee_get_flag, ieee_get_halting_mode, &
+         ieee_overflow, ieee_set_flag, ieee_set_halting_mode
+    USE, INTRINSIC :: iso_fortran_env, ONLY: iostat_end
+    CHARACTER(LEN=*), INTENT(IN) :: filename, header
+    INTEGER, INTENT(IN) :: next_index
+    REAL(wp), INTENT(IN) :: next_time
+    CHARACTER(LEN=512) :: line, message
+    CHARACTER(LEN=128) :: existing_header, index_text, time_text
+    INTEGER :: unit_manifest, ierr, line_length, comma, row_index
+    INTEGER :: previous_index, i
+    REAL(wp) :: row_time, previous_time
+    LOGICAL :: has_previous, overflow_halting, overflow_flag
+
+    OPEN(NEWUNIT=unit_manifest, FILE=filename, STATUS='OLD', ACTION='READ', &
+         IOSTAT=ierr, IOMSG=message)
+    IF (ierr /= 0) CALL fatal_error('Cannot read output manifest: '//TRIM(message))
+    existing_header = ''
+    READ(unit_manifest, '(A)', IOSTAT=ierr) existing_header
+    IF (ierr /= 0 .OR. TRIM(existing_header) /= TRIM(header)) &
+         CALL fatal_error('Output manifest header is invalid: '//TRIM(filename))
+
+    has_previous = .FALSE.
+    previous_index = -1
+    previous_time = -HUGE(1.0_wp)
+    DO
+      READ(unit_manifest, '(A)', IOSTAT=ierr) line
+      IF (ierr == iostat_end) EXIT
+      IF (ierr /= 0) CALL fatal_error('Cannot read output manifest row: '//TRIM(filename))
+      line_length = LEN_TRIM(line)
+      IF (line_length == 0) CALL fatal_error('Output manifest has a blank row: '//TRIM(filename))
+      comma = INDEX(line(:line_length), ',')
+      IF (comma <= 1 .OR. comma >= line_length) &
+           CALL fatal_error('Output manifest has a malformed row: '//TRIM(filename))
+      IF (INDEX(line(comma+1:line_length), ',') /= 0) &
+           CALL fatal_error('Output manifest has a malformed row: '//TRIM(filename))
+
+      index_text = ADJUSTL(line(:comma-1))
+      time_text = ADJUSTL(line(comma+1:line_length))
+      IF (LEN_TRIM(index_text) == 0 .OR. LEN_TRIM(time_text) == 0 .OR. &
+           VERIFY(TRIM(index_text), '0123456789') /= 0 .OR. &
+           VERIFY(TRIM(time_text), ' +-0123456789.eEdD') /= 0) &
+           CALL fatal_error('Output manifest has a malformed row: '//TRIM(filename))
+      READ(index_text, *, IOSTAT=ierr) row_index
+      IF (ierr /= 0) CALL fatal_error('Output manifest has an invalid snapshot index: '//TRIM(filename))
+      IF (row_index < 0) &
+           CALL fatal_error('Output manifest has an invalid snapshot index: '//TRIM(filename))
+
+      CALL ieee_get_halting_mode(ieee_overflow, overflow_halting)
+      CALL ieee_get_flag(ieee_overflow, overflow_flag)
+      CALL ieee_set_halting_mode(ieee_overflow, .FALSE.)
+      CALL ieee_set_flag(ieee_overflow, .FALSE.)
+      READ(time_text, *, IOSTAT=ierr) row_time
+      CALL ieee_set_flag(ieee_overflow, overflow_flag)
+      CALL ieee_set_halting_mode(ieee_overflow, overflow_halting)
+      IF (ierr /= 0) CALL fatal_error('Output manifest has an invalid snapshot time: '//TRIM(filename))
+      IF (.NOT. ieee_is_finite(row_time)) &
+           CALL fatal_error('Output manifest has an invalid snapshot time: '//TRIM(filename))
+
+      IF (has_previous) THEN
+        IF (previous_index == HUGE(previous_index)) &
+             CALL fatal_error('Output manifest snapshot index is exhausted: '//TRIM(filename))
+        IF (row_index /= previous_index + 1 .OR. row_time <= previous_time) &
+             CALL fatal_error('Output manifest indices or times are discontinuous: '//TRIM(filename))
+      END IF
+      previous_index = row_index
+      previous_time = row_time
+      has_previous = .TRUE.
+    END DO
+
+    CLOSE(unit_manifest, IOSTAT=ierr, IOMSG=message)
+    IF (ierr /= 0) CALL fatal_error('Cannot close output manifest: '//TRIM(message))
+    IF (next_index < 0 .OR. .NOT. ieee_is_finite(next_time)) &
+         CALL fatal_error('Restart output has an invalid manifest index or time: '//TRIM(filename))
+    IF (has_previous) THEN
+      IF (previous_index == HUGE(previous_index)) &
+           CALL fatal_error('Output manifest snapshot index is exhausted: '//TRIM(filename))
+      IF (next_index /= previous_index + 1 .OR. next_time <= previous_time) &
+           CALL fatal_error('Restart output does not continue the existing manifest: '//TRIM(filename))
+    END IF
+  END SUBROUTINE validate_output_manifest
 
   !******************************************************************************
   !> \brief Write accumulated maximum thickness, pressure and velocity fields.

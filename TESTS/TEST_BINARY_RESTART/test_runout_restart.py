@@ -30,8 +30,20 @@ def records(path):
     return result
 
 
+def write_records(path, payloads):
+    with path.open('wb') as stream:
+        for payload in payloads:
+            marker = struct.pack('<i', len(payload))
+            stream.write(marker+payload+marker)
+
+
 def sha(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def tree_hashes(directory):
+    return {str(path.relative_to(directory)): sha(path)
+            for path in directory.rglob('*') if path.is_file()}
 
 
 def parameter(text, name, value):
@@ -150,6 +162,68 @@ def main():
         assert snapshot(full, 'TEST_2D_0002.q_2d').read_bytes() == \
             snapshot(split, 'TEST_2D_0002.q_2d').read_bytes()
         passed(mode+' origin: exact checkpoint, physical output and complete CSV history')
+
+    source_case = root/'automatic-full'
+    case = prepare('high-index-manifest', parameter(text, 'T_END', '0.045'))
+    (case/'OUTPUT').mkdir()
+    shutil.copytree(source_case/'OUTPUT'/'TEST_2D', case/'OUTPUT'/'TEST_2D')
+    manifest_path = case/'OUTPUT'/'TEST_2D'/'metadata'/'output_manifest.csv'
+
+    payloads = records(checkpoint(case))
+    original_output_index = struct.unpack('<i', payloads[5][:4])[0]
+    assert original_output_index < 10000
+    checkpoint_time = struct.unpack('<4d', payloads[4])[0]
+    synthetic_rows = ['snapshot_index,time_seconds'] + [
+        f'{index},{checkpoint_time*index/10000:.16E}' for index in range(10000)
+    ]
+    manifest_path.write_text('\n'.join(synthetic_rows)+'\n')
+    previous_manifest_rows = manifest_path.read_text().splitlines()
+    payloads[5] = struct.pack('<i', 10000)+payloads[5][4:]
+    write_records(checkpoint(case), payloads)
+    continuation(case, end=0.045)
+    run(case, 'high-index.log')
+
+    manifest_rows = manifest_path.read_text().splitlines()
+    assert manifest_rows[:len(previous_manifest_rows)] == previous_manifest_rows
+    new_manifest_rows = manifest_rows[len(previous_manifest_rows):]
+    assert new_manifest_rows, 'Restart did not append high-index manifest records'
+    previous_time = float(previous_manifest_rows[-1].split(',')[1])
+    appended_times = []
+    for offset, row in enumerate(new_manifest_rows):
+        fields = row.split(',')
+        assert len(fields) == 2 and fields[0] == str(10000+offset), row
+        appended_times.append(float(fields[1]))
+    assert all(later > earlier for earlier, later in
+               zip([previous_time]+appended_times, appended_times))
+    manifest_indices = [int(row.split(',')[0]) for row in manifest_rows[1:]]
+    assert len(manifest_indices) == len(set(manifest_indices))
+    assert list((case/'OUTPUT'/'TEST_2D'/'snapshots').glob(
+        '10000_t_*/TEST_2D_10000.q_2d'))
+    passed('high-index restart: manifest and snapshot append at index 10000')
+
+    case = prepare('interrupted-manifest', parameter(text, 'T_END', '0.045'))
+    (case/'OUTPUT').mkdir()
+    shutil.copytree(root/'automatic-full'/'OUTPUT'/'TEST_2D', case/'OUTPUT'/'TEST_2D')
+    manifest_path = case/'OUTPUT'/'TEST_2D'/'metadata'/'output_manifest.csv'
+    intact_manifest = manifest_path.read_bytes()
+    checkpoint_before = sha(checkpoint(case))
+    manifest_path.write_bytes(intact_manifest+b'3,')
+    interrupted_manifest = manifest_path.read_bytes()
+    output_hashes_before = tree_hashes(case/'OUTPUT'/'TEST_2D')
+    continuation(case, end=0.045)
+    run(case, 'manifest-rejected.log', 'Output manifest has a malformed row')
+    assert manifest_path.read_bytes() == interrupted_manifest
+    assert sha(checkpoint(case)) == checkpoint_before
+    assert tree_hashes(case/'OUTPUT'/'TEST_2D') == output_hashes_before
+
+    manifest_path.write_bytes(intact_manifest)
+    run(case, 'manifest-resumed.log')
+    resumed_manifest_rows = manifest_path.read_text().splitlines()
+    assert resumed_manifest_rows[:-1] == intact_manifest.decode().splitlines()
+    assert resumed_manifest_rows[-1].split(',')[0] == '3'
+    assert float(resumed_manifest_rows[-1].split(',')[1]) > \
+        float(resumed_manifest_rows[-2].split(',')[1])
+    passed('interrupted manifest: reject partial row unchanged, then resume after repair')
 
     source_case = root/'automatic-split'
     full = root/'automatic-full'

@@ -165,8 +165,42 @@ prepare_solver_input "$external_case"
     awk '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_OVERWRITE=T," }' \
         IMEX_SfloW2D.inp > overwrite.inp
     mv overwrite.inp IMEX_SfloW2D.inp
+    output_checksums=$(find "$run_output" -type f -exec cksum {} \; | LC_ALL=C sort)
+    if "$executable" > external-stale-overwrite.log 2>&1; then
+        echo "FAIL: OUTPUT_OVERWRITE allowed an external checkpoint to duplicate manifest output" >&2
+        cat external-stale-overwrite.log >&2
+        exit 1
+    fi
+    grep -q 'manifest' external-stale-overwrite.log || {
+        echo "FAIL: stale external restart did not report the manifest conflict" >&2
+        cat external-stale-overwrite.log >&2
+        exit 1
+    }
+    updated_output_checksums=$(find "$run_output" -type f -exec cksum {} \; | LC_ALL=C sort)
+    [ "$output_checksums" = "$updated_output_checksums" ] || {
+        echo "FAIL: rejected stale external restart changed existing output files" >&2
+        printf '%s\n' "$output_checksums" > output-checksums-before.txt
+        printf '%s\n' "$updated_output_checksums" > output-checksums-after.txt
+        diff -u output-checksums-before.txt output-checksums-after.txt >&2 || true
+        exit 1
+    }
+
+    continuation_checkpoint="$external_checkpoint_dir/continuation restart checkpoint.bin"
+    cp "$run_output/restart/restart.bin" "$continuation_checkpoint"
+    awk -v checkpoint="$continuation_checkpoint" '
+        /RESTART_FILES=/ {
+            print " RESTART_FILES=\"" checkpoint "\","
+            next
+        }
+        /^ T_END=/ {
+            print " T_END=  5.500000000000000E+000,"
+            next
+        }
+        { print }
+    ' IMEX_SfloW2D.inp > continuation.inp
+    mv continuation.inp IMEX_SfloW2D.inp
     "$executable" > external-overwrite.log 2>&1 || {
-        echo "FAIL: explicit OUTPUT_OVERWRITE did not allow external restart output reuse" >&2
+        echo "FAIL: explicit overwrite did not allow compatible external restart continuation" >&2
         cat external-overwrite.log >&2
         exit 1
     }
