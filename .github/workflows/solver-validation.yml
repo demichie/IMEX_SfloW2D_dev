@@ -2,7 +2,11 @@ name: Solver validation
 
 on:
   push:
-  pull_request:
+    tags:
+      - '**'
+  release:
+    types: [published]
+  workflow_dispatch:
 
 jobs:
   solver:

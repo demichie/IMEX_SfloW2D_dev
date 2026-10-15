@@ -2,6 +2,8 @@
 
 The development repository maintains automated solver validation, Intel `ifx` portability and Docker workflows. See [GitHub Actions](https://github.com/demichie/IMEX_SfloW2D_dev/actions) for the current results.
 
+The validation workflows run when a tag is pushed, a release is published, or a maintainer starts them manually; ordinary branch commits and pull requests do not trigger these resource-intensive checks.
+
 The [N9 scientific baseline and M12c build acceptance records](https://github.com/demichie/IMEX_SfloW2D_dev/tree/master/docs/acceptance) document tested revisions, compiler configurations and limitations. Those acceptance records must not be interpreted as automatic approval of subsequent numerical changes.
 
 ## Documentation workflow

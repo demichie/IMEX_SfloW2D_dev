@@ -2,20 +2,11 @@ name: Intel ifx portability (experimental)
 
 on:
   workflow_dispatch:
-  pull_request:
-    paths:
-      - '.github/workflows/compiler-portability-ifx.yml'
-      - 'configure.ac'
-      - 'Makefile.am'
-      - 'src/**'
-      - 'TESTS/**'
   push:
-    paths:
-      - '.github/workflows/compiler-portability-ifx.yml'
-      - 'configure.ac'
-      - 'Makefile.am'
-      - 'src/**'
-      - 'TESTS/**'
+    tags:
+      - '**'
+  release:
+    types: [published]
 
 permissions:
   contents: read

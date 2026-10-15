@@ -2,17 +2,10 @@ name: Docker validation
 
 on:
   push:
-    branches: [master]
-    paths:
-      - Dockerfile
-      - .dockerignore
-      - .github/workflows/docker-validation.yml
-      - configure.ac
-      - Makefile.am
-      - src/**
-      - TESTS/**
-      - EXAMPLES/**
-  pull_request:
+    tags:
+      - '**'
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
