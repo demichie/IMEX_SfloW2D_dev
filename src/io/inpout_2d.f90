@@ -23,6 +23,8 @@ MODULE inpout_2d
   USE state_2d, ONLY: state_type
   USE domain_2d, ONLY: domain_type
   USE stochastic_module, ONLY: stochastic_workspace_type
+  USE output_paths, ONLY: initialize_output_paths, output_file_path, &
+                          begin_snapshot, snapshot_file_path
 
   USE parameters_2d, ONLY: idx_h, idx_hu, idx_hv, idx_T, idx_solid_first, &
                            idx_solid_last, idx_add_gas_first, idx_add_gas_last, idx_stoch, idx_pore, &
@@ -150,22 +152,24 @@ MODULE inpout_2d
   CHARACTER(LEN=40), dimension(10) :: restart_files
 
   CHARACTER(LEN=40) :: run_name           !< Name of the run
-  CHARACTER(LEN=40) :: bak_name           !< Backup file for the parameters
+  CHARACTER(LEN=1024) :: output_base_directory
+  LOGICAL :: output_overwrite
+  CHARACTER(LEN=2048) :: bak_name         !< Backup file for the parameters
   CHARACTER(LEN=40) :: input_file         !< File with the run parameters
   CHARACTER(LEN=40) :: restart_file       !< Name of the restart file
-  CHARACTER(LEN=40) :: probes_file        !< Name of the probes file
-  CHARACTER(LEN=40) :: output_file_2d     !< Name of the output files
-  CHARACTER(LEN=40) :: output_file_erosion!< Name of the output files
-  CHARACTER(LEN=40) :: output_file_erodible!< Name of the output files
-  CHARACTER(LEN=40) :: output_file_deposit!< Name of the output files
-  CHARACTER(LEN=40) :: output_file_B     !< Name of the output files
-  CHARACTER(LEN=40) :: output_esri_file   !< Name of the esri output files
-  CHARACTER(LEN=40) :: output_max_file    !< Name of the esri max. thick. file
-  CHARACTER(LEN=40) :: runout_file        !< Name of the runout file
+  CHARACTER(LEN=2048) :: probes_file      !< Name of the probes file
+  CHARACTER(LEN=2048) :: output_file_2d   !< Name of the output files
+  CHARACTER(LEN=2048) :: output_file_erosion
+  CHARACTER(LEN=2048) :: output_file_erodible
+  CHARACTER(LEN=2048) :: output_file_deposit
+  CHARACTER(LEN=2048) :: output_file_B
+  CHARACTER(LEN=2048) :: output_esri_file !< Name of the esri output files
+  CHARACTER(LEN=2048) :: output_max_file  !< Name of the esri max. thick. file
+  CHARACTER(LEN=2048) :: runout_file      !< Name of the runout file
   CHARACTER(LEN=40) :: topography_file    !< Name of the esri DEM file
   CHARACTER(LEN=40) :: erodible_file      !< Name of the esri DEM file
-  CHARACTER(LEN=40) :: output_VT_file
-  CHARACTER(LEN=40) :: mass_center_file
+  CHARACTER(LEN=2048) :: output_VT_file
+  CHARACTER(LEN=2048) :: mass_center_file
 
   INTEGER, PARAMETER :: input_unit = 7       !< Input data unit
   INTEGER, PARAMETER :: backup_unit = 8      !< Backup input data unit
@@ -185,6 +189,7 @@ MODULE inpout_2d
   INTEGER, PARAMETER :: output_unit_deposit = 27
   INTEGER, PARAMETER :: output_unit_B = 28
 
+  INTEGER, PARAMETER :: output_manifest_unit = 29
   CHARACTER(LEN=16), PARAMETER :: restart_format_magic = 'IMEX_SFLOW2D_RST'
   ! Version 5 adds self-contained runout and steady-stop diagnostic history.
   INTEGER, PARAMETER :: restart_format_version = 5
@@ -311,9 +316,12 @@ MODULE inpout_2d
   INTEGER             :: inertialNumber_varid !> ID for inertial number
 
   INTEGER             :: nc_time_idx       !< Counter for time
-  CHARACTER(LEN=128)  :: nc_filename       !< NetCDF file name
+  CHARACTER(LEN=2048)  :: nc_filename      !< NetCDF file name
+  LOGICAL :: output_manifest_initialized = .FALSE.
+  LOGICAL :: binary_restart_output = .FALSE.
 
   NAMELIST /run_parameters/ run_name, restart, t_start, t_end, dt_output, &
+    output_base_directory, output_overwrite, &
     output_cons_flag, output_esri_flag, &
     output_netcdf_flag, output_runout_flag, verbose_level, serial_flag,     &
     interactive_debug_flag
@@ -416,6 +424,10 @@ CONTAINS
 
     !-- Inizialization of the Variables for the namelist RUN_PARAMETERS
     run_name = 'default'
+    output_base_directory = 'OUTPUT'
+    output_overwrite = .FALSE.
+    output_manifest_initialized = .FALSE.
+    binary_restart_output = .FALSE.
     restart = .FALSE.
     t_start = 0.0
     t_end = 5.0E-2_wp
@@ -1028,6 +1040,8 @@ CONTAINS
     INTEGER :: i, i_solid, j, k
 
     INTEGER :: dot_idx
+    CHARACTER(LEN=4) :: restart_extension
+    CHARACTER(LEN=2048) :: in_place_restart_path
 
     CHARACTER(LEN=3) :: check_file
 
@@ -4586,9 +4600,26 @@ CONTAINS
 
     CLOSE (input_unit)
 
-    bak_name = TRIM(run_name)//'.bak'
+    restart_extension = ''
+    IF (restart) THEN
+      dot_idx = LEN_TRIM(restart_file)
+      IF (dot_idx >= 4) restart_extension = restart_file(dot_idx-3:dot_idx)
+    END IF
+    binary_restart_output = restart .AND. restart_extension == '.bin'
+    CALL initialize_output_paths(output_base_directory, run_name, &
+         output_overwrite, binary_restart_output)
+    IF (binary_restart_output .AND. INDEX(TRIM(restart_file), '/') == 0) THEN
+      in_place_restart_path = output_file_path('restart', 'restart.bin')
+      INQUIRE(FILE=TRIM(in_place_restart_path), EXIST=lexist)
+      IF (lexist) restart_file = TRIM(in_place_restart_path)
+    END IF
 
-    OPEN (backup_unit, file=bak_name, status='unknown', delim='quote')
+    bak_name = output_file_path('metadata', TRIM(run_name)//'.bak')
+    runout_file = output_file_path('diagnostics', TRIM(run_name)//'_runout.csv')
+    mass_center_file = output_file_path('diagnostics', &
+         TRIM(run_name)//'_mass_center.csv')
+
+    OPEN (backup_unit, file=bak_name, status='replace', delim='quote')
 
     WRITE (backup_unit, run_parameters)
 
@@ -5515,12 +5546,14 @@ CONTAINS
     output_idx = output_idx + 1
 
     idx_string = lettera(output_idx - 1)
+    IF (output_cons_flag .OR. output_esri_flag) &
+         CALL begin_snapshot(output_idx - 1, time)
 
     IF (output_netcdf_flag) CALL write_netcdf_timestep(time, state)
 
     IF (output_cons_flag) THEN
 
-      output_file_2d = TRIM(run_name)//'_'//idx_string//'.q_2d'
+      output_file_2d = snapshot_file_path(TRIM(run_name)//'_'//idx_string//'.q_2d')
 
       IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_file_2d
 
@@ -5528,8 +5561,10 @@ CONTAINS
 
       IF (erosion_coeff .GT. 0.0_wp) THEN
 
-        output_file_erosion = TRIM(run_name)//'_erosion_'//idx_string//'.q_2d'
-        output_file_erodible = TRIM(run_name)//'_erodible_'//idx_string//'.q_2d'
+        output_file_erosion = snapshot_file_path( &
+             TRIM(run_name)//'_erosion_'//idx_string//'.q_2d')
+        output_file_erodible = snapshot_file_path( &
+             TRIM(run_name)//'_erodible_'//idx_string//'.q_2d')
         OPEN (output_unit_erosion, FILE=output_file_erosion, status='unknown', &
               form='formatted')
         OPEN (output_unit_erodible, FILE=output_file_erodible, status='unknown', &
@@ -5539,7 +5574,8 @@ CONTAINS
 
       IF (settling_flag) THEN
 
-        output_file_deposit = TRIM(run_name)//'_deposit_'//idx_string//'.q_2d'
+        output_file_deposit = snapshot_file_path( &
+             TRIM(run_name)//'_deposit_'//idx_string//'.q_2d')
         OPEN (output_unit_deposit, FILE=output_file_deposit, status='unknown', &
               form='formatted')
 
@@ -5547,7 +5583,7 @@ CONTAINS
 
       IF (topo_change_flag) THEN
 
-        output_file_B = TRIM(run_name)//'_B_'//idx_string//'.q_2d'
+        output_file_B = snapshot_file_path(TRIM(run_name)//'_B_'//idx_string//'.q_2d')
         OPEN (output_unit_B, FILE=output_file_B, status='unknown', form='formatted')
 
       END IF
@@ -5659,7 +5695,59 @@ CONTAINS
 
     END IF
 
+    CALL record_output_manifest(output_idx - 1, time)
+
   END SUBROUTINE output_solution
+
+  !******************************************************************************
+  !> \brief Record the exact scheduled output time in the run manifest.
+  !> \param[in] index Zero-based output index used by snapshot filenames.
+  !> \param[in] time Exact simulation time written for this output event [s].
+  !******************************************************************************
+
+  SUBROUTINE record_output_manifest(index, time)
+    INTEGER, INTENT(IN) :: index
+    REAL(wp), INTENT(IN) :: time
+    CHARACTER(LEN=2048) :: filename
+    CHARACTER(LEN=128) :: header, existing_header
+    CHARACTER(LEN=512) :: message
+    LOGICAL :: exists
+    INTEGER :: ios
+
+    filename = output_file_path('metadata', 'output_manifest.csv')
+    header = 'snapshot_index,time_seconds'
+    INQUIRE(FILE=TRIM(filename), EXIST=exists)
+
+    IF (.NOT. output_manifest_initialized) THEN
+      IF (binary_restart_output .AND. exists) THEN
+        OPEN(UNIT=output_manifest_unit, FILE=TRIM(filename), STATUS='OLD', &
+             ACTION='READ', IOSTAT=ios, IOMSG=message)
+        IF (ios /= 0) CALL fatal_error('Cannot read output manifest: '//TRIM(message))
+        READ(output_manifest_unit, '(A)', IOSTAT=ios) existing_header
+        CLOSE(output_manifest_unit)
+        IF (ios /= 0 .OR. TRIM(existing_header) /= TRIM(header)) &
+             CALL fatal_error('Output manifest header is invalid: '//TRIM(filename))
+        OPEN(UNIT=output_manifest_unit, FILE=TRIM(filename), STATUS='OLD', &
+             POSITION='APPEND', ACTION='WRITE', IOSTAT=ios, IOMSG=message)
+      ELSE
+        OPEN(UNIT=output_manifest_unit, FILE=TRIM(filename), STATUS='REPLACE', &
+             ACTION='WRITE', IOSTAT=ios, IOMSG=message)
+        IF (ios == 0) WRITE(output_manifest_unit, '(A)') TRIM(header)
+      END IF
+      IF (ios /= 0) CALL fatal_error('Cannot open output manifest: '//TRIM(message))
+      output_manifest_initialized = .TRUE.
+    ELSE
+      OPEN(UNIT=output_manifest_unit, FILE=TRIM(filename), STATUS='OLD', &
+           POSITION='APPEND', ACTION='WRITE', IOSTAT=ios, IOMSG=message)
+      IF (ios /= 0) CALL fatal_error('Cannot append output manifest: '//TRIM(message))
+    END IF
+
+    WRITE(output_manifest_unit, '(I0,",",ES24.16E3)', IOSTAT=ios, IOMSG=message) &
+         index, time
+    IF (ios /= 0) CALL fatal_error('Cannot write output manifest: '//TRIM(message))
+    CLOSE(output_manifest_unit, IOSTAT=ios, IOMSG=message)
+    IF (ios /= 0) CALL fatal_error('Cannot close output manifest: '//TRIM(message))
+  END SUBROUTINE record_output_manifest
 
   !******************************************************************************
   !> \brief Write accumulated maximum thickness, pressure and velocity fields.
@@ -5688,7 +5776,7 @@ CONTAINS
     INTEGER :: i_pdyn_lev, i_thk_lev, i_table
 
     !Save max thickness
-    output_max_file = TRIM(run_name)//'_max.asc'
+    output_max_file = output_file_path('diagnostics', TRIM(run_name)//'_max.asc')
 
     IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_max_file
 
@@ -5721,7 +5809,7 @@ CONTAINS
 
     IF (n_thickness_levels*n_thickness_levels .GT. 1) THEN
 
-      output_VT_file = TRIM(run_name)//'_VT.txt'
+      output_VT_file = output_file_path('vulnerability', TRIM(run_name)//'_VT.txt')
       OPEN (output_VT_unit, FILE=output_VT_file, status='unknown', &
             form='formatted')
 
@@ -5741,7 +5829,8 @@ CONTAINS
 
           grid_output_int(:, :) = MERGE(1, -9999, state%vuln_table(i_table, :, :))
 
-          output_max_file = TRIM(run_name)//'_VT_'//idx_string//'.asc'
+          output_max_file = output_file_path('vulnerability', &
+               TRIM(run_name)//'_VT_'//idx_string//'.asc')
           OPEN (output_max_unit, FILE=output_max_file, status='unknown', &
                 form='formatted')
 
@@ -5805,7 +5894,8 @@ CONTAINS
 
     IF (output_idx .EQ. 1) THEN
 
-      OPEN (dem_esri_unit, FILE='dem_esri.asc', status='unknown', form='formatted')
+      OPEN (dem_esri_unit, FILE=output_file_path('terrain', 'dem_esri.asc'), &
+            status='unknown', form='formatted')
 
       WRITE (dem_esri_unit, '(A,I5)') 'ncols ', comp_cells_x
       WRITE (dem_esri_unit, '(A,I5)') 'nrows ', comp_cells_y
@@ -5822,7 +5912,8 @@ CONTAINS
 
       CLOSE (dem_esri_unit)
 
-      OPEN (dem_esri_unit, FILE='dem_esri_nodata.asc', status='unknown', form='formatted')
+      OPEN (dem_esri_unit, FILE=output_file_path('terrain', 'dem_esri_nodata.asc'), &
+            status='unknown', form='formatted')
 
       WRITE (dem_esri_unit, '(A,I5)') 'ncols ', comp_cells_x
       WRITE (dem_esri_unit, '(A,I5)') 'nrows ', comp_cells_y
@@ -5841,7 +5932,8 @@ CONTAINS
 
       IF (liquid_vaporization_flag) THEN
 
-        OPEN (dem_esri_unit, FILE='dem_esri_water.asc', status='unknown', form='formatted')
+        OPEN (dem_esri_unit, FILE=output_file_path('terrain', 'dem_esri_water.asc'), &
+              status='unknown', form='formatted')
 
         IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING dem_esri_water.asc'
 
@@ -5867,7 +5959,7 @@ CONTAINS
     idx_string = lettera(output_idx - 1)
 
     !Save thickness
-    output_esri_file = TRIM(run_name)//'_'//idx_string//'.asc'
+    output_esri_file = snapshot_file_path(TRIM(run_name)//'_'//idx_string//'.asc')
 
     IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_esri_file
 
@@ -5897,7 +5989,7 @@ CONTAINS
     CLOSE (output_esri_unit)
 
     !Save temperature
-    output_esri_file = TRIM(run_name)//'_T_'//idx_string//'.asc'
+    output_esri_file = snapshot_file_path(TRIM(run_name)//'_T_'//idx_string//'.asc')
 
     IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_esri_file
 
@@ -5933,8 +6025,8 @@ CONTAINS
 
         isolid_string = lettera(i_solid)
 
-        output_esri_file = &
-          TRIM(run_name)//'_dep_'//isolid_string//'_'//idx_string//'.asc'
+        output_esri_file = snapshot_file_path( &
+            TRIM(run_name)//'_dep_'//isolid_string//'_'//idx_string//'.asc')
 
         IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_esri_file
 
@@ -5968,8 +6060,8 @@ CONTAINS
       END DO
 
       ! Save total deposit (solid+continous phase associated with porosity)
-      output_esri_file = &
-        TRIM(run_name)//'_depTot_'//idx_string//'.asc'
+      output_esri_file = snapshot_file_path( &
+        TRIM(run_name)//'_depTot_'//idx_string//'.asc')
 
       IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_esri_file
 
@@ -6016,8 +6108,8 @@ CONTAINS
 
         isolid_string = lettera(i_solid)
 
-        output_esri_file = &
-          TRIM(run_name)//'_ers_'//isolid_string//'_'//idx_string//'.asc'
+        output_esri_file = snapshot_file_path( &
+            TRIM(run_name)//'_ers_'//isolid_string//'_'//idx_string//'.asc')
 
         IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_esri_file
 
@@ -6051,8 +6143,8 @@ CONTAINS
       END DO
 
       ! Save total erosion (solid+continous phase associated with porosity)
-      output_esri_file = &
-        TRIM(run_name)//'_ersTot_'//idx_string//'.asc'
+      output_esri_file = snapshot_file_path( &
+        TRIM(run_name)//'_ersTot_'//idx_string//'.asc')
 
       IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_esri_file
 
@@ -6327,7 +6419,8 @@ CONTAINS
 
       idx_string = lettera(k)
 
-      probes_file = TRIM(run_name)//'_prb_'//idx_string//'.csv'
+      probes_file = output_file_path('probes', &
+           TRIM(run_name)//'_prb_'//idx_string//'.csv')
 
       IF (time .EQ. t_start) THEN
 
@@ -6853,7 +6946,7 @@ CONTAINS
     ALLOCATE (Rouse_varid(n_solid))
 
     ! Set the output filename
-    nc_filename = TRIM(run_name)//'.nc'
+    nc_filename = output_file_path('fields', TRIM(run_name)//'.nc')
     INQUIRE(FILE=nc_filename, EXIST=file_exists)
 
     ! On restart, append to a compatible existing NetCDF file rather than

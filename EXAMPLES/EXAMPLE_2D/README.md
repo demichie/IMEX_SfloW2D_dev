@@ -30,7 +30,7 @@ From this directory, generate the input files with `python create_example.py 100
 
 ## Expected output
 
-The simulation produces native NetCDF output (`<run_name>.nc`), viewable in ParaView.
+The simulation produces native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc`, viewable in ParaView.
 
 The initial conditions and topography resemble Example 4.1 from Wang et al. (2004), but the rheological model is not the same as the original reference. The original README calls the script `create_example4.py` in its description, although the actual script and command are `create_example.py`.
 

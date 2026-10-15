@@ -6,7 +6,29 @@ import matplotlib.ticker as ticker
 import csv
 import glob
 import os
+from pathlib import Path
+import re
 from matplotlib.colors import LightSource
+
+
+def input_parameter(input_text, name, default=None):
+    match = re.search(
+        rf"^\s*{re.escape(name)}\s*=\s*['\"]?([^,'\"\s]+)['\"]?\s*,?",
+        input_text,
+        re.IGNORECASE | re.MULTILINE)
+    return match.group(1) if match else default
+
+
+input_text = Path("IMEX_SfloW2D.inp").read_text(encoding="utf-8")
+run_name = input_parameter(input_text, "RUN_NAME")
+if not run_name:
+    raise ValueError("RUN_NAME is missing from IMEX_SfloW2D.inp")
+output_base = Path(input_parameter(input_text, "OUTPUT_BASE_DIRECTORY", "OUTPUT"))
+if not output_base.is_absolute():
+    output_base = Path.cwd() / output_base
+run_output_dir = output_base / run_name
+metadata_dir = run_output_dir / "metadata"
+vulnerability_dir = run_output_dir / "vulnerability"
 
 
 def merge_vt(VTfile):
@@ -79,9 +101,9 @@ def fmt(x, pos):
     return r'${} \times 10^{{{}}}$'.format(a, b)
 
 
-for file in glob.glob("*.bak"):
-    # print(file)
-    bakfile = file
+bakfile = str(metadata_dir / (run_name + ".bak"))
+if not os.path.isfile(bakfile):
+    raise FileNotFoundError(f"solver backup not found: {bakfile}")
 
 with open(bakfile) as fp:
 
@@ -162,7 +184,7 @@ with open(bakfile) as fp:
             print("cell_size =", cell_size)
 
         if "VULNERABILITY_TABLE_PARAMETERS" in line:
-            VT_file = run_name + '_VT.txt'
+            VT_file = str(vulnerability_dir / (run_name + '_VT.txt'))
             print('VT_file', VT_file)
             merge_vt(VT_file)
 
@@ -219,7 +241,7 @@ ax.set_aspect('equal', 'box')
 # plt.show()
 """
 
-VTfile = bakfile.replace('.bak', '_VT.txt')
+VTfile = str(vulnerability_dir / (run_name + '_VT.txt'))
 
 print('VTfile', VTfile, os.path.exists(VTfile))
 # print(VTfile)
@@ -264,7 +286,12 @@ max_arr_ers = -1.E10
 min_arr_thk = 1.E10
 max_arr_thk = -1.E10
 
-for file in glob.glob("*.asc"):
+asc_files = glob.glob(str(run_output_dir / "snapshots" / "*" / "*.asc"))
+asc_files += glob.glob(str(vulnerability_dir / "*.asc"))
+asc_files += glob.glob(str(run_output_dir / "diagnostics" / "*.asc"))
+
+for file_path in asc_files:
+    file = Path(file_path).name
     print(file)
 
     if "masked" in file:
@@ -327,7 +354,7 @@ for file in glob.glob("*.asc"):
 
     if counter == 0:
 
-        source2 = file
+        source2 = file_path
 
         # Parse the header using a loop and
         # the built-in linecache module
@@ -410,7 +437,8 @@ for file in glob.glob("*.asc"):
                 np.maximum(-5, np.floor(np.log10(min_arr_thk))))
             max_int_thk = np.minimum(1, np.floor(np.log10(max_arr_thk)))
 
-for file in glob.glob("*.asc"):
+for file_path in asc_files:
+    file = Path(file_path).name
 
     if "topography_dem" in file:
 
@@ -470,7 +498,7 @@ for file in glob.glob("*.asc"):
     t_string = 't={t_output:.1f}s'.format(t_output=t_output)
     # print('t_string',t_string,t_output)
 
-    source2 = file
+    source2 = file_path
     print(source2)
 
     # Parse the header using a loop and
@@ -602,5 +630,5 @@ for file in glob.glob("*.asc"):
     plt.xlim([plt_xmin, plt_xmax])
     plt.ylim([plt_ymin, plt_ymax])
     plt.tight_layout()
-    plt.savefig(source2.replace('asc', 'png'), dpi=200)
+    plt.savefig(Path(source2).with_suffix('.png'), dpi=200)
     plt.close(fig)

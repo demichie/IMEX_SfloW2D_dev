@@ -33,7 +33,7 @@ Run `python create_example.py 300 30000.0 2000.0 2.0 330.0 100.0 0.00008 2.5e-4`
 
 ## Expected output
 
-Native NetCDF (`<run_name>.nc`), viewable in ParaView.
+Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc`, viewable in ParaView.
 
 ## Source pulse timing in the original documentation
 

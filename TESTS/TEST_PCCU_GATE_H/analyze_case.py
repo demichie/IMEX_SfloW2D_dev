@@ -31,7 +31,8 @@ def main():
     args = parser.parse_args()
 
     geometry = np.load(args.case_dir / "gate_h_geometry.npz")
-    state = np.loadtxt(args.case_dir / "gateH_0001.q_2d")
+    snapshot = next((args.case_dir / "OUTPUT/gateH/snapshots").glob("*/gateH_0001.q_2d"))
+    state = np.loadtxt(snapshot)
     dx = float(geometry["dx"])
     x_grid = geometry["x"]
     y_grid = geometry["y"]

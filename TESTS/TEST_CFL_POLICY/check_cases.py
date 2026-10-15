@@ -53,8 +53,9 @@ def check_times(values, sentinel=False):
 def payloads(directory):
     """Canonical state and checkpoint bytes; exclude timestamps/diagnostic text."""
     return {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in sorted(directory.iterdir())
-            if p.name == "restart.bin" or re.fullmatch(r"gateH_\d{4}\.q_2d", p.name)}
+            for p in sorted(directory.rglob("*"))
+            if p.is_file() and
+            (p.name == "restart.bin" or re.fullmatch(r"gateH_\d{4}\.q_2d", p.name))}
 
 
 def prepare(directory, repo, policy, stages, cfl):
@@ -125,7 +126,7 @@ def main():
                 initial=np.loadtxt(case/"gateH_0000.q_2d")[:,2]
                 limit=8192*EPS*max(1.0,float(np.abs(initial).sum()))
                 drift=0.0
-                for path in sorted(case.glob("gateH_*.q_2d")):
+                for path in sorted((case/"OUTPUT/gateH/snapshots").glob("*/gateH_*.q_2d")):
                     state=np.loadtxt(path)
                     if not np.isfinite(state).all() or state[:,2].min() < -limit:
                         raise AssertionError("nonfinite or inadmissible conservative output")
@@ -152,7 +153,7 @@ def main():
                     if payloads(old) != fingerprint:
                         raise AssertionError("omitted policy changed the pinned historical executable")
                     historical=True
-                backup=(case/"gateH.bak").read_text()
+                backup=(case/"OUTPUT/gateH/metadata/gateH.bak").read_text()
                 selected=policy or "directional_min"
                 if not re.search(rf"CFL_POLICY\s*=\s*[\"']{selected}\s*[\"']",backup,re.I):
                     raise AssertionError("effective input backup lacks selected CFL_POLICY")

@@ -63,11 +63,12 @@ sed -i.bak -e 's/^ TOPO_CHANGE_FLAG = F,/ TOPO_CHANGE_FLAG = T,/' \
     "$executable" > resumed_run.log
 )
 
-cmp "$reference_dir/restart.bin" "$resumed_dir/restart.bin"
+cmp "$reference_dir/OUTPUT/TEST_2D/restart/restart.bin" \
+    "$resumed_dir/OUTPUT/TEST_2D/restart/restart.bin"
 
 latest_snapshot() {
     snapshot_dir=$1
-    set -- "$snapshot_dir"/TEST_2D_[0-9][0-9][0-9][0-9].q_2d
+    set -- "$snapshot_dir"/OUTPUT/TEST_2D/snapshots/*/TEST_2D_[0-9][0-9][0-9][0-9].q_2d
     if [ ! -f "$1" ]; then
         echo "FAIL: no conservative snapshots found in $snapshot_dir" >&2
         ls -la "$snapshot_dir" >&2

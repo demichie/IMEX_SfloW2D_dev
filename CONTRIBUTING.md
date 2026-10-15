@@ -43,6 +43,7 @@ For a diagnostic GNU build, use a clean build directory or clean the preceding b
 Relevant executable regression suites include:
 
 ```sh
+TESTS/run_tests.sh src/IMEX_SfloW2D
 TESTS/TEST_BINARY_RESTART/run_test.sh src/IMEX_SfloW2D
 TESTS/TEST_STOCHASTIC_RESTART/run_test.sh src/IMEX_SfloW2D
 TESTS/TEST_PCCU_GATE_H/run_test.sh src/IMEX_SfloW2D

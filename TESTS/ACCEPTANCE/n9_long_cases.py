@@ -32,6 +32,18 @@ def digest(path):
     return result.hexdigest()
 
 
+def run_output_directory(directory, run_name):
+    run_directory = Path(directory)/'OUTPUT'/run_name
+    return run_directory if run_directory.is_dir() else Path(directory)
+
+
+def output_file(directory, run_name, category, filename):
+    output_directory = run_output_directory(directory, run_name)
+    if output_directory == Path(directory):
+        return output_directory/filename
+    return output_directory/category/filename
+
+
 def current_source_path(repo, historical_path):
     path = repo / historical_path
     if path.exists():
@@ -159,8 +171,8 @@ def diagnostic_comparison(full, resumed, run_name):
     checks = {}
     for suffix in ('runout', 'mass_center'):
         filename = run_name+'_'+suffix+'.csv'
-        left, left_header = diagnostic_csv(full/filename)
-        right, right_header = diagnostic_csv(resumed/filename)
+        left, left_header = diagnostic_csv(output_file(full, run_name, 'diagnostics', filename))
+        right, right_header = diagnostic_csv(output_file(resumed, run_name, 'diagnostics', filename))
         common, il, ir = np.intersect1d(left[:,0],right[:,0],return_indices=True)
         errors = np.max(np.abs(left[il]-right[ir]),axis=0) if len(common) else np.full(5,np.inf)
         same_history = left.shape == right.shape and np.array_equal(left[:,0],right[:,0])
@@ -413,7 +425,8 @@ def main():
         team = re.search(r'Parallel run: number of threads used\s+(\d+)',text)
         assert team and int(team[1]) == threads
         assert (directory/'IMEX_SfloW2D.inp').read_text() == input_text
-        info, _ = checkpoint(directory/'restart.bin')
+        run_name = re.search(r'RUN_NAME\s*=\s*["\']([^"\']+)', input_text, re.IGNORECASE)[1]
+        info, _ = checkpoint(output_file(directory, run_name, 'restart', 'restart.bin'))
         assert info['time_state'][0] == expected_time
         return {'recovered_completed_run': True,'actual_threads':threads,
                 'seconds':None,'log_sha256':digest(log),
@@ -434,8 +447,8 @@ def main():
         else:
             prior = next(r for r in lava['results'] if r['profile']==profile and r['actual_threads']==threads)
             reference = Path(prior['directory'])
-            assert digest(reference/'restart.bin') == prior['restart_sha256']
-            assert digest(reference/'exampleEtna_lava.nc') == prior['NetCDF_sha256']
+            assert digest(output_file(reference, 'exampleEtna_lava', 'restart', 'restart.bin')) == prior['restart_sha256']
+            assert digest(output_file(reference, 'exampleEtna_lava', 'fields', 'exampleEtna_lava.nc')) == prior['NetCDF_sha256']
             full_run = {'reused_verified_full_run': True, 'actual_threads':threads,
                         'seconds':prior['seconds'],'input_sha256':prior['input_sha256']}
         resumed = case_root/(tag+'-split')
@@ -474,10 +487,12 @@ def main():
         else:
             input_path.write_text(first_input)
             first_run = run(exe,resumed,threads,'first_run.log')
-        first_checkpoint,_ = checkpoint(resumed/'restart.bin')
+        run_name = 'exampleEtna' if case == 'ETNA' else 'exampleEtna_lava'
+        checkpoint_path = output_file(resumed, run_name, 'restart', 'restart.bin')
+        first_checkpoint,_ = checkpoint(checkpoint_path)
         assert first_checkpoint['time_state'][0] == split_time
         # Preserve the intermediate evidence before production overwrites it.
-        shutil.copy2(resumed/'restart.bin',resumed/'split_checkpoint.bin')
+        shutil.copy2(checkpoint_path,resumed/'split_checkpoint.bin')
         input_path.write_text(second_input)
         second_run = run(exe,resumed,threads,'resumed_run.log')
         print('RUNS FINISHED',tag,flush=True)
@@ -505,10 +520,14 @@ def main():
             directory = Path(result['reference_directory'])
             resumed = Path(result['resumed_directory'])
             try:
-                left, lm = native.read(directory/(name+'.nc'))
-                right, rm = native.read(resumed/(name+'.nc'))
-                result['reference'] = observations(left,lm,directory/'restart.bin',case)
-                result['resumed'] = observations(right,rm,resumed/'restart.bin',case)
+                full_netcdf = output_file(directory, name, 'fields', name+'.nc')
+                resumed_netcdf = output_file(resumed, name, 'fields', name+'.nc')
+                full_checkpoint = output_file(directory, name, 'restart', 'restart.bin')
+                resumed_checkpoint = output_file(resumed, name, 'restart', 'restart.bin')
+                left, lm = native.read(full_netcdf)
+                right, rm = native.read(resumed_netcdf)
+                result['reference'] = observations(left,lm,full_checkpoint,case)
+                result['resumed'] = observations(right,rm,resumed_checkpoint,case)
             except Exception as error:
                 result.update(status='fail',error=repr(error))
                 manifest['runs'].append(result);save()
@@ -516,9 +535,11 @@ def main():
                 continue
             result['netcdf_schema_bitwise_equal'] = lm == rm
             result['decoded_fields_bitwise_equal'] = result['reference']['decoded_sha256'] == result['resumed']['decoded_sha256']
-            result['checkpoint_bitwise_equal'] = digest(directory/'restart.bin') == digest(resumed/'restart.bin')
-            rasters = {p.name:digest(p) for p in directory.glob('*.asc')}
-            resumed_rasters = {p.name:digest(p) for p in resumed.glob('*.asc')}
+            result['checkpoint_bitwise_equal'] = digest(full_checkpoint) == digest(resumed_checkpoint)
+            full_output = run_output_directory(directory,name)
+            resumed_output = run_output_directory(resumed,name)
+            rasters = {p.name:digest(p) for p in full_output.rglob('*.asc')}
+            resumed_rasters = {p.name:digest(p) for p in resumed_output.rglob('*.asc')}
             result['ESRI_rasters_bitwise_equal'] = rasters == resumed_rasters
             result['ESRI_raster_files_compared'] = len(rasters)
             result['physical_continuation_status'] = 'pass' if all(result[k] for k in (
@@ -528,9 +549,10 @@ def main():
             result['status'] = 'pass' if result['physical_continuation_status']=='pass' and all(
                 v['status']=='pass' for v in result['diagnostic_csv'].values()) else 'fail'
             result['field_differences'] = {k:float(np.max(np.abs(left[k]-right[k]))) for k in left}
-            result['full_NetCDF_sha256'] = digest(directory/(name+'.nc'))
-            result['resumed_NetCDF_sha256'] = digest(resumed/(name+'.nc'))
-            result['reference_output_sha256'] = {p.name:digest(p) for p in directory.iterdir()
+            result['full_NetCDF_sha256'] = digest(full_netcdf)
+            result['resumed_NetCDF_sha256'] = digest(resumed_netcdf)
+            result['reference_output_sha256'] = {
+                str(p.relative_to(full_output)):digest(p) for p in full_output.rglob('*')
                 if p.is_file() and (p.suffix in ('.asc','.csv','.nc') or p.name=='restart.bin')}
             manifest['runs'].append(result); save()
             print('CONTINUATION',case,result['profile'],result['requested_threads'],result['status'],flush=True)

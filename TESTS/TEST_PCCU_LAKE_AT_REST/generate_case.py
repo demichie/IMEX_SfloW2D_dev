@@ -67,6 +67,7 @@ def write_case(slope_correction=False, curvature=False, bed_mode="planar"):
 
     Path("IMEX_SfloW2D.inp").write_text(f"""&RUN_PARAMETERS
  RUN_NAME="lakeRest",
+ OUTPUT_OVERWRITE=T,
  RESTART=T,
  T_START=0.0D0,
  T_END=1.0D-1,

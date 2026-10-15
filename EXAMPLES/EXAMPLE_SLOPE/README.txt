@@ -21,4 +21,4 @@ Run the solver (this assumes that the example is in the original folder):
 
 >> ../../bin/IMEX_SfloW2D
 
-Native NetCDF output is enabled in the input file. The simulation writes `<run_name>.nc` directly; open it with ParaView or another NetCDF-compatible tool.
+Native NetCDF output is enabled in the input file. The simulation writes `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc`; open it with ParaView or another NetCDF-compatible tool.

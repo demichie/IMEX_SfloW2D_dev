@@ -74,17 +74,17 @@ Writes: IMEX_SfloW2D.inp, topography_dem.asc, example_2D_0000.q_2d (and a previe
 
 >> ./IMEX_SfloW2D IMEX_SfloW2D.inp
 
-Produces: dambreak2D.nc (plus snapshots).
+Produces: `OUTPUT/dambreak2D/fields/dambreak2D.nc` plus snapshots under `OUTPUT/dambreak2D/snapshots/`.
 
 
 4. OPEN THE NATIVE NETCDF OUTPUT
 
-The solver writes dambreak2D.nc directly. Open it with ParaView or another NetCDF-compatible tool.
+The solver writes `OUTPUT/dambreak2D/fields/dambreak2D.nc`. Open it with ParaView or another NetCDF-compatible tool.
 
 
 5. FIND THE CENTERLINE HEIGHT ALONG Y = center_fraction (0=bottom, 0.5=mid, 1=top). ADD --animate FOR A MOVIE
 
->> python height_summary_nc.py dambreak2D.nc --center_fraction 0.5 --animate
+>> python height_summary_nc.py OUTPUT/dambreak2D/fields/dambreak2D.nc --center_fraction 0.5 --animate
 
 Outputs: frames/dambreak2D_hcenter_####.png and dambreak2D_height_movie.mp4 (or GIF if ffmpeg not available).
 

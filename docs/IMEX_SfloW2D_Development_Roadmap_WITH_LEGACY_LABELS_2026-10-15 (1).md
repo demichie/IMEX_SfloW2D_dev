@@ -769,19 +769,25 @@ Ricognizione del sorgente al 15 ottobre 2026: le scritture di output scientifico
 | Raster del terreno computazionale | `dem_esri.asc`, `dem_esri_nodata.asc`, opzionalmente `dem_esri_water.asc` | `terrain/` |
 | Restart scritto | `restart.bin` | `restart/` |
 
-I file input `topography_file`, `erodible_file` e i checkpoint indicati esplicitamente per la lettura sono aperti in lettura e non vanno spostati. Le procedure che costruiscono i nomi e aprono output sono in `inpout_2d`; l'append diagnostico CSV e NetCDF in restart e la scrittura del checkpoint richiedono particolare attenzione per conservare le semantiche validate. L'inventario è una baseline per la successiva implementazione e non abilita ancora l'output segregato: restano da introdurre il costruttore centrale dei percorsi, la creazione/validazione sicura delle directory e le relative prove.
+I file input `topography_file`, `erodible_file` e i checkpoint indicati esplicitamente per la lettura sono aperti in lettura e non vanno spostati. L'inventario è il riferimento per l'implementazione e per l'audit completo delle scritture, inclusi i percorsi di restart e le routine di post-processing.
+
+#### Implementazione C01/IO-1 — 15 ottobre 2026
+
+È stato aggiunto il modulo `src/io/output_paths.f90` con l'helper POSIX `src/io/output_dirs.c`; tutti gli output del solver censiti sono instradati sotto `<OUTPUT_BASE_DIRECTORY>/<RUN_NAME>/`. Il valore predefinito della base è `OUTPUT`; `OUTPUT_OVERWRITE` è falso per default e consente il riuso esplicito senza cancellare file preesistenti. I restart binari in-place possono riutilizzare la propria directory senza overwrite e risolvono il checkpoint scritto `restart/restart.bin`; i checkpoint esterni restano input esterni. I percorsi rifiutano componenti symlink e `..`; prima del riuso vengono inoltre rifiutati symlink, hard link o elementi non regolari già presenti nell'albero del run. `RUN_NAME` ammette solo lettere ASCII, numeri, `_` e `-`. Ogni snapshot ha una cartella indice/tempo e il manifest in `metadata/output_manifest.csv` registra l'indice e il tempo esatto.
+
+La documentazione introduttiva e la pagina website “Output files and formats” descrivono il layout e il contratto. Verifiche passate sul build GNU locale: `TESTS/run_tests.sh` (casi legacy, struttura, manifest, collisione senza overwrite, riuso esplicito, `RUN_NAME` e base con traversal rifiutati, basi symlink, file symlink e hard link rifiutati, basi personalizzate relative e assolute con spazi); `TESTS/TEST_BINARY_RESTART/run_test.sh`; `TESTS/TEST_STOCHASTIC_RESTART/run_test.sh`; `TESTS/TEST_PCCU_GATE_H/run_test.sh`; `TESTS/TEST_PCCU_LAKE_AT_REST/run_test.sh`; `TESTS/TEST_PCCU_INCLINED_EXCAVATION/run_test.sh`; `TESTS/TEST_CFL_POLICY/run_test.sh`. L'harness Acceptance/N9 è stato aggiornato per i nuovi percorsi, ma non è stato eseguito integralmente. C01 resta PARZIALE finché non si chiude il gate C03, compresi il confronto baseline A11 completo, l'audit di tutte le scritture/post-processing e i casi di ripartenza/interruzione ancora elencati sotto C03.
 
 ### C02 — Contratto di configurazione e sicurezza
 
-Stato ufficiale: DA FARE
+Stato ufficiale: IMPLEMENTATO, GATE APERTO
 
 #### Contratto di configurazione e sicurezza
 
 RUN_NAME già esistente identifica univocamente il run; validare caratteri ammessi ed escludere nomi vuoti, separatori, “.”, “..” e traversals.
 
-OUTPUT_BASE_DIRECTORY (nuovo parametro proposto) è configurabile, di default OUTPUT; sono ammessi percorsi relativi o assoluti, inclusi filesystem scratch HPC.
+OUTPUT_BASE_DIRECTORY è configurabile, di default OUTPUT; sono ammessi percorsi relativi o assoluti, inclusi filesystem scratch HPC, purché non contengano componenti `..` e non attraversino symlink.
 
-OUTPUT_OVERWRITE (nuovo parametro proposto) è FALSE per default: un nuovo run non deve sovrascrivere output di una directory esistente. Un’autorizzazione TRUE è esplicita e va confinata rigorosamente al run selezionato, con difese contro symlink, percorsi malformati o riferimenti esterni.
+OUTPUT_OVERWRITE è FALSE per default: un nuovo run non deve sovrascrivere output di una directory esistente. Un’autorizzazione TRUE è esplicita e resta confinata al run selezionato; non rimuove i file preesistenti. La creazione usa componenti directory senza seguire symlink.
 
 Un restart ordinario riutilizza la directory dello stesso run, senza richiedere overwrite, ma verifica compatibilità checkpoint e integrità degli output preesistenti. La lettura esplicita di checkpoint esterni resta supportata.
 

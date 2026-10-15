@@ -93,11 +93,12 @@ def main():
         problems.append(f"actual OpenMP team {actual} != requested {requested}")
     files = {}
     fields = {}
-    for path in sorted(Path.cwd().iterdir()):
-        if path.is_file() and (path.suffix in (".inp", ".asc", ".nc")
-                               or path.name.endswith((".q_2d", ".p_2d"))
+    for path in sorted(Path.cwd().rglob("*")):
+        if path.is_file() and (path.suffix in (".inp", ".asc", ".nc", ".csv")
+                               or path.name.endswith((".q_2d", ".p_2d", ".bin"))
                                or path.name == "restart.bin"):
-            files[path.name] = {"sha256": digest(path), "bytes": path.stat().st_size}
+            relative_path = str(path.relative_to(Path.cwd()))
+            files[relative_path] = {"sha256": digest(path), "bytes": path.stat().st_size}
         if path.name.endswith(".q_2d"):
             try:
                 values = np.loadtxt(path, ndmin=2, converters=fortran_float)
@@ -116,7 +117,7 @@ def main():
     # Effective namelist backups include initialized defaults even when the
     # user's input omits CFL_POLICY. Keep that selection in every run manifest.
     policies=[]
-    for backup in Path.cwd().glob("*.bak"):
+    for backup in Path.cwd().rglob("*.bak"):
         match=re.search(r"CFL_POLICY\s*=\s*[\"']([^\"']+)[\"']", backup.read_text(), re.I)
         if match:
             policies.append(match[1].strip())

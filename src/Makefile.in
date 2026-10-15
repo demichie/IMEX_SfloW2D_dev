@@ -123,6 +123,7 @@ am_IMEX_SfloW2D_OBJECTS = core/parameters_2d.$(OBJEXT) \
 	stochastic/stochastic_random_2d.$(OBJEXT) \
 	stochastic/stochastic_module.$(OBJEXT) \
 	core/simulation_2d.$(OBJEXT) core/init_2d.$(OBJEXT) \
+	io/output_paths.$(OBJEXT) io/output_dirs.$(OBJEXT) \
 	io/inpout_2d.$(OBJEXT) IMEX_SfloW2D.$(OBJEXT)
 IMEX_SfloW2D_OBJECTS = $(am_IMEX_SfloW2D_OBJECTS)
 IMEX_SfloW2D_DEPENDENCIES =
@@ -141,7 +142,21 @@ am__v_at_ = $(am__v_at_@AM_DEFAULT_V@)
 am__v_at_0 = @
 am__v_at_1 = 
 DEFAULT_INCLUDES = -I.@am__isrc@
-FCCOMPILE = $(FC) $(AM_FCFLAGS) $(FCFLAGS)
+depcomp = $(SHELL) $(top_srcdir)/depcomp
+am__maybe_remake_depfiles = depfiles
+am__depfiles_remade = io/$(DEPDIR)/output_dirs.Po
+am__mv = mv -f
+COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
+	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
+AM_V_CC = $(am__v_CC_@AM_V@)
+am__v_CC_ = $(am__v_CC_@AM_DEFAULT_V@)
+am__v_CC_0 = @echo "  CC      " $@;
+am__v_CC_1 =CCLD = $(CC)
+LINK = $(CCLD) $(AM_CFLAGS) $(CFLAGS) $(AM_LDFLAGS) $(LDFLAGS) -o $@
+AM_V_CCLD = $(am__v_CCLD_@AM_V@)
+am__v_CCLD_ = $(am__v_CCLD_@AM_DEFAULT_V@)
+am__v_CCLD_0 = @echo "  CCLD    " $@;
+am__v_CCLD_1 =FCCOMPILE = $(FC) $(AM_FCFLAGS) $(FCFLAGS)
 AM_V_FC = $(am__v_FC_@AM_V@)
 am__v_FC_ = $(am__v_FC_@AM_DEFAULT_V@)
 am__v_FC_0 = @echo "  FC      " $@;
@@ -177,7 +192,7 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-am__DIST_COMMON = $(srcdir)/Makefile.in
+am__DIST_COMMON = $(srcdir)/Makefile.in $(top_srcdir)/depcomp
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
 ACLOCAL = @ACLOCAL@
 AMTAR = @AMTAR@
@@ -186,10 +201,15 @@ AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
+CC = @CC@
+CCDEPMODE = @CCDEPMODE@
+CFLAGS = @CFLAGS@
+CPPFLAGS = @CPPFLAGS@
 CSCOPE = @CSCOPE@
 CTAGS = @CTAGS@
 CYGPATH_W = @CYGPATH_W@
 DEFS = @DEFS@
+DEPDIR = @DEPDIR@
 ECHO_C = @ECHO_C@
 ECHO_N = @ECHO_N@
 ECHO_T = @ECHO_T@
@@ -231,8 +251,11 @@ abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
 abs_top_builddir = @abs_top_builddir@
 abs_top_srcdir = @abs_top_srcdir@
+ac_ct_CC = @ac_ct_CC@
 ac_ct_FC = @ac_ct_FC@
+am__include = @am__include@
 am__leading_dot = @am__leading_dot@
+am__quote = @am__quote@
 am__rm_f_notfound = @am__rm_f_notfound@
 am__tar = @am__tar@
 am__untar = @am__untar@
@@ -300,6 +323,8 @@ IMEX_SfloW2D_SOURCES = \
                 stochastic/stochastic_module.f90 \
                 core/simulation_2d.f90 \
                 core/init_2d.f90 \
+                io/output_paths.f90 \
+                io/output_dirs.c \
                 io/inpout_2d.f90 \
                 IMEX_SfloW2D.f90
 
@@ -312,7 +337,7 @@ IMEX_SfloW2D_LDADD = @NETCDF_LIBS@ @LAPACK_LIBS@ -lm
 all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .f90 .o .obj
+.SUFFIXES: .c .f90 .o .obj
 $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -484,6 +509,10 @@ io/$(am__dirstamp):
 io/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) io/$(DEPDIR)
 	@: >>io/$(DEPDIR)/$(am__dirstamp)
+io/output_paths.$(OBJEXT): io/$(am__dirstamp) \
+	io/$(DEPDIR)/$(am__dirstamp)
+io/output_dirs.$(OBJEXT): io/$(am__dirstamp) \
+	io/$(DEPDIR)/$(am__dirstamp)
 io/inpout_2d.$(OBJEXT): io/$(am__dirstamp) \
 	io/$(DEPDIR)/$(am__dirstamp)
 
@@ -504,6 +533,30 @@ mostlyclean-compile:
 
 distclean-compile:
 	-rm -f *.tab.c
+
+@AMDEP_TRUE@@am__include@ @am__quote@io/$(DEPDIR)/output_dirs.Po@am__quote@ # am--include-marker
+
+$(am__depfiles_remade):
+	@$(MKDIR_P) $(@D)
+	@: >>$@
+
+am--depfiles: $(am__depfiles_remade)
+
+.c.o:
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ $< &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ $<
+
+.c.obj:
+@am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.obj$$||'`;\
+@am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $$depbase.Tpo -c -o $@ `$(CYGPATH_W) '$<'` &&\
+@am__fastdepCC_TRUE@	$(am__mv) $$depbase.Tpo $$depbase.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(COMPILE) -c -o $@ `$(CYGPATH_W) '$<'`
 
 .f90.o:
 	$(AM_V_FC)$(FCCOMPILE) -c -o $@ $<
@@ -654,6 +707,7 @@ clean: clean-am
 clean-am: clean-binPROGRAMS clean-generic mostlyclean-am
 
 distclean: distclean-am
+	-rm -f io/$(DEPDIR)/output_dirs.Po
 	-rm -f Makefile
 distclean-am: clean-am distclean-compile distclean-generic \
 	distclean-tags
@@ -699,6 +753,7 @@ install-ps-am:
 installcheck-am:
 
 maintainer-clean: maintainer-clean-am
+	-rm -f io/$(DEPDIR)/output_dirs.Po
 	-rm -f Makefile
 maintainer-clean-am: distclean-am maintainer-clean-generic
 
@@ -718,7 +773,7 @@ uninstall-am: uninstall-binPROGRAMS
 
 .MAKE: install-am install-strip
 
-.PHONY: CTAGS GTAGS TAGS all all-am check check-am clean \
+.PHONY: CTAGS GTAGS TAGS all all-am am--depfiles check check-am clean \
 	clean-binPROGRAMS clean-generic cscopelist-am ctags ctags-am \
 	distclean distclean-compile distclean-generic distclean-tags \
 	distdir dvi dvi-am html html-am info info-am install \
@@ -828,8 +883,9 @@ core/simulation_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
 core/init_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         core/constitutive_parameters_2d.$(OBJEXT)              \
                         geometry/geometry_2d.$(OBJEXT)                         \
-                        state/state_2d.$(OBJEXT)                               \
-                        state/state_conversion_2d.$(OBJEXT)
+                        state/state_2d.$(OBJEXT)
+io/output_paths.$(OBJEXT): core/parameters_2d.$(OBJEXT)                       \
+                          core/diagnostics_2d.$(OBJEXT)
 io/inpout_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         numerics/time_integration_2d.$(OBJEXT)                 \
                         core/constitutive_parameters_2d.$(OBJEXT)              \
@@ -841,11 +897,13 @@ io/inpout_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         state/state_2d.$(OBJEXT)                               \
                         state/state_conversion_2d.$(OBJEXT)                    \
                         stochastic/stochastic_module.$(OBJEXT)                 \
-                        stochastic/stochastic_random_2d.$(OBJEXT)
+                        stochastic/stochastic_random_2d.$(OBJEXT)              \
+                        io/output_paths.$(OBJEXT)
 IMEX_SfloW2D.$(OBJEXT): core/parameters_2d.$(OBJEXT)                         \
                          core/constitutive_parameters_2d.$(OBJEXT)             \
                          geometry/geometry_2d.$(OBJEXT)                        \
-                         core/init_2d.$(OBJEXT) io/inpout_2d.$(OBJEXT)         \
+                         core/init_2d.$(OBJEXT) io/output_paths.$(OBJEXT)      \
+                         io/inpout_2d.$(OBJEXT)                               \
                          physics/mass_exchange_2d.$(OBJEXT)                     \
                          core/simulation_2d.$(OBJEXT)                          \
                          state/state_conversion_2d.$(OBJEXT)

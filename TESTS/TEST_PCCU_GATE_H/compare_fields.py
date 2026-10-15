@@ -69,7 +69,8 @@ def accepted_times(values, end):
 def run(case_dir, mode, autonomous=False):
     """Generate both references from identical Q1 geometry; compare every final cell."""
     geometry = np.load(case_dir/"gate_h_geometry.npz")
-    data = np.loadtxt(case_dir/"gateH_0001.q_2d")
+    snapshot = next((case_dir/"OUTPUT/gateH/snapshots").glob("*/gateH_0001.q_2d"))
+    data = np.loadtxt(snapshot)
     dx = float(geometry["dx"])
     bed = geometry["bed"]
     x, y = np.meshgrid(geometry["x"], geometry["y"])
@@ -84,9 +85,9 @@ def run(case_dir, mode, autonomous=False):
     time_evidence = json.loads((case_dir/"accepted_time_evidence.json").read_text())
     if not time_evidence["canonical_output_byte_identical"]:
         raise AssertionError("observed times are not certified against the actual output")
-    for name, key in (("accepted_times.bin", "accepted_times_sha256"),
-                      ("gateH_0001.q_2d", "canonical_output_sha256")):
-        if hashlib.sha256((case_dir/name).read_bytes()).hexdigest() != time_evidence[key]:
+    for path, key in ((case_dir/"accepted_times.bin", "accepted_times_sha256"),
+                      (snapshot, "canonical_output_sha256")):
+        if hashlib.sha256(path.read_bytes()).hexdigest() != time_evidence[key]:
             raise AssertionError("accepted-time evidence does not match the actual artifacts")
     dt = accepted_times(np.fromfile(case_dir/"accepted_times.bin").reshape(-1, 2), CONTRACT["time"])
     result = dynamic.reference(initial, geometry["bed_vertex"], dx, dx, dt,

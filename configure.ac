@@ -21,6 +21,7 @@ fi
 
 # check for fortran compiler
 AC_PROG_FC
+AC_PROG_CC
 
 # Compiler-specific OpenMP flags can be overridden for non-GNU toolchains.
 AC_ARG_VAR([OPENMP_FCFLAGS], [Fortran OpenMP compile and link flags])

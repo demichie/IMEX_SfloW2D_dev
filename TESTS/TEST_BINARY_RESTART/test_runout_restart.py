@@ -85,11 +85,11 @@ def main():
         return output
 
     def require_output(case, filename):
-        path = case/filename
+        path = case/'OUTPUT'/'TEST_2D'/'diagnostics'/filename
         if path.is_file():
             return path
         details = [f'Missing expected output: {path}',
-                   f'Files created: {sorted(p.name for p in case.iterdir())}']
+                   f'Files created: {sorted(str(p.relative_to(case)) for p in case.rglob("*") if p.is_file())}']
         inp = case/'IMEX_SfloW2D.inp'
         if inp.is_file():
             relevant_input = [line for line in inp.read_text().splitlines()
@@ -110,6 +110,19 @@ def main():
         value = parameter(inp.read_text(), 'T_END', str(end))
         inp.write_text(parameter(value, 'RESTART_FILES', '"restart.bin"'))
 
+    def checkpoint(case):
+        return case/'OUTPUT'/'TEST_2D'/'restart'/'restart.bin'
+
+    def diagnostics(case):
+        path = case/'OUTPUT'/'TEST_2D'/'diagnostics'
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def snapshot(case, filename):
+        matches = list((case/'OUTPUT'/'TEST_2D'/'snapshots').glob('*/'+filename))
+        assert len(matches) == 1, (case, filename, matches)
+        return matches[0]
+
     def passed(name):
         checks.append({'name': name, 'status':'pass'})
         print('PASS:', name, flush=True)
@@ -120,14 +133,15 @@ def main():
         full = prepare(mode+'-full', parameter(source, 'T_END', '0.03'))
         split = prepare(mode+'-split', source)
         run(full, 'full.log'); run(split, 'first.log')
-        shutil.copy2(split/'restart.bin', split/'split_checkpoint.bin')
+        shutil.copy2(checkpoint(split), split/'split_checkpoint.bin')
         continuation(split); run(split, 'resumed.log')
-        assert records(full/'restart.bin') == records(split/'restart.bin')
+        assert records(checkpoint(full)) == records(checkpoint(split))
         for suffix in ('runout', 'mass_center'):
             filename = 'TEST_2D_'+suffix+'.csv'
             assert require_output(full, filename).read_bytes() == \
                 require_output(split, filename).read_bytes()
-        assert (full/'TEST_2D_0002.q_2d').read_bytes() == (split/'TEST_2D_0002.q_2d').read_bytes()
+        assert snapshot(full, 'TEST_2D_0002.q_2d').read_bytes() == \
+            snapshot(split, 'TEST_2D_0002.q_2d').read_bytes()
         passed(mode+' origin: exact checkpoint, physical output and complete CSV history')
 
     source_case = root/'automatic-split'
@@ -136,17 +150,18 @@ def main():
         case = prepare(mode)
         shutil.copy2(source_case/'split_checkpoint.bin', case/'restart.bin')
         if mode == 'one_missing':
-            original = (full/'TEST_2D_runout.csv').read_text().splitlines(keepends=True)
+            diagnostics(case)
+            original = require_output(full, 'TEST_2D_runout.csv').read_text().splitlines(keepends=True)
             prefix = [original[0]]+[line for line in original[1:] if float(line.split(',')[0]) <= 0.015]
-            (case/'TEST_2D_runout.csv').write_text(''.join(prefix))
+            (diagnostics(case)/'TEST_2D_runout.csv').write_text(''.join(prefix))
         continuation(case); run(case, 'resumed.log')
         for suffix in ('runout', 'mass_center'):
             filename = 'TEST_2D_'+suffix+'.csv'
-            original = (full/filename).read_text().splitlines()
+            original = require_output(full, filename).read_text().splitlines()
             expected = [original[0]]+[line for line in original[1:] if
                         (mode == 'one_missing' and suffix == 'runout') or float(line.split(',')[0]) > 0.015]
-            assert (case/filename).read_text().splitlines() == expected
-        assert records(full/'restart.bin') == records(case/'restart.bin')
+            assert require_output(case, filename).read_text().splitlines() == expected
+        assert records(checkpoint(full)) == records(checkpoint(case))
         passed(mode+': headered segments with exact diagnostic suffix and final checkpoint')
 
     mutations = {
@@ -163,19 +178,20 @@ def main():
     for name, mutate in mutations.items():
         case = prepare('reject-'+name)
         shutil.copy2(source_case/'split_checkpoint.bin', case/'restart.bin')
+        diagnostics(case)
         for suffix in ('runout', 'mass_center'):
             filename = 'TEST_2D_'+suffix+'.csv'
-            rows = (full/filename).read_text().splitlines(keepends=True)
+            rows = require_output(full, filename).read_text().splitlines(keepends=True)
             prefix = [rows[0]]+[line for line in rows[1:] if float(line.split(',')[0]) <= 0.015]
             content = ''.join(prefix)
             if suffix == 'mass_center':
                 content = mutate(content)
-            (case/filename).write_text(content)
+            (diagnostics(case)/filename).write_text(content)
         continuation(case)
-        before = {p.name: sha(p) for p in case.glob('*.csv')}
+        before = {p.name: sha(p) for p in (case/'OUTPUT'/'TEST_2D'/'diagnostics').glob('*.csv')}
         checkpoint_before = sha(case/'restart.bin')
         run(case, 'rejected.log', 'Diagnostic CSV')
-        assert before == {p.name:sha(p) for p in case.glob('*.csv')}
+        assert before == {p.name:sha(p) for p in (case/'OUTPUT'/'TEST_2D'/'diagnostics').glob('*.csv')}
         assert checkpoint_before == sha(case/'restart.bin')
         passed('reject '+name+': both CSVs and checkpoint preserved')
 
@@ -190,7 +206,7 @@ def main():
             ' EPS_STOP=0,', ' EPS_STOP=0,\n X0_RUNOUT=6,\n Y0_RUNOUT=0,')
         inp.write_text(content)
         run(case, 'rejected.log', 'Restart runout cadence')
-        assert not list(case.glob('*.csv'))
+        assert not list((case/'OUTPUT'/'TEST_2D'/'diagnostics').glob('*.csv'))
         passed('reject incompatible '+name+' before opening CSVs')
 
     case = prepare('reject-v4')
@@ -207,12 +223,13 @@ def main():
     full = prepare('positive-stop-full', parameter(source, 'T_END','0.03'))
     split = prepare('positive-stop-split', source)
     run(full, 'full.log'); run(split,'first.log')
-    assert struct.unpack('<4d',records(full/'restart.bin')[4])[0] == 0.015
+    assert struct.unpack('<4d',records(checkpoint(full))[4])[0] == 0.015
     continuation(split); run(split,'resumed.log')
-    assert records(full/'restart.bin') == records(split/'restart.bin')
+    assert records(checkpoint(full)) == records(checkpoint(split))
     for suffix in ('runout','mass_center'):
         filename = 'TEST_2D_'+suffix+'.csv'
-        assert (full/filename).read_bytes() == (split/filename).read_bytes()
+        assert require_output(full, filename).read_bytes() == \
+            require_output(split, filename).read_bytes()
     passed('positive EPS_STOP: restored stop deadline prevents unintended additional evolution')
     manifest['status'] = 'pass'
     (root/'evidence.json').write_text(json.dumps(manifest,indent=2)+'\n')

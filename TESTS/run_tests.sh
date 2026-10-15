@@ -30,7 +30,7 @@ done
 
 run_case() {
     case_dir=$1
-    expected_output=$2
+    run_name=$2
     fixture=${3:-}
     (
         cd "$case_dir"
@@ -48,27 +48,215 @@ run_case() {
             cat solver.log >&2
             exit 1
         fi
-        if [ ! -f "$expected_output" ]; then
-            echo "FAIL: expected output was not created in $case_dir: $expected_output" >&2
+        set -- "$case_dir/OUTPUT/$run_name"/snapshots/*/"$run_name"_*.q_2d
+        if [ ! -f "$1" ]; then
+            echo "FAIL: expected conservative snapshot was not created for $run_name" >&2
+            find "$case_dir/OUTPUT" -maxdepth 5 -type f -print >&2 || true
             cat solver.log >&2
             exit 1
+        fi
+        [ -f "$case_dir/OUTPUT/$run_name/metadata/$run_name.bak" ] || {
+            echo "FAIL: input backup is missing from per-run metadata for $run_name" >&2
+            exit 1
+        }
+        grep -q '^snapshot_index,time_seconds$' \
+            "$case_dir/OUTPUT/$run_name/metadata/output_manifest.csv" || {
+            echo "FAIL: snapshot manifest is missing or malformed for $run_name" >&2
+            exit 1
+        }
+        grep -Eq '^[0-9]+, *[-+]?[0-9]' \
+            "$case_dir/OUTPUT/$run_name/metadata/output_manifest.csv" || {
+            echo "FAIL: snapshot manifest contains no index/time records for $run_name" >&2
+            exit 1
+        }
+        if find "$case_dir" -maxdepth 1 -type f \
+            \( -name "$run_name*.q_2d" -o -name "$run_name*.nc" -o \
+               -name "$run_name*.csv" -o -name "$run_name.bak" -o \
+               -name "restart.bin" -o -name "dem_esri*.asc" \) \
+            | grep -q .; then
+            echo "FAIL: solver output escaped the per-run directory for $run_name" >&2
+            exit 1
+        fi
+        if [ "$run_name" = TEST_2D ]; then
+            before=$(cksum "$1")
+            if "$executable" > collision.log 2>&1; then
+                echo "FAIL: an existing run directory was accepted without OUTPUT_OVERWRITE" >&2
+                exit 1
+            fi
+            grep -q 'run output directory already exists' collision.log || {
+                echo "FAIL: output collision did not report the expected error" >&2
+                cat collision.log >&2
+                exit 1
+            }
+            [ "$before" = "$(cksum "$1")" ] || {
+                echo "FAIL: rejected output collision changed an existing snapshot" >&2
+                exit 1
+            }
+            awk '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_OVERWRITE=T," }' \
+                IMEX_sfloW2D.inp > IMEX_sfloW2D.inp.tmp
+            mv IMEX_sfloW2D.inp.tmp IMEX_sfloW2D.inp
+            "$executable" > overwrite.log 2>&1 || {
+                echo "FAIL: OUTPUT_OVERWRITE=T did not allow an existing run directory" >&2
+                cat overwrite.log >&2
+                exit 1
+            }
         fi
         sh ./cleanFolder.sh
     )
     echo "PASS: $(basename "$case_dir")"
 }
 
-run_case "$work_dir/TEST_2D" "TEST_2D_0001.q_2d"
-run_case "$work_dir/TEST_BOX" "TEST_BOX_400_0001.q_2d"
-run_case "$work_dir/TEST_BW" "TEST_BW_400_0001.q_2d"
+check_output_path_safety() {
+    safety_dir=$work_dir/output-path-safety
+    cp -R "$test_dir/TEST_2D" "$safety_dir"
+    (
+        cd "$safety_dir"
+        sh ./cleanFolder.sh
+        sed 's/RUN_NAME="TEST_2D"/RUN_NAME="..\/escape"/' \
+            IMEX_sfloW2D.inp > invalid.inp
+        mv invalid.inp IMEX_sfloW2D.inp
+        if "$executable" > invalid-name.log 2>&1; then
+            echo "FAIL: path traversal in RUN_NAME was accepted" >&2
+            exit 1
+        fi
+        grep -q 'RUN_NAME may contain only' invalid-name.log || {
+            echo "FAIL: invalid RUN_NAME did not report the expected error" >&2
+            cat invalid-name.log >&2
+            exit 1
+        }
+        [ ! -e OUTPUT ] || {
+            echo "FAIL: invalid RUN_NAME created an output directory" >&2
+            exit 1
+        }
+    )
 
-run_case "$work_dir/TEST_CF" "TEST_CF_0001.q_2d" cf
+    cp -R "$test_dir/TEST_2D" "$safety_dir/symlink-case"
+    (
+        cd "$safety_dir/symlink-case"
+        sh ./cleanFolder.sh
+        mkdir symlink-target
+        ln -s symlink-target unsafe-base
+        awk '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_BASE_DIRECTORY=\"unsafe-base\"," }' \
+            IMEX_sfloW2D.inp > symlink.inp
+        mv symlink.inp IMEX_sfloW2D.inp
+        if "$executable" > symlink.log 2>&1; then
+            echo "FAIL: symlink in OUTPUT_BASE_DIRECTORY was accepted" >&2
+            exit 1
+        fi
+        [ -z "$(find symlink-target -mindepth 1 -print -quit)" ] || {
+            echo "FAIL: symlink target was modified during path validation" >&2
+            exit 1
+        }
+    )
 
-run_case "$work_dir/TEST_TAAL" "TEST_TAAL_0001.q_2d" taal
+    cp -R "$test_dir/TEST_2D" "$safety_dir/symlink-file-case"
+    (
+        cd "$safety_dir/symlink-file-case"
+        sh ./cleanFolder.sh
+        mkdir -p OUTPUT/TEST_2D/metadata
+        printf 'protected sentinel\n' > "$safety_dir/sentinel.txt"
+        ln -s "$safety_dir/sentinel.txt" OUTPUT/TEST_2D/metadata/TEST_2D.bak
+        awk '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_OVERWRITE=T," }' \
+            IMEX_sfloW2D.inp > overwrite.inp
+        mv overwrite.inp IMEX_sfloW2D.inp
+        if "$executable" > symlink-file.log 2>&1; then
+            echo "FAIL: symlink output file was followed during overwrite" >&2
+            exit 1
+        fi
+        grep -q 'existing run output contains a symlink' symlink-file.log || {
+            echo "FAIL: symlink output file did not report the expected error" >&2
+            cat symlink-file.log >&2
+            exit 1
+        }
+        [ "$(cat "$safety_dir/sentinel.txt")" = "protected sentinel" ] || {
+            echo "FAIL: output symlink modified the external sentinel" >&2
+            exit 1
+        }
+        rm OUTPUT/TEST_2D/metadata/TEST_2D.bak
+        ln "$safety_dir/sentinel.txt" OUTPUT/TEST_2D/metadata/TEST_2D.bak
+        if "$executable" > hardlink-file.log 2>&1; then
+            echo "FAIL: hard-linked output file was accepted during overwrite" >&2
+            exit 1
+        fi
+        grep -q 'multiply-linked file' hardlink-file.log || {
+            echo "FAIL: hard-linked output file did not report the expected error" >&2
+            cat hardlink-file.log >&2
+            exit 1
+        }
+        [ "$(cat "$safety_dir/sentinel.txt")" = "protected sentinel" ] || {
+            echo "FAIL: output hard link modified the external sentinel" >&2
+            exit 1
+        }
+    )
+
+    cp -R "$test_dir/TEST_2D" "$safety_dir/traversal-base-case"
+    (
+        cd "$safety_dir/traversal-base-case"
+        sh ./cleanFolder.sh
+        awk '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_BASE_DIRECTORY=\"../outside\"," }' \
+            IMEX_sfloW2D.inp > traversal-base.inp
+        mv traversal-base.inp IMEX_sfloW2D.inp
+        if "$executable" > traversal-base.log 2>&1; then
+            echo "FAIL: parent-directory component in OUTPUT_BASE_DIRECTORY was accepted" >&2
+            exit 1
+        fi
+        [ ! -e "$work_dir/outside" ] || {
+            echo "FAIL: parent-directory output path created a directory outside the test case" >&2
+            exit 1
+        }
+    )
+
+    cp -R "$test_dir/TEST_2D" "$safety_dir/custom-base-case"
+    (
+        cd "$safety_dir/custom-base-case"
+        sh ./cleanFolder.sh
+        awk '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_BASE_DIRECTORY=\"custom output\"," }' \
+            IMEX_sfloW2D.inp > custom-base.inp
+        mv custom-base.inp IMEX_sfloW2D.inp
+        "$executable" > custom-base.log 2>&1 || {
+            echo "FAIL: valid custom output base was rejected" >&2
+            cat custom-base.log >&2
+            exit 1
+        }
+        [ -f "custom output/TEST_2D/metadata/output_manifest.csv" ] || {
+            echo "FAIL: solver ignored OUTPUT_BASE_DIRECTORY" >&2
+            exit 1
+        }
+    )
+    cp -R "$test_dir/TEST_2D" "$safety_dir/absolute-base-case"
+    physical_safety_dir=$(CDPATH= cd -- "$safety_dir" && pwd -P)
+    (
+        cd "$safety_dir/absolute-base-case"
+        sh ./cleanFolder.sh
+        awk -v output="$physical_safety_dir/absolute output" \
+            '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_BASE_DIRECTORY=\"" output "\"," }' \
+            IMEX_sfloW2D.inp > absolute-base.inp
+        mv absolute-base.inp IMEX_sfloW2D.inp
+        "$executable" > absolute-base.log 2>&1 || {
+            echo "FAIL: valid absolute OUTPUT_BASE_DIRECTORY was rejected" >&2
+            cat absolute-base.log >&2
+            exit 1
+        }
+        [ -f "$physical_safety_dir/absolute output/TEST_2D/metadata/output_manifest.csv" ] || {
+            echo "FAIL: solver ignored absolute OUTPUT_BASE_DIRECTORY" >&2
+            exit 1
+        }
+    )
+    echo "PASS: output path safety"
+}
+
+run_case "$work_dir/TEST_2D" "TEST_2D"
+run_case "$work_dir/TEST_BOX" "TEST_BOX_400"
+run_case "$work_dir/TEST_BW" "TEST_BW_400"
+
+run_case "$work_dir/TEST_CF" "TEST_CF" cf
+
+run_case "$work_dir/TEST_TAAL" "TEST_TAAL" taal
+check_output_path_safety
 
 for case_dir in "$work_dir"/TEST_DAMBREAK/*/; do
     [ -d "$case_dir" ] || continue
-    run_case "$case_dir" "dambreak2D_0001.q_2d"
+    run_case "$case_dir" "dambreak2D"
 done
 
 echo "PASS: legacy solver integration tests"

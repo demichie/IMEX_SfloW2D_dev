@@ -64,7 +64,7 @@ STEP 5: launch the simulations
 
 > python launch_jobs.py
 
-This script launch all the simulations. The maximum number of concurrent runs can be prescribed in the file (max_processes). This script launches the batch script "run.sh" present in each folder "ensemble.xxxxx". This script executes the pre-processing step for the initial volume, run the code and post-processes the output files. If the post-processing is not needed, comment the lines in "run.sh" inside tmeplatedir (before creating the folders).
+This script launch all the simulations. The maximum number of concurrent runs can be prescribed in the file (max_processes). This script launches the batch script "run.sh" present in each folder "ensemble.xxxxx". This script executes the pre-processing step for the initial volume and runs the solver. Optional per-run plotting is commented out in "run.sh" inside templatedir; enable it before creating the folders if needed. Solver outputs are stored under each member's `OUTPUT/<RUN_NAME>/` directory.
 
 STEP 6: create probabilistic output
 
@@ -80,4 +80,3 @@ This script loops over the different folders result.xxx, and creates .png maps f
 
 
  
-

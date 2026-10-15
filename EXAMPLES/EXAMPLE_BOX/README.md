@@ -29,7 +29,7 @@ Run `./create_example.py 400 0.5 300 false` to prepare the simulation, followed 
 
 ## Expected output
 
-Native NetCDF output (`<run_name>.nc`) may be inspected with ParaView.
+Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc` may be inspected with ParaView.
 
 ## Legacy documentation and preservation
 

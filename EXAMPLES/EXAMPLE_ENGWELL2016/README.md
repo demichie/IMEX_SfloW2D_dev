@@ -30,7 +30,7 @@ Run `python create_example.py 200 2000 2000 900 0.9 0.8` and then `../../bin/IME
 
 ## Expected output
 
-Native NetCDF output (`<run_name>.nc`) can be viewed in ParaView.
+Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc` can be viewed in ParaView.
 
 ## References
 

@@ -10,7 +10,7 @@ Once the topography file is unzipped, launch the solver:
 
 Several output files are created as ESRI ascii files (*.asc) and they can be plotted with a GIS.
 
-Native NetCDF output is enabled in the input file. The simulation writes `<run_name>.nc` directly; open it with ParaView or another NetCDF-compatible tool.
+Native NetCDF output is enabled in the input file. The simulation writes `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc`; open it with ParaView or another NetCDF-compatible tool.
 
 
 [1] A fast, calibrated model for pyroclastic density currents kinematics and hazard

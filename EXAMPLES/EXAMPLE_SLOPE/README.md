@@ -29,7 +29,7 @@ Generate with `./create_example.py 400 1.0 300 false` (x cells, solids volume fr
 
 ## Expected output
 
-Native NetCDF output (`<run_name>.nc`) is viewable in ParaView.
+Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc` is viewable in ParaView.
 
 ## Legacy documentation and preservation
 

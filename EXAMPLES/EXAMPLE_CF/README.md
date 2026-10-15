@@ -35,7 +35,7 @@ First run `unzip topo.zip` in this directory, then `../../bin/IMEX_SfloW2D`.
 The committed input sets `OUTPUT_ESRI_FLAG=F` and `OUTPUT_NETCDF_FLAG=T`. The older README describes ESRI `.asc` files; that description reflects a possible configuration rather than the default output flags currently tracked.
 
 
-Native NetCDF (`<run_name>.nc`) is enabled by the input. The older README also mentions ESRI `.asc` files, although `OUTPUT_ESRI_FLAG=F` in the current tracked input; this discrepancy should be addressed in the second pass.
+Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc` is enabled by the input. The older README also mentions ESRI `.asc` files, although `OUTPUT_ESRI_FLAG=F` in the current tracked input.
 
 ## References
 

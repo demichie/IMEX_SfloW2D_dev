@@ -29,7 +29,7 @@ Generate inputs with `./create_example.py 200 false` (x-cell count and plotting 
 
 ## Expected output
 
-Native NetCDF output (`<run_name>.nc`) is viewable in ParaView.
+Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc` is viewable in ParaView.
 
 ## References
 

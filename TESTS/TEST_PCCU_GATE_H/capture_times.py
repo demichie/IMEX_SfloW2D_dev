@@ -19,8 +19,10 @@ def capture(executable, case):
         subprocess.run([str(executable.resolve())], cwd=directory,
                        env=os.environ.copy(), stdout=stream, stderr=subprocess.STDOUT,
                        check=True, timeout=600)
-    original = (case/"gateH_0001.q_2d").read_bytes()
-    observed = (directory/"gateH_0001.q_2d").read_bytes()
+    original_path = next((case/"OUTPUT/gateH/snapshots").glob("*/gateH_0001.q_2d"))
+    observed_path = next((directory/"OUTPUT/gateH/snapshots").glob("*/gateH_0001.q_2d"))
+    original = original_path.read_bytes()
+    observed = observed_path.read_bytes()
     if original != observed:
         raise AssertionError("accepted-time observer changed canonical conservative fields")
     match = re.search(r"Parallel run: number of threads used\s+(\d+)",

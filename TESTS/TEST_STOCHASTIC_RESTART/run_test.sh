@@ -148,22 +148,26 @@ sed -i.bak -e 's/^ T_END=.*/ T_END=  3.000000000000000E+000,/' \
     check_threads resumed_run.log
 )
 
-if [ ! -f "$reference_dir/restart.bin" ] || \
-   [ ! -f "$resumed_dir/restart.bin" ]; then
+if [ ! -f "$reference_dir/OUTPUT/TEST_2D/restart/restart.bin" ] || \
+   [ ! -f "$resumed_dir/OUTPUT/TEST_2D/restart/restart.bin" ]; then
     echo "FAIL: stochastic run did not produce the expected restart file" >&2
     tail -80 "$reference_dir/run.log" >&2
     tail -80 "$resumed_dir/first_run.log" >&2
     exit 1
 fi
 
-cmp "$reference_dir/restart.bin" "$resumed_dir/restart.bin"
-cmp "$reference_dir/TEST_2D_0002.q_2d" \
-    "$resumed_dir/TEST_2D_0002.q_2d"
+cmp "$reference_dir/OUTPUT/TEST_2D/restart/restart.bin" \
+    "$resumed_dir/OUTPUT/TEST_2D/restart/restart.bin"
+set -- "$reference_dir"/OUTPUT/TEST_2D/snapshots/*/TEST_2D_0002.q_2d
+reference_snapshot=$1
+set -- "$resumed_dir"/OUTPUT/TEST_2D/snapshots/*/TEST_2D_0002.q_2d
+resumed_snapshot=$1
+cmp "$reference_snapshot" "$resumed_snapshot"
 
 # Columns 1-2 are coordinates and columns 3-8 are the six conservative
 # variables. Confirm that the OU/transport variable was actually evolved.
 if ! awk 'NF && $8 != 0.0 { found=1 } END { exit !found }' \
-    "$reference_dir/TEST_2D_0002.q_2d"; then
+    "$reference_snapshot"; then
     echo "FAIL: the stochastic conservative variable remained identically zero" >&2
     exit 1
 fi

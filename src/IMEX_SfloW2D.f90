@@ -58,6 +58,7 @@ PROGRAM IMEX_SfloW2D
    USE inpout_2d, ONLY : close_netcdf
    USE inpout_2d, ONLY : restart, restart_file
    USE inpout_2d, ONLY : read_restart_file, write_restart_file
+   USE output_paths, ONLY : output_file_path
    USE inpout_2d, ONLY : output_runout_flag
    USE inpout_2d, ONLY : output_cons_flag
    USE inpout_2d, ONLY : output_esri_flag
@@ -593,7 +594,8 @@ PROGRAM IMEX_SfloW2D
          IF ( output_cons_flag .OR. output_esri_flag .OR. output_netcdf_flag ) THEN
 
             CALL output_solution(simulation%runtime%t, simulation%state)
-            CALL write_restart_file('restart.bin', simulation%runtime,       &
+            CALL write_restart_file(output_file_path('restart', 'restart.bin'), &
+                 simulation%runtime,                                         &
                  simulation%stochastic, simulation%state, simulation%domain)
 
          END IF

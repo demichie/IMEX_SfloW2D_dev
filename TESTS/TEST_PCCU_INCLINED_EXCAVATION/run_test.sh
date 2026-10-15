@@ -31,32 +31,38 @@ cp "$example_dir/create_example.py" "$example_dir/IMEX_SfloW2D.template" "$work_
     sed -i.bak \
         -e 's/T_END=3.0D0/T_END=1.0D-3/' \
         -e 's/DT_OUTPUT=5.0D-2/DT_OUTPUT=1.0D-3/' \
+        -e '/RUN_NAME=/a\
+ OUTPUT_OVERWRITE=T,' \
         -e 's/OUTPUT_CONS_FLAG=F/OUTPUT_CONS_FLAG=T/' \
         -e 's/OUTPUT_NETCDF_FLAG=T/OUTPUT_NETCDF_FLAG=F/' \
         IMEX_SfloW2D.inp
+    snapshot_file() {
+        set -- OUTPUT/inclinedExcavation2D/snapshots/*/inclinedExcavation2D_0001.q_2d
+        printf '%s\n' "$1"
+    }
     OMP_NUM_THREADS=1 "$executable" > run_1_thread.log
-    cp inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.1thread.q_2d
+    cp "$(snapshot_file)" inclinedExcavation2D_0001.1thread.q_2d
     OMP_NUM_THREADS=4 "$executable" > run_4_threads.log
-    cmp inclinedExcavation2D_0001.1thread.q_2d inclinedExcavation2D_0001.q_2d
-    cp inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.G1.q_2d
+    cmp inclinedExcavation2D_0001.1thread.q_2d "$(snapshot_file)"
+    cp "$(snapshot_file)" inclinedExcavation2D_0001.G1.q_2d
 
     sed -i.bak -e 's/SLOPE_CORRECTION_FLAG=F/SLOPE_CORRECTION_FLAG=T/' \
         IMEX_SfloW2D.inp
-    rm -f inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.1thread.q_2d
+    rm -f inclinedExcavation2D_0001.1thread.q_2d
     OMP_NUM_THREADS=1 "$executable" > run_slope_1_thread.log
-    cp inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.1thread.q_2d
+    cp "$(snapshot_file)" inclinedExcavation2D_0001.1thread.q_2d
     OMP_NUM_THREADS=4 "$executable" > run_slope_4_threads.log
-    cmp inclinedExcavation2D_0001.1thread.q_2d inclinedExcavation2D_0001.q_2d
-    cp inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.slope.q_2d
+    cmp inclinedExcavation2D_0001.1thread.q_2d "$(snapshot_file)"
+    cp "$(snapshot_file)" inclinedExcavation2D_0001.slope.q_2d
 
     sed -i.bak -e 's/CURVATURE_TERM_FLAG=F/CURVATURE_TERM_FLAG=T/' \
         IMEX_SfloW2D.inp
-    rm -f inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.1thread.q_2d
+    rm -f inclinedExcavation2D_0001.1thread.q_2d
     OMP_NUM_THREADS=1 "$executable" > run_slope_curvature_1_thread.log
-    cp inclinedExcavation2D_0001.q_2d inclinedExcavation2D_0001.1thread.q_2d
+    cp "$(snapshot_file)" inclinedExcavation2D_0001.1thread.q_2d
     OMP_NUM_THREADS=4 "$executable" > run_slope_curvature_4_threads.log
-    cmp inclinedExcavation2D_0001.1thread.q_2d inclinedExcavation2D_0001.q_2d
-    cp inclinedExcavation2D_0001.q_2d \
+    cmp inclinedExcavation2D_0001.1thread.q_2d "$(snapshot_file)"
+    cp "$(snapshot_file)" \
         inclinedExcavation2D_0001.slope_curvature.q_2d
 
     python3 - <<'PY'

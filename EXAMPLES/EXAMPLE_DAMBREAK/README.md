@@ -30,11 +30,11 @@ This long-channel dam break is designed to examine simultaneous compaction and g
 
 ## How to run
 
-Generate using `python create_dambreak.py 300 15 3.0 0.15 0.20 0.40 0.58 300 1.0 true`. Arguments: NX, NY, channel length (m), channel width (m), dam length (m), dam height (m), solids volume fraction, ambient temperature (K), hydrostatic pore-pressure fraction, plot flag. From the example directory, create a solver link (`ln -s ../../bin/IMEX_SfloW2D .`) and run `./IMEX_SfloW2D IMEX_SfloW2D.inp`. For centerline postprocessing, use `python height_summary_nc.py dambreak2D.nc --center_fraction 0.5 --animate`. Clean with `python clean_folder.py` (dry run), followed by `python clean_folder.py --apply`.
+Generate using `python create_dambreak.py 300 15 3.0 0.15 0.20 0.40 0.58 300 1.0 true`. Arguments: NX, NY, channel length (m), channel width (m), dam length (m), dam height (m), solids volume fraction, ambient temperature (K), hydrostatic pore-pressure fraction, plot flag. From the example directory, create a solver link (`ln -s ../../bin/IMEX_SfloW2D .`) and run `./IMEX_SfloW2D IMEX_SfloW2D.inp`. For centerline postprocessing, use `python height_summary_nc.py OUTPUT/dambreak2D/fields/dambreak2D.nc --center_fraction 0.5 --animate`. Clean with `python clean_folder.py` (dry run), followed by `python clean_folder.py --apply`.
 
 ## Expected output
 
-The generator writes `IMEX_SfloW2D.inp`, `topography_dem.asc`, an initial conservative-state file and optional preview. The run writes `dambreak2D.nc`; `height_summary_nc.py` produces `frames/dambreak2D_hcenter_####.png` and an MP4 (or GIF fallback). For MP4, install `imageio[ffmpeg]`, `imageio-ffmpeg`, and system `ffmpeg`.
+The generator writes `IMEX_SfloW2D.inp`, `topography_dem.asc`, an initial conservative-state file and optional preview. The run writes `OUTPUT/dambreak2D/fields/dambreak2D.nc`; `height_summary_nc.py` produces `frames/dambreak2D_hcenter_####.png` and an MP4 (or GIF fallback). For MP4, install `imageio[ffmpeg]`, `imageio-ffmpeg`, and system `ffmpeg`.
 
 ## Pore-pressure and permeability options
 

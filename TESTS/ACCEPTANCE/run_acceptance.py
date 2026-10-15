@@ -155,7 +155,8 @@ def compare_threads(results):
         if len(pair) == 2 and all(r["status"] == "pass" for r in pair.values()):
             def fingerprints(result):
                 return [{name: record["sha256"] for name, record in call["files"].items()
-                         if name == "restart.bin" or re.search(r"_\d{4}\.q_2d$", name)}
+                         if Path(name).name == "restart.bin" or
+                         re.search(r"_\d{4}\.q_2d$", Path(name).name)}
                         for call in result["calls"]]
             left, right = fingerprints(pair[1]), fingerprints(pair[4])
             has_outputs = bool(left) and all(left) and bool(right) and all(right)

@@ -6,6 +6,8 @@ import pandas as pd
 import os
 import sys
 import glob
+from pathlib import Path
+from output_layout import run_output_directory
 from matplotlib import rc
 from matplotlib.colors import LightSource
 from matplotlib.colors import BoundaryNorm
@@ -159,16 +161,23 @@ def main(argv):
 
     # Filter out only directories from the results
     ensemble_folders = [
-        folder for folder in ensemble_folders if os.path.isdir(folder)
+        folder for folder in ensemble_folders
+        if os.path.isdir(folder)
+        and os.path.isfile(os.path.join(folder, "IMEX_SfloW2D.inp"))
     ]
+    if not ensemble_folders:
+        raise FileNotFoundError(
+            f"No ensemble members with IMEX_SfloW2D.inp found in {current_dir}")
 
-    folder = ensemble_folders[0]
+    folder = Path(ensemble_folders[0])
+    output_dir = run_output_directory(folder)
+    dem_file = output_dir / "terrain" / "dem_esri.asc"
+    if not dem_file.is_file():
+        raise FileNotFoundError(f"terrain raster not found: {dem_file}")
     print(folder)
-    fl = glob.glob(folder + '/dem_esri.asc')
-    print(fl[0])
 
     h, topo_nx, topo_ny, topo_xll, topo_yll, topo_cellsize, topo_nodata_value = read_asc_file(
-        fl[0])
+        str(dem_file))
 
     xmin = topo_xll
     xmax = topo_xll + topo_nx * topo_cellsize
@@ -178,11 +187,11 @@ def main(argv):
 
     print(xmin, xmax, ymin, ymax)
 
-    folder = ensemble_folders[0]
-    fl = glob.glob(folder + '/*_max.asc')
-    print(fl[0])
-
-    asc0, nx, ny, xref, yref, cellsize, nodata_value = read_asc_file(fl[0])
+    max_file = output_dir / "diagnostics" / f"{output_dir.name}_max.asc"
+    if not max_file.is_file():
+        raise FileNotFoundError(f"maximum-thickness raster not found: {max_file}")
+    asc0, nx, ny, xref, yref, cellsize, nodata_value = read_asc_file(
+        str(max_file))
 
     extent1 = [xref, xref + nx * cellsize, yref, yref + ny * cellsize]
 
@@ -199,11 +208,14 @@ def main(argv):
 
         printProgressBar(i, len(ensemble_folders) - 1)
 
-        # print(folder)
-        fl = glob.glob(folder + '/*_max.asc')
-        # print(fl)
-
-        asc, nx, ny, xref, yref, dxy, nodata_value = read_asc_file(fl[0])
+        member_output_dir = run_output_directory(folder)
+        max_file = member_output_dir / "diagnostics" / (
+            f"{member_output_dir.name}_max.asc")
+        if not max_file.is_file():
+            raise FileNotFoundError(
+                f"maximum-thickness raster not found: {max_file}")
+        asc, nx, ny, xref, yref, dxy, nodata_value = read_asc_file(
+            str(max_file))
 
         asc[asc == nodata_value] = 0.0
 

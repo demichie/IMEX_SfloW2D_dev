@@ -37,6 +37,8 @@ IMEX_SfloW2D_SOURCES = \
                 stochastic/stochastic_module.f90 \
                 core/simulation_2d.f90 \
                 core/init_2d.f90 \
+                io/output_paths.f90 \
+                io/output_dirs.c \
                 io/inpout_2d.f90 \
                 IMEX_SfloW2D.f90
 
@@ -137,8 +139,9 @@ core/simulation_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
 core/init_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         core/constitutive_parameters_2d.$(OBJEXT)              \
                         geometry/geometry_2d.$(OBJEXT)                         \
-                        state/state_2d.$(OBJEXT)                               \
-                        state/state_conversion_2d.$(OBJEXT)
+                        state/state_2d.$(OBJEXT)
+io/output_paths.$(OBJEXT): core/parameters_2d.$(OBJEXT)                       \
+                          core/diagnostics_2d.$(OBJEXT)
 io/inpout_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         numerics/time_integration_2d.$(OBJEXT)                 \
                         core/constitutive_parameters_2d.$(OBJEXT)              \
@@ -150,11 +153,13 @@ io/inpout_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         state/state_2d.$(OBJEXT)                               \
                         state/state_conversion_2d.$(OBJEXT)                    \
                         stochastic/stochastic_module.$(OBJEXT)                 \
-                        stochastic/stochastic_random_2d.$(OBJEXT)
+                        stochastic/stochastic_random_2d.$(OBJEXT)              \
+                        io/output_paths.$(OBJEXT)
 IMEX_SfloW2D.$(OBJEXT): core/parameters_2d.$(OBJEXT)                         \
                          core/constitutive_parameters_2d.$(OBJEXT)             \
                          geometry/geometry_2d.$(OBJEXT)                        \
-                         core/init_2d.$(OBJEXT) io/inpout_2d.$(OBJEXT)         \
+                         core/init_2d.$(OBJEXT) io/output_paths.$(OBJEXT)      \
+                         io/inpout_2d.$(OBJEXT)                               \
                          physics/mass_exchange_2d.$(OBJEXT)                     \
                          core/simulation_2d.$(OBJEXT)                          \
                          state/state_conversion_2d.$(OBJEXT)

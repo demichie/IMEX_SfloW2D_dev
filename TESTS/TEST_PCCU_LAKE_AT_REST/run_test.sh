@@ -32,14 +32,18 @@ cp "$test_dir/generate_case.py" "$work_dir/"
         bed_mode=$2
         shift 2
         rm -f lakeRest_0001.q_2d lakeRest_0001.1thread.q_2d
+        snapshot_file() {
+            set -- OUTPUT/lakeRest/snapshots/*/lakeRest_0001.q_2d
+            printf '%s\n' "$1"
+        }
         python3 generate_case.py --bed-mode "$bed_mode" "$@"
         OMP_NUM_THREADS=1 "$executable" > "run_${label}_1_thread.log"
-        cp lakeRest_0001.q_2d lakeRest_0001.1thread.q_2d
+        cp "$(snapshot_file)" lakeRest_0001.1thread.q_2d
         OMP_NUM_THREADS=4 "$executable" > "run_${label}_4_threads.log"
-        cmp lakeRest_0001.1thread.q_2d lakeRest_0001.q_2d
-        python3 generate_case.py --check lakeRest_0001.q_2d \
+        cmp lakeRest_0001.1thread.q_2d "$(snapshot_file)"
+        python3 generate_case.py --check "$(snapshot_file)" \
             --bed-mode "$bed_mode"
-        cp lakeRest_0001.q_2d "lakeRest_${label}.q_2d"
+        cp "$(snapshot_file)" "lakeRest_${label}.q_2d"
     }
 
     for bed_mode in planar one-cell; do

@@ -30,7 +30,7 @@ Run `python create_example.py 100 0.5 300 false`, then `../../bin/IMEX_SfloW2D`.
 
 ## Expected output
 
-Native NetCDF output (`<run_name>.nc`) is viewable in ParaView.
+Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc` is viewable in ParaView.
 
 ## References
 

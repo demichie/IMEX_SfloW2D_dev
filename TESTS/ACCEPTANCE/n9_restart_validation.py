@@ -90,6 +90,7 @@ def main():
     def job(case, profile, threads):
         exe = args.build_root/profile/'src/IMEX_SfloW2D'
         tag = f'{case}-{profile}-{threads}'
+        name = 'exampleEtna' if case == 'ETNA' else 'exampleEtna_lava'
         full, split = root/(tag+'-full'), root/(tag+'-split')
         canonical = (repo/f'EXAMPLES/EXAMPLE_{case}/IMEX_SfloW2D.inp').read_text()
         for directory in (full,split):
@@ -102,7 +103,8 @@ def main():
         half = 100 if case=='ETNA' else 1800
         (split/'IMEX_SfloW2D.inp').write_text(n9.changed_parameter(canonical,'T_END',str(half)))
         first_run = run(exe,split,threads,'first.log')
-        shutil.copy2(split/'restart.bin',split/'split_checkpoint.bin')
+        checkpoint = n9.output_file(split,name,'restart','restart.bin')
+        shutil.copy2(checkpoint,split/'split_checkpoint.bin')
         resumed = n9.changed_parameter(canonical,'RESTART','T')
         if case=='ETNA':
             resumed = n9.changed_parameter(resumed,'RESTART_FILES','"restart.bin"')
@@ -130,21 +132,32 @@ def main():
                 full, split, baseline = (Path(result[k]) for k in
                                          ('full_directory','split_directory','baseline_directory'))
                 name = 'exampleEtna' if result['case']=='ETNA' else 'exampleEtna_lava'
-                left, lm = reader.read(full/(name+'.nc'))
-                right, rm = reader.read(split/(name+'.nc'))
-                original, om = reader.read(baseline/(name+'.nc'))
+                full_netcdf = n9.output_file(full,name,'fields',name+'.nc')
+                split_netcdf = n9.output_file(split,name,'fields',name+'.nc')
+                baseline_netcdf = n9.output_file(baseline,name,'fields',name+'.nc')
+                full_checkpoint = n9.output_file(full,name,'restart','restart.bin')
+                split_checkpoint = n9.output_file(split,name,'restart','restart.bin')
+                baseline_checkpoint = n9.output_file(baseline,name,'restart','restart.bin')
+                left, lm = reader.read(full_netcdf)
+                right, rm = reader.read(split_netcdf)
+                original, om = reader.read(baseline_netcdf)
                 result['native_fields_restart_exact'] = lm==rm and all(np.array_equal(left[k],right[k]) for k in left)
                 result['native_fields_prechange_exact'] = lm==om and all(np.array_equal(left[k],original[k]) for k in left)
                 result['field_differences_prechange'] = {k:float(np.max(np.abs(left[k]-original[k]))) for k in left}
                 result['decoded_sha256'] = {k:hashlib.sha256(v.tobytes()).hexdigest() for k,v in left.items()}
-                full_records, split_records, old_records = (records(d/'restart.bin') for d in (full,split,baseline))
+                full_records, split_records, old_records = (
+                    records(path) for path in (full_checkpoint,split_checkpoint,baseline_checkpoint))
                 result['checkpoint_v5_restart_exact'] = full_records==split_records
                 result['canonical_records_prechange_exact'] = full_records[2:-2]==old_records[2:]
-                result['checkpoint_sha256'] = n9.digest(full/'restart.bin')
+                result['checkpoint_sha256'] = n9.digest(full_checkpoint)
                 result['diagnostic_csv'] = n9.diagnostic_comparison(full,split,name)
-                result['CSV_prechange_full_exact'] = all(n9.digest(full/(name+'_'+s+'.csv'))==
-                    n9.digest(baseline/(name+'_'+s+'.csv')) for s in ('runout','mass_center'))
-                rasters = [{p.name:n9.digest(p) for p in d.glob('*.asc')} for d in (full,split,baseline)]
+                result['CSV_prechange_full_exact'] = all(
+                    n9.digest(n9.output_file(full,name,'diagnostics',name+'_'+s+'.csv'))==
+                    n9.digest(n9.output_file(baseline,name,'diagnostics',name+'_'+s+'.csv'))
+                    for s in ('runout','mass_center'))
+                outputs = [n9.run_output_directory(d,name) for d in (full,split,baseline)]
+                rasters = [{p.name:n9.digest(p) for p in output.rglob('*.asc')}
+                           for output in outputs]
                 result['ESRI_restart_and_prechange_exact'] = rasters[0]==rasters[1]==rasters[2]
                 result['ESRI_files_compared'] = len(rasters[0])
                 result['prior_mass_observations_retained'] = True

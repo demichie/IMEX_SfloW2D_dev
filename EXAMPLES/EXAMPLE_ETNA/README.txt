@@ -29,7 +29,7 @@ To run the example, launch (this assumes that the example is in the original fol
 
 >> ../../bin/IMEX_SfloW2D
 
-Native NetCDF output is enabled in the input file. The simulation writes `<run_name>.nc` directly; open it with ParaView or another NetCDF-compatible tool.
+Native NetCDF output is enabled in the input file. The simulation writes `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc`; open it with ParaView or another NetCDF-compatible tool.
 
 The simulation also creates output files in the ESRI ascii raster format .asc. These files can be used with a GIS software, or post-processed with a python script creating bitmap images.
 To do that, first create a simbolic link of the script in this folder:

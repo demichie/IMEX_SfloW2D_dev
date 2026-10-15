@@ -55,6 +55,31 @@ fissures and the original Etna DEM before avalanche preprocessing. Together
 with `EXAMPLE_ETNA`, it is selected for the N9 long-case validation; it replaces
 `EXAMPLE_LAVA_IMO` in that selection without removing the existing IMO example.
 
+## Per-run output directories
+
+Solver-generated files are grouped below `OUTPUT/<RUN_NAME>/` by default.
+`OUTPUT_BASE_DIRECTORY` in `RUN_PARAMETERS` selects a different parent
+directory, and `OUTPUT_OVERWRITE=T` explicitly allows reusing an existing run
+directory. Reuse does not remove files left by an earlier run. Without the
+overwrite flag, an existing run directory is rejected before solver outputs
+are opened.
+
+The run directory contains `metadata/` (effective input backup and snapshot
+manifest), `fields/` (NetCDF), `snapshots/` (conservative and raster snapshots,
+each in an index/time-stamped directory), `diagnostics/`, `probes/`,
+`vulnerability/`, `terrain/`, and `restart/` (the written `restart.bin`).
+The manifest records each snapshot index and its exact time. Input files such
+as topography and externally supplied restart checkpoints remain at their
+configured input paths. For an in-place binary continuation, the basename
+`restart.bin` resolves to `OUTPUT/<RUN_NAME>/restart/restart.bin` when that
+checkpoint exists; otherwise the configured input path is used.
+
+`RUN_NAME` accepts ASCII letters, digits, `_` and `-`. Output path components
+are created without following symlinks; parent-directory (`..`) components in
+the configured output base are rejected. Before reusing an existing run
+directory, its contents are checked for symlinks, hard-linked files and
+non-regular entries.
+
 ## CFL timestep policies
 
 `NUMERIC_PARAMETERS` accepts `CFL_POLICY='directional_min'` (the default,
@@ -73,8 +98,8 @@ Other negative values and unknown policy names are rejected.
 
 The accepted timestep still obeys output/runout/probe events, the final time
 and the existing growth limiter. Neither policy is a general stability proof
-for IMEX stages; the supported stage counts remain `N_RK=2,3,4`. The selected
-policy is written to the effective input backup (`RUN_NAME.bak`).
+for IMEX stages; the supported stage counts remain `N_RK=2,3,4`. The selected policy is written to the effective input backup
+(`metadata/RUN_NAME.bak` within the per-run output directory).
 
 ## Runout and binary continuation
 

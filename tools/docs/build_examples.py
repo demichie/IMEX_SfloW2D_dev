@@ -101,7 +101,7 @@ def generate(repo, output, revision, repo_slug):
             link = f"{slug}/index.md"
             lines.extend([f"### [{meta['title']}]({link})", "", str(meta["summary"]), "", "Tags: " + ", ".join(f"`{t}`" for t in meta["tags"]), ""])
     (pages / "index.md").write_text("\n".join(lines), encoding="utf-8")
-    nav = ["  - Home: index.md", "  - Getting started:", "      - Overview: getting-started/index.md", "      - Installation: getting-started/installation.md", "  - Model: model/index.md", "  - Examples:", "      - Catalogue: examples/index.md"]
+    nav = ["  - Home: index.md", "  - Getting started:", "      - Overview: getting-started/index.md", "      - Installation: getting-started/installation.md", "      - Output files: getting-started/output-files.md", "  - Model: model/index.md", "  - Examples:", "      - Catalogue: examples/index.md"]
     for category in sorted(categories, key=str.casefold):
         nav.append(f"      - {json.dumps(category, ensure_ascii=False)}:")
         for slug, meta, _ in sorted(categories[category], key=lambda entry: entry[1]["title"].casefold()):

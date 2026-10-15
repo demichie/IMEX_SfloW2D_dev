@@ -30,7 +30,7 @@ Run `python create_example.py 200 250 10000000 900 0.5 0.01` and then `../../bin
 
 ## Expected output
 
-Native NetCDF (`<run_name>.nc`) is enabled; open it using ParaView.
+Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc` is enabled; open it using ParaView.
 
 ### Original explanatory note
 

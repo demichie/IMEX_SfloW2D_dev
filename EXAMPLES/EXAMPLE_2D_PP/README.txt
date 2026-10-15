@@ -21,11 +21,10 @@ Run the solver:
 
 >> ../../bin/IMEX_SfloW2D
 
-Native NetCDF output is enabled in the input file. The simulation writes `<run_name>.nc` directly; open it with ParaView or another NetCDF-compatible tool.
+Native NetCDF output is enabled in the input file. The simulation writes `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc`; open it with ParaView or another NetCDF-compatible tool.
 
 REFERENCES
 
 [1] Wang, Y., K. Hutter and S. P. Pudasaini, The Savage-Hutter theory: A system of partial differential equations for avalanche flows of snow, debris, and mud, ZAMM · Z. Angew. Math. Mech. 84, No. 8, 507 – 527 / DOI 10.1002/zamm.200310123, 2004.
 
 [2] Gueugneau, V., Kelfoun, K., Roche, O., & Chupin, L. Effects of pore pressure in pyroclastic flows: numerical simulation and experimental validation. Geophysical Research Letters, 44(5), 2194-2202, 2017.
-

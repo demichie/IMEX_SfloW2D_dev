@@ -34,10 +34,9 @@ Once the input file (IMEX_SfloW2D.inp) is created, launch the solver:
 
 >> ../../bin/IMEX_SfloW2D
 
-Native NetCDF output is enabled in the input file. The simulation writes `<run_name>.nc` directly; open it with ParaView or another NetCDF-compatible tool.
+Native NetCDF output is enabled in the input file. The simulation writes `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc`; open it with ParaView or another NetCDF-compatible tool.
 
 REFERENCES
 
 [1] Bursik, M. I. & Woods, A. W. The dynamics and thermodynamics of large ash flows. Bulletin of Volcanology, 1996, 58, 175-193 
 [2] Engwell, S.L., de' Michieli Vitturi, M. Esposti Ongaro, T,. and Neri, A. Insights into the formation and dynamics of coignimbrite plumes from one-dimensional models. Journal of Geophysical Research: Solid Earth 2016, 121 (6), 4211–4231
-

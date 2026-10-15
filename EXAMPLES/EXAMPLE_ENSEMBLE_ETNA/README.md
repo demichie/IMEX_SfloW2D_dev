@@ -37,10 +37,13 @@ From `EXAMPLE_ENSEMBLE_ETNA`, follow the sequence below.
 5. Execute `python launch_jobs.py` to run the `run.sh` script in each member directory. Configure `max_processes` in that script.
 6. Execute `python create_prob_maps.py` to aggregate raster products, optionally grouping realizations with pandas `groupby`.
 7. Execute `python plot_ensemble.py` to make PNG maps.
+8. Optionally execute `python create_hazard_maps.py` to calculate exceedance maps from maximum-thickness rasters.
 
 ## Expected output
 
-The workflow produces per-realization solver outputs, probability rasters (`.asc`) for maximum thickness and dynamic-pressure/thickness thresholds, grouped directories `result.xxx`, and PNG summary maps.
+Each realization writes solver output beneath `ensemble.xxxxx/OUTPUT/<RUN_NAME>/`: NetCDF fields are in `fields/`, snapshots in indexed directories under `snapshots/`, maximum-thickness products in `diagnostics/`, vulnerability rasters and tables in `vulnerability/`, terrain exports in `terrain/`, and input backups/metadata in `metadata/`. The aggregation scripts read those per-realization locations. They produce probability rasters (`.asc`) in `result.xxx`; `plot_ensemble.py` makes PNG summary maps, and the optional hazard-map script writes to `exceedance_maps/`.
+
+The template currently sets `RUN_NAME="exampleEtna"`, so the default output root for each member is `ensemble.xxxxx/OUTPUT/exampleEtna/`.
 
 ## Original directory layout and setup commands
 
@@ -86,7 +89,7 @@ The original README specifies substitution tokens in the form `ENSEMBLE_xyz` and
 /
 ```
 
-`templatedir/run.sh` orchestrates the ellipsoidal-volume preprocessing, solver execution and plotting. Postprocessing can be omitted by commenting out the corresponding lines *before* copying the template folder. The original documentation skips step 7 in its numbering and contains the misspellings `ENSAMBLE` and `create_ensamble.py`; these are documentation errors, not names to adopt as new conventions.
+`templatedir/run.sh` orchestrates the ellipsoidal-volume preprocessing and solver execution. Its optional per-run plotting command is commented out by default; enable it *before* copying the template folder to run the overlay postprocessor for each realization. The original documentation skips step 7 in its numbering and contains the misspellings `ENSAMBLE` and `create_ensamble.py`; these are documentation errors, not names to adopt as new conventions.
 
 ## Legacy documentation and preservation
 
