@@ -101,7 +101,7 @@ def read_asc_file(file_path):
         column_names = [i for i in range(0, ncols)]
 
         data = pd.read_csv(file_path,
-                           delim_whitespace=True,
+                           sep=r'\s+',
                            skiprows=6,
                            header=None,
                            nrows=nrows,

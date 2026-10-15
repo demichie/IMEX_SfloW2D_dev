@@ -25,7 +25,7 @@ def calculate_map(asc_file, category, row_list, group_index):
             rows = int(rows)
 
             array_inv = pd.read_table(output_file,
-                                      delim_whitespace=True,
+                                      sep=r'\s+',
                                       header=None,
                                       skiprows=6,
                                       dtype='unicode').astype(float).values

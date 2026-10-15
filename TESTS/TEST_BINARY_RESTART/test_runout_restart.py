@@ -47,6 +47,16 @@ def tree_hashes(directory):
             for path in directory.rglob('*') if path.is_file()}
 
 
+def outside_output_inventory(directory, logname):
+    inventory = {}
+    for path in directory.rglob('*'):
+        relative = path.relative_to(directory)
+        if relative.parts[0] == 'OUTPUT' or relative.as_posix() == logname:
+            continue
+        inventory[str(relative)] = 'directory' if path.is_dir() else sha(path)
+    return inventory
+
+
 def parameter(text, name, value):
     text, count = re.subn(r'(?mi)^(\s*'+name+r'\s*=)[^\n]*',
                          lambda m: m[1]+' '+value+',', text)
@@ -86,6 +96,7 @@ def main():
         return case
 
     def run(case, logname, expected_error=None):
+        before = outside_output_inventory(case, logname)
         with (case/logname).open('w') as log:
             proc = subprocess.run([str(exe)], cwd=case, timeout=120,
                 env={**os.environ, 'OMP_NUM_THREADS':str(args.threads), 'OMP_DYNAMIC':'FALSE'},
@@ -97,6 +108,10 @@ def main():
             assert proc.returncode == 0, (case, output[-3000:])
             assert re.search(r'number of threads used\s+'+str(args.threads)+r'\b', output)
             assert not (case/'runout.txt').exists()
+            assert outside_output_inventory(case, logname) == before, (
+                'Solver created or modified files outside OUTPUT:', case)
+            assert {path.name for path in (case/'OUTPUT').iterdir()} == {'TEST_2D'}, (
+                'Solver created output outside the RUN_NAME directory:', case)
         return output
 
     def run_fault(case, logname, *, write_match=None, write_occurrence=1,
@@ -199,7 +214,9 @@ def main():
         passed(mode+' origin: exact checkpoint, physical output and complete CSV history')
 
     source_case = root/'automatic-full'
-    case = prepare('high-index-manifest', parameter(text, 'T_END', '0.045'))
+    high_index_input = parameter(text, 'T_END', '0.045')
+    high_index_input = parameter(high_index_input, 'OUTPUT_ESRI_FLAG', 'T')
+    case = prepare('high-index-manifest', high_index_input)
     (case/'OUTPUT').mkdir()
     shutil.copytree(source_case/'OUTPUT'/'TEST_2D', case/'OUTPUT'/'TEST_2D')
     manifest_path = case/'OUTPUT'/'TEST_2D'/'metadata'/'output_manifest.csv'
@@ -234,6 +251,8 @@ def main():
     assert len(manifest_indices) == len(set(manifest_indices))
     assert list((case/'OUTPUT'/'TEST_2D'/'snapshots').glob(
         '10000_t_*/TEST_2D_10000.q_2d'))
+    assert list((case/'OUTPUT'/'TEST_2D'/'snapshots').glob(
+        '10000_t_*/TEST_2D_10000.asc'))
     passed('high-index restart: manifest and snapshot append at index 10000')
 
     snapshot_names = list((case/'OUTPUT'/'TEST_2D'/'snapshots').glob('10000_t_*'))

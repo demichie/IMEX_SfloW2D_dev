@@ -6006,7 +6006,7 @@ CONTAINS
     INTEGER, INTENT(IN) :: output_idx
     CLASS(state_type), INTENT(IN) :: state
 
-    CHARACTER(LEN=4) :: idx_string
+    CHARACTER(LEN=:), ALLOCATABLE :: idx_string
     CHARACTER(LEN=4) :: isolid_string
     INTEGER :: j
     INTEGER :: i_solid
