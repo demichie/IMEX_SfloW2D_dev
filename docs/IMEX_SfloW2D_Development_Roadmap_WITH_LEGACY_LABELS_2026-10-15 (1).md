@@ -121,11 +121,11 @@ Stati: COMPLETATO = verifiche e gate accettati; IMPLEMENTATO = codice presente m
 | B07 | XY-3          | Flusso PCCU di interfaccia                     | IMPLEMENTATO              |
 | B08 | XY-4          | Velocita faccia e path idrostatici di cella    | IMPLEMENTATO, GATE APERTO |
 | B09 | XY-5          | Condizioni al contorno e ricostruzione lineare | IMPLEMENTATO, GATE APERTO |
-| B10 | XY-6          | Derivate e halo geometrici                     | DA FARE                   |
+| B10 | XY-6          | Derivate e halo geometrici                     | IMPLEMENTATO, GATE APERTO |
 | B11 | XY-7          | Riduzione CFL direzionale                      | DA FARE                   |
 | B12 | XY-GATE       | Accettazione complessiva x/y                   | GATE                      |
 
-Evidenza B05–B09 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-5 sono implementate con le evidenze elencate nelle rispettive schede. Sono passate le regressioni spaziali e dinamiche strict/optimized, incluse prove a 1/4 thread, composizione variabile, fixture ruotate e confronti binari pre/post refactoring sui casi esplicitamente elencati. B10–B11 restano da eseguire. I gate dei singoli step non sostituiscono B12, che richiede la matrice d’accettazione complessiva.
+Evidenza B05–B10 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-6 sono implementate con le evidenze elencate nelle rispettive schede. Sono passate le regressioni spaziali e dinamiche strict/optimized, incluse prove a 1/4 thread, composizione variabile, fixture ruotate e confronti binari pre/post refactoring sui casi esplicitamente elencati. B11 resta da eseguire. I gate dei singoli step non sostituiscono B12, che richiede la matrice d’accettazione complessiva.
 
 ## Fase C — Output e distribuzione
 
@@ -672,9 +672,9 @@ Stato aggiornato: velocità di faccia e cell hydrostatic path consolidati nel co
 
 ### B09 — Condizioni al contorno e ricostruzione lineare
 
-Stato ufficiale: PARZIALE
+Stato ufficiale: IMPLEMENTATO, GATE APERTO
 
-File interessati: src/reconstruction_2d.f90; src/geometry_2d.f90; src/equation_terms_2d.f90.
+File interessati: src/spatial/reconstruction_2d.f90; src/geometry/geometry_2d.f90; src/physics/equation_terms_2d.f90.
 
 Attività: Estrarre logica riutilizzabile dei casi Dirichlet/Neumann/interpolazione per lato senza cancellare semantica dei boundary source, radial source o lateral source; nessuna modifica simultanea allo schema.
 
@@ -695,13 +695,15 @@ CI e pubblicazione: relocation: https://github.com/demichie/IMEX_SfloW2D_dev/act
 
 ### B10 — Derivate e halo geometrici
 
-Stato ufficiale: DA FARE
+Stato ufficiale: IMPLEMENTATO, GATE APERTO
 
-File interessati: src/geometry_2d.f90.
+File interessati: src/geometry/geometry_2d.f90.
 
 Attività: Valutare line kernels per derivate prime e seconde e utility di copia bordi senza variare ordine di accumulazione, formule Q1/LS/Hessian, trattamento delle dimensioni degeneri o mixed derivative. Non precomputare definitivamente la geometria: topografia futura time-dependent.
 
 Criteri di accettazione: TEST_GEOMETRY_1D per x e y e fixture 2D, ricostruzione dopo aggiornamenti B_vertex, confronto 1/4 thread e output di topografia invariati.
+
+Stato aggiornato al 15 ottobre 2026: le copie dei bordi dei campi derivati sono state estratte in utility private x/y; i loop 2D, le formule e le somme miste non sono stati modificati. L'estrazione del kernel aritmetico 1D è stata scartata perché il confronto bitwise ha rilevato differenze in optimized; mantenere i loop scalari originali conserva l'ordine numerico. `TEST_GEOMETRY_1D` è passato in strict e optimized (112 casi per profilo, fixture 1D x/y e 2D, cache avvelenate e snapshot identici a 1/4 thread); `TEST_TOPOGRAPHY_FACES` è passato in entrambi i profili. Il confronto A/B con il sorgente pre-B10 ha confermato payload identici bitwise su griglie 5x1, 9x1, 17x1, 5x5 e 7x9, tutti i quattro profili di topografia e slope-correction OFF/ON, a 1 e 4 thread, in strict e optimized. B10 è IMPLEMENTATO; il gate formale resta in B12.
 
 ### B11 — Riduzione CFL direzionale
 

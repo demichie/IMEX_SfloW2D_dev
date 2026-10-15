@@ -17,6 +17,7 @@ MODULE geometry_2d
   IMPLICIT NONE
 
   PRIVATE :: reconstruct_short_1d_line
+  PRIVATE :: copy_derivative_halo_x, copy_derivative_halo_y
 
   !> Location of the centers (x) of the control volume of the domain
   REAL(wp), ALLOCATABLE :: x_comp(:)
@@ -786,67 +787,12 @@ CONTAINS
 
     ! --- Handle left and right boundaries (columns j=1, 2, comp_cells_x-1, comp_cells_x) ---
     IF (comp_cells_x .GE. 5) THEN
-    !$OMP PARALLEL DO PRIVATE(k)
-    DO k = 1, comp_cells_y ! Loop over all rows
-       ! Left boundary
-       B_prime_x_geom(1,k)   = B_prime_x_geom(3,k)
-       B_prime_x_geom(2,k)   = B_prime_x_geom(3,k)
-       B_prime_y_geom(1,k)   = B_prime_y_geom(3,k)
-       B_prime_y_geom(2,k)   = B_prime_y_geom(3,k)
-       B_second_xx_geom(1,k) = B_second_xx_geom(3,k)
-       B_second_xx_geom(2,k) = B_second_xx_geom(3,k)
-       B_second_yy_geom(1,k) = B_second_yy_geom(3,k)
-       B_second_yy_geom(2,k) = B_second_yy_geom(3,k)
-       B_second_xy_geom(1,k) = B_second_xy_geom(3,k)
-       B_second_xy_geom(2,k) = B_second_xy_geom(3,k)
-
-       ! Right boundary
-       B_prime_x_geom(comp_cells_x-1,k) = B_prime_x_geom(comp_cells_x-2,k)
-       B_prime_x_geom(comp_cells_x,k)   = B_prime_x_geom(comp_cells_x-2,k)
-       B_prime_y_geom(comp_cells_x-1,k) = B_prime_y_geom(comp_cells_x-2,k)
-       B_prime_y_geom(comp_cells_x,k)   = B_prime_y_geom(comp_cells_x-2,k)
-       B_second_xx_geom(comp_cells_x-1,k) = B_second_xx_geom(comp_cells_x-2,k)
-       B_second_xx_geom(comp_cells_x,k)   = B_second_xx_geom(comp_cells_x-2,k)
-       B_second_yy_geom(comp_cells_x-1,k) = B_second_yy_geom(comp_cells_x-2,k)
-       B_second_yy_geom(comp_cells_x,k)   = B_second_yy_geom(comp_cells_x-2,k)
-       B_second_xy_geom(comp_cells_x-1,k) = B_second_xy_geom(comp_cells_x-2,k)
-       B_second_xy_geom(comp_cells_x,k)   = B_second_xy_geom(comp_cells_x-2,k)
-    END DO
-    !$OMP END PARALLEL DO
-
+       CALL copy_derivative_halo_x
     END IF
 
     IF ( comp_cells_y .GE. 5 ) THEN
 
-       ! --- Handle top and bottom boundaries (rows k=1, 2, comp_cells_y-1, comp_cells_y) ---
-       !$OMP PARALLEL DO PRIVATE(j)
-       DO j = 1, comp_cells_x ! Loop over all columns
-          ! Top boundary
-          B_prime_x_geom(j,1)   = B_prime_x_geom(j,3)
-          B_prime_x_geom(j,2)   = B_prime_x_geom(j,3)
-          B_prime_y_geom(j,1)   = B_prime_y_geom(j,3)
-          B_prime_y_geom(j,2)   = B_prime_y_geom(j,3)
-          B_second_xx_geom(j,1) = B_second_xx_geom(j,3)
-          B_second_xx_geom(j,2) = B_second_xx_geom(j,3)
-          B_second_yy_geom(j,1) = B_second_yy_geom(j,3)
-          B_second_yy_geom(j,2) = B_second_yy_geom(j,3)
-          B_second_xy_geom(j,1) = B_second_xy_geom(j,3)
-          B_second_xy_geom(j,2) = B_second_xy_geom(j,3)
-
-          ! Bottom boundary
-          B_prime_x_geom(j,comp_cells_y-1) = B_prime_x_geom(j,comp_cells_y-2)
-          B_prime_x_geom(j,comp_cells_y)   = B_prime_x_geom(j,comp_cells_y-2)
-          B_prime_y_geom(j,comp_cells_y-1) = B_prime_y_geom(j,comp_cells_y-2)
-          B_prime_y_geom(j,comp_cells_y)   = B_prime_y_geom(j,comp_cells_y-2)
-          B_second_xx_geom(j,comp_cells_y-1) = B_second_xx_geom(j,comp_cells_y-2)
-          B_second_xx_geom(j,comp_cells_y)   = B_second_xx_geom(j,comp_cells_y-2)
-          B_second_yy_geom(j,comp_cells_y-1) = B_second_yy_geom(j,comp_cells_y-2)
-          B_second_yy_geom(j,comp_cells_y)   = B_second_yy_geom(j,comp_cells_y-2)
-          B_second_xy_geom(j,comp_cells_y-1) = B_second_xy_geom(j,comp_cells_y-2)
-          B_second_xy_geom(j,comp_cells_y)   = B_second_xy_geom(j,comp_cells_y-2)
-       END DO
-       !$OMP END PARALLEL DO
-
+       CALL copy_derivative_halo_y
     END IF
 
     IF ( slope_correction_flag ) THEN
@@ -908,6 +854,68 @@ CONTAINS
        second = 2.0_wp*quadratic
     END IF
   END SUBROUTINE reconstruct_short_1d_line
+
+  !> \brief Copy the nearest valid x-interior derivative values into both halos.
+  SUBROUTINE copy_derivative_halo_x
+    INTEGER :: k
+
+    !$OMP PARALLEL DO PRIVATE(k)
+    DO k = 1, comp_cells_y
+       B_prime_x_geom(1,k)   = B_prime_x_geom(3,k)
+       B_prime_x_geom(2,k)   = B_prime_x_geom(3,k)
+       B_prime_y_geom(1,k)   = B_prime_y_geom(3,k)
+       B_prime_y_geom(2,k)   = B_prime_y_geom(3,k)
+       B_second_xx_geom(1,k) = B_second_xx_geom(3,k)
+       B_second_xx_geom(2,k) = B_second_xx_geom(3,k)
+       B_second_yy_geom(1,k) = B_second_yy_geom(3,k)
+       B_second_yy_geom(2,k) = B_second_yy_geom(3,k)
+       B_second_xy_geom(1,k) = B_second_xy_geom(3,k)
+       B_second_xy_geom(2,k) = B_second_xy_geom(3,k)
+
+       B_prime_x_geom(comp_cells_x-1,k) = B_prime_x_geom(comp_cells_x-2,k)
+       B_prime_x_geom(comp_cells_x,k)   = B_prime_x_geom(comp_cells_x-2,k)
+       B_prime_y_geom(comp_cells_x-1,k) = B_prime_y_geom(comp_cells_x-2,k)
+       B_prime_y_geom(comp_cells_x,k)   = B_prime_y_geom(comp_cells_x-2,k)
+       B_second_xx_geom(comp_cells_x-1,k) = B_second_xx_geom(comp_cells_x-2,k)
+       B_second_xx_geom(comp_cells_x,k)   = B_second_xx_geom(comp_cells_x-2,k)
+       B_second_yy_geom(comp_cells_x-1,k) = B_second_yy_geom(comp_cells_x-2,k)
+       B_second_yy_geom(comp_cells_x,k)   = B_second_yy_geom(comp_cells_x-2,k)
+       B_second_xy_geom(comp_cells_x-1,k) = B_second_xy_geom(comp_cells_x-2,k)
+       B_second_xy_geom(comp_cells_x,k)   = B_second_xy_geom(comp_cells_x-2,k)
+    END DO
+    !$OMP END PARALLEL DO
+  END SUBROUTINE copy_derivative_halo_x
+
+  !> \brief Copy the nearest valid y-interior derivative values into both halos.
+  SUBROUTINE copy_derivative_halo_y
+    INTEGER :: j
+
+    !$OMP PARALLEL DO PRIVATE(j)
+    DO j = 1, comp_cells_x
+       B_prime_x_geom(j,1)   = B_prime_x_geom(j,3)
+       B_prime_x_geom(j,2)   = B_prime_x_geom(j,3)
+       B_prime_y_geom(j,1)   = B_prime_y_geom(j,3)
+       B_prime_y_geom(j,2)   = B_prime_y_geom(j,3)
+       B_second_xx_geom(j,1) = B_second_xx_geom(j,3)
+       B_second_xx_geom(j,2) = B_second_xx_geom(j,3)
+       B_second_yy_geom(j,1) = B_second_yy_geom(j,3)
+       B_second_yy_geom(j,2) = B_second_yy_geom(j,3)
+       B_second_xy_geom(j,1) = B_second_xy_geom(j,3)
+       B_second_xy_geom(j,2) = B_second_xy_geom(j,3)
+
+       B_prime_x_geom(j,comp_cells_y-1) = B_prime_x_geom(j,comp_cells_y-2)
+       B_prime_x_geom(j,comp_cells_y)   = B_prime_x_geom(j,comp_cells_y-2)
+       B_prime_y_geom(j,comp_cells_y-1) = B_prime_y_geom(j,comp_cells_y-2)
+       B_prime_y_geom(j,comp_cells_y)   = B_prime_y_geom(j,comp_cells_y-2)
+       B_second_xx_geom(j,comp_cells_y-1) = B_second_xx_geom(j,comp_cells_y-2)
+       B_second_xx_geom(j,comp_cells_y)   = B_second_xx_geom(j,comp_cells_y-2)
+       B_second_yy_geom(j,comp_cells_y-1) = B_second_yy_geom(j,comp_cells_y-2)
+       B_second_yy_geom(j,comp_cells_y)   = B_second_yy_geom(j,comp_cells_y-2)
+       B_second_xy_geom(j,comp_cells_y-1) = B_second_xy_geom(j,comp_cells_y-2)
+       B_second_xy_geom(j,comp_cells_y)   = B_second_xy_geom(j,comp_cells_y-2)
+    END DO
+    !$OMP END PARALLEL DO
+  END SUBROUTINE copy_derivative_halo_y
 
   !******************************************************************************
   !> \brief Identify inlet cells and build their radial/lateral emission directions.
