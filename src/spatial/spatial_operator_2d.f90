@@ -161,17 +161,8 @@ CONTAINS
        j = domain%j_cent(l)
        k = domain%k_cent(l)
 
-       max_a_x = MAX( max_a_x,                                               &
-            this%hp_pccu%a_interface_xPos(j,k),                              &
-            -this%hp_pccu%a_interface_xNeg(j,k),                             &
-            this%hp_pccu%a_interface_xPos(j+1,k),                            &
-            -this%hp_pccu%a_interface_xNeg(j+1,k) )
-
-       max_a_y = MAX( max_a_y,                                               &
-            this%hp_pccu%a_interface_yPos(j,k),                              &
-            -this%hp_pccu%a_interface_yNeg(j,k),                             &
-            this%hp_pccu%a_interface_yPos(j,k+1),                            &
-            -this%hp_pccu%a_interface_yNeg(j,k+1) )
+       CALL accumulate_directional_face_speeds(this%hp_pccu,j,k,             &
+            max_a_x,max_a_y)
     END DO
     !$OMP END PARALLEL DO
 
@@ -200,5 +191,25 @@ CONTAINS
     END SELECT
 
   END SUBROUTINE compute_spatial_timestep
+
+  !> \brief Include all four reconstructed face speeds for one active cell.
+  !> \details The MAX operand order is kept identical to the original CFL loop.
+  SUBROUTINE accumulate_directional_face_speeds(speeds,j,k,max_a_x,max_a_y)
+    CLASS(hyperbolic_workspace_type), INTENT(IN) :: speeds
+    INTEGER, INTENT(IN) :: j,k
+    REAL(wp), INTENT(INOUT) :: max_a_x,max_a_y
+
+    max_a_x = MAX(max_a_x,                                                 &
+         speeds%a_interface_xPos(j,k),                                     &
+         -speeds%a_interface_xNeg(j,k),                                    &
+         speeds%a_interface_xPos(j+1,k),                                   &
+         -speeds%a_interface_xNeg(j+1,k))
+
+    max_a_y = MAX(max_a_y,                                                 &
+         speeds%a_interface_yPos(j,k),                                     &
+         -speeds%a_interface_yNeg(j,k),                                    &
+         speeds%a_interface_yPos(j,k+1),                                   &
+         -speeds%a_interface_yNeg(j,k+1))
+  END SUBROUTINE accumulate_directional_face_speeds
 
 END MODULE spatial_operator_2d

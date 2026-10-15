@@ -122,10 +122,10 @@ Stati: COMPLETATO = verifiche e gate accettati; IMPLEMENTATO = codice presente m
 | B08 | XY-4          | Velocita faccia e path idrostatici di cella    | IMPLEMENTATO, GATE APERTO |
 | B09 | XY-5          | Condizioni al contorno e ricostruzione lineare | IMPLEMENTATO, GATE APERTO |
 | B10 | XY-6          | Derivate e halo geometrici                     | IMPLEMENTATO, GATE APERTO |
-| B11 | XY-7          | Riduzione CFL direzionale                      | DA FARE                   |
+| B11 | XY-7          | Riduzione CFL direzionale                      | IMPLEMENTATO, GATE APERTO |
 | B12 | XY-GATE       | Accettazione complessiva x/y                   | GATE                      |
 
-Evidenza B05–B10 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-6 sono implementate con le evidenze elencate nelle rispettive schede. Sono passate le regressioni spaziali e dinamiche strict/optimized, incluse prove a 1/4 thread, composizione variabile, fixture ruotate e confronti binari pre/post refactoring sui casi esplicitamente elencati. B11 resta da eseguire. I gate dei singoli step non sostituiscono B12, che richiede la matrice d’accettazione complessiva.
+Evidenza B05–B11 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-7 sono implementate con le evidenze elencate nelle rispettive schede. Sono passate le regressioni spaziali e dinamiche strict/optimized, incluse prove a 1/4 thread, composizione variabile, fixture ruotate e confronti binari pre/post refactoring sui casi esplicitamente elencati. B12 resta aperto per l’accettazione complessiva.
 
 ## Fase C — Output e distribuzione
 
@@ -707,13 +707,15 @@ Stato aggiornato al 15 ottobre 2026: le copie dei bordi dei campi derivati sono 
 
 ### B11 — Riduzione CFL direzionale
 
-Stato ufficiale: DA FARE
+Stato ufficiale: IMPLEMENTATO, GATE APERTO
 
-File interessati: src/spatial_operator_2d.f90.
+File interessati: src/spatial/spatial_operator_2d.f90.
 
 Attivita: dopo A11, fattorizzare ove utile la raccolta dei massimi direzionali senza alterare i criteri scelti da CFL_POLICY. La funzionalita duale directional_min/combined e un lavoro circoscritto del gate A09, PRIMA di A11; B11 e soltanto refactoring interno successivo.
 
 Criteri di accettazione: stesso risultato numerico per ciascuna delle due policy prima e dopo il refactoring, conservando comportamento CFL=-1, MAX_DT, griglie 1D x/y e ordine di operazioni appropriato. Nessuna variazione di default.
+
+Stato aggiornato al 15 ottobre 2026: la raccolta dei quattro segnali di velocità di faccia per cella è stata estratta in una utility privata; le due riduzioni `MAX` mantengono lo stesso ordine di operandi e la riduzione OpenMP, mentre le formule `directional_min`/`combined`, il default e i loro rami 1D non cambiano. `TEST_SPATIAL_OPERATOR` è passato in strict e optimized: verifica le due formule, griglie x/y/point, propagazione nulla, cap `MAX_DT`, sentinel `CFL=-1` e team effettivi 1/4. `TEST_CFL_POLICY` è passato con solver strict e optimized, 18 traiettorie per profilo a 4 thread (N_RK=2,3,4; policy omessa, directional_min, combined; CFL adattivo e sentinel), confrontando output canonici, checkpoint e tempi accettati; sono passati anche i tre controlli di input non valido. B11 è IMPLEMENTATO; il gate complessivo resta in B12.
 
 ### B12 — Accettazione complessiva x/y
 
