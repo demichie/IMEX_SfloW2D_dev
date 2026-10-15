@@ -731,7 +731,7 @@ Evidenza aggiornata al 15 ottobre 2026: l'audit completo sul candidato basato su
 
 ### C01 — Output segregati per run
 
-Stato ufficiale: DA FARE
+Stato ufficiale: PARZIALE
 
 #### Struttura di directory concordata
 
@@ -752,6 +752,24 @@ Stato ufficiale: DA FARE
 > terrain/ dem_esri\*.asc
 >
 > restart/ restart.bin (nome fisso)
+
+#### Inventario iniziale dei file prodotti dal solver
+
+Ricognizione del sorgente al 15 ottobre 2026: le scritture di output scientifico e diagnostico sono centralizzate in `src/io/inpout_2d.f90`; il checkpoint viene invocato da `src/IMEX_SfloW2D.f90`. I percorsi correnti sono relativi alla working directory e vanno ricondotti alla directory del run senza cambiare i contenuti dei file:
+
+| Categoria | File attuali | Destinazione C01 |
+|-----------|--------------|------------------|
+| Backup parametri effettivi | `<RUN_NAME>.bak` | `metadata/` |
+| Serie NetCDF | `<RUN_NAME>.nc` | `fields/` |
+| Snapshot conservativi | `<RUN_NAME>_<idx>.q_2d`, `_erosion_`, `_erodible_`, `_deposit_`, `_B_` | `snapshots/<idx>_t_<time>/` |
+| Snapshot raster | `<RUN_NAME>_<idx>.asc`, `_T_`, `_dep_`, `_depTot_`, `_ers_`, `_ersTot_` | `snapshots/<idx>_t_<time>/` |
+| Diagnostica massima e runout | `<RUN_NAME>_max.asc`, `<RUN_NAME>_runout.csv`, `<RUN_NAME>_mass_center.csv` | `diagnostics/` |
+| Probe | `<RUN_NAME>_prb_<probe>.csv` | `probes/` |
+| Vulnerability table | `<RUN_NAME>_VT.txt`, `<RUN_NAME>_VT_<idx>.asc` | `vulnerability/` |
+| Raster del terreno computazionale | `dem_esri.asc`, `dem_esri_nodata.asc`, opzionalmente `dem_esri_water.asc` | `terrain/` |
+| Restart scritto | `restart.bin` | `restart/` |
+
+I file input `topography_file`, `erodible_file` e i checkpoint indicati esplicitamente per la lettura sono aperti in lettura e non vanno spostati. Le procedure che costruiscono i nomi e aprono output sono in `inpout_2d`; l'append diagnostico CSV e NetCDF in restart e la scrittura del checkpoint richiedono particolare attenzione per conservare le semantiche validate. L'inventario è una baseline per la successiva implementazione e non abilita ancora l'output segregato: restano da introdurre il costruttore centrale dei percorsi, la creazione/validazione sicura delle directory e le relative prove.
 
 ### C02 — Contratto di configurazione e sicurezza
 
