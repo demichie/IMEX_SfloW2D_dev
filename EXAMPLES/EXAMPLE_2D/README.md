@@ -26,11 +26,11 @@ A finite granular mass initially confined in a hemispherical shell is released o
 
 ## How to run
 
-From this directory, generate the input files with `python create_example.py 100 0.5 300 false`, then run `../../bin/IMEX_SfloW2D`. The generator requires NumPy; the legacy README also lists Basemap. Arguments: number of x cells, initial solid volume fraction, temperature (K), plot flag.
+From this directory, generate the input files with `python create_example.py 100 0.5 300 false`, then run `../../bin/IMEX_SfloW2D`. The generator requires NumPy; Matplotlib is additionally required when the plot flag is `true`. The current generator does not use Basemap, although the legacy README lists it. Arguments: number of x cells, initial solid volume fraction, temperature (K), plot flag.
 
 ## Expected output
 
-The simulation produces native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc`, viewable in ParaView.
+The generated input enables both native NetCDF and ESRI raster output. NetCDF is written to `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc` and can be viewed in ParaView; the ESRI rasters can be opened in a GIS.
 
 The initial conditions and topography resemble Example 4.1 from Wang et al. (2004), but the rheological model is not the same as the original reference. The original README calls the script `create_example4.py` in its description, although the actual script and command are `create_example.py`.
 

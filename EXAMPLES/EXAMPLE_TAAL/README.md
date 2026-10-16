@@ -34,10 +34,7 @@ Create the local executable link with `ln -s ../../bin/IMEX_SfloW2D .` and run `
 
 ## Expected output
 
-The committed input uses `OUTPUT_NETCDF_FLAG=T` and `OUTPUT_ESRI_FLAG=F`; NetCDF is the configured field output.
-
-
-Native NetCDF output is enabled (`OUTPUT_NETCDF_FLAG=T`), while `OUTPUT_ESRI_FLAG=F` for the current input.
+The committed input enables native NetCDF output and disables ESRI raster output (`OUTPUT_ESRI_FLAG=F`).
 
 ## Pulse semantics (preserved)
 
@@ -54,12 +51,8 @@ Native NetCDF output is enabled (`OUTPUT_NETCDF_FLAG=T`), while `OUTPUT_ESRI_FLA
 /
 ```
 
-The four timing parameters mean: time between cycles (30 s); injection duration per cycle (20 s, followed by 10 s off); ramp time for increasing/decreasing source intensity (4 s), scaling height and velocity to preserve Richardson number; and total source activation duration (150 s). For steady injection remove the timing line. The legacy README says to make the period longer than the source duration for a single pulse and gives `TIME_PARAM=100.D0,20.D0,0.D0,200.D0`; it claims this gives one 20 s pulse, but the parameter relationship should be checked because the fourth value exceeds the first.
+For this lateral radial source, the four timing parameters mean: period between cycles (30 s); injection duration per cycle (20 s, followed by 10 s off); ramp time for increasing/decreasing source intensity (4 s), scaling height and velocity to preserve Richardson number; and absolute source cut-off time (150 s). Thus the tracked input produces five pulses before the source stops at 150 s; the simulation continues to 200 s. For steady injection remove the timing line. The legacy README says to make the period longer than the source duration for a single pulse, but its example `TIME_PARAM=100.D0,20.D0,0.D0,200.D0` has a 100 s period and a 200 s cut-off; under the current implementation it produces pulses at 0–20 s and 100–120 s, not a single pulse.
 
 ## Legacy documentation and preservation
 
 The original [`README.txt`](README.txt) in this example directory remains the archival source for the complete historical narrative, parameter discussion, scientific references and commands. It has not been deleted or rewritten. This standardized README must not replace it as the sole provenance source until a full section-by-section textual comparison has been accepted.
-
-## Documentation verification note
-
-**Input-file output flags.** The tracked input enables NetCDF but sets `OUTPUT_ESRI_FLAG=F`; therefore ESRI raster outputs should not be promised as enabled by default.

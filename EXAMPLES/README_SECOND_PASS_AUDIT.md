@@ -18,9 +18,10 @@ This archive is extracted **inside** `EXAMPLES/` and contains 20 standardized `R
 - `EXAMPLE_ENGWELL2016`: script uses `xs_init`; inspect transformation before certifying physical interpretation.
 - `EXAMPLE_DAMBREAK`: current generator `create_dambreak.py`, with older filenames identified as historical; authoritative descriptions of pore pressure and inhibited gas escape retained.
 - `EXAMPLE_ETNA`: `cleanFolder.sh` capitalization and ellipsoid-preprocessing explanation.
-- `EXAMPLE_2D`: old `create_example4.py` is not the committed generator filename.
+- `EXAMPLE_2D`: old `create_example4.py` is not the committed generator filename. The current generator needs NumPy and only imports Matplotlib when plotting is requested; it does not use the Basemap dependency listed by the legacy README. Its generated input enables both NetCDF and ESRI output.
 - `EXAMPLE_ENSEMBLE_ETNA`: placeholder `ENSEMBLE_`, link/template execution stages retained.
 - `EXAMPLE_CF`, `EXAMPLE_TAAL` and `EXAMPLE_TAAL_BOTTOM`: their committed namelists have ESRI output disabled, contrary to the generic legacy output descriptions.
+- `EXAMPLE_TAAL_BOTTOM`: because `BOTTOM_RADIAL_SOURCE_FLAG=T`, `TIME_PARAM(4)` is a phase offset, not a total source duration or cut-off. Its current value (150 s) is five 30 s periods and therefore gives no net phase shift. This differs from lateral `EXAMPLE_TAAL`, where `TIME_PARAM(4)` is an absolute cut-off.
 - `EXAMPLE_ETNA_LAVA`: extra DEM and acceptance context restored; validation relates to a pinned source and input configuration.
 
 ## Outstanding work before deleting README.txt

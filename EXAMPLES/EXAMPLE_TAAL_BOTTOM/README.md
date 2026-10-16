@@ -27,7 +27,7 @@ A dilute gas–particle flow over Taal terrain, with an elliptical bottom-source
 | Source velocity / temperature | 10 m/s / 350 K |
 | `XS_SOURCE` | 0.976 |
 | Pore pressure | Enabled, fraction 0.5 |
-| `TIME_PARAM` | (30, 20, 0, 150) s |
+| `TIME_PARAM` | Period 30 s, active 20 s, ramp 0 s, phase offset 150 s |
 
 ## How to run
 
@@ -36,9 +36,6 @@ Create an executable link with `ln -s ../../bin/IMEX_SfloW2D .`, then execute `.
 ## Expected output
 
 The committed input enables NetCDF and runout diagnostics but disables ESRI raster output (`OUTPUT_ESRI_FLAG=F`).
-
-
-Native NetCDF and runout output are enabled; the current input disables ESRI rasters.
 
 ## Elliptical source and pulses (preserved)
 
@@ -56,12 +53,8 @@ Native NetCDF and runout output are enabled; the current input disables ESRI ras
 /
 ```
 
-`TIME_PARAM` defines the cycle period (30 s), injection duration (20 s), ramp duration (0 s) and nominal total source duration (150 s). Removing it gives a steady source. The original README proposes `TIME_PARAM=300.D0,20.D0,0.D0,150.D0` for a single 20 s pulse. Note that the simulation itself ends at 50 s in the checked input, so the full nominal source duration is not simulated. The physical interpretation of `XS_SOURCE` must not be conflated with `ALPHAS_SOURCE` without reading the model equation.
+For the bottom radial source, `TIME_PARAM(1:3)` define the cycle period (30 s), injection duration (20 s) and ramp duration (0 s). Unlike the lateral source, `TIME_PARAM(4)` is a phase offset used in the periodic window, not an absolute cut-off or total source duration. The tracked value (150 s) is exactly five periods, so it causes no net phase shift: the source is active during 0–20 s and 30–50 s, until the simulation ends. Removing the timing line gives a steady source. The legacy README labels the fourth value a total duration; under the current bottom-source implementation its single-pulse example (`300,20,0,150`) instead shifts the pulse to 150–170 s, if the simulation runs that long. The physical interpretation of `XS_SOURCE` must not be conflated with `ALPHAS_SOURCE` without reading the model equation.
 
 ## Legacy documentation and preservation
 
 The original [`README.txt`](README.txt) in this example directory remains the archival source for the complete historical narrative, parameter discussion, scientific references and commands. It has not been deleted or rewritten. This standardized README must not replace it as the sole provenance source until a full section-by-section textual comparison has been accepted.
-
-## Documentation verification note
-
-**Input-file output flags.** The tracked input enables NetCDF and runout output, with `OUTPUT_ESRI_FLAG=F`; generated ESRI files should not be promised as default outputs.
