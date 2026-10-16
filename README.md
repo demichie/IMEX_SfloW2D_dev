@@ -18,7 +18,10 @@ or, on a osx computer:
 
 To compile:
 
-> autoreconf -i
+Generated Autotools files such as `configure` and `Makefile.in` are not tracked
+in Git. Regenerate them from a checkout with:
+
+> autoreconf -fi
 
 The build uses the Fortran compiler selected by `FC` and the NetCDF Fortran
 library. For a Conda environment, pass its prefix as `--with-netcdf`:

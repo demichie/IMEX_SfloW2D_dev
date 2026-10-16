@@ -1,3 +1,20 @@
 doc/html/
 plume_mom.doxy
 
+# Regenerate Autotools outputs in a checkout with `autoreconf -fi`.
+/aclocal.m4
+/autom4te.cache/
+/compile
+/config.guess
+/config.log
+/config.status
+/config.sub
+/configure
+/depcomp
+/install-sh
+/Makefile
+/Makefile.in
+/missing
+/src/Makefile
+/src/Makefile.in
+/test-driver

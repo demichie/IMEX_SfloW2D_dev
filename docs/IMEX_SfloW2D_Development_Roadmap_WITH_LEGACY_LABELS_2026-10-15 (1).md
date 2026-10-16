@@ -164,7 +164,7 @@ Evidenza B05–B12 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-7 e
 | C01 | IO-1          | Output segregati per run                | COMPLETATO |
 | C02 | IO-2          | Contratto di configurazione e sicurezza | IMPLEMENTATO, GATE APERTO |
 | C03 | IO-GATE       | Accettazione I/O per run                | COMPLETATO |
-| C04 | DIST-1        | Autotools policy B                      | DA FARE |
+| C04 | DIST-1        | Autotools policy B                      | IMPLEMENTATO |
 | C05 | DIST-2        | Doppio archivio di distribuzione        | DA FARE |
 | C06 | DIST-GATE     | Validazione distributiva                | GATE    |
 
@@ -971,7 +971,15 @@ Con tale decisione e le verifiche C03 registrate, **C03 è COMPLETATO**. C01 è 
 
 **Test proporzionati (nuove modifiche a questo step):** T1 autoreconf e manifest EXTRA_DIST; T2 configure/make/check da checkout; T3 make distcheck e GNU/ifx/Docker al gate packaging, non a ogni modifica documentale. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: DA FARE
+Stato ufficiale: IMPLEMENTATO
+
+#### Evidenza C04 — 16 ottobre 2026
+
+I file generati Autotools non sono più versionati: `configure`, `Makefile.in` (root e `src/`), `aclocal.m4`, `compile`, `depcomp`, `install-sh` e `missing` sono stati rimossi dall'indice Git. `.gitignore` copre questi output e quelli di configurazione; `README.md` istruisce a rigenerarli con `autoreconf -fi`. Non è stato necessario modificare `src/Makefile.am`: l'inventario ha verificato che i quattro file `.inc` presenti sotto `src/` sono tutti inclusi in `EXTRA_DIST`.
+
+Su un worktree temporaneo pulito del commit C03, dopo l'applicazione delle modifiche C04, sono passati `autoreconf -fi`, `configure --with-netcdf=/opt/homebrew/opt/netcdf-fortran`, `make -j2` e `make check`. La rigenerazione ha inoltre verificato che gli output Autotools risultino ignorati da Git. Evidenza locale conservata in `/tmp/imex-c04-git-ffbea0b9` e `/tmp/imex-c04-build-ffbea0b9`; `git diff --check` passa.
+
+`make distcheck` e la matrice ifx/Docker restano differiti al gate di packaging C06 come previsto; questa attività non crea ancora gli archivi C05/C06.
 
 #### Milestone post-XY — Politica Autotools B e distribuzione con due archivi
 
