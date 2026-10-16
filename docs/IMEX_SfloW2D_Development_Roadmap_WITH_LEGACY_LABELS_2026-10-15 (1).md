@@ -165,7 +165,7 @@ Evidenza B05–B12 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-7 e
 | C02 | IO-2          | Contratto di configurazione e sicurezza | IMPLEMENTATO, GATE APERTO |
 | C03 | IO-GATE       | Accettazione I/O per run                | COMPLETATO |
 | C04 | DIST-1        | Autotools policy B                      | IMPLEMENTATO |
-| C05 | DIST-2        | Doppio archivio di distribuzione        | DA FARE |
+| C05 | DIST-2        | Doppio archivio di distribuzione        | IMPLEMENTATO |
 | C06 | DIST-GATE     | Validazione distributiva                | GATE    |
 
 ## Fase D — Reologie e solver IMEX
@@ -1010,6 +1010,12 @@ Stato ufficiale: IMPLEMENTATO (T1–T3); gate di rilascio C06 aperto
 **Test proporzionati (nuove modifiche a questo step):** T3 sorgente Autotools e Examples estratti, installazione, GNU/ifx/Docker, assenza dipendenze Git; T4 release solo dopo gate distributivo. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: GATE
+
+**Evidenza locale:** in un clone temporaneo isolato è stato creato il tag sintetico `9.9.16` sulla revisione `0ee23e80a3bd93847d7199323cb558c78d2656f5`; non è un tag del repository di lavoro né una release. `build_archives.py` ha generato entrambi gli archivi e il manifest dalla stessa revisione. Il tarball sorgente è stato estratto senza `.git`; `configure`, `make distcheck` e l'installazione/suite `make check` incluse nel gate sono passati con GNU Fortran e NetCDF-Fortran su macOS. Un ulteriore smoke test ha eseguito `TEST_2D` con l'eseguibile installato dal tarball. L'archivio Examples estratto conserva tutti i 20 `README.md` e i file di input/dati verificati per `EXAMPLE_CF`.
+
+Il primo `distcheck` ha evidenziato due requisiti di pulizia: rendere scrivibili le fixture copiate dai sorgenti di sola lettura e rimuovere i moduli Fortran `.mod` durante `clean`. Sono stati corretti `TESTS/run_tests.sh` e `src/Makefile.am`; il `distcheck` finale sull'archivio generato ha superato anche `distcleancheck`.
+
+Restano da eseguire le Actions manuali GNU, ifx e Docker e la build/pubblicazione della documentazione dopo il commit delle modifiche. L'audit di provenienza/licenza dei dataset e delle dipendenze operative di tutti gli esempi resta aperto; non dichiarare gli archivi pronti alla pubblicazione e non avviare una release.
 
 #### Regola di rilascio per documentazione pubblica
 

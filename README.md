@@ -58,6 +58,16 @@ fissures and the original Etna DEM before avalanche preprocessing. Together
 with `EXAMPLE_ETNA`, it is selected for the N9 long-case validation; it replaces
 `EXAMPLE_LAVA_IMO` in that selection without removing the existing IMO example.
 
+## Release downloads
+
+GitHub automatically provides **Source code (zip)** and **Source code
+(tar.gz)** snapshots for tags. These are Git snapshots, not the prepared
+Autotools source distribution; they may not contain generated files such as
+`configure`. When available, use the explicitly named
+`IMEX_SfloW2D-<version>.tar.gz` and
+`IMEX_SfloW2D-<version>-examples.tar.gz` assets attached to a validated
+[release](https://github.com/demichie/IMEX_SfloW2D_dev/releases).
+
 ## Per-run output directories
 
 Solver-generated files are grouped below `OUTPUT/<RUN_NAME>/` by default.

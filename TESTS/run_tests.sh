@@ -21,11 +21,16 @@ if [ ! -x "$executable" ]; then
     exit 2
 fi
 
+copy_writable_fixture() {
+    cp -R "$1" "$2"
+    chmod -R u+w "$2"
+}
+
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/imex-integration-tests.XXXXXX")
 trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
 
 for test_name in TEST_2D TEST_BOX TEST_BW TEST_CF TEST_TAAL TEST_DAMBREAK; do
-    cp -R "$test_dir/$test_name" "$work_dir/"
+    copy_writable_fixture "$test_dir/$test_name" "$work_dir/$test_name"
 done
 
 run_case() {
@@ -108,7 +113,7 @@ run_case() {
 
 check_output_path_safety() {
     safety_dir=$work_dir/output-path-safety
-    cp -R "$test_dir/TEST_2D" "$safety_dir"
+    copy_writable_fixture "$test_dir/TEST_2D" "$safety_dir"
     (
         cd "$safety_dir"
         sh ./cleanFolder.sh
@@ -130,7 +135,7 @@ check_output_path_safety() {
         }
     )
 
-    cp -R "$test_dir/TEST_2D" "$safety_dir/symlink-case"
+    copy_writable_fixture "$test_dir/TEST_2D" "$safety_dir/symlink-case"
     (
         cd "$safety_dir/symlink-case"
         sh ./cleanFolder.sh
@@ -149,7 +154,7 @@ check_output_path_safety() {
         }
     )
 
-    cp -R "$test_dir/TEST_2D" "$safety_dir/symlink-file-case"
+    copy_writable_fixture "$test_dir/TEST_2D" "$safety_dir/symlink-file-case"
     (
         cd "$safety_dir/symlink-file-case"
         sh ./cleanFolder.sh
@@ -189,7 +194,7 @@ check_output_path_safety() {
         }
     )
 
-    cp -R "$test_dir/TEST_2D" "$safety_dir/traversal-base-case"
+    copy_writable_fixture "$test_dir/TEST_2D" "$safety_dir/traversal-base-case"
     (
         cd "$safety_dir/traversal-base-case"
         sh ./cleanFolder.sh
@@ -206,7 +211,7 @@ check_output_path_safety() {
         }
     )
 
-    cp -R "$test_dir/TEST_2D" "$safety_dir/custom-base-case"
+    copy_writable_fixture "$test_dir/TEST_2D" "$safety_dir/custom-base-case"
     (
         cd "$safety_dir/custom-base-case"
         sh ./cleanFolder.sh
@@ -223,7 +228,7 @@ check_output_path_safety() {
             exit 1
         }
     )
-    cp -R "$test_dir/TEST_2D" "$safety_dir/absolute-base-case"
+    copy_writable_fixture "$test_dir/TEST_2D" "$safety_dir/absolute-base-case"
     physical_safety_dir=$(CDPATH= cd -- "$safety_dir" && pwd -P)
     (
         cd "$safety_dir/absolute-base-case"

@@ -19,3 +19,11 @@ IMEX_SfloW2D combines physical flow models with high-resolution spatial discreti
 
 !!! info "Automatically published releases"
     The documentation is built on demand or when a tag or release is published. Example pages are regenerated from the README.md files in `EXAMPLES/` at the selected revision.
+
+!!! warning "GitHub-generated source snapshots"
+    GitHub's automatic **Source code (zip/tar.gz)** downloads are snapshots of
+    the tagged repository, not the prepared Autotools source archive; they may
+    omit generated files such as `configure`. When available, use the named
+    `IMEX_SfloW2D-<version>.tar.gz` and
+    `IMEX_SfloW2D-<version>-examples.tar.gz` assets on the
+    [release page](https://github.com/demichie/IMEX_SfloW2D_dev/releases).

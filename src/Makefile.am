@@ -43,6 +43,7 @@ IMEX_SfloW2D_SOURCES = \
                 IMEX_SfloW2D.f90
 
 AM_FCFLAGS = @OPENMP_FCFLAGS@ @NETCDF_CPPFLAGS@ -I$(srcdir)/state
+CLEANFILES = *.mod
 EXTRA_DIST = state/state_conversion_phys_var.inc state/velocity_from_conservative.inc \
              state/mixture_heat_capacity.inc state/mixture_from_mass.inc
 
