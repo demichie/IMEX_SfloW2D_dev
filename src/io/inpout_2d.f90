@@ -578,7 +578,7 @@ CONTAINS
     IF (lexist .EQV. .FALSE.) THEN
 
       WRITE (*, *) 'Input file IMEX_SfloW2D.inp not found'
-      STOP
+      ERROR STOP 1
 
     ELSE
 

@@ -21,9 +21,18 @@ if [ ! -x "$executable" ]; then
     exit 2
 fi
 
+prepare_solver_input() {
+    fixture_dir=$1
+    if [ -f "$fixture_dir/IMEX_sfloW2D.inp" ]; then
+        mv "$fixture_dir/IMEX_sfloW2D.inp" "$fixture_dir/IMEX_input.tmp"
+        mv "$fixture_dir/IMEX_input.tmp" "$fixture_dir/IMEX_SfloW2D.inp"
+    fi
+}
+
 copy_writable_fixture() {
     cp -R "$1" "$2"
     chmod -R u+w "$2"
+    prepare_solver_input "$2"
 }
 
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/imex-integration-tests.XXXXXX")
@@ -98,8 +107,8 @@ run_case() {
                 exit 1
             }
             awk '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_OVERWRITE=T," }' \
-                IMEX_sfloW2D.inp > IMEX_sfloW2D.inp.tmp
-            mv IMEX_sfloW2D.inp.tmp IMEX_sfloW2D.inp
+                IMEX_SfloW2D.inp > IMEX_SfloW2D.inp.tmp
+            mv IMEX_SfloW2D.inp.tmp IMEX_SfloW2D.inp
             "$executable" > overwrite.log 2>&1 || {
                 echo "FAIL: OUTPUT_OVERWRITE=T did not allow an existing run directory" >&2
                 cat overwrite.log >&2
@@ -118,8 +127,8 @@ check_output_path_safety() {
         cd "$safety_dir"
         sh ./cleanFolder.sh
         sed 's/RUN_NAME="TEST_2D"/RUN_NAME="..\/escape"/' \
-            IMEX_sfloW2D.inp > invalid.inp
-        mv invalid.inp IMEX_sfloW2D.inp
+            IMEX_SfloW2D.inp > invalid.inp
+        mv invalid.inp IMEX_SfloW2D.inp
         if "$executable" > invalid-name.log 2>&1; then
             echo "FAIL: path traversal in RUN_NAME was accepted" >&2
             exit 1
@@ -142,8 +151,8 @@ check_output_path_safety() {
         mkdir symlink-target
         ln -s symlink-target unsafe-base
         awk '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_BASE_DIRECTORY=\"unsafe-base\"," }' \
-            IMEX_sfloW2D.inp > symlink.inp
-        mv symlink.inp IMEX_sfloW2D.inp
+            IMEX_SfloW2D.inp > symlink.inp
+        mv symlink.inp IMEX_SfloW2D.inp
         if "$executable" > symlink.log 2>&1; then
             echo "FAIL: symlink in OUTPUT_BASE_DIRECTORY was accepted" >&2
             exit 1
@@ -162,8 +171,8 @@ check_output_path_safety() {
         printf 'protected sentinel\n' > "$safety_dir/sentinel.txt"
         ln -s "$safety_dir/sentinel.txt" OUTPUT/TEST_2D/metadata/TEST_2D.bak
         awk '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_OVERWRITE=T," }' \
-            IMEX_sfloW2D.inp > overwrite.inp
-        mv overwrite.inp IMEX_sfloW2D.inp
+            IMEX_SfloW2D.inp > overwrite.inp
+        mv overwrite.inp IMEX_SfloW2D.inp
         if "$executable" > symlink-file.log 2>&1; then
             echo "FAIL: symlink output file was followed during overwrite" >&2
             exit 1
@@ -199,8 +208,8 @@ check_output_path_safety() {
         cd "$safety_dir/traversal-base-case"
         sh ./cleanFolder.sh
         awk '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_BASE_DIRECTORY=\"../outside\"," }' \
-            IMEX_sfloW2D.inp > traversal-base.inp
-        mv traversal-base.inp IMEX_sfloW2D.inp
+            IMEX_SfloW2D.inp > traversal-base.inp
+        mv traversal-base.inp IMEX_SfloW2D.inp
         if "$executable" > traversal-base.log 2>&1; then
             echo "FAIL: parent-directory component in OUTPUT_BASE_DIRECTORY was accepted" >&2
             exit 1
@@ -216,8 +225,8 @@ check_output_path_safety() {
         cd "$safety_dir/custom-base-case"
         sh ./cleanFolder.sh
         awk '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_BASE_DIRECTORY=\"custom output\"," }' \
-            IMEX_sfloW2D.inp > custom-base.inp
-        mv custom-base.inp IMEX_sfloW2D.inp
+            IMEX_SfloW2D.inp > custom-base.inp
+        mv custom-base.inp IMEX_SfloW2D.inp
         "$executable" > custom-base.log 2>&1 || {
             echo "FAIL: valid custom output base was rejected" >&2
             cat custom-base.log >&2
@@ -235,8 +244,8 @@ check_output_path_safety() {
         sh ./cleanFolder.sh
         awk -v output="$physical_safety_dir/absolute output" \
             '{ print; if ($0 ~ /RUN_NAME/) print "  OUTPUT_BASE_DIRECTORY=\"" output "\"," }' \
-            IMEX_sfloW2D.inp > absolute-base.inp
-        mv absolute-base.inp IMEX_sfloW2D.inp
+            IMEX_SfloW2D.inp > absolute-base.inp
+        mv absolute-base.inp IMEX_SfloW2D.inp
         "$executable" > absolute-base.log 2>&1 || {
             echo "FAIL: valid absolute OUTPUT_BASE_DIRECTORY was rejected" >&2
             cat absolute-base.log >&2

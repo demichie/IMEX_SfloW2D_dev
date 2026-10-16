@@ -4,8 +4,8 @@
 SUBDIRS =   \
             src
 
-# The lowercase test inputs are canonical; uppercase aliases are byte-identical
-# and collide with them on case-insensitive filesystems.
+# Test fixtures keep one lowercase input file; test copies use the solver's
+# required uppercase filename to avoid case-only aliases in Git.
 EXTRA_DIST = \
   COPYING \
   CITATION.cff \
