@@ -17,6 +17,7 @@ MODULE hyperbolic_2d
   USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
   USE geometry_2d, ONLY : grav_coeff_stag_x, grav_coeff_stag_y
   USE geometry_2d, ONLY : one_by_dx, one_by_dy
+  USE geometry_2d, ONLY : source_cell
 
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hp_reconstruction_2d, ONLY : hp_dry_tolerance
@@ -350,19 +351,39 @@ CONTAINS
                a_minus, a_plus, PATH_DIR_X, 2,                               &
                this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k) )
 
-          ! HP reconstruction is applied after the primitive boundary trace,
-          ! so it can restore a nonzero normal velocity at a nominally closed
-          ! edge. Enforce a zero-velocity Dirichlet wall on the final flux:
-          ! advective transport (total mass, energy, phases and auxiliaries)
-          ! is blocked, while the normal momentum flux retains wall pressure.
-          IF ( ( j .EQ. 1 ) .AND. ( bcW(2)%flag .EQ. 0 ) .AND.               &
+          ! Apply the boundary's one-way condition to the final HP-PCCU flux.
+          ! V2 limited the reconstructed normal momentum to outward-only values
+          ! (west/south <= 0; east/north >= 0). HP reconstruction follows the
+          ! primitive boundary trace and can otherwise reintroduce inflow, so
+          ! remove incoming mass-carried transport here. Keep normal momentum
+          ! flux, which contains the wall pressure contribution. Source cells
+          ! are exempt, as in the legacy reconstruction.
+          IF ( ( j .EQ. 1 ) .AND. ( source_cell(j,k) .NE. 2 ) .AND.           &
+               ( bcW(2)%flag .NE. 0 ) .AND.                                  &
+               ( this%G_interface_xL(1,j,k) .GT. 0.0_wp ) ) THEN
+             this%G_interface_xL(1,j,k) = 0.0_wp
+             this%G_interface_xR(1,j,k) = 0.0_wp
+             this%G_interface_xL(3:n_eqns,j,k) = 0.0_wp
+             this%G_interface_xR(3:n_eqns,j,k) = 0.0_wp
+          ELSEIF ( ( j .EQ. 1 ) .AND. ( source_cell(j,k) .NE. 2 ) .AND.      &
+               ( bcW(2)%flag .EQ. 0 ) .AND.                                  &
                ( bcW(2)%value .EQ. 0.0_wp ) ) THEN
              this%G_interface_xL(1,j,k) = 0.0_wp
              this%G_interface_xR(1,j,k) = 0.0_wp
              this%G_interface_xL(3:n_eqns,j,k) = 0.0_wp
              this%G_interface_xR(3:n_eqns,j,k) = 0.0_wp
           ELSEIF ( ( j .EQ. comp_interfaces_x ) .AND.                        &
-               ( bcE(2)%flag .EQ. 0 ) .AND. ( bcE(2)%value .EQ. 0.0_wp ) ) THEN
+               ( source_cell(j-1,k) .NE. 2 ) .AND.                           &
+               ( bcE(2)%flag .NE. 0 ) .AND.                                  &
+               ( this%G_interface_xL(1,j,k) .LT. 0.0_wp ) ) THEN
+             this%G_interface_xL(1,j,k) = 0.0_wp
+             this%G_interface_xR(1,j,k) = 0.0_wp
+             this%G_interface_xL(3:n_eqns,j,k) = 0.0_wp
+             this%G_interface_xR(3:n_eqns,j,k) = 0.0_wp
+          ELSEIF ( ( j .EQ. comp_interfaces_x ) .AND.                        &
+               ( source_cell(j-1,k) .NE. 2 ) .AND.                           &
+               ( bcE(2)%flag .EQ. 0 ) .AND.                                  &
+               ( bcE(2)%value .EQ. 0.0_wp ) ) THEN
              this%G_interface_xL(1,j,k) = 0.0_wp
              this%G_interface_xR(1,j,k) = 0.0_wp
              this%G_interface_xL(3:n_eqns,j,k) = 0.0_wp
@@ -391,14 +412,32 @@ CONTAINS
                a_minus, a_plus, PATH_DIR_Y, 3,                               &
                this%G_interface_yB(:,j,k), this%G_interface_yT(:,j,k) )
 
-          IF ( ( k .EQ. 1 ) .AND. ( bcS(3)%flag .EQ. 0 ) .AND.                &
+          IF ( ( k .EQ. 1 ) .AND. ( source_cell(j,k) .NE. 2 ) .AND.           &
+               ( bcS(3)%flag .NE. 0 ) .AND.                                  &
+               ( this%G_interface_yB(1,j,k) .GT. 0.0_wp ) ) THEN
+             this%G_interface_yB(1:2,j,k) = 0.0_wp
+             this%G_interface_yT(1:2,j,k) = 0.0_wp
+             this%G_interface_yB(4:n_eqns,j,k) = 0.0_wp
+             this%G_interface_yT(4:n_eqns,j,k) = 0.0_wp
+          ELSEIF ( ( k .EQ. 1 ) .AND. ( source_cell(j,k) .NE. 2 ) .AND.      &
+               ( bcS(3)%flag .EQ. 0 ) .AND.                                 &
                ( bcS(3)%value .EQ. 0.0_wp ) ) THEN
              this%G_interface_yB(1:2,j,k) = 0.0_wp
              this%G_interface_yT(1:2,j,k) = 0.0_wp
              this%G_interface_yB(4:n_eqns,j,k) = 0.0_wp
              this%G_interface_yT(4:n_eqns,j,k) = 0.0_wp
           ELSEIF ( ( k .EQ. comp_interfaces_y ) .AND.                        &
-               ( bcN(3)%flag .EQ. 0 ) .AND. ( bcN(3)%value .EQ. 0.0_wp ) ) THEN
+               ( source_cell(j,k-1) .NE. 2 ) .AND.                           &
+               ( bcN(3)%flag .NE. 0 ) .AND.                                  &
+               ( this%G_interface_yB(1,j,k) .LT. 0.0_wp ) ) THEN
+             this%G_interface_yB(1:2,j,k) = 0.0_wp
+             this%G_interface_yT(1:2,j,k) = 0.0_wp
+             this%G_interface_yB(4:n_eqns,j,k) = 0.0_wp
+             this%G_interface_yT(4:n_eqns,j,k) = 0.0_wp
+          ELSEIF ( ( k .EQ. comp_interfaces_y ) .AND.                        &
+               ( source_cell(j,k-1) .NE. 2 ) .AND.                           &
+               ( bcN(3)%flag .EQ. 0 ) .AND.                                  &
+               ( bcN(3)%value .EQ. 0.0_wp ) ) THEN
              this%G_interface_yB(1:2,j,k) = 0.0_wp
              this%G_interface_yT(1:2,j,k) = 0.0_wp
              this%G_interface_yB(4:n_eqns,j,k) = 0.0_wp
