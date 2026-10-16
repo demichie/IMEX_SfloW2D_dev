@@ -81,7 +81,8 @@ MODULE inpout_2d
 
   USE parameters_2d, ONLY: x_fissures_end_points, y_fissures_end_points,        &
                            width_fissures, linear_vel_fissures, T_fissures,    &
-                           time_param_fissures
+                           time_param_fissures, xs_fissures, xg_fissures,      &
+                           xl_fissures
 
   ! -- Variables for the optional PARTICLE_DISTRIBUTION_PARAMETERS namelist
   USE parameters_2d, ONLY: particle_distribution_flag, fractal_dim, diam_min,   &
@@ -1059,6 +1060,13 @@ CONTAINS
     REAL(wp) :: red_grav
     REAL(wp) :: rho_c
     REAL(wp) :: rho_m
+
+    ! Source composition as given, for the per-fissure conversion
+    LOGICAL :: composition_by_volume
+    REAL(wp) :: alphas_given(100), alphag_given(100), alphal_given
+    REAL(wp) :: alphas_fissure(100), alphal_fissure
+    REAL(wp) :: rho_m_fissure, inv_rhom_fissure, rho_c_fissure, xc_fissure
+    REAL(wp) :: sp_heat_c_fissure, sp_heat_mix_fissure
     REAL(wp) :: Ri
     REAL(wp) :: sp_heat_mix
     REAL(wp) :: mfr
@@ -4196,6 +4204,11 @@ CONTAINS
           END IF
         END IF
 
+        composition_by_volume = .NOT. ANY(xs_source(1:n_solid) .GT. -1.0_wp)
+        alphas_given(1:n_solid) = alphas_source(1:n_solid)
+        alphag_given(1:n_add_gas) = alphag_source(1:n_add_gas)
+        alphal_given = alphal_source
+
         IF (.NOT. ANY(xs_source(1:n_solid) .GT. -1.0_wp)) THEN
 
           CALL eval_mixture_properties_from_volume_fractions(                &
@@ -4214,6 +4227,48 @@ CONTAINS
         ! bottom radial source, which does not enter the source-flow setup.
         CALL enforce_mass_fraction_closure(                                  &
              xs_source(1:n_solid), xg_source(1:n_add_gas), xl_source)
+
+        ! Every fissure carries the source composition at its own
+        ! temperature. Converting volume fractions once, at T_FISSURES(1),
+        ! and rebuilding the mixture at another fissure's temperature changed
+        ! the solid volume fraction of that fissure.
+        IF (bottom_fissural_source_flag) THEN
+
+          ALLOCATE (xs_fissures(n_solid, n_fissures))
+          ALLOCATE (xg_fissures(n_add_gas, n_fissures))
+          ALLOCATE (xl_fissures(n_fissures))
+
+          DO i = 1, n_fissures
+
+            IF (composition_by_volume) THEN
+
+              alphas_fissure(1:n_solid) = alphas_given(1:n_solid)
+              alphal_fissure = alphal_given
+
+              CALL eval_mixture_properties_from_volume_fractions(            &
+                   ! IN
+                   T_fissures(i), alphag_given(1:n_add_gas),                 &
+                   ! INOUT
+                   alphas_fissure(1:n_solid), alphal_fissure,                &
+                   ! OUT
+                   rho_m_fissure, inv_rhom_fissure, rho_c_fissure,           &
+                   xs_fissures(:, i), xg_fissures(:, i), xl_fissures(i),     &
+                   xc_fissure, sp_heat_c_fissure, sp_heat_mix_fissure)
+
+              CALL enforce_mass_fraction_closure(xs_fissures(:, i),         &
+                   xg_fissures(:, i), xl_fissures(i))
+
+            ELSE
+
+              xs_fissures(:, i) = xs_source(1:n_solid)
+              xg_fissures(:, i) = xg_source(1:n_add_gas)
+              xl_fissures(i) = xl_source
+
+            END IF
+
+          END DO
+
+        END IF
 
         ALLOCATE (qp_source(n_vars + 2))
 

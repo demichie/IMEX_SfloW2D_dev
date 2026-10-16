@@ -36,6 +36,7 @@ PROGRAM IMEX_SfloW2D
    USE geometry_2d, ONLY : init_grid
    USE geometry_2d, ONLY : init_source
    USE geometry_2d, ONLY : refresh_topography_geometry
+   USE equation_terms_2d, ONLY : set_source_time_coefficients
 
    USE geometry_2d, ONLY : dx,dy,B_cent
    ! USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
@@ -459,6 +460,10 @@ PROGRAM IMEX_SfloW2D
 
       simulation%runtime%dt_old_old = simulation%runtime%dt_old
       simulation%runtime%dt_old = simulation%runtime%dt
+
+      ! Time windows of the sources averaged over the step about to be taken
+      CALL set_source_time_coefficients( simulation%runtime%t ,               &
+           simulation%runtime%dt )
 
       ! Fractional stochastic step: recover transported Z in wet cells,
       ! evolve the OU process everywhere, and initialize M*Z for advection.
