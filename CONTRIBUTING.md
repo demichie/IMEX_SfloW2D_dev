@@ -47,6 +47,7 @@ TESTS/run_tests.sh src/IMEX_SfloW2D
 TESTS/TEST_BINARY_RESTART/run_test.sh src/IMEX_SfloW2D
 TESTS/TEST_STOCHASTIC_RESTART/run_test.sh src/IMEX_SfloW2D
 TESTS/TEST_PCCU_GATE_H/run_test.sh src/IMEX_SfloW2D
+TESTS/TEST_SOURCE_MASS/run_test.sh src/IMEX_SfloW2D
 ```
 
 These are in addition to `make check`; they do not replace tests targeted at the code being modified. The GitHub Actions workflows validate GNU optimized/strict-debug builds, Docker configurations, and Intel `ifx` portability within their recorded scopes. These validation workflows run on tag pushes, published releases, or manual dispatch; they do not run on every branch commit or pull request.

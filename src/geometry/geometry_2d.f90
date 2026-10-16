@@ -119,6 +119,10 @@ MODULE geometry_2d
 
   REAL(wp), ALLOCATABLE :: cell_source_fractions(:,:)
 
+  ! Exact area of the bottom radial source over its sampled cell coverage;
+  ! the injection is scaled by it so that VEL_SOURCE acts on the exact area.
+  REAL(wp) :: bottom_source_area_ratio = 1.0_wp
+
    ! Cell-coverage fractions kept separate for each fissure.
    REAL(wp), ALLOCATABLE :: cell_fissure_fractions(:,:,:)
 
@@ -354,6 +358,12 @@ CONTAINS
 
        CALL compute_cell_fract(x_source,y_source,r_source,r2_source,            &
             angle_source,cell_source_fractions)
+
+       ! The sub-cell sampling misses the ellipse area by up to a few parts in
+       ! 1e5. Inject over the exact area pi*R_SOURCE*R2_SOURCE instead.
+       IF ( SUM( cell_source_fractions ) .GT. 0.0_wp )                       &
+            bottom_source_area_ratio = pi_g * r_source * r2_source /           &
+            ( dx * dy * SUM( cell_source_fractions ) )
 
     END IF
 
@@ -1934,11 +1944,17 @@ CONTAINS
 
           IF (vertex_count .LT. 3) CYCLE
 
+          ! Shoelace formula about the cell corner: with map coordinates of
+          ! order 1e6 m the products of absolute coordinates lose about 1e-3 m2
+          ! per cell, a few parts in 1e6 of the coverage of an oblique fissure.
           area_twice = 0.0_wp
           DO vertex = 1, vertex_count
              next_vertex = MOD(vertex, vertex_count) + 1
-             area_twice = area_twice + polygon_x(vertex) * polygon_y(next_vertex) &
-                  - polygon_x(next_vertex) * polygon_y(vertex)
+             area_twice = area_twice                                          &
+                  + ( polygon_x(vertex) - x_stag(cell_x) )                    &
+                  * ( polygon_y(next_vertex) - y_stag(cell_y) )               &
+                  - ( polygon_x(next_vertex) - x_stag(cell_x) )               &
+                  * ( polygon_y(vertex) - y_stag(cell_y) )
           END DO
           cell_fraction(cell_x,cell_y) = MIN(1.0_wp,                          &
                0.5_wp * ABS(area_twice) / (dx * dy))
