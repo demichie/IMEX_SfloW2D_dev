@@ -23,6 +23,10 @@ Supercritical shallow-water flow with weak bump response. The flow uses a single
 | Friction | Disabled |
 | Boundaries | Left: hu = 10 m²/s and h = 1 m. Right: zero-gradient outflow. |
 
+## Dependencies
+
+Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag is `true`.
+
 ## How to run
 
 Generate inputs with `./create_example.py 200 false` (x-cell count and plotting flag) and run `../../../bin/IMEX_SfloW2D` from this case directory.

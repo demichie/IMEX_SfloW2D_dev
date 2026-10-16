@@ -321,7 +321,7 @@ dist = np.sqrt((XS - x1)**2 + (YS - y1)**2)
 # print(indexes_np.shape)
 
 DEM = pd.read_table(DEM_file,
-                    delim_whitespace=True,
+                    sep=r"\s+",
                     header=None,
                     skiprows=6,
                     dtype='unicode').astype(float).values

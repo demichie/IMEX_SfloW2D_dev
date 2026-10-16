@@ -25,6 +25,10 @@ A pyroclastic avalanche is simulated over real Mount Etna terrain with Voellmyâ€
 | Example target volume | 250000 mÂ³ (configurable) |
 | Example semi-width | 150 m (configurable) |
 
+## Dependencies
+
+Requires Python 3, NumPy, and pandas for preprocessing. Matplotlib is required only for the optional raster plot.
+
 ## How to run
 
 From this directory, extract the DEM archive into `DEM/`, edit `input_ellipsoid.py` and run `python create_input_ellipsoid.py`. Then execute `../../bin/IMEX_SfloW2D`. For cleaning, the tracked script is `./cleanFolder.sh` (the original README incorrectly wrote `./cleanfolder.sh`). For raster plotting, create a symbolic link with `ln -s ../../UTILS/plot_overlay.py .` and run `python plot_overlay.py`.

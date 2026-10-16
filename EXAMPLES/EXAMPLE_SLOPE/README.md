@@ -23,6 +23,10 @@ Supercritical inflow (`Ri<1`) enters from the left and passes an initial slope, 
 | Sedimentation / entrainment | Disabled |
 | Thermal energy | Hyperbolic advection |
 
+## Dependencies
+
+Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag is `true`.
+
 ## How to run
 
 Generate with `./create_example.py 400 1.0 300 false` (x cells, solids volume fraction, temperature in K, plot flag), then run `../../bin/IMEX_SfloW2D`.

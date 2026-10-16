@@ -26,6 +26,10 @@ This example sets up multiple pyroclastic-avalanche simulations at Etna, samples
 | Parallel launch | `launch_jobs.py`, configurable `max_processes` |
 | Hazard aggregation | `create_prob_maps.py`, `plot_ensemble.py` |
 
+## Dependencies
+
+Requires Python 3 and the IMEX_SfloW2D executable. NumPy and pandas are used for sampling, input generation and aggregation; Matplotlib is used for plots. The optional `create_hazard_maps.py` additionally requires netCDF4 and GDAL's Python bindings (`osgeo`).
+
 ## How to run
 
 From `EXAMPLE_ENSEMBLE_ETNA`, follow the sequence below.
@@ -41,7 +45,7 @@ From `EXAMPLE_ENSEMBLE_ETNA`, follow the sequence below.
 
 ## Expected output
 
-Each realization writes solver output beneath `ensemble.xxxxx/OUTPUT/<RUN_NAME>/`: NetCDF fields are in `fields/`, snapshots in indexed directories under `snapshots/`, maximum-thickness products in `diagnostics/`, vulnerability rasters and tables in `vulnerability/`, terrain exports in `terrain/`, and input backups/metadata in `metadata/`. The aggregation scripts read those per-realization locations. They produce probability rasters (`.asc`) in `result.xxx`; `plot_ensemble.py` makes PNG summary maps, and the optional hazard-map script writes to `exceedance_maps/`.
+Each realization writes solver output beneath `ensemble.xxxxx/OUTPUT/<RUN_NAME>/`: snapshots in indexed directories under `snapshots/`, maximum-thickness products and runout tables in `diagnostics/`, vulnerability rasters in `vulnerability/`, terrain exports in `terrain/`, and input backups/metadata in `metadata/`. The stock template sets `OUTPUT_CONS_FLAG=F`, so it does not write NetCDF fields unless that flag is enabled. The aggregation scripts read the per-realization outputs and produce probability rasters (`.asc`) in `result.xxx`; `plot_ensemble.py` makes PNG summary maps, and the optional hazard-map script writes to `exceedance_maps/`.
 
 The template currently sets `RUN_NAME="exampleEtna"`, so the default output root for each member is `ensemble.xxxxx/OUTPUT/exampleEtna/`.
 
@@ -97,4 +101,4 @@ The original [`README.txt`](README.txt) in this example directory remains the ar
 
 ## Documentation verification note
 
-**Run order and placeholders.** The placeholder prefix used by `create_inputfiles.py` is `ENSEMBLE_` (not the typo `ENSAMBLE_`). The generation sequence retains symbolic links, template copies, per-member `run.sh`, raster aggregation and probability plotting.
+**Run order and placeholders.** `create_inputfiles.py` substitutes sampled values for matching `ENSEMBLE_` tokens (not the typo `ENSAMBLE_`). The `ENSEMBLE_vx` and `ENSEMBLE_vy` tokens are intentionally resolved later by `create_input_ellipsoid.py`, invoked by each member's `run.sh`; they are expected to remain after `create_inputfiles.py` alone. The generation sequence retains symbolic links, template copies, per-member runs, raster aggregation and probability plotting.

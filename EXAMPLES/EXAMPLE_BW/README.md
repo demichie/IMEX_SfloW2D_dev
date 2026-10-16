@@ -23,6 +23,10 @@ A 1-D flow down a gentle slope with friction, sedimentation and air entrainment.
 | Bed adjustment by deposition | Disabled by default |
 | x-resolution, solids fraction, temperature | Generator arguments |
 
+## Dependencies
+
+Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag is `true`.
+
 ## How to run
 
 Generate with `./create_example.py 400 0.01 900 false` (cells, solids volume fraction, temperature, plotting flag), then execute `../../bin/IMEX_SfloW2D`.

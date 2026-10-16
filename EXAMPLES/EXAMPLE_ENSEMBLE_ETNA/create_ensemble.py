@@ -68,7 +68,7 @@ def associate_sector_to_coords(sect_asc_file, coor_x, coor_y):
     rows = int(rows)
 
     val = pd.read_table(sect_asc_file,
-                        delim_whitespace=True,
+                        sep=r"\s+",
                         header=None,
                         skiprows=6,
                         dtype='unicode').astype(float).values
@@ -105,7 +105,7 @@ def nonuniform_continuous_grid_sampling(asc_file, n_samples, discrete_flag):
     rows = int(rows)
 
     val = pd.read_table(asc_file,
-                        delim_whitespace=True,
+                        sep=r"\s+",
                         header=None,
                         skiprows=6,
                         dtype='unicode').astype(float).values

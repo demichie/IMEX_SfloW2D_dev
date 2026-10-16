@@ -23,6 +23,10 @@ Steady subcritical shallow-water benchmark. The flow uses a single phase with no
 | Friction | Disabled |
 | Boundaries | Left: specific discharge hu = 4.42 m²/s. Right: flow height h = 2 m. |
 
+## Dependencies
+
+Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag is `true`.
+
 ## How to run
 
 Generate inputs with `./create_example.py 200 false` (x-cell count and plotting flag) and run `../../../bin/IMEX_SfloW2D` from this case directory.

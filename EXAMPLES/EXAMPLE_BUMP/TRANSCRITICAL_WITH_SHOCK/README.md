@@ -23,6 +23,10 @@ Transcritical transition from subcritical to supercritical flow including a shoc
 | Friction | Disabled |
 | Boundaries | Left: prescribed specific discharge. Right: zero-gradient outflow. |
 
+## Dependencies
+
+Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag is `true`.
+
 ## How to run
 
 Generate inputs with `./create_example.py 200 false` (x-cell count and plotting flag) and run `../../../bin/IMEX_SfloW2D` from this case directory.

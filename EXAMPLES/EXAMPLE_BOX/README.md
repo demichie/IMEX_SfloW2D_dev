@@ -23,6 +23,10 @@ A 1-D dam-break problem on flat terrain, including deposition, entrainment, and 
 | Temperature | Generator argument (K) |
 | x-resolution | Generator argument |
 
+## Dependencies
+
+Requires Python 3 and NumPy. Matplotlib is required only when the plotting flag is `true`.
+
 ## How to run
 
 Run `./create_example.py 400 0.5 300 false` to prepare the simulation, followed by `../../bin/IMEX_SfloW2D`. Arguments: x-cell count, particle volume fraction, temperature (K), plotting flag.

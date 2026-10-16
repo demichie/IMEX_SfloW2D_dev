@@ -140,9 +140,9 @@ for i in range(n_points):
 # define the initial solution
 for i in range(n_cells):
 
-    B_cent[i] = 0.5 * (B[i] + B[i + 1])
-    w_cent[i] = 0.5 * (w[i] + w[i + 1])
-    u_cent[i] = 0.5 * (u[i] + u[i + 1])
+    B_cent[i] = 0.5 * (B[i, 0] + B[i + 1, 0])
+    w_cent[i] = 0.5 * (w[i, 0] + w[i + 1, 0])
+    u_cent[i] = 0.5 * (u[i, 0] + u[i + 1, 0])
 
 # create topography file
 header = "ncols     %s\n" % n_points
