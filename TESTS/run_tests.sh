@@ -144,6 +144,41 @@ check_output_path_safety() {
         }
     )
 
+    copy_writable_fixture "$test_dir/TEST_2D" "$safety_dir/invalid-name-existing-case"
+    (
+        cd "$safety_dir/invalid-name-existing-case"
+        sh ./cleanFolder.sh
+        "$executable" > valid-name.log 2>&1 || {
+            echo "FAIL: could not prepare existing output for invalid-input check" >&2
+            cat valid-name.log >&2
+            exit 1
+        }
+        before_files=$(find OUTPUT -type f -exec cksum {} \; | LC_ALL=C sort)
+        before_dirs=$(find OUTPUT -type d -print | LC_ALL=C sort)
+        sed 's/RUN_NAME="TEST_2D"/RUN_NAME="..\/escape"/' \
+            IMEX_SfloW2D.inp > invalid.inp
+        mv invalid.inp IMEX_SfloW2D.inp
+        if "$executable" > invalid-name-existing.log 2>&1; then
+            echo "FAIL: path traversal in RUN_NAME was accepted with existing output" >&2
+            exit 1
+        fi
+        grep -q 'RUN_NAME may contain only' invalid-name-existing.log || {
+            echo "FAIL: invalid RUN_NAME did not report the expected error" >&2
+            cat invalid-name-existing.log >&2
+            exit 1
+        }
+        after_files=$(find OUTPUT -type f -exec cksum {} \; | LC_ALL=C sort)
+        after_dirs=$(find OUTPUT -type d -print | LC_ALL=C sort)
+        [ "$before_files" = "$after_files" ] && [ "$before_dirs" = "$after_dirs" ] || {
+            echo "FAIL: invalid RUN_NAME changed the existing output tree" >&2
+            exit 1
+        }
+        [ ! -e escape ] || {
+            echo "FAIL: invalid RUN_NAME created output outside OUTPUT" >&2
+            exit 1
+        }
+    )
+
     copy_writable_fixture "$test_dir/TEST_2D" "$safety_dir/symlink-case"
     (
         cd "$safety_dir/symlink-case"
