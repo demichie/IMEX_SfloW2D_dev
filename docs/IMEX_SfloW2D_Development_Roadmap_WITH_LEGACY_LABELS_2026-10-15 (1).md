@@ -120,6 +120,13 @@ Per C01/C02 sono richiesti test di naming, sicurezza directory, overwrite, manif
 
 Le voci **"Test proporzionati"** inserite sotto le schede A01–I09 sono *matrici prospettiche di selezione* e non dichiarazioni di test già eseguiti. I gate, gli stati ufficiali e gli esiti storici riportati nel testo originale restano invariati. Per gli step già completati queste voci valgono per eventuali modifiche future che li riguardino, non come richieste retroattive di nuova validazione.
 
+### Regola generale per la chiusura degli step implementati ma non ancora accettati
+
+Per ogni step con stato **`IMPLEMENTATO, GATE APERTO`** la scheda deve distinguere chiaramente: (i) i requisiti del contratto non ancora coperti da evidenze, (ii) le verifiche minime ancora necessarie e (iii) l'evidenza o decisione richiesta per il passaggio a **`COMPLETATO`**. Se non rimangono requisiti scoperti, il responsabile può chiudere il gate con una decisione documentata basata sulle evidenze già disponibili, senza ripetere test. Lo stato di uno step **non cambia automaticamente** perché è stato chiuso un gate più ampio: l'accettazione deve essere registrata esplicitamente nella sua scheda e nella tabella del Master Development Plan.
+
+Le evidenze di un gate trasversale possono essere riutilizzate da più step soltanto entro lo **scope, la revisione e l'ambiente effettivamente verificati**. Un elemento non coperto richiede soltanto test mirati T1/T2 (o T3 se il rischio residuo lo giustifica), secondo la regola di validazione proporzionata al rischio; evitare campagne scientifiche generalizzate in assenza di impatto numerico.
+
+
 # 3. Master Development Plan — ordine e stato corrente
 
 ## Fase A — Fondamenti numerici e baseline scientifica
@@ -881,7 +888,27 @@ Tutti i file scritti direttamente dal solver, inclusi backup di input, DEM espor
 
 Centralizzare la costruzione/validazione dei percorsi di output in un componente I/O dedicato. Definire eventuale modalità legacy temporanea solo per il periodo di validazione e migrazione degli script di post-processing.
 
+#### Criterio esplicito di chiusura del gate C02 — verifica documentale delle evidenze
+
+**Situazione al 16 ottobre 2026:** C02 è registrato come **`IMPLEMENTATO, GATE APERTO`**, mentre il gate I/O complessivo C03 risulta **`COMPLETATO`**. Questa differenza non costituisce di per sé una regressione tecnica: indica che la decisione di accettazione specifica C02 non è stata ancora registrata. Non modificare automaticamente lo stato di C02 in base al solo stato di C03.
+
+**Copertura da verificare e tracciare:** associare ogni requisito C02 al test o all'evidenza C03 che effettivamente lo copre, indicando revisione Git e ambito verificato. La verifica include: validazione di `RUN_NAME`; percorsi relativi/assoluti di `OUTPUT_BASE_DIRECTORY` e rifiuto di `..`/symlink; semantica di `OUTPUT_OVERWRITE` e isolamento del singolo run; collisioni e directory preesistenti; restart interno e checkpoint esterno con compatibilità e protezione delle scritture; assenza di output solver fuori dal run; naming degli snapshot/manifest e destinazioni dei file; controlli su symlink/hard link e preservazione degli output in caso di input o storia di restart non validi.
+
+**Evidenze già riportate in C03:** i test mirati su sicurezza dei percorsi, multi-run, overwrite, restart, manifest, fault injection e confronti di output sono descritti nella scheda C03; possono essere richiamati **senza rieseguirli**, purché coprano il requisito specifico e la revisione pertinente. La decisione scientifica N9 associata a C03 non sostituisce il controllo puntuale del contratto C02.
+
+**Procedura minima per chiudere C02:**
+
+1. Compilare una matrice requisito C02 → evidenza/test C03 → risultato → revisione/scope → eventuale lacuna; non basta dichiarare genericamente che C03 è completo.
+2. Identificare in modo esplicito gli eventuali requisiti non verificati o esclusi dallo scope. Per ciascuno distinguere fra test mirato ancora necessario e limitazione consapevolmente accettata. Non introdurre nuovi requisiti retroattivamente.
+3. Eseguire **solo** eventuali test T1/T2 indispensabili a colmare lacune reali; T3 soltanto in presenza di un rischio residuo motivato. Nessuna nuova campagna di regressione HP-PCCU/IMEX o ripetizione della matrice A11/N9 è richiesta per una chiusura puramente documentale.
+4. Registrare la decisione del responsabile, con data, revisione Git, evidenze riutilizzate, eccezioni e limiti; **solo dopo** aggiornare sia la scheda C02 sia la riga C02 nella tabella generale a `COMPLETATO`.
+
+**Condizione di uscita:** tutti i requisiti del contratto C02 risultano coperti da evidenza appropriata oppure da eccezioni esplicite approvate; non rimangono controlli obbligatori senza decisione. **Stato attuale invariato: `IMPLEMENTATO, GATE APERTO`** fino alla registrazione di tale verifica e della decisione formale.
+
+
 ### C03 — Accettazione I/O per run
+
+**Rapporto tra C03 e C02:** la chiusura di C03 documenta evidenze utilizzabili anche per C02, limitatamente ai requisiti effettivamente verificati. **Non determina automaticamente lo stato di C02**: la chiusura di quest'ultimo richiede la matrice di copertura e la decisione specifica descritte nella scheda C02. Non ripetere la campagna C03 per produrre una seconda evidenza identica.
 
 **Test proporzionati (nuove modifiche a questo step):** T1 tutti i negativi di path e collisione; T2 full/split/external restart, append NetCDF/CSV, snapshot interrotto; T3 2-3 scenari numerici rappresentativi con baseline A11; nessuna campagna HP-PCCU completa automatica. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
