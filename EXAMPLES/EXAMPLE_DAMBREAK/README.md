@@ -23,7 +23,7 @@ This long-channel dam break is designed to examine simultaneous compaction and g
 | MU_S, MU_2 | 0.55, 0.73 |
 | MUI_INF | 0.05 (0 would recover unregularized form) |
 | I_0 | 0.279 |
-| Hydraulic permeability | 1.10 × 10^-11 (may be overridden dynamically) |
+| Hydraulic permeability | Template value 1.10 × 10^-11; unused with dynamic permeability enabled |
 | GAS_LOSS_FLAG | T |
 | F_INHIBIT_MODE | DYNAMIC |
 | DYNAMIC_PERMEABILITY_FLAG | T |
@@ -43,9 +43,9 @@ The generator writes `IMEX_SfloW2D.inp`, `topography_dem.asc`, an initial conser
 - `OFF`: inhibition is always 1, even above maximum packing.
 - `STEP`: discontinuous switch at maximum packing.
 - `STATIC`: smooth transition independent of height, starting at user-provided `ALPHA_TRANS`.
-- `DYNAMIC`: height-dependent smooth transition, no manually set `ALPHA_TRANS` needed.
+- `DYNAMIC`: height-dependent smooth transition derived from flow height. The parser still requires `ALPHA_TRANS > 0` even though this branch uses the height-derived transition; the template sets `ALPHA_TRANS=0.2`.
 
-The original README warns that `GAS_LOSS_FLAG=T` is required to avoid nonphysical pressure decrease without gas loss. When `DYNAMIC_PERMEABILITY_FLAG=T`, the prescribed permeability is ignored and a local value is derived from solids fraction and Sauter diameter. The original text mentions both `1.10D-11` and `5.85e-12` as supplied values; this inconsistency is retained here as an audit note for verification.
+The original README warns that `GAS_LOSS_FLAG=T` is required to avoid nonphysical pressure decrease without gas loss. When `DYNAMIC_PERMEABILITY_FLAG=T`, the prescribed permeability is ignored and a local value is derived from solids fraction and Sauter diameter. The tracked template sets `hydraulic_permeability=1.10D-11`; the legacy text's `5.85e-12` is stale, and neither value controls this dynamic-permeability run.
 
 ## Provenance and documentation notes
 

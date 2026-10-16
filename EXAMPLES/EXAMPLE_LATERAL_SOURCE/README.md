@@ -18,15 +18,15 @@ Supercritical lateral inflow of a gas–particle mixture on flat terrain. Sedime
 
 | Parameter | Value |
 | --- | --- |
-| Source extent | Generator argument (m) |
-| Source mass-flow rate | Third generator argument; units to verify |
+| Source extent | 250 m in the documented invocation |
+| Source mass-flow rate | 10,000,000 kg/s in the documented invocation |
 | Temperature | Generator argument (K) |
 | Initial Richardson number | Generator argument, < 1 |
-| Solid fraction | Generator argument; basis to verify |
+| Solid mass fraction (`XS_SOURCE`) | 0.01 in the documented invocation |
 
 ## How to run
 
-Run `python create_example.py 200 250 10000000 900 0.5 0.01` and then `../../bin/IMEX_SfloW2D`. The script accepts x cells, source extent, source mass flow rate, temperature, Richardson number and solids fraction. The original README also labels the third argument "initial thickness" and gives incompatible units for the last argument; those contradictions require second-pass verification.
+Run `python create_example.py 200 250 10000000 900 0.5 0.01` and then `../../bin/IMEX_SfloW2D`. The six arguments are x cells, source extent (m), total source mass-flow rate (kg/s), temperature (K), Richardson number and solid mass fraction. The generator puts the third argument in `MFR_SOURCE`; the solver derives the source thickness from that rate. The sixth argument is written to `XS_SOURCE`, a mass fraction. The legacy README's "initial thickness" description for the third argument and "kg/s" units for the last argument are errors.
 
 ## Expected output
 
@@ -42,4 +42,4 @@ The original [`README.txt`](README.txt) in this example directory remains the ar
 
 ## Documentation verification note
 
-**Review mass-flow-rate parameter.** The third `create_example.py` argument is the **source mass-flow rate**, not initial thickness. The legacy README lists incompatible descriptions and units. Use the source mass-flow-rate designation; the precise SI unit and how the generator converts it to inflow state should be confirmed against the full script.
+**Parameter interpretation.** The generator maps its third argument to `MFR_SOURCE`; the solver reports this rate in kg/s and derives `H_SOURCE` from it. The final argument maps to `XS_SOURCE`, which is a source mass fraction.

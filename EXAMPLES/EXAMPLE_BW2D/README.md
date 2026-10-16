@@ -51,7 +51,7 @@ The original README contains two descriptions of the four `TIME_PARAM` settings.
 /
 ```
 
-For the latter: the period is 600 s; pulse duration 100 s; the linear ramp time is 50 s; the initial phase is 50 s (at the source peak). The initial flow declines over 50 s and is subsequently off during the remaining cycle. The discrepancy between descriptions must be resolved against the generator/template in the second migration pass.
+The generated template sets `BOTTOM_RADIAL_SOURCE_FLAG=T`, so `TIME_PARAM(4)` is a phase offset, not a cut-off. With the explicit values, the 50 s phase equals the ramp duration: the source starts at its peak, declines linearly to zero over the first 50 s, and stays off for the remainder of the 600 s period. The earlier 30 s/20 s prose does not describe this generated configuration.
 
 ## References
 
@@ -63,4 +63,4 @@ The original [`README.txt`](README.txt) in this example directory remains the ar
 
 ## Documentation verification note
 
-**Source timing.** The documented invocation supplies **eight** arguments. The explicit `TIME_PARAM = 600, 100, 50, 50` describes a 600 s period with a 100 s pulse and 50 s ramps; the contradictory 30/20 s prose is retained as a historical inconsistency, not as a second active configuration.
+**Source timing.** The documented invocation supplies **eight** arguments. The template-generated `TIME_PARAM = 600, 100, 50, 50` describes a 600 s period, a 100 s active window, a 50 s linear ramp and a 50 s phase offset. The contradictory 30/20 s prose is historical, not the active configuration.
