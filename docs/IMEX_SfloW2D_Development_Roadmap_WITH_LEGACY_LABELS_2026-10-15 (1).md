@@ -999,7 +999,11 @@ Gate di accettazione: (a) build/test da clone Git con autoreconf -fi; (b) config
 
 **Test proporzionati (nuove modifiche a questo step):** T1 versioni, checksum e inventario di entrambi gli archivi; T2 esempi estratti; T3 coerenza stessa revisione/tag prima del rilascio. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: DA FARE
+Implementato `tools/release/build_archives.py`: il tool risolve un tag Git, genera l'archivio sorgente con `make dist` e l'archivio Examples dall'identico commit, stampando la versione Autotools dal tag. Il manifest JSON registra revisione, checksum SHA-256 e inventario completo. `Makefile.am` distribuisce documentazione, licenza, i fixture richiesti da `make check` e i due dataset usati da tali fixture; i README storici restano inclusi nell'archivio Examples. Le varianti di input dei test che differiscono solo per maiuscole/minuscole sono byte-identiche: la distribuzione usa il nome minuscolo canonico, evitando collisioni sui filesystem macOS case-insensitive.
+
+T1–T3 verificati in un repository temporaneo isolato con tag sintetico `9.9.13` (revisione `1309bd62dcdecdda25b17b4d6033dcdf0c349ba8`): entrambi gli archivi sono stati generati, i checksum e la versione nel `configure` verificati indipendentemente, l'inventario Examples estratto ha conservato tutti i percorsi e i 20 `README.md`, e il manifest riporta lo stesso tag/revisione per entrambi. Non sono stati eseguiti `make check` dall'archivio estratto, `make distcheck`, prove ifx/Docker o pubblicazione: restano al gate C06. La provenienza/licenza dei dataset e le dipendenze operative degli esempi non sono ancora certificate; non dichiarare gli archivi autonomi o pronti alla pubblicazione.
+
+Stato ufficiale: IMPLEMENTATO (T1–T3); gate di rilascio C06 aperto
 
 ### C06 — Validazione distributiva
 

@@ -15,6 +15,7 @@ plume_mom.doxy
 /Makefile
 /Makefile.in
 /missing
+/dist/
 /src/Makefile
 /src/Makefile.in
 /test-driver
