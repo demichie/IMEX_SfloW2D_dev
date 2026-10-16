@@ -192,7 +192,7 @@ check_output_path_safety() {
             echo "FAIL: hard-linked output file was accepted during overwrite" >&2
             exit 1
         fi
-        grep -q 'multiply-linked file' hardlink-file.log || {
+        tr -d '[:space:]' < hardlink-file.log | grep -q 'multiply-linkedfile' || {
             echo "FAIL: hard-linked output file did not report the expected error" >&2
             cat hardlink-file.log >&2
             exit 1

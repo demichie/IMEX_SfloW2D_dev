@@ -148,6 +148,7 @@ MODULE inpout_2d
   USE parameters_2d, ONLY: gas_loss_flag
 
   IMPLICIT NONE
+  PRIVATE :: make_runout_headers
 
   INTEGER :: n_restart_files
   CHARACTER(LEN=2048), dimension(10) :: restart_files
@@ -6307,40 +6308,61 @@ CONTAINS
   END SUBROUTINE output_esri
 
   !******************************************************************************
-  !> \brief Open runout CSVs only after restoring the checkpoint history.
-  !> \param[in,out] runtime Runout origin on a new run; restored history on restart.
-  !> \param[in] binary_restart True only for a versioned binary continuation.
-  !> \note Existing histories are both validated before either file is opened
-  !> for append. Missing files start new segments with the same CSV schema.
+  !> \brief Validate existing runout CSVs without opening them for writing.
+  !> \param[in] runtime Restored runout history from the binary checkpoint.
+  !> \param[out] runout_exists Whether the runout CSV exists.
+  !> \param[out] mass_exists Whether the mass-center CSV exists.
+  !> \note Both histories are validated before either file can be modified.
   !******************************************************************************
-  SUBROUTINE open_runout_outputs(runtime, binary_restart)
-    CLASS(runtime_state_type), INTENT(INOUT) :: runtime
-    LOGICAL, INTENT(IN) :: binary_restart
+  SUBROUTINE validate_runout_outputs(runtime, runout_exists, mass_exists)
+    CLASS(runtime_state_type), INTENT(IN) :: runtime
+    LOGICAL, INTENT(OUT) :: runout_exists, mass_exists
     CHARACTER(LEN=128) :: runout_header, mass_header
-    LOGICAL :: runout_exists, mass_exists
 
-    IF (.NOT. output_runout_flag) RETURN
-    WRITE(runout_header, '(A13,A13,A13,A17,A17)') 'Time (s),', 'Runout (m),', &
-         ' Area (m2),', 'X_runout (m),', 'Y_runout (m)'
-    WRITE(mass_header, '(A18,A18,A18,A18,A18)') 'Time (s),', &
-         'Barycenter-x (m),', 'Barycenter-y (m),', 'Baricenter-dx (m),', &
-         'Baricenter-dy (m)'
     runout_exists = .FALSE.
     mass_exists = .FALSE.
-    IF (binary_restart) THEN
-      IF (.NOT. runtime%runout%initialized) &
-           CALL fatal_error('Binary restart has no initialized runout history.')
-      CALL validate_runout_csv(runout_file, runout_header, &
-           runtime%runout%runout_row, runout_exists)
-      CALL validate_runout_csv(mass_center_file, mass_header, &
-           runtime%runout%mass_center_row, mass_exists)
-    ELSE
+    IF (.NOT. output_runout_flag) RETURN
+    IF (.NOT. runtime%runout%initialized) &
+         CALL fatal_error('Binary restart has no initialized runout history.')
+    CALL make_runout_headers(runout_header, mass_header)
+    CALL validate_runout_csv(runout_file, runout_header, &
+         runtime%runout%runout_row, runout_exists)
+    CALL validate_runout_csv(mass_center_file, mass_header, &
+         runtime%runout%mass_center_row, mass_exists)
+  END SUBROUTINE validate_runout_outputs
+
+  !******************************************************************************
+  !> \brief Open runout CSVs after restart history validation has succeeded.
+  !> \param[in,out] runtime Runout origin on a new run.
+  !> \param[in] binary_restart True only for a versioned binary continuation.
+  !> \param[in] runout_exists Whether the runout CSV passed validation.
+  !> \param[in] mass_exists Whether the mass-center CSV passed validation.
+  !> \note Missing files start new segments with the same CSV schema.
+  !******************************************************************************
+  SUBROUTINE open_runout_outputs(runtime, binary_restart, runout_exists, mass_exists)
+    CLASS(runtime_state_type), INTENT(INOUT) :: runtime
+    LOGICAL, INTENT(IN) :: binary_restart, runout_exists, mass_exists
+    CHARACTER(LEN=128) :: runout_header, mass_header
+
+    IF (.NOT. output_runout_flag) RETURN
+    CALL make_runout_headers(runout_header, mass_header)
+    IF (.NOT. binary_restart) THEN
       runtime%runout%origin_x = x0_runout
       runtime%runout%origin_y = y0_runout
     END IF
     CALL open_runout_csv(runout_unit, runout_file, runout_header, runout_exists, binary_restart)
     CALL open_runout_csv(mass_center_unit, mass_center_file, mass_header, mass_exists, binary_restart)
   END SUBROUTINE open_runout_outputs
+
+  SUBROUTINE make_runout_headers(runout_header, mass_header)
+    CHARACTER(LEN=*), INTENT(OUT) :: runout_header, mass_header
+
+    WRITE(runout_header, '(A13,A13,A13,A17,A17)') 'Time (s),', 'Runout (m),', &
+         ' Area (m2),', 'X_runout (m),', 'Y_runout (m)'
+    WRITE(mass_header, '(A18,A18,A18,A18,A18)') 'Time (s),', &
+         'Barycenter-x (m),', 'Barycenter-y (m),', 'Baricenter-dx (m),', &
+         'Baricenter-dy (m)'
+  END SUBROUTINE make_runout_headers
 
   !******************************************************************************
   !> \brief Check schema, finite ordered samples and exact checkpoint CSV tail.

@@ -49,6 +49,7 @@ PROGRAM IMEX_SfloW2D
    USE inpout_2d, ONLY : output_solution
    USE inpout_2d, ONLY : output_runout
    USE inpout_2d, ONLY : open_runout_outputs
+   USE inpout_2d, ONLY : validate_runout_outputs
    USE inpout_2d, ONLY : read_solution
    USE inpout_2d, ONLY : close_units
    USE inpout_2d, ONLY : n_probes
@@ -126,6 +127,7 @@ PROGRAM IMEX_SfloW2D
    INTEGER :: len_fname
    CHARACTER(LEN=4) :: ext
    LOGICAL :: is_binary_restart
+   LOGICAL :: runout_exists, mass_exists
 
    WRITE(*,*) '---------------------'
    WRITE(*,*) 'IMEX_SfloW2D 2.0'
@@ -143,6 +145,8 @@ PROGRAM IMEX_SfloW2D
 
    CALL read_param
 
+   runout_exists = .FALSE.
+   mass_exists = .FALSE.
 
 !$ use_openmp = .true.
 !$ print *, "OpenMP program"
@@ -192,7 +196,6 @@ PROGRAM IMEX_SfloW2D
          CALL validate_restart_output_manifest()
 
          is_binary_restart = .TRUE.
-         CALL write_param_backup()
 
          ! In a binary restart, Z is already loaded, but we need to allocate the kernel
          ! if spatial correlation is active
@@ -362,7 +365,11 @@ PROGRAM IMEX_SfloW2D
 
    !$OMP END PARALLEL DO
 
-   CALL open_runout_outputs(simulation%runtime, is_binary_restart)
+   IF (is_binary_restart) THEN
+      CALL validate_runout_outputs(simulation%runtime, runout_exists, mass_exists)
+      CALL write_param_backup()
+   END IF
+   CALL open_runout_outputs(simulation%runtime, is_binary_restart, runout_exists, mass_exists)
 
    IF ( output_runout_flag .AND. (.NOT. is_binary_restart) )                &
         CALL output_runout(                                                  &

@@ -524,7 +524,12 @@ def main():
     hashes_before = tree_hashes(case/'OUTPUT'/'TEST_2D')
     continuation(case, end=0.045)
     run(case, 'csv-fault-rejected.log', 'Diagnostic CSV')
-    assert tree_hashes(case/'OUTPUT'/'TEST_2D') == hashes_before
+    hashes_after = tree_hashes(case/'OUTPUT'/'TEST_2D')
+    changed = {name: (hashes_before.get(name), hashes_after.get(name))
+               for name in set(hashes_before) | set(hashes_after)
+               if hashes_before.get(name) != hashes_after.get(name)}
+    assert not changed, (
+        'Rejected malformed diagnostic CSV modified output files:', changed)
     for name, content in intact_diagnostics.items():
         (diagnostic_dir/name).write_bytes(content)
     run(case, 'csv-recovered.log')
