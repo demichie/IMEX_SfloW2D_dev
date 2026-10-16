@@ -16,7 +16,8 @@ and entrainment off, so the mass in the domain is the mass the source put in:
 `check_mass.py` sums the solid mass (the mixture mass for the lateral source,
 whose input is a mixture mass flow rate) in each `.q_2d` output and compares
 it with the time integral of the prescribed source, computed independently of
-the solver. Every output must agree to `1e-9` relative.
+the solver. It reads snapshots from `OUTPUT/<case>/snapshots/`. Every output
+must agree to `1e-9` relative.
 
 ```sh
 TESTS/TEST_SOURCE_MASS/run_test.sh src/IMEX_SfloW2D

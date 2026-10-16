@@ -94,7 +94,9 @@ def main():
     case = sys.argv[1]
     tol = float(sys.argv[2]) if len(sys.argv) > 2 else 1.0e-9
     meta = json.load(open(os.path.join(case, 'sources.json')))
-    files = sorted(glob.glob(os.path.join(case, meta['name'] + '_[0-9][0-9][0-9][0-9].q_2d')))
+    files = sorted(glob.glob(os.path.join(
+        case, 'OUTPUT', meta['name'], 'snapshots', '*',
+        meta['name'] + '_[0-9][0-9][0-9][0-9].q_2d')))
     if len(files) < 2:
         print('FAIL: %s: no output' % meta['name'])
         return 1
