@@ -161,9 +161,9 @@ Evidenza B05–B12 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-7 e
 
 |     | Vecchia label | Attività                                | Stato   |
 |-----|---------------|-----------------------------------------|---------|
-| C01 | IO-1          | Output segregati per run                | PARZIALE |
+| C01 | IO-1          | Output segregati per run                | COMPLETATO |
 | C02 | IO-2          | Contratto di configurazione e sicurezza | IMPLEMENTATO, GATE APERTO |
-| C03 | IO-GATE       | Accettazione I/O per run                | GATE    |
+| C03 | IO-GATE       | Accettazione I/O per run                | COMPLETATO |
 | C04 | DIST-1        | Autotools policy B                      | DA FARE |
 | C05 | DIST-2        | Doppio archivio di distribuzione        | DA FARE |
 | C06 | DIST-GATE     | Validazione distributiva                | GATE    |
@@ -853,7 +853,7 @@ I file input `topography_file`, `erodible_file` e i checkpoint indicati esplicit
 
 È stato aggiunto il modulo `src/io/output_paths.f90` con l'helper POSIX `src/io/output_dirs.c`; tutti gli output del solver censiti sono instradati sotto `<OUTPUT_BASE_DIRECTORY>/<RUN_NAME>/`. Il valore predefinito della base è `OUTPUT`; `OUTPUT_OVERWRITE` è falso per default e consente il riuso esplicito senza cancellare file preesistenti. I restart binari in-place possono riutilizzare la propria directory senza overwrite e risolvono il checkpoint scritto `restart/restart.bin`; i checkpoint esterni restano input esterni. I percorsi rifiutano componenti symlink e `..`; prima del riuso vengono inoltre rifiutati symlink, hard link o elementi non regolari già presenti nell'albero del run. `RUN_NAME` ammette solo lettere ASCII, numeri, `_` e `-`. Ogni snapshot ha una cartella indice/tempo e il manifest in `metadata/output_manifest.csv` registra l'indice e il tempo esatto.
 
-La documentazione introduttiva e la pagina website “Output files and formats” descrivono il layout e il contratto. Verifiche passate sul build GNU locale: `TESTS/run_tests.sh` (casi legacy, struttura, manifest, collisione senza overwrite, riuso esplicito, `RUN_NAME` e base con traversal rifiutati, basi symlink, file symlink e hard link rifiutati, basi personalizzate relative e assolute con spazi); `TESTS/TEST_BINARY_RESTART/run_test.sh`; `TESTS/TEST_STOCHASTIC_RESTART/run_test.sh`; `TESTS/TEST_PCCU_GATE_H/run_test.sh`; `TESTS/TEST_PCCU_LAKE_AT_REST/run_test.sh`; `TESTS/TEST_PCCU_INCLINED_EXCAVATION/run_test.sh`; `TESTS/TEST_CFL_POLICY/run_test.sh`. L'harness Acceptance/N9 è stato aggiornato per i nuovi percorsi, ma non è stato eseguito integralmente. C01 resta PARZIALE finché non si chiude C03; l'inventario delle scritture e le verifiche mirate di percorso, restart e integrazione post-processing sono ora registrati nella sezione C03.
+La documentazione introduttiva e la pagina website “Output files and formats” descrivono il layout e il contratto. Verifiche passate sul build GNU locale: `TESTS/run_tests.sh` (casi legacy, struttura, manifest, collisione senza overwrite, riuso esplicito, `RUN_NAME` e base con traversal rifiutati, basi symlink, file symlink e hard link rifiutati, basi personalizzate relative e assolute con spazi); `TESTS/TEST_BINARY_RESTART/run_test.sh`; `TESTS/TEST_STOCHASTIC_RESTART/run_test.sh`; `TESTS/TEST_PCCU_GATE_H/run_test.sh`; `TESTS/TEST_PCCU_LAKE_AT_REST/run_test.sh`; `TESTS/TEST_PCCU_INCLINED_EXCAVATION/run_test.sh`; `TESTS/TEST_CFL_POLICY/run_test.sh`. L'harness Acceptance/N9 è stato aggiornato per i nuovi percorsi, ma non è stato eseguito integralmente. Con l'accettazione di C03, C01 è COMPLETATO; l'inventario delle scritture e le verifiche mirate di percorso, restart e integrazione post-processing sono registrati nella sezione C03.
 
 ### C02 — Contratto di configurazione e sicurezza
 
@@ -885,7 +885,7 @@ Centralizzare la costruzione/validazione dei percorsi di output in un componente
 
 **Test proporzionati (nuove modifiche a questo step):** T1 tutti i negativi di path e collisione; T2 full/split/external restart, append NetCDF/CSV, snapshot interrotto; T3 2-3 scenari numerici rappresentativi con baseline A11; nessuna campagna HP-PCCU completa automatica. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: GATE
+Stato ufficiale: COMPLETATO
 
 #### Test, documentazione e gate di accettazione
 
@@ -903,7 +903,7 @@ Solo dopo accettazione della riorganizzazione dell’I/O procedere con politica 
 
 #### Verifiche integrative della code review — 15 ottobre 2026 (C03-R1–R4)
 
-Le verifiche seguenti **integrano** i criteri C03 già elencati, senza sostituirli né riaprire le attività B08–B12. Sono osservazioni di revisione statica sui file locali forniti (`IMEX_changes.patch` e quattro nuovi file): **non costituiscono regressioni osservate né test eseguiti durante la revisione**. La loro chiusura richiede evidenze riproducibili; la milestone C03 resta GATE.
+Le verifiche seguenti **integrano** i criteri C03 già elencati, senza sostituirli né riaprire le attività B08–B12. Erano osservazioni di revisione statica sui file locali forniti (`IMEX_changes.patch` e quattro nuovi file), non regressioni osservate né test eseguiti durante quella revisione. Le relative evidenze riproducibili sono registrate di seguito.
 
 **C03-R1 — Indici degli snapshot oltre quattro cifre.** In `src/io/output_paths.f90`, `begin_snapshot` usava `CHARACTER(LEN=4) :: index_string` e `WRITE(index_string, '(I4.4)') index`. La correzione estende l'etichetta; l'audit ha inoltre trovato e corretto il troncamento a quattro caratteri in `output_esri`, che poteva riutilizzare nomi raster dopo l'indice 9999. Il test integrato ora verifica etichette e directory 0/9999/10000/10001 e produce il raster ESRI `TEST_2D_10000.asc` durante un restart ad alto indice.
 
@@ -939,21 +939,33 @@ Queste verifiche chiudono l'audit locale dei writer, il test multi-run e il cont
 
 La campagna diagnostica N9 è stata completata sul build audit r4 e sulla revisione sorgente `0a46c555bdaa8a9337213a8dfa0231dedaf522a9`, in modalità `current_build_audit_diagnostic`. Risultato: **8/8 continuazioni fisiche PASS**, nessun fallimento, nessuna anomalia diagnostica e **4/4 confronti di thread PASS** per ETNA ed ETNA_LAVA nei profili `historical_optimized` e `strict_debug`. Evidenza: `/tmp/imex-c03-n9-diagnostic-0a46c555-r4/evidence.json` (SHA-256 `350a7e5540089cc075d06ab12b4ba2504dbf4e384545d548841daf42b347fd49`). È una verifica diagnostica sui sorgenti correnti, non un confronto scientifico approvativo con la baseline: `n9_decision=open` e `N9_scientific_approval=false` restano invariati.
 
-Queste evidenze non chiudono C03: resta la decisione scientifica N9 separata; l'eventuale prova su filesystem scratch HPC dipende dalla conferma che tale ambiente faccia parte del gate di accettazione.
+L'evidenza r4 sopra è storica e non rappresenta la revisione più recente. Il test su filesystem scratch HPC è escluso dal gate C03, secondo la decisione dell'utente, perché non è l'ambiente di deployment previsto.
+
+#### Acceptance/N9 diagnostica — commit C03 `48a92a785460`
+
+Sul commit `48a92a785460be30f958fcc665cc29a440079316` sono state create da `git archive` due build pulite out-of-tree GNU Fortran 15.2, `historical_optimized` (`-Ofast -funroll-all-loops`) e `strict_debug` (`-O0 -g -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow`). Il manifest mirato di provenienza build (non una nuova acceptance completa N7/N8) è `/tmp/imex-n9-commit-48a92a785460/manifest.json` (SHA-256 `d998746af32fcd57a5a72f03ed559861e1dfaedc0128d9fe9cc3dccfb6fcff18`).
+
+`TESTS/ACCEPTANCE/n9_long_cases.py --diagnostic-current-source` ha completato ETNA (200 s) ed ETNA_LAVA (3600 s) con entrambi i profili e team effettivi da uno e quattro thread: **8/8 continuazioni PASS**, inclusi controlli fisici e CSV runout/mass-centre; **4/4 confronti bitwise tra thread PASS**. Evidenza: `/tmp/imex-n9-commit-48a92a785460-diagnostic/evidence.json` (SHA-256 `af25317a837190c24afbcffbc3dc0fb16a327a1947eacfc4020850e6f7a0edfe`). La modalità diagnostica non confronta i risultati con la baseline scientifica approvata; il manifest mantiene `n9_decision=open` e `N9_scientific_approval=false` perché il runner non assegna approvazioni scientifiche.
+
+#### Decisione scientifica N9 e chiusura C03 — 16 ottobre 2026
+
+Il responsabile scientifico ha approvato N9 per il commit `48a92a785460be30f958fcc665cc29a440079316`, dopo aver esaminato l'evidenza diagnostica sopra. Questa approvazione è la decisione del responsabile e non un confronto aggiuntivo con la baseline: il manifest del runner resta invariato e conserva correttamente `n9_decision=open` e `N9_scientific_approval=false`.
+
+Con tale decisione e le verifiche C03 registrate, **C03 è COMPLETATO**. C01 è COMPLETATO; C04–C06 restano DA FARE/GATE e possono procedere secondo il sequenziamento della roadmap.
 
 #### Checklist consolidata per la chiusura di C03 (inclusi i requisiti già previsti)
 
 - [x] Audit delle scritture del solver e controllo dell'inventario fuori da `<OUTPUT_BASE_DIRECTORY>/<RUN_NAME>/` per i run di restart verificati.
 - [x] Confronti quantitativi/bitwise appropriati con A11 per campi, diagnostiche, file e tempi di output, senza estendere lo scope scientifico A11.
-- [ ] Valutazione scientifica e decisione N9 sulla revisione corrente; la campagna diagnostica r4 non costituisce sign-off.
+- [x] Valutazione scientifica e decisione N9 sulla revisione corrente; approvazione del responsabile scientifico registrata il 16 ottobre 2026.
 - [x] Matrice locale restart in-place/esterno, append NetCDF/CSV, interruzione e ripresa senza perdita o sovrascrittura di risultati validi; vedi fault injection e test mirati sopra.
 - [x] Multi-run, collisioni, `RUN_NAME`, overwrite, traversal, symlink/hard link e percorsi relativi/assoluti verificati nell'harness locale.
 - [x] Filesystem scratch HPC escluso dal gate C03 perché non è l'ambiente di deployment previsto.
 - [x] Verifiche aggiuntive C03-R1–R4 e registrazione di risultati e riproducibilità.
 - [x] Audit dei percorsi documentati in EXAMPLES/UTILS e GitHub Pages, più test mirato dei consumer ETNA su raster reale; la pipeline hazard-map completa non è stata eseguita (netCDF4/GDAL non disponibili localmente).
-- [ ] Avvio di C04–C06 solo dopo l'accettazione di C03, secondo il sequenziamento esistente.
+- [x] Sequenziamento rispettato: C04–C06 non sono stati anticipati rispetto all'accettazione di C03 e restano il lavoro successivo.
 
-**Stato ed evidenze:** l'implementazione C01/C02 e i test GNU selezionati sono descritti sopra e risultano *riportati* nella roadmap; non sono stati rieseguiti in questa revisione. Non dichiarare C03 accettato prima della chiusura e della registrazione degli esiti.
+**Stato ed evidenze:** l'implementazione C01/C02 e i test GNU selezionati sono descritti sopra e risultano *riportati* nella roadmap; non sono stati rieseguiti in questa revisione. La diagnostica N9 mirata sul commit corrente è passata e il responsabile scientifico ha approvato N9 il 16 ottobre 2026. C03 è COMPLETATO; C04–C06 non sono stati avviati.
 
 ### C04 — Autotools policy B
 
