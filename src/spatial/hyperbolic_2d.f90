@@ -12,6 +12,7 @@
 MODULE hyperbolic_2d
 
   USE parameters_2d, ONLY : wp, n_eqns, n_vars, idx_u, idx_v
+  USE parameters_2d, ONLY : bcW, bcE, bcS, bcN
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
   USE geometry_2d, ONLY : grav_coeff_stag_x, grav_coeff_stag_y
@@ -349,6 +350,25 @@ CONTAINS
                a_minus, a_plus, PATH_DIR_X, 2,                               &
                this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k) )
 
+          ! HP reconstruction is applied after the primitive boundary trace,
+          ! so it can restore a nonzero normal velocity at a nominally closed
+          ! edge. Enforce a zero-velocity Dirichlet wall on the final flux:
+          ! advective transport (total mass, energy, phases and auxiliaries)
+          ! is blocked, while the normal momentum flux retains wall pressure.
+          IF ( ( j .EQ. 1 ) .AND. ( bcW(2)%flag .EQ. 0 ) .AND.               &
+               ( bcW(2)%value .EQ. 0.0_wp ) ) THEN
+             this%G_interface_xL(1,j,k) = 0.0_wp
+             this%G_interface_xR(1,j,k) = 0.0_wp
+             this%G_interface_xL(3:n_eqns,j,k) = 0.0_wp
+             this%G_interface_xR(3:n_eqns,j,k) = 0.0_wp
+          ELSEIF ( ( j .EQ. comp_interfaces_x ) .AND.                        &
+               ( bcE(2)%flag .EQ. 0 ) .AND. ( bcE(2)%value .EQ. 0.0_wp ) ) THEN
+             this%G_interface_xL(1,j,k) = 0.0_wp
+             this%G_interface_xR(1,j,k) = 0.0_wp
+             this%G_interface_xL(3:n_eqns,j,k) = 0.0_wp
+             this%G_interface_xR(3:n_eqns,j,k) = 0.0_wp
+          END IF
+
        END DO
        !$OMP END PARALLEL DO
 
@@ -370,6 +390,20 @@ CONTAINS
                recon%eta_interfaceT(j,k), grav_coeff_stag_y(j,k),            &
                a_minus, a_plus, PATH_DIR_Y, 3,                               &
                this%G_interface_yB(:,j,k), this%G_interface_yT(:,j,k) )
+
+          IF ( ( k .EQ. 1 ) .AND. ( bcS(3)%flag .EQ. 0 ) .AND.                &
+               ( bcS(3)%value .EQ. 0.0_wp ) ) THEN
+             this%G_interface_yB(1:2,j,k) = 0.0_wp
+             this%G_interface_yT(1:2,j,k) = 0.0_wp
+             this%G_interface_yB(4:n_eqns,j,k) = 0.0_wp
+             this%G_interface_yT(4:n_eqns,j,k) = 0.0_wp
+          ELSEIF ( ( k .EQ. comp_interfaces_y ) .AND.                        &
+               ( bcN(3)%flag .EQ. 0 ) .AND. ( bcN(3)%value .EQ. 0.0_wp ) ) THEN
+             this%G_interface_yB(1:2,j,k) = 0.0_wp
+             this%G_interface_yT(1:2,j,k) = 0.0_wp
+             this%G_interface_yB(4:n_eqns,j,k) = 0.0_wp
+             this%G_interface_yT(4:n_eqns,j,k) = 0.0_wp
+          END IF
 
        END DO
        !$OMP END PARALLEL DO
