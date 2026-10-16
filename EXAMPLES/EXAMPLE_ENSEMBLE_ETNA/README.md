@@ -38,7 +38,7 @@ From `EXAMPLE_ENSEMBLE_ETNA`, follow the sequence below.
 2. Unzip `DEM/Etna2014_crop.zip`, create `templatedir/DEM/`, and link its extracted raster into that folder. The original README's commands are reproduced in the workflow notes below.
 3. Execute `python create_ensemble.py` to generate the CSV of sampled uncertain parameters. Sampling ranges and sample count are configured in this script.
 4. Execute `python create_inputfiles.py` to create `ensemble.xxxxx` directories by copying `templatedir` and replacing placeholders of the form `ENSEMBLE_var1`.
-5. Execute `python launch_jobs.py` to run the `run.sh` script in each member directory. Configure `max_processes` in that script.
+5. Execute `python launch_jobs.py` to run the `run.sh` script in each member directory. Configure `max_processes` in that script. The launcher waits for every member and exits with an error if any run fails.
 6. Execute `python create_prob_maps.py` to aggregate raster products, optionally grouping realizations with pandas `groupby`.
 7. Execute `python plot_ensemble.py` to make PNG maps.
 8. Optionally execute `python create_hazard_maps.py` to calculate exceedance maps from maximum-thickness rasters.

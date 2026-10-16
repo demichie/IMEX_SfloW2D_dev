@@ -3,23 +3,40 @@
 
 import os
 import subprocess
+import sys
 
-dirs = next(os.walk('.'))[1]
-
-print('Start computation')
-
-command = "./run.sh"
-processes = set()
+directories = sorted(
+    directory for directory in os.listdir('.')
+    if directory.startswith("ensemble.") and os.path.isdir(directory)
+)
 max_processes = 5
+running = []
+failures = []
 
-for x in dirs:
+if not directories:
+    raise SystemExit("No ensemble.* directories found")
 
-    if "ensemble." in x:
+print(f"Start computation for {len(directories)} ensemble members")
 
-        os.chdir(x)
-        processes.add(subprocess.Popen([command, x]))
-        if len(processes) >= max_processes:
-            os.wait()
-            processes.difference_update(
-                [p for p in processes if p.poll() is not None])
-        os.chdir("..")
+try:
+    for directory in directories:
+        process = subprocess.Popen(["./run.sh", directory], cwd=directory)
+        running.append((process, directory))
+        if len(running) >= max_processes:
+            process, member = running.pop(0)
+            return_code = process.wait()
+            if return_code:
+                failures.append((member, return_code))
+finally:
+    for process, member in running:
+        return_code = process.wait()
+        if return_code:
+            failures.append((member, return_code))
+
+if failures:
+    for member, return_code in failures:
+        print(
+            f"{member}: run.sh exited with status {return_code}",
+            file=sys.stderr,
+        )
+    raise SystemExit(1)
