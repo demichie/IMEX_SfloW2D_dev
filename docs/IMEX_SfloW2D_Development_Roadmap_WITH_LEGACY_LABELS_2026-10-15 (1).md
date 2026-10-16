@@ -169,7 +169,7 @@ Evidenza B05–B12 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-7 e
 |     | Vecchia label | Attività                                | Stato   |
 |-----|---------------|-----------------------------------------|---------|
 | C01 | IO-1          | Output segregati per run                | COMPLETATO |
-| C02 | IO-2          | Contratto di configurazione e sicurezza | IMPLEMENTATO, GATE APERTO |
+| C02 | IO-2          | Contratto di configurazione e sicurezza | COMPLETATO |
 | C03 | IO-GATE       | Accettazione I/O per run                | COMPLETATO |
 | C04 | DIST-1        | Autotools policy B                      | IMPLEMENTATO |
 | C05 | DIST-2        | Doppio archivio di distribuzione        | IMPLEMENTATO |
@@ -866,7 +866,7 @@ La documentazione introduttiva e la pagina website “Output files and formats�
 
 **Test proporzionati (nuove modifiche a questo step):** T1 input RUN_NAME, path relativi/assoluti, traversal, symlink/hardlink, overwrite; T2 existing-run/restart esterno, directory HPC lunghe; T3 stress/race pertinenti al gate C03. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: IMPLEMENTATO, GATE APERTO
+Stato ufficiale: COMPLETATO
 
 #### Contratto di configurazione e sicurezza
 
@@ -890,7 +890,7 @@ Centralizzare la costruzione/validazione dei percorsi di output in un componente
 
 #### Criterio esplicito di chiusura del gate C02 — verifica documentale delle evidenze
 
-**Situazione al 16 ottobre 2026:** C02 è registrato come **`IMPLEMENTATO, GATE APERTO`**, mentre il gate I/O complessivo C03 risulta **`COMPLETATO`**. Questa differenza non costituisce di per sé una regressione tecnica: indica che la decisione di accettazione specifica C02 non è stata ancora registrata. Non modificare automaticamente lo stato di C02 in base al solo stato di C03.
+**Decisione formale del 16 ottobre 2026:** dopo la verifica della matrice requisito-evidenza, della suite locale e della CI GNU/ifx/Docker, il responsabile approva la chiusura di C02 per la revisione sorgente `bd4a87d8a8a7f9876950a7aa3024b41e8c7612d6`. La decisione accetta esplicitamente come limite il mancato test su un filesystem scratch HPC reale, già escluso dal gate C03; non modifica il contratto dei percorsi né le verifiche locali di path relativi/assoluti, traversal e symlink. C02 è COMPLETATO; C03 resta COMPLETATO.
 
 **Copertura da verificare e tracciare:** associare ogni requisito C02 al test o all'evidenza C03 che effettivamente lo copre, indicando revisione Git e ambito verificato. La verifica include: validazione di `RUN_NAME`; percorsi relativi/assoluti di `OUTPUT_BASE_DIRECTORY` e rifiuto di `..`/symlink; semantica di `OUTPUT_OVERWRITE` e isolamento del singolo run; collisioni e directory preesistenti; restart interno e checkpoint esterno con compatibilità e protezione delle scritture; assenza di output solver fuori dal run; naming degli snapshot/manifest e destinazioni dei file; controlli su symlink/hard link e preservazione degli output in caso di input o storia di restart non validi.
 
@@ -900,15 +900,15 @@ Centralizzare la costruzione/validazione dei percorsi di output in un componente
 
 | Requisito | Evidenza e risultato | Revisione e ambito | Lacuna o limite |
 |---|---|---|---|
-| Validazione di `RUN_NAME`, rifiuto del traversal e assenza di scritture su input non valido | `TESTS/run_tests.sh`: dopo un run valido, rifiuta `../escape` e confronta file, checksum e directory dell'albero `OUTPUT`; verifica l'errore atteso e l'assenza di output esterno. Suite GNU locale e CI: PASS. | Test committato in `bd4a87d8a8a7f9876950a7aa3024b41e8c7612d6`; il solver GNU locale è costruito da `432c2bbac6f09c6e94ad1bf9e95bac9ba16802b7`. Solver run `38877762627`, ifx `38877778700`, Docker `38877794457`: tutti i quattro job di ciascuna matrice PASS sul commit `bd4a87d8`. | Nessuna ulteriore lacuna di test emersa nel perimetro verificato; resta la decisione formale C02. |
-| `OUTPUT_BASE_DIRECTORY` relativo/assoluto, traversal, symlink e hard link | `TESTS/run_tests.sh` e verifiche C03 di percorsi personalizzati, symlink/hard link e sentinelle: PASS come riportato nella sezione C03. | Evidenze locali C03; il change set I/O/restart registra base `96b4cd3a` e build GNU derivata da `0a965c67`. Percorsi relativi/assoluti con spazi verificati; filesystem scratch HPC escluso dal gate C03 per decisione esplicita. | Nessun test su filesystem scratch HPC; l'esclusione è limitata all'ambiente, non al contratto dei percorsi. |
+| Validazione di `RUN_NAME`, rifiuto del traversal e assenza di scritture su input non valido | `TESTS/run_tests.sh`: dopo un run valido, rifiuta `../escape` e confronta file, checksum e directory dell'albero `OUTPUT`; verifica l'errore atteso e l'assenza di output esterno. Suite GNU locale e CI: PASS. | Test committato in `bd4a87d8a8a7f9876950a7aa3024b41e8c7612d6`; il solver GNU locale è costruito da `432c2bbac6f09c6e94ad1bf9e95bac9ba16802b7`. Solver run `38877762627`, ifx `38877778700`, Docker `38877794457`: tutti i quattro job di ciascuna matrice PASS sul commit `bd4a87d8`. | Evidenza sufficiente per il requisito nel perimetro accettato. |
+| `OUTPUT_BASE_DIRECTORY` relativo/assoluto, traversal, symlink e hard link | `TESTS/run_tests.sh` e verifiche C03 di percorsi personalizzati, symlink/hard link e sentinelle: PASS come riportato nella sezione C03. | Evidenze locali C03; il change set I/O/restart registra base `96b4cd3a` e build GNU derivata da `0a965c67`. Percorsi relativi/assoluti con spazi verificati. | Il responsabile accetta esplicitamente di non eseguire il test su filesystem scratch HPC reale; i controlli del contratto dei percorsi sono stati verificati localmente. |
 | `OUTPUT_OVERWRITE`, collisioni e isolamento tra run | `TESTS/run_tests.sh` e `TESTS/TEST_OUTPUT_PATHS/run_test.sh`: collisione senza overwrite, riuso esplicito e due run distinti nella stessa base; PASS nelle evidenze locali C03. | Evidenze C03 e suite GNU locale; le verifiche di layout includono i casi documentati nella sezione C03. | Nessuna lacuna funzionale identificata nel perimetro provato. |
 | Restart in-place/esterno, compatibilità e preservazione degli output validi | `TESTS/TEST_BINARY_RESTART/run_test.sh` e `test_runout_restart.py`: restart full/split, checkpoint esterno, manifest e output incoerenti rifiutati senza alterare i file validi; fault injection 29/29 PASS per la campagna registrata in C03. | Evidenze C03 su build GNU/historical optimized e revisione candidata indicate nella relativa sezione; non sono una nuova esecuzione sulla revisione attuale. | L'eventuale eccezione di filesystem resta quella già dichiarata; non è richiesta una nuova campagna scientifica per C02. |
 | Destinazioni degli output, snapshot/manifest, indici e assenza di output fuori dal run | Audit delle scritture e `TESTS/TEST_OUTPUT_PATHS/run_test.sh`: output sotto il run, manifest e indici 0/9999/10000/10001; PASS nelle evidenze C03. | Evidenze locali C03, inclusi i test T1/T2 riportati per la revisione `96b4cd3a` e la build derivata da `0a965c67`. | Nessuna lacuna funzionale identificata nel perimetro provato. |
 
 La suite `TESTS/run_tests.sh` è stata rieseguita localmente con il solver GNU indicato nella prima riga: tutti i test legacy e di sicurezza dei percorsi sono PASS. La regressione è stata poi verificata nella CI sul commit `bd4a87d8`: tutti i job Solver, ifx e Docker sono passati.
 
-**Valutazione delle lacune:** per i requisiti del contratto C02 documentati nella matrice non è emerso un ulteriore test T1/T2 indispensabile; T3 non è motivato da un rischio residuo specifico. Restano espliciti il limite del filesystem scratch HPC e la decisione formale di accettazione. Non interpretare questa valutazione tecnica come approvazione del gate.
+**Valutazione delle lacune:** per i requisiti del contratto C02 documentati nella matrice non è emerso un ulteriore test T1/T2 indispensabile; T3 non è motivato da un rischio residuo specifico. Il limite relativo al filesystem scratch HPC è stato esplicitamente accettato dal responsabile nella decisione di chiusura registrata sopra.
 
 **Procedura minima per chiudere C02:**
 
@@ -917,7 +917,7 @@ La suite `TESTS/run_tests.sh` è stata rieseguita localmente con il solver GNU i
 3. Eseguire **solo** eventuali test T1/T2 indispensabili a colmare lacune reali; T3 soltanto in presenza di un rischio residuo motivato. Nessuna nuova campagna di regressione HP-PCCU/IMEX o ripetizione della matrice A11/N9 è richiesta per una chiusura puramente documentale.
 4. Registrare la decisione del responsabile, con data, revisione Git, evidenze riutilizzate, eccezioni e limiti; **solo dopo** aggiornare sia la scheda C02 sia la riga C02 nella tabella generale a `COMPLETATO`.
 
-**Condizione di uscita:** tutti i requisiti del contratto C02 risultano coperti da evidenza appropriata oppure da eccezioni esplicite approvate; non rimangono controlli obbligatori senza decisione. **Stato attuale invariato: `IMPLEMENTATO, GATE APERTO`** fino alla registrazione di tale verifica e della decisione formale.
+**Condizione di uscita:** tutti i requisiti del contratto C02 risultano coperti da evidenza appropriata oppure da eccezioni esplicite approvate; non rimangono controlli obbligatori senza decisione. **Condizione soddisfatta; stato C02: `COMPLETATO`.**
 
 
 ### C03 — Accettazione I/O per run
