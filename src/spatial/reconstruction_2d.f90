@@ -874,6 +874,7 @@ CONTAINS
   SUBROUTINE reconstruct_kt_eta_traces(this,qp_expl)
     USE parameters_2d, ONLY : limiter,reconstr_coeff
     USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
+    USE geometry_2d, ONLY : sourceW,sourceE,sourceS,sourceN
     USE constitutive_parameters_2d, ONLY : grav
 
     CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
@@ -1120,6 +1121,44 @@ CONTAINS
        this%qp_adv_interfaceT(:,j,comp_interfaces_y)= &
             this%qp_adv_interfaceB(:,j,comp_interfaces_y)
     END DO
+    ! reconstruct() has already reflected the primitive/conservative states
+    ! at the internal radial-source wall. The eta pass above overwrites its
+    ! scalar ghost traces: restore equal depths on both sides, including the
+    ! selected transport reconstruction, before evaluating speeds and fluxes.
+    ! Injection is volumetric; no mass may cross this excluded inner boundary.
+    IF ( radial_source_flag ) THEN
+       DO l=1,this%hp_eta_cells
+          j=this%hp_eta_j(l)
+          k=this%hp_eta_k(l)
+          IF ( source_cell(j,k) .NE. 2 ) CYCLE
+          IF ( sourceE(j,k) ) THEN
+             this%eta_interfaceR(j+1,k)=this%eta_interfaceL(j+1,k)
+             IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+                  this%h_minmod_interfaceR(j+1,k)=this%h_minmod_interfaceL(j+1,k)
+             IF ( kt_trace_reconstruction .EQ. 'froude_blend' ) &
+                  this%h_froude_interfaceR(j+1,k)=this%h_froude_interfaceL(j+1,k)
+          ELSEIF ( sourceW(j,k) ) THEN
+             this%eta_interfaceL(j,k)=this%eta_interfaceR(j,k)
+             IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+                  this%h_minmod_interfaceL(j,k)=this%h_minmod_interfaceR(j,k)
+             IF ( kt_trace_reconstruction .EQ. 'froude_blend' ) &
+                  this%h_froude_interfaceL(j,k)=this%h_froude_interfaceR(j,k)
+          END IF
+          IF ( sourceN(j,k) ) THEN
+             this%eta_interfaceT(j,k+1)=this%eta_interfaceB(j,k+1)
+             IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+                  this%h_minmod_interfaceT(j,k+1)=this%h_minmod_interfaceB(j,k+1)
+             IF ( kt_trace_reconstruction .EQ. 'froude_blend' ) &
+                  this%h_froude_interfaceT(j,k+1)=this%h_froude_interfaceB(j,k+1)
+          ELSEIF ( sourceS(j,k) ) THEN
+             this%eta_interfaceB(j,k)=this%eta_interfaceT(j,k)
+             IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+                  this%h_minmod_interfaceB(j,k)=this%h_minmod_interfaceT(j,k)
+             IF ( kt_trace_reconstruction .EQ. 'froude_blend' ) &
+                  this%h_froude_interfaceB(j,k)=this%h_froude_interfaceT(j,k)
+          END IF
+       END DO
+    END IF
   END SUBROUTINE reconstruct_kt_eta_traces
 
   PURE FUNCTION froude_h_blend_weight(h,u_normal,gravity) RESULT(weight)

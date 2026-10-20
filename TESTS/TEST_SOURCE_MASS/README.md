@@ -19,6 +19,14 @@ it with the time integral of the prescribed source, computed independently of
 the solver. It reads snapshots from `OUTPUT/<case>/snapshots/`. Every output
 must agree to `1e-9` relative.
 
+`lateral_window` also checks the impermeable inner boundary of the radial
+source. Injection is applied as a volume source in the surrounding cells;
+the excluded source interior must not receive numerical mass flux. The KT
+free-surface and selected transport-depth traces must therefore preserve the
+reflecting ghost states after reconstruction. Recomputing those scalar traces
+without restoring the wall previously caused a mass deficit of about 0.437%
+with `froude_blend`, including mass loss after injection stopped.
+
 ```sh
 TESTS/TEST_SOURCE_MASS/run_test.sh src/IMEX_SfloW2D
 ```
