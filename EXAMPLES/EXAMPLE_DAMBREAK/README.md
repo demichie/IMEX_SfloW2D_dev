@@ -27,6 +27,11 @@ This long-channel dam break is designed to examine simultaneous compaction and g
 | GAS_LOSS_FLAG | T |
 | F_INHIBIT_MODE | DYNAMIC |
 | DYNAMIC_PERMEABILITY_FLAG | T |
+| Momentum boundaries | Template `FLAG=1` is outflow-only in the current solver; it does not impose impermeable walls. |
+
+## Dependencies
+
+The setup generator requires Python 3 and NumPy; Matplotlib is required only when its plot flag is `true`. The centerline postprocessor requires NumPy, Matplotlib, and either netCDF4 or h5py to read the NetCDF file. MP4 output additionally requires `imageio[ffmpeg]`, `imageio-ffmpeg`, and system `ffmpeg`; without FFmpeg the script falls back to GIF.
 
 ## How to run
 
@@ -49,7 +54,7 @@ The original README warns that `GAS_LOSS_FLAG=T` is required to avoid nonphysica
 
 ## Provenance and documentation notes
 
-The original README attributes the compaction/permeability formulation to Claudia Elijas-Parra and the channel setup to ECP Breard. It also uses historical names `create_dambreak_static.py` and `create_example_Roche_static.py` and describes a two-dimensional long rectangular channel with impermeable side walls and a no-flux right boundary.
+The original README attributes the compaction/permeability formulation to Claudia Elijas-Parra and the channel setup to ECP Breard. It also uses historical names `create_dambreak_static.py` and `create_example_Roche_static.py`. Its claim of impermeable side walls and a no-flux right boundary conflicts with the tracked template: momentum boundaries use `FLAG=1`, which the current solver treats as outflow-only.
 
 ## References
 
@@ -57,7 +62,7 @@ Barker and Gray (2017), cited in the original README for regularized μ(I). Comp
 
 ## Legacy documentation and preservation
 
-The original [`README.txt`](README.txt) in this example directory remains the archival source for the complete historical narrative, parameter discussion, scientific references and commands. It has not been deleted or rewritten. This standardized README must not replace it as the sole provenance source until a full section-by-section textual comparison has been accepted.
+The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 24 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
 
 ## Documentation verification note
 

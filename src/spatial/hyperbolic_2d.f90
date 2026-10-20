@@ -15,6 +15,7 @@ MODULE hyperbolic_2d
   USE parameters_2d, ONLY : idx_solidEqn_first, idx_solidEqn_last
   USE parameters_2d, ONLY : idx_solid_first, idx_solid_last
   USE parameters_2d, ONLY : kt_trace_reconstruction
+  USE parameters_2d, ONLY : lateral_source_flag
   USE parameters_2d, ONLY : bcW, bcE, bcS, bcN
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
@@ -594,7 +595,7 @@ CONTAINS
     USE pccu_2d, ONLY : eval_central_upwind_flux
     USE pccu_2d, ONLY : eval_oriented_pccu_pair
     USE pccu_2d, ONLY : pccu_speed_tolerance
-    USE nonconservative_2d, ONLY : PATH_DIR_X
+    USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
 
     IMPLICIT NONE
 
@@ -627,12 +628,15 @@ CONTAINS
     REAL(wp) :: h_eta_left,h_eta_right,theta_left,theta_right,theta_face
     REAL(wp) :: h_blend,u_normal
     CHARACTER(LEN=128) :: closure_context
+    LOGICAL :: source_trace_left,source_trace_right
 
     q_adv_left_use=q_adv_left
     q_adv_right_use=q_adv_right
     qp_adv_left_use=qp_adv_left
     qp_adv_right_use=qp_adv_right
     theta_face=0.0_wp
+    CALL lateral_source_trace_sides(direction,face_i,face_j,                &
+         source_trace_left,source_trace_right)
 
     ! Keep the direct h_x reconstruction whenever its transported states
     ! satisfy the facewise positivity bounds. Otherwise use the smallest
@@ -657,6 +661,8 @@ CONTAINS
        CASE DEFAULT
           CONTINUE
        END SELECT
+       IF ( source_trace_left ) h_eta_left=MAX(qp_adv_left(1),0.0_wp)
+       IF ( source_trace_right ) h_eta_right=MAX(qp_adv_right(1),0.0_wp)
        ! Reconstruct u,v separately at cell centres and form the face
        ! momenta as h_face*u_face using the selected shared depth traces.
        qp_adv_left_use=qp_adv_left
@@ -843,6 +849,8 @@ CONTAINS
     qp_path_right=qp_diff_right
     eta_path_left=eta_left
     eta_path_right=eta_right
+    IF ( source_trace_left ) eta_path_left=bed_face+h_eta_left
+    IF ( source_trace_right ) eta_path_right=bed_face+h_eta_right
     IF ( use_dry_donor ) THEN
        IF ( qp_adv_left_use(1) .LE. hp_dry_tolerance ) THEN
           qp_path_left(1)=0.0_wp
@@ -1050,6 +1058,7 @@ CONTAINS
 
     ! External procedures
     USE equation_terms_2d, ONLY : eval_local_speeds_direction
+    USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
 
     IMPLICIT NONE
 
@@ -1062,6 +1071,7 @@ CONTAINS
     REAL(wp) :: min_r, max_r, eta_min_r, eta_max_r
     REAL(wp) :: h_eta_minus, h_eta_plus
     REAL(wp) :: qp_eta_minus(n_vars+2), qp_eta_plus(n_vars+2)
+    LOGICAL :: source_trace_minus,source_trace_plus
 
     INTEGER :: j,k,l
 
@@ -1070,12 +1080,15 @@ CONTAINS
     IF ( comp_cells_x .GT. 1 ) THEN
 
        !$OMP DO private(j,k,min_r,max_r,eta_min_r,eta_max_r, &
-       !$OMP& h_eta_minus,h_eta_plus,qp_eta_minus,qp_eta_plus)
+       !$OMP& h_eta_minus,h_eta_plus,qp_eta_minus,qp_eta_plus, &
+       !$OMP& source_trace_minus,source_trace_plus)
 
        x_interfaces_loop:DO l = 1,solve_interfaces_x
 
           j = j_stag_x(l)
           k = k_stag_x(l)
+          CALL lateral_source_trace_sides(PATH_DIR_X,j,k,                  &
+               source_trace_minus,source_trace_plus)
 
           CALL eval_interface_speed_bounds( recon%qp_adv_interfaceL(:,j,k), &
                recon%qp_adv_interfaceR(:,j,k),grav_coeff_stag_x(j,k),idx_u,&
@@ -1101,6 +1114,10 @@ CONTAINS
                 CASE DEFAULT
                    CONTINUE
                 END SELECT
+                IF ( source_trace_minus ) h_eta_minus=MAX(                 &
+                     recon%qp_adv_interfaceL(1,j,k),0.0_wp)
+                IF ( source_trace_plus ) h_eta_plus=MAX(                   &
+                     recon%qp_adv_interfaceR(1,j,k),0.0_wp)
              END IF
              qp_eta_minus=recon%qp_adv_interfaceL(:,j,k)
              qp_eta_plus=recon%qp_adv_interfaceR(:,j,k)
@@ -1139,12 +1156,15 @@ CONTAINS
     IF ( comp_cells_y .GT. 1 ) THEN
 
        !$OMP DO private(j,k,min_r,max_r,eta_min_r,eta_max_r, &
-       !$OMP& h_eta_minus,h_eta_plus,qp_eta_minus,qp_eta_plus)
+       !$OMP& h_eta_minus,h_eta_plus,qp_eta_minus,qp_eta_plus, &
+       !$OMP& source_trace_minus,source_trace_plus)
 
        y_interfaces_loop:DO l = 1,solve_interfaces_y
 
           j = j_stag_y(l)
           k = k_stag_y(l)
+          CALL lateral_source_trace_sides(PATH_DIR_Y,j,k,                  &
+               source_trace_minus,source_trace_plus)
 
           CALL eval_interface_speed_bounds( recon%qp_adv_interfaceB(:,j,k), &
                recon%qp_adv_interfaceT(:,j,k),grav_coeff_stag_y(j,k),idx_v,&
@@ -1167,6 +1187,10 @@ CONTAINS
                 CASE DEFAULT
                    CONTINUE
                 END SELECT
+                IF ( source_trace_minus ) h_eta_minus=MAX(                 &
+                     recon%qp_adv_interfaceB(1,j,k),0.0_wp)
+                IF ( source_trace_plus ) h_eta_plus=MAX(                   &
+                     recon%qp_adv_interfaceT(1,j,k),0.0_wp)
              END IF
              qp_eta_minus=recon%qp_adv_interfaceB(:,j,k)
              qp_eta_plus=recon%qp_adv_interfaceT(:,j,k)
@@ -1240,5 +1264,32 @@ CONTAINS
     speed_plus = MAX(minus_max,plus_max,0.0_wp)
 
   END SUBROUTINE eval_interface_speed_bounds
+
+  SUBROUTINE lateral_source_trace_sides(direction,face_i,face_j,           &
+       source_left,source_right)
+
+    USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
+
+    IMPLICIT NONE
+
+    INTEGER, INTENT(IN) :: direction,face_i,face_j
+    LOGICAL, INTENT(OUT) :: source_left,source_right
+
+    source_left=.FALSE.
+    source_right=.FALSE.
+    IF ( .NOT. lateral_source_flag ) RETURN
+
+    SELECT CASE (direction)
+    CASE (PATH_DIR_X)
+       IF ( face_i .EQ. 1 ) source_left=source_cell(1,face_j) .EQ. 2
+       IF ( face_i .EQ. comp_interfaces_x ) &
+            source_right=source_cell(comp_cells_x,face_j) .EQ. 2
+    CASE (PATH_DIR_Y)
+       IF ( face_j .EQ. 1 ) source_left=source_cell(face_i,1) .EQ. 2
+       IF ( face_j .EQ. comp_interfaces_y ) &
+            source_right=source_cell(face_i,comp_cells_y) .EQ. 2
+    END SELECT
+
+  END SUBROUTINE lateral_source_trace_sides
 
 END MODULE hyperbolic_2d

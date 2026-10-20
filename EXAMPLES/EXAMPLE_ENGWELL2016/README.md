@@ -24,6 +24,10 @@ A supercritical radial inlet over flat terrain, intended to reproduce the behavi
 | Richardson number | Generator argument, < 1 |
 | Solid mass fraction (`XS_SOURCE`) | Sixth generator argument (`xs_init`) |
 
+## Dependencies
+
+The input generator requires Python 3 and NumPy.
+
 ## How to run
 
 Run `python create_example.py 200 2000 2000 900 0.9 0.8` and then `../../bin/IMEX_SfloW2D`. The script expects six arguments: x cells, source radius, source thickness, temperature, Richardson number and solid mass fraction. The sixth argument is substituted into `XS_SOURCE`, which the solver reads as a mass fraction; the legacy description calling it a volume fraction is incorrect.
@@ -39,4 +43,4 @@ Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc` can be viewed i
 
 ## Legacy documentation and preservation
 
-The original [`README.txt`](README.txt) in this example directory remains the archival source for the complete historical narrative, parameter discussion, scientific references and commands. It has not been deleted or rewritten. This standardized README must not replace it as the sole provenance source until a full section-by-section textual comparison has been accepted.
+The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 24 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.

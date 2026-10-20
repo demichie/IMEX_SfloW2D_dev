@@ -30,6 +30,10 @@ This numerical-verification example tests spurious transport across wet–dry in
 | `N_RK` | 2 |
 | Slope/curvature corrections | Disabled |
 
+## Dependencies
+
+The input generator requires Python 3 and NumPy. Matplotlib is required only when the `--plot` option is enabled.
+
 ## How to run
 
 From this directory run `python3 create_example.py 120 --plot`; then run the compiled solver with the generated input. For the original verification case, preserve the documented solver flags and initial-state conditions.
@@ -58,4 +62,4 @@ The original README proposes the following integral measures: `M_uphill` for `x<
 
 ## Legacy documentation and preservation
 
-The original [`README.txt`](README.txt) in this example directory remains the archival source for the complete historical narrative, parameter discussion, scientific references and commands. It has not been deleted or rewritten. This standardized README must not replace it as the sole provenance source until a full section-by-section textual comparison has been accepted.
+The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 24 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.

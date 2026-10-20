@@ -1110,6 +1110,44 @@ Con il template standard di `EXAMPLE_DAMBREAK` (`KT_TRACE_RECONSTRUCTION='froude
 
 Non è stata eseguita la suite completa del repository. C06 resta **GATE**: l'audit di tutti gli esempi e dei README storici non è concluso; `EXAMPLE_CF` non è stato ritestato con il solver corrente e l'esito di `TEST_SOURCE_MASS` non dimostra da solo la riproducibilità di `EXAMPLE_LATERAL_SOURCE`. Le evidenze dei run e dei test sono state conservate in directory temporanee, non nel repository.
 
+#### Aggiornamento prove runtime e packaging — 20 ottobre 2026
+
+Le prove sono state ripetute con il solver compilato dal commit corrente `7f05b9b2` e un'estrazione pulita dell'archivio Examples sintetico `9.9.21`. `EXAMPLE_CF` ha raggiunto `T_END=150 s` (NetCDF non vuoto di circa 25 MB), `EXAMPLE_TAAL` `T_END=200 s` (circa 172 MB) e `EXAMPLE_TAAL_BOTTOM` `T_END=50 s` (circa 39 MB). Questi risultati aggiornano le osservazioni precedenti: il collasso del passo temporale di `EXAMPLE_CF` non si riproduce con il solver corrente. `EXAMPLE_2D` ha inoltre completato lo smoke test dall'archivio Examples estratto.
+
+Il primo candidato `9.9.21` aveva omesso `src/python_diagnostics/kt_ritter_1d.f90`; l'inventario lo ha rilevato e la correzione locale a `EXTRA_DIST` è stata inclusa nel candidato successivo. Dopo gli aggiornamenti documentali è stato generato il candidato temporaneo `9.9.24` (revisione sintetica `40e48589c5f1db9c09c351073083cbd7c5f9063e`; nessun tag o commit aggiunto al repository principale). Il builder ha verificato gli inventari di entrambi gli archivi e tutti i 20 README. Il manifest registra SHA-256 `0d75ba496143a34d0a9458c3f103fae819b288e997ddd535e8172983fe6781e9` per l'archivio sorgente e `f47e3f18bfdf8abf51770c15be83134021c929ef3df2c40ab8aeca4f9c777215` per Examples. Il tarball sorgente estratto ha superato `configure`, `make`, `make check`, `make distcheck` e `make install` con GNU Fortran e NetCDF-Fortran su macOS.
+
+Dall'archivio Examples `9.9.24` estratto, `EXAMPLE_2D` è stato generato e avviato con il solver installato; il run ha raggiunto 1.5 s e scritto un NetCDF non vuoto di circa 5.1 MB. Il generatore del catalogo ha prodotto 20 Examples senza avvisi di contenuto e la build MkDocs generata dal workflow è riuscita con `--strict`. Al 20 ottobre il confronto completo dei 19 README legacy restava da completare; è stato chiuso nell'aggiornamento del 24 ottobre riportato di seguito.
+
+`EXAMPLE_LATERAL_SOURCE` continua a non dimostrare un flusso funzionante: l'invocazione documentata termina a 100 s con codice 0 ma produce gravità ridotta negativa, proprietà della sorgente non finite e massa nulla. Una prova diagnostica a 300 K rende finite le proprietà derivate (gravità ridotta circa 0.098 m/s², velocità circa 18.76 m/s, spessore circa 1794.6 m e portata richiesta 10,000,000 kg/s), ma la massa simulata resta nulla. Non è stata approvata né introdotta una configurazione fisica sostitutiva. MkDocs `--strict` e il confronto completo, sezione per sezione, dei 19 README legacy non sono ancora stati ripetuti/completati sul worktree corrente.
+
+Esito aggiornato C06: **GATE invariato**. Sono stati chiusi i run correnti di CF e TAAL, ma restano da chiarire la mancata iniezione di massa nell'esempio laterale, rigenerare/verificare l'archivio Examples aggiornato, ripetere la build documentale strict e completare il confronto dei README legacy. Provenienza e licenze dei DEM restano non verificate e non sono un blocco tecnico.
+
+#### Correzione della sorgente laterale e regressione — 24 ottobre 2026
+
+La causa della mancata iniezione con `froude_blend` era la sostituzione dello spessore prescritto alla frontiera con una traccia Froude ricostruita nulla. La correzione preserva ora lo spessore della sorgente nei limiti delle velocità, nel flusso avvettivo e nello stato del path idrostatico. La verifica dei quattro orientamenti ha inoltre rilevato e corretto due problemi associati: la ricostruzione dei lati sud/nord non ripristinava la traccia prescritta e la geometria della sorgente nord veniva assegnata al bordo sud.
+
+`TEST_SOURCE_MASS` è stato esteso a nove casi di bilancio e passa con tolleranza relativa `1e-9`, inclusi gli ingressi ai quattro bordi; il massimo errore relativo dei casi di bordo è `1.51e-11`. La build del solver dal worktree corrente è riuscita con GNU Fortran e NetCDF-Fortran. La simulazione diagnostica di `EXAMPLE_LATERAL_SOURCE` a 300 K ha raggiunto 100 s e scritto un NetCDF non vuoto, con massa non nulla. La ricetta documentata a 900 K resta invalida: la gravità ridotta è negativa. La temperatura diagnostica non è una sostituzione fisica approvata.
+
+L'ispezione del percorso di inizializzazione ha chiarito il meccanismo della configurazione a 900 K: la densità della miscela sorgente scende sotto la densità dell'aria ambiente, rendendo negativa la gravità ridotta `g' = (rho_m - rho_ambient) / rho_m * g`. Per il ramo con portata massica e Richardson positivo, il codice deriva lo spessore tramite `sqrt(RI_SOURCE / g')`; prima del controllo aggiunto il 24 ottobre, la radice di un valore negativo generava proprietà non finite e il solver poteva comunque terminare con codice 0. Non è stata scelta una temperatura alternativa: la scelta fisica resta aperta.
+
+Al momento della registrazione del fix della sorgente laterale, C06 restava **GATE** in attesa del confronto integrale dei 19 README legacy, della verifica degli esempi/dipendenze di post-processing rimanenti e dell'accettazione scientifica o correzione della configurazione documentata a 900 K. Il confronto README è stato completato nell'aggiornamento immediatamente seguente; gli altri gate restano aperti. La provenienza/licenza dei DEM resta non verificata ma non è un blocco tecnico.
+
+#### Confronto sezionale dei README legacy — 24 ottobre 2026
+
+Il confronto sezione per sezione di tutte le 19 coppie `README.txt`/`README.md` è completo. Sono stati verificati setup, parametri, comandi, output, riferimenti e dipendenze; i 19 file storici sono rimasti invariati. Le discrepanze con la configurazione corrente sono state riportate nelle guide Markdown e in `EXAMPLES/README_SECOND_PASS_AUDIT.md`, invece di riprodurre indicazioni legacy non valide. In particolare:
+
+- `EXAMPLE_DAMBREAK`: il README legacy dichiara pareti laterali impermeabili e bordo destro senza flusso, ma il template usa `FLAG=1` per i momenti e il solver corrente applica condizioni outflow-only.
+- `EXAMPLE_BW2D`: ripristinata la possibilità documentata di una sorgente stazionaria rimuovendo `TIME_PARAM`.
+- I README sorgente descrivono esplicitamente le discrepanze verificate su numero/unità degli argomenti, flag di output e semantica dei parametri temporali; non sono stati promossi errori legacy a istruzioni correnti.
+
+Il confronto documentale è quindi chiuso. Dopo l'aggiornamento, il generatore ha prodotto 20 pagine senza avvisi e MkDocs `--strict` è terminato con successo; il messaggio informativo su Material for MkDocs 2.0 non è bloccante. Il gate C06 resta **GATE**: la ricetta 900 K è ora rifiutata esplicitamente ma resta fisicamente invalida e richiede parametri approvati; sono inoltre aperte la validazione di esempi/dipendenze di post-processing non ancora provati e la generazione/verifica di un nuovo candidato Examples dal worktree corrente. La provenienza/licenza dei DEM resta non verificata e non blocca la validazione tecnica.
+
+#### Validazione esplicita della sorgente a gravità ridotta non positiva — 24 ottobre 2026
+
+Il parser ora richiede gravità ridotta positiva quando una sorgente laterale/radiale usa un Richardson prescritto. Se `RI_SOURCE >= 0` e `g' <= 0`, stampa un errore esplicito ed esegue `ERROR STOP` prima di calcolare lo spessore o iniziare il run. Il test di regressione riproduce la composizione documentata a 900 K e verifica il codice d'uscita nonzero, il messaggio diagnostico e l'assenza della directory di output.
+
+Il solver è stato ricompilato fuori dal repository con GNU Fortran e NetCDF-Fortran; `TEST_SOURCE_MASS` passa con nove bilanci di massa e il decimo test di rifiuto input atteso. Il confronto massimo di massa resta `1.51e-11`, sotto la tolleranza `1e-9`. Non sono stati modificati temperatura o altri parametri fisici dell'esempio.
+
 #### Regola di rilascio per documentazione pubblica
 
 Pubblicazione unificata: solo il workflow publish-documentation.yml deve distribuire contenuti su GitHub Pages; non creare un secondo workflow Doxygen che possa sostituire la root MkDocs. Eseguire manualmente o da tag/release secondo il workflow tracciato. La homepage resta a /, il catalogo in /examples/ e l’HTML Doxygen in /doxygen/. La documentazione deve essere costruita dalla medesima revisione del sorgente e il catalogo legge direttamente EXAMPLES/\*\*/README.md. Testare tema chiaro, tema scuro, stampa e risoluzione dei link quando si modifica il CSS.

@@ -76,6 +76,8 @@ def expected(meta, t):
     if kind == 'lateral':
         per, act, ramp, cutoff = meta['tp']
         return meta['mfr'] * window_integral(t, per, act, ramp, 0.0, True, cutoff)
+    if kind == 'lateral_boundary':
+        return meta['mfr'] * t
     if kind == 'bottom':
         per, act, ramp, phase = meta['tp']
         return (ALPHA_S * RHO_S * meta['vel'] * meta['area']
@@ -102,7 +104,7 @@ def main():
         return 1
     # q_2d columns: x, y, then the conservative variables; with one solid
     # class and no additional gas: rho*h, rho*h*u, rho*h*v, energy, solid
-    column = 2 if meta['kind'] == 'lateral' else 6
+    column = 2 if meta['kind'] in ('lateral', 'lateral_boundary') else 6
     area = meta['dx'] ** 2
     worst, failed = 0.0, False
     final = expected(meta, meta['t_end'])

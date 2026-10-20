@@ -45,7 +45,8 @@ IMEX_SfloW2D_SOURCES = \
 AM_FCFLAGS = @OPENMP_FCFLAGS@ @NETCDF_CPPFLAGS@ -I$(srcdir)/state
 CLEANFILES = *.mod
 EXTRA_DIST = state/state_conversion_phys_var.inc state/velocity_from_conservative.inc \
-             state/mixture_heat_capacity.inc state/mixture_from_mass.inc
+             state/mixture_heat_capacity.inc state/mixture_from_mass.inc \
+             python_diagnostics/kt_ritter_1d.f90
 
 state/state_conversion_2d.$(OBJEXT): state/state_conversion_phys_var.inc      \
                                      state/velocity_from_conservative.inc     \

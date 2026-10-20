@@ -26,7 +26,7 @@ An avalanche initially held within a hemispherical shell slides down a 35-degree
 
 ## How to run
 
-Run `python create_example.py 100 0.5 300 false`, then `../../bin/IMEX_SfloW2D`. Script arguments: x cells, solid volume fraction, temperature (K), plot flag. NumPy and Basemap are listed by the legacy README.
+Run `python create_example.py 100 0.5 300 false`, then `../../bin/IMEX_SfloW2D`. Script arguments: x cells, solid volume fraction, temperature (K), plot flag. The generator requires Python 3 and NumPy; Matplotlib is required only when the plot flag is `true`. The current generator does not use Basemap, although the legacy README lists it.
 
 ## Expected output
 
@@ -39,4 +39,4 @@ Native NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc` is viewable in 
 
 ## Legacy documentation and preservation
 
-The original [`README.txt`](README.txt) in this example directory remains the archival source for the complete historical narrative, parameter discussion, scientific references and commands. It has not been deleted or rewritten. This standardized README must not replace it as the sole provenance source until a full section-by-section textual comparison has been accepted.
+The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 24 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.

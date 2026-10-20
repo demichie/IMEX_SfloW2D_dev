@@ -4342,6 +4342,11 @@ CONTAINS
           WRITE (*, *) 'Source density =', rho_m, '(kg/m3)'
           WRITE (*, *) 'Source reduced gravity =', red_grav, '(m/s2)'
 
+          IF ( Ri_source .GE. 0.0_wp .AND. red_grav .LE. 0.0_wp ) THEN
+            WRITE (*, *) 'ERROR: Source reduced gravity must be positive when RI_SOURCE is specified'
+            ERROR STOP 1
+          END IF
+
           IF (mfr_source .GE. 0.0_wp) THEN
 
             IF (Ri_source .GE. 0.0_wp) THEN

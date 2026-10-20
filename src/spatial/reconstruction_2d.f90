@@ -648,14 +648,18 @@ CONTAINS
 
              IF ( k .EQ. 1 ) THEN
 
-                ! Dirichelet boundary condition at the south of the domain
-                IF ( bcS(i)%flag .EQ. 0 ) THEN
+                IF ( source_cell(j,k) .EQ. 2 ) THEN
 
-                   qrecS(i) = bcS(i)%value
+                   qrecS(i) = source_bdry(i)
 
                 ELSE
 
-                   IF ( i .EQ. 3 ) qrecS(i) = MIN( qrecS(i) , 0.0_wp )
+                   ! Dirichlet boundary condition at the south of the domain
+                   IF ( bcS(i)%flag .EQ. 0 ) THEN
+                      qrecS(i) = bcS(i)%value
+                   ELSE
+                      IF ( i .EQ. 3 ) qrecS(i) = MIN( qrecS(i) , 0.0_wp )
+                   END IF
 
                 END IF
 
@@ -663,14 +667,18 @@ CONTAINS
 
              IF ( k .EQ. comp_cells_y ) THEN
 
-                ! Dirichelet boundary condition at the north of the domain
-                IF ( bcN(i)%flag .EQ. 0 ) THEN
+                IF ( source_cell(j,k) .EQ. 2 ) THEN
 
-                   qrecN(i) = bcN(i)%value
+                   qrecN(i) = source_bdry(i)
 
                 ELSE
 
-                   IF ( i .EQ. 3 ) qrecN(i) = MAX( qrecN(i) , 0.0_wp )
+                   ! Dirichlet boundary condition at the north of the domain
+                   IF ( bcN(i)%flag .EQ. 0 ) THEN
+                      qrecN(i) = bcN(i)%value
+                   ELSE
+                      IF ( i .EQ. 3 ) qrecN(i) = MAX( qrecN(i) , 0.0_wp )
+                   END IF
 
                 END IF
 

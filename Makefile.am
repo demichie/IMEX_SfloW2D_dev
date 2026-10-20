@@ -12,6 +12,10 @@ EXTRA_DIST = \
   CONTRIBUTING.md \
   README.md \
   TESTS/run_tests.sh \
+  TESTS/TEST_SOURCE_MASS/README.md \
+  TESTS/TEST_SOURCE_MASS/run_test.sh \
+  TESTS/TEST_SOURCE_MASS/make_cases.py \
+  TESTS/TEST_SOURCE_MASS/check_mass.py \
   TESTS/TEST_OUTPUT_PATHS/run_test.sh \
   TESTS/TEST_OUTPUT_PATHS/test_snapshot_index.f90 \
   TESTS/TEST_2D/IMEX_sfloW2D.inp \

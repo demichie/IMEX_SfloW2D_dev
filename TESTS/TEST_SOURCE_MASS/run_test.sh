@@ -1,5 +1,5 @@
 #!/bin/sh
-# Mass injected by every source type against the exact value.
+# Source mass balances and invalid reduced-gravity input rejection.
 set -eu
 
 test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -33,6 +33,29 @@ python3 -B "$test_dir/make_cases.py" "$work_dir"
 
 failed=0
 for case_dir in "$work_dir"/*/; do
+    case_name=$(basename "$case_dir")
+    if [ "$case_name" = source_negative_reduced_gravity ]; then
+        if ( cd "$case_dir" && "$executable" > run.log 2>&1 ); then
+            echo "FAIL: solver accepted a source with non-positive reduced gravity"
+            failed=1
+            continue
+        fi
+        if ! grep -q 'Source reduced gravity must be positive when RI_SOURCE is specified' \
+                "$case_dir/run.log"; then
+            echo "FAIL: invalid source did not report the expected validation error"
+            tail -20 "$case_dir/run.log"
+            failed=1
+            continue
+        fi
+        if [ -e "$case_dir/OUTPUT" ]; then
+            echo "FAIL: invalid source created solver output before rejection"
+            failed=1
+            continue
+        fi
+        echo "PASS: rejected source with non-positive reduced gravity"
+        continue
+    fi
+
     if ! ( cd "$case_dir" && "$executable" > run.log 2>&1 ); then
         echo "FAIL: solver exited unsuccessfully in $case_dir"
         tail -20 "$case_dir/run.log"
@@ -46,4 +69,4 @@ if [ "$failed" -ne 0 ]; then
     echo "FAIL: source mass injection"
     exit 1
 fi
-echo "PASS: source mass injection"
+echo "PASS: source mass injection and validation"

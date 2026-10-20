@@ -1052,7 +1052,7 @@ CONTAINS
                 sourceS_vect_x(j,1) = 0.0_wp
                 sourceS_vect_y(j,1) = side_fract
 
-                total_source = total_source + dy * side_fract
+                total_source = total_source + dx * side_fract
 
              END IF
 
@@ -1067,16 +1067,16 @@ CONTAINS
              IF ( ( x_stag(j) .LE. x2_source ) .AND. ( x_stag(j+1) .GE.         &
                   x1_source ) ) THEN
 
-                source_cell(j,1) = 2
-                sourceN(j,1) = .TRUE.
+                source_cell(j,comp_cells_y) = 2
+                sourceN(j,comp_cells_y) = .TRUE.
 
                 side_fract = MIN ( MIN( (x_stag(j+1) - x1_source) , ( x2_source -     &
                      x_stag(j) ) ) , ( x2_source - x1_source ) , dx ) / dx
 
-                sourceS_vect_x(j,1) = 0.0_wp
-                sourceS_vect_y(j,1) = - side_fract
+                sourceN_vect_x(j,comp_cells_y) = 0.0_wp
+                sourceN_vect_y(j,comp_cells_y) = - side_fract
 
-                total_source = total_source + dy * side_fract
+              total_source = total_source + dx * side_fract
 
              END IF
 

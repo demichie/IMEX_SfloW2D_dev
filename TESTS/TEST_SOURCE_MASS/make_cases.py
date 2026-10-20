@@ -161,6 +161,32 @@ def main():
     write_case(work, 'lateral_window', grid, ' RADIAL_SOURCE_FLAG = T,\n', src, 40.0, 5.0,
                dict(kind='lateral', mfr=1.0e7, tp=(12.0, 8.0, 2.0, 30.0)))
 
+    # Lateral boundary source: the prescribed positive-depth trace must be
+    # retained by the KT speed bounds, flux and hydrostatic path.
+    for name, side, coord1, coord2 in (
+            ('west', 'W', 'Y1_SOURCE', 'Y2_SOURCE'),
+            ('east', 'E', 'Y1_SOURCE', 'Y2_SOURCE'),
+            ('south', 'S', 'X1_SOURCE', 'X2_SOURCE'),
+            ('north', 'N', 'X1_SOURCE', 'X2_SOURCE')):
+        src = ('&LATERAL_SOURCE_PARAMETERS\n SOURCE_SIDE = "%s",\n'
+               ' %s = 4900.0D0,\n %s = 5100.0D0,\n'
+               ' MFR_SOURCE = 1.0D4,\n RI_SOURCE = 0.5D0,\n'
+               ' T_SOURCE = 300.0D0,\n XS_SOURCE = 0.01D0,\n'
+               ' TIME_PARAM = 1.0D0, 1.0D0, 0.0D0, 1.0D0,\n /\n'
+               % (side, coord1, coord2))
+        write_case(work, 'lateral_boundary_' + name, grid,
+                   ' LATERAL_SOURCE_FLAG = T,\n', src, 0.1, 0.1,
+                   dict(kind='lateral_boundary', mfr=1.0e4))
+
+    # A prescribed Richardson number requires positive reduced gravity.
+    src = ('&LATERAL_SOURCE_PARAMETERS\n SOURCE_SIDE = "W",\n'
+           ' Y1_SOURCE = 4900.0D0,\n Y2_SOURCE = 5100.0D0,\n'
+           ' MFR_SOURCE = 1.0D4,\n RI_SOURCE = 0.5D0,\n'
+           ' T_SOURCE = 900.0D0,\n XS_SOURCE = 0.01D0,\n /\n')
+    write_case(work, 'source_negative_reduced_gravity', grid,
+               ' LATERAL_SOURCE_FLAG = T,\n', src, 0.1, 0.1,
+               dict(kind='invalid_source_gravity'))
+
     # Elliptical bottom source: periodic window with linear ramps and a phase
     src = ('&RADIAL_SOURCE_PARAMETERS\n X_SOURCE = 5000.0D0,\n Y_SOURCE = 5000.0D0,\n'
            ' R_SOURCE = 300.0D0,\n R2_SOURCE = 90.0D0,\n ANGLE_SOURCE = 30.0D0,\n'

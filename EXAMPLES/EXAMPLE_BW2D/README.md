@@ -27,6 +27,10 @@ A 2-D radial flow with basal friction, sedimentation and entrainment above slopi
 | Solid volume fraction | 8 × 10^-5 |
 | Particle size | 2.5 × 10^-4 m |
 
+## Dependencies
+
+The input generator requires Python 3 and NumPy.
+
 ## How to run
 
 Run `python create_example.py 300 30000.0 2000.0 2.0 330.0 100.0 0.00008 2.5e-4`, then `../../bin/IMEX_SfloW2D`. The eight arguments are number of x cells, half-domain size (m), source radius (m), slope (degrees), source temperature (K), velocity (m/s), solid volume fraction and particle size (m). The original README incorrectly states six arguments.
@@ -53,13 +57,15 @@ The original README contains two descriptions of the four `TIME_PARAM` settings.
 
 The generated template sets `BOTTOM_RADIAL_SOURCE_FLAG=T`, so `TIME_PARAM(4)` is a phase offset, not a cut-off. With the explicit values, the 50 s phase equals the ramp duration: the source starts at its peak, declines linearly to zero over the first 50 s, and stays off for the remainder of the 600 s period. The earlier 30 s/20 s prose does not describe this generated configuration.
 
+For steady-state injection, remove the `TIME_PARAM` line from the radial-source namelist.
+
 ## References
 
 1. Bursik, M. I., and Woods, A. W. (1996). The dynamics and thermodynamics of large ash flows. *Bulletin of Volcanology*, 58, 175–193.
 
 ## Legacy documentation and preservation
 
-The original [`README.txt`](README.txt) in this example directory remains the archival source for the complete historical narrative, parameter discussion, scientific references and commands. It has not been deleted or rewritten. This standardized README must not replace it as the sole provenance source until a full section-by-section textual comparison has been accepted.
+The paired [`README.txt`](README.txt) is retained as a verbatim archival record. This guide was compared section by section with the legacy file on 24 October 2026; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
 
 ## Documentation verification note
 
