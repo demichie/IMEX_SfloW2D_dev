@@ -1148,6 +1148,12 @@ Il parser ora richiede gravità ridotta positiva quando una sorgente laterale/ra
 
 Il solver è stato ricompilato fuori dal repository con GNU Fortran e NetCDF-Fortran; `TEST_SOURCE_MASS` passa con nove bilanci di massa e il decimo test di rifiuto input atteso. Il confronto massimo di massa resta `1.51e-11`, sotto la tolleranza `1e-9`. Non sono stati modificati temperatura o altri parametri fisici dell'esempio.
 
+#### Configurazione termica approvata per `EXAMPLE_LATERAL_SOURCE`
+
+L'utente ha approvato l'uso di `T_SOURCE=300 K`, uguale alla temperatura ambiente, al posto della precedente invocazione a 900 K. Con pressione `101300 Pa`, `XS_SOURCE=0.01`, densità dei solidi `2000 kg/m³` e aria alla stessa temperatura, la densità neutra corrisponde a circa `303.03 K`: a 300 K la miscela sorgente ha densità circa `1.188 kg/m³`, maggiore di quella ambiente (`1.176 kg/m³`), e gravità ridotta positiva (`0.098 m/s²`). La configurazione approvata è quindi non galleggiante nel senso richiesto dall'esempio.
+
+La guida Markdown attiva usa ora il comando con 300 K. Il run diagnostico già eseguito con gli stessi parametri ha raggiunto `T_END=100 s`, scritto un NetCDF non vuoto e prodotto massa non nulla. Il `README.txt` resta invariato come archivio storico; la vecchia invocazione a 900 K continua a essere rifiutata dalla validazione d'input. Non sono stati cambiati altri parametri fisici. Questo risolve il blocco scientifico della temperatura, non i restanti gate C06: run e dipendenze opzionali ancora da verificare e nuovo archivio Examples da generare dalla revisione che includerà le modifiche.
+
 #### Regola di rilascio per documentazione pubblica
 
 Pubblicazione unificata: solo il workflow publish-documentation.yml deve distribuire contenuti su GitHub Pages; non creare un secondo workflow Doxygen che possa sostituire la root MkDocs. Eseguire manualmente o da tag/release secondo il workflow tracciato. La homepage resta a /, il catalogo in /examples/ e l’HTML Doxygen in /doxygen/. La documentazione deve essere costruita dalla medesima revisione del sorgente e il catalogo legge direttamente EXAMPLES/\*\*/README.md. Testare tema chiaro, tema scuro, stampa e risoluzione dei link quando si modifica il CSS.
