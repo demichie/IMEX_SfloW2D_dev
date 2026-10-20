@@ -11,7 +11,7 @@
 
 MODULE reconstruction_2d
 
-  USE parameters_2d, ONLY : wp, n_vars
+  USE parameters_2d, ONLY : wp, n_vars, kt_trace_reconstruction
   USE parameters_2d, ONLY : lateral_source_flag, radial_source_flag
   USE parameters_2d, ONLY : bcW, bcE, bcS, bcN
   USE parameters_2d, ONLY : idx_u, idx_v
@@ -20,7 +20,7 @@ MODULE reconstruction_2d
   USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
   USE geometry_2d, ONLY : B_cent, B_face_x, B_face_y
   USE geometry_2d, ONLY : source_cell
-  USE geometry_2d, ONLY : one_by_dx, one_by_dy
+  USE geometry_2d, ONLY : one_by_dx, one_by_dy, dx, dy
   USE geometry_2d, ONLY : limit
 
    USE hp_reconstruction_2d, ONLY : hp_dry_tolerance
@@ -31,6 +31,10 @@ MODULE reconstruction_2d
   IMPLICIT NONE
 
   PRIVATE
+
+  ! Smooth transition from eta_x to h_x+B_x over this directional Froude band.
+  REAL(wp), PARAMETER :: fr_blend_lower = 0.8_wp
+  REAL(wp), PARAMETER :: fr_blend_upper = 1.2_wp
 
   !> \brief Persistent cell/face traces and thread-local storage for HP reconstruction.
   !> \details Arrays are indexed by component, x and y; hp_scratch uses its last
@@ -47,8 +51,20 @@ MODULE reconstruction_2d
      REAL(wp), ALLOCATABLE :: qp_interfaceB(:,:,:)
      REAL(wp), ALLOCATABLE :: qp_interfaceT(:,:,:)
 
-   ! Direct cell-side candidates retained until the local HP blend can
-   ! compare continuity errors across adjacent interfaces.
+     ! Direct h_x-based states for the advective part of the PCCU flux.
+     ! The existing interface states retain the eta-based reconstruction and
+     ! are used for central-upwind dissipation and hydrostatic path terms.
+     REAL(wp), ALLOCATABLE :: q_adv_interfaceL(:,:,:)
+     REAL(wp), ALLOCATABLE :: q_adv_interfaceR(:,:,:)
+     REAL(wp), ALLOCATABLE :: q_adv_interfaceB(:,:,:)
+     REAL(wp), ALLOCATABLE :: q_adv_interfaceT(:,:,:)
+     REAL(wp), ALLOCATABLE :: qp_adv_interfaceL(:,:,:)
+     REAL(wp), ALLOCATABLE :: qp_adv_interfaceR(:,:,:)
+     REAL(wp), ALLOCATABLE :: qp_adv_interfaceB(:,:,:)
+     REAL(wp), ALLOCATABLE :: qp_adv_interfaceT(:,:,:)
+
+   ! Direct h_x-based cell-side candidates retained for the advective flux
+   ! while the eta-based HP states are used by dissipation and path terms.
      REAL(wp), ALLOCATABLE :: qp_cellW(:,:,:)
      REAL(wp), ALLOCATABLE :: qp_cellE(:,:,:)
      REAL(wp), ALLOCATABLE :: qp_cellS(:,:,:)
@@ -60,10 +76,15 @@ MODULE reconstruction_2d
      REAL(wp), ALLOCATABLE :: eta_cellS(:,:), eta_cellN(:,:)
      REAL(wp), ALLOCATABLE :: eta_interfaceL(:,:), eta_interfaceR(:,:)
      REAL(wp), ALLOCATABLE :: eta_interfaceB(:,:), eta_interfaceT(:,:)
+     REAL(wp), ALLOCATABLE :: h_minmod_interfaceL(:,:), h_minmod_interfaceR(:,:)
+     REAL(wp), ALLOCATABLE :: h_minmod_interfaceB(:,:), h_minmod_interfaceT(:,:)
+     REAL(wp), ALLOCATABLE :: h_froude_interfaceL(:,:), h_froude_interfaceR(:,:)
+     REAL(wp), ALLOCATABLE :: h_froude_interfaceB(:,:), h_froude_interfaceT(:,:)
 
        LOGICAL, ALLOCATABLE :: hp_eta_mask(:,:)
        INTEGER, ALLOCATABLE :: hp_eta_j(:), hp_eta_k(:)
        INTEGER :: hp_eta_cells
+       ! Per direction: h-/h+, normal momentum-/+, then tangential momentum-/+.
        REAL(wp), ALLOCATABLE :: hp_blended(:,:,:,:)
        REAL(wp), ALLOCATABLE :: hp_scratch(:,:,:)
 
@@ -71,6 +92,7 @@ MODULE reconstruction_2d
      PROCEDURE :: initialize => initialize_reconstruction
      PROCEDURE :: finalize => finalize_reconstruction
      PROCEDURE :: reconstruct => reconstruction
+     PROCEDURE :: reconstruct_kt_eta => reconstruct_kt_eta_traces
   END TYPE reconstruction_workspace_type
 
 CONTAINS
@@ -93,6 +115,15 @@ CONTAINS
     ALLOCATE( this%qp_interfaceB( n_vars+2, comp_cells_x, comp_interfaces_y ) )
     ALLOCATE( this%qp_interfaceT( n_vars+2, comp_cells_x, comp_interfaces_y ) )
 
+    ALLOCATE( this%q_adv_interfaceL( n_vars, comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%q_adv_interfaceR( n_vars, comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%q_adv_interfaceB( n_vars, comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%q_adv_interfaceT( n_vars, comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%qp_adv_interfaceL( n_vars+2, comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%qp_adv_interfaceR( n_vars+2, comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%qp_adv_interfaceB( n_vars+2, comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%qp_adv_interfaceT( n_vars+2, comp_cells_x, comp_interfaces_y ) )
+
     ALLOCATE( this%qp_cellW( n_vars+2, comp_cells_x, comp_cells_y ) )
     ALLOCATE( this%qp_cellE( n_vars+2, comp_cells_x, comp_cells_y ) )
     ALLOCATE( this%qp_cellS( n_vars+2, comp_cells_x, comp_cells_y ) )
@@ -106,11 +137,19 @@ CONTAINS
     ALLOCATE( this%eta_interfaceR( comp_interfaces_x, comp_cells_y ) )
     ALLOCATE( this%eta_interfaceB( comp_cells_x, comp_interfaces_y ) )
     ALLOCATE( this%eta_interfaceT( comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%h_minmod_interfaceL( comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%h_minmod_interfaceR( comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%h_minmod_interfaceB( comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%h_minmod_interfaceT( comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%h_froude_interfaceL( comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%h_froude_interfaceR( comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%h_froude_interfaceB( comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%h_froude_interfaceT( comp_cells_x, comp_interfaces_y ) )
 
       ALLOCATE( this%hp_eta_mask(comp_cells_x,comp_cells_y) )
       ALLOCATE( this%hp_eta_j(comp_cells_x*comp_cells_y) )
       ALLOCATE( this%hp_eta_k(comp_cells_x*comp_cells_y) )
-      ALLOCATE( this%hp_blended(4,comp_cells_x,comp_cells_y,2) )
+      ALLOCATE( this%hp_blended(6,comp_cells_x,comp_cells_y,2) )
       ALLOCATE( this%hp_scratch(5,8,MAX(1,omp_get_max_threads())) )
       this%hp_eta_mask = .FALSE.
       this%hp_eta_cells = 0
@@ -136,6 +175,15 @@ CONTAINS
     DEALLOCATE( this%qp_interfaceB )
     DEALLOCATE( this%qp_interfaceT )
 
+    DEALLOCATE( this%q_adv_interfaceL )
+    DEALLOCATE( this%q_adv_interfaceR )
+    DEALLOCATE( this%q_adv_interfaceB )
+    DEALLOCATE( this%q_adv_interfaceT )
+    DEALLOCATE( this%qp_adv_interfaceL )
+    DEALLOCATE( this%qp_adv_interfaceR )
+    DEALLOCATE( this%qp_adv_interfaceB )
+    DEALLOCATE( this%qp_adv_interfaceT )
+
     DEALLOCATE( this%qp_cellW )
     DEALLOCATE( this%qp_cellE )
     DEALLOCATE( this%qp_cellS )
@@ -149,6 +197,14 @@ CONTAINS
     DEALLOCATE( this%eta_interfaceR )
     DEALLOCATE( this%eta_interfaceB )
     DEALLOCATE( this%eta_interfaceT )
+    DEALLOCATE( this%h_minmod_interfaceL )
+    DEALLOCATE( this%h_minmod_interfaceR )
+    DEALLOCATE( this%h_minmod_interfaceB )
+    DEALLOCATE( this%h_minmod_interfaceT )
+    DEALLOCATE( this%h_froude_interfaceL )
+    DEALLOCATE( this%h_froude_interfaceR )
+    DEALLOCATE( this%h_froude_interfaceB )
+    DEALLOCATE( this%h_froude_interfaceT )
 
       DEALLOCATE( this%hp_eta_mask )
       DEALLOCATE( this%hp_eta_j )
@@ -225,7 +281,8 @@ CONTAINS
    !> \param[in] j_cent X indices of active cells; only the first solve_cells entries are used.
    !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
 
-   SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent )
+   SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent, &
+        use_kt_direct )
 
     ! External procedures
       USE state_conversion_2d, ONLY : qp_to_qp2
@@ -250,6 +307,7 @@ CONTAINS
     INTEGER, INTENT(IN) :: solve_cells
     INTEGER, INTENT(IN) :: j_cent(:)
     INTEGER, INTENT(IN) :: k_cent(:)
+    LOGICAL, INTENT(IN) :: use_kt_direct
 
     REAL(wp) :: qrecW(n_vars+2) !< recons var at the west edge of the cells
     REAL(wp) :: qrecE(n_vars+2) !< recons var at the east edge of the cells
@@ -805,11 +863,285 @@ CONTAINS
 
     !$OMP END PARALLEL DO
 
-    CALL apply_hp_reconstruction( this, qp_expl, solve_cells, j_cent, k_cent )
+    CALL apply_hp_reconstruction( this, qp_expl, solve_cells, j_cent, k_cent, &
+         use_kt_direct )
 
     RETURN
 
   END SUBROUTINE reconstruction
+
+  !> Reconstruct the KP free surface separately for KT dissipation/path terms.
+  SUBROUTINE reconstruct_kt_eta_traces(this,qp_expl)
+    USE parameters_2d, ONLY : limiter,reconstr_coeff
+    USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
+    USE constitutive_parameters_2d, ONLY : grav
+
+    CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
+    REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
+    REAL(wp) :: sx(3),sy(3),hx(3),hy(3),xx(3),yy(3)
+    REAL(wp) :: slope_x,slope_y,slope_hx,slope_hy,eta_center
+    REAL(wp) :: eta_w,eta_e,eta_s,eta_n,slope_eta2,slope_minmod
+    REAL(wp) :: eta_w_mm,eta_e_mm,eta_s_mm,eta_n_mm
+    REAL(wp) :: slope_eta2_x,slope_eta2_y
+    REAL(wp) :: slope_blend_x,slope_blend_y,eta_blend_w,eta_blend_e
+    REAL(wp) :: eta_blend_s,eta_blend_n,fr_weight_x,fr_weight_y
+    INTEGER :: l,j,k
+
+    !$OMP PARALLEL DO PRIVATE(l,j,k,sx,sy,hx,hy,xx,yy,slope_x,slope_y,      &
+    !$OMP& slope_hx,slope_hy,eta_center,eta_w,eta_e,eta_s,eta_n,            &
+    !$OMP& slope_eta2,slope_minmod,eta_w_mm,eta_e_mm,eta_s_mm,eta_n_mm)
+    DO l=1,this%hp_eta_cells
+       j=this%hp_eta_j(l)
+       k=this%hp_eta_k(l)
+       eta_center=qp_expl(1,j,k)+B_cent(j,k)
+       slope_x=0.0_wp
+       slope_y=0.0_wp
+       slope_hx=0.0_wp
+       slope_hy=0.0_wp
+       IF ((j.GT.1).AND.(j.LT.comp_cells_x)) THEN
+          sx=[qp_expl(1,j-1,k)+B_cent(j-1,k),eta_center, &
+               qp_expl(1,j+1,k)+B_cent(j+1,k)]
+          hx=[qp_expl(1,j-1,k),qp_expl(1,j,k),qp_expl(1,j+1,k)]
+          xx=[x_comp(j-1),x_comp(j),x_comp(j+1)]
+          CALL limit(sx,xx,limiter(1),slope_x)
+          CALL limit(hx,xx,limiter(1),slope_hx)
+       END IF
+       IF ((k.GT.1).AND.(k.LT.comp_cells_y)) THEN
+          sy=[qp_expl(1,j,k-1)+B_cent(j,k-1),eta_center, &
+               qp_expl(1,j,k+1)+B_cent(j,k+1)]
+          hy=[qp_expl(1,j,k-1),qp_expl(1,j,k),qp_expl(1,j,k+1)]
+          yy=[y_comp(k-1),y_comp(k),y_comp(k+1)]
+          CALL limit(sy,yy,limiter(1),slope_y)
+          CALL limit(hy,yy,limiter(1),slope_hy)
+       END IF
+       eta_w=eta_center-reconstr_coeff*dx2*slope_x
+       eta_e=eta_center+reconstr_coeff*dx2*slope_x
+       eta_s=eta_center-reconstr_coeff*dy2*slope_y
+       eta_n=eta_center+reconstr_coeff*dy2*slope_y
+
+       ! K&P positivity correction for the eta_x traces used by the
+       ! hydrostatic/path discretization.
+       IF ( eta_e .LT. B_face_x(j+1,k) ) THEN
+          eta_e=B_face_x(j+1,k)
+          eta_w=2.0_wp*eta_center-eta_e
+       ELSEIF ( eta_w .LT. B_face_x(j,k) ) THEN
+          eta_w=B_face_x(j,k)
+          eta_e=2.0_wp*eta_center-eta_w
+       END IF
+       IF ( eta_n .LT. B_face_y(j,k+1) ) THEN
+          eta_n=B_face_y(j,k+1)
+          eta_s=2.0_wp*eta_center-eta_n
+       ELSEIF ( eta_s .LT. B_face_y(j,k) ) THEN
+          eta_s=B_face_y(j,k)
+          eta_n=2.0_wp*eta_center-eta_s
+       END IF
+       this%eta_cellW(j,k)=eta_w
+       this%eta_cellE(j,k)=eta_e
+       this%eta_cellS(j,k)=eta_s
+       this%eta_cellN(j,k)=eta_n
+
+       IF (kt_trace_reconstruction .EQ. 'minmod') THEN
+          ! Alternative transport traces: minmod(eta_x, h_x+B_x), followed
+          ! by the face-bed positivity correction. Hydrostatic eta stays above.
+          slope_eta2=reconstr_coeff*slope_hx + &
+               (B_face_x(j+1,k)-B_face_x(j,k))*one_by_dx
+          slope_minmod=minmod_slope_pair(reconstr_coeff*slope_x,slope_eta2)
+          eta_w_mm=eta_center-dx2*slope_minmod
+          eta_e_mm=eta_center+dx2*slope_minmod
+          IF ( eta_e_mm .LT. B_face_x(j+1,k) ) THEN
+             eta_e_mm=B_face_x(j+1,k)
+             eta_w_mm=2.0_wp*eta_center-eta_e_mm
+          ELSEIF ( eta_w_mm .LT. B_face_x(j,k) ) THEN
+             eta_w_mm=B_face_x(j,k)
+             eta_e_mm=2.0_wp*eta_center-eta_w_mm
+          END IF
+          this%h_minmod_interfaceR(j,k)= &
+               MAX(eta_w_mm-B_face_x(j,k),0.0_wp)
+          this%h_minmod_interfaceL(j+1,k)= &
+               MAX(eta_e_mm-B_face_x(j+1,k),0.0_wp)
+
+          slope_eta2=reconstr_coeff*slope_hy + &
+               (B_face_y(j,k+1)-B_face_y(j,k))*one_by_dy
+          slope_minmod=minmod_slope_pair(reconstr_coeff*slope_y,slope_eta2)
+          eta_s_mm=eta_center-dy2*slope_minmod
+          eta_n_mm=eta_center+dy2*slope_minmod
+          IF ( eta_n_mm .LT. B_face_y(j,k+1) ) THEN
+             eta_n_mm=B_face_y(j,k+1)
+             eta_s_mm=2.0_wp*eta_center-eta_n_mm
+          ELSEIF ( eta_s_mm .LT. B_face_y(j,k) ) THEN
+             eta_s_mm=B_face_y(j,k)
+             eta_n_mm=2.0_wp*eta_center-eta_s_mm
+          END IF
+          this%h_minmod_interfaceT(j,k)= &
+               MAX(eta_s_mm-B_face_y(j,k),0.0_wp)
+          this%h_minmod_interfaceB(j,k+1)= &
+               MAX(eta_n_mm-B_face_y(j,k+1),0.0_wp)
+       END IF
+    END DO
+    !$OMP END PARALLEL DO
+
+    IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
+       ! Cell-local directional blend: eta_x below Fr=0.8, h_x+B_x above
+       ! Fr=1.2, with a smoothstep transition in between. The resulting
+       ! h-face traces are shared by the advective and dissipative fluxes;
+       ! eta_cell* above remains the independent hydrostatic/path state.
+       !$OMP PARALLEL DO PRIVATE(l,j,k,sx,sy,hx,hy,xx,yy,slope_x,slope_y,  &
+       !$OMP& slope_hx,slope_hy,eta_center,slope_eta2_x,slope_eta2_y,     &
+       !$OMP& slope_blend_x,slope_blend_y,eta_blend_w,eta_blend_e,        &
+       !$OMP& eta_blend_s,eta_blend_n,fr_weight_x,fr_weight_y)
+       DO l=1,this%hp_eta_cells
+          j=this%hp_eta_j(l)
+          k=this%hp_eta_k(l)
+          eta_center=qp_expl(1,j,k)+B_cent(j,k)
+          slope_x=0.0_wp
+          slope_y=0.0_wp
+          slope_hx=0.0_wp
+          slope_hy=0.0_wp
+          IF ((j.GT.1).AND.(j.LT.comp_cells_x)) THEN
+             sx=[qp_expl(1,j-1,k)+B_cent(j-1,k),eta_center, &
+                  qp_expl(1,j+1,k)+B_cent(j+1,k)]
+             hx=[qp_expl(1,j-1,k),qp_expl(1,j,k),qp_expl(1,j+1,k)]
+             xx=[x_comp(j-1),x_comp(j),x_comp(j+1)]
+             CALL limit(sx,xx,limiter(1),slope_x)
+             CALL limit(hx,xx,limiter(1),slope_hx)
+          END IF
+          IF ((k.GT.1).AND.(k.LT.comp_cells_y)) THEN
+             sy=[qp_expl(1,j,k-1)+B_cent(j,k-1),eta_center, &
+                  qp_expl(1,j,k+1)+B_cent(j,k+1)]
+             hy=[qp_expl(1,j,k-1),qp_expl(1,j,k),qp_expl(1,j,k+1)]
+             yy=[y_comp(k-1),y_comp(k),y_comp(k+1)]
+             CALL limit(sy,yy,limiter(1),slope_y)
+             CALL limit(hy,yy,limiter(1),slope_hy)
+          END IF
+
+          fr_weight_x=froude_h_blend_weight(qp_expl(1,j,k), &
+               qp_expl(idx_u,j,k),grav)
+          fr_weight_y=froude_h_blend_weight(qp_expl(1,j,k), &
+               qp_expl(idx_v,j,k),grav)
+          slope_eta2_x=reconstr_coeff*slope_hx + &
+               (B_face_x(j+1,k)-B_face_x(j,k))*one_by_dx
+          slope_eta2_y=reconstr_coeff*slope_hy + &
+               (B_face_y(j,k+1)-B_face_y(j,k))*one_by_dy
+          slope_blend_x=(1.0_wp-fr_weight_x)*reconstr_coeff*slope_x + &
+               fr_weight_x*slope_eta2_x
+          slope_blend_y=(1.0_wp-fr_weight_y)*reconstr_coeff*slope_y + &
+               fr_weight_y*slope_eta2_y
+
+          eta_blend_w=eta_center-dx2*slope_blend_x
+          eta_blend_e=eta_center+dx2*slope_blend_x
+          IF ( eta_blend_e .LT. B_face_x(j+1,k) ) THEN
+             eta_blend_e=B_face_x(j+1,k)
+             eta_blend_w=2.0_wp*eta_center-eta_blend_e
+          ELSEIF ( eta_blend_w .LT. B_face_x(j,k) ) THEN
+             eta_blend_w=B_face_x(j,k)
+             eta_blend_e=2.0_wp*eta_center-eta_blend_w
+          END IF
+          this%h_froude_interfaceR(j,k)= &
+               MAX(eta_blend_w-B_face_x(j,k),0.0_wp)
+          this%h_froude_interfaceL(j+1,k)= &
+               MAX(eta_blend_e-B_face_x(j+1,k),0.0_wp)
+
+          eta_blend_s=eta_center-dy2*slope_blend_y
+          eta_blend_n=eta_center+dy2*slope_blend_y
+          IF ( eta_blend_n .LT. B_face_y(j,k+1) ) THEN
+             eta_blend_n=B_face_y(j,k+1)
+             eta_blend_s=2.0_wp*eta_center-eta_blend_n
+          ELSEIF ( eta_blend_s .LT. B_face_y(j,k) ) THEN
+             eta_blend_s=B_face_y(j,k)
+             eta_blend_n=2.0_wp*eta_center-eta_blend_s
+          END IF
+          this%h_froude_interfaceT(j,k)= &
+               MAX(eta_blend_s-B_face_y(j,k),0.0_wp)
+          this%h_froude_interfaceB(j,k+1)= &
+               MAX(eta_blend_n-B_face_y(j,k+1),0.0_wp)
+       END DO
+       !$OMP END PARALLEL DO
+
+       DO k=1,comp_cells_y
+          this%h_froude_interfaceL(1,k)=this%h_froude_interfaceR(1,k)
+          this%h_froude_interfaceR(comp_interfaces_x,k)= &
+               this%h_froude_interfaceL(comp_interfaces_x,k)
+       END DO
+       DO j=1,comp_cells_x
+          this%h_froude_interfaceB(j,1)=this%h_froude_interfaceT(j,1)
+          this%h_froude_interfaceT(j,comp_interfaces_y)= &
+               this%h_froude_interfaceB(j,comp_interfaces_y)
+       END DO
+    END IF
+
+    !$OMP PARALLEL DO PRIVATE(l,j,k)
+    DO l=1,this%hp_eta_cells
+       j=this%hp_eta_j(l)
+       k=this%hp_eta_k(l)
+       this%eta_interfaceR(j,k)=this%eta_cellW(j,k)
+       this%eta_interfaceL(j+1,k)=this%eta_cellE(j,k)
+       this%eta_interfaceT(j,k)=this%eta_cellS(j,k)
+       this%eta_interfaceB(j,k+1)=this%eta_cellN(j,k)
+       IF (j.EQ.1) THEN
+          this%eta_interfaceL(1,k)=this%eta_interfaceR(1,k)
+          IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+               this%h_minmod_interfaceL(1,k)=this%h_minmod_interfaceR(1,k)
+       END IF
+       IF (j.EQ.comp_cells_x) THEN
+          this%eta_interfaceR(comp_interfaces_x,k)= &
+               this%eta_interfaceL(comp_interfaces_x,k)
+          IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+               this%h_minmod_interfaceR(comp_interfaces_x,k)= &
+               this%h_minmod_interfaceL(comp_interfaces_x,k)
+       END IF
+       IF (k.EQ.1) THEN
+          this%eta_interfaceB(j,1)=this%eta_interfaceT(j,1)
+          IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+               this%h_minmod_interfaceB(j,1)=this%h_minmod_interfaceT(j,1)
+       END IF
+       IF (k.EQ.comp_cells_y) THEN
+          this%eta_interfaceT(j,comp_interfaces_y)= &
+               this%eta_interfaceB(j,comp_interfaces_y)
+          IF ( kt_trace_reconstruction .EQ. 'minmod' ) &
+               this%h_minmod_interfaceT(j,comp_interfaces_y)= &
+               this%h_minmod_interfaceB(j,comp_interfaces_y)
+       END IF
+    END DO
+    !$OMP END PARALLEL DO
+
+    DO k=1,comp_cells_y
+       this%q_adv_interfaceL(:,1,k)=this%q_adv_interfaceR(:,1,k)
+       this%qp_adv_interfaceL(:,1,k)=this%qp_adv_interfaceR(:,1,k)
+       this%q_adv_interfaceR(:,comp_interfaces_x,k)= &
+            this%q_adv_interfaceL(:,comp_interfaces_x,k)
+       this%qp_adv_interfaceR(:,comp_interfaces_x,k)= &
+            this%qp_adv_interfaceL(:,comp_interfaces_x,k)
+    END DO
+    DO j=1,comp_cells_x
+       this%q_adv_interfaceB(:,j,1)=this%q_adv_interfaceT(:,j,1)
+       this%qp_adv_interfaceB(:,j,1)=this%qp_adv_interfaceT(:,j,1)
+       this%q_adv_interfaceT(:,j,comp_interfaces_y)= &
+            this%q_adv_interfaceB(:,j,comp_interfaces_y)
+       this%qp_adv_interfaceT(:,j,comp_interfaces_y)= &
+            this%qp_adv_interfaceB(:,j,comp_interfaces_y)
+    END DO
+  END SUBROUTINE reconstruct_kt_eta_traces
+
+  PURE FUNCTION froude_h_blend_weight(h,u_normal,gravity) RESULT(weight)
+    REAL(wp), INTENT(IN) :: h,u_normal,gravity
+    REAL(wp) :: weight,fr,scaled
+
+    weight=0.0_wp
+    IF ( (h .LE. hp_dry_tolerance) .OR. (gravity .LE. 0.0_wp) ) RETURN
+
+    fr=ABS(u_normal)/SQRT(gravity*h)
+    scaled=MIN(1.0_wp,MAX(0.0_wp, &
+         (fr-fr_blend_lower)/(fr_blend_upper-fr_blend_lower)))
+    weight=scaled*scaled*(3.0_wp-2.0_wp*scaled)
+  END FUNCTION froude_h_blend_weight
+
+  PURE FUNCTION minmod_slope_pair(slope_a,slope_b) RESULT(slope)
+    REAL(wp), INTENT(IN) :: slope_a,slope_b
+    REAL(wp) :: slope
+    slope=0.0_wp
+    IF ( slope_a*slope_b .GT. 0.0_wp ) &
+         slope=SIGN(MIN(ABS(slope_a),ABS(slope_b)),slope_a)
+  END FUNCTION minmod_slope_pair
 
   !> \brief Apply one side's boundary condition to the linear reconstruction slope.
   !> \details Flag 0 limits a Dirichlet boundary stencil, flag 1 prescribes the
@@ -865,9 +1197,10 @@ CONTAINS
   END SUBROUTINE boundary_reconstruction_slope
 
   !> \brief Read one centre value for a direct reconstruction stencil.
-  !> \details Only auxiliary u/v are zeroed at the existing HP dry-depth
-  !>          threshold. Roundoff-scale positive mass must not supply a finite
-  !>          desingularized velocity to a neighbouring wet-cell limiter.
+  !> \details KT-PYTHON uses the cell-centred velocities already obtained by
+  !>          qc_to_qp, which applies the v2 mass-based desingularization.
+  !>          Auxiliary u/v are set to zero below the HP dry-depth threshold
+  !>          so a dry cell cannot supply a velocity to a neighbouring limiter.
   !>          Depth, volumetric momenta, temperature and composition remain
   !>          unchanged; neither the input physical nor conservative state is
   !>          modified. The function is allocation-free and thread-safe.
@@ -890,9 +1223,10 @@ CONTAINS
   !******************************************************************************
   !> \brief Evaluate hydrostatic candidates, blend them and commit final cell/face traces.
   !>
-   !> The first reconstruction pass supplies direct limited candidates. The HP
-   !> phases build local eta traces, evaluate continuity weights, then apply
-   !> blended thickness and momentum on the active target cells.
+   !> The first reconstruction pass supplies direct h_x-based candidates for
+   !> advective fluxes. The HP phases build eta-based traces for dissipative
+   !> jumps and hydrostatic paths, then apply the existing bounded momentum
+   !> correction on the active target cells.
   !>
   !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
   !> \param[in] qp_center Unmodified cell-centered physical states used by all HP candidate phases.
@@ -902,11 +1236,10 @@ CONTAINS
   !******************************************************************************
 
   SUBROUTINE apply_hp_reconstruction( this, qp_center, solve_cells, j_cent,    &
-       k_cent )
+       k_cent, use_kt_direct )
 
     USE state_conversion_2d, ONLY : qp_to_qc
     USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
-    USE state_conversion_2d, ONLY : velocity_from_conservative
     USE constitutive_parameters_2d, ONLY : T_ambient
     USE parameters_2d, ONLY : limiter, reconstr_coeff
     USE geometry_2d, ONLY : sourceW, sourceE, sourceS, sourceN
@@ -917,6 +1250,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: qp_center(:,:,:)
     INTEGER, INTENT(IN) :: solve_cells
     INTEGER, INTENT(IN) :: j_cent(:), k_cent(:)
+    LOGICAL, INTENT(IN) :: use_kt_direct
 
     REAL(wp) :: q_final(n_vars), qp_final(n_vars+2)
     REAL(wp) :: relief2d, residual2d
@@ -934,7 +1268,7 @@ CONTAINS
     END DO
     !$OMP END DO
 
-    ! Blend thickness and normal momentum only on solve_cells.
+    ! Evaluate the eta-based HP states only on solve_cells.
     !$OMP DO
     DO l = 1, solve_cells
        j = j_cent(l)
@@ -950,6 +1284,30 @@ CONTAINS
        CALL evaluate_hp_cell(j,k,residual2d,relief2d,2)
     END DO
     !$OMP END DO
+
+    ! The Python KT diagnostic reconstructs h, hu and u independently and
+    ! uses those direct traces for the inertial flux and wave speeds. Preserve
+    ! the raw states here, before commit_hp_cell replaces qp_cell* by HP states.
+    IF ( use_kt_direct ) THEN
+       !$OMP DO
+       DO l = 1, this%hp_eta_cells
+          j = this%hp_eta_j(l)
+          k = this%hp_eta_k(l)
+          CALL final_kt_state( this%qp_cellW(:,j,k),                         &
+               this%q_adv_interfaceR(:,j,k), this%qp_adv_interfaceR(:,j,k),  &
+               j,k,'west' )
+          CALL final_kt_state( this%qp_cellE(:,j,k),                         &
+               this%q_adv_interfaceL(:,j+1,k), this%qp_adv_interfaceL(:,j+1,k), &
+               j,k,'east' )
+          CALL final_kt_state( this%qp_cellS(:,j,k),                         &
+               this%q_adv_interfaceT(:,j,k), this%qp_adv_interfaceT(:,j,k),  &
+               j,k,'south' )
+          CALL final_kt_state( this%qp_cellN(:,j,k),                         &
+               this%q_adv_interfaceB(:,j,k+1), this%qp_adv_interfaceB(:,j,k+1), &
+               j,k,'north' )
+       END DO
+       !$OMP END DO
+    END IF
 
     !$OMP DO
     DO l = 1, solve_cells
@@ -984,6 +1342,17 @@ CONTAINS
    j = this%hp_eta_j(l)
    k = this%hp_eta_k(l)
 
+       IF ( .NOT. use_kt_direct ) THEN
+          CALL final_hp_state( this%qp_cellW(:,j,k),                         &
+               this%q_adv_interfaceR(:,j,k), this%qp_adv_interfaceR(:,j,k) )
+          CALL final_hp_state( this%qp_cellE(:,j,k),                         &
+               this%q_adv_interfaceL(:,j+1,k), this%qp_adv_interfaceL(:,j+1,k) )
+          CALL final_hp_state( this%qp_cellS(:,j,k),                         &
+               this%q_adv_interfaceT(:,j,k), this%qp_adv_interfaceT(:,j,k) )
+          CALL final_hp_state( this%qp_cellN(:,j,k),                         &
+               this%q_adv_interfaceB(:,j,k+1), this%qp_adv_interfaceB(:,j,k+1) )
+       END IF
+
        CALL final_hp_state( this%qp_cellW(:,j,k), q_final, qp_final )
        this%q_interfaceR(:,j,k) = q_final
        this%qp_interfaceR(:,j,k) = qp_final
@@ -1009,10 +1378,16 @@ CONTAINS
     DO k = 1, comp_cells_y
        this%q_interfaceL(:,1,k) = this%q_interfaceR(:,1,k)
        this%qp_interfaceL(:,1,k) = this%qp_interfaceR(:,1,k)
+       this%q_adv_interfaceL(:,1,k) = this%q_adv_interfaceR(:,1,k)
+       this%qp_adv_interfaceL(:,1,k) = this%qp_adv_interfaceR(:,1,k)
        this%q_interfaceR(:,comp_interfaces_x,k) =                             &
             this%q_interfaceL(:,comp_interfaces_x,k)
        this%qp_interfaceR(:,comp_interfaces_x,k) =                            &
             this%qp_interfaceL(:,comp_interfaces_x,k)
+       this%q_adv_interfaceR(:,comp_interfaces_x,k) =                         &
+            this%q_adv_interfaceL(:,comp_interfaces_x,k)
+       this%qp_adv_interfaceR(:,comp_interfaces_x,k) =                        &
+            this%qp_adv_interfaceL(:,comp_interfaces_x,k)
     END DO
     !$OMP END DO
 
@@ -1020,10 +1395,16 @@ CONTAINS
     DO j = 1, comp_cells_x
        this%q_interfaceB(:,j,1) = this%q_interfaceT(:,j,1)
        this%qp_interfaceB(:,j,1) = this%qp_interfaceT(:,j,1)
+       this%q_adv_interfaceB(:,j,1) = this%q_adv_interfaceT(:,j,1)
+       this%qp_adv_interfaceB(:,j,1) = this%qp_adv_interfaceT(:,j,1)
        this%q_interfaceT(:,j,comp_interfaces_y) =                             &
             this%q_interfaceB(:,j,comp_interfaces_y)
        this%qp_interfaceT(:,j,comp_interfaces_y) =                            &
             this%qp_interfaceB(:,j,comp_interfaces_y)
+       this%q_adv_interfaceT(:,j,comp_interfaces_y) =                        &
+            this%q_adv_interfaceB(:,j,comp_interfaces_y)
+       this%qp_adv_interfaceT(:,j,comp_interfaces_y) =                       &
+            this%qp_adv_interfaceB(:,j,comp_interfaces_y)
     END DO
     !$OMP END DO
 
@@ -1044,6 +1425,15 @@ CONTAINS
              this%qp_interfaceR(2,j+1,k) = -this%qp_interfaceR(2,j+1,k)
              this%qp_interfaceR(idx_u,j+1,k) =                               &
                   -this%qp_interfaceR(idx_u,j+1,k)
+             this%q_adv_interfaceR(:,j+1,k) = this%q_adv_interfaceL(:,j+1,k)
+             this%q_adv_interfaceR(2,j+1,k) =                                &
+                  -this%q_adv_interfaceR(2,j+1,k)
+             this%qp_adv_interfaceR(:,j+1,k) =                                &
+                  this%qp_adv_interfaceL(:,j+1,k)
+             this%qp_adv_interfaceR(2,j+1,k) =                                &
+                  -this%qp_adv_interfaceR(2,j+1,k)
+             this%qp_adv_interfaceR(idx_u,j+1,k) =                            &
+                  -this%qp_adv_interfaceR(idx_u,j+1,k)
              this%eta_interfaceR(j+1,k) = this%eta_interfaceL(j+1,k)
           ELSEIF ( sourceW(j,k) ) THEN
              this%q_interfaceL(:,j,k) = this%q_interfaceR(:,j,k)
@@ -1051,6 +1441,12 @@ CONTAINS
              this%qp_interfaceL(:,j,k) = this%qp_interfaceR(:,j,k)
              this%qp_interfaceL(2,j,k) = -this%qp_interfaceL(2,j,k)
              this%qp_interfaceL(idx_u,j,k) = -this%qp_interfaceL(idx_u,j,k)
+             this%q_adv_interfaceL(:,j,k) = this%q_adv_interfaceR(:,j,k)
+             this%q_adv_interfaceL(2,j,k) = -this%q_adv_interfaceL(2,j,k)
+             this%qp_adv_interfaceL(:,j,k) = this%qp_adv_interfaceR(:,j,k)
+             this%qp_adv_interfaceL(2,j,k) = -this%qp_adv_interfaceL(2,j,k)
+             this%qp_adv_interfaceL(idx_u,j,k) =                             &
+                  -this%qp_adv_interfaceL(idx_u,j,k)
              this%eta_interfaceL(j,k) = this%eta_interfaceR(j,k)
           END IF
 
@@ -1061,6 +1457,16 @@ CONTAINS
              this%qp_interfaceT(3,j,k+1) = -this%qp_interfaceT(3,j,k+1)
              this%qp_interfaceT(idx_v,j,k+1) =                               &
                   -this%qp_interfaceT(idx_v,j,k+1)
+             this%q_adv_interfaceT(:,j,k+1) =                                 &
+                  this%q_adv_interfaceB(:,j,k+1)
+             this%q_adv_interfaceT(3,j,k+1) =                                 &
+                  -this%q_adv_interfaceT(3,j,k+1)
+             this%qp_adv_interfaceT(:,j,k+1) =                                &
+                  this%qp_adv_interfaceB(:,j,k+1)
+             this%qp_adv_interfaceT(3,j,k+1) =                                &
+                  -this%qp_adv_interfaceT(3,j,k+1)
+             this%qp_adv_interfaceT(idx_v,j,k+1) =                            &
+                  -this%qp_adv_interfaceT(idx_v,j,k+1)
              this%eta_interfaceT(j,k+1) = this%eta_interfaceB(j,k+1)
           ELSEIF ( sourceS(j,k) ) THEN
              this%q_interfaceB(:,j,k) = this%q_interfaceT(:,j,k)
@@ -1068,6 +1474,12 @@ CONTAINS
              this%qp_interfaceB(:,j,k) = this%qp_interfaceT(:,j,k)
              this%qp_interfaceB(3,j,k) = -this%qp_interfaceB(3,j,k)
              this%qp_interfaceB(idx_v,j,k) = -this%qp_interfaceB(idx_v,j,k)
+             this%q_adv_interfaceB(:,j,k) = this%q_adv_interfaceT(:,j,k)
+             this%q_adv_interfaceB(3,j,k) = -this%q_adv_interfaceB(3,j,k)
+             this%qp_adv_interfaceB(:,j,k) = this%qp_adv_interfaceT(:,j,k)
+             this%qp_adv_interfaceB(3,j,k) = -this%qp_adv_interfaceB(3,j,k)
+             this%qp_adv_interfaceB(idx_v,j,k) =                             &
+                  -this%qp_adv_interfaceB(idx_v,j,k)
              this%eta_interfaceB(j,k) = this%eta_interfaceT(j,k)
           END IF
        END DO
@@ -1077,6 +1489,47 @@ CONTAINS
     !$OMP END PARALLEL
 
   CONTAINS
+
+    !> Convert direct KT traces without the HP dry-state projection.
+    !> Python clamps reconstructed h to zero but keeps independently
+    !> reconstructed hu/hv for the inertial momentum flux. The unit-depth
+    !> conversion below retains that conservative momentum even when h is
+    !> clipped to zero, while mass-like quantities still scale with h.
+    SUBROUTINE final_kt_state(qp_candidate,q_conservative,qp_reconstructed,  &
+         j_cell,k_cell,side)
+
+      REAL(wp), INTENT(IN) :: qp_candidate(n_vars+2)
+      REAL(wp), INTENT(OUT) :: q_conservative(n_vars)
+      REAL(wp), INTENT(OUT) :: qp_reconstructed(n_vars+2)
+      INTEGER, INTENT(IN) :: j_cell,k_cell
+      CHARACTER(LEN=*), INTENT(IN) :: side
+
+      REAL(wp) :: qp_unit(n_vars+2),q_unit(n_vars),h_trace
+      CHARACTER(LEN=96) :: closure_context
+
+      WRITE(closure_context,'(A,A,A,I0,A,I0)')                              &
+           'KT reconstruction ',TRIM(side),' cell=',j_cell,',',k_cell
+
+      qp_reconstructed = qp_candidate
+      h_trace = MAX(qp_candidate(1),0.0_wp)
+      qp_reconstructed(1) = h_trace
+
+      IF ( h_trace .GT. EPSILON(1.0_wp) ) THEN
+         CALL enforce_primitive_mass_fraction_closure(qp_reconstructed,      &
+              TRIM(closure_context))
+         CALL qp_to_qc(qp_reconstructed,q_conservative,TRIM(closure_context))
+      ELSE
+         qp_unit = qp_reconstructed
+         qp_unit(1) = 1.0_wp
+         CALL enforce_primitive_mass_fraction_closure(qp_unit,               &
+              TRIM(closure_context)//' unit-depth state')
+         CALL qp_to_qc(qp_unit,q_unit,TRIM(closure_context)//' unit-depth state')
+         q_conservative = h_trace*q_unit
+         q_conservative(2) = q_unit(2)
+         q_conservative(3) = q_unit(3)
+      END IF
+
+    END SUBROUTINE final_kt_state
 
     !> \brief Compute positivity-constrained free-surface traces for one parent-workset cell.
     !>
@@ -1179,9 +1632,13 @@ CONTAINS
        REAL(wp) :: h_line(5), u_line(5), Bm_line(5), Bp_line(5)
        REAL(wp) :: hm_direct(5), hp_direct(5), hum_direct(5), hup_direct(5)
        REAL(wp) :: um_candidate(5), up_candidate(5)
+       REAL(wp) :: tangent_line(5), htm_direct(5), htp_direct(5)
+       REAL(wp) :: vtm_candidate(5), vtp_candidate(5)
        REAL(wp) :: residual_line(5), relief_line(5)
        REAL(wp) :: hm_line(5), hp_line(5), hum_line(5), hup_line(5)
+       REAL(wp) :: htm_line(5), htp_line(5), hm_tangent_line(5), hp_tangent_line(5)
        REAL(wp) :: eta_m_line(5), eta_p_line(5), weight_line(5)
+       REAL(wp) :: eta_m_tangent(5), eta_p_tangent(5), weight_tangent(5)
        INTEGER :: line_start, line_end, line_size, center, offset
        INTEGER :: line_index, line_j, line_k, thread_id
 
@@ -1200,6 +1657,11 @@ CONTAINS
        line_size = line_end-line_start+1
        residual_line = 0.0_wp
        relief_line = 0.0_wp
+       tangent_line = 0.0_wp
+       htm_direct = 0.0_wp
+       htp_direct = 0.0_wp
+       vtm_candidate = 0.0_wp
+       vtp_candidate = 0.0_wp
 
        DO offset = 1, line_size
           line_index = line_start+offset-1
@@ -1208,6 +1670,7 @@ CONTAINS
              line_k = kc
              h_line(offset) = qp_center(1,line_j,line_k)
              u_line(offset) = qp_center(idx_u,line_j,line_k)
+             tangent_line(offset) = qp_center(idx_v,line_j,line_k)
              Bm_line(offset) = B_face_x(line_j,line_k)
              Bp_line(offset) = B_face_x(line_j+1,line_k)
              IF ( this%hp_eta_mask(line_j,line_k) ) THEN
@@ -1217,6 +1680,10 @@ CONTAINS
                 hup_direct(offset) = this%qp_cellE(2,line_j,line_k)
                 um_candidate(offset) = this%qp_cellW(idx_u,line_j,line_k)
                 up_candidate(offset) = this%qp_cellE(idx_u,line_j,line_k)
+                htm_direct(offset) = this%qp_cellW(3,line_j,line_k)
+                htp_direct(offset) = this%qp_cellE(3,line_j,line_k)
+                vtm_candidate(offset) = this%qp_cellW(idx_v,line_j,line_k)
+                vtp_candidate(offset) = this%qp_cellE(idx_v,line_j,line_k)
              ELSE
                 hm_direct(offset) = qp_center(1,line_j,line_k)
                 hp_direct(offset) = qp_center(1,line_j,line_k)
@@ -1224,12 +1691,17 @@ CONTAINS
                 hup_direct(offset) = qp_center(2,line_j,line_k)
                 um_candidate(offset) = qp_center(idx_u,line_j,line_k)
                 up_candidate(offset) = qp_center(idx_u,line_j,line_k)
+                htm_direct(offset) = qp_center(3,line_j,line_k)
+                htp_direct(offset) = qp_center(3,line_j,line_k)
+                vtm_candidate(offset) = qp_center(idx_v,line_j,line_k)
+                vtp_candidate(offset) = qp_center(idx_v,line_j,line_k)
              END IF
           ELSE
              line_j = jc
              line_k = line_index
              h_line(offset) = qp_center(1,line_j,line_k)
              u_line(offset) = qp_center(idx_v,line_j,line_k)
+             tangent_line(offset) = qp_center(idx_u,line_j,line_k)
              Bm_line(offset) = B_face_y(line_j,line_k)
              Bp_line(offset) = B_face_y(line_j,line_k+1)
              IF ( this%hp_eta_mask(line_j,line_k) ) THEN
@@ -1239,6 +1711,10 @@ CONTAINS
                 hup_direct(offset) = this%qp_cellN(3,line_j,line_k)
                 um_candidate(offset) = this%qp_cellS(idx_v,line_j,line_k)
                 up_candidate(offset) = this%qp_cellN(idx_v,line_j,line_k)
+                htm_direct(offset) = this%qp_cellS(2,line_j,line_k)
+                htp_direct(offset) = this%qp_cellN(2,line_j,line_k)
+                vtm_candidate(offset) = this%qp_cellS(idx_u,line_j,line_k)
+                vtp_candidate(offset) = this%qp_cellN(idx_u,line_j,line_k)
              ELSE
                 hm_direct(offset) = qp_center(1,line_j,line_k)
                 hp_direct(offset) = qp_center(1,line_j,line_k)
@@ -1246,6 +1722,10 @@ CONTAINS
                 hup_direct(offset) = qp_center(3,line_j,line_k)
                 um_candidate(offset) = qp_center(idx_v,line_j,line_k)
                 up_candidate(offset) = qp_center(idx_v,line_j,line_k)
+                htm_direct(offset) = qp_center(2,line_j,line_k)
+                htp_direct(offset) = qp_center(2,line_j,line_k)
+                vtm_candidate(offset) = qp_center(idx_u,line_j,line_k)
+                vtp_candidate(offset) = qp_center(idx_u,line_j,line_k)
              END IF
           END IF
        END DO
@@ -1264,8 +1744,25 @@ CONTAINS
           eta_m_line(1:line_size),eta_p_line(1:line_size),                 &
           weight_line(1:line_size),this%hp_scratch(1:line_size,:,thread_id) )
 
+       ! Apply the same HP depth blend and conservative, bounded momentum
+       ! correction to the tangential velocity component. The second call uses
+       ! the same line geometry and depth data; only the velocity/momentum
+       ! components differ. Thus x/y faces no longer treat the vector
+       ! components differently merely because one is normal and one tangent.
+       CALL reconstruct_hp_line( h_line(1:line_size),tangent_line(1:line_size), &
+          Bm_line(1:line_size),Bp_line(1:line_size),                         &
+          hm_direct(1:line_size),hp_direct(1:line_size),                     &
+          htm_direct(1:line_size),htp_direct(1:line_size),                   &
+          vtm_candidate(1:line_size),vtp_candidate(1:line_size),             &
+          residual_line(1:line_size),relief_line(1:line_size),              &
+          limiter(1),reconstr_coeff,hm_tangent_line(1:line_size),            &
+          hp_tangent_line(1:line_size),htm_line(1:line_size),                &
+          htp_line(1:line_size),eta_m_tangent(1:line_size),                  &
+          eta_p_tangent(1:line_size),weight_tangent(1:line_size),           &
+          this%hp_scratch(1:line_size,:,thread_id) )
+
        this%hp_blended(:,jc,kc,direction) = [ hm_line(center),hp_line(center), &
-          hum_line(center),hup_line(center) ]
+          hum_line(center),hup_line(center),htm_line(center),htp_line(center) ]
 
        END SUBROUTINE evaluate_hp_cell
 
@@ -1285,23 +1782,20 @@ CONTAINS
        this%qp_cellE(1,jc,kc) = this%hp_blended(2,jc,kc,1)
        this%qp_cellW(2,jc,kc) = this%hp_blended(3,jc,kc,1)
        this%qp_cellE(2,jc,kc) = this%hp_blended(4,jc,kc,1)
-       this%qp_cellW(3,jc,kc) = this%qp_cellW(1,jc,kc)*this%qp_cellW(idx_v,jc,kc)
-       this%qp_cellE(3,jc,kc) = this%qp_cellE(1,jc,kc)*this%qp_cellE(idx_v,jc,kc)
-       this%qp_cellW(idx_u,jc,kc) = safe_velocity(this%qp_cellW(2,jc,kc),   &
-          this%qp_cellW(1,jc,kc))
-       this%qp_cellE(idx_u,jc,kc) = safe_velocity(this%qp_cellE(2,jc,kc),   &
-          this%qp_cellE(1,jc,kc))
+       this%qp_cellW(3,jc,kc) = this%hp_blended(5,jc,kc,1)
+       this%qp_cellE(3,jc,kc) = this%hp_blended(6,jc,kc,1)
+       ! Keep the independently limited u/v traces from the initial scalar
+       ! reconstruction, as in KT. HP still supplies h and conservative
+       ! h*u/h*v; auxiliary velocities are not recovered from those momenta.
 
        this%qp_cellS(1,jc,kc) = this%hp_blended(1,jc,kc,2)
        this%qp_cellN(1,jc,kc) = this%hp_blended(2,jc,kc,2)
        this%qp_cellS(3,jc,kc) = this%hp_blended(3,jc,kc,2)
        this%qp_cellN(3,jc,kc) = this%hp_blended(4,jc,kc,2)
-       this%qp_cellS(2,jc,kc) = this%qp_cellS(1,jc,kc)*this%qp_cellS(idx_u,jc,kc)
-       this%qp_cellN(2,jc,kc) = this%qp_cellN(1,jc,kc)*this%qp_cellN(idx_u,jc,kc)
-       this%qp_cellS(idx_v,jc,kc) = safe_velocity(this%qp_cellS(3,jc,kc),   &
-          this%qp_cellS(1,jc,kc))
-       this%qp_cellN(idx_v,jc,kc) = safe_velocity(this%qp_cellN(3,jc,kc),   &
-          this%qp_cellN(1,jc,kc))
+       this%qp_cellS(2,jc,kc) = this%hp_blended(5,jc,kc,2)
+       this%qp_cellN(2,jc,kc) = this%hp_blended(6,jc,kc,2)
+       ! As for x faces, retain the independently reconstructed velocity
+       ! components instead of recovering them from the HP-corrected momenta.
 
        END SUBROUTINE commit_hp_cell
 
@@ -1384,8 +1878,8 @@ CONTAINS
     !>
     !> \param[in] qp_candidate Final HP physical candidate before composition closure.
     !> \param[out] q_conservative Conservative state obtained from the closed physical candidate.
-    !> \param[out] qp_reconstructed Closed physical state with velocities consistent with the
-    !>                              conservative momenta.
+    !> \param[out] qp_reconstructed Closed physical state retaining independently reconstructed
+    !>                              auxiliary velocity traces.
 
     SUBROUTINE final_hp_state(qp_candidate,q_conservative,qp_reconstructed)
 
@@ -1404,8 +1898,6 @@ CONTAINS
 
       CALL enforce_primitive_mass_fraction_closure(qp_reconstructed)
       CALL qp_to_qc(qp_reconstructed,q_conservative)
-      CALL velocity_from_conservative(q_conservative,                        &
-           qp_reconstructed(idx_u),qp_reconstructed(idx_v))
 
     END SUBROUTINE final_hp_state
 

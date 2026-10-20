@@ -118,6 +118,7 @@ def write_case(slope_correction=False, curvature=False, bed_mode="planar"):
 &TEMPERATURE_PARAMETERS
  /
 &NUMERIC_PARAMETERS
+ KT_TRACE_RECONSTRUCTION = 'froude_blend',
  DT0=1.0D-4, MAX_DT=1.0D-2, CFL=0.24D0,
  LIMITER=5*3, THETA=1.3D0, RECONSTR_COEFF=1.0D0,
  N_RK=2,

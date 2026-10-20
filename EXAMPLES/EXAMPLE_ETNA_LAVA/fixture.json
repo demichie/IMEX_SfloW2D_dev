@@ -4,8 +4,13 @@
   "input": {
     "path": "IMEX_SfloW2D.inp",
     "origin": "User-supplied Etna lava input, 2026-10-11",
-    "sha256": "37437d1325d7cd9bbdc79d40de639b1bc2b695c674fbbc7acac390644268fa80",
-    "parameters_changed_on_import": false
+    "sha256": "e2477f0a509d47a4baaba542f8e269da99f6c52fa16eacae26f55fbd46f00e59",
+    "parameters_changed_on_import": false,
+    "original_sha256": "37437d1325d7cd9bbdc79d40de639b1bc2b695c674fbbc7acac390644268fa80",
+    "parameters_changed_since_import": true,
+    "current_parameter_changes": {
+      "KT_TRACE_RECONSTRUCTION": "h_x"
+    }
   },
   "DEM": {
     "archive": "../EXAMPLE_ETNA/DEM/Etna2014_crop.zip",
@@ -29,10 +34,14 @@
     "CFL_POLICY": "directional_min (parameter omitted)",
     "n_RK": 2,
     "slope_correction": false,
-    "curvature_term": false
+    "curvature_term": false,
+    "KT_TRACE_RECONSTRUCTION": "h_x"
   },
   "N9": {
-    "selected_long_examples": ["EXAMPLE_ETNA", "EXAMPLE_ETNA_LAVA"],
+    "selected_long_examples": [
+      "EXAMPLE_ETNA",
+      "EXAMPLE_ETNA_LAVA"
+    ],
     "replaces_long_lava_case": "EXAMPLE_LAVA_IMO",
     "scientific_baseline_approved": false
   }

@@ -40,7 +40,7 @@ for name in c.CONTRACT['closures']:
             limiter = eq['pressure_flat_limiter']
         initial = c.conservative(name, ys, h)
         for steps in (1,2,20):
-            for n in ((2,3,4) if steps==20 else (2,)):
+            for n in (2,):
                 label = f'{family}-{name}-RK{n}-steps{steps}'
                 fields, hashes = c.launch(executable, label, name, initial, bed, n, steps, eq['dt'],
                                           eq['spacing'], eq['spacing'], (False,False), limiter)

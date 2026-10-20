@@ -79,6 +79,7 @@ CONTAINS
   !> \brief Configure the existing two-solid thermal-energy liquid exchange law.
   SUBROUTINE initialize_physics
     n_solid=ns; n_add_gas=0; n_stoch_vars=0; n_pore_vars=0
+    kt_trace_reconstruction = 'froude_blend'
     n_vars=nq; n_eqns=nq; n_RK=2
     idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
     idx_solid_first=5; idx_solid_last=6; idx_solidEqn_first=5; idx_solidEqn_last=6

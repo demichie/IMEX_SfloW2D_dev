@@ -1,57 +1,49 @@
-# Gate-H full-field excavation comparisons
+# Gate-H comparisons with the current KT-PYTHON operator
 
-The compact four-sided one-cell excavation uses `dx = dy = 0.4, 0.2, 0.1 m`.
-The nominal 8 m by 6 m depression is translated by half a cell in each
-direction and built from one globally continuous Q1 vertex field. Initial
-thickness is its exact cell average, giving the unexcavated inclined plane
-as the initial free surface.
-
-The test retains the existing three grids, G=1 and slope-plus-curvature
-modes, aggregate limits and zero-uphill requirement. It additionally checks
-every final thickness and free-surface cell against two independent initial
-value trajectories: current-policy IMEX at common accepted times and the
-unchanged historical SSPRK2 prototype under its separately approved limits.
-`reference_metrics.csv` remains the aggregate regression: positivity,
-conservation, uphill transfer, G=1 lateral symmetry, mass partitions, moments,
-total variation and extrema. Passing these aggregates alone is not proof of
-full-field agreement. Both clean-core checksums are frozen in the contracts.
-
-The test-only observational main records accepted times immediately before
-the production IMEX call. It reuses the tested numerical objects and compiler
-flags when available, changes no production source, and must produce
-byte-identical canonical conservative output. The accepted-time stream and
-canonical output hashes are checked before comparison. The reference uses
-those times and common initial fields, never actual intermediate states.
-
-`field_contract.json` preserves the original autonomous adaptive comparison.
-`field_contract_v2.json` records the user-approved separation from the
-common-time spatial/stage gate; all error limits are unchanged. The autonomous
-CFL comparison remains non-satisfied under `D-N7-CFL`, not a passing N7-D
-assertion. Add `--autonomous` to `compare_fields.py` to reproduce and record
-that diagnostic separately; its failure is retained in field evidence.
-
-The current `field_contract_v3.json` also records the user-authorized dry-only
-momentum projection of the accepted final IMEX state. Only the two momenta
-are reset at the unchanged shared depth threshold; conservative mass, thermal
-energy and components remain intact. The current-policy reference explicitly
-matches this mapping, while the historical SSPRK2 core remains unchanged.
-
-Run from the repository root to retain fields, accepted times and evidence:
+Run from the repository root with an executable built locally:
 
 ```sh
-KEEP_TEST_WORKDIR=1 OMP_NUM_THREADS=4 sh TESTS/TEST_PCCU_GATE_H/run_test.sh /path/to/IMEX_SfloW2D
+OMP_NUM_THREADS=1 OMP_DYNAMIC=FALSE KEEP_TEST_WORKDIR=1 \
+  TESTS/TEST_PCCU_GATE_H/run_test.sh \
+  "$PWD/build-local/optimized/src/IMEX_SfloW2D"
 ```
 
-The harness respects the requested thread team;
-the full acceptance runner checks actual one/four-thread runs in both compiler
-profiles. Compilation of the observation-only main requires gfortran and the
-configured NetCDF development libraries, as do the other solver tests.
+The test uses three grids (`dx = dy = 0.4, 0.2, 0.1 m`) and both G=1 and
+slope-plus-curvature modes. All runs use `N_RK=2` and
+`KT_TRACE_RECONSTRUCTION='froude_blend'`.
 
-For provenance, the earlier port audit reported the following historical
-slope-plus-curvature differences; these are not current acceptance limits:
+The independent NumPy implementation lives in
+`../TEST_SPATIAL_OPERATOR/reference/kt_python_2d_core.py`. It implements the
+current Fortran operator: independently limited velocities, the four selectable
+depth reconstructions, KT central-upwind transport, oriented hydrostatic paths,
+dry-donor guards, copied boundary traces, outflow-only external fluxes and
+curvature sources. It supports isothermal liquid with an optional solid species;
+Gate-H uses pure liquid without rheology or sources. One-cell dimensions use
+the same code as 2D with their inactive direction omitted.
 
-| dx [m] | L1(h) | L1(eta) | Linf(h) [m] |
-| ---: | ---: | ---: | ---: |
-| 0.4 | 7.1697e-5 | 2.7927e-5 | 1.0116e-3 |
-| 0.2 | 6.5239e-5 | 2.5412e-5 | 8.6013e-4 |
-| 0.1 | 6.4436e-5 | 2.5099e-5 | 1.2830e-3 |
+The reference starts from the exact emitted ASCII initial state and independently
+imports/interpolates the emitted DEM. It never uses evolved Fortran states as
+reference input. A test-only observational main records the accepted timesteps
+and must reproduce the uninstrumented canonical output byte for byte. The
+Python time integration uses the same `n_RK=2` explicit tableau (forward Euler
+for this source-free problem). Matching the accepted times isolates the spatial
+comparison; this test does not assert autonomous adaptive-CFL equality.
+
+`field_contract_v4.json` pins the active core and retains the original
+32768-epsilon-per-step h/eta comparison bound. Every cell is compared, including
+both momenta using independent initial hydrostatic mass/momentum scales.
+`reference_fields.npz` and `field_evidence.json` retain reference fields, checksums,
+errors, accepted times and the independently integrated boundary mass transport.
+
+The aggregate checks retain nonnegativity, zero uphill leakage, G=1 lateral
+symmetry and the existing mass-budget tolerance `5e-10`. The budget includes
+mass crossing the open external boundaries: the new scheme can produce a small
+outflow even at the coarse grid's short comparison time. Aggregate reference
+values are calculated from the new Python fields, with the existing bounds.
+A failed full-field comparison or invariant still fails the test, and all six
+completed grid/mode cases retain their diagnostics.
+
+The original HP-PCCU cores, `reference_metrics.csv` and contracts v1-v3 remain
+historical archives. Their different numerical scheme and SSPRK2 trajectories
+are not acceptance oracles for the current KT operator. Other historical test
+suites that explicitly exercise HP-PCCU are not migrated by this Gate-H test.

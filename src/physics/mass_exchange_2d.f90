@@ -17,13 +17,11 @@ MODULE mass_exchange_2d
   USE geometry_2d, ONLY : cell_source_fractions
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
-  USE geometry_2d, ONLY : dx, dy
   USE geometry_2d, ONLY : project_cell_field_to_vertices
   USE geometry_2d, ONLY : refresh_topography_geometry
 
   USE parameters_2d, ONLY : wp
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid
-  USE parameters_2d, ONLY : verbose_level
   USE parameters_2d, ONLY : bottom_radial_source_flag
 
   USE domain_2d, ONLY : domain_type
@@ -95,6 +93,7 @@ CONTAINS
     REAL(wp) :: out_of_source_fraction
 
     REAL(wp) :: p_dyn
+    CHARACTER(LEN=96) :: closure_context
 
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
@@ -124,7 +123,8 @@ CONTAINS
        !$OMP END PARALLEL DO
     END IF
 
-    !$OMP PARALLEL DO private(j,k,erosion_term,deposition_term,eqns_term,       &
+    !$OMP PARALLEL DO private(j,k,closure_context,erosion_term,deposition_term, &
+    !$OMP & eqns_term,                                                          &
     !$OMP & topo_term,r_Ri,r_rho_m,r_rho_c,r_red_grav,                          &
     !$OMP & continuous_phase_erosion_term,continuous_phase_loss_term,           &
     !$OMP & out_of_source_fraction,p_dyn,r_sp_heat_c,r_sp_heat_mix)
@@ -133,10 +133,12 @@ CONTAINS
 
        j = domain%j_cent(l)
        k = domain%k_cent(l)
+       WRITE(closure_context,'(A,I0,A,I0)') 'mass exchange cell=',j,',',k
 
        IF ( q(1,j,k) .GT. 0.0_wp ) THEN
 
-          CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+          CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn,        &
+               TRIM(closure_context) )
 
        ELSE
 
@@ -163,13 +165,6 @@ CONTAINS
 
        END IF
        
-       IF ( verbose_level .GE. 2 ) THEN
-
-          WRITE(*,*) 'before update erosion/deposition: j,k,q(:,j,k),B(j,k)',   &
-               j,k,q(:,j,k),B_cent(j,k)
-
-       END IF
-
        ! Update the solution with erosion/deposition terms
        q(1:n_eqns,j,k) = q(1:n_eqns,j,k) + dt * eqns_term(1:n_eqns)
        q(5:4+n_solid,j,k) = MAX( 0.0_wp , q(5:4+n_solid,j,k) )
@@ -196,14 +191,6 @@ CONTAINS
 
        negative_alpha_check:IF ( ANY(q(5:4+n_solid,j,k) .LT. 0.0_wp ) ) THEN
 
-          WRITE(*,*) 'WARNINIG: negative solid mass'
-          WRITE(*,*) 'j,k',j,k
-          WRITE(*,*) 'dt',dt
-          WRITE(*,*) 'before erosion: qc',q(1:n_vars,j,k) - dt * eqns_term(1:n_eqns)
-          WRITE(*,*) 'deposition_term',deposition_term
-          WRITE(*,*) 'erosion_term',erosion_term
-          WRITE(*,*) 'after erosion: qc',q(1:n_vars,j,k)
-
           CALL fatal_error('negative solid mass after mass exchange')
           
        END IF negative_alpha_check
@@ -217,20 +204,6 @@ CONTAINS
 
           ELSE
 
-             WRITE(*,*) 'j,k',j,k
-             WRITE(*,*) 'dt',dt
-             WRITE(*,*) 'before erosion'
-             WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
-             WRITE(*,*) 'q',q(1:n_eqns,j,k) - dt * eqns_term(1:n_eqns)
-             WRITE(*,*) 'deposition_term',deposition_term
-             WRITE(*,*) 'erosion_term',erosion_term
-             WRITE(*,*) 'continuous_phase_loss_term',continuous_phase_loss_term
-             WRITE(*,*) 'eqns_term',eqns_term
-             WRITE(*,*) 'after erosion'
-             CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-             WRITE(*,*) 'q',q(1:n_eqns,j,k)
-             WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
-                
              CALL fatal_error('negative total mass after mass exchange')
 
           END IF
@@ -246,19 +219,6 @@ CONTAINS
              
           ELSE
 
-             WRITE(*,*) 'SUM SOLID > TOT'
-             WRITE(*,*) 'j,k',j,k
-             WRITE(*,*) 'dt',dt
-             WRITE(*,*) 'before erosion'
-             WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
-             WRITE(*,*) 'q',q(1:n_eqns,j,k) - dt * eqns_term(1:n_eqns)
-             WRITE(*,*) 'deposition_term',deposition_term
-             WRITE(*,*) 'erosion_term',erosion_term
-             WRITE(*,*) 'continuous_phase_loss_term',continuous_phase_loss_term
-             WRITE(*,*) 'after erosion'
-             CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-             WRITE(*,*) 'qp',qp(1:n_eqns+2,j,k)
-             WRITE(*,*) 'q',q(1:n_eqns,j,k)          
              CALL fatal_error('solid mass exceeds total mass after mass exchange')
              
           END IF
@@ -268,7 +228,8 @@ CONTAINS
 
        IF ( q(1,j,k) .GT. 0.0_wp ) THEN
 
-          CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
+          CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn,        &
+               TRIM(closure_context)//' final state' )
           CALL mixt_var(qp(1:n_vars+2,j,k),r_Ri,r_rho_m,r_rho_c,r_red_grav,    &
                r_sp_heat_c,r_sp_heat_mix)
 
@@ -345,43 +306,10 @@ CONTAINS
     IMPLICIT NONE
 
     REAL(wp), INTENT(IN) :: dt
-    REAL(wp) :: cell_area, geometric_rate, mismatch
-    REAL(wp) :: volume_cell, volume_geometric
-    REAL(wp) :: mismatch_integral, mismatch_l1, mismatch_linf
     INTEGER :: j, k
 
     CALL project_cell_field_to_vertices(topography_rate_cell,                 &
          topography_rate_vertex)
-
-    ! Diagnostic reductions do not need full-domain geometric/mismatch fields.
-    IF (verbose_level >= 2) THEN
-       cell_area = dx * dy
-       volume_cell = cell_area * SUM(topography_rate_cell)
-       volume_geometric = 0.0_wp
-       mismatch_integral = 0.0_wp
-       mismatch_l1 = 0.0_wp
-       mismatch_linf = 0.0_wp
-       !$OMP PARALLEL DO COLLAPSE(2) PRIVATE(geometric_rate,mismatch) &
-       !$OMP & REDUCTION(+:volume_geometric,mismatch_integral,mismatch_l1) &
-       !$OMP & REDUCTION(MAX:mismatch_linf)
-       DO k = 1, comp_cells_y
-          DO j = 1, comp_cells_x
-             geometric_rate = 0.25_wp * (topography_rate_vertex(j,k) &
-                  + topography_rate_vertex(j+1,k) &
-                  + topography_rate_vertex(j,k+1) &
-                  + topography_rate_vertex(j+1,k+1))
-             mismatch = geometric_rate - topography_rate_cell(j,k)
-             volume_geometric = volume_geometric + geometric_rate
-             mismatch_integral = mismatch_integral + mismatch
-             mismatch_l1 = mismatch_l1 + ABS(mismatch)
-             mismatch_linf = MAX(mismatch_linf,ABS(mismatch))
-          END DO
-       END DO
-       !$OMP END PARALLEL DO
-       volume_geometric = cell_area * volume_geometric
-       mismatch_integral = cell_area * mismatch_integral
-       mismatch_l1 = cell_area * mismatch_l1
-    END IF
 
     !$OMP PARALLEL DO COLLAPSE(2)
     DO k = 1, comp_interfaces_y
@@ -392,13 +320,6 @@ CONTAINS
     !$OMP END PARALLEL DO
 
     CALL refresh_topography_geometry
-
-    IF ( verbose_level .GE. 2 ) THEN
-       WRITE(*,*) 'evolving-topography volume-rate cell/geometric:',         &
-            volume_cell, volume_geometric
-       WRITE(*,*) 'evolving-topography mismatch integral/L1/Linf:',          &
-            mismatch_integral, mismatch_l1, mismatch_linf
-    END IF
 
   END SUBROUTINE apply_vertex_first_topography_update
 

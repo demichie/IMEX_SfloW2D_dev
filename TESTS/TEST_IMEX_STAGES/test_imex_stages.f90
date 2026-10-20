@@ -78,7 +78,7 @@ PROGRAM test_imex_stages
   CALL get_command_argument(7,argument)
   IF (LEN_TRIM(argument)>0) READ(argument,*) boundary_test_mode
   IF (boundary_test_mode<0 .OR. boundary_test_mode>1) ERROR STOP 'invalid boundary test mode'
-  IF (stages<2 .OR. stages>4 .OR. steps<1) ERROR STOP 'invalid test controls'
+  IF (stages/=2 .OR. steps<1) ERROR STOP 'invalid test controls'
   !$OMP PARALLEL
   !$OMP SINGLE
   actual_threads=omp_get_num_threads()
@@ -296,7 +296,7 @@ CONTAINS
           END IF
 
           CALL boundary_reconstruction%reconstruct(boundary_qp,0.0_wp,nx*ny, &
-               boundary_j,boundary_k)
+               boundary_j,boundary_k,.TRUE.)
           center_value=boundary_qp(idx_T,cell_j,cell_k)
           SELECT CASE(side)
           CASE(1)
@@ -337,7 +337,7 @@ CONTAINS
 
     IF (nx==1) THEN
        CALL boundary_reconstruction%reconstruct(boundary_qp,0.0_wp,nx*ny, &
-            boundary_j,boundary_k)
+            boundary_j,boundary_k,.TRUE.)
        DO cell_k=1,ny
           CALL assert_boundary_value('collapsed x west', &
                boundary_reconstruction%qp_cellW(idx_T,1,cell_k), &
@@ -349,7 +349,7 @@ CONTAINS
     END IF
     IF (ny==1) THEN
        CALL boundary_reconstruction%reconstruct(boundary_qp,0.0_wp,nx*ny, &
-            boundary_j,boundary_k)
+            boundary_j,boundary_k,.TRUE.)
        DO cell_j=1,nx
           CALL assert_boundary_value('collapsed y south', &
                boundary_reconstruction%qp_cellS(idx_T,cell_j,1), &
@@ -387,7 +387,7 @@ CONTAINS
           END SELECT
           source_cell(cell_j,cell_k)=2
           CALL boundary_reconstruction%reconstruct(boundary_qp,0.0_wp,nx*ny, &
-               boundary_j,boundary_k)
+               boundary_j,boundary_k,.TRUE.)
           SELECT CASE(side)
           CASE(1)
              expected=boundary_reconstruction%qp_interfaceR(idx_T,cell_j,cell_k)
@@ -413,7 +413,7 @@ CONTAINS
           END SELECT
           source_cell(cell_j,cell_k)=2
           CALL boundary_reconstruction%reconstruct(boundary_qp,0.0_wp,nx*ny, &
-               boundary_j,boundary_k)
+               boundary_j,boundary_k,.TRUE.)
           SELECT CASE(side)
           CASE(1)
              CALL assert_boundary_value('radial west momentum reflection', &
@@ -485,7 +485,8 @@ CONTAINS
     cell_size=dx; dx2=0.5_wp*dx; dy2=0.5_wp*dy
     one_by_dx=1.0_wp/dx; one_by_dy=1.0_wp/dy
     n_vars=5; n_eqns=5; n_solid=1; n_add_gas=0; n_stoch_vars=0; n_pore_vars=0
-    n_RK=stages; idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
+    kt_trace_reconstruction = 'froude_blend'
+    n_RK=2; idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
     idx_solid_first=5; idx_solid_last=5; idx_solidEqn_first=5; idx_solidEqn_last=5
     idx_add_gas_first=6; idx_add_gas_last=5
     idx_addGasEqn_first=6; idx_addGasEqn_last=5

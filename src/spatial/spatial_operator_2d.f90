@@ -2,7 +2,7 @@
 !> \brief Model-facing explicit spatial operator
 !>
 !> This module is the boundary between time integration and the numerical
-!> discretization of spatial terms.  It owns the active HP-PCCU backend and
+!> discretization of spatial terms. It owns the KT-PYTHON backend and
 !> exposes only complete spatial-term and CFL evaluations.  Time integration
 !> therefore does not depend on flux, path-contribution, or wave-speed storage.
 !********************************************************************************
@@ -38,7 +38,7 @@ MODULE spatial_operator_2d
 
 CONTAINS
 
-  !> \brief Initialize the reconstruction and HP-PCCU backend owned by this operator.
+  !> \brief Initialize the reconstruction and KT-PYTHON flux workspace.
   !>
   !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
 
@@ -51,7 +51,7 @@ CONTAINS
 
   END SUBROUTINE initialize_spatial_operator
 
-  !> \brief Release the reconstruction and HP-PCCU backend storage.
+  !> \brief Release the reconstruction and KT-PYTHON flux workspace.
   !>
   !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
 
@@ -119,7 +119,7 @@ CONTAINS
     CLASS(domain_type), INTENT(IN) :: domain
 
     INTEGER :: j, k, l
-    REAL(wp) :: max_a_x, max_a_y
+    REAL(wp) :: max_a_x, max_a_y, cfl_spatial
     REAL(wp) :: dynamic_pressure, propagation_rate
 
     dt = max_dt
@@ -143,9 +143,14 @@ CONTAINS
     END DO
     !$OMP END PARALLEL DO
 
-    ! CFL speeds must use the same final HP traces as the spatial operator.
+    ! CFL speeds must use the same selected advective traces as the spatial operator.
     CALL this%reconstruction%reconstruct( qp, time, domain%solve_cells,      &
-         domain%j_cent, domain%k_cent )
+         domain%j_cent, domain%k_cent,                                       &
+         .TRUE. )
+
+    ! Match the KT face depths and desingularized velocities used by the
+    ! spatial operator before evaluating the CFL wave speeds.
+    CALL this%reconstruction%reconstruct_kt_eta( qp )
 
     CALL this%hp_pccu%evaluate_speeds( this%reconstruction,                  &
          domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,        &
@@ -170,20 +175,22 @@ CONTAINS
     ! pass. Keep the legacy operation order exactly in the default branch.
     ! This is a spatial suggestion, not a general IMEX stability guarantee;
     ! the main loop subsequently caps accepted steps at events and growth.
+    cfl_spatial = cfl
+    cfl_spatial = MIN(cfl_spatial,0.25_wp)
     SELECT CASE (TRIM(cfl_policy))
     CASE ('directional_min')
-       IF ( max_a_x .GT. 0.0_wp ) dt = MIN(dt,cfl*dx/max_a_x)
-       IF ( max_a_y .GT. 0.0_wp ) dt = MIN(dt,cfl*dy/max_a_y)
+       IF ( max_a_x .GT. 0.0_wp ) dt = MIN(dt,cfl_spatial*dx/max_a_x)
+       IF ( max_a_y .GT. 0.0_wp ) dt = MIN(dt,cfl_spatial*dy/max_a_y)
     CASE ('combined')
        ! Use the legacy division order in 1D: mathematical equivalence alone
        ! would allow a one-ulp difference from cfl/(lambda/dx).
        IF ( comp_cells_y .EQ. 1 ) THEN
-          IF ( comp_cells_x .GT. 1 .AND. max_a_x .GT. 0.0_wp ) dt = MIN(dt,cfl*dx/max_a_x)
+          IF ( comp_cells_x .GT. 1 .AND. max_a_x .GT. 0.0_wp ) dt = MIN(dt,cfl_spatial*dx/max_a_x)
        ELSEIF ( comp_cells_x .EQ. 1 ) THEN
-          IF ( max_a_y .GT. 0.0_wp ) dt = MIN(dt,cfl*dy/max_a_y)
+          IF ( max_a_y .GT. 0.0_wp ) dt = MIN(dt,cfl_spatial*dy/max_a_y)
        ELSE
           propagation_rate = max_a_x/dx + max_a_y/dy
-          IF ( propagation_rate .GT. 0.0_wp ) dt = MIN(dt,cfl/propagation_rate)
+          IF ( propagation_rate .GT. 0.0_wp ) dt = MIN(dt,cfl_spatial/propagation_rate)
        END IF
     CASE DEFAULT
        ! Also protect callers that configure the module without input I/O.

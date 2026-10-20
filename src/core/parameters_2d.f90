@@ -39,6 +39,11 @@ MODULE parameters_2d
   !> Both policies retain the configured CFL limits and all integrator time caps.
   CHARACTER(LEN=32) :: cfl_policy = 'directional_min'
 
+  !> Depth-trace reconstruction used by KT-PYTHON: h_x, eta_x, minmod, or
+  !> froude_blend (cell-local h_x/eta_x slope blend based on directional Fr).
+  !> The hydrostatic/path term continues to use eta_x independently.
+  CHARACTER(LEN=32) :: kt_trace_reconstruction = 'eta_x'
+
   REAL(wp) :: eps_sing          !< parameter for desingularization
   REAL(wp) :: eps_sing4         !< parameter for desingularization**4
 

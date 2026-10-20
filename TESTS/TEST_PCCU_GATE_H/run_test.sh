@@ -32,6 +32,7 @@ else
     trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
 fi
 PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/test_checker.py"
+PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/test_kt_reference.py"
 OMP_NUM_THREADS=${IMEX_AUDIT_FORCE_THREADS:-${OMP_NUM_THREADS:-1}}
 OMP_DYNAMIC=FALSE
 export OMP_NUM_THREADS OMP_DYNAMIC
@@ -51,9 +52,11 @@ do
             cd "$case_dir"
             "$executable" > run.log
         )
-        python3 "$test_dir/analyze_case.py" "$case_dir" "$mode" "$reference"
         python3 "$test_dir/capture_times.py" "$observer" "$case_dir"
         if ! PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/compare_fields.py" "$case_dir" "$mode"; then
+            failed=1
+        fi
+        if ! python3 "$test_dir/analyze_case.py" "$case_dir" "$mode" "$reference"; then
             failed=1
         fi
     done
@@ -65,4 +68,4 @@ if [ "$failed" -ne 0 ]; then
 fi
 
 echo "PASS: Gate-H G=1 and slope-plus-curvature excavation refinements"
-echo "      match the dry-safe Python reference fingerprints"
+echo "      match the current KT-PYTHON reference fields and mass budget"

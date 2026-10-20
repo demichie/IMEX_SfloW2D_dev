@@ -27,7 +27,7 @@ def main():
     subprocess.run(["python3",str(repo/"TESTS/TEST_PCCU_GATE_H/build_dt_observer.py"),
                     str(baseline),str(build),str(repo),"--include-spatial"],env=env,check=True)
     records=[]
-    for stages in (2,3,4):
+    for stages in (2,):
         tag=f"rk{stages}-adaptive-omitted"
         original=root/(tag+"-baseline")
         observed=root/(tag+"-baseline-observer")

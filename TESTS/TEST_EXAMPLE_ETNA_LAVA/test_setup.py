@@ -25,10 +25,14 @@ class PreparationTests(unittest.TestCase):
             output.writestr(member, content)
         return path, prepare.digest(path), hashlib.sha256(content).hexdigest()
 
-    def test_supplied_input_is_frozen_without_parameter_changes(self):
+    def test_current_input_checksum_and_lava_reconstruction(self):
         fixture = json.loads((EXAMPLE / "fixture.json").read_text())
         self.assertEqual(prepare.digest(EXAMPLE / "IMEX_SfloW2D.inp"), fixture["input"]["sha256"])
         self.assertFalse(fixture["input"]["parameters_changed_on_import"])
+        self.assertTrue(fixture["input"]["parameters_changed_since_import"])
+        self.assertEqual(fixture["run"]["KT_TRACE_RECONSTRUCTION"], "h_x")
+        self.assertIn("KT_TRACE_RECONSTRUCTION = 'h_x'",
+                      (EXAMPLE / "IMEX_SfloW2D.inp").read_text())
         self.assertEqual(fixture["N9"]["selected_long_examples"],
                          ["EXAMPLE_ETNA", "EXAMPLE_ETNA_LAVA"])
         self.assertFalse(fixture["N9"]["scientific_baseline_approved"])

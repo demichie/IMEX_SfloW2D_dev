@@ -23,6 +23,9 @@ MODULE state_conversion_2d
 
   PRIVATE
 
+  REAL(wp), PARAMETER :: mass_fraction_roundoff_tolerance =                 &
+       4096.0_wp * EPSILON(1.0_wp)
+
   !> \brief Evaluate carrier and whole-mixture specific heat capacities.
   !> \param[in]  xs            Solid mass fractions.
   !> \param[in]  xg            Additional-gas mass fractions.
@@ -69,6 +72,7 @@ MODULE state_conversion_2d
   PUBLIC :: eval_mixture_properties_from_volume_fractions
   PUBLIC :: enforce_mass_fraction_closure
   PUBLIC :: enforce_primitive_mass_fraction_closure
+  PUBLIC :: clip_roundoff_negative_component_masses
   PUBLIC :: primitive_to_volume_fractions
   PUBLIC :: velocity_from_conservative
   PUBLIC :: project_dry_cell_momenta
@@ -134,26 +138,30 @@ CONTAINS
   !> \param[in,out] xl Liquid mass fraction; independently transported only when gas and liquid are
   !>                   both present.
 
-  SUBROUTINE enforce_mass_fraction_closure(xs, xg, xl)
+  SUBROUTINE enforce_mass_fraction_closure(xs, xg, xl, context)
 
     REAL(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas), xl
-    REAL(wp), PARAMETER :: negative_tolerance = 100.0_wp * EPSILON(1.0_wp)
+    CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: context
+    ! A few thousand machine epsilons allow accumulated cancellation noise in
+    ! the explicit FV update to be clipped, while materially negative
+    ! fractions still trigger the fatal check below.
     REAL(wp) :: explicit_mass_fraction
 
     IF (n_solid .GT. 0) THEN
-       IF (ANY(xs .LT. -negative_tolerance))                                  &
-            ERROR STOP 'Material negative solid mass fraction'
+       IF (ANY(xs .LT. -mass_fraction_roundoff_tolerance)) THEN
+          ERROR STOP 'Material negative solid mass fraction'
+       END IF
        xs = MAX(xs, 0.0_wp)
     END IF
 
     IF (n_add_gas .GT. 0) THEN
-       IF (ANY(xg .LT. -negative_tolerance))                                  &
+       IF (ANY(xg .LT. -mass_fraction_roundoff_tolerance))                    &
             ERROR STOP 'Material negative additional-gas mass fraction'
        xg = MAX(xg, 0.0_wp)
     END IF
 
     IF (gas_flag .AND. liquid_flag) THEN
-       IF (xl .LT. -negative_tolerance)                                       &
+       IF (xl .LT. -mass_fraction_roundoff_tolerance)                         &
             ERROR STOP 'Material negative liquid mass fraction'
        xl = MAX(xl, 0.0_wp)
     ELSE
@@ -177,9 +185,10 @@ CONTAINS
   !> \param[in,out] qp Canonical physical states: h, hu, hv, T, component mass fractions, then
   !>                   appended u and v.
 
-  SUBROUTINE enforce_primitive_mass_fraction_closure(qp)
+  SUBROUTINE enforce_primitive_mass_fraction_closure(qp, context)
 
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2)
+    CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: context
     REAL(wp) :: xs(n_solid), xg(n_add_gas), xl
 
     xs = qp(idx_solid_first:idx_solid_last)
@@ -187,13 +196,48 @@ CONTAINS
     xl = 0.0_wp
     IF (gas_flag .AND. liquid_flag) xl = qp(n_vars)
 
-    CALL enforce_mass_fraction_closure(xs, xg, xl)
+    IF (PRESENT(context)) THEN
+       CALL enforce_mass_fraction_closure(xs, xg, xl, context)
+    ELSE
+       CALL enforce_mass_fraction_closure(xs, xg, xl)
+    END IF
 
     qp(idx_solid_first:idx_solid_last) = xs
     qp(idx_add_gas_first:idx_add_gas_last) = xg
     IF (gas_flag .AND. liquid_flag) qp(n_vars) = xl
 
   END SUBROUTINE enforce_primitive_mass_fraction_closure
+
+  !> Set only roundoff-sized negative conservative component masses to zero.
+  !> Material negatives are deliberately left unchanged for the existing
+  !> admissibility checks to report as errors.
+  SUBROUTINE clip_roundoff_negative_component_masses(qc)
+
+    REAL(wp), INTENT(INOUT) :: qc(n_vars)
+    REAL(wp) :: tolerance
+
+    IF (qc(1) .LE. 0.0_wp) RETURN
+    tolerance = mass_fraction_roundoff_tolerance *                         &
+         MAX(ABS(qc(1)),TINY(1.0_wp))
+
+    IF (n_solid .GT. 0) THEN
+       WHERE ((qc(idx_solid_first:idx_solid_last) .LT. 0.0_wp) .AND.       &
+            (qc(idx_solid_first:idx_solid_last) .GE. -tolerance))
+          qc(idx_solid_first:idx_solid_last) = 0.0_wp
+       END WHERE
+    END IF
+    IF (n_add_gas .GT. 0) THEN
+       WHERE ((qc(idx_add_gas_first:idx_add_gas_last) .LT. 0.0_wp) .AND.  &
+            (qc(idx_add_gas_first:idx_add_gas_last) .GE. -tolerance))
+          qc(idx_add_gas_first:idx_add_gas_last) = 0.0_wp
+       END WHERE
+    END IF
+    IF (gas_flag .AND. liquid_flag) THEN
+       IF ((qc(n_vars) .LT. 0.0_wp) .AND. (qc(n_vars) .GE. -tolerance))    &
+            qc(n_vars) = 0.0_wp
+    END IF
+
+  END SUBROUTINE clip_roundoff_negative_component_masses
 
 
   !> \brief Derive constitutive volume fractions from canonical physical mass fractions.
@@ -720,13 +764,14 @@ CONTAINS
   !> \param[out] p_dyn Dynamic pressure rho_m*(u^2+v^2)/2 [Pa].
   !******************************************************************************
 
-  SUBROUTINE qc_to_qp(qc,qp,p_dyn)
+  SUBROUTINE qc_to_qp(qc,qp,p_dyn,context)
 
     IMPLICIT none
 
     REAL(wp), INTENT(IN) :: qc(n_vars)
     REAL(wp), INTENT(OUT) :: qp(n_vars+2)
     REAL(wp), INTENT(OUT) :: p_dyn
+    CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: context
 
     REAL(wp) :: r_h               !< real-value flow thickness
     REAL(wp) :: r_u               !< real-value x-velocity
@@ -760,7 +805,11 @@ CONTAINS
        r_xs = qc(idx_solid_first:idx_solid_last) / qc(1)
        r_xg = qc(idx_add_gas_first:idx_add_gas_last) / qc(1)
        IF ( gas_flag .AND. liquid_flag ) r_xl = qc(n_vars) / qc(1)
-       CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl)
+       IF (PRESENT(context)) THEN
+          CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl, context)
+       ELSE
+          CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl)
+       END IF
     END IF
 
     qp(idx_solid_first:idx_solid_last) = r_xs
@@ -807,12 +856,13 @@ CONTAINS
   !>                component masses.
   !******************************************************************************
 
-  SUBROUTINE qp_to_qc(qp,qc)
+  SUBROUTINE qp_to_qc(qp,qc,context)
 
     IMPLICIT none
 
     REAL(wp), INTENT(IN) :: qp(n_vars+2)
     REAL(wp), INTENT(OUT) :: qc(n_vars)
+    CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: context
 
     REAL(wp) :: r_sp_heat_mix
 
@@ -866,7 +916,11 @@ CONTAINS
     r_xg = qp(idx_add_gas_first:idx_add_gas_last)
     IF ( gas_flag .AND. liquid_flag ) r_xl = qp(n_vars)
 
-    CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl)
+    IF (PRESENT(context)) THEN
+       CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl, context)
+    ELSE
+       CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl)
+    END IF
 
     CALL eval_mixture_properties_from_mass_fractions(                          &
          ! IN

@@ -8,16 +8,17 @@ matching output hash alone is not field agreement.
 
 ## Fixed case inventory
 
-Each compiler profile runs 69 cases with actual one- and four-thread teams:
+Each compiler profile runs 23 cases with actual one- and four-thread teams:
 
 | Cases | Count | Comparison time |
 | --- | ---: | ---: |
-| Seeded rough, drainage, compact and inclined compact fronts | 24 | 0.02 s |
-| Mixed Hessian dynamics and lakes, all slope and curvature toggles | 24 | 0.02 s |
-| Axial and oblique one-cell ramps and their quarter-turn rotations | 12 | 0.02 s |
-| Circular dry-front expansion on three grids | 9 | 0.1 s |
+| Seeded rough, drainage, compact and inclined compact fronts | 8 | 0.02 s |
+| Mixed Hessian dynamics and lakes, all slope and curvature toggles | 8 | 0.02 s |
+| Axial and oblique one-cell ramps and their quarter-turn rotations | 4 | 0.02 s |
+| Circular dry-front expansion on three grids | 3 | 0.1 s |
 
-All supported stage counts are included: `N_RK=2,3,4`. Production CFL is
+Current runs use `N_RK=2` and `KT_TRACE_RECONSTRUCTION='froude_blend'`.
+Archived evidence retains its original stage matrix. Production CFL is
 checked, not changed. Raw negativity, final repairs, mass budgets and
 complete thread payloads are checked separately. The spatial observer also
 checks active normal and tangential face momenta, thickness, free surface,

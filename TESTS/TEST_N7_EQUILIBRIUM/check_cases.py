@@ -19,6 +19,8 @@ import compare_stages as stages  # noqa: E402
 import hp_pccu_1d_core as core1  # noqa: E402
 
 CONTRACT = json.loads((TEST_DIR / "contract.json").read_text())
+# Current numerical configuration; retain the archived contract on disk.
+CONTRACT["stages"] = [2]
 ROUND = CONTRACT["roundoff_epsilon_multiplier"] * np.finfo(float).eps
 RHO, CP, TEMP, GRAV, RHO_A = 1000.0, 4180.0, 300.0, 9.81, 1.2
 

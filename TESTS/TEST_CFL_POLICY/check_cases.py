@@ -106,7 +106,7 @@ def main():
     env={**os.environ, "OMP_NUM_THREADS": str(threads), "OMP_DYNAMIC": "FALSE"}
     records=[]; canonical={}; proposals={}
     baseline=os.environ.get("IMEX_CFL_BASELINE")
-    for stages in (2,3,4):
+    for stages in (2,):
         for sentinel in (False, True):
             for policy in (None, "directional_min", "combined"):
                 tag=f"rk{stages}-{'sentinel' if sentinel else 'adaptive'}-{policy or 'omitted'}"

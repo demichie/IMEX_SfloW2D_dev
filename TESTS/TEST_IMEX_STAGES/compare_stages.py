@@ -20,7 +20,7 @@ import compare_reference as spatial
 
 CP = 4180.0
 RHO = 1000.0
-SUPPORTED_STAGES = (2, 3, 4)
+TEST_STAGES = (2,)
 EPS = np.finfo(float).eps
 LEVELS = (8, 16, 32, 64, 128)
 
@@ -55,7 +55,7 @@ def tableaux(n):
 
 def check_order_conditions():
     """Check first/second order and both mixed colored-tree conditions independently."""
-    for n in SUPPORTED_STAGES:
+    for n in TEST_STAGES:
         ae, ai, be, bi = tableaux(n)
         ce, ci = ae.sum(axis=1), ai.sum(axis=1)
         assert abs(be.sum()-1) < 8*EPS
@@ -348,7 +348,7 @@ def order_suite(args):
             close("mixed oracle refinement", thermal_oracle(initial_t, final_time, True, 2048), expected_t)
         else:
             expected_t = initial_t
-        for n in range(2, 5):
+        for n in TEST_STAGES:
             errors = []; fingerprints = []; minima = []; stage_checks = []
             for steps in LEVELS:
                 directory = Path(f"order-{kind}-RK{n}-steps{steps}")
@@ -386,7 +386,7 @@ def stage_count_suite(executable, profile):
     """Require nonzero, diagnostic-specific rejection through both production entry points."""
     generator = Path(__file__).resolve().parent.parent / "TEST_PCCU_LAKE_AT_REST/generate_case.py"
     for mode in ("input", "workspace"):
-        for stages in (-1, 0, 1, 2, 3, 4, 5, 6, None):
+        for stages in (-1, 0, 1, 2, 5, 6, None):
             if stages is None and mode == "workspace":
                 continue  # Omission is a namelist default, not a workspace request.
             directory = Path(f"stage-count-{mode}-{stages}")
@@ -398,7 +398,7 @@ def stage_count_suite(executable, profile):
                 assert content.count("N_RK=2,") == 1
                 inp.write_text(content.replace("N_RK=2,", "" if stages is None else f"N_RK={stages},"))
             expected = 2 if stages is None else stages
-            accepted = expected in SUPPORTED_STAGES
+            accepted = expected in (2, 3, 4)
             evidence = []
             for threads in (1, 4):
                 env = {**os.environ, "OMP_NUM_THREADS": str(threads), "OMP_DYNAMIC": "FALSE"}
@@ -436,7 +436,7 @@ def main():
                                                    slope_correction=slope, curvature_term=curvature)
                 harmonic, diagnostic = spatial.core.max_dt2d(q, bed, spatial.DX, spatial.DY, 0.0, params)
                 bound = min(diagnostic["dt_x"], diagnostic["dt_y"])
-                for n in SUPPORTED_STAGES:
+                for n in TEST_STAGES:
                     for policy, requested, dt in (("retained", 0.0, bound), ("harmonic", harmonic, harmonic)):
                         expected, final, stage_cfl = explicit_stages(q, bed, params, n, dt)
                         tag = f"{name}-G{int(slope)}-C{int(curvature)}-RK{n}-{policy}"

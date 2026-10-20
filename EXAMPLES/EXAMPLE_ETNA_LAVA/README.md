@@ -27,6 +27,7 @@ A one-hour lava-flow simulation using two bottom fissural sources and temperatur
 | Number of fissures | 2 |
 | Rheology | Model 3, temperature-dependent |
 | `N_RK` / CFL policy | 2 / `directional_min` (default) |
+| `KT_TRACE_RECONSTRUCTION` | `h_x` |
 | Slope correction / curvature | Disabled |
 
 ## How to run
@@ -46,6 +47,8 @@ OMP_NUM_THREADS=4 OMP_DYNAMIC=FALSE ../../bin/IMEX_SfloW2D
 The solver writes under `OUTPUT/exampleEtna_lava/`: the time-series NetCDF is in `fields/exampleEtna_lava.nc`, ESRI snapshots are in indexed directories under `snapshots/`, terrain exports are in `terrain/`, runout diagnostics are in `diagnostics/`, and the binary checkpoint is in `restart/restart.bin`. Conservative text output is disabled in the supplied input. Open `OUTPUT/exampleEtna_lava/fields/exampleEtna_lava.nc` in ParaView; generated DEM and output files are ignored by Git but not deleted.
 
 ## Validation evidence and limits
+
+The current input explicitly selects `h_x` for lava trace reconstruction. The retained validation runs predate this setting; `fixture.json` records both the original and current input checksums.
 
 The original README points to [the ETNA_LAVA validation report](../../docs/acceptance/ETNA_LAVA_EXAMPLE_2026_10_11.md) and to [`fixture.json`](fixture.json), which retains input/DEM checksums and relevant parameter values. The 3600 s runs were checked under strict/optimized profiles and actual one/four-thread teams, with bitwise-equal decoded fields/checkpoints within each profile. The lava front reaches the domain boundary, so a full mass budget must include boundary fluxes; the retained N9 closed-domain mass check ends at the last output before contact. Scientific N9 approval is documented separately from successful execution of this example.
 

@@ -1,21 +1,22 @@
-"""Reproducible all-cell Gate-H comparison, distinct from historical port norms."""
+"""Compare all Gate-H cells against the current independent KT-PYTHON scheme."""
 import argparse
 import hashlib
-import importlib.util
 import json
+import re
+import sys
 from pathlib import Path
 
 import numpy as np
 
 HERE = Path(__file__).resolve().parent
-spec = importlib.util.spec_from_file_location(
-    "geometry_dynamic_checker", HERE.parent / "TEST_N7_GEOMETRY_DYNAMIC/check_cases.py")
-dynamic = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(dynamic)
-CONTRACT_PATH = HERE/"field_contract_v3.json"
+REFERENCE = HERE.parent / "TEST_SPATIAL_OPERATOR/reference"
+sys.path.insert(0, str(REFERENCE))
+import kt_python_2d_core as kt
+CONTRACT_PATH = HERE / "field_contract_v4.json"
 CONTRACT = json.loads(CONTRACT_PATH.read_text())
-if CONTRACT["reference_core_sha256"] != dynamic.spatial.CORE_HASHES:
-    raise AssertionError("field contract does not pin the approved clean kernels")
+for filename, digest in CONTRACT["reference_core_sha256"].items():
+    if hashlib.sha256((REFERENCE / filename).read_bytes()).hexdigest() != digest:
+        raise AssertionError(f"reference implementation checksum mismatch: {filename}")
 
 
 def compare(actual, expected, bed, initial_h, steps):
@@ -66,8 +67,41 @@ def accepted_times(values, end):
     return values[:, 1]
 
 
+def common_input(case_dir, shape, dx):
+    """Independently import the exact ASCII initial state and sampled DEM.
+
+    Reading the emitted input bytes avoids comparing unrounded generator
+    arrays with the rounded data actually read by the production executable.
+    """
+    initial_data = np.loadtxt(case_dir/"gateH_0000.q_2d")
+    state = np.zeros(shape+(4,))
+    state[..., :3] = initial_data[:,2:5].reshape(shape+(3,))
+    with (case_dir/"topography_dem.asc").open() as stream:
+        header = dict((key.lower(),float(value)) for key,value in
+                      (stream.readline().split() for _ in range(6)))
+        raster = np.flipud(np.loadtxt(stream))
+    inp = (case_dir/"IMEX_SfloW2D.inp").read_text()
+    def value(name):
+        return float(re.search(rf"(?im)^\s*{name}\s*=\s*([^,\s]+)",inp)[1].replace('D','E').replace('d','e'))
+    x = value('X0')+np.arange(shape[1]+1)*dx
+    y = value('Y0')+np.arange(shape[0]+1)*dx
+    xd = header['xllcorner']+(np.arange(raster.shape[1])+0.5)*header['cellsize']
+    yd = header['yllcorner']+(np.arange(raster.shape[0])+0.5)*header['cellsize']
+    ix = np.clip(np.floor((x-xd[0])/(xd[1]-xd[0])).astype(int),0,len(xd)-2)
+    iy = np.clip(np.floor((y-yd[0])/(yd[1]-yd[0])).astype(int),0,len(yd)-2)
+    ax = (xd[ix+1]-x)/(xd[ix+1]-xd[ix])
+    ay = (yd[iy+1]-y)/(yd[iy+1]-yd[iy])
+    vertices = ax[None,:]*(ay[:,None]*raster[iy[:,None],ix[None,:]]+
+        (1-ay[:,None])*raster[iy[:,None]+1,ix[None,:]])+(1-ax[None,:])*(
+        ay[:,None]*raster[iy[:,None],ix[None,:]+1]+
+        (1-ay[:,None])*raster[iy[:,None]+1,ix[None,:]+1])
+    return state,vertices
+
+
 def run(case_dir, mode, autonomous=False):
-    """Generate both references from identical Q1 geometry; compare every final cell."""
+    """Generate the current KT reference from common inputs; compare every cell."""
+    if autonomous:
+        raise ValueError("autonomous CFL comparison is not implemented for the new KT core")
     geometry = np.load(case_dir/"gate_h_geometry.npz")
     snapshot = next((case_dir/"OUTPUT/gateH/snapshots").glob("*/gateH_0001.q_2d"))
     data = np.loadtxt(snapshot)
@@ -81,7 +115,7 @@ def run(case_dir, mode, autonomous=False):
     actual = data[:, 2].reshape(bed.shape)/1000
     flags = mode == "slope_curvature"
     settings = CONTRACT["current_IMEX"]
-    initial = dynamic.equilibrium.liquid_state(geometry["h0"])
+    initial, vertices = common_input(case_dir,bed.shape,dx)
     time_evidence = json.loads((case_dir/"accepted_time_evidence.json").read_text())
     if not time_evidence["canonical_output_byte_identical"]:
         raise AssertionError("observed times are not certified against the actual output")
@@ -90,76 +124,58 @@ def run(case_dir, mode, autonomous=False):
         if hashlib.sha256(path.read_bytes()).hexdigest() != time_evidence[key]:
             raise AssertionError("accepted-time evidence does not match the actual artifacts")
     dt = accepted_times(np.fromfile(case_dir/"accepted_times.bin").reshape(-1, 2), CONTRACT["time"])
-    result = dynamic.reference(initial, geometry["bed_vertex"], dx, dx, dt,
-        settings["n_RK"], flags, flags, rho_a=101300/(287.051*300),
-        eps_sing=settings["eps_sing"])
-    same = result["q"][..., 0]/1000
+    if settings["n_RK"] != 2:
+        raise AssertionError("this comparison requires n_RK=2")
+    params = kt.Parameters(rho_a=101300/(287.051*300), eps_sing=settings["eps_sing"],
+                           reconstruction=settings["KT_TRACE_RECONSTRUCTION"],
+                           slope_correction=flags, curvature_term=flags)
+    reference, minimum, budget = kt.advance(initial, vertices, dx, dx, dt, params,
+                                               return_diagnostics=True)
+    same = reference[..., 0]/1000
     failures = []
     try:
-        current = compare(actual, same, bed, geometry["h0"], len(result["dt_sequence"]))
+        current = compare(actual, same, bed, geometry["h0"], len(dt))
+        # Check momenta too: equal thickness alone must not hide a path/flux error.
+        actual_q = data[:, 2:5].reshape(bed.shape+(3,))
+        # Scale each equation by the independent initial hydrostatic units,
+        # also for almost stationary/near-dry momentum (N7 convention).
+        mass_scale = max(1,float(initial[...,0].max()))
+        momentum_scale = mass_scale*np.sqrt(params.g*max(1,float(initial[...,0].max())/params.rho_c))
+        scales = np.array([mass_scale,momentum_scale,momentum_scale])
+        limit = settings["roundoff_epsilon_multiplier"]*np.finfo(float).eps*len(dt)
+        errors = np.max(abs(actual_q-reference[..., :3]), axis=(0, 1))/scales
+        if np.any(errors > limit):
+            raise AssertionError(f"KT conservative field mismatch: {errors}, limit={limit}")
+        current["conservative_scaled_Linf"] = errors.tolist()
+        current["conservative_scaled_limit"] = limit
     except AssertionError as error:
         failures.append(str(error))
         current = {"status": "failed", "failure": str(error),
                    "h_Linf_m": float(np.max(np.abs(actual-same))),
-                   "eta_Linf_m": float(np.max(np.abs((actual+bed)-(same+bed)))),
                    "cells_compared": actual.size}
-    independent_time = {"status": "not_satisfied", "executed_in_this_run": False,
-                        "closure_action": "D-N7-CFL", "N7_D_assertion": False,
-                        "reason": "Autonomous adaptive trajectories are an explicitly separated unresolved diagnostic"}
-    if autonomous:
-        alternate = dynamic.reference(initial, geometry["bed_vertex"], dx, dx, None,
-            settings["n_RK"], flags, flags, rho_a=101300/(287.051*300),
-            eps_sing=settings["eps_sing"], time_policy={"dt0": settings["dt0"],
-            "max_dt": settings["max_dt"], "end": CONTRACT["time"], "maximum_steps": 1000})
-        try:
-            assessment = compare(actual, alternate["q"][..., 0]/1000, bed,
-                                 geometry["h0"], len(alternate["dt_sequence"]))
-            independent_time.update(status="passed", assessment=assessment)
-        except AssertionError as error:
-            independent_time.update(status="failed", failure=str(error))
-        independent_time.update(executed_in_this_run=True,
-            dt_sequence=alternate["dt_sequence"], directional_bounds=alternate["bounds"])
-    # Independently regenerated SSPRK2 fields, not the old port-audit scalar norms.
-    settings = CONTRACT["historical_SSPRK2"]
-    params = dynamic.core.SolverParams(rho_a=settings["rho_a"], eps_sing=settings["eps_sing"],
-                                      slope_correction=flags, curvature_term=flags)
-    bed_core = dynamic.core.continuous_q1_bed_geometry(geometry["bed_vertex"])
-    q = dynamic.compact(initial); time = 0.0; prototype_steps = []
-    while time < CONTRACT["time"]:
-        q, diagnostic = dynamic.core.step_ssprk2_2d(q, bed_core, dx, dx, time,
-            min(settings["dt_cap"], CONTRACT["time"]-time), params)
-        prototype_steps.append(diagnostic)
-        time += diagnostic["dt"]
-    prototype = q[..., 0]/1000
-    try:
-        historical = historical_comparison(actual, prototype, bed)
-    except AssertionError as error:
-        failures.append(str(error))
-        historical = {"status": "failed", "failure": str(error)}
     evidence = {"mode": mode, "dx": dx, "comparison_time": CONTRACT["time"],
         "contract_sha256": hashlib.sha256(CONTRACT_PATH.read_bytes()).hexdigest(),
-        "reference_core_sha256": dynamic.spatial.CORE_HASHES,
-        "current_IMEX": current, "current_IMEX_dt_sequence": result["dt_sequence"],
-        "accepted_time_observer": time_evidence,
-        "autonomous_CFL_diagnostic": independent_time,
-        "current_IMEX_minimum_raw_h": result["minimum_raw_h"],
-        "current_IMEX_directional_bounds": result["bounds"],
-        "historical_SSPRK2": historical, "historical_SSPRK2_steps": prototype_steps,
-        "reference_policy_equal": False, "old_port_norms_used_as_oracle": False,
+        "reference_core_sha256": CONTRACT["reference_core_sha256"],
+        "scheme": "KT-PYTHON", "trace_reconstruction": params.reconstruction,
+        "n_RK": 2, "boundary_budget": budget, "current_IMEX": current, "current_IMEX_dt_sequence": dt.tolist(),
+        "accepted_time_observer": time_evidence, "current_IMEX_minimum_raw_h": minimum,
+        "historical_SSPRK2": {"acceptance_oracle": False,
+            "reason": "different spatial scheme; retained historical contract is not applied"},
+        "autonomous_CFL_diagnostic": {"executed_in_this_run": False,
+            "reason": "this comparison uses the certified actual accepted time sequence"},
         "status": "failed" if failures else "passed", "failures": failures}
-    np.savez(case_dir/"reference_fields.npz", h_IMEX=same, eta_IMEX=same+bed,
-             h_SSPRK2=prototype, eta_SSPRK2=prototype+bed)
+    np.savez(case_dir/"reference_fields.npz", h_IMEX=same, eta_IMEX=same+bed, q_IMEX=reference)
+    evidence["reference_fields_sha256"] = hashlib.sha256((case_dir/"reference_fields.npz").read_bytes()).hexdigest()
     (case_dir/"field_evidence.json").write_text(json.dumps(evidence, indent=2, allow_nan=False)+"\n")
     if failures:
         raise AssertionError("; ".join(failures))
-    print(f"PASS: Gate-H full fields {mode} dx={dx:g}, IMEX Linf={current['h_Linf_m']:.3e} m, "
-          f"SSPRK2 Linf={historical['Linf_m']:.3e} m", flush=True)
+    print(f"PASS: KT-PYTHON full fields {mode} dx={dx:g}, h Linf={current['h_Linf_m']:.3e} m", flush=True)
 
 
 if __name__ == "__main__":
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument("case_dir", type=Path)
     cli.add_argument("mode", choices=CONTRACT["modes"])
-    cli.add_argument("--autonomous", action="store_true", help="Also record the unresolved autonomous CFL diagnostic")
+    cli.add_argument("--autonomous", action="store_true", help="Retained legacy option; reports that KT autonomous CFL comparison is unavailable")
     args = cli.parse_args()
     run(args.case_dir, args.mode, args.autonomous)

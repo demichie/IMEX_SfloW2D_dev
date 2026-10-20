@@ -89,6 +89,7 @@ CONTAINS
     comp_interfaces_x=nx+1; comp_interfaces_y=ny+1
     dx=0.75_wp; dy=1.25_wp; cell_size=dx
     n_solid=ns; n_add_gas=0; n_stoch_vars=0; n_pore_vars=0
+    kt_trace_reconstruction = 'froude_blend'
     n_vars=nq; n_eqns=nq; n_RK=2
     n_thickness_levels=1; n_dyn_pres_levels=1
     idx_h=1; idx_hu=2; idx_hv=3; idx_T=4

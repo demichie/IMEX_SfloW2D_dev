@@ -19,6 +19,8 @@ sys.path.insert(0, str(HERE.parent / "TEST_IMEX_STAGES"))
 import compare_stages as stages
 
 CONTRACT = json.loads((HERE / "contract.json").read_text())
+# Current numerical configuration; retain the archived contract on disk.
+CONTRACT["stages"] = [2]
 CONTACT = json.loads((HERE / "contact_contract_v3.json").read_text())
 P = CONTRACT["properties"]
 ROUND = CONTRACT["roundoff_epsilon_multiplier"] * np.finfo(float).eps

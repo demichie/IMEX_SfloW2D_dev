@@ -2425,9 +2425,6 @@ CONTAINS
                r_h * r_alphas(i_solid) / dt )
 
           IF ( deposition_term(i_solid) .LT. 0.0_wp ) THEN
-
-             WRITE(*,*) 'eval_erosion_dep_term'
-             WRITE(*,*) 'deposition_term(i_solid)',deposition_term(i_solid)
              CALL fatal_error('negative solid deposition rate')
 
           END IF

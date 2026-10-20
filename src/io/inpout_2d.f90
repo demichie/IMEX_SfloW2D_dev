@@ -67,7 +67,7 @@ MODULE inpout_2d
   USE parameters_2d, ONLY: bc
 
   ! -- Variables for the namelist NUMERIC_PARAMETERS
-  USE parameters_2d, ONLY: dt0, max_dt, cfl, cfl_policy, limiter, theta, reconstr_coeff, n_RK
+  USE parameters_2d, ONLY: dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, reconstr_coeff, n_RK
 
   ! -- Variables for the namelist EXPL_TERMS_PARAMETERS
   USE constitutive_parameters_2d, ONLY: grav, inv_grav
@@ -343,7 +343,7 @@ MODULE inpout_2d
 
   NAMELIST /initial_conditions/ T_init, T_ambient
 
-  NAMELIST /numeric_parameters/ dt0, max_dt, cfl, cfl_policy, limiter, theta, &
+  NAMELIST /numeric_parameters/ dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, &
     reconstr_coeff, n_RK
 
   NAMELIST /expl_terms_parameters/ grav
@@ -508,6 +508,7 @@ CONTAINS
     n_RK = 2
     cfl = 0.24_wp
     cfl_policy = 'directional_min'
+    kt_trace_reconstruction = 'eta_x'
     limiter(1:n_vars + 2) = 1
     theta = 1.0
     reconstr_coeff = 1.0
@@ -2166,6 +2167,20 @@ CONTAINS
     CASE DEFAULT
       CALL fatal_error('CFL_POLICY must be directional_min or combined')
     END SELECT
+
+    SELECT CASE (TRIM(ADJUSTL(kt_trace_reconstruction)))
+    CASE ('h_x', 'H_X')
+      kt_trace_reconstruction = 'h_x'
+    CASE ('eta_x', 'ETA_X')
+      kt_trace_reconstruction = 'eta_x'
+    CASE ('minmod', 'MINMOD')
+      kt_trace_reconstruction = 'minmod'
+    CASE ('froude_blend', 'FROUDE_BLEND', 'Froude_Blend')
+      kt_trace_reconstruction = 'froude_blend'
+    CASE DEFAULT
+      CALL fatal_error('KT_TRACE_RECONSTRUCTION must be h_x, eta_x, minmod or froude_blend')
+    END SELECT
+    WRITE(*,'(A,A)') 'KT trace reconstruction: ',TRIM(kt_trace_reconstruction)
 
     ! Precisely -1 prescribes max_dt at the spatial-operator boundary.
     ! Output/final-time caps and the existing growth limiter still apply.

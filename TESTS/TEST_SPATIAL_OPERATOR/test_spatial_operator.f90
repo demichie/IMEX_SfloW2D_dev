@@ -201,6 +201,7 @@ CONTAINS
     cell_size=dx; dx2=0.5_wp*dx; dy2=0.5_wp*dy
     one_by_dx=1.0_wp/dx; one_by_dy=1.0_wp/dy
     n_vars=5; n_eqns=5; n_solid=1; n_add_gas=0; n_stoch_vars=0; n_pore_vars=0
+    kt_trace_reconstruction = 'froude_blend'
     n_RK=2; idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
     idx_solid_first=5; idx_solid_last=5; idx_solidEqn_first=5; idx_solidEqn_last=5
     idx_add_gas_first=6; idx_add_gas_last=5

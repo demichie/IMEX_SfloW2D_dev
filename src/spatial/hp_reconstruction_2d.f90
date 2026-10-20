@@ -25,12 +25,14 @@ MODULE hp_reconstruction_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Blend direct and hydrostatic reconstructions while preserving depth positivity.
+  !> \brief Reconstruct depth from a minimum-magnitude free-surface slope.
   !>
   !> Direct reconstructions of h, h*u_n and u_n are supplied by the caller.
-  !> This routine reconstructs eta=h+B, enforces non-negative endpoint depths,
-  !> computes the parameter-free continuity blend, and limits the final normal
-  !> volumetric momentum while preserving its cell mean.
+  !> The free-surface slope is selected from two candidates: the limited slope
+  !> of eta=h+B and the sum of the direct h slope and the bed-face elevation
+  !> change. The candidate with smaller absolute magnitude reconstructs eta;
+  !> endpoint depths are then computed using the bed elevation at each face.
+  !> Momentum retains its existing bounded correction and candidate weighting.
   !>
   !> Boundary eta slopes use the frozen-reference zero-gradient convention.
   !>
@@ -57,7 +59,7 @@ CONTAINS
   !> \param[out] hu_plus Final limited positive-side volumetric normal momentum h*u_n.
   !> \param[out] eta_minus Negative-side hydrostatic free-surface candidate [m].
   !> \param[out] eta_plus Positive-side hydrostatic free-surface candidate [m].
-  !> \param[out] w_eta Hydrostatic-candidate blending weight per cell, in [0,1].
+  !> \param[out] w_eta Weight used by the existing momentum-candidate blend, in [0,1].
   !> \param[in,out] line_scratch Optional reusable scratch with at least (number_of_cells,8)
   !>                             entries; contents are overwritten.
   !>
@@ -103,8 +105,12 @@ CONTAINS
    REAL(wp), POINTER :: h_minus_orig(:), h_plus_orig(:), Eh(:), Eeta(:)
    REAL(wp), POINTER :: u_center_safe(:)
     REAL(wp) :: eta_stencil(3), coordinate_stencil(3)
-    REAL(wp) :: eta_slope, slope_min, slope_max
+    REAL(wp) :: eta_slope, eta2_slope, h_slope, bed_slope
+    REAL(wp) :: slope_min, slope_max
     REAL(wp) :: denominator, distribution_tolerance
+    REAL(wp) :: contact_scale, clearance_ratio
+    REAL(wp), PARAMETER :: diagnostic_blend_scale = 0.5_wp
+    REAL(wp) :: w_minus(SIZE(h_center)), w_plus(SIZE(h_center))
     REAL(wp) :: momentum_weight, dm_target, dm_lower, dm_upper, dm
     REAL(wp) :: u_min, u_max
     REAL(wp), VOLATILE :: mean_momentum_minus, mean_momentum_plus
@@ -163,10 +169,23 @@ CONTAINS
     DO i = 1, number_of_cells
 
        eta_slope = 0.0_wp
+       eta2_slope = 0.0_wp
        IF ( ( i .GT. 1 ) .AND. ( i .LT. number_of_cells ) ) THEN
           eta_stencil = eta_center(i-1:i+1)
           CALL limit( eta_stencil, coordinate_stencil, limiter_id, eta_slope )
           eta_slope = reconstruction_coefficient * eta_slope
+
+          ! Independent estimate eta2_x = h_x + b_x. The supplied direct h
+          ! traces already include the configured limiter and reconstruction
+          ! coefficient; B_plus-B_minus is the bed rise across this cell.
+          h_slope = h_plus_direct(i) - h_minus_direct(i)
+          bed_slope = B_plus(i) - B_minus(i)
+          eta2_slope = h_slope + bed_slope
+
+          ! Select the candidate with the smaller magnitude, as agreed. This
+          ! is deliberately a minimum-absolute-value selector, not the classic
+          ! sign-sensitive minmod (which would zero opposing-sign candidates).
+          IF ( ABS(eta2_slope) .LT. ABS(eta_slope) ) eta_slope = eta2_slope
        END IF
 
        slope_min = 2.0_wp * ( B_plus(i) - eta_center(i) )
@@ -207,39 +226,62 @@ CONTAINS
        END IF
 
        ! A dry cell average must always use the hydrostatic eta candidate.
-       ! For a wet cell whose eta candidate merely touches the bed at one
-       ! endpoint, distinguish local hydrostatic compensation from dynamic
-       ! drainage using the dimensionless 2-D residual supplied by the caller.
+       ! For wet cells, keep the eta/direct blend face-local near bed contact.
+       ! Applying the hydrostatic zero-depth endpoint to both faces when only
+       ! one face touches the bed can abruptly switch off drainage there.
+       ! Fade the eta correction smoothly on that face, leaving the opposite
+       ! face independently weighted.
+       w_minus(i) = w_eta(i)
+       w_plus(i) = w_eta(i)
        IF ( h_center(i) .LE. hp_dry_tolerance ) THEN
-          w_eta(i) = 1.0_wp
-       ELSEIF ( ( h_minus_eta(i) .LE. hp_dry_tolerance ) .OR.                &
-            ( h_plus_eta(i) .LE. hp_dry_tolerance ) ) THEN
-          IF ( hydrostatic_residual(i) .GT. hp_dynamic_residual_threshold ) THEN
-             w_eta(i) = 0.0_wp
-          ELSE
-             w_eta(i) = 1.0_wp
+          w_minus(i) = 1.0_wp
+          w_plus(i) = 1.0_wp
+       ELSEIF ( hydrostatic_residual(i) .GT. hp_dynamic_residual_threshold ) THEN
+          IF ( ( h_minus_eta(i) .LE. hp_dry_tolerance ) .OR.                &
+               ( h_plus_eta(i) .LE. hp_dry_tolerance ) .OR.                &
+               ( topographic_relief_ratio(i) .GT. 1.0_wp ) ) THEN
+             ! Preserve the existing direct reconstruction in dynamic shallow
+             ! flow, including the excavation/uphill-flux safeguard.
+             w_minus(i) = 0.0_wp
+             w_plus(i) = 0.0_wp
           END IF
-       ELSEIF ( ( hydrostatic_residual(i) .GT. hp_dynamic_residual_threshold ) .AND. &
-            ( topographic_relief_ratio(i) .GT. 1.0_wp ) ) THEN
-          ! Fully wet dynamic shallow flow over rough topography.  Suppress
-          ! eta only when the 2-D within-cell bed relief exceeds the local
-          ! thickness.  Both tests are dimensionless and direction-independent.
-          w_eta(i) = 0.0_wp
+       ELSE
+          ! Fade the eta contribution to zero at bed contact. The transition
+          ! scale is proportional to local depth, making the ramp dimensionless.
+          contact_scale = 0.05_wp * MAX(h_center(i),hp_dry_tolerance)
+          clearance_ratio = MAX(h_minus_eta(i),0.0_wp)/contact_scale
+          w_minus(i) = w_eta(i) *                                      &
+               (1.0_wp-MAX(0.0_wp,1.0_wp-clearance_ratio)**2)
+          clearance_ratio = MAX(h_plus_eta(i),0.0_wp)/contact_scale
+          w_plus(i) = w_eta(i) *                                       &
+               (1.0_wp-MAX(0.0_wp,1.0_wp-clearance_ratio)**2)
        END IF
 
-       h_minus(i) = ( 1.0_wp-w_eta(i) ) * h_minus_orig(i)                    &
-            + w_eta(i) * h_minus_eta(i)
-       h_plus(i) = ( 1.0_wp-w_eta(i) ) * h_plus_orig(i)                      &
-            + w_eta(i) * h_plus_eta(i)
+       ! TEMPORARY DIAGNOSTIC: reduce the adaptive HP blend by a common factor
+       ! for wet cells, retaining the dry-state and dynamic-flow safeguards.
+       IF ( h_center(i) .GT. hp_dry_tolerance ) THEN
+          w_minus(i) = diagnostic_blend_scale * w_minus(i)
+          w_plus(i) = diagnostic_blend_scale * w_plus(i)
+       END IF
+
+       ! Depth is reconstructed only from eta and the unique bed value at
+       ! each face; do not blend it with the direct h reconstruction.
+       h_minus(i) = h_minus_eta(i)
+       h_plus(i) = h_plus_eta(i)
 
        IF ( ABS( B_plus(i)-B_minus(i) ) .GT. hp_bed_step_tolerance ) THEN
-          momentum_weight = w_eta(i)
+          momentum_weight = w_minus(i)
        ELSE
           momentum_weight = 0.0_wp
        END IF
-
        hu_minus(i) = ( 1.0_wp-momentum_weight ) * hu_minus_direct(i)         &
             + momentum_weight * h_minus_eta(i) * u_minus_candidate(i)
+
+       IF ( ABS( B_plus(i)-B_minus(i) ) .GT. hp_bed_step_tolerance ) THEN
+          momentum_weight = w_plus(i)
+       ELSE
+          momentum_weight = 0.0_wp
+       END IF
        hu_plus(i) = ( 1.0_wp-momentum_weight ) * hu_plus_direct(i)           &
             + momentum_weight * h_plus_eta(i) * u_plus_candidate(i)
 

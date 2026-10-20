@@ -19,3 +19,14 @@ plume_mom.doxy
 /src/Makefile
 /src/Makefile.in
 /test-driver
+/build-local/
+
+# Local build products and Python diagnostic caches.
+/src/IMEX_SfloW2D
+/src/**/*.o
+/src/**/*.mod
+/src/**/*.smod
+/src/**/.deps/
+/src/**/.dirstamp
+/src/**/__pycache__/
+/src/**/*.py[cod]

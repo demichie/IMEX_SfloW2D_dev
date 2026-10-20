@@ -250,7 +250,7 @@ CONTAINS
   !> \param[in] Z Coordinates of the three-point limiter stencil.
   !> \param[in] equation_partition Explicit/implicit equation mask and compact index maps.
   !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
-  !> \param[in,out] spatial_operator Spatial operator and its persistent reconstruction/HP-PCCU
+  !> \param[in,out] spatial_operator Spatial operator and its persistent reconstruction/KT-PYTHON
   !>                                 workspaces.
   !> \param[in] observer Optional thread-safe read-only stage audit callback. When absent,
   !>                    no diagnostic storage is allocated and no callbacks are made.
@@ -266,8 +266,9 @@ CONTAINS
     USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms
 
     USE state_conversion_2d, ONLY : qc_to_qp, primitive_to_volume_fractions, &
-         project_dry_cell_momenta
-    USE parameters_2d, ONLY : dry_thickness_tolerance, idx_u, idx_v
+         project_dry_cell_momenta, clip_roundoff_negative_component_masses
+    USE parameters_2d, ONLY : dry_thickness_tolerance, idx_u, idx_v,         &
+         idx_solid_first, idx_solid_last
 
     USE equation_terms_2d, ONLY : eval_expl_terms
 
@@ -300,6 +301,7 @@ CONTAINS
 
     REAL(wp) :: a_diag
     REAL(wp) :: p_dyn
+    CHARACTER(LEN=128) :: closure_context
 
     REAL(wp) :: alpha_s
     REAL(wp) :: alphas_local(n_solid), alphag_local(n_add_gas), alphal_local
@@ -401,6 +403,7 @@ CONTAINS
        !$OMP PARALLEL 
        !$OMP DO schedule(guided)                                                &
        !$OMP & private(j,k,q_guess,q_si,q_fv_cell,Rj_not_impl,p_dyn,           &
+       !$OMP & closure_context,                                                &
        !$OMP & newton_iterations,newton_linear_info,newton_converged,          &
        !$OMP & newton_line_search_failed,implicit_status)
 
@@ -443,14 +446,19 @@ CONTAINS
           ! map an inadmissible conservative state to a dry primitive state.
           IF ( PRESENT(observer) ) CALL observer(1, i_RK, j, k, q_fv_cell, 0)
 
-          CALL qc_to_qp(q_fv_cell , qp(1:n_vars+2,j,k) , p_dyn )
+          WRITE(closure_context,'(A,I0,A,I0,A,I0)')                           &
+               'IMEX finite-volume stage=',i_RK,' cell=',j,',',k
+          CALL clip_roundoff_negative_component_masses(q_fv_cell)
+          CALL qc_to_qp(q_fv_cell , qp(1:n_vars+2,j,k) , p_dyn,               &
+               TRIM(closure_context) )
 
           IF ( verbose_level .GE. 2 ) THEN
 
              WRITE(*,*) 'q_guess',q_guess
              IF ( q_guess(1) .GT. 0.0_wp  ) THEN 
 
-                CALL qc_to_qp( q_guess , qp(1:n_vars+2,j,k) , p_dyn )
+                CALL qc_to_qp( q_guess , qp(1:n_vars+2,j,k) , p_dyn,         &
+                     TRIM(closure_context)//' q_guess' )
                 WRITE(*,*) 'q_guess: qp',qp(1:n_vars+2,j,k)
 
              END IF
@@ -635,7 +643,8 @@ CONTAINS
 
              IF ( q_guess(1) .GT. 0.0_wp ) THEN
 
-                CALL qc_to_qp( q_guess , qp(1:n_vars+2,j,k) , p_dyn )
+                CALL qc_to_qp( q_guess , qp(1:n_vars+2,j,k) , p_dyn,         &
+                     TRIM(closure_context)//' stage output' )
                 WRITE(*,*) 'imex_RK_solver: qp',qp(1:n_vars+2,j,k)
 
              END IF
@@ -650,7 +659,8 @@ CONTAINS
              IF ( this%q_rk(1,j,k) .GT. 0.0_wp ) THEN
 
                 CALL qc_to_qp( this%q_rk(1:n_vars,j,k) ,                             &
-                     this%qp_rk(1:n_vars+2,j,k) , p_dyn )
+                     this%qp_rk(1:n_vars+2,j,k) , p_dyn,                     &
+                     TRIM(closure_context)//' explicit stage state' )
 
              ELSE
 
@@ -679,7 +689,7 @@ CONTAINS
        IF ( need_explicit_stage ) THEN
 
           ! Evaluate the complete explicit spatial term. The time integrator
-          ! is independent of the HP-PCCU backend and its internal workspaces.
+          ! is independent of the KT-PYTHON flux workspace.
           CALL spatial_operator%evaluate( this%qp_rk,                       &
                this%spatial_terms(:,:,:,i_RK), t, domain )
 
@@ -706,20 +716,6 @@ CONTAINS
             this%omega )
 
 
-       IF ( verbose_level .GE. 1 ) THEN
-
-          WRITE(*,*) 'cell jk =',j,k
-          WRITE(*,*) 'before imex_RK_solver: qc',q_old_cell
-
-          IF ( q_old_cell(1) .GT. 0.0_wp ) THEN
-
-             CALL qc_to_qp(q_old_cell , qp(1:n_vars+2,j,k) , p_dyn )
-             WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
- 
-          END IF
-
-       END IF
-
        IF ( ( SUM(ABS( this%omega_tilde(:)-this%a_tilde_ij(n_RK,:))) .EQ. 0.0_wp  )       &
             .AND. ( SUM(ABS(this%omega(:)-this%a_dirk_ij(n_RK,:))) .EQ. 0.0_wp ) ) THEN
 
@@ -738,21 +734,11 @@ CONTAINS
        IF ( PRESENT(observer) ) CALL observer(3, 0, j, k, q(:,j,k), 0)
 
        IF ( ANY(ISNAN(q(:,j,k))) ) THEN
-          
-          WRITE(*,*) 'j,k,n_RK',j,k,n_RK
-          WRITE(*,*) 'dt',dt
-          WRITE(*,*) 'before imex_RK_solver: qc',q_old_cell
-          IF ( q_old_cell(1) .GT. 0.0_wp ) THEN
-
-             CALL qc_to_qp(q_old_cell , qp(1:n_vars+2,j,k) , p_dyn )
-             WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
-             
-          END IF
-          WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
-          
           CALL fatal_error('NaN detected after IMEX Runge-Kutta update')
           
        END IF
+
+       CALL clip_roundoff_negative_component_masses(q(:,j,k))
        
        
        ! negative_thickness_check:IF ( q(1,j,k) .LT. 0.0_wp ) THEN
@@ -764,28 +750,6 @@ CONTAINS
              q(2:n_vars,j,k) = 0.0_wp
 
           ELSE
-
-             WRITE(*,*) 'j,k,n_RK',j,k,n_RK
-             WRITE(*,*) 'dt',dt
-             WRITE(*,*) 'before imex_RK_solver: qc',q_old_cell
-             IF ( q_old_cell(1) .GT. 0.0_wp ) THEN
-
-                CALL qc_to_qp(q_old_cell , qp(1:n_vars+2,j,k) , p_dyn )
-                WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
-
-             END IF
-             WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
-
-             WRITE(*,*) 'spatial_terms(1,j,k,1:n_RK)',                       &
-                  this%spatial_terms(1,j,k,1:n_RK)
-             WRITE(*,*) qp(1:n_vars,j,k)
-
-             WRITE(*,*) 'expl_terms(1,j,k,1:n_RK)',this%expl_terms(1,j,k,1:n_RK)
-             WRITE(*,*) 'NH(1,j,k,1:n_RK)',this%NH(1,j,k,1:n_RK)
-             WRITE(*,*) 'SI_NH(1,j,k,1:n_RK)',this%SI_NH(1,j,k,1:n_RK)
-
-             WRITE(*,*) 'B_cent(j,k)',B_cent(j,k)
-
              CALL fatal_error('negative thickness after IMEX Runge-Kutta update')
 
           END IF
@@ -793,37 +757,7 @@ CONTAINS
        END IF negative_thickness_check
 
        negative_alpha_check:IF ( ANY(q(5:4+n_solid,j,k) .LT. 0.0_wp ) ) THEN
-
-          IF ( ANY(q(5:4+n_solid,j,k) .LE. -1.0E-7_wp ) ) THEN
-             
-             WRITE(*,*) 'WARNINIG: negative solid mass'
-             WRITE(*,*) 'j,k,n_RK',j,k,n_RK
-             WRITE(*,*) 'dt',dt
-             WRITE(*,*) 'before imex_RK_solver: qc',q_old_cell
-             IF ( q_old_cell(1) .GT. 0.0_wp ) THEN
-
-                CALL qc_to_qp(q_old_cell , qp(1:n_vars+2,j,k) , p_dyn )
-                WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
-                
-             END IF
-             WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
-
-             WRITE(*,*) 'spatial mass terms',                               &
-                  this%spatial_terms(1,j,k,1:n_RK)
-             WRITE(*,*) 'spatial solid-mass terms',                         &
-                  this%spatial_terms(5,j,k,1:n_RK)
-             
-
-             CALL fatal_error('negative solid mass after IMEX Runge-Kutta update')
-
-          ELSE
-
-             WHERE ( ( q(5:4+n_solid,j,k) .LT. 0.0_wp ) .AND.                 &
-                  ( q(5:4+n_solid,j,k) .GT. -1.0E-7_wp ) )                   &
-                  q(5:4+n_solid,j,k) = 0.0_wp
-
-          END IF
-             
+          CALL fatal_error('negative solid mass after IMEX Runge-Kutta update')
        END IF negative_alpha_check
 
        CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
@@ -891,19 +825,6 @@ CONTAINS
           
        
        IF ( qp(4,j,k) .LT. 273.0_wp ) THEN
-          
-          WRITE(*,*) 'temperature check'
-          WRITE(*,*) j,k
-          WRITE(*,*) 'qp new',qp(1:n_vars+2,j,k)
-          WRITE(*,*) 'qc new',q(1:n_vars,j,k)
-
-          CALL qc_to_qp(q_old_cell , qp(1:n_vars+2,j,k) , p_dyn )
-          WRITE(*,*) j,k
-          WRITE(*,*) 'qp old',qp(1:n_vars+2,j,k)
-          WRITE(*,*) 'qc old',q_old_cell
-
-          WRITE(*,*) 'spatial thermal-energy terms',                        &
-               this%spatial_terms(4,j,k,1:n_RK)
           CALL fatal_error('temperature below the admissible threshold')
 
        END IF
@@ -927,49 +848,7 @@ CONTAINS
                   / SUM(q(5:4+n_solid,j,k)) * q(1,j,k)
 
           ELSE
-
-             WRITE(*,*) 'WARNING:SUM(qsolid)>q1',SUM(q(5:4+n_solid,j,k))-q(1,j,k)
-             
-             WRITE(*,*) 'j,k,n_RK',j,k,n_RK
-             WRITE(*,*) 'dt',dt
-             WRITE(*,*) ' B_cent(j,k)', B_cent(j,k)
-             WRITE(*,*) 'before imex_RK_solver: qc',q_old_cell
-             IF ( q_old_cell(1) .GT. 0.0_wp ) THEN
-
-                CALL qc_to_qp(q_old_cell , qp(1:n_vars+2,j,k) , p_dyn )
-                WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
-
-             END IF
-             WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
-             
-             IF ( q(1,j,k) .GT. 0.0_wp ) THEN
-
-                CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-                WRITE(*,*) 'after imex_RK_solver: qp',qp(1:n_vars+2,j,k)
-
-             END IF
-
-             WRITE(*,*) 'spatial_terms(1)',                                 &
-                  this%spatial_terms(1,j,k,1:n_RK)
-             WRITE(*,*) 'expl_terms(1)', this%expl_terms(1,j,k,1:n_RK)
-             WRITE(*,*) 'NH(1)', this%NH(1,j,k,1:n_RK)
-             WRITE(*,*) 'SI(1)', this%SI_NH(1,j,k,1:n_RK)
-
-             WRITE(*,*) 'spatial_terms(5)',                                 &
-                  this%spatial_terms(5,j,k,1:n_RK)
-             WRITE(*,*) 'expl_terms(5)', this%expl_terms(5,j,k,1:n_RK)
-             WRITE(*,*) 'NH(5)', this%NH(5,j,k,1:n_RK)
-             WRITE(*,*) 'SI(5)', this%SI_NH(5,j,k,1:n_RK)
-             
-
              CALL fatal_error('solid mass exceeds total mass after IMEX update')
-
-          END IF
-
-          IF ( verbose_level .GE. 1 ) THEN
-
-             WRITE(*,*) 'h new',q(1,j,k) 
-             CALL debug_pause('solid-mass roundoff correction applied')
 
           END IF
 

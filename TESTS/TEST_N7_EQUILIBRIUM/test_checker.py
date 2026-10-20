@@ -27,8 +27,8 @@ class CheckerTests(unittest.TestCase):
         statistics[:, 11] = (0.01, 0.02)
         statistics[:, 12:] = (300, 0, 1)
         fields = {"statistics": statistics, "active": np.ones((1, 8)),
-                  "known": np.tile(initial, (3, 1, 1, 1)),
-                  "solved": np.tile(initial, (3, 1, 1, 1)), "raw_final": initial.copy()}
+                  "known": np.tile(initial, (2, 1, 1, 1)),
+                  "solved": np.tile(initial, (2, 1, 1, 1)), "raw_final": initial.copy()}
         checker.validate(fields, initial, 2)
         for column, value in ((2, -0.1), (5, 1e4), (6, 1), (8, 1), (12, 200), (14, -1)):
             bad = {key: value.copy() for key, value in fields.items()}

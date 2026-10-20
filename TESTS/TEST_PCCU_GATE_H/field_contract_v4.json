@@ -1,0 +1,47 @@
+{
+  "schema_version": 4,
+  "package": "KT-PYTHON Gate-H",
+  "grids": [
+    0.4,
+    0.2,
+    0.1
+  ],
+  "modes": [
+    "g1",
+    "slope_curvature"
+  ],
+  "time": 0.1,
+  "current_IMEX": {
+    "n_RK": 2,
+    "dt0": 0.0001,
+    "max_dt": 0.02,
+    "growth": "min(CFL directional minimum, max_dt, remaining time, 1.1*(dt_old+dt_old_old)/2)",
+    "roundoff_epsilon_multiplier": 32768,
+    "field_limit": "32768 * float64_epsilon * accepted_steps * max(1, initial_h_max)",
+    "ambient_density": "101300 / (287.051 * 300)",
+    "eps_sing": 1e-10,
+    "comparison_times": "Independent trajectory from common initial fields using actual accepted dt, captured by an observational main whose final canonical output must be byte-identical to the uninstrumented solver",
+    "KT_TRACE_RECONSTRUCTION": "froude_blend",
+    "conservative_scales": "M0=max(1,max initial mass); momentum=M0*sqrt(g*max(1,max initial depth)); same per-step roundoff multiplier"
+  },
+  "historical_SSPRK2": {
+    "maximum_normalized_L1_h": 0.0002,
+    "maximum_normalized_L1_eta": 0.0001,
+    "maximum_Linf_m": 0.003,
+    "user_approved": "2026-10-10, explicit reply before execution",
+    "rho_a": 0,
+    "eps_sing": 1e-10,
+    "dt_cap": 0.02,
+    "policy": "Unchanged clean step_ssprk2_2d, harmonic directional CFL and stage retry policy; not the production IMEX assembly"
+  },
+  "reference_package": "Independent NumPy KT-PYTHON operator matching current Fortran",
+  "reference_core_sha256": {
+    "hp_pccu_1d_core.py": "ffcb695ff8d8d2bd06e433d70b2a519c0b0012d959eb664b617deea83e8f64e2",
+    "hp_pccu_2d_core.py": "c63331366cadf9f04d802a3f058088b9c175399b2d6dc7015068a0ad110f1577",
+    "kt_python_2d_core.py": "9114dcab57c32f6be8b4dd66fc21ec0b47c23b2c7b2c507d12c279a90ea699bb"
+  },
+  "historical_policy": "HP-PCCU/SSPRK2 archives are historical evidence, not an acceptance oracle for the new KT scheme.",
+  "analytic_invariants": "Keep nonnegativity, uphill leakage, symmetry and the 5e-10 mass-budget threshold. Include independently integrated open-boundary mass transport.",
+  "scope": "Isothermal liquid with optional one-solid closure; Gate-H has pure liquid, no rheology or sources.",
+  "created": "2026-10-20"
+}

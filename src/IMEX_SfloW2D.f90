@@ -6,8 +6,8 @@
 !> The model is discretized in time with an explicit-implicit Runge-Kutta
 !> method where the hyperbolic part is solved explicetely and the other
 !> terms (relaxation and surce) are treated implicitely.\n
-!> The hyperbolic part uses the hydrostatic-path, path-conservative
-!> central-upwind (HP-PCCU) finite-volume operator; it does not require the
+!> The hyperbolic part uses the KT-PYTHON hydrostatic-path, path-conservative
+!> central-upwind finite-volume operator; it does not require the
 !> complete eigenstructure of the model.\n
 !> The implicit part is solved with a Newton-Raphson method where the
 !> elements of the Jacobian of the nonlinear system are evaluated
@@ -255,23 +255,6 @@ PROGRAM IMEX_SfloW2D
 
    END IF
 
-   IF ( verbose_level .GE. 1 ) THEN
-
-      WRITE(*,*) 'Min q(1,:,:)=',MINVAL(simulation%state%q(1,:,:))
-      WRITE(*,*) 'Max q(1,:,:)=',MAXVAL(simulation%state%q(1,:,:))
-
-      WRITE(*,*) 'Min B(:,:)=',MINVAL(B_cent(:,:))
-      WRITE(*,*) 'Max B(:,:)=',MAXVAL(B_cent(:,:))
-
-
-      WRITE(*,*) 'size B_cent',size(B_cent,1),size(B_cent,2)
-
-      WRITE(*,*) 'SUM(q(1,:,:)=',SUM(simulation%state%q(1,:,:))
-      WRITE(*,*) 'SUM(B_cent(:,:)=',SUM(B_cent(:,:))
-
-   END IF
-
-
    IF ( is_binary_restart ) THEN
       ! The current step and its history were restored by read_restart_file.
       WRITE(*,*) 'Restarting with saved timestep dt =', simulation%runtime%dt
@@ -418,13 +401,6 @@ PROGRAM IMEX_SfloW2D
 
          CALL simulation%domain%check_solve(simulation%state%q,               &
               simulation%runtime%t, .FALSE.)
-
-      END IF
-
-      IF ( verbose_level .GE. 1 ) THEN
-
-         WRITE(*,*) 'cells to solve and reconstruct:' ,                       &
-              COUNT(simulation%domain%solve_mask)
 
       END IF
 

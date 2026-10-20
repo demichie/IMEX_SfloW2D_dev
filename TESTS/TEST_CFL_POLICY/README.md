@@ -1,8 +1,8 @@
 # CFL policy and accepted timestep tests
 
 This production test verifies `directional_min` (including omission) and
-`combined` on the same Q1 excavation. It covers `N_RK=2,3,4`, the prescribed
-`CFL=-1` sentinel, unchanged 2D CFL limits and invalid policy names. It does
+`combined` on the same Q1 excavation. It covers `N_RK=2`, the prescribed
+`KT_TRACE_RECONSTRUCTION='froude_blend'`, the `CFL=-1` sentinel, unchanged 2D CFL limits and invalid policy names. It does
 not approve an N9 scientific baseline or establish universal IMEX stability.
 
 The temporal fixture adds eight dry cells per side to avoid treating open-boundary

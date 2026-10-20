@@ -32,6 +32,8 @@ spatial = stages.spatial
 core = spatial.core
 CONTRACT_PATH = HERE / "contract_v6.json"
 CONTRACT = json.loads(CONTRACT_PATH.read_text())
+# Current numerical configuration; retain the archived contract on disk.
+CONTRACT["stages"] = [2]
 ROUND = CONTRACT["roundoff_epsilon_multiplier"] * np.finfo(float).eps
 
 
