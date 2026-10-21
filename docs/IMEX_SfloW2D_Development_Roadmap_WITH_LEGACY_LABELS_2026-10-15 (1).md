@@ -1906,10 +1906,21 @@ Non è stato introdotto un fallback ANALYTIC per modelli non supportati: in
 questa tranche tutti i modelli attivi hanno una formula chiusa quando le
 variabili non-velocità sono esplicite.
 
-I solutori non sono ancora richiamati da `time_integration_2d`/Newton e non
-aggiungono dispatch per gruppi; questa integrazione resta un'attività D13
-successiva, dopo D10–D12. I gruppi accoppiati diversi dalla coppia di momenti
-non ricevono una soluzione analitica generica.
+I solutori analitici di velocità non sono ancora richiamati da
+`time_integration_2d`/Newton e non aggiungono dispatch per gruppi; questa
+integrazione resta un'attività D13 successiva, dopo D10–D12. I gruppi
+accoppiati diversi dalla coppia di momenti non ricevono una soluzione
+analitica generica.
+
+#### Raffreddamento della lava
+
+È stata aggiunta in `thermal_sources_2d` la routine
+`advance_lava_cooling_temperature`, che avanza l’ODE scalare a capacità termica
+areale e coefficienti fissati. Per radiazione e convezione usa la primitiva
+analitica tempo-temperatura con inversione scalare; per la sola convezione usa
+la soluzione esponenziale chiusa. La routine è autonoma e non è richiamata da
+`equation_terms_2d`, dal solver Newton o da `time_integration_2d`: l’attuale
+trattamento implicito e lo schema IMEX restano invariati.
 
 #### Contratto delle soluzioni di stage
 

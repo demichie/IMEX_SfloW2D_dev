@@ -111,7 +111,8 @@ rheology/rheology_empirical_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           rheology/rheology_analytic_utils_2d.$(OBJEXT)
 rheology/rheology_quadratic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)        \
                                           rheology/rheology_analytic_utils_2d.$(OBJEXT)
-physics/thermal_sources_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+physics/thermal_sources_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)           \
+                                      core/diagnostics_2d.$(OBJEXT)
 physics/pore_pressure_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                     core/constitutive_parameters_2d.$(OBJEXT) \
                                     core/complexify.$(OBJEXT)                 \
