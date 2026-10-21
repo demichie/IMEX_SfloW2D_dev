@@ -185,7 +185,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D02 | M12e-B        | Caratterizzazione numerica cell-local                       | COMPLETATO (gate locale GNU/macOS) |
 | D03 | —             | Audit e ownership di parametri, variabili e stato condiviso | IN PAUSA |
 | D04 | P2            | Eliminazione reologia 8                                     | COMPLETATO |
-| D05 | P3            | Estrazione moduli reologici e selezione testuale            | IN CORSO |
+| D05 | P3            | Estrazione moduli reologici e selezione testuale            | COMPLETATO |
 | D06 | P3            | Sorgenti termiche e pore pressure                           | DA FARE  |
 | D07 | —             | Migrazione progressiva dei parametri non reologici          | DA FARE  |
 | D08 | P4            | RHEOLOGY_MODEL da numeri a stringhe                         | ASSORBITO IN D05 |
@@ -1496,7 +1496,7 @@ Validazione D04:
 
 Prerequisiti: D04 completato e sotto-audit mirato dei parametri e delle interfacce reologiche da estrarre. La chiusura dell'audit generale D03 non è richiesta. Durante l’estrazione dei moduli reologici, trasferire agli owner di legge mu/xi, parametri lava, lahar, plastic, quadratic, Froude, Lucas e mu(I); non trascinare proprietà fisiche non reologiche in un generico modulo reologico. Registrare read/write e mantenere la numerica REAL/COMPLEX. La selezione testuale descritta in D08 è inclusa in D05: l’input usa i nomi canonici e il dispatcher risolve il nome una sola volta all’inizializzazione. I vecchi ID numerici sono respinti esplicitamente.
 
-Stato ufficiale: IN CORSO
+Stato ufficiale: COMPLETATO
 
 Regola di struttura: un modello reologico per file e per modulo. Tutti i
 contributi di una legge devono risiedere nel suo modulo, anche quando oggi
@@ -1559,9 +1559,35 @@ moduli; `xi`, `T_ref` e i coefficienti già condivisi restano nel modulo
 parametri, che non contiene kernel. I consumer di setup, diagnostica e rumore
 stocastico restano nei rispettivi percorsi generali, ma leggono gli owner
 espliciti. La caratterizzazione passa 255/255 fixture in strict e optimized,
-il parser passa 32/32 casi e la build strict-debug completa è riuscita.
-D05 resta IN CORSO in attesa della verifica finale di traiettoria pre/post
-prevista dal criterio T3.
+il parser passa 32/32 casi e la build completa passa in strict-debug e
+optimized.
+
+Esito T2/T3 — confronto pre/post tra baseline `379301f1` e candidato
+`664c82bc`, con GNU Fortran 15.2 e la fixture dinamica
+`TESTS/TEST_DAMBREAK/TEST_STEP_FINH`. È stato eseguito un caso per ciascuno dei
+dieci modelli attivi, con output a 0, 0.005 e 0.01 s; per Lahar sono state
+impostate la fase liquida e `SED_VOL_PERC=50`. Tutti i run hanno raggiunto la
+fine e prodotto stati finiti e dinamici. In strict (`-O0`, controlli runtime,
+un thread), i 30 snapshot confrontati sono byte-identici. In optimized
+(`-Ofast`), sia a uno sia a quattro thread, la massima norma `Linf` per campo,
+normalizzata con `max(1, Linf(baseline))` e presa su snapshot e variabili di
+stato, resta sotto la soglia `1e-10` per ogni modello:
+
+| Modello | Strict, 1 thread | Massima norma normalizzata optimized, 1/4 thread |
+|---------|------------------|---------------------------------------------------|
+| `voellmy` | identico | 5.751e-13 |
+| `plastic` | identico | 0 |
+| `lava` | identico | 1.724e-20 |
+| `lahar` | identico | 0 |
+| `empirical` | identico | 0 |
+| `quadratic` | identico | 0 |
+| `froude` | identico | 0 |
+| `lucas` | identico | 0 |
+| `mui` | identico | 0 |
+| `mui_voellmy` | identico | 3.553e-17 |
+
+Il gate T3 non rileva cambiamenti di traiettoria oltre la tolleranza stabilita;
+D05 è completato. D06 resta il prossimo step.
 
 I moduli spaziali HP-PCCU, le conversioni di stato e la geometria dovrebbero richiedere prevalentemente aggiornamenti dei percorsi e delle dipendenze, non modifiche degli algoritmi.
 
