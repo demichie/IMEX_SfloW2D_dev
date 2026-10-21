@@ -1,0 +1,2864 @@
+{
+  "schema_version": 1,
+  "milestone": "D02",
+  "date": "2026-10-21",
+  "baseline_commit": "5aee5d9eca04a01092401c5135f3735af86cc56e",
+  "status": "IMPLEMENTED_GATE_OPEN",
+  "scientific_acceptance": "NOT_ACCEPTED",
+  "production_sources_changed": false,
+  "report": "D02_CELL_LOCAL_CHARACTERIZATION_2026_10_21.md",
+  "reproduction": "TESTS/TEST_RHEOLOGY_CELL_LOCAL/README.md",
+  "profiles": {
+    "strict": {
+      "toolchain": "GNU Fortran (Homebrew GCC 15.2.0) 15.2.0",
+      "total": 249,
+      "passed": 221,
+      "failed": 28,
+      "source_hashes": {
+        "src/IMEX_SfloW2D.f90": "36471314eda5d1bdb25b06a8c1796a7bf6f3cd37964ecb1a0dcc08dc3781545a",
+        "src/core/complexify.f90": "f6de6fb8f4c59be820b342cc3a8c31d45601dc850b92132cb9c7796876f985cf",
+        "src/core/constitutive_parameters_2d.f90": "bbb8fb6a5ecda75cdfbd9dbd57650bd8d22736318e5140072bc3401511a87de3",
+        "src/core/diagnostics_2d.f90": "16b8c59ac2f90b5c99e7c5cfffc337d2da0dceefaec091efe36fb8c5cb80e759",
+        "src/core/init_2d.f90": "03451193df8e652b8eccf27644564e40fb05d929c094d2ba0172a0c4372140ca",
+        "src/core/model_layout_2d.f90": "ab60e9de67fc2d5fbc3d15d5536ceaa22f859ed3ec0e76652ad7a5e43a352cce",
+        "src/core/parameters_2d.f90": "980f336c0df8c655185d657ae191868ae37aedb98f5de5a557ad98c83d25b4f1",
+        "src/core/runtime_2d.f90": "3a514f259373a68fc764502fbdb9911c3a965bbf387763ba5acaa7e3279550d0",
+        "src/core/simulation_2d.f90": "0ed05c045960933096f8cdd4fe5267d0919ab5621ddf5093a33b0363dc0a59b9",
+        "src/geometry/domain_2d.f90": "6afd4e62d52dbd23ec429514dfb33ab3f8988887a88150197bd55f6a66bf6a5f",
+        "src/geometry/geometry_2d.f90": "befc1a4721e346bbdc871acaa89a468acb2e3823255621f1a155c2698d2f448d",
+        "src/io/inpout_2d.f90": "aa9e8107211e79e7b03f2e37d730beafaba393827ddbfd66fe2c890e5524a86f",
+        "src/io/output_dirs.c": "3613c329cb955256e4b57993a562b623ea981370fc5f1b5ecd1ddd03b39297c3",
+        "src/io/output_paths.f90": "c0688925c8e6468106d9bc202d11eca66ad1e13ff3956e8d8a2aaadec142a160",
+        "src/numerics/equation_metadata_2d.f90": "1dbcece9f777f6e742980924937413e74a5cb4fc431c856dc12a47b76ca9154e",
+        "src/numerics/lapack_interfaces_2d.f90": "2891985b5e521538e6871568aa8b708fdf01455b1908c7805cf2b6cfd3b5d952",
+        "src/numerics/nonlinear_solver_2d.f90": "0e00e83fc78e7317112d8ce34557a99ea31d1daecf6a933e17524b244a50c84a",
+        "src/numerics/time_integration_2d.f90": "d84cd0e9cb89d46dca849181c13c785e22eabd6ffe5574abb5f8269c4bcf7043",
+        "src/physics/equation_terms_2d.f90": "5c69e5b2150d2f011a362ebafd14df4d8d252f43932af927f58aa1c1bdf4bded",
+        "src/physics/mass_exchange_2d.f90": "c2cd9807cc7d5d22da2ce9dbbfb20aa82f808a51adddd48baacf856b30daf40c",
+        "src/python_diagnostics/kt_ritter_1d.f90": "3f7927adc6e42e014153cf72eb2c63f8787aafd3a5cb72eecf567c98e6cad52d",
+        "src/spatial/hp_reconstruction_2d.f90": "6de1a37572d5fffa55f1aa58b197b3824c087969c083c5137c6712fb021b81e0",
+        "src/spatial/hyperbolic_2d.f90": "a93bae6a4d51e322b095ce8e5b794ee37b4cd69dba03be979caf38e703f578a2",
+        "src/spatial/nonconservative_2d.f90": "44f659c71d192e3e285cd8fb962f66ca11dd383d3a5a9a2c24e9b7aef97d691e",
+        "src/spatial/pccu_2d.f90": "2d037f0ad8a48f31eb00ac3645f04ad554408ba749bec9875b8b01b393affc59",
+        "src/spatial/reconstruction_2d.f90": "a9c40d37fe5f10f2594ba1f72b7c4f9d41cfa0f72740bc33ee90c7e38be3a934",
+        "src/spatial/spatial_operator_2d.f90": "e2dc9486d3aa3284be331f058f767faee8576588e17290ec4e257e57a8507b0d",
+        "src/state/mixture_from_mass.inc": "da6131a86aa691dc043a77e2d3f50ed2f753d077590c081e7ee97d5bd4b20a5d",
+        "src/state/mixture_heat_capacity.inc": "c112e1dc64aebba6e282b1fc220377abe229948062da8168b563b382822ea1aa",
+        "src/state/state_2d.f90": "cdb80ac4b5357a25f36f28555e595764127e234096c67cedeb4585fa2881ccda",
+        "src/state/state_conversion_2d.f90": "1ef070d4a5bb27465296109153607d130547665e1d22f2d0cf9c1ff3c4505ade",
+        "src/state/state_conversion_phys_var.inc": "d9f63dcbe2ceb3b62131c01dbda1da2ffbaa793a7604382d3dad4ca450bc1729",
+        "src/state/velocity_from_conservative.inc": "552515c233b09171e4965e9f1866dfeedb5f37c1dce195ba02f18bcc7cd5671a",
+        "src/stochastic/stochastic_module.f90": "77090048c7cb80fa9f00d1e429326bc9c2c97af21fc31be2b007a1870f29663b",
+        "src/stochastic/stochastic_random_2d.f90": "39066c274a98949e1a5f636c763ee3b7572379dbea7951ef72b11448035beb00",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/characterize.py": "8bdd6a657a9fb0087e8737741290fe69416198bba5253f8347fa92571f94caf4",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/check_inputs.py": "57b52b35b1cd5aa741e618e9408afe384ebc67cf1dd6063b9ee8a90f74454c0d",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/check_stages.py": "60a9755de8476e03a7f68f3a42584b9316093eb54d2afd62134aa223b611b337",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/probe_sources.f90": "fe2882aa3a8d0f5d8b16d3d4d5b664a56784a69892d368c583d5f682a974c5d3",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/run_test.sh": "5d5f53eadadf60cba0712bb9a421d21126ca381420ae26e4848cba6ca6f503fa"
+      },
+      "tolerances": {
+        "values": 2e-10,
+        "derivatives": 3e-05,
+        "stage_residual": "production 1e-5 + 1e-5*initial residual",
+        "quadratic_stage_relative": 1e-05
+      },
+      "finding_counts": {
+        "configured ambient temperature overwritten": 1,
+        "complex-step versus finite-difference discrepancy": 20,
+        "Newton stage residual or convergence": 3,
+        "hazard probe: initialization or singular coefficient evaluation": 4
+      },
+      "failing_fixtures": [
+        {
+          "name": "ambient-overwrite",
+          "findings": [
+            "configured ambient temperature overwritten"
+          ]
+        },
+        {
+          "name": "pore-1-STATIC-0-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-STATIC-0-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-STATIC-1-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-STATIC-1-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-DYNAMIC-0-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-DYNAMIC-0-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-DYNAMIC-1-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-DYNAMIC-1-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-OFF-1-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-OFF-1-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-STEP-1-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-STEP-1-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-STATIC-0-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-STATIC-0-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-STATIC-1-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-STATIC-1-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-DYNAMIC-0-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-DYNAMIC-0-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-DYNAMIC-1-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-DYNAMIC-1-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "newton-4",
+          "findings": [
+            "Newton stage residual or convergence"
+          ]
+        },
+        {
+          "name": "newton-6",
+          "findings": [
+            "Newton stage residual or convergence"
+          ]
+        },
+        {
+          "name": "newton-pore",
+          "findings": [
+            "Newton stage residual or convergence"
+          ]
+        },
+        {
+          "name": "pore-only",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        },
+        {
+          "name": "dry-dynamic-pore",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        },
+        {
+          "name": "zero-solids-dynamic-pore",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        },
+        {
+          "name": "zero-solids-mono-pore",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        }
+      ],
+      "failing_derivative_columns": [
+        {
+          "fixture": "pore-1-STATIC-0-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.249285815335225
+        },
+        {
+          "fixture": "pore-1-STATIC-0-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 1.0660061512894108
+        },
+        {
+          "fixture": "pore-1-STATIC-0-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2491795364951361
+        },
+        {
+          "fixture": "pore-1-STATIC-0-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.2492210794503107
+        },
+        {
+          "fixture": "pore-1-STATIC-0-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.7946363985666176
+        },
+        {
+          "fixture": "pore-1-STATIC-0-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2491727761123805
+        },
+        {
+          "fixture": "pore-1-STATIC-1-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8685588442825821
+        },
+        {
+          "fixture": "pore-1-STATIC-1-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.7758217665756991
+        },
+        {
+          "fixture": "pore-1-STATIC-1-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8685074714763682
+        },
+        {
+          "fixture": "pore-1-STATIC-1-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8685275527856469
+        },
+        {
+          "fixture": "pore-1-STATIC-1-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.9400139774917807
+        },
+        {
+          "fixture": "pore-1-STATIC-1-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8685042035751028
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-0-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.2777190291998322
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-0-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 1.0723244859231094
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-0-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2776012648982316
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-0-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.2776452686694988
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-0-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 1.4549393326108062
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-0-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.277593562065991
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-1-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8584776467188179
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-1-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.760600801495209
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-1-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8584218428194645
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-1-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8584443492650558
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-1-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.9350072149240031
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-1-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8584183654278774
+        },
+        {
+          "fixture": "pore-2-OFF-1-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 9.825113898813919e-05
+        },
+        {
+          "fixture": "pore-2-OFF-1-0",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.00024046799721445298
+        },
+        {
+          "fixture": "pore-2-OFF-1-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 9.824811425626653e-05
+        },
+        {
+          "fixture": "pore-2-OFF-1-1",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.00024047450794751463
+        },
+        {
+          "fixture": "pore-2-STEP-1-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 9.825113898813919e-05
+        },
+        {
+          "fixture": "pore-2-STEP-1-0",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.00024046799721445298
+        },
+        {
+          "fixture": "pore-2-STEP-1-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 9.824811425626653e-05
+        },
+        {
+          "fixture": "pore-2-STEP-1-1",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.00024047450794751463
+        },
+        {
+          "fixture": "pore-2-STATIC-0-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.2492875664993055
+        },
+        {
+          "fixture": "pore-2-STATIC-0-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 1.0660061516459183
+        },
+        {
+          "fixture": "pore-2-STATIC-0-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2491795587364842
+        },
+        {
+          "fixture": "pore-2-STATIC-0-0",
+          "column": 6,
+          "newton_column": false,
+          "error": 1.249143697767438
+        },
+        {
+          "fixture": "pore-2-STATIC-0-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.249219876870394
+        },
+        {
+          "fixture": "pore-2-STATIC-0-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.7946363982275413
+        },
+        {
+          "fixture": "pore-2-STATIC-0-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2491724899545171
+        },
+        {
+          "fixture": "pore-2-STATIC-0-1",
+          "column": 6,
+          "newton_column": false,
+          "error": 1.2491500923760133
+        },
+        {
+          "fixture": "pore-2-STATIC-1-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8685597163256229
+        },
+        {
+          "fixture": "pore-2-STATIC-1-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.7758217665895161
+        },
+        {
+          "fixture": "pore-2-STATIC-1-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8685092723490037
+        },
+        {
+          "fixture": "pore-2-STATIC-1-0",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.8684861141576152
+        },
+        {
+          "fixture": "pore-2-STATIC-1-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8685269970957303
+        },
+        {
+          "fixture": "pore-2-STATIC-1-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.9400139774735871
+        },
+        {
+          "fixture": "pore-2-STATIC-1-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8685058554068154
+        },
+        {
+          "fixture": "pore-2-STATIC-1-1",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.8684892053782747
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.2777210108675063
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 1.0723244859260173
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2776012482202423
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-0",
+          "column": 6,
+          "newton_column": false,
+          "error": 1.2775616586374337
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.2776438848168805
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 1.4549393326369529
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2775931939959586
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-1",
+          "column": 6,
+          "newton_column": false,
+          "error": 1.2775689447058545
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8584801695546331
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.7606008014973471
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8584288292465356
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-0",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.8584059578541501
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8584453525576498
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.9350072149233646
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8584251931784878
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-1",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.8584092473609394
+        }
+      ],
+      "representative_records": [
+        {
+          "name": "pore-2-DYNAMIC-0-1",
+          "config": {
+            "rheology_model": 3,
+            "solids": 2,
+            "gas_flag": true,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": true,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": false,
+            "sutherland_flag": true,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "DYNAMIC",
+            "derivatives": true,
+            "operation": 0,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            61.76134322044443,
+            185.2840296613333,
+            -247.04537288177772,
+            41430479.95558265,
+            43.74999999999999,
+            18.000000000000004,
+            6176.134322044443
+          ],
+          "exit_code": 0,
+          "checks": {
+            "implicit_oracle_error": 3.154529289726561e-12,
+            "si_oracle_error": 0.0,
+            "real_complex_error": 0.0,
+            "unperturbed_imaginary_max": 0.0,
+            "normalized_column_error": 4.489874961266635e-16
+          },
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ],
+          "observed_globals": {
+            "T_env_before": 300.0,
+            "T_env_after": 300.0,
+            "xi_temp": 500.0
+          },
+          "status": "FAIL",
+          "selected_derivatives": [
+            {
+              "column": 1,
+              "cs": [
+                0.0,
+                642470.4143944653,
+                -856627.2191926203,
+                536.7797337574248,
+                0.0,
+                0.0,
+                1497817.105183619
+              ],
+              "fd_last": [
+                0.0,
+                642470.4099370163,
+                -856627.213249846,
+                536.7797355906137,
+                0.0,
+                0.0,
+                -5394747.90169515
+              ],
+              "fd_errors": [
+                1.2808108705729429,
+                1.2776749029451295,
+                1.2776438848168805,
+                1.2776435771378625
+              ],
+              "error": 1.2776438848168805,
+              "newton_column": false
+            },
+            {
+              "column": 4,
+              "cs": [
+                0.0,
+                0.0005867150229447353,
+                -0.000782286697259647,
+                -0.0007630131254547619,
+                0.0,
+                0.0,
+                0.000590186871499351
+              ],
+              "fd_last": [
+                0.0,
+                0.0005867150196152486,
+                -0.000782286693552075,
+                -0.0007630131237588386,
+                0.0,
+                0.0,
+                -0.00129728696917244
+              ],
+              "fd_errors": [
+                1.454939332776293,
+                1.4549393326369529,
+                1.454939330335146,
+                1.4549393353390736
+              ],
+              "error": 1.4549393326369529,
+              "newton_column": true
+            },
+            {
+              "column": 5,
+              "cs": [
+                0.0,
+                -642710.402805599,
+                856947.2037407985,
+                -56.08146472092496,
+                0.0,
+                0.0,
+                -1498095.1586132175
+              ],
+              "fd_last": [
+                0.0,
+                -642710.4038562643,
+                856947.2051416858,
+                -56.08146810638054,
+                0.0,
+                0.0,
+                5396731.737173729
+              ],
+              "fd_errors": [
+                1.2791744769663522,
+                1.2776087652651618,
+                1.2775931939959586,
+                1.2775930380778517
+              ],
+              "error": 1.2775931939959586,
+              "newton_column": false
+            },
+            {
+              "column": 6,
+              "cs": [
+                0.0,
+                -642742.1265547421,
+                856989.5020729894,
+                50.740372842741614,
+                0.0,
+                0.0,
+                -1498141.3208809989
+              ],
+              "fd_last": [
+                0.0,
+                -642742.1193166081,
+                856989.4924221442,
+                50.74039108876603,
+                0.0,
+                0.0,
+                5397366.941098071
+              ],
+              "fd_errors": [
+                1.2778354223062578,
+                1.2775715806644186,
+                1.2775689447058545,
+                1.2775689215186485
+              ],
+              "error": 1.2775689447058545,
+              "newton_column": false
+            }
+          ]
+        },
+        {
+          "name": "ambient-overwrite",
+          "config": {
+            "rheology_model": 3,
+            "solids": 2,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": false,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": false,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": true,
+            "operation": 0,
+            "dt": 0.05,
+            "diagonal": 1.0,
+            "T_env": 350.0
+          },
+          "q": [
+            2760.0,
+            8280.0,
+            -11040.0,
+            3574000000.0,
+            1000.0,
+            360.0
+          ],
+          "exit_code": 0,
+          "checks": {
+            "implicit_oracle_error": 0.0,
+            "si_oracle_error": 0.0,
+            "real_complex_error": 0.0,
+            "unperturbed_imaginary_max": 0.0,
+            "normalized_column_error": 1.0244531135479955e-15
+          },
+          "findings": [
+            "configured ambient temperature overwritten"
+          ],
+          "observed_globals": {
+            "T_env_before": 350.0,
+            "T_env_after": 300.0,
+            "xi_temp": 500.0
+          },
+          "status": "FAIL",
+          "selected_derivatives": []
+        },
+        {
+          "name": "newton-4",
+          "config": {
+            "rheology_model": 4,
+            "solids": 2,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": false,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": false,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": true,
+            "operation": 2,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            2760.0,
+            8280.0,
+            -11040.0,
+            2144400000.0,
+            1000.0,
+            360.0
+          ],
+          "exit_code": 0,
+          "checks": {
+            "implicit_oracle_error": 1.4107247117276587e-16,
+            "si_oracle_error": 0.0,
+            "real_complex_error": 0.0,
+            "unperturbed_imaginary_max": 0.0,
+            "normalized_column_error": 3.97393560545892e-16,
+            "stage_residual_max": 0.009793429606688164,
+            "stage_residual_tolerance_ratio": 9.030359137307054
+          },
+          "findings": [
+            "Newton stage residual or convergence"
+          ],
+          "observed_globals": {
+            "T_env_before": 300.0,
+            "T_env_after": 300.0,
+            "xi_temp": 500.0
+          },
+          "status": "FAIL",
+          "selected_derivatives": []
+        },
+        {
+          "name": "newton-6",
+          "config": {
+            "rheology_model": 6,
+            "solids": 2,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": false,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": false,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": true,
+            "operation": 2,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            2760.0,
+            8280.0,
+            -11040.0,
+            2144400000.0,
+            1000.0,
+            360.0
+          ],
+          "exit_code": 0,
+          "checks": {
+            "implicit_oracle_error": 1.3730294410823191e-16,
+            "si_oracle_error": 0.0,
+            "real_complex_error": 0.0,
+            "unperturbed_imaginary_max": 0.0,
+            "normalized_column_error": 5.720956004509662e-16,
+            "stage_residual_max": 0.0005735519589009641,
+            "stage_residual_tolerance_ratio": 1.3527168842003867,
+            "quadratic_stage_oracle_error": 5.175951453939323e-08
+          },
+          "findings": [
+            "Newton stage residual or convergence"
+          ],
+          "observed_globals": {
+            "T_env_before": 300.0,
+            "T_env_after": 300.0,
+            "xi_temp": 500.0
+          },
+          "status": "FAIL",
+          "selected_derivatives": []
+        },
+        {
+          "name": "newton-pore",
+          "config": {
+            "rheology_model": 6,
+            "solids": 2,
+            "gas_flag": true,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": true,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": false,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": true,
+            "operation": 2,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            1360.9881205364918,
+            4082.9643616094754,
+            -5443.952482145967,
+            648496530.5695871,
+            1000.0,
+            360.0,
+            136098.8120536492
+          ],
+          "exit_code": 0,
+          "checks": {
+            "implicit_oracle_error": 4.2463640189591107e-16,
+            "si_oracle_error": 0.0,
+            "real_complex_error": 0.0,
+            "unperturbed_imaginary_max": 0.0,
+            "normalized_column_error": 4.681031927328171e-16,
+            "stage_residual_max": 0.00028282514563215955,
+            "stage_residual_tolerance_ratio": 1.3206981041787316
+          },
+          "findings": [
+            "Newton stage residual or convergence"
+          ],
+          "observed_globals": {
+            "T_env_before": 300.0,
+            "T_env_after": 300.0,
+            "xi_temp": 500.0
+          },
+          "status": "FAIL",
+          "selected_derivatives": []
+        },
+        {
+          "name": "pore-only",
+          "config": {
+            "rheology_model": 6,
+            "solids": 2,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": false,
+            "pore_pressure_flag": true,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": false,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": false,
+            "operation": 1,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            2760.0,
+            8280.0,
+            -11040.0,
+            3574000000.0,
+            1000.0,
+            360.0,
+            276000.0
+          ],
+          "exit_code": -4,
+          "status": "FAIL",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        },
+        {
+          "name": "dry-dynamic-pore",
+          "config": {
+            "rheology_model": 6,
+            "solids": 2,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": true,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": true,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": false,
+            "operation": 1,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            0.0,
+            0.0,
+            -0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exit_code": -4,
+          "status": "FAIL",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        },
+        {
+          "name": "zero-solids-dynamic-pore",
+          "config": {
+            "rheology_model": 6,
+            "solids": 2,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": true,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": true,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": false,
+            "operation": 1,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            2000.0,
+            6000.0,
+            -8000.0,
+            4180000000.0,
+            0.0,
+            0.0,
+            200000.0
+          ],
+          "exit_code": -4,
+          "status": "FAIL",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        },
+        {
+          "name": "zero-solids-mono-pore",
+          "config": {
+            "rheology_model": 6,
+            "solids": 1,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": true,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": true,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": false,
+            "operation": 1,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            2000.0,
+            6000.0,
+            -8000.0,
+            4180000000.0,
+            0.0,
+            200000.0
+          ],
+          "exit_code": -4,
+          "status": "FAIL",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        }
+      ],
+      "untrapped_rest_diagnostics": [],
+      "raw_results_sha256": "7838d0807293b33913972b6eb81d612198c26e1e10d976c56c5925a5aed1a854",
+      "raw_results_path": "build-local/d02/strict/results.json",
+      "maximum_value_error": 5.058057266534078e-12,
+      "maximum_normalized_column_error": 4.396909066202588e-14
+    },
+    "optimized": {
+      "toolchain": "GNU Fortran (Homebrew GCC 15.2.0) 15.2.0",
+      "total": 249,
+      "passed": 213,
+      "failed": 36,
+      "source_hashes": {
+        "src/IMEX_SfloW2D.f90": "36471314eda5d1bdb25b06a8c1796a7bf6f3cd37964ecb1a0dcc08dc3781545a",
+        "src/core/complexify.f90": "f6de6fb8f4c59be820b342cc3a8c31d45601dc850b92132cb9c7796876f985cf",
+        "src/core/constitutive_parameters_2d.f90": "bbb8fb6a5ecda75cdfbd9dbd57650bd8d22736318e5140072bc3401511a87de3",
+        "src/core/diagnostics_2d.f90": "16b8c59ac2f90b5c99e7c5cfffc337d2da0dceefaec091efe36fb8c5cb80e759",
+        "src/core/init_2d.f90": "03451193df8e652b8eccf27644564e40fb05d929c094d2ba0172a0c4372140ca",
+        "src/core/model_layout_2d.f90": "ab60e9de67fc2d5fbc3d15d5536ceaa22f859ed3ec0e76652ad7a5e43a352cce",
+        "src/core/parameters_2d.f90": "980f336c0df8c655185d657ae191868ae37aedb98f5de5a557ad98c83d25b4f1",
+        "src/core/runtime_2d.f90": "3a514f259373a68fc764502fbdb9911c3a965bbf387763ba5acaa7e3279550d0",
+        "src/core/simulation_2d.f90": "0ed05c045960933096f8cdd4fe5267d0919ab5621ddf5093a33b0363dc0a59b9",
+        "src/geometry/domain_2d.f90": "6afd4e62d52dbd23ec429514dfb33ab3f8988887a88150197bd55f6a66bf6a5f",
+        "src/geometry/geometry_2d.f90": "befc1a4721e346bbdc871acaa89a468acb2e3823255621f1a155c2698d2f448d",
+        "src/io/inpout_2d.f90": "aa9e8107211e79e7b03f2e37d730beafaba393827ddbfd66fe2c890e5524a86f",
+        "src/io/output_dirs.c": "3613c329cb955256e4b57993a562b623ea981370fc5f1b5ecd1ddd03b39297c3",
+        "src/io/output_paths.f90": "c0688925c8e6468106d9bc202d11eca66ad1e13ff3956e8d8a2aaadec142a160",
+        "src/numerics/equation_metadata_2d.f90": "1dbcece9f777f6e742980924937413e74a5cb4fc431c856dc12a47b76ca9154e",
+        "src/numerics/lapack_interfaces_2d.f90": "2891985b5e521538e6871568aa8b708fdf01455b1908c7805cf2b6cfd3b5d952",
+        "src/numerics/nonlinear_solver_2d.f90": "0e00e83fc78e7317112d8ce34557a99ea31d1daecf6a933e17524b244a50c84a",
+        "src/numerics/time_integration_2d.f90": "d84cd0e9cb89d46dca849181c13c785e22eabd6ffe5574abb5f8269c4bcf7043",
+        "src/physics/equation_terms_2d.f90": "5c69e5b2150d2f011a362ebafd14df4d8d252f43932af927f58aa1c1bdf4bded",
+        "src/physics/mass_exchange_2d.f90": "c2cd9807cc7d5d22da2ce9dbbfb20aa82f808a51adddd48baacf856b30daf40c",
+        "src/python_diagnostics/kt_ritter_1d.f90": "3f7927adc6e42e014153cf72eb2c63f8787aafd3a5cb72eecf567c98e6cad52d",
+        "src/spatial/hp_reconstruction_2d.f90": "6de1a37572d5fffa55f1aa58b197b3824c087969c083c5137c6712fb021b81e0",
+        "src/spatial/hyperbolic_2d.f90": "a93bae6a4d51e322b095ce8e5b794ee37b4cd69dba03be979caf38e703f578a2",
+        "src/spatial/nonconservative_2d.f90": "44f659c71d192e3e285cd8fb962f66ca11dd383d3a5a9a2c24e9b7aef97d691e",
+        "src/spatial/pccu_2d.f90": "2d037f0ad8a48f31eb00ac3645f04ad554408ba749bec9875b8b01b393affc59",
+        "src/spatial/reconstruction_2d.f90": "a9c40d37fe5f10f2594ba1f72b7c4f9d41cfa0f72740bc33ee90c7e38be3a934",
+        "src/spatial/spatial_operator_2d.f90": "e2dc9486d3aa3284be331f058f767faee8576588e17290ec4e257e57a8507b0d",
+        "src/state/mixture_from_mass.inc": "da6131a86aa691dc043a77e2d3f50ed2f753d077590c081e7ee97d5bd4b20a5d",
+        "src/state/mixture_heat_capacity.inc": "c112e1dc64aebba6e282b1fc220377abe229948062da8168b563b382822ea1aa",
+        "src/state/state_2d.f90": "cdb80ac4b5357a25f36f28555e595764127e234096c67cedeb4585fa2881ccda",
+        "src/state/state_conversion_2d.f90": "1ef070d4a5bb27465296109153607d130547665e1d22f2d0cf9c1ff3c4505ade",
+        "src/state/state_conversion_phys_var.inc": "d9f63dcbe2ceb3b62131c01dbda1da2ffbaa793a7604382d3dad4ca450bc1729",
+        "src/state/velocity_from_conservative.inc": "552515c233b09171e4965e9f1866dfeedb5f37c1dce195ba02f18bcc7cd5671a",
+        "src/stochastic/stochastic_module.f90": "77090048c7cb80fa9f00d1e429326bc9c2c97af21fc31be2b007a1870f29663b",
+        "src/stochastic/stochastic_random_2d.f90": "39066c274a98949e1a5f636c763ee3b7572379dbea7951ef72b11448035beb00",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/characterize.py": "8bdd6a657a9fb0087e8737741290fe69416198bba5253f8347fa92571f94caf4",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/check_inputs.py": "57b52b35b1cd5aa741e618e9408afe384ebc67cf1dd6063b9ee8a90f74454c0d",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/check_stages.py": "60a9755de8476e03a7f68f3a42584b9316093eb54d2afd62134aa223b611b337",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/probe_sources.f90": "fe2882aa3a8d0f5d8b16d3d4d5b664a56784a69892d368c583d5f682a974c5d3",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/run_test.sh": "5d5f53eadadf60cba0712bb9a421d21126ca381420ae26e4848cba6ca6f503fa"
+      },
+      "tolerances": {
+        "values": 2e-10,
+        "derivatives": 3e-05,
+        "stage_residual": "production 1e-5 + 1e-5*initial residual",
+        "quadratic_stage_relative": 1e-05
+      },
+      "finding_counts": {
+        "production source failed or did not emit a complete record": 4,
+        "configured ambient temperature overwritten": 1,
+        "complex-step versus finite-difference discrepancy": 20,
+        "Newton stage residual or convergence": 3,
+        "hazard probe: initialization or singular coefficient evaluation": 4,
+        "isolated rest source path failed": 4
+      },
+      "failing_fixtures": [
+        {
+          "name": "law-5-rest",
+          "findings": [
+            "production source failed or did not emit a complete record"
+          ]
+        },
+        {
+          "name": "law-6-rest",
+          "findings": [
+            "production source failed or did not emit a complete record"
+          ]
+        },
+        {
+          "name": "law-11-rest",
+          "findings": [
+            "production source failed or did not emit a complete record"
+          ]
+        },
+        {
+          "name": "law-12-rest",
+          "findings": [
+            "production source failed or did not emit a complete record"
+          ]
+        },
+        {
+          "name": "ambient-overwrite",
+          "findings": [
+            "configured ambient temperature overwritten"
+          ]
+        },
+        {
+          "name": "pore-1-STATIC-0-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-STATIC-0-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-STATIC-1-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-STATIC-1-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-DYNAMIC-0-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-DYNAMIC-0-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-DYNAMIC-1-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-1-DYNAMIC-1-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-OFF-1-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-OFF-1-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-STEP-1-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-STEP-1-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-STATIC-0-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-STATIC-0-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-STATIC-1-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-STATIC-1-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-DYNAMIC-0-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-DYNAMIC-0-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-DYNAMIC-1-0",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "pore-2-DYNAMIC-1-1",
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ]
+        },
+        {
+          "name": "newton-4",
+          "findings": [
+            "Newton stage residual or convergence"
+          ]
+        },
+        {
+          "name": "newton-6",
+          "findings": [
+            "Newton stage residual or convergence"
+          ]
+        },
+        {
+          "name": "newton-pore",
+          "findings": [
+            "Newton stage residual or convergence"
+          ]
+        },
+        {
+          "name": "pore-only",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        },
+        {
+          "name": "dry-dynamic-pore",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        },
+        {
+          "name": "zero-solids-dynamic-pore",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        },
+        {
+          "name": "zero-solids-mono-pore",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        },
+        {
+          "name": "rest-isolated-5-si",
+          "findings": [
+            "isolated rest source path failed"
+          ]
+        },
+        {
+          "name": "rest-isolated-6-si",
+          "findings": [
+            "isolated rest source path failed"
+          ]
+        },
+        {
+          "name": "rest-isolated-11-si",
+          "findings": [
+            "isolated rest source path failed"
+          ]
+        },
+        {
+          "name": "rest-isolated-12-si",
+          "findings": [
+            "isolated rest source path failed"
+          ]
+        }
+      ],
+      "failing_derivative_columns": [
+        {
+          "fixture": "pore-1-STATIC-0-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.2492858153355562
+        },
+        {
+          "fixture": "pore-1-STATIC-0-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 1.0660061514211152
+        },
+        {
+          "fixture": "pore-1-STATIC-0-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2491795364949791
+        },
+        {
+          "fixture": "pore-1-STATIC-0-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.2492210794506342
+        },
+        {
+          "fixture": "pore-1-STATIC-0-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.7946363982445834
+        },
+        {
+          "fixture": "pore-1-STATIC-0-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2491727761122398
+        },
+        {
+          "fixture": "pore-1-STATIC-1-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8685588442829675
+        },
+        {
+          "fixture": "pore-1-STATIC-1-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.7758217665940862
+        },
+        {
+          "fixture": "pore-1-STATIC-1-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8685074714765508
+        },
+        {
+          "fixture": "pore-1-STATIC-1-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8685275527860531
+        },
+        {
+          "fixture": "pore-1-STATIC-1-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.940013977475359
+        },
+        {
+          "fixture": "pore-1-STATIC-1-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8685042035753044
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-0-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.2777190291997376
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-0-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 1.0723244856031517
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-0-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2776012648980262
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-0-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.277645268669407
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-0-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 1.454939330128448
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-0-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2775935620658077
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-1-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.858477646726842
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-1-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.7606008014878998
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-1-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8584218428194547
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-1-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8584443492730816
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-1-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.9350072149029822
+        },
+        {
+          "fixture": "pore-1-DYNAMIC-1-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8584183654278672
+        },
+        {
+          "fixture": "pore-2-OFF-1-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 9.825113898780747e-05
+        },
+        {
+          "fixture": "pore-2-OFF-1-0",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.000240467982811823
+        },
+        {
+          "fixture": "pore-2-OFF-1-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 9.824811428786818e-05
+        },
+        {
+          "fixture": "pore-2-OFF-1-1",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.00024047449604967428
+        },
+        {
+          "fixture": "pore-2-STEP-1-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 9.825113898780747e-05
+        },
+        {
+          "fixture": "pore-2-STEP-1-0",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.000240467982811823
+        },
+        {
+          "fixture": "pore-2-STEP-1-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 9.824811428786818e-05
+        },
+        {
+          "fixture": "pore-2-STEP-1-1",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.00024047449604967428
+        },
+        {
+          "fixture": "pore-2-STATIC-0-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.2492875664994367
+        },
+        {
+          "fixture": "pore-2-STATIC-0-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 1.0660061515844461
+        },
+        {
+          "fixture": "pore-2-STATIC-0-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.249179558736754
+        },
+        {
+          "fixture": "pore-2-STATIC-0-0",
+          "column": 6,
+          "newton_column": false,
+          "error": 1.249143697766839
+        },
+        {
+          "fixture": "pore-2-STATIC-0-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.249219876870483
+        },
+        {
+          "fixture": "pore-2-STATIC-0-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.7946363985208589
+        },
+        {
+          "fixture": "pore-2-STATIC-0-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2491724899548147
+        },
+        {
+          "fixture": "pore-2-STATIC-0-1",
+          "column": 6,
+          "newton_column": false,
+          "error": 1.2491500923755616
+        },
+        {
+          "fixture": "pore-2-STATIC-1-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8685597163255722
+        },
+        {
+          "fixture": "pore-2-STATIC-1-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.7758217665986954
+        },
+        {
+          "fixture": "pore-2-STATIC-1-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8685092723488849
+        },
+        {
+          "fixture": "pore-2-STATIC-1-0",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.868486114157768
+        },
+        {
+          "fixture": "pore-2-STATIC-1-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8685269970956907
+        },
+        {
+          "fixture": "pore-2-STATIC-1-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.9400139774807431
+        },
+        {
+          "fixture": "pore-2-STATIC-1-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8685058554066987
+        },
+        {
+          "fixture": "pore-2-STATIC-1-1",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.8684892053783732
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.2777210108677335
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 1.0723244858916232
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2776012482201453
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-0",
+          "column": 6,
+          "newton_column": false,
+          "error": 1.2775616586380945
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 1.277643884817055
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 1.454939332259734
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 1.2775931939958838
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-0-1",
+          "column": 6,
+          "newton_column": false,
+          "error": 1.277568944706686
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-0",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.858480169530599
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-0",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.760600801493128
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-0",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8584288292465385
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-0",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.8584059578541529
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-1",
+          "column": 1,
+          "newton_column": false,
+          "error": 0.8584453525336094
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-1",
+          "column": 4,
+          "newton_column": true,
+          "error": 0.935007214919487
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-1",
+          "column": 5,
+          "newton_column": false,
+          "error": 0.8584251931784909
+        },
+        {
+          "fixture": "pore-2-DYNAMIC-1-1",
+          "column": 6,
+          "newton_column": false,
+          "error": 0.8584092473609451
+        }
+      ],
+      "representative_records": [
+        {
+          "name": "pore-2-DYNAMIC-0-1",
+          "config": {
+            "rheology_model": 3,
+            "solids": 2,
+            "gas_flag": true,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": true,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": false,
+            "sutherland_flag": true,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "DYNAMIC",
+            "derivatives": true,
+            "operation": 0,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            61.76134322044443,
+            185.2840296613333,
+            -247.04537288177772,
+            41430479.95558265,
+            43.74999999999999,
+            18.000000000000004,
+            6176.134322044443
+          ],
+          "exit_code": 0,
+          "checks": {
+            "implicit_oracle_error": 3.1546844864839025e-12,
+            "si_oracle_error": 1.480297366166875e-16,
+            "real_complex_error": 0.0,
+            "unperturbed_imaginary_max": 0.0,
+            "normalized_column_error": 3.755348504797308e-16
+          },
+          "findings": [
+            "complex-step versus finite-difference discrepancy"
+          ],
+          "observed_globals": {
+            "T_env_before": 300.0,
+            "T_env_after": 300.0,
+            "xi_temp": 500.0
+          },
+          "status": "FAIL",
+          "selected_derivatives": [
+            {
+              "column": 1,
+              "cs": [
+                0.0,
+                642470.4143944653,
+                -856627.2191926205,
+                536.7797337574247,
+                0.0,
+                0.0,
+                1497817.10518362
+              ],
+              "fd_last": [
+                0.0,
+                642470.4099377526,
+                -856627.2132513185,
+                536.7797355906137,
+                0.0,
+                0.0,
+                -5394747.901648027
+              ],
+              "fd_errors": [
+                1.2808108705729422,
+                1.2776749029912653,
+                1.277643884817055,
+                1.2776435771402879
+              ],
+              "error": 1.277643884817055,
+              "newton_column": false
+            },
+            {
+              "column": 4,
+              "cs": [
+                0.0,
+                0.0005867150229447355,
+                -0.0007822866972596472,
+                -0.0007630131254547614,
+                0.0,
+                0.0,
+                0.0005901868714993512
+              ],
+              "fd_last": [
+                0.0,
+                0.0005867150272985568,
+                -0.0007822867023329987,
+                -0.0007630131303445314,
+                0.0,
+                0.0,
+                -0.0012972870108818272
+              ],
+              "fd_errors": [
+                1.4549393327662852,
+                1.4549393325984612,
+                1.454939332259734,
+                1.4549393207122094
+              ],
+              "error": 1.454939332259734,
+              "newton_column": true
+            },
+            {
+              "column": 5,
+              "cs": [
+                0.0,
+                -642710.4028055992,
+                856947.2037407988,
+                -56.081464720924934,
+                0.0,
+                0.0,
+                -1498095.1586132185
+              ],
+              "fd_last": [
+                0.0,
+                -642710.4038552248,
+                856947.2051416858,
+                -56.081466027535505,
+                0.0,
+                0.0,
+                5396731.73717165
+              ],
+              "fd_errors": [
+                1.279174476966355,
+                1.277608765265151,
+                1.2775931939958838,
+                1.2775930380779588
+              ],
+              "error": 1.2775931939958838,
+              "newton_column": false
+            },
+            {
+              "column": 6,
+              "cs": [
+                0.0,
+                -642742.1265547421,
+                856989.5020729894,
+                50.740372842741586,
+                0.0,
+                0.0,
+                -1498141.320880999
+              ],
+              "fd_last": [
+                0.0,
+                -642742.1193191345,
+                856989.4924271969,
+                50.74039108876603,
+                0.0,
+                0.0,
+                5397366.9410829125
+              ],
+              "fd_errors": [
+                1.277835422306255,
+                1.2775715806644161,
+                1.277568944706686,
+                1.2775689215194281
+              ],
+              "error": 1.277568944706686,
+              "newton_column": false
+            }
+          ]
+        },
+        {
+          "name": "ambient-overwrite",
+          "config": {
+            "rheology_model": 3,
+            "solids": 2,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": false,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": false,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": true,
+            "operation": 0,
+            "dt": 0.05,
+            "diagonal": 1.0,
+            "T_env": 350.0
+          },
+          "q": [
+            2760.0,
+            8280.0,
+            -11040.0,
+            3574000000.0,
+            1000.0,
+            360.0
+          ],
+          "exit_code": 0,
+          "checks": {
+            "implicit_oracle_error": 3.7396986092636874e-16,
+            "si_oracle_error": 0.0,
+            "real_complex_error": 0.0,
+            "unperturbed_imaginary_max": 0.0,
+            "normalized_column_error": 4.574447893090543e-16
+          },
+          "findings": [
+            "configured ambient temperature overwritten"
+          ],
+          "observed_globals": {
+            "T_env_before": 350.0,
+            "T_env_after": 300.0,
+            "xi_temp": 500.0
+          },
+          "status": "FAIL",
+          "selected_derivatives": []
+        },
+        {
+          "name": "newton-4",
+          "config": {
+            "rheology_model": 4,
+            "solids": 2,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": false,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": false,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": true,
+            "operation": 2,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            2760.0,
+            8280.0,
+            -11040.0,
+            2144400000.0,
+            1000.0,
+            360.0
+          ],
+          "exit_code": 0,
+          "checks": {
+            "implicit_oracle_error": 1.4107247117276587e-16,
+            "si_oracle_error": 3.042534004316123e-16,
+            "real_complex_error": 0.0,
+            "unperturbed_imaginary_max": 0.0,
+            "normalized_column_error": 3.97393560545892e-16,
+            "stage_residual_max": 0.009793429606688164,
+            "stage_residual_tolerance_ratio": 9.030359137307054
+          },
+          "findings": [
+            "Newton stage residual or convergence"
+          ],
+          "observed_globals": {
+            "T_env_before": 300.0,
+            "T_env_after": 300.0,
+            "xi_temp": 500.0
+          },
+          "status": "FAIL",
+          "selected_derivatives": []
+        },
+        {
+          "name": "newton-6",
+          "config": {
+            "rheology_model": 6,
+            "solids": 2,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": false,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": false,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": true,
+            "operation": 2,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            2760.0,
+            8280.0,
+            -11040.0,
+            2144400000.0,
+            1000.0,
+            360.0
+          ],
+          "exit_code": 0,
+          "checks": {
+            "implicit_oracle_error": 1.3730294410823191e-16,
+            "si_oracle_error": 0.0,
+            "real_complex_error": 0.0,
+            "unperturbed_imaginary_max": 0.0,
+            "normalized_column_error": 3.076816674694272e-16,
+            "stage_residual_max": 0.0005735519589080695,
+            "stage_residual_tolerance_ratio": 1.3527168842171449,
+            "quadratic_stage_oracle_error": 5.175951453939323e-08
+          },
+          "findings": [
+            "Newton stage residual or convergence"
+          ],
+          "observed_globals": {
+            "T_env_before": 300.0,
+            "T_env_after": 300.0,
+            "xi_temp": 500.0
+          },
+          "status": "FAIL",
+          "selected_derivatives": []
+        },
+        {
+          "name": "newton-pore",
+          "config": {
+            "rheology_model": 6,
+            "solids": 2,
+            "gas_flag": true,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": true,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": false,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": true,
+            "operation": 2,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            1360.9881205364918,
+            4082.9643616094754,
+            -5443.952482145967,
+            648496530.5695871,
+            1000.0,
+            360.0,
+            136098.8120536492
+          ],
+          "exit_code": 0,
+          "checks": {
+            "implicit_oracle_error": 4.2463640189591107e-16,
+            "si_oracle_error": 0.0,
+            "real_complex_error": 0.0,
+            "unperturbed_imaginary_max": 0.0,
+            "normalized_column_error": 4.350654774512565e-16,
+            "stage_residual_max": 0.00028282514563571226,
+            "stage_residual_tolerance_ratio": 1.3206981041953214
+          },
+          "findings": [
+            "Newton stage residual or convergence"
+          ],
+          "observed_globals": {
+            "T_env_before": 300.0,
+            "T_env_after": 300.0,
+            "xi_temp": 500.0
+          },
+          "status": "FAIL",
+          "selected_derivatives": []
+        },
+        {
+          "name": "pore-only",
+          "config": {
+            "rheology_model": 6,
+            "solids": 2,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": false,
+            "pore_pressure_flag": true,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": false,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": false,
+            "operation": 1,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            2760.0,
+            8280.0,
+            -11040.0,
+            3574000000.0,
+            1000.0,
+            360.0,
+            276000.0
+          ],
+          "exit_code": -4,
+          "status": "FAIL",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        },
+        {
+          "name": "dry-dynamic-pore",
+          "config": {
+            "rheology_model": 6,
+            "solids": 2,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": true,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": true,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": false,
+            "operation": 1,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            0.0,
+            0.0,
+            -0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "exit_code": -4,
+          "status": "FAIL",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        },
+        {
+          "name": "zero-solids-dynamic-pore",
+          "config": {
+            "rheology_model": 6,
+            "solids": 2,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": true,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": true,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": false,
+            "operation": 1,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            2000.0,
+            6000.0,
+            -8000.0,
+            4180000000.0,
+            0.0,
+            0.0,
+            200000.0
+          ],
+          "exit_code": -4,
+          "status": "FAIL",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        },
+        {
+          "name": "zero-solids-mono-pore",
+          "config": {
+            "rheology_model": 6,
+            "solids": 1,
+            "gas_flag": false,
+            "bx": 0.0,
+            "by": 0.0,
+            "bxx": 0.0,
+            "bxy": 0.0,
+            "byy": 0.0,
+            "z": 0.0,
+            "rheology_flag": true,
+            "pore_pressure_flag": true,
+            "slope_correction_flag": false,
+            "curvature_term_flag": false,
+            "dynamic_permeability_flag": true,
+            "sutherland_flag": false,
+            "stochastic_flag": false,
+            "f_inhibit_mode": "OFF",
+            "derivatives": false,
+            "operation": 1,
+            "dt": 0.05,
+            "diagonal": 1.0
+          },
+          "q": [
+            2000.0,
+            6000.0,
+            -8000.0,
+            4180000000.0,
+            0.0,
+            200000.0
+          ],
+          "exit_code": -4,
+          "status": "FAIL",
+          "findings": [
+            "hazard probe: initialization or singular coefficient evaluation"
+          ]
+        }
+      ],
+      "untrapped_rest_diagnostics": [
+        {
+          "model": 5,
+          "exit_code": 0,
+          "finite_zero": true
+        },
+        {
+          "model": 6,
+          "exit_code": 0,
+          "finite_zero": true
+        },
+        {
+          "model": 11,
+          "exit_code": 0,
+          "finite_zero": true
+        },
+        {
+          "model": 12,
+          "exit_code": 0,
+          "finite_zero": true
+        }
+      ],
+      "raw_results_sha256": "a71e334c71e5cb22ef0ae2bbfef02954bde4b2e8ae16e93899a2858da752b72f",
+      "raw_results_path": "build-local/d02/optimized/results.json",
+      "maximum_value_error": 6.523576081105618e-12,
+      "maximum_normalized_column_error": 2.8162885488450636e-14
+    }
+  },
+  "integration": {
+    "optimized": {
+      "n_RK": 2,
+      "driver_sha256": "313e38be2d058425a5509b7086f0f6840957a42e8e45947fd1dda3dd47ded325",
+      "build": "/Users/demichie/Codes/GIT/IMEX_SfloW2D_dev/build-local/optimized",
+      "records": [
+        {
+          "case": "quadratic",
+          "threads": 1,
+          "status": "PASS",
+          "checks": {
+            "known_stage2": 0.0,
+            "source_oracle": 2.896279613749096e-06,
+            "effective_increment": 0.0,
+            "final_projection": 0.0,
+            "dt_error": 0.0
+          },
+          "expected": [
+            1000.0,
+            1683.2311193509274,
+            841.6155596754637,
+            1254000000.0,
+            0.0
+          ],
+          "actual": [
+            1000.0,
+            1683.2359944589036,
+            841.6179972294518,
+            1254000000.0,
+            0.0
+          ]
+        },
+        {
+          "case": "quadratic",
+          "threads": 4,
+          "status": "PASS",
+          "checks": {
+            "known_stage2": 0.0,
+            "source_oracle": 2.896279613749096e-06,
+            "effective_increment": 0.0,
+            "final_projection": 0.0,
+            "dt_error": 0.0
+          },
+          "expected": [
+            1000.0,
+            1683.2311193509274,
+            841.6155596754637,
+            1254000000.0,
+            0.0
+          ],
+          "actual": [
+            1000.0,
+            1683.2359944589036,
+            841.6179972294518,
+            1254000000.0,
+            0.0
+          ]
+        },
+        {
+          "case": "coulomb-stop",
+          "threads": 1,
+          "status": "PASS",
+          "checks": {
+            "known_stage2": 0.0,
+            "source_oracle": 0.0,
+            "effective_increment": 0.0,
+            "final_projection": 0.0,
+            "dt_error": 0.0
+          },
+          "expected": [
+            1000.0,
+            0.0,
+            0.0,
+            1254000000.0,
+            0.0
+          ],
+          "actual": [
+            1000.0,
+            0.0,
+            0.0,
+            1254000000.0,
+            0.0
+          ]
+        },
+        {
+          "case": "coulomb-stop",
+          "threads": 4,
+          "status": "PASS",
+          "checks": {
+            "known_stage2": 0.0,
+            "source_oracle": 0.0,
+            "effective_increment": 0.0,
+            "final_projection": 0.0,
+            "dt_error": 0.0
+          },
+          "expected": [
+            1000.0,
+            0.0,
+            0.0,
+            1254000000.0,
+            0.0
+          ],
+          "actual": [
+            1000.0,
+            0.0,
+            0.0,
+            1254000000.0,
+            0.0
+          ]
+        },
+        {
+          "case": "lava-coupled",
+          "threads": 1,
+          "status": "PASS",
+          "checks": {
+            "known_stage2": 0.0,
+            "source_oracle": 5.608500707982991e-11,
+            "effective_increment": 0.0,
+            "final_projection": 0.0,
+            "dt_error": 0.0
+          },
+          "expected": [
+            1000.0,
+            1986.2933667369434,
+            993.1466833684717,
+            3761997816.0047793,
+            0.0
+          ],
+          "actual": [
+            1000.0,
+            1986.2933666255421,
+            993.1466833127711,
+            3761997816.0047793,
+            0.0
+          ]
+        },
+        {
+          "case": "lava-coupled",
+          "threads": 4,
+          "status": "PASS",
+          "checks": {
+            "known_stage2": 0.0,
+            "source_oracle": 5.608500707982991e-11,
+            "effective_increment": 0.0,
+            "final_projection": 0.0,
+            "dt_error": 0.0
+          },
+          "expected": [
+            1000.0,
+            1986.2933667369434,
+            993.1466833684717,
+            3761997816.0047793,
+            0.0
+          ],
+          "actual": [
+            1000.0,
+            1986.2933666255421,
+            993.1466833127711,
+            3761997816.0047793,
+            0.0
+          ]
+        }
+      ]
+    },
+    "strict": {
+      "n_RK": 2,
+      "driver_sha256": "313e38be2d058425a5509b7086f0f6840957a42e8e45947fd1dda3dd47ded325",
+      "build": "/Users/demichie/Codes/GIT/IMEX_SfloW2D_dev/build-local/strict-debug",
+      "records": [
+        {
+          "case": "quadratic",
+          "threads": 1,
+          "status": "PASS",
+          "checks": {
+            "known_stage2": 0.0,
+            "source_oracle": 2.896279613749096e-06,
+            "effective_increment": 0.0,
+            "final_projection": 0.0,
+            "dt_error": 0.0
+          },
+          "expected": [
+            1000.0,
+            1683.2311193509274,
+            841.6155596754637,
+            1254000000.0,
+            0.0
+          ],
+          "actual": [
+            1000.0,
+            1683.2359944589036,
+            841.6179972294518,
+            1254000000.0,
+            0.0
+          ]
+        },
+        {
+          "case": "quadratic",
+          "threads": 4,
+          "status": "PASS",
+          "checks": {
+            "known_stage2": 0.0,
+            "source_oracle": 2.896279613749096e-06,
+            "effective_increment": 0.0,
+            "final_projection": 0.0,
+            "dt_error": 0.0
+          },
+          "expected": [
+            1000.0,
+            1683.2311193509274,
+            841.6155596754637,
+            1254000000.0,
+            0.0
+          ],
+          "actual": [
+            1000.0,
+            1683.2359944589036,
+            841.6179972294518,
+            1254000000.0,
+            0.0
+          ]
+        },
+        {
+          "case": "coulomb-stop",
+          "threads": 1,
+          "status": "PASS",
+          "checks": {
+            "known_stage2": 0.0,
+            "source_oracle": 0.0,
+            "effective_increment": 0.0,
+            "final_projection": 0.0,
+            "dt_error": 0.0
+          },
+          "expected": [
+            1000.0,
+            0.0,
+            0.0,
+            1254000000.0,
+            0.0
+          ],
+          "actual": [
+            1000.0,
+            0.0,
+            0.0,
+            1254000000.0,
+            0.0
+          ]
+        },
+        {
+          "case": "coulomb-stop",
+          "threads": 4,
+          "status": "PASS",
+          "checks": {
+            "known_stage2": 0.0,
+            "source_oracle": 0.0,
+            "effective_increment": 0.0,
+            "final_projection": 0.0,
+            "dt_error": 0.0
+          },
+          "expected": [
+            1000.0,
+            0.0,
+            0.0,
+            1254000000.0,
+            0.0
+          ],
+          "actual": [
+            1000.0,
+            0.0,
+            0.0,
+            1254000000.0,
+            0.0
+          ]
+        },
+        {
+          "case": "lava-coupled",
+          "threads": 1,
+          "status": "PASS",
+          "checks": {
+            "known_stage2": 0.0,
+            "source_oracle": 5.608500707982991e-11,
+            "effective_increment": 0.0,
+            "final_projection": 0.0,
+            "dt_error": 0.0
+          },
+          "expected": [
+            1000.0,
+            1986.2933667369434,
+            993.1466833684717,
+            3761997816.0047793,
+            0.0
+          ],
+          "actual": [
+            1000.0,
+            1986.2933666255421,
+            993.1466833127711,
+            3761997816.0047793,
+            0.0
+          ]
+        },
+        {
+          "case": "lava-coupled",
+          "threads": 4,
+          "status": "PASS",
+          "checks": {
+            "known_stage2": 0.0,
+            "source_oracle": 5.608500707982991e-11,
+            "effective_increment": 0.0,
+            "final_projection": 0.0,
+            "dt_error": 0.0
+          },
+          "expected": [
+            1000.0,
+            1986.2933667369434,
+            993.1466833684717,
+            3761997816.0047793,
+            0.0
+          ],
+          "actual": [
+            1000.0,
+            1986.2933666255421,
+            993.1466833127711,
+            3761997816.0047793,
+            0.0
+          ]
+        }
+      ]
+    }
+  },
+  "parser": {
+    "records": [
+      {
+        "name": "valid-voellmy",
+        "model": 1,
+        "should_reject": false,
+        "rejected": false,
+        "reached_end": true,
+        "exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "unsupported-7",
+        "model": 7,
+        "should_reject": true,
+        "rejected": true,
+        "reached_end": false,
+        "exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "disabled-active-0",
+        "model": 0,
+        "should_reject": true,
+        "rejected": true,
+        "reached_end": false,
+        "exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "legacy-8",
+        "model": 8,
+        "should_reject": false,
+        "rejected": false,
+        "reached_end": true,
+        "exit_code": 0,
+        "status": "PASS"
+      },
+      {
+        "name": "missing-xi",
+        "model": 1,
+        "should_reject": true,
+        "rejected": false,
+        "reached_end": true,
+        "exit_code": 0,
+        "status": "FAIL"
+      },
+      {
+        "name": "missing-mu0",
+        "model": 9,
+        "should_reject": true,
+        "rejected": false,
+        "reached_end": true,
+        "exit_code": 0,
+        "status": "FAIL"
+      },
+      {
+        "name": "zero-Fr0",
+        "model": 9,
+        "should_reject": true,
+        "rejected": false,
+        "reached_end": true,
+        "exit_code": 0,
+        "status": "FAIL"
+      },
+      {
+        "name": "zero-Uw",
+        "model": 10,
+        "should_reject": true,
+        "rejected": false,
+        "reached_end": true,
+        "exit_code": 0,
+        "status": "FAIL"
+      },
+      {
+        "name": "missing-muinf",
+        "model": 10,
+        "should_reject": true,
+        "rejected": false,
+        "reached_end": true,
+        "exit_code": 0,
+        "status": "FAIL"
+      },
+      {
+        "name": "all-negative-froude",
+        "model": 9,
+        "should_reject": true,
+        "rejected": true,
+        "reached_end": false,
+        "exit_code": 0,
+        "status": "PASS"
+      }
+    ],
+    "acceptance": "NOT_ACCEPTED"
+  },
+  "changed_test_files_sha256": {
+    "TESTS/TEST_RHEOLOGY_CELL_LOCAL/run_test.sh": "5d5f53eadadf60cba0712bb9a421d21126ca381420ae26e4848cba6ca6f503fa",
+    "TESTS/TEST_RHEOLOGY_CELL_LOCAL/characterize.py": "8bdd6a657a9fb0087e8737741290fe69416198bba5253f8347fa92571f94caf4",
+    "TESTS/TEST_RHEOLOGY_CELL_LOCAL/probe_sources.f90": "fe2882aa3a8d0f5d8b16d3d4d5b664a56784a69892d368c583d5f682a974c5d3",
+    "TESTS/TEST_RHEOLOGY_CELL_LOCAL/README.md": "1a5d6990c51eefca6d609833499dd591dd4ae2c7ca13705b922f7b34a92976c1",
+    "TESTS/TEST_RHEOLOGY_CELL_LOCAL/check_stages.py": "60a9755de8476e03a7f68f3a42584b9316093eb54d2afd62134aa223b611b337",
+    "TESTS/TEST_RHEOLOGY_CELL_LOCAL/check_inputs.py": "57b52b35b1cd5aa741e618e9408afe384ebc67cf1dd6063b9ee8a90f74454c0d",
+    "TESTS/TEST_IMEX_STAGES/test_imex_stages.f90": "313e38be2d058425a5509b7086f0f6840957a42e8e45947fd1dda3dd47ded325",
+    "Makefile.am": "b4211c0caff2c63a93649b3d309b87b5203746abe1135d0063c6579fb1cff083"
+  },
+  "acceptance_requirements": {
+    "D02-01": "Restore/define smooth source dependencies; require CS/FD equivalence for the declared contract.",
+    "D02-02": "Resolve pore-only initialization and dry/zero-solid coefficient domains.",
+    "D02-03": "Validate missing and zero law parameters independently.",
+    "D02-04": "Resolve optimized SI rest trapping/build contract.",
+    "D02-05": "Define configurable versus fixed thermal ambient and remove inconsistent behavior.",
+    "D02-06": "Define accepted residual/correction convergence contract and verify it."
+  },
+  "distribution_check": "make -C build-local/optimized distdir; standalone suite and observer included"
+}

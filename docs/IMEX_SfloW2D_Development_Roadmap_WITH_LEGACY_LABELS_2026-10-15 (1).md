@@ -182,7 +182,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 |     | Vecchia label | Attività                                                    | Stato    |
 |-----|---------------|-------------------------------------------------------------|----------|
 | D01 | M12e-A        | Inventario formule e rami REAL/COMPLEX                      | COMPLETATO (audit statico) |
-| D02 | M12e-B        | Caratterizzazione numerica cell-local                       | DA FARE  |
+| D02 | M12e-B        | Caratterizzazione numerica cell-local                       | IMPLEMENTATO, GATE APERTO |
 | D03 | —             | Audit e ownership di parametri, variabili e stato condiviso | DA FARE  |
 | D04 | P2            | Eliminazione reologia 8                                     | DA FARE  |
 | D05 | P3            | Estrazione moduli reologici                                 | DA FARE  |
@@ -1190,7 +1190,7 @@ Pubblicazione unificata: solo il workflow publish-documentation.yml deve distrib
 
 **Test proporzionati (nuove modifiche a questo step):** T1 inventario branch REAL/COMPLEX, formule e proprietari; nessun run numerico se l’intervento è solo documentale. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: COMPLETATO (inventario statico; caratterizzazione numerica D02 ancora DA FARE)
+Stato ufficiale: COMPLETATO (inventario statico; caratterizzazione D02 implementata con gate aperto)
 
 #### Evidenza D01 — 21 ottobre 2026
 
@@ -1246,7 +1246,49 @@ I rilievi statici non autorizzano correzioni silenziose delle formule durante il
 
 **Test proporzionati (nuove modifiche a questo step):** T1 test cell-local di valore/derivata e finite/complex step, casi degeneri; T2 integrazione della sorgente; T3 tolleranze e confronti indipendenti se cambiano formule. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: DA FARE
+Stato ufficiale: IMPLEMENTATO, GATE APERTO
+
+#### Evidenza D02 — 21 ottobre 2026
+
+Caratterizzazione della baseline D01 `5aee5d9e`, senza modificare sorgenti
+Fortran produttivi, input o tolleranze. Harness riproducibile in
+`TESTS/TEST_RHEOLOGY_CELL_LOCAL`, rapporto
+[D02_CELL_LOCAL_CHARACTERIZATION_2026_10_21.md](acceptance/D02_CELL_LOCAL_CHARACTERIZATION_2026_10_21.md)
+e [risultati sintetici](acceptance/results_d02_cell_local_2026_10_21.json).
+I nuovi check sono distribuiti come suite autonoma: non vengono aggiunti a
+`make check` o CI come se i fallimenti produttivi fossero già risolti.
+
+La matrice locale GNU/macOS conta 249 fixture per profilo: **221 PASS / 28 FAIL
+strict**, **213 PASS / 36 FAIL optimized con trap aritmetici**. I valori finiti
+delle sorgenti concordano con gli oracoli indipendenti entro `6.53e-12`; lo
+scaling delle colonne complex-step normalizzate concorda entro `1e-13`.
+Passano tutti i 16 bilanci isolati di perdita di gas per profilo. Passano anche
+12 prove con l'integratore produttivo (`n_RK=2`, optimized/strict-debug,
+1/4 thread) per quadratic DIRK, arresto Coulomb e lava accoppiata. I check del
+parser reale passano 5/10 casi: cinque input con parametri mancanti/nulli sono
+accettati invece di essere respinti.
+
+#### Requisiti ancora scoperti e chiusura del gate
+
+Restano sei rilievi documentati nel rapporto: (1) 20 fixture con derivate
+CS/finite difference discordanti, incluse colonne termiche usate da Newton;
+(2) quattro casi di inizializzazione/dominio della diffusione di pressione;
+(3) validazione incompleta dei parametri; (4) eccezioni nel percorso SI a riposo
+ottimizzato con trap, da distinguere dai corrispondenti output finiti senza
+trap; (5) `T_env` configurato sovrascritto a 300 K; (6) uscita Newton per
+correzione piccola che non garantisce la soglia del residuo ricalcolato.
+I conteggi includono riproduzioni isolate: quattro difetti SI ottimizzati sono
+contati sia nelle fixture combinate sia nelle riproduzioni, non sono otto
+difetti fisici distinti.
+
+Per passare a COMPLETATO occorrono correzioni o contratti esplicitamente
+giustificati per questi punti, nuova evidenza T1/T2 mirata, equivalenza dei
+valori REAL quando si ripristinano le dipendenze COMPLEX e decisione documentata
+sui contratti termici, di trapping e di arresto. Non aumentare le tolleranze né
+convertire i rilievi in expected PASS. Il confronto dei diversi provider di
+permeabilità resta un vincolo D06; l'ownership D03 e la rimozione D04 non sono
+anticipate. Nessuna nuova validazione ifx/Linux/Docker o campagna scientifica
+estesa è attestata da D02.
 
 Matrice iniziale e rilievi da verificare: sezione «Findings and D02 worklist»
 del [rapporto D01](acceptance/D01_RHEOLOGY_INVENTORY_2026_10_21.md).
@@ -1254,7 +1296,8 @@ Separare prove REAL/COMPLEX delle sorgenti implicite, verifiche REAL delle
 leggi SI e confronto della mappa di stage corretta. Includere diffusione della
 pressione, inibizione, permeabilità mono/multi-classe, stati secchi e
 configurazione pore-only, oltre alle soglie e agli accoppiamenti termici.
-I test preesistenti non coprono ancora tutte le leggi e tutte le derivate.
+I test preesistenti da soli non coprivano tutte le leggi e tutte le derivate;
+la nuova matrice rende riproducibili le discrepanze rilevate, senza approvarle.
 
 ### D03 — Audit e ownership di parametri, variabili e stato condiviso
 

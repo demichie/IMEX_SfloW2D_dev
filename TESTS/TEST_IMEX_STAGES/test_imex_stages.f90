@@ -61,7 +61,7 @@ PROGRAM test_imex_stages
   CHARACTER(LEN=32) :: argument
   INTEGER :: nx,ny,slope,curvature,limiter_id,input_unit,output_unit,j,k,i,step
   INTEGER :: threads,actual_threads,stages,steps,drag,observe,l
-  INTEGER :: composition_mode,boundary_test_mode
+  INTEGER :: composition_mode,boundary_test_mode,source_test_model
 
   CALL get_command_argument(1,argument); READ(argument,*) threads
   CALL get_command_argument(2,argument); READ(argument,*) stages
@@ -78,6 +78,13 @@ PROGRAM test_imex_stages
   CALL get_command_argument(7,argument)
   IF (LEN_TRIM(argument)>0) READ(argument,*) boundary_test_mode
   IF (boundary_test_mode<0 .OR. boundary_test_mode>1) ERROR STOP 'invalid boundary test mode'
+  ! Optional D02 source-only integration fixtures; omitted preserves all
+  ! historical driver behavior. No alternate production source is introduced.
+  source_test_model=0
+  CALL get_command_argument(8,argument)
+  IF (LEN_TRIM(argument)>0) READ(argument,*) source_test_model
+  IF (source_test_model/=0 .AND. source_test_model/=1 .AND. source_test_model/=3) &
+       ERROR STOP 'invalid D02 source model'
   IF (stages/=2 .OR. steps<1) ERROR STOP 'invalid test controls'
   !$OMP PARALLEL
   !$OMP SINGLE
@@ -560,8 +567,17 @@ CONTAINS
     IF (drag/=0) THEN
        rheology_flag=.TRUE.; rheology_model=6; friction_factor=1.0_wp
     END IF
+    IF (source_test_model/=0) THEN
+       rheology_flag=.TRUE.; rheology_model=source_test_model
+       mu=0.3_wp; xi=500.0_wp; tau0=20.0_wp
+       nu_ref=0.02_wp; visc_par=0.003_wp; T_ref=900.0_wp; T_env=300.0_wp
+       radiative_term_coeff=3.0E-8_wp; convective_term_coeff=4.0_wp
+       IF (source_test_model==3) kt_trace_reconstruction='h_x'
+    END IF
     IF (composition_mode==0) THEN
        CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.,.FALSE.])
+       IF (source_test_model==3) &
+            CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.TRUE.,.FALSE.])
     ELSE
        BLOCK
          LOGICAL :: mask(n_vars)
