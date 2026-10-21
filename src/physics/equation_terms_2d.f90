@@ -11,7 +11,10 @@ MODULE equation_terms_2d
 
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE mu_i_rheology_2d, ONLY : eval_mu_i_source
+  USE rheology_froude_2d, ONLY : eval_froude_source
+  USE rheology_lucas_2d, ONLY : eval_lucas_source
+  USE rheology_mui_2d, ONLY : eval_mui_source
+  USE rheology_mui_voellmy_2d, ONLY : eval_mui_voellmy_source
 
   USE equation_metadata_2d, ONLY : equation_partition_type
 
@@ -1645,15 +1648,6 @@ CONTAINS
     REAL(wp) :: r_red_grav
     REAL(wp) :: r_rho_c
     REAL(wp) :: r_Ri
-    REAL(wp) :: Fr                !< Froude number
-    REAL(wp) :: U_f               !< norm velocity for frirction
-    REAL(wp) :: muF               !< mu(fr) o rmu(U)
-    !REAL(wp) :: muU               !< mu(U)
-    ! REAL(wp) :: Fr_x                !< Froude number
-    ! REAL(wp) :: Fr_y                !< Froude number
-    ! REAL(wp) :: mu_Fr_x             !< mu(fr)_x
-    ! REAL(wp) :: mu_Fr_y             !< mu(fr)_y
-
     ! mu(I) rheology variables
     REAL(wp) :: temp_term
     REAL(wp) :: centr_force_term
@@ -1809,111 +1803,18 @@ CONTAINS
           END IF
 
        ELSEIF ( rheology_model_id .EQ. rheology_id_froude ) THEN
-
-          ! From Zhu et al. 2020
-          ! (DOI: https://doi.org/10.1007/s10035-020-01053-7)
-          ! mu_0: Coulomb friction coefficient at Fr=+inf
-          ! mu_inf: Coulomb friction coefficient at Fr=0
-          ! Fr : froude number (!!!computed here using the total velocity and
-          ! the thickness instead of the particle holdup!!!)
-          ! Fr_0 : Renormalization factor controlling the gradient of the
-          ! function Zj : Value of the OU process at given cell (they can be
-          ! tranformed)
-
-          ! should also use rho or alpha?
-          ! must add something for curvature or temperature?
-
-          ! Model 9 needs a positive buoyancy load as well as a moving wet
-          ! state. Ambient gas can retain tiny mass/momentum after transport:
-          ! g'=0 then makes Fr undefined even though its speed is nonzero.
-          ! Buoyant gas (g'<0) is outside this basal-contact friction law too.
-          ! Do not manufacture a positive gravity or evaluate sqrt/division in
-          ! either case; keep the initialized zero source instead.
-          IF ( mod_vel .GT. 0.0_wp .AND. r_red_grav .GT. 0.0_wp ) THEN
-             ! Computing froude number (The definition in Zhu 2020 et Roche 2021
-             ! is sligtlhy different!)
-             Fr = mod_vel / SQRT(r_red_grav * r_h)
-
-             ! Mofidy deterministic Fr if needed
-             IF ( stochastic_flag ) THEN
-               IF (r_h .GT. 0.01_wp) THEN
-                  Fr = Fr + Zj
-               END IF
-               ! Set Foude number to zero if negative
-               IF (Fr .LT. 0._wp) Fr = 0._wp
-             END IF
-
-             ! Evaluating mu(fr), (mu_0 < mu_inf), it is increasing with Fr
-             muF = mu_inf + (mu_0 - mu_inf) * exp(-Fr/Fr_0)
-
-             ! Compute temporal friction term (temp_term = 0 if h=0)
-             temp_term = r_rho_m *  ( muF * r_h * grav_coeff * ( r_red_grav +   &
-                  centr_force_term ) )
-
-             ! Update the source term
-             ! units of dqc(2)/dt=d(rho h u)/dt (kg m-1 s-2)
-             source_term(2) = source_term(2) - temp_term * r_u / mod_hor_vel
-
-             ! units of dqc(3)/dt=d(rho h v)/dt (kg m-1 s-2)
-             source_term(3) = source_term(3) - temp_term * r_v / mod_hor_vel
-
-          ELSE ! At rest or without a positive buoyancy load: no basal friction.
-
-            muF = 0._wp
-
-          END IF
+          CALL eval_froude_source(r_h, r_u, r_v, mod_vel, mod_hor_vel,       &
+               r_rho_m, r_red_grav, grav_coeff, centr_force_term,            &
+               stochastic_flag, Zj, rheology_source_x, rheology_source_y)
+          source_term(2) = rheology_source_x
+          source_term(3) = rheology_source_y
 
       ELSEIF ( rheology_model_id .EQ. rheology_id_lucas ) THEN
-
-          ! From Lucas et al. 2014 (DOI: 10.1038/ncomms4417)
-          ! mu_0: Coulomb friction coefficient at U=0
-          ! mu_inf: Coulomb friction coefficient at U=+inf
-          ! U_w : Renormalization factor controlling the gradient of the function
-          ! Zj : Value of the OU process at given cell (they can be tranformed)
-
-          ! Compute friction only if mass is flowing (this implies that there is mass)
-          IF ( mod_vel .GT. 0.0_wp ) THEN
-
-             ! Mofidy deterministic U if needed
-             IF ( stochastic_flag ) THEN
-               U_f = mod_vel + Zj
-             ELSE
-               U_f = mod_vel
-             END IF
-
-             ! Evaluating mu(U), (mu_0 > mu_inf), it is decreasing with U
-             IF ( U_f .LT. U_w) THEN
-               muF = mu_0
-             ELSE
-               ! (for small h ; u->inf but if not true)
-               ! Max friction if h -> 0 : else weakening friction
-               IF (r_h .LT. 0.1_wp) THEN
-                  muF = mu_0
-               ELSE
-                  muF = mu_inf + (mu_0-mu_inf)/(U_f/U_w)
-               END IF
-               ! Alternative :
-               ! Use exp and limit with sigmoid : (a=15, b=0.5)
-               ! muF = mu_0 - ((mu_inf - mu_0) * exp(-(U_f-U_w)/U_w) *             &
-               !        (1._wp / (1._wp + exp(-15_wp * (r_h - 0.5_wp))))
-             END IF
-
-             ! Compute temporal friction term (temp_term = 0 if h=0)
-             temp_term = r_rho_m *  ( muF * r_h * grav_coeff * ( r_red_grav +      &
-                  centr_force_term ) )
-
-             ! Update the source term
-             ! units of dqc(2)/dt=d(rho h u)/dt (kg m-1 s-2)
-             source_term(2) = source_term(2) - temp_term * r_u / mod_hor_vel
-
-             ! units of dqc(3)/dt=d(rho h v)/dt (kg m-1 s-2)
-             source_term(3) = source_term(3) - temp_term * r_v / mod_hor_vel
-
-          ELSE ! If ||u|| = 0 then there will be no friction in this code
-
-            muF = 0._wp
-
-          END IF
+          CALL eval_lucas_source(r_h, r_u, r_v, mod_vel, mod_hor_vel,        &
+               r_rho_m, r_red_grav, grav_coeff, centr_force_term,            &
+               stochastic_flag, Zj, rheology_source_x, rheology_source_y)
+          source_term(2) = rheology_source_x
+          source_term(3) = rheology_source_y
 
       ELSEIF ( rheology_model_id .EQ. rheology_id_mui ) THEN
          IF ( mod_vel .GT. 0.0_wp ) THEN ! v>0 (avoid div by 0)
@@ -1927,7 +1828,7 @@ CONTAINS
 
             exc_pore_pres = 0.0_wp
             IF ( pore_pressure_flag ) exc_pore_pres = qpj(idx_pore)
-            CALL eval_mu_i_source(r_h, r_u, r_v, mod_vel, r_rho_m,          &
+            CALL eval_mui_source(r_h, r_u, r_v, mod_vel, r_rho_m,          &
                  r_red_grav, grav_coeff, r_alphas, centr_force_term,       &
                  pore_pressure_flag, exc_pore_pres, rheology_source_x,     &
                  rheology_source_y)
@@ -1950,7 +1851,7 @@ CONTAINS
 
             exc_pore_pres = 0.0_wp
             IF ( pore_pressure_flag ) exc_pore_pres = qpj(idx_pore)
-            CALL eval_mu_i_source(r_h, r_u, r_v, mod_vel, r_rho_m,          &
+            CALL eval_mui_voellmy_source(r_h, r_u, r_v, mod_vel, r_rho_m,   &
                  r_red_grav, grav_coeff, r_alphas, centr_force_term,       &
                  pore_pressure_flag, exc_pore_pres, rheology_source_x,     &
                  rheology_source_y)

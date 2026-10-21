@@ -3,6 +3,7 @@ PROGRAM test_rheology_froude
 
   USE parameters_2d
   USE constitutive_parameters_2d
+  USE rheology_parameters_2d, ONLY : mu_0, mu_inf, Fr_0
   USE state_conversion_2d, ONLY : mixt_var, qp_to_qc
   USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms, eval_implicit_terms
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite

@@ -107,9 +107,10 @@ MODULE inpout_2d
        rheology_id_lucas, rheology_id_mui, rheology_id_mui_voellmy
   USE rheology_2d, ONLY: resolve_rheology_model
   USE constitutive_parameters_2d, ONLY: mu, xi, tau, nu_ref, visc_par,     &
-       T_ref, mu_0, mu_inf, Fr_0, U_w,                                    &
+       T_ref,                                                                &
        A_drag, B_drag, collective_settling_flag
-  USE mu_i_rheology_2d, ONLY : mu_s, mu_2, I_0, muI_inf
+  USE rheology_parameters_2d, ONLY : mu_s, mu_2, I_0, muI_inf,               &
+       mu_0, mu_inf, Fr_0, U_w
   USE constitutive_parameters_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, &
        Kappa, n_td, friction_factor, tau0
   ! -- Functions used in the rheology calculations

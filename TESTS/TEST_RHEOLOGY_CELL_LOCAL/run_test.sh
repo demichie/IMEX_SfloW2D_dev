@@ -18,9 +18,12 @@ for profile in strict optimized; do
     esac
     common='-fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow -ffree-line-length-none'
     objects=''
-    for source in core/parameters_2d rheology/rheology_2d core/diagnostics_2d numerics/lapack_interfaces_2d \
+    for source in core/parameters_2d rheology/rheology_2d rheology/rheology_parameters_2d \
+        rheology/rheology_froude_2d rheology/rheology_lucas_2d \
+        core/diagnostics_2d numerics/lapack_interfaces_2d \
         core/constitutive_parameters_2d numerics/equation_metadata_2d core/complexify \
-        geometry/geometry_2d state/state_conversion_2d rheology/mu_i_rheology_2d \
+        geometry/geometry_2d state/state_conversion_2d \
+        rheology/rheology_mui_2d rheology/rheology_mui_voellmy_2d \
         physics/equation_terms_2d \
         numerics/nonlinear_solver_2d; do
         "$compiler" $flags $common -I"$repo_dir/src/state" -c "$repo_dir/src/$source.f90"

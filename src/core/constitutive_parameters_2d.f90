@@ -19,7 +19,7 @@ MODULE constitutive_parameters_2d
   PUBLIC :: entrainment_flag
   PUBLIC :: grav, inv_grav
   PUBLIC :: A_drag, B_drag, collective_settling_flag
-  PUBLIC :: mu, xi, mu_0, mu_inf, Fr_0, U_w
+  PUBLIC :: mu, xi
   PUBLIC :: alpha_trans, N_inh, f_inhibit_mode
   PUBLIC :: friction_factor, tau
   PUBLIC :: T_env, T_ref, nu_ref, visc_par, tau0, emme, c_p
@@ -57,12 +57,6 @@ MODULE constitutive_parameters_2d
   !> drag coefficients (Voellmy-Salm model)
   REAL(wp) :: mu
   REAL(wp) :: xi
-
-  !> friction coefficients (function Coulomb: mu(Fr) and mu:(U))
-  REAL(wp) :: mu_0
-  REAL(wp) :: mu_inf
-  REAL(wp) :: Fr_0
-  REAL(wp) :: U_w
 
    !> f_inhibit
    REAL(wp) :: alpha_trans !< solid volume fraction at which f_inhibit starts decreasing

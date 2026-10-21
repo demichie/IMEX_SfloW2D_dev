@@ -1,35 +1,30 @@
 !********************************************************************************
-!> \brief Constitutive parameters and source kernel for regularized mu(I) laws.
+!> \brief Combined mu(I)-Voellmy model 12 source terms.
 !********************************************************************************
 
-MODULE mu_i_rheology_2d
+MODULE rheology_mui_voellmy_2d
 
   USE parameters_2d, ONLY : wp, n_solid
   USE constitutive_parameters_2d, ONLY : diam_s, rho_s
+  USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf
   USE state_conversion_2d, ONLY : sauter_diameter, average_density_solids
 
   IMPLICIT NONE
 
   PRIVATE
 
-  PUBLIC :: I_0, mu_2, mu_s, muI_inf
-  PUBLIC :: eval_mu_i_source
-
-  REAL(wp) :: I_0
-  REAL(wp) :: mu_2
-  REAL(wp) :: mu_s
-  REAL(wp) :: muI_inf
+  PUBLIC :: eval_mui_voellmy_source
 
 CONTAINS
 
   !******************************************************************************
-  !> \brief Evaluate the regularized mu(I) basal friction source.
+  !> \brief Evaluate model 12's regularized mu(I) basal friction source.
   !******************************************************************************
 
-  SUBROUTINE eval_mu_i_source( flow_depth, velocity_x, velocity_y, speed,     &
-       mixture_density, reduced_gravity, gravity_coefficient, solid_fraction, &
-       curvature_acceleration, use_pore_pressure, excess_pore_pressure,       &
-       source_x, source_y )
+  SUBROUTINE eval_mui_voellmy_source( flow_depth, velocity_x, velocity_y,    &
+       speed, mixture_density, reduced_gravity, gravity_coefficient,         &
+       solid_fraction, curvature_acceleration, use_pore_pressure,             &
+       excess_pore_pressure, source_x, source_y )
 
     REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
     REAL(wp), INTENT(IN) :: mixture_density, reduced_gravity
@@ -92,6 +87,6 @@ CONTAINS
     source_x = source_x - friction_stress * (velocity_x / speed)
     source_y = source_y - friction_stress * (velocity_y / speed)
 
-  END SUBROUTINE eval_mu_i_source
+  END SUBROUTINE eval_mui_voellmy_source
 
-END MODULE mu_i_rheology_2d
+END MODULE rheology_mui_voellmy_2d

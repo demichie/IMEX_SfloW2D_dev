@@ -4,7 +4,8 @@ PROGRAM probe_sources
   USE omp_lib, ONLY : omp_get_num_threads
   USE parameters_2d
   USE constitutive_parameters_2d
-  USE mu_i_rheology_2d, ONLY : mu_s, mu_2, I_0, muI_inf
+  USE rheology_parameters_2d, ONLY : mu_s, mu_2, I_0, muI_inf,               &
+       mu_0, mu_inf, Fr_0, U_w
   USE state_conversion_2d, ONLY : qc_to_qp
   USE geometry_2d, ONLY : pi_g
   USE equation_terms_2d, ONLY : eval_implicit_terms, eval_nh_semi_impl_terms, &

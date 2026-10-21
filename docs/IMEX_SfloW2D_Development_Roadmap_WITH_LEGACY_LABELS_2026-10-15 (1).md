@@ -1497,6 +1497,16 @@ Prerequisiti: D04 completato e sotto-audit mirato dei parametri e delle interfac
 
 Stato ufficiale: IN CORSO
 
+Regola di struttura: un modello reologico per file e per modulo. Tutti i
+contributi di una legge devono risiedere nel suo modulo, anche quando oggi
+sono implementati in routine solver diverse: termini semi-impliciti,
+impliciti e, se prevista, la soluzione analitica dello stage. I moduli condivisi
+sono ammessi per parametri o utility comuni, ma non per accorpare kernel di
+leggi distinte. In particolare `mui` e `mui_voellmy`, pur avendo attualmente
+formule uguali, mantengono moduli separati. `rheology_parameters_2d` è soltanto
+l’owner condiviso dei coefficienti ancora usati da namelist e consumer
+esistenti; non contiene leggi reologiche.
+
 | ID interno | Nome input | Modulo previsto |
 |------------|------------|-----------------|
 | 0          | `none`     | nessuna reologia |
@@ -1506,10 +1516,10 @@ Stato ufficiale: IN CORSO
 | 4          | `lahar`    | `rheology_lahar.f90` |
 | 5          | `empirical`| `rheology_empirical.f90` |
 | 6          | `quadratic`| `rheology_quadratic.f90` |
-| 9          | `froude`   | `rheology_froude.f90` |
-| 10         | `lucas`    | `rheology_lucas.f90` |
-| 11         | `mui`      | `mu_i_rheology_2d.f90` |
-| 12         | `mui_voellmy` | `mu_i_rheology_2d.f90` |
+| 9          | `froude`   | `rheology_froude_2d.f90` |
+| 10         | `lucas`    | `rheology_lucas_2d.f90` |
+| 11         | `mui`      | `rheology_mui_2d.f90` |
+| 12         | `mui_voellmy` | `rheology_mui_voellmy_2d.f90` |
 
 Gli ID 7 (non supportato) e 8 (rimosso in D04) non hanno nomi input.
 
@@ -1522,7 +1532,7 @@ Questa è la parte operativa: cosa deve cambiare rispetto all’implementazione 
 | constitutive_parameters_2d.f90 | Mantenere i parametri globali attuali durante l’estrazione; trasferire solo i coefficienti con ownership reologica non condivisa.                         |
 | equation_terms_2d.f90          | Conservare l’assemblaggio generale e delegare ai moduli reologici i contributi specifici delle leggi.                                                    |
 | rheology_2d.f90                | Risolvere il nome in un ID al setup e dispatchare ai kernel della legge, senza confronti tra stringhe nei cicli numerici.                                 |
-| rheology\_\*.f90               | Implementare le leggi attive e i rispettivi contributi SI/IM, mantenendo invariati i contratti REAL/COMPLEX.                                              |
+| rheology\_\*.f90               | Un file/modulo per legge, con tutti i contributi SI/IM e l’eventuale soluzione analitica della legge; mantenere invariati i contratti REAL/COMPLEX. |
 | stochastic_module.f90          | Usare l’ID interno per le scelte stocastiche dipendenti dalla reologia.                                                                                   |
 | EXAMPLES/, TESTS/, generatori  | Aggiornare gli input attivi, gli esempi e gli script; testare nomi, maiuscole, nomi sconosciuti e rifiuto degli ID numerici.                              |
 | Makefile.am                    | Registrare i nuovi moduli e le dipendenze Fortran; rigenerare i file Automake derivati.                                                                  |
@@ -1539,13 +1549,17 @@ viene risolto una volta in un ID interno; non si spostano in blocco parametri
 condivisi (in particolare `T_ref`) né le sorgenti termiche/pore pressure di
 D06.
 
-Primo gruppo estratto: i modelli `mui` e `mui_voellmy` condividono il kernel
-`mu(I)` e ora lo chiamano da `mu_i_rheology_2d`; i coefficienti `mu_s`, `mu_2`,
-`I_0` e `muI_inf` appartengono a quel modulo, non più a
-`constitutive_parameters_2d`. La caratterizzazione indipendente passa per
-255/255 fixture in ciascun profilo strict e optimized; il parser passa 32/32
-casi in entrambi i profili. L’estrazione delle altre leggi e dei rispettivi
-coefficienti resta aperta: D05 è ancora IN CORSO.
+Primo gruppo estratto: `mui` e `mui_voellmy` hanno moduli distinti
+(`rheology_mui_2d` e `rheology_mui_voellmy_2d`), così ciascuna legge mantiene
+nel proprio file i relativi contributi e può evolvere indipendentemente.
+Secondo gruppo estratto: `froude` e `lucas` hanno moduli distinti
+(`rheology_froude_2d` e `rheology_lucas_2d`). I coefficienti ancora condivisi
+con input e consumer esistenti sono posseduti da `rheology_parameters_2d`,
+un modulo di soli parametri, non dai kernel. Restano invariati i consumer di
+setup e di rumore stocastico, aggiornati all’owner esplicito. La
+caratterizzazione indipendente passa 255/255 fixture per profilo strict e
+optimized; il parser passa 32/32 casi per profilo. Restano da estrarre le altre
+leggi e i rispettivi coefficienti: D05 è ancora IN CORSO.
 
 I moduli spaziali HP-PCCU, le conversioni di stato e la geometria dovrebbero richiedere prevalentemente aggiornamenti dei percorsi e delle dipendenze, non modifiche degli algoritmi.
 
