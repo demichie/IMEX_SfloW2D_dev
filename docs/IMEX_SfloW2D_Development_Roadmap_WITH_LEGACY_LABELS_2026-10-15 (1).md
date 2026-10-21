@@ -185,10 +185,10 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D02 | M12e-B        | Caratterizzazione numerica cell-local                       | COMPLETATO (gate locale GNU/macOS) |
 | D03 | —             | Audit e ownership di parametri, variabili e stato condiviso | IN PAUSA |
 | D04 | P2            | Eliminazione reologia 8                                     | COMPLETATO |
-| D05 | P3            | Estrazione moduli reologici                                 | DA FARE  |
+| D05 | P3            | Estrazione moduli reologici e selezione testuale            | IN CORSO |
 | D06 | P3            | Sorgenti termiche e pore pressure                           | DA FARE  |
 | D07 | —             | Migrazione progressiva dei parametri non reologici          | DA FARE  |
-| D08 | P4            | RHEOLOGY_MODEL da numeri a stringhe                         | DA FARE  |
+| D08 | P4            | RHEOLOGY_MODEL da numeri a stringhe                         | ASSORBITO IN D05 |
 | D09 | P5            | Correzione del solo attrito                                 | DA FARE  |
 | D10 | P6            | EX_terms / IM_terms                                         | DA FARE  |
 | D11 | P7            | IM_group e metadati                                         | DA FARE  |
@@ -1420,7 +1420,7 @@ Manifest completo e revisionato, dependency graph aciclico, piano di migrazione 
 | parameters   | max_nl_iter, tol_abs, tol_rel, eps_sing, eps_sing4                                                                                                        | Nonlinear solver / regularization               | Confirm which solvers and spatial kernels consume                         |
 | parameters   | reconstr_coeff, limiter(:), theta                                                                                                                         | Spatial reconstruction configuration            | No numerically visible changes during relocation                          |
 | parameters   | n_vars, n_eqns, n_layers, n_solid, n_add_gas, n_stoch_vars, n_pore_vars, idx\_\*                                                                          | Model layout / equation metadata                | Index initialization, physical state and no circular USE                  |
-| parameters   | rheology_flag, rheology_model, liquid_flag, gas_flag, pore_pressure_flag, sutherland_flag                                                                 | Model physics configuration / rheology selector | Rheology selection migration is separate D08                              |
+| parameters   | rheology_flag, rheology_model, liquid_flag, gas_flag, pore_pressure_flag, sutherland_flag                                                                 | Model physics configuration / rheology selector | Rheology selection migration is included in D05                           |
 | parameters   | slope_correction_flag, curvature_term_flag, topo_change_flag, water_level                                                                                 | Geometry / spatial physics configuration        | Time-dependent geometry remains updateable                                |
 | parameters   | stochastic_flag, stoch_transport_flag, length_spatial_corr                                                                                                | Stochastic model configuration                  | RNG/OU state and restart distinct from input settings                     |
 | parameters   | x_source, y_source, r_source, r2_source, azimuth_source, arc_width_source, mfr_source, vel_source, T_source, h_source, alphas_source(:), alphag_source(:) | Source configuration (radial/initial)           | Inspect activation flags, units and source initialization                 |
@@ -1473,7 +1473,7 @@ Non verrà mantenuto un metodo speciale di integrazione dell’ODE esterno alla 
 Completato: rimossi i rami `rheology_model==8` da solver, integratore e output,
 oltre alla routine `integrate_friction_term`; gli input con modello 8 sono
 respinti. Il modello 6 conserva la propria fisica Bursik--Woods. Il futuro
-dispatcher D05/D08 risolverà una volta gli identificatori esterni basati sui
+dispatcher D05 risolverà una volta gli identificatori esterni basati sui
 suffissi `rheology_<nome>.f90`; il modello 7 resta da auditare prima di
 assegnargli un nome/file. Nessun generatore esistente selezionava il modello 8.
 
@@ -1491,30 +1491,61 @@ Validazione D04:
 
 ### D05 — Estrazione moduli reologici
 
-**Test proporzionati (nuove modifiche a questo step):** T1 contratti di ogni modulo reologico e REAL/COMPLEX; T2 un caso per modello toccato; T3 confronto pre/post se il refactoring cambia il percorso numerico. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+**Test proporzionati (nuove modifiche a questo step):** T1 parsing dei nomi, contratti dei moduli reologici e REAL/COMPLEX; T2 un caso per modello attivo e confronto pre/post; T3 nessun cambiamento di traiettoria per il solo spostamento del codice. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Prerequisiti: D04 completato e sotto-audit mirato dei parametri e delle interfacce reologiche da estrarre. La chiusura dell'audit generale D03 non è richiesta. Durante l’estrazione dei moduli reologici, trasferire agli owner di legge mu/xi, parametri lava, lahar, plastic, quadratic, Froude, Lucas e mu(I); non trascinare proprietà fisiche non reologiche in un generico modulo reologico. Registrare read/write e mantenere la numerica REAL/COMPLEX.
+Prerequisiti: D04 completato e sotto-audit mirato dei parametri e delle interfacce reologiche da estrarre. La chiusura dell'audit generale D03 non è richiesta. Durante l’estrazione dei moduli reologici, trasferire agli owner di legge mu/xi, parametri lava, lahar, plastic, quadratic, Froude, Lucas e mu(I); non trascinare proprietà fisiche non reologiche in un generico modulo reologico. Registrare read/write e mantenere la numerica REAL/COMPLEX. La selezione testuale descritta in D08 è inclusa in D05: l’input usa i nomi canonici e il dispatcher risolve il nome una sola volta all’inizializzazione. I vecchi ID numerici sono respinti esplicitamente.
 
-Stato ufficiale: DA FARE
+Stato ufficiale: IN CORSO
+
+| ID interno | Nome input | Modulo previsto |
+|------------|------------|-----------------|
+| 0          | `none`     | nessuna reologia |
+| 1          | `voellmy`  | `rheology_voellmy.f90` |
+| 2          | `plastic`  | `rheology_plastic.f90` |
+| 3          | `lava`     | `rheology_lava.f90` |
+| 4          | `lahar`    | `rheology_lahar.f90` |
+| 5          | `empirical`| `rheology_empirical.f90` |
+| 6          | `quadratic`| `rheology_quadratic.f90` |
+| 9          | `froude`   | `rheology_froude.f90` |
+| 10         | `lucas`    | `rheology_lucas.f90` |
+| 11         | `mui`      | `mu_i_rheology_2d.f90` |
+| 12         | `mui_voellmy` | `mu_i_rheology_2d.f90` |
+
+Gli ID 7 (non supportato) e 8 (rimosso in D04) non hanno nomi input.
 
 Questa è la parte operativa: cosa deve cambiare rispetto all’implementazione attuale.
 
 | File                           | Modifiche richieste                                                                                                                                     |
 |--------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------|
-| parameters_2d.f90              | Cambiare rheology_model da intero a stringa; aggiornare le definizioni e le opzioni di configurazione.                                                  |
-| inpout_2d.f90                  | Leggere i nuovi nomi, eliminare i confronti numerici, delegare la validazione dei parametri reologici; aggiornare gli output che dipendono dal modello. |
-| init_2d.f90                    | Inizializzare il modello reologico, la partizione implicita e i gruppi.                                                                                 |
-| constitutive_parameters_2d.f90 | Conservare i parametri fisici; riorganizzarli soltanto se necessario per eliminare dipendenze improprie.                                                |
-| equation_metadata_2d.f90       | Aggiungere IM_group, IM_group_method, n_IM_groups, mapping delle equazioni e controlli di validità.                                                     |
-| time_integration_2d.f90        | Introdurre EX_terms e IM_terms; spostare fuori dall’integratore la sequenza SI+Newton e le correzioni reologiche.                                       |
-| nonlinear_solver_2d.f90        | Implementare il coordinamento dei gruppi, Newton con Jacobiano ridotto e la selezione ANALYTIC/NEWTON.                                                  |
-| equation_terms_2d.f90          | Estrarre le formule specifiche delle reologie, della sovrapressione e del raffreddamento; mantenere l’assemblaggio generale delle sorgenti.             |
-| rheology_2d.f90                | Nuovo dispatcher e procedura comune correct_friction_momentum.                                                                                          |
-| rheology\_\*.f90               | Implementare le singole leggi fisiche, i loro contributi SI/IM e le formule chiuse disponibili.                                                         |
-| pore_pressure_2d.f90           | Concentrare le sorgenti di sovrapressione interstiziale e la relativa soluzione analitica.                                                              |
-| thermal_sources_2d.f90         | Concentrare le sorgenti termiche e le formule analitiche supportate.                                                                                    |
-| simulation_2d.f90              | Aggiornare workspace e inizializzazione dei nuovi metadati.                                                                                             |
-| Makefile.am                    | Aggiornare sorgenti e dipendenze Fortran; rigenerare i file Automake derivati.                                                                          |
+| parameters_2d.f90              | Memorizzare il nome canonico e l’ID interno della reologia risolto una sola volta.                                                                       |
+| inpout_2d.f90                  | Leggere i nomi, respingere input numerici/sconosciuti, validare i parametri e stampare il nome selezionato.                                               |
+| constitutive_parameters_2d.f90 | Mantenere i parametri globali attuali durante l’estrazione; trasferire solo i coefficienti con ownership reologica non condivisa.                         |
+| equation_terms_2d.f90          | Conservare l’assemblaggio generale e delegare ai moduli reologici i contributi specifici delle leggi.                                                    |
+| rheology_2d.f90                | Risolvere il nome in un ID al setup e dispatchare ai kernel della legge, senza confronti tra stringhe nei cicli numerici.                                 |
+| rheology\_\*.f90               | Implementare le leggi attive e i rispettivi contributi SI/IM, mantenendo invariati i contratti REAL/COMPLEX.                                              |
+| stochastic_module.f90          | Usare l’ID interno per le scelte stocastiche dipendenti dalla reologia.                                                                                   |
+| EXAMPLES/, TESTS/, generatori  | Aggiornare gli input attivi, gli esempi e gli script; testare nomi, maiuscole, nomi sconosciuti e rifiuto degli ID numerici.                              |
+| Makefile.am                    | Registrare i nuovi moduli e le dipendenze Fortran; rigenerare i file Automake derivati.                                                                  |
+
+D05 resta circoscritto all’estrazione delle reologie e alla selezione testuale. Le sorgenti termiche e di pore pressure restano in D06; EX_terms/IM_terms restano in D10; i gruppi e il Jacobiano ridotto restano in D11–D13.
+
+Esito del sotto-audit: i coefficienti reologici sono attualmente dichiarati in
+`constitutive_parameters_2d` e letti/validati da `inpout_2d`; i kernel li
+leggono da `equation_terms_2d`. `alpha1_coeff` per lahar è inoltre derivato
+dall’input durante il setup. L’ID del modello ha consumatori fuori dai kernel:
+partizione della temperatura in `init_problem_param`, viscosità/settling
+lahar, rumore stocastico e diagnostiche di attrito. Per questo l’input testuale
+viene risolto una volta in un ID interno; non si spostano in blocco parametri
+condivisi (in particolare `T_ref`) né le sorgenti termiche/pore pressure di
+D06.
+
+Primo gruppo estratto: i modelli `mui` e `mui_voellmy` condividono il kernel
+`mu(I)` e ora lo chiamano da `mu_i_rheology_2d`; i coefficienti `mu_s`, `mu_2`,
+`I_0` e `muI_inf` appartengono a quel modulo, non più a
+`constitutive_parameters_2d`. La caratterizzazione indipendente passa per
+255/255 fixture in ciascun profilo strict e optimized; il parser passa 32/32
+casi in entrambi i profili. L’estrazione delle altre leggi e dei rispettivi
+coefficienti resta aperta: D05 è ancora IN CORSO.
 
 I moduli spaziali HP-PCCU, le conversioni di stato e la geometria dovrebbero richiedere prevalentemente aggiornamenti dei percorsi e delle dipendenze, non modifiche degli algoritmi.
 
@@ -1635,71 +1666,12 @@ Parametri letti da namelist convalidati una volta; grandezze derivate calcolate 
 
 Compilazione GNU e ifx, OpenMP 1/4 thread, test di input/restart, confronto numerico strict/optimized e casi fisici mirati. Registrare symbol manifest before/after, dependency graph, confronto di default e prestazioni; ogni modifica alla semantica delle fonti/risultati e un task scientifico separato. Aggiornare Doxygen per ogni simbolo e procedura alterati.
 
-### D08 — RHEOLOGY_MODEL da numeri a stringhe
+### D08 — RHEOLOGY_MODEL da numeri a stringhe (assorbito in D05)
 
-**Test proporzionati (nuove modifiche a questo step):** T1 parsing nomi e compatibilità input/errori; T2 un caso per modello attivo; T3 non necessario per mera rinomina senza cambi di dispatch. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
-
-Stato ufficiale: DA FARE
-
-#### Identificazione delle reologie
-
-La convenzione definitiva sarà:
-
-La stringa specificata nell’input corrisponde al suffisso del file sorgente.
-
-| Modello numerico attuale | Nuovo nome                  | File                     |
-|--------------------------|-----------------------------|--------------------------|
-| 0                        | none                        | Nessuna reologia         |
-| 1                        | voellmy                     | rheology_voellmy.f90     |
-| 2                        | plastic                     | rheology_plastic.f90     |
-| 3                        | lava                        | rheology_lava.f90        |
-| 4                        | lahar                       | rheology_lahar.f90       |
-| 5                        | empirical                   | rheology_empirical.f90   |
-| 6                        | quadratic                   | rheology_quadratic.f90   |
-| 7                        | Non supportato (audit D01)   | Nessuno                  |
-| 8                        | Eliminato                   | Nessuno                  |
-| 9                        | froude                      | rheology_froude.f90      |
-| 10                       | lucas                       | rheology_lucas.f90       |
-| 11                       | mui                         | rheology_mui.f90         |
-| 12                       | mui_voellmy                 | rheology_mui_voellmy.f90 |
-
-La tabella costituisce la mappatura di progetto, non un'interfaccia già implementata. D01 conferma le identità delle leggi presenti e l'assenza di una legge supportata per il modello 7: nessun nome o file gli viene assegnato. Il modello 8 è ancora nel codice e resta da rimuovere in D04. Valori, derivate e limiti delle formulazioni saranno caratterizzati in D02 prima della migrazione definitiva.
-
-Ad esempio, l’attuale input:
-
-&RHEOLOGY_PARAMETERS  
-RHEOLOGY_MODEL = 6  
-FRICTION_FACTOR = 1.0D-3  
-/
-
-diventerà:
-
-&RHEOLOGY_PARAMETERS  
-RHEOLOGY_MODEL = 'quadratic'  
-FRICTION_FACTOR = 1.0D-3  
-/
-
-Il dispatcher comune sarà in rheology_2d.f90. La selezione della reologia avverrà all’inizializzazione; nei cicli numerici non dovranno essere eseguiti ripetutamente confronti tra stringhe.
-
-#### Modifiche agli input, esempi e test
-
-La trasformazione da numeri a stringhe richiede di aggiornare tutti i file presenti in EXAMPLES/, TESTS/ e nella documentazione.
-
-In particolare:
-
-Sostituire tutti i valori numerici di RHEOLOGY_MODEL con i nomi testuali.
-
-Aggiornare gli script che generano automaticamente gli input.
-
-Verificare che gli output e i messaggi diagnostici riportino il nome del modello.
-
-Introdurre test per modelli sconosciuti e configurazioni dei gruppi non valide.
-
-Aggiungere test specifici per ANALYTIC, NEWTON e gruppi misti.
-
-Verificare il comportamento con numero diverso di incognite e in esecuzione OpenMP.
-
-Per i vecchi file di input numerici prevederei un errore esplicito con indicazione del nuovo formato, anziché conservare due sistemi paralleli di identificazione.
+La migrazione dell’input a nomi canonici, il rifiuto degli ID numerici e i
+relativi test sono stati trasferiti in D05 per evitare due step duplicati. D08
+non è più un’attività indipendente; i test di gruppi ANALYTIC/NEWTON e
+OpenMP restano assegnati a D11–D14.
 
 ### D09 — Correzione del solo attrito
 
@@ -2494,7 +2466,7 @@ Le sigle storiche non sono identificativi operativi e sono conservate esclusivam
 | D04      | P2                        | Eliminazione reologia 8                              |
 | D05      | P3                        | Estrazione moduli reologici                          |
 | D06      | P3                        | Sorgenti termiche e pore pressure                    |
-| D08      | P4                        | RHEOLOGY_MODEL da numeri a stringhe                  |
+| D08      | P4                        | RHEOLOGY_MODEL da numeri a stringhe (assorbito in D05) |
 | D09      | P5                        | Correzione del solo attrito                          |
 | D10      | P6                        | EX_terms / IM_terms                                  |
 | D11      | P7                        | IM_group e metadati                                  |

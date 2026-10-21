@@ -11,13 +11,17 @@ MODULE equation_terms_2d
 
   USE constitutive_parameters_2d
   USE state_conversion_2d
+  USE mu_i_rheology_2d, ONLY : eval_mu_i_source
 
   USE equation_metadata_2d, ONLY : equation_partition_type
 
   USE parameters_2d, ONLY : wp, sp, dry_thickness_tolerance
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
        n_stoch_vars, n_pore_vars
-  USE parameters_2d, ONLY : rheology_flag, rheology_model,                      &
+  USE parameters_2d, ONLY : rheology_flag, rheology_model_id,                   &
+       rheology_id_voellmy, rheology_id_plastic, rheology_id_lava, rheology_id_lahar,       &
+       rheology_id_empirical, rheology_id_quadratic, rheology_id_froude, rheology_id_lucas, &
+       rheology_id_mui, rheology_id_mui_voellmy,                                     &
        liquid_flag, gas_flag, slope_correction_flag,                            &
        curvature_term_flag, stochastic_flag,                  &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag
@@ -174,7 +178,7 @@ CONTAINS
     implicit_mask(3) = .TRUE.
 
     ! Temperature
-    IF ( rheology_model .EQ. 3 ) THEN
+    IF ( rheology_model_id .EQ. rheology_id_lava ) THEN
 
        implicit_mask(4) = .TRUE.
 
@@ -1200,7 +1204,8 @@ CONTAINS
        ! would erase it. This does not assign a derivative to Coulomb's cusp.
        moving = (REAL(mod_vel,wp) .NE. 0.0_wp) .OR. (AIMAG(mod_vel) .NE. 0.0_wp)
 
-       IF ( rheology_model .EQ. 1 .OR. rheology_model .EQ. 12 ) THEN
+       IF ( rheology_model_id .EQ. rheology_id_voellmy .OR.                       &
+            rheology_model_id .EQ. rheology_id_mui_voellmy ) THEN
           ! Voellmy Salm rheology
 
           IF ( moving ) THEN
@@ -1222,7 +1227,7 @@ CONTAINS
 
           ENDIF
 
-       ELSEIF ( rheology_model .EQ. 2 ) THEN
+       ELSEIF ( rheology_model_id .EQ. rheology_id_plastic ) THEN
 
           ! Plastic rheology
           IF ( moving ) THEN
@@ -1233,7 +1238,7 @@ CONTAINS
 
           ENDIF
 
-       ELSEIF ( rheology_model .EQ. 3 ) THEN
+       ELSEIF ( rheology_model_id .EQ. rheology_id_lava ) THEN
 
           h_threshold = 1.0E-10_wp
 
@@ -1265,7 +1270,7 @@ CONTAINS
                T_env**4 ) - convective_term_coeff * ( T - T_env )
 
 
-       ELSEIF ( rheology_model .EQ. 4 ) THEN
+       ELSEIF ( rheology_model_id .EQ. rheology_id_lahar ) THEN
 
           ! Lahars rheology (O'Brien 1993, FLO2D)
 
@@ -1348,7 +1353,7 @@ CONTAINS
 
           END IF
 
-       ELSEIF ( rheology_model .EQ. 5 ) THEN
+       ELSEIF ( rheology_model_id .EQ. rheology_id_empirical ) THEN
 
           c_tau = 1.0E-3_wp / ( 1.0_wp + 10.0_wp * h ) * mod_vel
 
@@ -1360,7 +1365,7 @@ CONTAINS
           END IF
 
 
-       ELSEIF ( rheology_model .EQ. 6 ) THEN
+       ELSEIF ( rheology_model_id .EQ. rheology_id_quadratic ) THEN
 
           IF ( moving ) THEN
 
@@ -1373,7 +1378,7 @@ CONTAINS
           ENDIF
 
        ! Coulomb function rheology: mu(Fr)
-       ELSEIF ( rheology_model .EQ. 9 ) THEN
+       ELSEIF ( rheology_model_id .EQ. rheology_id_froude ) THEN
 
        ENDIF
 
@@ -1650,16 +1655,10 @@ CONTAINS
     ! REAL(wp) :: mu_Fr_y             !< mu(fr)_y
 
     ! mu(I) rheology variables
-    REAL(wp) :: diam_characteristic !< area weighted mean diameter of particles
-    REAL(wp) :: rho_particle !< volume weighted mean density of particles
-    REAL(wp) :: I !< inertial number
-    REAL(wp) :: mu_I !< mu(I)
-    REAL(wp) :: shear_rate !< shear rate using horizontal velocity only
-    REAL(wp) :: vert_stress_eff !< effective vertical stress
-    REAL(wp) :: eff_normal_stress !< effective normal stress
-
     REAL(wp) :: temp_term
     REAL(wp) :: centr_force_term
+    REAL(wp) :: rheology_source_x
+    REAL(wp) :: rheology_source_y
 
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
@@ -1709,7 +1708,7 @@ CONTAINS
        mod_hor_vel = SQRT( r_u**2 + r_v**2 )
 
        ! Voellmy Salm rheology
-       rheology_model_if:IF ( rheology_model .EQ. 1 ) THEN
+       rheology_model_if:IF ( rheology_model_id .EQ. rheology_id_voellmy ) THEN
 
           IF ( mod_vel .GT. 0.0_wp ) THEN
 
@@ -1761,11 +1760,11 @@ CONTAINS
           END IF
 
           ! Plastic rheology
-       ELSEIF ( rheology_model .EQ. 2 ) THEN
+       ELSEIF ( rheology_model_id .EQ. rheology_id_plastic ) THEN
 
 
           ! Temperature dependent rheology
-       ELSEIF ( rheology_model .EQ. 3 ) THEN
+       ELSEIF ( rheology_model_id .EQ. rheology_id_lava ) THEN
 
           IF ( mod_vel .GT. 0.0_wp ) THEN
 
@@ -1778,7 +1777,7 @@ CONTAINS
           END IF
 
           ! Lahars rheology (O'Brien 1993, FLO2D)
-       ELSEIF ( rheology_model .EQ. 4 ) THEN
+       ELSEIF ( rheology_model_id .EQ. rheology_id_lahar ) THEN
 
           h_threshold = 1.0E-20_wp
 
@@ -1809,7 +1808,7 @@ CONTAINS
 
           END IF
 
-       ELSEIF ( rheology_model .EQ. 9 ) THEN
+       ELSEIF ( rheology_model_id .EQ. rheology_id_froude ) THEN
 
           ! From Zhu et al. 2020
           ! (DOI: https://doi.org/10.1007/s10035-020-01053-7)
@@ -1864,7 +1863,7 @@ CONTAINS
 
           END IF
 
-      ELSEIF ( rheology_model .EQ. 10 ) THEN
+      ELSEIF ( rheology_model_id .EQ. rheology_id_lucas ) THEN
 
           ! From Lucas et al. 2014 (DOI: 10.1038/ncomms4417)
           ! mu_0: Coulomb friction coefficient at U=0
@@ -1916,39 +1915,9 @@ CONTAINS
 
           END IF
 
-      ELSEIF ( rheology_model .EQ. 11 ) THEN
-         !    mu(I) rheology for dense granular flows   !
-         ! -------------------------------------------- !
-         ! from https://doi.org/10.1016/j.jnnfm.2015.02.006
-            !mu_s = 0.48_wp         ! static friction coefficient
-            !mu_2 = 0.73_wp         ! friction at high inertial number above which flow accelerates
-            !muI_inf = 1.2_wp        ! friction at high I to avoid plateau (Barker et al. 2017) doi:10.1017/jfm.2017.428
-            !I_0 = 0.279_wp         ! reference inertial
-
+      ELSEIF ( rheology_model_id .EQ. rheology_id_mui ) THEN
          IF ( mod_vel .GT. 0.0_wp ) THEN ! v>0 (avoid div by 0)
 
-            ! diameter and density of particles
-            IF ( n_solid .GT. 1) THEN ! if more than one solid phase
-               ! Sauter diameter
-               diam_characteristic = sauter_diameter( r_alphas )
-               ! Particle density
-               rho_particle = average_density_solids( r_alphas )
-            ELSE ! if only one solid phase
-               diam_characteristic = diam_s(1)
-               rho_particle = rho_s(1)
-            END IF
-
-            ! flow thickness (avoid div by 0)
-            IF (r_h .LT. EPSILON(1.0_wp)) THEN
-               r_h = EPSILON(1.0_wp)
-            END IF
-            ! IF (r_h .LT. diam_characteristic) THEN
-            !    r_h = diam_characteristic
-            ! END IF
-
-            ! Centrifugal force contribution (computed once, used consistently below).
-            ! See Eq. (3) Xia & Liang, 2018 Eng.Geol.
-            ! centrifugal force term: (u,v)^T*Hessian*(u,v)
             IF ( curvature_term_flag ) THEN
                centr_force_term = curvature_acceleration( Bsecondj_xx,       &
                     Bsecondj_xy, Bsecondj_yy, r_u, r_v )
@@ -1956,78 +1925,22 @@ CONTAINS
                centr_force_term = 0.0_wp
             END IF
 
-            ! Effective vertical stress: gravity + centrifugal − pore pressure
-            ! See Eq. (2) Gueugneau et al. 2017, GRL for pore pressure contribution
-            IF ( pore_pressure_flag ) THEN
-               ! pore pressure at the base (See Eq. (2) Gueugneau et al. 2017, GRL)
-               exc_pore_pres = qpj(idx_pore)
-               vert_stress_eff = r_rho_m * ( r_red_grav + centr_force_term ) * r_h &
-                           - exc_pore_pres
-            ELSE
-               vert_stress_eff = r_rho_m * ( r_red_grav + centr_force_term ) * r_h
-            END IF
-            vert_stress_eff = MAX(vert_stress_eff, 0.0_wp)
-
-           ! Effective normal stress — computed unconditionally; independent of shear rate
-            eff_normal_stress = MAX(0.0_wp, vert_stress_eff * SQRT(grav_coeff))
-            IF (eff_normal_stress .LT. EPSILON(1.0_wp)) THEN
-               eff_normal_stress = EPSILON(1.0_wp)
-            END IF
-
-            ! Shear rate at the base (Bouchut et al. 2021, Eqn. 2.15)
-            shear_rate = 5.0_wp/2.0_wp * mod_vel / (r_h * SQRT(grav_coeff))
-
-            ! Inertial number
-            I = diam_characteristic * shear_rate / SQRT(eff_normal_stress / rho_particle)
-
-            ! mu(I) with regularisation
-            mu_I = (mu_s * I_0 + mu_2 * I + muI_inf * I**2) / (I_0 + I)
-
-            ! Friction force per unit horizontal area, parallel to full velocity
-            ! vector (u,v,w), tangential to the topography.
-            temp_term = mu_I * eff_normal_stress
-
-            ! Apply friction force to momentum equations (only if there's velocity)
-            ! Friction force projected onto x direction, opposite to motion
-            source_term(2) = source_term(2) - temp_term * (r_u / mod_vel)
-            ! Friction force projected onto y direction, opposite to motion
-            source_term(3) = source_term(3) - temp_term * (r_v / mod_vel)
+            exc_pore_pres = 0.0_wp
+            IF ( pore_pressure_flag ) exc_pore_pres = qpj(idx_pore)
+            CALL eval_mu_i_source(r_h, r_u, r_v, mod_vel, r_rho_m,          &
+                 r_red_grav, grav_coeff, r_alphas, centr_force_term,       &
+                 pore_pressure_flag, exc_pore_pres, rheology_source_x,     &
+                 rheology_source_y)
+            source_term(2) = rheology_source_x
+            source_term(3) = rheology_source_y
 
          END IF
 
 
-       ELSEIF ( rheology_model .EQ. 12 ) THEN
-
-         !    mu(I) rheology with Voellmy-Salm style projection        !
-         ! ----------------------------------------------------------- !
-         ! mu(I) rheology for dense granular flows:
-         ! from https://doi.org/10.1016/j.jnnfm.2015.02.006
-         !mu_s = 0.7_wp          ! static friction coefficient
-         !mu_2 = 1.4_wp          ! friction at high inertial number
-         !muI_inf = 0.05_wp      ! friction at high I (Barker et al. 2017)
-         !I_0 = 0.3_wp           ! reference inertial number
+       ELSEIF ( rheology_model_id .EQ. rheology_id_mui_voellmy ) THEN
 
          IF ( mod_vel .GT. 0.0_wp ) THEN
 
-            ! diameter and density of particles
-            IF ( n_solid .GT. 1) THEN ! if more than one solid phase
-               ! Sauter diameter
-               diam_characteristic = sauter_diameter( r_alphas )
-               ! Particle density
-               rho_particle = average_density_solids( r_alphas )
-            ELSE ! if only one solid phase
-               diam_characteristic = diam_s(1)
-               rho_particle = rho_s(1)
-            END IF
-
-            !Flow thickness (avoid div by 0)
-            IF (r_h .LT. EPSILON(1.0_wp)) THEN
-               r_h = EPSILON(1.0_wp)
-            END IF
-
-            ! Centrifugal force contribution (computed once, used consistently below).
-            ! See Eq. (3) Xia & Liang, 2018 Eng.Geol.
-            ! centrifugal force term: (u,v)^T * Hessian * (u,v)
             IF ( curvature_term_flag ) THEN
                centr_force_term = curvature_acceleration( Bsecondj_xx,       &
                     Bsecondj_xy, Bsecondj_yy, r_u, r_v )
@@ -2035,44 +1948,14 @@ CONTAINS
                 centr_force_term = 0.0_wp
             END IF
 
-            ! Effective vertical stress: gravity + centrifugal − pore pressure.
-            ! See Eq. (2) Gueugneau et al. 2017, GRL for pore pressure contribution.
-            IF ( pore_pressure_flag ) THEN
-               exc_pore_pres = qpj(idx_pore)
-               vert_stress_eff = r_rho_m * ( r_red_grav + centr_force_term ) * r_h &
-                                 - exc_pore_pres
-            ELSE
-               vert_stress_eff = r_rho_m * ( r_red_grav + centr_force_term ) * r_h
-            END IF
-
-            vert_stress_eff = MAX(vert_stress_eff, 0.0_wp)
-
-            !Effective normal stress at the base (clamped at 0, then floored above 0)
-            eff_normal_stress = MAX(0.0_wp, vert_stress_eff * SQRT(grav_coeff))
-            IF (eff_normal_stress .LT. EPSILON(1.0_wp)) THEN
-               eff_normal_stress = EPSILON(1.0_wp)
-            END IF
-
-
-            !Shear rate at the base (Eqn. 2.15 from Bouchut et al. 2021)
-            shear_rate = 5.0_wp/2.0_wp * mod_vel / (r_h * SQRT(grav_coeff))
-
-            !Inertial number
-            I = diam_characteristic*shear_rate/SQRT(eff_normal_stress/rho_particle)
-
-            !Coefficient of friction -> accounting for regularisation
-            mu_I = (mu_s * I_0 + mu_2 * I + muI_inf * I**2) / ( I_0 + I )
-
-
-            ! Friction force per unit horizontal area, parallel to full velocity
-            ! vector (u,v,w), tangential to the topography.
-            temp_term = mu_I * eff_normal_stress
-
-            ! horizontal terms
-            ! units of dqc(2)/dt=d(rho h u)/dt (kg m-1 s-2)
-            source_term(2) = source_term(2) - temp_term * (r_u / mod_vel)
-            ! units of dqc(3)/dt=d(rho h v)/dt (kg m-1 s-2)
-            source_term(3) = source_term(3) - temp_term * (r_v / mod_vel)
+            exc_pore_pres = 0.0_wp
+            IF ( pore_pressure_flag ) exc_pore_pres = qpj(idx_pore)
+            CALL eval_mu_i_source(r_h, r_u, r_v, mod_vel, r_rho_m,          &
+                 r_red_grav, grav_coeff, r_alphas, centr_force_term,       &
+                 pore_pressure_flag, exc_pore_pres, rheology_source_x,     &
+                 rheology_source_y)
+            source_term(2) = rheology_source_x
+            source_term(3) = rheology_source_y
 
          END IF
 
@@ -2308,7 +2191,7 @@ CONTAINS
     CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,             &
          r_sp_heat_mix)
 
-    IF ( rheology_model .EQ. 4 ) THEN
+    IF ( rheology_model_id .EQ. rheology_id_lahar ) THEN
 
        ! alpha1 here has units: kg m-1 s-1
        ! in Table 2 from O'Brien 1988, the values reported have different
@@ -2374,7 +2257,7 @@ CONTAINS
 
           deposition_term(i_solid) = r_alphas(i_solid) * settling_vel
 
-          IF ( rheology_model .NE. 4 ) THEN
+          IF ( rheology_model_id .NE. rheology_id_lahar ) THEN
 
              ! Michaels and Bolger (1962) sedimentation correction accounting
              ! for hindered settling due to the presence of particles

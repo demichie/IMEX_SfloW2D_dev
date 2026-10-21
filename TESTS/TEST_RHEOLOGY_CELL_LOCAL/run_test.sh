@@ -1,5 +1,5 @@
 #!/bin/sh
-# D02 characterization and D03 workspace regression; nonzero means a check failed.
+# D02 characterization and D05 extraction regression; nonzero means a check failed.
 set -eu
 test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_dir=$(CDPATH= cd -- "$test_dir/../.." && pwd)
@@ -18,13 +18,18 @@ for profile in strict optimized; do
     esac
     common='-fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow -ffree-line-length-none'
     objects=''
-    for source in core/parameters_2d core/diagnostics_2d numerics/lapack_interfaces_2d \
+    for source in core/parameters_2d rheology/rheology_2d core/diagnostics_2d numerics/lapack_interfaces_2d \
         core/constitutive_parameters_2d numerics/equation_metadata_2d core/complexify \
-        geometry/geometry_2d state/state_conversion_2d physics/equation_terms_2d \
+        geometry/geometry_2d state/state_conversion_2d rheology/mu_i_rheology_2d \
+        physics/equation_terms_2d \
         numerics/nonlinear_solver_2d; do
         "$compiler" $flags $common -I"$repo_dir/src/state" -c "$repo_dir/src/$source.f90"
         objects="$objects ${source##*/}.o"
     done
+    "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_model_names.f90"
+    "$compiler" $common parameters_2d.o rheology_2d.o test_model_names.o \
+        -o test_model_names
+    ./test_model_names
     # IEEE checks and the test-side FD subtraction stay strict in both profiles.
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/probe_sources.f90"
     "$compiler" $common $objects probe_sources.o -llapack -o probe_sources

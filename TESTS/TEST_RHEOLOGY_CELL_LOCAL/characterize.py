@@ -181,7 +181,8 @@ def input_text(case):
             value = repr(value)
         else:
             value = str(value)
-        values.append(f'{key}={value}')
+        namelist_key = 'rheology_model_id' if key == 'rheology_model' else key
+        values.append(f'{namelist_key}={value}')
     values.append('input_q='+','.join(f'{x:.17e}' for x in case['q']))
     return '&fixture\n'+',\n'.join(values)+'\n/\n'
 

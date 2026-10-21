@@ -4,6 +4,7 @@ PROGRAM probe_sources
   USE omp_lib, ONLY : omp_get_num_threads
   USE parameters_2d
   USE constitutive_parameters_2d
+  USE mu_i_rheology_2d, ONLY : mu_s, mu_2, I_0, muI_inf
   USE state_conversion_2d, ONLY : qc_to_qp
   USE geometry_2d, ONLY : pi_g
   USE equation_terms_2d, ONLY : eval_implicit_terms, eval_nh_semi_impl_terms, &
@@ -25,7 +26,7 @@ PROGRAM probe_sources
   COMPLEX(wp) :: cq(7), complex_source(7), base_complex(7)
   LOGICAL :: mask(7)
   NAMELIST /fixture/ operation, solids, input_q, bx, by, bxx, bxy, byy, z, &
-       dt, diagonal, derivatives, one_sided_pressure, rheology_flag, rheology_model, gas_flag, &
+       dt, diagonal, derivatives, one_sided_pressure, rheology_flag, rheology_model_id, gas_flag, &
        pore_pressure_flag, dynamic_permeability_flag, sutherland_flag,    &
        stochastic_flag, slope_correction_flag, curvature_term_flag,      &
        f_inhibit_mode, mu, xi, tau, nu_ref, visc_par, T_ref, tau0,        &
@@ -39,7 +40,7 @@ PROGRAM probe_sources
   operation=0; solids=2; derivatives=.TRUE.; one_sided_pressure=.FALSE.; input_q=0.0_wp
   bx=0.0_wp; by=0.0_wp; bxx=0.0_wp; bxy=0.0_wp; byy=0.0_wp; z=0.0_wp
   dt=0.05_wp; diagonal=1.0_wp
-  rheology_flag=.TRUE.; rheology_model=6; gas_flag=.FALSE.
+  rheology_flag=.TRUE.; rheology_model_id=6; gas_flag=.FALSE.
   pore_pressure_flag=.FALSE.; dynamic_permeability_flag=.FALSE.
   sutherland_flag=.FALSE.; stochastic_flag=.FALSE.
   slope_correction_flag=.FALSE.; curvature_term_flag=.FALSE.
@@ -58,7 +59,7 @@ PROGRAM probe_sources
   n_pore_vars=MERGE(1,0,pore_pressure_flag)
   n_vars=4+solids+n_pore_vars; n_eqns=n_vars; n_RK=2
   kt_trace_reconstruction='froude_blend'
-  IF (rheology_model==3) kt_trace_reconstruction='h_x'
+  IF (rheology_model_id==3) kt_trace_reconstruction='h_x'
   idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
   idx_totMassEqn=1; idx_uEqn=2; idx_vEqn=3; idx_engyEqn=4
   idx_solid_first=5; idx_solid_last=4+solids
@@ -122,7 +123,7 @@ PROGRAM probe_sources
      STOP
   END IF
   IF (operation==9) THEN
-     IF ((rheology_model/=1 .AND. rheology_model/=12) .OR. .NOT.stochastic_flag) &
+     IF ((rheology_model_id/=1 .AND. rheology_model_id/=12) .OR. .NOT.stochastic_flag) &
           ERROR STOP 'parallel workspace probe requires stochastic Voellmy rheology'
      test_z=[-1000.0_wp,0.0_wp,500.0_wp,100000.0_wp]
      expected_parallel_source=0.0_wp
@@ -193,7 +194,7 @@ PROGRAM probe_sources
   WRITE(*,'(A,2ES26.17E3)') 'GLOBALS ',env_before,T_env
   IF (operation==2) THEN
      mask=.FALSE.; mask(2:3)=.TRUE.
-     IF (rheology_model==3) mask(4)=.TRUE.
+     IF (rheology_model_id==3) mask(4)=.TRUE.
      IF (pore_pressure_flag) mask(n_vars)=.TRUE.
      CALL partition%initialize(mask(1:n_vars))
      CALL initialize_nonlinear_solver

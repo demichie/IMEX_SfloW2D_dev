@@ -87,7 +87,7 @@ The original README specifies substitution tokens in the form `ENSEMBLE_xyz` and
  v_init=ENSEMBLE_vy,
 /
 &RHEOLOGY_PARAMETERS
- RHEOLOGY_MODEL=1,
+ RHEOLOGY_MODEL = 'voellmy',
  MU=ENSEMBLE_mu,
  XI=ENSEMBLE_xi
 /

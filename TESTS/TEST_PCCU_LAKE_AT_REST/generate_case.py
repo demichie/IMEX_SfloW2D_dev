@@ -127,7 +127,7 @@ def write_case(slope_correction=False, curvature=False, bed_mode="planar"):
  GRAV=9.81D0,
  /
 &RHEOLOGY_PARAMETERS
- RHEOLOGY_MODEL=0,
+ RHEOLOGY_MODEL = 'none',
  /
 &GAS_TRANSPORT_PARAMETERS
  SP_HEAT_A=998.0D0, SP_GAS_CONST_A=287.051D0,

@@ -86,7 +86,7 @@ prepare_case() {
             next
         }
         /^ RHEOLOGY_MODEL =/ {
-            print " RHEOLOGY_MODEL = 9,"
+            print " RHEOLOGY_MODEL = 'froude',"
             print " MU_0 = 0.10D0,"
             print " MU_INF = 0.50D0,"
             print " FR_0 = 1.0D0,"

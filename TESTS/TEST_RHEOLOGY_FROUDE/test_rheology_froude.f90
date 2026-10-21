@@ -120,7 +120,7 @@ CONTAINS
     gas_flag = .TRUE.
     liquid_flag = .FALSE.
     rheology_flag = .TRUE.
-    rheology_model = 9
+    rheology_model_id = 9
     slope_correction_flag = .FALSE.
     curvature_term_flag = .FALSE.
     pore_pressure_flag = .FALSE.

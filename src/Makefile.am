@@ -13,6 +13,7 @@ bindir=@bindir@
 IMEX_SfloW2D_SOURCES = \
                 core/parameters_2d.f90 \
                 core/diagnostics_2d.f90 \
+                rheology/rheology_2d.f90 \
                 numerics/lapack_interfaces_2d.f90 \
                 core/constitutive_parameters_2d.f90 \
                 core/model_layout_2d.f90 \
@@ -21,6 +22,7 @@ IMEX_SfloW2D_SOURCES = \
                 core/complexify.f90 \
                 geometry/geometry_2d.f90 \
                 state/state_conversion_2d.f90 \
+                rheology/mu_i_rheology_2d.f90 \
                 physics/equation_terms_2d.f90 \
                 spatial/nonconservative_2d.f90 \
                 spatial/pccu_2d.f90 \
@@ -54,14 +56,19 @@ state/state_conversion_2d.$(OBJEXT): state/state_conversion_phys_var.inc      \
                                      state/mixture_from_mass.inc
 
 numerics/lapack_interfaces_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+rheology/rheology_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 core/constitutive_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 core/runtime_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 core/complexify.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 geometry/geometry_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 state/state_conversion_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                      core/constitutive_parameters_2d.$(OBJEXT)
+rheology/mu_i_rheology_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
+                                     core/constitutive_parameters_2d.$(OBJEXT) \
+                                     state/state_conversion_2d.$(OBJEXT)
 physics/equation_terms_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
+                                     rheology/mu_i_rheology_2d.$(OBJEXT)       \
                                      core/diagnostics_2d.$(OBJEXT)             \
                                      numerics/equation_metadata_2d.$(OBJEXT)   \
                                      core/complexify.$(OBJEXT)                 \
@@ -146,6 +153,8 @@ core/init_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
 io/output_paths.$(OBJEXT): core/parameters_2d.$(OBJEXT)                       \
                           core/diagnostics_2d.$(OBJEXT)
 io/inpout_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
+                        rheology/rheology_2d.$(OBJEXT)                        \
+                        rheology/mu_i_rheology_2d.$(OBJEXT)                   \
                         numerics/time_integration_2d.$(OBJEXT)                 \
                         core/constitutive_parameters_2d.$(OBJEXT)              \
                         core/diagnostics_2d.$(OBJEXT)                           \

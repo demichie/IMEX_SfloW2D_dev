@@ -1,6 +1,8 @@
 # D02 cell-local rheology characterization
 
-This suite measures production sources before extraction into rheology modules.
+This suite measures production sources against independent references while
+the rheology laws are being extracted into dedicated modules. It also checks
+canonical input-name resolution and reverse mapping.
 It deliberately reports discrepancies as failures. A completed run is not
 automatically a scientific acceptance: consult the JSON `acceptance` field and
 the exit status. There are no expected-failure allowances or tolerance increases
@@ -36,9 +38,10 @@ are diagnostics, not replacements for the trapping checks.
 
 The independent NumPy reference builds conservative states from prescribed
 phase volume inventories, then decodes and evaluates the equations. It never
-uses production primitive states as oracle inputs. Models 1–6 and 9–12 are
-covered, with disabled rheology. Model 8 is no longer supported; the parser
-regression verifies it is rejected while model 6 remains accepted.
+uses production primitive states as oracle inputs. The parser uses the names
+`voellmy`, `plastic`, `lava`, `lahar`, `empirical`, `quadratic`, `froude`,
+`lucas`, `mui`, and `mui_voellmy`; `none` denotes disabled rheology. The
+historical model 8 is no longer supported.
 Pore-pressure diffusion, all inhibition modes, mono/multi-class permeability,
 Sutherland viscosity and conservative Darcy gas loss have dedicated fixtures.
 
@@ -100,11 +103,12 @@ select `froude_blend`. No production tableau or rheology selector is changed.
 `check_inputs.py` uses a fresh source-mass fixture and the real solver parser.
 It distinguishes input rejection text from the process exit code: plain Fortran
 STOP can return zero. Valid control runs must reach the end of a short run.
-The 29 cases cover accepted Voellmy and Bursik--Woods inputs, rejection of the
-removed model 8 and unsupported model 7, missing/zero/negative denominators,
-valid zero Coulomb coefficients, nonfinite coefficients and ambient cooling
-configuration. Generated fixtures allow overwrite only inside their supplied
-output directory. Lava uses `h_x`; other cases use `froude_blend`.
+The 32 cases cover accepted Voellmy and Bursik--Woods inputs, case-insensitive
+name handling, rejection of unknown names and legacy numeric IDs, missing/
+zero/negative denominators, valid zero Coulomb coefficients, nonfinite
+coefficients and ambient cooling configuration. Generated fixtures allow
+overwrite only inside their supplied output directory. Lava uses `h_x`; other
+cases use `froude_blend`.
 
 The parser requires finite active rheology coefficients, positive `xi`, `Fr_0`
 and `U_w`, and nonnegative Coulomb coefficients. Integer exponent inspection

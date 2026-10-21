@@ -5,7 +5,7 @@ CLAUDIA ELIJAS-PARRA - regularised mu(I) & dynamic permeability & compaction eff
 Simulation example that accounts for the effect of compaction and diffusion occurring simultaneously in thin fluidised granular flows. The conditions are defined in the following namelists:
 
 &RHEOLOGY_PARAMETERS
- RHEOLOGY_MODEL = 11,
+  RHEOLOGY_MODEL = 'mui',
  MU_S = 0.55D0,
  MU_2 = 0.73D0, 
  MUI_INF = 0.05D0,

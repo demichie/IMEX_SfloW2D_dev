@@ -498,7 +498,7 @@ CONTAINS
     idx_add_gas_first=6; idx_add_gas_last=5
     idx_addGasEqn_first=6; idx_addGasEqn_last=5
     idx_u=6; idx_v=7; idx_stoch=0; idx_pore=0
-    liquid_flag=.TRUE.; gas_flag=.FALSE.; rheology_flag=.FALSE.; rheology_model=0
+    liquid_flag=.TRUE.; gas_flag=.FALSE.; rheology_flag=.FALSE.; rheology_model_id=0
     slope_correction_flag=slope/=0; curvature_term_flag=curvature/=0
     stochastic_flag=.FALSE.; stoch_transport_flag=.FALSE.; pore_pressure_flag=.FALSE.
     gas_loss_flag=.FALSE.; liquid_vaporization_flag=.FALSE.; entrainment_flag=.FALSE.
@@ -565,10 +565,10 @@ CONTAINS
     cell_source_fractions=0.0_wp; cell_arc_perim=0.0_wp
     cell_arc_n_x=0.0_wp; cell_arc_n_y=0.0_wp
     IF (drag/=0) THEN
-       rheology_flag=.TRUE.; rheology_model=6; friction_factor=1.0_wp
+       rheology_flag=.TRUE.; rheology_model_id=6; friction_factor=1.0_wp
     END IF
     IF (source_test_model/=0) THEN
-       rheology_flag=.TRUE.; rheology_model=source_test_model
+       rheology_flag=.TRUE.; rheology_model_id=source_test_model
        mu=0.3_wp; xi=500.0_wp; tau0=20.0_wp
        nu_ref=0.02_wp; visc_par=0.003_wp; T_ref=900.0_wp; T_env=300.0_wp
        radiative_term_coeff=3.0E-8_wp; convective_term_coeff=4.0_wp

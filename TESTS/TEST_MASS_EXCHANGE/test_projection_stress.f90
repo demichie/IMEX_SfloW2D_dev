@@ -84,7 +84,7 @@ CONTAINS
     idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
     idx_solid_first=5; idx_solid_last=6; idx_solidEqn_first=5; idx_solidEqn_last=6
     idx_add_gas_first=7; idx_add_gas_last=6; idx_u=7; idx_v=8; idx_pore=0; idx_stoch=0
-    gas_flag=.FALSE.; liquid_flag=.TRUE.; rheology_flag=.FALSE.; rheology_model=0
+    gas_flag=.FALSE.; liquid_flag=.TRUE.; rheology_flag=.FALSE.; rheology_model_id=0
     stochastic_flag=.FALSE.; stoch_transport_flag=.FALSE.; pore_pressure_flag=.FALSE.
     gas_loss_flag=.FALSE.; liquid_vaporization_flag=.FALSE.; entrainment_flag=.FALSE.
     sutherland_flag=.FALSE.; slope_correction_flag=.TRUE.; topo_change_flag=.TRUE.

@@ -99,7 +99,7 @@
  GRAV= 9.81     ,
  /
 &RHEOLOGY_PARAMETERS
- RHEOLOGY_MODEL = 1,
+  RHEOLOGY_MODEL = 'voellmy',
  MU = 0.3,
  XI = 300.0
  /

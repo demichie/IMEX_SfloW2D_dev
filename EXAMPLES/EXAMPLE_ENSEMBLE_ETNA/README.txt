@@ -55,7 +55,7 @@ In the is simulation we have, for the file IMEX_SfloW2D.inp:
 / 
 
 &RHEOLOGY_PARAMETERS
- RHEOLOGY_MODEL = 1,
+  RHEOLOGY_MODEL = 'voellmy',
  MU = ENSEMBLE_mu,
  XI = ENSEMBLE_xi
  /

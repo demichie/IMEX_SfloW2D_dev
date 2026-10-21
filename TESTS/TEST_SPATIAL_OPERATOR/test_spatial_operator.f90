@@ -207,7 +207,7 @@ CONTAINS
     idx_add_gas_first=6; idx_add_gas_last=5
     idx_addGasEqn_first=6; idx_addGasEqn_last=5
     idx_u=6; idx_v=7; idx_stoch=0; idx_pore=0
-    liquid_flag=.TRUE.; gas_flag=.FALSE.; rheology_flag=.FALSE.; rheology_model=0
+    liquid_flag=.TRUE.; gas_flag=.FALSE.; rheology_flag=.FALSE.; rheology_model_id=0
     slope_correction_flag=slope/=0; curvature_term_flag=curvature/=0
     stochastic_flag=.FALSE.; stoch_transport_flag=.FALSE.; pore_pressure_flag=.FALSE.
     gas_loss_flag=.FALSE.; liquid_vaporization_flag=.FALSE.; entrainment_flag=.FALSE.
