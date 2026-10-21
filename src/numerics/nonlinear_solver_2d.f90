@@ -64,7 +64,8 @@ CONTAINS
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !> \param[out] iterations_used Number of Newton iterations attempted for this cell/stage.
-  !> \param[out] converged True when the implicit-stage solve meets its convergence criteria.
+  !> \param[out] converged True when every Newton stage residual meets its bound;
+  !>                       legacy model 8 retains its separate ODE bypass pending D04.
   !> \param[out] linear_info Linear-solver status: zero for success, nonzero for a failed solve.
   !> \param[out] line_search_failed True when backtracking fails to accept a step.
   !******************************************************************************
@@ -114,7 +115,6 @@ CONTAINS
     REAL(wp) :: scal_f_old
     REAL(wp) :: desc_dir(n_vars)
     REAL(wp) :: grad_f(n_vars)
-    REAL(wp) :: relative_step
 
     INTEGER :: pivot(n_vars)
 
@@ -314,18 +314,8 @@ CONTAINS
 
        IF ( verbose_level .GE. 3 ) WRITE(*,*) 'desc_dir',desc_dir
 
-       ! The correction is expressed in normalized variables. Unlike the old
-       ! EPSILON-based check on an accepted line-search step, this tests the
-       ! actual Newton direction and therefore does not turn a rejected step
-       ! into false convergence. Always perform at least one Newton update.
-       relative_step = MAXVAL( ABS(desc_dir) / MAX(ABS(qj_rel),1.0_wp) )
-
-       IF ( ( nl_iter .GT. 1 ) .AND. ( relative_step .LE. tol_rel_local ) ) THEN
-          converged = .TRUE.
-          IF ( verbose_level .GE. 2 )                                         &
-               WRITE(*,*) 'solve_rk_step: converged on Newton correction'
-          EXIT newton_raphson_loop
-       END IF
+       ! A small normalized correction is not evidence that the current state
+       ! solves the stage equation. Apply the update and check its residual.
 
        qj_rel_NR_old = qj_rel
        scal_f_old = scal_f
@@ -384,7 +374,9 @@ CONTAINS
 
           IF ( verbose_level .GE. 2 )                                         &
                WRITE(*,*) 'solve_rk_step: roundoff-limited Newton stagnation'
-          converged = .TRUE.
+          ! Roundoff stagnation with a residual still above its bound is a
+          ! failed solve, not an alternative successful convergence criterion.
+          converged = .FALSE.
           EXIT newton_raphson_loop
 
        END IF
@@ -908,13 +900,18 @@ CONTAINS
 
     REAL(wp) :: nh_term_impl(n_eqns)
     REAL(wp) :: Rj(n_eqns)
+    ! Keep the conservative difference separate from the forcing even under
+    ! -Ofast reassociation. Otherwise q + (dt*R-q_old) can lose a small forcing
+    ! before subtracting equal large states and falsely report zero residual.
+    REAL(wp), VOLATILE :: delta_q(n_vars)
 
     CALL eval_implicit_terms( Bprimej_x , Bprimej_y, Zij, r_qj = qj ,           &
          r_nh_term_impl=nh_term_impl )
 
     Rj = Rj_not_impl - a_diag * nh_term_impl
 
-    f_nl = qj - qj_old + dt_step * Rj
+    delta_q = qj - qj_old
+    f_nl = delta_q + dt_step * Rj
 
     f_nl = coeff_f * f_nl
 

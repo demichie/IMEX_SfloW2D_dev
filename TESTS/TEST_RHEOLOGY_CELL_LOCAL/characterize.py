@@ -135,9 +135,7 @@ def oracle(q, overrides):
             elif model == 6:
                 implicit[1:3] = -rho*c['friction_factor']*v*v*u/vh
         if model == 3:
-            # Characterize the actual hard-coded ambient, separately from the
-            # configuration-fidelity check; do not silently bless the overwrite.
-            implicit[3] = -c['radiative_term_coeff']*(t**4-300.**4)-c['convective_term_coeff']*(t-300.)
+            implicit[3] = -c['radiative_term_coeff']*(t**4-c['T_env']**4)-c['convective_term_coeff']*(t-c['T_env'])
         if h > EPS and v > 0:
             if model == 1:
                 load = max(0., c['mu']*rho*(g+C)*h*math.sqrt(G))
@@ -166,7 +164,8 @@ def oracle(q, overrides):
                 inertial = d*2.5*v/(max(h, EPS)*math.sqrt(G))/math.sqrt(normal/rp)
                 friction = (c['mu_s']*c['I_0']+c['mu_2']*inertial+c['muI_inf']*inertial**2)/(c['I_0']+inertial)
                 si[1:3] = -friction*normal*u/v
-    if c['pore_pressure_flag'] and h > 0 and p >= 0:
+    if (c['pore_pressure_flag'] and h > 0 and p >= 0 and 1-a.sum() > EPS
+            and (not c['dynamic_permeability_flag'] or a.sum() > EPS)):
         k, nu, rg, beta = pore_coeff(h, t, a, c)
         D = k/((1-a.sum())*nu*rg*beta)
         implicit[-1] = -rho*(math.pi/2)**2*D/max(1.e-10, h)*p*inhibition(a.sum(), h, c)
@@ -232,6 +231,10 @@ def cases():
     for radiation,convection in ((0.,4.),(3.e-8,0.),(3.e-8,4.)):
         result.append(fixture(f'cooling-{radiation:g}-{convection:g}',3,temperature=900.,
             radiative_term_coeff=radiation,convective_term_coeff=convection))
+    for law in (3,4,5):
+        # The flat-bed implicit viscous part is differentiable at rest even
+        # when the separate SI yield law is not. Test its actual derivative.
+        result.append(fixture(f'viscous-rest-derivative-{law}',law,velocity=(0.,0.)))
     result.append(fixture('ambient-overwrite',3,T_env=350.))
     for speed in (1.99999,2.,2.00001):
         result.append(fixture(f'lucas-Uw-{speed:.12g}',10,h=.2,velocity=(speed,0.),derivatives=False))
@@ -248,6 +251,10 @@ def cases():
     for pressure in (-100.,0.,100.):
         result.append(fixture(f'pore-sign-{pressure:g}',6,gas=True,pore_pressure_flag=True,
             pressure=pressure,one_sided_pressure=pressure==0.))
+    result.append(fixture('pore-only-regular',6,gas=True,rheology_flag=False,pore_pressure_flag=True))
+    for a in ((0.,),(0.,0.),(1.,)):
+        result.append(fixture('pore-domain-'+str(a),6,gas=True,alpha=a,pore_pressure_flag=True,
+                              dynamic_permeability_flag=True,derivatives=False))
     for a in (.19999,.2,.20001,.63999,.64,.64001):
         for mode in ('STEP','STATIC'):
             result.append(fixture(f'packing-{a:g}-{mode}',6,gas=True,alpha=(a,),
@@ -255,6 +262,9 @@ def cases():
     for law in (1,2,3,4,5,6,12):
         result.append(fixture(f'newton-{law}',law,temperature=900. if law==3 else 300.,operation=2))
     result.append(fixture('newton-pore',6,gas=True,pore_pressure_flag=True,operation=2))
+    stagnation=fixture('newton-stagnation',3,h=1.e12,temperature=900.,velocity=(0.,0.),operation=2,derivatives=False)
+    stagnation['expect_stagnation']=True
+    result.append(stagnation)
     for law in (9,10):
         result.append(fixture(f'neutral-{law}',law,gas=True,alpha=(0.,),temperature=300.,derivatives=False))
         result.append(fixture(f'buoyant-{law}',law,gas=True,alpha=(0.,),temperature=600.,derivatives=False))
@@ -323,7 +333,11 @@ def main():
                 bound=1.e-5+1.e-5*np.abs(case['config']['dt']*case['config']['diagonal']*expected)
                 checks['stage_residual_max']=residual
                 checks['stage_residual_tolerance_ratio']=float(np.max(np.abs(data['RESIDUAL'])/bound))
-                if data['STATUS'][0]!=1 or checks['stage_residual_tolerance_ratio']>1.:
+                if case.get('expect_stagnation'):
+                    record['stagnation_detected']=bool(data['STATUS'][0]==0 and checks['stage_residual_tolerance_ratio']>1.)
+                    if not record['stagnation_detected']:
+                        findings.append('Newton falsely reports convergence on unrepresentable update')
+                elif data['STATUS'][0]!=1 or checks['stage_residual_tolerance_ratio']>1.:
                     findings.append('Newton stage residual or convergence')
                 if case['config']['rheology_model']==6 and not case['config']['pore_pressure_flag']:
                     q=case['q']; h,u,t,rho,a,p=decode(q,case['config'])
@@ -341,9 +355,10 @@ def main():
         case['config'].update(operation=1,derivatives=False)
         run,data=run_probe(args.executable,case,args.output/'cases'/case['name'])
         values=data.get('REAL',np.array([np.nan]))
+        expected,_=oracle(case['q'],case['config'])
+        ok=run.returncode==0 and np.isfinite(values).all() and relative(values,expected)<=2.e-10
         records.append(dict(name=case['name'],config=case['config'],q=case['q'].tolist(),exit_code=run.returncode,
-            status='FAIL' if run.returncode or not np.isfinite(values).all() else 'PASS',
-            findings=['hazard probe: initialization or singular coefficient evaluation'] if run.returncode or not np.isfinite(values).all() else []))
+            status='PASS' if ok else 'FAIL',findings=[] if ok else ['hazard probe: domain value or initialization failure']))
     for law in (5,6,11,12):
         for label,operation,key in [('real',1,'REAL'),('complex',7,'COMPLEX_REAL'),('si',6,'SI')]:
             case=fixture(f'rest-isolated-{law}-{label}',law,velocity=(0.,0.),operation=operation,derivatives=False)

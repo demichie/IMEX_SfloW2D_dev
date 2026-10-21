@@ -50,14 +50,14 @@ loss instead uses a `1e-12` denominator floor. Every measured error is retained.
 A second CS probe uses the actual Newton normalization:
 `delta=n_vars*epsilon(wp)`, `q_org=max(abs(q),1e-3)`. The scaled column must
 agree with the physical column times q_org to `2e-10`. The Newton Jacobian
-assembly remains private and unchanged; full stage solves provide a separate
+assembly remains private; full stage solves provide a separate
 integration check. Derivatives of explicit mass/composition columns are
 identified separately from columns selected by the current Newton mask.
 
 At zero pressure the pressure derivative is checked with a positive one-sided
-FD, matching the implemented `P>=0` guard. At rest, exact dry states and named
-depth/temperature/velocity switching points, value/limit probes replace a
-claim of a unique derivative. The exact STEP packing switch accepts either
+FD, matching the implemented `P>=0` guard. At exact rest, smooth flat-bed viscous laws 3/4/5 also receive derivative
+checks. At nonsmooth rest, exact dry states and named depth/temperature/velocity
+switching points, value/limit probes replace a claim of a unique derivative. The exact STEP packing switch accepts either
 one-sided value because independent mass-to-volume rounding can change the
 selected side; it never accepts an intermediate value. Points on either side
 are checked normally.
@@ -66,6 +66,9 @@ Newton residuals are checked against the production criterion
 `1e-5 + 1e-5*abs(initial_residual)` for every component, independently of the
 returned `converged` flag. The quadratic stage also has an independent scalar
 root oracle; its state tolerance is `1e-5`, matching production solve accuracy.
+A large-state stagnation fixture requires a failed convergence flag when the
+independently recomputed residual exceeds its bound. It tests accurate failure
+reporting, rather than accepting an inaccurate stage solution.
 
 ## T2 actual integration and parser checks
 
@@ -94,15 +97,34 @@ select `froude_blend`. No production tableau or rheology selector is changed.
 `check_inputs.py` uses a fresh source-mass fixture and the real solver parser.
 It distinguishes input rejection text from the process exit code: plain Fortran
 STOP can return zero. Valid control runs must reach the end of a short run.
-Five invalid parameter configurations are currently accepted and are reported
-as failures, not interpreted as successful negative tests.
+The 28 cases cover missing/zero/negative denominators, valid zero Coulomb
+coefficients, nonfinite coefficients and ambient cooling configuration.
+Generated fixtures allow overwrite only inside their supplied output directory.
+Lava uses `h_x`; other cases use `froude_blend`.
+
+The parser requires finite active rheology coefficients, positive `xi`, `Fr_0`
+and `U_w`, and nonnegative Coulomb coefficients. Integer exponent inspection
+validates IEEE binary32/64 inputs under `-Ofast` without NaN comparisons.
+Cooling uses the configured positive finite `T_env`, defaulting to 300 K when
+omitted. The test reads its startup diagnostic because the historical backup
+writer omits the temperature namelist.
 
 ## Acceptance boundary
 
-The initial characterization finds unresolved derivative, domain, configuration
-and convergence issues; **D02 is not accepted**. See
-`docs/acceptance/D02_CELL_LOCAL_CHARACTERIZATION_2026_10_21.md` for evidence,
-scope and the exact work required to close the gate. This suite is distributed
-as a standalone check, not added to passing `make check`/CI gates while those
-production findings remain unresolved. Scientific formula changes, ownership
-migration and model-8 removal belong to separately validated follow-ups.
+The current suite contains 257 fixtures per profile. The original 249-fixture
+characterization and its findings remain historical evidence in
+`docs/acceptance/D02_CELL_LOCAL_CHARACTERIZATION_2026_10_21.md`; follow-up fixes,
+contracts and validation are recorded in
+`docs/acceptance/D02_NUMERICAL_FIXES_2026_10_21.md`.
+
+Pressure diffusion contributes zero for dry states, negative excess pressure or
+absent carrier pore volume. Dynamic permeability additionally requires a solid
+skeleton. Guards suppress only pressure relaxation and retain other sources.
+Smooth complex algebra preserves composition and height sensitivities, including
+inhibition transitions. The existing diffusion sphericity weights remain
+unchanged; reconciling them with Darcy gas-loss weights belongs to D06.
+
+This suite remains a standalone check, distributed with the project. Scientific
+formula changes, ownership migration, model-8 removal and broader compiler or
+platform acceptance belong to separately validated follow-ups. No test tolerance
+has been increased to close the initial findings.

@@ -1,5 +1,10 @@
 # D02 — Cell-local numerical characterization
 
+Historical characterization of the initial D02 implementation. Production fixes
+and subsequent acceptance evidence are recorded separately in the
+[follow-up report](D02_NUMERICAL_FIXES_2026_10_21.md); the measurements below
+remain unchanged.
+
 Date: 21 October 2026. Baseline: `5aee5d9e` (D01 inventory commit).
 Status: **IMPLEMENTED, ACCEPTANCE GATE OPEN**.
 

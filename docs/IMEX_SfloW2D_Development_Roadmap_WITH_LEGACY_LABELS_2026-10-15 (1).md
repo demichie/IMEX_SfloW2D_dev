@@ -182,7 +182,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 |     | Vecchia label | Attività                                                    | Stato    |
 |-----|---------------|-------------------------------------------------------------|----------|
 | D01 | M12e-A        | Inventario formule e rami REAL/COMPLEX                      | COMPLETATO (audit statico) |
-| D02 | M12e-B        | Caratterizzazione numerica cell-local                       | IMPLEMENTATO, GATE APERTO |
+| D02 | M12e-B        | Caratterizzazione numerica cell-local                       | COMPLETATO (gate locale GNU/macOS) |
 | D03 | —             | Audit e ownership di parametri, variabili e stato condiviso | DA FARE  |
 | D04 | P2            | Eliminazione reologia 8                                     | DA FARE  |
 | D05 | P3            | Estrazione moduli reologici                                 | DA FARE  |
@@ -1246,7 +1246,7 @@ I rilievi statici non autorizzano correzioni silenziose delle formule durante il
 
 **Test proporzionati (nuove modifiche a questo step):** T1 test cell-local di valore/derivata e finite/complex step, casi degeneri; T2 integrazione della sorgente; T3 tolleranze e confronti indipendenti se cambiano formule. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: IMPLEMENTATO, GATE APERTO
+Stato ufficiale: COMPLETATO (caratterizzazione e gate locale GNU/macOS; validazione cross-platform non attestata)
 
 #### Evidenza D02 — 21 ottobre 2026
 
@@ -1268,36 +1268,40 @@ Passano tutti i 16 bilanci isolati di perdita di gas per profilo. Passano anche
 parser reale passano 5/10 casi: cinque input con parametri mancanti/nulli sono
 accettati invece di essere respinti.
 
-#### Requisiti ancora scoperti e chiusura del gate
+#### Correzioni ed evidenza di chiusura
 
-Restano sei rilievi documentati nel rapporto: (1) 20 fixture con derivate
-CS/finite difference discordanti, incluse colonne termiche usate da Newton;
-(2) quattro casi di inizializzazione/dominio della diffusione di pressione;
-(3) validazione incompleta dei parametri; (4) eccezioni nel percorso SI a riposo
-ottimizzato con trap, da distinguere dai corrispondenti output finiti senza
-trap; (5) `T_env` configurato sovrascritto a 300 K; (6) uscita Newton per
-correzione piccola che non garantisce la soglia del residuo ricalcolato.
-I conteggi includono riproduzioni isolate: quattro difetti SI ottimizzati sono
-contati sia nelle fixture combinate sia nelle riproduzioni, non sono otto
-difetti fisici distinti.
+I sei rilievi della caratterizzazione iniziale sono stati corretti o chiusi con
+contratti espliciti. Le derivate delle sorgenti sono state verificate contro
+differenze finite; i domini degeneri della diffusione di pressione e i
+parametri non finiti o singolari sono controllati; il percorso SI a riposo,
+`T_env` configurato e il criterio di convergenza Newton rispettano i contratti
+documentati nel rapporto
+[D02_NUMERICAL_FIXES_2026_10_21.md](acceptance/D02_NUMERICAL_FIXES_2026_10_21.md).
+Le 257 fixture per profilo, le 793 colonne di derivata, i 28 casi del parser e
+i sei controlli di integrazione per profilo passano senza aumentare le
+tolleranze. I valori REAL comuni restano equivalenti entro gli scarti riportati
+nel follow-up; la sola differenza significativa è il rispetto intenzionale
+della temperatura ambiente configurata.
 
-Per passare a COMPLETATO occorrono correzioni o contratti esplicitamente
-giustificati per questi punti, nuova evidenza T1/T2 mirata, equivalenza dei
-valori REAL quando si ripristinano le dipendenze COMPLEX e decisione documentata
-sui contratti termici, di trapping e di arresto. Non aumentare le tolleranze né
-convertire i rilievi in expected PASS. Il confronto dei diversi provider di
-permeabilità resta un vincolo D06; l'ownership D03 e la rimozione D04 non sono
-anticipate. Nessuna nuova validazione ifx/Linux/Docker o campagna scientifica
-estesa è attestata da D02.
+La matrice regressiva completa è passata: **26/26 comandi**, 13 per profilo
+ottimizzato e strict-debug. Include build, parser, stage effettivi, `make check`,
+restart binario, restart stocastico, Gate H e source-mass; i test multi-thread
+sono stati eseguiti a 1 e 4 thread per entrambi i profili. I risultati
+riepilogativi sono in
+[results_d02_numerical_fixes_2026_10_21.json](acceptance/results_d02_numerical_fixes_2026_10_21.json);
+i log riproducibili sono in `build-local/d02-fixes/validation-logs/`.
 
-Matrice iniziale e rilievi da verificare: sezione «Findings and D02 worklist»
-del [rapporto D01](acceptance/D01_RHEOLOGY_INVENTORY_2026_10_21.md).
-Separare prove REAL/COMPLEX delle sorgenti implicite, verifiche REAL delle
-leggi SI e confronto della mappa di stage corretta. Includere diffusione della
-pressione, inibizione, permeabilità mono/multi-classe, stati secchi e
-configurazione pore-only, oltre alle soglie e agli accoppiamenti termici.
-I test preesistenti da soli non coprivano tutte le leggi e tutte le derivate;
-la nuova matrice rende riproducibili le discrepanze rilevate, senza approvarle.
+La chiusura attesta solo la caratterizzazione e la matrice locale GNU/macOS:
+non sono state eseguite nuove validazioni ifx/Linux/Docker né una campagna
+scientifica estesa. Il confronto dei diversi provider di permeabilità resta
+vincolo D06; ownership e thread-safety dello stato condiviso restano D03;
+la rimozione del bypass ODE del modello 8 resta D04; l'accettazione scientifica
+cross-model resta D15.
+
+La matrice iniziale e i rilievi storici restano documentati nella sezione
+«Findings and D02 worklist» del
+[rapporto D01](acceptance/D01_RHEOLOGY_INVENTORY_2026_10_21.md); la loro
+risoluzione è registrata nel follow-up D02 collegato sopra.
 
 ### D03 — Audit e ownership di parametri, variabili e stato condiviso
 

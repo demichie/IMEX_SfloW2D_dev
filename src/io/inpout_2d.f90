@@ -150,6 +150,7 @@ MODULE inpout_2d
 
   IMPLICIT NONE
   PRIVATE :: make_runout_headers
+  PRIVATE :: finite_input_value
 
   INTEGER :: n_restart_files
   CHARACTER(LEN=2048), dimension(10) :: restart_files
@@ -414,6 +415,25 @@ MODULE inpout_2d
     Tref_Suth, muRef_Suth, S_mu
 
 CONTAINS
+
+  !> \brief Check finiteness of a configured IEEE binary32/binary64 real.
+  !> \param[in] value Input coefficient, which may contain NaN or infinity.
+  !> \return True for finite values of the supported working precision.
+  !> \note Integer exponent inspection remains valid under -Ofast, whose
+  !>       finite-math assumptions can fold IEEE_IS_FINITE to true. No floating
+  !>       arithmetic is performed, including for signaling NaN input.
+  PURE ELEMENTAL LOGICAL FUNCTION finite_input_value(value) RESULT(finite)
+    USE, INTRINSIC :: iso_fortran_env, ONLY: int32, int64
+    REAL(wp), INTENT(IN) :: value
+    INTEGER(int32), PARAMETER :: exponent32=INT(Z'7F800000',int32)
+    INTEGER(int64), PARAMETER :: exponent64=INT(Z'7FF0000000000000',int64)
+    finite=.FALSE.
+    IF (STORAGE_SIZE(value)==64 .AND. DIGITS(value)==53 .AND. RADIX(value)==2) THEN
+      finite=IAND(TRANSFER(value,0_int64),exponent64)/=exponent64
+    ELSEIF (STORAGE_SIZE(value)==32 .AND. DIGITS(value)==24 .AND. RADIX(value)==2) THEN
+      finite=IAND(TRANSFER(value,0_int32),exponent32)/=exponent32
+    END IF
+  END FUNCTION finite_input_value
 
   !******************************************************************************
   !> \brief Initialize input defaults, output bookkeeping and boundary descriptors.
@@ -1002,6 +1022,10 @@ CONTAINS
   !>
   !> \note Populates parameters_2d, constitutive_parameters_2d and input geometry/erodible fields.
   !>       Invalid model combinations terminate before solver initialization.
+  !>       Rheology coefficients must be finite; xi, Fr_0 and U_w are strictly
+  !>       positive denominators while zero Coulomb coefficients are allowed.
+  !>       Omitted ambient cooling temperature defaults to 300 K; model 3
+  !>       honors an explicitly supplied positive T_env.
   !******************************************************************************
 
   SUBROUTINE read_param
@@ -3016,6 +3040,39 @@ CONTAINS
 
       END IF
 
+      ! Do this before comparisons: strict builds may trap even a comparison
+      ! with NaN, and optimized finite-math assumptions must not bypass input
+      ! validation. Unused sentinel parameters are deliberately not validated.
+      BLOCK
+        LOGICAL :: finite_parameters
+        finite_parameters=.TRUE.
+        SELECT CASE(rheology_model)
+        CASE(1)
+          finite_parameters=ALL(finite_input_value([mu,xi]))
+        CASE(2)
+          finite_parameters=finite_input_value(tau)
+        CASE(3)
+          finite_parameters=ALL(finite_input_value([nu_ref,tau0,visc_par,T_ref]))
+        CASE(4)
+          finite_parameters=ALL(finite_input_value([alpha2,beta2,T_ref,alpha1_ref,beta1,Kappa,n_td]))
+        CASE(6,8)
+          finite_parameters=finite_input_value(friction_factor)
+        CASE(9)
+          finite_parameters=ALL(finite_input_value([mu_0,mu_inf,Fr_0]))
+        CASE(10)
+          finite_parameters=ALL(finite_input_value([mu_0,mu_inf,U_w]))
+        CASE(11)
+          finite_parameters=ALL(finite_input_value([mu_s,mu_2,I_0,muI_inf]))
+        CASE(12)
+          finite_parameters=ALL(finite_input_value([mu_s,mu_2,I_0,muI_inf,xi]))
+        END SELECT
+        IF (.NOT.finite_parameters) THEN
+          WRITE (*, *) 'ERROR: problem with namelist RHEOLOGY_PARAMETERS'
+          WRITE (*, *) 'RHEOLOGY_MODEL =',rheology_model,' requires finite coefficients.'
+          STOP
+        END IF
+      END BLOCK
+
       IF (rheology_model .EQ. 0) THEN
 
         WRITE (*, *) 'ERROR: problem with namelist RHEOLOGY_PARAMETERS'
@@ -3026,7 +3083,7 @@ CONTAINS
 
       ELSEIF (rheology_model .EQ. 1) THEN
 
-        IF ((mu .EQ. -1.0_wp) .AND. (xi .EQ. -1.0_wp)) THEN
+        IF (mu .LT. 0.0_wp .OR. xi .LE. 0.0_wp) THEN
 
           WRITE (*, *) 'ERROR: problem with namelist RHEOLOGY_PARAMETERS'
           WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
@@ -3275,11 +3332,11 @@ CONTAINS
         WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
         WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'Fr_0 = ', Fr_0
         ! Stop the program if the parameters are not a double-precision floating-point numbers (real numbers).
-        IF ((mu_0 .LT. 0.0_wp) .AND. (mu_inf .LT. 0.0_wp) .AND. (Fr_0 .LT. 0.0_wp)) THEN
+        IF (mu_0 .LT. 0.0_wp .OR. mu_inf .LT. 0.0_wp .OR. Fr_0 .LE. 0.0_wp) THEN
           WRITE (*, *) 'ERROR: problem with namelist RHEOLOGY_PARAMETERS'
           WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
           WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'Fr_0 = ', Fr_0
-          WRITE (*, *) 'All these parameters should be positive! Please correct the input file!'
+          WRITE (*, *) 'Require MU_0 >= 0, MU_INF >= 0 and FR_0 > 0.'
           STOP
         END IF
         ! Stop the program if mu_0 > mu_inf
@@ -3296,11 +3353,11 @@ CONTAINS
         WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
         WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'U_w = ', U_w
         ! Stop the program if the parameters are not a double-precision floating-point numbers (real numbers).
-        IF ((mu_0 .LT. 0.0_wp) .AND. (mu_inf .LT. 0.0_wp) .AND. (U_w .LT. 0.0_wp)) THEN
+        IF (mu_0 .LT. 0.0_wp .OR. mu_inf .LT. 0.0_wp .OR. U_w .LE. 0.0_wp) THEN
           WRITE (*, *) 'ERROR: problem with namelist RHEOLOGY_PARAMETERS'
           WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
           WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'U_w = ', U_w
-          WRITE (*, *) 'All these parameters should be positive! Please correct the input file!'
+          WRITE (*, *) 'Require MU_0 >= 0, MU_INF >= 0 and U_W > 0.'
           STOP
         END IF
         ! Stop the program if mu_0 > mu_inf
@@ -3353,7 +3410,7 @@ CONTAINS
         END IF
 
         ! Require XI (turbulent friction) from Voellmy
-        IF (xi .EQ. -1.0_wp) THEN
+        IF (xi .LE. 0.0_wp) THEN
           WRITE (*, *) 'ERROR: problem with namelist RHEOLOGY_PARAMETERS'
           WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
           WRITE (*, *) 'XI =', xi
@@ -3374,6 +3431,9 @@ CONTAINS
 
     ! ------- READ temperature_parameters NAMELIST ------------------------------
 
+    ! Preserve the historical 300 K ambient when omitted, without overwriting
+    ! an explicit input later in the source kernel.
+    T_env = 300.0_wp
     READ (input_unit, temperature_parameters, IOSTAT=ios)
 
     IF (ios .NE. 0) THEN
@@ -3388,6 +3448,16 @@ CONTAINS
       REWIND (input_unit)
 
       IF (rheology_model .EQ. 3) THEN
+
+        IF (.NOT. finite_input_value(T_env)) THEN
+          WRITE (*, *) 'ERROR: invalid T_ENV in TEMPERATURE_PARAMETERS; require finite T_ENV.'
+          STOP
+        END IF
+        IF (T_env .LE. 0.0_wp) THEN
+          WRITE (*, *) 'ERROR: invalid T_ENV in TEMPERATURE_PARAMETERS; require T_ENV > 0.'
+          STOP
+        END IF
+        WRITE (*, *) 'Cooling ambient temperature (K) =', T_env
 
         radiative_term_coeff = SBconst*emissivity*exp_area_fract
         WRITE (*, *) 'radiative_term_coeff', radiative_term_coeff

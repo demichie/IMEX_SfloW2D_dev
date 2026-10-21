@@ -1106,6 +1106,10 @@ CONTAINS
   !>
   !> \note Provide either the paired real input/output arguments or the paired complex arguments.
   !>       The complex path is used by the Newton Jacobian, not by time advancement.
+  !>       Pore diffusion decodes its state independently of the rheology flag.
+  !>       Dry/negative-pressure states, absent pore volume, and dynamic permeability
+  !>       without solids contribute no pressure relaxation. Smooth closure algebra
+  !>       retains complex perturbations; only branch selection uses real parts.
   !******************************************************************************
 
   SUBROUTINE eval_implicit_terms( Bprimej_x, Bprimej_y, Zij, c_qj,              &
@@ -1150,6 +1154,7 @@ CONTAINS
     REAL(wp) :: h_threshold
 
     INTEGER :: i
+    LOGICAL :: moving
 
     !--- Lahars rheology model variables
 
@@ -1196,14 +1201,14 @@ CONTAINS
 
 
     !> calculation of permeability
-    REAL(wp) :: diam_sauter ! Sauter mean diameter [m]
-    REAL(wp) :: sphericity_mean ! < Surface-area-weighted mean sphericity
+    COMPLEX(wp) :: diam_sauter !< Sauter diameter retaining composition derivatives [m]
+    COMPLEX(wp) :: sphericity_mean !< Legacy diffusion weights, with complex sensitivities
    !> Inhibit factor for friction term
    COMPLEX(wp) :: x  ! local complex variable for f_inhibit calculation
    COMPLEX(wp) :: s ! local complex variable for f_inhibit calculation
    INTEGER :: n ! summation index for f_inhibit calculation
-   REAL(wp) :: tt, term, width
-   REAL(wp) :: alpha_trans_dynamic ! changes with height
+   COMPLEX(wp) :: tt, term, width
+   COMPLEX(wp) :: alpha_trans_dynamic !< Height-dependent transition with its derivative
 
 
     COMPLEX(wp) :: turb_stress
@@ -1232,10 +1237,12 @@ CONTAINS
     source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)
     f_inhibit = CMPLX(1.0_wp,0.0_wp,wp)
 
-    IF (rheology_flag) THEN
-
+    IF (rheology_flag .OR. pore_pressure_flag) THEN
        CALL c_phys_var(qj,h,u,v,T,rho_m,alphas,alphag,inv_rho_m,Zs,             &
             exc_pore_pres)
+    END IF
+
+    IF (rheology_flag) THEN
 
        red_grav = ( rho_m - rho_a_amb ) / rho_m * grav
 
@@ -1252,11 +1259,15 @@ CONTAINS
        mod_vel2 = u**2 + v**2 + w**2
        mod_vel = SQRT( mod_vel2 )
        mod_vel_hor = SQRT( u**2 + v**2 )
+       ! A purely imaginary velocity perturbation about rest still carries
+       ! the derivative of linear viscous laws. Branching on REAL(V) alone
+       ! would erase it. This does not assign a derivative to Coulomb's cusp.
+       moving = (REAL(mod_vel,wp) .NE. 0.0_wp) .OR. (AIMAG(mod_vel) .NE. 0.0_wp)
 
        IF ( rheology_model .EQ. 1 .OR. rheology_model .EQ. 12 ) THEN
           ! Voellmy Salm rheology
 
-          IF ( REAL(mod_vel) .NE. 0.0_wp ) THEN
+          IF ( moving ) THEN
 
              ! Modify xi if using a stochastic model
              IF (stochastic_flag) THEN
@@ -1278,7 +1289,7 @@ CONTAINS
        ELSEIF ( rheology_model .EQ. 2 ) THEN
 
           ! Plastic rheology
-          IF ( REAL(mod_vel) .NE. 0.0_wp ) THEN
+          IF ( moving ) THEN
 
              source_term(2) = source_term(2) - rho_m * tau * ( u / mod_vel )
 
@@ -1289,8 +1300,6 @@ CONTAINS
        ELSEIF ( rheology_model .EQ. 3 ) THEN
 
           h_threshold = 1.0E-10_wp
-
-          T_env = 300.0_wp
 
           ! Temperature dependent rheology
           IF ( REAL(h) .GT. h_threshold ) THEN
@@ -1306,7 +1315,7 @@ CONTAINS
 
           END IF
 
-          IF ( REAL(mod_vel) .NE. 0.0_wp ) THEN
+          IF ( moving ) THEN
 
              ! Last R.H.S. term in equation 2 from Costa & Macedonio, 2005
              source_term(2) = source_term(2) - rho_m * gamma * u
@@ -1391,7 +1400,7 @@ CONTAINS
           ! Total implicit friction slope (dimensionless)
           s_f = s_v + s_td
 
-          IF ( REAL(mod_vel) .GT. 0.0_wp ) THEN
+          IF ( moving ) THEN
 
              temp_term = grav * rho_m * h * s_f / mod_vel_hor
 
@@ -1407,7 +1416,7 @@ CONTAINS
 
           c_tau = 1.0E-3_wp / ( 1.0_wp + 10.0_wp * h ) * mod_vel
 
-          IF ( REAL(mod_vel) .NE. 0.0_wp ) THEN
+          IF ( moving ) THEN
 
              source_term(2) = source_term(2) - rho_m * c_tau * ( u/mod_vel_hor )
              source_term(3) = source_term(3) - rho_m * c_tau * ( v/mod_vel_hor )
@@ -1417,7 +1426,7 @@ CONTAINS
 
        ELSEIF ( rheology_model .EQ. 6 ) THEN
 
-          IF ( REAL(mod_vel) .NE. 0.0_wp ) THEN
+          IF ( moving ) THEN
 
              source_term(2) = source_term(2) - rho_m * ( u / mod_vel_hor ) *    &
                   friction_factor * mod_vel2
@@ -1435,6 +1444,18 @@ CONTAINS
     ENDIF
 
     IF ( pore_pressure_flag ) THEN
+       pore_diffusion: BLOCK
+
+       ! Check the model domain before constructing diffusion coefficients.
+       ! Keep other already assembled sources when this pressure term is absent.
+       IF (REAL(h,wp) .LE. 0.0_wp) EXIT pore_diffusion
+       IF (REAL(exc_pore_pres,wp) .LT. 0.0_wp) EXIT pore_diffusion
+       IF (REAL(1.0_wp-SUM(alphas),wp) .LE. EPSILON(1.0_wp)) EXIT pore_diffusion
+       IF (dynamic_permeability_flag) THEN
+          ! A pore network is undefined without a solid skeleton. This matches
+          ! the no-solid domain guard of the mass-exchange gas-loss model.
+          IF (REAL(SUM(alphas),wp) .LE. EPSILON(1.0_wp)) EXIT pore_diffusion
+       END IF
 
        h_threshold = 1.0E-10_wp
        hydraulic_permeability_local = CMPLX(hydraulic_permeability,0.0_wp,wp)
@@ -1452,11 +1473,11 @@ CONTAINS
          ! diameter and density of particles
          IF ( n_solid .GT. 1) THEN ! if more than one solid phase
             ! Sauter diameter
-            diam_sauter = sauter_diameter( real(alphas) )
+            diam_sauter = SUM(alphas) / SUM(alphas / diam_s)
             ! Surface-area-weighted mean sphericity (consistent with Sauter diameter)
             ! Sphericity is weighted by alpha_i * d_i^2 (proportional to surface area)
-            sphericity_mean = DOT_PRODUCT( real(alphas) * diam_s**2 , sphericity_s ) / &
-                              DOT_PRODUCT( real(alphas) , diam_s**2 )
+            sphericity_mean = SUM(alphas * diam_s**2 * sphericity_s) / &
+                              SUM(alphas * diam_s**2)
          ELSE ! if only one solid phase
             diam_sauter = diam_s(1)
             sphericity_mean = sphericity_s(1)
@@ -1525,16 +1546,17 @@ CONTAINS
             end if
             ! use solid volume fraction source for x
             x = SUM(alphas)
-            ! Normalize x to [0,1] using real part (or use abs(x) for magnitude)
+            ! Select the clamp from the real base state; retain the smooth
+            ! polynomial's complex dependence inside the transition interval.
             width = maximum_solid_packing - alpha_trans ! right_limit - left_limit
-            tt = (real(x) - alpha_trans) / width
-            if (tt < 0.0_wp) tt = 0.0_wp
-            if (tt > 1.0_wp) tt = 1.0_wp
+            tt = (x - alpha_trans) / width
+            if (REAL(tt,wp) < 0.0_wp) tt = 0.0_wp
+            if (REAL(tt,wp) > 1.0_wp) tt = 1.0_wp
             ! Initialize smoothstep sum
             s = CMPLX(0.0_wp,0.0_wp,wp)
             ! call the precomputed pascal triangle coefficients
             do n = 0, N_inh
-               term = pascal_coeff(n)  * tt**(N_inh + n + 1.0_wp)
+               term = pascal_coeff(n)  * tt**(N_inh + n + 1)
                s = s + term
             end do
             ! flip result: [0→1] becomes [1→0]
@@ -1550,10 +1572,10 @@ CONTAINS
 
             ! Calcualte dynamic alpha_trans based on height (from empirical fit)
             alpha_trans_dynamic = 10.0_wp ** (-0.28_wp) *                       &
-                 REAL(h,wp) ** 0.12_wp
+                 h ** 0.12_wp
 
             ! Correct for alpha_trans_dynamic exceeding maximum_solid_packing
-            if ( real(alpha_trans_dynamic) .GE. maximum_solid_packing ) then
+            if ( REAL(alpha_trans_dynamic,wp) .GE. maximum_solid_packing ) then
                 alpha_trans_dynamic = 0.99_wp * maximum_solid_packing
             end if
 
@@ -1564,16 +1586,16 @@ CONTAINS
             end if
             ! use solid volume fraction source for x
             x = SUM(alphas)
-            ! Normalize x to [0,1] using real part (or use abs(x) for magnitude)
+            ! Keep height and concentration sensitivities in the smooth branch.
             width = maximum_solid_packing - alpha_trans_dynamic ! right_limit - left_limit
-            tt = (real(x) - alpha_trans_dynamic) / width
-            if (tt < 0.0_wp) tt = 0.0_wp
-            if (tt > 1.0_wp) tt = 1.0_wp
+            tt = (x - alpha_trans_dynamic) / width
+            if (REAL(tt,wp) < 0.0_wp) tt = 0.0_wp
+            if (REAL(tt,wp) > 1.0_wp) tt = 1.0_wp
             ! Initialize smoothstep sum
             s = CMPLX(0.0_wp,0.0_wp,wp)
             ! call the precomputed pascal triangle coefficients
             do n = 0, N_inh
-               term = pascal_coeff(n)  * tt**(N_inh + n + 1.0_wp)
+               term = pascal_coeff(n)  * tt**(N_inh + n + 1)
                s = s + term
             end do
             ! flip result: [0→1] becomes [1→0]
@@ -1589,6 +1611,7 @@ CONTAINS
 
        END IF
 
+       END BLOCK pore_diffusion
     END IF
 
     nh_term = source_term
@@ -1721,6 +1744,11 @@ CONTAINS
        r_h = qpj(1)
        r_u = qpj(idx_u)
        r_v = qpj(idx_v)
+
+       ! Every SI law below is zero at exact rest. Return before norms and
+       ! divisions so optimized builds with arithmetic traps cannot speculate
+       ! a reciprocal of zero from a later moving-state branch.
+       IF ((r_u .EQ. 0.0_wp) .AND. (r_v .EQ. 0.0_wp)) RETURN
 
        CALL primitive_to_volume_fractions(qpj, r_alphas, r_alphag, r_alphal)
 
