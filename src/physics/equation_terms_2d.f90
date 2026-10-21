@@ -1212,6 +1212,7 @@ CONTAINS
 
 
     COMPLEX(wp) :: turb_stress
+    REAL(wp) :: xi_effective
 
 
     IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
@@ -1271,15 +1272,15 @@ CONTAINS
 
              ! Modify xi if using a stochastic model
              IF (stochastic_flag) THEN
-               xi_temp = xi + Zij
+               xi_effective = xi + Zij
                ! Limit the boundaies of stochastic friction
-               IF (xi_temp .LT. 1._wp) xi_temp = 1._wp
-               IF (xi_temp .GT. 1e5_wp) xi_temp = 1e5_wp
+               IF (xi_effective .LT. 1._wp) xi_effective = 1._wp
+               IF (xi_effective .GT. 1e5_wp) xi_effective = 1e5_wp
              ELSE
-               xi_temp = xi
+               xi_effective = xi
              END IF
 
-             turb_stress = rho_m * red_grav / xi_temp * mod_vel2
+             turb_stress = rho_m * red_grav / xi_effective * mod_vel2
 
              source_term(2) = source_term(2) - turb_stress * ( u / mod_vel )
              source_term(3) = source_term(3) - turb_stress * ( v / mod_vel )

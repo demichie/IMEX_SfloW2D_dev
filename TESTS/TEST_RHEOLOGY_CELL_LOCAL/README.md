@@ -27,10 +27,12 @@ nonzero if either has failures. It does not modify production inputs or source.
 The profiles are strict (`-O0 -g -fcheck=all -finit-real=snan`) and optimized
 (`-Ofast -g -funroll-all-loops`). Both enable OpenMP and
 `-ffpe-trap=invalid,zero,overflow`; driver-side finite differences stay at `-O0`.
-Fixtures run serially in isolated processes, with frozen stochastic Z and no
-RNG draws. Four optimized SI rest probes are repeated without enabling traps
-in the main program, using the identical production module objects. They are
-diagnostics, not replacements for the trapping checks.
+Fixtures run in isolated processes, with frozen stochastic Z and no RNG draws.
+The dedicated `parallel-voellmy-workspace` fixture repeats the same four frozen
+forcing values in a verified four-thread OpenMP team and compares each result
+with its serial reference. Four optimized SI rest probes are repeated without enabling
+traps in the main program, using the identical production module objects. They
+are diagnostics, not replacements for the trapping checks.
 
 The independent NumPy reference builds conservative states from prescribed
 phase volume inventories, then decodes and evaluates the equations. It never
@@ -111,7 +113,7 @@ writer omits the temperature namelist.
 
 ## Acceptance boundary
 
-The current suite contains 257 fixtures per profile. The original 249-fixture
+The current suite contains 258 fixtures per profile. The original 249-fixture
 characterization and its findings remain historical evidence in
 `docs/acceptance/D02_CELL_LOCAL_CHARACTERIZATION_2026_10_21.md`; follow-up fixes,
 contracts and validation are recorded in

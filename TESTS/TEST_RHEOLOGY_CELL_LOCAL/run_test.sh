@@ -1,5 +1,5 @@
 #!/bin/sh
-# D02 characterization; nonzero exit means scientific acceptance is still open.
+# D02 characterization and D03 workspace regression; nonzero means a check failed.
 set -eu
 test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_dir=$(CDPATH= cd -- "$test_dir/../.." && pwd)

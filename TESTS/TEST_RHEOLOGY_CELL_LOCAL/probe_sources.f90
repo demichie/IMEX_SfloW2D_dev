@@ -1,6 +1,7 @@
 !> \brief Isolated production-source probe for D02 numerical characterization.
 !> \details One process per fixture isolates floating-point traps and shared writes.
 PROGRAM probe_sources
+  USE omp_lib, ONLY : omp_get_num_threads
   USE parameters_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d, ONLY : qc_to_qp
@@ -10,7 +11,7 @@ PROGRAM probe_sources
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, solve_rk_step
   IMPLICIT NONE
-  INTEGER :: operation, solids, column, j, level, iterations, linear_info
+  INTEGER :: operation, solids, column, j, level, iterations, linear_info, iz
   LOGICAL :: derivatives, converged, search_failed, one_sided_pressure
   TYPE(equation_partition_type) :: partition
   REAL(wp) :: input_q(7), bx, by, bxx, bxy, byy, z, dt, diagonal, pressure
@@ -18,6 +19,9 @@ PROGRAM probe_sources
   REAL(wp) :: cs(7,7), normalized_cs(7,7), fd(7,7,4), steps(4), delta, env_before
   REAL(wp) :: stage(7), residual(7), erosion(2), deposition(2), exchange(7)
   REAL(wp) :: carrier_erosion, carrier_loss, topo, substrate(2)
+  REAL(wp) :: test_z(4), expected_parallel_source(7,4), parallel_source(7)
+  REAL(wp) :: parallel_error, local_error
+  INTEGER :: iteration, actual_threads
   COMPLEX(wp) :: cq(7), complex_source(7), base_complex(7)
   LOGICAL :: mask(7)
   NAMELIST /fixture/ operation, solids, input_q, bx, by, bxx, bxy, byy, z, &
@@ -87,7 +91,7 @@ PROGRAM probe_sources
   loss_rate=0.0_wp; alphastot_min=0.0_wp; erodible_porosity=0.4_wp
   coeff_porosity=erodible_porosity/(1.0_wp-erodible_porosity)
   erodible_deposit_flag=.FALSE.; liquid_vaporization_flag=.FALSE.
-  T_erodible=300.0_wp; xi_temp=xi
+  T_erodible=300.0_wp
   CALL precompute_pascal_coefficient(N_inh)
   q=input_q; env_before=T_env
   IF (operation==4) THEN
@@ -121,6 +125,32 @@ PROGRAM probe_sources
      WRITE(*,'(A,ES26.17E3)') 'LOSS ',carrier_loss
      WRITE(*,'(A,7ES26.17E3)') 'EXCHANGE ',exchange(1:n_vars)
      STOP
+  END IF
+  IF (operation==9) THEN
+     IF ((rheology_model/=1 .AND. rheology_model/=12) .OR. .NOT.stochastic_flag) &
+          ERROR STOP 'parallel workspace probe requires stochastic Voellmy rheology'
+     test_z=[-1000.0_wp,0.0_wp,500.0_wp,100000.0_wp]
+     expected_parallel_source=0.0_wp
+     DO j=1,SIZE(test_z)
+        CALL eval_implicit_terms(bx,by,test_z(j),r_qj=q(1:n_vars), &
+             r_nh_term_impl=expected_parallel_source(1:n_vars,j))
+     END DO
+     parallel_error=0.0_wp; actual_threads=0
+     !$OMP PARALLEL DO DEFAULT(NONE) SHARED(test_z,expected_parallel_source,q,bx,by,n_vars) &
+     !$OMP& PRIVATE(iz,parallel_source,local_error) REDUCTION(MAX:parallel_error,actual_threads) &
+     !$OMP& NUM_THREADS(4) SCHEDULE(STATIC)
+     DO iteration=1,100000
+        iz=MOD(iteration-1,SIZE(test_z))+1
+        parallel_source=0.0_wp
+        CALL eval_implicit_terms(bx,by,test_z(iz),r_qj=q(1:n_vars), &
+             r_nh_term_impl=parallel_source(1:n_vars))
+        local_error=MAXVAL(ABS(parallel_source(1:n_vars)-expected_parallel_source(1:n_vars,iz)))
+        parallel_error=MAX(parallel_error,local_error)
+        actual_threads=MAX(actual_threads,omp_get_num_threads())
+     END DO
+     !$OMP END PARALLEL DO
+     WRITE(*,'(A,ES26.17E3)') 'PARALLEL_XI ',parallel_error
+     WRITE(*,'(A,I0)') 'PARALLEL_THREADS ',actual_threads
   END IF
   real_source=0.0_wp; si=0.0_wp; cs=0.0_wp; normalized_cs=0.0_wp; fd=0.0_wp
   CALL implicit(q,real_source)
@@ -165,7 +195,7 @@ PROGRAM probe_sources
         WRITE(*,'(A,I0,A,I0,1X,7ES26.17E3)') 'FD',j,'_',level,fd(1:n_vars,j,level)
      END DO
   END DO
-  WRITE(*,'(A,3ES26.17E3)') 'GLOBALS ',env_before,T_env,xi_temp
+  WRITE(*,'(A,2ES26.17E3)') 'GLOBALS ',env_before,T_env
   IF (operation==2) THEN
      mask=.FALSE.; mask(2:3)=.TRUE.
      IF (rheology_model==3) mask(4)=.TRUE.

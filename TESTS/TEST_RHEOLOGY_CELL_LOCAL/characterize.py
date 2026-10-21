@@ -1,4 +1,4 @@
-"""D02 cell-local characterization with independent mixture/source oracles.
+"""D02 source characterization plus the D03 stochastic workspace regression.
 
 A failing physical or derivative check is reported as a finding, never blessed
 as an expected pass. Hazard fixtures run in separate processes with FPE traps.
@@ -196,7 +196,12 @@ def run_probe(executable, case, directory):
     parsed = {}
     for line in run.stdout.splitlines():
         tokens = line.split()
-        if tokens and (tokens[0] in ('N','REAL','COMPLEX_REAL','COMPLEX_IMAG','SI','GLOBALS','STAGE','RESIDUAL','STATUS','LOSS','EXCHANGE','ODE') or tokens[0].startswith(('CS','FD','NCS'))):
+        if tokens and (
+            tokens[0] in ('N','REAL','COMPLEX_REAL','COMPLEX_IMAG','SI','GLOBALS','STAGE',
+                          'RESIDUAL','STATUS','LOSS','EXCHANGE','ODE','PARALLEL_XI',
+                          'PARALLEL_THREADS')
+            or tokens[0].startswith(('CS','FD','NCS'))
+        ):
             parsed[tokens[0]] = np.array([float(x) for x in tokens[1:]])
     return run, parsed
 
@@ -236,6 +241,8 @@ def cases():
         # when the separate SI yield law is not. Test its actual derivative.
         result.append(fixture(f'viscous-rest-derivative-{law}',law,velocity=(0.,0.)))
     result.append(fixture('ambient-overwrite',3,T_env=350.))
+    result.append(fixture('parallel-voellmy-workspace',1,stochastic_flag=True,
+                          operation=9,derivatives=False))
     for speed in (1.99999,2.,2.00001):
         result.append(fixture(f'lucas-Uw-{speed:.12g}',10,h=.2,velocity=(speed,0.),derivatives=False))
     for t in (300.,900.,1100.):
@@ -287,7 +294,7 @@ def main():
         if run.returncode or 'REAL' not in data or not all(np.isfinite(x).all() for x in data.values()):
             findings.append('production source failed or did not emit a complete record')
         else:
-            record['observed_globals']={k:float(v) for k,v in zip(('T_env_before','T_env_after','xi_temp'),data['GLOBALS'])}
+            record['observed_globals']={k:float(v) for k,v in zip(('T_env_before','T_env_after'),data['GLOBALS'])}
             expected,esi=oracle(case['q'],case['config'])
             if case['name']=='packing-0.64-STEP':
                 # At this discontinuity, independently rounded mass-to-volume
@@ -300,6 +307,11 @@ def main():
             checks['si_oracle_error']=relative(data['SI'],esi)
             checks['real_complex_error']=relative(data['COMPLEX_REAL'],data['REAL'])
             checks['unperturbed_imaginary_max']=float(np.abs(data['COMPLEX_IMAG']).max())
+            if case['config']['operation']==9:
+                checks['parallel_xi_error']=float(data.get('PARALLEL_XI',np.array([np.inf]))[0])
+                actual_threads=int(data.get('PARALLEL_THREADS',np.array([0]))[0])
+                if actual_threads!=4:
+                    findings.append(f'parallel workspace used {actual_threads} threads instead of four')
             for key,value in checks.items():
                 if not np.isfinite(value) or value > 2.e-10:
                     findings.append(key)
@@ -429,7 +441,8 @@ def main():
     (args.output/'results.json').write_text(json.dumps(result,indent=2,allow_nan=False)+'\n')
     for record in failed:
         print('FAIL:',record['name'],', '.join(record['findings']))
-    print(f"D02 {args.profile}: {result['passed']}/{result['total']} fixtures pass; acceptance={result['acceptance']}",flush=True)
+    print(f"D02/D03 {args.profile}: {result['passed']}/{result['total']} fixtures pass; "
+          f"acceptance={result['acceptance']}",flush=True)
     return int(bool(failed))
 
 

@@ -1307,11 +1307,33 @@ risoluzione è registrata nel follow-up D02 collegato sopra.
 
 **Test proporzionati (nuove modifiche a questo step):** T1 audit dipendenze, ownership e accessi globali; T2 inizializzazione e serializzazione; T3 integrazione se cambia stato persistente. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: DA FARE
+Stato ufficiale: IN CORSO
 
 #### Obiettivo e posizione nella sequenza
 
 Definire un owner univoco per ogni dichiarazione di modulo in constitutive_parameters_2d.f90 e parameters_2d.f90 prima dei trasferimenti. Conservare i risultati della caratterizzazione REAL/COMPLEX D01-D02. Non duplicare il dato nei moduli consumatori: owner significa il modulo responsabile della definizione e del ciclo di vita, non ogni utilizzatore.
+
+#### Avanzamento iniziale
+
+Il workspace `xi_temp`, scritto come variabile di modulo nel kernel Voellmy,
+è stato rimosso da `constitutive_parameters_2d`; `eval_implicit_terms` usa ora
+lo scalare automatico `xi_effective`. Il regressore
+`parallel-voellmy-workspace` esegue 100.000 valutazioni con quattro thread e
+quattro valori congelati di `Zij`, confrontandole con i riferimenti seriali.
+Strict-debug e optimized passano entrambi 258/258 fixture; l'errore massimo del
+regressore parallelo è zero. Questo verifica il percorso interessato, non
+certifica la thread-safety complessiva del solver.
+
+È disponibile una prima versione di
+[`D03_SHARED_STATE_MANIFEST.json`](acceptance/D03_SHARED_STATE_MANIFEST.json):
+232 voci per simboli e componenti di `bc`, con dichiarazioni, riferimenti
+diretti, import, accessi sintattici, candidati owner e gate. L'indice statico
+non è ancora una revisione semantica: riferimenti indiretti/call-context,
+classificazione input-derivato-stato-workspace, serializzazione e accessi
+OpenMP/MPI richiedono verifica. Anche il grafo presente copre solo la relazione
+diretta tra i due moduli; l'audit completo e la revisione del manifest restano
+aperti. `xi` è registrato come parametro condiviso di configurazione; la
+modifica elimina solo il workspace mutabile.
 
 #### Inventario richiesto e deliverable
 
@@ -1327,7 +1349,7 @@ Manifest completo e revisionato, dependency graph aciclico, piano di migrazione 
 
 | Origine      | Variabili / famiglie                                                                                                                                      | Owner candidato                                 | Verifiche prima del trasferimento                                         |
 |--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|---------------------------------------------------------------------------|
-| constitutive | mu, xi, xi_temp, mu_0, mu_inf, Fr_0, U_w                                                                                                                  | Rheology / each law                             | xi_temp: verify local workspace vs shared configuration; stochastic paths |
+| constitutive | mu, xi, mu_0, mu_inf, Fr_0, U_w                                                                                                                  | Rheology / each law                             | xi_temp is local now; parallel Voellmy regression passes; audit xi ownership |
 | constitutive | I_0, mu_2, mu_s, muI_inf, friction_factor, tau                                                                                                            | Rheology / each law                             | Cross-model parameters and read/write/validation paths                    |
 | constitutive | T_ref, nu_ref, visc_par, tau0, emme, enne                                                                                                                 | Lava rheology / thermophysical definition       | Avoid duplicating shared thermal parameters                               |
 | constitutive | alpha1_coeff, beta1, alpha2, beta2, Kappa, n_td, n_td2                                                                                                    | Lahar rheology                                  | Initialization/order of derived n_td2                                     |
