@@ -14,11 +14,22 @@ MODULE equation_terms_2d
   USE rheology_froude_2d, ONLY : eval_froude_source
   USE rheology_lucas_2d, ONLY : eval_lucas_source
   USE rheology_mui_2d, ONLY : eval_mui_source
-  USE rheology_mui_voellmy_2d, ONLY : eval_mui_voellmy_source
+  USE rheology_mui_voellmy_2d, ONLY : eval_mui_voellmy_source,               &
+       eval_mui_voellmy_implicit_source
+  USE rheology_voellmy_2d, ONLY : eval_voellmy_implicit_source,              &
+       eval_voellmy_semi_impl_source
+  USE rheology_plastic_2d, ONLY : eval_plastic_implicit_source
+  USE rheology_lava_2d, ONLY : eval_lava_implicit_source,                    &
+       eval_lava_semi_impl_source
+  USE rheology_lahar_2d, ONLY : eval_lahar_implicit_source,                  &
+       eval_lahar_semi_impl_source, eval_lahar_fluid_viscosity,              &
+       eval_lahar_deposition_rate
+  USE rheology_empirical_2d, ONLY : eval_empirical_implicit_source
+  USE rheology_quadratic_2d, ONLY : eval_quadratic_implicit_source
 
   USE equation_metadata_2d, ONLY : equation_partition_type
 
-  USE parameters_2d, ONLY : wp, sp, dry_thickness_tolerance
+  USE parameters_2d, ONLY : wp, dry_thickness_tolerance
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
        n_stoch_vars, n_pore_vars
   USE parameters_2d, ONLY : rheology_flag, rheology_model_id,                   &
@@ -1062,8 +1073,6 @@ CONTAINS
     USE geometry_2d, ONLY : pi_g
 
     USE parameters_2d, ONLY : pore_pressure_flag
-    USE parameters_2d, ONLY : four_thirds , neg_four_thirds
-
     IMPLICIT NONE
 
     REAL(wp), INTENT(IN) :: Bprimej_x
@@ -1075,7 +1084,6 @@ CONTAINS
     REAL(wp), INTENT(OUT), OPTIONAL :: r_nh_term_impl(n_eqns)
 
     COMPLEX(wp) :: h                       !< height [m]
-    COMPLEX(wp) :: inv_h                   !< 1/height [m-1]
     COMPLEX(wp) :: u                       !< velocity (x direction) [m/s]
     COMPLEX(wp) :: v                       !< velocity (y direction) [m/s]
     COMPLEX(wp) :: w                       !< velocity (z direction) [m/s]
@@ -1092,37 +1100,10 @@ CONTAINS
     COMPLEX(wp) :: mod_vel
     COMPLEX(wp) :: mod_vel_hor
     COMPLEX(wp) :: mod_vel2
-    COMPLEX(wp) :: gamma
     REAL(wp) :: h_threshold
 
     INTEGER :: i
     LOGICAL :: moving
-
-    !--- Lahars rheology model variables
-
-    !> Temperature in C
-    COMPLEX(wp) :: Tc
-
-    COMPLEX(wp) :: expA , expB
-
-    !> 1st param for fluid viscosity empirical relationship (O'Brian et al, 1993)
-    COMPLEX(wp) :: alpha1    ! (units: kg m-1 s-1 )
-
-    !> Fluid dynamic viscosity (units: kg m-1 s-1 )
-    COMPLEX(wp) :: fluid_visc
-
-    !> Total friction slope (dimensionless): s_f = s_v+s_td+s_y
-    COMPLEX(wp) :: s_f
-
-    !> Viscous slope component of total Friction (dimensionless)
-    COMPLEX(wp) :: s_v
-
-    !> Turbulent dispersive slope component of total friction (dimensionless)
-    COMPLEX(wp) :: s_td
-
-    COMPLEX(wp) :: temp_term
-
-    COMPLEX(wp) :: c_tau
 
     COMPLEX(wp) :: Zs
 
@@ -1151,11 +1132,6 @@ CONTAINS
    INTEGER :: n ! summation index for f_inhibit calculation
    COMPLEX(wp) :: tt, term, width
    COMPLEX(wp) :: alpha_trans_dynamic !< Height-dependent transition with its derivative
-
-
-    COMPLEX(wp) :: turb_stress
-    REAL(wp) :: xi_effective
-
 
     IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
 
@@ -1207,182 +1183,30 @@ CONTAINS
        ! would erase it. This does not assign a derivative to Coulomb's cusp.
        moving = (REAL(mod_vel,wp) .NE. 0.0_wp) .OR. (AIMAG(mod_vel) .NE. 0.0_wp)
 
-       IF ( rheology_model_id .EQ. rheology_id_voellmy .OR.                       &
-            rheology_model_id .EQ. rheology_id_mui_voellmy ) THEN
-          ! Voellmy Salm rheology
-
-          IF ( moving ) THEN
-
-             ! Modify xi if using a stochastic model
-             IF (stochastic_flag) THEN
-               xi_effective = xi + Zij
-               ! Limit the boundaies of stochastic friction
-               IF (xi_effective .LT. 1._wp) xi_effective = 1._wp
-               IF (xi_effective .GT. 1e5_wp) xi_effective = 1e5_wp
-             ELSE
-               xi_effective = xi
-             END IF
-
-             turb_stress = rho_m * red_grav / xi_effective * mod_vel2
-
-             source_term(2) = source_term(2) - turb_stress * ( u / mod_vel )
-             source_term(3) = source_term(3) - turb_stress * ( v / mod_vel )
-
-          ENDIF
-
-       ELSEIF ( rheology_model_id .EQ. rheology_id_plastic ) THEN
-
-          ! Plastic rheology
-          IF ( moving ) THEN
-
-             source_term(2) = source_term(2) - rho_m * tau * ( u / mod_vel )
-
-             source_term(3) = source_term(3) - rho_m * tau * ( v / mod_vel )
-
-          ENDIF
-
-       ELSEIF ( rheology_model_id .EQ. rheology_id_lava ) THEN
-
-          h_threshold = 1.0E-10_wp
-
-          ! Temperature dependent rheology
-          IF ( REAL(h) .GT. h_threshold ) THEN
-
-             ! Equation 6 from Costa & Macedonio, 2005
-             gamma = 3.0_wp * nu_ref / h * EXP( - visc_par * ( T - T_ref ) )
-
-          ELSE
-
-             ! Equation 6 from Costa & Macedonio, 2005
-             gamma = 3.0_wp * nu_ref / h_threshold * EXP( - visc_par            &
-                  * ( T - T_ref ) )
-
-          END IF
-
-          IF ( moving ) THEN
-
-             ! Last R.H.S. term in equation 2 from Costa & Macedonio, 2005
-             source_term(2) = source_term(2) - rho_m * gamma * u
-
-             ! Last R.H.S. term in equation 3 from Costa & Macedonio, 2005
-             source_term(3) = source_term(3) - rho_m * gamma * v
-
-          ENDIF
-
-          source_term(4) = source_term(4) - radiative_term_coeff * ( T**4 -     &
-               T_env**4 ) - convective_term_coeff * ( T - T_env )
-
-
-       ELSEIF ( rheology_model_id .EQ. rheology_id_lahar ) THEN
-
-          ! Lahars rheology (O'Brien 1993, FLO2D)
-
-          ! alpha1 here has units: kg m-1 s-1
-          ! in Table 2 from O'Brien 1988, the values reported have different
-          ! units ( poises). 1poises = 0.1 kg m-1 s-1
-
-          IF ( wp .EQ. sp ) THEN
-
-             h_threshold = 1.0E-10_wp
-
-          ELSE
-
-             h_threshold = 1.0E-20_wp
-
-          END IF
-
-          ! convert from Kelvin to Celsius
-          Tc = T - 273.15_wp
-
-          ! the dependance of viscosity on temperature is modeled with the
-          ! equation presented at:
-          ! https://onlinelibrary.wiley.com/doi/pdf/10.1002/9781118131473.app3
-          !
-          ! In addition, we use a reference value provided in input at a
-          ! reference temperature. This value is used to scale the equation
-          IF ( REAL(Tc) .LT. 20.0_wp ) THEN
-
-             expA = 1301.0_wp / ( 998.333_wp + 8.1855_wp * ( Tc - 20.0_wp )     &
-                  + 0.00585_wp * ( Tc - 20.0_wp )**2 ) - 1.30223_wp
-
-             alpha1 = alpha1_coeff * 1.0E-3_wp * 10.0_wp**expA
-
-          ELSE
-
-             expB = ( 1.3272_wp * ( 20.0_wp - Tc ) - 0.001053_wp *              &
-                  ( Tc - 20.0_wp )**2 ) / ( Tc + 105.0_wp )
-
-             alpha1 = alpha1_coeff * 1.002E-3_wp * 10.0_wp**expB
-
-          END IF
-
-          ! Fluid dynamic viscosity [kg m-1 s-1]
-          fluid_visc = alpha1 * EXP( beta1 * SUM(alphas) )
-
-          IF ( REAL(h) .GT. h_threshold ) THEN
-
-             inv_h = 1.0_wp / h
-
-             ! Viscous slope component (dimensionless)
-             s_v = Kappa * fluid_visc * mod_vel * 0.125_wp * inv_rho_m *        &
-                  inv_grav * inv_h**2
-
-             ! Turbulent dispersive component (dimensionless)
-             s_td = n_td2 * mod_vel2 * inv_h**four_thirds
-
-          ELSE
-
-             ! Viscous slope component (dimensionless)
-             s_v = Kappa * fluid_visc * mod_vel / ( 8.0_wp * rho_m * grav *     &
-                  h_threshold**2 )
-
-             ! Turbulent dispersive components (dimensionless)
-             s_td = n_td2 * mod_vel2 * h_threshold**neg_four_thirds
-
-          END IF
-
-          ! Total implicit friction slope (dimensionless)
-          s_f = s_v + s_td
-
-          IF ( moving ) THEN
-
-             temp_term = grav * rho_m * h * s_f / mod_vel_hor
-
-             ! same units of dqc(2)/dt: kg m-1 s-2
-             source_term(2) = source_term(2) - u * temp_term
-
-             ! same units of dqc(3)/dt: kg m-1 s-2
-             source_term(3) = source_term(3) - v * temp_term
-
-          END IF
-
-       ELSEIF ( rheology_model_id .EQ. rheology_id_empirical ) THEN
-
-          c_tau = 1.0E-3_wp / ( 1.0_wp + 10.0_wp * h ) * mod_vel
-
-          IF ( moving ) THEN
-
-             source_term(2) = source_term(2) - rho_m * c_tau * ( u/mod_vel_hor )
-             source_term(3) = source_term(3) - rho_m * c_tau * ( v/mod_vel_hor )
-
-          END IF
-
-
-       ELSEIF ( rheology_model_id .EQ. rheology_id_quadratic ) THEN
-
-          IF ( moving ) THEN
-
-             source_term(2) = source_term(2) - rho_m * ( u / mod_vel_hor ) *    &
-                  friction_factor * mod_vel2
-
-             source_term(3) = source_term(3) - rho_m * ( v / mod_vel_hor ) *    &
-                  friction_factor * mod_vel2
-
-          ENDIF
-
-       ! Coulomb function rheology: mu(Fr)
-       ELSEIF ( rheology_model_id .EQ. rheology_id_froude ) THEN
-
+       IF (rheology_model_id .EQ. rheology_id_voellmy) THEN
+          CALL eval_voellmy_implicit_source(u, v, rho_m, red_grav, mod_vel,   &
+               mod_vel2, moving, stochastic_flag, Zij, source_term(2),       &
+               source_term(3))
+       ELSEIF (rheology_model_id .EQ. rheology_id_mui_voellmy) THEN
+          CALL eval_mui_voellmy_implicit_source(u, v, rho_m, red_grav,        &
+               mod_vel, mod_vel2, moving, stochastic_flag, Zij,              &
+               source_term(2), source_term(3))
+       ELSEIF (rheology_model_id .EQ. rheology_id_plastic) THEN
+          CALL eval_plastic_implicit_source(u, v, mod_vel, rho_m, moving,     &
+               source_term(2), source_term(3))
+       ELSEIF (rheology_model_id .EQ. rheology_id_lava) THEN
+          CALL eval_lava_implicit_source(h, T, rho_m, u, v, mod_vel, moving,  &
+               source_term(2), source_term(3), source_term(4))
+       ELSEIF (rheology_model_id .EQ. rheology_id_lahar) THEN
+          CALL eval_lahar_implicit_source(h, u, v, mod_vel, mod_vel_hor, T,   &
+               rho_m, inv_rho_m, alphas, moving, source_term(2),             &
+               source_term(3))
+       ELSEIF (rheology_model_id .EQ. rheology_id_empirical) THEN
+          CALL eval_empirical_implicit_source(h, u, v, mod_vel_hor, mod_vel,  &
+               rho_m, moving, source_term(2), source_term(3))
+       ELSEIF (rheology_model_id .EQ. rheology_id_quadratic) THEN
+          CALL eval_quadratic_implicit_source(u, v, mod_vel, mod_vel_hor,     &
+               mod_vel2, rho_m, moving, source_term(2), source_term(3))
        ENDIF
 
     ENDIF
@@ -1626,30 +1450,18 @@ CONTAINS
     REAL(wp) :: mod_vel
     REAL(wp) :: mod_hor_vel
 
-    REAL(wp) :: h_threshold
-
-    !--- Lahars rheology model variables
-
-    !> Yield strenght (units: kg m-1 s-2)
-    REAL(wp) :: tau_y
-
-    !> Yield slope component of total friction (dimensionless)
-    REAL(wp) :: s_y
-
     REAL(wp) :: r_h               !< real-value flow thickness
     REAL(wp) :: r_u               !< real-value x-velocity
     REAL(wp) :: r_v               !< real-value y-velocity
     REAL(wp) :: r_w               !< real_value z-velocity
     REAL(wp) :: r_alphas(n_solid) !< real-value solid volume fractions
     REAL(wp) :: r_rho_m           !< real-value mixture density [kg/m3]
-    REAL(wp) :: r_T               !< real-value temperature [K]
     REAL(wp) :: r_alphal          !< real-value liquid volume fraction
     REAL(wp) :: r_alphag(n_add_gas) !< real-value add. gas volume fractions
     REAL(wp) :: r_red_grav
     REAL(wp) :: r_rho_c
     REAL(wp) :: r_Ri
     ! mu(I) rheology variables
-    REAL(wp) :: temp_term
     REAL(wp) :: centr_force_term
     REAL(wp) :: rheology_source_x
     REAL(wp) :: rheology_source_y
@@ -1681,8 +1493,6 @@ CONTAINS
 
        CALL primitive_to_volume_fractions(qpj, r_alphas, r_alphag, r_alphal)
 
-       r_T = qpj(4)
-
        CALL mixt_var(qpj, r_Ri, r_rho_m, r_rho_c, r_red_grav,                  &
             r_sp_heat_c, r_sp_heat_mix)
 
@@ -1701,106 +1511,22 @@ CONTAINS
 
        mod_hor_vel = SQRT( r_u**2 + r_v**2 )
 
-       ! Voellmy Salm rheology
-       rheology_model_if:IF ( rheology_model_id .EQ. rheology_id_voellmy ) THEN
+       rheology_model_if:IF (rheology_model_id .EQ. rheology_id_voellmy) THEN
+          exc_pore_pres = 0.0_wp
+          IF (pore_pressure_flag) exc_pore_pres = qpj(idx_pore)
+          CALL eval_voellmy_semi_impl_source(r_h, r_u, r_v, mod_vel, r_rho_m, &
+               r_red_grav, grav_coeff, curvature_term_flag, Bsecondj_xx,      &
+               Bsecondj_xy, Bsecondj_yy, pore_pressure_flag, exc_pore_pres,   &
+               source_term(2), source_term(3))
 
-          IF ( mod_vel .GT. 0.0_wp ) THEN
+       ELSEIF (rheology_model_id .EQ. rheology_id_lava) THEN
+          CALL eval_lava_semi_impl_source(r_u, r_v, mod_vel, source_term(2),   &
+               source_term(3))
 
-             IF ( curvature_term_flag ) THEN
-
-                ! See Eq. (3) Xia & Liang, 2018 Eng.Geol.
-                ! centrifugal force term: (u,v)^T*Hessian*(u,v)
-                centr_force_term = curvature_acceleration( Bsecondj_xx,      &
-                     Bsecondj_xy, Bsecondj_yy, r_u, r_v )
-
-             ELSE
-
-                centr_force_term = 0.0_wp
-
-             END IF
-
-             ! See Eq. (3,4) Xia & Liang, 2018 Eng.Geol.
-             ! add the contribution on mu (with coeff for large slope)
-             ! and the contribution of centr. force (with coeff for slope)
-             ! a = grav_coeff * ( r_red_grav + centr_force_term )
-             ! 1/phi = SQRT(grav_coeff)
-             temp_term = mu * r_rho_m * ( r_red_grav + centr_force_term ) * r_h &
-                  * SQRT(grav_coeff)
-
-             temp_term = MAX(0.0_wp, temp_term)
-
-             IF ( pore_pressure_flag ) THEN
-
-                exc_pore_pres = qpj(idx_pore)
-
-                ! See Eq. (2) Gueugneau et al. 2017, GRL
-                ! add the contribution of pore pressure ( with coeff for slope)
-                temp_term = MAX(0.0_wp, temp_term - mu * SQRT(grav_coeff)       &
-                     * exc_pore_pres )
-
-             END IF
-
-             ! Friction terms cannot accelerate the flow
-             ! this term is parallel to the full vel vector (u,v,w)
-             ! tangential to the topography
-             temp_term = MAX(0.0_wp,temp_term)
-
-             ! horizontal terms
-             ! units of dqc(2)/dt=d(rho h u)/dt (kg m-1 s-2)
-             source_term(2) = source_term(2) - temp_term * r_u / mod_vel
-             ! units of dqc(3)/dt=d(rho h v)/dt (kg m-1 s-2)
-             source_term(3) = source_term(3) - temp_term * r_v / mod_vel
-
-          END IF
-
-          ! Plastic rheology
-       ELSEIF ( rheology_model_id .EQ. rheology_id_plastic ) THEN
-
-
-          ! Temperature dependent rheology
-       ELSEIF ( rheology_model_id .EQ. rheology_id_lava ) THEN
-
-          IF ( mod_vel .GT. 0.0_wp ) THEN
-
-             ! units of dqc(2)/dt [kg m-1 s-2]
-             source_term(2) = source_term(2) - tau0 * r_u / mod_vel
-
-             ! units of dqc(3)/dt [kg m-1 s-2]
-             source_term(3) = source_term(3) - tau0 * r_v / mod_vel
-
-          END IF
-
-          ! Lahars rheology (O'Brien 1993, FLO2D)
-       ELSEIF ( rheology_model_id .EQ. rheology_id_lahar ) THEN
-
-          h_threshold = 1.0E-20_wp
-
-          ! Yield strength (units: kg m-1 s-2)
-          tau_y = alpha2 * ( EXP( beta2 * SUM(r_alphas) ) - 1.0_wp )
-
-          IF ( r_h .GT. h_threshold ) THEN
-
-             ! Yield slope component (dimensionless)
-             s_y = tau_y / ( grav * r_rho_m * r_h )
-
-          ELSE
-
-             ! Yield slope component (dimensionless)
-             s_y = tau_y / ( grav * r_rho_m * h_threshold )
-
-          END IF
-
-          IF ( mod_vel .GT. 0.0_wp ) THEN
-
-             temp_term = grav * r_rho_m * r_h * s_y
-
-             ! units of dqc(2)/dt [kg m-1 s-2]
-             source_term(2) = source_term(2) - temp_term * r_u / mod_hor_vel
-
-             ! units of dqc(3)/dt [kg m-1 s-2]
-             source_term(3) = source_term(3) - temp_term * r_v / mod_hor_vel
-
-          END IF
+       ELSEIF (rheology_model_id .EQ. rheology_id_lahar) THEN
+          CALL eval_lahar_semi_impl_source(r_h, r_u, r_v, mod_hor_vel,        &
+               r_rho_m, SUM(r_alphas), mod_vel .GT. 0.0_wp,                  &
+               source_term(2), source_term(3))
 
        ELSEIF ( rheology_model_id .EQ. rheology_id_froude ) THEN
           CALL eval_froude_source(r_h, r_u, r_v, mod_vel, mod_hor_vel,       &
@@ -1953,13 +1679,9 @@ CONTAINS
 
     REAL(wp) :: alphas_tot   !< total solid volume fraction
 
-    REAL(wp) :: Tc           !< temperature of carrier pphase [K]
-
-    REAL(wp) :: alpha1       !< viscosity of continuous phase [kg m-1 s-1]
     REAL(wp) :: fluid_visc
     REAL(wp) :: inv_kin_visc
     REAL(wp) :: rhoc
-    REAL(wp) :: expA , expB
     REAL(wp) :: r_Ri
     REAL(wp) :: r_red_grav
 
@@ -2093,38 +1815,7 @@ CONTAINS
          r_sp_heat_mix)
 
     IF ( rheology_model_id .EQ. rheology_id_lahar ) THEN
-
-       ! alpha1 here has units: kg m-1 s-1
-       ! in Table 2 from O'Brien 1988, the values reported have different
-       ! units ( poises). 1poises = 0.1 kg m-1 s-1
-
-       ! convert from Kelvin to Celsius
-       Tc = r_T - 273.15_wp
-
-       ! the dependance of viscosity on temperature is modeled with the
-       ! equation presented at:
-       ! https://onlinelibrary.wiley.com/doi/pdf/10.1002/9781118131473.app3
-       !
-       ! In addition, we use a reference value provided in input at a
-       ! reference temperature. This value is used to scale the equation
-       IF ( REAL(Tc) .LT. 20.0_wp ) THEN
-
-          expA = 1301.0_wp / ( 998.333_wp + 8.1855_wp * ( Tc - 20.0_wp )        &
-               + 0.00585_wp * ( Tc - 20.0_wp )**2 ) - 1.30223_wp
-
-          alpha1 = alpha1_coeff * 1.0E-3_wp * 10.0_wp**expA
-
-       ELSE
-
-          expB = ( 1.3272_wp * ( 20.0_wp - Tc ) - 0.001053_wp *                 &
-               ( Tc - 20.0_wp )**2 ) / ( Tc + 105.0_wp )
-
-          alpha1 = alpha1_coeff * 1.002E-3_wp * 10.0_wp**expB
-
-       END IF
-
-       ! Fluid dynamic viscosity [kg m-1 s-1]
-       fluid_visc = alpha1 * EXP( beta1 * alphas_tot )
+       fluid_visc = eval_lahar_fluid_viscosity(r_T, alphas_tot)
        ! Kinematic viscosity [m2 s-1]
        inv_kin_visc = r_rho_m / fluid_visc
        ! Continuous phase density used for the settling velocity
@@ -2156,21 +1847,21 @@ CONTAINS
           settling_vel = settling_velocity( diam_s(i_solid) , rho_s(i_solid) ,  &
                rhoc , inv_kin_visc )
 
-          deposition_term(i_solid) = r_alphas(i_solid) * settling_vel
-
-          IF ( rheology_model_id .NE. rheology_id_lahar ) THEN
+          IF (rheology_model_id .EQ. rheology_id_lahar) THEN
+             deposition_term(i_solid) = eval_lahar_deposition_rate(           &
+                  r_alphas(i_solid), settling_vel, r_h, dt)
+          ELSE
+             deposition_term(i_solid) = r_alphas(i_solid) * settling_vel
 
              ! Michaels and Bolger (1962) sedimentation correction accounting
              ! for hindered settling due to the presence of particles
              deposition_term(i_solid) = deposition_term(i_solid) *              &
                   ( 1.0_wp - MIN( 1.0_wp , alphas_tot / alpha_max ) )**hind_exp
 
+             ! Limit deposition to the available amount in this time step.
+             deposition_term(i_solid) = MIN(deposition_term(i_solid),           &
+                  r_h * r_alphas(i_solid) / dt)
           END IF
-
-          ! limit the deposition (cannot remove more than particles present
-          ! in the flow)
-          deposition_term(i_solid) = MIN( deposition_term(i_solid) ,            &
-               r_h * r_alphas(i_solid) / dt )
 
           IF ( deposition_term(i_solid) .LT. 0.0_wp ) THEN
              CALL fatal_error('negative solid deposition rate')

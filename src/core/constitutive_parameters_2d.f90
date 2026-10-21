@@ -1,8 +1,8 @@
 !********************************************************************************
-!> \brief Constitutive model parameters
+!> \brief Shared material and physical parameters.
 !>
-!> Stores material properties and constitutive-law coefficients read during setup. Solver kernels
-!> consume these shared parameters; this module does not advance the flow.
+!> Stores configuration read during setup that is shared across constitutive
+!> models. Rheology-specific coefficients belong to their model modules.
 !********************************************************************************
 
 MODULE constitutive_parameters_2d
@@ -19,14 +19,11 @@ MODULE constitutive_parameters_2d
   PUBLIC :: entrainment_flag
   PUBLIC :: grav, inv_grav
   PUBLIC :: A_drag, B_drag, collective_settling_flag
-  PUBLIC :: mu, xi
   PUBLIC :: alpha_trans, N_inh, f_inhibit_mode
-  PUBLIC :: friction_factor, tau
-  PUBLIC :: T_env, T_ref, nu_ref, visc_par, tau0, emme, c_p
+  PUBLIC :: T_env, emme, c_p
   PUBLIC :: convective_term_coeff, atm_heat_transf_coeff, exp_area_fract
   PUBLIC :: radiative_term_coeff, SBconst, emissivity, enne, T_ground
   PUBLIC :: thermal_conductivity
-  PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
   PUBLIC :: rho_c_sub, rho_a_amb
   PUBLIC :: sp_heat_a, sp_gas_const_a, kin_visc_a
   PUBLIC :: sp_heat_g, sp_gas_const_g
@@ -53,36 +50,13 @@ MODULE constitutive_parameters_2d
   REAL(wp) :: A_drag
   REAL(wp) :: B_drag
   LOGICAL :: collective_settling_flag
-
-  !> drag coefficients (Voellmy-Salm model)
-  REAL(wp) :: mu
-  REAL(wp) :: xi
-
    !> f_inhibit
    REAL(wp) :: alpha_trans !< solid volume fraction at which f_inhibit starts decreasing
    INTEGER :: N_inh = 2 !< 2N+1 determines order of the smoothstep function for f_inhibit
    CHARACTER(LEN=8) :: f_inhibit_mode = 'OFF'  ! options: 'OFF','STATIC','DYNAMIC'
 
-  !> drag coefficients (B&W model)
-  REAL(wp) :: friction_factor
-
-  !> drag coefficients (plastic model)
-  REAL(wp) :: tau
-
   !> evironment temperature [K]
   REAL(wp) :: T_env
-
-  !> reference temperature [K]
-  REAL(wp) :: T_ref
-
-  !> reference kinematic viscosity [m2/s]
-  REAL(wp) :: nu_ref
-
-  !> viscosity parameter [K-1] (b in Table 1 Costa & Macedonio, 2005)
-  REAL(wp) :: visc_par
-
-  !> yield strength for lava rheology [kg m-1 s-2] (Eq.4 Kelfoun & Varga, 2015)
-  REAL(wp) :: tau0
 
   !> velocity boundary layer fraction of total thickness
   REAL(wp) :: emme
@@ -116,29 +90,6 @@ MODULE constitutive_parameters_2d
 
   !> thermal conductivity [W m-1 K-1] (k in Costa & Macedonio, 2005)
   REAL(wp) :: thermal_conductivity
-
-  !--- START Lahars rheology model parameters
-
-  !> 1st param for yield strenght empirical relationship (O'Brian et al, 1993)
-  REAL(wp) :: alpha2    ! (units: kg m-1 s-2)
-
-  !> 2nd param for yield strenght empirical relationship (O'Brian et al, 1993)
-  REAL(wp) :: beta2     ! (units: nondimensional)
-
-  !> ratio between reference value from input and computed values from eq.
-  REAL(wp) :: alpha1_coeff ! (units: nondimensional )
-
-  !> 2nd param for fluid viscosity empirical relationship (O'Brian et al, 1993)
-  REAL(wp) :: beta1     ! (units: nondimensional, input parameter)
-
-  !> Empirical resistance parameter (dimensionless, input parameter)
-  REAL(wp) :: Kappa
-
-  !> Mannings roughness coefficient ( units: T L^(-1/3) )
-  REAL(wp) :: n_td
-  REAL(wp) :: n_td2
-
-  !--- END Lahars rheology model parameters
 
   !> Specific gas constant of gas mixture (units: J kg-1 K-1)
 

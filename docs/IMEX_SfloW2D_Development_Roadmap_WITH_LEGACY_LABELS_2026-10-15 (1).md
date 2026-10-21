@@ -1464,7 +1464,8 @@ degli altri modelli.
 I tre fixture ODE legacy dalla caratterizzazione corrente; i risultati storici
 D01/D02 restano archiviati come evidenza della baseline precedente.
 
-La futura soluzione analitica della frizione quadratica apparterrà a rheology_quadratic.f90 e risolverà correttamente lo stage DIRK.
+La futura soluzione analitica della frizione quadratica apparterrà a
+`rheology_quadratic_2d.f90` e risolverà correttamente lo stage DIRK.
 
 Non verrà mantenuto un metodo speciale di integrazione dell’ODE esterno alla nuova architettura.
 
@@ -1510,12 +1511,12 @@ esistenti; non contiene leggi reologiche.
 | ID interno | Nome input | Modulo previsto |
 |------------|------------|-----------------|
 | 0          | `none`     | nessuna reologia |
-| 1          | `voellmy`  | `rheology_voellmy.f90` |
-| 2          | `plastic`  | `rheology_plastic.f90` |
-| 3          | `lava`     | `rheology_lava.f90` |
-| 4          | `lahar`    | `rheology_lahar.f90` |
-| 5          | `empirical`| `rheology_empirical.f90` |
-| 6          | `quadratic`| `rheology_quadratic.f90` |
+| 1          | `voellmy`  | `rheology_voellmy_2d.f90` |
+| 2          | `plastic`  | `rheology_plastic_2d.f90` |
+| 3          | `lava`     | `rheology_lava_2d.f90` |
+| 4          | `lahar`    | `rheology_lahar_2d.f90` |
+| 5          | `empirical`| `rheology_empirical_2d.f90` |
+| 6          | `quadratic`| `rheology_quadratic_2d.f90` |
 | 9          | `froude`   | `rheology_froude_2d.f90` |
 | 10         | `lucas`    | `rheology_lucas_2d.f90` |
 | 11         | `mui`      | `rheology_mui_2d.f90` |
@@ -1539,27 +1540,28 @@ Questa è la parte operativa: cosa deve cambiare rispetto all’implementazione 
 
 D05 resta circoscritto all’estrazione delle reologie e alla selezione testuale. Le sorgenti termiche e di pore pressure restano in D06; EX_terms/IM_terms restano in D10; i gruppi e il Jacobiano ridotto restano in D11–D13.
 
-Esito del sotto-audit: i coefficienti reologici sono attualmente dichiarati in
-`constitutive_parameters_2d` e letti/validati da `inpout_2d`; i kernel li
-leggono da `equation_terms_2d`. `alpha1_coeff` per lahar è inoltre derivato
-dall’input durante il setup. L’ID del modello ha consumatori fuori dai kernel:
-partizione della temperatura in `init_problem_param`, viscosità/settling
-lahar, rumore stocastico e diagnostiche di attrito. Per questo l’input testuale
-viene risolto una volta in un ID interno; non si spostano in blocco parametri
-condivisi (in particolare `T_ref`) né le sorgenti termiche/pore pressure di
-D06.
+Esito del sotto-audit: i coefficienti reologici sono posseduti dai rispettivi
+moduli e letti/validati da `inpout_2d`; `alpha1_coeff` per lahar viene derivato
+dall’input durante il setup. L’ID del modello ha inoltre consumer fuori dai
+kernel: partizione della temperatura in `init_problem_param`, selezione della
+viscosità e del settling lahar, rumore stocastico e diagnostiche di attrito.
+Per questo l’input testuale viene risolto una volta in un ID interno. `xi`,
+`T_ref` e gli altri parametri condivisi restano in `rheology_parameters_2d`;
+le sorgenti termiche e di pore pressure generali restano in D06.
 
-Primo gruppo estratto: `mui` e `mui_voellmy` hanno moduli distinti
-(`rheology_mui_2d` e `rheology_mui_voellmy_2d`), così ciascuna legge mantiene
-nel proprio file i relativi contributi e può evolvere indipendentemente.
-Secondo gruppo estratto: `froude` e `lucas` hanno moduli distinti
-(`rheology_froude_2d` e `rheology_lucas_2d`). I coefficienti ancora condivisi
-con input e consumer esistenti sono posseduti da `rheology_parameters_2d`,
-un modulo di soli parametri, non dai kernel. Restano invariati i consumer di
-setup e di rumore stocastico, aggiornati all’owner esplicito. La
-caratterizzazione indipendente passa 255/255 fixture per profilo strict e
-optimized; il parser passa 32/32 casi per profilo. Restano da estrarre le altre
-leggi e i rispettivi coefficienti: D05 è ancora IN CORSO.
+Sono ora presenti moduli separati per tutti i modelli attivi: `voellmy`,
+`plastic`, `lava`, `lahar`, `empirical`, `quadratic`, `froude`, `lucas`, `mui`
+e `mui_voellmy`. Ogni modulo contiene i contributi del modello che prima erano
+dispersi tra le routine implicite e semi-implicite; il modulo lahar contiene
+anche la relazione di viscosità usata dal settling e la propria regola di
+deposizione. I coefficienti specifici sono stati trasferiti ai rispettivi
+moduli; `xi`, `T_ref` e i coefficienti già condivisi restano nel modulo
+parametri, che non contiene kernel. I consumer di setup, diagnostica e rumore
+stocastico restano nei rispettivi percorsi generali, ma leggono gli owner
+espliciti. La caratterizzazione passa 255/255 fixture in strict e optimized,
+il parser passa 32/32 casi e la build strict-debug completa è riuscita.
+D05 resta IN CORSO in attesa della verifica finale di traiettoria pre/post
+prevista dal criterio T3.
 
 I moduli spaziali HP-PCCU, le conversioni di stato e la geometria dovrebbero richiedere prevalentemente aggiornamenti dei percorsi e delle dipendenze, non modifiche degli algoritmi.
 

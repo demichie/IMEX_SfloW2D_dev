@@ -5,7 +5,12 @@ PROGRAM probe_sources
   USE parameters_2d
   USE constitutive_parameters_2d
   USE rheology_parameters_2d, ONLY : mu_s, mu_2, I_0, muI_inf,               &
-       mu_0, mu_inf, Fr_0, U_w
+       mu_0, mu_inf, Fr_0, U_w, xi, T_ref
+  USE rheology_voellmy_2d, ONLY : mu
+  USE rheology_plastic_2d, ONLY : tau
+  USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0
+  USE rheology_lahar_2d, ONLY : alpha1_coeff, beta1, alpha2, beta2, Kappa, n_td2
+  USE rheology_quadratic_2d, ONLY : friction_factor
   USE state_conversion_2d, ONLY : qc_to_qp
   USE geometry_2d, ONLY : pi_g
   USE equation_terms_2d, ONLY : eval_implicit_terms, eval_nh_semi_impl_terms, &

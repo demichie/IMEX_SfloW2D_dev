@@ -106,13 +106,14 @@ MODULE inpout_2d
        rheology_id_lahar, rheology_id_empirical, rheology_id_quadratic, rheology_id_froude,&
        rheology_id_lucas, rheology_id_mui, rheology_id_mui_voellmy
   USE rheology_2d, ONLY: resolve_rheology_model
-  USE constitutive_parameters_2d, ONLY: mu, xi, tau, nu_ref, visc_par,     &
-       T_ref,                                                                &
-       A_drag, B_drag, collective_settling_flag
+  USE constitutive_parameters_2d, ONLY: A_drag, B_drag, collective_settling_flag
   USE rheology_parameters_2d, ONLY : mu_s, mu_2, I_0, muI_inf,               &
-       mu_0, mu_inf, Fr_0, U_w
-  USE constitutive_parameters_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, &
-       Kappa, n_td, friction_factor, tau0
+       mu_0, mu_inf, Fr_0, U_w, xi, T_ref
+  USE rheology_voellmy_2d, ONLY: mu
+  USE rheology_plastic_2d, ONLY: tau
+  USE rheology_lava_2d, ONLY: nu_ref, visc_par, tau0
+  USE rheology_lahar_2d, ONLY: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td
+  USE rheology_quadratic_2d, ONLY: friction_factor
   ! -- Functions used in the rheology calculations
   USE state_conversion_2d, ONLY: sauter_diameter, average_density_solids
   USE constitutive_parameters_2d, ONLY: precompute_pascal_coefficient
@@ -1048,7 +1049,8 @@ CONTAINS
          eval_mixture_properties_from_volume_fractions,                         &
          enforce_mass_fraction_closure
 
-    USE constitutive_parameters_2d, ONLY: n_td2, coeff_porosity,            &
+    USE rheology_lahar_2d, ONLY: n_td2
+    USE constitutive_parameters_2d, ONLY: coeff_porosity,                    &
          radiative_term_coeff, SBconst, convective_term_coeff
 
     USE init_2d, ONLY: erodible_init
