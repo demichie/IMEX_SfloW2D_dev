@@ -171,9 +171,11 @@ Evidenza B05–B12 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-7 e
 | C01 | IO-1          | Output segregati per run                | COMPLETATO |
 | C02 | IO-2          | Contratto di configurazione e sicurezza | COMPLETATO |
 | C03 | IO-GATE       | Accettazione I/O per run                | COMPLETATO |
-| C04 | DIST-1        | Autotools policy B                      | IMPLEMENTATO |
-| C05 | DIST-2        | Doppio archivio di distribuzione        | IMPLEMENTATO |
-| C06 | DIST-GATE     | Validazione distributiva                | GATE    |
+| C04 | DIST-1        | Autotools policy B                      | COMPLETATO |
+| C05 | DIST-2        | Doppio archivio di distribuzione        | COMPLETATO |
+| C06 | DIST-GATE     | Validazione distributiva                | COMPLETATO |
+
+La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazione per allegare gli archivi sorgente ed Examples a una release GitHub e la pubblicazione di una release ufficiale sono follow-up separati, esplicitamente differiti; il candidato `9.9.27` resta sintetico e non pubblicato.
 
 ## Fase D — Reologie e solver IMEX
 
@@ -1012,7 +1014,7 @@ Con tale decisione e le verifiche C03 registrate, **C03 è COMPLETATO**. C01 è 
 
 **Test proporzionati (nuove modifiche a questo step):** T1 autoreconf e manifest EXTRA_DIST; T2 configure/make/check da checkout; T3 make distcheck e GNU/ifx/Docker al gate packaging, non a ogni modifica documentale. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: IMPLEMENTATO
+Stato ufficiale: COMPLETATO (verifiche C04 concluse nel gate C06)
 
 #### Evidenza C04 — 16 ottobre 2026
 
@@ -1020,7 +1022,7 @@ I file generati Autotools non sono più versionati: `configure`, `Makefile.in` (
 
 Su un worktree temporaneo pulito del commit C03, dopo l'applicazione delle modifiche C04, sono passati `autoreconf -fi`, `configure --with-netcdf=/opt/homebrew/opt/netcdf-fortran`, `make -j2` e `make check`. La rigenerazione ha inoltre verificato che gli output Autotools risultino ignorati da Git. Evidenza locale conservata in `/tmp/imex-c04-git-ffbea0b9` e `/tmp/imex-c04-build-ffbea0b9`; `git diff --check` passa.
 
-`make distcheck` e la matrice ifx/Docker restano differiti al gate di packaging C06 come previsto; questa attività non crea ancora gli archivi C05/C06.
+Al 16 ottobre, `make distcheck` e la matrice ifx/Docker erano differiti al gate di packaging C06 come previsto. Sono stati completati e accettati nel successivo audit C06; C04 non crea autonomamente gli archivi C05/C06.
 
 #### Milestone post-XY — Politica Autotools B e distribuzione con due archivi
 
@@ -1044,17 +1046,23 @@ Implementato `tools/release/build_archives.py`: il tool risolve un tag Git, gene
 
 T1–T3 verificati in un repository temporaneo isolato con tag sintetico `9.9.13` (revisione `1309bd62dcdecdda25b17b4d6033dcdf0c349ba8`): entrambi gli archivi sono stati generati, i checksum e la versione nel `configure` verificati indipendentemente, l'inventario Examples estratto ha conservato tutti i percorsi e i 20 `README.md`, e il manifest riporta lo stesso tag/revisione per entrambi. Non erano ancora stati eseguiti `make check` dall'archivio estratto, `make distcheck`, prove ifx/Docker o pubblicazione: sono stati affrontati nel gate C06. Provenienza/licenze dei dataset restano non verificate e non sono un blocco per la validazione tecnica; non dichiarare diritti accertati. Le dipendenze operative e la riproducibilità di alcuni esempi restano un audit distinto.
 
-Stato ufficiale: IMPLEMENTATO (T1–T3); gate di rilascio C06 aperto
+Stato ufficiale: COMPLETATO (validazione T1–T3; automazione e pubblicazione della release differite come follow-up)
 
 ### C06 — Validazione distributiva
 
 **Test proporzionati (nuove modifiche a questo step):** T3 sorgente Autotools e Examples estratti, installazione, GNU/ifx/Docker, assenza dipendenze Git; T4 release solo dopo gate distributivo. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: GATE
+Stato ufficiale: COMPLETATO (validazione distributiva; release non pubblicata)
 
 **Evidenza locale:** in un clone temporaneo isolato è stato creato il tag sintetico `9.9.16` sulla revisione `0ee23e80a3bd93847d7199323cb558c78d2656f5`; non è un tag del repository di lavoro né una release. `build_archives.py` ha generato entrambi gli archivi e il manifest dalla stessa revisione. Il tarball sorgente è stato estratto senza `.git`; `configure`, `make distcheck` e l'installazione/suite `make check` incluse nel gate sono passati con GNU Fortran e NetCDF-Fortran su macOS. Un ulteriore smoke test ha eseguito `TEST_2D` con l'eseguibile installato dal tarball. L'archivio Examples estratto conserva tutti i 20 `README.md` e i file di input/dati verificati per `EXAMPLE_CF`.
 
 Il primo `distcheck` ha evidenziato due requisiti di pulizia: rendere scrivibili le fixture copiate dai sorgenti di sola lettura e rimuovere i moduli Fortran `.mod` durante `clean`. Sono stati corretti `TESTS/run_tests.sh` e `src/Makefile.am`; il `distcheck` finale sull'archivio generato ha superato anche `distcleancheck`.
+
+#### Chiusura tecnica della fase C — 21 ottobre 2026
+
+Per decisione dell'utente, la fase C si considera completata per la validazione tecnica. Le evidenze includono la validazione degli archivi estratti, `make distcheck`, gli smoke test e la matrice GitHub Actions accettata: Solver e Intel ifx (run `39563559928` e `39563583552`) sul commit `c3b47cbf9a07162f1f7cbaf8b26230c05ef87798`; Docker, tutti e quattro i job (run `39567697006`), sul commit `cf34b8d13e1739f0b4113b30f8365a2253f547e3`. Il secondo commit aggiunge solo la dipendenza Automake di `init_2d`; l'utente ha accettato le Actions sui due commit consecutivi senza richiederne il rerun.
+
+Non è stato creato un workflow per allegare automaticamente entrambi gli archivi a una release GitHub e non è stata pubblicata una release ufficiale. L'automazione e la pubblicazione sono differite a un follow-up distinto; `docker_create_publish.yml` pubblica solo l'immagine Docker. Il candidato `9.9.27` resta quindi un artefatto sintetico non pubblicato.
 
 Le Actions Solver, Intel ifx e Docker sono state completate con successo sul commit `bd4a87d8a8a7f9876950a7aa3024b41e8c7612d6`: run `38877762627`, `38877778700` e `38877794457`, rispettivamente, con tutti e quattro i job di ciascuna matrice passati. La CI comprende il test di preservazione dell'albero output su `RUN_NAME` non valido e conferma che la precedente regressione di naming/input è risolta. La documentazione aggiornata è stata pubblicata con successo sul commit `320499a3270d7e09d65f29f72506cc52a4812a0e` dal workflow unificato, run `38900609895` (build e deploy riusciti). Provenienza e licenze dei dataset restano non verificate, ma non sono un blocco per la validazione tecnica C06; le dipendenze e la riproducibilità di alcuni esempi restano da verificare.
 
@@ -1160,7 +1168,7 @@ Questo aggiornamento sostituisce lo stato dei gate riportato nelle note preceden
 
 Tutti i 20 esempi dell'archivio Examples estratto hanno raggiunto il rispettivo tempo finale configurato e prodotto output non vuoto. `EXAMPLE_ETNA` ha raggiunto 200 s, `EXAMPLE_ETNA_LAVA` 3600 s e l'ensemble Etna ha completato tutti i 20 membri a 50 s per membro. `create_prob_maps.py` e `plot_ensemble.py` sono terminati con successo, producendo 93 raster di probabilità e 93 PNG in tre gruppi di risultati. Il catalogo aggiornato ha generato 20 pagine senza avvisi e MkDocs `--strict` è terminato con successo; l'avviso su Material for MkDocs 2.0 è informativo.
 
-Il workflow Solver/Intel ifx/Docker non è stato rieseguito sulla revisione candidata: le ultime Actions riuscite disponibili appartengono a `bd4a87d8a8a7f9876950a7aa3024b41e8c7612d6`. ifx e Docker non sono installati localmente e `gh` non dispone di una sessione autenticata; pertanto C06 resta **GATE** in attesa della matrice sulla revisione candidata. Il post-processing opzionale delle mappe di superamento non è stato verificato perché nell'ambiente selezionato mancano `netCDF4` e i binding GDAL `osgeo`; questa attività è distinta dal gate obbligatorio di solver. La provenienza/licenza dei DEM resta non verificata e non è un blocco tecnico. La pubblicazione va eseguita solo dopo il commit di questo aggiornamento.
+Al momento della verifica del candidato `9.9.25`, le Actions riuscite più recenti appartenevano a `bd4a87d8a8a7f9876950a7aa3024b41e8c7612d6`; quello stato è storico e viene superato dalla matrice registrata nella sezione `9.9.27`. Il post-processing opzionale delle mappe di superamento non è stato verificato perché nell'ambiente selezionato mancano `netCDF4` e i binding GDAL `osgeo`; questa attività è distinta dal gate obbligatorio di solver. La provenienza/licenza dei DEM resta non verificata e non è un blocco tecnico.
 
 #### Nuovo candidato distributivo `9.9.27` — 21 ottobre 2026
 
@@ -1170,7 +1178,7 @@ Dall'archivio sorgente estratto sono passati `configure`, compilazione, `make ch
 
 Dall'archivio Examples estratto, `EXAMPLE_2D` ha raggiunto 1.5 s e prodotto un NetCDF non vuoto. `EXAMPLE_LATERAL_SOURCE`, con 900 K e `ALPHAS_SOURCE=0.01`, ha raggiunto 100 s e prodotto un NetCDF non vuoto; le masse finali sono circa `2.287e8 kg` per la miscela e `2.025e8 kg` per i solidi. Il catalogo documentale ha generato 20 pagine senza avvisi e MkDocs `--strict` è passato. La suite completa di 20 esempi era stata eseguita sul candidato precedente `9.9.25` e non è stata ripetuta sul `9.9.27`.
 
-C06 resta **GATE**: la matrice GitHub Actions Solver/Intel ifx/Docker non è stata eseguita sul candidato corrente. Il tag e il commit sintetici non sono stati pubblicati; la matrice dovrà quindi essere eseguita sulla revisione committata e condivisibile prima della chiusura. Il post-processing opzionale delle mappe di superamento resta non verificato e non è un blocco tecnico.
+La matrice GitHub Actions è completata e accettata per C06: Solver (run `39563559928`) e Intel ifx (run `39563583552`) sono passati sul commit `c3b47cbf9a07162f1f7cbaf8b26230c05ef87798`; Docker (run `39567697006`) ha superato tutti e quattro i job sul commit `cf34b8d13e1739f0b4113b30f8365a2253f547e3`. Il commit Docker aggiunge soltanto la dipendenza Automake necessaria a ordinare la compilazione del modulo usato da `init_2d`; l'utente accetta i risultati delle Actions sui due commit consecutivi, senza richiedere un nuovo run Solver/ifx. C06 è quindi **COMPLETATO** per la validazione distributiva. Il candidato `9.9.27` resta sintetico e non pubblicato; il post-processing opzionale delle mappe di superamento resta non verificato e non è un blocco tecnico.
 
 #### Regola di rilascio per documentazione pubblica
 
