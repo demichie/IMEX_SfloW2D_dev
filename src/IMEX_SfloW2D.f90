@@ -6,8 +6,8 @@
 !> The model is discretized in time with an explicit-implicit Runge-Kutta
 !> method where the hyperbolic part is solved explicetely and the other
 !> terms (relaxation and surce) are treated implicitely.\n
-!> The hyperbolic part uses the KT-PYTHON hydrostatic-path, path-conservative
-!> central-upwind finite-volume operator; it does not require the
+!> The hyperbolic part uses a KT hydrostatic-path, path-conservative central-upwind
+!> finite-volume operator; it does not require the
 !> complete eigenstructure of the model.\n
 !> The implicit part is solved with a Newton-Raphson method where the
 !> elements of the Jacobian of the nonlinear system are evaluated

@@ -2,7 +2,7 @@
 !> \brief Model-facing explicit spatial operator
 !>
 !> This module is the boundary between time integration and the numerical
-!> discretization of spatial terms. It owns the KT-PYTHON backend and
+!> discretization of spatial terms. It owns the KT backend and
 !> exposes only complete spatial-term and CFL evaluations.  Time integration
 !> therefore does not depend on flux, path-contribution, or wave-speed storage.
 !********************************************************************************
@@ -38,7 +38,7 @@ MODULE spatial_operator_2d
 
 CONTAINS
 
-  !> \brief Initialize the reconstruction and KT-PYTHON flux workspace.
+  !> \brief Initialize the reconstruction and KT flux workspace.
   !>
   !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
 
@@ -51,7 +51,7 @@ CONTAINS
 
   END SUBROUTINE initialize_spatial_operator
 
-  !> \brief Release the reconstruction and KT-PYTHON flux workspace.
+  !> \brief Release the reconstruction and KT flux workspace.
   !>
   !> \param[in,out] this Spatial operator owning reconstruction and HP-PCCU backend storage.
 

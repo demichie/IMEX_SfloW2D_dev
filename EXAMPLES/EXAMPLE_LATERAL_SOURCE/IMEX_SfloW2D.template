@@ -94,7 +94,7 @@
  MFR_SOURCE = source_mfr ,
  RI_SOURCE = source_Ri ,
  T_SOURCE = source_T ,
- XS_SOURCE = source_xs ,
+ ALPHAS_SOURCE = source_alpha_s ,
  /
 &RHEOLOGY_PARAMETERS
  RHEOLOGY_MODEL = 6,

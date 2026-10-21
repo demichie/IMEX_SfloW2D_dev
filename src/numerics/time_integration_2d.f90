@@ -250,7 +250,7 @@ CONTAINS
   !> \param[in] Z Coordinates of the three-point limiter stencil.
   !> \param[in] equation_partition Explicit/implicit equation mask and compact index maps.
   !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
-  !> \param[in,out] spatial_operator Spatial operator and its persistent reconstruction/KT-PYTHON
+  !> \param[in,out] spatial_operator Spatial operator and its persistent reconstruction/KT
   !>                                 workspaces.
   !> \param[in] observer Optional thread-safe read-only stage audit callback. When absent,
   !>                    no diagnostic storage is allocated and no callbacks are made.
@@ -689,7 +689,7 @@ CONTAINS
        IF ( need_explicit_stage ) THEN
 
           ! Evaluate the complete explicit spatial term. The time integrator
-          ! is independent of the KT-PYTHON flux workspace.
+          ! is independent of the KT flux workspace.
           CALL spatial_operator%evaluate( this%qp_rk,                       &
                this%spatial_terms(:,:,:,i_RK), t, domain )
 

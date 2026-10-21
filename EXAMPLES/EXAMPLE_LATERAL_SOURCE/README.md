@@ -20,9 +20,9 @@ Supercritical lateral inflow of a gas–particle mixture on flat terrain. Sedime
 | --- | --- |
 | Source extent | 250 m in the documented invocation |
 | Source mass-flow rate | 10,000,000 kg/s in the documented invocation |
-| Temperature | 300 K in the documented invocation (ambient temperature) |
+| Temperature | 900 K in the documented invocation |
 | Initial Richardson number | Generator argument, < 1 |
-| Solid mass fraction (`XS_SOURCE`) | 0.01 in the documented invocation |
+| Solid volume fraction (`ALPHAS_SOURCE`) | 0.01 in the documented invocation |
 
 ## Dependencies
 
@@ -30,15 +30,15 @@ The input generator requires Python 3 and NumPy.
 
 ## How to run
 
-Run `python create_example.py 200 250 10000000 300 0.5 0.01` and then `../../bin/IMEX_SfloW2D`. The six arguments are x cells, source extent (m), total source mass-flow rate (kg/s), temperature (K), Richardson number and solid mass fraction. The generator puts the third argument in `MFR_SOURCE`; the solver derives the source thickness from that rate. The sixth argument is written to `XS_SOURCE`, a mass fraction. The legacy README's "initial thickness" description for the third argument and "kg/s" units for the last argument are errors.
+Run `python create_example.py 200 250 10000000 900 0.5 0.01` and then `../../bin/IMEX_SfloW2D`. The six arguments are x cells, source extent (m), total source mass-flow rate (kg/s), temperature (K), Richardson number and solid volume fraction. The generator puts the third argument in `MFR_SOURCE`; the solver derives the source thickness from that rate. The sixth argument is written to `ALPHAS_SOURCE`, which specifies a volume fraction. `XS_SOURCE` instead specifies a mass fraction and must not be used to represent this example's 1% solid volume concentration.
 
 ## Expected output
 
-The documented 300 K invocation uses the same temperature as the 300 K ambient air. With `XS_SOURCE=0.01`, the solids make the source mixture slightly denser than ambient: approximately 1.188 kg/m³ versus 1.176 kg/m³, giving positive reduced gravity of about 0.098 m/s². The run reaches 100 s, writes nonempty NetCDF output at `OUTPUT/<RUN_NAME>/fields/<RUN_NAME>.nc`, and produces nonzero mass. Air entrainment is enabled, so the final mixture mass can exceed the imposed `MFR_SOURCE * T_END`.
+For the documented pressure, solid density and ambient conditions, the gas density at 900 K is approximately 0.392 kg/m³. A 1% solid volume fraction (`ALPHAS_SOURCE=0.01`, `RHO_S=2000 kg/m³`) gives a source mixture density of approximately 20.39 kg/m³, compared with ambient air at approximately 1.176 kg/m³. The resulting reduced gravity is positive, approximately 9.24 m/s². The earlier negative-gravity calculation used `XS_SOURCE=0.01`, incorrectly treating the intended volume fraction as a mass fraction.
 
-The earlier zero-mass result at 300 K was caused by the `froude_blend` reconstruction replacing the prescribed boundary-source depth with a zero reconstructed depth. The solver now preserves that prescribed trace when computing wave speeds, advective fluxes and the hydrostatic path. The validated 300 K run reported final mixture mass of about `1.331e9 kg` and solid mass of about `9.764e6 kg`.
+The solver distinguishes the two composition inputs: `ALPHAS_SOURCE` is the solid volume fraction, while `XS_SOURCE` is the solid mass fraction. The active example now retains 900 K and uses the intended 1% volume fraction. A run with the documented parameters reached 100 s, wrote a nonempty NetCDF file and reported final mixture and solid masses of about `2.287e8 kg` and `2.025e8 kg`, respectively. Air entrainment is enabled, so the final mixture mass can exceed the imposed `MFR_SOURCE * T_END`. The solver also preserves the prescribed boundary-source depth when computing wave speeds, advective fluxes and the hydrostatic path.
 
-The former 900 K invocation is not retained as the active setup: it gives negative source reduced gravity and is rejected by the solver when a Richardson number is prescribed.
+The former 900 K invocation with `XS_SOURCE=0.01` is a different, mass-basis mixture and is correctly rejected when its reduced gravity is non-positive and a Richardson number is prescribed.
 
 ### Original explanatory note
 
@@ -46,8 +46,8 @@ The legacy README says the example uses a simple friction model "as in [1]", but
 
 ## Legacy documentation and preservation
 
-The paired [`README.txt`](README.txt) is retained as a verbatim archival record, including its historical 900 K invocation. This guide uses the approved 300 K setup instead; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
+The paired [`README.txt`](README.txt) is retained as a verbatim archival record, including its historical description of the concentration as a mass fraction. The active guide corrects the composition to 1% by volume and records the distinction between `ALPHAS_SOURCE` and `XS_SOURCE`; verified differences in commands, dependencies and references are recorded in the Examples second-pass audit.
 
 ## Documentation verification note
 
-**Parameter interpretation.** The generator maps its third argument to `MFR_SOURCE`; the solver reports this rate in kg/s and derives `H_SOURCE` from it. The final argument maps to `XS_SOURCE`, which is a source mass fraction. For the documented pressure, ambient temperature and 1% solids, the neutral-density threshold is approximately 303.03 K; 300 K is selected to match ambient temperature and yields positive reduced gravity. The former 900 K invocation yields negative reduced gravity and is invalid for the prescribed positive Richardson-number setup.
+**Parameter interpretation.** The generator maps its third argument to `MFR_SOURCE`; the solver reports this rate in kg/s and derives `H_SOURCE` from it. The final argument maps to `ALPHAS_SOURCE`, a solid volume fraction. At 900 K, 1% solid volume yields a mixture density of approximately 20.39 kg/m³ and positive reduced gravity of approximately 9.24 m/s². By contrast, `XS_SOURCE=0.01` means 1% solids by mass and gives negative reduced gravity at 900 K; that is not the intended example composition.

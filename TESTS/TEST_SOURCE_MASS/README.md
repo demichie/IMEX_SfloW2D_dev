@@ -3,7 +3,7 @@
 Checks source mass injection and rejection of a source setup with invalid
 buoyancy.
 
-`make_cases.py` writes nine mass-balance cases on a flat bed with settling,
+`make_cases.py` writes ten mass-balance cases on a flat bed with settling,
 erosion and entrainment off, so the mass in the domain is the mass the source
 put in:
 
@@ -13,13 +13,16 @@ put in:
 | `fissure_map_coordinates` | one fissure always on, at map coordinates of order 1e6 m |
 | `lateral_window` | lateral radial source, periodic window with cosine ramps, cut off by `TIME_PARAM(4)` inside a window |
 | `lateral_boundary_{west,east,south,north}` | lateral boundary sources on all four domain sides, with prescribed positive depth and constant mass-flow rate |
+| `lateral_boundary_hot_volume_fraction` | lateral boundary source at 900 K with `ALPHAS_SOURCE=0.01` (1% solid volume fraction); confirms this composition has positive reduced gravity and injects the prescribed mixture mass |
 | `bottom_window` | elliptical bottom source, periodic window with linear ramps and a phase |
 | `bottom_intervals` | circular bottom source with `N_INTERVALS` velocity steps |
 
-An additional expected-failure case uses a source mixture lighter than the
-ambient gas with a prescribed Richardson number. The solver must reject it
-before deriving the source thickness or creating output. Thus the suite
-contains ten cases total: nine mass checks and one input-validation check.
+An additional expected-failure case uses `XS_SOURCE=0.01` at 900 K, which
+means 1% solids by mass and gives a source mixture lighter than ambient gas.
+The solver must reject it before deriving the source thickness or creating
+output. Thus the suite contains eleven cases total: ten mass checks and one
+input-validation check. This invalid mass-basis case is distinct from the
+valid hot volume-fraction case.
 
 `check_mass.py` sums the solid mass (the mixture mass for lateral sources,
 whose input is a mixture mass flow rate) in each `.q_2d` output and compares

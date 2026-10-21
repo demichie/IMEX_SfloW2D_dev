@@ -1244,7 +1244,7 @@ CONTAINS
   END SUBROUTINE boundary_reconstruction_slope
 
   !> \brief Read one centre value for a direct reconstruction stencil.
-  !> \details KT-PYTHON uses the cell-centred velocities already obtained by
+  !> \details KT uses the cell-centred velocities already obtained by
   !>          qc_to_qp, which applies the v2 mass-based desingularization.
   !>          Auxiliary u/v are set to zero below the HP dry-depth threshold
   !>          so a dry cell cannot supply a velocity to a neighbouring limiter.

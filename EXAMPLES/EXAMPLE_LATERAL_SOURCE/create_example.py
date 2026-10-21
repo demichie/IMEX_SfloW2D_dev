@@ -44,19 +44,19 @@ if len(sys.argv) == 7:
 
     a = sys.argv[6]
     try:
-        xs_init = float(a)
+        alpha_s_init = float(a)
     except ValueError:
         print("You must enter a float for solid fraction")
 
 else:
 
-    print('Please provide three arguments:\n')
+    print('Please provide six arguments:\n')
     print('1) Number of cells\n')
-    print('2) Source radius (>0)\n')
-    print('3) Initial thickness (>0)\n')
+    print('2) Source extent (m)\n')
+    print('3) Source mass-flow rate (kg/s)\n')
     print('4) Temperature (>0)\n')
-    print('5) Radial velocity (>0)\n')
-    print('6) Solid mass fraction (0,1)\n')
+    print('5) Initial Richardson number (<1)\n')
+    print('6) Solid volume fraction (0,1)\n')
     sys.exit()
 
 n_solid = 1
@@ -153,7 +153,7 @@ filedata = filedata.replace('source_y2', str(y2_init) + 'D0')
 filedata = filedata.replace('source_mfr', str(mfr_init) + 'D0')
 filedata = filedata.replace('source_Ri', str(Ri_init) + 'D0')
 filedata = filedata.replace('source_T', str(T_init) + 'D0')
-filedata = filedata.replace('source_xs', str(xs_init) + 'D0')
+filedata = filedata.replace('source_alpha_s', str(alpha_s_init) + 'D0')
 
 # Write the input file
 with open('IMEX_SfloW2D.inp', 'w') as file:

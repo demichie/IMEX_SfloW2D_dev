@@ -178,7 +178,18 @@ def main():
                    ' LATERAL_SOURCE_FLAG = T,\n', src, 0.1, 0.1,
                    dict(kind='lateral_boundary', mfr=1.0e4))
 
-    # A prescribed Richardson number requires positive reduced gravity.
+    # A 1% solid volume fraction at 900 K is denser than ambient and valid.
+    src = ('&LATERAL_SOURCE_PARAMETERS\n SOURCE_SIDE = "W",\n'
+           ' Y1_SOURCE = 4900.0D0,\n Y2_SOURCE = 5100.0D0,\n'
+           ' MFR_SOURCE = 1.0D4,\n RI_SOURCE = 0.5D0,\n'
+           ' T_SOURCE = 900.0D0,\n ALPHAS_SOURCE = 0.01D0,\n'
+           ' TIME_PARAM = 1.0D0, 1.0D0, 0.0D0, 1.0D0,\n /\n')
+    write_case(work, 'lateral_boundary_hot_volume_fraction', grid,
+               ' LATERAL_SOURCE_FLAG = T,\n', src, 0.1, 0.1,
+               dict(kind='lateral_boundary', mfr=1.0e4))
+
+    # A prescribed Richardson number with 1% solids by mass at 900 K is
+    # invalid because this mass-basis composition has negative reduced gravity.
     src = ('&LATERAL_SOURCE_PARAMETERS\n SOURCE_SIDE = "W",\n'
            ' Y1_SOURCE = 4900.0D0,\n Y2_SOURCE = 5100.0D0,\n'
            ' MFR_SOURCE = 1.0D4,\n RI_SOURCE = 0.5D0,\n'
