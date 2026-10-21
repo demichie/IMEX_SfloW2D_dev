@@ -141,7 +141,8 @@ core/simulation_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
 core/init_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         core/constitutive_parameters_2d.$(OBJEXT)              \
                         geometry/geometry_2d.$(OBJEXT)                         \
-                        state/state_2d.$(OBJEXT)
+                        state/state_2d.$(OBJEXT)                                \
+                        state/state_conversion_2d.$(OBJEXT)
 io/output_paths.$(OBJEXT): core/parameters_2d.$(OBJEXT)                       \
                           core/diagnostics_2d.$(OBJEXT)
 io/inpout_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
