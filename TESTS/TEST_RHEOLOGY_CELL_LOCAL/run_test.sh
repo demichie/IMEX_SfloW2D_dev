@@ -1,5 +1,5 @@
 #!/bin/sh
-# D02 characterization and D05 extraction regression; nonzero means a check failed.
+# D02 characterization and D05/D06 extraction regression; nonzero means a check failed.
 set -eu
 test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_dir=$(CDPATH= cd -- "$test_dir/../.." && pwd)
@@ -27,6 +27,7 @@ for profile in strict optimized; do
         rheology/rheology_lava_2d rheology/rheology_lahar_2d \
         rheology/rheology_empirical_2d rheology/rheology_quadratic_2d \
         rheology/rheology_mui_2d rheology/rheology_mui_voellmy_2d \
+        physics/thermal_sources_2d physics/pore_pressure_2d \
         physics/equation_terms_2d \
         numerics/nonlinear_solver_2d; do
         "$compiler" $flags $common -I"$repo_dir/src/state" -c "$repo_dir/src/$source.f90"
@@ -36,6 +37,10 @@ for profile in strict optimized; do
     "$compiler" $common parameters_2d.o rheology_2d.o test_model_names.o \
         -o test_model_names
     ./test_model_names
+    "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_source_modules.f90"
+    "$compiler" $common $objects test_source_modules.o -llapack \
+        -o test_source_modules
+    ./test_source_modules
     # IEEE checks and the test-side FD subtraction stay strict in both profiles.
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/probe_sources.f90"
     "$compiler" $common $objects probe_sources.o -llapack -o probe_sources

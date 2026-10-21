@@ -186,7 +186,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D03 | —             | Audit e ownership di parametri, variabili e stato condiviso | IN PAUSA |
 | D04 | P2            | Eliminazione reologia 8                                     | COMPLETATO |
 | D05 | P3            | Estrazione moduli reologici e selezione testuale            | COMPLETATO |
-| D06 | P3            | Sorgenti termiche e pore pressure                           | DA FARE  |
+| D06 | P3            | Sorgenti termiche e pore pressure                           | COMPLETATO |
 | D07 | —             | Migrazione progressiva dei parametri non reologici          | DA FARE  |
 | D08 | P4            | RHEOLOGY_MODEL da numeri a stringhe                         | ASSORBITO IN D05 |
 | D09 | P5            | Correzione del solo attrito                                 | DA FARE  |
@@ -1684,7 +1684,13 @@ Questo è il piano consolidato che utilizzerei come riferimento per l’implemen
 
 **Test proporzionati (nuove modifiche a questo step):** T1 sorgenti termiche/pore pressure e limiti sottili; T2 casi lava/raffreddamento; T3 energia e stiff RK se cambiano i termini. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: DA FARE
+Perimetro dell’estrazione:
+
+- `thermal_sources_2d` possiede l’energia delle iniezioni generali, lo scambio termico del mass exchange e la vaporizzazione. Il raffreddamento implicito specifico della lava resta nel modulo reologico della lava; parametri termici dichiarati ma non usati non costituiscono nuove leggi di conduzione o riscaldamento.
+- `pore_pressure_2d` possiede diffusione implicita (inclusa la sensibilità COMPLEX), perdita Darcy di gas e accoppiamenti conservativi con iniezioni e mass exchange.
+- Le due formulazioni della permeabilità dinamica restano provider distinti: diffusione con pesi di sfericità `alpha*d^2`, gas loss con `alpha/d`. L’estrazione conserva e verifica entrambe; non ne presume l’equivalenza né ne uniforma la fisica.
+
+Stato ufficiale: COMPLETATO (estrazione e gate locale GNU/macOS). T1 strict/optimized con gli oracoli indipendenti e i test termici, e T2 lava/raffreddamento, sono superati localmente. Decisione: mantenere distinti i provider di permeabilità (`alpha*d^2` per la diffusione, `alpha/d` per la Darcy gas-loss); un’eventuale armonizzazione resta una modifica scientifica futura, non parte di D06. T3 non era necessario perché i termini osservabili non sono cambiati.
 
 ### D07 — Migrazione progressiva dei parametri non reologici
 

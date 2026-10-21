@@ -36,6 +36,10 @@ END MODULE imex_test_observer
 PROGRAM test_imex_stages
   USE parameters_2d
   USE constitutive_parameters_2d
+  USE rheology_parameters_2d, ONLY : xi, T_ref
+  USE rheology_voellmy_2d, ONLY : mu
+  USE rheology_quadratic_2d, ONLY : friction_factor
+  USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0
   USE geometry_2d
   USE domain_2d, ONLY : domain_type
   USE spatial_operator_2d, ONLY : spatial_operator_type

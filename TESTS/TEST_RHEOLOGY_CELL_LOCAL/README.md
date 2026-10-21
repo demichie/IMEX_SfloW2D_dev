@@ -1,8 +1,9 @@
-# D02 cell-local rheology characterization
+# D02 cell-local source characterization
 
 This suite measures production sources against independent references while
-the rheology laws are being extracted into dedicated modules. It also checks
-canonical input-name resolution and reverse mapping.
+the rheology laws, pore-pressure terms and general thermal sources are being
+extracted into dedicated modules. It also checks canonical input-name
+resolution and reverse mapping.
 It deliberately reports discrepancies as failures. A completed run is not
 automatically a scientific acceptance: consult the JSON `acceptance` field and
 the exit status. There are no expected-failure allowances or tolerance increases
@@ -44,6 +45,8 @@ uses production primitive states as oracle inputs. The parser uses the names
 historical model 8 is no longer supported.
 Pore-pressure diffusion, all inhibition modes, mono/multi-class permeability,
 Sutherland viscosity and conservative Darcy gas loss have dedicated fixtures.
+The source-module checks independently exercise inlet heat, mass-exchange heat,
+vaporization, and conservative pore-pressure inlet/mass-exchange terms.
 
 For regular states, complex-step uses `1e-25*max(abs(q_j),1)` in physical
 conservative coordinates. Central finite differences use relative steps
@@ -131,7 +134,17 @@ absent carrier pore volume. Dynamic permeability additionally requires a solid
 skeleton. Guards suppress only pressure relaxation and retain other sources.
 Smooth complex algebra preserves composition and height sensitivities, including
 inhibition transitions. The existing diffusion sphericity weights remain
-unchanged; reconciling them with Darcy gas-loss weights belongs to D06.
+unchanged; D06 preserves and tests them separately from the Darcy gas-loss
+weights. Any harmonization is a separate scientific decision, not an implicit
+consequence of extraction.
+
+D06 places general inlet and mass-exchange heat/vaporization in
+`thermal_sources_2d`, while lava-specific cooling remains with the lava
+rheology. `pore_pressure_2d` owns pressure diffusion, Darcy gas loss and the
+conservative pressure-source couplings. The diffusion (`alpha*d^2`) and
+gas-loss (`alpha/d`) sphericity providers remain distinct and are tested
+against their separate independent formulas; this extraction does not silently
+change either scientific convention.
 
 This suite remains a standalone check, distributed with the project. Scientific
 formula changes, ownership migration, model-8 removal and broader compiler or

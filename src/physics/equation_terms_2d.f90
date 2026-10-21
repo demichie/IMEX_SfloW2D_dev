@@ -16,6 +16,11 @@ MODULE equation_terms_2d
   USE rheology_mui_2d, ONLY : eval_mui_source
   USE rheology_mui_voellmy_2d, ONLY : eval_mui_voellmy_source,               &
        eval_mui_voellmy_implicit_source
+  USE pore_pressure_2d, ONLY : eval_pore_pressure_diffusion_source,            &
+       eval_pore_pressure_gas_loss, eval_pore_pressure_inlet_source,            &
+       eval_pore_pressure_mass_exchange_source
+  USE thermal_sources_2d, ONLY : eval_inlet_thermal_energy_source,              &
+       eval_mass_exchange_thermal_energy, eval_vaporization_sources
   USE rheology_voellmy_2d, ONLY : eval_voellmy_implicit_source,              &
        eval_voellmy_semi_impl_source
   USE rheology_plastic_2d, ONLY : eval_plastic_implicit_source
@@ -551,8 +556,8 @@ CONTAINS
     expl_term(2) = expl_term(2) + 0.0_wp
     expl_term(3) = expl_term(3) + 0.0_wp
 
-    expl_term(4) = expl_term(4) + t_coeff * h_dot * r_rho_m * r_sp_heat_mix    &
-         * t_source
+    expl_term(4) = expl_term(4) + eval_inlet_thermal_energy_source(t_coeff,    &
+         h_dot, r_rho_m, r_sp_heat_mix, t_source)
 
     ! source terms for the solid equations
     expl_term(idx_solidEqn_first:idx_solidEqn_last) =                          &
@@ -579,8 +584,8 @@ CONTAINS
        ! we multiply the pore pressure inlet rate by the rate for q1
        ! the units of this source term are: kg^2 m^-3 s^-3
        expl_term(idx_poreEqn) = expl_term(idx_poreEqn) +                       &
-            t_coeff * ( q1 * pore_pres_fract * h_dot * r_rho_m * r_red_grav +  &
-            exc_pore_pres * h_dot * r_rho_m )
+            eval_pore_pressure_inlet_source(t_coeff, q1, pore_pres_fract,      &
+            h_dot, r_rho_m, r_red_grav, exc_pore_pres)
 
     END IF
 
@@ -639,8 +644,8 @@ CONTAINS
                r_sp_heat_c, r_sp_heat_mix)
 
           expl_term(1) = expl_term(1) + t_coeff * h_dot * r_rho_m
-          expl_term(4) = expl_term(4) + t_coeff * h_dot * r_rho_m            &
-               * r_sp_heat_mix * T_fissures(i_fissure)
+          expl_term(4) = expl_term(4) + eval_inlet_thermal_energy_source(      &
+               t_coeff, h_dot, r_rho_m, r_sp_heat_mix, T_fissures(i_fissure))
           expl_term(idx_solidEqn_first:idx_solidEqn_last) =                   &
                expl_term(idx_solidEqn_first:idx_solidEqn_last) +              &
                t_coeff * h_dot * r_rho_m * xs_fissures(1:n_solid,i_fissure)
@@ -655,9 +660,9 @@ CONTAINS
 
           IF (pore_pressure_flag) THEN
              exc_pore_pres = qpj(idx_pore)
-             expl_term(idx_poreEqn) = expl_term(idx_poreEqn) + t_coeff       &
-                  * (q1 * pore_pres_fract * h_dot * r_rho_m * r_red_grav +   &
-                  exc_pore_pres * h_dot * r_rho_m)
+             expl_term(idx_poreEqn) = expl_term(idx_poreEqn) +                &
+                  eval_pore_pressure_inlet_source(t_coeff, q1,                 &
+                  pore_pres_fract, h_dot, r_rho_m, r_red_grav, exc_pore_pres)
           END IF
 
        END DO
@@ -736,8 +741,8 @@ CONTAINS
                * lat_n_y_jk
 
        ! Thermal-energy equation.
-          expl_term(4) = expl_term(4) + t_coeff * h_dot * r_rho_m              &
-               * r_sp_heat_mix * T_source
+          expl_term(4) = expl_term(4) + eval_inlet_thermal_energy_source(     &
+               t_coeff, h_dot, r_rho_m, r_sp_heat_mix, T_source)
 
           ! Solid transport.
           expl_term(idx_solidEqn_first:idx_solidEqn_last) =                   &
@@ -757,9 +762,9 @@ CONTAINS
 
           IF ( pore_pressure_flag ) THEN
              exc_pore_pres = qpj(idx_pore)
-             expl_term(idx_poreEqn) = expl_term(idx_poreEqn) +                 &
-                  t_coeff * ( q1 * pore_pres_fract * h_dot * r_rho_m           &
-                  * r_red_grav + exc_pore_pres * h_dot * r_rho_m )
+             expl_term(idx_poreEqn) = expl_term(idx_poreEqn) +                &
+                  eval_pore_pressure_inlet_source(t_coeff, q1,                 &
+                  pore_pres_fract, h_dot, r_rho_m, r_red_grav, exc_pore_pres)
           END IF
 
        END IF
@@ -1070,8 +1075,6 @@ CONTAINS
 
     USE COMPLEXIFY
 
-    USE geometry_2d, ONLY : pi_g
-
     USE parameters_2d, ONLY : pore_pressure_flag
     IMPLICIT NONE
 
@@ -1100,8 +1103,6 @@ CONTAINS
     COMPLEX(wp) :: mod_vel
     COMPLEX(wp) :: mod_vel_hor
     COMPLEX(wp) :: mod_vel2
-    REAL(wp) :: h_threshold
-
     INTEGER :: i
     LOGICAL :: moving
 
@@ -1109,29 +1110,7 @@ CONTAINS
 
     COMPLEX(wp) :: exc_pore_pres
 
-    COMPLEX(wp) :: D_coeff
-    REAL(wp) :: gamma_gas
-    COMPLEX(wp) :: gas_compressibility
-
-    COMPLEX(wp) :: rho_gas
-
-    COMPLEX(wp) :: porosity
-    COMPLEX(wp) :: f_inhibit
-    COMPLEX(wp) :: dyn_visc_c
     COMPLEX(wp) :: red_grav
-    COMPLEX(wp) :: hydraulic_permeability_local
-    COMPLEX(wp) :: kin_visc_c_local
-
-
-    !> calculation of permeability
-    COMPLEX(wp) :: diam_sauter !< Sauter diameter retaining composition derivatives [m]
-    COMPLEX(wp) :: sphericity_mean !< Legacy diffusion weights, with complex sensitivities
-   !> Inhibit factor for friction term
-   COMPLEX(wp) :: x  ! local complex variable for f_inhibit calculation
-   COMPLEX(wp) :: s ! local complex variable for f_inhibit calculation
-   INTEGER :: n ! summation index for f_inhibit calculation
-   COMPLEX(wp) :: tt, term, width
-   COMPLEX(wp) :: alpha_trans_dynamic !< Height-dependent transition with its derivative
 
     IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
 
@@ -1154,8 +1133,6 @@ CONTAINS
 
     ! initialize the source terms
     source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)
-    f_inhibit = CMPLX(1.0_wp,0.0_wp,wp)
-
     IF (rheology_flag .OR. pore_pressure_flag) THEN
        CALL c_phys_var(qj,h,u,v,T,rho_m,alphas,alphag,inv_rho_m,Zs,             &
             exc_pore_pres)
@@ -1211,176 +1188,8 @@ CONTAINS
 
     ENDIF
 
-    IF ( pore_pressure_flag ) THEN
-       pore_diffusion: BLOCK
-
-       ! Check the model domain before constructing diffusion coefficients.
-       ! Keep other already assembled sources when this pressure term is absent.
-       IF (REAL(h,wp) .LE. 0.0_wp) EXIT pore_diffusion
-       IF (REAL(exc_pore_pres,wp) .LT. 0.0_wp) EXIT pore_diffusion
-       IF (REAL(1.0_wp-SUM(alphas),wp) .LE. EPSILON(1.0_wp)) EXIT pore_diffusion
-       IF (dynamic_permeability_flag) THEN
-          ! A pore network is undefined without a solid skeleton. This matches
-          ! the no-solid domain guard of the mass-exchange gas-loss model.
-          IF (REAL(SUM(alphas),wp) .LE. EPSILON(1.0_wp)) EXIT pore_diffusion
-       END IF
-
-       h_threshold = 1.0E-10_wp
-       hydraulic_permeability_local = CMPLX(hydraulic_permeability,0.0_wp,wp)
-       kin_visc_c_local = CMPLX(kin_visc_c,0.0_wp,wp)
-
-       gamma_gas = sp_heat_a / ( sp_heat_a - sp_gas_const_a )
-       gas_compressibility = 1.0_wp / ( gamma_gas * pres )
-       rho_gas = pres / ( sp_gas_const_a * T )
-
-       porosity = 1.0_wp - SUM(alphas)
-
- ! ---------------------------------------------------------
-       IF (dynamic_permeability_flag) THEN
-
-         ! diameter and density of particles
-         IF ( n_solid .GT. 1) THEN ! if more than one solid phase
-            ! Sauter diameter
-            diam_sauter = SUM(alphas) / SUM(alphas / diam_s)
-            ! Surface-area-weighted mean sphericity (consistent with Sauter diameter)
-            ! Sphericity is weighted by alpha_i * d_i^2 (proportional to surface area)
-            sphericity_mean = SUM(alphas * diam_s**2 * sphericity_s) / &
-                              SUM(alphas * diam_s**2)
-         ELSE ! if only one solid phase
-            diam_sauter = diam_s(1)
-            sphericity_mean = sphericity_s(1)
-         END IF
-         ! calculating permeability using Carman-Kozeny equation with sphericity
-         hydraulic_permeability_local = ( porosity**3.0_wp * &
-                                   ( diam_sauter * sphericity_mean )**2.0_wp ) / &
-                                   ( 150.0_wp * (1.0_wp - porosity)**2.0_wp )
-
-       END IF
-
-       ! ---------------------------------------------------------
-
-       IF ( gas_flag .AND. sutherland_flag ) THEN
-
-          dyn_visc_c = muRef_Suth * ( T / Tref_Suth )**1.5_wp *                 &
-               ( Tref_Suth + S_mu ) / ( T + S_mu )
-
-          kin_visc_c_local = dyn_visc_c / rho_gas
-
-       END IF
-
-       ! Eq. 7 from Gueugneau et al, 2017
-       D_coeff = hydraulic_permeability_local /                                &
-            ( porosity * kin_visc_c_local * rho_gas *                         &
-            gas_compressibility )
-
-       ! Equation 12 from Gueugneau et al, 2017
-       ! At zero excess pressure the source value is still zero, but the
-       ! positive-side derivative is needed by the complex-step Jacobian.
-       IF ( ( REAL(exc_pore_pres) .GE. 0.0_wp )                                 &
-            .AND. ( REAL(h) .GT. 0.0_wp) ) THEN
-
-
-         select case ( trim(adjustl(f_inhibit_mode)) )
-
-         case ( 'OFF' )
-            f_inhibit = 1.0_wp
-
-         case ('STEP')
-            !-------------------------------------------------------------------!
-            ! Calculate f_inhibit based on SOLID FRACTION
-            ! for STEP function case
-            !-------------------------------------------------------------------!
-            if ( SUM(alphas) .LT. maximum_solid_packing ) then
-               f_inhibit = 1.0_wp
-            else
-               f_inhibit = 0.0_wp
-            end if
-
-         case ('STATIC')
-
-            !f_inhibit = MAX(0.0_wp , 1.0_wp - (SUM(alphas) /                     &
-            !CMPLX(maximum_solid_packing,0.0_wp,wp))**alpha_trans )
-
-            !-------------------------------------------------------------------!
-            ! Calculate f_inhibit based on SOLID FRACTION
-            ! for COMPLEX input
-            ! Generalized smoothstep S_N(x) for compx input
-            !-------------------------------------------------------------------!
-
-            ! Validate N_inh read from namelist (should be non-negative integer)
-            if (N_inh < 0) then
-               WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', N_inh
-               STOP
-            end if
-            ! use solid volume fraction source for x
-            x = SUM(alphas)
-            ! Select the clamp from the real base state; retain the smooth
-            ! polynomial's complex dependence inside the transition interval.
-            width = maximum_solid_packing - alpha_trans ! right_limit - left_limit
-            tt = (x - alpha_trans) / width
-            if (REAL(tt,wp) < 0.0_wp) tt = 0.0_wp
-            if (REAL(tt,wp) > 1.0_wp) tt = 1.0_wp
-            ! Initialize smoothstep sum
-            s = CMPLX(0.0_wp,0.0_wp,wp)
-            ! call the precomputed pascal triangle coefficients
-            do n = 0, N_inh
-               term = pascal_coeff(n)  * tt**(N_inh + n + 1)
-               s = s + term
-            end do
-            ! flip result: [0→1] becomes [1→0]
-            s = 1.0_wp - s
-            f_inhibit = s
-
-         case ('DYNAMIC')
-            !-------------------------------------------------------------------!
-            ! Calculate f_inhibit based on SOLID FRACTION and HEIGHT of the flow
-            ! for COMPLEX input
-            ! Generalized smoothstep S_N(x) for compx input,
-            !-------------------------------------------------------------------!
-
-            ! Calcualte dynamic alpha_trans based on height (from empirical fit)
-            alpha_trans_dynamic = 10.0_wp ** (-0.28_wp) *                       &
-                 h ** 0.12_wp
-
-            ! Correct for alpha_trans_dynamic exceeding maximum_solid_packing
-            if ( REAL(alpha_trans_dynamic,wp) .GE. maximum_solid_packing ) then
-                alpha_trans_dynamic = 0.99_wp * maximum_solid_packing
-            end if
-
-            ! Validate N_inh read from namelist (should be non-negative integer)
-            if (N_inh < 0) then
-               WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', N_inh
-               STOP
-            end if
-            ! use solid volume fraction source for x
-            x = SUM(alphas)
-            ! Keep height and concentration sensitivities in the smooth branch.
-            width = maximum_solid_packing - alpha_trans_dynamic ! right_limit - left_limit
-            tt = (x - alpha_trans_dynamic) / width
-            if (REAL(tt,wp) < 0.0_wp) tt = 0.0_wp
-            if (REAL(tt,wp) > 1.0_wp) tt = 1.0_wp
-            ! Initialize smoothstep sum
-            s = CMPLX(0.0_wp,0.0_wp,wp)
-            ! call the precomputed pascal triangle coefficients
-            do n = 0, N_inh
-               term = pascal_coeff(n)  * tt**(N_inh + n + 1)
-               s = s + term
-            end do
-            ! flip result: [0→1] becomes [1→0]
-            s = 1.0_wp - s
-            f_inhibit = s
-
-         end select
-         ! -------------------------------------------------------------------!
-
-         ! Calculate the source term for the pore-pressure equation.
-         source_term(idx_poreEqn) = - rho_m * ( pi_g / 2.0_wp )**2 *           &
-               D_coeff / MAX(h_threshold,h) * exc_pore_pres * f_inhibit
-
-       END IF
-
-       END BLOCK pore_diffusion
-    END IF
+    IF ( pore_pressure_flag ) CALL eval_pore_pressure_diffusion_source(h, T,   &
+         rho_m, alphas, exc_pore_pres, source_term(idx_poreEqn))
 
     nh_term = source_term
 
@@ -1631,8 +1440,6 @@ CONTAINS
        continuous_phase_erosion_term , continuous_phase_loss_term , eqns_term , &
        topo_term  )
 
-    USE geometry_2d, ONLY : pi_g
-
     USE parameters_2d, ONLY : erodible_deposit_flag , liquid_vaporization_flag ,&
          pore_pressure_flag , gas_loss_flag
 
@@ -1682,6 +1489,9 @@ CONTAINS
     REAL(wp) :: fluid_visc
     REAL(wp) :: inv_kin_visc
     REAL(wp) :: rhoc
+    REAL(wp) :: dyn_visc_c
+    REAL(wp) :: rho_c
+    REAL(wp) :: kin_visc_c_local
     REAL(wp) :: r_Ri
     REAL(wp) :: r_red_grav
 
@@ -1699,32 +1509,11 @@ CONTAINS
     REAL(wp) :: rho_dep_tot
     REAL(wp) :: rho_ers_tot
 
-    REAL(wp) :: T_liquid
-    REAL(wp) :: T_boiling
     REAL(wp) :: T_erodible_local !< cell-local substrate temperature [K]
-    REAL(wp) :: sp_latent_heat
-    REAL(wp) :: sp_heat_liq_water
     REAL(wp) :: mass_vap_rate
+    REAL(wp) :: vapor_energy_source
 
     REAL(wp) :: pore_pressure_term
-    REAL(wp) :: f_inhibit
-    REAL(wp) :: vel_loss_gas
-
-   !> permeability calculationn
-    REAL(wp) :: diam_sauter ! < Sauter mean diameter
-    REAL(wp) :: sphericity_mean ! < Surface-area-weighted mean sphericity
-   !> Inhibit factor for friction term
-    REAL(wp) :: x  !< local variable for f_inhibit calculation
-    REAL(wp) :: s !< local variable for f_inhibit calculation
-    INTEGER :: n !< local variable for f_inhibit summation
-    REAL(wp) :: tt, term, width !< local variables for f_inhibit
-    REAL(wp) :: alpha_trans_dynamic !< dynamic transition solid fraction
-
-
-    REAL(wp) :: dyn_visc_c
-    REAL(wp) :: rho_c
-    REAL(wp) :: hydraulic_permeability_local
-    REAL(wp) :: kin_visc_c_local
 
     erosion_term(1:n_solid) = 0.0_wp
     deposition_term(1:n_solid) = 0.0_wp
@@ -1732,12 +1521,10 @@ CONTAINS
     continuous_phase_loss_term = 0.0_wp
     eqns_term(1:n_eqns) = 0.0_wp
     topo_term = 0.0_wp
-    hydraulic_permeability_local = hydraulic_permeability
-    kin_visc_c_local = kin_visc_c
     r_Zs = 0.0_wp
     r_exc_pore_pres = 0.0_wp
-    f_inhibit = 1.0_wp
     pore_pressure_term = 0.0_wp
+    kin_visc_c_local = kin_visc_c
 
     IF ( qpj(1) .LE. epsilon(1.0_wp) ) THEN
 
@@ -1891,148 +1678,8 @@ CONTAINS
 
        IF ( alphas_tot .LT. maximum_solid_packing ) THEN
 
-         ! compute f_inhibit based on the selected model
-         select case (trim(adjustl(f_inhibit_mode)))
-         case ('OFF')
-            f_inhibit = 1.0_wp ! no inhibition (pure diffusion)
-
-         case ('STEP')
-            !-------------------------------------------------------------------!
-            ! Calculate f_inhibit based on SOLID FRACTION
-            ! for STEP function case
-            !-------------------------------------------------------------------!
-            if ( alphas_tot .LT. maximum_solid_packing ) then
-               f_inhibit = 1.0_wp
-            else
-               f_inhibit = 0.0_wp
-            end if
-
-         case ('STATIC')
-            !-------------------------------------------------------------------!
-            ! Calculate f_inhibit based on SOLID FRACTION
-            ! for REAL case
-            ! Generalized smoothstep S_N(x) for real input, result flipped [1→0]
-            !-------------------------------------------------------------------!
-            ! Validate N_inh read from namelist (should be non-negative integer)
-            if (N_inh < 0) then
-               WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', N_inh
-               STOP
-            end if
-            ! use solid volume fraction source for x
-            x = alphas_tot
-            ! Normalize x to [0,1]
-            width = maximum_solid_packing - alpha_trans ! right limit - left limit
-            tt = (x - alpha_trans) / width
-            if (tt < 0.0_wp) tt = 0.0_wp
-            if (tt > 1.0_wp) tt = 1.0_wp
-            ! Initialize smoothstep sum
-            s = 0.0_wp
-            ! call the precomputed pascal triangle coefficients
-            do n = 0, N_inh
-               term = pascal_coeff(n)  * tt**(N_inh + n + 1.0_wp)
-               s = s + term
-            end do
-            ! Flip the smoothstep to start at 1 → 0
-            s = 1.0_wp - s
-            ! Assign to f_inhibit (convert real-like complex value)
-            f_inhibit = s
-
-         case ('DYNAMIC')
-            !-------------------------------------------------------------------!
-            ! Calculate f_inhibit based on SOLID FRACTION and FLOW HEIGHT
-            ! For a REAL case
-            ! Generalized smoothstep S_N(x) for real input, result flipped [1→0]
-            !-------------------------------------------------------------------!
-            ! Calculate the alpha_trans_dynamic based on flow height
-            IF (r_h .LT. EPSILON(1.0_wp)) THEN
-               r_h = EPSILON(1.0_wp) ! avoid multiplying by something lower than working precision
-            END IF
-
-            alpha_trans_dynamic = 10.0_wp ** (-0.28_wp) * r_h ** 0.12_wp
-
-
-            ! Correct for alpha_trans_dynamic exceeding maximum_solid_packing
-            if ( alpha_trans_dynamic .GE. maximum_solid_packing ) then
-                alpha_trans_dynamic = 0.99_wp * maximum_solid_packing
-            end if
-            ! Validate N_inh read from namelist (should be non-negative integer)
-            if (N_inh < 0) then
-               WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', N_inh
-               STOP
-            end if
-            ! use solid volume fraction source for x
-            x = alphas_tot
-            ! Normalize x to [0,1]
-            width = maximum_solid_packing - alpha_trans_dynamic ! right limit - left limit
-            tt = (x - alpha_trans_dynamic) / width
-            if (tt < 0.0_wp) tt = 0.0_wp
-            if (tt > 1.0_wp) tt = 1.0_wp
-            ! Initialize smoothstep sum
-            s = 0.0_wp
-            ! call the precomputed pascal triangle coefficients
-            do n = 0, N_inh
-               term = pascal_coeff(n)  * tt**(N_inh + n + 1.0_wp)
-               s = s + term
-            end do
-
-           ! Flip the smoothstep to start at 1 → 0
-            s = 1.0_wp - s
-            ! Assign to f_inhibit (convert real-like complex value)
-            f_inhibit = s
-
-         end select
-         ! ------------------------------------------------------------------- !
-
-   ! -------------------------------------------------------------------- !
-          ! Guard on alphas_tot: Carman-Kozeny below divides by
-          ! alphas_tot**2, and the surface-area weights divide by a sum
-          ! that vanishes with it, so a gas-only or numerically depleted
-          ! cell would divide by zero.
-          IF (dynamic_permeability_flag .AND.                                  &
-              ( alphas_tot .GT. EPSILON(1.0_wp) )) THEN
-
-            ! diameter and density of particles
-            IF ( n_solid .GT. 1) THEN ! if more than one solid phase
-               diam_sauter = sauter_diameter( r_alphas )
-               ! Surface-area-weighted mean sphericity, consistent with the
-               ! Sauter diameter used beside it: the surface area of class i
-               ! per unit bulk volume scales as alpha_i/d_i, not
-               ! alpha_i*d_i^2, which over-weights the coarse classes.
-               sphericity_mean = DOT_PRODUCT( r_alphas / diam_s , sphericity_s ) / &
-                                 SUM( r_alphas / diam_s )
-            ELSE ! if only one solid phase
-               diam_sauter = diam_s(1)
-               sphericity_mean = sphericity_s(1)
-            END IF
-            ! calculating permeability using Carman-Kozeny equation with sphericity
-            hydraulic_permeability_local = ( (1.0_wp - alphas_tot)**3.0_wp * &
-                                      ( diam_sauter * sphericity_mean )**2.0_wp ) / &
-                                      ( 150.0_wp * (alphas_tot)**2.0_wp )
-
-
-          END IF
-          ! ------------------------------------------------------------------ !
-
-          ! Kinematic viscosity
-          IF ( gas_flag .AND. sutherland_flag ) THEN
-
-             dyn_visc_c = muRef_Suth * ( r_T / Tref_Suth )**1.5_wp *            &
-                  ( Tref_Suth + S_mu ) / ( r_T + S_mu )
-
-             rho_c = pres / ( sp_gas_const_a * r_T )
-             kin_visc_c_local = dyn_visc_c / rho_c
-
-          END IF
-          ! ------------------------------------------------------------------ !
-
-        ! velocity of gas loss due to pore pressure gradient
-        vel_loss_gas = hydraulic_permeability_local /                         &
-               ( kin_visc_c_local * r_rho_c ) / MAX(1.0e-5_wp,r_h) *          &
-               0.5_wp * pi_g *                                                &
-               r_exc_pore_pres
-
-         ! Add the pore-pressure-driven gas loss, inhibited by f_inhibit.
-         pore_pressure_term = vel_loss_gas * f_inhibit
+         CALL eval_pore_pressure_gas_loss(r_h, r_T, r_alphas, alphas_tot,      &
+              r_rho_c, r_exc_pore_pres, pore_pressure_term)
 
          continuous_phase_loss_term = continuous_phase_loss_term +             &
                pore_pressure_term
@@ -2101,11 +1748,11 @@ CONTAINS
 
     ! Thermal-energy equation source term [kg s-3]:
     ! deposition, erosion and entrainment are considered
-    eqns_term(4) = - r_T * ( SUM( rho_s * sp_heat_s * deposition_term )        &
-         + r_rho_c * r_sp_heat_c * continuous_phase_loss_term )                &
-         + T_erodible_local * ( SUM( rho_s * sp_heat_s * erosion_term )        &
-         + rho_c_sub * r_sp_heat_c * continuous_phase_erosion_term )           &
-         + T_ambient * sp_heat_a * rho_a_amb * air_entr
+    eqns_term(4) = eval_mass_exchange_thermal_energy(r_T, rho_s, sp_heat_s,    &
+         deposition_term, erosion_term, r_rho_c, r_sp_heat_c,                  &
+         continuous_phase_loss_term, T_erodible_local, rho_c_sub,              &
+         continuous_phase_erosion_term, T_ambient, sp_heat_a, rho_a_amb,       &
+         air_entr)
 
     ! solid phase mass equation source term [kg m-2 s-1]:
     ! due to solid erosion and deposition
@@ -2114,18 +1761,11 @@ CONTAINS
 
     IF ( gas_flag .AND. liquid_vaporization_flag .AND. ( B_zone .NE. 0 ) ) THEN
 
-       ! gamma_steam = 0.114_wp
-       T_liquid = 290.0_wp
-       T_boiling = 373.15_wp
-       sp_latent_heat = 2264705.0_wp
-       sp_heat_liq_water = 4184.0_wp
-
-       mass_vap_rate = gamma_steam * MAX(0.0_wp , r_T-T_boiling) * SUM( rho_s * &
-            sp_heat_s * deposition_term ) / ( sp_heat_liq_water * ( T_boiling - &
-            T_liquid ) + sp_latent_heat )
+       CALL eval_vaporization_sources(r_T, rho_s, sp_heat_s, deposition_term,  &
+            gamma_steam, sp_heat_g(1), mass_vap_rate, vapor_energy_source)
 
        eqns_term(1) = eqns_term(1) + mass_vap_rate
-       eqns_term(4) = eqns_term(4) + mass_vap_rate * sp_heat_g(1) * T_boiling
+       eqns_term(4) = eqns_term(4) + vapor_energy_source
        eqns_term(5+n_solid) = eqns_term(5+n_solid) + mass_vap_rate
 
     END IF
@@ -2141,7 +1781,8 @@ CONTAINS
     IF ( pore_pressure_flag ) THEN
 
        ! Equation for q1*exc_pore_press
-       eqns_term(idx_poreEqn) = eqns_term(1) * r_exc_pore_pres
+       eqns_term(idx_poreEqn) = eval_pore_pressure_mass_exchange_source(       &
+            eqns_term(1), r_exc_pore_pres)
 
     END IF
 
