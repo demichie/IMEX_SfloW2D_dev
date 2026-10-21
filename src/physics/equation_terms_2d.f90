@@ -20,7 +20,8 @@ MODULE equation_terms_2d
        eval_pore_pressure_gas_loss, eval_pore_pressure_inlet_source,            &
        eval_pore_pressure_mass_exchange_source
   USE thermal_sources_2d, ONLY : eval_inlet_thermal_energy_source,              &
-       eval_mass_exchange_thermal_energy, eval_vaporization_sources
+       eval_lava_cooling_source, eval_mass_exchange_thermal_energy,              &
+       eval_vaporization_sources
   USE rheology_voellmy_2d, ONLY : eval_voellmy_implicit_source,              &
        eval_voellmy_semi_impl_source
   USE rheology_plastic_2d, ONLY : eval_plastic_implicit_source
@@ -1173,7 +1174,9 @@ CONTAINS
                source_term(2), source_term(3))
        ELSEIF (rheology_model_id .EQ. rheology_id_lava) THEN
           CALL eval_lava_implicit_source(h, T, rho_m, u, v, mod_vel, moving,  &
-               source_term(2), source_term(3), source_term(4))
+               source_term(2), source_term(3))
+          source_term(4) = eval_lava_cooling_source(T, radiative_term_coeff,   &
+               convective_term_coeff, T_env)
        ELSEIF (rheology_model_id .EQ. rheology_id_lahar) THEN
           CALL eval_lahar_implicit_source(h, u, v, mod_vel, mod_vel_hor, T,   &
                rho_m, inv_rho_m, alphas, moving, source_term(2),             &

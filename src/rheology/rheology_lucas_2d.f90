@@ -1,5 +1,19 @@
 !********************************************************************************
-!> \brief Lucas velocity-weakening model 10 source terms.
+!> \brief Lucas velocity-weakening Coulomb basal-friction model (model 10).
+!> \details For friction speed \f$U_f\f$, the coefficient is constant below
+!> the transition speed \f$U_w\f$ (and for shallow flow), and weakens above
+!> that threshold:
+!> \f[
+!> \mu(U_f)=
+!> \begin{cases}
+!> \mu_0, & U_f<U_w\ \mathrm{or}\ h<0.1,\\
+!> \mu_\infty+(\mu_0-\mu_\infty)U_w/U_f, & \mathrm{otherwise}.
+!> \end{cases}
+!> \f]
+!> The source is \f$\boldsymbol{S}=-\rho_m\mu hG(g'+a_c)
+!> \boldsymbol{u}_h/|\boldsymbol{u}_h|\f$. When stochastic mode is enabled,
+!> its increment is added to the speed before evaluating the law. The module
+!> exposes \ref eval_lucas_source for the x/y source components.
 !********************************************************************************
 
 MODULE rheology_lucas_2d
@@ -16,8 +30,23 @@ MODULE rheology_lucas_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Evaluate model 10's velocity-dependent Coulomb friction.
-  !> \details Follows Lucas et al. 2014 (doi:10.1038/ncomms4417).
+  !> \brief Evaluate model 10's velocity-dependent Coulomb source.
+  !> \details Applies the Lucas transition-speed law, including its shallow
+  !> flow branch, and returns the horizontal momentum-source components. No
+  !> source is produced at zero speed.
+  !> \param flow_depth Flow depth \f$h\f$.
+  !> \param velocity_x x component of horizontal velocity.
+  !> \param velocity_y y component of horizontal velocity.
+  !> \param speed Speed used by the weakening law.
+  !> \param horizontal_speed Magnitude of horizontal velocity.
+  !> \param mixture_density Mixture density \f$\rho_m\f$.
+  !> \param reduced_gravity Reduced gravity \f$g'\f$.
+  !> \param gravity_coefficient Gravity multiplier \f$G\f$.
+  !> \param curvature_term Curvature acceleration \f$a_c\f$.
+  !> \param stochastic Enable the stochastic speed increment.
+  !> \param stochastic_value Stochastic speed increment.
+  !> \param source_x Returned x momentum source.
+  !> \param source_y Returned y momentum source.
   !******************************************************************************
 
   SUBROUTINE eval_lucas_source( flow_depth, velocity_x, velocity_y, speed,   &

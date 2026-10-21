@@ -1,5 +1,24 @@
 !********************************************************************************
-!> \brief Combined mu(I)-Voellmy model 12 source terms.
+!> \brief Combined regularized \f$\mu(I)\f$ and Voellmy model (model 12).
+!> \details The semi-implicit basal term uses the regularized granular law
+!> \f[
+!> I=\frac{d\dot\gamma}{\sqrt{\sigma'_n/\rho_p}},\quad
+!> \mu(I)=\frac{\mu_s I_0+\mu_2 I+\mu_{I,\infty}I^2}{I_0+I},\quad
+!> \tau_b=\mu(I)\sigma'_n,
+!> \f]
+!> with \f$\dot\gamma=(5/2)|\boldsymbol{u}|/(h_{\rm eff}\sqrt{G})\f$ and
+!> \f$\sigma'_n=\max(\epsilon,\sqrt{G}\max(0,\rho_m(g'+a_c)h_{\rm eff}
+!> -\mathbf{1}_p p_e))\f$. Here \f$h_{\rm eff}\f$ is depth regularized by
+!> machine epsilon, and \f$\mathbf{1}_p\f$ enables pore-pressure reduction.
+!> The basal source is
+!> \f$\boldsymbol{S}_b=-\tau_b\boldsymbol{u}_h/|\boldsymbol{u}|\f$. The
+!> implicit turbulent term is
+!> \f$\boldsymbol{S}_t=-\rho_mg'|\boldsymbol{u}|^2
+!> \boldsymbol{u}_h/(\xi|\boldsymbol{u}|)\f$. The module exposes
+!> \ref eval_mui_voellmy_source for the regularized basal part and
+!> \ref eval_mui_voellmy_implicit_source for the turbulent part. The granular
+!> source uses Sauter particle diameter and average particle density when
+!> multiple solid classes are present.
 !********************************************************************************
 
 MODULE rheology_mui_voellmy_2d
@@ -17,6 +36,23 @@ MODULE rheology_mui_voellmy_2d
 
 CONTAINS
 
+  !******************************************************************************
+  !> \brief Evaluate the implicit Voellmy turbulent source.
+  !> \details Computes the velocity-squared stress with \f$\xi\f$ and returns
+  !> its x/y components. Optional stochastic variation of \f$\xi\f$ is bounded
+  !> to [1, 10^5]; a stationary state returns zero.
+  !> \param velocity_x x component of horizontal velocity.
+  !> \param velocity_y y component of horizontal velocity.
+  !> \param mixture_density Mixture density.
+  !> \param reduced_gravity Reduced gravity.
+  !> \param speed Speed magnitude.
+  !> \param speed_squared Squared speed.
+  !> \param moving Whether the state is moving.
+  !> \param use_stochastic_xi Enable stochastic \f$\xi\f$ variation.
+  !> \param stochastic_value Stochastic increment to \f$\xi\f$.
+  !> \param source_x Returned x momentum source.
+  !> \param source_y Returned y momentum source.
+  !******************************************************************************
   SUBROUTINE eval_mui_voellmy_implicit_source(velocity_x, velocity_y,        &
        mixture_density, reduced_gravity, speed, speed_squared, moving,       &
        use_stochastic_xi, stochastic_value, source_x, source_y)
@@ -50,7 +86,23 @@ CONTAINS
   END SUBROUTINE eval_mui_voellmy_implicit_source
 
   !******************************************************************************
-  !> \brief Evaluate model 12's regularized mu(I) basal friction source.
+  !> \brief Evaluate model 12's regularized \f$\mu(I)\f$ basal source.
+  !> \details Computes the inertial number and effective normal stress,
+  !> including optional pore-pressure reduction, then returns the basal
+  !> friction source in x and y. Stationary states return zero.
+  !> \param flow_depth Flow depth.
+  !> \param velocity_x x component of horizontal velocity.
+  !> \param velocity_y y component of horizontal velocity.
+  !> \param speed Speed magnitude.
+  !> \param mixture_density Mixture density.
+  !> \param reduced_gravity Reduced gravity.
+  !> \param gravity_coefficient Gravity multiplier.
+  !> \param solid_fraction Solid volume fractions by class.
+  !> \param curvature_acceleration Curvature contribution to vertical stress.
+  !> \param use_pore_pressure Enable pore-pressure reduction.
+  !> \param excess_pore_pressure Excess pore pressure.
+  !> \param source_x Returned x momentum source.
+  !> \param source_y Returned y momentum source.
   !******************************************************************************
 
   SUBROUTINE eval_mui_voellmy_source( flow_depth, velocity_x, velocity_y,    &

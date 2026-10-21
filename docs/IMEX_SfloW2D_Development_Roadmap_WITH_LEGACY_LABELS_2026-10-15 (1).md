@@ -1686,7 +1686,7 @@ Questo è il piano consolidato che utilizzerei come riferimento per l’implemen
 
 Perimetro dell’estrazione:
 
-- `thermal_sources_2d` possiede l’energia delle iniezioni generali, lo scambio termico del mass exchange e la vaporizzazione. Il raffreddamento implicito specifico della lava resta nel modulo reologico della lava; parametri termici dichiarati ma non usati non costituiscono nuove leggi di conduzione o riscaldamento.
+- `thermal_sources_2d` possiede l’energia delle iniezioni generali, lo scambio termico del mass exchange, la vaporizzazione e il raffreddamento radiativo/convettivo della lava. `rheology_lava_2d` resta proprietario dei soli termini reologici; parametri termici dichiarati ma non usati non costituiscono nuove leggi di conduzione o riscaldamento.
 - `pore_pressure_2d` possiede diffusione implicita (inclusa la sensibilità COMPLEX), perdita Darcy di gas e accoppiamenti conservativi con iniezioni e mass exchange.
 - Le due formulazioni della permeabilità dinamica restano provider distinti: diffusione con pesi di sfericità `alpha*d^2`, gas loss con `alpha/d`. L’estrazione conserva e verifica entrambe; non ne presume l’equivalenza né ne uniforma la fisica.
 

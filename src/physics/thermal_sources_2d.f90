@@ -11,6 +11,7 @@ MODULE thermal_sources_2d
   PRIVATE
 
   PUBLIC :: eval_inlet_thermal_energy_source
+  PUBLIC :: eval_lava_cooling_source
   PUBLIC :: eval_mass_exchange_thermal_energy
   PUBLIC :: eval_vaporization_sources
 
@@ -30,6 +31,20 @@ CONTAINS
          mixture_heat_capacity * source_temperature
 
   END FUNCTION eval_inlet_thermal_energy_source
+
+  PURE FUNCTION eval_lava_cooling_source(temperature, radiative_coefficient,   &
+       convective_coefficient, ambient_temperature) RESULT(source)
+
+    COMPLEX(wp), INTENT(IN) :: temperature
+    REAL(wp), INTENT(IN) :: radiative_coefficient
+    REAL(wp), INTENT(IN) :: convective_coefficient
+    REAL(wp), INTENT(IN) :: ambient_temperature
+    COMPLEX(wp) :: source
+
+    source = -radiative_coefficient * (temperature**4 - ambient_temperature**4) &
+         - convective_coefficient * (temperature - ambient_temperature)
+
+  END FUNCTION eval_lava_cooling_source
 
   PURE FUNCTION eval_mass_exchange_thermal_energy(flow_temperature,            &
        solid_density, solid_heat_capacity, deposition_rate, erosion_rate,      &

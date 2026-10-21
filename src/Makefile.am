@@ -92,7 +92,6 @@ rheology/rheology_mui_voellmy_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)      \
                                             rheology/rheology_parameters_2d.$(OBJEXT) \
                                             state/state_conversion_2d.$(OBJEXT)
 rheology/rheology_lava_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)              \
-                                     core/constitutive_parameters_2d.$(OBJEXT) \
                                      rheology/rheology_parameters_2d.$(OBJEXT)
 rheology/rheology_lahar_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)            \
                                       core/constitutive_parameters_2d.$(OBJEXT) \

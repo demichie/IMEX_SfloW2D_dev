@@ -1,5 +1,21 @@
 !********************************************************************************
-!> \brief Regularized mu(I) model 11 source terms.
+!> \brief Regularized \f$\mu(I)\f$ granular basal-friction model (model 11).
+!> \details The inertial number is formed from particle diameter \f$d\f$,
+!> shear rate \f$\dot\gamma=(5/2)|\boldsymbol{u}|/(h_{\rm eff}\sqrt{G})\f$
+!> and effective normal stress
+!> \f$\sigma'_n=\max(\epsilon,\sqrt{G}\max(0,\rho_m(g'+a_c)h_{\rm eff}
+!> -\mathbf{1}_p p_e))\f$, where \f$h_{\rm eff}\f$ is depth regularized by
+!> machine epsilon and \f$\mathbf{1}_p\f$ enables pore-pressure reduction:
+!> \f[
+!> I=\frac{d\dot\gamma}{\sqrt{\sigma'_n/\rho_p}},\qquad
+!> \mu(I)=\frac{\mu_s I_0+\mu_2 I+\mu_{I,\infty}I^2}{I_0+I}.
+!> \f]
+!> The basal stress is
+!> \f$\tau_b=\mu(I)\sigma'_n\f$ and the returned source is
+!> \f$\boldsymbol{S}=-\tau_b\boldsymbol{u}_h/|\boldsymbol{u}|\f$.
+!> \ref eval_mui_source evaluates the real-valued x/y source components,
+!> choosing a Sauter diameter and average solid density for mixtures with
+!> multiple solid classes.
 !********************************************************************************
 
 MODULE rheology_mui_2d
@@ -18,7 +34,23 @@ MODULE rheology_mui_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Evaluate model 11's regularized mu(I) basal friction source.
+  !> \brief Evaluate model 11's regularized \f$\mu(I)\f$ source.
+  !> \details Computes particle properties, effective normal stress, inertial
+  !> number and regularized friction coefficient, then projects basal stress
+  !> onto the horizontal velocity direction. Stationary states return zero.
+  !> \param flow_depth Flow depth.
+  !> \param velocity_x x component of horizontal velocity.
+  !> \param velocity_y y component of horizontal velocity.
+  !> \param speed Speed magnitude.
+  !> \param mixture_density Mixture density.
+  !> \param reduced_gravity Reduced gravity.
+  !> \param gravity_coefficient Gravity multiplier.
+  !> \param solid_fraction Solid volume fractions by class.
+  !> \param curvature_acceleration Curvature contribution to vertical stress.
+  !> \param use_pore_pressure Enable pore-pressure reduction.
+  !> \param excess_pore_pressure Excess pore pressure.
+  !> \param source_x Returned x momentum source.
+  !> \param source_y Returned y momentum source.
   !******************************************************************************
 
   SUBROUTINE eval_mui_source( flow_depth, velocity_x, velocity_y, speed,     &

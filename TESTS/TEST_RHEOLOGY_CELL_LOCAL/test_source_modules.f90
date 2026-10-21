@@ -4,12 +4,16 @@ PROGRAM test_source_modules
   USE pore_pressure_2d, ONLY : eval_pore_pressure_inlet_source,                &
        eval_pore_pressure_mass_exchange_source
   USE thermal_sources_2d, ONLY : eval_inlet_thermal_energy_source,             &
-       eval_mass_exchange_thermal_energy, eval_vaporization_sources
+       eval_lava_cooling_source, eval_mass_exchange_thermal_energy,            &
+       eval_vaporization_sources
 
   IMPLICIT NONE
 
   REAL(wp) :: actual
   REAL(wp) :: expected
+  REAL(wp) :: expected_derivative
+  REAL(wp) :: temperature_perturbation
+  COMPLEX(wp) :: complex_actual
   REAL(wp) :: vapor_mass_rate
   REAL(wp) :: vapor_energy_source
   REAL(wp) :: solid_density(2)
@@ -26,6 +30,18 @@ PROGRAM test_source_modules
        800.0_wp, 500.0_wp)
   expected = 0.5_wp * 0.02_wp * 1200.0_wp * 800.0_wp * 500.0_wp
   CALL assert_close(actual, expected, 'inlet thermal energy')
+
+  temperature_perturbation = 1.0E-20_wp
+  complex_actual = eval_lava_cooling_source(                              &
+       CMPLX(900.0_wp, temperature_perturbation, wp), 3.0E-8_wp,           &
+       4.0_wp, 300.0_wp)
+  expected = -3.0E-8_wp * (900.0_wp**4 - 300.0_wp**4) -                    &
+       4.0_wp * (900.0_wp - 300.0_wp)
+  expected_derivative = -4.0_wp * 3.0E-8_wp * 900.0_wp**3 - 4.0_wp
+  CALL assert_close(REAL(complex_actual,wp), expected, 'lava cooling value')
+  CALL assert_close(AIMAG(complex_actual) / temperature_perturbation,        &
+       expected_derivative,                                                 &
+       'lava cooling complex-step derivative')
 
   actual = eval_mass_exchange_thermal_energy(650.0_wp, solid_density,          &
        solid_heat_capacity, deposition_rate, erosion_rate, 1.2_wp, 1005.0_wp,  &

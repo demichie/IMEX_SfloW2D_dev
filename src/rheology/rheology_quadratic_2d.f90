@@ -1,5 +1,13 @@
 !********************************************************************************
-!> \brief Quadratic basal-friction rheology model terms.
+!> \brief Quadratic basal-friction model.
+!> \details The implicit drag is quadratic in the supplied speed:
+!> \f[
+!> \boldsymbol{S}=-\rho_m f_q|\boldsymbol{u}|^2
+!>                \frac{\boldsymbol{u}_h}{|\boldsymbol{u}_h|},
+!> \f]
+!> where \f$f_q\f$ is \ref friction_factor. The module provides
+!> \ref eval_quadratic_implicit_source, which returns zero for a stationary
+!> state and otherwise evaluates the complex-valued x/y sources.
 !********************************************************************************
 
 MODULE rheology_quadratic_2d
@@ -16,6 +24,21 @@ MODULE rheology_quadratic_2d
 
 CONTAINS
 
+  !******************************************************************************
+  !> \brief Evaluate the implicit quadratic-friction source.
+  !> \details Applies the quadratic speed-dependent drag opposite to the
+  !> horizontal velocity direction. Complex arithmetic retains sensitivities
+  !> for the implicit Jacobian.
+  !> \param velocity_x x component of horizontal velocity.
+  !> \param velocity_y y component of horizontal velocity.
+  !> \param speed Speed magnitude.
+  !> \param horizontal_speed Horizontal speed magnitude.
+  !> \param speed_squared Squared speed used by the quadratic law.
+  !> \param mixture_density Mixture density.
+  !> \param moving Whether the state is moving.
+  !> \param source_x Returned x momentum source.
+  !> \param source_y Returned y momentum source.
+  !******************************************************************************
   SUBROUTINE eval_quadratic_implicit_source(velocity_x, velocity_y, speed,     &
        horizontal_speed, speed_squared, mixture_density, moving, source_x, source_y)
 

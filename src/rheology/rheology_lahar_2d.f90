@@ -1,5 +1,34 @@
 !********************************************************************************
-!> \brief Lahar rheology model terms and viscosity relation.
+!> \brief Lahar rheology: temperature-dependent viscosity, turbulent drag and yield stress.
+!> \details With \f$T_C=T-273.15\f$, the carrier-fluid viscosity is
+!> \f$\eta_f(T,C)=\alpha_1(T)\exp(\beta_1 C)\f$. Its piecewise temperature
+!> factor is
+!> \f[
+!> \alpha_1(T)=\alpha_{1,\rm coeff}
+!> \begin{cases}
+!> 10^{-3}10^{1301/[998.333+8.1855(T_C-20)+0.00585(T_C-20)^2]-1.30223},
+!>       & T_C<20,\\
+!> 1.002\,10^{-3}10^{[1.3272(20-T_C)-0.001053(T_C-20)^2]/(T_C+105)},
+!>       & T_C\ge20.
+!> \end{cases}
+!> \f]
+!> The implicit momentum source
+!> combines viscous and turbulent slope contributions,
+!> \f[
+!> S_v=\frac{\kappa\eta_f|\boldsymbol{u}|}
+!>              {8\rho_m g h^2},\qquad
+!> S_t=n_{td}^2|\boldsymbol{u}|^2h^{-4/3},\qquad
+!> \boldsymbol{S}=-\frac{g\rho_mh(S_v+S_t)}
+!>                       {|\boldsymbol{u}_h|}\boldsymbol{u}_h.
+!> \f]
+!> The semi-implicit yield term uses
+!> \f$Y=\alpha_2[\exp(\beta_2 C)-1]\f$ and
+!> \f$\boldsymbol{S}_y=-Y\boldsymbol{u}_h/|\boldsymbol{u}_h|\f$. The
+!> \ref eval_lahar_implicit_source evaluates the viscous/turbulent drag and
+!> \ref eval_lahar_semi_impl_source evaluates the yield-stress term. The
+!> real and complex overloads of \ref eval_lahar_fluid_viscosity implement
+!> the same fluid-viscosity correlation, while
+!> \ref eval_lahar_deposition_rate supplies the capped settling rate.
 !********************************************************************************
 
 MODULE rheology_lahar_2d
@@ -31,6 +60,15 @@ MODULE rheology_lahar_2d
 
 CONTAINS
 
+  !******************************************************************************
+  !> \brief Evaluate carrier-fluid viscosity for real state variables.
+  !> \details Converts temperature to degrees Celsius, evaluates the
+  !> piecewise \f$\alpha_1(T)\f$ correlation, and multiplies by
+  !> \f$\exp(\beta_1 C)\f$ for the total solid fraction.
+  !> \param temperature Absolute temperature in kelvin.
+  !> \param solid_fraction_sum Sum of solid volume fractions.
+  !> \return Carrier-fluid dynamic viscosity.
+  !******************************************************************************
   FUNCTION eval_lahar_fluid_viscosity_real(temperature, solid_fraction_sum)  &
        RESULT(fluid_viscosity)
 
@@ -55,6 +93,15 @@ CONTAINS
 
   END FUNCTION eval_lahar_fluid_viscosity_real
 
+  !******************************************************************************
+  !> \brief Evaluate carrier-fluid viscosity for complex state variables.
+  !> \details Complex overload of the viscosity correlation. The branch in
+  !> the piecewise temperature law is selected from the real temperature;
+  !> algebra within that branch remains complex for derivative evaluation.
+  !> \param temperature Absolute temperature in kelvin.
+  !> \param solid_fraction_sum Sum of solid volume fractions.
+  !> \return Complex carrier-fluid dynamic viscosity.
+  !******************************************************************************
   FUNCTION eval_lahar_fluid_viscosity_complex(temperature, solid_fraction_sum) &
        RESULT(fluid_viscosity)
 
@@ -79,6 +126,17 @@ CONTAINS
 
   END FUNCTION eval_lahar_fluid_viscosity_complex
 
+  !******************************************************************************
+  !> \brief Evaluate the deposition-limited settling rate.
+  !> \details Caps the settling flux by the amount of solid available in the
+  !> flow during the current time step:
+  !> \f$D=\min(Cw_s,hC/\Delta t)\f$.
+  !> \param solid_fraction Solid volume fraction.
+  !> \param settling_velocity Settling velocity.
+  !> \param flow_depth Flow depth.
+  !> \param time_step Time-step size.
+  !> \return Deposition rate per unit area.
+  !******************************************************************************
   PURE FUNCTION eval_lahar_deposition_rate(solid_fraction, settling_velocity, &
        flow_depth, time_step) RESULT(deposition_rate)
 
@@ -91,6 +149,26 @@ CONTAINS
 
   END FUNCTION eval_lahar_deposition_rate
 
+  !******************************************************************************
+  !> \brief Evaluate the implicit viscous and turbulent lahar source.
+  !> \details Computes the temperature- and concentration-dependent fluid
+  !> viscosity, adds the viscous and turbulent contributions to the basal
+  !> slope, and returns their x/y momentum sources. A depth floor regularizes
+  !> the source in shallow states; complex arithmetic preserves state
+  !> sensitivities in the implicit Jacobian.
+  !> \param flow_depth Flow depth.
+  !> \param velocity_x x component of horizontal velocity.
+  !> \param velocity_y y component of horizontal velocity.
+  !> \param speed Speed magnitude.
+  !> \param horizontal_speed Horizontal speed magnitude.
+  !> \param temperature Absolute temperature.
+  !> \param mixture_density Mixture density.
+  !> \param inverse_density Reciprocal mixture density.
+  !> \param solid_fractions Solid volume fractions.
+  !> \param moving Whether the state is moving.
+  !> \param source_x Returned x momentum source.
+  !> \param source_y Returned y momentum source.
+  !******************************************************************************
   SUBROUTINE eval_lahar_implicit_source(flow_depth, velocity_x, velocity_y,    &
        speed, horizontal_speed, temperature, mixture_density, inverse_density, &
        solid_fractions, moving, source_x, source_y)
@@ -135,6 +213,20 @@ CONTAINS
 
   END SUBROUTINE eval_lahar_implicit_source
 
+  !******************************************************************************
+  !> \brief Evaluate the semi-implicit lahar yield-stress source.
+  !> \details Computes \f$Y=\alpha_2[\exp(\beta_2 C)-1]\f$ and returns
+  !> \f$-Y\boldsymbol{u}_h/|\boldsymbol{u}_h|\f$ for moving flow.
+  !> \param flow_depth Flow depth.
+  !> \param velocity_x x component of horizontal velocity.
+  !> \param velocity_y y component of horizontal velocity.
+  !> \param horizontal_speed Horizontal speed magnitude.
+  !> \param mixture_density Mixture density.
+  !> \param solid_fraction_sum Sum of solid volume fractions.
+  !> \param moving Whether the state is moving.
+  !> \param source_x Returned x momentum source.
+  !> \param source_y Returned y momentum source.
+  !******************************************************************************
   SUBROUTINE eval_lahar_semi_impl_source(flow_depth, velocity_x, velocity_y, &
        horizontal_speed, mixture_density, solid_fraction_sum, moving,          &
        source_x, source_y)

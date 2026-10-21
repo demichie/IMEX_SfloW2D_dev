@@ -1,5 +1,18 @@
 !********************************************************************************
-!> \brief Froude-dependent Coulomb model 9 source terms.
+!> \brief Froude-dependent Coulomb basal-friction model (model 9).
+!> \details The friction coefficient weakens exponentially with the Froude
+!> number, \f$\mathrm{Fr}=|\boldsymbol{u}|/\sqrt{g' h}\f$:
+!> \f[
+!> \mu(\mathrm{Fr})=\mu_\infty+(\mu_0-\mu_\infty)
+!>                 \exp(-\mathrm{Fr}/\mathrm{Fr}_0).
+!> \f]
+!> The horizontal source is
+!> \f$\boldsymbol{S}=-\rho_m\mu h G(g'+a_c)
+!> \boldsymbol{u}_h/|\boldsymbol{u}_h|\f$, where \f$G\f$ is the supplied
+!> gravity coefficient and \f$a_c\f$ is the curvature acceleration. Optional
+!> stochastic perturbations shift the Froude number for sufficiently deep
+!> flow and clamp it at zero. The module provides
+!> \ref eval_froude_source to evaluate the two horizontal source components.
 !********************************************************************************
 
 MODULE rheology_froude_2d
@@ -16,8 +29,24 @@ MODULE rheology_froude_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Evaluate model 9's Froude-dependent Coulomb friction.
-  !> \details Follows Zhu et al. 2020 (doi:10.1007/s10035-020-01053-7).
+  !> \brief Evaluate model 9's Froude-dependent Coulomb source.
+  !> \details Computes the Froude number and the exponentially weakening
+  !> friction coefficient, then returns the x/y components of the basal
+  !> friction source. A stochastic perturbation is applied only when enabled;
+  !> the source is zero unless speed and reduced gravity are positive.
+  !> \param flow_depth Flow depth \f$h\f$.
+  !> \param velocity_x x component of horizontal velocity.
+  !> \param velocity_y y component of horizontal velocity.
+  !> \param speed Magnitude used in the Froude number.
+  !> \param horizontal_speed Magnitude of horizontal velocity.
+  !> \param mixture_density Mixture density \f$\rho_m\f$.
+  !> \param reduced_gravity Reduced gravity \f$g'\f$.
+  !> \param gravity_coefficient Gravity multiplier \f$G\f$.
+  !> \param curvature_term Curvature acceleration \f$a_c\f$.
+  !> \param stochastic Enable the stochastic Froude perturbation.
+  !> \param stochastic_value Stochastic increment to the Froude number.
+  !> \param source_x Returned x momentum source.
+  !> \param source_y Returned y momentum source.
   !******************************************************************************
 
   SUBROUTINE eval_froude_source( flow_depth, velocity_x, velocity_y, speed,  &
