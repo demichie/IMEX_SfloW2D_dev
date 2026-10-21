@@ -14,6 +14,7 @@ IMEX_SfloW2D_SOURCES = \
                 core/parameters_2d.f90 \
                 core/diagnostics_2d.f90 \
                 rheology/rheology_2d.f90 \
+                rheology/rheology_analytic_utils_2d.f90 \
                 rheology/rheology_parameters_2d.f90 \
                 rheology/rheology_voellmy_2d.f90 \
                 rheology/rheology_plastic_2d.f90 \
@@ -69,14 +70,20 @@ state/state_conversion_2d.$(OBJEXT): state/state_conversion_phys_var.inc      \
 
 numerics/lapack_interfaces_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 rheology/rheology_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+rheology/rheology_analytic_utils_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)  \
+                                                core/diagnostics_2d.$(OBJEXT)
 rheology/rheology_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 rheology/rheology_voellmy_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)         \
-                                        rheology/rheology_parameters_2d.$(OBJEXT)
-rheology/rheology_plastic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+                                        rheology/rheology_parameters_2d.$(OBJEXT) \
+                                        rheology/rheology_analytic_utils_2d.$(OBJEXT)
+rheology/rheology_plastic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)         \
+                                        rheology/rheology_analytic_utils_2d.$(OBJEXT)
 rheology/rheology_froude_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
-                                       rheology/rheology_parameters_2d.$(OBJEXT)
+                                       rheology/rheology_parameters_2d.$(OBJEXT) \
+                                       rheology/rheology_analytic_utils_2d.$(OBJEXT)
 rheology/rheology_lucas_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)            \
-                                      rheology/rheology_parameters_2d.$(OBJEXT)
+                                      rheology/rheology_parameters_2d.$(OBJEXT) \
+                                      rheology/rheology_analytic_utils_2d.$(OBJEXT)
 core/constitutive_parameters_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 core/runtime_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 core/complexify.$(OBJEXT): core/parameters_2d.$(OBJEXT)
@@ -86,18 +93,24 @@ state/state_conversion_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
 rheology/rheology_mui_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)              \
                                     core/constitutive_parameters_2d.$(OBJEXT) \
                                     rheology/rheology_parameters_2d.$(OBJEXT)  \
-                                    state/state_conversion_2d.$(OBJEXT)
+                                    state/state_conversion_2d.$(OBJEXT)        \
+                                    rheology/rheology_analytic_utils_2d.$(OBJEXT)
 rheology/rheology_mui_voellmy_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)      \
                                             core/constitutive_parameters_2d.$(OBJEXT) \
                                             rheology/rheology_parameters_2d.$(OBJEXT) \
-                                            state/state_conversion_2d.$(OBJEXT)
+                                            state/state_conversion_2d.$(OBJEXT) \
+                                            rheology/rheology_analytic_utils_2d.$(OBJEXT)
 rheology/rheology_lava_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)              \
-                                     rheology/rheology_parameters_2d.$(OBJEXT)
+                                     rheology/rheology_parameters_2d.$(OBJEXT)  \
+                                     rheology/rheology_analytic_utils_2d.$(OBJEXT)
 rheology/rheology_lahar_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)            \
                                       core/constitutive_parameters_2d.$(OBJEXT) \
-                                      rheology/rheology_parameters_2d.$(OBJEXT)
-rheology/rheology_empirical_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
-rheology/rheology_quadratic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+                                      rheology/rheology_parameters_2d.$(OBJEXT) \
+                                      rheology/rheology_analytic_utils_2d.$(OBJEXT)
+rheology/rheology_empirical_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
+                                          rheology/rheology_analytic_utils_2d.$(OBJEXT)
+rheology/rheology_quadratic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)        \
+                                          rheology/rheology_analytic_utils_2d.$(OBJEXT)
 physics/thermal_sources_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 physics/pore_pressure_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                     core/constitutive_parameters_2d.$(OBJEXT) \

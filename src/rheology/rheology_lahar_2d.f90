@@ -29,6 +29,8 @@
 !> real and complex overloads of \ref eval_lahar_fluid_viscosity implement
 !> the same fluid-viscosity correlation, while
 !> \ref eval_lahar_deposition_rate supplies the capped settling rate.
+!> \ref solve_lahar_analytic_velocity solves the algebraic DIRK velocity
+!> stage as a quadratic with depth, temperature and concentration explicit.
 !********************************************************************************
 
 MODULE rheology_lahar_2d
@@ -36,6 +38,8 @@ MODULE rheology_lahar_2d
   USE parameters_2d, ONLY : wp, sp, four_thirds, neg_four_thirds
   USE constitutive_parameters_2d, ONLY : grav, inv_grav
   USE rheology_parameters_2d, ONLY : T_ref
+  USE rheology_analytic_utils_2d, ONLY : solve_quadratic_in_interval,       &
+       validate_analytic_velocity_inputs, fatal_analytic_input_error
 
   IMPLICIT NONE
 
@@ -44,6 +48,7 @@ MODULE rheology_lahar_2d
   PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
   PUBLIC :: eval_lahar_fluid_viscosity, eval_lahar_implicit_source
   PUBLIC :: eval_lahar_semi_impl_source, eval_lahar_deposition_rate
+  PUBLIC :: solve_lahar_analytic_velocity
 
   REAL(wp) :: alpha2
   REAL(wp) :: beta2
@@ -59,6 +64,69 @@ MODULE rheology_lahar_2d
   END INTERFACE eval_lahar_fluid_viscosity
 
 CONTAINS
+
+  !******************************************************************************
+  !> \brief Solve a complete lahar DIRK stage analytically for velocity.
+  !> \details Holds temperature, concentration, depth, density, and speed
+  !> ratio fixed. The implicit viscous and turbulent terms and semi-implicit
+  !> yield stress give a scalar quadratic in the stage speed:
+  !> \f$\lambda a_2r^2+(1+\lambda a_1)r+\lambda c-r_0=0\f$.
+  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !> \param flow_depth Explicit flow depth.
+  !> \param temperature Explicit temperature.
+  !> \param solid_fraction_sum Explicit total solid volume fraction.
+  !> \param mixture_density Explicit mixture density.
+  !> \param speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param velocity_before Input horizontal velocity.
+  !> \param velocity_after Returned horizontal velocity.
+  !******************************************************************************
+  SUBROUTINE solve_lahar_analytic_velocity(integration_step, flow_depth,   &
+       temperature, solid_fraction_sum, mixture_density, speed_ratio,       &
+       velocity_before, velocity_after)
+
+    REAL(wp), INTENT(IN) :: integration_step, flow_depth, temperature
+    REAL(wp), INTENT(IN) :: solid_fraction_sum, mixture_density, speed_ratio
+    REAL(wp), INTENT(IN) :: velocity_before(2)
+    REAL(wp), INTENT(OUT) :: velocity_after(2)
+
+    REAL(wp) :: speed_before, speed_after, effective_depth, depth_threshold
+    REAL(wp) :: fluid_viscosity, yield_strength
+    REAL(wp) :: constant_drag, linear_drag, quadratic_drag
+    LOGICAL :: root_found
+
+    velocity_after = velocity_before
+    speed_before = SQRT(SUM(velocity_before**2))
+    CALL validate_analytic_velocity_inputs(integration_step, flow_depth,    &
+         speed_ratio, speed_before, 'lahar')
+    IF (integration_step .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+    IF (mixture_density .LE. 0.0_wp) THEN
+       CALL fatal_analytic_input_error('Nonpositive mixture density in lahar analytic solver')
+    END IF
+
+    IF (wp .EQ. sp) THEN
+       depth_threshold = 1.0E-10_wp
+    ELSE
+       depth_threshold = 1.0E-20_wp
+    END IF
+    effective_depth = MAX(flow_depth, depth_threshold)
+    fluid_viscosity = eval_lahar_fluid_viscosity(temperature, solid_fraction_sum)
+    yield_strength = alpha2 * (EXP(beta2 * solid_fraction_sum) - 1.0_wp)
+
+    constant_drag = yield_strength / (mixture_density *                    &
+         MAX(flow_depth, 1.0E-20_wp))
+    linear_drag = Kappa * fluid_viscosity * speed_ratio /                   &
+         (8.0_wp * mixture_density * effective_depth**2)
+    quadratic_drag = grav * n_td2 * speed_ratio**2 *                       &
+         effective_depth**neg_four_thirds
+
+    CALL solve_quadratic_in_interval(integration_step*quadratic_drag,       &
+         1.0_wp + integration_step*linear_drag,                             &
+         integration_step*constant_drag - speed_before, 0.0_wp, speed_before, &
+         speed_after, root_found)
+    IF (.NOT. root_found) speed_after = 0.0_wp
+    velocity_after = (speed_after / speed_before) * velocity_before
+
+  END SUBROUTINE solve_lahar_analytic_velocity
 
   !******************************************************************************
   !> \brief Evaluate carrier-fluid viscosity for real state variables.

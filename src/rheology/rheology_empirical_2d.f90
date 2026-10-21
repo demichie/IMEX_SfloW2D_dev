@@ -6,20 +6,56 @@
 !> \f$\boldsymbol{S}=-\rho_m C\boldsymbol{u}_h/|\boldsymbol{u}_h|\f$.
 !> \ref eval_empirical_implicit_source evaluates its complex-valued x/y
 !> components for a moving state; the empirical constants are fixed in the
-!> routine.
+!> routine. \ref solve_empirical_analytic_velocity solves its algebraic DIRK
+!> velocity stage as a linear contraction with depth and speed ratio explicit.
 !********************************************************************************
 
 MODULE rheology_empirical_2d
 
   USE parameters_2d, ONLY : wp
+  USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs
 
   IMPLICIT NONE
 
   PRIVATE
 
   PUBLIC :: eval_empirical_implicit_source
+  PUBLIC :: solve_empirical_analytic_velocity
 
 CONTAINS
+
+  !******************************************************************************
+  !> \brief Solve the empirical-drag DIRK stage analytically for velocity.
+  !> \details Holds depth and the speed-to-horizontal-speed ratio fixed. Since
+  !> the drag acceleration is proportional to speed, the stage is a scalar
+  !> linear contraction of the input velocity,
+  !> \f$r^+=r_0/(1+\lambda a)\f$.
+  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !> \param flow_depth Explicit flow depth.
+  !> \param speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param velocity_before Input horizontal velocity.
+  !> \param velocity_after Returned horizontal velocity.
+  !******************************************************************************
+  SUBROUTINE solve_empirical_analytic_velocity(integration_step, flow_depth, &
+       speed_ratio, velocity_before, velocity_after)
+
+    REAL(wp), INTENT(IN) :: integration_step, flow_depth, speed_ratio
+    REAL(wp), INTENT(IN) :: velocity_before(2)
+    REAL(wp), INTENT(OUT) :: velocity_after(2)
+
+    REAL(wp) :: linear_drag
+
+    velocity_after = velocity_before
+    CALL validate_analytic_velocity_inputs(integration_step, flow_depth,    &
+         speed_ratio, SQRT(SUM(velocity_before**2)), 'empirical')
+    IF (integration_step .EQ. 0.0_wp) RETURN
+    IF (SUM(velocity_before**2) .EQ. 0.0_wp) RETURN
+
+    linear_drag = 1.0E-3_wp * speed_ratio /                               &
+         (flow_depth * (1.0_wp + 10.0_wp*flow_depth))
+    velocity_after = velocity_before / (1.0_wp + integration_step*linear_drag)
+
+  END SUBROUTINE solve_empirical_analytic_velocity
 
   !******************************************************************************
   !> \brief Evaluate the implicit empirical drag source.

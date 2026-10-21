@@ -18,10 +18,11 @@ for profile in strict optimized; do
     esac
     common='-fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow -ffree-line-length-none'
     objects=''
-    for source in core/parameters_2d rheology/rheology_2d rheology/rheology_parameters_2d \
+    for source in core/parameters_2d core/diagnostics_2d rheology/rheology_2d \
+        rheology/rheology_analytic_utils_2d rheology/rheology_parameters_2d \
         rheology/rheology_voellmy_2d rheology/rheology_plastic_2d \
         rheology/rheology_froude_2d rheology/rheology_lucas_2d \
-        core/diagnostics_2d numerics/lapack_interfaces_2d \
+        numerics/lapack_interfaces_2d \
         core/constitutive_parameters_2d numerics/equation_metadata_2d core/complexify \
         geometry/geometry_2d state/state_conversion_2d \
         rheology/rheology_lava_2d rheology/rheology_lahar_2d \
@@ -41,6 +42,10 @@ for profile in strict optimized; do
     "$compiler" $common $objects test_source_modules.o -llapack \
         -o test_source_modules
     ./test_source_modules
+    "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_analytic_velocity.f90"
+    "$compiler" $common $objects test_analytic_velocity.o -llapack \
+        -o test_analytic_velocity
+    ./test_analytic_velocity
     # IEEE checks and the test-side FD subtraction stay strict in both profiles.
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/probe_sources.f90"
     "$compiler" $common $objects probe_sources.o -llapack -o probe_sources

@@ -193,7 +193,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D10 | P6            | EX_terms / IM_terms                                         | DA FARE  |
 | D11 | P7            | IM_group e metadati                                         | DA FARE  |
 | D12 | P7            | Newton per gruppo e Jacobiano ridotto                       | DA FARE  |
-| D13 | P8            | Algebriche ANALYTIC per stage DIRK                          | DA FARE  |
+| D13 | P8            | Algebriche ANALYTIC per stage DIRK                          | IN CORSO |
 | D14 | P8            | Gruppi misti e validazione                                  | DA FARE  |
 | D15 | P9            | Acceptance della nuova architettura                         | GATE     |
 
@@ -1880,29 +1880,50 @@ Per NEWTON, costruire il residuo locale R_g(x_g) e il Jacobiano J_g = dR_g/dx_g 
 
 ### D13 — Algebriche ANALYTIC per stage DIRK
 
-**Test proporzionati (nuove modifiche a questo step):** T1 variabili ANALYTIC per stage DIRK e derivate; T2 casi con/algebriche senza; T3 N_RK 2/3/4 se cambia stage coupling. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+**Test proporzionati (nuove modifiche a questo step):** T1 residuali algebrici delle soluzioni ANALYTIC di stage DIRK; T2 regimi limite, soglie e selezione delle radici; T3 N_RK 2/3/4 quando si colleghino i solutori al ciclo degli stage. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: DA FARE
+Stato ufficiale: IN CORSO — implementate le routine di modulo; dispatch e integrazione nel solver restano fuori da questo tranche.
 
 #### Limitazioni di ANALYTIC
 
-Per la prima implementazione:
+Le routine di modulo risolvono l'equazione algebrica dello stage per le due
+componenti orizzontali della velocità. Profondità, temperatura, densità,
+frazioni solide, gravità, stress normali, geometria/curvatura, pressioni e
+rapporti tra velocità totale e orizzontale sono ingressi espliciti congelati
+durante lo stage. La direzione orizzontale viene preservata; la soluzione
+scalare del modulo della velocità viene selezionata nell'intervallo
+dissipativo [0, r0].
 
-Una sola equazione scalare, se è disponibile una formula chiusa.
+Le dieci reologie attualmente supportate hanno una forma chiusa con tali
+variabili esplicite: contrazione lineare per empirica; decremento costante
+per plastic; aggiornamento lineare con soglia per lava; quadratiche per
+quadratic drag, Voellmy, lahar, Lucas e mu(I); cubica per mu(I)-Voellmy;
+funzione Lambert W per Froude. Le funzioni comuni per le radici e Lambert W
+sono in `rheology_analytic_utils_2d`, mentre ogni solver specifico resta nel
+modulo della propria reologia.
 
-Oppure le due equazioni del momento, se esiste una soluzione vettoriale chiusa.
+Non è stato introdotto un fallback ANALYTIC per modelli non supportati: in
+questa tranche tutti i modelli attivi hanno una formula chiusa quando le
+variabili non-velocità sono esplicite.
 
-Nessuna soluzione analitica generica per gruppi con più equazioni accoppiate.
+I solutori non sono ancora richiamati da `time_integration_2d`/Newton e non
+aggiungono dispatch per gruppi; questa integrazione resta un'attività D13
+successiva, dopo D10–D12. I gruppi accoppiati diversi dalla coppia di momenti
+non ricevono una soluzione analitica generica.
 
-Questi vincoli sono controllati durante l’inizializzazione.
+#### Contratto delle soluzioni di stage
 
-#### Contratto ANALYTIC e soluzione quadratic drag
-
-ANALYTIC ammette esclusivamente (a) una singola equazione scalare oppure (b) esattamente entrambe le componenti della quantità di moto, quando esiste la formula congiunta. Si risolve **l’equazione algebrica dello stage DIRK**, non l’ODE su dt. Per la frizione quadratica isotropa, con k=f/h≥0 e modulo noto U\*, la relazione è:
-
-La radice non negativa, in forma stabile, è:
-
-Ricostruire il momento mantenendo il verso di riferimento, con casi robusti U\*=0, k=0, tau=0. Per raffreddamento e pore-pressure la formula è disponibile soltanto se rappresenta l’insieme delle sorgenti implicite attive per l’equazione. Un’eventuale formula quartica radiativa deve essere verificata quanto a radici, selezione fisica e stabilità; non utilizzare Newton implicitamente dentro ANALYTIC.
+Si risolve **l’equazione algebrica dello stage DIRK**, non l’ODE su `dt`.
+Per il quadratic drag, ad esempio, lo stage scalare è
+\f$\lambda a r^2+r-r_0=0\f$; per mu(I)-Voellmy la legge razionale mu(I)
+combinata con il termine quadratico produce un polinomio cubico. Froude usa
+la branca reale principale `W0` per la legge esponenziale di indebolimento.
+I risolutori selezionano la radice ammissibile più grande nell'intervallo
+[0, r0], preservando la direzione e impedendo incremento o inversione della
+velocità. Il test `../TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_analytic_velocity.f90`
+confronta ogni soluzione con l'equazione di stage ricostruita dai rispettivi
+moduli sorgente in build strict e optimized. Non utilizzare Newton
+implicitamente dentro una routine ANALYTIC.
 
 ### D14 — Gruppi misti e validazione
 

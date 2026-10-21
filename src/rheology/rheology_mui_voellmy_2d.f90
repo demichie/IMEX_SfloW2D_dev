@@ -19,6 +19,8 @@
 !> \ref eval_mui_voellmy_implicit_source for the turbulent part. The granular
 !> source uses Sauter particle diameter and average particle density when
 !> multiple solid classes are present.
+!> \ref solve_mui_voellmy_analytic_velocity solves the combined algebraic
+!> DIRK speed equation as a cubic with non-velocity state frozen explicitly.
 !********************************************************************************
 
 MODULE rheology_mui_voellmy_2d
@@ -27,14 +29,114 @@ MODULE rheology_mui_voellmy_2d
   USE constitutive_parameters_2d, ONLY : diam_s, rho_s
   USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf, xi
   USE state_conversion_2d, ONLY : sauter_diameter, average_density_solids
+  USE rheology_analytic_utils_2d, ONLY : solve_cubic_in_interval,          &
+       mui_velocity_stage_polynomial, validate_analytic_velocity_inputs,    &
+       fatal_analytic_input_error
 
   IMPLICIT NONE
 
   PRIVATE
 
   PUBLIC :: eval_mui_voellmy_source, eval_mui_voellmy_implicit_source
+  PUBLIC :: solve_mui_voellmy_analytic_velocity
 
 CONTAINS
+
+  !******************************************************************************
+  !> \brief Solve the complete \f$\mu(I)\f$-Voellmy DIRK stage analytically.
+  !> \details Holds particle properties, stress, depth, and speed ratio fixed.
+  !> The rational basal law plus quadratic turbulent drag gives a cubic
+  !> equation for the stage speed; the largest root in the dissipative
+  !> interval is selected.
+  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !> \param flow_depth Explicit flow depth.
+  !> \param speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param velocity_before Input horizontal velocity.
+  !> \param mixture_density Explicit mixture density.
+  !> \param reduced_gravity Explicit reduced gravity.
+  !> \param gravity_coefficient Explicit gravity multiplier.
+  !> \param solid_fraction Explicit solid volume fractions.
+  !> \param curvature_acceleration Explicit curvature contribution.
+  !> \param use_pore_pressure Enable explicit pore-pressure reduction.
+  !> \param excess_pore_pressure Explicit excess pore pressure.
+  !> \param use_stochastic_xi Enable stochastic \f$\xi\f$ adjustment.
+  !> \param stochastic_xi_value Explicit stochastic \f$\xi\f$ increment.
+  !> \param velocity_after Returned horizontal velocity.
+  !******************************************************************************
+  SUBROUTINE solve_mui_voellmy_analytic_velocity(integration_step,         &
+       flow_depth, speed_ratio, velocity_before, mixture_density,             &
+       reduced_gravity, gravity_coefficient, solid_fraction,                  &
+       curvature_acceleration, use_pore_pressure, excess_pore_pressure,       &
+       use_stochastic_xi, stochastic_xi_value, velocity_after)
+
+    REAL(wp), INTENT(IN) :: integration_step, flow_depth, speed_ratio
+    REAL(wp), INTENT(IN) :: velocity_before(2), mixture_density
+    REAL(wp), INTENT(IN) :: reduced_gravity, gravity_coefficient
+    REAL(wp), INTENT(IN) :: solid_fraction(n_solid)
+    REAL(wp), INTENT(IN) :: curvature_acceleration, excess_pore_pressure
+    LOGICAL, INTENT(IN) :: use_pore_pressure, use_stochastic_xi
+    REAL(wp), INTENT(IN) :: stochastic_xi_value
+    REAL(wp), INTENT(OUT) :: velocity_after(2)
+
+    REAL(wp) :: speed_before, speed_after, particle_diameter, particle_density
+    REAL(wp) :: effective_depth, vertical_stress, normal_stress
+    REAL(wp) :: quadratic, linear, constant, inertial_slope, basal_factor
+    REAL(wp) :: xi_effective, turbulent_drag
+    LOGICAL :: root_found
+
+    velocity_after = velocity_before
+    speed_before = SQRT(SUM(velocity_before**2))
+    CALL validate_analytic_velocity_inputs(integration_step, flow_depth,    &
+         speed_ratio, speed_before, 'mu(I)-Voellmy')
+    IF (integration_step .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+    IF (mixture_density .LE. 0.0_wp .OR. gravity_coefficient .LE. 0.0_wp) THEN
+       CALL fatal_analytic_input_error('Nonpositive density or gravity multiplier in mu(I)-Voellmy analytic solver')
+    END IF
+
+    IF (n_solid .GT. 1) THEN
+       particle_diameter = sauter_diameter(solid_fraction)
+       particle_density = average_density_solids(solid_fraction)
+    ELSE
+       particle_diameter = diam_s(1)
+       particle_density = rho_s(1)
+    END IF
+    IF (particle_diameter .LE. 0.0_wp .OR. particle_density .LE. 0.0_wp) THEN
+       CALL fatal_analytic_input_error('Nonpositive particle property in mu(I)-Voellmy analytic solver')
+    END IF
+    IF (I_0 .LT. 0.0_wp) THEN
+       CALL fatal_analytic_input_error('Negative I_0 in mu(I)-Voellmy analytic solver')
+    END IF
+
+    effective_depth = MAX(flow_depth, EPSILON(1.0_wp))
+    vertical_stress = mixture_density *                                   &
+         (reduced_gravity + curvature_acceleration) * effective_depth
+    IF (use_pore_pressure) vertical_stress = vertical_stress -             &
+         excess_pore_pressure
+    vertical_stress = MAX(vertical_stress, 0.0_wp)
+    normal_stress = MAX(EPSILON(1.0_wp),                                  &
+         vertical_stress * SQRT(gravity_coefficient))
+
+    CALL mui_velocity_stage_polynomial(integration_step, speed_before,      &
+         flow_depth, effective_depth, speed_ratio, mixture_density,         &
+         normal_stress, gravity_coefficient, particle_diameter,              &
+         particle_density, I_0, mu_s, mu_2, muI_inf, quadratic, linear,      &
+         constant, inertial_slope, basal_factor)
+
+    xi_effective = xi
+    IF (use_stochastic_xi) THEN
+       xi_effective = xi + stochastic_xi_value
+       xi_effective = MIN(1.0E5_wp, MAX(1.0_wp, xi_effective))
+    ELSEIF (xi_effective .LE. 0.0_wp) THEN
+       CALL fatal_analytic_input_error('Nonpositive xi in mu(I)-Voellmy analytic solver')
+    END IF
+    turbulent_drag = reduced_gravity * speed_ratio / (xi_effective*flow_depth)
+    CALL solve_cubic_in_interval(integration_step*turbulent_drag*          &
+         inertial_slope, quadratic + integration_step*turbulent_drag*I_0,  &
+         linear, constant, 0.0_wp, speed_before, speed_after, root_found)
+    IF (.NOT. root_found) speed_after = 0.0_wp
+    velocity_after = (speed_after / speed_before) * velocity_before
+
+  END SUBROUTINE solve_mui_voellmy_analytic_velocity
 
   !******************************************************************************
   !> \brief Evaluate the implicit Voellmy turbulent source.

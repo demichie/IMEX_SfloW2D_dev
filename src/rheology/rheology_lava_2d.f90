@@ -14,12 +14,16 @@
 !> \ref eval_lava_semi_impl_source evaluates the real-valued yield source.
 !> \ref nu_ref, \ref visc_par and \ref tau0 are the model parameters. Thermal
 !> cooling is owned by the thermal-source module, not by this rheology.
+!> \ref solve_lava_analytic_velocity solves the algebraic DIRK velocity
+!> stage with temperature and the other non-velocity inputs explicit.
 !********************************************************************************
 
 MODULE rheology_lava_2d
 
   USE parameters_2d, ONLY : wp
   USE rheology_parameters_2d, ONLY : T_ref
+  USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,  &
+       fatal_analytic_input_error
 
   IMPLICIT NONE
 
@@ -27,12 +31,60 @@ MODULE rheology_lava_2d
 
   PUBLIC :: nu_ref, visc_par, tau0
   PUBLIC :: eval_lava_implicit_source, eval_lava_semi_impl_source
+  PUBLIC :: solve_lava_analytic_velocity
 
   REAL(wp) :: nu_ref
   REAL(wp) :: visc_par
   REAL(wp) :: tau0
 
 CONTAINS
+
+  !******************************************************************************
+  !> \brief Solve a lava-rheology DIRK stage analytically for velocity.
+  !> \details Holds depth, temperature, density, and speed ratio fixed. The
+  !> viscous term gives linear speed damping and the yield term gives a
+  !> constant speed decrement, with stopping at zero:
+  !> \f$r^+=\max(0,(r_0-\lambda c)/(1+\lambda a))\f$.
+  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !> \param flow_depth Explicit flow depth.
+  !> \param temperature Explicit temperature.
+  !> \param mixture_density Explicit mixture density.
+  !> \param speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param velocity_before Input horizontal velocity.
+  !> \param velocity_after Returned horizontal velocity.
+  !******************************************************************************
+  SUBROUTINE solve_lava_analytic_velocity(integration_step, flow_depth,     &
+       temperature, mixture_density, speed_ratio, velocity_before,           &
+       velocity_after)
+
+    REAL(wp), INTENT(IN) :: integration_step, flow_depth, temperature
+    REAL(wp), INTENT(IN) :: mixture_density, speed_ratio
+    REAL(wp), INTENT(IN) :: velocity_before(2)
+    REAL(wp), INTENT(OUT) :: velocity_after(2)
+
+    REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
+    REAL(wp) :: speed_before, speed_after, effective_depth, gamma
+    REAL(wp) :: linear_drag, yield_drag
+
+    velocity_after = velocity_before
+    speed_before = SQRT(SUM(velocity_before**2))
+    CALL validate_analytic_velocity_inputs(integration_step, flow_depth,    &
+         speed_ratio, speed_before, 'lava')
+    IF (integration_step .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+    IF (mixture_density .LE. 0.0_wp) THEN
+       CALL fatal_analytic_input_error('Nonpositive mixture density in lava analytic solver')
+    END IF
+
+    effective_depth = MAX(flow_depth, h_threshold)
+    gamma = 3.0_wp * nu_ref / effective_depth *                             &
+         EXP(-visc_par * (temperature - T_ref))
+    linear_drag = gamma / flow_depth
+    yield_drag = tau0 / (mixture_density * flow_depth * speed_ratio)
+    speed_after = MAX(0.0_wp, (speed_before - integration_step*yield_drag) &
+         / (1.0_wp + integration_step*linear_drag))
+    velocity_after = (speed_after / speed_before) * velocity_before
+
+  END SUBROUTINE solve_lava_analytic_velocity
 
   !******************************************************************************
   !> \brief Evaluate the implicit temperature-dependent viscous drag.

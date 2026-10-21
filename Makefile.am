@@ -16,6 +16,7 @@ EXTRA_DIST = \
   TESTS/TEST_RHEOLOGY_CELL_LOCAL/run_test.sh \
   TESTS/TEST_RHEOLOGY_CELL_LOCAL/probe_sources.f90 \
   TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_source_modules.f90 \
+  TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_analytic_velocity.f90 \
   TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_model_names.f90 \
   TESTS/TEST_RHEOLOGY_CELL_LOCAL/characterize.py \
   TESTS/TEST_RHEOLOGY_CELL_LOCAL/check_inputs.py \

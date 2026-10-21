@@ -13,21 +13,94 @@
 !> The source is \f$\boldsymbol{S}=-\rho_m\mu hG(g'+a_c)
 !> \boldsymbol{u}_h/|\boldsymbol{u}_h|\f$. When stochastic mode is enabled,
 !> its increment is added to the speed before evaluating the law. The module
-!> exposes \ref eval_lucas_source for the x/y source components.
+!> exposes \ref eval_lucas_source for the x/y source components and
+!> \ref solve_lucas_analytic_velocity for the closed-form algebraic DIRK
+!> stage with the non-velocity variables explicit.
 !********************************************************************************
 
 MODULE rheology_lucas_2d
 
   USE parameters_2d, ONLY : wp
   USE rheology_parameters_2d, ONLY : mu_0, mu_inf, U_w
+  USE rheology_analytic_utils_2d, ONLY : solve_quadratic_in_interval,       &
+       validate_analytic_velocity_inputs, fatal_analytic_input_error
 
   IMPLICIT NONE
 
   PRIVATE
 
   PUBLIC :: eval_lucas_source
+  PUBLIC :: solve_lucas_analytic_velocity
 
 CONTAINS
+
+  !******************************************************************************
+  !> \brief Solve the Lucas velocity-weakening DIRK stage analytically.
+  !> \details Holds depth, gravity, curvature, stochastic speed shift, and
+  !> speed ratio fixed. The constant-friction branch is checked first; the
+  !> weakening branch reduces to a quadratic in stage speed.
+  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !> \param flow_depth Explicit flow depth.
+  !> \param speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param velocity_before Input horizontal velocity.
+  !> \param reduced_gravity Explicit reduced gravity.
+  !> \param gravity_coefficient Explicit gravity multiplier.
+  !> \param curvature_term Explicit curvature acceleration.
+  !> \param stochastic Enable the explicit speed shift.
+  !> \param stochastic_value Explicit stochastic increment.
+  !> \param velocity_after Returned horizontal velocity.
+  !******************************************************************************
+  SUBROUTINE solve_lucas_analytic_velocity(integration_step, flow_depth,   &
+       speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,    &
+       curvature_term, stochastic, stochastic_value, velocity_after)
+
+    REAL(wp), INTENT(IN) :: integration_step, flow_depth, speed_ratio
+    REAL(wp), INTENT(IN) :: velocity_before(2), reduced_gravity
+    REAL(wp), INTENT(IN) :: gravity_coefficient, curvature_term
+    LOGICAL, INTENT(IN) :: stochastic
+    REAL(wp), INTENT(IN) :: stochastic_value
+    REAL(wp), INTENT(OUT) :: velocity_after(2)
+
+    REAL(wp) :: speed_before, speed_after, shift, scale
+    REAL(wp) :: constant_branch_speed, quadratic_b, quadratic_c
+    LOGICAL :: root_found
+
+    velocity_after = velocity_before
+    speed_before = SQRT(SUM(velocity_before**2))
+    CALL validate_analytic_velocity_inputs(integration_step, flow_depth,    &
+         speed_ratio, speed_before, 'Lucas')
+    IF (integration_step .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+    IF (U_w .LE. 0.0_wp) THEN
+       CALL fatal_analytic_input_error('Nonpositive U_w in Lucas analytic solver')
+    END IF
+
+    scale = integration_step * gravity_coefficient *                     &
+         (reduced_gravity + curvature_term)
+    IF (scale .LE. 0.0_wp) RETURN
+    shift = 0.0_wp
+    IF (stochastic) shift = stochastic_value
+
+    constant_branch_speed = speed_before - scale*mu_0
+    IF (constant_branch_speed .GE. 0.0_wp .AND.                            &
+         (flow_depth .LT. 0.1_wp .OR.                                      &
+         speed_ratio*constant_branch_speed + shift .LT. U_w)) THEN
+       speed_after = constant_branch_speed
+    ELSE
+       quadratic_b = shift + speed_ratio*(scale*mu_inf - speed_before)
+       quadratic_c = shift*(scale*mu_inf - speed_before) +                &
+            scale*(mu_0-mu_inf)*U_w
+       CALL solve_quadratic_in_interval(speed_ratio, quadratic_b,           &
+            quadratic_c, 0.0_wp, speed_before, speed_after, root_found)
+       IF (root_found) THEN
+          root_found = speed_ratio*speed_after + shift .GE. U_w
+       END IF
+       IF (.NOT. root_found) speed_after = 0.0_wp
+    END IF
+
+    speed_after = MIN(speed_before, MAX(0.0_wp, speed_after))
+    velocity_after = (speed_after / speed_before) * velocity_before
+
+  END SUBROUTINE solve_lucas_analytic_velocity
 
   !******************************************************************************
   !> \brief Evaluate model 10's velocity-dependent Coulomb source.
