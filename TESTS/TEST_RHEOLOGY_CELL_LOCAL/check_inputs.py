@@ -21,8 +21,9 @@ def main():
     template=template.replace('RHEOLOGY_FLAG = F','RHEOLOGY_FLAG = T')
     template=re.sub(r'T_END=\s*40\.0D0','T_END= 0.0001D0',template)
     cases=[('valid-voellmy',1,'mu=.3, xi=500',False),
+           ('valid-bursik-woods',6,'friction_factor=.03',False),
            ('unsupported-7',7,'',True),('disabled-active-0',0,'',True),
-           ('legacy-8',8,'friction_factor=.03',False),
+           ('removed-model-8',8,'friction_factor=.03',True),
            ('missing-xi',1,'mu=.3',True),('missing-mu0',9,'mu_inf=.6, Fr_0=1.3',True),
            ('zero-Fr0',9,'mu_0=.2, mu_inf=.6, Fr_0=0',True),
            ('zero-Uw',10,'mu_0=.6, mu_inf=.2, U_w=0',True),

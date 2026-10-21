@@ -39,7 +39,7 @@ MODULE equation_terms_2d
   PUBLIC :: eval_inertial_flux, eval_hydrostatic_coefficient
   PUBLIC :: limit_component_mass_flux
   PUBLIC :: curvature_acceleration, eval_curvature_momentum_source
-  PUBLIC :: eval_expl_terms, integrate_friction_term
+  PUBLIC :: eval_expl_terms
   PUBLIC :: eval_implicit_terms, eval_nh_semi_impl_terms
   PUBLIC :: eval_mass_exchange_terms, eval_source_bdry
   PUBLIC :: set_source_time_coefficients
@@ -1017,71 +1017,6 @@ CONTAINS
     interval_mean_velocity = total / dt
 
   END FUNCTION interval_mean_velocity
-
-
-  !******************************************************************************
-  !> \brief Apply the analytic rheology-model-8 momentum relaxation.
-  !
-  !> This subroutine integrate analytically the friction term for turbulent
-  !> friction only.
-  !> \date 2021/12/10
-  !
-  !> @author
-  !> Mattia de' Michieli Vitturi
-  !
-  !>
-  !> \param[in,out] r_qj Real conservative cell state.
-  !> \param[in] dt Time increment [s].
-  !******************************************************************************
-
-  SUBROUTINE integrate_friction_term( r_qj , dt )
-
-    IMPLICIT NONE
-
-    REAL(wp), INTENT(INOUT) :: r_qj(n_vars)
-    REAL(wp), INTENT(IN) :: dt
-
-
-    REAL(wp) :: r_qp(n_vars+2)
-    REAL(wp) :: p_dyn
-    REAL(wp) :: r_h
-    REAL(wp) :: r_u
-    REAL(wp) :: r_v
-
-    REAL(wp) :: mod_vel_hor
-    REAL(wp) :: mod_vel
-
-    IF ( r_qj(1) .EQ. 0.0_wp ) RETURN
-
-    CALL qc_to_qp(r_qj , r_qp , p_dyn )
-
-    r_h = r_qp(1)
-
-    r_u = r_qp(idx_u)
-    r_v = r_qp(idx_v)
-
-    mod_vel_hor = SQRT( r_u**2 + r_v**2 )
-
-    ! A cell at rest has no velocity for the friction to damp, and the
-    ! reciprocal below would divide by zero.
-    IF ( mod_vel_hor .LE. EPSILON(1.0_wp) ) RETURN
-
-    mod_vel = 1.0_wp / ( 1.0_wp  / mod_vel_hor + friction_factor / r_h * dt )
-
-    r_u = r_u * ( mod_vel / mod_vel_hor )
-    r_v = r_v * ( mod_vel / mod_vel_hor )
-
-    r_qp(2) = r_h*r_u
-    r_qp(3) = r_h*r_v
-
-    r_qp(idx_u) = r_u
-    r_qp(idx_v) = r_v
-
-    CALL qp_to_qc(r_qp,r_qj)
-
-    RETURN
-
-  END SUBROUTINE integrate_friction_term
 
 
   !******************************************************************************

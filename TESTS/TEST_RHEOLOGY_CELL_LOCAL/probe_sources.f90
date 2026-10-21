@@ -7,7 +7,7 @@ PROGRAM probe_sources
   USE state_conversion_2d, ONLY : qc_to_qp
   USE geometry_2d, ONLY : pi_g
   USE equation_terms_2d, ONLY : eval_implicit_terms, eval_nh_semi_impl_terms, &
-       eval_mass_exchange_terms, integrate_friction_term
+       eval_mass_exchange_terms
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, solve_rk_step
   IMPLICIT NONE
@@ -94,11 +94,6 @@ PROGRAM probe_sources
   T_erodible=300.0_wp
   CALL precompute_pascal_coefficient(N_inh)
   q=input_q; env_before=T_env
-  IF (operation==4) THEN
-     CALL integrate_friction_term(q(1:n_vars),dt)
-     WRITE(*,'(A,7ES26.17E3)') 'ODE ',q(1:n_vars)
-     STOP
-  END IF
   IF (operation==1) THEN
      ! Hazard probes deliberately avoid unrelated SI or derivative calls.
      CALL implicit(q,real_source)

@@ -37,7 +37,8 @@ are diagnostics, not replacements for the trapping checks.
 The independent NumPy reference builds conservative states from prescribed
 phase volume inventories, then decodes and evaluates the equations. It never
 uses production primitive states as oracle inputs. Models 1–6 and 9–12 are
-covered, with disabled rheology and a separate legacy model-8 ODE check.
+covered, with disabled rheology. Model 8 is no longer supported; the parser
+regression verifies it is rejected while model 6 remains accepted.
 Pore-pressure diffusion, all inhibition modes, mono/multi-class permeability,
 Sutherland viscosity and conservative Darcy gas loss have dedicated fixtures.
 
@@ -99,10 +100,11 @@ select `froude_blend`. No production tableau or rheology selector is changed.
 `check_inputs.py` uses a fresh source-mass fixture and the real solver parser.
 It distinguishes input rejection text from the process exit code: plain Fortran
 STOP can return zero. Valid control runs must reach the end of a short run.
-The 28 cases cover missing/zero/negative denominators, valid zero Coulomb
-coefficients, nonfinite coefficients and ambient cooling configuration.
-Generated fixtures allow overwrite only inside their supplied output directory.
-Lava uses `h_x`; other cases use `froude_blend`.
+The 29 cases cover accepted Voellmy and Bursik--Woods inputs, rejection of the
+removed model 8 and unsupported model 7, missing/zero/negative denominators,
+valid zero Coulomb coefficients, nonfinite coefficients and ambient cooling
+configuration. Generated fixtures allow overwrite only inside their supplied
+output directory. Lava uses `h_x`; other cases use `froude_blend`.
 
 The parser requires finite active rheology coefficients, positive `xi`, `Fr_0`
 and `U_w`, and nonnegative Coulomb coefficients. Integer exponent inspection
@@ -113,7 +115,8 @@ writer omits the temperature namelist.
 
 ## Acceptance boundary
 
-The current suite contains 258 fixtures per profile. The original 249-fixture
+The current suite contains 255 fixtures per profile; the three legacy model-8
+ODE probes were removed with D04. The original 249-fixture
 characterization and its findings remain historical evidence in
 `docs/acceptance/D02_CELL_LOCAL_CHARACTERIZATION_2026_10_21.md`; follow-up fixes,
 contracts and validation are recorded in

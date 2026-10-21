@@ -408,16 +408,6 @@ def main():
                         if not np.isfinite(value) or value>2.e-10:
                             record['findings'].append(key)
                 record['status']='FAIL' if record['findings'] else 'PASS'; records.append(record)
-    for label,h,uv in [('moving',2.,(3.,-4.)),('rest',2.,(0.,0.)),('dry',0.,(0.,0.))]:
-        case=fixture('legacy-ode-'+label,8,h=h,velocity=uv,operation=4,derivatives=False)
-        run,data=run_probe(args.executable,case,args.output/'cases'/case['name'])
-        expected=case['q'].copy()
-        if label=='moving':
-            expected[1:3]/=1+.03*case['config']['dt']*np.linalg.norm(uv)/h
-        error=relative(data.get('ODE',np.full(len(expected),np.inf)),expected)
-        records.append(dict(name=case['name'],config=case['config'],q=case['q'].tolist(),exit_code=run.returncode,
-            checks=dict(ode_formula_error=error),status='PASS' if run.returncode==0 and error<=2.e-10 else 'FAIL',
-            findings=[] if run.returncode==0 and error<=2.e-10 else ['legacy ODE formula mismatch']))
     root=Path(__file__).resolve().parents[2]
     sources=sorted(str(p.relative_to(root)) for p in (root/'src').rglob('*') if p.suffix in ('.f90','.inc','.c'))
     sources+=sorted(str(p.relative_to(root)) for p in Path(__file__).parent.iterdir() if p.suffix in ('.py','.f90','.sh'))

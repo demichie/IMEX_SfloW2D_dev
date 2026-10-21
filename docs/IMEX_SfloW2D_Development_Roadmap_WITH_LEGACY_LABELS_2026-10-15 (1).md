@@ -183,8 +183,8 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 |-----|---------------|-------------------------------------------------------------|----------|
 | D01 | M12e-A        | Inventario formule e rami REAL/COMPLEX                      | COMPLETATO (audit statico) |
 | D02 | M12e-B        | Caratterizzazione numerica cell-local                       | COMPLETATO (gate locale GNU/macOS) |
-| D03 | —             | Audit e ownership di parametri, variabili e stato condiviso | DA FARE  |
-| D04 | P2            | Eliminazione reologia 8                                     | DA FARE  |
+| D03 | —             | Audit e ownership di parametri, variabili e stato condiviso | IN PAUSA |
+| D04 | P2            | Eliminazione reologia 8                                     | COMPLETATO |
 | D05 | P3            | Estrazione moduli reologici                                 | DA FARE  |
 | D06 | P3            | Sorgenti termiche e pore pressure                           | DA FARE  |
 | D07 | —             | Migrazione progressiva dei parametri non reologici          | DA FARE  |
@@ -1307,7 +1307,14 @@ risoluzione è registrata nel follow-up D02 collegato sopra.
 
 **Test proporzionati (nuove modifiche a questo step):** T1 audit dipendenze, ownership e accessi globali; T2 inizializzazione e serializzazione; T3 integrazione se cambia stato persistente. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: IN CORSO
+Stato ufficiale: IN PAUSA (ON HOLD)
+
+La caratterizzazione e le migrazioni isolate già registrate restano valide; la
+revisione generale del manifest e dell'ownership è sospesa per dare priorità a
+D04 e D05. Il manifest conserva le voci residue e i limiti di revisione aperti.
+Prima di D05 verrà svolto soltanto il sotto-audit mirato dei parametri e dei
+contratti reologici interessati dall'estrazione; non è richiesto chiudere
+l'inventario condiviso completo.
 
 #### Obiettivo e posizione nella sequenza
 
@@ -1389,7 +1396,7 @@ Distinguere input immutabili, grandezze derivate, stato evolutivo, diagnostiche 
 
 #### Criterio di accettazione
 
-Manifest completo e revisionato, dependency graph aciclico, piano di migrazione per dominio fisico, baseline registrate, nessuna proprietà senza owner, nessun workspace globale non motivato. Questo gate precede D05 (estrazione reologie), ma la rimozione isolata della reologia 8 in D04 puo procedere senza attendere la migrazione fisica se le regressioni sono preservate.
+Manifest completo e revisionato, dependency graph aciclico, piano di migrazione per dominio fisico, baseline registrate, nessuna proprietà senza owner, nessun workspace globale non motivato. Questi criteri restano il gate per riprendere e chiudere D03, ma non bloccano D04. D05 richiederà invece un sotto-gate circoscritto: ownership, read/write, contratti REAL/COMPLEX e dipendenze dei soli parametri e delle interfacce reologiche coinvolti, senza attendere la revisione generale dell'inventario.
 
 | Origine      | Variabili / famiglie                                                                                                                                      | Owner candidato                                 | Verifiche prima del trasferimento                                         |
 |--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------|---------------------------------------------------------------------------|
@@ -1427,27 +1434,35 @@ Manifest completo e revisionato, dependency graph aciclico, piano di migrazione 
 
 **Test proporzionati (nuove modifiche a questo step):** T1 rifiuto reologia 8, riferimenti e parsing; T2 un esempio con reologia supportata; T3 regressione altre reologie solo se toccate. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: DA FARE
+Stato ufficiale: COMPLETATO (gate locale GNU/macOS)
 
 Questa decisione è definitiva.
 
-Il modello 8 è un percorso sperimentale che integra analiticamente l’ODE della frizione quadratica, anziché risolvere l’equazione algebrica dello stage DIRK.
+Il modello 8 era un percorso sperimentale che integrava analiticamente l’ODE
+della frizione quadratica, anziché risolvere l’equazione algebrica dello stage
+DIRK. La decisione di rimuoverlo è stata implementata.
 
-La verifica del repository non ha individuato nessun input di esempio o test che selezioni RHEOLOGY_MODEL = 8.
+La verifica del repository non ha trovato input di esempio o generatori che
+selezionassero `RHEOLOGY_MODEL = 8`; il parser ora include un controllo
+esplicito del suo rifiuto.
 
-Si dovranno eliminare:
+Sono stati rimossi:
 
-Il ramo speciale in nonlinear_solver_2d.f90.
+Il bypass ODE in `nonlinear_solver_2d.f90`.
 
-La procedura integrate_friction_term in equation_terms_2d.f90.
+La procedura `integrate_friction_term` in `equation_terms_2d.f90`.
 
-Il trattamento speciale in time_integration_2d.f90.
+Il trattamento speciale in `time_integration_2d.f90`.
 
-La selezione del modello 8 nella lettura e validazione dell’input.
+La selezione e validazione del modello 8 nell'input; il parser lo respinge come
+modello non supportato.
 
-Il ramo specifico del modello 8 per shearVel in inpout_2d.f90.
+Il ramo per `shearVel`/Rouse specifico del modello 8 in `inpout_2d.f90`.
+Le variabili NetCDF restano nello schema e conservano il comportamento nullo
+degli altri modelli.
 
-Eventuali altri riferimenti esclusivamente associati a questo modello.
+I tre fixture ODE legacy dalla caratterizzazione corrente; i risultati storici
+D01/D02 restano archiviati come evidenza della baseline precedente.
 
 La futura soluzione analitica della frizione quadratica apparterrà a rheology_quadratic.f90 e risolverà correttamente lo stage DIRK.
 
@@ -1455,15 +1470,30 @@ Non verrà mantenuto un metodo speciale di integrazione dell’ODE esterno alla 
 
 #### Caso \#8 ed identificatori testuali
 
-Rimuovere rheology_model==8 da nonlinear_solver_2d, time_integration_2d, inpout_2d (incluso ramo shearVel) e l’unica routine integrate_friction_term; eliminare dipendenze e documentazione *solo* del modello 8. Il modello 6 conserva la propria fisica e ottiene un’opzione algebrica ANALYTIC. Tutti gli identificatori esterni sono stringhe corrispondenti al suffisso file rheology\_\<nome\>.f90; none non richiede un modulo. La selezione va risolta una volta in rheology_2d.f90, senza SELECT CASE su stringa nelle celle. Modello 7 da auditare prima di assegnare nome e file. Migrare anche gli script generatori e respingere esplicitamente i vecchi input numerici.
+Completato: rimossi i rami `rheology_model==8` da solver, integratore e output,
+oltre alla routine `integrate_friction_term`; gli input con modello 8 sono
+respinti. Il modello 6 conserva la propria fisica Bursik--Woods. Il futuro
+dispatcher D05/D08 risolverà una volta gli identificatori esterni basati sui
+suffissi `rheology_<nome>.f90`; il modello 7 resta da auditare prima di
+assegnargli un nome/file. Nessun generatore esistente selezionava il modello 8.
 
-Decisione approvata: eliminare completamente il modello reologico 8, mantenere il modello 6 per la legge Bursik–Woods; la soluzione algebrica ANALYTIC dello stage DIRK verrà introdotta separatamente in D13. L’implementazione nel repository non è ancora stata rimossa.
+Decisione approvata e implementata: eliminare completamente il modello
+reologico 8, mantenere il modello 6 per la legge Bursik--Woods; la soluzione
+algebrica `ANALYTIC` dello stage DIRK verrà introdotta separatamente in D13.
+
+Validazione D04:
+- build production optimized e strict-debug riuscite;
+- 29/29 casi parser passati in entrambi i profili, inclusi il rifiuto del
+  modello 8 e il controllo positivo per il modello 6;
+- 255/255 fixture di caratterizzazione passati in strict-debug e optimized;
+- stage quadratic, Coulomb-stop e lava-coupled passati con uno e quattro thread
+  in entrambi i profili.
 
 ### D05 — Estrazione moduli reologici
 
 **Test proporzionati (nuove modifiche a questo step):** T1 contratti di ogni modulo reologico e REAL/COMPLEX; T2 un caso per modello toccato; T3 confronto pre/post se il refactoring cambia il percorso numerico. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Prerequisito: audit D03. Durante l’estrazione dei moduli reologici, trasferire agli owner di legge mu/xi, parametri lava, lahar, plastic, quadratic, Froude, Lucas e mu(I); non trascinare proprietà fisiche non reologiche in un generico modulo reologico. Registrare read/write e mantenere la numerica REAL/COMPLEX.
+Prerequisiti: D04 completato e sotto-audit mirato dei parametri e delle interfacce reologiche da estrarre. La chiusura dell'audit generale D03 non è richiesta. Durante l’estrazione dei moduli reologici, trasferire agli owner di legge mu/xi, parametri lava, lahar, plastic, quadratic, Froude, Lucas e mu(I); non trascinare proprietà fisiche non reologiche in un generico modulo reologico. Registrare read/write e mantenere la numerica REAL/COMPLEX.
 
 Stato ufficiale: DA FARE
 

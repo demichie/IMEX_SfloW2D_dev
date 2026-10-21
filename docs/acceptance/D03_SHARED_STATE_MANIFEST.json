@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
-  "status": "in_progress",
+  "status": "on_hold",
+  "hold_reason": "The broad ownership audit is paused to prioritize D04 and D05; complete a focused rheology-ownership audit before D05.",
   "scope": [
     "parameters_2d",
     "constitutive_parameters_2d"

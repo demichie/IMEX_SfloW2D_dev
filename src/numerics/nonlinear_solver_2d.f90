@@ -64,8 +64,7 @@ CONTAINS
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !> \param[out] iterations_used Number of Newton iterations attempted for this cell/stage.
-  !> \param[out] converged True when every Newton stage residual meets its bound;
-  !>                       legacy model 8 retains its separate ODE bypass pending D04.
+  !> \param[out] converged True when every Newton stage residual meets its bound.
   !> \param[out] linear_info Linear-solver status: zero for success, nonzero for a failed solve.
   !> \param[out] line_search_failed True when backtracking fails to accept a step.
   !******************************************************************************
@@ -76,10 +75,6 @@ CONTAINS
        iterations_used, converged, linear_info, line_search_failed )
 
     USE parameters_2d, ONLY : max_nl_iter , tol_rel , tol_abs, n_RK
-
-    USE parameters_2d, ONLY : rheology_model
-
-    USE equation_terms_2d, ONLY : integrate_friction_term
 
     IMPLICIT NONE
 
@@ -144,14 +139,6 @@ CONTAINS
     converged = .FALSE.
     linear_info = 0
     line_search_failed = .FALSE.
-
-    IF ( rheology_model .EQ. 8 ) THEN
-
-       CALL integrate_friction_term( qj , dt_step )
-       converged = .TRUE.
-       RETURN
-
-    END IF
 
     coeff_f(1:n_eqns) = 1.0_wp
 

@@ -3048,7 +3048,7 @@ CONTAINS
           finite_parameters=ALL(finite_input_value([nu_ref,tau0,visc_par,T_ref]))
         CASE(4)
           finite_parameters=ALL(finite_input_value([alpha2,beta2,T_ref,alpha1_ref,beta1,Kappa,n_td]))
-        CASE(6,8)
+        CASE(6)
           finite_parameters=finite_input_value(friction_factor)
         CASE(9)
           finite_parameters=ALL(finite_input_value([mu_0,mu_inf,Fr_0]))
@@ -3302,7 +3302,7 @@ CONTAINS
 
         END IF
 
-      ELSEIF ((rheology_model .EQ. 6) .OR. (rheology_model .EQ. 8)) THEN
+      ELSEIF (rheology_model .EQ. 6) THEN
 
         IF (VERBOSE_LEVEL .GE. 0) THEN
 
@@ -7550,9 +7550,7 @@ CONTAINS
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y
     USE geometry_2d, ONLY: deposit, erosion, erodible
     USE parameters_2d, ONLY: n_vars
-    USE state_conversion_2d, ONLY: mixt_var, settling_velocity,               &
-         primitive_to_volume_fractions
-    USE constitutive_parameters_2d, ONLY: kin_visc_c, inv_pres
+    USE state_conversion_2d, ONLY: mixt_var, primitive_to_volume_fractions
 
     IMPLICIT NONE
     REAL(wp), INTENT(IN) :: time_in
@@ -7565,9 +7563,8 @@ CONTAINS
 
 
     REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c, r_sp_heat_mix
-    REAL(wp) :: r_h, r_u, r_v, r_T, r_w, mod_vel2, mod_hor_vel
-    REAL(wp) :: shear_stress, settling_vel, kin_visc_local, dyn_visc_c
-    REAL(wp) :: r_inv_rho_c, grav_coeff, vert_stress_eff, eff_normal_stress
+    REAL(wp) :: r_h, r_u, r_v, mod_hor_vel
+    REAL(wp) :: grav_coeff, vert_stress_eff, eff_normal_stress
     REAL(wp) :: diam_characteristic, rho_particle, shear_rate
     REAL(wp) :: exc_pore_pres
     REAL(wp) :: r_alphas(n_solid), r_alphag(n_add_gas), r_alphal
@@ -7653,7 +7650,6 @@ END IF
         r_h = state%qp(1, j, k)
         r_u = state%qp(n_vars + 1, j, k)
         r_v = state%qp(n_vars + 2, j, k)
-        r_T = state%qp(4, j, k)
         vertical_velocity(j, k) = r_u*B_prime_x_geom(j, k)                    &
                                + r_v*B_prime_y_geom(j, k)
 
@@ -7664,36 +7660,13 @@ END IF
         alphal2D(j,k) = r_alphal
 
         IF (slope_correction_flag) THEN
-          r_w = r_u*B_prime_x_geom(j, k) + r_v*B_prime_y_geom(j, k)
           grav_coeff = 1.0_wp/(1.0_wp + B_prime_x_geom(j, k)**2 +             &
                                B_prime_y_geom(j, k)**2)
         ELSE
-          r_w = 0.0_wp
           grav_coeff = 1.0_wp
         END IF
 
-        mod_vel2 = r_u**2 + r_v**2 + r_w**2
         mod_hor_vel = SQRT(r_u**2 + r_v**2)
-
-        IF (rheology_model .EQ. 8) THEN
-          shear_stress = r_rho_m*friction_factor*mod_vel2
-          shearVel(j, k) = SQRT(shear_stress/r_rho_m)
-          kin_visc_local = kin_visc_c
-
-          IF (gas_flag .AND. sutherland_flag) THEN
-            dyn_visc_c = muRef_Suth*(r_T/Tref_Suth)**1.5_wp* &
-                         (Tref_Suth + S_mu)/(r_T + S_mu)
-            r_inv_rho_c = sp_gas_const_a*r_T*inv_pres
-            kin_visc_local = dyn_visc_c*r_inv_rho_c
-          END IF
-
-          DO i = 1, n_solid
-            settling_vel = settling_velocity(diam_s(i), rho_s(i), r_rho_c, &
-                                             1.0_wp/kin_visc_local)
-            IF (shearVel(j, k) .GT. 0.0_wp) &
-              Rouse(i, j, k) = settling_vel/(vonK*shearVel(j, k))
-          END DO
-        END IF
 
         IF (rheology_flag .AND. rheology_model .EQ. 1) THEN
           exc_pore_pres = 0.0_wp

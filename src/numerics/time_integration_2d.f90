@@ -23,8 +23,6 @@ MODULE time_integration_2d
   USE geometry_2d, ONLY : cell_arc_perim, cell_arc_n_x, cell_arc_n_y
 
   USE constitutive_parameters_2d, ONLY : T_ambient
-  USE parameters_2d, ONLY : rheology_model
-
   USE nonlinear_solver_2d, ONLY : solve_rk_step
 
   USE equation_metadata_2d, ONLY : equation_partition_type
@@ -578,39 +576,30 @@ CONTAINS
 
                 END IF
 
-                IF ( rheology_model .EQ. 8 ) THEN
-                   
-                   this%NH(1:n_eqns,j,k,i_RK) = ( q_guess(1:n_vars)                  &
-                        - q_si(1:n_vars) ) / ( dt*a_diag )
-                   
+                ! Eval and store the implicit term at the i_RK step
+                CALL eval_implicit_terms( B_prime_x_geom(j,k) ,                 &
+                     B_prime_y_geom(j,k) , Z(j,k),                             &
+                     r_qj = q_guess , r_nh_term_impl = this%NH(1:n_eqns,j,k,i_RK) )
+
+                IF ( q_si(2)**2 + q_si(3)**2 .EQ. 0.0_wp ) THEN
+
+                   q_guess(2:3) = 0.0_wp
+
+                ELSEIF ( ( q_guess(2)*q_si(2) .LE. 0.0_wp ) .AND.                &
+                     ( q_guess(3)*q_si(3) .LE. 0.0_wp ) ) THEN
+
+                   ! If the implicit friction term changed the sign of the
+                   ! velocity then set it to zero.
+                   q_guess(2:3) = 0.0_wp
+
                 ELSE
-                   
-                   ! Eval and store the implicit term at the i_RK step
-                   CALL eval_implicit_terms( B_prime_x_geom(j,k) ,              &
-                        B_prime_y_geom(j,k) , Z(j,k),                          &
-                        r_qj = q_guess , r_nh_term_impl = this%NH(1:n_eqns,j,k,i_RK) )
-                   
-                   IF ( q_si(2)**2 + q_si(3)**2 .EQ. 0.0_wp ) THEN
-                      
-                      q_guess(2:3) = 0.0_wp 
-                      
-                   ELSEIF ( ( q_guess(2)*q_si(2) .LE. 0.0_wp ) .AND.            &
-                        ( q_guess(3)*q_si(3) .LE. 0.0_wp ) ) THEN
-                      
-                   ! If the impl. friction term changed the sign of the 
-                      ! velocity then set it to zero
-                      q_guess(2:3) = 0.0_wp 
-                      
-                   ELSE
-                      
-                      ! Align the velocity vector with previous one
-                      q_guess(2:3) = SQRT( q_guess(2)**2 + q_guess(3)**2 ) *      &
-                           q_si(2:3) / SQRT( q_si(2)**2 + q_si(3)**2 ) 
-                      
-                   END IF
-                   
+
+                   ! Align the velocity vector with the previous one.
+                   q_guess(2:3) = SQRT( q_guess(2)**2 + q_guess(3)**2 ) *      &
+                        q_si(2:3) / SQRT( q_si(2)**2 + q_si(3)**2 )
+
                 END IF
-                
+
              ELSE
 
                 ! If h=0 nothing has to be changed 
