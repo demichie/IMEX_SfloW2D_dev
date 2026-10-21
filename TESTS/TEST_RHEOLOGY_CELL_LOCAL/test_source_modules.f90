@@ -1,6 +1,7 @@
 PROGRAM test_source_modules
 
   USE parameters_2d, ONLY : wp
+  USE rheology_2d, ONLY : correct_friction_momentum
   USE pore_pressure_2d, ONLY : eval_pore_pressure_inlet_source,                &
        eval_pore_pressure_mass_exchange_source
   USE thermal_sources_2d, ONLY : eval_inlet_thermal_energy_source,             &
@@ -20,6 +21,8 @@ PROGRAM test_source_modules
   REAL(wp) :: solid_heat_capacity(2)
   REAL(wp) :: deposition_rate(2)
   REAL(wp) :: erosion_rate(2)
+  REAL(wp) :: momentum_before_friction(2)
+  REAL(wp) :: momentum_after_friction(2)
 
   solid_density = [2500.0_wp, 2700.0_wp]
   solid_heat_capacity = [800.0_wp, 900.0_wp]
@@ -30,6 +33,43 @@ PROGRAM test_source_modules
        800.0_wp, 500.0_wp)
   expected = 0.5_wp * 0.02_wp * 1200.0_wp * 800.0_wp * 500.0_wp
   CALL assert_close(actual, expected, 'inlet thermal energy')
+
+  momentum_before_friction = [3.0_wp, 4.0_wp]
+  momentum_after_friction = [1.8_wp, 2.4_wp]
+  CALL correct_friction_momentum(momentum_before_friction, momentum_after_friction)
+  CALL assert_close(momentum_after_friction(1), 1.8_wp,                    &
+       'friction correction preserves x direction')
+  CALL assert_close(momentum_after_friction(2), 2.4_wp,                    &
+       'friction correction preserves y direction')
+
+  momentum_after_friction = [6.0_wp, 8.0_wp]
+  CALL correct_friction_momentum(momentum_before_friction, momentum_after_friction)
+  CALL assert_close(momentum_after_friction(1), 3.0_wp,                    &
+       'friction correction caps momentum increase x')
+  CALL assert_close(momentum_after_friction(2), 4.0_wp,                    &
+       'friction correction caps momentum increase y')
+
+  momentum_after_friction = [-1.0_wp, 3.0_wp]
+  CALL correct_friction_momentum(momentum_before_friction, momentum_after_friction)
+  CALL assert_close(momentum_after_friction(1), 1.08_wp,                   &
+       'friction correction projects x without rotation')
+  CALL assert_close(momentum_after_friction(2), 1.44_wp,                   &
+       'friction correction projects y without rotation')
+
+  momentum_after_friction = [-3.0_wp, -4.0_wp]
+  CALL correct_friction_momentum(momentum_before_friction, momentum_after_friction)
+  CALL assert_close(momentum_after_friction(1), 0.0_wp,                    &
+       'friction correction stops reversed x momentum')
+  CALL assert_close(momentum_after_friction(2), 0.0_wp,                    &
+       'friction correction stops reversed y momentum')
+
+  momentum_before_friction = 0.0_wp
+  momentum_after_friction = [2.0_wp, 3.0_wp]
+  CALL correct_friction_momentum(momentum_before_friction, momentum_after_friction)
+  CALL assert_close(momentum_after_friction(1), 0.0_wp,                    &
+       'friction correction keeps zero x momentum at rest')
+  CALL assert_close(momentum_after_friction(2), 0.0_wp,                    &
+       'friction correction keeps zero y momentum at rest')
 
   temperature_perturbation = 1.0E-20_wp
   complex_actual = eval_lava_cooling_source(                              &

@@ -187,9 +187,9 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D04 | P2            | Eliminazione reologia 8                                     | COMPLETATO |
 | D05 | P3            | Estrazione moduli reologici e selezione testuale            | COMPLETATO |
 | D06 | P3            | Sorgenti termiche e pore pressure                           | COMPLETATO |
-| D07 | —             | Migrazione progressiva dei parametri non reologici          | DA FARE  |
+| D07 | —             | Migrazione progressiva dei parametri non reologici          | IN PAUSA |
 | D08 | P4            | RHEOLOGY_MODEL da numeri a stringhe                         | ASSORBITO IN D05 |
-| D09 | P5            | Correzione del solo attrito                                 | DA FARE  |
+| D09 | P5            | Correzione del solo attrito                                 | COMPLETATO (gate locale GNU/macOS) |
 | D10 | P6            | EX_terms / IM_terms                                         | DA FARE  |
 | D11 | P7            | IM_group e metadati                                         | DA FARE  |
 | D12 | P7            | Newton per gruppo e Jacobiano ridotto                       | DA FARE  |
@@ -1696,11 +1696,11 @@ Stato ufficiale: COMPLETATO (estrazione e gate locale GNU/macOS). T1 strict/opti
 
 **Test proporzionati (nuove modifiche a questo step):** T1 ownership parametri, inizializzazione e default; T2 input/restart rappresentativi; T3 solo se mutano effetti numerici. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: DA FARE
+Stato ufficiale: IN PAUSA (in attesa della ripresa e del gate D03).
 
 #### Ambito e dipendenze
 
-Eseguire per famiglie, DOPO il gate D03 e coordinandosi con D05/D06 (reologie e sorgenti). Non spostare ripetutamente le variabili da un contenitore globale a un altro. La riallocazione deve portare ownership semantica, API esplicite e minor accoppiamento verificato; E01 restera un audit architetturale indipendente post-refactoring.
+Eseguire per famiglie, DOPO il gate D03 e coordinandosi con D05/D06 (reologie e sorgenti). D07 resta in pausa finché D03 non viene ripreso e il suo gate non è chiuso. Non spostare ripetutamente le variabili da un contenitore globale a un altro. La riallocazione deve portare ownership semantica, API esplicite e minor accoppiamento verificato; E01 restera un audit architetturale indipendente post-refactoring.
 
 #### Sequenza operativa
 
@@ -1725,17 +1725,20 @@ OpenMP restano assegnati a D11–D14.
 
 **Test proporzionati (nuove modifiche a questo step):** T1 isolamento frizione e segno dei termini; T2 casi dissipativi/non dissipativi; T3 conservazione e regressione reologica se cambia forza effettiva. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: DA FARE
+Stato ufficiale: COMPLETATO (gate locale GNU/macOS).
 
-La nuova procedura:
+La procedura:
 
 correct_friction_momentum(...)
 
-sarà contenuta in:
+è contenuta in:
 
 src/rheology/rheology_2d.f90
 
-Sostituirà i due blocchi di correzione attualmente presenti dopo SI e dopo Newton.
+Sostituisce i due controlli ad hoc dopo SI e dopo Newton. Riceve esplicitamente
+il momento prima e dopo il sottopasso di frizione e proietta il candidato sulla
+direzione iniziale con un fattore compreso fra zero e uno. Se il momento iniziale
+è nullo, il risultato resta nullo.
 
 La correzione deve preservare la direzione e non aumentare il modulo della quantita di moto SOLO per il sottopasso in cui agisce esclusivamente la frizione. La stessa proprieta non si applica allo stato complessivo di uno stage DIRK o di un gruppo in cui siano presenti gravita, termini termici, pore pressure o altre sorgenti che possono ruotare o accelerare il momento.
 
@@ -1743,13 +1746,20 @@ Pertanto, per un aggiornamento esclusivamente reologico:
 
 La correzione non deve essere applicata a contributi spaziali, gravitativi o ad altre forze che possono modificare la direzione del moto.
 
-Inoltre, occorre eliminare l’incoerenza attuale fra OR e AND nei controlli di inversione.
+La sostituzione elimina l’incoerenza precedente fra OR e AND nei controlli
+componente per componente.
 
-La scelta precisa dell’algoritmo di proiezione e arresto sarà validata mediante test specifici, evitando modifiche numeriche non controllate durante il semplice spostamento del codice.
+Gate locale superato: i test unitari verificano allineamento, proiezione di un
+candidato ruotato, arresto per inversione, momento iniziale nullo e limite
+superiore al modulo. Le regressioni di integrazione strict/optimized verificano
+quadratica, arresto Coulomb e lava accoppiata a 1/4 thread. Le formule delle
+reologie non sono state modificate; la correzione si applica solo alle coppie
+di stati che delimitano gli aggiornamenti semi-implicito e implicito di frizione,
+non allo stato globale dello stage.
 
 #### Correzione esclusivamente reologica
 
-correct_friction_momentum vive in rheology_2d.f90 ed opera solo sul contributo della frizione isolato: m_after = alpha\*m_before, 0 \<= alpha \<= 1, con arresto ammissibile e nessuna rotazione/inversione. L'interfaccia deve rendere espliciti momentum_before_friction e momentum_after_friction e impedire di applicare questo vincolo allo stato globale derivante da altre sorgenti o dal solve accoppiato. SI, NEWTON e ANALYTIC possono usare il correttore esclusivamente nel sottopasso di frizione definito; i gruppi misti richiedono una prova separata del contributo isolato.
+correct_friction_momentum vive in rheology_2d.f90 ed opera solo sul contributo della frizione isolato: m_after = alpha\*m_before, 0 \<= alpha \<= 1, con arresto ammissibile e nessuna rotazione/inversione. L'interfaccia rende espliciti momentum_before_friction e momentum_after_friction e non proietta lo stato globale dello stage. L'integrazione attuale usa il correttore sugli aggiornamenti SI e NEWTON; ANALYTIC e i futuri gruppi misti richiedono una prova separata dell'isolamento del contributo prima di applicarlo.
 
 ### D10 — EX_terms / IM_terms
 

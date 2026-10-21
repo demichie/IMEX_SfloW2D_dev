@@ -1,5 +1,12 @@
 !********************************************************************************
-!> \brief Rheology model selection and naming.
+!> \brief Rheology model selection, naming and friction-only momentum correction.
+!> \details Resolves canonical model names to IDs and provides a projection
+!> for momentum updates caused exclusively by friction. The projection
+!> constrains the candidate update to
+!> \f$\boldsymbol{m}_{after}=\alpha\boldsymbol{m}_{before}\f$,
+!> \f$0\le\alpha\le1\f$, so it cannot rotate, reverse or increase the
+!> momentum. Callers must pass the momentum immediately before and after the
+!> isolated friction substep, not the full stage state.
 !********************************************************************************
 
 MODULE rheology_2d
@@ -13,8 +20,43 @@ MODULE rheology_2d
   PRIVATE
 
   PUBLIC :: resolve_rheology_model, rheology_name_from_id
+  PUBLIC :: correct_friction_momentum
 
 CONTAINS
+
+  !******************************************************************************
+  !> \brief Constrain a momentum update from an isolated friction substep.
+  !> \details Projects the candidate post-friction momentum onto the ray
+  !> defined by the pre-friction momentum and clamps its scale factor to
+  !> \f$[0,1]\f$. This preserves direction, prevents reversal, and ensures
+  !> friction cannot increase momentum magnitude. If the pre-friction
+  !> momentum is zero, the post-friction momentum is set to zero.
+  !> \param[in] momentum_before_friction Momentum immediately before friction.
+  !> \param[in,out] momentum_after_friction Candidate momentum immediately after friction.
+  !******************************************************************************
+  PURE SUBROUTINE correct_friction_momentum(momentum_before_friction,         &
+       momentum_after_friction)
+
+    USE parameters_2d, ONLY : wp
+    REAL(wp), INTENT(IN) :: momentum_before_friction(2)
+    REAL(wp), INTENT(INOUT) :: momentum_after_friction(2)
+
+    REAL(wp) :: momentum_before_squared
+    REAL(wp) :: friction_scale
+
+    momentum_before_squared = DOT_PRODUCT(momentum_before_friction,           &
+         momentum_before_friction)
+    IF (momentum_before_squared .EQ. 0.0_wp) THEN
+       momentum_after_friction = 0.0_wp
+       RETURN
+    END IF
+
+    friction_scale = DOT_PRODUCT(momentum_before_friction,                   &
+         momentum_after_friction) / momentum_before_squared
+    friction_scale = MAX(0.0_wp, MIN(1.0_wp, friction_scale))
+    momentum_after_friction = friction_scale * momentum_before_friction
+
+  END SUBROUTINE correct_friction_momentum
 
   !******************************************************************************
   !> \brief Resolve a user-supplied rheology name to its internal model ID.

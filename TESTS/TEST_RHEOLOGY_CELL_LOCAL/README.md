@@ -46,7 +46,9 @@ historical model 8 is no longer supported.
 Pore-pressure diffusion, all inhibition modes, mono/multi-class permeability,
 Sutherland viscosity and conservative Darcy gas loss have dedicated fixtures.
 The source-module checks independently exercise inlet heat, mass-exchange heat,
-vaporization, and conservative pore-pressure inlet/mass-exchange terms.
+vaporization, conservative pore-pressure inlet/mass-exchange terms, and the
+D09 friction-only momentum projection (alignment, stopping, and no magnitude
+increase).
 
 For regular states, complex-step uses `1e-25*max(abs(q_j),1)` in physical
 conservative coordinates. Central finite differences use relative steps

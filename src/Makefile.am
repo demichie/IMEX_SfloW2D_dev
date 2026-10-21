@@ -169,6 +169,7 @@ spatial/spatial_operator_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)            \
 numerics/time_integration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                          core/constitutive_parameters_2d.$(OBJEXT) \
                                          core/diagnostics_2d.$(OBJEXT)          \
+                                         rheology/rheology_2d.$(OBJEXT)         \
                                          geometry/domain_2d.$(OBJEXT)            \
                                          numerics/equation_metadata_2d.$(OBJEXT) \
                                          physics/equation_terms_2d.$(OBJEXT)     \

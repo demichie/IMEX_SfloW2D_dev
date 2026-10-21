@@ -263,6 +263,8 @@ CONTAINS
 
     USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms
 
+    USE rheology_2d, ONLY : correct_friction_momentum
+
     USE state_conversion_2d, ONLY : qc_to_qp, primitive_to_volume_fractions, &
          project_dry_cell_momenta, clip_roundoff_negative_component_masses
     USE parameters_2d, ONLY : dry_thickness_tolerance, idx_u, idx_v,         &
@@ -480,26 +482,8 @@ CONTAINS
                 q_si(1:n_vars) = q_fv_cell + dt * a_diag *                     &
                      this%SI_NH(1:n_eqns,j,k,i_RK)
 
-                IF ( ( q_fv_cell(2)**2 + q_fv_cell(3)**2 ) .EQ. 0.0_wp ) THEN
-
-                   !Case 1: if the velocity was null, then it must stay null
-                   q_si(2:3) = 0.0_wp 
-
-                ELSEIF ( ( q_si(2)*q_fv_cell(2) .LT. 0.0_wp ) .OR.              &
-                     ( q_si(3)*q_fv_cell(3) .LT. 0.0_wp ) ) THEN
-
-                   ! If the semi-impl. friction term changed the sign of the 
-                   ! velocity then set it to zero
-                   q_si(2:3) = 0.0_wp 
-
-                ELSE
-
-                   ! Align the velocity vector with previous one
-                   q_si(2:3) = SQRT( q_si(2)**2 + q_si(3)**2 ) *                &
-                        q_fv_cell(2:3) / SQRT( q_fv_cell(2)**2                  &
-                        + q_fv_cell(3)**2 )
-
-                END IF
+                ! Constrain only the momentum change from this friction substep.
+                CALL correct_friction_momentum(q_fv_cell(2:3), q_si(2:3))
 
                 ! Update the semi-implicit term accordingly with the
                 ! corrections above
@@ -581,24 +565,9 @@ CONTAINS
                      B_prime_y_geom(j,k) , Z(j,k),                             &
                      r_qj = q_guess , r_nh_term_impl = this%NH(1:n_eqns,j,k,i_RK) )
 
-                IF ( q_si(2)**2 + q_si(3)**2 .EQ. 0.0_wp ) THEN
-
-                   q_guess(2:3) = 0.0_wp
-
-                ELSEIF ( ( q_guess(2)*q_si(2) .LE. 0.0_wp ) .AND.                &
-                     ( q_guess(3)*q_si(3) .LE. 0.0_wp ) ) THEN
-
-                   ! If the implicit friction term changed the sign of the
-                   ! velocity then set it to zero.
-                   q_guess(2:3) = 0.0_wp
-
-                ELSE
-
-                   ! Align the velocity vector with the previous one.
-                   q_guess(2:3) = SQRT( q_guess(2)**2 + q_guess(3)**2 ) *      &
-                        q_si(2:3) / SQRT( q_si(2)**2 + q_si(3)**2 )
-
-                END IF
+                ! q_si is the pre-implicit-friction state; the implicit momentum
+                ! source contains rheology only, so constrain that update alone.
+                CALL correct_friction_momentum(q_si(2:3), q_guess(2:3))
 
              ELSE
 
