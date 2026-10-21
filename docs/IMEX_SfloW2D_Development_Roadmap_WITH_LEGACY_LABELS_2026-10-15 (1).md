@@ -181,7 +181,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 
 |     | Vecchia label | Attività                                                    | Stato    |
 |-----|---------------|-------------------------------------------------------------|----------|
-| D01 | M12e-A        | Inventario formule e rami REAL/COMPLEX                      | PARZIALE |
+| D01 | M12e-A        | Inventario formule e rami REAL/COMPLEX                      | COMPLETATO (audit statico) |
 | D02 | M12e-B        | Caratterizzazione numerica cell-local                       | DA FARE  |
 | D03 | —             | Audit e ownership di parametri, variabili e stato condiviso | DA FARE  |
 | D04 | P2            | Eliminazione reologia 8                                     | DA FARE  |
@@ -1190,33 +1190,71 @@ Pubblicazione unificata: solo il workflow publish-documentation.yml deve distrib
 
 **Test proporzionati (nuove modifiche a questo step):** T1 inventario branch REAL/COMPLEX, formule e proprietari; nessun run numerico se l’intervento è solo documentale. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: PARZIALE
+Stato ufficiale: COMPLETATO (inventario statico; caratterizzazione numerica D02 ancora DA FARE)
 
-#### M12e — scheda operativa
+#### Evidenza D01 — 21 ottobre 2026
+
+Audit della revisione `65888eeceacbf78497bb3f7d361dc5e598d8ef2d`, documentato in
+[D01_RHEOLOGY_INVENTORY_2026_10_21.md](acceptance/D01_RHEOLOGY_INVENTORY_2026_10_21.md)
+e nel relativo [inventario JSON](acceptance/results_d01_inventory_2026_10_21.json).
+Sono inventariati selettori 0–12, formule e guardie dei termini impliciti e
+semi-impliciti, sorgenti termiche e di pressione interstiziale, kernel condivisi
+di conversione REAL/COMPLEX, dipendenze di input/stato e percorso SI–Newton–RK.
+Il manifest registra hash di 17 file, riferimenti a 19 procedure e dieci punti
+di attenzione per D02 e le successive estrazioni. I proprietari riportati sono
+quelli attuali per responsabilità: non sostituiscono il manifest per simbolo D03.
+
+Il modello 7 non ha una legge implementata ed è rifiutato dal parser quando la
+reologia è attiva; non gli viene assegnato un nome fisico o un modulo futuro.
+Il modello 8 integra analiticamente un'ODE usando `dt`, non risolve l'equazione
+algebrica dello stage DIRK; la rimozione D04 e il solver ANALYTIC D13 restano
+attività separate. I termini SI sono solo REAL; l'API implicita REAL e quella
+COMPLEX eseguono la stessa algebra COMPLEX, con conversioni di stato condivise.
+
+Verifica T1 documentale: provenienza/hash, riferimenti alle procedure e ai rami,
+copertura dei selettori e dichiarazioni dei parametri, struttura JSON, link
+locali e whitespace. Nessun sorgente o input modificato, nessuna simulazione,
+compilazione o CI rieseguita. La chiusura riguarda l'inventario D01 e non attesta
+parità numerica, correttezza dei Jacobiani o equivalenza di futuri refactoring.
+
+#### M12e — contratto storico condiviso fra D01 e D02
+
+Il vecchio contratto M12e riuniva inventario e caratterizzazione numerica.
+L'inventario formule/rami/dipendenze è coperto da D01; le prove di valore e
+derivata seguenti appartengono a D02, e l'equivalenza durante l'estrazione ai
+successivi gate D05–D15. La chiusura statica non anticipa questi esiti.
 
 **Attività previste:** Caratterizzare sorgenti per ciascuna reologia, temperatura e pressione interstiziale su stati REAL/COMPLEX; confrontare Jacobiano complex-step e finite difference controllata; coprire U→0, h→0, soglie, ABS/MAX e branch non olomorfi; conservare formule condivise e test modello-per-modello prima dell’estrazione.
 
-**File interessati:** src/equation_terms_2d.f90; src/state_conversion_2d.f90; src/complexify.f90; src/state/\*.inc dopo A2; src/rheology/\*.f90 futuri; TESTS/TEST_RHEOLOGY_FROUDE/\* e nuovi TEST_RHEOLOGY\_\*.
+**File interessati:** src/physics/equation_terms_2d.f90; src/state/state_conversion_2d.f90; src/core/complexify.f90; src/state/\*.inc; src/io/inpout_2d.f90; src/numerics/nonlinear_solver_2d.f90; src/numerics/time_integration_2d.f90; src/rheology/\*.f90 futuri; TESTS/TEST_RHEOLOGY_FROUDE/\* e nuovi TEST_RHEOLOGY\_\*.
 
 **Criteri di accettazione:** Parità numerica reale/complessa per punti regolari; differenze delle derivate spiegate nei punti non lisci; nessuna regressione scientifica alla migrazione delle formule.
 
-#### Cosa rimane da verificare prima delle modifiche
+#### Esito dei chiarimenti preliminari
 
-Ci sono ancora tre aspetti che considero opportuno chiarire direttamente dal codice:
+I tre chiarimenti preliminari sono ora coperti dall'inventario:
 
-Identificazione del modello reologico 7: prima di assegnargli un nome e un file, occorre stabilire esattamente quale formulazione rappresenti e se sia effettivamente supportato.
+Modello 7: non supportato e privo di una formulazione identificabile nel codice corrente.
 
-Classificazione delle reologie analitiche: dobbiamo verificare le formule disponibili per ogni modello e distinguere le integrazioni dell’ODE dalle soluzioni algebriche dello stage DIRK.
+Reologie analitiche: il percorso speciale 8 è un'integrazione ODE; non esiste un dispatcher ANALYTIC per gli stage DIRK. Le riduzioni scalari possibili non costituiscono implementazioni già validate.
 
-Dipendenze delle sorgenti: durante l’estrazione delle reologie occorre preservare l’unica implementazione delle formule REAL/COMPLEX, necessaria per il complex-step.
+Dipendenze REAL/COMPLEX: sono mappati algebra implicita condivisa, include di conversione e routine solo REAL. Sono registrate le proiezioni REAL che perdono sensibilità, le guardie non lisce e le scritture globali da verificare prima dell'estrazione.
 
-Questi sono approfondimenti implementativi, non motivi per cambiare la struttura proposta.
+I rilievi statici non autorizzano correzioni silenziose delle formule durante il refactoring.
 
 ### D02 — Caratterizzazione numerica cell-local
 
 **Test proporzionati (nuove modifiche a questo step):** T1 test cell-local di valore/derivata e finite/complex step, casi degeneri; T2 integrazione della sorgente; T3 tolleranze e confronti indipendenti se cambiano formule. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: DA FARE
+
+Matrice iniziale e rilievi da verificare: sezione «Findings and D02 worklist»
+del [rapporto D01](acceptance/D01_RHEOLOGY_INVENTORY_2026_10_21.md).
+Separare prove REAL/COMPLEX delle sorgenti implicite, verifiche REAL delle
+leggi SI e confronto della mappa di stage corretta. Includere diffusione della
+pressione, inibizione, permeabilità mono/multi-classe, stati secchi e
+configurazione pore-only, oltre alle soglie e agli accoppiamenti termici.
+I test preesistenti non coprono ancora tutte le leggi e tutte le derivate.
 
 ### D03 — Audit e ownership di parametri, variabili e stato condiviso
 
@@ -1475,14 +1513,14 @@ La stringa specificata nell’input corrisponde al suffisso del file sorgente.
 | 4                        | lahar                       | rheology_lahar.f90       |
 | 5                        | empirical                   | rheology_empirical.f90   |
 | 6                        | quadratic                   | rheology_quadratic.f90   |
-| 7                        | Da verificare nel dettaglio | Da definire              |
+| 7                        | Non supportato (audit D01)   | Nessuno                  |
 | 8                        | Eliminato                   | Nessuno                  |
 | 9                        | froude                      | rheology_froude.f90      |
 | 10                       | lucas                       | rheology_lucas.f90       |
 | 11                       | mui                         | rheology_mui.f90         |
 | 12                       | mui_voellmy                 | rheology_mui_voellmy.f90 |
 
-La tabella costituisce la mappatura di progetto. I nomi descrittivi e, in particolare, il modello 7 devono essere verificati rispetto alle formulazioni realmente implementate prima della migrazione definitiva.
+La tabella costituisce la mappatura di progetto, non un'interfaccia già implementata. D01 conferma le identità delle leggi presenti e l'assenza di una legge supportata per il modello 7: nessun nome o file gli viene assegnato. Il modello 8 è ancora nel codice e resta da rimuovere in D04. Valori, derivate e limiti delle formulazioni saranno caratterizzati in D02 prima della migrazione definitiva.
 
 Ad esempio, l’attuale input:
 

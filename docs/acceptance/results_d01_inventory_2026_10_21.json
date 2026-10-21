@@ -1,0 +1,871 @@
+{
+  "schema_version": 1,
+  "milestone": "D01",
+  "date": "2026-10-21",
+  "baseline_commit": "65888eeceacbf78497bb3f7d361dc5e598d8ef2d",
+  "scope": "static implementation inventory only; no scientific or numerical acceptance",
+  "report": "D01_RHEOLOGY_INVENTORY_2026_10_21.md",
+  "status": "complete-static-inventory",
+  "next_gate": "D02",
+  "source_files": [
+    {
+      "path": "src/physics/equation_terms_2d.f90",
+      "sha256": "5c69e5b2150d2f011a362ebafd14df4d8d252f43932af927f58aa1c1bdf4bded"
+    },
+    {
+      "path": "src/io/inpout_2d.f90",
+      "sha256": "aa9e8107211e79e7b03f2e37d730beafaba393827ddbfd66fe2c890e5524a86f"
+    },
+    {
+      "path": "src/numerics/nonlinear_solver_2d.f90",
+      "sha256": "0e00e83fc78e7317112d8ce34557a99ea31d1daecf6a933e17524b244a50c84a"
+    },
+    {
+      "path": "src/numerics/time_integration_2d.f90",
+      "sha256": "d84cd0e9cb89d46dca849181c13c785e22eabd6ffe5574abb5f8269c4bcf7043"
+    },
+    {
+      "path": "src/state/state_conversion_2d.f90",
+      "sha256": "1ef070d4a5bb27465296109153607d130547665e1d22f2d0cf9c1ff3c4505ade"
+    },
+    {
+      "path": "src/core/constitutive_parameters_2d.f90",
+      "sha256": "bbb8fb6a5ecda75cdfbd9dbd57650bd8d22736318e5140072bc3401511a87de3"
+    },
+    {
+      "path": "src/core/parameters_2d.f90",
+      "sha256": "980f336c0df8c655185d657ae191868ae37aedb98f5de5a557ad98c83d25b4f1"
+    },
+    {
+      "path": "src/core/complexify.f90",
+      "sha256": "f6de6fb8f4c59be820b342cc3a8c31d45601dc850b92132cb9c7796876f985cf"
+    },
+    {
+      "path": "src/state/state_conversion_phys_var.inc",
+      "sha256": "d9f63dcbe2ceb3b62131c01dbda1da2ffbaa793a7604382d3dad4ca450bc1729"
+    },
+    {
+      "path": "src/state/velocity_from_conservative.inc",
+      "sha256": "552515c233b09171e4965e9f1866dfeedb5f37c1dce195ba02f18bcc7cd5671a"
+    },
+    {
+      "path": "src/state/mixture_heat_capacity.inc",
+      "sha256": "c112e1dc64aebba6e282b1fc220377abe229948062da8168b563b382822ea1aa"
+    },
+    {
+      "path": "src/state/mixture_from_mass.inc",
+      "sha256": "da6131a86aa691dc043a77e2d3f50ed2f753d077590c081e7ee97d5bd4b20a5d"
+    },
+    {
+      "path": "src/physics/mass_exchange_2d.f90",
+      "sha256": "c2cd9807cc7d5d22da2ce9dbbfb20aa82f808a51adddd48baacf856b30daf40c"
+    },
+    {
+      "path": "src/stochastic/stochastic_module.f90",
+      "sha256": "77090048c7cb80fa9f00d1e429326bc9c2c97af21fc31be2b007a1870f29663b"
+    },
+    {
+      "path": "TESTS/TEST_RHEOLOGY_FROUDE/test_rheology_froude.f90",
+      "sha256": "570eb426622a9fc41a076d908ba3dd40db1a3f4884984e716b2c0c9f3d40a08c"
+    },
+    {
+      "path": "TESTS/TEST_STATE_CONVERSION/test_state_conversion.f90",
+      "sha256": "13ed796bb21652da6e9adbe1f5f6e31323db527c6f9d7453bcc6e3a0f06e5bff"
+    },
+    {
+      "path": "TESTS/TEST_IMEX_STAGES/test_imex_stages.f90",
+      "sha256": "8b919d59cc2354c02a0a93472dd0b363e93fa71b1fd05c32c04f87ddee877f05"
+    }
+  ],
+  "routines": [
+    {
+      "path": "src/physics/equation_terms_2d.f90",
+      "routine": "init_problem_param",
+      "start_line": 163,
+      "end_line": 198,
+      "sha256": "289035cbc83d5439dc3f6a959a2c1289d68942d1c64760225b3c648e27e01846"
+    },
+    {
+      "path": "src/physics/equation_terms_2d.f90",
+      "routine": "eval_expl_terms",
+      "start_line": 325,
+      "end_line": 753,
+      "sha256": "b780d99195e21579897061556e071e63d33c217b84348a8c1a0739a87d0fca5c"
+    },
+    {
+      "path": "src/physics/equation_terms_2d.f90",
+      "routine": "integrate_friction_term",
+      "start_line": 1037,
+      "end_line": 1084,
+      "sha256": "79db3d0d157ace6e2773888e1d041f1db108c6d1b2e6e9b6cd0c3d56cc06bf8d"
+    },
+    {
+      "path": "src/physics/equation_terms_2d.f90",
+      "routine": "eval_implicit_terms",
+      "start_line": 1111,
+      "end_line": 1608,
+      "sha256": "80ff21225141cfad4a0a24a7facdf4734e94f4ef0a611926e0c49a624f025418"
+    },
+    {
+      "path": "src/physics/equation_terms_2d.f90",
+      "routine": "eval_nh_semi_impl_terms",
+      "start_line": 1637,
+      "end_line": 2123,
+      "sha256": "c2682c526bfa832a81ebded4bdd6a28ad61bb3d1f6077d80e95c2b144b1d9557"
+    },
+    {
+      "path": "src/physics/equation_terms_2d.f90",
+      "routine": "eval_mass_exchange_terms",
+      "start_line": 2155,
+      "end_line": 2715,
+      "sha256": "ac3aef1a427b602ca1173d9ea6b1b57846e7f47fd16a966f4c86df152f969773"
+    },
+    {
+      "path": "src/io/inpout_2d.f90",
+      "routine": "init_param",
+      "start_line": 434,
+      "end_line": 987,
+      "sha256": "2d311a8b5dfbc94f623349970d0efa68563f0d98c7e8cee96bdaebe39d7b73ec"
+    },
+    {
+      "path": "src/io/inpout_2d.f90",
+      "routine": "read_param",
+      "start_line": 1007,
+      "end_line": 4709,
+      "sha256": "5bbe582daf83ab3820f67fa45d80594ada4c115d732b71de708a7587ae3c3b88"
+    },
+    {
+      "path": "src/io/inpout_2d.f90",
+      "routine": "write_netcdf_timestep",
+      "start_line": 7480,
+      "end_line": 7825,
+      "sha256": "1087d70235d26c369813b37c6ebf447b9acfc7cf738b4fd2ba1d7567415fb504"
+    },
+    {
+      "path": "src/numerics/nonlinear_solver_2d.f90",
+      "routine": "initialize_nonlinear_solver",
+      "start_line": 39,
+      "end_line": 44,
+      "sha256": "e0a2fd58562c07f4ac6296a11e245a40167d4118f5888080eff9d248e9bf88cc"
+    },
+    {
+      "path": "src/numerics/nonlinear_solver_2d.f90",
+      "routine": "solve_rk_step",
+      "start_line": 72,
+      "end_line": 396,
+      "sha256": "7c5de3d39dffc2701201a9a680d060c64fb61b271ab0f7688e7b2dc945a243c9"
+    },
+    {
+      "path": "src/numerics/nonlinear_solver_2d.f90",
+      "routine": "eval_f",
+      "start_line": 885,
+      "end_line": 925,
+      "sha256": "606a201ab38f4f0f00165d1479f5cf87937d4f48d2bf45826d819bd1fa252646"
+    },
+    {
+      "path": "src/numerics/nonlinear_solver_2d.f90",
+      "routine": "eval_jacobian",
+      "start_line": 950,
+      "end_line": 1019,
+      "sha256": "c65dec60e9e16f747fbb7a644ec2b16ea340acfcd84114e82ec82c92a71b1318"
+    },
+    {
+      "path": "src/numerics/time_integration_2d.f90",
+      "routine": "imex_RK_solver",
+      "start_line": 259,
+      "end_line": 880,
+      "sha256": "cd5e2ec4aed779d71cdcb80875fb3b7866eff847d596079d7c385a6f4d82b8a9"
+    },
+    {
+      "path": "src/state/state_conversion_2d.f90",
+      "routine": "r_phys_var",
+      "start_line": 536,
+      "end_line": 566,
+      "sha256": "e947e249069d9090ce9fe57a101ee76fe75ab7ff59bac0b7cbb2a6d2613c611d"
+    },
+    {
+      "path": "src/state/state_conversion_2d.f90",
+      "routine": "c_phys_var",
+      "start_line": 594,
+      "end_line": 612,
+      "sha256": "b23e15de82629b60689ebb4230c7d71c5f6449749a6645f60d70f55e760b77f3"
+    },
+    {
+      "path": "src/state/state_conversion_2d.f90",
+      "routine": "sauter_diameter",
+      "start_line": 286,
+      "end_line": 299,
+      "sha256": "decc0b16fc1c745423b4a3ea4ecaa426f45926a7d0952dfe7b5ac97253354505"
+    },
+    {
+      "path": "src/state/state_conversion_2d.f90",
+      "routine": "average_density_solids",
+      "start_line": 308,
+      "end_line": 321,
+      "sha256": "d0bd7562ddafe117afcb7f6eca98cc69ee2f81422364d075790c37bc0140e0d5"
+    },
+    {
+      "path": "src/core/constitutive_parameters_2d.f90",
+      "routine": "precompute_pascal_coefficient",
+      "start_line": 284,
+      "end_line": 332,
+      "sha256": "e15cbcb5bec09b724d2b847b8e0f6522e12fe99ef2314cda037dd861d5d8003f"
+    }
+  ],
+  "selector_contract": {
+    "active_accepted_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "active_rejected_ids": [
+      0,
+      7
+    ],
+    "unknown_ids": "rejected",
+    "disabled_convention": 0,
+    "implicit_dispatch_ids": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      9,
+      12
+    ],
+    "semi_implicit_dispatch_ids": [
+      1,
+      2,
+      3,
+      4,
+      9,
+      10,
+      11,
+      12
+    ]
+  },
+  "models": [
+    {
+      "id": 0,
+      "planned_name": "none",
+      "input_status": "disabled-only",
+      "law_parameters": [],
+      "implicit": "none",
+      "semi_implicit": "none",
+      "implicit_api": "no model-specific implicit branch",
+      "semi_implicit_api": "no model-specific semi-implicit branch",
+      "references": {
+        "read_param": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 3019,
+            "text": "IF (rheology_model .EQ. 0) THEN"
+          }
+        ]
+      },
+      "numerical_characterization": "not performed in D01"
+    },
+    {
+      "id": 1,
+      "planned_name": "voellmy",
+      "input_status": "accepted",
+      "law_parameters": [
+        "mu",
+        "xi",
+        "xi_temp"
+      ],
+      "implicit": "turbulent drag",
+      "semi_implicit": "Coulomb load",
+      "implicit_api": "shared COMPLEX algebra with paired REAL/COMPLEX wrappers",
+      "semi_implicit_api": "REAL only",
+      "references": {
+        "read_param": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 3027,
+            "text": "ELSEIF (rheology_model .EQ. 1) THEN"
+          }
+        ],
+        "eval_implicit_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1256,
+            "text": "IF ( rheology_model .EQ. 1 .OR. rheology_model .EQ. 12 ) THEN"
+          }
+        ],
+        "eval_nh_semi_impl_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1748,
+            "text": "rheology_model_if:IF ( rheology_model .EQ. 1 ) THEN"
+          }
+        ],
+        "write_netcdf_timestep": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 7631,
+            "text": "IF (rheology_flag .AND. rheology_model .EQ. 1) THEN"
+          }
+        ]
+      },
+      "numerical_characterization": "not performed in D01"
+    },
+    {
+      "id": 2,
+      "planned_name": "plastic",
+      "input_status": "accepted",
+      "law_parameters": [
+        "tau"
+      ],
+      "implicit": "constant-strength drag",
+      "semi_implicit": "empty branch",
+      "implicit_api": "shared COMPLEX algebra with paired REAL/COMPLEX wrappers",
+      "semi_implicit_api": "REAL only",
+      "references": {
+        "read_param": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 3053,
+            "text": "ELSEIF (rheology_model .EQ. 2) THEN"
+          }
+        ],
+        "eval_implicit_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1278,
+            "text": "ELSEIF ( rheology_model .EQ. 2 ) THEN"
+          }
+        ],
+        "eval_nh_semi_impl_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1800,
+            "text": "ELSEIF ( rheology_model .EQ. 2 ) THEN"
+          }
+        ]
+      },
+      "numerical_characterization": "not performed in D01"
+    },
+    {
+      "id": 3,
+      "planned_name": "lava",
+      "input_status": "accepted",
+      "law_parameters": [
+        "nu_ref",
+        "visc_par",
+        "T_ref",
+        "tau0",
+        "radiative_term_coeff",
+        "convective_term_coeff",
+        "T_env",
+        "SBconst",
+        "emissivity",
+        "exp_area_fract",
+        "atm_heat_transf_coeff"
+      ],
+      "implicit": "temperature-dependent viscous drag and radiation/convection",
+      "semi_implicit": "yield strength",
+      "implicit_api": "shared COMPLEX algebra with paired REAL/COMPLEX wrappers",
+      "semi_implicit_api": "REAL only",
+      "references": {
+        "read_param": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 1570,
+            "text": "IF (RHEOLOGY_MODEL .EQ. 3) THEN"
+          },
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 3079,
+            "text": "ELSEIF (rheology_model .EQ. 3) THEN"
+          },
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 3390,
+            "text": "IF (rheology_model .EQ. 3) THEN"
+          }
+        ],
+        "eval_implicit_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1289,
+            "text": "ELSEIF ( rheology_model .EQ. 3 ) THEN"
+          }
+        ],
+        "eval_nh_semi_impl_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1804,
+            "text": "ELSEIF ( rheology_model .EQ. 3 ) THEN"
+          }
+        ]
+      },
+      "numerical_characterization": "not performed in D01"
+    },
+    {
+      "id": 4,
+      "planned_name": "lahar",
+      "input_status": "accepted",
+      "law_parameters": [
+        "alpha1_ref",
+        "alpha1_coeff",
+        "beta1",
+        "alpha2",
+        "beta2",
+        "Kappa",
+        "n_td",
+        "n_td2",
+        "T_ref"
+      ],
+      "implicit": "viscous and turbulent-dispersive drag",
+      "semi_implicit": "yield stress",
+      "implicit_api": "shared COMPLEX algebra with paired REAL/COMPLEX wrappers",
+      "semi_implicit_api": "REAL only",
+      "references": {
+        "read_param": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 1560,
+            "text": "IF (RHEOLOGY_MODEL .EQ. 4) THEN"
+          },
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 3136,
+            "text": "ELSEIF (rheology_model .EQ. 4) THEN"
+          }
+        ],
+        "eval_implicit_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1323,
+            "text": "ELSEIF ( rheology_model .EQ. 4 ) THEN"
+          }
+        ],
+        "eval_nh_semi_impl_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1817,
+            "text": "ELSEIF ( rheology_model .EQ. 4 ) THEN"
+          }
+        ]
+      },
+      "numerical_characterization": "not performed in D01"
+    },
+    {
+      "id": 5,
+      "planned_name": "empirical",
+      "input_status": "accepted",
+      "law_parameters": [],
+      "implicit": "hard-coded depth-dependent drag",
+      "semi_implicit": "none",
+      "implicit_api": "shared COMPLEX algebra with paired REAL/COMPLEX wrappers",
+      "semi_implicit_api": "no model-specific semi-implicit branch",
+      "references": {
+        "read_param": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 3246,
+            "text": "ELSEIF (rheology_model .EQ. 5) THEN"
+          }
+        ],
+        "eval_implicit_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1406,
+            "text": "ELSEIF ( rheology_model .EQ. 5 ) THEN"
+          }
+        ]
+      },
+      "numerical_characterization": "not performed in D01"
+    },
+    {
+      "id": 6,
+      "planned_name": "quadratic",
+      "input_status": "accepted",
+      "law_parameters": [
+        "friction_factor"
+      ],
+      "implicit": "quadratic drag",
+      "semi_implicit": "none",
+      "implicit_api": "shared COMPLEX algebra with paired REAL/COMPLEX wrappers",
+      "semi_implicit_api": "no model-specific semi-implicit branch",
+      "references": {
+        "read_param": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 3255,
+            "text": "ELSEIF ((rheology_model .EQ. 6) .OR. (rheology_model .EQ. 8)) THEN"
+          }
+        ],
+        "eval_implicit_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1418,
+            "text": "ELSEIF ( rheology_model .EQ. 6 ) THEN"
+          }
+        ]
+      },
+      "numerical_characterization": "not performed in D01"
+    },
+    {
+      "id": 7,
+      "planned_name": null,
+      "input_status": "rejected",
+      "law_parameters": [],
+      "implicit": "none",
+      "semi_implicit": "none",
+      "implicit_api": "no model-specific implicit branch",
+      "semi_implicit_api": "no model-specific semi-implicit branch",
+      "references": {},
+      "numerical_characterization": "not performed in D01"
+    },
+    {
+      "id": 8,
+      "planned_name": null,
+      "input_status": "accepted-remove-in-D04",
+      "law_parameters": [
+        "friction_factor"
+      ],
+      "implicit": "no source branch; special ODE bypass",
+      "semi_implicit": "none",
+      "implicit_api": "no model-specific implicit branch",
+      "semi_implicit_api": "no model-specific semi-implicit branch",
+      "references": {
+        "read_param": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 3255,
+            "text": "ELSEIF ((rheology_model .EQ. 6) .OR. (rheology_model .EQ. 8)) THEN"
+          }
+        ],
+        "solve_rk_step": [
+          {
+            "path": "src/numerics/nonlinear_solver_2d.f90",
+            "line": 148,
+            "text": "IF ( rheology_model .EQ. 8 ) THEN"
+          }
+        ],
+        "imex_RK_solver": [
+          {
+            "path": "src/numerics/time_integration_2d.f90",
+            "line": 581,
+            "text": "IF ( rheology_model .EQ. 8 ) THEN"
+          }
+        ],
+        "write_netcdf_timestep": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 7611,
+            "text": "IF (rheology_model .EQ. 8) THEN"
+          }
+        ]
+      },
+      "numerical_characterization": "not performed in D01"
+    },
+    {
+      "id": 9,
+      "planned_name": "froude",
+      "input_status": "accepted",
+      "law_parameters": [
+        "mu_0",
+        "mu_inf",
+        "Fr_0"
+      ],
+      "implicit": "empty branch",
+      "semi_implicit": "Froude-dependent friction",
+      "implicit_api": "shared COMPLEX algebra with paired REAL/COMPLEX wrappers",
+      "semi_implicit_api": "REAL only",
+      "references": {
+        "read_param": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 3274,
+            "text": "ELSEIF (rheology_model .EQ. 9) THEN"
+          },
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 4613,
+            "text": "if (rheology_model .EQ. 9) THEN"
+          }
+        ],
+        "eval_implicit_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1431,
+            "text": "ELSEIF ( rheology_model .EQ. 9 ) THEN"
+          }
+        ],
+        "eval_nh_semi_impl_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1848,
+            "text": "ELSEIF ( rheology_model .EQ. 9 ) THEN"
+          }
+        ]
+      },
+      "numerical_characterization": "not performed in D01"
+    },
+    {
+      "id": 10,
+      "planned_name": "lucas",
+      "input_status": "accepted",
+      "law_parameters": [
+        "mu_0",
+        "mu_inf",
+        "U_w"
+      ],
+      "implicit": "none",
+      "semi_implicit": "velocity weakening",
+      "implicit_api": "no model-specific implicit branch",
+      "semi_implicit_api": "REAL only",
+      "references": {
+        "read_param": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 3295,
+            "text": "ELSEIF (rheology_model .EQ. 10) THEN"
+          },
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 4618,
+            "text": "ELSEIF (rheology_model .EQ. 10) THEN"
+          }
+        ],
+        "eval_nh_semi_impl_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1903,
+            "text": "ELSEIF ( rheology_model .EQ. 10 ) THEN"
+          }
+        ]
+      },
+      "numerical_characterization": "not performed in D01"
+    },
+    {
+      "id": 11,
+      "planned_name": "mui",
+      "input_status": "accepted",
+      "law_parameters": [
+        "mu_s",
+        "mu_2",
+        "muI_inf",
+        "I_0",
+        "diam_s",
+        "rho_s"
+      ],
+      "implicit": "none",
+      "semi_implicit": "regularized inertial-number friction",
+      "implicit_api": "no model-specific implicit branch",
+      "semi_implicit_api": "REAL only",
+      "references": {
+        "read_param": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 3315,
+            "text": "ELSEIF (rheology_model .EQ. 11) THEN"
+          }
+        ],
+        "eval_nh_semi_impl_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1955,
+            "text": "ELSEIF ( rheology_model .EQ. 11 ) THEN"
+          }
+        ]
+      },
+      "numerical_characterization": "not performed in D01"
+    },
+    {
+      "id": 12,
+      "planned_name": "mui_voellmy",
+      "input_status": "accepted",
+      "law_parameters": [
+        "mu_s",
+        "mu_2",
+        "muI_inf",
+        "I_0",
+        "diam_s",
+        "rho_s",
+        "xi",
+        "xi_temp"
+      ],
+      "implicit": "Voellmy turbulent drag",
+      "semi_implicit": "regularized inertial-number friction",
+      "implicit_api": "shared COMPLEX algebra with paired REAL/COMPLEX wrappers",
+      "semi_implicit_api": "REAL only",
+      "references": {
+        "read_param": [
+          {
+            "path": "src/io/inpout_2d.f90",
+            "line": 3336,
+            "text": "ELSEIF (rheology_model .EQ. 12) THEN"
+          }
+        ],
+        "eval_implicit_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 1256,
+            "text": "IF ( rheology_model .EQ. 1 .OR. rheology_model .EQ. 12 ) THEN"
+          }
+        ],
+        "eval_nh_semi_impl_terms": [
+          {
+            "path": "src/physics/equation_terms_2d.f90",
+            "line": 2035,
+            "text": "ELSEIF ( rheology_model .EQ. 12 ) THEN"
+          }
+        ]
+      },
+      "numerical_characterization": "not performed in D01"
+    }
+  ],
+  "shared_state_kernels": [
+    "src/state/state_conversion_phys_var.inc",
+    "src/state/velocity_from_conservative.inc",
+    "src/state/mixture_heat_capacity.inc",
+    "src/state/mixture_from_mass.inc"
+  ],
+  "current_owners": {
+    "law_parameters": "src/core/constitutive_parameters_2d.f90",
+    "selector_and_flags": "src/core/parameters_2d.f90",
+    "alpha1_ref": "src/io/inpout_2d.f90",
+    "implicit_and_si_sources": "src/physics/equation_terms_2d.f90",
+    "source_decoding": "src/state/state_conversion_2d.f90",
+    "stage_map": "src/numerics/time_integration_2d.f90",
+    "jacobian": "src/numerics/nonlinear_solver_2d.f90"
+  },
+  "pore_pressure": {
+    "flag": "pore_pressure_flag",
+    "conservative_variable": "M*P",
+    "implicit_api": "shared COMPLEX source algebra",
+    "inhibition_modes": [
+      "OFF",
+      "STEP",
+      "STATIC",
+      "DYNAMIC"
+    ],
+    "parameters": [
+      "hydraulic_permeability",
+      "dynamic_permeability_flag",
+      "maximum_solid_packing",
+      "alpha_trans",
+      "N_inh",
+      "f_inhibit_mode",
+      "pascal_coeff",
+      "kin_visc_c",
+      "sphericity_s",
+      "diam_s",
+      "sp_heat_a",
+      "sp_gas_const_a",
+      "pres",
+      "Tref_Suth",
+      "muRef_Suth",
+      "S_mu"
+    ],
+    "real_projections": [
+      "multi-class Sauter diameter and sphericity weights",
+      "STATIC/DYNAMIC normalized polynomial argument",
+      "DYNAMIC height-dependent transition"
+    ]
+  },
+  "findings": [
+    {
+      "id": "D01-F01",
+      "observation": "unsupported model 7",
+      "follow_up": [
+        "D08"
+      ]
+    },
+    {
+      "id": "D01-F02",
+      "observation": "model-8 ODE versus DIRK",
+      "follow_up": [
+        "D04",
+        "D13"
+      ]
+    },
+    {
+      "id": "D01-F03",
+      "observation": "shared xi_temp and T_env writes",
+      "follow_up": [
+        "D02",
+        "D03"
+      ]
+    },
+    {
+      "id": "D01-F04",
+      "observation": "REAL projections in inhibition and permeability",
+      "follow_up": [
+        "D02",
+        "D06"
+      ]
+    },
+    {
+      "id": "D01-F05",
+      "observation": "diffusion versus gas-loss permeability/guards",
+      "follow_up": [
+        "D02",
+        "D06"
+      ]
+    },
+    {
+      "id": "D01-F06",
+      "observation": "pore-only initialization and dry coefficient evaluation",
+      "follow_up": [
+        "D02",
+        "D06"
+      ]
+    },
+    {
+      "id": "D01-F07",
+      "observation": "incomplete validation and zero denominators",
+      "follow_up": [
+        "D02",
+        "D08"
+      ]
+    },
+    {
+      "id": "D01-F08",
+      "observation": "Froude endpoint comments and load conventions",
+      "follow_up": [
+        "D02"
+      ]
+    },
+    {
+      "id": "D01-F09",
+      "observation": "piecewise speed/depth thresholds",
+      "follow_up": [
+        "D02"
+      ]
+    },
+    {
+      "id": "D01-F10",
+      "observation": "thermal/deposition/diagnostic clients",
+      "follow_up": [
+        "D02",
+        "D06"
+      ]
+    }
+  ],
+  "validation": {
+    "level": "T1 static",
+    "performed": [
+      "source provenance and hashes",
+      "routine spans and dispatch-reference consistency",
+      "parameter declarations and model coverage",
+      "local Markdown links and JSON structure",
+      "git diff --check"
+    ],
+    "numerical_tests_run": [],
+    "exclusions": "No runtime source/input changes; D02 derivative and physical tests, builds and CI remain outside this change."
+  }
+}
