@@ -50,6 +50,11 @@ for profile in strict optimized; do
     "$compiler" $common parameters_2d.o diagnostics_2d.o thermal_sources_2d.o \
         test_lava_cooling.o -o test_lava_cooling
     ./test_lava_cooling
+    "$compiler" -O0 -g -fcheck=all $common -c \
+        "$test_dir/test_pore_pressure_diffusion.f90"
+    "$compiler" $common $objects test_pore_pressure_diffusion.o -llapack \
+        -o test_pore_pressure_diffusion
+    ./test_pore_pressure_diffusion
     # IEEE checks and the test-side FD subtraction stay strict in both profiles.
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/probe_sources.f90"
     "$compiler" $common $objects probe_sources.o -llapack -o probe_sources

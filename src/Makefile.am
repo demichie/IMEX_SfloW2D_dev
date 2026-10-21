@@ -116,6 +116,7 @@ physics/thermal_sources_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)           \
 physics/pore_pressure_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                     core/constitutive_parameters_2d.$(OBJEXT) \
                                     core/complexify.$(OBJEXT)                 \
+                                    core/diagnostics_2d.$(OBJEXT)              \
                                     geometry/geometry_2d.$(OBJEXT)             \
                                     state/state_conversion_2d.$(OBJEXT)
 physics/equation_terms_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \

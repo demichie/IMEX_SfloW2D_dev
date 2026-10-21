@@ -50,7 +50,9 @@ vaporization, conservative pore-pressure inlet/mass-exchange terms, and the
 D09 friction-only momentum projection (alignment, stopping, and no magnitude
 increase). The exact lava-cooling checks exercise convection-only closed-form
 decay, radiative-convective flow composition, sub-ambient approach to ambient,
-and the initial ODE derivative.
+and the initial ODE derivative. The exact pore-pressure diffusion checks
+exercise the frozen-state exponential solution, its semigroup property, source
+agreement, and unchanged behavior for inactive source states.
 
 For regular states, complex-step uses `1e-25*max(abs(q_j),1)` in physical
 conservative coordinates. Central finite differences use relative steps

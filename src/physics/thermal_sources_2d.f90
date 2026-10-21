@@ -55,14 +55,15 @@ CONTAINS
   !> \brief Advance the lava cooling ODE exactly over a time interval.
   !> \details Separates the autonomous temperature equation and evaluates its
   !>          analytic time-temperature primitive. A bisection inversion finds
-  !>          the temperature at the requested elapsed time. The areal thermal
-  !>          capacity and cooling coefficients are held fixed.
+  !>          the temperature after the requested DIRK integration step. The
+  !>          areal thermal capacity and cooling coefficients are held fixed.
+  !> \param integration_step Effective DIRK integration step (dt * a_ii).
   !******************************************************************************
-  SUBROUTINE advance_lava_cooling_temperature(temperature, elapsed_time,       &
+  SUBROUTINE advance_lava_cooling_temperature(temperature, integration_step,    &
        areal_heat_capacity, radiative_coefficient, convective_coefficient,     &
        ambient_temperature, temperature_after)
 
-    REAL(wp), INTENT(IN) :: temperature, elapsed_time, areal_heat_capacity
+    REAL(wp), INTENT(IN) :: temperature, integration_step, areal_heat_capacity
     REAL(wp), INTENT(IN) :: radiative_coefficient, convective_coefficient
     REAL(wp), INTENT(IN) :: ambient_temperature
     REAL(wp), INTENT(OUT) :: temperature_after
@@ -73,7 +74,7 @@ CONTAINS
     INTEGER :: iteration
 
     IF (.NOT. ieee_is_finite(temperature) .OR.                              &
-         .NOT. ieee_is_finite(elapsed_time) .OR.                            &
+         .NOT. ieee_is_finite(integration_step) .OR.                        &
          .NOT. ieee_is_finite(areal_heat_capacity) .OR.                    &
          .NOT. ieee_is_finite(radiative_coefficient) .OR.                  &
          .NOT. ieee_is_finite(convective_coefficient) .OR.                 &
@@ -83,7 +84,7 @@ CONTAINS
     IF (temperature .LE. 0.0_wp .OR. ambient_temperature .LE. 0.0_wp) THEN
        CALL fatal_error('Nonpositive temperature in exact lava cooling integrator')
     END IF
-    IF (elapsed_time .LT. 0.0_wp .OR. areal_heat_capacity .LE. 0.0_wp) THEN
+    IF (integration_step .LT. 0.0_wp .OR. areal_heat_capacity .LE. 0.0_wp) THEN
        CALL fatal_error('Invalid time or heat capacity in exact lava cooling integrator')
     END IF
     IF (radiative_coefficient .LT. 0.0_wp .OR.                            &
@@ -92,7 +93,7 @@ CONTAINS
     END IF
 
     temperature_after = temperature
-    IF (elapsed_time .EQ. 0.0_wp .OR.                                      &
+    IF (integration_step .EQ. 0.0_wp .OR.                                   &
          (radiative_coefficient .EQ. 0.0_wp .AND.                          &
          convective_coefficient .EQ. 0.0_wp) .OR.                          &
          temperature .EQ. ambient_temperature) RETURN
@@ -100,7 +101,7 @@ CONTAINS
     IF (radiative_coefficient .EQ. 0.0_wp) THEN
        temperature_after = ambient_temperature + (temperature -             &
             ambient_temperature) * EXP(-convective_coefficient *          &
-            elapsed_time / areal_heat_capacity)
+            integration_step / areal_heat_capacity)
        RETURN
     END IF
 
@@ -114,7 +115,7 @@ CONTAINS
     initial_primitive = lava_cooling_time_primitive(                        &
          temperature / ambient_temperature, beta, cubic_root)
     elapsed_scale = radiative_coefficient * ambient_temperature**3 *        &
-         elapsed_time / areal_heat_capacity
+         integration_step / areal_heat_capacity
     IF (.NOT. ieee_is_finite(elapsed_scale)) THEN
        temperature_after = ambient_temperature
        RETURN

@@ -1922,6 +1922,15 @@ la soluzione esponenziale chiusa. La routine è autonoma e non è richiamata da
 `equation_terms_2d`, dal solver Newton o da `time_integration_2d`: l’attuale
 trattamento implicito e lo schema IMEX restano invariati.
 
+#### Diffusione della pressione interstiziale
+
+È stata aggiunta in `pore_pressure_2d` la routine autonoma
+`advance_pore_pressure_diffusion`. Con profondità, temperatura e frazioni
+solide e densità della miscela fissate allo stato dello stage, la sorgente
+lineare in pressione in eccesso si integra con una soluzione esponenziale
+usando `integration_step = dt * a_ii`. La routine non è richiamata da Newton o
+dal time integrator; la diffusione mantiene il trattamento implicito esistente.
+
 #### Contratto delle soluzioni di stage
 
 Si risolve **l’equazione algebrica dello stage DIRK**, non l’ODE su `dt`.
