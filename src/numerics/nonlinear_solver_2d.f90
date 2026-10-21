@@ -21,6 +21,7 @@ MODULE nonlinear_solver_2d
   PRIVATE
   PUBLIC :: initialize_nonlinear_solver
   PUBLIC :: finalize_nonlinear_solver
+  PUBLIC :: solve_implicit_stage
   PUBLIC :: solve_rk_step
 
   !> Complex-step perturbation and its reciprocal.
@@ -30,6 +31,63 @@ MODULE nonlinear_solver_2d
   REAL(wp), PARAMETER :: pivot_tol_factor = 64.0_wp
 
 CONTAINS
+
+  !******************************************************************************
+  !> \brief Advance one implicit stage and return its effective IM contribution.
+  !> \details Semi-implicit rheology, friction-only projections and Newton are
+  !>          kept inside the local solver boundary. The returned IM term is
+  !>          the sum of the corrected SI and Newton contributions.
+  !******************************************************************************
+  SUBROUTINE solve_implicit_stage(equation_partition, q_known, q_old, qp_known,&
+       dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,            &
+       Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij,                &
+       zero_x_momentum, zero_y_momentum, q_stage, effective_im_term,          &
+       iterations_used, converged, linear_info, line_search_failed)
+
+    USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms
+    USE rheology_2d, ONLY : correct_friction_momentum
+
+    IMPLICIT NONE
+
+    TYPE(equation_partition_type), INTENT(IN) :: equation_partition
+    REAL(wp), INTENT(IN) :: q_known(n_vars), q_old(n_vars)
+    REAL(wp), INTENT(IN) :: qp_known(n_vars+2)
+    REAL(wp), INTENT(IN) :: dt_step, a_diag
+    REAL(wp), INTENT(IN) :: known_stage_residual(n_eqns)
+    REAL(wp), INTENT(IN) :: Bprimej_x, Bprimej_y
+    REAL(wp), INTENT(IN) :: Bsecondj_xx, Bsecondj_xy, Bsecondj_yy
+    REAL(wp), INTENT(IN) :: grav_coeff, Zij
+    LOGICAL, INTENT(IN) :: zero_x_momentum, zero_y_momentum
+    REAL(wp), INTENT(OUT) :: q_stage(n_vars), effective_im_term(n_eqns)
+    INTEGER, INTENT(OUT) :: iterations_used, linear_info
+    LOGICAL, INTENT(OUT) :: converged, line_search_failed
+
+    REAL(wp) :: si_term(n_eqns)
+    REAL(wp) :: q_si(n_vars), residual_not_impl(n_eqns)
+
+    CALL eval_nh_semi_impl_terms(Bprimej_x, Bprimej_y, Bsecondj_xx,          &
+         Bsecondj_xy, Bsecondj_yy, grav_coeff, qp_known, si_term, Zij)
+
+    q_si = q_known + dt_step * a_diag * si_term(1:n_vars)
+    CALL correct_friction_momentum(q_known(2:3), q_si(2:3))
+    si_term(1:n_vars) = (q_si - q_known) / (dt_step * a_diag)
+
+    q_stage = q_si
+    residual_not_impl = known_stage_residual - a_diag * si_term
+    CALL solve_rk_step(equation_partition, q_stage, q_old, dt_step, a_diag,   &
+         residual_not_impl, Bprimej_x, Bprimej_y, Zij, iterations_used,      &
+         converged, linear_info, line_search_failed)
+
+    IF (zero_y_momentum) q_stage(3) = 0.0_wp
+    IF (zero_x_momentum) q_stage(2) = 0.0_wp
+
+    CALL correct_friction_momentum(q_si(2:3), q_stage(2:3))
+
+    effective_im_term = 0.0_wp
+    effective_im_term(1:n_vars) = (q_stage - q_si) / (dt_step * a_diag) +    &
+         si_term(1:n_vars)
+
+  END SUBROUTINE solve_implicit_stage
 
   !> \brief Set the complex-step perturbation and its reciprocal.
   !>

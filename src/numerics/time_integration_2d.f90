@@ -23,7 +23,7 @@ MODULE time_integration_2d
   USE geometry_2d, ONLY : cell_arc_perim, cell_arc_n_x, cell_arc_n_y
 
   USE constitutive_parameters_2d, ONLY : T_ambient
-  USE nonlinear_solver_2d, ONLY : solve_rk_step
+  USE nonlinear_solver_2d, ONLY : solve_implicit_stage
 
   USE equation_metadata_2d, ONLY : equation_partition_type
 
@@ -69,9 +69,8 @@ MODULE time_integration_2d
      REAL(wp), ALLOCATABLE :: q_rk(:,:,:)
      REAL(wp), ALLOCATABLE :: qp_rk(:,:,:)
      REAL(wp), ALLOCATABLE :: spatial_terms(:,:,:,:)
-     REAL(wp), ALLOCATABLE :: NH(:,:,:,:)
-     REAL(wp), ALLOCATABLE :: SI_NH(:,:,:,:)
-     REAL(wp), ALLOCATABLE :: expl_terms(:,:,:,:)
+     REAL(wp), ALLOCATABLE :: IM_terms(:,:,:,:)
+     REAL(wp), ALLOCATABLE :: EX_terms(:,:,:,:)
    CONTAINS
      PROCEDURE, PUBLIC :: initialize => initialize_time_integration
      PROCEDURE, PUBLIC :: finalize => finalize_time_integration
@@ -199,9 +198,8 @@ CONTAINS
     ALLOCATE( this%q_rk(n_vars,comp_cells_x,comp_cells_y) )
     ALLOCATE( this%qp_rk(n_vars+2,comp_cells_x,comp_cells_y) )
     ALLOCATE( this%spatial_terms(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
-    ALLOCATE( this%NH(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
-    ALLOCATE( this%SI_NH(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
-    ALLOCATE( this%expl_terms(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
+    ALLOCATE( this%IM_terms(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
+    ALLOCATE( this%EX_terms(n_eqns,comp_cells_x,comp_cells_y,n_RK) )
 
   END SUBROUTINE initialize_time_integration
 
@@ -222,9 +220,8 @@ CONTAINS
     DEALLOCATE( this%q_rk )
     DEALLOCATE( this%qp_rk )
     DEALLOCATE( this%spatial_terms )
-    DEALLOCATE( this%NH )
-    DEALLOCATE( this%SI_NH )
-    DEALLOCATE( this%expl_terms )
+    DEALLOCATE( this%IM_terms )
+    DEALLOCATE( this%EX_terms )
 
   END SUBROUTINE finalize_time_integration
 
@@ -259,16 +256,9 @@ CONTAINS
 
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
     
-    USE equation_terms_2d, ONLY : eval_implicit_terms
-
-    USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms
-
-    USE rheology_2d, ONLY : correct_friction_momentum
-
     USE state_conversion_2d, ONLY : qc_to_qp, primitive_to_volume_fractions, &
          project_dry_cell_momenta, clip_roundoff_negative_component_masses
-    USE parameters_2d, ONLY : dry_thickness_tolerance, idx_u, idx_v,         &
-         idx_solid_first, idx_solid_last
+    USE parameters_2d, ONLY : dry_thickness_tolerance, idx_u, idx_v
 
     USE equation_terms_2d, ONLY : eval_expl_terms
 
@@ -290,14 +280,13 @@ CONTAINS
     CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
     PROCEDURE(imex_state_observer), OPTIONAL :: observer
 
-    REAL(wp) :: q_si(n_vars) !< solution after the semi-implicit step
     REAL(wp) :: q_guess(n_vars) !< initial guess for the solution of the RK step
     REAL(wp) :: q_fv_cell(n_vars) !< finite-volume state for the current cell
     REAL(wp) :: residual_cell(n_vars) !< final RK residual for the current cell
     REAL(wp) :: q_old_cell(n_vars) !< state before the final RK assembly
     INTEGER :: i_RK
     INTEGER :: j,k,l            !< loop counter over the grid volumes
-    REAL(wp) :: Rj_not_impl(n_eqns)
+    REAL(wp) :: known_stage_residual(n_eqns)
 
     REAL(wp) :: a_diag
     REAL(wp) :: p_dyn
@@ -367,9 +356,8 @@ CONTAINS
        ! Initialization of the variables for the Runge-Kutta scheme
        this%q_rk( 1:n_vars , j , k ) = 0.0_wp
        this%spatial_terms(1:n_eqns,j,k,1:n_RK) = 0.0_wp
-       this%NH( 1:n_eqns, j , k , 1:n_RK ) = 0.0_wp
-       this%SI_NH( 1:n_eqns , j , k , 1:n_RK ) = 0.0_wp
-       this%expl_terms(1:n_eqns , j , k , 1:n_RK) = 0.0_wp
+       this%IM_terms(1:n_eqns,j,k,1:n_RK) = 0.0_wp
+       this%EX_terms(1:n_eqns,j,k,1:n_RK) = 0.0_wp
        
     END DO
     !$OMP END DO
@@ -402,7 +390,7 @@ CONTAINS
 
        !$OMP PARALLEL 
        !$OMP DO schedule(guided)                                                &
-       !$OMP & private(j,k,q_guess,q_si,q_fv_cell,Rj_not_impl,p_dyn,           &
+       !$OMP & private(j,k,q_guess,q_fv_cell,known_stage_residual,p_dyn,       &
        !$OMP & closure_context,                                                &
        !$OMP & newton_iterations,newton_linear_info,newton_converged,          &
        !$OMP & newton_line_search_failed,implicit_status)
@@ -438,8 +426,8 @@ CONTAINS
           ! The current diagonal implicit contribution is solved below.
           q_fv_cell(1:n_vars) = q( 1:n_vars , j , k )                            &
                - dt * (MATMUL( this%spatial_terms(1:n_eqns,j,k,1:i_RK)       &
-               - this%expl_terms(1:n_eqns,j,k,1:i_RK) , this%a_tilde(1:i_RK) )            &
-               - MATMUL( this%NH(1:n_eqns,j,k,1:i_RK) + this%SI_NH(1:n_eqns,j,k,1:i_RK) , &
+               - this%EX_terms(1:n_eqns,j,k,1:i_RK) , this%a_tilde(1:i_RK) )  &
+               - MATMUL( this%IM_terms(1:n_eqns,j,k,1:i_RK),                   &
                this%a_dirk(1:i_RK) ) )
 
           ! Capture the algebraic state before qc_to_qp can desingularize or
@@ -468,45 +456,23 @@ CONTAINS
           adiag_pos:IF ( a_diag .NE. 0.0_wp ) THEN
 
              pos_thick:IF ( q_fv_cell(1) .GT.  0.0_wp )  THEN
-
-                ! Eval the semi-implicit terms
-                ! (terms which non depend on velocity magnitude)
-                CALL eval_nh_semi_impl_terms( B_prime_x_geom(j,k) ,             &
-                     B_prime_y_geom(j,k) , B_second_xx_geom(j,k) ,              &
-                     B_second_xy_geom(j,k) , B_second_yy_geom(j,k) ,            &
-                     grav_coeff(j,k) ,                                         &
-                     qp( 1:n_vars+2 , j , k ) , this%SI_NH(1:n_eqns,j,k,i_RK) ,      &
-                     Z(j,k) )
-
-                ! Assemble the initial guess for the implicit solver
-                q_si(1:n_vars) = q_fv_cell + dt * a_diag *                     &
-                     this%SI_NH(1:n_eqns,j,k,i_RK)
-
-                ! Constrain only the momentum change from this friction substep.
-                CALL correct_friction_momentum(q_fv_cell(2:3), q_si(2:3))
-
-                ! Update the semi-implicit term accordingly with the
-                ! corrections above
-                this%SI_NH(1:n_eqns,j,k,i_RK) = ( q_si(1:n_vars) -                   &
-                     q_fv_cell ) / ( dt*a_diag )
-
-                ! Initialize the guess for the NR solver
-                q_guess(1:n_vars) = q_si(1:n_vars)
-
-
-                Rj_not_impl = ( MATMUL(                                    &
+                known_stage_residual = ( MATMUL(                             &
                      this%spatial_terms(1:n_eqns,j,k,1:i_RK-1) -            &
-                     this%expl_terms(1:n_eqns,j,k,1:i_RK-1), this%a_tilde(1:i_RK-1) )     &
-                     - MATMUL( this%NH(1:n_eqns,j,k,1:i_RK-1)                        &
-                     + this%SI_NH(1:n_eqns,j,k,1:i_RK-1) , this%a_dirk(1:i_RK-1) ) )      &
-                     - a_diag * this%SI_NH(1:n_eqns,j,k,i_RK)
+                     this%EX_terms(1:n_eqns,j,k,1:i_RK-1),                    &
+                     this%a_tilde(1:i_RK-1) )                                 &
+                     - MATMUL(this%IM_terms(1:n_eqns,j,k,1:i_RK-1),           &
+                     this%a_dirk(1:i_RK-1) ) )
 
-                ! Solve the implicit system to find the solution at the 
-                ! i_RK step of the IMEX RK procedure
-                CALL solve_rk_step( equation_partition, q_guess(1:n_vars),    &
-                     q(1:n_vars,j,k), dt, a_diag, Rj_not_impl,                &
-                     B_prime_x_geom(j,k),                                     &
-                     B_prime_y_geom(j,k), Z(j,k),                              &
+                ! The local solver owns the SI/Newton split and returns its
+                ! corrected, effective implicit contribution as one IM term.
+                CALL solve_implicit_stage(equation_partition, q_fv_cell,      &
+                     q(1:n_vars,j,k), qp(1:n_vars+2,j,k), dt, a_diag,         &
+                     known_stage_residual, B_prime_x_geom(j,k),               &
+                     B_prime_y_geom(j,k), B_second_xx_geom(j,k),              &
+                     B_second_xy_geom(j,k), B_second_yy_geom(j,k),            &
+                     grav_coeff(j,k), Z(j,k), comp_cells_x .EQ. 1,            &
+                     comp_cells_y .EQ. 1, q_guess,                            &
+                     this%IM_terms(1:n_eqns,j,k,i_RK),                        &
                      newton_iterations, newton_converged, newton_linear_info,   &
                      newton_line_search_failed )
 
@@ -548,50 +514,19 @@ CONTAINS
 
                 END IF
                 
-                IF ( comp_cells_y .EQ. 1 ) THEN
-
-                   q_guess(3) = 0.0_wp
-
-                END IF
-
-                IF ( comp_cells_x .EQ. 1 ) THEN
-
-                   q_guess(2) = 0.0_wp
-
-                END IF
-
-                ! Eval and store the implicit term at the i_RK step
-                CALL eval_implicit_terms( B_prime_x_geom(j,k) ,                 &
-                     B_prime_y_geom(j,k) , Z(j,k),                             &
-                     r_qj = q_guess , r_nh_term_impl = this%NH(1:n_eqns,j,k,i_RK) )
-
-                ! q_si is the pre-implicit-friction state; the implicit momentum
-                ! source contains rheology only, so constrain that update alone.
-                CALL correct_friction_momentum(q_si(2:3), q_guess(2:3))
-
              ELSE
 
                 ! If h=0 nothing has to be changed 
                 q_guess(1:n_vars) = q_fv_cell
-                q_si(1:n_vars) = q_fv_cell
-                this%SI_NH(1:n_eqns,j,k,i_RK) = 0.0_wp
-                this%NH(1:n_eqns,j,k,i_RK) = 0.0_wp
+                this%IM_terms(1:n_eqns,j,k,i_RK) = 0.0_wp
 
              END IF pos_thick
 
           END IF adiag_pos
 
-          IF ( a_diag .NE. 0.0_wp ) THEN
-
-             ! Update the implicit term with correction on the new velocity
-             this%NH(1:n_vars,j,k,i_RK) = ( q_guess(1:n_vars) - q_si(1:n_vars))      &
-                  / ( dt*a_diag ) 
-
-          END IF
-
           ! Store the current stage. Previous stage states are no longer
           ! needed here: their evaluated terms are retained in spatial_terms,
-          ! NH, SI_NH and expl_terms.
+          ! EX_terms and IM_terms.
           this%q_rk( 1:n_vars , j , k ) = q_guess
           IF ( PRESENT(observer) ) CALL observer(2, i_RK, j, k, q_guess, implicit_status)
 
@@ -632,7 +567,7 @@ CONTAINS
              CALL eval_expl_terms( B_prime_x_geom(j,k) , B_prime_y_geom(j,k) ,  &
                   B_second_xx_geom(j,k) , B_second_xy_geom(j,k) ,               &
                   B_second_yy_geom(j,k) , grav_coeff(j,k),                      &
-                  this%qp_rk(1:n_vars+2,j,k), this%expl_terms(1:n_eqns,j,k,i_RK), t,      &
+                  this%qp_rk(1:n_vars+2,j,k), this%EX_terms(1:n_eqns,j,k,i_RK), t, &
                   cell_source_fractions(j,k), cell_fissure_fractions(j,k,:),    &
                   cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k),    &
                   dx * dy )
@@ -669,9 +604,8 @@ CONTAINS
        q_old_cell = q(1:n_vars,j,k)
 
        residual_cell = MATMUL( this%spatial_terms(1:n_eqns,j,k,1:n_RK)       &
-            - this%expl_terms(1:n_eqns,j,k,1:n_RK) , this%omega_tilde ) -                 &
-            MATMUL( this%NH(1:n_eqns,j,k,1:n_RK) + this%SI_NH(1:n_eqns,j,k,1:n_RK) ,      &
-            this%omega )
+            - this%EX_terms(1:n_eqns,j,k,1:n_RK) , this%omega_tilde ) -      &
+            MATMUL( this%IM_terms(1:n_eqns,j,k,1:n_RK), this%omega )
 
 
        IF ( ( SUM(ABS( this%omega_tilde(:)-this%a_tilde_ij(n_RK,:))) .EQ. 0.0_wp  )       &
@@ -765,15 +699,13 @@ CONTAINS
              
              !WRITE(*,*) 'spatial_terms(1)',                                 &
              !     this%spatial_terms(1,j,k,1:n_RK)
-             !WRITE(*,*) 'expl_terms(1)', expl_terms(1,j,k,1:n_RK)
-             !WRITE(*,*) 'NH(1)', NH(1,j,k,1:n_RK)
-             !WRITE(*,*) 'SI(1)', SI_NH(1,j,k,1:n_RK) 
+             !WRITE(*,*) 'EX_terms(1)', this%EX_terms(1,j,k,1:n_RK)
+             !WRITE(*,*) 'IM_terms(1)', this%IM_terms(1,j,k,1:n_RK)
              
              !WRITE(*,*) 'spatial_terms(5)',                                 &
              !     this%spatial_terms(5,j,k,1:n_RK)
-             !WRITE(*,*) 'expl_terms(5)', expl_terms(5,j,k,1:n_RK)
-             !WRITE(*,*) 'NH(5)', NH(5,j,k,1:n_RK)
-             !WRITE(*,*) 'SI(5)', SI_NH(5,j,k,1:n_RK)
+             !WRITE(*,*) 'EX_terms(5)', this%EX_terms(5,j,k,1:n_RK)
+             !WRITE(*,*) 'IM_terms(5)', this%IM_terms(5,j,k,1:n_RK)
              
              !READ(*,*)
 

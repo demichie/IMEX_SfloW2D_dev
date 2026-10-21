@@ -190,7 +190,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D07 | —             | Migrazione progressiva dei parametri non reologici          | IN PAUSA |
 | D08 | P4            | RHEOLOGY_MODEL da numeri a stringhe                         | ASSORBITO IN D05 |
 | D09 | P5            | Correzione del solo attrito                                 | COMPLETATO (gate locale GNU/macOS) |
-| D10 | P6            | EX_terms / IM_terms                                         | DA FARE  |
+| D10 | P6            | EX_terms / IM_terms                                         | COMPLETATO (gate locale GNU/macOS) |
 | D11 | P7            | IM_group e metadati                                         | DA FARE  |
 | D12 | P7            | Newton per gruppo e Jacobiano ridotto                       | DA FARE  |
 | D13 | P8            | Algebriche ANALYTIC per stage DIRK                          | IN CORSO |
@@ -1765,27 +1765,23 @@ correct_friction_momentum vive in rheology_2d.f90 ed opera solo sul contributo d
 
 **Test proporzionati (nuove modifiche a questo step):** T1 contratto EX_terms/IM_terms e consistenza delle somme; T2 uno step IMEX con tutte le componenti; T3 casi stiff se cambia partizione. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: DA FARE
+Stato ufficiale: COMPLETATO (gate locale GNU/macOS)
 
-L’integratore dovrà conoscere soltanto:
+Il ciclo RK conosce e combina soltanto:
 
 spatial_terms  
 EX_terms  
 IM_terms
 
-L’attuale separazione NH e SI_NH non sarà più esposta all’integratore, poiché i due contributi utilizzano lo stesso tableau implicito.
+La separazione NH e SI_NH non è esposta all’integratore, poiché i due contributi utilizzano lo stesso tableau implicito.
 
-Lo stage sarà scritto concettualmente come:
+Il ciclo costruisce la parte nota dello stage con spatial_terms ed EX_terms tramite il tableau esplicito, e con IM_terms degli stage precedenti tramite il tableau implicito. La diagonale implicita corrente viene risolta nel solver locale.
 
-Il risolutore restituirà lo stato aggiornato e il contributo implicito effettivo:
+Per uno stage con $a_{ii} \neq 0$, il solver locale restituisce lo stato aggiornato e il contributo IM effettivo, ricostruito dopo le correzioni applicate.
 
-quando $a_{ii} \neq 0$.
+Il trattamento SI, Newton e le correzioni di frizione restano interni al solver locale. Il caso predefinito a singolo gruppo mantiene la sequenza SI+Newton; i tableau IMEX non sono stati modificati.
 
-Questo contributo deve comprendere anche le eventuali correzioni apportate durante la soluzione.
-
-Il trattamento SI rimane disponibile internamente quando richiesto dalle reologie, ma non deve più essere gestito direttamente dal ciclo RK.
-
-Il caso predefinito con un unico gruppo NEWTON dovrà riprodurre il comportamento SI+Newton attuale.
+Gate locale superato: `make check` strict e optimized; i test degli stage di produzione strict e optimized per quadratica, arresto Coulomb e lava accoppiata, con 1 e 4 thread; suite cell-local con 255 fixture strict e optimized. Nei test stage `known_stage2`, `effective_increment` e `final_projection` hanno errore zero.
 
 #### SI legacy, correzioni e incremento implicito effettivo
 
