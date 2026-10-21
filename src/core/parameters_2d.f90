@@ -311,11 +311,7 @@ MODULE parameters_2d
   REAL(wp) :: theta             !< Van Leer limiter parameter
   REAL(wp) :: t_start           !< initial time for the run
   REAL(wp) :: t_end             !< end time for the run
-  REAL(wp) :: t_output          !< time of the next output
   REAL(wp) :: dt_output         !< time interval for the output of the solution
-  REAL(wp) :: t_runout          !< time of the next runout output
-  REAL(wp) :: t_steady          !< end time when reached steady solution
-  REAL(wp) :: t_probes
 
   INTEGER :: verbose_level
 

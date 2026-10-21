@@ -12,8 +12,7 @@ PROGRAM test_mass_exchange
   USE state_conversion_2d, ONLY : qc_to_qp, settling_velocity
   USE equation_terms_2d, ONLY : eval_mass_exchange_terms
   USE mass_exchange_2d, ONLY : update_erosion_deposition_cell, release_topography_workspace
-  USE inpout_2d, ONLY : write_restart_file, read_restart_file, output_idx, &
-       t_output, t_runout, t_probes
+  USE inpout_2d, ONLY : write_restart_file, read_restart_file, output_idx
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
@@ -137,7 +136,8 @@ CONTAINS
     domain%solve_cells=l
     sym_noise=0.0_wp; noise_pow_val=1.0_wp
     CALL stochastic%initialize
-    output_idx=0; t_output=0.0_wp; t_runout=0.0_wp; t_probes=0.0_wp
+    output_idx=0
+    runtime%t_output=0.0_wp; runtime%t_runout=0.0_wp; runtime%t_probes=0.0_wp
   END SUBROUTINE initialize_fixture
 
   !> \brief Reset conservative inventories and an analytic initial bed before each independent case.

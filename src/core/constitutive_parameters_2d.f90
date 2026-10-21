@@ -28,7 +28,7 @@ MODULE constitutive_parameters_2d
   PUBLIC :: radiative_term_coeff, SBconst, emissivity, enne, T_ground
   PUBLIC :: thermal_conductivity
   PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
-  PUBLIC :: sp_heat_c, rho_c_sub, rho_a_amb
+  PUBLIC :: rho_c_sub, rho_a_amb
   PUBLIC :: sp_heat_a, sp_gas_const_a, kin_visc_a
   PUBLIC :: sp_heat_g, sp_gas_const_g
   PUBLIC :: kin_visc_l, kin_visc_c, Tref_Suth, muRef_Suth, S_mu, T_ambient
@@ -152,9 +152,6 @@ MODULE constitutive_parameters_2d
   REAL(wp) :: n_td2
 
   !--- END Lahars rheology model parameters
-
-  !> Specific heat of carrier phase (gas or liquid)
-  REAL(wp) :: sp_heat_c  ! ( initialized from input)
 
   !> Specific gas constant of gas mixture (units: J kg-1 K-1)
 

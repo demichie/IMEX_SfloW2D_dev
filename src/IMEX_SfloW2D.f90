@@ -77,10 +77,7 @@ PROGRAM IMEX_SfloW2D
 
    USE parameters_2d, ONLY : t_start
    USE parameters_2d, ONLY : t_end
-   USE parameters_2d, ONLY : t_output
-   USE parameters_2d, ONLY : t_runout
-   USE parameters_2d, ONLY : t_probes
-   USE parameters_2d, ONLY : t_steady
+   USE parameters_2d, ONLY : dt_output
    USE parameters_2d, ONLY : dt0
    USE parameters_2d, ONLY : topo_change_flag
    USE parameters_2d, ONLY : verbose_level
@@ -176,6 +173,9 @@ PROGRAM IMEX_SfloW2D
 
    is_binary_restart = .FALSE.
    simulation%runtime%t = t_start
+   simulation%runtime%t_output = t_start + dt_output
+   simulation%runtime%t_runout = 0.0_wp
+   simulation%runtime%t_probes = 0.0_wp
 
    IF ( restart ) THEN
 
@@ -194,7 +194,7 @@ PROGRAM IMEX_SfloW2D
          WRITE(*,*) 'Binary file (.bin) detected: Performing full restart.'
          CALL read_restart_file(TRIM(restart_file), simulation%runtime,      &
               simulation%stochastic, simulation%state, simulation%domain)
-         CALL validate_restart_output_manifest()
+         CALL validate_restart_output_manifest(simulation%runtime)
 
          is_binary_restart = .TRUE.
 
@@ -265,13 +265,13 @@ PROGRAM IMEX_SfloW2D
       simulation%runtime%dt_old_old = dt0
    END IF
 
-   t_steady = t_end
    stop_flag = .FALSE.
    IF (is_binary_restart) THEN
       stop_flag = simulation%runtime%stop_requested
-      IF (stop_flag) t_steady = simulation%runtime%steady_deadline
+      IF (.NOT. stop_flag) simulation%runtime%steady_deadline = t_end
+   ELSE
+      simulation%runtime%steady_deadline = t_end
    END IF
-   simulation%runtime%steady_deadline = t_steady
 
    IF ( .NOT. is_binary_restart ) simulation%state%vuln_table = .FALSE.
 
@@ -362,14 +362,15 @@ PROGRAM IMEX_SfloW2D
    IF ( output_cons_flag .OR. output_esri_flag .OR.                            &
       output_netcdf_flag ) THEN
       IF ( .NOT. is_binary_restart ) CALL output_solution(                   &
-      simulation%runtime%t, simulation%state)
+      simulation%runtime%t, simulation%state, simulation%runtime)
    END IF
 
    IF ( ( n_probes .GT. 0 ) .AND. (.NOT. is_binary_restart) )               &
         CALL output_probes(                                                  &
-        simulation%runtime%t, simulation%state)
+        simulation%runtime%t, simulation%state, simulation%runtime)
 
-   IF ( SUM(simulation%state%q(1,:,:)) .EQ. 0.0_wp ) t_steady = t_end
+   IF ( SUM(simulation%state%q(1,:,:)) .EQ. 0.0_wp )                        &
+      simulation%runtime%steady_deadline = t_end
 
    IF ( verbose_level .GE. 0 ) THEN
 
@@ -388,7 +389,7 @@ PROGRAM IMEX_SfloW2D
    CALL system_clock (st2)
 
    DO WHILE ( ( simulation%runtime%t .LT. t_end ) .AND.                       &
-        ( simulation%runtime%t .LT. t_steady ) )
+        ( simulation%runtime%t .LT. simulation%runtime%steady_deadline ) )
 
       CALL update_param
 
@@ -408,26 +409,32 @@ PROGRAM IMEX_SfloW2D
            simulation%state%q, simulation%state%qp, simulation%runtime%t,     &
            simulation%runtime%dt, simulation%domain)
 
-      IF ( t_end - t_output < 1.0E-7_WP ) t_output = t_end
-      IF ( t_end - t_runout < 1.0E-7_WP ) t_runout = t_end
-      IF ( t_end - t_probes < 1.0E-7_WP ) t_probes = t_end
+      IF ( t_end - simulation%runtime%t_output < 1.0E-7_WP )                 &
+         simulation%runtime%t_output = t_end
+      IF ( t_end - simulation%runtime%t_runout < 1.0E-7_WP )                 &
+         simulation%runtime%t_runout = t_end
+      IF ( t_end - simulation%runtime%t_probes < 1.0E-7_WP )                 &
+         simulation%runtime%t_probes = t_end
 
       IF ( simulation%runtime%t+simulation%runtime%dt .GT. t_end )            &
            simulation%runtime%dt = t_end - simulation%runtime%t
-      IF ( simulation%runtime%t+simulation%runtime%dt .GT. t_output )         &
-           simulation%runtime%dt = t_output - simulation%runtime%t
+      IF ( simulation%runtime%t+simulation%runtime%dt .GT.                   &
+           simulation%runtime%t_output )                                     &
+           simulation%runtime%dt = simulation%runtime%t_output - simulation%runtime%t
 
       IF ( output_runout_flag ) THEN
 
-         IF ( simulation%runtime%t+simulation%runtime%dt .GT. t_runout )      &
-              simulation%runtime%dt = t_runout - simulation%runtime%t
+         IF ( simulation%runtime%t+simulation%runtime%dt .GT.                &
+              simulation%runtime%t_runout )                                  &
+              simulation%runtime%dt = simulation%runtime%t_runout - simulation%runtime%t
 
       END IF
 
       IF ( n_probes .GT. 0 ) THEN
 
-         IF ( simulation%runtime%t+simulation%runtime%dt .GT. t_probes )      &
-              simulation%runtime%dt = t_probes - simulation%runtime%t
+         IF ( simulation%runtime%t+simulation%runtime%dt .GT.                &
+              simulation%runtime%t_probes )                                  &
+              simulation%runtime%dt = simulation%runtime%t_probes - simulation%runtime%t
 
       END IF
 
@@ -544,8 +551,9 @@ PROGRAM IMEX_SfloW2D
 
       IF ( output_runout_flag ) THEN
 
-         IF ( ( simulation%runtime%t .GE. t_runout ) .OR.                    &
-              ( simulation%runtime%t .GE. t_steady ) ) THEN
+         IF ( ( simulation%runtime%t .GE. simulation%runtime%t_runout ) .OR. &
+              ( simulation%runtime%t .GE.                                    &
+                simulation%runtime%steady_deadline ) ) THEN
 
             stop_flag_old = stop_flag
 
@@ -554,8 +562,8 @@ PROGRAM IMEX_SfloW2D
 
             IF ( ( stop_flag ) .AND. (.NOT.stop_flag_old) ) THEN
 
-               t_steady = MIN(t_end,t_output)
-               simulation%runtime%steady_deadline = t_steady
+               simulation%runtime%steady_deadline =                         &
+                    MIN(t_end, simulation%runtime%t_output)
 
             END IF
 
@@ -565,12 +573,13 @@ PROGRAM IMEX_SfloW2D
 
       IF ( n_probes .GT. 0 ) THEN
 
-         IF ( simulation%runtime%t .GE. t_probes )                           &
-              CALL output_probes(simulation%runtime%t, simulation%state)
+         IF ( simulation%runtime%t .GE. simulation%runtime%t_probes )        &
+              CALL output_probes(simulation%runtime%t, simulation%state,     &
+                   simulation%runtime)
 
       END IF
 
-      IF ( ( simulation%runtime%t .GE. t_output ) .OR.                       &
+      IF ( ( simulation%runtime%t .GE. simulation%runtime%t_output ) .OR.   &
            ( simulation%runtime%t .GE. t_end ) ) THEN
 
          CALL cpu_time(t3)
@@ -585,7 +594,8 @@ PROGRAM IMEX_SfloW2D
 
          IF ( output_cons_flag .OR. output_esri_flag .OR. output_netcdf_flag ) THEN
 
-            CALL output_solution(simulation%runtime%t, simulation%state)
+            CALL output_solution(simulation%runtime%t, simulation%state,    &
+                 simulation%runtime)
             CALL write_restart_file(output_file_path('restart', 'restart.bin'), &
                  simulation%runtime,                                         &
                  simulation%stochastic, simulation%state, simulation%domain)

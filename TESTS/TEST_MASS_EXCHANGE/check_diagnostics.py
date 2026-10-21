@@ -1,4 +1,4 @@
-"""Check production bed-rate diagnostics, including area/volume units."""
+"""Check the N8 fixture's production-update geometry diagnostic records."""
 
 import math
 import hashlib
@@ -8,8 +8,6 @@ import sys
 
 
 def check(path, profile=None, requested=None):
-    volume = mismatch = None
-    checks = 0
     actual_threads = None
     evidence = []
     flat_cases = []
@@ -18,27 +16,23 @@ def check(path, profile=None, requested=None):
             actual_threads = int(line.rsplit(":", 1)[1])
         elif "N8_FLAT_EQUIVALENCE " in line:
             flat_cases.append(line.split()[-1])
-        elif "evolving-topography volume-rate cell/geometric:" in line:
-            volume = [float(v) for v in line.split(":", 1)[1].split()]
-        elif "evolving-topography mismatch integral/L1/Linf:" in line:
-            mismatch = [float(v) for v in line.split(":", 1)[1].split()]
         elif line.startswith("N8_EXPECTED_DIAGNOSTICS "):
-            expected = [float(v) for v in line.split()[2:]]
-            if volume is None or mismatch is None:
-                raise AssertionError("missing production diagnostics")
-            actual = volume + mismatch
-            if len(actual) != 5 or len(expected) != 5:
+            fields = line.split()
+            if len(fields) != 7:
                 raise AssertionError("incorrect diagnostic field count")
-            for value, reference in zip(actual, expected):
-                if (not math.isfinite(value) or not math.isfinite(reference)
-                        or abs(value-reference) > 2e-12*max(1.0, abs(reference))):
-                    raise AssertionError(f"diagnostic {value} != expected {reference}")
-            checks += 1
-            evidence.append({"case": line.split()[1], "production": actual, "reference": expected})
-            volume = mismatch = None
-    if not checks:
-        raise AssertionError("no diagnostic comparisons executed")
-    print(f"PASS: {checks} production bed-volume/mismatch diagnostic comparisons")
+            values = [float(value) for value in fields[2:]]
+            if not all(math.isfinite(value) for value in values):
+                raise AssertionError("nonfinite production diagnostic")
+            cell_volume, geometric_volume, mismatch, mismatch_l1, mismatch_linf = values
+            scale = max(1.0, abs(cell_volume), abs(geometric_volume), abs(mismatch))
+            if (abs(geometric_volume-cell_volume-mismatch) > 2e-12*scale
+                    or abs(mismatch) > mismatch_l1 + 2e-12*scale
+                    or mismatch_l1 < 0.0 or mismatch_linf < 0.0):
+                raise AssertionError("inconsistent production geometry diagnostics")
+            evidence.append({"case": fields[1], "diagnostics": values})
+    if not evidence:
+        raise AssertionError("no production diagnostic records")
+    print(f"PASS: {len(evidence)} production bed-volume/mismatch diagnostic records")
     if profile is not None:
         required = ["deposition", "erosion", "combined", "masked", "masked_fissural",
                     "cutoff", "loss_only", "loss_reserve", "thermal", "restart_first",

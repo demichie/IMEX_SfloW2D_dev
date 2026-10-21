@@ -32,7 +32,7 @@ MODULE runtime_2d
      CHARACTER(LEN=128) :: runout_row = '', mass_center_row = ''
   END TYPE runout_state_type
 
-  !> \brief Mutable clock, timestep history and runout bookkeeping for one run.
+  !> \brief Mutable clock, output schedule, timestep history and runout state for one run.
   TYPE :: runtime_state_type
 
      !> Current simulation time
@@ -44,6 +44,11 @@ MODULE runtime_2d
      !> Time steps used by the temporal smoothing limiter
      REAL(wp) :: dt_old = 0.0_wp
      REAL(wp) :: dt_old_old = 0.0_wp
+
+     !> Next output times, restored with the binary restart state.
+     REAL(wp) :: t_output = 0.0_wp
+     REAL(wp) :: t_runout = 0.0_wp
+     REAL(wp) :: t_probes = 0.0_wp
 
      !> Runout/steady-stop state saved even when no CSV files are available.
      TYPE(runout_state_type) :: runout

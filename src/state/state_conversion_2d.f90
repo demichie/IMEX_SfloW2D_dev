@@ -556,9 +556,6 @@ CONTAINS
 
     INCLUDE 'state_conversion_phys_var.inc'
 
-    ! Preserve the historical update of the carrier specific heat.
-    IF ( .NOT. gas_flag ) sp_heat_c = sp_heat_l
-
     red_grav = ( rho_m - rho_a_amb ) * inv_rhom * grav
 
     p_dyn = 0.5_wp * rho_m * ( u**2 + v**2 )

@@ -1324,16 +1324,60 @@ Strict-debug e optimized passano entrambi 258/258 fixture; l'errore massimo del
 regressore parallelo è zero. Questo verifica il percorso interessato, non
 certifica la thread-safety complessiva del solver.
 
-È disponibile una prima versione di
+È disponibile una versione aggiornata di
 [`D03_SHARED_STATE_MANIFEST.json`](acceptance/D03_SHARED_STATE_MANIFEST.json):
-232 voci per simboli e componenti di `bc`, con dichiarazioni, riferimenti
-diretti, import, accessi sintattici, candidati owner e gate. L'indice statico
-non è ancora una revisione semantica: riferimenti indiretti/call-context,
-classificazione input-derivato-stato-workspace, serializzazione e accessi
+227 voci attive per simboli e componenti di `bc`, con dichiarazioni, riferimenti
+diretti, import, accessi sintattici, candidati owner e gate. Quattro timer sono
+stati trasferiti da `parameters_2d` a `runtime_state_type`: `t_output`,
+`t_runout` e `t_probes` sono ora stato di schedulazione runtime; `t_steady`
+riusa `runtime%steady_deadline`. L'indice statico non è ancora una revisione
+semantica: i riferimenti di riga nei file toccati, i riferimenti indiretti e i
+call-context, la classificazione input-derivato-stato-workspace e gli accessi
 OpenMP/MPI richiedono verifica. Anche il grafo presente copre solo la relazione
 diretta tra i due moduli; l'audit completo e la revisione del manifest restano
-aperti. `xi` è registrato come parametro condiviso di configurazione; la
-modifica elimina solo il workspace mutabile.
+aperti. `xi` resta un parametro condiviso di configurazione: il suo valore non
+è stato spostato o duplicato. Le rimozioni di stato condiviso sono descritte
+qui sopra.
+
+La revisione delle scritture ha inoltre trovato `sp_heat_c` aggiornato sia
+durante la lettura input sia a ogni decodifica REAL dello stato. Non risultano
+lettori del dato globale nel repository: le procedure di chiusura usano e
+restituiscono capacità termiche locali. La variabile, i due aggiornamenti e
+l'import del parser sono stati rimossi, eliminando una scrittura condivisa
+nelle chiamate `qc_to_qp` parallele senza cambiare le formule di chiusura.
+La suite rheology passa 258/258 fixture in strict-debug e optimized; il test
+del ciclo di vita del workspace passa. Le build production strict-debug e
+optimized superano gli stage quadratic, Coulomb-stop e lava-coupled con uno e
+quattro thread; il controllo input passa 28/28 casi. Queste verifiche coprono
+la modifica, ma non chiudono l'audit semantico D03.
+
+Il triage aggregato dell'inventario distingue ora 227 voci attive: 225 variabili
+di modulo e due componenti di `bc`; 11 sono dichiarate immutabili e 216 restano
+classificate come mutabili dall'indice lessicale. Le quattro voci trasferite
+sono tracciate separatamente nel manifest. Questa classificazione non implica
+che tutte richiedano una modifica. Il controllo per gruppi ha già separato le
+costanti/configurazioni di setup, le grandezze geometriche derivate
+(`eps_sing`, `eps_sing4`, assegnate in `init_grid`) e i contatori di
+dimensionamento inizializzati dall'input (`n_dyn_pres_levels`). I riferimenti a
+`n_vars`, `n_eqns` e `n_RK` in istruzioni di allocazione sono falsi positivi
+come scritture. La schedulazione (`t_output`, `t_runout`, `t_probes`) è stata
+trasferita in `runtime_state_type`, insieme allo stato temporale e viene
+aggiornata nei percorsi seriali di output. `t_steady` è stato rimosso come alias
+e il ciclo principale usa `runtime%steady_deadline`. La serializzazione mantiene
+ordine e numero dei valori del record binario; la prova locale di checkpoint e
+continuazione del test mass-exchange passa in strict-debug a uno e quattro
+thread, con artefatti confrontati identici; passa anche in optimized a uno e
+quattro thread. Il checker Python della suite è stato allineato ai record
+diagnostici effettivamente emessi dal fixture, verificando copertura, valori
+finiti e coerenza geometrica anziché richiedere righe assenti. L'intera
+`TEST_MASS_EXCHANGE/run_test.sh` passa in strict-debug e optimized, inclusi i
+controlli projection-stress. Dopo la migrazione, le build production optimized
+e strict-debug passano gli stage quadratic, Coulomb-stop e lava-coupled con uno
+e quattro thread; `check_inputs.py` passa 28/28 casi. La cache `pascal_coeff`
+e il flag sono inizializzati durante `init_param` e poi letti dalle equazioni:
+non risultano scritture nel percorso per-cella, quindi sono setup/cache
+condivisa, non workspace per thread. La migrazione non modifica il formato
+restart.
 
 #### Inventario richiesto e deliverable
 
@@ -1358,7 +1402,7 @@ Manifest completo e revisionato, dependency graph aciclico, piano di migrazione 
 | constitutive | grav, inv_grav, pres, inv_pres, T_ambient, rho_a_amb                                                                                                      | Physical constants / ambient conditions         | Immutable runtime configuration vs derived reciprocals                    |
 | constitutive | rho_l, inv_rho_l, kin_visc_l, sp_heat_l, gamma_steam                                                                                                      | Liquid / vaporization                           | Check vaporization and composition clients                                |
 | constitutive | sp_heat_a, sp_gas_const_a, kin_visc_a, sp_heat_g, sp_gas_const_g                                                                                          | Gas and phase properties                        | Allocated gas vectors, n_add_gas and restart                              |
-| constitutive | sp_heat_c, rho_c_sub, kin_visc_c, Tref_Suth, muRef_Suth, S_mu                                                                                             | Carrier gas / liquid / Sutherland               | Differentiate raw phase properties vs model-derived                       |
+| constitutive | rho_c_sub, kin_visc_c, Tref_Suth, muRef_Suth, S_mu                                                                                                               | Carrier gas / liquid / Sutherland               | sp_heat_c removed as unread shared state; retain local mixture outputs    |
 | constitutive | rho_s, inv_rho_s, diam_s, sphericity_s, sp_heat_s                                                                                                         | Particle/solid properties                       | Allocation/lifetime, inverse density, PSD initialization                  |
 | constitutive | A_drag, B_drag, collective_settling_flag, settling_flag, alphastot_min, vonK                                                                              | Particle drag / settling                        | Drag may also belong to common closure; validate consumers                |
 | constitutive | entrainment_flag, erosion_coeff, loss_rate, erodible_fract, erodible_porosity, coeff_porosity, T_erodible                                                 | Mass exchange / erodible substrate              | Source and deposition coupling; ownership of allocated data               |
@@ -1377,7 +1421,7 @@ Manifest completo e revisionato, dependency graph aciclico, piano di migrazione 
 | parameters   | collapsing_volume_flag, x_collapse, y_collapse, r_collapse, T_collapse, h_collapse, alphas_collapse(:)                                                    | Initial/collapse source configuration           | Shared initialization and startup state                                   |
 | parameters   | particle_distribution_flag, fractal_dim, diam_min, diam_max, rho_s_min, rho_s_max, sigmoid_k, sigmoid_d0                                                  | Particle-size distribution input                | Separate PSD parameters from derived per-class arrays                     |
 | parameters   | bc type, bcW(:), bcE(:), bcS(:), bcN(:)                                                                                                                   | Boundary-condition descriptors                  | Ownership and allocation/restart semantics                                |
-| parameters   | t_output, dt_output, t_runout, t_steady, t_probes, verbose_level, n\_\*\_levels, thickness_levels(:), dyn_pres_levels(:)                                  | Runtime scheduler / output and diagnostics      | Separate event scheduling from output preferences                         |
+| parameters   | dt_output, verbose_level, n\_\*\_levels, thickness_levels(:), dyn_pres_levels(:)                                                                              | Input/configuration and model layout             | Output timers moved to `runtime_state_type`; retain setup/diagnostic ownership review |
 
 ### D04 — Eliminazione reologia 8
 

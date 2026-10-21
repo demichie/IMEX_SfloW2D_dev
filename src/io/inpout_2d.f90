@@ -36,8 +36,7 @@ MODULE inpout_2d
                            idx_addGasEqn_last, idx_stochEqn, idx_poreEqn
 
   ! -- Variables for the namelist RUN_PARAMETERS
-  USE parameters_2d, ONLY: t_start, t_end, t_output, dt_output, t_runout,    &
-                           t_probes
+  USE parameters_2d, ONLY: t_start, t_end, dt_output
 
   USE parameters_2d, ONLY: verbose_level
 
@@ -473,8 +472,6 @@ CONTAINS
     t_start = 0.0
     t_end = 5.0E-2_wp
     dt_output = 5.0E-3_wp
-    t_runout = 0.0_wp
-    t_probes = 0.0_wp
     output_cons_flag = .FALSE.
     output_esri_flag = .FALSE.
     output_netcdf_flag = .FALSE.
@@ -1036,8 +1033,7 @@ CONTAINS
 
     USE geometry_2d, ONLY: deposit, deposit_tot, erosion, erodible, erosion_tot
 
-    USE constitutive_parameters_2d, ONLY: rho_a_amb, rho_c_sub, kin_visc_c, &
-         sp_heat_c
+    USE constitutive_parameters_2d, ONLY: rho_a_amb, rho_c_sub, kin_visc_c
 
     USE constitutive_parameters_2d, ONLY: inv_pres, inv_rho_l, inv_rho_s
     USE state_conversion_2d, ONLY: eval_mixture_properties_from_mass_fractions, &
@@ -1093,7 +1089,7 @@ CONTAINS
     REAL(wp) :: rho_m_fissure, inv_rhom_fissure, rho_c_fissure, xc_fissure
     REAL(wp) :: sp_heat_c_fissure, sp_heat_mix_fissure
     REAL(wp) :: Ri
-    REAL(wp) :: sp_heat_mix
+    REAL(wp) :: sp_heat_c, sp_heat_mix
     REAL(wp) :: mfr
 
     REAL(wp) :: pi_g
@@ -1129,8 +1125,6 @@ CONTAINS
     IF ((.NOT. output_cons_flag) .AND. (.NOT. output_esri_flag) .AND. &
         (.NOT. output_netcdf_flag)) &
       dt_output = 2.0*(t_end - t_start)
-
-    t_output = t_start + dt_output
 
     ! ---------- READ newrun_parameters NAMELIST --------------------------------
     READ (input_unit, newrun_parameters, IOSTAT=ios)
@@ -1611,7 +1605,6 @@ CONTAINS
         END IF
 
         kin_visc_c = kin_visc_l
-        sp_heat_c = sp_heat_l
 
       END IF
 
@@ -5686,21 +5679,22 @@ CONTAINS
   !>
   !> \param[in] time Current simulation time [s].
   !> \param[in,out] state Current state; its physical cache is refreshed for output when needed.
+  !> \param[in,out] runtime Current time and output schedule.
   !******************************************************************************
 
-  SUBROUTINE output_solution(time, state)
+  SUBROUTINE output_solution(time, state, runtime)
 
     USE geometry_2d, ONLY: comp_cells_x, B_cent, comp_cells_y, x_comp, &
                            y_comp, deposit, erosion, erodible
 
     USE parameters_2d, ONLY: n_vars
-    USE parameters_2d, ONLY: t_output, dt_output
-    USE parameters_2d, ONLY: t_steady
+    USE parameters_2d, ONLY: dt_output
 
     IMPLICIT none
 
     REAL(wp), INTENT(IN) :: time
     CLASS(state_type), INTENT(INOUT) :: state
+    CLASS(runtime_state_type), INTENT(INOUT) :: runtime
 
     CHARACTER(LEN=:), ALLOCATABLE :: idx_string
 
@@ -5846,13 +5840,13 @@ CONTAINS
     END IF
 
 
-    t_output = time + dt_output
+    runtime%t_output = time + dt_output
 
     IF (output_esri_flag) THEN
 
       CALL output_esri(output_idx, state)
 
-      IF ((time .GE. t_end) .OR. (time .GE. t_steady)) THEN
+      IF ((time .GE. t_end) .OR. (time .GE. runtime%steady_deadline)) THEN
 
         CALL output_max(state)
 
@@ -5910,8 +5904,10 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Validate restart manifest before opening mutable output histories.
+  !> \param[in] runtime Restored output schedule.
   !******************************************************************************
-  SUBROUTINE validate_restart_output_manifest()
+  SUBROUTINE validate_restart_output_manifest(runtime)
+    CLASS(runtime_state_type), INTENT(IN) :: runtime
     CHARACTER(LEN=2048) :: filename
     LOGICAL :: exists
 
@@ -5919,7 +5915,7 @@ CONTAINS
     filename = output_file_path('metadata', 'output_manifest.csv')
     INQUIRE(FILE=TRIM(filename), EXIST=exists)
     IF (exists) &
-         CALL validate_output_manifest(filename, 'snapshot_index,time_seconds', output_idx, t_output)
+         CALL validate_output_manifest(filename, 'snapshot_index,time_seconds', output_idx, runtime%t_output)
     IF (output_cons_flag .OR. output_esri_flag) CALL validate_snapshot_index(output_idx)
   END SUBROUTINE validate_restart_output_manifest
 
@@ -6667,12 +6663,12 @@ CONTAINS
   !>
   !> \param[in] time Current simulation time [s].
   !> \param[in] state Simulation cell states and accumulated diagnostics.
+  !> \param[in,out] runtime Current output schedule.
   !******************************************************************************
-
-  SUBROUTINE output_probes(time, state)
+  SUBROUTINE output_probes(time, state, runtime)
 
     USE geometry_2d, ONLY: x_comp, y_comp, deposit
-    USE parameters_2d, ONLY: t_probes, n_vars
+    USE parameters_2d, ONLY: n_vars
     USE geometry_2d, ONLY: interp_2d_scalarB
     USE state_conversion_2d, ONLY: primitive_to_volume_fractions
 
@@ -6680,6 +6676,7 @@ CONTAINS
 
     REAL(wp), INTENT(IN) :: time
     CLASS(state_type), INTENT(IN) :: state
+    CLASS(runtime_state_type), INTENT(INOUT) :: runtime
 
     CHARACTER(LEN=4) :: idx_string
 
@@ -6901,7 +6898,7 @@ CONTAINS
 
 1710 FORMAT(ES14.7E2, A1)
 
-    t_probes = time + dt_probes
+    runtime%t_probes = time + dt_probes
 
   END SUBROUTINE output_probes
 
@@ -6925,7 +6922,7 @@ CONTAINS
   SUBROUTINE output_runout(time, stop_flag, state, runtime)
 
     USE geometry_2d, ONLY: x_comp, y_comp, B_cent, dx, dy
-    USE parameters_2d, ONLY: t_runout, n_solid, n_vars
+    USE parameters_2d, ONLY: n_solid, n_vars
     USE state_conversion_2d, ONLY: primitive_to_volume_fractions
     IMPLICIT NONE
 
@@ -7195,7 +7192,7 @@ CONTAINS
     runtime%stop_requested = stop_flag
     END ASSOCIATE
 
-    t_runout = time + dt_runout
+    runtime%t_runout = time + dt_runout
 
   END SUBROUTINE output_runout
 
@@ -7985,8 +7982,8 @@ END IF
     WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) runtime%t, runtime%dt,  &
          runtime%dt_old, runtime%dt_old_old
     CALL check_restart_io(ierr, io_message, 'writing time state to', filename)
-    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) output_idx, t_output,   &
-         t_runout, t_probes
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) output_idx,             &
+         runtime%t_output, runtime%t_runout, runtime%t_probes
     CALL check_restart_io(ierr, io_message, 'writing output state to', filename)
 
     WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
@@ -8155,8 +8152,8 @@ END IF
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) runtime%t, runtime%dt,   &
          runtime%dt_old, runtime%dt_old_old
     CALL check_restart_io(ierr, io_message, 'reading time state from', filename)
-    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) output_idx, t_output,    &
-         t_runout, t_probes
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) output_idx,               &
+         runtime%t_output, runtime%t_runout, runtime%t_probes
     CALL check_restart_io(ierr, io_message, 'reading output state from', filename)
 
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%q
