@@ -14,9 +14,13 @@ the broader N7/N9 acceptance requirements remain open.
 
 ## Production corrections
 
-The changes are confined to
+At the time of this acceptance snapshot, the changes were confined to
 [`equation_terms_2d.f90`](../../src/physics/equation_terms_2d.f90) and
-[`mass_exchange_2d.f90`](../../src/physics/mass_exchange_2d.f90).
+`mass_exchange_2d.f90`. The latter module was retired in D16.10; the current
+post-IMEX transaction coordinator is
+[`apply_mass_exchange_step`](../../src/numerics/time_integration_2d.f90), while
+the geometry update is owned by
+[`geometry_2d.f90`](../../src/geometry/geometry_2d.f90).
 
 | Defect | Correction |
 | --- | --- |

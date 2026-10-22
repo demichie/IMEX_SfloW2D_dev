@@ -2145,6 +2145,14 @@ di `TEST_IMEX_STAGES` in entrambi i profili.
 
 **D16.10 — Rimozione controllata.** Eliminare `mass_exchange_2d.f90` solo quando ogni routine ha una destinazione verificata e non restano simboli, dipendenze o test non aggiornati.
 
+Il coordinatore `update_erosion_deposition_cell` è stato trasferito in
+`time_integration_2d` come `apply_mass_exchange_step`, mantenendo la chiamata
+una volta per passo dopo l’IMEX e prima dell’avanzamento dell’orologio. Il
+modulo `mass_exchange_2d` è stato rimosso dal codice, dai target di build e
+dai chiamanti; l’audit non trova più riferimenti a quel modulo o al vecchio
+simbolo in sorgenti e test. Le regressioni mass-exchange/projection, lifecycle,
+topography e IMEX stage/boundary passano in strict e optimized.
+
 **D16.11 — Documentazione e test.** Aggiornare Doxygen, dummy arguments, unità e semantica REAL/COMPLEX. Verificare la soluzione esatta, l’aggiornamento della sola componente energetica conservativa per il raffreddamento, la ricostruzione delle variabili fisiche derivate da q, il rate medio effettivo e la selezione per gruppo. Verificare che massa, quantità di moto e masse dei componenti restino invariate per il solo termine di raffreddamento, mentre densità e profondità derivate rispondono alla temperatura; la differenza dal rate implicito istantaneo è attesa. Verificare inoltre trattamenti espliciti/impliciti/semi-impliciti, solver analitici, vaporizzazione, conservazione, positività, topografia, restart e default reologico.
 
 **D16.12 — Gate di accettazione.** Accettare D16 solo quando la selezione reologica è centralizzata, le leggi sono nei moduli `*_laws_2d`, rate e sorgenti sono distinti, le integrazioni analitiche seguono la convenzione, gli aggiornamenti sono in `time_integration_2d`, la geometria è in `geometry_2d` e compilazione, test, restart, Doxygen e CI passano senza variazioni scientifiche non autorizzate. Il manifest deve riportare vecchio nome, nuovo nome, modulo proprietario, chiamanti aggiornati ed evidenze di regressione.

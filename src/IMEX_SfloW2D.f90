@@ -68,7 +68,7 @@ PROGRAM IMEX_SfloW2D
    USE inpout_2d, ONLY : output_esri_flag
    USE inpout_2d, ONLY : output_netcdf_flag
 
-   USE mass_exchange_2d, ONLY : update_erosion_deposition_cell
+   USE time_integration_2d, ONLY : apply_mass_exchange_step
    USE simulation_2d, ONLY : simulation
 
    USE inpout_2d, ONLY : restart
@@ -462,7 +462,7 @@ PROGRAM IMEX_SfloW2D
 
       ! Mass exchange is a separate fractional step after the IMEX update.
       ! It updates inventories first and refreshes the nodal bed if enabled.
-      CALL update_erosion_deposition_cell(simulation%state%q,                 &
+      CALL apply_mass_exchange_step(simulation%state%q,                       &
            simulation%state%qp, simulation%runtime%dt, simulation%domain)
 
       simulation%runtime%t = simulation%runtime%t + simulation%runtime%dt

@@ -4,7 +4,7 @@ PROGRAM test_projection_stress
   USE constitutive_parameters_2d
   USE geometry_2d
   USE domain_2d, ONLY : domain_type
-  USE mass_exchange_2d, ONLY : update_erosion_deposition_cell
+  USE time_integration_2d, ONLY : apply_mass_exchange_step
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
@@ -224,7 +224,7 @@ CONTAINS
     END DO
     available=erodible
     CALL reference_nodes
-    CALL update_erosion_deposition_cell(q,qp,1.0_wp,domain)
+    CALL apply_mass_exchange_step(q,qp,1.0_wp,domain)
     DO i=1,nq
        CALL require_small('conservative equation',MAXVAL(ABS(q(i,:,:)-expected(i,:,:))),MAXVAL(ABS(q0(i,:,:))))
     END DO

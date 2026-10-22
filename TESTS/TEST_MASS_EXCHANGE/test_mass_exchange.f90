@@ -11,7 +11,7 @@ PROGRAM test_mass_exchange
   USE stochastic_module, ONLY : stochastic_workspace_type, sym_noise, noise_pow_val
   USE state_conversion_2d, ONLY : qc_to_qp, settling_velocity
   USE equation_terms_2d, ONLY : eval_mass_exchange_terms
-  USE mass_exchange_2d, ONLY : update_erosion_deposition_cell
+  USE time_integration_2d, ONLY : apply_mass_exchange_step
   USE inpout_2d, ONLY : write_restart_file, read_restart_file, output_idx
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
@@ -479,7 +479,7 @@ CONTAINS
           vertex_delta(j,k)=SUM(cell_delta(j0:j1,k0:k1))/REAL((j1-j0+1)*(k1-k0+1),wp)
        END DO
     END DO
-    CALL update_erosion_deposition_cell(state%q,state%qp,dt,domain)
+    CALL apply_mass_exchange_step(state%q,state%qp,dt,domain)
     CALL assert_small(name//' conservative transaction',MAXVAL(ABS(state%q-q_expected)),MAXVAL(ABS(q0)))
     IF (gas_flag) THEN
        ! Compare each equation separately: thermal-energy magnitudes must not

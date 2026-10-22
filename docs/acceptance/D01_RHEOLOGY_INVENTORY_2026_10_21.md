@@ -31,7 +31,7 @@ Primary entry points (paths are relative to the repository root):
 | Recover physical state and mixture properties | `src/state/state_conversion_2d.f90` and its shared `.inc` kernels |
 | Evaluate stage residual/Jacobian | `src/numerics/nonlinear_solver_2d.f90`: `eval_f`, `eval_jacobian`, `solve_rk_step` |
 | Apply SI/Newton corrections and store effective RK terms | `src/numerics/time_integration_2d.f90`: `imex_RK_solver` |
-| Apply deposition, carrier loss and thermal mass exchange | `src/physics/equation_terms_2d.f90`: `eval_mass_exchange_terms`; `src/physics/mass_exchange_2d.f90` |
+| Evaluate and apply deposition, carrier loss and thermal mass exchange | `src/physics/equation_terms_2d.f90`: `eval_mass_exchange_terms`; `src/numerics/time_integration_2d.f90`: `apply_mass_exchange_step`, `apply_mass_exchange_increment` |
 | Supply stochastic forcing | `src/stochastic/stochastic_module.f90` |
 | Write law-dependent diagnostics | `src/io/inpout_2d.f90`: `write_netcdf_timestep` |
 
