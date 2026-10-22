@@ -44,56 +44,56 @@ prepare_case() {
         "$case_dir/INIT_STOCHASTIC_0000.q_2d"
 
     awk '
-        /^ RUN_NAME=/ {
+        /^[[:space:]]*RUN_NAME[[:space:]]*=/ {
             print
             print " SERIAL_FLAG=F,"
             next
         }
-        /^ RESTART_FILES=/ {
+        /^[[:space:]]*RESTART_FILES[[:space:]]*=/ {
             print " RESTART_FILES=\"INIT_STOCHASTIC_0000.q_2d\","; next
         }
-        /^ LIQUID_FLAG = F,/ {
+        /^[[:space:]]*LIQUID_FLAG[[:space:]]*=[[:space:]]*F,/ {
             print
             print " STOCHASTIC_FLAG = T,"
             next
         }
-        /^ LIMITER=/ {
+        /^[[:space:]]*LIMITER[[:space:]]*=/ {
             print " LIMITER= 1 1 1 1 1 1,"
             next
         }
-        /^ T_BCW%VALUE=/ {
+        /^[[:space:]]*T_BCW%VALUE[[:space:]]*=/ {
             print
             print " STOCH_BCW%FLAG=1,"
             print " STOCH_BCW%VALUE=0.0D0,"
             next
         }
-        /^ T_BCE%VALUE=/ {
+        /^[[:space:]]*T_BCE%VALUE[[:space:]]*=/ {
             print
             print " STOCH_BCE%FLAG=1,"
             print " STOCH_BCE%VALUE=0.0D0,"
             next
         }
-        /^ T_BCS%VALUE=/ {
+        /^[[:space:]]*T_BCS%VALUE[[:space:]]*=/ {
             print
             print " STOCH_BCS%FLAG=1,"
             print " STOCH_BCS%VALUE=0.0D0,"
             next
         }
-        /^ T_BCN%VALUE=/ {
+        /^[[:space:]]*T_BCN%VALUE[[:space:]]*=/ {
             print
             print " STOCH_BCN%FLAG=1,"
             print " STOCH_BCN%VALUE=0.0D0,"
             next
         }
-        /^ RHEOLOGY_MODEL =/ {
-            print " RHEOLOGY_MODEL = 'froude',"
+        /^[[:space:]]*RHEOLOGY_MODEL[[:space:]]*=/ {
+            print " RHEOLOGY_MODEL = " sprintf("%c", 39) "froude" sprintf("%c", 39) ","
             print " MU_0 = 0.10D0,"
             print " MU_INF = 0.50D0,"
             print " FR_0 = 1.0D0,"
             next
         }
-        /^ FRICTION_FACTOR =/ { next }
-        /^&SOLID_TRANSPORT_PARAMETERS/ {
+        /^[[:space:]]*FRICTION_FACTOR[[:space:]]*=/ { next }
+        /^[[:space:]]*&SOLID_TRANSPORT_PARAMETERS/ {
             print "&STOCHASTIC_PARAMETERS"
             print " SYM_NOISE = 0.0D0,"
             print " STD_MAX = 0.05D0,"

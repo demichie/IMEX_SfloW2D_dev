@@ -136,6 +136,7 @@ CONTAINS
   !> \param[in,out] xg Additional-gas mass fractions, excluding ambient air.
   !> \param[in,out] xl Liquid mass fraction; independently transported only when gas and liquid are
   !>                   both present.
+  !> \param[in] context Optional diagnostic context included in closure errors.
 
   SUBROUTINE enforce_mass_fraction_closure(xs, xg, xl, context)
 
@@ -183,6 +184,7 @@ CONTAINS
   !>
   !> \param[in,out] qp Canonical physical states: h, hu, hv, T, component mass fractions, then
   !>                   appended u and v.
+  !> \param[in] context Optional diagnostic context included in closure errors.
 
   SUBROUTINE enforce_primitive_mass_fraction_closure(qp, context)
 
@@ -207,9 +209,11 @@ CONTAINS
 
   END SUBROUTINE enforce_primitive_mass_fraction_closure
 
-  !> Set only roundoff-sized negative conservative component masses to zero.
+  !> \brief Clip only roundoff-sized negative conservative component masses.
   !> Material negatives are deliberately left unchanged for the existing
   !> admissibility checks to report as errors.
+  !> \param[in,out] qc Local conservative state; only roundoff-sized negative
+  !>                   solid, gas or liquid masses may be changed.
   SUBROUTINE clip_roundoff_negative_component_masses(qc)
 
     REAL(wp), INTENT(INOUT) :: qc(n_vars)
@@ -758,6 +762,7 @@ CONTAINS
   !> \param[out] qp Canonical physical states: h, hu, hv, T, component mass fractions, then appended
   !>                u and v.
   !> \param[out] p_dyn Dynamic pressure rho_m*(u^2+v^2)/2 [Pa].
+  !> \param[in] context Optional diagnostic context included in conversion errors.
   !******************************************************************************
 
   SUBROUTINE qc_to_qp(qc,qp,p_dyn,context)
@@ -850,6 +855,7 @@ CONTAINS
   !>               u and v.
   !> \param[out] qc Local conservative vector: mixture mass, momenta, thermal energy and transported
   !>                component masses.
+  !> \param[in] context Optional diagnostic context included in conversion errors.
   !******************************************************************************
 
   SUBROUTINE qp_to_qc(qp,qc,context)

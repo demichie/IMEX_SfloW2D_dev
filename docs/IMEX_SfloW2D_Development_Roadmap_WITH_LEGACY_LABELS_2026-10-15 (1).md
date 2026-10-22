@@ -2178,13 +2178,26 @@ topography e IMEX stage/boundary passano in strict e optimized.
 
 **D16.11 — Documentazione e test.** Aggiornare Doxygen, dummy arguments, unità e semantica REAL/COMPLEX. Verificare la soluzione esatta, l’aggiornamento della sola componente energetica conservativa per il raffreddamento, la ricostruzione delle variabili fisiche derivate da q, il rate medio effettivo e la selezione per gruppo. Verificare che massa, quantità di moto e masse dei componenti restino invariate per il solo termine di raffreddamento, mentre densità e profondità derivate rispondono alla temperatura; la differenza dal rate implicito istantaneo è attesa. Verificare inoltre trattamenti espliciti/impliciti/semi-impliciti, solver analitici, vaporizzazione, conservazione, positività, topografia, restart e default reologico.
 
-Evidenza di regressione dopo la relocation: `TEST_RHEOLOGY_CELL_LOCAL` passa
-255/255 fixture in strict e optimized, incluse le verifiche di raffreddamento
-lava esatto, aggiornamento energetico conservativo e ricostruzione dello stato,
-selezione per gruppo e rate effettivo dello stage IMEX. La build completa
-dell'applicazione riesce con i sorgenti nella nuova directory. Questi risultati
-non chiudono da soli D16.11: restano da consolidare gli altri controlli elencati
-in questo gate.
+**Esito D16.11: completato.** `TEST_RHEOLOGY_CELL_LOCAL` passa 255/255 fixture
+in strict e optimized; copre raffreddamento lava esatto e conservativo,
+ricostruzione dello stato, selezione per gruppo, solver analitici e rate
+effettivo dello stage IMEX. Passano inoltre `TEST_STATE_CONVERSION`,
+`TEST_RHEOLOGY_FROUDE`, `TEST_MASS_EXCHANGE` (strict/optimized, 1/4 thread),
+`TEST_TOPOGRAPHY_FACES` (1/4 thread) e la sezione stages di `TEST_IMEX_STAGES`
+(strict/optimized, entrambe le politiche CFL, 1/4 thread). Le regressioni
+`TEST_BINARY_RESTART` e `TEST_STOCHASTIC_RESTART` passano, inclusi confronto
+bit-a-bit del restart, evoluzione stocastica ripresa e casi di interruzione
+degli output. Il runner stocastico è stato reso robusto agli spazi di
+indentazione del namelist e conserva correttamente le virgolette del nome
+reologico.
+
+La verifica Doxygen mirata passa per tutti i 13 moduli in
+`src/physics/rheology_laws`; il controllo globale conferma che le linee
+eseguibili dei sorgenti coincidono con `HEAD`, ma segnala ancora 64 lacune
+preesistenti in `reconstruction_2d.f90`, `kt_ritter_1d.f90`,
+`hyperbolic_2d.f90` e `inpout_2d.f90`, fuori dai moduli D16 aggiornati.
+Queste restano da risolvere o delimitare nel gate globale Doxygen di D16.12;
+non sono state corrette in questo step.
 
 **D16.12 — Gate di accettazione.** Accettare D16 solo quando la selezione reologica è centralizzata, le leggi sono nei moduli `*_laws_2d`, rate e sorgenti sono distinti, le integrazioni analitiche seguono la convenzione, gli aggiornamenti sono in `time_integration_2d`, la geometria è in `geometry_2d` e compilazione, test, restart, Doxygen e CI passano senza variazioni scientifiche non autorizzate. Il manifest deve riportare vecchio nome, nuovo nome, modulo proprietario, chiamanti aggiornati ed evidenze di regressione.
 

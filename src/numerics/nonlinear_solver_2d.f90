@@ -38,6 +38,28 @@ CONTAINS
   !> \details Apply the semi-implicit contribution and its corrections before
   !>          the ordered implicit-group sweep. The returned IM term is the
   !>          net conservative increment over the stage interval.
+  !> \param[in] equation_partition Implicit equation groups, order and solve methods.
+  !> \param[in] q_known Conservative state including known stage contributions.
+  !> \param[in] q_old Conservative reference state at the start of the step.
+  !> \param[in] qp_known Physical state reconstructed from q_known.
+  !> \param[in] dt_step Stage time increment [s].
+  !> \param[in] a_diag Diagonal implicit Runge-Kutta coefficient [dimensionless].
+  !> \param[in] known_stage_residual Known stage source rates, excluding the current implicit rate.
+  !> \param[in] Bprimej_x Filtered bed slope in x [dimensionless].
+  !> \param[in] Bprimej_y Filtered bed slope in y [dimensionless].
+  !> \param[in] Bsecondj_xx Filtered bed curvature in xx [m^-1].
+  !> \param[in] Bsecondj_xy Filtered bed curvature in xy [m^-1].
+  !> \param[in] Bsecondj_yy Filtered bed curvature in yy [m^-1].
+  !> \param[in] grav_coeff Effective gravitational acceleration [m s^-2].
+  !> \param[in] Zij Local stochastic-process value supplied to the rheology.
+  !> \param[in] zero_x_momentum Reset the x-momentum component after the sweep.
+  !> \param[in] zero_y_momentum Reset the y-momentum component after the sweep.
+  !> \param[out] q_stage Conservative state after the ordered stage solve.
+  !> \param[out] effective_im_term Net conservative stage rate [state units s^-1].
+  !> \param[out] iterations_used Total Newton iterations attempted.
+  !> \param[out] converged True when all Newton solves satisfy their convergence criteria.
+  !> \param[out] linear_info Linear solver status; zero denotes success.
+  !> \param[out] line_search_failed True if a Newton line search could not accept a step.
   !******************************************************************************
   SUBROUTINE solve_imex_stage(equation_partition, q_known, q_old, qp_known,  &
        dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,            &
@@ -76,6 +98,28 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Backward-compatible name for the local IMEX stage coordinator.
+  !> \param[in] equation_partition Implicit equation groups, order and solve methods.
+  !> \param[in] q_known Conservative state including known stage contributions.
+  !> \param[in] q_old Conservative reference state at the start of the step.
+  !> \param[in] qp_known Physical state reconstructed from q_known.
+  !> \param[in] dt_step Stage time increment [s].
+  !> \param[in] a_diag Diagonal implicit Runge-Kutta coefficient [dimensionless].
+  !> \param[in] known_stage_residual Known stage source rates, excluding the current implicit rate.
+  !> \param[in] Bprimej_x Filtered bed slope in x [dimensionless].
+  !> \param[in] Bprimej_y Filtered bed slope in y [dimensionless].
+  !> \param[in] Bsecondj_xx Filtered bed curvature in xx [m^-1].
+  !> \param[in] Bsecondj_xy Filtered bed curvature in xy [m^-1].
+  !> \param[in] Bsecondj_yy Filtered bed curvature in yy [m^-1].
+  !> \param[in] grav_coeff Effective gravitational acceleration [m s^-2].
+  !> \param[in] Zij Local stochastic-process value supplied to the rheology.
+  !> \param[in] zero_x_momentum Reset the x-momentum component after the sweep.
+  !> \param[in] zero_y_momentum Reset the y-momentum component after the sweep.
+  !> \param[out] q_stage Conservative state after the ordered stage solve.
+  !> \param[out] effective_im_term Net conservative stage rate [state units s^-1].
+  !> \param[out] iterations_used Total Newton iterations attempted.
+  !> \param[out] converged True when all Newton solves satisfy their convergence criteria.
+  !> \param[out] linear_info Linear solver status; zero denotes success.
+  !> \param[out] line_search_failed True if a Newton line search could not accept a step.
   !******************************************************************************
   SUBROUTINE solve_implicit_stage(equation_partition, q_known, q_old,         &
        qp_known, dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y, &
@@ -125,6 +169,19 @@ CONTAINS
   END SUBROUTINE finalize_nonlinear_solver
 
   !> \brief Backward-compatible entry point for the implicit-group sweep.
+  !> \param[in] equation_partition Implicit equation groups, order and solve methods.
+  !> \param[in,out] qj Local conservative state vector updated by the group sweep.
+  !> \param[in] qj_old Conservative reference state at the start of the step.
+  !> \param[in] dt_step Stage time increment [s].
+  !> \param[in] a_diag Diagonal implicit Runge-Kutta coefficient [dimensionless].
+  !> \param[in] Rj_not_impl Known stage source rates, excluding the current implicit rate.
+  !> \param[in] Bprimej_x Filtered bed slope in x [dimensionless].
+  !> \param[in] Bprimej_y Filtered bed slope in y [dimensionless].
+  !> \param[in] Zij Local stochastic-process value supplied to the rheology.
+  !> \param[out] iterations_used Total Newton iterations attempted.
+  !> \param[out] converged True when all Newton solves satisfy their convergence criteria.
+  !> \param[out] linear_info Linear solver status; zero denotes success.
+  !> \param[out] line_search_failed True if a Newton line search could not accept a step.
   !******************************************************************************
   SUBROUTINE solve_rk_step(equation_partition, qj, qj_old, dt_step, a_diag,  &
        Rj_not_impl, Bprimej_x, Bprimej_y, Zij, iterations_used, converged,  &
@@ -158,7 +215,12 @@ CONTAINS
   !> \param[in] Rj_not_impl Already known stage contribution excluding the current implicit source.
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
+  !> \param[in] Bsecondj_xx Filtered bed curvature in xx [m^-1].
+  !> \param[in] Bsecondj_xy Filtered bed curvature in xy [m^-1].
+  !> \param[in] Bsecondj_yy Filtered bed curvature in yy [m^-1].
+  !> \param[in] grav_coeff Effective gravitational acceleration [m s^-2].
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
+  !> \param[in] apply_semi_implicit Apply the semi-implicit momentum contribution before the sweep.
   !> \param[out] iterations_used Number of Newton iterations attempted for this cell/stage.
   !> \param[out] converged True when every Newton stage residual meets its bound.
   !> \param[out] linear_info Linear-solver status: zero for success, nonzero for a failed solve.
@@ -395,6 +457,22 @@ CONTAINS
   END SUBROUTINE solve_implicit_groups
 
   !> \brief Solve one implicit Newton group while holding other equations fixed.
+  !> \param[in] group_equations Indices of the conservative equations in this group.
+  !> \param[in,out] qj Local conservative state; only group equations are updated.
+  !> \param[in] qj_old Conservative reference state at the start of the step.
+  !> \param[in] dt_step Stage time increment [s].
+  !> \param[in] a_diag Diagonal implicit Runge-Kutta coefficient [dimensionless].
+  !> \param[in] Rj_not_impl Known stage source rates, excluding the current implicit rate.
+  !> \param[in] Bprimej_x Filtered bed slope in x [dimensionless].
+  !> \param[in] Bprimej_y Filtered bed slope in y [dimensionless].
+  !> \param[in] Zij Local stochastic-process value supplied to the rheology.
+  !> \param[in] coeff_f Per-equation residual scaling factors.
+  !> \param[in] tol_abs_local Absolute residual tolerance.
+  !> \param[in] tol_rel_local Relative residual tolerance.
+  !> \param[in,out] iterations_used Cumulative Newton iterations attempted.
+  !> \param[out] converged True when the group residual meets its tolerance.
+  !> \param[out] linear_info Linear solver status; zero denotes success.
+  !> \param[out] line_search_failed True if backtracking cannot accept a step.
   SUBROUTINE solve_newton_group(group_equations, qj, qj_old, dt_step, a_diag,&
        Rj_not_impl, Bprimej_x, Bprimej_y, Zij, coeff_f, tol_abs_local,       &
        tol_rel_local, iterations_used, converged, linear_info,               &
@@ -744,6 +822,7 @@ CONTAINS
   !> \param[in] qj_rel_NR_old Normalized state at the start of the current line search.
   !> \param[in] qj_org Per-variable scaling factors for normalized Newton variables.
   !> \param[in] qj_old Cell conservative reference state used in the implicit-stage residual.
+  !> \param[in] qj_fixed Non-group conservative components held bitwise fixed during the line search.
   !> \param[in] scal_f_old Initial value of the half-squared scaled residual norm.
   !> \param[in] grad_f Gradient of the scalar residual merit function at the starting point.
   !> \param[in,out] desc_dir Newton descent direction, limited to the maximum permitted step length.
@@ -760,6 +839,7 @@ CONTAINS
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
+  !> \param[in] active_equations Equation indices whose residual rows are active.
   !******************************************************************************
 
   SUBROUTINE lnsrch( qj_rel_NR_old, qj_org, qj_fixed, qj_old, scal_f_old,      &
@@ -1007,6 +1087,7 @@ CONTAINS
   !> \param[out] f_nl Scaled nonlinear stage residual, one entry per equation.
   !> \param[out] scal_f Half the squared Euclidean norm of the scaled nonlinear residual.
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
+  !> \param[in] active_equations Equation indices whose residual rows and Jacobian columns are active.
   !******************************************************************************
 
   SUBROUTINE eval_f( qj , qj_old , dt_step, a_diag , coeff_f , Rj_not_impl ,    &
@@ -1070,7 +1151,6 @@ CONTAINS
   !> @author
   !> Mattia de' Michieli Vitturi
   !>
-  !> \param[in] equation_partition Explicit/implicit equation mask and compact index maps.
   !> \param[in] qj_rel Dimensionless normalized conservative state, qj=qj_rel*qj_org.
   !> \param[in] qj_org Per-variable scaling factors for normalized Newton variables.
   !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
@@ -1080,6 +1160,10 @@ CONTAINS
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[out] left_matrix Jacobian of the scaled residual with respect to the normalized state.
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
+  !> \param[in] active_equations Equation indices whose Jacobian columns are differentiated.
+  !> \details Uses complex-step perturbations of normalized conservative variables. The resulting
+  !>          imaginary derivatives form the active Jacobian columns without finite-difference
+  !>          subtraction.
   !******************************************************************************
 
   SUBROUTINE eval_jacobian( qj_rel, qj_org, dt_step, a_diag, coeff_f,        &
@@ -1152,6 +1236,8 @@ CONTAINS
   END SUBROUTINE eval_jacobian
 
   !> \brief Return a mask selecting residual rows in one implicit group.
+  !> \param[in] active_equations Equation indices in the group.
+  !> \return Logical mask over all equations, true for active indices.
   PURE FUNCTION equation_is_active(active_equations) RESULT(mask)
     INTEGER, INTENT(IN) :: active_equations(:)
     LOGICAL :: mask(n_eqns)

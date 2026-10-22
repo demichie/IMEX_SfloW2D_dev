@@ -254,6 +254,13 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Backward-compatible name for the exact-flow lava cooling solver.
+  !> \param[in] temperature Initial lava temperature [K].
+  !> \param[in] integration_step Integration interval [s].
+  !> \param[in] areal_heat_capacity Lava heat capacity per unit area [J m^-2 K^-1].
+  !> \param[in] radiative_coefficient Radiative coefficient [W m^-2 K^-4].
+  !> \param[in] convective_coefficient Convective coefficient [W m^-2 K^-1].
+  !> \param[in] ambient_temperature Ambient temperature [K].
+  !> \param[out] temperature_after Exact-flow temperature after the interval [K].
   !******************************************************************************
   SUBROUTINE advance_lava_cooling_temperature(temperature, integration_step,  &
        areal_heat_capacity, radiative_coefficient, convective_coefficient,    &

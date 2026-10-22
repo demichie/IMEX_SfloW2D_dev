@@ -69,14 +69,14 @@ CONTAINS
   !> \brief Integrate the lahar velocity source exactly.
   !> \details Holds temperature, concentration, depth, density, and speed
   !> ratio fixed while integrating the polynomial speed-decay law.
-  !> \param integration_step Exact-flow integration interval.
-  !> \param flow_depth Explicit flow depth.
-  !> \param temperature Explicit temperature.
-  !> \param solid_fraction_sum Explicit total solid volume fraction.
-  !> \param mixture_density Explicit mixture density.
-  !> \param speed_ratio Explicit total-to-horizontal speed ratio.
-  !> \param velocity_before Input horizontal velocity.
-  !> \param velocity_after Returned horizontal velocity.
+  !> \param[in] integration_step Exact-flow integration interval [s].
+  !> \param[in] flow_depth Explicit flow depth [m].
+  !> \param[in] temperature Explicit absolute temperature [K].
+  !> \param[in] solid_fraction_sum Explicit total solid volume fraction.
+  !> \param[in] mixture_density Explicit mixture density [kg m^-3].
+  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
+  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
   !******************************************************************************
   SUBROUTINE solve_lahar_analytic_velocity(integration_step, flow_depth,   &
        temperature, solid_fraction_sum, mixture_density, speed_ratio,       &
@@ -128,8 +128,8 @@ CONTAINS
   !> \details Converts temperature to degrees Celsius, evaluates the
   !> piecewise \f$\alpha_1(T)\f$ correlation, and multiplies by
   !> \f$\exp(\beta_1 C)\f$ for the total solid fraction.
-  !> \param temperature Absolute temperature in kelvin.
-  !> \param solid_fraction_sum Sum of solid volume fractions.
+  !> \param[in] temperature Absolute temperature [K].
+  !> \param[in] solid_fraction_sum Sum of solid volume fractions.
   !> \return Carrier-fluid dynamic viscosity.
   !******************************************************************************
   FUNCTION eval_lahar_fluid_viscosity_real(temperature, solid_fraction_sum)  &
@@ -161,8 +161,8 @@ CONTAINS
   !> \details Complex overload of the viscosity correlation. The branch in
   !> the piecewise temperature law is selected from the real temperature;
   !> algebra within that branch remains complex for derivative evaluation.
-  !> \param temperature Absolute temperature in kelvin.
-  !> \param solid_fraction_sum Sum of solid volume fractions.
+  !> \param[in] temperature Absolute temperature [K].
+  !> \param[in] solid_fraction_sum Sum of solid volume fractions.
   !> \return Complex carrier-fluid dynamic viscosity.
   !******************************************************************************
   FUNCTION eval_lahar_fluid_viscosity_complex(temperature, solid_fraction_sum) &
@@ -196,18 +196,18 @@ CONTAINS
   !> slope, and returns their x/y momentum sources. A depth floor regularizes
   !> the source in shallow states; complex arithmetic preserves state
   !> sensitivities in the implicit Jacobian.
-  !> \param flow_depth Flow depth.
-  !> \param velocity_x x component of horizontal velocity.
-  !> \param velocity_y y component of horizontal velocity.
-  !> \param speed Speed magnitude.
-  !> \param horizontal_speed Horizontal speed magnitude.
-  !> \param temperature Absolute temperature.
-  !> \param mixture_density Mixture density.
-  !> \param inverse_density Reciprocal mixture density.
-  !> \param solid_fractions Solid volume fractions.
-  !> \param moving Whether the state is moving.
-  !> \param rate_x Returned x momentum rate.
-  !> \param rate_y Returned y momentum rate.
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] speed Speed magnitude [m s^-1].
+  !> \param[in] horizontal_speed Horizontal speed magnitude [m s^-1].
+  !> \param[in] temperature Absolute temperature [K].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] inverse_density Reciprocal mixture density [m^3 kg^-1].
+  !> \param[in] solid_fractions Solid volume fractions by class.
+  !> \param[in] moving Whether the state is moving.
+  !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
+  !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !******************************************************************************
   SUBROUTINE eval_lahar_implicit_momentum_rate(flow_depth, velocity_x, velocity_y,    &
        speed, horizontal_speed, temperature, mixture_density, inverse_density, &
@@ -257,15 +257,15 @@ CONTAINS
   !> \brief Evaluate the semi-implicit lahar yield-stress momentum rate.
   !> \details Computes \f$Y=\alpha_2[\exp(\beta_2 C)-1]\f$ and returns
   !> \f$-Y\boldsymbol{u}_h/|\boldsymbol{u}_h|\f$ for moving flow.
-  !> \param flow_depth Flow depth.
-  !> \param velocity_x x component of horizontal velocity.
-  !> \param velocity_y y component of horizontal velocity.
-  !> \param horizontal_speed Horizontal speed magnitude.
-  !> \param mixture_density Mixture density.
-  !> \param solid_fraction_sum Sum of solid volume fractions.
-  !> \param moving Whether the state is moving.
-  !> \param rate_x Returned x momentum rate.
-  !> \param rate_y Returned y momentum rate.
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] horizontal_speed Horizontal speed magnitude [m s^-1].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] solid_fraction_sum Sum of solid volume fractions.
+  !> \param[in] moving Whether the state is moving.
+  !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
+  !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !******************************************************************************
   SUBROUTINE eval_lahar_semi_implicit_momentum_rate(flow_depth, velocity_x, velocity_y, &
        horizontal_speed, mixture_density, solid_fraction_sum, moving,          &

@@ -44,13 +44,13 @@ CONTAINS
   !> \brief Integrate the lava-rheology velocity source exactly.
   !> \details Holds depth, temperature, density, and speed ratio fixed. The
   !> affine speed-decay law is integrated exactly, with stopping at zero.
-  !> \param integration_step Exact-flow interval, normally dt * a_ii.
-  !> \param flow_depth Explicit flow depth.
-  !> \param temperature Explicit temperature.
-  !> \param mixture_density Explicit mixture density.
-  !> \param speed_ratio Explicit total-to-horizontal speed ratio.
-  !> \param velocity_before Input horizontal velocity.
-  !> \param velocity_after Returned horizontal velocity.
+  !> \param[in] integration_step Exact-flow interval [s], normally dt * a_ii.
+  !> \param[in] flow_depth Explicit flow depth [m].
+  !> \param[in] temperature Explicit temperature [K].
+  !> \param[in] mixture_density Explicit mixture density [kg m^-3].
+  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
+  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
   !******************************************************************************
   SUBROUTINE solve_lava_analytic_velocity(integration_step, flow_depth,     &
        temperature, mixture_density, speed_ratio, velocity_before,           &
@@ -91,15 +91,16 @@ CONTAINS
   !> \details Computes the depth-regularized drag coefficient and returns the
   !> x/y momentum sources for a moving state. Complex inputs preserve
   !> temperature, depth and velocity sensitivities in the implicit Jacobian.
-  !> \param flow_depth Flow depth.
-  !> \param temperature Lava temperature.
-  !> \param mixture_density Mixture density.
-  !> \param velocity_x x component of horizontal velocity.
-  !> \param velocity_y y component of horizontal velocity.
-  !> \param speed Speed magnitude (part of the common source interface).
-  !> \param moving Whether the state is moving.
-  !> \param rate_x Returned x momentum rate.
-  !> \param rate_y Returned y momentum rate.
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] temperature Lava temperature [K].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] speed Speed magnitude used by the common source interface [m s^-1].
+  !> \param[in] moving Whether the state is moving.
+  !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
+  !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
+  !> \note Complex-valued state and rates preserve complex-step derivatives.
   !******************************************************************************
   SUBROUTINE eval_lava_implicit_momentum_rate(flow_depth, temperature, mixture_density, &
        velocity_x, velocity_y, speed, moving, rate_x, rate_y)
@@ -131,11 +132,11 @@ CONTAINS
   !> \brief Evaluate the semi-implicit lava yield-stress momentum rate.
   !> \details Returns \f$-\tau_0(u_x,u_y)/|\boldsymbol{u}|\f$ for positive
   !> speed and zero otherwise.
-  !> \param velocity_x x component of horizontal velocity.
-  !> \param velocity_y y component of horizontal velocity.
-  !> \param speed Speed magnitude.
-  !> \param rate_x Returned x momentum rate.
-  !> \param rate_y Returned y momentum rate.
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] speed Speed magnitude [m s^-1].
+  !> \param[out] rate_x x momentum source rate.
+  !> \param[out] rate_y y momentum source rate.
   !******************************************************************************
   SUBROUTINE eval_lava_semi_implicit_momentum_rate(velocity_x, velocity_y, speed, rate_x, rate_y)
 

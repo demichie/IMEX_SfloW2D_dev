@@ -33,11 +33,11 @@ CONTAINS
   !> \brief Integrate the quadratic-friction velocity source exactly.
   !> \details Holds depth and the speed-to-horizontal-speed ratio fixed and
   !> applies the reciprocal-speed exact solution of the quadratic drag law.
-  !> \param integration_step Exact-flow integration interval.
-  !> \param flow_depth Explicit flow depth.
-  !> \param speed_ratio Explicit total-to-horizontal speed ratio.
-  !> \param velocity_before Input horizontal velocity.
-  !> \param velocity_after Returned horizontal velocity.
+  !> \param[in] integration_step Exact-flow integration interval [s].
+  !> \param[in] flow_depth Explicit flow depth [m].
+  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
+  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
   !******************************************************************************
   SUBROUTINE solve_quadratic_analytic_velocity(integration_step, flow_depth, &
        speed_ratio, velocity_before, velocity_after)
@@ -66,15 +66,16 @@ CONTAINS
   !> \details Applies the quadratic speed-dependent drag opposite to the
   !> horizontal velocity direction. Complex arithmetic retains sensitivities
   !> for the implicit Jacobian.
-  !> \param velocity_x x component of horizontal velocity.
-  !> \param velocity_y y component of horizontal velocity.
-  !> \param speed Speed magnitude.
-  !> \param horizontal_speed Horizontal speed magnitude.
-  !> \param speed_squared Squared speed used by the quadratic law.
-  !> \param mixture_density Mixture density.
-  !> \param moving Whether the state is moving.
-  !> \param rate_x Returned x momentum rate.
-  !> \param rate_y Returned y momentum rate.
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] speed Speed magnitude [m s^-1].
+  !> \param[in] horizontal_speed Horizontal speed magnitude [m s^-1].
+  !> \param[in] speed_squared Squared speed used by the quadratic law [m^2 s^-2].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] moving Whether the state is moving.
+  !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
+  !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
+  !> \note Complex-valued state and rates preserve complex-step derivatives.
   !******************************************************************************
   SUBROUTINE eval_quadratic_implicit_momentum_rate(velocity_x, velocity_y, speed, &
        horizontal_speed, speed_squared, mixture_density, moving, rate_x, rate_y)

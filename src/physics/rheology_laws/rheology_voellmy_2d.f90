@@ -48,19 +48,19 @@ CONTAINS
   !> \details Combines the frozen Coulomb stress with quadratic turbulent
   !> drag. Depth, density, gravity, curvature, pore pressure, and the
   !> speed-to-horizontal-speed ratio remain fixed during integration.
-  !> \param integration_step Exact-flow integration interval.
-  !> \param flow_depth Explicit flow depth.
-  !> \param speed_ratio Explicit total-to-horizontal speed ratio.
-  !> \param velocity_before Input horizontal velocity.
-  !> \param mixture_density Explicit mixture density.
-  !> \param reduced_gravity Explicit reduced gravity.
-  !> \param gravity_coefficient Explicit gravity multiplier.
-  !> \param curvature_acceleration Explicit curvature contribution.
-  !> \param use_pore_pressure Enable explicit pore-pressure reduction.
-  !> \param excess_pore_pressure Explicit excess pore pressure.
-  !> \param use_stochastic_xi Enable stochastic \f$\xi\f$ adjustment.
-  !> \param stochastic_xi_value Explicit stochastic \f$\xi\f$ increment.
-  !> \param velocity_after Returned horizontal velocity.
+  !> \param[in] integration_step Exact-flow integration interval [s].
+  !> \param[in] flow_depth Explicit flow depth [m].
+  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
+  !> \param[in] mixture_density Explicit mixture density [kg m^-3].
+  !> \param[in] reduced_gravity Explicit reduced gravity [m s^-2].
+  !> \param[in] gravity_coefficient Explicit gravity multiplier [dimensionless].
+  !> \param[in] curvature_acceleration Explicit curvature contribution [m s^-2].
+  !> \param[in] use_pore_pressure Enable explicit pore-pressure reduction.
+  !> \param[in] excess_pore_pressure Explicit excess pore pressure [Pa].
+  !> \param[in] use_stochastic_xi Enable stochastic \f$\xi\f$ adjustment.
+  !> \param[in] stochastic_xi_value Explicit stochastic \f$\xi\f$ increment.
+  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
   !******************************************************************************
   SUBROUTINE solve_voellmy_analytic_velocity(integration_step, flow_depth, &
        speed_ratio, velocity_before, mixture_density, reduced_gravity,        &
@@ -119,17 +119,18 @@ CONTAINS
   !> \details Computes the velocity-squared stress using \f$\xi\f$ and returns
   !> its x/y components opposite to the velocity direction. Optional
   !> stochastic variation of \f$\xi\f$ is bounded to [1, 10^5].
-  !> \param velocity_x x component of horizontal velocity.
-  !> \param velocity_y y component of horizontal velocity.
-  !> \param mixture_density Mixture density \f$\rho_m\f$.
-  !> \param reduced_gravity Reduced gravity \f$g'\f$.
-  !> \param speed Speed magnitude.
-  !> \param speed_squared Squared speed used in the turbulent stress.
-  !> \param moving Whether the state is moving.
-  !> \param use_stochastic_xi Enable the stochastic \f$\xi\f$ variation.
-  !> \param stochastic_value Stochastic increment to \f$\xi\f$.
-  !> \param rate_x Returned x momentum rate.
-  !> \param rate_y Returned y momentum rate.
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] mixture_density Mixture density \f$\rho_m\f$ [kg m^-3].
+  !> \param[in] reduced_gravity Reduced gravity \f$g'\f$ [m s^-2].
+  !> \param[in] speed Speed magnitude [m s^-1].
+  !> \param[in] speed_squared Squared speed used in the turbulent stress [m^2 s^-2].
+  !> \param[in] moving Whether the state is moving.
+  !> \param[in] use_stochastic_xi Enable the stochastic \f$\xi\f$ variation.
+  !> \param[in] stochastic_value Stochastic increment to \f$\xi\f$.
+  !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
+  !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
+  !> \note Complex-valued state and rates preserve complex-step derivatives.
   !******************************************************************************
   SUBROUTINE eval_voellmy_implicit_momentum_rate(velocity_x, velocity_y, mixture_density, &
        reduced_gravity, speed, speed_squared, moving, use_stochastic_xi,          &
@@ -169,21 +170,21 @@ CONTAINS
   !> optional curvature acceleration, clips negative stress to zero, and
   !> optionally reduces it by excess pore pressure. The returned x/y sources
   !> oppose the horizontal flow direction.
-  !> \param flow_depth Flow depth.
-  !> \param velocity_x x component of horizontal velocity.
-  !> \param velocity_y y component of horizontal velocity.
-  !> \param speed Speed magnitude.
-  !> \param mixture_density Mixture density.
-  !> \param reduced_gravity Reduced gravity.
-  !> \param gravity_coefficient Gravity multiplier.
-  !> \param curvature_term Enable curvature acceleration.
-  !> \param curvature_xx xx curvature coefficient.
-  !> \param curvature_xy xy curvature coefficient.
-  !> \param curvature_yy yy curvature coefficient.
-  !> \param use_pore_pressure Enable pore-pressure stress reduction.
-  !> \param excess_pore_pressure Excess pore pressure.
-  !> \param rate_x Returned x momentum rate.
-  !> \param rate_y Returned y momentum rate.
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] speed Speed magnitude [m s^-1].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] reduced_gravity Reduced gravity [m s^-2].
+  !> \param[in] gravity_coefficient Gravity multiplier [dimensionless].
+  !> \param[in] curvature_term Enable curvature acceleration.
+  !> \param[in] curvature_xx xx curvature coefficient [m^-1].
+  !> \param[in] curvature_xy xy curvature coefficient [m^-1].
+  !> \param[in] curvature_yy yy curvature coefficient [m^-1].
+  !> \param[in] use_pore_pressure Enable pore-pressure stress reduction.
+  !> \param[in] excess_pore_pressure Excess pore pressure [Pa].
+  !> \param[out] rate_x x momentum source rate.
+  !> \param[out] rate_y y momentum source rate.
   !******************************************************************************
   SUBROUTINE eval_voellmy_semi_implicit_momentum_rate(flow_depth, velocity_x, velocity_y, &
        speed, mixture_density, reduced_gravity, gravity_coefficient,            &

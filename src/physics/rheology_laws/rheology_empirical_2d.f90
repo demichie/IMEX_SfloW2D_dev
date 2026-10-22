@@ -30,11 +30,11 @@ CONTAINS
   !> \details Holds depth and the speed-to-horizontal-speed ratio fixed. Since
   !> the drag acceleration is proportional to speed, the input velocity is
   !> contracted exponentially.
-  !> \param integration_step Exact-flow interval, normally dt * a_ii.
-  !> \param flow_depth Explicit flow depth.
-  !> \param speed_ratio Explicit total-to-horizontal speed ratio.
-  !> \param velocity_before Input horizontal velocity.
-  !> \param velocity_after Returned horizontal velocity.
+  !> \param[in] integration_step Exact-flow interval [s], normally dt * a_ii.
+  !> \param[in] flow_depth Explicit flow depth [m].
+  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
+  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
   !******************************************************************************
   SUBROUTINE solve_empirical_analytic_velocity(integration_step, flow_depth, &
        speed_ratio, velocity_before, velocity_after)
@@ -64,15 +64,15 @@ CONTAINS
   !> \brief Evaluate the implicit empirical drag source.
   !> \details Forms the depth-dependent coefficient proportional to speed and
   !> returns the x/y momentum sources opposite to horizontal flow.
-  !> \param flow_depth Flow depth.
-  !> \param velocity_x x component of horizontal velocity.
-  !> \param velocity_y y component of horizontal velocity.
-  !> \param horizontal_speed Horizontal speed magnitude.
-  !> \param speed Speed magnitude used by the empirical coefficient.
-  !> \param mixture_density Mixture density.
-  !> \param moving Whether the state is moving.
-  !> \param rate_x Returned x momentum rate.
-  !> \param rate_y Returned y momentum rate.
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] horizontal_speed Horizontal speed magnitude [m s^-1].
+  !> \param[in] speed Speed magnitude used by the empirical coefficient [m s^-1].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] moving Whether the state is moving.
+  !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
+  !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !******************************************************************************
   SUBROUTINE eval_empirical_implicit_momentum_rate(flow_depth, velocity_x, velocity_y, &
        horizontal_speed, speed, mixture_density, moving, rate_x, rate_y)

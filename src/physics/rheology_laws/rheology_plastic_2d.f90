@@ -69,13 +69,14 @@ CONTAINS
   !> \details Returns \f$-\rho_m\tau(u_x,u_y)/|\boldsymbol{u}|\f$ for a
   !> moving state and zero otherwise. Complex arithmetic preserves derivatives
   !> with respect to the state in the implicit Jacobian.
-  !> \param velocity_x x component of horizontal velocity.
-  !> \param velocity_y y component of horizontal velocity.
-  !> \param speed Speed used to normalize the direction.
-  !> \param mixture_density Mixture density \f$\rho_m\f$.
-  !> \param moving Whether the state is moving.
-  !> \param rate_x Returned x momentum rate.
-  !> \param rate_y Returned y momentum rate.
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] speed Speed used to normalize the direction [m s^-1].
+  !> \param[in] mixture_density Mixture density \f$\rho_m\f$ [kg m^-3].
+  !> \param[in] moving Whether the state is moving.
+  !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
+  !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
+  !> \note Complex-valued state and rates preserve complex-step derivatives.
   !******************************************************************************
   SUBROUTINE eval_plastic_implicit_momentum_rate(velocity_x, velocity_y, speed, &
        mixture_density, moving, rate_x, rate_y)

@@ -38,16 +38,16 @@ CONTAINS
   !> \brief Integrate the Froude-dependent velocity source exactly.
   !> \details Holds depth, gravity, curvature, and the speed ratio fixed while
   !> integrating the frozen scalar speed-decay law.
-  !> \param integration_step Exact-flow integration interval.
-  !> \param flow_depth Explicit flow depth.
-  !> \param speed_ratio Explicit total-to-horizontal speed ratio.
-  !> \param velocity_before Input horizontal velocity.
-  !> \param reduced_gravity Explicit reduced gravity.
-  !> \param gravity_coefficient Explicit gravity multiplier.
-  !> \param curvature_term Explicit curvature acceleration.
-  !> \param stochastic Enable the explicit Froude shift.
-  !> \param stochastic_value Explicit stochastic increment.
-  !> \param velocity_after Returned horizontal velocity.
+  !> \param[in] integration_step Exact-flow integration interval [s].
+  !> \param[in] flow_depth Explicit flow depth [m].
+  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
+  !> \param[in] reduced_gravity Explicit reduced gravity [m s^-2].
+  !> \param[in] gravity_coefficient Explicit gravity multiplier [dimensionless].
+  !> \param[in] curvature_term Explicit curvature acceleration [m s^-2].
+  !> \param[in] stochastic Enable the explicit Froude shift.
+  !> \param[in] stochastic_value Explicit stochastic increment [dimensionless].
+  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
   !******************************************************************************
   SUBROUTINE solve_froude_analytic_velocity(integration_step, flow_depth,  &
        speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,   &
@@ -94,19 +94,19 @@ CONTAINS
   !> friction coefficient, then returns the x/y components of the basal
   !> friction source. A stochastic perturbation is applied only when enabled;
   !> the source is zero unless speed and reduced gravity are positive.
-  !> \param flow_depth Flow depth \f$h\f$.
-  !> \param velocity_x x component of horizontal velocity.
-  !> \param velocity_y y component of horizontal velocity.
-  !> \param speed Magnitude used in the Froude number.
-  !> \param horizontal_speed Magnitude of horizontal velocity.
-  !> \param mixture_density Mixture density \f$\rho_m\f$.
-  !> \param reduced_gravity Reduced gravity \f$g'\f$.
-  !> \param gravity_coefficient Gravity multiplier \f$G\f$.
-  !> \param curvature_term Curvature acceleration \f$a_c\f$.
-  !> \param stochastic Enable the stochastic Froude perturbation.
-  !> \param stochastic_value Stochastic increment to the Froude number.
-  !> \param rate_x Returned x momentum rate.
-  !> \param rate_y Returned y momentum rate.
+  !> \param[in] flow_depth Flow depth \f$h\f$ [m].
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] speed Magnitude used in the Froude number [m s^-1].
+  !> \param[in] horizontal_speed Horizontal velocity magnitude [m s^-1].
+  !> \param[in] mixture_density Mixture density \f$\rho_m\f$ [kg m^-3].
+  !> \param[in] reduced_gravity Reduced gravity \f$g'\f$ [m s^-2].
+  !> \param[in] gravity_coefficient Gravity multiplier \f$G\f$ [dimensionless].
+  !> \param[in] curvature_term Curvature acceleration \f$a_c\f$ [m s^-2].
+  !> \param[in] stochastic Enable the stochastic Froude perturbation.
+  !> \param[in] stochastic_value Stochastic increment to the Froude number.
+  !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
+  !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !******************************************************************************
 
   SUBROUTINE eval_froude_momentum_rate( flow_depth, velocity_x, velocity_y, speed, &

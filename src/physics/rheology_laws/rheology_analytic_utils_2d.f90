@@ -37,6 +37,7 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Report a fatal error raised by an exact rheology flow routine.
+  !> \param[in] message Diagnostic text describing the invalid input or failure.
   !******************************************************************************
   SUBROUTINE fatal_analytic_input_error(message)
 
@@ -48,6 +49,11 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Validate inputs to a module-level exact velocity solve.
+  !> \param[in] integration_step Exact-flow interval [s].
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] speed_ratio Ratio of total to horizontal speed.
+  !> \param[in] speed_before Initial speed magnitude [m s^-1].
+  !> \param[in] rheology_name Model name used to identify validation errors.
   !******************************************************************************
   SUBROUTINE validate_analytic_velocity_inputs(integration_step, flow_depth, &
        speed_ratio, speed_before, rheology_name)
@@ -82,6 +88,11 @@ CONTAINS
   !>          exact-flow formulas. Other supported laws are advanced by
   !>          inverting their separated scalar time integral, without taking
   !>          time-discretization substeps.
+  !> \param[in] flow_model Exact-flow law identifier.
+  !> \param[in] coefficients Model-specific frozen decay coefficients.
+  !> \param[in] time_step Integration interval [s].
+  !> \param[in] speed_before Initial speed magnitude [m s^-1].
+  !> \param[out] speed_after Integrated speed magnitude [m s^-1].
   !******************************************************************************
   SUBROUTINE solve_exact_velocity_flow(flow_model, coefficients, time_step, &
        speed_before, speed_after)
@@ -193,6 +204,10 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Advance a polynomial drag law c + a*r + b*r**2.
+  !> \param[in] coefficients Constant, linear, and quadratic drag coefficients.
+  !> \param[in] time_step Integration interval [s].
+  !> \param[in] speed_before Initial speed magnitude [m s^-1].
+  !> \param[out] speed_after Integrated speed magnitude [m s^-1].
   !******************************************************************************
   SUBROUTINE solve_quadratic_polynomial_flow(coefficients, time_step,       &
        speed_before, speed_after)
@@ -269,6 +284,14 @@ CONTAINS
 
   END SUBROUTINE solve_quadratic_polynomial_flow
 
+  !******************************************************************************
+  !> \brief Evaluate the elapsed time for a quadratic polynomial decay law.
+  !> \param[in] speed Speed at which to evaluate the separated time integral [m s^-1].
+  !> \param[in] constant_drag Constant decay coefficient.
+  !> \param[in] linear_drag Linear decay coefficient.
+  !> \param[in] quadratic_drag Quadratic decay coefficient.
+  !> \return Elapsed time from zero speed to the supplied speed [s].
+  !******************************************************************************
   PURE FUNCTION quadratic_decay_time(speed, constant_drag, linear_drag,     &
        quadratic_drag) RESULT(time)
 
@@ -299,6 +322,11 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Invert the exact separated time integral for nonlinear speed laws.
+  !> \param[in] flow_model Exact-flow law identifier.
+  !> \param[in] coefficients Model-specific frozen decay coefficients.
+  !> \param[in] time_step Integration interval [s].
+  !> \param[in] speed_before Initial speed magnitude [m s^-1].
+  !> \param[out] speed_after Integrated speed magnitude [m s^-1].
   !******************************************************************************
   SUBROUTINE solve_by_exact_time_integral(flow_model, coefficients, time_step, &
        speed_before, speed_after)
@@ -349,6 +377,10 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Evaluate the frozen-coefficient scalar speed-decay rate.
+  !> \param[in] flow_model Exact-flow law identifier.
+  !> \param[in] coefficients Model-specific frozen decay coefficients.
+  !> \param[in] speed Speed magnitude at which to evaluate the decay [m s^-1].
+  !> \return Nonnegative scalar speed-decay rate [m s^-2].
   !******************************************************************************
   PURE FUNCTION velocity_decay_rate(flow_model, coefficients, speed)        &
        RESULT(rate)
@@ -409,6 +441,11 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Integrate reciprocal decay rate with adaptive Simpson quadrature.
+  !> \param[in] flow_model Exact-flow law identifier.
+  !> \param[in] coefficients Model-specific frozen decay coefficients.
+  !> \param[in] lower Lower speed bound [m s^-1].
+  !> \param[in] upper Upper speed bound [m s^-1].
+  !> \return Elapsed time across the speed interval [s].
   !******************************************************************************
   FUNCTION integrate_inverse_decay_rate(flow_model, coefficients, lower,   &
        upper) RESULT(integral)
@@ -442,6 +479,14 @@ CONTAINS
 
   END FUNCTION integrate_inverse_decay_rate
 
+  !******************************************************************************
+  !> \brief Integrate reciprocal decay rate over one smooth speed interval.
+  !> \param[in] flow_model Exact-flow law identifier.
+  !> \param[in] coefficients Model-specific frozen decay coefficients.
+  !> \param[in] lower Lower speed bound [m s^-1].
+  !> \param[in] upper Upper speed bound [m s^-1].
+  !> \return Elapsed time across the speed interval [s].
+  !******************************************************************************
   FUNCTION integrate_inverse_interval(flow_model, coefficients, lower, upper) &
        RESULT(integral)
 
@@ -461,6 +506,20 @@ CONTAINS
 
   END FUNCTION integrate_inverse_interval
 
+  !******************************************************************************
+  !> \brief Recursively refine a Simpson estimate of reciprocal decay rate.
+  !> \param[in] flow_model Exact-flow law identifier.
+  !> \param[in] coefficients Model-specific frozen decay coefficients.
+  !> \param[in] lower Lower speed bound [m s^-1].
+  !> \param[in] upper Upper speed bound [m s^-1].
+  !> \param[in] f_lower Reciprocal decay rate at the lower endpoint.
+  !> \param[in] f_middle Reciprocal decay rate at the interval midpoint.
+  !> \param[in] f_upper Reciprocal decay rate at the upper endpoint.
+  !> \param[in] whole Simpson estimate over the full interval.
+  !> \param[in] tolerance Absolute error tolerance.
+  !> \param[in] depth Remaining recursive subdivision budget.
+  !> \return Adaptively refined integral estimate [s].
+  !******************************************************************************
   RECURSIVE FUNCTION adaptive_simpson(flow_model, coefficients, lower, upper, &
        f_lower, f_middle, f_upper, whole, tolerance, depth) RESULT(integral)
 
@@ -496,6 +555,13 @@ CONTAINS
 
   END FUNCTION adaptive_simpson
 
+  !******************************************************************************
+  !> \brief Evaluate the reciprocal of the frozen scalar speed-decay rate.
+  !> \param[in] flow_model Exact-flow law identifier.
+  !> \param[in] coefficients Model-specific frozen decay coefficients.
+  !> \param[in] speed Speed magnitude at which to evaluate the reciprocal [m s^-1].
+  !> \return Reciprocal decay rate, or a large sentinel for a zero rate.
+  !******************************************************************************
   FUNCTION inverse_rate(flow_model, coefficients, speed) RESULT(value)
 
     INTEGER, INTENT(IN) :: flow_model
@@ -517,6 +583,15 @@ CONTAINS
 
   END FUNCTION inverse_rate
 
+  !******************************************************************************
+  !> \brief Compute a single Simpson-rule estimate on an interval.
+  !> \param[in] lower Lower integration bound.
+  !> \param[in] upper Upper integration bound.
+  !> \param[in] f_lower Integrand value at the lower endpoint.
+  !> \param[in] f_middle Integrand value at the midpoint.
+  !> \param[in] f_upper Integrand value at the upper endpoint.
+  !> \return Simpson-rule integral estimate.
+  !******************************************************************************
   PURE FUNCTION simpson_estimate(lower, upper, f_lower, f_middle, f_upper)  &
        RESULT(value)
 
@@ -529,8 +604,11 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Select the largest real root of a quadratic in a closed interval.
-  !> \param[in] a,b,c Polynomial coefficients for a*x**2+b*x+c=0.
-  !> \param[in] lower,upper Closed interval for admissible roots.
+  !> \param[in] a Quadratic coefficient in a*x**2+b*x+c=0.
+  !> \param[in] b Linear coefficient in a*x**2+b*x+c=0.
+  !> \param[in] c Constant coefficient in a*x**2+b*x+c=0.
+  !> \param[in] lower Lower bound of the closed root interval.
+  !> \param[in] upper Upper bound of the closed root interval.
   !> \param[out] root Largest admissible root.
   !> \param[out] found True when at least one admissible real root exists.
   !******************************************************************************
@@ -589,8 +667,12 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Select the largest real root of a cubic in a closed interval.
-  !> \param[in] a,b,c,d Polynomial coefficients for a*x**3+b*x**2+c*x+d=0.
-  !> \param[in] lower,upper Closed interval for admissible roots.
+  !> \param[in] a Cubic coefficient in a*x**3+b*x**2+c*x+d=0.
+  !> \param[in] b Quadratic coefficient in a*x**3+b*x**2+c*x+d=0.
+  !> \param[in] c Linear coefficient in a*x**3+b*x**2+c*x+d=0.
+  !> \param[in] d Constant coefficient in a*x**3+b*x**2+c*x+d=0.
+  !> \param[in] lower Lower bound of the closed root interval.
+  !> \param[in] upper Upper bound of the closed root interval.
   !> \param[out] root Largest admissible root.
   !> \param[out] found True when at least one admissible real root exists.
   !******************************************************************************

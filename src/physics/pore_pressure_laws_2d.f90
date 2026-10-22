@@ -160,6 +160,12 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Backward-compatible name for the exact-flow pore-pressure solver.
+  !> \param[in] excess_pressure Initial excess pore pressure [Pa].
+  !> \param[in] integration_step Integration interval [s].
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] temperature Mixture temperature [K].
+  !> \param[in] solid_fractions Solid volume fractions, one per class.
+  !> \param[out] pressure_after Exact-flow excess pressure after the interval [Pa].
   !******************************************************************************
   SUBROUTINE advance_pore_pressure_diffusion(excess_pressure, integration_step,&
        flow_depth, temperature, solid_fractions, pressure_after)

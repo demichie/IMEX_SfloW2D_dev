@@ -79,6 +79,23 @@ CONTAINS
   !> \brief Evaluate the selected implicit rheology momentum rate.
   !> \details All state values are explicit arguments so the dispatch has no
   !> per-cell workspace allocation or hidden cell-state conversion.
+  !> \param[in] model_id Selected rheology identifier.
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] temperature Mixture temperature [K].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] inverse_density Reciprocal mixture density [m^3 kg^-1].
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] speed Total flow-speed magnitude [m s^-1].
+  !> \param[in] horizontal_speed Horizontal flow-speed magnitude [m s^-1].
+  !> \param[in] speed_squared Squared flow-speed magnitude [m^2 s^-2].
+  !> \param[in] reduced_gravity Reduced gravitational acceleration [m s^-2].
+  !> \param[in] solid_fractions Solid volume fractions, one per class.
+  !> \param[in] moving True when the flow is moving.
+  !> \param[in] use_stochastic Enable the stochastic rheology correction.
+  !> \param[in] stochastic_value Local stochastic-process value.
+  !> \param[out] rate x/y conservative momentum source rates [kg m^-1 s^-2].
+  !> \note State arguments are complex-valued to preserve complex-step derivatives.
   !******************************************************************************
   SUBROUTINE eval_implicit_rheology_rate(model_id, flow_depth, temperature,   &
        mixture_density, inverse_density, velocity_x, velocity_y, speed,      &
@@ -135,6 +152,25 @@ CONTAINS
   !> \brief Evaluate the selected semi-implicit rheology momentum rate.
   !> \details Curvature acceleration is used by the MUI-family laws only,
   !> matching their existing equation-term assembly semantics.
+  !> \param[in] model_id Selected rheology identifier.
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] speed Total flow-speed magnitude [m s^-1].
+  !> \param[in] horizontal_speed Horizontal flow-speed magnitude [m s^-1].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] reduced_gravity Reduced gravitational acceleration [m s^-2].
+  !> \param[in] gravity_coefficient Effective gravity multiplier [dimensionless].
+  !> \param[in] solid_fractions Solid volume fractions, one per class.
+  !> \param[in] curvature_term Enable curvature acceleration for applicable laws.
+  !> \param[in] curvature_xx Bed curvature in xx [m^-1].
+  !> \param[in] curvature_xy Bed curvature in xy [m^-1].
+  !> \param[in] curvature_yy Bed curvature in yy [m^-1].
+  !> \param[in] use_pore_pressure Enable the pore-pressure correction.
+  !> \param[in] excess_pore_pressure Excess pore pressure [Pa].
+  !> \param[in] use_stochastic Enable the stochastic rheology correction.
+  !> \param[in] stochastic_value Local stochastic-process value.
+  !> \param[out] rate x/y conservative momentum source rates [kg m^-1 s^-2].
   !******************************************************************************
   SUBROUTINE eval_semi_implicit_rheology_rate(model_id, flow_depth,          &
        velocity_x, velocity_y, speed, horizontal_speed, mixture_density,    &
@@ -336,7 +372,7 @@ CONTAINS
   !******************************************************************************
   !> \brief Resolve a user-supplied rheology name to its internal model ID.
   !>
-  !> \param[in] name Input model name.
+  !> \param[in,out] name Input model name; trimmed and canonicalized to lowercase.
   !> \param[out] model_id Internal model ID, or -1 for an unsupported name.
   !******************************************************************************
 

@@ -47,20 +47,20 @@ CONTAINS
   !> \brief Integrate the frozen \f$\mu(I)\f$-Voellmy source in time.
   !> \details Holds particle properties, stress, depth, and speed ratio fixed
   !> while integrating the combined rational and quadratic decay law.
-  !> \param integration_step Exact-flow integration interval.
-  !> \param flow_depth Explicit flow depth.
-  !> \param speed_ratio Explicit total-to-horizontal speed ratio.
-  !> \param velocity_before Input horizontal velocity.
-  !> \param mixture_density Explicit mixture density.
-  !> \param reduced_gravity Explicit reduced gravity.
-  !> \param gravity_coefficient Explicit gravity multiplier.
-  !> \param solid_fraction Explicit solid volume fractions.
-  !> \param curvature_acceleration Explicit curvature contribution.
-  !> \param use_pore_pressure Enable explicit pore-pressure reduction.
-  !> \param excess_pore_pressure Explicit excess pore pressure.
-  !> \param use_stochastic_xi Enable stochastic \f$\xi\f$ adjustment.
-  !> \param stochastic_xi_value Explicit stochastic \f$\xi\f$ increment.
-  !> \param velocity_after Returned horizontal velocity.
+  !> \param[in] integration_step Exact-flow integration interval [s].
+  !> \param[in] flow_depth Explicit flow depth [m].
+  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
+  !> \param[in] mixture_density Explicit mixture density [kg m^-3].
+  !> \param[in] reduced_gravity Explicit reduced gravity [m s^-2].
+  !> \param[in] gravity_coefficient Explicit gravity multiplier [dimensionless].
+  !> \param[in] solid_fraction Explicit solid volume fractions by class.
+  !> \param[in] curvature_acceleration Explicit curvature contribution [m s^-2].
+  !> \param[in] use_pore_pressure Enable explicit pore-pressure reduction.
+  !> \param[in] excess_pore_pressure Explicit excess pore pressure [Pa].
+  !> \param[in] use_stochastic_xi Enable stochastic \f$\xi\f$ adjustment.
+  !> \param[in] stochastic_xi_value Explicit stochastic \f$\xi\f$ increment.
+  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
   !******************************************************************************
   SUBROUTINE solve_mui_voellmy_analytic_velocity(integration_step,         &
        flow_depth, speed_ratio, velocity_before, mixture_density,             &
@@ -141,17 +141,18 @@ CONTAINS
   !> \details Computes the velocity-squared stress with \f$\xi\f$ and returns
   !> its x/y components. Optional stochastic variation of \f$\xi\f$ is bounded
   !> to [1, 10^5]; a stationary state returns zero.
-  !> \param velocity_x x component of horizontal velocity.
-  !> \param velocity_y y component of horizontal velocity.
-  !> \param mixture_density Mixture density.
-  !> \param reduced_gravity Reduced gravity.
-  !> \param speed Speed magnitude.
-  !> \param speed_squared Squared speed.
-  !> \param moving Whether the state is moving.
-  !> \param use_stochastic_xi Enable stochastic \f$\xi\f$ variation.
-  !> \param stochastic_value Stochastic increment to \f$\xi\f$.
-  !> \param rate_x Returned x momentum rate.
-  !> \param rate_y Returned y momentum rate.
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] reduced_gravity Reduced gravity [m s^-2].
+  !> \param[in] speed Speed magnitude [m s^-1].
+  !> \param[in] speed_squared Squared speed [m^2 s^-2].
+  !> \param[in] moving Whether the state is moving.
+  !> \param[in] use_stochastic_xi Enable stochastic \f$\xi\f$ variation.
+  !> \param[in] stochastic_value Stochastic increment to \f$\xi\f$.
+  !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
+  !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
+  !> \note Complex-valued state and rates preserve complex-step derivatives.
   !******************************************************************************
   SUBROUTINE eval_mui_voellmy_implicit_momentum_rate(velocity_x, velocity_y, &
        mixture_density, reduced_gravity, speed, speed_squared, moving,       &
@@ -190,19 +191,19 @@ CONTAINS
   !> \details Computes the inertial number and effective normal stress,
   !> including optional pore-pressure reduction, then returns the basal
   !> friction rate in x and y. Stationary states return zero.
-  !> \param flow_depth Flow depth.
-  !> \param velocity_x x component of horizontal velocity.
-  !> \param velocity_y y component of horizontal velocity.
-  !> \param speed Speed magnitude.
-  !> \param mixture_density Mixture density.
-  !> \param reduced_gravity Reduced gravity.
-  !> \param gravity_coefficient Gravity multiplier.
-  !> \param solid_fraction Solid volume fractions by class.
-  !> \param curvature_acceleration Curvature contribution to vertical stress.
-  !> \param use_pore_pressure Enable pore-pressure reduction.
-  !> \param excess_pore_pressure Excess pore pressure.
-  !> \param rate_x Returned x momentum rate.
-  !> \param rate_y Returned y momentum rate.
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] speed Speed magnitude [m s^-1].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] reduced_gravity Reduced gravity [m s^-2].
+  !> \param[in] gravity_coefficient Gravity multiplier [dimensionless].
+  !> \param[in] solid_fraction Solid volume fractions by class.
+  !> \param[in] curvature_acceleration Curvature contribution [m s^-2].
+  !> \param[in] use_pore_pressure Enable pore-pressure reduction.
+  !> \param[in] excess_pore_pressure Excess pore pressure [Pa].
+  !> \param[out] rate_x x momentum source rate.
+  !> \param[out] rate_y y momentum source rate.
   !******************************************************************************
 
   SUBROUTINE eval_mui_voellmy_momentum_rate( flow_depth, velocity_x, velocity_y, &
