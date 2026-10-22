@@ -59,7 +59,7 @@ MODULE equation_terms_2d
   PUBLIC :: limit_component_mass_flux
   PUBLIC :: curvature_acceleration, eval_curvature_momentum_source
   PUBLIC :: eval_expl_terms
-  PUBLIC :: eval_implicit_terms, eval_nh_semi_impl_terms
+  PUBLIC :: eval_implicit_terms, eval_semi_implicit_terms
   PUBLIC :: eval_mass_exchange_terms, eval_source_bdry
   PUBLIC :: set_source_time_coefficients
 
@@ -700,16 +700,16 @@ CONTAINS
   !> \param[in] Bsecondj_yy Filtered cell bed derivative d^2B/dy^2 [m^-1].
   !> \param[in] grav_coeff Large-slope gravity factor G at the supplied state location.
   !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
-  !> \param[out] nh_semi_impl_term Cell-source vector handled by the semi-implicit part of the time
-  !>                               scheme.
+  !> \param[out] semi_implicit_term Cell-source vector handled by the semi-implicit
+  !>                                part of the time scheme.
   !> \param[in] Zj Local effective stochastic fluctuation supplied to the rheology.
   !> \note The Froude-dependent law (model 9) requires positive reduced gravity.
   !>       Neutral or buoyant mixtures have no compressive buoyancy load in this law and receive
   !>       no basal friction; their Froude denominator must not be evaluated.
   !******************************************************************************
 
-  SUBROUTINE eval_nh_semi_impl_terms( Bprimej_x , Bprimej_y , Bsecondj_xx ,     &
-       Bsecondj_xy , Bsecondj_yy , grav_coeff , qpj , nh_semi_impl_term ,       &
+  SUBROUTINE eval_semi_implicit_terms( Bprimej_x , Bprimej_y , Bsecondj_xx ,    &
+       Bsecondj_xy , Bsecondj_yy , grav_coeff , qpj , semi_implicit_term ,     &
        Zj )
 
     USE parameters_2D, ONLY: pore_pressure_flag
@@ -726,7 +726,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: qpj(n_vars+2)
     REAL(wp), INTENT(IN) :: Zj ! value stochastic process
 
-    REAL(wp), INTENT(OUT) :: nh_semi_impl_term(n_eqns)
+    REAL(wp), INTENT(OUT) :: semi_implicit_term(n_eqns)
 
     REAL(wp) :: source_term(n_eqns)
 
@@ -749,7 +749,7 @@ CONTAINS
 
     REAL(wp) :: exc_pore_pres       !< excess pore pressure
 
-    nh_semi_impl_term(1:n_eqns) = 0.0_wp
+    semi_implicit_term(1:n_eqns) = 0.0_wp
 
     ! A dry cell carries no friction source.
     IF ( qpj(1) .LE. EPSILON(1.0_wp) ) RETURN
@@ -798,11 +798,11 @@ CONTAINS
 
     ENDIF rheology_if
 
-    nh_semi_impl_term = source_term
+    semi_implicit_term = source_term
 
     RETURN
 
-  END SUBROUTINE eval_nh_semi_impl_terms
+  END SUBROUTINE eval_semi_implicit_terms
 
   !******************************************************************************
   !> \brief Compute limited erosion, deposition, entrainment and associated equation sources.

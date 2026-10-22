@@ -13,7 +13,7 @@ PROGRAM probe_sources
   USE rheology_quadratic_2d, ONLY : friction_factor
   USE state_conversion_2d, ONLY : qc_to_qp
   USE geometry_2d, ONLY : pi_g
-  USE equation_terms_2d, ONLY : eval_implicit_terms, eval_nh_semi_impl_terms, &
+  USE equation_terms_2d, ONLY : eval_implicit_terms, eval_semi_implicit_terms, &
        eval_mass_exchange_terms
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, solve_rk_step
@@ -115,7 +115,7 @@ PROGRAM probe_sources
   END IF
   CALL qc_to_qp(q(1:n_vars),qp(1:n_vars+2),pressure)
   IF (operation==6) THEN
-     CALL eval_nh_semi_impl_terms(bx,by,bxx,bxy,byy,1.0_wp,qp(1:n_vars+2),si(1:n_vars),z)
+     CALL eval_semi_implicit_terms(bx,by,bxx,bxy,byy,1.0_wp,qp(1:n_vars+2),si(1:n_vars),z)
      WRITE(*,'(A,7ES26.17E3)') 'SI ',si(1:n_vars)
      STOP
   END IF
@@ -158,7 +158,7 @@ PROGRAM probe_sources
   CALL implicit(q,real_source)
   cq=CMPLX(q,0.0_wp,wp); base_complex=0.0_wp
   CALL eval_implicit_terms(bx,by,z,c_qj=cq(1:n_vars),c_nh_term_impl=base_complex(1:n_vars))
-  CALL eval_nh_semi_impl_terms(bx,by,bxx,bxy,byy,                  &
+  CALL eval_semi_implicit_terms(bx,by,bxx,bxy,byy,                  &
        1.0_wp/(1.0_wp+bx**2+by**2),qp(1:n_vars+2),si(1:n_vars),z)
   scale=MAX(ABS(q),1.0_wp)
   steps=[1.0E-5_wp,1.0E-6_wp,1.0E-7_wp,1.0E-8_wp]

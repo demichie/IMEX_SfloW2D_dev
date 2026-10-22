@@ -8,7 +8,7 @@ PROGRAM test_grouped_implicit_stage
   USE equation_metadata_2d, ONLY : equation_partition_type,                 &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   USE equation_terms_2d, ONLY : eval_implicit_terms,                     &
-       eval_nh_semi_impl_terms, init_problem_param
+       eval_semi_implicit_terms, init_problem_param
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
   USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var
@@ -295,7 +295,7 @@ PROGRAM test_grouped_implicit_stage
 
   q_stage_check = q_old
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
-  CALL eval_nh_semi_impl_terms(0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
+  CALL eval_semi_implicit_terms(0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
        grav, qp_known, si_source, 0.0_wp)
   CALL solve_imex_stage(partition, q_stage_check, q_stage_check, qp_known, &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &

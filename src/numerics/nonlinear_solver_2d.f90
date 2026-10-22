@@ -181,7 +181,7 @@ CONTAINS
     USE constitutive_parameters_2d, ONLY : T_env, radiative_term_coeff,       &
          convective_term_coeff
     USE state_conversion_2d, ONLY : r_phys_var, qc_to_qp
-    USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms
+    USE equation_terms_2d, ONLY : eval_semi_implicit_terms
     USE rheology_2d, ONLY : correct_friction_momentum, curvature_acceleration, &
          solve_analytic_rheology_velocity
     USE thermal_laws_2d, ONLY : solve_lava_analytic_temperature
@@ -360,7 +360,7 @@ CONTAINS
                ANY(group_equations(1:group_size) .EQ. 3)
           IF (group_has_momentum .AND. apply_si_local) THEN
              CALL qc_to_qp(qj, qp_current, dynamic_pressure)
-             CALL eval_nh_semi_impl_terms(Bprimej_x, Bprimej_y, Bsecondj_xx,&
+             CALL eval_semi_implicit_terms(Bprimej_x, Bprimej_y, Bsecondj_xx,&
                   Bsecondj_xy, Bsecondj_yy, grav_coeff, qp_current, si_term,&
                   Zij)
           END IF

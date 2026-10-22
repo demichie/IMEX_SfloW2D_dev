@@ -2114,6 +2114,10 @@ riesce.
 
 **D16.5 — Rinomina delle routine.** Applicare `eval_<modello>_<trattamento>_<quantità>`, usare `momentum_rate` per i rate reologici e sostituire `semi_impl` con `semi_implicit`. Usare `rate` soltanto per quantità effettivamente riferite al tempo.
 
+`eval_nh_semi_impl_terms` è stata rinominata `eval_semi_implicit_terms`;
+anche il dummy di output ora usa il qualificatore completo
+`semi_implicit_term`. Il solver e i test aggiornati usano la nuova API.
+
 **D16.6 — Riorganizzazione termica.** Rinominare l’integratore analitico della temperatura, separare rate di massa ed energia della vaporizzazione e mantenere l’assemblaggio energetico degli scambi in `equation_terms_2d`.
 
 **D16.7 — Riorganizzazione dello scambio di massa.** Spostare le formule costitutive in `mass_exchange_laws_2d`, lasciando l’assemblaggio in `equation_terms_2d` e l’applicazione temporale in `time_integration_2d`.
