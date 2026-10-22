@@ -36,7 +36,7 @@ Primary entry points (paths are relative to the repository root):
 | Write law-dependent diagnostics | `src/io/inpout_2d.f90`: `write_netcdf_timestep` |
 
 These are current owners/responsibilities, not the symbol-by-symbol ownership
-manifest required by D03. Future `rheology_*.f90`, `thermal_sources_2d.f90` and
+manifest required by D03. Future `rheology_*.f90`, `thermal_laws_2d.f90` and
 `pore_pressure_2d.f90` do not exist yet.
 
 ## State and notation

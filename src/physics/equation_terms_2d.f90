@@ -23,7 +23,7 @@ MODULE equation_terms_2d
   USE pore_pressure_2d, ONLY : eval_pore_pressure_diffusion_source,            &
        eval_pore_pressure_gas_loss, eval_pore_pressure_inlet_source,            &
        eval_pore_pressure_mass_exchange_source
-  USE thermal_sources_2d, ONLY : eval_inlet_thermal_energy_source,              &
+  USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                 &
        eval_lava_cooling_source, eval_mass_exchange_thermal_energy,              &
        eval_vaporization_sources
   USE rheology_lahar_2d, ONLY : eval_lahar_deposition_rate,                  &

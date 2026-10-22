@@ -30,7 +30,7 @@ for profile in strict optimized; do
         rheology/rheology_empirical_2d rheology/rheology_quadratic_2d \
         rheology/rheology_mui_2d rheology/rheology_mui_voellmy_2d \
         rheology/rheology_2d \
-        physics/thermal_sources_2d physics/pore_pressure_2d \
+        physics/thermal_laws_2d physics/pore_pressure_2d \
         physics/equation_terms_2d \
         numerics/nonlinear_solver_2d; do
         "$compiler" $flags $common -I"$repo_dir/src/state" -c "$repo_dir/src/$source.f90"
@@ -49,7 +49,7 @@ for profile in strict optimized; do
         -o test_analytic_velocity
     ./test_analytic_velocity
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_lava_cooling.f90"
-    "$compiler" $common parameters_2d.o diagnostics_2d.o thermal_sources_2d.o \
+    "$compiler" $common parameters_2d.o diagnostics_2d.o thermal_laws_2d.o \
         test_lava_cooling.o -o test_lava_cooling
     ./test_lava_cooling
     "$compiler" -O0 -g -fcheck=all $common -c \

@@ -1,7 +1,7 @@
 PROGRAM test_lava_cooling
 
   USE parameters_2d, ONLY : wp
-  USE thermal_sources_2d, ONLY : eval_lava_cooling_source,                   &
+  USE thermal_laws_2d, ONLY : eval_lava_cooling_source,                      &
        advance_lava_cooling_temperature, solve_lava_analytic_temperature
 
   IMPLICIT NONE

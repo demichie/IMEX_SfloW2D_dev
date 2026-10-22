@@ -34,7 +34,7 @@ IMEX_SfloW2D_SOURCES = \
                 rheology/rheology_mui_2d.f90 \
                 rheology/rheology_mui_voellmy_2d.f90 \
                 rheology/rheology_2d.f90 \
-                physics/thermal_sources_2d.f90 \
+                physics/thermal_laws_2d.f90 \
                 physics/pore_pressure_2d.f90 \
                 physics/equation_terms_2d.f90 \
                 spatial/nonconservative_2d.f90 \
@@ -122,7 +122,7 @@ rheology/rheology_empirical_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           rheology/rheology_analytic_utils_2d.$(OBJEXT)
 rheology/rheology_quadratic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)        \
                                           rheology/rheology_analytic_utils_2d.$(OBJEXT)
-physics/thermal_sources_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)           \
+physics/thermal_laws_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)               \
                                       core/diagnostics_2d.$(OBJEXT)
 physics/pore_pressure_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                     core/constitutive_parameters_2d.$(OBJEXT) \
@@ -132,7 +132,7 @@ physics/pore_pressure_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                     state/state_conversion_2d.$(OBJEXT)
 physics/equation_terms_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
-                                     physics/thermal_sources_2d.$(OBJEXT)     \
+                                     physics/thermal_laws_2d.$(OBJEXT)         \
                                      physics/pore_pressure_2d.$(OBJEXT)       \
                                      rheology/rheology_2d.$(OBJEXT)           \
                                      rheology/rheology_lahar_2d.$(OBJEXT)     \

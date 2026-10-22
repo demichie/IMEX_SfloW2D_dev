@@ -30,7 +30,7 @@ gfortran -O0 -g -fopenmp -fcheck=all -fbacktrace -I"$repo_dir/src/state" \
     "$repo_dir/src/rheology/rheology_mui_2d.f90" \
     "$repo_dir/src/rheology/rheology_mui_voellmy_2d.f90" \
     "$repo_dir/src/rheology/rheology_2d.f90" \
-    "$repo_dir/src/physics/thermal_sources_2d.f90" \
+    "$repo_dir/src/physics/thermal_laws_2d.f90" \
     "$repo_dir/src/physics/pore_pressure_2d.f90" \
     "$repo_dir/src/physics/equation_terms_2d.f90" \
     "$test_dir/test_state_conversion.f90"

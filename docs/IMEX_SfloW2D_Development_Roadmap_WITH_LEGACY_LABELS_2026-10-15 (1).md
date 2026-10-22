@@ -1414,7 +1414,7 @@ src/
 ├── state/ state_2d, state_conversion_2d, associated \*.inc  
 ├── geometry/ geometry_2d, domain_2d  
 ├── physics/ equation_terms_2d, mass_exchange_2d,  
-│ pore_pressure_2d \[NEW\], thermal_sources_2d \[NEW\]  
+│ pore_pressure_2d \[NEW\], thermal_laws_2d \[NEW\]
 ├── rheology/ rheology_2d \[NEW\], rheology_voellmy \[NEW\],  
 │ rheology_plastic \[NEW\], rheology_lava \[NEW\],  
 │ rheology_lahar \[NEW\], rheology_empirical \[NEW\],  
@@ -1471,7 +1471,7 @@ rheology_2d e modelli individuali
 
 Thermal
 
-thermal_sources_2d
+thermal_laws_2d
 
 Pore pressure
 
@@ -1491,7 +1491,7 @@ Questo è il piano consolidato che utilizzerei come riferimento per l’implemen
 
 Perimetro dell’estrazione:
 
-- `thermal_sources_2d` possiede l’energia delle iniezioni generali, lo scambio termico del mass exchange, la vaporizzazione e il raffreddamento radiativo/convettivo della lava. `rheology_lava_2d` resta proprietario dei soli termini reologici; parametri termici dichiarati ma non usati non costituiscono nuove leggi di conduzione o riscaldamento.
+- `thermal_laws_2d` possiede l’energia delle iniezioni generali, lo scambio termico del mass exchange, la vaporizzazione e il raffreddamento radiativo/convettivo della lava. `rheology_lava_2d` resta proprietario dei soli termini reologici; parametri termici dichiarati ma non usati non costituiscono nuove leggi di conduzione o riscaldamento.
 - `pore_pressure_2d` possiede diffusione implicita (inclusa la sensibilità COMPLEX), perdita Darcy di gas e accoppiamenti conservativi con iniezioni e mass exchange.
 - Le due formulazioni della permeabilità dinamica restano provider distinti: diffusione con pesi di sfericità `alpha*d^2`, gas loss con `alpha/d`. L’estrazione conserva e verifica entrambe; non ne presume l’equivalenza né ne uniforma la fisica.
 
@@ -2048,7 +2048,7 @@ coefficienti congelati appropriati al gruppo.
 
 #### Termini termici e scambio di massa
 
-`thermal_sources_2d.f90` deve diventare `thermal_laws_2d.f90`, perché contiene anche leggi costitutive e l’integrazione analitica della temperatura. Le routine devono riflettere la quantità restituita, ad esempio:
+`thermal_sources_2d.f90` è stato rinominato `thermal_laws_2d.f90`, perché contiene anche leggi costitutive e l’integrazione analitica della temperatura. Le routine devono riflettere la quantità restituita, ad esempio:
 
 ```text
 eval_lava_cooling_energy_rate
@@ -2095,6 +2095,12 @@ raffreddamento lava e lo scambio di massa lahar, da ricollocare secondo la
 responsabilità fisica appropriata.
 
 **D16.4 — Relocation dei moduli.** Rinominare e organizzare i moduli in `thermal_laws_2d`, `mass_exchange_laws_2d`, `pore_pressure_laws_2d` e `rheology_laws`. Aggiornare `USE`, Makefile, liste di build, Doxygen e test. La relocation deve essere scientificamente neutra.
+
+Prima relocation completata: `thermal_sources_2d.f90` è ora
+`thermal_laws_2d.f90`; i `USE`, il Makefile e i runner/test coinvolti sono
+aggiornati. `TEST_RHEOLOGY_CELL_LOCAL` passa in strict e optimized e
+`TEST_IMEX_STAGES` passa in entrambi i profili. Restano da riorganizzare i
+moduli di pressione dei pori, scambio di massa e reologia.
 
 **D16.5 — Rinomina delle routine.** Applicare `eval_<modello>_<trattamento>_<quantità>`, usare `momentum_rate` per i rate reologici e sostituire `semi_impl` con `semi_implicit`. Usare `rate` soltanto per quantità effettivamente riferite al tempo.
 

@@ -5,7 +5,7 @@
 !>          law and one exact-flow integrator for the autonomous cooling ODE.
 !********************************************************************************
 
-MODULE thermal_sources_2d
+MODULE thermal_laws_2d
 
   USE parameters_2d, ONLY : wp
   USE diagnostics_2d, ONLY : fatal_error
@@ -423,4 +423,4 @@ CONTAINS
 
   END SUBROUTINE eval_vaporization_sources
 
-END MODULE thermal_sources_2d
+END MODULE thermal_laws_2d

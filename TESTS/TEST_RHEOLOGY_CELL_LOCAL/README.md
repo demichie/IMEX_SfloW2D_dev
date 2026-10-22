@@ -149,7 +149,7 @@ weights. Any harmonization is a separate scientific decision, not an implicit
 consequence of extraction.
 
 D06 places general inlet and mass-exchange heat/vaporization in
-`thermal_sources_2d`, including lava cooling, while `rheology_lava_2d` owns
+`thermal_laws_2d`, including lava cooling, while `rheology_lava_2d` owns
 the lava rheological terms. `pore_pressure_2d` owns pressure diffusion, Darcy
 gas loss and the conservative pressure-source couplings. The diffusion (`alpha*d^2`) and
 gas-loss (`alpha/d`) sphericity providers remain distinct and are tested
