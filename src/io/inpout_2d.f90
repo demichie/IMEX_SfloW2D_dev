@@ -67,6 +67,9 @@ MODULE inpout_2d
 
   ! -- Variables for the namelist NUMERIC_PARAMETERS
   USE parameters_2d, ONLY: dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, reconstr_coeff, n_RK
+  USE parameters_2d, ONLY: imex_velocity_group, imex_energy_group,          &
+       imex_pore_pressure_group, imex_group_method
+  USE equation_metadata_2d, ONLY: resolve_imex_group_method
 
   ! -- Variables for the namelist EXPL_TERMS_PARAMETERS
   USE constitutive_parameters_2d, ONLY: grav, inv_grav
@@ -351,7 +354,8 @@ MODULE inpout_2d
   NAMELIST /initial_conditions/ T_init, T_ambient
 
   NAMELIST /numeric_parameters/ dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, &
-    reconstr_coeff, n_RK
+    reconstr_coeff, n_RK, imex_velocity_group, imex_energy_group,            &
+    imex_pore_pressure_group, imex_group_method
 
   NAMELIST /expl_terms_parameters/ grav
 
@@ -533,6 +537,12 @@ CONTAINS
     cfl = 0.24_wp
     cfl_policy = 'directional_min'
     kt_trace_reconstruction = 'eta_x'
+    imex_velocity_group = 3
+    imex_energy_group = 1
+    imex_pore_pressure_group = 2
+    imex_group_method(1) = 'ANALYTIC'
+    imex_group_method(2) = 'ANALYTIC'
+    imex_group_method(3) = 'NEWTON'
     limiter(1:n_vars + 2) = 1
     theta = 1.0
     reconstr_coeff = 1.0
@@ -2177,6 +2187,23 @@ CONTAINS
       REWIND (input_unit)
 
     END IF
+
+    BLOCK
+      INTEGER :: group_index, method_id
+      IF (MIN(imex_velocity_group, imex_energy_group,                       &
+           imex_pore_pressure_group) .LT. 1 .OR.                           &
+           MAX(imex_velocity_group, imex_energy_group,                      &
+           imex_pore_pressure_group) .GT. 3) THEN
+         CALL fatal_error('IMEX group IDs must be integers from 1 to 3')
+      END IF
+      DO group_index = 1, SIZE(imex_group_method)
+         CALL resolve_imex_group_method(imex_group_method(group_index),     &
+              method_id)
+         IF (method_id .LT. 0) THEN
+            CALL fatal_error('IMEX_GROUP_METHOD entries must be ANALYTIC or NEWTON')
+         END IF
+      END DO
+    END BLOCK
 
     ! Reject unsupported tableaux here, before simulation workspace initialization.
     CALL validate_runge_kutta_stages(n_RK)

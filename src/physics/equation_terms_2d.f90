@@ -208,15 +208,19 @@ CONTAINS
 
   SUBROUTINE init_problem_param( equation_partition )
 
-    USE parameters_2d, ONLY : pore_pressure_flag
+    USE parameters_2d, ONLY : pore_pressure_flag, rheology_model_id,        &
+         rheology_id_lava, imex_velocity_group, imex_energy_group,           &
+         imex_pore_pressure_group, imex_group_method
+    USE equation_metadata_2d, ONLY : resolve_imex_group_method
     IMPLICIT NONE
 
     TYPE(equation_partition_type), INTENT(INOUT) :: equation_partition
 
     LOGICAL :: implicit_mask(n_eqns)
     INTEGER :: IM_group(n_eqns)
-    INTEGER :: IM_group_method(3)
-    INTEGER :: n_IM_groups
+    INTEGER :: IM_group_method(3), configured_group_method(3)
+    INTEGER :: n_IM_groups, configured_group, compact_group
+    LOGICAL :: group_is_active(3)
 
     implicit_mask(1:n_eqns) = .FALSE.
     implicit_mask(2) = .TRUE.
@@ -240,28 +244,51 @@ CONTAINS
 
     IM_group = 0
     IM_group_method = 0
+    configured_group_method = 0
     n_IM_groups = 0
 
-    ! Keep the group order stable: analytical energy, analytical pore
-    ! pressure, then the coupled momentum equations. Inactive groups are omitted.
+    IF (MIN(imex_velocity_group, imex_energy_group,                        &
+         imex_pore_pressure_group) .LT. 1 .OR.                            &
+         MAX(imex_velocity_group, imex_energy_group,                       &
+         imex_pore_pressure_group) .GT. 3) THEN
+       CALL fatal_error('IMEX group IDs must be integers from 1 to 3')
+    END IF
+
+    DO configured_group = 1, 3
+       CALL resolve_imex_group_method(imex_group_method(configured_group), &
+            configured_group_method(configured_group))
+       IF (configured_group_method(configured_group) .LT. 0) THEN
+          CALL fatal_error('IMEX_GROUP_METHOD entries must be ANALYTIC or NEWTON')
+       END IF
+    END DO
+
+    ! Group IDs express the requested sweep order; repeated IDs combine terms.
     IF ( implicit_mask(4) ) THEN
-       n_IM_groups = n_IM_groups + 1
-       IM_group(4) = n_IM_groups
-       IM_group_method(n_IM_groups) = IM_GROUP_METHOD_ANALYTIC
+       IM_group(4) = imex_energy_group
     END IF
 
     IF ( pore_pressure_flag ) THEN
-       n_IM_groups = n_IM_groups + 1
-       IM_group(idx_pore) = n_IM_groups
-       IM_group_method(n_IM_groups) = IM_GROUP_METHOD_ANALYTIC
+       IM_group(idx_pore) = imex_pore_pressure_group
     END IF
 
     IF ( implicit_mask(2) .OR. implicit_mask(3) ) THEN
-       n_IM_groups = n_IM_groups + 1
-       IF ( implicit_mask(2) ) IM_group(2) = n_IM_groups
-       IF ( implicit_mask(3) ) IM_group(3) = n_IM_groups
-       IM_group_method(n_IM_groups) = IM_GROUP_METHOD_NEWTON
+       IM_group(2:3) = imex_velocity_group
     END IF
+
+    group_is_active = .FALSE.
+    DO configured_group = 1, 3
+       group_is_active(configured_group) = ANY(IM_group .EQ. configured_group)
+    END DO
+
+    DO configured_group = 1, 3
+       IF (.NOT. group_is_active(configured_group)) CYCLE
+       n_IM_groups = n_IM_groups + 1
+       IM_group_method(n_IM_groups) = configured_group_method(configured_group)
+       DO compact_group = 1, n_eqns
+          IF (IM_group(compact_group) .EQ. configured_group)                &
+               IM_group(compact_group) = n_IM_groups
+       END DO
+    END DO
 
     CALL equation_partition%initialize( implicit_mask, IM_group,             &
          IM_group_method(1:n_IM_groups) )

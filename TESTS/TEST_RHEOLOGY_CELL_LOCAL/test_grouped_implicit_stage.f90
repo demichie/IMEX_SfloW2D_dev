@@ -7,19 +7,21 @@ PROGRAM test_grouped_implicit_stage
   USE geometry_2d, ONLY : pi_g
   USE equation_metadata_2d, ONLY : equation_partition_type,                 &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
-  USE equation_terms_2d, ONLY : eval_implicit_terms, init_problem_param
+  USE equation_terms_2d, ONLY : eval_implicit_terms,                     &
+       eval_nh_semi_impl_terms, init_problem_param
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
   USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var
-  USE pore_pressure_2d, ONLY : solve_analytic_pore_pressure
-  USE thermal_sources_2d, ONLY : solve_lava_analytic_temperature
+  USE pore_pressure_2d, ONLY : solve_pore_pressure_diffusion_stage
+  USE thermal_sources_2d, ONLY : solve_lava_cooling_stage_temperature
+  USE rheology_lava_2d, ONLY : solve_lava_analytic_velocity
 
   IMPLICIT NONE
 
   TYPE(equation_partition_type) :: partition
   LOGICAL :: implicit_mask(7), converged, line_search_failed
-  INTEGER :: group_map(7), iterations, linear_info, i
-  REAL(wp) :: q_old(7), q_stage(7), known_residual(7), source(7)
+  INTEGER :: group_map(7), iterations, linear_info, i, equation
+  REAL(wp) :: q_old(7), q_stage(7), known_residual(7), source(7), si_source(7)
   REAL(wp) :: q_stage_check(7), q_expected(7), effective_stage_term(7)
   REAL(wp) :: qp_known(9), qp_expected(9), qp_actual(9)
   REAL(wp) :: dynamic_pressure, stage_rate_error
@@ -29,6 +31,7 @@ PROGRAM test_grouped_implicit_stage
   REAL(wp) :: expected_alphas(2), expected_alphag(0), expected_alphal
   REAL(wp) :: expected_temperature, expected_red_grav, expected_p_dyn
   REAL(wp) :: expected_Zs, expected_pore_pressure
+  REAL(wp) :: speed_ratio, analytic_velocity(2)
   REAL(wp) :: residual, scale, dt_step, a_diag
 
   n_solid = 2
@@ -63,6 +66,9 @@ PROGRAM test_grouped_implicit_stage
   stochastic_flag = .FALSE.
   stoch_transport_flag = .FALSE.
   f_inhibit_mode = 'OFF'
+  slope_correction_flag = .FALSE.
+  curvature_term_flag = .FALSE.
+  stochastic_flag = .FALSE.
 
   ALLOCATE(rho_s(2), inv_rho_s(2), sp_heat_s(2), diam_s(2), sphericity_s(2))
   ALLOCATE(sp_heat_g(0), sp_gas_const_g(0))
@@ -166,7 +172,7 @@ PROGRAM test_grouped_implicit_stage
 
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
   areal_heat_capacity = q_stage_check(4) / qp_known(4)
-  CALL solve_lava_analytic_temperature(qp_known(4), dt_step*a_diag,         &
+  CALL solve_lava_cooling_stage_temperature(qp_known(4), dt_step*a_diag,    &
        areal_heat_capacity, radiative_term_coeff, convective_term_coeff,    &
        T_env, exact_temperature)
   exact_energy = areal_heat_capacity * exact_temperature
@@ -177,7 +183,7 @@ PROGRAM test_grouped_implicit_stage
        expected_alphal, expected_alphag, expected_red_grav, expected_p_dyn,   &
        expected_Zs, expected_pore_pressure)
   pressure_known = q_expected(7) / q_expected(1)
-  CALL solve_analytic_pore_pressure(pressure_known, dt_step*a_diag,          &
+  CALL solve_pore_pressure_diffusion_stage(pressure_known, dt_step*a_diag,   &
        expected_h, expected_temperature, expected_alphas, expected_pressure)
   CALL solve_imex_stage(partition, q_stage_check, q_stage_check, qp_known,   &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
@@ -185,32 +191,131 @@ PROGRAM test_grouped_implicit_stage
        effective_stage_term, iterations, converged, linear_info,             &
        line_search_failed)
   IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
-     ERROR STOP 'exact-flow lava stage did not converge'
+     ERROR STOP 'analytic DIRK lava stage did not converge'
   END IF
   scale = MAX(1.0_wp, ABS(exact_energy))
   IF (ABS(q_stage(4) - exact_energy) / scale .GT. 5.0E-14_wp) THEN
-     ERROR STOP 'lava exact-flow group did not update the energy conservatively'
+     ERROR STOP 'lava analytic group did not update the energy conservatively'
   END IF
   scale = MAX(1.0_wp, ABS(q_expected(1) * expected_pressure))
   IF (ABS(q_stage(7) - q_expected(1) * expected_pressure) / scale .GT.      &
        5.0E-14_wp) THEN
      WRITE(*,*) 'pore exact-flow result, expected:', q_stage(7),             &
           q_expected(1)*expected_pressure
-     ERROR STOP 'pore-pressure exact-flow group did not use the updated state'
+     ERROR STOP 'pore-pressure analytic group did not use the updated state'
   END IF
   IF (q_stage(1) .NE. q_stage_check(1) .OR.                               &
        ANY(q_stage(5:6) .NE. q_stage_check(5:6))) THEN
-     ERROR STOP 'lava exact-flow group modified unrelated conservative variables'
+     ERROR STOP 'lava analytic group modified unrelated conservative variables'
   END IF
   stage_rate_error = MAXVAL(ABS(q_stage - q_stage_check -                  &
        dt_step*a_diag*effective_stage_term(1:7)))
   scale = MAX(1.0_wp, MAXVAL(ABS(q_stage)))
   IF (stage_rate_error / scale .GT. 5.0E-14_wp) THEN
-     ERROR STOP 'exact-flow effective rate does not match its net stage increment'
+     ERROR STOP 'analytic effective rate does not match its net stage increment'
+  END IF
+
+  imex_energy_group = 2
+  imex_pore_pressure_group = 1
+  imex_velocity_group = 3
+  imex_group_method = [CHARACTER(LEN=16) :: 'ANALYTIC', 'NEWTON', 'ANALYTIC']
+  CALL init_problem_param(partition)
+  IF (partition%n_IM_groups .NE. 3 .OR.                               &
+       partition%IM_group(7) .NE. 1 .OR.                               &
+       partition%IM_group(4) .NE. 2 .OR.                               &
+       partition%IM_group(2) .NE. 3 .OR.                               &
+       partition%IM_group(3) .NE. 3 .OR.                               &
+       partition%IM_group_method(1) .NE. IM_GROUP_METHOD_ANALYTIC .OR. &
+       partition%IM_group_method(2) .NE. IM_GROUP_METHOD_NEWTON .OR.   &
+       partition%IM_group_method(3) .NE. IM_GROUP_METHOD_ANALYTIC) THEN
+     ERROR STOP 'configured IMEX group order or methods were not preserved'
+  END IF
+
+  imex_energy_group = 1
+  imex_pore_pressure_group = 1
+  imex_velocity_group = 1
+  imex_group_method(1) = 'newton'
+  CALL init_problem_param(partition)
+  IF (partition%n_IM_groups .NE. 1 .OR.                               &
+       partition%n_IM_group_equations(1) .NE. 4 .OR.                   &
+       partition%IM_group_method(1) .NE. IM_GROUP_METHOD_NEWTON) THEN
+     ERROR STOP 'all implicit quantities could not be assigned to one Newton group'
+  END IF
+
+  CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
+  CALL solve_imex_stage(partition, q_stage_check, q_stage_check, qp_known,  &
+       dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
+       0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                     &
+       effective_stage_term, iterations, converged, linear_info,             &
+       line_search_failed)
+  IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
+     ERROR STOP 'single Newton group did not converge'
+  END IF
+  CALL eval_implicit_terms(0.0_wp, 0.0_wp, 0.0_wp, r_qj=q_stage,            &
+       r_nh_term_impl=source)
+  DO i = 1, SIZE(partition%implicit_map)
+     equation = partition%implicit_map(i)
+     residual = q_stage(equation) - q_stage_check(equation) -               &
+          dt_step*a_diag*source(equation)
+     scale = MAX(1.0_wp, ABS(q_stage_check(equation)))
+     IF (ABS(residual) / scale .GT. 2.0E-5_wp) THEN
+        WRITE(*,*) 'FAIL: single Newton group residual', equation, residual/scale
+        ERROR STOP 'single Newton group does not satisfy the joint stage equation'
+     END IF
+  END DO
+
+  q_stage_check = q_old
+  CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
+  CALL eval_nh_semi_impl_terms(0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
+       grav, qp_known, si_source, 0.0_wp)
+  CALL solve_imex_stage(partition, q_stage_check, q_stage_check, qp_known, &
+       dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
+       0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                    &
+       effective_stage_term, iterations, converged, linear_info,            &
+       line_search_failed)
+  IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
+     ERROR STOP 'Newton stage with SI momentum source did not converge'
+  END IF
+  CALL eval_implicit_terms(0.0_wp, 0.0_wp, 0.0_wp, r_qj=q_stage,            &
+       r_nh_term_impl=source)
+  scale = MAX(1.0_wp, MAXVAL(ABS(q_stage(2:3))))
+  IF (MAXVAL(ABS(q_stage(2:3) - q_stage_check(2:3) -                       &
+       dt_step*a_diag*(si_source(2:3)+source(2:3)))) / scale .GT. 2.0E-5_wp) THEN
+     ERROR STOP 'Newton momentum group did not combine SI and implicit sources'
+  END IF
+
+  imex_velocity_group = 1
+  imex_energy_group = 2
+  imex_pore_pressure_group = 3
+  imex_group_method = [CHARACTER(LEN=16) ::                             &
+       'ANALYTIC', 'ANALYTIC', 'ANALYTIC']
+  CALL init_problem_param(partition)
+  q_stage_check = q_old
+  CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
+  CALL r_phys_var(q_stage_check, expected_h, expected_u, expected_v,      &
+       expected_alphas, expected_density, expected_temperature,           &
+       expected_alphal, expected_alphag, expected_red_grav, expected_p_dyn,&
+       expected_Zs, expected_pore_pressure)
+  speed_ratio = 1.0_wp
+  CALL solve_lava_analytic_velocity(dt_step*a_diag, expected_h,            &
+       expected_temperature, expected_density, speed_ratio,                &
+       [expected_u, expected_v], analytic_velocity)
+  CALL solve_imex_stage(partition, q_stage_check, q_stage_check, qp_known, &
+       dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
+       0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                    &
+       effective_stage_term, iterations, converged, linear_info,            &
+       line_search_failed)
+  IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
+     ERROR STOP 'analytic rheology group did not complete the stage'
+  END IF
+  scale = MAX(1.0_wp, MAXVAL(ABS(q_stage(2:3))))
+  IF (MAXVAL(ABS(q_stage(2:3) - q_stage_check(1)*analytic_velocity)) /     &
+       scale .GT. 5.0E-14_wp) THEN
+     ERROR STOP 'analytic rheology group did not replace the SI+implicit solve'
   END IF
 
   CALL partition%finalize
   CALL finalize_nonlinear_solver
-  WRITE(*,*) 'PASS: DIRK, exact-flow and effective IMEX stage-rate contracts'
+  WRITE(*,*) 'PASS: grouped DIRK and effective IMEX stage-rate contracts'
 
 END PROGRAM test_grouped_implicit_stage

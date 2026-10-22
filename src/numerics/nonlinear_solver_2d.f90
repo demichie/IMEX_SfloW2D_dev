@@ -45,9 +45,6 @@ CONTAINS
        zero_x_momentum, zero_y_momentum, q_stage, effective_im_term,          &
        iterations_used, converged, linear_info, line_search_failed)
 
-    USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms
-    USE rheology_2d, ONLY : correct_friction_momentum
-
     IMPLICIT NONE
 
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
@@ -63,26 +60,14 @@ CONTAINS
     INTEGER, INTENT(OUT) :: iterations_used, linear_info
     LOGICAL, INTENT(OUT) :: converged, line_search_failed
 
-    REAL(wp) :: si_term(n_eqns)
-    REAL(wp) :: q_si(n_vars), residual_not_impl(n_eqns)
-
-    CALL eval_nh_semi_impl_terms(Bprimej_x, Bprimej_y, Bsecondj_xx,          &
-         Bsecondj_xy, Bsecondj_yy, grav_coeff, qp_known, si_term, Zij)
-
-    q_si = q_known + dt_step * a_diag * si_term(1:n_vars)
-    CALL correct_friction_momentum(q_known(2:3), q_si(2:3))
-    si_term(1:n_vars) = (q_si - q_known) / (dt_step * a_diag)
-
-    q_stage = q_si
-    residual_not_impl = known_stage_residual - a_diag * si_term
+    q_stage = q_known
     CALL solve_implicit_groups(equation_partition, q_stage, q_old, dt_step,   &
-         a_diag, residual_not_impl, Bprimej_x, Bprimej_y, Zij,                &
-         iterations_used, converged, linear_info, line_search_failed)
+         a_diag, known_stage_residual, Bprimej_x, Bprimej_y, Bsecondj_xx,    &
+         Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij, iterations_used,          &
+         converged, linear_info, line_search_failed, .TRUE.)
 
     IF (zero_y_momentum) q_stage(3) = 0.0_wp
     IF (zero_x_momentum) q_stage(2) = 0.0_wp
-
-    CALL correct_friction_momentum(q_si(2:3), q_stage(2:3))
 
     effective_im_term = 0.0_wp
     effective_im_term(1:n_vars) = (q_stage - q_known) / (dt_step * a_diag)
@@ -150,13 +135,15 @@ CONTAINS
     REAL(wp), INTENT(IN) :: qj_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step, a_diag
     REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns)
-    REAL(wp), INTENT(IN) :: Bprimej_x, Bprimej_y, Zij
+    REAL(wp), INTENT(IN) :: Bprimej_x, Bprimej_y
+    REAL(wp), INTENT(IN) :: Zij
     INTEGER, INTENT(OUT) :: iterations_used, linear_info
     LOGICAL, INTENT(OUT) :: converged, line_search_failed
 
     CALL solve_implicit_groups(equation_partition, qj, qj_old, dt_step,      &
-         a_diag, Rj_not_impl, Bprimej_x, Bprimej_y, Zij, iterations_used,   &
-         converged, linear_info, line_search_failed)
+         a_diag, Rj_not_impl, Bprimej_x, Bprimej_y, 0.0_wp, 0.0_wp,          &
+         0.0_wp, 0.0_wp, Zij, iterations_used, converged, linear_info,       &
+         line_search_failed)
 
   END SUBROUTINE solve_rk_step
 
@@ -179,20 +166,39 @@ CONTAINS
   !******************************************************************************
 
   SUBROUTINE solve_implicit_groups(equation_partition, qj, qj_old, dt_step,  &
-       a_diag, Rj_not_impl,                                                   &
-       Bprimej_x, Bprimej_y, Zij,                                              &
-       iterations_used, converged, linear_info, line_search_failed )
+       a_diag, Rj_not_impl, Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
+       Bsecondj_yy, grav_coeff, Zij,                                         &
+       iterations_used, converged, linear_info, line_search_failed,          &
+       apply_semi_implicit )
 
     USE parameters_2d, ONLY : max_nl_iter, tol_rel, tol_abs, n_RK,            &
-         n_solid, n_add_gas, idx_pore
+         n_solid, n_add_gas, idx_pore, rheology_flag, rheology_model_id,     &
+         rheology_id_none, rheology_id_voellmy, rheology_id_plastic,         &
+         rheology_id_lava, rheology_id_lahar, rheology_id_empirical,         &
+         rheology_id_quadratic, rheology_id_froude, rheology_id_lucas,       &
+         rheology_id_mui, rheology_id_mui_voellmy, pore_pressure_flag,       &
+         curvature_term_flag,                                                &
+         stochastic_flag, slope_correction_flag
     USE equation_metadata_2d, ONLY : IM_GROUP_METHOD_ANALYTIC,                &
          IM_GROUP_METHOD_NEWTON
-    USE parameters_2d, ONLY : rheology_model_id, rheology_id_lava, rheology_flag
     USE constitutive_parameters_2d, ONLY : T_env, radiative_term_coeff,       &
          convective_term_coeff
-    USE state_conversion_2d, ONLY : r_phys_var
-    USE thermal_sources_2d, ONLY : solve_lava_analytic_temperature
-    USE pore_pressure_2d, ONLY : solve_analytic_pore_pressure
+    USE state_conversion_2d, ONLY : r_phys_var, qc_to_qp
+    USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms,                   &
+         curvature_acceleration
+    USE rheology_2d, ONLY : correct_friction_momentum
+    USE thermal_sources_2d, ONLY : solve_lava_cooling_stage_temperature
+    USE pore_pressure_2d, ONLY : solve_pore_pressure_diffusion_stage
+    USE rheology_voellmy_2d, ONLY : solve_voellmy_analytic_velocity
+    USE rheology_plastic_2d, ONLY : solve_plastic_analytic_velocity
+    USE rheology_lava_2d, ONLY : solve_lava_analytic_velocity
+    USE rheology_lahar_2d, ONLY : solve_lahar_analytic_velocity
+    USE rheology_empirical_2d, ONLY : solve_empirical_analytic_velocity
+    USE rheology_quadratic_2d, ONLY : solve_quadratic_analytic_velocity
+    USE rheology_froude_2d, ONLY : solve_froude_analytic_velocity
+    USE rheology_lucas_2d, ONLY : solve_lucas_analytic_velocity
+    USE rheology_mui_2d, ONLY : solve_mui_analytic_velocity
+    USE rheology_mui_voellmy_2d, ONLY : solve_mui_voellmy_analytic_velocity
 
     IMPLICIT NONE
 
@@ -204,7 +210,10 @@ CONTAINS
     REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns)
     REAL(wp), INTENT(IN) :: Bprimej_x
     REAL(wp), INTENT(IN) :: Bprimej_y
+    REAL(wp), INTENT(IN) :: Bsecondj_xx, Bsecondj_xy, Bsecondj_yy
+    REAL(wp), INTENT(IN) :: grav_coeff
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
+    LOGICAL, INTENT(IN), OPTIONAL :: apply_semi_implicit
     INTEGER, INTENT(OUT) :: iterations_used
     LOGICAL, INTENT(OUT) :: converged
     INTEGER, INTENT(OUT) :: linear_info
@@ -213,16 +222,17 @@ CONTAINS
     REAL(wp) :: qj_init(n_vars), q_known(n_vars)
     REAL(wp) :: coeff_f(n_eqns)
     REAL(wp) :: tol_abs_local, tol_rel_local
-    REAL(wp) :: lava_h, lava_u, lava_v, lava_temperature, lava_density
-    REAL(wp) :: lava_alphas(n_solid), lava_alphag(n_add_gas), lava_alphal
-    REAL(wp) :: lava_red_grav, lava_p_dyn, lava_Zs, lava_pore_pressure
-    REAL(wp) :: pore_h, pore_u, pore_v, pore_temperature, pore_density
-    REAL(wp) :: pore_alphas(n_solid), pore_alphag(n_add_gas), pore_alphal
-    REAL(wp) :: pore_red_grav, pore_p_dyn, pore_Zs, pore_pressure
-    REAL(wp) :: temperature_stage, heat_capacity
-    REAL(wp) :: pressure_known, pressure_stage
+    REAL(wp) :: flow_h, flow_u, flow_v, flow_temperature, flow_density
+    REAL(wp) :: flow_alphas(n_solid), flow_alphag(n_add_gas), flow_alphal
+    REAL(wp) :: flow_red_grav, flow_p_dyn, flow_Zs, flow_pore_pressure
+    REAL(wp) :: temperature_stage, heat_capacity, pressure_known
+    REAL(wp) :: pressure_stage, speed_ratio, horizontal_speed
+    REAL(wp) :: curvature_accel, velocity_after(2), qp_current(n_vars+2)
+    REAL(wp) :: dynamic_pressure, si_term(n_eqns), residual_without_si(n_eqns)
+    REAL(wp) :: momentum_before_newton(2)
     INTEGER :: group, group_size, equation, i
     INTEGER :: group_equations(equation_partition%n_implicit)
+    LOGICAL :: group_has_momentum, apply_si_local
 
     iterations_used = 0
     converged = .FALSE.
@@ -251,6 +261,8 @@ CONTAINS
     qj_init = qj
     q_known = qj_old - dt_step * Rj_not_impl(1:n_vars)
     qj = q_known
+    apply_si_local = .FALSE.
+    IF (PRESENT(apply_semi_implicit)) apply_si_local = apply_semi_implicit
 
     ! Explicit equations have no current-stage implicit source and are solved
     ! directly before the ordered implicit-group sweep.
@@ -271,66 +283,160 @@ CONTAINS
 
        IF (equation_partition%IM_group_method(group) .EQ.                   &
             IM_GROUP_METHOD_ANALYTIC) THEN
-          IF (group_size .NE. 1) THEN
-             linear_info = -6
-             qj = qj_init
-             RETURN
+          DO i = 1, group_size
+             qj(group_equations(i)) = q_known(group_equations(i))
+          END DO
+
+          group_has_momentum = ANY(group_equations(1:group_size) .EQ. 2) .OR. &
+               ANY(group_equations(1:group_size) .EQ. 3)
+          IF (group_has_momentum) THEN
+             IF (.NOT. (ANY(group_equations(1:group_size) .EQ. 2) .AND.      &
+                  ANY(group_equations(1:group_size) .EQ. 3))) THEN
+                linear_info = -6
+                qj = qj_init
+                RETURN
+             END IF
+             IF (rheology_flag) THEN
+                CALL r_phys_var(qj, flow_h, flow_u, flow_v, flow_alphas,     &
+                     flow_density, flow_temperature, flow_alphal,           &
+                     flow_alphag, flow_red_grav, flow_p_dyn, flow_Zs,        &
+                     flow_pore_pressure)
+                horizontal_speed = SQRT(flow_u**2 + flow_v**2)
+                speed_ratio = 1.0_wp
+                IF (horizontal_speed .GT. 0.0_wp) THEN
+                   speed_ratio = SQRT(horizontal_speed**2 +                  &
+                        MERGE((flow_u*Bprimej_x + flow_v*Bprimej_y)**2,      &
+                        0.0_wp, slope_correction_flag)) / horizontal_speed
+                END IF
+                curvature_accel = 0.0_wp
+                IF (curvature_term_flag) THEN
+                   curvature_accel = curvature_acceleration(Bsecondj_xx,     &
+                        Bsecondj_xy, Bsecondj_yy, flow_u, flow_v)
+                END IF
+                velocity_after = [flow_u, flow_v]
+                SELECT CASE (rheology_model_id)
+                CASE (rheology_id_voellmy)
+                   CALL solve_voellmy_analytic_velocity(dt_step*a_diag,      &
+                        flow_h, speed_ratio, [flow_u, flow_v], flow_density, &
+                        flow_red_grav, grav_coeff, curvature_accel,          &
+                        pore_pressure_flag, flow_pore_pressure,               &
+                        stochastic_flag, Zij, velocity_after)
+                CASE (rheology_id_plastic)
+                   CALL solve_plastic_analytic_velocity(dt_step*a_diag,      &
+                        flow_h, speed_ratio, [flow_u, flow_v], velocity_after)
+                CASE (rheology_id_lava)
+                   CALL solve_lava_analytic_velocity(dt_step*a_diag,         &
+                        flow_h, flow_temperature, flow_density, speed_ratio, &
+                        [flow_u, flow_v], velocity_after)
+                CASE (rheology_id_lahar)
+                   CALL solve_lahar_analytic_velocity(dt_step*a_diag,        &
+                        flow_h, flow_temperature, SUM(flow_alphas),           &
+                        flow_density, speed_ratio, [flow_u, flow_v],          &
+                        velocity_after)
+                CASE (rheology_id_empirical)
+                   CALL solve_empirical_analytic_velocity(dt_step*a_diag,    &
+                        flow_h, speed_ratio, [flow_u, flow_v], velocity_after)
+                CASE (rheology_id_quadratic)
+                   CALL solve_quadratic_analytic_velocity(dt_step*a_diag,    &
+                        flow_h, speed_ratio, [flow_u, flow_v], velocity_after)
+                CASE (rheology_id_froude)
+                   CALL solve_froude_analytic_velocity(dt_step*a_diag,       &
+                        flow_h, speed_ratio, [flow_u, flow_v], flow_red_grav,&
+                        grav_coeff, curvature_accel, stochastic_flag, Zij,   &
+                        velocity_after)
+                CASE (rheology_id_lucas)
+                   CALL solve_lucas_analytic_velocity(dt_step*a_diag,        &
+                        flow_h, speed_ratio, [flow_u, flow_v], flow_red_grav,&
+                        grav_coeff, curvature_accel, stochastic_flag, Zij,   &
+                        velocity_after)
+                CASE (rheology_id_mui)
+                   CALL solve_mui_analytic_velocity(dt_step*a_diag,          &
+                        flow_h, speed_ratio, [flow_u, flow_v], flow_density, &
+                        flow_red_grav, grav_coeff, flow_alphas,              &
+                        curvature_accel, pore_pressure_flag,                  &
+                        flow_pore_pressure, velocity_after)
+                CASE (rheology_id_mui_voellmy)
+                   CALL solve_mui_voellmy_analytic_velocity(dt_step*a_diag,  &
+                        flow_h, speed_ratio, [flow_u, flow_v], flow_density, &
+                        flow_red_grav, grav_coeff, flow_alphas,              &
+                        curvature_accel, pore_pressure_flag,                  &
+                        flow_pore_pressure, stochastic_flag, Zij,            &
+                        velocity_after)
+                CASE DEFAULT
+                   IF (rheology_model_id .NE. rheology_id_none) THEN
+                      linear_info = -7
+                      qj = qj_init
+                      RETURN
+                   END IF
+                END SELECT
+                qj(2:3) = qj(1) * velocity_after
+             END IF
           END IF
-          equation = group_equations(1)
-          SELECT CASE (equation)
-          CASE (4)
+
+          IF (ANY(group_equations(1:group_size) .EQ. 4)) THEN
              IF (rheology_model_id .NE. rheology_id_lava) THEN
                 linear_info = -2
                 qj = qj_init
                 RETURN
              END IF
-             IF (.NOT. rheology_flag) THEN
-                CYCLE
-             END IF
-             CALL r_phys_var(qj, lava_h, lava_u, lava_v, lava_alphas,           &
-                  lava_density, lava_temperature, lava_alphal, lava_alphag,   &
-                  lava_red_grav, lava_p_dyn, lava_Zs, lava_pore_pressure)
-             IF (lava_temperature .LE. 0.0_wp) THEN
+             CALL r_phys_var(qj, flow_h, flow_u, flow_v, flow_alphas,        &
+                  flow_density, flow_temperature, flow_alphal, flow_alphag,  &
+                  flow_red_grav, flow_p_dyn, flow_Zs, flow_pore_pressure)
+             IF (flow_temperature .LE. 0.0_wp) THEN
                 linear_info = -3
                 qj = qj_init
                 RETURN
              END IF
-             heat_capacity = qj(4) / lava_temperature
-             CALL solve_lava_analytic_temperature(lava_temperature,             &
-                  dt_step*a_diag, heat_capacity, radiative_term_coeff,          &
+             heat_capacity = qj(4) / flow_temperature
+             CALL solve_lava_cooling_stage_temperature(flow_temperature,    &
+                  dt_step*a_diag, heat_capacity, radiative_term_coeff,       &
                   convective_term_coeff, T_env, temperature_stage)
              qj(4) = heat_capacity * temperature_stage
-          CASE DEFAULT
-             IF (equation .NE. idx_pore) THEN
-                linear_info = -4
-                qj = qj_init
-                RETURN
-             END IF
+          END IF
+
+          IF (ANY(group_equations(1:group_size) .EQ. idx_pore)) THEN
              IF (qj(1) .GT. 0.0_wp) THEN
-                CALL r_phys_var(qj, pore_h, pore_u, pore_v, pore_alphas,        &
-                     pore_density, pore_temperature, pore_alphal, pore_alphag, &
-                     pore_red_grav, pore_p_dyn, pore_Zs, pore_pressure)
+                CALL r_phys_var(qj, flow_h, flow_u, flow_v, flow_alphas,     &
+                     flow_density, flow_temperature, flow_alphal,           &
+                     flow_alphag, flow_red_grav, flow_p_dyn, flow_Zs,        &
+                     flow_pore_pressure)
                 pressure_known = qj(idx_pore) / qj(1)
-                CALL solve_analytic_pore_pressure(pressure_known,              &
-                     dt_step*a_diag, pore_h, pore_temperature, pore_alphas,    &
+                CALL solve_pore_pressure_diffusion_stage(pressure_known,     &
+                     dt_step*a_diag, flow_h, flow_temperature, flow_alphas,  &
                      pressure_stage)
                 qj(idx_pore) = qj(1) * pressure_stage
              END IF
-             END SELECT
+          END IF
 
        ELSEIF (equation_partition%IM_group_method(group) .EQ.              &
                IM_GROUP_METHOD_NEWTON) THEN
+          si_term = 0.0_wp
+          group_has_momentum = ANY(group_equations(1:group_size) .EQ. 2) .OR. &
+               ANY(group_equations(1:group_size) .EQ. 3)
+          IF (group_has_momentum .AND. apply_si_local) THEN
+             CALL qc_to_qp(qj, qp_current, dynamic_pressure)
+             CALL eval_nh_semi_impl_terms(Bprimej_x, Bprimej_y, Bsecondj_xx,&
+                  Bsecondj_xy, Bsecondj_yy, grav_coeff, qp_current, si_term,&
+                  Zij)
+          END IF
+          residual_without_si = Rj_not_impl - a_diag * si_term
           DO i = 1, group_size
              equation = group_equations(i)
-             qj(equation) = qj_init(equation)
+             qj(equation) = q_known(equation) +                             &
+                  dt_step*a_diag*si_term(equation)
           END DO
+          momentum_before_newton = qj(2:3)
           CALL solve_newton_group(group_equations(1:group_size), qj,        &
-               qj_old, dt_step, a_diag, Rj_not_impl, Bprimej_x, Bprimej_y, &
+               qj_old, dt_step, a_diag, residual_without_si,               &
+               Bprimej_x, Bprimej_y,                                       &
                Zij, coeff_f, tol_abs_local, tol_rel_local, iterations_used,&
                converged, linear_info, line_search_failed)
           IF (.NOT. converged) THEN
              qj = qj_init
              RETURN
+          END IF
+          IF (group_has_momentum) THEN
+             CALL correct_friction_momentum(momentum_before_newton, qj(2:3))
           END IF
        ELSE
           linear_info = -5

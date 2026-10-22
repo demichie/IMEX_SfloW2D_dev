@@ -1282,7 +1282,8 @@ assegnargli un nome/file. Nessun generatore esistente selezionava il modello 8.
 Decisione approvata e implementata: eliminare completamente il modello
 reologico 8, mantenere il modello 6 per la legge Bursik--Woods; la soluzione
 analitica dello stage è una delle due modalità di gruppo, insieme al solve
-Newton. `IM_GROUP_METHOD_ANALYTIC` indica l’integrazione analitica del termine;
+Newton. `IM_GROUP_METHOD_ANALYTIC` indica la soluzione chiusa dell’equazione
+implicita DIRK del gruppo;
 `IM_GROUP_METHOD_NEWTON` indica il solve implicito numerico, con SI dove
 previsto.
 
@@ -1701,16 +1702,34 @@ Per NEWTON, costruire il residuo locale R_g(x_g) e il Jacobiano J_g = dR_g/dx_g 
 `solve_implicit_groups` attraversa i gruppi nell’ordine dichiarato;
 `solve_rk_step` resta il wrapper compatibile. Le sole modalità di gruppo sono
 `IM_GROUP_METHOD_ANALYTIC` e `IM_GROUP_METHOD_NEWTON`: la prima usa
-l’integrazione analitica esatta del termine, la seconda risolve il residuo
-implicito con Newton, includendo il contributo SI ove previsto. Per ogni
-gruppo Newton, il solver riduce residuo, Jacobiano e sistema lineare al
-relativo mapping e mantiene invariate le componenti esterne. Il test
-`TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90` verifica i residui
-DIRK, il solve exact-flow della lava e il rate effettivo netto in
-strict/optimized. La line-search conserva esattamente le componenti esterne
-al gruppo attivo; il test verifica inoltre che massa e frazioni solide non
-vengano modificate dagli sweep dei gruppi. I test di metadati e la suite
-cell-local superano entrambi i profili: 255/255 fixture per profilo.
+la soluzione in forma chiusa dell’equazione implicita DIRK per tutti i termini
+supportati del gruppo; la seconda risolve il residuo con Newton e include il
+contributo semi-implicito per la quantità di moto. L’input assegna ciascuna
+famiglia (velocità, energia, pressione dei pori) a un ID di gruppo da 1 a 3:
+ID uguali combinano le famiglie nello stesso gruppo e gli ID crescenti
+stabiliscono l’ordine dello sweep. `IMEX_GROUP_METHOD(1:3)` sceglie `ANALYTIC`
+o `NEWTON` per l’ID corrispondente. Per esempio, assegnare tutte le famiglie
+al gruppo 1 e impostare `IMEX_GROUP_METHOD(1)='NEWTON'` risolve tutte le
+equazioni implicite in un unico gruppo Newton. Per un gruppo analitico misto,
+le formule chiuse sono applicate nell’ordine delle equazioni conservative,
+ricostruendo lo stato prima del termine successivo.
+
+Le variabili appartengono al namelist `NUMERIC_PARAMETERS`; i default
+mantengono l’ordine energia, pressione dei pori, velocità:
+
+```fortran
+imex_energy_group = 1
+imex_pore_pressure_group = 2
+imex_velocity_group = 3
+imex_group_method = 'ANALYTIC', 'ANALYTIC', 'NEWTON'
+```
+
+Per ogni gruppo Newton, il solver riduce residuo, Jacobiano e sistema lineare
+al relativo mapping e mantiene invariate le componenti esterne. Il test
+`TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90` verifica l’ordine e
+la composizione configurati, un gruppo Newton congiunto, i solve DIRK chiusi e
+il rate effettivo netto in strict/optimized. La line-search conserva
+esattamente le componenti esterne al gruppo attivo.
 
 Il gate completo `TEST_IMEX_STAGES` non è ancora accettato: il runner si
 interrompe nel link del binario di riferimento perché la ricostruzione
@@ -1933,15 +1952,16 @@ solve_lahar_analytic_velocity
 solve_analytic_pore_pressure
 ```
 
-`solve_lava_analytic_temperature` integra esattamente il termine di
-raffreddamento sull’intervallo dello stage e restituisce la temperatura finale
-esatta; il nome storico `advance_lava_cooling_temperature` resta un wrapper di
-compatibilità. `solve_lava_cooling_stage_temperature` risolve invece la
-distinta equazione algebrica DIRK basata sul rate implicito al valore finale e
-non sostituisce questo exact-flow solver. Analogamente,
-`advance_pore_pressure_diffusion` deve diventare
-`solve_analytic_pore_pressure`; `solve_pore_pressure_diffusion_stage` resta
-la distinta soluzione algebrica dello stage DIRK.
+`solve_lava_cooling_stage_temperature` risolve in forma chiusa l’equazione
+algebrica DIRK del termine energetico ed è la routine usata dal metodo di
+gruppo `ANALYTIC`. `solve_lava_analytic_temperature` integra invece l’ODE di
+raffreddamento esattamente a coefficienti congelati; resta un helper autonomo,
+non una modalità dello stage IMEX. `advance_lava_cooling_temperature` mantiene
+il nome di compatibilità. Analogamente, `solve_pore_pressure_diffusion_stage`
+risolve in forma chiusa l’equazione algebrica DIRK usata da `ANALYTIC`, mentre
+`solve_analytic_pore_pressure` integra esattamente l’ODE a stato congelato e
+non è selezionata dal dispatcher; `advance_pore_pressure_diffusion` resta il
+wrapper di compatibilità.
 
 #### Ruoli dei metodi e sequenza dello stage
 
@@ -1955,27 +1975,28 @@ problemi diversi:
   trattamento numerico dello stage: i contributi semi-impliciti sono applicati
   dal coordinatore e Newton risolve i residui impliciti delle variabili
   assegnate al gruppo. Non sono due opzioni di gruppo separate.
-- **Analitico:** `IM_GROUP_METHOD_ANALYTIC` integra esattamente il termine
-  fisico sull’intervallo \f$\tau=dt\,a_{ii}\f$ (per ora temperatura della lava
-  e pressione dei pori) e aggiorna le componenti conservative assegnate. Il
-  rate effettivo si ricava dall’incremento conservativo diviso per \f$\tau\f$;
-  in generale è un rate medio e non coincide con quello istantaneo al valore
-  finale.
+- **Analitico:** `IM_GROUP_METHOD_ANALYTIC` risolve direttamente in forma
+  chiusa l’equazione implicita DIRK per i termini assegnati: velocità,
+  raffreddamento della lava e pressione dei pori. Per la velocità questa
+  soluzione comprende già il contributo semi-implicito e quello implicito;
+  non si applica separatamente il SI prima del solve analitico.
 
 Le sole modalità selezionabili per un gruppo sono quindi `NEWTON` e
-`ANALYTIC`. Le routine DIRK algebriche chiuse ancora presenti nel codice non
-sono modalità di gruppo e non vengono selezionate dal dispatcher.
+`ANALYTIC`. I solve ODE a coefficienti congelati restano helper autonomi, non
+modalità di gruppo.
 
 La sequenza target per uno stage è:
 
 1. `time_integration_2d` costruisce lo stato conservativo noto `q_known`, i
    contributi degli stage precedenti e \f$\tau\f$.
-2. Il coordinatore locale dello stage applica il contributo SI previsto e le
-   sue correzioni, ottenendo lo stato di lavoro iniziale della sweep.
+2. Il coordinatore locale inizializza lo stato di lavoro noto. Per ciascun
+   gruppo Newton della quantità di moto applica il contributo SI previsto e
+   poi risolve il residuo Newton; un gruppo analitico della quantità di moto
+   risolve direttamente l’equazione DIRK completa.
 3. Il coordinatore percorre i gruppi nell’ordine definito da
    `equation_partition`. Ogni gruppo riceve lo stato di lavoro aggiornato dal
-   gruppo precedente e usa uno dei due metodi: integrazione analitica esatta
-   oppure trattamento Newton con SI dove previsto.
+   gruppo precedente e usa uno dei due metodi: solve analitico chiuso dello
+   stage oppure trattamento Newton (con SI per la quantità di moto).
 4. Ogni metodo modifica soltanto le componenti conservative assegnate al
    gruppo. Dopo ciascun aggiornamento si ricostruiscono da `q` le variabili
    fisiche necessarie al gruppo successivo. Per il raffreddamento, per esempio,
