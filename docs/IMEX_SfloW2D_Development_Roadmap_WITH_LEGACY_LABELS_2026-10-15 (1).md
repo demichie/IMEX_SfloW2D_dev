@@ -1732,20 +1732,32 @@ la composizione configurati, un gruppo Newton congiunto, i solve DIRK chiusi e
 il rate effettivo netto in strict/optimized. La line-search conserva
 esattamente le componenti esterne al gruppo attivo.
 
-Il gate completo `TEST_IMEX_STAGES` non è ancora accettato. Il binario di
-riferimento ora compila in modo coerente la ricostruzione, il backend
-hyperbolic e lo spatial operator dalla revisione storica fissata; questo
-risolveva il precedente errore di link dovuto a `reconstruct_kt_eta_traces`.
-Il confronto si arresta ancora su `known_mass` nel caso `dynamic_smooth`.
-La suite indipendente `TEST_SPATIAL_OPERATOR` riproduce una discrepanza sullo
-stesso fixture (`residual_mass`: valore prodotto `-1017.369...`, riferimento
-Python `-103.687...`), dopo il superamento dei fixture lake. Inoltre
-`known_mass` e la relativa tolleranza erano già stati riprodotti con il
-driver D11 non modificato. Questo localizza il blocco nel confronto
-dell’operatore spaziale con il riferimento Python fissato, ma non determina
-ancora quale lato sia errato: non è evidenza di equivalenza né una regressione
-attribuibile a D12. Occorre riconciliare il confronto e poi rieseguire il gate
-integrativo prima di chiudere D12.
+Il confronto spaziale e gli stage IMEX usano ora l’oracolo NumPy indipendente
+KT corrente; i core HP-PCCU storici non sono più usati per residui, velocità
+caratteristiche o CFL. `TEST_SPATIAL_OPERATOR` passa in strict e optimized:
+otto fixture, quattro configurazioni geometriche, esecuzione a 1/4 thread e
+sette controlli negativi. `TEST_IMEX_STAGES` passa i confronti degli stage e
+le due policy CFL in entrambi i profili; i controlli analitici degli stage
+N_RK=2/3/4 passano anch’essi in strict e optimized. Il riferimento KT applica
+ora la soglia dry anche alla profondità usata per le velocità d’onda; il suo
+checksum aggiornato è registrato nel contratto Gate-H v4 e i sei test
+autonomi del riferimento passano.
+
+Il runner non collega più i moduli spaziali storici al driver attuale per il
+test dei confini: i relativi workspace hanno layout incompatibili, quindi la
+doppia allocazione osservata nel binario baseline era un problema ABI del test,
+non un difetto riprodotto nel candidato. Il driver verifica ora direttamente
+le tracce analitiche del candidato. La sezione `stages` e i controlli dei
+confini passano in strict e optimized, inclusi assi collassati e thread 1/4.
+
+D12 resta IN CORSO: il runner completo si arresta in `order_suite` su
+`manufactured mass remains constant` (errore scalato `0.31518397499667228`,
+limite `7.2759576141834259e-12`). La fixture usa flusso uniforme ma condizioni
+di default che bloccano l’ingresso a ovest/sud e consentono l’uscita a
+est/nord; l’invariante di massa e gli oracoli temporali di tale fixture non
+sono quindi coerenti con i flussi di bordo. Ridisegnare o adjudicare la
+fixture e il relativo riferimento indipendente senza allargare le tolleranze,
+poi rieseguire il runner integrato prima della chiusura.
 
 ### D13 — Integrazione analitica esatta dei termini IM
 

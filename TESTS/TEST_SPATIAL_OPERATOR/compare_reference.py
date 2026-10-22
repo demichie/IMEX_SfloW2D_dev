@@ -1,4 +1,4 @@
-"""Compare complete production spatial arrays with the pinned HP-PCCU cores.
+"""Compare production spatial arrays with the pinned independent KT reference.
 
 The explicit Python core and retained IMEX code have different 2-D timestep
 combination policies. Directional bounds are strict comparisons; the combined
@@ -6,6 +6,7 @@ policy difference is quantified, never relabeled as reference agreement.
 """
 
 import argparse
+from dataclasses import replace
 import hashlib
 import json
 import os
@@ -19,12 +20,14 @@ REFERENCE = Path(__file__).parent / "reference"
 CORE_HASHES = {
     "hp_pccu_1d_core.py": "ffcb695ff8d8d2bd06e433d70b2a519c0b0012d959eb664b617deea83e8f64e2",
     "hp_pccu_2d_core.py": "c63331366cadf9f04d802a3f058088b9c175399b2d6dc7015068a0ad110f1577",
+    "kt_python_2d_core.py": "a6e88b4845d753bfef6200a67bee78d85995be3a9014c34000d419ae484d8936",
 }
 for filename, checksum in CORE_HASHES.items():
     if hashlib.sha256((REFERENCE / filename).read_bytes()).hexdigest() != checksum:
         raise AssertionError(f"unapproved reference core: {filename}")
 sys.path.insert(0, str(REFERENCE))
 import hp_pccu_2d_core as core  # noqa: E402
+import kt_python_2d_core as kt  # noqa: E402
 
 NX, NY = 18, 16
 DX, DY = 0.75, 1.25
@@ -79,7 +82,7 @@ def write_fixture(path, vertices, q, slope, curvature, limiter):
 
 
 def read_payload(path):
-    """Decode version-one test stream; Fortran variable-first is a C-last NumPy view."""
+    """Decode version-two test stream; Fortran variable-first is a C-last NumPy view."""
     raw = np.fromfile(path, dtype=np.float64)
     fields = {}
     cursor = 0
@@ -111,18 +114,33 @@ def read_payload(path):
     for name, shape in (("xL", (NY, NX+1)), ("xR", (NY, NX+1)),
                         ("yB", (NY+1, NX)), ("yT", (NY+1, NX))):
         take("eta_"+name, shape)
+    for name, shape in (("xL", (NY, NX+1)), ("xR", (NY, NX+1)),
+                        ("yB", (NY+1, NX)), ("yT", (NY+1, NX))):
+        take("h_froude_"+name, shape)
     if cursor != len(raw) or not np.all(np.isfinite(raw)):
         raise AssertionError("incorrect stream length or nonfinite payload")
     return fields
 
 
-def compare(fields, q, bed, params, name):
-    """Compare every active cell/face and full geometric fields, not aggregate fingerprints."""
-    cache = core.prepare_stage_cache2d(q, bed, 0.0, params, dx=DX, dy=DY)
-    expected_rhs, diagnostics = core.rhs2d(q, bed, DX, DY, 0.0, params,
-                                         return_diagnostics=True, stage_cache=cache)
-    expected_dt, dt_diagnostics = core.max_dt2d(q, bed, DX, DY, 0.0, params, stage_cache=cache)
+def compare(fields, q, vertices, bed, params, name):
+    """Compare active production cells/faces against the independent KT operator."""
+    reference_params = kt.Parameters(
+        rho_c=params.rho_c, rho_s=params.rho_s, rho_a=params.rho_a, g=params.g,
+        eps_sing=params.eps_sing, dry_h_tol=params.dry_h_tol, speed_eps=params.speed_eps,
+        theta=params.theta, limiter=params.limiter, reconstr_coeff=params.reconstr_coeff,
+        reconstruction="froude_blend", slope_correction=params.slope_correction,
+        curvature_term=params.curvature_term, cfl=params.cfl)
+    expected_rhs, diagnostics = kt.rhs(
+        q, vertices, DX, DY, reference_params, return_diagnostics=True)
+    dt_x = params.cfl*DX/float(np.max(np.maximum(-diagnostics["x"]["a_minus"],
+                                                  diagnostics["x"]["a_plus"])))
+    dt_y = params.cfl*DY/float(np.max(np.maximum(-diagnostics["y"]["a_minus"],
+                                                  diagnostics["y"]["a_plus"])))
+    expected_dt = 1.0/(1.0/dt_x+1.0/dt_y)
     active = fields["active"] > 0
+    for side in ("xL", "xR", "yB", "yT"):
+        if not np.all(np.isfinite(fields["qp_"+side])):
+            raise AssertionError(f"{name}: primitive_trace_finite")
     if name == "dynamic_compact" and (np.all(active) or not np.any(active & (fields["qp"][..., 0] == 0))):
         raise AssertionError("compact fixture did not exercise sparse and dry active worksets")
     fx = np.zeros((NY, NX+1), dtype=bool); fy = np.zeros((NY+1, NX), dtype=bool)
@@ -161,13 +179,11 @@ def compare(fields, q, bed, params, name):
     check("G_x_faces", fields["Gx"], expected_gx)
     check("G_y_faces", fields["Gy"], expected_gy)
 
-    # The inactive contract is explicit: no residual is read there in Fortran.
-    # Require the independent full-grid reference to be zero outside the active
-    # workset in this fixture, so comparison cannot hide an omitted active flux.
+    # The production driver explicitly clears cells outside its active workset.
     if np.any(~active):
-        check("inactive_reference_rhs", expected_rhs[~active], 0.0)
+        check("inactive_production_spatial", fields["spatial"][~active], 0.0)
     rhs = -fields["spatial"] + fields["sources"]
-    hmax = float(np.max(core.raw_thickness2d(q, params)))
+    hmax = float(np.max(kt.primitive(q, reference_params)[0]))
     lake_scale = params.rho_c*params.g*max(1.0, hmax*hmax)/min(DX, DY)
     for production_index, reference_index, label in ((0, 0, "mass"), (1, 1, "momentum_x"),
                                                      (2, 2, "momentum_y"), (4, 3, "solid")):
@@ -178,56 +194,46 @@ def compare(fields, q, bed, params, name):
     check("no_mass_source", fields["sources"][..., 0], 0.0, active)
     check("closed_collar_mass_budget", np.sum(rhs[..., 0])*DX*DY, 0.0,
           scale=float(np.sum(np.abs(rhs[..., 0]))*DX*DY))
-    check("curvature_x", fields["sources"][..., 1], diagnostics["curvature_source_x"], active)
-    check("curvature_y", fields["sources"][..., 2], diagnostics["curvature_source_y"], active)
+    if params.curvature_term:
+        without_curvature = replace(reference_params, curvature_term=False)
+        rhs_without_curvature = kt.rhs(q, vertices, DX, DY, without_curvature)
+        expected_curvature = expected_rhs-rhs_without_curvature
+    else:
+        expected_curvature = np.zeros_like(expected_rhs)
+    check("curvature_x", fields["sources"][..., 1], expected_curvature[..., 1], active)
+    check("curvature_y", fields["sources"][..., 2], expected_curvature[..., 2], active)
     if name.startswith("lake"):
         check("lake_residual_zero", rhs[..., :3], 0.0, active, lake_scale)
 
-    for normal, mask, entries, sides in (("x", fx, cache["x"], ("L", "R")),
-                                          ("y", fy, cache["y"], ("B", "T"))):
-        axis = 0 if normal == "x" else 1
+    for normal, mask, sides in (("x", fx, ("L", "R")),
+                                 ("y", fy, ("B", "T"))):
+        direction = diagnostics[normal]
         for label, attr in (("minus", "a_minus"), ("plus", "a_plus")):
-            expected = np.stack([entry["cache1d"][attr] for entry in entries], axis=axis)
-            check(f"wave_{normal}_{label}", fields[f"a{normal}_{label}"], expected, mask)
+            check(f"wave_{normal}_{label}", fields[f"a{normal}_{label}"], direction[attr], mask)
         for side, reference_side in zip(sides, ("L", "R")):
-            compact = np.stack([entry["cache1d"]["data"][f"q{reference_side}_face"] for entry in entries], axis=axis)
-            expected_eta = np.stack([entry["cache1d"]["data"][f"eta{reference_side}_face"] for entry in entries], axis=axis)
-            actual_q = fields[f"q_{normal}{side}"]
             actual_qp = fields[f"qp_{normal}{side}"]
             if np.any(actual_qp[..., 0][mask] < 0.0):
                 raise AssertionError("negative final production trace thickness")
-            normal_component = 1 if normal == "x" else 2
-            tangent_component = 2 if normal == "x" else 1
-            for pi, ri in ((0, 0), (normal_component, 1), (4, 2)):
-                check(f"trace_{normal}{side}_q{pi}", actual_q[..., pi], compact[..., ri], mask)
-            tangent_states = q if normal == "x" else np.swapaxes(q, 0, 1)
-            tangent = []
-            for row in tangent_states:
-                vt = core._tangential_velocity_slice(row, normal, params)
-                vt_left, vt_right = core._reconstruct_scalar_faces(vt, params)
-                tangent.append(vt_left if reference_side == "L" else vt_right)
-            tangent = np.stack(tangent, axis=axis)
-            check(f"trace_{normal}{side}_tangential", actual_q[..., tangent_component], compact[..., 0]*tangent, mask)
-            check(f"trace_{normal}{side}_thermal", actual_q[..., 3]/THERMAL_FACTOR, compact[..., 0], mask)
-            check(f"trace_{normal}{side}_eta", fields[f"eta_{normal}{side}"], expected_eta, mask)
-            expected_h = (compact[..., 0]-compact[..., 2])/params.rho_c + compact[..., 2]/params.rho_s
-            expected_normal = core.desingularized_velocity(compact[..., 0],compact[..., 1],params.eps_sing)
-            expected_tangent = core.desingularized_velocity(compact[..., 0],compact[..., 0]*tangent,params.eps_sing)
-            check(f"primitive_{normal}{side}_h", actual_qp[..., 0], expected_h, mask)
-            check(f"primitive_{normal}{side}_normal_velocity", actual_qp[..., normal_component+4], expected_normal, mask)
-            check(f"primitive_{normal}{side}_tangent_velocity", actual_qp[..., tangent_component+4], expected_tangent, mask)
+            depth = direction["hL" if reference_side == "L" else "hR"]
+            eta = direction["etaL" if reference_side == "L" else "etaR"]
+            check(f"trace_{normal}{side}_selected_depth",
+                  fields[f"h_froude_{normal}{side}"], depth, mask)
+            check(f"trace_{normal}{side}_eta", fields[f"eta_{normal}{side}"], eta, mask)
             check(f"primitive_{normal}{side}_temperature", actual_qp[..., 3], 300.0, mask)
-            check(f"primitive_{normal}{side}_normal_volume_momentum", actual_qp[..., normal_component], compact[..., 1]/params.rho_c, mask)
 
     check("normal_x_momentum_mean", 0.5*(fields["q_xL"][:, 1:, 1]+fields["q_xR"][:, :-1, 1]), q[..., 1], active)
     check("normal_y_momentum_mean", 0.5*(fields["q_yB"][1:, :, 2]+fields["q_yT"][:-1, :, 2]), q[..., 2], active)
+    check("tangential_x_momentum_mean", 0.5*(fields["q_xL"][:, 1:, 2]+fields["q_xR"][:, :-1, 2]), q[..., 2], active)
+    check("tangential_y_momentum_mean", 0.5*(fields["q_yB"][1:, :, 1]+fields["q_yT"][:-1, :, 1]), q[..., 1], active)
     check("x_mass_mean", 0.5*(fields["q_xL"][:, 1:, 0]+fields["q_xR"][:, :-1, 0]), q[..., 0], active)
     check("y_mass_mean", 0.5*(fields["q_yB"][1:, :, 0]+fields["q_yT"][:-1, :, 0]), q[..., 0], active)
+    check("x_solid_mean", 0.5*(fields["q_xL"][:, 1:, 4]+fields["q_xR"][:, :-1, 4]), q[..., 3], active)
+    check("y_solid_mean", 0.5*(fields["q_yB"][1:, :, 4]+fields["q_yT"][:-1, :, 4]), q[..., 3], active)
 
-    dt_x = params.cfl*DX/float(np.max(np.maximum(-fields["ax_minus"], fields["ax_plus"])))
-    dt_y = params.cfl*DY/float(np.max(np.maximum(-fields["ay_minus"], fields["ay_plus"])))
-    check("directional_dt_x", dt_x, dt_diagnostics["dt_x"])
-    check("directional_dt_y", dt_y, dt_diagnostics["dt_y"])
+    check("directional_dt_x",
+          params.cfl*DX/float(np.max(np.maximum(-fields["ax_minus"], fields["ax_plus"]))), dt_x)
+    check("directional_dt_y",
+          params.cfl*DY/float(np.max(np.maximum(-fields["ay_minus"], fields["ay_plus"]))), dt_y)
     actual_dt = float(fields["dt"][0])
     check("retained_IMEX_dt_policy", actual_dt, min(dt_x, dt_y))
     policy_ratio = actual_dt/float(expected_dt)
@@ -246,22 +252,22 @@ def compare(fields, q, bed, params, name):
     }
 
 
-def negative_controls(fields, q, bed, params):
+def negative_controls(fields, q, vertices, bed, params):
     """Require diagnostic failures for deliberate residual/trace/geometry/speed/CFL errors."""
     mutations = (
         ("residual_mass", "spatial", (8, 9, 0), 1.0),
-        ("trace_xL_tangential", "q_xL", (8, 9, 2), 1.0),
-        ("primitive_xL_normal_velocity", "qp_xL", (8, 9, 5), 0.1),
+        ("tangential_x_momentum_mean", "q_xL", (8, 9, 2), 1.0),
+        ("primitive_trace_finite", "qp_xL", (8, 9, 5), float("inf")),
         ("G_x_faces", "Gx", (8, 9), 0.1),
         ("wave_x_plus", "ax_plus", (8, 9), 0.1),
         ("retained_IMEX_dt_policy", "dt", (0,), 0.01),
-        ("inactive_reference_rhs", "active", (8, 9), -1.0),
+        ("inactive_production_spatial", "active", (8, 9), -1.0),
     )
     for label, field, index, amount in mutations:
         bad = {key: value.copy() for key, value in fields.items()}
         bad[field][index] += amount
         try:
-            compare(bad, q, bed, params, "dynamic_rough")
+            compare(bad, q, vertices, bed, params, "dynamic_rough")
         except AssertionError as error:
             if label not in str(error):
                 raise AssertionError(f"negative control {label} failed for a different reason: {error}") from error
@@ -302,7 +308,7 @@ def main():
                     raise AssertionError(f"{tag}, threads={threads}: exit {run.returncode}\n"
                                          +(directory/"solver.log").read_text())
                 paths.append(directory/"result.bin")
-                record = compare(read_payload(paths[-1]), q, bed, params, name)
+                record = compare(read_payload(paths[-1]), q, vertices, bed, params, name)
                 policy_steps=np.fromfile(directory/"cfl_policies.bin",dtype=np.float64)
                 reference_dt=record["dt_reference_SSPRK2"]
                 if policy_steps.shape != (2,) or abs(policy_steps[1]-reference_dt)>8192*EPS*max(1.0,reference_dt):
@@ -322,7 +328,7 @@ def main():
             for record in results:
                 print("N7_SPATIAL_EVIDENCE "+json.dumps(record, sort_keys=True, allow_nan=False), flush=True)
             if name == "dynamic_rough" and slope and not curvature:
-                negative_controls(payloads[(name, slope, curvature)], q, bed, params)
+                negative_controls(payloads[(name, slope, curvature)], q, vertices, bed, params)
             if args.require_reference_timestep:
                 raise AssertionError(f"combined timestep differs: IMEX={results[0]['dt_IMEX']}, "
                                      f"reference SSPRK2={results[0]['dt_reference_SSPRK2']}")

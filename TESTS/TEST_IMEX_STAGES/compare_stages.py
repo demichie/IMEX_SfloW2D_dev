@@ -1,7 +1,7 @@
 """Validate supported IMEX stages, CFL policies, temporal order and input rejection.
 
 Reference tableaux are independent of private production storage. Spatial RHS
-calls use the unchanged, checksum-pinned cores from TEST_SPATIAL_OPERATOR.
+calls use the checksum-pinned independent KT reference from TEST_SPATIAL_OPERATOR.
 The thermal-mode and quadratic-drag order oracles are independent analytic
 or method-of-lines calculations, not production fine-step trajectories.
 """
@@ -170,7 +170,7 @@ def lift(q):
     return production
 
 
-def explicit_stages(q, bed, params, n, dt):
+def explicit_stages(q, vertices, params, n, dt):
     ae, _, be, _ = tableaux(n)
     terms = []; states = []; stage_cfl = []
     for i in range(n):
@@ -178,12 +178,17 @@ def explicit_stages(q, bed, params, n, dt):
         for j in range(i):
             state += dt*ae[i, j]*terms[j]
         states.append(lift(state))
-        cache = spatial.core.prepare_stage_cache2d(state, bed, 0.0, params, dx=spatial.DX, dy=spatial.DY)
-        terms.append(spatial.core.rhs2d(state, bed, spatial.DX, spatial.DY, 0.0, params, stage_cache=cache))
-        harmonic, bounds = spatial.core.max_dt2d(state, bed, spatial.DX, spatial.DY, 0.0, params, stage_cache=cache)
-        stage_cfl.append({"stage": i+1, "dt_x": bounds["dt_x"], "dt_y": bounds["dt_y"],
-                          "dt_harmonic": harmonic, "dt_over_directional_minimum": dt/min(bounds["dt_x"], bounds["dt_y"]),
-                          "combined_Courant": dt*params.cfl/harmonic})
+        term, diagnostics = spatial.kt.rhs(
+            state, vertices, spatial.DX, spatial.DY, params, return_diagnostics=True)
+        terms.append(term)
+        dt_x = params.cfl*spatial.DX/float(np.max(np.maximum(
+            -diagnostics["x"]["a_minus"], diagnostics["x"]["a_plus"])))
+        dt_y = params.cfl*spatial.DY/float(np.max(np.maximum(
+            -diagnostics["y"]["a_minus"], diagnostics["y"]["a_plus"])))
+        harmonic = 1.0/(1.0/dt_x+1.0/dt_y)
+        stage_cfl.append({"stage": i+1, "dt_x": dt_x, "dt_y": dt_y,
+                          "dt_harmonic": harmonic, "dt_over_directional_minimum": dt/min(dt_x, dt_y),
+                          "combined_Courant": dt/harmonic})
     final = q.copy()
     for weight, rhs in zip(be, terms):
         final += dt*weight*rhs
@@ -332,12 +337,12 @@ def implicit_stage_checks(fields, n, dt):
             "production_Newton_tol_abs": 1e-5, "production_Newton_tol_rel": 1e-5}
 
 
-def analytic_quadratic_stage_checks(fields, n, dt, bed):
+def analytic_quadratic_stage_checks(fields, n, dt, vertices):
     """Check ANALYTIC stages against independent frozen-coefficient drag flows."""
     ae, ai, be, bi = tableaux(n)
     start = fields["known"][0, ..., 1:3]
     depth = fields["q0"][..., 0]/RHO
-    params = spatial.core.SolverParams(rho_a=1.2, eps_sing=1e-8, limiter=0)
+    params = spatial.kt.Parameters(rho_a=1.2, eps_sing=1e-8, limiter=0)
     interior = np.zeros(start.shape[:2], dtype=bool)
     interior[4:-4, 4:-4] = True
     explicit_rates = []
@@ -351,9 +356,7 @@ def analytic_quadratic_stage_checks(fields, n, dt, bed):
               mask=np.broadcast_to(interior[..., None], expected_known.shape))
         stage = fields["solved"][i]
         physical = np.stack((stage[..., 0], stage[..., 1], stage[..., 2], stage[..., 4]), axis=-1)
-        cache = spatial.core.prepare_stage_cache2d(physical, bed, 0.0, params, dx=0.75, dy=1.25)
-        explicit_rates.append(spatial.core.rhs2d(
-            physical, bed, 0.75, 1.25, 0.0, params, stage_cache=cache))
+        explicit_rates.append(spatial.kt.rhs(physical, vertices, 0.75, 1.25, params))
         diagonal = ai[i, i]
         old = fields["known"][i, ..., 1:3]
         actual = fields["solved"][i, ..., 1:3]
@@ -404,7 +407,7 @@ def analytic_tableau_suite(args):
             close("analytic fixture solid", fields["q"][..., 4], 0.0, mask=interior)
             if np.any(fields["statistics"][:, 5] != 0):
                 raise AssertionError("analytic tableau fixture unexpectedly clipped a raw stage")
-            error = analytic_quadratic_stage_checks(fields, n, dt, bed)
+            error = analytic_quadratic_stage_checks(fields, n, dt, vertices)
             errors.append(error)
             print("IMEX_ANALYTIC_TABLEAU_EVIDENCE "+json.dumps({
                 "profile": args.profile, "n_RK": n, "dt": dt,
@@ -655,13 +658,19 @@ def main():
         for name in cases:
             vertices, bed, q = spatial.fixture(name)
             for slope, curvature in ((False, False), (True, True)):
-                params = spatial.core.SolverParams(rho_a=1.2, eps_sing=1e-8,
-                                                   slope_correction=slope, curvature_term=curvature)
-                harmonic, diagnostic = spatial.core.max_dt2d(q, bed, spatial.DX, spatial.DY, 0.0, params)
-                bound = min(diagnostic["dt_x"], diagnostic["dt_y"])
+                params = spatial.kt.Parameters(rho_a=1.2, eps_sing=1e-8,
+                                               slope_correction=slope, curvature_term=curvature)
+                _, diagnostic = spatial.kt.rhs(
+                    q, vertices, spatial.DX, spatial.DY, params, return_diagnostics=True)
+                dt_x = params.cfl*spatial.DX/float(np.max(np.maximum(
+                    -diagnostic["x"]["a_minus"], diagnostic["x"]["a_plus"])))
+                dt_y = params.cfl*spatial.DY/float(np.max(np.maximum(
+                    -diagnostic["y"]["a_minus"], diagnostic["y"]["a_plus"])))
+                bound = min(dt_x, dt_y)
+                harmonic = 1.0/(1.0/dt_x+1.0/dt_y)
                 for n in TEST_STAGES:
                     for policy, requested, dt in (("retained", 0.0, bound), ("harmonic", harmonic, harmonic)):
-                        expected, final, stage_cfl = explicit_stages(q, bed, params, n, dt)
+                        expected, final, stage_cfl = explicit_stages(q, vertices, params, n, dt)
                         tag = f"{name}-G{int(slope)}-C{int(curvature)}-RK{n}-{policy}"
                         fields, hashes = launch(args.executable, Path(tag), vertices, lift(q), n, 1, requested,
                                                 slope=slope, curvature=curvature, limiter=params.limiter)

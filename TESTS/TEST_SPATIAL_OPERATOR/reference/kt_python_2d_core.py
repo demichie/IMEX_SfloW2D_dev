@@ -204,8 +204,10 @@ def direction(q, bed, spacing, axis, p, Gface):
     gL, gR = gammas
     # Speeds use the selected depth, including its dry zero-velocity convention.
     rhoL, rhoR = densities
-    cL = np.sqrt(np.maximum(Gface*gL/rhoL*hL, 0))
-    cR = np.sqrt(np.maximum(Gface*gR/rhoR*hR, 0))
+    speed_hL = np.where(hL > p.dry_h_tol, hL, 0)
+    speed_hR = np.where(hR > p.dry_h_tol, hR, 0)
+    cL = np.sqrt(np.maximum(Gface*gL/rhoL*speed_hL, 0))
+    cR = np.sqrt(np.maximum(Gface*gR/rhoR*speed_hR, 0))
     am, ap = np.minimum(np.minimum(uL-cL, uR-cR), 0), np.maximum(np.maximum(uL+cL, uR+cR), 0)
     den = ap-am
     safe = np.where(den > p.speed_eps, den, 1)

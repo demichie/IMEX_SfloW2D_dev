@@ -65,7 +65,6 @@ PROGRAM test_spatial_operator
        domain%solve_cells,domain%j_cent,domain%k_cent,                    &
        domain%solve_interfaces_x,domain%j_stag_x,domain%k_stag_x,          &
        domain%solve_interfaces_y,domain%j_stag_y,domain%k_stag_y)
-
   ! The API defines the returned term only on solve_cells. Initialize the
   ! remaining diagnostic payload explicitly, rather than reading undefined
   ! inactive entries from an INTENT(OUT) array.
@@ -165,7 +164,7 @@ PROGRAM test_spatial_operator
   CALL normalize_inactive_face_payloads
   OPEN(NEWUNIT=output_unit,FILE='result.bin',ACCESS='STREAM',           &
        FORM='UNFORMATTED',STATUS='REPLACE')
-  ! Versioned test-only stream order, decoded by compare_reference.py.
+  ! Version-two test-only stream order, decoded by compare_reference.py.
   ! No production output or private spatial-operator interface is changed.
   WRITE(output_unit) dt
   WRITE(output_unit) q,qp,term,cell_sources
@@ -182,6 +181,9 @@ PROGRAM test_spatial_operator
        reconstruction%qp_interfaceB,reconstruction%qp_interfaceT
   WRITE(output_unit) reconstruction%eta_interfaceL,reconstruction%eta_interfaceR, &
        reconstruction%eta_interfaceB,reconstruction%eta_interfaceT
+  WRITE(output_unit) reconstruction%h_froude_interfaceL, &
+       reconstruction%h_froude_interfaceR, reconstruction%h_froude_interfaceB, &
+       reconstruction%h_froude_interfaceT
   CLOSE(output_unit)
   WRITE(*,*) 'Production worksets:',domain%solve_cells,domain%reconstruction_cells
   CALL spatial%finalize
