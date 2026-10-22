@@ -1689,7 +1689,7 @@ esplicite per cella.
 
 #### Inizializzazione e validazione dei gruppi
 
-equation_partition_type conserva n_equations, n_explicit, n_implicit, implicit(:), implicit_map(:) e explicit_map(:). Aggiunge n_IM_groups, IM_group(:) per equazione, IM_group_method(:) per gruppo e le mappe compatte precomputate. La relazione IM_group(i)=0 se e solo se .NOT. implicit(i) è un’invariante. I gruppi devono essere numerati da 1 a n_IM_groups senza vuoti, ogni metodo deve essere valido, ogni richiesta ANALYTIC deve avere una formula chiusa disponibile per **tutte** le sorgenti implicite agenti sulle equazioni del gruppo. Il mapping globale non può essere sovrascritto con indici locali temporanei. implicit(:) deve avere una sola fonte di verità, evitando configurazioni indipendenti incoerenti.
+equation_partition_type conserva n_equations, n_explicit, n_implicit, implicit(:), implicit_map(:) e explicit_map(:). Aggiunge n_IM_groups, IM_group(:) per equazione, IM_group_method(:) per gruppo e le mappe compatte precomputate. La relazione IM_group(i)=0 se e solo se .NOT. implicit(i) è un’invariante. I gruppi devono essere numerati da 1 a n_IM_groups senza vuoti e ogni metodo deve essere valido. Ogni sorgente IM del gruppo deve essere supportata dal suo trattamento: Newton per il residuo implicito oppure integrazione analitica a coefficienti congelati, con formula chiusa ove disponibile e inversione numerica controllata dell’integrale temporale negli altri casi. Il mapping globale non può essere sovrascritto con indici locali temporanei. implicit(:) deve avere una sola fonte di verità, evitando configurazioni indipendenti incoerenti.
 
 #### Contratto algebrico dei gruppi
 
@@ -1702,16 +1702,17 @@ Per NEWTON, costruire il residuo locale R_g(x_g) e il Jacobiano J_g = dR_g/dx_g 
 `solve_implicit_groups` attraversa i gruppi nell’ordine dichiarato;
 `solve_rk_step` resta il wrapper compatibile. Le sole modalità di gruppo sono
 `IM_GROUP_METHOD_ANALYTIC` e `IM_GROUP_METHOD_NEWTON`: la prima usa
-la soluzione in forma chiusa dell’equazione implicita DIRK per tutti i termini
-supportati del gruppo; la seconda risolve il residuo con Newton e include il
-contributo semi-implicito per la quantità di moto. L’input assegna ciascuna
+il flusso nel tempo dei termini IM con coefficienti non cinematici congelati
+(formule chiuse quando disponibili, integrazione numerica controllata
+dell’integrale temporale altrimenti); la seconda risolve il residuo con
+Newton e include il contributo semi-implicito per la quantità di moto. L’input assegna ciascuna
 famiglia (velocità, energia, pressione dei pori) a un ID di gruppo da 1 a 3:
 ID uguali combinano le famiglie nello stesso gruppo e gli ID crescenti
 stabiliscono l’ordine dello sweep. `IMEX_GROUP_METHOD(1:3)` sceglie `ANALYTIC`
 o `NEWTON` per l’ID corrispondente. Per esempio, assegnare tutte le famiglie
 al gruppo 1 e impostare `IMEX_GROUP_METHOD(1)='NEWTON'` risolve tutte le
 equazioni implicite in un unico gruppo Newton. Per un gruppo analitico misto,
-le formule chiuse sono applicate nell’ordine delle equazioni conservative,
+i termini sono integrati nell’ordine delle equazioni conservative,
 ricostruendo lo stato prima del termine successivo.
 
 Le variabili appartengono al namelist `NUMERIC_PARAMETERS`; i default
@@ -1741,97 +1742,68 @@ registrato come limite preesistente del gate, non come evidenza di
 equivalenza né come regressione introdotta da D12. Occorre correggere o
 riconciliare il gate prima di chiudere D12.
 
-### D13 — Algebriche ANALYTIC per stage DIRK
+### D13 — Integrazione analitica esatta dei termini IM
 
-**Test proporzionati (nuove modifiche a questo step):** T1 residuali algebrici delle soluzioni ANALYTIC di stage DIRK; T2 regimi limite, soglie e selezione delle radici; T3 regressioni del tableau per N_RK 2/3/4. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+**Test proporzionati (nuove modifiche a questo step):** T1 confronto quantitativo con le soluzioni esatte disponibili; T2 regimi limite, soglie e monotonia; T3 regressioni del tableau per N_RK 2/3/4. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: IN CORSO — integrate le soluzioni algebriche di stage per
-velocità, raffreddamento lava e diffusione della pressione interstiziale. I
-test coprono i residui, la condivisione e l’ordine dei gruppi; restano da
-validare i regimi limite e l’intero tableau.
+Stato ufficiale: IN CORSO — i gruppi ANALYTIC integrano nel tempo i termini
+IM con i coefficienti non integrati congelati all’ingresso del gruppo. Le
+formule di flusso chiuse sono usate quando disponibili; gli altri termini
+sono trattati tramite inversione controllata dell’integrale scalare del tempo.
+I test coprono i gruppi e l’ordine; restano da validare i regimi limite e
+l’intero tableau.
 
-#### Limitazioni di ANALYTIC
+#### Flusso congelato per la velocità
 
-Le routine di modulo risolvono l'equazione algebrica dello stage per le due
-componenti orizzontali della velocità. Profondità, temperatura, densità,
+Le routine di modulo integrano nel tempo il termine sorgente combinato per le
+due componenti orizzontali della velocità. Profondità, temperatura, densità,
 frazioni solide, gravità, stress normali, geometria/curvatura, pressioni e
 rapporti tra velocità totale e orizzontale sono ingressi espliciti congelati
-durante lo stage. La direzione orizzontale viene preservata; la soluzione
-scalare del modulo della velocità viene selezionata nell'intervallo
-dissipativo [0, r0].
+durante l’integrazione. La direzione orizzontale viene preservata; si evolve
+il modulo scalare della velocità e lo si arresta a zero quando il flusso si
+ferma.
 
-Le dieci reologie attualmente supportate hanno una forma chiusa con tali
-variabili esplicite: contrazione lineare per empirica; decremento costante
-per plastic; aggiornamento lineare con soglia per lava; quadratiche per
-quadratic drag, Voellmy, lahar, Lucas e mu(I); cubica per mu(I)-Voellmy;
-funzione Lambert W per Froude. Le funzioni comuni per le radici e Lambert W
-sono in `rheology_analytic_utils_2d`, mentre ogni solver specifico resta nel
-modulo della propria reologia.
+Empirica, plastic, lava e quadratic drag usano le rispettive formule esplicite
+di flusso. Per gli altri modelli si inverte l’integrale separato
+\f$\int dr/f(r)\f$ con quadratura adattiva e bisezione, senza sotto-passi
+temporali. I coefficienti non cinematici restano congelati; l’integrale
+numerico ha controlli espliciti di convergenza.
 
-Non è stato introdotto un fallback ANALYTIC per modelli non supportati: in
-questa tranche tutti i modelli attivi hanno una formula chiusa quando le
-variabili non-velocità sono esplicite.
+#### Energia e pressione interstiziale
 
-Il dispatcher degli stage usa i solutori analitici di velocità per i gruppi
-`IM_GROUP_METHOD_ANALYTIC`; usa inoltre le soluzioni algebriche DIRK per il
-raffreddamento della lava e la pressione dei pori. I gruppi
-`IM_GROUP_METHOD_NEWTON` risolvono invece il residuo con Newton, includendo
-SI per la quantità di moto. Non è previsto un fallback analitico generico per
-gruppi accoppiati non supportati.
+Ogni quantità segue lo stesso contratto di metodo: `ANALYTIC` integra il
+termine IM nel tempo con i coefficienti non cinematici congelati; `NEWTON`
+risolve il residuo implicito dello stage e include SI per la quantità di moto
+dove previsto. Per la velocità, il solve analitico comprende già i termini
+semi-implicito e implicito, quindi non si applica SI separatamente.
 
-#### Raffreddamento della lava
+Per il raffreddamento lava, `solve_lava_analytic_temperature` è l’unico solve
+selezionato da `ANALYTIC` e integra l’ODE di raffreddamento a coefficienti
+congelati. Non esiste un solve algebrico DIRK alternativo.
 
-`thermal_sources_2d` distingue l’integrazione esatta dell’ODE dalla soluzione
-algebrica dello stage DIRK. `solve_lava_cooling_stage_temperature` risolve
-senza Newton l’equazione algebrica dello stage ed è la routine usata dai
-gruppi `IM_GROUP_METHOD_ANALYTIC`:
-\f[
-C_A(T-T_k)-\tau[-k_r(T^4-T_a^4)-k_c(T-T_a)]=0,\qquad \tau=dt\,a_{ii}.
-\f]
-La quartica monotona è scalata e risolta con formule chiuse, selezionando la
-radice nell’intervallo fisico fra temperatura nota e ambiente. Il solve usa
-la capacità termica areale dello stato di lavoro all’ingresso del gruppo.
-`solve_lava_analytic_temperature` integra invece l’ODE a coefficienti
-congelati ed è un helper autonomo, non selezionato dal dispatcher IMEX;
-`advance_lava_cooling_temperature` mantiene il nome di compatibilità.
+Per la diffusione della pressione interstiziale, `solve_analytic_pore_pressure`
+è l’unico solve selezionato da `ANALYTIC` e usa la soluzione esponenziale
+esatta con coefficienti congelati. Se energia e pressione condividono un
+gruppo, la pressione usa la temperatura aggiornata nella sequenza del gruppo.
+`advance_lava_cooling_temperature` e `advance_pore_pressure_diffusion`
+mantengono i rispettivi nomi di compatibilità.
 
-#### Diffusione della pressione interstiziale
+I test diretti verificano le traiettorie con build strict e optimized. La
+suite verifica gruppi ANALYTIC e NEWTON, famiglie condivise, ordine
+configurato, aggiornamenti visibili ai gruppi successivi e coerenza del rate
+effettivo con l’incremento conservativo netto. Restano da coprire i limiti
+estremi e la traiettoria completa dell’intero tableau con gruppi multipli.
 
-`advance_pore_pressure_diffusion` conserva il contratto di integrazione esatta
-esponenziale dell’ODE. La distinta routine
-`solve_pore_pressure_diffusion_stage` risolve la relazione algebrica
-\f$p_{e,\mathrm{stage}}=p_{e,\mathrm{known}}/(1+\tau\lambda)\f$, con
-\f$\lambda=(\pi/2)^2DI/[h\max(h_\mathrm{threshold},h)]\f$ e
-\f$\tau=dt\,a_{ii}\f$. Profondità, temperatura e frazioni solide sono
-congelate durante questo solve. È questa soluzione algebrica DIRK a essere
-collegata al gruppo `IM_GROUP_METHOD_ANALYTIC`; quando pressione e energia
-condividono il gruppo, il solve della pressione segue quello energetico e usa
-la temperatura aggiornata. `solve_analytic_pore_pressure` integra invece
-l’ODE a stato congelato e resta un helper autonomo non selezionato dal
-dispatcher.
+#### Contratto d’integrazione
 
-I test diretti verificano le integrazioni analitiche esatte e i residui dei
-solve algebrici DIRK, incluso il caso convection-only per l’energia, in build
-strict e optimized. Le routine di integrazione esatta a coefficienti
-congelati non sono selezionabili come modalità di gruppo. La suite verifica gruppi analitici e
-Newton, famiglie condivise, ordine configurato, aggiornamenti visibili ai
-gruppi successivi e coerenza del rate effettivo con l’incremento conservativo
-netto. Restano da coprire i limiti estremi della quartica e la traiettoria
-completa dell’intero tableau con gruppi multipli.
-
-#### Contratto delle soluzioni di stage
-
-Si risolve **l’equazione algebrica dello stage DIRK**, non l’ODE su `dt`.
-Per il quadratic drag, ad esempio, lo stage scalare è
-\f$\lambda a r^2+r-r_0=0\f$; per mu(I)-Voellmy la legge razionale mu(I)
-combinata con il termine quadratico produce un polinomio cubico. Froude usa
-la branca reale principale `W0` per la legge esponenziale di indebolimento.
-I risolutori selezionano la radice ammissibile più grande nell'intervallo
-[0, r0], preservando la direzione e impedendo incremento o inversione della
-velocità. Il test `../TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_analytic_velocity.f90`
-confronta ogni soluzione con l'equazione di stage ricostruita dai rispettivi
-moduli sorgente in build strict e optimized. Non utilizzare Newton
-implicitamente dentro una routine ANALYTIC.
+Il metodo `ANALYTIC` integra **l’ODE del termine IM su `dt*a_diag` con i
+coefficienti non cinematici congelati**, non risolve l’equazione algebrica
+DIRK. Quando esiste una formula chiusa dello stato finale, si usa quella;
+negli altri casi si inverte l’integrale del tempo con un metodo numerico
+controllato. Non utilizzare Newton implicitamente dentro una routine
+ANALYTIC. Il test
+`../TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_analytic_velocity.f90` verifica i
+limiti fisici e le formule esatte disponibili.
 
 ### D14 — Gruppi misti e validazione
 
@@ -1957,16 +1929,14 @@ solve_lahar_analytic_velocity
 solve_analytic_pore_pressure
 ```
 
-`solve_lava_cooling_stage_temperature` risolve in forma chiusa l’equazione
-algebrica DIRK del termine energetico ed è la routine usata dal metodo di
-gruppo `ANALYTIC`. `solve_lava_analytic_temperature` integra invece l’ODE di
-raffreddamento esattamente a coefficienti congelati; resta un helper autonomo,
-non una modalità dello stage IMEX. `advance_lava_cooling_temperature` mantiene
-il nome di compatibilità. Analogamente, `solve_pore_pressure_diffusion_stage`
-risolve in forma chiusa l’equazione algebrica DIRK usata da `ANALYTIC`, mentre
-`solve_analytic_pore_pressure` integra esattamente l’ODE a stato congelato e
-non è selezionata dal dispatcher; `advance_pore_pressure_diffusion` resta il
-wrapper di compatibilità.
+`solve_lava_analytic_temperature` integra l’ODE di raffreddamento a
+coefficienti congelati ed è l’unico solve di temperatura usato da `ANALYTIC`.
+`advance_lava_cooling_temperature` mantiene il nome di compatibilità.
+Analogamente, `solve_analytic_pore_pressure` integra l’ODE di diffusione
+esponenziale con coefficienti congelati ed è l’unico solve di pressione usato
+da `ANALYTIC`; `advance_pore_pressure_diffusion` resta il wrapper di
+compatibilità. Non devono essere reintrodotti solve algebrici DIRK paralleli
+per queste quantità.
 
 #### Ruoli dei metodi e sequenza dello stage
 
@@ -1980,15 +1950,15 @@ problemi diversi:
   trattamento numerico dello stage: i contributi semi-impliciti sono applicati
   dal coordinatore e Newton risolve i residui impliciti delle variabili
   assegnate al gruppo. Non sono due opzioni di gruppo separate.
-- **Analitico:** `IM_GROUP_METHOD_ANALYTIC` risolve direttamente in forma
-  chiusa l’equazione implicita DIRK per i termini assegnati: velocità,
-  raffreddamento della lava e pressione dei pori. Per la velocità questa
-  soluzione comprende già il contributo semi-implicito e quello implicito;
-  non si applica separatamente il SI prima del solve analitico.
+- **Analitico:** `IM_GROUP_METHOD_ANALYTIC` integra nel tempo i termini IM
+  assegnati con i coefficienti non cinematici congelati; usa formule chiuse
+  quando disponibili e inversione numerica controllata dell’integrale
+  temporale altrimenti. Per la velocità il solve comprende già il contributo
+  semi-implicito e quello implicito; non si applica separatamente il SI prima
+  del solve analitico.
 
 Le sole modalità selezionabili per un gruppo sono quindi `NEWTON` e
-`ANALYTIC`. I solve ODE a coefficienti congelati restano helper autonomi, non
-modalità di gruppo.
+`ANALYTIC`.
 
 La sequenza target per uno stage è:
 
@@ -1997,11 +1967,12 @@ La sequenza target per uno stage è:
 2. Il coordinatore locale inizializza lo stato di lavoro noto. Per ciascun
    gruppo Newton della quantità di moto applica il contributo SI previsto e
    poi risolve il residuo Newton; un gruppo analitico della quantità di moto
-   risolve direttamente l’equazione DIRK completa.
+   integra il termine sorgente combinato nell’intervallo dello stage.
 3. Il coordinatore percorre i gruppi nell’ordine definito da
    `equation_partition`. Ogni gruppo riceve lo stato di lavoro aggiornato dal
-   gruppo precedente e usa uno dei due metodi: solve analitico chiuso dello
-   stage oppure trattamento Newton (con SI per la quantità di moto).
+   gruppo precedente e usa uno dei due metodi: integrazione analitica a
+   coefficienti congelati oppure trattamento Newton (con SI per la quantità
+   di moto).
 4. Ogni metodo modifica soltanto le componenti conservative assegnate al
    gruppo. Dopo ciascun aggiornamento si ricostruiscono da `q` le variabili
    fisiche necessarie al gruppo successivo. Per il raffreddamento, per esempio,
@@ -2026,9 +1997,8 @@ ordinata a `solve_implicit_groups` e calcola il rate netto finale.
 `time_integration_2d` rimane responsabile della sequenza RK globale e dei contributi noti;
 `equation_metadata_2d` descrive partizioni, ordine e metodi; `equation_terms_2d`
 valuta rate e sorgenti per uno stato fornito, ma non orchestra i gruppi. Il
-coordinatore chiama i solve Newton o i solve analitici algebrici DIRK
-appropriati al gruppo; gli helper exact-flow a coefficienti congelati restano
-autonomi e non sono selezionati dal dispatcher.
+coordinatore chiama i solve Newton o i solve di integrazione analitica a
+coefficienti congelati appropriati al gruppo.
 
 #### Termini termici e scambio di massa
 

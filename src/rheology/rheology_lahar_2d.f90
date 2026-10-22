@@ -29,8 +29,8 @@
 !> real and complex overloads of \ref eval_lahar_fluid_viscosity implement
 !> the same fluid-viscosity correlation, while
 !> \ref eval_lahar_deposition_rate supplies the capped settling rate.
-!> \ref solve_lahar_analytic_velocity solves the algebraic DIRK velocity
-!> stage as a quadratic with depth, temperature and concentration explicit.
+!> \ref solve_lahar_analytic_velocity integrates the frozen polynomial
+!> velocity source with depth, temperature and concentration explicit.
 !********************************************************************************
 
 MODULE rheology_lahar_2d
@@ -38,8 +38,9 @@ MODULE rheology_lahar_2d
   USE parameters_2d, ONLY : wp, sp, four_thirds, neg_four_thirds
   USE constitutive_parameters_2d, ONLY : grav, inv_grav
   USE rheology_parameters_2d, ONLY : T_ref
-  USE rheology_analytic_utils_2d, ONLY : solve_quadratic_in_interval,       &
-       validate_analytic_velocity_inputs, fatal_analytic_input_error
+  USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs, &
+       fatal_analytic_input_error, solve_exact_velocity_flow,                &
+       EXACT_FLOW_QUADRATIC_POLYNOMIAL
 
   IMPLICIT NONE
 
@@ -66,12 +67,10 @@ MODULE rheology_lahar_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Solve a complete lahar DIRK stage analytically for velocity.
+  !> \brief Integrate the lahar velocity source exactly.
   !> \details Holds temperature, concentration, depth, density, and speed
-  !> ratio fixed. The implicit viscous and turbulent terms and semi-implicit
-  !> yield stress give a scalar quadratic in the stage speed:
-  !> \f$\lambda a_2r^2+(1+\lambda a_1)r+\lambda c-r_0=0\f$.
-  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !> ratio fixed while integrating the polynomial speed-decay law.
+  !> \param integration_step Exact-flow integration interval.
   !> \param flow_depth Explicit flow depth.
   !> \param temperature Explicit temperature.
   !> \param solid_fraction_sum Explicit total solid volume fraction.
@@ -92,7 +91,6 @@ CONTAINS
     REAL(wp) :: speed_before, speed_after, effective_depth, depth_threshold
     REAL(wp) :: fluid_viscosity, yield_strength
     REAL(wp) :: constant_drag, linear_drag, quadratic_drag
-    LOGICAL :: root_found
 
     velocity_after = velocity_before
     speed_before = SQRT(SUM(velocity_before**2))
@@ -119,11 +117,9 @@ CONTAINS
     quadratic_drag = grav * n_td2 * speed_ratio**2 *                       &
          effective_depth**neg_four_thirds
 
-    CALL solve_quadratic_in_interval(integration_step*quadratic_drag,       &
-         1.0_wp + integration_step*linear_drag,                             &
-         integration_step*constant_drag - speed_before, 0.0_wp, speed_before, &
-         speed_after, root_found)
-    IF (.NOT. root_found) speed_after = 0.0_wp
+    CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,         &
+         [constant_drag, linear_drag, quadratic_drag], integration_step,    &
+         speed_before, speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
 
   END SUBROUTINE solve_lahar_analytic_velocity

@@ -38,7 +38,7 @@ PROGRAM test_analytic_velocity
   REAL(wp), PARAMETER :: temperature = 293.15_wp
   REAL(wp) :: velocity_before(2), velocity_after(2), solid_fraction(1)
   REAL(wp) :: speed_after, horizontal_speed, source_x, source_y
-  REAL(wp) :: source(2), lambert_value
+  REAL(wp) :: source(2), lambert_value, expected_speed, linear_drag, yield_drag
   REAL(wp) :: root
   REAL(wp) :: stochastic_value
   COMPLEX(wp) :: complex_source_x, complex_source_y
@@ -70,6 +70,10 @@ PROGRAM test_analytic_velocity
   tau = 1.0_wp
   CALL solve_plastic_analytic_velocity(integration_step, flow_depth,       &
        speed_ratio, velocity_before, velocity_after)
+  expected_speed = MAX(0.0_wp, SQRT(SUM(velocity_before**2)) -              &
+       integration_step*tau/(flow_depth*speed_ratio))
+  CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
+       'plastic exact constant-drag flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   CALL eval_plastic_implicit_source(CMPLX(velocity_after(1),0.0_wp,wp),     &
        CMPLX(velocity_after(2),0.0_wp,wp), CMPLX(speed_after,0.0_wp,wp),     &
@@ -85,6 +89,14 @@ PROGRAM test_analytic_velocity
   T_ref = 300.0_wp
   CALL solve_lava_analytic_velocity(integration_step, flow_depth,           &
        temperature, mixture_density, speed_ratio, velocity_before, velocity_after)
+  linear_drag = 3.0_wp*nu_ref/flow_depth**2 *                               &
+       EXP(-visc_par*(temperature-T_ref))
+  yield_drag = tau0/(mixture_density*flow_depth*speed_ratio)
+  expected_speed = MAX(0.0_wp, (SQRT(SUM(velocity_before**2)) +             &
+       yield_drag/linear_drag)*EXP(-linear_drag*integration_step) -         &
+       yield_drag/linear_drag)
+  CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
+       'lava exact affine-drag flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   CALL eval_lava_implicit_source(CMPLX(flow_depth,0.0_wp,wp),                &
        CMPLX(temperature,0.0_wp,wp), CMPLX(mixture_density,0.0_wp,wp),       &
@@ -126,6 +138,12 @@ PROGRAM test_analytic_velocity
 
   CALL solve_empirical_analytic_velocity(integration_step, flow_depth,      &
        speed_ratio, velocity_before, velocity_after)
+  linear_drag = 1.0E-3_wp*speed_ratio/                                     &
+       (flow_depth*(1.0_wp+10.0_wp*flow_depth))
+  expected_speed = SQRT(SUM(velocity_before**2))*                           &
+       EXP(-linear_drag*integration_step)
+  CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
+       'empirical exact linear-drag flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
   CALL eval_empirical_implicit_source(CMPLX(flow_depth,0.0_wp,wp),           &
@@ -140,6 +158,11 @@ PROGRAM test_analytic_velocity
   friction_factor = 0.1_wp
   CALL solve_quadratic_analytic_velocity(integration_step, flow_depth,      &
        speed_ratio, velocity_before, velocity_after)
+  linear_drag = friction_factor*speed_ratio**2/flow_depth
+  expected_speed = SQRT(SUM(velocity_before**2))/                           &
+       (1.0_wp+linear_drag*SQRT(SUM(velocity_before**2))*integration_step)
+  CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
+       'quadratic exact reciprocal-speed flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
   CALL eval_quadratic_implicit_source(                                      &
@@ -312,7 +335,7 @@ PROGRAM test_analytic_velocity
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, source, 'mu(I)-Voellmy stochastic pore pressure')
 
-  WRITE(*,*) 'All analytic rheology stage checks passed.'
+  WRITE(*,*) 'All analytic rheology exact-flow checks passed.'
 
 CONTAINS
 
@@ -321,21 +344,36 @@ CONTAINS
     REAL(wp), INTENT(IN) :: before(2), after(2), coefficient, mass_depth
     REAL(wp), INTENT(IN) :: source(2)
     CHARACTER(LEN=*), INTENT(IN) :: label
-    REAL(wp) :: residual(2), tolerance
+    REAL(wp) :: tolerance, source_power, initial_speed, final_speed
+    REAL(wp) :: average_decay_rate, final_decay_rate, rate_tolerance
 
-    residual = after - before - coefficient*source/mass_depth
-    tolerance = 2.0E-10_wp * MAX(1.0_wp, MAXVAL(ABS(before)))
-    IF (MAXVAL(ABS(residual)) .GT. tolerance) THEN
-       WRITE(*,*) 'FAIL: analytic stage equation ', label, residual
+    tolerance = 2.0E-10_wp * MAX(1.0_wp, MAXVAL(ABS(before)),              &
+         ABS(coefficient)*MAXVAL(ABS(source))/mass_depth)
+    initial_speed = SQRT(SUM(before**2))
+    final_speed = SQRT(SUM(after**2))
+    source_power = SUM(after*source)
+    IF (source_power .GT. tolerance*mass_depth) THEN
+       WRITE(*,*) 'FAIL: exact rheology source accelerates the flow ', label
        ERROR STOP 1
     END IF
     IF (SUM(after*before) .LT. 0.0_wp) THEN
        WRITE(*,*) 'FAIL: analytic stage reversed direction ', label
        ERROR STOP 1
     END IF
-    IF (SQRT(SUM(after**2)) .GT. SQRT(SUM(before**2)) + tolerance) THEN
+    IF (final_speed .GT. initial_speed + tolerance) THEN
        WRITE(*,*) 'FAIL: analytic friction increased speed ', label
        ERROR STOP 1
+    END IF
+    IF (final_speed .GT. tolerance) THEN
+       average_decay_rate = (initial_speed-final_speed)/coefficient
+       final_decay_rate = SQRT(SUM(source**2))/mass_depth
+       rate_tolerance = 5.0E-2_wp*MAX(average_decay_rate, final_decay_rate, &
+            TINY(1.0_wp))
+       IF (ABS(average_decay_rate-final_decay_rate) .GT. rate_tolerance) THEN
+          WRITE(*,*) 'FAIL: exact-flow decay disagrees with terminal source ', &
+               label, average_decay_rate, final_decay_rate
+          ERROR STOP 1
+       END IF
     END IF
 
   END SUBROUTINE assert_stage

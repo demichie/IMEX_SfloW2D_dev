@@ -14,8 +14,8 @@
 !> \ref eval_lava_semi_impl_source evaluates the real-valued yield source.
 !> \ref nu_ref, \ref visc_par and \ref tau0 are the model parameters. Thermal
 !> cooling is owned by the thermal-source module, not by this rheology.
-!> \ref solve_lava_analytic_velocity solves the algebraic DIRK velocity
-!> stage with temperature and the other non-velocity inputs explicit.
+!> \ref solve_lava_analytic_velocity integrates the frozen affine velocity
+!> source exactly with temperature and other non-velocity inputs explicit.
 !********************************************************************************
 
 MODULE rheology_lava_2d
@@ -23,7 +23,7 @@ MODULE rheology_lava_2d
   USE parameters_2d, ONLY : wp
   USE rheology_parameters_2d, ONLY : T_ref
   USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,  &
-       fatal_analytic_input_error
+       fatal_analytic_input_error, solve_exact_velocity_flow, EXACT_FLOW_AFFINE
 
   IMPLICIT NONE
 
@@ -40,12 +40,10 @@ MODULE rheology_lava_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Solve a lava-rheology DIRK stage analytically for velocity.
+  !> \brief Integrate the lava-rheology velocity source exactly.
   !> \details Holds depth, temperature, density, and speed ratio fixed. The
-  !> viscous term gives linear speed damping and the yield term gives a
-  !> constant speed decrement, with stopping at zero:
-  !> \f$r^+=\max(0,(r_0-\lambda c)/(1+\lambda a))\f$.
-  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !> affine speed-decay law is integrated exactly, with stopping at zero.
+  !> \param integration_step Exact-flow interval, normally dt * a_ii.
   !> \param flow_depth Explicit flow depth.
   !> \param temperature Explicit temperature.
   !> \param mixture_density Explicit mixture density.
@@ -80,8 +78,9 @@ CONTAINS
          EXP(-visc_par * (temperature - T_ref))
     linear_drag = gamma / flow_depth
     yield_drag = tau0 / (mixture_density * flow_depth * speed_ratio)
-    speed_after = MAX(0.0_wp, (speed_before - integration_step*yield_drag) &
-         / (1.0_wp + integration_step*linear_drag))
+    CALL solve_exact_velocity_flow(EXACT_FLOW_AFFINE,                       &
+         [yield_drag, linear_drag], integration_step, speed_before,         &
+         speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
 
   END SUBROUTINE solve_lava_analytic_velocity

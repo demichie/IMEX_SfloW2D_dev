@@ -19,8 +19,8 @@
 !> \ref eval_mui_voellmy_implicit_source for the turbulent part. The granular
 !> source uses Sauter particle diameter and average particle density when
 !> multiple solid classes are present.
-!> \ref solve_mui_voellmy_analytic_velocity solves the combined algebraic
-!> DIRK speed equation as a cubic with non-velocity state frozen explicitly.
+!> \ref solve_mui_voellmy_analytic_velocity integrates the combined
+!> speed-dependent source with non-velocity state frozen explicitly.
 !********************************************************************************
 
 MODULE rheology_mui_voellmy_2d
@@ -29,9 +29,9 @@ MODULE rheology_mui_voellmy_2d
   USE constitutive_parameters_2d, ONLY : diam_s, rho_s
   USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf, xi
   USE state_conversion_2d, ONLY : sauter_diameter, average_density_solids
-  USE rheology_analytic_utils_2d, ONLY : solve_cubic_in_interval,          &
-       mui_velocity_stage_polynomial, validate_analytic_velocity_inputs,    &
-       fatal_analytic_input_error
+  USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs, &
+       fatal_analytic_input_error, solve_exact_velocity_flow,                &
+       EXACT_FLOW_MUI_VOELLMY
 
   IMPLICIT NONE
 
@@ -43,12 +43,10 @@ MODULE rheology_mui_voellmy_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Solve the complete \f$\mu(I)\f$-Voellmy DIRK stage analytically.
-  !> \details Holds particle properties, stress, depth, and speed ratio fixed.
-  !> The rational basal law plus quadratic turbulent drag gives a cubic
-  !> equation for the stage speed; the largest root in the dissipative
-  !> interval is selected.
-  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !> \brief Integrate the frozen \f$\mu(I)\f$-Voellmy source in time.
+  !> \details Holds particle properties, stress, depth, and speed ratio fixed
+  !> while integrating the combined rational and quadratic decay law.
+  !> \param integration_step Exact-flow integration interval.
   !> \param flow_depth Explicit flow depth.
   !> \param speed_ratio Explicit total-to-horizontal speed ratio.
   !> \param velocity_before Input horizontal velocity.
@@ -80,9 +78,8 @@ CONTAINS
 
     REAL(wp) :: speed_before, speed_after, particle_diameter, particle_density
     REAL(wp) :: effective_depth, vertical_stress, normal_stress
-    REAL(wp) :: quadratic, linear, constant, inertial_slope, basal_factor
+    REAL(wp) :: inertial_slope, basal_factor, sqrt_gravity
     REAL(wp) :: xi_effective, turbulent_drag
-    LOGICAL :: root_found
 
     velocity_after = velocity_before
     speed_before = SQRT(SUM(velocity_before**2))
@@ -116,11 +113,11 @@ CONTAINS
     normal_stress = MAX(EPSILON(1.0_wp),                                  &
          vertical_stress * SQRT(gravity_coefficient))
 
-    CALL mui_velocity_stage_polynomial(integration_step, speed_before,      &
-         flow_depth, effective_depth, speed_ratio, mixture_density,         &
-         normal_stress, gravity_coefficient, particle_diameter,              &
-         particle_density, I_0, mu_s, mu_2, muI_inf, quadratic, linear,      &
-         constant, inertial_slope, basal_factor)
+    sqrt_gravity = SQRT(gravity_coefficient)
+    inertial_slope = 2.5_wp * particle_diameter * speed_ratio /             &
+         (effective_depth * sqrt_gravity *                                  &
+         SQRT(normal_stress/particle_density))
+    basal_factor = normal_stress / (mixture_density*flow_depth*speed_ratio)
 
     xi_effective = xi
     IF (use_stochastic_xi) THEN
@@ -130,10 +127,10 @@ CONTAINS
        CALL fatal_analytic_input_error('Nonpositive xi in mu(I)-Voellmy analytic solver')
     END IF
     turbulent_drag = reduced_gravity * speed_ratio / (xi_effective*flow_depth)
-    CALL solve_cubic_in_interval(integration_step*turbulent_drag*          &
-         inertial_slope, quadratic + integration_step*turbulent_drag*I_0,  &
-         linear, constant, 0.0_wp, speed_before, speed_after, root_found)
-    IF (.NOT. root_found) speed_after = 0.0_wp
+    CALL solve_exact_velocity_flow(EXACT_FLOW_MUI_VOELLMY,                  &
+         [basal_factor*mu_s*I_0, basal_factor*mu_2*inertial_slope,         &
+         basal_factor*muI_inf*inertial_slope**2, I_0, inertial_slope,       &
+         turbulent_drag], integration_step, speed_before, speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
 
   END SUBROUTINE solve_mui_voellmy_analytic_velocity

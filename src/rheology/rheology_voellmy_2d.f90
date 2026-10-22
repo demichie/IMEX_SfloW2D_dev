@@ -19,16 +19,17 @@
 !> \ref eval_voellmy_semi_impl_source for the Coulomb term; \ref mu and
 !> \ref xi are their respective friction parameters. When enabled,
 !> \f$a_c=c_{xx}u_x^2+2c_{xy}u_xu_y+c_{yy}u_y^2\f$.
-!> \ref solve_voellmy_analytic_velocity solves the combined algebraic DIRK
-!> stage as a quadratic in speed while holding non-velocity inputs explicit.
+!> \ref solve_voellmy_analytic_velocity exactly integrates the frozen
+!> combined velocity source while holding non-velocity inputs fixed.
 !********************************************************************************
 
 MODULE rheology_voellmy_2d
 
   USE parameters_2d, ONLY : wp
   USE rheology_parameters_2d, ONLY : xi
-  USE rheology_analytic_utils_2d, ONLY : solve_quadratic_in_interval,       &
-       validate_analytic_velocity_inputs, fatal_analytic_input_error
+  USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs, &
+       fatal_analytic_input_error, solve_exact_velocity_flow,                &
+       EXACT_FLOW_QUADRATIC_POLYNOMIAL
 
   IMPLICIT NONE
 
@@ -42,14 +43,11 @@ MODULE rheology_voellmy_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Solve a complete Voellmy DIRK stage analytically for velocity.
-  !> \details Combines the frozen Coulomb stress with the quadratic turbulent
+  !> \brief Integrate the Voellmy velocity source exactly.
+  !> \details Combines the frozen Coulomb stress with quadratic turbulent
   !> drag. Depth, density, gravity, curvature, pore pressure, and the
-  !> speed-to-horizontal-speed ratio are explicit stage inputs. For stage
-  !> speed \f$r\f$, it solves
-  !> \f$\lambda b r^2+r+\lambda c-r_0=0\f$ and selects the largest root in
-  !> \f$[0,r_0]\f$.
-  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !> speed-to-horizontal-speed ratio remain fixed during integration.
+  !> \param integration_step Exact-flow integration interval.
   !> \param flow_depth Explicit flow depth.
   !> \param speed_ratio Explicit total-to-horizontal speed ratio.
   !> \param velocity_before Input horizontal velocity.
@@ -79,7 +77,6 @@ CONTAINS
 
     REAL(wp) :: speed_before, speed_after, xi_effective
     REAL(wp) :: coulomb_stress, constant_drag, quadratic_drag
-    LOGICAL :: root_found
 
     velocity_after = velocity_before
     speed_before = SQRT(SUM(velocity_before**2))
@@ -109,10 +106,9 @@ CONTAINS
     constant_drag = coulomb_stress / (mixture_density * flow_depth * speed_ratio)
     quadratic_drag = reduced_gravity * speed_ratio / (xi_effective*flow_depth)
 
-    CALL solve_quadratic_in_interval(integration_step*quadratic_drag,       &
-         1.0_wp, integration_step*constant_drag - speed_before, 0.0_wp,      &
-         speed_before, speed_after, root_found)
-    IF (.NOT. root_found) speed_after = 0.0_wp
+    CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,         &
+         [constant_drag, 0.0_wp, quadratic_drag], integration_step,          &
+         speed_before, speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
 
   END SUBROUTINE solve_voellmy_analytic_velocity

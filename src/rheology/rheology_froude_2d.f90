@@ -13,16 +13,17 @@
 !> stochastic perturbations shift the Froude number for sufficiently deep
 !> flow and clamp it at zero. The module provides
 !> \ref eval_froude_source to evaluate the two horizontal source components.
-!> \ref solve_froude_analytic_velocity solves the velocity DIRK stage on the
-!> exponential branch with the principal real Lambert W function.
+!> \ref solve_froude_analytic_velocity integrates the frozen Froude-dependent
+!> velocity source in time.
 !********************************************************************************
 
 MODULE rheology_froude_2d
 
   USE parameters_2d, ONLY : wp
   USE rheology_parameters_2d, ONLY : mu_0, mu_inf, Fr_0
-  USE rheology_analytic_utils_2d, ONLY : lambert_w0,                        &
-       validate_analytic_velocity_inputs, fatal_analytic_input_error
+  USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,  &
+       fatal_analytic_input_error, solve_exact_velocity_flow,                &
+       EXACT_FLOW_FROUDE
 
   IMPLICIT NONE
 
@@ -34,13 +35,10 @@ MODULE rheology_froude_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Solve the Froude-dependent DIRK stage analytically for velocity.
-  !> \details Holds depth, gravity, curvature, and the speed ratio fixed. On
-  !> the weakening branch, the scalar stage equation is solved with the
-  !> principal real Lambert W function; the zero-Froude clamp is checked
-  !> separately. All inputs other than the two horizontal velocity components
-  !> are explicit and frozen over the stage.
-  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !> \brief Integrate the Froude-dependent velocity source exactly.
+  !> \details Holds depth, gravity, curvature, and the speed ratio fixed while
+  !> integrating the frozen scalar speed-decay law.
+  !> \param integration_step Exact-flow integration interval.
   !> \param flow_depth Explicit flow depth.
   !> \param speed_ratio Explicit total-to-horizontal speed ratio.
   !> \param velocity_before Input horizontal velocity.
@@ -62,11 +60,8 @@ CONTAINS
     REAL(wp), INTENT(IN) :: stochastic_value
     REAL(wp), INTENT(OUT) :: velocity_after(2)
 
-    REAL(wp) :: speed_before, speed_after, shift, base_drag, scale
-    REAL(wp) :: froude_slope, froude_value_slope, constant_branch_speed
-    REAL(wp) :: remaining_speed, weakening_amplitude, argument, w_value
-    REAL(wp) :: exponent, lower_branch_limit
-    LOGICAL :: w_found, valid_root
+    REAL(wp) :: speed_before, speed_after, shift, base_drag
+    REAL(wp) :: froude_slope, froude_value_slope
 
     velocity_after = velocity_before
     speed_before = SQRT(SUM(velocity_before**2))
@@ -80,65 +75,15 @@ CONTAINS
     END IF
 
     base_drag = gravity_coefficient * (reduced_gravity + curvature_term)
-    scale = integration_step * base_drag
-    IF (scale .LE. 0.0_wp) RETURN
-
-    IF (mu_0 .EQ. mu_inf) THEN
-       speed_after = MAX(0.0_wp, speed_before - scale*mu_0)
-       velocity_after = (speed_after / speed_before) * velocity_before
-       RETURN
-    END IF
+    IF (base_drag .LE. 0.0_wp) RETURN
 
     shift = 0.0_wp
     IF (stochastic .AND. flow_depth .GT. 0.01_wp) shift = stochastic_value
     froude_value_slope = speed_ratio / SQRT(reduced_gravity*flow_depth)
     froude_slope = froude_value_slope / Fr_0
-    constant_branch_speed = speed_before - scale*mu_0
-    valid_root = constant_branch_speed .GE. 0.0_wp .AND.                   &
-         (froude_value_slope*constant_branch_speed + shift) .LE. 0.0_wp
-
-    IF (valid_root) THEN
-       speed_after = constant_branch_speed
-    ELSE
-       remaining_speed = speed_before - scale*mu_inf
-       weakening_amplitude = scale * (mu_0 - mu_inf) * EXP(-shift/Fr_0)
-       IF (weakening_amplitude .EQ. 0.0_wp) THEN
-          speed_after = remaining_speed
-          valid_root = speed_after .GE. 0.0_wp .AND.                       &
-               (froude_value_slope*speed_after + shift) .GE. 0.0_wp
-       ELSE
-          exponent = -froude_slope * remaining_speed
-          lower_branch_limit = LOG(HUGE(1.0_wp)) -                         &
-               LOG(ABS(froude_slope*weakening_amplitude))
-          IF (exponent .GT. lower_branch_limit) THEN
-             IF (weakening_amplitude .LT. 0.0_wp) THEN
-                CALL fatal_analytic_input_error(                            &
-                     'Lambert W argument overflow in Froude analytic solver')
-             END IF
-             valid_root = .FALSE.
-          ELSE
-             argument = -froude_slope * weakening_amplitude * EXP(exponent)
-             IF (argument .LT. -1.0_wp/EXP(1.0_wp) -                       &
-                  8.0_wp*EPSILON(1.0_wp)) THEN
-                valid_root = .FALSE.
-             ELSE
-                CALL lambert_w0(argument, w_value, w_found)
-                IF (.NOT. w_found) THEN
-                   CALL fatal_analytic_input_error(                        &
-                        'Lambert W evaluation failed in Froude analytic solver')
-                END IF
-                speed_after = remaining_speed + w_value/froude_slope
-                valid_root = speed_after .GE. 0.0_wp .AND.                 &
-                     speed_after .LE. speed_before .AND.                   &
-                     (froude_value_slope*speed_after + shift) .GE. 0.0_wp
-             END IF
-          END IF
-       END IF
-
-       IF (.NOT. valid_root) speed_after = 0.0_wp
-    END IF
-
-    speed_after = MIN(speed_before, MAX(0.0_wp, speed_after))
+    CALL solve_exact_velocity_flow(EXACT_FLOW_FROUDE,                       &
+         [base_drag, froude_slope, shift/Fr_0, mu_0, mu_inf],                &
+         integration_step, speed_before, speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
 
   END SUBROUTINE solve_froude_analytic_velocity

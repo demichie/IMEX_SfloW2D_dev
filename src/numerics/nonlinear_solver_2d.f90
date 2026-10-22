@@ -187,8 +187,8 @@ CONTAINS
     USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms,                   &
          curvature_acceleration
     USE rheology_2d, ONLY : correct_friction_momentum
-    USE thermal_sources_2d, ONLY : solve_lava_cooling_stage_temperature
-    USE pore_pressure_2d, ONLY : solve_pore_pressure_diffusion_stage
+    USE thermal_sources_2d, ONLY : solve_lava_analytic_temperature
+    USE pore_pressure_2d, ONLY : solve_analytic_pore_pressure
     USE rheology_voellmy_2d, ONLY : solve_voellmy_analytic_velocity
     USE rheology_plastic_2d, ONLY : solve_plastic_analytic_velocity
     USE rheology_lava_2d, ONLY : solve_lava_analytic_velocity
@@ -225,8 +225,8 @@ CONTAINS
     REAL(wp) :: flow_h, flow_u, flow_v, flow_temperature, flow_density
     REAL(wp) :: flow_alphas(n_solid), flow_alphag(n_add_gas), flow_alphal
     REAL(wp) :: flow_red_grav, flow_p_dyn, flow_Zs, flow_pore_pressure
-    REAL(wp) :: temperature_stage, heat_capacity, pressure_known
-    REAL(wp) :: pressure_stage, speed_ratio, horizontal_speed
+    REAL(wp) :: temperature_after, heat_capacity, pressure_known
+    REAL(wp) :: pressure_after, speed_ratio, horizontal_speed
     REAL(wp) :: curvature_accel, velocity_after(2), qp_current(n_vars+2)
     REAL(wp) :: dynamic_pressure, si_term(n_eqns), residual_without_si(n_eqns)
     REAL(wp) :: momentum_before_newton(2)
@@ -388,10 +388,10 @@ CONTAINS
                 RETURN
              END IF
              heat_capacity = qj(4) / flow_temperature
-             CALL solve_lava_cooling_stage_temperature(flow_temperature,    &
+             CALL solve_lava_analytic_temperature(flow_temperature,        &
                   dt_step*a_diag, heat_capacity, radiative_term_coeff,       &
-                  convective_term_coeff, T_env, temperature_stage)
-             qj(4) = heat_capacity * temperature_stage
+                  convective_term_coeff, T_env, temperature_after)
+             qj(4) = heat_capacity * temperature_after
           END IF
 
           IF (ANY(group_equations(1:group_size) .EQ. idx_pore)) THEN
@@ -401,10 +401,10 @@ CONTAINS
                      flow_alphag, flow_red_grav, flow_p_dyn, flow_Zs,        &
                      flow_pore_pressure)
                 pressure_known = qj(idx_pore) / qj(1)
-                CALL solve_pore_pressure_diffusion_stage(pressure_known,     &
+                CALL solve_analytic_pore_pressure(pressure_known,            &
                      dt_step*a_diag, flow_h, flow_temperature, flow_alphas,  &
-                     pressure_stage)
-                qj(idx_pore) = qj(1) * pressure_stage
+                     pressure_after)
+                qj(idx_pore) = qj(1) * pressure_after
              END IF
           END IF
 

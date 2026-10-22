@@ -16,7 +16,7 @@
 !> \ref eval_mui_source evaluates the real-valued x/y source components,
 !> choosing a Sauter diameter and average solid density for mixtures with
 !> multiple solid classes. \ref solve_mui_analytic_velocity solves its
-!> rational speed-dependent algebraic DIRK stage as a quadratic.
+!> rational speed-dependent frozen-coefficient source in time.
 !********************************************************************************
 
 MODULE rheology_mui_2d
@@ -25,9 +25,9 @@ MODULE rheology_mui_2d
   USE constitutive_parameters_2d, ONLY : diam_s, rho_s
   USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf
   USE state_conversion_2d, ONLY : sauter_diameter, average_density_solids
-  USE rheology_analytic_utils_2d, ONLY : solve_quadratic_in_interval,       &
-       mui_velocity_stage_polynomial, validate_analytic_velocity_inputs,    &
-       fatal_analytic_input_error
+  USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs, &
+       fatal_analytic_input_error, solve_exact_velocity_flow,                &
+       EXACT_FLOW_MUI
 
   IMPLICIT NONE
 
@@ -38,12 +38,10 @@ MODULE rheology_mui_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Solve the regularized \f$\mu(I)\f$ DIRK stage analytically.
+  !> \brief Integrate the regularized \f$\mu(I)\f$ source in time.
   !> \details Holds particle properties, effective stress, depth, and the
-  !> speed ratio fixed. Clearing the rational friction law's denominator
-  !> produces a quadratic equation for the stage speed; its largest admissible
-  !> root in \f$[0,r_0]\f$ is used.
-  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !> speed ratio fixed while integrating the rational speed-decay law.
+  !> \param integration_step Exact-flow integration interval.
   !> \param flow_depth Explicit flow depth.
   !> \param speed_ratio Explicit total-to-horizontal speed ratio.
   !> \param velocity_before Input horizontal velocity.
@@ -71,8 +69,7 @@ CONTAINS
 
     REAL(wp) :: speed_before, speed_after, particle_diameter, particle_density
     REAL(wp) :: effective_depth, vertical_stress, normal_stress
-    REAL(wp) :: quadratic, linear, constant, inertial_slope, basal_factor
-    LOGICAL :: root_found
+    REAL(wp) :: inertial_slope, basal_factor, sqrt_gravity
 
     velocity_after = velocity_before
     speed_before = SQRT(SUM(velocity_before**2))
@@ -106,14 +103,15 @@ CONTAINS
     normal_stress = MAX(EPSILON(1.0_wp),                                  &
          vertical_stress * SQRT(gravity_coefficient))
 
-    CALL mui_velocity_stage_polynomial(integration_step, speed_before,      &
-         flow_depth, effective_depth, speed_ratio, mixture_density,         &
-         normal_stress, gravity_coefficient, particle_diameter,              &
-         particle_density, I_0, mu_s, mu_2, muI_inf, quadratic, linear,      &
-         constant, inertial_slope, basal_factor)
-    CALL solve_quadratic_in_interval(quadratic, linear, constant,           &
-         0.0_wp, speed_before, speed_after, root_found)
-    IF (.NOT. root_found) speed_after = 0.0_wp
+    sqrt_gravity = SQRT(gravity_coefficient)
+    inertial_slope = 2.5_wp * particle_diameter * speed_ratio /             &
+         (effective_depth * sqrt_gravity *                                  &
+         SQRT(normal_stress/particle_density))
+    basal_factor = normal_stress / (mixture_density*flow_depth*speed_ratio)
+    CALL solve_exact_velocity_flow(EXACT_FLOW_MUI,                          &
+         [basal_factor*mu_s*I_0, basal_factor*mu_2*inertial_slope,         &
+         basal_factor*muI_inf*inertial_slope**2, I_0, inertial_slope],      &
+         integration_step, speed_before, speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
 
   END SUBROUTINE solve_mui_analytic_velocity

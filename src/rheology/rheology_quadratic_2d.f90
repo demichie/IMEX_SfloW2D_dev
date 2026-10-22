@@ -8,15 +8,15 @@
 !> where \f$f_q\f$ is \ref friction_factor. The module provides
 !> \ref eval_quadratic_implicit_source, which returns zero for a stationary
 !> state and otherwise evaluates the complex-valued x/y sources.
-!> \ref solve_quadratic_analytic_velocity solves the scalar quadratic DIRK
-!> stage and reconstructs both velocity components along their input direction.
+!> \ref solve_quadratic_analytic_velocity integrates the frozen quadratic
+!> velocity source and reconstructs both components along their input direction.
 !********************************************************************************
 
 MODULE rheology_quadratic_2d
 
   USE parameters_2d, ONLY : wp
-  USE rheology_analytic_utils_2d, ONLY : solve_quadratic_in_interval,       &
-       validate_analytic_velocity_inputs
+  USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs, &
+       solve_exact_velocity_flow, EXACT_FLOW_QUADRATIC
 
   IMPLICIT NONE
 
@@ -30,11 +30,10 @@ MODULE rheology_quadratic_2d
 CONTAINS
 
   !******************************************************************************
-  !> \brief Solve the quadratic-friction DIRK stage analytically for velocity.
-  !> \details Holds depth and the speed-to-horizontal-speed ratio fixed. The
-  !> stage speed is the largest root in [0, speed_before] of the quadratic
-  !> \f$\lambda a r^2+r-r_0=0\f$ obtained from the model's speed-squared drag.
-  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !> \brief Integrate the quadratic-friction velocity source exactly.
+  !> \details Holds depth and the speed-to-horizontal-speed ratio fixed and
+  !> applies the reciprocal-speed exact solution of the quadratic drag law.
+  !> \param integration_step Exact-flow integration interval.
   !> \param flow_depth Explicit flow depth.
   !> \param speed_ratio Explicit total-to-horizontal speed ratio.
   !> \param velocity_before Input horizontal velocity.
@@ -48,7 +47,6 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: velocity_after(2)
 
     REAL(wp) :: speed_before, speed_after, quadratic_drag
-    LOGICAL :: root_found
 
     velocity_after = velocity_before
     speed_before = SQRT(SUM(velocity_before**2))
@@ -57,9 +55,8 @@ CONTAINS
     IF (integration_step .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
 
     quadratic_drag = friction_factor * speed_ratio**2 / flow_depth
-    CALL solve_quadratic_in_interval(integration_step*quadratic_drag,      &
-         1.0_wp, -speed_before, 0.0_wp, speed_before, speed_after, root_found)
-    IF (.NOT. root_found) speed_after = 0.0_wp
+    CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC, [quadratic_drag],  &
+         integration_step, speed_before, speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
 
   END SUBROUTINE solve_quadratic_analytic_velocity

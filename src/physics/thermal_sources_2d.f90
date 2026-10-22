@@ -1,10 +1,8 @@
 !********************************************************************************
-!> \brief Thermal source laws and lava cooling stage solvers.
+!> \brief Thermal source laws and exact lava cooling integration.
 !> \details Provides thermal-energy sources for inlet injection, mass exchange
 !>          and vaporization, as well as the lava radiative/convective cooling
-!>          law. It provides both an exact-flow integrator for the autonomous
-!>          cooling ODE and a closed-form solution of its scalar DIRK stage
-!>          equation; callers select which contract applies.
+!>          law and one exact-flow integrator for the autonomous cooling ODE.
 !********************************************************************************
 
 MODULE thermal_sources_2d
@@ -21,7 +19,6 @@ MODULE thermal_sources_2d
   PUBLIC :: eval_lava_cooling_source
   PUBLIC :: solve_lava_analytic_temperature
   PUBLIC :: advance_lava_cooling_temperature
-  PUBLIC :: solve_lava_cooling_stage_temperature
   PUBLIC :: eval_mass_exchange_thermal_energy
   PUBLIC :: eval_vaporization_sources
 
@@ -85,13 +82,13 @@ CONTAINS
   !> \brief Solve the exact-flow lava cooling temperature over a time interval.
   !> \details Separates the autonomous temperature equation and evaluates its
   !>          analytic time-temperature primitive. A bisection inversion finds
-  !>          the temperature after the requested stage interval. The
+  !>          the temperature after the requested integration interval. The
   !>          areal thermal capacity and cooling coefficients are held fixed:
   !>          \f$C_A\frac{dT}{dt}=-k_r(T^4-T_a^4)-k_c(T-T_a)\f$.
   !>          The result is constrained to the closed interval between the
   !>          initial and ambient temperatures.
   !> \param[in] temperature Initial lava temperature T(0) [K].
-  !> \param[in] integration_step Effective stage interval, normally dt*a_ii [s].
+  !> \param[in] integration_step Integration interval, normally dt*a_ii [s].
   !> \param[in] areal_heat_capacity Areal heat capacity C_A [J m^-2 K^-1].
   !> \param[in] radiative_coefficient Radiative cooling coefficient k_r [W m^-2 K^-4].
   !> \param[in] convective_coefficient Convective cooling coefficient k_c [W m^-2 K^-1].
@@ -235,145 +232,6 @@ CONTAINS
          ambient_temperature, temperature_after)
 
   END SUBROUTINE advance_lava_cooling_temperature
-
-  !******************************************************************************
-  !> \brief Solve the scalar DIRK stage equation for lava cooling.
-  !> \details Solves
-  !>          \f$T=T_k+\tau S_T(T)/C_A\f$, where
-  !>          \f$\tau=dt\,a_{ii}\f$ and
-  !>          \f$S_T=-k_r(T^4-T_a^4)-k_c(T-T_a)\f$. The equation reduces to
-  !>          a monotone quartic of the form \f$aT^4+bT-c=0\f$ and is evaluated
-  !>          with Ferrari/Cardano radicals, not by integrating the continuous
-  !>          cooling ODE or iterating Newton.
-  !> \param[in] temperature_known Stage-known temperature after prior RK terms [K].
-  !> \param[in] integration_step Effective DIRK coefficient \f$dt\,a_{ii}\f$ [s].
-  !> \param[in] areal_heat_capacity Areal heat capacity \f$C_A\f$ [J m^-2 K^-1].
-  !> \param[in] radiative_coefficient Radiative coefficient \f$k_r\f$ [W m^-2 K^-4].
-  !> \param[in] convective_coefficient Convective coefficient \f$k_c\f$ [W m^-2 K^-1].
-  !> \param[in] ambient_temperature Ambient temperature \f$T_a\f$ [K].
-  !> \param[out] temperature_stage DIRK stage temperature satisfying the stage equation [K].
-  !> \note Requires finite nonnegative temperature_known and integration_step, positive
-  !>       heat capacity and ambient temperature, and nonnegative cooling coefficients.
-  !******************************************************************************
-  SUBROUTINE solve_lava_cooling_stage_temperature(temperature_known,          &
-       integration_step, areal_heat_capacity, radiative_coefficient,          &
-       convective_coefficient, ambient_temperature, temperature_stage)
-
-    REAL(wp), INTENT(IN) :: temperature_known, integration_step
-    REAL(wp), INTENT(IN) :: areal_heat_capacity
-    REAL(wp), INTENT(IN) :: radiative_coefficient, convective_coefficient
-    REAL(wp), INTENT(IN) :: ambient_temperature
-    REAL(wp), INTENT(OUT) :: temperature_stage
-
-    REAL(wp) :: scale, ratio, scaled_radiation, a, b, c, w
-    REAL(wp) :: log_p, p, u, x
-
-    IF (.NOT. ieee_is_finite(temperature_known) .OR.                       &
-         .NOT. ieee_is_finite(integration_step) .OR.                       &
-         .NOT. ieee_is_finite(areal_heat_capacity) .OR.                   &
-         .NOT. ieee_is_finite(radiative_coefficient) .OR.                 &
-         .NOT. ieee_is_finite(convective_coefficient) .OR.                &
-         .NOT. ieee_is_finite(ambient_temperature)) THEN
-       CALL fatal_error('Nonfinite input to lava cooling DIRK stage solver')
-    END IF
-    IF (temperature_known .LT. 0.0_wp .OR. integration_step .LT. 0.0_wp .OR. &
-         areal_heat_capacity .LE. 0.0_wp .OR. ambient_temperature .LE. 0.0_wp) THEN
-       CALL fatal_error('Invalid state or integration data in lava cooling DIRK stage solver')
-    END IF
-    IF (radiative_coefficient .LT. 0.0_wp .OR.                               &
-         convective_coefficient .LT. 0.0_wp) THEN
-       CALL fatal_error('Negative coefficient in lava cooling DIRK stage solver')
-    END IF
-
-    temperature_stage = temperature_known
-    IF (integration_step .EQ. 0.0_wp .OR.                                   &
-         (radiative_coefficient .EQ. 0.0_wp .AND.                           &
-         convective_coefficient .EQ. 0.0_wp)) RETURN
-
-    scale = MAX(temperature_known, ambient_temperature)
-    ratio = integration_step / areal_heat_capacity
-    scaled_radiation = radiative_coefficient * scale**3
-    a = ratio * scaled_radiation
-    b = 1.0_wp + ratio * convective_coefficient
-    c = temperature_known / scale + ratio *                                  &
-         (scaled_radiation * (ambient_temperature / scale)**4 +              &
-         convective_coefficient * ambient_temperature / scale)
-    IF (.NOT. ieee_is_finite(a) .OR. .NOT. ieee_is_finite(b) .OR.             &
-         .NOT. ieee_is_finite(c) .OR. b .LE. 0.0_wp .OR. c .LE. 0.0_wp) THEN
-       CALL fatal_error('Invalid quartic coefficients in lava cooling DIRK stage solver')
-    END IF
-
-    IF (a .EQ. 0.0_wp) THEN
-       x = c / b
-    ELSE
-       w = c / b
-       log_p = LOG(b) - 0.25_wp * LOG(a) - 0.75_wp * LOG(c)
-       IF (log_p .GE. 0.0_wp) THEN
-          u = EXP(-4.0_wp * log_p)
-          x = w * solve_u_y4_plus_y_minus_one(u)
-       ELSE
-          p = EXP(log_p)
-          x = EXP(0.25_wp * (LOG(c) - LOG(a))) *                           &
-               solve_x4_plus_p_x_minus_one(p)
-       END IF
-    END IF
-
-    IF (.NOT. ieee_is_finite(x) .OR. x .LT. 0.0_wp .OR. x .GT. 1.0_wp +      &
-         128.0_wp * EPSILON(1.0_wp)) THEN
-       CALL fatal_error('Quartic root outside the physical interval in lava cooling DIRK stage')
-    END IF
-    temperature_stage = scale * MIN(1.0_wp, MAX(0.0_wp, x))
-
-  END SUBROUTINE solve_lava_cooling_stage_temperature
-
-  !******************************************************************************
-  !> \brief Solve \f$u y^4+y-1=0\f$ for its unique positive root.
-  !******************************************************************************
-  PURE FUNCTION solve_u_y4_plus_y_minus_one(u) RESULT(y)
-
-    REAL(wp), INTENT(IN) :: u
-    REAL(wp) :: y
-    REAL(wp) :: v, delta, s, c
-
-    IF (u .EQ. 0.0_wp) THEN
-       y = 1.0_wp
-       RETURN
-    END IF
-
-    v = u**(1.0_wp/3.0_wp)
-    delta = 1.0_wp/256.0_wp + v**3/27.0_wp
-    s = SIGN(ABS(1.0_wp/16.0_wp + SQRT(delta))**(1.0_wp/3.0_wp),       &
-         1.0_wp/16.0_wp + SQRT(delta)) +                               &
-         SIGN(ABS(1.0_wp/16.0_wp - SQRT(delta))**(1.0_wp/3.0_wp),       &
-         1.0_wp/16.0_wp - SQRT(delta))
-    c = 1.0_wp / (2.0_wp * SQRT(2.0_wp*s))
-    y = 2.0_wp / (s + c) / (SQRT(2.0_wp*s) +                            &
-         SQRT(2.0_wp*s + 4.0_wp*v/(s+c)))
-
-  END FUNCTION solve_u_y4_plus_y_minus_one
-
-  !******************************************************************************
-  !> \brief Solve \f$y^4+p y-1=0\f$ for its unique positive root when 0<=p<=1.
-  !******************************************************************************
-  PURE FUNCTION solve_x4_plus_p_x_minus_one(p) RESULT(y)
-
-    REAL(wp), INTENT(IN) :: p
-    REAL(wp) :: y
-    REAL(wp) :: z, m, n, discriminant
-
-    IF (p .EQ. 0.0_wp) THEN
-       y = 1.0_wp
-       RETURN
-    END IF
-
-    z = 2.0_wp / SQRT(3.0_wp) * SINH(ASINH(3.0_wp*p**2*SQRT(3.0_wp) / 16.0_wp) / &
-         3.0_wp)
-    m = SQRT(2.0_wp*z)
-    n = -p / (2.0_wp*m)
-    discriminant = MAX(0.0_wp, m**2 - 4.0_wp*(z+n))
-    y = 0.5_wp * (SQRT(discriminant) - m)
-
-  END FUNCTION solve_x4_plus_p_x_minus_one
 
   !******************************************************************************
   !> \brief Find the unique real root below -1 of the normalized cooling cubic.
