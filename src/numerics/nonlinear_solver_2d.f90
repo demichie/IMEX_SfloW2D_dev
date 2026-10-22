@@ -173,10 +173,7 @@ CONTAINS
 
     USE parameters_2d, ONLY : max_nl_iter, tol_rel, tol_abs, n_RK,            &
          n_solid, n_add_gas, idx_pore, rheology_flag, rheology_model_id,     &
-         rheology_id_none, rheology_id_voellmy, rheology_id_plastic,         &
-         rheology_id_lava, rheology_id_lahar, rheology_id_empirical,         &
-         rheology_id_quadratic, rheology_id_froude, rheology_id_lucas,       &
-         rheology_id_mui, rheology_id_mui_voellmy, pore_pressure_flag,       &
+         rheology_id_lava, pore_pressure_flag,                              &
          curvature_term_flag,                                                &
          stochastic_flag, slope_correction_flag
     USE equation_metadata_2d, ONLY : IM_GROUP_METHOD_ANALYTIC,                &
@@ -185,19 +182,10 @@ CONTAINS
          convective_term_coeff
     USE state_conversion_2d, ONLY : r_phys_var, qc_to_qp
     USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms
-    USE rheology_2d, ONLY : correct_friction_momentum, curvature_acceleration
+    USE rheology_2d, ONLY : correct_friction_momentum, curvature_acceleration, &
+         solve_analytic_rheology_velocity
     USE thermal_laws_2d, ONLY : solve_lava_analytic_temperature
     USE pore_pressure_laws_2d, ONLY : solve_analytic_pore_pressure
-    USE rheology_voellmy_2d, ONLY : solve_voellmy_analytic_velocity
-    USE rheology_plastic_2d, ONLY : solve_plastic_analytic_velocity
-    USE rheology_lava_2d, ONLY : solve_lava_analytic_velocity
-    USE rheology_lahar_2d, ONLY : solve_lahar_analytic_velocity
-    USE rheology_empirical_2d, ONLY : solve_empirical_analytic_velocity
-    USE rheology_quadratic_2d, ONLY : solve_quadratic_analytic_velocity
-    USE rheology_froude_2d, ONLY : solve_froude_analytic_velocity
-    USE rheology_lucas_2d, ONLY : solve_lucas_analytic_velocity
-    USE rheology_mui_2d, ONLY : solve_mui_analytic_velocity
-    USE rheology_mui_voellmy_2d, ONLY : solve_mui_voellmy_analytic_velocity
 
     IMPLICIT NONE
 
@@ -227,6 +215,7 @@ CONTAINS
     REAL(wp) :: temperature_after, heat_capacity, pressure_known
     REAL(wp) :: pressure_after, speed_ratio, horizontal_speed
     REAL(wp) :: curvature_accel, velocity_after(2), qp_current(n_vars+2)
+    LOGICAL :: analytic_rheology_model_supported
     REAL(wp) :: dynamic_pressure, si_term(n_eqns), residual_without_si(n_eqns)
     REAL(wp) :: momentum_before_newton(2)
     INTEGER :: group, group_size, equation, i
@@ -313,61 +302,18 @@ CONTAINS
                         Bsecondj_xy, Bsecondj_yy, flow_u, flow_v)
                 END IF
                 velocity_after = [flow_u, flow_v]
-                SELECT CASE (rheology_model_id)
-                CASE (rheology_id_voellmy)
-                   CALL solve_voellmy_analytic_velocity(dt_step*a_diag,      &
-                        flow_h, speed_ratio, [flow_u, flow_v], flow_density, &
-                        flow_red_grav, grav_coeff, curvature_accel,          &
-                        pore_pressure_flag, flow_pore_pressure,               &
-                        stochastic_flag, Zij, velocity_after)
-                CASE (rheology_id_plastic)
-                   CALL solve_plastic_analytic_velocity(dt_step*a_diag,      &
-                        flow_h, speed_ratio, [flow_u, flow_v], velocity_after)
-                CASE (rheology_id_lava)
-                   CALL solve_lava_analytic_velocity(dt_step*a_diag,         &
-                        flow_h, flow_temperature, flow_density, speed_ratio, &
-                        [flow_u, flow_v], velocity_after)
-                CASE (rheology_id_lahar)
-                   CALL solve_lahar_analytic_velocity(dt_step*a_diag,        &
-                        flow_h, flow_temperature, SUM(flow_alphas),           &
-                        flow_density, speed_ratio, [flow_u, flow_v],          &
-                        velocity_after)
-                CASE (rheology_id_empirical)
-                   CALL solve_empirical_analytic_velocity(dt_step*a_diag,    &
-                        flow_h, speed_ratio, [flow_u, flow_v], velocity_after)
-                CASE (rheology_id_quadratic)
-                   CALL solve_quadratic_analytic_velocity(dt_step*a_diag,    &
-                        flow_h, speed_ratio, [flow_u, flow_v], velocity_after)
-                CASE (rheology_id_froude)
-                   CALL solve_froude_analytic_velocity(dt_step*a_diag,       &
-                        flow_h, speed_ratio, [flow_u, flow_v], flow_red_grav,&
-                        grav_coeff, curvature_accel, stochastic_flag, Zij,   &
-                        velocity_after)
-                CASE (rheology_id_lucas)
-                   CALL solve_lucas_analytic_velocity(dt_step*a_diag,        &
-                        flow_h, speed_ratio, [flow_u, flow_v], flow_red_grav,&
-                        grav_coeff, curvature_accel, stochastic_flag, Zij,   &
-                        velocity_after)
-                CASE (rheology_id_mui)
-                   CALL solve_mui_analytic_velocity(dt_step*a_diag,          &
-                        flow_h, speed_ratio, [flow_u, flow_v], flow_density, &
-                        flow_red_grav, grav_coeff, flow_alphas,              &
-                        curvature_accel, pore_pressure_flag,                  &
-                        flow_pore_pressure, velocity_after)
-                CASE (rheology_id_mui_voellmy)
-                   CALL solve_mui_voellmy_analytic_velocity(dt_step*a_diag,  &
-                        flow_h, speed_ratio, [flow_u, flow_v], flow_density, &
-                        flow_red_grav, grav_coeff, flow_alphas,              &
-                        curvature_accel, pore_pressure_flag,                  &
-                        flow_pore_pressure, stochastic_flag, Zij,            &
-                        velocity_after)
-                CASE DEFAULT
-                   IF (rheology_model_id .NE. rheology_id_none) THEN
-                      linear_info = -7
-                      qj = qj_init
-                      RETURN
-                   END IF
-                END SELECT
+                CALL solve_analytic_rheology_velocity(rheology_model_id,     &
+                     dt_step*a_diag, flow_h, flow_temperature, flow_density,&
+                     speed_ratio, [flow_u, flow_v], flow_red_grav,         &
+                     grav_coeff, flow_alphas, curvature_accel,             &
+                     pore_pressure_flag, flow_pore_pressure,               &
+                     stochastic_flag, Zij, velocity_after,                 &
+                     analytic_rheology_model_supported)
+                IF (.NOT. analytic_rheology_model_supported) THEN
+                   linear_info = -7
+                   qj = qj_init
+                   RETURN
+                END IF
                 qj(2:3) = qj(1) * velocity_after
              END IF
           END IF

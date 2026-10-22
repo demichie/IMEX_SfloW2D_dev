@@ -1,9 +1,9 @@
 !********************************************************************************
 !> \brief Rheology dispatch, model naming and friction-only momentum correction.
-!> \details Dispatches common implicit and semi-implicit momentum-rate
-!> interfaces to the selected constitutive law, resolves canonical model names
-!> to IDs, and provides a projection for momentum updates caused exclusively
-!> by friction. The projection constrains the candidate update to
+!> \details Dispatches common momentum-rate and analytic-velocity interfaces
+!> to the selected constitutive law, resolves canonical model names to IDs,
+!> and provides a projection for momentum updates caused exclusively by
+!> friction. The projection constrains the candidate update to
 !> \f$\boldsymbol{m}_{after}=\alpha\boldsymbol{m}_{before}\f$,
 !> \f$0\le\alpha\le1\f$, so it cannot rotate, reverse or increase the
 !> momentum. Callers must pass the momentum immediately before and after the
@@ -18,19 +18,29 @@ MODULE rheology_2d
        rheology_id_lucas, rheology_id_mui, rheology_id_mui_voellmy
   USE diagnostics_2d, ONLY : fatal_error
   USE rheology_voellmy_2d, ONLY : eval_voellmy_implicit_momentum_rate,       &
-       eval_voellmy_semi_implicit_momentum_rate
-  USE rheology_plastic_2d, ONLY : eval_plastic_implicit_momentum_rate
+       eval_voellmy_semi_implicit_momentum_rate,                            &
+       solve_voellmy_analytic_velocity
+  USE rheology_plastic_2d, ONLY : eval_plastic_implicit_momentum_rate,       &
+       solve_plastic_analytic_velocity
   USE rheology_lava_2d, ONLY : eval_lava_implicit_momentum_rate,             &
-       eval_lava_semi_implicit_momentum_rate
+       eval_lava_semi_implicit_momentum_rate,                               &
+       solve_lava_analytic_velocity
   USE rheology_lahar_2d, ONLY : eval_lahar_implicit_momentum_rate,            &
-       eval_lahar_semi_implicit_momentum_rate
-  USE rheology_empirical_2d, ONLY : eval_empirical_implicit_momentum_rate
-  USE rheology_quadratic_2d, ONLY : eval_quadratic_implicit_momentum_rate
-  USE rheology_froude_2d, ONLY : eval_froude_momentum_rate
-  USE rheology_lucas_2d, ONLY : eval_lucas_momentum_rate
-  USE rheology_mui_2d, ONLY : eval_mui_momentum_rate
+       eval_lahar_semi_implicit_momentum_rate,                              &
+       solve_lahar_analytic_velocity
+  USE rheology_empirical_2d, ONLY : eval_empirical_implicit_momentum_rate,   &
+       solve_empirical_analytic_velocity
+  USE rheology_quadratic_2d, ONLY : eval_quadratic_implicit_momentum_rate,   &
+       solve_quadratic_analytic_velocity
+  USE rheology_froude_2d, ONLY : eval_froude_momentum_rate,                  &
+       solve_froude_analytic_velocity
+  USE rheology_lucas_2d, ONLY : eval_lucas_momentum_rate,                    &
+       solve_lucas_analytic_velocity
+  USE rheology_mui_2d, ONLY : eval_mui_momentum_rate,                        &
+       solve_mui_analytic_velocity
   USE rheology_mui_voellmy_2d, ONLY : eval_mui_voellmy_momentum_rate,        &
-       eval_mui_voellmy_implicit_momentum_rate
+       eval_mui_voellmy_implicit_momentum_rate,                             &
+       solve_mui_voellmy_analytic_velocity
 
   IMPLICIT NONE
 
@@ -40,6 +50,7 @@ MODULE rheology_2d
   PUBLIC :: correct_friction_momentum
   PUBLIC :: curvature_acceleration, eval_implicit_rheology_rate
   PUBLIC :: eval_semi_implicit_rheology_rate
+  PUBLIC :: solve_analytic_rheology_velocity
 
 CONTAINS
 
@@ -191,6 +202,102 @@ CONTAINS
     END SELECT
 
   END SUBROUTINE eval_semi_implicit_rheology_rate
+
+  !******************************************************************************
+  !> \brief Integrate the selected rheology velocity law analytically.
+  !> \details Dispatches to the model-specific exact-flow solver. All state
+  !>          values are passed explicitly; unsupported model IDs leave the
+  !>          output equal to the input and return model_supported as false.
+  !> \param[in] model_id Rheology model ID.
+  !> \param[in] integration_step Exact-flow interval [s].
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] temperature Flow temperature [K].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] speed_ratio Total-to-horizontal speed ratio.
+  !> \param[in] velocity_before Horizontal velocity before integration [m s^-1].
+  !> \param[in] reduced_gravity Reduced gravity [m s^-2].
+  !> \param[in] gravity_coefficient Gravity coefficient used by rheology laws.
+  !> \param[in] solid_fractions Per-class solid volume fractions.
+  !> \param[in] curvature_acceleration Signed bed-curvature acceleration [m s^-2].
+  !> \param[in] use_pore_pressure Whether excess pore pressure is active.
+  !> \param[in] excess_pore_pressure Excess pore pressure.
+  !> \param[in] use_stochastic Whether stochastic forcing is active.
+  !> \param[in] stochastic_value Local stochastic rheology value.
+  !> \param[out] velocity_after Horizontal velocity after integration [m s^-1].
+  !> \param[out] model_supported True when model_id has an analytic velocity law.
+  !******************************************************************************
+  SUBROUTINE solve_analytic_rheology_velocity(model_id, integration_step,    &
+       flow_depth, temperature, mixture_density, speed_ratio, velocity_before, &
+       reduced_gravity, gravity_coefficient, solid_fractions,                &
+       curvature_acceleration, use_pore_pressure, excess_pore_pressure,      &
+       use_stochastic, stochastic_value, velocity_after, model_supported)
+
+    INTEGER, INTENT(IN) :: model_id
+    REAL(wp), INTENT(IN) :: integration_step, flow_depth, temperature
+    REAL(wp), INTENT(IN) :: mixture_density, speed_ratio
+    REAL(wp), INTENT(IN) :: velocity_before(2), reduced_gravity
+    REAL(wp), INTENT(IN) :: gravity_coefficient, solid_fractions(:)
+    REAL(wp), INTENT(IN) :: curvature_acceleration, excess_pore_pressure
+    REAL(wp), INTENT(IN) :: stochastic_value
+    LOGICAL, INTENT(IN) :: use_pore_pressure, use_stochastic
+    REAL(wp), INTENT(OUT) :: velocity_after(2)
+    LOGICAL, INTENT(OUT) :: model_supported
+
+    velocity_after = velocity_before
+    model_supported = .TRUE.
+
+    SELECT CASE (model_id)
+    CASE (rheology_id_none)
+       CONTINUE
+    CASE (rheology_id_voellmy)
+       CALL solve_voellmy_analytic_velocity(integration_step, flow_depth,    &
+            speed_ratio, velocity_before, mixture_density, reduced_gravity,  &
+            gravity_coefficient, curvature_acceleration, use_pore_pressure, &
+            excess_pore_pressure, use_stochastic, stochastic_value,         &
+            velocity_after)
+    CASE (rheology_id_plastic)
+       CALL solve_plastic_analytic_velocity(integration_step, flow_depth,    &
+            speed_ratio, velocity_before, velocity_after)
+    CASE (rheology_id_lava)
+       CALL solve_lava_analytic_velocity(integration_step, flow_depth,      &
+            temperature, mixture_density, speed_ratio, velocity_before,     &
+            velocity_after)
+    CASE (rheology_id_lahar)
+       CALL solve_lahar_analytic_velocity(integration_step, flow_depth,     &
+            temperature, SUM(solid_fractions), mixture_density, speed_ratio,&
+            velocity_before, velocity_after)
+    CASE (rheology_id_empirical)
+       CALL solve_empirical_analytic_velocity(integration_step, flow_depth, &
+            speed_ratio, velocity_before, velocity_after)
+    CASE (rheology_id_quadratic)
+       CALL solve_quadratic_analytic_velocity(integration_step, flow_depth, &
+            speed_ratio, velocity_before, velocity_after)
+    CASE (rheology_id_froude)
+       CALL solve_froude_analytic_velocity(integration_step, flow_depth,    &
+            speed_ratio, velocity_before, reduced_gravity,                  &
+            gravity_coefficient, curvature_acceleration, use_stochastic,   &
+            stochastic_value, velocity_after)
+    CASE (rheology_id_lucas)
+       CALL solve_lucas_analytic_velocity(integration_step, flow_depth,     &
+            speed_ratio, velocity_before, reduced_gravity,                  &
+            gravity_coefficient, curvature_acceleration, use_stochastic,   &
+            stochastic_value, velocity_after)
+    CASE (rheology_id_mui)
+       CALL solve_mui_analytic_velocity(integration_step, flow_depth,       &
+            speed_ratio, velocity_before, mixture_density, reduced_gravity, &
+            gravity_coefficient, solid_fractions, curvature_acceleration,   &
+            use_pore_pressure, excess_pore_pressure, velocity_after)
+    CASE (rheology_id_mui_voellmy)
+       CALL solve_mui_voellmy_analytic_velocity(integration_step,           &
+            flow_depth, speed_ratio, velocity_before, mixture_density,      &
+            reduced_gravity, gravity_coefficient, solid_fractions,           &
+            curvature_acceleration, use_pore_pressure, excess_pore_pressure, &
+            use_stochastic, stochastic_value, velocity_after)
+    CASE DEFAULT
+       model_supported = .FALSE.
+    END SELECT
+
+  END SUBROUTINE solve_analytic_rheology_velocity
 
   !******************************************************************************
   !> \brief Constrain a momentum update from an isolated friction substep.

@@ -2081,19 +2081,22 @@ Le operazioni geometriche devono rimanere in `geometry_2d.f90`, per esempio `pro
 
 **D16.1 — Inventario semantico.** Elencare tutte le routine reologiche, termiche, di pressione dei pori e di scambio di massa, registrando chiamanti, argomenti, unità, risultato, dipendenza dal modello, trattamento numerico, uso REAL/COMPLEX e responsabilità futura. Distinguere proprietà, rate, sorgenti assemblate, solver analitici e aggiornamenti dello stato.
 
-**D16.2 — Interfacce comuni.** Definire le API generiche di `rheology_2d` e le interfacce delle leggi termiche, di massa e di pressione dei pori, dichiarando esplicitamente se restituiscono proprietà, rate, sorgenti o variabili aggiornate. Formalizzare e completare il contratto del coordinatore dello stage (`solve_imex_stage`, ora implementato): applicazione SI, dispatch ordinato dei gruppi e scelta fra le sole modalità Newton e analitica, aggiornamento dello stato conservativo condiviso, ricostruzione dello stato fisico per il gruppo successivo e calcolo del rate effettivo netto dalla differenza conservativa di stage.
+**D16.2 — Interfacce comuni.** Definire le API generiche di `rheology_2d` e le interfacce delle leggi termiche, di massa e di pressione dei pori, dichiarando esplicitamente se restituiscono proprietà, rate, sorgenti o variabili aggiornate. Formalizzare e completare il contratto del coordinatore dello stage (`solve_imex_stage`, ora implementato): applicazione SI, dispatch ordinato dei gruppi e scelta fra le sole modalità Newton e analitica, aggiornamento dello stato conservativo condiviso, ricostruzione dello stato fisico per il gruppo successivo e calcolo del rate effettivo netto dalla differenza conservativa di stage. L'interfaccia di `rheology_2d` comprende ora anche il dispatcher dei solver analitici di velocità, con stato fisico esplicito e stato di supporto del modello restituito al chiamante.
 
 **D16.3 — Dispatcher reologico.** Spostare in `rheology_2d` tutti i rami basati su `rheology_model_id` o sul nome del modello e rimuovere le chiamate dirette ai moduli specifici da `equation_terms_2d`, mantenendo formule, argomenti e semantica complex-step.
 
 Prima tranche completata: `rheology_2d` espone dispatcher con argomenti espliciti
 per i rate reologici impliciti e semi-impliciti; `equation_terms_2d` delega a
 queste interfacce e `curvature_acceleration` appartiene ora a `rheology_2d`.
-`TEST_RHEOLOGY_CELL_LOCAL` passa in strict e optimized (255/255 fixture per
-profilo), `TEST_IMEX_STAGES` passa in strict e optimized e
-`TEST_CURVATURE_SOURCE` passa in strict. D16.3 resta aperto: in
-`equation_terms_2d` sono ancora presenti selezioni specifiche per il
-raffreddamento lava e lo scambio di massa lahar, da ricollocare secondo la
-responsabilità fisica appropriata.
+Il dispatcher di velocità analitica è stato aggiunto a `rheology_2d` e
+`nonlinear_solver_2d` delega ora a questa API invece di selezionare direttamente
+i solver specifici. Il test dei flussi analitici copre tutti i modelli
+supportati, il modello `none` e un ID non supportato; l'eseguibile passa nei
+profili strict e optimized. Il runner completo raggiunge questi test ma non
+termina perché nell'ambiente manca NumPy, richiesto da `characterize.py`.
+D16.3 resta aperto: in `equation_terms_2d` sono ancora presenti selezioni
+specifiche per il raffreddamento lava e lo scambio di massa lahar, da
+ricollocare secondo la responsabilità fisica appropriata.
 
 **D16.4 — Relocation dei moduli.** Rinominare e organizzare i moduli in `thermal_laws_2d`, `mass_exchange_laws_2d`, `pore_pressure_laws_2d` e `rheology_laws`. Aggiornare `USE`, Makefile, liste di build, Doxygen e test. La relocation deve essere scientificamente neutra.
 
