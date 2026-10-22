@@ -19,9 +19,9 @@ MODULE equation_metadata_2d
   !> \brief Equation partition and implicit-group metadata for local stage solves.
   !> \details Retains the full explicit/implicit mask and its compact global
   !>          index maps, and assigns each implicit equation to an ordered
-  !>          group with a declared solve method. Explicit equations have group
-  !>          zero. Group metadata describes future stage dispatch; it does
-  !>          not itself change the current solver or equation order.
+  !>          group with a declared solve method and precomputed compact map.
+  !>          Explicit equations have group zero; global equation indices and
+  !>          the explicit/implicit partition remain unchanged by grouping.
   TYPE :: equation_partition_type
 
      !> Total number of equations in the configured model.
@@ -53,6 +53,12 @@ MODULE equation_metadata_2d
      !> Values are IM_GROUP_METHOD_ANALYTIC or IM_GROUP_METHOD_NEWTON.
      INTEGER, ALLOCATABLE :: IM_group_method(:)
 
+     !> Number of implicit equations in each group.
+     INTEGER, ALLOCATABLE :: n_IM_group_equations(:)
+
+     !> Compact global equation indices by group; unused trailing entries are zero.
+     INTEGER, ALLOCATABLE :: IM_group_map(:,:)
+
    CONTAINS
 
      PROCEDURE :: initialize => initialize_equation_partition
@@ -71,7 +77,8 @@ CONTAINS
   !>          every equation is explicit), preserving the legacy monolithic
   !>          solve contract. If supplied, group numbers must be dense and
   !>          positive for implicit equations, zero for explicit equations,
-  !>          and each group's method must be supported.
+  !>          and each group's method must be supported. Also precomputes each
+  !>          group's compact global equation map.
   !>
   !> \param[in,out] this Partition descriptor to finalize and populate.
   !> \param[in] implicit_mask One flag per full-system equation; true selects implicit treatment.
@@ -89,8 +96,10 @@ CONTAINS
     INTEGER, INTENT(IN), OPTIONAL :: IM_group_method(:)
 
     INTEGER :: equation
+    INTEGER :: group
     INTEGER :: i_explicit
     INTEGER :: i_implicit
+    INTEGER :: i_group
 
     CALL this%finalize
 
@@ -151,6 +160,19 @@ CONTAINS
 
     END IF
 
+    ALLOCATE( this%n_IM_group_equations(this%n_IM_groups) )
+    ALLOCATE( this%IM_group_map(this%n_implicit,this%n_IM_groups) )
+    this%n_IM_group_equations = 0
+    this%IM_group_map = 0
+
+    DO equation = 1, this%n_equations
+       group = this%IM_group(equation)
+       IF ( group .EQ. 0 ) CYCLE
+       i_group = this%n_IM_group_equations(group) + 1
+       this%n_IM_group_equations(group) = i_group
+       this%IM_group_map(i_group,group) = equation
+    END DO
+
     IF ( .NOT. this%is_initialized() ) THEN
        ERROR STOP 'initialize_equation_partition: invalid equation-group metadata'
     END IF
@@ -173,6 +195,9 @@ CONTAINS
     IF ( ALLOCATED(this%explicit_map) ) DEALLOCATE(this%explicit_map)
     IF ( ALLOCATED(this%IM_group) ) DEALLOCATE(this%IM_group)
     IF ( ALLOCATED(this%IM_group_method) ) DEALLOCATE(this%IM_group_method)
+    IF ( ALLOCATED(this%n_IM_group_equations) )                             &
+         DEALLOCATE(this%n_IM_group_equations)
+    IF ( ALLOCATED(this%IM_group_map) ) DEALLOCATE(this%IM_group_map)
 
     this%n_equations = 0
     this%n_implicit = 0
@@ -197,6 +222,7 @@ CONTAINS
     INTEGER :: group
     INTEGER :: i_implicit
     INTEGER :: i_explicit
+    INTEGER :: i_group
 
     equation_partition_is_initialized = .FALSE.
 
@@ -205,6 +231,8 @@ CONTAINS
     IF ( .NOT. ALLOCATED(this%explicit_map) ) RETURN
     IF ( .NOT. ALLOCATED(this%IM_group) ) RETURN
     IF ( .NOT. ALLOCATED(this%IM_group_method) ) RETURN
+    IF ( .NOT. ALLOCATED(this%n_IM_group_equations) ) RETURN
+    IF ( .NOT. ALLOCATED(this%IM_group_map) ) RETURN
 
     IF ( this%n_equations .LT. 0 .OR. this%n_implicit .LT. 0 .OR.          &
          this%n_explicit .LT. 0 .OR. this%n_IM_groups .LT. 0 ) RETURN
@@ -214,7 +242,10 @@ CONTAINS
          this%n_implicit .NE. SIZE(this%implicit_map) .OR.                   &
          this%n_explicit .NE. SIZE(this%explicit_map) .OR.                   &
          this%n_equations .NE. SIZE(this%IM_group) .OR.                      &
-         this%n_IM_groups .NE. SIZE(this%IM_group_method) ) RETURN
+         this%n_IM_groups .NE. SIZE(this%IM_group_method) .OR.               &
+         this%n_IM_groups .NE. SIZE(this%n_IM_group_equations) .OR.          &
+         SIZE(this%IM_group_map,1) .NE. this%n_implicit .OR.                  &
+         SIZE(this%IM_group_map,2) .NE. this%n_IM_groups ) RETURN
     IF ( COUNT(this%implicit) .NE. this%n_implicit ) RETURN
 
     IF ( ANY(this%implicit .NEQV. (this%IM_group .GT. 0)) ) RETURN
@@ -237,6 +268,21 @@ CONTAINS
 
     DO group = 1, this%n_IM_groups
        IF ( .NOT. ANY(this%IM_group .EQ. group) ) RETURN
+       IF ( this%n_IM_group_equations(group) .LT. 1 .OR.                    &
+            this%n_IM_group_equations(group) .GT. this%n_implicit ) RETURN
+
+       i_group = 0
+       DO i_implicit = 1, this%n_implicit
+          equation = this%implicit_map(i_implicit)
+          IF ( this%IM_group(equation) .NE. group ) CYCLE
+          i_group = i_group + 1
+          IF ( i_group .GT. this%n_IM_group_equations(group) ) RETURN
+          IF ( this%IM_group_map(i_group,group) .NE. equation ) RETURN
+       END DO
+
+       IF ( i_group .NE. this%n_IM_group_equations(group) ) RETURN
+       IF ( ANY(this%IM_group_map(i_group+1:this%n_implicit,group) .NE. 0) ) &
+            RETURN
     END DO
 
     equation_partition_is_initialized = .TRUE.

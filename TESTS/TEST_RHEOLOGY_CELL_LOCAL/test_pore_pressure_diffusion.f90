@@ -5,7 +5,7 @@ PROGRAM test_pore_pressure_diffusion
        kin_visc_c, sp_heat_a, sp_gas_const_a, pres, dynamic_permeability_flag
   USE geometry_2d, ONLY : pi_g
   USE pore_pressure_2d, ONLY : eval_pore_pressure_diffusion_source,            &
-       advance_pore_pressure_diffusion
+       advance_pore_pressure_diffusion, solve_pore_pressure_diffusion_stage
 
   IMPLICIT NONE
 
@@ -17,7 +17,8 @@ PROGRAM test_pore_pressure_diffusion
   REAL(wp), ALLOCATABLE :: solid_fractions(:)
   REAL(wp) :: after_first, after_second, after_full, after_short
   REAL(wp) :: decay_rate, expected_pressure, measured_derivative
-  COMPLEX(wp) :: source
+  REAL(wp) :: stage_pressure, stage_residual
+  COMPLEX(wp) :: source, stage_source
 
   n_solid = 2
   ALLOCATE(solid_fractions(n_solid))
@@ -46,6 +47,19 @@ PROGRAM test_pore_pressure_diffusion
        flow_depth, temperature, solid_fractions, after_full)
   CALL assert_close(after_full, expected_pressure, 2.0E-14_wp,               &
        'diffusion integrator disagrees with the source-derived decay rate')
+
+  CALL solve_pore_pressure_diffusion_stage(initial_pressure, integration_step,&
+       flow_depth, temperature, solid_fractions, stage_pressure)
+  CALL eval_pore_pressure_diffusion_source(                                  &
+       CMPLX(flow_depth,0.0_wp,wp), CMPLX(temperature,0.0_wp,wp),            &
+       CMPLX(mixture_density,0.0_wp,wp),                                     &
+       CMPLX(solid_fractions,0.0_wp,wp),                                     &
+       CMPLX(stage_pressure,0.0_wp,wp), stage_source)
+  stage_residual = (mixture_density*flow_depth*(stage_pressure-              &
+       initial_pressure) - integration_step*REAL(stage_source,wp)) /          &
+       (mixture_density*flow_depth*initial_pressure)
+  CALL assert_close(stage_residual, 0.0_wp, 2.0E-14_wp,                      &
+       'pore-pressure DIRK stage does not satisfy its algebraic equation')
 
   CALL advance_pore_pressure_diffusion(initial_pressure, 0.15_wp,            &
        flow_depth, temperature, solid_fractions, after_first)

@@ -2,7 +2,7 @@ PROGRAM test_lava_cooling
 
   USE parameters_2d, ONLY : wp
   USE thermal_sources_2d, ONLY : eval_lava_cooling_source,                   &
-       advance_lava_cooling_temperature
+       advance_lava_cooling_temperature, solve_lava_cooling_stage_temperature
 
   IMPLICIT NONE
 
@@ -13,6 +13,7 @@ PROGRAM test_lava_cooling
   REAL(wp), PARAMETER :: convective_coefficient = 9.0_wp
   REAL(wp) :: after_first, after_second, after_full, after_short
   REAL(wp) :: expected_derivative, measured_derivative, expected_temperature
+  REAL(wp) :: stage_temperature, stage_residual, tau
 
   CALL advance_lava_cooling_temperature(initial_temperature, 10.0_wp,       &
        areal_heat_capacity, radiative_coefficient,                           &
@@ -67,6 +68,38 @@ PROGRAM test_lava_cooling
        areal_heat_capacity, 0.0_wp, 0.0_wp, ambient, after_full)
   CALL assert_close(after_full, initial_temperature, 0.0_wp,                  &
        'zero cooling coefficients changed the temperature')
+
+  tau = 500.0_wp
+  CALL solve_lava_cooling_stage_temperature(initial_temperature, tau,        &
+       areal_heat_capacity, radiative_coefficient,                           &
+       convective_coefficient, ambient, stage_temperature)
+  stage_residual = (areal_heat_capacity * (stage_temperature -               &
+       initial_temperature) - tau * REAL(eval_lava_cooling_source(            &
+       CMPLX(stage_temperature,0.0_wp,wp), radiative_coefficient,             &
+       convective_coefficient, ambient),wp)) /                               &
+       (areal_heat_capacity * initial_temperature)
+  CALL assert_close(stage_residual, 0.0_wp, 2.0E-12_wp,                      &
+       'combined DIRK cooling stage does not satisfy its algebraic equation')
+
+  CALL solve_lava_cooling_stage_temperature(initial_temperature, tau,        &
+       areal_heat_capacity, 0.0_wp, convective_coefficient, ambient,         &
+       stage_temperature)
+  expected_temperature = (initial_temperature + tau *                      &
+       convective_coefficient * ambient / areal_heat_capacity) /             &
+       (1.0_wp + tau * convective_coefficient / areal_heat_capacity)
+  CALL assert_close(stage_temperature, expected_temperature, 2.0E-14_wp,     &
+       'convection-only DIRK cooling stage is not algebraically exact')
+
+  tau = 1.0E12_wp
+  CALL solve_lava_cooling_stage_temperature(initial_temperature, tau,        &
+       areal_heat_capacity, radiative_coefficient, 0.0_wp, ambient,         &
+       stage_temperature)
+  stage_residual = (areal_heat_capacity * (stage_temperature -               &
+       initial_temperature) - tau * REAL(eval_lava_cooling_source(            &
+       CMPLX(stage_temperature,0.0_wp,wp), radiative_coefficient, 0.0_wp,     &
+       ambient),wp)) / (areal_heat_capacity * initial_temperature)
+  CALL assert_close(stage_residual, 0.0_wp, 1.0E-9_wp,                       &
+       'radiation-dominated quartic root does not satisfy the DIRK equation')
 
   WRITE(*,*) 'All exact lava cooling checks passed.'
 

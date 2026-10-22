@@ -4,9 +4,9 @@
 !>          pressure sources induced by inlet injection and mass exchange, and
 !>          the constitutive diffusion/inhibition factors shared by those
 !>          calculations. The diffusion routine accepts complex states for
-!>          Jacobian differentiation; a separate real-valued routine provides
-!>          the exact DIRK flow while mixture density, depth, temperature and
-!>          solid fractions are frozen.
+!>          Jacobian differentiation. Separate real-valued routines provide
+!>          both the exact frozen-state ODE flow and the closed-form algebraic
+!>          DIRK stage solve.
 !********************************************************************************
 
 MODULE pore_pressure_2d
@@ -28,6 +28,7 @@ MODULE pore_pressure_2d
 
   PUBLIC :: eval_pore_pressure_diffusion_source
   PUBLIC :: advance_pore_pressure_diffusion
+  PUBLIC :: solve_pore_pressure_diffusion_stage
   PUBLIC :: eval_pore_pressure_gas_loss
   PUBLIC :: eval_pore_pressure_inlet_source
   PUBLIC :: eval_pore_pressure_mass_exchange_source
@@ -156,6 +157,83 @@ CONTAINS
     pressure_after = excess_pressure * EXP(-decay_exponent)
 
   END SUBROUTINE advance_pore_pressure_diffusion
+
+  !******************************************************************************
+  !> \brief Solve the pore-pressure diffusion equation for one DIRK stage.
+  !> \details With flow depth, temperature and solid fractions frozen, the
+  !>          excess pressure satisfies \f$\dot p_e=-\lambda p_e\f$, where
+  !>          \f$\lambda=(\pi/2)^2DI/[h\max(h_{\mathrm{threshold}},h)]\f$.
+  !>          Its DIRK stage equation therefore has the closed form
+  !>          \f$p_{e,\mathrm{stage}}=p_{e,\mathrm{known}}/(1+\tau\lambda)\f$.
+  !>          This is the algebraic stage solve, not exact integration of the
+  !>          continuous ODE.
+  !> \param[in] excess_pressure_known Stage-known excess pore pressure [Pa].
+  !> \param[in] integration_step Effective DIRK coefficient \f$dt\,a_{ii}\f$ [s].
+  !> \param[in] flow_depth Frozen flow depth h [m].
+  !> \param[in] temperature Frozen gas/mixture temperature [K].
+  !> \param[in] solid_fractions Frozen per-class solid volume fractions.
+  !> \param[out] pressure_stage Excess pore pressure satisfying the stage equation [Pa].
+  !> \note Dry states, nonpositive excess pressure, absent pore volume and inactive
+  !>       diffusion closures remain unchanged.
+  !******************************************************************************
+  SUBROUTINE solve_pore_pressure_diffusion_stage(excess_pressure_known,       &
+       integration_step, flow_depth, temperature, solid_fractions,            &
+       pressure_stage)
+
+    REAL(wp), INTENT(IN) :: excess_pressure_known, integration_step
+    REAL(wp), INTENT(IN) :: flow_depth, temperature
+    REAL(wp), INTENT(IN) :: solid_fractions(n_solid)
+    REAL(wp), INTENT(OUT) :: pressure_stage
+
+    COMPLEX(wp) :: diffusion_coefficient, inhibition
+    REAL(wp) :: decay_rate, denominator, log_decay_product
+    LOGICAL :: active
+    REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
+
+    IF (.NOT. ieee_is_finite(excess_pressure_known) .OR.                    &
+         .NOT. ieee_is_finite(integration_step) .OR.                         &
+         .NOT. ieee_is_finite(flow_depth) .OR.                               &
+         .NOT. ieee_is_finite(temperature) .OR.                              &
+         .NOT. ALL(ieee_is_finite(solid_fractions))) THEN
+       CALL fatal_error('Nonfinite input to pore-pressure DIRK stage solver')
+    END IF
+    IF (integration_step .LT. 0.0_wp) THEN
+       CALL fatal_error('Negative integration step in pore-pressure DIRK stage solver')
+    END IF
+
+    pressure_stage = excess_pressure_known
+    IF (integration_step .EQ. 0.0_wp .OR. excess_pressure_known .LE. 0.0_wp .OR. &
+         flow_depth .LE. 0.0_wp) RETURN
+    IF (REAL(1.0_wp-SUM(solid_fractions),wp) .LE. EPSILON(1.0_wp)) RETURN
+    IF (dynamic_permeability_flag) THEN
+       IF (REAL(SUM(solid_fractions),wp) .LE. EPSILON(1.0_wp)) RETURN
+    END IF
+    IF (temperature .LE. 0.0_wp) THEN
+       CALL fatal_error('Nonpositive temperature in pore-pressure DIRK stage solver')
+    END IF
+
+    CALL eval_pore_pressure_diffusion_factors(                               &
+         CMPLX(flow_depth, 0.0_wp, wp), CMPLX(temperature, 0.0_wp, wp),      &
+         CMPLX(solid_fractions, 0.0_wp, wp), diffusion_coefficient,          &
+         inhibition, active)
+    IF (.NOT. active) RETURN
+
+    decay_rate = REAL((pi_g / 2.0_wp)**2 * diffusion_coefficient * inhibition,&
+         wp) / MAX(h_threshold, flow_depth) / flow_depth
+    IF (.NOT. ieee_is_finite(decay_rate) .OR. decay_rate .LT. 0.0_wp) THEN
+       CALL fatal_error('Invalid decay rate in pore-pressure DIRK stage solver')
+    END IF
+    IF (decay_rate .EQ. 0.0_wp) RETURN
+    log_decay_product = LOG(integration_step) + LOG(decay_rate)
+    IF (log_decay_product .GE. LOG(HUGE(1.0_wp))) THEN
+       pressure_stage = 0.0_wp
+       RETURN
+    END IF
+
+    denominator = 1.0_wp + integration_step * decay_rate
+    pressure_stage = excess_pressure_known / denominator
+
+  END SUBROUTINE solve_pore_pressure_diffusion_stage
 
   !******************************************************************************
   !> \brief Compute pressure-diffusion and inhibition factors for a local mixture.

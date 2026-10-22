@@ -52,7 +52,11 @@ increase). The exact lava-cooling checks exercise convection-only closed-form
 decay, radiative-convective flow composition, sub-ambient approach to ambient,
 and the initial ODE derivative. The exact pore-pressure diffusion checks
 exercise the frozen-state exponential solution, its semigroup property, source
-agreement, and unchanged behavior for inactive source states.
+agreement, and unchanged behavior for inactive source states. Separate
+algebraic-stage checks reconstruct the DIRK cooling and pore-pressure residuals,
+including a radiation-dominated quartic limit. A grouped-stage test exercises
+the ordered ANALYTIC energy/pressure dispatch and the reduced Newton momentum
+solve, checking every implicit residual in both strict and optimized profiles.
 
 For regular states, complex-step uses `1e-25*max(abs(q_j),1)` in physical
 conservative coordinates. Central finite differences use relative steps

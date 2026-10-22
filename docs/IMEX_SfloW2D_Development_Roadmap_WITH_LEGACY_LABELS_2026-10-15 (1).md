@@ -192,7 +192,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D09 | P5            | Correzione del solo attrito                                 | COMPLETATO (gate locale GNU/macOS) |
 | D10 | P6            | EX_terms / IM_terms                                         | COMPLETATO (gate locale GNU/macOS) |
 | D11 | P7            | IM_group e metadati                                  | COMPLETATO (gate locale GNU/macOS) |
-| D12 | P7            | Newton per gruppo e Jacobiano ridotto                       | DA FARE  |
+| D12 | P7            | Newton per gruppo e Jacobiano ridotto                       | IN CORSO |
 | D13 | P8            | Algebriche ANALYTIC per stage DIRK                          | IN CORSO |
 | D14 | P8            | Gruppi misti e validazione                                  | DA FARE  |
 | D15 | P9            | Acceptance della nuova architettura                         | GATE     |
@@ -1868,19 +1868,19 @@ di integrazione locali; il runner dei metadati è incluso in `check-local`.
 
 **Test proporzionati (nuove modifiche a questo step):** T1 Jacobiani ridotti, complex step e convergenza Newton; T2 problemi stiff; T3 full/split e profili se cambiano traiettorie. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: DA FARE
+Stato ufficiale: IN CORSO — implementata la sweep ordinata dei gruppi e il
+Newton ridotto alle sole equazioni del gruppo; gate d'integrazione completo
+ancora aperto.
 
 #### Jacobiano Newton
 
-Attualmente la dimensione dipende da n_implicit.
-
-Nella nuova versione dipenderà invece dal singolo gruppo:
-
-Il Jacobiano sarà:
-
-Le derivate continueranno a essere calcolate mediante complex-step, perturbando esclusivamente le incognite del gruppo.
-
-Le mappe degli indici saranno costruite all’inizializzazione, evitando allocazioni ripetute durante la soluzione delle celle.
+La dimensione del Jacobiano Newton dipende dal gruppo attivo, non dal totale
+`n_implicit`. Il residuo, le righe/colonne del Jacobiano complex-step e la
+line-search includono soltanto le equazioni del gruppo; le altre componenti
+restano fisse durante la sua iterazione. I sistemi 2×2/3×3 riutilizzano i
+risolutori pivotati esistenti. Le mappe compatte sono precalcolate nei
+metadati; il solver usa workspace locali automatici, senza allocazioni
+esplicite per cella.
 
 #### Inizializzazione e validazione dei gruppi
 
@@ -1892,11 +1892,36 @@ Sia tau = dt\*a_diag e q_known lo stato noto dopo l’assemblaggio dei termini R
 
 Per NEWTON, costruire il residuo locale R_g(x_g) e il Jacobiano J_g = dR_g/dx_g con dimensione n_g × n_g, n_g = COUNT(IM_group==g). Complex-step perturba solo colonne del gruppo e mantiene le altre variabili fisse. Riutilizzare gli ottimizzati solver lineari 2×2/3×3 quando appropriato, calcolare gradienti e line search nello spazio locale e garantire nessuna modifica a componenti esterne. Preallocare workspace per thread, dimensionati per il massimo gruppo Newton, **non** allocare per cella.
 
+#### Implementazione ed evidenza D12
+
+`solve_rk_step` ora aggiorna le equazioni esplicite e attraversa i gruppi
+nell’ordine dichiarato. I gruppi `ANALYTIC` sono dispatchati separatamente;
+per ogni gruppo `NEWTON`, il solver riduce residuo, Jacobiano e sistema lineare
+al relativo mapping e mantiene invariate le componenti esterne. Il test
+`TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90` ricostruisce i
+residui DIRK per energia, pressione e quantità di moto e li verifica in
+strict/optimized. La line-search conserva esattamente le componenti esterne
+al gruppo attivo; il test verifica inoltre che massa e frazioni solide non
+vengano modificate dagli sweep dei gruppi. I test di metadati e la suite
+cell-local superano entrambi i profili: 255/255 fixture per profilo.
+
+Il gate completo `TEST_IMEX_STAGES` non è ancora accettato: il runner si
+interrompe nel link del binario di riferimento perché la ricostruzione
+storica non definisce `reconstruct_kt_eta_traces`; l’eseguibile di produzione
+compila, ma la suite di confronto segnala `known_mass` nel caso
+`dynamic_smooth`. Lo stesso errore e la stessa tolleranza sono stati
+riprodotti usando il solver D11 non modificato, quindi il risultato è
+registrato come limite preesistente del gate, non come evidenza di
+equivalenza né come regressione introdotta da D12. Occorre correggere o
+riconciliare il gate prima di chiudere D12.
+
 ### D13 — Algebriche ANALYTIC per stage DIRK
 
 **Test proporzionati (nuove modifiche a questo step):** T1 residuali algebrici delle soluzioni ANALYTIC di stage DIRK; T2 regimi limite, soglie e selezione delle radici; T3 N_RK 2/3/4 quando si colleghino i solutori al ciclo degli stage. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: IN CORSO — implementate le routine di modulo; dispatch e integrazione nel solver restano fuori da questo tranche.
+Stato ufficiale: IN CORSO — integrate le soluzioni algebriche di stage per
+raffreddamento lava e diffusione della pressione interstiziale; restano da
+validare i regimi limite, le combinazioni di gruppi e l’intero tableau.
 
 #### Limitazioni di ANALYTIC
 
@@ -1920,30 +1945,41 @@ Non è stato introdotto un fallback ANALYTIC per modelli non supportati: in
 questa tranche tutti i modelli attivi hanno una formula chiusa quando le
 variabili non-velocità sono esplicite.
 
-I solutori analitici di velocità non sono ancora richiamati da
-`time_integration_2d`/Newton e non aggiungono dispatch per gruppi; questa
-integrazione resta un'attività D13 successiva, dopo D10–D12. I gruppi
-accoppiati diversi dalla coppia di momenti non ricevono una soluzione
-analitica generica.
+I solutori analitici di velocità non sono ancora richiamati dal dispatcher
+degli stage. Le formule di energia e pressione riportate sotto sono invece
+collegate ai rispettivi gruppi `ANALYTIC`. Non è previsto un fallback
+analitico generico per gruppi accoppiati non supportati.
 
 #### Raffreddamento della lava
 
-È stata aggiunta in `thermal_sources_2d` la routine
-`advance_lava_cooling_temperature`, che avanza l’ODE scalare a capacità termica
-areale e coefficienti fissati. Per radiazione e convezione usa la primitiva
-analitica tempo-temperatura con inversione scalare; per la sola convezione usa
-la soluzione esponenziale chiusa. La routine è autonoma e non è richiamata da
-`equation_terms_2d`, dal solver Newton o da `time_integration_2d`: l’attuale
-trattamento implicito e lo schema IMEX restano invariati.
+`thermal_sources_2d` distingue l’integrazione esatta dell’ODE dalla soluzione
+algebrica dello stage DIRK. `advance_lava_cooling_temperature` mantiene il
+contratto exact-flow autonomo; `solve_lava_cooling_stage_temperature` risolve
+invece, senza Newton,
+\f[
+C_A(T-T_k)-\tau[-k_r(T^4-T_a^4)-k_c(T-T_a)]=0,\qquad \tau=dt\,a_{ii}.
+\f]
+La quartica monotona è scalata e risolta con formule chiuse, selezionando la
+radice nell’intervallo fisico fra temperatura nota e ambiente. Il dispatcher
+usa la capacità termica areale congelata nello stato noto dello stage.
 
 #### Diffusione della pressione interstiziale
 
-È stata aggiunta in `pore_pressure_2d` la routine autonoma
-`advance_pore_pressure_diffusion`. Con profondità, temperatura e frazioni
-solide e densità della miscela fissate allo stato dello stage, la sorgente
-lineare in pressione in eccesso si integra con una soluzione esponenziale
-usando `integration_step = dt * a_ii`. La routine non è richiamata da Newton o
-dal time integrator; la diffusione mantiene il trattamento implicito esistente.
+`advance_pore_pressure_diffusion` conserva il contratto di integrazione esatta
+esponenziale dell’ODE. La distinta routine
+`solve_pore_pressure_diffusion_stage` risolve la relazione algebrica
+\f$p_{e,\mathrm{stage}}=p_{e,\mathrm{known}}/(1+\tau\lambda)\f$, con
+\f$\lambda=(\pi/2)^2DI/[h\max(h_\mathrm{threshold},h)]\f$ e
+\f$\tau=dt\,a_{ii}\f$. Profondità, temperatura e frazioni solide sono
+congelate; il solve è collegato al gruppo `ANALYTIC` dopo l’eventuale solve
+energetico, così il coefficiente usa la temperatura aggiornata dello stage.
+
+I test diretti ricostruiscono i residui algebrici delle due routine di stage,
+inclusi il caso convection-only per l’energia, in build strict e optimized.
+La suite di gruppo verifica anche i residui delle equazioni Newton. Restano
+da coprire i limiti estremi della quartica e la traiettoria completa con
+gruppi multipli; gli exact-flow helper non sostituiscono l’equazione
+algebrica DIRK.
 
 #### Contratto delle soluzioni di stage
 

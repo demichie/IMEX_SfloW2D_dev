@@ -27,6 +27,10 @@ PROGRAM test_equation_metadata
        ALL(partition%IM_group .EQ. [ 0, 1, 1, 0, 0, 0, 1 ]) )
   CALL assert_true( 'default group method',                                &
        partition%IM_group_method(1) .EQ. IM_GROUP_METHOD_NEWTON )
+  CALL assert_true( 'default group size',                                  &
+       ALL(partition%n_IM_group_equations .EQ. [ 3 ]) )
+  CALL assert_true( 'default compact group map',                           &
+       ALL(partition%IM_group_map(:,1) .EQ. [ 2, 3, 7 ]) )
 
   ! Reconfiguration must replace the previous allocation and support an empty
   ! implicit partition.
@@ -39,6 +43,9 @@ PROGRAM test_equation_metadata
   CALL assert_true( 'all equations explicit', partition%n_explicit .EQ. 7 )
   CALL assert_true( 'no groups for all-explicit partition',                 &
        partition%n_IM_groups .EQ. 0 .AND. SIZE(partition%IM_group_method) .EQ. 0 )
+  CALL assert_true( 'empty compact group map',                              &
+       SIZE(partition%IM_group_map,1) .EQ. 0 .AND.                         &
+       SIZE(partition%IM_group_map,2) .EQ. 0 )
   CALL assert_true( 'zero group for all-explicit equations',                &
        ALL(partition%IM_group .EQ. 0) )
   CALL assert_true( 'zero-sized implicit map', SIZE(partition%implicit_map) .EQ. 0 )
@@ -58,6 +65,8 @@ PROGRAM test_equation_metadata
   CALL assert_true( 'zero-sized explicit map', SIZE(partition%explicit_map) .EQ. 0 )
   CALL assert_true( 'all-implicit default group',                           &
        partition%n_IM_groups .EQ. 1 .AND. ALL(partition%IM_group .EQ. 1) )
+  CALL assert_true( 'all-implicit group map',                              &
+       ALL(partition%IM_group_map(:,1) .EQ. [ 1, 2, 3, 4, 5, 6, 7 ]) )
 
   ! The documented D11 layout keeps energy, pore pressure and the coupled
   ! momenta in ordered groups with independent solve methods.
@@ -73,6 +82,12 @@ PROGRAM test_equation_metadata
   CALL assert_true( 'documented group methods',                              &
        ALL(partition%IM_group_method .EQ. [ IM_GROUP_METHOD_ANALYTIC,       &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON ]) )
+  CALL assert_true( 'documented group sizes',                               &
+       ALL(partition%n_IM_group_equations .EQ. [ 1, 1, 2 ]) )
+  CALL assert_true( 'documented compact group maps',                        &
+       ALL(partition%IM_group_map(:,1) .EQ. [ 4, 0, 0, 0 ]) .AND.           &
+       ALL(partition%IM_group_map(:,2) .EQ. [ 5, 0, 0, 0 ]) .AND.           &
+       ALL(partition%IM_group_map(:,3) .EQ. [ 2, 3, 0, 0 ]) )
 
   ! The public consistency check rejects metadata mutations that violate the
   ! partition, dense group numbering or supported method identifiers.
@@ -94,6 +109,10 @@ PROGRAM test_equation_metadata
   CALL assert_true( 'unsupported group method rejected',                    &
        .NOT. partition%is_initialized() )
   partition%IM_group_method(1) = IM_GROUP_METHOD_ANALYTIC
+  partition%IM_group_map(1,3) = 7
+  CALL assert_true( 'compact map must match group membership',              &
+       .NOT. partition%is_initialized() )
+  partition%IM_group_map(1,3) = 2
   CALL assert_true( 'restored multi-group partition valid', partition%is_initialized() )
 
   CALL partition%finalize

@@ -132,7 +132,16 @@ CONTAINS
        Bprimej_x, Bprimej_y, Zij,                                              &
        iterations_used, converged, linear_info, line_search_failed )
 
-    USE parameters_2d, ONLY : max_nl_iter , tol_rel , tol_abs, n_RK
+    USE parameters_2d, ONLY : max_nl_iter, tol_rel, tol_abs, n_RK,            &
+         n_solid, n_add_gas, idx_pore
+    USE equation_metadata_2d, ONLY : IM_GROUP_METHOD_ANALYTIC,                &
+         IM_GROUP_METHOD_NEWTON
+    USE parameters_2d, ONLY : rheology_model_id, rheology_id_lava, rheology_flag
+    USE constitutive_parameters_2d, ONLY : T_env, radiative_term_coeff,       &
+         convective_term_coeff
+    USE state_conversion_2d, ONLY : r_phys_var
+    USE thermal_sources_2d, ONLY : solve_lava_cooling_stage_temperature
+    USE pore_pressure_2d, ONLY : solve_pore_pressure_diffusion_stage
 
     IMPLICIT NONE
 
@@ -150,55 +159,33 @@ CONTAINS
     INTEGER, INTENT(OUT) :: linear_info
     LOGICAL, INTENT(OUT) :: line_search_failed
 
-    REAL(wp) :: qj_init(n_vars)
-
-    REAL(wp) :: qj_org(n_vars) , qj_rel(n_vars)
-
-    REAL(wp) :: left_matrix(n_eqns,n_vars)
-    REAL(wp) :: right_term(n_eqns)
-
-    REAL(wp) :: scal_f
-
+    REAL(wp) :: qj_init(n_vars), q_known(n_vars)
     REAL(wp) :: coeff_f(n_eqns)
-    REAL(wp) :: residual_ref(n_eqns)
-    REAL(wp) :: residual_tol(n_eqns)
     REAL(wp) :: tol_abs_local, tol_rel_local
-
-    REAL(wp) :: qj_rel_NR_old(n_vars)
-    REAL(wp) :: scal_f_old
-    REAL(wp) :: desc_dir(n_vars)
-    REAL(wp) :: grad_f(n_vars)
-
-    INTEGER :: pivot(n_vars)
-
-    REAL(wp) :: left_matrix_small22(equation_partition%n_implicit,           &
-         equation_partition%n_implicit)
-
-    REAL(wp) :: desc_dir_small2(equation_partition%n_implicit)
-    INTEGER :: pivot_small2(equation_partition%n_implicit)
-
-    REAL(wp) :: desc_dir_small1(equation_partition%n_explicit)
-
-    INTEGER :: ok
-
-    INTEGER :: i,j
-    INTEGER :: idx
-    INTEGER :: nl_iter
-
-    REAL(wp), PARAMETER :: STPMX=100.0_wp
-    REAL(wp) :: stpmax
-    LOGICAL :: check
-
-    ! REAL(wp) :: qpj(n_vars+2) , p_dyn
-
-    REAL(wp) :: desc_dir_temp(n_vars)
+    REAL(wp) :: lava_h, lava_u, lava_v, lava_temperature, lava_density
+    REAL(wp) :: lava_alphas(n_solid), lava_alphag(n_add_gas), lava_alphal
+    REAL(wp) :: lava_red_grav, lava_p_dyn, lava_Zs, lava_pore_pressure
+    REAL(wp) :: pore_h, pore_u, pore_v, pore_temperature, pore_density
+    REAL(wp) :: pore_alphas(n_solid), pore_alphag(n_add_gas), pore_alphal
+    REAL(wp) :: pore_red_grav, pore_p_dyn, pore_Zs, pore_pressure
+    REAL(wp) :: temperature_stage, heat_capacity
+    REAL(wp) :: pressure_known, pressure_stage
+    INTEGER :: group, group_size, equation, i
+    INTEGER :: group_equations(equation_partition%n_implicit)
 
     iterations_used = 0
     converged = .FALSE.
     linear_info = 0
     line_search_failed = .FALSE.
 
-    coeff_f(1:n_eqns) = 1.0_wp
+    IF (.NOT. equation_partition%is_initialized() .OR.                     &
+         equation_partition%n_equations .NE. n_eqns .OR.                   &
+         n_eqns .NE. n_vars .OR. equation_partition%n_implicit .GT. n_vars) THEN
+       linear_info = -1
+       RETURN
+    END IF
+
+    coeff_f = 1.0_wp
 
     ! The four-stage third-order method needs a more accurate solution of
     ! each implicit stage than the default tolerances provide. Keep the
@@ -210,227 +197,221 @@ CONTAINS
        tol_rel_local = 1.0E-12_wp
     END IF
 
-    grad_f(1:n_eqns) = 0.0_wp
-
     qj_init = qj
+    q_known = qj_old - dt_step * Rj_not_impl(1:n_vars)
+    qj = q_known
 
-    !---- normalize the conservative variables ------
+    ! Explicit equations have no current-stage implicit source and are solved
+    ! directly before the ordered implicit-group sweep.
+    DO i = 1, equation_partition%n_explicit
+       equation = equation_partition%explicit_map(i)
+       qj(equation) = q_known(equation)
+    END DO
 
-    qj_org = MAX( ABS(qj) , 1.0E-3_wp )
+    IF (equation_partition%n_IM_groups .EQ. 0) THEN
+       converged = .TRUE.
+       RETURN
+    END IF
 
-    qj_rel = qj / qj_org
-    check = .FALSE.
+    DO group = 1, equation_partition%n_IM_groups
+       group_size = equation_partition%n_IM_group_equations(group)
+       group_equations(1:group_size) =                                      &
+            equation_partition%IM_group_map(1:group_size,group)
 
-    ! -----------------------------------------------
-    newton_raphson_loop:DO nl_iter=1,max_nl_iter
-
-       iterations_used = nl_iter
-
-       IF ( verbose_level .GE. 2 ) WRITE(*,*) 'solve_rk_step: nl_iter',nl_iter
-
-       CALL eval_f( qj , qj_old , dt_step , a_diag , coeff_f ,             &
-            Rj_not_impl , Bprimej_x , Bprimej_y , right_term , scal_f , Zij )
-
-       IF ( verbose_level .GE. 2 ) THEN
-
-          WRITE(*,*) 'solve_rk_step: right_term',right_term
-
-       END IF
-
-       IF ( verbose_level .GE. 2 ) THEN
-
-          WRITE(*,*) 'before_lnsrch: scal_f',scal_f
-
-       END IF
-
-       ! check the residual of the system
-
-       IF ( nl_iter .EQ. 1 ) residual_ref = ABS(right_term)
-       residual_tol = tol_abs_local + tol_rel_local * residual_ref
-
-       IF ( ALL( ABS(right_term) .LE. residual_tol ) ) THEN
-
-          IF ( verbose_level .GE. 3 ) WRITE(*,*) '1: check',check
-          converged = .TRUE.
-          EXIT newton_raphson_loop
-
-       END IF
-
-       ! ---- evaluate the descent direction ------------------------------------
-
-       CALL eval_jacobian( equation_partition, qj_rel , qj_org , dt_step ,   &
-            a_diag , coeff_f , Bprimej_x , Bprimej_y , left_matrix, Zij )
-
-       ! DGESV/SGESV overwrite the Jacobian with its LU factors in the fully
-       ! implicit case. Form the line-search gradient before the linear solve.
-       IF ( nl_iter .GT. 1 ) grad_f = MATMUL( right_term , left_matrix )
-
-       IF ( equation_partition%n_implicit .EQ. n_eqns ) THEN
-
-          desc_dir_temp = - right_term
-
-          CALL solve_dense_system(left_matrix, desc_dir_temp, pivot, ok)
-
-          IF ( ok .NE. 0 ) THEN
-             linear_info = ok
+       IF (equation_partition%IM_group_method(group) .EQ.                   &
+            IM_GROUP_METHOD_ANALYTIC) THEN
+          IF (group_size .NE. 1) THEN
+             linear_info = -6
              qj = qj_init
              RETURN
           END IF
-
-          desc_dir = desc_dir_temp
-
-       ELSE
-
-          DO i=1,equation_partition%n_implicit
-
-             desc_dir_small2(i) = right_term(equation_partition%implicit_map(i))
-
-             DO j=1,equation_partition%n_implicit
-                left_matrix_small22(i,j) =                                     &
-                     left_matrix(equation_partition%implicit_map(i),           &
-                     equation_partition%implicit_map(j))
-             END DO
-
-          END DO
-
-          ! Non-implicit columns are diagonal by construction in
-          ! eval_jacobian; therefore the A21 block is identically zero.
-          DO i=1,equation_partition%n_explicit
-
-             idx = equation_partition%explicit_map(i)
-             desc_dir_small1(i) = right_term(idx)
-
-             IF ( ABS(left_matrix(idx,idx)) .LE. TINY(1.0_wp) ) THEN
-                linear_info = i
+          equation = group_equations(1)
+          SELECT CASE (equation)
+          CASE (4)
+             IF (rheology_model_id .NE. rheology_id_lava) THEN
+                linear_info = -2
                 qj = qj_init
                 RETURN
              END IF
-
-             desc_dir_small1(i) = desc_dir_small1(i) / left_matrix(idx,idx)
-
-          END DO
-
-          IF ( equation_partition%n_implicit .EQ. 2 ) THEN
-
-             CALL solve_2x2_pivoted( left_matrix_small22,                     &
-                  desc_dir_small2, ok )
-
-             IF ( ok .NE. 0 ) THEN
-                linear_info = ok
+             IF (.NOT. rheology_flag) THEN
+                qj(4) = q_known(4)
+                CYCLE
+             END IF
+             CALL r_phys_var(q_known, lava_h, lava_u, lava_v, lava_alphas,  &
+                  lava_density, lava_temperature, lava_alphal, lava_alphag,&
+                  lava_red_grav, lava_p_dyn, lava_Zs, lava_pore_pressure)
+             IF (lava_temperature .LE. 0.0_wp) THEN
+                linear_info = -3
                 qj = qj_init
                 RETURN
              END IF
-
-          ELSEIF ( equation_partition%n_implicit .EQ. 3 ) THEN
-
-             CALL solve_3x3_pivoted( left_matrix_small22,                      &
-                  desc_dir_small2, ok )
-
-             IF ( ok .NE. 0 ) THEN
-                linear_info = ok
+             heat_capacity = q_known(4) / lava_temperature
+             CALL solve_lava_cooling_stage_temperature(lava_temperature,    &
+                  dt_step*a_diag, heat_capacity, radiative_term_coeff,     &
+                  convective_term_coeff, T_env, temperature_stage)
+             qj(4) = heat_capacity * temperature_stage
+          CASE DEFAULT
+             IF (equation .NE. idx_pore) THEN
+                linear_info = -4
                 qj = qj_init
                 RETURN
              END IF
-
-          ELSE
-
-             CALL solve_dense_system(left_matrix_small22, desc_dir_small2,  &
-                  pivot_small2, ok)
-
-             IF ( ok .NE. 0 ) THEN
-                linear_info = ok
-                qj = qj_init
-                RETURN
+             IF (q_known(1) .LE. 0.0_wp) THEN
+                qj(idx_pore) = q_known(idx_pore)
+             ELSE
+                CALL r_phys_var(qj, pore_h, pore_u, pore_v, pore_alphas,   &
+                     pore_density, pore_temperature, pore_alphal,          &
+                     pore_alphag, pore_red_grav, pore_p_dyn, pore_Zs,      &
+                     pore_pressure)
+                pressure_known = q_known(idx_pore) / q_known(1)
+                CALL solve_pore_pressure_diffusion_stage(pressure_known,   &
+                     dt_step*a_diag, pore_h, pore_temperature, pore_alphas,&
+                     pressure_stage)
              END IF
+             qj(idx_pore) = q_known(1) * pressure_stage
+          END SELECT
 
-          END IF
-
-          desc_dir = 0.0_wp
-
-          DO i=1,equation_partition%n_implicit
-             desc_dir(equation_partition%implicit_map(i)) = -desc_dir_small2(i)
+       ELSEIF (equation_partition%IM_group_method(group) .EQ.              &
+            IM_GROUP_METHOD_NEWTON) THEN
+          DO i = 1, group_size
+             equation = group_equations(i)
+             qj(equation) = qj_init(equation)
           END DO
-
-          DO i=1,equation_partition%n_explicit
-             desc_dir(equation_partition%explicit_map(i)) = -desc_dir_small1(i)
-          END DO
-
-       END IF
-
-       IF ( verbose_level .GE. 3 ) WRITE(*,*) 'desc_dir',desc_dir
-
-       ! A small normalized correction is not evidence that the current state
-       ! solves the stage equation. Apply the update and check its residual.
-
-       qj_rel_NR_old = qj_rel
-       scal_f_old = scal_f
-
-       IF ( nl_iter .GT. 1 ) THEN
-          ! Search for the step lambda giving a suffic. decrease in the solution
-
-          stpmax = STPMX * MAX( SQRT( DOT_PRODUCT(qj_rel,qj_rel) ) ,            &
-               DBLE( SIZE(qj_rel) ) )
-
-          CALL lnsrch( qj_rel_NR_old , qj_org , qj_old , scal_f_old , grad_f ,  &
-               desc_dir , coeff_f , qj_rel , scal_f , right_term , stpmax ,     &
-               check , dt_step , a_diag , Rj_not_impl , Bprimej_x , Bprimej_y,  &
-               Zij )
-
-          IF ( check ) THEN
-             qj = qj_rel * qj_org
-             line_search_failed = .TRUE.
-             IF ( verbose_level .GE. 2 )                                      &
-                  WRITE(*,*) 'solve_rk_step: line search failed'
+          CALL solve_newton_group(group_equations(1:group_size), qj,        &
+               qj_old, dt_step, a_diag, Rj_not_impl, Bprimej_x, Bprimej_y, &
+               Zij, coeff_f, tol_abs_local, tol_rel_local, iterations_used,&
+               converged, linear_info, line_search_failed)
+          IF (.NOT. converged) THEN
+             qj = qj_init
              RETURN
           END IF
-
        ELSE
-
-          qj_rel = qj_rel_NR_old + desc_dir
-
-          qj = qj_rel * qj_org
-
-          CALL eval_f( qj , qj_old , dt_step , a_diag , coeff_f ,          &
-               Rj_not_impl , Bprimej_x , Bprimej_y , right_term , scal_f, Zij )
-
+          linear_info = -5
+          qj = qj_init
+          RETURN
        END IF
+    END DO
 
-       IF ( verbose_level .GE. 2 ) WRITE(*,*) 'after_lnsrch: scal_f',scal_f
-
-       qj = qj_rel * qj_org
-
-       IF ( verbose_level .GE. 3 ) THEN
-
-          WRITE(*,*) 'qj',qj
-
-       END IF
-
-       IF ( ALL( ABS(right_term) .LE. residual_tol ) ) THEN
-
-          IF ( verbose_level .GE. 3 ) WRITE(*,*) '1: check',check
-          check= .FALSE.
-          converged = .TRUE.
-          EXIT newton_raphson_loop
-
-       END IF
-
-       IF ( MAXVAL( ABS( qj_rel(:) - qj_rel_NR_old(:) ) / MAX( ABS( qj_rel(:)) ,&
-            1.0_wp ) ) < EPSILON(1.0_wp) ) THEN
-
-          IF ( verbose_level .GE. 2 )                                         &
-               WRITE(*,*) 'solve_rk_step: roundoff-limited Newton stagnation'
-          ! Roundoff stagnation with a residual still above its bound is a
-          ! failed solve, not an alternative successful convergence criterion.
-          converged = .FALSE.
-          EXIT newton_raphson_loop
-
-       END IF
-
-    END DO newton_raphson_loop
-
-    RETURN
+    converged = .TRUE.
 
   END SUBROUTINE solve_rk_step
+
+  !> \brief Solve one implicit Newton group while holding other equations fixed.
+  SUBROUTINE solve_newton_group(group_equations, qj, qj_old, dt_step, a_diag,&
+       Rj_not_impl, Bprimej_x, Bprimej_y, Zij, coeff_f, tol_abs_local,       &
+       tol_rel_local, iterations_used, converged, linear_info,               &
+       line_search_failed)
+
+    USE parameters_2d, ONLY : max_nl_iter
+
+    IMPLICIT NONE
+
+    INTEGER, INTENT(IN) :: group_equations(:)
+    REAL(wp), INTENT(INOUT) :: qj(n_vars)
+    REAL(wp), INTENT(IN) :: qj_old(n_vars), dt_step, a_diag
+    REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns), Bprimej_x, Bprimej_y, Zij
+    REAL(wp), INTENT(IN) :: coeff_f(n_eqns), tol_abs_local, tol_rel_local
+    INTEGER, INTENT(INOUT) :: iterations_used
+    LOGICAL, INTENT(OUT) :: converged, line_search_failed
+    INTEGER, INTENT(OUT) :: linear_info
+
+    REAL(wp) :: qj_org(n_vars), qj_rel(n_vars), qj_rel_old(n_vars)
+    REAL(wp) :: qj_trial(n_vars)
+    REAL(wp) :: left_matrix(n_eqns,n_vars), right_term(n_eqns)
+    REAL(wp) :: residual_ref(n_eqns), residual_tol(n_eqns)
+    REAL(wp) :: desc_dir(n_vars), grad_f(n_vars), scal_f, scal_f_old
+    REAL(wp) :: stpmax
+    REAL(wp) :: group_matrix(SIZE(group_equations),SIZE(group_equations))
+    REAL(wp) :: group_rhs(SIZE(group_equations))
+    INTEGER :: group_pivot(SIZE(group_equations))
+    INTEGER :: nl_iter, i, j, ok
+    LOGICAL :: check
+    REAL(wp), PARAMETER :: STPMX = 100.0_wp
+
+    converged = .FALSE.
+    line_search_failed = .FALSE.
+    linear_info = 0
+    grad_f = 0.0_wp
+    qj_org = MAX(ABS(qj),1.0E-3_wp)
+    qj_rel = qj / qj_org
+
+    DO nl_iter = 1, max_nl_iter
+       iterations_used = iterations_used + 1
+       CALL eval_f(qj, qj_old, dt_step, a_diag, coeff_f, Rj_not_impl,       &
+            Bprimej_x, Bprimej_y, right_term, scal_f, Zij, group_equations)
+
+       IF (nl_iter .EQ. 1) residual_ref = ABS(right_term)
+       residual_tol = tol_abs_local + tol_rel_local*residual_ref
+       IF (ALL(ABS(right_term) .LE. residual_tol)) THEN
+          converged = .TRUE.
+          EXIT
+       END IF
+
+       CALL eval_jacobian(qj_rel, qj_org, dt_step, a_diag, coeff_f,         &
+            Bprimej_x, Bprimej_y, left_matrix, Zij, group_equations)
+       IF (nl_iter .GT. 1) grad_f = MATMUL(right_term,left_matrix)
+
+       DO i = 1, SIZE(group_equations)
+          group_rhs(i) = -right_term(group_equations(i))
+          DO j = 1, SIZE(group_equations)
+             group_matrix(i,j) = left_matrix(group_equations(i),            &
+                  group_equations(j))
+          END DO
+       END DO
+       IF (SIZE(group_equations) .EQ. 2) THEN
+          CALL solve_2x2_pivoted(group_matrix, group_rhs, ok)
+       ELSEIF (SIZE(group_equations) .EQ. 3) THEN
+          CALL solve_3x3_pivoted(group_matrix, group_rhs, ok)
+       ELSE
+          CALL solve_dense_system(group_matrix, group_rhs, group_pivot, ok)
+       END IF
+       IF (ok .NE. 0) THEN
+          linear_info = ok
+          RETURN
+       END IF
+
+       desc_dir = 0.0_wp
+       DO i = 1, SIZE(group_equations)
+          desc_dir(group_equations(i)) = group_rhs(i)
+       END DO
+       qj_rel_old = qj_rel
+       scal_f_old = scal_f
+
+       IF (nl_iter .GT. 1) THEN
+          stpmax = STPMX * MAX(NORM2(qj_rel),REAL(SIZE(qj_rel),wp))
+          CALL lnsrch(qj_rel_old, qj_org, qj, qj_old, scal_f_old, grad_f,   &
+               desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax,      &
+               check, dt_step, a_diag, Rj_not_impl, Bprimej_x, Bprimej_y,  &
+               Zij, group_equations)
+          IF (check) THEN
+             line_search_failed = .TRUE.
+             RETURN
+          END IF
+       ELSE
+          qj_rel = qj_rel_old + desc_dir
+          qj_trial = qj
+          DO i = 1, SIZE(group_equations)
+             qj_trial(group_equations(i)) =                                &
+                  qj_rel(group_equations(i))*qj_org(group_equations(i))
+          END DO
+          CALL eval_f(qj_trial, qj_old, dt_step, a_diag, coeff_f,           &
+               Rj_not_impl, Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
+               group_equations)
+       END IF
+
+       DO i = 1, SIZE(group_equations)
+          qj(group_equations(i)) = qj_rel(group_equations(i))*             &
+               qj_org(group_equations(i))
+       END DO
+       IF (ALL(ABS(right_term) .LE. residual_tol)) THEN
+          converged = .TRUE.
+          EXIT
+       END IF
+       IF (MAXVAL(ABS(qj_rel-qj_rel_old)/MAX(ABS(qj_rel),1.0_wp)) .LT.      &
+            EPSILON(1.0_wp)) EXIT
+    END DO
+
+  END SUBROUTINE solve_newton_group
 
   !******************************************************************************
   !> \brief Solve a two-equation dense system with guarded partial pivoting.
@@ -683,9 +664,10 @@ CONTAINS
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !******************************************************************************
 
-  SUBROUTINE lnsrch( qj_rel_NR_old , qj_org , qj_old , scal_f_old , grad_f ,    &
-       desc_dir , coeff_f , qj_rel , scal_f , right_term , stpmax , check ,     &
-       dt_step , a_diag , Rj_not_impl , Bprimej_x , Bprimej_y, Zij )
+  SUBROUTINE lnsrch( qj_rel_NR_old, qj_org, qj_fixed, qj_old, scal_f_old,      &
+       grad_f, desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax, check,  &
+       dt_step , a_diag , Rj_not_impl , Bprimej_x , Bprimej_y, Zij,           &
+       active_equations )
 
     IMPLICIT NONE
 
@@ -694,6 +676,9 @@ CONTAINS
 
     !> Initial point
     REAL(wp), DIMENSION(:), INTENT(IN) :: qj_org
+
+    ! Non-group variables must remain bitwise unchanged during line search.
+    REAL(wp), INTENT(IN) :: qj_fixed(n_vars)
 
     !> Initial point
     REAL(wp), DIMENSION(:), INTENT(IN) :: qj_old
@@ -733,9 +718,11 @@ CONTAINS
 
     ! vars for stochastic variable
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
+    INTEGER, INTENT(IN) :: active_equations(:)
     REAL(wp), PARAMETER :: TOLX=epsilon(qj_rel)
 
     INTEGER, DIMENSION(1) :: ndum
+    INTEGER :: i, equation
     REAL(wp) :: ALF , a,alam,alam2,alamin,b,disc
     REAL(wp) :: scal_f2
     REAL(wp) :: desc_dir_abs
@@ -802,10 +789,15 @@ CONTAINS
 
        qj_rel = qj_rel_NR_old + alam * desc_dir
 
-       qj = qj_rel * qj_org
+       qj = qj_fixed
+       DO i = 1, SIZE(active_equations)
+          equation = active_equations(i)
+          qj(equation) = qj_rel(equation)*qj_org(equation)
+       END DO
 
        CALL eval_f( qj , qj_old , dt_step , a_diag , coeff_f ,             &
-            Rj_not_impl , Bprimej_x , Bprimej_y, right_term , scal_f, Zij )
+            Rj_not_impl , Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
+            active_equations )
 
        IF ( verbose_level .GE. 4 ) THEN
 
@@ -921,7 +913,7 @@ CONTAINS
 
   SUBROUTINE eval_f( qj , qj_old , dt_step, a_diag , coeff_f , Rj_not_impl ,    &
        Bprimej_x ,                                                              &
-       Bprimej_y , f_nl , scal_f, Zij )
+       Bprimej_y , f_nl , scal_f, Zij, active_equations )
 
     USE equation_terms_2d, ONLY : eval_implicit_terms
 
@@ -942,6 +934,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: scal_f
 
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
+    INTEGER, INTENT(IN) :: active_equations(:)
 
     REAL(wp) :: nh_term_impl(n_eqns)
     REAL(wp) :: Rj(n_eqns)
@@ -957,8 +950,10 @@ CONTAINS
 
     delta_q = qj - qj_old
     f_nl = delta_q + dt_step * Rj
-
     f_nl = coeff_f * f_nl
+    WHERE (.NOT. equation_is_active(active_equations))
+       f_nl = 0.0_wp
+    END WHERE
 
     scal_f = 0.5_wp * DOT_PRODUCT( f_nl , f_nl )
 
@@ -989,14 +984,13 @@ CONTAINS
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !******************************************************************************
 
-  SUBROUTINE eval_jacobian( equation_partition, qj_rel , qj_org , dt_step,  &
-       a_diag , coeff_f, Bprimej_x , Bprimej_y , left_matrix, Zij )
+  SUBROUTINE eval_jacobian( qj_rel, qj_org, dt_step, a_diag, coeff_f,        &
+       Bprimej_x, Bprimej_y, left_matrix, Zij, active_equations )
 
     USE equation_terms_2d, ONLY : eval_implicit_terms
 
     IMPLICIT NONE
 
-    TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     REAL(wp), INTENT(IN) :: qj_rel(n_vars)
     REAL(wp), INTENT(IN) :: qj_org(n_vars)
     REAL(wp), INTENT(IN) :: dt_step
@@ -1009,13 +1003,14 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: left_matrix(n_eqns,n_vars)
 
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
+    INTEGER, INTENT(IN) :: active_equations(:)
 
     REAL(wp) :: Jacob_relax(n_eqns,n_vars)
     COMPLEX(wp) :: nh_terms_cmplx_impl(n_eqns)
     COMPLEX(wp) :: qj_cmplx(n_vars) , qj_rel_cmplx(n_vars)
     COMPLEX(wp) :: qj_rel_cmplx_init(n_vars)
 
-    INTEGER :: i
+    INTEGER :: i, j, equation
 
     ! initialize the matrix of the linearized system and the Jacobian
 
@@ -1032,33 +1027,43 @@ CONTAINS
 
     END DO
 
-    DO i=1,n_vars
+    DO i = 1, SIZE(active_equations)
+       equation = active_equations(i)
+       left_matrix(equation,equation) = coeff_f(equation) * qj_org(equation)
 
-       left_matrix(i,i) = coeff_f(i) * qj_org(i)
+       qj_rel_cmplx = qj_rel_cmplx_init
+       qj_rel_cmplx(equation) = CMPLX(qj_rel(equation), h, wp)
+       qj_cmplx = qj_rel_cmplx * qj_org
 
-       IF ( equation_partition%implicit(i) ) THEN
+       CALL eval_implicit_terms(Bprimej_x, Bprimej_y, Zij,                   &
+            c_qj=qj_cmplx, c_nh_term_impl=nh_terms_cmplx_impl)
 
-          qj_rel_cmplx(1:n_vars) = qj_rel_cmplx_init(1:n_vars)
-          qj_rel_cmplx(i) = CMPLX(qj_rel(i), h,wp)
-
-          qj_cmplx = qj_rel_cmplx * qj_org
-
-          CALL eval_implicit_terms( Bprimej_x , Bprimej_y, Zij,                 &
-               c_qj = qj_cmplx , c_nh_term_impl = nh_terms_cmplx_impl )
-
-          Jacob_relax(1:n_eqns,i) = coeff_f(1:n_eqns) *                        &
-               AIMAG(nh_terms_cmplx_impl) * one_by_h
-
-          left_matrix(1:n_eqns,i) = left_matrix(1:n_eqns,i) - dt_step * a_diag       &
-               * Jacob_relax(1:n_eqns,i)
-
-       END IF
-
+       DO j = 1, SIZE(active_equations)
+          Jacob_relax(active_equations(j),equation) =                         &
+               coeff_f(active_equations(j)) *                                &
+               AIMAG(nh_terms_cmplx_impl(active_equations(j))) * one_by_h
+       END DO
+       DO j = 1, n_eqns
+          left_matrix(j,equation) = left_matrix(j,equation) -                 &
+               dt_step*a_diag*Jacob_relax(j,equation)
+       END DO
     END DO
 
     RETURN
 
   END SUBROUTINE eval_jacobian
+
+  !> \brief Return a mask selecting residual rows in one implicit group.
+  PURE FUNCTION equation_is_active(active_equations) RESULT(mask)
+    INTEGER, INTENT(IN) :: active_equations(:)
+    LOGICAL :: mask(n_eqns)
+    INTEGER :: i
+
+    mask = .FALSE.
+    DO i = 1, SIZE(active_equations)
+       mask(active_equations(i)) = .TRUE.
+    END DO
+  END FUNCTION equation_is_active
 
 
 END MODULE nonlinear_solver_2d

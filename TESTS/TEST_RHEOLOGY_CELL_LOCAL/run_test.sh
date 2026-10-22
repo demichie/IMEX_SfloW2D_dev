@@ -55,6 +55,11 @@ for profile in strict optimized; do
     "$compiler" $common $objects test_pore_pressure_diffusion.o -llapack \
         -o test_pore_pressure_diffusion
     ./test_pore_pressure_diffusion
+    "$compiler" -O0 -g -fcheck=all $common -I"$repo_dir/src/state" -c \
+        "$test_dir/test_grouped_implicit_stage.f90"
+    "$compiler" $common $objects test_grouped_implicit_stage.o -llapack \
+        -o test_grouped_implicit_stage
+    ./test_grouped_implicit_stage
     # IEEE checks and the test-side FD subtraction stay strict in both profiles.
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/probe_sources.f90"
     "$compiler" $common $objects probe_sources.o -llapack -o probe_sources
