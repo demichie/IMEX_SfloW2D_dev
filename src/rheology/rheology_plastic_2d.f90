@@ -7,7 +7,7 @@
 !> \f]
 !> The supplied speed is the normalization used by the implementation. The
 !> source is zero when the caller indicates that the flow is not moving.
-!> \ref eval_plastic_implicit_source evaluates the complex-valued x/y sources
+!> \ref eval_plastic_implicit_momentum_rate evaluates the complex-valued x/y rates
 !> for the implicit solve, while \ref solve_plastic_analytic_velocity
 !> integrates its frozen velocity source exactly.
 !> \ref tau stores the model strength.
@@ -23,7 +23,7 @@ MODULE rheology_plastic_2d
 
   PRIVATE
 
-  PUBLIC :: tau, eval_plastic_implicit_source
+  PUBLIC :: tau, eval_plastic_implicit_momentum_rate
   PUBLIC :: solve_plastic_analytic_velocity
 
   REAL(wp) :: tau
@@ -74,23 +74,23 @@ CONTAINS
   !> \param speed Speed used to normalize the direction.
   !> \param mixture_density Mixture density \f$\rho_m\f$.
   !> \param moving Whether the state is moving.
-  !> \param source_x Returned x momentum source.
-  !> \param source_y Returned y momentum source.
+  !> \param rate_x Returned x momentum rate.
+  !> \param rate_y Returned y momentum rate.
   !******************************************************************************
-  SUBROUTINE eval_plastic_implicit_source(velocity_x, velocity_y, speed,       &
-       mixture_density, moving, source_x, source_y)
+  SUBROUTINE eval_plastic_implicit_momentum_rate(velocity_x, velocity_y, speed, &
+       mixture_density, moving, rate_x, rate_y)
 
     COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y, speed, mixture_density
     LOGICAL, INTENT(IN) :: moving
-    COMPLEX(wp), INTENT(OUT) :: source_x, source_y
+    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
 
-    source_x = CMPLX(0.0_wp, 0.0_wp, wp)
-    source_y = CMPLX(0.0_wp, 0.0_wp, wp)
+    rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
+    rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
     IF (.NOT. moving) RETURN
 
-    source_x = -mixture_density * tau * (velocity_x / speed)
-    source_y = -mixture_density * tau * (velocity_y / speed)
+    rate_x = -mixture_density * tau * (velocity_x / speed)
+    rate_y = -mixture_density * tau * (velocity_y / speed)
 
-  END SUBROUTINE eval_plastic_implicit_source
+  END SUBROUTINE eval_plastic_implicit_momentum_rate
 
 END MODULE rheology_plastic_2d

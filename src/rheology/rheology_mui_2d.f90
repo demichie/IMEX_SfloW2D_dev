@@ -13,7 +13,7 @@
 !> The basal stress is
 !> \f$\tau_b=\mu(I)\sigma'_n\f$ and the returned source is
 !> \f$\boldsymbol{S}=-\tau_b\boldsymbol{u}_h/|\boldsymbol{u}|\f$.
-!> \ref eval_mui_source evaluates the real-valued x/y source components,
+!> \ref eval_mui_momentum_rate evaluates the real-valued x/y momentum rates,
 !> choosing a Sauter diameter and average solid density for mixtures with
 !> multiple solid classes. \ref solve_mui_analytic_velocity solves its
 !> rational speed-dependent frozen-coefficient source in time.
@@ -33,7 +33,7 @@ MODULE rheology_mui_2d
 
   PRIVATE
 
-  PUBLIC :: eval_mui_source, solve_mui_analytic_velocity
+  PUBLIC :: eval_mui_momentum_rate, solve_mui_analytic_velocity
 
 CONTAINS
 
@@ -132,14 +132,14 @@ CONTAINS
   !> \param curvature_acceleration Curvature contribution to vertical stress.
   !> \param use_pore_pressure Enable pore-pressure reduction.
   !> \param excess_pore_pressure Excess pore pressure.
-  !> \param source_x Returned x momentum source.
-  !> \param source_y Returned y momentum source.
+  !> \param rate_x Returned x momentum rate.
+  !> \param rate_y Returned y momentum rate.
   !******************************************************************************
 
-  SUBROUTINE eval_mui_source( flow_depth, velocity_x, velocity_y, speed,     &
+  SUBROUTINE eval_mui_momentum_rate( flow_depth, velocity_x, velocity_y, speed, &
        mixture_density, reduced_gravity, gravity_coefficient, solid_fraction, &
        curvature_acceleration, use_pore_pressure, excess_pore_pressure,       &
-       source_x, source_y )
+       rate_x, rate_y )
 
     REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
     REAL(wp), INTENT(IN) :: mixture_density, reduced_gravity
@@ -148,7 +148,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: curvature_acceleration
     LOGICAL, INTENT(IN) :: use_pore_pressure
     REAL(wp), INTENT(IN) :: excess_pore_pressure
-    REAL(wp), INTENT(OUT) :: source_x, source_y
+    REAL(wp), INTENT(OUT) :: rate_x, rate_y
 
     REAL(wp) :: particle_diameter
     REAL(wp) :: particle_density
@@ -160,8 +160,8 @@ CONTAINS
     REAL(wp) :: friction_coefficient
     REAL(wp) :: friction_stress
 
-    source_x = 0.0_wp
-    source_y = 0.0_wp
+    rate_x = 0.0_wp
+    rate_y = 0.0_wp
     IF ( speed .LE. 0.0_wp ) RETURN
 
     IF ( n_solid .GT. 1 ) THEN
@@ -199,9 +199,9 @@ CONTAINS
          muI_inf * inertial_number**2) / (I_0 + inertial_number)
 
     friction_stress = friction_coefficient * effective_normal_stress
-    source_x = source_x - friction_stress * (velocity_x / speed)
-    source_y = source_y - friction_stress * (velocity_y / speed)
+    rate_x = rate_x - friction_stress * (velocity_x / speed)
+    rate_y = rate_y - friction_stress * (velocity_y / speed)
 
-  END SUBROUTINE eval_mui_source
+  END SUBROUTINE eval_mui_momentum_rate
 
 END MODULE rheology_mui_2d

@@ -18,11 +18,11 @@ MODULE equation_terms_2d
 
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE rheology_froude_2d, ONLY : eval_froude_source
-  USE rheology_lucas_2d, ONLY : eval_lucas_source
-  USE rheology_mui_2d, ONLY : eval_mui_source
-  USE rheology_mui_voellmy_2d, ONLY : eval_mui_voellmy_source,               &
-       eval_mui_voellmy_implicit_source
+  USE rheology_froude_2d, ONLY : eval_froude_momentum_rate
+  USE rheology_lucas_2d, ONLY : eval_lucas_momentum_rate
+  USE rheology_mui_2d, ONLY : eval_mui_momentum_rate
+  USE rheology_mui_voellmy_2d, ONLY : eval_mui_voellmy_momentum_rate,        &
+       eval_mui_voellmy_implicit_momentum_rate
   USE pore_pressure_2d, ONLY : eval_pore_pressure_diffusion_source,            &
        eval_pore_pressure_gas_loss, eval_pore_pressure_inlet_source,            &
        eval_pore_pressure_mass_exchange_source
@@ -31,14 +31,14 @@ MODULE equation_terms_2d
        eval_vaporization_sources
   USE rheology_voellmy_2d, ONLY : eval_voellmy_implicit_momentum_rate,      &
        eval_voellmy_semi_implicit_momentum_rate
-  USE rheology_plastic_2d, ONLY : eval_plastic_implicit_source
-  USE rheology_lava_2d, ONLY : eval_lava_implicit_source,                    &
-       eval_lava_semi_impl_source
+  USE rheology_plastic_2d, ONLY : eval_plastic_implicit_momentum_rate
+  USE rheology_lava_2d, ONLY : eval_lava_implicit_momentum_rate,              &
+       eval_lava_semi_implicit_momentum_rate
   USE rheology_lahar_2d, ONLY : eval_lahar_implicit_momentum_rate,           &
        eval_lahar_semi_implicit_momentum_rate, eval_lahar_fluid_viscosity,   &
        eval_lahar_deposition_rate
-  USE rheology_empirical_2d, ONLY : eval_empirical_implicit_source
-  USE rheology_quadratic_2d, ONLY : eval_quadratic_implicit_source
+  USE rheology_empirical_2d, ONLY : eval_empirical_implicit_momentum_rate
+  USE rheology_quadratic_2d, ONLY : eval_quadratic_implicit_momentum_rate
 
   USE equation_metadata_2d, ONLY : equation_partition_type,                   &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
@@ -1259,14 +1259,14 @@ CONTAINS
                mod_vel2, moving, stochastic_flag, Zij, source_term(2),       &
                source_term(3))
        ELSEIF (rheology_model_id .EQ. rheology_id_mui_voellmy) THEN
-          CALL eval_mui_voellmy_implicit_source(u, v, rho_m, red_grav,        &
+          CALL eval_mui_voellmy_implicit_momentum_rate(u, v, rho_m, red_grav, &
                mod_vel, mod_vel2, moving, stochastic_flag, Zij,              &
                source_term(2), source_term(3))
        ELSEIF (rheology_model_id .EQ. rheology_id_plastic) THEN
-          CALL eval_plastic_implicit_source(u, v, mod_vel, rho_m, moving,     &
+          CALL eval_plastic_implicit_momentum_rate(u, v, mod_vel, rho_m, moving, &
                source_term(2), source_term(3))
        ELSEIF (rheology_model_id .EQ. rheology_id_lava) THEN
-          CALL eval_lava_implicit_source(h, T, rho_m, u, v, mod_vel, moving,  &
+          CALL eval_lava_implicit_momentum_rate(h, T, rho_m, u, v, mod_vel, moving, &
                source_term(2), source_term(3))
           source_term(4) = eval_lava_cooling_source(T, radiative_term_coeff,   &
                convective_term_coeff, T_env)
@@ -1275,10 +1275,10 @@ CONTAINS
                rho_m, inv_rho_m, alphas, moving, source_term(2),             &
                source_term(3))
        ELSEIF (rheology_model_id .EQ. rheology_id_empirical) THEN
-          CALL eval_empirical_implicit_source(h, u, v, mod_vel_hor, mod_vel,  &
+          CALL eval_empirical_implicit_momentum_rate(h, u, v, mod_vel_hor, mod_vel, &
                rho_m, moving, source_term(2), source_term(3))
        ELSEIF (rheology_model_id .EQ. rheology_id_quadratic) THEN
-          CALL eval_quadratic_implicit_source(u, v, mod_vel, mod_vel_hor,     &
+          CALL eval_quadratic_implicit_momentum_rate(u, v, mod_vel, mod_vel_hor, &
                mod_vel2, rho_m, moving, source_term(2), source_term(3))
        ENDIF
 
@@ -1367,8 +1367,8 @@ CONTAINS
     REAL(wp) :: r_Ri
     ! mu(I) rheology variables
     REAL(wp) :: centr_force_term
-    REAL(wp) :: rheology_source_x
-    REAL(wp) :: rheology_source_y
+    REAL(wp) :: rheology_rate_x
+    REAL(wp) :: rheology_rate_y
 
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
@@ -1424,7 +1424,7 @@ CONTAINS
                source_term(2), source_term(3))
 
        ELSEIF (rheology_model_id .EQ. rheology_id_lava) THEN
-          CALL eval_lava_semi_impl_source(r_u, r_v, mod_vel, source_term(2),   &
+          CALL eval_lava_semi_implicit_momentum_rate(r_u, r_v, mod_vel, source_term(2), &
                source_term(3))
 
        ELSEIF (rheology_model_id .EQ. rheology_id_lahar) THEN
@@ -1433,18 +1433,18 @@ CONTAINS
                source_term(2), source_term(3))
 
        ELSEIF ( rheology_model_id .EQ. rheology_id_froude ) THEN
-          CALL eval_froude_source(r_h, r_u, r_v, mod_vel, mod_hor_vel,       &
+          CALL eval_froude_momentum_rate(r_h, r_u, r_v, mod_vel, mod_hor_vel, &
                r_rho_m, r_red_grav, grav_coeff, centr_force_term,            &
-               stochastic_flag, Zj, rheology_source_x, rheology_source_y)
-          source_term(2) = rheology_source_x
-          source_term(3) = rheology_source_y
+               stochastic_flag, Zj, rheology_rate_x, rheology_rate_y)
+          source_term(2) = rheology_rate_x
+          source_term(3) = rheology_rate_y
 
       ELSEIF ( rheology_model_id .EQ. rheology_id_lucas ) THEN
-          CALL eval_lucas_source(r_h, r_u, r_v, mod_vel, mod_hor_vel,        &
+          CALL eval_lucas_momentum_rate(r_h, r_u, r_v, mod_vel, mod_hor_vel, &
                r_rho_m, r_red_grav, grav_coeff, centr_force_term,            &
-               stochastic_flag, Zj, rheology_source_x, rheology_source_y)
-          source_term(2) = rheology_source_x
-          source_term(3) = rheology_source_y
+               stochastic_flag, Zj, rheology_rate_x, rheology_rate_y)
+          source_term(2) = rheology_rate_x
+          source_term(3) = rheology_rate_y
 
       ELSEIF ( rheology_model_id .EQ. rheology_id_mui ) THEN
          IF ( mod_vel .GT. 0.0_wp ) THEN ! v>0 (avoid div by 0)
@@ -1458,12 +1458,12 @@ CONTAINS
 
             exc_pore_pres = 0.0_wp
             IF ( pore_pressure_flag ) exc_pore_pres = qpj(idx_pore)
-            CALL eval_mui_source(r_h, r_u, r_v, mod_vel, r_rho_m,          &
+            CALL eval_mui_momentum_rate(r_h, r_u, r_v, mod_vel, r_rho_m,   &
                  r_red_grav, grav_coeff, r_alphas, centr_force_term,       &
-                 pore_pressure_flag, exc_pore_pres, rheology_source_x,     &
-                 rheology_source_y)
-            source_term(2) = rheology_source_x
-            source_term(3) = rheology_source_y
+                 pore_pressure_flag, exc_pore_pres, rheology_rate_x,       &
+                 rheology_rate_y)
+            source_term(2) = rheology_rate_x
+            source_term(3) = rheology_rate_y
 
          END IF
 
@@ -1481,12 +1481,12 @@ CONTAINS
 
             exc_pore_pres = 0.0_wp
             IF ( pore_pressure_flag ) exc_pore_pres = qpj(idx_pore)
-            CALL eval_mui_voellmy_source(r_h, r_u, r_v, mod_vel, r_rho_m,   &
+            CALL eval_mui_voellmy_momentum_rate(r_h, r_u, r_v, mod_vel, r_rho_m, &
                  r_red_grav, grav_coeff, r_alphas, centr_force_term,       &
-                 pore_pressure_flag, exc_pore_pres, rheology_source_x,     &
-                 rheology_source_y)
-            source_term(2) = rheology_source_x
-            source_term(3) = rheology_source_y
+                 pore_pressure_flag, exc_pore_pres, rheology_rate_x,       &
+                 rheology_rate_y)
+            source_term(2) = rheology_rate_x
+            source_term(3) = rheology_rate_y
 
          END IF
 

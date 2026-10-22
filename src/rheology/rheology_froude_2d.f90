@@ -12,7 +12,7 @@
 !> gravity coefficient and \f$a_c\f$ is the curvature acceleration. Optional
 !> stochastic perturbations shift the Froude number for sufficiently deep
 !> flow and clamp it at zero. The module provides
-!> \ref eval_froude_source to evaluate the two horizontal source components.
+!> \ref eval_froude_momentum_rate to evaluate the two horizontal momentum rates.
 !> \ref solve_froude_analytic_velocity integrates the frozen Froude-dependent
 !> velocity source in time.
 !********************************************************************************
@@ -29,7 +29,7 @@ MODULE rheology_froude_2d
 
   PRIVATE
 
-  PUBLIC :: eval_froude_source
+  PUBLIC :: eval_froude_momentum_rate
   PUBLIC :: solve_froude_analytic_velocity
 
 CONTAINS
@@ -105,27 +105,27 @@ CONTAINS
   !> \param curvature_term Curvature acceleration \f$a_c\f$.
   !> \param stochastic Enable the stochastic Froude perturbation.
   !> \param stochastic_value Stochastic increment to the Froude number.
-  !> \param source_x Returned x momentum source.
-  !> \param source_y Returned y momentum source.
+  !> \param rate_x Returned x momentum rate.
+  !> \param rate_y Returned y momentum rate.
   !******************************************************************************
 
-  SUBROUTINE eval_froude_source( flow_depth, velocity_x, velocity_y, speed,  &
+  SUBROUTINE eval_froude_momentum_rate( flow_depth, velocity_x, velocity_y, speed, &
        horizontal_speed, mixture_density, reduced_gravity, gravity_coefficient, &
-       curvature_term, stochastic, stochastic_value, source_x, source_y )
+       curvature_term, stochastic, stochastic_value, rate_x, rate_y )
 
     REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
     REAL(wp), INTENT(IN) :: horizontal_speed, mixture_density, reduced_gravity
     REAL(wp), INTENT(IN) :: gravity_coefficient, curvature_term
     LOGICAL, INTENT(IN) :: stochastic
     REAL(wp), INTENT(IN) :: stochastic_value
-    REAL(wp), INTENT(OUT) :: source_x, source_y
+    REAL(wp), INTENT(OUT) :: rate_x, rate_y
 
     REAL(wp) :: froude_number
     REAL(wp) :: friction_coefficient
     REAL(wp) :: friction_stress
 
-    source_x = 0.0_wp
-    source_y = 0.0_wp
+    rate_x = 0.0_wp
+    rate_y = 0.0_wp
 
     IF ( speed .GT. 0.0_wp .AND. reduced_gravity .GT. 0.0_wp ) THEN
        froude_number = speed / SQRT(reduced_gravity * flow_depth)
@@ -138,10 +138,10 @@ CONTAINS
        friction_coefficient = mu_inf + (mu_0 - mu_inf) * EXP(-froude_number/Fr_0)
        friction_stress = mixture_density * ( friction_coefficient * flow_depth * &
             gravity_coefficient * ( reduced_gravity + curvature_term ) )
-       source_x = source_x - friction_stress * velocity_x / horizontal_speed
-       source_y = source_y - friction_stress * velocity_y / horizontal_speed
+       rate_x = rate_x - friction_stress * velocity_x / horizontal_speed
+       rate_y = rate_y - friction_stress * velocity_y / horizontal_speed
     END IF
 
-  END SUBROUTINE eval_froude_source
+  END SUBROUTINE eval_froude_momentum_rate
 
 END MODULE rheology_froude_2d

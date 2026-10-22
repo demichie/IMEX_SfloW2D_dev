@@ -4,7 +4,7 @@
 !> \f$C(h,|\boldsymbol{u}|)=10^{-3}|\boldsymbol{u}|/(1+10h)\f$. The
 !> horizontal source is
 !> \f$\boldsymbol{S}=-\rho_m C\boldsymbol{u}_h/|\boldsymbol{u}_h|\f$.
-!> \ref eval_empirical_implicit_source evaluates its complex-valued x/y
+!> \ref eval_empirical_implicit_momentum_rate evaluates its complex-valued x/y
 !> components for a moving state; the empirical constants are fixed in the
 !> routine. \ref solve_empirical_analytic_velocity integrates its frozen
 !> linear-drag velocity source exactly.
@@ -20,7 +20,7 @@ MODULE rheology_empirical_2d
 
   PRIVATE
 
-  PUBLIC :: eval_empirical_implicit_source
+  PUBLIC :: eval_empirical_implicit_momentum_rate
   PUBLIC :: solve_empirical_analytic_velocity
 
 CONTAINS
@@ -71,27 +71,27 @@ CONTAINS
   !> \param speed Speed magnitude used by the empirical coefficient.
   !> \param mixture_density Mixture density.
   !> \param moving Whether the state is moving.
-  !> \param source_x Returned x momentum source.
-  !> \param source_y Returned y momentum source.
+  !> \param rate_x Returned x momentum rate.
+  !> \param rate_y Returned y momentum rate.
   !******************************************************************************
-  SUBROUTINE eval_empirical_implicit_source(flow_depth, velocity_x, velocity_y, &
-       horizontal_speed, speed, mixture_density, moving, source_x, source_y)
+  SUBROUTINE eval_empirical_implicit_momentum_rate(flow_depth, velocity_x, velocity_y, &
+       horizontal_speed, speed, mixture_density, moving, rate_x, rate_y)
 
     COMPLEX(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y
     COMPLEX(wp), INTENT(IN) :: horizontal_speed, speed, mixture_density
     LOGICAL, INTENT(IN) :: moving
-    COMPLEX(wp), INTENT(OUT) :: source_x, source_y
+    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
 
     COMPLEX(wp) :: friction_coefficient
 
-    source_x = CMPLX(0.0_wp, 0.0_wp, wp)
-    source_y = CMPLX(0.0_wp, 0.0_wp, wp)
+    rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
+    rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
     IF (.NOT. moving) RETURN
 
     friction_coefficient = 1.0E-3_wp / (1.0_wp + 10.0_wp * flow_depth) * speed
-    source_x = -mixture_density * friction_coefficient * (velocity_x / horizontal_speed)
-    source_y = -mixture_density * friction_coefficient * (velocity_y / horizontal_speed)
+    rate_x = -mixture_density * friction_coefficient * (velocity_x / horizontal_speed)
+    rate_y = -mixture_density * friction_coefficient * (velocity_y / horizontal_speed)
 
-  END SUBROUTINE eval_empirical_implicit_source
+  END SUBROUTINE eval_empirical_implicit_momentum_rate
 
 END MODULE rheology_empirical_2d

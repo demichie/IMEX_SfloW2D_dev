@@ -13,7 +13,7 @@
 !> The source is \f$\boldsymbol{S}=-\rho_m\mu hG(g'+a_c)
 !> \boldsymbol{u}_h/|\boldsymbol{u}_h|\f$. When stochastic mode is enabled,
 !> its increment is added to the speed before evaluating the law. The module
-!> exposes \ref eval_lucas_source for the x/y source components and
+!> exposes \ref eval_lucas_momentum_rate for the x/y momentum rates and
 !> \ref solve_lucas_analytic_velocity for exact integration of the frozen
 !> speed-decay law with non-velocity variables explicit.
 !********************************************************************************
@@ -30,7 +30,7 @@ MODULE rheology_lucas_2d
 
   PRIVATE
 
-  PUBLIC :: eval_lucas_source
+  PUBLIC :: eval_lucas_momentum_rate
   PUBLIC :: solve_lucas_analytic_velocity
 
 CONTAINS
@@ -102,27 +102,27 @@ CONTAINS
   !> \param curvature_term Curvature acceleration \f$a_c\f$.
   !> \param stochastic Enable the stochastic speed increment.
   !> \param stochastic_value Stochastic speed increment.
-  !> \param source_x Returned x momentum source.
-  !> \param source_y Returned y momentum source.
+  !> \param rate_x Returned x momentum rate.
+  !> \param rate_y Returned y momentum rate.
   !******************************************************************************
 
-  SUBROUTINE eval_lucas_source( flow_depth, velocity_x, velocity_y, speed,   &
+  SUBROUTINE eval_lucas_momentum_rate( flow_depth, velocity_x, velocity_y, speed, &
        horizontal_speed, mixture_density, reduced_gravity, gravity_coefficient, &
-       curvature_term, stochastic, stochastic_value, source_x, source_y )
+       curvature_term, stochastic, stochastic_value, rate_x, rate_y )
 
     REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
     REAL(wp), INTENT(IN) :: horizontal_speed, mixture_density, reduced_gravity
     REAL(wp), INTENT(IN) :: gravity_coefficient, curvature_term
     LOGICAL, INTENT(IN) :: stochastic
     REAL(wp), INTENT(IN) :: stochastic_value
-    REAL(wp), INTENT(OUT) :: source_x, source_y
+    REAL(wp), INTENT(OUT) :: rate_x, rate_y
 
     REAL(wp) :: friction_speed
     REAL(wp) :: friction_coefficient
     REAL(wp) :: friction_stress
 
-    source_x = 0.0_wp
-    source_y = 0.0_wp
+    rate_x = 0.0_wp
+    rate_y = 0.0_wp
 
     IF ( speed .GT. 0.0_wp ) THEN
        IF ( stochastic ) THEN
@@ -143,10 +143,10 @@ CONTAINS
 
        friction_stress = mixture_density * ( friction_coefficient * flow_depth * &
             gravity_coefficient * ( reduced_gravity + curvature_term ) )
-       source_x = source_x - friction_stress * velocity_x / horizontal_speed
-       source_y = source_y - friction_stress * velocity_y / horizontal_speed
+       rate_x = rate_x - friction_stress * velocity_x / horizontal_speed
+       rate_y = rate_y - friction_stress * velocity_y / horizontal_speed
     END IF
 
-  END SUBROUTINE eval_lucas_source
+  END SUBROUTINE eval_lucas_momentum_rate
 
 END MODULE rheology_lucas_2d

@@ -1940,13 +1940,21 @@ eval_voellmy_semi_impl_source -> eval_voellmy_semi_implicit_momentum_rate
 eval_lahar_implicit_source    -> eval_lahar_implicit_momentum_rate
 eval_lahar_semi_impl_source   -> eval_lahar_semi_implicit_momentum_rate
 eval_mui_source               -> eval_mui_momentum_rate
+eval_lava_implicit_source     -> eval_lava_implicit_momentum_rate
+eval_lava_semi_impl_source    -> eval_lava_semi_implicit_momentum_rate
+eval_mui_voellmy_source       -> eval_mui_voellmy_momentum_rate
+eval_mui_voellmy_implicit_source -> eval_mui_voellmy_implicit_momentum_rate
+eval_plastic_implicit_source  -> eval_plastic_implicit_momentum_rate
+eval_empirical_implicit_source -> eval_empirical_implicit_momentum_rate
+eval_quadratic_implicit_source -> eval_quadratic_implicit_momentum_rate
+eval_froude_source            -> eval_froude_momentum_rate
+eval_lucas_source             -> eval_lucas_momentum_rate
 ```
 
-Prima tranche implementata: i rate impliciti e semi-impliciti di Voellmy e
-Lahar sono stati rinominati secondo questa convenzione; i call site in
-`equation_terms_2d` e il test delle velocità analitiche usano i nuovi nomi.
-`TEST_RHEOLOGY_CELL_LOCAL/run_test.sh` passa in strict e optimized
-(255/255 fixture di caratterizzazione per profilo).
+Le routine di rate della quantità di moto selezionate in questa tranche sono
+state rinominate secondo la convenzione; i call site in `equation_terms_2d` e
+il test delle velocità analitiche usano i nuovi nomi. `TEST_RHEOLOGY_CELL_LOCAL/run_test.sh`
+passa in strict e optimized (255/255 fixture di caratterizzazione per profilo).
 
 La verifica deve essere fatta sulle unità e sul risultato reale di ogni routine. Le proprietà non sono rate: `eval_lahar_fluid_viscosity` rimane una valutazione di viscosità, mentre `eval_lahar_deposition_rate` identifica correttamente un rate.
 

@@ -14,24 +14,26 @@ PROGRAM test_analytic_velocity
        eval_voellmy_implicit_momentum_rate,                                  &
        eval_voellmy_semi_implicit_momentum_rate,                             &
        solve_voellmy_analytic_velocity
-  USE rheology_plastic_2d, ONLY : tau, eval_plastic_implicit_source,         &
+  USE rheology_plastic_2d, ONLY : tau, eval_plastic_implicit_momentum_rate,  &
        solve_plastic_analytic_velocity
   USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0,                       &
-       eval_lava_implicit_source, eval_lava_semi_impl_source,                &
+       eval_lava_implicit_momentum_rate, eval_lava_semi_implicit_momentum_rate, &
        solve_lava_analytic_velocity
   USE rheology_lahar_2d, ONLY : alpha2, beta2, alpha1_coeff, beta1, Kappa,   &
        n_td, n_td2, eval_lahar_implicit_momentum_rate,                       &
        eval_lahar_semi_implicit_momentum_rate,                               &
        solve_lahar_analytic_velocity
-  USE rheology_empirical_2d, ONLY : eval_empirical_implicit_source,          &
+  USE rheology_empirical_2d, ONLY : eval_empirical_implicit_momentum_rate,   &
        solve_empirical_analytic_velocity
   USE rheology_quadratic_2d, ONLY : friction_factor,                        &
-       eval_quadratic_implicit_source, solve_quadratic_analytic_velocity
-  USE rheology_froude_2d, ONLY : eval_froude_source, solve_froude_analytic_velocity
-  USE rheology_lucas_2d, ONLY : eval_lucas_source, solve_lucas_analytic_velocity
-  USE rheology_mui_2d, ONLY : eval_mui_source, solve_mui_analytic_velocity
-  USE rheology_mui_voellmy_2d, ONLY : eval_mui_voellmy_source,              &
-       eval_mui_voellmy_implicit_source, solve_mui_voellmy_analytic_velocity
+       eval_quadratic_implicit_momentum_rate, solve_quadratic_analytic_velocity
+  USE rheology_froude_2d, ONLY : eval_froude_momentum_rate,                  &
+       solve_froude_analytic_velocity
+  USE rheology_lucas_2d, ONLY : eval_lucas_momentum_rate,                    &
+       solve_lucas_analytic_velocity
+  USE rheology_mui_2d, ONLY : eval_mui_momentum_rate, solve_mui_analytic_velocity
+  USE rheology_mui_voellmy_2d, ONLY : eval_mui_voellmy_momentum_rate,        &
+       eval_mui_voellmy_implicit_momentum_rate, solve_mui_voellmy_analytic_velocity
 
   IMPLICIT NONE
 
@@ -81,7 +83,7 @@ PROGRAM test_analytic_velocity
   CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
        'plastic exact constant-drag flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
-  CALL eval_plastic_implicit_source(CMPLX(velocity_after(1),0.0_wp,wp),     &
+  CALL eval_plastic_implicit_momentum_rate(CMPLX(velocity_after(1),0.0_wp,wp), &
        CMPLX(velocity_after(2),0.0_wp,wp), CMPLX(speed_after,0.0_wp,wp),     &
        CMPLX(mixture_density,0.0_wp,wp), .TRUE., complex_source_x,          &
        complex_source_y)
@@ -104,11 +106,11 @@ PROGRAM test_analytic_velocity
   CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
        'lava exact affine-drag flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
-  CALL eval_lava_implicit_source(CMPLX(flow_depth,0.0_wp,wp),                &
+  CALL eval_lava_implicit_momentum_rate(CMPLX(flow_depth,0.0_wp,wp),        &
        CMPLX(temperature,0.0_wp,wp), CMPLX(mixture_density,0.0_wp,wp),       &
        CMPLX(velocity_after(1),0.0_wp,wp), CMPLX(velocity_after(2),0.0_wp,wp), &
        CMPLX(speed_after,0.0_wp,wp), .TRUE., complex_source_x, complex_source_y)
-  CALL eval_lava_semi_impl_source(velocity_after(1), velocity_after(2),      &
+  CALL eval_lava_semi_implicit_momentum_rate(velocity_after(1), velocity_after(2), &
        speed_after, source_x, source_y)
   source = [REAL(complex_source_x,wp)+source_x,                              &
        REAL(complex_source_y,wp)+source_y]
@@ -152,7 +154,7 @@ PROGRAM test_analytic_velocity
        'empirical exact linear-drag flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_empirical_implicit_source(CMPLX(flow_depth,0.0_wp,wp),           &
+  CALL eval_empirical_implicit_momentum_rate(CMPLX(flow_depth,0.0_wp,wp),   &
        CMPLX(velocity_after(1),0.0_wp,wp), CMPLX(velocity_after(2),0.0_wp,wp), &
        CMPLX(horizontal_speed,0.0_wp,wp), CMPLX(speed_after,0.0_wp,wp),     &
        CMPLX(mixture_density,0.0_wp,wp), .TRUE., complex_source_x,           &
@@ -171,7 +173,7 @@ PROGRAM test_analytic_velocity
        'quadratic exact reciprocal-speed flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_quadratic_implicit_source(                                      &
+  CALL eval_quadratic_implicit_momentum_rate(                               &
        CMPLX(velocity_after(1),0.0_wp,wp), CMPLX(velocity_after(2),0.0_wp,wp), &
        CMPLX(speed_after,0.0_wp,wp), CMPLX(horizontal_speed,0.0_wp,wp),     &
        CMPLX(speed_after**2,0.0_wp,wp), CMPLX(mixture_density,0.0_wp,wp),  &
@@ -218,7 +220,7 @@ PROGRAM test_analytic_velocity
        0.0_wp, .FALSE., stochastic_value, velocity_after)
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_froude_source(flow_depth, velocity_after(1), velocity_after(2), &
+  CALL eval_froude_momentum_rate(flow_depth, velocity_after(1), velocity_after(2), &
        speed_after, horizontal_speed, mixture_density, reduced_gravity,      &
        gravity_coefficient, 0.0_wp, .FALSE., stochastic_value,              &
        source_x, source_y)
@@ -231,7 +233,7 @@ PROGRAM test_analytic_velocity
        0.0_wp, .TRUE., stochastic_value, velocity_after)
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_froude_source(flow_depth, velocity_after(1), velocity_after(2), &
+  CALL eval_froude_momentum_rate(flow_depth, velocity_after(1), velocity_after(2), &
        speed_after, horizontal_speed, mixture_density, reduced_gravity,      &
        gravity_coefficient, 0.0_wp, .TRUE., stochastic_value,               &
        source_x, source_y)
@@ -255,7 +257,7 @@ PROGRAM test_analytic_velocity
        0.0_wp, .FALSE., stochastic_value, velocity_after)
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_lucas_source(flow_depth, velocity_after(1), velocity_after(2),  &
+  CALL eval_lucas_momentum_rate(flow_depth, velocity_after(1), velocity_after(2), &
        speed_after, horizontal_speed, mixture_density, reduced_gravity,      &
        gravity_coefficient, 0.0_wp, .FALSE., stochastic_value,               &
        source_x, source_y)
@@ -268,7 +270,7 @@ PROGRAM test_analytic_velocity
        0.0_wp, .TRUE., stochastic_value, velocity_after)
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_lucas_source(flow_depth, velocity_after(1), velocity_after(2),  &
+  CALL eval_lucas_momentum_rate(flow_depth, velocity_after(1), velocity_after(2), &
        speed_after, horizontal_speed, mixture_density, reduced_gravity,      &
        gravity_coefficient, 0.0_wp, .TRUE., stochastic_value,               &
        source_x, source_y)
@@ -285,7 +287,7 @@ PROGRAM test_analytic_velocity
        gravity_coefficient, solid_fraction, 0.0_wp, .FALSE., 0.0_wp,         &
        velocity_after)
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
-  CALL eval_mui_source(flow_depth, velocity_after(1), velocity_after(2),    &
+  CALL eval_mui_momentum_rate(flow_depth, velocity_after(1), velocity_after(2), &
        speed_after, mixture_density, reduced_gravity, gravity_coefficient,    &
        solid_fraction, 0.0_wp, .FALSE., 0.0_wp, source_x, source_y)
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
@@ -296,7 +298,7 @@ PROGRAM test_analytic_velocity
        gravity_coefficient, solid_fraction, 0.0_wp, .TRUE., 1000.0_wp,       &
        velocity_after)
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
-  CALL eval_mui_source(flow_depth, velocity_after(1), velocity_after(2),    &
+  CALL eval_mui_momentum_rate(flow_depth, velocity_after(1), velocity_after(2), &
        speed_after, mixture_density, reduced_gravity, gravity_coefficient,    &
        solid_fraction, 0.0_wp, .TRUE., 1000.0_wp, source_x, source_y)
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
@@ -308,11 +310,11 @@ PROGRAM test_analytic_velocity
        .FALSE., 0.0_wp, velocity_after)
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_mui_voellmy_source(flow_depth, velocity_after(1),                &
+  CALL eval_mui_voellmy_momentum_rate(flow_depth, velocity_after(1),        &
        velocity_after(2), speed_after, mixture_density, reduced_gravity,     &
        gravity_coefficient, solid_fraction, 0.0_wp, .FALSE., 0.0_wp,         &
        source_x, source_y)
-  CALL eval_mui_voellmy_implicit_source(                                    &
+  CALL eval_mui_voellmy_implicit_momentum_rate(                             &
        CMPLX(velocity_after(1),0.0_wp,wp), CMPLX(velocity_after(2),0.0_wp,wp), &
        CMPLX(mixture_density,0.0_wp,wp), CMPLX(reduced_gravity,0.0_wp,wp),  &
        CMPLX(speed_after,0.0_wp,wp), CMPLX(speed_after**2,0.0_wp,wp),       &
@@ -327,11 +329,11 @@ PROGRAM test_analytic_velocity
        gravity_coefficient, solid_fraction, 0.0_wp, .TRUE., 500.0_wp,        &
        .TRUE., 100.0_wp, velocity_after)
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
-  CALL eval_mui_voellmy_source(flow_depth, velocity_after(1),                &
+  CALL eval_mui_voellmy_momentum_rate(flow_depth, velocity_after(1),        &
        velocity_after(2), speed_after, mixture_density, reduced_gravity,     &
        gravity_coefficient, solid_fraction, 0.0_wp, .TRUE., 500.0_wp,        &
        source_x, source_y)
-  CALL eval_mui_voellmy_implicit_source(                                    &
+  CALL eval_mui_voellmy_implicit_momentum_rate(                             &
        CMPLX(velocity_after(1),0.0_wp,wp), CMPLX(velocity_after(2),0.0_wp,wp), &
        CMPLX(mixture_density,0.0_wp,wp), CMPLX(reduced_gravity,0.0_wp,wp),  &
        CMPLX(speed_after,0.0_wp,wp), CMPLX(speed_after**2,0.0_wp,wp),       &
