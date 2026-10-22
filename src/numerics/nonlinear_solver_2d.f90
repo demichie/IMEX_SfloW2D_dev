@@ -184,9 +184,8 @@ CONTAINS
     USE constitutive_parameters_2d, ONLY : T_env, radiative_term_coeff,       &
          convective_term_coeff
     USE state_conversion_2d, ONLY : r_phys_var, qc_to_qp
-    USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms,                   &
-         curvature_acceleration
-    USE rheology_2d, ONLY : correct_friction_momentum
+    USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms
+    USE rheology_2d, ONLY : correct_friction_momentum, curvature_acceleration
     USE thermal_sources_2d, ONLY : solve_lava_analytic_temperature
     USE pore_pressure_2d, ONLY : solve_analytic_pore_pressure
     USE rheology_voellmy_2d, ONLY : solve_voellmy_analytic_velocity

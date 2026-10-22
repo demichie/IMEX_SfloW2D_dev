@@ -18,27 +18,16 @@ MODULE equation_terms_2d
 
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE rheology_froude_2d, ONLY : eval_froude_momentum_rate
-  USE rheology_lucas_2d, ONLY : eval_lucas_momentum_rate
-  USE rheology_mui_2d, ONLY : eval_mui_momentum_rate
-  USE rheology_mui_voellmy_2d, ONLY : eval_mui_voellmy_momentum_rate,        &
-       eval_mui_voellmy_implicit_momentum_rate
+  USE rheology_2d, ONLY : curvature_acceleration, eval_implicit_rheology_rate, &
+       eval_semi_implicit_rheology_rate
   USE pore_pressure_2d, ONLY : eval_pore_pressure_diffusion_source,            &
        eval_pore_pressure_gas_loss, eval_pore_pressure_inlet_source,            &
        eval_pore_pressure_mass_exchange_source
   USE thermal_sources_2d, ONLY : eval_inlet_thermal_energy_source,              &
        eval_lava_cooling_source, eval_mass_exchange_thermal_energy,              &
        eval_vaporization_sources
-  USE rheology_voellmy_2d, ONLY : eval_voellmy_implicit_momentum_rate,      &
-       eval_voellmy_semi_implicit_momentum_rate
-  USE rheology_plastic_2d, ONLY : eval_plastic_implicit_momentum_rate
-  USE rheology_lava_2d, ONLY : eval_lava_implicit_momentum_rate,              &
-       eval_lava_semi_implicit_momentum_rate
-  USE rheology_lahar_2d, ONLY : eval_lahar_implicit_momentum_rate,           &
-       eval_lahar_semi_implicit_momentum_rate, eval_lahar_fluid_viscosity,   &
-       eval_lahar_deposition_rate
-  USE rheology_empirical_2d, ONLY : eval_empirical_implicit_momentum_rate
-  USE rheology_quadratic_2d, ONLY : eval_quadratic_implicit_momentum_rate
+  USE rheology_lahar_2d, ONLY : eval_lahar_deposition_rate,                  &
+       eval_lahar_fluid_viscosity
 
   USE equation_metadata_2d, ONLY : equation_partition_type,                   &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
@@ -46,10 +35,8 @@ MODULE equation_terms_2d
   USE parameters_2d, ONLY : wp, dry_thickness_tolerance
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
        n_stoch_vars, n_pore_vars
-  USE parameters_2d, ONLY : rheology_flag, rheology_model_id,                   &
-       rheology_id_voellmy, rheology_id_plastic, rheology_id_lava, rheology_id_lahar,       &
-       rheology_id_empirical, rheology_id_quadratic, rheology_id_froude, rheology_id_lucas, &
-       rheology_id_mui, rheology_id_mui_voellmy,                                     &
+  USE parameters_2d, ONLY : rheology_flag, rheology_model_id, rheology_id_lava, &
+       rheology_id_lahar,                                                        &
        liquid_flag, gas_flag, slope_correction_flag,                            &
        curvature_term_flag, stochastic_flag,                  &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag
@@ -86,34 +73,6 @@ MODULE equation_terms_2d
   REAL(wp), ALLOCATABLE :: fissure_coeff_step(:)
 
 CONTAINS
-
-  !******************************************************************************
-  !> \brief Contract the filtered bed Hessian with the Cartesian velocity.
-  !>
-  !> The Cartesian velocity components are contracted with the cell-centred
-  !> Hessian obtained from the retained quadratic least-squares bed fit.
-  !>
-  !> \param[in] Bsecond_xx Filtered bed Hessian xx entry [m^-1].
-  !> \param[in] Bsecond_xy Filtered bed Hessian xy entry [m^-1].
-  !> \param[in] Bsecond_yy Filtered bed Hessian yy entry [m^-1].
-  !> \param[in] velocity_x Cartesian depth-averaged x velocity [m s^-1].
-  !> \param[in] velocity_y Cartesian depth-averaged y velocity [m s^-1].
-  !> \return Signed bed-curvature acceleration
-  !>         \f$a_{\mathrm{curv}}=B_{xx}u^2+2B_{xy}uv+B_{yy}v^2\f$ [m s^-2].
-  !******************************************************************************
-
-  PURE FUNCTION curvature_acceleration( Bsecond_xx, Bsecond_xy, Bsecond_yy,   &
-       velocity_x, velocity_y ) RESULT(acceleration)
-
-    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
-    REAL(wp), INTENT(IN) :: velocity_x, velocity_y
-    REAL(wp) :: acceleration
-
-    acceleration = Bsecond_xx * velocity_x**2                               &
-         + 2.0_wp * Bsecond_xy * velocity_x * velocity_y                    &
-         + Bsecond_yy * velocity_y**2
-
-  END FUNCTION curvature_acceleration
 
   !******************************************************************************
   !> \brief Evaluate the bed-curvature contribution to both momentum equations.
@@ -1254,32 +1213,12 @@ CONTAINS
        ! would erase it. This does not assign a derivative to Coulomb's cusp.
        moving = (REAL(mod_vel,wp) .NE. 0.0_wp) .OR. (AIMAG(mod_vel) .NE. 0.0_wp)
 
-       IF (rheology_model_id .EQ. rheology_id_voellmy) THEN
-          CALL eval_voellmy_implicit_momentum_rate(u, v, rho_m, red_grav, mod_vel, &
-               mod_vel2, moving, stochastic_flag, Zij, source_term(2),       &
-               source_term(3))
-       ELSEIF (rheology_model_id .EQ. rheology_id_mui_voellmy) THEN
-          CALL eval_mui_voellmy_implicit_momentum_rate(u, v, rho_m, red_grav, &
-               mod_vel, mod_vel2, moving, stochastic_flag, Zij,              &
-               source_term(2), source_term(3))
-       ELSEIF (rheology_model_id .EQ. rheology_id_plastic) THEN
-          CALL eval_plastic_implicit_momentum_rate(u, v, mod_vel, rho_m, moving, &
-               source_term(2), source_term(3))
-       ELSEIF (rheology_model_id .EQ. rheology_id_lava) THEN
-          CALL eval_lava_implicit_momentum_rate(h, T, rho_m, u, v, mod_vel, moving, &
-               source_term(2), source_term(3))
+       CALL eval_implicit_rheology_rate(rheology_model_id, h, T, rho_m,       &
+            inv_rho_m, u, v, mod_vel, mod_vel_hor, mod_vel2, red_grav,       &
+            alphas, moving, stochastic_flag, Zij, source_term(2:3))
+       IF (rheology_model_id .EQ. rheology_id_lava) THEN
           source_term(4) = eval_lava_cooling_source(T, radiative_term_coeff,   &
                convective_term_coeff, T_env)
-       ELSEIF (rheology_model_id .EQ. rheology_id_lahar) THEN
-          CALL eval_lahar_implicit_momentum_rate(h, u, v, mod_vel, mod_vel_hor, T, &
-               rho_m, inv_rho_m, alphas, moving, source_term(2),             &
-               source_term(3))
-       ELSEIF (rheology_model_id .EQ. rheology_id_empirical) THEN
-          CALL eval_empirical_implicit_momentum_rate(h, u, v, mod_vel_hor, mod_vel, &
-               rho_m, moving, source_term(2), source_term(3))
-       ELSEIF (rheology_model_id .EQ. rheology_id_quadratic) THEN
-          CALL eval_quadratic_implicit_momentum_rate(u, v, mod_vel, mod_vel_hor, &
-               mod_vel2, rho_m, moving, source_term(2), source_term(3))
        ENDIF
 
     ENDIF
@@ -1365,11 +1304,6 @@ CONTAINS
     REAL(wp) :: r_red_grav
     REAL(wp) :: r_rho_c
     REAL(wp) :: r_Ri
-    ! mu(I) rheology variables
-    REAL(wp) :: centr_force_term
-    REAL(wp) :: rheology_rate_x
-    REAL(wp) :: rheology_rate_y
-
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
 
@@ -1382,7 +1316,6 @@ CONTAINS
 
     ! initialize and evaluate the forces terms
     source_term(1:n_eqns) = 0.0_wp
-    centr_force_term = 0.0_wp
 
     rheology_if:IF (rheology_flag) THEN
 
@@ -1415,82 +1348,13 @@ CONTAINS
 
        mod_hor_vel = SQRT( r_u**2 + r_v**2 )
 
-       rheology_model_if:IF (rheology_model_id .EQ. rheology_id_voellmy) THEN
-          exc_pore_pres = 0.0_wp
-          IF (pore_pressure_flag) exc_pore_pres = qpj(idx_pore)
-          CALL eval_voellmy_semi_implicit_momentum_rate(r_h, r_u, r_v, mod_vel, r_rho_m, &
-               r_red_grav, grav_coeff, curvature_term_flag, Bsecondj_xx,      &
-               Bsecondj_xy, Bsecondj_yy, pore_pressure_flag, exc_pore_pres,   &
-               source_term(2), source_term(3))
-
-       ELSEIF (rheology_model_id .EQ. rheology_id_lava) THEN
-          CALL eval_lava_semi_implicit_momentum_rate(r_u, r_v, mod_vel, source_term(2), &
-               source_term(3))
-
-       ELSEIF (rheology_model_id .EQ. rheology_id_lahar) THEN
-          CALL eval_lahar_semi_implicit_momentum_rate(r_h, r_u, r_v, mod_hor_vel, &
-               r_rho_m, SUM(r_alphas), mod_vel .GT. 0.0_wp,                  &
-               source_term(2), source_term(3))
-
-       ELSEIF ( rheology_model_id .EQ. rheology_id_froude ) THEN
-          CALL eval_froude_momentum_rate(r_h, r_u, r_v, mod_vel, mod_hor_vel, &
-               r_rho_m, r_red_grav, grav_coeff, centr_force_term,            &
-               stochastic_flag, Zj, rheology_rate_x, rheology_rate_y)
-          source_term(2) = rheology_rate_x
-          source_term(3) = rheology_rate_y
-
-      ELSEIF ( rheology_model_id .EQ. rheology_id_lucas ) THEN
-          CALL eval_lucas_momentum_rate(r_h, r_u, r_v, mod_vel, mod_hor_vel, &
-               r_rho_m, r_red_grav, grav_coeff, centr_force_term,            &
-               stochastic_flag, Zj, rheology_rate_x, rheology_rate_y)
-          source_term(2) = rheology_rate_x
-          source_term(3) = rheology_rate_y
-
-      ELSEIF ( rheology_model_id .EQ. rheology_id_mui ) THEN
-         IF ( mod_vel .GT. 0.0_wp ) THEN ! v>0 (avoid div by 0)
-
-            IF ( curvature_term_flag ) THEN
-               centr_force_term = curvature_acceleration( Bsecondj_xx,       &
-                    Bsecondj_xy, Bsecondj_yy, r_u, r_v )
-            ELSE
-               centr_force_term = 0.0_wp
-            END IF
-
-            exc_pore_pres = 0.0_wp
-            IF ( pore_pressure_flag ) exc_pore_pres = qpj(idx_pore)
-            CALL eval_mui_momentum_rate(r_h, r_u, r_v, mod_vel, r_rho_m,   &
-                 r_red_grav, grav_coeff, r_alphas, centr_force_term,       &
-                 pore_pressure_flag, exc_pore_pres, rheology_rate_x,       &
-                 rheology_rate_y)
-            source_term(2) = rheology_rate_x
-            source_term(3) = rheology_rate_y
-
-         END IF
-
-
-       ELSEIF ( rheology_model_id .EQ. rheology_id_mui_voellmy ) THEN
-
-         IF ( mod_vel .GT. 0.0_wp ) THEN
-
-            IF ( curvature_term_flag ) THEN
-               centr_force_term = curvature_acceleration( Bsecondj_xx,       &
-                    Bsecondj_xy, Bsecondj_yy, r_u, r_v )
-            ELSE
-                centr_force_term = 0.0_wp
-            END IF
-
-            exc_pore_pres = 0.0_wp
-            IF ( pore_pressure_flag ) exc_pore_pres = qpj(idx_pore)
-            CALL eval_mui_voellmy_momentum_rate(r_h, r_u, r_v, mod_vel, r_rho_m, &
-                 r_red_grav, grav_coeff, r_alphas, centr_force_term,       &
-                 pore_pressure_flag, exc_pore_pres, rheology_rate_x,       &
-                 rheology_rate_y)
-            source_term(2) = rheology_rate_x
-            source_term(3) = rheology_rate_y
-
-         END IF
-
-       ENDIF rheology_model_if
+       exc_pore_pres = 0.0_wp
+       IF (pore_pressure_flag) exc_pore_pres = qpj(idx_pore)
+       CALL eval_semi_implicit_rheology_rate(rheology_model_id, r_h, r_u,  &
+            r_v, mod_vel, mod_hor_vel, r_rho_m, r_red_grav, grav_coeff,    &
+            r_alphas, curvature_term_flag, Bsecondj_xx, Bsecondj_xy,       &
+            Bsecondj_yy, pore_pressure_flag, exc_pore_pres,                &
+            stochastic_flag, Zj, source_term(2:3))
 
     ENDIF rheology_if
 

@@ -19,7 +19,7 @@ for profile in strict optimized; do
     esac
     common='-fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow -ffree-line-length-none'
     objects=''
-    for source in core/parameters_2d core/diagnostics_2d rheology/rheology_2d \
+    for source in core/parameters_2d core/diagnostics_2d \
         rheology/rheology_analytic_utils_2d rheology/rheology_parameters_2d \
         rheology/rheology_voellmy_2d rheology/rheology_plastic_2d \
         rheology/rheology_froude_2d rheology/rheology_lucas_2d \
@@ -29,6 +29,7 @@ for profile in strict optimized; do
         rheology/rheology_lava_2d rheology/rheology_lahar_2d \
         rheology/rheology_empirical_2d rheology/rheology_quadratic_2d \
         rheology/rheology_mui_2d rheology/rheology_mui_voellmy_2d \
+        rheology/rheology_2d \
         physics/thermal_sources_2d physics/pore_pressure_2d \
         physics/equation_terms_2d \
         numerics/nonlinear_solver_2d; do
@@ -36,8 +37,8 @@ for profile in strict optimized; do
         objects="$objects ${source##*/}.o"
     done
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_model_names.f90"
-    "$compiler" $common parameters_2d.o rheology_2d.o test_model_names.o \
-        -o test_model_names
+    model_objects='parameters_2d.o diagnostics_2d.o constitutive_parameters_2d.o geometry_2d.o state_conversion_2d.o rheology_parameters_2d.o rheology_analytic_utils_2d.o rheology_voellmy_2d.o rheology_plastic_2d.o rheology_froude_2d.o rheology_lucas_2d.o rheology_lava_2d.o rheology_lahar_2d.o rheology_empirical_2d.o rheology_quadratic_2d.o rheology_mui_2d.o rheology_mui_voellmy_2d.o rheology_2d.o'
+    "$compiler" $common $model_objects test_model_names.o -llapack -o test_model_names
     ./test_model_names
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_source_modules.f90"
     "$compiler" $common $objects test_source_modules.o -llapack \

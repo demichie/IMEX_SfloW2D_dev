@@ -2084,6 +2084,16 @@ Le operazioni geometriche devono rimanere in `geometry_2d.f90`, per esempio `pro
 
 **D16.3 — Dispatcher reologico.** Spostare in `rheology_2d` tutti i rami basati su `rheology_model_id` o sul nome del modello e rimuovere le chiamate dirette ai moduli specifici da `equation_terms_2d`, mantenendo formule, argomenti e semantica complex-step.
 
+Prima tranche completata: `rheology_2d` espone dispatcher con argomenti espliciti
+per i rate reologici impliciti e semi-impliciti; `equation_terms_2d` delega a
+queste interfacce e `curvature_acceleration` appartiene ora a `rheology_2d`.
+`TEST_RHEOLOGY_CELL_LOCAL` passa in strict e optimized (255/255 fixture per
+profilo), `TEST_IMEX_STAGES` passa in strict e optimized e
+`TEST_CURVATURE_SOURCE` passa in strict. D16.3 resta aperto: in
+`equation_terms_2d` sono ancora presenti selezioni specifiche per il
+raffreddamento lava e lo scambio di massa lahar, da ricollocare secondo la
+responsabilità fisica appropriata.
+
 **D16.4 — Relocation dei moduli.** Rinominare e organizzare i moduli in `thermal_laws_2d`, `mass_exchange_laws_2d`, `pore_pressure_laws_2d` e `rheology_laws`. Aggiornare `USE`, Makefile, liste di build, Doxygen e test. La relocation deve essere scientificamente neutra.
 
 **D16.5 — Rinomina delle routine.** Applicare `eval_<modello>_<trattamento>_<quantità>`, usare `momentum_rate` per i rate reologici e sostituire `semi_impl` con `semi_implicit`. Usare `rate` soltanto per quantità effettivamente riferite al tempo.
