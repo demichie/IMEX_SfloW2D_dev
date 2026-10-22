@@ -8,7 +8,7 @@ PROGRAM test_source_modules
        eval_lava_cooling_source, eval_mass_exchange_thermal_energy,            &
        eval_vaporization_sources
   USE mass_exchange_laws_2d, ONLY : eval_hindered_settling_deposition_rate,  &
-       eval_lahar_deposition_rate
+       eval_lahar_deposition_rate, eval_erosion_rates
 
   IMPLICIT NONE
 
@@ -25,6 +25,7 @@ PROGRAM test_source_modules
   REAL(wp) :: erosion_rate(2)
   REAL(wp) :: momentum_before_friction(2)
   REAL(wp) :: momentum_after_friction(2)
+  REAL(wp) :: solid_erosion_rate(2), continuous_erosion_rate
 
   solid_density = [2500.0_wp, 2700.0_wp]
   solid_heat_capacity = [800.0_wp, 900.0_wp]
@@ -41,6 +42,20 @@ PROGRAM test_source_modules
   actual = eval_hindered_settling_deposition_rate(0.2_wp, 0.4_wp, 0.1_wp,  &
        1.0_wp, 0.5_wp, 1.0_wp, 1.0_wp)
   CALL assert_close(actual, 0.02_wp, 'hindered-settling available-mass cap')
+  CALL eval_erosion_rates(2.0_wp, 3.0_wp, 0.2_wp, 0.5_wp, 0.4_wp,          &
+       [0.25_wp, 0.75_wp], [100.0_wp, 100.0_wp], 0.5_wp, solid_erosion_rate, &
+       continuous_erosion_rate)
+  CALL assert_close(solid_erosion_rate(1), 0.36_wp, 'first solid erosion rate')
+  CALL assert_close(solid_erosion_rate(2), 1.08_wp, 'second solid erosion rate')
+  CALL assert_close(continuous_erosion_rate, 0.96_wp,                        &
+       'continuous-phase erosion rate')
+  CALL eval_erosion_rates(2.0_wp, 3.0_wp, 0.2_wp, 0.5_wp, 0.4_wp,          &
+       [0.25_wp, 0.75_wp], [0.1_wp, 0.2_wp], 0.5_wp, solid_erosion_rate,    &
+       continuous_erosion_rate)
+  CALL assert_close(solid_erosion_rate(1), 0.2_wp, 'first erosion inventory cap')
+  CALL assert_close(solid_erosion_rate(2), 0.4_wp, 'second erosion inventory cap')
+  CALL assert_close(continuous_erosion_rate, 0.4_wp,                        &
+       'capped continuous-phase erosion rate')
 
   actual = eval_inlet_thermal_energy_source(0.5_wp, 0.02_wp, 1200.0_wp,       &
        800.0_wp, 500.0_wp)

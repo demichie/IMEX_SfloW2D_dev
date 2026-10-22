@@ -1,7 +1,7 @@
 !********************************************************************************
 !> \brief Constitutive laws used by mass-exchange source assembly.
-!> \details Provides cell-local deposition rates independently of source
-!>          assembly, state updates and inventory bookkeeping.
+!> \details Provides cell-local erosion and deposition rates independently of
+!>          source assembly, state updates and inventory bookkeeping.
 !********************************************************************************
 
 MODULE mass_exchange_laws_2d
@@ -14,6 +14,7 @@ MODULE mass_exchange_laws_2d
 
   PUBLIC :: eval_lahar_deposition_rate
   PUBLIC :: eval_hindered_settling_deposition_rate
+  PUBLIC :: eval_erosion_rates
 
 CONTAINS
 
@@ -68,5 +69,52 @@ CONTAINS
     rate = MIN(rate, flow_depth * solid_fraction / time_step)
 
   END FUNCTION eval_hindered_settling_deposition_rate
+
+  !******************************************************************************
+  !> \brief Evaluate solid erosion rates limited by substrate inventory.
+  !> \details Applies the empirical erosion law, partitions erosion across
+  !> erodible components, limits each rate to available inventory and returns
+  !> the associated continuous-phase erosion rate.
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] speed Three-dimensional flow-speed magnitude [m s^-1].
+  !> \param[in] total_solid_fraction Sum of solid volume fractions.
+  !> \param[in] erosion_coefficient Empirical erosion coefficient.
+  !> \param[in] erodible_porosity Substrate porosity.
+  !> \param[in] erodible_fraction Per-class fraction of erodible material.
+  !> \param[in] erodible_inventory Available per-class substrate thickness [m].
+  !> \param[in] time_step Time-step size [s].
+  !> \param[out] solid_erosion_rate Per-class solid erosion rates [m s^-1].
+  !> \param[out] continuous_phase_erosion_rate Continuous-phase erosion rate [m s^-1].
+  !******************************************************************************
+  PURE SUBROUTINE eval_erosion_rates(flow_depth, speed, total_solid_fraction, &
+       erosion_coefficient, erodible_porosity, erodible_fraction,            &
+       erodible_inventory, time_step, solid_erosion_rate,                    &
+       continuous_phase_erosion_rate)
+
+    REAL(wp), INTENT(IN) :: flow_depth, speed, total_solid_fraction
+    REAL(wp), INTENT(IN) :: erosion_coefficient, erodible_porosity
+    REAL(wp), INTENT(IN) :: erodible_fraction(:), erodible_inventory(:)
+    REAL(wp), INTENT(IN) :: time_step
+    REAL(wp), INTENT(OUT) :: solid_erosion_rate(:)
+    REAL(wp), INTENT(OUT) :: continuous_phase_erosion_rate
+
+    REAL(wp) :: total_erosion, total_solid_erosion
+
+    IF (erosion_coefficient .GT. 0.0_wp) THEN
+       total_erosion = erosion_coefficient * speed * flow_depth *            &
+            (1.0_wp - total_solid_fraction)
+       total_solid_erosion = total_erosion * (1.0_wp - erodible_porosity)
+       solid_erosion_rate = erodible_fraction * total_solid_erosion
+    ELSE
+       solid_erosion_rate = 0.0_wp
+    END IF
+
+    solid_erosion_rate = MAX(0.0_wp, MIN(solid_erosion_rate,                 &
+         erodible_inventory / time_step))
+    total_solid_erosion = SUM(solid_erosion_rate)
+    total_erosion = total_solid_erosion / (1.0_wp - erodible_porosity)
+    continuous_phase_erosion_rate = total_erosion * erodible_porosity
+
+  END SUBROUTINE eval_erosion_rates
 
 END MODULE mass_exchange_laws_2d

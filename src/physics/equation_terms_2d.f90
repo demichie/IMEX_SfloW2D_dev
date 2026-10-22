@@ -27,7 +27,7 @@ MODULE equation_terms_2d
        eval_lava_cooling_source, eval_mass_exchange_thermal_energy,              &
        eval_vaporization_sources
   USE mass_exchange_laws_2d, ONLY : eval_lahar_deposition_rate,               &
-       eval_hindered_settling_deposition_rate
+       eval_hindered_settling_deposition_rate, eval_erosion_rates
   USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
 
   USE equation_metadata_2d, ONLY : equation_partition_type,                   &
@@ -1444,9 +1444,6 @@ CONTAINS
     REAL(wp) :: r_Zs         !< real-value stochastic variable
     REAL(wp) :: r_exc_pore_pres   !< real-value excess p pres
 
-    REAL(wp) :: tot_erosion  !< total erosion rate [m/s]
-    REAL(wp) :: tot_solid_erosion !< total solid erosion rate [m/s]
-
     REAL(wp) :: alphas_tot   !< total solid volume fraction
 
     REAL(wp) :: fluid_visc
@@ -1531,33 +1528,15 @@ CONTAINS
     mod_vel2 = r_u**2 + r_v**2 + r_w**2
     mod_vel = SQRT( mod_vel2 )
 
-    IF ( erosion_coeff .GT. 0.0_wp ) THEN
-
-       ! empirical formulation (see Fagents & Baloga 2006, Eq. 5)
-       ! here we use the solid volume fraction instead of relative density
-       ! This term has units: m s-1
-       tot_erosion = erosion_coeff * mod_vel * r_h * ( 1.0_wp-alphas_tot )
-
-       tot_solid_erosion = tot_erosion * ( 1.0_wp - erodible_porosity )
-
-       erosion_term(1:n_solid) = erodible_fract(1:n_solid)  * tot_solid_erosion
-
+    IF (erosion_coeff .GT. 0.0_wp) THEN
+       CALL eval_erosion_rates(r_h, mod_vel, alphas_tot, erosion_coeff,       &
+            erodible_porosity, erodible_fract(1:n_solid),                    &
+            erodible(1:n_solid), dt, erosion_term(1:n_solid),                &
+            continuous_phase_erosion_term)
     ELSE
-
-       tot_solid_erosion = 0.0_wp
-
-       erosion_term(1:n_solid) = 0.0_wp
-
+       erosion_term = 0.0_wp
+       continuous_phase_erosion_term = 0.0_wp
     END IF
-
-    ! Limit the deposition during a single time step
-    erosion_term(1:n_solid) = MAX(0.0_wp,MIN( erosion_term(1:n_solid),          &
-         erodible(1:n_solid) / dt ) )
-
-    tot_solid_erosion = SUM( erosion_term(1:n_solid) )
-    tot_erosion = tot_solid_erosion / ( 1.0_wp - erodible_porosity )
-
-    continuous_phase_erosion_term = tot_erosion * erodible_porosity
 
     r_T = qpj(4)
 
