@@ -26,7 +26,8 @@ MODULE equation_terms_2d
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                 &
        eval_lava_cooling_source, eval_mass_exchange_thermal_energy,              &
        eval_vaporization_sources
-  USE mass_exchange_laws_2d, ONLY : eval_lahar_deposition_rate
+  USE mass_exchange_laws_2d, ONLY : eval_lahar_deposition_rate,               &
+       eval_hindered_settling_deposition_rate
   USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
 
   USE equation_metadata_2d, ONLY : equation_partition_type,                   &
@@ -1600,16 +1601,10 @@ CONTAINS
              deposition_term(i_solid) = eval_lahar_deposition_rate(           &
                   r_alphas(i_solid), settling_vel, r_h, dt)
           ELSE
-             deposition_term(i_solid) = r_alphas(i_solid) * settling_vel
-
-             ! Michaels and Bolger (1962) sedimentation correction accounting
-             ! for hindered settling due to the presence of particles
-             deposition_term(i_solid) = deposition_term(i_solid) *              &
-                  ( 1.0_wp - MIN( 1.0_wp , alphas_tot / alpha_max ) )**hind_exp
-
-             ! Limit deposition to the available amount in this time step.
-             deposition_term(i_solid) = MIN(deposition_term(i_solid),           &
-                  r_h * r_alphas(i_solid) / dt)
+             deposition_term(i_solid) =                                       &
+                  eval_hindered_settling_deposition_rate(                     &
+                  r_alphas(i_solid), settling_vel, r_h, dt, alphas_tot,       &
+                  alpha_max, hind_exp)
           END IF
 
           IF ( deposition_term(i_solid) .LT. 0.0_wp ) THEN
