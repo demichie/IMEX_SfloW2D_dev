@@ -1788,11 +1788,17 @@ gruppo, la pressione usa la temperatura aggiornata nella sequenza del gruppo.
 `advance_lava_cooling_temperature` e `advance_pore_pressure_diffusion`
 mantengono i rispettivi nomi di compatibilità.
 
-I test diretti verificano le traiettorie con build strict e optimized. La
-suite verifica gruppi ANALYTIC e NEWTON, famiglie condivise, ordine
+I test diretti verificano le traiettorie con build strict e optimized. Il test
+`test_analytic_velocity` controlla la proprietà di semigruppo per tutti i
+modelli scalari, inclusi attraversamenti delle soglie Froude/Lucas, e verifica
+gli endpoint contro una soluzione di riferimento RK4 indipendente e gli
+estremi di arresto e intervallo nullo. I test energia e pressione controllano
+anch’essi la composizione temporale e il limite a breve intervallo.
+La suite verifica gruppi ANALYTIC e NEWTON, famiglie condivise, ordine
 configurato, aggiornamenti visibili ai gruppi successivi e coerenza del rate
 effettivo con l’incremento conservativo netto. Restano da coprire i limiti
-estremi e la traiettoria completa dell’intero tableau con gruppi multipli.
+estremi aggiuntivi e la traiettoria completa dell’intero tableau con gruppi
+multipli.
 
 #### Contratto d’integrazione
 

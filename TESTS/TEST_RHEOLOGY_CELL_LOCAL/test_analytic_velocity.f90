@@ -5,7 +5,11 @@ PROGRAM test_analytic_velocity
   USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf, mu_0, mu_inf, &
        Fr_0, U_w, xi, T_ref
   USE rheology_analytic_utils_2d, ONLY : lambert_w0, solve_quadratic_in_interval, &
-       solve_cubic_in_interval
+       solve_cubic_in_interval, solve_exact_velocity_flow,                    &
+       EXACT_FLOW_CONSTANT, EXACT_FLOW_LINEAR, EXACT_FLOW_AFFINE,              &
+       EXACT_FLOW_QUADRATIC, EXACT_FLOW_QUADRATIC_POLYNOMIAL,                  &
+       EXACT_FLOW_FROUDE, EXACT_FLOW_LUCAS, EXACT_FLOW_MUI,                    &
+       EXACT_FLOW_MUI_VOELLMY
   USE rheology_voellmy_2d, ONLY : voellmy_mu => mu,                          &
        eval_voellmy_implicit_source, eval_voellmy_semi_impl_source,          &
        solve_voellmy_analytic_velocity
@@ -335,6 +339,36 @@ PROGRAM test_analytic_velocity
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, source, 'mu(I)-Voellmy stochastic pore pressure')
 
+  CALL assert_flow_semigroup(EXACT_FLOW_CONSTANT, [0.6_wp], 0.5_wp,       &
+       'constant drag')
+  CALL assert_flow_semigroup(EXACT_FLOW_LINEAR, [0.2_wp], 0.5_wp,         &
+       'linear drag')
+  CALL assert_flow_semigroup(EXACT_FLOW_AFFINE, [0.5_wp, 0.2_wp], 0.5_wp, &
+       'affine drag')
+  CALL assert_flow_semigroup(EXACT_FLOW_QUADRATIC, [0.08_wp], 0.5_wp,     &
+       'quadratic drag')
+  CALL assert_flow_semigroup(EXACT_FLOW_QUADRATIC_POLYNOMIAL,              &
+       [0.2_wp, 0.1_wp, 0.02_wp], 0.5_wp, 'polynomial drag')
+  CALL assert_flow_semigroup(EXACT_FLOW_FROUDE,                            &
+       [0.5_wp, 0.2_wp, -0.86_wp, 0.5_wp, 0.2_wp], 1.0_wp,                &
+       'Froude threshold crossing')
+  CALL assert_flow_semigroup(EXACT_FLOW_LUCAS,                             &
+       [0.5_wp, 1.0_wp, 0.0_wp, 0.5_wp, 0.2_wp, 4.3_wp, 0.0_wp],          &
+       1.0_wp, 'Lucas threshold crossing')
+  CALL assert_flow_semigroup(EXACT_FLOW_MUI,                               &
+       [0.04_wp, 0.01_wp, 0.002_wp, 0.3_wp, 0.08_wp], 0.5_wp,             &
+       'mu(I) drag')
+  CALL assert_flow_semigroup(EXACT_FLOW_MUI_VOELLMY,                       &
+       [0.04_wp, 0.01_wp, 0.002_wp, 0.3_wp, 0.08_wp, 0.02_wp], 0.5_wp,    &
+       'mu(I)-Voellmy drag')
+  CALL solve_exact_velocity_flow(EXACT_FLOW_CONSTANT, [2.0_wp], 1.0_wp,   &
+       0.5_wp, speed_after)
+  CALL assert_close(speed_after, 0.0_wp, 'constant-drag stopping limit')
+  CALL solve_exact_velocity_flow(EXACT_FLOW_MUI,                          &
+       [0.04_wp, 0.01_wp, 0.002_wp, 0.3_wp, 0.08_wp], 0.0_wp,             &
+       4.5_wp, speed_after)
+  CALL assert_close(speed_after, 4.5_wp, 'zero-interval identity')
+
   WRITE(*,*) 'All analytic rheology exact-flow checks passed.'
 
 CONTAINS
@@ -377,6 +411,121 @@ CONTAINS
     END IF
 
   END SUBROUTINE assert_stage
+
+  SUBROUTINE assert_flow_semigroup(flow_model, coefficients, interval, label)
+
+    INTEGER, INTENT(IN) :: flow_model
+    REAL(wp), INTENT(IN) :: coefficients(:), interval
+    CHARACTER(LEN=*), INTENT(IN) :: label
+    REAL(wp), PARAMETER :: initial_speed = 4.5_wp
+    REAL(wp) :: full_step, first_half, two_half_steps, reference_step, tolerance
+
+    CALL solve_exact_velocity_flow(flow_model, coefficients, interval,     &
+         initial_speed, full_step)
+    CALL solve_exact_velocity_flow(flow_model, coefficients, 0.5_wp*interval, &
+         initial_speed, first_half)
+    CALL solve_exact_velocity_flow(flow_model, coefficients, 0.5_wp*interval, &
+         first_half, two_half_steps)
+    reference_step = reference_flow_solution(flow_model, coefficients,      &
+         initial_speed, interval)
+
+    tolerance = 2.0E-9_wp*MAX(1.0_wp, ABS(full_step))
+    IF (ABS(full_step-two_half_steps) .GT. tolerance) THEN
+       WRITE(*,*) 'FAIL: exact-flow semigroup property ', label,            &
+            full_step, two_half_steps
+       ERROR STOP 1
+    END IF
+    tolerance = 2.0E-8_wp*MAX(1.0_wp, ABS(reference_step))
+    IF (ABS(full_step-reference_step) .GT. tolerance) THEN
+       WRITE(*,*) 'FAIL: exact-flow endpoint disagrees with independent RK4 ', &
+            label, full_step, reference_step
+       ERROR STOP 1
+    END IF
+    IF (full_step .LT. 0.0_wp .OR. full_step .GT. initial_speed) THEN
+       WRITE(*,*) 'FAIL: exact-flow semigroup left dissipative interval ',  &
+            label, full_step
+       ERROR STOP 1
+    END IF
+
+  END SUBROUTINE assert_flow_semigroup
+
+  FUNCTION reference_flow_solution(flow_model, coefficients, initial_speed, &
+       interval) RESULT(speed)
+
+    INTEGER, INTENT(IN) :: flow_model
+    REAL(wp), INTENT(IN) :: coefficients(:), initial_speed, interval
+    INTEGER, PARAMETER :: reference_steps = 32768
+    REAL(wp) :: speed, step_size, k1, k2, k3, k4
+    INTEGER :: i
+
+    speed = initial_speed
+    step_size = interval/REAL(reference_steps,wp)
+    DO i = 1, reference_steps
+       k1 = -reference_flow_rate(flow_model, coefficients, speed)
+       k2 = -reference_flow_rate(flow_model, coefficients,                   &
+            speed+0.5_wp*step_size*k1)
+       k3 = -reference_flow_rate(flow_model, coefficients,                   &
+            speed+0.5_wp*step_size*k2)
+       k4 = -reference_flow_rate(flow_model, coefficients, speed+step_size*k3)
+       speed = speed + step_size*(k1+2.0_wp*k2+2.0_wp*k3+k4)/6.0_wp
+       IF (speed .LE. 0.0_wp) THEN
+          speed = 0.0_wp
+          EXIT
+       END IF
+    END DO
+
+  END FUNCTION reference_flow_solution
+
+  PURE FUNCTION reference_flow_rate(flow_model, coefficients, speed)       &
+       RESULT(rate)
+
+    INTEGER, INTENT(IN) :: flow_model
+    REAL(wp), INTENT(IN) :: coefficients(:), speed
+    REAL(wp) :: rate, friction_speed, denominator
+
+    SELECT CASE (flow_model)
+    CASE (EXACT_FLOW_CONSTANT)
+       rate = coefficients(1)
+    CASE (EXACT_FLOW_LINEAR)
+       rate = coefficients(1)*speed
+    CASE (EXACT_FLOW_AFFINE)
+       rate = coefficients(1)+coefficients(2)*speed
+    CASE (EXACT_FLOW_QUADRATIC)
+       rate = coefficients(1)*speed**2
+    CASE (EXACT_FLOW_QUADRATIC_POLYNOMIAL)
+       rate = coefficients(1)+coefficients(2)*speed+                       &
+            coefficients(3)*speed**2
+    CASE (EXACT_FLOW_FROUDE)
+       IF (coefficients(2)*speed+coefficients(3) .LE. 0.0_wp) THEN
+          rate = coefficients(1)*coefficients(4)
+       ELSE
+          rate = coefficients(1)*(coefficients(5)+(coefficients(4)-        &
+               coefficients(5))*EXP(-coefficients(2)*speed-coefficients(3)))
+       END IF
+    CASE (EXACT_FLOW_LUCAS)
+       friction_speed = coefficients(2)*speed+coefficients(3)
+       IF (coefficients(7) .GT. 0.5_wp .OR.                               &
+            friction_speed .LT. coefficients(6)) THEN
+          rate = coefficients(1)*coefficients(4)
+       ELSEIF (friction_speed .GT. 0.0_wp) THEN
+          rate = coefficients(1)*(coefficients(5)+(coefficients(4)-        &
+               coefficients(5))*coefficients(6)/friction_speed)
+       ELSE
+          rate = coefficients(1)*coefficients(4)
+       END IF
+    CASE (EXACT_FLOW_MUI)
+       denominator = coefficients(4)+coefficients(5)*speed
+       rate = (coefficients(1)+coefficients(2)*speed+                      &
+            coefficients(3)*speed**2)/denominator
+    CASE (EXACT_FLOW_MUI_VOELLMY)
+       denominator = coefficients(4)+coefficients(5)*speed
+       rate = (coefficients(1)+coefficients(2)*speed+                      &
+            coefficients(3)*speed**2)/denominator+coefficients(6)*speed**2
+    CASE DEFAULT
+       rate = 0.0_wp
+    END SELECT
+
+  END FUNCTION reference_flow_rate
 
   SUBROUTINE assert_close(value, reference, label)
 
