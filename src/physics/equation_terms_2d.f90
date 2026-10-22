@@ -28,7 +28,7 @@ MODULE equation_terms_2d
        eval_vaporization_sources
   USE mass_exchange_laws_2d, ONLY : eval_lahar_deposition_rate,               &
        eval_hindered_settling_deposition_rate, eval_erosion_rates,             &
-       eval_continuous_phase_loss_rate
+       eval_continuous_phase_loss_rate, eval_air_entrainment_rate
   USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
 
   USE equation_metadata_2d, ONLY : equation_partition_type,                   &
@@ -1462,7 +1462,6 @@ CONTAINS
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
 
-    REAL(wp) :: entr_coeff
     REAL(wp) :: air_entr
 
     REAL(wp) :: dep_tot
@@ -1639,9 +1638,7 @@ CONTAINS
     IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                      &
          ( r_Ri .GT. 0.0_wp ) ) THEN
 
-       entr_coeff = 0.075_wp / SQRT( 1.0_wp + 718.0_wp * r_Ri**2.4_wp )
-
-       air_entr = entr_coeff * SQRT(mod_vel2)
+       air_entr = eval_air_entrainment_rate(r_Ri, mod_vel2)
 
     ELSE
 

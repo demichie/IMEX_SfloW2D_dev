@@ -1,7 +1,7 @@
 !********************************************************************************
 !> \brief Constitutive laws used by mass-exchange source assembly.
-!> \details Provides cell-local erosion, deposition and carrier-loss rates
-!>          independently of source assembly, state updates and bookkeeping.
+!> \details Provides cell-local erosion, deposition, carrier-loss and
+!>          entrainment rates independently of source assembly and bookkeeping.
 !********************************************************************************
 
 MODULE mass_exchange_laws_2d
@@ -16,6 +16,7 @@ MODULE mass_exchange_laws_2d
   PUBLIC :: eval_hindered_settling_deposition_rate
   PUBLIC :: eval_erosion_rates
   PUBLIC :: eval_continuous_phase_loss_rate
+  PUBLIC :: eval_air_entrainment_rate
 
 CONTAINS
 
@@ -149,5 +150,23 @@ CONTAINS
          SUM(deposition_rate))) / time_step))
 
   END FUNCTION eval_continuous_phase_loss_rate
+
+  !******************************************************************************
+  !> \brief Evaluate the empirical air-entrainment rate.
+  !> \param[in] richardson_number Richardson number.
+  !> \param[in] speed_squared Squared flow-speed magnitude [m2 s-2].
+  !> \return Air-entrainment rate [m s-1].
+  !******************************************************************************
+  PURE FUNCTION eval_air_entrainment_rate(richardson_number, speed_squared)  &
+       RESULT(entrainment_rate)
+
+    REAL(wp), INTENT(IN) :: richardson_number, speed_squared
+    REAL(wp) :: entrainment_coefficient, entrainment_rate
+
+    entrainment_coefficient = 0.075_wp / SQRT(1.0_wp + 718.0_wp *            &
+         richardson_number**2.4_wp)
+    entrainment_rate = entrainment_coefficient * SQRT(speed_squared)
+
+  END FUNCTION eval_air_entrainment_rate
 
 END MODULE mass_exchange_laws_2d

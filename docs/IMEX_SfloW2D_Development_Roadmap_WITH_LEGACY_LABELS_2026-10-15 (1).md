@@ -2113,12 +2113,12 @@ in corso.
 **D16.7 — Riorganizzazione dello scambio di massa.** Spostare le formule costitutive in `mass_exchange_laws_2d`, lasciando l’assemblaggio in `equation_terms_2d` e l’applicazione temporale in `time_integration_2d`.
 
 Estrazioni completate: `eval_lahar_deposition_rate`, la legge di deposizione
-generale per sedimentazione ostacolata, `eval_erosion_rates` e il limite del
-rate di perdita del carrier appartengono ora a `mass_exchange_laws_2d`;
-`equation_terms_2d` mantiene selezione e assemblaggio. Resta da estrarre la
-formula di entrainment. I test sorgente verificano le leggi di deposizione, i
-limiti di massa e volume disponibili e i rate di erosione limitati
-dall’inventario.
+generale per sedimentazione ostacolata, `eval_erosion_rates`, il limite del
+rate di perdita del carrier e `eval_air_entrainment_rate` appartengono ora a
+`mass_exchange_laws_2d`; `equation_terms_2d` mantiene selezione e assemblaggio.
+I test sorgente verificano le leggi di deposizione, i limiti di massa e volume
+disponibili, i rate di erosione limitati dall’inventario e la legge di
+entrainment.
 
 **D16.8 — Aggiornamento per stage o per passo.** Trasferire l’applicazione dell’incremento, degli inventari e dei controlli da `mass_exchange_2d` a `time_integration_2d`; documentare l’ordine rispetto a RK/IMEX, positività, topografia e geometria.
 

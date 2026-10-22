@@ -9,7 +9,7 @@ PROGRAM test_source_modules
        eval_vaporization_sources
   USE mass_exchange_laws_2d, ONLY : eval_hindered_settling_deposition_rate,  &
        eval_lahar_deposition_rate, eval_erosion_rates,                       &
-       eval_continuous_phase_loss_rate
+       eval_continuous_phase_loss_rate, eval_air_entrainment_rate
 
   IMPLICIT NONE
 
@@ -66,6 +66,9 @@ PROGRAM test_source_modules
   actual = eval_continuous_phase_loss_rate(2.0_wp, 1.0_wp, 0.75_wp, 1.0_wp,&
        1.0_wp, [0.0_wp, 0.0_wp], 1.0_wp)
   CALL assert_close(actual, 0.0_wp, 'carrier loss exhausted-volume cap')
+  actual = eval_air_entrainment_rate(0.25_wp, 25.0_wp)
+  expected = 0.075_wp / SQRT(1.0_wp + 718.0_wp * 0.25_wp**2.4_wp) * 5.0_wp
+  CALL assert_close(actual, expected, 'air entrainment rate')
 
   actual = eval_inlet_thermal_energy_source(0.5_wp, 0.02_wp, 1200.0_wp,       &
        800.0_wp, 500.0_wp)
