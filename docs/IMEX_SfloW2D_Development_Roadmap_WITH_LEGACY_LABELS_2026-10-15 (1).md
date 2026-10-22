@@ -191,7 +191,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D08 | P4            | RHEOLOGY_MODEL da numeri a stringhe                         | ASSORBITO IN D05 |
 | D09 | P5            | Correzione del solo attrito                                 | COMPLETATO (gate locale GNU/macOS) |
 | D10 | P6            | EX_terms / IM_terms                                         | COMPLETATO (gate locale GNU/macOS) |
-| D11 | P7            | IM_group e metadati                                         | DA FARE  |
+| D11 | P7            | IM_group e metadati                                  | COMPLETATO (gate locale GNU/macOS) |
 | D12 | P7            | Newton per gruppo e Jacobiano ridotto                       | DA FARE  |
 | D13 | P8            | Algebriche ANALYTIC per stage DIRK                          | IN CORSO |
 | D14 | P8            | Gruppi misti e validazione                                  | DA FARE  |
@@ -1793,7 +1793,7 @@ Con tau=0, lo stage non effettua un solve implicito: evitare divisioni per zero 
 
 **Test proporzionati (nuove modifiche a questo step):** T1 metadati e copertura IM_group; T2 selezioni e subset; T3 regressioni RK quando cambia il raggruppamento. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: DA FARE
+Stato ufficiale: COMPLETATO (gate locale GNU/macOS)
 
 #### Metadati
 
@@ -1845,6 +1845,24 @@ Gruppo 3 — Momento x/y
 NEWTON, Jacobiano 2×2
 
 Ogni gruppo utilizza i valori più aggiornati disponibili delle variabili esterne. Non introduciamo ulteriori maschere di lagging.
+
+#### Implementazione ed evidenza D11
+
+`equation_partition_type%initialize` accetta opzionalmente la mappa dei gruppi
+e i relativi metodi. Le chiamate legacy che forniscono solo `implicit_mask`
+mantengono un unico gruppo NEWTON; una partizione tutta esplicita non crea
+gruppi. L'inizializzazione valida dimensioni, corrispondenza tra maschera e
+gruppi, numerazione densa, metodi supportati e mappe compatte.
+
+`init_problem_param` assegna gruppi ANALYTIC separati a energia lava e
+sovrapressione quando attive, seguiti dal gruppo NEWTON dei momenti. I gruppi
+disattivati vengono omessi e rinumerati senza buchi. Questi campi restano
+metadati: il solver, il tableau e il dispatch non li consumano in D11.
+
+Verifica locale: `TESTS/TEST_EQUATION_METADATA/run_test.sh` supera i casi
+strict per partizioni legacy, gruppi multipli, subset espliciti/impliciti,
+metodi e invarianti. `make check` supera il build ottimizzato e le regressioni
+di integrazione locali; il runner dei metadati è incluso in `check-local`.
 
 ### D12 — Newton per gruppo e Jacobiano ridotto
 

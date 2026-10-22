@@ -24,6 +24,8 @@ EXTRA_DIST = \
   TESTS/TEST_RHEOLOGY_CELL_LOCAL/check_inputs.py \
   TESTS/TEST_RHEOLOGY_CELL_LOCAL/check_stages.py \
   TESTS/TEST_IMEX_STAGES/test_imex_stages.f90 \
+  TESTS/TEST_EQUATION_METADATA/run_test.sh \
+  TESTS/TEST_EQUATION_METADATA/test_equation_metadata.f90 \
   TESTS/TEST_SOURCE_MASS/README.md \
   TESTS/TEST_SOURCE_MASS/run_test.sh \
   TESTS/TEST_SOURCE_MASS/make_cases.py \
@@ -66,6 +68,7 @@ EXTRA_DIST = \
   EXAMPLES/EXAMPLE_TAAL/topography_dem.asc
 
 check-local:
+	$(SHELL) $(top_srcdir)/TESTS/TEST_EQUATION_METADATA/run_test.sh
 	$(SHELL) $(top_srcdir)/TESTS/TEST_OUTPUT_PATHS/run_test.sh \
 	  "$(FC)" "$(OPENMP_FCFLAGS)" "$(abs_top_builddir)/src"
 	$(SHELL) $(top_srcdir)/TESTS/run_tests.sh \

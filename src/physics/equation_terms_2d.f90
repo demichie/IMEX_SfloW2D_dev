@@ -40,7 +40,8 @@ MODULE equation_terms_2d
   USE rheology_empirical_2d, ONLY : eval_empirical_implicit_source
   USE rheology_quadratic_2d, ONLY : eval_quadratic_implicit_source
 
-  USE equation_metadata_2d, ONLY : equation_partition_type
+  USE equation_metadata_2d, ONLY : equation_partition_type,                   &
+       IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
 
   USE parameters_2d, ONLY : wp, dry_thickness_tolerance
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
@@ -192,14 +193,17 @@ CONTAINS
   !> Builds the compact equation partition consumed by the local implicit
   !> solver. The two momentum equations are implicit; lava temperature is
   !> implicit for the lava rheology, pore pressure is implicit when enabled,
-  !> and transported solid-component equations remain explicit.
+  !> and transported solid-component equations remain explicit. The implicit
+  !> groups are ordered as ANALYTIC lava energy, ANALYTIC pore pressure, and
+  !> NEWTON momentum, omitting inactive groups and keeping the numbering dense.
   !> \date 07/09/2012
   !>
-  !> \param[in,out] equation_partition Equation descriptor initialized with the implicit mask
-  !>                                   and compact explicit/implicit index maps.
+  !> \param[in,out] equation_partition Receives the implicit mask, compact
+  !>                                   explicit/implicit maps and group methods.
   !>
-  !> \note Reads the configured rheology and pore-pressure flags; writes the supplied descriptor
-  !>       and reports the number of implicit equations.
+  !> \note Reads configured rheology and pore-pressure flags. Group methods are
+  !>       metadata only here; this routine does not dispatch a solve by group.
+  !>       Reports the number of implicit equations.
   !******************************************************************************
 
   SUBROUTINE init_problem_param( equation_partition )
@@ -210,6 +214,9 @@ CONTAINS
     TYPE(equation_partition_type), INTENT(INOUT) :: equation_partition
 
     LOGICAL :: implicit_mask(n_eqns)
+    INTEGER :: IM_group(n_eqns)
+    INTEGER :: IM_group_method(3)
+    INTEGER :: n_IM_groups
 
     implicit_mask(1:n_eqns) = .FALSE.
     implicit_mask(2) = .TRUE.
@@ -231,7 +238,33 @@ CONTAINS
 
     END IF
 
-    CALL equation_partition%initialize( implicit_mask )
+    IM_group = 0
+    IM_group_method = 0
+    n_IM_groups = 0
+
+    ! Keep the D11 group order stable: lava energy, pore pressure, then
+    ! the coupled momentum equations. Inactive groups are omitted.
+    IF ( implicit_mask(4) ) THEN
+       n_IM_groups = n_IM_groups + 1
+       IM_group(4) = n_IM_groups
+       IM_group_method(n_IM_groups) = IM_GROUP_METHOD_ANALYTIC
+    END IF
+
+    IF ( pore_pressure_flag ) THEN
+       n_IM_groups = n_IM_groups + 1
+       IM_group(idx_pore) = n_IM_groups
+       IM_group_method(n_IM_groups) = IM_GROUP_METHOD_ANALYTIC
+    END IF
+
+    IF ( implicit_mask(2) .OR. implicit_mask(3) ) THEN
+       n_IM_groups = n_IM_groups + 1
+       IF ( implicit_mask(2) ) IM_group(2) = n_IM_groups
+       IF ( implicit_mask(3) ) IM_group(3) = n_IM_groups
+       IM_group_method(n_IM_groups) = IM_GROUP_METHOD_NEWTON
+    END IF
+
+    CALL equation_partition%initialize( implicit_mask, IM_group,             &
+         IM_group_method(1:n_IM_groups) )
 
     WRITE(*,*) 'Implicit equations =',equation_partition%n_implicit
 
