@@ -1825,13 +1825,15 @@ limiti fisici e le formule esatte disponibili.
 
 **Test proporzionati (nuove modifiche a questo step):** T1 gruppi misti e fallback; T2 combinazioni rappresentative; T3 confronto delle traiettorie se cambia la strategia implicita. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: IN CORSO — `TEST_IMEX_STAGES/compare_stages.py --section
-groups` verifica traiettorie complete `N_RK=2/3/4` con gruppi ANALYTIC e
-NEWTON ordinati in entrambi i modi. Gli oracoli controllano il solve Newton
-della temperatura, il flusso esatto della velocità con coefficienti congelati,
-la ricorrenza degli stage e l’assemblaggio finale; il test richiede inoltre
-che l’ordine dei gruppi produca la differenza prevista. Validato in strict e
-optimized con thread 1/4. Restano da chiudere gli altri elementi di D14.
+Stato ufficiale: COMPLETATO (validazione locale GNU/macOS). `TEST_RHEOLOGY_CELL_LOCAL/run_test.sh`
+passa 255/255 fixture in strict e optimized, inclusi i contratti dei gruppi,
+le combinazioni rappresentative e il solve Newton monolitico. Inoltre,
+`TEST_IMEX_STAGES/compare_stages.py --section groups` verifica traiettorie
+complete `N_RK=2/3/4` con gruppi ANALYTIC e NEWTON ordinati in entrambi i modi.
+Gli oracoli controllano il solve Newton della temperatura, il flusso esatto
+della velocità con coefficienti congelati, la ricorrenza degli stage e
+l’assemblaggio finale; l’ordine dei gruppi produce una differenza misurabile.
+Quest’ultima suite passa in strict e optimized con thread 1/4.
 
 ### D15 — Acceptance della nuova architettura
 
@@ -2274,7 +2276,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D11 | P7            | IM_group e metadati                                  | COMPLETATO (gate locale GNU/macOS) |
 | D12 | P7            | Newton per gruppo e Jacobiano ridotto                       | IN CORSO |
 | D13 | P8            | Algebriche ANALYTIC per stage DIRK                          | IN CORSO |
-| D14 | P8            | Gruppi misti e validazione                                  | DA FARE  |
+| D14 | P8            | Gruppi misti e validazione                                  | COMPLETATO (gate locale GNU/macOS) |
 | D15 | P9            | Acceptance della nuova architettura                         | GATE     |
 | D16 | —             | Consolidamento leggi fisiche, rate e assemblaggio IMEX      | DA FARE  |
 

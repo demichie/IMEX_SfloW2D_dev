@@ -4,6 +4,7 @@ set -eu
 test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_dir=$(CDPATH= cd -- "$test_dir/../.." && pwd)
 work_dir=${D02_WORK_DIR:-$(mktemp -d /tmp/imex-d02.XXXXXX)}
+python=${PYTHON:-python3}
 mkdir -p "$work_dir"
 work_dir=$(CDPATH= cd -- "$work_dir" && pwd)
 echo "D02 evidence directory: $work_dir"
@@ -70,7 +71,7 @@ for profile in strict optimized; do
             -c "$test_dir/probe_sources.f90" -o probe_untrapped.o
         "$compiler" -fopenmp $objects probe_untrapped.o -llapack -o probe_untrapped
     fi
-    PYTHONDONTWRITEBYTECODE=1 python3 "$test_dir/characterize.py" \
+    PYTHONDONTWRITEBYTECODE=1 "$python" "$test_dir/characterize.py" \
         "$work_dir/$profile/probe_sources" "$work_dir/$profile" "$profile" || failed=1
 done
 exit "$failed"
