@@ -11,7 +11,8 @@ PROGRAM test_analytic_velocity
        EXACT_FLOW_FROUDE, EXACT_FLOW_LUCAS, EXACT_FLOW_MUI,                    &
        EXACT_FLOW_MUI_VOELLMY
   USE rheology_voellmy_2d, ONLY : voellmy_mu => mu,                          &
-       eval_voellmy_implicit_source, eval_voellmy_semi_impl_source,          &
+       eval_voellmy_implicit_momentum_rate,                                  &
+       eval_voellmy_semi_implicit_momentum_rate,                             &
        solve_voellmy_analytic_velocity
   USE rheology_plastic_2d, ONLY : tau, eval_plastic_implicit_source,         &
        solve_plastic_analytic_velocity
@@ -19,7 +20,8 @@ PROGRAM test_analytic_velocity
        eval_lava_implicit_source, eval_lava_semi_impl_source,                &
        solve_lava_analytic_velocity
   USE rheology_lahar_2d, ONLY : alpha2, beta2, alpha1_coeff, beta1, Kappa,   &
-       n_td, n_td2, eval_lahar_implicit_source, eval_lahar_semi_impl_source, &
+       n_td, n_td2, eval_lahar_implicit_momentum_rate,                       &
+       eval_lahar_semi_implicit_momentum_rate,                               &
        solve_lahar_analytic_velocity
   USE rheology_empirical_2d, ONLY : eval_empirical_implicit_source,          &
        solve_empirical_analytic_velocity
@@ -125,14 +127,14 @@ PROGRAM test_analytic_velocity
        velocity_before, velocity_after)
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_lahar_implicit_source(CMPLX(flow_depth,0.0_wp,wp),               &
+  CALL eval_lahar_implicit_momentum_rate(CMPLX(flow_depth,0.0_wp,wp),       &
        CMPLX(velocity_after(1),0.0_wp,wp), CMPLX(velocity_after(2),0.0_wp,wp), &
        CMPLX(speed_after,0.0_wp,wp), CMPLX(horizontal_speed,0.0_wp,wp),      &
        CMPLX(temperature,0.0_wp,wp), CMPLX(mixture_density,0.0_wp,wp),      &
        CMPLX(1.0_wp/mixture_density,0.0_wp,wp),                             &
        CMPLX(solid_fraction,0.0_wp,wp), .TRUE., complex_source_x,            &
        complex_source_y)
-  CALL eval_lahar_semi_impl_source(flow_depth, velocity_after(1),             &
+  CALL eval_lahar_semi_implicit_momentum_rate(flow_depth, velocity_after(1), &
        velocity_after(2), horizontal_speed, mixture_density,                 &
        SUM(solid_fraction), .TRUE., source_x, source_y)
   source = [REAL(complex_source_x,wp)+source_x,                              &
@@ -186,12 +188,12 @@ PROGRAM test_analytic_velocity
        velocity_after)
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_voellmy_implicit_source(                                        &
+  CALL eval_voellmy_implicit_momentum_rate(                                 &
        CMPLX(velocity_after(1),0.0_wp,wp), CMPLX(velocity_after(2),0.0_wp,wp), &
        CMPLX(mixture_density,0.0_wp,wp), CMPLX(reduced_gravity,0.0_wp,wp),  &
        CMPLX(speed_after,0.0_wp,wp), CMPLX(speed_after**2,0.0_wp,wp),       &
        .TRUE., .FALSE., 0.0_wp, complex_source_x, complex_source_y)
-  CALL eval_voellmy_semi_impl_source(flow_depth, velocity_after(1),          &
+  CALL eval_voellmy_semi_implicit_momentum_rate(flow_depth, velocity_after(1), &
        velocity_after(2), speed_after, mixture_density, reduced_gravity,    &
        gravity_coefficient, .FALSE., 0.0_wp, 0.0_wp, 0.0_wp, .FALSE.,        &
        0.0_wp, source_x, source_y)

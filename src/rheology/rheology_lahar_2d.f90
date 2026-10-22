@@ -24,8 +24,8 @@
 !> The semi-implicit yield term uses
 !> \f$Y=\alpha_2[\exp(\beta_2 C)-1]\f$ and
 !> \f$\boldsymbol{S}_y=-Y\boldsymbol{u}_h/|\boldsymbol{u}_h|\f$. The
-!> \ref eval_lahar_implicit_source evaluates the viscous/turbulent drag and
-!> \ref eval_lahar_semi_impl_source evaluates the yield-stress term. The
+!> \ref eval_lahar_implicit_momentum_rate evaluates the viscous/turbulent drag and
+!> \ref eval_lahar_semi_implicit_momentum_rate evaluates the yield-stress term. The
 !> real and complex overloads of \ref eval_lahar_fluid_viscosity implement
 !> the same fluid-viscosity correlation, while
 !> \ref eval_lahar_deposition_rate supplies the capped settling rate.
@@ -47,8 +47,8 @@ MODULE rheology_lahar_2d
   PRIVATE
 
   PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
-  PUBLIC :: eval_lahar_fluid_viscosity, eval_lahar_implicit_source
-  PUBLIC :: eval_lahar_semi_impl_source, eval_lahar_deposition_rate
+  PUBLIC :: eval_lahar_fluid_viscosity, eval_lahar_implicit_momentum_rate
+  PUBLIC :: eval_lahar_semi_implicit_momentum_rate, eval_lahar_deposition_rate
   PUBLIC :: solve_lahar_analytic_velocity
 
   REAL(wp) :: alpha2
@@ -230,26 +230,26 @@ CONTAINS
   !> \param inverse_density Reciprocal mixture density.
   !> \param solid_fractions Solid volume fractions.
   !> \param moving Whether the state is moving.
-  !> \param source_x Returned x momentum source.
-  !> \param source_y Returned y momentum source.
+  !> \param rate_x Returned x momentum rate.
+  !> \param rate_y Returned y momentum rate.
   !******************************************************************************
-  SUBROUTINE eval_lahar_implicit_source(flow_depth, velocity_x, velocity_y,    &
+  SUBROUTINE eval_lahar_implicit_momentum_rate(flow_depth, velocity_x, velocity_y,    &
        speed, horizontal_speed, temperature, mixture_density, inverse_density, &
-       solid_fractions, moving, source_x, source_y)
+       solid_fractions, moving, rate_x, rate_y)
 
     COMPLEX(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y
     COMPLEX(wp), INTENT(IN) :: speed, horizontal_speed, temperature
     COMPLEX(wp), INTENT(IN) :: mixture_density, inverse_density
     COMPLEX(wp), INTENT(IN) :: solid_fractions(:)
     LOGICAL, INTENT(IN) :: moving
-    COMPLEX(wp), INTENT(OUT) :: source_x, source_y
+    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
 
     COMPLEX(wp) :: fluid_viscosity, inverse_depth, viscous_slope
     COMPLEX(wp) :: turbulent_slope, total_slope, friction_term
     REAL(wp) :: depth_threshold
 
-    source_x = CMPLX(0.0_wp, 0.0_wp, wp)
-    source_y = CMPLX(0.0_wp, 0.0_wp, wp)
+    rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
+    rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
     IF (wp .EQ. sp) THEN
        depth_threshold = 1.0E-10_wp
     ELSE
@@ -272,13 +272,13 @@ CONTAINS
     IF (.NOT. moving) RETURN
 
     friction_term = grav * mixture_density * flow_depth * total_slope / horizontal_speed
-    source_x = -velocity_x * friction_term
-    source_y = -velocity_y * friction_term
+    rate_x = -velocity_x * friction_term
+    rate_y = -velocity_y * friction_term
 
-  END SUBROUTINE eval_lahar_implicit_source
+  END SUBROUTINE eval_lahar_implicit_momentum_rate
 
   !******************************************************************************
-  !> \brief Evaluate the semi-implicit lahar yield-stress source.
+  !> \brief Evaluate the semi-implicit lahar yield-stress momentum rate.
   !> \details Computes \f$Y=\alpha_2[\exp(\beta_2 C)-1]\f$ and returns
   !> \f$-Y\boldsymbol{u}_h/|\boldsymbol{u}_h|\f$ for moving flow.
   !> \param flow_depth Flow depth.
@@ -288,23 +288,23 @@ CONTAINS
   !> \param mixture_density Mixture density.
   !> \param solid_fraction_sum Sum of solid volume fractions.
   !> \param moving Whether the state is moving.
-  !> \param source_x Returned x momentum source.
-  !> \param source_y Returned y momentum source.
+  !> \param rate_x Returned x momentum rate.
+  !> \param rate_y Returned y momentum rate.
   !******************************************************************************
-  SUBROUTINE eval_lahar_semi_impl_source(flow_depth, velocity_x, velocity_y, &
+  SUBROUTINE eval_lahar_semi_implicit_momentum_rate(flow_depth, velocity_x, velocity_y, &
        horizontal_speed, mixture_density, solid_fraction_sum, moving,          &
-       source_x, source_y)
+       rate_x, rate_y)
 
     REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y
     REAL(wp), INTENT(IN) :: horizontal_speed, mixture_density, solid_fraction_sum
     LOGICAL, INTENT(IN) :: moving
-    REAL(wp), INTENT(OUT) :: source_x, source_y
+    REAL(wp), INTENT(OUT) :: rate_x, rate_y
 
     REAL(wp) :: yield_strength, yield_slope, friction_term
     REAL(wp), PARAMETER :: depth_threshold = 1.0E-20_wp
 
-    source_x = 0.0_wp
-    source_y = 0.0_wp
+    rate_x = 0.0_wp
+    rate_y = 0.0_wp
     IF (.NOT. moving) RETURN
 
     yield_strength = alpha2 * (EXP(beta2 * solid_fraction_sum) - 1.0_wp)
@@ -314,9 +314,9 @@ CONTAINS
        yield_slope = yield_strength / (grav * mixture_density * depth_threshold)
     END IF
     friction_term = grav * mixture_density * flow_depth * yield_slope
-    source_x = -friction_term * velocity_x / horizontal_speed
-    source_y = -friction_term * velocity_y / horizontal_speed
+    rate_x = -friction_term * velocity_x / horizontal_speed
+    rate_y = -friction_term * velocity_y / horizontal_speed
 
-  END SUBROUTINE eval_lahar_semi_impl_source
+  END SUBROUTINE eval_lahar_semi_implicit_momentum_rate
 
 END MODULE rheology_lahar_2d

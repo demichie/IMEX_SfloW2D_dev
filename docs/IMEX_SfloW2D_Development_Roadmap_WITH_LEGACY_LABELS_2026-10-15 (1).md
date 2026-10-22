@@ -1942,6 +1942,12 @@ eval_lahar_semi_impl_source   -> eval_lahar_semi_implicit_momentum_rate
 eval_mui_source               -> eval_mui_momentum_rate
 ```
 
+Prima tranche implementata: i rate impliciti e semi-impliciti di Voellmy e
+Lahar sono stati rinominati secondo questa convenzione; i call site in
+`equation_terms_2d` e il test delle velocità analitiche usano i nuovi nomi.
+`TEST_RHEOLOGY_CELL_LOCAL/run_test.sh` passa in strict e optimized
+(255/255 fixture di caratterizzazione per profilo).
+
 La verifica deve essere fatta sulle unità e sul risultato reale di ogni routine. Le proprietà non sono rate: `eval_lahar_fluid_viscosity` rimane una valutazione di viscosità, mentre `eval_lahar_deposition_rate` identifica correttamente un rate.
 
 Le integrazioni analitiche devono seguire:
@@ -2295,7 +2301,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D12 | P7            | Newton per gruppo e Jacobiano ridotto                       | IN CORSO |
 | D13 | P8            | Integrazione analitica esatta dei termini IM                | COMPLETATO (gate locale GNU/macOS) |
 | D14 | P8            | Gruppi misti e validazione                                  | COMPLETATO (gate locale GNU/macOS) |
-| D16 | —             | Consolidamento leggi fisiche, rate e assemblaggio IMEX      | DA FARE  |
+| D16 | —             | Consolidamento leggi fisiche, rate e assemblaggio IMEX      | IN CORSO |
 | D15 | P9            | Acceptance finale della nuova architettura                  | GATE     |
 
 ## Fase E — Architettura e robustezza del passo
