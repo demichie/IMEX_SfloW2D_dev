@@ -7,7 +7,7 @@
 
 MODULE thermal_laws_2d
 
-  USE parameters_2d, ONLY : wp
+  USE parameters_2d, ONLY : wp, rheology_id_lava
   USE diagnostics_2d, ONLY : fatal_error
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
@@ -17,6 +17,7 @@ MODULE thermal_laws_2d
 
   PUBLIC :: eval_inlet_thermal_energy_source
   PUBLIC :: eval_lava_cooling_source
+  PUBLIC :: eval_rheology_cooling_source
   PUBLIC :: solve_lava_analytic_temperature
   PUBLIC :: advance_lava_cooling_temperature
   PUBLIC :: eval_mass_exchange_thermal_energy
@@ -77,6 +78,37 @@ CONTAINS
          - convective_coefficient * (temperature - ambient_temperature)
 
   END FUNCTION eval_lava_cooling_source
+
+  !******************************************************************************
+  !> \brief Evaluate any cooling source associated with the selected rheology.
+  !> \details Lava uses the radiative/convective cooling law; other models
+  !>          contribute no rheology-specific cooling source.
+  !> \param[in] model_id Selected rheology model ID.
+  !> \param[in] temperature Current temperature [K].
+  !> \param[in] radiative_coefficient Radiative coefficient [W m^-2 K^-4].
+  !> \param[in] convective_coefficient Convective coefficient [W m^-2 K^-1].
+  !> \param[in] ambient_temperature Ambient temperature [K].
+  !> \return Rheology-specific thermal-energy source per unit area [W m^-2].
+  !******************************************************************************
+  PURE FUNCTION eval_rheology_cooling_source(model_id, temperature,          &
+       radiative_coefficient, convective_coefficient, ambient_temperature)   &
+       RESULT(source)
+
+    INTEGER, INTENT(IN) :: model_id
+    COMPLEX(wp), INTENT(IN) :: temperature
+    REAL(wp), INTENT(IN) :: radiative_coefficient, convective_coefficient
+    REAL(wp), INTENT(IN) :: ambient_temperature
+    COMPLEX(wp) :: source
+
+    SELECT CASE (model_id)
+    CASE (rheology_id_lava)
+       source = eval_lava_cooling_source(temperature, radiative_coefficient, &
+            convective_coefficient, ambient_temperature)
+    CASE DEFAULT
+       source = CMPLX(0.0_wp, 0.0_wp, wp)
+    END SELECT
+
+  END FUNCTION eval_rheology_cooling_source
 
   !******************************************************************************
   !> \brief Solve the exact-flow lava cooling temperature over a time interval.

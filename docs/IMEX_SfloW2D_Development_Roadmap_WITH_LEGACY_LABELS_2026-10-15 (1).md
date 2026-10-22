@@ -2092,11 +2092,14 @@ Il dispatcher di velocità analitica è stato aggiunto a `rheology_2d` e
 `nonlinear_solver_2d` delega ora a questa API invece di selezionare direttamente
 i solver specifici. Il test dei flussi analitici copre tutti i modelli
 supportati, il modello `none` e un ID non supportato; l'eseguibile passa nei
-profili strict e optimized. Il runner completo raggiunge questi test ma non
+profili strict e optimized. La selezione del raffreddamento specifico della
+reologia è ora in `thermal_laws_2d`; la viscosità di settling lahar e la
+selezione della legge di deposizione sono in `mass_exchange_laws_2d`.
+`equation_terms_2d` mantiene l'assemblaggio dei termini, senza chiamate dirette
+alle leggi specifiche lava/lahar. Il mapping lava del gruppo di temperatura in
+`init_problem_param` resta una decisione di partizione delle equazioni, non una
+dispatch costitutiva. Il runner completo raggiunge i test Fortran ma non
 termina perché nell'ambiente manca NumPy, richiesto da `characterize.py`.
-D16.3 resta aperto: in `equation_terms_2d` sono ancora presenti selezioni
-specifiche per il raffreddamento lava e lo scambio di massa lahar, da
-ricollocare secondo la responsabilità fisica appropriata.
 
 **D16.4 — Relocation dei moduli.** Rinominare e organizzare i moduli in `thermal_laws_2d`, `mass_exchange_laws_2d`, `pore_pressure_laws_2d` e `rheology_laws`. Aggiornare `USE`, Makefile, liste di build, Doxygen e test. La relocation deve essere scientificamente neutra.
 
@@ -2118,8 +2121,10 @@ riesce.
 Estrazioni completate: `eval_lahar_deposition_rate`, la legge di deposizione
 generale per sedimentazione ostacolata, `eval_erosion_rates`, il limite del
 rate di perdita del carrier e `eval_air_entrainment_rate` appartengono ora a
-`mass_exchange_laws_2d`; `equation_terms_2d` mantiene selezione e assemblaggio.
-I test sorgente verificano le leggi di deposizione, i limiti di massa e volume
+`mass_exchange_laws_2d`. Il modulo ospita anche la selezione della viscosità
+per il settling e il dispatch tra le leggi di deposizione lahar e hindered
+settling; `equation_terms_2d` mantiene l'assemblaggio dei termini. I test
+sorgente verificano le leggi di deposizione, i limiti di massa e volume
 disponibili, i rate di erosione limitati dall’inventario e la legge di
 entrainment.
 

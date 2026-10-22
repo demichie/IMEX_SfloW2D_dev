@@ -6,7 +6,8 @@
 
 MODULE mass_exchange_laws_2d
 
-  USE parameters_2d, ONLY : wp
+  USE parameters_2d, ONLY : wp, rheology_id_lahar
+  USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
 
   IMPLICIT NONE
 
@@ -14,11 +15,87 @@ MODULE mass_exchange_laws_2d
 
   PUBLIC :: eval_lahar_deposition_rate
   PUBLIC :: eval_hindered_settling_deposition_rate
+  PUBLIC :: eval_settling_fluid_properties
+  PUBLIC :: eval_solid_deposition_rate
   PUBLIC :: eval_erosion_rates
   PUBLIC :: eval_continuous_phase_loss_rate
   PUBLIC :: eval_air_entrainment_rate
 
 CONTAINS
+
+  !******************************************************************************
+  !> \brief Select the fluid properties used by the settling calculation.
+  !> \details Lahar settling uses the lahar rheology's temperature- and
+  !>          concentration-dependent viscosity and mixture density. Other
+  !>          models retain the carrier-fluid properties supplied by the caller.
+  !> \param[in] model_id Selected rheology model ID.
+  !> \param[in] temperature Mixture temperature [K].
+  !> \param[in] total_solid_fraction Sum of solid volume fractions.
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] carrier_density_fallback Carrier density for non-lahar models.
+  !> \param[in] kinematic_viscosity_fallback Kinematic viscosity for
+  !>        non-lahar models [m^2 s^-1].
+  !> \param[out] carrier_density Density used for settling [kg m^-3].
+  !> \param[out] inverse_kinematic_viscosity Reciprocal kinematic viscosity
+  !>        used for settling [s m^-2].
+  !******************************************************************************
+  SUBROUTINE eval_settling_fluid_properties(model_id, temperature,           &
+       total_solid_fraction, mixture_density, carrier_density_fallback,     &
+       kinematic_viscosity_fallback, carrier_density,                       &
+       inverse_kinematic_viscosity)
+
+    INTEGER, INTENT(IN) :: model_id
+    REAL(wp), INTENT(IN) :: temperature, total_solid_fraction, mixture_density
+    REAL(wp), INTENT(IN) :: carrier_density_fallback
+    REAL(wp), INTENT(IN) :: kinematic_viscosity_fallback
+    REAL(wp), INTENT(OUT) :: carrier_density, inverse_kinematic_viscosity
+    REAL(wp) :: fluid_viscosity
+
+    carrier_density = carrier_density_fallback
+
+    IF (model_id .EQ. rheology_id_lahar) THEN
+       fluid_viscosity = eval_lahar_fluid_viscosity(temperature,            &
+            total_solid_fraction)
+       carrier_density = mixture_density
+       inverse_kinematic_viscosity = mixture_density / fluid_viscosity
+    ELSE
+       inverse_kinematic_viscosity = 1.0_wp / kinematic_viscosity_fallback
+    END IF
+
+  END SUBROUTINE eval_settling_fluid_properties
+
+  !******************************************************************************
+  !> \brief Dispatch the solid deposition law selected for settling.
+  !> \param[in] model_id Selected rheology model ID.
+  !> \param[in] solid_fraction Solid volume fraction for this class.
+  !> \param[in] settling_velocity Settling velocity [m s^-1].
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] time_step Time-step size [s].
+  !> \param[in] total_solid_fraction Sum of solid volume fractions.
+  !> \param[in] maximum_solid_fraction Hindered-settling packing threshold.
+  !> \param[in] hindered_settling_exponent Michaels-Bolger exponent.
+  !> \return Deposition rate [m s^-1].
+  !******************************************************************************
+  PURE FUNCTION eval_solid_deposition_rate(model_id, solid_fraction,         &
+       settling_velocity, flow_depth, time_step, total_solid_fraction,       &
+       maximum_solid_fraction, hindered_settling_exponent) RESULT(rate)
+
+    INTEGER, INTENT(IN) :: model_id
+    REAL(wp), INTENT(IN) :: solid_fraction, settling_velocity
+    REAL(wp), INTENT(IN) :: flow_depth, time_step, total_solid_fraction
+    REAL(wp), INTENT(IN) :: maximum_solid_fraction, hindered_settling_exponent
+    REAL(wp) :: rate
+
+    IF (model_id .EQ. rheology_id_lahar) THEN
+       rate = eval_lahar_deposition_rate(solid_fraction, settling_velocity,   &
+            flow_depth, time_step)
+    ELSE
+       rate = eval_hindered_settling_deposition_rate(solid_fraction,         &
+            settling_velocity, flow_depth, time_step, total_solid_fraction,  &
+            maximum_solid_fraction, hindered_settling_exponent)
+    END IF
+
+  END FUNCTION eval_solid_deposition_rate
 
   !******************************************************************************
   !> \brief Evaluate the deposition-limited lahar settling rate.
