@@ -1743,11 +1743,12 @@ riconciliare il gate prima di chiudere D12.
 
 ### D13 — Algebriche ANALYTIC per stage DIRK
 
-**Test proporzionati (nuove modifiche a questo step):** T1 residuali algebrici delle soluzioni ANALYTIC di stage DIRK; T2 regimi limite, soglie e selezione delle radici; T3 N_RK 2/3/4 quando si colleghino i solutori al ciclo degli stage. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+**Test proporzionati (nuove modifiche a questo step):** T1 residuali algebrici delle soluzioni ANALYTIC di stage DIRK; T2 regimi limite, soglie e selezione delle radici; T3 regressioni del tableau per N_RK 2/3/4. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
 Stato ufficiale: IN CORSO — integrate le soluzioni algebriche di stage per
-raffreddamento lava e diffusione della pressione interstiziale; restano da
-validare i regimi limite, le combinazioni di gruppi e l’intero tableau.
+velocità, raffreddamento lava e diffusione della pressione interstiziale. I
+test coprono i residui, la condivisione e l’ordine dei gruppi; restano da
+validare i regimi limite e l’intero tableau.
 
 #### Limitazioni di ANALYTIC
 
@@ -1771,28 +1772,28 @@ Non è stato introdotto un fallback ANALYTIC per modelli non supportati: in
 questa tranche tutti i modelli attivi hanno una formula chiusa quando le
 variabili non-velocità sono esplicite.
 
-I solutori analitici di velocità non sono ancora richiamati dal dispatcher
-degli stage. Il raffreddamento della lava è collegato al gruppo
-`IM_GROUP_METHOD_ANALYTIC`, così come la pressione dei pori; le velocità
-accoppiate usano `IM_GROUP_METHOD_NEWTON`. Non è previsto un fallback
-analitico generico per gruppi accoppiati non supportati.
+Il dispatcher degli stage usa i solutori analitici di velocità per i gruppi
+`IM_GROUP_METHOD_ANALYTIC`; usa inoltre le soluzioni algebriche DIRK per il
+raffreddamento della lava e la pressione dei pori. I gruppi
+`IM_GROUP_METHOD_NEWTON` risolvono invece il residuo con Newton, includendo
+SI per la quantità di moto. Non è previsto un fallback analitico generico per
+gruppi accoppiati non supportati.
 
 #### Raffreddamento della lava
 
 `thermal_sources_2d` distingue l’integrazione esatta dell’ODE dalla soluzione
-algebrica dello stage DIRK. `solve_lava_analytic_temperature` è il solve
-analitico esatto usato dal gruppo lava; `advance_lava_cooling_temperature`
-resta come nome di compatibilità. `solve_lava_cooling_stage_temperature`
-risolve invece, senza Newton,
+algebrica dello stage DIRK. `solve_lava_cooling_stage_temperature` risolve
+senza Newton l’equazione algebrica dello stage ed è la routine usata dai
+gruppi `IM_GROUP_METHOD_ANALYTIC`:
 \f[
 C_A(T-T_k)-\tau[-k_r(T^4-T_a^4)-k_c(T-T_a)]=0,\qquad \tau=dt\,a_{ii}.
 \f]
 La quartica monotona è scalata e risolta con formule chiuse, selezionando la
 radice nell’intervallo fisico fra temperatura nota e ambiente. Il solve usa
 la capacità termica areale dello stato di lavoro all’ingresso del gruppo.
-Questa routine DIRK algebrica non è una terza modalità del dispatcher: i
-gruppi selezionano solo Newton (con SI dove previsto) oppure integrazione
-analitica esatta.
+`solve_lava_analytic_temperature` integra invece l’ODE a coefficienti
+congelati ed è un helper autonomo, non selezionato dal dispatcher IMEX;
+`advance_lava_cooling_temperature` mantiene il nome di compatibilità.
 
 #### Diffusione della pressione interstiziale
 
@@ -1802,17 +1803,21 @@ esponenziale dell’ODE. La distinta routine
 \f$p_{e,\mathrm{stage}}=p_{e,\mathrm{known}}/(1+\tau\lambda)\f$, con
 \f$\lambda=(\pi/2)^2DI/[h\max(h_\mathrm{threshold},h)]\f$ e
 \f$\tau=dt\,a_{ii}\f$. Profondità, temperatura e frazioni solide sono
-congelate; il solve analitico esatto è collegato al gruppo
-`IM_GROUP_METHOD_ANALYTIC` dopo il raffreddamento della lava, così il
-coefficiente usa la temperatura aggiornata dello stage.
+congelate durante questo solve. È questa soluzione algebrica DIRK a essere
+collegata al gruppo `IM_GROUP_METHOD_ANALYTIC`; quando pressione e energia
+condividono il gruppo, il solve della pressione segue quello energetico e usa
+la temperatura aggiornata. `solve_analytic_pore_pressure` integra invece
+l’ODE a stato congelato e resta un helper autonomo non selezionato dal
+dispatcher.
 
 I test diretti verificano le integrazioni analitiche esatte e i residui dei
-solve DIRK algebrici legacy, incluso il caso convection-only per l’energia,
-in build strict e optimized. Le routine DIRK algebriche legacy non sono
-selezionabili come modalità di gruppo. La suite di gruppo verifica i gruppi
-analitici/Newton e la coerenza del rate effettivo con l’incremento conservativo
+solve algebrici DIRK, incluso il caso convection-only per l’energia, in build
+strict e optimized. Le routine di integrazione esatta a coefficienti
+congelati non sono selezionabili come modalità di gruppo. La suite verifica gruppi analitici e
+Newton, famiglie condivise, ordine configurato, aggiornamenti visibili ai
+gruppi successivi e coerenza del rate effettivo con l’incremento conservativo
 netto. Restano da coprire i limiti estremi della quartica e la traiettoria
-completa con gruppi multipli.
+completa dell’intero tableau con gruppi multipli.
 
 #### Contratto delle soluzioni di stage
 
@@ -2020,9 +2025,10 @@ condiviso, applica SI, sceglie il metodo per ciascun gruppo, delega la sweep
 ordinata a `solve_implicit_groups` e calcola il rate netto finale.
 `time_integration_2d` rimane responsabile della sequenza RK globale e dei contributi noti;
 `equation_metadata_2d` descrive partizioni, ordine e metodi; `equation_terms_2d`
-valuta rate e sorgenti per uno stato fornito, ma non orchestra i gruppi. I
-solve Newton e i solve fisici exact-flow restano helper chiamati dal
-coordinatore.
+valuta rate e sorgenti per uno stato fornito, ma non orchestra i gruppi. Il
+coordinatore chiama i solve Newton o i solve analitici algebrici DIRK
+appropriati al gruppo; gli helper exact-flow a coefficienti congelati restano
+autonomi e non sono selezionati dal dispatcher.
 
 #### Termini termici e scambio di massa
 

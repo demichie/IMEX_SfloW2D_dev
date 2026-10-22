@@ -215,6 +215,35 @@ PROGRAM test_grouped_implicit_stage
      ERROR STOP 'analytic effective rate does not match its net stage increment'
   END IF
 
+  imex_energy_group = 1
+  imex_pore_pressure_group = 1
+  imex_velocity_group = 2
+  imex_group_method(1:2) = [CHARACTER(LEN=16) :: 'ANALYTIC', 'ANALYTIC']
+  CALL init_problem_param(partition)
+  IF (partition%n_IM_groups .NE. 2 .OR.                                  &
+       partition%n_IM_group_equations(1) .NE. 2 .OR.                      &
+       partition%IM_group(4) .NE. 1 .OR.                                 &
+       partition%IM_group(7) .NE. 1 .OR.                                 &
+       partition%IM_group(2) .NE. 2 .OR.                                 &
+       partition%IM_group_method(1) .NE. IM_GROUP_METHOD_ANALYTIC .OR.   &
+       partition%IM_group_method(2) .NE. IM_GROUP_METHOD_ANALYTIC) THEN
+     ERROR STOP 'energy and pore pressure could not share an analytic group'
+  END IF
+  CALL solve_imex_stage(partition, q_stage_check, q_stage_check, qp_known, &
+       dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
+       0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                    &
+       effective_stage_term, iterations, converged, linear_info,            &
+       line_search_failed)
+  IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
+     ERROR STOP 'mixed analytic group stage did not converge'
+  END IF
+  IF (ABS(q_stage(4) - exact_energy) / MAX(1.0_wp, ABS(exact_energy)) .GT. &
+       5.0E-14_wp .OR.                                                   &
+       ABS(q_stage(7) - q_expected(1)*expected_pressure) /                &
+       MAX(1.0_wp, ABS(q_expected(1)*expected_pressure)) .GT. 5.0E-14_wp) THEN
+     ERROR STOP 'shared analytic group produced an inconsistent stage'
+  END IF
+
   imex_energy_group = 2
   imex_pore_pressure_group = 1
   imex_velocity_group = 3
