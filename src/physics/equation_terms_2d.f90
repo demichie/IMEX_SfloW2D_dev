@@ -20,7 +20,7 @@ MODULE equation_terms_2d
   USE state_conversion_2d
   USE rheology_2d, ONLY : curvature_acceleration, eval_implicit_rheology_rate, &
        eval_semi_implicit_rheology_rate
-  USE pore_pressure_2d, ONLY : eval_pore_pressure_diffusion_source,            &
+  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_diffusion_source,       &
        eval_pore_pressure_gas_loss, eval_pore_pressure_inlet_source,            &
        eval_pore_pressure_mass_exchange_source
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                 &

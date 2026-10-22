@@ -9,7 +9,7 @@
 !>          DIRK stage solve.
 !********************************************************************************
 
-MODULE pore_pressure_2d
+MODULE pore_pressure_laws_2d
 
   USE parameters_2d, ONLY : wp, n_solid, gas_flag, sutherland_flag
   USE COMPLEXIFY
@@ -484,4 +484,4 @@ CONTAINS
 
   END FUNCTION eval_pore_pressure_mass_exchange_source
 
-END MODULE pore_pressure_2d
+END MODULE pore_pressure_laws_2d

@@ -187,7 +187,7 @@ CONTAINS
     USE equation_terms_2d, ONLY : eval_nh_semi_impl_terms
     USE rheology_2d, ONLY : correct_friction_momentum, curvature_acceleration
     USE thermal_laws_2d, ONLY : solve_lava_analytic_temperature
-    USE pore_pressure_2d, ONLY : solve_analytic_pore_pressure
+    USE pore_pressure_laws_2d, ONLY : solve_analytic_pore_pressure
     USE rheology_voellmy_2d, ONLY : solve_voellmy_analytic_velocity
     USE rheology_plastic_2d, ONLY : solve_plastic_analytic_velocity
     USE rheology_lava_2d, ONLY : solve_lava_analytic_velocity

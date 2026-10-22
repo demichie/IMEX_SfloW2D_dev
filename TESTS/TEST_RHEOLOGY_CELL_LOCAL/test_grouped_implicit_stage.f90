@@ -12,7 +12,7 @@ PROGRAM test_grouped_implicit_stage
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
   USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var
-  USE pore_pressure_2d, ONLY : solve_analytic_pore_pressure
+  USE pore_pressure_laws_2d, ONLY : solve_analytic_pore_pressure
   USE thermal_laws_2d, ONLY : solve_lava_analytic_temperature
   USE rheology_lava_2d, ONLY : solve_lava_analytic_velocity
 
