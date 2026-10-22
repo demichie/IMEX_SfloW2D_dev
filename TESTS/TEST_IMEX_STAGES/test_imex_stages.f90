@@ -44,7 +44,8 @@ PROGRAM test_imex_stages
   USE domain_2d, ONLY : domain_type
   USE spatial_operator_2d, ONLY : spatial_operator_type
   USE time_integration_2d, ONLY : time_integration_workspace_type
-  USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_ANALYTIC
+  USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_ANALYTIC, &
+       IM_GROUP_METHOD_NEWTON
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, finalize_nonlinear_solver
   USE state_conversion_2d, ONLY : qc_to_qp
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
@@ -66,6 +67,7 @@ PROGRAM test_imex_stages
   INTEGER :: nx,ny,slope,curvature,limiter_id,input_unit,output_unit,j,k,i,step
   INTEGER :: threads,actual_threads,stages,steps,drag,observe,l
   INTEGER :: composition_mode,boundary_test_mode,source_test_model,analytic_mode
+  INTEGER :: mixed_group_mode
 
   CALL get_command_argument(1,argument); READ(argument,*) threads
   CALL get_command_argument(2,argument); READ(argument,*) stages
@@ -96,6 +98,13 @@ PROGRAM test_imex_stages
   IF (analytic_mode<0 .OR. analytic_mode>1) ERROR STOP 'invalid analytic fixture mode'
   IF (analytic_mode==1 .AND. (drag==0 .OR. composition_mode/=0 .OR. source_test_model/=0)) &
        ERROR STOP 'analytic fixture requires single-phase quadratic drag'
+  mixed_group_mode=0
+  argument=''
+  CALL get_command_argument(10,argument)
+  IF (LEN_TRIM(argument)>0) READ(argument,*) mixed_group_mode
+  IF (mixed_group_mode<0 .OR. mixed_group_mode>2) ERROR STOP 'invalid mixed-group fixture mode'
+  IF (mixed_group_mode>0 .AND. (source_test_model/=3 .OR. composition_mode/=0 .OR. &
+       drag/=0 .OR. analytic_mode/=0)) ERROR STOP 'mixed-group fixture requires lava source model'
   IF (stages<2 .OR. stages>4 .OR. steps<1) ERROR STOP 'invalid test controls'
   !$OMP PARALLEL
   !$OMP SINGLE
@@ -581,18 +590,29 @@ CONTAINS
     IF (source_test_model/=0) THEN
        rheology_flag=.TRUE.; rheology_model_id=source_test_model
        mu=0.3_wp; xi=500.0_wp; tau0=20.0_wp
-       nu_ref=0.02_wp; visc_par=0.003_wp; T_ref=900.0_wp; T_env=300.0_wp
+       nu_ref=0.02_wp; visc_par=0.003_wp;        T_ref=900.0_wp; T_env=300.0_wp
        radiative_term_coeff=3.0E-8_wp; convective_term_coeff=4.0_wp
+       IF (mixed_group_mode>0) THEN
+          visc_par=0.3_wp
+          T_ref=1000.0_wp
+          convective_term_coeff=1.0E4_wp
+       END IF
        IF (source_test_model==3) kt_trace_reconstruction='h_x'
     END IF
     IF (composition_mode==0) THEN
        IF (analytic_mode==1) THEN
           CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.,.FALSE.], &
                [0,1,1,0,0], [IM_GROUP_METHOD_ANALYTIC])
+       ELSE IF (mixed_group_mode==1) THEN
+          CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.TRUE.,.FALSE.], &
+               [0,1,1,2,0], [IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON])
+       ELSE IF (mixed_group_mode==2) THEN
+          CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.TRUE.,.FALSE.], &
+               [0,2,2,1,0], [IM_GROUP_METHOD_NEWTON, IM_GROUP_METHOD_ANALYTIC])
        ELSE
           CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.,.FALSE.])
        END IF
-       IF (source_test_model==3) &
+       IF (source_test_model==3 .AND. mixed_group_mode==0) &
             CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.TRUE.,.FALSE.])
     ELSE
        BLOCK

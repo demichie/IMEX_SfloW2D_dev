@@ -100,7 +100,7 @@ def read_payload(path, nx, ny, n, steps):
 
 def launch(executable, directory, vertices, production, n, steps, dt, drag=0,
            slope=False, curvature=False, limiter=3, dx=0.75, dy=1.25, observe=1,
-           analytic_mode=0):
+           analytic_mode=0, source_test_model=0, mixed_group_mode=0):
     directory.mkdir(parents=True)
     write_fixture(directory/"fixture.inp", vertices, production, slope, curvature, limiter, dt, dx, dy)
     results = []
@@ -112,6 +112,8 @@ def launch(executable, directory, vertices, production, n, steps, dt, drag=0,
             command = [str(executable), str(threads), str(n), str(steps), str(drag), str(observe)]
             if analytic_mode:
                 command.extend(("0", "0", "0", str(analytic_mode)))
+            elif mixed_group_mode:
+                command.extend(("0", "0", str(source_test_model), "0", str(mixed_group_mode)))
             run = subprocess.run(command, cwd=work, env=env, stdout=stream,
                                  stderr=subprocess.STDOUT, timeout=180)
         if run.returncode:
@@ -416,6 +418,136 @@ def analytic_tableau_suite(args):
     print("PASS: exact-flow stage trajectories and final assembly for N_RK=2/3/4", flush=True)
 
 
+def close_approx(label, actual, expected, relative_tolerance, mask):
+    actual, expected = np.broadcast_arrays(actual, expected)
+    actual, expected = actual[mask], expected[mask]
+    scale = max(1.0, float(np.max(np.abs(expected))))
+    error = float(np.max(np.abs(actual-expected)))/scale
+    if error > relative_tolerance:
+        raise AssertionError(f"{label}: scaled error {error:.17g} > {relative_tolerance:.17g}")
+
+
+def newton_lava_temperature(energy, mass, interval):
+    """Independent bisection of the scalar DIRK cooling residual."""
+    ambient = 300.0
+    heat_capacity = CP*mass
+    initial_temperature = energy/heat_capacity
+    lower = np.full_like(initial_temperature, ambient)
+    upper = initial_temperature.copy()
+    for _ in range(80):
+        midpoint = 0.5*(lower+upper)
+        source = (-3.0e-8*(midpoint**4-ambient**4) -
+                  1.0e4*(midpoint-ambient))
+        residual = heat_capacity*(midpoint-initial_temperature)-interval*source
+        lower = np.where(residual < 0.0, midpoint, lower)
+        upper = np.where(residual >= 0.0, midpoint, upper)
+    return 0.5*(lower+upper)
+
+
+def exact_lava_momentum(momentum, mass, temperature, interval):
+    """Independent frozen-temperature affine-drag velocity flow."""
+    depth = mass/RHO
+    speed = np.linalg.norm(momentum, axis=-1)/mass
+    linear_drag = 3.0*0.02/depth**2*np.exp(-0.3*(temperature-1000.0))
+    yield_drag = 20.0/(RHO*depth)
+    speed_after = np.maximum(
+        0.0, (speed+yield_drag/linear_drag)*np.exp(-linear_drag*interval) -
+        yield_drag/linear_drag)
+    return momentum*(speed_after/np.maximum(speed, np.finfo(float).tiny))[..., None]
+
+
+def mixed_group_stage_checks(fields, n, dt, group_order):
+    """Validate mixed ANALYTIC/NEWTON stages and tableau assembly in the interior."""
+    _, ai, _, bi = tableaux(n)
+    start = fields["q0"][..., :4]
+    interior = np.zeros(start.shape[:2], dtype=bool)
+    interior[4:-4, 4:-4] = True
+    rates = []
+    if np.any(fields["statistics"][:, 6] != 0.0) or fields["statistics"][0, 7] <= 0.0:
+        raise AssertionError("mixed-group trajectory had a failed or missing Newton solve")
+    for i in range(n):
+        expected_known = start.copy()
+        for j in range(i):
+            expected_known += dt*ai[i, j]*rates[j]
+        close("mixed-group known tableau assembly", fields["known"][i, ..., :4],
+              expected_known, mask=np.broadcast_to(interior[..., None], expected_known.shape))
+        known = fields["known"][i, ..., :4]
+        solved = fields["solved"][i, ..., :4]
+        diagonal = ai[i, i]
+        if diagonal == 0.0:
+            close("mixed-group zero-diagonal state", solved, known,
+                  mask=np.broadcast_to(interior[..., None], known.shape))
+            rates.append(np.zeros_like(known))
+            continue
+
+        interval = dt*diagonal
+        mass = known[..., 0]
+        known_temperature = known[..., 3]/(CP*mass)
+        expected_temperature = newton_lava_temperature(known[..., 3], mass, interval)
+        actual_temperature = solved[..., 3]/(CP*mass)
+        temperature_error = float(np.max(np.abs(
+            actual_temperature[interior]-expected_temperature[interior])))
+        if temperature_error > 2.0e-5:
+            raise AssertionError(
+                f"mixed-group Newton cooling temperature error {temperature_error:.17g}")
+        velocity_temperature = known_temperature if group_order == 1 else expected_temperature
+        expected_momentum = exact_lava_momentum(
+            known[..., 1:3], mass, velocity_temperature, interval)
+        close_approx("mixed-group exact-flow momentum", solved[..., 1:3],
+                     expected_momentum, 2.0e-10,
+                     np.broadcast_to(interior[..., None], expected_momentum.shape))
+        rates.append((solved-known)/(dt*diagonal))
+
+    expected_final = start.copy()
+    for weight, rate in zip(bi, rates):
+        expected_final += dt*weight*rate
+    close("mixed-group raw tableau assembly", fields["raw_final"][..., :4],
+          expected_final, mask=np.broadcast_to(interior[..., None], expected_final.shape))
+    close("mixed-group repaired tableau assembly", fields["q"][..., :4],
+          expected_final, mask=np.broadcast_to(interior[..., None], expected_final.shape))
+    return fields["q"][..., 1:3][interior].copy()
+
+
+def mixed_group_tableau_suite(args):
+    """Exercise both mixed-method orderings through every supported tableau."""
+    ny, nx = 17, 18
+    vertices = np.zeros((ny+1, nx+1))
+    q0 = np.zeros((ny, nx, 5))
+    q0[..., 0] = RHO
+    q0[..., 1] = 600.0
+    q0[..., 2] = 800.0
+    q0[..., 3] = RHO*CP*1000.0
+    for n in TABLEAU_STAGES:
+        endpoints = {}
+        for group_order in (1, 2):
+            directory = Path(
+                f"mixed-{args.profile}-{os.getpid()}-RK{n}-order{group_order}")
+            fields, hashes = launch(
+                args.executable, directory, vertices, q0, n, 1, 0.5,
+                limiter=0, dx=100.0, dy=100.0, source_test_model=3,
+                mixed_group_mode=group_order)
+            interior = np.zeros(fields["active"].shape, dtype=bool)
+            interior[4:-4, 4:-4] = True
+            close("mixed-group fixture mass", fields["q"][..., 0], RHO, mask=interior)
+            close("mixed-group fixture solid", fields["q"][..., 4], 0.0, mask=interior)
+            endpoints[group_order] = mixed_group_stage_checks(
+                fields, n, fields["statistics"][0, 0], group_order)
+            print("IMEX_MIXED_GROUP_EVIDENCE "+json.dumps({
+                "profile": args.profile, "n_RK": n, "group_order": group_order,
+                "dt": float(fields["statistics"][0, 0]), **hashes
+            }, sort_keys=True, allow_nan=False), flush=True)
+        order_difference = float(np.max(np.abs(endpoints[1]-endpoints[2])))/RHO
+        if order_difference <= 1.0e-8:
+            raise AssertionError(
+                f"configured mixed-group order did not affect the frozen-flow trajectory: "
+                f"RK{n}, difference={order_difference:.17g}")
+        print("IMEX_MIXED_GROUP_ORDER_EVIDENCE "+json.dumps({
+            "profile": args.profile, "n_RK": n,
+            "maximum_scaled_endpoint_difference": order_difference
+        }, sort_keys=True, allow_nan=False), flush=True)
+    print("PASS: mixed ANALYTIC/NEWTON group trajectories for N_RK=2/3/4", flush=True)
+
+
 def order_suite(args):
     final_time = 0.32
     for kind in ("thermal", "drag", "mixed"):
@@ -513,12 +645,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("executable", type=Path); parser.add_argument("profile")
     parser.add_argument("--stage-count-executable", type=Path)
-    parser.add_argument("--section", choices=("stages", "order", "analytic"))
+    parser.add_argument("--section", choices=("stages", "order", "analytic", "groups"))
     args = parser.parse_args(); args.executable = args.executable.resolve()
     check_order_conditions()
     if args.stage_count_executable:
         stage_count_suite(args.stage_count_executable.resolve(), args.profile)
-    if args.section not in ("order", "analytic"):
+    if args.section not in ("order", "analytic", "groups"):
         cases = ("lake_rough", "dynamic_smooth", "dynamic_drainage", "dynamic_compact")
         for name in cases:
             vertices, bed, q = spatial.fixture(name)
@@ -557,6 +689,8 @@ def main():
         order_suite(args)
     if args.section in (None, "analytic"):
         analytic_tableau_suite(args)
+    if args.section in (None, "groups"):
+        mixed_group_tableau_suite(args)
 
 
 if __name__ == "__main__":

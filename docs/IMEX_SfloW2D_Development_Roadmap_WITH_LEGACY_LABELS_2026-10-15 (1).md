@@ -1825,7 +1825,13 @@ limiti fisici e le formule esatte disponibili.
 
 **Test proporzionati (nuove modifiche a questo step):** T1 gruppi misti e fallback; T2 combinazioni rappresentative; T3 confronto delle traiettorie se cambia la strategia implicita. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: DA FARE
+Stato ufficiale: IN CORSO — `TEST_IMEX_STAGES/compare_stages.py --section
+groups` verifica traiettorie complete `N_RK=2/3/4` con gruppi ANALYTIC e
+NEWTON ordinati in entrambi i modi. Gli oracoli controllano il solve Newton
+della temperatura, il flusso esatto della velocità con coefficienti congelati,
+la ricorrenza degli stage e l’assemblaggio finale; il test richiede inoltre
+che l’ordine dei gruppi produca la differenza prevista. Validato in strict e
+optimized con thread 1/4. Restano da chiudere gli altri elementi di D14.
 
 ### D15 — Acceptance della nuova architettura
 
