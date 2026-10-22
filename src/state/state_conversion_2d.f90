@@ -66,7 +66,6 @@ MODULE state_conversion_2d
   PUBLIC :: qc_to_qp, qp_to_qc, qp_to_qp2
   PUBLIC :: mixt_var
   PUBLIC :: sauter_diameter, average_density_solids
-  PUBLIC :: settling_velocity
   PUBLIC :: eval_mixture_heat_capacity
   PUBLIC :: eval_mixture_properties_from_mass_fractions
   PUBLIC :: eval_mixture_properties_from_volume_fractions
@@ -997,103 +996,4 @@ CONTAINS
 
   !------------------------------------------------------------------------------
   !> \brief Evaluate particle terminal settling speed with the configured drag correlation.
-  !>
-  !> Settling velocity function
-  !
-  !> This subroutine compute the settling velocity of the particles, as a
-  !> function of diameter, density of particles and carrier phase and viscosity.
-  !> \date 2019/11/11
-  !
-  !> @author
-  !> Mattia de' Michieli Vitturi
-  !
-  !>
-  !> \param[in] diam Particle diameter [m].
-  !> \param[in] rhos Particle material density [kg m^-3].
-  !> \param[in] rhoc Carrier-fluid density [kg m^-3].
-  !> \param[in] inv_kin_visc Reciprocal of the carrier kinematic viscosity [s m^-2].
-  !> \return Terminal settling speed [m s^-1].
-  !------------------------------------------------------------------------------
-
-  REAL(wp) FUNCTION settling_velocity(diam,rhos,rhoc,inv_kin_visc)
-
-    IMPLICIT NONE
-
-    REAL(wp), INTENT(IN) :: diam          !< particle diameter [m]
-    REAL(wp), INTENT(IN) :: rhos          !< particle density [kg/m3]
-    REAL(wp), INTENT(IN) :: rhoc          !< carrier phase density [kg/m3]
-    REAL(wp), INTENT(IN) :: inv_kin_visc  !< carrier phase viscosity reciprocal
-
-    REAL(wp) :: Rey           !< Reynolds number
-    REAL(wp) :: inv_sqrt_C_D  !< Reciprocal of sqrt of Drag coefficient
-
-    ! loop variables
-    INTEGER :: i              !< loop counter for iterative procedure
-    REAL(wp) :: const_part    !< term not changing in iterative procedure
-    REAL(wp) :: inv_sqrt_C_D_old  !< previous iteration sqrt of drag coefficient
-    REAL(wp) :: set_vel_old   !< previous iteration settling velocity
-
-    ! INTEGER :: dig          !< order of magnitude of settling velocity
-
-    inv_sqrt_C_D = 1.0_wp
-
-    IF ( rhos .LE. rhoc ) THEN
-
-       settling_velocity = 0.0_wp
-       RETURN
-
-    END IF
-
-    const_part =  SQRT( (4.0_wp/3.0_wp) * ( rhos / rhoc - 1.0_wp ) * diam * grav )
-
-    settling_velocity = const_part * inv_sqrt_C_D
-
-    Rey = diam * settling_velocity * inv_kin_visc
-
-    IF ( Rey .LE. 1000.0_wp ) THEN
-
-       C_D_loop:DO i=1,20
-
-          set_vel_old = settling_velocity
-          inv_sqrt_C_D_old = inv_sqrt_C_D
-
-          IF ( collective_settling_flag ) THEN
-
-             ! Optional collective-settling drag law from the development branch
-             inv_sqrt_C_D = SQRT( 1.0_wp / ( 24.0_wp * ( 1.0_wp +              &
-                  0.15_wp*Rey**(0.687_wp) ) / Rey +                             &
-                  A_drag * ( LOG(Rey) - B_drag ) ) )
-
-          ELSE
-
-             ! Original Schiller-Naumann drag law
-             inv_sqrt_C_D = SQRT( Rey / ( 24.0_wp * ( 1.0_wp +                 &
-                  0.15_wp*Rey**(0.687_wp) ) ) )
-
-          END IF
-
-          settling_velocity = const_part * inv_sqrt_C_D
-
-          IF ( ABS( set_vel_old - settling_velocity ) / set_vel_old             &
-               .LT. 1.0E-6_wp ) THEN
-
-!!$             ! round to first three significative digits
-!!$             dig = FLOOR(LOG10(set_vel_old))
-!!$             settling_velocity = 10.0_wp**(dig-3)                            &
-!!$                  * FLOOR( 10.0_wp**(-dig+3)*set_vel_old )
-
-             RETURN
-
-          END IF
-
-          Rey = diam * settling_velocity * inv_kin_visc
-
-       END DO C_D_loop
-
-    END IF
-
-    RETURN
-
-  END FUNCTION settling_velocity
-
 END MODULE state_conversion_2d

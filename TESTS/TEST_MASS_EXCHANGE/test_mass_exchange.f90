@@ -9,7 +9,8 @@ PROGRAM test_mass_exchange
   USE model_layout_2d, ONLY : model_layout_type
   USE runtime_2d, ONLY : runtime_state_type
   USE stochastic_module, ONLY : stochastic_workspace_type, sym_noise, noise_pow_val
-  USE state_conversion_2d, ONLY : qc_to_qp, settling_velocity
+  USE state_conversion_2d, ONLY : qc_to_qp
+  USE mass_exchange_laws_2d, ONLY : settling_velocity
   USE equation_terms_2d, ONLY : eval_mass_exchange_terms
   USE time_integration_2d, ONLY : apply_mass_exchange_step
   USE inpout_2d, ONLY : write_restart_file, read_restart_file, output_idx

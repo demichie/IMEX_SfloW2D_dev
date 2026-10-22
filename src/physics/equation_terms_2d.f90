@@ -27,7 +27,7 @@ MODULE equation_terms_2d
        eval_rheology_cooling_energy_rate, eval_vaporization_mass_rate,         &
        eval_vaporization_energy_rate
   USE mass_exchange_laws_2d, ONLY : eval_settling_fluid_properties,            &
-       eval_solid_deposition_rate, eval_erosion_rates,                          &
+       settling_velocity, eval_solid_deposition_rate, eval_erosion_rates,       &
        eval_continuous_phase_loss_rate, eval_air_entrainment_rate
 
   USE equation_metadata_2d, ONLY : equation_partition_type,                   &

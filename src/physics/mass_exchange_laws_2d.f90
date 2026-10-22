@@ -1,18 +1,22 @@
 !********************************************************************************
 !> \brief Constitutive laws used by mass-exchange source assembly.
-!> \details Provides cell-local erosion, deposition, carrier-loss and
-!>          entrainment rates independently of source assembly and bookkeeping.
+!> \details Provides settling velocity and cell-local erosion, deposition,
+!>          carrier-loss and entrainment rates independently of source assembly
+!>          and bookkeeping.
 !********************************************************************************
 
 MODULE mass_exchange_laws_2d
 
   USE parameters_2d, ONLY : wp, rheology_id_lahar
+  USE constitutive_parameters_2d, ONLY : grav, A_drag, B_drag,                &
+       collective_settling_flag
   USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
 
   IMPLICIT NONE
 
   PRIVATE
 
+  PUBLIC :: settling_velocity
   PUBLIC :: eval_lahar_deposition_rate
   PUBLIC :: eval_hindered_settling_deposition_rate
   PUBLIC :: eval_settling_fluid_properties
@@ -22,6 +26,69 @@ MODULE mass_exchange_laws_2d
   PUBLIC :: eval_air_entrainment_rate
 
 CONTAINS
+
+  !******************************************************************************
+  !> \brief Compute particle terminal settling velocity.
+  !> \details Iterates the drag coefficient as a function of particle Reynolds
+  !>          number using the configured settling drag law.
+  !> \param[in] diam Particle diameter [m].
+  !> \param[in] rhos Particle material density [kg m^-3].
+  !> \param[in] rhoc Carrier-fluid density [kg m^-3].
+  !> \param[in] inv_kin_visc Reciprocal carrier kinematic viscosity [s m^-2].
+  !> \return Terminal settling speed [m s^-1].
+  !******************************************************************************
+  REAL(wp) FUNCTION settling_velocity(diam, rhos, rhoc, inv_kin_visc)
+
+    REAL(wp), INTENT(IN) :: diam
+    REAL(wp), INTENT(IN) :: rhos
+    REAL(wp), INTENT(IN) :: rhoc
+    REAL(wp), INTENT(IN) :: inv_kin_visc
+
+    REAL(wp) :: Rey
+    REAL(wp) :: inv_sqrt_C_D
+    INTEGER :: i
+    REAL(wp) :: const_part
+    REAL(wp) :: set_vel_old
+
+    inv_sqrt_C_D = 1.0_wp
+
+    IF (rhos <= rhoc) THEN
+       settling_velocity = 0.0_wp
+       RETURN
+    END IF
+
+    const_part = SQRT((4.0_wp / 3.0_wp) * (rhos / rhoc - 1.0_wp) * diam * grav)
+
+    settling_velocity = const_part * inv_sqrt_C_D
+    Rey = diam * settling_velocity * inv_kin_visc
+
+    IF (Rey <= 1000.0_wp) THEN
+       C_D_loop: DO i = 1, 20
+          set_vel_old = settling_velocity
+
+          IF (collective_settling_flag) THEN
+             inv_sqrt_C_D = SQRT(1.0_wp / (24.0_wp * (1.0_wp +               &
+                  0.15_wp * Rey**(0.687_wp)) / Rey +                          &
+                  A_drag * (LOG(Rey) - B_drag)))
+          ELSE
+             inv_sqrt_C_D = SQRT(Rey / (24.0_wp * (1.0_wp +                 &
+                  0.15_wp * Rey**(0.687_wp))))
+          END IF
+
+          settling_velocity = const_part * inv_sqrt_C_D
+
+          IF (ABS(set_vel_old - settling_velocity) / set_vel_old             &
+               < 1.0E-6_wp) THEN
+             RETURN
+          END IF
+
+          Rey = diam * settling_velocity * inv_kin_visc
+       END DO C_D_loop
+    END IF
+
+    RETURN
+
+  END FUNCTION settling_velocity
 
   !******************************************************************************
   !> \brief Select the fluid properties used by the settling calculation.
