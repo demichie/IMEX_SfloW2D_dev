@@ -27,8 +27,7 @@
 !> \ref eval_lahar_implicit_momentum_rate evaluates the viscous/turbulent drag and
 !> \ref eval_lahar_semi_implicit_momentum_rate evaluates the yield-stress term. The
 !> real and complex overloads of \ref eval_lahar_fluid_viscosity implement
-!> the same fluid-viscosity correlation, while
-!> \ref eval_lahar_deposition_rate supplies the capped settling rate.
+!> the same fluid-viscosity correlation.
 !> \ref solve_lahar_analytic_velocity integrates the frozen polynomial
 !> velocity source with depth, temperature and concentration explicit.
 !********************************************************************************
@@ -48,7 +47,7 @@ MODULE rheology_lahar_2d
 
   PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
   PUBLIC :: eval_lahar_fluid_viscosity, eval_lahar_implicit_momentum_rate
-  PUBLIC :: eval_lahar_semi_implicit_momentum_rate, eval_lahar_deposition_rate
+  PUBLIC :: eval_lahar_semi_implicit_momentum_rate
   PUBLIC :: solve_lahar_analytic_velocity
 
   REAL(wp) :: alpha2
@@ -189,29 +188,6 @@ CONTAINS
     fluid_viscosity = alpha1 * EXP(beta1 * solid_fraction_sum)
 
   END FUNCTION eval_lahar_fluid_viscosity_complex
-
-  !******************************************************************************
-  !> \brief Evaluate the deposition-limited settling rate.
-  !> \details Caps the settling flux by the amount of solid available in the
-  !> flow during the current time step:
-  !> \f$D=\min(Cw_s,hC/\Delta t)\f$.
-  !> \param solid_fraction Solid volume fraction.
-  !> \param settling_velocity Settling velocity.
-  !> \param flow_depth Flow depth.
-  !> \param time_step Time-step size.
-  !> \return Deposition rate per unit area.
-  !******************************************************************************
-  PURE FUNCTION eval_lahar_deposition_rate(solid_fraction, settling_velocity, &
-       flow_depth, time_step) RESULT(deposition_rate)
-
-    REAL(wp), INTENT(IN) :: solid_fraction, settling_velocity
-    REAL(wp), INTENT(IN) :: flow_depth, time_step
-    REAL(wp) :: deposition_rate
-
-    deposition_rate = MIN(solid_fraction * settling_velocity,                 &
-         flow_depth * solid_fraction / time_step)
-
-  END FUNCTION eval_lahar_deposition_rate
 
   !******************************************************************************
   !> \brief Evaluate the implicit viscous and turbulent lahar source.

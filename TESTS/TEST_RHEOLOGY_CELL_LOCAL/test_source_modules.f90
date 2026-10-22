@@ -7,6 +7,7 @@ PROGRAM test_source_modules
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                &
        eval_lava_cooling_source, eval_mass_exchange_thermal_energy,            &
        eval_vaporization_sources
+  USE mass_exchange_laws_2d, ONLY : eval_lahar_deposition_rate
 
   IMPLICIT NONE
 
@@ -28,6 +29,11 @@ PROGRAM test_source_modules
   solid_heat_capacity = [800.0_wp, 900.0_wp]
   deposition_rate = [0.01_wp, 0.02_wp]
   erosion_rate = [0.003_wp, 0.004_wp]
+
+  actual = eval_lahar_deposition_rate(0.2_wp, 0.5_wp, 2.0_wp, 0.5_wp)
+  CALL assert_close(actual, 0.1_wp, 'lahar settling-limited deposition')
+  actual = eval_lahar_deposition_rate(0.2_wp, 0.5_wp, 0.02_wp, 0.5_wp)
+  CALL assert_close(actual, 0.008_wp, 'lahar available-mass deposition cap')
 
   actual = eval_inlet_thermal_energy_source(0.5_wp, 0.02_wp, 1200.0_wp,       &
        800.0_wp, 500.0_wp)

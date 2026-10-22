@@ -31,6 +31,7 @@ gfortran -O0 -g -Wall -Wextra -fopenmp -fcheck=all -fbacktrace -I"$repo_dir/src/
     "$repo_dir/src/rheology/rheology_2d.f90" \
     "$repo_dir/src/physics/thermal_laws_2d.f90" \
     "$repo_dir/src/physics/pore_pressure_laws_2d.f90" \
+    "$repo_dir/src/physics/mass_exchange_laws_2d.f90" \
     "$repo_dir/src/physics/equation_terms_2d.f90" \
     "$repo_dir/src/geometry/domain_2d.f90" \
     "$repo_dir/src/state/state_2d.f90" \

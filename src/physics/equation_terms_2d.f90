@@ -26,8 +26,8 @@ MODULE equation_terms_2d
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                 &
        eval_lava_cooling_source, eval_mass_exchange_thermal_energy,              &
        eval_vaporization_sources
-  USE rheology_lahar_2d, ONLY : eval_lahar_deposition_rate,                  &
-       eval_lahar_fluid_viscosity
+  USE mass_exchange_laws_2d, ONLY : eval_lahar_deposition_rate
+  USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
 
   USE equation_metadata_2d, ONLY : equation_partition_type,                   &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON

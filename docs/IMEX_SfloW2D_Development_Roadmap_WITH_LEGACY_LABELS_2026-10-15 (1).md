@@ -2096,18 +2096,27 @@ responsabilità fisica appropriata.
 
 **D16.4 — Relocation dei moduli.** Rinominare e organizzare i moduli in `thermal_laws_2d`, `mass_exchange_laws_2d`, `pore_pressure_laws_2d` e `rheology_laws`. Aggiornare `USE`, Makefile, liste di build, Doxygen e test. La relocation deve essere scientificamente neutra.
 
-Prime relocation completate: `thermal_sources_2d.f90` è ora
+Relocation completate: `thermal_sources_2d.f90` è ora
 `thermal_laws_2d.f90` e `pore_pressure_2d.f90` è ora
 `pore_pressure_laws_2d.f90`; i `USE`, il Makefile e i runner/test coinvolti
 sono aggiornati. `TEST_RHEOLOGY_CELL_LOCAL` passa in strict e optimized e
 `TEST_IMEX_STAGES` passa in entrambi i profili. Restano da estrarre le leggi
 di scambio di massa e organizzare i moduli reologici in `rheology_laws/`.
+È stato creato `mass_exchange_laws_2d` e vi è stata trasferita la legge di
+deposizione limitata lahar; il trasferimento delle altre formule è ancora
+in corso.
 
 **D16.5 — Rinomina delle routine.** Applicare `eval_<modello>_<trattamento>_<quantità>`, usare `momentum_rate` per i rate reologici e sostituire `semi_impl` con `semi_implicit`. Usare `rate` soltanto per quantità effettivamente riferite al tempo.
 
 **D16.6 — Riorganizzazione termica.** Rinominare l’integratore analitico della temperatura, separare rate di massa ed energia della vaporizzazione e mantenere l’assemblaggio energetico degli scambi in `equation_terms_2d`.
 
 **D16.7 — Riorganizzazione dello scambio di massa.** Spostare le formule costitutive in `mass_exchange_laws_2d`, lasciando l’assemblaggio in `equation_terms_2d` e l’applicazione temporale in `time_integration_2d`.
+
+Prima estrazione completata: `eval_lahar_deposition_rate` appartiene ora a
+`mass_exchange_laws_2d`; `equation_terms_2d` mantiene l’assemblaggio e le
+altre formule di erosione, deposizione, perdita del carrier ed entrainment
+restano da estrarre. Il test sorgente copre sia il limite di velocità di
+sedimentazione sia il limite della massa disponibile.
 
 **D16.8 — Aggiornamento per stage o per passo.** Trasferire l’applicazione dell’incremento, degli inventari e dei controlli da `mass_exchange_2d` a `time_integration_2d`; documentare l’ordine rispetto a RK/IMEX, positività, topografia e geometria.
 
