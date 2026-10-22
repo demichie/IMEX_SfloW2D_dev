@@ -1,5 +1,12 @@
 !********************************************************************************
-!> \brief Excess pore-pressure source terms and their local closures.
+!> \brief Excess pore-pressure diffusion and gas-loss source laws.
+!> \details Evaluates Darcy-type excess-pressure diffusion, pore-gas loss,
+!>          pressure sources induced by inlet injection and mass exchange, and
+!>          the constitutive diffusion/inhibition factors shared by those
+!>          calculations. The diffusion routine accepts complex states for
+!>          Jacobian differentiation; a separate real-valued routine provides
+!>          the exact DIRK flow while mixture density, depth, temperature and
+!>          solid fractions are frozen.
 !********************************************************************************
 
 MODULE pore_pressure_2d
@@ -27,6 +34,24 @@ MODULE pore_pressure_2d
 
 CONTAINS
 
+  !******************************************************************************
+  !> \brief Evaluate the excess pore-pressure diffusion source.
+  !> \details For wet cells with nonnegative excess pressure and active pore
+  !>          volume, returns
+  !>          \f$S_p=-\rho_m(\pi/2)^2D p_e I/\max(h_{\mathrm{threshold}},h)\f$.
+  !>          D is the pressure-diffusion coefficient and I is the configured
+  !>          solid-fraction inhibition factor. Complex arguments preserve
+  !>          derivatives for the implicit Jacobian.
+  !> \param[in] flow_depth Flow depth h [m].
+  !> \param[in] temperature Gas/mixture temperature T [K].
+  !> \param[in] mixture_density Mixture density rho_m [kg m^-3].
+  !> \param[in] solid_fractions Per-class solid volume fractions.
+  !> \param[in] excess_pressure Nonnegative excess pore pressure p_e [Pa].
+  !> \param[out] source Conservative pore-pressure diffusion source S_p
+  !>                   [kg^2 m^-3 s^-3].
+  !> \note Returns zero for dry cells, negative excess pressure, absent pore volume, or
+  !>       inactive diffusion closure.
+  !******************************************************************************
   SUBROUTINE eval_pore_pressure_diffusion_source(flow_depth, temperature,      &
        mixture_density, solid_fractions, excess_pressure, source)
 
@@ -59,12 +84,22 @@ CONTAINS
   !******************************************************************************
   !> \brief Advance excess pore pressure analytically over one DIRK integration step.
   !> \details With mixture density, depth, temperature and solid fractions
-  !>          frozen, the transported variable Q_p = rho_m*h*p_e satisfies
-  !>          dQ_p/dt = -lambda*Q_p,
-  !>          where lambda = (pi/2)^2*D*I/(h*max(h_threshold,h)). Therefore the
-  !>          excess pressure is multiplied by exp(-lambda*integration_step).
-  !>          Existing dry, negative-pressure and no-carrier states are unchanged.
-  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !>          frozen, the transported variable
+  !>          \f$Q_p=\rho_m h p_e\f$ satisfies
+  !>          \f$\frac{dQ_p}{dt}=-\lambda Q_p\f$, where
+  !>          \f$\lambda=(\pi/2)^2DI/[h\max(h_{\mathrm{threshold}},h)]\f$.
+  !>          Therefore p_e is multiplied by
+  !>          \f$\exp(-\lambda\,\texttt{integration\_step})\f$.
+  !>          Dry states, nonpositive excess pressure, absent carrier phases and
+  !>          inactive diffusion closures are returned unchanged.
+  !> \param[in] excess_pressure Initial excess pore pressure p_e [Pa].
+  !> \param[in] integration_step Effective DIRK integration interval, normally dt*a_ii [s].
+  !> \param[in] flow_depth Frozen flow depth h [m].
+  !> \param[in] temperature Frozen temperature T [K].
+  !> \param[in] solid_fractions Frozen per-class solid volume fractions.
+  !> \param[out] pressure_after Exact-flow excess pore pressure after the interval [Pa].
+  !> \note Requires finite inputs and a nonnegative integration step. A negative step,
+  !>       nonfinite input, or nonpositive temperature in an active state is fatal.
   !******************************************************************************
   SUBROUTINE advance_pore_pressure_diffusion(excess_pressure, integration_step,&
        flow_depth, temperature, solid_fractions, pressure_after)
@@ -122,6 +157,25 @@ CONTAINS
 
   END SUBROUTINE advance_pore_pressure_diffusion
 
+  !******************************************************************************
+  !> \brief Compute pressure-diffusion and inhibition factors for a local mixture.
+  !> \details Computes gas compressibility and density from the ideal-gas
+  !>          closure, pore volume from phi=1-sum(alpha_i), and the diffusion
+  !>          coefficient
+  !>          \f$D=k/(\phi\nu_g\rho_gC_g)\f$. Permeability may be fixed
+  !>          or evaluated from the Kozeny-Carman mixture closure; the Sutherland
+  !>          viscosity law is used when configured. The inhibition output
+  !>          implements the selected OFF, STEP, STATIC or DYNAMIC closure.
+  !> \param[in] flow_depth Complex-valued flow depth h [m].
+  !> \param[in] temperature Complex-valued gas/mixture temperature T [K].
+  !> \param[in] solid_fractions Complex-valued per-class solid volume fractions.
+  !> \param[out] diffusion_coefficient Pressure-diffusion coefficient D [m^2 s^-1].
+  !> \param[out] inhibition Dimensionless solid-fraction inhibition factor I.
+  !> \param[out] active True when the state has carrier/pore volume for diffusion;
+  !>                    otherwise both returned factors are their neutral defaults.
+  !> \note Real parts select piecewise branches while smooth closure algebra retains
+  !>       complex perturbations for complex-step differentiation.
+  !******************************************************************************
   SUBROUTINE eval_pore_pressure_diffusion_factors(flow_depth, temperature,    &
        solid_fractions, diffusion_coefficient, inhibition, active)
 
@@ -231,6 +285,23 @@ CONTAINS
 
   END SUBROUTINE eval_pore_pressure_diffusion_factors
 
+  !******************************************************************************
+  !> \brief Evaluate the pore-gas loss rate from Darcy outflow.
+  !> \details Computes an upward pore-gas velocity from local permeability,
+  !>          kinematic viscosity, carrier density, flow depth and excess
+  !>          pressure, then multiplies it by the configured solid-fraction
+  !>          inhibition factor. The velocity is
+  !>          \f$v_D=\frac{\pi k p_e}{2\nu_g\rho_c\max(10^{-5}\,\mathrm{m},h)}\f$,
+  !>          and \f$\texttt{gas\_loss}=Iv_D\f$. The dynamic-permeability and Sutherland
+  !>          options use the same mixture closures as pore-pressure diffusion.
+  !> \param[in] flow_depth Flow depth h [m].
+  !> \param[in] temperature Gas temperature T [K].
+  !> \param[in] solid_fractions Per-class solid volume fractions.
+  !> \param[in] total_solid_fraction Sum of solid volume fractions.
+  !> \param[in] carrier_density Carrier-phase density [kg m^-3].
+  !> \param[in] excess_pressure Excess pore pressure p_e [Pa].
+  !> \param[out] gas_loss Inhibited upward carrier-gas loss velocity [m s^-1].
+  !******************************************************************************
   SUBROUTINE eval_pore_pressure_gas_loss(flow_depth, temperature,              &
        solid_fractions, total_solid_fraction, carrier_density, excess_pressure,&
        gas_loss)
@@ -344,6 +415,22 @@ CONTAINS
 
   END SUBROUTINE eval_pore_pressure_gas_loss
 
+  !******************************************************************************
+  !> \brief Compute the excess pore-pressure source associated with inlet injection.
+  !> \details Returns the time-weighted source
+  !>          \f$S_p=c_t\dot{H}\rho_m(q_1f_pg'+p_e)\f$,
+  !>          where \f$q_1=\rho_mh\f$,
+  !>          combining the hydrostatic pressure carried by injected mixture
+  !>          with the injected excess-pressure fraction.
+  !> \param[in] time_coefficient Dimensionless temporal activation or step-averaged weight.
+  !> \param[in] q1 Local mass-per-area/carrier state quantity used by the inlet closure.
+  !> \param[in] pressure_fraction Configured fraction f_p of the injected hydrostatic pressure.
+  !> \param[in] injection_rate Equivalent injected layer-thickness rate Hdot [m s^-1].
+  !> \param[in] mixture_density Density of the injected mixture rho_m [kg m^-3].
+  !> \param[in] reduced_gravity Buoyancy-reduced gravitational acceleration g' [m s^-2].
+  !> \param[in] excess_pressure Local excess pore pressure p_e [Pa].
+  !> \return Conservative excess-pore-pressure source [kg^2 m^-3 s^-3].
+  !******************************************************************************
   PURE FUNCTION eval_pore_pressure_inlet_source(time_coefficient, q1,          &
        pressure_fraction, injection_rate, mixture_density, reduced_gravity,    &
        excess_pressure) RESULT(source)
@@ -363,6 +450,13 @@ CONTAINS
 
   END FUNCTION eval_pore_pressure_inlet_source
 
+  !******************************************************************************
+  !> \brief Compute the excess-pressure source induced by a mass exchange.
+  !> \details Applies the local proportional closure S_p = S_m*p_e.
+  !> \param[in] mass_source Conservative mass source S_m for the exchanged carrier phase.
+  !> \param[in] excess_pressure Local excess pore pressure p_e [Pa].
+  !> \return Excess-pore-pressure equation source [kg^2 m^-3 s^-3].
+  !******************************************************************************
   PURE FUNCTION eval_pore_pressure_mass_exchange_source(mass_source,           &
        excess_pressure) RESULT(source)
 

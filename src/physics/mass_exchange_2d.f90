@@ -1,8 +1,13 @@
 !********************************************************************************
-!> \brief Erosion, deposition and entrainment updates
-!
-!> This module applies mass-exchange terms to the conservative state and
-!> updates the associated deposits, erodible material and topography.
+!> \brief Cell-local erosion, deposition, entrainment and evolving-bed updates.
+!> \details Evaluates cell-local mass-exchange sources through
+!>          equation_terms_2d, applies their conservative-state and material
+!>          inventory increments, and enforces local admissibility of solid
+!>          masses and flow depth. When bed evolution is enabled, limited cell
+!>          elevation-rate proposals are accumulated, projected to the nodal
+!>          bed once per update, and followed by a refresh of derived geometry.
+!>          The persistent work arrays belong to this module and can be
+!>          released explicitly when a simulation is finalized.
 !
 !********************************************************************************
 
@@ -44,13 +49,21 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Advance cell-local mass exchange and optionally update the shared nodal bed.
-  !>
-  !>
-  !> \param[in,out] q Cell-centered conservative states, indexed as (variable,x-cell,y-cell).
-  !> \param[in,out] qp Canonical physical states: h, hu, hv, T, component mass fractions, then
-  !>                   appended u and v.
-  !> \param[in] dt Time increment [s].
-  !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
+  !> \details For each active solve cell, reconstructs the physical state,
+  !>          evaluates erosion/deposition/entrainment and related sources,
+  !>          applies q <- q + dt*eqns_term, and updates deposit and erodible
+  !>          inventories. Small negative solid masses are clipped to zero;
+  !>          materially inadmissible total or solid mass raises a fatal error.
+  !>          If topography changes, each limited cell bed-rate proposal is
+  !>          projected to vertices and integrated once after the cell loop:
+  !>          B_vertex <- B_vertex + dt*topography_rate_vertex.
+  !> \param[in,out] q Cell-centered conservative state [variable,x-cell,y-cell]; updated by
+  !>                  the mass-exchange equation source.
+  !> \param[in,out] qp Cell-centered physical state with h, temperature, component fractions,
+  !>                   and appended velocity components; refreshed for solved cells.
+  !> \param[in] dt Physical time increment [s].
+  !> \param[in] domain Domain descriptor containing the active solve-cell count and the
+  !>                  corresponding j_cent/k_cent cell indices.
   !******************************************************************************
 
   SUBROUTINE update_erosion_deposition_cell(q, qp, dt, domain)
@@ -258,12 +271,14 @@ CONTAINS
   END SUBROUTINE update_erosion_deposition_cell
 
   !******************************************************************************
-  !> \brief Allocate or resize the persistent evolving-bed proposal arrays.
+  !> \brief Ensure that persistent evolving-bed proposal arrays match the current grid.
+  !> \details Allocates the cell-rate and vertex-rate arrays on first use. If
+  !>          the computational grid dimensions changed, releases the old
+  !>          arrays before allocating storage with the current dimensions.
+  !>          Existing proposals are not preserved across a resize.
   !>
-  !> Allocate the evolving-topography workspace once per grid.
-  !>
-  !> \note Uses current grid dimensions to allocate/resize private topography_rate_cell and
-  !>       topography_rate_vertex.
+  !> \note Uses comp_cells_x/comp_cells_y and comp_interfaces_x/comp_interfaces_y;
+  !>       this routine has no arguments or return value.
   !******************************************************************************
 
   SUBROUTINE ensure_topography_workspace
@@ -291,14 +306,13 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Project cell bed rates to vertices and refresh the derived geometry.
-  !>
-  !> Only B_vertex is advanced. All center, face, slope and curvature fields
-  !> are regenerated once from that authoritative nodal bed after the update.
-  !>
+  !> \details Projects the already limited topography_rate_cell field onto
+  !>          vertices, advances the authoritative nodal bed by
+  !>          dt*topography_rate_vertex, and regenerates all dependent
+  !>          center, face, slope and curvature fields.
   !> \param[in] dt Time increment [s].
-  !>
-  !> \note Reads the already limited topography_rate_cell proposals; changes B_vertex and refreshes
-  !>       all dependent geometric fields after the update.
+  !> \note Requires the evolving-bed workspace to have been allocated and populated by
+  !>       update_erosion_deposition_cell.
   !******************************************************************************
 
   SUBROUTINE apply_vertex_first_topography_update(dt)
@@ -323,11 +337,13 @@ CONTAINS
 
   END SUBROUTINE apply_vertex_first_topography_update
 
-  ! Idempotent release of the lazy evolving-bed workspace.
-  !> \brief Release the persistent evolving-bed arrays if they are allocated.
-  !>
-  !> \note Releases private topography-rate arrays without changing B_vertex. Repeated calls are
-  !>       safe.
+  !******************************************************************************
+  !> \brief Release the persistent evolving-bed proposal arrays.
+  !> \details Deallocates the private cell- and vertex-rate work arrays when
+  !>          allocated. It does not modify the authoritative bed or derived
+  !>          geometry, and repeated calls are safe.
+  !> \note This routine has no arguments or return value.
+  !******************************************************************************
 
   SUBROUTINE release_topography_workspace
     IF (ALLOCATED(topography_rate_cell)) DEALLOCATE(topography_rate_cell)

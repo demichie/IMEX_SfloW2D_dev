@@ -1,7 +1,12 @@
 !********************************************************************************
-!> \brief General thermal source terms for the depth-averaged equations.
-!> \details Provides an independent exact scalar ODE flow for lava cooling;
-!>          callers decide whether and how to use it.
+!> \brief Thermal source laws and exact scalar cooling integration.
+!> \details Provides thermal-energy sources for inlet injection, mass exchange
+!>          and vaporization, as well as the lava radiative/convective cooling
+!>          law. The module also advances the autonomous lava temperature
+!>          equation exactly over a requested DIRK integration interval by
+!>          evaluating an analytic time-temperature primitive and inverting it.
+!>          These routines do not select a time-integration scheme; callers
+!>          decide where and how each source or exact flow is applied.
 !********************************************************************************
 
 MODULE thermal_sources_2d
@@ -22,6 +27,19 @@ MODULE thermal_sources_2d
 
 CONTAINS
 
+  !******************************************************************************
+  !> \brief Compute the sensible thermal-energy source from injected material.
+  !> \details Returns
+  !>          \f$S_T=c_t\dot{H}\rho_m c_{p,m}T_s\f$,
+  !>          the injected material's enthalpy rate per unit horizontal area.
+  !> \param[in] time_coefficient Dimensionless temporal activation or step-averaged source weight.
+  !> \param[in] injection_rate Equivalent injected layer-thickness rate [m s^-1].
+  !> \param[in] mixture_density Density of the injected mixture [kg m^-3].
+  !> \param[in] mixture_heat_capacity Specific heat capacity of the injected mixture
+  !>                                  [J kg^-1 K^-1].
+  !> \param[in] source_temperature Temperature of the injected material [K].
+  !> \return Thermal-energy source per unit area [W m^-2].
+  !******************************************************************************
   PURE FUNCTION eval_inlet_thermal_energy_source(time_coefficient, injection_rate, &
        mixture_density, mixture_heat_capacity, source_temperature) RESULT(source)
 
@@ -37,6 +55,18 @@ CONTAINS
 
   END FUNCTION eval_inlet_thermal_energy_source
 
+  !******************************************************************************
+  !> \brief Evaluate the lava radiative and convective cooling source.
+  !> \details Uses the net Stefan-type radiation and linear convection law
+  !>          \f$S_T=-k_r(T^4-T_a^4)-k_c(T-T_a)\f$.
+  !>          The complex temperature argument preserves complex-step
+  !>          derivatives used by the implicit solver.
+  !> \param[in] temperature Current lava temperature, real or complex [K].
+  !> \param[in] radiative_coefficient Radiative coefficient k_r [W m^-2 K^-4].
+  !> \param[in] convective_coefficient Convective coefficient k_c [W m^-2 K^-1].
+  !> \param[in] ambient_temperature Ambient temperature T_a [K].
+  !> \return Net cooling energy source per unit area [W m^-2].
+  !******************************************************************************
   PURE FUNCTION eval_lava_cooling_source(temperature, radiative_coefficient,   &
        convective_coefficient, ambient_temperature) RESULT(source)
 
@@ -56,8 +86,19 @@ CONTAINS
   !> \details Separates the autonomous temperature equation and evaluates its
   !>          analytic time-temperature primitive. A bisection inversion finds
   !>          the temperature after the requested DIRK integration step. The
-  !>          areal thermal capacity and cooling coefficients are held fixed.
-  !> \param integration_step Effective DIRK integration step (dt * a_ii).
+  !>          areal thermal capacity and cooling coefficients are held fixed:
+  !>          \f$C_A\frac{dT}{dt}=-k_r(T^4-T_a^4)-k_c(T-T_a)\f$.
+  !>          The result is constrained to the closed interval between the
+  !>          initial and ambient temperatures.
+  !> \param[in] temperature Initial lava temperature T(0) [K].
+  !> \param[in] integration_step Effective DIRK integration interval, normally dt*a_ii [s].
+  !> \param[in] areal_heat_capacity Areal heat capacity C_A [J m^-2 K^-1].
+  !> \param[in] radiative_coefficient Radiative cooling coefficient k_r [W m^-2 K^-4].
+  !> \param[in] convective_coefficient Convective cooling coefficient k_c [W m^-2 K^-1].
+  !> \param[in] ambient_temperature Ambient temperature T_a [K].
+  !> \param[out] temperature_after Exact-flow temperature after integration_step [K].
+  !> \note Requires finite inputs, positive initial and ambient temperatures, positive heat
+  !>       capacity, nonnegative integration step, and nonnegative cooling coefficients.
   !******************************************************************************
   SUBROUTINE advance_lava_cooling_temperature(temperature, integration_step,    &
        areal_heat_capacity, radiative_coefficient, convective_coefficient,     &
@@ -179,6 +220,13 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Find the unique real root below -1 of the normalized cooling cubic.
+  !> \details For beta >= 0, solves
+  !>          \f$r^3+r^2+r+(1+\beta)=0\f$ by bisection on the unique real root
+  !>          \f$r<-1\f$.
+  !>          This root factors the normalized quartic cooling polynomial.
+  !> \param[in] beta Nonnegative ratio k_c/(k_r*T_a^3).
+  !> \param[out] root Unique real cubic root below -1.
+  !> \note For beta=0, the root is exactly -1.
   !******************************************************************************
   SUBROUTINE lava_cooling_cubic_root(beta, root)
 
@@ -216,6 +264,13 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Evaluate the analytic primitive for the normalized cooling law.
+  !> \details Returns an antiderivative of
+  !>          \f$1/[(1-x)(x^3+x^2+x+1+\beta)]\f$, used to convert temperature
+  !>          change into elapsed dimensionless time in the lava cooling ODE.
+  !> \param[in] x Positive temperature ratio T/T_a, with x != 1.
+  !> \param[in] beta Nonnegative ratio k_c/(k_r*T_a^3).
+  !> \param[in] cubic_root Unique real root below -1 of the normalized cubic.
+  !> \return Analytic primitive value, up to an irrelevant additive constant.
   !******************************************************************************
   PURE FUNCTION lava_cooling_time_primitive(x, beta, cubic_root) RESULT(value)
 
@@ -245,6 +300,34 @@ CONTAINS
 
   END FUNCTION lava_cooling_time_primitive
 
+  !******************************************************************************
+  !> \brief Compute the thermal-energy source associated with mass exchange.
+  !> \details Accounts for energy removed with deposited solids and lost carrier
+  !>          material, energy supplied by eroded solids and carrier material,
+  !>          and ambient-air entrainment:
+  !>          \f[
+  !>          S_T=-T_f\left(\sum_i\rho_i c_iD_i+\rho_c c_cL_c\right)
+  !>              +T_s\left(\sum_i\rho_i c_iE_i+\rho_{sc}c_cE_c\right)
+  !>              +T_a c_a\rho_aE_a.
+  !>          \f]
+  !> \param[in] flow_temperature Temperature of the flowing mixture T_f [K].
+  !> \param[in] solid_density Per-class solid densities rho_i [kg m^-3].
+  !> \param[in] solid_heat_capacity Per-class solid specific heat capacities c_i [J kg^-1 K^-1].
+  !> \param[in] deposition_rate Per-class deposition thickness rates D_i [m s^-1].
+  !> \param[in] erosion_rate Per-class solid erosion thickness rates E_i [m s^-1].
+  !> \param[in] carrier_density Flow carrier density rho_c [kg m^-3].
+  !> \param[in] carrier_heat_capacity Carrier specific heat capacity c_c [J kg^-1 K^-1].
+  !> \param[in] carrier_loss_rate Carrier-layer loss rate L_c [m s^-1].
+  !> \param[in] substrate_temperature Substrate temperature T_s for incoming eroded material [K].
+  !> \param[in] substrate_carrier_density Carrier density of the substrate material rho_sc
+  !>                                      [kg m^-3].
+  !> \param[in] carrier_erosion_rate Carrier-layer erosion/entrainment rate E_c [m s^-1].
+  !> \param[in] ambient_temperature Ambient-air temperature T_a [K].
+  !> \param[in] air_heat_capacity Ambient-air specific heat capacity c_a [J kg^-1 K^-1].
+  !> \param[in] ambient_air_density Ambient-air density rho_a [kg m^-3].
+  !> \param[in] air_entrainment_rate Ambient-air entrainment rate E_a [m s^-1].
+  !> \return Net mass-exchange thermal-energy source per unit area [W m^-2].
+  !******************************************************************************
   PURE FUNCTION eval_mass_exchange_thermal_energy(flow_temperature,            &
        solid_density, solid_heat_capacity, deposition_rate, erosion_rate,      &
        carrier_density, carrier_heat_capacity, carrier_loss_rate,              &
@@ -278,6 +361,26 @@ CONTAINS
 
   END FUNCTION eval_mass_exchange_thermal_energy
 
+  !******************************************************************************
+  !> \brief Compute vapor mass and sensible-energy sources from hot-solid deposition.
+  !> \details Deposition heat above the boiling point supplies liquid warming
+  !>          and latent vaporization energy. The generated steam rate is
+  !>          multiplied by the configured steam fraction; its energy source is
+  !>          evaluated at the boiling temperature:
+  !>          \f[
+  !>          \dot{m}_v=\frac{f_v\max(0,T_f-T_b)\sum_i\rho_i c_iD_i}
+  !>                         {c_l(T_b-T_l)+L_v},\qquad
+  !>          S_v=\dot{m}_v c_gT_b.
+  !>          \f]
+  !> \param[in] flow_temperature Flow temperature T_f [K].
+  !> \param[in] solid_density Per-class solid densities rho_i [kg m^-3].
+  !> \param[in] solid_heat_capacity Per-class solid specific heat capacities c_i [J kg^-1 K^-1].
+  !> \param[in] deposition_rate Per-class deposition thickness rates D_i [m s^-1].
+  !> \param[in] steam_fraction Fraction f_v of the available deposition heat assigned to vapor.
+  !> \param[in] gas_heat_capacity Steam specific heat capacity c_g [J kg^-1 K^-1].
+  !> \param[out] vapor_mass_rate Generated vapor mass rate per unit area [kg m^-2 s^-1].
+  !> \param[out] vapor_energy_source Vapor sensible-energy source per unit area [W m^-2].
+  !******************************************************************************
   PURE SUBROUTINE eval_vaporization_sources(flow_temperature, solid_density,    &
        solid_heat_capacity, deposition_rate, steam_fraction, gas_heat_capacity,&
        vapor_mass_rate, vapor_energy_source)

@@ -1,8 +1,15 @@
 !********************************************************************************
-!> \brief Model-specific equation terms
-!>
-!> Provides inertial fluxes, characteristic bounds, hydrostatic coefficients and cell-local source
-!> laws. Spatial path assembly and time integration remain in their dedicated modules.
+!> \brief Physical fluxes and source terms for the depth-averaged equations.
+!> \details Provides the equation-partition metadata, inertial transport flux,
+!>          characteristic wave-speed bounds, hydrostatic coefficients, bed
+!>          curvature sources, and explicit, implicit, semi-implicit and
+!>          mass-exchange source vectors. It also evaluates inlet states and
+!>          exact step-averaged activation coefficients for periodic, interval
+!>          and fissure sources. Rheology, pore-pressure and thermal laws are
+!>          delegated to their owning physics modules. Spatial path assembly
+!>          and time integration remain in their dedicated modules.
+!>          The module retains private per-step source-window coefficients
+!>          between set_source_time_coefficients and eval_expl_terms.
 !********************************************************************************
 
 MODULE equation_terms_2d
@@ -90,7 +97,8 @@ CONTAINS
   !> \param[in] Bsecond_yy Filtered bed Hessian yy entry [m^-1].
   !> \param[in] velocity_x Cartesian depth-averaged x velocity [m s^-1].
   !> \param[in] velocity_y Cartesian depth-averaged y velocity [m s^-1].
-  !> \return Signed bed-curvature acceleration u^T Hessian(B) u [m s^-2].
+  !> \return Signed bed-curvature acceleration
+  !>         \f$a_{\mathrm{curv}}=B_{xx}u^2+2B_{xy}uv+B_{yy}v^2\f$ [m s^-2].
   !******************************************************************************
 
   PURE FUNCTION curvature_acceleration( Bsecond_xx, Bsecond_xy, Bsecond_yy,   &
@@ -109,7 +117,8 @@ CONTAINS
   !******************************************************************************
   !> \brief Evaluate the bed-curvature contribution to both momentum equations.
   !>
-  !> Implements S_curv = -G_c M a_curv grad(B), independently of the HP path.
+  !> Implements \f$\mathbf{S}_{\mathrm{curv}}=-G_cM
+  !> a_{\mathrm{curv}}\nabla B\f$, independently of the hydrostatic path.
   !>
   !> \param[in] Bprime_x Filtered bed derivative dB/dx [dimensionless].
   !> \param[in] Bprime_y Filtered bed derivative dB/dy [dimensionless].
@@ -147,8 +156,13 @@ CONTAINS
   !> Bound the signed sum of all independently transported component-mass
   !> fluxes by the signed total-mixture mass flux. A single common factor
   !> preserves the relative component proportions.
+  !> If the signed component sum exceeds the total flux in its direction, each
+  !> component flux is multiplied by |F_total/F_components|; all other flux
+  !> components are left unchanged.
   !>
-  !> \param[in,out] flux Conservative flux vector, one entry per balance equation.
+  !> \param[in,out] flux Conservative flux vector [equation]; its solid, additional-gas and,
+  !>                  when both gas and liquid phases are enabled, liquid components may be
+  !>                  scaled in place.
 
   SUBROUTINE limit_component_mass_flux(flux)
 
@@ -175,13 +189,17 @@ CONTAINS
   !******************************************************************************
   !> \brief Classify the configured equations as explicit or implicit.
   !
-  !> This subroutine set the number and the flags of the non-hyperbolic
-  !> terms.
+  !> Builds the compact equation partition consumed by the local implicit
+  !> solver. The two momentum equations are implicit; lava temperature is
+  !> implicit for the lava rheology, pore pressure is implicit when enabled,
+  !> and transported solid-component equations remain explicit.
   !> \date 07/09/2012
   !>
-  !> \param[in,out] equation_partition Explicit/implicit equation mask and compact index maps.
+  !> \param[in,out] equation_partition Equation descriptor initialized with the implicit mask
+  !>                                   and compact explicit/implicit index maps.
   !>
-  !> \note Reads shared model flags and writes the supplied equation-partition descriptor.
+  !> \note Reads the configured rheology and pore-pressure flags; writes the supplied descriptor
+  !>       and reports the number of implicit equations.
   !******************************************************************************
 
   SUBROUTINE init_problem_param( equation_partition )
@@ -223,11 +241,18 @@ CONTAINS
 
 
   !> \brief Shared characteristic-speed calculation for a Cartesian direction.
-  !> \param[in] qpj Local physical state with component mass fractions.
-  !> \param[in] grav_coeff Large-slope gravity factor at this state location.
-  !> \param[in] normal_velocity_index Index of the velocity normal to the direction.
+  !> \details Uses the shallow-flow eigenvalue bounds
+  !>          \f$\lambda_{\min,\max}=u_n\mp\sqrt{Gg'h}\f$. If the radicand is
+  !>          negative, both bounds are set to u_n; a zero radicand also gives
+  !>          equal bounds.
+  !> \param[in] qpj Local physical state of length n_vars+2: depth, temperature, component
+  !>                fractions and appended x/y velocities.
+  !> \param[in] grav_coeff Large-slope gravity factor G at the state location.
+  !> \param[in] normal_velocity_index Index of the normal velocity in qpj (idx_u for x,
+  !>                                  idx_v for y).
   !> \param[out] vel_min Lower characteristic speed [m s^-1].
   !> \param[out] vel_max Upper characteristic speed [m s^-1].
+  !> \note normal_velocity_index must identify one of the two Cartesian velocity components.
   SUBROUTINE eval_local_speeds_direction(qpj,grav_coeff,normal_velocity_index, &
        vel_min,vel_max)
     REAL(wp), INTENT(IN) :: qpj(n_vars+2), grav_coeff
@@ -254,12 +279,13 @@ CONTAINS
   !******************************************************************************
   !> \brief Derive reduced gravity and the pressure coefficient Gamma from a physical state.
   !>
-  !> Gamma=rho_m*g' is recomputed from the final reconstructed primitive state;
+  !> \f$\Gamma=\rho_mg'\f$ is recomputed from the final reconstructed primitive state;
   !> no derived thermodynamic quantity is reconstructed independently.
   !>
   !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
   !> \param[out] reduced_gravity Buoyancy-reduced gravitational acceleration g prime [m s^-2].
-  !> \param[out] gamma Hydrostatic coefficient Gamma=rho_m*g prime.
+  !> \param[out] gamma Hydrostatic pressure coefficient \f$\Gamma=\rho_mg'\f$
+  !>                   [kg m^-2 s^-2].
   !******************************************************************************
 
   SUBROUTINE eval_hydrostatic_coefficient(qpj,reduced_gravity,gamma)
@@ -282,6 +308,8 @@ CONTAINS
   !> Every retained conservative component is transported by the normal face
   !> velocity.  Hydrostatic pressure is represented exclusively by the path
   !> contribution and must not appear in this flux.
+  !> The flux is \f$\mathbf{F}_n=u_n\mathbf{q}_c\f$ for h>0 and is zero for a
+  !> dry state.
   !>
   !> \param[in] qcj Local conservative state vector associated with qpj.
   !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
@@ -316,19 +344,18 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Evaluate cell-local explicit sources, including configured inlet and thermal terms.
-  !
-  !> This subroutine evaluates the cell-local sources treated explicitly
-  !> in the IMEX scheme. Hydrostatic pressure and bed forcing belong to the
-  !> spatial path operator, not to this local-source evaluation. The sign of the
-  !> terms is taken with the terms on the right-hand side of the equations.
-  !> Curvature is evaluated only above the shared dry-depth threshold; positive
-  !> conservative mass below that threshold is retained, as are other sources.
+  !> \details Returns the right-hand-side source vector for explicit cell-local
+  !>          physics. It includes the velocity-dependent bed-curvature term
+  !>          and any active bottom-radial, fissural or lateral-radial inlet
+  !>          sources, including their mass, momentum, thermal, component and
+  !>          pore-pressure contributions. Hydrostatic pressure and ordinary
+  !>          bed-slope forcing are represented by the spatial path operator.
+  !>          Curvature is suppressed below dry_thickness_tolerance without
+  !>          discarding positive conservative mass or disabling injection.
+  !>          If step-averaged source coefficients have been set, those
+  !>          coefficients replace pointwise window evaluation.
   !> \date 2019/12/13
-  !
-  !> @author
-  !> Mattia de' Michieli Vitturi
-  !
-  !>
+  !> @author Mattia de' Michieli Vitturi
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[in] Bsecondj_xx Filtered cell bed derivative d^2B/dx^2 [m^-1].
@@ -371,15 +398,15 @@ CONTAINS
     REAL(wp), INTENT(IN) :: Bsecondj_yy
     REAL(wp), INTENT(IN) :: grav_coeff
 
-    REAL(wp), INTENT(IN) :: qpj(n_vars+2)      !< local physical variables
-    REAL(wp), INTENT(OUT) :: expl_term(n_eqns) !< local explicit forces
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2)
+    REAL(wp), INTENT(OUT) :: expl_term(n_eqns)
 
     REAL(wp), INTENT(IN) :: time
     REAL(wp), INTENT(IN) :: cell_fract_jk
       REAL(wp), INTENT(IN) :: cell_fissure_fract(:)
 
-    !> Lateral radial-source per-cell geometry. Pass 0 to disable the lateral
-    !> injection.
+    ! Lateral radial-source per-cell geometry. Pass 0 to disable the lateral
+    ! injection.
     REAL(wp), INTENT(IN) :: lat_arc_perim_jk
     REAL(wp), INTENT(IN) :: lat_n_x_jk
     REAL(wp), INTENT(IN) :: lat_n_y_jk
@@ -777,17 +804,18 @@ CONTAINS
   END SUBROUTINE eval_expl_terms
 
   !******************************************************************************
-  !> \brief Average the time windows of the sources over one time step.
-  !>
-  !> The explicit terms are evaluated with the time at the start of the step
-  !> in every stage. A point value of a source window therefore integrates its
-  !> ramps with an error of order rate*dt/2, and a step that starts at the end
-  !> of a window or crosses it injects at the full rate. The mean of each
-  !> window over [time, time+dt], from its exact integral, makes every step
-  !> inject what the window prescribes; a step on a plateau gets exactly 1.
+  !> \brief Cache exact step-mean coefficients for configured inlet sources.
+  !> \details Computes the mean source activation over [time,time+dt] rather
+  !>          than sampling a ramp at a single time. Bottom radial and fissure
+  !>          windows use their configured pulse phases; the lateral radial
+  !>          window also honors its absolute cutoff and cosine ramps. Variable
+  !>          bottom-source velocity intervals are averaged separately.
+  !>          The resulting private coefficients are consumed by
+  !>          eval_expl_terms during the current step.
   !>
   !> \param[in] time Time at the start of the step [s].
   !> \param[in] dt Length of the step [s].
+  !> \note A nonpositive dt leaves the cached coefficients unchanged. No value is returned.
   !******************************************************************************
 
   SUBROUTINE set_source_time_coefficients( time , dt )
@@ -859,6 +887,7 @@ CONTAINS
   !> \param[in] cosine Cosine ramps when true, linear ramps otherwise.
   !> \param[in] cutoff Time from which the window is 0 [s].
   !> \return Mean coefficient over the step.
+  !> \note Assumes per > 0 and dt > 0; the result is clipped to [0,1].
   !******************************************************************************
 
   REAL(wp) FUNCTION window_mean( v0 , dt , per , act , ramp , cosine , cutoff )
@@ -928,6 +957,8 @@ CONTAINS
   !> \param[in] ramp Ramp time [s].
   !> \param[in] cosine Cosine ramps when true, linear ramps otherwise.
   !> \return Integral of the coefficient [s].
+  !> \note The limits are expected to satisfy 0 <= a <= b. A nonpositive ramp selects
+  !>       a rectangular window.
   !******************************************************************************
 
   REAL(wp) FUNCTION window_integral( a , b , act , ramp , cosine )
@@ -1001,6 +1032,7 @@ CONTAINS
   !> \param[in] t0 Start of the step [s].
   !> \param[in] dt Length of the step [s].
   !> \return Mean velocity over the step [m s^-1].
+  !> \note Uses the configured interval start times and velocities; a positive dt is required.
   !******************************************************************************
 
   REAL(wp) FUNCTION interval_mean_velocity( t0 , dt )
@@ -1045,30 +1077,31 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Evaluate stiff cell-local sources in the real or complex state path.
-  !
-  !> This subroutine evaluates the source terms  of the system of equations,
-  !> both for real or complex inputs, that are treated implicitely in the DIRK
-  !> numerical scheme.
+  !> \details Dispatches the configured implicit rheology law and lava cooling
+  !>          source, and evaluates pore-pressure diffusion when enabled. The
+  !>          selected result is an equation-sized right-hand-side vector.
+  !>          Supply either the real state/output pair or the complex
+  !>          state/output pair. The complex path preserves smooth complex-step
+  !>          derivatives for the Newton Jacobian; piecewise branches are
+  !>          selected using real state values.
   !> \date 01/06/2012
-  !
-  !> @author
-  !> Mattia de' Michieli Vitturi
-  !
-  !>
+  !> @author Mattia de' Michieli Vitturi
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
-  !> \param[in] c_qj Optional complex conservative state used for complex-step source derivatives.
-  !> \param[out] c_nh_term_impl Optional complex implicit-source vector corresponding to c_qj.
-  !> \param[in] r_qj Real conservative cell state.
-  !> \param[out] r_nh_term_impl Optional real implicit-source vector corresponding to r_qj.
+  !> \param[in] c_qj Optional complex conservative cell state [variable], used for complex-step
+  !>                 source derivatives.
+  !> \param[out] c_nh_term_impl Optional complex implicit-source vector [equation] corresponding
+  !>                            to c_qj.
+  !> \param[in] r_qj Optional real conservative cell state [variable].
+  !> \param[out] r_nh_term_impl Optional real implicit-source vector [equation] corresponding
+  !>                            to r_qj.
   !>
-  !> \note Provide either the paired real input/output arguments or the paired complex arguments.
-  !>       The complex path is used by the Newton Jacobian, not by time advancement.
-  !>       Pore diffusion decodes its state independently of the rheology flag.
-  !>       Dry/negative-pressure states, absent pore volume, and dynamic permeability
-  !>       without solids contribute no pressure relaxation. Smooth closure algebra
-  !>       retains complex perturbations; only branch selection uses real parts.
+  !> \note Provide exactly one complete input/output pair: c_qj with c_nh_term_impl, or r_qj
+  !>       with r_nh_term_impl. Zij is the effective stochastic fluctuation passed to rheology
+  !>       closures. Pore diffusion is evaluated independently of the rheology flag; dry or
+  !>       negative-pressure states, absent pore volume, and dynamic permeability without
+  !>       solids contribute no pressure relaxation.
   !******************************************************************************
 
   SUBROUTINE eval_implicit_terms( Bprimej_x, Bprimej_y, Zij, c_qj,              &
@@ -1212,16 +1245,15 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Evaluate semi-implicit rheology and geometric source contributions.
-  !
-  !> This subroutine evaluates the non-hyperbolic terms that are solved
-  !> semi-implicitely by the solver. For example, any discontinuous term that
-  !> appears in the friction terms.
+  !> \details Dispatches the semi-implicit part of the configured rheology law
+  !>          for the supplied physical state and returns it in the momentum
+  !>          equations of an otherwise zero equation-sized source vector.
+  !>          The selected law may use bed slope, bed curvature, reduced
+  !>          gravity, pore pressure, solid fractions and the effective
+  !>          stochastic variable. A dry cell or exact rest state contributes
+  !>          zero, avoiding undefined velocity norms or divisions.
   !> \date 20/01/2018
-  !
-  !> @author
-  !> Mattia de' Michieli Vitturi
-  !
-  !>
+  !> @author Mattia de' Michieli Vitturi
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[in] Bsecondj_xx Filtered cell bed derivative d^2B/dx^2 [m^-1].
@@ -1410,16 +1442,18 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Compute limited erosion, deposition, entrainment and associated equation sources.
-  !
-  !> This subroutine evaluates all the terms related to mass exhange between the
-  !> flow and the environment: air entrainment, deposition, erosion, entrainment
-  !> of water vapour.
+  !> \details Evaluates per-class solid erosion and settling/deposition, carrier
+  !>          erosion and loss, optional air entrainment, vaporization,
+  !>          thermal and pore-pressure sources, and the corresponding
+  !>          conservative equation source. Erosion is limited by the available
+  !>          erodible inventory over dt; deposition and carrier loss are
+  !>          limited by the mass available in the flow and by the maximum
+  !>          packing constraint. The bed-elevation rate is
+  !>          \f$\dot{B}=(\sum_iD_i-\sum_iE_i)/(1-\phi_e)\f$.
+  !>          If the flow is dry or its total solid fraction is at/below the
+  !>          configured cutoff, every output is zero.
   !> \date 20/01/2018
-  !
-  !> @author
-  !> Mattia de' Michieli Vitturi
-  !
-  !>
+  !> @author Mattia de' Michieli Vitturi
   !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
   !> \param[in] B_zone Connected-water-region indicator used by the exchange laws.
   !> \param[in] B_prime_x Filtered bed derivative dB/dx [dimensionless].
@@ -1428,14 +1462,15 @@ CONTAINS
   !> \param[in] dt Time increment [s].
   !> \param[out] erosion_term Per-solid erosion rates after inventory limiting [m s^-1].
   !> \param[out] deposition_term Per-solid deposition rates [m s^-1].
-  !> \param[out] continuous_phase_erosion_term Carrier-phase volume rate associated with
-  !>                                           entrainment/erosion [m s^-1].
-  !> \param[out] continuous_phase_loss_term Carrier-phase volume loss rate [m s^-1].
-  !> \param[out] eqns_term Conservative source vector for the local mass-exchange update.
+  !> \param[out] continuous_phase_erosion_term Carrier-phase volume rate entrained with erosion
+  !>                                           from the substrate [m s^-1].
+  !> \param[out] continuous_phase_loss_term Carrier-phase volume loss rate, including configured
+  !>                                        loss and any active pore-gas outflow [m s^-1].
+  !> \param[out] eqns_term Conservative source vector [equation] for the cell-local mass-exchange
+  !>                        update; includes mass, momentum, energy and component sources.
   !> \param[out] topo_term Proposed cell bed-elevation rate, positive for bed growth [m s^-1].
-  !> \note The solid-fraction cutoff suppresses the whole exchange transaction: all rates and
-  !>       equation/bed proposals remain zero. Substrate temperature is selected locally so
-  !>       parallel calls never mutate the shared material configuration.
+  !> \note B_zone selects the connected-water zone used by vaporization. Substrate temperature
+  !>       is selected locally so parallel calls never mutate shared material configuration.
   !******************************************************************************
 
   SUBROUTINE eval_mass_exchange_terms( qpj , B_zone , B_prime_x , B_prime_y ,   &
@@ -1448,15 +1483,15 @@ CONTAINS
 
     IMPLICIT NONE
 
-    REAL(wp), INTENT(IN) :: qpj(n_vars+2)              !< physical variables
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2)
     INTEGER, INTENT(IN) :: B_zone
     REAL(wp), INTENT(IN) :: B_prime_x
     REAL(wp), INTENT(IN) :: B_prime_y
-    REAL(wp), INTENT(IN) :: erodible(n_solid)          !< erodible thickness
+    REAL(wp), INTENT(IN) :: erodible(n_solid)
     REAL(wp), INTENT(IN) :: dt
 
-    REAL(wp), INTENT(OUT) :: erosion_term(n_solid)     !< erosion term
-    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)  !< deposition term
+    REAL(wp), INTENT(OUT) :: erosion_term(n_solid)
+    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
     REAL(wp), INTENT(OUT) :: continuous_phase_erosion_term
     REAL(wp), INTENT(OUT) :: continuous_phase_loss_term
     REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
@@ -1799,22 +1834,23 @@ CONTAINS
 
 
   !******************************************************************************
-  !> \brief Construct the physical state imposed by a radial or lateral inlet.
-  !
-  !> This subroutine evaluates the source terms at the interfaces when an
-  !> internal radial source is present, as for a base surge. The terms are
-  !> applied as boundary conditions, and thus they have the units of the
-  !> physical variable qp
+  !> \brief Construct the physical inlet state for an active radial-source pulse.
+  !> \details Evaluates the configured periodic pulse at time and returns the
+  !>          inlet state in the canonical q/qp layout: depth, depth-weighted
+  !>          x/y velocity, temperature, component fractions and appended
+  !>          x/y velocities. During an inactive pulse, depth, momentum and
+  !>          composition remain zero while temperature is set to T_source.
+  !>          For an active pulse with coefficient c_t, depth and velocity are
+  !>          scaled as h=c_t*h_source and u,v=sqrt(c_t)*vel_source*(vect_x,
+  !>          vect_y), so depth-weighted momentum scales as c_t^(3/2).
   !> \date 2019/12/01
-  !
-  !> @author
-  !> Mattia de' Michieli Vitturi
-  !
-  !>
+  !> @author Mattia de' Michieli Vitturi
   !> \param[in] time Current simulation time [s].
-  !> \param[in] vect_x X component of the inlet direction/face-coverage vector.
-  !> \param[in] vect_y Y component of the inlet direction/face-coverage vector.
-  !> \param[out] source_bdry Physical inlet state of length n_vars+2.
+  !> \param[in] vect_x X component of the inlet direction vector.
+  !> \param[in] vect_y Y component of the inlet direction vector.
+  !> \param[out] source_bdry Inlet state of length n_vars+2 in the canonical physical-state
+  !>                         layout; composition is populated only when the pulse is active.
+  !> \note Returns the temperature-only inactive state when time reaches the configured cutoff.
   !******************************************************************************
 
   SUBROUTINE eval_source_bdry( time, vect_x , vect_y , source_bdry )
