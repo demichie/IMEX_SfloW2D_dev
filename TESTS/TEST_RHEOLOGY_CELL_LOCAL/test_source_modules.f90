@@ -8,7 +8,8 @@ PROGRAM test_source_modules
        eval_lava_cooling_source, eval_mass_exchange_thermal_energy,            &
        eval_vaporization_sources
   USE mass_exchange_laws_2d, ONLY : eval_hindered_settling_deposition_rate,  &
-       eval_lahar_deposition_rate, eval_erosion_rates
+       eval_lahar_deposition_rate, eval_erosion_rates,                       &
+       eval_continuous_phase_loss_rate
 
   IMPLICIT NONE
 
@@ -56,6 +57,15 @@ PROGRAM test_source_modules
   CALL assert_close(solid_erosion_rate(2), 0.4_wp, 'second erosion inventory cap')
   CALL assert_close(continuous_erosion_rate, 0.4_wp,                        &
        'capped continuous-phase erosion rate')
+  actual = eval_continuous_phase_loss_rate(2.0_wp, 1.0_wp, 0.25_wp, 0.5_wp, &
+       0.5_wp, [0.0625_wp, 0.0625_wp], 0.5_wp)
+  CALL assert_close(actual, 0.5_wp, 'carrier loss solid-packing cap')
+  actual = eval_continuous_phase_loss_rate(2.0_wp, 1.0_wp, 0.25_wp, 1.0_wp, &
+       0.5_wp, [0.0625_wp, 0.0625_wp], 0.5_wp)
+  CALL assert_close(actual, 1.3125_wp, 'carrier loss available-volume cap')
+  actual = eval_continuous_phase_loss_rate(2.0_wp, 1.0_wp, 0.75_wp, 1.0_wp,&
+       1.0_wp, [0.0_wp, 0.0_wp], 1.0_wp)
+  CALL assert_close(actual, 0.0_wp, 'carrier loss exhausted-volume cap')
 
   actual = eval_inlet_thermal_energy_source(0.5_wp, 0.02_wp, 1200.0_wp,       &
        800.0_wp, 500.0_wp)

@@ -27,7 +27,8 @@ MODULE equation_terms_2d
        eval_lava_cooling_source, eval_mass_exchange_thermal_energy,              &
        eval_vaporization_sources
   USE mass_exchange_laws_2d, ONLY : eval_lahar_deposition_rate,               &
-       eval_hindered_settling_deposition_rate, eval_erosion_rates
+       eval_hindered_settling_deposition_rate, eval_erosion_rates,             &
+       eval_continuous_phase_loss_rate
   USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
 
   USE equation_metadata_2d, ONLY : equation_partition_type,                   &
@@ -1624,16 +1625,10 @@ CONTAINS
 
     END IF
 
-    ! limit the loss accountaing for maximum solid packing
-    continuous_phase_loss_term = MIN( continuous_phase_loss_term ,              &
-         r_h * MAX( 0.0_wp , maximum_solid_packing - SUM(r_alphas) ) / dt )
-
-    ! Limit to the available carrier after reserving the pore volume of the
-    ! remaining solids. An already exhausted reserve is zero, not negative:
-    ! a nonnegative requested loss must not become a spurious carrier gain.
-    continuous_phase_loss_term = MIN( continuous_phase_loss_term ,              &
-         MAX(0.0_wp, ( r_h * ( 1.0_wp - SUM(r_alphas) ) - coeff_porosity *      &
-         ( r_h * SUM(r_alphas) - dt * SUM(deposition_term(1:n_solid)) ) ) / dt) )
+    ! Limit carrier loss by solid packing and the available carrier reserve.
+    continuous_phase_loss_term = eval_continuous_phase_loss_rate(             &
+         continuous_phase_loss_term, r_h, alphas_tot, maximum_solid_packing,  &
+         coeff_porosity, deposition_term(1:n_solid), dt)
 
 
     ! Re-erodible deposits use the current flow temperature by model policy,

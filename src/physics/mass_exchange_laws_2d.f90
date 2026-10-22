@@ -1,7 +1,7 @@
 !********************************************************************************
 !> \brief Constitutive laws used by mass-exchange source assembly.
-!> \details Provides cell-local erosion and deposition rates independently of
-!>          source assembly, state updates and inventory bookkeeping.
+!> \details Provides cell-local erosion, deposition and carrier-loss rates
+!>          independently of source assembly, state updates and bookkeeping.
 !********************************************************************************
 
 MODULE mass_exchange_laws_2d
@@ -15,6 +15,7 @@ MODULE mass_exchange_laws_2d
   PUBLIC :: eval_lahar_deposition_rate
   PUBLIC :: eval_hindered_settling_deposition_rate
   PUBLIC :: eval_erosion_rates
+  PUBLIC :: eval_continuous_phase_loss_rate
 
 CONTAINS
 
@@ -116,5 +117,37 @@ CONTAINS
     continuous_phase_erosion_rate = total_erosion * erodible_porosity
 
   END SUBROUTINE eval_erosion_rates
+
+  !******************************************************************************
+  !> \brief Limit the requested continuous-phase loss to available capacity.
+  !> \details Applies the solid-packing cap and the carrier-volume reserve after
+  !>          accounting for the associated solid deposition.
+  !> \param[in] requested_loss_rate Requested carrier loss rate [m s^-1].
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] total_solid_fraction Sum of solid volume fractions.
+  !> \param[in] maximum_solid_packing Maximum solid packing fraction.
+  !> \param[in] porosity_coefficient Carrier volume associated with deposited solids.
+  !> \param[in] deposition_rate Per-class solid deposition rates [m s^-1].
+  !> \param[in] time_step Time-step size [s].
+  !> \return Limited continuous-phase loss rate [m s^-1].
+  !******************************************************************************
+  PURE FUNCTION eval_continuous_phase_loss_rate(requested_loss_rate,         &
+       flow_depth, total_solid_fraction, maximum_solid_packing,               &
+       porosity_coefficient, deposition_rate, time_step) RESULT(loss_rate)
+
+    REAL(wp), INTENT(IN) :: requested_loss_rate, flow_depth
+    REAL(wp), INTENT(IN) :: total_solid_fraction, maximum_solid_packing
+    REAL(wp), INTENT(IN) :: porosity_coefficient, deposition_rate(:)
+    REAL(wp), INTENT(IN) :: time_step
+    REAL(wp) :: loss_rate
+
+    loss_rate = MIN(requested_loss_rate, flow_depth * MAX(0.0_wp,            &
+         maximum_solid_packing - total_solid_fraction) / time_step)
+    loss_rate = MIN(loss_rate, MAX(0.0_wp, (flow_depth *                     &
+         (1.0_wp - total_solid_fraction) - porosity_coefficient *            &
+         (flow_depth * total_solid_fraction - time_step *                    &
+         SUM(deposition_rate))) / time_step))
+
+  END FUNCTION eval_continuous_phase_loss_rate
 
 END MODULE mass_exchange_laws_2d
