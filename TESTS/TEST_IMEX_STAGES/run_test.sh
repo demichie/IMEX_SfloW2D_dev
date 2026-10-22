@@ -43,9 +43,13 @@ for profile in $profiles; do
                 ;;
         esac
         objects="$objects ${object%.f90}.o"
-        if [ "$source" != "spatial/reconstruction_2d.f90" ]; then
-            reference_objects="$reference_objects $build_dir/$profile/${object%.f90}.o"
-        fi
+        case "$source" in
+            spatial/reconstruction_2d.f90|spatial/hyperbolic_2d.f90|spatial/spatial_operator_2d.f90)
+                ;;
+            *)
+                reference_objects="$reference_objects $build_dir/$profile/${object%.f90}.o"
+                ;;
+        esac
     done
     gfortran -O0 -g -fcheck=all -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
         $netcdf_fflags -c "$test_dir/test_imex_stages.f90"
@@ -58,6 +62,12 @@ for profile in $profiles; do
         git -C "$baseline_repo" show \
             "$baseline_revision:src/spatial/reconstruction_2d.f90" \
             > "$reference_dir/reconstruction_2d.f90"
+        git -C "$baseline_repo" show \
+            "$baseline_revision:src/spatial/hyperbolic_2d.f90" \
+            > "$reference_dir/hyperbolic_2d.f90"
+        git -C "$baseline_repo" show \
+            "$baseline_revision:src/spatial/spatial_operator_2d.f90" \
+            > "$reference_dir/spatial_operator_2d.f90"
         actual_baseline_sha256=$(shasum -a 256 "$reference_dir/reconstruction_2d.f90" | awk '{print $1}')
         if [ "$actual_baseline_sha256" != "$baseline_sha256" ]; then
             echo "Pinned XY-5 reconstruction baseline checksum mismatch" >&2
@@ -65,11 +75,20 @@ for profile in $profiles; do
         fi
         (
             cd "$reference_dir"
+            # The reference reconstruction, hyperbolic backend, and spatial operator
+            # must come from the same revision because their type-bound APIs evolved together.
             gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
-                -I"$build_dir/$profile" -I"$repo_dir/src/state" -J"$reference_dir" \
-                $netcdf_fflags -c reconstruction_2d.f90
+                -I"$reference_dir" -I"$build_dir/$profile" -I"$repo_dir/src/state" \
+                -J"$reference_dir" $netcdf_fflags -c reconstruction_2d.f90
             gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
-                $reference_objects reconstruction_2d.o "$build_dir/$profile/test_imex_stages.o" \
+                -I"$reference_dir" -I"$build_dir/$profile" -I"$repo_dir/src/state" \
+                -J"$reference_dir" $netcdf_fflags -c "$reference_dir/hyperbolic_2d.f90"
+            gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+                -I"$reference_dir" -I"$build_dir/$profile" -I"$repo_dir/src/state" \
+                -J"$reference_dir" $netcdf_fflags -c "$reference_dir/spatial_operator_2d.f90"
+            gfortran $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+                $reference_objects reconstruction_2d.o hyperbolic_2d.o \
+                spatial_operator_2d.o "$build_dir/$profile/test_imex_stages.o" \
                 -llapack $netcdf_flibs $netcdf_clibs -o test_imex_stages_reference
         )
     fi

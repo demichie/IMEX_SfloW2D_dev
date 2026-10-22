@@ -302,7 +302,7 @@ Attivita e verifiche operative: COMPLETE per il perimetro A11 approvato, con che
 
 File interessati: src/spatial_operator_2d.f90; TESTS/ACCEPTANCE/\*; docs/acceptance/\*; EXAMPLES/\*; README.md.
 
-Criteri di accettazione: SODDISFATTI per il perimetro scientifico autorizzato e la revisione congelata. D15 resta un gate distinto, successivo a relocation, reologie e solver IMEX per gruppi, e deve trattare separatamente equivalenza strutturale e cambiamenti numerici autorizzati.
+Criteri di accettazione: SODDISFATTI per il perimetro scientifico autorizzato e la revisione congelata. D15 resta un gate distinto, successivo alla relocation, alle reologie, al solver IMEX per gruppi e al consolidamento D16; deve trattare separatamente equivalenza strutturale e cambiamenti numerici autorizzati.
 
 Make HP-PCCU the canonical production spatial operator after A02-A10 gates pass.
 
@@ -1732,26 +1732,32 @@ la composizione configurati, un gruppo Newton congiunto, i solve DIRK chiusi e
 il rate effettivo netto in strict/optimized. La line-search conserva
 esattamente le componenti esterne al gruppo attivo.
 
-Il gate completo `TEST_IMEX_STAGES` non è ancora accettato: il runner si
-interrompe nel link del binario di riferimento perché la ricostruzione
-storica non definisce `reconstruct_kt_eta_traces`; l’eseguibile di produzione
-compila, ma la suite di confronto segnala `known_mass` nel caso
-`dynamic_smooth`. Lo stesso errore e la stessa tolleranza sono stati
-riprodotti usando il solver D11 non modificato, quindi il risultato è
-registrato come limite preesistente del gate, non come evidenza di
-equivalenza né come regressione introdotta da D12. Occorre correggere o
-riconciliare il gate prima di chiudere D12.
+Il gate completo `TEST_IMEX_STAGES` non è ancora accettato. Il binario di
+riferimento ora compila in modo coerente la ricostruzione, il backend
+hyperbolic e lo spatial operator dalla revisione storica fissata; questo
+risolveva il precedente errore di link dovuto a `reconstruct_kt_eta_traces`.
+Il confronto si arresta ancora su `known_mass` nel caso `dynamic_smooth`.
+La suite indipendente `TEST_SPATIAL_OPERATOR` riproduce una discrepanza sullo
+stesso fixture (`residual_mass`: valore prodotto `-1017.369...`, riferimento
+Python `-103.687...`), dopo il superamento dei fixture lake. Inoltre
+`known_mass` e la relativa tolleranza erano già stati riprodotti con il
+driver D11 non modificato. Questo localizza il blocco nel confronto
+dell’operatore spaziale con il riferimento Python fissato, ma non determina
+ancora quale lato sia errato: non è evidenza di equivalenza né una regressione
+attribuibile a D12. Occorre riconciliare il confronto e poi rieseguire il gate
+integrativo prima di chiudere D12.
 
 ### D13 — Integrazione analitica esatta dei termini IM
 
 **Test proporzionati (nuove modifiche a questo step):** T1 confronto quantitativo con le soluzioni esatte disponibili; T2 regimi limite, soglie e monotonia; T3 regressioni del tableau per N_RK 2/3/4. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
 
-Stato ufficiale: IN CORSO — i gruppi ANALYTIC integrano nel tempo i termini
-IM con i coefficienti non integrati congelati all’ingresso del gruppo. Le
-formule di flusso chiuse sono usate quando disponibili; gli altri termini
-sono trattati tramite inversione controllata dell’integrale scalare del tempo.
-I test coprono i gruppi, l’ordine e i regimi limite; resta da validare la
-traiettoria completa del tableau con gruppi multipli (D14).
+Stato ufficiale: COMPLETATO (validazione locale GNU/macOS). I gruppi
+ANALYTIC integrano nel tempo i termini IM con i coefficienti non integrati
+congelati all’ingresso del gruppo. Le formule di flusso chiuse sono usate
+quando disponibili; gli altri termini sono trattati tramite inversione
+controllata dell’integrale scalare del tempo. Le suite strict e optimized
+verificano soluzioni esatte, regimi limite, tableau `N_RK=2/3/4` e traiettorie
+complete con gruppi multipli (D14), con esecuzioni a uno e quattro thread.
 
 #### Flusso congelato per la velocità
 
@@ -1807,8 +1813,8 @@ per `N_RK=2/3/4`, gli stati noti e risolti degli stage e l’assemblaggio finale
 contro flussi quadratici indipendenti; il test controlla anche la soluzione
 esatta dell’endpoint nel caso a due stage e la convergenza al raffinamento
 temporale per i tableau a tre e quattro stage, con esecuzioni a uno e quattro
-thread. Resta da coprire la traiettoria completa dell’intero tableau con
-gruppi multipli, tracciata in D14.
+thread. La traiettoria completa dell’intero tableau con gruppi multipli è
+verificata dalla suite D14.
 
 #### Contratto d’integrazione
 
@@ -1835,21 +1841,11 @@ della velocità con coefficienti congelati, la ricorrenza degli stage e
 l’assemblaggio finale; l’ordine dei gruppi produce una differenza misurabile.
 Quest’ultima suite passa in strict e optimized con thread 1/4.
 
-### D15 — Acceptance della nuova architettura
-
-**Test proporzionati (nuove modifiche a questo step):** T3/T4 gate architetturale: matrice reologie e IMEX, conservazione, REAL/COMPLEX, restart, baseline A11 e variazioni numeriche autorizzate; decisione scientifica autonoma. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
-
-Stato ufficiale: GATE
-
-#### Manifest, ripartenza e gate
-
-Ogni commit funzionale porta evidenza di compilazione pulita, test associati, SHA e descrizione della tolleranza. Gli input e l’output devono registrare stringa reologica e gruppo/metodo/ordine; i restart non devono ripartire silenziosamente con un diverso modello/gruppo. Le ottimizzazioni OpenMP non possono introdurre workspace Newton condivisi. Conservare i .inc di conversione REAL/COMPLEX e i controlli sulla non analiticità di ABS, MAX, segni e soglie nel complex-step. Prima di G01 eseguire il gate di compatibilità del default, regressioni scientifiche HP-PCCU, storage/restart e accuratezza per gruppi.
-
 ### D16 — Consolidamento dell’architettura delle leggi fisiche, dei rate e dell’assemblaggio IMEX
 
 #### Logica e obiettivi
 
-D16 completa la modularizzazione avviata in D05–D15 separando chiaramente quattro responsabilità: (1) le leggi costitutive, che calcolano proprietà fisiche e rate; (2) `equation_terms_2d`, che assembla i contributi nelle equazioni; (3) le interfacce di dominio, che selezionano il modello fisico; (4) `time_integration_2d`, che integra e applica gli aggiornamenti allo stato. Non è autorizzata una nuova relocation indiscriminata né una modifica delle formule, della discretizzazione o della semantica REAL/COMPLEX già verificata.
+D16 completa la modularizzazione avviata in D05–D14 e prepara l’architettura consolidata per l’accettazione finale D15, separando chiaramente quattro responsabilità: (1) le leggi costitutive, che calcolano proprietà fisiche e rate; (2) `equation_terms_2d`, che assembla i contributi nelle equazioni; (3) le interfacce di dominio, che selezionano il modello fisico; (4) `time_integration_2d`, che integra e applica gli aggiornamenti allo stato. Non è autorizzata una nuova relocation indiscriminata né una modifica delle formule, della discretizzazione o della semantica REAL/COMPLEX già verificata.
 
 I termini reologici restituiti dalle routine specifiche sono fisicamente rate di quantità di moto: vengono calcolati dalla legge e poi integrati nel tempo. `source` descrive il loro ruolo nell’equazione, ma `rate` descrive meglio la quantità restituita. Lo stesso vale per erosione, deposizione, entrainment, perdita del carrier e vaporizzazione. La convenzione deve quindi distinguere:
 
@@ -2080,6 +2076,16 @@ Le operazioni geometriche devono rimanere in `geometry_2d.f90`, per esempio `pro
 
 **D16.12 — Gate di accettazione.** Accettare D16 solo quando la selezione reologica è centralizzata, le leggi sono nei moduli `*_laws_2d`, rate e sorgenti sono distinti, le integrazioni analitiche seguono la convenzione, gli aggiornamenti sono in `time_integration_2d`, la geometria è in `geometry_2d` e compilazione, test, restart, Doxygen e CI passano senza variazioni scientifiche non autorizzate. Il manifest deve riportare vecchio nome, nuovo nome, modulo proprietario, chiamanti aggiornati ed evidenze di regressione.
 
+### D15 — Acceptance finale della nuova architettura
+
+**Test proporzionati (nuove modifiche a questo step):** gate scientifico finale sul codice consolidato da D16: matrice reologie e IMEX, conservazione, REAL/COMPLEX, restart, baseline A11 e variazioni numeriche autorizzate; decisione scientifica autonoma. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
+
+Stato ufficiale: GATE
+
+#### Manifest, ripartenza e gate
+
+Ogni commit funzionale porta evidenza di compilazione pulita, test associati, SHA e descrizione della tolleranza. Gli input e l’output devono registrare stringa reologica e gruppo/metodo/ordine; i restart non devono ripartire silenziosamente con un diverso modello/gruppo. Le ottimizzazioni OpenMP non possono introdurre workspace Newton condivisi. Conservare i .inc di conversione REAL/COMPLEX e i controlli sulla non analiticità di ABS, MAX, segni e soglie nel complex-step. Prima di G01 eseguire il gate di compatibilità del default, regressioni scientifiche HP-PCCU, storage/restart e accuratezza per gruppi.
+
 # IMEX_SfloW2D — Development Roadmap
 
 **Piano unico, integrato e consolidato | 14 ottobre 2026 | repository fd43e4ca2ee6**
@@ -2275,10 +2281,10 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D10 | P6            | EX_terms / IM_terms                                         | COMPLETATO (gate locale GNU/macOS) |
 | D11 | P7            | IM_group e metadati                                  | COMPLETATO (gate locale GNU/macOS) |
 | D12 | P7            | Newton per gruppo e Jacobiano ridotto                       | IN CORSO |
-| D13 | P8            | Algebriche ANALYTIC per stage DIRK                          | IN CORSO |
+| D13 | P8            | Integrazione analitica esatta dei termini IM                | COMPLETATO (gate locale GNU/macOS) |
 | D14 | P8            | Gruppi misti e validazione                                  | COMPLETATO (gate locale GNU/macOS) |
-| D15 | P9            | Acceptance della nuova architettura                         | GATE     |
 | D16 | —             | Consolidamento leggi fisiche, rate e assemblaggio IMEX      | DA FARE  |
+| D15 | P9            | Acceptance finale della nuova architettura                  | GATE     |
 
 ## Fase E — Architettura e robustezza del passo
 
@@ -2298,7 +2304,7 @@ L’architettura deve consentire l’aggiunta e la modifica di reologie, equazio
 
 #### Sequenziamento e vincolo di ingresso
 
-Relocation sorgenti (completata) → refactoring x/y → riorganizzazione I/O e OUTPUT/\<RUN_NAME\>/ → politica Autotools B e packaging con due archivi → separazione reologie e riorganizzazione solver IMEX → D15 (accettazione scientifica) → E03 (accettazione architetturale) → nuovi sviluppi scientifici pianificati (G01–H05 e altre estensioni).
+Relocation sorgenti (completata) → refactoring x/y → riorganizzazione I/O e OUTPUT/\<RUN_NAME\>/ → politica Autotools B e packaging con due archivi → separazione reologie e riorganizzazione solver IMEX → D16 (consolidamento) → D15 (accettazione scientifica finale) → E03 (accettazione architetturale) → nuovi sviluppi scientifici pianificati (G01–H05 e altre estensioni).
 
 Le attività preparatorie e i test esplorativi possono proseguire prima di E03, ma non devono imporre nuove dipendenze strutturali o essere assunti come architettura definitiva. L’ingresso nelle milestone funzionali successive richiede la chiusura esplicita di E03.
 
@@ -2889,10 +2895,10 @@ Le sigle storiche non sono identificativi operativi e sono conservate esclusivam
 | D10      | P6                        | EX_terms / IM_terms                                  |
 | D11      | P7                        | IM_group e metadati                                  |
 | D12      | P7                        | Newton per gruppo e Jacobiano ridotto                |
-| D13      | P8                        | Algebriche ANALYTIC per stage DIRK                   |
+| D13      | P8                        | Integrazione analitica esatta dei termini IM         |
 | D14      | P8                        | Gruppi misti e validazione                           |
-| D15      | P9                        | Acceptance della nuova architettura                  |
 | D16      | —                         | Consolidamento leggi fisiche e assemblaggio IMEX     |
+| D15      | P9                        | Acceptance finale della nuova architettura           |
 | E01      | ARCH-1                    | Audit dipendenze e ownership stato                   |
 | E02      | ARCH-2                    | Architecture fitness checks                          |
 | E03      | ARCH-GATE                 | Architecture readiness                               |
