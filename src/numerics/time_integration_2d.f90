@@ -1,8 +1,9 @@
 !********************************************************************************
 !> \brief IMEX Runge-Kutta time integration
 !>
-!> This module owns the IMEX tableau and Runge-Kutta stage workspace and
-!> orchestrates explicit/implicit stage advancement.
+!> This module owns the IMEX tableau and Runge-Kutta stage workspace,
+!> orchestrates explicit/implicit stage advancement and applies post-IMEX
+!> fractional-step mass-exchange increments to cell states and inventories.
 !********************************************************************************
 
 MODULE time_integration_2d
@@ -36,6 +37,7 @@ MODULE time_integration_2d
   PRIVATE
 
   PUBLIC :: validate_runge_kutta_stages
+  PUBLIC :: apply_mass_exchange_increment
 
   ABSTRACT INTERFACE
      !> \brief Observe an unmodified cell state at a specified IMEX audit point.
@@ -90,6 +92,92 @@ CONTAINS
        CALL fatal_error('N_RK must be 2, 3 or 4')
     END IF
   END SUBROUTINE validate_runge_kutta_stages
+
+  !> \brief Apply and validate a cell's post-IMEX mass-exchange update.
+  !> \details Applies conservative equation sources and material-inventory
+  !>          increments for the completed time step, then enforces the
+  !>          mass-exchange positivity checks and refreshes the primitive state.
+  !>          The caller invokes this after the IMEX Runge-Kutta update and
+  !>          before projecting any cell bed-rate proposals or advancing time.
+  !> \param[in,out] q_cell Conservative cell state.
+  !> \param[in,out] qp_cell Primitive cell state, refreshed from q_cell.
+  !> \param[in] time_step Physical time increment [s].
+  !> \param[in] equation_rate Conservative equation source rates.
+  !> \param[in] deposition_rate Per-class deposition rates.
+  !> \param[in] erosion_rate Per-class erosion rates.
+  !> \param[in,out] deposit_inventory Accumulated deposited solid thickness.
+  !> \param[in,out] erosion_inventory Accumulated eroded solid thickness.
+  !> \param[in,out] erodible_inventory Remaining per-class substrate thickness.
+  !> \param[in] redeposit_on_substrate Whether deposited solids replenish the substrate.
+  !> \param[in] closure_context Cell context used in physical-state diagnostics.
+  !******************************************************************************
+  SUBROUTINE apply_mass_exchange_increment(q_cell, qp_cell, time_step,       &
+       equation_rate, deposition_rate, erosion_rate, deposit_inventory,      &
+       erosion_inventory, erodible_inventory, redeposit_on_substrate,        &
+       closure_context)
+
+    USE state_conversion_2d, ONLY : qc_to_qp, mixt_var
+
+    IMPLICIT NONE
+
+    REAL(wp), INTENT(INOUT) :: q_cell(n_vars), qp_cell(n_vars+2)
+    REAL(wp), INTENT(IN) :: time_step, equation_rate(n_eqns)
+    REAL(wp), INTENT(IN) :: deposition_rate(n_solid), erosion_rate(n_solid)
+    REAL(wp), INTENT(INOUT) :: deposit_inventory(:)
+    REAL(wp), INTENT(INOUT) :: erosion_inventory(:)
+    REAL(wp), INTENT(INOUT) :: erodible_inventory(:)
+    LOGICAL, INTENT(IN) :: redeposit_on_substrate
+    CHARACTER(*), INTENT(IN) :: closure_context
+
+    REAL(wp) :: p_dyn
+    REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
+    REAL(wp) :: r_sp_heat_c, r_sp_heat_mix
+
+    q_cell(1:n_eqns) = q_cell(1:n_eqns) + time_step * equation_rate
+    q_cell(5:4+n_solid) = MAX(0.0_wp, q_cell(5:4+n_solid))
+
+    deposit_inventory = deposit_inventory + time_step * deposition_rate
+    erosion_inventory = erosion_inventory + time_step * erosion_rate
+    erodible_inventory = erodible_inventory - time_step * erosion_rate
+
+    IF (redeposit_on_substrate) THEN
+       erodible_inventory = erodible_inventory + time_step * deposition_rate
+    END IF
+
+    IF (ANY(q_cell(5:4+n_solid) .LT. 0.0_wp)) THEN
+       CALL fatal_error('negative solid mass after mass exchange')
+    END IF
+
+    IF (q_cell(1) .LE. 0.0_wp) THEN
+       IF (q_cell(1) .GT. -1.0E-10_wp) THEN
+          q_cell(1:n_vars) = 0.0_wp
+       ELSE
+          CALL fatal_error('negative total mass after mass exchange')
+       END IF
+    END IF
+
+    IF (SUM(q_cell(5:4+n_solid)) .GT. q_cell(1)) THEN
+       IF (q_cell(1) .LT. 1.0e-10_wp) THEN
+          q_cell(5:4+n_solid) = q_cell(5:4+n_solid)                   &
+               / SUM(q_cell(5:4+n_solid)) * q_cell(1)
+       ELSE
+          CALL fatal_error('solid mass exceeds total mass after mass exchange')
+       END IF
+    END IF
+
+    IF (q_cell(1) .GT. 0.0_wp) THEN
+       CALL qc_to_qp(q_cell, qp_cell, p_dyn, TRIM(closure_context) // ' final state')
+       CALL mixt_var(qp_cell, r_Ri, r_rho_m, r_rho_c, r_red_grav,       &
+            r_sp_heat_c, r_sp_heat_mix)
+    ELSE
+       qp_cell = 0.0_wp
+       qp_cell(4) = T_ambient
+       r_red_grav = 0.0_wp
+    END IF
+
+    IF (r_red_grav .LE. 0.0_wp) q_cell(1:n_vars) = 0.0_wp
+
+  END SUBROUTINE apply_mass_exchange_increment
 
   !> \brief Build the selected IMEX tableau and allocate Runge-Kutta stage storage.
   !>

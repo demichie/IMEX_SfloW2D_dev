@@ -1,19 +1,17 @@
 !********************************************************************************
 !> \brief Cell-local erosion, deposition, entrainment and evolving-bed updates.
 !> \details Evaluates cell-local mass-exchange sources through
-!>          equation_terms_2d, applies their conservative-state and material
-!>          inventory increments, and enforces local admissibility of solid
-!>          masses and flow depth. When bed evolution is enabled, limited cell
-!>          elevation-rate proposals are accumulated, projected to the nodal
-!>          bed once per update, and followed by a refresh of derived geometry.
+!>          equation_terms_2d and delegates conservative-state, inventory and
+!>          admissibility updates to time_integration_2d. When bed evolution is
+!>          enabled, limited cell elevation-rate proposals are accumulated,
+!>          projected to the nodal bed once per update, and followed by a
+!>          refresh of derived geometry.
 !>          The persistent work arrays belong to this module and can be
 !>          released explicitly when a simulation is finalized.
 !
 !********************************************************************************
 
 MODULE mass_exchange_2d
-
-  USE diagnostics_2d, ONLY : fatal_error
 
   USE constitutive_parameters_2d, ONLY : T_ambient
 
@@ -49,14 +47,13 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Advance cell-local mass exchange and optionally update the shared nodal bed.
-  !> \details For each active solve cell, reconstructs the physical state,
-  !>          evaluates erosion/deposition/entrainment and related sources,
-  !>          applies q <- q + dt*eqns_term, and updates deposit and erodible
-  !>          inventories. Small negative solid masses are clipped to zero;
-  !>          materially inadmissible total or solid mass raises a fatal error.
-  !>          If topography changes, each limited cell bed-rate proposal is
-  !>          projected to vertices and integrated once after the cell loop:
-  !>          B_vertex <- B_vertex + dt*topography_rate_vertex.
+  !> \details Runs as a post-IMEX fractional step. For each active solve cell,
+  !>          reconstructs the physical state and evaluates mass-exchange
+  !>          sources; time_integration_2d applies the conservative and
+  !>          inventory increments and their admissibility checks. If
+  !>          topography changes, each limited cell bed-rate proposal is
+  !>          projected to vertices and integrated once after the cell loop,
+  !>          before the caller advances the simulation clock.
   !> \param[in,out] q Cell-centered conservative state [variable,x-cell,y-cell]; updated by
   !>                  the mass-exchange equation source.
   !> \param[in,out] qp Cell-centered physical state with h, temperature, component fractions,
@@ -75,8 +72,9 @@ CONTAINS
     USE geometry_2d, ONLY : B_zone
 
     USE equation_terms_2d, ONLY : eval_mass_exchange_terms
+    USE time_integration_2d, ONLY : apply_mass_exchange_increment
 
-    USE state_conversion_2d, ONLY : qc_to_qp, mixt_var
+    USE state_conversion_2d, ONLY : qc_to_qp
     USE parameters_2d, ONLY : topo_change_flag, bottom_radial_source_flag, &
          bottom_fissural_source_flag
     USE parameters_2d, ONLY : erodible_deposit_flag
@@ -97,10 +95,6 @@ CONTAINS
     REAL(wp) :: eqns_term(n_eqns)
     REAL(wp) :: topo_term
 
-    REAL(wp) :: r_Ri , r_rho_m
-    REAL(wp) :: r_rho_c      !< real-value carrier phase density [kg/m3]
-    REAL(wp) :: r_red_grav   !< real-value reduced gravity
-
     INTEGER :: j,k,l
 
     REAL(wp) :: out_of_source_fraction
@@ -108,8 +102,6 @@ CONTAINS
     REAL(wp) :: p_dyn
     CHARACTER(LEN=96) :: closure_context
 
-    REAL(wp) :: r_sp_heat_c
-    REAL(wp) :: r_sp_heat_mix
     LOGICAL :: liquid_loss_active
 
 
@@ -138,9 +130,9 @@ CONTAINS
 
     !$OMP PARALLEL DO private(j,k,closure_context,erosion_term,deposition_term, &
     !$OMP & eqns_term,                                                          &
-    !$OMP & topo_term,r_Ri,r_rho_m,r_rho_c,r_red_grav,                          &
+    !$OMP & topo_term,                                                          &
     !$OMP & continuous_phase_erosion_term,continuous_phase_loss_term,           &
-    !$OMP & out_of_source_fraction,p_dyn,r_sp_heat_c,r_sp_heat_mix)
+    !$OMP & out_of_source_fraction,p_dyn)
 
     DO l = 1,domain%solve_cells
 
@@ -178,87 +170,14 @@ CONTAINS
 
        END IF
        
-       ! Update the solution with erosion/deposition terms
-       q(1:n_eqns,j,k) = q(1:n_eqns,j,k) + dt * eqns_term(1:n_eqns)
-       q(5:4+n_solid,j,k) = MAX( 0.0_wp , q(5:4+n_solid,j,k) )
-       
-       deposit(j,k,1:n_solid) = deposit(j,k,1:n_solid)                          &
-            + dt * deposition_term(1:n_solid)
+       CALL apply_mass_exchange_increment(q(1:n_vars,j,k),                    &
+            qp(1:n_vars+2,j,k), dt, eqns_term, deposition_term, erosion_term, &
+            deposit(j,k,1:n_solid), erosion(j,k,1:n_solid),                   &
+            erodible(1:n_solid,j,k), erodible_deposit_flag, closure_context)
 
-       erosion(j,k,1:n_solid) = erosion(j,k,1:n_solid)                          &
-            + dt * erosion_term(1:n_solid)
-
-       erodible(1:n_solid,j,k) = erodible(1:n_solid,j,k)                        &
-            - dt * erosion_term(1:n_solid)
-
-       IF ( erodible_deposit_flag ) THEN
-
-          erodible(1:n_solid,j,k) = erodible(1:n_solid,j,k)                     &
-               + dt * deposition_term(1:n_solid)
-
-       END IF
-       
        ! Store the final, already limited cell proposal. The nodal bed is
        ! assembled only after every cell-local flow/inventory update is done.
        IF ( topo_change_flag ) topography_rate_cell(j,k) = topo_term
-
-       negative_alpha_check:IF ( ANY(q(5:4+n_solid,j,k) .LT. 0.0_wp ) ) THEN
-
-          CALL fatal_error('negative solid mass after mass exchange')
-          
-       END IF negative_alpha_check
-       
-       ! Check for negative thickness
-       IF ( q(1,j,k) .LE. 0.0_wp ) THEN
-
-          IF ( q(1,j,k) .GT. -1.0E-10_wp ) THEN
-
-             q(1:n_vars,j,k) = 0.0_wp
-
-          ELSE
-
-             CALL fatal_error('negative total mass after mass exchange')
-
-          END IF
-
-       END IF
-
-       IF ( SUM(q(5:4+n_solid,j,k)) .GT. q(1,j,k) ) THEN
-
-          IF ( q(1,j,k) .LT. 1.0e-10_wp ) THEN
-
-             q(5:4+n_solid,j,k) = q(5:4+n_solid,j,k)                            &
-                  / SUM(q(5:4+n_solid,j,k)) * q(1,j,k)
-             
-          ELSE
-
-             CALL fatal_error('solid mass exceeds total mass after mass exchange')
-             
-          END IF
-
-       END IF
-
-
-       IF ( q(1,j,k) .GT. 0.0_wp ) THEN
-
-          CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn,        &
-               TRIM(closure_context)//' final state' )
-          CALL mixt_var(qp(1:n_vars+2,j,k),r_Ri,r_rho_m,r_rho_c,r_red_grav,    &
-               r_sp_heat_c,r_sp_heat_mix)
-
-       ELSE
-
-          qp(1:n_vars+2,j,k) = 0.0_wp
-          qp(4,j,k) = T_ambient
-          r_red_grav = 0.0_wp
-
-       END IF
-
-       IF ( r_red_grav .LE. 0.0_wp ) THEN
-
-          q(1:n_vars,j,k) = 0.0_wp
-
-       END IF
 
     END DO
 

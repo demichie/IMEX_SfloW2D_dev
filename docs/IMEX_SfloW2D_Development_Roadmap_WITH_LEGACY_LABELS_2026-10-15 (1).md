@@ -2122,6 +2122,16 @@ entrainment.
 
 **D16.8 — Aggiornamento per stage o per passo.** Trasferire l’applicazione dell’incremento, degli inventari e dei controlli da `mass_exchange_2d` a `time_integration_2d`; documentare l’ordine rispetto a RK/IMEX, positività, topografia e geometria.
 
+L’aggiornamento degli stati e degli inventari viene ora applicato per cella da
+`apply_mass_exchange_increment` in `time_integration_2d`. La sequenza resta una
+frazione post-IMEX, eseguita una volta per passo: i rate cell-locali sono
+valutati e limitati prima dell’incremento; l’incremento aggiorna insieme stato e
+inventari, applica i controlli di positività e ricostruisce lo stato primitivo;
+solo dopo il loop le proposte limitate del letto sono proiettate sui vertici e
+la geometria derivata viene aggiornata. Il chiamante avanza l’orologio della
+simulazione dopo il completamento di questa sequenza. La proiezione e il
+refresh geometrico restano in `mass_exchange_2d` fino a D16.9.
+
 **D16.9 — Separazione geometrica.** Trasferire in `geometry_2d` proiezioni, evoluzione del letto e refresh geometrico, verificando che la topografia evolutiva resti aggiornabile e che il vertex gather conservi il bilancio globale.
 
 **D16.10 — Rimozione controllata.** Eliminare `mass_exchange_2d.f90` solo quando ogni routine ha una destinazione verificata e non restano simboli, dipendenze o test non aggiornati.
