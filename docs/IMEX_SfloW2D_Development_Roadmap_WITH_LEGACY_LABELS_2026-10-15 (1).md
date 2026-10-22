@@ -1751,7 +1751,7 @@ IM con i coefficienti non integrati congelati all’ingresso del gruppo. Le
 formule di flusso chiuse sono usate quando disponibili; gli altri termini
 sono trattati tramite inversione controllata dell’integrale scalare del tempo.
 I test coprono i gruppi e l’ordine; restano da validare i regimi limite e
-l’intero tableau.
+la traiettoria completa con gruppi multipli.
 
 #### Flusso congelato per la velocità
 
@@ -1796,9 +1796,14 @@ estremi di arresto e intervallo nullo. I test energia e pressione controllano
 anch’essi la composizione temporale e il limite a breve intervallo.
 La suite verifica gruppi ANALYTIC e NEWTON, famiglie condivise, ordine
 configurato, aggiornamenti visibili ai gruppi successivi e coerenza del rate
-effettivo con l’incremento conservativo netto. Restano da coprire i limiti
-estremi aggiuntivi e la traiettoria completa dell’intero tableau con gruppi
-multipli.
+effettivo con l’incremento conservativo netto. La regressione
+`TEST_IMEX_STAGES/compare_stages.py --section analytic` verifica inoltre,
+per `N_RK=2/3/4`, gli stati noti e risolti degli stage e l’assemblaggio finale
+contro flussi quadratici indipendenti; il test controlla anche la soluzione
+esatta dell’endpoint nel caso a due stage e la convergenza al raffinamento
+temporale per i tableau a tre e quattro stage, con esecuzioni a uno e quattro
+thread. Restano da coprire i limiti estremi aggiuntivi e la traiettoria
+completa dell’intero tableau con gruppi multipli.
 
 #### Contratto d’integrazione
 

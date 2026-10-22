@@ -21,6 +21,7 @@ import compare_reference as spatial
 CP = 4180.0
 RHO = 1000.0
 TEST_STAGES = (2,)
+TABLEAU_STAGES = (2, 3, 4)
 EPS = np.finfo(float).eps
 LEVELS = (8, 16, 32, 64, 128)
 
@@ -55,7 +56,7 @@ def tableaux(n):
 
 def check_order_conditions():
     """Check first/second order and both mixed colored-tree conditions independently."""
-    for n in TEST_STAGES:
+    for n in TABLEAU_STAGES:
         ae, ai, be, bi = tableaux(n)
         ce, ci = ae.sum(axis=1), ai.sum(axis=1)
         assert abs(be.sum()-1) < 8*EPS
@@ -98,7 +99,8 @@ def read_payload(path, nx, ny, n, steps):
 
 
 def launch(executable, directory, vertices, production, n, steps, dt, drag=0,
-           slope=False, curvature=False, limiter=3, dx=0.75, dy=1.25, observe=1):
+           slope=False, curvature=False, limiter=3, dx=0.75, dy=1.25, observe=1,
+           analytic_mode=0):
     directory.mkdir(parents=True)
     write_fixture(directory/"fixture.inp", vertices, production, slope, curvature, limiter, dt, dx, dy)
     results = []
@@ -107,8 +109,11 @@ def launch(executable, directory, vertices, production, n, steps, dt, drag=0,
         (work/"fixture.inp").write_bytes((directory/"fixture.inp").read_bytes())
         env = {**os.environ, "OMP_NUM_THREADS": str(threads), "OMP_DYNAMIC": "FALSE"}
         with (work/"solver.log").open("w") as stream:
-            run = subprocess.run([str(executable), str(threads), str(n), str(steps), str(drag), str(observe)],
-                                 cwd=work, env=env, stdout=stream, stderr=subprocess.STDOUT, timeout=180)
+            command = [str(executable), str(threads), str(n), str(steps), str(drag), str(observe)]
+            if analytic_mode:
+                command.extend(("0", "0", "0", str(analytic_mode)))
+            run = subprocess.run(command, cwd=work, env=env, stdout=stream,
+                                 stderr=subprocess.STDOUT, timeout=180)
         if run.returncode:
             raise AssertionError(f"{work}: exit {run.returncode}\n"+(work/"solver.log").read_text())
         ny, nx, _ = production.shape
@@ -325,6 +330,92 @@ def implicit_stage_checks(fields, n, dt):
             "production_Newton_tol_abs": 1e-5, "production_Newton_tol_rel": 1e-5}
 
 
+def analytic_quadratic_stage_checks(fields, n, dt, bed):
+    """Check ANALYTIC stages against independent frozen-coefficient drag flows."""
+    ae, ai, be, bi = tableaux(n)
+    start = fields["known"][0, ..., 1:3]
+    depth = fields["q0"][..., 0]/RHO
+    params = spatial.core.SolverParams(rho_a=1.2, eps_sing=1e-8, limiter=0)
+    interior = np.zeros(start.shape[:2], dtype=bool)
+    interior[4:-4, 4:-4] = True
+    explicit_rates = []
+    increments = []
+    for i in range(n):
+        expected_known = start.copy()
+        for j in range(i):
+            expected_known += dt*ae[i, j]*explicit_rates[j][..., 1:3]
+            expected_known += dt*ai[i, j]*increments[j]
+        close("analytic known momentum assembly", fields["known"][i, ..., 1:3], expected_known,
+              mask=np.broadcast_to(interior[..., None], expected_known.shape))
+        stage = fields["solved"][i]
+        physical = np.stack((stage[..., 0], stage[..., 1], stage[..., 2], stage[..., 4]), axis=-1)
+        cache = spatial.core.prepare_stage_cache2d(physical, bed, 0.0, params, dx=0.75, dy=1.25)
+        explicit_rates.append(spatial.core.rhs2d(
+            physical, bed, 0.75, 1.25, 0.0, params, stage_cache=cache))
+        diagonal = ai[i, i]
+        old = fields["known"][i, ..., 1:3]
+        actual = fields["solved"][i, ..., 1:3]
+        if diagonal == 0:
+            close("zero diagonal analytic stage", actual, old,
+                  mask=np.broadcast_to(interior[..., None], old.shape))
+            increments.append(np.zeros_like(actual))
+            continue
+        magnitude = np.linalg.norm(old, axis=-1)
+        exact = old/(1+dt*diagonal*magnitude/(RHO*depth**2))[..., None]
+        close("exact-flow analytic stage", actual, exact,
+              mask=np.broadcast_to(interior[..., None], exact.shape))
+        increments.append((actual-old)/(dt*diagonal))
+    final = start.copy()
+    for weight, increment in zip(bi, increments):
+        final += dt*weight*increment
+    for weight, rate in zip(be, explicit_rates):
+        final += dt*weight*rate[..., 1:3]
+    close("analytic final momentum assembly", fields["raw_final"][..., 1:3], final,
+          mask=np.broadcast_to(interior[..., None], final.shape))
+    close("analytic repaired momentum assembly", fields["q"][..., 1:3], final,
+          mask=np.broadcast_to(interior[..., None], final.shape))
+    exact_final = start/(1+dt*np.linalg.norm(start, axis=-1)/(RHO*depth**2))[..., None]
+    return float(np.max(np.abs(fields["q"][..., 1:3][interior] -
+                               exact_final[interior])))/RHO
+
+
+def analytic_tableau_suite(args):
+    """Exercise all supported tableaux through the production ANALYTIC dispatcher."""
+    ny, nx = 17, 18
+    vertices = np.zeros((ny+1, nx+1))
+    q0 = np.zeros((ny, nx, 5))
+    q0[..., 0] = RHO
+    q0[..., 1] = 600.0
+    q0[..., 2] = 800.0
+    q0[..., 3] = RHO*CP*300.0
+    bed = np.zeros(q0.shape[:2])
+    dt_values = (0.08, 0.04, 0.02)
+    for n in TABLEAU_STAGES:
+        errors = []
+        for dt in dt_values:
+            directory = Path(f"analytic-{args.profile}-{os.getpid()}-quadratic-RK{n}-dt{dt:g}")
+            fields, hashes = launch(args.executable, directory, vertices, q0, n, 1, dt,
+                                    drag=1, limiter=0, analytic_mode=1)
+            interior = np.zeros(fields["active"].shape, dtype=bool)
+            interior[4:-4, 4:-4] = True
+            close("analytic fixture mass", fields["q"][..., 0], RHO, mask=interior)
+            close("analytic fixture solid", fields["q"][..., 4], 0.0, mask=interior)
+            if np.any(fields["statistics"][:, 5] != 0):
+                raise AssertionError("analytic tableau fixture unexpectedly clipped a raw stage")
+            error = analytic_quadratic_stage_checks(fields, n, dt, bed)
+            errors.append(error)
+            print("IMEX_ANALYTIC_TABLEAU_EVIDENCE "+json.dumps({
+                "profile": args.profile, "n_RK": n, "dt": dt,
+                "exact_quadratic_endpoint_error": error, **hashes
+            }, sort_keys=True, allow_nan=False), flush=True)
+        if errors[0] <= 1024*EPS:
+            if max(errors) > 1024*EPS:
+                raise AssertionError(f"exact-flow endpoint lost exactness under refinement: RK{n}, {errors}")
+        elif not errors[-1] < errors[0]:
+            raise AssertionError(f"exact-flow tableau does not converge under dt refinement: RK{n}, {errors}")
+    print("PASS: exact-flow stage trajectories and final assembly for N_RK=2/3/4", flush=True)
+
+
 def order_suite(args):
     final_time = 0.32
     for kind in ("thermal", "drag", "mixed"):
@@ -422,12 +513,12 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("executable", type=Path); parser.add_argument("profile")
     parser.add_argument("--stage-count-executable", type=Path)
-    parser.add_argument("--section", choices=("stages", "order"))
+    parser.add_argument("--section", choices=("stages", "order", "analytic"))
     args = parser.parse_args(); args.executable = args.executable.resolve()
     check_order_conditions()
     if args.stage_count_executable:
         stage_count_suite(args.stage_count_executable.resolve(), args.profile)
-    if args.section != "order":
+    if args.section not in ("order", "analytic"):
         cases = ("lake_rough", "dynamic_smooth", "dynamic_drainage", "dynamic_compact")
         for name in cases:
             vertices, bed, q = spatial.fixture(name)
@@ -462,8 +553,10 @@ def main():
                                 if without[key].tobytes() != fields[key].tobytes():
                                     raise AssertionError("optional observer changed the production state")
         print("PASS: production raw stages and assembly, both CFL policies, actual 1/4 threads", flush=True)
-    if args.section != "stages":
+    if args.section in (None, "order"):
         order_suite(args)
+    if args.section in (None, "analytic"):
+        analytic_tableau_suite(args)
 
 
 if __name__ == "__main__":

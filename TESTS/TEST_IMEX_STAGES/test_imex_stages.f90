@@ -32,7 +32,7 @@ CONTAINS
   END SUBROUTINE capture_state
 END MODULE imex_test_observer
 
-!> \brief Exercise real IMEX stages, final repairs and Newton solves on generated fixtures.
+!> \brief Exercise real IMEX stages, final repairs and implicit-group solves on generated fixtures.
 PROGRAM test_imex_stages
   USE parameters_2d
   USE constitutive_parameters_2d
@@ -44,7 +44,7 @@ PROGRAM test_imex_stages
   USE domain_2d, ONLY : domain_type
   USE spatial_operator_2d, ONLY : spatial_operator_type
   USE time_integration_2d, ONLY : time_integration_workspace_type
-  USE equation_metadata_2d, ONLY : equation_partition_type
+  USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_ANALYTIC
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, finalize_nonlinear_solver
   USE state_conversion_2d, ONLY : qc_to_qp
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
@@ -65,7 +65,7 @@ PROGRAM test_imex_stages
   CHARACTER(LEN=32) :: argument
   INTEGER :: nx,ny,slope,curvature,limiter_id,input_unit,output_unit,j,k,i,step
   INTEGER :: threads,actual_threads,stages,steps,drag,observe,l
-  INTEGER :: composition_mode,boundary_test_mode,source_test_model
+  INTEGER :: composition_mode,boundary_test_mode,source_test_model,analytic_mode
 
   CALL get_command_argument(1,argument); READ(argument,*) threads
   CALL get_command_argument(2,argument); READ(argument,*) stages
@@ -89,7 +89,14 @@ PROGRAM test_imex_stages
   IF (LEN_TRIM(argument)>0) READ(argument,*) source_test_model
   IF (source_test_model/=0 .AND. source_test_model/=1 .AND. source_test_model/=3) &
        ERROR STOP 'invalid D02 source model'
-  IF (stages/=2 .OR. steps<1) ERROR STOP 'invalid test controls'
+  analytic_mode=0
+  argument=''
+  CALL get_command_argument(9,argument)
+  IF (LEN_TRIM(argument)>0) READ(argument,*) analytic_mode
+  IF (analytic_mode<0 .OR. analytic_mode>1) ERROR STOP 'invalid analytic fixture mode'
+  IF (analytic_mode==1 .AND. (drag==0 .OR. composition_mode/=0 .OR. source_test_model/=0)) &
+       ERROR STOP 'analytic fixture requires single-phase quadratic drag'
+  IF (stages<2 .OR. stages>4 .OR. steps<1) ERROR STOP 'invalid test controls'
   !$OMP PARALLEL
   !$OMP SINGLE
   actual_threads=omp_get_num_threads()
@@ -497,7 +504,7 @@ CONTAINS
     one_by_dx=1.0_wp/dx; one_by_dy=1.0_wp/dy
     n_vars=5; n_eqns=5; n_solid=1; n_add_gas=0; n_stoch_vars=0; n_pore_vars=0
     kt_trace_reconstruction = 'froude_blend'
-    n_RK=2; idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
+    n_RK=stages; idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
     idx_solid_first=5; idx_solid_last=5; idx_solidEqn_first=5; idx_solidEqn_last=5
     idx_add_gas_first=6; idx_add_gas_last=5
     idx_addGasEqn_first=6; idx_addGasEqn_last=5
@@ -579,7 +586,12 @@ CONTAINS
        IF (source_test_model==3) kt_trace_reconstruction='h_x'
     END IF
     IF (composition_mode==0) THEN
-       CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.,.FALSE.])
+       IF (analytic_mode==1) THEN
+          CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.,.FALSE.], &
+               [0,1,1,0,0], [IM_GROUP_METHOD_ANALYTIC])
+       ELSE
+          CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.,.FALSE.])
+       END IF
        IF (source_test_model==3) &
             CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.TRUE.,.FALSE.])
     ELSE
