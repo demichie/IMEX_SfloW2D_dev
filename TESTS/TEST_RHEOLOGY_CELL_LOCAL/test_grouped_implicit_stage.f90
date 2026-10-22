@@ -9,7 +9,8 @@ PROGRAM test_grouped_implicit_stage
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   USE equation_terms_2d, ONLY : eval_implicit_terms
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
-       finalize_nonlinear_solver, solve_rk_step
+       finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
+  USE state_conversion_2d, ONLY : qc_to_qp
 
   IMPLICIT NONE
 
@@ -17,6 +18,8 @@ PROGRAM test_grouped_implicit_stage
   LOGICAL :: implicit_mask(7), converged, line_search_failed
   INTEGER :: group_map(7), iterations, linear_info, i
   REAL(wp) :: q_old(7), q_stage(7), known_residual(7), source(7)
+  REAL(wp) :: q_stage_check(7), effective_stage_term(7), qp_known(9)
+  REAL(wp) :: dynamic_pressure, stage_rate_error
   REAL(wp) :: residual, scale, dt_step, a_diag
 
   n_solid = 2
@@ -34,8 +37,13 @@ PROGRAM test_grouped_implicit_stage
   idx_solid_last = 6
   idx_solidEqn_first = 5
   idx_solidEqn_last = 6
+  idx_add_gas_first = 7
+  idx_add_gas_last = 6
   idx_pore = 7
   idx_poreEqn = 7
+  idx_u = n_vars + 1
+  idx_v = n_vars + 2
+  idx_stoch = 0
   rheology_flag = .TRUE.
   rheology_model_id = rheology_id_lava
   pore_pressure_flag = .TRUE.
@@ -119,8 +127,27 @@ PROGRAM test_grouped_implicit_stage
      ERROR STOP 'group solves modified equations outside their partitions'
   END IF
 
+  q_stage_check = q_old
+  q_stage_check(2:3) = 0.0_wp
+  CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
+  CALL solve_imex_stage(partition, q_stage_check, q_stage_check, qp_known,  &
+       dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
+       0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                     &
+       effective_stage_term, iterations, converged, linear_info,             &
+       line_search_failed)
+  IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
+     ERROR STOP 'IMEX stage coordinator did not converge'
+  END IF
+  stage_rate_error = MAXVAL(ABS(q_stage - q_stage_check -                  &
+       dt_step*a_diag*effective_stage_term(1:7)))
+  scale = MAX(1.0_wp, MAXVAL(ABS(q_stage)))
+  IF (stage_rate_error / scale .GT. 5.0E-14_wp) THEN
+     WRITE(*,*) 'FAIL: effective IM stage rate', stage_rate_error / scale
+     ERROR STOP 'effective IM rate does not match the net stage increment'
+  END IF
+
   CALL partition%finalize
   CALL finalize_nonlinear_solver
-  WRITE(*,*) 'PASS: analytic and reduced-Newton stage groups satisfy DIRK residuals'
+  WRITE(*,*) 'PASS: grouped DIRK solves and effective IMEX stage rate'
 
 END PROGRAM test_grouped_implicit_stage

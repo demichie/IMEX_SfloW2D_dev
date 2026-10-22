@@ -23,7 +23,7 @@ MODULE time_integration_2d
   USE geometry_2d, ONLY : cell_arc_perim, cell_arc_n_x, cell_arc_n_y
 
   USE constitutive_parameters_2d, ONLY : T_ambient
-  USE nonlinear_solver_2d, ONLY : solve_implicit_stage
+  USE nonlinear_solver_2d, ONLY : solve_imex_stage
 
   USE equation_metadata_2d, ONLY : equation_partition_type
 
@@ -463,9 +463,9 @@ CONTAINS
                      - MATMUL(this%IM_terms(1:n_eqns,j,k,1:i_RK-1),           &
                      this%a_dirk(1:i_RK-1) ) )
 
-                ! The local solver owns the SI/Newton split and returns its
-                ! corrected, effective implicit contribution as one IM term.
-                CALL solve_implicit_stage(equation_partition, q_fv_cell,      &
+                ! The local stage coordinator applies SI and the ordered
+                ! implicit-group sweep, returning one effective IM term.
+                CALL solve_imex_stage(equation_partition, q_fv_cell,          &
                      q(1:n_vars,j,k), qp(1:n_vars+2,j,k), dt, a_diag,         &
                      known_stage_residual, B_prime_x_geom(j,k),               &
                      B_prime_y_geom(j,k), B_second_xx_geom(j,k),              &
