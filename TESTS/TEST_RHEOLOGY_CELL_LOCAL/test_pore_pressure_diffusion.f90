@@ -65,6 +65,16 @@ PROGRAM test_pore_pressure_diffusion
        (mixture_density * flow_depth), 2.0E-5_wp,                            &
        'diffusion integrator initial derivative disagrees with source')
 
+  CALL advance_pore_pressure_diffusion(initial_pressure, 0.0_wp,            &
+       flow_depth, temperature, solid_fractions, after_full)
+  CALL assert_close(after_full, initial_pressure, 0.0_wp,                    &
+       'zero-duration diffusion changed the pressure')
+
+  CALL advance_pore_pressure_diffusion(0.0_wp, integration_step,            &
+       flow_depth, temperature, solid_fractions, after_full)
+  CALL assert_close(after_full, 0.0_wp, 0.0_wp,                             &
+       'zero excess pressure was not preserved')
+
   CALL advance_pore_pressure_diffusion(-initial_pressure, integration_step,  &
        flow_depth, temperature, solid_fractions, after_full)
   CALL assert_close(after_full, -initial_pressure, 0.0_wp,                    &
@@ -81,6 +91,18 @@ PROGRAM test_pore_pressure_diffusion
        flow_depth, temperature, solid_fractions, after_full)
   CALL assert_close(after_full, initial_pressure, 0.0_wp,                    &
        'state without pore volume should remain unchanged')
+
+  solid_fractions = 0.2_wp / REAL(n_solid,wp)
+  CALL advance_pore_pressure_diffusion(initial_pressure, HUGE(1.0_wp),       &
+       flow_depth, temperature, solid_fractions, after_full)
+  CALL assert_close(after_full, 0.0_wp, 0.0_wp,                              &
+       'long-time diffusion limit did not decay excess pressure to zero')
+
+  hydraulic_permeability = 0.0_wp
+  CALL advance_pore_pressure_diffusion(initial_pressure, integration_step,   &
+       flow_depth, temperature, solid_fractions, after_full)
+  CALL assert_close(after_full, initial_pressure, 0.0_wp,                    &
+       'zero permeability changed excess pore pressure')
 
   WRITE(*,*) 'All exact pore-pressure diffusion checks passed.'
 

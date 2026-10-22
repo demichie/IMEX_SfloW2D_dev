@@ -14,6 +14,12 @@ PROGRAM test_lava_cooling
   REAL(wp) :: after_first, after_second, after_full, after_short
   REAL(wp) :: expected_derivative, measured_derivative, expected_temperature
 
+  CALL advance_lava_cooling_temperature(initial_temperature, 0.0_wp,        &
+       areal_heat_capacity, radiative_coefficient, convective_coefficient,   &
+       ambient, after_full)
+  CALL assert_close(after_full, initial_temperature, 0.0_wp,               &
+       'zero-duration cooling changed the temperature')
+
   CALL advance_lava_cooling_temperature(initial_temperature, 10.0_wp,       &
        areal_heat_capacity, radiative_coefficient,                           &
        convective_coefficient, ambient, after_first)
@@ -67,6 +73,18 @@ PROGRAM test_lava_cooling
   IF (after_full .LE. ambient - 100.0_wp .OR. after_full .GE. ambient) THEN
      ERROR STOP 'sub-ambient cooling flow did not approach ambient temperature'
   END IF
+
+  CALL advance_lava_cooling_temperature(ambient, 25.0_wp,                   &
+       areal_heat_capacity, radiative_coefficient, convective_coefficient,   &
+       ambient, after_full)
+  CALL assert_close(after_full, ambient, 0.0_wp,                             &
+       'ambient equilibrium was not preserved')
+
+  CALL advance_lava_cooling_temperature(initial_temperature, 1.0E9_wp,      &
+       areal_heat_capacity, 0.0_wp, convective_coefficient, ambient,        &
+       after_full)
+  CALL assert_close(after_full, ambient, 2.0E-14_wp,                         &
+       'long-time convection limit did not reach ambient temperature')
 
   CALL advance_lava_cooling_temperature(initial_temperature, 10.0_wp,       &
        areal_heat_capacity, 0.0_wp, 0.0_wp, ambient, after_full)

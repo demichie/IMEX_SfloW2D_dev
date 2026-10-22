@@ -1750,8 +1750,8 @@ Stato ufficiale: IN CORSO — i gruppi ANALYTIC integrano nel tempo i termini
 IM con i coefficienti non integrati congelati all’ingresso del gruppo. Le
 formule di flusso chiuse sono usate quando disponibili; gli altri termini
 sono trattati tramite inversione controllata dell’integrale scalare del tempo.
-I test coprono i gruppi e l’ordine; restano da validare i regimi limite e
-la traiettoria completa con gruppi multipli.
+I test coprono i gruppi, l’ordine e i regimi limite; resta da validare la
+traiettoria completa del tableau con gruppi multipli (D14).
 
 #### Flusso congelato per la velocità
 
@@ -1792,8 +1792,13 @@ I test diretti verificano le traiettorie con build strict e optimized. Il test
 `test_analytic_velocity` controlla la proprietà di semigruppo per tutti i
 modelli scalari, inclusi attraversamenti delle soglie Froude/Lucas, e verifica
 gli endpoint contro una soluzione di riferimento RK4 indipendente e gli
-estremi di arresto e intervallo nullo. I test energia e pressione controllano
-anch’essi la composizione temporale e il limite a breve intervallo.
+estremi di arresto e intervallo nullo. Controlla inoltre i limiti di tempo
+nullo, velocità nulla e coefficiente di drag nullo per tutte le leggi scalari,
+i rami degeneri della legge polinomiale e i casi di arresto finito. I test
+energia e pressione verificano anche equilibrio alla temperatura ambiente,
+tempo nullo, limite a lungo tempo, pressione nulla, stato senza volume poroso
+e permeabilità nulla, oltre alla composizione temporale e al limite a breve
+intervallo.
 La suite verifica gruppi ANALYTIC e NEWTON, famiglie condivise, ordine
 configurato, aggiornamenti visibili ai gruppi successivi e coerenza del rate
 effettivo con l’incremento conservativo netto. La regressione
@@ -1802,8 +1807,8 @@ per `N_RK=2/3/4`, gli stati noti e risolti degli stage e l’assemblaggio finale
 contro flussi quadratici indipendenti; il test controlla anche la soluzione
 esatta dell’endpoint nel caso a due stage e la convergenza al raffinamento
 temporale per i tableau a tre e quattro stage, con esecuzioni a uno e quattro
-thread. Restano da coprire i limiti estremi aggiuntivi e la traiettoria
-completa dell’intero tableau con gruppi multipli.
+thread. Resta da coprire la traiettoria completa dell’intero tableau con
+gruppi multipli, tracciata in D14.
 
 #### Contratto d’integrazione
 

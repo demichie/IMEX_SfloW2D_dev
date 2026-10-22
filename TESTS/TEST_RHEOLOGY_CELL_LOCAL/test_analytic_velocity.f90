@@ -368,6 +368,54 @@ PROGRAM test_analytic_velocity
        [0.04_wp, 0.01_wp, 0.002_wp, 0.3_wp, 0.08_wp], 0.0_wp,             &
        4.5_wp, speed_after)
   CALL assert_close(speed_after, 4.5_wp, 'zero-interval identity')
+  CALL assert_flow_limits(EXACT_FLOW_CONSTANT, [0.6_wp], [0.0_wp], 'constant')
+  CALL assert_flow_limits(EXACT_FLOW_LINEAR, [0.2_wp], [0.0_wp], 'linear')
+  CALL assert_flow_limits(EXACT_FLOW_AFFINE, [0.5_wp, 0.2_wp],            &
+       [0.0_wp, 0.0_wp], 'affine')
+  CALL assert_flow_limits(EXACT_FLOW_QUADRATIC, [0.08_wp], [0.0_wp],      &
+       'quadratic')
+  CALL assert_flow_limits(EXACT_FLOW_QUADRATIC_POLYNOMIAL,                &
+       [0.2_wp, 0.1_wp, 0.02_wp], [0.0_wp, 0.0_wp, 0.0_wp], 'polynomial')
+  CALL assert_flow_limits(EXACT_FLOW_FROUDE,                              &
+       [0.5_wp, 0.2_wp, -0.86_wp, 0.5_wp, 0.2_wp],                        &
+       [0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp], 'Froude')
+  CALL assert_flow_limits(EXACT_FLOW_LUCAS,                               &
+       [0.5_wp, 1.0_wp, 0.0_wp, 0.5_wp, 0.2_wp, 4.3_wp, 0.0_wp],          &
+       [0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp], 'Lucas')
+  CALL assert_flow_limits(EXACT_FLOW_MUI,                                 &
+       [0.04_wp, 0.01_wp, 0.002_wp, 0.3_wp, 0.08_wp],                     &
+       [0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp], 'mu(I)')
+  CALL assert_flow_limits(EXACT_FLOW_MUI_VOELLMY,                         &
+       [0.04_wp, 0.01_wp, 0.002_wp, 0.3_wp, 0.08_wp, 0.02_wp],            &
+       [0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp], 'mu(I)-Voellmy')
+
+  CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,         &
+       [0.0_wp, 0.2_wp, 0.0_wp], 0.7_wp, 4.5_wp, speed_after)
+  CALL assert_close(speed_after, 4.5_wp*EXP(-0.2_wp*0.7_wp),               &
+       'polynomial linear-only limit')
+  CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,         &
+       [0.0_wp, 0.0_wp, 0.02_wp], 0.7_wp, 4.5_wp, speed_after)
+  CALL assert_close(speed_after, 4.5_wp/(1.0_wp+0.02_wp*4.5_wp*0.7_wp),   &
+       'polynomial quadratic-only limit')
+  CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,         &
+       [0.0_wp, 0.2_wp, 0.02_wp], 0.7_wp, 4.5_wp, speed_after)
+  expected_speed = 4.5_wp*EXP(-0.2_wp*0.7_wp) /                           &
+       (1.0_wp+(0.02_wp*4.5_wp/0.2_wp)*(1.0_wp-EXP(-0.2_wp*0.7_wp)))
+  CALL assert_close(speed_after, expected_speed, 'polynomial zero-constant limit')
+  CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,         &
+       [0.5_wp, 0.2_wp, 0.0_wp], 0.7_wp, 4.5_wp, speed_after)
+  expected_speed = (4.5_wp+0.5_wp/0.2_wp)*EXP(-0.2_wp*0.7_wp)-0.5_wp/0.2_wp
+  CALL assert_close(speed_after, expected_speed, 'polynomial zero-quadratic limit')
+  CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,         &
+       [1.0_wp, 2.0_wp, 1.0_wp], 0.2_wp, 4.5_wp, speed_after)
+  expected_speed = 5.5_wp/(1.0_wp+5.5_wp*0.2_wp)-1.0_wp
+  CALL assert_close(speed_after, expected_speed, 'polynomial repeated-root limit')
+  CALL assert_flow_semigroup(EXACT_FLOW_QUADRATIC_POLYNOMIAL,              &
+       [1.0_wp, 3.0_wp, 1.0_wp], 0.1_wp,                                  &
+       'polynomial negative-discriminant branch')
+  CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,         &
+       [1.0_wp, 0.2_wp, 0.02_wp], 10.0_wp, 4.5_wp, speed_after)
+  CALL assert_close(speed_after, 0.0_wp, 'polynomial finite stopping limit')
 
   WRITE(*,*) 'All analytic rheology exact-flow checks passed.'
 
@@ -448,6 +496,26 @@ CONTAINS
     END IF
 
   END SUBROUTINE assert_flow_semigroup
+
+  SUBROUTINE assert_flow_limits(flow_model, coefficients, zero_coefficients, label)
+
+    INTEGER, INTENT(IN) :: flow_model
+    REAL(wp), INTENT(IN) :: coefficients(:), zero_coefficients(:)
+    CHARACTER(LEN=*), INTENT(IN) :: label
+    REAL(wp), PARAMETER :: initial_speed = 4.5_wp
+    REAL(wp) :: result
+
+    CALL solve_exact_velocity_flow(flow_model, coefficients, 0.0_wp,       &
+         initial_speed, result)
+    CALL assert_close(result, initial_speed, TRIM(label)//' zero-time limit')
+    CALL solve_exact_velocity_flow(flow_model, coefficients, 0.5_wp,       &
+         0.0_wp, result)
+    CALL assert_close(result, 0.0_wp, TRIM(label)//' zero-speed limit')
+    CALL solve_exact_velocity_flow(flow_model, zero_coefficients, 0.5_wp,  &
+         initial_speed, result)
+    CALL assert_close(result, initial_speed, TRIM(label)//' zero-drag limit')
+
+  END SUBROUTINE assert_flow_limits
 
   FUNCTION reference_flow_solution(flow_model, coefficients, initial_speed, &
        interval) RESULT(speed)
