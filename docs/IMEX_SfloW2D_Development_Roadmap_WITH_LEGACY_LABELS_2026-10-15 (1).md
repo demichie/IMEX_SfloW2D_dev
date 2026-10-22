@@ -2118,7 +2118,17 @@ riesce.
 anche il dummy di output ora usa il qualificatore completo
 `semi_implicit_term`. Il solver e i test aggiornati usano la nuova API.
 
-**D16.6 — Riorganizzazione termica.** Rinominare l’integratore analitico della temperatura, separare rate di massa ed energia della vaporizzazione e mantenere l’assemblaggio energetico degli scambi in `equation_terms_2d`.
+**D16.6 — Riorganizzazione termica.** Usare `solve_lava_analytic_temperature` come nome canonico dell’integratore analitico (mantenendo `advance_lava_cooling_temperature` come wrapper di compatibilità), separare i rate di massa ed energia della vaporizzazione e mantenere l’assemblaggio energetico degli scambi in `equation_terms_2d`.
+
+Completata la separazione: `eval_vaporization_mass_rate` e
+`eval_vaporization_energy_rate` calcolano risultati distinti in
+`thermal_laws_2d`; `eval_mass_exchange_thermal_energy` appartiene ora a
+`equation_terms_2d`, che assembla i contributi energetici. La legge di
+raffreddamento e il relativo dispatcher usano `energy_rate` nei nomi. Il
+solve canonico della temperatura esiste già con il nome previsto e il vecchio
+nome `advance_lava_cooling_temperature` resta un wrapper di compatibilità.
+I test sorgente verificano separatamente i rate di massa ed energia e il
+comportamento alla soglia di ebollizione.
 
 **D16.7 — Riorganizzazione dello scambio di massa.** Spostare le formule costitutive in `mass_exchange_laws_2d`, lasciando l’assemblaggio in `equation_terms_2d` e l’applicazione temporale in `time_integration_2d`.
 

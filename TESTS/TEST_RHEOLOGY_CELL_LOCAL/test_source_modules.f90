@@ -4,11 +4,12 @@ PROGRAM test_source_modules
        rheology_id_lava
   USE rheology_lahar_2d, ONLY : alpha1_coeff, beta1, eval_lahar_fluid_viscosity
   USE rheology_2d, ONLY : correct_friction_momentum
+  USE equation_terms_2d, ONLY : eval_mass_exchange_thermal_energy
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source,           &
        eval_pore_pressure_mass_exchange_source
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                &
-       eval_rheology_cooling_source, eval_mass_exchange_thermal_energy,       &
-       eval_vaporization_sources
+       eval_rheology_cooling_energy_rate, eval_vaporization_mass_rate,       &
+       eval_vaporization_energy_rate
   USE mass_exchange_laws_2d, ONLY : eval_hindered_settling_deposition_rate,  &
        eval_lahar_deposition_rate, eval_settling_fluid_properties,           &
        eval_solid_deposition_rate, eval_erosion_rates,                       &
@@ -22,7 +23,7 @@ PROGRAM test_source_modules
   REAL(wp) :: temperature_perturbation
   COMPLEX(wp) :: complex_actual
   REAL(wp) :: vapor_mass_rate
-  REAL(wp) :: vapor_energy_source
+  REAL(wp) :: vapor_energy_rate
   REAL(wp) :: solid_density(2)
   REAL(wp) :: solid_heat_capacity(2)
   REAL(wp) :: deposition_rate(2)
@@ -139,7 +140,7 @@ PROGRAM test_source_modules
        'friction correction keeps zero y momentum at rest')
 
   temperature_perturbation = 1.0E-20_wp
-  complex_actual = eval_rheology_cooling_source(rheology_id_lava,          &
+  complex_actual = eval_rheology_cooling_energy_rate(rheology_id_lava,     &
        CMPLX(900.0_wp, temperature_perturbation, wp), 3.0E-8_wp,           &
        4.0_wp, 300.0_wp)
   expected = -3.0E-8_wp * (900.0_wp**4 - 300.0_wp**4) -                    &
@@ -149,7 +150,7 @@ PROGRAM test_source_modules
   CALL assert_close(AIMAG(complex_actual) / temperature_perturbation,        &
        expected_derivative,                                                 &
        'lava cooling complex-step derivative')
-  complex_actual = eval_rheology_cooling_source(rheology_id_none,          &
+  complex_actual = eval_rheology_cooling_energy_rate(rheology_id_none,     &
        CMPLX(900.0_wp, temperature_perturbation, wp), 3.0E-8_wp,           &
        4.0_wp, 300.0_wp)
   CALL assert_close(REAL(complex_actual,wp), 0.0_wp, 'non-lava cooling source')
@@ -167,15 +168,21 @@ PROGRAM test_source_modules
        0.006_wp
   CALL assert_close(actual, expected, 'mass-exchange thermal energy')
 
-  CALL eval_vaporization_sources(400.0_wp, solid_density, solid_heat_capacity, &
-       deposition_rate, 0.114_wp, 2010.0_wp, vapor_mass_rate,                  &
-       vapor_energy_source)
+  vapor_mass_rate = eval_vaporization_mass_rate(400.0_wp, solid_density,    &
+       solid_heat_capacity, deposition_rate, 0.114_wp)
+  vapor_energy_rate = eval_vaporization_energy_rate(vapor_mass_rate,        &
+       2010.0_wp)
   expected = 0.114_wp * (400.0_wp - 373.15_wp) *                              &
        SUM(solid_density * solid_heat_capacity * deposition_rate) /            &
        (4184.0_wp * (373.15_wp - 290.0_wp) + 2264705.0_wp)
   CALL assert_close(vapor_mass_rate, expected, 'vaporization mass rate')
-  CALL assert_close(vapor_energy_source, expected * 2010.0_wp * 373.15_wp,    &
+  CALL assert_close(vapor_energy_rate, expected * 2010.0_wp * 373.15_wp,    &
        'vaporization energy')
+  actual = eval_vaporization_mass_rate(373.15_wp, solid_density,            &
+       solid_heat_capacity, deposition_rate, 0.114_wp)
+  CALL assert_close(actual, 0.0_wp, 'vaporization threshold mass rate')
+  actual = eval_vaporization_energy_rate(actual, 2010.0_wp)
+  CALL assert_close(actual, 0.0_wp, 'vaporization threshold energy rate')
 
   actual = eval_pore_pressure_inlet_source(0.4_wp, 1.2_wp, 0.03_wp, 0.02_wp,  &
        900.0_wp, 0.7_wp, 5000.0_wp)

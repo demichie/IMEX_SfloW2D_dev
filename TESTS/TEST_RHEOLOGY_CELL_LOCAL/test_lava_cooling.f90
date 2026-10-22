@@ -1,7 +1,7 @@
 PROGRAM test_lava_cooling
 
   USE parameters_2d, ONLY : wp
-  USE thermal_laws_2d, ONLY : eval_lava_cooling_source,                      &
+  USE thermal_laws_2d, ONLY : eval_lava_cooling_energy_rate,                 &
        advance_lava_cooling_temperature, solve_lava_analytic_temperature
 
   IMPLICIT NONE
@@ -52,7 +52,7 @@ PROGRAM test_lava_cooling
   CALL advance_lava_cooling_temperature(initial_temperature, 0.01_wp,        &
        areal_heat_capacity, radiative_coefficient,                           &
        convective_coefficient, ambient, after_short)
-  expected_derivative = REAL(eval_lava_cooling_source(                       &
+  expected_derivative = REAL(eval_lava_cooling_energy_rate(                  &
        CMPLX(initial_temperature, 0.0_wp, wp), radiative_coefficient,         &
        convective_coefficient, ambient), wp) / areal_heat_capacity
   measured_derivative = (after_short - initial_temperature) / 0.01_wp

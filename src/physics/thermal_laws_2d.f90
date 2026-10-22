@@ -1,8 +1,8 @@
 !********************************************************************************
-!> \brief Thermal source laws and exact lava cooling integration.
-!> \details Provides thermal-energy sources for inlet injection, mass exchange
-!>          and vaporization, as well as the lava radiative/convective cooling
-!>          law and one exact-flow integrator for the autonomous cooling ODE.
+!> \brief Thermal laws and exact lava cooling integration.
+!> \details Provides thermal-energy rates for inlet injection and vaporization,
+!>          the lava radiative/convective cooling law and its exact-flow
+!>          integrator.
 !********************************************************************************
 
 MODULE thermal_laws_2d
@@ -16,12 +16,17 @@ MODULE thermal_laws_2d
   PRIVATE
 
   PUBLIC :: eval_inlet_thermal_energy_source
-  PUBLIC :: eval_lava_cooling_source
-  PUBLIC :: eval_rheology_cooling_source
+  PUBLIC :: eval_lava_cooling_energy_rate
+  PUBLIC :: eval_rheology_cooling_energy_rate
   PUBLIC :: solve_lava_analytic_temperature
   PUBLIC :: advance_lava_cooling_temperature
-  PUBLIC :: eval_mass_exchange_thermal_energy
-  PUBLIC :: eval_vaporization_sources
+  PUBLIC :: eval_vaporization_mass_rate
+  PUBLIC :: eval_vaporization_energy_rate
+
+  REAL(wp), PARAMETER :: vaporization_liquid_temperature = 290.0_wp
+  REAL(wp), PARAMETER :: vaporization_boiling_temperature = 373.15_wp
+  REAL(wp), PARAMETER :: vaporization_latent_heat = 2264705.0_wp
+  REAL(wp), PARAMETER :: vaporization_liquid_heat_capacity = 4184.0_wp
 
 CONTAINS
 
@@ -54,7 +59,7 @@ CONTAINS
   END FUNCTION eval_inlet_thermal_energy_source
 
   !******************************************************************************
-  !> \brief Evaluate the lava radiative and convective cooling source.
+  !> \brief Evaluate the lava radiative and convective cooling energy rate.
   !> \details Uses the net Stefan-type radiation and linear convection law
   !>          \f$S_T=-k_r(T^4-T_a^4)-k_c(T-T_a)\f$.
   !>          The complex temperature argument preserves complex-step
@@ -63,9 +68,9 @@ CONTAINS
   !> \param[in] radiative_coefficient Radiative coefficient k_r [W m^-2 K^-4].
   !> \param[in] convective_coefficient Convective coefficient k_c [W m^-2 K^-1].
   !> \param[in] ambient_temperature Ambient temperature T_a [K].
-  !> \return Net cooling energy source per unit area [W m^-2].
+  !> \return Net cooling energy rate per unit area [W m^-2].
   !******************************************************************************
-  PURE FUNCTION eval_lava_cooling_source(temperature, radiative_coefficient,   &
+  PURE FUNCTION eval_lava_cooling_energy_rate(temperature, radiative_coefficient, &
        convective_coefficient, ambient_temperature) RESULT(source)
 
     COMPLEX(wp), INTENT(IN) :: temperature
@@ -77,10 +82,10 @@ CONTAINS
     source = -radiative_coefficient * (temperature**4 - ambient_temperature**4) &
          - convective_coefficient * (temperature - ambient_temperature)
 
-  END FUNCTION eval_lava_cooling_source
+  END FUNCTION eval_lava_cooling_energy_rate
 
   !******************************************************************************
-  !> \brief Evaluate any cooling source associated with the selected rheology.
+  !> \brief Evaluate the cooling energy rate associated with the selected rheology.
   !> \details Lava uses the radiative/convective cooling law; other models
   !>          contribute no rheology-specific cooling source.
   !> \param[in] model_id Selected rheology model ID.
@@ -88,27 +93,27 @@ CONTAINS
   !> \param[in] radiative_coefficient Radiative coefficient [W m^-2 K^-4].
   !> \param[in] convective_coefficient Convective coefficient [W m^-2 K^-1].
   !> \param[in] ambient_temperature Ambient temperature [K].
-  !> \return Rheology-specific thermal-energy source per unit area [W m^-2].
+  !> \return Rheology-specific thermal-energy rate per unit area [W m^-2].
   !******************************************************************************
-  PURE FUNCTION eval_rheology_cooling_source(model_id, temperature,          &
+  PURE FUNCTION eval_rheology_cooling_energy_rate(model_id, temperature,     &
        radiative_coefficient, convective_coefficient, ambient_temperature)   &
-       RESULT(source)
+       RESULT(rate)
 
     INTEGER, INTENT(IN) :: model_id
     COMPLEX(wp), INTENT(IN) :: temperature
     REAL(wp), INTENT(IN) :: radiative_coefficient, convective_coefficient
     REAL(wp), INTENT(IN) :: ambient_temperature
-    COMPLEX(wp) :: source
+    COMPLEX(wp) :: rate
 
     SELECT CASE (model_id)
     CASE (rheology_id_lava)
-       source = eval_lava_cooling_source(temperature, radiative_coefficient, &
+       rate = eval_lava_cooling_energy_rate(temperature, radiative_coefficient, &
             convective_coefficient, ambient_temperature)
     CASE DEFAULT
-       source = CMPLX(0.0_wp, 0.0_wp, wp)
+       rate = CMPLX(0.0_wp, 0.0_wp, wp)
     END SELECT
 
-  END FUNCTION eval_rheology_cooling_source
+  END FUNCTION eval_rheology_cooling_energy_rate
 
   !******************************************************************************
   !> \brief Solve the exact-flow lava cooling temperature over a time interval.
@@ -348,111 +353,55 @@ CONTAINS
   END FUNCTION lava_cooling_time_primitive
 
   !******************************************************************************
-  !> \brief Compute the thermal-energy source associated with mass exchange.
-  !> \details Accounts for energy removed with deposited solids and lost carrier
-  !>          material, energy supplied by eroded solids and carrier material,
-  !>          and ambient-air entrainment:
-  !>          \f[
-  !>          S_T=-T_f\left(\sum_i\rho_i c_iD_i+\rho_c c_cL_c\right)
-  !>              +T_s\left(\sum_i\rho_i c_iE_i+\rho_{sc}c_cE_c\right)
-  !>              +T_a c_a\rho_aE_a.
-  !>          \f]
-  !> \param[in] flow_temperature Temperature of the flowing mixture T_f [K].
-  !> \param[in] solid_density Per-class solid densities rho_i [kg m^-3].
-  !> \param[in] solid_heat_capacity Per-class solid specific heat capacities c_i [J kg^-1 K^-1].
-  !> \param[in] deposition_rate Per-class deposition thickness rates D_i [m s^-1].
-  !> \param[in] erosion_rate Per-class solid erosion thickness rates E_i [m s^-1].
-  !> \param[in] carrier_density Flow carrier density rho_c [kg m^-3].
-  !> \param[in] carrier_heat_capacity Carrier specific heat capacity c_c [J kg^-1 K^-1].
-  !> \param[in] carrier_loss_rate Carrier-layer loss rate L_c [m s^-1].
-  !> \param[in] substrate_temperature Substrate temperature T_s for incoming eroded material [K].
-  !> \param[in] substrate_carrier_density Carrier density of the substrate material rho_sc
-  !>                                      [kg m^-3].
-  !> \param[in] carrier_erosion_rate Carrier-layer erosion/entrainment rate E_c [m s^-1].
-  !> \param[in] ambient_temperature Ambient-air temperature T_a [K].
-  !> \param[in] air_heat_capacity Ambient-air specific heat capacity c_a [J kg^-1 K^-1].
-  !> \param[in] ambient_air_density Ambient-air density rho_a [kg m^-3].
-  !> \param[in] air_entrainment_rate Ambient-air entrainment rate E_a [m s^-1].
-  !> \return Net mass-exchange thermal-energy source per unit area [W m^-2].
-  !******************************************************************************
-  PURE FUNCTION eval_mass_exchange_thermal_energy(flow_temperature,            &
-       solid_density, solid_heat_capacity, deposition_rate, erosion_rate,      &
-       carrier_density, carrier_heat_capacity, carrier_loss_rate,              &
-       substrate_temperature, substrate_carrier_density,                       &
-       carrier_erosion_rate, ambient_temperature, air_heat_capacity,            &
-       ambient_air_density, air_entrainment_rate) RESULT(source)
-
-    REAL(wp), INTENT(IN) :: flow_temperature
-    REAL(wp), INTENT(IN) :: solid_density(:)
-    REAL(wp), INTENT(IN) :: solid_heat_capacity(:)
-    REAL(wp), INTENT(IN) :: deposition_rate(:)
-    REAL(wp), INTENT(IN) :: erosion_rate(:)
-    REAL(wp), INTENT(IN) :: carrier_density
-    REAL(wp), INTENT(IN) :: carrier_heat_capacity
-    REAL(wp), INTENT(IN) :: carrier_loss_rate
-    REAL(wp), INTENT(IN) :: substrate_temperature
-    REAL(wp), INTENT(IN) :: substrate_carrier_density
-    REAL(wp), INTENT(IN) :: carrier_erosion_rate
-    REAL(wp), INTENT(IN) :: ambient_temperature
-    REAL(wp), INTENT(IN) :: air_heat_capacity
-    REAL(wp), INTENT(IN) :: ambient_air_density
-    REAL(wp), INTENT(IN) :: air_entrainment_rate
-    REAL(wp) :: source
-
-    source = -flow_temperature * ( SUM( solid_density * solid_heat_capacity *  &
-         deposition_rate ) + carrier_density * carrier_heat_capacity *         &
-         carrier_loss_rate ) + substrate_temperature * ( SUM( solid_density *  &
-         solid_heat_capacity * erosion_rate ) + substrate_carrier_density *    &
-         carrier_heat_capacity * carrier_erosion_rate ) + ambient_temperature &
-         * air_heat_capacity * ambient_air_density * air_entrainment_rate
-
-  END FUNCTION eval_mass_exchange_thermal_energy
-
-  !******************************************************************************
-  !> \brief Compute vapor mass and sensible-energy sources from hot-solid deposition.
+  !> \brief Compute the vaporization mass rate from hot-solid deposition.
   !> \details Deposition heat above the boiling point supplies liquid warming
   !>          and latent vaporization energy. The generated steam rate is
-  !>          multiplied by the configured steam fraction; its energy source is
-  !>          evaluated at the boiling temperature:
-  !>          \f[
-  !>          \dot{m}_v=\frac{f_v\max(0,T_f-T_b)\sum_i\rho_i c_iD_i}
-  !>                         {c_l(T_b-T_l)+L_v},\qquad
-  !>          S_v=\dot{m}_v c_gT_b.
-  !>          \f]
+  !>          multiplied by the configured steam fraction.
+  !>          \f$\dot{m}_v=f_v\max(0,T_f-T_b)\sum_i\rho_i c_iD_i/
+  !>          [c_l(T_b-T_l)+L_v]\f$.
   !> \param[in] flow_temperature Flow temperature T_f [K].
   !> \param[in] solid_density Per-class solid densities rho_i [kg m^-3].
   !> \param[in] solid_heat_capacity Per-class solid specific heat capacities c_i [J kg^-1 K^-1].
   !> \param[in] deposition_rate Per-class deposition thickness rates D_i [m s^-1].
   !> \param[in] steam_fraction Fraction f_v of the available deposition heat assigned to vapor.
-  !> \param[in] gas_heat_capacity Steam specific heat capacity c_g [J kg^-1 K^-1].
-  !> \param[out] vapor_mass_rate Generated vapor mass rate per unit area [kg m^-2 s^-1].
-  !> \param[out] vapor_energy_source Vapor sensible-energy source per unit area [W m^-2].
+  !> \return Generated vapor mass rate per unit area [kg m^-2 s^-1].
   !******************************************************************************
-  PURE SUBROUTINE eval_vaporization_sources(flow_temperature, solid_density,    &
-       solid_heat_capacity, deposition_rate, steam_fraction, gas_heat_capacity,&
-       vapor_mass_rate, vapor_energy_source)
+  PURE FUNCTION eval_vaporization_mass_rate(flow_temperature, solid_density,   &
+       solid_heat_capacity, deposition_rate, steam_fraction) RESULT(rate)
 
     REAL(wp), INTENT(IN) :: flow_temperature
     REAL(wp), INTENT(IN) :: solid_density(:)
     REAL(wp), INTENT(IN) :: solid_heat_capacity(:)
     REAL(wp), INTENT(IN) :: deposition_rate(:)
     REAL(wp), INTENT(IN) :: steam_fraction
-    REAL(wp), INTENT(IN) :: gas_heat_capacity
-    REAL(wp), INTENT(OUT) :: vapor_mass_rate
-    REAL(wp), INTENT(OUT) :: vapor_energy_source
+    REAL(wp) :: rate
 
-    REAL(wp), PARAMETER :: liquid_temperature = 290.0_wp
-    REAL(wp), PARAMETER :: boiling_temperature = 373.15_wp
-    REAL(wp), PARAMETER :: latent_heat = 2264705.0_wp
-    REAL(wp), PARAMETER :: liquid_heat_capacity = 4184.0_wp
+    rate = steam_fraction * MAX(0.0_wp, flow_temperature -                    &
+         vaporization_boiling_temperature) *                                 &
+         SUM(solid_density * solid_heat_capacity * deposition_rate) /         &
+         (vaporization_liquid_heat_capacity *                                 &
+         (vaporization_boiling_temperature -                                  &
+         vaporization_liquid_temperature) + vaporization_latent_heat)
 
-    vapor_mass_rate = steam_fraction * MAX(0.0_wp, flow_temperature -         &
-         boiling_temperature) * SUM(solid_density * solid_heat_capacity *      &
-         deposition_rate) / (liquid_heat_capacity * (boiling_temperature -    &
-         liquid_temperature) + latent_heat)
-    vapor_energy_source = vapor_mass_rate * gas_heat_capacity *                &
-         boiling_temperature
+  END FUNCTION eval_vaporization_mass_rate
 
-  END SUBROUTINE eval_vaporization_sources
+  !******************************************************************************
+  !> \brief Compute the sensible-energy rate carried by generated vapor.
+  !> \details Evaluates \f$\dot{E}_v=\dot{m}_vc_gT_b\f$ at the boiling
+  !>          temperature.
+  !> \param[in] vapor_mass_rate Generated vapor mass rate per unit area [kg m^-2 s^-1].
+  !> \param[in] gas_heat_capacity Steam specific heat capacity c_g [J kg^-1 K^-1].
+  !> \return Vapor sensible-energy rate per unit area [W m^-2].
+  !******************************************************************************
+  PURE FUNCTION eval_vaporization_energy_rate(vapor_mass_rate,               &
+       gas_heat_capacity) RESULT(rate)
+
+    REAL(wp), INTENT(IN) :: vapor_mass_rate, gas_heat_capacity
+    REAL(wp) :: rate
+
+    rate = vapor_mass_rate * gas_heat_capacity *                             &
+         vaporization_boiling_temperature
+
+  END FUNCTION eval_vaporization_energy_rate
 
 END MODULE thermal_laws_2d

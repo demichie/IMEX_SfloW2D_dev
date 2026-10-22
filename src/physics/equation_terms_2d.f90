@@ -24,8 +24,8 @@ MODULE equation_terms_2d
        eval_pore_pressure_gas_loss, eval_pore_pressure_inlet_source,            &
        eval_pore_pressure_mass_exchange_source
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                 &
-       eval_rheology_cooling_source, eval_mass_exchange_thermal_energy,         &
-       eval_vaporization_sources
+       eval_rheology_cooling_energy_rate, eval_vaporization_mass_rate,         &
+       eval_vaporization_energy_rate
   USE mass_exchange_laws_2d, ONLY : eval_settling_fluid_properties,            &
        eval_solid_deposition_rate, eval_erosion_rates,                          &
        eval_continuous_phase_loss_rate, eval_air_entrainment_rate
@@ -60,7 +60,8 @@ MODULE equation_terms_2d
   PUBLIC :: curvature_acceleration, eval_curvature_momentum_source
   PUBLIC :: eval_expl_terms
   PUBLIC :: eval_implicit_terms, eval_semi_implicit_terms
-  PUBLIC :: eval_mass_exchange_terms, eval_source_bdry
+  PUBLIC :: eval_mass_exchange_terms, eval_mass_exchange_thermal_energy
+  PUBLIC :: eval_source_bdry
   PUBLIC :: set_source_time_coefficients
 
   ! Time coefficients of the sources averaged over the current step, set by
@@ -658,8 +659,8 @@ CONTAINS
        CALL eval_implicit_rheology_rate(rheology_model_id, h, T, rho_m,       &
             inv_rho_m, u, v, mod_vel, mod_vel_hor, mod_vel2, red_grav,       &
             alphas, moving, stochastic_flag, Zij, source_term(2:3))
-       source_term(4) = eval_rheology_cooling_source(rheology_model_id, T,    &
-            radiative_term_coeff, convective_term_coeff, T_env)
+       source_term(4) = eval_rheology_cooling_energy_rate(rheology_model_id,  &
+            T, radiative_term_coeff, convective_term_coeff, T_env)
 
     ENDIF
 
@@ -805,6 +806,61 @@ CONTAINS
   END SUBROUTINE eval_semi_implicit_terms
 
   !******************************************************************************
+  !> \brief Assemble the thermal-energy source associated with mass exchange.
+  !> \details Accounts for energy removed with deposited solids and lost carrier
+  !>          material, energy supplied by eroded solids and carrier material,
+  !>          and ambient-air entrainment.
+  !> \param[in] flow_temperature Flow temperature of the mixture [K].
+  !> \param[in] solid_density Per-class solid densities [kg m^-3].
+  !> \param[in] solid_heat_capacity Per-class solid specific heat capacities [J kg^-1 K^-1].
+  !> \param[in] deposition_rate Per-class deposition thickness rates [m s^-1].
+  !> \param[in] erosion_rate Per-class solid erosion thickness rates [m s^-1].
+  !> \param[in] carrier_density Flow carrier density [kg m^-3].
+  !> \param[in] carrier_heat_capacity Carrier specific heat capacity [J kg^-1 K^-1].
+  !> \param[in] carrier_loss_rate Carrier-layer loss rate [m s^-1].
+  !> \param[in] substrate_temperature Temperature of eroded material [K].
+  !> \param[in] substrate_carrier_density Carrier density of substrate material [kg m^-3].
+  !> \param[in] carrier_erosion_rate Carrier-layer erosion rate [m s^-1].
+  !> \param[in] ambient_temperature Ambient-air temperature [K].
+  !> \param[in] air_heat_capacity Ambient-air specific heat capacity [J kg^-1 K^-1].
+  !> \param[in] ambient_air_density Ambient-air density [kg m^-3].
+  !> \param[in] air_entrainment_rate Ambient-air entrainment rate [m s^-1].
+  !> \return Net mass-exchange thermal-energy source per unit area [W m^-2].
+  !******************************************************************************
+  PURE FUNCTION eval_mass_exchange_thermal_energy(flow_temperature,            &
+       solid_density, solid_heat_capacity, deposition_rate, erosion_rate,      &
+       carrier_density, carrier_heat_capacity, carrier_loss_rate,              &
+       substrate_temperature, substrate_carrier_density,                       &
+       carrier_erosion_rate, ambient_temperature, air_heat_capacity,            &
+       ambient_air_density, air_entrainment_rate) RESULT(source)
+
+    REAL(wp), INTENT(IN) :: flow_temperature
+    REAL(wp), INTENT(IN) :: solid_density(:)
+    REAL(wp), INTENT(IN) :: solid_heat_capacity(:)
+    REAL(wp), INTENT(IN) :: deposition_rate(:)
+    REAL(wp), INTENT(IN) :: erosion_rate(:)
+    REAL(wp), INTENT(IN) :: carrier_density
+    REAL(wp), INTENT(IN) :: carrier_heat_capacity
+    REAL(wp), INTENT(IN) :: carrier_loss_rate
+    REAL(wp), INTENT(IN) :: substrate_temperature
+    REAL(wp), INTENT(IN) :: substrate_carrier_density
+    REAL(wp), INTENT(IN) :: carrier_erosion_rate
+    REAL(wp), INTENT(IN) :: ambient_temperature
+    REAL(wp), INTENT(IN) :: air_heat_capacity
+    REAL(wp), INTENT(IN) :: ambient_air_density
+    REAL(wp), INTENT(IN) :: air_entrainment_rate
+    REAL(wp) :: source
+
+    source = -flow_temperature * ( SUM( solid_density * solid_heat_capacity *  &
+         deposition_rate ) + carrier_density * carrier_heat_capacity *         &
+         carrier_loss_rate ) + substrate_temperature * ( SUM( solid_density *  &
+         solid_heat_capacity * erosion_rate ) + substrate_carrier_density *    &
+         carrier_heat_capacity * carrier_erosion_rate ) + ambient_temperature &
+         * air_heat_capacity * ambient_air_density * air_entrainment_rate
+
+  END FUNCTION eval_mass_exchange_thermal_energy
+
+  !******************************************************************************
   !> \brief Compute limited erosion, deposition, entrainment and associated equation sources.
   !> \details Evaluates per-class solid erosion and settling/deposition, carrier
   !>          erosion and loss, optional air entrainment, vaporization,
@@ -907,8 +963,8 @@ CONTAINS
     REAL(wp) :: rho_ers_tot
 
     REAL(wp) :: T_erodible_local !< cell-local substrate temperature [K]
-    REAL(wp) :: mass_vap_rate
-    REAL(wp) :: vapor_energy_source
+    REAL(wp) :: vapor_mass_rate
+    REAL(wp) :: vapor_energy_rate
 
     REAL(wp) :: pore_pressure_term
 
@@ -1107,12 +1163,14 @@ CONTAINS
 
     IF ( gas_flag .AND. liquid_vaporization_flag .AND. ( B_zone .NE. 0 ) ) THEN
 
-       CALL eval_vaporization_sources(r_T, rho_s, sp_heat_s, deposition_term,  &
-            gamma_steam, sp_heat_g(1), mass_vap_rate, vapor_energy_source)
+       vapor_mass_rate = eval_vaporization_mass_rate(r_T, rho_s, sp_heat_s,   &
+            deposition_term, gamma_steam)
+       vapor_energy_rate = eval_vaporization_energy_rate(vapor_mass_rate,     &
+            sp_heat_g(1))
 
-       eqns_term(1) = eqns_term(1) + mass_vap_rate
-       eqns_term(4) = eqns_term(4) + vapor_energy_source
-       eqns_term(5+n_solid) = eqns_term(5+n_solid) + mass_vap_rate
+       eqns_term(1) = eqns_term(1) + vapor_mass_rate
+       eqns_term(4) = eqns_term(4) + vapor_energy_rate
+       eqns_term(5+n_solid) = eqns_term(5+n_solid) + vapor_mass_rate
 
     END IF
 
