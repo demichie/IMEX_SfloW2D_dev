@@ -69,10 +69,10 @@ PROGRAM test_equation_metadata
        ALL(partition%IM_group_map(:,1) .EQ. [ 1, 2, 3, 4, 5, 6, 7 ]) )
 
   ! The documented D11 layout keeps energy, pore pressure and the coupled
-  ! momenta in ordered groups with independent solve methods.
+  ! momenta in ordered groups using only analytical or Newton methods.
   implicit_mask_five = [ .FALSE., .TRUE., .TRUE., .TRUE., .TRUE. ]
   CALL partition%initialize( implicit_mask_five, [ 0, 3, 3, 1, 2 ],        &
-       [ IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_ANALYTIC,                &
+       [ IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_ANALYTIC,                 &
        IM_GROUP_METHOD_NEWTON ] )
 
   CALL assert_true( 'multi-group partition initialized', partition%is_initialized() )

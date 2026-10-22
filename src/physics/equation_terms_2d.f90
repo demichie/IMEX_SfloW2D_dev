@@ -242,8 +242,8 @@ CONTAINS
     IM_group_method = 0
     n_IM_groups = 0
 
-    ! Keep the D11 group order stable: lava energy, pore pressure, then
-    ! the coupled momentum equations. Inactive groups are omitted.
+    ! Keep the group order stable: analytical energy, analytical pore
+    ! pressure, then the coupled momentum equations. Inactive groups are omitted.
     IF ( implicit_mask(4) ) THEN
        n_IM_groups = n_IM_groups + 1
        IM_group(4) = n_IM_groups

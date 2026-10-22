@@ -1281,7 +1281,10 @@ assegnargli un nome/file. Nessun generatore esistente selezionava il modello 8.
 
 Decisione approvata e implementata: eliminare completamente il modello
 reologico 8, mantenere il modello 6 per la legge Bursik--Woods; la soluzione
-algebrica `ANALYTIC` dello stage DIRK verrà introdotta separatamente in D13.
+analitica dello stage è una delle due modalità di gruppo, insieme al solve
+Newton. `IM_GROUP_METHOD_ANALYTIC` indica l’integrazione analitica del termine;
+`IM_GROUP_METHOD_NEWTON` indica il solve implicito numerico, con SI dove
+previsto.
 
 Validazione D04:
 - build production optimized e strict-debug riuscite;
@@ -1695,12 +1698,15 @@ Per NEWTON, costruire il residuo locale R_g(x_g) e il Jacobiano J_g = dR_g/dx_g 
 
 #### Implementazione ed evidenza D12
 
-`solve_rk_step` ora aggiorna le equazioni esplicite e attraversa i gruppi
-nell’ordine dichiarato. I gruppi `ANALYTIC` sono dispatchati separatamente;
-per ogni gruppo `NEWTON`, il solver riduce residuo, Jacobiano e sistema lineare
-al relativo mapping e mantiene invariate le componenti esterne. Il test
-`TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90` ricostruisce i
-residui DIRK per energia, pressione e quantità di moto e li verifica in
+`solve_implicit_groups` attraversa i gruppi nell’ordine dichiarato;
+`solve_rk_step` resta il wrapper compatibile. Le sole modalità di gruppo sono
+`IM_GROUP_METHOD_ANALYTIC` e `IM_GROUP_METHOD_NEWTON`: la prima usa
+l’integrazione analitica esatta del termine, la seconda risolve il residuo
+implicito con Newton, includendo il contributo SI ove previsto. Per ogni
+gruppo Newton, il solver riduce residuo, Jacobiano e sistema lineare al
+relativo mapping e mantiene invariate le componenti esterne. Il test
+`TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90` verifica i residui
+DIRK, il solve exact-flow della lava e il rate effettivo netto in
 strict/optimized. La line-search conserva esattamente le componenti esterne
 al gruppo attivo; il test verifica inoltre che massa e frazioni solide non
 vengano modificate dagli sweep dei gruppi. I test di metadati e la suite
@@ -1747,22 +1753,27 @@ questa tranche tutti i modelli attivi hanno una formula chiusa quando le
 variabili non-velocità sono esplicite.
 
 I solutori analitici di velocità non sono ancora richiamati dal dispatcher
-degli stage. Le formule di energia e pressione riportate sotto sono invece
-collegate ai rispettivi gruppi `ANALYTIC`. Non è previsto un fallback
+degli stage. Il raffreddamento della lava è collegato al gruppo
+`IM_GROUP_METHOD_ANALYTIC`, così come la pressione dei pori; le velocità
+accoppiate usano `IM_GROUP_METHOD_NEWTON`. Non è previsto un fallback
 analitico generico per gruppi accoppiati non supportati.
 
 #### Raffreddamento della lava
 
 `thermal_sources_2d` distingue l’integrazione esatta dell’ODE dalla soluzione
-algebrica dello stage DIRK. `advance_lava_cooling_temperature` mantiene il
-contratto exact-flow autonomo; `solve_lava_cooling_stage_temperature` risolve
-invece, senza Newton,
+algebrica dello stage DIRK. `solve_lava_analytic_temperature` è il solve
+analitico esatto usato dal gruppo lava; `advance_lava_cooling_temperature`
+resta come nome di compatibilità. `solve_lava_cooling_stage_temperature`
+risolve invece, senza Newton,
 \f[
 C_A(T-T_k)-\tau[-k_r(T^4-T_a^4)-k_c(T-T_a)]=0,\qquad \tau=dt\,a_{ii}.
 \f]
 La quartica monotona è scalata e risolta con formule chiuse, selezionando la
-radice nell’intervallo fisico fra temperatura nota e ambiente. Il dispatcher
-usa la capacità termica areale congelata nello stato noto dello stage.
+radice nell’intervallo fisico fra temperatura nota e ambiente. Il solve usa
+la capacità termica areale dello stato di lavoro all’ingresso del gruppo.
+Questa routine DIRK algebrica non è una terza modalità del dispatcher: i
+gruppi selezionano solo Newton (con SI dove previsto) oppure integrazione
+analitica esatta.
 
 #### Diffusione della pressione interstiziale
 
@@ -1772,15 +1783,17 @@ esponenziale dell’ODE. La distinta routine
 \f$p_{e,\mathrm{stage}}=p_{e,\mathrm{known}}/(1+\tau\lambda)\f$, con
 \f$\lambda=(\pi/2)^2DI/[h\max(h_\mathrm{threshold},h)]\f$ e
 \f$\tau=dt\,a_{ii}\f$. Profondità, temperatura e frazioni solide sono
-congelate; il solve è collegato al gruppo `ANALYTIC` dopo l’eventuale solve
-energetico, così il coefficiente usa la temperatura aggiornata dello stage.
+congelate; il solve analitico esatto è collegato al gruppo
+`IM_GROUP_METHOD_ANALYTIC` dopo il raffreddamento della lava, così il
+coefficiente usa la temperatura aggiornata dello stage.
 
-I test diretti ricostruiscono i residui algebrici delle due routine di stage,
-inclusi il caso convection-only per l’energia, in build strict e optimized.
-La suite di gruppo verifica anche i residui delle equazioni Newton. Restano
-da coprire i limiti estremi della quartica e la traiettoria completa con
-gruppi multipli; gli exact-flow helper non sostituiscono l’equazione
-algebrica DIRK.
+I test diretti verificano le integrazioni analitiche esatte e i residui dei
+solve DIRK algebrici legacy, incluso il caso convection-only per l’energia,
+in build strict e optimized. Le routine DIRK algebriche legacy non sono
+selezionabili come modalità di gruppo. La suite di gruppo verifica i gruppi
+analitici/Newton e la coerenza del rate effettivo con l’incremento conservativo
+netto. Restano da coprire i limiti estremi della quartica e la traiettoria
+completa con gruppi multipli.
 
 #### Contratto delle soluzioni di stage
 
@@ -1920,12 +1933,12 @@ solve_lahar_analytic_velocity
 solve_analytic_pore_pressure
 ```
 
-`advance_lava_cooling_temperature` deve diventare
-`solve_lava_analytic_temperature`: integra esattamente il termine di
+`solve_lava_analytic_temperature` integra esattamente il termine di
 raffreddamento sull’intervallo dello stage e restituisce la temperatura finale
-esatta. `solve_lava_cooling_stage_temperature` risolve invece la distinta
-equazione algebrica DIRK basata sul rate implicito al valore finale e non
-sostituisce questo exact-flow solver. Analogamente,
+esatta; il nome storico `advance_lava_cooling_temperature` resta un wrapper di
+compatibilità. `solve_lava_cooling_stage_temperature` risolve invece la
+distinta equazione algebrica DIRK basata sul rate implicito al valore finale e
+non sostituisce questo exact-flow solver. Analogamente,
 `advance_pore_pressure_diffusion` deve diventare
 `solve_analytic_pore_pressure`; `solve_pore_pressure_diffusion_stage` resta
 la distinta soluzione algebrica dello stage DIRK.
@@ -1938,31 +1951,20 @@ problemi diversi:
 - **Esplicito:** `time_integration_2d` include nel contributo noto dello stage
   i rate espliciti già valutati. Non è una modalità di solve dei gruppi
   impliciti.
-- **Semi-implicito (SI):** nel flusso attuale è un contributo di stage valutato
-  sullo stato fisico noto e applicato prima della sweep dei gruppi. Le relative
-  correzioni fanno parte dell’incremento dello stage; SI non è attualmente un
-  valore di `IM_group_method`.
-- **Implicit/Newton:** per ogni stato di prova il residuo valuta il rate
-  implicito e risolve la relazione algebrica DIRK dello stage. Il rate
-  istantaneo valutato nello stato di prova non va confuso con il rate effettivo
-  restituito per l’intero incremento dello stage.
-- **Soluzione chiusa della relazione DIRK:** l’attuale
-  `IM_GROUP_METHOD_ANALYTIC` seleziona una soluzione chiusa della relazione
-  algebrica di stage (per esempio `solve_lava_cooling_stage_temperature`).
-  Non è l’integrazione exact-flow della legge fisica.
-- **Integrazione analitica exact-flow:** `solve_lava_analytic_temperature` e
-  `solve_analytic_pore_pressure` integrano la legge fisica sull’intervallo
-  \f$\tau=dt\,a_{ii}\f$ e restituiscono il valore finale esatto. Il rate
-  effettivo associato è ricavato dall’incremento conservativo diviso per
-  \f$\tau\f$; in generale è un rate medio e non coincide con il rate
-  istantaneo al valore finale.
+- **Newton con SI dove previsto:** `IM_GROUP_METHOD_NEWTON` indica il
+  trattamento numerico dello stage: i contributi semi-impliciti sono applicati
+  dal coordinatore e Newton risolve i residui impliciti delle variabili
+  assegnate al gruppo. Non sono due opzioni di gruppo separate.
+- **Analitico:** `IM_GROUP_METHOD_ANALYTIC` integra esattamente il termine
+  fisico sull’intervallo \f$\tau=dt\,a_{ii}\f$ (per ora temperatura della lava
+  e pressione dei pori) e aggiorna le componenti conservative assegnate. Il
+  rate effettivo si ricava dall’incremento conservativo diviso per \f$\tau\f$;
+  in generale è un rate medio e non coincide con quello istantaneo al valore
+  finale.
 
-La selezione dei gruppi non deve quindi usare un unico identificatore
-`ANALYTIC` per indicare sia la soluzione chiusa DIRK sia l’exact-flow: il
-contratto e, se entrambe le opzioni restano disponibili, i rispettivi
-identificatori devono distinguerle. Un eventuale metodo SI per singolo gruppo
-richiede anch’esso un contratto esplicito, invece di essere implicato nel
-significato di `ANALYTIC` o `NEWTON`.
+Le sole modalità selezionabili per un gruppo sono quindi `NEWTON` e
+`ANALYTIC`. Le routine DIRK algebriche chiuse ancora presenti nel codice non
+sono modalità di gruppo e non vengono selezionate dal dispatcher.
 
 La sequenza target per uno stage è:
 
@@ -1972,8 +1974,8 @@ La sequenza target per uno stage è:
    sue correzioni, ottenendo lo stato di lavoro iniziale della sweep.
 3. Il coordinatore percorre i gruppi nell’ordine definito da
    `equation_partition`. Ogni gruppo riceve lo stato di lavoro aggiornato dal
-   gruppo precedente e usa il proprio metodo: solve DIRK algebrico oppure
-   exact-flow, oltre al solve Newton quando previsto dal contratto.
+   gruppo precedente e usa uno dei due metodi: integrazione analitica esatta
+   oppure trattamento Newton con SI dove previsto.
 4. Ogni metodo modifica soltanto le componenti conservative assegnate al
    gruppo. Dopo ciascun aggiornamento si ricostruiscono da `q` le variabili
    fisiche necessarie al gruppo successivo. Per il raffreddamento, per esempio,
@@ -1988,14 +1990,14 @@ La sequenza target per uno stage è:
    \f$R_\mathrm{eff}=(q_\mathrm{final}-q_\mathrm{known})/\tau\f$. Questo
    conteggia una volta sola SI e gli aggiornamenti dei gruppi; non è la somma
    di rate finali ricalcolati separatamente e non presume che il rate medio
-   exact-flow coincida con quello implicito istantaneo.
+   analitico medio coincida con quello implicito istantaneo.
 
 La responsabilità del dispatch e dell’ordine dei gruppi appartiene al
-coordinatore locale dello stage, cioè a `solve_implicit_stage` da rinominare
-`solve_imex_stage` (o a un equivalente stage solver dedicato). Questo livello
-possiede lo stato condiviso, applica SI, sceglie il metodo per ciascun gruppo,
-aggiorna lo stato e calcola il rate netto finale. `time_integration_2d`
-rimane responsabile della sequenza RK globale e dei contributi noti;
+coordinatore locale dello stage `solve_imex_stage`; `solve_implicit_stage`
+resta come wrapper di compatibilità. Il coordinatore possiede lo stato
+condiviso, applica SI, sceglie il metodo per ciascun gruppo, delega la sweep
+ordinata a `solve_implicit_groups` e calcola il rate netto finale.
+`time_integration_2d` rimane responsabile della sequenza RK globale e dei contributi noti;
 `equation_metadata_2d` descrive partizioni, ordine e metodi; `equation_terms_2d`
 valuta rate e sorgenti per uno stato fornito, ma non orchestra i gruppi. I
 solve Newton e i solve fisici exact-flow restano helper chiamati dal
@@ -2035,7 +2037,7 @@ Le operazioni geometriche devono rimanere in `geometry_2d.f90`, per esempio `pro
 
 **D16.1 — Inventario semantico.** Elencare tutte le routine reologiche, termiche, di pressione dei pori e di scambio di massa, registrando chiamanti, argomenti, unità, risultato, dipendenza dal modello, trattamento numerico, uso REAL/COMPLEX e responsabilità futura. Distinguere proprietà, rate, sorgenti assemblate, solver analitici e aggiornamenti dello stato.
 
-**D16.2 — Interfacce comuni.** Definire le API generiche di `rheology_2d` e le interfacce delle leggi termiche, di massa e di pressione dei pori, dichiarando esplicitamente se restituiscono proprietà, rate, sorgenti o variabili aggiornate. Definire il contratto del coordinatore dello stage (`solve_imex_stage`, nome proposto): applicazione SI, dispatch ordinato dei gruppi e dei rispettivi metodi, aggiornamento dello stato conservativo condiviso, ricostruzione dello stato fisico per il gruppo successivo e calcolo del rate effettivo netto dalla differenza conservativa di stage. Mantenere distinti il solve chiuso della relazione DIRK e l’integrazione exact-flow.
+**D16.2 — Interfacce comuni.** Definire le API generiche di `rheology_2d` e le interfacce delle leggi termiche, di massa e di pressione dei pori, dichiarando esplicitamente se restituiscono proprietà, rate, sorgenti o variabili aggiornate. Formalizzare e completare il contratto del coordinatore dello stage (`solve_imex_stage`, ora implementato): applicazione SI, dispatch ordinato dei gruppi e scelta fra le sole modalità Newton e analitica, aggiornamento dello stato conservativo condiviso, ricostruzione dello stato fisico per il gruppo successivo e calcolo del rate effettivo netto dalla differenza conservativa di stage.
 
 **D16.3 — Dispatcher reologico.** Spostare in `rheology_2d` tutti i rami basati su `rheology_model_id` o sul nome del modello e rimuovere le chiamate dirette ai moduli specifici da `equation_terms_2d`, mantenendo formule, argomenti e semantica complex-step.
 

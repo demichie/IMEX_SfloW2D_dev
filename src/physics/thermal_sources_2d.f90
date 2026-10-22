@@ -19,6 +19,7 @@ MODULE thermal_sources_2d
 
   PUBLIC :: eval_inlet_thermal_energy_source
   PUBLIC :: eval_lava_cooling_source
+  PUBLIC :: solve_lava_analytic_temperature
   PUBLIC :: advance_lava_cooling_temperature
   PUBLIC :: solve_lava_cooling_stage_temperature
   PUBLIC :: eval_mass_exchange_thermal_energy
@@ -81,16 +82,16 @@ CONTAINS
   END FUNCTION eval_lava_cooling_source
 
   !******************************************************************************
-  !> \brief Advance the lava cooling ODE exactly over a time interval.
+  !> \brief Solve the exact-flow lava cooling temperature over a time interval.
   !> \details Separates the autonomous temperature equation and evaluates its
   !>          analytic time-temperature primitive. A bisection inversion finds
-  !>          the temperature after the requested DIRK integration step. The
+  !>          the temperature after the requested stage interval. The
   !>          areal thermal capacity and cooling coefficients are held fixed:
   !>          \f$C_A\frac{dT}{dt}=-k_r(T^4-T_a^4)-k_c(T-T_a)\f$.
   !>          The result is constrained to the closed interval between the
   !>          initial and ambient temperatures.
   !> \param[in] temperature Initial lava temperature T(0) [K].
-  !> \param[in] integration_step Effective DIRK integration interval, normally dt*a_ii [s].
+  !> \param[in] integration_step Effective stage interval, normally dt*a_ii [s].
   !> \param[in] areal_heat_capacity Areal heat capacity C_A [J m^-2 K^-1].
   !> \param[in] radiative_coefficient Radiative cooling coefficient k_r [W m^-2 K^-4].
   !> \param[in] convective_coefficient Convective cooling coefficient k_c [W m^-2 K^-1].
@@ -99,7 +100,7 @@ CONTAINS
   !> \note Requires finite inputs, positive initial and ambient temperatures, positive heat
   !>       capacity, nonnegative integration step, and nonnegative cooling coefficients.
   !******************************************************************************
-  SUBROUTINE advance_lava_cooling_temperature(temperature, integration_step,    &
+  SUBROUTINE solve_lava_analytic_temperature(temperature, integration_step,   &
        areal_heat_capacity, radiative_coefficient, convective_coefficient,     &
        ambient_temperature, temperature_after)
 
@@ -214,6 +215,24 @@ CONTAINS
        temperature_after = MIN(ambient_temperature,                        &
             MAX(temperature, temperature_after))
     END IF
+
+  END SUBROUTINE solve_lava_analytic_temperature
+
+  !******************************************************************************
+  !> \brief Backward-compatible name for the exact-flow lava cooling solver.
+  !******************************************************************************
+  SUBROUTINE advance_lava_cooling_temperature(temperature, integration_step,  &
+       areal_heat_capacity, radiative_coefficient, convective_coefficient,    &
+       ambient_temperature, temperature_after)
+
+    REAL(wp), INTENT(IN) :: temperature, integration_step, areal_heat_capacity
+    REAL(wp), INTENT(IN) :: radiative_coefficient, convective_coefficient
+    REAL(wp), INTENT(IN) :: ambient_temperature
+    REAL(wp), INTENT(OUT) :: temperature_after
+
+    CALL solve_lava_analytic_temperature(temperature, integration_step,      &
+         areal_heat_capacity, radiative_coefficient, convective_coefficient,  &
+         ambient_temperature, temperature_after)
 
   END SUBROUTINE advance_lava_cooling_temperature
 

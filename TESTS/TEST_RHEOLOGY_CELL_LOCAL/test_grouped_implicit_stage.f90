@@ -7,10 +7,12 @@ PROGRAM test_grouped_implicit_stage
   USE geometry_2d, ONLY : pi_g
   USE equation_metadata_2d, ONLY : equation_partition_type,                 &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
-  USE equation_terms_2d, ONLY : eval_implicit_terms
+  USE equation_terms_2d, ONLY : eval_implicit_terms, init_problem_param
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
-  USE state_conversion_2d, ONLY : qc_to_qp
+  USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var
+  USE pore_pressure_2d, ONLY : solve_analytic_pore_pressure
+  USE thermal_sources_2d, ONLY : solve_lava_analytic_temperature
 
   IMPLICIT NONE
 
@@ -18,8 +20,15 @@ PROGRAM test_grouped_implicit_stage
   LOGICAL :: implicit_mask(7), converged, line_search_failed
   INTEGER :: group_map(7), iterations, linear_info, i
   REAL(wp) :: q_old(7), q_stage(7), known_residual(7), source(7)
-  REAL(wp) :: q_stage_check(7), effective_stage_term(7), qp_known(9)
+  REAL(wp) :: q_stage_check(7), q_expected(7), effective_stage_term(7)
+  REAL(wp) :: qp_known(9), qp_expected(9), qp_actual(9)
   REAL(wp) :: dynamic_pressure, stage_rate_error
+  REAL(wp) :: areal_heat_capacity, exact_temperature, exact_energy
+  REAL(wp) :: pressure_known, expected_pressure
+  REAL(wp) :: expected_h, expected_u, expected_v, expected_density
+  REAL(wp) :: expected_alphas(2), expected_alphag(0), expected_alphal
+  REAL(wp) :: expected_temperature, expected_red_grav, expected_p_dyn
+  REAL(wp) :: expected_Zs, expected_pore_pressure
   REAL(wp) :: residual, scale, dt_step, a_diag
 
   n_solid = 2
@@ -108,6 +117,8 @@ PROGRAM test_grouped_implicit_stage
   CALL eval_implicit_terms(0.0_wp, 0.0_wp, 0.0_wp, r_qj=q_stage,            &
        r_nh_term_impl=source)
   DO i = 1, SIZE(partition%implicit_map)
+     IF (partition%implicit_map(i) .EQ. 4 .OR.                             &
+          partition%implicit_map(i) .EQ. 7) CYCLE
      residual = q_stage(partition%implicit_map(i)) -                       &
           q_old(partition%implicit_map(i)) - dt_step*a_diag*                &
           source(partition%implicit_map(i))
@@ -146,8 +157,60 @@ PROGRAM test_grouped_implicit_stage
      ERROR STOP 'effective IM rate does not match the net stage increment'
   END IF
 
+  CALL init_problem_param(partition)
+  IF (partition%IM_group_method(1) .NE. IM_GROUP_METHOD_ANALYTIC .OR.      &
+       partition%IM_group_method(2) .NE. IM_GROUP_METHOD_ANALYTIC .OR.      &
+       partition%IM_group_method(3) .NE. IM_GROUP_METHOD_NEWTON) THEN
+     ERROR STOP 'equation groups do not select only analytic or Newton methods'
+  END IF
+
+  CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
+  areal_heat_capacity = q_stage_check(4) / qp_known(4)
+  CALL solve_lava_analytic_temperature(qp_known(4), dt_step*a_diag,         &
+       areal_heat_capacity, radiative_term_coeff, convective_term_coeff,    &
+       T_env, exact_temperature)
+  exact_energy = areal_heat_capacity * exact_temperature
+  q_expected = q_stage_check
+  q_expected(4) = exact_energy
+  CALL r_phys_var(q_expected, expected_h, expected_u, expected_v,           &
+       expected_alphas, expected_density, expected_temperature,              &
+       expected_alphal, expected_alphag, expected_red_grav, expected_p_dyn,   &
+       expected_Zs, expected_pore_pressure)
+  pressure_known = q_expected(7) / q_expected(1)
+  CALL solve_analytic_pore_pressure(pressure_known, dt_step*a_diag,          &
+       expected_h, expected_temperature, expected_alphas, expected_pressure)
+  CALL solve_imex_stage(partition, q_stage_check, q_stage_check, qp_known,   &
+       dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
+       0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                     &
+       effective_stage_term, iterations, converged, linear_info,             &
+       line_search_failed)
+  IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
+     ERROR STOP 'exact-flow lava stage did not converge'
+  END IF
+  scale = MAX(1.0_wp, ABS(exact_energy))
+  IF (ABS(q_stage(4) - exact_energy) / scale .GT. 5.0E-14_wp) THEN
+     ERROR STOP 'lava exact-flow group did not update the energy conservatively'
+  END IF
+  scale = MAX(1.0_wp, ABS(q_expected(1) * expected_pressure))
+  IF (ABS(q_stage(7) - q_expected(1) * expected_pressure) / scale .GT.      &
+       5.0E-14_wp) THEN
+     WRITE(*,*) 'pore exact-flow result, expected:', q_stage(7),             &
+          q_expected(1)*expected_pressure
+     ERROR STOP 'pore-pressure exact-flow group did not use the updated state'
+  END IF
+  IF (q_stage(1) .NE. q_stage_check(1) .OR.                               &
+       ANY(q_stage(5:6) .NE. q_stage_check(5:6))) THEN
+     ERROR STOP 'lava exact-flow group modified unrelated conservative variables'
+  END IF
+  stage_rate_error = MAXVAL(ABS(q_stage - q_stage_check -                  &
+       dt_step*a_diag*effective_stage_term(1:7)))
+  scale = MAX(1.0_wp, MAXVAL(ABS(q_stage)))
+  IF (stage_rate_error / scale .GT. 5.0E-14_wp) THEN
+     ERROR STOP 'exact-flow effective rate does not match its net stage increment'
+  END IF
+
   CALL partition%finalize
   CALL finalize_nonlinear_solver
-  WRITE(*,*) 'PASS: grouped DIRK solves and effective IMEX stage rate'
+  WRITE(*,*) 'PASS: DIRK, exact-flow and effective IMEX stage-rate contracts'
 
 END PROGRAM test_grouped_implicit_stage

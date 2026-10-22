@@ -5,7 +5,8 @@ PROGRAM test_pore_pressure_diffusion
        kin_visc_c, sp_heat_a, sp_gas_const_a, pres, dynamic_permeability_flag
   USE geometry_2d, ONLY : pi_g
   USE pore_pressure_2d, ONLY : eval_pore_pressure_diffusion_source,            &
-       advance_pore_pressure_diffusion, solve_pore_pressure_diffusion_stage
+       advance_pore_pressure_diffusion, solve_analytic_pore_pressure,          &
+       solve_pore_pressure_diffusion_stage
 
   IMPLICIT NONE
 
@@ -47,6 +48,10 @@ PROGRAM test_pore_pressure_diffusion
        flow_depth, temperature, solid_fractions, after_full)
   CALL assert_close(after_full, expected_pressure, 2.0E-14_wp,               &
        'diffusion integrator disagrees with the source-derived decay rate')
+  CALL solve_analytic_pore_pressure(initial_pressure, integration_step,       &
+       flow_depth, temperature, solid_fractions, after_first)
+  CALL assert_close(after_first, after_full, 0.0_wp,                          &
+       'legacy and canonical exact-flow names return different pressures')
 
   CALL solve_pore_pressure_diffusion_stage(initial_pressure, integration_step,&
        flow_depth, temperature, solid_fractions, stage_pressure)

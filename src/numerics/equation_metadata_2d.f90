@@ -11,7 +11,7 @@ MODULE equation_metadata_2d
   PUBLIC :: equation_partition_type
   PUBLIC :: IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
 
-  !> Analytic closed-form stage solve.
+  !> Exact integration of the physical source over the stage interval.
   INTEGER, PARAMETER :: IM_GROUP_METHOD_ANALYTIC = 1
   !> Newton stage solve.
   INTEGER, PARAMETER :: IM_GROUP_METHOD_NEWTON = 2

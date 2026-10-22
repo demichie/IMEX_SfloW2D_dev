@@ -191,8 +191,8 @@ CONTAINS
     USE constitutive_parameters_2d, ONLY : T_env, radiative_term_coeff,       &
          convective_term_coeff
     USE state_conversion_2d, ONLY : r_phys_var
-    USE thermal_sources_2d, ONLY : solve_lava_cooling_stage_temperature
-    USE pore_pressure_2d, ONLY : solve_pore_pressure_diffusion_stage
+    USE thermal_sources_2d, ONLY : solve_lava_analytic_temperature
+    USE pore_pressure_2d, ONLY : solve_analytic_pore_pressure
 
     IMPLICIT NONE
 
@@ -285,20 +285,19 @@ CONTAINS
                 RETURN
              END IF
              IF (.NOT. rheology_flag) THEN
-                qj(4) = q_known(4)
                 CYCLE
              END IF
-             CALL r_phys_var(q_known, lava_h, lava_u, lava_v, lava_alphas,  &
-                  lava_density, lava_temperature, lava_alphal, lava_alphag,&
+             CALL r_phys_var(qj, lava_h, lava_u, lava_v, lava_alphas,           &
+                  lava_density, lava_temperature, lava_alphal, lava_alphag,   &
                   lava_red_grav, lava_p_dyn, lava_Zs, lava_pore_pressure)
              IF (lava_temperature .LE. 0.0_wp) THEN
                 linear_info = -3
                 qj = qj_init
                 RETURN
              END IF
-             heat_capacity = q_known(4) / lava_temperature
-             CALL solve_lava_cooling_stage_temperature(lava_temperature,    &
-                  dt_step*a_diag, heat_capacity, radiative_term_coeff,     &
+             heat_capacity = qj(4) / lava_temperature
+             CALL solve_lava_analytic_temperature(lava_temperature,             &
+                  dt_step*a_diag, heat_capacity, radiative_term_coeff,          &
                   convective_term_coeff, T_env, temperature_stage)
              qj(4) = heat_capacity * temperature_stage
           CASE DEFAULT
@@ -307,23 +306,20 @@ CONTAINS
                 qj = qj_init
                 RETURN
              END IF
-             IF (q_known(1) .LE. 0.0_wp) THEN
-                qj(idx_pore) = q_known(idx_pore)
-             ELSE
-                CALL r_phys_var(qj, pore_h, pore_u, pore_v, pore_alphas,   &
-                     pore_density, pore_temperature, pore_alphal,          &
-                     pore_alphag, pore_red_grav, pore_p_dyn, pore_Zs,      &
-                     pore_pressure)
-                pressure_known = q_known(idx_pore) / q_known(1)
-                CALL solve_pore_pressure_diffusion_stage(pressure_known,   &
-                     dt_step*a_diag, pore_h, pore_temperature, pore_alphas,&
+             IF (qj(1) .GT. 0.0_wp) THEN
+                CALL r_phys_var(qj, pore_h, pore_u, pore_v, pore_alphas,        &
+                     pore_density, pore_temperature, pore_alphal, pore_alphag, &
+                     pore_red_grav, pore_p_dyn, pore_Zs, pore_pressure)
+                pressure_known = qj(idx_pore) / qj(1)
+                CALL solve_analytic_pore_pressure(pressure_known,              &
+                     dt_step*a_diag, pore_h, pore_temperature, pore_alphas,    &
                      pressure_stage)
+                qj(idx_pore) = qj(1) * pressure_stage
              END IF
-             qj(idx_pore) = q_known(1) * pressure_stage
-          END SELECT
+             END SELECT
 
        ELSEIF (equation_partition%IM_group_method(group) .EQ.              &
-            IM_GROUP_METHOD_NEWTON) THEN
+               IM_GROUP_METHOD_NEWTON) THEN
           DO i = 1, group_size
              equation = group_equations(i)
              qj(equation) = qj_init(equation)

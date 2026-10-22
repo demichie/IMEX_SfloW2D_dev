@@ -27,6 +27,7 @@ MODULE pore_pressure_2d
   PRIVATE
 
   PUBLIC :: eval_pore_pressure_diffusion_source
+  PUBLIC :: solve_analytic_pore_pressure
   PUBLIC :: advance_pore_pressure_diffusion
   PUBLIC :: solve_pore_pressure_diffusion_stage
   PUBLIC :: eval_pore_pressure_gas_loss
@@ -83,7 +84,7 @@ CONTAINS
   END SUBROUTINE eval_pore_pressure_diffusion_source
 
   !******************************************************************************
-  !> \brief Advance excess pore pressure analytically over one DIRK integration step.
+  !> \brief Solve exact-flow excess pore pressure over a stage interval.
   !> \details With mixture density, depth, temperature and solid fractions
   !>          frozen, the transported variable
   !>          \f$Q_p=\rho_m h p_e\f$ satisfies
@@ -94,7 +95,7 @@ CONTAINS
   !>          Dry states, nonpositive excess pressure, absent carrier phases and
   !>          inactive diffusion closures are returned unchanged.
   !> \param[in] excess_pressure Initial excess pore pressure p_e [Pa].
-  !> \param[in] integration_step Effective DIRK integration interval, normally dt*a_ii [s].
+  !> \param[in] integration_step Effective stage interval, normally dt*a_ii [s].
   !> \param[in] flow_depth Frozen flow depth h [m].
   !> \param[in] temperature Frozen temperature T [K].
   !> \param[in] solid_fractions Frozen per-class solid volume fractions.
@@ -102,7 +103,7 @@ CONTAINS
   !> \note Requires finite inputs and a nonnegative integration step. A negative step,
   !>       nonfinite input, or nonpositive temperature in an active state is fatal.
   !******************************************************************************
-  SUBROUTINE advance_pore_pressure_diffusion(excess_pressure, integration_step,&
+  SUBROUTINE solve_analytic_pore_pressure(excess_pressure, integration_step,   &
        flow_depth, temperature, solid_fractions, pressure_after)
 
     REAL(wp), INTENT(IN) :: excess_pressure, integration_step, flow_depth
@@ -155,6 +156,21 @@ CONTAINS
     END IF
     decay_exponent = integration_step * decay_rate
     pressure_after = excess_pressure * EXP(-decay_exponent)
+
+  END SUBROUTINE solve_analytic_pore_pressure
+
+  !******************************************************************************
+  !> \brief Backward-compatible name for the exact-flow pore-pressure solver.
+  !******************************************************************************
+  SUBROUTINE advance_pore_pressure_diffusion(excess_pressure, integration_step,&
+       flow_depth, temperature, solid_fractions, pressure_after)
+
+    REAL(wp), INTENT(IN) :: excess_pressure, integration_step, flow_depth
+    REAL(wp), INTENT(IN) :: temperature, solid_fractions(n_solid)
+    REAL(wp), INTENT(OUT) :: pressure_after
+
+    CALL solve_analytic_pore_pressure(excess_pressure, integration_step,     &
+         flow_depth, temperature, solid_fractions, pressure_after)
 
   END SUBROUTINE advance_pore_pressure_diffusion
 

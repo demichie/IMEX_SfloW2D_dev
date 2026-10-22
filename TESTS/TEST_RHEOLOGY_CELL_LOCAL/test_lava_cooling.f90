@@ -2,7 +2,8 @@ PROGRAM test_lava_cooling
 
   USE parameters_2d, ONLY : wp
   USE thermal_sources_2d, ONLY : eval_lava_cooling_source,                   &
-       advance_lava_cooling_temperature, solve_lava_cooling_stage_temperature
+       advance_lava_cooling_temperature, solve_lava_analytic_temperature,     &
+       solve_lava_cooling_stage_temperature
 
   IMPLICIT NONE
 
@@ -26,6 +27,11 @@ PROGRAM test_lava_cooling
        convective_coefficient, ambient, after_full)
   CALL assert_close(after_second, after_full, 2.0E-11_wp,                    &
        'combined radiative-convective flow violates the semigroup property')
+  CALL solve_lava_analytic_temperature(initial_temperature, 25.0_wp,         &
+       areal_heat_capacity, radiative_coefficient, convective_coefficient,    &
+       ambient, expected_temperature)
+  CALL assert_close(after_full, expected_temperature, 0.0_wp,                &
+       'legacy and canonical exact-flow names return different temperatures')
 
   CALL advance_lava_cooling_temperature(initial_temperature, 10.0_wp,       &
        areal_heat_capacity, radiative_coefficient, 0.0_wp, ambient,          &
