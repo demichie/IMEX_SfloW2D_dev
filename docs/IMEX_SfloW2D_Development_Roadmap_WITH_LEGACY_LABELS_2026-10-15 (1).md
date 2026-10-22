@@ -1851,11 +1851,25 @@ eval_mui_momentum_rate
 eval_explicit_terms
 eval_implicit_terms
 eval_semi_implicit_terms
+eval_analytic_stage_rates
 eval_mass_exchange_terms
 eval_boundary_terms
 ```
 
 Le abbreviazioni storiche `expl`, `impl` e `semi_impl` devono essere sostituite progressivamente. `equation_terms_2d` non deve però selezionare direttamente i modelli reologici. Condizioni come `IF (rheology_model_id .EQ. rheology_id_voellmy)` e i corrispondenti `SELECT CASE` devono essere spostati in `rheology_2d.f90`.
+
+`eval_analytic_stage_rates` è l’adapter tra i solver analitici di stage e
+l’assemblaggio delle equazioni. Riceve lo stato conservativo noto dello stage,
+l’intervallo effettivo \f$\tau=dt\,a_{ii}\f$ e le equazioni del gruppo attivo;
+calcola solo i rate richiesti da quel gruppo. I solver analitici sottostanti
+restituiscono i nuovi valori di stage. L’adapter converte ciascun incremento
+conservativo nel rate effettivo
+\f$R_{\mathrm{eff}}=(U_{\mathrm{stage}}-U_{\mathrm{known}})/\tau\f$,
+con le stesse unità e lo stesso contratto dei rate impliciti e semi-impliciti.
+Il dispatch dei gruppi passa la mappa compatta delle equazioni attive, così
+non vengono calcolati rate per gruppi non richiesti. Questa selezione limita
+le equazioni da valutare; la selezione del modello reologico resta delegata a
+`rheology_2d`.
 
 `rheology_2d.f90` deve funzionare da dispatcher e fornire interfacce comuni, almeno per:
 
@@ -1920,7 +1934,19 @@ solve_lahar_analytic_velocity
 solve_analytic_pore_pressure
 ```
 
-`advance_lava_cooling_temperature` deve diventare `solve_lava_analytic_temperature`.
+`solve_lava_cooling_stage_temperature` deve diventare
+`solve_lava_analytic_temperature`: calcola la temperatura al nuovo stage DIRK.
+`advance_lava_cooling_temperature` mantiene invece il contratto di
+integrazione exact-flow autonoma e non va confusa con il solve algebrico dello
+stage. Analogamente, `solve_pore_pressure_diffusion_stage` deve diventare
+`solve_analytic_pore_pressure`, mentre `advance_pore_pressure_diffusion`
+continua a identificare l’integrazione exact-flow autonoma.
+
+Per un solve analitico di stage, il rate effettivo da assemblare è prodotto
+da `eval_analytic_stage_rates`, usando l’incremento della variabile
+conservativa fra lo stato noto dello stage e il valore risolto, diviso per
+l’intervallo temporale dello stage. Il rate risultante deve coincidere, entro
+la tolleranza del solve, con il rate implicito valutato allo stato di stage.
 
 #### Termini termici e scambio di massa
 
@@ -1956,7 +1982,7 @@ Le operazioni geometriche devono rimanere in `geometry_2d.f90`, per esempio `pro
 
 **D16.1 — Inventario semantico.** Elencare tutte le routine reologiche, termiche, di pressione dei pori e di scambio di massa, registrando chiamanti, argomenti, unità, risultato, dipendenza dal modello, trattamento numerico, uso REAL/COMPLEX e responsabilità futura. Distinguere proprietà, rate, sorgenti assemblate, solver analitici e aggiornamenti dello stato.
 
-**D16.2 — Interfacce comuni.** Definire le API generiche di `rheology_2d` e le interfacce delle leggi termiche, di massa e di pressione dei pori, dichiarando esplicitamente se restituiscono proprietà, rate, sorgenti o variabili aggiornate.
+**D16.2 — Interfacce comuni.** Definire le API generiche di `rheology_2d` e le interfacce delle leggi termiche, di massa e di pressione dei pori, dichiarando esplicitamente se restituiscono proprietà, rate, sorgenti o variabili aggiornate. Definire `eval_analytic_stage_rates` in `equation_terms_2d` come adapter selettivo per il gruppo/equazioni attive, con rate effettivi in variabili conservative.
 
 **D16.3 — Dispatcher reologico.** Spostare in `rheology_2d` tutti i rami basati su `rheology_model_id` o sul nome del modello e rimuovere le chiamate dirette ai moduli specifici da `equation_terms_2d`, mantenendo formule, argomenti e semantica complex-step.
 
@@ -1974,7 +2000,7 @@ Le operazioni geometriche devono rimanere in `geometry_2d.f90`, per esempio `pro
 
 **D16.10 — Rimozione controllata.** Eliminare `mass_exchange_2d.f90` solo quando ogni routine ha una destinazione verificata e non restano simboli, dipendenze o test non aggiornati.
 
-**D16.11 — Documentazione e test.** Aggiornare Doxygen, dummy arguments, unità e semantica REAL/COMPLEX. Verificare equivalenza dei rate, trattamenti espliciti/impliciti/semi-impliciti, solver analitici, vaporizzazione, conservazione, positività, topografia, restart e default reologico.
+**D16.11 — Documentazione e test.** Aggiornare Doxygen, dummy arguments, unità e semantica REAL/COMPLEX. Verificare equivalenza dei rate, inclusa la corrispondenza fra rate analitico effettivo e rate implicito allo stato di stage, e la selezione per gruppo; verificare inoltre trattamenti espliciti/impliciti/semi-impliciti, solver analitici, vaporizzazione, conservazione, positività, topografia, restart e default reologico.
 
 **D16.12 — Gate di accettazione.** Accettare D16 solo quando la selezione reologica è centralizzata, le leggi sono nei moduli `*_laws_2d`, rate e sorgenti sono distinti, le integrazioni analitiche seguono la convenzione, gli aggiornamenti sono in `time_integration_2d`, la geometria è in `geometry_2d` e compilazione, test, restart, Doxygen e CI passano senza variazioni scientifiche non autorizzate. Il manifest deve riportare vecchio nome, nuovo nome, modulo proprietario, chiamanti aggiornati ed evidenze di regressione.
 
@@ -2176,6 +2202,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D13 | P8            | Algebriche ANALYTIC per stage DIRK                          | IN CORSO |
 | D14 | P8            | Gruppi misti e validazione                                  | DA FARE  |
 | D15 | P9            | Acceptance della nuova architettura                         | GATE     |
+| D16 | —             | Consolidamento leggi fisiche, rate e assemblaggio IMEX      | DA FARE  |
 
 ## Fase E — Architettura e robustezza del passo
 
@@ -2789,6 +2816,7 @@ Le sigle storiche non sono identificativi operativi e sono conservate esclusivam
 | D13      | P8                        | Algebriche ANALYTIC per stage DIRK                   |
 | D14      | P8                        | Gruppi misti e validazione                           |
 | D15      | P9                        | Acceptance della nuova architettura                  |
+| D16      | —                         | Consolidamento leggi fisiche e assemblaggio IMEX     |
 | E01      | ARCH-1                    | Audit dipendenze e ownership stato                   |
 | E02      | ARCH-2                    | Architecture fitness checks                          |
 | E03      | ARCH-GATE                 | Architecture readiness                               |
