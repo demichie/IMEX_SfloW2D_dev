@@ -1027,7 +1027,7 @@ successivi gate D05–D15. La chiusura statica non anticipa questi esiti.
 
 **Attività previste:** Caratterizzare sorgenti per ciascuna reologia, temperatura e pressione interstiziale su stati REAL/COMPLEX; confrontare Jacobiano complex-step e finite difference controllata; coprire U→0, h→0, soglie, ABS/MAX e branch non olomorfi; conservare formule condivise e test modello-per-modello prima dell’estrazione.
 
-**File interessati:** src/physics/equation_terms_2d.f90; src/state/state_conversion_2d.f90; src/core/complexify.f90; src/state/\*.inc; src/io/inpout_2d.f90; src/numerics/nonlinear_solver_2d.f90; src/numerics/time_integration_2d.f90; src/rheology/\*.f90 futuri; TESTS/TEST_RHEOLOGY_FROUDE/\* e nuovi TEST_RHEOLOGY\_\*.
+**File interessati:** src/physics/equation_terms_2d.f90; src/state/state_conversion_2d.f90; src/core/complexify.f90; src/state/\*.inc; src/io/inpout_2d.f90; src/numerics/nonlinear_solver_2d.f90; src/numerics/time_integration_2d.f90; src/physics/rheology_laws/\*.f90; TESTS/TEST_RHEOLOGY_FROUDE/\* e nuovi TEST_RHEOLOGY\_\*.
 
 **Criteri di accettazione:** Parità numerica reale/complessa per punti regolari; differenze delle derivate spiegate nei punti non lisci; nessuna regressione scientifica alla migrazione delle formule.
 
@@ -1413,14 +1413,15 @@ src/
 │ pccu_2d, nonconservative_2d  
 ├── state/ state_2d, state_conversion_2d, associated \*.inc  
 ├── geometry/ geometry_2d, domain_2d  
-├── physics/ equation_terms_2d, mass_exchange_2d,  
-│ pore_pressure_laws_2d \[NEW\], thermal_laws_2d \[NEW\]
-├── rheology/ rheology_2d \[NEW\], rheology_voellmy \[NEW\],  
-│ rheology_plastic \[NEW\], rheology_lava \[NEW\],  
-│ rheology_lahar \[NEW\], rheology_empirical \[NEW\],  
-│ rheology_quadratic \[NEW\], rheology_froude \[NEW\],  
-│ rheology_lucas \[NEW\], rheology_mui \[NEW\],  
-│ rheology_mui_voellmy \[NEW\] \[\*.f90\]  
+├── physics/
+│   ├── equation_terms_2d, mass_exchange_laws_2d,
+│   │   pore_pressure_laws_2d, thermal_laws_2d
+│   └── rheology_laws/ rheology_2d, rheology_voellmy,
+│       rheology_plastic, rheology_lava,
+│       rheology_lahar, rheology_empirical,
+│       rheology_quadratic, rheology_froude,
+│       rheology_lucas, rheology_mui,
+│       rheology_mui_voellmy \[\*.f90\]
 ├── stochastic/ stochastic_module, stochastic_random_2d  
 ├── io/ inpout_2d; future input, restart,  
 │ serial/parallel NetCDF and diagnostics modules  
@@ -1538,7 +1539,7 @@ correct_friction_momentum(...)
 
 è contenuta in:
 
-src/rheology/rheology_2d.f90
+src/physics/rheology_laws/rheology_2d.f90
 
 Sostituisce i due controlli ad hoc dopo SI e dopo Newton. Riceve esplicitamente
 il momento prima e dopo il sottopasso di frizione e proietta il candidato sulla
@@ -2097,14 +2098,13 @@ responsabilità fisica appropriata.
 **D16.4 — Relocation dei moduli.** Rinominare e organizzare i moduli in `thermal_laws_2d`, `mass_exchange_laws_2d`, `pore_pressure_laws_2d` e `rheology_laws`. Aggiornare `USE`, Makefile, liste di build, Doxygen e test. La relocation deve essere scientificamente neutra.
 
 Relocation completate: `thermal_sources_2d.f90` è ora
-`thermal_laws_2d.f90` e `pore_pressure_2d.f90` è ora
-`pore_pressure_laws_2d.f90`; i `USE`, il Makefile e i runner/test coinvolti
-sono aggiornati. `TEST_RHEOLOGY_CELL_LOCAL` passa in strict e optimized e
-`TEST_IMEX_STAGES` passa in entrambi i profili. Restano da estrarre le leggi
-di scambio di massa e organizzare i moduli reologici in `rheology_laws/`.
-È stato creato `mass_exchange_laws_2d` e vi è stata trasferita la legge di
-deposizione limitata lahar; il trasferimento delle altre formule è ancora
-in corso.
+`thermal_laws_2d.f90`, `pore_pressure_2d.f90` è ora
+`pore_pressure_laws_2d.f90` e `mass_exchange_laws_2d` contiene le leggi
+costitutive di scambio. I 13 sorgenti reologici sono ora in
+`src/physics/rheology_laws/`; Makefile e runner/test coinvolti usano i nuovi
+percorsi. Dopo lo spostamento, `TEST_RHEOLOGY_CELL_LOCAL` passa in strict e
+optimized (255/255 fixture per profilo) e la build completa dell'applicazione
+riesce.
 
 **D16.5 — Rinomina delle routine.** Applicare `eval_<modello>_<trattamento>_<quantità>`, usare `momentum_rate` per i rate reologici e sostituire `semi_impl` con `semi_implicit`. Usare `rate` soltanto per quantità effettivamente riferite al tempo.
 
@@ -2154,6 +2154,14 @@ simbolo in sorgenti e test. Le regressioni mass-exchange/projection, lifecycle,
 topography e IMEX stage/boundary passano in strict e optimized.
 
 **D16.11 — Documentazione e test.** Aggiornare Doxygen, dummy arguments, unità e semantica REAL/COMPLEX. Verificare la soluzione esatta, l’aggiornamento della sola componente energetica conservativa per il raffreddamento, la ricostruzione delle variabili fisiche derivate da q, il rate medio effettivo e la selezione per gruppo. Verificare che massa, quantità di moto e masse dei componenti restino invariate per il solo termine di raffreddamento, mentre densità e profondità derivate rispondono alla temperatura; la differenza dal rate implicito istantaneo è attesa. Verificare inoltre trattamenti espliciti/impliciti/semi-impliciti, solver analitici, vaporizzazione, conservazione, positività, topografia, restart e default reologico.
+
+Evidenza di regressione dopo la relocation: `TEST_RHEOLOGY_CELL_LOCAL` passa
+255/255 fixture in strict e optimized, incluse le verifiche di raffreddamento
+lava esatto, aggiornamento energetico conservativo e ricostruzione dello stato,
+selezione per gruppo e rate effettivo dello stage IMEX. La build completa
+dell'applicazione riesce con i sorgenti nella nuova directory. Questi risultati
+non chiudono da soli D16.11: restano da consolidare gli altri controlli elencati
+in questo gate.
 
 **D16.12 — Gate di accettazione.** Accettare D16 solo quando la selezione reologica è centralizzata, le leggi sono nei moduli `*_laws_2d`, rate e sorgenti sono distinti, le integrazioni analitiche seguono la convenzione, gli aggiornamenti sono in `time_integration_2d`, la geometria è in `geometry_2d` e compilazione, test, restart, Doxygen e CI passano senza variazioni scientifiche non autorizzate. Il manifest deve riportare vecchio nome, nuovo nome, modulo proprietario, chiamanti aggiornati ed evidenze di regressione.
 

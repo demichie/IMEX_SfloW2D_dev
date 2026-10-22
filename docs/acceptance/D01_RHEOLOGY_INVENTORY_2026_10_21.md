@@ -37,8 +37,9 @@ Primary entry points (paths are relative to the repository root):
 
 These are current owners/responsibilities, not the symbol-by-symbol ownership
 manifest required by D03. The `thermal_laws_2d` and `pore_pressure_laws_2d`
-modules are now in place; the rheology modules are still under `src/rheology`,
-and mass-exchange laws have not yet been extracted into their own module.
+modules are in place; the rheology modules are under
+`src/physics/rheology_laws`, and mass-exchange laws have been extracted into
+their own module.
 
 ## State and notation
 

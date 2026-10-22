@@ -20,26 +20,26 @@ for profile in strict optimized; do
     gfortran $profile_flags -fopenmp -fbacktrace \
         -ffpe-trap=invalid,zero,overflow -I"$repo_dir/src/state" -c \
         "$repo_dir/src/core/parameters_2d.f90" \
-        "$repo_dir/src/rheology/rheology_parameters_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_parameters_2d.f90" \
         "$repo_dir/src/core/diagnostics_2d.f90" \
-        "$repo_dir/src/rheology/rheology_analytic_utils_2d.f90" \
-        "$repo_dir/src/rheology/rheology_parameters_2d.f90" \
-        "$repo_dir/src/rheology/rheology_voellmy_2d.f90" \
-        "$repo_dir/src/rheology/rheology_plastic_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_analytic_utils_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_parameters_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_voellmy_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_plastic_2d.f90" \
         "$repo_dir/src/core/constitutive_parameters_2d.f90" \
         "$repo_dir/src/numerics/equation_metadata_2d.f90" \
         "$repo_dir/src/core/complexify.f90" \
         "$repo_dir/src/geometry/geometry_2d.f90" \
         "$repo_dir/src/state/state_conversion_2d.f90" \
-        "$repo_dir/src/rheology/rheology_lava_2d.f90" \
-        "$repo_dir/src/rheology/rheology_lahar_2d.f90" \
-        "$repo_dir/src/rheology/rheology_empirical_2d.f90" \
-        "$repo_dir/src/rheology/rheology_quadratic_2d.f90" \
-        "$repo_dir/src/rheology/rheology_froude_2d.f90" \
-        "$repo_dir/src/rheology/rheology_lucas_2d.f90" \
-        "$repo_dir/src/rheology/rheology_mui_2d.f90" \
-        "$repo_dir/src/rheology/rheology_mui_voellmy_2d.f90" \
-        "$repo_dir/src/rheology/rheology_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_lava_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_lahar_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_empirical_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_quadratic_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_froude_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_lucas_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_mui_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_mui_voellmy_2d.f90" \
+        "$repo_dir/src/physics/rheology_laws/rheology_2d.f90" \
         "$repo_dir/src/physics/thermal_laws_2d.f90" \
         "$repo_dir/src/physics/pore_pressure_laws_2d.f90" \
         "$repo_dir/src/physics/mass_exchange_laws_2d.f90" \
