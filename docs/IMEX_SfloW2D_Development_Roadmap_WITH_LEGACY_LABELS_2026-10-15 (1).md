@@ -1851,25 +1851,11 @@ eval_mui_momentum_rate
 eval_explicit_terms
 eval_implicit_terms
 eval_semi_implicit_terms
-eval_analytic_stage_rates
 eval_mass_exchange_terms
 eval_boundary_terms
 ```
 
 Le abbreviazioni storiche `expl`, `impl` e `semi_impl` devono essere sostituite progressivamente. `equation_terms_2d` non deve però selezionare direttamente i modelli reologici. Condizioni come `IF (rheology_model_id .EQ. rheology_id_voellmy)` e i corrispondenti `SELECT CASE` devono essere spostati in `rheology_2d.f90`.
-
-`eval_analytic_stage_rates` è l’adapter tra i solver analitici di stage e
-l’assemblaggio delle equazioni. Riceve lo stato conservativo noto dello stage,
-l’intervallo effettivo \f$\tau=dt\,a_{ii}\f$ e le equazioni del gruppo attivo;
-calcola solo i rate richiesti da quel gruppo. I solver analitici sottostanti
-restituiscono i nuovi valori di stage. L’adapter converte ciascun incremento
-conservativo nel rate effettivo
-\f$R_{\mathrm{eff}}=(U_{\mathrm{stage}}-U_{\mathrm{known}})/\tau\f$,
-con le stesse unità e lo stesso contratto dei rate impliciti e semi-impliciti.
-Il dispatch dei gruppi passa la mappa compatta delle equazioni attive, così
-non vengono calcolati rate per gruppi non richiesti. Questa selezione limita
-le equazioni da valutare; la selezione del modello reologico resta delegata a
-`rheology_2d`.
 
 `rheology_2d.f90` deve funzionare da dispatcher e fornire interfacce comuni, almeno per:
 
@@ -1934,19 +1920,86 @@ solve_lahar_analytic_velocity
 solve_analytic_pore_pressure
 ```
 
-`solve_lava_cooling_stage_temperature` deve diventare
-`solve_lava_analytic_temperature`: calcola la temperatura al nuovo stage DIRK.
-`advance_lava_cooling_temperature` mantiene invece il contratto di
-integrazione exact-flow autonoma e non va confusa con il solve algebrico dello
-stage. Analogamente, `solve_pore_pressure_diffusion_stage` deve diventare
-`solve_analytic_pore_pressure`, mentre `advance_pore_pressure_diffusion`
-continua a identificare l’integrazione exact-flow autonoma.
+`advance_lava_cooling_temperature` deve diventare
+`solve_lava_analytic_temperature`: integra esattamente il termine di
+raffreddamento sull’intervallo dello stage e restituisce la temperatura finale
+esatta. `solve_lava_cooling_stage_temperature` risolve invece la distinta
+equazione algebrica DIRK basata sul rate implicito al valore finale e non
+sostituisce questo exact-flow solver. Analogamente,
+`advance_pore_pressure_diffusion` deve diventare
+`solve_analytic_pore_pressure`; `solve_pore_pressure_diffusion_stage` resta
+la distinta soluzione algebrica dello stage DIRK.
 
-Per un solve analitico di stage, il rate effettivo da assemblare è prodotto
-da `eval_analytic_stage_rates`, usando l’incremento della variabile
-conservativa fra lo stato noto dello stage e il valore risolto, diviso per
-l’intervallo temporale dello stage. Il rate risultante deve coincidere, entro
-la tolleranza del solve, con il rate implicito valutato allo stato di stage.
+#### Ruoli dei metodi e sequenza dello stage
+
+La roadmap deve mantenere distinti i seguenti trattamenti, perché risolvono
+problemi diversi:
+
+- **Esplicito:** `time_integration_2d` include nel contributo noto dello stage
+  i rate espliciti già valutati. Non è una modalità di solve dei gruppi
+  impliciti.
+- **Semi-implicito (SI):** nel flusso attuale è un contributo di stage valutato
+  sullo stato fisico noto e applicato prima della sweep dei gruppi. Le relative
+  correzioni fanno parte dell’incremento dello stage; SI non è attualmente un
+  valore di `IM_group_method`.
+- **Implicit/Newton:** per ogni stato di prova il residuo valuta il rate
+  implicito e risolve la relazione algebrica DIRK dello stage. Il rate
+  istantaneo valutato nello stato di prova non va confuso con il rate effettivo
+  restituito per l’intero incremento dello stage.
+- **Soluzione chiusa della relazione DIRK:** l’attuale
+  `IM_GROUP_METHOD_ANALYTIC` seleziona una soluzione chiusa della relazione
+  algebrica di stage (per esempio `solve_lava_cooling_stage_temperature`).
+  Non è l’integrazione exact-flow della legge fisica.
+- **Integrazione analitica exact-flow:** `solve_lava_analytic_temperature` e
+  `solve_analytic_pore_pressure` integrano la legge fisica sull’intervallo
+  \f$\tau=dt\,a_{ii}\f$ e restituiscono il valore finale esatto. Il rate
+  effettivo associato è ricavato dall’incremento conservativo diviso per
+  \f$\tau\f$; in generale è un rate medio e non coincide con il rate
+  istantaneo al valore finale.
+
+La selezione dei gruppi non deve quindi usare un unico identificatore
+`ANALYTIC` per indicare sia la soluzione chiusa DIRK sia l’exact-flow: il
+contratto e, se entrambe le opzioni restano disponibili, i rispettivi
+identificatori devono distinguerle. Un eventuale metodo SI per singolo gruppo
+richiede anch’esso un contratto esplicito, invece di essere implicato nel
+significato di `ANALYTIC` o `NEWTON`.
+
+La sequenza target per uno stage è:
+
+1. `time_integration_2d` costruisce lo stato conservativo noto `q_known`, i
+   contributi degli stage precedenti e \f$\tau\f$.
+2. Il coordinatore locale dello stage applica il contributo SI previsto e le
+   sue correzioni, ottenendo lo stato di lavoro iniziale della sweep.
+3. Il coordinatore percorre i gruppi nell’ordine definito da
+   `equation_partition`. Ogni gruppo riceve lo stato di lavoro aggiornato dal
+   gruppo precedente e usa il proprio metodo: solve DIRK algebrico oppure
+   exact-flow, oltre al solve Newton quando previsto dal contratto.
+4. Ogni metodo modifica soltanto le componenti conservative assegnate al
+   gruppo. Dopo ciascun aggiornamento si ricostruiscono da `q` le variabili
+   fisiche necessarie al gruppo successivo. Per il raffreddamento, per esempio,
+   restano fisse le altre componenti conservative e si aggiorna l’energia;
+   densità e profondità derivate si adeguano alla nuova temperatura senza
+   introdurre variazioni di massa, quantità di moto o masse dei componenti.
+   Non si deve riconvertire ciecamente l’intero stato fisico in `q` mantenendo
+   fisse profondità e velocità: ciò introdurrebbe incrementi conservativi non
+   presenti nel termine energetico.
+5. Al termine della sweep si restituisce un solo rate effettivo per lo stage,
+   ricavato dall’incremento conservativo netto rispetto a `q_known`,
+   \f$R_\mathrm{eff}=(q_\mathrm{final}-q_\mathrm{known})/\tau\f$. Questo
+   conteggia una volta sola SI e gli aggiornamenti dei gruppi; non è la somma
+   di rate finali ricalcolati separatamente e non presume che il rate medio
+   exact-flow coincida con quello implicito istantaneo.
+
+La responsabilità del dispatch e dell’ordine dei gruppi appartiene al
+coordinatore locale dello stage, cioè a `solve_implicit_stage` da rinominare
+`solve_imex_stage` (o a un equivalente stage solver dedicato). Questo livello
+possiede lo stato condiviso, applica SI, sceglie il metodo per ciascun gruppo,
+aggiorna lo stato e calcola il rate netto finale. `time_integration_2d`
+rimane responsabile della sequenza RK globale e dei contributi noti;
+`equation_metadata_2d` descrive partizioni, ordine e metodi; `equation_terms_2d`
+valuta rate e sorgenti per uno stato fornito, ma non orchestra i gruppi. I
+solve Newton e i solve fisici exact-flow restano helper chiamati dal
+coordinatore.
 
 #### Termini termici e scambio di massa
 
@@ -1982,7 +2035,7 @@ Le operazioni geometriche devono rimanere in `geometry_2d.f90`, per esempio `pro
 
 **D16.1 — Inventario semantico.** Elencare tutte le routine reologiche, termiche, di pressione dei pori e di scambio di massa, registrando chiamanti, argomenti, unità, risultato, dipendenza dal modello, trattamento numerico, uso REAL/COMPLEX e responsabilità futura. Distinguere proprietà, rate, sorgenti assemblate, solver analitici e aggiornamenti dello stato.
 
-**D16.2 — Interfacce comuni.** Definire le API generiche di `rheology_2d` e le interfacce delle leggi termiche, di massa e di pressione dei pori, dichiarando esplicitamente se restituiscono proprietà, rate, sorgenti o variabili aggiornate. Definire `eval_analytic_stage_rates` in `equation_terms_2d` come adapter selettivo per il gruppo/equazioni attive, con rate effettivi in variabili conservative.
+**D16.2 — Interfacce comuni.** Definire le API generiche di `rheology_2d` e le interfacce delle leggi termiche, di massa e di pressione dei pori, dichiarando esplicitamente se restituiscono proprietà, rate, sorgenti o variabili aggiornate. Definire il contratto del coordinatore dello stage (`solve_imex_stage`, nome proposto): applicazione SI, dispatch ordinato dei gruppi e dei rispettivi metodi, aggiornamento dello stato conservativo condiviso, ricostruzione dello stato fisico per il gruppo successivo e calcolo del rate effettivo netto dalla differenza conservativa di stage. Mantenere distinti il solve chiuso della relazione DIRK e l’integrazione exact-flow.
 
 **D16.3 — Dispatcher reologico.** Spostare in `rheology_2d` tutti i rami basati su `rheology_model_id` o sul nome del modello e rimuovere le chiamate dirette ai moduli specifici da `equation_terms_2d`, mantenendo formule, argomenti e semantica complex-step.
 
@@ -2000,7 +2053,7 @@ Le operazioni geometriche devono rimanere in `geometry_2d.f90`, per esempio `pro
 
 **D16.10 — Rimozione controllata.** Eliminare `mass_exchange_2d.f90` solo quando ogni routine ha una destinazione verificata e non restano simboli, dipendenze o test non aggiornati.
 
-**D16.11 — Documentazione e test.** Aggiornare Doxygen, dummy arguments, unità e semantica REAL/COMPLEX. Verificare equivalenza dei rate, inclusa la corrispondenza fra rate analitico effettivo e rate implicito allo stato di stage, e la selezione per gruppo; verificare inoltre trattamenti espliciti/impliciti/semi-impliciti, solver analitici, vaporizzazione, conservazione, positività, topografia, restart e default reologico.
+**D16.11 — Documentazione e test.** Aggiornare Doxygen, dummy arguments, unità e semantica REAL/COMPLEX. Verificare la soluzione esatta, l’aggiornamento della sola componente energetica conservativa per il raffreddamento, la ricostruzione delle variabili fisiche derivate da q, il rate medio effettivo e la selezione per gruppo. Verificare che massa, quantità di moto e masse dei componenti restino invariate per il solo termine di raffreddamento, mentre densità e profondità derivate rispondono alla temperatura; la differenza dal rate implicito istantaneo è attesa. Verificare inoltre trattamenti espliciti/impliciti/semi-impliciti, solver analitici, vaporizzazione, conservazione, positività, topografia, restart e default reologico.
 
 **D16.12 — Gate di accettazione.** Accettare D16 solo quando la selezione reologica è centralizzata, le leggi sono nei moduli `*_laws_2d`, rate e sorgenti sono distinti, le integrazioni analitiche seguono la convenzione, gli aggiornamenti sono in `time_integration_2d`, la geometria è in `geometry_2d` e compilazione, test, restart, Doxygen e CI passano senza variazioni scientifiche non autorizzate. Il manifest deve riportare vecchio nome, nuovo nome, modulo proprietario, chiamanti aggiornati ed evidenze di regressione.
 
