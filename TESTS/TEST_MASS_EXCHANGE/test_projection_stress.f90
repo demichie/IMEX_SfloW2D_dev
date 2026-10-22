@@ -4,7 +4,7 @@ PROGRAM test_projection_stress
   USE constitutive_parameters_2d
   USE geometry_2d
   USE domain_2d, ONLY : domain_type
-  USE mass_exchange_2d, ONLY : update_erosion_deposition_cell, release_topography_workspace
+  USE mass_exchange_2d, ONLY : update_erosion_deposition_cell
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite

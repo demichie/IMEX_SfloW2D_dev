@@ -206,8 +206,8 @@ stochastic/stochastic_module.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                         state/state_2d.$(OBJEXT)                 \
                                         stochastic/stochastic_random_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
+                              geometry/geometry_2d.$(OBJEXT)                    \
                               geometry/domain_2d.$(OBJEXT)                      \
-                              physics/mass_exchange_2d.$(OBJEXT)                \
                               numerics/equation_metadata_2d.$(OBJEXT)           \
                               physics/equation_terms_2d.$(OBJEXT)               \
                               core/model_layout_2d.$(OBJEXT)                    \

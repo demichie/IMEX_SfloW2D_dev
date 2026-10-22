@@ -21,7 +21,7 @@ MODULE simulation_2d
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,                &
        finalize_nonlinear_solver
 
-  USE mass_exchange_2d, ONLY : release_topography_workspace
+  USE geometry_2d, ONLY : release_topography_workspace
 
   USE runtime_2d, ONLY : runtime_state_type
   USE state_2d, ONLY : state_type

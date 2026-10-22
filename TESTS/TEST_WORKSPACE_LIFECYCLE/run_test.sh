@@ -40,7 +40,6 @@ gfortran -O0 -g -Wall -Wextra -fopenmp -fcheck=all -fbacktrace -I"$repo_dir/src/
     "$repo_dir/src/spatial/nonconservative_2d.f90" \
     "$repo_dir/src/spatial/pccu_2d.f90" \
     "$repo_dir/src/spatial/hyperbolic_2d.f90" \
-    "$repo_dir/src/physics/mass_exchange_2d.f90" \
     "$repo_dir/src/core/init_2d.f90" \
     "$test_dir/test_workspace_lifecycle.f90"
 gfortran -fopenmp -fcheck=all -fbacktrace ./*.o -llapack -o test_workspace_lifecycle

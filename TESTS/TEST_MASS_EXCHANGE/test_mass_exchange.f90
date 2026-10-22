@@ -11,7 +11,7 @@ PROGRAM test_mass_exchange
   USE stochastic_module, ONLY : stochastic_workspace_type, sym_noise, noise_pow_val
   USE state_conversion_2d, ONLY : qc_to_qp, settling_velocity
   USE equation_terms_2d, ONLY : eval_mass_exchange_terms
-  USE mass_exchange_2d, ONLY : update_erosion_deposition_cell, release_topography_workspace
+  USE mass_exchange_2d, ONLY : update_erosion_deposition_cell
   USE inpout_2d, ONLY : write_restart_file, read_restart_file, output_idx
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64

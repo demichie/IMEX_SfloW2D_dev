@@ -6,12 +6,11 @@ PROGRAM test_workspace_lifecycle
        curvature_term_flag, liquid_vaporization_flag
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, cell_size, x0, y0,   &
        topography_profile, nodata_topo, init_grid, B_vertex,                &
-       sourceE_vect_x, sourceW_vect_x, sourceS_vect_x, sourceN_vect_x
+       sourceE_vect_x, sourceW_vect_x, sourceS_vect_x, sourceN_vect_x,      &
+       release_topography_workspace
   USE init_2d, ONLY : thickness_init, erodible_init, release_initialization_fields
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
-  USE mass_exchange_2d, ONLY : release_topography_workspace
-
   IMPLICIT NONE
 
   TYPE(reconstruction_workspace_type) :: reconstruction

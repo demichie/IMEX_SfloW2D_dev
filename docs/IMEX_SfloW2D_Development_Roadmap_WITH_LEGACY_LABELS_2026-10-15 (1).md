@@ -2128,11 +2128,20 @@ frazione post-IMEX, eseguita una volta per passo: i rate cell-locali sono
 valutati e limitati prima dell’incremento; l’incremento aggiorna insieme stato e
 inventari, applica i controlli di positività e ricostruisce lo stato primitivo;
 solo dopo il loop le proposte limitate del letto sono proiettate sui vertici e
-la geometria derivata viene aggiornata. Il chiamante avanza l’orologio della
-simulazione dopo il completamento di questa sequenza. La proiezione e il
-refresh geometrico restano in `mass_exchange_2d` fino a D16.9.
+la geometria derivata viene aggiornata da `geometry_2d`. Il chiamante avanza
+l’orologio della simulazione dopo il completamento di questa sequenza.
 
 **D16.9 — Separazione geometrica.** Trasferire in `geometry_2d` proiezioni, evoluzione del letto e refresh geometrico, verificando che la topografia evolutiva resti aggiornabile e che il vertex gather conservi il bilancio globale.
+
+Le proposte di rate del letto, il workspace cella/vertice, il vertex gather,
+l’avanzamento del letto nodale e il refresh delle grandezze derivate sono ora
+posseduti da `geometry_2d`. `mass_exchange_2d` registra solo i rate cell-locali
+già limitati e invoca l’aggiornamento geometrico dopo il loop; la finalizzazione
+rilascia il workspace tramite il modulo geometrico. `TEST_MASS_EXCHANGE` e
+projection stress passano in strict e optimized con 1 e 4 thread, verificando
+bilancio del volume, celle asciutte/inattive e determinismo. Passano inoltre
+`TEST_TOPOGRAPHY_FACES`, `TEST_WORKSPACE_LIFECYCLE` e la sezione stage/boundary
+di `TEST_IMEX_STAGES` in entrambi i profili.
 
 **D16.10 — Rimozione controllata.** Eliminare `mass_exchange_2d.f90` solo quando ogni routine ha una destinazione verificata e non restano simboli, dipendenze o test non aggiornati.
 

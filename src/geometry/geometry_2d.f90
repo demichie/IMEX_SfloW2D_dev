@@ -18,6 +18,11 @@ MODULE geometry_2d
 
   PRIVATE :: reconstruct_short_1d_line
   PRIVATE :: copy_derivative_halo_x, copy_derivative_halo_y
+  PRIVATE :: topography_rate_cell, topography_rate_vertex
+  PRIVATE :: ensure_topography_rate_workspace
+
+  PUBLIC :: begin_topography_rate_update, record_topography_rate_cell
+  PUBLIC :: apply_topography_rate_update, release_topography_workspace
 
   !> Location of the centers (x) of the control volume of the domain
   REAL(wp), ALLOCATABLE :: x_comp(:)
@@ -33,6 +38,10 @@ MODULE geometry_2d
 
   !> Authoritative continuous topography at Cartesian grid vertices.
   REAL(wp), ALLOCATABLE :: B_vertex(:,:)
+
+  !> Cell proposals and their mass-lumped projection for the current bed update.
+  REAL(wp), ALLOCATABLE :: topography_rate_cell(:,:)
+  REAL(wp), ALLOCATABLE :: topography_rate_vertex(:,:)
 
   !> Unique Q1 bed elevation at x-normal and y-normal Cartesian faces.
   REAL(wp), ALLOCATABLE :: B_face_x(:,:)
@@ -472,6 +481,129 @@ CONTAINS
     CALL topography_reconstruction
 
   END SUBROUTINE refresh_topography_geometry
+
+  !******************************************************************************
+  !> \brief Start a cell-local topography update and clear prior proposals.
+  !> \details Resizes the geometry-owned work arrays when the grid changes and
+  !>          initializes all cells, including inactive and dry cells, to zero.
+  !******************************************************************************
+  SUBROUTINE begin_topography_rate_update
+
+    IMPLICIT NONE
+    INTEGER :: j, k
+
+    CALL ensure_topography_rate_workspace
+
+    !$OMP PARALLEL DO COLLAPSE(2)
+    DO k = 1, comp_cells_y
+       DO j = 1, comp_cells_x
+          topography_rate_cell(j,k) = 0.0_wp
+       END DO
+    END DO
+    !$OMP END PARALLEL DO
+
+  END SUBROUTINE begin_topography_rate_update
+
+  !******************************************************************************
+  !> \brief Store a limited cell bed-rate proposal for the current update.
+  !> \param[in] j Cell x index.
+  !> \param[in] k Cell y index.
+  !> \param[in] rate Limited cell elevation rate [m s-1].
+  !******************************************************************************
+  SUBROUTINE record_topography_rate_cell(j, k, rate)
+
+    IMPLICIT NONE
+
+    INTEGER, INTENT(IN) :: j, k
+    REAL(wp), INTENT(IN) :: rate
+
+    IF (.NOT.ALLOCATED(topography_rate_cell)) THEN
+       ERROR STOP 'topography rate workspace is not initialized'
+    END IF
+    IF (j < 1 .OR. j > comp_cells_x .OR. k < 1 .OR. k > comp_cells_y) THEN
+       ERROR STOP 'topography rate cell index is outside the grid'
+    END IF
+
+    topography_rate_cell(j,k) = rate
+
+  END SUBROUTINE record_topography_rate_cell
+
+  !******************************************************************************
+  !> \brief Project cell bed-rate proposals and update the authoritative bed.
+  !> \details Gathers adjacent cell proposals at vertices, advances B_vertex
+  !>          once by the time increment and refreshes all derived geometry.
+  !> \param[in] time_step Physical time increment [s].
+  !******************************************************************************
+  SUBROUTINE apply_topography_rate_update(time_step)
+
+    IMPLICIT NONE
+
+    REAL(wp), INTENT(IN) :: time_step
+    INTEGER :: j, k
+
+    IF (.NOT.ALLOCATED(topography_rate_cell) .OR.                         &
+         .NOT.ALLOCATED(topography_rate_vertex)) THEN
+       ERROR STOP 'topography rate workspace is not initialized'
+    END IF
+
+    CALL project_cell_field_to_vertices(topography_rate_cell,             &
+         topography_rate_vertex)
+
+    !$OMP PARALLEL DO COLLAPSE(2)
+    DO k = 1, comp_interfaces_y
+       DO j = 1, comp_interfaces_x
+          B_vertex(j,k) = B_vertex(j,k) + time_step * topography_rate_vertex(j,k)
+       END DO
+    END DO
+    !$OMP END PARALLEL DO
+
+    CALL refresh_topography_geometry
+
+  END SUBROUTINE apply_topography_rate_update
+
+  !******************************************************************************
+  !> \brief Release the geometry-owned topography update workspace.
+  !> \details Deallocates cell and vertex rates; repeated calls are safe.
+  !******************************************************************************
+  SUBROUTINE release_topography_workspace
+
+    IMPLICIT NONE
+
+    IF (ALLOCATED(topography_rate_cell)) DEALLOCATE(topography_rate_cell)
+    IF (ALLOCATED(topography_rate_vertex)) DEALLOCATE(topography_rate_vertex)
+
+  END SUBROUTINE release_topography_workspace
+
+  !******************************************************************************
+  !> \brief Ensure that topography update arrays match the current grid.
+  !******************************************************************************
+  SUBROUTINE ensure_topography_rate_workspace
+
+    IMPLICIT NONE
+
+    LOGICAL :: grid_size_changed
+
+    IF (ALLOCATED(topography_rate_cell) .NEQV.                         &
+         ALLOCATED(topography_rate_vertex)) THEN
+       CALL release_topography_workspace
+    END IF
+
+    grid_size_changed = .FALSE.
+    IF (ALLOCATED(topography_rate_cell)) THEN
+       grid_size_changed = (SIZE(topography_rate_cell,1) .NE. comp_cells_x) &
+            .OR. (SIZE(topography_rate_cell,2) .NE. comp_cells_y)            &
+            .OR. (SIZE(topography_rate_vertex,1) .NE. comp_interfaces_x)     &
+            .OR. (SIZE(topography_rate_vertex,2) .NE. comp_interfaces_y)
+    END IF
+
+    IF (grid_size_changed) CALL release_topography_workspace
+
+    IF (.NOT.ALLOCATED(topography_rate_cell)) THEN
+       ALLOCATE(topography_rate_cell(comp_cells_x,comp_cells_y))
+       ALLOCATE(topography_rate_vertex(comp_interfaces_x,comp_interfaces_y))
+    END IF
+
+  END SUBROUTINE ensure_topography_rate_workspace
 
   !******************************************************************************
   !> \brief Identify the largest connected region at the configured water elevation.
