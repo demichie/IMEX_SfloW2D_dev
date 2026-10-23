@@ -46,6 +46,8 @@ those environment issues.
 
 No Intel ifx, Linux, CI, or portability acceptance is claimed. The subsequent
 numbered implementation of the explicit stage interface is recorded in
-[D17.9 explicit stage routing](D17_9_EXPLICIT_STAGE_ROUTING.md). D17.10 onward
-still needs to complete the semi-implicit/implicit interfaces, remaining
-stage/step routing, native input and full acceptance.
+[D17.9 explicit stage routing](D17_9_EXPLICIT_STAGE_ROUTING.md), and the
+group-filtered semi-implicit/implicit rate interfaces in
+[D17.10 group-filtered implicit rates](D17_10_GROUP_FILTERED_IMPLICIT_RATES.md).
+Multiple Newton-solver execution, remaining stage/step routing, native input
+and full acceptance remain open.

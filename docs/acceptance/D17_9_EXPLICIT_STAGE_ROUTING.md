@@ -36,5 +36,7 @@ spatial flux formulation.
 | Production executable | Out-of-tree GNU Fortran build and link pass with the installed NetCDF libraries |
 | Whitespace | `git -c core.whitespace=cr-at-eol diff --check` passes |
 
-No Intel ifx, Linux, CI or cross-platform acceptance is claimed. D17.10 and
-later roadmap requirements remain open; this report does not mark D17 complete.
+No Intel ifx, Linux, CI or cross-platform acceptance is claimed. Subsequent
+group-filtered semi-implicit/implicit routing is documented in
+[D17.10 acceptance](D17_10_GROUP_FILTERED_IMPLICIT_RATES.md). Later roadmap
+requirements remain open; this report does not mark D17 complete.

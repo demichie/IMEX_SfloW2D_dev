@@ -34,10 +34,15 @@ MODULE equation_terms_2d
   USE equation_metadata_2d, ONLY : equation_partition_type,                   &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,                       &
-       SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE,                         &
+       SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON, SOURCE_CADENCE_STAGE,   &
        SOURCE_SOLVE_ANALYTIC_VELOCITY, SOURCE_SOLVE_ANALYTIC_TEMPERATURE,     &
        SOURCE_SOLVE_ANALYTIC_PORE_PRESSURE, SOURCE_TARGET_VELOCITY,          &
        SOURCE_TARGET_TEMPERATURE, SOURCE_TARGET_PORE_PRESSURE,               &
+       SOURCE_SOLVE_NEWTON_BLOCK, SOURCE_ROLE_IMPLICIT,                      &
+       SOURCE_ROLE_SEMI_IMPLICIT, SOURCE_TERM_THERMAL_RADIATIVE_COOLING,     &
+       SOURCE_TERM_THERMAL_CONVECTIVE_COOLING,                               &
+       SOURCE_TERM_PORE_PRESSURE_DISSIPATION, source_term_type,              &
+       source_term_descriptor,                                               &
        SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION,&
        SOURCE_TERM_BOTTOM_FISSURAL_INJECTION, SOURCE_TERM_RADIAL_INJECTION
   USE source_registry_2d, ONLY : source_group_type, source_solver_type, group_contains
@@ -669,6 +674,65 @@ CONTAINS
 
   END SUBROUTINE eval_expl_terms
 
+  !> \brief Validate one Newton group/solver selection before rate evaluation.
+  SUBROUTINE validate_newton_selection(group,solver)
+    TYPE(source_group_type), INTENT(IN) :: group
+    TYPE(source_solver_type), INTENT(IN) :: solver
+    INTEGER :: i
+
+    IF (group%method/=SOURCE_METHOD_NEWTON .OR. &
+         .NOT.ALLOCATED(group%term_ids) .OR. &
+         .NOT.ALLOCATED(group%implicit_solver_ids)) THEN
+       CALL fatal_error('D17: implicit rate evaluation requires a Newton source group')
+       RETURN
+    END IF
+    IF (solver%kind/=SOURCE_SOLVE_NEWTON_BLOCK .OR. solver%id<1 .OR. &
+         .NOT.ANY(group%implicit_solver_ids==solver%id) .OR. &
+         .NOT.ALLOCATED(solver%term_ids)) THEN
+       CALL fatal_error('D17: implicit rate evaluation requires a solver in the selected group')
+       RETURN
+    END IF
+    DO i=1,SIZE(solver%term_ids)
+       IF (.NOT.group_contains(group,solver%term_ids(i))) THEN
+          CALL fatal_error('D17: implicit solver term is absent from its source group')
+          RETURN
+       END IF
+    END DO
+  END SUBROUTINE validate_newton_selection
+
+  !> \brief Test whether a selected Newton solver owns a term of the requested role.
+  PURE LOGICAL FUNCTION solver_has_role(group,solver,role,model_id) RESULT(found)
+    TYPE(source_group_type), INTENT(IN) :: group
+    TYPE(source_solver_type), INTENT(IN) :: solver
+    INTEGER, INTENT(IN) :: role,model_id
+    TYPE(source_term_type) :: term
+    INTEGER :: i
+
+    found=.FALSE.
+    IF (.NOT.ALLOCATED(solver%term_ids)) RETURN
+    DO i=1,SIZE(solver%term_ids)
+       IF (.NOT.group_contains(group,solver%term_ids(i))) CYCLE
+       term=source_term_descriptor(solver%term_ids(i))
+       IF (term%role==role .AND. term%model_id==model_id) THEN
+          found=.TRUE.
+          RETURN
+       END IF
+    END DO
+  END FUNCTION solver_has_role
+
+  !> \brief Test whether a selected Newton solver owns one specific source term.
+  PURE LOGICAL FUNCTION solver_has_term(group,solver,term_id) RESULT(found)
+    TYPE(source_group_type), INTENT(IN) :: group
+    TYPE(source_solver_type), INTENT(IN) :: solver
+    INTEGER, INTENT(IN) :: term_id
+    found=group_contains(group,term_id)
+    IF (.NOT.ALLOCATED(solver%term_ids)) THEN
+       found=.FALSE.
+       RETURN
+    END IF
+    IF (found) found=ANY(solver%term_ids==term_id)
+  END FUNCTION solver_has_term
+
 
   !******************************************************************************
   !> \brief Evaluate stiff cell-local sources in the real or complex state path.
@@ -691,16 +755,19 @@ CONTAINS
   !> \param[in] r_qj Optional real conservative cell state [variable].
   !> \param[out] r_nh_term_impl Optional real implicit-source vector [equation] corresponding
   !>                            to r_qj.
+  !> \param[in] group Optional validated Newton source group; requires solver.
+  !> \param[in] solver Optional registered Newton solver; limits rate assembly to its terms.
   !>
   !> \note Provide exactly one complete input/output pair: c_qj with c_nh_term_impl, or r_qj
   !>       with r_nh_term_impl. Zij is the effective stochastic fluctuation passed to rheology
   !>       closures. Pore diffusion is evaluated independently of the rheology flag; dry or
   !>       negative-pressure states, absent pore volume, and dynamic permeability without
-  !>       solids contribute no pressure relaxation.
+  !>       solids contribute no pressure relaxation. When group and solver are omitted, the
+  !>       legacy unfiltered source assembly is retained.
   !******************************************************************************
 
   SUBROUTINE eval_implicit_terms( Bprimej_x, Bprimej_y, Zij, c_qj,              &
-       c_nh_term_impl, r_qj , r_nh_term_impl )
+       c_nh_term_impl, r_qj , r_nh_term_impl, group, solver )
 
     USE COMPLEXIFY
 
@@ -714,6 +781,8 @@ CONTAINS
     COMPLEX(wp), INTENT(OUT), OPTIONAL :: c_nh_term_impl(n_eqns)
     REAL(wp), INTENT(IN), OPTIONAL :: r_qj(n_vars)
     REAL(wp), INTENT(OUT), OPTIONAL :: r_nh_term_impl(n_eqns)
+    TYPE(source_group_type), INTENT(IN), OPTIONAL :: group
+    TYPE(source_solver_type), INTENT(IN), OPTIONAL :: solver
 
     COMPLEX(wp) :: h                       !< height [m]
     COMPLEX(wp) :: u                       !< velocity (x direction) [m/s]
@@ -740,6 +809,8 @@ CONTAINS
     COMPLEX(wp) :: exc_pore_pres
 
     COMPLEX(wp) :: red_grav
+    LOGICAL :: selected_rheology, selected_thermal, selected_pore
+    LOGICAL :: selected_radiative, selected_convective
 
     IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
 
@@ -760,14 +831,39 @@ CONTAINS
 
     END IF
 
+    IF (PRESENT(group) .NEQV. PRESENT(solver)) THEN
+       CALL fatal_error('D17: implicit rate evaluation requires both group and solver descriptors')
+       RETURN
+    END IF
+    IF (PRESENT(group)) THEN
+       CALL validate_newton_selection(group,solver)
+       selected_rheology=solver_has_role(group,solver,SOURCE_ROLE_IMPLICIT, &
+            rheology_model_id)
+       selected_radiative=solver_has_term(group,solver, &
+            SOURCE_TERM_THERMAL_RADIATIVE_COOLING)
+       selected_convective=solver_has_term(group,solver, &
+            SOURCE_TERM_THERMAL_CONVECTIVE_COOLING)
+       IF (selected_radiative .NEQV. selected_convective) THEN
+          CALL fatal_error('D17: thermal cooling terms must be selected as a complete bundle')
+          RETURN
+       END IF
+       selected_thermal=selected_radiative .OR. selected_convective
+       selected_pore=solver_has_term(group,solver, &
+            SOURCE_TERM_PORE_PRESSURE_DISSIPATION)
+    ELSE
+       selected_rheology=rheology_flag
+       selected_thermal=rheology_flag
+       selected_pore=pore_pressure_flag
+    END IF
+
     ! initialize the source terms
     source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)
-    IF (rheology_flag .OR. pore_pressure_flag) THEN
+    IF (selected_rheology .OR. selected_thermal .OR. selected_pore) THEN
        CALL c_phys_var(qj,h,u,v,T,rho_m,alphas,alphag,inv_rho_m,Zs,             &
             exc_pore_pres)
     END IF
 
-    IF (rheology_flag) THEN
+    IF (rheology_flag .AND. selected_rheology) THEN
 
        red_grav = ( rho_m - rho_a_amb ) / rho_m * grav
 
@@ -792,12 +888,15 @@ CONTAINS
        CALL eval_implicit_rheology_rate(rheology_model_id, h, T, rho_m,       &
             inv_rho_m, u, v, mod_vel, mod_vel_hor, mod_vel2, red_grav,       &
             alphas, moving, stochastic_flag, Zij, source_term(2:3))
+    END IF
+
+    IF (selected_thermal) THEN
        source_term(4) = eval_rheology_cooling_energy_rate(rheology_model_id,  &
             T, radiative_term_coeff, convective_term_coeff, T_env)
-
     ENDIF
 
-    IF ( pore_pressure_flag ) CALL eval_pore_pressure_diffusion_source(h, T,   &
+    IF ( pore_pressure_flag .AND. selected_pore ) &
+         CALL eval_pore_pressure_diffusion_source(h, T,                       &
          rho_m, alphas, exc_pore_pres, source_term(idx_poreEqn))
 
     nh_term = source_term
@@ -837,6 +936,8 @@ CONTAINS
   !> \param[out] semi_implicit_term Cell-source vector handled by the semi-implicit
   !>                                part of the time scheme.
   !> \param[in] Zj Local effective stochastic fluctuation supplied to the rheology.
+  !> \param[in] group Optional validated Newton source group; requires solver.
+  !> \param[in] solver Optional registered Newton solver; limits assembly to its terms.
   !> \note The Froude-dependent law (model 9) requires positive reduced gravity.
   !>       Neutral or buoyant mixtures have no compressive buoyancy load in this law and receive
   !>       no basal friction; their Froude denominator must not be evaluated.
@@ -844,7 +945,7 @@ CONTAINS
 
   SUBROUTINE eval_semi_implicit_terms( Bprimej_x , Bprimej_y , Bsecondj_xx ,    &
        Bsecondj_xy , Bsecondj_yy , grav_coeff , qpj , semi_implicit_term ,     &
-       Zj )
+       Zj, group, solver )
 
     USE parameters_2D, ONLY: pore_pressure_flag
 
@@ -861,6 +962,8 @@ CONTAINS
     REAL(wp), INTENT(IN) :: Zj ! value stochastic process
 
     REAL(wp), INTENT(OUT) :: semi_implicit_term(n_eqns)
+    TYPE(source_group_type), INTENT(IN), OPTIONAL :: group
+    TYPE(source_solver_type), INTENT(IN), OPTIONAL :: solver
 
     REAL(wp) :: source_term(n_eqns)
 
@@ -882,8 +985,21 @@ CONTAINS
     REAL(wp) :: r_sp_heat_mix
 
     REAL(wp) :: exc_pore_pres       !< excess pore pressure
+    LOGICAL :: selected_rheology
 
     semi_implicit_term(1:n_eqns) = 0.0_wp
+
+    IF (PRESENT(group) .NEQV. PRESENT(solver)) THEN
+       CALL fatal_error('D17: semi-implicit evaluation requires both group and solver descriptors')
+       RETURN
+    END IF
+    IF (PRESENT(group)) THEN
+       CALL validate_newton_selection(group,solver)
+       selected_rheology=solver_has_role(group,solver, &
+            SOURCE_ROLE_SEMI_IMPLICIT,rheology_model_id)
+    ELSE
+       selected_rheology=rheology_flag
+    END IF
 
     ! A dry cell carries no friction source.
     IF ( qpj(1) .LE. EPSILON(1.0_wp) ) RETURN
@@ -891,7 +1007,7 @@ CONTAINS
     ! initialize and evaluate the forces terms
     source_term(1:n_eqns) = 0.0_wp
 
-    rheology_if:IF (rheology_flag) THEN
+    rheology_if:IF (rheology_flag .AND. selected_rheology) THEN
 
        r_h = qpj(1)
        r_u = qpj(idx_u)

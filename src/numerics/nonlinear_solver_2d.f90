@@ -288,7 +288,8 @@ CONTAINS
     REAL(wp) :: qp_current(n_vars+2)
     REAL(wp) :: dynamic_pressure, si_term(n_eqns), residual_without_si(n_eqns)
     REAL(wp) :: momentum_before_newton(2)
-    INTEGER :: group, group_size, equation, i, solver_id, analytic_status
+    INTEGER :: group, group_size, equation, i, solver_index, solver_size
+    INTEGER :: solver_id, analytic_status
     INTEGER :: group_equations(equation_partition%n_implicit)
     LOGICAL :: group_has_momentum, apply_si_local
 
@@ -392,38 +393,72 @@ CONTAINS
           qj=analytic_state
 
        ELSEIF (stage_groups(group)%method==SOURCE_METHOD_NEWTON) THEN
-          si_term = 0.0_wp
-          group_has_momentum = ANY(group_equations(1:group_size) .EQ. 2) .OR. &
-               ANY(group_equations(1:group_size) .EQ. 3)
-          IF (group_has_momentum .AND. apply_si_local) THEN
-             CALL qc_to_qp(qj, qp_current, dynamic_pressure)
-             CALL eval_semi_implicit_terms(Bprimej_x, Bprimej_y, Bsecondj_xx,&
-                  Bsecondj_xy, Bsecondj_yy, grav_coeff, qp_current, si_term,&
-                  Zij)
-          END IF
-          DO i = 1, group_size
-             equation = group_equations(i)
-             qj(equation) = q_known(equation) +                             &
-                  dt_step*a_diag*si_term(equation)
-          END DO
-          IF (group_has_momentum .AND. apply_si_local) THEN
-             CALL correct_friction_momentum(q_known(2:3), qj(2:3))
-             si_term(1:n_vars) = (qj - q_known) / (dt_step * a_diag)
-          END IF
-          residual_without_si = Rj_not_impl - a_diag * si_term
-          momentum_before_newton = qj(2:3)
-          CALL solve_newton_group(group_equations(1:group_size), qj,        &
-               qj_old, dt_step, a_diag, residual_without_si,               &
-               Bprimej_x, Bprimej_y,                                       &
-               Zij, coeff_f, tol_abs_local, tol_rel_local, iterations_used,&
-               converged, linear_info, line_search_failed)
-          IF (.NOT. converged) THEN
-             qj = qj_init
+          IF (.NOT.ALLOCATED(stage_groups(group)%implicit_solver_ids)) THEN
+             linear_info=-1
+             qj=qj_init
              RETURN
           END IF
-          IF (group_has_momentum) THEN
-             CALL correct_friction_momentum(momentum_before_newton, qj(2:3))
+          IF (SIZE(stage_groups(group)%implicit_solver_ids)<1) THEN
+             linear_info=-1
+             qj=qj_init
+             RETURN
           END IF
+          DO solver_index=1,SIZE(stage_groups(group)%implicit_solver_ids)
+             solver_id=stage_groups(group)%implicit_solver_ids(solver_index)
+             IF (solver_id<1 .OR. solver_id>SIZE(solvers)) THEN
+                linear_info=-1
+                qj=qj_init
+                RETURN
+             END IF
+             IF (.NOT.ALLOCATED(solvers(solver_id)%equation_ids)) THEN
+                linear_info=-1
+                qj=qj_init
+                RETURN
+             END IF
+             solver_size=SIZE(solvers(solver_id)%equation_ids)
+             IF (solver_size<1 .OR. solver_size>group_size) THEN
+                linear_info=-1
+                qj=qj_init
+                RETURN
+             END IF
+
+             si_term=0.0_wp
+             group_has_momentum = ANY(solvers(solver_id)%equation_ids==2) .OR. &
+                  ANY(solvers(solver_id)%equation_ids==3)
+             IF (group_has_momentum .AND. apply_si_local) THEN
+                CALL qc_to_qp(qj, qp_current, dynamic_pressure)
+                CALL eval_semi_implicit_terms(Bprimej_x, Bprimej_y,          &
+                     Bsecondj_xx,Bsecondj_xy,Bsecondj_yy,grav_coeff,        &
+                     qp_current,si_term,Zij,group=stage_groups(group),       &
+                     solver=solvers(solver_id))
+             END IF
+             DO i=1,solver_size
+                equation=solvers(solver_id)%equation_ids(i)
+                qj(equation)=q_known(equation)+dt_step*a_diag*si_term(equation)
+             END DO
+             IF (group_has_momentum .AND. apply_si_local) THEN
+                CALL correct_friction_momentum(q_known(2:3),qj(2:3))
+                DO i=1,solver_size
+                   equation=solvers(solver_id)%equation_ids(i)
+                   si_term(equation)=                                        &
+                        (qj(equation)-q_known(equation))/(dt_step*a_diag)
+                END DO
+             END IF
+             residual_without_si=Rj_not_impl-a_diag*si_term
+             momentum_before_newton=qj(2:3)
+             CALL solve_newton_group(stage_groups(group),solvers(solver_id),&
+                  solvers(solver_id)%equation_ids,qj,qj_old,dt_step,a_diag,&
+                  residual_without_si,Bprimej_x,Bprimej_y,Zij,coeff_f,      &
+                  tol_abs_local,tol_rel_local,iterations_used,converged,   &
+                  linear_info,line_search_failed)
+             IF (.NOT.converged) THEN
+                qj=qj_init
+                RETURN
+             END IF
+             IF (group_has_momentum) THEN
+                CALL correct_friction_momentum(momentum_before_newton,qj(2:3))
+             END IF
+          END DO
        ELSE
           linear_info = -5
           qj = qj_init
@@ -452,8 +487,9 @@ CONTAINS
   !> \param[out] converged True when the group residual meets its tolerance.
   !> \param[out] linear_info Linear solver status; zero denotes success.
   !> \param[out] line_search_failed True if backtracking cannot accept a step.
-  SUBROUTINE solve_newton_group(group_equations, qj, qj_old, dt_step, a_diag,&
-       Rj_not_impl, Bprimej_x, Bprimej_y, Zij, coeff_f, tol_abs_local,       &
+  SUBROUTINE solve_newton_group(source_group,source_solver,group_equations,   &
+       qj,qj_old,dt_step,a_diag,Rj_not_impl,Bprimej_x,Bprimej_y,Zij,coeff_f, &
+       tol_abs_local,                                                         &
        tol_rel_local, iterations_used, converged, linear_info,               &
        line_search_failed)
 
@@ -461,6 +497,8 @@ CONTAINS
 
     IMPLICIT NONE
 
+    TYPE(source_group_type), INTENT(IN) :: source_group
+    TYPE(source_solver_type), INTENT(IN) :: source_solver
     INTEGER, INTENT(IN) :: group_equations(:)
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
     REAL(wp), INTENT(IN) :: qj_old(n_vars), dt_step, a_diag
@@ -493,7 +531,8 @@ CONTAINS
     DO nl_iter = 1, max_nl_iter
        iterations_used = iterations_used + 1
        CALL eval_f(qj, qj_old, dt_step, a_diag, coeff_f, Rj_not_impl,       &
-            Bprimej_x, Bprimej_y, right_term, scal_f, Zij, group_equations)
+            Bprimej_x, Bprimej_y, right_term, scal_f, Zij, group_equations, &
+            source_group,source_solver)
 
        IF (nl_iter .EQ. 1) residual_ref = ABS(right_term)
        residual_tol = tol_abs_local + tol_rel_local*residual_ref
@@ -503,7 +542,8 @@ CONTAINS
        END IF
 
        CALL eval_jacobian(qj_rel, qj_org, dt_step, a_diag, coeff_f,         &
-            Bprimej_x, Bprimej_y, left_matrix, Zij, group_equations)
+            Bprimej_x, Bprimej_y, left_matrix, Zij, group_equations,       &
+            source_group,source_solver)
        IF (nl_iter .GT. 1) grad_f = MATMUL(right_term,left_matrix)
 
        DO i = 1, SIZE(group_equations)
@@ -537,7 +577,7 @@ CONTAINS
           CALL lnsrch(qj_rel_old, qj_org, qj, qj_old, scal_f_old, grad_f,   &
                desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax,      &
                check, dt_step, a_diag, Rj_not_impl, Bprimej_x, Bprimej_y,  &
-               Zij, group_equations)
+               Zij, group_equations,source_group,source_solver)
           IF (check) THEN
              line_search_failed = .TRUE.
              RETURN
@@ -551,7 +591,7 @@ CONTAINS
           END DO
           CALL eval_f(qj_trial, qj_old, dt_step, a_diag, coeff_f,           &
                Rj_not_impl, Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
-               group_equations)
+               group_equations,source_group,source_solver)
        END IF
 
        DO i = 1, SIZE(group_equations)
@@ -824,7 +864,7 @@ CONTAINS
   SUBROUTINE lnsrch( qj_rel_NR_old, qj_org, qj_fixed, qj_old, scal_f_old,      &
        grad_f, desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax, check,  &
        dt_step , a_diag , Rj_not_impl , Bprimej_x , Bprimej_y, Zij,           &
-       active_equations )
+       active_equations,source_group,source_solver )
 
     IMPLICIT NONE
 
@@ -876,6 +916,8 @@ CONTAINS
     ! vars for stochastic variable
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
     INTEGER, INTENT(IN) :: active_equations(:)
+    TYPE(source_group_type), INTENT(IN) :: source_group
+    TYPE(source_solver_type), INTENT(IN) :: source_solver
     REAL(wp), PARAMETER :: TOLX=epsilon(qj_rel)
 
     INTEGER, DIMENSION(1) :: ndum
@@ -954,7 +996,7 @@ CONTAINS
 
        CALL eval_f( qj , qj_old , dt_step , a_diag , coeff_f ,             &
             Rj_not_impl , Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
-            active_equations )
+            active_equations,source_group,source_solver )
 
        IF ( verbose_level .GE. 4 ) THEN
 
@@ -1071,7 +1113,7 @@ CONTAINS
 
   SUBROUTINE eval_f( qj , qj_old , dt_step, a_diag , coeff_f , Rj_not_impl ,    &
        Bprimej_x ,                                                              &
-       Bprimej_y , f_nl , scal_f, Zij, active_equations )
+       Bprimej_y , f_nl , scal_f, Zij, active_equations,source_group,source_solver )
 
     USE equation_terms_2d, ONLY : eval_implicit_terms
 
@@ -1093,6 +1135,8 @@ CONTAINS
 
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
     INTEGER, INTENT(IN) :: active_equations(:)
+    TYPE(source_group_type), INTENT(IN) :: source_group
+    TYPE(source_solver_type), INTENT(IN) :: source_solver
 
     REAL(wp) :: nh_term_impl(n_eqns)
     REAL(wp) :: Rj(n_eqns)
@@ -1102,7 +1146,7 @@ CONTAINS
     REAL(wp), VOLATILE :: delta_q(n_vars)
 
     CALL eval_implicit_terms( Bprimej_x , Bprimej_y, Zij, r_qj = qj ,           &
-         r_nh_term_impl=nh_term_impl )
+         r_nh_term_impl=nh_term_impl,group=source_group,solver=source_solver )
 
     Rj = Rj_not_impl - a_diag * nh_term_impl
 
@@ -1146,7 +1190,8 @@ CONTAINS
   !******************************************************************************
 
   SUBROUTINE eval_jacobian( qj_rel, qj_org, dt_step, a_diag, coeff_f,        &
-       Bprimej_x, Bprimej_y, left_matrix, Zij, active_equations )
+       Bprimej_x, Bprimej_y, left_matrix, Zij, active_equations,             &
+       source_group,source_solver )
 
     USE equation_terms_2d, ONLY : eval_implicit_terms
 
@@ -1165,6 +1210,8 @@ CONTAINS
 
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
     INTEGER, INTENT(IN) :: active_equations(:)
+    TYPE(source_group_type), INTENT(IN) :: source_group
+    TYPE(source_solver_type), INTENT(IN) :: source_solver
 
     REAL(wp) :: Jacob_relax(n_eqns,n_vars)
     COMPLEX(wp) :: nh_terms_cmplx_impl(n_eqns)
@@ -1197,7 +1244,8 @@ CONTAINS
        qj_cmplx = qj_rel_cmplx * qj_org
 
        CALL eval_implicit_terms(Bprimej_x, Bprimej_y, Zij,                   &
-            c_qj=qj_cmplx, c_nh_term_impl=nh_terms_cmplx_impl)
+            c_qj=qj_cmplx, c_nh_term_impl=nh_terms_cmplx_impl,               &
+            group=source_group,solver=source_solver)
 
        DO j = 1, SIZE(active_equations)
           Jacob_relax(active_equations(j),equation) =                         &
