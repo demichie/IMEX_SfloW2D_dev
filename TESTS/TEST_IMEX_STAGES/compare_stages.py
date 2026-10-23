@@ -653,6 +653,38 @@ def stage_count_suite(executable, profile):
                   "requested_n_RK": stages, "effective_n_RK": expected, "accepted": accepted,
                   "runs": evidence}, sort_keys=True), flush=True)
     print("PASS: unsupported N_RK rejected by input and workspace; default remains 2", flush=True)
+    directory = Path("source-groups-native")
+    directory.mkdir()
+    subprocess.run([sys.executable, str(generator)], cwd=directory, check=True)
+    with (directory / "IMEX_SfloW2D.inp").open("a") as stream:
+        stream.write("""
+&SOURCE_GROUPS
+ source_group_count=2,
+ source_group_id(1)=1,
+ source_group_order(1)=1,
+ source_group_cadence(1)='STAGE',
+ source_group_method(1)='NEWTON',
+ source_group_term_count(1)=0,
+ source_group_solver_count(1)=1,
+ source_solver_order(1,1)=1,
+ source_solver_target_count(1,1)=1,
+ source_solver_targets(1,1,1)='VELOCITY',
+ source_group_id(2)=1,
+ source_group_order(2)=1,
+ source_group_cadence(2)='STEP',
+ source_group_method(2)='EXPLICIT',
+ source_group_term_count(2)=1,
+ source_group_terms(1,2)='SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS',
+ source_group_solver_count(2)=0
+/
+""")
+    env = {**os.environ, "OMP_NUM_THREADS": "1", "OMP_DYNAMIC": "FALSE"}
+    run = subprocess.run([str(executable), "native-source", "2"], cwd=directory, env=env,
+                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=30)
+    (directory / "native-source.log").write_text(run.stdout)
+    if run.returncode != 0 or "PASS: stage count accepted:" not in run.stdout:
+        raise AssertionError(f"{directory}: native source input flow failed\n{run.stdout}")
+    print("PASS: SOURCE_GROUPS parsed through read_param and built from active physics", flush=True)
 
 
 def main():

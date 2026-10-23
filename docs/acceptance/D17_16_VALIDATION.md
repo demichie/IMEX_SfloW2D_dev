@@ -53,10 +53,14 @@ It compiles the production module order (including `source_configuration_2d`,
 `simulation_2d` and `inpout_2d`) and exercises mass-exchange and checkpoint
 continuation.
 
+`TESTS/TEST_IMEX_STAGES/run_test.sh` passed in strict and optimized profiles.
+Its generated lake-at-rest input includes a native schedule; the test runs the
+full `init_param`/`read_param` path and builds the registry from the parsed
+configuration. It verifies the implicit velocity block and the active
+post-RK liquid-loss term in the resulting schedule.
+
 ## Remaining acceptance gap
 
-The parser cases exercise the production namelist-reader helper using scratch
-input units; the complete `read_param` startup flow is not yet run by a
-dedicated input fixture. Native schedule equivalence across physical model
+Native schedule equivalence across the full matrix of physical model
 combinations and cross-platform/CI acceptance remain open. D17.16 is therefore
 **partially complete**.
