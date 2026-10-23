@@ -36,7 +36,6 @@ PROGRAM IMEX_SfloW2D
    USE geometry_2d, ONLY : init_grid
    USE geometry_2d, ONLY : init_source
    USE geometry_2d, ONLY : refresh_topography_geometry
-   USE equation_terms_2d, ONLY : set_source_time_coefficients
 
    USE geometry_2d, ONLY : dx,dy
    ! USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
@@ -68,7 +67,6 @@ PROGRAM IMEX_SfloW2D
    USE inpout_2d, ONLY : output_esri_flag
    USE inpout_2d, ONLY : output_netcdf_flag
 
-   USE time_integration_2d, ONLY : apply_mass_exchange_step
    USE simulation_2d, ONLY : simulation
    USE source_registry_2d, ONLY : source_group_type, group_contains
    USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE, &
@@ -461,30 +459,7 @@ PROGRAM IMEX_SfloW2D
       simulation%runtime%dt_old_old = simulation%runtime%dt_old
       simulation%runtime%dt_old = simulation%runtime%dt
 
-      ! Time windows of the sources averaged over the step about to be taken
-      CALL set_source_time_coefficients( simulation%runtime%t ,               &
-           simulation%runtime%dt )
-
-      ! Fractional stochastic step: recover transported Z in wet cells,
-      ! evolve the OU process everywhere, and initialize M*Z for advection.
-      IF (stochastic_flag) CALL simulation%stochastic%prepare_timestep(       &
-           simulation%state, simulation%runtime%dt)
-
-      CALL simulation%time_integration%advance(                              &
-           simulation%state%q, simulation%state%qp, simulation%runtime%t,    &
-           simulation%runtime%dt, simulation%stochastic%effective_Z,         &
-           simulation%equation_partition,                                   &
-           simulation%source_registry, &
-           simulation%domain,                                               &
-           simulation%spatial_operator)
-
-      ! Mass exchange is a separate fractional step after the IMEX update.
-      ! It updates inventories first and refreshes the nodal bed if enabled.
-      CALL apply_mass_exchange_step(simulation%state%q,                       &
-           simulation%state%qp, simulation%runtime%dt, simulation%domain,    &
-           simulation%source_registry)
-
-      simulation%runtime%t = simulation%runtime%t + simulation%runtime%dt
+      CALL simulation%advance_timestep()
 
       !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2, &
       !$OMP & thickness_exceeds,pressure_exceeds, &

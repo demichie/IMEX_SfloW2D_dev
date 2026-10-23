@@ -24,7 +24,21 @@ No source evaluation was moved between stages, and no blanket EX evaluation
 was added. The existing `t` argument and tableau-driven `need_explicit_stage`
 behavior are unchanged.
 
-## Local evidence
+## Production sequence and local evidence
+
+The production phase sequence is centralized in
+`simulation%advance_timestep`, which is used by the driver after it selects
+and limits `dt`. An optional observer reports completed phases for tests; it is
+not used by normal runs. The sequence is source-window averaging, optional OU
+preparation, RK-IMEX, post-RK step sources, then runtime-clock advancement.
+
+`TESTS/TEST_IMEX_STAGES/run_test.sh` exercises this production routine from a
+generated input after `init_param`/`read_param`, model initialization and
+restart loading. The test asserts the exact five-event order and checks that
+the clock remains at the step-start time until the last event. This fixture has
+stochastic physics and time-windowed sources disabled, so the observer checks
+the production OU phase boundary but not a nontrivial OU update or averaged
+source coefficient.
 
 `TESTS/TEST_IMEX_STAGES/run_test.sh` passed in strict and optimized profiles,
 covering observed stage trajectories and final assembly for N_RK=2/3/4, mixed
@@ -35,8 +49,8 @@ budgets, bed updates, and checkpoint continuation.
 
 ## Remaining acceptance gap
 
-These tests exercise the stage integrator and post-RK exchange separately.
-There is no automated single-timestep test of the production driver that
-captures the full sequence, including source-window averaging and OU
-preparation. Therefore D17.15 is **partially verified**, not complete. No
-cross-platform or CI acceptance is claimed.
+The test starts after the driver has selected and limited `dt`; it does not
+exercise that scheduling logic or the driver’s subsequent diagnostics/output.
+It also does not validate active source-window averaging or a stochastic OU
+update in the integrated sequence. Therefore D17.15 is **partially verified**,
+not complete. No cross-platform or CI acceptance is claimed.

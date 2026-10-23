@@ -10,7 +10,8 @@
 
 MODULE simulation_2d
 
-  USE equation_terms_2d, ONLY : init_problem_param
+  USE equation_terms_2d, ONLY : init_problem_param, set_source_time_coefficients
+  USE time_integration_2d, ONLY : apply_mass_exchange_step
 
   USE source_registry_2d, ONLY : source_registry_type
   USE source_configuration_2d, ONLY : initialize_configured_sources, &
@@ -21,8 +22,8 @@ MODULE simulation_2d
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE model_layout_2d, ONLY : model_layout_type
 
-  USE parameters_2d, ONLY : n_layers, n_vars, n_eqns, n_solid, n_add_gas,   &
-       n_stoch_vars, n_pore_vars, liquid_flag, gas_flag
+  USE parameters_2d, ONLY : wp, n_layers, n_vars, n_eqns, n_solid, n_add_gas, &
+       n_stoch_vars, n_pore_vars, liquid_flag, gas_flag, stochastic_flag
 
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,                &
        finalize_nonlinear_solver
@@ -42,6 +43,23 @@ MODULE simulation_2d
 
   PUBLIC :: simulation_context_type
   PUBLIC :: simulation
+  PUBLIC :: TIMESTEP_EVENT_SOURCE_WINDOWS, TIMESTEP_EVENT_STOCHASTIC_PREPARED
+  PUBLIC :: TIMESTEP_EVENT_RK_COMPLETE, TIMESTEP_EVENT_STEP_SOURCES_COMPLETE
+  PUBLIC :: TIMESTEP_EVENT_CLOCK_ADVANCED
+
+  INTEGER, PARAMETER :: TIMESTEP_EVENT_SOURCE_WINDOWS=1
+  INTEGER, PARAMETER :: TIMESTEP_EVENT_STOCHASTIC_PREPARED=2
+  INTEGER, PARAMETER :: TIMESTEP_EVENT_RK_COMPLETE=3
+  INTEGER, PARAMETER :: TIMESTEP_EVENT_STEP_SOURCES_COMPLETE=4
+  INTEGER, PARAMETER :: TIMESTEP_EVENT_CLOCK_ADVANCED=5
+
+  ABSTRACT INTERFACE
+     SUBROUTINE timestep_event_observer(event,time,dt)
+       IMPORT :: wp
+       INTEGER, INTENT(IN) :: event
+       REAL(wp), INTENT(IN) :: time,dt
+     END SUBROUTINE timestep_event_observer
+  END INTERFACE
 
   !> \brief Ownership root for runtime, states and reusable numerical workspaces.
   !> \details Initialization follows the model-layout dependencies; finalization
@@ -62,6 +80,7 @@ MODULE simulation_2d
 
      PROCEDURE :: initialize => initialize_simulation
      PROCEDURE :: finalize => finalize_simulation
+     PROCEDURE :: advance_timestep => advance_simulation_timestep
 
   END TYPE simulation_context_type
 
@@ -105,6 +124,41 @@ CONTAINS
     WRITE(*,*) 'ALLOCATION OF ARRAYS COMPLETED'
 
   END SUBROUTINE initialize_simulation
+
+  !> \brief Apply one production timestep after the driver has selected dt.
+  !> \details Preserves the fractional-step ordering: source-window averages,
+  !>          OU preparation, RK-IMEX, post-RK step sources, then clock advance.
+  !> \param[in,out] this Initialized simulation context.
+  !> \param[optional] observer Test hook called after each completed phase.
+  SUBROUTINE advance_simulation_timestep(this,observer)
+    CLASS(simulation_context_type), INTENT(INOUT) :: this
+    PROCEDURE(timestep_event_observer), OPTIONAL :: observer
+    REAL(wp) :: step_start,step_length
+
+    step_start=this%runtime%t
+    step_length=this%runtime%dt
+
+    CALL set_source_time_coefficients(step_start,step_length)
+    IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_SOURCE_WINDOWS,step_start,step_length)
+
+    IF (stochastic_flag) CALL this%stochastic%prepare_timestep(this%state,step_length)
+    IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_STOCHASTIC_PREPARED, &
+         step_start,step_length)
+
+    CALL this%time_integration%advance(this%state%q,this%state%qp,step_start, &
+         step_length,this%stochastic%effective_Z,this%equation_partition, &
+         this%source_registry,this%domain,this%spatial_operator)
+    IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_RK_COMPLETE,step_start,step_length)
+
+    CALL apply_mass_exchange_step(this%state%q,this%state%qp,step_length, &
+         this%domain,this%source_registry)
+    IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_STEP_SOURCES_COMPLETE, &
+         step_start,step_length)
+
+    this%runtime%t=step_start+step_length
+    IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_CLOCK_ADVANCED, &
+         this%runtime%t,step_length)
+  END SUBROUTINE advance_simulation_timestep
 
   !> \brief Release the simulation state, metadata and solver workspaces.
   !>

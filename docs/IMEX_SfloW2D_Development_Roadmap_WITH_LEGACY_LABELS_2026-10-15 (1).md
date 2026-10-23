@@ -2504,7 +2504,7 @@ requisito numerato è:
 | D17.10 | **Implementato localmente** | Rate semi-impliciti/impliciti filtrati per gruppo e solver, percorsi impliciti REAL/COMPLEX e sweep runtime ordinato dei solve Newton multipli; report e regressioni locali in D17.10. |
 | D17.11 | **Implementato localmente per i kernel REAL/COMPLEX duplicati individuati** | La correlazione di viscosità lahar condivide ora il kernel COMPLEX con il wrapper REAL; valore e derivata sono testati nei due rami. Per il perimetro verificato non serve un file `.inc`; report D17.11. |
 | D17.12 | **Implementato localmente** | Bridge analitico validato; vedere il report D17-C. |
-| D17.13–D17.16 | **Parziali** | D17.13 resta parziale: equivalenza per tutte le attivazioni non completata. D17.14 instrada il batch mass-exchange atomico dal registro `step` una sola volta dopo RK. D17.15 è stato confrontato con l’ordine implementato, ma resta da aggiungere una verifica automatizzata dell’orchestrazione end-to-end. D17.16 implementa localmente `SOURCE_GROUPS`, la distinzione esplicito/default legacy, i controlli di conflitto e la copertura completa dei termini attivi; il flusso completo `read_param` è ora coperto per una configurazione nativa rappresentativa, mentre l’equivalenza per tutte le combinazioni fisiche resta da validare. Evidenze D17.13–D17.16. |
+| D17.13–D17.16 | **Parziali** | D17.13 resta parziale: equivalenza per tutte le attivazioni non completata. D17.14 instrada il batch mass-exchange atomico dal registro `step` una sola volta dopo RK. D17.15 ora verifica l’ordine delle cinque fasi production source-window/OU/RK/step-source/clock nella routine condivisa da driver e test; selezione di `dt`, finestre attive, aggiornamento OU attivo e output end-to-end restano da coprire. D17.16 implementa localmente `SOURCE_GROUPS`, la distinzione esplicito/default legacy, i controlli di conflitto e la copertura completa dei termini attivi; il flusso completo `read_param` è coperto per una configurazione nativa rappresentativa, mentre l’equivalenza per tutte le combinazioni fisiche resta da validare. Evidenze D17.13–D17.16. |
 | D17.17–D17.18 | **Parziali** | Dispatch analitico, esplicito e rate Newton filtrati sono dietro `equation_terms_2d`; il batch mass-exchange `step` è instradato dal registro, ma la copertura e la separazione fisica/numerica complessive restano da completare. |
 | D17.19 | **In corso** | Stato puntuale dei 24 elementi nella sequenza implementativa sotto. |
 | D17.20 | **Parziale** | Regressioni del registro, dei solve analitici e del routing esplicito superate localmente; matrice obbligatoria completa ancora aperta. |
@@ -3143,12 +3143,12 @@ uno spostamento simultaneo del driver per introdurre i registri.
 
 ##### Stato ed evidenza locale
 
-L’audit del driver e dei kernel conferma l’ordine attuale: scelta e limitazione
-di `dt`, medie delle finestre, preparazione OU, avanzamento RK (con solve
-impliciti ordinati e EX/spaziale sullo stato risolto), assembly finale e
-proiezioni, batch mass-exchange con ricostruzione e aggiornamento del letto,
-avanzamento dell’orologio e diagnostiche/output. L’ordine esterno è già
-compatibile con la specifica; non è stato rifattorizzato.
+L’ordine del driver è centralizzato in `simulation%advance_timestep` e
+conserva: medie delle finestre, preparazione OU condizionale, avanzamento RK
+(con solve impliciti ordinati e EX/spaziale sullo stato risolto), assembly
+finale e proiezioni, batch mass-exchange con ricostruzione e aggiornamento del
+letto, quindi avanzamento dell’orologio. La scelta/limitazione di `dt` resta
+nel driver prima della routine; diagnostiche/output restano dopo.
 
 Le regressioni IMEX verificano traiettorie e assembly stage per N_RK=2/3/4,
 gruppi misti analitici/Newton e hook spaziali; le regressioni mass-exchange
@@ -3156,11 +3156,12 @@ verificano l’aggiornamento aggregato, inventari, maschere, topografia e il
 routing post-RK. Entrambe le suite passano localmente in profili strict e
 optimized.
 
-**D17.15 resta parziale:** manca un test automatizzato che osservi l’intera
-sequenza dal driver su un singolo timestep; le medie delle finestre sorgente e
-l’ordine con la preparazione OU non hanno una regressione end-to-end dedicata.
-Il report distingue la corrispondenza osservata nel codice dall’accettazione
-runtime completa: [D17.15 — timestep ordering](acceptance/D17_15_TIMESTEP_ORDER.md).
+**D17.15 resta parziale:** `TEST_IMEX_STAGES` verifica con un observer le
+cinque fasi della routine production e l’avanzamento finale dell’orologio.
+La fixture ha sorgenti a finestra e stochastic physics disattivati; selezione
+di `dt`, coefficienti attivi, aggiornamento OU attivo e output del driver
+restano da verificare insieme. Evidenza e limiti:
+[D17.15 — timestep ordering](acceptance/D17_15_TIMESTEP_ORDER.md).
 
 ---
 
@@ -3294,7 +3295,7 @@ l’evidenza disponibile, non il completamento dell’accettazione D17.
 12. Modificare `eval_semi_implicit_terms`. **IMPLEMENTATO localmente:** seleziona i termini semi-impliciti del gruppo e del solver Newton indicati.
 13. Modificare `eval_implicit_terms`. **IMPLEMENTATO localmente:** seleziona rate reologici, raffreddamento e dissipazione della pressione dei pori dal gruppo/solver; routing REAL/COMPLEX mantenuto.
 14. Aggiungere `eval_analytic_terms`. **COMPLETATO localmente (D17.12).**
-15. Modificare `time_integration_2d.f90`. **PARZIALE:** dispatch dei gruppi `stage` e routing del batch mass-exchange `step` completati localmente (D17.9/D17.14); la verifica end-to-end dell’ordine complessivo resta aperta (D17.15).
+15. Modificare `time_integration_2d.f90`. **PARZIALE:** dispatch dei gruppi `stage` e routing del batch mass-exchange `step` completati localmente (D17.9/D17.14); la routine condivisa production `simulation%advance_timestep` e il test dell’ordine delle fasi sono implementati localmente; resta la verifica end-to-end con finestre e OU attivi (D17.15).
 16. Modificare `nonlinear_solver_2d.f90`. **PARZIALE:** descrittori gruppo/solver propagati al residuo, alla Jacobiana complessa, al line search e al rate semi-implicito; sweep ordinato dei solver di un gruppo implementato localmente (D17.10). Restano i percorsi numerici e di cadenza ancora non integrati.
 17. Rimuovere le chiamate fisiche dirette dai moduli numerici. **PARZIALE:** rimosse dal percorso analitico interessato dal bridge; resta da completare/verificare per tutti i percorsi.
 18. Riutilizzare kernel REAL/COMPLEX comuni; introdurre `.inc` solo dove utili. **IMPLEMENTATO localmente per la duplicazione individuata:** la correlazione di viscosità lahar ha un solo kernel COMPLEX; non è stato introdotto un `.inc` non necessario. Evidenza: [D17.11 — REAL/COMPLEX kernel reuse](acceptance/D17_11_REAL_COMPLEX_KERNEL_REUSE.md).
@@ -3302,7 +3303,7 @@ l’evidenza disponibile, non il completamento dell’accettazione D17.
 20. Organizzare i solve impliciti multipli. **IMPLEMENTATO localmente:** il coordinatore esegue i solver Newton nell’ordine registrato e limita ciascun solve ai propri termini/equazioni; il test runtime controlla i residui termico e di pressione dei pori nello stato sequenziale. Il blocco legacy accoppiato resta un unico solve.
 21. Organizzare i solve analitici singoli per gruppo. **COMPLETATO localmente per i gruppi supportati e verificato dal report D17-C.**
 22. Integrare il trasferimento di massa. **DA FARE:** i gruppi `step` sono descritti, ma il percorso mass-exchange resta quello post-RK esistente.
-23. Verificare l’ordine delle operazioni. **PARZIALE:** ordine dei gruppi analitici legacy e routing esplicito verificati; ordine end-to-end con i percorsi `step` e le interfacce ancora mancanti da validare.
+23. Verificare l’ordine delle operazioni. **PARZIALE:** ordine dei gruppi analitici legacy, routing esplicito e sequenza production delle fasi source-window/OU/RK/step-source/clock verificati; finestre/OU attivi e ordine driver completo restano da validare.
 24. Eseguire i test di regressione. **PARZIALE:** suite locali mirate B, C, D17.9 e D17.10 superate, incluse le suite reologia, registro e IMEX strict/optimized; matrice D17.20 e gate CI/piattaforme non completati.
 
 ---

@@ -682,9 +682,10 @@ def stage_count_suite(executable, profile):
     run = subprocess.run([str(executable), "native-source", "2"], cwd=directory, env=env,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=30)
     (directory / "native-source.log").write_text(run.stdout)
-    if run.returncode != 0 or "PASS: stage count accepted:" not in run.stdout:
+    if run.returncode != 0 or "PASS: stage count accepted:" not in run.stdout or \
+            "PASS: production timestep phase order" not in run.stdout:
         raise AssertionError(f"{directory}: native source input flow failed\n{run.stdout}")
-    print("PASS: SOURCE_GROUPS parsed through read_param and built from active physics", flush=True)
+    print("PASS: SOURCE_GROUPS read_param flow and production timestep phase order", flush=True)
 
 
 def main():
