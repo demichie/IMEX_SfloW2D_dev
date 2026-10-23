@@ -481,7 +481,8 @@ PROGRAM IMEX_SfloW2D
       ! Mass exchange is a separate fractional step after the IMEX update.
       ! It updates inventories first and refreshes the nodal bed if enabled.
       CALL apply_mass_exchange_step(simulation%state%q,                       &
-           simulation%state%qp, simulation%runtime%dt, simulation%domain)
+           simulation%state%qp, simulation%runtime%dt, simulation%domain,    &
+           simulation%source_registry)
 
       simulation%runtime%t = simulation%runtime%t + simulation%runtime%dt
 

@@ -2504,7 +2504,7 @@ requisito numerato è:
 | D17.10 | **Implementato localmente** | Rate semi-impliciti/impliciti filtrati per gruppo e solver, percorsi impliciti REAL/COMPLEX e sweep runtime ordinato dei solve Newton multipli; report e regressioni locali in D17.10. |
 | D17.11 | **Implementato localmente per i kernel REAL/COMPLEX duplicati individuati** | La correlazione di viscosità lahar condivide ora il kernel COMPLEX con il wrapper REAL; valore e derivata sono testati nei due rami. Per il perimetro verificato non serve un file `.inc`; report D17.11. |
 | D17.12 | **Implementato localmente** | Bridge analitico validato; vedere il report D17-C. |
-| D17.13–D17.16 | **Parziali** | Default inattivi e sequenza runtime energia analitica → pressione analitica → quantità di moto Newton verificate con il builder configurato e oracoli/residui locali; equivalenza per tutte le attivazioni, routing `step`, mass-exchange e parsing nativo restano aperti. Evidenza D17.13. |
+| D17.13–D17.16 | **Parziali** | D17.13 resta parziale: equivalenza per tutte le attivazioni non completata. D17.14 instrada il batch mass-exchange atomico dal registro `step` una sola volta dopo RK; D17.15–D17.16 e il parsing nativo restano aperti. Evidenze D17.13 e D17.14. |
 | D17.17–D17.18 | **Parziali** | Dispatch analitico, esplicito e rate Newton filtrati sono dietro `equation_terms_2d`; restano la copertura mass-exchange/`step` e la verifica completa della separazione fisica/numerica. |
 | D17.19 | **In corso** | Stato puntuale dei 24 elementi nella sequenza implementativa sotto. |
 | D17.20 | **Parziale** | Regressioni del registro, dei solve analitici e del routing esplicito superate localmente; matrice obbligatoria completa ancora aperta. |
@@ -3108,6 +3108,17 @@ Modificare `time_integration_2d.f90` affinché:
 - elabori i gruppi `step` in una fase separata;
 - non ricalcoli i gruppi `step` negli stage;
 - applichi i risultati nell’ordine definito dalla configurazione.
+
+##### Stato ed evidenza locale
+
+Il driver passa il registro validato al fractional step post-RK. La routine
+seleziona i gruppi `step` nell'ordine convalidato e applica una sola volta il
+batch mass-exchange indivisibile; un registro senza termini `step` non modifica
+stato, inventari o topografia. Il batch non viene invocato dal ciclo degli
+stage. I gruppi post-RK non mass-exchange sono rifiutati esplicitamente finché
+non esiste un kernel che li implementi.
+
+Regressione e limiti: [D17.14 — post-RK step routing](acceptance/D17_14_STEP_ROUTING.md).
 
 ---
 

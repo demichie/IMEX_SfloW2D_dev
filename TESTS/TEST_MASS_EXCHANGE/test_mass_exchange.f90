@@ -11,8 +11,12 @@ PROGRAM test_mass_exchange
   USE stochastic_module, ONLY : stochastic_workspace_type, sym_noise, noise_pow_val
   USE state_conversion_2d, ONLY : qc_to_qp, mixt_var
   USE mass_exchange_laws_2d, ONLY : settling_velocity, eval_air_entrainment_rate
-  USE equation_terms_2d, ONLY : eval_mass_exchange_terms
+  USE equation_terms_2d, ONLY : eval_mass_exchange_terms, init_problem_param
   USE time_integration_2d, ONLY : apply_mass_exchange_step
+  USE equation_metadata_2d, ONLY : equation_partition_type
+  USE source_registry_2d, ONLY : source_registry_type, source_group_type, source_solver_type
+  USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, SOURCE_METHOD_EXPLICIT, SOURCE_PHASE_POST_RK
+  USE source_configuration_2d, ONLY : initialize_configured_sources
   USE inpout_2d, ONLY : write_restart_file, read_restart_file, output_idx
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
@@ -28,6 +32,8 @@ PROGRAM test_mass_exchange
   TYPE(model_layout_type) :: layout
   TYPE(runtime_state_type) :: runtime
   TYPE(stochastic_workspace_type) :: stochastic
+  TYPE(equation_partition_type) :: equation_partition
+  TYPE(source_registry_type) :: source_registry
   CHARACTER(LEN=64) :: selected, argument
   INTEGER :: actual_threads, requested_threads, status, snapshot_unit, extension_unit
 
@@ -44,6 +50,7 @@ PROGRAM test_mass_exchange
   CALL get_environment_variable('N8_CASE', selected, STATUS=status)
   IF (status /= 0) selected = 'all'
   CALL initialize_fixture
+  CALL test_empty_step_registry
   OPEN(NEWUNIT=snapshot_unit, FILE='snapshot.bin', ACCESS='STREAM',      &
        FORM='UNFORMATTED', STATUS='REPLACE')
   OPEN(NEWUNIT=extension_unit, FILE='flat_evaluations.bin', ACCESS='STREAM', &
@@ -140,6 +147,52 @@ CONTAINS
     output_idx=0
     runtime%t_output=0.0_wp; runtime%t_runout=0.0_wp; runtime%t_probes=0.0_wp
   END SUBROUTINE initialize_fixture
+
+  !> \brief Build the production source schedule from the current fixture settings.
+  SUBROUTINE configure_source_registry
+    CHARACTER(LEN=256) :: error
+    CALL init_problem_param(equation_partition)
+    CALL initialize_configured_sources(source_registry,equation_partition,error)
+    IF (LEN_TRIM(error)>0) ERROR STOP 'failed to configure mass-exchange source registry'
+  END SUBROUTINE configure_source_registry
+
+  !> \brief Ensure an empty registered post-RK schedule suppresses legacy-active sources.
+  SUBROUTINE test_empty_step_registry
+    TYPE(source_group_type) :: empty_step
+    TYPE(source_group_type) :: no_stages(0)
+    TYPE(source_solver_type) :: no_solvers(0)
+    REAL(wp) :: q_before(nq,nx,ny), deposit_before(nx,ny,ns)
+    REAL(wp) :: erosion_before(nx,ny,ns), inventory_before(ns,nx,ny)
+    REAL(wp) :: bed_before(nx+1,ny+1)
+    CHARACTER(LEN=256) :: error
+    INTEGER :: i
+
+    CALL reset_fixture
+    erosion_coeff=100.0_wp
+    empty_step%id=1
+    empty_step%cadence=SOURCE_CADENCE_STEP
+    empty_step%method=SOURCE_METHOD_EXPLICIT
+    empty_step%phase=SOURCE_PHASE_POST_RK
+    empty_step%execution_order=1
+    empty_step%term_ids=[INTEGER::]
+    empty_step%equation_ids=[(i,i=1,nq)]
+    empty_step%implicit_solver_ids=[INTEGER::]
+    empty_step%analytic_solver_ids=[INTEGER::]
+    CALL source_registry%initialize(nq,0,no_stages,[empty_step],no_solvers,error)
+    IF (LEN_TRIM(error)>0) ERROR STOP 'failed to initialize empty step registry'
+    q_before=state%q; deposit_before=deposit; erosion_before=erosion
+    inventory_before=erodible; bed_before=B_vertex
+    CALL apply_mass_exchange_step(state%q,state%qp,1.0_wp,domain,source_registry)
+    CALL same_bits('empty step q',RESHAPE(state%q,[SIZE(q_before)]),RESHAPE(q_before,[SIZE(q_before)]))
+    CALL same_bits('empty step deposit',RESHAPE(deposit,[SIZE(deposit_before)]), &
+         RESHAPE(deposit_before,[SIZE(deposit_before)]))
+    CALL same_bits('empty step erosion',RESHAPE(erosion,[SIZE(erosion_before)]), &
+         RESHAPE(erosion_before,[SIZE(erosion_before)]))
+    CALL same_bits('empty step inventory',RESHAPE(erodible,[SIZE(inventory_before)]), &
+         RESHAPE(inventory_before,[SIZE(inventory_before)]))
+    CALL same_bits('empty step bed',RESHAPE(B_vertex,[SIZE(bed_before)]),RESHAPE(bed_before,[SIZE(bed_before)]))
+    CALL source_registry%finalize()
+  END SUBROUTINE test_empty_step_registry
 
   !> \brief Reset conservative inventories and an analytic initial bed before each independent case.
   SUBROUTINE reset_fixture
@@ -240,6 +293,7 @@ CONTAINS
     CASE('thermal')
        erosion_coeff=100.0_wp; erodible_deposit_flag=.TRUE.
     END SELECT
+    CALL configure_source_registry
     CALL check_update(name,dt)
     IF (name=='thermal') CALL check_thermal_entrainment
   END SUBROUTINE run_case
@@ -326,6 +380,7 @@ CONTAINS
              cell_source_fractions(3,1)=0.25_wp
           END IF
        END SELECT
+       CALL configure_source_registry
        CALL check_update(TRIM(names(c)),dt)
     END DO
     CLOSE(snapshot_unit)
@@ -517,7 +572,7 @@ CONTAINS
           vertex_delta(j,k)=SUM(cell_delta(j0:j1,k0:k1))/REAL((j1-j0+1)*(k1-k0+1),wp)
        END DO
     END DO
-    CALL apply_mass_exchange_step(state%q,state%qp,dt,domain)
+    CALL apply_mass_exchange_step(state%q,state%qp,dt,domain,source_registry)
     CALL assert_small(name//' conservative transaction',MAXVAL(ABS(state%q-q_expected)),MAXVAL(ABS(q0)))
     IF (gas_flag) THEN
        ! Compare each equation separately: thermal-energy magnitudes must not
@@ -629,6 +684,7 @@ CONTAINS
     REAL(wp) :: q2(nq,nx,ny),bed2(nx+1,ny+1),dep2(nx,ny,ns),ers2(nx,ny,ns),inv2(ns,nx,ny)
     CALL reset_fixture
     settling_flag=.TRUE.; erosion_coeff=0.001_wp; erodible_deposit_flag=.TRUE.
+    CALL configure_source_registry
     CALL check_update('restart_first',0.2_wp)
     q1=state%q; bed1=B_vertex; dep1=deposit; ers1=erosion; inv1=erodible
     IF (SUM(deposit)+SUM(erosion)<=0.0_wp) ERROR STOP 'restart bed did not evolve'

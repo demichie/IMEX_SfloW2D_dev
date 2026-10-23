@@ -31,7 +31,8 @@ MODULE time_integration_2d
   USE source_registry_2d, ONLY : source_registry_type, source_group_type, &
        source_solver_type, group_contains
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE, &
-       SOURCE_TERM_BOUNDARY_INJECTION
+       SOURCE_CADENCE_STEP, SOURCE_ROLE_MASS, SOURCE_TERM_BOUNDARY_INJECTION, &
+       source_term_type, source_term_descriptor
 
   USE spatial_operator_2d, ONLY : spatial_operator_type
 
@@ -194,8 +195,9 @@ CONTAINS
   !> \param[in,out] qp Cell-centered primitive state, refreshed for solved cells.
   !> \param[in] time_step Physical time increment [s].
   !> \param[in] domain Domain descriptor for active solve-cell indices.
+  !> \param[in] source_registry Optional validated schedule for post-RK sources.
   !******************************************************************************
-  SUBROUTINE apply_mass_exchange_step(q, qp, time_step, domain)
+  SUBROUTINE apply_mass_exchange_step(q, qp, time_step, domain, source_registry)
 
     USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,    &
          entrainment_flag, loss_rate
@@ -215,6 +217,7 @@ CONTAINS
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: time_step
     CLASS(domain_type), INTENT(IN) :: domain
+    CLASS(source_registry_type), INTENT(IN), OPTIONAL :: source_registry
 
     REAL(wp) :: erosion_term(n_solid)
     REAL(wp) :: deposition_term(n_solid)
@@ -225,7 +228,10 @@ CONTAINS
     REAL(wp) :: out_of_source_fraction
     REAL(wp) :: p_dyn
     CHARACTER(LEN=96) :: closure_context
+    TYPE(source_group_type), ALLOCATABLE :: step_groups(:)
+    TYPE(source_term_type) :: term
     INTEGER :: j, k, l
+    INTEGER :: group_index, term_index, mass_group_count
     LOGICAL :: liquid_loss_active
 
     ! Carrier loss is a mass exchange even without erosion or settling. Use
@@ -235,6 +241,28 @@ CONTAINS
     IF (liquid_flag) THEN
        IF (ALLOCATED(loss_rate)) liquid_loss_active = loss_rate .GT. 0.0_wp
     END IF
+
+    IF (PRESENT(source_registry)) THEN
+       IF (.NOT.source_registry%is_initialized()) &
+            CALL fatal_error('D17: post-RK source dispatch requires an initialized registry')
+       step_groups=source_registry%step_groups()
+       mass_group_count=0
+       DO group_index=1,SIZE(step_groups)
+          IF (step_groups(group_index)%cadence/=SOURCE_CADENCE_STEP) &
+               CALL fatal_error('D17: invalid cadence in post-RK source schedule')
+          IF (SIZE(step_groups(group_index)%term_ids)>0) &
+               mass_group_count=mass_group_count+1
+          DO term_index=1,SIZE(step_groups(group_index)%term_ids)
+             term=source_term_descriptor(step_groups(group_index)%term_ids(term_index))
+             IF (term%role/=SOURCE_ROLE_MASS) &
+                  CALL fatal_error('D17: unsupported non-mass post-RK source')
+          END DO
+       END DO
+       IF (mass_group_count>1) &
+            CALL fatal_error('D17: atomic mass-exchange batch split across step groups')
+       IF (mass_group_count==0) RETURN
+    END IF
+
     IF ((erosion_coeff .EQ. 0.0_wp) .AND. (.NOT.settling_flag)            &
          .AND. (.NOT.pore_pressure_flag) .AND. (.NOT.entrainment_flag)     &
          .AND. (.NOT.liquid_loss_active)) RETURN
