@@ -1,0 +1,1621 @@
+{
+  "schema_version": 1,
+  "milestone": "D17",
+  "phase": "inventory_and_contract",
+  "date": "2026-10-23",
+  "baseline_commit": "1310511ed940dc50325f656236ca7ce467eb8d52",
+  "status": "DOCUMENTED_NOT_IMPLEMENTED",
+  "numerical_acceptance": "NOT_RUN_DOCUMENTATION_ONLY",
+  "production_sources_changed": false,
+  "tracked_inputs_changed": false,
+  "identifier_policy": "All SOURCE_TERM_* names are proposed symbolic IDs; no integer enum or runtime registry has been added.",
+  "equations_legend": {
+    "mass": "Q1=rho*h",
+    "momentum_x": "Q2=Q1*u",
+    "momentum_y": "Q3=Q1*v",
+    "energy": "Q4=areal heat capacity * T",
+    "pore_pressure": "Qp=Q1*excess_pressure",
+    "transported_stochastic_mass": "Qz=Q1*Z"
+  },
+  "default_groups": [
+    {
+      "cadence": "stage",
+      "id": 1,
+      "method": "analytic",
+      "target": "temperature",
+      "activation": "lava energy implicit mask",
+      "execution_order": "first active implicit group",
+      "term_ids": [
+        "SOURCE_TERM_THERMAL_RADIATIVE_COOLING",
+        "SOURCE_TERM_THERMAL_CONVECTIVE_COOLING"
+      ]
+    },
+    {
+      "cadence": "stage",
+      "id": 2,
+      "method": "analytic",
+      "target": "pore_pressure",
+      "activation": "pore_pressure_flag",
+      "execution_order": "second active implicit group",
+      "term_ids": [
+        "SOURCE_TERM_PORE_PRESSURE_DISSIPATION"
+      ]
+    },
+    {
+      "cadence": "stage",
+      "id": 3,
+      "method": "newton",
+      "target": "velocity",
+      "activation": "momentum equations always implicit in current partition, including zero rheology",
+      "execution_order": "last default implicit group",
+      "term_ids": [
+        "SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB",
+        "SOURCE_TERM_RHEOLOGY_VOELLMY_TURBULENT_DRAG",
+        "SOURCE_TERM_RHEOLOGY_PLASTIC_YIELD",
+        "SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS",
+        "SOURCE_TERM_RHEOLOGY_LAVA_YIELD",
+        "SOURCE_TERM_RHEOLOGY_LAHAR_VISCOUS",
+        "SOURCE_TERM_RHEOLOGY_LAHAR_TURBULENT_DRAG",
+        "SOURCE_TERM_RHEOLOGY_LAHAR_YIELD",
+        "SOURCE_TERM_RHEOLOGY_EMPIRICAL_DRAG",
+        "SOURCE_TERM_RHEOLOGY_QUADRATIC_DRAG",
+        "SOURCE_TERM_RHEOLOGY_FROUDE_FRICTION",
+        "SOURCE_TERM_RHEOLOGY_LUCAS_FRICTION",
+        "SOURCE_TERM_RHEOLOGY_MUI_FRICTION",
+        "SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_FRICTION",
+        "SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_TURBULENT_DRAG"
+      ]
+    },
+    {
+      "cadence": "stage",
+      "id": 4,
+      "method": "explicit",
+      "target": null,
+      "activation": "requested explicit stage evaluation",
+      "execution_order": "existing post-stage EX evaluation / boundary evaluation within spatial reconstruction",
+      "term_ids": [
+        "SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION",
+        "SOURCE_TERM_BOTTOM_FISSURAL_INJECTION",
+        "SOURCE_TERM_RADIAL_INJECTION",
+        "SOURCE_TERM_GEOMETRY_CURVATURE",
+        "SOURCE_TERM_BOUNDARY_INJECTION"
+      ]
+    },
+    {
+      "cadence": "step",
+      "id": 1,
+      "method": "explicit",
+      "target": null,
+      "activation": "current mass-exchange outer guards and per-cell cutoff",
+      "execution_order": "after completed RK, before advancing runtime time",
+      "term_ids": [
+        "SOURCE_TERM_MASS_EXCHANGE_EROSION",
+        "SOURCE_TERM_MASS_EXCHANGE_DEPOSITION",
+        "SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS",
+        "SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS",
+        "SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS",
+        "SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT",
+        "SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION"
+      ]
+    }
+  ],
+  "scheduling_contracts": [
+    "Group ID identifies a group; execution_order and stage phase determine scheduling. Stage id=1 cannot name both explicit and analytic groups.",
+    "No duplicate physical contribution across stage/step; dependent assembly and full-law analytic bundles consume existing term IDs without a second application.",
+    "One analytic target may be scalar or vector velocity block; exactly one solver per normalized analytic group.",
+    "Legacy mixed analytic groups normalize in actual velocity -> temperature -> pore order, refreshing state after each target.",
+    "Legacy shared Newton groups retain their jointly solved equation block; independent ordered solves require explicit block metadata and compatibility validation.",
+    "Default cell-source and mass-exchange summation/limiter batches remain atomic until separately validated term-selective kernels exist."
+  ],
+  "baseline_references": [
+    {
+      "path": "src/IMEX_SfloW2D.f90",
+      "symbol": "set_source_time_coefficients",
+      "line": 39
+    },
+    {
+      "path": "src/IMEX_SfloW2D.f90",
+      "symbol": "apply_mass_exchange_step",
+      "line": 71
+    },
+    {
+      "path": "src/numerics/nonlinear_solver_2d.f90",
+      "symbol": "solve_imex_stage",
+      "line": 63
+    },
+    {
+      "path": "src/numerics/nonlinear_solver_2d.f90",
+      "symbol": "solve_implicit_groups",
+      "line": 226
+    },
+    {
+      "path": "src/numerics/nonlinear_solver_2d.f90",
+      "symbol": "solve_newton_group",
+      "line": 476
+    },
+    {
+      "path": "src/physics/equation_terms_2d.f90",
+      "symbol": "init_problem_param",
+      "line": 1267
+    }
+  ],
+  "excluded_from_additive_source_registry": [
+    "Hydrostatic pressure and ordinary bed-slope nonconservative spatial path; retain existing HP/PCCU discretization.",
+    "Stochastic OU preparation/evolution, geometric reconstruction and output; preserve their scheduling around sources.",
+    "Friction stopping/projections, dry-cell corrections and mass positivity checks are numerical application policies, not additional physical rates."
+  ],
+  "terms": [
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_voellmy_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_voellmy_2d.f90",
+        "symbol": "eval_voellmy_semi_implicit_momentum_rate",
+        "line": 189
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_semi_implicit_terms",
+        "line": 712
+      },
+      "current_role": "semi_implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_voellmy",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 1
+      },
+      "evaluation_batch": "voellmy_semi_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_voellmy_2d.f90",
+        "symbol": "solve_voellmy_analytic_velocity",
+        "line": 65
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_VOELLMY_TURBULENT_DRAG",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_voellmy_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_voellmy_2d.f90",
+        "symbol": "eval_voellmy_implicit_momentum_rate",
+        "line": 135
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_implicit_terms",
+        "line": 569
+      },
+      "current_role": "implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_voellmy",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 2
+      },
+      "evaluation_batch": "voellmy_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": true,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_voellmy_2d.f90",
+        "symbol": "solve_voellmy_analytic_velocity",
+        "line": 65
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_PLASTIC_YIELD",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_plastic_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_plastic_2d.f90",
+        "symbol": "eval_plastic_implicit_momentum_rate",
+        "line": 81
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_implicit_terms",
+        "line": 569
+      },
+      "current_role": "implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_plastic",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 2
+      },
+      "evaluation_batch": "plastic_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": true,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_plastic_2d.f90",
+        "symbol": "solve_plastic_analytic_velocity",
+        "line": 45
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_lava_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_lava_2d.f90",
+        "symbol": "eval_lava_implicit_momentum_rate",
+        "line": 104
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_implicit_terms",
+        "line": 569
+      },
+      "current_role": "implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_lava",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 2
+      },
+      "evaluation_batch": "lava_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": true,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_lava_2d.f90",
+        "symbol": "solve_lava_analytic_velocity",
+        "line": 55
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_LAVA_YIELD",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_lava_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_lava_2d.f90",
+        "symbol": "eval_lava_semi_implicit_momentum_rate",
+        "line": 140
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_semi_implicit_terms",
+        "line": 712
+      },
+      "current_role": "semi_implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_lava",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 1
+      },
+      "evaluation_batch": "lava_semi_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_lava_2d.f90",
+        "symbol": "solve_lava_analytic_velocity",
+        "line": 55
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_LAHAR_VISCOUS",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_lahar_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_lahar_2d.f90",
+        "symbol": "eval_lahar_implicit_momentum_rate",
+        "line": 146
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_implicit_terms",
+        "line": 569
+      },
+      "current_role": "implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_lahar",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 2
+      },
+      "evaluation_batch": "lahar_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": true,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time. Viscous/turbulent terms currently share one summed kernel; evaluate that batch once and preserve summation order.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_lahar_2d.f90",
+        "symbol": "solve_lahar_analytic_velocity",
+        "line": 81
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_LAHAR_TURBULENT_DRAG",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_lahar_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_lahar_2d.f90",
+        "symbol": "eval_lahar_implicit_momentum_rate",
+        "line": 146
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_implicit_terms",
+        "line": 569
+      },
+      "current_role": "implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_lahar",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 2
+      },
+      "evaluation_batch": "lahar_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": true,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time. Viscous/turbulent terms currently share one summed kernel; evaluate that batch once and preserve summation order.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_lahar_2d.f90",
+        "symbol": "solve_lahar_analytic_velocity",
+        "line": 81
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_LAHAR_YIELD",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_lahar_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_lahar_2d.f90",
+        "symbol": "eval_lahar_semi_implicit_momentum_rate",
+        "line": 204
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_semi_implicit_terms",
+        "line": 712
+      },
+      "current_role": "semi_implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_lahar",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 1
+      },
+      "evaluation_batch": "lahar_semi_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_lahar_2d.f90",
+        "symbol": "solve_lahar_analytic_velocity",
+        "line": 81
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_EMPIRICAL_DRAG",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_empirical_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_empirical_2d.f90",
+        "symbol": "eval_empirical_implicit_momentum_rate",
+        "line": 77
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_implicit_terms",
+        "line": 569
+      },
+      "current_role": "implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_empirical",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 2
+      },
+      "evaluation_batch": "empirical_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": true,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_empirical_2d.f90",
+        "symbol": "solve_empirical_analytic_velocity",
+        "line": 39
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_QUADRATIC_DRAG",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_quadratic_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_quadratic_2d.f90",
+        "symbol": "eval_quadratic_implicit_momentum_rate",
+        "line": 79
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_implicit_terms",
+        "line": 569
+      },
+      "current_role": "implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_quadratic",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 2
+      },
+      "evaluation_batch": "quadratic_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": true,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_quadratic_2d.f90",
+        "symbol": "solve_quadratic_analytic_velocity",
+        "line": 42
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_FROUDE_FRICTION",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_froude_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_froude_2d.f90",
+        "symbol": "eval_froude_momentum_rate",
+        "line": 112
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_semi_implicit_terms",
+        "line": 712
+      },
+      "current_role": "semi_implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_froude",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 1
+      },
+      "evaluation_batch": "froude_semi_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_froude_2d.f90",
+        "symbol": "solve_froude_analytic_velocity",
+        "line": 52
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_LUCAS_FRICTION",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_lucas_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_lucas_2d.f90",
+        "symbol": "eval_lucas_momentum_rate",
+        "line": 109
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_semi_implicit_terms",
+        "line": 712
+      },
+      "current_role": "semi_implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_lucas",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 1
+      },
+      "evaluation_batch": "lucas_semi_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_lucas_2d.f90",
+        "symbol": "solve_lucas_analytic_velocity",
+        "line": 53
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_MUI_FRICTION",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_mui_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_mui_2d.f90",
+        "symbol": "eval_mui_momentum_rate",
+        "line": 139
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_semi_implicit_terms",
+        "line": 712
+      },
+      "current_role": "semi_implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_mui",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 1
+      },
+      "evaluation_batch": "mui_semi_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_mui_2d.f90",
+        "symbol": "solve_mui_analytic_velocity",
+        "line": 57
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_FRICTION",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_mui_voellmy_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_mui_voellmy_2d.f90",
+        "symbol": "eval_mui_voellmy_momentum_rate",
+        "line": 209
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_semi_implicit_terms",
+        "line": 712
+      },
+      "current_role": "semi_implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_mui_voellmy",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 1
+      },
+      "evaluation_batch": "mui_voellmy_semi_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_mui_voellmy_2d.f90",
+        "symbol": "solve_mui_voellmy_analytic_velocity",
+        "line": 65
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_TURBULENT_DRAG",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/rheology_laws/rheology_mui_voellmy_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/rheology_laws/rheology_mui_voellmy_2d.f90",
+        "symbol": "eval_mui_voellmy_implicit_momentum_rate",
+        "line": 157
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_implicit_terms",
+        "line": 569
+      },
+      "current_role": "implicit_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "rheology_flag and rheology_model_id == rheology_id_mui_voellmy",
+      "default": {
+        "method": "newton",
+        "cadence": "stage",
+        "group": 3,
+        "phase": "current_stage_implicit_sweep",
+        "target": "velocity",
+        "order": 2
+      },
+      "evaluation_batch": "mui_voellmy_implicit",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": true,
+        "boundary_state": false
+      },
+      "notes": "SI: evaluate before Newton and apply dissipative correction; implicit: evaluate on Newton trial state. Analytic velocity consumes the entire active law bundle, never each term a second time.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/rheology_laws/rheology_mui_voellmy_2d.f90",
+        "symbol": "solve_mui_voellmy_analytic_velocity",
+        "line": 65
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_THERMAL_RADIATIVE_COOLING",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/thermal_laws_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/thermal_laws_2d.f90",
+        "symbol": "eval_rheology_cooling_energy_rate",
+        "line": 98
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_implicit_terms",
+        "line": 569
+      },
+      "current_role": "thermal_rate",
+      "equations": [
+        "energy"
+      ],
+      "activation": "rheology_model_id == rheology_id_lava enables the analytic energy partition; implicit source evaluation additionally requires rheology_flag",
+      "default": {
+        "method": "analytic",
+        "cadence": "stage",
+        "group": 1,
+        "phase": "current_stage_implicit_sweep",
+        "target": "temperature",
+        "order": 1
+      },
+      "evaluation_batch": "lava_cooling",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": true,
+        "boundary_state": false
+      },
+      "notes": "Common cooling kernel/analytic solve handles the selected coefficient bundle once; energy Q4=C_area*T. Also available through implicit source evaluation for configured Newton energy groups.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/thermal_laws_2d.f90",
+        "symbol": "solve_lava_analytic_temperature",
+        "line": 137
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_THERMAL_CONVECTIVE_COOLING",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/thermal_laws_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/thermal_laws_2d.f90",
+        "symbol": "eval_rheology_cooling_energy_rate",
+        "line": 98
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_implicit_terms",
+        "line": 569
+      },
+      "current_role": "thermal_rate",
+      "equations": [
+        "energy"
+      ],
+      "activation": "rheology_model_id == rheology_id_lava enables the analytic energy partition; implicit source evaluation additionally requires rheology_flag",
+      "default": {
+        "method": "analytic",
+        "cadence": "stage",
+        "group": 1,
+        "phase": "current_stage_implicit_sweep",
+        "target": "temperature",
+        "order": 1
+      },
+      "evaluation_batch": "lava_cooling",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": true,
+        "boundary_state": false
+      },
+      "notes": "Common cooling kernel/analytic solve handles the selected coefficient bundle once; energy Q4=C_area*T. Also available through implicit source evaluation for configured Newton energy groups.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/thermal_laws_2d.f90",
+        "symbol": "solve_lava_analytic_temperature",
+        "line": 137
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_PORE_PRESSURE_DISSIPATION",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/pore_pressure_laws_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/pore_pressure_laws_2d.f90",
+        "symbol": "eval_pore_pressure_diffusion_source",
+        "line": 56
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_implicit_terms",
+        "line": 569
+      },
+      "current_role": "pore_rate",
+      "equations": [
+        "pore_pressure"
+      ],
+      "activation": "pore_pressure_flag",
+      "default": {
+        "method": "analytic",
+        "cadence": "stage",
+        "group": 2,
+        "phase": "current_stage_implicit_sweep",
+        "target": "pore_pressure",
+        "order": 2
+      },
+      "evaluation_batch": "pore_diffusion",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": true,
+        "boundary_state": false
+      },
+      "notes": "Analytic pressure follows temperature by default; refresh primitive state and freeze the updated temperature and composition for this solve. Also available through configured Newton groups.",
+      "state_used": "Current ordered implicit-group state; Newton differentiates trial-state implicit rates; SI uses pre-Newton state; analytic solve freezes non-target values from its entry state.",
+      "analytic_bundle_solver": {
+        "path": "src/physics/pore_pressure_laws_2d.f90",
+        "symbol": "solve_analytic_pore_pressure",
+        "line": 105
+      },
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/equation_terms_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_expl_terms",
+        "line": 109
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_expl_terms",
+        "line": 109
+      },
+      "current_role": "cell_rate",
+      "equations": [
+        "mass",
+        "energy",
+        "solid_masses",
+        "additional_gas_masses",
+        "liquid_mass_if_present",
+        "pore_pressure_if_enabled"
+      ],
+      "activation": "bottom_radial_source_flag",
+      "default": {
+        "method": "explicit",
+        "cadence": "stage",
+        "group": 4,
+        "phase": "requested_explicit_stage_evaluation",
+        "target": null,
+        "order": 2
+      },
+      "evaluation_batch": "bottom_radial",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "One physical injection bundle includes dependent heat/composition/pressure assembly; no duplicate child registration. Bottom/fissural injection adds zero horizontal momentum. Preparation uses whole-step averaged windows; evaluation uses current requested RK stage state and the existing time argument.",
+      "state_used": "Primitive state of the solved requested RK stage; time is the current imex_RK_solver argument, not a newly introduced stage-time shift.",
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_BOTTOM_FISSURAL_INJECTION",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/equation_terms_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_expl_terms",
+        "line": 109
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_expl_terms",
+        "line": 109
+      },
+      "current_role": "cell_rate",
+      "equations": [
+        "mass",
+        "energy",
+        "solid_masses",
+        "additional_gas_masses",
+        "liquid_mass_if_present",
+        "pore_pressure_if_enabled"
+      ],
+      "activation": "bottom_fissural_source_flag",
+      "default": {
+        "method": "explicit",
+        "cadence": "stage",
+        "group": 4,
+        "phase": "requested_explicit_stage_evaluation",
+        "target": null,
+        "order": 3
+      },
+      "evaluation_batch": "bottom_fissures",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "One physical injection bundle includes dependent heat/composition/pressure assembly; no duplicate child registration. Bottom/fissural injection adds zero horizontal momentum. Preparation uses whole-step averaged windows; evaluation uses current requested RK stage state and the existing time argument.",
+      "state_used": "Primitive state of the solved requested RK stage; time is the current imex_RK_solver argument, not a newly introduced stage-time shift.",
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_RADIAL_INJECTION",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/equation_terms_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_expl_terms",
+        "line": 109
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_expl_terms",
+        "line": 109
+      },
+      "current_role": "cell_rate",
+      "equations": [
+        "mass",
+        "momentum_x",
+        "momentum_y",
+        "energy",
+        "solid_masses",
+        "additional_gas_masses",
+        "liquid_mass_if_present",
+        "pore_pressure_if_enabled"
+      ],
+      "activation": "radial_source_flag",
+      "default": {
+        "method": "explicit",
+        "cadence": "stage",
+        "group": 4,
+        "phase": "requested_explicit_stage_evaluation",
+        "target": null,
+        "order": 4
+      },
+      "evaluation_batch": "lateral_radial",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "One physical injection bundle includes dependent heat/composition/pressure assembly; no duplicate child registration. Bottom/fissural injection adds zero horizontal momentum. Preparation uses whole-step averaged windows; evaluation uses current requested RK stage state and the existing time argument.",
+      "state_used": "Primitive state of the solved requested RK stage; time is the current imex_RK_solver argument, not a newly introduced stage-time shift.",
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_GEOMETRY_CURVATURE",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/equation_terms_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_curvature_momentum_source",
+        "line": 1517
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_expl_terms",
+        "line": 109
+      },
+      "current_role": "cell_rate",
+      "equations": [
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "curvature_term_flag and wet cell above dry_thickness_tolerance",
+      "default": {
+        "method": "explicit",
+        "cadence": "stage",
+        "group": 4,
+        "phase": "requested_explicit_stage_evaluation",
+        "target": null,
+        "order": 1
+      },
+      "evaluation_batch": "curvature",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "Keep ordinary hydrostatic/bed-slope path forcing in the spatial operator; friction normal-load curvature is a constitutive argument, not this additional source.",
+      "state_used": "Primitive state of the solved requested RK stage; time is the current imex_RK_solver argument, not a newly introduced stage-time shift.",
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_BOUNDARY_INJECTION",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/equation_terms_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_source_bdry",
+        "line": 1169
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_source_bdry",
+        "line": 1169
+      },
+      "current_role": "boundary_state",
+      "equations": [
+        "boundary_primitive_state_then_spatial_flux"
+      ],
+      "activation": "lateral_source_flag and source_cell == 2",
+      "default": {
+        "method": "explicit",
+        "cadence": "stage",
+        "group": 4,
+        "phase": "requested_explicit_stage_evaluation",
+        "target": null,
+        "order": 5
+      },
+      "evaluation_batch": "lateral_boundary",
+      "current_interfaces": {
+        "real_rate": false,
+        "complex_rate": false,
+        "boundary_state": true
+      },
+      "notes": "Called by reconstruction_2d:reconstruct through equation_terms_2d; supplies a face/ghost primitive state, not an additive cell rate. Time gate is evaluated pointwise using existing time argument, not the radial step-average cache.",
+      "state_used": "Source parameters and existing reconstruction time; construct primitive boundary state before numerical spatial flux.",
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_MASS_EXCHANGE_EROSION",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/mass_exchange_laws_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/mass_exchange_laws_2d.f90",
+        "symbol": "eval_erosion_rates",
+        "line": 235
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_mass_exchange_terms",
+        "line": 843
+      },
+      "current_role": "mass_rate",
+      "equations": [
+        "mass",
+        "energy",
+        "solid_masses"
+      ],
+      "activation": "erosion_coeff > 0",
+      "default": {
+        "method": "explicit",
+        "cadence": "step",
+        "group": 1,
+        "phase": "post_rk_mass_exchange",
+        "target": null,
+        "order": 1
+      },
+      "evaluation_batch": "erosion",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "Per-solid and continuous substrate erosion share one kernel and reserve cap using dt and erodible inventory. All step terms share the post-RK state, cutoff alphastot_min, source coverage mask and one inventory/topography application; changes of group are not yet certified.",
+      "state_used": "Post-RK conservative state decoded immediately before one shared mass-exchange evaluation; all proposals use this same pre-application state.",
+      "side_effects": "Only erosion/deposition update solid inventories and bed proposals; assembly and application share one source-coverage mask. No mutation in physical rate kernels.",
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_MASS_EXCHANGE_DEPOSITION",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/mass_exchange_laws_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/mass_exchange_laws_2d.f90",
+        "symbol": "eval_solid_deposition_rate",
+        "line": 146
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_mass_exchange_terms",
+        "line": 843
+      },
+      "current_role": "mass_rate",
+      "equations": [
+        "mass",
+        "energy",
+        "momentum_x",
+        "momentum_y",
+        "solid_masses"
+      ],
+      "activation": "settling_flag and positive per-class solid fraction",
+      "default": {
+        "method": "explicit",
+        "cadence": "step",
+        "group": 1,
+        "phase": "post_rk_mass_exchange",
+        "target": null,
+        "order": 2
+      },
+      "evaluation_batch": "deposition",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "Settling/viscosity and model-specific hindered/lahar closure; dt limits deposition. All step terms share the post-RK state, cutoff alphastot_min, source coverage mask and one inventory/topography application; changes of group are not yet certified.",
+      "state_used": "Post-RK conservative state decoded immediately before one shared mass-exchange evaluation; all proposals use this same pre-application state.",
+      "side_effects": "Only erosion/deposition update solid inventories and bed proposals; assembly and application share one source-coverage mask. No mutation in physical rate kernels.",
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/equation_terms_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_mass_exchange_terms",
+        "line": 843
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_mass_exchange_terms",
+        "line": 843
+      },
+      "current_role": "mass_rate",
+      "equations": [
+        "mass",
+        "energy",
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "liquid_flag",
+      "default": {
+        "method": "explicit",
+        "cadence": "step",
+        "group": 1,
+        "phase": "post_rk_mass_exchange",
+        "target": null,
+        "order": 3
+      },
+      "evaluation_batch": "combined_carrier_loss",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "Configured loss_rate; summed with porosity/deposition and Darcy loss before a shared packing/reserve limiter. All step terms share the post-RK state, cutoff alphastot_min, source coverage mask and one inventory/topography application; changes of group are not yet certified.",
+      "state_used": "Post-RK conservative state decoded immediately before one shared mass-exchange evaluation; all proposals use this same pre-application state.",
+      "side_effects": "Only erosion/deposition update solid inventories and bed proposals; assembly and application share one source-coverage mask. No mutation in physical rate kernels.",
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/equation_terms_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_mass_exchange_terms",
+        "line": 843
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_mass_exchange_terms",
+        "line": 843
+      },
+      "current_role": "mass_rate",
+      "equations": [
+        "mass",
+        "energy",
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "nonzero coeff_porosity * sum(deposition_term)",
+      "default": {
+        "method": "explicit",
+        "cadence": "step",
+        "group": 1,
+        "phase": "post_rk_mass_exchange",
+        "target": null,
+        "order": 4
+      },
+      "evaluation_batch": "combined_carrier_loss",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "Derived carrier loss accompanying solid deposition; shared limiter depends on the same deposition proposal. All step terms share the post-RK state, cutoff alphastot_min, source coverage mask and one inventory/topography application; changes of group are not yet certified.",
+      "state_used": "Post-RK conservative state decoded immediately before one shared mass-exchange evaluation; all proposals use this same pre-application state.",
+      "side_effects": "Only erosion/deposition update solid inventories and bed proposals; assembly and application share one source-coverage mask. No mutation in physical rate kernels.",
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/pore_pressure_laws_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/pore_pressure_laws_2d.f90",
+        "symbol": "eval_pore_pressure_gas_loss",
+        "line": 200
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_mass_exchange_terms",
+        "line": 843
+      },
+      "current_role": "mass_rate",
+      "equations": [
+        "mass",
+        "energy",
+        "momentum_x",
+        "momentum_y"
+      ],
+      "activation": "pore_pressure_flag and gas_loss_flag and packing below maximum",
+      "default": {
+        "method": "explicit",
+        "cadence": "step",
+        "group": 1,
+        "phase": "post_rk_mass_exchange",
+        "target": null,
+        "order": 5
+      },
+      "evaluation_batch": "combined_carrier_loss",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "Darcy gas-loss closure; shared combined carrier limiter, not independent application. All step terms share the post-RK state, cutoff alphastot_min, source coverage mask and one inventory/topography application; changes of group are not yet certified.",
+      "state_used": "Post-RK conservative state decoded immediately before one shared mass-exchange evaluation; all proposals use this same pre-application state.",
+      "side_effects": "Only erosion/deposition update solid inventories and bed proposals; assembly and application share one source-coverage mask. No mutation in physical rate kernels.",
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/mass_exchange_laws_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/mass_exchange_laws_2d.f90",
+        "symbol": "eval_air_entrainment_rate",
+        "line": 304
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_mass_exchange_terms",
+        "line": 843
+      },
+      "current_role": "mass_rate",
+      "equations": [
+        "mass",
+        "energy"
+      ],
+      "activation": "entrainment_flag and positive h and Richardson number",
+      "default": {
+        "method": "explicit",
+        "cadence": "step",
+        "group": 1,
+        "phase": "post_rk_mass_exchange",
+        "target": null,
+        "order": 6
+      },
+      "evaluation_batch": "entrainment",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "Entrainment adds ambient mass and energy, with zero injected horizontal momentum. All step terms share the post-RK state, cutoff alphastot_min, source coverage mask and one inventory/topography application; changes of group are not yet certified.",
+      "state_used": "Post-RK conservative state decoded immediately before one shared mass-exchange evaluation; all proposals use this same pre-application state.",
+      "side_effects": "Only erosion/deposition update solid inventories and bed proposals; assembly and application share one source-coverage mask. No mutation in physical rate kernels.",
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/thermal_laws_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/thermal_laws_2d.f90",
+        "symbol": "eval_vaporization_mass_rate",
+        "line": 294
+      },
+      "current_assembly": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_mass_exchange_terms",
+        "line": 843
+      },
+      "current_role": "mass_rate",
+      "equations": [
+        "mass",
+        "energy",
+        "first_additional_gas_mass"
+      ],
+      "activation": "gas_flag and liquid_vaporization_flag and B_zone /= 0",
+      "default": {
+        "method": "explicit",
+        "cadence": "step",
+        "group": 1,
+        "phase": "post_rk_mass_exchange",
+        "target": null,
+        "order": 7
+      },
+      "evaluation_batch": "vaporization",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "Uses the accepted deposition proposal and eval_vaporization_energy_rate; adds mass, energy and first additional-gas mass. All step terms share the post-RK state, cutoff alphastot_min, source coverage mask and one inventory/topography application; changes of group are not yet certified.",
+      "state_used": "Post-RK conservative state decoded immediately before one shared mass-exchange evaluation; all proposals use this same pre-application state.",
+      "side_effects": "Only erosion/deposition update solid inventories and bed proposals; assembly and application share one source-coverage mask. No mutation in physical rate kernels.",
+      "entry_kind": "physical",
+      "registration_policy": "register_once_with_required_batch_validation",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_INLET_THERMAL_COUPLING",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/thermal_laws_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/thermal_laws_2d.f90",
+        "symbol": "eval_inlet_thermal_energy_source",
+        "line": 46
+      },
+      "current_role": "dependent_assembly",
+      "equations": [
+        "energy"
+      ],
+      "activation": "parent active and corresponding equation/flag enabled",
+      "default": null,
+      "evaluation_batch": "injection bundles",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "Derived stage assembly of injection bundles; same state and order as parent, not an extra integrated source.",
+      "state_used": "Exactly the parent proposal state; no independent evaluation or application.",
+      "entry_kind": "dependent_assembly",
+      "registration_policy": "derived_from_parent_not_registered",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_INLET_PORE_COUPLING",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/pore_pressure_laws_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/pore_pressure_laws_2d.f90",
+        "symbol": "eval_pore_pressure_inlet_source",
+        "line": 329
+      },
+      "current_role": "dependent_assembly",
+      "equations": [
+        "pore_pressure"
+      ],
+      "activation": "parent active and corresponding equation/flag enabled",
+      "default": null,
+      "evaluation_batch": "injection bundles",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "Derived stage assembly of injection bundles; same state and order as parent, not an extra integrated source.",
+      "state_used": "Exactly the parent proposal state; no independent evaluation or application.",
+      "entry_kind": "dependent_assembly",
+      "registration_policy": "derived_from_parent_not_registered",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_MASS_PORE_COUPLING",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/pore_pressure_laws_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/pore_pressure_laws_2d.f90",
+        "symbol": "eval_pore_pressure_mass_exchange_source",
+        "line": 355
+      },
+      "current_role": "dependent_assembly",
+      "equations": [
+        "pore_pressure"
+      ],
+      "activation": "parent active and corresponding equation/flag enabled",
+      "default": null,
+      "evaluation_batch": "assembled total mass-exchange rate",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "Derived step assembly of assembled total mass-exchange rate; same state and order as parent, not an extra integrated source.",
+      "state_used": "Exactly the parent proposal state; no independent evaluation or application.",
+      "entry_kind": "dependent_assembly",
+      "registration_policy": "derived_from_parent_not_registered",
+      "configuration_status": "NOT_IMPLEMENTED"
+    },
+    {
+      "term_id": "SOURCE_TERM_MASS_STOCHASTIC_COUPLING",
+      "identifier_status": "PROPOSED_NOT_IMPLEMENTED",
+      "owner": "src/physics/equation_terms_2d.f90",
+      "current_procedure": {
+        "path": "src/physics/equation_terms_2d.f90",
+        "symbol": "eval_mass_exchange_terms",
+        "line": 843
+      },
+      "current_role": "dependent_assembly",
+      "equations": [
+        "transported_stochastic_mass"
+      ],
+      "activation": "parent active and corresponding equation/flag enabled",
+      "default": null,
+      "evaluation_batch": "assembled total mass-exchange rate",
+      "current_interfaces": {
+        "real_rate": true,
+        "complex_rate": false,
+        "boundary_state": false
+      },
+      "notes": "Derived step assembly of assembled total mass-exchange rate; same state and order as parent, not an extra integrated source.",
+      "state_used": "Exactly the parent proposal state; no independent evaluation or application.",
+      "entry_kind": "dependent_assembly",
+      "registration_policy": "derived_from_parent_not_registered",
+      "configuration_status": "NOT_IMPLEMENTED"
+    }
+  ],
+  "source_hashes": {
+    "TESTS/TEST_IMEX_STAGES/compare_stages.py": "2987aee1eb282b96518048a2d1b5933cb57f90a800f54d19623ac952bc0c5f7f",
+    "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_analytic_velocity.f90": "80514f943159bd72e6db1a9e2733ea22031cbc8cfea8c2c31d19695ec5552da1",
+    "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90": "00d7c3b7780bd7208bdaeed1d1d4bead5ccdd141e278973ff8fb3e5afdfd8fac",
+    "src/IMEX_SfloW2D.f90": "247aeb61977fe5e216fe7bd6d9a77ef733628b5a30b54595b325dc8bcc148c86",
+    "src/core/parameters_2d.f90": "e1de9dbe4c1f406253a40bfc6051462b29fcf352010a98519faf2b51ac4809ab",
+    "src/io/inpout_2d.f90": "fee23d22ccc33492fcf699d3babe9f4998964ed74856a7b7552d2448dab05aec",
+    "src/numerics/equation_metadata_2d.f90": "83a2ea75ecd81b5a7b22623f29c9ec273f154e1c6e397b4a0842515b660dcc7e",
+    "src/numerics/nonlinear_solver_2d.f90": "64325b8f99deb4b6baa33772842b162754c0487aca2c043a8396dc0061e6123c",
+    "src/numerics/time_integration_2d.f90": "9c03093517fd0006717597587459a166fcce35c97b3f451d0a0b3508cdc18f90",
+    "src/physics/equation_terms_2d.f90": "d72c8af61be33aa01a449e4312aa239a22fa873b70fb5f7087ca0c2bd5f7a72e",
+    "src/physics/mass_exchange_laws_2d.f90": "908b06578c74fe854515a3d08519d300b5471e41df858279c6b1f9c66b930975",
+    "src/physics/pore_pressure_laws_2d.f90": "34c6e668def0772ad3a53169d6e5c91d4371155b40c9f3b67da00d6f65963b4c",
+    "src/physics/rheology_laws/rheology_2d.f90": "0576ef32595d4faf2000ce32e8943f2a1821b966474cd865ca46d87150517b6b",
+    "src/physics/rheology_laws/rheology_analytic_utils_2d.f90": "3c59fcab5398be29e0bd305b2fa5184d3c21b26799b547f081c0e2350acffeb3",
+    "src/physics/rheology_laws/rheology_empirical_2d.f90": "0f750ef48916e817eecfe0cdd36bd505c5b96d062f205d10e138b4221261a7da",
+    "src/physics/rheology_laws/rheology_froude_2d.f90": "b4261f407cfe84687364b1001bc3ac750db0297cc71840cf80ced723f5315a5f",
+    "src/physics/rheology_laws/rheology_lahar_2d.f90": "593a105ce2d78d9af5317e86387b5bced05ccafd19e3ddb6c7720fc61fe8c719",
+    "src/physics/rheology_laws/rheology_lava_2d.f90": "ceb3ab22fb7aa1c7d1b6d36fd3905876351d0080b3c20940005eed24e5ac0c3b",
+    "src/physics/rheology_laws/rheology_lucas_2d.f90": "82b867830333f9144f91f70c50c223769c2ba0eb39b6e97d69196a7923a1295b",
+    "src/physics/rheology_laws/rheology_mui_2d.f90": "91eb182edd3dbd7488e9482bbd1e3999c877b57ba13460653066ea199c474a13",
+    "src/physics/rheology_laws/rheology_mui_voellmy_2d.f90": "8d0987e90a5733b63cd6514adc6b1dcf7116cfc2fab20f9dd743fbb76b55f3a4",
+    "src/physics/rheology_laws/rheology_parameters_2d.f90": "91c1819860af7558638c253b0e8aa577aafdeb7f794f3e9cea113b9794ef56b0",
+    "src/physics/rheology_laws/rheology_plastic_2d.f90": "7aff5fa9a97d6a878b188df292f6ce2ca9ad3d50be7026ce7ae87623d43223ee",
+    "src/physics/rheology_laws/rheology_quadratic_2d.f90": "89772a757c60c95ae38da247c6a7890ee1e00d743f5c7feb7c1d3bb1a389a13d",
+    "src/physics/rheology_laws/rheology_voellmy_2d.f90": "a609c556064f0caa20a8c5c041c02b8a36e95babe0d1520d85268b3e6503ec81",
+    "src/physics/thermal_laws_2d.f90": "0c0564b1d31d732bd36e6c7098739d1332f1e21fb177917761bc068980ca35e9",
+    "src/spatial/reconstruction_2d.f90": "8b23367d2477c0da4a661e1ef60de07b333e4c4b91f45ff0fcceb082e51db561",
+    "src/spatial/spatial_operator_2d.f90": "e2dc9486d3aa3284be331f058f767faee8576588e17290ec4e257e57a8507b0d"
+  },
+  "static_validation": {
+    "status": "PASS",
+    "checks": [
+      "JSON structure and unique proposed IDs",
+      "30 physical entries plus 4 dependent assemblies",
+      "all baseline hashes match current files",
+      "source anchors and Markdown links resolve",
+      "default membership exhaustive and method-homogeneous",
+      "no double registration or derived child scheduling",
+      "tracked changes confined to documentation"
+    ],
+    "source_hash_count": 28,
+    "source_reference_count": 82,
+    "markdown_link_count": 37,
+    "numerical_tests_run": false
+  }
+}
