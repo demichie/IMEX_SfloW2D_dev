@@ -9,6 +9,7 @@ PROGRAM test_grouped_implicit_stage
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   USE equation_terms_2d, ONLY : eval_implicit_terms,                     &
        eval_semi_implicit_terms, init_problem_param
+  USE rheology_2d, ONLY : correct_friction_momentum
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
   USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var
@@ -292,6 +293,30 @@ PROGRAM test_grouped_implicit_stage
         ERROR STOP 'single Newton group does not satisfy the joint stage equation'
      END IF
   END DO
+
+  ! A large yield impulse must be constrained before Newton, not only after it.
+  tau0 = 20000.0_wp
+  q_stage_check = q_old
+  CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
+  CALL eval_semi_implicit_terms(0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
+       grav, qp_known, si_source, 0.0_wp)
+  q_expected = q_stage_check
+  q_expected(2:3) = q_expected(2:3) +                                     &
+       dt_step*a_diag*si_source(2:3)
+  CALL correct_friction_momentum(q_stage_check(2:3), q_expected(2:3))
+  CALL solve_imex_stage(partition, q_stage_check, q_stage_check,            &
+       dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
+       0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                     &
+       effective_stage_term, iterations, converged, linear_info,             &
+       line_search_failed)
+  IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
+     ERROR STOP 'large semi-implicit yield stage did not converge'
+  END IF
+  scale = MAX(1.0_wp, MAXVAL(ABS(q_expected(2:3))))
+  IF (MAXVAL(ABS(q_stage(2:3) - q_expected(2:3))) / scale .GT. 2.0E-12_wp) THEN
+     ERROR STOP 'semi-implicit yield friction reversed the momentum'
+  END IF
+  tau0 = 0.0_wp
 
   q_stage_check = q_old
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)

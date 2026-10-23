@@ -422,12 +422,16 @@ CONTAINS
                   Bsecondj_xy, Bsecondj_yy, grav_coeff, qp_current, si_term,&
                   Zij)
           END IF
-          residual_without_si = Rj_not_impl - a_diag * si_term
           DO i = 1, group_size
              equation = group_equations(i)
              qj(equation) = q_known(equation) +                             &
                   dt_step*a_diag*si_term(equation)
           END DO
+          IF (group_has_momentum .AND. apply_si_local) THEN
+             CALL correct_friction_momentum(q_known(2:3), qj(2:3))
+             si_term(1:n_vars) = (qj - q_known) / (dt_step * a_diag)
+          END IF
+          residual_without_si = Rj_not_impl - a_diag * si_term
           momentum_before_newton = qj(2:3)
           CALL solve_newton_group(group_equations(1:group_size), qj,        &
                qj_old, dt_step, a_diag, residual_without_si,               &
