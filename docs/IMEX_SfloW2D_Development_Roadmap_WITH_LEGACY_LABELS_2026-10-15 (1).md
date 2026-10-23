@@ -2504,7 +2504,7 @@ requisito numerato è:
 | D17.10 | **Implementato localmente** | Rate semi-impliciti/impliciti filtrati per gruppo e solver, percorsi impliciti REAL/COMPLEX e sweep runtime ordinato dei solve Newton multipli; report e regressioni locali in D17.10. |
 | D17.11 | **Implementato localmente per i kernel REAL/COMPLEX duplicati individuati** | La correlazione di viscosità lahar condivide ora il kernel COMPLEX con il wrapper REAL; valore e derivata sono testati nei due rami. Per il perimetro verificato non serve un file `.inc`; report D17.11. |
 | D17.12 | **Implementato localmente** | Bridge analitico validato; vedere il report D17-C. |
-| D17.13–D17.16 | **Parziali** | Default e ordine legacy conservati in parte; esecuzione dei gruppi `step`, equivalenza completa, parsing nativo e presenza/ambiguità dell’input restano da completare. |
+| D17.13–D17.16 | **Parziali** | I default dei gruppi legacy sono verificati nel bridge per i casi inattivo e lava/energia/pressione attivi; equivalenza numerica end-to-end, routing `step`, mass-exchange e parsing nativo restano da completare. Evidenza D17.13. |
 | D17.17–D17.18 | **Parziali** | Dispatch analitico, esplicito e rate Newton filtrati sono dietro `equation_terms_2d`; restano la copertura mass-exchange/`step` e la verifica completa della separazione fisica/numerica. |
 | D17.19 | **In corso** | Stato puntuale dei 24 elementi nella sequenza implementativa sotto. |
 | D17.20 | **Parziale** | Regressioni del registro, dei solve analitici e del routing esplicito superate localmente; matrice obbligatoria completa ancora aperta. |
@@ -2955,6 +2955,13 @@ In assenza di configurazioni esplicite nel file di input, il codice deve costrui
 
 La configurazione di default deve essere determinata dall’inventario delle chiamate effettive presenti nel codice, non soltanto dal nome dei moduli.
 
+**Stato locale:** i default IMEX compilati sono verificati attraverso
+`initialize_configured_sources` nei casi senza sorgenti attive e con i solve
+analitici lava/energia/pressione abilitati; il test controlla ID, metodo,
+ordine, termini e target. Questo verifica la costruzione del registro, non
+l’equivalenza numerica runtime per tutte le attivazioni. Vedere
+[D17.13 — default configuration](acceptance/D17_13_DEFAULT_CONFIGURATION.md).
+
 ##### D17.13.1 — Sorgenti esplicite `stage`
 
 Il gruppo esplicito `stage` proposto ha **ID 4**, per non collidere con gli ID
@@ -3209,11 +3216,11 @@ l’evidenza disponibile, non il completamento dell’accettazione D17.
 1. Inventariare tutte le chiamate attuali ai termini sorgente (fase A documentata nella specifica/manifest allegati). **COMPLETATO.**
 2. Definire i `term_id`. **COMPLETATO.**
 3. Definire metodi, cadenze e identificatori dei solve. **COMPLETATO nei metadati.**
-4. Costruire la tabella completa dei default. **COMPLETATO come baseline e adattatore legacy; equivalenza runtime complessiva ancora da verificare (D17.13).**
+4. Costruire la tabella completa dei default. **COMPLETATO come baseline e adattatore legacy; la costruzione dei default è verificata nei casi inattivo e lava/energia/pressione attivi, mentre l’equivalenza runtime complessiva resta da verificare (D17.13).**
 5. Definire `source_group_type`. **COMPLETATO.**
 6. Creare i registri `stage_groups` e `step_groups`. **COMPLETATO.**
 7. Definire le firme delle quattro interfacce. **COMPLETATO per i percorsi supportati:** semi-implicita e implicita accettano anche gruppo e descrittore solver, mantenendo i call site legacy.
-8. Implementare i gruppi di default. **COMPLETATO nei metadati; dispatch e confronto completo con il comportamento legacy restano parziali.**
+8. Implementare i gruppi di default. **COMPLETATO nei metadati; il bridge predefinito è testato nei casi inattivo e attivo riportati in D17.13; dispatch ed equivalenza numerica completa con il comportamento legacy restano parziali.**
 9. Implementare il parsing dell’input. **DA FARE:** formato nativo non implementato.
 10. Implementare i controlli di consistenza. **PARZIALE:** validazione dei registri e dei profili esistenti e della selezione gruppo/solver; controlli di presenza/conflitto nel parsing nativo (D17.16) restano da fare.
 11. Modificare `eval_expl_terms`. **COMPLETATO localmente per il routing esplicito `stage` e l’hook al bordo (D17.9).**

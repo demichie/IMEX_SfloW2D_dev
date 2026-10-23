@@ -97,6 +97,7 @@ PROGRAM test_source_registry
     END DO
     END DO
   END DO
+  CALL test_configured_default_schedule()
   ! One configured bridge smoke test covers all injection and mass-exchange gates.
   CALL configure_bridge()
   enabled=.TRUE.; original=[3,1,2]; methods=[IM_GROUP_METHOD_ANALYTIC, &
@@ -245,6 +246,81 @@ CONTAINS
     END IF
     checks=checks+1
   END SUBROUTINE require
+  SUBROUTINE test_configured_default_schedule()
+    USE parameters_2d, ONLY : wp,rheology_flag,rheology_model_id,pore_pressure_flag, &
+         idx_pore,imex_velocity_group,imex_energy_group,imex_pore_pressure_group, &
+         imex_group_method,curvature_term_flag,bottom_radial_source_flag, &
+         bottom_fissural_source_flag,radial_source_flag,lateral_source_flag, &
+         liquid_flag,gas_flag,gas_loss_flag,liquid_vaporization_flag
+    USE constitutive_parameters_2d, ONLY : erosion_coeff,settling_flag, &
+         coeff_porosity,entrainment_flag
+    INTEGER :: default_mask(7)
+    LOGICAL :: active_mask(7)
+    INTEGER :: default_methods(3)
+    CHARACTER(LEN=16) :: default_method_names(3)
+    INTEGER :: expected_terms(2)
+
+    idx_pore=7
+    CALL require(imex_velocity_group==3 .AND. imex_energy_group==1 .AND. &
+         imex_pore_pressure_group==2,'compiled legacy IMEX group defaults')
+    default_method_names=[CHARACTER(LEN=16)::'ANALYTIC','ANALYTIC','NEWTON']
+    CALL require(ALL(imex_group_method==default_method_names), &
+         'compiled legacy IMEX method defaults')
+    default_methods=[IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_ANALYTIC, &
+         IM_GROUP_METHOD_NEWTON]
+
+    rheology_flag=.FALSE.;pore_pressure_flag=.FALSE.
+    curvature_term_flag=.FALSE.;bottom_radial_source_flag=.FALSE.
+    bottom_fissural_source_flag=.FALSE.;radial_source_flag=.FALSE.
+    lateral_source_flag=.FALSE.;liquid_flag=.FALSE.;gas_flag=.TRUE.
+    gas_loss_flag=.FALSE.;liquid_vaporization_flag=.FALSE.
+    erosion_coeff=0.0_wp;settling_flag=.FALSE.;coeff_porosity=0.0_wp
+    entrainment_flag=.FALSE.
+    active_mask=.FALSE.;active_mask(2:3)=.TRUE.
+    default_mask=0;default_mask(2:3)=1
+    CALL partition%initialize(active_mask,default_mask,[IM_GROUP_METHOD_NEWTON])
+    CALL initialize_configured_sources(registry,partition,error)
+    CALL require(error=='','inactive compiled default schedule: '//TRIM(error))
+    groups=registry%stage_groups();steps=registry%step_groups();solves=registry%solvers()
+    CALL require(SIZE(groups)==2 .AND. SIZE(steps)==1 .AND. SIZE(solves)==1, &
+         'inactive compiled default group counts')
+    CALL require(groups(1)%id==3 .AND. groups(1)%legacy_id==3 .AND. &
+         groups(1)%method==SOURCE_METHOD_NEWTON .AND. &
+         ALL(groups(1)%equation_ids==[2,3]),'default velocity group mapping')
+    CALL require(SIZE(groups(1)%term_ids)==0 .AND. &
+         SIZE(steps(1)%term_ids)==0,'inactive defaults register no source terms')
+    CALL require(groups(2)%id==4 .AND. &
+         groups(2)%method==SOURCE_METHOD_EXPLICIT,'default EX group reservation')
+
+    rheology_flag=.TRUE.;rheology_model_id=rheology_id_lava
+    pore_pressure_flag=.TRUE.
+    active_mask(4)=.TRUE.;active_mask(idx_pore)=.TRUE.
+    default_mask(2:3)=3;default_mask(4)=1;default_mask(idx_pore)=2
+    CALL partition%initialize(active_mask,default_mask,default_methods)
+    CALL initialize_configured_sources(registry,partition,error)
+    CALL require(error=='','active compiled default schedule: '//TRIM(error))
+    groups=registry%stage_groups();steps=registry%step_groups();solves=registry%solvers()
+    CALL require(SIZE(groups)==4 .AND. SIZE(steps)==1 .AND. SIZE(solves)==3, &
+         'active compiled default group counts')
+    CALL require(groups(1)%id==1 .AND. groups(1)%method==SOURCE_METHOD_ANALYTIC .AND. &
+         ALL(groups(1)%equation_ids==[4]),'default analytic energy group')
+    CALL require(groups(2)%id==2 .AND. groups(2)%method==SOURCE_METHOD_ANALYTIC .AND. &
+         ALL(groups(2)%equation_ids==[idx_pore]),'default analytic pore group')
+    CALL require(groups(3)%id==3 .AND. groups(3)%method==SOURCE_METHOD_NEWTON .AND. &
+         ALL(groups(3)%equation_ids==[2,3]),'default Newton velocity group')
+    expected_terms=[SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
+         SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
+    CALL require(same_members(groups(1)%term_ids,expected_terms), &
+         'default energy cooling bundle')
+    expected_terms=rheology_source_terms(rheology_id_lava)
+    CALL require(same_members(groups(3)%term_ids,expected_terms), &
+         'default lava rheology terms')
+    CALL require(SIZE(groups(2)%term_ids)==1 .AND. &
+         groups(2)%term_ids(1)==SOURCE_TERM_PORE_PRESSURE_DISSIPATION, &
+         'default pore-pressure term')
+    CALL require(SIZE(groups(4)%term_ids)==0 .AND. SIZE(steps(1)%term_ids)==0, &
+         'default explicit and step groups remain empty when disabled')
+  END SUBROUTINE test_configured_default_schedule
   FUNCTION target_eqs(target) RESULT(ids)
     INTEGER, INTENT(IN) :: target
     INTEGER, ALLOCATABLE :: ids(:)
