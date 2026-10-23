@@ -11,6 +11,7 @@ PROGRAM test_grouped_implicit_stage
        eval_semi_implicit_terms, init_problem_param
   USE source_registry_2d, ONLY : source_registry_type, source_group_type,   &
        source_solver_type
+  USE source_configuration_2d, ONLY : initialize_configured_sources
   USE source_catalog_2d, ONLY : rheology_source_terms, &
        SOURCE_TERM_THERMAL_RADIATIVE_COOLING, SOURCE_TERM_THERMAL_CONVECTIVE_COOLING, &
        SOURCE_TERM_PORE_PRESSURE_DISSIPATION, SOURCE_METHOD_NEWTON,          &
@@ -49,6 +50,7 @@ PROGRAM test_grouped_implicit_stage
   REAL(wp) :: speed_ratio, analytic_velocity(2)
   REAL(wp) :: residual, scale, dt_step, a_diag
   COMPLEX(wp) :: complex_q(7), complex_source(7)
+  CHARACTER(LEN=256) :: source_error
 
   n_solid = 2
   n_add_gas = 0
@@ -77,6 +79,12 @@ PROGRAM test_grouped_implicit_stage
   pore_pressure_flag = .TRUE.
   gas_flag = .FALSE.
   liquid_flag = .TRUE.
+  gas_loss_flag = .FALSE.
+  liquid_vaporization_flag = .FALSE.
+  erosion_coeff = 0.0_wp
+  settling_flag = .FALSE.
+  coeff_porosity = 0.0_wp
+  entrainment_flag = .FALSE.
   sutherland_flag = .FALSE.
   dynamic_permeability_flag = .FALSE.
   stochastic_flag = .FALSE.
@@ -119,7 +127,14 @@ PROGRAM test_grouped_implicit_stage
   CALL partition%initialize(implicit_mask, group_map,                       &
        [IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_ANALYTIC,                 &
        IM_GROUP_METHOD_NEWTON])
-  CALL refresh_source_registry
+  imex_velocity_group=3
+  imex_energy_group=1
+  imex_pore_pressure_group=2
+  imex_group_method=[CHARACTER(LEN=16)::'ANALYTIC','ANALYTIC','NEWTON']
+  CALL initialize_configured_sources(source_registry,partition,source_error)
+  IF (LEN_TRIM(source_error)>0) ERROR STOP TRIM(source_error)
+  IF (SIZE(source_registry%stage_groups())/=4) &
+       ERROR STOP 'default configuration did not build the expected stage groups'
   filter_group%id=1
   filter_group%execution_order=1
   filter_group%cadence=SOURCE_CADENCE_STAGE

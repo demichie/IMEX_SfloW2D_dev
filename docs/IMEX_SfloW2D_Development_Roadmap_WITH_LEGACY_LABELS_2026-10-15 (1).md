@@ -2504,7 +2504,7 @@ requisito numerato è:
 | D17.10 | **Implementato localmente** | Rate semi-impliciti/impliciti filtrati per gruppo e solver, percorsi impliciti REAL/COMPLEX e sweep runtime ordinato dei solve Newton multipli; report e regressioni locali in D17.10. |
 | D17.11 | **Implementato localmente per i kernel REAL/COMPLEX duplicati individuati** | La correlazione di viscosità lahar condivide ora il kernel COMPLEX con il wrapper REAL; valore e derivata sono testati nei due rami. Per il perimetro verificato non serve un file `.inc`; report D17.11. |
 | D17.12 | **Implementato localmente** | Bridge analitico validato; vedere il report D17-C. |
-| D17.13–D17.16 | **Parziali** | I default dei gruppi legacy sono verificati nel bridge per i casi inattivo e lava/energia/pressione attivi; equivalenza numerica end-to-end, routing `step`, mass-exchange e parsing nativo restano da completare. Evidenza D17.13. |
+| D17.13–D17.16 | **Parziali** | Default inattivi e sequenza runtime energia analitica → pressione analitica → quantità di moto Newton verificate con il builder configurato e oracoli/residui locali; equivalenza per tutte le attivazioni, routing `step`, mass-exchange e parsing nativo restano aperti. Evidenza D17.13. |
 | D17.17–D17.18 | **Parziali** | Dispatch analitico, esplicito e rate Newton filtrati sono dietro `equation_terms_2d`; restano la copertura mass-exchange/`step` e la verifica completa della separazione fisica/numerica. |
 | D17.19 | **In corso** | Stato puntuale dei 24 elementi nella sequenza implementativa sotto. |
 | D17.20 | **Parziale** | Regressioni del registro, dei solve analitici e del routing esplicito superate localmente; matrice obbligatoria completa ancora aperta. |
@@ -2958,8 +2958,11 @@ La configurazione di default deve essere determinata dall’inventario delle chi
 **Stato locale:** i default IMEX compilati sono verificati attraverso
 `initialize_configured_sources` nei casi senza sorgenti attive e con i solve
 analitici lava/energia/pressione abilitati; il test controlla ID, metodo,
-ordine, termini e target. Questo verifica la costruzione del registro, non
-l’equivalenza numerica runtime per tutte le attivazioni. Vedere
+ordine, termini e target. Il test grouped-stage esegue inoltre la sequenza
+default energia analitica → pressione analitica → quantità di moto Newton;
+oracoli exact-flow, residui Newton e rate effettivi verificano gli aggiornamenti
+dei target. Resta aperta l’equivalenza per tutte le attivazioni e i percorsi
+temporali. Vedere
 [D17.13 — default configuration](acceptance/D17_13_DEFAULT_CONFIGURATION.md).
 
 ##### D17.13.1 — Sorgenti esplicite `stage`

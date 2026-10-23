@@ -26,6 +26,7 @@ for profile in strict optimized; do
         numerics/lapack_interfaces_2d \
         core/constitutive_parameters_2d numerics/equation_metadata_2d \
         numerics/source_catalog_2d numerics/source_registry_2d \
+        physics/source_configuration_2d \
         core/complexify \
         geometry/geometry_2d state/state_conversion_2d \
         physics/rheology_laws/rheology_lava_2d physics/rheology_laws/rheology_lahar_2d \
