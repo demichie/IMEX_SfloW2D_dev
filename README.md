@@ -51,6 +51,12 @@ directories, leaving the source fixtures untouched. The CI workflow also runs
 binary/stochastic restart and HP-PCCU Gate-H checks with actual one- and
 four-thread OpenMP teams in both build profiles.
 
+The legacy test runner can optionally run the focused `TEST_DYNAMIC_FINH`
+fixture with `TESTS/run_tests.sh /path/to/IMEX_SfloW2D TEST_DYNAMIC_FINH`.
+The Intel ifx portability workflow exposes the same focused diagnostic through
+the `diagnose_dynamic_fin_h` manual-dispatch input and uploads its solver log
+and elapsed-time record.
+
 Several examples can be found in the EXAMPLES folder.
 
 The [Etna lava example](EXAMPLES/EXAMPLE_ETNA_LAVA/README.md) uses two bottom

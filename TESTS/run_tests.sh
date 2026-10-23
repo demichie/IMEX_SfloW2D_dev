@@ -4,12 +4,20 @@ set -eu
 test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_dir=$(CDPATH= cd -- "$test_dir/.." && pwd)
 
-if [ "$#" -ne 1 ]; then
-    echo "Usage: $0 /path/to/IMEX_SfloW2D" >&2
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
+    echo "Usage: $0 /path/to/IMEX_SfloW2D [TEST_DYNAMIC_FINH]" >&2
     exit 2
 fi
 
 executable=$1
+selected_case=${2:-}
+case "$selected_case" in
+    ""|TEST_DYNAMIC_FINH) ;;
+    *)
+        echo "Unsupported focused integration case: $selected_case" >&2
+        exit 2
+        ;;
+esac
 case "$executable" in
     /*) ;;
     *)
@@ -38,9 +46,14 @@ copy_writable_fixture() {
 work_dir=$(mktemp -d "${TMPDIR:-/tmp}/imex-integration-tests.XXXXXX")
 trap 'rm -rf "$work_dir"' EXIT HUP INT TERM
 
-for test_name in TEST_2D TEST_BOX TEST_BW TEST_CF TEST_TAAL TEST_DAMBREAK; do
-    copy_writable_fixture "$test_dir/$test_name" "$work_dir/$test_name"
-done
+if [ -n "$selected_case" ]; then
+    copy_writable_fixture "$test_dir/TEST_DAMBREAK/$selected_case" \
+        "$work_dir/$selected_case"
+else
+    for test_name in TEST_2D TEST_BOX TEST_BW TEST_CF TEST_TAAL TEST_DAMBREAK; do
+        copy_writable_fixture "$test_dir/$test_name" "$work_dir/$test_name"
+    done
+fi
 
 run_case() {
     case_dir=$1
@@ -57,16 +70,48 @@ run_case() {
                 cp "$repo_dir/EXAMPLES/EXAMPLE_TAAL/topography_dem.asc" .
                 ;;
         esac
-        if ! "$executable" > solver.log 2>&1; then
+        solver_log=solver.log
+        if [ -n "${IMEX_TEST_LOG_DIR:-}" ]; then
+            mkdir -p "$IMEX_TEST_LOG_DIR"
+            case_name=$(basename "$case_dir")
+            solver_log="$IMEX_TEST_LOG_DIR/$case_name.solver.log"
+        fi
+
+        solver_status=0
+        if [ -n "${IMEX_TEST_LOG_DIR:-}" ]; then
+            run_started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            run_started_epoch=$(date +%s)
+        fi
+        if [ -n "${IMEX_TEST_CASE_TIMEOUT:-}" ]; then
+            if timeout --signal=TERM --kill-after=30s \
+                "$IMEX_TEST_CASE_TIMEOUT" "$executable" > "$solver_log" 2>&1; then
+                :
+            else
+                solver_status=$?
+            fi
+        elif "$executable" > "$solver_log" 2>&1; then
+            :
+        else
+            solver_status=$?
+        fi
+        if [ -n "${IMEX_TEST_LOG_DIR:-}" ]; then
+            run_finished_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+            run_finished_epoch=$(date +%s)
+            printf 'started_utc=%s\nfinished_utc=%s\nelapsed_seconds=%s\n' \
+                "$run_started_utc" "$run_finished_utc" \
+                "$((run_finished_epoch - run_started_epoch))" \
+                > "$IMEX_TEST_LOG_DIR/$case_name.timing.txt"
+        fi
+        if [ "$solver_status" -ne 0 ]; then
             echo "FAIL: solver exited unsuccessfully in $case_dir" >&2
-            cat solver.log >&2
-            exit 1
+            cat "$solver_log" >&2
+            exit "$solver_status"
         fi
         set -- "$case_dir/OUTPUT/$run_name"/snapshots/*/"$run_name"_*.q_2d
         if [ ! -f "$1" ]; then
             echo "FAIL: expected conservative snapshot was not created for $run_name" >&2
             find "$case_dir/OUTPUT" -maxdepth 5 -type f -print >&2 || true
-            cat solver.log >&2
+            cat "$solver_log" >&2
             exit 1
         fi
         [ -f "$case_dir/OUTPUT/$run_name/metadata/$run_name.bak" ] || {
@@ -119,6 +164,11 @@ run_case() {
     )
     echo "PASS: $(basename "$case_dir")"
 }
+
+if [ -n "$selected_case" ]; then
+    run_case "$work_dir/$selected_case" "dambreak2D"
+    exit 0
+fi
 
 check_output_path_safety() {
     safety_dir=$work_dir/output-path-safety

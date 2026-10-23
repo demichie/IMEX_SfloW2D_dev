@@ -2,6 +2,12 @@ name: Intel ifx portability (experimental)
 
 on:
   workflow_dispatch:
+    inputs:
+      diagnose_dynamic_fin_h:
+        description: "Run only TEST_DYNAMIC_FINH with ifx diagnostic flags and preserve logs"
+        required: false
+        type: boolean
+        default: false
   push:
     tags:
       - '**'
@@ -19,8 +25,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        profile: [optimized, diagnostic]
-        threads: [1, 4]
+        profile: ${{ inputs.diagnose_dynamic_fin_h && fromJSON('["diagnostic"]') || fromJSON('["optimized","diagnostic"]') }}
+        threads: ${{ inputs.diagnose_dynamic_fin_h && fromJSON('[1]') || fromJSON('[1,4]') }}
 
     env:
       NETCDF_FORTRAN_TAG: v4.6.2
@@ -128,19 +134,39 @@ jobs:
           ldd src/IMEX_SfloW2D
 
       - name: Legacy integration tests (make check)
+        if: ${{ !inputs.diagnose_dynamic_fin_h }}
         run: make check
 
+      - name: Profile TEST_DYNAMIC_FINH
+        if: ${{ inputs.diagnose_dynamic_fin_h && matrix.profile == 'diagnostic' && matrix.threads == 1 }}
+        env:
+          IMEX_TEST_LOG_DIR: ${{ runner.temp }}/ifx-dynamic-finh
+          IMEX_TEST_CASE_TIMEOUT: 60m
+        run: TESTS/run_tests.sh src/IMEX_SfloW2D TEST_DYNAMIC_FINH
+
       - name: Binary restart and runout regression
+        if: ${{ !inputs.diagnose_dynamic_fin_h }}
         run: TESTS/TEST_BINARY_RESTART/run_test.sh src/IMEX_SfloW2D
 
       - name: Stochastic restart regression
+        if: ${{ !inputs.diagnose_dynamic_fin_h }}
         run: TESTS/TEST_STOCHASTIC_RESTART/run_test.sh src/IMEX_SfloW2D
 
       - name: HP-PCCU Gate-H validation
+        if: ${{ !inputs.diagnose_dynamic_fin_h }}
         run: TESTS/TEST_PCCU_GATE_H/run_test.sh src/IMEX_SfloW2D
 
       - name: Source mass injection
+        if: ${{ !inputs.diagnose_dynamic_fin_h }}
         run: TESTS/TEST_SOURCE_MASS/run_test.sh src/IMEX_SfloW2D
+
+      - name: Upload focused diagnostic logs
+        if: ${{ always() && inputs.diagnose_dynamic_fin_h && matrix.profile == 'diagnostic' && matrix.threads == 1 }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ifx-dynamic-finh-diagnostic-${{ matrix.threads }}
+          path: ${{ runner.temp }}/ifx-dynamic-finh/
+          if-no-files-found: warn
 
       - name: Collect diagnostic logs if a step fails
         if: failure()
