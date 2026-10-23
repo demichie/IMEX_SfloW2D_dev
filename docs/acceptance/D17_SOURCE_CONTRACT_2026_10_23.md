@@ -2,6 +2,10 @@
 
 Status: **inventory and contracts documented; runtime D17 not implemented**.
 Baseline: `1310511ed940dc50325f656236ca7ce467eb8d52` (includes the recorded D16 Intel ifx CI acceptance).
+
+Historical phase-A specification. The subsequent [D17-B implementation and
+validation report](D17_B_SOURCE_REGISTRY_2026_10_23.md) records the runtime metadata
+now present; the phase-A contracts and baseline measurements below remain intact.
 No production source, input, workflow, tolerance or numerical algorithm changes
 are part of this phase. No simulation or new compiler/CI acceptance is claimed.
 

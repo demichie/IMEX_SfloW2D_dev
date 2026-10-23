@@ -4,13 +4,17 @@
 !> This module owns the state, runtime data and numerical workspaces that form
 !> one simulation and coordinates their lifecycle.
 !>
-!> Owns state, runtime, domain, layout, equation partition and numerical workspaces. Initialization
+!> Owns state, runtime, domain, layout, equation partition, source registry and numerical workspaces. Initialization
 !> follows their dependency order; finalization releases their storage.
 !********************************************************************************
 
 MODULE simulation_2d
 
   USE equation_terms_2d, ONLY : init_problem_param
+
+  USE source_registry_2d, ONLY : source_registry_type
+  USE source_configuration_2d, ONLY : initialize_configured_sources
+  USE diagnostics_2d, ONLY : fatal_error
 
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE model_layout_2d, ONLY : model_layout_type
@@ -44,6 +48,7 @@ MODULE simulation_2d
 
      TYPE(runtime_state_type) :: runtime
      TYPE(model_layout_type) :: model_layout
+     TYPE(source_registry_type) :: source_registry !< Validated D17 metadata; stage dispatch remains legacy.
      TYPE(equation_partition_type) :: equation_partition
      TYPE(state_type) :: state
      TYPE(domain_type) :: domain
@@ -70,10 +75,14 @@ CONTAINS
 
     CLASS(simulation_context_type), INTENT(INOUT) :: this
 
+    CHARACTER(LEN=256) :: source_error
+
     CALL this%model_layout%initialize( n_layers, n_vars, n_eqns, n_solid,   &
          n_add_gas, n_stoch_vars, n_pore_vars, liquid_flag .AND. gas_flag )
 
     CALL init_problem_param( this%equation_partition )
+    CALL initialize_configured_sources(this%source_registry,this%equation_partition,source_error)
+    IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
     CALL this%state%initialize( this%model_layout )
 
@@ -105,6 +114,7 @@ CONTAINS
 
     CALL finalize_nonlinear_solver
 
+    CALL this%source_registry%finalize()
     CALL this%equation_partition%finalize
     CALL this%model_layout%finalize
     CALL this%stochastic%finalize

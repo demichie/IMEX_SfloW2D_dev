@@ -23,6 +23,8 @@ IMEX_SfloW2D_SOURCES = \
                 core/constitutive_parameters_2d.f90 \
                 core/model_layout_2d.f90 \
                 numerics/equation_metadata_2d.f90 \
+                numerics/source_catalog_2d.f90 \
+                numerics/source_registry_2d.f90 \
                 core/runtime_2d.f90 \
                 core/complexify.f90 \
                 geometry/geometry_2d.f90 \
@@ -37,6 +39,7 @@ IMEX_SfloW2D_SOURCES = \
                 physics/thermal_laws_2d.f90 \
                 physics/pore_pressure_laws_2d.f90 \
                 physics/mass_exchange_laws_2d.f90 \
+                physics/source_configuration_2d.f90 \
                 physics/equation_terms_2d.f90 \
                 spatial/nonconservative_2d.f90 \
                 spatial/pccu_2d.f90 \
@@ -248,3 +251,11 @@ IMEX_SfloW2D.$(OBJEXT): core/parameters_2d.$(OBJEXT)                         \
 
 IMEX_SfloW2D_LDFLAGS = @OPENMP_FCFLAGS@ @NETCDF_LDFLAGS@
 IMEX_SfloW2D_LDADD = @NETCDF_LIBS@ @LAPACK_LIBS@ -lm
+
+# D17 metadata is built once; no new dependency is introduced in stage kernels.
+numerics/source_catalog_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+numerics/source_registry_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
+                                      numerics/equation_metadata_2d.$(OBJEXT)
+physics/source_configuration_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \
+                                         core/constitutive_parameters_2d.$(OBJEXT)
+core/simulation_2d.$(OBJEXT): physics/source_configuration_2d.$(OBJEXT)

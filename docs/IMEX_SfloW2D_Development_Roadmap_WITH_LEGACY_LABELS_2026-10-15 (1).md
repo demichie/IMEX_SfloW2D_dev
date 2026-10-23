@@ -2456,15 +2456,29 @@ non è coperto da questa CI.
 
 ### D17 — Organizzazione unificata dei termini sorgente, gruppi e separazione tra fisica e numerica
 
-Stato ufficiale: IN CORSO — inventario e contratti documentati; runtime da implementare.
+Stato ufficiale: IN CORSO — fasi A/B implementate e verificate localmente; dispatch numerico e input nativo da implementare.
 
 Baseline della fase A: `1310511e` (23 ottobre 2026). Specifica di compatibilità:
 [D17_SOURCE_CONTRACT_2026_10_23.md](acceptance/D17_SOURCE_CONTRACT_2026_10_23.md);
 inventario con 30 contributi fisici e 4 assemblaggi derivati:
 [D17_SOURCE_TERMS_MANIFEST_2026_10_23.json](acceptance/D17_SOURCE_TERMS_MANIFEST_2026_10_23.json).
-Gli identificatori sono proposti, non ancora enum Fortran. Verifiche statiche
-soltanto: nessuna modifica a sorgenti/input e nessuna nuova accettazione numerica.
-I gate B–F della specifica restano aperti; D17 non è completato.
+La fase A è una baseline documentale storica. La fase B successiva definisce i
+34 ID Fortran, descrittori dei gruppi/solve e registri validati posseduti dalla
+simulazione, con adattatore dei gruppi IMEX legacy. Rapporto:
+[D17_B_SOURCE_REGISTRY_2026_10_23.md](acceptance/D17_B_SOURCE_REGISTRY_2026_10_23.md),
+[evidenza machine-readable](acceptance/results_d17_b_source_registry_2026_10_23.json).
+
+Passano per profilo strict/optimized 864 configurazioni legacy, 14.823 assert e
+27 casi negativi. Passano anche 255/255 fixture reologiche per profilo, 32/32
+check del parser per build e 12 prove con l’integratore produttivo a 1/4 thread.
+La normalizzazione conserva i blocchi Newton congiunti e separa i gruppi
+analitici legacy nell’ordine velocità/temperatura/pressione. Nessuna validazione
+o allocazione del registro è aggiunta ai loop degli stage o di Newton.
+
+Il registro affianca la partizione esistente; i kernel e il percorso numerico
+restano quelli attuali. I gate C–F (bridge analitico, filtri, dispatch EX/bordo/step,
+input nativo e acceptance completa) restano aperti. Nessuna nuova accettazione
+ifx/Linux/Docker è attestata da B; D17 non è completato.
 
 #### D17.0 — Logica generale e obiettivo
 

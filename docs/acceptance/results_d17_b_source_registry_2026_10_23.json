@@ -1,0 +1,1191 @@
+{
+  "schema_version": 1,
+  "milestone": "D17",
+  "phase": "B",
+  "date": "2026-10-23",
+  "baseline_commit": "2faaa71416fda50fdc77da381b9c5fe95b7bb3d9",
+  "status": "IMPLEMENTED_LOCAL_VALIDATION_PASS",
+  "d17_complete": false,
+  "dispatch_uses_registry": false,
+  "new_source_input_implemented": false,
+  "numerical_formulas_changed": false,
+  "tracked_operational_inputs_changed": false,
+  "toolchain": "GNU Fortran (Homebrew GCC 15.2.0) 15.2.0",
+  "source_hashes": {
+    "Makefile.am": "4d59481b114bdfc043e6141915db53e777294aee79cff527c9f03f02d014b80f",
+    "TESTS/TEST_SOURCE_REGISTRY/README.md": "b5426fd4b7de385a4a27d3bc185152a48ef04574359d4caf4d38cb97a30dd5bf",
+    "TESTS/TEST_SOURCE_REGISTRY/run_test.sh": "d278715f5520027efab72c28a86fd101ff9a202f81338b890f7b5655d2a9be10",
+    "TESTS/TEST_SOURCE_REGISTRY/test_source_registry.f90": "047d98dc63e6abd56b94927a169618530b0b7715c5356747815995e5eff9d00f",
+    "src/IMEX_SfloW2D.f90": "247aeb61977fe5e216fe7bd6d9a77ef733628b5a30b54595b325dc8bcc148c86",
+    "src/Makefile.am": "22324517c99868a8c0ef2e661d13f44c55b19044e055e15224fbb509e3365e47",
+    "src/core/complexify.f90": "23a5c16cf6b8e09ab8dd7db404b1802749c0d99a9067bfc118f92ffc0d8ff28b",
+    "src/core/constitutive_parameters_2d.f90": "a5c5804af48b9f1f9e6923c9e2502acd4d30f80b15543108ccd64d24c4bde889",
+    "src/core/diagnostics_2d.f90": "16b8c59ac2f90b5c99e7c5cfffc337d2da0dceefaec091efe36fb8c5cb80e759",
+    "src/core/init_2d.f90": "03451193df8e652b8eccf27644564e40fb05d929c094d2ba0172a0c4372140ca",
+    "src/core/model_layout_2d.f90": "ab60e9de67fc2d5fbc3d15d5536ceaa22f859ed3ec0e76652ad7a5e43a352cce",
+    "src/core/parameters_2d.f90": "e1de9dbe4c1f406253a40bfc6051462b29fcf352010a98519faf2b51ac4809ab",
+    "src/core/runtime_2d.f90": "b9bfe0a9b1502a6970f7567e00ea3701d1dcb6316b23dac73cfd143d4cc16adb",
+    "src/core/simulation_2d.f90": "63387c5c51fbcc39c114963a114f3637e1127a4be9ce1f8b90a72716124eb83c",
+    "src/geometry/domain_2d.f90": "6afd4e62d52dbd23ec429514dfb33ab3f8988887a88150197bd55f6a66bf6a5f",
+    "src/geometry/geometry_2d.f90": "6fb40fe444db7d3c615ea37a9bd96e7e44a4e12cadc31c76711d839cfb0855e4",
+    "src/io/inpout_2d.f90": "fee23d22ccc33492fcf699d3babe9f4998964ed74856a7b7552d2448dab05aec",
+    "src/io/output_dirs.c": "3613c329cb955256e4b57993a562b623ea981370fc5f1b5ecd1ddd03b39297c3",
+    "src/io/output_paths.f90": "c0688925c8e6468106d9bc202d11eca66ad1e13ff3956e8d8a2aaadec142a160",
+    "src/numerics/equation_metadata_2d.f90": "83a2ea75ecd81b5a7b22623f29c9ec273f154e1c6e397b4a0842515b660dcc7e",
+    "src/numerics/lapack_interfaces_2d.f90": "2891985b5e521538e6871568aa8b708fdf01455b1908c7805cf2b6cfd3b5d952",
+    "src/numerics/nonlinear_solver_2d.f90": "64325b8f99deb4b6baa33772842b162754c0487aca2c043a8396dc0061e6123c",
+    "src/numerics/source_catalog_2d.f90": "0d22e5a158a1311a729acb355ef657062b73fe44d0e59b1127f4aef530706251",
+    "src/numerics/source_registry_2d.f90": "dab7b2709d5e36dcb281ad045a64b3a09a341f538a26ce0591d9a962059df128",
+    "src/numerics/time_integration_2d.f90": "9c03093517fd0006717597587459a166fcce35c97b3f451d0a0b3508cdc18f90",
+    "src/physics/equation_terms_2d.f90": "d72c8af61be33aa01a449e4312aa239a22fa873b70fb5f7087ca0c2bd5f7a72e",
+    "src/physics/mass_exchange_laws_2d.f90": "908b06578c74fe854515a3d08519d300b5471e41df858279c6b1f9c66b930975",
+    "src/physics/pore_pressure_laws_2d.f90": "34c6e668def0772ad3a53169d6e5c91d4371155b40c9f3b67da00d6f65963b4c",
+    "src/physics/rheology_laws/rheology_2d.f90": "0576ef32595d4faf2000ce32e8943f2a1821b966474cd865ca46d87150517b6b",
+    "src/physics/rheology_laws/rheology_analytic_utils_2d.f90": "3c59fcab5398be29e0bd305b2fa5184d3c21b26799b547f081c0e2350acffeb3",
+    "src/physics/rheology_laws/rheology_empirical_2d.f90": "0f750ef48916e817eecfe0cdd36bd505c5b96d062f205d10e138b4221261a7da",
+    "src/physics/rheology_laws/rheology_froude_2d.f90": "b4261f407cfe84687364b1001bc3ac750db0297cc71840cf80ced723f5315a5f",
+    "src/physics/rheology_laws/rheology_lahar_2d.f90": "593a105ce2d78d9af5317e86387b5bced05ccafd19e3ddb6c7720fc61fe8c719",
+    "src/physics/rheology_laws/rheology_lava_2d.f90": "ceb3ab22fb7aa1c7d1b6d36fd3905876351d0080b3c20940005eed24e5ac0c3b",
+    "src/physics/rheology_laws/rheology_lucas_2d.f90": "82b867830333f9144f91f70c50c223769c2ba0eb39b6e97d69196a7923a1295b",
+    "src/physics/rheology_laws/rheology_mui_2d.f90": "91eb182edd3dbd7488e9482bbd1e3999c877b57ba13460653066ea199c474a13",
+    "src/physics/rheology_laws/rheology_mui_voellmy_2d.f90": "8d0987e90a5733b63cd6514adc6b1dcf7116cfc2fab20f9dd743fbb76b55f3a4",
+    "src/physics/rheology_laws/rheology_parameters_2d.f90": "91c1819860af7558638c253b0e8aa577aafdeb7f794f3e9cea113b9794ef56b0",
+    "src/physics/rheology_laws/rheology_plastic_2d.f90": "7aff5fa9a97d6a878b188df292f6ce2ca9ad3d50be7026ce7ae87623d43223ee",
+    "src/physics/rheology_laws/rheology_quadratic_2d.f90": "89772a757c60c95ae38da247c6a7890ee1e00d743f5c7feb7c1d3bb1a389a13d",
+    "src/physics/rheology_laws/rheology_voellmy_2d.f90": "a609c556064f0caa20a8c5c041c02b8a36e95babe0d1520d85268b3e6503ec81",
+    "src/physics/source_configuration_2d.f90": "1cec072114b0d297a1bef225f3fcb2a4e37bdd257c725f44af5ae13833aace3e",
+    "src/physics/thermal_laws_2d.f90": "0c0564b1d31d732bd36e6c7098739d1332f1e21fb177917761bc068980ca35e9",
+    "src/python_diagnostics/kt_ritter_1d.f90": "1bfa40c40bf66b305b004eb21b073346d8c463c1f94f64cd1dabf1054ddbbe45",
+    "src/spatial/hp_reconstruction_2d.f90": "6de1a37572d5fffa55f1aa58b197b3824c087969c083c5137c6712fb021b81e0",
+    "src/spatial/hyperbolic_2d.f90": "dcb3792a680c8c410813297489193ea73dbaefc1eb9fee75cd5d51d0817ed40b",
+    "src/spatial/nonconservative_2d.f90": "44f659c71d192e3e285cd8fb962f66ca11dd383d3a5a9a2c24e9b7aef97d691e",
+    "src/spatial/pccu_2d.f90": "2d037f0ad8a48f31eb00ac3645f04ad554408ba749bec9875b8b01b393affc59",
+    "src/spatial/reconstruction_2d.f90": "8b23367d2477c0da4a661e1ef60de07b333e4c4b91f45ff0fcceb082e51db561",
+    "src/spatial/spatial_operator_2d.f90": "e2dc9486d3aa3284be331f058f767faee8576588e17290ec4e257e57a8507b0d",
+    "src/state/mixture_from_mass.inc": "da6131a86aa691dc043a77e2d3f50ed2f753d077590c081e7ee97d5bd4b20a5d",
+    "src/state/mixture_heat_capacity.inc": "c112e1dc64aebba6e282b1fc220377abe229948062da8168b563b382822ea1aa",
+    "src/state/state_2d.f90": "cdb80ac4b5357a25f36f28555e595764127e234096c67cedeb4585fa2881ccda",
+    "src/state/state_conversion_2d.f90": "0edbac1633e24f47ac42086b80a9de672fde200ab0c05787322be89236d6d7e5",
+    "src/state/state_conversion_phys_var.inc": "d9f63dcbe2ceb3b62131c01dbda1da2ffbaa793a7604382d3dad4ca450bc1729",
+    "src/state/velocity_from_conservative.inc": "552515c233b09171e4965e9f1866dfeedb5f37c1dce195ba02f18bcc7cd5671a",
+    "src/stochastic/stochastic_module.f90": "2ee54e877a391a42ed994a04acebd50000b488c806d7d007ab19885449794aa7",
+    "src/stochastic/stochastic_random_2d.f90": "39066c274a98949e1a5f636c763ee3b7572379dbea7951ef72b11448035beb00"
+  },
+  "focused": {
+    "strict": {
+      "status": "PASS",
+      "legacy_configurations": 864,
+      "assertions": 14823,
+      "rejected_invalid_configurations": 27,
+      "log": "build-local/d17-registry/focused/strict/results.log",
+      "log_sha256": "981e4383cc67d20b521c29917927f957fc04fc644aa809301bf6dda555c53051"
+    },
+    "optimized": {
+      "status": "PASS",
+      "legacy_configurations": 864,
+      "assertions": 14823,
+      "rejected_invalid_configurations": 27,
+      "log": "build-local/d17-registry/focused/optimized/results.log",
+      "log_sha256": "981e4383cc67d20b521c29917927f957fc04fc644aa809301bf6dda555c53051"
+    }
+  },
+  "full_solver": {
+    "optimized": {
+      "build_status": "PASS",
+      "compiler_flags": "-Ofast -funroll-all-loops",
+      "parser": {
+        "records": [
+          {
+            "name": "valid-voellmy",
+            "model": 1,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "valid-bursik-woods",
+            "model": 6,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "unsupported-7",
+            "model": 7,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "disabled-active-0",
+            "model": 0,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "removed-model-8",
+            "model": 8,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "missing-xi",
+            "model": 1,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "missing-mu0",
+            "model": 9,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "zero-Fr0",
+            "model": 9,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "zero-Uw",
+            "model": 10,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "missing-muinf",
+            "model": 10,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "all-negative-froude",
+            "model": 9,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "zero-coulomb",
+            "model": 1,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "zero-froude-friction",
+            "model": 9,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "zero-lucas-friction",
+            "model": 10,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-mu",
+            "model": 1,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "infinite-xi",
+            "model": 1,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-Fr0",
+            "model": 9,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "infinite-Uw",
+            "model": 10,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-plastic",
+            "model": 2,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-lava",
+            "model": 3,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-lahar",
+            "model": 4,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "infinite-quadratic",
+            "model": 6,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-mui",
+            "model": 11,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-mui-voellmy",
+            "model": 12,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "ambient-default",
+            "model": 3,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": 300.0,
+            "status": "PASS"
+          },
+          {
+            "name": "ambient-set",
+            "model": 3,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": 350.0,
+            "status": "PASS"
+          },
+          {
+            "name": "ambient-zero",
+            "model": 3,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "ambient-nan",
+            "model": 3,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "ambient-inf",
+            "model": 3,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "valid-uppercase-name",
+            "model": 6,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "unknown-name",
+            "model": -1,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "legacy-numeric-id",
+            "model": 6,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          }
+        ],
+        "acceptance": "PASS"
+      },
+      "actual_stages": {
+        "n_RK": 2,
+        "driver_sha256": "796aa8ebffc5bdc035f83f19588e2d80fcc0942331a08f1c5d6a2ff0eb20b535",
+        "build": "/Users/demichie/Codes/GIT/IMEX_SfloW2D_dev/build-local/optimized",
+        "records": [
+          {
+            "case": "quadratic",
+            "threads": 1,
+            "status": "PASS",
+            "checks": {
+              "known_stage2": 0.0,
+              "source_oracle": 1.1471135660850226e-12,
+              "effective_increment": 0.0,
+              "final_projection": 0.0,
+              "dt_error": 0.0
+            },
+            "expected": [
+              1000.0,
+              1683.2311193509274,
+              841.6155596754637,
+              1254000000.0,
+              0.0
+            ],
+            "actual": [
+              1000.0,
+              1683.2311193528583,
+              841.6155596764291,
+              1254000000.0,
+              0.0
+            ]
+          },
+          {
+            "case": "quadratic",
+            "threads": 4,
+            "status": "PASS",
+            "checks": {
+              "known_stage2": 0.0,
+              "source_oracle": 1.1471135660850226e-12,
+              "effective_increment": 0.0,
+              "final_projection": 0.0,
+              "dt_error": 0.0
+            },
+            "expected": [
+              1000.0,
+              1683.2311193509274,
+              841.6155596754637,
+              1254000000.0,
+              0.0
+            ],
+            "actual": [
+              1000.0,
+              1683.2311193528583,
+              841.6155596764291,
+              1254000000.0,
+              0.0
+            ]
+          },
+          {
+            "case": "coulomb-stop",
+            "threads": 1,
+            "status": "PASS",
+            "checks": {
+              "known_stage2": 0.0,
+              "source_oracle": 0.0,
+              "effective_increment": 0.0,
+              "final_projection": 0.0,
+              "dt_error": 0.0
+            },
+            "expected": [
+              1000.0,
+              0.0,
+              0.0,
+              1254000000.0,
+              0.0
+            ],
+            "actual": [
+              1000.0,
+              0.0,
+              0.0,
+              1254000000.0,
+              0.0
+            ]
+          },
+          {
+            "case": "coulomb-stop",
+            "threads": 4,
+            "status": "PASS",
+            "checks": {
+              "known_stage2": 0.0,
+              "source_oracle": 0.0,
+              "effective_increment": 0.0,
+              "final_projection": 0.0,
+              "dt_error": 0.0
+            },
+            "expected": [
+              1000.0,
+              0.0,
+              0.0,
+              1254000000.0,
+              0.0
+            ],
+            "actual": [
+              1000.0,
+              0.0,
+              0.0,
+              1254000000.0,
+              0.0
+            ]
+          },
+          {
+            "case": "lava-coupled",
+            "threads": 1,
+            "status": "PASS",
+            "checks": {
+              "known_stage2": 0.0,
+              "source_oracle": 5.6084778137137706e-11,
+              "effective_increment": 0.0,
+              "final_projection": 0.0,
+              "dt_error": 0.0
+            },
+            "expected": [
+              1000.0,
+              1986.2933667369434,
+              993.1466833684717,
+              3761997816.0047793,
+              0.0
+            ],
+            "actual": [
+              1000.0,
+              1986.2933666255426,
+              993.1466833127713,
+              3761997816.0047793,
+              0.0
+            ]
+          },
+          {
+            "case": "lava-coupled",
+            "threads": 4,
+            "status": "PASS",
+            "checks": {
+              "known_stage2": 0.0,
+              "source_oracle": 5.6084778137137706e-11,
+              "effective_increment": 0.0,
+              "final_projection": 0.0,
+              "dt_error": 0.0
+            },
+            "expected": [
+              1000.0,
+              1986.2933667369434,
+              993.1466833684717,
+              3761997816.0047793,
+              0.0
+            ],
+            "actual": [
+              1000.0,
+              1986.2933666255426,
+              993.1466833127713,
+              3761997816.0047793,
+              0.0
+            ]
+          }
+        ]
+      }
+    },
+    "strict-debug": {
+      "build_status": "PASS",
+      "compiler_flags": "-O0 -g -Wall -fcheck=all -fbacktrace -ffpe-trap=invalid,zero,overflow",
+      "parser": {
+        "records": [
+          {
+            "name": "valid-voellmy",
+            "model": 1,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "valid-bursik-woods",
+            "model": 6,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "unsupported-7",
+            "model": 7,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "disabled-active-0",
+            "model": 0,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "removed-model-8",
+            "model": 8,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "missing-xi",
+            "model": 1,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "missing-mu0",
+            "model": 9,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "zero-Fr0",
+            "model": 9,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "zero-Uw",
+            "model": 10,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "missing-muinf",
+            "model": 10,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "all-negative-froude",
+            "model": 9,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "zero-coulomb",
+            "model": 1,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "zero-froude-friction",
+            "model": 9,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "zero-lucas-friction",
+            "model": 10,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-mu",
+            "model": 1,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "infinite-xi",
+            "model": 1,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-Fr0",
+            "model": 9,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "infinite-Uw",
+            "model": 10,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-plastic",
+            "model": 2,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-lava",
+            "model": 3,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-lahar",
+            "model": 4,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "infinite-quadratic",
+            "model": 6,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-mui",
+            "model": 11,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "nan-mui-voellmy",
+            "model": 12,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "ambient-default",
+            "model": 3,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": 300.0,
+            "status": "PASS"
+          },
+          {
+            "name": "ambient-set",
+            "model": 3,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": 350.0,
+            "status": "PASS"
+          },
+          {
+            "name": "ambient-zero",
+            "model": 3,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "ambient-nan",
+            "model": 3,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "ambient-inf",
+            "model": 3,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "valid-uppercase-name",
+            "model": 6,
+            "should_reject": false,
+            "rejected": false,
+            "reached_end": true,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "unknown-name",
+            "model": -1,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          },
+          {
+            "name": "legacy-numeric-id",
+            "model": 6,
+            "should_reject": true,
+            "rejected": true,
+            "reached_end": false,
+            "exit_code": 0,
+            "ambient_temperature": null,
+            "status": "PASS"
+          }
+        ],
+        "acceptance": "PASS"
+      },
+      "actual_stages": {
+        "n_RK": 2,
+        "driver_sha256": "796aa8ebffc5bdc035f83f19588e2d80fcc0942331a08f1c5d6a2ff0eb20b535",
+        "build": "/Users/demichie/Codes/GIT/IMEX_SfloW2D_dev/build-local/strict-debug",
+        "records": [
+          {
+            "case": "quadratic",
+            "threads": 1,
+            "status": "PASS",
+            "checks": {
+              "known_stage2": 0.0,
+              "source_oracle": 1.1471135660850226e-12,
+              "effective_increment": 0.0,
+              "final_projection": 0.0,
+              "dt_error": 0.0
+            },
+            "expected": [
+              1000.0,
+              1683.2311193509274,
+              841.6155596754637,
+              1254000000.0,
+              0.0
+            ],
+            "actual": [
+              1000.0,
+              1683.2311193528583,
+              841.6155596764291,
+              1254000000.0,
+              0.0
+            ]
+          },
+          {
+            "case": "quadratic",
+            "threads": 4,
+            "status": "PASS",
+            "checks": {
+              "known_stage2": 0.0,
+              "source_oracle": 1.1471135660850226e-12,
+              "effective_increment": 0.0,
+              "final_projection": 0.0,
+              "dt_error": 0.0
+            },
+            "expected": [
+              1000.0,
+              1683.2311193509274,
+              841.6155596754637,
+              1254000000.0,
+              0.0
+            ],
+            "actual": [
+              1000.0,
+              1683.2311193528583,
+              841.6155596764291,
+              1254000000.0,
+              0.0
+            ]
+          },
+          {
+            "case": "coulomb-stop",
+            "threads": 1,
+            "status": "PASS",
+            "checks": {
+              "known_stage2": 0.0,
+              "source_oracle": 0.0,
+              "effective_increment": 0.0,
+              "final_projection": 0.0,
+              "dt_error": 0.0
+            },
+            "expected": [
+              1000.0,
+              0.0,
+              0.0,
+              1254000000.0,
+              0.0
+            ],
+            "actual": [
+              1000.0,
+              0.0,
+              0.0,
+              1254000000.0,
+              0.0
+            ]
+          },
+          {
+            "case": "coulomb-stop",
+            "threads": 4,
+            "status": "PASS",
+            "checks": {
+              "known_stage2": 0.0,
+              "source_oracle": 0.0,
+              "effective_increment": 0.0,
+              "final_projection": 0.0,
+              "dt_error": 0.0
+            },
+            "expected": [
+              1000.0,
+              0.0,
+              0.0,
+              1254000000.0,
+              0.0
+            ],
+            "actual": [
+              1000.0,
+              0.0,
+              0.0,
+              1254000000.0,
+              0.0
+            ]
+          },
+          {
+            "case": "lava-coupled",
+            "threads": 1,
+            "status": "PASS",
+            "checks": {
+              "known_stage2": 0.0,
+              "source_oracle": 5.6084778137137706e-11,
+              "effective_increment": 0.0,
+              "final_projection": 0.0,
+              "dt_error": 0.0
+            },
+            "expected": [
+              1000.0,
+              1986.2933667369434,
+              993.1466833684717,
+              3761997816.0047793,
+              0.0
+            ],
+            "actual": [
+              1000.0,
+              1986.2933666255426,
+              993.1466833127713,
+              3761997816.0047793,
+              0.0
+            ]
+          },
+          {
+            "case": "lava-coupled",
+            "threads": 4,
+            "status": "PASS",
+            "checks": {
+              "known_stage2": 0.0,
+              "source_oracle": 5.6084778137137706e-11,
+              "effective_increment": 0.0,
+              "final_projection": 0.0,
+              "dt_error": 0.0
+            },
+            "expected": [
+              1000.0,
+              1986.2933667369434,
+              993.1466833684717,
+              3761997816.0047793,
+              0.0
+            ],
+            "actual": [
+              1000.0,
+              1986.2933666255426,
+              993.1466833127713,
+              3761997816.0047793,
+              0.0
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "rheology": {
+    "strict": {
+      "acceptance": "PASS",
+      "total": 255,
+      "passed": 255,
+      "failed": 0,
+      "tolerances": {
+        "values": 2e-10,
+        "derivatives": 3e-05,
+        "stage_residual": "production 1e-5 + 1e-5*initial residual",
+        "quadratic_stage_relative": 1e-05
+      }
+    },
+    "optimized": {
+      "acceptance": "PASS",
+      "total": 255,
+      "passed": 255,
+      "failed": 0,
+      "tolerances": {
+        "values": 2e-10,
+        "derivatives": 3e-05,
+        "stage_residual": "production 1e-5 + 1e-5*initial residual",
+        "quadratic_stage_relative": 1e-05
+      }
+    }
+  },
+  "source_mass": {
+    "status": "PASS",
+    "profile": "optimized",
+    "threads": 1,
+    "cases": [
+      {
+        "case": "bottom_intervals",
+        "worst_relative_error": 9.08e-13,
+        "tolerance": 1e-09
+      },
+      {
+        "case": "bottom_window",
+        "worst_relative_error": 8.58e-13,
+        "tolerance": 1e-09
+      },
+      {
+        "case": "fissure_map_coordinates",
+        "worst_relative_error": 1.3e-11,
+        "tolerance": 1e-09
+      },
+      {
+        "case": "fissures",
+        "worst_relative_error": 1.02e-12,
+        "tolerance": 1e-09
+      },
+      {
+        "case": "lateral_boundary_east",
+        "worst_relative_error": 1.51e-11,
+        "tolerance": 1e-09
+      },
+      {
+        "case": "lateral_boundary_hot_volume_fraction",
+        "worst_relative_error": 3.01e-13,
+        "tolerance": 1e-09
+      },
+      {
+        "case": "lateral_boundary_north",
+        "worst_relative_error": 1.51e-11,
+        "tolerance": 1e-09
+      },
+      {
+        "case": "lateral_boundary_south",
+        "worst_relative_error": 1.51e-11,
+        "tolerance": 1e-09
+      },
+      {
+        "case": "lateral_boundary_west",
+        "worst_relative_error": 1.51e-11,
+        "tolerance": 1e-09
+      },
+      {
+        "case": "lateral_window",
+        "worst_relative_error": 2.76e-13,
+        "tolerance": 1e-09
+      }
+    ],
+    "log": "build-local/d17-registry/source-mass-optimized-t1.log"
+  },
+  "static": {
+    "manifest_ids_match": true,
+    "dependency_graph_acyclic": true,
+    "module_count": 46,
+    "shell_syntax": "PASS",
+    "whitespace": "PASS",
+    "distribution_hashes_match": true,
+    "operational_inputs_unchanged": true,
+    "new_fortran_lines_within_132_columns": true,
+    "no_objects_or_modules_in_src_or_repo_root": true
+  },
+  "log_hashes": {
+    "build-local/d17-registry/source-mass-optimized-t1.log": "125822c3a54e99ee8c267cef6ee4aea4b3996aba8953c586ec0b94dc70b4e2fc",
+    "build-local/d17-registry/inputs-optimized.log": "ab3ac36baeadc3311c3511f7f0cba964290ea5bf8103705a50ea1b922d441011",
+    "build-local/d17-registry/rheology.log": "998730842ea54a2558a061680339a18186f21f37288c14d17206a45a26414b0a",
+    "build-local/d17-registry/build-strict-debug.log": "73a7d23322e3c7eae1dfa0ffa6c22ae19d43caf5635a6a9f4582942399414937",
+    "build-local/d17-registry/autoreconf.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build-local/d17-registry/distdir.log": "a4b7e1439321f41bae91b98bf1829efc3fbd9130c2ee12fc3d255c3ee808224e",
+    "build-local/d17-registry/inputs-strict-debug.log": "ab3ac36baeadc3311c3511f7f0cba964290ea5bf8103705a50ea1b922d441011",
+    "build-local/d17-registry/stages-strict-debug.log": "cf0a47d14b9cd5851db7b1084b2fd43bd6d78c4384bea0f5da2e8f83a8942db2",
+    "build-local/d17-registry/stages-optimized.log": "cf0a47d14b9cd5851db7b1084b2fd43bd6d78c4384bea0f5da2e8f83a8942db2",
+    "build-local/d17-registry/build-optimized.log": "e6910668c8c8444a5f716a055a93630a48f89bea94a883e40b27da73081fba94",
+    "build-local/d17-registry/focused.log": "6c0b6f458d5e0c758a16f207b04ffb1ed650565ec11546a3024e810c5a5d8412"
+  },
+  "limits": [
+    "GNU/macOS local validation only; no new ifx/Linux/Docker evidence.",
+    "Registry is initialized and owned but does not yet dispatch numerical work.",
+    "D17-C through F remain open; no full workflow matrix or new CI run claimed."
+  ]
+}
