@@ -110,6 +110,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: pressure_after
 
     COMPLEX(wp) :: diffusion_coefficient, inhibition
+    COMPLEX(wp) :: complex_solid_fractions(n_solid)
     REAL(wp) :: decay_rate, decay_exponent
     LOGICAL :: active
     REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
@@ -136,10 +137,10 @@ CONTAINS
        CALL fatal_error('Nonpositive temperature in pore-pressure diffusion integrator')
     END IF
 
+    complex_solid_fractions = CMPLX(solid_fractions, 0.0_wp, wp)
     CALL eval_pore_pressure_diffusion_factors(                               &
          CMPLX(flow_depth, 0.0_wp, wp), CMPLX(temperature, 0.0_wp, wp),      &
-         CMPLX(solid_fractions, 0.0_wp, wp), diffusion_coefficient,          &
-         inhibition, active)
+         complex_solid_fractions, diffusion_coefficient, inhibition, active)
     IF (.NOT. active) RETURN
 
     decay_rate = REAL((pi_g / 2.0_wp)**2 * diffusion_coefficient * inhibition,&
