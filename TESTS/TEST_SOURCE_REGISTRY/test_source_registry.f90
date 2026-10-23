@@ -12,8 +12,8 @@ PROGRAM test_source_registry
   TYPE(source_group_type), ALLOCATABLE :: groups(:),steps(:),badgroups(:),badsteps(:),snapshot(:)
   TYPE(source_solver_type), ALLOCATABLE :: solves(:),badsolves(:)
   TYPE(source_term_type) :: term
-  INTEGER, ALLOCATABLE :: terms(:),family(:),expected(:),expected_targets(:)
-  INTEGER :: a,b,c,bits,mode,g,t,k,j,position,checks,methods(3),original(3),pore,nphysical,negative
+  INTEGER, ALLOCATABLE :: terms(:),family(:),bundle(:),expected(:),expected_targets(:)
+  INTEGER :: a,b,c,bits,mode,g,t,k,j,position,checks,methods(3),original(3),pore,nphysical,negative,model_id
   LOGICAL :: enabled(3),mask(7)
   CHARACTER(LEN=256) :: error
   checks=0; negative=0
@@ -168,22 +168,40 @@ PROGRAM test_source_registry
   CALL trial%initialize(7,7,badgroups,steps,badsolves,error)
   CALL require(INDEX(error,'complete law bundle')>0,'partial analytic velocity bundle rejected')
   negative=negative+1
-  ! Every family is catalogued; lahar's two drag IDs must stay in one batch.
-  DO k=0,12
-    family=rheology_source_terms(k)
-    IF (k==7 .OR. k==8 .OR. k==0) THEN
-      CALL require(SIZE(family)==0,'removed/disabled rheology has no scheduled family')
-    ELSE
-      CALL require(SIZE(family)>0,'supported family present')
-    END IF
+  ! Model membership and atomic batches are derived from the catalog.
+  DO k=1,SOURCE_TERM_COUNT
+    term=source_term_descriptor(k)
+    IF (term%model_id==0) CYCLE
+    model_id=term%model_id
+    family=rheology_source_terms(model_id)
+    CALL require(SIZE(family)>0,'catalogued rheology family present')
+    DO j=1,SIZE(family)
+      term=source_term_descriptor(family(j))
+      CALL require(term%model_id==model_id, &
+           'rheology lookup returns only its registered family')
+    END DO
   END DO
-  terms=rheology_source_terms(4)
-  terms=PACK(terms,terms/=SOURCE_TERM_RHEOLOGY_LAHAR_TURBULENT_DRAG)
-  enabled=[.TRUE.,.FALSE.,.FALSE.];pore=0
-  original=[3,1,2];methods=[IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_NEWTON]
+  DO k=1,SOURCE_TERM_COUNT
+    term=source_term_descriptor(k)
+    IF (term%bundle_id==0) CYCLE
+    bundle=source_bundle_terms(term%bundle_id)
+    CALL require(SIZE(bundle)>=2,'catalogued atomic batch has multiple terms')
+    IF (k/=bundle(1)) CYCLE
+    enabled=[.TRUE.,.FALSE.,.FALSE.]; original=[1,1,1]; methods=IM_GROUP_METHOD_NEWTON; pore=0
+    DO j=1,SIZE(bundle)
+      term=source_term_descriptor(bundle(j))
+      IF (term%target>0) enabled(term%target)=.TRUE.
+    END DO
+    IF (enabled(3)) pore=7
+    CALL make_partition()
+    terms=bundle(:SIZE(bundle)-1)
+    CALL trial%initialize_legacy(partition,original,methods,pore,terms,error)
+    CALL require(INDEX(error,'batch')>0,'incomplete catalogued batch rejected')
+    negative=negative+1
+  END DO
+  enabled=[.TRUE.,.FALSE.,.FALSE.]; pore=0
+  original=[3,1,2]; methods=[IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_NEWTON]
   CALL make_partition()
-  CALL trial%initialize_legacy(partition,original,methods,pore,terms,error)
-  CALL require(INDEX(error,'batch')>0,'partial lahar summed kernel rejected');negative=negative+1
   terms=[SOURCE_TERM_THERMAL_RADIATIVE_COOLING,SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
   CALL trial%initialize_legacy(partition,original,methods,pore,terms,error)
   CALL require(INDEX(error,'enabled legacy target')>0,'active source cannot disappear on an inactive target')

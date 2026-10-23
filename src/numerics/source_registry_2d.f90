@@ -239,7 +239,7 @@ CONTAINS
     TYPE(source_group_type) :: group
     TYPE(source_solver_type) :: solver
     TYPE(source_term_type) :: term
-    INTEGER, ALLOCATABLE :: solve_ids(:),collected(:),expected(:),terms(:)
+    INTEGER, ALLOCATABLE :: solve_ids(:),collected(:),expected(:),terms(:),bundle_terms(:)
     LOGICAL :: seen(SOURCE_TERM_COUNT)
     INTEGER :: i,j,k,id,si,nstage,family,mass_group,term_group(SOURCE_TERM_COUNT)
     LOGICAL, ALLOCATABLE :: used_solver(:),equation_seen(:)
@@ -380,10 +380,14 @@ CONTAINS
     error='D17: orphan solver descriptor'
     IF (.NOT.ALL(used_solver)) RETURN
     error='D17: coupled evaluation batch split or incomplete'
-    IF (.NOT.same_batch([SOURCE_TERM_RHEOLOGY_LAHAR_VISCOUS, &
-         SOURCE_TERM_RHEOLOGY_LAHAR_TURBULENT_DRAG],term_group)) RETURN
-    IF (.NOT.same_batch([SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
-         SOURCE_TERM_THERMAL_CONVECTIVE_COOLING],term_group)) RETURN
+    DO id=1,SOURCE_TERM_COUNT
+      term=source_term_descriptor(id)
+      IF (term%bundle_id==0) CYCLE
+      bundle_terms=source_bundle_terms(term%bundle_id)
+      IF (SIZE(bundle_terms)<2) RETURN
+      IF (id/=bundle_terms(1)) CYCLE
+      IF (.NOT.same_batch(bundle_terms,term_group)) RETURN
+    END DO
     error=''
   END SUBROUTINE validate_registry
 

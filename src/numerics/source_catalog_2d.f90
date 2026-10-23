@@ -18,6 +18,7 @@ MODULE source_catalog_2d
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: source_term_type, source_term_descriptor, rheology_source_terms
+  PUBLIC :: source_bundle_terms
   PUBLIC :: SOURCE_TERM_COUNT, SOURCE_PHYSICAL_TERM_COUNT
   !> method explicit.
   INTEGER, PARAMETER, PUBLIC :: SOURCE_METHOD_EXPLICIT = 1
@@ -143,6 +144,8 @@ MODULE source_catalog_2d
   INTEGER, PARAMETER :: SOURCE_TERM_COUNT = 34
   !> Physical terms eligible for scheduling (subject to capability/batch checks).
   INTEGER, PARAMETER :: SOURCE_PHYSICAL_TERM_COUNT = 30
+  INTEGER, PARAMETER :: SOURCE_BUNDLE_LAHAR_DRAG = 1
+  INTEGER, PARAMETER :: SOURCE_BUNDLE_THERMAL_COOLING = 2
 
   !> \brief Value descriptor of one physical or dependent source contribution.
   TYPE :: source_term_type
@@ -155,7 +158,152 @@ MODULE source_catalog_2d
     LOGICAL :: real_rate = .FALSE. !< Existing real rate evaluation.
     LOGICAL :: complex_rate = .FALSE. !< Existing complex rate evaluation.
     LOGICAL :: schedulable = .FALSE. !< False for dependent equation assembly.
+    INTEGER :: bundle_id = 0 !< Nonzero for terms that must share one evaluation group.
   END TYPE source_term_type
+
+  !> Single registration point for term capabilities and rheology membership.
+  TYPE(source_term_type), PARAMETER :: SOURCE_CATALOG(SOURCE_TERM_COUNT) = [ &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB, &
+            name='SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB', role=SOURCE_ROLE_SEMI_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_voellmy, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_VOELLMY_TURBULENT_DRAG, &
+            name='SOURCE_TERM_RHEOLOGY_VOELLMY_TURBULENT_DRAG', role=SOURCE_ROLE_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_voellmy, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_PLASTIC_YIELD, &
+            name='SOURCE_TERM_RHEOLOGY_PLASTIC_YIELD', role=SOURCE_ROLE_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_plastic, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS, &
+            name='SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS', role=SOURCE_ROLE_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_lava, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_LAVA_YIELD, &
+            name='SOURCE_TERM_RHEOLOGY_LAVA_YIELD', role=SOURCE_ROLE_SEMI_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_lava, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_LAHAR_VISCOUS, &
+            name='SOURCE_TERM_RHEOLOGY_LAHAR_VISCOUS', role=SOURCE_ROLE_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_lahar, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
+            bundle_id=SOURCE_BUNDLE_LAHAR_DRAG), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_LAHAR_TURBULENT_DRAG, &
+            name='SOURCE_TERM_RHEOLOGY_LAHAR_TURBULENT_DRAG', role=SOURCE_ROLE_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_lahar, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
+            bundle_id=SOURCE_BUNDLE_LAHAR_DRAG), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_LAHAR_YIELD, &
+            name='SOURCE_TERM_RHEOLOGY_LAHAR_YIELD', role=SOURCE_ROLE_SEMI_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_lahar, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_EMPIRICAL_DRAG, &
+            name='SOURCE_TERM_RHEOLOGY_EMPIRICAL_DRAG', role=SOURCE_ROLE_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_empirical, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_QUADRATIC_DRAG, &
+            name='SOURCE_TERM_RHEOLOGY_QUADRATIC_DRAG', role=SOURCE_ROLE_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_quadratic, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_FROUDE_FRICTION, &
+            name='SOURCE_TERM_RHEOLOGY_FROUDE_FRICTION', role=SOURCE_ROLE_SEMI_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_froude, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_LUCAS_FRICTION, &
+            name='SOURCE_TERM_RHEOLOGY_LUCAS_FRICTION', role=SOURCE_ROLE_SEMI_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_lucas, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_MUI_FRICTION, &
+            name='SOURCE_TERM_RHEOLOGY_MUI_FRICTION', role=SOURCE_ROLE_SEMI_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_mui, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_FRICTION, &
+            name='SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_FRICTION', role=SOURCE_ROLE_SEMI_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_mui_voellmy, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_TURBULENT_DRAG, &
+            name='SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_TURBULENT_DRAG', role=SOURCE_ROLE_IMPLICIT, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
+            model_id=rheology_id_mui_voellmy, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
+            name='SOURCE_TERM_THERMAL_RADIATIVE_COOLING', role=SOURCE_ROLE_THERMAL, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_TEMPERATURE, &
+            real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
+            bundle_id=SOURCE_BUNDLE_THERMAL_COOLING), &
+       source_term_type(id=SOURCE_TERM_THERMAL_CONVECTIVE_COOLING, &
+            name='SOURCE_TERM_THERMAL_CONVECTIVE_COOLING', role=SOURCE_ROLE_THERMAL, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_TEMPERATURE, &
+            real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
+            bundle_id=SOURCE_BUNDLE_THERMAL_COOLING), &
+       source_term_type(id=SOURCE_TERM_PORE_PRESSURE_DISSIPATION, &
+            name='SOURCE_TERM_PORE_PRESSURE_DISSIPATION', role=SOURCE_ROLE_PORE, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_PORE_PRESSURE, &
+            real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, &
+            name='SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION', role=SOURCE_ROLE_CELL, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_BOTTOM_FISSURAL_INJECTION, &
+            name='SOURCE_TERM_BOTTOM_FISSURAL_INJECTION', role=SOURCE_ROLE_CELL, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_RADIAL_INJECTION, &
+            name='SOURCE_TERM_RADIAL_INJECTION', role=SOURCE_ROLE_CELL, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_GEOMETRY_CURVATURE, &
+            name='SOURCE_TERM_GEOMETRY_CURVATURE', role=SOURCE_ROLE_CELL, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_BOUNDARY_INJECTION, &
+            name='SOURCE_TERM_BOUNDARY_INJECTION', role=SOURCE_ROLE_BOUNDARY, &
+            representation=SOURCE_REPRESENTATION_BOUNDARY_STATE, real_rate=.FALSE., &
+            complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_EROSION, &
+            name='SOURCE_TERM_MASS_EXCHANGE_EROSION', role=SOURCE_ROLE_MASS, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_DEPOSITION, &
+            name='SOURCE_TERM_MASS_EXCHANGE_DEPOSITION', role=SOURCE_ROLE_MASS, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS, &
+            name='SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS', role=SOURCE_ROLE_MASS, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS, &
+            name='SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS', role=SOURCE_ROLE_MASS, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS, &
+            name='SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS', role=SOURCE_ROLE_MASS, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT, &
+            name='SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT', role=SOURCE_ROLE_MASS, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION, &
+            name='SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION', role=SOURCE_ROLE_MASS, &
+            representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.TRUE.), &
+       source_term_type(id=SOURCE_TERM_INLET_THERMAL_COUPLING, &
+            name='SOURCE_TERM_INLET_THERMAL_COUPLING', role=SOURCE_ROLE_DERIVED, &
+            representation=SOURCE_REPRESENTATION_DEPENDENT, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.FALSE.), &
+       source_term_type(id=SOURCE_TERM_INLET_PORE_COUPLING, &
+            name='SOURCE_TERM_INLET_PORE_COUPLING', role=SOURCE_ROLE_DERIVED, &
+            representation=SOURCE_REPRESENTATION_DEPENDENT, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.FALSE.), &
+       source_term_type(id=SOURCE_TERM_MASS_PORE_COUPLING, &
+            name='SOURCE_TERM_MASS_PORE_COUPLING', role=SOURCE_ROLE_DERIVED, &
+            representation=SOURCE_REPRESENTATION_DEPENDENT, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.FALSE.), &
+       source_term_type(id=SOURCE_TERM_MASS_STOCHASTIC_COUPLING, &
+            name='SOURCE_TERM_MASS_STOCHASTIC_COUPLING', role=SOURCE_ROLE_DERIVED, &
+            representation=SOURCE_REPRESENTATION_DEPENDENT, real_rate=.TRUE., &
+            complex_rate=.FALSE., schedulable=.FALSE.) &
+       ]
 
 CONTAINS
 
@@ -165,283 +313,23 @@ CONTAINS
   PURE FUNCTION source_term_descriptor(term_id) RESULT(term)
     INTEGER, INTENT(IN) :: term_id
     TYPE(source_term_type) :: term
-    SELECT CASE(term_id)
-    CASE(SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB)
-      term%name = 'SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB'
-      term%role = SOURCE_ROLE_SEMI_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_voellmy
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_VOELLMY_TURBULENT_DRAG)
-      term%name = 'SOURCE_TERM_RHEOLOGY_VOELLMY_TURBULENT_DRAG'
-      term%role = SOURCE_ROLE_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_voellmy
-      term%real_rate = .TRUE.
-      term%complex_rate = .TRUE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_PLASTIC_YIELD)
-      term%name = 'SOURCE_TERM_RHEOLOGY_PLASTIC_YIELD'
-      term%role = SOURCE_ROLE_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_plastic
-      term%real_rate = .TRUE.
-      term%complex_rate = .TRUE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS)
-      term%name = 'SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS'
-      term%role = SOURCE_ROLE_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_lava
-      term%real_rate = .TRUE.
-      term%complex_rate = .TRUE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_LAVA_YIELD)
-      term%name = 'SOURCE_TERM_RHEOLOGY_LAVA_YIELD'
-      term%role = SOURCE_ROLE_SEMI_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_lava
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_LAHAR_VISCOUS)
-      term%name = 'SOURCE_TERM_RHEOLOGY_LAHAR_VISCOUS'
-      term%role = SOURCE_ROLE_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_lahar
-      term%real_rate = .TRUE.
-      term%complex_rate = .TRUE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_LAHAR_TURBULENT_DRAG)
-      term%name = 'SOURCE_TERM_RHEOLOGY_LAHAR_TURBULENT_DRAG'
-      term%role = SOURCE_ROLE_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_lahar
-      term%real_rate = .TRUE.
-      term%complex_rate = .TRUE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_LAHAR_YIELD)
-      term%name = 'SOURCE_TERM_RHEOLOGY_LAHAR_YIELD'
-      term%role = SOURCE_ROLE_SEMI_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_lahar
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_EMPIRICAL_DRAG)
-      term%name = 'SOURCE_TERM_RHEOLOGY_EMPIRICAL_DRAG'
-      term%role = SOURCE_ROLE_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_empirical
-      term%real_rate = .TRUE.
-      term%complex_rate = .TRUE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_QUADRATIC_DRAG)
-      term%name = 'SOURCE_TERM_RHEOLOGY_QUADRATIC_DRAG'
-      term%role = SOURCE_ROLE_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_quadratic
-      term%real_rate = .TRUE.
-      term%complex_rate = .TRUE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_FROUDE_FRICTION)
-      term%name = 'SOURCE_TERM_RHEOLOGY_FROUDE_FRICTION'
-      term%role = SOURCE_ROLE_SEMI_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_froude
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_LUCAS_FRICTION)
-      term%name = 'SOURCE_TERM_RHEOLOGY_LUCAS_FRICTION'
-      term%role = SOURCE_ROLE_SEMI_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_lucas
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_MUI_FRICTION)
-      term%name = 'SOURCE_TERM_RHEOLOGY_MUI_FRICTION'
-      term%role = SOURCE_ROLE_SEMI_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_mui
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_FRICTION)
-      term%name = 'SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_FRICTION'
-      term%role = SOURCE_ROLE_SEMI_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_mui_voellmy
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_TURBULENT_DRAG)
-      term%name = 'SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_TURBULENT_DRAG'
-      term%role = SOURCE_ROLE_IMPLICIT
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_VELOCITY
-      term%model_id = rheology_id_mui_voellmy
-      term%real_rate = .TRUE.
-      term%complex_rate = .TRUE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_THERMAL_RADIATIVE_COOLING)
-      term%name = 'SOURCE_TERM_THERMAL_RADIATIVE_COOLING'
-      term%role = SOURCE_ROLE_THERMAL
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_TEMPERATURE
-      term%real_rate = .TRUE.
-      term%complex_rate = .TRUE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_THERMAL_CONVECTIVE_COOLING)
-      term%name = 'SOURCE_TERM_THERMAL_CONVECTIVE_COOLING'
-      term%role = SOURCE_ROLE_THERMAL
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_TEMPERATURE
-      term%real_rate = .TRUE.
-      term%complex_rate = .TRUE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_PORE_PRESSURE_DISSIPATION)
-      term%name = 'SOURCE_TERM_PORE_PRESSURE_DISSIPATION'
-      term%role = SOURCE_ROLE_PORE
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%target = SOURCE_TARGET_PORE_PRESSURE
-      term%real_rate = .TRUE.
-      term%complex_rate = .TRUE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION)
-      term%name = 'SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION'
-      term%role = SOURCE_ROLE_CELL
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_BOTTOM_FISSURAL_INJECTION)
-      term%name = 'SOURCE_TERM_BOTTOM_FISSURAL_INJECTION'
-      term%role = SOURCE_ROLE_CELL
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_RADIAL_INJECTION)
-      term%name = 'SOURCE_TERM_RADIAL_INJECTION'
-      term%role = SOURCE_ROLE_CELL
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_GEOMETRY_CURVATURE)
-      term%name = 'SOURCE_TERM_GEOMETRY_CURVATURE'
-      term%role = SOURCE_ROLE_CELL
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_BOUNDARY_INJECTION)
-      term%name = 'SOURCE_TERM_BOUNDARY_INJECTION'
-      term%role = SOURCE_ROLE_BOUNDARY
-      term%representation = SOURCE_REPRESENTATION_BOUNDARY_STATE
-      term%real_rate = .FALSE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_MASS_EXCHANGE_EROSION)
-      term%name = 'SOURCE_TERM_MASS_EXCHANGE_EROSION'
-      term%role = SOURCE_ROLE_MASS
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_MASS_EXCHANGE_DEPOSITION)
-      term%name = 'SOURCE_TERM_MASS_EXCHANGE_DEPOSITION'
-      term%role = SOURCE_ROLE_MASS
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS)
-      term%name = 'SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS'
-      term%role = SOURCE_ROLE_MASS
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS)
-      term%name = 'SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS'
-      term%role = SOURCE_ROLE_MASS
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS)
-      term%name = 'SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS'
-      term%role = SOURCE_ROLE_MASS
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT)
-      term%name = 'SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT'
-      term%role = SOURCE_ROLE_MASS
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION)
-      term%name = 'SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION'
-      term%role = SOURCE_ROLE_MASS
-      term%representation = SOURCE_REPRESENTATION_CELL_RATE
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .TRUE.
-    CASE(SOURCE_TERM_INLET_THERMAL_COUPLING)
-      term%name = 'SOURCE_TERM_INLET_THERMAL_COUPLING'
-      term%role = SOURCE_ROLE_DERIVED
-      term%representation = SOURCE_REPRESENTATION_DEPENDENT
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .FALSE.
-    CASE(SOURCE_TERM_INLET_PORE_COUPLING)
-      term%name = 'SOURCE_TERM_INLET_PORE_COUPLING'
-      term%role = SOURCE_ROLE_DERIVED
-      term%representation = SOURCE_REPRESENTATION_DEPENDENT
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .FALSE.
-    CASE(SOURCE_TERM_MASS_PORE_COUPLING)
-      term%name = 'SOURCE_TERM_MASS_PORE_COUPLING'
-      term%role = SOURCE_ROLE_DERIVED
-      term%representation = SOURCE_REPRESENTATION_DEPENDENT
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .FALSE.
-    CASE(SOURCE_TERM_MASS_STOCHASTIC_COUPLING)
-      term%name = 'SOURCE_TERM_MASS_STOCHASTIC_COUPLING'
-      term%role = SOURCE_ROLE_DERIVED
-      term%representation = SOURCE_REPRESENTATION_DEPENDENT
-      term%real_rate = .TRUE.
-      term%complex_rate = .FALSE.
-      term%schedulable = .FALSE.
-    CASE DEFAULT
-      RETURN
-    END SELECT
-    term%id = term_id
+    IF (term_id<1 .OR. term_id>SOURCE_TERM_COUNT) RETURN
+    term=SOURCE_CATALOG(term_id)
   END FUNCTION source_term_descriptor
+
+  !> \brief Return the registered terms that must share an evaluation group.
+  !> \param[in] bundle_id Catalog batch ID; zero returns an empty list.
+  !> \return Stable term IDs in catalog order.
+  FUNCTION source_bundle_terms(bundle_id) RESULT(ids)
+    INTEGER, INTENT(IN) :: bundle_id
+    INTEGER, ALLOCATABLE :: ids(:)
+    INTEGER :: i
+    ALLOCATE(ids(0))
+    IF (bundle_id<=0) RETURN
+    DO i=1,SOURCE_TERM_COUNT
+      IF (SOURCE_CATALOG(i)%bundle_id==bundle_id) ids=[ids,i]
+    END DO
+  END FUNCTION source_bundle_terms
 
   !> \brief Return all rate IDs belonging to one selected rheology.
   !> \param[in] model_id Resolved rheology family ID.

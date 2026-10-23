@@ -13,10 +13,12 @@ catalog module. This report records the subsequent implementation separately.
 
 ## Implementation and compatibility
 
-- `source_catalog_2d` defines all 34 stable IDs, roles, representations, target
-  blocks and real/complex capabilities. Thirty entries are physical; four
-  dependent assemblies are catalogued but rejected as independent registrations.
-  Rheology family identity refers to the existing resolved model constants.
+- `source_catalog_2d` defines all 34 stable IDs and their roles,
+  representations, target blocks, real/complex capabilities, rheology membership
+  and optional atomic-batch membership in one immutable table. Thirty entries
+  are physical; four dependent assemblies are catalogued but rejected as
+  independent registrations. Rheology family identity refers to the existing
+  resolved model constants.
 - `source_registry_2d` provides group/solver descriptors, separate stage/step
   registries, explicit identity/phase/order, and transactional initialization.
   Private storage is returned only through detached copies. Failure releases
@@ -31,9 +33,10 @@ catalog module. This report records the subsequent implementation separately.
 - Registration checks reject duplicate physical terms across cadences, unknown
   or dependent IDs, invalid methods/cadences/targets, incomplete or orphan solves,
   overlapping solve equations, unsorted/ambiguous execution order, mixed rheology
-  families, partial analytic velocity bundles and split common kernel batches.
-  Lahar viscous/turbulent terms and thermal radiative/convective terms retain
-  their shared batches. Active mass-exchange proposals remain in one step group.
+  families, partial analytic velocity bundles and incomplete/split catalogued
+  atomic batches. The registry validates batch membership generically; it does
+  not enumerate particular rheologies or physics terms. Active mass-exchange
+  proposals remain in one step group.
 - `source_configuration_2d` translates existing activation flags once after
   equation partition initialization. It records potentially active contributions;
   the existing physical kernels still apply wetness, packing, windows, reserve
@@ -56,12 +59,20 @@ GNU Fortran (Homebrew GCC 15.2.0) 15.2.0, macOS ARM64:
 | Check | Evidence |
 |---|---|
 | D17 metadata, strict and optimized | 864 legacy configurations per profile; 14,823 assertions and 27 rejected invalid configurations per profile |
+| Catalog-refactor follow-up, strict and optimized | 864 legacy configurations per profile; 14,857 assertions and 28 rejected invalid configurations per profile; logs in `build-local/d17-registry/refactor` |
 | Standalone rheology suite, strict and optimized | 255/255 cell-local fixtures per profile; model names, source modules, analytic velocity, exact cooling/pressure and grouped DIRK checks pass |
 | Configured full solver builds | optimized and strict-debug pass |
 | Real parser plus short valid simulations | 32/32 checks per build; simulation-owned registry initialization exercised |
 | Actual `n_RK=2` stage integration | 6/6 per build: quadratic, Coulomb stopping and lava, each at 1/4 threads |
 | Source-mass suite | PASS: optimized, one thread; 10 mass-budget cases plus input rejection checks |
 | Distribution/static checks | Source/test inclusion, manifest-ID match, shell syntax, dependencies and whitespace |
+
+The catalog-refactor follow-up reran the focused strict and optimized registry
+suite after replacing the per-ID descriptor switch with the catalog table and
+making atomic-batch validation and test generation data-driven. The full-solver,
+parser and integration results above are the original phase-B evidence; they
+were not rerun for this metadata-only follow-up. The machine-readable JSON
+retains the original phase-B run and its source hashes.
 
 The strict standalone D17 profile uses `-O0 -g -Wall -Wextra -fcheck=all
 -finit-real=snan`; optimized uses `-Ofast -funroll-all-loops`. Both enable
