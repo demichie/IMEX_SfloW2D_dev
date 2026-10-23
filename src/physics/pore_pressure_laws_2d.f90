@@ -180,134 +180,6 @@ CONTAINS
   END SUBROUTINE advance_pore_pressure_diffusion
 
   !******************************************************************************
-  !> \brief Compute pressure-diffusion and inhibition factors for a local mixture.
-  !> \details Computes gas compressibility and density from the ideal-gas
-  !>          closure, pore volume from phi=1-sum(alpha_i), and the diffusion
-  !>          coefficient
-  !>          \f$D=k/(\phi\nu_g\rho_gC_g)\f$. Permeability may be fixed
-  !>          or evaluated from the Kozeny-Carman mixture closure; the Sutherland
-  !>          viscosity law is used when configured. The inhibition output
-  !>          implements the selected OFF, STEP, STATIC or DYNAMIC closure.
-  !> \param[in] flow_depth Complex-valued flow depth h [m].
-  !> \param[in] temperature Complex-valued gas/mixture temperature T [K].
-  !> \param[in] solid_fractions Complex-valued per-class solid volume fractions.
-  !> \param[out] diffusion_coefficient Pressure-diffusion coefficient D [m^2 s^-1].
-  !> \param[out] inhibition Dimensionless solid-fraction inhibition factor I.
-  !> \param[out] active True when the state has carrier/pore volume for diffusion;
-  !>                    otherwise both returned factors are their neutral defaults.
-  !> \note Real parts select piecewise branches while smooth closure algebra retains
-  !>       complex perturbations for complex-step differentiation.
-  !******************************************************************************
-  SUBROUTINE eval_pore_pressure_diffusion_factors(flow_depth, temperature,    &
-       solid_fractions, diffusion_coefficient, inhibition, active)
-
-    COMPLEX(wp), INTENT(IN) :: flow_depth, temperature
-    COMPLEX(wp), INTENT(IN) :: solid_fractions(n_solid)
-    COMPLEX(wp), INTENT(OUT) :: diffusion_coefficient, inhibition
-    LOGICAL, INTENT(OUT) :: active
-
-    COMPLEX(wp) :: gas_compressibility, gas_density, porosity
-    COMPLEX(wp) :: dynamic_viscosity, local_permeability
-    COMPLEX(wp) :: local_kinematic_viscosity, sauter_diam
-    COMPLEX(wp) :: mean_sphericity, x, smoothstep
-    COMPLEX(wp) :: normalized_fraction, term, width, dynamic_transition
-    REAL(wp) :: gamma_gas
-    INTEGER :: n
-
-    diffusion_coefficient = CMPLX(0.0_wp, 0.0_wp, wp)
-    inhibition = CMPLX(1.0_wp, 0.0_wp, wp)
-    active = .FALSE.
-
-    IF (REAL(1.0_wp-SUM(solid_fractions),wp) .LE. EPSILON(1.0_wp)) RETURN
-    IF (dynamic_permeability_flag) THEN
-       IF (REAL(SUM(solid_fractions),wp) .LE. EPSILON(1.0_wp)) RETURN
-    END IF
-    active = .TRUE.
-
-    local_permeability = CMPLX(hydraulic_permeability, 0.0_wp, wp)
-    local_kinematic_viscosity = CMPLX(kin_visc_c, 0.0_wp, wp)
-    gamma_gas = sp_heat_a / (sp_heat_a - sp_gas_const_a)
-    gas_compressibility = 1.0_wp / (gamma_gas * pres)
-    gas_density = pres / (sp_gas_const_a * temperature)
-    porosity = 1.0_wp - SUM(solid_fractions)
-
-    IF (dynamic_permeability_flag) THEN
-       IF (n_solid .GT. 1) THEN
-          sauter_diam = SUM(solid_fractions) / SUM(solid_fractions / diam_s)
-          mean_sphericity = SUM(solid_fractions * diam_s**2 * sphericity_s) / &
-               SUM(solid_fractions * diam_s**2)
-       ELSE
-          sauter_diam = diam_s(1)
-          mean_sphericity = sphericity_s(1)
-       END IF
-       local_permeability = (porosity**3.0_wp *                             &
-            (sauter_diam * mean_sphericity)**2.0_wp) /                      &
-            (150.0_wp * (1.0_wp - porosity)**2.0_wp)
-    END IF
-
-    IF (gas_flag .AND. sutherland_flag) THEN
-       dynamic_viscosity = muRef_Suth * (temperature / Tref_Suth)**1.5_wp *  &
-            (Tref_Suth + S_mu) / (temperature + S_mu)
-       local_kinematic_viscosity = dynamic_viscosity / gas_density
-    END IF
-
-    diffusion_coefficient = local_permeability /                            &
-         (porosity * local_kinematic_viscosity * gas_density *               &
-         gas_compressibility)
-
-    SELECT CASE (TRIM(ADJUSTL(f_inhibit_mode)))
-    CASE ('OFF')
-       inhibition = 1.0_wp
-
-    CASE ('STEP')
-       IF (SUM(solid_fractions) .LT. maximum_solid_packing) THEN
-          inhibition = 1.0_wp
-       ELSE
-          inhibition = 0.0_wp
-       END IF
-
-    CASE ('STATIC')
-       IF (N_inh .LT. 0) THEN
-          WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', N_inh
-          STOP
-       END IF
-       x = SUM(solid_fractions)
-       width = maximum_solid_packing - alpha_trans
-       normalized_fraction = (x - alpha_trans) / width
-       IF (REAL(normalized_fraction,wp) .LT. 0.0_wp) normalized_fraction = 0.0_wp
-       IF (REAL(normalized_fraction,wp) .GT. 1.0_wp) normalized_fraction = 1.0_wp
-       smoothstep = CMPLX(0.0_wp, 0.0_wp, wp)
-       DO n = 0, N_inh
-          term = pascal_coeff(n) * normalized_fraction**(N_inh + n + 1)
-          smoothstep = smoothstep + term
-       END DO
-       inhibition = 1.0_wp - smoothstep
-
-    CASE ('DYNAMIC')
-       dynamic_transition = 10.0_wp**(-0.28_wp) * flow_depth**0.12_wp
-       IF (REAL(dynamic_transition,wp) .GE. maximum_solid_packing) THEN
-          dynamic_transition = 0.99_wp * maximum_solid_packing
-       END IF
-       IF (N_inh .LT. 0) THEN
-          WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', N_inh
-          STOP
-       END IF
-       x = SUM(solid_fractions)
-       width = maximum_solid_packing - dynamic_transition
-       normalized_fraction = (x - dynamic_transition) / width
-       IF (REAL(normalized_fraction,wp) .LT. 0.0_wp) normalized_fraction = 0.0_wp
-       IF (REAL(normalized_fraction,wp) .GT. 1.0_wp) normalized_fraction = 1.0_wp
-       smoothstep = CMPLX(0.0_wp, 0.0_wp, wp)
-       DO n = 0, N_inh
-          term = pascal_coeff(n) * normalized_fraction**(N_inh + n + 1)
-          smoothstep = smoothstep + term
-       END DO
-       inhibition = 1.0_wp - smoothstep
-    END SELECT
-
-  END SUBROUTINE eval_pore_pressure_diffusion_factors
-
-  !******************************************************************************
   !> \brief Evaluate the pore-gas loss rate from Darcy outflow.
   !> \details Computes an upward pore-gas velocity from local permeability,
   !>          kinematic viscosity, carrier density, flow depth and excess
@@ -489,5 +361,133 @@ CONTAINS
     source = mass_source * excess_pressure
 
   END FUNCTION eval_pore_pressure_mass_exchange_source
+
+  !******************************************************************************
+  !> \brief Compute pressure-diffusion and inhibition factors for a local mixture.
+  !> \details Computes gas compressibility and density from the ideal-gas
+  !>          closure, pore volume from phi=1-sum(alpha_i), and the diffusion
+  !>          coefficient
+  !>          \f$D=k/(\phi\nu_g\rho_gC_g)\f$. Permeability may be fixed
+  !>          or evaluated from the Kozeny-Carman mixture closure; the Sutherland
+  !>          viscosity law is used when configured. The inhibition output
+  !>          implements the selected OFF, STEP, STATIC or DYNAMIC closure.
+  !> \param[in] flow_depth Complex-valued flow depth h [m].
+  !> \param[in] temperature Complex-valued gas/mixture temperature T [K].
+  !> \param[in] solid_fractions Complex-valued per-class solid volume fractions.
+  !> \param[out] diffusion_coefficient Pressure-diffusion coefficient D [m^2 s^-1].
+  !> \param[out] inhibition Dimensionless solid-fraction inhibition factor I.
+  !> \param[out] active True when the state has carrier/pore volume for diffusion;
+  !>                    otherwise both returned factors are their neutral defaults.
+  !> \note Real parts select piecewise branches while smooth closure algebra retains
+  !>       complex perturbations for complex-step differentiation.
+  !******************************************************************************
+  SUBROUTINE eval_pore_pressure_diffusion_factors(flow_depth, temperature,    &
+       solid_fractions, diffusion_coefficient, inhibition, active)
+
+    COMPLEX(wp), INTENT(IN) :: flow_depth, temperature
+    COMPLEX(wp), INTENT(IN) :: solid_fractions(n_solid)
+    COMPLEX(wp), INTENT(OUT) :: diffusion_coefficient, inhibition
+    LOGICAL, INTENT(OUT) :: active
+
+    COMPLEX(wp) :: gas_compressibility, gas_density, porosity
+    COMPLEX(wp) :: dynamic_viscosity, local_permeability
+    COMPLEX(wp) :: local_kinematic_viscosity, sauter_diam
+    COMPLEX(wp) :: mean_sphericity, x, smoothstep
+    COMPLEX(wp) :: normalized_fraction, term, width, dynamic_transition
+    REAL(wp) :: gamma_gas
+    INTEGER :: n
+
+    diffusion_coefficient = CMPLX(0.0_wp, 0.0_wp, wp)
+    inhibition = CMPLX(1.0_wp, 0.0_wp, wp)
+    active = .FALSE.
+
+    IF (REAL(1.0_wp-SUM(solid_fractions),wp) .LE. EPSILON(1.0_wp)) RETURN
+    IF (dynamic_permeability_flag) THEN
+       IF (REAL(SUM(solid_fractions),wp) .LE. EPSILON(1.0_wp)) RETURN
+    END IF
+    active = .TRUE.
+
+    local_permeability = CMPLX(hydraulic_permeability, 0.0_wp, wp)
+    local_kinematic_viscosity = CMPLX(kin_visc_c, 0.0_wp, wp)
+    gamma_gas = sp_heat_a / (sp_heat_a - sp_gas_const_a)
+    gas_compressibility = 1.0_wp / (gamma_gas * pres)
+    gas_density = pres / (sp_gas_const_a * temperature)
+    porosity = 1.0_wp - SUM(solid_fractions)
+
+    IF (dynamic_permeability_flag) THEN
+       IF (n_solid .GT. 1) THEN
+          sauter_diam = SUM(solid_fractions) / SUM(solid_fractions / diam_s)
+          mean_sphericity = SUM(solid_fractions * diam_s**2 * sphericity_s) / &
+               SUM(solid_fractions * diam_s**2)
+       ELSE
+          sauter_diam = diam_s(1)
+          mean_sphericity = sphericity_s(1)
+       END IF
+       local_permeability = (porosity**3.0_wp *                             &
+            (sauter_diam * mean_sphericity)**2.0_wp) /                      &
+            (150.0_wp * (1.0_wp - porosity)**2.0_wp)
+    END IF
+
+    IF (gas_flag .AND. sutherland_flag) THEN
+       dynamic_viscosity = muRef_Suth * (temperature / Tref_Suth)**1.5_wp *  &
+            (Tref_Suth + S_mu) / (temperature + S_mu)
+       local_kinematic_viscosity = dynamic_viscosity / gas_density
+    END IF
+
+    diffusion_coefficient = local_permeability /                            &
+         (porosity * local_kinematic_viscosity * gas_density *               &
+         gas_compressibility)
+
+    SELECT CASE (TRIM(ADJUSTL(f_inhibit_mode)))
+    CASE ('OFF')
+       inhibition = 1.0_wp
+
+    CASE ('STEP')
+       IF (SUM(solid_fractions) .LT. maximum_solid_packing) THEN
+          inhibition = 1.0_wp
+       ELSE
+          inhibition = 0.0_wp
+       END IF
+
+    CASE ('STATIC')
+       IF (N_inh .LT. 0) THEN
+          WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', N_inh
+          STOP
+       END IF
+       x = SUM(solid_fractions)
+       width = maximum_solid_packing - alpha_trans
+       normalized_fraction = (x - alpha_trans) / width
+       IF (REAL(normalized_fraction,wp) .LT. 0.0_wp) normalized_fraction = 0.0_wp
+       IF (REAL(normalized_fraction,wp) .GT. 1.0_wp) normalized_fraction = 1.0_wp
+       smoothstep = CMPLX(0.0_wp, 0.0_wp, wp)
+       DO n = 0, N_inh
+          term = pascal_coeff(n) * normalized_fraction**(N_inh + n + 1)
+          smoothstep = smoothstep + term
+       END DO
+       inhibition = 1.0_wp - smoothstep
+
+    CASE ('DYNAMIC')
+       dynamic_transition = 10.0_wp**(-0.28_wp) * flow_depth**0.12_wp
+       IF (REAL(dynamic_transition,wp) .GE. maximum_solid_packing) THEN
+          dynamic_transition = 0.99_wp * maximum_solid_packing
+       END IF
+       IF (N_inh .LT. 0) THEN
+          WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', N_inh
+          STOP
+       END IF
+       x = SUM(solid_fractions)
+       width = maximum_solid_packing - dynamic_transition
+       normalized_fraction = (x - dynamic_transition) / width
+       IF (REAL(normalized_fraction,wp) .LT. 0.0_wp) normalized_fraction = 0.0_wp
+       IF (REAL(normalized_fraction,wp) .GT. 1.0_wp) normalized_fraction = 1.0_wp
+       smoothstep = CMPLX(0.0_wp, 0.0_wp, wp)
+       DO n = 0, N_inh
+          term = pascal_coeff(n) * normalized_fraction**(N_inh + n + 1)
+          smoothstep = smoothstep + term
+       END DO
+       inhibition = 1.0_wp - smoothstep
+    END SELECT
+
+  END SUBROUTINE eval_pore_pressure_diffusion_factors
 
 END MODULE pore_pressure_laws_2d

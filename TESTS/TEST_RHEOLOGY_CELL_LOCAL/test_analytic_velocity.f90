@@ -117,7 +117,7 @@ PROGRAM test_analytic_velocity
   CALL eval_lava_implicit_momentum_rate(CMPLX(flow_depth,0.0_wp,wp),        &
        CMPLX(temperature,0.0_wp,wp), CMPLX(mixture_density,0.0_wp,wp),       &
        CMPLX(velocity_after(1),0.0_wp,wp), CMPLX(velocity_after(2),0.0_wp,wp), &
-       CMPLX(speed_after,0.0_wp,wp), .TRUE., complex_source_x, complex_source_y)
+       .TRUE., complex_source_x, complex_source_y)
   CALL eval_lava_semi_implicit_momentum_rate(velocity_after(1), velocity_after(2), &
        speed_after, source_x, source_y)
   source = [REAL(complex_source_x,wp)+source_x,                              &
@@ -189,7 +189,7 @@ PROGRAM test_analytic_velocity
   horizontal_speed = SQRT(SUM(velocity_after**2))
   CALL eval_quadratic_implicit_momentum_rate(                               &
        CMPLX(velocity_after(1),0.0_wp,wp), CMPLX(velocity_after(2),0.0_wp,wp), &
-       CMPLX(speed_after,0.0_wp,wp), CMPLX(horizontal_speed,0.0_wp,wp),     &
+       CMPLX(horizontal_speed,0.0_wp,wp),                                   &
        CMPLX(speed_after**2,0.0_wp,wp), CMPLX(mixture_density,0.0_wp,wp),  &
        .TRUE., complex_source_x, complex_source_y)
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &

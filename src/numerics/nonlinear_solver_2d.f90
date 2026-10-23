@@ -41,7 +41,6 @@ CONTAINS
   !> \param[in] equation_partition Implicit equation groups, order and solve methods.
   !> \param[in] q_known Conservative state including known stage contributions.
   !> \param[in] q_old Conservative reference state at the start of the step.
-  !> \param[in] qp_known Physical state reconstructed from q_known.
   !> \param[in] dt_step Stage time increment [s].
   !> \param[in] a_diag Diagonal implicit Runge-Kutta coefficient [dimensionless].
   !> \param[in] known_stage_residual Known stage source rates, excluding the current implicit rate.
@@ -61,7 +60,7 @@ CONTAINS
   !> \param[out] linear_info Linear solver status; zero denotes success.
   !> \param[out] line_search_failed True if a Newton line search could not accept a step.
   !******************************************************************************
-  SUBROUTINE solve_imex_stage(equation_partition, q_known, q_old, qp_known,  &
+  SUBROUTINE solve_imex_stage(equation_partition, q_known, q_old,            &
        dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,            &
        Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij,                &
        zero_x_momentum, zero_y_momentum, q_stage, effective_im_term,          &
@@ -71,7 +70,6 @@ CONTAINS
 
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     REAL(wp), INTENT(IN) :: q_known(n_vars), q_old(n_vars)
-    REAL(wp), INTENT(IN) :: qp_known(n_vars+2)
     REAL(wp), INTENT(IN) :: dt_step, a_diag
     REAL(wp), INTENT(IN) :: known_stage_residual(n_eqns)
     REAL(wp), INTENT(IN) :: Bprimej_x, Bprimej_y
@@ -97,11 +95,10 @@ CONTAINS
   END SUBROUTINE solve_imex_stage
 
   !******************************************************************************
-  !> \brief Backward-compatible name for the local IMEX stage coordinator.
+  !> \brief Legacy name for the local IMEX stage coordinator.
   !> \param[in] equation_partition Implicit equation groups, order and solve methods.
   !> \param[in] q_known Conservative state including known stage contributions.
   !> \param[in] q_old Conservative reference state at the start of the step.
-  !> \param[in] qp_known Physical state reconstructed from q_known.
   !> \param[in] dt_step Stage time increment [s].
   !> \param[in] a_diag Diagonal implicit Runge-Kutta coefficient [dimensionless].
   !> \param[in] known_stage_residual Known stage source rates, excluding the current implicit rate.
@@ -122,14 +119,13 @@ CONTAINS
   !> \param[out] line_search_failed True if a Newton line search could not accept a step.
   !******************************************************************************
   SUBROUTINE solve_implicit_stage(equation_partition, q_known, q_old,         &
-       qp_known, dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y, &
+       dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,          &
        Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij,               &
        zero_x_momentum, zero_y_momentum, q_stage, effective_im_term,         &
        iterations_used, converged, linear_info, line_search_failed)
 
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     REAL(wp), INTENT(IN) :: q_known(n_vars), q_old(n_vars)
-    REAL(wp), INTENT(IN) :: qp_known(n_vars+2)
     REAL(wp), INTENT(IN) :: dt_step, a_diag
     REAL(wp), INTENT(IN) :: known_stage_residual(n_eqns)
     REAL(wp), INTENT(IN) :: Bprimej_x, Bprimej_y
@@ -140,7 +136,7 @@ CONTAINS
     INTEGER, INTENT(OUT) :: iterations_used, linear_info
     LOGICAL, INTENT(OUT) :: converged, line_search_failed
 
-    CALL solve_imex_stage(equation_partition, q_known, q_old, qp_known,      &
+    CALL solve_imex_stage(equation_partition, q_known, q_old,                &
          dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,         &
          Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij,              &
          zero_x_momentum, zero_y_momentum, q_stage, effective_im_term,        &
@@ -233,7 +229,7 @@ CONTAINS
        iterations_used, converged, linear_info, line_search_failed,          &
        apply_semi_implicit )
 
-    USE parameters_2d, ONLY : max_nl_iter, tol_rel, tol_abs, n_RK,            &
+    USE parameters_2d, ONLY : tol_rel, tol_abs, n_RK,                         &
          n_solid, n_add_gas, idx_pore, rheology_flag, rheology_model_id,     &
          rheology_id_lava, pore_pressure_flag,                              &
          curvature_term_flag,                                                &

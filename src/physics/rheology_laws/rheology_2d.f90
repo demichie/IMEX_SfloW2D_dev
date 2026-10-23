@@ -126,7 +126,7 @@ CONTAINS
             speed, mixture_density, moving, rate(1), rate(2))
     CASE(rheology_id_lava)
        CALL eval_lava_implicit_momentum_rate(flow_depth, temperature,        &
-            mixture_density, velocity_x, velocity_y, speed, moving,          &
+            mixture_density, velocity_x, velocity_y, moving,                &
             rate(1), rate(2))
     CASE(rheology_id_lahar)
        CALL eval_lahar_implicit_momentum_rate(flow_depth, velocity_x,        &
@@ -138,7 +138,7 @@ CONTAINS
             rate(1), rate(2))
     CASE(rheology_id_quadratic)
        CALL eval_quadratic_implicit_momentum_rate(velocity_x, velocity_y,   &
-            speed, horizontal_speed, speed_squared, mixture_density, moving, &
+            horizontal_speed, speed_squared, mixture_density, moving,       &
             rate(1), rate(2))
     CASE(rheology_id_none, rheology_id_froude, rheology_id_lucas, rheology_id_mui)
        CONTINUE

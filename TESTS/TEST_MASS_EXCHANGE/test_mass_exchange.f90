@@ -9,8 +9,8 @@ PROGRAM test_mass_exchange
   USE model_layout_2d, ONLY : model_layout_type
   USE runtime_2d, ONLY : runtime_state_type
   USE stochastic_module, ONLY : stochastic_workspace_type, sym_noise, noise_pow_val
-  USE state_conversion_2d, ONLY : qc_to_qp
-  USE mass_exchange_laws_2d, ONLY : settling_velocity
+  USE state_conversion_2d, ONLY : qc_to_qp, mixt_var
+  USE mass_exchange_laws_2d, ONLY : settling_velocity, eval_air_entrainment_rate
   USE equation_terms_2d, ONLY : eval_mass_exchange_terms
   USE time_integration_2d, ONLY : apply_mass_exchange_step
   USE inpout_2d, ONLY : write_restart_file, read_restart_file, output_idx
@@ -149,6 +149,7 @@ CONTAINS
     IF (ALLOCATED(loss_rate)) loss_rate=0.0_wp
     alphastot_min=0.0_wp; erodible_porosity=0.25_wp
     coeff_porosity=erodible_porosity/(1.0_wp-erodible_porosity)
+    entrainment_flag=.FALSE.
     erodible_deposit_flag=.FALSE.; bottom_radial_source_flag=.FALSE.
     bottom_fissural_source_flag=.FALSE.
     T_erodible=317.0_wp; verbose_level=2
@@ -240,7 +241,43 @@ CONTAINS
        erosion_coeff=100.0_wp; erodible_deposit_flag=.TRUE.
     END SELECT
     CALL check_update(name,dt)
+    IF (name=='thermal') CALL check_thermal_entrainment
   END SUBROUTINE run_case
+
+  !> \brief Verify that production thermal assembly includes entrained ambient-air energy.
+  SUBROUTINE check_thermal_entrainment
+    REAL(wp) :: qp_local(n_vars+2), dynamic_pressure
+    REAL(wp) :: richardson, mixture_density, carrier_density, reduced_gravity
+    REAL(wp) :: carrier_heat_capacity, mixture_heat_capacity
+    REAL(wp) :: erosion_rate(ns), deposition_rate(ns)
+    REAL(wp) :: carrier_erosion_rate, carrier_loss_rate
+    REAL(wp) :: equation_rate(n_eqns), topo_rate, air_rate, expected
+    REAL(wp) :: speed_squared
+
+    CALL reset_fixture
+    erosion_coeff=100.0_wp; erodible_deposit_flag=.TRUE.
+    entrainment_flag=.TRUE.
+    CALL qc_to_qp(state%q(:,1,1), qp_local, dynamic_pressure)
+    CALL mixt_var(qp_local, richardson, mixture_density, carrier_density,   &
+         reduced_gravity, carrier_heat_capacity, mixture_heat_capacity)
+    IF (MIN(mixture_density,carrier_density,reduced_gravity,                 &
+         carrier_heat_capacity,mixture_heat_capacity)<=0.0_wp)               &
+         ERROR STOP 'invalid thermal entrainment fixture properties'
+    speed_squared=qp_local(idx_u)**2+qp_local(idx_v)**2
+    air_rate=eval_air_entrainment_rate(richardson, speed_squared)
+    IF (air_rate<=0.0_wp) ERROR STOP 'thermal entrainment fixture is inactive'
+
+    CALL eval_mass_exchange_terms(qp_local,0,0.0_wp,0.0_wp,erodible(:,1,1), &
+         1.0_wp,erosion_rate,deposition_rate,carrier_erosion_rate,          &
+         carrier_loss_rate,equation_rate,topo_rate)
+    expected=-qp_local(4)*(SUM(rho_s*sp_heat_s*deposition_rate) +           &
+         carrier_density*carrier_heat_capacity*carrier_loss_rate) +        &
+         qp_local(4)*(SUM(rho_s*sp_heat_s*erosion_rate) +                   &
+         rho_c_sub*carrier_heat_capacity*carrier_erosion_rate) +            &
+         T_ambient*sp_heat_a*rho_a_amb*air_rate
+    CALL assert_small('thermal entrainment energy source',                  &
+         ABS(equation_rate(4)-expected),MAX(1.0_wp,ABS(expected)))
+  END SUBROUTINE check_thermal_entrainment
 
   !> \brief Exercise the existing signed pore-pressure loss law with an independent gas fixture.
   SUBROUTINE run_gas_cases

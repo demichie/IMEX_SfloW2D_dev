@@ -96,17 +96,16 @@ CONTAINS
   !> \param[in] mixture_density Mixture density [kg m^-3].
   !> \param[in] velocity_x x velocity [m s^-1].
   !> \param[in] velocity_y y velocity [m s^-1].
-  !> \param[in] speed Speed magnitude used by the common source interface [m s^-1].
   !> \param[in] moving Whether the state is moving.
   !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
   !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !> \note Complex-valued state and rates preserve complex-step derivatives.
   !******************************************************************************
   SUBROUTINE eval_lava_implicit_momentum_rate(flow_depth, temperature, mixture_density, &
-       velocity_x, velocity_y, speed, moving, rate_x, rate_y)
+       velocity_x, velocity_y, moving, rate_x, rate_y)
 
     COMPLEX(wp), INTENT(IN) :: flow_depth, temperature, mixture_density
-    COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y, speed
+    COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y
     LOGICAL, INTENT(IN) :: moving
     COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
 

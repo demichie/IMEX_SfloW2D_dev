@@ -60,7 +60,7 @@ MODULE equation_terms_2d
   PUBLIC :: curvature_acceleration, eval_curvature_momentum_source
   PUBLIC :: eval_expl_terms
   PUBLIC :: eval_implicit_terms, eval_semi_implicit_terms
-  PUBLIC :: eval_mass_exchange_terms, eval_mass_exchange_thermal_energy
+  PUBLIC :: eval_mass_exchange_terms
   PUBLIC :: eval_source_bdry
   PUBLIC :: set_source_time_coefficients
 
@@ -136,7 +136,7 @@ CONTAINS
 
     REAL(wp), INTENT(IN) :: time
     REAL(wp), INTENT(IN) :: cell_fract_jk
-      REAL(wp), INTENT(IN) :: cell_fissure_fract(:)
+    REAL(wp), INTENT(IN) :: cell_fissure_fract(:)
 
     ! Lateral radial-source per-cell geometry. Pass 0 to disable the lateral
     ! injection.
@@ -807,60 +807,7 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Assemble the thermal-energy source associated with mass exchange.
-  !> \details Accounts for energy removed with deposited solids and lost carrier
-  !>          material, energy supplied by eroded solids and carrier material,
-  !>          and ambient-air entrainment.
-  !> \param[in] flow_temperature Flow temperature of the mixture [K].
-  !> \param[in] solid_density Per-class solid densities [kg m^-3].
-  !> \param[in] solid_heat_capacity Per-class solid specific heat capacities [J kg^-1 K^-1].
-  !> \param[in] deposition_rate Per-class deposition thickness rates [m s^-1].
-  !> \param[in] erosion_rate Per-class solid erosion thickness rates [m s^-1].
-  !> \param[in] carrier_density Flow carrier density [kg m^-3].
-  !> \param[in] carrier_heat_capacity Carrier specific heat capacity [J kg^-1 K^-1].
-  !> \param[in] carrier_loss_rate Carrier-layer loss rate [m s^-1].
-  !> \param[in] substrate_temperature Temperature of eroded material [K].
-  !> \param[in] substrate_carrier_density Carrier density of substrate material [kg m^-3].
-  !> \param[in] carrier_erosion_rate Carrier-layer erosion rate [m s^-1].
-  !> \param[in] ambient_temperature Ambient-air temperature [K].
-  !> \param[in] air_heat_capacity Ambient-air specific heat capacity [J kg^-1 K^-1].
-  !> \param[in] ambient_air_density Ambient-air density [kg m^-3].
-  !> \param[in] air_entrainment_rate Ambient-air entrainment rate [m s^-1].
-  !> \return Net mass-exchange thermal-energy source per unit area [W m^-2].
-  !******************************************************************************
-  PURE FUNCTION eval_mass_exchange_thermal_energy(flow_temperature,            &
-       solid_density, solid_heat_capacity, deposition_rate, erosion_rate,      &
-       carrier_density, carrier_heat_capacity, carrier_loss_rate,              &
-       substrate_temperature, substrate_carrier_density,                       &
-       carrier_erosion_rate, ambient_temperature, air_heat_capacity,            &
-       ambient_air_density, air_entrainment_rate) RESULT(source)
 
-    REAL(wp), INTENT(IN) :: flow_temperature
-    REAL(wp), INTENT(IN) :: solid_density(:)
-    REAL(wp), INTENT(IN) :: solid_heat_capacity(:)
-    REAL(wp), INTENT(IN) :: deposition_rate(:)
-    REAL(wp), INTENT(IN) :: erosion_rate(:)
-    REAL(wp), INTENT(IN) :: carrier_density
-    REAL(wp), INTENT(IN) :: carrier_heat_capacity
-    REAL(wp), INTENT(IN) :: carrier_loss_rate
-    REAL(wp), INTENT(IN) :: substrate_temperature
-    REAL(wp), INTENT(IN) :: substrate_carrier_density
-    REAL(wp), INTENT(IN) :: carrier_erosion_rate
-    REAL(wp), INTENT(IN) :: ambient_temperature
-    REAL(wp), INTENT(IN) :: air_heat_capacity
-    REAL(wp), INTENT(IN) :: ambient_air_density
-    REAL(wp), INTENT(IN) :: air_entrainment_rate
-    REAL(wp) :: source
-
-    source = -flow_temperature * ( SUM( solid_density * solid_heat_capacity *  &
-         deposition_rate ) + carrier_density * carrier_heat_capacity *         &
-         carrier_loss_rate ) + substrate_temperature * ( SUM( solid_density *  &
-         solid_heat_capacity * erosion_rate ) + substrate_carrier_density *    &
-         carrier_heat_capacity * carrier_erosion_rate ) + ambient_temperature &
-         * air_heat_capacity * ambient_air_density * air_entrainment_rate
-
-  END FUNCTION eval_mass_exchange_thermal_energy
-
-  !******************************************************************************
   !> \brief Compute limited erosion, deposition, entrainment and associated equation sources.
   !> \details Evaluates per-class solid erosion and settling/deposition, carrier
   !>          erosion and loss, optional air entrainment, vaporization,
@@ -1150,11 +1097,11 @@ CONTAINS
 
     ! Thermal-energy equation source term [kg s-3]:
     ! deposition, erosion and entrainment are considered
-    eqns_term(4) = eval_mass_exchange_thermal_energy(r_T, rho_s, sp_heat_s,    &
-         deposition_term, erosion_term, r_rho_c, r_sp_heat_c,                  &
-         continuous_phase_loss_term, T_erodible_local, rho_c_sub,              &
-         continuous_phase_erosion_term, T_ambient, sp_heat_a, rho_a_amb,       &
-         air_entr)
+    eqns_term(4) = -r_T * ( SUM(rho_s * sp_heat_s * deposition_term) +       &
+         r_rho_c * r_sp_heat_c * continuous_phase_loss_term ) +               &
+         T_erodible_local * ( SUM(rho_s * sp_heat_s * erosion_term) +         &
+         rho_c_sub * r_sp_heat_c * continuous_phase_erosion_term ) +           &
+         T_ambient * sp_heat_a * rho_a_amb * air_entr
 
     ! solid phase mass equation source term [kg m-2 s-1]:
     ! due to solid erosion and deposition

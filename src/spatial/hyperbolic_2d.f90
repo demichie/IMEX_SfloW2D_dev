@@ -148,10 +148,6 @@ CONTAINS
 
     INTEGER :: l , i, j, k      !< loop counters
 
-    !WRITE(*,*) 'SUBROUTINE eval_hyperbolic_terms'
-    !WRITE(*,*) 'qp_expl(4,1,1)',qp_expl(4,1,1)
-    !WRITE(*,*)
-    
     ! Linear reconstruction of the physical variables at the interfaces
     CALL recon%reconstruct( qp_expl, t, solve_cells, j_cent, k_cent, .TRUE. )
 
@@ -319,6 +315,9 @@ CONTAINS
   !>
   !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
   !> \param[in] recon Reconstructed cell-owned and face-oriented physical/conservative traces.
+  !> \param[in] qp_center Cell-centered physical state used for face fluxes.
+  !> \param[in] use_dry_donor Enable the dry-donor face treatment.
+  !> \param[in] t Current simulation or stage time [s].
   !> \param[in] solve_interfaces_x Number of active x-normal faces.
   !> \param[in] j_stag_x X-face indices paired with k_stag_x.
   !> \param[in] k_stag_x Y-cell indices of active x-normal faces.
@@ -505,6 +504,10 @@ CONTAINS
   !> \param[in] bed_face Unique bed elevation shared by both states at this face.
   !> \param[in] qp_adv_left Physical face state, including advective velocities.
   !> \param[in] qp_adv_right Physical face state, including advective velocities.
+  !> \param[in] h_minmod_left Minmod-reconstructed depth on the negative side.
+  !> \param[in] h_minmod_right Minmod-reconstructed depth on the positive side.
+  !> \param[in] h_froude_left Froude-blend depth on the negative side.
+  !> \param[in] h_froude_right Froude-blend depth on the positive side.
   !> \param[in] grav_coeff Large-slope gravity factor at the interface.
   !> \param[in] a_minus Negative face speed bound.
   !> \param[in] a_plus Positive face speed bound.
@@ -512,6 +515,10 @@ CONTAINS
   !> \param[in] normal_momentum_index Normal momentum slot in physical state.
   !> \param[in] face_i X interface index.
   !> \param[in] face_j Y interface index.
+  !> \param[in] use_dry_donor Enable the dry-donor face treatment.
+  !> \param[in] dry_donor_left Whether the negative side uses a dry-donor trace.
+  !> \param[in] dry_donor_right Whether the positive side uses a dry-donor trace.
+  !> \param[in] t Current simulation or stage time [s].
   !> \param[out] value_left PCCU contribution assigned to the negative-side cell.
   !> \param[out] value_right PCCU contribution assigned to the positive-side cell.
   SUBROUTINE eval_pccu_interface(eta_left,eta_right,bed_face,                &
@@ -530,7 +537,7 @@ CONTAINS
     USE pccu_2d, ONLY : eval_hydrostatic_path
     USE pccu_2d, ONLY : eval_oriented_pccu_pair
     USE pccu_2d, ONLY : pccu_speed_tolerance
-    USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
+    USE nonconservative_2d, ONLY : PATH_DIR_X
 
     IMPLICIT NONE
 
@@ -730,6 +737,8 @@ CONTAINS
   !>
   !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
   !> \param[in] recon Reconstructed cell-owned and face-oriented physical/conservative traces.
+  !> \param[in] qp_expl Cell-centered physical state at the explicit stage.
+  !> \param[in] use_dry_donor Enable the dry-donor face treatment.
   !> \param[in] solve_cells Number of entries in the active-cell index lists.
   !> \param[in] j_cent X indices of active cells; only the first solve_cells entries are used.
   !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
@@ -1085,6 +1094,14 @@ CONTAINS
 
   END SUBROUTINE eval_interface_speed_bounds
 
+  !******************************************************************************
+  !> \brief Identify lateral source traces on the domain boundary.
+  !> \param[in] direction Cartesian orientation of the face.
+  !> \param[in] face_i X interface index.
+  !> \param[in] face_j Y interface index.
+  !> \param[out] source_left True when the negative-side trace is a source cell.
+  !> \param[out] source_right True when the positive-side trace is a source cell.
+  !******************************************************************************
   SUBROUTINE lateral_source_trace_sides(direction,face_i,face_j,           &
        source_left,source_right)
 

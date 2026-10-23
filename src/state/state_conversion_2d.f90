@@ -9,6 +9,7 @@
 MODULE state_conversion_2d
 
   USE constitutive_parameters_2d
+  USE diagnostics_2d, ONLY : fatal_error
 
   USE parameters_2d, ONLY : wp
   USE parameters_2d, ONLY : n_vars, n_solid, n_add_gas
@@ -149,20 +150,23 @@ CONTAINS
 
     IF (n_solid .GT. 0) THEN
        IF (ANY(xs .LT. -mass_fraction_roundoff_tolerance)) THEN
-          ERROR STOP 'Material negative solid mass fraction'
+          CALL mass_fraction_closure_error(                                  &
+               'Material negative solid mass fraction', context)
        END IF
        xs = MAX(xs, 0.0_wp)
     END IF
 
     IF (n_add_gas .GT. 0) THEN
        IF (ANY(xg .LT. -mass_fraction_roundoff_tolerance))                    &
-            ERROR STOP 'Material negative additional-gas mass fraction'
+            CALL mass_fraction_closure_error(                                &
+                 'Material negative additional-gas mass fraction', context)
        xg = MAX(xg, 0.0_wp)
     END IF
 
     IF (gas_flag .AND. liquid_flag) THEN
        IF (xl .LT. -mass_fraction_roundoff_tolerance)                         &
-            ERROR STOP 'Material negative liquid mass fraction'
+            CALL mass_fraction_closure_error(                                &
+                 'Material negative liquid mass fraction', context)
        xl = MAX(xl, 0.0_wp)
     ELSE
        xl = 0.0_wp
@@ -1000,6 +1004,22 @@ CONTAINS
 
   END SUBROUTINE qp_to_qp2
 
-  !------------------------------------------------------------------------------
-  !> \brief Evaluate particle terminal settling speed with the configured drag correlation.
+  !******************************************************************************
+  !> \brief Attach optional state context to a fatal mass-fraction closure error.
+  !> \param[in] message Error description.
+  !> \param[in] context Optional cell, face, or stage context.
+  !******************************************************************************
+  SUBROUTINE mass_fraction_closure_error(message, context)
+
+    CHARACTER(LEN=*), INTENT(IN) :: message
+    CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: context
+
+    IF (PRESENT(context)) THEN
+       CALL fatal_error(TRIM(context)//': '//TRIM(message))
+    ELSE
+       CALL fatal_error(message)
+    END IF
+
+  END SUBROUTINE mass_fraction_closure_error
+
 END MODULE state_conversion_2d

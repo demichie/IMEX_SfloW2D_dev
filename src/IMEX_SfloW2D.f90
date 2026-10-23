@@ -38,7 +38,7 @@ PROGRAM IMEX_SfloW2D
    USE geometry_2d, ONLY : refresh_topography_geometry
    USE equation_terms_2d, ONLY : set_source_time_coefficients
 
-   USE geometry_2d, ONLY : dx,dy,B_cent
+   USE geometry_2d, ONLY : dx,dy
    ! USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
 
    USE init_2d, ONLY : collapsing_volume

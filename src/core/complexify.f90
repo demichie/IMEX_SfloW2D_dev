@@ -258,18 +258,6 @@ contains
     return
   end function abs_c
 
-! COSD
-!  complex(wp) function cosd_c(z)
-!    complex(wp), intent(in) :: z
-!    cosd_c = cos(z*3.14159265358979323846/180.)
-!  end function cosd_c
-
-! SIND
-!  complex(wp) function sind_c(z)
-!    complex(wp), intent(in) :: z
-!    sind_c = sin(z*3.14159265358979323846/180.)
-!  end function sind_c
-
 ! ACOS
   !> \brief Evaluate acos at the real value and propagate its first-order perturbation.
   !>
@@ -278,7 +266,6 @@ contains
 
   complex(wp) function acos_c(z)
     complex(wp), intent(in) :: z
-!   acos_c = - cmplx(0., 1.)*log(z+sqrt(z**2-1.))
 !   not general complex valued formula:
     acos_c = cmplx(acos(real(z)),-aimag(z)/sqrt(1.-real(z)**2),wp)
     return
@@ -292,7 +279,6 @@ contains
 
   complex(wp) function asin_c(z)
     complex(wp), intent(in) :: z
-!   asin_c = - cmplx(0., 1.)*log(cmplx(0.,1.)*z+sqrt(1.-z**2))
 !   not general complex valued formula:
     asin_c = cmplx(asin(real(z)),aimag(z)/sqrt(1.-real(z)**2),wp)
     return
@@ -306,16 +292,6 @@ contains
 
   complex(wp) function atan_c(z)
     complex(wp), intent(in) :: z
-!   complex(wp) z2
-!   real(wp) pi2, xans, yans, r, r2, x, y
-!   pi2 = 2.0*atan(1.0)
-!   r      = sqrt(real(z)**2+aimag(z)**2)
-!   x      = real(z)
-!   y      = aimag(z)
-!   r2     = r*r
-!   xans   = 0.5*atan2 (2.0*x, 1.0-r2)
-!   yans   = 0.25*log((r2+2.0*y+1.0)/(r2-2.0*y+1.0))
-!   atan_c = cmplx (xans, yans)
 !   not general complex valued formula:
     atan_c = cmplx(atan(real(z)),aimag(z)/(1.+real(z)**2),wp)
     return
@@ -330,19 +306,6 @@ contains
 
   complex(wp) function atan2_cc(csn, ccs)
     complex(wp), intent(in) :: csn, ccs
-!   real(wp) pi
-!   pi = 4.0*atan(1.0)
-!   if (sqrt(real(ccs)**2 + aimag(ccs)**2).eq.0.) then  ! abs orig
-!     if (sqrt(real(csn)**2+aimag(csn)**2).eq.0.) then
-!       atan2_cc = cmplx(0.0)
-!     else
-!       atan2_cc = cmplx(sign(0.5*pi,real(csn)), 0.0)
-!     end if
-!   else
-!     atan2_cc = atan(csn/ccs)
-!     if (real(ccs).lt.0.) atan2_cc = atan2_cc + pi
-!     if (real(atan2_cc).gt.pi) atan2_cc = atan2_cc - 2.0*pi
-!   end if
 !   not general complex valued formula:
     real(wp) a,b,c,d
     a=real(csn)
@@ -361,10 +324,6 @@ contains
 
   complex(wp) function cosh_c(z)
     complex(wp), intent(in) :: z
-!   complex(wp) eplus, eminus
-!   eplus = exp(z)
-!   eminus = exp(z)
-!   cosh_c = (eplus + eminus)/2.
 !   not general complex valued formula:
     cosh_c=cmplx(cosh(real(z)),aimag(z)*sinh(real(z)),wp)
     return
@@ -378,10 +337,6 @@ contains
 
   complex(wp) function sinh_c(z)
     complex(wp), intent(in) :: z
-!   complex(wp) eplus, eminus
-!   eplus = exp(z)
-!   eminus = exp(z)
-!   sinh_c = (eplus - eminus)/2.
 !   not general complex valued formula:
     sinh_c=cmplx(sinh(real(z)),aimag(z)*cosh(real(z)),wp)
     return
@@ -395,10 +350,6 @@ contains
 
   complex(wp) function tan_c(z)
     complex(wp), intent(in) :: z
-!   complex(wp) eiplus, eiminus
-!   eiplus = exp(cmplx(0.,1.)*z)
-!   eiminus = exp(-cmplx(0.,1.)*z)
-!   tan_c = cmplx(0.,1.)*(eiminus - eiplus)/(eiplus + eiminus)
 !   not general complex valued formula:
     tan_c=cmplx(tan(real(z)),aimag(z)/cos(real(z))**2,wp)
     return
@@ -412,14 +363,6 @@ contains
 
   complex(wp) function tanh_c(a)
     complex(wp), intent(in) :: a
-!   complex(wp) eplus, eminus
-!   if(real(a) > 50)then
-!     tanh_c = 1.
-!   else
-!     eplus = exp(a)
-!     eminus = exp(-a)
-!     tanh_c = (eplus - eminus)/(eplus + eminus)
-!   end if
 !   not general complex valued formula:
     tanh_c=cmplx(tanh(real(a)),aimag(a)/cosh(real(a))**2,wp)
     return

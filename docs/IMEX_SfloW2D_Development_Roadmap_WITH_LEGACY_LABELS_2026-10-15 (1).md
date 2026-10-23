@@ -1492,7 +1492,7 @@ Questo è il piano consolidato che utilizzerei come riferimento per l’implemen
 
 Perimetro dell’estrazione:
 
-- `thermal_laws_2d` possiede l’energia delle iniezioni generali, lo scambio termico del mass exchange, la vaporizzazione e il raffreddamento radiativo/convettivo della lava. `rheology_lava_2d` resta proprietario dei soli termini reologici; parametri termici dichiarati ma non usati non costituiscono nuove leggi di conduzione o riscaldamento.
+- `thermal_laws_2d` possiede le leggi per l’energia delle iniezioni generali, la vaporizzazione e il raffreddamento radiativo/convettivo della lava. Il termine energetico del mass exchange viene assemblato direttamente in `equation_terms_2d::eval_mass_exchange_terms`, insieme agli altri termini dello scambio. `rheology_lava_2d` resta proprietario dei soli termini reologici; parametri termici dichiarati ma non usati non costituiscono nuove leggi di conduzione o riscaldamento.
 - `pore_pressure_laws_2d` possiede diffusione implicita (inclusa la sensibilità COMPLEX), perdita Darcy di gas e accoppiamenti conservativi con iniezioni e mass exchange.
 - Le due formulazioni della permeabilità dinamica restano provider distinti: diffusione con pesi di sfericità `alpha*d^2`, gas loss con `alpha/d`. L’estrazione conserva e verifica entrambe; non ne presume l’equivalenza né ne uniforma la fisica.
 
@@ -2057,7 +2057,11 @@ eval_vaporization_mass_rate
 eval_vaporization_energy_rate
 ```
 
-`eval_mass_exchange_thermal_energy` deve rimanere in `equation_terms_2d`: combina temperature, proprietà termiche e rate di scambio per costruire il contributo da inserire nell’equazione energetica; non è una legge costitutiva termica indipendente. La vaporizzazione deve essere separata tra calcolo costitutivo dei rate in `thermal_laws_2d` e assemblaggio dei contributi di massa ed energia in `equation_terms_2d`.
+Il contributo termico dello scambio di massa va assemblato direttamente in
+`eval_mass_exchange_terms`: una routine separata che esegue soltanto questo
+conto non aggiunge una responsabilità distinta. La vaporizzazione resta invece
+separata tra calcolo costitutivo dei rate in `thermal_laws_2d` e assemblaggio
+dei contributi di massa ed energia in `equation_terms_2d`.
 
 Le leggi per erosione, deposizione, sedimentazione, entrainment e perdita del carrier devono essere in `mass_exchange_laws_2d.f90`, con nomi del tipo:
 
@@ -2122,8 +2126,9 @@ anche il dummy di output ora usa il qualificatore completo
 
 Completata la separazione: `eval_vaporization_mass_rate` e
 `eval_vaporization_energy_rate` calcolano risultati distinti in
-`thermal_laws_2d`; `eval_mass_exchange_thermal_energy` appartiene ora a
-`equation_terms_2d`, che assembla i contributi energetici. La legge di
+`thermal_laws_2d`; il termine termico di scambio è assemblato direttamente in
+`eval_mass_exchange_terms`, senza una funzione separata che eseguiva soltanto
+quel conto. La legge di
 raffreddamento e il relativo dispatcher usano `energy_rate` nei nomi. Il
 solve canonico della temperatura esiste già con il nome previsto e il vecchio
 nome `advance_lava_cooling_temperature` resta un wrapper di compatibilità.
@@ -2192,14 +2197,37 @@ indentazione del namelist e conserva correttamente le virgolette del nome
 reologico.
 
 La verifica Doxygen mirata passa per tutti i 13 moduli in
-`src/physics/rheology_laws`; il controllo globale conferma che le linee
-eseguibili dei sorgenti coincidono con `HEAD`, ma segnala ancora 64 lacune
-preesistenti in `reconstruction_2d.f90`, `kt_ritter_1d.f90`,
-`hyperbolic_2d.f90` e `inpout_2d.f90`, fuori dai moduli D16 aggiornati.
-Queste restano da risolvere o delimitare nel gate globale Doxygen di D16.12;
-non sono state corrette in questo step.
+`src/physics/rheology_laws`; al momento della chiusura di D16.11 il controllo
+globale confermava che le linee eseguibili dei sorgenti coincidevano con
+`HEAD`, ma segnalava ancora 64 lacune preesistenti in `reconstruction_2d.f90`,
+`kt_ritter_1d.f90`, `hyperbolic_2d.f90` e `inpout_2d.f90`, fuori dai moduli
+D16 aggiornati. Queste lacune sono state chiuse nel gate Doxygen di D16.12,
+senza modifiche al codice eseguibile.
 
 **D16.12 — Gate di accettazione.** Accettare D16 solo quando la selezione reologica è centralizzata, le leggi sono nei moduli `*_laws_2d`, rate e sorgenti sono distinti, le integrazioni analitiche seguono la convenzione, gli aggiornamenti sono in `time_integration_2d`, la geometria è in `geometry_2d` e compilazione, test, restart, Doxygen e CI passano senza variazioni scientifiche non autorizzate. Il manifest deve riportare vecchio nome, nuovo nome, modulo proprietario, chiamanti aggiornati ed evidenze di regressione.
+
+**Esito della verifica locale D16.12: parziale; D16 resta aperto.** Il manifest
+`acceptance/D16_MIGRATION_MANIFEST.json` registra le migrazioni, i moduli
+proprietari, i chiamanti e le regressioni. Il controllo Doxygen globale passa su
+45 sorgenti e conferma che codice eseguibile e direttive sono invariati rispetto
+a `HEAD`; anche la build completa strict-debug passa. Passano
+`TEST_RHEOLOGY_CELL_LOCAL` (255/255 fixture in strict e optimized),
+`TEST_MASS_EXCHANGE` (strict/optimized, 1/4 thread),
+`TEST_TOPOGRAPHY_FACES` (1/4 thread), `TEST_WORKSPACE_LIFECYCLE`,
+la sezione stage/boundary di `TEST_IMEX_STAGES` (strict/optimized) e i test
+`TEST_BINARY_RESTART` e `TEST_STOCHASTIC_RESTART` (1/4 thread).
+
+La verifica completa non è ancora conclusiva: `make check` ha superato i test
+metadata, output-path e i primi cinque casi solver, ma è stata interrotta mentre
+`TEST_DAMBREAK/TEST_DYNAMIC_FINH` avanzava molto lentamente nella build locale
+strict-debug. L'esecuzione senza selezione di sezione di `TEST_IMEX_STAGES`
+supera il controllo stage/assembly, ma fallisce poi nell'order suite
+all'asserzione `manufactured mass remains constant` (errore scalato
+0.31518397499667228); va chiarito prima dell'accettazione completa. Infine non
+risulta un run GitHub Actions per la revisione testata
+`4973360ddf213501a93fe7f02ff9a417ae42f2aa`; il CLI GitHub non è autenticato in
+questo ambiente. Il gate D16.12 rimane quindi in attesa del chiarimento del test
+e della verifica CI sulla revisione condivisa.
 
 ### D15 — Acceptance finale della nuova architettura
 

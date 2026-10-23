@@ -4,7 +4,6 @@ PROGRAM test_source_modules
        rheology_id_lava
   USE rheology_lahar_2d, ONLY : alpha1_coeff, beta1, eval_lahar_fluid_viscosity
   USE rheology_2d, ONLY : correct_friction_momentum
-  USE equation_terms_2d, ONLY : eval_mass_exchange_thermal_energy
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source,           &
        eval_pore_pressure_mass_exchange_source
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                &
@@ -156,17 +155,6 @@ PROGRAM test_source_modules
   CALL assert_close(REAL(complex_actual,wp), 0.0_wp, 'non-lava cooling source')
   CALL assert_close(AIMAG(complex_actual), 0.0_wp,                         &
        'non-lava cooling complex-step derivative')
-
-  actual = eval_mass_exchange_thermal_energy(650.0_wp, solid_density,          &
-       solid_heat_capacity, deposition_rate, erosion_rate, 1.2_wp, 1005.0_wp,  &
-       0.004_wp, 300.0_wp, 1.1_wp, 0.005_wp, 290.0_wp, 1005.0_wp, 1.18_wp,    &
-       0.006_wp)
-  expected = -650.0_wp * (SUM(solid_density * solid_heat_capacity *           &
-       deposition_rate) + 1.2_wp * 1005.0_wp * 0.004_wp) + 300.0_wp *         &
-       (SUM(solid_density * solid_heat_capacity * erosion_rate) +              &
-       1.1_wp * 1005.0_wp * 0.005_wp) + 290.0_wp * 1005.0_wp * 1.18_wp *      &
-       0.006_wp
-  CALL assert_close(actual, expected, 'mass-exchange thermal energy')
 
   vapor_mass_rate = eval_vaporization_mass_rate(400.0_wp, solid_density,    &
        solid_heat_capacity, deposition_rate, 0.114_wp)

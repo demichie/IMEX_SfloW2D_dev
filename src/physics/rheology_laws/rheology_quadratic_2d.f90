@@ -68,7 +68,6 @@ CONTAINS
   !> for the implicit Jacobian.
   !> \param[in] velocity_x x velocity [m s^-1].
   !> \param[in] velocity_y y velocity [m s^-1].
-  !> \param[in] speed Speed magnitude [m s^-1].
   !> \param[in] horizontal_speed Horizontal speed magnitude [m s^-1].
   !> \param[in] speed_squared Squared speed used by the quadratic law [m^2 s^-2].
   !> \param[in] mixture_density Mixture density [kg m^-3].
@@ -77,10 +76,10 @@ CONTAINS
   !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !> \note Complex-valued state and rates preserve complex-step derivatives.
   !******************************************************************************
-  SUBROUTINE eval_quadratic_implicit_momentum_rate(velocity_x, velocity_y, speed, &
+  SUBROUTINE eval_quadratic_implicit_momentum_rate(velocity_x, velocity_y,   &
        horizontal_speed, speed_squared, mixture_density, moving, rate_x, rate_y)
 
-    COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y, speed, horizontal_speed
+    COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y, horizontal_speed
     COMPLEX(wp), INTENT(IN) :: speed_squared, mixture_density
     LOGICAL, INTENT(IN) :: moving
     COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y

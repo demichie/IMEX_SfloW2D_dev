@@ -448,10 +448,8 @@ CONTAINS
   SUBROUTINE imex_RK_solver(this, q, qp, t, dt, Z, equation_partition,      &
        domain, spatial_operator, observer)
 
-    USE constitutive_parameters_2d, ONLY : maximum_solid_packing
-    
-    USE state_conversion_2d, ONLY : qc_to_qp, primitive_to_volume_fractions, &
-         project_dry_cell_momenta, clip_roundoff_negative_component_masses
+    USE state_conversion_2d, ONLY : qc_to_qp, project_dry_cell_momenta,      &
+         clip_roundoff_negative_component_masses
     USE parameters_2d, ONLY : dry_thickness_tolerance, idx_u, idx_v
 
     USE equation_terms_2d, ONLY : eval_expl_terms
@@ -460,8 +458,7 @@ CONTAINS
 
     USE geometry_2d, ONLY : B_nodata
 
-!!$    USE parameters_2d, ONLY : time_param , bottom_radial_source_flag
-    
+
     IMPLICIT NONE
 
     CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
@@ -486,8 +483,6 @@ CONTAINS
     REAL(wp) :: p_dyn
     CHARACTER(LEN=128) :: closure_context
 
-    REAL(wp) :: alpha_s
-    REAL(wp) :: alphas_local(n_solid), alphag_local(n_add_gas), alphal_local
     LOGICAL :: solid_excess_roundoff
     LOGICAL :: need_explicit_stage
 
@@ -543,8 +538,7 @@ CONTAINS
        IF ( verbose_level .GE. 2 ) THEN
 
           WRITE(*,*) 'solver, imex_RK_solver: j,k',j,k
-          !READ(*,*)
-          
+
        END IF
 
        ! Initialization of the variables for the Runge-Kutta scheme
@@ -598,8 +592,6 @@ CONTAINS
           IF ( verbose_level .GE. 2 ) THEN
 
              WRITE(*,*) 'solver, imex_RK_solver: j,k',j,k
-             ! READ(*,*)
-
           END IF
 
           ! initialize the RK step
@@ -660,7 +652,7 @@ CONTAINS
                 ! The local stage coordinator applies SI and the ordered
                 ! implicit-group sweep, returning one effective IM term.
                 CALL solve_imex_stage(equation_partition, q_fv_cell,          &
-                     q(1:n_vars,j,k), qp(1:n_vars+2,j,k), dt, a_diag,         &
+                     q(1:n_vars,j,k), dt, a_diag,                             &
                      known_stage_residual, B_prime_x_geom(j,k),               &
                      B_prime_y_geom(j,k), B_second_xx_geom(j,k),              &
                      B_second_xy_geom(j,k), B_second_yy_geom(j,k),            &
@@ -784,8 +776,7 @@ CONTAINS
 
     END DO runge_kutta
 
-    !$OMP PARALLEL DO private(j,k,p_dyn,alpha_s,alphas_local,alphag_local,     &
-    !$OMP & alphal_local,solid_excess_roundoff,                                &
+    !$OMP PARALLEL DO private(j,k,p_dyn,solid_excess_roundoff,                 &
     !$OMP & residual_cell,q_old_cell)
 
     assemble_sol:DO l = 1,domain%solve_cells
@@ -827,7 +818,6 @@ CONTAINS
        CALL clip_roundoff_negative_component_masses(q(:,j,k))
        
        
-       ! negative_thickness_check:IF ( q(1,j,k) .LT. 0.0_wp ) THEN
        negative_thickness_check:IF ( q(1,j,k) .LT. EPSILON(1.0_wp) ) THEN
 
           IF ( q(1,j,k) .GT. -1.0E-7_wp ) THEN
@@ -859,55 +849,6 @@ CONTAINS
           qp(idx_u:idx_v,j,k) = 0.0_wp
        END IF
 
-       IF ( qp(1,j,k) .GT. 1.e-10_wp ) THEN
-       
-          CALL primitive_to_volume_fractions(qp(1:n_vars+2,j,k),              &
-               alphas_local, alphag_local, alphal_local)
-          alpha_s = SUM(alphas_local)
-
-       ELSE
-
-          alpha_s = 0.0_wp
-
-       END IF
-          
-       IF ( alpha_s .GT. maximum_solid_packing ) THEN
-
-          IF ( ( alpha_s - maximum_solid_packing ) .LT. 1.e-4_wp ) THEN 
-
-             !q(5:4+n_solid,j,k) = q(5:4+n_solid,j,k) * maximum_solid_packing / alpha_s
-                
-          ELSE
-          
-             !WRITE(*,*) 'j,k',j,k
-             !WRITE(*,*) 'alpha_s',alpha_s
-             
-             !WRITE(*,*) 'before imex_RK_solver: qc',q_old_cell
-             !WRITE(*,*) 'after imex_RK_solver: qc',q(1:n_vars,j,k)
-             
-             !CALL qc_to_qp(q_old_cell , qp(1:n_vars+2,j,k) , p_dyn )
-             !WRITE(*,*) 'before imex_RK_solver: qp',qp(1:n_vars+2,j,k)
-             
-             !CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-             !WRITE(*,*) 'after imex_RK_solver: qp',qp(1:n_vars+2,j,k)
-             
-             !WRITE(*,*) 'spatial_terms(1)',                                 &
-             !     this%spatial_terms(1,j,k,1:n_RK)
-             !WRITE(*,*) 'EX_terms(1)', this%EX_terms(1,j,k,1:n_RK)
-             !WRITE(*,*) 'IM_terms(1)', this%IM_terms(1,j,k,1:n_RK)
-             
-             !WRITE(*,*) 'spatial_terms(5)',                                 &
-             !     this%spatial_terms(5,j,k,1:n_RK)
-             !WRITE(*,*) 'EX_terms(5)', this%EX_terms(5,j,k,1:n_RK)
-             !WRITE(*,*) 'IM_terms(5)', this%IM_terms(5,j,k,1:n_RK)
-             
-             !READ(*,*)
-
-          END IF
-             
-       END IF
-          
-       
        IF ( qp(4,j,k) .LT. 273.0_wp ) THEN
           CALL fatal_error('temperature below the admissible threshold')
 

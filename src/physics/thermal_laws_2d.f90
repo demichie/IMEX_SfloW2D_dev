@@ -278,6 +278,58 @@ CONTAINS
   END SUBROUTINE advance_lava_cooling_temperature
 
   !******************************************************************************
+  !> \brief Compute the vaporization mass rate from hot-solid deposition.
+  !> \details Deposition heat above the boiling point supplies liquid warming
+  !>          and latent vaporization energy. The generated steam rate is
+  !>          multiplied by the configured steam fraction.
+  !>          \f$\dot{m}_v=f_v\max(0,T_f-T_b)\sum_i\rho_i c_iD_i/
+  !>          [c_l(T_b-T_l)+L_v]\f$.
+  !> \param[in] flow_temperature Flow temperature T_f [K].
+  !> \param[in] solid_density Per-class solid densities rho_i [kg m^-3].
+  !> \param[in] solid_heat_capacity Per-class solid specific heat capacities c_i [J kg^-1 K^-1].
+  !> \param[in] deposition_rate Per-class deposition thickness rates D_i [m s^-1].
+  !> \param[in] steam_fraction Fraction f_v of the available deposition heat assigned to vapor.
+  !> \return Generated vapor mass rate per unit area [kg m^-2 s^-1].
+  !******************************************************************************
+  PURE FUNCTION eval_vaporization_mass_rate(flow_temperature, solid_density,   &
+       solid_heat_capacity, deposition_rate, steam_fraction) RESULT(rate)
+
+    REAL(wp), INTENT(IN) :: flow_temperature
+    REAL(wp), INTENT(IN) :: solid_density(:)
+    REAL(wp), INTENT(IN) :: solid_heat_capacity(:)
+    REAL(wp), INTENT(IN) :: deposition_rate(:)
+    REAL(wp), INTENT(IN) :: steam_fraction
+    REAL(wp) :: rate
+
+    rate = steam_fraction * MAX(0.0_wp, flow_temperature -                    &
+         vaporization_boiling_temperature) *                                 &
+         SUM(solid_density * solid_heat_capacity * deposition_rate) /         &
+         (vaporization_liquid_heat_capacity *                                 &
+         (vaporization_boiling_temperature -                                  &
+         vaporization_liquid_temperature) + vaporization_latent_heat)
+
+  END FUNCTION eval_vaporization_mass_rate
+
+  !******************************************************************************
+  !> \brief Compute the sensible-energy rate carried by generated vapor.
+  !> \details Evaluates \f$\dot{E}_v=\dot{m}_vc_gT_b\f$ at the boiling
+  !>          temperature.
+  !> \param[in] vapor_mass_rate Generated vapor mass rate per unit area [kg m^-2 s^-1].
+  !> \param[in] gas_heat_capacity Steam specific heat capacity c_g [J kg^-1 K^-1].
+  !> \return Vapor sensible-energy rate per unit area [W m^-2].
+  !******************************************************************************
+  PURE FUNCTION eval_vaporization_energy_rate(vapor_mass_rate,               &
+       gas_heat_capacity) RESULT(rate)
+
+    REAL(wp), INTENT(IN) :: vapor_mass_rate, gas_heat_capacity
+    REAL(wp) :: rate
+
+    rate = vapor_mass_rate * gas_heat_capacity *                             &
+         vaporization_boiling_temperature
+
+  END FUNCTION eval_vaporization_energy_rate
+
+  !******************************************************************************
   !> \brief Find the unique real root below -1 of the normalized cooling cubic.
   !> \details For beta >= 0, solves
   !>          \f$r^3+r^2+r+(1+\beta)=0\f$ by bisection on the unique real root
@@ -358,57 +410,5 @@ CONTAINS
          ATAN((2.0_wp*x + quadratic_linear) / SQRT(discriminant))
 
   END FUNCTION lava_cooling_time_primitive
-
-  !******************************************************************************
-  !> \brief Compute the vaporization mass rate from hot-solid deposition.
-  !> \details Deposition heat above the boiling point supplies liquid warming
-  !>          and latent vaporization energy. The generated steam rate is
-  !>          multiplied by the configured steam fraction.
-  !>          \f$\dot{m}_v=f_v\max(0,T_f-T_b)\sum_i\rho_i c_iD_i/
-  !>          [c_l(T_b-T_l)+L_v]\f$.
-  !> \param[in] flow_temperature Flow temperature T_f [K].
-  !> \param[in] solid_density Per-class solid densities rho_i [kg m^-3].
-  !> \param[in] solid_heat_capacity Per-class solid specific heat capacities c_i [J kg^-1 K^-1].
-  !> \param[in] deposition_rate Per-class deposition thickness rates D_i [m s^-1].
-  !> \param[in] steam_fraction Fraction f_v of the available deposition heat assigned to vapor.
-  !> \return Generated vapor mass rate per unit area [kg m^-2 s^-1].
-  !******************************************************************************
-  PURE FUNCTION eval_vaporization_mass_rate(flow_temperature, solid_density,   &
-       solid_heat_capacity, deposition_rate, steam_fraction) RESULT(rate)
-
-    REAL(wp), INTENT(IN) :: flow_temperature
-    REAL(wp), INTENT(IN) :: solid_density(:)
-    REAL(wp), INTENT(IN) :: solid_heat_capacity(:)
-    REAL(wp), INTENT(IN) :: deposition_rate(:)
-    REAL(wp), INTENT(IN) :: steam_fraction
-    REAL(wp) :: rate
-
-    rate = steam_fraction * MAX(0.0_wp, flow_temperature -                    &
-         vaporization_boiling_temperature) *                                 &
-         SUM(solid_density * solid_heat_capacity * deposition_rate) /         &
-         (vaporization_liquid_heat_capacity *                                 &
-         (vaporization_boiling_temperature -                                  &
-         vaporization_liquid_temperature) + vaporization_latent_heat)
-
-  END FUNCTION eval_vaporization_mass_rate
-
-  !******************************************************************************
-  !> \brief Compute the sensible-energy rate carried by generated vapor.
-  !> \details Evaluates \f$\dot{E}_v=\dot{m}_vc_gT_b\f$ at the boiling
-  !>          temperature.
-  !> \param[in] vapor_mass_rate Generated vapor mass rate per unit area [kg m^-2 s^-1].
-  !> \param[in] gas_heat_capacity Steam specific heat capacity c_g [J kg^-1 K^-1].
-  !> \return Vapor sensible-energy rate per unit area [W m^-2].
-  !******************************************************************************
-  PURE FUNCTION eval_vaporization_energy_rate(vapor_mass_rate,               &
-       gas_heat_capacity) RESULT(rate)
-
-    REAL(wp), INTENT(IN) :: vapor_mass_rate, gas_heat_capacity
-    REAL(wp) :: rate
-
-    rate = vapor_mass_rate * gas_heat_capacity *                             &
-         vaporization_boiling_temperature
-
-  END FUNCTION eval_vaporization_energy_rate
 
 END MODULE thermal_laws_2d

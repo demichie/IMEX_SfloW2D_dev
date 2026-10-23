@@ -1,5 +1,6 @@
-! Standalone Fortran mirror of kt_v2_original_1d.py for its Ritter test,
-! using reconstructed u and h_face*u_face for the transported momentum.
+!> \brief Standalone one-dimensional Ritter dam-break diagnostic.
+!> \details Mirrors the reference KT test using reconstructed velocity and
+!>          face depth times velocity for the transported momentum.
 program kt_ritter_1d
   use, intrinsic :: iso_fortran_env, only : real64
   implicit none
@@ -78,6 +79,11 @@ program kt_ritter_1d
 
 contains
 
+  !> \brief Return the three-argument minmod limiter.
+  !> \param[in] a First slope candidate.
+  !> \param[in] b Centered slope candidate.
+  !> \param[in] c Third slope candidate.
+  !> \return The same-sign candidate with smallest magnitude, or zero.
   pure function mm3(a,b,c) result(v)
     real(wp), intent(in) :: a,b,c
     real(wp) :: v
@@ -90,6 +96,9 @@ contains
     end if
   end function mm3
 
+  !> \brief Compute limited cell-centered slopes on the uniform grid.
+  !> \param[in] v Cell-centered field values.
+  !> \param[out] slope Limited slope for each cell.
   subroutine limited_slope(v,slope)
     real(wp), intent(in) :: v(nx)
     real(wp), intent(out) :: slope(nx)
@@ -106,6 +115,10 @@ contains
     end do
   end subroutine limited_slope
 
+  !> \brief Recover velocity from depth and conservative momentum near dry states.
+  !> \param[in] h Flow depth.
+  !> \param[in] hu Conservative momentum.
+  !> \return Desingularized velocity.
   pure function desingularized_u(h,hu) result(u)
     real(wp), intent(in) :: h,hu
     real(wp) :: u, eps, denominator
@@ -115,6 +128,10 @@ contains
     if (denominator > 0.0_wp) u=sqrt(2.0_wp)*h*hu/denominator
   end function desingularized_u
 
+  !> \brief Assemble the one-dimensional spatial residual and maximum wave speed.
+  !> \param[in] state Cell-centered conservative state.
+  !> \param[out] rhs Semi-discrete conservative residual.
+  !> \param[out] max_speed Maximum absolute numerical wave speed.
   subroutine spatial_rhs(state,rhs,max_speed)
     real(wp), intent(in) :: state(nx,2)
     real(wp), intent(out) :: rhs(nx,2),max_speed
@@ -182,6 +199,10 @@ contains
     max_speed=max(maxval(abs(am)),maxval(abs(ap)))
   end subroutine spatial_rhs
 
+  !> \brief Compute exact Ritter-solution cell averages at the requested time.
+  !> \param[in] edges Cell-edge coordinates.
+  !> \param[in] time Evaluation time.
+  !> \param[out] hbar Exact depth averaged over each cell.
   subroutine ritter_cell_averages(edges,time,hbar)
     real(wp), intent(in) :: edges(0:nx),time
     real(wp), intent(out) :: hbar(nx)

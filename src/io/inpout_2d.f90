@@ -753,7 +753,6 @@ CONTAINS
           ! only compute once
           IF (.NOT. pascal_coeff_precomputed) THEN
             CALL precompute_pascal_coefficient(N_inh)
-            !pascal_coeff_precomputed = .TRUE.
             WRITE (*, *) 'f_inhibit_mode = ', f_inhibit_mode
             WRITE (*, *) 'Precomputed Pascal coefficients for N_INH = ', N_inh
             WRITE (*, *) 'pascal_coeff_precomputed = ', pascal_coeff_precomputed
@@ -841,7 +840,6 @@ CONTAINS
     stoch_bcN%flag = -1
     pore_bcN%flag = -1
 
-    ! sed_vol_perc = -1.0_wp
 
     rheology_model = 'none'
     rheology_model_id = rheology_id_none
@@ -1809,7 +1807,6 @@ CONTAINS
           coeff_porosity = 0.0_wp
           erodible_fract(1:n_solid) = 1.0_wp/n_solid
           T_erodible = 300.0_wp
-          !subtract_init_flag = .FALSE.
 
         ELSE
 
@@ -2326,11 +2323,6 @@ CONTAINS
           WRITE (*, *) 'B.C. for hu not set properly'
           WRITE (*, *) 'Please check the input file'
           STOP
-
-        ELSE
-
-          ! hu_bcW%flag = 1
-          ! hu_bcW%value = 0.0_wp
 
         END IF
 
@@ -3976,8 +3968,6 @@ CONTAINS
 
           END IF
 
-          ! source_length = 2.0 * pi_g * r_source
-
           IF ((x_source - MAX(r_source, r2_source)) .LE. X0 + cell_size) THEN
 
             WRITE (*, *) 'ERROR: problem with namelist RADIAL_SOURCE_PARAMETERS'
@@ -4523,7 +4513,6 @@ CONTAINS
           mfr = rho_m*h_source*source_length*vel_source
           WRITE (*, *) 'Source mass flow rate =', mfr, '(kg/s)'
           WRITE (*, *)
-          ! READ(*,*)
 
         END IF
 
@@ -4881,7 +4870,6 @@ CONTAINS
 
     IF (rheology_flag) WRITE (backup_unit, rheology_parameters)
 
-    ! WRITE(backup_unit,temperature_parameters)
 
     WRITE (backup_unit, solid_transport_parameters)
     WRITE (backup_unit, gas_transport_parameters)
@@ -5292,7 +5280,6 @@ CONTAINS
 
             IF (thickness_interp .GT. 0.0_wp) THEN
 
-              ! WRITE(*,*) 'j,k,thickness: ',j,k,thickness_init(j,k)
               domain%solve_mask_time(j, k) = release_time(i_file)
 
             END IF
@@ -5794,7 +5781,6 @@ CONTAINS
 
       END IF
 
-      !WRITE(output_unit_2d,1002) x0,dx,comp_cells_x,y0,dy,comp_cells_y,t
 
       DO k = 1, comp_cells_y
 
@@ -5985,7 +5971,7 @@ CONTAINS
     CHARACTER(LEN=512) :: line, message
     CHARACTER(LEN=128) :: existing_header, index_text, time_text
     INTEGER :: unit_manifest, ierr, line_length, comma, row_index
-    INTEGER :: previous_index, i
+    INTEGER :: previous_index
     REAL(wp) :: row_time, previous_time
     LOGICAL :: has_previous, overflow_halting, overflow_flag
 
@@ -6542,6 +6528,11 @@ CONTAINS
     CALL open_runout_csv(mass_center_unit, mass_center_file, mass_header, mass_exists, binary_restart)
   END SUBROUTINE open_runout_outputs
 
+  !******************************************************************************
+  !> \brief Format the CSV column headers for runout and mass-center histories.
+  !> \param[out] runout_header Header row for the runout history.
+  !> \param[out] mass_header Header row for the mass-center history.
+  !******************************************************************************
   SUBROUTINE make_runout_headers(runout_header, mass_header)
     CHARACTER(LEN=*), INTENT(OUT) :: runout_header, mass_header
 
@@ -7013,10 +7004,6 @@ CONTAINS
 
     ALLOCATE (X(sX, sY), Y(sX, sY), dist(sX, sY), dist_x(sX, sY),             &
               dist_y(sX, sY), alphas_tot(sX, sY))
-
-    ! This work with large
-    !X(:,:) = SPREAD( x_comp, 2, sY )
-    !Y(:,:) = SPREAD( y_comp, 1, sX )
 
     !$OMP PARALLEL
     !$OMP DO

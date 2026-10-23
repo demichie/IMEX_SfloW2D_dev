@@ -141,7 +141,6 @@ CONTAINS
     t_steady = 10_wp * tau_stochastic 
     dt = 0.1_wp * tau_stochastic
     n_iter = CEILING(t_steady/dt)
-    ! WRITE(*,*) 'dt,n_inter',dt,n_iter
 
     ! Allocate and compute convolution kernel if needed (will be keept in memory)
     IF (length_spatial_corr > 0.0_wp) THEN
@@ -409,6 +408,8 @@ END FUNCTION VelocitySquared
   END FUNCTION expFormNoise
 
   !> \brief Apply one Euler-Maruyama step to a scalar Ornstein-Uhlenbeck state.
+  !> \details Uses \f$Z_{n+1}=Z_n-(\Delta t/\tau)Z_n+
+  !>          \sigma\sqrt{2\Delta t/\tau}\,\xi_n\f$.
   !>
   !> \param[in] Zij Current Gaussian OU state before this stochastic update.
   !> \param[in] dt Time increment [s].
@@ -417,9 +418,6 @@ END FUNCTION VelocitySquared
   !> \return Updated Gaussian OU state after damping and stochastic forcing.
 
   REAL(wp) FUNCTION EulerMaruyamaScheme(Zij, dt, sigma, noise_ij)
-    ! Update the Ornstein-Uhlenback process using EULER-MARUYAMA Method
-    ! Z(j,k) = Z(j,k) - (dt / tau_stochastic) * Z(j,k) + &
-    ! sigma_noise * SQRT(2.0_wp * (dt / tau_stochastic)) * noise(j,k)
     IMPLICIT NONE
     REAL(wp), INTENT(IN) :: Zij, dt, sigma, noise_ij
     EulerMaruyamaScheme = Zij - (dt / tau_stochastic) * Zij +             &
@@ -492,8 +490,6 @@ subroutine convolve_2d(input_signal, kernel, result)
           ! bound checks below on an identity kernel.
           shift_x = -idx_k_x + half_len_k_x + 1
           shift_y = -idx_k_y + half_len_k_y + 1
-          ! sum_at_position = 0.1_wp
-
           ! here there may be a bug in the indexing (segmentation fault-invalid memory reference) 
           if ((idx_centre_y + shift_y .LT. 1) .or.  (idx_centre_y + shift_y .GT. size(padded_signal,2))) THEN
             

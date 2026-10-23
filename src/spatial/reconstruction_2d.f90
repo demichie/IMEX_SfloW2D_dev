@@ -280,6 +280,8 @@ CONTAINS
    !> \param[in] solve_cells Number of entries in the active-cell index lists.
    !> \param[in] j_cent X indices of active cells; only the first solve_cells entries are used.
    !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
+   !> \param[in] use_kt_direct Use direct KT traces instead of the HP dry-state projection.
+
 
    SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent, &
         use_kt_direct )
@@ -349,10 +351,6 @@ CONTAINS
        this%qp_cellN(:,j,k) = this%qp_cellW(:,j,k)
     END DO
     !$OMP END PARALLEL DO
-
-    !WRITE(*,*) 'recontruction 0'
-    !WRITE(*,*) 'nvars',n_vars
-    !WRITE(*,*) 'qp_expl(:,1,1)',qp_expl(:,1,1)
 
     !$OMP PARALLEL DO private(j,k,i,qrecW,qrecE,qrecS,qrecN,x_stencil,y_stencil,&
     !$OMP & qrec_stencil,qrec_prime_x,qrec_prime_y,qp2recW,qp2recE,qp2recS,     &
@@ -878,7 +876,11 @@ CONTAINS
 
   END SUBROUTINE reconstruction
 
-  !> Reconstruct the KP free surface separately for KT dissipation/path terms.
+  !******************************************************************************
+  !> \brief Reconstruct the KP free surface for KT dissipation and path terms.
+  !> \param[in,out] this Workspace containing the active HP-eta cell list and traces.
+  !> \param[in] qp_expl Cell-centered physical states at the explicit stage.
+  !******************************************************************************
   SUBROUTINE reconstruct_kt_eta_traces(this,qp_expl)
     USE parameters_2d, ONLY : limiter,reconstr_coeff
     USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
@@ -1169,6 +1171,13 @@ CONTAINS
     END IF
   END SUBROUTINE reconstruct_kt_eta_traces
 
+  !******************************************************************************
+  !> \brief Compute a smooth blend weight from the local Froude number.
+  !> \param[in] h Flow depth.
+  !> \param[in] u_normal Normal velocity.
+  !> \param[in] gravity Effective gravitational acceleration.
+  !> \return Blend weight between zero and one.
+  !******************************************************************************
   PURE FUNCTION froude_h_blend_weight(h,u_normal,gravity) RESULT(weight)
     REAL(wp), INTENT(IN) :: h,u_normal,gravity
     REAL(wp) :: weight,fr,scaled
@@ -1182,6 +1191,12 @@ CONTAINS
     weight=scaled*scaled*(3.0_wp-2.0_wp*scaled)
   END FUNCTION froude_h_blend_weight
 
+  !******************************************************************************
+  !> \brief Apply the two-argument minmod limiter to a pair of slopes.
+  !> \param[in] slope_a First slope candidate.
+  !> \param[in] slope_b Second slope candidate.
+  !> \return Same-sign slope with the smaller magnitude, or zero.
+  !******************************************************************************
   PURE FUNCTION minmod_slope_pair(slope_a,slope_b) RESULT(slope)
     REAL(wp), INTENT(IN) :: slope_a,slope_b
     REAL(wp) :: slope
@@ -1280,6 +1295,7 @@ CONTAINS
   !> \param[in] solve_cells Number of entries in the active-cell index lists.
   !> \param[in] j_cent X indices of active cells; only the first solve_cells entries are used.
   !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
+  !> \param[in] use_kt_direct Use direct KT traces instead of the HP dry-state projection.
   !******************************************************************************
 
   SUBROUTINE apply_hp_reconstruction( this, qp_center, solve_cells, j_cent,    &
@@ -1537,11 +1553,19 @@ CONTAINS
 
   CONTAINS
 
-    !> Convert direct KT traces without the HP dry-state projection.
+    !******************************************************************************
+    !> \brief Convert direct KT traces without the HP dry-state projection.
     !> Python clamps reconstructed h to zero but keeps independently
     !> reconstructed hu/hv for the inertial momentum flux. The unit-depth
     !> conversion below retains that conservative momentum even when h is
     !> clipped to zero, while mass-like quantities still scale with h.
+    !> \param[in] qp_candidate Reconstructed physical state at the face.
+    !> \param[out] q_conservative Conservative state converted from the trace.
+    !> \param[out] qp_reconstructed Physical state after depth and composition closure.
+    !> \param[in] j_cell X index of the adjacent cell.
+    !> \param[in] k_cell Y index of the adjacent cell.
+    !> \param[in] side Label identifying the face side for diagnostics.
+    !******************************************************************************
     SUBROUTINE final_kt_state(qp_candidate,q_conservative,qp_reconstructed,  &
          j_cell,k_cell,side)
 
@@ -1901,25 +1925,6 @@ CONTAINS
       END IF
 
     END FUNCTION local_hydrostatic_residual
-
-   !> \brief Recover a trace velocity only when its thickness exceeds the dry tolerance.
-   !>
-   !> \param[in] momentum Volumetric normal momentum h*u_n of the reconstructed trace.
-   !> \param[in] thickness Depth of the reconstructed trace [m].
-   !> \return Momentum/thickness [m s^-1], or zero for a numerically dry trace.
-
-   PURE ELEMENTAL FUNCTION safe_velocity(momentum,thickness) RESULT(velocity)
-
-      REAL(wp), INTENT(IN) :: momentum, thickness
-      REAL(wp) :: velocity
-
-      IF ( thickness .GT. hp_dry_tolerance ) THEN
-         velocity = momentum / thickness
-      ELSE
-         velocity = 0.0_wp
-      END IF
-
-    END FUNCTION safe_velocity
 
     !> \brief Close component fractions and convert a final HP candidate into conservative form.
     !>

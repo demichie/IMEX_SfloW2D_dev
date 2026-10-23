@@ -1,0 +1,277 @@
+{
+  "schema_version": 1,
+  "milestone": "D16",
+  "status": "pending_closure",
+  "tested_source_revision": "4973360ddf213501a93fe7f02ff9a417ae42f2aa",
+  "roadmap": "IMEX_SfloW2D_Development_Roadmap_WITH_LEGACY_LABELS_2026-10-15 (1).md",
+  "migrations": [
+    {
+      "id": "D16.3-rheology-dispatch",
+      "legacy_name": "Model-specific rheology dispatch from equation_terms_2d and nonlinear_solver_2d",
+      "new_name": "eval_implicit_rheology_rate, eval_semi_implicit_rheology_rate, solve_analytic_rheology_velocity",
+      "owning_module": "rheology_2d (src/physics/rheology_laws/rheology_2d.f90)",
+      "updated_callers": [
+        "src/physics/equation_terms_2d.f90",
+        "src/numerics/nonlinear_solver_2d.f90"
+      ],
+      "regression_evidence": [
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_source_modules.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_analytic_velocity.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90",
+        "TESTS/TEST_CURVATURE_SOURCE/test_curvature_source.f90"
+      ]
+    },
+    {
+      "id": "D16.4-thermal-module",
+      "legacy_name": "thermal_sources_2d (src/physics/thermal_sources_2d.f90)",
+      "new_name": "thermal_laws_2d (src/physics/thermal_laws_2d.f90)",
+      "owning_module": "thermal_laws_2d",
+      "updated_callers": [
+        "src/physics/equation_terms_2d.f90",
+        "src/numerics/nonlinear_solver_2d.f90"
+      ],
+      "regression_evidence": [
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_source_modules.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_lava_cooling.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90"
+      ]
+    },
+    {
+      "id": "D16.4-pore-pressure-module",
+      "legacy_name": "pore_pressure_2d (src/physics/pore_pressure_2d.f90)",
+      "new_name": "pore_pressure_laws_2d (src/physics/pore_pressure_laws_2d.f90)",
+      "owning_module": "pore_pressure_laws_2d",
+      "updated_callers": [
+        "src/physics/equation_terms_2d.f90",
+        "src/numerics/nonlinear_solver_2d.f90"
+      ],
+      "regression_evidence": [
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_pore_pressure_diffusion.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_source_modules.f90"
+      ]
+    },
+    {
+      "id": "D16.4-rheology-source-relocation",
+      "legacy_name": [
+        "src/physics/rheology_analytic_utils_2d.f90",
+        "src/physics/rheology_empirical_2d.f90",
+        "src/physics/rheology_froude_2d.f90",
+        "src/physics/rheology_lahar_2d.f90",
+        "src/physics/rheology_lava_2d.f90",
+        "src/physics/rheology_lucas_2d.f90",
+        "src/physics/rheology_mui_2d.f90",
+        "src/physics/rheology_mui_voellmy_2d.f90",
+        "src/physics/rheology_parameters_2d.f90",
+        "src/physics/rheology_plastic_2d.f90",
+        "src/physics/rheology_quadratic_2d.f90",
+        "src/physics/rheology_voellmy_2d.f90",
+        "src/physics/rheology_2d.f90"
+      ],
+      "new_name": "The same 13 source files under src/physics/rheology_laws/",
+      "owning_module": "The corresponding rheology_* modules in src/physics/rheology_laws/",
+      "updated_callers": [
+        "src/Makefile.am",
+        "src/physics/equation_terms_2d.f90",
+        "src/numerics/nonlinear_solver_2d.f90",
+        "src/io/inpout_2d.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/"
+      ],
+      "regression_evidence": [
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/run_test.sh",
+        "Full application build"
+      ]
+    },
+    {
+      "id": "D16.5-semi-implicit-evaluator",
+      "legacy_name": "equation_terms_2d::eval_nh_semi_impl_terms",
+      "new_name": "equation_terms_2d::eval_semi_implicit_terms",
+      "owning_module": "equation_terms_2d (src/physics/equation_terms_2d.f90)",
+      "updated_callers": [
+        "src/numerics/nonlinear_solver_2d.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/probe_sources.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90"
+      ],
+      "regression_evidence": [
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/run_test.sh",
+        "TESTS/TEST_IMEX_STAGES/run_test.sh"
+      ]
+    },
+    {
+      "id": "D16.6-thermal-rates",
+      "legacy_name": [
+        "thermal_laws_2d::eval_lava_cooling_source",
+        "thermal_laws_2d::eval_rheology_cooling_source",
+        "thermal_laws_2d::eval_vaporization_sources",
+        "thermal_laws_2d::eval_mass_exchange_thermal_energy"
+      ],
+      "new_name": [
+        "thermal_laws_2d::eval_lava_cooling_energy_rate",
+        "thermal_laws_2d::eval_rheology_cooling_energy_rate",
+        "thermal_laws_2d::eval_vaporization_mass_rate",
+        "thermal_laws_2d::eval_vaporization_energy_rate",
+        "thermal-energy assembly in equation_terms_2d::eval_mass_exchange_terms"
+      ],
+      "owning_module": [
+        "thermal_laws_2d",
+        "equation_terms_2d"
+      ],
+      "updated_callers": [
+        "src/physics/equation_terms_2d.f90",
+        "src/numerics/nonlinear_solver_2d.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_lava_cooling.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_source_modules.f90",
+        "TESTS/TEST_MASS_EXCHANGE/test_mass_exchange.f90"
+      ],
+      "regression_evidence": [
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_lava_cooling.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_source_modules.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90",
+        "TESTS/TEST_MASS_EXCHANGE/test_mass_exchange.f90"
+      ]
+    },
+    {
+      "id": "D16.3-D16.7-mass-exchange-laws",
+      "legacy_name": [
+        "state_conversion_2d::settling_velocity",
+        "Model-specific settling-fluid and deposition selection embedded in equation_terms_2d",
+        "equation_terms_2d::eval_lahar_deposition_rate",
+        "equation_terms_2d::eval_hindered_settling_deposition_rate",
+        "equation_terms_2d::eval_erosion_rates",
+        "equation_terms_2d::eval_continuous_phase_loss_rate",
+        "equation_terms_2d::eval_air_entrainment_rate"
+      ],
+      "new_name": [
+        "mass_exchange_laws_2d::eval_settling_fluid_properties",
+        "mass_exchange_laws_2d::eval_solid_deposition_rate",
+        "mass_exchange_laws_2d::settling_velocity",
+        "mass_exchange_laws_2d::eval_lahar_deposition_rate",
+        "mass_exchange_laws_2d::eval_hindered_settling_deposition_rate",
+        "mass_exchange_laws_2d::eval_erosion_rates",
+        "mass_exchange_laws_2d::eval_continuous_phase_loss_rate",
+        "mass_exchange_laws_2d::eval_air_entrainment_rate"
+      ],
+      "owning_module": "mass_exchange_laws_2d (src/physics/mass_exchange_laws_2d.f90)",
+      "updated_callers": [
+        "src/physics/equation_terms_2d.f90",
+        "TESTS/TEST_MASS_EXCHANGE/test_mass_exchange.f90",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_source_modules.f90"
+      ],
+      "regression_evidence": [
+        "TESTS/TEST_MASS_EXCHANGE/run_test.sh",
+        "TESTS/TEST_RHEOLOGY_CELL_LOCAL/run_test.sh"
+      ]
+    },
+    {
+      "id": "D16.8-D16.10-state-update",
+      "legacy_name": "mass_exchange_2d::update_erosion_deposition_cell",
+      "new_name": [
+        "time_integration_2d::apply_mass_exchange_step",
+        "time_integration_2d::apply_mass_exchange_increment"
+      ],
+      "owning_module": "time_integration_2d (src/numerics/time_integration_2d.f90)",
+      "updated_callers": [
+        "src/IMEX_SfloW2D.f90",
+        "TESTS/TEST_MASS_EXCHANGE/test_mass_exchange.f90",
+        "TESTS/TEST_MASS_EXCHANGE/test_projection_stress.f90"
+      ],
+      "regression_evidence": [
+        "TESTS/TEST_MASS_EXCHANGE/run_test.sh",
+        "TESTS/TEST_IMEX_STAGES/run_test.sh",
+        "TESTS/TEST_BINARY_RESTART/run_test.sh"
+      ]
+    },
+    {
+      "id": "D16.9-topography-geometry",
+      "legacy_name": [
+        "mass_exchange_2d::apply_vertex_first_topography_update",
+        "mass_exchange_2d::ensure_topography_workspace",
+        "mass_exchange_2d::release_topography_workspace"
+      ],
+      "new_name": [
+        "geometry_2d::begin_topography_rate_update",
+        "geometry_2d::record_topography_rate_cell",
+        "geometry_2d::apply_topography_rate_update",
+        "geometry_2d::refresh_topography_geometry",
+        "geometry_2d::release_topography_workspace"
+      ],
+      "owning_module": "geometry_2d (src/geometry/geometry_2d.f90)",
+      "updated_callers": [
+        "src/numerics/time_integration_2d.f90",
+        "src/IMEX_SfloW2D.f90",
+        "src/io/inpout_2d.f90",
+        "TESTS/TEST_MASS_EXCHANGE/test_projection_stress.f90",
+        "TESTS/TEST_TOPOGRAPHY_FACES/",
+        "TESTS/TEST_WORKSPACE_LIFECYCLE/"
+      ],
+      "regression_evidence": [
+        "TESTS/TEST_TOPOGRAPHY_FACES/run_test.sh",
+        "TESTS/TEST_WORKSPACE_LIFECYCLE/run_test.sh",
+        "TESTS/TEST_IMEX_STAGES/run_test.sh",
+        "TESTS/TEST_BINARY_RESTART/run_test.sh"
+      ]
+    },
+    {
+      "id": "D16.10-retire-mass-exchange-module",
+      "legacy_name": "module mass_exchange_2d (src/physics/mass_exchange_2d.f90)",
+      "new_name": "Retired; state updates are owned by time_integration_2d, geometry changes by geometry_2d, and constitutive laws by mass_exchange_laws_2d",
+      "owning_module": [
+        "time_integration_2d",
+        "geometry_2d",
+        "mass_exchange_laws_2d"
+      ],
+      "updated_callers": [
+        "src/IMEX_SfloW2D.f90",
+        "src/Makefile.am",
+        "TESTS/TEST_MASS_EXCHANGE/",
+        "TESTS/TEST_WORKSPACE_LIFECYCLE/"
+      ],
+      "regression_evidence": [
+        "Production source audit finds no import or call of mass_exchange_2d or update_erosion_deposition_cell; archived acceptance evidence retains historical path labels",
+        "TESTS/TEST_MASS_EXCHANGE/run_test.sh",
+        "TESTS/TEST_WORKSPACE_LIFECYCLE/run_test.sh"
+      ]
+    }
+  ],
+  "acceptance_evidence": {
+    "global_doxygen": {
+      "status": "pass",
+      "command": "python check_documentation.py --check-against-git HEAD",
+      "result": "45 source files, 133 functions, 43 modules, 2 programs, 224 subroutines, and 4 include fragments; executable code and directives unchanged from HEAD"
+    },
+    "strict_debug_build": {
+      "status": "pass",
+      "command": "configure --with-netcdf=/opt/homebrew --enable-strict-debug; make -j2",
+      "result": "Full application built successfully out of tree."
+    },
+    "regression_suite": {
+      "status": "partial",
+      "passed": [
+        "TEST_RHEOLOGY_CELL_LOCAL: 255/255 fixtures in strict and optimized profiles",
+        "TEST_MASS_EXCHANGE: strict and optimized profiles, actual 1/4-thread comparisons",
+        "TEST_TOPOGRAPHY_FACES: 1 and 4 threads",
+        "TEST_WORKSPACE_LIFECYCLE: 4 threads",
+        "TEST_IMEX_STAGES with IMEX_TEST_SECTION=stages: strict and optimized profiles, including boundary checks"
+      ],
+      "not_completed": [
+        "make check passed equation metadata, output-path, five solver examples, and output-path safety; it was stopped while TEST_DAMBREAK/TEST_DYNAMIC_FINH was still running at t=0.0015 in the local strict-debug build.",
+        "The all-sections TEST_IMEX_STAGES run passed the stage and assembly section but failed the separate order-suite assertion 'manufactured mass remains constant' (scaled error 0.31518397499667228)."
+      ]
+    },
+    "restart_tests": {
+      "status": "pass",
+      "thread_counts": [
+        1,
+        4
+      ],
+      "tests": [
+        "TESTS/TEST_BINARY_RESTART/run_test.sh: binary restart and runout recovery scenarios passed",
+        "TESTS/TEST_STOCHASTIC_RESTART/run_test.sh: stochastic transport and restarted OU evolution were bit-for-bit identical"
+      ]
+    },
+    "continuous_integration": {
+      "status": "not_available",
+      "note": "No Actions run is recorded for tested_source_revision; GitHub CLI authentication is unavailable in this environment."
+    }
+  }
+}
