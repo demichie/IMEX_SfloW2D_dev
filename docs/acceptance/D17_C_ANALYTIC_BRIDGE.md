@@ -44,6 +44,8 @@ workspace's Python 3.9 environment and a system Python lacking NumPy did not
 run the comparison step; no repository or dependency files were changed for
 those environment issues.
 
-No Intel ifx, Linux, CI, or portability acceptance is claimed. D17-D/E still
-need to route explicit, boundary, and post-RK mass-exchange paths; D17-F remains
-responsible for native source input and broader capability acceptance.
+No Intel ifx, Linux, CI, or portability acceptance is claimed. The subsequent
+numbered implementation of the explicit stage interface is recorded in
+[D17.9 explicit stage routing](D17_9_EXPLICIT_STAGE_ROUTING.md). D17.10 onward
+still needs to complete the semi-implicit/implicit interfaces, remaining
+stage/step routing, native input and full acceptance.

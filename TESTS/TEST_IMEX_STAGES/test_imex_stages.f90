@@ -47,7 +47,8 @@ PROGRAM test_imex_stages
   USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_ANALYTIC, &
        IM_GROUP_METHOD_NEWTON
   USE source_catalog_2d, ONLY : rheology_source_terms, SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
-       SOURCE_TERM_THERMAL_CONVECTIVE_COOLING, SOURCE_TERM_PORE_PRESSURE_DISSIPATION
+       SOURCE_TERM_THERMAL_CONVECTIVE_COOLING, SOURCE_TERM_PORE_PRESSURE_DISSIPATION, &
+       SOURCE_TERM_GEOMETRY_CURVATURE
   USE source_registry_2d, ONLY : source_registry_type
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, finalize_nonlinear_solver
   USE state_conversion_2d, ONLY : qc_to_qp
@@ -401,6 +402,25 @@ CONTAINS
        CALL eval_source_bdry(0.0_wp,1.0_wp,0.0_wp,source_state)
        CALL assert_boundary_value('source boundary helper temperature', &
             source_state(idx_T),source_temperature)
+       source_cell=0
+       sourceW=.FALSE.; sourceE=.FALSE.; sourceS=.FALSE.; sourceN=.FALSE.
+       sourceW_vect_x=0.0_wp; sourceW_vect_y=0.0_wp
+       sourceE_vect_x=0.0_wp; sourceE_vect_y=0.0_wp
+       sourceS_vect_x=0.0_wp; sourceS_vect_y=0.0_wp
+       sourceN_vect_x=0.0_wp; sourceN_vect_y=0.0_wp
+       cell_j=1; cell_k=(ny+1)/2
+       sourceW(cell_j,cell_k)=.TRUE.
+       source_cell(cell_j,cell_k)=2
+       CALL boundary_reconstruction%reconstruct(boundary_qp,0.0_wp,nx*ny, &
+            boundary_j,boundary_k,.TRUE.,source_boundary_enabled=.FALSE.)
+       expected=boundary_qp(idx_T,cell_j,cell_k)
+       CALL assert_boundary_value('unselected lateral source trace', &
+            boundary_reconstruction%qp_interfaceR(idx_T,cell_j,cell_k),expected)
+       CALL boundary_reconstruction%reconstruct(boundary_qp,0.0_wp,nx*ny, &
+            boundary_j,boundary_k,.TRUE.,source_boundary_enabled=.TRUE.)
+       CALL assert_boundary_value('selected lateral source trace', &
+            boundary_reconstruction%qp_interfaceR(idx_T,cell_j,cell_k), &
+            source_temperature)
        DO side=1,2
           source_cell=0
           sourceW=.FALSE.; sourceE=.FALSE.; sourceS=.FALSE.; sourceN=.FALSE.
@@ -647,6 +667,8 @@ CONTAINS
 
     active_terms=[INTEGER::]
     IF (rheology_flag) active_terms=rheology_source_terms(rheology_model_id)
+    IF (curvature_term_flag) &
+         active_terms=[active_terms,SOURCE_TERM_GEOMETRY_CURVATURE]
     IF (partition%implicit(4)) active_terms=[active_terms, &
          SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
          SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]

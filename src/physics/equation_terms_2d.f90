@@ -34,10 +34,13 @@ MODULE equation_terms_2d
   USE equation_metadata_2d, ONLY : equation_partition_type,                   &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,                       &
+       SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE,                         &
        SOURCE_SOLVE_ANALYTIC_VELOCITY, SOURCE_SOLVE_ANALYTIC_TEMPERATURE,     &
        SOURCE_SOLVE_ANALYTIC_PORE_PRESSURE, SOURCE_TARGET_VELOCITY,          &
-       SOURCE_TARGET_TEMPERATURE, SOURCE_TARGET_PORE_PRESSURE
-  USE source_registry_2d, ONLY : source_group_type, source_solver_type
+       SOURCE_TARGET_TEMPERATURE, SOURCE_TARGET_PORE_PRESSURE,               &
+       SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION,&
+       SOURCE_TERM_BOTTOM_FISSURAL_INJECTION, SOURCE_TERM_RADIAL_INJECTION
+  USE source_registry_2d, ONLY : source_group_type, source_solver_type, group_contains
 
   USE parameters_2d, ONLY : wp, dry_thickness_tolerance
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
@@ -227,7 +230,7 @@ CONTAINS
   SUBROUTINE eval_expl_terms( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy , &
        Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,             &
        cell_fissure_fract,                                                       &
-       lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk )
+       lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group )
 
     USE parameters_2d, ONLY : vel_source , T_source , xs_source , xg_source,    &
          xl_source , time_param , bottom_radial_source_flag,                    &
@@ -262,6 +265,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: lat_n_x_jk
     REAL(wp), INTENT(IN) :: lat_n_y_jk
     REAL(wp), INTENT(IN) :: cell_area_jk
+    TYPE(source_group_type), INTENT(IN) :: group
 
     REAL(wp) :: r_h          !< real-value flow thickness
     REAL(wp) :: r_u          !< real-value x-velocity
@@ -292,6 +296,12 @@ CONTAINS
     expl_term(1:n_eqns) = 0.0_wp
     q1 = 0.0_wp
 
+    IF (group%method/=SOURCE_METHOD_EXPLICIT .OR. &
+         group%cadence/=SOURCE_CADENCE_STAGE .OR. &
+         .NOT.ALLOCATED(group%term_ids)) THEN
+       CALL fatal_error('D17: eval_expl_terms requires a validated explicit stage group')
+    END IF
+
       IF ( ( qpj(1) .LE. EPSILON(1.0_wp) ) .AND. ( cell_fract_jk .EQ. 0.0_wp )    &
              .AND. ( lat_arc_perim_jk .EQ. 0.0_wp ) .AND.                          &
              ALL(cell_fissure_fract .EQ. 0.0_wp) ) RETURN
@@ -308,7 +318,9 @@ CONTAINS
 
        q1 = r_h * r_rho_m
 
-       IF ( curvature_term_flag .AND. r_h .GT. dry_thickness_tolerance ) THEN
+       IF ( curvature_term_flag .AND.                                      &
+            group_contains(group,SOURCE_TERM_GEOMETRY_CURVATURE) .AND.     &
+            r_h .GT. dry_thickness_tolerance ) THEN
 
           ! Hydrostatic pressure and the ordinary bed-slope source are already
           ! represented by the HP path. Curvature remains a separate,
@@ -329,7 +341,8 @@ CONTAINS
 
     ! ----------- ADDITIONAL EXPLICIT TERMS FOR BOTTOM RADIAL SOURCE ------------
 
-    IF ( bottom_radial_source_flag .AND. ( cell_fract_jk .GT. 0.0_wp ) ) THEN
+    IF ( group_contains(group,SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION) .AND. &
+         bottom_radial_source_flag .AND. ( cell_fract_jk .GT. 0.0_wp ) ) THEN
 
     IF ( n_intervals .GT. 0 ) THEN
 
@@ -472,7 +485,8 @@ CONTAINS
 
     ! Each fissure uses its own clipped cell coverage, pulse and temperature,
     ! and the source composition converted at that temperature.
-    IF ( bottom_fissural_source_flag ) THEN
+    IF ( group_contains(group,SOURCE_TERM_BOTTOM_FISSURAL_INJECTION) .AND. &
+         bottom_fissural_source_flag ) THEN
 
        DO i_fissure = 1, n_fissures
 
@@ -556,7 +570,8 @@ CONTAINS
     ! per-cell rate rho_source * h_source * vel_source * cell_arc_perim_jk
     ! / cell_area_jk sums to MFR over all in-arc cells.
 
-    IF ( radial_source_flag .AND. ( lat_arc_perim_jk .GT. 0.0_wp ) .AND.       &
+    IF ( group_contains(group,SOURCE_TERM_RADIAL_INJECTION) .AND.              &
+         radial_source_flag .AND. ( lat_arc_perim_jk .GT. 0.0_wp ) .AND.       &
          ( h_source .GT. 0.0_wp ) ) THEN
 
        ! Time gate: keep the current-main semantics used by eval_source_bdry.

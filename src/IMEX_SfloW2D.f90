@@ -70,6 +70,9 @@ PROGRAM IMEX_SfloW2D
 
    USE time_integration_2d, ONLY : apply_mass_exchange_step
    USE simulation_2d, ONLY : simulation
+   USE source_registry_2d, ONLY : source_group_type, group_contains
+   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE, &
+        SOURCE_TERM_BOUNDARY_INJECTION
 
    USE inpout_2d, ONLY : restart
 
@@ -123,6 +126,9 @@ PROGRAM IMEX_SfloW2D
    REAL(wp) :: mod_vel , mod_vel2, r_u, r_v
 
    INTEGER :: len_fname
+   INTEGER :: i_source_group
+   TYPE(source_group_type), ALLOCATABLE :: stage_source_groups(:)
+   LOGICAL :: boundary_source_enabled
    CHARACTER(LEN=4) :: ext
    LOGICAL :: is_binary_restart
    LOGICAL :: runout_exists, mass_exists
@@ -170,6 +176,16 @@ PROGRAM IMEX_SfloW2D
    CALL init_grid
 
    CALL simulation%initialize
+
+   stage_source_groups=simulation%source_registry%stage_groups()
+   boundary_source_enabled=.FALSE.
+   DO i_source_group=1,SIZE(stage_source_groups)
+      IF (stage_source_groups(i_source_group)%cadence/=SOURCE_CADENCE_STAGE .OR. &
+           stage_source_groups(i_source_group)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
+      boundary_source_enabled=boundary_source_enabled .OR. group_contains( &
+           stage_source_groups(i_source_group),SOURCE_TERM_BOUNDARY_INJECTION)
+   END DO
+   DEALLOCATE(stage_source_groups)
 
    is_binary_restart = .FALSE.
    simulation%runtime%t = t_start
@@ -407,7 +423,8 @@ PROGRAM IMEX_SfloW2D
 
       CALL simulation%spatial_operator%compute_timestep(                      &
            simulation%state%q, simulation%state%qp, simulation%runtime%t,     &
-           simulation%runtime%dt, simulation%domain)
+           simulation%runtime%dt, simulation%domain,                         &
+           boundary_source_enabled=boundary_source_enabled)
 
       IF ( t_end - simulation%runtime%t_output < 1.0E-7_WP )                 &
          simulation%runtime%t_output = t_end

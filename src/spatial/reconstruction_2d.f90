@@ -284,7 +284,7 @@ CONTAINS
 
 
    SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent, &
-        use_kt_direct )
+        use_kt_direct, source_boundary_enabled )
 
     ! External procedures
       USE state_conversion_2d, ONLY : qp_to_qp2
@@ -310,6 +310,7 @@ CONTAINS
     INTEGER, INTENT(IN) :: j_cent(:)
     INTEGER, INTENT(IN) :: k_cent(:)
     LOGICAL, INTENT(IN) :: use_kt_direct
+    LOGICAL, INTENT(IN), OPTIONAL :: source_boundary_enabled
 
     REAL(wp) :: qrecW(n_vars+2) !< recons var at the west edge of the cells
     REAL(wp) :: qrecE(n_vars+2) !< recons var at the east edge of the cells
@@ -333,9 +334,13 @@ CONTAINS
     REAL(wp) :: dq
 
     LOGICAL :: regular_interior
+    LOGICAL :: use_boundary_source
 
     ! Keep the same constant candidates for inactive neighbours, but initialize
     ! only cells that can contribute to an active HP trace.
+    use_boundary_source=lateral_source_flag
+    IF (PRESENT(source_boundary_enabled)) &
+         use_boundary_source=source_boundary_enabled
     CALL build_hp_workset(this, solve_cells, j_cent, k_cent)
 
     !$OMP PARALLEL DO PRIVATE(l,j,k)
@@ -374,7 +379,8 @@ CONTAINS
        ! The existing lateral boundary source keeps its Dirichlet treatment.
        source_bdry(1:n_vars+2) = qp_expl(1:n_vars+2,j,k)
 
-       IF ( lateral_source_flag .AND. ( source_cell(j,k) .EQ. 2 ) ) THEN
+       IF ( use_boundary_source .AND. lateral_source_flag .AND.             &
+            ( source_cell(j,k) .EQ. 2 ) ) THEN
 
           IF ( sourceE(j,k) ) THEN
 

@@ -29,7 +29,9 @@ MODULE time_integration_2d
   USE equation_metadata_2d, ONLY : equation_partition_type
 
   USE source_registry_2d, ONLY : source_registry_type, source_group_type, &
-       source_solver_type
+       source_solver_type, group_contains
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE, &
+       SOURCE_TERM_BOUNDARY_INJECTION
 
   USE spatial_operator_2d, ONLY : spatial_operator_type
 
@@ -477,6 +479,7 @@ CONTAINS
     PROCEDURE(imex_state_observer), OPTIONAL :: observer
 
     TYPE(source_group_type), ALLOCATABLE :: stage_groups(:)
+    TYPE(source_group_type), ALLOCATABLE :: explicit_groups(:)
     TYPE(source_solver_type), ALLOCATABLE :: source_solvers(:)
     REAL(wp) :: q_guess(n_vars) !< initial guess for the solution of the RK step
     REAL(wp) :: q_fv_cell(n_vars) !< finite-volume state for the current cell
@@ -485,6 +488,7 @@ CONTAINS
     INTEGER :: i_RK
     INTEGER :: j,k,l            !< loop counter over the grid volumes
     REAL(wp) :: known_stage_residual(n_eqns)
+    REAL(wp) :: explicit_rate(n_eqns)
 
     REAL(wp) :: a_diag
     REAL(wp) :: p_dyn
@@ -492,6 +496,7 @@ CONTAINS
 
     LOGICAL :: solid_excess_roundoff
     LOGICAL :: need_explicit_stage
+    LOGICAL :: boundary_source_enabled
 
     INTEGER :: newton_iterations
     INTEGER :: newton_linear_info
@@ -499,6 +504,7 @@ CONTAINS
     LOGICAL :: newton_line_search_failed
     INTEGER :: newton_calls_step
     INTEGER :: implicit_status
+    INTEGER :: registry_group_index, explicit_group_index
     INTEGER :: newton_iterations_step
     INTEGER :: newton_iterations_max_step
     INTEGER :: newton_failures_step
@@ -510,6 +516,15 @@ CONTAINS
     END IF
     stage_groups=source_registry%stage_groups()
     source_solvers=source_registry%solvers()
+    ALLOCATE(explicit_groups(0))
+    boundary_source_enabled=.FALSE.
+    DO registry_group_index=1,SIZE(stage_groups)
+       IF (stage_groups(registry_group_index)%cadence/=SOURCE_CADENCE_STAGE .OR. &
+            stage_groups(registry_group_index)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
+       explicit_groups=[explicit_groups,stage_groups(registry_group_index)]
+       boundary_source_enabled=boundary_source_enabled .OR. group_contains( &
+            stage_groups(registry_group_index),SOURCE_TERM_BOUNDARY_INJECTION)
+    END DO
 
     IF ( .NOT. equation_partition%is_initialized() ) THEN
        ERROR STOP 'imex_RK_solver: equation partition is not initialized'
@@ -593,6 +608,7 @@ CONTAINS
        !$OMP DO schedule(guided)                                                &
        !$OMP & private(j,k,q_guess,q_fv_cell,known_stage_residual,p_dyn,       &
        !$OMP & closure_context,                                                &
+       !$OMP & explicit_rate,explicit_group_index,                             &
        !$OMP & newton_iterations,newton_linear_info,newton_converged,          &
        !$OMP & newton_line_search_failed,implicit_status)
 
@@ -764,13 +780,18 @@ CONTAINS
 
              ! Evaluate local explicit sources separately from the spatial
              ! hydrostatic path contribution handled by spatial_operator.
-             CALL eval_expl_terms( B_prime_x_geom(j,k) , B_prime_y_geom(j,k) ,  &
-                  B_second_xx_geom(j,k) , B_second_xy_geom(j,k) ,               &
-                  B_second_yy_geom(j,k) , grav_coeff(j,k),                      &
-                  this%qp_rk(1:n_vars+2,j,k), this%EX_terms(1:n_eqns,j,k,i_RK), t, &
-                  cell_source_fractions(j,k), cell_fissure_fractions(j,k,:),    &
-                  cell_arc_perim(j,k), cell_arc_n_x(j,k), cell_arc_n_y(j,k),    &
-                  dx * dy )
+             this%EX_terms(1:n_eqns,j,k,i_RK)=0.0_wp
+             DO explicit_group_index=1,SIZE(explicit_groups)
+                CALL eval_expl_terms( B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
+                     B_second_xx_geom(j,k),B_second_xy_geom(j,k),             &
+                     B_second_yy_geom(j,k),grav_coeff(j,k),                   &
+                     this%qp_rk(1:n_vars+2,j,k),explicit_rate,t,               &
+                     cell_source_fractions(j,k),cell_fissure_fractions(j,k,:),&
+                     cell_arc_perim(j,k),cell_arc_n_x(j,k),cell_arc_n_y(j,k), &
+                     dx*dy,explicit_groups(explicit_group_index))
+                this%EX_terms(1:n_eqns,j,k,i_RK)=                              &
+                     this%EX_terms(1:n_eqns,j,k,i_RK)+explicit_rate
+             END DO
   
           END IF
 
@@ -784,7 +805,8 @@ CONTAINS
           ! Evaluate the complete explicit spatial term. The time integrator
           ! is independent of the KT flux workspace.
           CALL spatial_operator%evaluate( this%qp_rk,                       &
-               this%spatial_terms(:,:,:,i_RK), t, domain )
+               this%spatial_terms(:,:,:,i_RK), t, domain,                  &
+               boundary_source_enabled=boundary_source_enabled )
 
        END IF
 

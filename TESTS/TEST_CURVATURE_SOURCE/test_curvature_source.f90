@@ -6,6 +6,9 @@ PROGRAM test_curvature_source
   USE equation_terms_2d, ONLY : curvature_acceleration
   USE equation_terms_2d, ONLY : eval_curvature_momentum_source
   USE equation_terms_2d, ONLY : eval_expl_terms
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE, &
+       SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION
+  USE source_registry_2d, ONLY : source_group_type
 
   IMPLICIT NONE
 
@@ -23,7 +26,15 @@ PROGRAM test_curvature_source
   REAL(wp) :: source_x, source_y, expected_x, expected_y
   REAL(wp) :: tolerance
   REAL(wp) :: physical(7), original(7), explicit_source(5)
+  TYPE(source_group_type) :: curvature_group, circular_injection_group
   INTEGER :: sample
+
+  curvature_group%method=SOURCE_METHOD_EXPLICIT
+  curvature_group%cadence=SOURCE_CADENCE_STAGE
+  curvature_group%term_ids=[SOURCE_TERM_GEOMETRY_CURVATURE]
+  circular_injection_group%method=SOURCE_METHOD_EXPLICIT
+  circular_injection_group%cadence=SOURCE_CADENCE_STAGE
+  circular_injection_group%term_ids=[SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION]
 
   expected_acceleration = Bxx*u*u + 2.0_wp*Bxy*u*v + Byy*v*v
   CALL assert_small( 'curvature acceleration',                             &
@@ -69,13 +80,15 @@ PROGRAM test_curvature_source
      physical(6)=1.0E150_wp; physical(7)=-1.0E150_wp
      original=physical
      CALL eval_expl_terms(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
-          0.0_wp,0.0_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp)
+          0.0_wp,0.0_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
+          curvature_group)
      CALL assert_small('dry curvature source',MAXVAL(ABS(explicit_source)),0.0_wp)
      CALL assert_small('dry physical state retained',MAXVAL(ABS(physical-original)),0.0_wp)
   END DO
   physical(1)=2.0_wp*dry_thickness_tolerance; physical(6)=u; physical(7)=v
   CALL eval_expl_terms(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
-       0.0_wp,0.0_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp)
+       0.0_wp,0.0_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
+       curvature_group)
   CALL eval_curvature_momentum_source(Bx,By,Bxx,Bxy,Byy,G,          &
        rho_l*physical(1),u,v,expected_x,expected_y)
   tolerance=128.0_wp*EPSILON(1.0_wp)*MAX(ABS(expected_x),ABS(expected_y))
@@ -89,7 +102,13 @@ PROGRAM test_curvature_source
   time_param=[10.0_wp,5.0_wp,0.0_wp,0.0_wp]
   physical(1)=dry_thickness_tolerance/2.0_wp
   CALL eval_expl_terms(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
-       0.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp)
+       0.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
+       curvature_group)
+  CALL assert_small('unselected circular injection excluded', &
+       MAXVAL(ABS(explicit_source)),0.0_wp)
+  CALL eval_expl_terms(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
+       0.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
+       circular_injection_group)
   expected_x=0.25_wp*vel_source*rho_l
   CALL assert_small('dry-cell mass injection retained',ABS(explicit_source(1)-expected_x), &
        64.0_wp*EPSILON(1.0_wp)*expected_x)

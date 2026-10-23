@@ -8,6 +8,9 @@ PROGRAM test_spatial_operator
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   USE equation_terms_2d, ONLY : eval_expl_terms
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE, &
+       SOURCE_TERM_GEOMETRY_CURVATURE
+  USE source_registry_2d, ONLY : source_group_type
   USE omp_lib
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
@@ -17,6 +20,7 @@ PROGRAM test_spatial_operator
   TYPE(spatial_operator_type) :: spatial
   TYPE(reconstruction_workspace_type) :: reconstruction
   TYPE(hyperbolic_workspace_type) :: hyperbolic
+  TYPE(source_group_type) :: explicit_group
   REAL(wp), ALLOCATABLE :: q(:,:,:), q0(:,:,:), qp(:,:,:), term(:,:,:), direct(:,:,:), cell_sources(:,:,:)
   REAL(wp) :: dt, repeated_dt, saved_cfl, capped_dt, no_fissures(0)
   !> Independent rate derived from the public backend face payload [1/s].
@@ -39,6 +43,11 @@ PROGRAM test_spatial_operator
   READ(input_unit,*) nx,ny,slope,curvature,limiter_id
   READ(input_unit,*) dx,dy
   CALL initialize_fixture
+  explicit_group%method=SOURCE_METHOD_EXPLICIT
+  explicit_group%cadence=SOURCE_CADENCE_STAGE
+  explicit_group%term_ids=[INTEGER::]
+  IF (curvature_term_flag) &
+       explicit_group%term_ids=[SOURCE_TERM_GEOMETRY_CURVATURE]
   READ(input_unit,*) B_vertex
   READ(input_unit,*) q
   CLOSE(input_unit)
@@ -86,7 +95,7 @@ PROGRAM test_spatial_operator
              B_second_xx_geom(j,k),B_second_xy_geom(j,k),              &
              B_second_yy_geom(j,k),grav_coeff(j,k),qp(:,j,k),           &
              cell_sources(:,j,k),0.0_wp,0.0_wp,no_fissures,            &
-             0.0_wp,0.0_wp,0.0_wp,dx*dy)
+             0.0_wp,0.0_wp,0.0_wp,dx*dy,explicit_group)
      END DO
   END DO
   IF (.NOT.ALL(ieee_is_finite(cell_sources))) ERROR STOP 'nonfinite local source'

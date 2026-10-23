@@ -2456,29 +2456,55 @@ non è coperto da questa CI.
 
 ### D17 — Organizzazione unificata dei termini sorgente, gruppi e separazione tra fisica e numerica
 
-Stato ufficiale: IN CORSO — fasi A/B implementate e verificate localmente; dispatch numerico e input nativo da implementare.
+Stato ufficiale: IN CORSO — i metadati del registro, il bridge analitico e
+l’interfaccia esplicita D17.9 sono implementati e verificati localmente.
+D17.10 e i requisiti successivi restano aperti; D17 nel complesso non è
+completato. L’implementazione D17.9 è nel worktree e non è ancora committata.
 
 Baseline della fase A: `1310511e` (23 ottobre 2026). Specifica di compatibilità:
 [D17_SOURCE_CONTRACT_2026_10_23.md](acceptance/D17_SOURCE_CONTRACT_2026_10_23.md);
 inventario con 30 contributi fisici e 4 assemblaggi derivati:
 [D17_SOURCE_TERMS_MANIFEST_2026_10_23.json](acceptance/D17_SOURCE_TERMS_MANIFEST_2026_10_23.json).
-La fase A è una baseline documentale storica. La fase B successiva definisce i
-34 ID Fortran, descrittori dei gruppi/solve e registri validati posseduti dalla
-simulazione, con adattatore dei gruppi IMEX legacy. Rapporto:
+La fase A è una baseline documentale storica. Il catalogo e il registro
+definiscono i 34 ID Fortran, i descrittori dei gruppi/solve e i registri
+validati posseduti dalla simulazione, con adattatore dei gruppi IMEX legacy.
+Rapporto:
 [D17_B_SOURCE_REGISTRY_2026_10_23.md](acceptance/D17_B_SOURCE_REGISTRY_2026_10_23.md),
 [evidenza machine-readable](acceptance/results_d17_b_source_registry_2026_10_23.json).
+Il dispatch dei solve analitici è documentato in
+[D17_C_ANALYTIC_BRIDGE.md](acceptance/D17_C_ANALYTIC_BRIDGE.md); il routing
+esplicito stage, incluso l’hook distinto al bordo, è documentato in
+[D17_9_EXPLICIT_STAGE_ROUTING.md](acceptance/D17_9_EXPLICIT_STAGE_ROUTING.md).
 
-Passano per profilo strict/optimized 864 configurazioni legacy, 14.823 assert e
-27 casi negativi. Passano anche 255/255 fixture reologiche per profilo, 32/32
-check del parser per build e 12 prove con l’integratore produttivo a 1/4 thread.
-La normalizzazione conserva i blocchi Newton congiunti e separa i gruppi
-analitici legacy nell’ordine velocità/temperatura/pressione. Nessuna validazione
-o allocazione del registro è aggiunta ai loop degli stage o di Newton.
+Per il registro passano, in strict e optimized, 864 configurazioni legacy,
+14.857 asserzioni e 28 casi invalidi rifiutati. I test D17-C e D17.9 verificano
+localmente i percorsi analitici ed espliciti e le regressioni IMEX/spaziali
+indicate nei rispettivi report. I risultati di parser e integratore riportati
+nel rapporto B sono evidenza storica di quella fase, non una validazione
+completa del D17 attuale. La normalizzazione conserva i blocchi Newton
+congiunti e ordina i gruppi analitici legacy velocità/temperatura/pressione.
+Validazione e copie complete del registro restano fuori dai loop di cella e
+Newton.
 
-Il registro affianca la partizione esistente; i kernel e il percorso numerico
-restano quelli attuali. I gate C–F (bridge analitico, filtri, dispatch EX/bordo/step,
-input nativo e acceptance completa) restano aperti. Nessuna nuova accettazione
-ifx/Linux/Docker è attestata da B; D17 non è completato.
+Nessuna nuova accettazione Intel ifx/Linux/CI è attestata. Lo stato per ciascun
+requisito numerato è:
+
+| Requisito | Stato al 23 ottobre 2026 | Evidenza o lavoro ancora necessario |
+|---|---|---|
+| D17.1 | **Parziale** | Bridge analitico e dispatcher esplicito collegati; routing comune semi-implicito/implicito e mass-exchange da completare. |
+| D17.2–D17.5 | **Implementati localmente** | Catalogo, ID, descrittori e registri `stage`/`step`; coperti dai test del registro. |
+| D17.6 | **Implementato per i gruppi legacy supportati** | Validazione del solve unico e normalizzazione legacy; il formato nativo resta da implementare in D17.16. |
+| D17.7 | **Parziale** | Blocco Newton legacy congiunto preservato; sweep di più solve indipendenti nello stesso gruppo ancora da organizzare. |
+| D17.8 | **Parziale** | Interfacce analitica ed esplicita ricevono metadati di gruppo; semi-implicita e implicita non sono ancora filtrate per gruppo/solver. |
+| D17.9 | **Implementato localmente** | Rate espliciti e hook al bordo selezionati dal gruppo; test strict/optimized e build GNU superati. Modifiche non committate. |
+| D17.10 | **Da fare** | Routing delle interfacce semi-implicita e implicita per gruppo, termine e solver. |
+| D17.11 | **Parziale** | Capability REAL/COMPLEX descritte nel catalogo; riuso dei kernel e copertura completa da verificare. |
+| D17.12 | **Implementato localmente** | Bridge analitico validato; vedere il report D17-C. |
+| D17.13–D17.16 | **Parziali** | Default e ordine legacy conservati in parte; esecuzione dei gruppi `step`, equivalenza completa, parsing nativo e presenza/ambiguità dell’input restano da completare. |
+| D17.17–D17.18 | **Parziali** | Alcuni dispatch fisici sono dietro `equation_terms_2d`; manca l’adattamento generale dei rate impliciti, semi-impliciti e mass-exchange. |
+| D17.19 | **In corso** | Stato puntuale dei 24 elementi nella sequenza implementativa sotto. |
+| D17.20 | **Parziale** | Regressioni del registro, dei solve analitici e del routing esplicito superate localmente; matrice obbligatoria completa ancora aperta. |
+| D17.21 | **Non soddisfatto** | Criteri finali non raggiunti; D17 non può essere dichiarato completato. |
 
 #### D17.0 — Logica generale e obiettivo
 
@@ -3168,34 +3194,45 @@ Il trasferimento di massa deve essere integrato progressivamente nella struttura
 
 #### D17.19 — Sequenza implementativa
 
-1. Inventariare tutte le chiamate attuali ai termini sorgente (fase A documentata nella specifica/manifest allegati).
-2. Definire i `term_id`.
-3. Definire metodi, cadenze e identificatori dei solve.
-4. Costruire la tabella completa dei default.
-5. Definire `source_group_type`.
-6. Creare i registri `stage_groups` e `step_groups`.
-7. Definire le firme delle quattro interfacce.
-8. Implementare i gruppi di default.
-9. Implementare il parsing dell’input.
-10. Implementare i controlli di consistenza.
-11. Modificare `eval_expl_terms`.
-12. Modificare `eval_semi_implicit_terms`.
-13. Modificare `eval_implicit_terms`.
-14. Aggiungere `eval_analytic_terms`.
-15. Modificare `time_integration_2d.f90`.
-16. Modificare `nonlinear_solver_2d.f90`.
-17. Rimuovere le chiamate fisiche dirette dai moduli numerici.
-18. Riutilizzare kernel REAL/COMPLEX comuni; introdurre `.inc` solo dove utili.
-19. Creare wrapper reali e complessi.
-20. Organizzare i solve impliciti multipli.
-21. Organizzare i solve analitici singoli per gruppo.
-22. Integrare il trasferimento di massa.
-23. Verificare l’ordine delle operazioni.
-24. Eseguire i test di regressione.
+Stato: IN CORSO. Le voci completate indicano l’implementazione locale e
+l’evidenza disponibile, non il completamento dell’accettazione D17.
+
+1. Inventariare tutte le chiamate attuali ai termini sorgente (fase A documentata nella specifica/manifest allegati). **COMPLETATO.**
+2. Definire i `term_id`. **COMPLETATO.**
+3. Definire metodi, cadenze e identificatori dei solve. **COMPLETATO nei metadati.**
+4. Costruire la tabella completa dei default. **COMPLETATO come baseline e adattatore legacy; equivalenza runtime complessiva ancora da verificare (D17.13).**
+5. Definire `source_group_type`. **COMPLETATO.**
+6. Creare i registri `stage_groups` e `step_groups`. **COMPLETATO.**
+7. Definire le firme delle quattro interfacce. **PARZIALE:** bridge analitico e interfaccia esplicita aggiornati; semi-implicita e implicita restano da generalizzare.
+8. Implementare i gruppi di default. **COMPLETATO nei metadati; dispatch e confronto completo con il comportamento legacy restano parziali.**
+9. Implementare il parsing dell’input. **DA FARE:** formato nativo non implementato.
+10. Implementare i controlli di consistenza. **PARZIALE:** validazione dei registri e dei profili esistenti; controlli di presenza/conflitto nel parsing nativo (D17.16) restano da fare.
+11. Modificare `eval_expl_terms`. **COMPLETATO localmente per il routing esplicito `stage` e l’hook al bordo (D17.9).**
+12. Modificare `eval_semi_implicit_terms`. **DA FARE.**
+13. Modificare `eval_implicit_terms`. **DA FARE.**
+14. Aggiungere `eval_analytic_terms`. **COMPLETATO localmente (D17.12).**
+15. Modificare `time_integration_2d.f90`. **PARZIALE:** dispatch dei rate espliciti collegato; routing `step` e mass-exchange registrato ancora da integrare.
+16. Modificare `nonlinear_solver_2d.f90`. **PARZIALE:** bridge analitico e percorso Newton legacy preservato; esecuzione di più solve indipendenti per gruppo non implementata.
+17. Rimuovere le chiamate fisiche dirette dai moduli numerici. **PARZIALE:** rimosse dal percorso analitico interessato dal bridge; resta da completare/verificare per tutti i percorsi.
+18. Riutilizzare kernel REAL/COMPLEX comuni; introdurre `.inc` solo dove utili. **PARZIALE:** capability descritte nel catalogo; riuso e copertura integrale non accettati.
+19. Creare wrapper reali e complessi. **PARZIALE/DA VERIFICARE:** non esiste ancora un’accettazione completa dei wrapper per tutti i termini.
+20. Organizzare i solve impliciti multipli. **DA FARE.**
+21. Organizzare i solve analitici singoli per gruppo. **COMPLETATO localmente per i gruppi supportati e verificato dal report D17-C.**
+22. Integrare il trasferimento di massa. **DA FARE:** i gruppi `step` sono descritti, ma il percorso mass-exchange resta quello post-RK esistente.
+23. Verificare l’ordine delle operazioni. **PARZIALE:** ordine dei gruppi analitici legacy e routing esplicito verificati; ordine end-to-end con i percorsi `step` e le interfacce ancora mancanti da validare.
+24. Eseguire i test di regressione. **PARZIALE:** test mirati B, C e D17.9 superati localmente; matrice D17.20 e gate CI/piattaforme non completati.
 
 ---
 
 #### D17.20 — Test obbligatori
+
+Stato ufficiale: **PARZIALE**. I report B, C e D17.9 attestano solo i
+percorsi e le asserzioni esplicitamente coperti; il superamento delle suite
+mirate non equivale al superamento dell’intera matrice. Restano in particolare
+da coprire il parsing nativo e la gestione dell’input assente/ambiguo, i gruppi
+`step` e il mass-exchange attraverso il registro, i solve Newton multipli,
+l’intero spazio REAL/COMPLEX, l’equivalenza completa dei default e
+l’accettazione end-to-end dei casi limite elencati sotto.
 
 Devono essere verificati:
 
@@ -3232,6 +3269,9 @@ Devono essere verificati:
 ---
 
 #### D17.21 — Criteri di completamento
+
+Stato ufficiale: **DA FARE** — nessun criterio complessivo è dichiarato
+soddisfatto finché restano aperti i requisiti e i test indicati sopra.
 
 Il D17 sarà completato quando:
 
@@ -3912,5 +3952,3 @@ Le sigle storiche non sono identificativi operativi e sono conservate esclusivam
 | I07      | S-GATE                    | Validazione subgrid                                  |
 | I08      | ML-1                      | Inferenza ML/NN delle closure                        |
 | I09      | ML-GATE                   | Validazione ML/NN                                    |
-
-

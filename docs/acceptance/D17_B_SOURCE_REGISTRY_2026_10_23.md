@@ -85,12 +85,13 @@ under `build-local/d17-registry` or test-owned temporary directories, outside
 
 This report records phase B as it stood before stage routing. The D17-C analytic
 bridge and its local test evidence are recorded separately in
-[D17-C analytic bridge](D17_C_ANALYTIC_BRIDGE.md). D17-D/E must connect
-explicit, boundary, and post-RK mass-exchange paths while preserving coupled
-blocks and atomic mass proposals. D17-F must add native input syntax and
-presence tracking, remaining capability checks, and full numerical/portability
-acceptance. Unsupported partial bundles remain rejected; this phase does not
-claim arbitrary term/method combinations are available.
+[D17-C analytic bridge](D17_C_ANALYTIC_BRIDGE.md); the numbered D17.9 explicit
+stage routing and its validation are documented in
+[D17.9 explicit stage routing](D17_9_EXPLICIT_STAGE_ROUTING.md). Remaining
+requirements are tracked by their roadmap numbers, including D17.10 onward for
+the semi-implicit/implicit interfaces, stage/step routing, native input and
+full acceptance. Unsupported partial bundles remain rejected; this phase does
+not claim arbitrary term/method combinations are available.
 
 Copy accessors and full registry validation are for initialization/diagnostics.
 Future hot-path integration must bind/precompute the required metadata outside

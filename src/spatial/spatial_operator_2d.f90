@@ -83,18 +83,21 @@ CONTAINS
   !>       are already included through path terms.
   !******************************************************************************
 
-  SUBROUTINE evaluate_spatial_operator( this, qp, spatial_term, time, domain )
+  SUBROUTINE evaluate_spatial_operator( this, qp, spatial_term, time, domain, &
+       boundary_source_enabled )
 
     CLASS(spatial_operator_type), INTENT(INOUT) :: this
     REAL(wp), INTENT(IN) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(OUT) :: spatial_term(n_eqns,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: time
     CLASS(domain_type), INTENT(IN) :: domain
+    LOGICAL, INTENT(IN), OPTIONAL :: boundary_source_enabled
 
     CALL this%hp_pccu%evaluate_terms( this%reconstruction, qp, spatial_term, &
          time, domain%solve_cells, domain%j_cent, domain%k_cent,              &
          domain%solve_interfaces_x, domain%j_stag_x, domain%k_stag_x,        &
-         domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y )
+         domain%solve_interfaces_y, domain%j_stag_y, domain%k_stag_y,        &
+         source_boundary_enabled=boundary_source_enabled )
 
   END SUBROUTINE evaluate_spatial_operator
 
@@ -109,7 +112,8 @@ CONTAINS
   !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
   !******************************************************************************
 
-  SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain )
+  SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain,        &
+       boundary_source_enabled )
 
     CLASS(spatial_operator_type), INTENT(INOUT) :: this
     REAL(wp), INTENT(IN) :: q(n_vars,comp_cells_x,comp_cells_y)
@@ -117,6 +121,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: time
     REAL(wp), INTENT(OUT) :: dt
     CLASS(domain_type), INTENT(IN) :: domain
+    LOGICAL, INTENT(IN), OPTIONAL :: boundary_source_enabled
 
     INTEGER :: j, k, l
     REAL(wp) :: max_a_x, max_a_y, cfl_spatial
@@ -146,7 +151,7 @@ CONTAINS
     ! CFL speeds must use the same selected advective traces as the spatial operator.
     CALL this%reconstruction%reconstruct( qp, time, domain%solve_cells,      &
          domain%j_cent, domain%k_cent,                                       &
-         .TRUE. )
+         .TRUE., source_boundary_enabled=boundary_source_enabled )
 
     ! Match the KT face depths and desingularized velocities used by the
     ! spatial operator before evaluating the CFL wave speeds.
