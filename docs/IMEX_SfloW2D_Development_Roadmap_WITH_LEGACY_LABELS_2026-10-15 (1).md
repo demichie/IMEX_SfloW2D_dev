@@ -1751,14 +1751,21 @@ non un difetto riprodotto nel candidato. Il driver verifica ora direttamente
 le tracce analitiche del candidato. La sezione `stages` e i controlli dei
 confini passano in strict e optimized, inclusi assi collassati e thread 1/4.
 
-D12 resta IN CORSO: il runner completo si arresta in `order_suite` su
+La verifica precedente si arrestava in `order_suite` su
 `manufactured mass remains constant` (errore scalato `0.31518397499667228`,
-limite `7.2759576141834259e-12`). La fixture usa flusso uniforme ma condizioni
-di default che bloccano l’ingresso a ovest/sud e consentono l’uscita a
-est/nord; l’invariante di massa e gli oracoli temporali di tale fixture non
-sono quindi coerenti con i flussi di bordo. Ridisegnare o adjudicare la
-fixture e il relativo riferimento indipendente senza allargare le tolleranze,
-poi rieseguire il runner integrato prima della chiusura.
+limite `7.2759576141834259e-12`): la fixture usava flusso uniforme ma
+condizioni di default che bloccano l’ingresso a ovest/sud e consentono
+l’uscita a est/nord.
+
+Aggiornamento 23 ottobre 2026: il controllo è stato riallineato ai bordi
+outflow-only. Il fixture d’ordine usa una griglia 16x16; gli oracoli analitici
+confrontano la regione interna, separata dai bordi da sei celle, mentre il
+bilancio globale verifica che la massa non aumenti e non impone più una massa
+costante. Il controllo del drag verifica l’equazione implicita locale rispetto
+allo stato noto di ciascuno stage, senza assumere nullo il contributo esplicito
+di bordo. La sezione `order` passa in strict e optimized per thermal, drag e
+mixed (`N_RK=2`). D12 resta IN CORSO fino alla riesecuzione del runner
+integrato.
 
 ### D13 — Integrazione analitica esatta dei termini IM
 
@@ -2220,14 +2227,14 @@ la sezione stage/boundary di `TEST_IMEX_STAGES` (strict/optimized) e i test
 La verifica completa non è ancora conclusiva: `make check` ha superato i test
 metadata, output-path e i primi cinque casi solver, ma è stata interrotta mentre
 `TEST_DAMBREAK/TEST_DYNAMIC_FINH` avanzava molto lentamente nella build locale
-strict-debug. L'esecuzione senza selezione di sezione di `TEST_IMEX_STAGES`
-supera il controllo stage/assembly, ma fallisce poi nell'order suite
-all'asserzione `manufactured mass remains constant` (errore scalato
-0.31518397499667228); va chiarito prima dell'accettazione completa. Infine non
-risulta un run GitHub Actions per la revisione testata
-`4973360ddf213501a93fe7f02ff9a417ae42f2aa`; il CLI GitHub non è autenticato in
-questo ambiente. Il gate D16.12 rimane quindi in attesa del chiarimento del test
-e della verifica CI sulla revisione condivisa.
+strict-debug. La precedente esecuzione di `TEST_IMEX_STAGES` falliva
+nell’order suite sull’asserzione di massa costante; aggiornamento 23 ottobre:
+la sezione `order` passa ora in strict e optimized, con il confronto e il
+bilancio coerenti con i bordi outflow-only. Il runner integrato completo resta
+da rieseguire. Non risulta inoltre un run GitHub Actions per la revisione
+registrata nel manifest (`4973360ddf213501a93fe7f02ff9a417ae42f2aa`); il CLI
+GitHub non è autenticato in questo ambiente. Il gate D16.12 resta quindi
+aperto per il runner integrato e la verifica CI sulla revisione condivisa.
 
 ### D15 — Acceptance finale della nuova architettura
 

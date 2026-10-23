@@ -131,13 +131,28 @@ Temperature errors use a `1 K` scale, momentum errors a
 Independent first/second-order and mixed colored-tree tableau conditions are
 checked as well.
 
-Nonzero implicit drag stages are additionally checked against their quadratic
-equation and independent algebraic root, including known/final momentum
-assembly. Production Newton convergence permits either its residual criterion
-or a normalized correction below `tol_rel=1e-5`; `tol_abs` is also `1e-5`.
-Some captured stages converge through the correction criterion without meeting
-the residual-only test. This is recorded explicitly and is not mislabeled as
-a machine-precision implicit solve. Neither tolerance is tightened by the test.
+#### Follow-up: outflow-only boundaries (2026-10-23)
+
+The order fixture was updated after the production boundary treatment began
+suppressing inflow at non-Dirichlet edges. It now uses a 16 by 16 grid and
+compares analytic thermal and momentum references only in the interior, six
+cells away from the boundary. The global mass check now requires non-increasing
+mass, consistent with the outflow-only boundary fluxes, rather than constant
+mass. Drag-stage validation checks the local implicit equation against each
+stage's known state, which may include explicit boundary-flux contributions.
+The focused `order` section passes in strict and optimized profiles for the
+thermal, drag and mixed fixtures (`N_RK=2`).
+
+In the original acceptance runs, nonzero implicit drag stages were checked
+against their quadratic equation and independent algebraic root, including
+known/final momentum assembly. In the updated order fixture, the local
+implicit equation is checked against each full known stage; tableau assembly
+is instead exercised by the separate stage-comparison section. Production
+Newton convergence permits either its residual criterion or a normalized
+correction below `tol_rel=1e-5`; `tol_abs` is also `1e-5`. Some captured stages
+converge through the correction criterion without meeting the residual-only
+test. This is recorded explicitly and is not mislabeled as a machine-precision
+implicit solve. Neither tolerance is tightened by the test.
 
 ## Reproduced single-stage defect
 
