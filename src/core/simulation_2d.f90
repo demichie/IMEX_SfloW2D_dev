@@ -11,7 +11,7 @@
 MODULE simulation_2d
 
   USE equation_terms_2d, ONLY : init_problem_param, set_source_time_coefficients
-  USE time_integration_2d, ONLY : apply_mass_exchange_step
+  USE mass_exchange_step_2d, ONLY : apply_mass_exchange_step
 
   USE source_registry_2d, ONLY : source_registry_type
   USE source_configuration_2d, ONLY : initialize_configured_sources, &

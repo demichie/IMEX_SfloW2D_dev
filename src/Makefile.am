@@ -52,6 +52,7 @@ IMEX_SfloW2D_SOURCES = \
                 spatial/hyperbolic_2d.f90 \
                 spatial/spatial_operator_2d.f90 \
                 numerics/time_integration_2d.f90 \
+                numerics/mass_exchange_step_2d.f90 \
                 stochastic/stochastic_random_2d.f90 \
                 stochastic/stochastic_module.f90 \
                 core/simulation_2d.f90 \
@@ -200,6 +201,15 @@ numerics/time_integration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                          numerics/nonlinear_solver_2d.$(OBJEXT)  \
                                          spatial/spatial_operator_2d.$(OBJEXT)  \
                                          state/state_conversion_2d.$(OBJEXT)
+numerics/mass_exchange_step_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
+                                          core/constitutive_parameters_2d.$(OBJEXT) \
+                                          core/diagnostics_2d.$(OBJEXT)       \
+                                          geometry/domain_2d.$(OBJEXT)        \
+                                          numerics/source_registry_2d.$(OBJEXT) \
+                                          numerics/source_catalog_2d.$(OBJEXT) \
+                                          physics/equation_terms_2d.$(OBJEXT) \
+                                          geometry/geometry_2d.$(OBJEXT)     \
+                                          state/state_conversion_2d.$(OBJEXT)
 stochastic/stochastic_random_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 stochastic/stochastic_module.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                         geometry/domain_2d.$(OBJEXT)             \
@@ -217,7 +227,8 @@ core/simulation_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
                               spatial/spatial_operator_2d.$(OBJEXT)             \
                               state/state_2d.$(OBJEXT)                          \
                               stochastic/stochastic_module.$(OBJEXT)            \
-                              numerics/time_integration_2d.$(OBJEXT)
+                              numerics/time_integration_2d.$(OBJEXT)            \
+                              numerics/mass_exchange_step_2d.$(OBJEXT)
 core/init_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         core/constitutive_parameters_2d.$(OBJEXT)              \
                         geometry/geometry_2d.$(OBJEXT)                         \
