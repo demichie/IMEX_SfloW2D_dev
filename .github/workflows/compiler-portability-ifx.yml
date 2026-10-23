@@ -106,7 +106,11 @@ jobs:
         shell: bash
         run: |
           if [ '${{ matrix.profile }}' = diagnostic ]; then
-            echo 'FCFLAGS=-O0 -g -traceback -check all' >> "$GITHUB_ENV"
+            if [ '${{ inputs.diagnose_dynamic_fin_h }}' = true ]; then
+              echo 'FCFLAGS=-O0 -g -traceback -check bounds' >> "$GITHUB_ENV"
+            else
+              echo 'FCFLAGS=-O0 -g -traceback -check all' >> "$GITHUB_ENV"
+            fi
           else
             echo 'FCFLAGS=-O2' >> "$GITHUB_ENV"
           fi
@@ -137,7 +141,7 @@ jobs:
         if: ${{ !inputs.diagnose_dynamic_fin_h }}
         run: make check
 
-      - name: Profile TEST_DYNAMIC_FINH
+      - name: Profile TEST_DYNAMIC_FINH with bounds checks
         if: ${{ inputs.diagnose_dynamic_fin_h && matrix.profile == 'diagnostic' && matrix.threads == 1 }}
         env:
           IMEX_TEST_LOG_DIR: ${{ runner.temp }}/ifx-dynamic-finh
