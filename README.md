@@ -55,7 +55,8 @@ The legacy test runner can optionally run the focused `TEST_DYNAMIC_FINH`
 fixture with `TESTS/run_tests.sh /path/to/IMEX_SfloW2D TEST_DYNAMIC_FINH`.
 The Intel ifx portability workflow exposes the same focused diagnostic through
 the `diagnose_dynamic_fin_h` manual-dispatch input and uploads its solver log
-and elapsed-time record.
+and elapsed-time record. The focused diagnostic run is limited to five minutes
+so a stalled test still produces diagnostic artifacts promptly.
 
 Several examples can be found in the EXAMPLES folder.
 

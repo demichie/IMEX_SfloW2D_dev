@@ -141,7 +141,7 @@ jobs:
         if: ${{ inputs.diagnose_dynamic_fin_h && matrix.profile == 'diagnostic' && matrix.threads == 1 }}
         env:
           IMEX_TEST_LOG_DIR: ${{ runner.temp }}/ifx-dynamic-finh
-          IMEX_TEST_CASE_TIMEOUT: 60m
+          IMEX_TEST_CASE_TIMEOUT: 5m
         run: TESTS/run_tests.sh src/IMEX_SfloW2D TEST_DYNAMIC_FINH
 
       - name: Binary restart and runout regression
