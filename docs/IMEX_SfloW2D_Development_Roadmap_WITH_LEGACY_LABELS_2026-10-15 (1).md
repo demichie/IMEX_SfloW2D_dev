@@ -1,3 +1,205 @@
+# IMEX_SfloW2D — Development Roadmap
+
+**Piano unico, integrato e consolidato | 14 ottobre 2026 | repository fd43e4ca2ee6**
+
+Questa roadmap raccoglie in un unico documento la visione scientifica, i principi architetturali, il piano di sviluppo e le schede operative. Le sezioni introduttive e il Master Development Plan costituiscono il riferimento generale; le schede delle fasi descrivono gli interventi implementativi e i relativi criteri di accettazione. Le attività implementate ma non ancora accettate sono mantenute distinte dalle milestone completate.
+
+# 1. Visione scientifica e funzionale del modello a sviluppo completato
+
+Scopo della sezione. Questa presentazione descrive il sistema scientifico e numerico che IMEX_SfloW2D dovrà diventare a conclusione del programma. È rivolta anche a chi non conosce il sorgente. Le capacità obiettivo non vanno confuse con funzionalità già implementate: la roadmap e i gate successivi distinguono baseline verificata, refactoring, estensioni scientifiche e futuri backend HPC.
+
+### A. Problemi fisici, applicazioni e filosofia di modellazione
+
+IMEX_SfloW2D è una piattaforma per la simulazione di flussi geofisici e vulcanici su topografie naturali, mediante equazioni multifase depth-averaged. Il sistema è pensato per flussi di materiale granulare e miscele fluide particellate, potenzialmente polidisperse, dalle correnti piroclastiche a diversa concentrazione alle colate laviche e ad altri flussi gravitativi rappresentabili dalle formulazioni costitutive disponibili. Le applicazioni comprendono la propagazione, la canalizzazione e la deposizione, la valutazione delle aree invase e l’analisi di scenari su modelli digitali del terreno.
+
+La formulazione depth-averaged riduce il costo rispetto ai modelli tridimensionali verticalmente risolti, ma introduce problemi di chiusura: le distribuzioni verticali delle componenti, la microtopografia non risolta e diversi meccanismi di scambio non sono ricostruibili direttamente dalla sola media di profondità. L’obiettivo della nuova architettura è esplicitare tali limiti, integrare chiusure verificabili e mantenere separati i meccanismi fisici dagli algoritmi numerici e dall’infrastruttura di calcolo.
+
+Il sistema finale dovrà poter eseguire studi scientifici controllati, simulazioni su DEM reali, confronti fra differenti modelli reologici e campagne di calcolo sistematiche, documentando la configurazione effettiva, le ipotesi costitutive, la qualità della soluzione e l’origine dei dati di riferimento.
+
+### B. Sistema multifase, polidispersione e variabili conservative
+
+Il modello dovrà descrivere miscele composte da fasi vettore e componenti solide trasportate, incluse classi granulometriche distinte quando richieste dal modello. Le classi trasportate mantengono identità e bilanci di massa coerenti, così che granulometria, densità, concentrazione e proprietà termodinamiche contribuiscano ai flussi e alle sorgenti. Le variabili conservative costituiscono la base del bilancio numerico; le primitive di cella sono ricostruite mediante una trasformazione fisicamente consistente, con trattamento esplicito delle celle secche e quasi secche.
+
+La termodinamica delle miscele, la conversione fra frazioni massiche e volumetriche, la densità del vettore e le proprietà efficaci devono essere calcolate da un’unica interpretazione dello stato, preservando i kernel condivisi REAL/COMPLEX e il percorso di derivazione complex-step dei Jacobiani. L’obiettivo non è assumere un modello costitutivo unico per tutti i flussi, bensì permettere formulazioni diverse entro uno stesso quadro di conservazione e validazione.
+
+### C. Reologie alternative e proprietà costitutive
+
+La piattaforma dovrà consentire di selezionare reologie diverse senza modificare il ciclo IMEX o il motore generale di Newton. I modelli reologici esistenti verranno estratti in moduli autonomi, selezionati tramite identificatori leggibili e registrati all’inizializzazione. Le implementazioni dovranno conservare le specificità fisiche del modello, inclusi eventuali regimi limite, dissipazione, frenamento e dipendenze termiche, senza imporre una correzione della quantità di moto a sorgenti che non rappresentano esclusivamente attrito.
+
+L’architettura dovrà garantire che l’aggiunta o il confronto di una reologia abbia un perimetro locale e sia accompagnata da caratterizzazione scientifica REAL/COMPLEX, controlli sulle derivate, test di stati degeneri e confronto rispetto alla baseline. Questa fase di modularizzazione riguarda per ora i soli modelli reologici: non autorizza un refactoring generalizzato e simultaneo di tutti i processi costitutivi.
+
+### D. Uno o due strati e processi di interazione
+
+Il sistema dovrà evolvere da una formulazione produttiva a strato singolo verso una scelta runtime fra uno e due strati fisici, preservando inizialmente il comportamento N_LAYERS=1. Il futuro modello a due strati dovrà distinguere le variabili e i processi di ciascuno strato e rappresentare i trasferimenti interstrato di massa, quantità di moto ed energia, oltre agli accoppiamenti idrostatici e non conservativi richiesti dalle equazioni. La modellazione dei due strati è una vera estensione fisica, non una duplicazione meccanica del codice a strato singolo.
+
+La struttura delle variabili e delle equazioni dovrà essere descritta da model_layout_type, con indici, dimensioni e partizioni definite una sola volta. Lo storage sarà gradualmente reso layer-aware prima dell’attivazione delle nuove equazioni. I kernel comuni resteranno condivisi; i trasferimenti interstrato saranno distinti sia dalle sorgenti esterne sia dai prodotti spaziali non conservativi.
+
+### E. Discretizzazione spaziale, topografia, wet/dry e well-balancing
+
+La dinamica su terreno naturale richiede una discretizzazione capace di trattare variazioni anche forti di quota, velocità caratteristiche direzionali, gradienti geometrici, fronti di avanzamento, arresto del flusso e celle alternativamente asciutte o bagnate. L’infrastruttura HP-PCCU accoppia flussi convettivi, ricostruzione coerente, contributi di percorso idrostatici alle celle e alle interfacce, e propagazione numerica mediante velocità caratteristiche locali. L’obiettivo è preservare gli equilibri appropriati senza perdere robustezza nella dinamica di propagazione.
+
+La topografia nodale B_vertex rappresenta la geometria autoritativa; da essa si ottengono quote al centro e alle facce coerenti e le derivate richieste dal modello. La geometria non deve diventare permanentemente statica: la stessa infrastruttura dovrà permettere l’aggiornamento di un fondo che evolve, con refresh delle quantità derivate. Il motore numerico dei prodotti non conservativi rimane generico, mentre i coefficienti fisici e i provider di equilibrio dipendono dal modello.
+
+Il consolidamento direzionale x/y ridurrà duplicazioni e differenze accidentali tra i due assi, preservando la semantica dell’operatore e i gate di regressione. L’interfaccia dell’operatore spaziale dovrà rimanere indipendente dagli specifici stencils e dalle tecniche di parallelizzazione.
+
+### F. Integrazione temporale robusta e stati fisicamente ammissibili
+
+Il modello conserva gli schemi IMEX Runge–Kutta già approvati; non è previsto in questa roadmap un programma di sostituzione o ottimizzazione dei tableaux. Il controllo della rigidità e delle sorgenti rimane affidato alla struttura esplicita/implicita esistente e ai miglioramenti architetturali del solve locale. Per aumentare la robustezza introdurremo invece un meccanismo generico di time-step rejection and retry: un tentativo di passo è accettato soltanto se i suoi stadi e lo stato finale superano verifiche numeriche e fisiche esplicitamente definite.
+
+In caso di fallimento recuperabile il tempo fisico non avanza, si ripristina lo stato di inizio passo, si riduce Δt e si ripete la stessa integrazione. Se il nuovo Δt scende sotto un minimo configurabile, oppure sono esauriti i retry, il run termina con una diagnostica completa. I limiti inferiori e superiori delle variabili primitive saranno definiti da default generali, eventuali default specifici del modello fisico/reologico e override puntuali di input, con precedenza esplicita e validazione all’avvio.
+
+Il controllo delle primitive verrà eseguito soltanto sugli stati delle celle effettivamente risolte DOPO ciascuno stadio RK completato e DOPO l’assemblaggio finale, senza inserirlo nelle conversioni conservative→primitive usate sulle facce di ricostruzione. I fallimenti numerici che impediscono di terminare uno stadio, come il mancato successo del solve implicito, devono invece propagare tempestivamente uno stato recuperabile. Nessun limite viene applicato mediante clipping artificiale dello stato conservativo.
+
+### G. Chiusure della struttura verticale nel modello depth-averaged
+
+Un modello depth-averaged non risolve esplicitamente le distribuzioni lungo la verticale. Tuttavia, concentrazioni solide e distribuzioni granulometriche possono essere fortemente stratificate; anche velocità, temperatura e altre grandezze possono variare con la quota. I termini integrati di flusso, trasporto e scambio dipendono spesso da prodotti non lineari di questi campi, per cui sostituire indiscriminatamente il prodotto delle medie alla media del prodotto può introdurre errori sistematici.
+
+La nuova famiglia di chiusure verticali dovrà rappresentare soprattutto i profili delle classi solide e le loro interazioni con altri campi verticalmente distribuiti, restituendo alle equazioni depth-averaged quantità integrali consistenti. Sono possibili formulazioni analitiche, fisiche e semiempiriche oppure chiusure ML/NN, ma tutte devono esporre lo stesso contratto fisico e rispettare vincoli di massa, normalizzazione e ammissibilità.
+
+Per questo sviluppo non è sufficiente raffinare la griglia orizzontale di IMEX_SfloW2D: il codice non risolve la coordinata verticale e non può generare da solo il riferimento dettagliato che occorre apprendere o parametrizzare. Le fonti di validazione dovranno quindi includere teoria, osservazioni/esperimenti e, quando disponibili, simulazioni di modelli verticalmente risolti. Questi ultimi sono fonti offline di dati scientifici, non simulatori esterni da accoppiare durante il run.
+
+### H. Modelli subgrid topografici basati sul confronto fine/coarse
+
+Per “subgrid” in questa roadmap si intende prioritariamente l’effetto di una descrizione del terreno molto più dettagliata della griglia impiegata nella simulazione produttiva. Piccoli canali, creste, ostacoli, discontinuità morfologiche e variazioni di pendenza possono influire su avanzamento, canalizzazione, blocco locale, direzione del flusso e distribuzione spaziale degli spessori anche quando non vengono risolti dalla griglia grossolana.
+
+A differenza delle chiusure verticali, qui il riferimento può essere ottenuto con IMEX_SfloW2D stesso: eseguire lo stesso problema fisico su DEM e griglie fini, confrontarlo con il corrispondente problema grossolano e identificare gli effetti sistematici delle strutture topografiche eliminate dal coarse-graining. Occorrono insiemi di casi con terreno, condizioni iniziali, reologie, granulometrie e risoluzioni diverse; il confronto deve esplicitare come aggregare campi, topografia, flussi e diagnostiche tra le due discretizzazioni.
+
+Le chiusure potranno essere costruite in forma fisica, semiempirica o ML/NN e utilizzate nel solver coarse. Non si assume a priori che l’effetto subgrid sia un semplice attrito aggiuntivo: potranno emergere correzioni direzionali al trasporto, blocco parziale, effetti sulle interfacce o altri contributi, che dovranno essere identificati e verificati prima di scegliere dove inserirli nelle equazioni. La validazione richiede dati e terreni indipendenti da quelli usati per la calibrazione o l’addestramento, insieme a controlli su conservazione, simmetria, stabilità e generalizzazione.
+
+### I. ML/NN come backend interno delle chiusure
+
+Il machine learning non costituisce un simulatore separato e non sostituisce automaticamente le equazioni di bilancio. Verrà introdotto come backend opzionale per valutare chiusure verticali o topografiche subgrid attraverso inferenza durante l’esecuzione di IMEX_SfloW2D. Le medesime API dovranno consentire alternative analitiche, semiempiriche e neurali; la scelta della tecnologia non deve propagarsi nell’integratore IMEX, nel calcolo dei flussi o nell’infrastruttura MPI.
+
+Il contratto ML comprende definizione/versionamento delle feature, unità e normalizzazioni, intervalli di validità, pesi e metadati del modello, riproducibilità della valutazione, gestione di output non ammissibili e fallback espliciti. Per la futura esecuzione MPI/GPU l’inferenza dovrà poter avvenire in batch, evitando allocazioni per cella e assicurando indipendenza dal partizionamento quando richiesto. L’accoppiamento operativo con modelli numerici esterni a IMEX_SfloW2D è escluso dal perimetro di questa roadmap.
+
+### J. Esecuzione parallela, I/O scientifico e riproducibilità
+
+Il modello finale dovrà essere utilizzabile in modalità seriale, OpenMP e MPI+OpenMP, con decomposizione in domini locali, halo espliciti, tile di celle attive e kernel progressivamente predisposti a GPU. Lo storage e la comunicazione dovranno conoscere il layout numerico e le dimensioni, non il significato fisico delle variabili. L’ottimizzazione del carico e l’inferenza neurale in batch verranno dopo la stabilizzazione della correttezza e delle interfacce.
+
+Le simulazioni dovranno produrre campi scientifici e diagnostiche in formati documentati, con gestione coerente dei restart, degli output per run, delle metainformazioni e del NetCDF seriale o parallelo. Lo stato necessario a ripetere un passo deve essere distinguibile dal workspace temporaneo: questa distinzione è essenziale tanto per il restart deterministico quanto per il rollback dopo un tentativo di timestep rifiutato. Il sistema di build, i test, la CI, Doxygen, MkDocs e la documentazione verificata degli esempi fanno parte dell’infrastruttura di ricerca, non sono accessori opzionali.
+
+### K. Risultato atteso e criteri generali di credibilità scientifica
+
+A sviluppo completato, IMEX_SfloW2D sarà una piattaforma depth-averaged multifase, polidispersa, selezionabile a uno o due strati, dotata di reologie modulari, operatore spaziale HP-PCCU generico e validato, robustezza temporale con controllo di ammissibilità, chiusure verticali e topografiche subgrid opzionali anche ML/NN, supporto a topografia evolutiva, I/O scientifico riproducibile e calcolo distribuito predisposto ad acceleratori.
+
+Il principio trasversale resta la separazione fra (i) formulazione e validazione fisica, (ii) discretizzazione spaziale e temporale, (iii) gestione dello stato e ammissibilità, (iv) infrastrutture HPC, dati e documentazione. Ogni nuovo sviluppo deve specificare che cosa cambia scientificamente, rispetto a quale baseline viene confrontato e quale evidenza permette di considerarlo accettato.
+
+# 2. Principi e obiettivi dello sviluppo
+
+Sviluppare IMEX_SfloW2D mantenendo la baseline scientifica HP-PCCU, l’equivalenza numerica dei refactoring e la possibilità di estendere progressivamente reologie, metodi impliciti, storage layer-aware, elaborazione MPI/HPC, chiusure verticali e subgrid e backend ML/NN. Non sono previsti accoppiamenti runtime con modelli esterni.
+
+Stati: COMPLETATO = verifiche e gate accettati; IMPLEMENTATO = codice presente ma gate non ancora approvato; PARZIALE = attività iniziata o copertura incompleta; DA FARE = non implementato; GATE = verifica/approvazione da effettuare. Lo stato non equivale alla descrizione storica di una vecchia roadmap.
+
+## Regola generale vincolante — Validazione proporzionata al rischio (risk-based regression testing)
+
+> **PRINCIPIO TRASVERSALE PER TUTTE LE FASI A–I.** Ogni modifica viene verificata in funzione del suo impatto tecnico e scientifico; **non è richiesto ripetere automaticamente l'intera suite numerica ad ogni modifica**. La validazione completa è riservata ai gate scientifici pertinenti, alle modifiche trasversali ad alto rischio e alle release. Un gate già approvato resta approvato nel proprio perimetro storico: le modifiche successive richiedono una nuova verifica d'impatto, non la riapertura retroattiva del gate.
+
+### Classi di verifica e quando eseguirle
+
+| Livello | Momento e finalità | Contenuto minimo | Non implica |
+|---|---|---|---|
+| **T1 — Mirato** | Ogni piccola modifica durante lo sviluppo | Compilazione/lint dei componenti toccati quando applicabile; test unitari, di contratto, negativi e edge case direttamente coinvolti | Riesecuzione di tutte le simulazioni scientifiche |
+| **T2 — Integrazione** | Fine di una modifica funzionale e prima della revisione del relativo step | Un numero contenuto di casi end-to-end pertinenti; compatibilità delle interfacce, restart/I/O o output numerici secondo la superficie modificata | Campagna A11/N9 completa |
+| **T3 — Regressione selettiva di gate** | Per accettazione di step o gate, e per modifiche trasversali | Sottoinsieme rappresentativo, congelato e riproducibile di regressioni che copre i percorsi realmente impattati; strict/optimized, 1/4 thread o toolchain aggiuntive **solo se pertinenti** | Riesecuzione automatica di ogni test storico |
+| **T4 — Campagna estesa/scientifica e release** | Nuovi modelli fisici, cambiamenti numerici importanti, HPC con nuovi ordini/riduzioni, gate scientifici o release | Matrici, benchmark, conservazione, comparatori indipendenti, riproducibilità e CI secondo lo scope formalmente approvato | Approvazione scientifica oltre il perimetro effettivamente testato |
+
+### Procedura obbligatoria per ogni change set
+
+1. **Classificare la modifica**: solo documentazione, packaging, I/O/path, interfaccia/stato/restart, algoritmo numerico, fisica, parallelismo; includere dipendenze indirette reali. Se un file contiene più responsabilità (es. `inpout_2d.f90`), valutare *le routine e i flussi di dati modificati*, non soltanto il nome del file.
+2. **Definire prima dei test la matrice minima**: T1 sempre ove applicabile, T2 quando cambia un comportamento osservabile, T3/T4 solo per rischi e gate motivati. Annotare motivazione dei test inclusi **e di quelli costosi esclusi**. Non usare l'assenza di modifiche alle equazioni come unica prova di equivalenza: percorsi I/O, checkpoint, scheduling e stato globale possono avere effetti indiretti.
+3. **Usare comparatori appropriati**: bitwise se formato, ordine delle operazioni e ambiente lo consentono; confronti numerici con tolleranze dichiarate altrimenti; per I/O distinguere bytes scientifici/metadati intenzionalmente variati (path, manifest, timestamp). Conservare il riferimento alla baseline A11 con revisioni, input e checksum.
+4. **Escalation guidata**: ampliare i test se un controllo fallisce, cambiano precisione/ordine delle operazioni, OpenMP/MPI, bilanci, discretizzazione, stato/restart, o emergono modifiche collaterali non previste. Non dichiarare un gate chiuso con soli smoke test.
+5. **Registrare l'evidenza**: revisione Git, toolchain, profilo, conteggio thread/rank se pertinente, comando o workflow, casi, comparatore, risultato, esclusioni motivate, limiti e responsabile della decisione. Le evidenze storiche non sono automaticamente test eseguiti sul nuovo HEAD.
+6. **Separare frequenze**: T1/T2 su sviluppo/PR; T3 nei gate e, ove conveniente, nella CI; T4 per release o milestone scientifiche. È lecito eseguire una suite ampia in CI a basso costo, ma ciò non è un requisito per ogni micro-commit o per ogni revisione locale.
+
+### Prescrizione specifica per modifiche esclusivamente di I/O (Fase C)
+
+Per C01/C02 sono richiesti test di naming, sicurezza directory, overwrite, manifest, serializzazione, output NetCDF/ASCII/CSV e almeno un caso full/split/restart con append. È richiesta almeno una regressione end-to-end breve sul contenuto scientifico, confrontando output omogenei dopo normalizzazione dei soli metadati deliberatamente cambiati. **I test specifici di ricostruzione HP, PCCU, Jacobiani, reologie e schemi RK non si ripetono tutti** se non sono stati toccati percorsi numerici/stato e i confronti end-to-end selezionati sono positivi. La chiusura C03 richiede il proprio gate I/O e la relativa evidenza; non riapre A11 o B12.
+
+### Applicazione alle schede operative
+
+Le voci **"Test proporzionati"** inserite sotto le schede A01–I09 sono *matrici prospettiche di selezione* e non dichiarazioni di test già eseguiti. I gate, gli stati ufficiali e gli esiti storici riportati nel testo originale restano invariati. Per gli step già completati queste voci valgono per eventuali modifiche future che li riguardino, non come richieste retroattive di nuova validazione.
+
+### Regola generale per la chiusura degli step implementati ma non ancora accettati
+
+Per ogni step con stato **`IMPLEMENTATO, GATE APERTO`** la scheda deve distinguere chiaramente: (i) i requisiti del contratto non ancora coperti da evidenze, (ii) le verifiche minime ancora necessarie e (iii) l'evidenza o decisione richiesta per il passaggio a **`COMPLETATO`**. Se non rimangono requisiti scoperti, il responsabile può chiudere il gate con una decisione documentata basata sulle evidenze già disponibili, senza ripetere test. Lo stato di uno step **non cambia automaticamente** perché è stato chiuso un gate più ampio: l'accettazione deve essere registrata esplicitamente nella sua scheda e nella tabella del Master Development Plan.
+
+Le evidenze di un gate trasversale possono essere riutilizzate da più step soltanto entro lo **scope, la revisione e l'ambiente effettivamente verificati**. Un elemento non coperto richiede soltanto test mirati T1/T2 (o T3 se il rischio residuo lo giustifica), secondo la regola di validazione proporzionata al rischio; evitare campagne scientifiche generalizzate in assenza di impatto numerico.
+
+
+# 3. Master Development Plan — ordine e stato corrente
+
+## Fase A — Fondamenti numerici e baseline scientifica
+
+|     | Vecchia label | Attività                                             | Stato      |
+|-----|---------------|------------------------------------------------------|------------|
+| A01 | N0            | Baseline, test di riferimento e manifest complessivo | PARZIALE   |
+| A02 | N1            | Primitive canoniche e mass fractions                 | COMPLETATO |
+| A03 | N2            | Topografia Q1 e geometria B_vertex                   | COMPLETATO |
+| A04 | N3            | Ricostruzione HP                                     | COMPLETATO |
+| A05 | N4            | Operatore HP-PCCU, G=1                               | COMPLETATO |
+| A06 | N5            | Slope correction                                     | COMPLETATO |
+| A07 | N6            | Curvature source                                     | COMPLETATO |
+| A08 | N7            | Validazione idrodinamica 1D e 2D                     | COMPLETATO |
+| A09 | D-N7-CFL      | Due policy CFL                                       | COMPLETATO |
+| A10 | N8            | Topografia evolutiva e scambio di massa              | COMPLETATO |
+| A11 | N9            | Cutover e baseline scientifica                       | APPROVATO  |
+
+## Fase B — Build e consolidamento dell’operatore x/y
+
+|     | Vecchia label | Attività                                       | Stato                     |
+|-----|---------------|------------------------------------------------|---------------------------|
+| B01 | M12c          | Build, CI e portabilita                        | COMPLETATO                |
+| B02 | P1            | Mappa dipendenze e relocation path-only        | COMPLETATO                |
+| B03 | M12d          | Stocastico OU, RNG e restart seriale           | IMPLEMENTATO              |
+| B04 | M13           | Model layout, N_LAYERS=1                       | IMPLEMENTATO              |
+| B05 | XY-1          | Velocita caratteristiche comuni                | IMPLEMENTATO              |
+| B06 | XY-2          | Ricostruzione HP sulle linee                   | IMPLEMENTATO              |
+| B07 | XY-3          | Flusso PCCU di interfaccia                     | IMPLEMENTATO              |
+| B08 | XY-4          | Velocita faccia e path idrostatici di cella    | COMPLETATO                |
+| B09 | XY-5          | Condizioni al contorno e ricostruzione lineare | COMPLETATO                |
+| B10 | XY-6          | Derivate e halo geometrici                     | COMPLETATO                |
+| B11 | XY-7          | Riduzione CFL direzionale                      | COMPLETATO                |
+| B12 | XY-GATE       | Accettazione complessiva x/y                   | COMPLETATO                |
+
+Evidenza B05–B12 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-7 e il gate complessivo x/y sono completati nel perimetro verificato. Sono passate le regressioni spaziali e dinamiche strict/optimized, incluse prove a 1/4 thread, composizione variabile, fixture ruotate e confronti binari pre/post refactoring sui casi esplicitamente elencati. L'accettazione B12 non estende l'approvazione scientifica A11 oltre la revisione e lo scope approvati, né chiude D15.
+
+## Fase C — Output e distribuzione
+
+|     | Vecchia label | Attività                                | Stato   |
+|-----|---------------|-----------------------------------------|---------|
+| C01 | IO-1          | Output segregati per run                | COMPLETATO |
+| C02 | IO-2          | Contratto di configurazione e sicurezza | COMPLETATO |
+| C03 | IO-GATE       | Accettazione I/O per run                | COMPLETATO |
+| C04 | DIST-1        | Autotools policy B                      | COMPLETATO |
+| C05 | DIST-2        | Doppio archivio di distribuzione        | COMPLETATO |
+| C06 | DIST-GATE     | Validazione distributiva                | COMPLETATO |
+
+La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazione per allegare gli archivi sorgente ed Examples a una release GitHub e la pubblicazione di una release ufficiale sono follow-up separati, esplicitamente differiti; il candidato `9.9.27` resta sintetico e non pubblicato.
+
+## Fase D — Reologie e solver IMEX
+
+|     | Vecchia label | Attività                                                    | Stato    |
+|-----|---------------|-------------------------------------------------------------|----------|
+| D01 | M12e-A        | Inventario formule e rami REAL/COMPLEX                      | COMPLETATO (audit statico) |
+| D02 | M12e-B        | Caratterizzazione numerica cell-local                       | COMPLETATO (gate locale GNU/macOS) |
+| D03 | —             | Audit e ownership di parametri, variabili e stato condiviso | IN PAUSA |
+| D04 | P2            | Eliminazione reologia 8                                     | COMPLETATO |
+| D05 | P3            | Estrazione moduli reologici e selezione testuale            | COMPLETATO |
+| D06 | P3            | Sorgenti termiche e pore pressure                           | COMPLETATO |
+| D07 | —             | Migrazione progressiva dei parametri non reologici          | IN PAUSA |
+| D08 | P4            | RHEOLOGY_MODEL da numeri a stringhe                         | ASSORBITO IN D05 |
+| D09 | P5            | Correzione del solo attrito                                 | COMPLETATO (gate locale GNU/macOS) |
+| D10 | P6            | EX_terms / IM_terms                                         | COMPLETATO (gate locale GNU/macOS) |
+| D11 | P7            | IM_group e metadati                                  | COMPLETATO (gate locale GNU/macOS) |
+| D12 | P7            | Newton per gruppo e Jacobiano ridotto                       | IN CORSO |
+| D13 | P8            | Integrazione analitica esatta dei termini IM                | COMPLETATO (gate locale GNU/macOS) |
+| D14 | P8            | Gruppi misti e validazione                                  | COMPLETATO (gate locale GNU/macOS) |
+| D16 | —             | Consolidamento leggi fisiche, rate e assemblaggio IMEX      | IN CORSO |
+| D17 | —             | Struttura unificata dei termini sorgente e separazione tra fisica e numerica | DA FARE |
+| D15 | P9            | Acceptance finale della nuova architettura                  | GATE     |
+
+
 ## Fase E — Architettura e robustezza del passo
 
 |     | Vecchia label | Attività                              | Stato   |
@@ -53,6 +255,9 @@
 | I07 | S-GATE        | Validazione subgrid                  | GATE   |
 | I08 | ML-1          | Inferenza ML/NN delle closure        | FUTURO |
 | I09 | ML-GATE       | Validazione ML/NN                    | GATE   |
+
+
+
 
 # 4. Detailed Development Plan — schede operative
 
@@ -2244,6 +2449,766 @@ Resta da verificare la CI GitHub sulla revisione condivisa `9b2a4989`; non è
 stata verificata in questa sessione. D16.12 resta aperto esclusivamente per
 questa conferma CI remota.
 
+##### D17 — Organizzazione unificata dei termini sorgente, gruppi e separazione tra fisica e numerica
+
+#### D17.0 — Logica generale e obiettivo
+
+Il D17 introduce una struttura comune per tutti i termini sorgente delle equazioni e separa:
+
+1. leggi fisiche;
+2. calcolo dei rate;
+3. assemblaggio dei contributi nelle equazioni;
+4. integrazione RK-IMEX;
+5. solve impliciti;
+6. solve analitici.
+
+La struttura generale deve essere:
+
+```text
+time_integration_2d
+        |
+        v
+nonlinear_solver_2d
+        |
+        v
+equation_terms_2d
+        |
+        v
+moduli fisici e leggi costitutive
+```
+
+Le leggi fisiche devono calcolare rate o risultati analitici senza conoscere RK, IMEX, gruppi o time-step.
+
+Le routine numeriche devono invece gestire:
+
+- stage;
+- time-step;
+- cadenze;
+- gruppi;
+- ordine dei solve;
+- integrazione dei rate.
+
+`equation_terms_2d.f90` costituisce il livello di collegamento tra i due ambiti.
+
+---
+
+#### D17.1 — Contratto tra fisica e numerica
+
+I moduli fisici devono:
+
+- definire le leggi costitutive;
+- calcolare rate;
+- calcolare eventuali soluzioni analitiche;
+- fornire kernel reali e complessi;
+- non conoscere la struttura RK-IMEX.
+
+`equation_terms_2d.f90` deve:
+
+- ricevere un gruppo;
+- selezionare i termini fisici;
+- chiamare le leggi appropriate;
+- assemblare i contributi nelle equazioni;
+- restituire rate o risultati analitici.
+
+Non deve reimplementare le leggi fisiche né integrare nel tempo.
+
+`time_integration_2d.f90` deve gestire il ciclo RK-IMEX e l’applicazione dei gruppi.
+
+`nonlinear_solver_2d.f90` deve occuparsi esclusivamente dei solve numerici impliciti e non deve chiamare direttamente moduli come:
+
+```fortran
+thermal_laws_2d
+pore_pressure_laws_2d
+rheology_laws_2d
+```
+
+---
+
+#### D17.2 — Termini fisici elementari
+
+Ogni componente fisica deve essere identificata da un `term_id`.
+
+Esempi:
+
+```fortran
+SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB
+SOURCE_TERM_RHEOLOGY_VOELLMY_TURBULENT_DRAG
+SOURCE_TERM_THERMAL_RADIATIVE_COOLING
+SOURCE_TERM_THERMAL_VAPORIZATION
+SOURCE_TERM_PORE_PRESSURE_DISSIPATION
+SOURCE_TERM_MASS_EXCHANGE_EROSION
+SOURCE_TERM_MASS_EXCHANGE_DEPOSITION
+SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT
+SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION
+SOURCE_TERM_BOTTOM_FISSURAL_INJECTION
+SOURCE_TERM_RADIAL_INJECTION
+SOURCE_TERM_BOUNDARY_INJECTION
+```
+
+Ogni termine deve avere:
+
+- equazioni interessate;
+- modulo fisico responsabile;
+- interfacce disponibili;
+- metodo;
+- cadenza;
+- gruppo.
+
+##### Implementazione
+
+Devono essere definiti tutti i `term_id` in un modulo comune. La selezione dei termini non deve dipendere dalla posizione delle chiamate nel codice.
+
+---
+
+#### D17.3 — Metodi e cadenze
+
+Ogni termine deve essere organizzato mediante:
+
+```text
+method  = 'explicit' | 'newton' | 'analytic'
+cadence = 'stage'   | 'step'
+group   = intero positivo
+```
+
+Il metodo determina il trattamento:
+
+| Metodo | Interfacce |
+|---|---|
+| `explicit` | esplicita |
+| `newton` | semi-implicita e implicita |
+| `analytic` | analitica |
+
+Non deve essere introdotto un parametro indipendente `treatment`.
+
+La cadenza determina il momento della valutazione:
+
+- `stage`: dentro il ciclo RK-IMEX;
+- `step`: una volta per time-step, fuori dal ciclo RK.
+
+##### Implementazione
+
+Devono essere definiti enum o costanti per:
+
+- metodo;
+- cadenza;
+- `term_id`;
+- variabili target;
+- solve impliciti;
+- solve analitici.
+
+---
+
+#### D17.4 — Appartenenza ai gruppi
+
+Ogni termine può appartenere a un solo gruppo per una determinata cadenza.
+
+Sono distinti:
+
+```text
+(stage, group=1)
+(step,  group=1)
+```
+
+All’interno di un gruppo deve essere presente un solo metodo.
+
+##### Implementazione
+
+Devono essere gestiti separatamente:
+
+```fortran
+stage_groups(:)
+step_groups(:)
+```
+
+L’inizializzazione deve verificare:
+
+- unicità dell’appartenenza;
+- uniformità del metodo;
+- validità del gruppo;
+- coerenza tra termine e cadenza.
+
+---
+
+#### D17.5 — Struttura del gruppo
+
+La struttura minima raccomandata è:
+
+```fortran
+TYPE :: source_group_type
+   INTEGER :: id
+   INTEGER :: cadence
+   INTEGER :: method
+
+   INTEGER, ALLOCATABLE :: term_ids(:)
+   INTEGER, ALLOCATABLE :: equation_ids(:)
+
+   INTEGER, ALLOCATABLE :: implicit_solver_ids(:)
+   INTEGER, ALLOCATABLE :: analytic_solver_ids(:)
+END TYPE source_group_type
+```
+
+Devono essere presenti due registri distinti:
+
+```fortran
+TYPE(source_group_type), ALLOCATABLE :: stage_groups(:)
+TYPE(source_group_type), ALLOCATABLE :: step_groups(:)
+```
+
+Deve inoltre essere disponibile una funzione del tipo:
+
+```fortran
+LOGICAL FUNCTION group_contains(group, term_id)
+```
+
+---
+
+#### D17.6 — Gruppi `analytic`
+
+Un gruppo `analytic` può contenere un solo solve analitico.
+
+Il solve integra una sola variabile target, mantenendo congelate le altre.
+
+Valido:
+
+```text
+gruppo analytic:
+    solve analitico della temperatura
+    contributo radiativo
+    contributo convettivo
+```
+
+Non valido:
+
+```text
+gruppo analytic:
+    solve analitico della temperatura
+    solve analitico della pressione dei pori
+```
+
+I due solve devono essere assegnati a gruppi distinti.
+
+##### Implementazione
+
+Per ogni gruppo analitico deve essere verificato:
+
+```text
+SIZE(analytic_solver_ids) == 1
+```
+
+Deve inoltre essere definita la variabile target.
+
+---
+
+#### D17.7 — Gruppi `newton`
+
+Un gruppo Newton può contenere più solve impliciti.
+
+Esempio:
+
+```text
+gruppo newton:
+    solve implicito della velocità
+    solve implicito della temperatura
+    solve implicito della pressione dei pori
+```
+
+I solve possono essere indipendenti e possono essere eseguiti secondo un ordine definito. Non è necessario costruire un unico sistema globale accoppiato.
+
+##### Implementazione
+
+Ogni gruppo Newton deve contenere uno o più:
+
+```fortran
+implicit_solver_ids(:)
+```
+
+Ogni solve deve avere:
+
+- identificatore;
+- variabile target;
+- termini associati;
+- ordine di esecuzione;
+- interfaccia numerica.
+
+---
+
+#### D17.8 — Interfacce comuni
+
+Le interfacce generiche devono essere definite in `equation_terms_2d.f90`:
+
+```fortran
+eval_expl_terms
+eval_nh_semi_impl_terms
+eval_implicit_terms
+eval_analytic_terms
+```
+
+Ogni routine deve:
+
+1. ricevere il gruppo;
+2. inizializzare il risultato;
+3. selezionare i termini;
+4. chiamare le leggi fisiche;
+5. assemblare il risultato;
+6. restituire rate o risultato analitico.
+
+Firme indicative:
+
+```fortran
+SUBROUTINE eval_expl_terms(group, q, qp, time, rate)
+```
+
+```fortran
+SUBROUTINE eval_nh_semi_impl_terms(group, q, qp, time, rate)
+```
+
+```fortran
+SUBROUTINE eval_implicit_terms(group, q, qp, time, rate)
+```
+
+```fortran
+SUBROUTINE eval_analytic_terms(group, q_old, qp_old, dt, result)
+```
+
+La semantica di `result` deve essere fissata prima dell’implementazione: rate medio, incremento oppure stato finale.
+
+---
+
+#### D17.9 — Interfaccia esplicita
+
+L’interfaccia esplicita deve assemblare tutti i contributi espliciti richiesti.
+
+Per esempio:
+
+\[
+R_{\mathrm{explicit}}
+=
+R_{\mathrm{Coulomb}}
++
+R_{\mathrm{turbulent\ drag}}.
+\]
+
+Le formule fisiche non devono essere duplicate.
+
+##### Implementazione
+
+Modificare `eval_expl_terms` affinché:
+
+- inizializzi il vettore `rate`;
+- selezioni i `term_id`;
+- chiami i kernel fisici;
+- sommi i contributi;
+- distingua i gruppi `stage` dai gruppi `step`.
+
+---
+
+#### D17.10 — Interfacce semi-implicite e implicite
+
+Un gruppo Newton può contenere più contributi semi-impliciti e più solve impliciti.
+
+Esempio:
+
+```text
+semi-implicito:
+    Coulomb friction
+
+implicito:
+    turbulent drag
+    thermal relaxation
+```
+
+##### Implementazione
+
+Modificare:
+
+```fortran
+eval_nh_semi_impl_terms
+eval_implicit_terms
+```
+
+per selezionare il gruppo, il termine e lo specifico `implicit_solver_id`.
+
+Devono essere supportate versioni reali e complesse quando richieste dal solutore.
+
+---
+
+#### D17.11 — Riutilizzo tramite file `.inc`
+
+Le formule comuni non devono essere duplicate tra versioni reali e complesse.
+
+Esempi:
+
+```text
+rheology_voellmy_coulomb_rate.inc
+rheology_voellmy_turbulent_drag_rate.inc
+thermal_radiative_cooling_rate.inc
+```
+
+I file `.inc` devono contenere soltanto il kernel matematico comune.
+
+I wrapper devono gestire:
+
+- tipo reale o complesso;
+- dichiarazioni;
+- argomenti;
+- selezione del contributo;
+- risultato.
+
+---
+
+#### D17.12 — Interfacce analitiche
+
+Le routine analitiche devono rimanere nei moduli fisici, ma devono essere chiamate attraverso `eval_analytic_terms`.
+
+Il flusso deve essere:
+
+```text
+time_integration_2d
+        ↓
+equation_terms_2d
+        ↓
+legge fisica analitica
+```
+
+##### Implementazione
+
+- aggiungere `eval_analytic_terms`;
+- rimuovere le chiamate dirette dai moduli numerici;
+- assicurare un solo solve analitico per gruppo;
+- utilizzare gruppi distinti per variabili analitiche diverse.
+
+---
+
+#### D17.13 — Configurazione di default compatibile con il codice attuale
+
+In assenza di configurazioni esplicite nel file di input, il codice deve costruire automaticamente una configurazione equivalente al comportamento attuale.
+
+La configurazione di default deve essere determinata dall’inventario delle chiamate effettive presenti nel codice, non soltanto dal nome dei moduli.
+
+##### D17.13.1 — Sorgenti esplicite `stage`
+
+Le sorgenti attualmente calcolate dentro `eval_expl_terms` devono rimanere nel ciclo RK:
+
+```text
+stage group 1:
+    SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION
+    SOURCE_TERM_BOTTOM_FISSURAL_INJECTION
+    SOURCE_TERM_RADIAL_INJECTION
+    SOURCE_TERM_BOUNDARY_INJECTION
+```
+
+Configurazione equivalente:
+
+```text
+method  = explicit
+cadence = stage
+group   = 1
+```
+
+Se alcuni termini non sono attivi in una particolare configurazione fisica, devono semplicemente contribuire con zero o non essere registrati.
+
+##### D17.13.2 — Termini Newton `stage`
+
+Devono essere registrati nei gruppi Newton tutti i termini attualmente gestiti da:
+
+```fortran
+eval_nh_semi_impl_terms
+eval_implicit_terms
+```
+
+La configurazione deve contenere:
+
+```text
+method  = newton
+cadence = stage
+group   = N
+```
+
+Per ogni gruppo devono essere specificati:
+
+- elenco dei termini semi-impliciti;
+- elenco dei solve impliciti;
+- variabile target di ogni solve;
+- ordine dei solve;
+- equazioni aggiornate.
+
+Non è sufficiente indicare genericamente “termini attuali”: l’elenco deve essere esplicito nel codice o nella tabella di configurazione interna.
+
+##### D17.13.3 — Solve analitici
+
+Ogni solve analitico attualmente presente deve essere registrato.
+
+Se due solve riguardano variabili diverse, devono appartenere a gruppi distinti:
+
+```text
+analytic group 1:
+    solve analitico della temperatura
+```
+
+```text
+analytic group 2:
+    solve analitico della pressione dei pori
+```
+
+Ogni gruppo deve rispettare:
+
+```text
+SIZE(analytic_solver_ids) == 1
+```
+
+La cadenza deve riprodurre quella effettiva del codice attuale.
+
+##### D17.13.4 — Termini espliciti `step`
+
+I termini attualmente applicati fuori dal ciclo RK devono rimanere inizialmente `step`.
+
+Esempio:
+
+```text
+step group 1:
+    SOURCE_TERM_MASS_EXCHANGE_EROSION
+    SOURCE_TERM_MASS_EXCHANGE_DEPOSITION
+    SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT
+    SOURCE_TERM_MASS_EXCHANGE_CARRIER_LOSS
+    SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION
+```
+
+Configurazione equivalente:
+
+```text
+method  = explicit
+cadence = step
+group   = 1
+```
+
+L’elenco definitivo deve essere ricavato dalle chiamate attuali a `eval_mass_exchange_terms` e alle routine di aggiornamento del trasferimento di massa.
+
+##### D17.13.5 — Inventario obbligatorio dei default
+
+Prima dell’implementazione deve essere costruita una tabella definitiva contenente, per ogni termine:
+
+| Campo | Contenuto |
+|---|---|
+| `term_id` | identificatore fisico |
+| modulo | file responsabile |
+| routine attuale | chiamata esistente |
+| metodo default | `explicit`, `newton`, `analytic` |
+| cadenza default | `stage` o `step` |
+| gruppo default | numero del gruppo |
+| solve target | variabile aggiornata |
+| ordine | posizione nell’elaborazione |
+| equazioni | componenti modificate |
+
+Questa tabella deve essere considerata la specifica di compatibilità con il codice attuale.
+
+##### D17.13.6 — Criterio di equivalenza
+
+La configurazione di default deve riprodurre:
+
+1. ordine delle chiamate;
+2. momento di valutazione;
+3. stato utilizzato per il rate;
+4. momento di applicazione;
+5. aggiornamento degli inventari;
+6. aggiornamento della topografia;
+7. controlli di positività;
+8. ricostruzione delle variabili fisiche.
+
+Il solo fatto di assegnare lo stesso metodo non è sufficiente a garantire la compatibilità.
+
+---
+
+#### D17.14 — Separazione tra `stage` e `step`
+
+I gruppi `stage` vengono valutati nel ciclo RK-IMEX.
+
+I gruppi `step` vengono valutati una sola volta dopo il completamento del RK.
+
+##### Implementazione
+
+Modificare `time_integration_2d.f90` affinché:
+
+- elabori i gruppi `stage` durante il ciclo RK;
+- elabori i gruppi `step` in una fase separata;
+- non ricalcoli i gruppi `step` negli stage;
+- applichi i risultati nell’ordine definito dalla configurazione.
+
+---
+
+#### D17.15 — Ordine del time-step
+
+L’ordine raccomandato è:
+
+1. costruzione dello stato iniziale;
+2. gruppi espliciti `stage`;
+3. gruppi semi-impliciti `stage`;
+4. solve impliciti Newton;
+5. completamento del RK-IMEX;
+6. costruzione dello stato finale;
+7. gruppi `step`;
+8. applicazione dei loro contributi;
+9. aggiornamento degli inventari;
+10. aggiornamento della geometria o topografia;
+11. controllo di positività;
+12. ricostruzione delle variabili fisiche;
+13. aggiornamento diagnostico e output.
+
+L’ordine definitivo deve essere verificato rispetto al codice attuale e codificato esplicitamente in `time_integration_2d.f90`.
+
+---
+
+#### D17.16 — Validazione dell’input e dei gruppi
+
+Durante l’inizializzazione devono essere controllati:
+
+- metodo valido;
+- cadenza valida;
+- gruppo positivo;
+- termine assegnato una sola volta per cadenza;
+- metodo unico nel gruppo;
+- interfacce richieste disponibili;
+- un solo solve analitico nei gruppi `analytic`;
+- uno o più solve impliciti nei gruppi `newton`;
+- variabili target definite;
+- ordine dei solve non ambiguo;
+- termine fisico esistente.
+
+Gli errori devono essere rilevati prima dell’avvio della simulazione.
+
+---
+
+#### D17.17 — Riorganizzazione dei moduli
+
+I moduli fisici devono essere organizzati, per esempio, in:
+
+```text
+rheology_laws_2d.f90
+thermal_laws_2d.f90
+pore_pressure_laws_2d.f90
+```
+
+Essi non devono contenere:
+
+- ciclo RK;
+- gestione degli stage;
+- gestione delle cadenze;
+- selezione dei gruppi;
+- solutore Newton;
+- integrazione generale del time-step.
+
+Le routine di assemblaggio devono rimanere in `equation_terms_2d.f90`.
+
+##### Implementazione
+
+- spostare le formule fisiche nei moduli `*_laws_2d`;
+- spostare l’assemblaggio in `equation_terms_2d`;
+- eliminare le formule duplicate;
+- verificare che i moduli fisici non dipendano dalla numerica temporale.
+
+---
+
+#### D17.18 — Adattamento delle routine esistenti
+
+Devono essere riorganizzate:
+
+```fortran
+eval_expl_terms
+eval_nh_semi_impl_terms
+eval_implicit_terms
+eval_mass_exchange_terms
+```
+
+La riorganizzazione deve:
+
+- utilizzare i `term_id`;
+- rispettare gruppi e cadenze;
+- distinguere rate da aggiornamenti temporali;
+- mantenere inizialmente il comportamento fisico attuale;
+- eliminare chiamate duplicate;
+- preservare l’ordine dei default.
+
+Il trasferimento di massa deve essere integrato progressivamente nella struttura generale, mantenendo inizialmente la cadenza attuale fuori dal RK.
+
+---
+
+#### D17.19 — Sequenza implementativa
+
+1. Inventariare tutte le chiamate attuali ai termini sorgente.
+2. Definire i `term_id`.
+3. Definire metodi, cadenze e identificatori dei solve.
+4. Costruire la tabella completa dei default.
+5. Definire `source_group_type`.
+6. Creare i registri `stage_groups` e `step_groups`.
+7. Definire le firme delle quattro interfacce.
+8. Implementare i gruppi di default.
+9. Implementare il parsing dell’input.
+10. Implementare i controlli di consistenza.
+11. Modificare `eval_expl_terms`.
+12. Modificare `eval_nh_semi_impl_terms`.
+13. Modificare `eval_implicit_terms`.
+14. Aggiungere `eval_analytic_terms`.
+15. Modificare `time_integration_2d.f90`.
+16. Modificare `nonlinear_solver_2d.f90`.
+17. Rimuovere le chiamate fisiche dirette dai moduli numerici.
+18. Introdurre i file `.inc`.
+19. Creare wrapper reali e complessi.
+20. Organizzare i solve impliciti multipli.
+21. Organizzare i solve analitici singoli per gruppo.
+22. Integrare il trasferimento di massa.
+23. Verificare l’ordine delle operazioni.
+24. Eseguire i test di regressione.
+
+---
+
+#### D17.20 — Test obbligatori
+
+Devono essere verificati:
+
+1. assenza di configurazioni nell’input;
+2. sorgenti esplicite `stage`;
+3. sorgenti esplicite `step`;
+4. gruppo Newton con un solve implicito;
+5. gruppo Newton con più solve impliciti;
+6. gruppo analitico con un solo solve;
+7. rifiuto di due solve analitici nello stesso gruppo;
+8. gruppi `stage` e `step` con lo stesso numero;
+9. termine assegnato a due gruppi con la stessa cadenza;
+10. gruppo con metodi diversi;
+11. metodo Newton incompleto;
+12. metodo analitico senza solve analitico;
+13. verifica reale/complessa;
+14. sorgenti circolari, fissurali e al bordo;
+15. trasferimento di massa fuori dal RK;
+16. conservazione della massa;
+17. positività;
+18. ordine dei solve;
+19. equivalenza con i default attuali;
+20. indipendenza dei moduli numerici dai moduli fisici.
+
+---
+
+#### D17.21 — Criteri di completamento
+
+Il D17 sarà completato quando:
+
+- ogni termine fisico sarà identificato da un `term_id`;
+- la tabella dei default sarà completa;
+- ogni termine avrà una sola appartenenza per cadenza;
+- ogni gruppo avrà un solo metodo;
+- ogni gruppo `analytic` avrà un solo solve analitico;
+- ogni gruppo `newton` potrà contenere più solve impliciti;
+- i solve avranno variabili target e ordine definiti;
+- tutte le chiamate ai termini passeranno da `equation_terms_2d.f90`;
+- `nonlinear_solver_2d.f90` non conoscerà i modelli fisici;
+- `time_integration_2d.f90` non conterrà formule costitutive;
+- le leggi fisiche non conosceranno RK, IMEX o gruppi;
+- i rate reali e complessi saranno ottenuti senza duplicazioni;
+- i gruppi `stage` e `step` saranno indipendenti;
+- i default riprodurranno il comportamento attuale;
+- l’ordine temporale sarà documentato;
+- gli errori saranno rilevati all’inizializzazione;
+- i test di regressione saranno superati.
+
 ### D15 — Acceptance finale della nuova architettura
 
 **Test proporzionati (nuove modifiche a questo step):** gate scientifico finale sul codice consolidato da D16: matrice reologie e IMEX, conservazione, REAL/COMPLEX, restart, baseline A11 e variazioni numeriche autorizzate; decisione scientifica autonoma. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
@@ -2254,205 +3219,7 @@ Stato ufficiale: GATE
 
 Ogni commit funzionale porta evidenza di compilazione pulita, test associati, SHA e descrizione della tolleranza. Gli input e l’output devono registrare stringa reologica e gruppo/metodo/ordine; i restart non devono ripartire silenziosamente con un diverso modello/gruppo. Le ottimizzazioni OpenMP non possono introdurre workspace Newton condivisi. Conservare i .inc di conversione REAL/COMPLEX e i controlli sulla non analiticità di ABS, MAX, segni e soglie nel complex-step. Prima di G01 eseguire il gate di compatibilità del default, regressioni scientifiche HP-PCCU, storage/restart e accuratezza per gruppi.
 
-# IMEX_SfloW2D — Development Roadmap
 
-**Piano unico, integrato e consolidato | 14 ottobre 2026 | repository fd43e4ca2ee6**
-
-Un unico indice operativo e una sola scheda per ogni attività. La tabella espone lo stato corrente; tutte le specifiche e i gate sono riportati nella scheda a cui si riferiscono. Le attività implementate ma non ancora accettate sono distinte dalle milestone completate.
-
-# 1. Visione scientifica e funzionale del modello a sviluppo completato
-
-Scopo della sezione. Questa presentazione descrive il sistema scientifico e numerico che IMEX_SfloW2D dovrà diventare a conclusione del programma. È rivolta anche a chi non conosce il sorgente. Le capacità obiettivo non vanno confuse con funzionalità già implementate: la roadmap e i gate successivi distinguono baseline verificata, refactoring, estensioni scientifiche e futuri backend HPC.
-
-### A. Problemi fisici, applicazioni e filosofia di modellazione
-
-IMEX_SfloW2D è una piattaforma per la simulazione di flussi geofisici e vulcanici su topografie naturali, mediante equazioni multifase depth-averaged. Il sistema è pensato per flussi di materiale granulare e miscele fluide particellate, potenzialmente polidisperse, dalle correnti piroclastiche a diversa concentrazione alle colate laviche e ad altri flussi gravitativi rappresentabili dalle formulazioni costitutive disponibili. Le applicazioni comprendono la propagazione, la canalizzazione e la deposizione, la valutazione delle aree invase e l’analisi di scenari su modelli digitali del terreno.
-
-La formulazione depth-averaged riduce il costo rispetto ai modelli tridimensionali verticalmente risolti, ma introduce problemi di chiusura: le distribuzioni verticali delle componenti, la microtopografia non risolta e diversi meccanismi di scambio non sono ricostruibili direttamente dalla sola media di profondità. L’obiettivo della nuova architettura è esplicitare tali limiti, integrare chiusure verificabili e mantenere separati i meccanismi fisici dagli algoritmi numerici e dall’infrastruttura di calcolo.
-
-Il sistema finale dovrà poter eseguire studi scientifici controllati, simulazioni su DEM reali, confronti fra differenti modelli reologici e campagne di calcolo sistematiche, documentando la configurazione effettiva, le ipotesi costitutive, la qualità della soluzione e l’origine dei dati di riferimento.
-
-### B. Sistema multifase, polidispersione e variabili conservative
-
-Il modello dovrà descrivere miscele composte da fasi vettore e componenti solide trasportate, incluse classi granulometriche distinte quando richieste dal modello. Le classi trasportate mantengono identità e bilanci di massa coerenti, così che granulometria, densità, concentrazione e proprietà termodinamiche contribuiscano ai flussi e alle sorgenti. Le variabili conservative costituiscono la base del bilancio numerico; le primitive di cella sono ricostruite mediante una trasformazione fisicamente consistente, con trattamento esplicito delle celle secche e quasi secche.
-
-La termodinamica delle miscele, la conversione fra frazioni massiche e volumetriche, la densità del vettore e le proprietà efficaci devono essere calcolate da un’unica interpretazione dello stato, preservando i kernel condivisi REAL/COMPLEX e il percorso di derivazione complex-step dei Jacobiani. L’obiettivo non è assumere un modello costitutivo unico per tutti i flussi, bensì permettere formulazioni diverse entro uno stesso quadro di conservazione e validazione.
-
-### C. Reologie alternative e proprietà costitutive
-
-La piattaforma dovrà consentire di selezionare reologie diverse senza modificare il ciclo IMEX o il motore generale di Newton. I modelli reologici esistenti verranno estratti in moduli autonomi, selezionati tramite identificatori leggibili e registrati all’inizializzazione. Le implementazioni dovranno conservare le specificità fisiche del modello, inclusi eventuali regimi limite, dissipazione, frenamento e dipendenze termiche, senza imporre una correzione della quantità di moto a sorgenti che non rappresentano esclusivamente attrito.
-
-L’architettura dovrà garantire che l’aggiunta o il confronto di una reologia abbia un perimetro locale e sia accompagnata da caratterizzazione scientifica REAL/COMPLEX, controlli sulle derivate, test di stati degeneri e confronto rispetto alla baseline. Questa fase di modularizzazione riguarda per ora i soli modelli reologici: non autorizza un refactoring generalizzato e simultaneo di tutti i processi costitutivi.
-
-### D. Uno o due strati e processi di interazione
-
-Il sistema dovrà evolvere da una formulazione produttiva a strato singolo verso una scelta runtime fra uno e due strati fisici, preservando inizialmente il comportamento N_LAYERS=1. Il futuro modello a due strati dovrà distinguere le variabili e i processi di ciascuno strato e rappresentare i trasferimenti interstrato di massa, quantità di moto ed energia, oltre agli accoppiamenti idrostatici e non conservativi richiesti dalle equazioni. La modellazione dei due strati è una vera estensione fisica, non una duplicazione meccanica del codice a strato singolo.
-
-La struttura delle variabili e delle equazioni dovrà essere descritta da model_layout_type, con indici, dimensioni e partizioni definite una sola volta. Lo storage sarà gradualmente reso layer-aware prima dell’attivazione delle nuove equazioni. I kernel comuni resteranno condivisi; i trasferimenti interstrato saranno distinti sia dalle sorgenti esterne sia dai prodotti spaziali non conservativi.
-
-### E. Discretizzazione spaziale, topografia, wet/dry e well-balancing
-
-La dinamica su terreno naturale richiede una discretizzazione capace di trattare variazioni anche forti di quota, velocità caratteristiche direzionali, gradienti geometrici, fronti di avanzamento, arresto del flusso e celle alternativamente asciutte o bagnate. L’infrastruttura HP-PCCU accoppia flussi convettivi, ricostruzione coerente, contributi di percorso idrostatici alle celle e alle interfacce, e propagazione numerica mediante velocità caratteristiche locali. L’obiettivo è preservare gli equilibri appropriati senza perdere robustezza nella dinamica di propagazione.
-
-La topografia nodale B_vertex rappresenta la geometria autoritativa; da essa si ottengono quote al centro e alle facce coerenti e le derivate richieste dal modello. La geometria non deve diventare permanentemente statica: la stessa infrastruttura dovrà permettere l’aggiornamento di un fondo che evolve, con refresh delle quantità derivate. Il motore numerico dei prodotti non conservativi rimane generico, mentre i coefficienti fisici e i provider di equilibrio dipendono dal modello.
-
-Il consolidamento direzionale x/y ridurrà duplicazioni e differenze accidentali tra i due assi, preservando la semantica dell’operatore e i gate di regressione. L’interfaccia dell’operatore spaziale dovrà rimanere indipendente dagli specifici stencils e dalle tecniche di parallelizzazione.
-
-### F. Integrazione temporale robusta e stati fisicamente ammissibili
-
-Il modello conserva gli schemi IMEX Runge–Kutta già approvati; non è previsto in questa roadmap un programma di sostituzione o ottimizzazione dei tableaux. Il controllo della rigidità e delle sorgenti rimane affidato alla struttura esplicita/implicita esistente e ai miglioramenti architetturali del solve locale. Per aumentare la robustezza introdurremo invece un meccanismo generico di time-step rejection and retry: un tentativo di passo è accettato soltanto se i suoi stadi e lo stato finale superano verifiche numeriche e fisiche esplicitamente definite.
-
-In caso di fallimento recuperabile il tempo fisico non avanza, si ripristina lo stato di inizio passo, si riduce Δt e si ripete la stessa integrazione. Se il nuovo Δt scende sotto un minimo configurabile, oppure sono esauriti i retry, il run termina con una diagnostica completa. I limiti inferiori e superiori delle variabili primitive saranno definiti da default generali, eventuali default specifici del modello fisico/reologico e override puntuali di input, con precedenza esplicita e validazione all’avvio.
-
-Il controllo delle primitive verrà eseguito soltanto sugli stati delle celle effettivamente risolte DOPO ciascuno stadio RK completato e DOPO l’assemblaggio finale, senza inserirlo nelle conversioni conservative→primitive usate sulle facce di ricostruzione. I fallimenti numerici che impediscono di terminare uno stadio, come il mancato successo del solve implicito, devono invece propagare tempestivamente uno stato recuperabile. Nessun limite viene applicato mediante clipping artificiale dello stato conservativo.
-
-### G. Chiusure della struttura verticale nel modello depth-averaged
-
-Un modello depth-averaged non risolve esplicitamente le distribuzioni lungo la verticale. Tuttavia, concentrazioni solide e distribuzioni granulometriche possono essere fortemente stratificate; anche velocità, temperatura e altre grandezze possono variare con la quota. I termini integrati di flusso, trasporto e scambio dipendono spesso da prodotti non lineari di questi campi, per cui sostituire indiscriminatamente il prodotto delle medie alla media del prodotto può introdurre errori sistematici.
-
-La nuova famiglia di chiusure verticali dovrà rappresentare soprattutto i profili delle classi solide e le loro interazioni con altri campi verticalmente distribuiti, restituendo alle equazioni depth-averaged quantità integrali consistenti. Sono possibili formulazioni analitiche, fisiche e semiempiriche oppure chiusure ML/NN, ma tutte devono esporre lo stesso contratto fisico e rispettare vincoli di massa, normalizzazione e ammissibilità.
-
-Per questo sviluppo non è sufficiente raffinare la griglia orizzontale di IMEX_SfloW2D: il codice non risolve la coordinata verticale e non può generare da solo il riferimento dettagliato che occorre apprendere o parametrizzare. Le fonti di validazione dovranno quindi includere teoria, osservazioni/esperimenti e, quando disponibili, simulazioni di modelli verticalmente risolti. Questi ultimi sono fonti offline di dati scientifici, non simulatori esterni da accoppiare durante il run.
-
-### H. Modelli subgrid topografici basati sul confronto fine/coarse
-
-Per “subgrid” in questa roadmap si intende prioritariamente l’effetto di una descrizione del terreno molto più dettagliata della griglia impiegata nella simulazione produttiva. Piccoli canali, creste, ostacoli, discontinuità morfologiche e variazioni di pendenza possono influire su avanzamento, canalizzazione, blocco locale, direzione del flusso e distribuzione spaziale degli spessori anche quando non vengono risolti dalla griglia grossolana.
-
-A differenza delle chiusure verticali, qui il riferimento può essere ottenuto con IMEX_SfloW2D stesso: eseguire lo stesso problema fisico su DEM e griglie fini, confrontarlo con il corrispondente problema grossolano e identificare gli effetti sistematici delle strutture topografiche eliminate dal coarse-graining. Occorrono insiemi di casi con terreno, condizioni iniziali, reologie, granulometrie e risoluzioni diverse; il confronto deve esplicitare come aggregare campi, topografia, flussi e diagnostiche tra le due discretizzazioni.
-
-Le chiusure potranno essere costruite in forma fisica, semiempirica o ML/NN e utilizzate nel solver coarse. Non si assume a priori che l’effetto subgrid sia un semplice attrito aggiuntivo: potranno emergere correzioni direzionali al trasporto, blocco parziale, effetti sulle interfacce o altri contributi, che dovranno essere identificati e verificati prima di scegliere dove inserirli nelle equazioni. La validazione richiede dati e terreni indipendenti da quelli usati per la calibrazione o l’addestramento, insieme a controlli su conservazione, simmetria, stabilità e generalizzazione.
-
-### I. ML/NN come backend interno delle chiusure
-
-Il machine learning non costituisce un simulatore separato e non sostituisce automaticamente le equazioni di bilancio. Verrà introdotto come backend opzionale per valutare chiusure verticali o topografiche subgrid attraverso inferenza durante l’esecuzione di IMEX_SfloW2D. Le medesime API dovranno consentire alternative analitiche, semiempiriche e neurali; la scelta della tecnologia non deve propagarsi nell’integratore IMEX, nel calcolo dei flussi o nell’infrastruttura MPI.
-
-Il contratto ML comprende definizione/versionamento delle feature, unità e normalizzazioni, intervalli di validità, pesi e metadati del modello, riproducibilità della valutazione, gestione di output non ammissibili e fallback espliciti. Per la futura esecuzione MPI/GPU l’inferenza dovrà poter avvenire in batch, evitando allocazioni per cella e assicurando indipendenza dal partizionamento quando richiesto. L’accoppiamento operativo con modelli numerici esterni a IMEX_SfloW2D è escluso dal perimetro di questa roadmap.
-
-### J. Esecuzione parallela, I/O scientifico e riproducibilità
-
-Il modello finale dovrà essere utilizzabile in modalità seriale, OpenMP e MPI+OpenMP, con decomposizione in domini locali, halo espliciti, tile di celle attive e kernel progressivamente predisposti a GPU. Lo storage e la comunicazione dovranno conoscere il layout numerico e le dimensioni, non il significato fisico delle variabili. L’ottimizzazione del carico e l’inferenza neurale in batch verranno dopo la stabilizzazione della correttezza e delle interfacce.
-
-Le simulazioni dovranno produrre campi scientifici e diagnostiche in formati documentati, con gestione coerente dei restart, degli output per run, delle metainformazioni e del NetCDF seriale o parallelo. Lo stato necessario a ripetere un passo deve essere distinguibile dal workspace temporaneo: questa distinzione è essenziale tanto per il restart deterministico quanto per il rollback dopo un tentativo di timestep rifiutato. Il sistema di build, i test, la CI, Doxygen, MkDocs e la documentazione verificata degli esempi fanno parte dell’infrastruttura di ricerca, non sono accessori opzionali.
-
-### K. Risultato atteso e criteri generali di credibilità scientifica
-
-A sviluppo completato, IMEX_SfloW2D sarà una piattaforma depth-averaged multifase, polidispersa, selezionabile a uno o due strati, dotata di reologie modulari, operatore spaziale HP-PCCU generico e validato, robustezza temporale con controllo di ammissibilità, chiusure verticali e topografiche subgrid opzionali anche ML/NN, supporto a topografia evolutiva, I/O scientifico riproducibile e calcolo distribuito predisposto ad acceleratori.
-
-Il principio trasversale resta la separazione fra (i) formulazione e validazione fisica, (ii) discretizzazione spaziale e temporale, (iii) gestione dello stato e ammissibilità, (iv) infrastrutture HPC, dati e documentazione. Ogni nuovo sviluppo deve specificare che cosa cambia scientificamente, rispetto a quale baseline viene confrontato e quale evidenza permette di considerarlo accettato.
-
-# 2. Principi e obiettivi dello sviluppo
-
-Sviluppare IMEX_SfloW2D mantenendo la baseline scientifica HP-PCCU, l’equivalenza numerica dei refactoring e la possibilità di estendere progressivamente reologie, metodi impliciti, storage layer-aware, elaborazione MPI/HPC, chiusure verticali e subgrid e backend ML/NN. Non sono previsti accoppiamenti runtime con modelli esterni.
-
-Stati: COMPLETATO = verifiche e gate accettati; IMPLEMENTATO = codice presente ma gate non ancora approvato; PARZIALE = attività iniziata o copertura incompleta; DA FARE = non implementato; GATE = verifica/approvazione da effettuare. Lo stato non equivale alla descrizione storica di una vecchia roadmap.
-
-## Regola generale vincolante — Validazione proporzionata al rischio (risk-based regression testing)
-
-> **PRINCIPIO TRASVERSALE PER TUTTE LE FASI A–I.** Ogni modifica viene verificata in funzione del suo impatto tecnico e scientifico; **non è richiesto ripetere automaticamente l'intera suite numerica ad ogni modifica**. La validazione completa è riservata ai gate scientifici pertinenti, alle modifiche trasversali ad alto rischio e alle release. Un gate già approvato resta approvato nel proprio perimetro storico: le modifiche successive richiedono una nuova verifica d'impatto, non la riapertura retroattiva del gate.
-
-### Classi di verifica e quando eseguirle
-
-| Livello | Momento e finalità | Contenuto minimo | Non implica |
-|---|---|---|---|
-| **T1 — Mirato** | Ogni piccola modifica durante lo sviluppo | Compilazione/lint dei componenti toccati quando applicabile; test unitari, di contratto, negativi e edge case direttamente coinvolti | Riesecuzione di tutte le simulazioni scientifiche |
-| **T2 — Integrazione** | Fine di una modifica funzionale e prima della revisione del relativo step | Un numero contenuto di casi end-to-end pertinenti; compatibilità delle interfacce, restart/I/O o output numerici secondo la superficie modificata | Campagna A11/N9 completa |
-| **T3 — Regressione selettiva di gate** | Per accettazione di step o gate, e per modifiche trasversali | Sottoinsieme rappresentativo, congelato e riproducibile di regressioni che copre i percorsi realmente impattati; strict/optimized, 1/4 thread o toolchain aggiuntive **solo se pertinenti** | Riesecuzione automatica di ogni test storico |
-| **T4 — Campagna estesa/scientifica e release** | Nuovi modelli fisici, cambiamenti numerici importanti, HPC con nuovi ordini/riduzioni, gate scientifici o release | Matrici, benchmark, conservazione, comparatori indipendenti, riproducibilità e CI secondo lo scope formalmente approvato | Approvazione scientifica oltre il perimetro effettivamente testato |
-
-### Procedura obbligatoria per ogni change set
-
-1. **Classificare la modifica**: solo documentazione, packaging, I/O/path, interfaccia/stato/restart, algoritmo numerico, fisica, parallelismo; includere dipendenze indirette reali. Se un file contiene più responsabilità (es. `inpout_2d.f90`), valutare *le routine e i flussi di dati modificati*, non soltanto il nome del file.
-2. **Definire prima dei test la matrice minima**: T1 sempre ove applicabile, T2 quando cambia un comportamento osservabile, T3/T4 solo per rischi e gate motivati. Annotare motivazione dei test inclusi **e di quelli costosi esclusi**. Non usare l'assenza di modifiche alle equazioni come unica prova di equivalenza: percorsi I/O, checkpoint, scheduling e stato globale possono avere effetti indiretti.
-3. **Usare comparatori appropriati**: bitwise se formato, ordine delle operazioni e ambiente lo consentono; confronti numerici con tolleranze dichiarate altrimenti; per I/O distinguere bytes scientifici/metadati intenzionalmente variati (path, manifest, timestamp). Conservare il riferimento alla baseline A11 con revisioni, input e checksum.
-4. **Escalation guidata**: ampliare i test se un controllo fallisce, cambiano precisione/ordine delle operazioni, OpenMP/MPI, bilanci, discretizzazione, stato/restart, o emergono modifiche collaterali non previste. Non dichiarare un gate chiuso con soli smoke test.
-5. **Registrare l'evidenza**: revisione Git, toolchain, profilo, conteggio thread/rank se pertinente, comando o workflow, casi, comparatore, risultato, esclusioni motivate, limiti e responsabile della decisione. Le evidenze storiche non sono automaticamente test eseguiti sul nuovo HEAD.
-6. **Separare frequenze**: T1/T2 su sviluppo/PR; T3 nei gate e, ove conveniente, nella CI; T4 per release o milestone scientifiche. È lecito eseguire una suite ampia in CI a basso costo, ma ciò non è un requisito per ogni micro-commit o per ogni revisione locale.
-
-### Prescrizione specifica per modifiche esclusivamente di I/O (Fase C)
-
-Per C01/C02 sono richiesti test di naming, sicurezza directory, overwrite, manifest, serializzazione, output NetCDF/ASCII/CSV e almeno un caso full/split/restart con append. È richiesta almeno una regressione end-to-end breve sul contenuto scientifico, confrontando output omogenei dopo normalizzazione dei soli metadati deliberatamente cambiati. **I test specifici di ricostruzione HP, PCCU, Jacobiani, reologie e schemi RK non si ripetono tutti** se non sono stati toccati percorsi numerici/stato e i confronti end-to-end selezionati sono positivi. La chiusura C03 richiede il proprio gate I/O e la relativa evidenza; non riapre A11 o B12.
-
-### Applicazione alle schede operative
-
-Le voci **"Test proporzionati"** inserite sotto le schede A01–I09 sono *matrici prospettiche di selezione* e non dichiarazioni di test già eseguiti. I gate, gli stati ufficiali e gli esiti storici riportati nel testo originale restano invariati. Per gli step già completati queste voci valgono per eventuali modifiche future che li riguardino, non come richieste retroattive di nuova validazione.
-
-### Regola generale per la chiusura degli step implementati ma non ancora accettati
-
-Per ogni step con stato **`IMPLEMENTATO, GATE APERTO`** la scheda deve distinguere chiaramente: (i) i requisiti del contratto non ancora coperti da evidenze, (ii) le verifiche minime ancora necessarie e (iii) l'evidenza o decisione richiesta per il passaggio a **`COMPLETATO`**. Se non rimangono requisiti scoperti, il responsabile può chiudere il gate con una decisione documentata basata sulle evidenze già disponibili, senza ripetere test. Lo stato di uno step **non cambia automaticamente** perché è stato chiuso un gate più ampio: l'accettazione deve essere registrata esplicitamente nella sua scheda e nella tabella del Master Development Plan.
-
-Le evidenze di un gate trasversale possono essere riutilizzate da più step soltanto entro lo **scope, la revisione e l'ambiente effettivamente verificati**. Un elemento non coperto richiede soltanto test mirati T1/T2 (o T3 se il rischio residuo lo giustifica), secondo la regola di validazione proporzionata al rischio; evitare campagne scientifiche generalizzate in assenza di impatto numerico.
-
-
-# 3. Master Development Plan — ordine e stato corrente
-
-## Fase A — Fondamenti numerici e baseline scientifica
-
-|     | Vecchia label | Attività                                             | Stato      |
-|-----|---------------|------------------------------------------------------|------------|
-| A01 | N0            | Baseline, test di riferimento e manifest complessivo | PARZIALE   |
-| A02 | N1            | Primitive canoniche e mass fractions                 | COMPLETATO |
-| A03 | N2            | Topografia Q1 e geometria B_vertex                   | COMPLETATO |
-| A04 | N3            | Ricostruzione HP                                     | COMPLETATO |
-| A05 | N4            | Operatore HP-PCCU, G=1                               | COMPLETATO |
-| A06 | N5            | Slope correction                                     | COMPLETATO |
-| A07 | N6            | Curvature source                                     | COMPLETATO |
-| A08 | N7            | Validazione idrodinamica 1D e 2D                     | COMPLETATO |
-| A09 | D-N7-CFL      | Due policy CFL                                       | COMPLETATO |
-| A10 | N8            | Topografia evolutiva e scambio di massa              | COMPLETATO |
-| A11 | N9            | Cutover e baseline scientifica                       | APPROVATO  |
-
-## Fase B — Build e consolidamento dell’operatore x/y
-
-|     | Vecchia label | Attività                                       | Stato                     |
-|-----|---------------|------------------------------------------------|---------------------------|
-| B01 | M12c          | Build, CI e portabilita                        | COMPLETATO                |
-| B02 | P1            | Mappa dipendenze e relocation path-only        | COMPLETATO                |
-| B03 | M12d          | Stocastico OU, RNG e restart seriale           | IMPLEMENTATO              |
-| B04 | M13           | Model layout, N_LAYERS=1                       | IMPLEMENTATO              |
-| B05 | XY-1          | Velocita caratteristiche comuni                | IMPLEMENTATO              |
-| B06 | XY-2          | Ricostruzione HP sulle linee                   | IMPLEMENTATO              |
-| B07 | XY-3          | Flusso PCCU di interfaccia                     | IMPLEMENTATO              |
-| B08 | XY-4          | Velocita faccia e path idrostatici di cella    | COMPLETATO                |
-| B09 | XY-5          | Condizioni al contorno e ricostruzione lineare | COMPLETATO                |
-| B10 | XY-6          | Derivate e halo geometrici                     | COMPLETATO                |
-| B11 | XY-7          | Riduzione CFL direzionale                      | COMPLETATO                |
-| B12 | XY-GATE       | Accettazione complessiva x/y                   | COMPLETATO                |
-
-Evidenza B05–B12 raccolta al 15 ottobre 2026: le fattorizzazioni XY-1…XY-7 e il gate complessivo x/y sono completati nel perimetro verificato. Sono passate le regressioni spaziali e dinamiche strict/optimized, incluse prove a 1/4 thread, composizione variabile, fixture ruotate e confronti binari pre/post refactoring sui casi esplicitamente elencati. L'accettazione B12 non estende l'approvazione scientifica A11 oltre la revisione e lo scope approvati, né chiude D15.
-
-## Fase C — Output e distribuzione
-
-|     | Vecchia label | Attività                                | Stato   |
-|-----|---------------|-----------------------------------------|---------|
-| C01 | IO-1          | Output segregati per run                | COMPLETATO |
-| C02 | IO-2          | Contratto di configurazione e sicurezza | COMPLETATO |
-| C03 | IO-GATE       | Accettazione I/O per run                | COMPLETATO |
-| C04 | DIST-1        | Autotools policy B                      | COMPLETATO |
-| C05 | DIST-2        | Doppio archivio di distribuzione        | COMPLETATO |
-| C06 | DIST-GATE     | Validazione distributiva                | COMPLETATO |
-
-La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazione per allegare gli archivi sorgente ed Examples a una release GitHub e la pubblicazione di una release ufficiale sono follow-up separati, esplicitamente differiti; il candidato `9.9.27` resta sintetico e non pubblicato.
-
-## Fase D — Reologie e solver IMEX
-
-|     | Vecchia label | Attività                                                    | Stato    |
-|-----|---------------|-------------------------------------------------------------|----------|
-| D01 | M12e-A        | Inventario formule e rami REAL/COMPLEX                      | COMPLETATO (audit statico) |
-| D02 | M12e-B        | Caratterizzazione numerica cell-local                       | COMPLETATO (gate locale GNU/macOS) |
-| D03 | —             | Audit e ownership di parametri, variabili e stato condiviso | IN PAUSA |
-| D04 | P2            | Eliminazione reologia 8                                     | COMPLETATO |
-| D05 | P3            | Estrazione moduli reologici e selezione testuale            | COMPLETATO |
-| D06 | P3            | Sorgenti termiche e pore pressure                           | COMPLETATO |
-| D07 | —             | Migrazione progressiva dei parametri non reologici          | IN PAUSA |
-| D08 | P4            | RHEOLOGY_MODEL da numeri a stringhe                         | ASSORBITO IN D05 |
-| D09 | P5            | Correzione del solo attrito                                 | COMPLETATO (gate locale GNU/macOS) |
-| D10 | P6            | EX_terms / IM_terms                                         | COMPLETATO (gate locale GNU/macOS) |
-| D11 | P7            | IM_group e metadati                                  | COMPLETATO (gate locale GNU/macOS) |
-| D12 | P7            | Newton per gruppo e Jacobiano ridotto                       | IN CORSO |
-| D13 | P8            | Integrazione analitica esatta dei termini IM                | COMPLETATO (gate locale GNU/macOS) |
-| D14 | P8            | Gruppi misti e validazione                                  | COMPLETATO (gate locale GNU/macOS) |
-| D16 | —             | Consolidamento leggi fisiche, rate e assemblaggio IMEX      | IN CORSO |
-| D15 | P9            | Acceptance finale della nuova architettura                  | GATE     |
 
 ## Fase E — Architettura e robustezza del passo
 
@@ -2964,6 +3731,8 @@ Prima definire model_layout, conservazione e semantica degli operatori, completa
 | ML-GATE   | Equivalenza del contratto delle closure con backend neurale e non neurale, versionamento modello/feature, fallback documentato, test OpenMP e performance.  |
 | ARCH-GATE | Disattivazione delle nuove closure riproduce la baseline; nessun nuovo accoppiamento runtime con simulatori esterni.                                        |
 
+
+
 # 5. Requisiti trasversali di completamento
 
 Le prescrizioni seguenti sono obbligatorie per tutte le fasi del piano. I vincoli specifici di una attività sono riportati nella relativa scheda. La pubblicazione del sito non equivale al completamento del gate di copertura Doxygen.
@@ -3066,6 +3835,7 @@ Le sigle storiche non sono identificativi operativi e sono conservate esclusivam
 | D13      | P8                        | Integrazione analitica esatta dei termini IM         |
 | D14      | P8                        | Gruppi misti e validazione                           |
 | D16      | —                         | Consolidamento leggi fisiche e assemblaggio IMEX     |
+| D17      | —                         | Struttura unificata dei termini sorgente e separazione tra fisica e numerica |
 | D15      | P9                        | Acceptance finale della nuova architettura           |
 | E01      | ARCH-1                    | Audit dipendenze e ownership stato                   |
 | E02      | ARCH-2                    | Architecture fitness checks                          |
@@ -3098,3 +3868,6 @@ Le sigle storiche non sono identificativi operativi e sono conservate esclusivam
 | I07      | S-GATE                    | Validazione subgrid                                  |
 | I08      | ML-1                      | Inferenza ML/NN delle closure                        |
 | I09      | ML-GATE                   | Validazione ML/NN                                    |
+
+
+
