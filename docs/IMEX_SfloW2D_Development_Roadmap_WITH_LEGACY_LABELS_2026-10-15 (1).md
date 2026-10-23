@@ -2213,7 +2213,7 @@ senza modifiche al codice eseguibile.
 
 **D16.12 — Gate di accettazione.** Accettare D16 solo quando la selezione reologica è centralizzata, le leggi sono nei moduli `*_laws_2d`, rate e sorgenti sono distinti, le integrazioni analitiche seguono la convenzione, gli aggiornamenti sono in `time_integration_2d`, la geometria è in `geometry_2d` e compilazione, test, restart, Doxygen e CI passano senza variazioni scientifiche non autorizzate. Il manifest deve riportare vecchio nome, nuovo nome, modulo proprietario, chiamanti aggiornati ed evidenze di regressione.
 
-**Esito della verifica locale D16.12: parziale; D16 resta aperto.** Il manifest
+**Esito della verifica locale D16.12: superata; D16 resta aperto per CI remota.** Il manifest
 `acceptance/D16_MIGRATION_MANIFEST.json` registra le migrazioni, i moduli
 proprietari, i chiamanti e le regressioni. Il controllo Doxygen globale passa su
 45 sorgenti e conferma che codice eseguibile e direttive sono invariati rispetto
@@ -2224,17 +2224,25 @@ a `HEAD`; anche la build completa strict-debug passa. Passano
 la sezione stage/boundary di `TEST_IMEX_STAGES` (strict/optimized) e i test
 `TEST_BINARY_RESTART` e `TEST_STOCHASTIC_RESTART` (1/4 thread).
 
-La verifica completa non è ancora conclusiva: `make check` ha superato i test
-metadata, output-path e i primi cinque casi solver, ma è stata interrotta mentre
+La verifica integrata era stata precedentemente interrotta mentre
 `TEST_DAMBREAK/TEST_DYNAMIC_FINH` avanzava molto lentamente nella build locale
-strict-debug. La precedente esecuzione di `TEST_IMEX_STAGES` falliva
-nell’order suite sull’asserzione di massa costante; aggiornamento 23 ottobre:
-la sezione `order` passa ora in strict e optimized, con il confronto e il
-bilancio coerenti con i bordi outflow-only. Il runner integrato completo resta
-da rieseguire. Non risulta inoltre un run GitHub Actions per la revisione
-registrata nel manifest (`4973360ddf213501a93fe7f02ff9a417ae42f2aa`); il CLI
-GitHub non è autenticato in questo ambiente. Il gate D16.12 resta quindi
-aperto per il runner integrato e la verifica CI sulla revisione condivisa.
+strict-debug. L’indagine ha individuato la regressione nel passaggio al solver
+IMEX per gruppi: la correzione d’attrito sul contributo semi-implicito era
+applicata solo dopo Newton, invece che prima della soluzione con conseguente
+aggiornamento del rate e del residuo. Il commit `9b2a4989` ripristina la
+correzione pre-Newton e aggiunge a `test_grouped_implicit_stage` una regressione
+con impulso di snervamento sufficiente a invertire il momento se non limitato.
+
+**Aggiornamento 23 ottobre 2026 — gate locale completato.** `make check` passa
+nei build strict-debug e optimized, inclusi tutti i casi di
+`TEST_DAMBREAK`, `TEST_DYNAMIC_FINH` compreso. Il caso dinamico raggiunge
+`T_END=0.30` con `dt` circa `0.00068–0.00070` e completa in 19,29 s nel build
+optimized. Anche la sezione `order` di `TEST_IMEX_STAGES` passa in strict e
+optimized, con confronto e bilancio coerenti con i bordi outflow-only.
+
+Resta da verificare la CI GitHub sulla revisione condivisa `9b2a4989`; non è
+stata verificata in questa sessione. D16.12 resta aperto esclusivamente per
+questa conferma CI remota.
 
 ### D15 — Acceptance finale della nuova architettura
 
