@@ -25,7 +25,7 @@ for profile in strict optimized; do
         physics/rheology_laws/rheology_froude_2d physics/rheology_laws/rheology_lucas_2d \
         numerics/lapack_interfaces_2d \
         core/constitutive_parameters_2d numerics/equation_metadata_2d \
-        numerics/source_catalog_2d numerics/source_registry_2d \
+        numerics/source_catalog_2d numerics/source_input_2d numerics/source_registry_2d \
         physics/source_configuration_2d \
         core/complexify \
         geometry/geometry_2d state/state_conversion_2d \

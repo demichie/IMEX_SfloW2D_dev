@@ -38,6 +38,7 @@ MODULE source_input_2d
   PUBLIC :: read_native_source_groups
   PUBLIC :: uppercase_source_text
 CONTAINS
+  !> \brief Reset all parsed native source-group input to the absent state.
   SUBROUTINE clear_source_input
     source_group_count=0
     source_group_id=0
@@ -53,6 +54,10 @@ CONTAINS
     native_source_configuration_present=.FALSE.
   END SUBROUTINE clear_source_input
 
+  !> \brief Find and parse the optional native source-group namelist.
+  !> \param[in] input_unit Rewoundable unit containing the complete solver input.
+  !> \param[in] legacy_imex_explicit True when a legacy IMEX field was set explicitly.
+  !> \param[out] error Empty on success; otherwise describes malformed or conflicting input.
   SUBROUTINE read_native_source_groups(input_unit,legacy_imex_explicit,error)
     INTEGER, INTENT(IN) :: input_unit
     LOGICAL, INTENT(IN) :: legacy_imex_explicit
@@ -107,6 +112,9 @@ CONTAINS
     IF (io_status/=0) error='Unable to rewind input after reading SOURCE_GROUPS'
   END SUBROUTINE read_native_source_groups
 
+  !> \brief Convert ASCII lowercase letters in source input to uppercase.
+  !> \param[in] text Input text.
+  !> \return Same-length text with lowercase ASCII letters converted to uppercase.
   PURE FUNCTION uppercase_source_text(text) RESULT(upper)
     CHARACTER(*), INTENT(IN) :: text
     CHARACTER(LEN=LEN(text)) :: upper

@@ -128,6 +128,7 @@ CONTAINS
   !> \param[in] solve_interfaces_y Number of active y-normal faces.
   !> \param[in] j_stag_y X-cell indices of active y-normal faces.
   !> \param[in] k_stag_y Y-face indices paired with j_stag_y.
+  !> \param[in] source_boundary_enabled Optional override for boundary-source traces.
 
   SUBROUTINE eval_hyperbolic_terms( this, recon, qp_expl,                     &
        divFlux_iRK, t, solve_cells, j_cent, k_cent, solve_interfaces_x,       &

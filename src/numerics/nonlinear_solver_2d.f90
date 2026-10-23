@@ -481,6 +481,8 @@ CONTAINS
   !> \param[in] Bprimej_y Filtered bed slope in y [dimensionless].
   !> \param[in] Zij Local stochastic-process value supplied to the rheology.
   !> \param[in] coeff_f Per-equation residual scaling factors.
+  !> \param[in] source_group Validated Newton source group being solved.
+  !> \param[in] source_solver Validated solver descriptor selecting rates and target equations.
   !> \param[in] tol_abs_local Absolute residual tolerance.
   !> \param[in] tol_rel_local Relative residual tolerance.
   !> \param[in,out] iterations_used Cumulative Newton iterations attempted.
@@ -859,6 +861,8 @@ CONTAINS
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !> \param[in] active_equations Equation indices whose residual rows are active.
+  !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
+  !> \param[in] source_solver Validated Newton solver descriptor for the selected rate evaluation.
   !******************************************************************************
 
   SUBROUTINE lnsrch( qj_rel_NR_old, qj_org, qj_fixed, qj_old, scal_f_old,      &
@@ -1109,6 +1113,8 @@ CONTAINS
   !> \param[out] scal_f Half the squared Euclidean norm of the scaled nonlinear residual.
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !> \param[in] active_equations Equation indices whose residual rows and Jacobian columns are active.
+  !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
+  !> \param[in] source_solver Validated Newton solver descriptor for the selected rate evaluation.
   !******************************************************************************
 
   SUBROUTINE eval_f( qj , qj_old , dt_step, a_diag , coeff_f , Rj_not_impl ,    &
@@ -1184,6 +1190,8 @@ CONTAINS
   !> \param[out] left_matrix Jacobian of the scaled residual with respect to the normalized state.
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !> \param[in] active_equations Equation indices whose Jacobian columns are differentiated.
+  !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
+  !> \param[in] source_solver Validated Newton solver descriptor for the selected rate evaluation.
   !> \details Uses complex-step perturbations of normalized conservative variables. The resulting
   !>          imaginary derivatives form the active Jacobian columns without finite-difference
   !>          subtraction.

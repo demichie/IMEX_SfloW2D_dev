@@ -54,6 +54,10 @@ MODULE simulation_2d
   INTEGER, PARAMETER :: TIMESTEP_EVENT_CLOCK_ADVANCED=5
 
   ABSTRACT INTERFACE
+     !> \brief Report one completed production-timestep phase to an observer.
+     !> \param[in] event Completed phase identifier from TIMESTEP_EVENT_*.
+     !> \param[in] time Step-start time, or the advanced time for the clock event [s].
+     !> \param[in] dt Timestep length used by the completed phase [s].
      SUBROUTINE timestep_event_observer(event,time,dt)
        IMPORT :: wp
        INTEGER, INTENT(IN) :: event
@@ -129,7 +133,7 @@ CONTAINS
   !> \details Preserves the fractional-step ordering: source-window averages,
   !>          OU preparation, RK-IMEX, post-RK step sources, then clock advance.
   !> \param[in,out] this Initialized simulation context.
-  !> \param[optional] observer Test hook called after each completed phase.
+  !> \param[in] observer Optional test hook called after each completed phase.
   SUBROUTINE advance_simulation_timestep(this,observer)
     CLASS(simulation_context_type), INTENT(INOUT) :: this
     PROCEDURE(timestep_event_observer), OPTIONAL :: observer

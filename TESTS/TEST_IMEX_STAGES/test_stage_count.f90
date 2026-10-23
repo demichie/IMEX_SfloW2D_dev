@@ -3,8 +3,9 @@
 !>          Invalid workspace requests must fail before allocation: dimensions are unset.
 PROGRAM test_stage_count
   USE parameters_2d, ONLY : n_RK, n_vars, n_eqns, kt_trace_reconstruction
-  USE parameters_2d, ONLY : wp, t_start, dt0, stochastic_flag
-  USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, init_grid
+  USE parameters_2d, ONLY : wp, t_start, dt0, stochastic_flag, vel_source
+  USE constitutive_parameters_2d, ONLY : rho_l
+  USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, cell_size, init_grid
   USE time_integration_2d, ONLY : time_integration_workspace_type
   USE inpout_2d, ONLY : init_param, read_param, read_solution
   USE source_input_2d, ONLY : native_source_configuration_present, source_group_count
@@ -12,6 +13,7 @@ PROGRAM test_stage_count
   USE source_configuration_2d, ONLY : initialize_native_source_configuration
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE source_catalog_2d, ONLY : SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS, &
+       SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, SOURCE_CADENCE_STAGE, &
        SOURCE_CADENCE_STEP, SOURCE_METHOD_NEWTON, SOURCE_METHOD_EXPLICIT
   USE simulation_2d, ONLY : simulation, TIMESTEP_EVENT_SOURCE_WINDOWS, &
        TIMESTEP_EVENT_STOCHASTIC_PREPARED, TIMESTEP_EVENT_RK_COMPLETE, &
@@ -24,6 +26,7 @@ PROGRAM test_stage_count
   CHARACTER(LEN=32) :: mode, argument
   CHARACTER(LEN=256) :: error
   INTEGER :: expected,event_log(5),event_count
+  REAL(wp) :: initial_mass,expected_mass_change,actual_mass_change
 
   CALL get_command_argument(1,mode)
   CALL get_command_argument(2,argument)
@@ -38,12 +41,12 @@ PROGRAM test_stage_count
      CALL read_param
      IF (.NOT.stochastic_flag) ERROR STOP 'stochastic physics was not enabled'
      IF (.NOT.native_source_configuration_present) ERROR STOP 'native source namelist was not parsed'
-     IF (source_group_count/=2) ERROR STOP 'native source group count changed unexpectedly'
+     IF (source_group_count/=3) ERROR STOP 'native source group count changed unexpectedly'
      CALL initialize_native_source_configuration(registry,partition,error)
      IF (LEN_TRIM(error)>0) ERROR STOP 'native source schedule rejected: '//TRIM(error)
      stage_groups=registry%stage_groups()
      step_groups=registry%step_groups()
-     IF (SIZE(stage_groups)/=1 .OR. SIZE(step_groups)/=1) &
+     IF (SIZE(stage_groups)/=2 .OR. SIZE(step_groups)/=1) &
           ERROR STOP 'native source groups were not built'
      IF (stage_groups(1)%method/=SOURCE_METHOD_NEWTON .OR. &
           SIZE(stage_groups(1)%equation_ids)/=2 .OR. &
@@ -54,12 +57,18 @@ PROGRAM test_stage_count
           SIZE(step_groups(1)%term_ids)/=1 .OR. &
           step_groups(1)%term_ids(1)/=SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS) &
           ERROR STOP 'native active mass-exchange term was not retained'
+     IF (stage_groups(2)%cadence/=SOURCE_CADENCE_STAGE .OR. &
+          stage_groups(2)%method/=SOURCE_METHOD_EXPLICIT .OR. &
+          SIZE(stage_groups(2)%term_ids)/=1 .OR. &
+          stage_groups(2)%term_ids(1)/=SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION) &
+          ERROR STOP 'native circular source stage group was not retained'
      CALL init_grid
      CALL simulation%initialize
      simulation%runtime%t=t_start
      CALL read_solution(simulation%state,simulation%domain)
      CALL simulation%domain%check_solve(simulation%state%q, &
           simulation%runtime%t,.TRUE.)
+     initial_mass=SUM(simulation%state%q(1,:,:))
      simulation%runtime%dt=dt0
      simulation%runtime%dt_old=dt0
      simulation%runtime%dt_old_old=dt0
@@ -71,6 +80,14 @@ PROGRAM test_stage_count
           TIMESTEP_EVENT_STEP_SOURCES_COMPLETE,TIMESTEP_EVENT_CLOCK_ADVANCED])) &
           ERROR STOP 'production timestep event sequence mismatch'
      IF (simulation%runtime%t/=t_start+dt0) ERROR STOP 'production timestep did not advance clock'
+     expected_mass_change=dt0*0.5_wp*vel_source*rho_l*ACOS(-1.0_wp)*1.5_wp**2
+     actual_mass_change=(SUM(simulation%state%q(1,:,:))-initial_mass)* &
+          cell_size*cell_size
+     IF (ABS(actual_mass_change-expected_mass_change)> &
+          1.0E-9_wp*MAX(1.0_wp,ABS(expected_mass_change))) &
+          ERROR STOP 'production source-window mass budget mismatch'
+     IF (ANY(simulation%state%q(1,:,:)<0.0_wp)) &
+          ERROR STOP 'production source-window step lost positivity'
      WRITE(*,*) 'PASS: production timestep phase order'
      CALL simulation%finalize
   CASE ('workspace')

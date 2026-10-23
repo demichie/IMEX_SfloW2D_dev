@@ -380,6 +380,9 @@ CONTAINS
     error=''
   END SUBROUTINE initialize_native_source_configuration
 
+  !> \brief Map a native cadence name to its catalog identifier.
+  !> \param[in] name Input cadence name.
+  !> \return Cadence identifier, or zero when unsupported.
   PURE INTEGER FUNCTION native_cadence(name)
     CHARACTER(*), INTENT(IN) :: name
     SELECT CASE(TRIM(uppercase_source_text(name)))
@@ -389,6 +392,9 @@ CONTAINS
     END SELECT
   END FUNCTION native_cadence
 
+  !> \brief Map a native solver-method name to its catalog identifier.
+  !> \param[in] name Input method name.
+  !> \return Method identifier, or zero when unsupported.
   PURE INTEGER FUNCTION native_method(name)
     CHARACTER(*), INTENT(IN) :: name
     SELECT CASE(TRIM(uppercase_source_text(name)))
@@ -399,6 +405,9 @@ CONTAINS
     END SELECT
   END FUNCTION native_method
 
+  !> \brief Map a native solver-target name to its catalog identifier.
+  !> \param[in] name Input target name.
+  !> \return Target identifier, or zero when unsupported.
   PURE INTEGER FUNCTION native_target(name)
     CHARACTER(*), INTENT(IN) :: name
     SELECT CASE(TRIM(uppercase_source_text(name)))
@@ -409,6 +418,9 @@ CONTAINS
     END SELECT
   END FUNCTION native_target
 
+  !> \brief Resolve a native source-term name to its schedulable catalog identifier.
+  !> \param[in] name Input physical source-term name.
+  !> \return Schedulable term identifier, or zero when unsupported.
   PURE INTEGER FUNCTION native_term_id(name)
     CHARACTER(*), INTENT(IN) :: name
     TYPE(source_term_type) :: term

@@ -3,12 +3,13 @@ PROGRAM test_curvature_source
   USE parameters_2d
   USE constitutive_parameters_2d, ONLY : rho_l, inv_rho_l, rho_a_amb, grav, &
        sp_heat_l, inv_rho_s, sp_heat_s, sp_heat_g, sp_gas_const_g
-  USE geometry_2d, ONLY : bottom_source_area_ratio
+  USE geometry_2d, ONLY : bottom_source_area_ratio, pi_g
   USE equation_terms_2d, ONLY : curvature_acceleration
   USE equation_terms_2d, ONLY : eval_curvature_momentum_source
   USE equation_terms_2d, ONLY : eval_expl_terms, set_source_time_coefficients
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE, &
-       SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION
+       SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, &
+       SOURCE_TERM_BOTTOM_FISSURAL_INJECTION, SOURCE_TERM_RADIAL_INJECTION
   USE source_registry_2d, ONLY : source_group_type
 
   IMPLICIT NONE
@@ -25,9 +26,10 @@ PROGRAM test_curvature_source
 
   REAL(wp) :: acceleration, expected_acceleration
   REAL(wp) :: source_x, source_y, expected_x, expected_y
-  REAL(wp) :: tolerance
+  REAL(wp) :: tolerance, ramp_mean
   REAL(wp) :: physical(7), original(7), explicit_source(5)
   TYPE(source_group_type) :: curvature_group, circular_injection_group
+  TYPE(source_group_type) :: fissural_injection_group, radial_injection_group
   INTEGER :: sample
 
   curvature_group%method=SOURCE_METHOD_EXPLICIT
@@ -36,6 +38,12 @@ PROGRAM test_curvature_source
   circular_injection_group%method=SOURCE_METHOD_EXPLICIT
   circular_injection_group%cadence=SOURCE_CADENCE_STAGE
   circular_injection_group%term_ids=[SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION]
+  fissural_injection_group%method=SOURCE_METHOD_EXPLICIT
+  fissural_injection_group%cadence=SOURCE_CADENCE_STAGE
+  fissural_injection_group%term_ids=[SOURCE_TERM_BOTTOM_FISSURAL_INJECTION]
+  radial_injection_group%method=SOURCE_METHOD_EXPLICIT
+  radial_injection_group%cadence=SOURCE_CADENCE_STAGE
+  radial_injection_group%term_ids=[SOURCE_TERM_RADIAL_INJECTION]
 
   expected_acceleration = Bxx*u*u + 2.0_wp*Bxy*u*v + Byy*v*v
   CALL assert_small( 'curvature acceleration',                             &
@@ -121,6 +129,7 @@ PROGRAM test_curvature_source
   ! Step averaging must integrate activation across the interval, not sample
   ! only its active start or endpoint.
   bottom_source_area_ratio=1.0_wp
+  pi_g=ACOS(-1.0_wp)
   time_param=[10.0_wp,5.0_wp,0.0_wp,0.0_wp]
   CALL set_source_time_coefficients(4.0_wp,2.0_wp)
   CALL eval_expl_terms(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
@@ -130,12 +139,56 @@ PROGRAM test_curvature_source
   CALL assert_small('partially active step-averaged mass source', &
        ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
 
+  time_param=[10.0_wp,5.0_wp,1.0_wp,0.0_wp]
+  CALL set_source_time_coefficients(0.0_wp,2.0_wp)
+  CALL eval_expl_terms(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
+       0.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
+       circular_injection_group)
+  expected_x=0.75_wp*0.25_wp*vel_source*rho_l
+  CALL assert_small('linearly ramped step-averaged mass source', &
+       ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
+
+  time_param=[10.0_wp,5.0_wp,0.0_wp,0.0_wp]
+  CALL set_source_time_coefficients(9.0_wp,2.0_wp)
+  CALL eval_expl_terms(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
+       9.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
+       circular_injection_group)
+  expected_x=0.5_wp*0.25_wp*vel_source*rho_l
+  CALL assert_small('period-wrapped step-averaged mass source', &
+       ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
+
   CALL set_source_time_coefficients(5.0_wp,2.0_wp)
   CALL eval_expl_terms(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        5.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
        circular_injection_group)
   CALL assert_small('inactive step-averaged mass source', &
        MAXVAL(ABS(explicit_source)),0.0_wp)
+
+  bottom_radial_source_flag=.FALSE.; bottom_fissural_source_flag=.TRUE.
+  n_fissures=1
+  ALLOCATE(xs_fissures(1,1),xg_fissures(0,1),xl_fissures(1))
+  xs_fissures=0.0_wp; xg_fissures=0.0_wp; xl_fissures=1.0_wp
+  linear_vel_fissures(1)=0.02_wp; T_fissures(1)=T_source
+  time_param_fissures(:,1)=[10.0_wp,5.0_wp,0.0_wp,0.0_wp]
+  CALL set_source_time_coefficients(4.0_wp,2.0_wp)
+  CALL eval_expl_terms(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
+       4.0_wp,0.0_wp,[0.25_wp],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
+       fissural_injection_group)
+  expected_x=0.5_wp*0.25_wp*linear_vel_fissures(1)*rho_l
+  CALL assert_small('partially active fissural source', &
+       ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
+
+  bottom_fissural_source_flag=.FALSE.; radial_source_flag=.TRUE.
+  h_source=2.0_wp; vel_source=0.01_wp
+  time_param=[10.0_wp,4.0_wp,2.0_wp,3.0_wp]
+  CALL set_source_time_coefficients(0.0_wp,1.0_wp)
+  CALL eval_expl_terms(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
+       0.0_wp,0.0_wp,[REAL(wp)::],2.0_wp,1.0_wp,0.0_wp,1.0_wp, &
+       radial_injection_group)
+  ramp_mean=0.5_wp-1.0_wp/ACOS(-1.0_wp)
+  expected_x=ramp_mean*h_source*vel_source*2.0_wp*rho_l
+  CALL assert_small('cosine-ramped radial source', &
+       ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
 
   WRITE(*,*) 'PASS: curvature, dry-state guard, and step-averaged source windows verified'
 

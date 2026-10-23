@@ -281,6 +281,7 @@ CONTAINS
    !> \param[in] j_cent X indices of active cells; only the first solve_cells entries are used.
    !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
    !> \param[in] use_kt_direct Use direct KT traces instead of the HP dry-state projection.
+   !> \param[in] source_boundary_enabled Optional override for boundary-source traces.
 
 
    SUBROUTINE reconstruction( this, qp_expl, t, solve_cells, j_cent, k_cent, &

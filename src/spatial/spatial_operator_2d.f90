@@ -78,6 +78,7 @@ CONTAINS
   !>                          q_t+spatial_term=local_sources.
   !> \param[in] time Current simulation time [s].
   !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
+  !> \param[in] boundary_source_enabled Optional override for boundary-source traces.
   !>
   !> \note The sign convention is q_t+spatial_term=local_sources; hydrostatic pressure/topography
   !>       are already included through path terms.
@@ -110,6 +111,7 @@ CONTAINS
   !> \param[in] time Current simulation time [s].
   !> \param[out] dt Returned CFL-limited timestep, bounded by max_dt [s].
   !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
+  !> \param[in] boundary_source_enabled Optional override for boundary-source traces during CFL evaluation.
   !******************************************************************************
 
   SUBROUTINE compute_spatial_timestep( this, q, qp, time, dt, domain,        &

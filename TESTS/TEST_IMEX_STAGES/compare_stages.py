@@ -660,8 +660,12 @@ def stage_count_suite(executable, profile):
     content = inp.read_text()
     content = content.replace(
         "RADIAL_SOURCE_FLAG=F, COLLAPSING_VOLUME_FLAG=F,",
-        "RADIAL_SOURCE_FLAG=F, COLLAPSING_VOLUME_FLAG=F, STOCHASTIC_FLAG=T,",
+        "RADIAL_SOURCE_FLAG=F, BOTTOM_RADIAL_SOURCE_FLAG=T, "
+        "COLLAPSING_VOLUME_FLAG=F, STOCHASTIC_FLAG=T,",
     )
+    content = content.replace("T_START=0.0D0,", "T_START=4.9D0,")
+    content = content.replace("T_END=1.0D-1,", "T_END=5.1D0,")
+    content = content.replace("DT0=1.0D-4,", "DT0=2.0D-1,")
     inp.write_text(content + """
 &STOCHASTIC_PARAMETERS
  std_max=1.0D0,
@@ -670,11 +674,19 @@ def stage_count_suite(executable, profile):
  stochastic_seed=1729,
  stoch_transport_flag=F,
 /
+&RADIAL_SOURCE_PARAMETERS
+ x_source=6.0D0,
+ y_source=4.0D0,
+ r_source=1.5D0,
+ vel_source=1.0D-2,
+ T_source=300.0D0,
+ time_param=10.0D0,5.0D0,0.0D0,0.0D0,
+/
 """)
     with (directory / "IMEX_SfloW2D.inp").open("a") as stream:
         stream.write("""
 &SOURCE_GROUPS
- source_group_count=2,
+ source_group_count=3,
  source_group_id(1)=1,
  source_group_order(1)=1,
  source_group_cadence(1)='STAGE',
@@ -691,6 +703,13 @@ def stage_count_suite(executable, profile):
  source_group_term_count(2)=1,
  source_group_terms(1,2)='SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS',
  source_group_solver_count(2)=0
+ source_group_id(3)=2,
+ source_group_order(3)=2,
+ source_group_cadence(3)='STAGE',
+ source_group_method(3)='EXPLICIT',
+ source_group_term_count(3)=1,
+ source_group_terms(1,3)='SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION',
+ source_group_solver_count(3)=0
 /
 """)
     env = {**os.environ, "OMP_NUM_THREADS": "1", "OMP_DYNAMIC": "FALSE"}
@@ -700,7 +719,8 @@ def stage_count_suite(executable, profile):
     if run.returncode != 0 or "PASS: stage count accepted:" not in run.stdout or \
             "PASS: production timestep phase order" not in run.stdout:
         raise AssertionError(f"{directory}: native source input flow failed\n{run.stdout}")
-    print("PASS: SOURCE_GROUPS read_param flow and production timestep phase order", flush=True)
+    print("PASS: SOURCE_GROUPS read_param flow, production timestep phase order, "
+          "and active source-window mass budget", flush=True)
 
 
 def main():

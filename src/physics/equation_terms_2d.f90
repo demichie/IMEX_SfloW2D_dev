@@ -230,6 +230,7 @@ CONTAINS
   !> \param[in] lat_n_x_jk Mean x component of the emitting arc normal.
   !> \param[in] lat_n_y_jk Mean y component of the emitting arc normal.
   !> \param[in] cell_area_jk Horizontal area of the current cell [m^2].
+  !> \param[in] group Validated explicit source group selecting cell-local terms.
   !******************************************************************************
 
   SUBROUTINE eval_expl_terms( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy , &
@@ -675,6 +676,8 @@ CONTAINS
   END SUBROUTINE eval_expl_terms
 
   !> \brief Validate one Newton group/solver selection before rate evaluation.
+  !> \param[in] group Validated Newton group containing the solver and its terms.
+  !> \param[in] solver Newton solver descriptor selecting the rates to evaluate.
   SUBROUTINE validate_newton_selection(group,solver)
     TYPE(source_group_type), INTENT(IN) :: group
     TYPE(source_solver_type), INTENT(IN) :: solver
@@ -701,6 +704,11 @@ CONTAINS
   END SUBROUTINE validate_newton_selection
 
   !> \brief Test whether a selected Newton solver owns a term of the requested role.
+  !> \param[in] group Validated Newton source group.
+  !> \param[in] solver Newton solver descriptor.
+  !> \param[in] role Catalog role to search for.
+  !> \param[in] model_id Physical model identifier to match.
+  !> \return True when the solver selects a group term with the requested role and model.
   PURE LOGICAL FUNCTION solver_has_role(group,solver,role,model_id) RESULT(found)
     TYPE(source_group_type), INTENT(IN) :: group
     TYPE(source_solver_type), INTENT(IN) :: solver
@@ -721,6 +729,10 @@ CONTAINS
   END FUNCTION solver_has_role
 
   !> \brief Test whether a selected Newton solver owns one specific source term.
+  !> \param[in] group Validated Newton source group.
+  !> \param[in] solver Newton solver descriptor.
+  !> \param[in] term_id Catalog term identifier to search for.
+  !> \return True when the solver and group both select the requested term.
   PURE LOGICAL FUNCTION solver_has_term(group,solver,term_id) RESULT(found)
     TYPE(source_group_type), INTENT(IN) :: group
     TYPE(source_solver_type), INTENT(IN) :: solver

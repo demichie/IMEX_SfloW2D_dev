@@ -4,7 +4,11 @@ set -eu
 test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_dir=$(CDPATH= cd -- "$test_dir/../.." && pwd)
 build_dir=$(mktemp -d /tmp/imex-curvature-source.XXXXXX)
-trap 'rm -rf "$build_dir"' EXIT HUP INT TERM
+if [ "${KEEP_TEST_WORKDIR:-0}" = 1 ]; then
+    echo "Keeping test work directory: $build_dir"
+else
+    trap 'rm -rf "$build_dir"' EXIT HUP INT TERM
+fi
 
 cd "$build_dir"
 

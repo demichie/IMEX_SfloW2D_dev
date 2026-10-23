@@ -2508,10 +2508,10 @@ requisito numerato è:
 | D17.10 | **Implementato localmente** | Rate semi-impliciti/impliciti filtrati per gruppo e solver, percorsi impliciti REAL/COMPLEX e sweep runtime ordinato dei solve Newton multipli; report e regressioni locali in D17.10. |
 | D17.11 | **Implementato localmente per i kernel REAL/COMPLEX duplicati individuati** | La correlazione di viscosità lahar condivide ora il kernel COMPLEX con il wrapper REAL; valore e derivata sono testati nei due rami. Per il perimetro verificato non serve un file `.inc`; report D17.11. |
 | D17.12 | **Implementato localmente** | Bridge analitico validato; vedere il report D17-C. |
-| D17.13–D17.16 | **Parziali** | D17.13 resta parziale: equivalenza per tutte le attivazioni non completata. D17.14 instrada il batch mass-exchange atomico dal registro `step` una sola volta dopo RK. D17.15 verifica l’ordine delle cinque fasi production source-window/OU/RK/step-source/clock nella routine condivisa da driver e test e un aggiornamento OU attivo con seed fissato; un test fisico separato verifica il coefficiente medio di una finestra attiva e inattiva per la sorgente circolare bottom, ma finestre attive nel timestep production, selezione di `dt` e output end-to-end restano da coprire. D17.16 implementa localmente `SOURCE_GROUPS`, la distinzione esplicito/default legacy, i controlli di conflitto e la copertura completa dei termini attivi; il flusso completo `read_param` è coperto per una configurazione nativa rappresentativa, mentre l’equivalenza per tutte le combinazioni fisiche resta da validare. Evidenze D17.13–D17.16. |
+| D17.13–D17.16 | **Parziali** | D17.13 resta parziale: equivalenza per tutte le attivazioni non completata. D17.14 instrada il batch mass-exchange atomico dal registro `step` una sola volta dopo RK. D17.15 verifica l’ordine delle cinque fasi production source-window/OU/RK/step-source/clock e un aggiornamento OU attivo con seed fissato; il test nativo end-to-end verifica una sorgente circolare attiva a metà intervallo e il bilancio integrato nel passo production. Test equation-term separati coprono impulso parziale, rampa lineare, wrap, inattività, finestra fissurale e rampa cosinusoidale radiale. Selezione di `dt`, output end-to-end, trasporto stocastico e tutte le combinazioni di sorgente restano aperti. D17.16 implementa localmente `SOURCE_GROUPS`, la distinzione esplicito/default legacy, i controlli di conflitto e la copertura completa dei termini attivi; il flusso completo `read_param` è coperto per una configurazione nativa rappresentativa, mentre l’equivalenza per tutte le combinazioni fisiche resta da validare. Evidenze D17.13–D17.16. |
 | D17.17–D17.18 | **Parziali** | Dispatch analitico, esplicito e rate Newton filtrati sono dietro `equation_terms_2d`; il batch post-RK `step` è separato da `time_integration_2d` in `mass_exchange_step_2d`, mantenendo validazione del registro, atomicità e posizione temporale. Il test statico copre tutti i sorgenti `numerics/` e `spatial/`, proibisce import diretti dei moduli fisici e controlla l’allowlist delle API equazionali usate dallo spazio; i moduli `*_laws_2d` non dipendono dall’orchestrazione numerica/spaziale. Restano audit del call graph/runtime, integrazione term-selective e matrice D17.20. |
 | D17.19 | **In corso** | Stato puntuale dei 24 elementi nella sequenza implementativa sotto. |
-| D17.20 | **Parziale** | Regressioni del registro, dei solve analitici e del routing esplicito superate localmente; matrice obbligatoria completa ancora aperta. |
+| D17.20 | **Parziale** | Le regressioni locali strict/optimized verificano il registro/parser, i solve analitici e Newton, i percorsi REAL/COMPLEX, gli hook spaziali, il batch post-RK e ora una finestra source attiva nel timestep production con budget di massa. Restano l’equivalenza su tutte le combinazioni fisiche, copertura end-to-end delle altre finestre/sorgenti, selezione di `dt`/output del driver, approvazione delle baseline e gate cross-platform/CI. |
 | D17.21 | **Non soddisfatto** | Criteri finali non raggiunti; D17 non può essere dichiarato completato. |
 
 #### D17.0 — Logica generale e obiettivo
@@ -3163,9 +3163,12 @@ optimized.
 **D17.15 resta parziale:** `TEST_IMEX_STAGES` verifica con un observer le
 cinque fasi della routine production e l’avanzamento finale dell’orologio.
 La fixture abilita un aggiornamento OU con seed fissato e ne verifica
-l’effetto sul campo stocastico dopo la fase dedicata; le finestre sorgente attive e il
-trasporto stocastico restano da verificare. Restano inoltre la selezione di
-`dt` e l’output del driver. Evidenza e limiti:
+l’effetto sul campo stocastico dopo la fase dedicata; inoltre applica una
+sorgente circolare attiva per metà del timestep e verifica il bilancio integrato
+di massa e la positività. La suite `TEST_CURVATURE_SOURCE` verifica a livello
+equation-term le finestre per sorgenti circolari, fissurali e radiali. Restano
+la selezione/limitazione di `dt`, l’output del driver, il trasporto stocastico e
+l’equivalenza di tutte le sorgenti/configurazioni. Evidenza e limiti:
 [D17.15 — timestep ordering](acceptance/D17_15_TIMESTEP_ORDER.md).
 
 ---
@@ -3316,7 +3319,7 @@ l’evidenza disponibile, non il completamento dell’accettazione D17.
 12. Modificare `eval_semi_implicit_terms`. **IMPLEMENTATO localmente:** seleziona i termini semi-impliciti del gruppo e del solver Newton indicati.
 13. Modificare `eval_implicit_terms`. **IMPLEMENTATO localmente:** seleziona rate reologici, raffreddamento e dissipazione della pressione dei pori dal gruppo/solver; routing REAL/COMPLEX mantenuto.
 14. Aggiungere `eval_analytic_terms`. **COMPLETATO localmente (D17.12).**
-15. Modificare `time_integration_2d.f90`. **PARZIALE:** dispatch dei gruppi `stage` completato localmente (D17.9); la routine condivisa production `simulation%advance_timestep` e il test dell’ordine delle fasi sono implementati localmente (D17.15). Il batch post-RK `step` è delegato a `mass_exchange_step_2d`; il coefficiente medio della sorgente circolare è coperto a livello equation-term, mentre restano da verificare finestre attive nel timestep production, selezione di `dt` e ordine driver completo.
+15. Modificare `time_integration_2d.f90`. **PARZIALE:** dispatch dei gruppi `stage` completato localmente (D17.9); la routine condivisa production `simulation%advance_timestep` e il test dell’ordine delle fasi sono implementati localmente (D17.15). Il batch post-RK `step` è delegato a `mass_exchange_step_2d`; la sorgente circolare a finestra parziale è verificata anche nel timestep production, mentre le medie equation-term coprono impulsi, rampe, wrap, inattività e le sorgenti fissurali/radiali. Restano da verificare selezione di `dt`, output driver e tutte le combinazioni fisiche.
 16. Modificare `nonlinear_solver_2d.f90`. **PARZIALE:** descrittori gruppo/solver propagati al residuo, alla Jacobiana complessa, al line search e al rate semi-implicito; sweep ordinato dei solver di un gruppo implementato localmente (D17.10). Restano i percorsi numerici e di cadenza ancora non integrati.
 17. Rimuovere le chiamate fisiche dirette dai moduli numerici. **PARZIALE, audit statico completato per i confini dei moduli:** nessun sorgente in `numerics/` o `spatial/` importa direttamente moduli `*_laws_2d`; l’uso spaziale di `equation_terms_2d` è limitato a un’allowlist di API per flussi, coefficienti idrostatici, velocità caratteristiche, hook al bordo e limiter di flusso. Le leggi non importano moduli di orchestrazione numerica/spaziale. Restano audit del call graph e verifica runtime/term-selective.
 18. Riutilizzare kernel REAL/COMPLEX comuni; introdurre `.inc` solo dove utili. **IMPLEMENTATO localmente per la duplicazione individuata:** la correlazione di viscosità lahar ha un solo kernel COMPLEX; non è stato introdotto un `.inc` non necessario. Evidenza: [D17.11 — REAL/COMPLEX kernel reuse](acceptance/D17_11_REAL_COMPLEX_KERNEL_REUSE.md).
@@ -3324,20 +3327,31 @@ l’evidenza disponibile, non il completamento dell’accettazione D17.
 20. Organizzare i solve impliciti multipli. **IMPLEMENTATO localmente:** il coordinatore esegue i solver Newton nell’ordine registrato e limita ciascun solve ai propri termini/equazioni; il test runtime controlla i residui termico e di pressione dei pori nello stato sequenziale. Il blocco legacy accoppiato resta un unico solve.
 21. Organizzare i solve analitici singoli per gruppo. **COMPLETATO localmente per i gruppi supportati e verificato dal report D17-C.**
 22. Integrare il trasferimento di massa. **IMPLEMENTATO localmente per il batch post-RK:** il registro `step` valida il batch mass-exchange atomico; valutazione dei rate, maschere, aggiornamento di stato/inventari e topografia sono eseguiti da `mass_exchange_step_2d` dopo RK e prima dell’avanzamento del clock. Il dispatch term-selective e la matrice completa restano aperti.
-23. Verificare l’ordine delle operazioni. **PARZIALE:** ordine dei gruppi analitici legacy, routing esplicito e sequenza production source-window/OU/RK/step-source/clock verificati; aggiornamento OU attivo e media temporale bottom-source al confine equation-term coperti; finestre sorgente attive nel timestep production, selezione di `dt` e ordine driver completo restano da validare.
-24. Eseguire i test di regressione. **PARZIALE:** suite locali mirate B, C, D17.9, D17.10, D17.15 e D17.17 superate, incluse le suite reologia, registro, mass-exchange e IMEX strict/optimized; il controllo architetturale statico passa. La regressione D17.17 aggiunge una verifica della sorgente circolare con finestra parzialmente attiva e interamente inattiva. Matrice D17.20 e gate CI/piattaforme non completati.
+23. Verificare l’ordine delle operazioni. **PARZIALE:** ordine dei gruppi analitici legacy, routing esplicito e sequenza production source-window/OU/RK/step-source/clock verificati; aggiornamento OU attivo, media temporale equation-term di sorgenti circolari/fissurali/radiali e sorgente circolare a finestra parziale nel timestep production verificati; selezione di `dt` e ordine driver completo restano da validare.
+24. Eseguire i test di regressione. **PARZIALE:** suite locali mirate B, C, D17.9, D17.10, D17.15 e D17.17 superate, incluse reologia REAL/COMPLEX, registro, mass-exchange e IMEX strict/optimized; il controllo architetturale statico passa. Le regressioni source-window verificano impulso, rampa lineare/cosinusoidale, attraversamento del periodo, intervallo inattivo, contributo fissurale e bilancio production. Matrice D17.20 completa e gate CI/piattaforme non completati.
 
 ---
 
 #### D17.20 — Test obbligatori
 
-Stato ufficiale: **PARZIALE**. I report B, C, D17.9 e D17.10 attestano solo i
-percorsi e le asserzioni esplicitamente coperti; il superamento delle suite
-mirate non equivale al superamento dell’intera matrice. Restano in particolare
-da coprire il parsing nativo e la gestione dell’input assente/ambiguo, i gruppi
-`step` e il mass-exchange attraverso il registro, l’intero spazio REAL/COMPLEX,
-l’equivalenza completa dei default e
-l’accettazione end-to-end dei casi limite elencati sotto.
+Stato ufficiale: **PARZIALE**. Le verifiche locali aggiornate coprono molte
+condizioni strutturali e numeriche elencate sotto; i report B, C, D17.9, D17.10,
+D17.15 e D17.17 attestano solo i percorsi e le asserzioni effettivamente
+eseguiti. Restano aperte l’equivalenza dei default per tutte le combinazioni
+fisiche, le finestre temporali di tutte le sorgenti nel percorso production,
+la selezione di `dt` e l’output del driver, nonché l’accettazione delle
+piattaforme/CI e l’approvazione scientifica delle baseline.
+
+**Evidenza locale eseguita il 2026-10-23:** `TEST_SOURCE_REGISTRY` passa in
+strict/optimized con 864 combinazioni legacy, 14.893 asserzioni e 28
+configurazioni invalide; `TEST_RHEOLOGY_CELL_LOCAL` passa con 255/255 fixture
+per profilo, inclusi rate REAL/COMPLEX e solve Newton ordinati; `TEST_IMEX_STAGES`
+passa in strict/optimized con 1/4 thread, tableau, gruppi nativi e misti,
+ordine production e budget di massa della sorgente temporizzata; `TEST_MASS_EXCHANGE`
+passa in strict/optimized con 1/4 thread; `TEST_CURVATURE_SOURCE` e
+`TEST_STATE_CONVERSION` passano; i controlli architetturali D17 e i contratti
+Doxygen passano. Questi risultati non equivalgono all’accettazione end-to-end
+completa della matrice.
 
 Devono essere verificati:
 
@@ -3366,7 +3380,6 @@ Devono essere verificati:
 23. assenza di collisione tra gruppo EX e gruppi IM nello stesso namespace;
 24. rifiuto della doppia registrazione stage/step e dell’input nativo/legacy ambiguo;
 25. hook al bordo senza doppio rate di cella, e sorgente di curvatura;
-26. finestre temporali, diagonal-zero, stati asciutti e fisica disabilitata; **PARZIALE:** stato asciutto, default fisici inattivi e media temporale della sorgente circolare al confine equation-term coperti; manca il caso active-window nel timestep production e la copertura delle altre sorgenti temporizzate.
 27. preservazione della correzione SI pre-Newton e dei rate effettivi corretti;
 28. batch mass-exchange, limitatori condivisi, inventari e topografia;
 29. rifiuto di selezioni parziali non supportate e confronto default/legacy normalizzati.
