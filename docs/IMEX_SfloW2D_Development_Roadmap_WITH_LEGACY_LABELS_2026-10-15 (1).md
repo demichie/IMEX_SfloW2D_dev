@@ -195,7 +195,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D12 | P7            | Newton per gruppo e Jacobiano ridotto                       | IN CORSO |
 | D13 | P8            | Integrazione analitica esatta dei termini IM                | COMPLETATO (gate locale GNU/macOS) |
 | D14 | P8            | Gruppi misti e validazione                                  | COMPLETATO (gate locale GNU/macOS) |
-| D16 | —             | Consolidamento leggi fisiche, rate e assemblaggio IMEX      | IN CORSO |
+| D16 | —             | Consolidamento leggi fisiche, rate e assemblaggio IMEX      | COMPLETATO (gate locale + CI ifx completa) |
 | D17 | —             | Struttura unificata dei termini sorgente e separazione tra fisica e numerica | DA FARE |
 | D15 | P9            | Acceptance finale della nuova architettura                  | GATE     |
 
@@ -2418,7 +2418,7 @@ senza modifiche al codice eseguibile.
 
 **D16.12 — Gate di accettazione.** Accettare D16 solo quando la selezione reologica è centralizzata, le leggi sono nei moduli `*_laws_2d`, rate e sorgenti sono distinti, le integrazioni analitiche seguono la convenzione, gli aggiornamenti sono in `time_integration_2d`, la geometria è in `geometry_2d` e compilazione, test, restart, Doxygen e CI passano senza variazioni scientifiche non autorizzate. Il manifest deve riportare vecchio nome, nuovo nome, modulo proprietario, chiamanti aggiornati ed evidenze di regressione.
 
-**Esito della verifica locale D16.12: superata; D16 resta aperto per CI remota.** Il manifest
+**Esito della verifica locale D16.12: superata.** Il manifest
 `acceptance/D16_MIGRATION_MANIFEST.json` registra le migrazioni, i moduli
 proprietari, i chiamanti e le regressioni. Il controllo Doxygen globale passa su
 45 sorgenti e conferma che codice eseguibile e direttive sono invariati rispetto
@@ -2445,9 +2445,14 @@ nei build strict-debug e optimized, inclusi tutti i casi di
 optimized. Anche la sezione `order` di `TEST_IMEX_STAGES` passa in strict e
 optimized, con confronto e bilancio coerenti con i bordi outflow-only.
 
-Resta da verificare la CI GitHub sulla revisione condivisa `9b2a4989`; non è
-stata verificata in questa sessione. D16.12 resta aperto esclusivamente per
-questa conferma CI remota.
+**Aggiornamento 23 ottobre 2026 — CI remota ifx completata.** Il run completo
+[Intel ifx portability](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/39964608238)
+è passato sulla revisione `b63d4eca`, discendente di `9b2a4989`. Tutti e quattro
+i job (optimized/diagnostic, 1/4 thread) hanno superato `make check`, i test di
+restart e le validazioni HP-PCCU e source-mass. Il run mirato precedente sullo
+stesso commit ha inoltre superato `TEST_DYNAMIC_FINH` con `-check all` in 87 s,
+senza warning di array temporanei. D16.12 è superato; D17 resta pianificato e
+non è coperto da questa CI.
 
 ##### D17 — Organizzazione unificata dei termini sorgente, gruppi e separazione tra fisica e numerica
 
@@ -3868,6 +3873,5 @@ Le sigle storiche non sono identificativi operativi e sono conservate esclusivam
 | I07      | S-GATE                    | Validazione subgrid                                  |
 | I08      | ML-1                      | Inferenza ML/NN delle closure                        |
 | I09      | ML-GATE                   | Validazione ML/NN                                    |
-
 
 
