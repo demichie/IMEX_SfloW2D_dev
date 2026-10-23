@@ -20,6 +20,20 @@ The `time_integration_2d` module no longer exports or owns mass-exchange
 transaction routines. Production and regression-test callers import the
 executor directly. Its compilation dependencies are declared in `src/Makefile.am`.
 
+## Dependency-boundary audit
+
+`TESTS/ACCEPTANCE/test_acceptance_tools.py` checks the complete `numerics` and
+`spatial` source directories for direct imports of physical law modules. It
+also checks that rheology, thermal, pore-pressure and mass-exchange law modules
+do not import numerical or spatial orchestration. Spatial modules may use the
+small approved `equation_terms_2d` flux, hydrostatic-coefficient, speed-bound,
+boundary-source and component-flux APIs; physical source-law imports remain
+behind the equation bridge. The boundary test passes against the current tree.
+
+This is a static module-boundary audit, not a complete call-graph or
+term-by-term runtime audit. The full D17.20 term/physics matrix and the
+term-selective mass-exchange evaluation remain open.
+
 ## Verification
 
 `TEST_MASS_EXCHANGE/run_test.sh` passed in strict and optimized profiles,
@@ -27,8 +41,14 @@ including transaction, inventory, bed-projection and checkpoint-continuation
 cases with 1 and 4 OpenMP threads. `TEST_IMEX_STAGES/run_test.sh` passed in
 strict and optimized profiles, verifying the production sequence remains RK,
 post-RK step sources, then clock advancement. The full strict-debug solver
-build also passed.
+build also passed. The focused static boundary test passes. The complete
+Python acceptance-tool suite has one unrelated failure:
+`test_n7_b_and_geometry_completion_evidence` expects a different pinned
+digest for `TESTS/TEST_GEOMETRY_1D/run_test.sh`; the observed digest is
+`b650775807bc8b3afc9378577d03a57744dc832da33184ac608396f3c85aa56e`, while
+the test expects `b7471ae4c748750ec99cc96a41bf078ad5264beb056d2ae213fdaf6f5bb3a1df`.
+The baseline digest was not changed.
 
-This change does not complete D17.17–D17.18: the broader audit of numerical and
-physical module dependencies, term-selective mass-exchange evaluation, and the
-full D17.20 acceptance matrix remains open.
+This change does not complete D17.17–D17.18: call-graph/runtime verification
+and term-selective mass-exchange evaluation remain open, as does the full
+D17.20 acceptance matrix.

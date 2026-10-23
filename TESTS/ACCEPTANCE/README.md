@@ -186,6 +186,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover \
 ```
 
 These tests cover parsing, log/exit-code recording, actual-team evidence,
-missing/different output fingerprints and plan links. They do not test the
-physical model. The dated acceptance matrix is maintained separately in
+missing/different output fingerprints, plan links, and selected D17 module
+dependency boundaries. They do not test the physical model. The dated
+acceptance matrix is maintained separately in
 [`docs/acceptance`](../../docs/acceptance/N7_N8_N9_AUDIT_2026_10_09.md).

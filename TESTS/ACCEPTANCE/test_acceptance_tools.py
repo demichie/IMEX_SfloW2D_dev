@@ -4,6 +4,7 @@ import json
 from hashlib import sha256
 import math
 from pathlib import Path
+import re
 import subprocess
 import tempfile
 import unittest
@@ -13,6 +14,60 @@ from run_acceptance import compare_threads, execute, overlay_worktree
 
 
 class AuditToolsTests(unittest.TestCase):
+    def test_d17_numeric_and_physics_module_boundaries(self):
+        repo = Path(__file__).resolve().parents[2]
+        orchestration_paths = [
+            *(repo / "src/numerics").rglob("*.f90"),
+            *(repo / "src/spatial").rglob("*.f90"),
+        ]
+        physical_law_module = re.compile(
+            r"^\s*use\s+(?:rheology(?:_[a-z0-9]+)?_2d|"
+            r"(?:thermal|pore_pressure|mass_exchange)_laws_2d)\b",
+            re.IGNORECASE | re.MULTILINE,
+        )
+        numerical_module = re.compile(
+            r"^\s*use\s+(?:time_integration_2d|nonlinear_solver_2d|"
+            r"(?:spatial_operator|hyperbolic|reconstruction|pccu)_2d)\b",
+            re.IGNORECASE | re.MULTILINE,
+        )
+
+        for path in orchestration_paths:
+            source = path.read_text()
+            self.assertIsNone(
+                physical_law_module.search(source),
+                f"{path.relative_to(repo)} must call physical kernels through equation_terms_2d",
+            )
+
+        physics_law_paths = [
+            *(repo / "src/physics/rheology_laws").rglob("*.f90"),
+            *(repo / "src/physics").glob("*_laws_2d.f90"),
+        ]
+        for path in physics_law_paths:
+            self.assertIsNone(
+                numerical_module.search(path.read_text()),
+                f"{path.relative_to(repo)} must not depend on numerical or spatial orchestration",
+            )
+
+        allowed_spatial_equation_apis = {
+            "eval_hydrostatic_coefficient",
+            "eval_inertial_flux",
+            "eval_local_speeds_direction",
+            "eval_source_bdry",
+            "limit_component_mass_flux",
+        }
+        spatial_equation_use = re.compile(
+            r"^\s*use\s+equation_terms_2d\s*,\s*only\s*:\s*([^\n&]+)",
+            re.IGNORECASE | re.MULTILINE,
+        )
+        for path in (repo / "src/spatial").rglob("*.f90"):
+            source = path.read_text()
+            for imported_names in spatial_equation_use.findall(source):
+                names = {name.strip().lower() for name in imported_names.split(",")}
+                self.assertTrue(
+                    names <= {name.lower() for name in allowed_spatial_equation_apis},
+                    f"{path.relative_to(repo)} imports an unapproved equation API: {names}",
+                )
+
     def test_fortran_exponents(self):
         self.assertEqual(fortran_float("0.987774513049-133"), 0.987774513049e-133)
         self.assertEqual(fortran_float(b"-0.322725514122-157"), -0.322725514122e-157)
