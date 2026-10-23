@@ -2497,15 +2497,15 @@ requisito numerato è:
 |---|---|---|
 | D17.1 | **Parziale** | Bridge analitico e dispatcher esplicito collegati; routing comune semi-implicito/implicito e mass-exchange da completare. |
 | D17.2–D17.5 | **Implementati localmente** | Catalogo, ID, descrittori e registri `stage`/`step`; coperti dai test del registro. |
-| D17.6 | **Implementato per i gruppi legacy supportati** | Validazione del solve unico e normalizzazione legacy; il formato nativo resta da implementare in D17.16. |
-| D17.7 | **Implementato localmente per i gruppi stage supportati** | Sweep ordinato dei solve indipendenti; blocco Newton legacy congiunto preservato come solve unico. Parsing nativo ed equivalenza end-to-end restano aperti nei requisiti pertinenti. |
+| D17.6 | **Implementato per i gruppi legacy supportati; builder nativo locale** | Validazione del solve unico e normalizzazione legacy; il builder nativo controlla copertura dei termini attivi e coerenza dei target (D17.16). |
+| D17.7 | **Implementato localmente per i gruppi stage supportati** | Sweep ordinato dei solve indipendenti; blocco Newton legacy congiunto preservato come solve unico. L’equivalenza end-to-end resta aperta nei requisiti pertinenti. |
 | D17.8 | **Parziale** | Le quattro interfacce ricevono metadati di gruppo/solve nei percorsi supportati; restano i percorsi numerici e di cadenza non ancora integrati. |
 | D17.9 | **Implementato e committato** | Rate espliciti e hook al bordo selezionati dal gruppo; test strict/optimized e build GNU superati (`3fc18813`). |
 | D17.10 | **Implementato localmente** | Rate semi-impliciti/impliciti filtrati per gruppo e solver, percorsi impliciti REAL/COMPLEX e sweep runtime ordinato dei solve Newton multipli; report e regressioni locali in D17.10. |
 | D17.11 | **Implementato localmente per i kernel REAL/COMPLEX duplicati individuati** | La correlazione di viscosità lahar condivide ora il kernel COMPLEX con il wrapper REAL; valore e derivata sono testati nei due rami. Per il perimetro verificato non serve un file `.inc`; report D17.11. |
 | D17.12 | **Implementato localmente** | Bridge analitico validato; vedere il report D17-C. |
-| D17.13–D17.16 | **Parziali** | D17.13 resta parziale: equivalenza per tutte le attivazioni non completata. D17.14 instrada il batch mass-exchange atomico dal registro `step` una sola volta dopo RK; D17.15–D17.16 e il parsing nativo restano aperti. Evidenze D17.13 e D17.14. |
-| D17.17–D17.18 | **Parziali** | Dispatch analitico, esplicito e rate Newton filtrati sono dietro `equation_terms_2d`; restano la copertura mass-exchange/`step` e la verifica completa della separazione fisica/numerica. |
+| D17.13–D17.16 | **Parziali** | D17.13 resta parziale: equivalenza per tutte le attivazioni non completata. D17.14 instrada il batch mass-exchange atomico dal registro `step` una sola volta dopo RK. D17.15 è stato confrontato con l’ordine implementato, ma resta da aggiungere una verifica automatizzata dell’orchestrazione end-to-end. D17.16 implementa localmente `SOURCE_GROUPS`, la distinzione esplicito/default legacy, i controlli di conflitto e la copertura completa dei termini attivi; il flusso completo `read_param` e l’equivalenza per tutte le combinazioni fisiche restano da validare. Evidenze D17.13–D17.16. |
+| D17.17–D17.18 | **Parziali** | Dispatch analitico, esplicito e rate Newton filtrati sono dietro `equation_terms_2d`; il batch mass-exchange `step` è instradato dal registro, ma la copertura e la separazione fisica/numerica complessive restano da completare. |
 | D17.19 | **In corso** | Stato puntuale dei 24 elementi nella sequenza implementativa sotto. |
 | D17.20 | **Parziale** | Regressioni del registro, dei solve analitici e del routing esplicito superate localmente; matrice obbligatoria completa ancora aperta. |
 | D17.21 | **Non soddisfatto** | Criteri finali non raggiunti; D17 non può essere dichiarato completato. |
@@ -3141,6 +3141,27 @@ posticipare i controlli già presenti fino al termine dello step. La numerica
 coordina; il main conserva inizialmente l’ordine esterno attuale, senza imporre
 uno spostamento simultaneo del driver per introdurre i registri.
 
+##### Stato ed evidenza locale
+
+L’audit del driver e dei kernel conferma l’ordine attuale: scelta e limitazione
+di `dt`, medie delle finestre, preparazione OU, avanzamento RK (con solve
+impliciti ordinati e EX/spaziale sullo stato risolto), assembly finale e
+proiezioni, batch mass-exchange con ricostruzione e aggiornamento del letto,
+avanzamento dell’orologio e diagnostiche/output. L’ordine esterno è già
+compatibile con la specifica; non è stato rifattorizzato.
+
+Le regressioni IMEX verificano traiettorie e assembly stage per N_RK=2/3/4,
+gruppi misti analitici/Newton e hook spaziali; le regressioni mass-exchange
+verificano l’aggiornamento aggregato, inventari, maschere, topografia e il
+routing post-RK. Entrambe le suite passano localmente in profili strict e
+optimized.
+
+**D17.15 resta parziale:** manca un test automatizzato che osservi l’intera
+sequenza dal driver su un singolo timestep; le medie delle finestre sorgente e
+l’ordine con la preparazione OU non hanno una regressione end-to-end dedicata.
+Il report distingue la corrispondenza osservata nel codice dall’accettazione
+runtime completa: [D17.15 — timestep ordering](acceptance/D17_15_TIMESTEP_ORDER.md).
+
 ---
 
 #### D17.16 — Validazione dell’input e dei gruppi
@@ -3164,7 +3185,36 @@ la compatibilità dei campi `IMEX_*` attuali e distinguere input esplicitamente
 fornito da default inizializzati. Rifiutare la combinazione ambigua di nuova
 configurazione nativa e configurazione legacy esplicita, capability mancanti,
 bundle parziali non supportati e split di limitatori condivisi non validati.
-Il nuovo formato della namelist resta da definire nella fase runtime.
+La namelist nativa opzionale si chiama `SOURCE_GROUPS`; cadenze, metodi,
+termini e target sono indicati con nomi simbolici.
+
+##### Stato ed evidenza locale
+
+La validazione esistente controlla i campi legacy `IMEX_*` letti dalla
+namelist prima dell’inizializzazione dei workspace: ID gruppo nell’intervallo
+1–3 e metodi ANALYTIC/NEWTON supportati. `source_registry_2d` valida inoltre
+identità e ordine dei gruppi, cadenza/fase/metodo, appartenenza dei termini,
+duplicazioni globali, target/equazioni, coverage e ordine dei solver, bundle
+atomici e descrittori mancanti o non validi; l’inizializzazione fallita libera
+i dati parziali.
+
+Il parser rileva namelist duplicate e input malformati e rifiuta la
+combinazione con campi legacy espliciti; i sentinels permettono di distinguere
+questi ultimi dai default. Il builder nativo richiede ogni termine fisico
+attivo esattamente una volta, verifica i target impliciti e valida gli indici
+equazione prima di costruire partizione e registro.
+
+`TEST_SOURCE_REGISTRY/run_test.sh` passa in strict e optimized: 864
+configurazioni legacy, 14.893 asserzioni e 28 configurazioni invalide
+rifiutate per profilo; include casi parser validi, assenti, malformati,
+duplicati e in conflitto. `TEST_MASS_EXCHANGE/run_test.sh` compila i moduli
+di produzione, incluso `inpout_2d`, e passa in entrambi i profili. Report:
+[D17.16 — input and source-schedule validation](acceptance/D17_16_VALIDATION.md).
+
+**D17.16 resta parziale:** il parser è testato con unità scratch, ma il flusso
+completo `read_param` non ha ancora fixture end-to-end; l’equivalenza della
+configurazione nativa per tutte le combinazioni fisiche e l’accettazione
+cross-platform/CI restano aperte.
 
 ---
 
@@ -3235,13 +3285,13 @@ l’evidenza disponibile, non il completamento dell’accettazione D17.
 6. Creare i registri `stage_groups` e `step_groups`. **COMPLETATO.**
 7. Definire le firme delle quattro interfacce. **COMPLETATO per i percorsi supportati:** semi-implicita e implicita accettano anche gruppo e descrittore solver, mantenendo i call site legacy.
 8. Implementare i gruppi di default. **COMPLETATO nei metadati; il bridge predefinito è testato nei casi inattivo e attivo riportati in D17.13; dispatch ed equivalenza numerica completa con il comportamento legacy restano parziali.**
-9. Implementare il parsing dell’input. **DA FARE:** formato nativo non implementato.
-10. Implementare i controlli di consistenza. **PARZIALE:** validazione dei registri e dei profili esistenti e della selezione gruppo/solver; controlli di presenza/conflitto nel parsing nativo (D17.16) restano da fare.
+9. Implementare il parsing dell’input. **IMPLEMENTATO localmente:** namelist opzionale `SOURCE_GROUPS`, rilevamento duplicati, errori sintattici e conflitti con campi legacy espliciti; test parser strict/optimized (D17.16). Il flusso completo `read_param` resta da coprire con fixture end-to-end.
+10. Implementare i controlli di consistenza. **PARZIALE:** validazione legacy e nativa; 864 configurazioni legacy, 14.893 asserzioni e 28 configurazioni invalide per profilo (D17.16). Il builder richiede ogni termine fisico attivo esattamente una volta e verifica gli obiettivi impliciti; equivalenza per tutte le combinazioni fisiche e accettazione cross-platform/CI restano aperte.
 11. Modificare `eval_expl_terms`. **COMPLETATO localmente per il routing esplicito `stage` e l’hook al bordo (D17.9).**
 12. Modificare `eval_semi_implicit_terms`. **IMPLEMENTATO localmente:** seleziona i termini semi-impliciti del gruppo e del solver Newton indicati.
 13. Modificare `eval_implicit_terms`. **IMPLEMENTATO localmente:** seleziona rate reologici, raffreddamento e dissipazione della pressione dei pori dal gruppo/solver; routing REAL/COMPLEX mantenuto.
 14. Aggiungere `eval_analytic_terms`. **COMPLETATO localmente (D17.12).**
-15. Modificare `time_integration_2d.f90`. **PARZIALE:** dispatch dei rate espliciti collegato; routing `step` e mass-exchange registrato ancora da integrare.
+15. Modificare `time_integration_2d.f90`. **PARZIALE:** dispatch dei gruppi `stage` e routing del batch mass-exchange `step` completati localmente (D17.9/D17.14); la verifica end-to-end dell’ordine complessivo resta aperta (D17.15).
 16. Modificare `nonlinear_solver_2d.f90`. **PARZIALE:** descrittori gruppo/solver propagati al residuo, alla Jacobiana complessa, al line search e al rate semi-implicito; sweep ordinato dei solver di un gruppo implementato localmente (D17.10). Restano i percorsi numerici e di cadenza ancora non integrati.
 17. Rimuovere le chiamate fisiche dirette dai moduli numerici. **PARZIALE:** rimosse dal percorso analitico interessato dal bridge; resta da completare/verificare per tutti i percorsi.
 18. Riutilizzare kernel REAL/COMPLEX comuni; introdurre `.inc` solo dove utili. **IMPLEMENTATO localmente per la duplicazione individuata:** la correlazione di viscosità lahar ha un solo kernel COMPLEX; non è stato introdotto un `.inc` non necessario. Evidenza: [D17.11 — REAL/COMPLEX kernel reuse](acceptance/D17_11_REAL_COMPLEX_KERNEL_REUSE.md).

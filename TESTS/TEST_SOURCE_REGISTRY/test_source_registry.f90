@@ -3,9 +3,11 @@ PROGRAM test_source_registry
   USE source_catalog_2d
   USE source_registry_2d
   USE source_configuration_2d, ONLY : initialize_configured_sources
+  USE source_configuration_2d, ONLY : initialize_native_source_configuration
+  USE source_input_2d
   USE equation_metadata_2d, ONLY : equation_partition_type, &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
-  USE parameters_2d, ONLY : rheology_id_lava
+  USE parameters_2d, ONLY : rheology_id_lava,n_eqns,idx_pore
   IMPLICIT NONE
   TYPE(source_registry_type) :: registry,trial
   TYPE(equation_partition_type) :: partition
@@ -98,8 +100,10 @@ PROGRAM test_source_registry
     END DO
   END DO
   CALL test_configured_default_schedule()
+  CALL test_native_source_input_parser()
   ! One configured bridge smoke test covers all injection and mass-exchange gates.
   CALL configure_bridge()
+  CALL test_native_source_configuration()
   enabled=.TRUE.; original=[3,1,2]; methods=[IM_GROUP_METHOD_ANALYTIC, &
        IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_NEWTON]; pore=7
   CALL make_partition()
@@ -365,6 +369,159 @@ CONTAINS
     imex_velocity_group=3;imex_energy_group=1;imex_pore_pressure_group=2
     imex_group_method=[CHARACTER(LEN=16)::'ANALYTIC','ANALYTIC','NEWTON']
   END SUBROUTINE configure_bridge
+  SUBROUTINE test_native_source_configuration()
+    INTEGER :: native_terms(7),term_index
+    CHARACTER(LEN=64) :: term_names(7)
+
+    n_eqns=7
+    idx_pore=7
+    native_source_configuration_present=.TRUE.
+    CALL clear_source_input()
+    native_source_configuration_present=.TRUE.
+    source_group_count=5
+    CALL set_group(1,10,'STAGE','ANALYTIC',1, &
+         [SOURCE_TERM_THERMAL_RADIATIVE_COOLING,SOURCE_TERM_THERMAL_CONVECTIVE_COOLING], &
+         ['TEMPERATURE'])
+    CALL set_group(2,11,'STAGE','ANALYTIC',2, &
+         [SOURCE_TERM_PORE_PRESSURE_DISSIPATION],['PORE_PRESSURE'])
+    CALL set_group(3,12,'STAGE','NEWTON',3, &
+         rheology_source_terms(rheology_id_lava),['VELOCITY'])
+    CALL set_group(4,4,'STAGE','EXPLICIT',1, &
+         [SOURCE_TERM_GEOMETRY_CURVATURE,SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, &
+         SOURCE_TERM_BOTTOM_FISSURAL_INJECTION,SOURCE_TERM_RADIAL_INJECTION, &
+         SOURCE_TERM_BOUNDARY_INJECTION],[CHARACTER(LEN=16)::])
+    CALL set_group(5,1,'STEP','EXPLICIT',1, &
+         [SOURCE_TERM_MASS_EXCHANGE_EROSION,SOURCE_TERM_MASS_EXCHANGE_DEPOSITION, &
+         SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS, &
+         SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS, &
+         SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS, &
+         SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT,SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION], &
+         [CHARACTER(LEN=16)::])
+    idx_pore=0
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(INDEX(error,'pore-pressure equation index')>0 .AND. &
+         .NOT.trial%is_initialized() .AND. .NOT.partition%is_initialized(), &
+         'out-of-range pore equation index rejected safely')
+    idx_pore=7
+    n_eqns=0
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(INDEX(error,'valid equation layout')>0 .AND. &
+         .NOT.trial%is_initialized() .AND. .NOT.partition%is_initialized(), &
+         'uninitialized equation layout rejected safely')
+    n_eqns=7
+    CALL initialize_native_source_configuration(registry,partition,error)
+    CALL require(error=='' .AND. registry%is_initialized(), &
+         'native named source groups accepted: '//TRIM(error))
+    groups=registry%stage_groups();steps=registry%step_groups();solves=registry%solvers()
+    CALL require(SIZE(groups)==4 .AND. SIZE(steps)==1 .AND. SIZE(solves)==3, &
+         'native source group and solver counts')
+    CALL require(groups(1)%method==SOURCE_METHOD_ANALYTIC .AND. &
+         groups(2)%method==SOURCE_METHOD_ANALYTIC .AND. &
+         groups(3)%method==SOURCE_METHOD_NEWTON .AND. &
+         groups(4)%method==SOURCE_METHOD_EXPLICIT, &
+         'native phase and execution order')
+    CALL require(ALL(groups(3)%equation_ids==[2,3]) .AND. &
+         SIZE(steps(1)%term_ids)==7,'native targets and complete step batch')
+
+    source_group_term_count(5)=6
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(error/='' .AND. .NOT.trial%is_initialized() .AND. &
+         .NOT.partition%is_initialized(),'native schedule omission rejected transactionally')
+    source_group_term_count(5)=7
+    native_terms=[SOURCE_TERM_MASS_EXCHANGE_EROSION,SOURCE_TERM_MASS_EXCHANGE_DEPOSITION, &
+         SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS, &
+         SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS, &
+         SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS, &
+         SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT,SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION]
+    DO term_index=1,SIZE(native_terms)
+      term=source_term_descriptor(native_terms(term_index))
+      term_names(term_index)=term%name
+    END DO
+    source_group_terms(1,5)=source_group_terms(2,5)
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
+         'duplicate native source term rejected')
+    source_group_terms(1,5)=term_names(1)
+    CALL clear_source_input()
+  END SUBROUTINE test_native_source_configuration
+
+  SUBROUTINE test_native_source_input_parser()
+    CHARACTER(LEN=128) :: valid_lines(13)
+
+    valid_lines=[CHARACTER(LEN=128) :: &
+         '&source_groups', &
+         ' source_group_count=1,', &
+         ' source_group_id(1)=5,', &
+         ' source_group_order(1)=1,', &
+         " source_group_cadence(1)='STAGE',", &
+         " source_group_method(1)='NEWTON',", &
+         ' source_group_term_count(1)=1,', &
+         " source_group_terms(1,1)='SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB',", &
+         ' source_group_solver_count(1)=1,', &
+         ' source_solver_order(1,1)=1,', &
+         ' source_solver_target_count(1,1)=1,', &
+         " source_solver_targets(1,1,1)='VELOCITY',", &
+         '/']
+    CALL check_native_input(valid_lines,.FALSE.,'',.TRUE.)
+    CALL require(source_group_count==1 .AND. source_group_id(1)==5 .AND. &
+         source_group_terms(1,1)=='SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB' .AND. &
+         source_solver_targets(1,1,1)=='VELOCITY','native namelist values parsed')
+    CALL check_native_input([CHARACTER(LEN=128) :: '! no native source groups'], &
+         .FALSE.,'',.FALSE.)
+    CALL require(source_group_count==0,'absent native namelist preserves legacy path')
+    CALL check_native_input([CHARACTER(LEN=128) :: &
+         '&source_groups', ' source_group_count=1', '/', &
+         '&SOURCE_GROUPS', ' source_group_count=1', '/'], &
+         .FALSE.,'may appear only once',.FALSE.)
+    CALL check_native_input([CHARACTER(LEN=128) :: &
+         '&source_groups', ' unknown_source_field=1', '/'], &
+         .FALSE.,'Invalid SOURCE_GROUPS',.FALSE.)
+    CALL check_native_input(valid_lines,.TRUE.,'cannot be combined',.TRUE.)
+    CALL clear_source_input()
+  END SUBROUTINE test_native_source_input_parser
+
+  SUBROUTINE check_native_input(lines,legacy_imex_explicit,expected_error,expected_present)
+    CHARACTER(*), INTENT(IN) :: lines(:),expected_error
+    LOGICAL, INTENT(IN) :: legacy_imex_explicit,expected_present
+    INTEGER :: input_unit,line_index
+    OPEN(NEWUNIT=input_unit,STATUS='scratch',ACTION='readwrite',FORM='formatted')
+    DO line_index=1,SIZE(lines)
+      WRITE(input_unit,'(A)') TRIM(lines(line_index))
+    END DO
+    CALL clear_source_input()
+    CALL read_native_source_groups(input_unit,legacy_imex_explicit,error)
+    IF (LEN_TRIM(expected_error)==0) THEN
+      CALL require(error=='','native input reader: '//TRIM(error))
+    ELSE
+      CALL require(INDEX(error,TRIM(expected_error))>0, &
+           'native input error diagnostic: '//TRIM(error))
+    END IF
+    CALL require(native_source_configuration_present .EQV. expected_present, &
+         'native input presence flag')
+    CLOSE(input_unit)
+  END SUBROUTINE check_native_input
+
+  SUBROUTINE set_group(slot,id,cadence,method,order,term_ids,targets)
+    INTEGER, INTENT(IN) :: slot,id,order,term_ids(:)
+    CHARACTER(*), INTENT(IN) :: cadence,method,targets(:)
+    TYPE(source_term_type) :: descriptor
+    INTEGER :: i
+    source_group_id(slot)=id
+    source_group_cadence(slot)=cadence
+    source_group_method(slot)=method
+    source_group_order(slot)=order
+    source_group_term_count(slot)=SIZE(term_ids)
+    DO i=1,SIZE(term_ids)
+      descriptor=source_term_descriptor(term_ids(i))
+      source_group_terms(i,slot)=descriptor%name
+    END DO
+    source_group_solver_count(slot)=SIZE(targets)
+    IF (SIZE(targets)>0) THEN
+      source_solver_order(1,slot)=1
+      source_solver_target_count(1,slot)=SIZE(targets)
+      source_solver_targets(1:SIZE(targets),1,slot)=targets
+    END IF
+  END SUBROUTINE set_group
   SUBROUTINE disable_sources()
     USE parameters_2d, ONLY : rheology_flag,rheology_model_id,rheology_id_none,pore_pressure_flag, &
          curvature_term_flag,bottom_radial_source_flag,bottom_fissural_source_flag, &

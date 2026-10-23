@@ -19,6 +19,7 @@ for profile in strict optimized; do
       "$repo_dir/src/core/constitutive_parameters_2d.f90" \
       "$repo_dir/src/numerics/equation_metadata_2d.f90" \
       "$repo_dir/src/numerics/source_catalog_2d.f90" \
+      "$repo_dir/src/numerics/source_input_2d.f90" \
       "$repo_dir/src/numerics/source_registry_2d.f90" \
       "$repo_dir/src/physics/source_configuration_2d.f90" \
       "$test_dir/test_source_registry.f90"

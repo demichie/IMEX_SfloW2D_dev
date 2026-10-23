@@ -24,6 +24,7 @@ IMEX_SfloW2D_SOURCES = \
                 core/model_layout_2d.f90 \
                 numerics/equation_metadata_2d.f90 \
                 numerics/source_catalog_2d.f90 \
+                numerics/source_input_2d.f90 \
                 numerics/source_registry_2d.f90 \
                 core/runtime_2d.f90 \
                 core/complexify.f90 \
@@ -243,7 +244,8 @@ io/inpout_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         state/state_conversion_2d.$(OBJEXT)                    \
                         stochastic/stochastic_module.$(OBJEXT)                 \
                         stochastic/stochastic_random_2d.$(OBJEXT)              \
-                        io/output_paths.$(OBJEXT)
+                        io/output_paths.$(OBJEXT)                              \
+                        numerics/source_input_2d.$(OBJEXT)
 IMEX_SfloW2D.$(OBJEXT): core/parameters_2d.$(OBJEXT)                         \
                          core/constitutive_parameters_2d.$(OBJEXT)             \
                          geometry/geometry_2d.$(OBJEXT)                        \
@@ -259,8 +261,11 @@ IMEX_SfloW2D_LDADD = @NETCDF_LIBS@ @LAPACK_LIBS@ -lm
 # D17 metadata is built once and consumed by stage dispatch through the analytic
 # bridge; no registry validation or copying is performed inside cell loops.
 numerics/source_catalog_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+numerics/source_input_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 numerics/source_registry_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
                                       numerics/equation_metadata_2d.$(OBJEXT)
 physics/source_configuration_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \
+                                         numerics/source_input_2d.$(OBJEXT) \
                                          core/constitutive_parameters_2d.$(OBJEXT)
-core/simulation_2d.$(OBJEXT): physics/source_configuration_2d.$(OBJEXT)
+core/simulation_2d.$(OBJEXT): physics/source_configuration_2d.$(OBJEXT) \
+                              numerics/source_input_2d.$(OBJEXT)
