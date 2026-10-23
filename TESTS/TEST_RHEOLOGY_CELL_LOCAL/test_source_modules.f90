@@ -20,6 +20,8 @@ PROGRAM test_source_modules
   REAL(wp) :: expected
   REAL(wp) :: expected_derivative
   REAL(wp) :: temperature_perturbation
+  REAL(wp) :: temperature_points(2), finite_difference_step
+  REAL(wp) :: finite_difference_derivative, complex_derivative
   COMPLEX(wp) :: complex_actual
   REAL(wp) :: vapor_mass_rate
   REAL(wp) :: vapor_energy_rate
@@ -31,6 +33,7 @@ PROGRAM test_source_modules
   REAL(wp) :: momentum_after_friction(2)
   REAL(wp) :: solid_erosion_rate(2), continuous_erosion_rate
   REAL(wp) :: carrier_density, inverse_kinematic_viscosity, expected_viscosity
+  INTEGER :: i
 
   solid_density = [2500.0_wp, 2700.0_wp]
   solid_heat_capacity = [800.0_wp, 900.0_wp]
@@ -63,6 +66,28 @@ PROGRAM test_source_modules
   CALL assert_close(carrier_density, 1800.0_wp, 'lahar settling density')
   CALL assert_close(inverse_kinematic_viscosity,                            &
        1800.0_wp/expected_viscosity, 'lahar settling viscosity dispatch')
+  temperature_points=[280.0_wp,320.0_wp]
+  temperature_perturbation=1.0E-20_wp
+  finite_difference_step=1.0E-4_wp
+  DO i=1,SIZE(temperature_points)
+     expected_viscosity=eval_lahar_fluid_viscosity(temperature_points(i),0.3_wp)
+     complex_actual=eval_lahar_fluid_viscosity( &
+          CMPLX(temperature_points(i),temperature_perturbation,wp), &
+          CMPLX(0.3_wp,0.0_wp,wp))
+     CALL assert_close(REAL(complex_actual,wp),expected_viscosity, &
+          'lahar real/complex viscosity value')
+     complex_derivative=AIMAG(complex_actual)/temperature_perturbation
+     finite_difference_derivative=( &
+          eval_lahar_fluid_viscosity(temperature_points(i)+finite_difference_step,0.3_wp)- &
+          eval_lahar_fluid_viscosity(temperature_points(i)-finite_difference_step,0.3_wp))/ &
+          (2.0_wp*finite_difference_step)
+     IF (ABS(complex_derivative-finite_difference_derivative) .GT. &
+          1.0E-6_wp*MAX(1.0_wp,ABS(finite_difference_derivative))) THEN
+        WRITE(*,*) 'FAIL: lahar complex-step derivative',i, &
+             complex_derivative,finite_difference_derivative
+        ERROR STOP 1
+     END IF
+  END DO
   CALL eval_settling_fluid_properties(rheology_id_none, 293.15_wp,           &
        0.3_wp, 1800.0_wp, 1000.0_wp, 2.0E-6_wp, carrier_density,            &
        inverse_kinematic_viscosity)

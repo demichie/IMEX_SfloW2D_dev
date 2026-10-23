@@ -231,9 +231,7 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Evaluate carrier-fluid viscosity for real state variables.
-  !> \details Converts temperature to degrees Celsius, evaluates the
-  !> piecewise \f$\alpha_1(T)\f$ correlation, and multiplies by
-  !> \f$\exp(\beta_1 C)\f$ for the total solid fraction.
+  !> \details Wraps the complex correlation for real state variables.
   !> \param[in] temperature Absolute temperature [K].
   !> \param[in] solid_fraction_sum Sum of solid volume fractions.
   !> \return Carrier-fluid dynamic viscosity.
@@ -243,22 +241,11 @@ CONTAINS
 
     REAL(wp), INTENT(IN) :: temperature, solid_fraction_sum
     REAL(wp) :: fluid_viscosity
-    REAL(wp) :: temperature_celsius, exponent_a, exponent_b, alpha1
+    COMPLEX(wp) :: complex_viscosity
 
-    temperature_celsius = temperature - 273.15_wp
-    IF (temperature_celsius .LT. 20.0_wp) THEN
-       exponent_a = 1301.0_wp / (998.333_wp + 8.1855_wp *                    &
-            (temperature_celsius - 20.0_wp) + 0.00585_wp *                   &
-            (temperature_celsius - 20.0_wp)**2) - 1.30223_wp
-       alpha1 = alpha1_coeff * 1.0E-3_wp * 10.0_wp**exponent_a
-    ELSE
-       exponent_b = (1.3272_wp * (20.0_wp - temperature_celsius)             &
-            - 0.001053_wp * (temperature_celsius - 20.0_wp)**2)              &
-            / (temperature_celsius + 105.0_wp)
-       alpha1 = alpha1_coeff * 1.002E-3_wp * 10.0_wp**exponent_b
-    END IF
-
-    fluid_viscosity = alpha1 * EXP(beta1 * solid_fraction_sum)
+    complex_viscosity = eval_lahar_fluid_viscosity_complex(                  &
+         CMPLX(temperature,0.0_wp,wp),CMPLX(solid_fraction_sum,0.0_wp,wp))
+    fluid_viscosity = REAL(complex_viscosity,wp)
 
   END FUNCTION eval_lahar_fluid_viscosity_real
 

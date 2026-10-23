@@ -2502,7 +2502,7 @@ requisito numerato è:
 | D17.8 | **Parziale** | Le quattro interfacce ricevono metadati di gruppo/solve nei percorsi supportati; restano i percorsi numerici e di cadenza non ancora integrati. |
 | D17.9 | **Implementato e committato** | Rate espliciti e hook al bordo selezionati dal gruppo; test strict/optimized e build GNU superati (`3fc18813`). |
 | D17.10 | **Implementato localmente** | Rate semi-impliciti/impliciti filtrati per gruppo e solver, percorsi impliciti REAL/COMPLEX e sweep runtime ordinato dei solve Newton multipli; report e regressioni locali in D17.10. |
-| D17.11 | **Parziale** | Capability REAL/COMPLEX descritte nel catalogo; riuso dei kernel e copertura completa da verificare. |
+| D17.11 | **Implementato localmente per i kernel REAL/COMPLEX duplicati individuati** | La correlazione di viscosità lahar condivide ora il kernel COMPLEX con il wrapper REAL; valore e derivata sono testati nei due rami. Per il perimetro verificato non serve un file `.inc`; report D17.11. |
 | D17.12 | **Implementato localmente** | Bridge analitico validato; vedere il report D17-C. |
 | D17.13–D17.16 | **Parziali** | Default e ordine legacy conservati in parte; esecuzione dei gruppi `step`, equivalenza completa, parsing nativo e presenza/ambiguità dell’input restano da completare. |
 | D17.17–D17.18 | **Parziali** | Dispatch analitico, esplicito e rate Newton filtrati sono dietro `equation_terms_2d`; restano la copertura mass-exchange/`step` e la verifica completa della separazione fisica/numerica. |
@@ -3223,8 +3223,8 @@ l’evidenza disponibile, non il completamento dell’accettazione D17.
 15. Modificare `time_integration_2d.f90`. **PARZIALE:** dispatch dei rate espliciti collegato; routing `step` e mass-exchange registrato ancora da integrare.
 16. Modificare `nonlinear_solver_2d.f90`. **PARZIALE:** descrittori gruppo/solver propagati al residuo, alla Jacobiana complessa, al line search e al rate semi-implicito; sweep ordinato dei solver di un gruppo implementato localmente (D17.10). Restano i percorsi numerici e di cadenza ancora non integrati.
 17. Rimuovere le chiamate fisiche dirette dai moduli numerici. **PARZIALE:** rimosse dal percorso analitico interessato dal bridge; resta da completare/verificare per tutti i percorsi.
-18. Riutilizzare kernel REAL/COMPLEX comuni; introdurre `.inc` solo dove utili. **PARZIALE:** capability descritte nel catalogo e selezione implicita coperta in REAL/COMPLEX; riuso e copertura integrale non accettati.
-19. Creare wrapper reali e complessi. **PARZIALE/DA VERIFICARE:** non esiste ancora un’accettazione completa dei wrapper per tutti i termini.
+18. Riutilizzare kernel REAL/COMPLEX comuni; introdurre `.inc` solo dove utili. **IMPLEMENTATO localmente per la duplicazione individuata:** la correlazione di viscosità lahar ha un solo kernel COMPLEX; non è stato introdotto un `.inc` non necessario. Evidenza: [D17.11 — REAL/COMPLEX kernel reuse](acceptance/D17_11_REAL_COMPLEX_KERNEL_REUSE.md).
+19. Creare wrapper reali e complessi. **IMPLEMENTATO localmente per la viscosità lahar:** il wrapper REAL conserva l’interfaccia generica e riusa il kernel COMPLEX; test di valore e derivata nei due rami della correlazione. La matrice D17.20 resta aperta.
 20. Organizzare i solve impliciti multipli. **IMPLEMENTATO localmente:** il coordinatore esegue i solver Newton nell’ordine registrato e limita ciascun solve ai propri termini/equazioni; il test runtime controlla i residui termico e di pressione dei pori nello stato sequenziale. Il blocco legacy accoppiato resta un unico solve.
 21. Organizzare i solve analitici singoli per gruppo. **COMPLETATO localmente per i gruppi supportati e verificato dal report D17-C.**
 22. Integrare il trasferimento di massa. **DA FARE:** i gruppi `step` sono descritti, ma il percorso mass-exchange resta quello post-RK esistente.
