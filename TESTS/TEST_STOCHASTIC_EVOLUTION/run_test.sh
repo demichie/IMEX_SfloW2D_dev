@@ -15,6 +15,8 @@ gfortran -O0 -g -Wall -Wextra -fopenmp -fcheck=all -fbacktrace -I"$repo_dir/src/
     "$repo_dir/src/core/constitutive_parameters_2d.f90" \
     "$repo_dir/src/core/model_layout_2d.f90" \
     "$repo_dir/src/numerics/equation_metadata_2d.f90" \
+    "$repo_dir/src/numerics/source_catalog_2d.f90" \
+    "$repo_dir/src/numerics/source_registry_2d.f90" \
     "$repo_dir/src/core/complexify.f90" \
     "$repo_dir/src/geometry/geometry_2d.f90" \
     "$repo_dir/src/state/state_conversion_2d.f90" \

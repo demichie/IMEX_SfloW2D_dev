@@ -28,6 +28,9 @@ MODULE time_integration_2d
 
   USE equation_metadata_2d, ONLY : equation_partition_type
 
+  USE source_registry_2d, ONLY : source_registry_type, source_group_type, &
+       source_solver_type
+
   USE spatial_operator_2d, ONLY : spatial_operator_type
 
   USE domain_2d, ONLY : domain_type
@@ -438,6 +441,7 @@ CONTAINS
   !> \param[in] dt Time increment [s].
   !> \param[in] Z Coordinates of the three-point limiter stencil.
   !> \param[in] equation_partition Explicit/implicit equation mask and compact index maps.
+  !> \param[in] source_registry Validated source metadata used to dispatch stage solves.
   !> \param[in] domain Active-cell/face lists and reconstruction halo for this simulation.
   !> \param[in,out] spatial_operator Spatial operator and its persistent reconstruction/KT
   !>                                 workspaces.
@@ -446,7 +450,7 @@ CONTAINS
   !******************************************************************************
 
   SUBROUTINE imex_RK_solver(this, q, qp, t, dt, Z, equation_partition,      &
-       domain, spatial_operator, observer)
+       source_registry, domain, spatial_operator, observer)
 
     USE state_conversion_2d, ONLY : qc_to_qp, project_dry_cell_momenta,      &
          clip_roundoff_negative_component_masses
@@ -467,10 +471,13 @@ CONTAINS
     REAL(wp), INTENT(IN) :: t, dt
     REAL(wp), INTENT(IN) :: Z(comp_cells_x,comp_cells_y)
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
+    TYPE(source_registry_type), INTENT(IN) :: source_registry
     CLASS(domain_type), INTENT(IN) :: domain
     CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
     PROCEDURE(imex_state_observer), OPTIONAL :: observer
 
+    TYPE(source_group_type), ALLOCATABLE :: stage_groups(:)
+    TYPE(source_solver_type), ALLOCATABLE :: source_solvers(:)
     REAL(wp) :: q_guess(n_vars) !< initial guess for the solution of the RK step
     REAL(wp) :: q_fv_cell(n_vars) !< finite-volume state for the current cell
     REAL(wp) :: residual_cell(n_vars) !< final RK residual for the current cell
@@ -497,6 +504,12 @@ CONTAINS
     INTEGER :: newton_failures_step
     INTEGER :: newton_linear_failures_step
     INTEGER :: newton_line_search_failures_step
+
+    IF (.NOT.source_registry%is_initialized()) THEN
+       CALL fatal_error('D17: IMEX advance requires an initialized source registry')
+    END IF
+    stage_groups=source_registry%stage_groups()
+    source_solvers=source_registry%solvers()
 
     IF ( .NOT. equation_partition%is_initialized() ) THEN
        ERROR STOP 'imex_RK_solver: equation partition is not initialized'
@@ -651,7 +664,8 @@ CONTAINS
 
                 ! The local stage coordinator applies SI and the ordered
                 ! implicit-group sweep, returning one effective IM term.
-                CALL solve_imex_stage(equation_partition, q_fv_cell,          &
+                CALL solve_imex_stage(equation_partition, stage_groups,       &
+                     source_solvers, q_fv_cell,                              &
                      q(1:n_vars,j,k), dt, a_diag,                             &
                      known_stage_residual, B_prime_x_geom(j,k),               &
                      B_prime_y_geom(j,k), B_second_xx_geom(j,k),              &

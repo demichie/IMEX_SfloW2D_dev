@@ -15,12 +15,16 @@ PROGRAM probe_sources
   USE geometry_2d, ONLY : pi_g
   USE equation_terms_2d, ONLY : eval_implicit_terms, eval_semi_implicit_terms, &
        eval_mass_exchange_terms
-  USE equation_metadata_2d, ONLY : equation_partition_type
+  USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_NEWTON
+  USE source_catalog_2d, ONLY : rheology_source_terms, SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
+       SOURCE_TERM_THERMAL_CONVECTIVE_COOLING, SOURCE_TERM_PORE_PRESSURE_DISSIPATION
+  USE source_registry_2d, ONLY : source_registry_type
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, solve_rk_step
   IMPLICIT NONE
   INTEGER :: operation, solids, column, j, level, iterations, linear_info, iz
   LOGICAL :: derivatives, converged, search_failed, one_sided_pressure
   TYPE(equation_partition_type) :: partition
+  TYPE(source_registry_type) :: source_registry
   REAL(wp) :: input_q(7), bx, by, bxx, bxy, byy, z, dt, diagonal, pressure
   REAL(wp) :: q(7), qp(9), real_source(7), si(7), plus(7), minus(7), scale(7)
   REAL(wp) :: cs(7,7), normalized_cs(7,7), fd(7,7,4), steps(4), delta, env_before
@@ -31,6 +35,9 @@ PROGRAM probe_sources
   INTEGER :: iteration, actual_threads
   COMPLEX(wp) :: cq(7), complex_source(7), base_complex(7)
   LOGICAL :: mask(7)
+  INTEGER, ALLOCATABLE :: active_terms(:)
+  INTEGER :: pore_equation
+  CHARACTER(LEN=256) :: registry_error
   NAMELIST /fixture/ operation, solids, input_q, bx, by, bxx, bxy, byy, z, &
        dt, diagonal, derivatives, one_sided_pressure, rheology_flag, rheology_model_id, gas_flag, &
        pore_pressure_flag, dynamic_permeability_flag, sutherland_flag,    &
@@ -204,14 +211,30 @@ PROGRAM probe_sources
      IF (pore_pressure_flag) mask(n_vars)=.TRUE.
      CALL partition%initialize(mask(1:n_vars))
      CALL initialize_nonlinear_solver
+     active_terms=[INTEGER::]
+     IF (rheology_flag) active_terms=rheology_source_terms(rheology_model_id)
+     IF (partition%implicit(4)) active_terms=[active_terms, &
+          SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
+          SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
+     pore_equation=0
+     IF (pore_pressure_flag) THEN
+        pore_equation=idx_pore
+        active_terms=[active_terms,SOURCE_TERM_PORE_PRESSURE_DISSIPATION]
+     END IF
+     CALL source_registry%initialize_legacy(partition,[1,1,1], &
+          [IM_GROUP_METHOD_NEWTON,IM_GROUP_METHOD_NEWTON,IM_GROUP_METHOD_NEWTON], &
+          pore_equation,active_terms,registry_error)
+     IF (LEN_TRIM(registry_error)>0) ERROR STOP TRIM(registry_error)
      stage=q
-     CALL solve_rk_step(partition,stage(1:n_vars),q(1:n_vars),dt,diagonal, &
+     CALL solve_rk_step(partition,source_registry%stage_groups(), &
+          source_registry%solvers(),stage(1:n_vars),q(1:n_vars),dt,diagonal, &
           0.0_wp*q(1:n_vars),bx,by,z,iterations,converged,linear_info,search_failed)
      CALL implicit(stage,residual)
      residual(1:n_vars)=stage(1:n_vars)-q(1:n_vars)-dt*diagonal*residual(1:n_vars)
      WRITE(*,'(A,7ES26.17E3)') 'STAGE ',stage(1:n_vars)
      WRITE(*,'(A,7ES26.17E3)') 'RESIDUAL ',residual(1:n_vars)
      WRITE(*,'(A,4I8)') 'STATUS ',MERGE(1,0,converged),iterations,linear_info,MERGE(1,0,search_failed)
+     CALL source_registry%finalize
   END IF
 CONTAINS
   !> \brief Evaluate the REAL production source without changing caller storage.

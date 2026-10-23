@@ -83,18 +83,14 @@ under `build-local/d17-registry` or test-owned temporary directories, outside
 
 ## Gate boundary and next steps
 
-Accept phase B for this local scope: descriptors, initialization-time validation,
-immutable registries, legacy normalization and simulation ownership are present.
-This does **not** certify a new numerical integration path: the existing solver
-still consumes `equation_partition_type` and its current ordered groups.
-
-D17-C must add the analytic assembly bridge and remove physical law calls from
-the numerical solver without changing state-refresh order or effective IM
-increments. D17-D/E must connect term/solver filtering and explicit/boundary/step
-paths while preserving coupled blocks and atomic mass proposals. D17-F must add
-new native input syntax/presence tracking, remaining capability checks and full
-numerical/portability acceptance. Unsupported partial bundles remain rejected;
-this phase does not claim arbitrary term/method combinations are available.
+This report records phase B as it stood before stage routing. The D17-C analytic
+bridge and its local test evidence are recorded separately in
+[D17-C analytic bridge](D17_C_ANALYTIC_BRIDGE.md). D17-D/E must connect
+explicit, boundary, and post-RK mass-exchange paths while preserving coupled
+blocks and atomic mass proposals. D17-F must add native input syntax and
+presence tracking, remaining capability checks, and full numerical/portability
+acceptance. Unsupported partial bundles remain rejected; this phase does not
+claim arbitrary term/method combinations are available.
 
 Copy accessors and full registry validation are for initialization/diagnostics.
 Future hot-path integration must bind/precompute the required metadata outside

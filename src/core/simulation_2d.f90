@@ -48,7 +48,7 @@ MODULE simulation_2d
 
      TYPE(runtime_state_type) :: runtime
      TYPE(model_layout_type) :: model_layout
-     TYPE(source_registry_type) :: source_registry !< Validated D17 metadata; stage dispatch remains legacy.
+     TYPE(source_registry_type) :: source_registry !< Validated metadata for stage dispatch and source scheduling.
      TYPE(equation_partition_type) :: equation_partition
      TYPE(state_type) :: state
      TYPE(domain_type) :: domain

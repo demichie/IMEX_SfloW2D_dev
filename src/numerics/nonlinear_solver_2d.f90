@@ -16,6 +16,12 @@ MODULE nonlinear_solver_2d
 
   USE equation_metadata_2d, ONLY : equation_partition_type
 
+  USE source_registry_2d, ONLY : source_group_type, source_solver_type
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON, &
+       SOURCE_METHOD_ANALYTIC
+  USE equation_terms_2d, ONLY : analytic_term_context_type,                 &
+       eval_analytic_terms, eval_semi_implicit_terms, correct_friction_momentum
+
   IMPLICIT NONE
 
   PRIVATE
@@ -39,6 +45,8 @@ CONTAINS
   !>          the ordered implicit-group sweep. The returned IM term is the
   !>          net conservative increment over the stage interval.
   !> \param[in] equation_partition Implicit equation groups, order and solve methods.
+  !> \param[in] stage_groups Validated, normalized stage-group descriptors.
+  !> \param[in] solvers Registry solver descriptors referenced by the groups.
   !> \param[in] q_known Conservative state including known stage contributions.
   !> \param[in] q_old Conservative reference state at the start of the step.
   !> \param[in] dt_step Stage time increment [s].
@@ -60,7 +68,8 @@ CONTAINS
   !> \param[out] linear_info Linear solver status; zero denotes success.
   !> \param[out] line_search_failed True if a Newton line search could not accept a step.
   !******************************************************************************
-  SUBROUTINE solve_imex_stage(equation_partition, q_known, q_old,            &
+  SUBROUTINE solve_imex_stage(equation_partition, stage_groups, solvers,     &
+       q_known, q_old,                                                       &
        dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,            &
        Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij,                &
        zero_x_momentum, zero_y_momentum, q_stage, effective_im_term,          &
@@ -69,6 +78,8 @@ CONTAINS
     IMPLICIT NONE
 
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
+    TYPE(source_group_type), INTENT(IN) :: stage_groups(:)
+    TYPE(source_solver_type), INTENT(IN) :: solvers(:)
     REAL(wp), INTENT(IN) :: q_known(n_vars), q_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step, a_diag
     REAL(wp), INTENT(IN) :: known_stage_residual(n_eqns)
@@ -81,7 +92,8 @@ CONTAINS
     LOGICAL, INTENT(OUT) :: converged, line_search_failed
 
     q_stage = q_known
-    CALL solve_implicit_groups(equation_partition, q_stage, q_old, dt_step,   &
+    CALL solve_implicit_groups(equation_partition, stage_groups, solvers,    &
+         q_stage, q_old, dt_step,                                             &
          a_diag, known_stage_residual, Bprimej_x, Bprimej_y, Bsecondj_xx,    &
          Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij, iterations_used,          &
          converged, linear_info, line_search_failed, .TRUE.)
@@ -97,6 +109,8 @@ CONTAINS
   !******************************************************************************
   !> \brief Legacy name for the local IMEX stage coordinator.
   !> \param[in] equation_partition Implicit equation groups, order and solve methods.
+  !> \param[in] stage_groups Validated, normalized stage-group descriptors.
+  !> \param[in] solvers Registry solver descriptors referenced by the groups.
   !> \param[in] q_known Conservative state including known stage contributions.
   !> \param[in] q_old Conservative reference state at the start of the step.
   !> \param[in] dt_step Stage time increment [s].
@@ -118,13 +132,16 @@ CONTAINS
   !> \param[out] linear_info Linear solver status; zero denotes success.
   !> \param[out] line_search_failed True if a Newton line search could not accept a step.
   !******************************************************************************
-  SUBROUTINE solve_implicit_stage(equation_partition, q_known, q_old,         &
+  SUBROUTINE solve_implicit_stage(equation_partition, stage_groups, solvers,  &
+       q_known, q_old,                                                       &
        dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,          &
        Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij,               &
        zero_x_momentum, zero_y_momentum, q_stage, effective_im_term,         &
        iterations_used, converged, linear_info, line_search_failed)
 
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
+    TYPE(source_group_type), INTENT(IN) :: stage_groups(:)
+    TYPE(source_solver_type), INTENT(IN) :: solvers(:)
     REAL(wp), INTENT(IN) :: q_known(n_vars), q_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step, a_diag
     REAL(wp), INTENT(IN) :: known_stage_residual(n_eqns)
@@ -136,7 +153,8 @@ CONTAINS
     INTEGER, INTENT(OUT) :: iterations_used, linear_info
     LOGICAL, INTENT(OUT) :: converged, line_search_failed
 
-    CALL solve_imex_stage(equation_partition, q_known, q_old,                &
+    CALL solve_imex_stage(equation_partition, stage_groups, solvers,         &
+         q_known, q_old,                                                     &
          dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,         &
          Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij,              &
          zero_x_momentum, zero_y_momentum, q_stage, effective_im_term,        &
@@ -166,6 +184,8 @@ CONTAINS
 
   !> \brief Backward-compatible entry point for the implicit-group sweep.
   !> \param[in] equation_partition Implicit equation groups, order and solve methods.
+  !> \param[in] stage_groups Validated, normalized stage-group descriptors.
+  !> \param[in] solvers Registry solver descriptors referenced by the groups.
   !> \param[in,out] qj Local conservative state vector updated by the group sweep.
   !> \param[in] qj_old Conservative reference state at the start of the step.
   !> \param[in] dt_step Stage time increment [s].
@@ -179,11 +199,14 @@ CONTAINS
   !> \param[out] linear_info Linear solver status; zero denotes success.
   !> \param[out] line_search_failed True if a Newton line search could not accept a step.
   !******************************************************************************
-  SUBROUTINE solve_rk_step(equation_partition, qj, qj_old, dt_step, a_diag,  &
+  SUBROUTINE solve_rk_step(equation_partition, stage_groups, solvers, qj,    &
+       qj_old, dt_step, a_diag,                                              &
        Rj_not_impl, Bprimej_x, Bprimej_y, Zij, iterations_used, converged,  &
        linear_info, line_search_failed)
 
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
+    TYPE(source_group_type), INTENT(IN) :: stage_groups(:)
+    TYPE(source_solver_type), INTENT(IN) :: solvers(:)
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
     REAL(wp), INTENT(IN) :: qj_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step, a_diag
@@ -193,7 +216,8 @@ CONTAINS
     INTEGER, INTENT(OUT) :: iterations_used, linear_info
     LOGICAL, INTENT(OUT) :: converged, line_search_failed
 
-    CALL solve_implicit_groups(equation_partition, qj, qj_old, dt_step,      &
+    CALL solve_implicit_groups(equation_partition, stage_groups, solvers,    &
+         qj, qj_old, dt_step,                                                &
          a_diag, Rj_not_impl, Bprimej_x, Bprimej_y, 0.0_wp, 0.0_wp,          &
          0.0_wp, 0.0_wp, Zij, iterations_used, converged, linear_info,       &
          line_search_failed)
@@ -203,6 +227,8 @@ CONTAINS
   !> \brief Apply the ordered implicit-group sweep using Newton or closed-form DIRK solves.
   !>
   !> \param[in] equation_partition Explicit/implicit equation mask and compact index maps.
+  !> \param[in] stage_groups Validated ordered stage groups; explicit groups are skipped.
+  !> \param[in] solvers Registry solver descriptors referenced by analytic groups.
   !> \param[in,out] qj Local conservative state vector; mass and momenta are per unit horizontal
   !>                   area.
   !> \param[in] qj_old Cell conservative reference state used in the implicit-stage residual.
@@ -223,31 +249,21 @@ CONTAINS
   !> \param[out] line_search_failed True when backtracking fails to accept a step.
   !******************************************************************************
 
-  SUBROUTINE solve_implicit_groups(equation_partition, qj, qj_old, dt_step,  &
+  SUBROUTINE solve_implicit_groups(equation_partition, stage_groups, solvers, &
+       qj, qj_old, dt_step,                                                  &
        a_diag, Rj_not_impl, Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
        Bsecondj_yy, grav_coeff, Zij,                                         &
        iterations_used, converged, linear_info, line_search_failed,          &
        apply_semi_implicit )
 
-    USE parameters_2d, ONLY : tol_rel, tol_abs, n_RK,                         &
-         n_solid, n_add_gas, idx_pore, rheology_flag, rheology_model_id,     &
-         rheology_id_lava, pore_pressure_flag,                              &
-         curvature_term_flag,                                                &
-         stochastic_flag, slope_correction_flag
-    USE equation_metadata_2d, ONLY : IM_GROUP_METHOD_ANALYTIC,                &
-         IM_GROUP_METHOD_NEWTON
-    USE constitutive_parameters_2d, ONLY : T_env, radiative_term_coeff,       &
-         convective_term_coeff
-    USE state_conversion_2d, ONLY : r_phys_var, qc_to_qp
-    USE equation_terms_2d, ONLY : eval_semi_implicit_terms
-    USE rheology_2d, ONLY : correct_friction_momentum, curvature_acceleration, &
-         solve_analytic_rheology_velocity
-    USE thermal_laws_2d, ONLY : solve_lava_analytic_temperature
-    USE pore_pressure_laws_2d, ONLY : solve_analytic_pore_pressure
+    USE parameters_2d, ONLY : tol_rel, tol_abs, n_RK
+    USE state_conversion_2d, ONLY : qc_to_qp
 
     IMPLICIT NONE
 
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
+    TYPE(source_group_type), INTENT(IN) :: stage_groups(:)
+    TYPE(source_solver_type), INTENT(IN) :: solvers(:)
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
     REAL(wp), INTENT(IN) :: qj_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step
@@ -267,16 +283,12 @@ CONTAINS
     REAL(wp) :: qj_init(n_vars), q_known(n_vars)
     REAL(wp) :: coeff_f(n_eqns)
     REAL(wp) :: tol_abs_local, tol_rel_local
-    REAL(wp) :: flow_h, flow_u, flow_v, flow_temperature, flow_density
-    REAL(wp) :: flow_alphas(n_solid), flow_alphag(n_add_gas), flow_alphal
-    REAL(wp) :: flow_red_grav, flow_p_dyn, flow_Zs, flow_pore_pressure
-    REAL(wp) :: temperature_after, heat_capacity, pressure_known
-    REAL(wp) :: pressure_after, speed_ratio, horizontal_speed
-    REAL(wp) :: curvature_accel, velocity_after(2), qp_current(n_vars+2)
-    LOGICAL :: analytic_rheology_model_supported
+    REAL(wp) :: analytic_state(n_vars)
+    TYPE(analytic_term_context_type) :: analytic_context
+    REAL(wp) :: qp_current(n_vars+2)
     REAL(wp) :: dynamic_pressure, si_term(n_eqns), residual_without_si(n_eqns)
     REAL(wp) :: momentum_before_newton(2)
-    INTEGER :: group, group_size, equation, i
+    INTEGER :: group, group_size, equation, i, solver_id, analytic_status
     INTEGER :: group_equations(equation_partition%n_implicit)
     LOGICAL :: group_has_momentum, apply_si_local
 
@@ -287,7 +299,8 @@ CONTAINS
 
     IF (.NOT. equation_partition%is_initialized() .OR.                     &
          equation_partition%n_equations .NE. n_eqns .OR.                   &
-         n_eqns .NE. n_vars .OR. equation_partition%n_implicit .GT. n_vars) THEN
+         n_eqns .NE. n_vars .OR. equation_partition%n_implicit .GT. n_vars .OR. &
+         (equation_partition%n_IM_groups>0 .AND. SIZE(stage_groups)==0)) THEN
        linear_info = -1
        RETURN
     END IF
@@ -309,6 +322,13 @@ CONTAINS
     qj = q_known
     apply_si_local = .FALSE.
     IF (PRESENT(apply_semi_implicit)) apply_si_local = apply_semi_implicit
+    analytic_context%Bprime_x=Bprimej_x
+    analytic_context%Bprime_y=Bprimej_y
+    analytic_context%Bsecond_xx=Bsecondj_xx
+    analytic_context%Bsecond_xy=Bsecondj_xy
+    analytic_context%Bsecond_yy=Bsecondj_yy
+    analytic_context%grav_coeff=grav_coeff
+    analytic_context%Zij=Zij
 
     ! Explicit equations have no current-stage implicit source and are solved
     ! directly before the ordered implicit-group sweep.
@@ -317,102 +337,61 @@ CONTAINS
        qj(equation) = q_known(equation)
     END DO
 
-    IF (equation_partition%n_IM_groups .EQ. 0) THEN
-       converged = .TRUE.
-       RETURN
-    END IF
+    DO group = 1, SIZE(stage_groups)
+       IF (stage_groups(group)%method==SOURCE_METHOD_EXPLICIT) CYCLE
+       IF (.NOT.ALLOCATED(stage_groups(group)%equation_ids)) THEN
+          linear_info=-1
+          qj=qj_init
+          RETURN
+       END IF
+       group_size=SIZE(stage_groups(group)%equation_ids)
+       IF (group_size<1 .OR. group_size>SIZE(group_equations)) THEN
+          linear_info=-1
+          qj=qj_init
+          RETURN
+       END IF
+       group_equations(1:group_size)=stage_groups(group)%equation_ids
 
-    DO group = 1, equation_partition%n_IM_groups
-       group_size = equation_partition%n_IM_group_equations(group)
-       group_equations(1:group_size) =                                      &
-            equation_partition%IM_group_map(1:group_size,group)
-
-       IF (equation_partition%IM_group_method(group) .EQ.                   &
-            IM_GROUP_METHOD_ANALYTIC) THEN
-          DO i = 1, group_size
-             qj(group_equations(i)) = q_known(group_equations(i))
+       IF (stage_groups(group)%method==SOURCE_METHOD_ANALYTIC) THEN
+          DO i=1,group_size
+             qj(group_equations(i))=q_known(group_equations(i))
           END DO
-
-          group_has_momentum = ANY(group_equations(1:group_size) .EQ. 2) .OR. &
-               ANY(group_equations(1:group_size) .EQ. 3)
-          IF (group_has_momentum) THEN
-             IF (.NOT. (ANY(group_equations(1:group_size) .EQ. 2) .AND.      &
-                  ANY(group_equations(1:group_size) .EQ. 3))) THEN
-                linear_info = -6
-                qj = qj_init
-                RETURN
-             END IF
-             IF (rheology_flag) THEN
-                CALL r_phys_var(qj, flow_h, flow_u, flow_v, flow_alphas,     &
-                     flow_density, flow_temperature, flow_alphal,           &
-                     flow_alphag, flow_red_grav, flow_p_dyn, flow_Zs,        &
-                     flow_pore_pressure)
-                horizontal_speed = SQRT(flow_u**2 + flow_v**2)
-                speed_ratio = 1.0_wp
-                IF (horizontal_speed .GT. 0.0_wp) THEN
-                   speed_ratio = SQRT(horizontal_speed**2 +                  &
-                        MERGE((flow_u*Bprimej_x + flow_v*Bprimej_y)**2,      &
-                        0.0_wp, slope_correction_flag)) / horizontal_speed
-                END IF
-                curvature_accel = 0.0_wp
-                IF (curvature_term_flag) THEN
-                   curvature_accel = curvature_acceleration(Bsecondj_xx,     &
-                        Bsecondj_xy, Bsecondj_yy, flow_u, flow_v)
-                END IF
-                velocity_after = [flow_u, flow_v]
-                CALL solve_analytic_rheology_velocity(rheology_model_id,     &
-                     dt_step*a_diag, flow_h, flow_temperature, flow_density,&
-                     speed_ratio, [flow_u, flow_v], flow_red_grav,         &
-                     grav_coeff, flow_alphas, curvature_accel,             &
-                     pore_pressure_flag, flow_pore_pressure,               &
-                     stochastic_flag, Zij, velocity_after,                 &
-                     analytic_rheology_model_supported)
-                IF (.NOT. analytic_rheology_model_supported) THEN
-                   linear_info = -7
-                   qj = qj_init
-                   RETURN
-                END IF
-                qj(2:3) = qj(1) * velocity_after
-             END IF
+          group_has_momentum=ANY(group_equations(1:group_size)==2) .OR. &
+               ANY(group_equations(1:group_size)==3)
+          IF (group_has_momentum .AND. &
+               .NOT.(ANY(group_equations(1:group_size)==2) .AND. &
+               ANY(group_equations(1:group_size)==3))) THEN
+             linear_info=-6
+             qj=qj_init
+             RETURN
           END IF
-
-          IF (ANY(group_equations(1:group_size) .EQ. 4)) THEN
-             IF (rheology_model_id .NE. rheology_id_lava) THEN
-                linear_info = -2
-                qj = qj_init
-                RETURN
-             END IF
-             CALL r_phys_var(qj, flow_h, flow_u, flow_v, flow_alphas,        &
-                  flow_density, flow_temperature, flow_alphal, flow_alphag,  &
-                  flow_red_grav, flow_p_dyn, flow_Zs, flow_pore_pressure)
-             IF (flow_temperature .LE. 0.0_wp) THEN
-                linear_info = -3
-                qj = qj_init
-                RETURN
-             END IF
-             heat_capacity = qj(4) / flow_temperature
-             CALL solve_lava_analytic_temperature(flow_temperature,        &
-                  dt_step*a_diag, heat_capacity, radiative_term_coeff,       &
-                  convective_term_coeff, T_env, temperature_after)
-             qj(4) = heat_capacity * temperature_after
+          IF (.NOT.ALLOCATED(stage_groups(group)%analytic_solver_ids)) THEN
+             linear_info=-1
+             qj=qj_init
+             RETURN
           END IF
-
-          IF (ANY(group_equations(1:group_size) .EQ. idx_pore)) THEN
-             IF (qj(1) .GT. 0.0_wp) THEN
-                CALL r_phys_var(qj, flow_h, flow_u, flow_v, flow_alphas,     &
-                     flow_density, flow_temperature, flow_alphal,           &
-                     flow_alphag, flow_red_grav, flow_p_dyn, flow_Zs,        &
-                     flow_pore_pressure)
-                pressure_known = qj(idx_pore) / qj(1)
-                CALL solve_analytic_pore_pressure(pressure_known,            &
-                     dt_step*a_diag, flow_h, flow_temperature, flow_alphas,  &
-                     pressure_after)
-                qj(idx_pore) = qj(1) * pressure_after
-             END IF
+          IF (SIZE(stage_groups(group)%analytic_solver_ids)/=1) THEN
+             linear_info=-1
+             qj=qj_init
+             RETURN
           END IF
+          solver_id=stage_groups(group)%analytic_solver_ids(1)
+          IF (solver_id<1 .OR. solver_id>SIZE(solvers)) THEN
+             linear_info=-1
+             qj=qj_init
+             RETURN
+          END IF
+          CALL eval_analytic_terms(stage_groups(group),solvers(solver_id),qj, &
+               analytic_context,dt_step*a_diag,analytic_state,             &
+               status=analytic_status)
+          IF (analytic_status/=0) THEN
+             linear_info=analytic_status
+             qj=qj_init
+             RETURN
+          END IF
+          qj=analytic_state
 
-       ELSEIF (equation_partition%IM_group_method(group) .EQ.              &
-               IM_GROUP_METHOD_NEWTON) THEN
+       ELSEIF (stage_groups(group)%method==SOURCE_METHOD_NEWTON) THEN
           si_term = 0.0_wp
           group_has_momentum = ANY(group_equations(1:group_size) .EQ. 2) .OR. &
                ANY(group_equations(1:group_size) .EQ. 3)

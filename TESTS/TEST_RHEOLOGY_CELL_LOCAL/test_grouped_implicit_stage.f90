@@ -9,6 +9,10 @@ PROGRAM test_grouped_implicit_stage
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   USE equation_terms_2d, ONLY : eval_implicit_terms,                     &
        eval_semi_implicit_terms, init_problem_param
+  USE source_registry_2d, ONLY : source_registry_type
+  USE source_catalog_2d, ONLY : rheology_source_terms, &
+       SOURCE_TERM_THERMAL_RADIATIVE_COOLING, SOURCE_TERM_THERMAL_CONVECTIVE_COOLING, &
+       SOURCE_TERM_PORE_PRESSURE_DISSIPATION
   USE rheology_2d, ONLY : correct_friction_momentum
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
@@ -20,6 +24,7 @@ PROGRAM test_grouped_implicit_stage
   IMPLICIT NONE
 
   TYPE(equation_partition_type) :: partition
+  TYPE(source_registry_type) :: source_registry
   LOGICAL :: implicit_mask(7), converged, line_search_failed
   INTEGER :: group_map(7), iterations, linear_info, i, equation
   REAL(wp) :: q_old(7), q_stage(7), known_residual(7), source(7), si_source(7)
@@ -104,6 +109,7 @@ PROGRAM test_grouped_implicit_stage
   CALL partition%initialize(implicit_mask, group_map,                       &
        [IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_ANALYTIC,                 &
        IM_GROUP_METHOD_NEWTON])
+  CALL refresh_source_registry
 
   q_old = [1200.0_wp, 2400.0_wp, -1200.0_wp, 4.0E9_wp,                     &
        180.0_wp, 120.0_wp, 6.0E6_wp]
@@ -112,7 +118,8 @@ PROGRAM test_grouped_implicit_stage
   dt_step = 0.2_wp
   a_diag = 0.75_wp
   CALL initialize_nonlinear_solver
-  CALL solve_rk_step(partition, q_stage, q_old, dt_step, a_diag,            &
+  CALL solve_rk_step(partition, source_registry%stage_groups(),              &
+       source_registry%solvers(), q_stage, q_old, dt_step, a_diag,           &
        known_residual, 0.0_wp, 0.0_wp, 0.0_wp, iterations, converged,      &
        linear_info, line_search_failed)
   IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
@@ -148,7 +155,8 @@ PROGRAM test_grouped_implicit_stage
   q_stage_check = q_old
   q_stage_check(2:3) = 0.0_wp
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
-  CALL solve_imex_stage(partition, q_stage_check, q_stage_check,            &
+  CALL solve_imex_stage(partition, source_registry%stage_groups(),           &
+       source_registry%solvers(), q_stage_check, q_stage_check,              &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                     &
        effective_stage_term, iterations, converged, linear_info,             &
@@ -165,6 +173,7 @@ PROGRAM test_grouped_implicit_stage
   END IF
 
   CALL init_problem_param(partition)
+  CALL refresh_source_registry
   IF (partition%IM_group_method(1) .NE. IM_GROUP_METHOD_ANALYTIC .OR.      &
        partition%IM_group_method(2) .NE. IM_GROUP_METHOD_ANALYTIC .OR.      &
        partition%IM_group_method(3) .NE. IM_GROUP_METHOD_NEWTON) THEN
@@ -186,7 +195,8 @@ PROGRAM test_grouped_implicit_stage
   pressure_known = q_expected(7) / q_expected(1)
   CALL solve_analytic_pore_pressure(pressure_known, dt_step*a_diag,          &
        expected_h, expected_temperature, expected_alphas, expected_pressure)
-  CALL solve_imex_stage(partition, q_stage_check, q_stage_check,             &
+  CALL solve_imex_stage(partition, source_registry%stage_groups(),            &
+       source_registry%solvers(), q_stage_check, q_stage_check,               &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                     &
        effective_stage_term, iterations, converged, linear_info,             &
@@ -221,6 +231,7 @@ PROGRAM test_grouped_implicit_stage
   imex_velocity_group = 2
   imex_group_method(1:2) = [CHARACTER(LEN=16) :: 'ANALYTIC', 'ANALYTIC']
   CALL init_problem_param(partition)
+  CALL refresh_source_registry
   IF (partition%n_IM_groups .NE. 2 .OR.                                  &
        partition%n_IM_group_equations(1) .NE. 2 .OR.                      &
        partition%IM_group(4) .NE. 1 .OR.                                 &
@@ -230,7 +241,8 @@ PROGRAM test_grouped_implicit_stage
        partition%IM_group_method(2) .NE. IM_GROUP_METHOD_ANALYTIC) THEN
      ERROR STOP 'energy and pore pressure could not share an analytic group'
   END IF
-  CALL solve_imex_stage(partition, q_stage_check, q_stage_check,           &
+  CALL solve_imex_stage(partition, source_registry%stage_groups(),          &
+       source_registry%solvers(), q_stage_check, q_stage_check,             &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                    &
        effective_stage_term, iterations, converged, linear_info,            &
@@ -250,6 +262,7 @@ PROGRAM test_grouped_implicit_stage
   imex_velocity_group = 3
   imex_group_method = [CHARACTER(LEN=16) :: 'ANALYTIC', 'NEWTON', 'ANALYTIC']
   CALL init_problem_param(partition)
+  CALL refresh_source_registry
   IF (partition%n_IM_groups .NE. 3 .OR.                               &
        partition%IM_group(7) .NE. 1 .OR.                               &
        partition%IM_group(4) .NE. 2 .OR.                               &
@@ -266,6 +279,7 @@ PROGRAM test_grouped_implicit_stage
   imex_velocity_group = 1
   imex_group_method(1) = 'newton'
   CALL init_problem_param(partition)
+  CALL refresh_source_registry
   IF (partition%n_IM_groups .NE. 1 .OR.                               &
        partition%n_IM_group_equations(1) .NE. 4 .OR.                   &
        partition%IM_group_method(1) .NE. IM_GROUP_METHOD_NEWTON) THEN
@@ -273,7 +287,8 @@ PROGRAM test_grouped_implicit_stage
   END IF
 
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
-  CALL solve_imex_stage(partition, q_stage_check, q_stage_check,            &
+  CALL solve_imex_stage(partition, source_registry%stage_groups(),           &
+       source_registry%solvers(), q_stage_check, q_stage_check,              &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                     &
        effective_stage_term, iterations, converged, linear_info,             &
@@ -304,7 +319,8 @@ PROGRAM test_grouped_implicit_stage
   q_expected(2:3) = q_expected(2:3) +                                     &
        dt_step*a_diag*si_source(2:3)
   CALL correct_friction_momentum(q_stage_check(2:3), q_expected(2:3))
-  CALL solve_imex_stage(partition, q_stage_check, q_stage_check,            &
+  CALL solve_imex_stage(partition, source_registry%stage_groups(),           &
+       source_registry%solvers(), q_stage_check, q_stage_check,              &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                     &
        effective_stage_term, iterations, converged, linear_info,             &
@@ -322,7 +338,8 @@ PROGRAM test_grouped_implicit_stage
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
   CALL eval_semi_implicit_terms(0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
        grav, qp_known, si_source, 0.0_wp)
-  CALL solve_imex_stage(partition, q_stage_check, q_stage_check,           &
+  CALL solve_imex_stage(partition, source_registry%stage_groups(),          &
+       source_registry%solvers(), q_stage_check, q_stage_check,             &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                    &
        effective_stage_term, iterations, converged, linear_info,            &
@@ -344,6 +361,7 @@ PROGRAM test_grouped_implicit_stage
   imex_group_method = [CHARACTER(LEN=16) ::                             &
        'ANALYTIC', 'ANALYTIC', 'ANALYTIC']
   CALL init_problem_param(partition)
+  CALL refresh_source_registry
   q_stage_check = q_old
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
   CALL r_phys_var(q_stage_check, expected_h, expected_u, expected_v,      &
@@ -354,7 +372,8 @@ PROGRAM test_grouped_implicit_stage
   CALL solve_lava_analytic_velocity(dt_step*a_diag, expected_h,            &
        expected_temperature, expected_density, speed_ratio,                &
        [expected_u, expected_v], analytic_velocity)
-  CALL solve_imex_stage(partition, q_stage_check, q_stage_check,           &
+  CALL solve_imex_stage(partition, source_registry%stage_groups(),          &
+       source_registry%solvers(), q_stage_check, q_stage_check,             &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                    &
        effective_stage_term, iterations, converged, linear_info,            &
@@ -369,7 +388,36 @@ PROGRAM test_grouped_implicit_stage
   END IF
 
   CALL partition%finalize
+  CALL source_registry%finalize
   CALL finalize_nonlinear_solver
   WRITE(*,*) 'PASS: grouped DIRK and effective IMEX stage-rate contracts'
+
+CONTAINS
+  SUBROUTINE refresh_source_registry
+    INTEGER :: target_groups(3),methods(3),pore_equation,group
+    INTEGER, ALLOCATABLE :: active_terms(:)
+    CHARACTER(LEN=256) :: error
+    target_groups=1
+    methods=IM_GROUP_METHOD_NEWTON
+    DO group=1,partition%n_IM_groups
+       methods(group)=partition%IM_group_method(group)
+    END DO
+    IF (partition%implicit(2)) target_groups(1)=partition%IM_group(2)
+    IF (partition%implicit(4)) target_groups(2)=partition%IM_group(4)
+    active_terms=[INTEGER::]
+    IF (rheology_flag) active_terms=rheology_source_terms(rheology_model_id)
+    IF (partition%implicit(4)) active_terms=[active_terms, &
+         SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
+         SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
+    pore_equation=0
+    IF (pore_pressure_flag) THEN
+       pore_equation=idx_pore
+       target_groups(3)=partition%IM_group(idx_pore)
+       active_terms=[active_terms,SOURCE_TERM_PORE_PRESSURE_DISSIPATION]
+    END IF
+    CALL source_registry%initialize_legacy(partition,target_groups,methods, &
+         pore_equation,active_terms,error)
+    IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
+  END SUBROUTINE refresh_source_registry
 
 END PROGRAM test_grouped_implicit_stage

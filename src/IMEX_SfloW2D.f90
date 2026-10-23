@@ -457,6 +457,7 @@ PROGRAM IMEX_SfloW2D
            simulation%state%q, simulation%state%qp, simulation%runtime%t,    &
            simulation%runtime%dt, simulation%stochastic%effective_Z,         &
            simulation%equation_partition,                                   &
+           simulation%source_registry, &
            simulation%domain,                                               &
            simulation%spatial_operator)
 

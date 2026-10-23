@@ -24,7 +24,9 @@ for profile in strict optimized; do
         physics/rheology_laws/rheology_voellmy_2d physics/rheology_laws/rheology_plastic_2d \
         physics/rheology_laws/rheology_froude_2d physics/rheology_laws/rheology_lucas_2d \
         numerics/lapack_interfaces_2d \
-        core/constitutive_parameters_2d numerics/equation_metadata_2d core/complexify \
+        core/constitutive_parameters_2d numerics/equation_metadata_2d \
+        numerics/source_catalog_2d numerics/source_registry_2d \
+        core/complexify \
         geometry/geometry_2d state/state_conversion_2d \
         physics/rheology_laws/rheology_lava_2d physics/rheology_laws/rheology_lahar_2d \
         physics/rheology_laws/rheology_empirical_2d physics/rheology_laws/rheology_quadratic_2d \

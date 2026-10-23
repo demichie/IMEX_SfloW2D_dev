@@ -18,25 +18,32 @@ MODULE equation_terms_2d
 
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE rheology_2d, ONLY : curvature_acceleration, eval_implicit_rheology_rate, &
-       eval_semi_implicit_rheology_rate
+  USE rheology_2d, ONLY : curvature_acceleration, correct_friction_momentum, &
+       eval_implicit_rheology_rate, eval_semi_implicit_rheology_rate,        &
+       solve_analytic_rheology_velocity
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_diffusion_source,       &
        eval_pore_pressure_gas_loss, eval_pore_pressure_inlet_source,            &
-       eval_pore_pressure_mass_exchange_source
+       eval_pore_pressure_mass_exchange_source, solve_analytic_pore_pressure
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                 &
        eval_rheology_cooling_energy_rate, eval_vaporization_mass_rate,         &
-       eval_vaporization_energy_rate
+       eval_vaporization_energy_rate, solve_lava_analytic_temperature
   USE mass_exchange_laws_2d, ONLY : eval_settling_fluid_properties,            &
        settling_velocity, eval_solid_deposition_rate, eval_erosion_rates,       &
        eval_continuous_phase_loss_rate, eval_air_entrainment_rate
 
   USE equation_metadata_2d, ONLY : equation_partition_type,                   &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,                       &
+       SOURCE_SOLVE_ANALYTIC_VELOCITY, SOURCE_SOLVE_ANALYTIC_TEMPERATURE,     &
+       SOURCE_SOLVE_ANALYTIC_PORE_PRESSURE, SOURCE_TARGET_VELOCITY,          &
+       SOURCE_TARGET_TEMPERATURE, SOURCE_TARGET_PORE_PRESSURE
+  USE source_registry_2d, ONLY : source_group_type, source_solver_type
 
   USE parameters_2d, ONLY : wp, dry_thickness_tolerance
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
        n_stoch_vars, n_pore_vars
   USE parameters_2d, ONLY : rheology_flag, rheology_model_id,                   &
+       rheology_id_lava,                                                       &
        liquid_flag, gas_flag, slope_correction_flag,                            &
        curvature_term_flag, stochastic_flag,                  &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag
@@ -60,6 +67,8 @@ MODULE equation_terms_2d
   PUBLIC :: curvature_acceleration, eval_curvature_momentum_source
   PUBLIC :: eval_expl_terms
   PUBLIC :: eval_implicit_terms, eval_semi_implicit_terms
+  PUBLIC :: analytic_term_context_type, eval_analytic_terms
+  PUBLIC :: correct_friction_momentum
   PUBLIC :: eval_mass_exchange_terms
   PUBLIC :: eval_source_bdry
   PUBLIC :: set_source_time_coefficients
@@ -73,7 +82,116 @@ MODULE equation_terms_2d
   REAL(wp) :: lateral_coeff_step = -1.0_wp
   REAL(wp), ALLOCATABLE :: fissure_coeff_step(:)
 
+  !> \brief Cell-local geometry and stochastic values needed by exact-flow kernels.
+  TYPE :: analytic_term_context_type
+    REAL(wp) :: Bprime_x=0.0_wp, Bprime_y=0.0_wp
+    REAL(wp) :: Bsecond_xx=0.0_wp, Bsecond_xy=0.0_wp, Bsecond_yy=0.0_wp
+    REAL(wp) :: grav_coeff=0.0_wp, Zij=0.0_wp
+  END TYPE analytic_term_context_type
+
 CONTAINS
+
+  !> \brief Apply one validated analytic source solve to its conservative target.
+  !> \details The exact-flow kernels receive only a physical interval and cell
+  !>          context; stage and Runge-Kutta scheduling remain in the caller.
+  !> \param[in] group Validated analytic source group.
+  !> \param[in] solver Its single analytic solver descriptor.
+  !> \param[in] q_before Conservative state after preceding ordered groups.
+  !> \param[in] context Cell-local geometry, gravity and stochastic values.
+  !> \param[in] interval Physical integration interval [s].
+  !> \param[out] q_after State with only the solver target changed.
+  !> \param[out] status Zero on success; negative values preserve legacy diagnostics.
+  SUBROUTINE eval_analytic_terms(group,solver,q_before,context,interval,q_after,status)
+    TYPE(source_group_type), INTENT(IN) :: group
+    TYPE(source_solver_type), INTENT(IN) :: solver
+    REAL(wp), INTENT(IN) :: q_before(n_vars),interval
+    TYPE(analytic_term_context_type), INTENT(IN) :: context
+    REAL(wp), INTENT(OUT) :: q_after(n_vars)
+    INTEGER, INTENT(OUT) :: status
+    REAL(wp) :: flow_h,flow_u,flow_v,flow_temperature,flow_density
+    REAL(wp) :: flow_alphas(n_solid),flow_alphag(n_add_gas),flow_alphal
+    REAL(wp) :: flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure
+    REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
+    REAL(wp) :: heat_capacity,temperature_after,pressure_known,pressure_after
+    LOGICAL :: supported
+
+    q_after=q_before
+    status=-5
+    IF (group%method/=SOURCE_METHOD_ANALYTIC) RETURN
+    IF (.NOT.ALLOCATED(solver%target_ids) .OR. &
+         .NOT.ALLOCATED(solver%equation_ids)) RETURN
+    IF (SIZE(solver%target_ids)/=1) RETURN
+
+    SELECT CASE(solver%kind)
+    CASE(SOURCE_SOLVE_ANALYTIC_VELOCITY)
+      IF (solver%target_ids(1)/=SOURCE_TARGET_VELOCITY .OR. &
+           .NOT.(ANY(solver%equation_ids==2) .AND. &
+           ANY(solver%equation_ids==3))) RETURN
+      IF (rheology_flag) THEN
+        CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,         &
+             flow_density,flow_temperature,flow_alphal,flow_alphag,       &
+             flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure)
+        horizontal_speed=SQRT(flow_u**2+flow_v**2)
+        speed_ratio=1.0_wp
+        IF (horizontal_speed>0.0_wp) THEN
+          speed_ratio=SQRT(horizontal_speed**2+                           &
+               MERGE((flow_u*context%Bprime_x+flow_v*context%Bprime_y)**2,&
+               0.0_wp,slope_correction_flag))/horizontal_speed
+        END IF
+        curvature_accel=0.0_wp
+        IF (curvature_term_flag) curvature_accel=curvature_acceleration(  &
+             context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,    &
+             flow_u,flow_v)
+        velocity_after=[flow_u,flow_v]
+        CALL solve_analytic_rheology_velocity(rheology_model_id,interval, &
+             flow_h,flow_temperature,flow_density,speed_ratio,            &
+             [flow_u,flow_v],flow_red_grav,context%grav_coeff,flow_alphas,&
+             curvature_accel,pore_pressure_flag,flow_pore_pressure,       &
+             stochastic_flag,context%Zij,velocity_after,supported)
+        IF (.NOT.supported) THEN
+          status=-7
+          RETURN
+        END IF
+        q_after(2:3)=q_before(1)*velocity_after
+      END IF
+      status=0
+
+    CASE(SOURCE_SOLVE_ANALYTIC_TEMPERATURE)
+      IF (solver%target_ids(1)/=SOURCE_TARGET_TEMPERATURE .OR. &
+           .NOT.ANY(solver%equation_ids==4)) RETURN
+      IF (rheology_model_id/=rheology_id_lava) THEN
+        status=-2
+        RETURN
+      END IF
+      CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,           &
+           flow_density,flow_temperature,flow_alphal,flow_alphag,         &
+           flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure)
+      IF (flow_temperature<=0.0_wp) THEN
+        status=-3
+        RETURN
+      END IF
+      heat_capacity=q_before(4)/flow_temperature
+      CALL solve_lava_analytic_temperature(flow_temperature,interval,      &
+           heat_capacity,radiative_term_coeff,convective_term_coeff,      &
+           T_env,temperature_after)
+      q_after(4)=heat_capacity*temperature_after
+      status=0
+
+    CASE(SOURCE_SOLVE_ANALYTIC_PORE_PRESSURE)
+      IF (solver%target_ids(1)/=SOURCE_TARGET_PORE_PRESSURE .OR. &
+           .NOT.ANY(solver%equation_ids==idx_pore)) RETURN
+      IF (q_before(1)>0.0_wp) THEN
+        CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,         &
+             flow_density,flow_temperature,flow_alphal,flow_alphag,       &
+             flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure)
+        pressure_known=q_before(idx_pore)/q_before(1)
+        CALL solve_analytic_pore_pressure(pressure_known,interval,flow_h,  &
+             flow_temperature,flow_alphas,pressure_after)
+        q_after(idx_pore)=q_before(1)*pressure_after
+      END IF
+      status=0
+    END SELECT
+  END SUBROUTINE eval_analytic_terms
 
   !******************************************************************************
   !> \brief Evaluate cell-local explicit sources, including configured inlet and thermal terms.

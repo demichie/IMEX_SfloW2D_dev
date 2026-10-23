@@ -46,6 +46,9 @@ PROGRAM test_imex_stages
   USE time_integration_2d, ONLY : time_integration_workspace_type
   USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_ANALYTIC, &
        IM_GROUP_METHOD_NEWTON
+  USE source_catalog_2d, ONLY : rheology_source_terms, SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
+       SOURCE_TERM_THERMAL_CONVECTIVE_COOLING, SOURCE_TERM_PORE_PRESSURE_DISSIPATION
+  USE source_registry_2d, ONLY : source_registry_type
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, finalize_nonlinear_solver
   USE state_conversion_2d, ONLY : qc_to_qp
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
@@ -58,6 +61,7 @@ PROGRAM test_imex_stages
   TYPE(spatial_operator_type) :: spatial
   TYPE(time_integration_workspace_type) :: integration
   TYPE(equation_partition_type) :: partition
+  TYPE(source_registry_type) :: source_registry
   TYPE(reconstruction_workspace_type) :: audit_reconstruction
   TYPE(hyperbolic_workspace_type) :: audit_hyperbolic
   REAL(wp), ALLOCATABLE :: q(:,:,:),q0(:,:,:),qp(:,:,:),Z(:,:),statistics(:,:),initial_mask(:,:)
@@ -149,9 +153,9 @@ PROGRAM test_imex_stages
      IF (dt_requested>0.0_wp) dt=dt_requested
      known=0.0_wp; solved=0.0_wp; raw_final=0.0_wp; seen=0; implicit_statuses=0
      IF (observe/=0) THEN
-        CALL integration%advance(q,qp,t,dt,Z,partition,domain,spatial,observer=capture_state)
+        CALL integration%advance(q,qp,t,dt,Z,partition,source_registry,domain,spatial,observer=capture_state)
      ELSE
-        CALL integration%advance(q,qp,t,dt,Z,partition,domain,spatial)
+        CALL integration%advance(q,qp,t,dt,Z,partition,source_registry,domain,spatial)
      END IF
      statistics(:,step)=0.0_wp
      statistics(1,step)=dt; statistics(2,step)=dt_bound
@@ -621,11 +625,43 @@ CONTAINS
          CALL partition%initialize(mask)
        END BLOCK
     END IF
+    CALL configure_source_registry()
     CALL initialize_nonlinear_solver
     CALL integration%initialize
     CALL domain%initialize
     CALL spatial%initialize
   END SUBROUTINE initialize_fixture
+
+  SUBROUTINE configure_source_registry
+    INTEGER :: target_groups(3),methods(3),pore_equation,group
+    INTEGER, ALLOCATABLE :: active_terms(:)
+    CHARACTER(LEN=256) :: error
+
+    target_groups=1
+    methods=IM_GROUP_METHOD_NEWTON
+    DO group=1,partition%n_IM_groups
+       methods(group)=partition%IM_group_method(group)
+    END DO
+    IF (partition%implicit(2)) target_groups(1)=partition%IM_group(2)
+    IF (partition%implicit(4)) target_groups(2)=partition%IM_group(4)
+
+    active_terms=[INTEGER::]
+    IF (rheology_flag) active_terms=rheology_source_terms(rheology_model_id)
+    IF (partition%implicit(4)) active_terms=[active_terms, &
+         SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
+         SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
+    pore_equation=0
+    IF (pore_pressure_flag .AND. idx_pore>=5 .AND. idx_pore<=n_vars) THEN
+       IF (partition%implicit(idx_pore)) THEN
+          pore_equation=idx_pore
+          target_groups(3)=partition%IM_group(idx_pore)
+          active_terms=[active_terms,SOURCE_TERM_PORE_PRESSURE_DISSIPATION]
+       END IF
+    END IF
+    CALL source_registry%initialize_legacy(partition,target_groups,methods, &
+         pore_equation,active_terms,error)
+    IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
+  END SUBROUTINE configure_source_registry
 
   !> \brief Audit all raw-stage inventories and independent reconstructed traces for one step.
   !> \details Test-only workspace is allocated once. Serial diagnostics do not
