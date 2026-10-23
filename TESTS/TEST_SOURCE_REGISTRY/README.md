@@ -34,12 +34,15 @@ bounded mass-exchange transaction. Per-cell state/window/packing guards remain
 in the existing physics. Explicit footprints conservatively retain the legacy
 full equation vector, while implicit solve descriptors use exact target blocks.
 
-The registry is metadata alongside the existing equation partition in D17-B.
-It does not dispatch rates, analytic solves, boundary fluxes or time-step groups
-yet. No new source namelist is accepted. D17-C–F must connect the registry to
-assembly/integration and validate those numerical paths before D17 acceptance.
-The committed phase-A manifest remains historical evidence; the phase-B report
-records the implementation and its own validation scope.
+The registry now drives analytic and explicit stage routing, ordered implicit
+solves, and validation/execution of the atomic post-RK mass-exchange batch.
+The optional `SOURCE_GROUPS` namelist is parsed and validated; the input-path
+integration test covers a representative native schedule, not every valid or
+invalid physical configuration. Boundary-source evaluation continues through
+the equation bridge. The registry is therefore more than metadata, but the
+remaining D17.20 matrix and cross-platform acceptance are still required.
+The committed phase-A manifest remains historical evidence; phase-B and later
+reports record the implementation and their respective validation scopes.
 
 ## Registering a rheology in D17-B
 

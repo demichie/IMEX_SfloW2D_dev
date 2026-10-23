@@ -3,9 +3,10 @@ PROGRAM test_curvature_source
   USE parameters_2d
   USE constitutive_parameters_2d, ONLY : rho_l, inv_rho_l, rho_a_amb, grav, &
        sp_heat_l, inv_rho_s, sp_heat_s, sp_heat_g, sp_gas_const_g
+  USE geometry_2d, ONLY : bottom_source_area_ratio
   USE equation_terms_2d, ONLY : curvature_acceleration
   USE equation_terms_2d, ONLY : eval_curvature_momentum_source
-  USE equation_terms_2d, ONLY : eval_expl_terms
+  USE equation_terms_2d, ONLY : eval_expl_terms, set_source_time_coefficients
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE, &
        SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION
   USE source_registry_2d, ONLY : source_group_type
@@ -117,7 +118,26 @@ PROGRAM test_curvature_source
        64.0_wp*EPSILON(1.0_wp)*expected_y)
   CALL assert_small('dry curvature with injection',MAXVAL(ABS(explicit_source(2:3))),0.0_wp)
 
-  WRITE(*,*) 'PASS: slope-weighted curvature and shared dry-depth guard verified'
+  ! Step averaging must integrate activation across the interval, not sample
+  ! only its active start or endpoint.
+  bottom_source_area_ratio=1.0_wp
+  time_param=[10.0_wp,5.0_wp,0.0_wp,0.0_wp]
+  CALL set_source_time_coefficients(4.0_wp,2.0_wp)
+  CALL eval_expl_terms(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
+       4.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
+       circular_injection_group)
+  expected_x=0.5_wp*0.25_wp*vel_source*rho_l
+  CALL assert_small('partially active step-averaged mass source', &
+       ABS(explicit_source(1)-expected_x),64.0_wp*EPSILON(1.0_wp)*expected_x)
+
+  CALL set_source_time_coefficients(5.0_wp,2.0_wp)
+  CALL eval_expl_terms(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
+       5.0_wp,0.25_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
+       circular_injection_group)
+  CALL assert_small('inactive step-averaged mass source', &
+       MAXVAL(ABS(explicit_source)),0.0_wp)
+
+  WRITE(*,*) 'PASS: curvature, dry-state guard, and step-averaged source windows verified'
 
 CONTAINS
 

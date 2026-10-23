@@ -41,8 +41,12 @@ field remains unchanged through source-window preparation, then becomes
 nonzero during stochastic preparation. Stochastic transport remains disabled,
 so the fixture does not change the restart state layout.
 
-The fixture still has time-windowed sources disabled and does not verify a
-nontrivial averaged source coefficient.
+The production-timestep fixture still has time-windowed sources disabled.
+Separately, `TESTS/TEST_CURVATURE_SOURCE/run_test.sh` now verifies that the
+bottom circular source uses the exact interval-mean activation when a timestep
+crosses the pulse cutoff, including a fully inactive interval. This exercises
+the cached coefficient through `eval_expl_terms`; it does not verify active
+source-window averaging in a full production timestep.
 
 `TESTS/TEST_IMEX_STAGES/run_test.sh` passed in strict and optimized profiles,
 covering observed stage trajectories and final assembly for N_RK=2/3/4, mixed
@@ -55,6 +59,7 @@ budgets, bed updates, and checkpoint continuation.
 
 The test starts after the driver has selected and limited `dt`; it does not
 exercise that scheduling logic or the driver’s subsequent diagnostics/output.
-It also does not validate active source-window averaging or stochastic
-transport. Therefore D17.15 is **partially verified**, not complete. No
-cross-platform or CI acceptance is claimed.
+An active source-window mean is verified at the equation-term boundary, but not
+through a production timestep; stochastic transport is also not validated.
+Therefore D17.15 is **partially verified**, not complete. No cross-platform or
+CI acceptance is claimed.
