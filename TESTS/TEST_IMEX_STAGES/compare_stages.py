@@ -656,6 +656,21 @@ def stage_count_suite(executable, profile):
     directory = Path("source-groups-native")
     directory.mkdir()
     subprocess.run([sys.executable, str(generator)], cwd=directory, check=True)
+    inp = directory / "IMEX_SfloW2D.inp"
+    content = inp.read_text()
+    content = content.replace(
+        "RADIAL_SOURCE_FLAG=F, COLLAPSING_VOLUME_FLAG=F,",
+        "RADIAL_SOURCE_FLAG=F, COLLAPSING_VOLUME_FLAG=F, STOCHASTIC_FLAG=T,",
+    )
+    inp.write_text(content + """
+&STOCHASTIC_PARAMETERS
+ std_max=1.0D0,
+ tau_stochastic=1.0D0,
+ noise_pow_val=1.0D0,
+ stochastic_seed=1729,
+ stoch_transport_flag=F,
+/
+""")
     with (directory / "IMEX_SfloW2D.inp").open("a") as stream:
         stream.write("""
 &SOURCE_GROUPS

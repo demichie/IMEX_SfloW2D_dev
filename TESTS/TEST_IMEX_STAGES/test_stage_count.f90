@@ -3,7 +3,7 @@
 !>          Invalid workspace requests must fail before allocation: dimensions are unset.
 PROGRAM test_stage_count
   USE parameters_2d, ONLY : n_RK, n_vars, n_eqns, kt_trace_reconstruction
-  USE parameters_2d, ONLY : wp, t_start, dt0
+  USE parameters_2d, ONLY : wp, t_start, dt0, stochastic_flag
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, init_grid
   USE time_integration_2d, ONLY : time_integration_workspace_type
   USE inpout_2d, ONLY : init_param, read_param, read_solution
@@ -36,6 +36,7 @@ PROGRAM test_stage_count
   CASE ('native-source')
      CALL init_param
      CALL read_param
+     IF (.NOT.stochastic_flag) ERROR STOP 'stochastic physics was not enabled'
      IF (.NOT.native_source_configuration_present) ERROR STOP 'native source namelist was not parsed'
      IF (source_group_count/=2) ERROR STOP 'native source group count changed unexpectedly'
      CALL initialize_native_source_configuration(registry,partition,error)
@@ -93,6 +94,15 @@ CONTAINS
     INTEGER :: expected_event
     event_count=event_count+1
     IF (event_count>SIZE(event_log)) ERROR STOP 'too many timestep events'
+    IF (event==TIMESTEP_EVENT_SOURCE_WINDOWS .AND. stochastic_flag) THEN
+       IF (ANY(simulation%stochastic%Z/=0.0_wp)) &
+            ERROR STOP 'OU field changed before the stochastic phase'
+    END IF
+    IF (event==TIMESTEP_EVENT_STOCHASTIC_PREPARED) THEN
+       IF (.NOT.stochastic_flag) ERROR STOP 'stochastic phase was not enabled'
+       IF (ALL(simulation%stochastic%Z==0.0_wp)) &
+            ERROR STOP 'active OU phase did not update the stochastic field'
+    END IF
     SELECT CASE(event_count)
     CASE(1); expected_event=TIMESTEP_EVENT_SOURCE_WINDOWS
     CASE(2); expected_event=TIMESTEP_EVENT_STOCHASTIC_PREPARED

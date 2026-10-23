@@ -35,10 +35,14 @@ preparation, RK-IMEX, post-RK step sources, then runtime-clock advancement.
 `TESTS/TEST_IMEX_STAGES/run_test.sh` exercises this production routine from a
 generated input after `init_param`/`read_param`, model initialization and
 restart loading. The test asserts the exact five-event order and checks that
-the clock remains at the step-start time until the last event. This fixture has
-stochastic physics and time-windowed sources disabled, so the observer checks
-the production OU phase boundary but not a nontrivial OU update or averaged
-source coefficient.
+the clock remains at the step-start time until the last event. The native-source
+fixture enables stochastic physics with a fixed seed and verifies that the OU
+field remains unchanged through source-window preparation, then becomes
+nonzero during stochastic preparation. Stochastic transport remains disabled,
+so the fixture does not change the restart state layout.
+
+The fixture still has time-windowed sources disabled and does not verify a
+nontrivial averaged source coefficient.
 
 `TESTS/TEST_IMEX_STAGES/run_test.sh` passed in strict and optimized profiles,
 covering observed stage trajectories and final assembly for N_RK=2/3/4, mixed
@@ -51,6 +55,6 @@ budgets, bed updates, and checkpoint continuation.
 
 The test starts after the driver has selected and limited `dt`; it does not
 exercise that scheduling logic or the driver’s subsequent diagnostics/output.
-It also does not validate active source-window averaging or a stochastic OU
-update in the integrated sequence. Therefore D17.15 is **partially verified**,
-not complete. No cross-platform or CI acceptance is claimed.
+It also does not validate active source-window averaging or stochastic
+transport. Therefore D17.15 is **partially verified**, not complete. No
+cross-platform or CI acceptance is claimed.

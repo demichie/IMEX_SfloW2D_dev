@@ -2504,7 +2504,7 @@ requisito numerato è:
 | D17.10 | **Implementato localmente** | Rate semi-impliciti/impliciti filtrati per gruppo e solver, percorsi impliciti REAL/COMPLEX e sweep runtime ordinato dei solve Newton multipli; report e regressioni locali in D17.10. |
 | D17.11 | **Implementato localmente per i kernel REAL/COMPLEX duplicati individuati** | La correlazione di viscosità lahar condivide ora il kernel COMPLEX con il wrapper REAL; valore e derivata sono testati nei due rami. Per il perimetro verificato non serve un file `.inc`; report D17.11. |
 | D17.12 | **Implementato localmente** | Bridge analitico validato; vedere il report D17-C. |
-| D17.13–D17.16 | **Parziali** | D17.13 resta parziale: equivalenza per tutte le attivazioni non completata. D17.14 instrada il batch mass-exchange atomico dal registro `step` una sola volta dopo RK. D17.15 ora verifica l’ordine delle cinque fasi production source-window/OU/RK/step-source/clock nella routine condivisa da driver e test; selezione di `dt`, finestre attive, aggiornamento OU attivo e output end-to-end restano da coprire. D17.16 implementa localmente `SOURCE_GROUPS`, la distinzione esplicito/default legacy, i controlli di conflitto e la copertura completa dei termini attivi; il flusso completo `read_param` è coperto per una configurazione nativa rappresentativa, mentre l’equivalenza per tutte le combinazioni fisiche resta da validare. Evidenze D17.13–D17.16. |
+| D17.13–D17.16 | **Parziali** | D17.13 resta parziale: equivalenza per tutte le attivazioni non completata. D17.14 instrada il batch mass-exchange atomico dal registro `step` una sola volta dopo RK. D17.15 ora verifica l’ordine delle cinque fasi production source-window/OU/RK/step-source/clock nella routine condivisa da driver e test e un aggiornamento OU attivo con seed fissato; selezione di `dt`, finestre sorgente attive e output end-to-end restano da coprire. D17.16 implementa localmente `SOURCE_GROUPS`, la distinzione esplicito/default legacy, i controlli di conflitto e la copertura completa dei termini attivi; il flusso completo `read_param` è coperto per una configurazione nativa rappresentativa, mentre l’equivalenza per tutte le combinazioni fisiche resta da validare. Evidenze D17.13–D17.16. |
 | D17.17–D17.18 | **Parziali** | Dispatch analitico, esplicito e rate Newton filtrati sono dietro `equation_terms_2d`; il batch mass-exchange `step` è instradato dal registro, ma la copertura e la separazione fisica/numerica complessive restano da completare. |
 | D17.19 | **In corso** | Stato puntuale dei 24 elementi nella sequenza implementativa sotto. |
 | D17.20 | **Parziale** | Regressioni del registro, dei solve analitici e del routing esplicito superate localmente; matrice obbligatoria completa ancora aperta. |
@@ -3158,9 +3158,10 @@ optimized.
 
 **D17.15 resta parziale:** `TEST_IMEX_STAGES` verifica con un observer le
 cinque fasi della routine production e l’avanzamento finale dell’orologio.
-La fixture ha sorgenti a finestra e stochastic physics disattivati; selezione
-di `dt`, coefficienti attivi, aggiornamento OU attivo e output del driver
-restano da verificare insieme. Evidenza e limiti:
+La fixture abilita un aggiornamento OU con seed fissato e ne verifica
+l’effetto sul campo stocastico dopo la fase dedicata; le finestre sorgente attive e il
+trasporto stocastico restano da verificare. Restano inoltre la selezione di
+`dt` e l’output del driver. Evidenza e limiti:
 [D17.15 — timestep ordering](acceptance/D17_15_TIMESTEP_ORDER.md).
 
 ---
