@@ -1,4 +1,6 @@
-!> Compute solid settling and deposition rates, preserving legacy fluid properties.
+!> \brief Compute solid settling and deposition rates.
+!> \details The explicit treatment preserves the established local fluid
+!> properties and settling closures; unsupported methods are rejected.
 MODULE mass_exchange_deposition_2d
   USE parameters_2d
   USE constitutive_parameters_2d

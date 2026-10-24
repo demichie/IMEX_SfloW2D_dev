@@ -1436,3 +1436,8 @@ Audit puntuale di `equation_terms_2d.f90`: eliminati i due blocchi Doxygen orfan
 ### D17.22 — Rimozione della riesportazione di curvatura da equation_terms (24 ottobre 2026)
 
 Dopo Actions verdi confermate sul commit `dd6ce6ff`, rimossi da `equation_terms_2d` `USE rheology_2d, ONLY : curvature_acceleration` e il corrispondente `PUBLIC`. La funzione resta definita e pubblica nel proprietario `rheology_2d`, mentre gli assemblatori fisici la importano direttamente in `source_terms_2d`. Aggiunto un controllo statico in `test_d17_physical_interfaces.py` contro la riesportazione legacy. Nessuna formula o firma di procedura modificata. Il nuovo commit richiede conferma delle Actions; D17.20/D17.21 restano aperti.
+
+
+### D17.22 — Audit Doxygen dei moduli mass-exchange (24 ottobre 2026)
+
+Dopo la validazione CI del commit `21f5165b`, corretti i commenti introduttivi dei moduli `mass_exchange_terms_2d`, `mass_exchange_balance_2d`, `mass_exchange_deposition_2d` e `mass_exchange_carrier_loss_2d` per esplicitare ownership del batch, limitatore condiviso e distinzione tra rate fisici e aggiornamenti di inventario. Eliminato linguaggio storico ambiguo su `legacy fluid properties` nel modulo deposition senza modificare la legge. Nessuna interfaccia fisica cancellata: per le sorgenti configurabili resta il contratto a quattro metodi D17. Pulizia esclusivamente documentale in attesa di verifica CI; audit globale delle API e D17.20/D17.21 ancora aperti.

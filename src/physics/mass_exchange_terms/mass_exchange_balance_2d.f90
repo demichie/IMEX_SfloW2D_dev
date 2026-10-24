@@ -1,5 +1,6 @@
-!> Assemble conservative and topographic sources from one atomic mass-exchange batch.
-!> Rate limiting remains owned by the process kernels and occurs before this call.
+!> \brief Assemble conservative and topographic rates for one mass-exchange batch.
+!> \details Physical rate limiting is performed by the process kernels
+!> before this call; this module does not update flow or bed inventories.
 MODULE mass_exchange_balance_2d
   USE parameters_2d
   USE constitutive_parameters_2d

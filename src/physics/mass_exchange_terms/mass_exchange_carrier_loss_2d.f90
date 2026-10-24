@@ -1,5 +1,6 @@
-!> Coupled carrier-phase loss: prescribed liquid loss, deposition and pore gas.
-!> Apply the shared physical limiter only once, after all contributions.
+!> \brief Evaluate carrier-phase loss contributions as one physical batch.
+!> \details Combine prescribed liquid, deposition-related and pore-gas
+!> losses before applying the shared limiter exactly once.
 MODULE mass_exchange_carrier_loss_2d
   USE parameters_2d, ONLY : wp, n_solid, liquid_flag, pore_pressure_flag, gas_loss_flag
   USE diagnostics_2d, ONLY : fatal_error
