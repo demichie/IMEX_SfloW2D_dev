@@ -45,7 +45,8 @@ MODULE equation_terms_2d
        source_term_descriptor,                                               &
        SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION,&
        SOURCE_TERM_BOTTOM_FISSURAL_INJECTION, SOURCE_TERM_RADIAL_INJECTION
-  USE source_registry_2d, ONLY : source_group_type, source_solver_type, group_contains
+  USE source_registry_2d, ONLY : source_group_type, source_solver_type, &
+       group_contains, group_contains_name
 
   USE parameters_2d, ONLY : wp, dry_thickness_tolerance
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
@@ -325,7 +326,7 @@ CONTAINS
        q1 = r_h * r_rho_m
 
        IF ( curvature_term_flag .AND.                                      &
-            group_contains(group,SOURCE_TERM_GEOMETRY_CURVATURE) .AND.     &
+            group_contains_name(group,'SOURCE_TERM_GEOMETRY_CURVATURE') .AND.     &
             r_h .GT. dry_thickness_tolerance ) THEN
 
           ! Hydrostatic pressure and the ordinary bed-slope source are already
@@ -347,7 +348,7 @@ CONTAINS
 
     ! ----------- ADDITIONAL EXPLICIT TERMS FOR BOTTOM RADIAL SOURCE ------------
 
-    IF ( group_contains(group,SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION) .AND. &
+    IF ( group_contains_name(group,'SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION') .AND. &
          bottom_radial_source_flag .AND. ( cell_fract_jk .GT. 0.0_wp ) ) THEN
 
     IF ( n_intervals .GT. 0 ) THEN
@@ -491,7 +492,7 @@ CONTAINS
 
     ! Each fissure uses its own clipped cell coverage, pulse and temperature,
     ! and the source composition converted at that temperature.
-    IF ( group_contains(group,SOURCE_TERM_BOTTOM_FISSURAL_INJECTION) .AND. &
+    IF ( group_contains_name(group,'SOURCE_TERM_BOTTOM_FISSURAL_INJECTION') .AND. &
          bottom_fissural_source_flag ) THEN
 
        DO i_fissure = 1, n_fissures
@@ -576,7 +577,7 @@ CONTAINS
     ! per-cell rate rho_source * h_source * vel_source * cell_arc_perim_jk
     ! / cell_area_jk sums to MFR over all in-arc cells.
 
-    IF ( group_contains(group,SOURCE_TERM_RADIAL_INJECTION) .AND.              &
+    IF ( group_contains_name(group,'SOURCE_TERM_RADIAL_INJECTION') .AND.              &
          radial_source_flag .AND. ( lat_arc_perim_jk .GT. 0.0_wp ) .AND.       &
          ( h_source .GT. 0.0_wp ) ) THEN
 
