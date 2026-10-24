@@ -101,7 +101,9 @@ CONTAINS
     INTEGER :: target_ids(SOURCE_INPUT_MAX_TARGETS,1, &
          SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: target_group(3),methods(SOURCE_INPUT_MAX_GROUPS),membership(n_eqns)
-    LOGICAL :: implicit_mask(n_eqns),seen_terms(SOURCE_TERM_COUNT),expected_targets(3)
+    LOGICAL :: implicit_mask(n_eqns),expected_targets(3)
+    CHARACTER(LEN=64) :: seen_names(SOURCE_TERM_COUNT)
+    INTEGER :: n_seen
     INTEGER :: i,j,k,g,s,t,slot,compact_group,stage_count,step_count,term_id,target
     CHARACTER(LEN=256) :: validation_error
 
@@ -126,7 +128,7 @@ CONTAINS
     ALLOCATE(parsed_names(SOURCE_INPUT_MAX_TERMS,source_group_count))
     parsed_names=''; parsed_count=0; cadence=0; method=0; phase=0; solver_count=0
     target_count=0; target_ids=0
-    seen_terms=.FALSE.
+    seen_names=''; n_seen=0
     DO g=1,source_group_count
       error='D17: source group IDs and execution orders must be positive'
       IF (source_group_id(g)<1 .OR. source_group_order(g)<1) RETURN
@@ -188,10 +190,11 @@ CONTAINS
           error='D17: source group expansion exceeds supported catalog capacity'
           IF (parsed_count(g)>=SOURCE_INPUT_MAX_TERMS) RETURN
           error='D17: a source term may be registered only once globally'
-          IF (seen_terms(term_id)) RETURN
-          parsed_count(g)=parsed_count(g)+1
-          seen_terms(term_id)=.TRUE.
           component=source_term_descriptor(term_id)
+          IF (ANY(seen_names(1:n_seen)==component%name)) RETURN
+          parsed_count(g)=parsed_count(g)+1
+          n_seen=n_seen+1
+          seen_names(n_seen)=component%name
           parsed_names(parsed_count(g),g)=component%name
         END DO
       END DO
@@ -251,9 +254,10 @@ CONTAINS
     IF (gas_flag .AND. liquid_vaporization_flag) &
          active_terms=[active_terms,SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION]
     error='D17: native schedule must register every configured active term exactly once'
-    IF (COUNT(seen_terms)/=SIZE(active_terms)) RETURN
+    IF (n_seen/=SIZE(active_terms)) RETURN
     DO i=1,SIZE(active_terms)
-      IF (.NOT.seen_terms(active_terms(i))) RETURN
+      component=source_term_descriptor(active_terms(i))
+      IF (.NOT.ANY(seen_names(1:n_seen)==component%name)) RETURN
     END DO
 
     target_group=0
