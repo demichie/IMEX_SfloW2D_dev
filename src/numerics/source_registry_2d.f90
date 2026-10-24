@@ -358,8 +358,9 @@ CONTAINS
       error='D17: physical term duplicated, unknown or dependent'
       DO j=1,SIZE(group%term_names)
         term=source_term_descriptor_by_name(group%term_names(j))
-        id=term%id
-        IF (id<1 .OR. id>SOURCE_TERM_COUNT) RETURN
+        ! Unknown names yield an empty descriptor. No numeric identity
+        ! is needed to validate membership or scheduling capabilities.
+        IF (LEN_TRIM(term%name)==0) RETURN
         IF (.NOT.term%schedulable) RETURN
         IF (ANY(seen_names==term%name)) RETURN
         seen_names=[seen_names,term%name]
