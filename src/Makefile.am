@@ -139,6 +139,8 @@ physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) 
                                       physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
+physics/rheology_laws/rheology_newmodel_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+                                                     core/diagnostics_2d.$(OBJEXT)
 physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)        \
                                           physics/rheology_laws/rheology_analytic_utils_2d.$(OBJEXT)
 physics/thermal_laws_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)               \
