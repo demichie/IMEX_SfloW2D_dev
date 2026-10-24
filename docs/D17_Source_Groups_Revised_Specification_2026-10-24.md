@@ -939,3 +939,8 @@ Introdotto in `source_catalog_2d` l'array `RHEOLOGY_LAWS` con una sola voce nomi
 ### D17.22.36 — Vista canonica delle sorgenti schedulabili per gruppo (24 ottobre 2026)
 
 `source_registry_2d` esporta `group_source_names(group)`, che espone ogni legge reologica come una sola sorgente nominale e deduplica gli addendi matematici appartenenti alla stessa famiglia, mantenendo distinti gli altri termini fisici. La rappresentazione interna `term_ids` non viene ancora eliminata: rimane necessaria agli assemblatori REAL/COMPLEX e alla compatibilità legacy. Inserita una regressione nella matrice delle configurazioni legacy che verifica l'identità canonica completa per i gruppi reologici. **Questo passo non equivale ancora a un registro esclusivamente nominale né alla rimozione dei 34 contributi del catalogo transitorio.** La compilazione e le Actions del nuovo HEAD sono ancora da verificare.
+
+
+### D17.22.37 — Identità canoniche persistenti nel gruppo (24 ottobre 2026)
+
+`source_group_type` contiene ora `source_names(:)`, popolato una sola volta durante `initialize` insieme alla rappresentazione transitoria degli addendi (`term_ids` e `term_names`). `source_names` espone una sola identità per legge reologica completa e una voce per ogni altra sorgente; la validazione verifica che il campo coincida con il raggruppamento canonico calcolato dal catalogo. La matrice di regressione legacy controlla la disponibilità e coerenza di questo campo per ogni gruppo di stage. **Non sono stati eliminati `term_ids` o `term_names`**, tuttora richiesti dai kernel; la migrazione del dispatcher e la rimozione degli addendi dal catalogo schedulabile restano in corso. Nuovo HEAD ancora da verificare con le Actions.

@@ -160,6 +160,14 @@ PROGRAM test_source_registry
           END DO
         END IF
       END DO
+      DO j=1,SIZE(groups)
+        CALL require(ALLOCATED(groups(j)%source_names), &
+             'stage group caches canonical schedulable source identities')
+        CALL require(SIZE(groups(j)%source_names)==SIZE(group_source_names(groups(j))), &
+             'canonical source count matches physical grouping')
+        CALL require(ALL(groups(j)%source_names==group_source_names(groups(j))), &
+             'cached source identities match the complete physical laws')
+      END DO
       CALL require(SIZE(groups)==position+1,'only one additional EX group')
       CALL require(groups(position+1)%id==4,'reserved EX ID')
       CALL require(groups(position+1)%method==SOURCE_METHOD_EXPLICIT,'EX homogeneous method')

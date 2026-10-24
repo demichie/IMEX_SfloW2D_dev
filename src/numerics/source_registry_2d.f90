@@ -23,7 +23,8 @@ MODULE source_registry_2d
     INTEGER :: phase=0 !< Implicit sweep, requested EX evaluation, or post-RK.
     INTEGER :: execution_order=0 !< Explicit order within its phase.
     INTEGER, ALLOCATABLE :: term_ids(:) !< Temporary compatibility representation.
-    CHARACTER(LEN=64), ALLOCATABLE :: term_names(:) !< Canonical physical source names.
+    CHARACTER(LEN=64), ALLOCATABLE :: term_names(:) !< Legacy component names for physical evaluation.
+    CHARACTER(LEN=64), ALLOCATABLE :: source_names(:) !< Unique schedulable source identities.
     INTEGER, ALLOCATABLE :: equation_ids(:) !< Union of target equations or explicit footprint.
   END TYPE source_group_type
 
@@ -265,12 +266,16 @@ CONTAINS
     INTEGER :: i
 
     DO i=1,SIZE(this%stage_entries)
-      IF (ALLOCATED(this%stage_entries(i)%term_ids)) &
-           this%stage_entries(i)%term_names=source_names_for_ids(this%stage_entries(i)%term_ids)
+      IF (ALLOCATED(this%stage_entries(i)%term_ids)) THEN
+        this%stage_entries(i)%term_names=source_names_for_ids(this%stage_entries(i)%term_ids)
+        this%stage_entries(i)%source_names=group_source_names(this%stage_entries(i))
+      END IF
     END DO
     DO i=1,SIZE(this%step_entries)
-      IF (ALLOCATED(this%step_entries(i)%term_ids)) &
-           this%step_entries(i)%term_names=source_names_for_ids(this%step_entries(i)%term_ids)
+      IF (ALLOCATED(this%step_entries(i)%term_ids)) THEN
+        this%step_entries(i)%term_names=source_names_for_ids(this%step_entries(i)%term_ids)
+        this%step_entries(i)%source_names=group_source_names(this%step_entries(i))
+      END IF
     END DO
   END SUBROUTINE populate_registry_term_names
 
@@ -342,6 +347,11 @@ CONTAINS
           IF (LEN_TRIM(group%term_names(j))==0) RETURN
           IF (COUNT(group%term_names==group%term_names(j))/=1) RETURN
         END DO
+      END IF
+      IF (ALLOCATED(group%source_names)) THEN
+        error='D17: canonical group source identity does not match the complete laws'
+        IF (SIZE(group%source_names)/=SIZE(group_source_names(group))) RETURN
+        IF (ANY(group%source_names/=group_source_names(group))) RETURN
       END IF
       error='D17: physical term duplicated, unknown or dependent'
       DO j=1,SIZE(group%term_ids)
