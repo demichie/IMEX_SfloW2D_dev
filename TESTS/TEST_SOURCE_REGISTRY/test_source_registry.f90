@@ -212,6 +212,11 @@ PROGRAM test_source_registry
   CALL require(SIZE(groups(4)%term_ids)==5,'curvature/circular/fissural/radial/boundary inventory')
   CALL require(SIZE(steps(1)%term_ids)==7,'all bounded mass proposals registered')
   CALL require(group_contains(groups(4),SOURCE_TERM_BOUNDARY_INJECTION),'boundary hook retained')
+  CALL require(ALLOCATED(groups(3)%source_names) .AND. &
+       ALLOCATED(groups(3)%term_names),'normalized group exposes name-only dispatch metadata')
+  CALL require(group_contains_name(groups(3),rheology_source_name(rheology_id_lava)), &
+       'rheological law selected by canonical source identity')
+
   ! Group-owned equation and source validation, with no solver-ID metadata.
   DO mode=1,13
     badgroups=groups; badsteps=steps

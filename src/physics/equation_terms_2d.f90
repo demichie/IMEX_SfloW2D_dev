@@ -301,7 +301,7 @@ CONTAINS
 
     IF (group%method/=SOURCE_METHOD_EXPLICIT .OR. &
          group%cadence/=SOURCE_CADENCE_STAGE .OR. &
-         .NOT.ALLOCATED(group%term_ids)) THEN
+         .NOT.ALLOCATED(group%source_names)) THEN
        CALL fatal_error('D17: eval_expl_terms requires a validated explicit stage group')
     END IF
 
@@ -678,7 +678,7 @@ CONTAINS
   SUBROUTINE validate_newton_selection(group)
     TYPE(source_group_type), INTENT(IN) :: group
     IF (group%method/=SOURCE_METHOD_NEWTON .OR. &
-         .NOT.ALLOCATED(group%term_ids)) THEN
+         .NOT.ALLOCATED(group%source_names)) THEN
        CALL fatal_error('D17: implicit evaluation requires a Newton group with sources')
        RETURN
     END IF
@@ -695,25 +695,14 @@ CONTAINS
     IF (model_id/=0 .AND. ALLOCATED(group%source_names)) THEN
       IF (.NOT.ANY(group%source_names==rheology_source_name(model_id))) RETURN
     END IF
-    ! Registered groups own canonical names; numeric membership is only a
-    ! compatibility fallback for pre-normalized legacy descriptors.
-    IF (ALLOCATED(group%term_names)) THEN
-      DO i=1,SIZE(group%term_names)
-        term=source_term_descriptor_by_name(group%term_names(i))
-        IF (term%role==role .AND. term%model_id==model_id) THEN
-          found=.TRUE.
-          RETURN
-        END IF
-      END DO
-      RETURN
-    END IF
-    IF (.NOT.ALLOCATED(group%term_ids)) RETURN
-    DO i=1,SIZE(group%term_ids)
-       term=source_term_descriptor(group%term_ids(i))
-       IF (term%role==role .AND. term%model_id==model_id) THEN
-          found=.TRUE.
-          RETURN
-       END IF
+    ! Mathematical contributions are resolved by name, not by group IDs.
+    IF (.NOT.ALLOCATED(group%term_names)) RETURN
+    DO i=1,SIZE(group%term_names)
+      term=source_term_descriptor_by_name(group%term_names(i))
+      IF (term%role==role .AND. term%model_id==model_id) THEN
+        found=.TRUE.
+        RETURN
+      END IF
     END DO
   END FUNCTION group_has_role
 

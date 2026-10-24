@@ -949,3 +949,8 @@ Introdotto in `source_catalog_2d` l'array `RHEOLOGY_LAWS` con una sola voce nomi
 ### D17.22.38 — Selezione nominale effettiva nel dispatcher SI/IM (24 ottobre 2026)
 
 In `equation_terms_2d`, `group_has_role` verifica l'appartenenza della legge reologica attraverso `group%source_names` prima del controllo interno della presenza del ruolo e degli addendi. In `source_registry_2d`, `group_contains_name` risolve prioritariamente i nomi canonici `source_names`, mantenendo l'accesso transitorio agli addendi `term_names` per la compatibilità con il dispatcher corrente. Estesa la matrice dei test legacy alla risoluzione nominale delle leggi complete. Non sono mutate le formulazioni fisiche SI/IM, il Newton o gli schemi RK. **La migrazione non è completata**: `term_ids` e il catalogo legacy restano necessari alla valutazione fisica. Il nuovo HEAD richiede verifica delle Actions e delle regressioni numeriche.
+
+
+### D17.22.39 — Eliminazione della dipendenza da term_ids nel dispatcher fisico (24 ottobre 2026)
+
+`src/physics/equation_terms_2d.f90` non legge più `group%term_ids`: i controlli d'ingresso per i gruppi espliciti e Newton richiedono `source_names` allocato e la ricerca di ruoli SI/IM risolve gli addendi dai nomi `term_names`, mantenendo il filtro sulla legge canonica `source_names`. Un controllo nel test del registro verifica la disponibilità delle due rappresentazioni nominali e la selezione nominale della legge lava. **Limite:** `term_ids` rimane nell'oggetto gruppo e in registry/configurazione/test, perciò non è stata completata la sua eliminazione globale. Questa modifica non cambia le formule fisiche; la verifica del nuovo HEAD attraverso le Actions è ancora richiesta.
