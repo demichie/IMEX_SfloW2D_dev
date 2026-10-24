@@ -11,18 +11,23 @@ MODULE source_terms_2d
   USE mass_injection_coefficients_2d
   USE parameters_2d
   USE constitutive_parameters_2d
-  USE state_conversion_2d, ONLY : mixt_var
-  USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source
-  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source
+  USE state_conversion_2d
+  USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source, eval_thermal_cooling_implicit
+  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source, &
+       eval_pore_pressure_dissipation_implicit
   USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
   USE mass_exchange_terms_2d, ONLY : eval_mass_exchange_terms
-  USE rheology_2d, ONLY : curvature_acceleration
+  USE rheology_2d, ONLY : curvature_acceleration, &
+       eval_rheology_implicit, eval_rheology_semi_implicit
   USE diagnostics_2d, ONLY : fatal_error
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_ROLE_IMPLICIT, &
+       SOURCE_ROLE_SEMI_IMPLICIT, rheology_source_name, rheology_has_role
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE
   USE source_registry_2d, ONLY : source_group_type, group_contains_name
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_step_source_explicit, eval_stage_source_explicit
+  PUBLIC :: eval_source_implicit, eval_source_semi_implicit
   PUBLIC :: eval_geometry_curvature_explicit
   PUBLIC :: eval_geometry_curvature_semi_implicit
   PUBLIC :: eval_geometry_curvature_implicit
@@ -49,6 +54,280 @@ MODULE source_terms_2d
   ! They remain private to the physics source layer, but are imported by
   ! the legacy window initializer until its migration.
 CONTAINS
+
+  PURE LOGICAL FUNCTION group_has_role(group,role,model_id) RESULT(found)
+    TYPE(source_group_type), INTENT(IN) :: group
+    INTEGER, INTENT(IN) :: role,model_id
+    CHARACTER(LEN=64) :: law_name
+    found=.FALSE.
+    IF (model_id==0) RETURN
+    law_name=rheology_source_name(model_id)
+    IF (LEN_TRIM(law_name)==0) RETURN
+    ! A whole law is the scheduling unit. Mathematical roles remain
+    ! properties of its internal evaluator, not independent group members.
+    IF (.NOT.group_contains_name(group,law_name)) RETURN
+    found=rheology_has_role(model_id,role)
+  END FUNCTION group_has_role
+
+  SUBROUTINE validate_newton_selection(group)
+    TYPE(source_group_type), INTENT(IN) :: group
+    IF (group%method/=SOURCE_METHOD_NEWTON .OR. &
+         .NOT.ALLOCATED(group%source_names)) THEN
+       CALL fatal_error('D17: implicit evaluation requires a Newton group with sources')
+       RETURN
+    END IF
+  END SUBROUTINE validate_newton_selection
+
+  SUBROUTINE eval_source_implicit( Bprimej_x, Bprimej_y, Zij, c_qj,              &
+       c_nh_term_impl, r_qj , r_nh_term_impl, group )
+
+    USE COMPLEXIFY
+
+    USE parameters_2d, ONLY : pore_pressure_flag
+    IMPLICIT NONE
+
+    REAL(wp), INTENT(IN) :: Bprimej_x
+    REAL(wp), INTENT(IN) :: Bprimej_y
+    REAL(wp), INTENT(IN):: Zij
+    COMPLEX(wp), INTENT(IN), OPTIONAL :: c_qj(n_vars)
+    COMPLEX(wp), INTENT(OUT), OPTIONAL :: c_nh_term_impl(n_eqns)
+    REAL(wp), INTENT(IN), OPTIONAL :: r_qj(n_vars)
+    REAL(wp), INTENT(OUT), OPTIONAL :: r_nh_term_impl(n_eqns)
+    TYPE(source_group_type), INTENT(IN), OPTIONAL :: group
+
+    COMPLEX(wp) :: h                       !< height [m]
+    COMPLEX(wp) :: u                       !< velocity (x direction) [m/s]
+    COMPLEX(wp) :: v                       !< velocity (y direction) [m/s]
+    COMPLEX(wp) :: w                       !< velocity (z direction) [m/s]
+    COMPLEX(wp) :: T                       !< temperature [K]
+    COMPLEX(wp) :: rho_m                   !< mixture density [kg/m3]
+    COMPLEX(wp) :: alphas(n_solid)         !< sediment volume fractions
+    COMPLEX(wp) :: alphag(n_add_gas)       !< add. gas volume fractions
+    COMPLEX(wp) :: inv_rho_m               !< 1/mixture density [kg-1 m3]
+
+    COMPLEX(wp) :: qj(n_vars)
+    COMPLEX(wp) :: nh_term(n_eqns)
+    COMPLEX(wp) :: source_term(n_eqns)
+
+    COMPLEX(wp) :: mod_vel
+    COMPLEX(wp) :: mod_vel_hor
+    COMPLEX(wp) :: mod_vel2
+    INTEGER :: i
+    LOGICAL :: moving
+
+    COMPLEX(wp) :: Zs
+
+    COMPLEX(wp) :: exc_pore_pres
+
+    COMPLEX(wp) :: red_grav
+    LOGICAL :: selected_rheology, selected_thermal, selected_pore
+    LOGICAL :: selected_radiative, selected_convective
+
+    IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
+
+       qj = c_qj
+
+    ELSEIF ( present(r_qj) .AND. present(r_nh_term_impl) ) THEN
+
+       DO i = 1,n_vars
+
+          qj(i) = CMPLX( r_qj(i),0.0_wp,wp )
+
+       END DO
+
+    ELSE
+
+      WRITE(*,*) 'Constitutive, eval_source_implicit: problem with arguments'
+       STOP
+
+    END IF
+
+    IF (PRESENT(group)) THEN
+       CALL validate_newton_selection(group)
+       selected_rheology=group_has_role(group,SOURCE_ROLE_IMPLICIT, &
+            rheology_model_id)
+       selected_radiative=group_contains_name(group, &
+            'thermal_cooling')
+       selected_convective=group_contains_name(group, &
+            'thermal_cooling')
+       IF (selected_radiative .NEQV. selected_convective) THEN
+          CALL fatal_error('D17: thermal cooling terms must be selected as a complete bundle')
+          RETURN
+       END IF
+       selected_thermal=selected_radiative .OR. selected_convective
+       selected_pore=group_contains_name(group, &
+            'pore_pressure_dissipation')
+    ELSE
+       selected_rheology=rheology_flag
+       selected_thermal=rheology_flag
+       selected_pore=pore_pressure_flag
+    END IF
+
+    ! initialize the source terms
+    source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)
+    IF (selected_rheology .OR. selected_thermal .OR. selected_pore) THEN
+       CALL c_phys_var(qj,h,u,v,T,rho_m,alphas,alphag,inv_rho_m,Zs,             &
+            exc_pore_pres)
+    END IF
+
+    IF (rheology_flag .AND. selected_rheology) THEN
+
+       red_grav = ( rho_m - rho_a_amb ) / rho_m * grav
+
+       IF ( slope_correction_flag ) THEN
+
+          w = u * Bprimej_x + v * Bprimej_y
+
+       ELSE
+
+          w = CMPLX( 0.0_wp , 0.0_wp , wp )
+
+       END IF
+
+       mod_vel2 = u**2 + v**2 + w**2
+       mod_vel = SQRT( mod_vel2 )
+       mod_vel_hor = SQRT( u**2 + v**2 )
+       ! A purely imaginary velocity perturbation about rest still carries
+       ! the derivative of linear viscous laws. Branching on REAL(V) alone
+       ! would erase it. This does not assign a derivative to Coulomb's cusp.
+       moving = (REAL(mod_vel,wp) .NE. 0.0_wp) .OR. (AIMAG(mod_vel) .NE. 0.0_wp)
+
+       CALL eval_rheology_implicit(rheology_model_id, h, T, rho_m,       &
+            inv_rho_m, u, v, mod_vel, mod_vel_hor, mod_vel2, red_grav,       &
+            alphas, moving, stochastic_flag, Zij, source_term(2:3))
+    END IF
+
+    IF (selected_thermal) THEN
+       source_term(4) = eval_thermal_cooling_implicit( &
+            T, radiative_term_coeff, convective_term_coeff, T_env)
+    ENDIF
+
+    IF ( pore_pressure_flag .AND. selected_pore ) &
+         CALL eval_pore_pressure_dissipation_implicit(h, T,                       &
+         rho_m, alphas, exc_pore_pres, source_term(idx_poreEqn))
+
+    nh_term = source_term
+
+    IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
+
+       c_nh_term_impl = nh_term
+
+    ELSEIF ( present(r_qj) .AND. present(r_nh_term_impl) ) THEN
+
+       r_nh_term_impl = REAL( nh_term )
+
+    END IF
+
+    RETURN
+
+  END SUBROUTINE eval_source_implicit
+
+  SUBROUTINE eval_source_semi_implicit( Bprimej_x , Bprimej_y , Bsecondj_xx ,    &
+       Bsecondj_xy , Bsecondj_yy , grav_coeff , qpj , semi_implicit_term ,     &
+       Zj, group )
+
+    USE parameters_2D, ONLY: pore_pressure_flag
+
+    IMPLICIT NONE
+
+    REAL(wp), INTENT(IN) :: Bprimej_x
+    REAL(wp), INTENT(IN) :: Bprimej_y
+    REAL(wp), INTENT(IN) :: Bsecondj_xx
+    REAL(wp), INTENT(IN) :: Bsecondj_xy
+    REAL(wp), INTENT(IN) :: Bsecondj_yy
+    REAL(wp), INTENT(IN) :: grav_coeff
+
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2)
+    REAL(wp), INTENT(IN) :: Zj ! value stochastic process
+
+    REAL(wp), INTENT(OUT) :: semi_implicit_term(n_eqns)
+    TYPE(source_group_type), INTENT(IN), OPTIONAL :: group
+
+    REAL(wp) :: source_term(n_eqns)
+
+    REAL(wp) :: mod_vel
+    REAL(wp) :: mod_hor_vel
+
+    REAL(wp) :: r_h               !< real-value flow thickness
+    REAL(wp) :: r_u               !< real-value x-velocity
+    REAL(wp) :: r_v               !< real-value y-velocity
+    REAL(wp) :: r_w               !< real_value z-velocity
+    REAL(wp) :: r_alphas(n_solid) !< real-value solid volume fractions
+    REAL(wp) :: r_rho_m           !< real-value mixture density [kg/m3]
+    REAL(wp) :: r_alphal          !< real-value liquid volume fraction
+    REAL(wp) :: r_alphag(n_add_gas) !< real-value add. gas volume fractions
+    REAL(wp) :: r_red_grav
+    REAL(wp) :: r_rho_c
+    REAL(wp) :: r_Ri
+    REAL(wp) :: r_sp_heat_c
+    REAL(wp) :: r_sp_heat_mix
+
+    REAL(wp) :: exc_pore_pres       !< excess pore pressure
+    LOGICAL :: selected_rheology
+
+    semi_implicit_term(1:n_eqns) = 0.0_wp
+
+    IF (PRESENT(group)) THEN
+       CALL validate_newton_selection(group)
+       selected_rheology=group_has_role(group, &
+            SOURCE_ROLE_SEMI_IMPLICIT,rheology_model_id)
+    ELSE
+       selected_rheology=rheology_flag
+    END IF
+
+    ! A dry cell carries no friction source.
+    IF ( qpj(1) .LE. EPSILON(1.0_wp) ) RETURN
+
+    ! initialize and evaluate the forces terms
+    source_term(1:n_eqns) = 0.0_wp
+
+    rheology_if:IF (rheology_flag .AND. selected_rheology) THEN
+
+       r_h = qpj(1)
+       r_u = qpj(idx_u)
+       r_v = qpj(idx_v)
+
+       ! Every SI law below is zero at exact rest. Return before norms and
+       ! divisions so optimized builds with arithmetic traps cannot speculate
+       ! a reciprocal of zero from a later moving-state branch.
+       IF ((r_u .EQ. 0.0_wp) .AND. (r_v .EQ. 0.0_wp)) RETURN
+
+       CALL primitive_to_volume_fractions(qpj, r_alphas, r_alphag, r_alphal)
+
+       CALL mixt_var(qpj, r_Ri, r_rho_m, r_rho_c, r_red_grav,                  &
+            r_sp_heat_c, r_sp_heat_mix)
+
+
+       IF ( slope_correction_flag ) THEN
+
+          r_w = r_u * Bprimej_x + r_v * Bprimej_y
+
+       ELSE
+
+          r_w = 0.0_wp
+
+       END IF
+
+       mod_vel = SQRT( r_u**2 + r_v**2 + r_w**2 )
+
+       mod_hor_vel = SQRT( r_u**2 + r_v**2 )
+
+       exc_pore_pres = 0.0_wp
+       IF (pore_pressure_flag) exc_pore_pres = qpj(idx_pore)
+       CALL eval_rheology_semi_implicit(rheology_model_id, r_h, r_u,  &
+            r_v, mod_vel, mod_hor_vel, r_rho_m, r_red_grav, grav_coeff,    &
+            r_alphas, curvature_term_flag, Bsecondj_xx, Bsecondj_xy,       &
+            Bsecondj_yy, pore_pressure_flag, exc_pore_pres,                &
+            stochastic_flag, Zj, source_term(2:3))
+
+    ENDIF rheology_if
+
+    semi_implicit_term = source_term
+
+    RETURN
+
+  END SUBROUTINE eval_source_semi_implicit
+
 
   SUBROUTINE eval_stage_source_explicit( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy , &
        Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,             &
