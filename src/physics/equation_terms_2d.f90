@@ -39,12 +39,9 @@ MODULE equation_terms_2d
        SOURCE_SOLVE_ANALYTIC_PORE_PRESSURE, SOURCE_TARGET_VELOCITY,          &
        SOURCE_TARGET_TEMPERATURE, SOURCE_TARGET_PORE_PRESSURE,               &
        SOURCE_SOLVE_NEWTON_BLOCK, SOURCE_ROLE_IMPLICIT,                      &
-       SOURCE_ROLE_SEMI_IMPLICIT, SOURCE_TERM_THERMAL_RADIATIVE_COOLING,     &
-       SOURCE_TERM_THERMAL_CONVECTIVE_COOLING,                               &
-       SOURCE_TERM_PORE_PRESSURE_DISSIPATION, source_term_type,              &
-       source_term_descriptor, source_term_descriptor_by_name,                &
-       rheology_source_name, rheology_has_role,                                                  &
-       SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION,&
+       SOURCE_ROLE_SEMI_IMPLICIT,                                            &
+       rheology_source_name, rheology_has_role,                             &
+       SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, &
        SOURCE_TERM_BOTTOM_FISSURAL_INJECTION, SOURCE_TERM_RADIAL_INJECTION
   USE source_registry_2d, ONLY : source_group_type, &
        group_contains, group_contains_name
@@ -699,16 +696,6 @@ CONTAINS
     found=rheology_has_role(model_id,role)
   END FUNCTION group_has_role
 
-  PURE LOGICAL FUNCTION group_has_term(group,term_id) RESULT(found)
-    TYPE(source_group_type), INTENT(IN) :: group
-    INTEGER, INTENT(IN) :: term_id
-    TYPE(source_term_type) :: term
-    term=source_term_descriptor(term_id)
-    found=.FALSE.
-    IF (LEN_TRIM(term%name)==0) RETURN
-    found=group_contains_name(group,term%name)
-  END FUNCTION group_has_term
-
 
   !******************************************************************************
   !> \brief Evaluate stiff cell-local sources in the real or complex state path.
@@ -810,17 +797,17 @@ CONTAINS
        CALL validate_newton_selection(group)
        selected_rheology=group_has_role(group,SOURCE_ROLE_IMPLICIT, &
             rheology_model_id)
-       selected_radiative=group_has_term(group, &
-            SOURCE_TERM_THERMAL_RADIATIVE_COOLING)
-       selected_convective=group_has_term(group, &
-            SOURCE_TERM_THERMAL_CONVECTIVE_COOLING)
+       selected_radiative=group_contains_name(group, &
+            'SOURCE_TERM_THERMAL_RADIATIVE_COOLING')
+       selected_convective=group_contains_name(group, &
+            'SOURCE_TERM_THERMAL_CONVECTIVE_COOLING')
        IF (selected_radiative .NEQV. selected_convective) THEN
           CALL fatal_error('D17: thermal cooling terms must be selected as a complete bundle')
           RETURN
        END IF
        selected_thermal=selected_radiative .OR. selected_convective
-       selected_pore=group_has_term(group, &
-            SOURCE_TERM_PORE_PRESSURE_DISSIPATION)
+       selected_pore=group_contains_name(group, &
+            'SOURCE_TERM_PORE_PRESSURE_DISSIPATION')
     ELSE
        selected_rheology=rheology_flag
        selected_thermal=rheology_flag
