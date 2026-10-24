@@ -128,6 +128,8 @@ END TYPE
 Gli `equation_ids` del gruppo derivano dai termini e dal modello fisico. Per Newton identificano esattamente il sistema accoppiato (ad esempio, quantità di moto x/y e temperatura se condividono il gruppo). Per `ANALYTIC` devono coincidere con il target dell'unico solve disponibile. Per `EXPLICIT` definiscono il footprint delle sorgenti, non un sistema lineare da risolvere.
 
 
+**Aggiornamento 24 ottobre — commit `1d916bcd`:** eliminate le argomentazioni `solvers(:)` dalle API di orchestrazione in `nonlinear_solver_2d` e la copia `source_solvers` in `time_integration_2d`. I gruppi e i relativi `equation_ids` determinano la chiamata al Newton e all'operatore analitico; `source_solver_type`, `solver_entries` e le liste degli ID di solve permangono nel registro e nel parser e devono essere rimossi con una successiva modifica coordinata. Build e test sul nuovo commit non ancora eseguiti.
+
 **Stato di avanzamento D17.5 — IN CORSO (24 ottobre 2026).** Validazione di un solo solver per gruppo introdotta; con `5c01d13d` rimossa anche la lista temporanea `solve_ids` dalla validazione; con `0d9d444f` eliminato anche il ciclo sui sotto-solver; con `8fc3e17a` eliminati dal validatore aggregazione `collected` e tracciamento `equation_seen` per sotto-solve, sostituiti da confronti esatti con il gruppo; descrittori non ancora semplificati e ancora basati anche su ID. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
 
 ## D17.6 — Gruppi `ANALYTIC`
@@ -881,3 +883,8 @@ Commit [`075d3c95`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/075d3c95
 ### D17.22.26 — Firme interne Newton senza descrittore solver (24 ottobre 2026)
 
 Commit [`ab515430`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/ab51543037946bf92fe0b69b5617fa87539764e3): eliminate le argomentazioni `source_solver` dalle routine interne di Newton, residuo e Jacobiana in `nonlinear_solver_2d`. Le equazioni rimangono definite dal gruppo e il percorso REAL/COMPLEX passa ai rate IM con il solo gruppo. Il vettore di descrittori `solvers(:)` rimane ancora nella API esterna e nei controlli di transizione: **non è stata ancora eliminata la definizione `source_solver_type` dal registro**. Non sono state cambiate formule fisiche o metodi RK. **Verifica:** nuova compilazione e test Actions ancora da eseguire sul commit; D17.5 e D17.10 IN CORSO.
+
+
+### D17.22.27 — Rimozione di solvers(:) dal percorso numerico esterno (24 ottobre 2026)
+
+Commit [`1d916bcd`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/1d916bcdad552f7c08e23e13a2679626d3235c46): eliminate le argomentazioni `solvers(:)` da `solve_imex_stage`, `solve_implicit_stage`, `solve_rk_step` e `solve_implicit_groups`, e la copia `source_solvers=source_registry%solvers()` nell'integratore temporale. I due percorsi Newton e analytic consumano gli indici delle equazioni dei gruppi validati. I kernel fisici, le formule SI/IM e le due correzioni di quantità di moto non sono stati modificati. **Stato:** D17.5 IN CORSO: rimangono `source_solver_type`, `solver_entries`, `implicit_solver_ids` e `analytic_solver_ids` in registro/configurazione e i relativi test da adeguare. **Verifica:** Actions e regressioni ancora da eseguire sul nuovo HEAD; non attribuire a questo commit i test verdi del precedente SHA `19380916`.
