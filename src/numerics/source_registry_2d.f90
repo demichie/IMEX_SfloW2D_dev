@@ -294,7 +294,8 @@ CONTAINS
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
     TYPE(source_group_type) :: group
     TYPE(source_term_type) :: term
-    INTEGER, ALLOCATABLE :: expected(:),terms(:),bundle_terms(:)
+    INTEGER, ALLOCATABLE :: expected(:),bundle_terms(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: law_names(:)
     LOGICAL :: seen(SOURCE_TERM_COUNT)
     INTEGER :: i,j,id,nstage,family,mass_group
     error='D17: invalid or duplicate source catalog name'
@@ -382,9 +383,9 @@ CONTAINS
       ! temporarily contains its legacy formula addends. Never schedule
       ! a proper subset in a Newton or analytic group.
       IF (family/=0 .AND. group%method/=SOURCE_METHOD_EXPLICIT) THEN
-        terms=rheology_source_terms(family)
+        law_names=rheology_component_names(family)
         error='D17: rheology group requires the complete law bundle'
-        IF (.NOT.ALL(name_membership(source_names_for_ids(terms),group%term_names))) RETURN
+        IF (.NOT.ALL(name_membership(law_names,group%term_names))) RETURN
       END IF
       ! No independently scheduled sub-solves: validate group equation shape.
       error='D17: incomplete or incompatible group equation target'
@@ -394,9 +395,9 @@ CONTAINS
         SELECT CASE(SIZE(group%equation_ids))
         CASE(2)
           IF (.NOT.same_set(group%equation_ids,[2,3])) RETURN
-          terms=rheology_source_terms(family)
-          IF (SIZE(terms)/=SIZE(group%term_names) .OR. &
-               .NOT.ALL(name_membership(source_names_for_ids(terms),group%term_names))) THEN
+          law_names=rheology_component_names(family)
+          IF (SIZE(law_names)/=SIZE(group%term_names) .OR. &
+               .NOT.ALL(name_membership(law_names,group%term_names))) THEN
             error='D17: analytic velocity requires the complete law bundle'; RETURN
           END IF
         CASE(1)
