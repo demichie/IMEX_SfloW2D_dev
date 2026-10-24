@@ -3,6 +3,9 @@
 MODULE mass_injection_coefficients_2d
   USE parameters_2d, ONLY : wp
   IMPLICIT NONE
+  PRIVATE
+  PUBLIC :: set_source_time_coefficients
+  PUBLIC :: bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step
   REAL(wp) :: bottom_coeff_step = -1.0_wp
   REAL(wp) :: bottom_vel_step = -1.0_wp
   REAL(wp) :: lateral_coeff_step = -1.0_wp

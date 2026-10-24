@@ -1,6 +1,6 @@
 !> \brief Common physical source assembly entry points.
-!> \details Owns the explicit STEP source-rate bridge independently of the
-!> spatial flux and hydrostatic interfaces in equation_terms_2d.
+!> \details Owns STAGE/STEP explicit, semi-implicit, implicit and analytic
+!> source assembly independently of spatial fluxes in equation_terms_2d.
 !> The bounded mass-exchange transaction and all inventory updates remain
 !> the responsibility of step_source_executor_2d.
 MODULE source_terms_2d
@@ -52,9 +52,7 @@ MODULE source_terms_2d
   PUBLIC :: eval_radial_injection_implicit
   PUBLIC :: solve_radial_injection_analytic
 
-  ! Shared source-window coefficients updated once before the RK stages.
-  ! They remain private to the physics source layer, but are imported by
-  ! the legacy window initializer until its migration.
+  ! Cell-local geometry and stochastic context for analytic source solves.
   TYPE :: analytic_term_context_type
     REAL(wp) :: Bprime_x=0.0_wp, Bprime_y=0.0_wp
     REAL(wp) :: Bsecond_xx=0.0_wp, Bsecond_xy=0.0_wp, Bsecond_yy=0.0_wp

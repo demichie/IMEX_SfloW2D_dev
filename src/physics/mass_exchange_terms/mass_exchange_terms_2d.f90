@@ -1,5 +1,4 @@
 !> Assemble the complete physical post-RK mass exchange source.
-!> Kernel moved unchanged from equation_terms_2d; no change to rates or limiting.
 MODULE mass_exchange_terms_2d
   USE diagnostics_2d, ONLY : fatal_error
   USE parameters_2d
@@ -15,8 +14,6 @@ MODULE mass_exchange_terms_2d
   PUBLIC :: eval_mass_exchange_terms
 CONTAINS
   !******************************************************************************
-  !> \brief Assemble the thermal-energy source associated with mass exchange.
-
   !> \brief Compute limited erosion, deposition, entrainment and associated equation sources.
   !> \details Evaluates per-class solid erosion and settling/deposition, carrier
   !>          erosion and loss, optional air entrainment, vaporization,

@@ -1421,3 +1421,8 @@ Dopo il passaggio dei coefficienti temporali a `mass_injection_coefficients_2d`,
 ### D17.22 — Audit interfacce e rimozione riferimenti legacy (24 ottobre 2026)
 
 Il commit successivo a `a974b5b1` aggiunge alla suite statica D17 un gate contro la ricomparsa degli assemblatori `eval_expl_terms`, `eval_stage_expl_terms`, `eval_step_expl_terms`, `eval_semi_implicit_terms`, `eval_implicit_terms`, `eval_analytic_terms` e degli import legacy delle sorgenti fisiche attraverso `equation_terms_2d`. La verifica CI di questo nuovo gate e ancora pendente; fino a `a974b5b1` compilazione e test registro sono confermati verdi. La chiusura D17.20/D17.21 resta esplicitamente aperta.
+
+
+### D17.22 — Audit mirato degli export e dei commenti Doxygen (24 ottobre 2026)
+
+Dopo conferma di entrambe le Actions verdi sul commit `78070634`, ripulita la documentazione di `source_terms_2d`: la descrizione ora copre i quattro metodi e non indica piu l'inizializzatore temporale come bridge legacy. In `mass_exchange_terms_2d` rimossa una doppia intestazione `\\brief` relativa a una routine inesistente e un riferimento storico di migrazione non piu utile. In `mass_injection_coefficients_2d` introdotti `PRIVATE` di default e `PUBLIC` espliciti per setter e quattro coefficienti condivisi, lasciando privati i kernel ausiliari `window_mean`, `window_integral` e `interval_mean_velocity`. Nessuna modifica alle formule o al dispatch. Questo nuovo commit richiede Actions; le regressioni scientifiche D17.20–D17.21 restano aperte. L'audit degli export delle altre famiglie fisiche non e ancora concluso.
