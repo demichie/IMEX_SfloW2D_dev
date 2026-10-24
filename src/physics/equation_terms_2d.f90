@@ -37,7 +37,6 @@ MODULE equation_terms_2d
   PUBLIC :: limit_component_mass_flux
   PUBLIC :: curvature_acceleration
 
-
 CONTAINS
 
   !******************************************************************************
@@ -61,8 +60,7 @@ CONTAINS
 
   SUBROUTINE init_problem_param( equation_partition )
 
-    USE parameters_2d, ONLY : pore_pressure_flag, thermal_cooling_flag,      &
-         imex_velocity_group, imex_energy_group,                             &
+    USE parameters_2d, ONLY : imex_velocity_group, imex_energy_group,        &
          imex_pore_pressure_group, imex_group_method
     USE equation_metadata_2d, ONLY : resolve_imex_group_method
     IMPLICIT NONE
@@ -289,39 +287,5 @@ CONTAINS
     END IF
 
   END SUBROUTINE limit_component_mass_flux
-
-  !******************************************************************************
-  !> \brief Evaluate the bed-curvature contribution to both momentum equations.
-  !>
-  !> Implements \f$\mathbf{S}_{\mathrm{curv}}=-G_cM
-  !> a_{\mathrm{curv}}\nabla B\f$, independently of the hydrostatic path.
-  !>
-  !> \param[in] Bprime_x Filtered bed derivative dB/dx [dimensionless].
-  !> \param[in] Bprime_y Filtered bed derivative dB/dy [dimensionless].
-  !> \param[in] Bsecond_xx Filtered bed Hessian xx entry [m^-1].
-  !> \param[in] Bsecond_xy Filtered bed Hessian xy entry [m^-1].
-  !> \param[in] Bsecond_yy Filtered bed Hessian yy entry [m^-1].
-  !> \param[in] grav_coefficient Large-slope gravity factor G, not the gravitational acceleration.
-  !> \param[in] mixture_mass Mixture mass per unit horizontal area, rho_m*h [kg m^-2].
-  !> \param[in] velocity_x Cartesian depth-averaged x velocity [m s^-1].
-  !> \param[in] velocity_y Cartesian depth-averaged y velocity [m s^-1].
-  !> \param[out] source_x Curvature contribution to the x-momentum source.
-  !> \param[out] source_y Curvature contribution to the y-momentum source.
-  !******************************************************************************
-
-  !******************************************************************************
-  !> \brief Cache exact step-mean coefficients for configured inlet sources.
-  !> \details Computes the mean source activation over [time,time+dt] rather
-  !>          than sampling a ramp at a single time. Bottom radial and fissure
-  !>          windows use their configured pulse phases; the lateral radial
-  !>          window also honors its absolute cutoff and cosine ramps. Variable
-  !>          bottom-source velocity intervals are averaged separately.
-  !>          The resulting private coefficients are consumed by
-  !>          source_terms_2d source evaluation during the current step.
-  !>
-  !> \param[in] time Time at the start of the step [s].
-  !> \param[in] dt Length of the step [s].
-  !> \note A nonpositive dt leaves the cached coefficients unchanged. No value is returned.
-  !******************************************************************************
 
 END MODULE equation_terms_2d
