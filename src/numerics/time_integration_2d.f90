@@ -259,8 +259,8 @@ CONTAINS
   SUBROUTINE imex_RK_solver(this, q, qp, t, dt, Z, equation_partition,      &
        source_registry, domain, spatial_operator, observer)
 
-    USE state_conversion_2d, ONLY : qc_to_qp, project_dry_cell_momenta,      &
-         clip_roundoff_negative_component_masses
+    USE state_conversion_2d, ONLY : qc_to_qp, clip_roundoff_negative_component_masses
+    USE state_2d, ONLY : finalize_imex_cell_state
 
     USE source_terms_2d, ONLY : eval_stage_source_explicit
 
