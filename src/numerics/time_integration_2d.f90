@@ -28,7 +28,7 @@ MODULE time_integration_2d
   USE equation_metadata_2d, ONLY : equation_partition_type
 
   USE source_registry_2d, ONLY : source_registry_type, source_group_type, &
-       source_solver_type, group_contains
+       group_contains
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE, &
        SOURCE_TERM_BOUNDARY_INJECTION
 
@@ -286,7 +286,6 @@ CONTAINS
 
     TYPE(source_group_type), ALLOCATABLE :: stage_groups(:)
     TYPE(source_group_type), ALLOCATABLE :: explicit_groups(:)
-    TYPE(source_solver_type), ALLOCATABLE :: source_solvers(:)
     REAL(wp) :: q_guess(n_vars) !< initial guess for the solution of the RK step
     REAL(wp) :: q_fv_cell(n_vars) !< finite-volume state for the current cell
     REAL(wp) :: residual_cell(n_vars) !< final RK residual for the current cell
@@ -321,7 +320,6 @@ CONTAINS
        CALL fatal_error('D17: IMEX advance requires an initialized source registry')
     END IF
     stage_groups=source_registry%stage_groups()
-    source_solvers=source_registry%solvers()
     ALLOCATE(explicit_groups(0))
     boundary_source_enabled=.FALSE.
     DO registry_group_index=1,SIZE(stage_groups)
@@ -487,7 +485,7 @@ CONTAINS
                 ! The local stage coordinator applies SI and the ordered
                 ! implicit-group sweep, returning one effective IM term.
                 CALL solve_imex_stage(equation_partition, stage_groups,       &
-                     source_solvers, q_fv_cell,                              &
+                     q_fv_cell,                              &
                      q(1:n_vars,j,k), dt, a_diag,                             &
                      known_stage_residual, B_prime_x_geom(j,k),               &
                      B_prime_y_geom(j,k), B_second_xx_geom(j,k),              &

@@ -16,7 +16,7 @@ MODULE nonlinear_solver_2d
 
   USE equation_metadata_2d, ONLY : equation_partition_type
 
-  USE source_registry_2d, ONLY : source_group_type, source_solver_type
+  USE source_registry_2d, ONLY : source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON, &
        SOURCE_METHOD_ANALYTIC
   USE equation_terms_2d, ONLY : analytic_term_context_type,                 &
@@ -46,7 +46,6 @@ CONTAINS
   !>          net conservative increment over the stage interval.
   !> \param[in] equation_partition Implicit equation groups, order and solve methods.
   !> \param[in] stage_groups Validated, normalized stage-group descriptors.
-  !> \param[in] solvers Registry solver descriptors referenced by the groups.
   !> \param[in] q_known Conservative state including known stage contributions.
   !> \param[in] q_old Conservative reference state at the start of the step.
   !> \param[in] dt_step Stage time increment [s].
@@ -68,7 +67,7 @@ CONTAINS
   !> \param[out] linear_info Linear solver status; zero denotes success.
   !> \param[out] line_search_failed True if a Newton line search could not accept a step.
   !******************************************************************************
-  SUBROUTINE solve_imex_stage(equation_partition, stage_groups, solvers,     &
+  SUBROUTINE solve_imex_stage(equation_partition, stage_groups,     &
        q_known, q_old,                                                       &
        dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,            &
        Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij,                &
@@ -79,7 +78,6 @@ CONTAINS
 
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     TYPE(source_group_type), INTENT(IN) :: stage_groups(:)
-    TYPE(source_solver_type), INTENT(IN) :: solvers(:)
     REAL(wp), INTENT(IN) :: q_known(n_vars), q_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step, a_diag
     REAL(wp), INTENT(IN) :: known_stage_residual(n_eqns)
@@ -92,7 +90,7 @@ CONTAINS
     LOGICAL, INTENT(OUT) :: converged, line_search_failed
 
     q_stage = q_known
-    CALL solve_implicit_groups(equation_partition, stage_groups, solvers,    &
+    CALL solve_implicit_groups(equation_partition, stage_groups,    &
          q_stage, q_old, dt_step,                                             &
          a_diag, known_stage_residual, Bprimej_x, Bprimej_y, Bsecondj_xx,    &
          Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij, iterations_used,          &
@@ -110,7 +108,6 @@ CONTAINS
   !> \brief Legacy name for the local IMEX stage coordinator.
   !> \param[in] equation_partition Implicit equation groups, order and solve methods.
   !> \param[in] stage_groups Validated, normalized stage-group descriptors.
-  !> \param[in] solvers Registry solver descriptors referenced by the groups.
   !> \param[in] q_known Conservative state including known stage contributions.
   !> \param[in] q_old Conservative reference state at the start of the step.
   !> \param[in] dt_step Stage time increment [s].
@@ -132,7 +129,7 @@ CONTAINS
   !> \param[out] linear_info Linear solver status; zero denotes success.
   !> \param[out] line_search_failed True if a Newton line search could not accept a step.
   !******************************************************************************
-  SUBROUTINE solve_implicit_stage(equation_partition, stage_groups, solvers,  &
+  SUBROUTINE solve_implicit_stage(equation_partition, stage_groups,  &
        q_known, q_old,                                                       &
        dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,          &
        Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij,               &
@@ -141,7 +138,6 @@ CONTAINS
 
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     TYPE(source_group_type), INTENT(IN) :: stage_groups(:)
-    TYPE(source_solver_type), INTENT(IN) :: solvers(:)
     REAL(wp), INTENT(IN) :: q_known(n_vars), q_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step, a_diag
     REAL(wp), INTENT(IN) :: known_stage_residual(n_eqns)
@@ -153,7 +149,7 @@ CONTAINS
     INTEGER, INTENT(OUT) :: iterations_used, linear_info
     LOGICAL, INTENT(OUT) :: converged, line_search_failed
 
-    CALL solve_imex_stage(equation_partition, stage_groups, solvers,         &
+    CALL solve_imex_stage(equation_partition, stage_groups,         &
          q_known, q_old,                                                     &
          dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,         &
          Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij,              &
@@ -185,7 +181,6 @@ CONTAINS
   !> \brief Backward-compatible entry point for the implicit-group sweep.
   !> \param[in] equation_partition Implicit equation groups, order and solve methods.
   !> \param[in] stage_groups Validated, normalized stage-group descriptors.
-  !> \param[in] solvers Registry solver descriptors referenced by the groups.
   !> \param[in,out] qj Local conservative state vector updated by the group sweep.
   !> \param[in] qj_old Conservative reference state at the start of the step.
   !> \param[in] dt_step Stage time increment [s].
@@ -199,14 +194,13 @@ CONTAINS
   !> \param[out] linear_info Linear solver status; zero denotes success.
   !> \param[out] line_search_failed True if a Newton line search could not accept a step.
   !******************************************************************************
-  SUBROUTINE solve_rk_step(equation_partition, stage_groups, solvers, qj,    &
+  SUBROUTINE solve_rk_step(equation_partition, stage_groups, qj,    &
        qj_old, dt_step, a_diag,                                              &
        Rj_not_impl, Bprimej_x, Bprimej_y, Zij, iterations_used, converged,  &
        linear_info, line_search_failed)
 
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     TYPE(source_group_type), INTENT(IN) :: stage_groups(:)
-    TYPE(source_solver_type), INTENT(IN) :: solvers(:)
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
     REAL(wp), INTENT(IN) :: qj_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step, a_diag
@@ -216,7 +210,7 @@ CONTAINS
     INTEGER, INTENT(OUT) :: iterations_used, linear_info
     LOGICAL, INTENT(OUT) :: converged, line_search_failed
 
-    CALL solve_implicit_groups(equation_partition, stage_groups, solvers,    &
+    CALL solve_implicit_groups(equation_partition, stage_groups,    &
          qj, qj_old, dt_step,                                                &
          a_diag, Rj_not_impl, Bprimej_x, Bprimej_y, 0.0_wp, 0.0_wp,          &
          0.0_wp, 0.0_wp, Zij, iterations_used, converged, linear_info,       &
@@ -228,7 +222,6 @@ CONTAINS
   !>
   !> \param[in] equation_partition Explicit/implicit equation mask and compact index maps.
   !> \param[in] stage_groups Validated ordered stage groups; explicit groups are skipped.
-  !> \param[in] solvers Registry solver descriptors referenced by analytic groups.
   !> \param[in,out] qj Local conservative state vector; mass and momenta are per unit horizontal
   !>                   area.
   !> \param[in] qj_old Cell conservative reference state used in the implicit-stage residual.
@@ -249,7 +242,7 @@ CONTAINS
   !> \param[out] line_search_failed True when backtracking fails to accept a step.
   !******************************************************************************
 
-  SUBROUTINE solve_implicit_groups(equation_partition, stage_groups, solvers, &
+  SUBROUTINE solve_implicit_groups(equation_partition, stage_groups, &
        qj, qj_old, dt_step,                                                  &
        a_diag, Rj_not_impl, Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
        Bsecondj_yy, grav_coeff, Zij,                                         &
@@ -263,7 +256,6 @@ CONTAINS
 
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     TYPE(source_group_type), INTENT(IN) :: stage_groups(:)
-    TYPE(source_solver_type), INTENT(IN) :: solvers(:)
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
     REAL(wp), INTENT(IN) :: qj_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step
@@ -288,8 +280,8 @@ CONTAINS
     REAL(wp) :: qp_current(n_vars+2)
     REAL(wp) :: dynamic_pressure, si_term(n_eqns), residual_without_si(n_eqns)
     REAL(wp) :: momentum_before_newton(2)
-    INTEGER :: group, group_size, equation, i, solver_size
-    INTEGER :: solver_id, analytic_status
+    INTEGER :: group, group_size, equation, i
+    INTEGER :: analytic_status
     INTEGER :: group_equations(equation_partition%n_implicit)
     LOGICAL :: group_has_momentum, apply_si_local
 
@@ -366,22 +358,6 @@ CONTAINS
              qj=qj_init
              RETURN
           END IF
-          IF (.NOT.ALLOCATED(stage_groups(group)%analytic_solver_ids)) THEN
-             linear_info=-1
-             qj=qj_init
-             RETURN
-          END IF
-          IF (SIZE(stage_groups(group)%analytic_solver_ids)/=1) THEN
-             linear_info=-1
-             qj=qj_init
-             RETURN
-          END IF
-          solver_id=stage_groups(group)%analytic_solver_ids(1)
-          IF (solver_id<1 .OR. solver_id>SIZE(solvers)) THEN
-             linear_info=-1
-             qj=qj_init
-             RETURN
-          END IF
           CALL eval_analytic_terms(stage_groups(group),qj, &
                analytic_context,dt_step*a_diag,analytic_state,             &
                status=analytic_status)
@@ -393,44 +369,7 @@ CONTAINS
           qj=analytic_state
 
        ELSEIF (stage_groups(group)%method==SOURCE_METHOD_NEWTON) THEN
-          IF (.NOT.ALLOCATED(stage_groups(group)%implicit_solver_ids)) THEN
-             linear_info=-1
-             qj=qj_init
-             RETURN
-          END IF
-          IF (SIZE(stage_groups(group)%implicit_solver_ids)/=1) THEN
-             linear_info=-1
-             qj=qj_init
-             RETURN
-          END IF
-          ! D17: one coupled Newton solve owns the complete equation group.
-             solver_id=stage_groups(group)%implicit_solver_ids(1)
-             IF (solver_id<1 .OR. solver_id>SIZE(solvers)) THEN
-                linear_info=-1
-                qj=qj_init
-                RETURN
-             END IF
-             IF (.NOT.ALLOCATED(solvers(solver_id)%equation_ids)) THEN
-                linear_info=-1
-                qj=qj_init
-                RETURN
-             END IF
-             ! The group equation map is the sole numerical solve footprint.
-             ! A transitional solver descriptor may not select a sub-system.
-             solver_size=SIZE(solvers(solver_id)%equation_ids)
-             IF (solver_size/=group_size) THEN
-                linear_info=-1
-                qj=qj_init
-                RETURN
-             END IF
-             DO i=1,group_size
-                IF (COUNT(solvers(solver_id)%equation_ids==group_equations(i))/=1) THEN
-                   linear_info=-1
-                   qj=qj_init
-                   RETURN
-                END IF
-             END DO
-
+          ! Equation membership was validated at registry initialization.
              si_term=0.0_wp
              group_has_momentum = ANY(group_equations(1:group_size)==2) .OR. &
                   ANY(group_equations(1:group_size)==3)
