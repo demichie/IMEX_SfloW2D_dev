@@ -668,3 +668,10 @@ Commit [`079225a0`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/079225a0
 ### D17.22.8 — Validazione precoce dei solve nativi (24 ottobre 2026)
 
 In `source_configuration_2d::initialize_native_source_configuration`, il parsing ora rifiuta immediatamente i gruppi `NEWTON` o `ANALYTIC` con numero di solver diverso da uno, senza attendere la validazione del registro. Il test `TEST_SOURCE_REGISTRY` aggiunge il caso di due solver Newton nel gruppo nativo e verifica il rifiuto transazionale. Non sono state modificate fisica, integratore o leggi. **Stato: commit pubblicato, Actions da avviare manualmente solo quando richiesto; test della modifica non ancora eseguiti.**
+
+ 
+### D17.22.9 — Esecutore Newton a solve unico per gruppo (24 ottobre 2026)
+
+Commit [`db750a5b`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/db750a5b5430b6e0e37c3b6d2013d79171ba2627): in `nonlinear_solver_2d.f90`, la gestione di un gruppo `NEWTON` verifica **esattamente un** `implicit_solver_id` e invoca una sola volta `solve_newton_group`, eliminando lo sweep `DO solver_index` ora vietato. Il solver mantiene la lista indicizzata delle equazioni, la valutazione SI, la correzione direzionale prima del Newton e quella successiva, nonché il solver lineare e la Jacobiana esistenti. Le modifiche sono limitate al controllo di cardinalità, alla scelta del primo/unico ID e alla rimozione del loop.
+
+**Stato:** commit pubblicato; non sono ancora state avviate Actions, per rispettare la politica manuale D17.22.6. Resta da semplificare la struttura del gruppo e da completare la migrazione nominale. Prima del prossimo refactoring strutturale eseguire compilation e test pertinenti su richiesta, oltre alle regressioni numericali proporzionate al cambiamento.
