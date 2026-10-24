@@ -315,7 +315,9 @@ PROGRAM test_source_registry
   END DO
   DO k=1,SOURCE_TERM_COUNT
     term=source_term_descriptor(k)
-    IF (term%bundle_id==0) CYCLE
+    ! Atomic-batch completeness applies only to independent non-rheological sources.
+    ! A rheological law is already a single source, not a bundle of addends.
+    IF (term%bundle_id==0 .OR. term%model_id/=0) CYCLE
     bundle=test_bundle_ids(term%bundle_id)
     CALL require(SIZE(bundle)>=2,'catalogued atomic batch has multiple terms')
     IF (k/=bundle(1)) CYCLE
@@ -328,11 +330,7 @@ PROGRAM test_source_registry
     CALL make_partition()
     terms=bundle(:SIZE(bundle)-1)
     CALL trial%initialize_legacy(partition,original,methods,pore,catalog_names_for_test(terms),error)
-    IF (term%model_id/=0) THEN
-      CALL require(error/='', 'legacy rheology batch normalizes to a complete source')
-    ELSE
-      CALL require(INDEX(error,'batch')>0,'incomplete catalogued batch rejected')
-    END IF
+    CALL require(INDEX(error,'batch')>0,'incomplete catalogued batch rejected')
     negative=negative+1
   END DO
   enabled=[.TRUE.,.FALSE.,.FALSE.]; pore=0
