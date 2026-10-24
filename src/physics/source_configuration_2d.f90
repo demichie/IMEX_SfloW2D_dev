@@ -52,8 +52,7 @@ CONTAINS
         error='D17: unsupported configured rheology'; RETURN
       END IF
     END IF
-    IF (partition%implicit(4)) active_names=[CHARACTER(LEN=64) :: active_names,'thermal_cooling', &
-         'thermal_cooling']
+    IF (partition%implicit(4)) active_names=[CHARACTER(LEN=64) :: active_names,'thermal_cooling']
     pore=0
     IF (pore_pressure_flag) THEN
       pore=idx_pore

@@ -21,7 +21,7 @@ PROGRAM test_source_registry
   TYPE(source_term_type) :: term
   CHARACTER(LEN=64), ALLOCATABLE :: active(:)
   CHARACTER(LEN=256) :: error
-  INTEGER :: i,j,mode,a,b,c,bits,ids(3),methods(3),membership(7),nm
+  INTEGER :: i,mode,a,b,c,bits,ids(3),methods(3),membership(7),nm
   LOGICAL :: mask(7),enabled(3)
   CALL require(SOURCE_TERM_COUNT==24,'physical catalog contains exactly 24 sources')
   CALL require(source_catalog_names_unique(),'unique physical source names')

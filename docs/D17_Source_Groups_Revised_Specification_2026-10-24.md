@@ -1258,3 +1258,7 @@ Il log `compile(7).log` sulla HEAD `e14ad96` segnala in `source_input_2d.f90` un
 ### D17.22.87 — Copertura regressiva del catalogo fisico e parsing case-insensitive (24 ottobre 2026)
 
 Ripristinati test della configurazione di default lava (gruppi analitici energia e pressione, Newton velocità, esplicito di bordo, post-RK deposizione), della lettura NAMELIST, del conflitto tra SOURCE_GROUPS e campi legacy IMEX, del rifiuto di duplicati, della costruzione di cinque gruppi nativi e dei casi negativi su addendi matematici, target sconosciuti e sorgenti mancanti/duplicate. La suite continua a verificare le 864 assegnazioni legacy. Corretto il parser della configurazione nativa: confronta i nomi delle sorgenti in modo case-insensitive mediante normalizzazione in minuscolo, senza alias legacy e con identità canoniche di catalogo. Gli input SOURCE_GROUPS contenenti nomi maiuscoli sono quindi confrontati con i nomi fisici minuscoli. Nessun cambio ai kernel numerici. Verifiche CI pendenti.
+
+### D17.22.88 — Correzione duplicazione thermal_cooling nella configurazione legacy (24 ottobre 2026)
+
+Il test CI del commit `3878eb1` ha scoperto un residuo della fusione radiative + convective: `initialize_configured_sources` inseriva due volte `thermal_cooling` nella lista legacy, facendo fallire la validazione di unicità. Ora registra una sola sorgente fisica termica; entrambe le componenti del raffreddamento restano valutate nel kernel. Eliminata anche la variabile inutilizzata `j` dal test. La CI successiva è da verificare.
