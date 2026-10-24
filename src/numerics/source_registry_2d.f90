@@ -512,7 +512,11 @@ CONTAINS
     TYPE(source_group_type) :: group
     group%id=id; group%legacy_id=legacy; group%cadence=cadence
     group%method=method; group%phase=phase; group%execution_order=order
-    group%term_names=source_names_for_ids(terms); group%equation_ids=equations
+    ! Allocate the owned arrays explicitly to avoid compiler warnings about
+    ! allocatable-component descriptor initialization on intrinsic assignment.
+    ALLOCATE(group%term_names(SIZE(terms)),group%equation_ids(SIZE(equations)))
+    group%term_names=source_names_for_ids(terms)
+    group%equation_ids=equations
   END FUNCTION make_group
 
   !> Resolve compatibility catalog positions from canonical mathematical names.

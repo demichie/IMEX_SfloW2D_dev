@@ -121,3 +121,17 @@ First run: [40084977002](https://github.com/demichie/IMEX_SfloW2D_dev/actions/ru
 - Preserve the user's agreed architecture, default physical behavior, dry-state semantics, atomic mass exchange, model-specific laws and coupling.
 - After each meaningful commit, update **this file** with SHA, affected modules, CI URL/result, tests run and outstanding work, in the same branch; never mark an unrun test as passed.
 - Avoid superficial one-function commits that accumulate temporary adapters without converging on the final design. Favor coherent, reviewable changes supported by CI.
+
+## Audit 2026-10-24 — name-only group storage and CI checkpoint
+
+**Branch HEAD audited:** `f8420e5e5f22f03b8bf04b3e9d325ef3ae2491c1` (`feature/d17-source-refactor`). The user reported that both compilation and source-registry GitHub Actions passed at this checkpoint; this entry does **not** claim full numerical-regression acceptance.
+
+**Source audit:** all 50 Fortran files in `src/` were inspected on the audited HEAD. No reference to `term_ids` or access to `%term_ids` remains in those production sources. `source_group_type` stores `term_names(:)` (temporary mathematical-addend names), `source_names(:)` (one schedulable identity per complete rheology law), and `equation_ids(:)`. The previous build and registry failures were addressed in commits `609f293`, `07bd36d`, `acac97e`, `c02ba1f`, and `f8420e5`.
+
+**Compatibility boundaries still present:** numeric `SOURCE_TERM_*` catalog IDs, `source_term_descriptor(id)`, `source_names_for_ids`, and the local `group_term_ids` translation still exist. They are not stored as group membership, but the catalog still models individual rheological addends. `source_configuration_2d` also uses numeric catalog lookups at the input/legacy boundary. Accordingly, **removing `term_ids` from the group is VERIFIED at source level, but the ultimate D17 minimal name-only catalog and removal of the addend compatibility representation are NOT DONE**. Do not conflate these milestones.
+
+**Warnings:** the optimized registry test previously emitted `-Wmaybe-uninitialized` on allocatable array assignments in `make_group`. This audit changes group construction to explicit allocation followed by assignment; warning disappearance is **pending CI verification**, not yet established.
+
+**Evidence and remaining acceptance:** user-reported build and registry test Actions passed after `f8420e5`; exact run IDs were not supplied in this conversation. The full D17.20 numerical equivalence matrix, multi-compiler checks, and final D17.21 acceptance remain open. The main revised specification `D17_Source_Groups_Revised_Specification_2026-10-24.md` is the normative target, and historical roadmap/status entries remain historical rather than current evidence.
+
+**Next gate:** run build and both strict/optimized source-registry tests after this audit commit; inspect warnings, then continue the coordinated elimination of catalog/addend compatibility scaffolding with numerical regression coverage.
