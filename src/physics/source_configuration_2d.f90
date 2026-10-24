@@ -93,7 +93,6 @@ CONTAINS
     TYPE(source_term_type) :: component
     INTEGER, ALLOCATABLE :: ordered(:),targets(:),equations(:)
     CHARACTER(LEN=64), ALLOCATABLE :: parsed_names(:,:),law_names(:)
-    INTEGER, ALLOCATABLE :: law_terms(:)
     CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
     INTEGER :: cadence(SOURCE_INPUT_MAX_GROUPS),method(SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: phase(SOURCE_INPUT_MAX_GROUPS),solver_count(SOURCE_INPUT_MAX_GROUPS)
@@ -176,14 +175,9 @@ CONTAINS
              LEN_TRIM(rheology_source_name(rheology_model_id))>0 .AND. &
              TRIM(uppercase_source_text(source_group_terms(i,g)))== &
              TRIM(uppercase_source_text(rheology_source_name(rheology_model_id)))) THEN
-          law_terms=rheology_source_terms(rheology_model_id)
+          law_names=rheology_component_names(rheology_model_id)
           error='D17: unsupported complete rheology source'
-          IF (SIZE(law_terms)==0) RETURN
-          ALLOCATE(law_names(SIZE(law_terms)))
-          DO t=1,SIZE(law_terms)
-            component=source_term_descriptor(law_terms(t))
-            law_names(t)=component%name
-          END DO
+          IF (SIZE(law_names)==0) RETURN
         ELSE
           component=source_term_descriptor_by_name( &
                TRIM(uppercase_source_text(source_group_terms(i,g))))
@@ -234,12 +228,9 @@ CONTAINS
 
     ALLOCATE(active_names(0))
     IF (rheology_flag) THEN
-      law_terms=rheology_source_terms(rheology_model_id)
-      DO t=1,SIZE(law_terms)
-        component=source_term_descriptor(law_terms(t))
-        active_names=[active_names,component%name]
-      END DO
-      IF (SIZE(law_terms)==0 .AND. rheology_model_id/=rheology_id_none) THEN
+      law_names=rheology_component_names(rheology_model_id)
+      active_names=[active_names,law_names]
+      IF (SIZE(law_names)==0 .AND. rheology_model_id/=rheology_id_none) THEN
         error='D17: unsupported configured rheology'; RETURN
       END IF
     END IF

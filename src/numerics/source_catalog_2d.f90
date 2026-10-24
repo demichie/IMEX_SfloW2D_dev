@@ -18,6 +18,7 @@ MODULE source_catalog_2d
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: source_term_type, source_term_descriptor, rheology_source_terms
+  PUBLIC :: rheology_component_names
   PUBLIC :: source_bundle_terms
   PUBLIC :: source_term_descriptor_by_name, source_catalog_names_unique
   PUBLIC :: rheology_source_name, canonical_rheology_catalog_unique
@@ -480,6 +481,24 @@ CONTAINS
     END DO
     ok=.TRUE.
   END FUNCTION canonical_rheology_catalog_unique
+
+  !> Temporary compatibility adapter: ordered addend names of one rheology.
+  !> Physical scheduling must ultimately use only the complete law name.
+  FUNCTION rheology_component_names(model_id) RESULT(names)
+    INTEGER, INTENT(IN) :: model_id
+    CHARACTER(LEN=64), ALLOCATABLE :: names(:)
+    INTEGER :: i,n
+    ALLOCATE(names(SOURCE_TERM_COUNT))
+    n=0
+    IF (model_id/=0) THEN
+      DO i=1,SOURCE_TERM_COUNT
+        IF (SOURCE_CATALOG(i)%model_id/=model_id) CYCLE
+        n=n+1
+        names(n)=SOURCE_CATALOG(i)%name
+      END DO
+    END IF
+    names=names(:n)
+  END FUNCTION rheology_component_names
 
   !> \brief Return all rate IDs belonging to one selected rheology.
   !> \param[in] model_id Resolved rheology family ID.
