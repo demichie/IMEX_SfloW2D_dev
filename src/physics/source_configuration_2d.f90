@@ -91,9 +91,10 @@ CONTAINS
     TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:)
     TYPE(source_group_type) :: group
     INTEGER, ALLOCATABLE :: parsed_terms(:,:),ordered(:),targets(:),equations(:)
-    INTEGER, ALLOCATABLE :: group_terms(:),active_terms(:)
+    INTEGER, ALLOCATABLE :: group_terms(:),active_terms(:),law_terms(:)
     INTEGER :: cadence(SOURCE_INPUT_MAX_GROUPS),method(SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: phase(SOURCE_INPUT_MAX_GROUPS),solver_count(SOURCE_INPUT_MAX_GROUPS)
+    INTEGER :: parsed_count(SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: target_count(1,SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: target_ids(SOURCE_INPUT_MAX_TARGETS,1, &
          SOURCE_INPUT_MAX_GROUPS)
@@ -121,7 +122,7 @@ CONTAINS
     END IF
 
     ALLOCATE(parsed_terms(SOURCE_INPUT_MAX_TERMS,source_group_count))
-    parsed_terms=0; cadence=0; method=0; phase=0; solver_count=0
+    parsed_terms=0; parsed_count=0; cadence=0; method=0; phase=0; solver_count=0
     target_count=0; target_ids=0
     seen_terms=.FALSE.
     DO g=1,source_group_count
@@ -164,13 +165,30 @@ CONTAINS
         error='D17: explicit source groups must declare at least one term'; RETURN
       END IF
       DO i=1,source_group_term_count(g)
-        term_id=native_term_id(source_group_terms(i,g))
-        error='D17: unknown, dependent or unschedulable source term name'
-        IF (term_id==0) RETURN
-        IF (seen_terms(term_id)) THEN
-          error='D17: a source term may be registered only once globally'; RETURN
+        ! One canonical rheology name expands to the complete legacy law.
+        IF (rheology_flag .AND. &
+             LEN_TRIM(rheology_source_name(rheology_model_id))>0 .AND. &
+             TRIM(uppercase_source_text(source_group_terms(i,g)))== &
+             TRIM(uppercase_source_text(rheology_source_name(rheology_model_id)))) THEN
+          law_terms=rheology_source_terms(rheology_model_id)
+          error='D17: unsupported complete rheology source'
+          IF (SIZE(law_terms)==0) RETURN
+        ELSE
+          term_id=native_term_id(source_group_terms(i,g))
+          error='D17: unknown, dependent or unschedulable source term name'
+          IF (term_id==0) RETURN
+          law_terms=[term_id]
         END IF
-        seen_terms(term_id)=.TRUE.; parsed_terms(i,g)=term_id
+        DO t=1,SIZE(law_terms)
+          term_id=law_terms(t)
+          error='D17: source group expansion exceeds supported catalog capacity'
+          IF (parsed_count(g)>=SOURCE_INPUT_MAX_TERMS) RETURN
+          error='D17: a source term may be registered only once globally'
+          IF (seen_terms(term_id)) RETURN
+          parsed_count(g)=parsed_count(g)+1
+          seen_terms(term_id)=.TRUE.
+          parsed_terms(parsed_count(g),g)=term_id
+        END DO
       END DO
       ! An implicit group has a single target list, not nested solvers.
       error='D17: invalid group target count'
@@ -299,7 +317,7 @@ CONTAINS
       group%id=source_group_id(g); group%legacy_id=0
       group%cadence=cadence(g); group%method=method(g)
       group%phase=phase(g); group%execution_order=source_group_order(g)
-      group_terms=parsed_terms(1:source_group_term_count(g),g)
+      group_terms=parsed_terms(1:parsed_count(g),g)
       group%term_ids=group_terms
       group%equation_ids=[INTEGER::]
       IF (phase(g)==SOURCE_PHASE_RK_IMPLICIT) THEN

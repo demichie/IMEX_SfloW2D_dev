@@ -482,6 +482,25 @@ CONTAINS
     CALL require(ALL(groups(3)%equation_ids==[2,3]) .AND. &
          SIZE(steps(1)%term_ids)==7,'native targets and complete step batch')
 
+    ! The canonical rheology name represents the full physical law.
+    source_group_term_count(3)=1
+    source_group_terms(:,3)=''
+    source_group_terms(1,3)=rheology_source_name(rheology_id_lava)
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(error=='' .AND. trial%is_initialized(), &
+         'canonical rheology schedules complete law: '//TRIM(error))
+    snapshot=trial%stage_groups()
+    CALL require(same_members(snapshot(3)%term_ids,rheology_source_terms(rheology_id_lava)), &
+         'canonical rheology retains all physical addends')
+    ! Mixed canonical and component declarations must not double-schedule.
+    source_group_term_count(3)=2
+    source_group_terms(2,3)='SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS'
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(INDEX(error,'only once globally')>0, &
+         'canonical and component rheology duplication rejected')
+    source_group_term_count(3)=2
+    source_group_terms(1,3)='SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS'
+    source_group_terms(2,3)='SOURCE_TERM_RHEOLOGY_LAVA_YIELD'
     ! A native implicit group has a target list directly on the group.
     source_group_target_count(3)=0
     CALL initialize_native_source_configuration(trial,partition,error)
