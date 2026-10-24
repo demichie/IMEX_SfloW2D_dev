@@ -150,7 +150,7 @@ CONTAINS
     TYPE(source_group_type) :: group
     TYPE(source_term_type) :: term
     INTEGER, ALLOCATABLE :: targets(:),equations(:),target_equations(:)
-    CHARACTER(LEN=64), ALLOCATABLE :: names(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: names(:),active_names(:)
     INTEGER :: legacy,target,split_id,i,method,order
     LOGICAL :: enabled(3)
     CALL this%finalize()
@@ -214,6 +214,7 @@ CONTAINS
          partition%n_implicit/=2*MERGE(1,0,enabled(1))+COUNT(enabled(2:3))) THEN
       error='D17: unsupported or missing legacy implicit target'; RETURN
     END IF
+    active_names=source_names_for_ids(active_terms)
     ALLOCATE(stages(0),steps(0))
     split_id=4
     DO legacy=1,3
@@ -222,7 +223,7 @@ CONTAINS
       method=SOURCE_METHOD_NEWTON
       IF (legacy_methods(legacy)==IM_GROUP_METHOD_ANALYTIC) method=SOURCE_METHOD_ANALYTIC
       IF (method==SOURCE_METHOD_NEWTON) THEN
-        names=names_for_targets(active_terms,targets)
+        names=names_for_targets(active_names,targets)
         equations=PACK([(i,i=1,partition%n_equations)],partition%IM_group== &
              partition%IM_group(target_equation_ids_first(targets(1),pore_equation)))
         group=make_group(legacy,legacy,SOURCE_CADENCE_STAGE,method, &
@@ -231,7 +232,7 @@ CONTAINS
       ELSE
         DO i=1,SIZE(targets)
           target=targets(i)
-          names=names_for_targets(active_terms,[target])
+          names=names_for_targets(active_names,[target])
           equations=target_equation_ids(target,pore_equation)
           order=legacy
           IF (SIZE(targets)>1) THEN
@@ -245,11 +246,11 @@ CONTAINS
       END IF
     END DO
     equations=[(i,i=1,partition%n_equations)]
-    names=names_for_targets(active_terms,[0])
+    names=names_for_targets(active_names,[0])
     group=make_group(4,0,SOURCE_CADENCE_STAGE,SOURCE_METHOD_EXPLICIT, &
          SOURCE_PHASE_RK_EXPLICIT,1,names,equations)
     stages=[stages,group]
-    names=names_for_targets(active_terms,[-1])
+    names=names_for_targets(active_names,[-1])
     group=make_group(1,0,SOURCE_CADENCE_STEP,SOURCE_METHOD_EXPLICIT, &
          SOURCE_PHASE_POST_RK,1,names,equations)
     steps=[group]
@@ -482,22 +483,23 @@ CONTAINS
   END FUNCTION target_equation_ids_first
 
   !> \brief Select source names for target blocks, EX (0) or mass exchange (-1).
-  !> \param[in] active_terms Legacy physical IDs at the input compatibility boundary.
+  !> \param[in] active_names Names normalized at the legacy boundary.
   !> \param[in] targets Target IDs, zero for EX or minus one for step mass.
   !> \return Stable-order canonical addend names; invalid IDs reach validation.
-  FUNCTION names_for_targets(active_terms,targets) RESULT(names)
-    INTEGER, INTENT(IN) :: active_terms(:),targets(:)
+  FUNCTION names_for_targets(active_names,targets) RESULT(names)
+    CHARACTER(*), INTENT(IN) :: active_names(:)
+    INTEGER, INTENT(IN) :: targets(:)
     CHARACTER(LEN=64), ALLOCATABLE :: names(:)
     TYPE(source_term_type) :: term
     INTEGER :: i,target,n
-    ALLOCATE(names(SIZE(active_terms)))
+    ALLOCATE(names(SIZE(active_names)))
     n=0
-    DO i=1,SIZE(active_terms)
-      term=source_term_descriptor(active_terms(i)); target=term%target
+    DO i=1,SIZE(active_names)
+      term=source_term_descriptor_by_name(active_names(i)); target=term%target
       IF (term%role==SOURCE_ROLE_MASS) target=-1
       IF (ANY(targets==target)) THEN
         n=n+1
-        names(n)=term%name
+        names(n)=active_names(i)
       END IF
     END DO
     names=names(:n)
