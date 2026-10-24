@@ -3,7 +3,10 @@ PROGRAM test_d17_production_newton
   USE parameters_2d
   USE constitutive_parameters_2d
   USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_NEWTON
-  USE source_registry_2d, ONLY : source_group_type
+  USE source_registry_2d, ONLY : source_group_type,source_registry_type
+  USE source_configuration_2d, ONLY : initialize_configured_sources, &
+       initialize_native_source_configuration
+  USE source_input_2d
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON,SOURCE_CADENCE_STAGE, &
        SOURCE_PHASE_RK_IMPLICIT
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,solve_rk_step,solve_imex_stage
@@ -13,6 +16,12 @@ PROGRAM test_d17_production_newton
   IMPLICIT NONE
   TYPE(equation_partition_type) :: partition
   TYPE(source_group_type) :: group(1)
+  TYPE(source_registry_type) :: legacy_registry,native_registry
+  TYPE(equation_partition_type) :: native_partition
+  REAL(wp) :: legacy_q(4),native_q(4)
+  CHARACTER(LEN=256) :: config_error
+  INTEGER :: legacy_iterations,native_iterations,legacy_info,native_info
+  LOGICAL :: legacy_converged,native_converged,legacy_search,native_search
   REAL(wp) :: q(4),old(4),known(4),dt,expected(2),rate_real(4)
   REAL(wp) :: im_term(4),raw_si(2),si_ratio,alpha
   COMPLEX(wp) :: complex_state(4),rate_complex(4)
@@ -152,6 +161,64 @@ PROGRAM test_d17_production_newton
   expected=old(2:3)/(1.0_wp+0.1_wp*dt*0.75_wp)
   CALL check(q(2:3),expected,'post-Newton correct implicit drag')
   PRINT *, 'PASS D17 production post-Newton friction ray guard'
+  ! Quantitative legacy/native configuration equivalence: both paths
+  ! construct their own validated source groups, then call the real solver.
+  rheology_flag=.TRUE.;rheology_model='newmodel'
+  thermal_cooling_flag=.FALSE.;pore_pressure_flag=.FALSE.
+  curvature_term_flag=.FALSE.;bottom_radial_source_flag=.FALSE.
+  bottom_fissural_source_flag=.FALSE.;radial_source_flag=.FALSE.
+  lateral_source_flag=.FALSE.;gas_flag=.FALSE.
+  gas_loss_flag=.FALSE.;liquid_vaporization_flag=.FALSE.
+  liquid_flag=.FALSE.;settling_flag=.FALSE.;entrainment_flag=.FALSE.
+  erosion_coeff=0.0_wp
+  imex_velocity_group=1;imex_energy_group=2;imex_pore_pressure_group=3
+  imex_group_method=[CHARACTER(LEN=16)::'NEWTON','NEWTON','NEWTON']
+  CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.], &
+       [0,1,1,0],[IM_GROUP_METHOD_NEWTON])
+  CALL initialize_configured_sources(legacy_registry,partition,config_error)
+  IF (LEN_TRIM(config_error)>0) THEN
+    PRINT *, TRIM(config_error)
+    ERROR STOP 'legacy numeric configuration rejected'
+  END IF
+  CALL clear_source_input()
+  native_source_configuration_present=.TRUE.
+  source_group_count=1
+  source_group_id(1)=27
+  source_group_order(1)=1
+  source_group_cadence(1)='STAGE'
+  source_group_method(1)='NEWTON'
+  source_group_term_count(1)=1
+  source_group_terms(1,1)='RHEOLOGY_NEWMODEL'
+  source_group_target_count(1)=1
+  source_group_targets(1,1)='VELOCITY'
+  CALL initialize_native_source_configuration(native_registry,native_partition,config_error)
+  IF (LEN_TRIM(config_error)>0) THEN
+    PRINT *, TRIM(config_error)
+    ERROR STOP 'native numeric configuration rejected'
+  END IF
+  old=[1000.0_wp,3000.0_wp,-4000.0_wp,1.2E9_wp]
+  legacy_q=old;native_q=old;known=0.0_wp;dt=0.2_wp
+  CALL solve_rk_step(partition,legacy_registry%stage_groups(),legacy_q,old, &
+       dt,0.75_wp,known,0.0_wp,0.0_wp,0.0_wp, &
+       legacy_iterations,legacy_converged,legacy_info,legacy_search)
+  CALL solve_rk_step(native_partition,native_registry%stage_groups(),native_q,old, &
+       dt,0.75_wp,known,0.0_wp,0.0_wp,0.0_wp, &
+       native_iterations,native_converged,native_info,native_search)
+  IF (.NOT.legacy_converged .OR. .NOT.native_converged .OR. &
+       legacy_info/=0 .OR. native_info/=0 .OR. &
+       legacy_search .OR. native_search) &
+       ERROR STOP 'legacy/native numeric Newton failed'
+  IF (legacy_iterations/=native_iterations) &
+       ERROR STOP 'legacy/native Newton iteration counts differ'
+  IF (ANY(ABS(legacy_q-native_q)>1.0E-10_wp)) &
+       ERROR STOP 'legacy/native numerical stage diverged'
+  expected=old(2:3)/(1.0_wp+0.1_wp*dt*0.75_wp)
+  CALL check(legacy_q(2:3),expected,'legacy/native exact stage reference')
+  IF (ABS(legacy_q(1)-old(1))>1.0E-12_wp .OR. &
+       ABS(legacy_q(4)-old(4))>1.0E-5_wp) &
+       ERROR STOP 'legacy/native non-source equations changed'
+  CALL clear_source_input()
+  PRINT *, 'PASS D17 legacy/native quantitative Newton stage equivalence'
 CONTAINS
   SUBROUTINE check(actual,reference,label)
     REAL(wp),INTENT(IN)::actual(2),reference(2)
