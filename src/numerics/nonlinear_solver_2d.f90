@@ -454,7 +454,7 @@ CONTAINS
              END IF
              residual_without_si=Rj_not_impl-a_diag*si_term
              momentum_before_newton=qj(2:3)
-             CALL solve_newton_group(stage_groups(group),solvers(solver_id),&
+             CALL solve_newton_group(stage_groups(group),&
                   group_equations(1:group_size),qj,qj_old,dt_step,a_diag,&
                   residual_without_si,Bprimej_x,Bprimej_y,Zij,coeff_f,      &
                   tol_abs_local,tol_rel_local,iterations_used,converged,   &
@@ -496,7 +496,7 @@ CONTAINS
   !> \param[out] converged True when the group residual meets its tolerance.
   !> \param[out] linear_info Linear solver status; zero denotes success.
   !> \param[out] line_search_failed True if backtracking cannot accept a step.
-  SUBROUTINE solve_newton_group(source_group,source_solver,group_equations,   &
+  SUBROUTINE solve_newton_group(source_group,group_equations,   &
        qj,qj_old,dt_step,a_diag,Rj_not_impl,Bprimej_x,Bprimej_y,Zij,coeff_f, &
        tol_abs_local,                                                         &
        tol_rel_local, iterations_used, converged, linear_info,               &
@@ -507,7 +507,6 @@ CONTAINS
     IMPLICIT NONE
 
     TYPE(source_group_type), INTENT(IN) :: source_group
-    TYPE(source_solver_type), INTENT(IN) :: source_solver
     INTEGER, INTENT(IN) :: group_equations(:)
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
     REAL(wp), INTENT(IN) :: qj_old(n_vars), dt_step, a_diag
@@ -541,7 +540,7 @@ CONTAINS
        iterations_used = iterations_used + 1
        CALL eval_f(qj, qj_old, dt_step, a_diag, coeff_f, Rj_not_impl,       &
             Bprimej_x, Bprimej_y, right_term, scal_f, Zij, group_equations, &
-            source_group,source_solver)
+            source_group)
 
        IF (nl_iter .EQ. 1) residual_ref = ABS(right_term)
        residual_tol = tol_abs_local + tol_rel_local*residual_ref
@@ -552,7 +551,7 @@ CONTAINS
 
        CALL eval_jacobian(qj_rel, qj_org, dt_step, a_diag, coeff_f,         &
             Bprimej_x, Bprimej_y, left_matrix, Zij, group_equations,       &
-            source_group,source_solver)
+            source_group)
        IF (nl_iter .GT. 1) grad_f = MATMUL(right_term,left_matrix)
 
        DO i = 1, SIZE(group_equations)
@@ -586,7 +585,7 @@ CONTAINS
           CALL lnsrch(qj_rel_old, qj_org, qj, qj_old, scal_f_old, grad_f,   &
                desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax,      &
                check, dt_step, a_diag, Rj_not_impl, Bprimej_x, Bprimej_y,  &
-               Zij, group_equations,source_group,source_solver)
+               Zij, group_equations,source_group)
           IF (check) THEN
              line_search_failed = .TRUE.
              RETURN
@@ -600,7 +599,7 @@ CONTAINS
           END DO
           CALL eval_f(qj_trial, qj_old, dt_step, a_diag, coeff_f,           &
                Rj_not_impl, Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
-               group_equations,source_group,source_solver)
+               group_equations,source_group)
        END IF
 
        DO i = 1, SIZE(group_equations)
@@ -869,13 +868,12 @@ CONTAINS
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !> \param[in] active_equations Equation indices whose residual rows are active.
   !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
-  !> \param[in] source_solver Validated Newton solver descriptor for the selected rate evaluation.
-  !******************************************************************************
+    !******************************************************************************
 
   SUBROUTINE lnsrch( qj_rel_NR_old, qj_org, qj_fixed, qj_old, scal_f_old,      &
        grad_f, desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax, check,  &
        dt_step , a_diag , Rj_not_impl , Bprimej_x , Bprimej_y, Zij,           &
-       active_equations,source_group,source_solver )
+       active_equations,source_group )
 
     IMPLICIT NONE
 
@@ -928,7 +926,6 @@ CONTAINS
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
     INTEGER, INTENT(IN) :: active_equations(:)
     TYPE(source_group_type), INTENT(IN) :: source_group
-    TYPE(source_solver_type), INTENT(IN) :: source_solver
     REAL(wp), PARAMETER :: TOLX=epsilon(qj_rel)
 
     INTEGER, DIMENSION(1) :: ndum
@@ -1007,7 +1004,7 @@ CONTAINS
 
        CALL eval_f( qj , qj_old , dt_step , a_diag , coeff_f ,             &
             Rj_not_impl , Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
-            active_equations,source_group,source_solver )
+            active_equations,source_group )
 
        IF ( verbose_level .GE. 4 ) THEN
 
@@ -1121,12 +1118,11 @@ CONTAINS
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !> \param[in] active_equations Equation indices whose residual rows and Jacobian columns are active.
   !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
-  !> \param[in] source_solver Validated Newton solver descriptor for the selected rate evaluation.
-  !******************************************************************************
+    !******************************************************************************
 
   SUBROUTINE eval_f( qj , qj_old , dt_step, a_diag , coeff_f , Rj_not_impl ,    &
        Bprimej_x ,                                                              &
-       Bprimej_y , f_nl , scal_f, Zij, active_equations,source_group,source_solver )
+       Bprimej_y , f_nl , scal_f, Zij, active_equations,source_group )
 
     USE equation_terms_2d, ONLY : eval_implicit_terms
 
@@ -1149,7 +1145,6 @@ CONTAINS
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
     INTEGER, INTENT(IN) :: active_equations(:)
     TYPE(source_group_type), INTENT(IN) :: source_group
-    TYPE(source_solver_type), INTENT(IN) :: source_solver
 
     REAL(wp) :: nh_term_impl(n_eqns)
     REAL(wp) :: Rj(n_eqns)
@@ -1198,15 +1193,14 @@ CONTAINS
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !> \param[in] active_equations Equation indices whose Jacobian columns are differentiated.
   !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
-  !> \param[in] source_solver Validated Newton solver descriptor for the selected rate evaluation.
-  !> \details Uses complex-step perturbations of normalized conservative variables. The resulting
+    !> \details Uses complex-step perturbations of normalized conservative variables. The resulting
   !>          imaginary derivatives form the active Jacobian columns without finite-difference
   !>          subtraction.
   !******************************************************************************
 
   SUBROUTINE eval_jacobian( qj_rel, qj_org, dt_step, a_diag, coeff_f,        &
        Bprimej_x, Bprimej_y, left_matrix, Zij, active_equations,             &
-       source_group,source_solver )
+       source_group )
 
     USE equation_terms_2d, ONLY : eval_implicit_terms
 
@@ -1226,7 +1220,6 @@ CONTAINS
     REAL(wp), INTENT(IN):: Zij ! value stochastic process
     INTEGER, INTENT(IN) :: active_equations(:)
     TYPE(source_group_type), INTENT(IN) :: source_group
-    TYPE(source_solver_type), INTENT(IN) :: source_solver
 
     REAL(wp) :: Jacob_relax(n_eqns,n_vars)
     COMPLEX(wp) :: nh_terms_cmplx_impl(n_eqns)
