@@ -90,8 +90,8 @@ def main() -> int:
         for name in names:
             matches = [
                 (file, re.search(
-                    rf"(?im)^\\s*(?:pure\\s+)?(?:real\\(wp\\)\\s+|complex\\(wp\\)\\s+)?"
-                    rf"(?:subroutine|function)\\s+{re.escape(name)}\\s*\\(",
+                    rf"(?im)^\s*(?:pure\s+)?(?:real\(wp\)\s+|complex\(wp\)\s+)?"
+                    rf"(?:subroutine|function)\s+{re.escape(name)}\s*\(",
                     contents,
                 ))
                 for file, contents in code_by_file.items()
@@ -111,7 +111,7 @@ def main() -> int:
         declarations = []
         for name in names:
             matches = list(re.finditer(
-                rf"(?im)^\\s*public\\s*::[^\\n]*\\b{re.escape(name)}\\b",
+                rf"(?im)^\s*public\s*::[^\n]*\b{re.escape(name)}\b",
                 contents,
             ))
             declarations.append(matches)

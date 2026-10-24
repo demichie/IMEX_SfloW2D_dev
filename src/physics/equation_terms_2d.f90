@@ -829,56 +829,11 @@ CONTAINS
   END SUBROUTINE solve_radial_injection_analytic
 
 
-  SUBROUTINE eval_geometry_curvature_semi_implicit(Bprime_x, Bprime_y, &
-       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
-       mixture_mass, velocity_x, velocity_y, source_x, source_y)
-    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
-    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
-    REAL(wp), INTENT(IN) :: grav_coefficient
-    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
-    REAL(wp), INTENT(OUT) :: source_x, source_y
-    CALL fatal_error('geometry_curvature: semi_implicit treatment is unsupported')
-  END SUBROUTINE eval_geometry_curvature_semi_implicit
 
-  SUBROUTINE eval_geometry_curvature_implicit(Bprime_x, Bprime_y, &
-       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
-       mixture_mass, velocity_x, velocity_y, source_x, source_y)
-    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
-    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
-    REAL(wp), INTENT(IN) :: grav_coefficient
-    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
-    REAL(wp), INTENT(OUT) :: source_x, source_y
-    CALL fatal_error('geometry_curvature: implicit treatment is unsupported')
-  END SUBROUTINE eval_geometry_curvature_implicit
 
-  SUBROUTINE solve_geometry_curvature_analytic(Bprime_x, Bprime_y, &
-       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
-       mixture_mass, velocity_x, velocity_y, source_x, source_y)
-    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
-    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
-    REAL(wp), INTENT(IN) :: grav_coefficient
-    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
-    REAL(wp), INTENT(OUT) :: source_x, source_y
-    CALL fatal_error('geometry_curvature: analytic treatment is unsupported')
-  END SUBROUTINE solve_geometry_curvature_analytic
 
-  SUBROUTINE eval_boundary_injection_semi_implicit(time, vect_x, vect_y, source_bdry)
-    REAL(wp), INTENT(IN) :: time, vect_x, vect_y
-    REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
-    CALL fatal_error('boundary_injection: semi_implicit treatment is unsupported')
-  END SUBROUTINE eval_boundary_injection_semi_implicit
 
-  SUBROUTINE eval_boundary_injection_implicit(time, vect_x, vect_y, source_bdry)
-    REAL(wp), INTENT(IN) :: time, vect_x, vect_y
-    REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
-    CALL fatal_error('boundary_injection: implicit treatment is unsupported')
-  END SUBROUTINE eval_boundary_injection_implicit
 
-  SUBROUTINE solve_boundary_injection_analytic(time, vect_x, vect_y, source_bdry)
-    REAL(wp), INTENT(IN) :: time, vect_x, vect_y
-    REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
-    CALL fatal_error('boundary_injection: analytic treatment is unsupported')
-  END SUBROUTINE solve_boundary_injection_analytic
 
   !> \brief Validate one Newton group/solver selection before rate evaluation.
   !> \param[in] group Validated Newton group containing the solver and its terms.
@@ -1311,6 +1266,25 @@ CONTAINS
 
   END SUBROUTINE eval_boundary_injection_explicit
 
+  SUBROUTINE eval_boundary_injection_semi_implicit(time, vect_x, vect_y, source_bdry)
+    REAL(wp), INTENT(IN) :: time, vect_x, vect_y
+    REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
+    CALL fatal_error('boundary_injection: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_boundary_injection_semi_implicit
+
+  SUBROUTINE eval_boundary_injection_implicit(time, vect_x, vect_y, source_bdry)
+    REAL(wp), INTENT(IN) :: time, vect_x, vect_y
+    REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
+    CALL fatal_error('boundary_injection: implicit treatment is unsupported')
+  END SUBROUTINE eval_boundary_injection_implicit
+
+  SUBROUTINE solve_boundary_injection_analytic(time, vect_x, vect_y, source_bdry)
+    REAL(wp), INTENT(IN) :: time, vect_x, vect_y
+    REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
+    CALL fatal_error('boundary_injection: analytic treatment is unsupported')
+  END SUBROUTINE solve_boundary_injection_analytic
+
+
   !******************************************************************************
   ! Supporting routines for equation-term evaluation.
   !******************************************************************************
@@ -1602,6 +1576,40 @@ CONTAINS
     source_y = -grav_coefficient * mixture_mass * acceleration * Bprime_y
 
   END SUBROUTINE eval_geometry_curvature_explicit
+
+  SUBROUTINE eval_geometry_curvature_semi_implicit(Bprime_x, Bprime_y, &
+       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
+       mixture_mass, velocity_x, velocity_y, source_x, source_y)
+    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
+    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
+    REAL(wp), INTENT(IN) :: grav_coefficient
+    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
+    REAL(wp), INTENT(OUT) :: source_x, source_y
+    CALL fatal_error('geometry_curvature: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_geometry_curvature_semi_implicit
+
+  SUBROUTINE eval_geometry_curvature_implicit(Bprime_x, Bprime_y, &
+       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
+       mixture_mass, velocity_x, velocity_y, source_x, source_y)
+    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
+    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
+    REAL(wp), INTENT(IN) :: grav_coefficient
+    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
+    REAL(wp), INTENT(OUT) :: source_x, source_y
+    CALL fatal_error('geometry_curvature: implicit treatment is unsupported')
+  END SUBROUTINE eval_geometry_curvature_implicit
+
+  SUBROUTINE solve_geometry_curvature_analytic(Bprime_x, Bprime_y, &
+       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
+       mixture_mass, velocity_x, velocity_y, source_x, source_y)
+    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
+    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
+    REAL(wp), INTENT(IN) :: grav_coefficient
+    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
+    REAL(wp), INTENT(OUT) :: source_x, source_y
+    CALL fatal_error('geometry_curvature: analytic treatment is unsupported')
+  END SUBROUTINE solve_geometry_curvature_analytic
+
 
   !******************************************************************************
   !> \brief Cache exact step-mean coefficients for configured inlet sources.
