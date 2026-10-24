@@ -11,7 +11,7 @@
 MODULE simulation_2d
 
   USE equation_terms_2d, ONLY : init_problem_param, set_source_time_coefficients
-  USE mass_exchange_step_2d, ONLY : apply_mass_exchange_step
+  USE step_source_executor_2d, ONLY : execute_step_source_groups
 
   USE source_registry_2d, ONLY : source_registry_type
   USE source_configuration_2d, ONLY : initialize_configured_sources, &
@@ -154,7 +154,7 @@ CONTAINS
          this%source_registry,this%domain,this%spatial_operator)
     IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_RK_COMPLETE,step_start,step_length)
 
-    CALL apply_mass_exchange_step(this%state%q,this%state%qp,step_length, &
+    CALL execute_step_source_groups(this%state%q,this%state%qp,step_length, &
          this%domain,this%source_registry)
     IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_STEP_SOURCES_COMPLETE, &
          step_start,step_length)
