@@ -44,6 +44,7 @@ IMEX_SfloW2D_SOURCES = \
                 physics/mass_exchange/mass_exchange_erosion_2d.f90 \
                 physics/mass_exchange/mass_exchange_deposition_2d.f90 \
                 physics/mass_exchange/mass_exchange_vaporization_2d.f90 \
+                physics/mass_exchange/mass_exchange_entrainment_2d.f90 \
                 physics/mass_exchange_assembly_2d.f90 \
                 physics/source_configuration_2d.f90 \
                 physics/equation_terms_2d.f90 \
@@ -157,6 +158,9 @@ physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): core/parameters_2d.
 physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      physics/thermal_laws_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+                                     core/constitutive_parameters_2d.$(OBJEXT) \
+                                     physics/mass_exchange_laws_2d.$(OBJEXT)
 physics/mass_exchange_assembly_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      state/state_conversion_2d.$(OBJEXT) \
@@ -167,6 +171,7 @@ physics/mass_exchange_assembly_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                                      physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT) \
                                      physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT) \
                                      physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT) \
+                                     physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT) \
                                      core/diagnostics_2d.$(OBJEXT)
 physics/equation_terms_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                      core/constitutive_parameters_2d.$(OBJEXT) \

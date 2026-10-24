@@ -10,7 +10,7 @@ MODULE mass_exchange_assembly_2d
   USE mass_exchange_carrier_loss_2d, ONLY : eval_total_carrier_loss_rate
   USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion
   USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition
-  USE mass_exchange_laws_2d, ONLY : eval_air_entrainment_rate
+  USE mass_exchange_entrainment_2d, ONLY : eval_mass_exchange_air_entrainment
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_mass_exchange_terms
@@ -177,16 +177,7 @@ CONTAINS
     T_erodible_local = T_erodible
     IF ( erodible_deposit_flag ) T_erodible_local = r_T
 
-    IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                      &
-         ( r_Ri .GT. 0.0_wp ) ) THEN
-
-       air_entr = eval_air_entrainment_rate(r_Ri, mod_vel2)
-
-    ELSE
-
-       air_entr = 0.0_wp
-
-    END IF
+    air_entr = eval_mass_exchange_air_entrainment(r_h, r_Ri, mod_vel2)
 
     eqns_term(1:n_eqns) = 0.0_wp
 
