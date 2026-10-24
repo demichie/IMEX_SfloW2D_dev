@@ -1247,3 +1247,7 @@ Il test eseguito dopo D17.22.82 fallisce ancora su `legacy component is rejected
 
 **Attenzione:** questo è un commit architetturale ampio intenzionalmente pubblicato PRIMA del gate CI. La suite nativa storica è stata sostituita e le verifiche puntuali in precedenza contenute devono essere ripristinate in forma coerente col nuovo catalogo; non asserire equivalenza numerica senza eseguire i test. Eventuali errori compiler/CI vanno corretti sul nuovo assetto, senza ripristinare cataloghi o adattatori.
 
+### D17.22.85 — Identificatori numerici dei soli blocchi-equazione
+
+I vecchi ID numerici delle singole sorgenti fisiche restano eliminati. Sono mantenute le costanti `SOURCE_TARGET_VELOCITY`, `SOURCE_TARGET_TEMPERATURE`, `SOURCE_TARGET_PORE_PRESSURE` per gli indici dei target della partizione IMEX: non sono voci del catalogo delle sorgenti né campi aggiuntivi in `source_term_type`. Questa distinzione evita modifiche non necessarie alle interfacce della partizione delle equazioni.
+
