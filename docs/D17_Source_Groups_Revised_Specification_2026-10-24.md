@@ -1181,3 +1181,7 @@ Dopo D17.22.71 i gruppi del solver non contengono più addendi reologici schedul
 
 **Limitazioni:** il catalogo dei 34 addendi e il `source_term_type` esteso non sono ancora stati rimossi: questa è la sincronizzazione necessaria della suite alla nuova identità schedulabile, non la chiusura dell'intero D17. Le eventuali regressioni fisiche e le Actions sul nuovo commit sono ancora da verificare. D17.2, D17.5, D17.16, D17.19 **IN CORSO**.
 
+### D17.22.73 — Distinzione dei test di input legacy e dei gruppi diretti (24 ottobre 2026)
+
+Precisati i tre assert negativi nel test del registro: quando i vecchi nomi dei sottocomponenti vengono inseriti **direttamente** in `group%term_names` o nei SOURCE_GROUPS nativi, la nuova validazione deve respingerli. La sola conversione nominale per i 864 scenari legacy avviene in `catalog_names_for_test`. Nessuna modifica alla fisica. L'Action completa resta necessaria per verificare il comportamento. D17 resta IN CORSO.
+
