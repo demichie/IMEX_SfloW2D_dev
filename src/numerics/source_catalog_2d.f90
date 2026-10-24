@@ -7,7 +7,7 @@ MODULE source_catalog_2d
   PRIVATE
   PUBLIC :: source_term_type, SOURCE_CATALOG, SOURCE_TERM_COUNT
   PUBLIC :: source_term_descriptor_by_name, source_catalog_names_unique
-  PUBLIC :: rheology_source_name, rheology_has_role, canonical_rheology_catalog_unique
+  PUBLIC :: rheology_source_name, rheology_has_role, rheology_name_has_role, canonical_rheology_catalog_unique
   INTEGER, PARAMETER, PUBLIC :: SOURCE_METHOD_EXPLICIT=1, SOURCE_METHOD_NEWTON=2, SOURCE_METHOD_ANALYTIC=3
   INTEGER, PARAMETER, PUBLIC :: SOURCE_CADENCE_STAGE=1, SOURCE_CADENCE_STEP=2
   INTEGER, PARAMETER, PUBLIC :: SOURCE_PHASE_RK_IMPLICIT=1, SOURCE_PHASE_RK_EXPLICIT=2, SOURCE_PHASE_POST_RK=3
@@ -104,20 +104,31 @@ CONTAINS
   END FUNCTION canonical_rheology_catalog_unique
   PURE LOGICAL FUNCTION rheology_has_role(model_id,role) RESULT(found)
     INTEGER, INTENT(IN) :: model_id,role
+    ! Compatibility bridge: role selection itself uses the canonical name.
+    found=rheology_name_has_role(rheology_source_name(model_id),role)
+  END FUNCTION rheology_has_role
+
+  !> Check a rheology's actual SI/IM contribution by canonical source name.
+  !> This is independent of the legacy numeric model ID.
+  PURE LOGICAL FUNCTION rheology_name_has_role(source_name,role) RESULT(found)
+    CHARACTER(*), INTENT(IN) :: source_name
+    INTEGER, INTENT(IN) :: role
     found=.FALSE.
     SELECT CASE(role)
     CASE(SOURCE_ROLE_IMPLICIT)
-      SELECT CASE(model_id)
-      CASE(rheology_id_voellmy,rheology_id_plastic,rheology_id_lava, &
-           rheology_id_lahar,rheology_id_empirical,rheology_id_quadratic,rheology_id_mui_voellmy)
+      SELECT CASE(TRIM(source_name))
+      CASE('rheology_voellmy','rheology_plastic','rheology_lava', &
+           'rheology_lahar','rheology_empirical','rheology_quadratic', &
+           'rheology_mui_voellmy')
         found=.TRUE.
       END SELECT
     CASE(SOURCE_ROLE_SEMI_IMPLICIT)
-      SELECT CASE(model_id)
-      CASE(rheology_id_voellmy,rheology_id_lava,rheology_id_lahar, &
-           rheology_id_froude,rheology_id_lucas,rheology_id_mui,rheology_id_mui_voellmy)
+      SELECT CASE(TRIM(source_name))
+      CASE('rheology_voellmy','rheology_lava','rheology_lahar', &
+           'rheology_froude','rheology_lucas','rheology_mui', &
+           'rheology_mui_voellmy')
         found=.TRUE.
       END SELECT
     END SELECT
-  END FUNCTION rheology_has_role
+  END FUNCTION rheology_name_has_role
 END MODULE source_catalog_2d

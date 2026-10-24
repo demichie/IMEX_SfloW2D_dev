@@ -182,6 +182,16 @@ def main() -> int:
         failures.append("STEP executor must reuse dry-cell initializer in both branches")
     if re.search(r"(?im)^\s*qp(?:_cell|\([^\n]*\))?\s*\(4[^\n]*=\s*T_ambient", step_code):
         failures.append("STEP executor must not duplicate ambient dry initialization")
+    # Role decisions must be based on canonical rheology source names.
+    catalog_code = CATALOG.read_text(encoding="utf-8")
+    role_match = re.search(
+        r"(?is)PURE\s+LOGICAL\s+FUNCTION\s+rheology_name_has_role\b"
+        r"(.*?)END\s+FUNCTION\s+rheology_name_has_role\b", catalog_code
+    )
+    if role_match is None:
+        failures.append("missing canonical name-based rheology role selector")
+    elif "rheology_id_" in role_match.group(1).lower():
+        failures.append("canonical rheology role selector must not use numeric rheology IDs")
     for failure in failures:
         print("FAIL:", failure, file=sys.stderr)
     print(f"D17 physical treatment audit: {len(catalog)} configured sources, "
