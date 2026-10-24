@@ -697,9 +697,20 @@ CONTAINS
        RETURN
     END IF
     DO i=1,SIZE(solver%term_ids)
-       IF (.NOT.group_contains(group,solver%term_ids(i))) THEN
-          CALL fatal_error('D17: implicit solver term is absent from its source group')
-          RETURN
+       IF (ALLOCATED(solver%term_names)) THEN
+          IF (i>SIZE(solver%term_names)) THEN
+             CALL fatal_error('D17: inconsistent Newton solver source names')
+             RETURN
+          END IF
+          IF (.NOT.group_contains_name(group,solver%term_names(i))) THEN
+             CALL fatal_error('D17: implicit solver term is absent from its source group')
+             RETURN
+          END IF
+       ELSE
+          IF (.NOT.group_contains(group,solver%term_ids(i))) THEN
+             CALL fatal_error('D17: implicit solver term is absent from its source group')
+             RETURN
+          END IF
        END IF
     END DO
   END SUBROUTINE validate_newton_selection
@@ -720,8 +731,14 @@ CONTAINS
     found=.FALSE.
     IF (.NOT.ALLOCATED(solver%term_ids)) RETURN
     DO i=1,SIZE(solver%term_ids)
-       IF (.NOT.group_contains(group,solver%term_ids(i))) CYCLE
-       term=source_term_descriptor(solver%term_ids(i))
+       IF (ALLOCATED(solver%term_names)) THEN
+          IF (i>SIZE(solver%term_names)) RETURN
+          IF (.NOT.group_contains_name(group,solver%term_names(i))) CYCLE
+          term=source_term_descriptor_by_name(solver%term_names(i))
+       ELSE
+          IF (.NOT.group_contains(group,solver%term_ids(i))) CYCLE
+          term=source_term_descriptor(solver%term_ids(i))
+       END IF
        IF (term%role==role .AND. term%model_id==model_id) THEN
           found=.TRUE.
           RETURN
