@@ -68,9 +68,8 @@ PROGRAM IMEX_SfloW2D
    USE inpout_2d, ONLY : output_netcdf_flag
 
    USE simulation_2d, ONLY : simulation
-   USE source_registry_2d, ONLY : source_group_type, group_contains
-   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE, &
-        SOURCE_TERM_BOUNDARY_INJECTION
+   USE source_registry_2d, ONLY : source_group_type, group_contains_name
+   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE
 
    USE inpout_2d, ONLY : restart
 
@@ -180,8 +179,8 @@ PROGRAM IMEX_SfloW2D
    DO i_source_group=1,SIZE(stage_source_groups)
       IF (stage_source_groups(i_source_group)%cadence/=SOURCE_CADENCE_STAGE .OR. &
            stage_source_groups(i_source_group)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
-      boundary_source_enabled=boundary_source_enabled .OR. group_contains( &
-           stage_source_groups(i_source_group),SOURCE_TERM_BOUNDARY_INJECTION)
+      boundary_source_enabled=boundary_source_enabled .OR. group_contains_name( &
+           stage_source_groups(i_source_group),'SOURCE_TERM_BOUNDARY_INJECTION')
    END DO
    DEALLOCATE(stage_source_groups)
 

@@ -208,7 +208,7 @@ PROGRAM test_source_registry
       CALL require(groups(position+1)%id==4,'reserved EX ID')
       CALL require(groups(position+1)%method==SOURCE_METHOD_EXPLICIT,'EX homogeneous method')
       CALL require(SIZE(steps)==1 .AND. steps(1)%id==1,'independent step namespace')
-      CALL require(group_contains(steps(1),SOURCE_TERM_MASS_EXCHANGE_DEPOSITION),'mass membership')
+      CALL require(group_contains_name(steps(1),'SOURCE_TERM_MASS_EXCHANGE_DEPOSITION'),'mass membership')
       CALL require(ALLOCATED(steps(1)%term_names),'step group materializes source names')
       CALL require(group_contains_name(steps(1),'SOURCE_TERM_MASS_EXCHANGE_DEPOSITION'), &
            'name-based mass membership')
@@ -239,7 +239,7 @@ PROGRAM test_source_registry
   CALL require(SIZE(groups)==4,'configured default groups')
   CALL require(SIZE(groups(4)%term_names)==5,'curvature/circular/fissural/radial/boundary inventory')
   CALL require(SIZE(steps(1)%term_names)==7,'all bounded mass proposals registered')
-  CALL require(group_contains(groups(4),SOURCE_TERM_BOUNDARY_INJECTION),'boundary hook retained')
+  CALL require(group_contains_name(groups(4),'SOURCE_TERM_BOUNDARY_INJECTION'),'boundary hook retained')
   CALL require(ALLOCATED(groups(3)%source_names) .AND. &
        ALLOCATED(groups(3)%term_names),'normalized group exposes name-only dispatch metadata')
   CALL require(group_contains_name(groups(3),rheology_source_name(rheology_id_lava)), &

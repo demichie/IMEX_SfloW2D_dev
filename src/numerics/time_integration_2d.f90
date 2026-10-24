@@ -28,9 +28,8 @@ MODULE time_integration_2d
   USE equation_metadata_2d, ONLY : equation_partition_type
 
   USE source_registry_2d, ONLY : source_registry_type, source_group_type, &
-       group_contains
-  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE, &
-       SOURCE_TERM_BOUNDARY_INJECTION
+       group_contains_name
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE
 
   USE spatial_operator_2d, ONLY : spatial_operator_type
 
@@ -326,8 +325,8 @@ CONTAINS
        IF (stage_groups(registry_group_index)%cadence/=SOURCE_CADENCE_STAGE .OR. &
             stage_groups(registry_group_index)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
        explicit_groups=[explicit_groups,stage_groups(registry_group_index)]
-       boundary_source_enabled=boundary_source_enabled .OR. group_contains( &
-            stage_groups(registry_group_index),SOURCE_TERM_BOUNDARY_INJECTION)
+       boundary_source_enabled=boundary_source_enabled .OR. group_contains_name( &
+            stage_groups(registry_group_index),'SOURCE_TERM_BOUNDARY_INJECTION')
     END DO
 
     IF ( .NOT. equation_partition%is_initialized() ) THEN

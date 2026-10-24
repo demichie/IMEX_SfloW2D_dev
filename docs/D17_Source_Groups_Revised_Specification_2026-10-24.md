@@ -1211,3 +1211,9 @@ Il parsing di `SOURCE_GROUPS` non alloca più una lista temporanea di componenti
 
 **Questo non completa D17:** il catalogo a 34 voci, gli identificatori storici e i metadati extra di `source_term_type` devono ancora essere eliminati con la revisione delle verifiche e dei test. Non si dichiara valida la nuova HEAD prima della CI. Nessuna struttura o funzione nuova è stata aggiunta al solver.
 
+### D17.22.78 — Eliminazione dell'API numerica di appartenenza ai gruppi (24 ottobre 2026)
+
+Rimossa da `source_registry_2d` la funzione pubblica `group_contains(group,term_id)`, che riceveva identificatori numerici del vecchio catalogo per convertirli in nomi. Il driver principale `IMEX_SfloW2D`, l'integrazione temporale `time_integration_2d` e i test della registry usano ora direttamente `group_contains_name(group,name)` per controllare le sorgenti fisiche di bordo e di scambio di massa; eliminati in questi due chiamanti gli import degli ID numerici corrispondenti. Non viene aggiunto alcun adattatore o livello di compatibilità. I kernel e le formule restano invariati.
+
+**Stato:** è un'eliminazione effettiva di un'API numerica obsoleta, ma il catalogo a 34 contributi e il tipo a cinque campi devono ancora essere sostituiti. CI sulla nuova HEAD pendente; D17.19 resta IN CORSO.
+

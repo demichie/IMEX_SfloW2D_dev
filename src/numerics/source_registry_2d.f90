@@ -12,7 +12,7 @@ MODULE source_registry_2d
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: source_group_type, source_registry_type
-  PUBLIC :: group_contains, group_contains_name, group_source_names
+  PUBLIC :: group_contains_name, group_source_names
 
   !> \brief Homogeneous source group; identity is cadence plus id, not order.
   TYPE :: source_group_type
@@ -44,21 +44,6 @@ MODULE source_registry_2d
     PROCEDURE :: validate => validate_registry
   END TYPE source_registry_type
 CONTAINS
-  !> \brief Test physical membership without accessing unallocated storage.
-  !> \param[in] group Group descriptor.
-  !> \param[in] term_id Physical catalog ID.
-  !> \return True exactly when the group contains the term.
-  PURE LOGICAL FUNCTION group_contains(group,term_id)
-    TYPE(source_group_type), INTENT(IN) :: group
-    INTEGER, INTENT(IN) :: term_id
-    TYPE(source_term_type) :: term
-    group_contains=.FALSE.
-    term=source_term_descriptor(term_id)
-    IF (LEN_TRIM(term%name)==0) RETURN
-    ! IDs are compatibility inputs; membership is keyed by canonical name.
-    group_contains=group_contains_name(group,term%name)
-  END FUNCTION group_contains
-
   !> Query group membership by the physical source name.
   PURE LOGICAL FUNCTION group_contains_name(group,name) RESULT(found)
     TYPE(source_group_type), INTENT(IN) :: group
