@@ -66,12 +66,18 @@ CONTAINS
     IF (erosion_coeff>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_EROSION']
     IF (settling_flag) THEN
       active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_DEPOSITION']
-      IF (ABS(coeff_porosity)>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS']
+      IF (ABS(coeff_porosity)>0.0_wp) &
+           active_names=[CHARACTER(LEN=64) :: active_names, &
+           'SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS']
     END IF
     IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS']
-    IF (pore_pressure_flag .AND. gas_loss_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS']
+    IF (pore_pressure_flag .AND. gas_loss_flag) &
+         active_names=[CHARACTER(LEN=64) :: active_names, &
+         'SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS']
     IF (entrainment_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT']
-    IF (gas_flag .AND. liquid_vaporization_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION']
+    IF (gas_flag .AND. liquid_vaporization_flag) &
+         active_names=[CHARACTER(LEN=64) :: active_names, &
+         'SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION']
     DO i=1,3
       method=imex_group_method(i)
       CALL resolve_imex_group_method(method,methods(i))
