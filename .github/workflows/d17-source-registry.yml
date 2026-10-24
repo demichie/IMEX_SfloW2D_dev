@@ -1,0 +1,42 @@
+name: D17 source registry tests
+
+on:
+  push:
+    branches:
+      - feature/d17-source-refactor
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-registry:
+    name: Source registry (strict and optimized)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout current revision
+        uses: actions/checkout@v4
+
+      - name: Install GNU Fortran
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran
+
+      - name: Run existing D17 registry regression
+        shell: bash
+        env:
+          D17_WORK_DIR: ${{ runner.temp }}/d17-registry-tests
+        run: |
+          set -o pipefail
+          mkdir -p "$D17_WORK_DIR"
+          TESTS/TEST_SOURCE_REGISTRY/run_test.sh 2>&1 | tee "$D17_WORK_DIR/test-run.log"
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d17-registry-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/d17-registry-tests/
+          if-no-files-found: warn
+          retention-days: 30
