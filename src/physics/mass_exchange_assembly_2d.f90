@@ -8,6 +8,7 @@ MODULE mass_exchange_assembly_2d
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source
   USE thermal_laws_2d, ONLY : eval_vaporization_mass_rate, eval_vaporization_energy_rate
   USE mass_exchange_carrier_loss_2d, ONLY : eval_total_carrier_loss_rate
+  USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion
   USE mass_exchange_laws_2d, ONLY : eval_settling_fluid_properties, &
        settling_velocity, eval_solid_deposition_rate, eval_erosion_rates, &
        eval_continuous_phase_loss_rate, eval_air_entrainment_rate
@@ -176,15 +177,8 @@ CONTAINS
     mod_vel2 = r_u**2 + r_v**2 + r_w**2
     mod_vel = SQRT( mod_vel2 )
 
-    IF (erosion_coeff .GT. 0.0_wp) THEN
-       CALL eval_erosion_rates(r_h, mod_vel, alphas_tot, erosion_coeff,       &
-            erodible_porosity, erodible_fract(1:n_solid),                    &
-            erodible(1:n_solid), dt, erosion_term(1:n_solid),                &
-            continuous_phase_erosion_term)
-    ELSE
-       erosion_term = 0.0_wp
-       continuous_phase_erosion_term = 0.0_wp
-    END IF
+    CALL eval_mass_exchange_erosion(r_h, mod_vel, alphas_tot, erodible, dt, &
+         erosion_term, continuous_phase_erosion_term)
 
     r_T = qpj(4)
 
