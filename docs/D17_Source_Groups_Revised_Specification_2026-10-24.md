@@ -428,7 +428,7 @@ GRUPPO 3: STEP, EXPLICIT, batch mass-exchange completo
 Non dichiarare questo esempio valido per qualunque reologia: la compatibilità di ogni termine con il metodo scelto deve risultare dal catalogo e dai test.
 
 
-**Stato di avanzamento D17.16 — IN CORSO (24 ottobre 2026).** Con commit `b3549e79` rifiutati i metadati solver residui e i target incompleti; introdotti con commit `a4f18652` i target nativi a livello di gruppo con rifiuto dell'input misto e test dedicati; il vecchio input per-solver resta esplicitamente compatibile durante la migrazione. Validazione preventiva del numero unico di solver nativi aggiunta; con `7ea4969c` eliminati i loop di costruzione multi-solver del percorso nativo, ora diretto; catalogo nominale, conflitti e contratti restano da consolidare. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
+**Stato di avanzamento D17.16 — IN CORSO (24 ottobre 2026).** Con commit `5349d89c` aggiunto anche il rifiuto esplicito di metadati solver legacy orfani o relativi al secondo sotto-solver; con commit `b3549e79` rifiutati i metadati solver residui e i target incompleti; introdotti con commit `a4f18652` i target nativi a livello di gruppo con rifiuto dell'input misto e test dedicati; il vecchio input per-solver resta esplicitamente compatibile durante la migrazione. Validazione preventiva del numero unico di solver nativi aggiunta; con `7ea4969c` eliminati i loop di costruzione multi-solver del percorso nativo, ora diretto; catalogo nominale, conflitti e contratti restano da consolidare. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
 
 ## D17.17 — Separazione fisica/numerica
 
@@ -837,3 +837,10 @@ Commit [`a4f18652`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/a4f18652
 ### D17.22.20 — Controlli input nativo (24 ottobre 2026)
 
 Commit [`b3549e79`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/b3549e79a131dfd7d497b09a25ecbfe6109bbab0): il parser ora rifiuta metadati legacy di sotto-solver residui quando si usano target di gruppo, anche con conteggio solver zero; rifiuta target incompleti e orfani. Aggiunti test negativi. D17.16 resta IN CORSO: i vecchi campi, source_solver_type e gli ID fisici devono ancora essere rimossi. Nessuna modifica alla fisica. Verifiche di compilazione e test sul nuovo HEAD ancora non eseguite.
+
+
+### D17.22.21 — Controlli sui metadati residui della sintassi legacy nativa (24 ottobre 2026)
+
+Commit [`5349d89c`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/5349d89c9faf2ace73f69d524c445dbc78c099e9): nel parser `source_configuration_2d` vengono ora rifiutati gli attributi `source_solver_order`, `source_solver_target_count` e `source_solver_targets` quando manca il relativo solver legacy, nonché gli attributi del secondo sotto-solver ormai vietato. Aggiunti test negativi in `TEST_SOURCE_REGISTRY`. La transizione a target di gruppo non modifica le formule fisiche.
+
+**Stato:** D17.16 IN CORSO. Il formato legacy nativo rimane temporaneamente supportato per migrazione; rimozione definitiva dei campi, di `source_solver_type` e degli ID fisici ancora da completare. **Verifica:** commit non ancora coperto da nuove Actions, che rimangono manuali.
