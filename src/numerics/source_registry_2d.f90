@@ -381,7 +381,7 @@ CONTAINS
       IF (family/=0 .AND. group%method/=SOURCE_METHOD_EXPLICIT) THEN
         terms=rheology_source_terms(family)
         error='D17: rheology group requires the complete law bundle'
-        IF (.NOT.ALL(in_list(terms,group_term_ids(group)))) RETURN
+        IF (.NOT.ALL(name_membership(source_names_for_ids(terms),group%term_names))) RETURN
       END IF
       ! No independently scheduled sub-solves: validate group equation shape.
       error='D17: incomplete or incompatible group equation target'
@@ -392,7 +392,8 @@ CONTAINS
         CASE(2)
           IF (.NOT.same_set(group%equation_ids,[2,3])) RETURN
           terms=rheology_source_terms(family)
-          IF (.NOT.same_set(terms,group_term_ids(group))) THEN
+          IF (SIZE(terms)/=SIZE(group%term_names) .OR. &
+               .NOT.ALL(name_membership(source_names_for_ids(terms),group%term_names))) THEN
             error='D17: analytic velocity requires the complete law bundle'; RETURN
           END IF
         CASE(1)
@@ -519,19 +520,15 @@ CONTAINS
     group%equation_ids=equations
   END FUNCTION make_group
 
-  !> Resolve compatibility catalog positions from canonical mathematical names.
-  FUNCTION group_term_ids(group) RESULT(ids)
-    TYPE(source_group_type), INTENT(IN) :: group
-    INTEGER, ALLOCATABLE :: ids(:)
-    TYPE(source_term_type) :: term
+  !> Check catalogued mathematical names without converting group storage to IDs.
+  PURE FUNCTION name_membership(required,available) RESULT(found)
+    CHARACTER(*), INTENT(IN) :: required(:),available(:)
+    LOGICAL :: found(SIZE(required))
     INTEGER :: i
-    ALLOCATE(ids(0))
-    IF (.NOT.ALLOCATED(group%term_names)) RETURN
-    DO i=1,SIZE(group%term_names)
-      term=source_term_descriptor_by_name(group%term_names(i))
-      ids=[ids,term%id]
+    DO i=1,SIZE(required)
+      found(i)=ANY(available==required(i))
     END DO
-  END FUNCTION group_term_ids
+  END FUNCTION name_membership
 
   !> \brief Check index bounds and uniqueness before any vector indexing.
   !> \param[in] ids Conservative equation IDs.

@@ -987,3 +987,8 @@ Nel commit [`d3cfc58`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/d3cfc
 
 Per richiesta esplicita dell'utente, **questo file** `docs/D17_Source_Groups_Revised_Specification_2026-10-24.md` è il solo documento D17 da mantenere aggiornato. Le precedenti menzioni di altri handoff, documenti storici o roadmap in questa specifica descrivono il contesto della migrazione e non costituiscono un obbligo di aggiornarli. **Ogni successiva modifica di stato o registrazione di un'implementazione D17 va riportata qui**, preservando la specifica integrale e distinguendo tra codice modificato, compilazione riuscita, test del registro e regressioni numeriche scientifiche.
 
+### D17.22.45 — Confronto nominale dei bundle reologici nel validatore (24 ottobre 2026)
+
+Nel modulo `source_registry_2d` il controllo di completezza della legge reologica nei gruppi Newton e analytic confronta ora direttamente i nomi degli addendi presenti in `group%term_names` con quelli attesi dal catalogo. Eliminata la funzione inversa `group_term_ids`, che ricostruiva temporaneamente una lista di ID numerici dalla rappresentazione nominale del gruppo; il confronto usa `name_membership` e la conversione di sola andata `source_names_for_ids`. I controlli di completezza e cardinalità del gruppo analytic restano invariati nella loro intenzione.
+
+**Stato:** modifica al codice pubblicata, **compilazione e test da verificare sul nuovo commit**. Questo intervento elimina una conversione nome→ID dal registro ma **non** conclude la migrazione D17.2/D17.19-10c: il catalogo numerico dei 34 contributi, `source_names_for_ids`, e `term_names` rimangono transitori e richiedono un intervento successivo coordinato. Nessuna modifica prevista ai kernel fisici, ai tableau o al solutore Newton.
