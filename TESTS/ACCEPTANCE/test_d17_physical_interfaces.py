@@ -144,11 +144,11 @@ def main() -> int:
         encoding="utf-8"
     )
     if not re.search(
-        r"(?im)^\s*use\s+source_terms_2d\s*,\s*only\s*:\s*eval_step_source_explicit\b",
+        r"(?im)^\s*use\s+source_terms_2d\s*,\s*only\s*:\s*eval_source_explicit\b",
         executor,
     ):
         failures.append("STEP executor must import the common explicit source bridge")
-    if len(re.findall(r"(?i)\bcall\s+eval_step_source_explicit\s*\(", executor)) != 1:
+    if len(re.findall(r"(?i)\bcall\s+eval_source_explicit\s*\(", executor)) != 1:
         failures.append("STEP executor must evaluate the explicit source bridge once per cell")
     if re.search(r"(?im)^\s*use\s+(?:equation_terms_2d|mass_exchange_assembly_2d)\b",
                  executor):
