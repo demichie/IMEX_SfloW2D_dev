@@ -1251,3 +1251,6 @@ Il test eseguito dopo D17.22.82 fallisce ancora su `legacy component is rejected
 
 I vecchi ID numerici delle singole sorgenti fisiche restano eliminati. Sono mantenute le costanti `SOURCE_TARGET_VELOCITY`, `SOURCE_TARGET_TEMPERATURE`, `SOURCE_TARGET_PORE_PRESSURE` per gli indici dei target della partizione IMEX: non sono voci del catalogo delle sorgenti né campi aggiuntivi in `source_term_type`. Questa distinzione evita modifiche non necessarie alle interfacce della partizione delle equazioni.
 
+### D17.22.86 — Capacità degli input nativi collegate al nuovo catalogo (24 ottobre 2026)
+
+Il log `compile(7).log` sulla HEAD `e14ad96` segnala in `source_input_2d.f90` un simbolo rimosso: `SOURCE_PHYSICAL_TERM_COUNT`. L'input nativo ora deriva `SOURCE_INPUT_MAX_GROUPS` e `SOURCE_INPUT_MAX_TERMS` da `SOURCE_TERM_COUNT`, che rappresenta le 24 sorgenti fisiche complete. Non si ripristina l'alias legacy. Gli errori successivi sulle dimensioni degli array e sulla dichiarazione NAMELIST sono conseguenze del simbolo non risolto. Compilazione successiva ancora da verificare.
