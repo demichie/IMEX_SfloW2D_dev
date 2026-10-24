@@ -481,6 +481,14 @@ CONTAINS
     CALL require(ALL(groups(3)%equation_ids==[2,3]) .AND. &
          SIZE(steps(1)%term_ids)==7,'native targets and complete step batch')
 
+    ! D17.19: one solve per Newton group, rejected at input validation.
+    source_group_solver_count(3)=2
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(INDEX(error,'exactly one solver')>0 .AND. &
+         .NOT.trial%is_initialized() .AND. .NOT.partition%is_initialized(), &
+         'multiple native Newton solvers rejected at input')
+    source_group_solver_count(3)=1
+
     source_group_term_count(5)=6
     CALL initialize_native_source_configuration(trial,partition,error)
     CALL require(error/='' .AND. .NOT.trial%is_initialized() .AND. &

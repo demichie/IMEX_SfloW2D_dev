@@ -185,8 +185,8 @@ CONTAINS
           error='D17: explicit source groups cannot declare solvers'; RETURN
         END IF
       ELSE
-        IF (solver_count(g)<1) THEN
-          error='D17: implicit source groups require at least one solver'; RETURN
+        IF (solver_count(g)/=1) THEN
+          error='D17: Newton and analytic source groups require exactly one solver'; RETURN
         END IF
         DO s=1,solver_count(g)
           IF (source_solver_order(s,g)<1 .OR. source_solver_order(s,g)>solver_count(g)) THEN

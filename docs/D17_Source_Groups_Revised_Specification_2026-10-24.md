@@ -663,3 +663,8 @@ Le due Actions D17 dedicate, `d17-compile.yml` e `d17-source-registry.yml`, devo
 Commit [`079225a0`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/079225a0a8be366c5816f4d896b9b2ac34441bd6): il validatore del registro richiede ora esattamente **un solo solver Newton per gruppo**. Il test che prima accettava due solver indipendenti nello stesso gruppo è stato trasformato in test negativo. Non sono state cambiate formule fisiche, implementazione di Newton o sequenze RK.
 
 **Stato:** prima correzione relativa al contratto D17.19 passo 2 pubblicata, **non ancora verificata con CI**. Restano da adeguare parser, struttura dei gruppi e runtime; più gruppi Newton distinti restano consentiti. Le Actions rimangono manuali.
+
+
+### D17.22.8 — Validazione precoce dei solve nativi (24 ottobre 2026)
+
+In `source_configuration_2d::initialize_native_source_configuration`, il parsing ora rifiuta immediatamente i gruppi `NEWTON` o `ANALYTIC` con numero di solver diverso da uno, senza attendere la validazione del registro. Il test `TEST_SOURCE_REGISTRY` aggiunge il caso di due solver Newton nel gruppo nativo e verifica il rifiuto transazionale. Non sono state modificate fisica, integratore o leggi. **Stato: commit pubblicato, Actions da avviare manualmente solo quando richiesto; test della modifica non ancora eseguiti.**
