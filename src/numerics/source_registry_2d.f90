@@ -294,8 +294,8 @@ CONTAINS
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
     TYPE(source_group_type) :: group
     TYPE(source_term_type) :: term
-    INTEGER, ALLOCATABLE :: expected(:),bundle_terms(:)
-    CHARACTER(LEN=64), ALLOCATABLE :: law_names(:)
+    INTEGER, ALLOCATABLE :: expected(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: law_names(:),batch_names(:)
     CHARACTER(LEN=64), ALLOCATABLE :: seen_names(:)
     INTEGER :: i,j,id,nstage,family,mass_group
     error='D17: invalid or duplicate source catalog name'
@@ -415,10 +415,10 @@ CONTAINS
     DO id=1,SOURCE_TERM_COUNT
       term=source_term_descriptor(id)
       IF (term%bundle_id==0) CYCLE
-      bundle_terms=source_bundle_terms(term%bundle_id)
-      IF (SIZE(bundle_terms)<2) RETURN
-      IF (id/=bundle_terms(1)) CYCLE
-      IF (.NOT.same_batch(source_names_for_ids(bundle_terms),groups)) RETURN
+      batch_names=source_bundle_names(term%bundle_id)
+      IF (SIZE(batch_names)<2) RETURN
+      IF (term%name/=batch_names(1)) CYCLE
+      IF (.NOT.same_batch(batch_names,groups)) RETURN
     END DO
     error=''
   END SUBROUTINE validate_registry
