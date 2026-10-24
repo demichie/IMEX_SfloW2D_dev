@@ -13,7 +13,7 @@ MODULE mass_exchange_step_2d
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, SOURCE_ROLE_MASS, &
-       source_term_type, source_term_descriptor
+       source_term_type, source_term_descriptor_by_name
 
   IMPLICIT NONE
 
@@ -164,10 +164,10 @@ CONTAINS
        DO group_index=1,SIZE(step_groups)
           IF (step_groups(group_index)%cadence/=SOURCE_CADENCE_STEP) &
                CALL fatal_error('D17: invalid cadence in post-RK source schedule')
-          IF (SIZE(step_groups(group_index)%term_ids)>0) &
+          IF (SIZE(step_groups(group_index)%term_names)>0) &
                mass_group_count=mass_group_count+1
-          DO term_index=1,SIZE(step_groups(group_index)%term_ids)
-             term=source_term_descriptor(step_groups(group_index)%term_ids(term_index))
+          DO term_index=1,SIZE(step_groups(group_index)%term_names)
+             term=source_term_descriptor_by_name(step_groups(group_index)%term_names(term_index))
              IF (term%role/=SOURCE_ROLE_MASS) &
                   CALL fatal_error('D17: unsupported non-mass post-RK source')
           END DO
