@@ -20,6 +20,7 @@ MODULE source_catalog_2d
   PUBLIC :: source_term_type, source_term_descriptor, rheology_source_terms
   PUBLIC :: source_bundle_terms
   PUBLIC :: source_term_descriptor_by_name, source_catalog_names_unique
+  PUBLIC :: rheology_source_name
   PUBLIC :: SOURCE_TERM_COUNT, SOURCE_PHYSICAL_TERM_COUNT
   !> method explicit.
   INTEGER, PARAMETER, PUBLIC :: SOURCE_METHOD_EXPLICIT = 1
@@ -433,6 +434,26 @@ CONTAINS
       IF (SOURCE_CATALOG(i)%bundle_id==bundle_id) ids=[ids,i]
     END DO
   END FUNCTION source_bundle_terms
+
+  !> Canonical identity of an entire rheological law, not its formula addends.
+  !> During migration rheology_source_terms still returns legacy component IDs.
+  PURE FUNCTION rheology_source_name(model_id) RESULT(name)
+    INTEGER, INTENT(IN) :: model_id
+    CHARACTER(LEN=64) :: name
+    name=''
+    SELECT CASE(model_id)
+    CASE(rheology_id_voellmy);     name='rheology_voellmy'
+    CASE(rheology_id_plastic);     name='rheology_plastic'
+    CASE(rheology_id_lava);        name='rheology_lava'
+    CASE(rheology_id_lahar);       name='rheology_lahar'
+    CASE(rheology_id_empirical);   name='rheology_empirical'
+    CASE(rheology_id_quadratic);   name='rheology_quadratic'
+    CASE(rheology_id_froude);      name='rheology_froude'
+    CASE(rheology_id_lucas);       name='rheology_lucas'
+    CASE(rheology_id_mui);         name='rheology_mui'
+    CASE(rheology_id_mui_voellmy); name='rheology_mui_voellmy'
+    END SELECT
+  END FUNCTION rheology_source_name
 
   !> \brief Return all rate IDs belonging to one selected rheology.
   !> \param[in] model_id Resolved rheology family ID.

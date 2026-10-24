@@ -912,3 +912,8 @@ Nell'assemblatore `equation_terms_2d` la selezione dei contributi impliciti per 
 ### D17.22.31 — Validazione dei nomi canonici nel registro (24 ottobre 2026)
 
 Il validatore `source_registry_2d` rifiuta ora nomi canonici vuoti o duplicati all'interno di un gruppo, oltre a verificare la coerenza con la rappresentazione numerica transitoria. Aggiunte due regressioni negative al test del registro. Questo controllo prepara la rimozione degli ID numerici: **non** costituisce ancora la migrazione completa del catalogo o l'accorpamento dei contributi delle leggi reologiche. D17.2 e D17.19 passo 10c rimangono IN CORSO. Non ancora verificate compile/registry Actions sul nuovo HEAD.
+
+
+### D17.22.32 — Identità canonica univoca delle leggi reologiche (24 ottobre 2026)
+
+Aggiunta al catalogo `rheology_source_name(model_id)` che associa ciascuna delle dieci famiglie reologiche supportate a un'unica identità nominale (`rheology_voellmy`, `rheology_lahar`, ecc.), indipendente dal numero di addendi della relativa legge. I test del registro verificano che i nomi esistano, siano distinti e corrispondano a leggi legacy con contributi fisici. Questa è la definizione dell'identità per la successiva migrazione: **non** unifica ancora le voci schedulabili nel catalogo né altera le liste legacy `rheology_source_terms` o la fisica. `source_term_type` rimane transitorio, D17.2 / D17.19 passo 10c IN CORSO. Build e Actions sul nuovo commit ancora da verificare.

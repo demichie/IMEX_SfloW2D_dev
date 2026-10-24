@@ -7,7 +7,10 @@ PROGRAM test_source_registry
   USE source_input_2d
   USE equation_metadata_2d, ONLY : equation_partition_type, &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
-  USE parameters_2d, ONLY : rheology_id_lava,n_eqns,idx_pore
+  USE parameters_2d, ONLY : rheology_id_voellmy,rheology_id_plastic, &
+       rheology_id_lava,rheology_id_lahar,rheology_id_empirical, &
+       rheology_id_quadratic,rheology_id_froude,rheology_id_lucas, &
+       rheology_id_mui,rheology_id_mui_voellmy,n_eqns,idx_pore
   IMPLICIT NONE
   TYPE(source_registry_type) :: registry,trial
   TYPE(equation_partition_type) :: partition
@@ -60,6 +63,26 @@ PROGRAM test_source_registry
            .AND. .NOT.term%has_analytic,'dependent contributions not schedulable')
     END SELECT
   END DO
+  ! Each rheological family has exactly one stable public source name,
+  ! independent of the legacy list of contributing formulas.
+  BLOCK
+    INTEGER :: i,j
+    CHARACTER(LEN=64) :: names(10)
+    INTEGER :: families(10)
+    families=[rheology_id_voellmy,rheology_id_plastic,rheology_id_lava, &
+         rheology_id_lahar,rheology_id_empirical,rheology_id_quadratic, &
+         rheology_id_froude,rheology_id_lucas,rheology_id_mui,rheology_id_mui_voellmy]
+    DO i=1,SIZE(families)
+      names(i)=rheology_source_name(families(i))
+      CALL require(LEN_TRIM(names(i))>0,'canonical rheology name exists')
+      CALL require(SIZE(rheology_source_terms(families(i)))>0, &
+           'canonical rheology retains legacy physical contributions')
+      DO j=1,i-1
+        CALL require(names(i)/=names(j),'canonical rheology names are distinct')
+      END DO
+    END DO
+    CALL require(rheology_source_name(-1)=='','unknown rheology has no source name')
+  END BLOCK
   CALL require(source_catalog_names_unique(),'catalog canonical names are unique')
   term=source_term_descriptor_by_name('SOURCE_TERM_MASS_EXCHANGE_DEPOSITION')
   CALL require(term%id==SOURCE_TERM_MASS_EXCHANGE_DEPOSITION, &
