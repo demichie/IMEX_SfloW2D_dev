@@ -176,43 +176,52 @@ CONTAINS
         END IF
         seen_terms(term_id)=.TRUE.; parsed_terms(i,g)=term_id
       END DO
-      solver_count(g)=source_group_solver_count(g)
-      IF (solver_count(g)<0 .OR. solver_count(g)>SOURCE_INPUT_MAX_SOLVERS) THEN
-        error='D17: invalid source solver count'; RETURN
+      ! Native group targets are authoritative. Old solver fields are an
+      ! explicit compatibility path until all callers use group metadata.
+      IF (source_group_target_count(g)>0) THEN
+        error='D17: cannot mix group targets with legacy solver fields'
+        IF (source_group_solver_count(g)/=0) RETURN
+        solver_count(g)=1
+        target_count(1,g)=source_group_target_count(g)
+        error='D17: invalid group target count'
+        IF (target_count(1,g)>SOURCE_INPUT_MAX_TARGETS) RETURN
+        IF (method(g)==SOURCE_METHOD_EXPLICIT) RETURN
+        DO t=1,target_count(1,g)
+          target=native_target(source_group_targets(t,g))
+          error='D17: unknown or duplicate group target'
+          IF (target==0) RETURN
+          IF (ANY(target_ids(:,1,g)==target)) RETURN
+          target_ids(t,1,g)=target
+        END DO
+      ELSE
+        solver_count(g)=source_group_solver_count(g)
+        error='D17: invalid source solver count'
+        IF (solver_count(g)<0 .OR. solver_count(g)>SOURCE_INPUT_MAX_SOLVERS) RETURN
+        IF (solver_count(g)==1) THEN
+          error='D17: invalid source solver execution order'
+          IF (source_solver_order(1,g)/=1) RETURN
+          target_count(1,g)=source_solver_target_count(1,g)
+          error='D17: invalid source solver target count'
+          IF (target_count(1,g)<1 .OR. target_count(1,g)>SOURCE_INPUT_MAX_TARGETS) RETURN
+          DO t=1,target_count(1,g)
+            target=native_target(source_solver_targets(t,1,g))
+            error='D17: unknown or duplicate source solver target'
+            IF (target==0) RETURN
+            IF (ANY(target_ids(:,1,g)==target)) RETURN
+            target_ids(t,1,g)=target
+          END DO
+        END IF
       END IF
       IF (method(g)==SOURCE_METHOD_EXPLICIT) THEN
-        IF (solver_count(g)/=0) THEN
-          error='D17: explicit source groups cannot declare solvers'; RETURN
-        END IF
+        error='D17: explicit source groups cannot declare solvers or group targets'
+        IF (solver_count(g)/=0) RETURN
       ELSE
-        IF (solver_count(g)/=1) THEN
-          error='D17: Newton and analytic source groups require exactly one solver'; RETURN
+        error='D17: Newton and analytic source groups require exactly one solver'
+        IF (solver_count(g)/=1) RETURN
+        IF (method(g)==SOURCE_METHOD_ANALYTIC) THEN
+          error='D17: analytic groups must have exactly one target'
+          IF (target_count(1,g)/=1) RETURN
         END IF
-        DO s=1,solver_count(g)
-          IF (source_solver_order(s,g)<1 .OR. source_solver_order(s,g)>solver_count(g)) THEN
-            error='D17: invalid source solver execution order'; RETURN
-          END IF
-          IF (COUNT(source_solver_order(1:solver_count(g),g)==source_solver_order(s,g))/=1) THEN
-            error='D17: duplicate source solver execution order'; RETURN
-          END IF
-          target_count(s,g)=source_solver_target_count(s,g)
-          IF (target_count(s,g)<1 .OR. target_count(s,g)>SOURCE_INPUT_MAX_TARGETS) THEN
-            error='D17: invalid source solver target count'; RETURN
-          END IF
-          IF (method(g)==SOURCE_METHOD_ANALYTIC .AND. target_count(s,g)/=1) THEN
-            error='D17: analytic solvers must have exactly one target'; RETURN
-          END IF
-          DO t=1,target_count(s,g)
-            target=native_target(source_solver_targets(t,s,g))
-            IF (target==0) THEN
-              error='D17: unknown source solver target'; RETURN
-            END IF
-            IF (ANY(target_ids(1:target_count(s,g),s,g)==target)) THEN
-              error='D17: duplicate target in one source solver'; RETURN
-            END IF
-            target_ids(t,s,g)=target
-          END DO
-        END DO
       END IF
     END DO
 

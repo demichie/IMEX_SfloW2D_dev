@@ -21,6 +21,10 @@ MODULE source_input_2d
   INTEGER, PUBLIC :: source_group_term_count(SOURCE_INPUT_MAX_GROUPS)=0
   CHARACTER(LEN=64), PUBLIC :: source_group_terms( &
        SOURCE_INPUT_MAX_TERMS,SOURCE_INPUT_MAX_GROUPS)=''
+  ! Final group-level target input; legacy per-solver fields remain for migration.
+  INTEGER, PUBLIC :: source_group_target_count(SOURCE_INPUT_MAX_GROUPS)=0
+  CHARACTER(LEN=16), PUBLIC :: source_group_targets( &
+       SOURCE_INPUT_MAX_TARGETS,SOURCE_INPUT_MAX_GROUPS)=''
   INTEGER, PUBLIC :: source_group_solver_count(SOURCE_INPUT_MAX_GROUPS)=0
   INTEGER, PUBLIC :: source_solver_order( &
        SOURCE_INPUT_MAX_SOLVERS,SOURCE_INPUT_MAX_GROUPS)=0
@@ -32,6 +36,7 @@ MODULE source_input_2d
 
   NAMELIST /source_groups/ source_group_count, source_group_id, source_group_order, &
        source_group_cadence, source_group_method, source_group_term_count, source_group_terms, &
+       source_group_target_count, source_group_targets, &
        source_group_solver_count, source_solver_order, source_solver_target_count, source_solver_targets
 
   PUBLIC :: clear_source_input
@@ -47,6 +52,8 @@ CONTAINS
     source_group_method=''
     source_group_term_count=0
     source_group_terms=''
+    source_group_target_count=0
+    source_group_targets=''
     source_group_solver_count=0
     source_solver_order=0
     source_solver_target_count=0

@@ -489,6 +489,32 @@ CONTAINS
          'multiple native Newton solvers rejected at input')
     source_group_solver_count(3)=1
 
+    ! New group-level target syntax must be equivalent to the former
+    ! single-solver fields without changing the registered physical terms.
+    source_group_solver_count(3)=0
+    source_solver_order(1,3)=0
+    source_solver_target_count(1,3)=0
+    source_solver_targets(:,1,3)=''
+    source_group_target_count(3)=1
+    source_group_targets(1,3)='VELOCITY'
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(error=='' .AND. trial%is_initialized(), &
+         'native group-level targets initialize without solver input: '//TRIM(error))
+    snapshot=trial%stage_groups()
+    CALL require(ALL(snapshot(3)%equation_ids==[2,3]), &
+         'group-level target selects the complete velocity block')
+    source_group_solver_count(3)=1
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(INDEX(error,'cannot mix group targets')>0, &
+         'mixed group and solver target syntax rejected')
+    source_group_solver_count(3)=0
+    source_group_target_count(3)=0
+    source_group_targets(:,3)=''
+    source_group_solver_count(3)=1
+    source_solver_order(1,3)=1
+    source_solver_target_count(1,3)=1
+    source_solver_targets(1,1,3)='VELOCITY'
+
     source_group_term_count(5)=6
     CALL initialize_native_source_configuration(trial,partition,error)
     CALL require(error/='' .AND. .NOT.trial%is_initialized() .AND. &
