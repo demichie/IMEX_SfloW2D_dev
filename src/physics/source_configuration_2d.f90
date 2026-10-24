@@ -92,7 +92,7 @@ CONTAINS
     TYPE(source_group_type) :: group
     TYPE(source_term_type) :: component
     INTEGER, ALLOCATABLE :: ordered(:),targets(:),equations(:)
-    CHARACTER(LEN=64), ALLOCATABLE :: parsed_names(:,:)
+    CHARACTER(LEN=64), ALLOCATABLE :: parsed_names(:,:),law_names(:)
     INTEGER, ALLOCATABLE :: law_terms(:)
     CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
     INTEGER :: cadence(SOURCE_INPUT_MAX_GROUPS),method(SOURCE_INPUT_MAX_GROUPS)
@@ -103,9 +103,9 @@ CONTAINS
          SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: target_group(3),methods(SOURCE_INPUT_MAX_GROUPS),membership(n_eqns)
     LOGICAL :: implicit_mask(n_eqns),expected_targets(3)
-    CHARACTER(LEN=64) :: seen_names(SOURCE_TERM_COUNT)
+    CHARACTER(LEN=64) :: seen_names(SOURCE_INPUT_MAX_GROUPS*SOURCE_INPUT_MAX_TERMS)
     INTEGER :: n_seen
-    INTEGER :: i,j,k,g,s,t,slot,compact_group,stage_count,step_count,term_id,target
+    INTEGER :: i,j,k,g,s,t,slot,compact_group,stage_count,step_count,target
     CHARACTER(LEN=256) :: validation_error
 
     CALL registry%finalize()
@@ -170,7 +170,8 @@ CONTAINS
         error='D17: explicit source groups must declare at least one term'; RETURN
       END IF
       DO i=1,source_group_term_count(g)
-        ! One canonical rheology name expands to the complete legacy law.
+        ! A complete rheology still expands to legacy addend names until
+        ! the physical catalog and dispatcher are migrated together.
         IF (rheology_flag .AND. &
              LEN_TRIM(rheology_source_name(rheology_model_id))>0 .AND. &
              TRIM(uppercase_source_text(source_group_terms(i,g)))== &
@@ -178,26 +179,30 @@ CONTAINS
           law_terms=rheology_source_terms(rheology_model_id)
           error='D17: unsupported complete rheology source'
           IF (SIZE(law_terms)==0) RETURN
+          ALLOCATE(law_names(SIZE(law_terms)))
+          DO t=1,SIZE(law_terms)
+            component=source_term_descriptor(law_terms(t))
+            law_names(t)=component%name
+          END DO
         ELSE
           component=source_term_descriptor_by_name( &
                TRIM(uppercase_source_text(source_group_terms(i,g))))
-          term_id=component%id
           error='D17: unknown, dependent or unschedulable source term name'
-          IF (term_id==0 .OR. .NOT.component%schedulable) RETURN
-          law_terms=[term_id]
+          IF (component%id==0 .OR. .NOT.component%schedulable) RETURN
+          ALLOCATE(law_names(1))
+          law_names(1)=component%name
         END IF
-        DO t=1,SIZE(law_terms)
-          term_id=law_terms(t)
+        DO t=1,SIZE(law_names)
           error='D17: source group expansion exceeds supported catalog capacity'
           IF (parsed_count(g)>=SOURCE_INPUT_MAX_TERMS) RETURN
           error='D17: a source term may be registered only once globally'
-          component=source_term_descriptor(term_id)
-          IF (ANY(seen_names(1:n_seen)==component%name)) RETURN
+          IF (ANY(seen_names(1:n_seen)==law_names(t))) RETURN
           parsed_count(g)=parsed_count(g)+1
           n_seen=n_seen+1
-          seen_names(n_seen)=component%name
-          parsed_names(parsed_count(g),g)=component%name
+          seen_names(n_seen)=law_names(t)
+          parsed_names(parsed_count(g),g)=law_names(t)
         END DO
+        DEALLOCATE(law_names)
       END DO
       ! An implicit group has a single target list, not nested solvers.
       error='D17: invalid group target count'
