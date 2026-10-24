@@ -308,6 +308,7 @@ CONTAINS
     groups=[this%stage_entries,this%step_entries]
     DO i=1,SIZE(groups)
       group=groups(i)
+      family=0 ! Rheology completeness is checked per group, not across groups.
       error='D17: invalid group identity, method, phase or order'
       IF (group%id<1 .OR. group%execution_order<1 .OR. group%legacy_id<0) RETURN
       IF (i<=nstage) THEN
