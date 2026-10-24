@@ -26,6 +26,12 @@ PROGRAM test_source_registry
     IF (term%schedulable) nphysical=nphysical+1
   END DO
   CALL require(nphysical==SOURCE_PHYSICAL_TERM_COUNT,'physical catalog count')
+  CALL require(source_catalog_names_unique(),'catalog canonical names are unique')
+  term=source_term_descriptor_by_name('SOURCE_TERM_MASS_EXCHANGE_DEPOSITION')
+  CALL require(term%id==SOURCE_TERM_MASS_EXCHANGE_DEPOSITION, &
+       'catalog lookup by canonical source name')
+  term=source_term_descriptor_by_name('UNKNOWN_SOURCE_NAME')
+  CALL require(term%id==0,'unknown source name rejected')
   term=source_term_descriptor(0); CALL require(term%id==0,'invalid catalog lookup')
   ! All 864 legacy assignments/method combinations, with optional thermal/pore targets.
   DO mode=0,3
@@ -91,7 +97,22 @@ PROGRAM test_source_registry
       CALL require(groups(position+1)%method==SOURCE_METHOD_EXPLICIT,'EX homogeneous method')
       CALL require(SIZE(steps)==1 .AND. steps(1)%id==1,'independent step namespace')
       CALL require(group_contains(steps(1),SOURCE_TERM_MASS_EXCHANGE_DEPOSITION),'mass membership')
+      CALL require(ALLOCATED(steps(1)%term_names),'step group materializes source names')
+      CALL require(group_contains_name(steps(1),'SOURCE_TERM_MASS_EXCHANGE_DEPOSITION'), &
+           'name-based mass membership')
+      CALL require(.NOT.group_contains_name(steps(1),'UNKNOWN_SOURCE_NAME'), &
+           'unknown name is not a group member')
       CALL registry%validate(error); CALL require(error=='','repeat validation')
+      DO j=1,SIZE(groups)
+        CALL require(ALLOCATED(groups(j)%term_names),'stage group has canonical source names')
+        CALL require(SIZE(groups(j)%term_names)==SIZE(groups(j)%term_ids), &
+             'stage group name and legacy counts agree')
+      END DO
+      DO j=1,SIZE(solves)
+        CALL require(ALLOCATED(solves(j)%term_names),'solver has canonical source names')
+        CALL require(SIZE(solves(j)%term_names)==SIZE(solves(j)%term_ids), &
+             'solver name and legacy counts agree')
+      END DO
       snapshot=registry%stage_groups(); snapshot(1)%id=999
       snapshot=registry%stage_groups(); CALL require(snapshot(1)%id/=999,'detached immutable storage')
     END DO
