@@ -751,3 +751,13 @@ Commit [`db750a5b`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/db750a5b
 Commit [`521f752c`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/521f752c4b99e850f4d77e5ec45b5e5d740be29c): il percorso `NEWTON` di `nonlinear_solver_2d.f90` ora richiede che il descrittore dell'unico solver abbia esattamente tutte le equazioni del gruppo, controlla la copertura senza richiedere lo stesso ordine, usa `group_equations(:)` negli aggiornamenti SI e passa questa stessa lista al Newton indicizzato. Non modifica le routine della Jacobiana, le leggi fisiche né i tableaux. **Stato: implementato, non ancora verificato tramite compilazione/test dopo questo commit.** Restano da completare l'assemblaggio congiunto e la riorganizzazione dei descrittori secondo D17.19.
 
 **Politica Actions:** compilazione e registro possono essere eseguiti manualmente al prossimo gate di verifica del gruppo di modifiche; nessun trigger `push` deve essere reintrodotto.
+
+
+### D17.22.11 — Gate manuale compilazione e registro superato (24 ottobre 2026)
+
+Le Actions sono state avviate manualmente tramite `workflow_dispatch` sul commit [`decee60b`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/decee60b7b48cc563e77e9569c9de0760a6348bf). **Entrambe terminate con successo**:
+
+- [D17 compile diagnostics — run 40088178193](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/40088178193): compilazione GNU riuscita.
+- [D17 source registry tests — run 40088314870](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/40088314870): regressione del registro `strict` e `optimized` riuscita.
+
+Questo gate copre anche gli ultimi cambiamenti ai gruppi Newton fino al commit indicato (validatore, input, singola esecuzione e selezione delle equazioni). **Non dimostra ancora l'equivalenza numerica end-to-end né la correttezza della Jacobiana per gruppi Newton con più target**. I gate scientifici della sezione D17.20 restano aperti. Le Actions restano manuali, senza trigger automatico sui push.
