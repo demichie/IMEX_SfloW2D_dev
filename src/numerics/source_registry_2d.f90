@@ -225,7 +225,7 @@ CONTAINS
         equations=PACK([(i,i=1,partition%n_equations)],partition%IM_group== &
              partition%IM_group(target_equation_ids_first(targets(1),pore_equation)))
         group=make_group(legacy,legacy,SOURCE_CADENCE_STAGE,method, &
-             SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,terms,equations)
+             SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,source_names_for_ids(terms),equations)
         stages=[stages,group]
       ELSE
         DO i=1,SIZE(targets)
@@ -238,7 +238,7 @@ CONTAINS
             order=split_id
           END IF
           group=make_group(order,legacy,SOURCE_CADENCE_STAGE,method, &
-               SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,terms,equations)
+               SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,source_names_for_ids(terms),equations)
           stages=[stages,group]
         END DO
       END IF
@@ -246,11 +246,11 @@ CONTAINS
     equations=[(i,i=1,partition%n_equations)]
     terms=terms_for_targets(active_terms,[0])
     group=make_group(4,0,SOURCE_CADENCE_STAGE,SOURCE_METHOD_EXPLICIT, &
-         SOURCE_PHASE_RK_EXPLICIT,1,terms,equations)
+         SOURCE_PHASE_RK_EXPLICIT,1,source_names_for_ids(terms),equations)
     stages=[stages,group]
     terms=terms_for_targets(active_terms,[-1])
     group=make_group(1,0,SOURCE_CADENCE_STEP,SOURCE_METHOD_EXPLICIT, &
-         SOURCE_PHASE_POST_RK,1,terms,equations)
+         SOURCE_PHASE_POST_RK,1,source_names_for_ids(terms),equations)
     steps=[group]
     CALL this%initialize(partition%n_equations,pore_equation,stages,steps,error)
   END SUBROUTINE initialize_legacy_registry
@@ -505,18 +505,19 @@ CONTAINS
   !> \param[in] method Group method.
   !> \param[in] phase Evaluation phase within its cadence.
   !> \param[in] order Explicit position within that phase.
-  !> \param[in] terms Physical term membership.
+  !> \param[in] names Canonical component names, converted at the legacy boundary.
   !> \param[in] equations Conservative equation footprint.
   !> \return Group directly owning the equation footprint.
-  FUNCTION make_group(id,legacy,cadence,method,phase,order,terms,equations) RESULT(group)
-    INTEGER, INTENT(IN) :: id,legacy,cadence,method,phase,order,terms(:),equations(:)
+  FUNCTION make_group(id,legacy,cadence,method,phase,order,names,equations) RESULT(group)
+    INTEGER, INTENT(IN) :: id,legacy,cadence,method,phase,order,equations(:)
+    CHARACTER(*), INTENT(IN) :: names(:)
     TYPE(source_group_type) :: group
     group%id=id; group%legacy_id=legacy; group%cadence=cadence
     group%method=method; group%phase=phase; group%execution_order=order
     ! Allocate the owned arrays explicitly to avoid compiler warnings about
     ! allocatable-component descriptor initialization on intrinsic assignment.
-    ALLOCATE(group%term_names(SIZE(terms)),group%equation_ids(SIZE(equations)))
-    group%term_names=source_names_for_ids(terms)
+    ALLOCATE(group%term_names(SIZE(names)),group%equation_ids(SIZE(equations)))
+    group%term_names=names
     group%equation_ids=equations
   END FUNCTION make_group
 
