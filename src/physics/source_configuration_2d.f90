@@ -91,8 +91,9 @@ CONTAINS
     TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:)
     TYPE(source_group_type) :: group
     TYPE(source_term_type) :: component
-    INTEGER, ALLOCATABLE :: parsed_terms(:,:),ordered(:),targets(:),equations(:)
-    INTEGER, ALLOCATABLE :: group_terms(:),active_terms(:),law_terms(:)
+    INTEGER, ALLOCATABLE :: ordered(:),targets(:),equations(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: parsed_names(:,:)
+    INTEGER, ALLOCATABLE :: active_terms(:),law_terms(:)
     INTEGER :: cadence(SOURCE_INPUT_MAX_GROUPS),method(SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: phase(SOURCE_INPUT_MAX_GROUPS),solver_count(SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: parsed_count(SOURCE_INPUT_MAX_GROUPS)
@@ -122,8 +123,8 @@ CONTAINS
       error='D17: pore-pressure equation index is outside the configured layout'; RETURN
     END IF
 
-    ALLOCATE(parsed_terms(SOURCE_INPUT_MAX_TERMS,source_group_count))
-    parsed_terms=0; parsed_count=0; cadence=0; method=0; phase=0; solver_count=0
+    ALLOCATE(parsed_names(SOURCE_INPUT_MAX_TERMS,source_group_count))
+    parsed_names=''; parsed_count=0; cadence=0; method=0; phase=0; solver_count=0
     target_count=0; target_ids=0
     seen_terms=.FALSE.
     DO g=1,source_group_count
@@ -175,9 +176,11 @@ CONTAINS
           error='D17: unsupported complete rheology source'
           IF (SIZE(law_terms)==0) RETURN
         ELSE
-          term_id=native_term_id(source_group_terms(i,g))
+          component=source_term_descriptor_by_name( &
+               TRIM(uppercase_source_text(source_group_terms(i,g))))
+          term_id=component%id
           error='D17: unknown, dependent or unschedulable source term name'
-          IF (term_id==0) RETURN
+          IF (term_id==0 .OR. .NOT.component%schedulable) RETURN
           law_terms=[term_id]
         END IF
         DO t=1,SIZE(law_terms)
@@ -188,7 +191,8 @@ CONTAINS
           IF (seen_terms(term_id)) RETURN
           parsed_count(g)=parsed_count(g)+1
           seen_terms(term_id)=.TRUE.
-          parsed_terms(parsed_count(g),g)=term_id
+          component=source_term_descriptor(term_id)
+          parsed_names(parsed_count(g),g)=component%name
         END DO
       END DO
       ! An implicit group has a single target list, not nested solvers.
@@ -318,13 +322,9 @@ CONTAINS
       group%id=source_group_id(g); group%legacy_id=0
       group%cadence=cadence(g); group%method=method(g)
       group%phase=phase(g); group%execution_order=source_group_order(g)
-      group_terms=parsed_terms(1:parsed_count(g),g)
       IF (ALLOCATED(group%term_names)) DEALLOCATE(group%term_names)
-      ALLOCATE(group%term_names(SIZE(group_terms)))
-      DO t=1,SIZE(group_terms)
-        component=source_term_descriptor(group_terms(t))
-        group%term_names(t)=component%name
-      END DO
+      ALLOCATE(group%term_names(parsed_count(g)))
+      group%term_names=parsed_names(1:parsed_count(g),g)
       group%equation_ids=[INTEGER::]
       IF (phase(g)==SOURCE_PHASE_RK_IMPLICIT) THEN
         equations=[INTEGER::]
@@ -394,20 +394,4 @@ CONTAINS
     END SELECT
   END FUNCTION native_target
 
-  !> \brief Resolve a native source-term name to its schedulable catalog identifier.
-  !> \param[in] name Input physical source-term name.
-  !> \return Schedulable term identifier, or zero when unsupported.
-  PURE INTEGER FUNCTION native_term_id(name)
-    CHARACTER(*), INTENT(IN) :: name
-    TYPE(source_term_type) :: term
-    INTEGER :: id
-    native_term_id=0
-    DO id=1,SOURCE_TERM_COUNT
-      term=source_term_descriptor(id)
-      IF (TRIM(uppercase_source_text(name))==TRIM(term%name)) THEN
-        IF (term%schedulable) native_term_id=id
-        RETURN
-      END IF
-    END DO
-  END FUNCTION native_term_id
 END MODULE source_configuration_2d
