@@ -19,25 +19,37 @@ MODULE rheology_plastic_2d
        solve_exact_velocity_flow, EXACT_FLOW_CONSTANT
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: tau, eval_rheology_plastic_implicit
-  PUBLIC :: solve_rheology_plastic_analytic
-  REAL(wp) :: tau
-  ! Uniform source treatment entry points. Existing kernels remain unchanged.
   PUBLIC :: eval_rheology_plastic_explicit
   PUBLIC :: eval_rheology_plastic_semi_implicit
+  PUBLIC :: eval_rheology_plastic_implicit
+  PUBLIC :: solve_rheology_plastic_analytic
+  PUBLIC :: tau
+  REAL(wp) :: tau
+  ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
-  !******************************************************************************
-  !> \brief Integrate the constant plastic-friction velocity source exactly.
-  !> \details Holds depth and the speed-to-horizontal-speed ratio fixed. The
-  !> speed is reduced by the constant friction acceleration until it reaches
-  !> zero; the horizontal velocity direction is preserved:
-  !> \f$r^+=\max(0,r_0-\lambda\tau/(h\beta))\f$.
-  !> \param[in] integration_step Exact-flow interval, normally dt * a_ii.
-  !> \param[in] flow_depth Explicit flow depth.
-  !> \param[in] speed_ratio Explicit ratio of total to horizontal speed.
-  !> \param[in] velocity_before Horizontal velocity before integration.
-  !> \param[out] velocity_after Horizontal velocity after integration.
-  !******************************************************************************
+
+  SUBROUTINE eval_rheology_plastic_explicit()
+    CALL fatal_error('rheology_plastic: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_plastic_explicit
+
+  SUBROUTINE eval_rheology_plastic_semi_implicit(rate_x, rate_y)
+    REAL(wp), INTENT(OUT) :: rate_x, rate_y
+    rate_x = 0.0_wp
+    rate_y = 0.0_wp
+  END SUBROUTINE eval_rheology_plastic_semi_implicit
+
+  SUBROUTINE eval_rheology_plastic_implicit(velocity_x, velocity_y, speed, &
+       mixture_density, moving, rate_x, rate_y)
+    COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y, speed, mixture_density
+    LOGICAL, INTENT(IN) :: moving
+    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
+    rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
+    rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
+    IF (.NOT. moving) RETURN
+    rate_x = -mixture_density * tau * (velocity_x / speed)
+    rate_y = -mixture_density * tau * (velocity_y / speed)
+  END SUBROUTINE eval_rheology_plastic_implicit
+
   SUBROUTINE solve_rheology_plastic_analytic(integration_step, flow_depth,  &
        speed_ratio, velocity_before, velocity_after)
     REAL(wp), INTENT(IN) :: integration_step, flow_depth, speed_ratio
@@ -54,6 +66,19 @@ CONTAINS
          speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
   END SUBROUTINE solve_rheology_plastic_analytic
+
+  !******************************************************************************
+  !> \brief Integrate the constant plastic-friction velocity source exactly.
+  !> \details Holds depth and the speed-to-horizontal-speed ratio fixed. The
+  !> speed is reduced by the constant friction acceleration until it reaches
+  !> zero; the horizontal velocity direction is preserved:
+  !> \f$r^+=\max(0,r_0-\lambda\tau/(h\beta))\f$.
+  !> \param[in] integration_step Exact-flow interval, normally dt * a_ii.
+  !> \param[in] flow_depth Explicit flow depth.
+  !> \param[in] speed_ratio Explicit ratio of total to horizontal speed.
+  !> \param[in] velocity_before Horizontal velocity before integration.
+  !> \param[out] velocity_after Horizontal velocity after integration.
+  !******************************************************************************
   !******************************************************************************
   !> \brief Evaluate the implicit plastic-friction source.
   !> \details Returns \f$-\rho_m\tau(u_x,u_y)/|\boldsymbol{u}|\f$ for a
@@ -68,25 +93,6 @@ CONTAINS
   !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !> \note Complex-valued state and rates preserve complex-step derivatives.
   !******************************************************************************
-  SUBROUTINE eval_rheology_plastic_implicit(velocity_x, velocity_y, speed, &
-       mixture_density, moving, rate_x, rate_y)
-    COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y, speed, mixture_density
-    LOGICAL, INTENT(IN) :: moving
-    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
-    rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
-    rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-    IF (.NOT. moving) RETURN
-    rate_x = -mixture_density * tau * (velocity_x / speed)
-    rate_y = -mixture_density * tau * (velocity_y / speed)
-  END SUBROUTINE eval_rheology_plastic_implicit
   ! Unsupported physical treatment, rejected by the source catalog.
-  SUBROUTINE eval_rheology_plastic_explicit()
-    CALL fatal_error('rheology_plastic: explicit treatment is unsupported')
-  END SUBROUTINE eval_rheology_plastic_explicit
   ! Valid zero component of the configured Newton treatment.
-  SUBROUTINE eval_rheology_plastic_semi_implicit(rate_x, rate_y)
-    REAL(wp), INTENT(OUT) :: rate_x, rate_y
-    rate_x = 0.0_wp
-    rate_y = 0.0_wp
-  END SUBROUTINE eval_rheology_plastic_semi_implicit
 END MODULE rheology_plastic_2d

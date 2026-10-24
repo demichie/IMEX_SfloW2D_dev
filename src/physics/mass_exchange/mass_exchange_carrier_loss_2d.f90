@@ -8,13 +8,10 @@ MODULE mass_exchange_carrier_loss_2d
 
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: eval_continuous_phase_loss_rate
-  ! Four-entry physical treatment contract; only EXPLICIT is supported.
   PUBLIC :: eval_mass_exchange_carrier_loss_explicit
   PUBLIC :: eval_mass_exchange_carrier_loss_semi_implicit
   PUBLIC :: eval_mass_exchange_carrier_loss_implicit
   PUBLIC :: solve_mass_exchange_carrier_loss_analytic
-  ! Catalog-addressable carrier-loss contributors; only explicit is supported.
   PUBLIC :: eval_mass_exchange_carrier_liquid_loss_explicit
   PUBLIC :: eval_mass_exchange_carrier_liquid_loss_semi_implicit
   PUBLIC :: eval_mass_exchange_carrier_liquid_loss_implicit
@@ -27,7 +24,11 @@ MODULE mass_exchange_carrier_loss_2d
   PUBLIC :: eval_mass_exchange_carrier_darcy_loss_semi_implicit
   PUBLIC :: eval_mass_exchange_carrier_darcy_loss_implicit
   PUBLIC :: solve_mass_exchange_carrier_darcy_loss_analytic
+  PUBLIC :: eval_continuous_phase_loss_rate
+  ! Four-entry physical treatment contract; only EXPLICIT is supported.
+  ! Catalog-addressable carrier-loss contributors; only explicit is supported.
 CONTAINS
+
   SUBROUTINE eval_mass_exchange_carrier_loss_explicit(r_h, r_T, r_alphas, alphas_tot, &
        r_rho_c, r_exc_pore_pres, &
        deposition_term, dt, continuous_phase_loss_term)
@@ -46,24 +47,6 @@ CONTAINS
          continuous_phase_loss_term, r_h, alphas_tot, maximum_solid_packing,  &
          coeff_porosity, deposition_term(1:n_solid), dt)
   END SUBROUTINE eval_mass_exchange_carrier_loss_explicit
-  PURE FUNCTION eval_continuous_phase_loss_rate(requested_loss_rate,         &
-       flow_depth, total_solid_fraction, maximum_solid_packing,               &
-       porosity_coefficient, deposition_rate, time_step) RESULT(loss_rate)
-
-    REAL(wp), INTENT(IN) :: requested_loss_rate, flow_depth
-    REAL(wp), INTENT(IN) :: total_solid_fraction, maximum_solid_packing
-    REAL(wp), INTENT(IN) :: porosity_coefficient, deposition_rate(:)
-    REAL(wp), INTENT(IN) :: time_step
-    REAL(wp) :: loss_rate
-
-    loss_rate = MIN(requested_loss_rate, flow_depth * MAX(0.0_wp,            &
-         maximum_solid_packing - total_solid_fraction) / time_step)
-    loss_rate = MIN(loss_rate, MAX(0.0_wp, (flow_depth *                     &
-         (1.0_wp - total_solid_fraction) - porosity_coefficient *            &
-         (flow_depth * total_solid_fraction - time_step *                    &
-         SUM(deposition_rate))) / time_step))
-
-  END FUNCTION eval_continuous_phase_loss_rate
 
   SUBROUTINE eval_mass_exchange_carrier_loss_semi_implicit(r_h, r_T, r_alphas, alphas_tot, r_rho_c, r_exc_pore_pres, &
        deposition_term, dt, continuous_phase_loss_term)
@@ -180,5 +163,39 @@ CONTAINS
     CALL fatal_error('mass_exchange_carrier_darcy_loss: analytic is unsupported')
     rate = 0.0_wp
   END FUNCTION solve_mass_exchange_carrier_darcy_loss_analytic
+
+  PURE FUNCTION eval_continuous_phase_loss_rate(requested_loss_rate,         &
+       flow_depth, total_solid_fraction, maximum_solid_packing,               &
+       porosity_coefficient, deposition_rate, time_step) RESULT(loss_rate)
+
+    REAL(wp), INTENT(IN) :: requested_loss_rate, flow_depth
+    REAL(wp), INTENT(IN) :: total_solid_fraction, maximum_solid_packing
+    REAL(wp), INTENT(IN) :: porosity_coefficient, deposition_rate(:)
+    REAL(wp), INTENT(IN) :: time_step
+    REAL(wp) :: loss_rate
+
+    loss_rate = MIN(requested_loss_rate, flow_depth * MAX(0.0_wp,            &
+         maximum_solid_packing - total_solid_fraction) / time_step)
+    loss_rate = MIN(loss_rate, MAX(0.0_wp, (flow_depth *                     &
+         (1.0_wp - total_solid_fraction) - porosity_coefficient *            &
+         (flow_depth * total_solid_fraction - time_step *                    &
+         SUM(deposition_rate))) / time_step))
+
+  END FUNCTION eval_continuous_phase_loss_rate
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 END MODULE mass_exchange_carrier_loss_2d

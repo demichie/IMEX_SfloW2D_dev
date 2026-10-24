@@ -25,28 +25,52 @@ MODULE rheology_lava_2d
        fatal_analytic_input_error, solve_exact_velocity_flow, EXACT_FLOW_AFFINE
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: nu_ref, visc_par, tau0
-  PUBLIC :: eval_rheology_lava_implicit
+  PUBLIC :: eval_rheology_lava_explicit
   PUBLIC :: eval_rheology_lava_semi_implicit
+  PUBLIC :: eval_rheology_lava_implicit
   PUBLIC :: solve_rheology_lava_analytic
+  PUBLIC :: nu_ref, visc_par, tau0
   REAL(wp) :: nu_ref
   REAL(wp) :: visc_par
   REAL(wp) :: tau0
   ! Uniform source treatment entry points. Existing kernels remain unchanged.
-  PUBLIC :: eval_rheology_lava_explicit
 CONTAINS
-  !******************************************************************************
-  !> \brief Integrate the lava-rheology velocity source exactly.
-  !> \details Holds depth, temperature, density, and speed ratio fixed. The
-  !> affine speed-decay law is integrated exactly, with stopping at zero.
-  !> \param[in] integration_step Exact-flow interval [s], normally dt * a_ii.
-  !> \param[in] flow_depth Explicit flow depth [m].
-  !> \param[in] temperature Explicit temperature [K].
-  !> \param[in] mixture_density Explicit mixture density [kg m^-3].
-  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
-  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
-  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
-  !******************************************************************************
+
+  SUBROUTINE eval_rheology_lava_explicit()
+    CALL fatal_error('rheology_lava: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_lava_explicit
+
+  SUBROUTINE eval_rheology_lava_semi_implicit(velocity_x, velocity_y, speed, rate_x, rate_y)
+    REAL(wp), INTENT(IN) :: velocity_x, velocity_y, speed
+    REAL(wp), INTENT(OUT) :: rate_x, rate_y
+    rate_x = 0.0_wp
+    rate_y = 0.0_wp
+    IF (speed .LE. 0.0_wp) RETURN
+    rate_x = -tau0 * velocity_x / speed
+    rate_y = -tau0 * velocity_y / speed
+  END SUBROUTINE eval_rheology_lava_semi_implicit
+
+  SUBROUTINE eval_rheology_lava_implicit(flow_depth, temperature, mixture_density, &
+       velocity_x, velocity_y, moving, rate_x, rate_y)
+    COMPLEX(wp), INTENT(IN) :: flow_depth, temperature, mixture_density
+    COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y
+    LOGICAL, INTENT(IN) :: moving
+    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
+    COMPLEX(wp) :: gamma
+    REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
+    rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
+    rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
+    IF (REAL(flow_depth, wp) .GT. h_threshold) THEN
+       gamma = 3.0_wp * nu_ref / flow_depth * EXP(-visc_par * (temperature - T_ref))
+    ELSE
+       gamma = 3.0_wp * nu_ref / h_threshold * EXP(-visc_par * (temperature - T_ref))
+    END IF
+    IF (moving) THEN
+       rate_x = -mixture_density * gamma * velocity_x
+       rate_y = -mixture_density * gamma * velocity_y
+    END IF
+  END SUBROUTINE eval_rheology_lava_implicit
+
   SUBROUTINE solve_rheology_lava_analytic(integration_step, flow_depth,     &
        temperature, mixture_density, speed_ratio, velocity_before,           &
        velocity_after)
@@ -75,6 +99,19 @@ CONTAINS
          speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
   END SUBROUTINE solve_rheology_lava_analytic
+
+  !******************************************************************************
+  !> \brief Integrate the lava-rheology velocity source exactly.
+  !> \details Holds depth, temperature, density, and speed ratio fixed. The
+  !> affine speed-decay law is integrated exactly, with stopping at zero.
+  !> \param[in] integration_step Exact-flow interval [s], normally dt * a_ii.
+  !> \param[in] flow_depth Explicit flow depth [m].
+  !> \param[in] temperature Explicit temperature [K].
+  !> \param[in] mixture_density Explicit mixture density [kg m^-3].
+  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
+  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
+  !******************************************************************************
   !******************************************************************************
   !> \brief Evaluate the implicit temperature-dependent viscous drag.
   !> \details Computes the depth-regularized drag coefficient and returns the
@@ -90,26 +127,6 @@ CONTAINS
   !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !> \note Complex-valued state and rates preserve complex-step derivatives.
   !******************************************************************************
-  SUBROUTINE eval_rheology_lava_implicit(flow_depth, temperature, mixture_density, &
-       velocity_x, velocity_y, moving, rate_x, rate_y)
-    COMPLEX(wp), INTENT(IN) :: flow_depth, temperature, mixture_density
-    COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y
-    LOGICAL, INTENT(IN) :: moving
-    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
-    COMPLEX(wp) :: gamma
-    REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
-    rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
-    rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-    IF (REAL(flow_depth, wp) .GT. h_threshold) THEN
-       gamma = 3.0_wp * nu_ref / flow_depth * EXP(-visc_par * (temperature - T_ref))
-    ELSE
-       gamma = 3.0_wp * nu_ref / h_threshold * EXP(-visc_par * (temperature - T_ref))
-    END IF
-    IF (moving) THEN
-       rate_x = -mixture_density * gamma * velocity_x
-       rate_y = -mixture_density * gamma * velocity_y
-    END IF
-  END SUBROUTINE eval_rheology_lava_implicit
   !******************************************************************************
   !> \brief Evaluate the semi-implicit lava yield-stress momentum rate.
   !> \details Returns \f$-\tau_0(u_x,u_y)/|\boldsymbol{u}|\f$ for positive
@@ -120,17 +137,5 @@ CONTAINS
   !> \param[out] rate_x x momentum source rate.
   !> \param[out] rate_y y momentum source rate.
   !******************************************************************************
-  SUBROUTINE eval_rheology_lava_semi_implicit(velocity_x, velocity_y, speed, rate_x, rate_y)
-    REAL(wp), INTENT(IN) :: velocity_x, velocity_y, speed
-    REAL(wp), INTENT(OUT) :: rate_x, rate_y
-    rate_x = 0.0_wp
-    rate_y = 0.0_wp
-    IF (speed .LE. 0.0_wp) RETURN
-    rate_x = -tau0 * velocity_x / speed
-    rate_y = -tau0 * velocity_y / speed
-  END SUBROUTINE eval_rheology_lava_semi_implicit
   ! Unsupported physical treatment, rejected by the source catalog.
-  SUBROUTINE eval_rheology_lava_explicit()
-    CALL fatal_error('rheology_lava: explicit treatment is unsupported')
-  END SUBROUTINE eval_rheology_lava_explicit
 END MODULE rheology_lava_2d

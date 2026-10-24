@@ -15,10 +15,12 @@ MODULE thermal_laws_2d
 
   PRIVATE
 
-  PUBLIC :: eval_inlet_thermal_energy_source
+  PUBLIC :: eval_thermal_cooling_explicit
+  PUBLIC :: eval_thermal_cooling_semi_implicit
   PUBLIC :: eval_thermal_cooling_implicit
-  PUBLIC :: eval_rheology_cooling_energy_rate
   PUBLIC :: solve_thermal_cooling_analytic
+  PUBLIC :: eval_inlet_thermal_energy_source
+  PUBLIC :: eval_rheology_cooling_energy_rate
   PUBLIC :: advance_lava_cooling_temperature
   PUBLIC :: eval_vaporization_mass_rate
   PUBLIC :: eval_vaporization_energy_rate
@@ -29,51 +31,18 @@ MODULE thermal_laws_2d
   REAL(wp), PARAMETER :: vaporization_liquid_heat_capacity = 4184.0_wp
 
   ! Uniform treatment surface for this source family.
-  PUBLIC :: eval_thermal_cooling_semi_implicit
-  PUBLIC :: eval_thermal_cooling_explicit
 
 CONTAINS
 
-  !******************************************************************************
-  !> \brief Compute the sensible thermal-energy source from injected material.
-  !> \details Returns
-  !>          \f$S_T=c_t\dot{H}\rho_m c_{p,m}T_s\f$,
-  !>          the injected material's enthalpy rate per unit horizontal area.
-  !> \param[in] time_coefficient Dimensionless temporal activation or step-averaged source weight.
-  !> \param[in] injection_rate Equivalent injected layer-thickness rate [m s^-1].
-  !> \param[in] mixture_density Density of the injected mixture [kg m^-3].
-  !> \param[in] mixture_heat_capacity Specific heat capacity of the injected mixture
-  !>                                  [J kg^-1 K^-1].
-  !> \param[in] source_temperature Temperature of the injected material [K].
-  !> \return Thermal-energy source per unit area [W m^-2].
-  !******************************************************************************
-  PURE FUNCTION eval_inlet_thermal_energy_source(time_coefficient, injection_rate, &
-       mixture_density, mixture_heat_capacity, source_temperature) RESULT(source)
+  SUBROUTINE eval_thermal_cooling_explicit()
+    CALL fatal_error('thermal_cooling: explicit treatment is unsupported')
+  END SUBROUTINE eval_thermal_cooling_explicit
 
-    REAL(wp), INTENT(IN) :: time_coefficient
-    REAL(wp), INTENT(IN) :: injection_rate
-    REAL(wp), INTENT(IN) :: mixture_density
-    REAL(wp), INTENT(IN) :: mixture_heat_capacity
-    REAL(wp), INTENT(IN) :: source_temperature
-    REAL(wp) :: source
+  SUBROUTINE eval_thermal_cooling_semi_implicit(rate)
+    REAL(wp), INTENT(OUT) :: rate
+    rate = 0.0_wp
+  END SUBROUTINE eval_thermal_cooling_semi_implicit
 
-    source = time_coefficient * injection_rate * mixture_density *             &
-         mixture_heat_capacity * source_temperature
-
-  END FUNCTION eval_inlet_thermal_energy_source
-
-  !******************************************************************************
-  !> \brief Evaluate the lava radiative and convective cooling energy rate.
-  !> \details Uses the net Stefan-type radiation and linear convection law
-  !>          \f$S_T=-k_r(T^4-T_a^4)-k_c(T-T_a)\f$.
-  !>          The complex temperature argument preserves complex-step
-  !>          derivatives used by the implicit solver.
-  !> \param[in] temperature Current lava temperature, real or complex [K].
-  !> \param[in] radiative_coefficient Radiative coefficient k_r [W m^-2 K^-4].
-  !> \param[in] convective_coefficient Convective coefficient k_c [W m^-2 K^-1].
-  !> \param[in] ambient_temperature Ambient temperature T_a [K].
-  !> \return Net cooling energy rate per unit area [W m^-2].
-  !******************************************************************************
   PURE FUNCTION eval_thermal_cooling_implicit(temperature, radiative_coefficient, &
        convective_coefficient, ambient_temperature) RESULT(source)
 
@@ -88,56 +57,6 @@ CONTAINS
 
   END FUNCTION eval_thermal_cooling_implicit
 
-  !******************************************************************************
-  !> \brief Evaluate the cooling energy rate associated with the selected rheology.
-  !> \details Lava uses the radiative/convective cooling law; other models
-  !>          contribute no rheology-specific cooling source.
-  !> \param[in] model_id Selected rheology model ID.
-  !> \param[in] temperature Current temperature [K].
-  !> \param[in] radiative_coefficient Radiative coefficient [W m^-2 K^-4].
-  !> \param[in] convective_coefficient Convective coefficient [W m^-2 K^-1].
-  !> \param[in] ambient_temperature Ambient temperature [K].
-  !> \return Rheology-specific thermal-energy rate per unit area [W m^-2].
-  !******************************************************************************
-  PURE FUNCTION eval_rheology_cooling_energy_rate(model_id, temperature,     &
-       radiative_coefficient, convective_coefficient, ambient_temperature)   &
-       RESULT(rate)
-
-    INTEGER, INTENT(IN) :: model_id
-    COMPLEX(wp), INTENT(IN) :: temperature
-    REAL(wp), INTENT(IN) :: radiative_coefficient, convective_coefficient
-    REAL(wp), INTENT(IN) :: ambient_temperature
-    COMPLEX(wp) :: rate
-
-    SELECT CASE (model_id)
-    CASE (rheology_id_lava)
-       rate = eval_thermal_cooling_implicit(temperature, radiative_coefficient, &
-            convective_coefficient, ambient_temperature)
-    CASE DEFAULT
-       rate = CMPLX(0.0_wp, 0.0_wp, wp)
-    END SELECT
-
-  END FUNCTION eval_rheology_cooling_energy_rate
-
-  !******************************************************************************
-  !> \brief Solve the exact-flow lava cooling temperature over a time interval.
-  !> \details Separates the autonomous temperature equation and evaluates its
-  !>          analytic time-temperature primitive. A bisection inversion finds
-  !>          the temperature after the requested integration interval. The
-  !>          areal thermal capacity and cooling coefficients are held fixed:
-  !>          \f$C_A\frac{dT}{dt}=-k_r(T^4-T_a^4)-k_c(T-T_a)\f$.
-  !>          The result is constrained to the closed interval between the
-  !>          initial and ambient temperatures.
-  !> \param[in] temperature Initial lava temperature T(0) [K].
-  !> \param[in] integration_step Integration interval, normally dt*a_ii [s].
-  !> \param[in] areal_heat_capacity Areal heat capacity C_A [J m^-2 K^-1].
-  !> \param[in] radiative_coefficient Radiative cooling coefficient k_r [W m^-2 K^-4].
-  !> \param[in] convective_coefficient Convective cooling coefficient k_c [W m^-2 K^-1].
-  !> \param[in] ambient_temperature Ambient temperature T_a [K].
-  !> \param[out] temperature_after Exact-flow temperature after integration_step [K].
-  !> \note Requires finite inputs, positive initial and ambient temperatures, positive heat
-  !>       capacity, nonnegative integration step, and nonnegative cooling coefficients.
-  !******************************************************************************
   SUBROUTINE solve_thermal_cooling_analytic(temperature, integration_step,   &
        areal_heat_capacity, radiative_coefficient, convective_coefficient,     &
        ambient_temperature, temperature_after)
@@ -255,6 +174,99 @@ CONTAINS
     END IF
 
   END SUBROUTINE solve_thermal_cooling_analytic
+
+
+  !******************************************************************************
+  !> \brief Compute the sensible thermal-energy source from injected material.
+  !> \details Returns
+  !>          \f$S_T=c_t\dot{H}\rho_m c_{p,m}T_s\f$,
+  !>          the injected material's enthalpy rate per unit horizontal area.
+  !> \param[in] time_coefficient Dimensionless temporal activation or step-averaged source weight.
+  !> \param[in] injection_rate Equivalent injected layer-thickness rate [m s^-1].
+  !> \param[in] mixture_density Density of the injected mixture [kg m^-3].
+  !> \param[in] mixture_heat_capacity Specific heat capacity of the injected mixture
+  !>                                  [J kg^-1 K^-1].
+  !> \param[in] source_temperature Temperature of the injected material [K].
+  !> \return Thermal-energy source per unit area [W m^-2].
+  !******************************************************************************
+  PURE FUNCTION eval_inlet_thermal_energy_source(time_coefficient, injection_rate, &
+       mixture_density, mixture_heat_capacity, source_temperature) RESULT(source)
+
+    REAL(wp), INTENT(IN) :: time_coefficient
+    REAL(wp), INTENT(IN) :: injection_rate
+    REAL(wp), INTENT(IN) :: mixture_density
+    REAL(wp), INTENT(IN) :: mixture_heat_capacity
+    REAL(wp), INTENT(IN) :: source_temperature
+    REAL(wp) :: source
+
+    source = time_coefficient * injection_rate * mixture_density *             &
+         mixture_heat_capacity * source_temperature
+
+  END FUNCTION eval_inlet_thermal_energy_source
+
+  !******************************************************************************
+  !> \brief Evaluate the lava radiative and convective cooling energy rate.
+  !> \details Uses the net Stefan-type radiation and linear convection law
+  !>          \f$S_T=-k_r(T^4-T_a^4)-k_c(T-T_a)\f$.
+  !>          The complex temperature argument preserves complex-step
+  !>          derivatives used by the implicit solver.
+  !> \param[in] temperature Current lava temperature, real or complex [K].
+  !> \param[in] radiative_coefficient Radiative coefficient k_r [W m^-2 K^-4].
+  !> \param[in] convective_coefficient Convective coefficient k_c [W m^-2 K^-1].
+  !> \param[in] ambient_temperature Ambient temperature T_a [K].
+  !> \return Net cooling energy rate per unit area [W m^-2].
+  !******************************************************************************
+
+  !******************************************************************************
+  !> \brief Evaluate the cooling energy rate associated with the selected rheology.
+  !> \details Lava uses the radiative/convective cooling law; other models
+  !>          contribute no rheology-specific cooling source.
+  !> \param[in] model_id Selected rheology model ID.
+  !> \param[in] temperature Current temperature [K].
+  !> \param[in] radiative_coefficient Radiative coefficient [W m^-2 K^-4].
+  !> \param[in] convective_coefficient Convective coefficient [W m^-2 K^-1].
+  !> \param[in] ambient_temperature Ambient temperature [K].
+  !> \return Rheology-specific thermal-energy rate per unit area [W m^-2].
+  !******************************************************************************
+  PURE FUNCTION eval_rheology_cooling_energy_rate(model_id, temperature,     &
+       radiative_coefficient, convective_coefficient, ambient_temperature)   &
+       RESULT(rate)
+
+    INTEGER, INTENT(IN) :: model_id
+    COMPLEX(wp), INTENT(IN) :: temperature
+    REAL(wp), INTENT(IN) :: radiative_coefficient, convective_coefficient
+    REAL(wp), INTENT(IN) :: ambient_temperature
+    COMPLEX(wp) :: rate
+
+    SELECT CASE (model_id)
+    CASE (rheology_id_lava)
+       rate = eval_thermal_cooling_implicit(temperature, radiative_coefficient, &
+            convective_coefficient, ambient_temperature)
+    CASE DEFAULT
+       rate = CMPLX(0.0_wp, 0.0_wp, wp)
+    END SELECT
+
+  END FUNCTION eval_rheology_cooling_energy_rate
+
+  !******************************************************************************
+  !> \brief Solve the exact-flow lava cooling temperature over a time interval.
+  !> \details Separates the autonomous temperature equation and evaluates its
+  !>          analytic time-temperature primitive. A bisection inversion finds
+  !>          the temperature after the requested integration interval. The
+  !>          areal thermal capacity and cooling coefficients are held fixed:
+  !>          \f$C_A\frac{dT}{dt}=-k_r(T^4-T_a^4)-k_c(T-T_a)\f$.
+  !>          The result is constrained to the closed interval between the
+  !>          initial and ambient temperatures.
+  !> \param[in] temperature Initial lava temperature T(0) [K].
+  !> \param[in] integration_step Integration interval, normally dt*a_ii [s].
+  !> \param[in] areal_heat_capacity Areal heat capacity C_A [J m^-2 K^-1].
+  !> \param[in] radiative_coefficient Radiative cooling coefficient k_r [W m^-2 K^-4].
+  !> \param[in] convective_coefficient Convective cooling coefficient k_c [W m^-2 K^-1].
+  !> \param[in] ambient_temperature Ambient temperature T_a [K].
+  !> \param[out] temperature_after Exact-flow temperature after integration_step [K].
+  !> \note Requires finite inputs, positive initial and ambient temperatures, positive heat
+  !>       capacity, nonnegative integration step, and nonnegative cooling coefficients.
+  !******************************************************************************
 
   !******************************************************************************
   !> \brief Backward-compatible name for the exact-flow lava cooling solver.
@@ -416,13 +428,6 @@ CONTAINS
   END FUNCTION lava_cooling_time_primitive
 
   ! Valid zero contribution for the semi-implicit part of Newton.
-  SUBROUTINE eval_thermal_cooling_semi_implicit(rate)
-    REAL(wp), INTENT(OUT) :: rate
-    rate = 0.0_wp
-  END SUBROUTINE eval_thermal_cooling_semi_implicit
 
-  SUBROUTINE eval_thermal_cooling_explicit()
-    CALL fatal_error('thermal_cooling: explicit treatment is unsupported')
-  END SUBROUTINE eval_thermal_cooling_explicit
 
 END MODULE thermal_laws_2d

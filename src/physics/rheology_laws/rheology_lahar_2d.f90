@@ -41,10 +41,12 @@ MODULE rheology_lahar_2d
        EXACT_FLOW_QUADRATIC_POLYNOMIAL
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
-  PUBLIC :: eval_lahar_fluid_viscosity, eval_rheology_lahar_implicit
+  PUBLIC :: eval_rheology_lahar_explicit
   PUBLIC :: eval_rheology_lahar_semi_implicit
+  PUBLIC :: eval_rheology_lahar_implicit
   PUBLIC :: solve_rheology_lahar_analytic
+  PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
+  PUBLIC :: eval_lahar_fluid_viscosity
   REAL(wp) :: alpha2
   REAL(wp) :: beta2
   REAL(wp) :: alpha1_coeff
@@ -57,21 +59,72 @@ MODULE rheology_lahar_2d
      MODULE PROCEDURE eval_lahar_fluid_viscosity_complex
   END INTERFACE eval_lahar_fluid_viscosity
   ! Uniform source treatment entry points. Existing kernels remain unchanged.
-  PUBLIC :: eval_rheology_lahar_explicit
 CONTAINS
-  !******************************************************************************
-  !> \brief Integrate the lahar velocity source exactly.
-  !> \details Holds temperature, concentration, depth, density, and speed
-  !> ratio fixed while integrating the polynomial speed-decay law.
-  !> \param[in] integration_step Exact-flow integration interval [s].
-  !> \param[in] flow_depth Explicit flow depth [m].
-  !> \param[in] temperature Explicit absolute temperature [K].
-  !> \param[in] solid_fraction_sum Explicit total solid volume fraction.
-  !> \param[in] mixture_density Explicit mixture density [kg m^-3].
-  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
-  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
-  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
-  !******************************************************************************
+
+  SUBROUTINE eval_rheology_lahar_explicit()
+    CALL fatal_error('rheology_lahar: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_lahar_explicit
+
+  SUBROUTINE eval_rheology_lahar_semi_implicit(flow_depth, velocity_x, velocity_y, &
+       horizontal_speed, mixture_density, solid_fraction_sum, moving,          &
+       rate_x, rate_y)
+    REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y
+    REAL(wp), INTENT(IN) :: horizontal_speed, mixture_density, solid_fraction_sum
+    LOGICAL, INTENT(IN) :: moving
+    REAL(wp), INTENT(OUT) :: rate_x, rate_y
+    REAL(wp) :: yield_strength, yield_slope, friction_term
+    REAL(wp), PARAMETER :: depth_threshold = 1.0E-20_wp
+    rate_x = 0.0_wp
+    rate_y = 0.0_wp
+    IF (.NOT. moving) RETURN
+    yield_strength = alpha2 * (EXP(beta2 * solid_fraction_sum) - 1.0_wp)
+    IF (flow_depth .GT. depth_threshold) THEN
+       yield_slope = yield_strength / (grav * mixture_density * flow_depth)
+    ELSE
+       yield_slope = yield_strength / (grav * mixture_density * depth_threshold)
+    END IF
+    friction_term = grav * mixture_density * flow_depth * yield_slope
+    rate_x = -friction_term * velocity_x / horizontal_speed
+    rate_y = -friction_term * velocity_y / horizontal_speed
+  END SUBROUTINE eval_rheology_lahar_semi_implicit
+
+  SUBROUTINE eval_rheology_lahar_implicit(flow_depth, velocity_x, velocity_y,    &
+       speed, horizontal_speed, temperature, mixture_density, inverse_density, &
+       solid_fractions, moving, rate_x, rate_y)
+    COMPLEX(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y
+    COMPLEX(wp), INTENT(IN) :: speed, horizontal_speed, temperature
+    COMPLEX(wp), INTENT(IN) :: mixture_density, inverse_density
+    COMPLEX(wp), INTENT(IN) :: solid_fractions(:)
+    LOGICAL, INTENT(IN) :: moving
+    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
+    COMPLEX(wp) :: fluid_viscosity, inverse_depth, viscous_slope
+    COMPLEX(wp) :: turbulent_slope, total_slope, friction_term
+    REAL(wp) :: depth_threshold
+    rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
+    rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
+    IF (wp .EQ. sp) THEN
+       depth_threshold = 1.0E-10_wp
+    ELSE
+       depth_threshold = 1.0E-20_wp
+    END IF
+    fluid_viscosity = eval_lahar_fluid_viscosity(temperature, SUM(solid_fractions))
+    IF (REAL(flow_depth, wp) .GT. depth_threshold) THEN
+       inverse_depth = 1.0_wp / flow_depth
+       viscous_slope = Kappa * fluid_viscosity * speed * 0.125_wp *          &
+            inverse_density * inv_grav * inverse_depth**2
+       turbulent_slope = n_td2 * speed**2 * inverse_depth**four_thirds
+    ELSE
+       viscous_slope = Kappa * fluid_viscosity * speed /                    &
+            (8.0_wp * mixture_density * grav * depth_threshold**2)
+       turbulent_slope = n_td2 * speed**2 * depth_threshold**neg_four_thirds
+    END IF
+    total_slope = viscous_slope + turbulent_slope
+    IF (.NOT. moving) RETURN
+    friction_term = grav * mixture_density * flow_depth * total_slope / horizontal_speed
+    rate_x = -velocity_x * friction_term
+    rate_y = -velocity_y * friction_term
+  END SUBROUTINE eval_rheology_lahar_implicit
+
   SUBROUTINE solve_rheology_lahar_analytic(integration_step, flow_depth,   &
        temperature, solid_fraction_sum, mixture_density, speed_ratio,       &
        velocity_before, velocity_after)
@@ -109,6 +162,20 @@ CONTAINS
          speed_before, speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
   END SUBROUTINE solve_rheology_lahar_analytic
+
+  !******************************************************************************
+  !> \brief Integrate the lahar velocity source exactly.
+  !> \details Holds temperature, concentration, depth, density, and speed
+  !> ratio fixed while integrating the polynomial speed-decay law.
+  !> \param[in] integration_step Exact-flow integration interval [s].
+  !> \param[in] flow_depth Explicit flow depth [m].
+  !> \param[in] temperature Explicit absolute temperature [K].
+  !> \param[in] solid_fraction_sum Explicit total solid volume fraction.
+  !> \param[in] mixture_density Explicit mixture density [kg m^-3].
+  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
+  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
+  !******************************************************************************
   !******************************************************************************
   !> \brief Evaluate the implicit viscous and turbulent lahar source.
   !> \details Computes the temperature- and concentration-dependent fluid
@@ -129,42 +196,6 @@ CONTAINS
   !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
   !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !******************************************************************************
-  SUBROUTINE eval_rheology_lahar_implicit(flow_depth, velocity_x, velocity_y,    &
-       speed, horizontal_speed, temperature, mixture_density, inverse_density, &
-       solid_fractions, moving, rate_x, rate_y)
-    COMPLEX(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y
-    COMPLEX(wp), INTENT(IN) :: speed, horizontal_speed, temperature
-    COMPLEX(wp), INTENT(IN) :: mixture_density, inverse_density
-    COMPLEX(wp), INTENT(IN) :: solid_fractions(:)
-    LOGICAL, INTENT(IN) :: moving
-    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
-    COMPLEX(wp) :: fluid_viscosity, inverse_depth, viscous_slope
-    COMPLEX(wp) :: turbulent_slope, total_slope, friction_term
-    REAL(wp) :: depth_threshold
-    rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
-    rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-    IF (wp .EQ. sp) THEN
-       depth_threshold = 1.0E-10_wp
-    ELSE
-       depth_threshold = 1.0E-20_wp
-    END IF
-    fluid_viscosity = eval_lahar_fluid_viscosity(temperature, SUM(solid_fractions))
-    IF (REAL(flow_depth, wp) .GT. depth_threshold) THEN
-       inverse_depth = 1.0_wp / flow_depth
-       viscous_slope = Kappa * fluid_viscosity * speed * 0.125_wp *          &
-            inverse_density * inv_grav * inverse_depth**2
-       turbulent_slope = n_td2 * speed**2 * inverse_depth**four_thirds
-    ELSE
-       viscous_slope = Kappa * fluid_viscosity * speed /                    &
-            (8.0_wp * mixture_density * grav * depth_threshold**2)
-       turbulent_slope = n_td2 * speed**2 * depth_threshold**neg_four_thirds
-    END IF
-    total_slope = viscous_slope + turbulent_slope
-    IF (.NOT. moving) RETURN
-    friction_term = grav * mixture_density * flow_depth * total_slope / horizontal_speed
-    rate_x = -velocity_x * friction_term
-    rate_y = -velocity_y * friction_term
-  END SUBROUTINE eval_rheology_lahar_implicit
   !******************************************************************************
   !> \brief Evaluate the semi-implicit lahar yield-stress momentum rate.
   !> \details Computes \f$Y=\alpha_2[\exp(\beta_2 C)-1]\f$ and returns
@@ -179,28 +210,6 @@ CONTAINS
   !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
   !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !******************************************************************************
-  SUBROUTINE eval_rheology_lahar_semi_implicit(flow_depth, velocity_x, velocity_y, &
-       horizontal_speed, mixture_density, solid_fraction_sum, moving,          &
-       rate_x, rate_y)
-    REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y
-    REAL(wp), INTENT(IN) :: horizontal_speed, mixture_density, solid_fraction_sum
-    LOGICAL, INTENT(IN) :: moving
-    REAL(wp), INTENT(OUT) :: rate_x, rate_y
-    REAL(wp) :: yield_strength, yield_slope, friction_term
-    REAL(wp), PARAMETER :: depth_threshold = 1.0E-20_wp
-    rate_x = 0.0_wp
-    rate_y = 0.0_wp
-    IF (.NOT. moving) RETURN
-    yield_strength = alpha2 * (EXP(beta2 * solid_fraction_sum) - 1.0_wp)
-    IF (flow_depth .GT. depth_threshold) THEN
-       yield_slope = yield_strength / (grav * mixture_density * flow_depth)
-    ELSE
-       yield_slope = yield_strength / (grav * mixture_density * depth_threshold)
-    END IF
-    friction_term = grav * mixture_density * flow_depth * yield_slope
-    rate_x = -friction_term * velocity_x / horizontal_speed
-    rate_y = -friction_term * velocity_y / horizontal_speed
-  END SUBROUTINE eval_rheology_lahar_semi_implicit
   !******************************************************************************
   !> \brief Evaluate carrier-fluid viscosity for real state variables.
   !> \details Wraps the complex correlation for real state variables.
@@ -246,7 +255,4 @@ CONTAINS
     fluid_viscosity = alpha1 * EXP(beta1 * solid_fraction_sum)
   END FUNCTION eval_lahar_fluid_viscosity_complex
   ! Unsupported physical treatment, rejected by the source catalog.
-  SUBROUTINE eval_rheology_lahar_explicit()
-    CALL fatal_error('rheology_lahar: explicit treatment is unsupported')
-  END SUBROUTINE eval_rheology_lahar_explicit
 END MODULE rheology_lahar_2d

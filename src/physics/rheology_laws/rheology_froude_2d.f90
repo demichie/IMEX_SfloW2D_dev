@@ -25,27 +25,51 @@ MODULE rheology_froude_2d
        EXACT_FLOW_FROUDE
   IMPLICIT NONE
   PRIVATE
+  PUBLIC :: eval_rheology_froude_explicit
   PUBLIC :: eval_rheology_froude_semi_implicit
+  PUBLIC :: eval_rheology_froude_implicit
   PUBLIC :: solve_rheology_froude_analytic
   ! Uniform source treatment entry points. Existing kernels remain unchanged.
-  PUBLIC :: eval_rheology_froude_explicit
-  PUBLIC :: eval_rheology_froude_implicit
 CONTAINS
-  !******************************************************************************
-  !> \brief Integrate the Froude-dependent velocity source exactly.
-  !> \details Holds depth, gravity, curvature, and the speed ratio fixed while
-  !> integrating the frozen scalar speed-decay law.
-  !> \param[in] integration_step Exact-flow integration interval [s].
-  !> \param[in] flow_depth Explicit flow depth [m].
-  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
-  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
-  !> \param[in] reduced_gravity Explicit reduced gravity [m s^-2].
-  !> \param[in] gravity_coefficient Explicit gravity multiplier [dimensionless].
-  !> \param[in] curvature_term Explicit curvature acceleration [m s^-2].
-  !> \param[in] stochastic Enable the explicit Froude shift.
-  !> \param[in] stochastic_value Explicit stochastic increment [dimensionless].
-  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
-  !******************************************************************************
+
+  SUBROUTINE eval_rheology_froude_explicit()
+    CALL fatal_error('rheology_froude: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_froude_explicit
+
+  SUBROUTINE eval_rheology_froude_semi_implicit( flow_depth, velocity_x, velocity_y, speed, &
+       horizontal_speed, mixture_density, reduced_gravity, gravity_coefficient, &
+       curvature_term, stochastic, stochastic_value, rate_x, rate_y )
+    REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
+    REAL(wp), INTENT(IN) :: horizontal_speed, mixture_density, reduced_gravity
+    REAL(wp), INTENT(IN) :: gravity_coefficient, curvature_term
+    LOGICAL, INTENT(IN) :: stochastic
+    REAL(wp), INTENT(IN) :: stochastic_value
+    REAL(wp), INTENT(OUT) :: rate_x, rate_y
+    REAL(wp) :: froude_number
+    REAL(wp) :: friction_coefficient
+    REAL(wp) :: friction_stress
+    rate_x = 0.0_wp
+    rate_y = 0.0_wp
+    IF ( speed .GT. 0.0_wp .AND. reduced_gravity .GT. 0.0_wp ) THEN
+       froude_number = speed / SQRT(reduced_gravity * flow_depth)
+       IF ( stochastic ) THEN
+          IF ( flow_depth .GT. 0.01_wp ) froude_number = froude_number + stochastic_value
+          IF ( froude_number .LT. 0.0_wp ) froude_number = 0.0_wp
+       END IF
+       friction_coefficient = mu_inf + (mu_0 - mu_inf) * EXP(-froude_number/Fr_0)
+       friction_stress = mixture_density * ( friction_coefficient * flow_depth * &
+            gravity_coefficient * ( reduced_gravity + curvature_term ) )
+       rate_x = rate_x - friction_stress * velocity_x / horizontal_speed
+       rate_y = rate_y - friction_stress * velocity_y / horizontal_speed
+    END IF
+  END SUBROUTINE eval_rheology_froude_semi_implicit
+
+  SUBROUTINE eval_rheology_froude_implicit(rate_x, rate_y)
+    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
+    rate_x = CMPLX(0.0_wp,0.0_wp,wp)
+    rate_y = CMPLX(0.0_wp,0.0_wp,wp)
+  END SUBROUTINE eval_rheology_froude_implicit
+
   SUBROUTINE solve_rheology_froude_analytic(integration_step, flow_depth,  &
        speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,   &
        curvature_term, stochastic, stochastic_value, velocity_after)
@@ -78,6 +102,22 @@ CONTAINS
          integration_step, speed_before, speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
   END SUBROUTINE solve_rheology_froude_analytic
+
+  !******************************************************************************
+  !> \brief Integrate the Froude-dependent velocity source exactly.
+  !> \details Holds depth, gravity, curvature, and the speed ratio fixed while
+  !> integrating the frozen scalar speed-decay law.
+  !> \param[in] integration_step Exact-flow integration interval [s].
+  !> \param[in] flow_depth Explicit flow depth [m].
+  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
+  !> \param[in] reduced_gravity Explicit reduced gravity [m s^-2].
+  !> \param[in] gravity_coefficient Explicit gravity multiplier [dimensionless].
+  !> \param[in] curvature_term Explicit curvature acceleration [m s^-2].
+  !> \param[in] stochastic Enable the explicit Froude shift.
+  !> \param[in] stochastic_value Explicit stochastic increment [dimensionless].
+  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
+  !******************************************************************************
   !******************************************************************************
   !> \brief Evaluate model 9's Froude-dependent Coulomb source.
   !> \details Computes the Froude number and the exponentially weakening
@@ -98,41 +138,6 @@ CONTAINS
   !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
   !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !******************************************************************************
-  SUBROUTINE eval_rheology_froude_semi_implicit( flow_depth, velocity_x, velocity_y, speed, &
-       horizontal_speed, mixture_density, reduced_gravity, gravity_coefficient, &
-       curvature_term, stochastic, stochastic_value, rate_x, rate_y )
-    REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
-    REAL(wp), INTENT(IN) :: horizontal_speed, mixture_density, reduced_gravity
-    REAL(wp), INTENT(IN) :: gravity_coefficient, curvature_term
-    LOGICAL, INTENT(IN) :: stochastic
-    REAL(wp), INTENT(IN) :: stochastic_value
-    REAL(wp), INTENT(OUT) :: rate_x, rate_y
-    REAL(wp) :: froude_number
-    REAL(wp) :: friction_coefficient
-    REAL(wp) :: friction_stress
-    rate_x = 0.0_wp
-    rate_y = 0.0_wp
-    IF ( speed .GT. 0.0_wp .AND. reduced_gravity .GT. 0.0_wp ) THEN
-       froude_number = speed / SQRT(reduced_gravity * flow_depth)
-       IF ( stochastic ) THEN
-          IF ( flow_depth .GT. 0.01_wp ) froude_number = froude_number + stochastic_value
-          IF ( froude_number .LT. 0.0_wp ) froude_number = 0.0_wp
-       END IF
-       friction_coefficient = mu_inf + (mu_0 - mu_inf) * EXP(-froude_number/Fr_0)
-       friction_stress = mixture_density * ( friction_coefficient * flow_depth * &
-            gravity_coefficient * ( reduced_gravity + curvature_term ) )
-       rate_x = rate_x - friction_stress * velocity_x / horizontal_speed
-       rate_y = rate_y - friction_stress * velocity_y / horizontal_speed
-    END IF
-  END SUBROUTINE eval_rheology_froude_semi_implicit
   ! Unsupported physical treatment, rejected by the source catalog.
-  SUBROUTINE eval_rheology_froude_explicit()
-    CALL fatal_error('rheology_froude: explicit treatment is unsupported')
-  END SUBROUTINE eval_rheology_froude_explicit
   ! Valid zero component of the configured Newton treatment.
-  SUBROUTINE eval_rheology_froude_implicit(rate_x, rate_y)
-    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
-    rate_x = CMPLX(0.0_wp,0.0_wp,wp)
-    rate_y = CMPLX(0.0_wp,0.0_wp,wp)
-  END SUBROUTINE eval_rheology_froude_implicit
 END MODULE rheology_froude_2d

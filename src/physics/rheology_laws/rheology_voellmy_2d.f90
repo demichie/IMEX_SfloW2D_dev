@@ -31,32 +31,75 @@ MODULE rheology_voellmy_2d
        EXACT_FLOW_QUADRATIC_POLYNOMIAL
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: mu, eval_rheology_voellmy_implicit
+  PUBLIC :: eval_rheology_voellmy_explicit
   PUBLIC :: eval_rheology_voellmy_semi_implicit
+  PUBLIC :: eval_rheology_voellmy_implicit
   PUBLIC :: solve_rheology_voellmy_analytic
+  PUBLIC :: mu
   REAL(wp) :: mu
   ! Uniform source treatment entry points. Existing kernels remain unchanged.
-  PUBLIC :: eval_rheology_voellmy_explicit
 CONTAINS
-  !******************************************************************************
-  !> \brief Integrate the Voellmy velocity source exactly.
-  !> \details Combines the frozen Coulomb stress with quadratic turbulent
-  !> drag. Depth, density, gravity, curvature, pore pressure, and the
-  !> speed-to-horizontal-speed ratio remain fixed during integration.
-  !> \param[in] integration_step Exact-flow integration interval [s].
-  !> \param[in] flow_depth Explicit flow depth [m].
-  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
-  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
-  !> \param[in] mixture_density Explicit mixture density [kg m^-3].
-  !> \param[in] reduced_gravity Explicit reduced gravity [m s^-2].
-  !> \param[in] gravity_coefficient Explicit gravity multiplier [dimensionless].
-  !> \param[in] curvature_acceleration Explicit curvature contribution [m s^-2].
-  !> \param[in] use_pore_pressure Enable explicit pore-pressure reduction.
-  !> \param[in] excess_pore_pressure Explicit excess pore pressure [Pa].
-  !> \param[in] use_stochastic_xi Enable stochastic \f$\xi\f$ adjustment.
-  !> \param[in] stochastic_xi_value Explicit stochastic \f$\xi\f$ increment.
-  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
-  !******************************************************************************
+
+  SUBROUTINE eval_rheology_voellmy_explicit()
+    CALL fatal_error('rheology_voellmy: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_voellmy_explicit
+
+  SUBROUTINE eval_rheology_voellmy_semi_implicit(flow_depth, velocity_x, velocity_y, &
+       speed, mixture_density, reduced_gravity, gravity_coefficient,            &
+       curvature_term, curvature_xx, curvature_xy, curvature_yy,                &
+       use_pore_pressure, excess_pore_pressure, rate_x, rate_y)
+    REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
+    REAL(wp), INTENT(IN) :: mixture_density, reduced_gravity, gravity_coefficient
+    LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure
+    REAL(wp), INTENT(IN) :: curvature_xx, curvature_xy, curvature_yy
+    REAL(wp), INTENT(IN) :: excess_pore_pressure
+    REAL(wp), INTENT(OUT) :: rate_x, rate_y
+    REAL(wp) :: curvature_acceleration, friction_stress
+    rate_x = 0.0_wp
+    rate_y = 0.0_wp
+    IF (speed .LE. 0.0_wp) RETURN
+    curvature_acceleration = 0.0_wp
+    IF (curvature_term) THEN
+       curvature_acceleration = curvature_xx * velocity_x**2                &
+            + 2.0_wp * curvature_xy * velocity_x * velocity_y                &
+            + curvature_yy * velocity_y**2
+    END IF
+    friction_stress = mu * mixture_density *                                  &
+         (reduced_gravity + curvature_acceleration) * flow_depth              &
+         * SQRT(gravity_coefficient)
+    friction_stress = MAX(0.0_wp, friction_stress)
+    IF (use_pore_pressure) friction_stress = MAX(0.0_wp, friction_stress      &
+         - mu * SQRT(gravity_coefficient) * excess_pore_pressure)
+    rate_x = -friction_stress * velocity_x / speed
+    rate_y = -friction_stress * velocity_y / speed
+  END SUBROUTINE eval_rheology_voellmy_semi_implicit
+
+  SUBROUTINE eval_rheology_voellmy_implicit(velocity_x, velocity_y, mixture_density, &
+       reduced_gravity, speed, speed_squared, moving, use_stochastic_xi,          &
+       stochastic_value, rate_x, rate_y)
+    COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y
+    COMPLEX(wp), INTENT(IN) :: mixture_density, reduced_gravity
+    COMPLEX(wp), INTENT(IN) :: speed, speed_squared
+    LOGICAL, INTENT(IN) :: moving, use_stochastic_xi
+    REAL(wp), INTENT(IN) :: stochastic_value
+    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
+    REAL(wp) :: xi_effective
+    COMPLEX(wp) :: turbulent_stress
+    rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
+    rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
+    IF (.NOT. moving) RETURN
+    IF (use_stochastic_xi) THEN
+       xi_effective = xi + stochastic_value
+       IF (xi_effective .LT. 1.0_wp) xi_effective = 1.0_wp
+       IF (xi_effective .GT. 1.0E5_wp) xi_effective = 1.0E5_wp
+    ELSE
+       xi_effective = xi
+    END IF
+    turbulent_stress = mixture_density * reduced_gravity / xi_effective * speed_squared
+    rate_x = -turbulent_stress * (velocity_x / speed)
+    rate_y = -turbulent_stress * (velocity_y / speed)
+  END SUBROUTINE eval_rheology_voellmy_implicit
+
   SUBROUTINE solve_rheology_voellmy_analytic(integration_step, flow_depth, &
        speed_ratio, velocity_before, mixture_density, reduced_gravity,        &
        gravity_coefficient, curvature_acceleration, use_pore_pressure,       &
@@ -101,6 +144,26 @@ CONTAINS
          speed_before, speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
   END SUBROUTINE solve_rheology_voellmy_analytic
+
+  !******************************************************************************
+  !> \brief Integrate the Voellmy velocity source exactly.
+  !> \details Combines the frozen Coulomb stress with quadratic turbulent
+  !> drag. Depth, density, gravity, curvature, pore pressure, and the
+  !> speed-to-horizontal-speed ratio remain fixed during integration.
+  !> \param[in] integration_step Exact-flow integration interval [s].
+  !> \param[in] flow_depth Explicit flow depth [m].
+  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
+  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
+  !> \param[in] mixture_density Explicit mixture density [kg m^-3].
+  !> \param[in] reduced_gravity Explicit reduced gravity [m s^-2].
+  !> \param[in] gravity_coefficient Explicit gravity multiplier [dimensionless].
+  !> \param[in] curvature_acceleration Explicit curvature contribution [m s^-2].
+  !> \param[in] use_pore_pressure Enable explicit pore-pressure reduction.
+  !> \param[in] excess_pore_pressure Explicit excess pore pressure [Pa].
+  !> \param[in] use_stochastic_xi Enable stochastic \f$\xi\f$ adjustment.
+  !> \param[in] stochastic_xi_value Explicit stochastic \f$\xi\f$ increment.
+  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
+  !******************************************************************************
   !******************************************************************************
   !> \brief Evaluate the implicit turbulent Voellmy source.
   !> \details Computes the velocity-squared stress using \f$\xi\f$ and returns
@@ -119,31 +182,6 @@ CONTAINS
   !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !> \note Complex-valued state and rates preserve complex-step derivatives.
   !******************************************************************************
-  SUBROUTINE eval_rheology_voellmy_implicit(velocity_x, velocity_y, mixture_density, &
-       reduced_gravity, speed, speed_squared, moving, use_stochastic_xi,          &
-       stochastic_value, rate_x, rate_y)
-    COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y
-    COMPLEX(wp), INTENT(IN) :: mixture_density, reduced_gravity
-    COMPLEX(wp), INTENT(IN) :: speed, speed_squared
-    LOGICAL, INTENT(IN) :: moving, use_stochastic_xi
-    REAL(wp), INTENT(IN) :: stochastic_value
-    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
-    REAL(wp) :: xi_effective
-    COMPLEX(wp) :: turbulent_stress
-    rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
-    rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-    IF (.NOT. moving) RETURN
-    IF (use_stochastic_xi) THEN
-       xi_effective = xi + stochastic_value
-       IF (xi_effective .LT. 1.0_wp) xi_effective = 1.0_wp
-       IF (xi_effective .GT. 1.0E5_wp) xi_effective = 1.0E5_wp
-    ELSE
-       xi_effective = xi
-    END IF
-    turbulent_stress = mixture_density * reduced_gravity / xi_effective * speed_squared
-    rate_x = -turbulent_stress * (velocity_x / speed)
-    rate_y = -turbulent_stress * (velocity_y / speed)
-  END SUBROUTINE eval_rheology_voellmy_implicit
   !******************************************************************************
   !> \brief Evaluate the semi-implicit Coulomb Voellmy momentum rate.
   !> \details Builds the basal stress from flow depth, reduced gravity and
@@ -166,37 +204,5 @@ CONTAINS
   !> \param[out] rate_x x momentum source rate.
   !> \param[out] rate_y y momentum source rate.
   !******************************************************************************
-  SUBROUTINE eval_rheology_voellmy_semi_implicit(flow_depth, velocity_x, velocity_y, &
-       speed, mixture_density, reduced_gravity, gravity_coefficient,            &
-       curvature_term, curvature_xx, curvature_xy, curvature_yy,                &
-       use_pore_pressure, excess_pore_pressure, rate_x, rate_y)
-    REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
-    REAL(wp), INTENT(IN) :: mixture_density, reduced_gravity, gravity_coefficient
-    LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure
-    REAL(wp), INTENT(IN) :: curvature_xx, curvature_xy, curvature_yy
-    REAL(wp), INTENT(IN) :: excess_pore_pressure
-    REAL(wp), INTENT(OUT) :: rate_x, rate_y
-    REAL(wp) :: curvature_acceleration, friction_stress
-    rate_x = 0.0_wp
-    rate_y = 0.0_wp
-    IF (speed .LE. 0.0_wp) RETURN
-    curvature_acceleration = 0.0_wp
-    IF (curvature_term) THEN
-       curvature_acceleration = curvature_xx * velocity_x**2                &
-            + 2.0_wp * curvature_xy * velocity_x * velocity_y                &
-            + curvature_yy * velocity_y**2
-    END IF
-    friction_stress = mu * mixture_density *                                  &
-         (reduced_gravity + curvature_acceleration) * flow_depth              &
-         * SQRT(gravity_coefficient)
-    friction_stress = MAX(0.0_wp, friction_stress)
-    IF (use_pore_pressure) friction_stress = MAX(0.0_wp, friction_stress      &
-         - mu * SQRT(gravity_coefficient) * excess_pore_pressure)
-    rate_x = -friction_stress * velocity_x / speed
-    rate_y = -friction_stress * velocity_y / speed
-  END SUBROUTINE eval_rheology_voellmy_semi_implicit
   ! Unsupported physical treatment, rejected by the source catalog.
-  SUBROUTINE eval_rheology_voellmy_explicit()
-    CALL fatal_error('rheology_voellmy: explicit treatment is unsupported')
-  END SUBROUTINE eval_rheology_voellmy_explicit
 END MODULE rheology_voellmy_2d

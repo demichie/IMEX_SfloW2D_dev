@@ -7,17 +7,18 @@ MODULE mass_exchange_deposition_2d
   USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
   IMPLICIT NONE
   PRIVATE
+  PUBLIC :: eval_mass_exchange_deposition_explicit
+  PUBLIC :: eval_mass_exchange_deposition_semi_implicit
+  PUBLIC :: eval_mass_exchange_deposition_implicit
+  PUBLIC :: solve_mass_exchange_deposition_analytic
   PUBLIC :: settling_velocity
   PUBLIC :: eval_settling_fluid_properties
   PUBLIC :: eval_solid_deposition_rate
   PUBLIC :: eval_lahar_deposition_rate
   PUBLIC :: eval_hindered_settling_deposition_rate
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
-  PUBLIC :: eval_mass_exchange_deposition_explicit
-  PUBLIC :: eval_mass_exchange_deposition_semi_implicit
-  PUBLIC :: eval_mass_exchange_deposition_implicit
-  PUBLIC :: solve_mass_exchange_deposition_analytic
 CONTAINS
+
   SUBROUTINE eval_mass_exchange_deposition_explicit(r_h, r_T, r_alphas, alphas_tot, &
        r_rho_m, r_rho_c, dt, deposition_term)
     REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
@@ -65,6 +66,28 @@ CONTAINS
 
     END DO
   END SUBROUTINE eval_mass_exchange_deposition_explicit
+
+  SUBROUTINE eval_mass_exchange_deposition_semi_implicit(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
+    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
+    REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
+    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
+    CALL fatal_error('deposition: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_mass_exchange_deposition_semi_implicit
+
+  SUBROUTINE eval_mass_exchange_deposition_implicit(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
+    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
+    REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
+    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
+    CALL fatal_error('deposition: implicit treatment is unsupported')
+  END SUBROUTINE eval_mass_exchange_deposition_implicit
+
+  SUBROUTINE solve_mass_exchange_deposition_analytic(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
+    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
+    REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
+    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
+    CALL fatal_error('deposition: analytic treatment is unsupported')
+  END SUBROUTINE solve_mass_exchange_deposition_analytic
+
   REAL(wp) FUNCTION settling_velocity(diam, rhos, rhoc, inv_kin_visc)
 
     REAL(wp), INTENT(IN) :: diam
@@ -192,24 +215,6 @@ CONTAINS
 
   END FUNCTION eval_hindered_settling_deposition_rate
 
-  SUBROUTINE eval_mass_exchange_deposition_semi_implicit(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
-    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
-    REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
-    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
-    CALL fatal_error('deposition: semi_implicit treatment is unsupported')
-  END SUBROUTINE eval_mass_exchange_deposition_semi_implicit
 
-  SUBROUTINE eval_mass_exchange_deposition_implicit(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
-    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
-    REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
-    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
-    CALL fatal_error('deposition: implicit treatment is unsupported')
-  END SUBROUTINE eval_mass_exchange_deposition_implicit
 
-  SUBROUTINE solve_mass_exchange_deposition_analytic(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
-    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
-    REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
-    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
-    CALL fatal_error('deposition: analytic treatment is unsupported')
-  END SUBROUTINE solve_mass_exchange_deposition_analytic
 END MODULE mass_exchange_deposition_2d

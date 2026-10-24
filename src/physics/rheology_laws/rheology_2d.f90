@@ -46,134 +46,21 @@ MODULE rheology_2d
 
   PRIVATE
 
-  PUBLIC :: resolve_rheology_model, rheology_name_from_id
-  PUBLIC :: curvature_acceleration, eval_rheology_implicit
+  PUBLIC :: eval_rheology_explicit
   PUBLIC :: eval_rheology_semi_implicit
+  PUBLIC :: eval_rheology_implicit
   PUBLIC :: solve_rheology_analytic
+  PUBLIC :: resolve_rheology_model, rheology_name_from_id
+  PUBLIC :: curvature_acceleration
 
   ! Uniform treatment surface for this source family.
-  PUBLIC :: eval_rheology_explicit
 
 CONTAINS
 
-  !******************************************************************************
-  !> \brief Contract the filtered bed Hessian with the Cartesian velocity.
-  !> \param[in] Bsecond_xx Filtered bed Hessian xx entry [m^-1].
-  !> \param[in] Bsecond_xy Filtered bed Hessian xy entry [m^-1].
-  !> \param[in] Bsecond_yy Filtered bed Hessian yy entry [m^-1].
-  !> \param[in] velocity_x Cartesian depth-averaged x velocity [m s^-1].
-  !> \param[in] velocity_y Cartesian depth-averaged y velocity [m s^-1].
-  !> \return Signed bed-curvature acceleration [m s^-2].
-  !******************************************************************************
-  PURE FUNCTION curvature_acceleration(Bsecond_xx, Bsecond_xy, Bsecond_yy,  &
-       velocity_x, velocity_y) RESULT(acceleration)
+  SUBROUTINE eval_rheology_explicit()
+    CALL fatal_error('rheology: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_explicit
 
-    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
-    REAL(wp), INTENT(IN) :: velocity_x, velocity_y
-    REAL(wp) :: acceleration
-
-    acceleration = Bsecond_xx*velocity_x**2 +                              &
-         2.0_wp*Bsecond_xy*velocity_x*velocity_y + Bsecond_yy*velocity_y**2
-
-  END FUNCTION curvature_acceleration
-
-  !******************************************************************************
-  !> \brief Evaluate the selected implicit rheology momentum rate.
-  !> \details All state values are explicit arguments so the dispatch has no
-  !> per-cell workspace allocation or hidden cell-state conversion.
-  !> \param[in] model_id Selected rheology identifier.
-  !> \param[in] flow_depth Flow depth [m].
-  !> \param[in] temperature Mixture temperature [K].
-  !> \param[in] mixture_density Mixture density [kg m^-3].
-  !> \param[in] inverse_density Reciprocal mixture density [m^3 kg^-1].
-  !> \param[in] velocity_x x velocity [m s^-1].
-  !> \param[in] velocity_y y velocity [m s^-1].
-  !> \param[in] speed Total flow-speed magnitude [m s^-1].
-  !> \param[in] horizontal_speed Horizontal flow-speed magnitude [m s^-1].
-  !> \param[in] speed_squared Squared flow-speed magnitude [m^2 s^-2].
-  !> \param[in] reduced_gravity Reduced gravitational acceleration [m s^-2].
-  !> \param[in] solid_fractions Solid volume fractions, one per class.
-  !> \param[in] moving True when the flow is moving.
-  !> \param[in] use_stochastic Enable the stochastic rheology correction.
-  !> \param[in] stochastic_value Local stochastic-process value.
-  !> \param[out] rate x/y conservative momentum source rates [kg m^-1 s^-2].
-  !> \note State arguments are complex-valued to preserve complex-step derivatives.
-  !******************************************************************************
-  SUBROUTINE eval_rheology_implicit(model_id, flow_depth, temperature,   &
-       mixture_density, inverse_density, velocity_x, velocity_y, speed,      &
-       horizontal_speed, speed_squared, reduced_gravity, solid_fractions,    &
-       moving, use_stochastic, stochastic_value, rate)
-
-    INTEGER, INTENT(IN) :: model_id
-    COMPLEX(wp), INTENT(IN) :: flow_depth, temperature, mixture_density
-    COMPLEX(wp), INTENT(IN) :: inverse_density, velocity_x, velocity_y
-    COMPLEX(wp), INTENT(IN) :: speed, horizontal_speed, speed_squared
-    COMPLEX(wp), INTENT(IN) :: reduced_gravity, solid_fractions(:)
-    LOGICAL, INTENT(IN) :: moving, use_stochastic
-    REAL(wp), INTENT(IN) :: stochastic_value
-    COMPLEX(wp), INTENT(OUT) :: rate(2)
-
-    rate = CMPLX(0.0_wp, 0.0_wp, wp)
-    SELECT CASE(model_id)
-    CASE(rheology_id_voellmy)
-       CALL eval_rheology_voellmy_implicit(velocity_x, velocity_y,      &
-            mixture_density, reduced_gravity, speed, speed_squared, moving,  &
-            use_stochastic, stochastic_value, rate(1), rate(2))
-    CASE(rheology_id_mui_voellmy)
-       CALL eval_rheology_mui_voellmy_implicit(velocity_x, velocity_y,  &
-            mixture_density, reduced_gravity, speed, speed_squared, moving,  &
-            use_stochastic, stochastic_value, rate(1), rate(2))
-    CASE(rheology_id_plastic)
-       CALL eval_rheology_plastic_implicit(velocity_x, velocity_y,      &
-            speed, mixture_density, moving, rate(1), rate(2))
-    CASE(rheology_id_lava)
-       CALL eval_rheology_lava_implicit(flow_depth, temperature,        &
-            mixture_density, velocity_x, velocity_y, moving,                &
-            rate(1), rate(2))
-    CASE(rheology_id_lahar)
-       CALL eval_rheology_lahar_implicit(flow_depth, velocity_x,        &
-            velocity_y, speed, horizontal_speed, temperature, mixture_density, &
-            inverse_density, solid_fractions, moving, rate(1), rate(2))
-    CASE(rheology_id_empirical)
-       CALL eval_rheology_empirical_implicit(flow_depth, velocity_x,    &
-            velocity_y, horizontal_speed, speed, mixture_density, moving,   &
-            rate(1), rate(2))
-    CASE(rheology_id_quadratic)
-       CALL eval_rheology_quadratic_implicit(velocity_x, velocity_y,   &
-            horizontal_speed, speed_squared, mixture_density, moving,       &
-            rate(1), rate(2))
-    CASE(rheology_id_none, rheology_id_froude, rheology_id_lucas, rheology_id_mui)
-       CONTINUE
-    CASE DEFAULT
-       CALL fatal_error('Invalid rheology ID in implicit momentum-rate dispatch')
-    END SELECT
-
-  END SUBROUTINE eval_rheology_implicit
-
-  !******************************************************************************
-  !> \brief Evaluate the selected semi-implicit rheology momentum rate.
-  !> \details Curvature acceleration is used by the MUI-family laws only,
-  !> matching their existing equation-term assembly semantics.
-  !> \param[in] model_id Selected rheology identifier.
-  !> \param[in] flow_depth Flow depth [m].
-  !> \param[in] velocity_x x velocity [m s^-1].
-  !> \param[in] velocity_y y velocity [m s^-1].
-  !> \param[in] speed Total flow-speed magnitude [m s^-1].
-  !> \param[in] horizontal_speed Horizontal flow-speed magnitude [m s^-1].
-  !> \param[in] mixture_density Mixture density [kg m^-3].
-  !> \param[in] reduced_gravity Reduced gravitational acceleration [m s^-2].
-  !> \param[in] gravity_coefficient Effective gravity multiplier [dimensionless].
-  !> \param[in] solid_fractions Solid volume fractions, one per class.
-  !> \param[in] curvature_term Enable curvature acceleration for applicable laws.
-  !> \param[in] curvature_xx Bed curvature in xx [m^-1].
-  !> \param[in] curvature_xy Bed curvature in xy [m^-1].
-  !> \param[in] curvature_yy Bed curvature in yy [m^-1].
-  !> \param[in] use_pore_pressure Enable the pore-pressure correction.
-  !> \param[in] excess_pore_pressure Excess pore pressure [Pa].
-  !> \param[in] use_stochastic Enable the stochastic rheology correction.
-  !> \param[in] stochastic_value Local stochastic-process value.
-  !> \param[out] rate x/y conservative momentum source rates [kg m^-1 s^-2].
-  !******************************************************************************
   SUBROUTINE eval_rheology_semi_implicit(model_id, flow_depth,          &
        velocity_x, velocity_y, speed, horizontal_speed, mixture_density,    &
        reduced_gravity, gravity_coefficient, solid_fractions, curvature_term, &
@@ -241,29 +128,57 @@ CONTAINS
 
   END SUBROUTINE eval_rheology_semi_implicit
 
-  !******************************************************************************
-  !> \brief Integrate the selected rheology velocity law analytically.
-  !> \details Dispatches to the model-specific exact-flow solver. All state
-  !>          values are passed explicitly; unsupported model IDs leave the
-  !>          output equal to the input and return model_supported as false.
-  !> \param[in] model_id Rheology model ID.
-  !> \param[in] integration_step Exact-flow interval [s].
-  !> \param[in] flow_depth Flow depth [m].
-  !> \param[in] temperature Flow temperature [K].
-  !> \param[in] mixture_density Mixture density [kg m^-3].
-  !> \param[in] speed_ratio Total-to-horizontal speed ratio.
-  !> \param[in] velocity_before Horizontal velocity before integration [m s^-1].
-  !> \param[in] reduced_gravity Reduced gravity [m s^-2].
-  !> \param[in] gravity_coefficient Gravity coefficient used by rheology laws.
-  !> \param[in] solid_fractions Per-class solid volume fractions.
-  !> \param[in] curvature_acceleration Signed bed-curvature acceleration [m s^-2].
-  !> \param[in] use_pore_pressure Whether excess pore pressure is active.
-  !> \param[in] excess_pore_pressure Excess pore pressure.
-  !> \param[in] use_stochastic Whether stochastic forcing is active.
-  !> \param[in] stochastic_value Local stochastic rheology value.
-  !> \param[out] velocity_after Horizontal velocity after integration [m s^-1].
-  !> \param[out] model_supported True when model_id has an analytic velocity law.
-  !******************************************************************************
+  SUBROUTINE eval_rheology_implicit(model_id, flow_depth, temperature,   &
+       mixture_density, inverse_density, velocity_x, velocity_y, speed,      &
+       horizontal_speed, speed_squared, reduced_gravity, solid_fractions,    &
+       moving, use_stochastic, stochastic_value, rate)
+
+    INTEGER, INTENT(IN) :: model_id
+    COMPLEX(wp), INTENT(IN) :: flow_depth, temperature, mixture_density
+    COMPLEX(wp), INTENT(IN) :: inverse_density, velocity_x, velocity_y
+    COMPLEX(wp), INTENT(IN) :: speed, horizontal_speed, speed_squared
+    COMPLEX(wp), INTENT(IN) :: reduced_gravity, solid_fractions(:)
+    LOGICAL, INTENT(IN) :: moving, use_stochastic
+    REAL(wp), INTENT(IN) :: stochastic_value
+    COMPLEX(wp), INTENT(OUT) :: rate(2)
+
+    rate = CMPLX(0.0_wp, 0.0_wp, wp)
+    SELECT CASE(model_id)
+    CASE(rheology_id_voellmy)
+       CALL eval_rheology_voellmy_implicit(velocity_x, velocity_y,      &
+            mixture_density, reduced_gravity, speed, speed_squared, moving,  &
+            use_stochastic, stochastic_value, rate(1), rate(2))
+    CASE(rheology_id_mui_voellmy)
+       CALL eval_rheology_mui_voellmy_implicit(velocity_x, velocity_y,  &
+            mixture_density, reduced_gravity, speed, speed_squared, moving,  &
+            use_stochastic, stochastic_value, rate(1), rate(2))
+    CASE(rheology_id_plastic)
+       CALL eval_rheology_plastic_implicit(velocity_x, velocity_y,      &
+            speed, mixture_density, moving, rate(1), rate(2))
+    CASE(rheology_id_lava)
+       CALL eval_rheology_lava_implicit(flow_depth, temperature,        &
+            mixture_density, velocity_x, velocity_y, moving,                &
+            rate(1), rate(2))
+    CASE(rheology_id_lahar)
+       CALL eval_rheology_lahar_implicit(flow_depth, velocity_x,        &
+            velocity_y, speed, horizontal_speed, temperature, mixture_density, &
+            inverse_density, solid_fractions, moving, rate(1), rate(2))
+    CASE(rheology_id_empirical)
+       CALL eval_rheology_empirical_implicit(flow_depth, velocity_x,    &
+            velocity_y, horizontal_speed, speed, mixture_density, moving,   &
+            rate(1), rate(2))
+    CASE(rheology_id_quadratic)
+       CALL eval_rheology_quadratic_implicit(velocity_x, velocity_y,   &
+            horizontal_speed, speed_squared, mixture_density, moving,       &
+            rate(1), rate(2))
+    CASE(rheology_id_none, rheology_id_froude, rheology_id_lucas, rheology_id_mui)
+       CONTINUE
+    CASE DEFAULT
+       CALL fatal_error('Invalid rheology ID in implicit momentum-rate dispatch')
+    END SELECT
+
+  END SUBROUTINE eval_rheology_implicit
+
   SUBROUTINE solve_rheology_analytic(model_id, integration_step,    &
        flow_depth, temperature, mixture_density, speed_ratio, velocity_before, &
        reduced_gravity, gravity_coefficient, solid_fractions,                &
@@ -336,6 +251,100 @@ CONTAINS
     END SELECT
 
   END SUBROUTINE solve_rheology_analytic
+
+
+  !******************************************************************************
+  !> \brief Contract the filtered bed Hessian with the Cartesian velocity.
+  !> \param[in] Bsecond_xx Filtered bed Hessian xx entry [m^-1].
+  !> \param[in] Bsecond_xy Filtered bed Hessian xy entry [m^-1].
+  !> \param[in] Bsecond_yy Filtered bed Hessian yy entry [m^-1].
+  !> \param[in] velocity_x Cartesian depth-averaged x velocity [m s^-1].
+  !> \param[in] velocity_y Cartesian depth-averaged y velocity [m s^-1].
+  !> \return Signed bed-curvature acceleration [m s^-2].
+  !******************************************************************************
+  PURE FUNCTION curvature_acceleration(Bsecond_xx, Bsecond_xy, Bsecond_yy,  &
+       velocity_x, velocity_y) RESULT(acceleration)
+
+    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
+    REAL(wp), INTENT(IN) :: velocity_x, velocity_y
+    REAL(wp) :: acceleration
+
+    acceleration = Bsecond_xx*velocity_x**2 +                              &
+         2.0_wp*Bsecond_xy*velocity_x*velocity_y + Bsecond_yy*velocity_y**2
+
+  END FUNCTION curvature_acceleration
+
+  !******************************************************************************
+  !> \brief Evaluate the selected implicit rheology momentum rate.
+  !> \details All state values are explicit arguments so the dispatch has no
+  !> per-cell workspace allocation or hidden cell-state conversion.
+  !> \param[in] model_id Selected rheology identifier.
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] temperature Mixture temperature [K].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] inverse_density Reciprocal mixture density [m^3 kg^-1].
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] speed Total flow-speed magnitude [m s^-1].
+  !> \param[in] horizontal_speed Horizontal flow-speed magnitude [m s^-1].
+  !> \param[in] speed_squared Squared flow-speed magnitude [m^2 s^-2].
+  !> \param[in] reduced_gravity Reduced gravitational acceleration [m s^-2].
+  !> \param[in] solid_fractions Solid volume fractions, one per class.
+  !> \param[in] moving True when the flow is moving.
+  !> \param[in] use_stochastic Enable the stochastic rheology correction.
+  !> \param[in] stochastic_value Local stochastic-process value.
+  !> \param[out] rate x/y conservative momentum source rates [kg m^-1 s^-2].
+  !> \note State arguments are complex-valued to preserve complex-step derivatives.
+  !******************************************************************************
+
+  !******************************************************************************
+  !> \brief Evaluate the selected semi-implicit rheology momentum rate.
+  !> \details Curvature acceleration is used by the MUI-family laws only,
+  !> matching their existing equation-term assembly semantics.
+  !> \param[in] model_id Selected rheology identifier.
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] velocity_x x velocity [m s^-1].
+  !> \param[in] velocity_y y velocity [m s^-1].
+  !> \param[in] speed Total flow-speed magnitude [m s^-1].
+  !> \param[in] horizontal_speed Horizontal flow-speed magnitude [m s^-1].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] reduced_gravity Reduced gravitational acceleration [m s^-2].
+  !> \param[in] gravity_coefficient Effective gravity multiplier [dimensionless].
+  !> \param[in] solid_fractions Solid volume fractions, one per class.
+  !> \param[in] curvature_term Enable curvature acceleration for applicable laws.
+  !> \param[in] curvature_xx Bed curvature in xx [m^-1].
+  !> \param[in] curvature_xy Bed curvature in xy [m^-1].
+  !> \param[in] curvature_yy Bed curvature in yy [m^-1].
+  !> \param[in] use_pore_pressure Enable the pore-pressure correction.
+  !> \param[in] excess_pore_pressure Excess pore pressure [Pa].
+  !> \param[in] use_stochastic Enable the stochastic rheology correction.
+  !> \param[in] stochastic_value Local stochastic-process value.
+  !> \param[out] rate x/y conservative momentum source rates [kg m^-1 s^-2].
+  !******************************************************************************
+
+  !******************************************************************************
+  !> \brief Integrate the selected rheology velocity law analytically.
+  !> \details Dispatches to the model-specific exact-flow solver. All state
+  !>          values are passed explicitly; unsupported model IDs leave the
+  !>          output equal to the input and return model_supported as false.
+  !> \param[in] model_id Rheology model ID.
+  !> \param[in] integration_step Exact-flow interval [s].
+  !> \param[in] flow_depth Flow depth [m].
+  !> \param[in] temperature Flow temperature [K].
+  !> \param[in] mixture_density Mixture density [kg m^-3].
+  !> \param[in] speed_ratio Total-to-horizontal speed ratio.
+  !> \param[in] velocity_before Horizontal velocity before integration [m s^-1].
+  !> \param[in] reduced_gravity Reduced gravity [m s^-2].
+  !> \param[in] gravity_coefficient Gravity coefficient used by rheology laws.
+  !> \param[in] solid_fractions Per-class solid volume fractions.
+  !> \param[in] curvature_acceleration Signed bed-curvature acceleration [m s^-2].
+  !> \param[in] use_pore_pressure Whether excess pore pressure is active.
+  !> \param[in] excess_pore_pressure Excess pore pressure.
+  !> \param[in] use_stochastic Whether stochastic forcing is active.
+  !> \param[in] stochastic_value Local stochastic rheology value.
+  !> \param[out] velocity_after Horizontal velocity after integration [m s^-1].
+  !> \param[out] model_supported True when model_id has an analytic velocity law.
+  !******************************************************************************
 
   !******************************************************************************
   !> \brief Resolve a user-supplied rheology name to its internal model ID.
@@ -434,8 +443,5 @@ CONTAINS
 
   END FUNCTION rheology_name_from_id
 
-  SUBROUTINE eval_rheology_explicit()
-    CALL fatal_error('rheology: explicit treatment is unsupported')
-  END SUBROUTINE eval_rheology_explicit
 
 END MODULE rheology_2d

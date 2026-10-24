@@ -26,6 +26,8 @@ MODULE pore_pressure_laws_2d
 
   PRIVATE
 
+  PUBLIC :: eval_pore_pressure_dissipation_explicit
+  PUBLIC :: eval_pore_pressure_dissipation_semi_implicit
   PUBLIC :: eval_pore_pressure_dissipation_implicit
   PUBLIC :: solve_pore_pressure_dissipation_analytic
   PUBLIC :: advance_pore_pressure_diffusion
@@ -34,29 +36,18 @@ MODULE pore_pressure_laws_2d
   PUBLIC :: eval_pore_pressure_mass_exchange_source
 
   ! Uniform treatment surface for this source family.
-  PUBLIC :: eval_pore_pressure_dissipation_explicit
-  PUBLIC :: eval_pore_pressure_dissipation_semi_implicit
 
 CONTAINS
 
-  !******************************************************************************
-  !> \brief Evaluate the excess pore-pressure diffusion source.
-  !> \details For wet cells with nonnegative excess pressure and active pore
-  !>          volume, returns
-  !>          \f$S_p=-\rho_m(\pi/2)^2D p_e I/\max(h_{\mathrm{threshold}},h)\f$.
-  !>          D is the pressure-diffusion coefficient and I is the configured
-  !>          solid-fraction inhibition factor. Complex arguments preserve
-  !>          derivatives for the implicit Jacobian.
-  !> \param[in] flow_depth Flow depth h [m].
-  !> \param[in] temperature Gas/mixture temperature T [K].
-  !> \param[in] mixture_density Mixture density rho_m [kg m^-3].
-  !> \param[in] solid_fractions Per-class solid volume fractions.
-  !> \param[in] excess_pressure Nonnegative excess pore pressure p_e [Pa].
-  !> \param[out] source Conservative pore-pressure diffusion source S_p
-  !>                   [kg^2 m^-3 s^-3].
-  !> \note Returns zero for dry cells, negative excess pressure, absent pore volume, or
-  !>       inactive diffusion closure.
-  !******************************************************************************
+  SUBROUTINE eval_pore_pressure_dissipation_explicit()
+    CALL fatal_error('pore_pressure: explicit treatment is unsupported')
+  END SUBROUTINE eval_pore_pressure_dissipation_explicit
+
+  SUBROUTINE eval_pore_pressure_dissipation_semi_implicit(rate)
+    REAL(wp), INTENT(OUT) :: rate
+    rate = 0.0_wp
+  END SUBROUTINE eval_pore_pressure_dissipation_semi_implicit
+
   SUBROUTINE eval_pore_pressure_dissipation_implicit(flow_depth, temperature,      &
        mixture_density, solid_fractions, excess_pressure, source)
 
@@ -86,26 +77,6 @@ CONTAINS
 
   END SUBROUTINE eval_pore_pressure_dissipation_implicit
 
-  !******************************************************************************
-  !> \brief Solve exact-flow excess pore pressure over a stage interval.
-  !> \details With mixture density, depth, temperature and solid fractions
-  !>          frozen, the transported variable
-  !>          \f$Q_p=\rho_m h p_e\f$ satisfies
-  !>          \f$\frac{dQ_p}{dt}=-\lambda Q_p\f$, where
-  !>          \f$\lambda=(\pi/2)^2DI/[h\max(h_{\mathrm{threshold}},h)]\f$.
-  !>          Therefore p_e is multiplied by
-  !>          \f$\exp(-\lambda\,\texttt{integration\_step})\f$.
-  !>          Dry states, nonpositive excess pressure, absent carrier phases and
-  !>          inactive diffusion closures are returned unchanged.
-  !> \param[in] excess_pressure Initial excess pore pressure p_e [Pa].
-  !> \param[in] integration_step Effective stage interval, normally dt*a_ii [s].
-  !> \param[in] flow_depth Frozen flow depth h [m].
-  !> \param[in] temperature Frozen temperature T [K].
-  !> \param[in] solid_fractions Frozen per-class solid volume fractions.
-  !> \param[out] pressure_after Exact-flow excess pore pressure after the interval [Pa].
-  !> \note Requires finite inputs and a nonnegative integration step. A negative step,
-  !>       nonfinite input, or nonpositive temperature in an active state is fatal.
-  !******************************************************************************
   SUBROUTINE solve_pore_pressure_dissipation_analytic(excess_pressure, integration_step,   &
        flow_depth, temperature, solid_fractions, pressure_after)
 
@@ -162,6 +133,47 @@ CONTAINS
     pressure_after = excess_pressure * EXP(-decay_exponent)
 
   END SUBROUTINE solve_pore_pressure_dissipation_analytic
+
+
+  !******************************************************************************
+  !> \brief Evaluate the excess pore-pressure diffusion source.
+  !> \details For wet cells with nonnegative excess pressure and active pore
+  !>          volume, returns
+  !>          \f$S_p=-\rho_m(\pi/2)^2D p_e I/\max(h_{\mathrm{threshold}},h)\f$.
+  !>          D is the pressure-diffusion coefficient and I is the configured
+  !>          solid-fraction inhibition factor. Complex arguments preserve
+  !>          derivatives for the implicit Jacobian.
+  !> \param[in] flow_depth Flow depth h [m].
+  !> \param[in] temperature Gas/mixture temperature T [K].
+  !> \param[in] mixture_density Mixture density rho_m [kg m^-3].
+  !> \param[in] solid_fractions Per-class solid volume fractions.
+  !> \param[in] excess_pressure Nonnegative excess pore pressure p_e [Pa].
+  !> \param[out] source Conservative pore-pressure diffusion source S_p
+  !>                   [kg^2 m^-3 s^-3].
+  !> \note Returns zero for dry cells, negative excess pressure, absent pore volume, or
+  !>       inactive diffusion closure.
+  !******************************************************************************
+
+  !******************************************************************************
+  !> \brief Solve exact-flow excess pore pressure over a stage interval.
+  !> \details With mixture density, depth, temperature and solid fractions
+  !>          frozen, the transported variable
+  !>          \f$Q_p=\rho_m h p_e\f$ satisfies
+  !>          \f$\frac{dQ_p}{dt}=-\lambda Q_p\f$, where
+  !>          \f$\lambda=(\pi/2)^2DI/[h\max(h_{\mathrm{threshold}},h)]\f$.
+  !>          Therefore p_e is multiplied by
+  !>          \f$\exp(-\lambda\,\texttt{integration\_step})\f$.
+  !>          Dry states, nonpositive excess pressure, absent carrier phases and
+  !>          inactive diffusion closures are returned unchanged.
+  !> \param[in] excess_pressure Initial excess pore pressure p_e [Pa].
+  !> \param[in] integration_step Effective stage interval, normally dt*a_ii [s].
+  !> \param[in] flow_depth Frozen flow depth h [m].
+  !> \param[in] temperature Frozen temperature T [K].
+  !> \param[in] solid_fractions Frozen per-class solid volume fractions.
+  !> \param[out] pressure_after Exact-flow excess pore pressure after the interval [Pa].
+  !> \note Requires finite inputs and a nonnegative integration step. A negative step,
+  !>       nonfinite input, or nonpositive temperature in an active state is fatal.
+  !******************************************************************************
 
   !******************************************************************************
   !> \brief Backward-compatible name for the exact-flow pore-pressure solver.
@@ -495,14 +507,7 @@ CONTAINS
 
   END SUBROUTINE eval_pore_pressure_diffusion_factors
 
-  SUBROUTINE eval_pore_pressure_dissipation_explicit()
-    CALL fatal_error('pore_pressure: explicit treatment is unsupported')
-  END SUBROUTINE eval_pore_pressure_dissipation_explicit
 
   ! Valid zero contribution for the semi-implicit part of Newton.
-  SUBROUTINE eval_pore_pressure_dissipation_semi_implicit(rate)
-    REAL(wp), INTENT(OUT) :: rate
-    rate = 0.0_wp
-  END SUBROUTINE eval_pore_pressure_dissipation_semi_implicit
 
 END MODULE pore_pressure_laws_2d

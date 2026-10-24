@@ -5,13 +5,14 @@ MODULE mass_exchange_entrainment_2d
   USE constitutive_parameters_2d, ONLY : entrainment_flag
 
   PRIVATE
-  PUBLIC :: eval_air_entrainment_rate
-  ! Four-entry physical treatment contract; only EXPLICIT is supported.
   PUBLIC :: eval_mass_exchange_entrainment_explicit
   PUBLIC :: eval_mass_exchange_entrainment_semi_implicit
   PUBLIC :: eval_mass_exchange_entrainment_implicit
   PUBLIC :: solve_mass_exchange_entrainment_analytic
+  PUBLIC :: eval_air_entrainment_rate
+  ! Four-entry physical treatment contract; only EXPLICIT is supported.
 CONTAINS
+
   REAL(wp) FUNCTION eval_mass_exchange_entrainment_explicit(r_h, r_Ri, mod_vel2)
     REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
     IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                      &
@@ -25,17 +26,6 @@ CONTAINS
 
     END IF
   END FUNCTION eval_mass_exchange_entrainment_explicit
-  PURE FUNCTION eval_air_entrainment_rate(richardson_number, speed_squared)  &
-       RESULT(entrainment_rate)
-
-    REAL(wp), INTENT(IN) :: richardson_number, speed_squared
-    REAL(wp) :: entrainment_coefficient, entrainment_rate
-
-    entrainment_coefficient = 0.075_wp / SQRT(1.0_wp + 718.0_wp *            &
-         richardson_number**2.4_wp)
-    entrainment_rate = entrainment_coefficient * SQRT(speed_squared)
-
-  END FUNCTION eval_air_entrainment_rate
 
   REAL(wp) FUNCTION eval_mass_exchange_entrainment_semi_implicit(r_h, r_Ri, mod_vel2)
     REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
@@ -54,4 +44,19 @@ CONTAINS
     CALL fatal_error('entrainment: analytic treatment is unsupported')
     solve_mass_exchange_entrainment_analytic = 0.0_wp
   END FUNCTION solve_mass_exchange_entrainment_analytic
+
+  PURE FUNCTION eval_air_entrainment_rate(richardson_number, speed_squared)  &
+       RESULT(entrainment_rate)
+
+    REAL(wp), INTENT(IN) :: richardson_number, speed_squared
+    REAL(wp) :: entrainment_coefficient, entrainment_rate
+
+    entrainment_coefficient = 0.075_wp / SQRT(1.0_wp + 718.0_wp *            &
+         richardson_number**2.4_wp)
+    entrainment_rate = entrainment_coefficient * SQRT(speed_squared)
+
+  END FUNCTION eval_air_entrainment_rate
+
+
+
 END MODULE mass_exchange_entrainment_2d
