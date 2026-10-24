@@ -223,6 +223,14 @@ PROGRAM test_source_registry
        'empty canonical group name rejected')
   negative=negative+1
 
+  ! Newton must not register only one mathematical addend of a law.
+  badgroups=groups
+  badgroups(3)%term_ids=[SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS]
+  CALL trial%initialize(7,7,badgroups,steps,error)
+  CALL require(INDEX(error,'complete law bundle')>0, &
+       'partial Newton rheology is not an independently schedulable source')
+  negative=negative+1
+
   ! Reject an analytic velocity group with an incomplete physical law.
   badgroups=groups
   badgroups(3)%method=SOURCE_METHOD_ANALYTIC

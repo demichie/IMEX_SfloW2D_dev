@@ -922,3 +922,10 @@ Aggiunta al catalogo `rheology_source_name(model_id)` che associa ciascuna delle
 ### D17.22.33 — Nomi reologici canonici nell'input SOURCE_GROUPS (24 ottobre 2026)
 
 `source_configuration_2d` accetta ora nei gruppi nativi una singola dichiarazione del nome canonico della legge reologica configurata (ad esempio `rheology_lava`) e la espande nella lista completa dei contributi legacy della stessa legge. Il conteggio delle dichiarazioni di input è distinto dal conteggio delle componenti espanse, così la validazione globale dei contributi attivi rimane invariata. Una dichiarazione mista del nome completo con un suo addendo viene respinta come duplicazione. Aggunti test di equivalenza e rifiuto in `TEST_SOURCE_REGISTRY` per la legge lava. Non cambiano le formule SI/IM, la scelta del gruppo, gli schemi RK o la conservazione. **Stato:** D17.16/input nominale in avanzamento; catalogo ancora a 34 voci e `source_term_type` transitorio. La fusione interna delle voci reologiche e il catalogo minimale D17.2/10c non sono conclusi. Compilazione e regressioni sul nuovo HEAD da verificare.
+
+
+### D17.22.34 — Atomicità della legge reologica in Newton e analytic (24 ottobre 2026)
+
+Il registro rifiuta ora ogni gruppo implicito contenente soltanto un sottoinsieme degli addendi legacy appartenenti alla stessa legge reologica. La verifica di completezza usa `rheology_source_terms(family)` e impedisce di considerare schedulabile una singola formula fisica di Voellmy, lava, lahar ecc. Un test negativo aggiuntivo copre esplicitamente la legge lava incompleta in Newton; il controllo analitico di completezza preesistente rimane attivo. La misura prepara l'unificazione delle voci senza cambiare il calcolo SI/IM né il comportamento legacy con leggi complete.
+
+**Stato:** passo intermedio, non ancora catalogo nominale definitivo. `source_term_type`, `term_ids` e il catalogo dei 34 addendi sono ancora presenti e devono essere sostituiti con una voce per legge in una migrazione coordinata di registry, input e dispatcher. Build e test del nuovo HEAD non ancora eseguiti.

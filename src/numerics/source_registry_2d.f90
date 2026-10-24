@@ -353,6 +353,14 @@ CONTAINS
         END IF
         error='D17: physical term duplicated, unknown or dependent'
       END DO
+      ! A rheological law is one physical source even while the catalog
+      ! temporarily contains its legacy formula addends. Never schedule
+      ! a proper subset in a Newton or analytic group.
+      IF (family/=0 .AND. group%method/=SOURCE_METHOD_EXPLICIT) THEN
+        terms=rheology_source_terms(family)
+        error='D17: rheology group requires the complete law bundle'
+        IF (.NOT.ALL(in_list(terms,group%term_ids))) RETURN
+      END IF
       ! No independently scheduled sub-solves: validate group equation shape.
       error='D17: incomplete or incompatible group equation target'
       IF (group%method==SOURCE_METHOD_NEWTON) THEN
