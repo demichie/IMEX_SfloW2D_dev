@@ -296,7 +296,7 @@ CONTAINS
     TYPE(source_term_type) :: term
     INTEGER, ALLOCATABLE :: expected(:),bundle_terms(:)
     CHARACTER(LEN=64), ALLOCATABLE :: law_names(:)
-    LOGICAL :: seen(SOURCE_TERM_COUNT)
+    CHARACTER(LEN=64), ALLOCATABLE :: seen_names(:)
     INTEGER :: i,j,id,nstage,family,mass_group
     error='D17: invalid or duplicate source catalog name'
     IF (.NOT.source_catalog_names_unique()) RETURN
@@ -307,7 +307,8 @@ CONTAINS
     IF (this%pore_equation/=0) THEN
       IF (this%pore_equation<5 .OR. this%pore_equation>this%n_equations) RETURN
     END IF
-    seen=.FALSE.; family=0; mass_group=0
+    ALLOCATE(seen_names(0))
+    family=0; mass_group=0
     nstage=SIZE(this%stage_entries)
     groups=[this%stage_entries,this%step_entries]
     DO i=1,SIZE(groups)
@@ -360,8 +361,8 @@ CONTAINS
         id=term%id
         IF (id<1 .OR. id>SOURCE_TERM_COUNT) RETURN
         IF (.NOT.term%schedulable) RETURN
-        IF (seen(id)) RETURN
-        seen(id)=.TRUE.
+        IF (ANY(seen_names==term%name)) RETURN
+        seen_names=[seen_names,term%name]
       error='D17: term does not support this method/cadence or target'
         IF (.NOT.supports_group(term,group)) RETURN
         IF (term%target/=0) THEN
