@@ -10,7 +10,8 @@
 
 MODULE simulation_2d
 
-  USE equation_terms_2d, ONLY : init_problem_param, set_source_time_coefficients
+  USE equation_terms_2d, ONLY : init_problem_param
+  USE mass_injection_coefficients_2d, ONLY : set_source_time_coefficients
   USE step_source_executor_2d, ONLY : execute_step_source_groups
 
   USE source_registry_2d, ONLY : source_registry_type

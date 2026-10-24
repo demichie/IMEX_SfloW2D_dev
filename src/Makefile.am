@@ -176,7 +176,8 @@ physics/mass_exchange_terms/mass_exchange_terms_2d.$(OBJEXT): core/parameters_2d
                                      physics/mass_exchange_terms/mass_exchange_entrainment_2d.$(OBJEXT) \
                                      physics/mass_exchange_terms/mass_exchange_balance_2d.$(OBJEXT) \
                                      core/diagnostics_2d.$(OBJEXT)
-physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+                                     geometry/geometry_2d.$(OBJEXT)
 physics/mass_injection_terms/mass_boundary_injection_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      geometry/geometry_2d.$(OBJEXT) \
@@ -310,7 +311,8 @@ core/simulation_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
                               state/state_2d.$(OBJEXT)                          \
                               stochastic/stochastic_module.$(OBJEXT)            \
                               numerics/time_integration_2d.$(OBJEXT)            \
-                              numerics/step_source_executor_2d.$(OBJEXT)
+                              numerics/step_source_executor_2d.$(OBJEXT) \
+                              physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT)
 core/init_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         core/constitutive_parameters_2d.$(OBJEXT)              \
                         geometry/geometry_2d.$(OBJEXT)                         \
@@ -361,4 +363,5 @@ physics/source_configuration_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT)
                                          numerics/source_input_2d.$(OBJEXT) \
                                          core/constitutive_parameters_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): physics/source_configuration_2d.$(OBJEXT) \
+                                     physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT) \
                               numerics/source_input_2d.$(OBJEXT)
