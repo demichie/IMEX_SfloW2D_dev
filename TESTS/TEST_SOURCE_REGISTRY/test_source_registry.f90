@@ -636,9 +636,10 @@ CONTAINS
     CALL initialize_native_source_configuration(trial,partition,error)
     CALL require(error/='', &
          'native declaration of a legacy component is rejected')
-    source_group_term_count(3)=2
-    source_group_terms(1,3)='SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS'
-    source_group_terms(2,3)='SOURCE_TERM_RHEOLOGY_LAVA_YIELD'
+    ! Restore a valid complete-law declaration before testing targets.
+    source_group_term_count(3)=1
+    source_group_terms(:,3)=''
+    source_group_terms(1,3)=rheology_source_name(rheology_id_lava)
     ! A native implicit group has a target list directly on the group.
     source_group_target_count(3)=0
     CALL initialize_native_source_configuration(trial,partition,error)

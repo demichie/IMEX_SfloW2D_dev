@@ -279,7 +279,7 @@ CONTAINS
     TYPE(source_group_type) :: group
     TYPE(source_term_type) :: term
     INTEGER, ALLOCATABLE :: expected(:)
-    CHARACTER(LEN=64), ALLOCATABLE :: law_names(:),batch_names(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: batch_names(:)
     CHARACTER(LEN=64), ALLOCATABLE :: seen_names(:)
     INTEGER :: i,j,id,nstage,family,mass_group
     error='D17: invalid or duplicate source catalog name'
@@ -516,16 +516,6 @@ CONTAINS
     group%term_names=names
     group%equation_ids=equations
   END FUNCTION make_group
-
-  !> Check catalogued mathematical names without converting group storage to IDs.
-  PURE FUNCTION name_membership(required,available) RESULT(found)
-    CHARACTER(*), INTENT(IN) :: required(:),available(:)
-    LOGICAL :: found(SIZE(required))
-    INTEGER :: i
-    DO i=1,SIZE(required)
-      found(i)=ANY(available==required(i))
-    END DO
-  END FUNCTION name_membership
 
   !> \brief Check index bounds and uniqueness before any vector indexing.
   !> \param[in] ids Conservative equation IDs.

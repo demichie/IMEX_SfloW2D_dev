@@ -32,7 +32,7 @@ CONTAINS
     TYPE(source_registry_type), INTENT(INOUT) :: registry
     TYPE(equation_partition_type), INTENT(IN) :: partition
     CHARACTER(*), INTENT(OUT) :: error
-    CHARACTER(LEN=64), ALLOCATABLE :: active_names(:),law_names(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
     INTEGER :: methods(3),i,pore
     CHARACTER(LEN=16) :: method
     CALL registry%finalize()
@@ -177,8 +177,7 @@ CONTAINS
         error='D17: explicit source groups must declare at least one term'; RETURN
       END IF
       DO i=1,source_group_term_count(g)
-        ! A complete rheology still expands to legacy addend names until
-        ! the physical catalog and dispatcher are migrated together.
+        ! Schedule the complete rheological law as one physical source.
         IF (rheology_flag .AND. &
              LEN_TRIM(rheology_source_name(rheology_model_id))>0 .AND. &
              TRIM(uppercase_source_text(source_group_terms(i,g)))== &
