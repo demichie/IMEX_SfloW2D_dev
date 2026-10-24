@@ -17,10 +17,6 @@ MODULE mass_exchange_carrier_loss_2d
   PUBLIC :: eval_mass_exchange_carrier_liquid_loss_semi_implicit
   PUBLIC :: eval_mass_exchange_carrier_liquid_loss_implicit
   PUBLIC :: solve_mass_exchange_carrier_liquid_loss_analytic
-  PUBLIC :: deposition_induced_carrier_loss
-  PUBLIC :: eval_mass_exchange_carrier_deposition_loss_semi_implicit
-  PUBLIC :: eval_mass_exchange_carrier_deposition_loss_implicit
-  PUBLIC :: solve_mass_exchange_carrier_deposition_loss_analytic
   PUBLIC :: eval_mass_exchange_carrier_darcy_loss_explicit
   PUBLIC :: eval_mass_exchange_carrier_darcy_loss_semi_implicit
   PUBLIC :: eval_mass_exchange_carrier_darcy_loss_implicit
