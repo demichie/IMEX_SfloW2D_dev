@@ -902,3 +902,8 @@ Commit [`1d916bcd`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/1d916bcd
 ### D17.22.29 — Selezione nominale delle sorgenti negli assemblatori SI/IM (24 ottobre 2026)
 
 Nell'assemblatore `equation_terms_2d` la selezione dei contributi impliciti per ruolo/modello usa prioritariamente `group%term_names` e `source_term_descriptor_by_name`, mentre il controllo della presenza del singolo termine risolve il suo nome canonico e interroga `group_contains_name`. Il fallback a `term_ids` è confinato ai descrittori legacy non ancora normalizzati. Questa modifica non elimina ancora gli ID numerici dal catalogo, né cambia i kernel fisici e i metodi numerici; è un passo preparatorio della migrazione D17.2/10c. **Stato:** IN CORSO; commit da verificare con compilazione e test sul nuovo HEAD.
+
+
+### D17.22.30 — Membership nominale anche per le API di compatibilità (24 ottobre 2026)
+
+`group_contains(group,term_id)` risolve prima l'identità nominale dal catalogo, quindi delega a `group_contains_name(group,name)`: un ID numerico non è più usato come chiave per verificare l'appartenenza a un gruppo normalizzato. Rimane il fallback ai `term_ids` soltanto per gruppi grezzi pre-normalizzazione. Il catalogo conserva temporaneamente gli ID e le suddivisioni delle leggi reologiche; **D17.2 e D17.19/10c non sono completati**. Nessun cambiamento ai kernel fisici. Verifica con le Actions necessaria sul nuovo commit.

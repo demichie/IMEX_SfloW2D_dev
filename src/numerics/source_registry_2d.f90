@@ -51,8 +51,12 @@ CONTAINS
   PURE LOGICAL FUNCTION group_contains(group,term_id)
     TYPE(source_group_type), INTENT(IN) :: group
     INTEGER, INTENT(IN) :: term_id
+    TYPE(source_term_type) :: term
     group_contains=.FALSE.
-    IF (ALLOCATED(group%term_ids)) group_contains=ANY(group%term_ids==term_id)
+    term=source_term_descriptor(term_id)
+    IF (LEN_TRIM(term%name)==0) RETURN
+    ! IDs are compatibility inputs; membership is keyed by canonical name.
+    group_contains=group_contains_name(group,term%name)
   END FUNCTION group_contains
 
   !> Query group membership by source name. The legacy integer-backed group
