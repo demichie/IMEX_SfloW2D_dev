@@ -1,7 +1,6 @@
 PROGRAM test_source_modules
 
-  USE parameters_2d, ONLY : wp, rheology_id_none, rheology_id_lahar,          &
-       rheology_id_lava
+  USE parameters_2d, ONLY : wp
   USE rheology_lahar_2d, ONLY : alpha1_coeff, beta1, eval_lahar_fluid_viscosity
   USE rheology_2d, ONLY : correct_friction_momentum
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source,           &
@@ -51,17 +50,17 @@ PROGRAM test_source_modules
   actual = eval_hindered_settling_deposition_rate(0.2_wp, 0.4_wp, 0.1_wp,  &
        1.0_wp, 0.5_wp, 1.0_wp, 1.0_wp)
   CALL assert_close(actual, 0.02_wp, 'hindered-settling available-mass cap')
-  actual = eval_solid_deposition_rate(rheology_id_lahar, 0.2_wp, 0.5_wp,    &
+  actual = eval_solid_deposition_rate('lahar', 0.2_wp, 0.5_wp,    &
        2.0_wp, 0.5_wp, 0.5_wp, 0.6_wp, 4.65_wp)
   CALL assert_close(actual, 0.1_wp, 'lahar deposition dispatch')
-  actual = eval_solid_deposition_rate(rheology_id_none, 0.2_wp, 0.4_wp,     &
+  actual = eval_solid_deposition_rate('none', 0.2_wp, 0.4_wp,     &
        0.1_wp, 1.0_wp, 0.5_wp, 1.0_wp, 1.0_wp)
   CALL assert_close(actual, 0.02_wp, 'hindered-settling deposition dispatch')
 
   alpha1_coeff = 1.0_wp
   beta1 = 2.0_wp
   expected_viscosity = eval_lahar_fluid_viscosity(293.15_wp, 0.3_wp)
-  CALL eval_settling_fluid_properties(rheology_id_lahar, 293.15_wp,         &
+  CALL eval_settling_fluid_properties('lahar', 293.15_wp,         &
        0.3_wp, 1800.0_wp, 1000.0_wp, 1.0E-6_wp, carrier_density,            &
        inverse_kinematic_viscosity)
   CALL assert_close(carrier_density, 1800.0_wp, 'lahar settling density')
@@ -89,7 +88,7 @@ PROGRAM test_source_modules
         ERROR STOP 1
      END IF
   END DO
-  CALL eval_settling_fluid_properties(rheology_id_none, 293.15_wp,           &
+  CALL eval_settling_fluid_properties('none', 293.15_wp,           &
        0.3_wp, 1800.0_wp, 1000.0_wp, 2.0E-6_wp, carrier_density,            &
        inverse_kinematic_viscosity)
   CALL assert_close(carrier_density, 1000.0_wp, 'carrier settling density')
@@ -165,7 +164,7 @@ PROGRAM test_source_modules
        'friction correction keeps zero y momentum at rest')
 
   temperature_perturbation = 1.0E-20_wp
-  complex_actual = eval_rheology_cooling_energy_rate(rheology_id_lava,     &
+  complex_actual = eval_rheology_cooling_energy_rate('lava',     &
        CMPLX(900.0_wp, temperature_perturbation, wp), 3.0E-8_wp,           &
        4.0_wp, 300.0_wp)
   expected = -3.0E-8_wp * (900.0_wp**4 - 300.0_wp**4) -                    &
@@ -175,7 +174,7 @@ PROGRAM test_source_modules
   CALL assert_close(AIMAG(complex_actual) / temperature_perturbation,        &
        expected_derivative,                                                 &
        'lava cooling complex-step derivative')
-  complex_actual = eval_rheology_cooling_energy_rate(rheology_id_none,     &
+  complex_actual = eval_rheology_cooling_energy_rate('none',     &
        CMPLX(900.0_wp, temperature_perturbation, wp), 3.0E-8_wp,           &
        4.0_wp, 300.0_wp)
   CALL assert_close(REAL(complex_actual,wp), 0.0_wp, 'non-lava cooling source')

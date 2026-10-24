@@ -10,8 +10,8 @@ MODULE source_configuration_2d
   USE equation_metadata_2d, ONLY : equation_partition_type, resolve_imex_group_method, &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   USE source_input_2d
-  USE parameters_2d, ONLY : wp, n_eqns, rheology_flag, rheology_model_id, &
-       rheology_id_none, rheology_id_lava, thermal_cooling_flag, &
+  USE parameters_2d, ONLY : wp, n_eqns, rheology_flag, rheology_model, &
+        thermal_cooling_flag, &
        pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag, &
        bottom_fissural_source_flag, radial_source_flag, lateral_source_flag, &
        liquid_flag, gas_flag, gas_loss_flag, liquid_vaporization_flag, &
@@ -45,10 +45,10 @@ CONTAINS
     END IF
     ALLOCATE(active_names(0))
     IF (rheology_flag) THEN
-      IF (LEN_TRIM(rheology_source_name(rheology_model_id))>0) &
-           active_names=[CHARACTER(LEN=64) :: active_names,rheology_source_name(rheology_model_id)]
-      IF (LEN_TRIM(rheology_source_name(rheology_model_id))==0 .AND. &
-           rheology_model_id/=rheology_id_none) THEN
+      IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))>0) &
+           active_names=[CHARACTER(LEN=64) :: active_names,canonical_rheology_source_name(rheology_model)]
+      IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))==0 .AND. &
+           TRIM(rheology_model)/='none') THEN
         error='D17: unsupported configured rheology'; RETURN
       END IF
     END IF
@@ -180,9 +180,9 @@ CONTAINS
         ! A named rheological law is one schedulable physical source.
         source_name=TRIM(lowercase_source_text(source_group_terms(i,g)))
         IF (rheology_flag .AND. &
-             LEN_TRIM(rheology_source_name(rheology_model_id))>0 .AND. &
-             source_name==TRIM(rheology_source_name(rheology_model_id))) THEN
-          source_name=rheology_source_name(rheology_model_id)
+             LEN_TRIM(canonical_rheology_source_name(rheology_model))>0 .AND. &
+             source_name==TRIM(canonical_rheology_source_name(rheology_model))) THEN
+          source_name=canonical_rheology_source_name(rheology_model)
         ELSE
           component=source_term_descriptor_by_name(source_name)
           error='D17: unknown, dependent or unschedulable source term name'
@@ -228,10 +228,10 @@ CONTAINS
 
     ALLOCATE(active_names(0))
     IF (rheology_flag) THEN
-      IF (LEN_TRIM(rheology_source_name(rheology_model_id))>0) &
-           active_names=[CHARACTER(LEN=64) :: active_names,rheology_source_name(rheology_model_id)]
-      IF (LEN_TRIM(rheology_source_name(rheology_model_id))==0 .AND. &
-           rheology_model_id/=rheology_id_none) THEN
+      IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))>0) &
+           active_names=[CHARACTER(LEN=64) :: active_names,canonical_rheology_source_name(rheology_model)]
+      IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))==0 .AND. &
+           TRIM(rheology_model)/='none') THEN
         error='D17: unsupported configured rheology'; RETURN
       END IF
     END IF

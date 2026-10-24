@@ -6,8 +6,8 @@ PROGRAM test_source_registry
        IM_GROUP_METHOD_NEWTON, IM_GROUP_METHOD_ANALYTIC
   USE source_configuration_2d, ONLY : initialize_native_source_configuration, initialize_configured_sources
   USE source_input_2d
-  USE parameters_2d, ONLY : wp, rheology_id_lava, rheology_id_voellmy, n_eqns, idx_pore, &
-       rheology_flag, rheology_model_id, pore_pressure_flag, thermal_cooling_flag, &
+  USE parameters_2d, ONLY : wp, n_eqns, idx_pore, &
+       rheology_flag, rheology_model, pore_pressure_flag, thermal_cooling_flag, &
        curvature_term_flag, bottom_radial_source_flag, bottom_fissural_source_flag, &
        radial_source_flag, lateral_source_flag, liquid_flag, gas_flag, &
        gas_loss_flag, liquid_vaporization_flag, imex_velocity_group, &
@@ -94,7 +94,7 @@ PROGRAM test_source_registry
 CONTAINS
   SUBROUTINE configure_lava_case()
     n_eqns=7;idx_pore=7
-    rheology_flag=.TRUE.;rheology_model_id=rheology_id_lava
+    rheology_flag=.TRUE.;rheology_model='lava'
     thermal_cooling_flag=.TRUE.
     pore_pressure_flag=.TRUE.
     curvature_term_flag=.FALSE.
@@ -142,7 +142,7 @@ CONTAINS
     DO model=1,2
       DO choice=1,2
         CALL configure_lava_case()
-        rheology_model_id=MERGE(rheology_id_lava,rheology_id_voellmy,model==2)
+        rheology_model=MERGE('lava   ','voellmy',model==2)
         thermal_cooling_flag=(choice==2)
         pore_pressure_flag=.FALSE.
         lateral_source_flag=.FALSE.

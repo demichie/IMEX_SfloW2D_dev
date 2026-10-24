@@ -1,13 +1,9 @@
 MODULE source_catalog_2d
-  USE parameters_2d, ONLY : rheology_id_voellmy, rheology_id_plastic, &
-       rheology_id_lava, rheology_id_lahar, rheology_id_empirical, &
-       rheology_id_quadratic, rheology_id_froude, rheology_id_lucas, &
-       rheology_id_mui, rheology_id_mui_voellmy
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: source_term_type, SOURCE_CATALOG, SOURCE_TERM_COUNT
   PUBLIC :: source_term_descriptor_by_name, source_catalog_names_unique
-  PUBLIC :: rheology_source_name, rheology_has_role, rheology_name_has_role, canonical_rheology_catalog_unique
+  PUBLIC :: canonical_rheology_source_name, rheology_name_has_role, canonical_rheology_catalog_unique
   INTEGER, PARAMETER, PUBLIC :: SOURCE_METHOD_EXPLICIT=1, SOURCE_METHOD_NEWTON=2, SOURCE_METHOD_ANALYTIC=3
   INTEGER, PARAMETER, PUBLIC :: SOURCE_CADENCE_STAGE=1, SOURCE_CADENCE_STEP=2
   INTEGER, PARAMETER, PUBLIC :: SOURCE_PHASE_RK_IMPLICIT=1, SOURCE_PHASE_RK_EXPLICIT=2, SOURCE_PHASE_POST_RK=3
@@ -75,23 +71,19 @@ CONTAINS
     END DO
     ok=.TRUE.
   END FUNCTION source_catalog_names_unique
-  PURE FUNCTION rheology_source_name(model_id) RESULT(name)
-    INTEGER, INTENT(IN) :: model_id
+  PURE FUNCTION canonical_rheology_source_name(model_name) RESULT(name)
+    CHARACTER(*), INTENT(IN) :: model_name
     CHARACTER(LEN=64) :: name
+    INTEGER :: i
     name=''
-    SELECT CASE(model_id)
-    CASE(rheology_id_voellmy); name='rheology_voellmy'
-    CASE(rheology_id_plastic); name='rheology_plastic'
-    CASE(rheology_id_lava); name='rheology_lava'
-    CASE(rheology_id_lahar); name='rheology_lahar'
-    CASE(rheology_id_empirical); name='rheology_empirical'
-    CASE(rheology_id_quadratic); name='rheology_quadratic'
-    CASE(rheology_id_froude); name='rheology_froude'
-    CASE(rheology_id_lucas); name='rheology_lucas'
-    CASE(rheology_id_mui); name='rheology_mui'
-    CASE(rheology_id_mui_voellmy); name='rheology_mui_voellmy'
-    END SELECT
-  END FUNCTION rheology_source_name
+    IF (TRIM(model_name)=='none') RETURN
+    DO i=1,10
+      IF (TRIM(model_name)==TRIM(SOURCE_CATALOG(i)%name(10:))) THEN
+        name=SOURCE_CATALOG(i)%name
+        RETURN
+      END IF
+    END DO
+  END FUNCTION canonical_rheology_source_name
   PURE LOGICAL FUNCTION canonical_rheology_catalog_unique() RESULT(ok)
     INTEGER :: i,j
     ok=.FALSE.
@@ -102,12 +94,6 @@ CONTAINS
     END DO
     ok=.TRUE.
   END FUNCTION canonical_rheology_catalog_unique
-  PURE LOGICAL FUNCTION rheology_has_role(model_id,role) RESULT(found)
-    INTEGER, INTENT(IN) :: model_id,role
-    ! Compatibility bridge: role selection itself uses the canonical name.
-    found=rheology_name_has_role(rheology_source_name(model_id),role)
-  END FUNCTION rheology_has_role
-
   !> Check a rheology's actual SI/IM contribution by canonical source name.
   !> This is independent of the legacy numeric model ID.
   PURE LOGICAL FUNCTION rheology_name_has_role(source_name,role) RESULT(found)

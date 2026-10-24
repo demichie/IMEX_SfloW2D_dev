@@ -7,7 +7,7 @@
 
 MODULE thermal_laws_2d
 
-  USE parameters_2d, ONLY : wp, rheology_id_lava
+  USE parameters_2d, ONLY : wp
   USE diagnostics_2d, ONLY : fatal_error
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
@@ -221,25 +221,25 @@ CONTAINS
   !> \brief Evaluate the cooling energy rate associated with the selected rheology.
   !> \details Lava uses the radiative/convective cooling law; other models
   !>          contribute no rheology-specific cooling source.
-  !> \param[in] model_id Selected rheology model ID.
+  !> \param[in] model_name Selected rheology model ID.
   !> \param[in] temperature Current temperature [K].
   !> \param[in] radiative_coefficient Radiative coefficient [W m^-2 K^-4].
   !> \param[in] convective_coefficient Convective coefficient [W m^-2 K^-1].
   !> \param[in] ambient_temperature Ambient temperature [K].
   !> \return Rheology-specific thermal-energy rate per unit area [W m^-2].
   !******************************************************************************
-  PURE FUNCTION eval_rheology_cooling_energy_rate(model_id, temperature,     &
+  PURE FUNCTION eval_rheology_cooling_energy_rate(model_name, temperature,     &
        radiative_coefficient, convective_coefficient, ambient_temperature)   &
        RESULT(rate)
 
-    INTEGER, INTENT(IN) :: model_id
+    CHARACTER(*), INTENT(IN) :: model_name
     COMPLEX(wp), INTENT(IN) :: temperature
     REAL(wp), INTENT(IN) :: radiative_coefficient, convective_coefficient
     REAL(wp), INTENT(IN) :: ambient_temperature
     COMPLEX(wp) :: rate
 
-    SELECT CASE (model_id)
-    CASE (rheology_id_lava)
+    SELECT CASE (TRIM(model_name))
+    CASE ('lava','rheology_lava')
        rate = eval_thermal_cooling_implicit(temperature, radiative_coefficient, &
             convective_coefficient, ambient_temperature)
     CASE DEFAULT

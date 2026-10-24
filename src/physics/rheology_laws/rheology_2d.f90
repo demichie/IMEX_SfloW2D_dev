@@ -1,7 +1,7 @@
 !********************************************************************************
 !> \brief Rheology dispatch, model naming and friction-only momentum correction.
 !> \details Dispatches common momentum-rate and analytic-velocity interfaces
-!> to the selected constitutive law, resolves canonical model names to IDs,
+!> to the selected constitutive law using canonical source names,
 !> and provides a projection for momentum updates caused exclusively by
 !> friction. The projection constrains the candidate update to
 !> \f$\boldsymbol{m}_{after}=\alpha\boldsymbol{m}_{before}\f$,
@@ -12,10 +12,7 @@
 
 MODULE rheology_2d
 
-  USE parameters_2d, ONLY : wp, rheology_id_none, rheology_id_voellmy,       &
-       rheology_id_plastic, rheology_id_lava, rheology_id_lahar,             &
-       rheology_id_empirical, rheology_id_quadratic, rheology_id_froude,     &
-       rheology_id_lucas, rheology_id_mui, rheology_id_mui_voellmy
+  USE parameters_2d, ONLY : wp
   USE diagnostics_2d, ONLY : fatal_error
   USE rheology_voellmy_2d, ONLY : eval_rheology_voellmy_implicit,       &
        eval_rheology_voellmy_semi_implicit,                            &
@@ -50,7 +47,6 @@ MODULE rheology_2d
   PUBLIC :: eval_rheology_semi_implicit
   PUBLIC :: eval_rheology_implicit
   PUBLIC :: solve_rheology_analytic
-  PUBLIC :: resolve_rheology_model, rheology_name_from_id
   PUBLIC :: curvature_acceleration
 
   ! Uniform treatment surface for this source family.
@@ -278,7 +274,7 @@ CONTAINS
   !> \brief Evaluate the selected implicit rheology momentum rate.
   !> \details All state values are explicit arguments so the dispatch has no
   !> per-cell workspace allocation or hidden cell-state conversion.
-  !> \param[in] model_id Selected rheology identifier.
+  !> \param[in] model_name Selected rheology identifier.
   !> \param[in] flow_depth Flow depth [m].
   !> \param[in] temperature Mixture temperature [K].
   !> \param[in] mixture_density Mixture density [kg m^-3].
@@ -301,7 +297,7 @@ CONTAINS
   !> \brief Evaluate the selected semi-implicit rheology momentum rate.
   !> \details Curvature acceleration is used by the MUI-family laws only,
   !> matching their existing equation-term assembly semantics.
-  !> \param[in] model_id Selected rheology identifier.
+  !> \param[in] model_name Selected rheology identifier.
   !> \param[in] flow_depth Flow depth [m].
   !> \param[in] velocity_x x velocity [m s^-1].
   !> \param[in] velocity_y y velocity [m s^-1].
@@ -327,7 +323,7 @@ CONTAINS
   !> \details Dispatches to the model-specific exact-flow solver. All state
   !>          values are passed explicitly; unsupported model IDs leave the
   !>          output equal to the input and return model_supported as false.
-  !> \param[in] model_id Rheology model ID.
+  !> \param[in] model_name Rheology model ID.
   !> \param[in] integration_step Exact-flow interval [s].
   !> \param[in] flow_depth Flow depth [m].
   !> \param[in] temperature Flow temperature [K].
@@ -343,105 +339,10 @@ CONTAINS
   !> \param[in] use_stochastic Whether stochastic forcing is active.
   !> \param[in] stochastic_value Local stochastic rheology value.
   !> \param[out] velocity_after Horizontal velocity after integration [m s^-1].
-  !> \param[out] model_supported True when model_id has an analytic velocity law.
+  !> \param[out] model_supported True when model_name has an analytic velocity law.
   !******************************************************************************
 
-  !******************************************************************************
-  !> \brief Resolve a user-supplied rheology name to its internal model ID.
-  !>
-  !> \param[in,out] name Input model name; trimmed and canonicalized to lowercase.
-  !> \param[out] model_id Internal model ID, or -1 for an unsupported name.
-  !******************************************************************************
 
-  SUBROUTINE resolve_rheology_model( name, model_id )
-
-    CHARACTER(LEN=*), INTENT(INOUT) :: name
-    INTEGER, INTENT(OUT) :: model_id
-
-    CHARACTER(LEN=LEN(name)) :: canonical_name
-    INTEGER :: character_index, character_code
-
-    canonical_name = ADJUSTL(name)
-    DO character_index = 1, LEN_TRIM(canonical_name)
-       character_code = IACHAR(canonical_name(character_index:character_index))
-       IF ( character_code .GE. IACHAR('A') .AND. &
-            character_code .LE. IACHAR('Z') ) THEN
-          canonical_name(character_index:character_index) =                  &
-               ACHAR(character_code + IACHAR('a') - IACHAR('A'))
-       END IF
-    END DO
-    name = TRIM(canonical_name)
-
-    SELECT CASE (TRIM(name))
-    CASE ('none')
-       model_id = rheology_id_none
-    CASE ('voellmy')
-       model_id = rheology_id_voellmy
-    CASE ('plastic')
-       model_id = rheology_id_plastic
-    CASE ('lava')
-       model_id = rheology_id_lava
-    CASE ('lahar')
-       model_id = rheology_id_lahar
-    CASE ('empirical')
-       model_id = rheology_id_empirical
-    CASE ('quadratic')
-       model_id = rheology_id_quadratic
-    CASE ('froude')
-       model_id = rheology_id_froude
-    CASE ('lucas')
-       model_id = rheology_id_lucas
-    CASE ('mui')
-       model_id = rheology_id_mui
-    CASE ('mui_voellmy')
-       model_id = rheology_id_mui_voellmy
-    CASE DEFAULT
-       model_id = -1
-    END SELECT
-
-  END SUBROUTINE resolve_rheology_model
-
-
-  !******************************************************************************
-  !> \brief Return the canonical input name corresponding to an internal ID.
-  !>
-  !> \param[in] model_id Internal rheology model ID.
-  !> \return Canonical name, or 'unknown' for an unsupported ID.
-  !******************************************************************************
-
-  PURE FUNCTION rheology_name_from_id( model_id ) RESULT(name)
-
-    INTEGER, INTENT(IN) :: model_id
-    CHARACTER(LEN=32) :: name
-
-    SELECT CASE (model_id)
-    CASE (rheology_id_none)
-       name = 'none'
-    CASE (rheology_id_voellmy)
-       name = 'voellmy'
-    CASE (rheology_id_plastic)
-       name = 'plastic'
-    CASE (rheology_id_lava)
-       name = 'lava'
-    CASE (rheology_id_lahar)
-       name = 'lahar'
-    CASE (rheology_id_empirical)
-       name = 'empirical'
-    CASE (rheology_id_quadratic)
-       name = 'quadratic'
-    CASE (rheology_id_froude)
-       name = 'froude'
-    CASE (rheology_id_lucas)
-       name = 'lucas'
-    CASE (rheology_id_mui)
-       name = 'mui'
-    CASE (rheology_id_mui_voellmy)
-       name = 'mui_voellmy'
-    CASE DEFAULT
-       name = 'unknown'
-    END SELECT
-
-  END FUNCTION rheology_name_from_id
 
 
 END MODULE rheology_2d

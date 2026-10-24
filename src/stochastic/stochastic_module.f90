@@ -16,8 +16,7 @@
 MODULE stochastic_module
   
   ! external variables
-  USE parameters_2d, ONLY : wp, rheology_model_id, rheology_id_froude,            &
-       rheology_id_lucas, idx_stoch, idx_u, idx_v
+  USE parameters_2d, ONLY : wp, rheology_model, idx_stoch, idx_u, idx_v
   
   USE domain_2d, ONLY: domain_type
   USE state_2d, ONLY: state_type
@@ -385,8 +384,8 @@ END FUNCTION VelocitySquared
     IF (state%q(1,j,k) <= EPSILON(1.0_wp)) THEN
       ! Keep fluctuations available when flow enters a previously dry cell.
       getSigmaNoise = std_max
-    ELSEIF ((rheology_model_id == rheology_id_froude) .OR.                        &
-            (rheology_model_id == rheology_id_lucas)) THEN
+    ELSEIF ((TRIM(rheology_model) == 'froude') .OR.                        &
+            (TRIM(rheology_model) == 'lucas')) THEN
       velocity_squared = VelocitySquared(state,j,k)
       getSigmaNoise = expFormNoise(velocity_squared)
     ELSE

@@ -105,12 +105,8 @@ MODULE inpout_2d
        emme, atm_heat_transf_coeff, thermal_conductivity, T_env, T_ground, c_p
 
   ! -- Variables for the namelist RHEOLOGY_PARAMETERS
-  USE parameters_2d, ONLY: rheology_model, rheology_model_id,                  &
-       rheology_id_none, rheology_id_voellmy, rheology_id_plastic, rheology_id_lava,       &
-       rheology_id_lahar, rheology_id_empirical, rheology_id_quadratic, rheology_id_froude,&
-       rheology_id_lucas, rheology_id_mui, rheology_id_mui_voellmy, &
-       thermal_cooling_flag
-  USE rheology_2d, ONLY: resolve_rheology_model
+  USE parameters_2d, ONLY: rheology_model, thermal_cooling_flag
+  USE source_catalog_2d, ONLY: canonical_rheology_source_name
   USE constitutive_parameters_2d, ONLY: A_drag, B_drag, collective_settling_flag
   USE rheology_parameters_2d, ONLY : mu_s, mu_2, I_0, muI_inf,               &
        mu_0, mu_inf, Fr_0, U_w, xi, T_ref
@@ -567,7 +563,6 @@ CONTAINS
 
     !-- Inizialization of the Variables for the namelist RHEOLOGY_PARAMETERS
     rheology_model = 'none'
-    rheology_model_id = rheology_id_none
     nu_ref = 0.0_wp
     mu = -1.0_wp
     xi = -1.0_wp
@@ -845,7 +840,6 @@ CONTAINS
 
 
     rheology_model = 'none'
-    rheology_model_id = rheology_id_none
     mu = -1
     xi = -1
     tau = -1
@@ -1587,8 +1581,8 @@ CONTAINS
 
         IF (kin_visc_l .EQ. -1.0_wp) THEN
 
-          IF ((rheology_model_id .NE. rheology_id_lahar) .AND.                   &
-              (rheology_model_id .NE. rheology_id_lava)) THEN
+          IF ((TRIM(rheology_model) .NE. 'lahar') .AND.                   &
+              (TRIM(rheology_model) .NE. 'lava')) THEN
 
             WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
             WRITE (*, *) 'KIN_VISC_L =', kin_visc_l
@@ -1599,7 +1593,7 @@ CONTAINS
 
         ELSE
 
-          IF (rheology_model_id .EQ. rheology_id_lahar) THEN
+          IF (TRIM(rheology_model) .EQ. 'lahar') THEN
 
             WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
             WRITE (*, *) 'KIN_VISC_L =', kin_visc_l
@@ -1609,7 +1603,7 @@ CONTAINS
 
           END IF
 
-          IF (rheology_model_id .EQ. rheology_id_lava) THEN
+          IF (TRIM(rheology_model) .EQ. 'lava') THEN
 
             WRITE (*, *) 'ERROR: problem with namelist LIQUID_TRANSPORT_PARAMETERS'
             WRITE (*, *) 'KIN_VISC_L =', kin_visc_l
@@ -3084,8 +3078,19 @@ CONTAINS
 
       END IF
 
-      CALL resolve_rheology_model(rheology_model, rheology_model_id)
-      IF (rheology_model_id .LT. 0) THEN
+      BLOCK
+        INTEGER :: i, code
+        CHARACTER(LEN=LEN(rheology_model)) :: normalized
+        normalized=ADJUSTL(rheology_model)
+        DO i=1,LEN_TRIM(normalized)
+          code=IACHAR(normalized(i:i))
+          IF (code>=IACHAR('A') .AND. code<=IACHAR('Z')) &
+               normalized(i:i)=ACHAR(code+IACHAR('a')-IACHAR('A'))
+        END DO
+        rheology_model=TRIM(normalized)
+      END BLOCK
+      IF (TRIM(rheology_model)/='none' .AND. &
+           LEN_TRIM(canonical_rheology_source_name(rheology_model))==0) THEN
         WRITE (*, *) 'ERROR: unknown RHEOLOGY_MODEL =', TRIM(rheology_model)
         WRITE (*, *) 'Supported names: none, voellmy, plastic, lava, lahar,'
         WRITE (*, *) '                 empirical, quadratic, froude, lucas, mui, mui_voellmy'
@@ -3098,24 +3103,24 @@ CONTAINS
       BLOCK
         LOGICAL :: finite_parameters
         finite_parameters=.TRUE.
-        SELECT CASE(rheology_model_id)
-        CASE(rheology_id_voellmy)
+        SELECT CASE(TRIM(rheology_model))
+        CASE('voellmy')
           finite_parameters=ALL(finite_input_value([mu,xi]))
-        CASE(rheology_id_plastic)
+        CASE('plastic')
           finite_parameters=finite_input_value(tau)
-        CASE(rheology_id_lava)
+        CASE('lava')
           finite_parameters=ALL(finite_input_value([nu_ref,tau0,visc_par,T_ref]))
-        CASE(rheology_id_lahar)
+        CASE('lahar')
           finite_parameters=ALL(finite_input_value([alpha2,beta2,T_ref,alpha1_ref,beta1,Kappa,n_td]))
-        CASE(rheology_id_quadratic)
+        CASE('quadratic')
           finite_parameters=finite_input_value(friction_factor)
-        CASE(rheology_id_froude)
+        CASE('froude')
           finite_parameters=ALL(finite_input_value([mu_0,mu_inf,Fr_0]))
-        CASE(rheology_id_lucas)
+        CASE('lucas')
           finite_parameters=ALL(finite_input_value([mu_0,mu_inf,U_w]))
-        CASE(rheology_id_mui)
+        CASE('mui')
           finite_parameters=ALL(finite_input_value([mu_s,mu_2,I_0,muI_inf]))
-        CASE(rheology_id_mui_voellmy)
+        CASE('mui_voellmy')
           finite_parameters=ALL(finite_input_value([mu_s,mu_2,I_0,muI_inf,xi]))
         END SELECT
         IF (.NOT.finite_parameters) THEN
@@ -3125,7 +3130,7 @@ CONTAINS
         END IF
       END BLOCK
 
-      IF (rheology_model_id .EQ. rheology_id_none) THEN
+      IF (TRIM(rheology_model) .EQ. 'none') THEN
 
         WRITE (*, *) 'ERROR: problem with namelist RHEOLOGY_PARAMETERS'
         WRITE (*, *) 'RHEOLOGY_FLAG', rheology_flag, 'RHEOLOGY_MODEL =', &
@@ -3133,7 +3138,7 @@ CONTAINS
         WRITE (*, *) 'Please check the input file'
         STOP
 
-      ELSEIF (rheology_model_id .EQ. rheology_id_voellmy) THEN
+      ELSEIF (TRIM(rheology_model) .EQ. 'voellmy') THEN
 
         IF (mu .LT. 0.0_wp .OR. xi .LE. 0.0_wp) THEN
 
@@ -3159,7 +3164,7 @@ CONTAINS
 
         END IF
 
-      ELSEIF (rheology_model_id .EQ. rheology_id_plastic) THEN
+      ELSEIF (TRIM(rheology_model) .EQ. 'plastic') THEN
 
         IF (tau .EQ. -1.0_wp) THEN
 
@@ -3185,7 +3190,7 @@ CONTAINS
 
         END IF
 
-      ELSEIF (rheology_model_id .EQ. rheology_id_lava) THEN
+      ELSEIF (TRIM(rheology_model) .EQ. 'lava') THEN
 
         IF (nu_ref .EQ. -1.0_wp) THEN
 
@@ -3242,7 +3247,7 @@ CONTAINS
 
         END IF
 
-      ELSEIF (rheology_model_id .EQ. rheology_id_lahar) THEN
+      ELSEIF (TRIM(rheology_model) .EQ. 'lahar') THEN
 
         IF (gas_flag .OR. (.NOT. liquid_flag)) THEN
 
@@ -3352,7 +3357,7 @@ CONTAINS
 
         END IF
 
-      ELSEIF (rheology_model_id .EQ. rheology_id_empirical) THEN
+      ELSEIF (TRIM(rheology_model) .EQ. 'empirical') THEN
 
         IF (VERBOSE_LEVEL .GE. 0) THEN
 
@@ -3361,7 +3366,7 @@ CONTAINS
 
         END IF
 
-      ELSEIF (rheology_model_id .EQ. rheology_id_quadratic) THEN
+      ELSEIF (TRIM(rheology_model) .EQ. 'quadratic') THEN
 
         IF (VERBOSE_LEVEL .GE. 0) THEN
 
@@ -3380,7 +3385,7 @@ CONTAINS
         END IF
 
         ! Check Inputs Model Zhu et al 2020
-      ELSEIF (rheology_model_id .EQ. rheology_id_froude) THEN
+      ELSEIF (TRIM(rheology_model) .EQ. 'froude') THEN
         WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
         WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'Fr_0 = ', Fr_0
         ! Stop the program if the parameters are not a double-precision floating-point numbers (real numbers).
@@ -3401,7 +3406,7 @@ CONTAINS
         END IF
 
         ! Check Inputs Model Lucas et al 2014
-      ELSEIF (rheology_model_id .EQ. rheology_id_lucas) THEN
+      ELSEIF (TRIM(rheology_model) .EQ. 'lucas') THEN
         WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
         WRITE (*, *) 'MU_0 =', mu_0, ' MU_inf =', mu_inf, 'U_w = ', U_w
         ! Stop the program if the parameters are not a double-precision floating-point numbers (real numbers).
@@ -3421,7 +3426,7 @@ CONTAINS
           STOP
         END IF
 
-      ELSEIF (rheology_model_id .EQ. rheology_id_mui) THEN
+      ELSEIF (TRIM(rheology_model) .EQ. 'mui') THEN
         WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
         WRITE (*, *) 'MU(I) RHEOLOGY FOR DENSE GRANULAR FLOWS'
         WRITE (*, *) 'MU_S =', mu_s, ' MU_2 =', mu_2, 'I_0 = ', I_0, 'MUI_INF = ', muI_inf
@@ -3442,7 +3447,7 @@ CONTAINS
           STOP
         END IF
 
-      ELSEIF (rheology_model_id .EQ. rheology_id_mui_voellmy) THEN
+      ELSEIF (TRIM(rheology_model) .EQ. 'mui_voellmy') THEN
         WRITE (*, *) 'RHEOLOGY_MODEL =', rheology_model
         WRITE (*, *) 'COMBINED MU(I) + VOELLMY RHEOLOGY'
         WRITE (*, *) 'MU_S =', mu_s, ' MU_2 =', mu_2, 'I_0 = ', I_0, 'MUI_INF = ', muI_inf
@@ -3487,7 +3492,7 @@ CONTAINS
     ! an explicit input later in the source kernel.
     T_env = 300.0_wp
     ! Preserve historical behavior when the optional flag is absent.
-    thermal_cooling_flag = rheology_model_id == rheology_id_lava
+    thermal_cooling_flag = TRIM(rheology_model) == 'lava'
     READ (input_unit, temperature_parameters, IOSTAT=ios)
 
     IF (ios .NE. 0) THEN
@@ -4731,20 +4736,20 @@ CONTAINS
       ! Set the velocity-dependent intensity law. For legacy inputs, use the
       ! corresponding rheology scale when u_0 is not specified explicitly.
       WRITE (*, *) 'Setting stochastic intensity parameters...'
-      if (rheology_model_id .EQ. rheology_id_froude) THEN
+      if (TRIM(rheology_model) .EQ. 'froude') THEN
         std_min = 0.0_wp !std_max * (mu_0/mu_inf) ! mu_0 < mu_inf in mu(Fr)
         IF (noise_activation_velocity <= 0.0_wp)                              &
              noise_activation_velocity = Fr_0
         std_slope_factor = noise_activation_velocity**2
-      ELSEIF (rheology_model_id .EQ. rheology_id_lucas) THEN
+      ELSEIF (TRIM(rheology_model) .EQ. 'lucas') THEN
         std_min = std_max*(mu_inf/mu_0) ! mu_0 > mu_inf in mu(U)
         IF (noise_activation_velocity <= 0.0_wp)                              &
              noise_activation_velocity = U_w
         std_slope_factor = noise_activation_velocity**2
       END IF
 
-      IF (((rheology_model_id == rheology_id_froude) .OR.                        &
-           (rheology_model_id == rheology_id_lucas)) .AND.                       &
+      IF (((TRIM(rheology_model) == 'froude') .OR.                        &
+           (TRIM(rheology_model) == 'lucas')) .AND.                       &
           (noise_activation_velocity <= 0.0_wp)) THEN
         CALL fatal_error('noise_activation_velocity must be > 0')
       END IF
@@ -7725,14 +7730,14 @@ END IF
 
         mod_hor_vel = SQRT(r_u**2 + r_v**2)
 
-        IF (rheology_flag .AND. rheology_model_id .EQ. rheology_id_voellmy) THEN
+        IF (rheology_flag .AND. TRIM(rheology_model) .EQ. 'voellmy') THEN
           exc_pore_pres = 0.0_wp
           IF (n_pore_vars .GT. 0) exc_pore_pres = state%qp(idx_pore, j, k)
           muEff(j, k) = mu*MAX(0.0_wp, 1.0_wp - MAX(0.0_wp, exc_pore_pres) / &
                                (r_rho_m*r_h*r_red_grav))
         ELSE IF (rheology_flag .AND. &
-                 (rheology_model_id .EQ. rheology_id_mui .OR.                   &
-                  rheology_model_id .EQ. rheology_id_mui_voellmy)) THEN
+                 (TRIM(rheology_model) .EQ. 'mui' .OR.                   &
+                  TRIM(rheology_model) .EQ. 'mui_voellmy')) THEN
           IF (mod_hor_vel .LT. EPSILON(1.0_wp)) THEN
             muEff(j, k) = mu_s
           ELSE

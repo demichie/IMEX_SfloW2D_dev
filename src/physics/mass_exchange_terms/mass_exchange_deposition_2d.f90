@@ -45,7 +45,7 @@ CONTAINS
 
     END IF
 
-    CALL eval_settling_fluid_properties(rheology_model_id, r_T, alphas_tot,  &
+    CALL eval_settling_fluid_properties(rheology_model, r_T, alphas_tot,  &
          r_rho_m, r_rho_c, kin_visc_c_local, rhoc, inv_kin_visc)
 
     DO i_solid=1,n_solid
@@ -56,7 +56,7 @@ CONTAINS
                rhoc , inv_kin_visc )
 
           deposition_term(i_solid) = eval_solid_deposition_rate(              &
-               rheology_model_id, r_alphas(i_solid), settling_vel, r_h, dt,  &
+               rheology_model, r_alphas(i_solid), settling_vel, r_h, dt,  &
                alphas_tot, alpha_max, hind_exp)
 
           IF ( deposition_term(i_solid) .LT. 0.0_wp ) THEN
@@ -143,12 +143,12 @@ CONTAINS
 
   END FUNCTION settling_velocity
 
-  SUBROUTINE eval_settling_fluid_properties(model_id, temperature,           &
+  SUBROUTINE eval_settling_fluid_properties(model_name, temperature,           &
        total_solid_fraction, mixture_density, carrier_density_fallback,     &
        kinematic_viscosity_fallback, carrier_density,                       &
        inverse_kinematic_viscosity)
 
-    INTEGER, INTENT(IN) :: model_id
+    CHARACTER(*), INTENT(IN) :: model_name
     REAL(wp), INTENT(IN) :: temperature, total_solid_fraction, mixture_density
     REAL(wp), INTENT(IN) :: carrier_density_fallback
     REAL(wp), INTENT(IN) :: kinematic_viscosity_fallback
@@ -157,7 +157,7 @@ CONTAINS
 
     carrier_density = carrier_density_fallback
 
-    IF (model_id .EQ. rheology_id_lahar) THEN
+    IF (model_name .EQ. 'lahar') THEN
        fluid_viscosity = eval_lahar_fluid_viscosity(temperature,            &
             total_solid_fraction)
        carrier_density = mixture_density
@@ -168,17 +168,17 @@ CONTAINS
 
   END SUBROUTINE eval_settling_fluid_properties
 
-  PURE FUNCTION eval_solid_deposition_rate(model_id, solid_fraction,         &
+  PURE FUNCTION eval_solid_deposition_rate(model_name, solid_fraction,         &
        settling_velocity, flow_depth, time_step, total_solid_fraction,       &
        maximum_solid_fraction, hindered_settling_exponent) RESULT(rate)
 
-    INTEGER, INTENT(IN) :: model_id
+    CHARACTER(*), INTENT(IN) :: model_name
     REAL(wp), INTENT(IN) :: solid_fraction, settling_velocity
     REAL(wp), INTENT(IN) :: flow_depth, time_step, total_solid_fraction
     REAL(wp), INTENT(IN) :: maximum_solid_fraction, hindered_settling_exponent
     REAL(wp) :: rate
 
-    IF (model_id .EQ. rheology_id_lahar) THEN
+    IF (model_name .EQ. 'lahar') THEN
        rate = eval_lahar_deposition_rate(solid_fraction, settling_velocity,   &
             flow_depth, time_step)
     ELSE

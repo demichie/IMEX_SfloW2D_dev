@@ -19,7 +19,7 @@ CP_S = np.array([900., 1100.])
 DIAM = np.array([1.e-4, 4.e-4])
 SPH = np.array([.8, .6])
 AIR = 101300. / (287.05 * 300.)
-LAWS = (1, 2, 3, 4, 5, 6, 9, 10, 11, 12)
+LAWS = ('voellmy', 'plastic', 'lava', 'lahar', 'empirical', 'quadratic', 'froude', 'lucas', 'mui', 'mui_voellmy')
 DEFAULTS = dict(mu=.3, xi=500., tau=.4, nu_ref=.02, visc_par=.003,
                 T_ref=900., tau0=20., alpha1_coeff=1., beta1=2., alpha2=5.,
                 beta2=3., Kappa=24., n_td2=.01, friction_factor=.03,
@@ -29,7 +29,7 @@ DEFAULTS = dict(mu=.3, xi=500., tau=.4, nu_ref=.02, visc_par=.003,
                 maximum_solid_packing=.64, alpha_trans=.2, N_inh=2)
 
 
-def fixture(name, model=6, h=2., temperature=500., velocity=(3., -4.),
+def fixture(name, model='quadratic', h=2., temperature=500., velocity=(3., -4.),
             alpha=(.2, .1), gas=False, pressure=100., **controls):
     """Construct conservative data from prescribed volume inventories, independently."""
     a = np.array(alpha)
@@ -112,15 +112,15 @@ def oracle(q, overrides):
     implicit = np.zeros(len(q)); si = np.zeros(len(q)); model = c['rheology_model']
     if c['rheology_flag']:
         if v > 0:
-            if model in (1, 12):
+            if model in ('voellmy', 'mui_voellmy'):
                 xi = np.clip(c['xi']+c['z'], 1., 1.e5) if c['stochastic_flag'] else c['xi']
                 implicit[1:3] = -rho*g/xi*v*u
-            elif model == 2:
+            elif model == 'plastic':
                 implicit[1:3] = -rho*c['tau']*u/v
-            elif model == 3:
+            elif model == 'lava':
                 gamma = 3*c['nu_ref']/max(h, 1.e-10)*np.exp(-c['visc_par']*(t-c['T_ref']))
                 implicit[1:3] = -rho*gamma*u
-            elif model == 4:
+            elif model == 'lahar':
                 tc = t-273.15
                 if tc < 20:
                     av = 1.e-3*10**(1301/(998.333+8.1855*(tc-20)+.00585*(tc-20)**2)-1.30223)
@@ -130,34 +130,34 @@ def oracle(q, overrides):
                 sv = c['Kappa']*visc*v/(8*rho*9.81*max(h, 1.e-20)**2)
                 std = c['n_td2']*v*v*max(h, 1.e-20)**(-4/3)
                 implicit[1:3] = -9.81*rho*h*(sv+std)*u/vh
-            elif model == 5:
+            elif model == 'empirical':
                 implicit[1:3] = -rho*1.e-3*v/(1+10*h)*u/vh
-            elif model == 6:
+            elif model == 'quadratic':
                 implicit[1:3] = -rho*c['friction_factor']*v*v*u/vh
-        if model == 3:
+        if model == 'lava':
             implicit[3] = -c['radiative_term_coeff']*(t**4-c['T_env']**4)-c['convective_term_coeff']*(t-c['T_env'])
         if h > EPS and v > 0:
-            if model == 1:
+            if model == 'voellmy':
                 load = max(0., c['mu']*rho*(g+C)*h*math.sqrt(G))
                 if c['pore_pressure_flag']:
                     load = max(0., load-c['mu']*math.sqrt(G)*p)
                 si[1:3] = -max(0., load)*u/v
-            elif model == 3:
+            elif model == 'lava':
                 si[1:3] = -c['tau0']*u/v
-            elif model == 4:
+            elif model == 'lahar':
                 sy = c['alpha2']*(np.exp(c['beta2']*a.sum())-1)/(9.81*rho*max(h, 1.e-20))
                 si[1:3] = -9.81*rho*h*sy*u/vh
-            elif model == 9 and g > 0:
+            elif model == 'froude' and g > 0:
                 fr = v/math.sqrt(g*h)
                 if c['stochastic_flag']:
                     fr = max(0., fr+(c['z'] if h > .01 else 0.))
                 friction = c['mu_inf']+(c['mu_0']-c['mu_inf'])*np.exp(-fr/c['Fr_0'])
                 si[1:3] = -rho*friction*h*G*g*u/vh
-            elif model == 10:
+            elif model == 'lucas':
                 uf = v+(c['z'] if c['stochastic_flag'] else 0.)
                 friction = c['mu_0'] if uf < c['U_w'] or h < .1 else c['mu_inf']+(c['mu_0']-c['mu_inf'])*c['U_w']/uf
                 si[1:3] = -rho*friction*h*G*g*u/vh
-            elif model in (11, 12):
+            elif model in ('mui', 'mui_voellmy'):
                 d = a.sum()/(a/DIAM[:len(a)]).sum() if a.sum() > EPS else DIAM[:len(a)].mean()
                 rp = a@RHO_S[:len(a)]/a.sum() if a.sum() > EPS else RHO_S[:len(a)].mean()
                 normal = max(EPS, max(0., rho*(g+C)*max(h, EPS)-(p if c['pore_pressure_flag'] else 0.))*math.sqrt(G))
@@ -181,8 +181,7 @@ def input_text(case):
             value = repr(value)
         else:
             value = str(value)
-        namelist_key = 'rheology_model_id' if key == 'rheology_model' else key
-        values.append(f'{namelist_key}={value}')
+        values.append(f'{key}={value}')
     values.append('input_q='+','.join(f'{x:.17e}' for x in case['q']))
     return '&fixture\n'+',\n'.join(values)+'\n/\n'
 
@@ -208,72 +207,72 @@ def run_probe(executable, case, directory):
 
 
 def cases():
-    result = [fixture('disabled-rheology',0,rheology_flag=False)]
+    result = [fixture('disabled-rheology','none',rheology_flag=False)]
     for law in LAWS:
         for slope in (False, True):
             for axis, uv in [('x',(3.,0.)),('y',(0.,-4.)),('xy',(3.,-4.))]:
-                result.append(fixture(f'law-{law}-slope-{int(slope)}-{axis}',law,temperature=900. if law==3 else 300.,
+                result.append(fixture(f'law-{law}-slope-{int(slope)}-{axis}',law,temperature=900. if law=='lava' else 300.,
                     velocity=uv, slope_correction_flag=slope, bx=.35 if slope else 0., by=-.22 if slope else 0.))
         for label,h,uv in [('rest',2.,(0.,0.)),('dry',0.,(0.,0.)),('thin',1.e-12,(.01,-.02))]:
             result.append(fixture(f'law-{law}-{label}',law,h=h,velocity=uv,derivatives=False))
-    for law in (1,11,12):
+    for law in ('voellmy', 'mui', 'mui_voellmy'):
         for pressure in (0.,1.e3,1.e6):
             result.append(fixture(f'load-{law}-{pressure:g}',law,pressure=pressure,pore_pressure_flag=True,
                 curvature_term_flag=True,bxx=.02,bxy=-.01,byy=.03,derivatives=False))
-    for law in (11,12):
+    for law in ('mui', 'mui_voellmy'):
         result.append(fixture(f'mui-mono-{law}',law,alpha=(.3,)))
-    for law in (1,12):
+    for law in ('voellmy', 'mui_voellmy'):
         for z in (-1000.,-499.,0.,99500.,100000.):
             result.append(fixture(f'xi-{law}-{z:g}',law,stochastic_flag=True,z=z))
-    for law,threshold in ((9,.01),(10,.1)):
+    for law,threshold in (('froude',.01),('lucas',.1)):
         for h in (threshold*(1-1.e-5),threshold,threshold*(1+1.e-5)):
             for z in (-100.,.2,5.):
                 result.append(fixture(f'stoch-{law}-{h:g}-{z:g}',law,h=h,stochastic_flag=True,z=z,derivatives=False))
     for t in (293.1499,293.15,293.1501,280.,330.):
-        result.append(fixture(f'lahar-T-{t:.12g}',4,temperature=t,derivatives=abs(t-293.15)>.01))
+        result.append(fixture(f'lahar-T-{t:.12g}','lahar',temperature=t,derivatives=abs(t-293.15)>.01))
     for h in (.999e-10,1.e-10,1.001e-10,1.e-22,1.e-20):
-        for law in (3,4):
+        for law in ('lava', 'lahar'):
             result.append(fixture(f'threshold-{law}-{h:g}',law,h=h,derivatives=False))
     for radiation,convection in ((0.,4.),(3.e-8,0.),(3.e-8,4.)):
-        result.append(fixture(f'cooling-{radiation:g}-{convection:g}',3,temperature=900.,
+        result.append(fixture(f'cooling-{radiation:g}-{convection:g}','lava',temperature=900.,
             radiative_term_coeff=radiation,convective_term_coeff=convection))
-    for law in (3,4,5):
+    for law in ('lava', 'lahar', 'empirical'):
         # The flat-bed implicit viscous part is differentiable at rest even
         # when the separate SI yield law is not. Test its actual derivative.
         result.append(fixture(f'viscous-rest-derivative-{law}',law,velocity=(0.,0.)))
-    result.append(fixture('ambient-overwrite',3,T_env=350.))
-    result.append(fixture('parallel-voellmy-workspace',1,stochastic_flag=True,
+    result.append(fixture('ambient-overwrite','lava',T_env=350.))
+    result.append(fixture('parallel-voellmy-workspace','voellmy',stochastic_flag=True,
                           operation=9,derivatives=False))
     for speed in (1.99999,2.,2.00001):
-        result.append(fixture(f'lucas-Uw-{speed:.12g}',10,h=.2,velocity=(speed,0.),derivatives=False))
+        result.append(fixture(f'lucas-Uw-{speed:.12g}','lucas',h=.2,velocity=(speed,0.),derivatives=False))
     for t in (300.,900.,1100.):
-        result.append(fixture(f'lava-temperature-{t:g}',3,temperature=t))
+        result.append(fixture(f'lava-temperature-{t:g}','lava',temperature=t))
     for n in (1,2):
         for mode in ('OFF','STEP','STATIC','DYNAMIC'):
             for dynamic in (False,True):
                 for suth in (False,True):
                     a = (.55,) if n==1 else (.35,.2)
-                    result.append(fixture(f'pore-{n}-{mode}-{int(dynamic)}-{int(suth)}',3,gas=True,
+                    result.append(fixture(f'pore-{n}-{mode}-{int(dynamic)}-{int(suth)}','lava',gas=True,
                         temperature=700.,h=.05,alpha=a,pore_pressure_flag=True,
                         f_inhibit_mode=mode,dynamic_permeability_flag=dynamic,sutherland_flag=suth))
     for pressure in (-100.,0.,100.):
-        result.append(fixture(f'pore-sign-{pressure:g}',6,gas=True,pore_pressure_flag=True,
+        result.append(fixture(f'pore-sign-{pressure:g}','quadratic',gas=True,pore_pressure_flag=True,
             pressure=pressure,one_sided_pressure=pressure==0.))
-    result.append(fixture('pore-only-regular',6,gas=True,rheology_flag=False,pore_pressure_flag=True))
+    result.append(fixture('pore-only-regular','quadratic',gas=True,rheology_flag=False,pore_pressure_flag=True))
     for a in ((0.,),(0.,0.),(1.,)):
-        result.append(fixture('pore-domain-'+str(a),6,gas=True,alpha=a,pore_pressure_flag=True,
+        result.append(fixture('pore-domain-'+str(a),'quadratic',gas=True,alpha=a,pore_pressure_flag=True,
                               dynamic_permeability_flag=True,derivatives=False))
     for a in (.19999,.2,.20001,.63999,.64,.64001):
         for mode in ('STEP','STATIC'):
-            result.append(fixture(f'packing-{a:g}-{mode}',6,gas=True,alpha=(a,),
+            result.append(fixture(f'packing-{a:g}-{mode}','quadratic',gas=True,alpha=(a,),
                 pore_pressure_flag=True,f_inhibit_mode=mode,derivatives=False))
-    for law in (1,2,3,4,5,6,12):
-        result.append(fixture(f'newton-{law}',law,temperature=900. if law==3 else 300.,operation=2))
-    result.append(fixture('newton-pore',6,gas=True,pore_pressure_flag=True,operation=2))
-    stagnation=fixture('newton-stagnation',3,h=1.e12,temperature=900.,velocity=(0.,0.),operation=2,derivatives=False)
+    for law in ('voellmy', 'plastic', 'lava', 'lahar', 'empirical', 'quadratic', 'mui_voellmy'):
+        result.append(fixture(f'newton-{law}',law,temperature=900. if law=='lava' else 300.,operation=2))
+    result.append(fixture('newton-pore','quadratic',gas=True,pore_pressure_flag=True,operation=2))
+    stagnation=fixture('newton-stagnation','lava',h=1.e12,temperature=900.,velocity=(0.,0.),operation=2,derivatives=False)
     stagnation['expect_stagnation']=True
     result.append(stagnation)
-    for law in (9,10):
+    for law in ('froude', 'lucas'):
         result.append(fixture(f'neutral-{law}',law,gas=True,alpha=(0.,),temperature=300.,derivatives=False))
         result.append(fixture(f'buoyant-{law}',law,gas=True,alpha=(0.,),temperature=600.,derivatives=False))
     assert len({x['name'] for x in result}) == len(result), 'fixture names must be unique'
@@ -328,7 +327,7 @@ def main():
                     # Two successive step sizes must agree; no single lucky FD step suffices.
                     best=min(max(errors[k:k+2]) for k in range(3))
                     cols.append(dict(column=j+1,cs=cs.tolist(),fd_last=fd[-1].tolist(),fd_errors=errors,error=best,
-                                     newton_column=(j in (1,2) or (j==3 and case['config']['rheology_model']==3)
+                                     newton_column=(j in (1,2) or (j==3 and case['config']['rheology_model']=='lava')
                                                     or (j==len(case['q'])-1 and case['config']['pore_pressure_flag']))))
                 record['derivatives']=cols
                 checks['normalized_column_error']=max(relative(data[f'NCS{j+1}'],data[f'CS{j+1}']*max(abs(case['q'][j]),1.e-3))
@@ -352,7 +351,7 @@ def main():
                         findings.append('Newton falsely reports convergence on unrepresentable update')
                 elif data['STATUS'][0]!=1 or checks['stage_residual_tolerance_ratio']>1.:
                     findings.append('Newton stage residual or convergence')
-                if case['config']['rheology_model']==6 and not case['config']['pore_pressure_flag']:
+                if case['config']['rheology_model']=='quadratic' and not case['config']['pore_pressure_flag']:
                     q=case['q']; h,u,t,rho,a,p=decode(q,case['config'])
                     k=case['config']['dt']*.03/(rho*h*h); r=np.linalg.norm(q[1:3])
                     speed=2*r/(1+math.sqrt(1+4*k*r))
@@ -360,10 +359,10 @@ def main():
                     if checks['quadratic_stage_oracle_error']>1.e-5:
                         findings.append('quadratic DIRK stage oracle')
         record['status']='FAIL' if findings else 'PASS'; records.append(record)
-    hazards=[fixture('pore-only',6,rheology_flag=False,pore_pressure_flag=True),
-             fixture('dry-dynamic-pore',6,h=0.,pore_pressure_flag=True,dynamic_permeability_flag=True),
-             fixture('zero-solids-dynamic-pore',6,alpha=(0.,0.),pore_pressure_flag=True,dynamic_permeability_flag=True),
-             fixture('zero-solids-mono-pore',6,alpha=(0.,),pore_pressure_flag=True,dynamic_permeability_flag=True)]
+    hazards=[fixture('pore-only','quadratic',rheology_flag=False,pore_pressure_flag=True),
+             fixture('dry-dynamic-pore','quadratic',h=0.,pore_pressure_flag=True,dynamic_permeability_flag=True),
+             fixture('zero-solids-dynamic-pore','quadratic',alpha=(0.,0.),pore_pressure_flag=True,dynamic_permeability_flag=True),
+             fixture('zero-solids-mono-pore','quadratic',alpha=(0.,),pore_pressure_flag=True,dynamic_permeability_flag=True)]
     for case in hazards:
         case['config'].update(operation=1,derivatives=False)
         run,data=run_probe(args.executable,case,args.output/'cases'/case['name'])
@@ -372,7 +371,7 @@ def main():
         ok=run.returncode==0 and np.isfinite(values).all() and relative(values,expected)<=2.e-10
         records.append(dict(name=case['name'],config=case['config'],q=case['q'].tolist(),exit_code=run.returncode,
             status='PASS' if ok else 'FAIL',findings=[] if ok else ['hazard probe: domain value or initialization failure']))
-    for law in (5,6,11,12):
+    for law in ('empirical', 'quadratic', 'mui', 'mui_voellmy'):
         for label,operation,key in [('real',1,'REAL'),('complex',7,'COMPLEX_REAL'),('si',6,'SI')]:
             case=fixture(f'rest-isolated-{law}-{label}',law,velocity=(0.,0.),operation=operation,derivatives=False)
             run,data=run_probe(args.executable,case,args.output/'cases'/case['name'])
@@ -384,7 +383,7 @@ def main():
     for n in (1,2):
         for mode in ('OFF','STEP','STATIC','DYNAMIC'):
             for dynamic in (False,True):
-                case=fixture(f'gas-loss-{n}-{mode}-{int(dynamic)}',6,gas=True,
+                case=fixture(f'gas-loss-{n}-{mode}-{int(dynamic)}','quadratic',gas=True,
                     alpha=(.4,) if n==1 else (.25,.15),h=.05,temperature=700.,
                     operation=3,derivatives=False,pore_pressure_flag=True,gas_loss_flag=True,
                     f_inhibit_mode=mode,dynamic_permeability_flag=dynamic,sutherland_flag=True)
@@ -417,7 +416,7 @@ def main():
     diagnostics=[]
     untrapped=args.executable.with_name('probe_untrapped')
     if args.profile=='optimized' and untrapped.is_file():
-        for law in (5,6,11,12):
+        for law in ('empirical', 'quadratic', 'mui', 'mui_voellmy'):
             case=fixture(f'rest-no-traps-{law}',law,velocity=(0.,0.),operation=6,derivatives=False)
             run,data=run_probe(untrapped,case,args.output/'cases'/case['name'])
             values=data.get('SI',np.array([np.nan]))

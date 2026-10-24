@@ -22,7 +22,7 @@ MODULE source_terms_2d
        eval_rheology_implicit, eval_rheology_semi_implicit
   USE diagnostics_2d, ONLY : fatal_error
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_ROLE_IMPLICIT, &
-       SOURCE_ROLE_SEMI_IMPLICIT, rheology_source_name, rheology_name_has_role
+       SOURCE_ROLE_SEMI_IMPLICIT, canonical_rheology_source_name, rheology_name_has_role
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC, SOURCE_CADENCE_STAGE
   USE source_registry_2d, ONLY : source_group_type, group_contains_name
   IMPLICIT NONE
@@ -250,7 +250,7 @@ CONTAINS
 
     END IF
 
-    selected_model_name=rheology_source_name(rheology_model_id)
+    selected_model_name=canonical_rheology_source_name(rheology_model)
     IF (PRESENT(group)) THEN
        CALL validate_newton_selection(group)
        selected_model_name=group_rheology_name(group)
@@ -377,7 +377,7 @@ CONTAINS
 
     semi_implicit_term(1:n_eqns) = 0.0_wp
 
-    selected_model_name=rheology_source_name(rheology_model_id)
+    selected_model_name=canonical_rheology_source_name(rheology_model)
     IF (PRESENT(group)) THEN
        CALL validate_newton_selection(group)
        selected_model_name=group_rheology_name(group)

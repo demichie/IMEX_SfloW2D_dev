@@ -214,6 +214,22 @@ def main() -> int:
         failures.append("group source names must determine the active rheology")
     if re.search(r"(?i)group_has_role\(\s*group\s*,[^)]*rheology_model_id", assembly):
         failures.append("group role dispatch must not use a legacy numeric model ID")
+    # D17.19-10c: model identities are canonical names only, including tests.
+    forbidden_rheology_ids = re.compile(
+        r"(?i)\b(?:rheology_model_id|rheology_id_[a-z0-9_]+|"
+        r"resolve_rheology_model|rheology_name_from_id|"
+        r"rheology_source_name|rheology_has_role)\b"
+    )
+    for subtree in (ROOT / "src", ROOT / "TESTS"):
+        for filename in subtree.rglob("*.f90"):
+            no_comments = "\n".join(
+                line.split("!")[0] for line in
+                filename.read_text(encoding="utf-8").splitlines()
+            )
+            if forbidden_rheology_ids.search(no_comments):
+                failures.append(
+                    f"removed numeric rheology API in {filename.relative_to(ROOT)}"
+                )
     for failure in failures:
         print("FAIL:", failure, file=sys.stderr)
     print(f"D17 physical treatment audit: {len(catalog)} configured sources, "

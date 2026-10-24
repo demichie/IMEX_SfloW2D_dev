@@ -68,19 +68,6 @@ MODULE parameters_2d
   !> lava, lahar, empirical, quadratic, froude, lucas, mui, or mui_voellmy).
   CHARACTER(LEN=32) :: rheology_model = 'none'
 
-  !> Internal model IDs resolved once from rheology_model during input setup.
-  INTEGER, PARAMETER :: rheology_id_none = 0
-  INTEGER, PARAMETER :: rheology_id_voellmy = 1
-  INTEGER, PARAMETER :: rheology_id_plastic = 2
-  INTEGER, PARAMETER :: rheology_id_lava = 3
-  INTEGER, PARAMETER :: rheology_id_lahar = 4
-  INTEGER, PARAMETER :: rheology_id_empirical = 5
-  INTEGER, PARAMETER :: rheology_id_quadratic = 6
-  INTEGER, PARAMETER :: rheology_id_froude = 9
-  INTEGER, PARAMETER :: rheology_id_lucas = 10
-  INTEGER, PARAMETER :: rheology_id_mui = 11
-  INTEGER, PARAMETER :: rheology_id_mui_voellmy = 12
-  INTEGER :: rheology_model_id = rheology_id_none
   ! Cooling can be set independently of the rheology via TEMPERATURE_PARAMETERS.
   LOGICAL :: thermal_cooling_flag = .FALSE.
 

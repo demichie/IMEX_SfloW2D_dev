@@ -75,7 +75,7 @@ PROGRAM test_grouped_implicit_stage
   idx_v = n_vars + 2
   idx_stoch = 0
   rheology_flag = .TRUE.
-  rheology_model_id = rheology_id_lava
+  rheology_model='lava'
   pore_pressure_flag = .TRUE.
   gas_flag = .FALSE.
   liquid_flag = .TRUE.
@@ -140,7 +140,7 @@ PROGRAM test_grouped_implicit_stage
   filter_group%cadence=SOURCE_CADENCE_STAGE
   filter_group%method=SOURCE_METHOD_NEWTON
   filter_group%phase=SOURCE_PHASE_RK_IMPLICIT
-  filter_group%term_ids=[rheology_source_terms(rheology_model_id), &
+  filter_group%term_ids=[rheology_source_terms(rheology_model), &
        SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
        SOURCE_TERM_THERMAL_CONVECTIVE_COOLING, &
        SOURCE_TERM_PORE_PRESSURE_DISSIPATION]
@@ -152,7 +152,7 @@ PROGRAM test_grouped_implicit_stage
   filter_solvers(1)%execution_order=1
   filter_solvers(1)%target_ids=[SOURCE_TARGET_VELOCITY]
   filter_solvers(1)%equation_ids=[2,3]
-  filter_solvers(1)%term_ids=rheology_source_terms(rheology_model_id)
+  filter_solvers(1)%term_ids=rheology_source_terms(rheology_model)
   filter_solvers(2)%id=2
   filter_solvers(2)%kind=SOURCE_SOLVE_NEWTON_BLOCK
   filter_solvers(2)%execution_order=2
@@ -602,7 +602,7 @@ CONTAINS
     IF (partition%implicit(2)) target_groups(1)=partition%IM_group(2)
     IF (partition%implicit(4)) target_groups(2)=partition%IM_group(4)
     active_terms=[INTEGER::]
-    IF (rheology_flag) active_terms=rheology_source_terms(rheology_model_id)
+    IF (rheology_flag) active_terms=rheology_source_terms(rheology_model)
     IF (partition%implicit(4)) active_terms=[active_terms, &
          SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
          SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
