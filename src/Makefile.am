@@ -60,7 +60,6 @@ IMEX_SfloW2D_SOURCES = \
                 spatial/spatial_operator_2d.f90 \
                 numerics/time_integration_2d.f90 \
                 numerics/step_source_executor_2d.f90 \
-                numerics/mass_exchange_step_2d.f90 \
                 stochastic/stochastic_random_2d.f90 \
                 stochastic/stochastic_module.f90 \
                 core/simulation_2d.f90 \
@@ -259,7 +258,6 @@ stochastic/stochastic_module.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                         geometry/geometry_2d.$(OBJEXT)          \
                                         state/state_2d.$(OBJEXT)                 \
                                         stochastic/stochastic_random_2d.$(OBJEXT)
-numerics/mass_exchange_step_2d.$(OBJEXT): numerics/step_source_executor_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
                               geometry/geometry_2d.$(OBJEXT)                    \
                               geometry/domain_2d.$(OBJEXT)                      \
@@ -272,7 +270,7 @@ core/simulation_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
                               state/state_2d.$(OBJEXT)                          \
                               stochastic/stochastic_module.$(OBJEXT)            \
                               numerics/time_integration_2d.$(OBJEXT)            \
-                              numerics/mass_exchange_step_2d.$(OBJEXT)
+                              numerics/step_source_executor_2d.$(OBJEXT)
 core/init_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                           \
                         core/constitutive_parameters_2d.$(OBJEXT)              \
                         geometry/geometry_2d.$(OBJEXT)                         \

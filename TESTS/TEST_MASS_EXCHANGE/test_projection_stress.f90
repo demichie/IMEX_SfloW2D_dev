@@ -4,7 +4,7 @@ PROGRAM test_projection_stress
   USE constitutive_parameters_2d
   USE geometry_2d
   USE domain_2d, ONLY : domain_type
-  USE mass_exchange_step_2d, ONLY : apply_mass_exchange_step
+  USE step_source_executor_2d, ONLY : apply_mass_exchange_step => execute_step_source_groups
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
