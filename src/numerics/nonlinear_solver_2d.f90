@@ -415,16 +415,25 @@ CONTAINS
                 qj=qj_init
                 RETURN
              END IF
+             ! The group equation map is the sole numerical solve footprint.
+             ! A transitional solver descriptor may not select a sub-system.
              solver_size=SIZE(solvers(solver_id)%equation_ids)
              IF (solver_size/=group_size) THEN
                 linear_info=-1
                 qj=qj_init
                 RETURN
              END IF
+             DO i=1,group_size
+                IF (COUNT(solvers(solver_id)%equation_ids==group_equations(i))/=1) THEN
+                   linear_info=-1
+                   qj=qj_init
+                   RETURN
+                END IF
+             END DO
 
              si_term=0.0_wp
-             group_has_momentum = ANY(solvers(solver_id)%equation_ids==2) .OR. &
-                  ANY(solvers(solver_id)%equation_ids==3)
+             group_has_momentum = ANY(group_equations(1:group_size)==2) .OR. &
+                  ANY(group_equations(1:group_size)==3)
              IF (group_has_momentum .AND. apply_si_local) THEN
                 CALL qc_to_qp(qj, qp_current, dynamic_pressure)
                 CALL eval_semi_implicit_terms(Bprimej_x, Bprimej_y,          &
@@ -447,7 +456,7 @@ CONTAINS
              residual_without_si=Rj_not_impl-a_diag*si_term
              momentum_before_newton=qj(2:3)
              CALL solve_newton_group(stage_groups(group),solvers(solver_id),&
-                  solvers(solver_id)%equation_ids,qj,qj_old,dt_step,a_diag,&
+                  group_equations(1:group_size),qj,qj_old,dt_step,a_diag,&
                   residual_without_si,Bprimej_x,Bprimej_y,Zij,coeff_f,      &
                   tol_abs_local,tol_rel_local,iterations_used,converged,   &
                   linear_info,line_search_failed)
