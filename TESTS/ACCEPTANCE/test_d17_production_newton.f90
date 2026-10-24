@@ -219,6 +219,33 @@ PROGRAM test_d17_production_newton
        ERROR STOP 'legacy/native non-source equations changed'
   CALL clear_source_input()
   PRINT *, 'PASS D17 legacy/native quantitative Newton stage equivalence'
+  ! Stage-local diagonal coefficient regression, including zero diagonal
+  ! explicit stages and representative DIRK coefficients used by RK schemes.
+  CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.], &
+       [0,1,1,0],[IM_GROUP_METHOD_NEWTON])
+  group(1)%equation_ids=[2,3]
+  group(1)%source_names=[CHARACTER(LEN=64)::'rheology_newmodel']
+  DO k=1,4
+    SELECT CASE(k)
+    CASE(1)
+      dt=0.02_wp;alpha=0.25_wp
+    CASE(2)
+      dt=0.2_wp;alpha=0.5_wp
+    CASE(3)
+      dt=0.4_wp;alpha=0.75_wp
+    CASE(4)
+      dt=0.8_wp;alpha=1.0_wp
+    END SELECT
+    old=[1000.0_wp,3000.0_wp,-4000.0_wp,1.2E9_wp]
+    q=old;known=0.0_wp
+    CALL solve_rk_step(partition,group,q,old,dt,alpha,known, &
+         0.0_wp,0.0_wp,0.0_wp,iterations,converged,info,search_failed)
+    IF (.NOT.converged .OR. info/=0 .OR. search_failed) &
+         ERROR STOP 'stage diagonal Newton solve failed'
+    expected=old(2:3)/(1.0_wp+0.1_wp*dt*alpha)
+    CALL check(q(2:3),expected,'DIRK diagonal exact stage update')
+  END DO
+  PRINT *, 'PASS D17 four stage-diagonal Newton coefficients'
 CONTAINS
   SUBROUTINE check(actual,reference,label)
     REAL(wp),INTENT(IN)::actual(2),reference(2)
