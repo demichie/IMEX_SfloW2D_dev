@@ -1521,3 +1521,8 @@ Aggiunta la regressione Fortran `TESTS/ACCEPTANCE/test_d17_production_rheology.f
 ### D17.20 — Esecuzione Newton di produzione per gruppi 2x2 e 3x3 (25 ottobre 2026)
 
 Aggiunto `TESTS/ACCEPTANCE/test_d17_production_newton.f90` alla Action `d17-compile.yml`, compilato contro gli oggetti della build e chiamante `nonlinear_solver_2d::solve_rk_step`. La suite costruisce gruppi nominali NEWTON di dimensione 2 (momentum) e 3 (momentum e temperatura), controlla convergenza/diagnostica e confronta il drag lineare `rheology_newmodel` con la soluzione esatta del passo diagonale `q_m^{n+1}=q_m^n/(1+0.1*a_ii*dt)`; verifica anche che massa e temperatura rimangano invariati quando i coefficienti di raffreddamento sono nulli. Il sistema 3x3 esercita il percorso del solver ma **non testa ancora le derivate incrociate fisiche**, poiche la temperatura non genera contributi attivi nel fixture. Il test non e ancora validato da CI: eventuali difetti di configurazione dovranno essere corretti dopo i log. D17.20–D17.21 restano aperti.
+
+
+### D17.20 — Newton 3x3 con accoppiamento fisico lava/raffreddamento (25 ottobre 2026)
+
+Esteso `TESTS/ACCEPTANCE/test_d17_production_newton.f90` con un gruppo NEWTON contenente `rheology_lava` e `thermal_cooling` sulle equazioni di momento x/y ed energia. Il test attiva la dipendenza reologica dalla temperatura e un raffreddamento convettivo non nullo; verifica che la derivata incrociata complex-step momento/energia sia non nulla, esegue `nonlinear_solver_2d::solve_rk_step` sul blocco unico 3x3 e controlla il residuo conservativo con l'assemblatore implicito di produzione. **Test implementato; CI da verificare.** Le regressioni legacy/native, RK, mass exchange e le due correzioni SI/IM restano aperte.
