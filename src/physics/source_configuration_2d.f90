@@ -295,14 +295,13 @@ CONTAINS
       compact_group=compact_group+1
       methods(compact_group)=IM_GROUP_METHOD_NEWTON
       IF (method(g)==SOURCE_METHOD_ANALYTIC) methods(compact_group)=IM_GROUP_METHOD_ANALYTIC
-      DO s=1,solver_count(g)
-        DO t=1,target_count(s,g)
-          SELECT CASE(target_ids(t,s,g))
-          CASE(SOURCE_TARGET_VELOCITY); membership(2:3)=compact_group
-          CASE(SOURCE_TARGET_TEMPERATURE); membership(4)=compact_group
-          CASE(SOURCE_TARGET_PORE_PRESSURE); membership(idx_pore)=compact_group
-          END SELECT
-        END DO
+      ! Exactly one solver is admitted for each non-explicit group.
+      DO t=1,target_count(1,g)
+        SELECT CASE(target_ids(t,1,g))
+        CASE(SOURCE_TARGET_VELOCITY); membership(2:3)=compact_group
+        CASE(SOURCE_TARGET_TEMPERATURE); membership(4)=compact_group
+        CASE(SOURCE_TARGET_PORE_PRESSURE); membership(idx_pore)=compact_group
+        END SELECT
       END DO
     END DO
     CALL partition%initialize(implicit_mask,membership,methods(1:compact_group))
@@ -322,36 +321,31 @@ CONTAINS
       IF (phase(g)==SOURCE_PHASE_RK_IMPLICIT) THEN
         equations=[INTEGER::]
         solver_ids=[INTEGER::]
-        DO order_position=1,solver_count(g)
-          s=0
-          DO slot=1,solver_count(g)
-            IF (source_solver_order(slot,g)==order_position) s=slot
-          END DO
-          targets=target_ids(1:target_count(s,g),s,g)
-          solver_terms=[INTEGER::]
-          DO term_id=1,SIZE(group_terms)
-            term=source_term_descriptor(group_terms(term_id))
-            IF (ANY(targets==term%target)) solver_terms=[solver_terms,term%id]
-          END DO
-          equations=[INTEGER::]
-          DO t=1,SIZE(targets)
-            SELECT CASE(targets(t))
-            CASE(SOURCE_TARGET_VELOCITY); equations=[equations,2,3]
-            CASE(SOURCE_TARGET_TEMPERATURE); equations=[equations,4]
-            CASE(SOURCE_TARGET_PORE_PRESSURE); equations=[equations,idx_pore]
-            END SELECT
-          END DO
-          solver%id=SIZE(solvers)+1
-          solver%execution_order=order_position
-          solver%target_ids=targets; solver%equation_ids=equations
-          solver%term_ids=solver_terms
-          solver%kind=SOURCE_SOLVE_NEWTON_BLOCK
-          IF (method(g)==SOURCE_METHOD_ANALYTIC) &
-               solver%kind=SOURCE_SOLVE_ANALYTIC_VELOCITY+targets(1)-1
-          solvers=[solvers,solver]
-          solver_ids=[solver_ids,solver%id]
-          group%equation_ids=[group%equation_ids,equations]
+        ! Input validation has already required one solver, with order 1.
+        s=1
+        targets=target_ids(1:target_count(s,g),s,g)
+        solver_terms=[INTEGER::]
+        DO term_id=1,SIZE(group_terms)
+          term=source_term_descriptor(group_terms(term_id))
+          IF (ANY(targets==term%target)) solver_terms=[solver_terms,term%id]
         END DO
+        DO t=1,SIZE(targets)
+          SELECT CASE(targets(t))
+          CASE(SOURCE_TARGET_VELOCITY); equations=[equations,2,3]
+          CASE(SOURCE_TARGET_TEMPERATURE); equations=[equations,4]
+          CASE(SOURCE_TARGET_PORE_PRESSURE); equations=[equations,idx_pore]
+          END SELECT
+        END DO
+        solver%id=SIZE(solvers)+1
+        solver%execution_order=1
+        solver%target_ids=targets; solver%equation_ids=equations
+        solver%term_ids=solver_terms
+        solver%kind=SOURCE_SOLVE_NEWTON_BLOCK
+        IF (method(g)==SOURCE_METHOD_ANALYTIC) &
+             solver%kind=SOURCE_SOLVE_ANALYTIC_VELOCITY+targets(1)-1
+        solvers=[solvers,solver]
+        solver_ids=[solver%id]
+        group%equation_ids=equations
         IF (method(g)==SOURCE_METHOD_ANALYTIC) THEN
           group%analytic_solver_ids=solver_ids
           group%implicit_solver_ids=[INTEGER::]
