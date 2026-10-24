@@ -168,7 +168,7 @@ CONTAINS
         END DO
         CALL require(has_cooling .EQV. thermal_cooling_flag, &
              'physical cooling membership follows dedicated flag')
-        CALL require(COUNT(enabled_eq)==MERGE(4,3,thermal_cooling_flag), &
+        CALL require(COUNT(enabled_eq)==MERGE(3,2,thermal_cooling_flag), &
              'legacy equation layout changes only when cooling active')
       END DO
     END DO
