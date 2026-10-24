@@ -296,7 +296,7 @@ CONTAINS
     TYPE(source_term_type) :: term
     INTEGER, ALLOCATABLE :: expected(:),terms(:),bundle_terms(:)
     LOGICAL :: seen(SOURCE_TERM_COUNT)
-    INTEGER :: i,j,id,nstage,family,mass_group,term_group(SOURCE_TERM_COUNT)
+    INTEGER :: i,j,id,nstage,family,mass_group
     error='D17: invalid or duplicate source catalog name'
     IF (.NOT.source_catalog_names_unique()) RETURN
     error='D17: incomplete source registry'
@@ -306,7 +306,7 @@ CONTAINS
     IF (this%pore_equation/=0) THEN
       IF (this%pore_equation<5 .OR. this%pore_equation>this%n_equations) RETURN
     END IF
-    seen=.FALSE.; term_group=0; family=0; mass_group=0
+    seen=.FALSE.; family=0; mass_group=0
     nstage=SIZE(this%stage_entries)
     groups=[this%stage_entries,this%step_entries]
     DO i=1,SIZE(groups)
@@ -360,7 +360,7 @@ CONTAINS
         IF (id<1 .OR. id>SOURCE_TERM_COUNT) RETURN
         IF (.NOT.term%schedulable) RETURN
         IF (seen(id)) RETURN
-        seen(id)=.TRUE.; term_group(id)=i
+        seen(id)=.TRUE.
       error='D17: term does not support this method/cadence or target'
         IF (.NOT.supports_group(term,group)) RETURN
         IF (term%target/=0) THEN
@@ -415,7 +415,7 @@ CONTAINS
       bundle_terms=source_bundle_terms(term%bundle_id)
       IF (SIZE(bundle_terms)<2) RETURN
       IF (id/=bundle_terms(1)) CYCLE
-      IF (.NOT.same_batch(bundle_terms,term_group)) RETURN
+      IF (.NOT.same_batch(source_names_for_ids(bundle_terms),groups)) RETURN
     END DO
     error=''
   END SUBROUTINE validate_registry
@@ -584,15 +584,27 @@ CONTAINS
     equal=.TRUE.
   END FUNCTION same_set
 
-  !> \brief Require every member of an atomic kernel batch in one group.
-  !> \param[in] ids Required physical batch IDs.
-  !> \param[in] term_group Global group position per physical term, zero if absent.
-  !> \return True if the whole batch is absent or present in one group.
-  LOGICAL FUNCTION same_batch(ids,term_group) RESULT(valid)
-    INTEGER, INTENT(IN) :: ids(:),term_group(:)
-    valid=.TRUE.
-    IF (ALL(term_group(ids)==0)) RETURN
-    valid=ALL(term_group(ids)>0) .AND. ALL(term_group(ids)==term_group(ids(1)))
+  !> \brief Require all canonical batch members in the same group, or none.
+  !> \param[in] names Canonical names of the atomic-batch addends.
+  !> \param[in] groups All stage and step groups in execution order.
+  !> \return True only for a wholly absent or unsplit batch.
+  LOGICAL FUNCTION same_batch(names,groups) RESULT(valid)
+    CHARACTER(*), INTENT(IN) :: names(:)
+    TYPE(source_group_type), INTENT(IN) :: groups(:)
+    INTEGER :: i,j,owner,found
+    valid=.FALSE.
+    owner=0
+    found=0
+    DO i=1,SIZE(names)
+      DO j=1,SIZE(groups)
+        IF (.NOT.ALLOCATED(groups(j)%term_names)) CYCLE
+        IF (.NOT.ANY(groups(j)%term_names==names(i))) CYCLE
+        found=found+1
+        IF (owner==0) owner=j
+        IF (owner/=j) RETURN
+      END DO
+    END DO
+    valid=(found==0 .OR. found==SIZE(names))
   END FUNCTION same_batch
 
   !> \brief Check implemented temporal capabilities for one physical term.
