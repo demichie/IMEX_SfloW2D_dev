@@ -19,6 +19,7 @@ MODULE source_catalog_2d
   PRIVATE
   PUBLIC :: source_term_type, source_term_descriptor, rheology_source_terms
   PUBLIC :: source_bundle_terms
+  PUBLIC :: source_term_descriptor_by_name, source_catalog_names_unique
   PUBLIC :: SOURCE_TERM_COUNT, SOURCE_PHYSICAL_TERM_COUNT
   !> method explicit.
   INTEGER, PARAMETER, PUBLIC :: SOURCE_METHOD_EXPLICIT = 1
@@ -316,6 +317,37 @@ CONTAINS
     IF (term_id<1 .OR. term_id>SOURCE_TERM_COUNT) RETURN
     term=SOURCE_CATALOG(term_id)
   END FUNCTION source_term_descriptor
+
+
+  !> Look up a source by its canonical name. This is the first name-based
+  !> interface; numeric catalog IDs remain temporarily for existing callers.
+  !> An unknown name returns an empty descriptor (id=0).
+  PURE FUNCTION source_term_descriptor_by_name(name) RESULT(term)
+    CHARACTER(*), INTENT(IN) :: name
+    TYPE(source_term_type) :: term
+    INTEGER :: i
+
+    term=source_term_type()
+    DO i=1,SIZE(SOURCE_CATALOG)
+      IF (TRIM(SOURCE_CATALOG(i)%name)==TRIM(name)) THEN
+        term=SOURCE_CATALOG(i)
+        RETURN
+      END IF
+    END DO
+  END FUNCTION source_term_descriptor_by_name
+
+  !> Guard the name-only identity contract against duplicate catalog entries.
+  PURE LOGICAL FUNCTION source_catalog_names_unique() RESULT(unique)
+    INTEGER :: i,j
+    unique=.FALSE.
+    DO i=1,SIZE(SOURCE_CATALOG)
+      IF (LEN_TRIM(SOURCE_CATALOG(i)%name)==0) RETURN
+      DO j=i+1,SIZE(SOURCE_CATALOG)
+        IF (TRIM(SOURCE_CATALOG(i)%name)==TRIM(SOURCE_CATALOG(j)%name)) RETURN
+      END DO
+    END DO
+    unique=.TRUE.
+  END FUNCTION source_catalog_names_unique
 
   !> \brief Return the registered terms that must share an evaluation group.
   !> \param[in] bundle_id Catalog batch ID; zero returns an empty list.

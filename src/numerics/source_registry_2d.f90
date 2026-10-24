@@ -12,7 +12,7 @@ MODULE source_registry_2d
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: source_group_type, source_solver_type, source_registry_type
-  PUBLIC :: group_contains
+  PUBLIC :: group_contains, group_contains_name
 
   !> \brief One ordered numerical block, containing all of its physical terms.
   TYPE :: source_solver_type
@@ -67,6 +67,19 @@ CONTAINS
     group_contains=.FALSE.
     IF (ALLOCATED(group%term_ids)) group_contains=ANY(group%term_ids==term_id)
   END FUNCTION group_contains
+
+  !> Query group membership by source name. The legacy integer-backed group
+  !> representation is converted to names at this boundary until migration.
+  PURE LOGICAL FUNCTION group_contains_name(group,name) RESULT(found)
+    TYPE(source_group_type), INTENT(IN) :: group
+    CHARACTER(*), INTENT(IN) :: name
+    TYPE(source_term_type) :: term
+
+    term=source_term_descriptor_by_name(name)
+    found=.FALSE.
+    IF (term%id==0) RETURN
+    found=group_contains(group,term%id)
+  END FUNCTION group_contains_name
 
   !> \brief Copy and validate complete group/solve metadata transactionally.
   !> \param[in,out] this Registry; reset even when validation fails.
