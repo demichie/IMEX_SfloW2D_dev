@@ -100,7 +100,7 @@ PROGRAM test_source_registry
     DO i=1,SIZE(families)
       names(i)=rheology_source_name(families(i))
       CALL require(LEN_TRIM(names(i))>0,'canonical rheology name exists')
-      CALL require(SIZE(rheology_source_terms(families(i)))>0, &
+      CALL require(SIZE(test_rheology_ids(families(i)))>0, &
            'canonical rheology retains legacy physical contributions')
       DO j=1,i-1
         CALL require(names(i)/=names(j),'canonical rheology names are distinct')
@@ -122,7 +122,7 @@ PROGRAM test_source_registry
     enabled=[.TRUE.,BTEST(mode,0),BTEST(mode,1)]
     pore=0
     IF (enabled(3)) pore=7
-    family=rheology_source_terms(MERGE(3,1,enabled(2)))
+    family=test_rheology_ids(MERGE(3,1,enabled(2)))
     terms=[family,SOURCE_TERM_GEOMETRY_CURVATURE,SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, &
          SOURCE_TERM_BOTTOM_FISSURAL_INJECTION,SOURCE_TERM_RADIAL_INJECTION, &
          SOURCE_TERM_BOUNDARY_INJECTION,SOURCE_TERM_MASS_EXCHANGE_EROSION, &
@@ -155,7 +155,7 @@ PROGRAM test_source_registry
         BLOCK
           CHARACTER(LEN=64), ALLOCATABLE :: names(:)
           names=group_source_names(groups(j))
-          IF (SIZE(rheology_source_terms(MERGE(3,1,enabled(2))))>0) THEN
+          IF (SIZE(test_rheology_ids(MERGE(3,1,enabled(2))))>0) THEN
             CALL require(ANY(names==rheology_source_name(MERGE(3,1,enabled(2)))), &
                  'complete rheology is one canonical schedule identity')
           END IF
@@ -305,7 +305,7 @@ PROGRAM test_source_registry
     term=source_term_descriptor(k)
     IF (term%model_id==0) CYCLE
     model_id=term%model_id
-    family=rheology_source_terms(model_id)
+    family=test_rheology_ids(model_id)
     CALL require(SIZE(family)>0,'catalogued rheology family present')
     DO j=1,SIZE(family)
       term=source_term_descriptor(family(j))
@@ -316,7 +316,7 @@ PROGRAM test_source_registry
   DO k=1,SOURCE_TERM_COUNT
     term=source_term_descriptor(k)
     IF (term%bundle_id==0) CYCLE
-    bundle=source_bundle_terms(term%bundle_id)
+    bundle=test_bundle_ids(term%bundle_id)
     CALL require(SIZE(bundle)>=2,'catalogued atomic batch has multiple terms')
     IF (k/=bundle(1)) CYCLE
     enabled=[.TRUE.,.FALSE.,.FALSE.]; original=[1,1,1]; methods=IM_GROUP_METHOD_NEWTON; pore=0
@@ -375,6 +375,32 @@ PROGRAM test_source_registry
   WRITE(*,'(A,I0,A,I0,A)') 'PASS: D17 registry, 864 legacy configurations; ',checks,' assertions; ',negative, &
        ' rejected invalid configurations'
 CONTAINS
+  ! Test-only enumeration: the production catalog no longer exposes
+  ! positional IDs as an API for rheology and evaluation batches.
+  FUNCTION test_rheology_ids(law) RESULT(ids)
+    INTEGER, INTENT(IN) :: law
+    INTEGER, ALLOCATABLE :: ids(:)
+    TYPE(source_term_type) :: item
+    INTEGER :: m
+    ALLOCATE(ids(0))
+    DO m=1,SOURCE_TERM_COUNT
+      item=source_term_descriptor(m)
+      IF (law/=0 .AND. item%model_id==law) ids=[ids,m]
+    END DO
+  END FUNCTION test_rheology_ids
+
+  FUNCTION test_bundle_ids(batch) RESULT(ids)
+    INTEGER, INTENT(IN) :: batch
+    INTEGER, ALLOCATABLE :: ids(:)
+    TYPE(source_term_type) :: item
+    INTEGER :: m
+    ALLOCATE(ids(0))
+    DO m=1,SOURCE_TERM_COUNT
+      item=source_term_descriptor(m)
+      IF (batch>0 .AND. item%bundle_id==batch) ids=[ids,m]
+    END DO
+  END FUNCTION test_bundle_ids
+
   ! Legacy test scenarios may still use catalog indexes to enumerate rates;
   ! the registry interface itself accepts physical source names only.
   FUNCTION catalog_names_for_test(ids) RESULT(names)
@@ -464,7 +490,7 @@ CONTAINS
          SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
     CALL require(same_name_members(groups(1)%term_names,expected_terms), &
          'default energy cooling bundle')
-    expected_terms=rheology_source_terms(rheology_id_lava)
+    expected_terms=test_rheology_ids(rheology_id_lava)
     CALL require(same_name_members(groups(3)%term_names,expected_terms), &
          'default lava rheology terms')
     CALL require(SIZE(groups(2)%term_names)==1 .AND. &
@@ -553,7 +579,7 @@ CONTAINS
     CALL set_group(2,11,'STAGE','ANALYTIC',2, &
          [SOURCE_TERM_PORE_PRESSURE_DISSIPATION],['PORE_PRESSURE'])
     CALL set_group(3,12,'STAGE','NEWTON',3, &
-         rheology_source_terms(rheology_id_lava),['VELOCITY'])
+         test_rheology_ids(rheology_id_lava),['VELOCITY'])
     CALL set_group(4,4,'STAGE','EXPLICIT',1, &
          [SOURCE_TERM_GEOMETRY_CURVATURE,SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, &
          SOURCE_TERM_BOTTOM_FISSURAL_INJECTION,SOURCE_TERM_RADIAL_INJECTION, &
@@ -599,7 +625,7 @@ CONTAINS
     CALL require(error=='' .AND. trial%is_initialized(), &
          'canonical rheology schedules complete law: '//TRIM(error))
     snapshot=trial%stage_groups()
-    CALL require(same_name_members(snapshot(3)%term_names,rheology_source_terms(rheology_id_lava)), &
+    CALL require(same_name_members(snapshot(3)%term_names,test_rheology_ids(rheology_id_lava)), &
          'canonical rheology retains all physical addends')
     ! Mixed canonical and component declarations must not double-schedule.
     source_group_term_count(3)=2
