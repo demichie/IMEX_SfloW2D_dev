@@ -222,7 +222,7 @@ Conservare il calcolo del residuo sui soli indici attivi, la Jacobiana complex-s
 **Tracciabilità:** `IMEX_SfloW2D_v2/src/solver_2d.f90` (`implicit_map`, `solve_rk_step`, `eval_jacobian`) e `IMEX_SfloW2D_dev/src/numerics/nonlinear_solver_2d.f90` (`solve_newton_group`, `eval_f`, `eval_jacobian`).
 
 
-**Stato di avanzamento D17.10 — IN CORSO (24 ottobre 2026).** Assemblaggio SI/IM e Newton indicizzato già esistenti; unico solve per gruppo applicato, ma copertura congiunta, correzioni e regressioni ancora incomplete. **Aggiornamento 24 ottobre:** commit `521f752c` allinea il solver alla lista completa `group_equations` e verifica che il singolo descrittore Newton copra esattamente quelle equazioni; le valutazioni SI/IM congiunte e i confronti numerici restano da completare. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
+**Stato di avanzamento D17.10 — IN CORSO (24 ottobre 2026).** Assemblaggio SI/IM e Newton indicizzato già esistenti; unico solve per gruppo applicato, ma copertura congiunta, correzioni e regressioni ancora incomplete. **Aggiornamento 24 ottobre (commit `67aab829`):** verifica aggiunta che il solve Newton selezioni tutte le sorgenti del gruppo, senza omissioni SI/IM. **Aggiornamento precedente:** commit `521f752c` allinea il solver alla lista completa `group_equations` e verifica che il singolo descrittore Newton copra esattamente quelle equazioni; le valutazioni SI/IM congiunte e i confronti numerici restano da completare. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
 
 ## D17.11 — Kernel REAL/COMPLEX
 
@@ -761,3 +761,10 @@ Le Actions sono state avviate manualmente tramite `workflow_dispatch` sul commit
 - [D17 source registry tests — run 40088314870](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/40088314870): regressione del registro `strict` e `optimized` riuscita.
 
 Questo gate copre anche gli ultimi cambiamenti ai gruppi Newton fino al commit indicato (validatore, input, singola esecuzione e selezione delle equazioni). **Non dimostra ancora l'equivalenza numerica end-to-end né la correttezza della Jacobiana per gruppi Newton con più target**. I gate scientifici della sezione D17.20 restano aperti. Le Actions restano manuali, senza trigger automatico sui push.
+
+
+### D17.22.12 — Copertura dei rate SI/IM di gruppo (24 ottobre 2026)
+
+Commit [`67aab829`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/67aab8293ae288fc70877826fbfb4fd0f00e2712): il validatore dell'assemblatore `equation_terms_2d::validate_newton_selection` richiede ora che l'unico solver Newton includa **tutte e sole** le sorgenti fisiche presenti nel gruppo. In assenza di corrispondenza esatta, la selezione viene rifiutata prima di assemblare i rate SI/IM. I controlli restano compatibili con i descrittori legacy basati su `term_ids` durante la migrazione nominale. Nessuna formula fisica o Jacobiana modificata.
+
+**Stato:** commit pubblicato; questa modifica **non è stata ancora compilata o testata**. Completare i test specifici di selezione delle sorgenti, poi avviare manualmente compile e registry Actions al prossimo gate coerente. Il successivo intervento dovrà continuare con il gruppo nominale unico previsto da D17.19, senza conservare permanentemente gli ID fisici.
