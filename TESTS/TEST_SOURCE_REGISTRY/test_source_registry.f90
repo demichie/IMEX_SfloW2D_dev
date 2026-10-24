@@ -12,7 +12,6 @@ PROGRAM test_source_registry
   TYPE(source_registry_type) :: registry,trial
   TYPE(equation_partition_type) :: partition
   TYPE(source_group_type), ALLOCATABLE :: groups(:),steps(:),badgroups(:),badsteps(:),snapshot(:)
-  TYPE(source_solver_type), ALLOCATABLE :: solves(:),badsolves(:)
   TYPE(source_term_type) :: term
   INTEGER, ALLOCATABLE :: terms(:),family(:),bundle(:),expected(:),expected_targets(:)
   INTEGER :: a,b,c,bits,mode,g,t,k,j,position,checks,methods(3),original(3),pore,nphysical,negative,model_id
@@ -93,7 +92,7 @@ PROGRAM test_source_registry
       CALL make_partition()
       CALL registry%initialize_legacy(partition,original,methods,pore,terms,error)
       CALL require(error=='' .AND. registry%is_initialized(),'legacy normalization: '//TRIM(error))
-      groups=registry%stage_groups(); steps=registry%step_groups(); solves=registry%solvers()
+      groups=registry%stage_groups(); steps=registry%step_groups()
       position=0
       DO g=1,3
         expected_targets=PACK([1,2,3],enabled .AND. original==g)
@@ -102,23 +101,19 @@ PROGRAM test_source_registry
           position=position+1
           CALL require(groups(position)%method==SOURCE_METHOD_NEWTON,'legacy Newton method')
           CALL require(groups(position)%id==g .AND. groups(position)%legacy_id==g,'retained Newton ID')
-          CALL require(SIZE(groups(position)%implicit_solver_ids)==1,'joint Newton solve retained')
-          k=groups(position)%implicit_solver_ids(1)
           expected=[INTEGER::]
           DO j=1,SIZE(expected_targets)
             expected=[expected,target_eqs(expected_targets(j))]
           END DO
-          CALL require(same_members(solves(k)%equation_ids,expected),'joint equation/derivative block')
-          CALL require(same_members(solves(k)%target_ids,expected_targets),'joint target coverage')
+          CALL require(same_members(groups(position)%equation_ids,expected),'joint equation block')
         ELSE
           DO t=1,3
             IF (.NOT.enabled(t) .OR. original(t)/=g) CYCLE
             position=position+1
             CALL require(groups(position)%legacy_id==g,'analytic original ID')
             CALL require(groups(position)%method==SOURCE_METHOD_ANALYTIC,'analytic method')
-            CALL require(SIZE(groups(position)%analytic_solver_ids)==1,'one analytic solve per group')
-            k=groups(position)%analytic_solver_ids(1)
-            CALL require(ALL(solves(k)%target_ids==t),'legacy velocity-temperature-pressure order')
+            CALL require(same_members(groups(position)%equation_ids,target_eqs(t)), &
+                 'analytic equation target retained')
             IF (SIZE(expected_targets)>1) THEN
               CALL require(groups(position)%id>4,'split identity avoids EX/legacy collisions')
             ELSE
@@ -143,11 +138,6 @@ PROGRAM test_source_registry
         CALL require(SIZE(groups(j)%term_names)==SIZE(groups(j)%term_ids), &
              'stage group name and legacy counts agree')
       END DO
-      DO j=1,SIZE(solves)
-        CALL require(ALLOCATED(solves(j)%term_names),'solver has canonical source names')
-        CALL require(SIZE(solves(j)%term_names)==SIZE(solves(j)%term_ids), &
-             'solver name and legacy counts agree')
-      END DO
       snapshot=registry%stage_groups(); snapshot(1)%id=999
       snapshot=registry%stage_groups(); CALL require(snapshot(1)%id/=999,'detached immutable storage')
     END DO
@@ -165,70 +155,42 @@ PROGRAM test_source_registry
   CALL make_partition()
   CALL initialize_configured_sources(registry,partition,error)
   CALL require(error=='','configured source bridge: '//TRIM(error))
-  groups=registry%stage_groups();steps=registry%step_groups();solves=registry%solvers()
-  CALL require(SIZE(groups)==4 .AND. SIZE(solves)==3,'configured default groups')
+  groups=registry%stage_groups();steps=registry%step_groups()
+  CALL require(SIZE(groups)==4,'configured default groups')
   CALL require(SIZE(groups(4)%term_ids)==5,'curvature/circular/fissural/radial/boundary inventory')
   CALL require(SIZE(steps(1)%term_ids)==7,'all bounded mass proposals registered')
   CALL require(group_contains(groups(4),SOURCE_TERM_BOUNDARY_INJECTION),'boundary hook retained')
-  DO mode=1,21
-    badgroups=groups;badsteps=steps;badsolves=solves
+  ! Group-owned equation and source validation, with no solver-ID metadata.
+  DO mode=1,13
+    badgroups=groups; badsteps=steps
     SELECT CASE(mode)
-    CASE(1);badgroups(1)%id=4 ! Collision with EX group.
-    CASE(2);badgroups(4)%term_ids=[badgroups(4)%term_ids,SOURCE_TERM_GEOMETRY_CURVATURE]
-    CASE(3);badsteps(1)%term_ids=[badsteps(1)%term_ids,SOURCE_TERM_GEOMETRY_CURVATURE]
-    CASE(4);badgroups(1)%analytic_solver_ids=[1,2]
-    CASE(5);badgroups(3)%implicit_solver_ids=[INTEGER::]
-    CASE(6);badgroups(4)%term_ids=[SOURCE_TERM_INLET_THERMAL_COUPLING]
-    CASE(7);badgroups(4)%term_ids=[999]
-    CASE(8);badsolves(1)%target_ids=[4]
-    CASE(9);badsolves(1)%equation_ids=[99]
-    CASE(10);DEALLOCATE(badgroups(1)%equation_ids)
-    CASE(11);badgroups(1)%id=0
-    CASE(12);badgroups(4)%cadence=SOURCE_CADENCE_STEP
-    CASE(13)
-      badgroups(1)%term_ids=[SOURCE_TERM_THERMAL_RADIATIVE_COOLING]
-      badsolves(1)%term_ids=badgroups(1)%term_ids
-    CASE(14)
-      badsolves=[badsolves,badsolves(3)];badsolves(4)%id=4
-    CASE(15)
-      badsolves=[badsolves,badsolves(3)];badsolves(4)%id=4;badsolves(4)%execution_order=2
-      badgroups(3)%implicit_solver_ids=[3,4]
-    CASE(16)
-      badgroups(3)%term_ids=[badgroups(3)%term_ids,SOURCE_TERM_RHEOLOGY_PLASTIC_YIELD]
-      badsolves(3)%term_ids=badgroups(3)%term_ids
-    CASE(17)
-      badsteps=[badsteps,badsteps];badsteps(2)%id=2;badsteps(2)%execution_order=2
-      badsteps(1)%term_ids=steps(1)%term_ids(1:2);badsteps(2)%term_ids=steps(1)%term_ids(3:)
-    CASE(18);badgroups(2)%execution_order=1
-    CASE(19);badgroups(1)%method=99
-    CASE(20);badgroups(1)%analytic_solver_ids=[99]
-    CASE(21);badsolves(3)%term_ids=[INTEGER::]
+    CASE(1); badgroups(1)%id=4
+    CASE(2); badgroups(4)%term_ids=[badgroups(4)%term_ids,SOURCE_TERM_GEOMETRY_CURVATURE]
+    CASE(3); badsteps(1)%term_ids=[badsteps(1)%term_ids,SOURCE_TERM_GEOMETRY_CURVATURE]
+    CASE(4); badgroups(1)%equation_ids=[2,3,4]
+    CASE(5); badgroups(3)%equation_ids=[INTEGER::]
+    CASE(6); badgroups(4)%term_ids=[SOURCE_TERM_INLET_THERMAL_COUPLING]
+    CASE(7); badgroups(4)%term_ids=[999]
+    CASE(8); badgroups(1)%equation_ids=[99]
+    CASE(9); DEALLOCATE(badgroups(1)%equation_ids)
+    CASE(10); badgroups(1)%id=0
+    CASE(11); badgroups(4)%cadence=SOURCE_CADENCE_STEP
+    CASE(12); badgroups(2)%execution_order=1
+    CASE(13); badgroups(1)%method=99
     END SELECT
-    CALL trial%initialize(7,7,badgroups,badsteps,badsolves,error)
-    CALL require(error/='' .AND. .NOT.trial%is_initialized(),'invalid native registry rejected')
-    snapshot=trial%stage_groups();CALL require(SIZE(snapshot)==0,'failed initialization releases storage')
+    CALL trial%initialize(7,7,badgroups,badsteps,error)
+    CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
+         'invalid group-only registry rejected')
+    snapshot=trial%stage_groups()
+    CALL require(SIZE(snapshot)==0,'failed initialization releases storage')
     negative=negative+1
   END DO
-  ! Reject multiple Newton solvers within one source group (D17.19 step 2).
-  badgroups=[groups(1),groups(3),groups(4)];badsolves=solves
-  badgroups(1)%method=SOURCE_METHOD_NEWTON
-  badgroups(1)%equation_ids=[4,7]
-  badgroups(1)%term_ids=[groups(1)%term_ids,groups(2)%term_ids]
-  badgroups(1)%analytic_solver_ids=[INTEGER::];badgroups(1)%implicit_solver_ids=[1,2]
-  badgroups(2)%execution_order=2
-  badsolves(1)%kind=SOURCE_SOLVE_NEWTON_BLOCK;badsolves(2)%kind=SOURCE_SOLVE_NEWTON_BLOCK
-  badsolves(2)%execution_order=2
-  CALL trial%initialize(7,7,badgroups,steps,badsolves,error)
-  CALL require(INDEX(error,'invalid solver count')>0, &
-       'multiple Newton solves in the same group rejected')
-  negative=negative+1
-  ! A partial analytic velocity bundle must never silently evaluate the full law.
-  badgroups=groups;badsolves=solves
+
+  ! Reject an analytic velocity group with an incomplete physical law.
+  badgroups=groups
   badgroups(3)%method=SOURCE_METHOD_ANALYTIC
-  badgroups(3)%implicit_solver_ids=[INTEGER::];badgroups(3)%analytic_solver_ids=[3]
   badgroups(3)%term_ids=[SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS]
-  badsolves(3)%kind=SOURCE_SOLVE_ANALYTIC_VELOCITY;badsolves(3)%term_ids=badgroups(3)%term_ids
-  CALL trial%initialize(7,7,badgroups,steps,badsolves,error)
+  CALL trial%initialize(7,7,badgroups,steps,error)
   CALL require(INDEX(error,'complete law bundle')>0,'partial analytic velocity bundle rejected')
   negative=negative+1
   ! Model membership and atomic batches are derived from the catalog.
@@ -275,15 +237,15 @@ PROGRAM test_source_registry
   CALL make_partition()
   CALL initialize_configured_sources(registry,partition,error)
   CALL require(error=='','disabled physics still has valid metadata')
-  groups=registry%stage_groups();solves=registry%solvers()
-  CALL require(SIZE(groups)==2 .AND. SIZE(solves)==1,'zero-rate momentum block retained')
-  CALL require(SIZE(solves(1)%term_ids)==0,'disabled rheology has no physical rates')
-  CALL require(ALL(solves(1)%equation_ids==[2,3]),'zero-rate momentum target preserved')
+  groups=registry%stage_groups()
+  CALL require(SIZE(groups)==2,'zero-rate momentum block retained')
+  CALL require(SIZE(groups(1)%term_ids)==0,'disabled rheology has no physical rates')
+  CALL require(ALL(groups(1)%equation_ids==[2,3]),'zero-rate momentum target preserved')
   mask=.FALSE.
   CALL partition%initialize(mask)
   CALL initialize_configured_sources(registry,partition,error)
   CALL require(error=='','empty implicit partition accepted')
-  solves=registry%solvers();CALL require(SIZE(solves)==0,'no orphan solve in explicit-only partition')
+  CALL require(SIZE(groups)==1,'explicit-only partition has no implicit group')
   mask=.FALSE.;mask(2)=.TRUE.
   CALL partition%initialize(mask)
   CALL trial%initialize_legacy(partition,original,methods,0,[INTEGER::],error)
@@ -343,8 +305,8 @@ CONTAINS
     CALL partition%initialize(active_mask,default_mask,[IM_GROUP_METHOD_NEWTON])
     CALL initialize_configured_sources(registry,partition,error)
     CALL require(error=='','inactive compiled default schedule: '//TRIM(error))
-    groups=registry%stage_groups();steps=registry%step_groups();solves=registry%solvers()
-    CALL require(SIZE(groups)==2 .AND. SIZE(steps)==1 .AND. SIZE(solves)==1, &
+    groups=registry%stage_groups();steps=registry%step_groups()
+    CALL require(SIZE(groups)==2 .AND. SIZE(steps)==1, &
          'inactive compiled default group counts')
     CALL require(groups(1)%id==3 .AND. groups(1)%legacy_id==3 .AND. &
          groups(1)%method==SOURCE_METHOD_NEWTON .AND. &
@@ -361,8 +323,8 @@ CONTAINS
     CALL partition%initialize(active_mask,default_mask,default_methods)
     CALL initialize_configured_sources(registry,partition,error)
     CALL require(error=='','active compiled default schedule: '//TRIM(error))
-    groups=registry%stage_groups();steps=registry%step_groups();solves=registry%solvers()
-    CALL require(SIZE(groups)==4 .AND. SIZE(steps)==1 .AND. SIZE(solves)==3, &
+    groups=registry%stage_groups();steps=registry%step_groups()
+    CALL require(SIZE(groups)==4 .AND. SIZE(steps)==1, &
          'active compiled default group counts')
     CALL require(groups(1)%id==1 .AND. groups(1)%method==SOURCE_METHOD_ANALYTIC .AND. &
          ALL(groups(1)%equation_ids==[4]),'default analytic energy group')
@@ -470,8 +432,8 @@ CONTAINS
     CALL initialize_native_source_configuration(registry,partition,error)
     CALL require(error=='' .AND. registry%is_initialized(), &
          'native named source groups accepted: '//TRIM(error))
-    groups=registry%stage_groups();steps=registry%step_groups();solves=registry%solvers()
-    CALL require(SIZE(groups)==4 .AND. SIZE(steps)==1 .AND. SIZE(solves)==3, &
+    groups=registry%stage_groups();steps=registry%step_groups()
+    CALL require(SIZE(groups)==4 .AND. SIZE(steps)==1, &
          'native source group and solver counts')
     CALL require(groups(1)%method==SOURCE_METHOD_ANALYTIC .AND. &
          groups(2)%method==SOURCE_METHOD_ANALYTIC .AND. &

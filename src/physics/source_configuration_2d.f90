@@ -6,7 +6,7 @@
 !********************************************************************************
 MODULE source_configuration_2d
   USE source_catalog_2d
-  USE source_registry_2d, ONLY : source_registry_type, source_group_type, source_solver_type
+  USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE equation_metadata_2d, ONLY : equation_partition_type, resolve_imex_group_method, &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   USE source_input_2d
@@ -89,12 +89,10 @@ CONTAINS
     TYPE(equation_partition_type), INTENT(INOUT) :: partition
     CHARACTER(*), INTENT(OUT) :: error
     TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:)
-    TYPE(source_solver_type), ALLOCATABLE :: solvers(:)
     TYPE(source_group_type) :: group
-    TYPE(source_solver_type) :: solver
     TYPE(source_term_type) :: term
     INTEGER, ALLOCATABLE :: parsed_terms(:,:),ordered(:),targets(:),equations(:)
-    INTEGER, ALLOCATABLE :: solver_terms(:),group_terms(:),active_terms(:),solver_ids(:)
+    INTEGER, ALLOCATABLE :: group_terms(:),active_terms(:)
     INTEGER :: cadence(SOURCE_INPUT_MAX_GROUPS),method(SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: phase(SOURCE_INPUT_MAX_GROUPS),solver_count(SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: target_count(1,SOURCE_INPUT_MAX_GROUPS)
@@ -296,7 +294,7 @@ CONTAINS
 
     stage_count=COUNT(cadence(1:source_group_count)==SOURCE_CADENCE_STAGE)
     step_count=source_group_count-stage_count
-    ALLOCATE(stages(stage_count),steps(step_count),solvers(0))
+    ALLOCATE(stages(stage_count),steps(step_count))
     j=0; k=0
     DO i=1,source_group_count
       g=ordered(i)
@@ -308,15 +306,7 @@ CONTAINS
       group%equation_ids=[INTEGER::]
       IF (phase(g)==SOURCE_PHASE_RK_IMPLICIT) THEN
         equations=[INTEGER::]
-        solver_ids=[INTEGER::]
-        ! Input validation has already required one solver, with order 1.
-        s=1
-        targets=target_ids(1:target_count(s,g),s,g)
-        solver_terms=[INTEGER::]
-        DO term_id=1,SIZE(group_terms)
-          term=source_term_descriptor(group_terms(term_id))
-          IF (ANY(targets==term%target)) solver_terms=[solver_terms,term%id]
-        END DO
+        targets=target_ids(1:target_count(1,g),1,g)
         DO t=1,SIZE(targets)
           SELECT CASE(targets(t))
           CASE(SOURCE_TARGET_VELOCITY); equations=[equations,2,3]
@@ -324,27 +314,9 @@ CONTAINS
           CASE(SOURCE_TARGET_PORE_PRESSURE); equations=[equations,idx_pore]
           END SELECT
         END DO
-        solver%id=SIZE(solvers)+1
-        solver%execution_order=1
-        solver%target_ids=targets; solver%equation_ids=equations
-        solver%term_ids=solver_terms
-        solver%kind=SOURCE_SOLVE_NEWTON_BLOCK
-        IF (method(g)==SOURCE_METHOD_ANALYTIC) &
-             solver%kind=SOURCE_SOLVE_ANALYTIC_VELOCITY+targets(1)-1
-        solvers=[solvers,solver]
-        solver_ids=[solver%id]
         group%equation_ids=equations
-        IF (method(g)==SOURCE_METHOD_ANALYTIC) THEN
-          group%analytic_solver_ids=solver_ids
-          group%implicit_solver_ids=[INTEGER::]
-        ELSE
-          group%implicit_solver_ids=solver_ids
-          group%analytic_solver_ids=[INTEGER::]
-        END IF
       ELSE
         group%equation_ids=[(t,t=1,n_eqns)]
-        group%implicit_solver_ids=[INTEGER::]
-        group%analytic_solver_ids=[INTEGER::]
       END IF
       IF (cadence(g)==SOURCE_CADENCE_STAGE) THEN
         j=j+1; stages(j)=group
@@ -353,7 +325,7 @@ CONTAINS
       END IF
     END DO
     CALL registry%initialize(n_eqns,MERGE(idx_pore,0,pore_pressure_flag), &
-         stages,steps,solvers,validation_error)
+         stages,steps,validation_error)
     IF (LEN_TRIM(validation_error)>0) THEN
       CALL partition%finalize()
       error=TRIM(validation_error)

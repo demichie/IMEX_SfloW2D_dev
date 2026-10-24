@@ -11,19 +11,8 @@ MODULE source_registry_2d
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: source_group_type, source_solver_type, source_registry_type
+  PUBLIC :: source_group_type, source_registry_type
   PUBLIC :: group_contains, group_contains_name
-
-  !> \brief One ordered numerical block, containing all of its physical terms.
-  TYPE :: source_solver_type
-    INTEGER :: id=0 !< Unique positive registry-local solver ID.
-    INTEGER :: kind=0 !< Newton block or a specific analytic target solve.
-    INTEGER :: execution_order=0 !< Position within its group.
-    INTEGER, ALLOCATABLE :: target_ids(:) !< Scalar/vector target blocks.
-    INTEGER, ALLOCATABLE :: equation_ids(:) !< Full conservative equation indices.
-    INTEGER, ALLOCATABLE :: term_ids(:) !< Temporary compatibility representation.
-    CHARACTER(LEN=64), ALLOCATABLE :: term_names(:) !< Canonical physical source names.
-  END TYPE source_solver_type
 
   !> \brief Homogeneous source group; identity is cadence plus id, not order.
   TYPE :: source_group_type
@@ -36,8 +25,6 @@ MODULE source_registry_2d
     INTEGER, ALLOCATABLE :: term_ids(:) !< Temporary compatibility representation.
     CHARACTER(LEN=64), ALLOCATABLE :: term_names(:) !< Canonical physical source names.
     INTEGER, ALLOCATABLE :: equation_ids(:) !< Union of target equations or explicit footprint.
-    INTEGER, ALLOCATABLE :: implicit_solver_ids(:) !< Registry-local Newton solve IDs.
-    INTEGER, ALLOCATABLE :: analytic_solver_ids(:) !< Exactly one for an analytic group.
   END TYPE source_group_type
 
   !> \brief Validated metadata owned and finalized by one simulation context.
@@ -47,7 +34,6 @@ MODULE source_registry_2d
     INTEGER :: pore_equation=0 !< Pore index, zero when absent.
     LOGICAL :: initialized=.FALSE. !< Cached successful-validation status.
     TYPE(source_group_type), ALLOCATABLE :: stage_entries(:), step_entries(:)
-    TYPE(source_solver_type), ALLOCATABLE :: solver_entries(:)
   CONTAINS
     PROCEDURE :: initialize => initialize_registry
     PROCEDURE :: initialize_legacy => initialize_legacy_registry
@@ -55,7 +41,6 @@ MODULE source_registry_2d
     PROCEDURE :: is_initialized => registry_is_initialized
     PROCEDURE :: stage_groups => copy_stage_groups
     PROCEDURE :: step_groups => copy_step_groups
-    PROCEDURE :: solvers => copy_solvers
     PROCEDURE :: validate => validate_registry
   END TYPE source_registry_type
 CONTAINS
@@ -89,20 +74,17 @@ CONTAINS
   !> \param[in] pore_equation Optional pore equation index, or zero when absent.
   !> \param[in] stage_groups Ordered stage descriptors.
   !> \param[in] step_groups Ordered post-RK descriptors.
-  !> \param[in] solvers Ordered block descriptors.
   !> \param[out] error Empty on success, otherwise a diagnostic before simulation.
-  SUBROUTINE initialize_registry(this,n_equations,pore_equation,stage_groups,step_groups,solvers,error)
+  SUBROUTINE initialize_registry(this,n_equations,pore_equation,stage_groups,step_groups,error)
     CLASS(source_registry_type), INTENT(INOUT) :: this
     INTEGER, INTENT(IN) :: n_equations,pore_equation
     TYPE(source_group_type), INTENT(IN) :: stage_groups(:),step_groups(:)
-    TYPE(source_solver_type), INTENT(IN) :: solvers(:)
     CHARACTER(*), INTENT(OUT) :: error
     CALL this%finalize()
     this%n_equations=n_equations
     this%pore_equation=pore_equation
     this%stage_entries=stage_groups
     this%step_entries=step_groups
-    this%solver_entries=solvers
     CALL populate_registry_term_names(this)
     CALL this%validate(error)
     IF (LEN_TRIM(error)>0) THEN
@@ -130,9 +112,7 @@ CONTAINS
     INTEGER, INTENT(IN) :: pore_equation,active_terms(:)
     CHARACTER(*), INTENT(OUT) :: error
     TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:)
-    TYPE(source_solver_type), ALLOCATABLE :: solves(:)
     TYPE(source_group_type) :: group
-    TYPE(source_solver_type) :: solver
     TYPE(source_term_type) :: term
     INTEGER, ALLOCATABLE :: targets(:),terms(:),equations(:),target_equations(:)
     INTEGER :: legacy,target,split_id,i,method,order
@@ -198,7 +178,7 @@ CONTAINS
          partition%n_implicit/=2*MERGE(1,0,enabled(1))+COUNT(enabled(2:3))) THEN
       error='D17: unsupported or missing legacy implicit target'; RETURN
     END IF
-    ALLOCATE(stages(0),steps(0),solves(0))
+    ALLOCATE(stages(0),steps(0))
     split_id=4
     DO legacy=1,3
       targets=PACK([1,2,3],enabled .AND. legacy_target_groups==legacy)
@@ -209,26 +189,21 @@ CONTAINS
         terms=terms_for_targets(active_terms,targets)
         equations=PACK([(i,i=1,partition%n_equations)],partition%IM_group== &
              partition%IM_group(target_equation_ids_first(targets(1),pore_equation)))
-        solver=make_solver(SIZE(solves)+1,SOURCE_SOLVE_NEWTON_BLOCK,targets,equations,terms)
-        solves=[solves,solver]
         group=make_group(legacy,legacy,SOURCE_CADENCE_STAGE,method, &
-             SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,terms,equations,[solver%id])
+             SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,terms,equations)
         stages=[stages,group]
       ELSE
         DO i=1,SIZE(targets)
           target=targets(i)
           terms=terms_for_targets(active_terms,[target])
           equations=target_equation_ids(target,pore_equation)
-          solver=make_solver(SIZE(solves)+1,SOURCE_SOLVE_ANALYTIC_VELOCITY+target-1, &
-               [target],equations,terms)
-          solves=[solves,solver]
           order=legacy
           IF (SIZE(targets)>1) THEN
             split_id=split_id+1
             order=split_id
           END IF
           group=make_group(order,legacy,SOURCE_CADENCE_STAGE,method, &
-               SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,terms,equations,[solver%id])
+               SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,terms,equations)
           stages=[stages,group]
         END DO
       END IF
@@ -236,13 +211,13 @@ CONTAINS
     equations=[(i,i=1,partition%n_equations)]
     terms=terms_for_targets(active_terms,[0])
     group=make_group(4,0,SOURCE_CADENCE_STAGE,SOURCE_METHOD_EXPLICIT, &
-         SOURCE_PHASE_RK_EXPLICIT,1,terms,equations,[INTEGER::])
+         SOURCE_PHASE_RK_EXPLICIT,1,terms,equations)
     stages=[stages,group]
     terms=terms_for_targets(active_terms,[-1])
     group=make_group(1,0,SOURCE_CADENCE_STEP,SOURCE_METHOD_EXPLICIT, &
-         SOURCE_PHASE_POST_RK,1,terms,equations,[INTEGER::])
+         SOURCE_PHASE_POST_RK,1,terms,equations)
     steps=[group]
-    CALL this%initialize(partition%n_equations,pore_equation,stages,steps,solves,error)
+    CALL this%initialize(partition%n_equations,pore_equation,stages,steps,error)
   END SUBROUTINE initialize_legacy_registry
 
   !> Translate legacy catalog positions to their canonical source names.
@@ -273,10 +248,6 @@ CONTAINS
       IF (ALLOCATED(this%step_entries(i)%term_ids)) &
            this%step_entries(i)%term_names=source_names_for_ids(this%step_entries(i)%term_ids)
     END DO
-    DO i=1,SIZE(this%solver_entries)
-      IF (ALLOCATED(this%solver_entries(i)%term_ids)) &
-           this%solver_entries(i)%term_names=source_names_for_ids(this%solver_entries(i)%term_ids)
-    END DO
   END SUBROUTINE populate_registry_term_names
 
   !> \brief Validate native or normalized descriptors before making them visible.
@@ -287,24 +258,20 @@ CONTAINS
     CHARACTER(*), INTENT(OUT) :: error
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
     TYPE(source_group_type) :: group
-    TYPE(source_solver_type) :: solver
     TYPE(source_term_type) :: term
     INTEGER, ALLOCATABLE :: expected(:),terms(:),bundle_terms(:)
     LOGICAL :: seen(SOURCE_TERM_COUNT)
-    INTEGER :: i,j,k,id,si,nstage,family,mass_group,term_group(SOURCE_TERM_COUNT)
-    LOGICAL, ALLOCATABLE :: used_solver(:)
+    INTEGER :: i,j,id,nstage,family,mass_group,term_group(SOURCE_TERM_COUNT)
     error='D17: invalid or duplicate source catalog name'
     IF (.NOT.source_catalog_names_unique()) RETURN
     error='D17: incomplete source registry'
     IF (.NOT.ALLOCATED(this%stage_entries)) RETURN
     IF (.NOT.ALLOCATED(this%step_entries)) RETURN
-    IF (.NOT.ALLOCATED(this%solver_entries)) RETURN
     IF (this%n_equations<4) RETURN
     IF (this%pore_equation/=0) THEN
       IF (this%pore_equation<5 .OR. this%pore_equation>this%n_equations) RETURN
     END IF
-    ALLOCATE(used_solver(SIZE(this%solver_entries)))
-    used_solver=.FALSE.; seen=.FALSE.; term_group=0; family=0; mass_group=0
+    seen=.FALSE.; term_group=0; family=0; mass_group=0
     nstage=SIZE(this%stage_entries)
     groups=[this%stage_entries,this%step_entries]
     DO i=1,SIZE(groups)
@@ -338,8 +305,6 @@ CONTAINS
       error='D17: unallocated group descriptor arrays'
       IF (.NOT.ALLOCATED(group%term_ids)) RETURN
       IF (.NOT.ALLOCATED(group%equation_ids)) RETURN
-      IF (.NOT.ALLOCATED(group%implicit_solver_ids)) RETURN
-      IF (.NOT.ALLOCATED(group%analytic_solver_ids)) RETURN
       error='D17: invalid or repeated group equation'
       IF (.NOT.valid_equations(group%equation_ids,this%n_equations)) RETURN
       ! Name arrays are materialized on registry initialization. Keep direct
@@ -379,70 +344,27 @@ CONTAINS
         END IF
         error='D17: physical term duplicated, unknown or dependent'
       END DO
-      error='D17: invalid solver count for group method'
-      SELECT CASE(group%method)
-      CASE(SOURCE_METHOD_EXPLICIT)
-        IF (SIZE(group%implicit_solver_ids)+SIZE(group%analytic_solver_ids)/=0) RETURN
-      CASE(SOURCE_METHOD_NEWTON)
-        IF (SIZE(group%implicit_solver_ids)/=1 .OR. SIZE(group%analytic_solver_ids)/=0) RETURN
-      CASE(SOURCE_METHOD_ANALYTIC)
-        IF (SIZE(group%analytic_solver_ids)/=1 .OR. SIZE(group%implicit_solver_ids)/=0) RETURN
-      END SELECT
-      ! Transitional descriptor: exactly one solve per non-explicit group.
-      IF (group%method/=SOURCE_METHOD_EXPLICIT) THEN
-        error='D17: missing, duplicate or inconsistent solver descriptor'
-        IF (group%method==SOURCE_METHOD_NEWTON) THEN
-          si=group%implicit_solver_ids(1)
-        ELSE
-          si=group%analytic_solver_ids(1)
-        END IF
-        IF (si<1 .OR. si>SIZE(this%solver_entries)) RETURN
-        IF (used_solver(si)) RETURN
-        used_solver(si)=.TRUE.; solver=this%solver_entries(si)
-        IF (solver%id/=si .OR. solver%execution_order/=1) RETURN
-        IF (.NOT.ALLOCATED(solver%target_ids)) RETURN
-        IF (.NOT.ALLOCATED(solver%equation_ids)) RETURN
-        IF (.NOT.ALLOCATED(solver%term_ids)) RETURN
-        IF (SIZE(solver%target_ids)<1) RETURN
-        IF (.NOT.valid_equations(solver%equation_ids,this%n_equations)) RETURN
-        IF (SIZE(solver%equation_ids)==0) RETURN
-        expected=[INTEGER::]
-        DO k=1,SIZE(solver%target_ids)
-          id=solver%target_ids(k)
-          IF (id<1 .OR. id>3) RETURN
-          IF (COUNT(solver%target_ids==id)/=1) RETURN
-          expected=[expected,target_equation_ids(id,this%pore_equation)]
-        END DO
-        IF (.NOT.same_set(expected,solver%equation_ids)) RETURN
-        ! With one solve per implicit group, its equation map is the group map.
-        IF (.NOT.same_set(solver%equation_ids,group%equation_ids)) RETURN
-        IF (group%method==SOURCE_METHOD_NEWTON) THEN
-          IF (solver%kind/=SOURCE_SOLVE_NEWTON_BLOCK) RETURN
-        ELSE
-          IF (SIZE(solver%target_ids)/=1) RETURN
-          IF (solver%kind/=SOURCE_SOLVE_ANALYTIC_VELOCITY+solver%target_ids(1)-1) RETURN
-        END IF
-        DO k=1,SIZE(solver%term_ids)
-          term=source_term_descriptor(solver%term_ids(k))
-          IF (.NOT.ANY(solver%target_ids==term%target)) RETURN
-        END DO
-        IF (group%method==SOURCE_METHOD_ANALYTIC) THEN
-          IF (solver%target_ids(1)==SOURCE_TARGET_VELOCITY) THEN
-            terms=rheology_source_terms(family)
-            IF (.NOT.same_set(terms,solver%term_ids)) THEN
-              error='D17: analytic velocity requires the complete law bundle'; RETURN
-            END IF
+      ! No independently scheduled sub-solves: validate group equation shape.
+      error='D17: incomplete or incompatible group equation target'
+      IF (group%method==SOURCE_METHOD_NEWTON) THEN
+        IF (SIZE(group%equation_ids)==0) RETURN
+      ELSE IF (group%method==SOURCE_METHOD_ANALYTIC) THEN
+        SELECT CASE(SIZE(group%equation_ids))
+        CASE(2)
+          IF (.NOT.same_set(group%equation_ids,[2,3])) RETURN
+          terms=rheology_source_terms(family)
+          IF (.NOT.same_set(terms,group%term_ids)) THEN
+            error='D17: analytic velocity requires the complete law bundle'; RETURN
           END IF
-        END IF
-      END IF
-      error='D17: solver coverage does not match group equations/terms'
-      IF (group%method/=SOURCE_METHOD_EXPLICIT) THEN
-        ! A single solve must contain precisely the group's physical sources.
-        IF (.NOT.same_set(solver%term_ids,group%term_ids)) RETURN
+        CASE(1)
+          id=group%equation_ids(1)
+          IF (id/=4 .AND. id/=this%pore_equation) RETURN
+          IF (id==this%pore_equation .AND. this%pore_equation==0) RETURN
+        CASE DEFAULT
+          RETURN
+        END SELECT
       END IF
     END DO
-    error='D17: orphan solver descriptor'
-    IF (.NOT.ALL(used_solver)) RETURN
     error='D17: coupled evaluation batch split or incomplete'
     DO id=1,SOURCE_TERM_COUNT
       term=source_term_descriptor(id)
@@ -461,7 +383,6 @@ CONTAINS
     CLASS(source_registry_type), INTENT(INOUT) :: this
     IF (ALLOCATED(this%stage_entries)) DEALLOCATE(this%stage_entries)
     IF (ALLOCATED(this%step_entries)) DEALLOCATE(this%step_entries)
-    IF (ALLOCATED(this%solver_entries)) DEALLOCATE(this%solver_entries)
     this%n_equations=0; this%pore_equation=0; this%initialized=.FALSE.
   END SUBROUTINE finalize_registry
 
@@ -492,16 +413,6 @@ CONTAINS
     ALLOCATE(groups(0))
     IF (ALLOCATED(this%step_entries)) groups=this%step_entries
   END FUNCTION copy_step_groups
-
-  !> \brief Return a detached copy of numerical block descriptors.
-  !> \param[in] this Registry.
-  !> \return Solvers, or an allocated empty list after finalization.
-  FUNCTION copy_solvers(this) RESULT(solvers)
-    CLASS(source_registry_type), INTENT(IN) :: this
-    TYPE(source_solver_type), ALLOCATABLE :: solvers(:)
-    ALLOCATE(solvers(0))
-    IF (ALLOCATED(this%solver_entries)) solvers=this%solver_entries
-  END FUNCTION copy_solvers
 
   !> \brief Map one target to conservative equation indices.
   !> \param[in] target Velocity, energy or pore target ID.
@@ -547,19 +458,6 @@ CONTAINS
   END FUNCTION terms_for_targets
 
   !> \brief Construct one block with fully allocated arrays.
-  !> \param[in] id Unique solver ID.
-  !> \param[in] kind Newton or analytic solve kind.
-  !> \param[in] targets Declared target blocks.
-  !> \param[in] equations Ordered equation footprint.
-  !> \param[in] terms Physical term bundle.
-  !> \return Descriptor with order one in its legacy-normalized group.
-  FUNCTION make_solver(id,kind,targets,equations,terms) RESULT(solver)
-    INTEGER, INTENT(IN) :: id,kind,targets(:),equations(:),terms(:)
-    TYPE(source_solver_type) :: solver
-    solver%id=id; solver%kind=kind; solver%execution_order=1
-    solver%target_ids=targets; solver%equation_ids=equations; solver%term_ids=terms
-  END FUNCTION make_solver
-
   !> \brief Construct a fully allocated homogeneous group.
   !> \param[in] id Group identity, independent of order.
   !> \param[in] legacy Original input group, or zero for EX/step.
@@ -569,17 +467,13 @@ CONTAINS
   !> \param[in] order Explicit position within that phase.
   !> \param[in] terms Physical term membership.
   !> \param[in] equations Conservative equation footprint.
-  !> \param[in] solves Registry-local block IDs, empty for explicit groups.
-  !> \return Group with exactly the solver list required by its method.
-  FUNCTION make_group(id,legacy,cadence,method,phase,order,terms,equations,solves) RESULT(group)
-    INTEGER, INTENT(IN) :: id,legacy,cadence,method,phase,order,terms(:),equations(:),solves(:)
+  !> \return Group directly owning the equation footprint.
+  FUNCTION make_group(id,legacy,cadence,method,phase,order,terms,equations) RESULT(group)
+    INTEGER, INTENT(IN) :: id,legacy,cadence,method,phase,order,terms(:),equations(:)
     TYPE(source_group_type) :: group
     group%id=id; group%legacy_id=legacy; group%cadence=cadence
     group%method=method; group%phase=phase; group%execution_order=order
     group%term_ids=terms; group%equation_ids=equations
-    group%implicit_solver_ids=[INTEGER::]; group%analytic_solver_ids=[INTEGER::]
-    IF (method==SOURCE_METHOD_NEWTON) group%implicit_solver_ids=solves
-    IF (method==SOURCE_METHOD_ANALYTIC) group%analytic_solver_ids=solves
   END FUNCTION make_group
 
   !> \brief Check index bounds and uniqueness before any vector indexing.
