@@ -20,7 +20,7 @@ MODULE source_catalog_2d
   PUBLIC :: source_term_type, source_term_descriptor, rheology_source_terms
   PUBLIC :: source_bundle_terms
   PUBLIC :: source_term_descriptor_by_name, source_catalog_names_unique
-  PUBLIC :: rheology_source_name
+  PUBLIC :: rheology_source_name, canonical_rheology_catalog_unique
   PUBLIC :: SOURCE_TERM_COUNT, SOURCE_PHYSICAL_TERM_COUNT
   !> method explicit.
   INTEGER, PARAMETER, PUBLIC :: SOURCE_METHOD_EXPLICIT = 1
@@ -165,6 +165,24 @@ MODULE source_catalog_2d
     LOGICAL :: has_analytic = .FALSE. !< Analytic local update is available.
     INTEGER :: bundle_id = 0 !< Nonzero for terms that must share one evaluation group.
   END TYPE source_term_type
+
+  !> One public identity per complete rheology; the legacy terms remain internal.
+  TYPE :: rheology_law_type
+    CHARACTER(LEN=64) :: name=''
+    INTEGER :: model_id=0
+  END TYPE rheology_law_type
+  TYPE(rheology_law_type), PARAMETER :: RHEOLOGY_LAWS(10) = [ &
+       rheology_law_type('rheology_voellmy',rheology_id_voellmy), &
+       rheology_law_type('rheology_plastic',rheology_id_plastic), &
+       rheology_law_type('rheology_lava',rheology_id_lava), &
+       rheology_law_type('rheology_lahar',rheology_id_lahar), &
+       rheology_law_type('rheology_empirical',rheology_id_empirical), &
+       rheology_law_type('rheology_quadratic',rheology_id_quadratic), &
+       rheology_law_type('rheology_froude',rheology_id_froude), &
+       rheology_law_type('rheology_lucas',rheology_id_lucas), &
+       rheology_law_type('rheology_mui',rheology_id_mui), &
+       rheology_law_type('rheology_mui_voellmy',rheology_id_mui_voellmy) &
+       ]
 
   !> Single registration point for term capabilities and rheology membership.
   TYPE(source_term_type), PARAMETER :: SOURCE_CATALOG(SOURCE_TERM_COUNT) = [ &
@@ -440,20 +458,28 @@ CONTAINS
   PURE FUNCTION rheology_source_name(model_id) RESULT(name)
     INTEGER, INTENT(IN) :: model_id
     CHARACTER(LEN=64) :: name
+    INTEGER :: i
     name=''
-    SELECT CASE(model_id)
-    CASE(rheology_id_voellmy);     name='rheology_voellmy'
-    CASE(rheology_id_plastic);     name='rheology_plastic'
-    CASE(rheology_id_lava);        name='rheology_lava'
-    CASE(rheology_id_lahar);       name='rheology_lahar'
-    CASE(rheology_id_empirical);   name='rheology_empirical'
-    CASE(rheology_id_quadratic);   name='rheology_quadratic'
-    CASE(rheology_id_froude);      name='rheology_froude'
-    CASE(rheology_id_lucas);       name='rheology_lucas'
-    CASE(rheology_id_mui);         name='rheology_mui'
-    CASE(rheology_id_mui_voellmy); name='rheology_mui_voellmy'
-    END SELECT
+    DO i=1,SIZE(RHEOLOGY_LAWS)
+      IF (RHEOLOGY_LAWS(i)%model_id==model_id) THEN
+        name=RHEOLOGY_LAWS(i)%name
+        RETURN
+      END IF
+    END DO
   END FUNCTION rheology_source_name
+
+  PURE LOGICAL FUNCTION canonical_rheology_catalog_unique() RESULT(ok)
+    INTEGER :: i,j
+    ok=.FALSE.
+    DO i=1,SIZE(RHEOLOGY_LAWS)
+      IF (LEN_TRIM(RHEOLOGY_LAWS(i)%name)==0) RETURN
+      DO j=i+1,SIZE(RHEOLOGY_LAWS)
+        IF (RHEOLOGY_LAWS(i)%name==RHEOLOGY_LAWS(j)%name) RETURN
+        IF (RHEOLOGY_LAWS(i)%model_id==RHEOLOGY_LAWS(j)%model_id) RETURN
+      END DO
+    END DO
+    ok=.TRUE.
+  END FUNCTION canonical_rheology_catalog_unique
 
   !> \brief Return all rate IDs belonging to one selected rheology.
   !> \param[in] model_id Resolved rheology family ID.

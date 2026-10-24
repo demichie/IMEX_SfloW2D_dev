@@ -84,6 +84,8 @@ PROGRAM test_source_registry
     CALL require(rheology_source_name(-1)=='','unknown rheology has no source name')
   END BLOCK
   CALL require(source_catalog_names_unique(),'catalog canonical names are unique')
+  CALL require(canonical_rheology_catalog_unique(), &
+       'one unique canonical identity per rheology law')
   term=source_term_descriptor_by_name('SOURCE_TERM_MASS_EXCHANGE_DEPOSITION')
   CALL require(term%id==SOURCE_TERM_MASS_EXCHANGE_DEPOSITION, &
        'catalog lookup by canonical source name')
