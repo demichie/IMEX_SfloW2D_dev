@@ -352,8 +352,14 @@ CONTAINS
       error='D17: physical term duplicated, unknown or dependent'
       DO j=1,SIZE(group%term_ids)
         id=group%term_ids(j)
-        term=source_term_descriptor(id)
-        IF (.NOT.term%schedulable) RETURN
+        ! Validated registry groups resolve their source through the canonical
+        ! name. Raw legacy descriptors are still accepted by direct validate().
+        IF (ALLOCATED(group%term_names)) THEN
+          term=source_term_descriptor_by_name(group%term_names(j))
+        ELSE
+          term=source_term_descriptor(id)
+        END IF
+        IF (term%id/=id .OR. .NOT.term%schedulable) RETURN
         IF (seen(id)) RETURN
         seen(id)=.TRUE.; term_group(id)=i
         error='D17: term does not support this method/cadence or target'
