@@ -289,7 +289,7 @@ CONTAINS
 
     ! External procedures
       USE state_conversion_2d, ONLY : qp_to_qp2
-    USE equation_terms_2d, ONLY : eval_boundary_injection_explicit
+    USE source_terms_2d, ONLY : eval_boundary_injection_explicit
     USE parameters_2d, ONLY : limiter
 
     USE geometry_2d, ONLY : x_comp , x_stag , y_comp , y_stag , dx2 , dy2
