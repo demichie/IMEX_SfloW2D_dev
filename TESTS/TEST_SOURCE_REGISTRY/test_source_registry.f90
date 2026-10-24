@@ -236,9 +236,49 @@ CONTAINS
     END IF
   END SUBROUTINE set_native_group
 
+  SUBROUTINE compare_groups(left,right,label)
+    TYPE(source_group_type), INTENT(IN) :: left,right
+    CHARACTER(*), INTENT(IN) :: label
+    INTEGER :: i
+    CALL require(left%method==right%method .AND. &
+         left%cadence==right%cadence .AND. left%phase==right%phase, &
+         label//' method/cadence/phase')
+    CALL require(ALLOCATED(left%equation_ids) .EQV. &
+         ALLOCATED(right%equation_ids),label//' equations allocated')
+    IF (ALLOCATED(left%equation_ids)) THEN
+      CALL require(SIZE(left%equation_ids)==SIZE(right%equation_ids), &
+           label//' equation count')
+      CALL require(ALL(left%equation_ids==right%equation_ids), &
+           label//' equation indices')
+    END IF
+    CALL require(ALLOCATED(left%source_names) .AND. &
+         ALLOCATED(right%source_names),label//' source names allocated')
+    CALL require(SIZE(left%source_names)==SIZE(right%source_names), &
+         label//' source count')
+    DO i=1,SIZE(left%source_names)
+      CALL require(ANY(right%source_names==left%source_names(i)), &
+           label//' canonical source membership')
+    END DO
+  END SUBROUTINE compare_groups
+
   SUBROUTINE verify_native_schedule()
-    TYPE(source_group_type), ALLOCATABLE :: g(:),s(:)
+    TYPE(source_group_type), ALLOCATABLE :: g(:),s(:),legacy_g(:),legacy_s(:)
+    INTEGER :: i
     CALL configure_lava_case()
+    ! Obtain an independently normalized legacy schedule before building
+    ! the native equivalent. Compare full equation/source footprints below.
+    BLOCK
+      LOGICAL :: active_eq(7)
+      INTEGER :: assigned(7)
+      active_eq=.FALSE.;active_eq(2:4)=.TRUE.;active_eq(7)=.TRUE.
+      assigned=0;assigned(2:3)=3;assigned(4)=1;assigned(7)=2
+      CALL partition%initialize(active_eq,assigned, &
+           [IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_NEWTON])
+    END BLOCK
+    CALL initialize_configured_sources(registry,partition,error)
+    CALL require(error=='','legacy schedule for native equivalence: '//TRIM(error))
+    legacy_g=registry%stage_groups()
+    legacy_s=registry%step_groups()
     CALL clear_source_input()
     native_source_configuration_present=.TRUE.
     source_group_count=5
@@ -256,6 +296,14 @@ CONTAINS
          group_contains_name(g(3),'rheology_lava'),'native canonical physical names')
     CALL require(group_contains_name(s(1),'mass_exchange_deposition'), &
          'native post-RK physical group')
+    CALL require(SIZE(g)==SIZE(legacy_g) .AND. SIZE(s)==SIZE(legacy_s), &
+         'legacy/native same group counts')
+    DO i=1,SIZE(g)
+      CALL compare_groups(legacy_g(i),g(i),'legacy/native STAGE')
+    END DO
+    DO i=1,SIZE(s)
+      CALL compare_groups(legacy_s(i),s(i),'legacy/native STEP')
+    END DO
     source_group_terms(1,3)='SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS'
     CALL initialize_native_source_configuration(invalid,partition,error)
     CALL require(error/='' .AND. .NOT.invalid%is_initialized(), &
