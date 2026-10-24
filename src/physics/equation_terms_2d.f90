@@ -110,9 +110,8 @@ CONTAINS
   !> \param[in] interval Physical integration interval [s].
   !> \param[out] q_after State with only the solver target changed.
   !> \param[out] status Zero on success; negative values preserve legacy diagnostics.
-  SUBROUTINE eval_analytic_terms(group,solver,q_before,context,interval,q_after,status)
+  SUBROUTINE eval_analytic_terms(group,q_before,context,interval,q_after,status)
     TYPE(source_group_type), INTENT(IN) :: group
-    TYPE(source_solver_type), INTENT(IN) :: solver
     REAL(wp), INTENT(IN) :: q_before(n_vars),interval
     TYPE(analytic_term_context_type), INTENT(IN) :: context
     REAL(wp), INTENT(OUT) :: q_after(n_vars)
@@ -127,15 +126,12 @@ CONTAINS
     q_after=q_before
     status=-5
     IF (group%method/=SOURCE_METHOD_ANALYTIC) RETURN
-    IF (.NOT.ALLOCATED(solver%target_ids) .OR. &
-         .NOT.ALLOCATED(solver%equation_ids)) RETURN
-    IF (SIZE(solver%target_ids)/=1) RETURN
-
-    SELECT CASE(solver%kind)
-    CASE(SOURCE_SOLVE_ANALYTIC_VELOCITY)
-      IF (solver%target_ids(1)/=SOURCE_TARGET_VELOCITY .OR. &
-           .NOT.(ANY(solver%equation_ids==2) .AND. &
-           ANY(solver%equation_ids==3))) RETURN
+    IF (.NOT.ALLOCATED(group%equation_ids)) RETURN
+    ! The group owns the analytic operator and its complete equation target.
+    SELECT CASE(SIZE(group%equation_ids))
+    CASE(2)
+      IF (.NOT.(ANY(group%equation_ids==2) .AND. &
+           ANY(group%equation_ids==3))) RETURN
       IF (rheology_flag) THEN
         CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,         &
              flow_density,flow_temperature,flow_alphal,flow_alphag,       &
@@ -165,9 +161,8 @@ CONTAINS
       END IF
       status=0
 
-    CASE(SOURCE_SOLVE_ANALYTIC_TEMPERATURE)
-      IF (solver%target_ids(1)/=SOURCE_TARGET_TEMPERATURE .OR. &
-           .NOT.ANY(solver%equation_ids==4)) RETURN
+    CASE(1)
+      IF (group%equation_ids(1)==4) THEN
       IF (rheology_model_id/=rheology_id_lava) THEN
         status=-2
         RETURN
@@ -186,9 +181,7 @@ CONTAINS
       q_after(4)=heat_capacity*temperature_after
       status=0
 
-    CASE(SOURCE_SOLVE_ANALYTIC_PORE_PRESSURE)
-      IF (solver%target_ids(1)/=SOURCE_TARGET_PORE_PRESSURE .OR. &
-           .NOT.ANY(solver%equation_ids==idx_pore)) RETURN
+      ELSE IF (group%equation_ids(1)==idx_pore .AND. pore_pressure_flag) THEN
       IF (q_before(1)>0.0_wp) THEN
         CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,         &
              flow_density,flow_temperature,flow_alphal,flow_alphag,       &
@@ -199,6 +192,9 @@ CONTAINS
         q_after(idx_pore)=q_before(1)*pressure_after
       END IF
       status=0
+      ELSE
+        RETURN
+      END IF
     END SELECT
   END SUBROUTINE eval_analytic_terms
 

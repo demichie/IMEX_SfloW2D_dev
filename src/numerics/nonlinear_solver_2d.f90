@@ -382,7 +382,7 @@ CONTAINS
              qj=qj_init
              RETURN
           END IF
-          CALL eval_analytic_terms(stage_groups(group),solvers(solver_id),qj, &
+          CALL eval_analytic_terms(stage_groups(group),qj, &
                analytic_context,dt_step*a_diag,analytic_state,             &
                status=analytic_status)
           IF (analytic_status/=0) THEN
