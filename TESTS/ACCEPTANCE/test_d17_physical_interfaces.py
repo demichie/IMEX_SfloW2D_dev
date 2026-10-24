@@ -132,21 +132,21 @@ def main() -> int:
         encoding="utf-8"
     )
     if not re.search(
-        r"(?im)^\\s*use\\s+source_terms_2d\\s*,\\s*only\\s*:\\s*eval_step_source_explicit\\b",
+        r"(?im)^\s*use\s+source_terms_2d\s*,\s*only\s*:\s*eval_step_source_explicit\b",
         executor,
     ):
         failures.append("STEP executor must import the common explicit source bridge")
-    if len(re.findall(r"(?i)\\bcall\\s+eval_step_source_explicit\\s*\\(", executor)) != 1:
+    if len(re.findall(r"(?i)\bcall\s+eval_step_source_explicit\s*\(", executor)) != 1:
         failures.append("STEP executor must evaluate the explicit source bridge once per cell")
-    if re.search(r"(?im)^\\s*use\\s+(?:equation_terms_2d|mass_exchange_assembly_2d)\\b",
+    if re.search(r"(?im)^\s*use\s+(?:equation_terms_2d|mass_exchange_assembly_2d)\b",
                  executor):
         failures.append("STEP executor must not import the old equation/mass-rate bridge")
-    if re.search(r"(?i)\\bcall\\s+(?:eval_expl_terms|eval_mass_exchange_terms)\\s*\\(",
+    if re.search(r"(?i)\bcall\s+(?:eval_expl_terms|eval_mass_exchange_terms)\s*\(",
                  executor):
         failures.append("STEP executor must not call the old physical rate entry point")
-    if not re.search(r"(?i)\\bcall\\s+eval_mass_exchange_terms\\s*\\(", bridge):
+    if not re.search(r"(?i)\bcall\s+eval_mass_exchange_terms\s*\(", bridge):
         failures.append("common STEP bridge must delegate to the atomic mass-exchange assembly")
-    if re.search(r"(?i)\\bcall\\s+eval_mass_exchange_terms\\s*\\(",
+    if re.search(r"(?i)\bcall\s+eval_mass_exchange_terms\s*\(",
                  equation_bridge):
         failures.append("equation_terms must not call the mass-exchange kernel directly")
     for failure in failures:
