@@ -45,7 +45,7 @@ MODULE equation_terms_2d
        source_term_descriptor, source_term_descriptor_by_name,                &
        SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION,&
        SOURCE_TERM_BOTTOM_FISSURAL_INJECTION, SOURCE_TERM_RADIAL_INJECTION
-  USE source_registry_2d, ONLY : source_group_type, source_solver_type, &
+  USE source_registry_2d, ONLY : source_group_type, &
        group_contains, group_contains_name
 
   USE parameters_2d, ONLY : wp, dry_thickness_tolerance
@@ -675,101 +675,36 @@ CONTAINS
   !> \brief Validate one Newton group/solver selection before rate evaluation.
   !> \param[in] group Validated Newton group containing the solver and its terms.
   !> \param[in] solver Newton solver descriptor selecting the rates to evaluate.
-  SUBROUTINE validate_newton_selection(group,solver)
+  SUBROUTINE validate_newton_selection(group)
     TYPE(source_group_type), INTENT(IN) :: group
-    TYPE(source_solver_type), INTENT(IN) :: solver
-    INTEGER :: i
-
     IF (group%method/=SOURCE_METHOD_NEWTON .OR. &
-         .NOT.ALLOCATED(group%term_ids) .OR. &
-         .NOT.ALLOCATED(group%implicit_solver_ids)) THEN
-       CALL fatal_error('D17: implicit rate evaluation requires a Newton source group')
+         .NOT.ALLOCATED(group%term_ids)) THEN
+       CALL fatal_error('D17: implicit evaluation requires a Newton group with sources')
        RETURN
     END IF
-    IF (solver%kind/=SOURCE_SOLVE_NEWTON_BLOCK .OR. solver%id<1 .OR. &
-         .NOT.ANY(group%implicit_solver_ids==solver%id) .OR. &
-         .NOT.ALLOCATED(solver%term_ids)) THEN
-       CALL fatal_error('D17: implicit rate evaluation requires a solver in the selected group')
-       RETURN
-    END IF
-    ! A single Newton solve must assemble every source in the group.
-    IF (SIZE(group%implicit_solver_ids)/=1 .OR. &
-         SIZE(solver%term_ids)/=SIZE(group%term_ids)) THEN
-       CALL fatal_error('D17: Newton solver must cover the complete source group')
-       RETURN
-    END IF
-    DO i=1,SIZE(group%term_ids)
-       IF (COUNT(solver%term_ids==group%term_ids(i))/=1) THEN
-          CALL fatal_error('D17: Newton solver misses a group source')
-          RETURN
-       END IF
-    END DO
-    DO i=1,SIZE(solver%term_ids)
-       IF (ALLOCATED(solver%term_names)) THEN
-          IF (i>SIZE(solver%term_names)) THEN
-             CALL fatal_error('D17: inconsistent Newton solver source names')
-             RETURN
-          END IF
-          IF (.NOT.group_contains_name(group,solver%term_names(i))) THEN
-             CALL fatal_error('D17: implicit solver term is absent from its source group')
-             RETURN
-          END IF
-       ELSE
-          IF (.NOT.group_contains(group,solver%term_ids(i))) THEN
-             CALL fatal_error('D17: implicit solver term is absent from its source group')
-             RETURN
-          END IF
-       END IF
-    END DO
   END SUBROUTINE validate_newton_selection
 
-  !> \brief Test whether a selected Newton solver owns a term of the requested role.
-  !> \param[in] group Validated Newton source group.
-  !> \param[in] solver Newton solver descriptor.
-  !> \param[in] role Catalog role to search for.
-  !> \param[in] model_id Physical model identifier to match.
-  !> \return True when the solver selects a group term with the requested role and model.
-  PURE LOGICAL FUNCTION solver_has_role(group,solver,role,model_id) RESULT(found)
+  PURE LOGICAL FUNCTION group_has_role(group,role,model_id) RESULT(found)
     TYPE(source_group_type), INTENT(IN) :: group
-    TYPE(source_solver_type), INTENT(IN) :: solver
     INTEGER, INTENT(IN) :: role,model_id
     TYPE(source_term_type) :: term
     INTEGER :: i
-
     found=.FALSE.
-    IF (.NOT.ALLOCATED(solver%term_ids)) RETURN
-    DO i=1,SIZE(solver%term_ids)
-       IF (ALLOCATED(solver%term_names)) THEN
-          IF (i>SIZE(solver%term_names)) RETURN
-          IF (.NOT.group_contains_name(group,solver%term_names(i))) CYCLE
-          term=source_term_descriptor_by_name(solver%term_names(i))
-       ELSE
-          IF (.NOT.group_contains(group,solver%term_ids(i))) CYCLE
-          term=source_term_descriptor(solver%term_ids(i))
-       END IF
+    IF (.NOT.ALLOCATED(group%term_ids)) RETURN
+    DO i=1,SIZE(group%term_ids)
+       term=source_term_descriptor(group%term_ids(i))
        IF (term%role==role .AND. term%model_id==model_id) THEN
           found=.TRUE.
           RETURN
        END IF
     END DO
-  END FUNCTION solver_has_role
+  END FUNCTION group_has_role
 
-  !> \brief Test whether a selected Newton solver owns one specific source term.
-  !> \param[in] group Validated Newton source group.
-  !> \param[in] solver Newton solver descriptor.
-  !> \param[in] term_id Catalog term identifier to search for.
-  !> \return True when the solver and group both select the requested term.
-  PURE LOGICAL FUNCTION solver_has_term(group,solver,term_id) RESULT(found)
+  PURE LOGICAL FUNCTION group_has_term(group,term_id) RESULT(found)
     TYPE(source_group_type), INTENT(IN) :: group
-    TYPE(source_solver_type), INTENT(IN) :: solver
     INTEGER, INTENT(IN) :: term_id
     found=group_contains(group,term_id)
-    IF (.NOT.ALLOCATED(solver%term_ids)) THEN
-       found=.FALSE.
-       RETURN
-    END IF
-    IF (found) found=ANY(solver%term_ids==term_id)
-  END FUNCTION solver_has_term
+  END FUNCTION group_has_term
 
 
   !******************************************************************************
@@ -805,7 +740,7 @@ CONTAINS
   !******************************************************************************
 
   SUBROUTINE eval_implicit_terms( Bprimej_x, Bprimej_y, Zij, c_qj,              &
-       c_nh_term_impl, r_qj , r_nh_term_impl, group, solver )
+       c_nh_term_impl, r_qj , r_nh_term_impl, group )
 
     USE COMPLEXIFY
 
@@ -820,7 +755,6 @@ CONTAINS
     REAL(wp), INTENT(IN), OPTIONAL :: r_qj(n_vars)
     REAL(wp), INTENT(OUT), OPTIONAL :: r_nh_term_impl(n_eqns)
     TYPE(source_group_type), INTENT(IN), OPTIONAL :: group
-    TYPE(source_solver_type), INTENT(IN), OPTIONAL :: solver
 
     COMPLEX(wp) :: h                       !< height [m]
     COMPLEX(wp) :: u                       !< velocity (x direction) [m/s]
@@ -869,24 +803,20 @@ CONTAINS
 
     END IF
 
-    IF (PRESENT(group) .NEQV. PRESENT(solver)) THEN
-       CALL fatal_error('D17: implicit rate evaluation requires both group and solver descriptors')
-       RETURN
-    END IF
     IF (PRESENT(group)) THEN
-       CALL validate_newton_selection(group,solver)
-       selected_rheology=solver_has_role(group,solver,SOURCE_ROLE_IMPLICIT, &
+       CALL validate_newton_selection(group)
+       selected_rheology=group_has_role(group,SOURCE_ROLE_IMPLICIT, &
             rheology_model_id)
-       selected_radiative=solver_has_term(group,solver, &
+       selected_radiative=group_has_term(group, &
             SOURCE_TERM_THERMAL_RADIATIVE_COOLING)
-       selected_convective=solver_has_term(group,solver, &
+       selected_convective=group_has_term(group, &
             SOURCE_TERM_THERMAL_CONVECTIVE_COOLING)
        IF (selected_radiative .NEQV. selected_convective) THEN
           CALL fatal_error('D17: thermal cooling terms must be selected as a complete bundle')
           RETURN
        END IF
        selected_thermal=selected_radiative .OR. selected_convective
-       selected_pore=solver_has_term(group,solver, &
+       selected_pore=group_has_term(group, &
             SOURCE_TERM_PORE_PRESSURE_DISSIPATION)
     ELSE
        selected_rheology=rheology_flag
@@ -983,7 +913,7 @@ CONTAINS
 
   SUBROUTINE eval_semi_implicit_terms( Bprimej_x , Bprimej_y , Bsecondj_xx ,    &
        Bsecondj_xy , Bsecondj_yy , grav_coeff , qpj , semi_implicit_term ,     &
-       Zj, group, solver )
+       Zj, group )
 
     USE parameters_2D, ONLY: pore_pressure_flag
 
@@ -1001,7 +931,6 @@ CONTAINS
 
     REAL(wp), INTENT(OUT) :: semi_implicit_term(n_eqns)
     TYPE(source_group_type), INTENT(IN), OPTIONAL :: group
-    TYPE(source_solver_type), INTENT(IN), OPTIONAL :: solver
 
     REAL(wp) :: source_term(n_eqns)
 
@@ -1027,13 +956,9 @@ CONTAINS
 
     semi_implicit_term(1:n_eqns) = 0.0_wp
 
-    IF (PRESENT(group) .NEQV. PRESENT(solver)) THEN
-       CALL fatal_error('D17: semi-implicit evaluation requires both group and solver descriptors')
-       RETURN
-    END IF
     IF (PRESENT(group)) THEN
-       CALL validate_newton_selection(group,solver)
-       selected_rheology=solver_has_role(group,solver, &
+       CALL validate_newton_selection(group)
+       selected_rheology=group_has_role(group, &
             SOURCE_ROLE_SEMI_IMPLICIT,rheology_model_id)
     ELSE
        selected_rheology=rheology_flag

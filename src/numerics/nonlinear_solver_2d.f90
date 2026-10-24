@@ -438,8 +438,7 @@ CONTAINS
                 CALL qc_to_qp(qj, qp_current, dynamic_pressure)
                 CALL eval_semi_implicit_terms(Bprimej_x, Bprimej_y,          &
                      Bsecondj_xx,Bsecondj_xy,Bsecondj_yy,grav_coeff,        &
-                     qp_current,si_term,Zij,group=stage_groups(group),       &
-                     solver=solvers(solver_id))
+                     qp_current,si_term,Zij,group=stage_groups(group))
              END IF
              DO i=1,group_size
                 equation=group_equations(i)
@@ -1160,7 +1159,7 @@ CONTAINS
     REAL(wp), VOLATILE :: delta_q(n_vars)
 
     CALL eval_implicit_terms( Bprimej_x , Bprimej_y, Zij, r_qj = qj ,           &
-         r_nh_term_impl=nh_term_impl,group=source_group,solver=source_solver )
+         r_nh_term_impl=nh_term_impl,group=source_group )
 
     Rj = Rj_not_impl - a_diag * nh_term_impl
 
@@ -1261,7 +1260,7 @@ CONTAINS
 
        CALL eval_implicit_terms(Bprimej_x, Bprimej_y, Zij,                   &
             c_qj=qj_cmplx, c_nh_term_impl=nh_terms_cmplx_impl,               &
-            group=source_group,solver=source_solver)
+            group=source_group)
 
        DO j = 1, SIZE(active_equations)
           Jacob_relax(active_equations(j),equation) =                         &
