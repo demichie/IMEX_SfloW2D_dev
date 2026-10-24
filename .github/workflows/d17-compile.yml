@@ -84,6 +84,16 @@ jobs:
             -lnetcdff -llapack -lblas -lm -o build-logs/test_d17_production_rheology
           build-logs/test_d17_production_rheology 2>&1 | tee build-logs/production-rheology.log
 
+      - name: Execute D17 production Newton group regression
+        shell: bash
+        run: |
+          set -o pipefail
+          gfortran -O0 -g -fcheck=all -fbacktrace -fopenmp -I src -I src/state \
+            TESTS/ACCEPTANCE/test_d17_production_newton.f90 \
+            $(find src -name '*.o' ! -name 'IMEX_SfloW2D.o' | sort) \
+            -lnetcdff -llapack -lblas -lm -o build-logs/test_d17_production_newton
+          build-logs/test_d17_production_newton 2>&1 | tee build-logs/production-newton.log
+
       - name: Record binary
         shell: bash
         run: |
