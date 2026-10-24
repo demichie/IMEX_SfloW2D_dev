@@ -411,14 +411,17 @@ CONTAINS
         END SELECT
       END IF
     END DO
+    ! Inspect the actual nominal memberships, not numeric catalog positions.
+    ! Any atomic batch touched by a group must be wholly present in one group.
     error='D17: coupled evaluation batch split or incomplete'
-    DO id=1,SOURCE_TERM_COUNT
-      term=source_term_descriptor(id)
-      IF (term%bundle_id==0) CYCLE
-      batch_names=source_bundle_names(term%bundle_id)
-      IF (SIZE(batch_names)<2) RETURN
-      IF (term%name/=batch_names(1)) CYCLE
-      IF (.NOT.same_batch(batch_names,groups)) RETURN
+    DO i=1,SIZE(groups)
+      DO j=1,SIZE(groups(i)%term_names)
+        term=source_term_descriptor_by_name(groups(i)%term_names(j))
+        IF (term%bundle_id==0) CYCLE
+        batch_names=source_bundle_names(term%bundle_id)
+        IF (SIZE(batch_names)<2) RETURN
+        IF (.NOT.same_batch(batch_names,groups)) RETURN
+      END DO
     END DO
     error=''
   END SUBROUTINE validate_registry
