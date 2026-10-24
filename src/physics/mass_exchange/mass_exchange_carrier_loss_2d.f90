@@ -3,6 +3,7 @@
 MODULE mass_exchange_carrier_loss_2d
   USE parameters_2d, ONLY : wp, n_solid, liquid_flag, pore_pressure_flag, gas_loss_flag
   USE constitutive_parameters_2d, ONLY : loss_rate, coeff_porosity, maximum_solid_packing
+  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_gas_loss
 
   IMPLICIT NONE
   PRIVATE
