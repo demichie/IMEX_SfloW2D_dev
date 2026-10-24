@@ -541,6 +541,20 @@ CONTAINS
     source_solver_target_count(1,3)=1
     source_solver_targets(1,1,3)='VELOCITY'
 
+    ! Legacy solver fields must not be silently accepted without an owner.
+    source_group_solver_count(4)=0
+    source_solver_order(1,4)=1
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(INDEX(error,'legacy source solver fields')>0, &
+         'orphan legacy solver order is rejected')
+    source_solver_order(1,4)=0
+    ! The old multi-solver layout is forbidden even when the count is one.
+    source_solver_order(2,3)=2
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(INDEX(error,'unused legacy source solver fields')>0, &
+         'unused second legacy solver rejected')
+    source_solver_order(2,3)=0
+
     source_group_term_count(5)=6
     CALL initialize_native_source_configuration(trial,partition,error)
     CALL require(error/='' .AND. .NOT.trial%is_initialized() .AND. &

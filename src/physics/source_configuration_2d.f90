@@ -201,6 +201,18 @@ CONTAINS
           target_ids(t,1,g)=target
         END DO
       ELSE
+        ! Legacy native syntax: reject orphan solver fields instead of silently
+        ! accepting data that cannot belong to the unique configured solve.
+        error='D17: legacy source solver fields require exactly one solver'
+        IF (source_group_solver_count(g)==0) THEN
+          IF (ANY(source_solver_order(:,g)/=0) .OR. &
+               ANY(source_solver_target_count(:,g)/=0) .OR. &
+               ANY(source_solver_targets(:,:,g)/='')) RETURN
+        END IF
+        error='D17: unused legacy source solver fields'
+        IF (ANY(source_solver_order(2:,g)/=0) .OR. &
+             ANY(source_solver_target_count(2:,g)/=0) .OR. &
+             ANY(source_solver_targets(:,2:,g)/='')) RETURN
         solver_count(g)=source_group_solver_count(g)
         error='D17: invalid source solver count'
         IF (solver_count(g)<0 .OR. solver_count(g)>SOURCE_INPUT_MAX_SOLVERS) RETURN
