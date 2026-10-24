@@ -690,6 +690,18 @@ CONTAINS
     TYPE(source_term_type) :: term
     INTEGER :: i
     found=.FALSE.
+    ! Registered groups own canonical names; numeric membership is only a
+    ! compatibility fallback for pre-normalized legacy descriptors.
+    IF (ALLOCATED(group%term_names)) THEN
+      DO i=1,SIZE(group%term_names)
+        term=source_term_descriptor_by_name(group%term_names(i))
+        IF (term%role==role .AND. term%model_id==model_id) THEN
+          found=.TRUE.
+          RETURN
+        END IF
+      END DO
+      RETURN
+    END IF
     IF (.NOT.ALLOCATED(group%term_ids)) RETURN
     DO i=1,SIZE(group%term_ids)
        term=source_term_descriptor(group%term_ids(i))
@@ -703,7 +715,11 @@ CONTAINS
   PURE LOGICAL FUNCTION group_has_term(group,term_id) RESULT(found)
     TYPE(source_group_type), INTENT(IN) :: group
     INTEGER, INTENT(IN) :: term_id
-    found=group_contains(group,term_id)
+    TYPE(source_term_type) :: term
+    term=source_term_descriptor(term_id)
+    found=.FALSE.
+    IF (LEN_TRIM(term%name)==0) RETURN
+    found=group_contains_name(group,term%name)
   END FUNCTION group_has_term
 
 
