@@ -97,8 +97,8 @@ CONTAINS
     INTEGER, ALLOCATABLE :: solver_terms(:),group_terms(:),active_terms(:),solver_ids(:)
     INTEGER :: cadence(SOURCE_INPUT_MAX_GROUPS),method(SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: phase(SOURCE_INPUT_MAX_GROUPS),solver_count(SOURCE_INPUT_MAX_GROUPS)
-    INTEGER :: target_count(SOURCE_INPUT_MAX_SOLVERS,SOURCE_INPUT_MAX_GROUPS)
-    INTEGER :: target_ids(SOURCE_INPUT_MAX_TARGETS,SOURCE_INPUT_MAX_SOLVERS, &
+    INTEGER :: target_count(1,SOURCE_INPUT_MAX_GROUPS)
+    INTEGER :: target_ids(SOURCE_INPUT_MAX_TARGETS,1, &
          SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: target_group(3),methods(SOURCE_INPUT_MAX_GROUPS),membership(n_eqns)
     LOGICAL :: implicit_mask(n_eqns),seen_terms(SOURCE_TERM_COUNT),expected_targets(3)
@@ -176,23 +176,20 @@ CONTAINS
         END IF
         seen_terms(term_id)=.TRUE.; parsed_terms(i,g)=term_id
       END DO
-      ! Native group targets are authoritative. Old solver fields are an
-      ! explicit compatibility path until all callers use group metadata.
-      IF (source_group_target_count(g)/=0 .OR. &
-           ANY(source_group_targets(:,g)/='')) THEN
-        error='D17: cannot mix group targets with legacy solver fields'
-        IF (source_group_solver_count(g)/=0 .OR. &
-             ANY(source_solver_order(:,g)/=0) .OR. &
-             ANY(source_solver_target_count(:,g)/=0) .OR. &
-             ANY(source_solver_targets(:,:,g)/='')) RETURN
-        error='D17: invalid group target count'
-        IF (source_group_target_count(g)<1 .OR. &
-             source_group_target_count(g)>SOURCE_INPUT_MAX_TARGETS) RETURN
+      ! An implicit group has a single target list, not nested solvers.
+      error='D17: invalid group target count'
+      IF (source_group_target_count(g)<0 .OR. &
+           source_group_target_count(g)>SOURCE_INPUT_MAX_TARGETS) RETURN
+      IF (method(g)==SOURCE_METHOD_EXPLICIT) THEN
+        error='D17: explicit source groups cannot declare group targets'
+        IF (source_group_target_count(g)/=0) RETURN
+        IF (ANY(source_group_targets(:,g)/='')) RETURN
+        solver_count(g)=0
+      ELSE
+        error='D17: Newton and analytic groups require group targets'
+        IF (source_group_target_count(g)<1) RETURN
         solver_count(g)=1
         target_count(1,g)=source_group_target_count(g)
-        error='D17: invalid group target count'
-        IF (target_count(1,g)>SOURCE_INPUT_MAX_TARGETS) RETURN
-        IF (method(g)==SOURCE_METHOD_EXPLICIT) RETURN
         DO t=1,target_count(1,g)
           target=native_target(source_group_targets(t,g))
           error='D17: unknown or duplicate group target'
@@ -200,43 +197,6 @@ CONTAINS
           IF (ANY(target_ids(:,1,g)==target)) RETURN
           target_ids(t,1,g)=target
         END DO
-      ELSE
-        ! Legacy native syntax: reject orphan solver fields instead of silently
-        ! accepting data that cannot belong to the unique configured solve.
-        error='D17: legacy source solver fields require exactly one solver'
-        IF (source_group_solver_count(g)==0) THEN
-          IF (ANY(source_solver_order(:,g)/=0) .OR. &
-               ANY(source_solver_target_count(:,g)/=0) .OR. &
-               ANY(source_solver_targets(:,:,g)/='')) RETURN
-        END IF
-        error='D17: unused legacy source solver fields'
-        IF (ANY(source_solver_order(2:,g)/=0) .OR. &
-             ANY(source_solver_target_count(2:,g)/=0) .OR. &
-             ANY(source_solver_targets(:,2:,g)/='')) RETURN
-        solver_count(g)=source_group_solver_count(g)
-        error='D17: invalid source solver count'
-        IF (solver_count(g)<0 .OR. solver_count(g)>SOURCE_INPUT_MAX_SOLVERS) RETURN
-        IF (solver_count(g)==1) THEN
-          error='D17: invalid source solver execution order'
-          IF (source_solver_order(1,g)/=1) RETURN
-          target_count(1,g)=source_solver_target_count(1,g)
-          error='D17: invalid source solver target count'
-          IF (target_count(1,g)<1 .OR. target_count(1,g)>SOURCE_INPUT_MAX_TARGETS) RETURN
-          DO t=1,target_count(1,g)
-            target=native_target(source_solver_targets(t,1,g))
-            error='D17: unknown or duplicate source solver target'
-            IF (target==0) RETURN
-            IF (ANY(target_ids(:,1,g)==target)) RETURN
-            target_ids(t,1,g)=target
-          END DO
-        END IF
-      END IF
-      IF (method(g)==SOURCE_METHOD_EXPLICIT) THEN
-        error='D17: explicit source groups cannot declare solvers or group targets'
-        IF (solver_count(g)/=0) RETURN
-      ELSE
-        error='D17: Newton and analytic source groups require exactly one solver'
-        IF (solver_count(g)/=1) RETURN
         IF (method(g)==SOURCE_METHOD_ANALYTIC) THEN
           error='D17: analytic groups must have exactly one target'
           IF (target_count(1,g)/=1) RETURN

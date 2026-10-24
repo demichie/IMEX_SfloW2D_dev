@@ -481,80 +481,27 @@ CONTAINS
     CALL require(ALL(groups(3)%equation_ids==[2,3]) .AND. &
          SIZE(steps(1)%term_ids)==7,'native targets and complete step batch')
 
-    ! D17.19: one solve per Newton group, rejected at input validation.
-    source_group_solver_count(3)=2
+    ! A native implicit group has a target list directly on the group.
+    source_group_target_count(3)=0
     CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'exactly one solver')>0 .AND. &
-         .NOT.trial%is_initialized() .AND. .NOT.partition%is_initialized(), &
-         'multiple native Newton solvers rejected at input')
-    source_group_solver_count(3)=1
-
-    ! New group-level target syntax must be equivalent to the former
-    ! single-solver fields without changing the registered physical terms.
-    source_group_solver_count(3)=0
-    source_solver_order(1,3)=0
-    source_solver_target_count(1,3)=0
-    source_solver_targets(:,1,3)=''
+    CALL require(INDEX(error,'require group targets')>0, &
+         'missing implicit group targets rejected')
     source_group_target_count(3)=1
+    source_group_targets(1,3)='UNKNOWN'
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(INDEX(error,'unknown or duplicate group target')>0, &
+         'unknown group target rejected')
     source_group_targets(1,3)='VELOCITY'
     CALL initialize_native_source_configuration(trial,partition,error)
     CALL require(error=='' .AND. trial%is_initialized(), &
-         'native group-level targets initialize without solver input: '//TRIM(error))
-    snapshot=trial%stage_groups()
-    CALL require(ALL(snapshot(3)%equation_ids==[2,3]), &
-         'group-level target selects the complete velocity block')
-    source_group_solver_count(3)=1
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'cannot mix group targets')>0, &
-         'mixed group and solver target syntax rejected')
-    source_group_solver_count(3)=0
-    source_solver_order(1,3)=1
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'cannot mix group targets')>0, &
-         'stale solver order rejected with group targets')
-    source_solver_order(1,3)=0
-    source_solver_target_count(1,3)=1
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'cannot mix group targets')>0, &
-         'stale solver target count rejected with group targets')
-    source_solver_target_count(1,3)=0
-    source_solver_targets(1,1,3)='VELOCITY'
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'cannot mix group targets')>0, &
-         'stale solver target rejected with group targets')
-    source_solver_targets(1,1,3)=''
-    source_group_target_count(3)=0
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'invalid group target count')>0, &
-         'orphan group target rejected rather than ignored')
-    source_group_target_count(3)=1
-    source_group_targets(1,3)=''
+         'native group-level targets initialize: '//TRIM(error))
+    source_group_target_count(3)=2
+    source_group_targets(2,3)='VELOCITY'
     CALL initialize_native_source_configuration(trial,partition,error)
     CALL require(INDEX(error,'unknown or duplicate group target')>0, &
-         'empty group target rejected')
-    source_group_targets(1,3)='VELOCITY'
-    source_group_solver_count(3)=0
-    source_group_target_count(3)=0
-    source_group_targets(:,3)=''
-    source_group_solver_count(3)=1
-    source_solver_order(1,3)=1
-    source_solver_target_count(1,3)=1
-    source_solver_targets(1,1,3)='VELOCITY'
-
-    ! Legacy solver fields must not be silently accepted without an owner.
-    source_group_solver_count(4)=0
-    source_solver_order(1,4)=1
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'legacy source solver fields')>0, &
-         'orphan legacy solver order is rejected')
-    source_solver_order(1,4)=0
-    ! The old multi-solver layout is forbidden even when the count is one.
-    source_solver_order(2,3)=2
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'unused legacy source solver fields')>0, &
-         'unused second legacy solver rejected')
-    source_solver_order(2,3)=0
-
+         'duplicate group target rejected')
+    source_group_target_count(3)=1
+    source_group_targets(2,3)=''
     source_group_term_count(5)=6
     CALL initialize_native_source_configuration(trial,partition,error)
     CALL require(error/='' .AND. .NOT.trial%is_initialized() .AND. &
@@ -578,7 +525,7 @@ CONTAINS
   END SUBROUTINE test_native_source_configuration
 
   SUBROUTINE test_native_source_input_parser()
-    CHARACTER(LEN=128) :: valid_lines(13)
+    CHARACTER(LEN=128) :: valid_lines(11)
 
     valid_lines=[CHARACTER(LEN=128) :: &
          '&source_groups', &
@@ -589,15 +536,13 @@ CONTAINS
          " source_group_method(1)='NEWTON',", &
          ' source_group_term_count(1)=1,', &
          " source_group_terms(1,1)='SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB',", &
-         ' source_group_solver_count(1)=1,', &
-         ' source_solver_order(1,1)=1,', &
-         ' source_solver_target_count(1,1)=1,', &
-         " source_solver_targets(1,1,1)='VELOCITY',", &
+         ' source_group_target_count(1)=1,', &
+         " source_group_targets(1,1)='VELOCITY',", &
          '/']
     CALL check_native_input(valid_lines,.FALSE.,'',.TRUE.)
     CALL require(source_group_count==1 .AND. source_group_id(1)==5 .AND. &
          source_group_terms(1,1)=='SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB' .AND. &
-         source_solver_targets(1,1,1)=='VELOCITY','native namelist values parsed')
+         source_group_targets(1,1)=='VELOCITY','native namelist values parsed')
     CALL check_native_input([CHARACTER(LEN=128) :: '! no native source groups'], &
          .FALSE.,'',.FALSE.)
     CALL require(source_group_count==0,'absent native namelist preserves legacy path')
@@ -647,12 +592,8 @@ CONTAINS
       descriptor=source_term_descriptor(term_ids(i))
       source_group_terms(i,slot)=descriptor%name
     END DO
-    source_group_solver_count(slot)=SIZE(targets)
-    IF (SIZE(targets)>0) THEN
-      source_solver_order(1,slot)=1
-      source_solver_target_count(1,slot)=SIZE(targets)
-      source_solver_targets(1:SIZE(targets),1,slot)=targets
-    END IF
+    source_group_target_count(slot)=SIZE(targets)
+    IF (SIZE(targets)>0) source_group_targets(1:SIZE(targets),slot)=targets
   END SUBROUTINE set_group
   SUBROUTINE disable_sources()
     USE parameters_2d, ONLY : rheology_flag,rheology_model_id,rheology_id_none,pore_pressure_flag, &
