@@ -12,8 +12,6 @@ MODULE step_source_executor_2d
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
-  USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, SOURCE_METHOD_EXPLICIT, &
-       source_term_type, source_term_descriptor_by_name
 
   IMPLICIT NONE
 
@@ -145,9 +143,8 @@ CONTAINS
     REAL(wp) :: p_dyn
     CHARACTER(LEN=96) :: closure_context
     TYPE(source_group_type), ALLOCATABLE :: step_groups(:)
-    TYPE(source_term_type) :: term
     INTEGER :: j, k, l
-    INTEGER :: group_index, term_index, mass_group_count
+    INTEGER :: group_index, mass_group_count
     LOGICAL :: liquid_loss_active
 
     liquid_loss_active = .FALSE.
@@ -161,17 +158,8 @@ CONTAINS
        step_groups=source_registry%step_groups()
        mass_group_count=0
        DO group_index=1,SIZE(step_groups)
-          IF (step_groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) &
-               CALL fatal_error('D17: STEP source group must use EXPLICIT method')
-          IF (step_groups(group_index)%cadence/=SOURCE_CADENCE_STEP) &
-               CALL fatal_error('D17: invalid cadence in post-RK source schedule')
           IF (SIZE(step_groups(group_index)%source_names)>0) &
                mass_group_count=mass_group_count+1
-          DO term_index=1,SIZE(step_groups(group_index)%source_names)
-             term=source_term_descriptor_by_name(step_groups(group_index)%source_names(term_index))
-             IF (term%target/='mass_exchange') &
-                  CALL fatal_error('D17: unsupported non-mass post-RK source')
-          END DO
        END DO
        IF (mass_group_count>1) &
             CALL fatal_error('D17: atomic mass-exchange batch split across step groups')

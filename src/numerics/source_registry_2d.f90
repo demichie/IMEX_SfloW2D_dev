@@ -286,7 +286,6 @@ CONTAINS
         ! Unknown names yield an empty descriptor. No numeric identity
         ! is needed to validate membership or scheduling capabilities.
         IF (LEN_TRIM(term%name)==0) RETURN
-        IF (LEN_TRIM(term%name)==0) RETURN
         ! Mathematical rheology addends are catalogued only for legacy
         ! evaluation; native and normalized groups own complete laws.
                 IF (ANY(seen_names==term%name)) RETURN

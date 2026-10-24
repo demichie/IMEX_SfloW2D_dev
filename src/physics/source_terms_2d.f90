@@ -220,7 +220,6 @@ CONTAINS
     COMPLEX(wp) :: red_grav
     LOGICAL :: selected_rheology, selected_thermal, selected_pore
     CHARACTER(LEN=64) :: selected_model_name
-    LOGICAL :: selected_radiative, selected_convective
 
     IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
 
@@ -245,15 +244,7 @@ CONTAINS
     IF (PRESENT(group)) THEN
        selected_model_name=group_rheology_name(group)
        selected_rheology=group_has_role(group,SOURCE_ROLE_IMPLICIT)
-       selected_radiative=group_contains_name(group, &
-            'thermal_cooling')
-       selected_convective=group_contains_name(group, &
-            'thermal_cooling')
-       IF (selected_radiative .NEQV. selected_convective) THEN
-          CALL fatal_error('D17: thermal cooling terms must be selected as a complete bundle')
-          RETURN
-       END IF
-       selected_thermal=selected_radiative .OR. selected_convective
+       selected_thermal=group_contains_name(group,'thermal_cooling')
        selected_pore=group_contains_name(group, &
             'pore_pressure_dissipation')
     ELSE
