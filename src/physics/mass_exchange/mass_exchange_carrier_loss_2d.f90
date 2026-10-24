@@ -17,7 +17,7 @@ MODULE mass_exchange_carrier_loss_2d
   PUBLIC :: eval_mass_exchange_carrier_liquid_loss_semi_implicit
   PUBLIC :: eval_mass_exchange_carrier_liquid_loss_implicit
   PUBLIC :: solve_mass_exchange_carrier_liquid_loss_analytic
-  PUBLIC :: eval_mass_exchange_carrier_deposition_loss_explicit
+  PUBLIC :: deposition_induced_carrier_loss
   PUBLIC :: eval_mass_exchange_carrier_deposition_loss_semi_implicit
   PUBLIC :: eval_mass_exchange_carrier_deposition_loss_implicit
   PUBLIC :: solve_mass_exchange_carrier_deposition_loss_analytic
@@ -38,7 +38,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: continuous_phase_loss_term
     ! Compose independent requested rates, then apply the shared limiter once.
     continuous_phase_loss_term = eval_mass_exchange_carrier_liquid_loss_explicit() &
-         + eval_mass_exchange_carrier_deposition_loss_explicit(deposition_term)
+         + deposition_induced_carrier_loss(deposition_term)
     continuous_phase_loss_term = continuous_phase_loss_term + &
          eval_mass_exchange_carrier_darcy_loss_explicit(r_h, r_T, r_alphas, &
          alphas_tot, r_rho_c, r_exc_pore_pres)
@@ -97,32 +97,12 @@ CONTAINS
     rate = 0.0_wp
   END FUNCTION solve_mass_exchange_carrier_liquid_loss_analytic
 
-  REAL(wp) FUNCTION eval_mass_exchange_carrier_deposition_loss_explicit(deposition_term) RESULT(rate)
+  REAL(wp) FUNCTION deposition_induced_carrier_loss(deposition_term) RESULT(rate)
     REAL(wp), INTENT(IN) :: deposition_term(n_solid)
     ! Requested constituent carrier loss; limiting is applied by the batch.
     rate = coeff_porosity * SUM(deposition_term(1:n_solid))
-  END FUNCTION eval_mass_exchange_carrier_deposition_loss_explicit
+  END FUNCTION deposition_induced_carrier_loss
 
-  REAL(wp) FUNCTION eval_mass_exchange_carrier_deposition_loss_semi_implicit(deposition_term) RESULT(rate)
-    REAL(wp), INTENT(IN) :: deposition_term(n_solid)
-    ! Unsupported physical treatment.
-    CALL fatal_error('mass_exchange_carrier_deposition_loss: semi_implicit is unsupported')
-    rate = 0.0_wp
-  END FUNCTION eval_mass_exchange_carrier_deposition_loss_semi_implicit
-
-  REAL(wp) FUNCTION eval_mass_exchange_carrier_deposition_loss_implicit(deposition_term) RESULT(rate)
-    REAL(wp), INTENT(IN) :: deposition_term(n_solid)
-    ! Unsupported physical treatment.
-    CALL fatal_error('mass_exchange_carrier_deposition_loss: implicit is unsupported')
-    rate = 0.0_wp
-  END FUNCTION eval_mass_exchange_carrier_deposition_loss_implicit
-
-  REAL(wp) FUNCTION solve_mass_exchange_carrier_deposition_loss_analytic(deposition_term) RESULT(rate)
-    REAL(wp), INTENT(IN) :: deposition_term(n_solid)
-    ! Unsupported physical treatment.
-    CALL fatal_error('mass_exchange_carrier_deposition_loss: analytic is unsupported')
-    rate = 0.0_wp
-  END FUNCTION solve_mass_exchange_carrier_deposition_loss_analytic
 
   REAL(wp) FUNCTION eval_mass_exchange_carrier_darcy_loss_explicit(r_h, r_T, r_alphas, alphas_tot, &
        r_rho_c, r_exc_pore_pres) RESULT(rate)

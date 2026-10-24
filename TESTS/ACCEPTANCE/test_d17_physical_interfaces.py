@@ -120,6 +120,18 @@ def main() -> int:
             if positions != sorted(positions):
                 failures.append(f"{source}: PUBLIC declarations must be ordered "
                                 "explicit, semi_implicit, implicit, analytic")
+    # D17 R1/R2: dependent deposition loss is an internal component, and
+    # all mass-exchange physical laws reside under the canonical process folder.
+    if "source_term_type('mass_exchange_carrier_deposition_loss'" in text:
+        failures.append("deposition-induced carrier loss must not be independently scheduled")
+    mass_dir = PHYSICS / "mass_exchange"
+    if not (mass_dir / "mass_exchange_laws_2d.f90").is_file():
+        failures.append("missing mass_exchange_laws_2d production coordinator")
+    if (PHYSICS / "mass_exchange_terms").exists():
+        failures.append("old mass_exchange_terms directory still exists")
+    if not re.search(r"(?im)^\s*interface\s+eval_source_explicit\b", (
+        ROOT / "src/physics/source_terms_2d.f90").read_text(encoding="utf-8")):
+        failures.append("missing single public EXPLICIT source dispatch interface")
     # D17.14/15: STEP scheduling must reach physical rates exclusively through
     # the common source_terms bridge; inventories remain in the STEP executor.
     executor = (ROOT / "src/numerics/step_source_executor_2d.f90").read_text(

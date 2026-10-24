@@ -120,7 +120,7 @@ CONTAINS
     USE geometry_2d, ONLY : begin_topography_rate_update,                   &
          record_topography_rate_cell, apply_topography_rate_update
     USE geometry_2d, ONLY : deposit, erosion, erodible, B_zone
-    USE source_terms_2d, ONLY : eval_step_source_explicit
+    USE source_terms_2d, ONLY : eval_source_explicit
     USE state_conversion_2d, ONLY : qc_to_qp
     USE parameters_2d, ONLY : topo_change_flag, bottom_radial_source_flag,  &
          bottom_fissural_source_flag, erodible_deposit_flag,                &
@@ -190,7 +190,7 @@ CONTAINS
           CALL initialize_dry_physical_cell(qp(1:n_vars+2,j,k))
        END IF
 
-       CALL eval_step_source_explicit(qp(1:n_vars+2,j,k), B_zone(j,k),      &
+       CALL eval_source_explicit(qp(1:n_vars+2,j,k), B_zone(j,k),      &
             B_prime_x_geom(j,k), B_prime_y_geom(j,k),                      &
             erodible(1:n_solid,j,k), time_step, erosion_term,              &
             deposition_term, continuous_phase_erosion_term,                &

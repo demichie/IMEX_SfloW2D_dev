@@ -20,7 +20,7 @@ MODULE source_catalog_2d
     LOGICAL :: has_newton = .FALSE.
     LOGICAL :: has_analytic = .FALSE.
   END TYPE source_term_type
-  INTEGER, PARAMETER :: SOURCE_TERM_COUNT=25
+  INTEGER, PARAMETER :: SOURCE_TERM_COUNT=24
   TYPE(source_term_type), PARAMETER :: SOURCE_CATALOG(SOURCE_TERM_COUNT)=[ &
        source_term_type('rheology_voellmy','velocity',.FALSE.,.TRUE.,.TRUE.), &
        source_term_type('rheology_plastic','velocity',.FALSE.,.TRUE.,.TRUE.), &
@@ -43,7 +43,6 @@ MODULE source_catalog_2d
        source_term_type('mass_exchange_erosion','mass_exchange',.TRUE.,.FALSE.,.FALSE.), &
        source_term_type('mass_exchange_deposition','mass_exchange',.TRUE.,.FALSE.,.FALSE.), &
        source_term_type('mass_exchange_carrier_liquid_loss','mass_exchange',.TRUE.,.FALSE.,.FALSE.), &
-       source_term_type('mass_exchange_carrier_deposition_loss','mass_exchange',.TRUE.,.FALSE.,.FALSE.), &
        source_term_type('mass_exchange_carrier_darcy_loss','mass_exchange',.TRUE.,.FALSE.,.FALSE.), &
        source_term_type('mass_exchange_entrainment','mass_exchange',.TRUE.,.FALSE.,.FALSE.), &
        source_term_type('mass_exchange_vaporization','mass_exchange',.TRUE.,.FALSE.,.FALSE.) &

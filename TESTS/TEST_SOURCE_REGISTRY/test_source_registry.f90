@@ -36,6 +36,8 @@ PROGRAM test_source_registry
   END DO
   term=source_term_descriptor_by_name('SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS')
   CALL require(term%name=='','legacy mathematical addend removed')
+  term=source_term_descriptor_by_name('mass_exchange_carrier_deposition_loss')
+  CALL require(term%name=='','dependent deposition carrier loss is not independently schedulable')
   term=source_term_descriptor_by_name('SOURCE_TERM_THERMAL_RADIATIVE_COOLING')
   CALL require(term%name=='','thermal formula component is not schedulable')
   DO mode=0,3

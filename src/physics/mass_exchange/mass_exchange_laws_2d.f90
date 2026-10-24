@@ -1,7 +1,7 @@
 !> \brief Assemble the atomic post-RK mass-exchange source rates.
 !> \details Physical exchange and equation-rate assembly only; the STEP
 !> executor retains ownership of inventory and bed-state updates.
-MODULE mass_exchange_terms_2d
+MODULE mass_exchange_laws_2d
   USE diagnostics_2d, ONLY : fatal_error
   USE parameters_2d
   USE constitutive_parameters_2d
@@ -180,4 +180,4 @@ CONTAINS
     RETURN
 
   END SUBROUTINE eval_mass_exchange_terms
-END MODULE mass_exchange_terms_2d
+END MODULE mass_exchange_laws_2d

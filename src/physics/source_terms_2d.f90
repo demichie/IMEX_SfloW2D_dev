@@ -17,7 +17,7 @@ MODULE source_terms_2d
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source, &
        eval_pore_pressure_dissipation_implicit, solve_pore_pressure_dissipation_analytic
   USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
-  USE mass_exchange_terms_2d, ONLY : eval_mass_exchange_terms
+  USE mass_exchange_laws_2d, ONLY : eval_mass_exchange_terms
   USE rheology_2d, ONLY : curvature_acceleration, solve_rheology_analytic, &
        eval_rheology_implicit, eval_rheology_semi_implicit
   USE diagnostics_2d, ONLY : fatal_error
@@ -27,7 +27,12 @@ MODULE source_terms_2d
   USE source_registry_2d, ONLY : source_group_type, group_contains_name
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: eval_step_source_explicit, eval_stage_source_explicit
+  PUBLIC :: eval_source_explicit
+  ! Source evaluation is dispatched through one public generic: STAGE
+  ! carries injection geometry; STEP carries atomic exchange rates/inventories.
+  INTERFACE eval_source_explicit
+     MODULE PROCEDURE eval_stage_source_explicit, eval_step_source_explicit
+  END INTERFACE
   PUBLIC :: eval_source_implicit, eval_source_semi_implicit, eval_source_analytic
   PUBLIC :: analytic_term_context_type
   PUBLIC :: eval_geometry_curvature_explicit

@@ -66,9 +66,6 @@ CONTAINS
     IF (erosion_coeff>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
     IF (settling_flag) THEN
       active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_deposition']
-      IF (ABS(coeff_porosity)>0.0_wp) &
-           active_names=[CHARACTER(LEN=64) :: active_names, &
-           'mass_exchange_carrier_deposition_loss']
     END IF
     IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_liquid_loss']
     IF (pore_pressure_flag .AND. gas_loss_flag) &
@@ -246,8 +243,6 @@ CONTAINS
     IF (erosion_coeff>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
     IF (settling_flag) THEN
       active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_deposition']
-      IF (ABS(coeff_porosity)>0.0_wp) &
-           active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_deposition_loss']
     END IF
     IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_liquid_loss']
     IF (pore_pressure_flag .AND. gas_loss_flag) &
