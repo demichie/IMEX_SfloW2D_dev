@@ -696,6 +696,18 @@ CONTAINS
        CALL fatal_error('D17: implicit rate evaluation requires a solver in the selected group')
        RETURN
     END IF
+    ! A single Newton solve must assemble every source in the group.
+    IF (SIZE(group%implicit_solver_ids)/=1 .OR. &
+         SIZE(solver%term_ids)/=SIZE(group%term_ids)) THEN
+       CALL fatal_error('D17: Newton solver must cover the complete source group')
+       RETURN
+    END IF
+    DO i=1,SIZE(group%term_ids)
+       IF (COUNT(solver%term_ids==group%term_ids(i))/=1) THEN
+          CALL fatal_error('D17: Newton solver misses a group source')
+          RETURN
+       END IF
+    END DO
     DO i=1,SIZE(solver%term_ids)
        IF (ALLOCATED(solver%term_names)) THEN
           IF (i>SIZE(solver%term_names)) THEN
