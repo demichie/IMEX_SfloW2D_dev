@@ -85,7 +85,8 @@ CONTAINS
     CHARACTER(LEN=64), ALLOCATABLE :: names(:)
     TYPE(source_term_type) :: term
     CHARACTER(LEN=64) :: name
-    INTEGER :: i
+    CHARACTER(LEN=64), ALLOCATABLE :: buffer(:)
+    INTEGER :: i, n
     ALLOCATE(names(0))
     IF (.NOT.ALLOCATED(group%term_names)) RETURN
     DO i=1,SIZE(group%term_names)
@@ -93,7 +94,12 @@ CONTAINS
       name=term%name
       IF (term%model_id/=0) name=rheology_source_name(term%model_id)
       IF (LEN_TRIM(name)==0) CYCLE
-      IF (.NOT.ANY(names==name)) names=[names,name]
+      IF (ANY(names==name)) CYCLE
+      n=SIZE(names)
+      ALLOCATE(buffer(n+1))
+      buffer(1:n)=names
+      buffer(n+1)=name
+      CALL MOVE_ALLOC(buffer,names)
     END DO
   END FUNCTION group_source_names
 
