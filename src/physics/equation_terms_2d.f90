@@ -15,7 +15,7 @@
 MODULE equation_terms_2d
 
   USE diagnostics_2d, ONLY : fatal_error
-  USE mass_exchange_assembly_2d, ONLY : eval_mass_exchange_terms
+  USE source_terms_2d, ONLY : eval_step_source_explicit
 
   USE constitutive_parameters_2d
   USE state_conversion_2d
@@ -127,7 +127,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: continuous_phase_erosion_term, continuous_phase_loss_term
     REAL(wp), INTENT(OUT) :: eqns_term(n_eqns), topo_term
 
-    CALL eval_mass_exchange_terms(qpj, B_zone, B_prime_x, B_prime_y, &
+    CALL eval_step_source_explicit(qpj, B_zone, B_prime_x, B_prime_y, &
          erodible, dt, erosion_term, deposition_term, &
          continuous_phase_erosion_term, continuous_phase_loss_term, eqns_term, topo_term)
   END SUBROUTINE eval_step_expl_terms

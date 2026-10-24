@@ -1,7 +1,7 @@
 !********************************************************************************
 !> \brief Execute validated STEP source groups after the RK update.
 !> \details Coordinates the atomic mass-exchange transaction after IMEX
-!>          integration. Physical rates are evaluated by mass_exchange_assembly_2d,
+!>          integration. Physical rates are evaluated through source_terms_2d,
 !>          while bed projection and geometry refresh remain in geometry_2d.
 !********************************************************************************
 
@@ -123,7 +123,7 @@ CONTAINS
     USE geometry_2d, ONLY : begin_topography_rate_update,                   &
          record_topography_rate_cell, apply_topography_rate_update
     USE geometry_2d, ONLY : deposit, erosion, erodible, B_zone
-    USE equation_terms_2d, ONLY : eval_expl_terms
+    USE source_terms_2d, ONLY : eval_step_source_explicit
     USE state_conversion_2d, ONLY : qc_to_qp
     USE parameters_2d, ONLY : topo_change_flag, bottom_radial_source_flag,  &
          bottom_fissural_source_flag, erodible_deposit_flag,                &
