@@ -90,6 +90,7 @@ CONTAINS
     CHARACTER(*), INTENT(OUT) :: error
     TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:)
     TYPE(source_group_type) :: group
+    TYPE(source_term_type) :: component
     INTEGER, ALLOCATABLE :: parsed_terms(:,:),ordered(:),targets(:),equations(:)
     INTEGER, ALLOCATABLE :: group_terms(:),active_terms(:),law_terms(:)
     INTEGER :: cadence(SOURCE_INPUT_MAX_GROUPS),method(SOURCE_INPUT_MAX_GROUPS)
@@ -318,7 +319,12 @@ CONTAINS
       group%cadence=cadence(g); group%method=method(g)
       group%phase=phase(g); group%execution_order=source_group_order(g)
       group_terms=parsed_terms(1:parsed_count(g),g)
-      group%term_ids=group_terms
+      IF (ALLOCATED(group%term_names)) DEALLOCATE(group%term_names)
+      ALLOCATE(group%term_names(SIZE(group_terms)))
+      DO t=1,SIZE(group_terms)
+        component=source_term_descriptor(group_terms(t))
+        group%term_names(t)=component%name
+      END DO
       group%equation_ids=[INTEGER::]
       IF (phase(g)==SOURCE_PHASE_RK_IMPLICIT) THEN
         equations=[INTEGER::]

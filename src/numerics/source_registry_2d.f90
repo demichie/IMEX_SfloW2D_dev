@@ -22,7 +22,6 @@ MODULE source_registry_2d
     INTEGER :: method=0 !< Explicit, Newton or analytic.
     INTEGER :: phase=0 !< Implicit sweep, requested EX evaluation, or post-RK.
     INTEGER :: execution_order=0 !< Explicit order within its phase.
-    INTEGER, ALLOCATABLE :: term_ids(:) !< Temporary compatibility representation.
     CHARACTER(LEN=64), ALLOCATABLE :: term_names(:) !< Legacy component names for physical evaluation.
     CHARACTER(LEN=64), ALLOCATABLE :: source_names(:) !< Unique schedulable source identities.
     INTEGER, ALLOCATABLE :: equation_ids(:) !< Union of target equations or explicit footprint.
@@ -75,14 +74,12 @@ CONTAINS
     ! Transitional support for callers identifying mathematical addends.
     IF (ALLOCATED(group%term_names)) THEN
       found=ANY(group%term_names==TRIM(name))
-    ELSE IF (ALLOCATED(group%term_ids)) THEN
-      found=ANY(source_names_for_ids(group%term_ids)==TRIM(name))
     END IF
   END FUNCTION group_contains_name
 
   !> Return one name per schedulable physical source. Rheological
   !> component identities collapse to a single complete-law name; their
-  !> detailed term_ids remain internal for existing physical assemblers.
+  !> term_names remains an internal compatibility view for physical assemblers.
   FUNCTION group_source_names(group) RESULT(names)
     TYPE(source_group_type), INTENT(IN) :: group
     CHARACTER(LEN=64), ALLOCATABLE :: names(:)
@@ -90,9 +87,9 @@ CONTAINS
     CHARACTER(LEN=64) :: name
     INTEGER :: i
     ALLOCATE(names(0))
-    IF (.NOT.ALLOCATED(group%term_ids)) RETURN
-    DO i=1,SIZE(group%term_ids)
-      term=source_term_descriptor(group%term_ids(i))
+    IF (.NOT.ALLOCATED(group%term_names)) RETURN
+    DO i=1,SIZE(group%term_names)
+      term=source_term_descriptor_by_name(group%term_names(i))
       name=term%name
       IF (term%model_id/=0) name=rheology_source_name(term%model_id)
       IF (LEN_TRIM(name)==0) CYCLE
@@ -271,18 +268,11 @@ CONTAINS
   SUBROUTINE populate_registry_term_names(this)
     CLASS(source_registry_type), INTENT(INOUT) :: this
     INTEGER :: i
-
     DO i=1,SIZE(this%stage_entries)
-      IF (ALLOCATED(this%stage_entries(i)%term_ids)) THEN
-        this%stage_entries(i)%term_names=source_names_for_ids(this%stage_entries(i)%term_ids)
-        this%stage_entries(i)%source_names=group_source_names(this%stage_entries(i))
-      END IF
+      this%stage_entries(i)%source_names=group_source_names(this%stage_entries(i))
     END DO
     DO i=1,SIZE(this%step_entries)
-      IF (ALLOCATED(this%step_entries(i)%term_ids)) THEN
-        this%step_entries(i)%term_names=source_names_for_ids(this%step_entries(i)%term_ids)
-        this%step_entries(i)%source_names=group_source_names(this%step_entries(i))
-      END IF
+      this%step_entries(i)%source_names=group_source_names(this%step_entries(i))
     END DO
   END SUBROUTINE populate_registry_term_names
 
@@ -339,41 +329,29 @@ CONTAINS
              groups(j)%execution_order>=group%execution_order) RETURN
       END DO
       error='D17: unallocated group descriptor arrays'
-      IF (.NOT.ALLOCATED(group%term_ids)) RETURN
+      IF (.NOT.ALLOCATED(group%term_names)) RETURN
       IF (.NOT.ALLOCATED(group%equation_ids)) RETURN
       error='D17: invalid or repeated group equation'
       IF (.NOT.valid_equations(group%equation_ids,this%n_equations)) RETURN
-      ! Name arrays are materialized on registry initialization. Keep direct
-      ! validation of pre-normalized legacy descriptors backward-compatible.
-      IF (ALLOCATED(group%term_names)) THEN
-        error='D17: group source name and legacy membership disagree'
-        IF (SIZE(group%term_names)/=SIZE(group%term_ids)) RETURN
-        IF (ANY(group%term_names/=source_names_for_ids(group%term_ids))) RETURN
-        error='D17: repeated or empty canonical source name'
-        DO j=1,SIZE(group%term_names)
-          IF (LEN_TRIM(group%term_names(j))==0) RETURN
-          IF (COUNT(group%term_names==group%term_names(j))/=1) RETURN
-        END DO
-      END IF
+      error='D17: repeated or empty canonical source name'
+      DO j=1,SIZE(group%term_names)
+        IF (LEN_TRIM(group%term_names(j))==0) RETURN
+        IF (COUNT(group%term_names==group%term_names(j))/=1) RETURN
+      END DO
       IF (ALLOCATED(group%source_names)) THEN
         error='D17: canonical group source identity does not match the complete laws'
         IF (SIZE(group%source_names)/=SIZE(group_source_names(group))) RETURN
         IF (ANY(group%source_names/=group_source_names(group))) RETURN
       END IF
       error='D17: physical term duplicated, unknown or dependent'
-      DO j=1,SIZE(group%term_ids)
-        id=group%term_ids(j)
-        ! Validated registry groups resolve their source through the canonical
-        ! name. Raw legacy descriptors are still accepted by direct validate().
-        IF (ALLOCATED(group%term_names)) THEN
-          term=source_term_descriptor_by_name(group%term_names(j))
-        ELSE
-          term=source_term_descriptor(id)
-        END IF
-        IF (term%id/=id .OR. .NOT.term%schedulable) RETURN
+      DO j=1,SIZE(group%term_names)
+        term=source_term_descriptor_by_name(group%term_names(j))
+        id=term%id
+        IF (id<1 .OR. id>SOURCE_TERM_COUNT) RETURN
+        IF (.NOT.term%schedulable) RETURN
         IF (seen(id)) RETURN
         seen(id)=.TRUE.; term_group(id)=i
-        error='D17: term does not support this method/cadence or target'
+      error='D17: term does not support this method/cadence or target'
         IF (.NOT.supports_group(term,group)) RETURN
         IF (term%target/=0) THEN
           expected=target_equation_ids(term%target,this%pore_equation)
@@ -396,7 +374,7 @@ CONTAINS
       IF (family/=0 .AND. group%method/=SOURCE_METHOD_EXPLICIT) THEN
         terms=rheology_source_terms(family)
         error='D17: rheology group requires the complete law bundle'
-        IF (.NOT.ALL(in_list(terms,group%term_ids))) RETURN
+        IF (.NOT.ALL(in_list(terms,group_term_ids(group)))) RETURN
       END IF
       ! No independently scheduled sub-solves: validate group equation shape.
       error='D17: incomplete or incompatible group equation target'
@@ -407,7 +385,7 @@ CONTAINS
         CASE(2)
           IF (.NOT.same_set(group%equation_ids,[2,3])) RETURN
           terms=rheology_source_terms(family)
-          IF (.NOT.same_set(terms,group%term_ids)) THEN
+          IF (.NOT.same_set(terms,group_term_ids(group))) THEN
             error='D17: analytic velocity requires the complete law bundle'; RETURN
           END IF
         CASE(1)
@@ -527,8 +505,22 @@ CONTAINS
     TYPE(source_group_type) :: group
     group%id=id; group%legacy_id=legacy; group%cadence=cadence
     group%method=method; group%phase=phase; group%execution_order=order
-    group%term_ids=terms; group%equation_ids=equations
+    group%term_names=source_names_for_ids(terms); group%equation_ids=equations
   END FUNCTION make_group
+
+  !> Resolve compatibility catalog positions from canonical mathematical names.
+  FUNCTION group_term_ids(group) RESULT(ids)
+    TYPE(source_group_type), INTENT(IN) :: group
+    INTEGER, ALLOCATABLE :: ids(:)
+    TYPE(source_term_type) :: term
+    INTEGER :: i
+    ALLOCATE(ids(0))
+    IF (.NOT.ALLOCATED(group%term_names)) RETURN
+    DO i=1,SIZE(group%term_names)
+      term=source_term_descriptor_by_name(group%term_names(i))
+      ids=[ids,term%id]
+    END DO
+  END FUNCTION group_term_ids
 
   !> \brief Check index bounds and uniqueness before any vector indexing.
   !> \param[in] ids Conservative equation IDs.
