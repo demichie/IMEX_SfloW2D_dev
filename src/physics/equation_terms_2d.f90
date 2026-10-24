@@ -71,11 +71,16 @@ MODULE equation_terms_2d
   PUBLIC :: eval_inertial_flux, eval_hydrostatic_coefficient
   PUBLIC :: limit_component_mass_flux
   PUBLIC :: curvature_acceleration, eval_curvature_momentum_source
-  PUBLIC :: eval_expl_terms, eval_step_mass_exchange_terms
+  PUBLIC :: eval_expl_terms
   PUBLIC :: eval_implicit_terms, eval_semi_implicit_terms
   PUBLIC :: analytic_term_context_type, eval_analytic_terms
   PUBLIC :: eval_source_bdry
   PUBLIC :: set_source_time_coefficients
+
+  INTERFACE eval_expl_terms
+    MODULE PROCEDURE eval_stage_expl_terms
+    MODULE PROCEDURE eval_step_expl_terms
+  END INTERFACE eval_expl_terms
 
   ! Time coefficients of the sources averaged over the current step, set by
   ! set_source_time_coefficients once the step length is known. A negative
@@ -97,7 +102,7 @@ CONTAINS
 
   !> Explicit STEP mass-exchange physics bridge (atomic batch).
   !> This returns rates only. Inventory and bed updates belong to STEP execution.
-  SUBROUTINE eval_step_mass_exchange_terms(qpj, B_zone, B_prime_x, B_prime_y, &
+  SUBROUTINE eval_step_expl_terms(qpj, B_zone, B_prime_x, B_prime_y, &
        erodible, dt, erosion_term, deposition_term, &
        continuous_phase_erosion_term, continuous_phase_loss_term, eqns_term, topo_term)
     REAL(wp), INTENT(IN) :: qpj(n_vars+2), B_prime_x, B_prime_y
@@ -110,7 +115,7 @@ CONTAINS
     CALL eval_mass_exchange_terms(qpj, B_zone, B_prime_x, B_prime_y, &
          erodible, dt, erosion_term, deposition_term, &
          continuous_phase_erosion_term, continuous_phase_loss_term, eqns_term, topo_term)
-  END SUBROUTINE eval_step_mass_exchange_terms
+  END SUBROUTINE eval_step_expl_terms
 
 
   !> \brief Apply one validated analytic source solve to its conservative target.
@@ -243,7 +248,7 @@ CONTAINS
   !> \param[in] group Validated explicit source group selecting cell-local terms.
   !******************************************************************************
 
-  SUBROUTINE eval_expl_terms( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy , &
+  SUBROUTINE eval_stage_expl_terms( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy , &
        Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,             &
        cell_fissure_fract,                                                       &
        lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group )
@@ -315,7 +320,7 @@ CONTAINS
     IF (group%method/=SOURCE_METHOD_EXPLICIT .OR. &
          group%cadence/=SOURCE_CADENCE_STAGE .OR. &
          .NOT.ALLOCATED(group%source_names)) THEN
-       CALL fatal_error('D17: eval_expl_terms requires a validated explicit stage group')
+       CALL fatal_error('D17: eval_stage_expl_terms requires a validated explicit stage group')
     END IF
 
       IF ( ( qpj(1) .LE. EPSILON(1.0_wp) ) .AND. ( cell_fract_jk .EQ. 0.0_wp )    &
@@ -683,7 +688,7 @@ CONTAINS
 
     RETURN
 
-  END SUBROUTINE eval_expl_terms
+  END SUBROUTINE eval_stage_expl_terms
 
   !> \brief Validate one Newton group/solver selection before rate evaluation.
   !> \param[in] group Validated Newton group containing the solver and its terms.
