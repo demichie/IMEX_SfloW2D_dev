@@ -225,9 +225,9 @@ CONTAINS
     TYPE(source_group_type) :: group
     TYPE(source_term_type) :: term
     INTEGER, ALLOCATABLE :: expected(:)
-    CHARACTER(LEN=64), ALLOCATABLE :: batch_names(:)
+    CHARACTER(LEN=64) :: rheology_name
     CHARACTER(LEN=64), ALLOCATABLE :: seen_names(:)
-    INTEGER :: i,j,id,nstage,family,mass_group
+    INTEGER :: i,j,id,nstage,mass_group
     error='D17: invalid or duplicate source catalog name'
     IF (.NOT.source_catalog_names_unique()) RETURN
     error='D17: incomplete source registry'
@@ -238,12 +238,12 @@ CONTAINS
       IF (this%pore_equation<5 .OR. this%pore_equation>this%n_equations) RETURN
     END IF
     ALLOCATE(seen_names(0))
-    family=0; mass_group=0
+    mass_group=0
     nstage=SIZE(this%stage_entries)
     groups=[this%stage_entries,this%step_entries]
     DO i=1,SIZE(groups)
       group=groups(i)
-      family=0 ! Rheology completeness is checked per group, not across groups.
+      rheology_name='' ! Rheology is one schedulable physical identity.
       error='D17: invalid group identity, method, phase or order'
       IF (group%id<1 .OR. group%execution_order<1 .OR. group%legacy_id<0) RETURN
       IF (i<=nstage) THEN
@@ -296,20 +296,19 @@ CONTAINS
           IF (ANY(expected<1)) RETURN
           IF (.NOT.ALL(in_list(expected,group%equation_ids))) RETURN
         END IF
-        IF (term%model_id/=0) THEN
-          IF (TRIM(term%name)/=TRIM(rheology_source_name(term%model_id))) RETURN
-          IF (family/=0 .AND. family/=term%model_id) RETURN
-          family=term%model_id
+        IF (INDEX(TRIM(term%name),'rheology_')==1) THEN
+          IF (LEN_TRIM(rheology_name)>0 .AND. rheology_name/=term%name) RETURN
+          rheology_name=term%name
         END IF
-        IF (term%role==SOURCE_ROLE_MASS) THEN
+        IF (INDEX(TRIM(term%name),'SOURCE_TERM_MASS_EXCHANGE_')==1) THEN
           IF (mass_group/=0 .AND. mass_group/=i) RETURN
           mass_group=i
         END IF
         error='D17: physical term duplicated, unknown or dependent'
       END DO
-      IF (family/=0 .AND. group%method/=SOURCE_METHOD_EXPLICIT) THEN
+      IF (LEN_TRIM(rheology_name)>0 .AND. group%method/=SOURCE_METHOD_EXPLICIT) THEN
         error='D17: rheology group requires the complete law'
-        IF (.NOT.ANY(group%source_names==rheology_source_name(family))) RETURN
+        IF (.NOT.ANY(group%source_names==rheology_name)) RETURN
       END IF
       ! No independently scheduled sub-solves: validate group equation shape.
       error='D17: incomplete or incompatible group equation target'
@@ -319,9 +318,9 @@ CONTAINS
         SELECT CASE(SIZE(group%equation_ids))
         CASE(2)
           IF (.NOT.same_set(group%equation_ids,[2,3])) RETURN
-          IF (family==0) RETURN
+          IF (LEN_TRIM(rheology_name)==0) RETURN
           IF (SIZE(group%source_names)/=1 .OR. &
-               .NOT.ANY(group%source_names==rheology_source_name(family))) THEN
+               .NOT.ANY(group%source_names==rheology_name)) THEN
             error='D17: analytic velocity requires the complete law'; RETURN
           END IF
         CASE(1)
@@ -333,17 +332,14 @@ CONTAINS
         END SELECT
       END IF
     END DO
-    ! Inspect the actual nominal memberships, not numeric catalog positions.
-    ! Any atomic batch touched by a group must be wholly present in one group.
+    ! Radiative and convective cooling must remain in the same source group.
+    ! The invariant depends on source names, not catalog bundle identifiers.
     error='D17: coupled evaluation batch split or incomplete'
     DO i=1,SIZE(groups)
-      DO j=1,SIZE(groups(i)%source_names)
-        term=source_term_descriptor_by_name(groups(i)%source_names(j))
-        IF (term%bundle_id==0 .OR. term%model_id/=0) CYCLE
-        batch_names=source_bundle_names(term%bundle_id)
-        IF (SIZE(batch_names)<2) RETURN
-        IF (.NOT.same_batch(batch_names,groups)) RETURN
-      END DO
+      IF (.NOT.ANY(groups(i)%source_names=='SOURCE_TERM_THERMAL_RADIATIVE_COOLING') .AND. &
+           .NOT.ANY(groups(i)%source_names=='SOURCE_TERM_THERMAL_CONVECTIVE_COOLING')) CYCLE
+      IF (.NOT.ALL([ANY(groups(i)%source_names=='SOURCE_TERM_THERMAL_RADIATIVE_COOLING'), &
+           ANY(groups(i)%source_names=='SOURCE_TERM_THERMAL_CONVECTIVE_COOLING')])) RETURN
     END DO
     error=''
   END SUBROUTINE validate_registry
@@ -425,7 +421,7 @@ CONTAINS
     n=0
     DO i=1,SIZE(active_names)
       term=source_term_descriptor_by_name(active_names(i)); target=term%target
-      IF (term%role==SOURCE_ROLE_MASS) target=-1
+      IF (INDEX(TRIM(term%name),'SOURCE_TERM_MASS_EXCHANGE_')==1) target=-1
       IF (ANY(targets==target)) THEN
         n=n+1
         names(n)=active_names(i)
@@ -538,9 +534,9 @@ CONTAINS
     CASE(SOURCE_METHOD_EXPLICIT)
       supported=term%has_explicit
       IF (group%cadence==SOURCE_CADENCE_STAGE) THEN
-        supported=supported .AND. term%role/=SOURCE_ROLE_MASS
+        supported=supported .AND. INDEX(TRIM(term%name),'SOURCE_TERM_MASS_EXCHANGE_')/=1
       ELSE IF (group%cadence==SOURCE_CADENCE_STEP) THEN
-        supported=supported .AND. term%role==SOURCE_ROLE_MASS
+        supported=supported .AND. INDEX(TRIM(term%name),'SOURCE_TERM_MASS_EXCHANGE_')==1
       ELSE
         supported=.FALSE.
       END IF

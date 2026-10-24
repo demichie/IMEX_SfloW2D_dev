@@ -1227,3 +1227,9 @@ Refactoring coordinato di `source_registry_2d.f90`, `source_configuration_2d.f90
 
 La Action `D17 compile diagnostics` su `245ef1671cfdc119bf924ad8513b8947684eb8fc` fallisce durante la compilazione di `src/numerics/mass_exchange_step_2d.f90`: alle righe 167, 169, 170 rimanevano tre accessi a `step_groups(group_index)%term_names`, eliminato da `source_group_type` in D17.22.79. Il messaggio successivo `Expecting END IF statement` è secondario a questi errori di tipo. Correzione diretta: i tre accessi sono ora `%source_names` e la validazione continua a rifiutare ogni sorgente post-RK che non abbia `SOURCE_ROLE_MASS`. Nessun cambiamento alle formule o alla logica degli scambi di massa, nessun array sostitutivo. Compilation e Source Registry Actions sulla nuova HEAD da verificare. Il catalogo dei 34 addendi e la riduzione a cinque campi restano D17 aperti.
 
+### D17.22.81 — Eliminazione di role/model_id/bundle_id dalla validazione del registro (24 ottobre 2026)
+
+Rifattorizzata `source_registry_2d` eliminando l'accesso ai campi legacy `term%role`, `term%model_id` e `term%bundle_id`: identificazione della legge reologica completa, classificazione delle sorgenti post-RK di scambio di massa e validazione dell'atomicità radiativa–convettiva si basano sulle identità nominali delle sorgenti già registrate. Restano invariati i controlli di capacità, cadenza, destinazione delle equazioni e completezza del gruppo; i kernel fisici non vengono modificati. Nessun catalogo parallelo o adattatore introdotto.
+
+**Stato:** il registro è ora indipendente da tre campi da eliminare nella struttura finale a cinque campi. Il catalogo legacy a 34 contributi e i test storici devono ancora essere trasformati. Le due GitHub Actions devono validare questa nuova HEAD.
+
