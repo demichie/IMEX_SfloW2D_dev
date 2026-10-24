@@ -96,7 +96,7 @@ Status legend: **NOT STARTED**, **PARTIAL**, **PENDING CI**, **VERIFIED** (only 
 | Independent lava thermal cooling | **NOT STARTED** | New `TEMPERATURE_PARAMETERS` flag; absent flag maintains lava auto-on; four combinations tested. |
 | Mass exchange modularization | **NOT STARTED** | Separate physical mass laws; one deposition plus carrier loss; shared limiter; post-RK atomic STEP/EXPLICIT. |
 | New source demonstration | **NOT STARTED** | Show that adding standard rheology touches only model module, catalog, static dispatch, parameters/build/tests. |
-| End-to-end regression matrix | **NOT STARTED** | Build, source registry, input defaults, coupled Newton, real/complex/complex-step Jacobians, RK, dry limits, mass budget, cooling permutations, legacy run comparisons. |
+| Source-registry strict/optimized regression | **PENDING CI** | [Run 40084977002](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/40084977002) of the existing registry script; inspect result and update this row. |\n| End-to-end regression matrix | **NOT STARTED** | Build, source registry, input defaults, coupled Newton, real/complex/complex-step Jacobians, RK, dry limits, mass budget, cooling permutations, legacy run comparisons. |
 | Final D17 acceptance | **NOT STARTED** | Complete detailed D17.21 evidence matrix and explicit review; do not declare done early. |
 
 ### Recommended next steps
@@ -107,7 +107,13 @@ Status legend: **NOT STARTED**, **PARTIAL**, **PENDING CI**, **VERIFIED** (only 
 4. Implement static rheology dispatch and the four explicit/newton/analytic-compatible interfaces with one coupled Newton solve per group.
 5. Implement state/momentum corrections, reorganized assembly and mass laws, independent cooling and regression gates in the D17 order.
 
-## 7. Instructions to the next chat/maintainer
+## 7. Focused source-registry regression CI
+
+Dedicated workflow: [`d17-source-registry.yml`](../.github/workflows/d17-source-registry.yml), added by [commit `788bbc70`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/788bbc704eec6c021ba16573710ee7e8f8245ba0). It runs the **existing** `TESTS/TEST_SOURCE_REGISTRY/run_test.sh` with GNU Fortran in both `strict` and `optimized` profiles; no new test logic or scientific semantics were introduced. Logs and individual profile outputs are uploaded as an artifact even on failure. The workflow triggers on D17 branch pushes or manually.
+
+First run: [40084977002](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/40084977002), triggered by `788bbc70`. **Status when written: queued; outcome not yet confirmed.** Check the live result, the run's job steps and `d17-registry-logs-*` artifact. If failing, investigate test output and record the first substantive cause; compilation-only CI success is not equivalent to passing source registry tests.
+
+## 8. Instructions to the next chat/maintainer
 
 - Read this handoff, the general roadmap's D17 section, and **the latest reconciled detailed specification once added**; inspect the current **branch HEAD**, never assume the last SHA here is still current.
 - Review actual commits and GitHub Actions runs to know what changed and what passed. “Committed,” “compiles,” “unit-tested” and “numerically equivalent” are distinct statuses.
