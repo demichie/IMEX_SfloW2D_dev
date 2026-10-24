@@ -508,6 +508,32 @@ CONTAINS
     CALL require(INDEX(error,'cannot mix group targets')>0, &
          'mixed group and solver target syntax rejected')
     source_group_solver_count(3)=0
+    source_solver_order(1,3)=1
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(INDEX(error,'cannot mix group targets')>0, &
+         'stale solver order rejected with group targets')
+    source_solver_order(1,3)=0
+    source_solver_target_count(1,3)=1
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(INDEX(error,'cannot mix group targets')>0, &
+         'stale solver target count rejected with group targets')
+    source_solver_target_count(1,3)=0
+    source_solver_targets(1,1,3)='VELOCITY'
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(INDEX(error,'cannot mix group targets')>0, &
+         'stale solver target rejected with group targets')
+    source_solver_targets(1,1,3)=''
+    source_group_target_count(3)=0
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(INDEX(error,'invalid group target count')>0, &
+         'orphan group target rejected rather than ignored')
+    source_group_target_count(3)=1
+    source_group_targets(1,3)=''
+    CALL initialize_native_source_configuration(trial,partition,error)
+    CALL require(INDEX(error,'unknown or duplicate group target')>0, &
+         'empty group target rejected')
+    source_group_targets(1,3)='VELOCITY'
+    source_group_solver_count(3)=0
     source_group_target_count(3)=0
     source_group_targets(:,3)=''
     source_group_solver_count(3)=1

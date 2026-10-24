@@ -178,9 +178,16 @@ CONTAINS
       END DO
       ! Native group targets are authoritative. Old solver fields are an
       ! explicit compatibility path until all callers use group metadata.
-      IF (source_group_target_count(g)>0) THEN
+      IF (source_group_target_count(g)/=0 .OR. &
+           ANY(source_group_targets(:,g)/='')) THEN
         error='D17: cannot mix group targets with legacy solver fields'
-        IF (source_group_solver_count(g)/=0) RETURN
+        IF (source_group_solver_count(g)/=0 .OR. &
+             ANY(source_solver_order(:,g)/=0) .OR. &
+             ANY(source_solver_target_count(:,g)/=0) .OR. &
+             ANY(source_solver_targets(:,:,g)/='')) RETURN
+        error='D17: invalid group target count'
+        IF (source_group_target_count(g)<1 .OR. &
+             source_group_target_count(g)>SOURCE_INPUT_MAX_TARGETS) RETURN
         solver_count(g)=1
         target_count(1,g)=source_group_target_count(g)
         error='D17: invalid group target count'
