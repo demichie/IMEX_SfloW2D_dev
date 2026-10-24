@@ -44,7 +44,7 @@ CONTAINS
        closure_context)
 
     USE state_conversion_2d, ONLY : qc_to_qp, mixt_var
-    USE constitutive_parameters_2d, ONLY : T_ambient
+    USE state_2d, ONLY : initialize_dry_physical_cell
 
     REAL(wp), INTENT(INOUT) :: q_cell(n_vars), qp_cell(n_vars+2)
     REAL(wp), INTENT(IN) :: time_step, equation_rate(n_eqns)
@@ -96,8 +96,7 @@ CONTAINS
        CALL mixt_var(qp_cell, r_Ri, r_rho_m, r_rho_c, r_red_grav,       &
             r_sp_heat_c, r_sp_heat_mix)
     ELSE
-       qp_cell = 0.0_wp
-       qp_cell(4) = T_ambient
+       CALL initialize_dry_physical_cell(qp_cell)
        r_red_grav = 0.0_wp
     END IF
 
@@ -128,7 +127,7 @@ CONTAINS
     USE parameters_2d, ONLY : topo_change_flag, bottom_radial_source_flag,  &
          bottom_fissural_source_flag, erodible_deposit_flag,                &
          pore_pressure_flag, liquid_flag
-    USE constitutive_parameters_2d, ONLY : T_ambient
+    USE state_2d, ONLY : initialize_dry_physical_cell
 
     REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
@@ -200,8 +199,7 @@ CONTAINS
           CALL qc_to_qp(q(1:n_vars,j,k), qp(1:n_vars+2,j,k), p_dyn,         &
                TRIM(closure_context))
        ELSE
-          qp(1:n_vars+2,j,k) = 0.0_wp
-          qp(4,j,k) = T_ambient
+          CALL initialize_dry_physical_cell(qp(1:n_vars+2,j,k))
        END IF
 
        CALL eval_step_source_explicit(qp(1:n_vars+2,j,k), B_zone(j,k),      &

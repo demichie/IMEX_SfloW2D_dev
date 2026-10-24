@@ -175,6 +175,13 @@ def main() -> int:
     if re.search(r"(?im)^\s*(?:public\s*::|use\s+rheology_2d\s*,\s*only\s*:)\s*curvature_acceleration\b", equation_code):
         failures.append("equation_terms must not re-export curvature_acceleration")
 
+    # STEP rate/update paths must reuse the same physical dry-state initializer
+    # as the RK halo/stage path; do not duplicate ambient-temperature defaults.
+    step_code = (ROOT / "src/numerics/step_source_executor_2d.f90").read_text(encoding="utf-8")
+    if step_code.count("CALL initialize_dry_physical_cell(") != 2:
+        failures.append("STEP executor must reuse dry-cell initializer in both branches")
+    if re.search(r"(?im)^\s*qp(?:_cell|\([^\n]*\))?\s*\(4[^\n]*=\s*T_ambient", step_code):
+        failures.append("STEP executor must not duplicate ambient dry initialization")
     for failure in failures:
         print("FAIL:", failure, file=sys.stderr)
     print(f"D17 physical treatment audit: {len(catalog)} configured sources, "

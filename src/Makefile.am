@@ -295,6 +295,7 @@ numerics/step_source_executor_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           numerics/source_registry_2d.$(OBJEXT) \
                                           numerics/source_catalog_2d.$(OBJEXT) \
                                           physics/source_terms_2d.$(OBJEXT) \
+                                          state/state_2d.$(OBJEXT) \
                                           geometry/geometry_2d.$(OBJEXT)     \
                                           state/state_conversion_2d.$(OBJEXT)
 stochastic/stochastic_random_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
