@@ -45,7 +45,8 @@ PROGRAM test_d17_production_newton
   sp_heat_a=1005.0_wp;sp_gas_const_a=287.0_wp
   grav=9.81_wp;rho_a_amb=1.2_wp
   eps_sing=1.0E-8_wp;eps_sing4=eps_sing**4
-  tol_abs=1.0E-10_wp;tol_rel=1.0E-12_wp;max_nl_iter=30
+  ! tol_abs, tol_rel and max_nl_iter are compile-time constants in parameters_2d.
+  ! The acceptance harness uses the production solver tolerances unchanged.
   ALLOCATE(rho_s(0),inv_rho_s(0),sp_heat_s(0),diam_s(0),sphericity_s(0))
   ALLOCATE(sp_heat_g(0),sp_gas_const_g(0))
   CALL initialize_nonlinear_solver
