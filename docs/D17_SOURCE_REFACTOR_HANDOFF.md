@@ -3,7 +3,7 @@
 **Repository:** [demichie/IMEX_SfloW2D_dev](https://github.com/demichie/IMEX_SfloW2D_dev)  
 **Working branch:** `feature/d17-source-refactor` (branched from `master`)  
 **Last updated:** 2026-10-24  
-**Status:** IN PROGRESS — **not accepted**, build recheck pending after compiler fix.
+**Status:** IN PROGRESS — **not accepted**; GNU build **passed** after import fix, numerical regression tests not yet executed.
 
 > **Read this file first when resuming work in another chat.** This document records the agreed *target architecture*, observed repository state, actual branch commits, CI evidence, and the next action. It is not a declaration that a change has passed compilation or numerical regression tests. Update this file in the same branch whenever D17 code changes or CI status changes.
 
@@ -61,7 +61,7 @@ The following commits are **published changes**, not necessarily compiled or reg
 | [`66ea646e`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/66ea646e6e94dccf89e7330170348ac5991677aa) | Name-based selection for four cell-local explicit sources. | Not independently tested |
 | [`9c908505`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/9c908505805391e09a2fa4baca8050d1f025b1d5) | Name-based Newton group membership and role metadata lookup in source assembly. | Initially failed compile due to missing imported symbol |
 | [`fa1820a5`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/fa1820a53467c5db6fa846ca1b29bcdb1d517789) | Added `.github/workflows/d17-compile.yml`: GNU build-only CI, full log artifact even on failure. | First run failed as below |
-| [`e3a9f743`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/e3a9f743faa4683c1804c4b81fdad08131d71078) | Added missing `source_term_descriptor_by_name` import in `equation_terms_2d.f90`. | **New CI run must be checked** |
+| [`e3a9f743`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/e3a9f743faa4683c1804c4b81fdad08131d71078) | Added missing `source_term_descriptor_by_name` import in `equation_terms_2d.f90`. | **GNU compilation succeeded: run 40084588414** |
 
 **Important:** The multiple temporary `term_ids`/`term_names` dual paths in these commits are a **migration scaffold only**. Do not extend this scaffold indefinitely: the agreed destination is a **single name-only representation**. Existing old source sub-contributions and over-rich catalog fields must be removed in coordinated commits.
 
@@ -73,9 +73,9 @@ Workflow: [`D17 compile diagnostics`](../.github/workflows/d17-compile.yml). Its
 - Ubuntu 24.04 / GNU Fortran 13.3.0, netCDF-Fortran 4.5.4.
 - Compiler and dependencies installed; Autotools generation and `configure` successful.
 - Compilation halted in `src/physics/equation_terms_2d.f90:737`, at `source_term_descriptor_by_name(solver%term_names(i))`: missing import in `USE source_catalog_2d, ONLY`. Diagnostic included both `has no IMPLICIT type` and a PURE-procedure purity error (latter is a consequence of missing interface). No evidence of independent physics/solver errors in this run.
-- Fixed by `e3a9f743` with the missing import. **Do not mark build green before checking a later run on that SHA.**
+- Fixed by `e3a9f743` with the missing import. **Follow-up CI run on e3a9f743: SUCCESS** — [run 40084588414](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/40084588414), compile-only, no test execution.
 
-**Next CI action:** inspect the newest D17 workflow run after `e3a9f743`; if failing, read its `compile.log` and fix **the first real compilation error** before starting another large architectural migration. The CI artifact can be downloaded from the run page. Further compiler issues may appear after the first failure is removed.
+**Next CI action:** confirm build status after the documentation commit; then run the existing source-registry test suite separately. Compile-only SUCCESS does not certify numerical equivalence. If a later build fails, analyze the first error in its `compile.log`.
 
 ## 6. Work remaining — roadmap and sequencing
 
@@ -84,7 +84,7 @@ Status legend: **NOT STARTED**, **PARTIAL**, **PENDING CI**, **VERIFIED** (only 
 | Work package | Status | Required deliverable / gate |
 |---|---|---|
 | D17 specification consolidation | **PARTIAL** | Commit/reconcile the latest full detailed D17.0–D17.21 design and implementation plan with this handoff. |
-| GNU build gate | **PENDING CI** | Clean build on branch; fix failures; record run URL and compiler output here. |
+| GNU build gate | **VERIFIED for e3a9f743** | [Successful compile-only run 40084588414](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/40084588414); further commits still require their own check. |
 | Catalog normalization | **PARTIAL** | One name-only descriptor per independently configurable source; only name, target, three capabilities. Remove permanent source IDs, old roles, families, bundles, etc. |
 | Reology source consolidation | **NOT STARTED** | One source per rheology, internal force components evaluated by model; preserve model-specific formulae. |
 | Name-only groups and solvers | **PARTIAL** | Remove dual `term_ids`/`term_names`; eliminate numeric source ID conversion, update input/registry/solvers/tests together. |
@@ -101,7 +101,7 @@ Status legend: **NOT STARTED**, **PARTIAL**, **PENDING CI**, **VERIFIED** (only 
 
 ### Recommended next steps
 
-1. **Check CI after the import fix.** Stop and correct all build errors first; then run existing source-registry tests and compare legacy behavior.
+1. **CI compile is green after the import fix.** Next run existing source-registry tests and compare legacy behavior before larger changes.
 2. **Reconcile/commit the latest complete D17 specification** so future workers have one detailed authoritative implementation contract.
 3. Prepare one **coordinated name-only change set** covering catalog, registry, source configuration, source assemblers, mass-exchange selectors and tests. Replace old per-contribution rheology items with one entry per configured source; avoid another layer of permanent adapters.
 4. Implement static rheology dispatch and the four explicit/newton/analytic-compatible interfaces with one coupled Newton solve per group.
