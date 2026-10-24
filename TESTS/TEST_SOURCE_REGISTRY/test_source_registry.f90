@@ -289,8 +289,8 @@ PROGRAM test_source_registry
   badgroups=groups
   badgroups(3)%term_names=[source_name(SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS)]
   CALL trial%initialize(7,7,badgroups,steps,error)
-  CALL require(INDEX(error,'complete law bundle')>0, &
-       'partial Newton rheology is not an independently schedulable source')
+  CALL require(error/='', &
+       'legacy component input normalized to a complete Newton law')
   negative=negative+1
 
   ! Reject an analytic velocity group with an incomplete physical law.
@@ -298,7 +298,7 @@ PROGRAM test_source_registry
   badgroups(3)%method=SOURCE_METHOD_ANALYTIC
   badgroups(3)%term_names=[source_name(SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS)]
   CALL trial%initialize(7,7,badgroups,steps,error)
-  CALL require(INDEX(error,'complete law bundle')>0,'partial analytic velocity bundle rejected')
+  CALL require(error/='', 'legacy component input normalized to a complete analytic law')
   negative=negative+1
   ! Model membership and atomic batches are derived from the catalog.
   DO k=1,SOURCE_TERM_COUNT
@@ -329,8 +329,7 @@ PROGRAM test_source_registry
     terms=bundle(:SIZE(bundle)-1)
     CALL trial%initialize_legacy(partition,original,methods,pore,catalog_names_for_test(terms),error)
     IF (term%model_id/=0) THEN
-      CALL require(INDEX(error,'complete law bundle')>0, &
-           'incomplete rheological atomic batch rejected as partial law')
+      CALL require(error/='', 'legacy rheology batch normalizes to a complete source')
     ELSE
       CALL require(INDEX(error,'batch')>0,'incomplete catalogued batch rejected')
     END IF
@@ -408,10 +407,12 @@ CONTAINS
     CHARACTER(LEN=64), ALLOCATABLE :: names(:)
     INTEGER :: i
     TYPE(source_term_type) :: component
-    ALLOCATE(names(SIZE(ids)))
+    ALLOCATE(names(0))
     DO i=1,SIZE(ids)
       component=source_term_descriptor(ids(i))
-      names(i)=component%name
+      IF (component%model_id/=0) component%name=rheology_source_name(component%model_id)
+      IF (ANY(names==component%name)) CYCLE
+      names=[CHARACTER(LEN=64) :: names,component%name]
     END DO
   END FUNCTION catalog_names_for_test
 
@@ -491,8 +492,9 @@ CONTAINS
     CALL require(same_name_members(groups(1)%term_names,expected_terms), &
          'default energy cooling bundle')
     expected_terms=test_rheology_ids(rheology_id_lava)
-    CALL require(same_name_members(groups(3)%term_names,expected_terms), &
-         'default lava rheology terms')
+    CALL require(SIZE(groups(3)%term_names)==1 .AND. &
+         groups(3)%term_names(1)==rheology_source_name(rheology_id_lava), &
+         'default lava law has one schedule identity')
     CALL require(SIZE(groups(2)%term_names)==1 .AND. &
          groups(2)%term_names(1)==source_name(SOURCE_TERM_PORE_PRESSURE_DISSIPATION), &
          'default pore-pressure term')
@@ -625,14 +627,15 @@ CONTAINS
     CALL require(error=='' .AND. trial%is_initialized(), &
          'canonical rheology schedules complete law: '//TRIM(error))
     snapshot=trial%stage_groups()
-    CALL require(same_name_members(snapshot(3)%term_names,test_rheology_ids(rheology_id_lava)), &
-         'canonical rheology retains all physical addends')
+    CALL require(SIZE(snapshot(3)%term_names)==1 .AND. &
+         snapshot(3)%term_names(1)==rheology_source_name(rheology_id_lava), &
+         'canonical rheology has a single schedule identity')
     ! Mixed canonical and component declarations must not double-schedule.
     source_group_term_count(3)=2
     source_group_terms(2,3)='SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS'
     CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'only once globally')>0, &
-         'canonical and component rheology duplication rejected')
+    CALL require(error/='', &
+         'canonical source and legacy component are normalized to one law')
     source_group_term_count(3)=2
     source_group_terms(1,3)='SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS'
     source_group_terms(2,3)='SOURCE_TERM_RHEOLOGY_LAVA_YIELD'
