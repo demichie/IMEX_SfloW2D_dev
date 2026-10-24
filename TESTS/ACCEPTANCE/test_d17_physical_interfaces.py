@@ -120,6 +120,35 @@ def main() -> int:
             if positions != sorted(positions):
                 failures.append(f"{source}: PUBLIC declarations must be ordered "
                                 "explicit, semi_implicit, implicit, analytic")
+    # D17.14/15: STEP scheduling must reach physical rates exclusively through
+    # the common source_terms bridge; inventories remain in the STEP executor.
+    executor = (ROOT / "src/numerics/step_source_executor_2d.f90").read_text(
+        encoding="utf-8"
+    )
+    bridge = (ROOT / "src/physics/source_terms_2d.f90").read_text(
+        encoding="utf-8"
+    )
+    equation_bridge = (ROOT / "src/physics/equation_terms_2d.f90").read_text(
+        encoding="utf-8"
+    )
+    if not re.search(
+        r"(?im)^\\s*use\\s+source_terms_2d\\s*,\\s*only\\s*:\\s*eval_step_source_explicit\\b",
+        executor,
+    ):
+        failures.append("STEP executor must import the common explicit source bridge")
+    if len(re.findall(r"(?i)\\bcall\\s+eval_step_source_explicit\\s*\\(", executor)) != 1:
+        failures.append("STEP executor must evaluate the explicit source bridge once per cell")
+    if re.search(r"(?im)^\\s*use\\s+(?:equation_terms_2d|mass_exchange_assembly_2d)\\b",
+                 executor):
+        failures.append("STEP executor must not import the old equation/mass-rate bridge")
+    if re.search(r"(?i)\\bcall\\s+(?:eval_expl_terms|eval_mass_exchange_terms)\\s*\\(",
+                 executor):
+        failures.append("STEP executor must not call the old physical rate entry point")
+    if not re.search(r"(?i)\\bcall\\s+eval_mass_exchange_terms\\s*\\(", bridge):
+        failures.append("common STEP bridge must delegate to the atomic mass-exchange assembly")
+    if re.search(r"(?i)\\bcall\\s+eval_mass_exchange_terms\\s*\\(",
+                 equation_bridge):
+        failures.append("equation_terms must not call the mass-exchange kernel directly")
     for failure in failures:
         print("FAIL:", failure, file=sys.stderr)
     print(f"D17 physical treatment audit: {len(catalog)} configured sources, "
