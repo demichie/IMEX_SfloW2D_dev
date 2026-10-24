@@ -5,7 +5,8 @@ MODULE mass_exchange_assembly_2d
   USE parameters_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source
+  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source, &
+       eval_pore_pressure_gas_loss
   USE thermal_laws_2d, ONLY : eval_vaporization_mass_rate, eval_vaporization_energy_rate
   USE mass_exchange_laws_2d, ONLY : eval_settling_fluid_properties, &
        settling_velocity, eval_solid_deposition_rate, eval_erosion_rates, &
