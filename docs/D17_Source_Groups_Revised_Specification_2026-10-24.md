@@ -128,7 +128,7 @@ END TYPE
 Gli `equation_ids` del gruppo derivano dai termini e dal modello fisico. Per Newton identificano esattamente il sistema accoppiato (ad esempio, quantità di moto x/y e temperatura se condividono il gruppo). Per `ANALYTIC` devono coincidere con il target dell'unico solve disponibile. Per `EXPLICIT` definiscono il footprint delle sorgenti, non un sistema lineare da risolvere.
 
 
-**Stato di avanzamento D17.5 — IN CORSO (24 ottobre 2026).** Validazione di un solo solver per gruppo introdotta; con `8fc3e17a` eliminati dal validatore aggregazione `collected` e tracciamento `equation_seen` per sotto-solve, sostituiti da confronti esatti con il gruppo; descrittori non ancora semplificati e ancora basati anche su ID. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
+**Stato di avanzamento D17.5 — IN CORSO (24 ottobre 2026).** Validazione di un solo solver per gruppo introdotta; con `0d9d444f` eliminato anche il ciclo sui sotto-solver; con `8fc3e17a` eliminati dal validatore aggregazione `collected` e tracciamento `equation_seen` per sotto-solve, sostituiti da confronti esatti con il gruppo; descrittori non ancora semplificati e ancora basati anche su ID. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
 
 ## D17.6 — Gruppi `ANALYTIC`
 
@@ -799,3 +799,10 @@ Inserita la **Guida di lettura e priorità di migrazione** immediatamente prima 
 Commit [`8fc3e17a`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/8fc3e17abd6f45f2ef17672299cb9f61ff8cb3d6): nel validatore `source_registry_2d` rimossi il vettore `collected` e la maschera `equation_seen` che erano necessari ad aggregare più sotto-solve indipendenti. Ora l'unico descrittore implicito deve avere **esattamente lo stesso insieme di termini ed equazioni del gruppo**, verificato tramite `same_set`. Restano temporaneamente `source_solver_type` e gli ID nel formato del registro: saranno eliminati nell'unità coordinata di migrazione nominale definita nella guida prima di D17.19; non sono il design finale.
 
 **Verifica:** implementato, non ancora verificato tramite le Actions sul nuovo HEAD. La baseline compile+registry verde del precedente SHA rimane documentata in D17.22.11; le regressioni numeriche restano aperte. Nessuna modifica a formule fisiche o schemi RK.
+
+
+### D17.22.15 — Validazione del singolo solve senza ciclo interno (24 ottobre 2026)
+
+Commit [`0d9d444f`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/0d9d444f2dd9d505591b13fcd38701071a0b143d): eliminata dal validatore del registro l'iterazione sui sotto-solver del gruppo, sostituita da una singola validazione per gruppo non esplicito. Rimossi anche un controllo di inclusione delle equazioni ormai ridondante rispetto alla successiva verifica di uguaglianza degli insiemi. Non sono cambiate le formule fisiche né il calcolo Newton.
+
+**Stato:** D17.5 ancora IN CORSO. Il registro conserva temporaneamente `source_solver_type` e gli ID di solve, che la specifica obbliga a rimuovere dopo la migrazione coordinata dei chiamanti. Il nuovo commit non ha ancora un esito compile/registry: i test verdi precedenti non vengono attribuiti a questo HEAD. I workflow restano manuali.
