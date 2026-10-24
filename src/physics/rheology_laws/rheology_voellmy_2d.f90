@@ -24,6 +24,7 @@
 !********************************************************************************
 
 MODULE rheology_voellmy_2d
+  USE diagnostics_2d, ONLY : fatal_error
 
   USE parameters_2d, ONLY : wp
   USE rheology_parameters_2d, ONLY : xi
@@ -40,6 +41,21 @@ MODULE rheology_voellmy_2d
   PUBLIC :: solve_voellmy_analytic_velocity
 
   REAL(wp) :: mu
+
+  ! Uniform source treatment entry points. Existing kernels remain unchanged.
+  PUBLIC :: eval_rheology_voellmy_explicit
+  PUBLIC :: eval_rheology_voellmy_semi_implicit
+  INTERFACE eval_rheology_voellmy_semi_implicit
+    MODULE PROCEDURE eval_voellmy_semi_implicit_momentum_rate
+  END INTERFACE eval_rheology_voellmy_semi_implicit
+  PUBLIC :: eval_rheology_voellmy_implicit
+  INTERFACE eval_rheology_voellmy_implicit
+    MODULE PROCEDURE eval_voellmy_implicit_momentum_rate
+  END INTERFACE eval_rheology_voellmy_implicit
+  PUBLIC :: solve_rheology_voellmy_analytic
+  INTERFACE solve_rheology_voellmy_analytic
+    MODULE PROCEDURE solve_voellmy_analytic_velocity
+  END INTERFACE solve_rheology_voellmy_analytic
 
 CONTAINS
 
@@ -222,5 +238,10 @@ CONTAINS
     rate_y = -friction_stress * velocity_y / speed
 
   END SUBROUTINE eval_voellmy_semi_implicit_momentum_rate
+
+  ! Unsupported physical treatment, rejected by the source catalog.
+  SUBROUTINE eval_rheology_voellmy_explicit()
+    CALL fatal_error('rheology_voellmy: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_voellmy_explicit
 
 END MODULE rheology_voellmy_2d

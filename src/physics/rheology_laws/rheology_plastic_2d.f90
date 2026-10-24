@@ -14,6 +14,7 @@
 !********************************************************************************
 
 MODULE rheology_plastic_2d
+  USE diagnostics_2d, ONLY : fatal_error
 
   USE parameters_2d, ONLY : wp
   USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,  &
@@ -27,6 +28,18 @@ MODULE rheology_plastic_2d
   PUBLIC :: solve_plastic_analytic_velocity
 
   REAL(wp) :: tau
+
+  ! Uniform source treatment entry points. Existing kernels remain unchanged.
+  PUBLIC :: eval_rheology_plastic_explicit
+  PUBLIC :: eval_rheology_plastic_semi_implicit
+  PUBLIC :: eval_rheology_plastic_implicit
+  INTERFACE eval_rheology_plastic_implicit
+    MODULE PROCEDURE eval_plastic_implicit_momentum_rate
+  END INTERFACE eval_rheology_plastic_implicit
+  PUBLIC :: solve_rheology_plastic_analytic
+  INTERFACE solve_rheology_plastic_analytic
+    MODULE PROCEDURE solve_plastic_analytic_velocity
+  END INTERFACE solve_rheology_plastic_analytic
 
 CONTAINS
 
@@ -93,5 +106,15 @@ CONTAINS
     rate_y = -mixture_density * tau * (velocity_y / speed)
 
   END SUBROUTINE eval_plastic_implicit_momentum_rate
+
+  ! Unsupported physical treatment, rejected by the source catalog.
+  SUBROUTINE eval_rheology_plastic_explicit()
+    CALL fatal_error('rheology_plastic: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_plastic_explicit
+
+  ! Unsupported physical treatment, rejected by the source catalog.
+  SUBROUTINE eval_rheology_plastic_semi_implicit()
+    CALL fatal_error('rheology_plastic: semi-implicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_plastic_semi_implicit
 
 END MODULE rheology_plastic_2d

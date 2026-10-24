@@ -33,6 +33,7 @@
 !********************************************************************************
 
 MODULE rheology_lahar_2d
+  USE diagnostics_2d, ONLY : fatal_error
 
   USE parameters_2d, ONLY : wp, sp, four_thirds, neg_four_thirds
   USE constitutive_parameters_2d, ONLY : grav, inv_grav
@@ -62,6 +63,21 @@ MODULE rheology_lahar_2d
      MODULE PROCEDURE eval_lahar_fluid_viscosity_real
      MODULE PROCEDURE eval_lahar_fluid_viscosity_complex
   END INTERFACE eval_lahar_fluid_viscosity
+
+  ! Uniform source treatment entry points. Existing kernels remain unchanged.
+  PUBLIC :: eval_rheology_lahar_explicit
+  PUBLIC :: eval_rheology_lahar_semi_implicit
+  INTERFACE eval_rheology_lahar_semi_implicit
+    MODULE PROCEDURE eval_lahar_semi_implicit_momentum_rate
+  END INTERFACE eval_rheology_lahar_semi_implicit
+  PUBLIC :: eval_rheology_lahar_implicit
+  INTERFACE eval_rheology_lahar_implicit
+    MODULE PROCEDURE eval_lahar_implicit_momentum_rate
+  END INTERFACE eval_rheology_lahar_implicit
+  PUBLIC :: solve_rheology_lahar_analytic
+  INTERFACE solve_rheology_lahar_analytic
+    MODULE PROCEDURE solve_lahar_analytic_velocity
+  END INTERFACE solve_rheology_lahar_analytic
 
 CONTAINS
 
@@ -281,5 +297,10 @@ CONTAINS
     fluid_viscosity = alpha1 * EXP(beta1 * solid_fraction_sum)
 
   END FUNCTION eval_lahar_fluid_viscosity_complex
+
+  ! Unsupported physical treatment, rejected by the source catalog.
+  SUBROUTINE eval_rheology_lahar_explicit()
+    CALL fatal_error('rheology_lahar: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_lahar_explicit
 
 END MODULE rheology_lahar_2d

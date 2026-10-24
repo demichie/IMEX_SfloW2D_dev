@@ -33,6 +33,18 @@ MODULE pore_pressure_laws_2d
   PUBLIC :: eval_pore_pressure_inlet_source
   PUBLIC :: eval_pore_pressure_mass_exchange_source
 
+  ! Uniform treatment surface for this source family.
+  PUBLIC :: eval_pore_pressure_explicit
+  PUBLIC :: eval_pore_pressure_semi_implicit
+  PUBLIC :: eval_pore_pressure_implicit
+  INTERFACE eval_pore_pressure_implicit
+    MODULE PROCEDURE eval_pore_pressure_diffusion_source
+  END INTERFACE eval_pore_pressure_implicit
+  PUBLIC :: solve_pore_pressure_analytic
+  INTERFACE solve_pore_pressure_analytic
+    MODULE PROCEDURE solve_analytic_pore_pressure
+  END INTERFACE solve_pore_pressure_analytic
+
 CONTAINS
 
   !******************************************************************************
@@ -490,5 +502,13 @@ CONTAINS
     END SELECT
 
   END SUBROUTINE eval_pore_pressure_diffusion_factors
+
+  SUBROUTINE eval_pore_pressure_explicit()
+    CALL fatal_error('pore_pressure: explicit treatment is unsupported')
+  END SUBROUTINE eval_pore_pressure_explicit
+
+  SUBROUTINE eval_pore_pressure_semi_implicit()
+    CALL fatal_error('pore_pressure: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_pore_pressure_semi_implicit
 
 END MODULE pore_pressure_laws_2d

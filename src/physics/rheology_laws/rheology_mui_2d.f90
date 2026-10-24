@@ -20,6 +20,7 @@
 !********************************************************************************
 
 MODULE rheology_mui_2d
+  USE diagnostics_2d, ONLY : fatal_error
 
   USE parameters_2d, ONLY : wp, n_solid
   USE constitutive_parameters_2d, ONLY : diam_s, rho_s
@@ -34,6 +35,18 @@ MODULE rheology_mui_2d
   PRIVATE
 
   PUBLIC :: eval_mui_momentum_rate, solve_mui_analytic_velocity
+
+  ! Uniform source treatment entry points. Existing kernels remain unchanged.
+  PUBLIC :: eval_rheology_mui_explicit
+  PUBLIC :: eval_rheology_mui_semi_implicit
+  INTERFACE eval_rheology_mui_semi_implicit
+    MODULE PROCEDURE eval_mui_momentum_rate
+  END INTERFACE eval_rheology_mui_semi_implicit
+  PUBLIC :: eval_rheology_mui_implicit
+  PUBLIC :: solve_rheology_mui_analytic
+  INTERFACE solve_rheology_mui_analytic
+    MODULE PROCEDURE solve_mui_analytic_velocity
+  END INTERFACE solve_rheology_mui_analytic
 
 CONTAINS
 
@@ -203,5 +216,15 @@ CONTAINS
     rate_y = rate_y - friction_stress * (velocity_y / speed)
 
   END SUBROUTINE eval_mui_momentum_rate
+
+  ! Unsupported physical treatment, rejected by the source catalog.
+  SUBROUTINE eval_rheology_mui_explicit()
+    CALL fatal_error('rheology_mui: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_mui_explicit
+
+  ! Unsupported physical treatment, rejected by the source catalog.
+  SUBROUTINE eval_rheology_mui_implicit()
+    CALL fatal_error('rheology_mui: semi-implicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_mui_implicit
 
 END MODULE rheology_mui_2d

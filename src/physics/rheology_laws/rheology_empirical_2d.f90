@@ -11,6 +11,7 @@
 !********************************************************************************
 
 MODULE rheology_empirical_2d
+  USE diagnostics_2d, ONLY : fatal_error
 
   USE parameters_2d, ONLY : wp
   USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,  &
@@ -22,6 +23,18 @@ MODULE rheology_empirical_2d
 
   PUBLIC :: eval_empirical_implicit_momentum_rate
   PUBLIC :: solve_empirical_analytic_velocity
+
+  ! Uniform source treatment entry points. Existing kernels remain unchanged.
+  PUBLIC :: eval_rheology_empirical_explicit
+  PUBLIC :: eval_rheology_empirical_semi_implicit
+  PUBLIC :: eval_rheology_empirical_implicit
+  INTERFACE eval_rheology_empirical_implicit
+    MODULE PROCEDURE eval_empirical_implicit_momentum_rate
+  END INTERFACE eval_rheology_empirical_implicit
+  PUBLIC :: solve_rheology_empirical_analytic
+  INTERFACE solve_rheology_empirical_analytic
+    MODULE PROCEDURE solve_empirical_analytic_velocity
+  END INTERFACE solve_rheology_empirical_analytic
 
 CONTAINS
 
@@ -93,5 +106,15 @@ CONTAINS
     rate_y = -mixture_density * friction_coefficient * (velocity_y / horizontal_speed)
 
   END SUBROUTINE eval_empirical_implicit_momentum_rate
+
+  ! Unsupported physical treatment, rejected by the source catalog.
+  SUBROUTINE eval_rheology_empirical_explicit()
+    CALL fatal_error('rheology_empirical: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_empirical_explicit
+
+  ! Unsupported physical treatment, rejected by the source catalog.
+  SUBROUTINE eval_rheology_empirical_semi_implicit()
+    CALL fatal_error('rheology_empirical: semi-implicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_empirical_semi_implicit
 
 END MODULE rheology_empirical_2d

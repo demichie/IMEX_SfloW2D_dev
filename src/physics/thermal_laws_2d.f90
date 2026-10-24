@@ -28,6 +28,18 @@ MODULE thermal_laws_2d
   REAL(wp), PARAMETER :: vaporization_latent_heat = 2264705.0_wp
   REAL(wp), PARAMETER :: vaporization_liquid_heat_capacity = 4184.0_wp
 
+  ! Uniform treatment surface for this source family.
+  PUBLIC :: eval_lava_cooling_explicit
+  INTERFACE eval_lava_cooling_explicit
+    MODULE PROCEDURE eval_lava_cooling_energy_rate
+  END INTERFACE eval_lava_cooling_explicit
+  PUBLIC :: eval_lava_cooling_semi_implicit
+  PUBLIC :: eval_lava_cooling_implicit
+  PUBLIC :: solve_lava_cooling_analytic
+  INTERFACE solve_lava_cooling_analytic
+    MODULE PROCEDURE solve_lava_analytic_temperature
+  END INTERFACE solve_lava_cooling_analytic
+
 CONTAINS
 
   !******************************************************************************
@@ -410,5 +422,13 @@ CONTAINS
          ATAN((2.0_wp*x + quadratic_linear) / SQRT(discriminant))
 
   END FUNCTION lava_cooling_time_primitive
+
+  SUBROUTINE eval_lava_cooling_semi_implicit()
+    CALL fatal_error('lava_cooling: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_lava_cooling_semi_implicit
+
+  SUBROUTINE eval_lava_cooling_implicit()
+    CALL fatal_error('lava_cooling: implicit treatment is unsupported')
+  END SUBROUTINE eval_lava_cooling_implicit
 
 END MODULE thermal_laws_2d

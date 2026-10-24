@@ -18,6 +18,7 @@
 !********************************************************************************
 
 MODULE rheology_froude_2d
+  USE diagnostics_2d, ONLY : fatal_error
 
   USE parameters_2d, ONLY : wp
   USE rheology_parameters_2d, ONLY : mu_0, mu_inf, Fr_0
@@ -31,6 +32,18 @@ MODULE rheology_froude_2d
 
   PUBLIC :: eval_froude_momentum_rate
   PUBLIC :: solve_froude_analytic_velocity
+
+  ! Uniform source treatment entry points. Existing kernels remain unchanged.
+  PUBLIC :: eval_rheology_froude_explicit
+  PUBLIC :: eval_rheology_froude_semi_implicit
+  INTERFACE eval_rheology_froude_semi_implicit
+    MODULE PROCEDURE eval_froude_momentum_rate
+  END INTERFACE eval_rheology_froude_semi_implicit
+  PUBLIC :: eval_rheology_froude_implicit
+  PUBLIC :: solve_rheology_froude_analytic
+  INTERFACE solve_rheology_froude_analytic
+    MODULE PROCEDURE solve_froude_analytic_velocity
+  END INTERFACE solve_rheology_froude_analytic
 
 CONTAINS
 
@@ -143,5 +156,15 @@ CONTAINS
     END IF
 
   END SUBROUTINE eval_froude_momentum_rate
+
+  ! Unsupported physical treatment, rejected by the source catalog.
+  SUBROUTINE eval_rheology_froude_explicit()
+    CALL fatal_error('rheology_froude: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_froude_explicit
+
+  ! Unsupported physical treatment, rejected by the source catalog.
+  SUBROUTINE eval_rheology_froude_implicit()
+    CALL fatal_error('rheology_froude: semi-implicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_froude_implicit
 
 END MODULE rheology_froude_2d

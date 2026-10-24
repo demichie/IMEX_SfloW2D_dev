@@ -19,6 +19,7 @@
 !********************************************************************************
 
 MODULE rheology_lava_2d
+  USE diagnostics_2d, ONLY : fatal_error
 
   USE parameters_2d, ONLY : wp
   USE rheology_parameters_2d, ONLY : T_ref
@@ -37,6 +38,21 @@ MODULE rheology_lava_2d
   REAL(wp) :: nu_ref
   REAL(wp) :: visc_par
   REAL(wp) :: tau0
+
+  ! Uniform source treatment entry points. Existing kernels remain unchanged.
+  PUBLIC :: eval_rheology_lava_explicit
+  PUBLIC :: eval_rheology_lava_semi_implicit
+  INTERFACE eval_rheology_lava_semi_implicit
+    MODULE PROCEDURE eval_lava_semi_implicit_momentum_rate
+  END INTERFACE eval_rheology_lava_semi_implicit
+  PUBLIC :: eval_rheology_lava_implicit
+  INTERFACE eval_rheology_lava_implicit
+    MODULE PROCEDURE eval_lava_implicit_momentum_rate
+  END INTERFACE eval_rheology_lava_implicit
+  PUBLIC :: solve_rheology_lava_analytic
+  INTERFACE solve_rheology_lava_analytic
+    MODULE PROCEDURE solve_lava_analytic_velocity
+  END INTERFACE solve_rheology_lava_analytic
 
 CONTAINS
 
@@ -150,5 +166,10 @@ CONTAINS
     rate_y = -tau0 * velocity_y / speed
 
   END SUBROUTINE eval_lava_semi_implicit_momentum_rate
+
+  ! Unsupported physical treatment, rejected by the source catalog.
+  SUBROUTINE eval_rheology_lava_explicit()
+    CALL fatal_error('rheology_lava: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_lava_explicit
 
 END MODULE rheology_lava_2d

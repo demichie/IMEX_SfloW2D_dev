@@ -51,6 +51,21 @@ MODULE rheology_2d
   PUBLIC :: eval_semi_implicit_rheology_rate
   PUBLIC :: solve_analytic_rheology_velocity
 
+  ! Uniform treatment surface for this source family.
+  PUBLIC :: eval_rheology_explicit
+  PUBLIC :: eval_rheology_semi_implicit
+  INTERFACE eval_rheology_semi_implicit
+    MODULE PROCEDURE eval_semi_implicit_rheology_rate
+  END INTERFACE eval_rheology_semi_implicit
+  PUBLIC :: eval_rheology_implicit
+  INTERFACE eval_rheology_implicit
+    MODULE PROCEDURE eval_implicit_rheology_rate
+  END INTERFACE eval_rheology_implicit
+  PUBLIC :: solve_rheology_analytic
+  INTERFACE solve_rheology_analytic
+    MODULE PROCEDURE solve_analytic_rheology_velocity
+  END INTERFACE solve_rheology_analytic
+
 CONTAINS
 
   !******************************************************************************
@@ -430,5 +445,9 @@ CONTAINS
     END SELECT
 
   END FUNCTION rheology_name_from_id
+
+  SUBROUTINE eval_rheology_explicit()
+    CALL fatal_error('rheology: explicit treatment is unsupported')
+  END SUBROUTINE eval_rheology_explicit
 
 END MODULE rheology_2d
