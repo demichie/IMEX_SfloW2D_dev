@@ -304,7 +304,12 @@ PROGRAM test_source_registry
     CALL make_partition()
     terms=bundle(:SIZE(bundle)-1)
     CALL trial%initialize_legacy(partition,original,methods,pore,terms,error)
-    CALL require(INDEX(error,'batch')>0,'incomplete catalogued batch rejected')
+    IF (term%model_id/=0) THEN
+      CALL require(INDEX(error,'complete law bundle')>0, &
+           'incomplete rheological atomic batch rejected as partial law')
+    ELSE
+      CALL require(INDEX(error,'batch')>0,'incomplete catalogued batch rejected')
+    END IF
     negative=negative+1
   END DO
   enabled=[.TRUE.,.FALSE.,.FALSE.]; pore=0
