@@ -164,10 +164,10 @@ CONTAINS
        DO group_index=1,SIZE(step_groups)
           IF (step_groups(group_index)%cadence/=SOURCE_CADENCE_STEP) &
                CALL fatal_error('D17: invalid cadence in post-RK source schedule')
-          IF (SIZE(step_groups(group_index)%term_names)>0) &
+          IF (SIZE(step_groups(group_index)%source_names)>0) &
                mass_group_count=mass_group_count+1
-          DO term_index=1,SIZE(step_groups(group_index)%term_names)
-             term=source_term_descriptor_by_name(step_groups(group_index)%term_names(term_index))
+          DO term_index=1,SIZE(step_groups(group_index)%source_names)
+             term=source_term_descriptor_by_name(step_groups(group_index)%source_names(term_index))
              IF (term%role/=SOURCE_ROLE_MASS) &
                   CALL fatal_error('D17: unsupported non-mass post-RK source')
           END DO
