@@ -149,7 +149,8 @@ CONTAINS
     TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:)
     TYPE(source_group_type) :: group
     TYPE(source_term_type) :: term
-    INTEGER, ALLOCATABLE :: targets(:),terms(:),equations(:),target_equations(:)
+    INTEGER, ALLOCATABLE :: targets(:),equations(:),target_equations(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: names(:)
     INTEGER :: legacy,target,split_id,i,method,order
     LOGICAL :: enabled(3)
     CALL this%finalize()
@@ -221,16 +222,16 @@ CONTAINS
       method=SOURCE_METHOD_NEWTON
       IF (legacy_methods(legacy)==IM_GROUP_METHOD_ANALYTIC) method=SOURCE_METHOD_ANALYTIC
       IF (method==SOURCE_METHOD_NEWTON) THEN
-        terms=terms_for_targets(active_terms,targets)
+        names=names_for_targets(active_terms,targets)
         equations=PACK([(i,i=1,partition%n_equations)],partition%IM_group== &
              partition%IM_group(target_equation_ids_first(targets(1),pore_equation)))
         group=make_group(legacy,legacy,SOURCE_CADENCE_STAGE,method, &
-             SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,source_names_for_ids(terms),equations)
+             SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,names,equations)
         stages=[stages,group]
       ELSE
         DO i=1,SIZE(targets)
           target=targets(i)
-          terms=terms_for_targets(active_terms,[target])
+          names=names_for_targets(active_terms,[target])
           equations=target_equation_ids(target,pore_equation)
           order=legacy
           IF (SIZE(targets)>1) THEN
@@ -238,19 +239,19 @@ CONTAINS
             order=split_id
           END IF
           group=make_group(order,legacy,SOURCE_CADENCE_STAGE,method, &
-               SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,source_names_for_ids(terms),equations)
+               SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,names,equations)
           stages=[stages,group]
         END DO
       END IF
     END DO
     equations=[(i,i=1,partition%n_equations)]
-    terms=terms_for_targets(active_terms,[0])
+    names=names_for_targets(active_terms,[0])
     group=make_group(4,0,SOURCE_CADENCE_STAGE,SOURCE_METHOD_EXPLICIT, &
-         SOURCE_PHASE_RK_EXPLICIT,1,source_names_for_ids(terms),equations)
+         SOURCE_PHASE_RK_EXPLICIT,1,names,equations)
     stages=[stages,group]
-    terms=terms_for_targets(active_terms,[-1])
+    names=names_for_targets(active_terms,[-1])
     group=make_group(1,0,SOURCE_CADENCE_STEP,SOURCE_METHOD_EXPLICIT, &
-         SOURCE_PHASE_POST_RK,1,source_names_for_ids(terms),equations)
+         SOURCE_PHASE_POST_RK,1,names,equations)
     steps=[group]
     CALL this%initialize(partition%n_equations,pore_equation,stages,steps,error)
   END SUBROUTINE initialize_legacy_registry
@@ -480,22 +481,27 @@ CONTAINS
     id=ids(1)
   END FUNCTION target_equation_ids_first
 
-  !> \brief Select terms for target blocks, EX (0) or mass exchange (-1).
-  !> \param[in] active_terms Physical IDs proposed by the configuration bridge.
+  !> \brief Select source names for target blocks, EX (0) or mass exchange (-1).
+  !> \param[in] active_terms Legacy physical IDs at the input compatibility boundary.
   !> \param[in] targets Target IDs, zero for EX or minus one for step mass.
-  !> \return Stable-order subset; invalid terms reach validation rather than vanish.
-  FUNCTION terms_for_targets(active_terms,targets) RESULT(ids)
+  !> \return Stable-order canonical addend names; invalid IDs reach validation.
+  FUNCTION names_for_targets(active_terms,targets) RESULT(names)
     INTEGER, INTENT(IN) :: active_terms(:),targets(:)
-    INTEGER, ALLOCATABLE :: ids(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: names(:)
     TYPE(source_term_type) :: term
-    INTEGER :: i,target
-    ids=[INTEGER::]
+    INTEGER :: i,target,n
+    ALLOCATE(names(SIZE(active_terms)))
+    n=0
     DO i=1,SIZE(active_terms)
       term=source_term_descriptor(active_terms(i)); target=term%target
       IF (term%role==SOURCE_ROLE_MASS) target=-1
-      IF (ANY(targets==target)) ids=[ids,active_terms(i)]
+      IF (ANY(targets==target)) THEN
+        n=n+1
+        names(n)=term%name
+      END IF
     END DO
-  END FUNCTION terms_for_targets
+    names=names(:n)
+  END FUNCTION names_for_targets
 
   !> \brief Construct one block with fully allocated arrays.
   !> \brief Construct a fully allocated homogeneous group.
