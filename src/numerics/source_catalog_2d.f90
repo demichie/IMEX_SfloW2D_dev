@@ -426,6 +426,18 @@ CONTAINS
         RETURN
       END IF
     END DO
+    ! Complete rheological laws have a single scheduling identity.
+    DO i=1,SIZE(RHEOLOGY_LAWS)
+      IF (TRIM(RHEOLOGY_LAWS(i)%name)/=TRIM(name)) CYCLE
+      term=source_term_type()
+      term%name=RHEOLOGY_LAWS(i)%name
+      term%target=SOURCE_TARGET_VELOCITY
+      term%model_id=RHEOLOGY_LAWS(i)%model_id
+      term%schedulable=.TRUE.
+      term%has_newton=.TRUE.
+      term%has_analytic=.TRUE.
+      RETURN
+    END DO
   END FUNCTION source_term_descriptor_by_name
 
   !> Guard the name-only identity contract against duplicate catalog entries.

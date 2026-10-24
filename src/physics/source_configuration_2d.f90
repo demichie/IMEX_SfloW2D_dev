@@ -45,9 +45,10 @@ CONTAINS
     END IF
     ALLOCATE(active_names(0))
     IF (rheology_flag) THEN
-      law_names=rheology_component_names(rheology_model_id)
-      active_names=[CHARACTER(LEN=64) :: active_names,law_names]
-      IF (SIZE(law_names)==0 .AND. rheology_model_id/=rheology_id_none) THEN
+      IF (LEN_TRIM(rheology_source_name(rheology_model_id))>0) &
+           active_names=[CHARACTER(LEN=64) :: active_names,rheology_source_name(rheology_model_id)]
+      IF (LEN_TRIM(rheology_source_name(rheology_model_id))==0 .AND. &
+           rheology_model_id/=rheology_id_none) THEN
         error='D17: unsupported configured rheology'; RETURN
       END IF
     END IF
@@ -182,14 +183,17 @@ CONTAINS
              LEN_TRIM(rheology_source_name(rheology_model_id))>0 .AND. &
              TRIM(uppercase_source_text(source_group_terms(i,g)))== &
              TRIM(uppercase_source_text(rheology_source_name(rheology_model_id)))) THEN
-          law_names=rheology_component_names(rheology_model_id)
-          error='D17: unsupported complete rheology source'
-          IF (SIZE(law_names)==0) RETURN
+          ALLOCATE(law_names(1))
+          law_names(1)=rheology_source_name(rheology_model_id)
         ELSE
           component=source_term_descriptor_by_name( &
                TRIM(uppercase_source_text(source_group_terms(i,g))))
           error='D17: unknown, dependent or unschedulable source term name'
           IF (component%id==0 .OR. .NOT.component%schedulable) RETURN
+          IF (component%model_id/=0) THEN
+            error='D17: rheology components cannot be independently scheduled'
+            RETURN
+          END IF
           ALLOCATE(law_names(1))
           law_names(1)=component%name
         END IF
@@ -235,9 +239,10 @@ CONTAINS
 
     ALLOCATE(active_names(0))
     IF (rheology_flag) THEN
-      law_names=rheology_component_names(rheology_model_id)
-      active_names=[CHARACTER(LEN=64) :: active_names,law_names]
-      IF (SIZE(law_names)==0 .AND. rheology_model_id/=rheology_id_none) THEN
+      IF (LEN_TRIM(rheology_source_name(rheology_model_id))>0) &
+           active_names=[CHARACTER(LEN=64) :: active_names,rheology_source_name(rheology_model_id)]
+      IF (LEN_TRIM(rheology_source_name(rheology_model_id))==0 .AND. &
+           rheology_model_id/=rheology_id_none) THEN
         error='D17: unsupported configured rheology'; RETURN
       END IF
     END IF

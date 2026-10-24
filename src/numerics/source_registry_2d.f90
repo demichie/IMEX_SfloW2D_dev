@@ -356,6 +356,7 @@ CONTAINS
           IF (.NOT.ALL(in_list(expected,group%equation_ids))) RETURN
         END IF
         IF (term%model_id/=0) THEN
+          IF (TRIM(term%name)/=TRIM(rheology_source_name(term%model_id))) RETURN
           IF (family/=0 .AND. family/=term%model_id) RETURN
           family=term%model_id
         END IF
@@ -365,13 +366,9 @@ CONTAINS
         END IF
         error='D17: physical term duplicated, unknown or dependent'
       END DO
-      ! A rheological law is one physical source even while the catalog
-      ! temporarily contains its legacy formula addends. Never schedule
-      ! a proper subset in a Newton or analytic group.
       IF (family/=0 .AND. group%method/=SOURCE_METHOD_EXPLICIT) THEN
-        law_names=rheology_component_names(family)
-        error='D17: rheology group requires the complete law bundle'
-        IF (.NOT.ALL(name_membership(law_names,group%term_names))) RETURN
+        error='D17: rheology group requires the complete law'
+        IF (.NOT.ANY(group%term_names==rheology_source_name(family))) RETURN
       END IF
       ! No independently scheduled sub-solves: validate group equation shape.
       error='D17: incomplete or incompatible group equation target'
@@ -381,10 +378,10 @@ CONTAINS
         SELECT CASE(SIZE(group%equation_ids))
         CASE(2)
           IF (.NOT.same_set(group%equation_ids,[2,3])) RETURN
-          law_names=rheology_component_names(family)
-          IF (SIZE(law_names)/=SIZE(group%term_names) .OR. &
-               .NOT.ALL(name_membership(law_names,group%term_names))) THEN
-            error='D17: analytic velocity requires the complete law bundle'; RETURN
+          IF (family==0) RETURN
+          IF (SIZE(group%term_names)/=1 .OR. &
+               .NOT.ANY(group%term_names==rheology_source_name(family))) THEN
+            error='D17: analytic velocity requires the complete law'; RETURN
           END IF
         CASE(1)
           id=group%equation_ids(1)
@@ -401,7 +398,7 @@ CONTAINS
     DO i=1,SIZE(groups)
       DO j=1,SIZE(groups(i)%term_names)
         term=source_term_descriptor_by_name(groups(i)%term_names(j))
-        IF (term%bundle_id==0) CYCLE
+        IF (term%bundle_id==0 .OR. term%model_id/=0) CYCLE
         batch_names=source_bundle_names(term%bundle_id)
         IF (SIZE(batch_names)<2) RETURN
         IF (.NOT.same_batch(batch_names,groups)) RETURN
