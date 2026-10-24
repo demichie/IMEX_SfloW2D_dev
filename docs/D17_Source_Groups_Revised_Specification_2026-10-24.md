@@ -428,7 +428,7 @@ GRUPPO 3: STEP, EXPLICIT, batch mass-exchange completo
 Non dichiarare questo esempio valido per qualunque reologia: la compatibilità di ogni termine con il metodo scelto deve risultare dal catalogo e dai test.
 
 
-**Stato di avanzamento D17.16 — IN CORSO (24 ottobre 2026).** Validazione preventiva del numero unico di solver nativi aggiunta; con `7ea4969c` eliminati i loop di costruzione multi-solver del percorso nativo, ora diretto; catalogo nominale, conflitti e contratti restano da consolidare. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
+**Stato di avanzamento D17.16 — IN CORSO (24 ottobre 2026).** Introdotti con commit `a4f18652` i target nativi a livello di gruppo con rifiuto dell'input misto e test dedicati; il vecchio input per-solver resta esplicitamente compatibile durante la migrazione. Validazione preventiva del numero unico di solver nativi aggiunta; con `7ea4969c` eliminati i loop di costruzione multi-solver del percorso nativo, ora diretto; catalogo nominale, conflitti e contratti restano da consolidare. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
 
 ## D17.17 — Separazione fisica/numerica
 
@@ -825,3 +825,10 @@ Commit [`7ea4969c`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/7ea4969c
 ### D17.22.18 — Stato operativo nella tabella D17.19 (24 ottobre 2026)
 
 Aggiunta la colonna **Stato** nella tabella D17.19, con categorie DA INIZIARE / IN CORSO / COMPLETATA. Nessun passo è dichiarato COMPLETATO senza tutti i controlli di accettazione. Le attività di rimozione dei campi sotto-solver dall'input, eliminazione di `source_solver_type` e conversione del catalogo alle sole identità nominali restano un **unico programma coordinato**: aggiornare parser, adapter legacy, registry, solver, assemblatori, test e build prima di dichiarare conclusa la migrazione. Ogni avanzamento successivo deve aggiornare la colonna e le sezioni tecniche pertinenti.
+
+
+### D17.22.19 — Primo passaggio coordinato verso l'input a target di gruppo (24 ottobre 2026)
+
+Commit [`a4f18652`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/a4f186524ea09413ea79680a2b91de75d266f70c): `source_input_2d` ammette i nuovi campi `source_group_target_count` e `source_group_targets`; `source_configuration_2d` traduce questi valori nell'attuale descrittore di gruppo/solver e rifiuta esplicitamente la mescolanza di target di gruppo con `source_group_solver_count`. Il formato nativo precedente rimane un percorso legacy esplicito in questa fase, non la soluzione finale. `TEST_SOURCE_REGISTRY` ora verifica una configurazione con target di gruppo e il conflitto dei due formati.
+
+**Stato reale:** D17.16 e D17.19 passo 4 restano IN CORSO; la rimozione dei quattro vecchi campi dalla namelist, l'eliminazione di `source_solver_type` e la migrazione del catalogo agli identificativi esclusivamente nominali **non sono ancora state implementate**. Non sono stati modificati kernel o schemi RK. **Verifiche:** nuovo codice non ancora compilato/testato; le Actions rimangono manuali. Questa sezione non costituisce un gate di accettazione della migrazione completa.
