@@ -289,7 +289,7 @@ CONTAINS
     TYPE(source_group_type) :: group
     TYPE(source_solver_type) :: solver
     TYPE(source_term_type) :: term
-    INTEGER, ALLOCATABLE :: solve_ids(:),expected(:),terms(:),bundle_terms(:)
+    INTEGER, ALLOCATABLE :: expected(:),terms(:),bundle_terms(:)
     LOGICAL :: seen(SOURCE_TERM_COUNT)
     INTEGER :: i,j,k,id,si,nstage,family,mass_group,term_group(SOURCE_TERM_COUNT)
     LOGICAL, ALLOCATABLE :: used_solver(:)
@@ -388,16 +388,18 @@ CONTAINS
       CASE(SOURCE_METHOD_ANALYTIC)
         IF (SIZE(group%analytic_solver_ids)/=1 .OR. SIZE(group%implicit_solver_ids)/=0) RETURN
       END SELECT
-      ! Transitional descriptor: at most one solve per non-explicit group.
-      solve_ids=[group%implicit_solver_ids,group%analytic_solver_ids]
+      ! Transitional descriptor: exactly one solve per non-explicit group.
       IF (group%method/=SOURCE_METHOD_EXPLICIT) THEN
-        j=1
         error='D17: missing, duplicate or inconsistent solver descriptor'
-        si=solve_ids(j)
+        IF (group%method==SOURCE_METHOD_NEWTON) THEN
+          si=group%implicit_solver_ids(1)
+        ELSE
+          si=group%analytic_solver_ids(1)
+        END IF
         IF (si<1 .OR. si>SIZE(this%solver_entries)) RETURN
         IF (used_solver(si)) RETURN
         used_solver(si)=.TRUE.; solver=this%solver_entries(si)
-        IF (solver%id/=si .OR. solver%execution_order/=j) RETURN
+        IF (solver%id/=si .OR. solver%execution_order/=1) RETURN
         IF (.NOT.ALLOCATED(solver%target_ids)) RETURN
         IF (.NOT.ALLOCATED(solver%equation_ids)) RETURN
         IF (.NOT.ALLOCATED(solver%term_ids)) RETURN
@@ -420,7 +422,6 @@ CONTAINS
           IF (SIZE(solver%target_ids)/=1) RETURN
           IF (solver%kind/=SOURCE_SOLVE_ANALYTIC_VELOCITY+solver%target_ids(1)-1) RETURN
         END IF
-        IF (.NOT.ALL(in_list(solver%term_ids,group%term_ids))) RETURN
         DO k=1,SIZE(solver%term_ids)
           term=source_term_descriptor(solver%term_ids(k))
           IF (.NOT.ANY(solver%target_ids==term%target)) RETURN
