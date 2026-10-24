@@ -350,7 +350,7 @@ CONTAINS
         IF (LEN_TRIM(term%name)==0) RETURN
         IF (.NOT.term%schedulable) RETURN
         IF (ANY(seen_names==term%name)) RETURN
-        seen_names=[seen_names,term%name]
+        seen_names=[CHARACTER(LEN=64) :: seen_names,term%name]
       error='D17: term does not support this method/cadence or target'
         IF (.NOT.supports_group(term,group)) RETURN
         IF (term%target/=0) THEN
