@@ -204,7 +204,7 @@ CONTAINS
           qp(4,j,k) = T_ambient
        END IF
 
-       CALL eval_expl_terms(qp(1:n_vars+2,j,k), B_zone(j,k),      &
+       CALL eval_step_source_explicit(qp(1:n_vars+2,j,k), B_zone(j,k),      &
             B_prime_x_geom(j,k), B_prime_y_geom(j,k),                      &
             erodible(1:n_solid,j,k), time_step, erosion_term,              &
             deposition_term, continuous_phase_erosion_term,                &
