@@ -192,21 +192,21 @@ def main() -> int:
         failures.append("missing canonical name-based rheology role selector")
     elif "rheology_id_" in role_match.group(1).lower():
         failures.append("canonical rheology role selector must not use numeric rheology IDs")
-    # The three live constitutive dispatchers must use canonical source names.
+    # Verify the three concrete physical dispatchers and their assembly callers.
     rheology_dispatch = (PHYSICS / "rheology_laws/rheology_2d.f90").read_text(encoding="utf-8")
     assembly = (PHYSICS / "source_terms_2d.f90").read_text(encoding="utf-8")
     for routine in ("eval_rheology_semi_implicit", "eval_rheology_implicit",
                     "solve_rheology_analytic"):
         match = re.search(
-            rf"(?is)\\bSUBROUTINE\\s+{routine}\\s*\\((.*?)"
-            rf"END\\s+SUBROUTINE\\s+{routine}\\b", rheology_dispatch
+            rf"(?is)\bSUBROUTINE\s+{routine}\s*\(.*?"
+            rf"END\s+SUBROUTINE\s+{routine}\b", rheology_dispatch
         )
         if match is None or "SELECT CASE(TRIM(model_name))" not in match.group(0):
             failures.append(f"{routine}: must dispatch by canonical model_name")
-        elif re.search(r"(?i)\\bCASE\\s*\\(\\s*rheology_id_", match.group(0)):
+        elif re.search(r"(?i)\bCASE\s*\(\s*rheology_id_", match.group(0)):
             failures.append(f"{routine}: numeric rheology dispatch reintroduced")
         if not re.search(
-            rf"(?i)CALL\\s+{routine}\\s*\\(\\s*rheology_source_name\\(",
+            rf"(?i)CALL\s+{routine}\s*\(\s*rheology_source_name\(",
             assembly
         ):
             failures.append(f"{routine}: source assembly must pass canonical name")
