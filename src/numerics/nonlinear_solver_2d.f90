@@ -416,7 +416,7 @@ CONTAINS
                 RETURN
              END IF
              solver_size=SIZE(solvers(solver_id)%equation_ids)
-             IF (solver_size<1 .OR. solver_size>group_size) THEN
+             IF (solver_size/=group_size) THEN
                 linear_info=-1
                 qj=qj_init
                 RETURN
@@ -432,14 +432,14 @@ CONTAINS
                      qp_current,si_term,Zij,group=stage_groups(group),       &
                      solver=solvers(solver_id))
              END IF
-             DO i=1,solver_size
-                equation=solvers(solver_id)%equation_ids(i)
+             DO i=1,group_size
+                equation=group_equations(i)
                 qj(equation)=q_known(equation)+dt_step*a_diag*si_term(equation)
              END DO
              IF (group_has_momentum .AND. apply_si_local) THEN
                 CALL correct_friction_momentum(q_known(2:3),qj(2:3))
-                DO i=1,solver_size
-                   equation=solvers(solver_id)%equation_ids(i)
+                DO i=1,group_size
+                   equation=group_equations(i)
                    si_term(equation)=                                        &
                         (qj(equation)-q_known(equation))/(dt_step*a_diag)
                 END DO
