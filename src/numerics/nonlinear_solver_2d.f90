@@ -288,7 +288,7 @@ CONTAINS
     REAL(wp) :: qp_current(n_vars+2)
     REAL(wp) :: dynamic_pressure, si_term(n_eqns), residual_without_si(n_eqns)
     REAL(wp) :: momentum_before_newton(2)
-    INTEGER :: group, group_size, equation, i, solver_index, solver_size
+    INTEGER :: group, group_size, equation, i, solver_size
     INTEGER :: solver_id, analytic_status
     INTEGER :: group_equations(equation_partition%n_implicit)
     LOGICAL :: group_has_momentum, apply_si_local
@@ -398,13 +398,13 @@ CONTAINS
              qj=qj_init
              RETURN
           END IF
-          IF (SIZE(stage_groups(group)%implicit_solver_ids)<1) THEN
+          IF (SIZE(stage_groups(group)%implicit_solver_ids)/=1) THEN
              linear_info=-1
              qj=qj_init
              RETURN
           END IF
-          DO solver_index=1,SIZE(stage_groups(group)%implicit_solver_ids)
-             solver_id=stage_groups(group)%implicit_solver_ids(solver_index)
+          ! D17: one coupled Newton solve owns the complete equation group.
+             solver_id=stage_groups(group)%implicit_solver_ids(1)
              IF (solver_id<1 .OR. solver_id>SIZE(solvers)) THEN
                 linear_info=-1
                 qj=qj_init
@@ -458,7 +458,6 @@ CONTAINS
              IF (group_has_momentum) THEN
                 CALL correct_friction_momentum(momentum_before_newton,qj(2:3))
              END IF
-          END DO
        ELSE
           linear_info = -5
           qj = qj_init
