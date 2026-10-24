@@ -1233,3 +1233,7 @@ Rifattorizzata `source_registry_2d` eliminando l'accesso ai campi legacy `term%r
 
 **Stato:** il registro è ora indipendente da tre campi da eliminare nella struttura finale a cinque campi. Il catalogo legacy a 34 contributi e i test storici devono ancora essere trasformati. Le due GitHub Actions devono validare questa nuova HEAD.
 
+### D17.22.82 — Correzione test negativi Newton/analitico e rimozione same_batch (24 ottobre 2026)
+
+Il log `test-run(20261024-171638).log` relativo alla milestone D17.22.81 interrompe la suite alla verifica `legacy component is rejected from a directly specified Newton group`. L'asserzione del test confrontava erroneamente `error==''` pur richiedendo esplicitamente il rifiuto dei componenti reologici legacy. Ripristinata la condizione negativa corretta `error/=''` e aggiunto il controllo `.NOT.trial%is_initialized()` nei due test Newton e analitico. Rimossa la funzione privata `same_batch`, non più utilizzata dopo la verifica diretta dell'atomicità del raffreddamento nel registro. Nessuna alterazione del comportamento del solver o delle formule fisiche. CI sul nuovo commit ancora pendente; catalogo definitivo a cinque campi **NON ANCORA COMPLETATO**.
+

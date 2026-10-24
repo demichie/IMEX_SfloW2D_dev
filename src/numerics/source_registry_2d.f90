@@ -498,29 +498,6 @@ CONTAINS
     equal=.TRUE.
   END FUNCTION same_set
 
-  !> \brief Require all canonical batch members in the same group, or none.
-  !> \param[in] names Canonical names of the atomic-batch addends.
-  !> \param[in] groups All stage and step groups in execution order.
-  !> \return True only for a wholly absent or unsplit batch.
-  LOGICAL FUNCTION same_batch(names,groups) RESULT(valid)
-    CHARACTER(*), INTENT(IN) :: names(:)
-    TYPE(source_group_type), INTENT(IN) :: groups(:)
-    INTEGER :: i,j,owner,found
-    valid=.FALSE.
-    owner=0
-    found=0
-    DO i=1,SIZE(names)
-      DO j=1,SIZE(groups)
-        IF (.NOT.ALLOCATED(groups(j)%source_names)) CYCLE
-        IF (.NOT.ANY(groups(j)%source_names==names(i))) CYCLE
-        found=found+1
-        IF (owner==0) owner=j
-        IF (owner/=j) RETURN
-      END DO
-    END DO
-    valid=(found==0 .OR. found==SIZE(names))
-  END FUNCTION same_batch
-
   !> \brief Check implemented temporal capabilities for one physical term.
   !> \param[in] term Valid schedulable catalog descriptor.
   !> \param[in] group Candidate method/cadence.

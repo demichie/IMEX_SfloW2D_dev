@@ -289,7 +289,7 @@ PROGRAM test_source_registry
   badgroups=groups
   badgroups(3)%source_names=[source_name(SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS)]
   CALL trial%initialize(7,7,badgroups,steps,error)
-  CALL require(error/='', &
+  CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
        'legacy component is rejected from a directly specified Newton group')
   negative=negative+1
 
@@ -298,7 +298,8 @@ PROGRAM test_source_registry
   badgroups(3)%method=SOURCE_METHOD_ANALYTIC
   badgroups(3)%source_names=[source_name(SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS)]
   CALL trial%initialize(7,7,badgroups,steps,error)
-  CALL require(error/='', 'legacy component rejected from a directly specified analytic group')
+  CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
+       'legacy component rejected from a directly specified analytic group')
   negative=negative+1
   ! Model membership and atomic batches are derived from the catalog.
   DO k=1,SOURCE_TERM_COUNT
