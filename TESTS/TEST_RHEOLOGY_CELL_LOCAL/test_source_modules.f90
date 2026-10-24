@@ -9,10 +9,11 @@ PROGRAM test_source_modules
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                &
        eval_rheology_cooling_energy_rate, eval_vaporization_mass_rate,       &
        eval_vaporization_energy_rate
-  USE mass_exchange_laws_2d, ONLY : eval_hindered_settling_deposition_rate,  &
-       eval_lahar_deposition_rate, eval_settling_fluid_properties,           &
-       eval_solid_deposition_rate, eval_erosion_rates,                       &
-       eval_continuous_phase_loss_rate, eval_air_entrainment_rate
+  USE mass_exchange_deposition_2d, ONLY : eval_hindered_settling_deposition_rate, &
+       eval_lahar_deposition_rate, eval_settling_fluid_properties, eval_solid_deposition_rate
+  USE mass_exchange_erosion_2d, ONLY : eval_erosion_rates
+  USE mass_exchange_carrier_loss_2d, ONLY : eval_continuous_phase_loss_rate
+  USE mass_exchange_entrainment_2d, ONLY : eval_air_entrainment_rate
 
   IMPLICIT NONE
 

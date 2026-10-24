@@ -3,10 +3,10 @@
 MODULE mass_exchange_carrier_loss_2d
   USE parameters_2d, ONLY : wp, n_solid, liquid_flag, pore_pressure_flag, gas_loss_flag
   USE constitutive_parameters_2d, ONLY : loss_rate, coeff_porosity, maximum_solid_packing
-  USE mass_exchange_laws_2d, ONLY : eval_continuous_phase_loss_rate
-  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_gas_loss
+
   IMPLICIT NONE
   PRIVATE
+  PUBLIC :: eval_continuous_phase_loss_rate
   PUBLIC :: eval_total_carrier_loss_rate
 CONTAINS
   SUBROUTINE eval_total_carrier_loss_rate(r_h, r_T, r_alphas, alphas_tot, &
@@ -50,4 +50,22 @@ CONTAINS
          continuous_phase_loss_term, r_h, alphas_tot, maximum_solid_packing,  &
          coeff_porosity, deposition_term(1:n_solid), dt)
   END SUBROUTINE eval_total_carrier_loss_rate
+  PURE FUNCTION eval_continuous_phase_loss_rate(requested_loss_rate,         &
+       flow_depth, total_solid_fraction, maximum_solid_packing,               &
+       porosity_coefficient, deposition_rate, time_step) RESULT(loss_rate)
+
+    REAL(wp), INTENT(IN) :: requested_loss_rate, flow_depth
+    REAL(wp), INTENT(IN) :: total_solid_fraction, maximum_solid_packing
+    REAL(wp), INTENT(IN) :: porosity_coefficient, deposition_rate(:)
+    REAL(wp), INTENT(IN) :: time_step
+    REAL(wp) :: loss_rate
+
+    loss_rate = MIN(requested_loss_rate, flow_depth * MAX(0.0_wp,            &
+         maximum_solid_packing - total_solid_fraction) / time_step)
+    loss_rate = MIN(loss_rate, MAX(0.0_wp, (flow_depth *                     &
+         (1.0_wp - total_solid_fraction) - porosity_coefficient *            &
+         (flow_depth * total_solid_fraction - time_step *                    &
+         SUM(deposition_rate))) / time_step))
+
+  END FUNCTION eval_continuous_phase_loss_rate
 END MODULE mass_exchange_carrier_loss_2d

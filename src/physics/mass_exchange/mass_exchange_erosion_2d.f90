@@ -2,9 +2,9 @@
 MODULE mass_exchange_erosion_2d
   USE parameters_2d, ONLY : wp, n_solid
   USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity, erodible_fract
-  USE mass_exchange_laws_2d, ONLY : eval_erosion_rates
-  IMPLICIT NONE
+
   PRIVATE
+  PUBLIC :: eval_erosion_rates
   PUBLIC :: eval_mass_exchange_erosion
 CONTAINS
   SUBROUTINE eval_mass_exchange_erosion(r_h, mod_vel, alphas_tot, erodible, dt, &
@@ -21,4 +21,34 @@ CONTAINS
        continuous_phase_erosion_term = 0.0_wp
     END IF
   END SUBROUTINE eval_mass_exchange_erosion
+  PURE SUBROUTINE eval_erosion_rates(flow_depth, speed, total_solid_fraction, &
+       erosion_coefficient, erodible_porosity, erodible_fraction,            &
+       erodible_inventory, time_step, solid_erosion_rate,                    &
+       continuous_phase_erosion_rate)
+
+    REAL(wp), INTENT(IN) :: flow_depth, speed, total_solid_fraction
+    REAL(wp), INTENT(IN) :: erosion_coefficient, erodible_porosity
+    REAL(wp), INTENT(IN) :: erodible_fraction(:), erodible_inventory(:)
+    REAL(wp), INTENT(IN) :: time_step
+    REAL(wp), INTENT(OUT) :: solid_erosion_rate(:)
+    REAL(wp), INTENT(OUT) :: continuous_phase_erosion_rate
+
+    REAL(wp) :: total_erosion, total_solid_erosion
+
+    IF (erosion_coefficient .GT. 0.0_wp) THEN
+       total_erosion = erosion_coefficient * speed * flow_depth *            &
+            (1.0_wp - total_solid_fraction)
+       total_solid_erosion = total_erosion * (1.0_wp - erodible_porosity)
+       solid_erosion_rate = erodible_fraction * total_solid_erosion
+    ELSE
+       solid_erosion_rate = 0.0_wp
+    END IF
+
+    solid_erosion_rate = MAX(0.0_wp, MIN(solid_erosion_rate,                 &
+         erodible_inventory / time_step))
+    total_solid_erosion = SUM(solid_erosion_rate)
+    total_erosion = total_solid_erosion / (1.0_wp - erodible_porosity)
+    continuous_phase_erosion_rate = total_erosion * erodible_porosity
+
+  END SUBROUTINE eval_erosion_rates
 END MODULE mass_exchange_erosion_2d
