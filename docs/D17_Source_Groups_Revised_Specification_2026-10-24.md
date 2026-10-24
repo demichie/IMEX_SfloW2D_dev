@@ -1,10 +1,10 @@
 # D17 — Organizzazione unificata dei termini sorgente e dei gruppi di integrazione
 
-**Specifica di revisione autonoma | 24 ottobre 2026 | stato: PROPOSTA DA IMPLEMENTARE**
+**Specifica di revisione autonoma | 24 ottobre 2026 | stato: IMPLEMENTAZIONE IN CORSO (gate numerici aperti)**
 
 > Questo documento riguarda **solo D17**. Sostituisce, per gli aspetti in conflitto, la precedente impostazione D17 che consentiva più solve Newton indipendenti all'interno dello stesso gruppo. Non costituisce una dichiarazione che il codice sia già allineato né un'autorizzazione a cambiare la fisica o gli schemi RK-IMEX. Le indicazioni «attuale» riportano il comportamento osservato nel repository `demichie/IMEX_SfloW2D_dev` sul branch `master` consultato il 24 ottobre 2026 e nella documentazione D17 allegata alla roadmap. Le indicazioni «richiesto» definiscono invece il contratto da implementare.
 
-> **Audit avanzamento al 24 ottobre 2026 — aggiornato sulla HEAD `ecef5c5`:** l'utente ha confermato entrambe le Actions verdi fino a `61fee22`. Risultati verificati: catalogo a 24 sorgenti e cinque campi, registro privo di sotto-solver, mapping combinatorio legacy, parser nativo ampliato e flag termico indipendente nella suite attuale. Il commit `ecef5c5` trasferisce `correct_friction_momentum` in `state_2d` e aggiunge test vettoriali; la relativa CI non è ancora confermata. La verifica CI **non** equivale all'equivalenza numerica completa D17.20–D17.21.
+> **Audit consolidato al 24 ottobre 2026 — HEAD validata `35be9f0a`:** entrambe le Actions verdi confermate. Catalogo di 24 sorgenti e 96 procedure concrete, registro senza sotto-solver, assemblatori in `source_terms_2d`, `equation_terms_2d` limitato a cinque procedure, correzione della quantità di moto e finalizzazione post-RK/halo in `state_2d`. Restano aperti dispatch scientifico, Newton accoppiato, equivalenza legacy/nativo, `rheology_newmodel`, regressioni D17.20 e gate D17.21.
 
 ## D17.0 — Obiettivo e principio di semplificazione
 
@@ -21,7 +21,7 @@ Le tre proprietà sono:
 **Esempio vincolante.** Velocità `NEWTON` e temperatura `ANALYTIC`, entrambe `STAGE`, **non** possono condividere il gruppo: servono due gruppi. Velocità e temperatura entrambe `NEWTON` e `STAGE` possono condividere un gruppo: allora Newton risolve **congiuntamente** il sistema per `(q_2,q_3,q_4)` (salvo layout specifico del modello). Se devono essere risolte una dopo l'altra, servono due gruppi Newton ordinati. Il raggruppamento non autorizza a trascurare derivate incrociate realmente presenti nel residuo.
 
 
-**Stato di avanzamento D17.0 — PARZIALMENTE COMPLETATO — architettura nominale verificata fino a 61fee22; assemblatori definitivi, stato e mass-exchange ancora aperti.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.0 — PARZIALE — architettura implementata; gate numerici aperti.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.0a — Contratto uniforme delle leggi fisiche
 
@@ -30,7 +30,7 @@ Le tre proprietà sono:
 Il requisito vale indistintamente per reologia, raffreddamento/termica, pressione dei pori, trasferimenti di massa e ogni altra legge sorgente presente o futura. `source_terms_2d` invoca solo le interfacce pertinenti alla configurazione validata e **assembla tutti i contributi**, senza eccezioni o canali laterali per una famiglia fisica. Le routine esistenti possono essere mantenute come implementazione interna delle interfacce: evitare duplicazione delle formule e wrapper inutilmente stratificati.
 
 
-**Stato di avanzamento D17.0a — IMPLEMENTAZIONE DELLE 4 INTERFACCE CONCRETE COMPLETATA PER IL CATALOGO (24 ottobre 2026; nuova CI pendente).** Ultime Actions confermate verdi dall'utente su `02b2214`. Audit nominale esteso a tutte le 24 sorgenti di `SOURCE_CATALOG` (96 procedure concrete `eval_<sorgente>_{explicit,semi_implicit,implicit}` e `solve_<sorgente>_analytic` nei file `src/physics/`). Eseguite estrazioni fisiche delle tre iniezioni esplicite dall'assemblatore monolitico; rinominate le procedure di curvatura e di injection al bordo; suddivise le tre perdite della fase continua conservando un solo limitatore a valle. Metodi assenti rifiutati via diagnostica, componenti SI/IM strutturalmente nulle dei modelli NEWTON restituite come zero valido. Introdotto test automatico nominale e di disponibilita' in D17 source registry Action. **La chiusura scientifica ed end-to-end rimane distinta:** nuova CI e verifiche D17.20–21 pendenti, compatibilita' comportamentale e dispatch da gruppi ancora da validare.
+**Stato di avanzamento D17.0a — IMPLEMENTATO / CI VERDE — quattro interfacce concrete per 24 sorgenti (96 procedure); dispatch numerico da verificare.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.1 — Confini di responsabilità
 
@@ -49,7 +49,7 @@ Il requisito vale indistintamente per reologia, raffreddamento/termica, pression
 **Rinomina obbligatoria (D17):** l’attuale modulo `equation_terms_2d` deve diventare `source_terms_2d` (file `src/physics/source_terms_2d.f90`), perché il suo compito è assemblare i termini sorgente. La rinomina non deve tuttavia trasferire automaticamente tutte le API attuali nel nuovo modulo: le routine di **flusso inerziale**, **coefficienti idrostatici**, **velocità caratteristiche** e gli altri operatori non-sorgente devono essere assegnati ai moduli già responsabili del trasporto/spazio o a un modulo mirato soltanto se necessario. Non modificare le formule o la discretizzazione HP-PCCU durante lo spostamento. Le sorgenti al bordo producono uno stato imposto, non un rate di cella: mantenere la valutazione fisica nell’interfaccia appropriata di `source_terms_2d` e l’applicazione nel relativo hook di bordo. Aggiornare tutti i `USE`, il grafo delle dipendenze Fortran, `Makefile.am`, test, documentazione e gli audit statici; evitare wrapper permanenti con il vecchio nome. Prima del cambio verificare il call graph completo per non lasciare API non-sorgente senza proprietario.
 
 
-**Stato di avanzamento D17.1 — PARZIALMENTE COMPLETATO — separazione catalogo/registro/configurazione verificata; spostamento correzione momentum in state_2d su ecef5c5 attende CI; confini restanti aperti.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.1 — PARZIALE — separazione catalogo, sorgenti e stato avanzata; equivalenza e confini residui aperti.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.2 — Catalogo minimo: nomi, target e tre capabilities (vincolante)
 
@@ -76,7 +76,7 @@ La selezione del metodo e della cadenza rimane esclusivamente **nel gruppo**. Il
 La selezione del target è nominale (per esempio `momentum`, `temperature`, `pore_pressure`) e viene risolta una sola volta in indici di equazioni tramite metadata delle equazioni; i solver continuano a lavorare solo con tali indici. I contributi dipendenti alle altre equazioni, per esempio quelli prodotti dal mass-exchange, vengono assemblati dalla legge/coordinatore fisico senza registrare una voce sorgente distinta per ciascun termine algebrico. Per la migrazione dei vecchi input nativi, eventuali nomi storici vanno convertiti o rifiutati esplicitamente durante la lettura, senza creare sorgenti attive duplicate.
 
 
-**Stato di avanzamento D17.2 — PARZIALMENTE COMPLETATO — SOTTOOBIETTIVO COMPLETATO/CI VERDE: 24 identità fisiche e tipo esattamente a cinque campi; restano identità numeriche reologiche interne e prova rheology_newmodel.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.2 — PARZIALE — catalogo 24 nomi e cinque campi verificato; ID reologici interni e rheology_newmodel aperti.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.3 — Semantica dei metodi
 
@@ -97,7 +97,7 @@ Per uno stadio diagonale RK, l'intervallo implicito pertinente è `a_ii^IM * dt`
 `source_terms_2d` offre l'operatore analitico `q_after = Phi_G(q_before, delta_t)` per **un solo problema analitico**. L'operatore restituisce lo stato aggiornato per il target, non un rate o un incremento arbitrario. A `STAGE` usa l'intervallo indicato dal tableau (nella configurazione attuale `a_ii^IM*dt`); a `STEP`, solo qualora quel particolare solve abbia una semantica e un'implementazione supportate, riceve `dt` e agisce dopo RK. Fino ad allora `STEP+ANALYTIC` deve essere rifiutato all'avvio. **Non** accumulare più solve analitici indipendenti nello stesso gruppo: usare gruppi distinti.
 
 
-**Stato di avanzamento D17.3 — PARZIALMENTE COMPLETATO — validazione capacità del gruppo esistente; interfacce SI/IM di tutte le famiglie da verificare.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.3 — PARZIALE — capacità e interfacce SI/IM presenti; comportamento quantitativo per gruppo da verificare.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.4 — Cadenza e ordine
 
@@ -107,7 +107,7 @@ Per uno stadio diagonale RK, l'intervallo implicito pertinente è `a_ii^IM * dt`
 - Identità di gruppo: combinazione `(cadence, group_id)` oppure ID globalmente univoco, secondo il contratto di input scelto; usare una regola unica e documentata. L'ordine non costituisce l'identità del gruppo. Conservare il namespace stage/step indipendente senza ambiguità.
 
 
-**Stato di avanzamento D17.4 — PARZIALMENTE COMPLETATO — cadenza/ordine validati; esecutore STEP unico ancora assente.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.4 — PARZIALE — cadenza/ordine disponibili; dispatch STEP generale e confronto temporale ancora aperti.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.5 — Struttura minima del gruppo
 
@@ -134,7 +134,7 @@ Gli `equation_ids` del gruppo derivano dai termini e dal modello fisico. Per New
 
 **Aggiornamento — rimozione strutturale (24 ottobre 2026):** preparata la sostituzione del registro basato sui descrittori dei sotto-solver con il registro fondato unicamente sui gruppi. Eliminati `source_solver_type`, `solver_entries`, `implicit_solver_ids`, `analytic_solver_ids` e le relative API; adattati parser nativo, adapter legacy e test. Questa modifica non è ancora stata verificata mediante le Actions e non dimostra equivalenza numerica; lo stato resta IN CORSO.
 
-**Stato di avanzamento D17.5 — COMPLETATO (STRUTTURA) — un gruppo/un metodo/un set di equazioni, nessun sotto-solver o term_ids; CI verde fino a 61fee22; equivalenza scientifica del solve congiunto separata.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.5 — COMPLETATO (STRUTTURA) / CI VERDE — nessun sotto-solver o term_ids, singolo metodo e target di gruppo.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.6 — Gruppi `ANALYTIC`
 
@@ -145,7 +145,7 @@ Gli `equation_ids` del gruppo derivano dai termini e dal modello fisico. Per New
 - L'operatore aggiorna soltanto le equazioni target, lasciando invariato il restante stato conservativo, a meno di una trasformazione dichiarata e validata.
 
 
-**Stato di avanzamento D17.6 — PARZIALMENTE COMPLETATO — singolo metodo analytic per gruppo implementato; verifiche numeriche end-to-end incomplete.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.6 — PARZIALE — operatore analytic unico implementato; confronto con baseline aperto.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.7 — Gruppi `NEWTON` (requisito corretto e vincolante)
 
@@ -163,7 +163,7 @@ Esempi:
 **Obsoleto:** il requisito precedente «un gruppo Newton può contenere più solve Newton indipendenti eseguiti in ordine». Le sezioni D17.7, D17.10, D17.19 e i vecchi report che lo descrivono documentano un'implementazione da correggere, non il nuovo obiettivo. Il vecchio blocco Newton accoppiato deve continuare a essere risolto congiuntamente; il nuovo contratto deve estendere tale regola ai gruppi nativi. Quando due gruppi condividono dipendenze fisiche, l'esecuzione sequenziale può differire dal solve accoppiato: non prometterne equivalenza senza verifica.
 
 
-**Stato di avanzamento D17.7 — PARZIALMENTE COMPLETATO — un Newton per gruppo, senza scheduling interno; test Jacobiane/residui accoppiati incompleti.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.7 — PARZIALE — singolo Newton per gruppo; residui/Jacobiane accoppiati da verificare.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.8 — Modulo `source_terms_2d` e API di assemblaggio
 
@@ -177,14 +177,14 @@ Esempi:
 L'elenco `term_names` seleziona i contributi e il modulo assembla i vettori sulle equazioni appropriate; non deve scegliere autonomamente la cadenza o il metodo. Non introdurre un dispatcher universale con tipo di output ambiguo: rate SI/IM/EX e aggiornamento analitico hanno contratti matematici diversi. **Regola generale senza eccezioni:** ogni contributo sorgente delle equazioni, **inclusi tutti i trasferimenti di massa**, deve essere assemblato in `source_terms_2d`. In particolare erosione, deposizione, perdite della fase continua, entrainment, vaporizzazione e contributi accoppiati a quantità di moto, energia, componenti e pressione dei pori non devono essere assemblati una seconda volta nell'esecutore temporale. L'assemblatore deve produrre un risultato coerente che comprenda sia il vettore delle sorgenti delle equazioni conservative sia i rate accessori necessari per gli inventari dei materiali e per la variazione del letto. Gli eventuali termini derivati vengono inclusi automaticamente nelle equazioni pertinenti, senza essere schedulati come sorgenti indipendenti. Tenere distinta la *valutazione/assemblaggio dei rate* dall'*applicazione atomica* dello step.
 
 
-**Stato di avanzamento D17.8 — IMPLEMENTATO (ARCHITETTURA), CI VERDE FINO A a974b5b1 — assemblatori STAGE/STEP explicit, semi-implicit, implicit e analytic in source_terms_2d; prove numeriche ancora aperte.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.8 — IMPLEMENTATO (ARCHITETTURA) / CI VERDE — quattro assemblatori comuni in source_terms_2d; regressioni aperte.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.9 — Rate espliciti e sorgenti al bordo
 
 **Base già implementata:** routing dei rate di cella `STAGE/EXPLICIT` filtrato dal gruppo e hook al bordo separato. Nel riallineamento non duplicare le sorgenti al bordo come rate di cella e non alterare l'operatore spaziale, la curvatura o le finestre di attivazione. Una sorgente di bordo produce uno stato imposto: la sua partecipazione alla configurazione deve rispettare tale rappresentazione. Conservare i test già validi e aggiungere verifiche mirate alla struttura semplificata.
 
 
-**Stato di avanzamento D17.9 — PARZIALMENTE COMPLETATO — routing nominale e hook espliciti presenti; assemblatori comuni migrati e CI verde, bilanci numerici ancora da verificare.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.9 — PARZIALE — routing esplicito e hook al bordo migrati; rate e BC da confrontare.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.10 — SI/IM, Newton e Jacobiana congiunta
 
@@ -234,21 +234,21 @@ Conservare il calcolo del residuo sui soli indici attivi, la Jacobiana complex-s
 
 **Aggiornamento — commit `ab515430`:** tolto `source_solver_type` dalle firme interne di `solve_newton_group`, residuo e Jacobiana REAL/COMPLEX; il gruppo è l'unica selezione trasmessa nelle valutazioni del rate. Il livello di orchestration conserva ancora `solvers(:)` per convalida e deve essere migrato insieme al registro.
 
-**Stato di avanzamento D17.10 — PARZIALMENTE COMPLETATO — Newton indicizzato e doppia correzione presenti; migrazione correzione in state_2d su ecef5c5; test congiunti 1x1/2x2/3x3 mancanti.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.10 — PARZIALE — Newton indicizzato e due correzioni preservati; prove 1x1/2x2/3x3 aperte.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.11 — Kernel REAL/COMPLEX
 
 **Base già realizzata nel perimetro verificato:** riutilizzo del kernel COMPLEX della correlazione lahar dal wrapper REAL. Conservare la compatibilità complex-step e prevenire la duplicazione delle formule. Dove un termine selezionabile entra in Newton, verificare la disponibilità delle sue valutazioni necessarie al residuo e alla Jacobiana. Non imporre file `.inc` dove il riuso del kernel esistente è sufficiente.
 
 
-**Stato di avanzamento D17.11 — PARZIALMENTE COMPLETATO — kernel REAL/COMPLEX preservati; capability e Jacobiane da verificare per legge.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.11 — PARZIALE — kernel REAL/COMPLEX mantenuti; Jacobiane da validare per legge.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.12 — Solve analitici
 
 **Base già implementata:** interfaccia analitica in `source_terms_2d`, con target velocità, temperatura o pressione dei pori. Semplificare il contratto rimuovendo i riferimenti a un descrittore di sotto-solve indipendente quando la scelta è già univocamente determinata dal gruppo; mantenere l'intervallo fisico e l'aggiornamento del solo target. Rifiutare gruppi che richiederebbero due operatori analitici distinti.
 
 
-**Stato di avanzamento D17.12 — PARZIALMENTE COMPLETATO — analitico temperatura separato dalla reologia con flag dedicato (CI verde fino a 61fee22); confronti numerici mancanti.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.12 — PARZIALE — analitico e thermal flag indipendente implementati; bilanci quantitativi aperti.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 
 **Aggiornamento 24 ottobre — commit `e4dda5ed`:** l'assemblatore analitico `eval_analytic_terms` riceve ora soltanto il gruppo e riconosce l'unico operatore da `group%equation_ids` (momentum 2/3, temperatura 4, pressione dei pori); non richiede il descrittore `source_solver_type`. Il runtime mantiene ancora il descrittore per i controlli del registro: la rimozione completa deve migrare anche SI/IM e Newton. Verifica del nuovo commit ancora da eseguire.
@@ -272,7 +272,7 @@ Conservare il calcolo del residuo sui soli indici attivi, la Jacobiana complex-s
 **Casi minimi di regressione:** (a) reologia lava + flag attivo: confronto con baseline; (b) reologia lava + flag disattivo: nessuna sorgente radiativa/convettiva; (c) altra reologia + flag attivo: sorgente termica selezionata e integrata col metodo disponibile; (d) altra reologia + flag disattivo: nessuna sorgente termica; (e) assenza del flag in vecchi input; (f) gruppi `NEWTON/STAGE` e `ANALYTIC/STAGE` termici indipendenti dalla reologia, con verifica su residuo/Jacobiana o bridge analitico; (g) errori precoci per configurazioni termiche non supportate. Preservare la correttezza dell'input termico e le unità dei coefficienti.
 
 
-**Stato di avanzamento D17.12a — IMPLEMENTATO E VERIFICATO DALLA CI (metadata) — thermal_cooling_flag indipendente, fallback storico, quattro combinazioni lava/Voellmy ON/OFF; restano prove quantitative dei bilanci energetici.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.12a — IMPLEMENTATO (CONFIGURAZIONE) / CI VERDE — thermal_cooling_flag e matrice di fallback testati; bilanci aperti.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.13 — Default e compatibilità legacy
 
@@ -287,7 +287,7 @@ Conservare il calcolo del residuo sui soli indici attivi, la Jacobiana complex-s
 La tabella dei default deve includere la nuova attivazione termica indipendente e il comportamento in assenza del relativo flag secondo D17.12a. Deve indicare condizioni di attivazione, metodo, cadenza, gruppo, equazioni target e precedenze per ogni combinazione fisica supportata. Confrontare sia il registro normalizzato sia l'effettiva evoluzione numerica. Non riprodurre una struttura di sotto-solve solo per imitare la nomenclatura legacy.
 
 
-**Stato di avanzamento D17.13 — PARZIALMENTE COMPLETATO — 864 combinazioni legacy e verifiche del default confermate dalla CI fino a 61fee22; confronto numerico completo ancora aperto.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.13 — PARZIALE — mapping combinatorio legacy coperto dalla suite; confronto output aperto.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.14 — Trasferimenti di massa: applicazione del contratto fisico uniforme
 
@@ -363,7 +363,7 @@ Al momento il mass-exchange supporta **solo `EXPLICIT/STEP`** come combinazione 
 Il batch indivisibile e i limitatori condivisi devono continuare a essere rispettati. Non introdurre un metodo implicito o analitico fittizio per rendere l'interfaccia uniforme. La semplificazione richiesta riguarda il **percorso di assemblaggio e scheduling**, non una modifica delle leggi fisiche.
 
 
-**Stato di avanzamento D17.14 — PARZIALMENTE COMPLETATO (audit 24 ottobre 2026).** Interfacce reali per tutte le sette voci mass exchange del catalogo: cinque processi fisici con nomi `eval_mass_exchange_<processo>_explicit` e relative tre procedure non supportate; in `mass_exchange_carrier_loss_2d` le tre perdite configurabili (liquida, indotta dalla deposizione, Darcy) sono calcolate separatamente, poi sommate e limitate **una sola volta** nella transazione carrier-loss. Esistono quattro procedure nominali per ciascuna delle sette voci. Restano aperti dispatch definitivo del gruppo STEP, test di equivalenza fisica/quantitativi e CI del commit.
+**Stato di avanzamento D17.14 — PARZIALE — processi mass exchange e limiter comune; equivalenza STEP aperta.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.15 — Sequenza del timestep
 
@@ -379,7 +379,7 @@ Sequenza production da preservare:
 È necessario testare le sorgenti circolari, fissurali, radiali e al bordo, inclusi periodi inattivi, rampe, finestre parziali e wrap, nonché `dt`, output e restart nei casi pertinenti. La verifica già svolta delle cinque fasi source-window/OU/RK/step/clock rimane evidenza storica nel suo perimetro.
 
 
-**Stato di avanzamento D17.15 — PARZIALMENTE COMPLETATO — sequenza RK/STEP esistente; STEP comune e regressioni d'ordine pendenti.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.15 — PARZIALE — ordine RK/STEP presente e stato estratto; regressioni temporali aperte.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.15a — `time_integration_2d` indipendente dalla fisica e operazioni sullo stato in `state_2d` (vincolante)
 
@@ -400,7 +400,7 @@ Sequenza production da preservare:
 **Non confondere pulizia del modulo con eliminazione dei controlli:** tutte le verifiche numeriche a runtime restano obbligatorie. L'integratore può mantenere `n_eqns`, indici forniti come metadati, coefficienti RK, stato e operatori numerici; ciò che va rimosso sono i dettagli specifici di temperatura, solidi, quantità di moto e nomi delle leggi fisiche. L'attività è un **refactoring a comportamento invariato**, non una revisione della formulazione numerica.
 
 
-**Stato di avanzamento D17.15a — PARZIALMENTE COMPLETATO — correzione momentum spostata in state_2d e finalizzazione post-RK ora estratta in finalize_imex_cell_state; CI e prove sugli stati intermedi/finali ancora pendenti, halo ancora aperto.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.15a — IMPLEMENTATO (MIGRAZIONE PRINCIPALE) / CI VERDE — finalizzazione post-RK e dry halo/stage in state_2d; test stato/observer mancanti.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.16 — Input e validazione preventiva e unica
 
@@ -442,7 +442,7 @@ GRUPPO 3: STEP, EXPLICIT, batch mass-exchange completo
 Non dichiarare questo esempio valido per qualunque reologia: la compatibilità di ogni termine con il metodo scelto deve risultare dal catalogo e dai test.
 
 
-**Stato di avanzamento D17.16 — PARZIALMENTE COMPLETATO — input nativo, rifiuti e calendario verificati fino a 61fee22; controlli di regressione estesi mancanti.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.16 — PARZIALE — parser e validazioni nella CI; equivalenza input numerica aperta.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 **Aggiornamento successivo — commit `04b2bc07`:** i quattro campi del sotto-solver sono stati rimossi dalla namelist `SOURCE_GROUPS` e dal parser nativo; gli input nativi storici che li contengono ricevono errore di namelist, mentre il percorso legacy senza `SOURCE_GROUPS` rimane separato. I target ora si specificano con `source_group_target_count` e `source_group_targets`. Il livello interno `source_solver_type` e il catalogo a ID numerici restano da migrare. La modifica richiede ancora verifica di build e test.
 
@@ -451,7 +451,7 @@ Non dichiarare questo esempio valido per qualunque reologia: la compatibilità d
 Conservare l'isolamento dei moduli `*_laws_2d` rispetto a RK, gruppi e infrastruttura spaziale; l'assemblaggio dei contributi nelle equazioni rimane in `source_terms_2d`. La selezione fisica deve essere guidata dall'elenco termini del **gruppo**, non da identificatori di sotto-solve non necessari. Il solver legge residuo/rate dal bridge equazionale, non importa direttamente leggi fisiche. Completare audit statico e call graph, distinguendo le API di sorgente dalle API fisiche non-sorgente dell'operatore spaziale.
 
 
-**Stato di avanzamento D17.17 — PARZIALMENTE COMPLETATO — assemblatori definitivi migrati, equation_terms ripulito, injection coefficients separati; restano audit di responsabilità e prove quantitative.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.17 — PARZIALE — equation_terms ripulito; assemblatori in source_terms e finalizzazione in state_2d; audit generale API aperto.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.18 — Adattamento delle routine esistenti
 
@@ -460,7 +460,7 @@ Minimizzare le modifiche alle formule: **uniformare tutti i moduli di leggi sorg
 **Riorganizzazione del modulo:** prima classificare tutte le routine pubbliche dell’attuale `equation_terms_2d` come *sorgente* o *non-sorgente*. Spostare soltanto le seconde verso il proprietario appropriato, mantenendo signature e comportamento ove possibile; rinominare quindi modulo e file in `source_terms_2d` e aggiornare import, compilazione, test e documentazione. Separare i commit/logical steps di spostamento/rinomina da quelli che modificano il comportamento dei gruppi, così da rendere le regressioni attribuibili. Non creare un ulteriore dispatcher generico.
 
 
-**Stato di avanzamento D17.18 — PARZIALMENTE COMPLETATO — catalogo uniforme e 96 interfacce concrete implementate, mass exchange organizzato per processi; dispatch e regressioni numeriche da chiudere.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.18 — PARZIALE — quattro interfacce per 24 sorgenti; dispatch ed equivalenza da validare.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## D17.18a — Procedura minima per aggiungere una sorgente fisica (vincolante)
 
@@ -557,7 +557,7 @@ Il validatore legge nomi, target e tre capabilities, controlla unicità, copertu
 **Test di estensibilità obbligatorio:** aggiungere in un branch di test una reologia Newton-only fittizia seguendo A–E, verificare che compilazione e validazione funzionino modificando il **solo dispatcher statico** fra i moduli eseguibili preesistenti (oltre a catalogo/input/build), *senza alcuna modifica* ai moduli elencati in D17.18a.4, e verificare il rifiuto delle combinazioni non supportate. Tale esercizio rende misurabile la promessa di semplificazione.
 
 
-**Stato di avanzamento D17.18a — DA INIZIARE — prova rheology_newmodel end-to-end non implementata; resta anche l'eliminazione delle identità numeriche interne reologiche.** **Evidenza:** due Actions verdi confermate fino a `61fee22`; `ecef5c5` non ancora verificato. Le verifiche scientifiche D17.20–D17.21 restano aperte.
+**Stato di avanzamento D17.18a — DA INIZIARE (PROVA NUOVO MODELLO) — rheology_newmodel e rimozione ID reologici interni ancora aperti.** **CI:** due Actions verdi fino a `35be9f0a` confermate; test scientifici D17.20–21 ancora aperti.
 
 ## Guida di lettura e priorità di migrazione
 
@@ -580,27 +580,27 @@ Il validatore legge nomi, target e tre capabilities, controlla unicità, copertu
 
 ## D17.19 — Piano implementativo aggiornato (ordine consigliato)
 
-**Audit aggiornato al commit `a974b5b1` (entrambe le Actions verdi confermate):** gli assemblatori comuni STAGE/STEP EXPLICIT, SEMI_IMPLICIT, IMPLICIT e ANALYTIC sono in `source_terms_2d`; i vecchi adattatori sono eliminati; `mass_injection_coefficients_2d` possiede il calendario delle iniezioni e `equation_terms_2d` conserva le sole cinque routine di equazione, oltre alla riesportazione di curvatura. Le note di stato originali più sotto vengono rettificate secondo questo audit; le prove numeriche D17.20–D17.21 restano non soddisfatte.\n\n
+**Audit aggiornato a `35be9f0a` (due Actions verdi):** assemblatori in `source_terms_2d`; `equation_terms_2d` contiene cinque procedure e non riesporta la curvatura; correzione momentum, finalizzazione post-RK e inizializzazione asciutta di halo/stage sono in `state_2d`; coefficienti di iniezione in `mass_injection_coefficients_2d`. Le regressioni D17.20–21 rimangono aperte.
 
 | Passo | Azione | Tipo | Accettazione mirata | Stato |
 |---|---|---|---|---|
-| 1 | Congelare inventario termini e baseline dei casi legacy; registrare test storici e SHA | Conservare | Catalogo e comparatori disponibili | PARZIALMENTE COMPLETATO — inventario/catalogo e baseline CI disponibili; baseline numeriche complete mancanti |
-| 2 | Formalizzare contratto **un gruppo/un metodo/una cadenza/un solve**; eliminare la semantica dei multi-solve Newton | **Correggere** | Specifica, test negativi per multi-solve | COMPLETATO STRUTTURA — unico gruppo/metodo/solve; test CI verdi fino a 61fee22, prove coupled Newton ancora aperte |
-| 3 | Semplificare `source_group_type` e il registro, con un unico insieme di target e nessun scheduling interno | **Correggere** | Build, test di registry e immutabilità | COMPLETATO STRUTTURA — registro nominale senza sotto-solver e term_ids, CI verde fino a 61fee22 |
-| 4 | Semplificare il parser `SOURCE_GROUPS` e adapter legacy; validare subito dopo input | **Correggere** | Input validi, conflitti e messaggi negativi | PARZIALMENTE COMPLETATO — configurazione nativa e negativi passano CI fino a 61fee22; equivalenza input end-to-end aperta |
-| 5 | Adattare l'assemblaggio SI/IM a **tutti i termini del gruppo** | **Correggere** | Test dei rate per gruppo, REAL/COMPLEX | PARZIALMENTE COMPLETATO — dispatch per legge fisica; test dei rate SI/IM congiunti ancora mancanti |
-| 6 | **Riutilizzare il Newton indicizzato già presente nella dev** (`group_equations(:)`), senza riscriverlo: una sola chiamata Newton per gruppo con residuo/Jacobiana congiunti; preservare le **due correzioni numeriche** dopo SI e dopo Newton, riconoscendo i blocchi tramite indici di equazione (D17.10.1) | **Correggere** | Test sistemi 2x2, 1x1, 3x3, accoppiamento e correzioni nei due punti | PARZIALMENTE COMPLETATO — Newton indicizzato riutilizzato; test 1x1/2x2/3x3 e correzioni doppie pendenti |
-| 7 | Adattare bridge analitico all'operatore unico di gruppo | Adeguare | Un solo analytic; confronto legacy | PARZIALMENTE COMPLETATO — bridge analitico esistente; confronto numerico end-to-end mancante |
-| 8 | Preservare routing esplicito `STAGE` e hook al bordo | Conservare/adeguare | Rate e BC senza duplicazione | PARZIALMENTE COMPLETATO — routing esplicito mantenuto; dispatcher definitivo e rate tests mancanti |
-| 8a | Separare il raffreddamento dalla selezione reologica: aggiungere `thermal_cooling_flag` in `TEMPERATURE_PARAMETERS`, migrare i controlli su layout, sorgenti, coefficienti e kernel, senza cambiare la legge fisica; preservare compatibilità dei vecchi input quando il flag è assente | **Correggere** | Matrice 2x2 reologia lava/non lava e raffreddamento on/off, parser e bilanci energetici | IMPLEMENTATO / CI VERDE — thermal_cooling_flag, default storico e matrice 2x2; bilanci energetici numerici ancora pendenti |
-| 9 | Uniformare **tutte** le famiglie di leggi sorgente al contratto fisico `explicit`/`semi_implicit`/`implicit`/`analytic`, conservando i kernel esistenti; registrare per ciascuna sorgente **un solo nome, un target, tre capabilities** (`EXPLICIT`/`NEWTON`/`ANALYTIC`), con SI+IM obbligatorie per NEWTON | **Correggere** | Test per ogni famiglia: dispatch coerente, disponibilità e rifiuto di interfacce non implementate | INTERFACCE FISICHE CONCRETE IMPLEMENTATE 24/24 — 96 procedure con naming uniforme eval/solve e CI verde fino a a974b5b1; blocchi STAGE estratti e SI/IM NEWTON nulli validi. Rimangono regressioni quantitative e dispatch end-to-end da validare |
-| 10 | Riorganizzare `src/physics/mass_exchange/` per processi, accorpare deposizione + perdita indotta, migrare i kernel esistenti e introdurre il coordinamento interno in `mass_exchange_laws_2d` senza duplicare i limitatori condivisi; integrare la sola interfaccia `explicit` in `source_terms_2d::eval_expl_terms`, eliminare il routing temporale separato e preservare il batch legacy come **ultimo gruppo `STEP/EXPLICIT`** | **Correggere** | Bilanci, test dei singoli processi, limitatore comune e dipendenze, conservazione dell’inventario, nessun doppio aggiornamento, corretto ordine STEP e build aggiornato | PARZIALMENTE COMPLETATO — bridge comune STEP utilizzato direttamente dall'esecutore post-RK; gate statico ora ne controlla l'unicita e vieta il ritorno all'assemblaggio diretto.  nominate tutte e sette le sorgenti mass exchange del catalogo con quattro interfacce; le tre perdite carrier sono distinte e il limitatore rimane applicato una sola volta dopo la loro somma. Nuova CI e prove comparative D17.20–21 pendenti; dispatch definitivo STEP e controllo atomico ancora da chiudere |
-| 10a | Estrarre da `time_integration_2d` i controlli/correzioni fisico-specifiche in `state_2d` con nomi neutrali (`finalize_dry_cell_state`, controlli su masse/temperatura, roundoff), riusando `state_conversion_2d` e conservando sequenza/soglie; centralizzare anche l'inizializzazione delle primitive asciutte nell'halo | **Correggere** | Audit delle chiamate e test di equivalenza sugli stati intermedi/finali, celle asciutte, errori, observer e halo di ricostruzione | IMPLEMENTATO (FINALIZZAZIONE CELLE POST-RK) / CI PENDENTE — blocco di clipping, dry-cell, conversione, controlli, roundoff e maschera nodata trasferito in state_2d; inizializzazione dry halo/explicit-stage ora centralizzata in state_2d; rimangono test sugli stati intermedi e regressioni di equivalenza |
-| 10b | Migrare `correct_friction_momentum` in `state_2d` come correzione della direzione della quantità di moto a due stati; conservarne le due chiamate dal solver dopo SI e dopo Newton, tramite metadati di indici | **Correggere** | Test before/after di entrambi i punti, SI attivo/inattivo, sistema accoppiato e assenza di chiamate automatiche in finalizzazione generica | IMPLEMENTATO / CI VERDE fino a a974b5b1 — correzione trasferita in state_2d; formula e due chiamate preservate, gate numerici ancora aperti |
-| 10c | Migrare catalogo, gruppi, input e dispatcher da ID numerici fisici a nomi canonici; accorpare le componenti delle reologie sotto un solo termine configurabile e rendere il validatore indipendente dai modelli | **Correggere** | Esempio `rheology_newmodel` D17.18a, test compatibilità e assenza di ID fisici | PARZIALMENTE COMPLETATO — catalogo 24 e cinque campi verificati fino a 61fee22; identità numeriche interne e rheology_newmodel ancora aperti |
-| 11 | Eliminare verifiche di configurazione ridondanti dagli hot loop, non i controlli numerici | Semplificare | Audit e prestazioni senza regressioni | DA INIZIARE — audit degli hot loop non eseguito |
-| 12 | Eseguire regressioni proporzionate al rischio su legacy/nativo, finestre, RK, OU, output, restart, ifx/CI pertinenti | Verificare | Evidenze e baseline approvate | PARZIALMENTE COMPLETATO — build e registry CI verdi fino a 61fee22; compare quantitativo, restart e ifx ancora aperti |
-| 13 | Chiudere D17 solo quando D17.20–D17.21 sono soddisfatti | Gate | Decisione documentata | DA INIZIARE — gate finale D17.20–D17.21 non soddisfatto |
+| 1 | Congelare inventario termini e baseline dei casi legacy; registrare test storici e SHA | Conservare | Catalogo e comparatori disponibili | PARZIALE — inventario CI verificato; baseline numeriche incomplete |
+| 2 | Formalizzare contratto **un gruppo/un metodo/una cadenza/un solve**; eliminare la semantica dei multi-solve Newton | **Correggere** | Specifica, test negativi per multi-solve | COMPLETATO (STRUTTURA) / CI VERDE — un metodo e un solve per gruppo; test coupled Newton separati |
+| 3 | Semplificare `source_group_type` e il registro, con un unico insieme di target e nessun scheduling interno | **Correggere** | Build, test di registry e immutabilità | COMPLETATO (STRUTTURA) / CI VERDE — no term_ids o sotto-solver |
+| 4 | Semplificare il parser `SOURCE_GROUPS` e adapter legacy; validare subito dopo input | **Correggere** | Input validi, conflitti e messaggi negativi | PARZIALE / CI VERDE — parser e legacy mapping presenti; confronto end-to-end aperto |
+| 5 | Adattare l'assemblaggio SI/IM a **tutti i termini del gruppo** | **Correggere** | Test dei rate per gruppo, REAL/COMPLEX | PARZIALE / CI VERDE — SI/IM in source_terms; test rate accoppiati aperti |
+| 6 | **Riutilizzare il Newton indicizzato già presente nella dev** (`group_equations(:)`), senza riscriverlo: una sola chiamata Newton per gruppo con residuo/Jacobiana congiunti; preservare le **due correzioni numeriche** dopo SI e dopo Newton, riconoscendo i blocchi tramite indici di equazione (D17.10.1) | **Correggere** | Test sistemi 2x2, 1x1, 3x3, accoppiamento e correzioni nei due punti | PARZIALE / CI VERDE — Newton indicizzato e due correzioni; test quantitativi mancanti |
+| 7 | Adattare bridge analitico all'operatore unico di gruppo | Adeguare | Un solo analytic; confronto legacy | PARZIALE / CI VERDE — bridge analytic presente, baseline numeriche aperte |
+| 8 | Preservare routing esplicito `STAGE` e hook al bordo | Conservare/adeguare | Rate e BC senza duplicazione | IMPLEMENTATO (ROUTING) / CI VERDE — STAGE e boundary hook; test rate aperti |
+| 8a | Separare il raffreddamento dalla selezione reologica: aggiungere `thermal_cooling_flag` in `TEMPERATURE_PARAMETERS`, migrare i controlli su layout, sorgenti, coefficienti e kernel, senza cambiare la legge fisica; preservare compatibilità dei vecchi input quando il flag è assente | **Correggere** | Matrice 2x2 reologia lava/non lava e raffreddamento on/off, parser e bilanci energetici | IMPLEMENTATO (CONFIGURAZIONE) / CI VERDE — flag e fallback, bilanci aperti |
+| 9 | Uniformare **tutte** le famiglie di leggi sorgente al contratto fisico `explicit`/`semi_implicit`/`implicit`/`analytic`, conservando i kernel esistenti; registrare per ciascuna sorgente **un solo nome, un target, tre capabilities** (`EXPLICIT`/`NEWTON`/`ANALYTIC`), con SI+IM obbligatorie per NEWTON | **Correggere** | Test per ogni famiglia: dispatch coerente, disponibilità e rifiuto di interfacce non implementate | IMPLEMENTATO (96 INTERFACCE) / CI VERDE — dispatch quantitativo da verificare |
+| 10 | Riorganizzare `src/physics/mass_exchange/` per processi, accorpare deposizione + perdita indotta, migrare i kernel esistenti e introdurre il coordinamento interno in `mass_exchange_laws_2d` senza duplicare i limitatori condivisi; integrare la sola interfaccia `explicit` in `source_terms_2d::eval_expl_terms`, eliminare il routing temporale separato e preservare il batch legacy come **ultimo gruppo `STEP/EXPLICIT`** | **Correggere** | Bilanci, test dei singoli processi, limitatore comune e dipendenze, conservazione dell’inventario, nessun doppio aggiornamento, corretto ordine STEP e build aggiornato | PARZIALE / CI VERDE — processi mass exchange e limitatore condiviso; confronto STEP mancante |
+| 10a | Estrarre da `time_integration_2d` i controlli/correzioni fisico-specifiche in `state_2d` con nomi neutrali (`finalize_dry_cell_state`, controlli su masse/temperatura, roundoff), riusando `state_conversion_2d` e conservando sequenza/soglie; centralizzare anche l'inizializzazione delle primitive asciutte nell'halo | **Correggere** | Audit delle chiamate e test di equivalenza sugli stati intermedi/finali, celle asciutte, errori, observer e halo di ricostruzione | IMPLEMENTATO (MIGRAZIONE PRINCIPALE) / CI VERDE — finalizzazione post-RK e dry halo/stage ora in state_2d; test equivalenza stati, observer e casi asciutti ancora da eseguire |
+| 10b | Migrare `correct_friction_momentum` in `state_2d` come correzione della direzione della quantità di moto a due stati; conservarne le due chiamate dal solver dopo SI e dopo Newton, tramite metadati di indici | **Correggere** | Test before/after di entrambi i punti, SI attivo/inattivo, sistema accoppiato e assenza di chiamate automatiche in finalizzazione generica | IMPLEMENTATO (MIGRAZIONE) / CI VERDE — correct_friction_momentum in state_2d; verifiche before/after aperte |
+| 10c | Migrare catalogo, gruppi, input e dispatcher da ID numerici fisici a nomi canonici; accorpare le componenti delle reologie sotto un solo termine configurabile e rendere il validatore indipendente dai modelli | **Correggere** | Esempio `rheology_newmodel` D17.18a, test compatibilità e assenza di ID fisici | PARZIALE / CI VERDE — catalogo canonico; ID e rheology_newmodel aperti |
+| 11 | Eliminare verifiche di configurazione ridondanti dagli hot loop, non i controlli numerici | Semplificare | Audit e prestazioni senza regressioni | DA INIZIARE — audit hot loop mancante |
+| 12 | Eseguire regressioni proporzionate al rischio su legacy/nativo, finestre, RK, OU, output, restart, ifx/CI pertinenti | Verificare | Evidenze e baseline approvate | PARZIALE / CI VERDE — build e registry, non prove numeriche complete, restart e ifx |
+| 13 | Chiudere D17 solo quando D17.20–D17.21 sono soddisfatti | Gate | Decisione documentata | NON SODDISFATTO — gate scientifici D17.20–21 aperti |
 
 La voce D17.2 richiede ora una **migrazione strutturale del catalogo e dei nomi**; le voci D17.9 routing esplicito, D17.11 riuso kernel, D17.12 bridge analitico e parti D17.15 sono **basi già realizzate**; il batch D17.14 esiste ma il suo routing speciale deve essere sostituito; non ripianificare da zero ciò che è corretto. Il cambiamento prioritario riguarda il significato dei gruppi Newton, il parser/registro e il residuo congiunto. L'implementazione di metodi ancora non supportati alla cadenza `STEP` non è una precondizione per chiudere il refactoring di compatibilità: serve una decisione esplicita di scope, altrimenti restano combinazioni vietate e validate come tali.
 
@@ -1451,3 +1451,8 @@ Dopo commit `0da5c7cb`, estratto da `time_integration_2d::imex_RK_solver` il blo
 ### D17.22 — D17.19 passo 10a: inizializzazione dry dell'halo e degli stage (24 ottobre 2026)
 
 Dopo Actions verdi sul commit `b2f61de2`, estratta in `state_2d::initialize_dry_physical_cell` l'inizializzazione fisica asciutta (tutte le componenti zero, temperatura `T_ambient`) e sostituite le due sequenze duplicate in `time_integration_2d`: inizializzazione della reconstruction halo ad inizio RK e fallback dry dello stato fisico durante gli stage espliciti. Preservati l'ordine dei loop OpenMP, le condizioni sui target e i valori assegnati, senza modifiche a formule o controlli. Assieme a `finalize_imex_cell_state`, risultano quindi migrati in `state_2d` sia il blocco finale della cella attiva sia l'inizializzazione dry dell'halo; restano da eseguire test quantitativi di equivalenza e audit di ulteriori preparazioni dry in moduli spaziali. CI di questo commit pendente, D17.20/D17.21 non chiusi.
+
+
+### D17.22 — Audit coordinato degli stati D17.x e della tabella D17.19 (24 ottobre 2026)
+
+**Base verificata:** commit `35be9f0a`, entrambe le Actions confermate verdi dall'utente. Aggiornate le schede di stato di D17.0–D17.18a e tutte le righe operative di D17.19. In particolare, D17.19 passo 10a: finalizzazione post-RK, proiezione dry, controlli di massa/temperatura e inizializzazione asciutta halo/stage sono in `state_2d` con CI verde; mancano ancora test quantitativi degli stati intermedi/finali, observer e condizioni limite, pertanto il punto NON è dichiarato chiuso scientificamente. Passo 10b: migrazione della correzione momentum verificata dalla CI, prove before/after ancora da chiudere. Sono chiusi come **struttura**, non come equivalenza numerica, i passi 2 e 3. D17.20 e D17.21 rimangono aperti; nessun esito scientifico è dedotto dalle sole Actions. Le voci storiche di D17.22 restano una cronologia e non prevalgono su questo audit consolidato.
