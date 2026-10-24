@@ -246,6 +246,23 @@ PROGRAM test_d17_production_newton
     CALL check(q(2:3),expected,'DIRK diagonal exact stage update')
   END DO
   PRINT *, 'PASS D17 four stage-diagonal Newton coefficients'
+  ! Verify the production stage residual with nonzero known forcing
+  ! for n_RK=2,3,4. This exercises stage composition, not the spatial tableau.
+  DO k=2,4
+    n_RK=k
+    old=[1000.0_wp,3000.0_wp,-4000.0_wp,1.2E9_wp]
+    dt=0.2_wp
+    known=0.0_wp
+    known(2:3)=0.02_wp*old(2:3)
+    q=old
+    CALL solve_rk_step(partition,group,q,old,dt,0.75_wp,known, &
+         0.0_wp,0.0_wp,0.0_wp,iterations,converged,info,search_failed)
+    IF (.NOT.converged .OR. info/=0 .OR. search_failed) &
+         ERROR STOP 'known forcing RK stage failed'
+    expected=(old(2:3)-dt*known(2:3))/(1.0_wp+0.1_wp*dt*0.75_wp)
+    CALL check(q(2:3),expected,'RK stage with known forcing')
+  END DO
+  PRINT *, 'PASS D17 known forcing for n_RK=2,3,4'
 CONTAINS
   SUBROUTINE check(actual,reference,label)
     REAL(wp),INTENT(IN)::actual(2),reference(2)

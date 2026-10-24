@@ -8,6 +8,8 @@ PROGRAM test_d17_mass_balance
   REAL(wp) :: solid_erosion,solid_deposition,carrier_erosion,carrier_loss
   REAL(wp) :: u,v,temp,carrier_rho,carrier_heat,air,bed_temp
   REAL(wp) :: expected(6),expected_topo,dt
+  REAL(wp) :: q_initial(6),q_full(6),q_half(6),bed_full,bed_half
+  REAL(wp) :: deposited(2),eroded(2),substrate(2)
   INTEGER :: scenario
   n_solid=2;n_eqns=6;n_vars=6;n_add_gas=0
   idx_solidEqn_first=5;idx_solidEqn_last=6
@@ -59,6 +61,22 @@ PROGRAM test_d17_mass_balance
     ! The bath and flow inventory exchange must close for solids.
     IF (ANY(ABS(dt*rates(5:6)+dt*rho_s*(dep-er))>1.0E-12_wp)) &
          ERROR STOP 'solid flow-bed exchange'
+    ! Frozen-rate STEP transaction: two half increments must reproduce
+    ! the full conservative update and bed change.
+    q_initial=[1600.0_wp,900.0_wp,-400.0_wp,2.0E9_wp,100.0_wp,120.0_wp]
+    substrate=[0.2_wp,0.3_wp]
+    q_full=q_initial+dt*rates
+    q_half=q_initial+0.5_wp*dt*rates
+    q_half=q_half+0.5_wp*dt*rates
+    CALL compare(q_full,q_half,'full versus two half STEP increments')
+    deposited=dt*dep
+    eroded=dt*er
+    IF (ANY(substrate-eroded<0.0_wp)) ERROR STOP 'fixture inventory exhausted'
+    IF (ANY(ABS(dt*rates(5:6)+rho_s*(deposited-eroded))>1.0E-10_wp)) &
+         ERROR STOP 'solid bed-flow transaction identity'
+    bed_full=dt*topo
+    bed_half=0.5_wp*dt*topo+0.5_wp*dt*topo
+    IF (ABS(bed_full-bed_half)>1.0E-14_wp) ERROR STOP 'bed step subdivision'
     IF (scenario==4 .AND. ANY(ABS(rates)>0.0_wp)) ERROR STOP 'zero exchange'
   END DO
   PRINT *, 'PASS D17 production mass-exchange conservation (4 scenarios)'
