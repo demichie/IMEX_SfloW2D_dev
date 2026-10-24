@@ -388,8 +388,10 @@ CONTAINS
       CASE(SOURCE_METHOD_ANALYTIC)
         IF (SIZE(group%analytic_solver_ids)/=1 .OR. SIZE(group%implicit_solver_ids)/=0) RETURN
       END SELECT
+      ! Transitional descriptor: at most one solve per non-explicit group.
       solve_ids=[group%implicit_solver_ids,group%analytic_solver_ids]
-      DO j=1,SIZE(solve_ids)
+      IF (group%method/=SOURCE_METHOD_EXPLICIT) THEN
+        j=1
         error='D17: missing, duplicate or inconsistent solver descriptor'
         si=solve_ids(j)
         IF (si<1 .OR. si>SIZE(this%solver_entries)) RETURN
@@ -402,7 +404,6 @@ CONTAINS
         IF (SIZE(solver%target_ids)<1) RETURN
         IF (.NOT.valid_equations(solver%equation_ids,this%n_equations)) RETURN
         IF (SIZE(solver%equation_ids)==0) RETURN
-        IF (.NOT.ALL(in_list(solver%equation_ids,group%equation_ids))) RETURN
         expected=[INTEGER::]
         DO k=1,SIZE(solver%target_ids)
           id=solver%target_ids(k)
@@ -432,7 +433,7 @@ CONTAINS
             END IF
           END IF
         END IF
-      END DO
+      END IF
       error='D17: solver coverage does not match group equations/terms'
       IF (group%method/=SOURCE_METHOD_EXPLICIT) THEN
         ! A single solve must contain precisely the group's physical sources.
