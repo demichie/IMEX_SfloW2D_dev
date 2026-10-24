@@ -9,7 +9,6 @@ MODULE equation_terms_2d
   USE diagnostics_2d, ONLY : fatal_error
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE rheology_2d, ONLY : curvature_acceleration
 
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE parameters_2d, ONLY : wp, &
@@ -35,7 +34,6 @@ MODULE equation_terms_2d
   PUBLIC :: eval_local_speeds_direction
   PUBLIC :: eval_inertial_flux, eval_hydrostatic_coefficient
   PUBLIC :: limit_component_mass_flux
-  PUBLIC :: curvature_acceleration
 
 CONTAINS
 

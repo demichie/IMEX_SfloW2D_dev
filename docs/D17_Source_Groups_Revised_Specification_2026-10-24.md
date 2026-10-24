@@ -1431,3 +1431,8 @@ Dopo conferma di entrambe le Actions verdi sul commit `78070634`, ripulita la do
 ### D17.22 — Pulizia Doxygen residuo in equation_terms_2d (24 ottobre 2026)
 
 Audit puntuale di `equation_terms_2d.f90`: eliminati i due blocchi Doxygen orfani in coda al modulo (curvatura del fondo e coefficienti temporali delle sorgenti), gia migrati rispettivamente in `source_terms_2d` e `mass_injection_coefficients_2d`. Eliminata anche la doppia importazione locale di `pore_pressure_flag` e `thermal_cooling_flag` in `init_problem_param`, gia visibili a livello di modulo; ridotta la spaziatura superflua. Restano le cinque procedure del modulo equazioni e la riesportazione di `curvature_acceleration`, da conservare fino all'audit dei chiamanti. Nessun algoritmo modificato; verifica CI del nuovo commit pendente. I gate numerici D17.20/D17.21 restano aperti.
+
+
+### D17.22 — Rimozione della riesportazione di curvatura da equation_terms (24 ottobre 2026)
+
+Dopo Actions verdi confermate sul commit `dd6ce6ff`, rimossi da `equation_terms_2d` `USE rheology_2d, ONLY : curvature_acceleration` e il corrispondente `PUBLIC`. La funzione resta definita e pubblica nel proprietario `rheology_2d`, mentre gli assemblatori fisici la importano direttamente in `source_terms_2d`. Aggiunto un controllo statico in `test_d17_physical_interfaces.py` contro la riesportazione legacy. Nessuna formula o firma di procedura modificata. Il nuovo commit richiede conferma delle Actions; D17.20/D17.21 restano aperti.

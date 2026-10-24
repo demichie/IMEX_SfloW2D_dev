@@ -170,6 +170,11 @@ def main() -> int:
                 exposed = match.group(1).lower()
                 if re.search(r"eval_(?:boundary|bottom|radial|geometry)_(?:injection|curvature)", exposed):
                     failures.append(f"legacy source import through equation_terms in {filename.relative_to(ROOT)}")
+    equation_file = ROOT / "src/physics/equation_terms_2d.f90"
+    equation_code = equation_file.read_text(encoding="utf-8")
+    if re.search(r"(?im)^\s*(?:public\s*::|use\s+rheology_2d\s*,\s*only\s*:)\s*curvature_acceleration\b", equation_code):
+        failures.append("equation_terms must not re-export curvature_acceleration")
+
     for failure in failures:
         print("FAIL:", failure, file=sys.stderr)
     print(f"D17 physical treatment audit: {len(catalog)} configured sources, "
