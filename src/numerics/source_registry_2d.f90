@@ -640,16 +640,21 @@ CONTAINS
     TYPE(source_term_type), INTENT(IN) :: term
     TYPE(source_group_type), INTENT(IN) :: group
     supported=.FALSE.
-    SELECT CASE(term%role)
-    CASE(SOURCE_ROLE_IMPLICIT,SOURCE_ROLE_SEMI_IMPLICIT,SOURCE_ROLE_THERMAL,SOURCE_ROLE_PORE)
-      IF (group%cadence/=SOURCE_CADENCE_STAGE) RETURN
-      supported=group%method==SOURCE_METHOD_NEWTON .OR. group%method==SOURCE_METHOD_ANALYTIC
-      IF (group%method==SOURCE_METHOD_NEWTON .AND. term%role/=SOURCE_ROLE_SEMI_IMPLICIT) &
-           supported=supported .AND. term%complex_rate
-    CASE(SOURCE_ROLE_CELL,SOURCE_ROLE_BOUNDARY)
-      supported=group%cadence==SOURCE_CADENCE_STAGE .AND. group%method==SOURCE_METHOD_EXPLICIT
-    CASE(SOURCE_ROLE_MASS)
-      supported=group%cadence==SOURCE_CADENCE_STEP .AND. group%method==SOURCE_METHOD_EXPLICIT
+    IF (.NOT.term%schedulable) RETURN
+    SELECT CASE(group%method)
+    CASE(SOURCE_METHOD_EXPLICIT)
+      supported=term%has_explicit
+      IF (group%cadence==SOURCE_CADENCE_STAGE) THEN
+        supported=supported .AND. term%role/=SOURCE_ROLE_MASS
+      ELSE IF (group%cadence==SOURCE_CADENCE_STEP) THEN
+        supported=supported .AND. term%role==SOURCE_ROLE_MASS
+      ELSE
+        supported=.FALSE.
+      END IF
+    CASE(SOURCE_METHOD_NEWTON)
+      supported=group%cadence==SOURCE_CADENCE_STAGE .AND. term%has_newton
+    CASE(SOURCE_METHOD_ANALYTIC)
+      supported=group%cadence==SOURCE_CADENCE_STAGE .AND. term%has_analytic
     END SELECT
   END FUNCTION supports_group
 END MODULE source_registry_2d

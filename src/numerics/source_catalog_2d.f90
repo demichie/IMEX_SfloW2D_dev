@@ -159,6 +159,9 @@ MODULE source_catalog_2d
     LOGICAL :: real_rate = .FALSE. !< Existing real rate evaluation.
     LOGICAL :: complex_rate = .FALSE. !< Existing complex rate evaluation.
     LOGICAL :: schedulable = .FALSE. !< False for dependent equation assembly.
+    LOGICAL :: has_explicit = .FALSE. !< Explicit rate/update interface is available.
+    LOGICAL :: has_newton = .FALSE. !< Both Newton-facing interfaces exist.
+    LOGICAL :: has_analytic = .FALSE. !< Analytic local update is available.
     INTEGER :: bundle_id = 0 !< Nonzero for terms that must share one evaluation group.
   END TYPE source_term_type
 
@@ -167,143 +170,211 @@ MODULE source_catalog_2d
        source_term_type(id=SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB, &
             name='SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB', role=SOURCE_ROLE_SEMI_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
-            model_id=rheology_id_voellmy, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+            model_id=rheology_id_voellmy, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_VOELLMY_TURBULENT_DRAG, &
             name='SOURCE_TERM_RHEOLOGY_VOELLMY_TURBULENT_DRAG', role=SOURCE_ROLE_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
-            model_id=rheology_id_voellmy, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+            model_id=rheology_id_voellmy, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_PLASTIC_YIELD, &
             name='SOURCE_TERM_RHEOLOGY_PLASTIC_YIELD', role=SOURCE_ROLE_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
-            model_id=rheology_id_plastic, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+            model_id=rheology_id_plastic, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS, &
             name='SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS', role=SOURCE_ROLE_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
-            model_id=rheology_id_lava, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+            model_id=rheology_id_lava, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_LAVA_YIELD, &
             name='SOURCE_TERM_RHEOLOGY_LAVA_YIELD', role=SOURCE_ROLE_SEMI_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
-            model_id=rheology_id_lava, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+            model_id=rheology_id_lava, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_LAHAR_VISCOUS, &
             name='SOURCE_TERM_RHEOLOGY_LAHAR_VISCOUS', role=SOURCE_ROLE_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
             model_id=rheology_id_lahar, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
-            bundle_id=SOURCE_BUNDLE_LAHAR_DRAG), &
+            bundle_id=SOURCE_BUNDLE_LAHAR_DRAG, &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_LAHAR_TURBULENT_DRAG, &
             name='SOURCE_TERM_RHEOLOGY_LAHAR_TURBULENT_DRAG', role=SOURCE_ROLE_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
             model_id=rheology_id_lahar, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
-            bundle_id=SOURCE_BUNDLE_LAHAR_DRAG), &
+            bundle_id=SOURCE_BUNDLE_LAHAR_DRAG, &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_LAHAR_YIELD, &
             name='SOURCE_TERM_RHEOLOGY_LAHAR_YIELD', role=SOURCE_ROLE_SEMI_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
-            model_id=rheology_id_lahar, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+            model_id=rheology_id_lahar, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_EMPIRICAL_DRAG, &
             name='SOURCE_TERM_RHEOLOGY_EMPIRICAL_DRAG', role=SOURCE_ROLE_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
-            model_id=rheology_id_empirical, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+            model_id=rheology_id_empirical, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_QUADRATIC_DRAG, &
             name='SOURCE_TERM_RHEOLOGY_QUADRATIC_DRAG', role=SOURCE_ROLE_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
-            model_id=rheology_id_quadratic, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+            model_id=rheology_id_quadratic, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_FROUDE_FRICTION, &
             name='SOURCE_TERM_RHEOLOGY_FROUDE_FRICTION', role=SOURCE_ROLE_SEMI_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
-            model_id=rheology_id_froude, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+            model_id=rheology_id_froude, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_LUCAS_FRICTION, &
             name='SOURCE_TERM_RHEOLOGY_LUCAS_FRICTION', role=SOURCE_ROLE_SEMI_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
-            model_id=rheology_id_lucas, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+            model_id=rheology_id_lucas, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_MUI_FRICTION, &
             name='SOURCE_TERM_RHEOLOGY_MUI_FRICTION', role=SOURCE_ROLE_SEMI_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
-            model_id=rheology_id_mui, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+            model_id=rheology_id_mui, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_FRICTION, &
             name='SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_FRICTION', role=SOURCE_ROLE_SEMI_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
-            model_id=rheology_id_mui_voellmy, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE.), &
+            model_id=rheology_id_mui_voellmy, real_rate=.TRUE., complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_TURBULENT_DRAG, &
             name='SOURCE_TERM_RHEOLOGY_MUI_VOELLMY_TURBULENT_DRAG', role=SOURCE_ROLE_IMPLICIT, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_VELOCITY, &
-            model_id=rheology_id_mui_voellmy, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+            model_id=rheology_id_mui_voellmy, real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
             name='SOURCE_TERM_THERMAL_RADIATIVE_COOLING', role=SOURCE_ROLE_THERMAL, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_TEMPERATURE, &
             real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
-            bundle_id=SOURCE_BUNDLE_THERMAL_COOLING), &
+            bundle_id=SOURCE_BUNDLE_THERMAL_COOLING, &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_THERMAL_CONVECTIVE_COOLING, &
             name='SOURCE_TERM_THERMAL_CONVECTIVE_COOLING', role=SOURCE_ROLE_THERMAL, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_TEMPERATURE, &
             real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
-            bundle_id=SOURCE_BUNDLE_THERMAL_COOLING), &
+            bundle_id=SOURCE_BUNDLE_THERMAL_COOLING, &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_PORE_PRESSURE_DISSIPATION, &
             name='SOURCE_TERM_PORE_PRESSURE_DISSIPATION', role=SOURCE_ROLE_PORE, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, target=SOURCE_TARGET_PORE_PRESSURE, &
-            real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE.), &
+            real_rate=.TRUE., complex_rate=.TRUE., schedulable=.TRUE., &
+            has_explicit=.FALSE., has_newton=.TRUE., &
+            has_analytic=.TRUE.), &
        source_term_type(id=SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, &
             name='SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION', role=SOURCE_ROLE_CELL, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.TRUE.), &
+            complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.TRUE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_BOTTOM_FISSURAL_INJECTION, &
             name='SOURCE_TERM_BOTTOM_FISSURAL_INJECTION', role=SOURCE_ROLE_CELL, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.TRUE.), &
+            complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.TRUE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_RADIAL_INJECTION, &
             name='SOURCE_TERM_RADIAL_INJECTION', role=SOURCE_ROLE_CELL, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.TRUE.), &
+            complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.TRUE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_GEOMETRY_CURVATURE, &
             name='SOURCE_TERM_GEOMETRY_CURVATURE', role=SOURCE_ROLE_CELL, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.TRUE.), &
+            complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.TRUE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_BOUNDARY_INJECTION, &
             name='SOURCE_TERM_BOUNDARY_INJECTION', role=SOURCE_ROLE_BOUNDARY, &
             representation=SOURCE_REPRESENTATION_BOUNDARY_STATE, real_rate=.FALSE., &
-            complex_rate=.FALSE., schedulable=.TRUE.), &
+            complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.TRUE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_EROSION, &
             name='SOURCE_TERM_MASS_EXCHANGE_EROSION', role=SOURCE_ROLE_MASS, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.TRUE.), &
+            complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.TRUE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_DEPOSITION, &
             name='SOURCE_TERM_MASS_EXCHANGE_DEPOSITION', role=SOURCE_ROLE_MASS, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.TRUE.), &
+            complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.TRUE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS, &
             name='SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS', role=SOURCE_ROLE_MASS, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.TRUE.), &
+            complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.TRUE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS, &
             name='SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS', role=SOURCE_ROLE_MASS, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.TRUE.), &
+            complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.TRUE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS, &
             name='SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS', role=SOURCE_ROLE_MASS, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.TRUE.), &
+            complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.TRUE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT, &
             name='SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT', role=SOURCE_ROLE_MASS, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.TRUE.), &
+            complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.TRUE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION, &
             name='SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION', role=SOURCE_ROLE_MASS, &
             representation=SOURCE_REPRESENTATION_CELL_RATE, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.TRUE.), &
+            complex_rate=.FALSE., schedulable=.TRUE., &
+            has_explicit=.TRUE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_INLET_THERMAL_COUPLING, &
             name='SOURCE_TERM_INLET_THERMAL_COUPLING', role=SOURCE_ROLE_DERIVED, &
             representation=SOURCE_REPRESENTATION_DEPENDENT, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.FALSE.), &
+            complex_rate=.FALSE., schedulable=.FALSE., &
+            has_explicit=.FALSE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_INLET_PORE_COUPLING, &
             name='SOURCE_TERM_INLET_PORE_COUPLING', role=SOURCE_ROLE_DERIVED, &
             representation=SOURCE_REPRESENTATION_DEPENDENT, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.FALSE.), &
+            complex_rate=.FALSE., schedulable=.FALSE., &
+            has_explicit=.FALSE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_MASS_PORE_COUPLING, &
             name='SOURCE_TERM_MASS_PORE_COUPLING', role=SOURCE_ROLE_DERIVED, &
             representation=SOURCE_REPRESENTATION_DEPENDENT, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.FALSE.), &
+            complex_rate=.FALSE., schedulable=.FALSE., &
+            has_explicit=.FALSE., has_newton=.FALSE., &
+            has_analytic=.FALSE.), &
        source_term_type(id=SOURCE_TERM_MASS_STOCHASTIC_COUPLING, &
             name='SOURCE_TERM_MASS_STOCHASTIC_COUPLING', role=SOURCE_ROLE_DERIVED, &
             representation=SOURCE_REPRESENTATION_DEPENDENT, real_rate=.TRUE., &
-            complex_rate=.FALSE., schedulable=.FALSE.) &
+            complex_rate=.FALSE., schedulable=.FALSE., &
+            has_explicit=.FALSE., has_newton=.FALSE., &
+            has_analytic=.FALSE.) &
        ]
 
 CONTAINS
