@@ -61,13 +61,13 @@ CONTAINS
     CALL fatal_error('rheology: explicit treatment is unsupported')
   END SUBROUTINE eval_rheology_explicit
 
-  SUBROUTINE eval_rheology_semi_implicit(model_id, flow_depth,          &
+  SUBROUTINE eval_rheology_semi_implicit(model_name, flow_depth,          &
        velocity_x, velocity_y, speed, horizontal_speed, mixture_density,    &
        reduced_gravity, gravity_coefficient, solid_fractions, curvature_term, &
        curvature_xx, curvature_xy, curvature_yy, use_pore_pressure,          &
        excess_pore_pressure, use_stochastic, stochastic_value, rate)
 
-    INTEGER, INTENT(IN) :: model_id
+    CHARACTER(*), INTENT(IN) :: model_name
     REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
     REAL(wp), INTENT(IN) :: horizontal_speed, mixture_density, reduced_gravity
     REAL(wp), INTENT(IN) :: gravity_coefficient, solid_fractions(:)
@@ -79,31 +79,31 @@ CONTAINS
     REAL(wp) :: curvature_term_value
 
     rate = 0.0_wp
-    SELECT CASE(model_id)
-    CASE(rheology_id_voellmy)
+    SELECT CASE(TRIM(model_name))
+    CASE('rheology_voellmy')
        CALL eval_rheology_voellmy_semi_implicit(flow_depth, velocity_x, &
             velocity_y, speed, mixture_density, reduced_gravity,             &
             gravity_coefficient, curvature_term, curvature_xx, curvature_xy, &
             curvature_yy, use_pore_pressure, excess_pore_pressure,           &
             rate(1), rate(2))
-    CASE(rheology_id_lava)
+    CASE('rheology_lava')
        CALL eval_rheology_lava_semi_implicit(velocity_x, velocity_y,   &
             speed, rate(1), rate(2))
-    CASE(rheology_id_lahar)
+    CASE('rheology_lahar')
        CALL eval_rheology_lahar_semi_implicit(flow_depth, velocity_x,  &
             velocity_y, horizontal_speed, mixture_density,                  &
             SUM(solid_fractions), speed .GT. 0.0_wp, rate(1), rate(2))
-    CASE(rheology_id_froude)
+    CASE('rheology_froude')
        CALL eval_rheology_froude_semi_implicit(flow_depth, velocity_x, velocity_y,   &
             speed, horizontal_speed, mixture_density, reduced_gravity,      &
             gravity_coefficient, 0.0_wp, use_stochastic, stochastic_value,  &
             rate(1), rate(2))
-    CASE(rheology_id_lucas)
+    CASE('rheology_lucas')
        CALL eval_rheology_lucas_semi_implicit(flow_depth, velocity_x, velocity_y,    &
             speed, horizontal_speed, mixture_density, reduced_gravity,      &
             gravity_coefficient, 0.0_wp, use_stochastic, stochastic_value,  &
             rate(1), rate(2))
-    CASE(rheology_id_mui)
+    CASE('rheology_mui')
        curvature_term_value = 0.0_wp
        IF (curvature_term) curvature_term_value = curvature_acceleration(   &
             curvature_xx, curvature_xy, curvature_yy, velocity_x, velocity_y)
@@ -111,7 +111,7 @@ CONTAINS
             speed, mixture_density, reduced_gravity, gravity_coefficient,  &
             solid_fractions, curvature_term_value, use_pore_pressure,      &
             excess_pore_pressure, rate(1), rate(2))
-    CASE(rheology_id_mui_voellmy)
+    CASE('rheology_mui_voellmy')
        curvature_term_value = 0.0_wp
        IF (curvature_term) curvature_term_value = curvature_acceleration(   &
             curvature_xx, curvature_xy, curvature_yy, velocity_x, velocity_y)
@@ -119,21 +119,21 @@ CONTAINS
             velocity_y, speed, mixture_density, reduced_gravity,            &
             gravity_coefficient, solid_fractions, curvature_term_value,    &
             use_pore_pressure, excess_pore_pressure, rate(1), rate(2))
-    CASE(rheology_id_none, rheology_id_plastic, rheology_id_empirical,       &
-         rheology_id_quadratic)
+    CASE('none', 'rheology_plastic', 'rheology_empirical',       &
+         'rheology_quadratic')
        CONTINUE
     CASE DEFAULT
-       CALL fatal_error('Invalid rheology ID in semi-implicit momentum-rate dispatch')
+       CALL fatal_error('Invalid rheology name in semi-implicit momentum-rate dispatch')
     END SELECT
 
   END SUBROUTINE eval_rheology_semi_implicit
 
-  SUBROUTINE eval_rheology_implicit(model_id, flow_depth, temperature,   &
+  SUBROUTINE eval_rheology_implicit(model_name, flow_depth, temperature,   &
        mixture_density, inverse_density, velocity_x, velocity_y, speed,      &
        horizontal_speed, speed_squared, reduced_gravity, solid_fractions,    &
        moving, use_stochastic, stochastic_value, rate)
 
-    INTEGER, INTENT(IN) :: model_id
+    CHARACTER(*), INTENT(IN) :: model_name
     COMPLEX(wp), INTENT(IN) :: flow_depth, temperature, mixture_density
     COMPLEX(wp), INTENT(IN) :: inverse_density, velocity_x, velocity_y
     COMPLEX(wp), INTENT(IN) :: speed, horizontal_speed, speed_squared
@@ -143,49 +143,49 @@ CONTAINS
     COMPLEX(wp), INTENT(OUT) :: rate(2)
 
     rate = CMPLX(0.0_wp, 0.0_wp, wp)
-    SELECT CASE(model_id)
-    CASE(rheology_id_voellmy)
+    SELECT CASE(TRIM(model_name))
+    CASE('rheology_voellmy')
        CALL eval_rheology_voellmy_implicit(velocity_x, velocity_y,      &
             mixture_density, reduced_gravity, speed, speed_squared, moving,  &
             use_stochastic, stochastic_value, rate(1), rate(2))
-    CASE(rheology_id_mui_voellmy)
+    CASE('rheology_mui_voellmy')
        CALL eval_rheology_mui_voellmy_implicit(velocity_x, velocity_y,  &
             mixture_density, reduced_gravity, speed, speed_squared, moving,  &
             use_stochastic, stochastic_value, rate(1), rate(2))
-    CASE(rheology_id_plastic)
+    CASE('rheology_plastic')
        CALL eval_rheology_plastic_implicit(velocity_x, velocity_y,      &
             speed, mixture_density, moving, rate(1), rate(2))
-    CASE(rheology_id_lava)
+    CASE('rheology_lava')
        CALL eval_rheology_lava_implicit(flow_depth, temperature,        &
             mixture_density, velocity_x, velocity_y, moving,                &
             rate(1), rate(2))
-    CASE(rheology_id_lahar)
+    CASE('rheology_lahar')
        CALL eval_rheology_lahar_implicit(flow_depth, velocity_x,        &
             velocity_y, speed, horizontal_speed, temperature, mixture_density, &
             inverse_density, solid_fractions, moving, rate(1), rate(2))
-    CASE(rheology_id_empirical)
+    CASE('rheology_empirical')
        CALL eval_rheology_empirical_implicit(flow_depth, velocity_x,    &
             velocity_y, horizontal_speed, speed, mixture_density, moving,   &
             rate(1), rate(2))
-    CASE(rheology_id_quadratic)
+    CASE('rheology_quadratic')
        CALL eval_rheology_quadratic_implicit(velocity_x, velocity_y,   &
             horizontal_speed, speed_squared, mixture_density, moving,       &
             rate(1), rate(2))
-    CASE(rheology_id_none, rheology_id_froude, rheology_id_lucas, rheology_id_mui)
+    CASE('none', 'rheology_froude', 'rheology_lucas', 'rheology_mui')
        CONTINUE
     CASE DEFAULT
-       CALL fatal_error('Invalid rheology ID in implicit momentum-rate dispatch')
+       CALL fatal_error('Invalid rheology name in implicit momentum-rate dispatch')
     END SELECT
 
   END SUBROUTINE eval_rheology_implicit
 
-  SUBROUTINE solve_rheology_analytic(model_id, integration_step,    &
+  SUBROUTINE solve_rheology_analytic(model_name, integration_step,    &
        flow_depth, temperature, mixture_density, speed_ratio, velocity_before, &
        reduced_gravity, gravity_coefficient, solid_fractions,                &
        curvature_acceleration, use_pore_pressure, excess_pore_pressure,      &
        use_stochastic, stochastic_value, velocity_after, model_supported)
 
-    INTEGER, INTENT(IN) :: model_id
+    CHARACTER(*), INTENT(IN) :: model_name
     REAL(wp), INTENT(IN) :: integration_step, flow_depth, temperature
     REAL(wp), INTENT(IN) :: mixture_density, speed_ratio
     REAL(wp), INTENT(IN) :: velocity_before(2), reduced_gravity
@@ -199,48 +199,48 @@ CONTAINS
     velocity_after = velocity_before
     model_supported = .TRUE.
 
-    SELECT CASE (model_id)
-    CASE (rheology_id_none)
+    SELECT CASE(TRIM(model_name))
+    CASE ('none')
        CONTINUE
-    CASE (rheology_id_voellmy)
+    CASE ('rheology_voellmy')
        CALL solve_rheology_voellmy_analytic(integration_step, flow_depth,    &
             speed_ratio, velocity_before, mixture_density, reduced_gravity,  &
             gravity_coefficient, curvature_acceleration, use_pore_pressure, &
             excess_pore_pressure, use_stochastic, stochastic_value,         &
             velocity_after)
-    CASE (rheology_id_plastic)
+    CASE ('rheology_plastic')
        CALL solve_rheology_plastic_analytic(integration_step, flow_depth,    &
             speed_ratio, velocity_before, velocity_after)
-    CASE (rheology_id_lava)
+    CASE ('rheology_lava')
        CALL solve_rheology_lava_analytic(integration_step, flow_depth,      &
             temperature, mixture_density, speed_ratio, velocity_before,     &
             velocity_after)
-    CASE (rheology_id_lahar)
+    CASE ('rheology_lahar')
        CALL solve_rheology_lahar_analytic(integration_step, flow_depth,     &
             temperature, SUM(solid_fractions), mixture_density, speed_ratio,&
             velocity_before, velocity_after)
-    CASE (rheology_id_empirical)
+    CASE ('rheology_empirical')
        CALL solve_rheology_empirical_analytic(integration_step, flow_depth, &
             speed_ratio, velocity_before, velocity_after)
-    CASE (rheology_id_quadratic)
+    CASE ('rheology_quadratic')
        CALL solve_rheology_quadratic_analytic(integration_step, flow_depth, &
             speed_ratio, velocity_before, velocity_after)
-    CASE (rheology_id_froude)
+    CASE ('rheology_froude')
        CALL solve_rheology_froude_analytic(integration_step, flow_depth,    &
             speed_ratio, velocity_before, reduced_gravity,                  &
             gravity_coefficient, curvature_acceleration, use_stochastic,   &
             stochastic_value, velocity_after)
-    CASE (rheology_id_lucas)
+    CASE ('rheology_lucas')
        CALL solve_rheology_lucas_analytic(integration_step, flow_depth,     &
             speed_ratio, velocity_before, reduced_gravity,                  &
             gravity_coefficient, curvature_acceleration, use_stochastic,   &
             stochastic_value, velocity_after)
-    CASE (rheology_id_mui)
+    CASE ('rheology_mui')
        CALL solve_rheology_mui_analytic(integration_step, flow_depth,       &
             speed_ratio, velocity_before, mixture_density, reduced_gravity, &
             gravity_coefficient, solid_fractions, curvature_acceleration,   &
             use_pore_pressure, excess_pore_pressure, velocity_after)
-    CASE (rheology_id_mui_voellmy)
+    CASE ('rheology_mui_voellmy')
        CALL solve_rheology_mui_voellmy_analytic(integration_step,           &
             flow_depth, speed_ratio, velocity_before, mixture_density,      &
             reduced_gravity, gravity_coefficient, solid_fractions,           &

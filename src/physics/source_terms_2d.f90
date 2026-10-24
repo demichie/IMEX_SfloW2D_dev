@@ -22,7 +22,7 @@ MODULE source_terms_2d
        eval_rheology_implicit, eval_rheology_semi_implicit
   USE diagnostics_2d, ONLY : fatal_error
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_ROLE_IMPLICIT, &
-       SOURCE_ROLE_SEMI_IMPLICIT, rheology_source_name, rheology_has_role
+       SOURCE_ROLE_SEMI_IMPLICIT, rheology_source_name, rheology_name_has_role
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC, SOURCE_CADENCE_STAGE
   USE source_registry_2d, ONLY : source_group_type, group_contains_name
   IMPLICIT NONE
@@ -98,7 +98,7 @@ CONTAINS
              context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,    &
              flow_u,flow_v)
         velocity_after=[flow_u,flow_v]
-        CALL solve_rheology_analytic(rheology_model_id,interval, &
+        CALL solve_rheology_analytic(rheology_source_name(rheology_model_id),interval, &
              flow_h,flow_temperature,flow_density,speed_ratio,            &
              [flow_u,flow_v],flow_red_grav,context%grav_coeff,flow_alphas,&
              curvature_accel,pore_pressure_flag,flow_pore_pressure,       &
@@ -160,7 +160,7 @@ CONTAINS
     ! A whole law is the scheduling unit. Mathematical roles remain
     ! properties of its internal evaluator, not independent group members.
     IF (.NOT.group_contains_name(group,law_name)) RETURN
-    found=rheology_has_role(model_id,role)
+    found=rheology_name_has_role(law_name,role)
   END FUNCTION group_has_role
 
   SUBROUTINE validate_newton_selection(group)
@@ -286,7 +286,7 @@ CONTAINS
        ! would erase it. This does not assign a derivative to Coulomb's cusp.
        moving = (REAL(mod_vel,wp) .NE. 0.0_wp) .OR. (AIMAG(mod_vel) .NE. 0.0_wp)
 
-       CALL eval_rheology_implicit(rheology_model_id, h, T, rho_m,       &
+       CALL eval_rheology_implicit(rheology_source_name(rheology_model_id), h, T, rho_m,       &
             inv_rho_m, u, v, mod_vel, mod_vel_hor, mod_vel2, red_grav,       &
             alphas, moving, stochastic_flag, Zij, source_term(2:3))
     END IF
@@ -408,7 +408,7 @@ CONTAINS
 
        exc_pore_pres = 0.0_wp
        IF (pore_pressure_flag) exc_pore_pres = qpj(idx_pore)
-       CALL eval_rheology_semi_implicit(rheology_model_id, r_h, r_u,  &
+       CALL eval_rheology_semi_implicit(rheology_source_name(rheology_model_id), r_h, r_u,  &
             r_v, mod_vel, mod_hor_vel, r_rho_m, r_red_grav, grav_coeff,    &
             r_alphas, curvature_term_flag, Bsecondj_xx, Bsecondj_xy,       &
             Bsecondj_yy, pore_pressure_flag, exc_pore_pres,                &
