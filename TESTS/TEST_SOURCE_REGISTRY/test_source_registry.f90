@@ -6,8 +6,8 @@ PROGRAM test_source_registry
        IM_GROUP_METHOD_NEWTON, IM_GROUP_METHOD_ANALYTIC
   USE source_configuration_2d, ONLY : initialize_native_source_configuration, initialize_configured_sources
   USE source_input_2d
-  USE parameters_2d, ONLY : wp, rheology_id_lava, n_eqns, idx_pore, &
-       rheology_flag, rheology_model_id, pore_pressure_flag, &
+  USE parameters_2d, ONLY : wp, rheology_id_lava, rheology_id_voellmy, n_eqns, idx_pore, &
+       rheology_flag, rheology_model_id, pore_pressure_flag, thermal_cooling_flag, &
        curvature_term_flag, bottom_radial_source_flag, bottom_fissural_source_flag, &
        radial_source_flag, lateral_source_flag, liquid_flag, gas_flag, &
        gas_loss_flag, liquid_vaporization_flag, imex_velocity_group, &
@@ -87,6 +87,7 @@ PROGRAM test_source_registry
     END DO
   END DO
   CALL verify_default_schedule()
+  CALL verify_thermal_activation_matrix()
   CALL verify_native_parser()
   CALL verify_native_schedule()
   WRITE(*,'(A)') 'D17 physical catalog, native configuration and 864 legacy mappings verified'
@@ -94,6 +95,7 @@ CONTAINS
   SUBROUTINE configure_lava_case()
     n_eqns=7;idx_pore=7
     rheology_flag=.TRUE.;rheology_model_id=rheology_id_lava
+    thermal_cooling_flag=.TRUE.
     pore_pressure_flag=.TRUE.
     curvature_term_flag=.FALSE.
     bottom_radial_source_flag=.FALSE.
@@ -132,6 +134,45 @@ CONTAINS
     CALL require(group_contains_name(s(1),'mass_exchange_deposition'), &
          'post-RK deposition scheduling')
   END SUBROUTINE verify_default_schedule
+
+  SUBROUTINE verify_thermal_activation_matrix()
+    TYPE(source_group_type), ALLOCATABLE :: groups(:)
+    LOGICAL :: enabled_eq(7),has_cooling
+    INTEGER :: assigned(7),model,choice,method(2),i
+    DO model=1,2
+      DO choice=1,2
+        CALL configure_lava_case()
+        rheology_model_id=MERGE(rheology_id_lava,rheology_id_voellmy,model==2)
+        thermal_cooling_flag=(choice==2)
+        pore_pressure_flag=.FALSE.
+        lateral_source_flag=.FALSE.
+        settling_flag=.FALSE.
+        enabled_eq=.FALSE.; enabled_eq(2:3)=.TRUE.
+        enabled_eq(4)=thermal_cooling_flag
+        assigned=0
+        IF (thermal_cooling_flag) THEN
+          assigned(4)=1
+          assigned(2:3)=2
+          method=[IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_NEWTON]
+          CALL partition%initialize(enabled_eq,assigned,method)
+        ELSE
+          assigned(2:3)=1
+          CALL partition%initialize(enabled_eq,assigned,[IM_GROUP_METHOD_NEWTON])
+        END IF
+        CALL initialize_configured_sources(registry,partition,error)
+        CALL require(error=='','cooling on/off independent of rheology: '//TRIM(error))
+        groups=registry%stage_groups()
+        has_cooling=.FALSE.
+        DO i=1,SIZE(groups)
+          has_cooling=has_cooling .OR. group_contains_name(groups(i),'thermal_cooling')
+        END DO
+        CALL require(has_cooling .EQV. thermal_cooling_flag, &
+             'physical cooling membership follows dedicated flag')
+        CALL require(COUNT(enabled_eq)==MERGE(4,3,thermal_cooling_flag), &
+             'legacy equation layout changes only when cooling active')
+      END DO
+    END DO
+  END SUBROUTINE verify_thermal_activation_matrix
 
   SUBROUTINE verify_native_parser()
     INTEGER :: unit,i

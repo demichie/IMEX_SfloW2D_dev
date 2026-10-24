@@ -25,7 +25,7 @@ MODULE equation_terms_2d
        eval_pore_pressure_gas_loss, eval_pore_pressure_inlet_source,            &
        eval_pore_pressure_mass_exchange_source, solve_analytic_pore_pressure
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                 &
-       eval_rheology_cooling_energy_rate, eval_vaporization_mass_rate,         &
+       eval_lava_cooling_energy_rate, eval_vaporization_mass_rate,         &
        eval_vaporization_energy_rate, solve_lava_analytic_temperature
   USE mass_exchange_laws_2d, ONLY : eval_settling_fluid_properties,            &
        settling_velocity, eval_solid_deposition_rate, eval_erosion_rates,       &
@@ -48,7 +48,7 @@ MODULE equation_terms_2d
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
        n_stoch_vars, n_pore_vars
   USE parameters_2d, ONLY : rheology_flag, rheology_model_id,                   &
-       rheology_id_lava,                                                       &
+       rheology_id_lava, thermal_cooling_flag,                                &
        liquid_flag, gas_flag, slope_correction_flag,                            &
        curvature_term_flag, stochastic_flag,                  &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag
@@ -159,7 +159,7 @@ CONTAINS
 
     CASE(1)
       IF (group%equation_ids(1)==4) THEN
-      IF (rheology_model_id/=rheology_id_lava) THEN
+      IF (.NOT.thermal_cooling_flag) THEN
         status=-2
         RETURN
       END IF
@@ -847,7 +847,7 @@ CONTAINS
     END IF
 
     IF (selected_thermal) THEN
-       source_term(4) = eval_rheology_cooling_energy_rate(rheology_model_id,  &
+       source_term(4) = eval_lava_cooling_energy_rate( &
             T, radiative_term_coeff, convective_term_coeff, T_env)
     ENDIF
 
@@ -1466,8 +1466,8 @@ CONTAINS
 
   SUBROUTINE init_problem_param( equation_partition )
 
-    USE parameters_2d, ONLY : pore_pressure_flag, rheology_model_id,        &
-         rheology_id_lava, imex_velocity_group, imex_energy_group,           &
+    USE parameters_2d, ONLY : pore_pressure_flag, thermal_cooling_flag,      &
+         imex_velocity_group, imex_energy_group,                             &
          imex_pore_pressure_group, imex_group_method
     USE equation_metadata_2d, ONLY : resolve_imex_group_method
     IMPLICIT NONE
@@ -1485,7 +1485,7 @@ CONTAINS
     implicit_mask(3) = .TRUE.
 
     ! Temperature
-    IF ( rheology_model_id .EQ. rheology_id_lava ) THEN
+    IF (thermal_cooling_flag) THEN
 
        implicit_mask(4) = .TRUE.
 

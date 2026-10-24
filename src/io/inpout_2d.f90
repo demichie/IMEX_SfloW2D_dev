@@ -108,7 +108,8 @@ MODULE inpout_2d
   USE parameters_2d, ONLY: rheology_model, rheology_model_id,                  &
        rheology_id_none, rheology_id_voellmy, rheology_id_plastic, rheology_id_lava,       &
        rheology_id_lahar, rheology_id_empirical, rheology_id_quadratic, rheology_id_froude,&
-       rheology_id_lucas, rheology_id_mui, rheology_id_mui_voellmy
+       rheology_id_lucas, rheology_id_mui, rheology_id_mui_voellmy, &
+       thermal_cooling_flag
   USE rheology_2d, ONLY: resolve_rheology_model
   USE constitutive_parameters_2d, ONLY: A_drag, B_drag, collective_settling_flag
   USE rheology_parameters_2d, ONLY : mu_s, mu_2, I_0, muI_inf,               &
@@ -382,7 +383,7 @@ MODULE inpout_2d
   NAMELIST /collapsing_volume_parameters/ x_collapse, y_collapse, &
     r_collapse, T_collapse, h_collapse, alphas_collapse, alphag_collapse
 
-  NAMELIST /temperature_parameters/ emissivity, atm_heat_transf_coeff, &
+  NAMELIST /temperature_parameters/ thermal_cooling_flag, emissivity, atm_heat_transf_coeff, &
     thermal_conductivity, exp_area_fract, c_p, enne, emme, T_env, &
     T_ground
 
@@ -560,6 +561,7 @@ CONTAINS
     enne = 4.0_wp
     emme = 12.0_wp
     T_env = 300.0_wp
+    thermal_cooling_flag = .FALSE.
     T_ground = 1200.0_wp
     c_p = 1200.0_wp
 
@@ -3484,6 +3486,8 @@ CONTAINS
     ! Preserve the historical 300 K ambient when omitted, without overwriting
     ! an explicit input later in the source kernel.
     T_env = 300.0_wp
+    ! Preserve historical behavior when the optional flag is absent.
+    thermal_cooling_flag = rheology_model_id == rheology_id_lava
     READ (input_unit, temperature_parameters, IOSTAT=ios)
 
     IF (ios .NE. 0) THEN
@@ -3497,7 +3501,7 @@ CONTAINS
 
       REWIND (input_unit)
 
-      IF (rheology_model_id .EQ. rheology_id_lava) THEN
+      IF (thermal_cooling_flag) THEN
 
         IF (.NOT. finite_input_value(T_env)) THEN
           WRITE (*, *) 'ERROR: invalid T_ENV in TEMPERATURE_PARAMETERS; require finite T_ENV.'

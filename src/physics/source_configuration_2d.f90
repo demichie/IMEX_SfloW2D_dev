@@ -11,7 +11,7 @@ MODULE source_configuration_2d
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   USE source_input_2d
   USE parameters_2d, ONLY : wp, n_eqns, rheology_flag, rheology_model_id, &
-       rheology_id_none, rheology_id_lava, &
+       rheology_id_none, rheology_id_lava, thermal_cooling_flag, &
        pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag, &
        bottom_fissural_source_flag, radial_source_flag, lateral_source_flag, &
        liquid_flag, gas_flag, gas_loss_flag, liquid_vaporization_flag, &
@@ -124,12 +124,12 @@ CONTAINS
     IF (source_group_count<1 .OR. source_group_count>SOURCE_INPUT_MAX_GROUPS) THEN
       error='D17: SOURCE_GROUP_COUNT is outside the supported range'; RETURN
     END IF
-    IF (n_eqns<3 .OR. (rheology_model_id==rheology_id_lava .AND. n_eqns<4)) THEN
+    IF (n_eqns<3 .OR. (thermal_cooling_flag .AND. n_eqns<4)) THEN
       error='D17: native source configuration requires a valid equation layout'; RETURN
     END IF
     IF (pore_pressure_flag .AND. (idx_pore<1 .OR. idx_pore>n_eqns .OR. &
          idx_pore==2 .OR. idx_pore==3 .OR. &
-         (rheology_model_id==rheology_id_lava .AND. idx_pore==4))) THEN
+         (thermal_cooling_flag .AND. idx_pore==4))) THEN
       error='D17: pore-pressure equation index is outside the configured layout'; RETURN
     END IF
 
@@ -235,7 +235,7 @@ CONTAINS
         error='D17: unsupported configured rheology'; RETURN
       END IF
     END IF
-    IF (rheology_model_id==rheology_id_lava) active_names=[CHARACTER(LEN=64) :: active_names, &
+    IF (thermal_cooling_flag) active_names=[CHARACTER(LEN=64) :: active_names, &
          'thermal_cooling']
     IF (pore_pressure_flag) active_names=[CHARACTER(LEN=64) :: active_names,'pore_pressure_dissipation']
     IF (curvature_term_flag) active_names=[CHARACTER(LEN=64) :: active_names,'geometry_curvature']
@@ -262,7 +262,7 @@ CONTAINS
     END DO
 
     target_group=0
-    expected_targets=[.TRUE.,rheology_model_id==rheology_id_lava,pore_pressure_flag]
+    expected_targets=[.TRUE.,thermal_cooling_flag,pore_pressure_flag]
     DO g=1,source_group_count
       IF (cadence(g)/=SOURCE_CADENCE_STAGE .OR. method(g)==SOURCE_METHOD_EXPLICIT) CYCLE
       DO s=1,solver_count(g)

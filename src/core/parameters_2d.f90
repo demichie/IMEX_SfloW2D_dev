@@ -81,6 +81,8 @@ MODULE parameters_2d
   INTEGER, PARAMETER :: rheology_id_mui = 11
   INTEGER, PARAMETER :: rheology_id_mui_voellmy = 12
   INTEGER :: rheology_model_id = rheology_id_none
+  ! Cooling can be set independently of the rheology via TEMPERATURE_PARAMETERS.
+  LOGICAL :: thermal_cooling_flag = .FALSE.
 
   LOGICAL :: liquid_flag
 
