@@ -9,9 +9,8 @@ MODULE mass_exchange_assembly_2d
   USE thermal_laws_2d, ONLY : eval_vaporization_mass_rate, eval_vaporization_energy_rate
   USE mass_exchange_carrier_loss_2d, ONLY : eval_total_carrier_loss_rate
   USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion
-  USE mass_exchange_laws_2d, ONLY : eval_settling_fluid_properties, &
-       settling_velocity, eval_solid_deposition_rate, eval_erosion_rates, &
-       eval_continuous_phase_loss_rate, eval_air_entrainment_rate
+  USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition
+  USE mass_exchange_laws_2d, ONLY : eval_air_entrainment_rate
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_mass_exchange_terms
@@ -79,11 +78,6 @@ CONTAINS
     REAL(wp) :: mod_vel
     REAL(wp) :: mod_vel2
 
-    REAL(wp) :: hind_exp
-    REAL(wp) :: alpha_max
-
-    INTEGER :: i_solid
-
     REAL(wp) :: r_h          !< real-value flow thickness
     REAL(wp) :: r_u          !< real-value x-velocity
     REAL(wp) :: r_v          !< real-value y-velocity
@@ -99,16 +93,8 @@ CONTAINS
 
     REAL(wp) :: alphas_tot   !< total solid volume fraction
 
-    REAL(wp) :: inv_kin_visc
-    REAL(wp) :: rhoc
-    REAL(wp) :: dyn_visc_c
-    REAL(wp) :: rho_c
-    REAL(wp) :: kin_visc_c_local
     REAL(wp) :: r_Ri
     REAL(wp) :: r_red_grav
-
-    !> Hindered settling velocity (units: m s-1 )
-    REAL(wp) :: settling_vel
 
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
@@ -133,17 +119,12 @@ CONTAINS
     topo_term = 0.0_wp
     r_Zs = 0.0_wp
     r_exc_pore_pres = 0.0_wp
-    kin_visc_c_local = kin_visc_c
 
     IF ( qpj(1) .LE. epsilon(1.0_wp) ) THEN
 
        RETURN
 
     END IF
-
-    ! parameters for Michaels and Bolger (1962) sedimentation correction
-    alpha_max = 0.6_wp
-    hind_exp = 4.65_wp
 
     IF ( qpj(1) .LE. EPSILON(1.0_wp) ) RETURN
 
@@ -185,38 +166,8 @@ CONTAINS
     CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,             &
          r_sp_heat_mix)
 
-    IF ( gas_flag .AND. sutherland_flag ) THEN
-
-       dyn_visc_c = muRef_Suth * ( r_T / Tref_Suth )**1.5_wp *               &
-            ( Tref_Suth + S_mu ) / ( r_T + S_mu )
-
-       rho_c = pres / ( sp_gas_const_a * r_T )
-       kin_visc_c_local = dyn_visc_c / rho_c
-
-    END IF
-
-    CALL eval_settling_fluid_properties(rheology_model_id, r_T, alphas_tot,  &
-         r_rho_m, r_rho_c, kin_visc_c_local, rhoc, inv_kin_visc)
-
-    DO i_solid=1,n_solid
-
-       IF ( ( r_alphas(i_solid) .GT. 0.0_wp ) .AND. ( settling_flag ) ) THEN
-
-          settling_vel = settling_velocity( diam_s(i_solid) , rho_s(i_solid) ,  &
-               rhoc , inv_kin_visc )
-
-          deposition_term(i_solid) = eval_solid_deposition_rate(              &
-               rheology_model_id, r_alphas(i_solid), settling_vel, r_h, dt,  &
-               alphas_tot, alpha_max, hind_exp)
-
-          IF ( deposition_term(i_solid) .LT. 0.0_wp ) THEN
-             CALL fatal_error('negative solid deposition rate')
-
-          END IF
-
-       END IF
-
-    END DO
+    CALL eval_mass_exchange_deposition(r_h, r_T, r_alphas, alphas_tot, &
+         r_rho_m, r_rho_c, dt, deposition_term)
 
     CALL eval_total_carrier_loss_rate(r_h, r_T, r_alphas, alphas_tot, &
          r_rho_c, r_exc_pore_pres, deposition_term, dt, &
