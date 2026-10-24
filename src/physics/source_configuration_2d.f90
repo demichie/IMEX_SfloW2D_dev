@@ -32,7 +32,7 @@ CONTAINS
     TYPE(source_registry_type), INTENT(INOUT) :: registry
     TYPE(equation_partition_type), INTENT(IN) :: partition
     CHARACTER(*), INTENT(OUT) :: error
-    INTEGER, ALLOCATABLE :: terms(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: active_names(:),law_names(:)
     INTEGER :: methods(3),i,pore
     CHARACTER(LEN=16) :: method
     CALL registry%finalize()
@@ -43,41 +43,42 @@ CONTAINS
     IF (partition%n_equations<4) THEN
       error='D17: source layout requires at least four equations'; RETURN
     END IF
-    terms=[INTEGER::]
+    ALLOCATE(active_names(0))
     IF (rheology_flag) THEN
-      terms=rheology_source_terms(rheology_model_id)
-      IF (SIZE(terms)==0 .AND. rheology_model_id/=rheology_id_none) THEN
+      law_names=rheology_component_names(rheology_model_id)
+      active_names=[active_names,law_names]
+      IF (SIZE(law_names)==0 .AND. rheology_model_id/=rheology_id_none) THEN
         error='D17: unsupported configured rheology'; RETURN
       END IF
     END IF
-    IF (partition%implicit(4)) terms=[terms,SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
-         SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
+    IF (partition%implicit(4)) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_THERMAL_RADIATIVE_COOLING', &
+         'SOURCE_TERM_THERMAL_CONVECTIVE_COOLING']
     pore=0
     IF (pore_pressure_flag) THEN
       pore=idx_pore
-      terms=[terms,SOURCE_TERM_PORE_PRESSURE_DISSIPATION]
+      active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_PORE_PRESSURE_DISSIPATION']
     END IF
-    IF (curvature_term_flag) terms=[terms,SOURCE_TERM_GEOMETRY_CURVATURE]
-    IF (bottom_radial_source_flag) terms=[terms,SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION]
-    IF (bottom_fissural_source_flag) terms=[terms,SOURCE_TERM_BOTTOM_FISSURAL_INJECTION]
-    IF (radial_source_flag) terms=[terms,SOURCE_TERM_RADIAL_INJECTION]
-    IF (lateral_source_flag) terms=[terms,SOURCE_TERM_BOUNDARY_INJECTION]
-    IF (erosion_coeff>0.0_wp) terms=[terms,SOURCE_TERM_MASS_EXCHANGE_EROSION]
+    IF (curvature_term_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_GEOMETRY_CURVATURE']
+    IF (bottom_radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION']
+    IF (bottom_fissural_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_BOTTOM_FISSURAL_INJECTION']
+    IF (radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_RADIAL_INJECTION']
+    IF (lateral_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_BOUNDARY_INJECTION']
+    IF (erosion_coeff>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_EROSION']
     IF (settling_flag) THEN
-      terms=[terms,SOURCE_TERM_MASS_EXCHANGE_DEPOSITION]
-      IF (ABS(coeff_porosity)>0.0_wp) terms=[terms,SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS]
+      active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_DEPOSITION']
+      IF (ABS(coeff_porosity)>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS']
     END IF
-    IF (liquid_flag) terms=[terms,SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS]
-    IF (pore_pressure_flag .AND. gas_loss_flag) terms=[terms,SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS]
-    IF (entrainment_flag) terms=[terms,SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT]
-    IF (gas_flag .AND. liquid_vaporization_flag) terms=[terms,SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION]
+    IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS']
+    IF (pore_pressure_flag .AND. gas_loss_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS']
+    IF (entrainment_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT']
+    IF (gas_flag .AND. liquid_vaporization_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION']
     DO i=1,3
       method=imex_group_method(i)
       CALL resolve_imex_group_method(method,methods(i))
     END DO
     CALL registry%initialize_legacy(partition, &
          [imex_velocity_group,imex_energy_group,imex_pore_pressure_group], &
-         methods,pore,terms,error)
+         methods,pore,active_names,error)
   END SUBROUTINE initialize_configured_sources
 
   !> \brief Translate the native namelist into an equation partition and registry.

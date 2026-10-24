@@ -135,22 +135,23 @@ CONTAINS
   !> \param[in] legacy_target_groups Original velocity/temperature/pressure IDs.
   !> \param[in] legacy_methods Three resolved legacy group methods.
   !> \param[in] pore_equation Pore equation index, zero when inactive.
-  !> \param[in] active_terms Potentially active physical IDs (cell guards still apply).
+  !> \param[in] active_names Names of potentially active physical addends (cell guards still apply).
   !> \param[out] error Empty on success, otherwise a configuration diagnostic.
   !> \note Mixed analytic groups expand in velocity/temperature/pressure order;
   !>       split IDs start at five. Newton groups retain their full equation block.
   SUBROUTINE initialize_legacy_registry(this,partition,legacy_target_groups,legacy_methods, &
-       pore_equation,active_terms,error)
+       pore_equation,active_names,error)
     CLASS(source_registry_type), INTENT(INOUT) :: this
     TYPE(equation_partition_type), INTENT(IN) :: partition
     INTEGER, INTENT(IN) :: legacy_target_groups(3),legacy_methods(3)
-    INTEGER, INTENT(IN) :: pore_equation,active_terms(:)
+    INTEGER, INTENT(IN) :: pore_equation
+    CHARACTER(*), INTENT(IN) :: active_names(:)
     CHARACTER(*), INTENT(OUT) :: error
     TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:)
     TYPE(source_group_type) :: group
     TYPE(source_term_type) :: term
     INTEGER, ALLOCATABLE :: targets(:),equations(:),target_equations(:)
-    CHARACTER(LEN=64), ALLOCATABLE :: names(:),active_names(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: names(:)
     INTEGER :: legacy,target,split_id,i,method,order
     LOGICAL :: enabled(3)
     CALL this%finalize()
@@ -181,7 +182,6 @@ CONTAINS
     END IF
     enabled=[partition%implicit(2),partition%implicit(4),pore_equation/=0]
     ! Normalize legacy catalog IDs before checking group membership/targets.
-    active_names=source_names_for_ids(active_terms)
     DO i=1,SIZE(active_names)
       term=source_term_descriptor_by_name(active_names(i))
       IF (.NOT.term%schedulable) THEN
@@ -258,19 +258,6 @@ CONTAINS
     CALL this%initialize(partition%n_equations,pore_equation,stages,steps,error)
   END SUBROUTINE initialize_legacy_registry
 
-  !> Translate legacy catalog positions to their canonical source names.
-  PURE FUNCTION source_names_for_ids(ids) RESULT(names)
-    INTEGER, INTENT(IN) :: ids(:)
-    CHARACTER(LEN=64) :: names(SIZE(ids))
-    TYPE(source_term_type) :: term
-    INTEGER :: i
-
-    names=''
-    DO i=1,SIZE(ids)
-      term=source_term_descriptor(ids(i))
-      names(i)=term%name
-    END DO
-  END FUNCTION source_names_for_ids
 
   !> Materialize source identities once at registry initialization, outside
   !> stage and cell loops. Existing ID-backed consumers remain supported.
