@@ -29,6 +29,15 @@ jobs:
           mkdir -p "$D17_WORK_DIR"
           python3 TESTS/ACCEPTANCE/test_d17_physical_interfaces.py 2>&1 | tee "$D17_WORK_DIR/interface-audit.log"
 
+      - name: Check post-RK state finalization and observer ordering
+        shell: bash
+        env:
+          D17_WORK_DIR: ${{ runner.temp }}/d17-registry-tests
+        run: |
+          set -o pipefail
+          mkdir -p "$D17_WORK_DIR"
+          python3 TESTS/ACCEPTANCE/test_d17_state_finalization.py 2>&1 | tee "$D17_WORK_DIR/state-finalization.log"
+
       - name: Run existing D17 registry regression
         shell: bash
         env:

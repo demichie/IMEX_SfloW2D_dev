@@ -1461,3 +1461,8 @@ Dopo Actions verdi sul commit `b2f61de2`, estratta in `state_2d::initialize_dry_
 ### D17.22 — Unificazione inizializzazione dry post-RK/STEP mass exchange (24 ottobre 2026)
 
 Dopo audit coordinato su `35be9f0a` e conferma delle due Actions verdi, rimossa la duplicazione dello stato fisico asciutto nel modulo `step_source_executor_2d`: sia il fallback durante la valutazione dei rate STEP, sia il ramo dry dopo `apply_mass_exchange_increment`, ora invocano `state_2d::initialize_dry_physical_cell`. Il contratto resta invariato (tutti i campi zero, temperatura ambiente `T_ambient`), e gli aggiornamenti conservativi e di inventario rimangono nello stesso ordine. Aggiunta dipendenza Makefile `step_source_executor_2d -> state_2d` e guardia statica D17 sulle due chiamate. Questo avanza D17.15a/D17.17 e la verifica dei percorsi dry del passo 10a, senza concludere le regressioni quantitative D17.20–D17.21. Nuovo commit non ancora validato tramite CI.
+
+
+### D17.22 — Gate strutturale sulla sequenza finale RK (24 ottobre 2026)
+
+Dopo CI verde confermata sul commit `e4f6dfca`, aggiunto `TESTS/ACCEPTANCE/test_d17_state_finalization.py` e integrato nella Action manuale `D17 source registry tests`. Il gate ispeziona la chiamata dell'observer sullo stato conservativo grezzo prima della finalizzazione, l'ordine dei controlli NaN/clipping/spessore/masse/conversione/proiezione dry/temperatura/roundoff/nodata, le soglie storiche, il recupero da `q_previous`, e la centralizzazione dry nei percorsi RK halo/stage e mass-exchange STEP. Questo e un **test strutturale**, non un confronto numerico degli stati: D17.19 passo 10a resta implementato con gate quantitativi incompleti. Il commit che introduce il gate necessita verifica CI; D17.20–21 ancora aperti.
