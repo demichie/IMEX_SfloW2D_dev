@@ -18,7 +18,7 @@ MODULE equation_terms_2d
 
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE rheology_2d, ONLY : curvature_acceleration, correct_friction_momentum, &
+  USE rheology_2d, ONLY : curvature_acceleration, &
        eval_implicit_rheology_rate, eval_semi_implicit_rheology_rate,        &
        solve_analytic_rheology_velocity
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_diffusion_source,       &
@@ -73,7 +73,6 @@ MODULE equation_terms_2d
   PUBLIC :: eval_expl_terms
   PUBLIC :: eval_implicit_terms, eval_semi_implicit_terms
   PUBLIC :: analytic_term_context_type, eval_analytic_terms
-  PUBLIC :: correct_friction_momentum
   PUBLIC :: eval_mass_exchange_terms
   PUBLIC :: eval_source_bdry
   PUBLIC :: set_source_time_coefficients

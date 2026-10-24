@@ -7,13 +7,14 @@ PROGRAM test_state_initialization
   USE model_layout_2d, ONLY : model_layout_type
   USE parameters_2d, ONLY : wp, n_thickness_levels,                         &
        n_dyn_pres_levels
-  USE state_2d, ONLY : state_type
+  USE state_2d, ONLY : state_type, correct_friction_momentum
 
   IMPLICIT NONE
 
   TYPE(state_type) :: state
   TYPE(domain_type) :: domain
   TYPE(model_layout_type) :: model_layout
+  REAL(wp) :: before_momentum(2), after_momentum(2)
 
   comp_cells_x = 5
   comp_cells_y = 4
@@ -65,6 +66,25 @@ PROGRAM test_state_initialization
        .AND. ALL(domain%j_stag_y .EQ. 0)                                  &
        .AND. ALL(domain%k_stag_y .EQ. 0))
 
+  ! Isolated SI projection: preserve incoming direction and disallow growth.
+  before_momentum=[3.0_wp,4.0_wp]
+  after_momentum=[2.0_wp,1.0_wp]
+  CALL correct_friction_momentum(before_momentum,after_momentum)
+  CALL assert_true('post-SI projection onto prior direction', &
+       MAXVAL(ABS(after_momentum-[1.2_wp,1.6_wp]))<1.0e-12_wp)
+  ! Post-Newton projection uses the *post-SI* momentum, not the stage input.
+  before_momentum=after_momentum
+  after_momentum=[10.0_wp,10.0_wp]
+  CALL correct_friction_momentum(before_momentum,after_momentum)
+  CALL assert_true('post-Newton correction clamps magnitude', &
+       MAXVAL(ABS(after_momentum-before_momentum))<1.0e-12_wp)
+  after_momentum=-before_momentum
+  CALL correct_friction_momentum(before_momentum,after_momentum)
+  CALL assert_true('momentum reversal rejected',ALL(after_momentum==0.0_wp))
+  before_momentum=0.0_wp
+  after_momentum=[4.0_wp,-5.0_wp]
+  CALL correct_friction_momentum(before_momentum,after_momentum)
+  CALL assert_true('zero reference leaves zero momentum',ALL(after_momentum==0.0_wp))
   CALL domain%finalize
   CALL state%finalize
   CALL model_layout%finalize

@@ -20,7 +20,8 @@ MODULE nonlinear_solver_2d
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON, &
        SOURCE_METHOD_ANALYTIC
   USE equation_terms_2d, ONLY : analytic_term_context_type,                 &
-       eval_analytic_terms, eval_semi_implicit_terms, correct_friction_momentum
+       eval_analytic_terms, eval_semi_implicit_terms
+  USE state_2d, ONLY : correct_friction_momentum
 
   IMPLICIT NONE
 
