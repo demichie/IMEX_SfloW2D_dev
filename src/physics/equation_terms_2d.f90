@@ -9,45 +9,23 @@ MODULE equation_terms_2d
   USE diagnostics_2d, ONLY : fatal_error
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE rheology_2d, ONLY : curvature_acceleration, &
-       eval_rheology_implicit, eval_rheology_semi_implicit,        &
-       solve_rheology_analytic
-  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_dissipation_implicit,       &
-       eval_pore_pressure_gas_loss, eval_pore_pressure_inlet_source,            &
-       eval_pore_pressure_mass_exchange_source, solve_pore_pressure_dissipation_analytic
-  USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                 &
-       eval_thermal_cooling_implicit, eval_vaporization_mass_rate,         &
-       eval_vaporization_energy_rate, solve_thermal_cooling_analytic
+  USE rheology_2d, ONLY : curvature_acceleration
 
-  USE equation_metadata_2d, ONLY : equation_partition_type,                   &
-       IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
-  USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,                       &
-       SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON, SOURCE_CADENCE_STAGE,   &
-       SOURCE_SOLVE_ANALYTIC_VELOCITY, SOURCE_SOLVE_ANALYTIC_TEMPERATURE,     &
-       SOURCE_SOLVE_ANALYTIC_PORE_PRESSURE, SOURCE_TARGET_VELOCITY,          &
-       SOURCE_TARGET_TEMPERATURE, SOURCE_TARGET_PORE_PRESSURE,               &
-       SOURCE_SOLVE_NEWTON_BLOCK, SOURCE_ROLE_IMPLICIT,                      &
-       SOURCE_ROLE_SEMI_IMPLICIT,                                            &
-       rheology_source_name, rheology_has_role
-  USE source_registry_2d, ONLY : source_group_type, &
-       group_contains_name
-
-  USE parameters_2d, ONLY : wp, dry_thickness_tolerance
-  USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &
-       n_stoch_vars, n_pore_vars
-  USE parameters_2d, ONLY : rheology_flag, rheology_model_id,                   &
-       rheology_id_lava, thermal_cooling_flag,                                &
-       liquid_flag, gas_flag, slope_correction_flag,                            &
-       curvature_term_flag, stochastic_flag,                  &
-       stoch_transport_flag, pore_pressure_flag, sutherland_flag
-
-  USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T, idx_solid_first,      &
-       idx_solid_last, idx_add_gas_first, idx_add_gas_last, idx_stoch, idx_pore,  &
-       idx_u, idx_v
-
-  USE parameters_2d, ONLY : idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn,    &
-       idx_solidEqn_first, idx_solidEqn_last, idx_addGasEqn_first,              &
-       idx_addGasEqn_last, idx_stochEqn, idx_poreEqn
+  USE equation_metadata_2d, ONLY : equation_partition_type
+  USE parameters_2d, ONLY : wp, &
+       n_eqns, &
+       n_vars, &
+       thermal_cooling_flag, &
+       liquid_flag, &
+       gas_flag, &
+       pore_pressure_flag, &
+       idx_pore, &
+       idx_u, &
+       idx_v, &
+       idx_solidEqn_first, &
+       idx_solidEqn_last, &
+       idx_addGasEqn_first, &
+       idx_addGasEqn_last
 
   IMPLICIT NONE
 
@@ -61,148 +39,6 @@ MODULE equation_terms_2d
 
 
 CONTAINS
-
-  !> Explicit STEP mass-exchange physics bridge (atomic batch).
-  !> This returns rates only. Inventory and bed updates belong to STEP execution.
-
-  !> \brief Apply one validated analytic source solve to its conservative target.
-  !> \details The exact-flow kernels receive only a physical interval and cell
-  !>          context; stage and Runge-Kutta scheduling remain in the caller.
-  !> \param[in] group Validated analytic source group.
-  !> \param[in] solver Its single analytic solver descriptor.
-  !> \param[in] q_before Conservative state after preceding ordered groups.
-  !> \param[in] context Cell-local geometry, gravity and stochastic values.
-  !> \param[in] interval Physical integration interval [s].
-  !> \param[out] q_after State with only the solver target changed.
-  !> \param[out] status Zero on success; negative values preserve legacy diagnostics.
-
-
-  !******************************************************************************
-  !> \brief Evaluate cell-local explicit sources, including configured inlet and thermal terms.
-  !> \details Returns the right-hand-side source vector for explicit cell-local
-  !>          physics. It includes the velocity-dependent bed-curvature term
-  !>          and any active bottom-radial, fissural or lateral-radial inlet
-  !>          sources, including their mass, momentum, thermal, component and
-  !>          pore-pressure contributions. Hydrostatic pressure and ordinary
-  !>          bed-slope forcing are represented by the spatial path operator.
-  !>          Curvature is suppressed below dry_thickness_tolerance without
-  !>          discarding positive conservative mass or disabling injection.
-  !>          If step-averaged source coefficients have been set, those
-  !>          coefficients replace pointwise window evaluation.
-  !> \date 2019/12/13
-  !> @author Mattia de' Michieli Vitturi
-  !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
-  !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
-  !> \param[in] Bsecondj_xx Filtered cell bed derivative d^2B/dx^2 [m^-1].
-  !> \param[in] Bsecondj_xy Filtered mixed bed derivative d^2B/(dx dy) [m^-1].
-  !> \param[in] Bsecondj_yy Filtered cell bed derivative d^2B/dy^2 [m^-1].
-  !> \param[in] grav_coeff Large-slope gravity factor G at the supplied state location.
-  !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
-  !> \param[out] expl_term Explicit cell-source vector, with the right-hand-side sign convention.
-  !> \param[in] time Current simulation time [s].
-  !> \param[in] cell_fract_jk Fraction of the current cell covered by the bottom radial source.
-  !> \param[in] cell_fissure_fract Current cell coverage fractions for all configured fissures.
-  !> \param[in] lat_arc_perim_jk Active emission-arc length within the current cell [m].
-  !> \param[in] lat_n_x_jk Mean x component of the emitting arc normal.
-  !> \param[in] lat_n_y_jk Mean y component of the emitting arc normal.
-  !> \param[in] cell_area_jk Horizontal area of the current cell [m^2].
-  !> \param[in] group Validated explicit source group selecting cell-local terms.
-  !******************************************************************************
-
-  !> Contribution owned by the bottom_circular_injection configured explicit source.
-
-  !> Contribution owned by the bottom_fissural_injection configured explicit source.
-
-  !> Contribution owned by the radial_injection configured explicit source.
-
-  !> \brief Validate one Newton group/solver selection before rate evaluation.
-  !> \param[in] group Validated Newton group containing the solver and its terms.
-  !> \param[in] solver Newton solver descriptor selecting the rates to evaluate.
-
-  !******************************************************************************
-  !> \brief Evaluate stiff cell-local sources in the real or complex state path.
-  !> \details Dispatches the configured implicit rheology law and lava cooling
-  !>          source, and evaluates pore-pressure diffusion when enabled. The
-  !>          selected result is an equation-sized right-hand-side vector.
-  !>          Supply either the real state/output pair or the complex
-  !>          state/output pair. The complex path preserves smooth complex-step
-  !>          derivatives for the Newton Jacobian; piecewise branches are
-  !>          selected using real state values.
-  !> \date 01/06/2012
-  !> @author Mattia de' Michieli Vitturi
-  !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
-  !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
-  !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
-  !> \param[in] c_qj Optional complex conservative cell state [variable], used for complex-step
-  !>                 source derivatives.
-  !> \param[out] c_nh_term_impl Optional complex implicit-source vector [equation] corresponding
-  !>                            to c_qj.
-  !> \param[in] r_qj Optional real conservative cell state [variable].
-  !> \param[out] r_nh_term_impl Optional real implicit-source vector [equation] corresponding
-  !>                            to r_qj.
-  !> \param[in] group Optional validated Newton source group; requires solver.
-  !> \param[in] solver Optional registered Newton solver; limits rate assembly to its terms.
-  !>
-  !> \note Provide exactly one complete input/output pair: c_qj with c_nh_term_impl, or r_qj
-  !>       with r_nh_term_impl. Zij is the effective stochastic fluctuation passed to rheology
-  !>       closures. Pore diffusion is evaluated independently of the rheology flag; dry or
-  !>       negative-pressure states, absent pore volume, and dynamic permeability without
-  !>       solids contribute no pressure relaxation. When group and solver are omitted, the
-  !>       legacy unfiltered source assembly is retained.
-  !******************************************************************************
-
-  !******************************************************************************
-  !> \brief Evaluate semi-implicit rheology and geometric source contributions.
-  !> \details Dispatches the semi-implicit part of the configured rheology law
-  !>          for the supplied physical state and returns it in the momentum
-  !>          equations of an otherwise zero equation-sized source vector.
-  !>          The selected law may use bed slope, bed curvature, reduced
-  !>          gravity, pore pressure, solid fractions and the effective
-  !>          stochastic variable. A dry cell or exact rest state contributes
-  !>          zero, avoiding undefined velocity norms or divisions.
-  !> \date 20/01/2018
-  !> @author Mattia de' Michieli Vitturi
-  !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
-  !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
-  !> \param[in] Bsecondj_xx Filtered cell bed derivative d^2B/dx^2 [m^-1].
-  !> \param[in] Bsecondj_xy Filtered mixed bed derivative d^2B/(dx dy) [m^-1].
-  !> \param[in] Bsecondj_yy Filtered cell bed derivative d^2B/dy^2 [m^-1].
-  !> \param[in] grav_coeff Large-slope gravity factor G at the supplied state location.
-  !> \param[in] qpj Local physical state of length n_vars+2 with component mass fractions.
-  !> \param[out] semi_implicit_term Cell-source vector handled by the semi-implicit
-  !>                                part of the time scheme.
-  !> \param[in] Zj Local effective stochastic fluctuation supplied to the rheology.
-  !> \param[in] group Optional validated Newton source group; requires solver.
-  !> \param[in] solver Optional registered Newton solver; limits assembly to its terms.
-  !> \note The Froude-dependent law (model 9) requires positive reduced gravity.
-  !>       Neutral or buoyant mixtures have no compressive buoyancy load in this law and receive
-  !>       no basal friction; their Froude denominator must not be evaluated.
-  !******************************************************************************
-
-  !******************************************************************************
-  !> \brief Construct the physical inlet state for an active radial-source pulse.
-  !> \details Evaluates the configured periodic pulse at time and returns the
-  !>          inlet state in the canonical q/qp layout: depth, depth-weighted
-  !>          x/y velocity, temperature, component fractions and appended
-  !>          x/y velocities. During an inactive pulse, depth, momentum and
-  !>          composition remain zero while temperature is set to T_source.
-  !>          For an active pulse with coefficient c_t, depth and velocity are
-  !>          scaled as h=c_t*h_source and u,v=sqrt(c_t)*vel_source*(vect_x,
-  !>          vect_y), so depth-weighted momentum scales as c_t^(3/2).
-  !> \date 2019/12/01
-  !> @author Mattia de' Michieli Vitturi
-  !> \param[in] time Current simulation time [s].
-  !> \param[in] vect_x X component of the inlet direction vector.
-  !> \param[in] vect_y Y component of the inlet direction vector.
-  !> \param[out] source_bdry Inlet state of length n_vars+2 in the canonical physical-state
-  !>                         layout; composition is populated only when the pulse is active.
-  !> \note Returns the temperature-only inactive state when time reaches the configured cutoff.
-  !******************************************************************************
-
-  !******************************************************************************
-  ! Supporting routines for equation-term evaluation.
-  !******************************************************************************
-
 
   !******************************************************************************
   !> \brief Classify the configured equations as explicit or implicit.
