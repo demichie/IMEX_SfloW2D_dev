@@ -289,10 +289,10 @@ CONTAINS
     TYPE(source_group_type) :: group
     TYPE(source_solver_type) :: solver
     TYPE(source_term_type) :: term
-    INTEGER, ALLOCATABLE :: solve_ids(:),collected(:),expected(:),terms(:),bundle_terms(:)
+    INTEGER, ALLOCATABLE :: solve_ids(:),expected(:),terms(:),bundle_terms(:)
     LOGICAL :: seen(SOURCE_TERM_COUNT)
     INTEGER :: i,j,k,id,si,nstage,family,mass_group,term_group(SOURCE_TERM_COUNT)
-    LOGICAL, ALLOCATABLE :: used_solver(:),equation_seen(:)
+    LOGICAL, ALLOCATABLE :: used_solver(:)
     error='D17: invalid or duplicate source catalog name'
     IF (.NOT.source_catalog_names_unique()) RETURN
     error='D17: incomplete source registry'
@@ -303,7 +303,7 @@ CONTAINS
     IF (this%pore_equation/=0) THEN
       IF (this%pore_equation<5 .OR. this%pore_equation>this%n_equations) RETURN
     END IF
-    ALLOCATE(used_solver(SIZE(this%solver_entries)),equation_seen(this%n_equations))
+    ALLOCATE(used_solver(SIZE(this%solver_entries)))
     used_solver=.FALSE.; seen=.FALSE.; term_group=0; family=0; mass_group=0
     nstage=SIZE(this%stage_entries)
     groups=[this%stage_entries,this%step_entries]
@@ -389,7 +389,6 @@ CONTAINS
         IF (SIZE(group%analytic_solver_ids)/=1 .OR. SIZE(group%implicit_solver_ids)/=0) RETURN
       END SELECT
       solve_ids=[group%implicit_solver_ids,group%analytic_solver_ids]
-      collected=[INTEGER::]; equation_seen=.FALSE.
       DO j=1,SIZE(solve_ids)
         error='D17: missing, duplicate or inconsistent solver descriptor'
         si=solve_ids(j)
@@ -404,8 +403,6 @@ CONTAINS
         IF (.NOT.valid_equations(solver%equation_ids,this%n_equations)) RETURN
         IF (SIZE(solver%equation_ids)==0) RETURN
         IF (.NOT.ALL(in_list(solver%equation_ids,group%equation_ids))) RETURN
-        IF (ANY(equation_seen(solver%equation_ids))) RETURN
-        equation_seen(solver%equation_ids)=.TRUE.
         expected=[INTEGER::]
         DO k=1,SIZE(solver%target_ids)
           id=solver%target_ids(k)
@@ -414,6 +411,8 @@ CONTAINS
           expected=[expected,target_equation_ids(id,this%pore_equation)]
         END DO
         IF (.NOT.same_set(expected,solver%equation_ids)) RETURN
+        ! With one solve per implicit group, its equation map is the group map.
+        IF (.NOT.same_set(solver%equation_ids,group%equation_ids)) RETURN
         IF (group%method==SOURCE_METHOD_NEWTON) THEN
           IF (solver%kind/=SOURCE_SOLVE_NEWTON_BLOCK) RETURN
         ELSE
@@ -424,8 +423,6 @@ CONTAINS
         DO k=1,SIZE(solver%term_ids)
           term=source_term_descriptor(solver%term_ids(k))
           IF (.NOT.ANY(solver%target_ids==term%target)) RETURN
-          IF (ANY(collected==term%id)) RETURN
-          collected=[collected,term%id]
         END DO
         IF (group%method==SOURCE_METHOD_ANALYTIC) THEN
           IF (solver%target_ids(1)==SOURCE_TARGET_VELOCITY) THEN
@@ -438,8 +435,8 @@ CONTAINS
       END DO
       error='D17: solver coverage does not match group equations/terms'
       IF (group%method/=SOURCE_METHOD_EXPLICIT) THEN
-        IF (.NOT.same_set(collected,group%term_ids)) RETURN
-        IF (COUNT(equation_seen)/=SIZE(group%equation_ids)) RETURN
+        ! A single solve must contain precisely the group's physical sources.
+        IF (.NOT.same_set(solver%term_ids,group%term_ids)) RETURN
       END IF
     END DO
     error='D17: orphan solver descriptor'
