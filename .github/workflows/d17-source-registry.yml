@@ -30,7 +30,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p "$D17_WORK_DIR"
-          TESTS/TEST_SOURCE_REGISTRY/run_test.sh 2>&1 | tee "$D17_WORK_DIR/test-run.log"
+          sh TESTS/TEST_SOURCE_REGISTRY/run_test.sh 2>&1 | tee "$D17_WORK_DIR/test-run.log"
 
       - name: Upload test logs
         if: always()
