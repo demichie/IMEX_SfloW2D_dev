@@ -78,6 +78,48 @@ def main() -> int:
                 failures.append(f"{source}: supported {method} uses fatal_error in {file.relative_to(ROOT)}")
             if not supported[method] and not rejects_method:
                 failures.append(f"{source}: unsupported {method} must reject accidental invocation")
+    # Each physical source owns a single, ordered four-entry public contract.
+    # Keeping all four procedures together also prevents accidentally routing
+    # different treatments through unrelated physical modules.
+    for source, _target, _explicit, _newton, _analytic in catalog:
+        names = [
+            f"{'solve' if method == 'analytic' else 'eval'}_{source}_{method}"
+            for method in METHODS
+        ]
+        owners = []
+        for name in names:
+            matches = [
+                (file, re.search(
+                    rf"(?im)^\\s*(?:pure\\s+)?(?:real\\(wp\\)\\s+|complex\\(wp\\)\\s+)?"
+                    rf"(?:subroutine|function)\\s+{re.escape(name)}\\s*\\(",
+                    contents,
+                ))
+                for file, contents in code_by_file.items()
+            ]
+            owners.append([(file, m.start()) for file, m in matches if m])
+        if not all(len(matches) == 1 for matches in owners):
+            continue  # Existing checks already report missing/duplicated procedures.
+        if len({matches[0][0] for matches in owners}) != 1:
+            failures.append(f"{source}: treatment procedures are split across physical modules")
+            continue
+        positions = [matches[0][1] for matches in owners]
+        if positions != sorted(positions):
+            failures.append(f"{source}: procedure definitions must be ordered "
+                            "explicit, semi_implicit, implicit, analytic")
+        file = owners[0][0][0]
+        contents = code_by_file[file]
+        declarations = []
+        for name in names:
+            matches = list(re.finditer(
+                rf"(?im)^\\s*public\\s*::[^\\n]*\\b{re.escape(name)}\\b",
+                contents,
+            ))
+            declarations.append(matches)
+        if all(len(matches) == 1 for matches in declarations):
+            positions = [matches[0].start() for matches in declarations]
+            if positions != sorted(positions):
+                failures.append(f"{source}: PUBLIC declarations must be ordered "
+                                "explicit, semi_implicit, implicit, analytic")
     for failure in failures:
         print("FAIL:", failure, file=sys.stderr)
     print(f"D17 physical treatment audit: {len(catalog)} configured sources, "
