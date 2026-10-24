@@ -240,6 +240,8 @@ Conservare il calcolo del residuo sui soli indici attivi, la Jacobiana complex-s
 
 **Stato di avanzamento D17.12 — IN CORSO (24 ottobre 2026).** Bridge analitico preesistente; adattamento alla struttura finale e regressioni da completare. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
 
+
+**Aggiornamento 24 ottobre — commit `e4dda5ed`:** l'assemblatore analitico `eval_analytic_terms` riceve ora soltanto il gruppo e riconosce l'unico operatore da `group%equation_ids` (momentum 2/3, temperatura 4, pressione dei pori); non richiede il descrittore `source_solver_type`. Il runtime mantiene ancora il descrittore per i controlli del registro: la rimozione completa deve migrare anche SI/IM e Newton. Verifica del nuovo commit ancora da eseguire.
 ## D17.12a — Attivazione indipendente del raffreddamento termico (nuova decisione vincolante)
 
 **Obiettivo.** L'attivazione della legge di raffreddamento della lava non deve dipendere dalla selezione della reologia lava. La reologia descrive la risposta meccanica; l'attivazione della sorgente termica è una scelta fisica distinta, configurata nei parametri della temperatura. Non introdurre nuove vie di integrazione o moduli dedicati: la legge termica conserva le quattro interfacce uniformi e i suoi contributi vengono assemblati da `source_terms_2d` nei gruppi ordinari.
@@ -860,3 +862,8 @@ Commit [`04b2bc07`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/04b2bc07
 ### D17.22.23 — Il gruppo determina le incognite del Newton (24 ottobre 2026)
 
 Commit [`3b54bc01`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/3b54bc01ba3de2ae2d71144aea05852e62b6936d): il runtime `nonlinear_solver_2d` passa a `solve_newton_group` gli indici delle equazioni del gruppo, non la copia nel descrittore del solver. Prima della chiamata richiede l'uguaglianza esatta degli insiemi e considera il momentum dal gruppo. Il controllo è transitorio e impedisce che un sotto-solver definisca un sistema numerico differente. **Non** è la rimozione definitiva di `source_solver_type`: il descrittore resta necessario alle attuali interfacce SI/IM, Newton e analytic, da migrare insieme. D17.5 e D17.10 restano IN CORSO. Nuovo HEAD non ancora compilato o testato con le Actions manuali; nessuna formula fisica o RK modificata.
+
+
+### D17.22.24 — Analytic guidato dal gruppo (24 ottobre 2026)
+
+Commit [`e4dda5ed`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/e4dda5ed5e4f0ffde6e38038b1c737bd0faf457e): `eval_analytic_terms` non riceve più `source_solver_type`; l'operatore viene selezionato dalla dimensione e dal contenuto di `group%equation_ids`. Aggiornata la chiamata in `nonlinear_solver_2d`. Le formule analitiche rimangono invariate. **Non** è ancora stata eliminata la struttura globale `source_solver_type`, necessaria alle altre interfacce. D17.12 e D17.5 sono IN CORSO per la migrazione coordinata. Compile/registry e regressioni analitiche sul nuovo SHA sono ancora da eseguire.
