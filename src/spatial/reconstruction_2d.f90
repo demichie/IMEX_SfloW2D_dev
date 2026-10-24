@@ -289,7 +289,7 @@ CONTAINS
 
     ! External procedures
       USE state_conversion_2d, ONLY : qp_to_qp2
-    USE equation_terms_2d, ONLY : eval_source_bdry
+    USE equation_terms_2d, ONLY : eval_boundary_injection_explicit
     USE parameters_2d, ONLY : limiter
 
     USE geometry_2d, ONLY : x_comp , x_stag , y_comp , y_stag , dx2 , dy2
@@ -385,22 +385,22 @@ CONTAINS
 
           IF ( sourceE(j,k) ) THEN
 
-             CALL eval_source_bdry( t, sourceE_vect_x(j,k), sourceE_vect_y(j,k), &
+             CALL eval_boundary_injection_explicit( t, sourceE_vect_x(j,k), sourceE_vect_y(j,k), &
                   source_bdry )
 
           ELSEIF ( sourceW(j,k) ) THEN
 
-             CALL eval_source_bdry( t, sourceW_vect_x(j,k), sourceW_vect_y(j,k), &
+             CALL eval_boundary_injection_explicit( t, sourceW_vect_x(j,k), sourceW_vect_y(j,k), &
                   source_bdry )
 
           ELSEIF ( sourceS(j,k) ) THEN
 
-             CALL eval_source_bdry( t, sourceS_vect_x(j,k), sourceS_vect_y(j,k), &
+             CALL eval_boundary_injection_explicit( t, sourceS_vect_x(j,k), sourceS_vect_y(j,k), &
                   source_bdry )
 
           ELSEIF ( sourceN(j,k) ) THEN
 
-             CALL eval_source_bdry( t, sourceN_vect_x(j,k), sourceN_vect_y(j,k), &
+             CALL eval_boundary_injection_explicit( t, sourceN_vect_x(j,k), sourceN_vect_y(j,k), &
                   source_bdry )
 
           END IF

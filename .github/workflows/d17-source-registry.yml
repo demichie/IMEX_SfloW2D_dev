@@ -20,6 +20,9 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y gfortran
 
+      - name: Check four concrete physics interfaces per configured source
+        run: python3 TESTS/ACCEPTANCE/test_d17_physical_interfaces.py
+
       - name: Run existing D17 registry regression
         shell: bash
         env:

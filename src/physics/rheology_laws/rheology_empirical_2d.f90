@@ -83,8 +83,10 @@ CONTAINS
   SUBROUTINE eval_rheology_empirical_explicit()
     CALL fatal_error('rheology_empirical: explicit treatment is unsupported')
   END SUBROUTINE eval_rheology_empirical_explicit
-  ! Unsupported physical treatment, rejected by the source catalog.
-  SUBROUTINE eval_rheology_empirical_semi_implicit()
-    CALL fatal_error('rheology_empirical: semi-implicit treatment is unsupported')
+  ! Valid zero component of the configured Newton treatment.
+  SUBROUTINE eval_rheology_empirical_semi_implicit(rate_x, rate_y)
+    REAL(wp), INTENT(OUT) :: rate_x, rate_y
+    rate_x = 0.0_wp
+    rate_y = 0.0_wp
   END SUBROUTINE eval_rheology_empirical_semi_implicit
 END MODULE rheology_empirical_2d

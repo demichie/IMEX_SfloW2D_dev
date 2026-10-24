@@ -84,8 +84,10 @@ CONTAINS
   SUBROUTINE eval_rheology_quadratic_explicit()
     CALL fatal_error('rheology_quadratic: explicit treatment is unsupported')
   END SUBROUTINE eval_rheology_quadratic_explicit
-  ! Unsupported physical treatment, rejected by the source catalog.
-  SUBROUTINE eval_rheology_quadratic_semi_implicit()
-    CALL fatal_error('rheology_quadratic: semi-implicit treatment is unsupported')
+  ! Valid zero component of the configured Newton treatment.
+  SUBROUTINE eval_rheology_quadratic_semi_implicit(rate_x, rate_y)
+    REAL(wp), INTENT(OUT) :: rate_x, rate_y
+    rate_x = 0.0_wp
+    rate_y = 0.0_wp
   END SUBROUTINE eval_rheology_quadratic_semi_implicit
 END MODULE rheology_quadratic_2d

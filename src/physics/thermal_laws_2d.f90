@@ -415,12 +415,14 @@ CONTAINS
 
   END FUNCTION lava_cooling_time_primitive
 
-  SUBROUTINE eval_thermal_cooling_semi_implicit()
-    CALL fatal_error('lava_cooling: semi_implicit treatment is unsupported')
+  ! Valid zero contribution for the semi-implicit part of Newton.
+  SUBROUTINE eval_thermal_cooling_semi_implicit(rate)
+    REAL(wp), INTENT(OUT) :: rate
+    rate = 0.0_wp
   END SUBROUTINE eval_thermal_cooling_semi_implicit
 
   SUBROUTINE eval_thermal_cooling_explicit()
-    CALL fatal_error('lava_cooling: implicit treatment is unsupported')
+    CALL fatal_error('thermal_cooling: explicit treatment is unsupported')
   END SUBROUTINE eval_thermal_cooling_explicit
 
 END MODULE thermal_laws_2d

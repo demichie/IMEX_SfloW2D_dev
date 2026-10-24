@@ -10,53 +10,42 @@ MODULE mass_exchange_carrier_loss_2d
   PRIVATE
   PUBLIC :: eval_continuous_phase_loss_rate
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
-  PUBLIC :: eval_carrier_loss_explicit
-  PUBLIC :: eval_carrier_loss_semi_implicit
-  PUBLIC :: eval_carrier_loss_implicit
-  PUBLIC :: solve_carrier_loss_analytic
+  PUBLIC :: eval_mass_exchange_carrier_loss_explicit
+  PUBLIC :: eval_mass_exchange_carrier_loss_semi_implicit
+  PUBLIC :: eval_mass_exchange_carrier_loss_implicit
+  PUBLIC :: solve_mass_exchange_carrier_loss_analytic
+  ! Catalog-addressable carrier-loss contributors; only explicit is supported.
+  PUBLIC :: eval_mass_exchange_carrier_liquid_loss_explicit
+  PUBLIC :: eval_mass_exchange_carrier_liquid_loss_semi_implicit
+  PUBLIC :: eval_mass_exchange_carrier_liquid_loss_implicit
+  PUBLIC :: solve_mass_exchange_carrier_liquid_loss_analytic
+  PUBLIC :: eval_mass_exchange_carrier_deposition_loss_explicit
+  PUBLIC :: eval_mass_exchange_carrier_deposition_loss_semi_implicit
+  PUBLIC :: eval_mass_exchange_carrier_deposition_loss_implicit
+  PUBLIC :: solve_mass_exchange_carrier_deposition_loss_analytic
+  PUBLIC :: eval_mass_exchange_carrier_darcy_loss_explicit
+  PUBLIC :: eval_mass_exchange_carrier_darcy_loss_semi_implicit
+  PUBLIC :: eval_mass_exchange_carrier_darcy_loss_implicit
+  PUBLIC :: solve_mass_exchange_carrier_darcy_loss_analytic
 CONTAINS
-  SUBROUTINE eval_carrier_loss_explicit(r_h, r_T, r_alphas, alphas_tot, &
+  SUBROUTINE eval_mass_exchange_carrier_loss_explicit(r_h, r_T, r_alphas, alphas_tot, &
        r_rho_c, r_exc_pore_pres, &
        deposition_term, dt, continuous_phase_loss_term)
     REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
     REAL(wp), INTENT(IN) :: r_rho_c, r_exc_pore_pres, deposition_term(n_solid), dt
     REAL(wp), INTENT(OUT) :: continuous_phase_loss_term
-    REAL(wp) :: pore_pressure_term
-
-    IF ( liquid_flag ) THEN
-
-       ! set the rate of loss of continuous phase
-       continuous_phase_loss_term = loss_rate
-
-    ELSE
-
-       continuous_phase_loss_term = 0.0_wp
-
-    END IF
-
-    ! add the loss associated with solid deposition
-    continuous_phase_loss_term =  continuous_phase_loss_term +                  &
-         coeff_porosity * SUM( deposition_term(1:n_solid) )
-
-    IF ( pore_pressure_flag .AND. gas_loss_flag ) THEN
-
-       IF ( alphas_tot .LT. maximum_solid_packing ) THEN
-
-         CALL eval_pore_pressure_gas_loss(r_h, r_T, r_alphas, alphas_tot,      &
-              r_rho_c, r_exc_pore_pres, pore_pressure_term)
-
-         continuous_phase_loss_term = continuous_phase_loss_term +             &
-               pore_pressure_term
-
-       END IF
-
-    END IF
+    ! Compose independent requested rates, then apply the shared limiter once.
+    continuous_phase_loss_term = eval_mass_exchange_carrier_liquid_loss_explicit() &
+         + eval_mass_exchange_carrier_deposition_loss_explicit(deposition_term)
+    continuous_phase_loss_term = continuous_phase_loss_term + &
+         eval_mass_exchange_carrier_darcy_loss_explicit(r_h, r_T, r_alphas, &
+         alphas_tot, r_rho_c, r_exc_pore_pres)
 
     ! Limit carrier loss by solid packing and the available carrier reserve.
     continuous_phase_loss_term = eval_continuous_phase_loss_rate(             &
          continuous_phase_loss_term, r_h, alphas_tot, maximum_solid_packing,  &
          coeff_porosity, deposition_term(1:n_solid), dt)
-  END SUBROUTINE eval_carrier_loss_explicit
+  END SUBROUTINE eval_mass_exchange_carrier_loss_explicit
   PURE FUNCTION eval_continuous_phase_loss_rate(requested_loss_rate,         &
        flow_depth, total_solid_fraction, maximum_solid_packing,               &
        porosity_coefficient, deposition_rate, time_step) RESULT(loss_rate)
@@ -76,27 +65,120 @@ CONTAINS
 
   END FUNCTION eval_continuous_phase_loss_rate
 
-  SUBROUTINE eval_carrier_loss_semi_implicit(r_h, r_T, r_alphas, alphas_tot, r_rho_c, r_exc_pore_pres, &
+  SUBROUTINE eval_mass_exchange_carrier_loss_semi_implicit(r_h, r_T, r_alphas, alphas_tot, r_rho_c, r_exc_pore_pres, &
        deposition_term, dt, continuous_phase_loss_term)
     REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
     REAL(wp), INTENT(IN) :: r_rho_c, r_exc_pore_pres, deposition_term(n_solid), dt
     REAL(wp), INTENT(OUT) :: continuous_phase_loss_term
     CALL fatal_error('carrier_loss: semi_implicit treatment is unsupported')
-  END SUBROUTINE eval_carrier_loss_semi_implicit
+  END SUBROUTINE eval_mass_exchange_carrier_loss_semi_implicit
 
-  SUBROUTINE eval_carrier_loss_implicit(r_h, r_T, r_alphas, alphas_tot, r_rho_c, r_exc_pore_pres, &
+  SUBROUTINE eval_mass_exchange_carrier_loss_implicit(r_h, r_T, r_alphas, alphas_tot, r_rho_c, r_exc_pore_pres, &
        deposition_term, dt, continuous_phase_loss_term)
     REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
     REAL(wp), INTENT(IN) :: r_rho_c, r_exc_pore_pres, deposition_term(n_solid), dt
     REAL(wp), INTENT(OUT) :: continuous_phase_loss_term
     CALL fatal_error('carrier_loss: implicit treatment is unsupported')
-  END SUBROUTINE eval_carrier_loss_implicit
+  END SUBROUTINE eval_mass_exchange_carrier_loss_implicit
 
-  SUBROUTINE solve_carrier_loss_analytic(r_h, r_T, r_alphas, alphas_tot, r_rho_c, r_exc_pore_pres, &
+  SUBROUTINE solve_mass_exchange_carrier_loss_analytic(r_h, r_T, r_alphas, alphas_tot, r_rho_c, r_exc_pore_pres, &
        deposition_term, dt, continuous_phase_loss_term)
     REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
     REAL(wp), INTENT(IN) :: r_rho_c, r_exc_pore_pres, deposition_term(n_solid), dt
     REAL(wp), INTENT(OUT) :: continuous_phase_loss_term
     CALL fatal_error('carrier_loss: analytic treatment is unsupported')
-  END SUBROUTINE solve_carrier_loss_analytic
+  END SUBROUTINE solve_mass_exchange_carrier_loss_analytic
+
+  REAL(wp) FUNCTION eval_mass_exchange_carrier_liquid_loss_explicit() RESULT(rate)
+    ! Requested constituent carrier loss; limiting is applied by the batch.
+    rate = 0.0_wp
+    IF (liquid_flag) rate = loss_rate
+  END FUNCTION eval_mass_exchange_carrier_liquid_loss_explicit
+
+  REAL(wp) FUNCTION eval_mass_exchange_carrier_liquid_loss_semi_implicit() RESULT(rate)
+    ! Unsupported physical treatment.
+    CALL fatal_error('mass_exchange_carrier_liquid_loss: semi_implicit is unsupported')
+    rate = 0.0_wp
+  END FUNCTION eval_mass_exchange_carrier_liquid_loss_semi_implicit
+
+  REAL(wp) FUNCTION eval_mass_exchange_carrier_liquid_loss_implicit() RESULT(rate)
+    ! Unsupported physical treatment.
+    CALL fatal_error('mass_exchange_carrier_liquid_loss: implicit is unsupported')
+    rate = 0.0_wp
+  END FUNCTION eval_mass_exchange_carrier_liquid_loss_implicit
+
+  REAL(wp) FUNCTION solve_mass_exchange_carrier_liquid_loss_analytic() RESULT(rate)
+    ! Unsupported physical treatment.
+    CALL fatal_error('mass_exchange_carrier_liquid_loss: analytic is unsupported')
+    rate = 0.0_wp
+  END FUNCTION solve_mass_exchange_carrier_liquid_loss_analytic
+
+  REAL(wp) FUNCTION eval_mass_exchange_carrier_deposition_loss_explicit(deposition_term) RESULT(rate)
+    REAL(wp), INTENT(IN) :: deposition_term(n_solid)
+    ! Requested constituent carrier loss; limiting is applied by the batch.
+    rate = coeff_porosity * SUM(deposition_term(1:n_solid))
+  END FUNCTION eval_mass_exchange_carrier_deposition_loss_explicit
+
+  REAL(wp) FUNCTION eval_mass_exchange_carrier_deposition_loss_semi_implicit(deposition_term) RESULT(rate)
+    REAL(wp), INTENT(IN) :: deposition_term(n_solid)
+    ! Unsupported physical treatment.
+    CALL fatal_error('mass_exchange_carrier_deposition_loss: semi_implicit is unsupported')
+    rate = 0.0_wp
+  END FUNCTION eval_mass_exchange_carrier_deposition_loss_semi_implicit
+
+  REAL(wp) FUNCTION eval_mass_exchange_carrier_deposition_loss_implicit(deposition_term) RESULT(rate)
+    REAL(wp), INTENT(IN) :: deposition_term(n_solid)
+    ! Unsupported physical treatment.
+    CALL fatal_error('mass_exchange_carrier_deposition_loss: implicit is unsupported')
+    rate = 0.0_wp
+  END FUNCTION eval_mass_exchange_carrier_deposition_loss_implicit
+
+  REAL(wp) FUNCTION solve_mass_exchange_carrier_deposition_loss_analytic(deposition_term) RESULT(rate)
+    REAL(wp), INTENT(IN) :: deposition_term(n_solid)
+    ! Unsupported physical treatment.
+    CALL fatal_error('mass_exchange_carrier_deposition_loss: analytic is unsupported')
+    rate = 0.0_wp
+  END FUNCTION solve_mass_exchange_carrier_deposition_loss_analytic
+
+  REAL(wp) FUNCTION eval_mass_exchange_carrier_darcy_loss_explicit(r_h, r_T, r_alphas, alphas_tot, &
+       r_rho_c, r_exc_pore_pres) RESULT(rate)
+    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
+    REAL(wp), INTENT(IN) :: r_rho_c, r_exc_pore_pres
+    ! Requested constituent carrier loss; limiting is applied by the batch.
+    rate = 0.0_wp
+    IF (pore_pressure_flag .AND. gas_loss_flag) THEN
+       IF (alphas_tot .LT. maximum_solid_packing) THEN
+          CALL eval_pore_pressure_gas_loss(r_h, r_T, r_alphas, alphas_tot, &
+               r_rho_c, r_exc_pore_pres, rate)
+       END IF
+    END IF
+  END FUNCTION eval_mass_exchange_carrier_darcy_loss_explicit
+
+  REAL(wp) FUNCTION eval_mass_exchange_carrier_darcy_loss_semi_implicit(r_h, r_T, r_alphas, alphas_tot, &
+       r_rho_c, r_exc_pore_pres) RESULT(rate)
+    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
+    REAL(wp), INTENT(IN) :: r_rho_c, r_exc_pore_pres
+    ! Unsupported physical treatment.
+    CALL fatal_error('mass_exchange_carrier_darcy_loss: semi_implicit is unsupported')
+    rate = 0.0_wp
+  END FUNCTION eval_mass_exchange_carrier_darcy_loss_semi_implicit
+
+  REAL(wp) FUNCTION eval_mass_exchange_carrier_darcy_loss_implicit(r_h, r_T, r_alphas, alphas_tot, &
+       r_rho_c, r_exc_pore_pres) RESULT(rate)
+    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
+    REAL(wp), INTENT(IN) :: r_rho_c, r_exc_pore_pres
+    ! Unsupported physical treatment.
+    CALL fatal_error('mass_exchange_carrier_darcy_loss: implicit is unsupported')
+    rate = 0.0_wp
+  END FUNCTION eval_mass_exchange_carrier_darcy_loss_implicit
+
+  REAL(wp) FUNCTION solve_mass_exchange_carrier_darcy_loss_analytic(r_h, r_T, r_alphas, alphas_tot, &
+       r_rho_c, r_exc_pore_pres) RESULT(rate)
+    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
+    REAL(wp), INTENT(IN) :: r_rho_c, r_exc_pore_pres
+    ! Unsupported physical treatment.
+    CALL fatal_error('mass_exchange_carrier_darcy_loss: analytic is unsupported')
+    rate = 0.0_wp
+  END FUNCTION solve_mass_exchange_carrier_darcy_loss_analytic
+
 END MODULE mass_exchange_carrier_loss_2d

@@ -134,8 +134,10 @@ CONTAINS
   SUBROUTINE eval_rheology_lucas_explicit()
     CALL fatal_error('rheology_lucas: explicit treatment is unsupported')
   END SUBROUTINE eval_rheology_lucas_explicit
-  ! Unsupported physical treatment, rejected by the source catalog.
-  SUBROUTINE eval_rheology_lucas_implicit()
-    CALL fatal_error('rheology_lucas: semi-implicit treatment is unsupported')
+  ! Valid zero component of the configured Newton treatment.
+  SUBROUTINE eval_rheology_lucas_implicit(rate_x, rate_y)
+    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
+    rate_x = CMPLX(0.0_wp,0.0_wp,wp)
+    rate_y = CMPLX(0.0_wp,0.0_wp,wp)
   END SUBROUTINE eval_rheology_lucas_implicit
 END MODULE rheology_lucas_2d

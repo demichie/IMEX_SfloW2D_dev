@@ -5,7 +5,7 @@ PROGRAM test_curvature_source
        sp_heat_l, inv_rho_s, sp_heat_s, sp_heat_g, sp_gas_const_g
   USE geometry_2d, ONLY : bottom_source_area_ratio, pi_g
   USE equation_terms_2d, ONLY : curvature_acceleration
-  USE equation_terms_2d, ONLY : eval_curvature_momentum_source
+  USE equation_terms_2d, ONLY : eval_geometry_curvature_explicit
   USE equation_terms_2d, ONLY : eval_expl_terms, set_source_time_coefficients
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE, &
        SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, &
@@ -51,7 +51,7 @@ PROGRAM test_curvature_source
        64.0_wp*EPSILON(1.0_wp)*ABS(expected_acceleration) )
 
   acceleration = curvature_acceleration(Bxx,Bxy,Byy,u,v)
-  CALL eval_curvature_momentum_source( Bx, By, Bxx, Bxy, Byy, G,           &
+  CALL eval_geometry_curvature_explicit( Bx, By, Bxx, Bxy, Byy, G,           &
        mixture_mass, u, v, source_x, source_y )
 
   expected_x = -G*mixture_mass*expected_acceleration*Bx
@@ -98,7 +98,7 @@ PROGRAM test_curvature_source
   CALL eval_expl_terms(Bx,By,Bxx,Bxy,Byy,G,physical,explicit_source, &
        0.0_wp,0.0_wp,[REAL(wp)::],0.0_wp,0.0_wp,0.0_wp,1.0_wp, &
        curvature_group)
-  CALL eval_curvature_momentum_source(Bx,By,Bxx,Bxy,Byy,G,          &
+  CALL eval_geometry_curvature_explicit(Bx,By,Bxx,Bxy,Byy,G,          &
        rho_l*physical(1),u,v,expected_x,expected_y)
   tolerance=128.0_wp*EPSILON(1.0_wp)*MAX(ABS(expected_x),ABS(expected_y))
   CALL assert_small('resolved x source retained',ABS(explicit_source(2)-expected_x),tolerance)

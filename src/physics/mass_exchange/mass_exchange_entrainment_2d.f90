@@ -7,24 +7,24 @@ MODULE mass_exchange_entrainment_2d
   PRIVATE
   PUBLIC :: eval_air_entrainment_rate
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
-  PUBLIC :: eval_entrainment_explicit
-  PUBLIC :: eval_entrainment_semi_implicit
-  PUBLIC :: eval_entrainment_implicit
-  PUBLIC :: solve_entrainment_analytic
+  PUBLIC :: eval_mass_exchange_entrainment_explicit
+  PUBLIC :: eval_mass_exchange_entrainment_semi_implicit
+  PUBLIC :: eval_mass_exchange_entrainment_implicit
+  PUBLIC :: solve_mass_exchange_entrainment_analytic
 CONTAINS
-  REAL(wp) FUNCTION eval_entrainment_explicit(r_h, r_Ri, mod_vel2)
+  REAL(wp) FUNCTION eval_mass_exchange_entrainment_explicit(r_h, r_Ri, mod_vel2)
     REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
     IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                      &
          ( r_Ri .GT. 0.0_wp ) ) THEN
 
-       eval_entrainment_explicit = eval_air_entrainment_rate(r_Ri, mod_vel2)
+       eval_mass_exchange_entrainment_explicit = eval_air_entrainment_rate(r_Ri, mod_vel2)
 
     ELSE
 
-       eval_entrainment_explicit = 0.0_wp
+       eval_mass_exchange_entrainment_explicit = 0.0_wp
 
     END IF
-  END FUNCTION eval_entrainment_explicit
+  END FUNCTION eval_mass_exchange_entrainment_explicit
   PURE FUNCTION eval_air_entrainment_rate(richardson_number, speed_squared)  &
        RESULT(entrainment_rate)
 
@@ -37,21 +37,21 @@ CONTAINS
 
   END FUNCTION eval_air_entrainment_rate
 
-  REAL(wp) FUNCTION eval_entrainment_semi_implicit(r_h, r_Ri, mod_vel2)
+  REAL(wp) FUNCTION eval_mass_exchange_entrainment_semi_implicit(r_h, r_Ri, mod_vel2)
     REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
     CALL fatal_error('entrainment: semi_implicit treatment is unsupported')
-    eval_entrainment_semi_implicit = 0.0_wp
-  END FUNCTION eval_entrainment_semi_implicit
+    eval_mass_exchange_entrainment_semi_implicit = 0.0_wp
+  END FUNCTION eval_mass_exchange_entrainment_semi_implicit
 
-  REAL(wp) FUNCTION eval_entrainment_implicit(r_h, r_Ri, mod_vel2)
+  REAL(wp) FUNCTION eval_mass_exchange_entrainment_implicit(r_h, r_Ri, mod_vel2)
     REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
     CALL fatal_error('entrainment: implicit treatment is unsupported')
-    eval_entrainment_implicit = 0.0_wp
-  END FUNCTION eval_entrainment_implicit
+    eval_mass_exchange_entrainment_implicit = 0.0_wp
+  END FUNCTION eval_mass_exchange_entrainment_implicit
 
-  REAL(wp) FUNCTION solve_entrainment_analytic(r_h, r_Ri, mod_vel2)
+  REAL(wp) FUNCTION solve_mass_exchange_entrainment_analytic(r_h, r_Ri, mod_vel2)
     REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
     CALL fatal_error('entrainment: analytic treatment is unsupported')
-    solve_entrainment_analytic = 0.0_wp
-  END FUNCTION solve_entrainment_analytic
+    solve_mass_exchange_entrainment_analytic = 0.0_wp
+  END FUNCTION solve_mass_exchange_entrainment_analytic
 END MODULE mass_exchange_entrainment_2d

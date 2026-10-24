@@ -4,7 +4,7 @@ PROGRAM test_state_conversion
   USE constitutive_parameters_2d
   USE state_conversion_2d
   USE equation_terms_2d, ONLY : eval_inertial_flux,                           &
-       limit_component_mass_flux, eval_source_bdry
+       limit_component_mass_flux, eval_boundary_injection_explicit
 
   IMPLICIT NONE
 
@@ -471,18 +471,18 @@ CONTAINS
     expected(idx_u) = 1.8_wp
     expected(idx_v) = 2.4_wp
 
-    CALL eval_source_bdry(1.0_wp, 0.6_wp, 0.8_wp, source_state)
+    CALL eval_boundary_injection_explicit(1.0_wp, 0.6_wp, 0.8_wp, source_state)
     CALL assert_close_vector('active source uses mass fractions',             &
          source_state, expected, 2.0E-12_wp)
 
     expected = 0.0_wp
     expected(4) = T_source
-    CALL eval_source_bdry(5.0_wp, 0.6_wp, 0.8_wp, source_state)
+    CALL eval_boundary_injection_explicit(5.0_wp, 0.6_wp, 0.8_wp, source_state)
     CALL assert_close_vector('periodically inactive source is dry',           &
          source_state, expected, 0.0_wp)
 
     time_param(4) = 3.0_wp
-    CALL eval_source_bdry(3.0_wp, 0.6_wp, 0.8_wp, source_state)
+    CALL eval_boundary_injection_explicit(3.0_wp, 0.6_wp, 0.8_wp, source_state)
     CALL assert_close_vector('source after cutoff is dry', source_state,      &
          expected, 0.0_wp)
 

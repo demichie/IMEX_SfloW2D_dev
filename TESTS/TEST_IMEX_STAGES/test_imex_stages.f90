@@ -252,7 +252,7 @@ CONTAINS
 
   !> \brief Exercise production linear boundary slopes, source traces and collapsed axes.
   SUBROUTINE run_boundary_reconstruction_tests
-    USE equation_terms_2d, ONLY : eval_source_bdry
+    USE equation_terms_2d, ONLY : eval_boundary_injection_explicit
     TYPE(reconstruction_workspace_type) :: boundary_reconstruction
     REAL(wp), ALLOCATABLE :: boundary_qp(:,:,:)
     INTEGER, ALLOCATABLE :: boundary_j(:),boundary_k(:)
@@ -399,7 +399,7 @@ CONTAINS
        xs_source(1:n_solid)=0.2_wp
        time_param=[1.0_wp,1.0_wp,0.0_wp,10.0_wp]
        source_temperature=T_source
-       CALL eval_source_bdry(0.0_wp,1.0_wp,0.0_wp,source_state)
+       CALL eval_boundary_injection_explicit(0.0_wp,1.0_wp,0.0_wp,source_state)
        CALL assert_boundary_value('source boundary helper temperature', &
             source_state(idx_T),source_temperature)
        source_cell=0

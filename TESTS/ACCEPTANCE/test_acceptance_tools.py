@@ -52,7 +52,7 @@ class AuditToolsTests(unittest.TestCase):
             "eval_hydrostatic_coefficient",
             "eval_inertial_flux",
             "eval_local_speeds_direction",
-            "eval_source_bdry",
+            "eval_boundary_injection_explicit",
             "limit_component_mass_flux",
         }
         spatial_equation_use = re.compile(

@@ -67,11 +67,29 @@ MODULE equation_terms_2d
   PUBLIC :: eval_local_speeds_direction
   PUBLIC :: eval_inertial_flux, eval_hydrostatic_coefficient
   PUBLIC :: limit_component_mass_flux
-  PUBLIC :: curvature_acceleration, eval_curvature_momentum_source
+  PUBLIC :: curvature_acceleration, eval_geometry_curvature_explicit
   PUBLIC :: eval_expl_terms
+  PUBLIC :: eval_geometry_curvature_semi_implicit
+  PUBLIC :: eval_geometry_curvature_implicit
+  PUBLIC :: solve_geometry_curvature_analytic
+  PUBLIC :: eval_boundary_injection_explicit
+  PUBLIC :: eval_boundary_injection_semi_implicit
+  PUBLIC :: eval_boundary_injection_implicit
+  PUBLIC :: solve_boundary_injection_analytic
+  PUBLIC :: eval_bottom_circular_injection_explicit
+  PUBLIC :: eval_bottom_circular_injection_semi_implicit
+  PUBLIC :: eval_bottom_circular_injection_implicit
+  PUBLIC :: solve_bottom_circular_injection_analytic
+  PUBLIC :: eval_bottom_fissural_injection_explicit
+  PUBLIC :: eval_bottom_fissural_injection_semi_implicit
+  PUBLIC :: eval_bottom_fissural_injection_implicit
+  PUBLIC :: solve_bottom_fissural_injection_analytic
+  PUBLIC :: eval_radial_injection_explicit
+  PUBLIC :: eval_radial_injection_semi_implicit
+  PUBLIC :: eval_radial_injection_implicit
+  PUBLIC :: solve_radial_injection_analytic
   PUBLIC :: eval_implicit_terms, eval_semi_implicit_terms
   PUBLIC :: analytic_term_context_type, eval_analytic_terms
-  PUBLIC :: eval_source_bdry
   PUBLIC :: set_source_time_coefficients
 
   INTERFACE eval_expl_terms
@@ -346,7 +364,7 @@ CONTAINS
           ! Below the shared dry threshold the auxiliary velocity is not a
           ! resolved physical velocity: do not square it in this source.
           ! This guard neither discards mass nor disables external injection.
-          CALL eval_curvature_momentum_source( Bprimej_x, Bprimej_y,         &
+          CALL eval_geometry_curvature_explicit( Bprimej_x, Bprimej_y,         &
                Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, q1,        &
                r_u, r_v, expl_term(2), expl_term(3) )
 
@@ -357,10 +375,40 @@ CONTAINS
 
     END IF
 
+    ! Each configured source owns exactly one explicit rate calculation.
+    IF (group_contains_name(group,'bottom_circular_injection')) &
+         CALL eval_bottom_circular_injection_explicit(qpj,time,cell_fract_jk,q1,expl_term)
+    IF (group_contains_name(group,'bottom_fissural_injection')) &
+         CALL eval_bottom_fissural_injection_explicit(qpj,time,cell_fissure_fract,q1,expl_term)
+    IF (group_contains_name(group,'radial_injection')) &
+         CALL eval_radial_injection_explicit(qpj,time,lat_arc_perim_jk, &
+         lat_n_x_jk,lat_n_y_jk,cell_area_jk,q1,expl_term)
+
+    RETURN
+
+  END SUBROUTINE eval_stage_expl_terms
+
+
+  !> Contribution owned by the bottom_circular_injection configured explicit source.
+  SUBROUTINE eval_bottom_circular_injection_explicit(qpj, time, cell_fract_jk, q1, expl_term)
+    USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source, &
+         xl_source, time_param, bottom_radial_source_flag, pore_pressure_flag, &
+         pore_pres_fract, n_intervals, t_intervals, vel_intervals, &
+         radial_source_flag, h_source, bottom_fissural_source_flag, &
+         n_fissures, linear_vel_fissures, T_fissures, time_param_fissures, &
+         xs_fissures, xg_fissures, xl_fissures
+    USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, cell_fract_jk, q1
+    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+    REAL(wp) :: t_rem, t_coeff, h_dot, vel_local
+    REAL(wp) :: qp_source(n_vars+2)
+    REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
+    REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, exc_pore_pres
+    INTEGER :: i_int, i_fissure
+
     ! ----------- ADDITIONAL EXPLICIT TERMS FOR BOTTOM RADIAL SOURCE ------------
 
-    IF ( group_contains_name(group,'bottom_circular_injection') .AND. &
-         bottom_radial_source_flag .AND. ( cell_fract_jk .GT. 0.0_wp ) ) THEN
+    IF ( bottom_radial_source_flag .AND. ( cell_fract_jk .GT. 0.0_wp ) ) THEN
 
     IF ( n_intervals .GT. 0 ) THEN
 
@@ -500,11 +548,46 @@ CONTAINS
     END IF
 
     END IF   ! bottom_radial_source_flag
+  END SUBROUTINE eval_bottom_circular_injection_explicit
+
+  SUBROUTINE eval_bottom_circular_injection_semi_implicit(qpj, time, cell_fract_jk, q1, expl_term)
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, cell_fract_jk, q1
+    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+    CALL fatal_error('bottom_circular_injection: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_bottom_circular_injection_semi_implicit
+
+  SUBROUTINE eval_bottom_circular_injection_implicit(qpj, time, cell_fract_jk, q1, expl_term)
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, cell_fract_jk, q1
+    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+    CALL fatal_error('bottom_circular_injection: implicit treatment is unsupported')
+  END SUBROUTINE eval_bottom_circular_injection_implicit
+
+  SUBROUTINE solve_bottom_circular_injection_analytic(qpj, time, cell_fract_jk, q1, expl_term)
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, cell_fract_jk, q1
+    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+    CALL fatal_error('bottom_circular_injection: analytic treatment is unsupported')
+  END SUBROUTINE solve_bottom_circular_injection_analytic
+
+  !> Contribution owned by the bottom_fissural_injection configured explicit source.
+  SUBROUTINE eval_bottom_fissural_injection_explicit(qpj, time, cell_fissure_fract, q1, expl_term)
+    USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source, &
+         xl_source, time_param, bottom_radial_source_flag, pore_pressure_flag, &
+         pore_pres_fract, n_intervals, t_intervals, vel_intervals, &
+         radial_source_flag, h_source, bottom_fissural_source_flag, &
+         n_fissures, linear_vel_fissures, T_fissures, time_param_fissures, &
+         xs_fissures, xg_fissures, xl_fissures
+    USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, cell_fissure_fract(:), q1
+    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+    REAL(wp) :: t_rem, t_coeff, h_dot, vel_local
+    REAL(wp) :: qp_source(n_vars+2)
+    REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
+    REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, exc_pore_pres
+    INTEGER :: i_int, i_fissure
 
     ! Each fissure uses its own clipped cell coverage, pulse and temperature,
     ! and the source composition converted at that temperature.
-    IF ( group_contains_name(group,'bottom_fissural_injection') .AND. &
-         bottom_fissural_source_flag ) THEN
+    IF ( bottom_fissural_source_flag ) THEN
 
        DO i_fissure = 1, n_fissures
 
@@ -579,6 +662,44 @@ CONTAINS
        END DO
 
     END IF
+  END SUBROUTINE eval_bottom_fissural_injection_explicit
+
+  SUBROUTINE eval_bottom_fissural_injection_semi_implicit(qpj, time, cell_fissure_fract, q1, expl_term)
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, cell_fissure_fract(:), q1
+    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+    CALL fatal_error('bottom_fissural_injection: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_bottom_fissural_injection_semi_implicit
+
+  SUBROUTINE eval_bottom_fissural_injection_implicit(qpj, time, cell_fissure_fract, q1, expl_term)
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, cell_fissure_fract(:), q1
+    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+    CALL fatal_error('bottom_fissural_injection: implicit treatment is unsupported')
+  END SUBROUTINE eval_bottom_fissural_injection_implicit
+
+  SUBROUTINE solve_bottom_fissural_injection_analytic(qpj, time, cell_fissure_fract, q1, expl_term)
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, cell_fissure_fract(:), q1
+    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+    CALL fatal_error('bottom_fissural_injection: analytic treatment is unsupported')
+  END SUBROUTINE solve_bottom_fissural_injection_analytic
+
+  !> Contribution owned by the radial_injection configured explicit source.
+  SUBROUTINE eval_radial_injection_explicit(qpj, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
+       cell_area_jk, q1, expl_term)
+    USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source, &
+         xl_source, time_param, bottom_radial_source_flag, pore_pressure_flag, &
+         pore_pres_fract, n_intervals, t_intervals, vel_intervals, &
+         radial_source_flag, h_source, bottom_fissural_source_flag, &
+         n_fissures, linear_vel_fissures, T_fissures, time_param_fissures, &
+         xs_fissures, xg_fissures, xl_fissures
+    USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, lat_arc_perim_jk
+    REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk, q1
+    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+    REAL(wp) :: t_rem, t_coeff, h_dot, vel_local
+    REAL(wp) :: qp_source(n_vars+2)
+    REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
+    REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, exc_pore_pres
+    INTEGER :: i_int, i_fissure
 
     ! ----------- LATERAL RADIAL SOURCE (volume formulation) ------------------
     !
@@ -588,11 +709,10 @@ CONTAINS
     ! per-cell rate rho_source * h_source * vel_source * cell_arc_perim_jk
     ! / cell_area_jk sums to MFR over all in-arc cells.
 
-    IF ( group_contains_name(group,'radial_injection') .AND.              &
-         radial_source_flag .AND. ( lat_arc_perim_jk .GT. 0.0_wp ) .AND.       &
+    IF ( radial_source_flag .AND. ( lat_arc_perim_jk .GT. 0.0_wp ) .AND.       &
          ( h_source .GT. 0.0_wp ) ) THEN
 
-       ! Time gate: keep the current-main semantics used by eval_source_bdry.
+       ! Time gate: keep the current-main semantics used by eval_boundary_injection_explicit.
        ! TIME_PARAM(4) is an absolute cut-off for the lateral radial source.
        IF ( time .GE. time_param(4) ) THEN
 
@@ -682,10 +802,83 @@ CONTAINS
        END IF
 
     END IF
+  END SUBROUTINE eval_radial_injection_explicit
 
-    RETURN
+  SUBROUTINE eval_radial_injection_semi_implicit(qpj, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
+       cell_area_jk, q1, expl_term)
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, lat_arc_perim_jk
+    REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk, q1
+    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+    CALL fatal_error('radial_injection: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_radial_injection_semi_implicit
 
-  END SUBROUTINE eval_stage_expl_terms
+  SUBROUTINE eval_radial_injection_implicit(qpj, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
+       cell_area_jk, q1, expl_term)
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, lat_arc_perim_jk
+    REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk, q1
+    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+    CALL fatal_error('radial_injection: implicit treatment is unsupported')
+  END SUBROUTINE eval_radial_injection_implicit
+
+  SUBROUTINE solve_radial_injection_analytic(qpj, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
+       cell_area_jk, q1, expl_term)
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, lat_arc_perim_jk
+    REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk, q1
+    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+    CALL fatal_error('radial_injection: analytic treatment is unsupported')
+  END SUBROUTINE solve_radial_injection_analytic
+
+
+  SUBROUTINE eval_geometry_curvature_semi_implicit(Bprime_x, Bprime_y, &
+       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
+       mixture_mass, velocity_x, velocity_y, source_x, source_y)
+    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
+    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
+    REAL(wp), INTENT(IN) :: grav_coefficient
+    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
+    REAL(wp), INTENT(OUT) :: source_x, source_y
+    CALL fatal_error('geometry_curvature: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_geometry_curvature_semi_implicit
+
+  SUBROUTINE eval_geometry_curvature_implicit(Bprime_x, Bprime_y, &
+       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
+       mixture_mass, velocity_x, velocity_y, source_x, source_y)
+    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
+    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
+    REAL(wp), INTENT(IN) :: grav_coefficient
+    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
+    REAL(wp), INTENT(OUT) :: source_x, source_y
+    CALL fatal_error('geometry_curvature: implicit treatment is unsupported')
+  END SUBROUTINE eval_geometry_curvature_implicit
+
+  SUBROUTINE solve_geometry_curvature_analytic(Bprime_x, Bprime_y, &
+       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
+       mixture_mass, velocity_x, velocity_y, source_x, source_y)
+    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
+    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
+    REAL(wp), INTENT(IN) :: grav_coefficient
+    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
+    REAL(wp), INTENT(OUT) :: source_x, source_y
+    CALL fatal_error('geometry_curvature: analytic treatment is unsupported')
+  END SUBROUTINE solve_geometry_curvature_analytic
+
+  SUBROUTINE eval_boundary_injection_semi_implicit(time, vect_x, vect_y, source_bdry)
+    REAL(wp), INTENT(IN) :: time, vect_x, vect_y
+    REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
+    CALL fatal_error('boundary_injection: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_boundary_injection_semi_implicit
+
+  SUBROUTINE eval_boundary_injection_implicit(time, vect_x, vect_y, source_bdry)
+    REAL(wp), INTENT(IN) :: time, vect_x, vect_y
+    REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
+    CALL fatal_error('boundary_injection: implicit treatment is unsupported')
+  END SUBROUTINE eval_boundary_injection_implicit
+
+  SUBROUTINE solve_boundary_injection_analytic(time, vect_x, vect_y, source_bdry)
+    REAL(wp), INTENT(IN) :: time, vect_x, vect_y
+    REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
+    CALL fatal_error('boundary_injection: analytic treatment is unsupported')
+  END SUBROUTINE solve_boundary_injection_analytic
 
   !> \brief Validate one Newton group/solver selection before rate evaluation.
   !> \param[in] group Validated Newton group containing the solver and its terms.
@@ -1044,7 +1237,7 @@ CONTAINS
   !> \note Returns the temperature-only inactive state when time reaches the configured cutoff.
   !******************************************************************************
 
-  SUBROUTINE eval_source_bdry( time, vect_x , vect_y , source_bdry )
+  SUBROUTINE eval_boundary_injection_explicit( time, vect_x , vect_y , source_bdry )
 
     USE parameters_2d, ONLY : h_source , vel_source , T_source , xs_source,    &
          xg_source, xl_source, time_param
@@ -1116,7 +1309,7 @@ CONTAINS
 
     RETURN
 
-  END SUBROUTINE eval_source_bdry
+  END SUBROUTINE eval_boundary_injection_explicit
 
   !******************************************************************************
   ! Supporting routines for equation-term evaluation.
@@ -1392,7 +1585,7 @@ CONTAINS
   !> \param[out] source_y Curvature contribution to the y-momentum source.
   !******************************************************************************
 
-  PURE SUBROUTINE eval_curvature_momentum_source( Bprime_x, Bprime_y,         &
+  PURE SUBROUTINE eval_geometry_curvature_explicit( Bprime_x, Bprime_y,         &
        Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient,                 &
        mixture_mass, velocity_x, velocity_y, source_x, source_y )
 
@@ -1408,7 +1601,7 @@ CONTAINS
     source_x = -grav_coefficient * mixture_mass * acceleration * Bprime_x
     source_y = -grav_coefficient * mixture_mass * acceleration * Bprime_y
 
-  END SUBROUTINE eval_curvature_momentum_source
+  END SUBROUTINE eval_geometry_curvature_explicit
 
   !******************************************************************************
   !> \brief Cache exact step-mean coefficients for configured inlet sources.

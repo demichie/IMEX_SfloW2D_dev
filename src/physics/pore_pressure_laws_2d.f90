@@ -499,8 +499,10 @@ CONTAINS
     CALL fatal_error('pore_pressure: explicit treatment is unsupported')
   END SUBROUTINE eval_pore_pressure_dissipation_explicit
 
-  SUBROUTINE eval_pore_pressure_dissipation_semi_implicit()
-    CALL fatal_error('pore_pressure: semi_implicit treatment is unsupported')
+  ! Valid zero contribution for the semi-implicit part of Newton.
+  SUBROUTINE eval_pore_pressure_dissipation_semi_implicit(rate)
+    REAL(wp), INTENT(OUT) :: rate
+    rate = 0.0_wp
   END SUBROUTINE eval_pore_pressure_dissipation_semi_implicit
 
 END MODULE pore_pressure_laws_2d

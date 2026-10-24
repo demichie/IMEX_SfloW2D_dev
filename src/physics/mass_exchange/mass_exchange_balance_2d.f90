@@ -4,7 +4,7 @@ MODULE mass_exchange_balance_2d
   USE parameters_2d
   USE constitutive_parameters_2d
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source
-  USE mass_exchange_vaporization_2d, ONLY : eval_vaporization_explicit
+  USE mass_exchange_vaporization_2d, ONLY : eval_mass_exchange_vaporization_explicit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: assemble_mass_exchange_balance
@@ -62,7 +62,7 @@ CONTAINS
     eqns_term(idx_solidEqn_first:idx_solidEqn_last) = rho_s(1:n_solid) *        &
          ( erosion_term(1:n_solid) - deposition_term(1:n_solid) )
 
-    CALL eval_vaporization_explicit(B_zone, r_T, deposition_term, eqns_term)
+    CALL eval_mass_exchange_vaporization_explicit(B_zone, r_T, deposition_term, eqns_term)
 
     IF ( stoch_transport_flag) THEN
 

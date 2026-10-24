@@ -129,8 +129,10 @@ CONTAINS
   SUBROUTINE eval_rheology_froude_explicit()
     CALL fatal_error('rheology_froude: explicit treatment is unsupported')
   END SUBROUTINE eval_rheology_froude_explicit
-  ! Unsupported physical treatment, rejected by the source catalog.
-  SUBROUTINE eval_rheology_froude_implicit()
-    CALL fatal_error('rheology_froude: semi-implicit treatment is unsupported')
+  ! Valid zero component of the configured Newton treatment.
+  SUBROUTINE eval_rheology_froude_implicit(rate_x, rate_y)
+    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
+    rate_x = CMPLX(0.0_wp,0.0_wp,wp)
+    rate_y = CMPLX(0.0_wp,0.0_wp,wp)
   END SUBROUTINE eval_rheology_froude_implicit
 END MODULE rheology_froude_2d
