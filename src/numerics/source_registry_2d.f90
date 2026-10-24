@@ -180,8 +180,10 @@ CONTAINS
       END IF
     END IF
     enabled=[partition%implicit(2),partition%implicit(4),pore_equation/=0]
-    DO i=1,SIZE(active_terms)
-      term=source_term_descriptor(active_terms(i))
+    ! Normalize legacy catalog IDs before checking group membership/targets.
+    active_names=source_names_for_ids(active_terms)
+    DO i=1,SIZE(active_names)
+      term=source_term_descriptor_by_name(active_names(i))
       IF (.NOT.term%schedulable) THEN
         error='D17: active ID is unknown or dependent'; RETURN
       END IF
@@ -214,7 +216,6 @@ CONTAINS
          partition%n_implicit/=2*MERGE(1,0,enabled(1))+COUNT(enabled(2:3))) THEN
       error='D17: unsupported or missing legacy implicit target'; RETURN
     END IF
-    active_names=source_names_for_ids(active_terms)
     ALLOCATE(stages(0),steps(0))
     split_id=4
     DO legacy=1,3
