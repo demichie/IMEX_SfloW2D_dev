@@ -24,6 +24,16 @@ for profile in strict optimized; do
       "$repo_dir/src/physics/source_configuration_2d.f90" \
       "$test_dir/test_source_registry.f90"
     "$compiler" -fbacktrace -ffpe-trap=invalid,zero,overflow ./*.o -o test_source_registry
+    # D17.20 independent Newton-only extension fixture (no historical solver API).
+    "$compiler" $flags -fbacktrace -ffpe-trap=invalid,zero,overflow -c \
+      "$repo_dir/src/core/diagnostics_2d.f90" \
+      "$repo_dir/src/physics/rheology_laws/rheology_newmodel_2d.f90" \
+      "$test_dir/test_newmodel_numerics.f90"
+    "$compiler" -fbacktrace -ffpe-trap=invalid,zero,overflow \
+      parameters_2d.o diagnostics_2d.o source_catalog_2d.o \
+      rheology_newmodel_2d.o test_newmodel_numerics.o -o test_newmodel_numerics
+    ./test_newmodel_numerics > newmodel-numerics.log
+    cat newmodel-numerics.log
     ./test_source_registry > results.log
     cat results.log
 done
