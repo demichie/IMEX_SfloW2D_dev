@@ -179,10 +179,10 @@ CONTAINS
       END IF
       DO i=1,source_group_term_count(g)
         ! A named rheological law is one schedulable physical source.
-        source_name=TRIM(uppercase_source_text(source_group_terms(i,g)))
+        source_name=TRIM(lowercase_source_text(source_group_terms(i,g)))
         IF (rheology_flag .AND. &
              LEN_TRIM(rheology_source_name(rheology_model_id))>0 .AND. &
-             source_name==TRIM(uppercase_source_text(rheology_source_name(rheology_model_id)))) THEN
+             source_name==TRIM(rheology_source_name(rheology_model_id))) THEN
           source_name=rheology_source_name(rheology_model_id)
         ELSE
           component=source_term_descriptor_by_name(source_name)
@@ -399,5 +399,18 @@ CONTAINS
     CASE DEFAULT; native_target=0
     END SELECT
   END FUNCTION native_target
+
+  !> Normalize user-supplied physical-source names without accepting legacy aliases.
+  PURE FUNCTION lowercase_source_text(value) RESULT(lower)
+    CHARACTER(*), INTENT(IN) :: value
+    CHARACTER(LEN(value)) :: lower
+    INTEGER :: i,code
+    lower=value
+    DO i=1,LEN(value)
+      code=IACHAR(value(i:i))
+      IF (code>=IACHAR('A') .AND. code<=IACHAR('Z')) &
+           lower(i:i)=ACHAR(code+IACHAR('a')-IACHAR('A'))
+    END DO
+  END FUNCTION lowercase_source_text
 
 END MODULE source_configuration_2d

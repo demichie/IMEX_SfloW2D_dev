@@ -1254,3 +1254,7 @@ I vecchi ID numerici delle singole sorgenti fisiche restano eliminati. Sono mant
 ### D17.22.86 — Capacità degli input nativi collegate al nuovo catalogo (24 ottobre 2026)
 
 Il log `compile(7).log` sulla HEAD `e14ad96` segnala in `source_input_2d.f90` un simbolo rimosso: `SOURCE_PHYSICAL_TERM_COUNT`. L'input nativo ora deriva `SOURCE_INPUT_MAX_GROUPS` e `SOURCE_INPUT_MAX_TERMS` da `SOURCE_TERM_COUNT`, che rappresenta le 24 sorgenti fisiche complete. Non si ripristina l'alias legacy. Gli errori successivi sulle dimensioni degli array e sulla dichiarazione NAMELIST sono conseguenze del simbolo non risolto. Compilazione successiva ancora da verificare.
+
+### D17.22.87 — Copertura regressiva del catalogo fisico e parsing case-insensitive (24 ottobre 2026)
+
+Ripristinati test della configurazione di default lava (gruppi analitici energia e pressione, Newton velocità, esplicito di bordo, post-RK deposizione), della lettura NAMELIST, del conflitto tra SOURCE_GROUPS e campi legacy IMEX, del rifiuto di duplicati, della costruzione di cinque gruppi nativi e dei casi negativi su addendi matematici, target sconosciuti e sorgenti mancanti/duplicate. La suite continua a verificare le 864 assegnazioni legacy. Corretto il parser della configurazione nativa: confronta i nomi delle sorgenti in modo case-insensitive mediante normalizzazione in minuscolo, senza alias legacy e con identità canoniche di catalogo. Gli input SOURCE_GROUPS contenenti nomi maiuscoli sono quindi confrontati con i nomi fisici minuscoli. Nessun cambio ai kernel numerici. Verifiche CI pendenti.
