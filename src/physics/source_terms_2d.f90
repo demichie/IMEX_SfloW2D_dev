@@ -176,15 +176,6 @@ CONTAINS
     found=rheology_name_has_role(group_rheology_name(group),role)
   END FUNCTION group_has_role
 
-  SUBROUTINE validate_newton_selection(group)
-    TYPE(source_group_type), INTENT(IN) :: group
-    IF (group%method/=SOURCE_METHOD_NEWTON .OR. &
-         .NOT.ALLOCATED(group%source_names)) THEN
-       CALL fatal_error('D17: implicit evaluation requires a Newton group with sources')
-       RETURN
-    END IF
-  END SUBROUTINE validate_newton_selection
-
   SUBROUTINE eval_source_implicit( Bprimej_x, Bprimej_y, Zij, c_qj,              &
        c_nh_term_impl, r_qj , r_nh_term_impl, group )
 
@@ -252,7 +243,6 @@ CONTAINS
 
     selected_model_name=canonical_rheology_source_name(rheology_model)
     IF (PRESENT(group)) THEN
-       CALL validate_newton_selection(group)
        selected_model_name=group_rheology_name(group)
        selected_rheology=group_has_role(group,SOURCE_ROLE_IMPLICIT)
        selected_radiative=group_contains_name(group, &
@@ -379,7 +369,6 @@ CONTAINS
 
     selected_model_name=canonical_rheology_source_name(rheology_model)
     IF (PRESENT(group)) THEN
-       CALL validate_newton_selection(group)
        selected_model_name=group_rheology_name(group)
        selected_rheology=group_has_role(group,SOURCE_ROLE_SEMI_IMPLICIT)
     ELSE
@@ -509,11 +498,6 @@ CONTAINS
     expl_term(1:n_eqns) = 0.0_wp
     q1 = 0.0_wp
 
-    IF (group%method/=SOURCE_METHOD_EXPLICIT .OR. &
-         group%cadence/=SOURCE_CADENCE_STAGE .OR. &
-         .NOT.ALLOCATED(group%source_names)) THEN
-       CALL fatal_error('D17: eval_stage_source_explicit requires a validated explicit stage group')
-    END IF
 
       IF ( ( qpj(1) .LE. EPSILON(1.0_wp) ) .AND. ( cell_fract_jk .EQ. 0.0_wp )    &
              .AND. ( lat_arc_perim_jk .EQ. 0.0_wp ) .AND.                          &

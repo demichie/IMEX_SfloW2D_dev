@@ -230,6 +230,16 @@ def main() -> int:
                 failures.append(
                     f"removed numeric rheology API in {filename.relative_to(ROOT)}"
                 )
+    # D17.19 step 11: method/cadence validation belongs to registry setup,
+    # never in cell-local source evaluation or Jacobian assembly.
+    source_assembly = (PHYSICS / "source_terms_2d.f90").read_text(encoding="utf-8")
+    if re.search(r"(?i)\bvalidate_newton_selection\b", source_assembly):
+        failures.append("Newton group method revalidated in cell-local source kernel")
+    stage_body = procedure_body(source_assembly, "eval_stage_source_explicit")
+    if stage_body is None:
+        failures.append("missing explicit stage source kernel")
+    elif re.search(r"(?i)group%(?:method|cadence)", stage_body):
+        failures.append("explicit stage kernel must not revalidate method/cadence per cell")
     for failure in failures:
         print("FAIL:", failure, file=sys.stderr)
     print(f"D17 physical treatment audit: {len(catalog)} configured sources, "
