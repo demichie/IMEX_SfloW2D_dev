@@ -1,9 +1,6 @@
 name: D17 source registry tests
 
 on:
-  push:
-    branches:
-      - feature/d17-source-refactor
   workflow_dispatch:
 
 permissions:

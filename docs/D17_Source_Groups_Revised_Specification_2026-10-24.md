@@ -651,3 +651,8 @@ D17 è **COMPLETATO** soltanto quando tutti i punti seguenti risultano verificat
 4. Proseguire nell'ordine dettagliato di **D17.19** con la semantica delle sezioni D17.0–D17.18a, verifiche D17.20 e gate D17.21.
 5. Dopo ciascun commit importante, **aggiornare questa stessa D17.22** con SHA, modifiche, CI, regressioni e attività residue, **senza alterare il testo preesistente** salvo revisione esplicitamente richiesta.
 
+
+
+### D17.22.6 — Politica di esecuzione manuale delle Actions (24 ottobre 2026)
+
+Le due Actions D17 dedicate, `d17-compile.yml` e `d17-source-registry.yml`, devono utilizzare **esclusivamente `workflow_dispatch`**: nessuna esecuzione automatica ai commit o ai push. Compilazione e test vengono avviati intenzionalmente soltanto quando necessari a verificare un gruppo coerente di modifiche o un gate D17. Registrare qui l'esito dei run eseguiti; non interpretare l'assenza di nuove esecuzioni come validazione dei commit successivi.
