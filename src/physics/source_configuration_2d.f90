@@ -52,33 +52,33 @@ CONTAINS
         error='D17: unsupported configured rheology'; RETURN
       END IF
     END IF
-    IF (partition%implicit(4)) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_THERMAL_RADIATIVE_COOLING', &
-         'SOURCE_TERM_THERMAL_CONVECTIVE_COOLING']
+    IF (partition%implicit(4)) active_names=[CHARACTER(LEN=64) :: active_names,'thermal_cooling', &
+         'thermal_cooling']
     pore=0
     IF (pore_pressure_flag) THEN
       pore=idx_pore
-      active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_PORE_PRESSURE_DISSIPATION']
+      active_names=[CHARACTER(LEN=64) :: active_names,'pore_pressure_dissipation']
     END IF
-    IF (curvature_term_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_GEOMETRY_CURVATURE']
-    IF (bottom_radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION']
-    IF (bottom_fissural_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_BOTTOM_FISSURAL_INJECTION']
-    IF (radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_RADIAL_INJECTION']
-    IF (lateral_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_BOUNDARY_INJECTION']
-    IF (erosion_coeff>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_EROSION']
+    IF (curvature_term_flag) active_names=[CHARACTER(LEN=64) :: active_names,'geometry_curvature']
+    IF (bottom_radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_circular_injection']
+    IF (bottom_fissural_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_fissural_injection']
+    IF (radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'radial_injection']
+    IF (lateral_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'boundary_injection']
+    IF (erosion_coeff>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
     IF (settling_flag) THEN
-      active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_DEPOSITION']
+      active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_deposition']
       IF (ABS(coeff_porosity)>0.0_wp) &
            active_names=[CHARACTER(LEN=64) :: active_names, &
-           'SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS']
+           'mass_exchange_carrier_deposition_loss']
     END IF
-    IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS']
+    IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_liquid_loss']
     IF (pore_pressure_flag .AND. gas_loss_flag) &
          active_names=[CHARACTER(LEN=64) :: active_names, &
-         'SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS']
-    IF (entrainment_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT']
+         'mass_exchange_carrier_darcy_loss']
+    IF (entrainment_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_entrainment']
     IF (gas_flag .AND. liquid_vaporization_flag) &
          active_names=[CHARACTER(LEN=64) :: active_names, &
-         'SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION']
+         'mass_exchange_vaporization']
     DO i=1,3
       method=imex_group_method(i)
       CALL resolve_imex_group_method(method,methods(i))
@@ -187,11 +187,7 @@ CONTAINS
         ELSE
           component=source_term_descriptor_by_name(source_name)
           error='D17: unknown, dependent or unschedulable source term name'
-          IF (LEN_TRIM(component%name)==0 .OR. .NOT.component%schedulable) RETURN
-          IF (component%model_id/=0) THEN
-            error='D17: rheology components cannot be independently scheduled'
-            RETURN
-          END IF
+          IF (LEN_TRIM(component%name)==0) RETURN
           source_name=component%name
         END IF
         error='D17: source group exceeds supported catalog capacity'
@@ -241,25 +237,25 @@ CONTAINS
       END IF
     END IF
     IF (rheology_model_id==rheology_id_lava) active_names=[CHARACTER(LEN=64) :: active_names, &
-         'SOURCE_TERM_THERMAL_RADIATIVE_COOLING','SOURCE_TERM_THERMAL_CONVECTIVE_COOLING']
-    IF (pore_pressure_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_PORE_PRESSURE_DISSIPATION']
-    IF (curvature_term_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_GEOMETRY_CURVATURE']
-    IF (bottom_radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION']
-    IF (bottom_fissural_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_BOTTOM_FISSURAL_INJECTION']
-    IF (radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_RADIAL_INJECTION']
-    IF (lateral_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_BOUNDARY_INJECTION']
-    IF (erosion_coeff>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_EROSION']
+         'thermal_cooling']
+    IF (pore_pressure_flag) active_names=[CHARACTER(LEN=64) :: active_names,'pore_pressure_dissipation']
+    IF (curvature_term_flag) active_names=[CHARACTER(LEN=64) :: active_names,'geometry_curvature']
+    IF (bottom_radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_circular_injection']
+    IF (bottom_fissural_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_fissural_injection']
+    IF (radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'radial_injection']
+    IF (lateral_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'boundary_injection']
+    IF (erosion_coeff>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
     IF (settling_flag) THEN
-      active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_DEPOSITION']
+      active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_deposition']
       IF (ABS(coeff_porosity)>0.0_wp) &
-           active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS']
+           active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_deposition_loss']
     END IF
-    IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS']
+    IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_liquid_loss']
     IF (pore_pressure_flag .AND. gas_loss_flag) &
-         active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS']
-    IF (entrainment_flag) active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT']
+         active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_darcy_loss']
+    IF (entrainment_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_entrainment']
     IF (gas_flag .AND. liquid_vaporization_flag) &
-         active_names=[CHARACTER(LEN=64) :: active_names,'SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION']
+         active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_vaporization']
     error='D17: native schedule must register every configured active term exactly once'
     IF (n_seen/=SIZE(active_names)) RETURN
     DO i=1,SIZE(active_names)

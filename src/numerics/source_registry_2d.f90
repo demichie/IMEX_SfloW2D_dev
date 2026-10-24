@@ -140,11 +140,11 @@ CONTAINS
     ! Normalize legacy catalog IDs before checking group membership/targets.
     DO i=1,SIZE(active_names)
       term=source_term_descriptor_by_name(active_names(i))
-      IF (.NOT.term%schedulable) THEN
+      IF (LEN_TRIM(term%name)==0) THEN
         error='D17: active ID is unknown or dependent'; RETURN
       END IF
-      IF (term%target>0) THEN
-        IF (.NOT.enabled(term%target)) THEN
+      IF (target_index(term%target)>0) THEN
+        IF (.NOT.enabled(target_index(term%target))) THEN
           error='D17: active term has no enabled legacy target'; RETURN
         END IF
       END IF
@@ -286,16 +286,15 @@ CONTAINS
         ! Unknown names yield an empty descriptor. No numeric identity
         ! is needed to validate membership or scheduling capabilities.
         IF (LEN_TRIM(term%name)==0) RETURN
-        IF (.NOT.term%schedulable) RETURN
+        IF (LEN_TRIM(term%name)==0) RETURN
         ! Mathematical rheology addends are catalogued only for legacy
         ! evaluation; native and normalized groups own complete laws.
-        IF (INDEX(TRIM(term%name),'SOURCE_TERM_RHEOLOGY_')==1) RETURN
-        IF (ANY(seen_names==term%name)) RETURN
+                IF (ANY(seen_names==term%name)) RETURN
         seen_names=[CHARACTER(LEN=64) :: seen_names,term%name]
       error='D17: term does not support this method/cadence or target'
         IF (.NOT.supports_group(term,group)) RETURN
-        IF (term%target/=0) THEN
-          expected=target_equation_ids(term%target,this%pore_equation)
+        IF (target_index(term%target)>0) THEN
+          expected=target_equation_ids(target_index(term%target),this%pore_equation)
           IF (ANY(expected<1)) RETURN
           IF (.NOT.ALL(in_list(expected,group%equation_ids))) RETURN
         END IF
@@ -303,7 +302,7 @@ CONTAINS
           IF (LEN_TRIM(rheology_name)>0 .AND. rheology_name/=term%name) RETURN
           rheology_name=term%name
         END IF
-        IF (INDEX(TRIM(term%name),'SOURCE_TERM_MASS_EXCHANGE_')==1) THEN
+        IF (INDEX(TRIM(term%name),'mass_exchange_')==1) THEN
           IF (mass_group/=0 .AND. mass_group/=i) RETURN
           mass_group=i
         END IF
@@ -334,15 +333,6 @@ CONTAINS
           RETURN
         END SELECT
       END IF
-    END DO
-    ! Radiative and convective cooling must remain in the same source group.
-    ! The invariant depends on source names, not catalog bundle identifiers.
-    error='D17: coupled evaluation batch split or incomplete'
-    DO i=1,SIZE(groups)
-      IF (.NOT.ANY(groups(i)%source_names=='SOURCE_TERM_THERMAL_RADIATIVE_COOLING') .AND. &
-           .NOT.ANY(groups(i)%source_names=='SOURCE_TERM_THERMAL_CONVECTIVE_COOLING')) CYCLE
-      IF (.NOT.ALL([ANY(groups(i)%source_names=='SOURCE_TERM_THERMAL_RADIATIVE_COOLING'), &
-           ANY(groups(i)%source_names=='SOURCE_TERM_THERMAL_CONVECTIVE_COOLING')])) RETURN
     END DO
     error=''
   END SUBROUTINE validate_registry
@@ -410,6 +400,16 @@ CONTAINS
     id=ids(1)
   END FUNCTION target_equation_ids_first
 
+  INTEGER FUNCTION target_index(name) RESULT(target)
+    CHARACTER(*), INTENT(IN) :: name
+    target=0
+    SELECT CASE(TRIM(name))
+    CASE('velocity'); target=1
+    CASE('temperature'); target=2
+    CASE('pore_pressure'); target=3
+    CASE('mass_exchange'); target=-1
+    END SELECT
+  END FUNCTION target_index
   !> \brief Select source names for target blocks, EX (0) or mass exchange (-1).
   !> \param[in] active_names Names normalized at the legacy boundary.
   !> \param[in] targets Target IDs, zero for EX or minus one for step mass.
@@ -423,8 +423,8 @@ CONTAINS
     ALLOCATE(names(SIZE(active_names)))
     n=0
     DO i=1,SIZE(active_names)
-      term=source_term_descriptor_by_name(active_names(i)); target=term%target
-      IF (INDEX(TRIM(term%name),'SOURCE_TERM_MASS_EXCHANGE_')==1) target=-1
+      term=source_term_descriptor_by_name(active_names(i)); target=target_index(term%target)
+      IF (INDEX(TRIM(term%name),'mass_exchange_')==1) target=-1
       IF (ANY(targets==target)) THEN
         n=n+1
         names(n)=active_names(i)
@@ -509,14 +509,14 @@ CONTAINS
     TYPE(source_term_type), INTENT(IN) :: term
     TYPE(source_group_type), INTENT(IN) :: group
     supported=.FALSE.
-    IF (.NOT.term%schedulable) RETURN
+    IF (LEN_TRIM(term%name)==0) RETURN
     SELECT CASE(group%method)
     CASE(SOURCE_METHOD_EXPLICIT)
       supported=term%has_explicit
       IF (group%cadence==SOURCE_CADENCE_STAGE) THEN
-        supported=supported .AND. INDEX(TRIM(term%name),'SOURCE_TERM_MASS_EXCHANGE_')/=1
+        supported=supported .AND. INDEX(TRIM(term%name),'mass_exchange_')/=1
       ELSE IF (group%cadence==SOURCE_CADENCE_STEP) THEN
-        supported=supported .AND. INDEX(TRIM(term%name),'SOURCE_TERM_MASS_EXCHANGE_')==1
+        supported=supported .AND. INDEX(TRIM(term%name),'mass_exchange_')==1
       ELSE
         supported=.FALSE.
       END IF

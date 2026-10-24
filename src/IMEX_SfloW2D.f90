@@ -180,7 +180,7 @@ PROGRAM IMEX_SfloW2D
       IF (stage_source_groups(i_source_group)%cadence/=SOURCE_CADENCE_STAGE .OR. &
            stage_source_groups(i_source_group)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
       boundary_source_enabled=boundary_source_enabled .OR. group_contains_name( &
-           stage_source_groups(i_source_group),'SOURCE_TERM_BOUNDARY_INJECTION')
+           stage_source_groups(i_source_group),'boundary_injection')
    END DO
    DEALLOCATE(stage_source_groups)
 

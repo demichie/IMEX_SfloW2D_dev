@@ -326,7 +326,7 @@ CONTAINS
             stage_groups(registry_group_index)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
        explicit_groups=[explicit_groups,stage_groups(registry_group_index)]
        boundary_source_enabled=boundary_source_enabled .OR. group_contains_name( &
-            stage_groups(registry_group_index),'SOURCE_TERM_BOUNDARY_INJECTION')
+            stage_groups(registry_group_index),'boundary_injection')
     END DO
 
     IF ( .NOT. equation_partition%is_initialized() ) THEN

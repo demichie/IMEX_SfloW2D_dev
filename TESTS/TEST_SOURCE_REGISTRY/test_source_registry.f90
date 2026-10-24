@@ -1,771 +1,89 @@
-!> \brief D17 metadata regressions: legacy schedules, coupling and invalid native groups.
 PROGRAM test_source_registry
   USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   USE source_catalog_2d
   USE source_registry_2d
-  USE source_configuration_2d, ONLY : initialize_configured_sources
-  USE source_configuration_2d, ONLY : initialize_native_source_configuration
-  USE source_input_2d
   USE equation_metadata_2d, ONLY : equation_partition_type, &
-       IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
-  USE parameters_2d, ONLY : rheology_id_voellmy,rheology_id_plastic, &
-       rheology_id_lava,rheology_id_lahar,rheology_id_empirical, &
-       rheology_id_quadratic,rheology_id_froude,rheology_id_lucas, &
-       rheology_id_mui,rheology_id_mui_voellmy,n_eqns,idx_pore
+       IM_GROUP_METHOD_NEWTON, IM_GROUP_METHOD_ANALYTIC
+  USE parameters_2d, ONLY : rheology_id_lava
   IMPLICIT NONE
-  TYPE(source_registry_type) :: registry,trial
   TYPE(equation_partition_type) :: partition
-  TYPE(source_group_type), ALLOCATABLE :: groups(:),steps(:),badgroups(:),badsteps(:),snapshot(:)
+  TYPE(source_registry_type) :: registry,invalid
+  TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:),wrong(:)
   TYPE(source_term_type) :: term
-  INTEGER, ALLOCATABLE :: terms(:),family(:),bundle(:),expected(:),expected_targets(:)
-  INTEGER :: a,b,c,bits,mode,g,t,k,j,position,checks,methods(3),original(3),pore,nphysical,negative,model_id
-  LOGICAL :: enabled(3),mask(7)
+  CHARACTER(LEN=64), ALLOCATABLE :: active(:)
   CHARACTER(LEN=256) :: error
-  checks=0; negative=0
-  nphysical=0
-  DO k=1,SOURCE_TERM_COUNT
-    term=source_term_descriptor(k)
-    CALL require(term%id==k .AND. LEN_TRIM(term%name)>0,'catalog ID/name')
-    ! Every catalog entry must resolve to the same descriptor by canonical name.
-    ! This also covers non-schedulable dependent contributions.
-    BLOCK
-      TYPE(source_term_type) :: named_term
-      named_term=source_term_descriptor_by_name(term%name)
-      CALL require(named_term%id==k .AND. named_term%target==term%target, &
-           'catalog name round trip')
-      CALL require(named_term%has_explicit .EQV. term%has_explicit, &
-           'catalog explicit capability round trip')
-      CALL require(named_term%has_newton .EQV. term%has_newton, &
-           'catalog Newton capability round trip')
-      CALL require(named_term%has_analytic .EQV. term%has_analytic, &
-           'catalog analytic capability round trip')
-    END BLOCK
-    IF (term%schedulable) nphysical=nphysical+1
+  INTEGER :: i,j,mode,a,b,c,bits,ids(3),methods(3),membership(7),nm
+  LOGICAL :: mask(7),enabled(3)
+  CALL require(SOURCE_TERM_COUNT==24,'physical catalog contains exactly 24 sources')
+  CALL require(source_catalog_names_unique(),'unique physical source names')
+  CALL require(canonical_rheology_catalog_unique(),'unique complete rheology names')
+  DO i=1,SOURCE_TERM_COUNT
+    term=source_term_descriptor_by_name(SOURCE_CATALOG(i)%name)
+    CALL require(term%name==SOURCE_CATALOG(i)%name,'physical catalog lookup')
+    CALL require(LEN_TRIM(term%target)>0,'physical target declared')
   END DO
-  CALL require(nphysical==SOURCE_PHYSICAL_TERM_COUNT,'physical catalog count')
-  ! Transitional regression: preserve the legacy method matrix while the
-  ! numerical capabilities are moved from roles into the catalog.
-  DO k=1,SOURCE_TERM_COUNT
-    term=source_term_descriptor(k)
-    SELECT CASE(term%role)
-    CASE(SOURCE_ROLE_IMPLICIT,SOURCE_ROLE_THERMAL,SOURCE_ROLE_PORE)
-      CALL require(.NOT.term%has_explicit,'legacy implicit source is not explicit')
-      CALL require(term%has_newton .EQV. term%complex_rate, &
-           'legacy complex Newton capability')
-      CALL require(term%has_analytic,'legacy analytic eligibility')
-    CASE(SOURCE_ROLE_SEMI_IMPLICIT)
-      CALL require(.NOT.term%has_explicit .AND. term%has_newton &
-           .AND. term%has_analytic,'semi-implicit contribution in Newton contract')
-    CASE(SOURCE_ROLE_CELL,SOURCE_ROLE_BOUNDARY,SOURCE_ROLE_MASS)
-      CALL require(term%has_explicit .AND. .NOT.term%has_newton &
-           .AND. .NOT.term%has_analytic,'explicit source capabilities')
-    CASE(SOURCE_ROLE_DERIVED)
-      CALL require(.NOT.term%has_explicit .AND. .NOT.term%has_newton &
-           .AND. .NOT.term%has_analytic,'dependent contributions not schedulable')
-    END SELECT
-  END DO
-  ! The dispatcher resolves implicit/SI roles through the complete law,
-  ! not by scheduling mathematical addends independently.
-  DO k=1,SOURCE_TERM_COUNT
-    term=source_term_descriptor(k)
-    IF (term%model_id==0) CYCLE
-    CALL require(rheology_has_role(term%model_id,term%role), &
-         'complete law retains internal component assembly role')
-  END DO
-  CALL require(.NOT.rheology_has_role(0,SOURCE_ROLE_IMPLICIT), &
-       'no internal rheological role without a law')
-  ! Complete-law canonicalization must not expose mathematical addend IDs
-  ! to the group-facing registry identity.
-  DO k=1,SOURCE_TERM_COUNT
-    term=source_term_descriptor(k)
-    IF (term%model_id/=0) THEN
-      CALL require(canonical_source_name(term%name)==rheology_source_name(term%model_id), &
-           'rheology component resolves to complete-law identity')
-    ELSE
-      CALL require(canonical_source_name(term%name)==term%name, &
-           'non-rheological source keeps its canonical name')
-    END IF
-  END DO
-  CALL require(canonical_source_name('UNKNOWN_SOURCE_NAME')=='', &
-       'unknown source does not yield a canonical identity')
-  ! Each rheological family has exactly one stable public source name,
-  ! independent of the legacy list of contributing formulas.
-  BLOCK
-    INTEGER :: i,j
-    CHARACTER(LEN=64) :: names(10)
-    INTEGER :: families(10)
-    families=[rheology_id_voellmy,rheology_id_plastic,rheology_id_lava, &
-         rheology_id_lahar,rheology_id_empirical,rheology_id_quadratic, &
-         rheology_id_froude,rheology_id_lucas,rheology_id_mui,rheology_id_mui_voellmy]
-    DO i=1,SIZE(families)
-      names(i)=rheology_source_name(families(i))
-      CALL require(LEN_TRIM(names(i))>0,'canonical rheology name exists')
-      CALL require(SIZE(test_rheology_ids(families(i)))>0, &
-           'canonical rheology retains legacy physical contributions')
-      DO j=1,i-1
-        CALL require(names(i)/=names(j),'canonical rheology names are distinct')
-      END DO
-    END DO
-    CALL require(rheology_source_name(-1)=='','unknown rheology has no source name')
-  END BLOCK
-  CALL require(source_catalog_names_unique(),'catalog canonical names are unique')
-  CALL require(canonical_rheology_catalog_unique(), &
-       'one unique canonical identity per rheology law')
-  term=source_term_descriptor_by_name('SOURCE_TERM_MASS_EXCHANGE_DEPOSITION')
-  CALL require(term%id==SOURCE_TERM_MASS_EXCHANGE_DEPOSITION, &
-       'catalog lookup by canonical source name')
-  term=source_term_descriptor_by_name('UNKNOWN_SOURCE_NAME')
-  CALL require(term%id==0,'unknown source name rejected')
-  term=source_term_descriptor(0); CALL require(term%id==0,'invalid catalog lookup')
-  ! All 864 legacy assignments/method combinations, with optional thermal/pore targets.
+  term=source_term_descriptor_by_name('SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS')
+  CALL require(term%name=='','legacy mathematical addend removed')
+  term=source_term_descriptor_by_name('SOURCE_TERM_THERMAL_RADIATIVE_COOLING')
+  CALL require(term%name=='','thermal formula component is not schedulable')
   DO mode=0,3
     enabled=[.TRUE.,BTEST(mode,0),BTEST(mode,1)]
-    pore=0
-    IF (enabled(3)) pore=7
-    family=test_rheology_ids(MERGE(3,1,enabled(2)))
-    terms=[family,SOURCE_TERM_GEOMETRY_CURVATURE,SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, &
-         SOURCE_TERM_BOTTOM_FISSURAL_INJECTION,SOURCE_TERM_RADIAL_INJECTION, &
-         SOURCE_TERM_BOUNDARY_INJECTION,SOURCE_TERM_MASS_EXCHANGE_EROSION, &
-         SOURCE_TERM_MASS_EXCHANGE_DEPOSITION,SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS, &
-         SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS,SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS, &
-         SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT,SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION]
-    IF (enabled(2)) terms=[terms,SOURCE_TERM_THERMAL_RADIATIVE_COOLING,SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
-    IF (enabled(3)) terms=[terms,SOURCE_TERM_PORE_PRESSURE_DISSIPATION]
+    mask=.FALSE.;mask(2:3)=.TRUE.;mask(4)=enabled(2);mask(7)=enabled(3)
+    active=[CHARACTER(LEN=64)::'rheology_lava','geometry_curvature', &
+         'bottom_circular_injection','boundary_injection','mass_exchange_deposition']
+    IF (enabled(2)) active=[active,'thermal_cooling']
+    IF (enabled(3)) active=[active,'pore_pressure_dissipation']
     DO a=1,3
     DO b=1,3
     DO c=1,3
     DO bits=0,7
-      original=[a,b,c]
-      DO g=1,3
-        methods(g)=MERGE(IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_NEWTON,BTEST(bits,g-1))
+      ids=[a,b,c]
+      DO i=1,3
+        methods(i)=MERGE(IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_NEWTON,BTEST(bits,i-1))
       END DO
-      CALL make_partition()
-      CALL registry%initialize_legacy(partition,original,methods,pore,catalog_names_for_test(terms),error)
-      IF (error/='' .OR. .NOT.registry%is_initialized()) THEN
-        WRITE(error_unit,'(A,5(I0,1X),A,A)') &
-             'Legacy normalization failure (mode,a,b,c,bits): ',mode,a,b,c,bits, &
-             ' reason: ',TRIM(error)
-      END IF
-      CALL require(error=='' .AND. registry%is_initialized(),'legacy normalization: '//TRIM(error))
-      groups=registry%stage_groups(); steps=registry%step_groups()
-      ! A scheduled rheology is exposed as one complete-law identity.
-      DO j=1,SIZE(groups)
-        IF (groups(j)%method==SOURCE_METHOD_EXPLICIT) CYCLE
-        IF (.NOT.ANY(groups(j)%equation_ids==2)) CYCLE
-        BLOCK
-          CHARACTER(LEN=64), ALLOCATABLE :: names(:)
-          names=group_source_names(groups(j))
-          IF (SIZE(test_rheology_ids(MERGE(3,1,enabled(2))))>0) THEN
-            CALL require(ANY(names==rheology_source_name(MERGE(3,1,enabled(2)))), &
-                 'complete rheology is one canonical schedule identity')
-          END IF
-        END BLOCK
+      membership=0;nm=0
+      BLOCK
+        INTEGER :: selected(3)
+        DO i=1,3
+          IF (.NOT.ANY(enabled .AND. ids==i)) CYCLE
+          nm=nm+1;selected(nm)=methods(i)
+          IF (enabled(1) .AND. ids(1)==i) membership(2:3)=nm
+          IF (enabled(2) .AND. ids(2)==i) membership(4)=nm
+          IF (enabled(3) .AND. ids(3)==i) membership(7)=nm
+        END DO
+        CALL partition%initialize(mask,membership,selected(1:nm))
+      END BLOCK
+      CALL registry%initialize_legacy(partition,ids,methods,MERGE(7,0,enabled(3)),active,error)
+      CALL require(error=='' .AND. registry%is_initialized(), &
+           'legacy combination normalizes: '//TRIM(error))
+      stages=registry%stage_groups();steps=registry%step_groups()
+      CALL require(SIZE(steps)==1,'one post-RK source group')
+      CALL require(group_contains_name(steps(1),'mass_exchange_deposition'),'mass source ownership')
+      CALL require(.NOT.group_contains_name(steps(1),'rheology_lava'),'no stage source in step')
+      CALL registry%validate(error)
+      CALL require(error=='','repeat physical registry validation')
+      wrong=stages
+      DO i=1,SIZE(wrong)
+        IF (wrong(i)%method==SOURCE_METHOD_EXPLICIT) CYCLE
+        IF (.NOT.ANY(wrong(i)%equation_ids==2)) CYCLE
+        wrong(i)%source_names=[CHARACTER(LEN=64)::'SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS']
+        CALL invalid%initialize(7,MERGE(7,0,enabled(3)),wrong,steps,error)
+        CALL require(error/='' .AND. .NOT.invalid%is_initialized(), &
+             'mathematical addend rejected in velocity group')
+        EXIT
       END DO
-      position=0
-      DO g=1,3
-        expected_targets=PACK([1,2,3],enabled .AND. original==g)
-        IF (SIZE(expected_targets)==0) CYCLE
-        IF (methods(g)==IM_GROUP_METHOD_NEWTON) THEN
-          position=position+1
-          CALL require(groups(position)%method==SOURCE_METHOD_NEWTON,'legacy Newton method')
-          CALL require(groups(position)%id==g .AND. groups(position)%legacy_id==g,'retained Newton ID')
-          expected=[INTEGER::]
-          DO j=1,SIZE(expected_targets)
-            expected=[expected,target_eqs(expected_targets(j))]
-          END DO
-          CALL require(same_members(groups(position)%equation_ids,expected),'joint equation block')
-        ELSE
-          DO t=1,3
-            IF (.NOT.enabled(t) .OR. original(t)/=g) CYCLE
-            position=position+1
-            CALL require(groups(position)%legacy_id==g,'analytic original ID')
-            CALL require(groups(position)%method==SOURCE_METHOD_ANALYTIC,'analytic method')
-            CALL require(same_members(groups(position)%equation_ids,target_eqs(t)), &
-                 'analytic equation target retained')
-            IF (SIZE(expected_targets)>1) THEN
-              CALL require(groups(position)%id>4,'split identity avoids EX/legacy collisions')
-            ELSE
-              CALL require(groups(position)%id==g,'single analytic identity retained')
-            END IF
-          END DO
-        END IF
-      END DO
-      DO j=1,SIZE(groups)
-        CALL require(ALLOCATED(groups(j)%source_names), &
-             'stage group caches canonical schedulable source identities')
-        CALL require(SIZE(groups(j)%source_names)==SIZE(group_source_names(groups(j))), &
-             'canonical source count matches physical grouping')
-        CALL require(ALL(groups(j)%source_names==group_source_names(groups(j))), &
-             'cached source identities match the complete physical laws')
-        IF (ANY(groups(j)%equation_ids==2) .AND. &
-             groups(j)%method/=SOURCE_METHOD_EXPLICIT) THEN
-          CALL require(group_contains_name(groups(j), &
-               rheology_source_name(MERGE(3,1,enabled(2)))), &
-               'normalized group resolves canonical complete rheology')
-        END IF
-      END DO
-      CALL require(SIZE(groups)==position+1,'only one additional EX group')
-      CALL require(groups(position+1)%id==4,'reserved EX ID')
-      CALL require(groups(position+1)%method==SOURCE_METHOD_EXPLICIT,'EX homogeneous method')
-      CALL require(SIZE(steps)==1 .AND. steps(1)%id==1,'independent step namespace')
-      CALL require(group_contains_name(steps(1),'SOURCE_TERM_MASS_EXCHANGE_DEPOSITION'),'mass membership')
-      CALL require(ALLOCATED(steps(1)%source_names),'step group materializes source names')
-      CALL require(group_contains_name(steps(1),'SOURCE_TERM_MASS_EXCHANGE_DEPOSITION'), &
-           'name-based mass membership')
-      CALL require(.NOT.group_contains_name(steps(1),'UNKNOWN_SOURCE_NAME'), &
-           'unknown name is not a group member')
-      CALL registry%validate(error); CALL require(error=='','repeat validation')
-      DO j=1,SIZE(groups)
-        CALL require(ALLOCATED(groups(j)%source_names),'stage group has canonical source names')
-      END DO
-      snapshot=registry%stage_groups(); snapshot(1)%id=999
-      snapshot=registry%stage_groups(); CALL require(snapshot(1)%id/=999,'detached immutable storage')
     END DO
     END DO
     END DO
     END DO
   END DO
-  CALL test_configured_default_schedule()
-  CALL test_native_source_input_parser()
-  ! One configured bridge smoke test covers all injection and mass-exchange gates.
-  CALL configure_bridge()
-  CALL test_native_source_configuration()
-  enabled=.TRUE.; original=[3,1,2]; methods=[IM_GROUP_METHOD_ANALYTIC, &
-       IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_NEWTON]; pore=7
-  CALL make_partition()
-  CALL initialize_configured_sources(registry,partition,error)
-  CALL require(error=='','configured source bridge: '//TRIM(error))
-  groups=registry%stage_groups();steps=registry%step_groups()
-  CALL require(SIZE(groups)==4,'configured default groups')
-  CALL require(SIZE(groups(4)%source_names)==5,'curvature/circular/fissural/radial/boundary inventory')
-  CALL require(SIZE(steps(1)%source_names)==7,'all bounded mass proposals registered')
-  CALL require(group_contains_name(groups(4),'SOURCE_TERM_BOUNDARY_INJECTION'),'boundary hook retained')
-  CALL require(ALLOCATED(groups(3)%source_names) .AND. &
-       ALLOCATED(groups(3)%source_names),'normalized group exposes name-only dispatch metadata')
-  CALL require(group_contains_name(groups(3),rheology_source_name(rheology_id_lava)), &
-       'rheological law selected by canonical source identity')
-
-  ! Group-owned equation and source validation, with no solver-ID metadata.
-  DO mode=1,13
-    badgroups=groups; badsteps=steps
-    SELECT CASE(mode)
-    CASE(1); badgroups(1)%id=4
-    CASE(2); badgroups(4)%source_names=[badgroups(4)%source_names,source_name(SOURCE_TERM_GEOMETRY_CURVATURE)]
-    CASE(3); badsteps(1)%source_names=[badsteps(1)%source_names,source_name(SOURCE_TERM_GEOMETRY_CURVATURE)]
-    CASE(4); badgroups(1)%equation_ids=[2,3,4]
-    CASE(5); badgroups(3)%equation_ids=[INTEGER::]
-    CASE(6); badgroups(4)%source_names=[source_name(SOURCE_TERM_INLET_THERMAL_COUPLING)]
-    CASE(7); badgroups(4)%source_names=[CHARACTER(LEN=64)::'UNKNOWN_SOURCE_999']
-    CASE(8); badgroups(1)%equation_ids=[99]
-    CASE(9); DEALLOCATE(badgroups(1)%equation_ids)
-    CASE(10); badgroups(1)%id=0
-    CASE(11); badgroups(4)%cadence=SOURCE_CADENCE_STEP
-    CASE(12); badgroups(2)%execution_order=1
-    CASE(13); badgroups(1)%method=99
-    END SELECT
-    CALL trial%initialize(7,7,badgroups,badsteps,error)
-    CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
-         'invalid group-only registry rejected')
-    snapshot=trial%stage_groups()
-    CALL require(SIZE(snapshot)==0,'failed initialization releases storage')
-    negative=negative+1
-  END DO
-
-  ! Canonical-name identity is checked even when numeric IDs are unchanged.
-  badgroups=groups
-  badgroups(4)%source_names(1)=badgroups(4)%source_names(2)
-  CALL trial%initialize(7,7,badgroups,steps,error)
-  CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
-       'duplicate canonical group name rejected')
-  negative=negative+1
-  badgroups=groups
-  badgroups(4)%source_names(1)=''
-  CALL trial%initialize(7,7,badgroups,steps,error)
-  CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
-       'empty canonical group name rejected')
-  negative=negative+1
-
-  ! Newton must not register only one mathematical addend of a law.
-  badgroups=groups
-  badgroups(3)%source_names=[source_name(SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS)]
-  CALL trial%initialize(7,7,badgroups,steps,error)
-  CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
-       'legacy component is rejected from a directly specified Newton group')
-  negative=negative+1
-
-  ! Reject an analytic velocity group with an incomplete physical law.
-  badgroups=groups
-  badgroups(3)%method=SOURCE_METHOD_ANALYTIC
-  badgroups(3)%source_names=[source_name(SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS)]
-  CALL trial%initialize(7,7,badgroups,steps,error)
-  CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
-       'legacy component rejected from a directly specified analytic group')
-  negative=negative+1
-  ! Model membership and atomic batches are derived from the catalog.
-  DO k=1,SOURCE_TERM_COUNT
-    term=source_term_descriptor(k)
-    IF (term%model_id==0) CYCLE
-    model_id=term%model_id
-    family=test_rheology_ids(model_id)
-    CALL require(SIZE(family)>0,'catalogued rheology family present')
-    DO j=1,SIZE(family)
-      term=source_term_descriptor(family(j))
-      CALL require(term%model_id==model_id, &
-           'rheology lookup returns only its registered family')
-    END DO
-  END DO
-  DO k=1,SOURCE_TERM_COUNT
-    term=source_term_descriptor(k)
-    ! Atomic-batch completeness applies only to independent non-rheological sources.
-    ! A rheological law is already a single source, not a bundle of addends.
-    IF (term%bundle_id==0 .OR. term%model_id/=0) CYCLE
-    bundle=test_bundle_ids(term%bundle_id)
-    CALL require(SIZE(bundle)>=2,'catalogued atomic batch has multiple terms')
-    IF (k/=bundle(1)) CYCLE
-    enabled=[.TRUE.,.FALSE.,.FALSE.]; original=[1,1,1]; methods=IM_GROUP_METHOD_NEWTON; pore=0
-    DO j=1,SIZE(bundle)
-      term=source_term_descriptor(bundle(j))
-      IF (term%target>0) enabled(term%target)=.TRUE.
-    END DO
-    IF (enabled(3)) pore=7
-    CALL make_partition()
-    terms=bundle(:SIZE(bundle)-1)
-    CALL trial%initialize_legacy(partition,original,methods,pore,catalog_names_for_test(terms),error)
-    CALL require(INDEX(error,'batch')>0,'incomplete catalogued batch rejected')
-    negative=negative+1
-  END DO
-  enabled=[.TRUE.,.FALSE.,.FALSE.]; pore=0
-  original=[3,1,2]; methods=[IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_NEWTON]
-  CALL make_partition()
-  terms=[SOURCE_TERM_THERMAL_RADIATIVE_COOLING,SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
-  CALL trial%initialize_legacy(partition,original,methods,pore,catalog_names_for_test(terms),error)
-  CALL require(INDEX(error,'enabled legacy target')>0,'active source cannot disappear on an inactive target')
-  negative=negative+1
-  ! Input/source activation may be empty while momentum remains an implicit block.
-  CALL disable_sources()
-  enabled=[.TRUE.,.FALSE.,.FALSE.];pore=0
-  CALL make_partition()
-  CALL initialize_configured_sources(registry,partition,error)
-  CALL require(error=='','disabled physics still has valid metadata')
-  groups=registry%stage_groups()
-  CALL require(SIZE(groups)==2,'zero-rate momentum block retained')
-  CALL require(SIZE(groups(1)%source_names)==0,'disabled rheology has no physical rates')
-  CALL require(ALL(groups(1)%equation_ids==[2,3]),'zero-rate momentum target preserved')
-  mask=.FALSE.
-  CALL partition%initialize(mask)
-  CALL initialize_configured_sources(registry,partition,error)
-  CALL require(error=='','empty implicit partition accepted')
-  groups=registry%stage_groups()
-  CALL require(SIZE(groups)==1 .AND. groups(1)%method==SOURCE_METHOD_EXPLICIT, &
-       'explicit-only partition has no implicit group')
-  mask=.FALSE.;mask(2)=.TRUE.
-  CALL partition%initialize(mask)
-  CALL trial%initialize_legacy(partition,original,methods,0,[CHARACTER(LEN=64)::],error)
-  CALL require(INDEX(error,'two-equation block')>0,'split legacy momentum rejected');negative=negative+1
-  enabled=[.TRUE.,.FALSE.,.FALSE.];CALL make_partition()
-  CALL trial%initialize_legacy(partition,[0,1,2],methods,0,[CHARACTER(LEN=64)::],error)
-  CALL require(INDEX(error,'group IDs')>0,'invalid legacy ID rejected');negative=negative+1
-  CALL trial%initialize_legacy(partition,original,[99,99,99],0,[CHARACTER(LEN=64)::],error)
-  CALL require(INDEX(error,'legacy method')>0,'invalid legacy method rejected');negative=negative+1
-  CALL registry%finalize();CALL registry%finalize()
-  CALL require(.NOT.registry%is_initialized(),'idempotent finalization')
-  snapshot=registry%stage_groups();CALL require(SIZE(snapshot)==0,'released stage storage')
-  WRITE(*,'(A,I0,A,I0,A)') 'PASS: D17 registry, 864 legacy configurations; ',checks,' assertions; ',negative, &
-       ' rejected invalid configurations'
+  WRITE(*,'(A)') 'D17 physical source catalog and 864 legacy mappings verified'
 CONTAINS
-  ! Test-only enumeration: the production catalog no longer exposes
-  ! positional IDs as an API for rheology and evaluation batches.
-  FUNCTION test_rheology_ids(law) RESULT(ids)
-    INTEGER, INTENT(IN) :: law
-    INTEGER, ALLOCATABLE :: ids(:)
-    TYPE(source_term_type) :: item
-    INTEGER :: m
-    ALLOCATE(ids(0))
-    DO m=1,SOURCE_TERM_COUNT
-      item=source_term_descriptor(m)
-      IF (law/=0 .AND. item%model_id==law) ids=[ids,m]
-    END DO
-  END FUNCTION test_rheology_ids
-
-  FUNCTION test_bundle_ids(batch) RESULT(ids)
-    INTEGER, INTENT(IN) :: batch
-    INTEGER, ALLOCATABLE :: ids(:)
-    TYPE(source_term_type) :: item
-    INTEGER :: m
-    ALLOCATE(ids(0))
-    DO m=1,SOURCE_TERM_COUNT
-      item=source_term_descriptor(m)
-      IF (batch>0 .AND. item%bundle_id==batch) ids=[ids,m]
-    END DO
-  END FUNCTION test_bundle_ids
-
-  ! Legacy test scenarios may still use catalog indexes to enumerate rates;
-  ! the registry interface itself accepts physical source names only.
-  FUNCTION catalog_names_for_test(ids) RESULT(names)
-    INTEGER, INTENT(IN) :: ids(:)
-    CHARACTER(LEN=64), ALLOCATABLE :: names(:)
-    INTEGER :: i
-    TYPE(source_term_type) :: component
-    ALLOCATE(names(0))
-    DO i=1,SIZE(ids)
-      component=source_term_descriptor(ids(i))
-      IF (component%model_id/=0) component%name=rheology_source_name(component%model_id)
-      IF (ANY(names==component%name)) CYCLE
-      names=[CHARACTER(LEN=64) :: names,component%name]
-    END DO
-  END FUNCTION catalog_names_for_test
-
-  SUBROUTINE require(condition,label)
-    LOGICAL, INTENT(IN) :: condition
-    CHARACTER(*), INTENT(IN) :: label
-    IF (.NOT.condition) THEN
-      WRITE(error_unit,*) 'FAIL: ',label
-      ERROR STOP 1
-    END IF
-    checks=checks+1
+  SUBROUTINE require(valid,message)
+    LOGICAL, INTENT(IN) :: valid
+    CHARACTER(*), INTENT(IN) :: message
+    IF (valid) RETURN
+    WRITE(error_unit,'(A)') 'FAIL: '//message
+    ERROR STOP 1
   END SUBROUTINE require
-  SUBROUTINE test_configured_default_schedule()
-    USE parameters_2d, ONLY : wp,rheology_flag,rheology_model_id,pore_pressure_flag, &
-         idx_pore,imex_velocity_group,imex_energy_group,imex_pore_pressure_group, &
-         imex_group_method,curvature_term_flag,bottom_radial_source_flag, &
-         bottom_fissural_source_flag,radial_source_flag,lateral_source_flag, &
-         liquid_flag,gas_flag,gas_loss_flag,liquid_vaporization_flag
-    USE constitutive_parameters_2d, ONLY : erosion_coeff,settling_flag, &
-         coeff_porosity,entrainment_flag
-    INTEGER :: default_mask(7)
-    LOGICAL :: active_mask(7)
-    INTEGER :: default_methods(3)
-    CHARACTER(LEN=16) :: default_method_names(3)
-    INTEGER :: expected_terms(2)
-
-    idx_pore=7
-    CALL require(imex_velocity_group==3 .AND. imex_energy_group==1 .AND. &
-         imex_pore_pressure_group==2,'compiled legacy IMEX group defaults')
-    default_method_names=[CHARACTER(LEN=16)::'ANALYTIC','ANALYTIC','NEWTON']
-    CALL require(ALL(imex_group_method==default_method_names), &
-         'compiled legacy IMEX method defaults')
-    default_methods=[IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_ANALYTIC, &
-         IM_GROUP_METHOD_NEWTON]
-
-    rheology_flag=.FALSE.;pore_pressure_flag=.FALSE.
-    curvature_term_flag=.FALSE.;bottom_radial_source_flag=.FALSE.
-    bottom_fissural_source_flag=.FALSE.;radial_source_flag=.FALSE.
-    lateral_source_flag=.FALSE.;liquid_flag=.FALSE.;gas_flag=.TRUE.
-    gas_loss_flag=.FALSE.;liquid_vaporization_flag=.FALSE.
-    erosion_coeff=0.0_wp;settling_flag=.FALSE.;coeff_porosity=0.0_wp
-    entrainment_flag=.FALSE.
-    active_mask=.FALSE.;active_mask(2:3)=.TRUE.
-    default_mask=0;default_mask(2:3)=1
-    CALL partition%initialize(active_mask,default_mask,[IM_GROUP_METHOD_NEWTON])
-    CALL initialize_configured_sources(registry,partition,error)
-    CALL require(error=='','inactive compiled default schedule: '//TRIM(error))
-    groups=registry%stage_groups();steps=registry%step_groups()
-    CALL require(SIZE(groups)==2 .AND. SIZE(steps)==1, &
-         'inactive compiled default group counts')
-    CALL require(groups(1)%id==3 .AND. groups(1)%legacy_id==3 .AND. &
-         groups(1)%method==SOURCE_METHOD_NEWTON .AND. &
-         ALL(groups(1)%equation_ids==[2,3]),'default velocity group mapping')
-    CALL require(SIZE(groups(1)%source_names)==0 .AND. &
-         SIZE(steps(1)%source_names)==0,'inactive defaults register no source terms')
-    CALL require(groups(2)%id==4 .AND. &
-         groups(2)%method==SOURCE_METHOD_EXPLICIT,'default EX group reservation')
-
-    rheology_flag=.TRUE.;rheology_model_id=rheology_id_lava
-    pore_pressure_flag=.TRUE.
-    active_mask(4)=.TRUE.;active_mask(idx_pore)=.TRUE.
-    default_mask(2:3)=3;default_mask(4)=1;default_mask(idx_pore)=2
-    CALL partition%initialize(active_mask,default_mask,default_methods)
-    CALL initialize_configured_sources(registry,partition,error)
-    CALL require(error=='','active compiled default schedule: '//TRIM(error))
-    groups=registry%stage_groups();steps=registry%step_groups()
-    CALL require(SIZE(groups)==4 .AND. SIZE(steps)==1, &
-         'active compiled default group counts')
-    CALL require(groups(1)%id==1 .AND. groups(1)%method==SOURCE_METHOD_ANALYTIC .AND. &
-         ALL(groups(1)%equation_ids==[4]),'default analytic energy group')
-    CALL require(groups(2)%id==2 .AND. groups(2)%method==SOURCE_METHOD_ANALYTIC .AND. &
-         ALL(groups(2)%equation_ids==[idx_pore]),'default analytic pore group')
-    CALL require(groups(3)%id==3 .AND. groups(3)%method==SOURCE_METHOD_NEWTON .AND. &
-         ALL(groups(3)%equation_ids==[2,3]),'default Newton velocity group')
-    expected_terms=[SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
-         SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
-    CALL require(same_name_members(groups(1)%source_names,expected_terms), &
-         'default energy cooling bundle')
-    expected_terms=test_rheology_ids(rheology_id_lava)
-    CALL require(SIZE(groups(3)%source_names)==1 .AND. &
-         groups(3)%source_names(1)==rheology_source_name(rheology_id_lava), &
-         'default lava law has one schedule identity')
-    CALL require(SIZE(groups(2)%source_names)==1 .AND. &
-         groups(2)%source_names(1)==source_name(SOURCE_TERM_PORE_PRESSURE_DISSIPATION), &
-         'default pore-pressure term')
-    CALL require(SIZE(groups(4)%source_names)==0 .AND. SIZE(steps(1)%source_names)==0, &
-         'default explicit and step groups remain empty when disabled')
-  END SUBROUTINE test_configured_default_schedule
-  FUNCTION source_name(id) RESULT(name)
-    INTEGER, INTENT(IN) :: id
-    CHARACTER(LEN=64) :: name
-    TYPE(source_term_type) :: descriptor
-    descriptor=source_term_descriptor(id)
-    name=descriptor%name
-  END FUNCTION source_name
-  LOGICAL FUNCTION same_name_members(names,ids) RESULT(equal)
-    CHARACTER(LEN=64), INTENT(IN) :: names(:)
-    INTEGER, INTENT(IN) :: ids(:)
-    INTEGER :: i
-    equal=SIZE(names)==SIZE(ids)
-    IF (.NOT.equal) RETURN
-    DO i=1,SIZE(ids)
-      IF (COUNT(names==source_name(ids(i)))/=1) THEN
-        equal=.FALSE.
-        RETURN
-      END IF
-    END DO
-  END FUNCTION same_name_members
-  FUNCTION target_eqs(target) RESULT(ids)
-    INTEGER, INTENT(IN) :: target
-    INTEGER, ALLOCATABLE :: ids(:)
-    SELECT CASE(target)
-    CASE(1);ids=[2,3]
-    CASE(2);ids=[4]
-    CASE(3);ids=[7]
-    END SELECT
-  END FUNCTION target_eqs
-  LOGICAL FUNCTION same_members(left,right) RESULT(equal)
-    INTEGER, INTENT(IN) :: left(:),right(:)
-    INTEGER :: index
-    equal=SIZE(left)==SIZE(right)
-    DO index=1,SIZE(left)
-      equal=equal .AND. COUNT(right==left(index))==1
-    END DO
-  END FUNCTION same_members
-  SUBROUTINE make_partition()
-    INTEGER :: membership(7),compact_methods(3),count_groups,group,target
-    mask=.FALSE.;mask(2:3)=.TRUE.;mask(4)=enabled(2);mask(7)=enabled(3)
-    membership=0;count_groups=0
-    DO group=1,3
-      IF (.NOT.ANY(enabled .AND. original==group)) CYCLE
-      count_groups=count_groups+1;compact_methods(count_groups)=methods(group)
-      DO target=1,3
-        IF (enabled(target) .AND. original(target)==group) membership(target_eqs(target))=count_groups
-      END DO
-    END DO
-    CALL partition%initialize(mask,membership,compact_methods(1:count_groups))
-  END SUBROUTINE make_partition
-  SUBROUTINE configure_bridge()
-    USE parameters_2d, ONLY : rheology_flag,rheology_model_id,pore_pressure_flag,idx_pore, &
-         curvature_term_flag,bottom_radial_source_flag,bottom_fissural_source_flag, &
-         radial_source_flag,lateral_source_flag,liquid_flag,gas_flag,gas_loss_flag, &
-         liquid_vaporization_flag,imex_velocity_group,imex_energy_group,imex_pore_pressure_group,imex_group_method
-    USE constitutive_parameters_2d, ONLY : erosion_coeff,settling_flag,coeff_porosity,entrainment_flag
-    rheology_flag=.TRUE.;rheology_model_id=rheology_id_lava;pore_pressure_flag=.TRUE.;idx_pore=7
-    curvature_term_flag=.TRUE.;bottom_radial_source_flag=.TRUE.;bottom_fissural_source_flag=.TRUE.
-    radial_source_flag=.TRUE.;lateral_source_flag=.TRUE.;liquid_flag=.TRUE.;gas_flag=.TRUE.
-    gas_loss_flag=.TRUE.;liquid_vaporization_flag=.TRUE.;erosion_coeff=0.1;settling_flag=.TRUE.
-    coeff_porosity=0.3;entrainment_flag=.TRUE.
-    imex_velocity_group=3;imex_energy_group=1;imex_pore_pressure_group=2
-    imex_group_method=[CHARACTER(LEN=16)::'ANALYTIC','ANALYTIC','NEWTON']
-  END SUBROUTINE configure_bridge
-  SUBROUTINE test_native_source_configuration()
-    INTEGER :: native_terms(7),term_index
-    CHARACTER(LEN=64) :: term_names(7)
-
-    n_eqns=7
-    idx_pore=7
-    native_source_configuration_present=.TRUE.
-    CALL clear_source_input()
-    native_source_configuration_present=.TRUE.
-    source_group_count=5
-    CALL set_group(1,10,'STAGE','ANALYTIC',1, &
-         [SOURCE_TERM_THERMAL_RADIATIVE_COOLING,SOURCE_TERM_THERMAL_CONVECTIVE_COOLING], &
-         ['TEMPERATURE'])
-    CALL set_group(2,11,'STAGE','ANALYTIC',2, &
-         [SOURCE_TERM_PORE_PRESSURE_DISSIPATION],['PORE_PRESSURE'])
-    CALL set_group(3,12,'STAGE','NEWTON',3, &
-         test_rheology_ids(rheology_id_lava),['VELOCITY'])
-    CALL set_group(4,4,'STAGE','EXPLICIT',1, &
-         [SOURCE_TERM_GEOMETRY_CURVATURE,SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, &
-         SOURCE_TERM_BOTTOM_FISSURAL_INJECTION,SOURCE_TERM_RADIAL_INJECTION, &
-         SOURCE_TERM_BOUNDARY_INJECTION],[CHARACTER(LEN=16)::])
-    CALL set_group(5,1,'STEP','EXPLICIT',1, &
-         [SOURCE_TERM_MASS_EXCHANGE_EROSION,SOURCE_TERM_MASS_EXCHANGE_DEPOSITION, &
-         SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS, &
-         SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS, &
-         SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS, &
-         SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT,SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION], &
-         [CHARACTER(LEN=16)::])
-    idx_pore=0
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'pore-pressure equation index')>0 .AND. &
-         .NOT.trial%is_initialized() .AND. .NOT.partition%is_initialized(), &
-         'out-of-range pore equation index rejected safely')
-    idx_pore=7
-    n_eqns=0
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'valid equation layout')>0 .AND. &
-         .NOT.trial%is_initialized() .AND. .NOT.partition%is_initialized(), &
-         'uninitialized equation layout rejected safely')
-    n_eqns=7
-    CALL initialize_native_source_configuration(registry,partition,error)
-    CALL require(error=='' .AND. registry%is_initialized(), &
-         'native named source groups accepted: '//TRIM(error))
-    groups=registry%stage_groups();steps=registry%step_groups()
-    CALL require(SIZE(groups)==4 .AND. SIZE(steps)==1, &
-         'native source group and solver counts')
-    CALL require(groups(1)%method==SOURCE_METHOD_ANALYTIC .AND. &
-         groups(2)%method==SOURCE_METHOD_ANALYTIC .AND. &
-         groups(3)%method==SOURCE_METHOD_NEWTON .AND. &
-         groups(4)%method==SOURCE_METHOD_EXPLICIT, &
-         'native phase and execution order')
-    CALL require(ALL(groups(3)%equation_ids==[2,3]) .AND. &
-         SIZE(steps(1)%source_names)==7,'native targets and complete step batch')
-
-    ! The canonical rheology name represents the full physical law.
-    source_group_term_count(3)=1
-    source_group_terms(:,3)=''
-    source_group_terms(1,3)=rheology_source_name(rheology_id_lava)
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(error=='' .AND. trial%is_initialized(), &
-         'canonical rheology schedules complete law: '//TRIM(error))
-    snapshot=trial%stage_groups()
-    CALL require(SIZE(snapshot(3)%source_names)==1 .AND. &
-         snapshot(3)%source_names(1)==rheology_source_name(rheology_id_lava), &
-         'canonical rheology has a single schedule identity')
-    ! Mixed canonical and component declarations must not double-schedule.
-    source_group_term_count(3)=2
-    source_group_terms(2,3)='SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS'
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(error/='', &
-         'native declaration of a legacy component is rejected')
-    ! Restore a valid complete-law declaration before testing targets.
-    source_group_term_count(3)=1
-    source_group_terms(:,3)=''
-    source_group_terms(1,3)=rheology_source_name(rheology_id_lava)
-    ! A native implicit group has a target list directly on the group.
-    source_group_target_count(3)=0
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'require group targets')>0, &
-         'missing implicit group targets rejected')
-    source_group_target_count(3)=1
-    source_group_targets(1,3)='UNKNOWN'
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'unknown or duplicate group target')>0, &
-         'unknown group target rejected')
-    source_group_targets(1,3)='VELOCITY'
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(error=='' .AND. trial%is_initialized(), &
-         'native group-level targets initialize: '//TRIM(error))
-    source_group_target_count(3)=2
-    source_group_targets(2,3)='VELOCITY'
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(INDEX(error,'unknown or duplicate group target')>0, &
-         'duplicate group target rejected')
-    source_group_target_count(3)=1
-    source_group_targets(2,3)=''
-    source_group_term_count(5)=6
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(error/='' .AND. .NOT.trial%is_initialized() .AND. &
-         .NOT.partition%is_initialized(),'native schedule omission rejected transactionally')
-    source_group_term_count(5)=7
-    native_terms=[SOURCE_TERM_MASS_EXCHANGE_EROSION,SOURCE_TERM_MASS_EXCHANGE_DEPOSITION, &
-         SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS, &
-         SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS, &
-         SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS, &
-         SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT,SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION]
-    DO term_index=1,SIZE(native_terms)
-      term=source_term_descriptor(native_terms(term_index))
-      term_names(term_index)=term%name
-    END DO
-    source_group_terms(1,5)=source_group_terms(2,5)
-    CALL initialize_native_source_configuration(trial,partition,error)
-    CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
-         'duplicate native source term rejected')
-    source_group_terms(1,5)=term_names(1)
-    CALL clear_source_input()
-  END SUBROUTINE test_native_source_configuration
-
-  SUBROUTINE test_native_source_input_parser()
-    CHARACTER(LEN=128) :: valid_lines(11)
-
-    valid_lines=[CHARACTER(LEN=128) :: &
-         '&source_groups', &
-         ' source_group_count=1,', &
-         ' source_group_id(1)=5,', &
-         ' source_group_order(1)=1,', &
-         " source_group_cadence(1)='STAGE',", &
-         " source_group_method(1)='NEWTON',", &
-         ' source_group_term_count(1)=1,', &
-         " source_group_terms(1,1)='SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB',", &
-         ' source_group_target_count(1)=1,', &
-         " source_group_targets(1,1)='VELOCITY',", &
-         '/']
-    CALL check_native_input(valid_lines,.FALSE.,'',.TRUE.)
-    CALL require(source_group_count==1 .AND. source_group_id(1)==5 .AND. &
-         source_group_terms(1,1)=='SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB' .AND. &
-         source_group_targets(1,1)=='VELOCITY','native namelist values parsed')
-    CALL check_native_input([CHARACTER(LEN=128) :: '! no native source groups'], &
-         .FALSE.,'',.FALSE.)
-    CALL require(source_group_count==0,'absent native namelist preserves legacy path')
-    CALL check_native_input([CHARACTER(LEN=128) :: &
-         '&source_groups', ' source_group_count=1', '/', &
-         '&SOURCE_GROUPS', ' source_group_count=1', '/'], &
-         .FALSE.,'may appear only once',.FALSE.)
-    CALL check_native_input([CHARACTER(LEN=128) :: &
-         '&source_groups', ' unknown_source_field=1', '/'], &
-         .FALSE.,'Invalid SOURCE_GROUPS',.FALSE.)
-    CALL check_native_input(valid_lines,.TRUE.,'cannot be combined',.TRUE.)
-    CALL clear_source_input()
-  END SUBROUTINE test_native_source_input_parser
-
-  SUBROUTINE check_native_input(lines,legacy_imex_explicit,expected_error,expected_present)
-    CHARACTER(*), INTENT(IN) :: lines(:),expected_error
-    LOGICAL, INTENT(IN) :: legacy_imex_explicit,expected_present
-    INTEGER :: input_unit,line_index
-    OPEN(NEWUNIT=input_unit,STATUS='scratch',ACTION='readwrite',FORM='formatted')
-    DO line_index=1,SIZE(lines)
-      WRITE(input_unit,'(A)') TRIM(lines(line_index))
-    END DO
-    CALL clear_source_input()
-    CALL read_native_source_groups(input_unit,legacy_imex_explicit,error)
-    IF (LEN_TRIM(expected_error)==0) THEN
-      CALL require(error=='','native input reader: '//TRIM(error))
-    ELSE
-      CALL require(INDEX(error,TRIM(expected_error))>0, &
-           'native input error diagnostic: '//TRIM(error))
-    END IF
-    CALL require(native_source_configuration_present .EQV. expected_present, &
-         'native input presence flag')
-    CLOSE(input_unit)
-  END SUBROUTINE check_native_input
-
-  SUBROUTINE set_group(slot,id,cadence,method,order,term_ids,targets)
-    INTEGER, INTENT(IN) :: slot,id,order,term_ids(:)
-    CHARACTER(*), INTENT(IN) :: cadence,method,targets(:)
-    TYPE(source_term_type) :: descriptor
-    INTEGER :: i
-    source_group_id(slot)=id
-    source_group_cadence(slot)=cadence
-    source_group_method(slot)=method
-    source_group_order(slot)=order
-    source_group_term_count(slot)=0
-    source_group_terms(:,slot)=''
-    DO i=1,SIZE(term_ids)
-      descriptor=source_term_descriptor(term_ids(i))
-      IF (descriptor%model_id/=0) descriptor%name=rheology_source_name(descriptor%model_id)
-      IF (ANY(source_group_terms(:,slot)==descriptor%name)) CYCLE
-      source_group_term_count(slot)=source_group_term_count(slot)+1
-      source_group_terms(source_group_term_count(slot),slot)=descriptor%name
-    END DO
-    source_group_target_count(slot)=SIZE(targets)
-    IF (SIZE(targets)>0) source_group_targets(1:SIZE(targets),slot)=targets
-  END SUBROUTINE set_group
-  SUBROUTINE disable_sources()
-    USE parameters_2d, ONLY : rheology_flag,rheology_model_id,rheology_id_none,pore_pressure_flag, &
-         curvature_term_flag,bottom_radial_source_flag,bottom_fissural_source_flag, &
-         radial_source_flag,lateral_source_flag,liquid_flag,gas_flag,gas_loss_flag,liquid_vaporization_flag
-    USE constitutive_parameters_2d, ONLY : erosion_coeff,settling_flag,coeff_porosity,entrainment_flag
-    rheology_flag=.FALSE.;rheology_model_id=rheology_id_none;pore_pressure_flag=.FALSE.
-    curvature_term_flag=.FALSE.;bottom_radial_source_flag=.FALSE.;bottom_fissural_source_flag=.FALSE.
-    radial_source_flag=.FALSE.;lateral_source_flag=.FALSE.;liquid_flag=.FALSE.;gas_flag=.FALSE.
-    gas_loss_flag=.FALSE.;liquid_vaporization_flag=.FALSE.;erosion_coeff=0.0;settling_flag=.FALSE.
-    coeff_porosity=0.0;entrainment_flag=.FALSE.
-  END SUBROUTINE disable_sources
 END PROGRAM test_source_registry

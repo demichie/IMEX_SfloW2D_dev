@@ -40,9 +40,7 @@ MODULE equation_terms_2d
        SOURCE_TARGET_TEMPERATURE, SOURCE_TARGET_PORE_PRESSURE,               &
        SOURCE_SOLVE_NEWTON_BLOCK, SOURCE_ROLE_IMPLICIT,                      &
        SOURCE_ROLE_SEMI_IMPLICIT,                                            &
-       rheology_source_name, rheology_has_role,                             &
-       SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, &
-       SOURCE_TERM_BOTTOM_FISSURAL_INJECTION, SOURCE_TERM_RADIAL_INJECTION
+       rheology_source_name, rheology_has_role
   USE source_registry_2d, ONLY : source_group_type, &
        group_contains_name
 
@@ -320,7 +318,7 @@ CONTAINS
        q1 = r_h * r_rho_m
 
        IF ( curvature_term_flag .AND.                                      &
-            group_contains_name(group,'SOURCE_TERM_GEOMETRY_CURVATURE') .AND.     &
+            group_contains_name(group,'geometry_curvature') .AND.     &
             r_h .GT. dry_thickness_tolerance ) THEN
 
           ! Hydrostatic pressure and the ordinary bed-slope source are already
@@ -342,7 +340,7 @@ CONTAINS
 
     ! ----------- ADDITIONAL EXPLICIT TERMS FOR BOTTOM RADIAL SOURCE ------------
 
-    IF ( group_contains_name(group,'SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION') .AND. &
+    IF ( group_contains_name(group,'bottom_circular_injection') .AND. &
          bottom_radial_source_flag .AND. ( cell_fract_jk .GT. 0.0_wp ) ) THEN
 
     IF ( n_intervals .GT. 0 ) THEN
@@ -486,7 +484,7 @@ CONTAINS
 
     ! Each fissure uses its own clipped cell coverage, pulse and temperature,
     ! and the source composition converted at that temperature.
-    IF ( group_contains_name(group,'SOURCE_TERM_BOTTOM_FISSURAL_INJECTION') .AND. &
+    IF ( group_contains_name(group,'bottom_fissural_injection') .AND. &
          bottom_fissural_source_flag ) THEN
 
        DO i_fissure = 1, n_fissures
@@ -571,7 +569,7 @@ CONTAINS
     ! per-cell rate rho_source * h_source * vel_source * cell_arc_perim_jk
     ! / cell_area_jk sums to MFR over all in-arc cells.
 
-    IF ( group_contains_name(group,'SOURCE_TERM_RADIAL_INJECTION') .AND.              &
+    IF ( group_contains_name(group,'radial_injection') .AND.              &
          radial_source_flag .AND. ( lat_arc_perim_jk .GT. 0.0_wp ) .AND.       &
          ( h_source .GT. 0.0_wp ) ) THEN
 
@@ -798,16 +796,16 @@ CONTAINS
        selected_rheology=group_has_role(group,SOURCE_ROLE_IMPLICIT, &
             rheology_model_id)
        selected_radiative=group_contains_name(group, &
-            'SOURCE_TERM_THERMAL_RADIATIVE_COOLING')
+            'thermal_cooling')
        selected_convective=group_contains_name(group, &
-            'SOURCE_TERM_THERMAL_CONVECTIVE_COOLING')
+            'thermal_cooling')
        IF (selected_radiative .NEQV. selected_convective) THEN
           CALL fatal_error('D17: thermal cooling terms must be selected as a complete bundle')
           RETURN
        END IF
        selected_thermal=selected_radiative .OR. selected_convective
        selected_pore=group_contains_name(group, &
-            'SOURCE_TERM_PORE_PRESSURE_DISSIPATION')
+            'pore_pressure_dissipation')
     ELSE
        selected_rheology=rheology_flag
        selected_thermal=rheology_flag

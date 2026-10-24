@@ -12,7 +12,7 @@ MODULE mass_exchange_step_2d
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
-  USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, SOURCE_ROLE_MASS, &
+  USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, &
        source_term_type, source_term_descriptor_by_name
 
   IMPLICIT NONE
@@ -168,7 +168,7 @@ CONTAINS
                mass_group_count=mass_group_count+1
           DO term_index=1,SIZE(step_groups(group_index)%source_names)
              term=source_term_descriptor_by_name(step_groups(group_index)%source_names(term_index))
-             IF (term%role/=SOURCE_ROLE_MASS) &
+             IF (term%target/='mass_exchange') &
                   CALL fatal_error('D17: unsupported non-mass post-RK source')
           END DO
        END DO
