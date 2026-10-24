@@ -128,7 +128,7 @@ END TYPE
 Gli `equation_ids` del gruppo derivano dai termini e dal modello fisico. Per Newton identificano esattamente il sistema accoppiato (ad esempio, quantità di moto x/y e temperatura se condividono il gruppo). Per `ANALYTIC` devono coincidere con il target dell'unico solve disponibile. Per `EXPLICIT` definiscono il footprint delle sorgenti, non un sistema lineare da risolvere.
 
 
-**Stato di avanzamento D17.5 — IN CORSO (24 ottobre 2026).** Validazione di un solo solver per gruppo introdotta; descrittori non ancora semplificati e ancora basati anche su ID. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
+**Stato di avanzamento D17.5 — IN CORSO (24 ottobre 2026).** Validazione di un solo solver per gruppo introdotta; con `8fc3e17a` eliminati dal validatore aggregazione `collected` e tracciamento `equation_seen` per sotto-solve, sostituiti da confronti esatti con il gruppo; descrittori non ancora semplificati e ancora basati anche su ID. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
 
 ## D17.6 — Gruppi `ANALYTIC`
 
@@ -792,3 +792,10 @@ Commit [`67aab829`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/67aab829
 ### D17.22.13 — Chiarimento architetturale e ordine di migrazione (24 ottobre 2026)
 
 Inserita la **Guida di lettura e priorità di migrazione** immediatamente prima di D17.19. D17.19 resta l'unico piano sequenziale; i passi 3/4/5/6/9/10c si devono eseguire come **una migrazione coordinata** verso il catalogo e il gruppo minimali, non come accumulo di strutture legacy con controlli aggiuntivi. La specifica tecnica D17.0–D17.18a è conservata integralmente, inclusi gli stati di avanzamento. Il gate compile+registry precedente rimane valido per lo SHA verificato; le nuove modifiche richiederanno un nuovo controllo.
+
+
+### D17.22.14 — Prima semplificazione strutturale del validatore (24 ottobre 2026)
+
+Commit [`8fc3e17a`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/8fc3e17abd6f45f2ef17672299cb9f61ff8cb3d6): nel validatore `source_registry_2d` rimossi il vettore `collected` e la maschera `equation_seen` che erano necessari ad aggregare più sotto-solve indipendenti. Ora l'unico descrittore implicito deve avere **esattamente lo stesso insieme di termini ed equazioni del gruppo**, verificato tramite `same_set`. Restano temporaneamente `source_solver_type` e gli ID nel formato del registro: saranno eliminati nell'unità coordinata di migrazione nominale definita nella guida prima di D17.19; non sono il design finale.
+
+**Verifica:** implementato, non ancora verificato tramite le Actions sul nuovo HEAD. La baseline compile+registry verde del precedente SHA rimane documentata in D17.22.11; le regressioni numeriche restano aperte. Nessuna modifica a formule fisiche o schemi RK.
