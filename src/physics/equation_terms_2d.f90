@@ -15,6 +15,7 @@
 MODULE equation_terms_2d
 
   USE diagnostics_2d, ONLY : fatal_error
+  USE mass_exchange_assembly_2d, ONLY : eval_mass_exchange_terms
 
   USE constitutive_parameters_2d
   USE state_conversion_2d
@@ -70,7 +71,7 @@ MODULE equation_terms_2d
   PUBLIC :: eval_inertial_flux, eval_hydrostatic_coefficient
   PUBLIC :: limit_component_mass_flux
   PUBLIC :: curvature_acceleration, eval_curvature_momentum_source
-  PUBLIC :: eval_expl_terms
+  PUBLIC :: eval_expl_terms, eval_step_mass_exchange_terms
   PUBLIC :: eval_implicit_terms, eval_semi_implicit_terms
   PUBLIC :: analytic_term_context_type, eval_analytic_terms
   PUBLIC :: eval_source_bdry
@@ -93,6 +94,24 @@ MODULE equation_terms_2d
   END TYPE analytic_term_context_type
 
 CONTAINS
+
+  !> Explicit STEP mass-exchange physics bridge (atomic batch).
+  !> This returns rates only. Inventory and bed updates belong to STEP execution.
+  SUBROUTINE eval_step_mass_exchange_terms(qpj, B_zone, B_prime_x, B_prime_y, &
+       erodible, dt, erosion_term, deposition_term, &
+       continuous_phase_erosion_term, continuous_phase_loss_term, eqns_term, topo_term)
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2), B_prime_x, B_prime_y
+    REAL(wp), INTENT(IN) :: erodible(n_solid), dt
+    INTEGER, INTENT(IN) :: B_zone
+    REAL(wp), INTENT(OUT) :: erosion_term(n_solid), deposition_term(n_solid)
+    REAL(wp), INTENT(OUT) :: continuous_phase_erosion_term, continuous_phase_loss_term
+    REAL(wp), INTENT(OUT) :: eqns_term(n_eqns), topo_term
+
+    CALL eval_mass_exchange_terms(qpj, B_zone, B_prime_x, B_prime_y, &
+         erodible, dt, erosion_term, deposition_term, &
+         continuous_phase_erosion_term, continuous_phase_loss_term, eqns_term, topo_term)
+  END SUBROUTINE eval_step_mass_exchange_terms
+
 
   !> \brief Apply one validated analytic source solve to its conservative target.
   !> \details The exact-flow kernels receive only a physical interval and cell

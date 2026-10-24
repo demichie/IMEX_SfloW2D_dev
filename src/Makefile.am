@@ -185,6 +185,7 @@ physics/equation_terms_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                      physics/thermal_laws_2d.$(OBJEXT)         \
                                      physics/pore_pressure_laws_2d.$(OBJEXT)   \
                                      physics/mass_exchange_laws_2d.$(OBJEXT)   \
+                                     physics/mass_exchange_assembly_2d.$(OBJEXT) \
                                      physics/rheology_laws/rheology_2d.$(OBJEXT)           \
                                      core/diagnostics_2d.$(OBJEXT)             \
                                      numerics/equation_metadata_2d.$(OBJEXT)   \
@@ -249,7 +250,7 @@ numerics/step_source_executor_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           geometry/domain_2d.$(OBJEXT)        \
                                           numerics/source_registry_2d.$(OBJEXT) \
                                           numerics/source_catalog_2d.$(OBJEXT) \
-                                          physics/mass_exchange_assembly_2d.$(OBJEXT) \
+                                          physics/equation_terms_2d.$(OBJEXT) \
                                           geometry/geometry_2d.$(OBJEXT)     \
                                           state/state_conversion_2d.$(OBJEXT)
 stochastic/stochastic_random_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)

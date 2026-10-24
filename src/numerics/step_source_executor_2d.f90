@@ -12,7 +12,7 @@ MODULE step_source_executor_2d
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
-  USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, &
+  USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, SOURCE_METHOD_EXPLICIT, &
        source_term_type, source_term_descriptor_by_name
 
   IMPLICIT NONE
@@ -123,7 +123,7 @@ CONTAINS
     USE geometry_2d, ONLY : begin_topography_rate_update,                   &
          record_topography_rate_cell, apply_topography_rate_update
     USE geometry_2d, ONLY : deposit, erosion, erodible, B_zone
-    USE mass_exchange_assembly_2d, ONLY : eval_mass_exchange_terms
+    USE equation_terms_2d, ONLY : eval_step_mass_exchange_terms
     USE state_conversion_2d, ONLY : qc_to_qp
     USE parameters_2d, ONLY : topo_change_flag, bottom_radial_source_flag,  &
          bottom_fissural_source_flag, erodible_deposit_flag,                &
@@ -162,6 +162,8 @@ CONTAINS
        step_groups=source_registry%step_groups()
        mass_group_count=0
        DO group_index=1,SIZE(step_groups)
+          IF (step_groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) &
+               CALL fatal_error('D17: STEP source group must use EXPLICIT method')
           IF (step_groups(group_index)%cadence/=SOURCE_CADENCE_STEP) &
                CALL fatal_error('D17: invalid cadence in post-RK source schedule')
           IF (SIZE(step_groups(group_index)%source_names)>0) &
@@ -202,7 +204,7 @@ CONTAINS
           qp(4,j,k) = T_ambient
        END IF
 
-       CALL eval_mass_exchange_terms(qp(1:n_vars+2,j,k), B_zone(j,k),      &
+       CALL eval_step_mass_exchange_terms(qp(1:n_vars+2,j,k), B_zone(j,k),      &
             B_prime_x_geom(j,k), B_prime_y_geom(j,k),                      &
             erodible(1:n_solid,j,k), time_step, erosion_term,              &
             deposition_term, continuous_phase_erosion_term,                &
