@@ -428,7 +428,7 @@ GRUPPO 3: STEP, EXPLICIT, batch mass-exchange completo
 Non dichiarare questo esempio valido per qualunque reologia: la compatibilità di ogni termine con il metodo scelto deve risultare dal catalogo e dai test.
 
 
-**Stato di avanzamento D17.16 — IN CORSO (24 ottobre 2026).** Validazione preventiva del numero unico di solver nativi aggiunta; catalogo nominale, conflitti e contratti restano da consolidare. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
+**Stato di avanzamento D17.16 — IN CORSO (24 ottobre 2026).** Validazione preventiva del numero unico di solver nativi aggiunta; con `7ea4969c` eliminati i loop di costruzione multi-solver del percorso nativo, ora diretto; catalogo nominale, conflitti e contratti restano da consolidare. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
 
 ## D17.17 — Separazione fisica/numerica
 
@@ -813,3 +813,10 @@ Commit [`0d9d444f`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/0d9d444f
 Commit [`5c01d13d`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/5c01d13d49d562a395e5b805e2d4ffc4321bd09b): in `source_registry_2d::validate_registry` eliminati l'array locale aggregato `solve_ids` e il controllo di inclusione dei termini già garantito dall'uguaglianza esatta dei due insiemi. Il descrittore unico è selezionato direttamente dall'ID Newton oppure analytic del gruppo; l'ordine del descrittore deve essere 1. Si tratta di rimozione di codice di transizione nel validatore, non dell'eliminazione definitiva degli ID e di `source_solver_type`, ancora utilizzati dai chiamanti. Nessuna formula o integrazione numerica modificata.
 
 **Stato:** D17.5 IN CORSO; questo commit non è ancora stato verificato da CI. I gate manuali precedenti si riferiscono a uno SHA antecedente. La rimozione definitiva delle strutture duplicate richiede ancora la migrazione coordinata di parser, runtime e catalogo prevista prima di D17.19.
+
+
+### D17.22.17 — Costruzione diretta dei gruppi impliciti nativi (24 ottobre 2026)
+
+Commit [`7ea4969c`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/7ea4969c2053d79a202242c93706b8a5357951e2): in `source_configuration_2d` rimossi i due cicli che scandivano i sotto-solver nei gruppi impliciti nativi, sia durante la derivazione del partizionamento delle equazioni sia durante la costruzione del descrittore. Poiché la validazione preliminare richiede già esattamente un solver, l'implementazione usa direttamente il primo e unico elemento, con ordine 1, e assegna al gruppo l'intera lista delle sue equazioni. Il formato `SOURCE_GROUPS` e il percorso legacy restano per ora immutati; la rimozione dei campi solver-specifici dall'input è ancora prevista nella migrazione coordinata.
+
+**Verifiche:** nuovo commit non ancora testato con le due Actions. D17.16 rimane IN CORSO; l'eliminazione finale degli ID e di `source_solver_type` non è ancora realizzata. Nessun cambiamento alle formule o ai tableaux RK.
