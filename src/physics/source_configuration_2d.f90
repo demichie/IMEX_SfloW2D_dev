@@ -100,7 +100,7 @@ CONTAINS
     TYPE(source_group_type) :: group
     TYPE(source_term_type) :: component
     INTEGER, ALLOCATABLE :: ordered(:),targets(:),equations(:)
-    CHARACTER(LEN=64), ALLOCATABLE :: parsed_names(:,:),law_names(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: parsed_names(:,:)
     CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
     INTEGER :: cadence(SOURCE_INPUT_MAX_GROUPS),method(SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: phase(SOURCE_INPUT_MAX_GROUPS),solver_count(SOURCE_INPUT_MAX_GROUPS)
@@ -113,6 +113,7 @@ CONTAINS
     CHARACTER(LEN=64) :: seen_names(SOURCE_INPUT_MAX_GROUPS*SOURCE_INPUT_MAX_TERMS)
     INTEGER :: n_seen
     INTEGER :: i,j,k,g,s,t,slot,compact_group,stage_count,step_count,target
+    CHARACTER(LEN=64) :: source_name
     CHARACTER(LEN=256) :: validation_error
 
     CALL registry%finalize()
@@ -177,36 +178,30 @@ CONTAINS
         error='D17: explicit source groups must declare at least one term'; RETURN
       END IF
       DO i=1,source_group_term_count(g)
-        ! Schedule the complete rheological law as one physical source.
+        ! A named rheological law is one schedulable physical source.
+        source_name=TRIM(uppercase_source_text(source_group_terms(i,g)))
         IF (rheology_flag .AND. &
              LEN_TRIM(rheology_source_name(rheology_model_id))>0 .AND. &
-             TRIM(uppercase_source_text(source_group_terms(i,g)))== &
-             TRIM(uppercase_source_text(rheology_source_name(rheology_model_id)))) THEN
-          ALLOCATE(law_names(1))
-          law_names(1)=rheology_source_name(rheology_model_id)
+             source_name==TRIM(uppercase_source_text(rheology_source_name(rheology_model_id)))) THEN
+          source_name=rheology_source_name(rheology_model_id)
         ELSE
-          component=source_term_descriptor_by_name( &
-               TRIM(uppercase_source_text(source_group_terms(i,g))))
+          component=source_term_descriptor_by_name(source_name)
           error='D17: unknown, dependent or unschedulable source term name'
-          IF (component%id==0 .OR. .NOT.component%schedulable) RETURN
+          IF (LEN_TRIM(component%name)==0 .OR. .NOT.component%schedulable) RETURN
           IF (component%model_id/=0) THEN
             error='D17: rheology components cannot be independently scheduled'
             RETURN
           END IF
-          ALLOCATE(law_names(1))
-          law_names(1)=component%name
+          source_name=component%name
         END IF
-        DO t=1,SIZE(law_names)
-          error='D17: source group expansion exceeds supported catalog capacity'
-          IF (parsed_count(g)>=SOURCE_INPUT_MAX_TERMS) RETURN
-          error='D17: a source term may be registered only once globally'
-          IF (ANY(seen_names(1:n_seen)==law_names(t))) RETURN
-          parsed_count(g)=parsed_count(g)+1
-          n_seen=n_seen+1
-          seen_names(n_seen)=law_names(t)
-          parsed_names(parsed_count(g),g)=law_names(t)
-        END DO
-        DEALLOCATE(law_names)
+        error='D17: source group exceeds supported catalog capacity'
+        IF (parsed_count(g)>=SOURCE_INPUT_MAX_TERMS) RETURN
+        error='D17: a source term may be registered only once globally'
+        IF (ANY(seen_names(1:n_seen)==source_name)) RETURN
+        parsed_count(g)=parsed_count(g)+1
+        n_seen=n_seen+1
+        seen_names(n_seen)=source_name
+        parsed_names(parsed_count(g),g)=source_name
       END DO
       ! An implicit group has a single target list, not nested solvers.
       error='D17: invalid group target count'

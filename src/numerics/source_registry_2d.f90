@@ -59,8 +59,7 @@ CONTAINS
     group_contains=group_contains_name(group,term%name)
   END FUNCTION group_contains
 
-  !> Query group membership by source name. The legacy integer-backed group
-  !> representation is converted to names at this boundary until migration.
+  !> Query group membership by the physical source name.
   PURE LOGICAL FUNCTION group_contains_name(group,name) RESULT(found)
     TYPE(source_group_type), INTENT(IN) :: group
     CHARACTER(*), INTENT(IN) :: name
