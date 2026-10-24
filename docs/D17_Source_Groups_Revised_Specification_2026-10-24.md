@@ -224,6 +224,8 @@ Conservare il calcolo del residuo sui soli indici attivi, la Jacobiana complex-s
 
 **Aggiornamento 24 ottobre — commit `3b54bc01`:** nel runtime Newton il footprint numerico viene passato dall'insieme delle equazioni del gruppo; il descrittore legacy è controllato per corrispondenza esatta (inclusi i casi di liste permutate), ma non determina più la lista passata al solve. Il descrittore non è ancora stato eliminato, e servono test compile/registry e accoppiamento multi-target.
 
+**Aggiornamento 24 ottobre — commit `075d3c95`:** gli assemblatori `eval_semi_implicit_terms` e `eval_implicit_terms` accettano ora il solo `group`, senza parametro `solver`; la scelta delle sorgenti dipende direttamente dai termini del gruppo. Il runtime passa il gruppo nelle chiamate SI, IM REAL e IM COMPLEX. Restano la migrazione delle firme interne del Newton, la rimozione del registro dei sotto-solver e i test scientifici/complex-step.
+
 **Stato di avanzamento D17.10 — IN CORSO (24 ottobre 2026).** Assemblaggio SI/IM e Newton indicizzato già esistenti; unico solve per gruppo applicato, ma copertura congiunta, correzioni e regressioni ancora incomplete. **Aggiornamento 24 ottobre (commit `67aab829`):** verifica aggiunta che il solve Newton selezioni tutte le sorgenti del gruppo, senza omissioni SI/IM. **Aggiornamento precedente:** commit `521f752c` allinea il solver alla lista completa `group_equations` e verifica che il singolo descrittore Newton copra esattamente quelle equazioni; le valutazioni SI/IM congiunte e i confronti numerici restano da completare. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
 
 ## D17.11 — Kernel REAL/COMPLEX
@@ -867,3 +869,8 @@ Commit [`3b54bc01`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/3b54bc01
 ### D17.22.24 — Analytic guidato dal gruppo (24 ottobre 2026)
 
 Commit [`e4dda5ed`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/e4dda5ed5e4f0ffde6e38038b1c737bd0faf457e): `eval_analytic_terms` non riceve più `source_solver_type`; l'operatore viene selezionato dalla dimensione e dal contenuto di `group%equation_ids`. Aggiornata la chiamata in `nonlinear_solver_2d`. Le formule analitiche rimangono invariate. **Non** è ancora stata eliminata la struttura globale `source_solver_type`, necessaria alle altre interfacce. D17.12 e D17.5 sono IN CORSO per la migrazione coordinata. Compile/registry e regressioni analitiche sul nuovo SHA sono ancora da eseguire.
+
+
+### D17.22.25 — Assemblatori SI/IM senza selettore del sotto-solver (24 ottobre 2026)
+
+Commit [`075d3c95`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/075d3c95d265abc179ee35eadf7bdd387a1bf069): in `equation_terms_2d` sono state eliminate le dipendenze da `source_solver_type` per `eval_semi_implicit_terms` ed `eval_implicit_terms`, insieme ai relativi helper di selezione; i termini di gruppo sostituiscono il doppio filtro gruppo/solver. Adeguati i tre punti di invocazione in `nonlinear_solver_2d`. I kernel delle leggi fisiche non sono modificati. **Non è la rimozione definitiva di `source_solver_type`**: rimangono firma interna Newton, registry, adapter legacy e configurazione nativa. **Verifiche:** commit non ancora compilato né testato sulle Actions manuali; D17.5, D17.8, D17.10 ancora IN CORSO.
