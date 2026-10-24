@@ -22,6 +22,7 @@ MODULE source_catalog_2d
   PUBLIC :: source_bundle_terms, source_bundle_names
   PUBLIC :: source_term_descriptor_by_name, source_catalog_names_unique
   PUBLIC :: rheology_source_name, canonical_rheology_catalog_unique
+  PUBLIC :: canonical_source_name
   PUBLIC :: SOURCE_TERM_COUNT, SOURCE_PHYSICAL_TERM_COUNT
   !> method explicit.
   INTEGER, PARAMETER, PUBLIC :: SOURCE_METHOD_EXPLICIT = 1
@@ -470,6 +471,17 @@ CONTAINS
     END IF
     names=names(:n)
   END FUNCTION source_bundle_names
+
+  !> Resolve any legacy mathematical component to the identity of its
+  !> complete physical source. Keep the compatibility metadata internal.
+  PURE FUNCTION canonical_source_name(component_name) RESULT(name)
+    CHARACTER(*), INTENT(IN) :: component_name
+    CHARACTER(LEN=64) :: name
+    TYPE(source_term_type) :: component
+    component=source_term_descriptor_by_name(component_name)
+    name=component%name
+    IF (component%model_id/=0) name=rheology_source_name(component%model_id)
+  END FUNCTION canonical_source_name
 
   !> Canonical identity of an entire rheological law, not its formula addends.
   !> During migration rheology_source_terms still returns legacy component IDs.

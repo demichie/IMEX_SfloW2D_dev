@@ -64,6 +64,20 @@ PROGRAM test_source_registry
            .AND. .NOT.term%has_analytic,'dependent contributions not schedulable')
     END SELECT
   END DO
+  ! Complete-law canonicalization must not expose mathematical addend IDs
+  ! to the group-facing registry identity.
+  DO k=1,SOURCE_TERM_COUNT
+    term=source_term_descriptor(k)
+    IF (term%model_id/=0) THEN
+      CALL require(canonical_source_name(term%name)==rheology_source_name(term%model_id), &
+           'rheology component resolves to complete-law identity')
+    ELSE
+      CALL require(canonical_source_name(term%name)==term%name, &
+           'non-rheological source keeps its canonical name')
+    END IF
+  END DO
+  CALL require(canonical_source_name('UNKNOWN_SOURCE_NAME')=='', &
+       'unknown source does not yield a canonical identity')
   ! Each rheological family has exactly one stable public source name,
   ! independent of the legacy list of contributing formulas.
   BLOCK

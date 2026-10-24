@@ -83,16 +83,13 @@ CONTAINS
   FUNCTION group_source_names(group) RESULT(names)
     TYPE(source_group_type), INTENT(IN) :: group
     CHARACTER(LEN=64), ALLOCATABLE :: names(:)
-    TYPE(source_term_type) :: term
     CHARACTER(LEN=64) :: name
     CHARACTER(LEN=64), ALLOCATABLE :: buffer(:)
     INTEGER :: i, n
     ALLOCATE(names(0))
     IF (.NOT.ALLOCATED(group%term_names)) RETURN
     DO i=1,SIZE(group%term_names)
-      term=source_term_descriptor_by_name(group%term_names(i))
-      name=term%name
-      IF (term%model_id/=0) name=rheology_source_name(term%model_id)
+      name=canonical_source_name(group%term_names(i))
       IF (LEN_TRIM(name)==0) CYCLE
       IF (ANY(names==name)) CYCLE
       n=SIZE(names)
