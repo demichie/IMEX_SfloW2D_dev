@@ -64,6 +64,16 @@ PROGRAM test_source_registry
            .AND. .NOT.term%has_analytic,'dependent contributions not schedulable')
     END SELECT
   END DO
+  ! The dispatcher resolves implicit/SI roles through the complete law,
+  ! not by scheduling mathematical addends independently.
+  DO k=1,SOURCE_TERM_COUNT
+    term=source_term_descriptor(k)
+    IF (term%model_id==0) CYCLE
+    CALL require(rheology_has_role(term%model_id,term%role), &
+         'complete law retains internal component assembly role')
+  END DO
+  CALL require(.NOT.rheology_has_role(0,SOURCE_ROLE_IMPLICIT), &
+       'no internal rheological role without a law')
   ! Complete-law canonicalization must not expose mathematical addend IDs
   ! to the group-facing registry identity.
   DO k=1,SOURCE_TERM_COUNT

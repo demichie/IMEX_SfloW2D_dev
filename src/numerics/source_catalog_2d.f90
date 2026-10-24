@@ -22,7 +22,7 @@ MODULE source_catalog_2d
   PUBLIC :: source_bundle_terms, source_bundle_names
   PUBLIC :: source_term_descriptor_by_name, source_catalog_names_unique
   PUBLIC :: rheology_source_name, canonical_rheology_catalog_unique
-  PUBLIC :: canonical_source_name
+  PUBLIC :: canonical_source_name, rheology_has_role
   PUBLIC :: SOURCE_TERM_COUNT, SOURCE_PHYSICAL_TERM_COUNT
   !> method explicit.
   INTEGER, PARAMETER, PUBLIC :: SOURCE_METHOD_EXPLICIT = 1
@@ -482,6 +482,22 @@ CONTAINS
     name=component%name
     IF (component%model_id/=0) name=rheology_source_name(component%model_id)
   END FUNCTION canonical_source_name
+
+  !> Whether a complete rheological law has contributions of this internal
+  !> assembly role. This is metadata, never a separately schedulable source.
+  PURE LOGICAL FUNCTION rheology_has_role(model_id,role) RESULT(found)
+    INTEGER, INTENT(IN) :: model_id,role
+    INTEGER :: i
+    found=.FALSE.
+    IF (model_id==0) RETURN
+    DO i=1,SOURCE_TERM_COUNT
+      IF (SOURCE_CATALOG(i)%model_id/=model_id) CYCLE
+      IF (SOURCE_CATALOG(i)%role==role) THEN
+        found=.TRUE.
+        RETURN
+      END IF
+    END DO
+  END FUNCTION rheology_has_role
 
   !> Canonical identity of an entire rheological law, not its formula addends.
   !> During migration rheology_source_terms still returns legacy component IDs.

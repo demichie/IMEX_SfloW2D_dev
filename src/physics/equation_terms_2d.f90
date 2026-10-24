@@ -43,7 +43,7 @@ MODULE equation_terms_2d
        SOURCE_TERM_THERMAL_CONVECTIVE_COOLING,                               &
        SOURCE_TERM_PORE_PRESSURE_DISSIPATION, source_term_type,              &
        source_term_descriptor, source_term_descriptor_by_name,                &
-       rheology_source_name,                                                  &
+       rheology_source_name, rheology_has_role,                                                  &
        SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION,&
        SOURCE_TERM_BOTTOM_FISSURAL_INJECTION, SOURCE_TERM_RADIAL_INJECTION
   USE source_registry_2d, ONLY : source_group_type, &
@@ -688,23 +688,15 @@ CONTAINS
   PURE LOGICAL FUNCTION group_has_role(group,role,model_id) RESULT(found)
     TYPE(source_group_type), INTENT(IN) :: group
     INTEGER, INTENT(IN) :: role,model_id
-    TYPE(source_term_type) :: term
-    INTEGER :: i
+    CHARACTER(LEN=64) :: law_name
     found=.FALSE.
-    ! Canonical law identity is authoritative for normalized groups.
-    ! Retain role-specific checks on internal addends until dispatch migrates.
-    IF (model_id/=0 .AND. ALLOCATED(group%source_names)) THEN
-      IF (.NOT.ANY(group%source_names==rheology_source_name(model_id))) RETURN
-    END IF
-    ! Mathematical contributions are resolved by name, not by group IDs.
-    IF (.NOT.ALLOCATED(group%term_names)) RETURN
-    DO i=1,SIZE(group%term_names)
-      term=source_term_descriptor_by_name(group%term_names(i))
-      IF (term%role==role .AND. term%model_id==model_id) THEN
-        found=.TRUE.
-        RETURN
-      END IF
-    END DO
+    IF (model_id==0) RETURN
+    law_name=rheology_source_name(model_id)
+    IF (LEN_TRIM(law_name)==0) RETURN
+    ! A whole law is the scheduling unit. Mathematical roles remain
+    ! properties of its internal evaluator, not independent group members.
+    IF (.NOT.group_contains_name(group,law_name)) RETURN
+    found=rheology_has_role(model_id,role)
   END FUNCTION group_has_role
 
   PURE LOGICAL FUNCTION group_has_term(group,term_id) RESULT(found)
