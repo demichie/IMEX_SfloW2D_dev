@@ -19,8 +19,8 @@ MODULE nonlinear_solver_2d
   USE source_registry_2d, ONLY : source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON, &
        SOURCE_METHOD_ANALYTIC
-  USE equation_terms_2d, ONLY : analytic_term_context_type,                 &
-       eval_analytic_terms, eval_semi_implicit_terms
+  USE source_terms_2d, ONLY : analytic_term_context_type, &
+       eval_source_analytic, eval_source_semi_implicit
   USE state_2d, ONLY : correct_friction_momentum
 
   IMPLICIT NONE
@@ -359,7 +359,7 @@ CONTAINS
              qj=qj_init
              RETURN
           END IF
-          CALL eval_analytic_terms(stage_groups(group),qj, &
+          CALL eval_source_analytic(stage_groups(group),qj, &
                analytic_context,dt_step*a_diag,analytic_state,             &
                status=analytic_status)
           IF (analytic_status/=0) THEN
@@ -376,7 +376,7 @@ CONTAINS
                   ANY(group_equations(1:group_size)==3)
              IF (group_has_momentum .AND. apply_si_local) THEN
                 CALL qc_to_qp(qj, qp_current, dynamic_pressure)
-                CALL eval_semi_implicit_terms(Bprimej_x, Bprimej_y,          &
+                CALL eval_source_semi_implicit(Bprimej_x, Bprimej_y,          &
                      Bsecondj_xx,Bsecondj_xy,Bsecondj_yy,grav_coeff,        &
                      qp_current,si_term,Zij,group=stage_groups(group))
              END IF
@@ -1064,7 +1064,7 @@ CONTAINS
        Bprimej_x ,                                                              &
        Bprimej_y , f_nl , scal_f, Zij, active_equations,source_group )
 
-    USE equation_terms_2d, ONLY : eval_implicit_terms
+    USE source_terms_2d, ONLY : eval_source_implicit
 
     IMPLICIT NONE
 
@@ -1093,7 +1093,7 @@ CONTAINS
     ! before subtracting equal large states and falsely report zero residual.
     REAL(wp), VOLATILE :: delta_q(n_vars)
 
-    CALL eval_implicit_terms( Bprimej_x , Bprimej_y, Zij, r_qj = qj ,           &
+    CALL eval_source_implicit( Bprimej_x , Bprimej_y, Zij, r_qj = qj ,           &
          r_nh_term_impl=nh_term_impl,group=source_group )
 
     Rj = Rj_not_impl - a_diag * nh_term_impl
@@ -1142,7 +1142,7 @@ CONTAINS
        Bprimej_x, Bprimej_y, left_matrix, Zij, active_equations,             &
        source_group )
 
-    USE equation_terms_2d, ONLY : eval_implicit_terms
+    USE source_terms_2d, ONLY : eval_source_implicit
 
     IMPLICIT NONE
 
@@ -1191,7 +1191,7 @@ CONTAINS
        qj_rel_cmplx(equation) = CMPLX(qj_rel(equation), h, wp)
        qj_cmplx = qj_rel_cmplx * qj_org
 
-       CALL eval_implicit_terms(Bprimej_x, Bprimej_y, Zij,                   &
+       CALL eval_source_implicit(Bprimej_x, Bprimej_y, Zij,                   &
             c_qj=qj_cmplx, c_nh_term_impl=nh_terms_cmplx_impl,               &
             group=source_group)
 

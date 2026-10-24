@@ -9,16 +9,13 @@
 !>          delegated to their owning physics modules. Spatial path assembly
 !>          and time integration remain in their dedicated modules.
 !>          The module retains private per-step source-window coefficients
-!>          between set_source_time_coefficients and eval_expl_terms.
+!>          between set_source_time_coefficients and source_terms_2d source evaluation.
 !********************************************************************************
 
 MODULE equation_terms_2d
 
   USE diagnostics_2d, ONLY : fatal_error
-  USE source_terms_2d, ONLY : analytic_term_context_type, eval_source_analytic, &
-       eval_step_source_explicit, eval_stage_source_explicit, &
-       eval_source_implicit, eval_source_semi_implicit, &
-       eval_geometry_curvature_explicit, eval_geometry_curvature_semi_implicit, &
+  USE source_terms_2d, ONLY : eval_geometry_curvature_explicit, eval_geometry_curvature_semi_implicit, &
        eval_geometry_curvature_implicit, solve_geometry_curvature_analytic, &
        bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step, &
        eval_boundary_injection_explicit, &
@@ -89,7 +86,6 @@ MODULE equation_terms_2d
   PUBLIC :: eval_inertial_flux, eval_hydrostatic_coefficient
   PUBLIC :: limit_component_mass_flux
   PUBLIC :: curvature_acceleration, eval_geometry_curvature_explicit
-  PUBLIC :: eval_expl_terms
   PUBLIC :: eval_geometry_curvature_semi_implicit
   PUBLIC :: eval_geometry_curvature_implicit
   PUBLIC :: solve_geometry_curvature_analytic
@@ -109,18 +105,12 @@ MODULE equation_terms_2d
   PUBLIC :: eval_radial_injection_semi_implicit
   PUBLIC :: eval_radial_injection_implicit
   PUBLIC :: solve_radial_injection_analytic
-  PUBLIC :: eval_implicit_terms, eval_semi_implicit_terms
-  PUBLIC :: analytic_term_context_type, eval_analytic_terms
   PUBLIC :: set_source_time_coefficients
 
-  INTERFACE eval_expl_terms
-    MODULE PROCEDURE eval_stage_expl_terms
-    MODULE PROCEDURE eval_step_expl_terms
-  END INTERFACE eval_expl_terms
 
   ! Time coefficients of the sources averaged over the current step, set by
   ! set_source_time_coefficients once the step length is known. A negative
-  ! value means they have not been set, and eval_expl_terms uses the value
+  ! value means they have not been set, and source_terms_2d source evaluation uses the value
   ! at its time argument.
 
 
@@ -131,20 +121,7 @@ CONTAINS
 
   !> Explicit STEP mass-exchange physics bridge (atomic batch).
   !> This returns rates only. Inventory and bed updates belong to STEP execution.
-  SUBROUTINE eval_step_expl_terms(qpj, B_zone, B_prime_x, B_prime_y, &
-       erodible, dt, erosion_term, deposition_term, &
-       continuous_phase_erosion_term, continuous_phase_loss_term, eqns_term, topo_term)
-    REAL(wp), INTENT(IN) :: qpj(n_vars+2), B_prime_x, B_prime_y
-    REAL(wp), INTENT(IN) :: erodible(n_solid), dt
-    INTEGER, INTENT(IN) :: B_zone
-    REAL(wp), INTENT(OUT) :: erosion_term(n_solid), deposition_term(n_solid)
-    REAL(wp), INTENT(OUT) :: continuous_phase_erosion_term, continuous_phase_loss_term
-    REAL(wp), INTENT(OUT) :: eqns_term(n_eqns), topo_term
 
-    CALL eval_step_source_explicit(qpj, B_zone, B_prime_x, B_prime_y, &
-         erodible, dt, erosion_term, deposition_term, &
-         continuous_phase_erosion_term, continuous_phase_loss_term, eqns_term, topo_term)
-  END SUBROUTINE eval_step_expl_terms
 
 
   !> \brief Apply one validated analytic source solve to its conservative target.
@@ -157,14 +134,7 @@ CONTAINS
   !> \param[in] interval Physical integration interval [s].
   !> \param[out] q_after State with only the solver target changed.
   !> \param[out] status Zero on success; negative values preserve legacy diagnostics.
-  SUBROUTINE eval_analytic_terms(group,q_before,context,interval,q_after,status)
-    TYPE(source_group_type), INTENT(IN) :: group
-    REAL(wp), INTENT(IN) :: q_before(n_vars),interval
-    TYPE(analytic_term_context_type), INTENT(IN) :: context
-    REAL(wp), INTENT(OUT) :: q_after(n_vars)
-    INTEGER, INTENT(OUT) :: status
-    CALL eval_source_analytic(group,q_before,context,interval,q_after,status)
-  END SUBROUTINE eval_analytic_terms
+
 
   !******************************************************************************
   !> \brief Evaluate cell-local explicit sources, including configured inlet and thermal terms.
@@ -198,20 +168,7 @@ CONTAINS
   !> \param[in] group Validated explicit source group selecting cell-local terms.
   !******************************************************************************
 
-  SUBROUTINE eval_stage_expl_terms( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy , &
-       Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,             &
-       cell_fissure_fract,                                                       &
-       lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group )
-    REAL(wp), INTENT(IN) :: Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, Bsecondj_yy
-    REAL(wp), INTENT(IN) :: grav_coeff, qpj(n_vars+2), time, cell_fract_jk
-    REAL(wp), INTENT(IN) :: cell_fissure_fract(:)
-    REAL(wp), INTENT(IN) :: lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk
-    REAL(wp), INTENT(OUT) :: expl_term(n_eqns)
-    TYPE(source_group_type), INTENT(IN) :: group
-    CALL eval_stage_source_explicit(Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
-         Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk, &
-         cell_fissure_fract, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group)
-  END SUBROUTINE eval_stage_expl_terms
+
 
 
   !> Contribution owned by the bottom_circular_injection configured explicit source.
@@ -276,17 +233,7 @@ CONTAINS
   !>       legacy unfiltered source assembly is retained.
   !******************************************************************************
 
-  SUBROUTINE eval_implicit_terms( Bprimej_x, Bprimej_y, Zij, c_qj,              &
-       c_nh_term_impl, r_qj , r_nh_term_impl, group )
-    REAL(wp), INTENT(IN) :: Bprimej_x, Bprimej_y, Zij
-    COMPLEX(wp), INTENT(IN), OPTIONAL :: c_qj(n_vars)
-    COMPLEX(wp), INTENT(OUT), OPTIONAL :: c_nh_term_impl(n_eqns)
-    REAL(wp), INTENT(IN), OPTIONAL :: r_qj(n_vars)
-    REAL(wp), INTENT(OUT), OPTIONAL :: r_nh_term_impl(n_eqns)
-    TYPE(source_group_type), INTENT(IN), OPTIONAL :: group
-    CALL eval_source_implicit(Bprimej_x, Bprimej_y, Zij, c_qj, &
-         c_nh_term_impl, r_qj, r_nh_term_impl, group)
-  END SUBROUTINE eval_implicit_terms
+
 
   !******************************************************************************
   !> \brief Evaluate semi-implicit rheology and geometric source contributions.
@@ -316,16 +263,7 @@ CONTAINS
   !>       no basal friction; their Froude denominator must not be evaluated.
   !******************************************************************************
 
-  SUBROUTINE eval_semi_implicit_terms( Bprimej_x , Bprimej_y , Bsecondj_xx ,    &
-       Bsecondj_xy , Bsecondj_yy , grav_coeff , qpj , semi_implicit_term ,     &
-       Zj, group )
-    REAL(wp), INTENT(IN) :: Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, Bsecondj_yy
-    REAL(wp), INTENT(IN) :: grav_coeff, qpj(n_vars+2), Zj
-    REAL(wp), INTENT(OUT) :: semi_implicit_term(n_eqns)
-    TYPE(source_group_type), INTENT(IN), OPTIONAL :: group
-    CALL eval_source_semi_implicit(Bprimej_x, Bprimej_y, Bsecondj_xx, &
-         Bsecondj_xy, Bsecondj_yy, grav_coeff, qpj, semi_implicit_term, Zj, group)
-  END SUBROUTINE eval_semi_implicit_terms
+
 
   !******************************************************************************
   !> \brief Construct the physical inlet state for an active radial-source pulse.
@@ -639,7 +577,7 @@ CONTAINS
   !>          window also honors its absolute cutoff and cosine ramps. Variable
   !>          bottom-source velocity intervals are averaged separately.
   !>          The resulting private coefficients are consumed by
-  !>          eval_expl_terms during the current step.
+  !>          source_terms_2d source evaluation during the current step.
   !>
   !> \param[in] time Time at the start of the step [s].
   !> \param[in] dt Length of the step [s].
