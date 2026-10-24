@@ -745,10 +745,14 @@ CONTAINS
     source_group_cadence(slot)=cadence
     source_group_method(slot)=method
     source_group_order(slot)=order
-    source_group_term_count(slot)=SIZE(term_ids)
+    source_group_term_count(slot)=0
+    source_group_terms(:,slot)=''
     DO i=1,SIZE(term_ids)
       descriptor=source_term_descriptor(term_ids(i))
-      source_group_terms(i,slot)=descriptor%name
+      IF (descriptor%model_id/=0) descriptor%name=rheology_source_name(descriptor%model_id)
+      IF (ANY(source_group_terms(:,slot)==descriptor%name)) CYCLE
+      source_group_term_count(slot)=source_group_term_count(slot)+1
+      source_group_terms(source_group_term_count(slot),slot)=descriptor%name
     END DO
     source_group_target_count(slot)=SIZE(targets)
     IF (SIZE(targets)>0) source_group_targets(1:SIZE(targets),slot)=targets

@@ -1185,3 +1185,9 @@ Dopo D17.22.71 i gruppi del solver non contengono più addendi reologici schedul
 
 Precisati i tre assert negativi nel test del registro: quando i vecchi nomi dei sottocomponenti vengono inseriti **direttamente** in `group%term_names` o nei SOURCE_GROUPS nativi, la nuova validazione deve respingerli. La sola conversione nominale per i 864 scenari legacy avviene in `catalog_names_for_test`. Nessuna modifica alla fisica. L'Action completa resta necessaria per verificare il comportamento. D17 resta IN CORSO.
 
+### D17.22.74 — Correzione degli input nativi nei test di integrazione (24 ottobre 2026)
+
+Aggiornata la routine **esistente e solo di test** `set_group`: quando genera il namelist nativo, riconduce tutti gli ID dei componenti di una stessa legge al nome `rheology_<law>`, deduplicando le occorrenze e mantenendo coerente `source_group_term_count`. L'insieme delle sorgenti non reologiche e degli input di test espliciti resta immutato. In questo modo i test del percorso nativo verificano la vera API a legge completa e non dichiarano più due addendi che il parser correttamente respinge. Il codice di produzione non acquisisce nuove strutture.
+
+**Verifica pendente:** l'integrazione D17.22.71–74 richiede la compilazione e l'esecuzione della suite; non è ancora implementata la rimozione definitiva del catalogo a 34 voci.
+
