@@ -317,6 +317,11 @@ CONTAINS
         error='D17: group source name and legacy membership disagree'
         IF (SIZE(group%term_names)/=SIZE(group%term_ids)) RETURN
         IF (ANY(group%term_names/=source_names_for_ids(group%term_ids))) RETURN
+        error='D17: repeated or empty canonical source name'
+        DO j=1,SIZE(group%term_names)
+          IF (LEN_TRIM(group%term_names(j))==0) RETURN
+          IF (COUNT(group%term_names==group%term_names(j))/=1) RETURN
+        END DO
       END IF
       error='D17: physical term duplicated, unknown or dependent'
       DO j=1,SIZE(group%term_ids)

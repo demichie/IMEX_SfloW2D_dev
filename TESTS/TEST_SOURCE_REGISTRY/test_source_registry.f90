@@ -186,6 +186,20 @@ PROGRAM test_source_registry
     negative=negative+1
   END DO
 
+  ! Canonical-name identity is checked even when numeric IDs are unchanged.
+  badgroups=groups
+  badgroups(4)%term_names(1)=badgroups(4)%term_names(2)
+  CALL trial%initialize(7,7,badgroups,steps,error)
+  CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
+       'duplicate canonical group name rejected')
+  negative=negative+1
+  badgroups=groups
+  badgroups(4)%term_names(1)=''
+  CALL trial%initialize(7,7,badgroups,steps,error)
+  CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
+       'empty canonical group name rejected')
+  negative=negative+1
+
   ! Reject an analytic velocity group with an incomplete physical law.
   badgroups=groups
   badgroups(3)%method=SOURCE_METHOD_ANALYTIC

@@ -907,3 +907,8 @@ Nell'assemblatore `equation_terms_2d` la selezione dei contributi impliciti per 
 ### D17.22.30 — Membership nominale anche per le API di compatibilità (24 ottobre 2026)
 
 `group_contains(group,term_id)` risolve prima l'identità nominale dal catalogo, quindi delega a `group_contains_name(group,name)`: un ID numerico non è più usato come chiave per verificare l'appartenenza a un gruppo normalizzato. Rimane il fallback ai `term_ids` soltanto per gruppi grezzi pre-normalizzazione. Il catalogo conserva temporaneamente gli ID e le suddivisioni delle leggi reologiche; **D17.2 e D17.19/10c non sono completati**. Nessun cambiamento ai kernel fisici. Verifica con le Actions necessaria sul nuovo commit.
+
+
+### D17.22.31 — Validazione dei nomi canonici nel registro (24 ottobre 2026)
+
+Il validatore `source_registry_2d` rifiuta ora nomi canonici vuoti o duplicati all'interno di un gruppo, oltre a verificare la coerenza con la rappresentazione numerica transitoria. Aggiunte due regressioni negative al test del registro. Questo controllo prepara la rimozione degli ID numerici: **non** costituisce ancora la migrazione completa del catalogo o l'accorpamento dei contributi delle leggi reologiche. D17.2 e D17.19 passo 10c rimangono IN CORSO. Non ancora verificate compile/registry Actions sul nuovo HEAD.
