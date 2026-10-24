@@ -64,6 +64,16 @@ jobs:
           set -o pipefail
           make -j2 2>&1 | tee build-logs/compile.log
 
+      - name: Execute D17 numeric dry-state finalization regression
+        shell: bash
+        run: |
+          set -o pipefail
+          gfortran -O0 -g -fcheck=all -fbacktrace -fopenmp -I src -I src/state \
+            TESTS/ACCEPTANCE/test_d17_state_numeric.f90 \
+            $(find src -name '*.o' ! -name 'IMEX_SfloW2D.o' | sort) \
+            -lnetcdff -llapack -lblas -lm -o build-logs/test_d17_state_numeric
+          build-logs/test_d17_state_numeric 2>&1 | tee build-logs/state-numeric.log
+
       - name: Record binary
         shell: bash
         run: |

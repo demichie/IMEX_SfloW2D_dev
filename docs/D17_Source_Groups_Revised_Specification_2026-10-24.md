@@ -1466,3 +1466,8 @@ Dopo audit coordinato su `35be9f0a` e conferma delle due Actions verdi, rimossa 
 ### D17.22 — Gate strutturale sulla sequenza finale RK (24 ottobre 2026)
 
 Dopo CI verde confermata sul commit `e4f6dfca`, aggiunto `TESTS/ACCEPTANCE/test_d17_state_finalization.py` e integrato nella Action manuale `D17 source registry tests`. Il gate ispeziona la chiamata dell'observer sullo stato conservativo grezzo prima della finalizzazione, l'ordine dei controlli NaN/clipping/spessore/masse/conversione/proiezione dry/temperatura/roundoff/nodata, le soglie storiche, il recupero da `q_previous`, e la centralizzazione dry nei percorsi RK halo/stage e mass-exchange STEP. Questo e un **test strutturale**, non un confronto numerico degli stati: D17.19 passo 10a resta implementato con gate quantitativi incompleti. Il commit che introduce il gate necessita verifica CI; D17.20–21 ancora aperti.
+
+
+### D17.22 — Primo test numerico eseguibile della finalizzazione dry (24 ottobre 2026)
+
+Aggiunto `TESTS/ACCEPTANCE/test_d17_state_numeric.f90` ed esecuzione nella Action `D17 compile diagnostics`, dopo la build completa: verifica valori concreti dell'inizializzatore fisico dry con `T_ambient`, finalizzazione conservativa della cella a massa nulla, proiezione delle componenti di velocità, azzeramento di uno spessore negativo entro la tolleranza storica (`-1e-8`) e maschera `nodata`. Il programma è collegato agli oggetti Fortran costruiti dal progetto ed eseguito con runtime bounds checks; nessuna formula fisica modificata. Il test non copre ancora casi wet con costituzione multicomponente, roundoff delle classi solide, errori fatali attesi, observer dinamico né confronto legacy/nativo. La relativa CI è pendente e D17.20–D17.21 rimangono aperti.
