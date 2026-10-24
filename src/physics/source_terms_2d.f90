@@ -10,7 +10,7 @@ MODULE source_terms_2d
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source
   USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
-  USE mass_exchange_assembly_2d, ONLY : eval_mass_exchange_terms
+  USE mass_source_terms_2d, ONLY : eval_mass_exchange_terms
   USE rheology_2d, ONLY : curvature_acceleration
   USE diagnostics_2d, ONLY : fatal_error
   IMPLICIT NONE
