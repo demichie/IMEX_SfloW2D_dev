@@ -1217,3 +1217,9 @@ Rimossa da `source_registry_2d` la funzione pubblica `group_contains(group,term_
 
 **Stato:** è un'eliminazione effettiva di un'API numerica obsoleta, ma il catalogo a 34 contributi e il tipo a cinque campi devono ancora essere sostituiti. CI sulla nuova HEAD pendente; D17.19 resta IN CORSO.
 
+### D17.22.79 — Eliminazione della doppia rappresentazione dei nomi nei source groups (24 ottobre 2026)
+
+Refactoring coordinato di `source_registry_2d.f90`, `source_configuration_2d.f90`, `equation_terms_2d.f90` e dell'intera suite `TEST_SOURCE_REGISTRY`: `source_group_type` contiene **un solo array** `source_names(:)` per i nomi canonici delle sorgenti fisiche, senza `term_names(:)`. Il costruttore dei gruppi legacy e il parser nativo popolano direttamente `source_names`. Eliminati il popolamento secondario `populate_registry_term_names` e la conversione ripetuta dei nomi nella funzione `group_source_names`, che ora restituisce semplicemente l'array del gruppo. `group_contains_name` legge soltanto l'array canonico; nessuna tolleranza per il vecchio array di componenti matematici. Test e validazione operano sull'unica rappresentazione. Eliminato anche dall'import di `equation_terms_2d` il simbolo `group_contains` già rimosso nella milestone precedente. La fisica e la schedulazione non cambiano.
+
+**Stato:** eliminazione definitiva di `term_names` da `source_group_type` implementata. Rimane **DA COMPLETARE** la sostituzione del catalogo legacy a 34 contributi e di `source_term_type` a cinque campi. Nessun nuovo adattatore o array di compatibilità. Gate: Actions compile diagnostics e source registry tests sulla nuova HEAD, ancora da verificare.
+

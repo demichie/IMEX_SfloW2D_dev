@@ -44,7 +44,7 @@ MODULE equation_terms_2d
        SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, &
        SOURCE_TERM_BOTTOM_FISSURAL_INJECTION, SOURCE_TERM_RADIAL_INJECTION
   USE source_registry_2d, ONLY : source_group_type, &
-       group_contains, group_contains_name
+       group_contains_name
 
   USE parameters_2d, ONLY : wp, dry_thickness_tolerance
   USE parameters_2d, ONLY : n_eqns, n_vars, n_solid, n_add_gas,                &

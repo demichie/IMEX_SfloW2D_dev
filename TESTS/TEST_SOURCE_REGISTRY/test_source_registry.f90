@@ -209,14 +209,14 @@ PROGRAM test_source_registry
       CALL require(groups(position+1)%method==SOURCE_METHOD_EXPLICIT,'EX homogeneous method')
       CALL require(SIZE(steps)==1 .AND. steps(1)%id==1,'independent step namespace')
       CALL require(group_contains_name(steps(1),'SOURCE_TERM_MASS_EXCHANGE_DEPOSITION'),'mass membership')
-      CALL require(ALLOCATED(steps(1)%term_names),'step group materializes source names')
+      CALL require(ALLOCATED(steps(1)%source_names),'step group materializes source names')
       CALL require(group_contains_name(steps(1),'SOURCE_TERM_MASS_EXCHANGE_DEPOSITION'), &
            'name-based mass membership')
       CALL require(.NOT.group_contains_name(steps(1),'UNKNOWN_SOURCE_NAME'), &
            'unknown name is not a group member')
       CALL registry%validate(error); CALL require(error=='','repeat validation')
       DO j=1,SIZE(groups)
-        CALL require(ALLOCATED(groups(j)%term_names),'stage group has canonical source names')
+        CALL require(ALLOCATED(groups(j)%source_names),'stage group has canonical source names')
       END DO
       snapshot=registry%stage_groups(); snapshot(1)%id=999
       snapshot=registry%stage_groups(); CALL require(snapshot(1)%id/=999,'detached immutable storage')
@@ -237,11 +237,11 @@ PROGRAM test_source_registry
   CALL require(error=='','configured source bridge: '//TRIM(error))
   groups=registry%stage_groups();steps=registry%step_groups()
   CALL require(SIZE(groups)==4,'configured default groups')
-  CALL require(SIZE(groups(4)%term_names)==5,'curvature/circular/fissural/radial/boundary inventory')
-  CALL require(SIZE(steps(1)%term_names)==7,'all bounded mass proposals registered')
+  CALL require(SIZE(groups(4)%source_names)==5,'curvature/circular/fissural/radial/boundary inventory')
+  CALL require(SIZE(steps(1)%source_names)==7,'all bounded mass proposals registered')
   CALL require(group_contains_name(groups(4),'SOURCE_TERM_BOUNDARY_INJECTION'),'boundary hook retained')
   CALL require(ALLOCATED(groups(3)%source_names) .AND. &
-       ALLOCATED(groups(3)%term_names),'normalized group exposes name-only dispatch metadata')
+       ALLOCATED(groups(3)%source_names),'normalized group exposes name-only dispatch metadata')
   CALL require(group_contains_name(groups(3),rheology_source_name(rheology_id_lava)), &
        'rheological law selected by canonical source identity')
 
@@ -250,12 +250,12 @@ PROGRAM test_source_registry
     badgroups=groups; badsteps=steps
     SELECT CASE(mode)
     CASE(1); badgroups(1)%id=4
-    CASE(2); badgroups(4)%term_names=[badgroups(4)%term_names,source_name(SOURCE_TERM_GEOMETRY_CURVATURE)]
-    CASE(3); badsteps(1)%term_names=[badsteps(1)%term_names,source_name(SOURCE_TERM_GEOMETRY_CURVATURE)]
+    CASE(2); badgroups(4)%source_names=[badgroups(4)%source_names,source_name(SOURCE_TERM_GEOMETRY_CURVATURE)]
+    CASE(3); badsteps(1)%source_names=[badsteps(1)%source_names,source_name(SOURCE_TERM_GEOMETRY_CURVATURE)]
     CASE(4); badgroups(1)%equation_ids=[2,3,4]
     CASE(5); badgroups(3)%equation_ids=[INTEGER::]
-    CASE(6); badgroups(4)%term_names=[source_name(SOURCE_TERM_INLET_THERMAL_COUPLING)]
-    CASE(7); badgroups(4)%term_names=[CHARACTER(LEN=64)::'UNKNOWN_SOURCE_999']
+    CASE(6); badgroups(4)%source_names=[source_name(SOURCE_TERM_INLET_THERMAL_COUPLING)]
+    CASE(7); badgroups(4)%source_names=[CHARACTER(LEN=64)::'UNKNOWN_SOURCE_999']
     CASE(8); badgroups(1)%equation_ids=[99]
     CASE(9); DEALLOCATE(badgroups(1)%equation_ids)
     CASE(10); badgroups(1)%id=0
@@ -273,13 +273,13 @@ PROGRAM test_source_registry
 
   ! Canonical-name identity is checked even when numeric IDs are unchanged.
   badgroups=groups
-  badgroups(4)%term_names(1)=badgroups(4)%term_names(2)
+  badgroups(4)%source_names(1)=badgroups(4)%source_names(2)
   CALL trial%initialize(7,7,badgroups,steps,error)
   CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
        'duplicate canonical group name rejected')
   negative=negative+1
   badgroups=groups
-  badgroups(4)%term_names(1)=''
+  badgroups(4)%source_names(1)=''
   CALL trial%initialize(7,7,badgroups,steps,error)
   CALL require(error/='' .AND. .NOT.trial%is_initialized(), &
        'empty canonical group name rejected')
@@ -287,7 +287,7 @@ PROGRAM test_source_registry
 
   ! Newton must not register only one mathematical addend of a law.
   badgroups=groups
-  badgroups(3)%term_names=[source_name(SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS)]
+  badgroups(3)%source_names=[source_name(SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS)]
   CALL trial%initialize(7,7,badgroups,steps,error)
   CALL require(error/='', &
        'legacy component is rejected from a directly specified Newton group')
@@ -296,7 +296,7 @@ PROGRAM test_source_registry
   ! Reject an analytic velocity group with an incomplete physical law.
   badgroups=groups
   badgroups(3)%method=SOURCE_METHOD_ANALYTIC
-  badgroups(3)%term_names=[source_name(SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS)]
+  badgroups(3)%source_names=[source_name(SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS)]
   CALL trial%initialize(7,7,badgroups,steps,error)
   CALL require(error/='', 'legacy component rejected from a directly specified analytic group')
   negative=negative+1
@@ -348,7 +348,7 @@ PROGRAM test_source_registry
   CALL require(error=='','disabled physics still has valid metadata')
   groups=registry%stage_groups()
   CALL require(SIZE(groups)==2,'zero-rate momentum block retained')
-  CALL require(SIZE(groups(1)%term_names)==0,'disabled rheology has no physical rates')
+  CALL require(SIZE(groups(1)%source_names)==0,'disabled rheology has no physical rates')
   CALL require(ALL(groups(1)%equation_ids==[2,3]),'zero-rate momentum target preserved')
   mask=.FALSE.
   CALL partition%initialize(mask)
@@ -464,8 +464,8 @@ CONTAINS
     CALL require(groups(1)%id==3 .AND. groups(1)%legacy_id==3 .AND. &
          groups(1)%method==SOURCE_METHOD_NEWTON .AND. &
          ALL(groups(1)%equation_ids==[2,3]),'default velocity group mapping')
-    CALL require(SIZE(groups(1)%term_names)==0 .AND. &
-         SIZE(steps(1)%term_names)==0,'inactive defaults register no source terms')
+    CALL require(SIZE(groups(1)%source_names)==0 .AND. &
+         SIZE(steps(1)%source_names)==0,'inactive defaults register no source terms')
     CALL require(groups(2)%id==4 .AND. &
          groups(2)%method==SOURCE_METHOD_EXPLICIT,'default EX group reservation')
 
@@ -487,16 +487,16 @@ CONTAINS
          ALL(groups(3)%equation_ids==[2,3]),'default Newton velocity group')
     expected_terms=[SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
          SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
-    CALL require(same_name_members(groups(1)%term_names,expected_terms), &
+    CALL require(same_name_members(groups(1)%source_names,expected_terms), &
          'default energy cooling bundle')
     expected_terms=test_rheology_ids(rheology_id_lava)
-    CALL require(SIZE(groups(3)%term_names)==1 .AND. &
-         groups(3)%term_names(1)==rheology_source_name(rheology_id_lava), &
+    CALL require(SIZE(groups(3)%source_names)==1 .AND. &
+         groups(3)%source_names(1)==rheology_source_name(rheology_id_lava), &
          'default lava law has one schedule identity')
-    CALL require(SIZE(groups(2)%term_names)==1 .AND. &
-         groups(2)%term_names(1)==source_name(SOURCE_TERM_PORE_PRESSURE_DISSIPATION), &
+    CALL require(SIZE(groups(2)%source_names)==1 .AND. &
+         groups(2)%source_names(1)==source_name(SOURCE_TERM_PORE_PRESSURE_DISSIPATION), &
          'default pore-pressure term')
-    CALL require(SIZE(groups(4)%term_names)==0 .AND. SIZE(steps(1)%term_names)==0, &
+    CALL require(SIZE(groups(4)%source_names)==0 .AND. SIZE(steps(1)%source_names)==0, &
          'default explicit and step groups remain empty when disabled')
   END SUBROUTINE test_configured_default_schedule
   FUNCTION source_name(id) RESULT(name)
@@ -615,7 +615,7 @@ CONTAINS
          groups(4)%method==SOURCE_METHOD_EXPLICIT, &
          'native phase and execution order')
     CALL require(ALL(groups(3)%equation_ids==[2,3]) .AND. &
-         SIZE(steps(1)%term_names)==7,'native targets and complete step batch')
+         SIZE(steps(1)%source_names)==7,'native targets and complete step batch')
 
     ! The canonical rheology name represents the full physical law.
     source_group_term_count(3)=1
@@ -625,8 +625,8 @@ CONTAINS
     CALL require(error=='' .AND. trial%is_initialized(), &
          'canonical rheology schedules complete law: '//TRIM(error))
     snapshot=trial%stage_groups()
-    CALL require(SIZE(snapshot(3)%term_names)==1 .AND. &
-         snapshot(3)%term_names(1)==rheology_source_name(rheology_id_lava), &
+    CALL require(SIZE(snapshot(3)%source_names)==1 .AND. &
+         snapshot(3)%source_names(1)==rheology_source_name(rheology_id_lava), &
          'canonical rheology has a single schedule identity')
     ! Mixed canonical and component declarations must not double-schedule.
     source_group_term_count(3)=2

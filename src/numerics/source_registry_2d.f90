@@ -22,7 +22,6 @@ MODULE source_registry_2d
     INTEGER :: method=0 !< Explicit, Newton or analytic.
     INTEGER :: phase=0 !< Implicit sweep, requested EX evaluation, or post-RK.
     INTEGER :: execution_order=0 !< Explicit order within its phase.
-    CHARACTER(LEN=64), ALLOCATABLE :: term_names(:) !< Legacy component names for physical evaluation.
     CHARACTER(LEN=64), ALLOCATABLE :: source_names(:) !< Unique schedulable source identities.
     INTEGER, ALLOCATABLE :: equation_ids(:) !< Union of target equations or explicit footprint.
   END TYPE source_group_type
@@ -44,44 +43,21 @@ MODULE source_registry_2d
     PROCEDURE :: validate => validate_registry
   END TYPE source_registry_type
 CONTAINS
-  !> Query group membership by the physical source name.
+  !> Membership in the single, canonical physical-source name array.
   PURE LOGICAL FUNCTION group_contains_name(group,name) RESULT(found)
     TYPE(source_group_type), INTENT(IN) :: group
     CHARACTER(*), INTENT(IN) :: name
     found=.FALSE.
-    ! Complete rheological laws and other schedulable sources are addressed
-    ! by their canonical identities when the group has been normalized.
-    IF (ALLOCATED(group%source_names)) THEN
-      found=ANY(group%source_names==TRIM(name))
-      IF (found) RETURN
-    END IF
-    ! Transitional support for callers identifying mathematical addends.
-    IF (ALLOCATED(group%term_names)) THEN
-      found=ANY(group%term_names==TRIM(name))
-    END IF
+    IF (.NOT.ALLOCATED(group%source_names)) RETURN
+    found=ANY(group%source_names==TRIM(name))
   END FUNCTION group_contains_name
 
-  !> Return one name per schedulable physical source. Rheological
-  !> component identities collapse to a single complete-law name; their
-  !> term_names remains an internal compatibility view for physical assemblers.
+  !> Return the group-owned names without an additional canonicalization layer.
   FUNCTION group_source_names(group) RESULT(names)
     TYPE(source_group_type), INTENT(IN) :: group
     CHARACTER(LEN=64), ALLOCATABLE :: names(:)
-    CHARACTER(LEN=64) :: name
-    CHARACTER(LEN=64), ALLOCATABLE :: buffer(:)
-    INTEGER :: i, n
     ALLOCATE(names(0))
-    IF (.NOT.ALLOCATED(group%term_names)) RETURN
-    DO i=1,SIZE(group%term_names)
-      name=canonical_source_name(group%term_names(i))
-      IF (LEN_TRIM(name)==0) CYCLE
-      IF (ANY(names==name)) CYCLE
-      n=SIZE(names)
-      ALLOCATE(buffer(n+1))
-      buffer(1:n)=names
-      buffer(n+1)=name
-      CALL MOVE_ALLOC(buffer,names)
-    END DO
+    IF (ALLOCATED(group%source_names)) names=group%source_names
   END FUNCTION group_source_names
 
   !> \brief Copy and validate complete group/solve metadata transactionally.
@@ -101,7 +77,6 @@ CONTAINS
     this%pore_equation=pore_equation
     this%stage_entries=stage_groups
     this%step_entries=step_groups
-    CALL populate_registry_term_names(this)
     CALL this%validate(error)
     IF (LEN_TRIM(error)>0) THEN
       CALL this%finalize()
@@ -240,19 +215,6 @@ CONTAINS
   END SUBROUTINE initialize_legacy_registry
 
 
-  !> Materialize source identities once at registry initialization, outside
-  !> stage and cell loops. Existing ID-backed consumers remain supported.
-  SUBROUTINE populate_registry_term_names(this)
-    CLASS(source_registry_type), INTENT(INOUT) :: this
-    INTEGER :: i
-    DO i=1,SIZE(this%stage_entries)
-      this%stage_entries(i)%source_names=group_source_names(this%stage_entries(i))
-    END DO
-    DO i=1,SIZE(this%step_entries)
-      this%step_entries(i)%source_names=group_source_names(this%step_entries(i))
-    END DO
-  END SUBROUTINE populate_registry_term_names
-
   !> \brief Validate native or normalized descriptors before making them visible.
   !> \param[in] this Candidate metadata; validation does not mutate it.
   !> \param[out] error Empty when all membership/capability/block checks pass.
@@ -309,23 +271,18 @@ CONTAINS
              groups(j)%execution_order>=group%execution_order) RETURN
       END DO
       error='D17: unallocated group descriptor arrays'
-      IF (.NOT.ALLOCATED(group%term_names)) RETURN
+      IF (.NOT.ALLOCATED(group%source_names)) RETURN
       IF (.NOT.ALLOCATED(group%equation_ids)) RETURN
       error='D17: invalid or repeated group equation'
       IF (.NOT.valid_equations(group%equation_ids,this%n_equations)) RETURN
       error='D17: repeated or empty canonical source name'
-      DO j=1,SIZE(group%term_names)
-        IF (LEN_TRIM(group%term_names(j))==0) RETURN
-        IF (COUNT(group%term_names==group%term_names(j))/=1) RETURN
+      DO j=1,SIZE(group%source_names)
+        IF (LEN_TRIM(group%source_names(j))==0) RETURN
+        IF (COUNT(group%source_names==group%source_names(j))/=1) RETURN
       END DO
-      IF (ALLOCATED(group%source_names)) THEN
-        error='D17: canonical group source identity does not match the complete laws'
-        IF (SIZE(group%source_names)/=SIZE(group_source_names(group))) RETURN
-        IF (ANY(group%source_names/=group_source_names(group))) RETURN
-      END IF
       error='D17: physical term duplicated, unknown or dependent'
-      DO j=1,SIZE(group%term_names)
-        term=source_term_descriptor_by_name(group%term_names(j))
+      DO j=1,SIZE(group%source_names)
+        term=source_term_descriptor_by_name(group%source_names(j))
         ! Unknown names yield an empty descriptor. No numeric identity
         ! is needed to validate membership or scheduling capabilities.
         IF (LEN_TRIM(term%name)==0) RETURN
@@ -352,7 +309,7 @@ CONTAINS
       END DO
       IF (family/=0 .AND. group%method/=SOURCE_METHOD_EXPLICIT) THEN
         error='D17: rheology group requires the complete law'
-        IF (.NOT.ANY(group%term_names==rheology_source_name(family))) RETURN
+        IF (.NOT.ANY(group%source_names==rheology_source_name(family))) RETURN
       END IF
       ! No independently scheduled sub-solves: validate group equation shape.
       error='D17: incomplete or incompatible group equation target'
@@ -363,8 +320,8 @@ CONTAINS
         CASE(2)
           IF (.NOT.same_set(group%equation_ids,[2,3])) RETURN
           IF (family==0) RETURN
-          IF (SIZE(group%term_names)/=1 .OR. &
-               .NOT.ANY(group%term_names==rheology_source_name(family))) THEN
+          IF (SIZE(group%source_names)/=1 .OR. &
+               .NOT.ANY(group%source_names==rheology_source_name(family))) THEN
             error='D17: analytic velocity requires the complete law'; RETURN
           END IF
         CASE(1)
@@ -380,8 +337,8 @@ CONTAINS
     ! Any atomic batch touched by a group must be wholly present in one group.
     error='D17: coupled evaluation batch split or incomplete'
     DO i=1,SIZE(groups)
-      DO j=1,SIZE(groups(i)%term_names)
-        term=source_term_descriptor_by_name(groups(i)%term_names(j))
+      DO j=1,SIZE(groups(i)%source_names)
+        term=source_term_descriptor_by_name(groups(i)%source_names(j))
         IF (term%bundle_id==0 .OR. term%model_id/=0) CYCLE
         batch_names=source_bundle_names(term%bundle_id)
         IF (SIZE(batch_names)<2) RETURN
@@ -496,8 +453,8 @@ CONTAINS
     group%method=method; group%phase=phase; group%execution_order=order
     ! Allocate the owned arrays explicitly to avoid compiler warnings about
     ! allocatable-component descriptor initialization on intrinsic assignment.
-    ALLOCATE(group%term_names(SIZE(names)),group%equation_ids(SIZE(equations)))
-    group%term_names=names
+    ALLOCATE(group%source_names(SIZE(names)),group%equation_ids(SIZE(equations)))
+    group%source_names=names
     group%equation_ids=equations
   END FUNCTION make_group
 
@@ -558,8 +515,8 @@ CONTAINS
     found=0
     DO i=1,SIZE(names)
       DO j=1,SIZE(groups)
-        IF (.NOT.ALLOCATED(groups(j)%term_names)) CYCLE
-        IF (.NOT.ANY(groups(j)%term_names==names(i))) CYCLE
+        IF (.NOT.ALLOCATED(groups(j)%source_names)) CYCLE
+        IF (.NOT.ANY(groups(j)%source_names==names(i))) CYCLE
         found=found+1
         IF (owner==0) owner=j
         IF (owner/=j) RETURN

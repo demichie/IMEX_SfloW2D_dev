@@ -332,9 +332,9 @@ CONTAINS
       group%id=source_group_id(g); group%legacy_id=0
       group%cadence=cadence(g); group%method=method(g)
       group%phase=phase(g); group%execution_order=source_group_order(g)
-      IF (ALLOCATED(group%term_names)) DEALLOCATE(group%term_names)
-      ALLOCATE(group%term_names(parsed_count(g)))
-      group%term_names=parsed_names(1:parsed_count(g),g)
+      IF (ALLOCATED(group%source_names)) DEALLOCATE(group%source_names)
+      ALLOCATE(group%source_names(parsed_count(g)))
+      group%source_names=parsed_names(1:parsed_count(g),g)
       group%equation_ids=[INTEGER::]
       IF (phase(g)==SOURCE_PHASE_RK_IMPLICIT) THEN
         equations=[INTEGER::]
