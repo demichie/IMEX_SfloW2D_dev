@@ -6,17 +6,13 @@ MODULE mass_exchange_vaporization_2d
   USE thermal_laws_2d, ONLY : eval_vaporization_mass_rate, eval_vaporization_energy_rate
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: add_mass_exchange_vaporization
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
   PUBLIC :: eval_vaporization_explicit
   PUBLIC :: eval_vaporization_semi_implicit
   PUBLIC :: eval_vaporization_implicit
   PUBLIC :: eval_vaporization_analytic
-  INTERFACE eval_vaporization_explicit
-    MODULE PROCEDURE add_mass_exchange_vaporization
-  END INTERFACE eval_vaporization_explicit
 CONTAINS
-  SUBROUTINE add_mass_exchange_vaporization(B_zone, r_T, deposition_term, eqns_term)
+  SUBROUTINE eval_vaporization_explicit(B_zone, r_T, deposition_term, eqns_term)
     INTEGER, INTENT(IN) :: B_zone
     REAL(wp), INTENT(IN) :: r_T, deposition_term(n_solid)
     REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns)
@@ -33,7 +29,7 @@ CONTAINS
        eqns_term(5+n_solid) = eqns_term(5+n_solid) + vapor_mass_rate
 
     END IF
-  END SUBROUTINE add_mass_exchange_vaporization
+  END SUBROUTINE eval_vaporization_explicit
 
   SUBROUTINE eval_vaporization_semi_implicit(B_zone, r_T, deposition_term, eqns_term)
     INTEGER, INTENT(IN) :: B_zone

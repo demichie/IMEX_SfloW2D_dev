@@ -6,17 +6,13 @@ MODULE mass_exchange_erosion_2d
 
   PRIVATE
   PUBLIC :: eval_erosion_rates
-  PUBLIC :: eval_mass_exchange_erosion
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
   PUBLIC :: eval_erosion_explicit
   PUBLIC :: eval_erosion_semi_implicit
   PUBLIC :: eval_erosion_implicit
   PUBLIC :: eval_erosion_analytic
-  INTERFACE eval_erosion_explicit
-    MODULE PROCEDURE eval_mass_exchange_erosion
-  END INTERFACE eval_erosion_explicit
 CONTAINS
-  SUBROUTINE eval_mass_exchange_erosion(r_h, mod_vel, alphas_tot, erodible, dt, &
+  SUBROUTINE eval_erosion_explicit(r_h, mod_vel, alphas_tot, erodible, dt, &
        erosion_term, continuous_phase_erosion_term)
     REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
     REAL(wp), INTENT(OUT) :: erosion_term(n_solid), continuous_phase_erosion_term
@@ -29,7 +25,7 @@ CONTAINS
        erosion_term = 0.0_wp
        continuous_phase_erosion_term = 0.0_wp
     END IF
-  END SUBROUTINE eval_mass_exchange_erosion
+  END SUBROUTINE eval_erosion_explicit
   PURE SUBROUTINE eval_erosion_rates(flow_depth, speed, total_solid_fraction, &
        erosion_coefficient, erodible_porosity, erodible_fraction,            &
        erodible_inventory, time_step, solid_erosion_rate,                    &

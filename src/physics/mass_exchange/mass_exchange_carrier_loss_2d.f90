@@ -9,17 +9,13 @@ MODULE mass_exchange_carrier_loss_2d
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_continuous_phase_loss_rate
-  PUBLIC :: eval_total_carrier_loss_rate
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
   PUBLIC :: eval_carrier_loss_explicit
   PUBLIC :: eval_carrier_loss_semi_implicit
   PUBLIC :: eval_carrier_loss_implicit
   PUBLIC :: eval_carrier_loss_analytic
-  INTERFACE eval_carrier_loss_explicit
-    MODULE PROCEDURE eval_total_carrier_loss_rate
-  END INTERFACE eval_carrier_loss_explicit
 CONTAINS
-  SUBROUTINE eval_total_carrier_loss_rate(r_h, r_T, r_alphas, alphas_tot, &
+  SUBROUTINE eval_carrier_loss_explicit(r_h, r_T, r_alphas, alphas_tot, &
        r_rho_c, r_exc_pore_pres, &
        deposition_term, dt, continuous_phase_loss_term)
     REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
@@ -60,7 +56,7 @@ CONTAINS
     continuous_phase_loss_term = eval_continuous_phase_loss_rate(             &
          continuous_phase_loss_term, r_h, alphas_tot, maximum_solid_packing,  &
          coeff_porosity, deposition_term(1:n_solid), dt)
-  END SUBROUTINE eval_total_carrier_loss_rate
+  END SUBROUTINE eval_carrier_loss_explicit
   PURE FUNCTION eval_continuous_phase_loss_rate(requested_loss_rate,         &
        flow_depth, total_solid_fraction, maximum_solid_packing,               &
        porosity_coefficient, deposition_rate, time_step) RESULT(loss_rate)

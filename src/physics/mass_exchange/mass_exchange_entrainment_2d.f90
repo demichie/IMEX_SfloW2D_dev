@@ -6,29 +6,25 @@ MODULE mass_exchange_entrainment_2d
 
   PRIVATE
   PUBLIC :: eval_air_entrainment_rate
-  PUBLIC :: eval_mass_exchange_air_entrainment
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
   PUBLIC :: eval_entrainment_explicit
   PUBLIC :: eval_entrainment_semi_implicit
   PUBLIC :: eval_entrainment_implicit
   PUBLIC :: eval_entrainment_analytic
-  INTERFACE eval_entrainment_explicit
-    MODULE PROCEDURE eval_mass_exchange_air_entrainment
-  END INTERFACE eval_entrainment_explicit
 CONTAINS
-  REAL(wp) FUNCTION eval_mass_exchange_air_entrainment(r_h, r_Ri, mod_vel2)
+  REAL(wp) FUNCTION eval_entrainment_explicit(r_h, r_Ri, mod_vel2)
     REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
     IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                      &
          ( r_Ri .GT. 0.0_wp ) ) THEN
 
-       eval_mass_exchange_air_entrainment = eval_air_entrainment_rate(r_Ri, mod_vel2)
+       eval_entrainment_explicit = eval_air_entrainment_rate(r_Ri, mod_vel2)
 
     ELSE
 
-       eval_mass_exchange_air_entrainment = 0.0_wp
+       eval_entrainment_explicit = 0.0_wp
 
     END IF
-  END FUNCTION eval_mass_exchange_air_entrainment
+  END FUNCTION eval_entrainment_explicit
   PURE FUNCTION eval_air_entrainment_rate(richardson_number, speed_squared)  &
        RESULT(entrainment_rate)
 

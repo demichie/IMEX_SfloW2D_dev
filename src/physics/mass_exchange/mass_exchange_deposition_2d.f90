@@ -12,17 +12,13 @@ MODULE mass_exchange_deposition_2d
   PUBLIC :: eval_solid_deposition_rate
   PUBLIC :: eval_lahar_deposition_rate
   PUBLIC :: eval_hindered_settling_deposition_rate
-  PUBLIC :: eval_mass_exchange_deposition
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
   PUBLIC :: eval_deposition_explicit
   PUBLIC :: eval_deposition_semi_implicit
   PUBLIC :: eval_deposition_implicit
   PUBLIC :: eval_deposition_analytic
-  INTERFACE eval_deposition_explicit
-    MODULE PROCEDURE eval_mass_exchange_deposition
-  END INTERFACE eval_deposition_explicit
 CONTAINS
-  SUBROUTINE eval_mass_exchange_deposition(r_h, r_T, r_alphas, alphas_tot, &
+  SUBROUTINE eval_deposition_explicit(r_h, r_T, r_alphas, alphas_tot, &
        r_rho_m, r_rho_c, dt, deposition_term)
     REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
     REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
@@ -68,7 +64,7 @@ CONTAINS
        END IF
 
     END DO
-  END SUBROUTINE eval_mass_exchange_deposition
+  END SUBROUTINE eval_deposition_explicit
   REAL(wp) FUNCTION settling_velocity(diam, rhos, rhoc, inv_kin_visc)
 
     REAL(wp), INTENT(IN) :: diam
