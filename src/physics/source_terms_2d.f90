@@ -72,6 +72,7 @@ CONTAINS
     REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
     REAL(wp) :: heat_capacity,temperature_after,pressure_known,pressure_after
     LOGICAL :: supported
+    CHARACTER(LEN=64) :: selected_model_name
 
     q_after=q_before
     status=-5
@@ -98,7 +99,12 @@ CONTAINS
              context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,    &
              flow_u,flow_v)
         velocity_after=[flow_u,flow_v]
-        CALL solve_rheology_analytic(rheology_source_name(rheology_model_id),interval, &
+        selected_model_name=group_rheology_name(group)
+        IF (LEN_TRIM(selected_model_name)==0) THEN
+          status=-7
+          RETURN
+        END IF
+        CALL solve_rheology_analytic(selected_model_name,interval, &
              flow_h,flow_temperature,flow_density,speed_ratio,            &
              [flow_u,flow_v],flow_red_grav,context%grav_coeff,flow_alphas,&
              curvature_accel,pore_pressure_flag,flow_pore_pressure,       &
@@ -149,18 +155,25 @@ CONTAINS
   END SUBROUTINE eval_source_analytic
 
 
-  PURE LOGICAL FUNCTION group_has_role(group,role,model_id) RESULT(found)
+  !> Recover the rheology directly from a validated group's canonical sources.
+  !> Numerical equation identifiers are not physical model identifiers.
+  PURE FUNCTION group_rheology_name(group) RESULT(name)
     TYPE(source_group_type), INTENT(IN) :: group
-    INTEGER, INTENT(IN) :: role,model_id
-    CHARACTER(LEN=64) :: law_name
-    found=.FALSE.
-    IF (model_id==0) RETURN
-    law_name=rheology_source_name(model_id)
-    IF (LEN_TRIM(law_name)==0) RETURN
-    ! A whole law is the scheduling unit. Mathematical roles remain
-    ! properties of its internal evaluator, not independent group members.
-    IF (.NOT.group_contains_name(group,law_name)) RETURN
-    found=rheology_name_has_role(law_name,role)
+    CHARACTER(LEN=64) :: name
+    INTEGER :: i
+    name=''
+    IF (.NOT.ALLOCATED(group%source_names)) RETURN
+    DO i=1,SIZE(group%source_names)
+       IF (INDEX(TRIM(group%source_names(i)),'rheology_')/=1) CYCLE
+       name=group%source_names(i)
+       RETURN
+    END DO
+  END FUNCTION group_rheology_name
+
+  PURE LOGICAL FUNCTION group_has_role(group,role) RESULT(found)
+    TYPE(source_group_type), INTENT(IN) :: group
+    INTEGER, INTENT(IN) :: role
+    found=rheology_name_has_role(group_rheology_name(group),role)
   END FUNCTION group_has_role
 
   SUBROUTINE validate_newton_selection(group)
@@ -215,6 +228,7 @@ CONTAINS
 
     COMPLEX(wp) :: red_grav
     LOGICAL :: selected_rheology, selected_thermal, selected_pore
+    CHARACTER(LEN=64) :: selected_model_name
     LOGICAL :: selected_radiative, selected_convective
 
     IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
@@ -236,10 +250,11 @@ CONTAINS
 
     END IF
 
+    selected_model_name=rheology_source_name(rheology_model_id)
     IF (PRESENT(group)) THEN
        CALL validate_newton_selection(group)
-       selected_rheology=group_has_role(group,SOURCE_ROLE_IMPLICIT, &
-            rheology_model_id)
+       selected_model_name=group_rheology_name(group)
+       selected_rheology=group_has_role(group,SOURCE_ROLE_IMPLICIT)
        selected_radiative=group_contains_name(group, &
             'thermal_cooling')
        selected_convective=group_contains_name(group, &
@@ -286,7 +301,7 @@ CONTAINS
        ! would erase it. This does not assign a derivative to Coulomb's cusp.
        moving = (REAL(mod_vel,wp) .NE. 0.0_wp) .OR. (AIMAG(mod_vel) .NE. 0.0_wp)
 
-       CALL eval_rheology_implicit(rheology_source_name(rheology_model_id), h, T, rho_m,       &
+       CALL eval_rheology_implicit(selected_model_name, h, T, rho_m,       &
             inv_rho_m, u, v, mod_vel, mod_vel_hor, mod_vel2, red_grav,       &
             alphas, moving, stochastic_flag, Zij, source_term(2:3))
     END IF
@@ -358,13 +373,15 @@ CONTAINS
 
     REAL(wp) :: exc_pore_pres       !< excess pore pressure
     LOGICAL :: selected_rheology
+    CHARACTER(LEN=64) :: selected_model_name
 
     semi_implicit_term(1:n_eqns) = 0.0_wp
 
+    selected_model_name=rheology_source_name(rheology_model_id)
     IF (PRESENT(group)) THEN
        CALL validate_newton_selection(group)
-       selected_rheology=group_has_role(group, &
-            SOURCE_ROLE_SEMI_IMPLICIT,rheology_model_id)
+       selected_model_name=group_rheology_name(group)
+       selected_rheology=group_has_role(group,SOURCE_ROLE_SEMI_IMPLICIT)
     ELSE
        selected_rheology=rheology_flag
     END IF
@@ -408,7 +425,7 @@ CONTAINS
 
        exc_pore_pres = 0.0_wp
        IF (pore_pressure_flag) exc_pore_pres = qpj(idx_pore)
-       CALL eval_rheology_semi_implicit(rheology_source_name(rheology_model_id), r_h, r_u,  &
+       CALL eval_rheology_semi_implicit(selected_model_name, r_h, r_u,  &
             r_v, mod_vel, mod_hor_vel, r_rho_m, r_red_grav, grav_coeff,    &
             r_alphas, curvature_term_flag, Bsecondj_xx, Bsecondj_xy,       &
             Bsecondj_yy, pore_pressure_flag, exc_pore_pres,                &

@@ -206,10 +206,14 @@ def main() -> int:
         elif re.search(r"(?i)\bCASE\s*\(\s*rheology_id_", match.group(0)):
             failures.append(f"{routine}: numeric rheology dispatch reintroduced")
         if not re.search(
-            rf"(?i)CALL\s+{routine}\s*\(\s*rheology_source_name\(",
+            rf"(?i)CALL\s+{routine}\s*\(\s*selected_model_name\b",
             assembly
         ):
-            failures.append(f"{routine}: source assembly must pass canonical name")
+            failures.append(f"{routine}: source assembly must pass selected canonical name")
+    if "selected_model_name=group_rheology_name(group)" not in assembly:
+        failures.append("group source names must determine the active rheology")
+    if re.search(r"(?i)group_has_role\(\s*group\s*,[^)]*rheology_model_id", assembly):
+        failures.append("group role dispatch must not use a legacy numeric model ID")
     for failure in failures:
         print("FAIL:", failure, file=sys.stderr)
     print(f"D17 physical treatment audit: {len(catalog)} configured sources, "
