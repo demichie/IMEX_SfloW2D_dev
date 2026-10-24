@@ -543,6 +543,25 @@ Il validatore legge nomi, target e tre capabilities, controlla unicità, copertu
 
 **Stato di avanzamento D17.18a — DA INIZIARE (24 ottobre 2026).** Procedura vincolante specificata ma prova rheology_newmodel end-to-end non implementata. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
 
+## Guida di lettura e priorità di migrazione
+
+**Fonte normativa:** D17.0–D17.18a definiscono il comportamento finale e non costituiscono una sequenza di commit. **Unica sequenza operativa:** D17.19, integrata dalla dipendenza vincolante di seguito. D17.20 definisce i test, D17.21 i gate finali, D17.22 la cronologia. Lo stato riportato in coda a ciascuna sezione tecnica deve essere aggiornato dopo i commit pertinenti: `DA INIZIARE`, `IN CORSO` oppure `COMPLETATA` (quest'ultima solo con evidenze di verifica).
+
+**La migrazione è una sostituzione, non una manutenzione perpetua della struttura transitoria.** Il catalogo finale contiene esattamente `name`, `target`, `has_explicit`, `has_newton`, `has_analytic`. Un'unica sorgente rappresenta l'intera legge fisica (per esempio `rheology_voellmy`), non i contributi Coulomb e turbolento. Non restano `SOURCE_TERM_*` numerici come identità, `rheology_model_id`, `role`, `bundle_id`, `model_id`, `family`, conversioni nome-ID, `term_ids` in parallelo a `term_names` o un registro permanente dei sotto-solver. Sono invece consentiti gli indici numerici dei gruppi e delle equazioni.
+
+**Vincolo sul gruppo:** `source_group_type` rappresenta direttamente il metodo, la cadenza, l'ordine, l'insieme dei nomi fisici e gli indici delle equazioni. Un gruppo Newton ha un unico sistema accoppiato; un gruppo analytic ha un unico operatore. `implicit_solver_ids(:)`, `analytic_solver_ids(:)`, `source_solver_type` e gli array `source_solver_*` dell'input sono **solo impalcature di transizione da rimuovere**, non API finali da cristallizzare con cardinalità uno. Il residuo e la Jacobiana Newton usano `group_equations(:)` e includono tutti i rate SI/IM del gruppo; conservare le due correzioni direzionali distinte ai punti prescritti in D17.10.1.
+
+**Come eseguire i passi 3, 4, 5, 6, 9 e 10c di D17.19 senza doppie architetture permanenti:**
+
+1. **Contratto e baseline:** preservare l'inventario legacy, i test dei default e la baseline numerica. Il gate GNU compile+registry raggiunto sul commit `decee60b` non vale come regressione scientifica end-to-end.
+2. **Metadati di gruppo come proprietario unico:** rendere l'appartenenza delle sorgenti e gli indici delle equazioni autoritativi a livello del gruppo. Nei passaggi intermedi verificare l'uguaglianza *esatta* fra gruppo e vecchio descrittore helper; non aggiungere nuove funzioni o stati persistenti che dipendano dalle liste di sotto-solver.
+3. **Catalogo nominale e accorpamento delle leggi:** introdurre le voci fisiche complete; migrare insieme configurazione, validazione, dispatch statico per nome, assemblatori e test. Conservare le formule nei moduli fisici. Eliminare gli ID e i metadata ridondanti una volta migrati tutti i chiamanti, senza sostituirli con un nuovo strato di lookup per ID.
+4. **Input `SOURCE_GROUPS` minimale:** rimuovere solver count/order/targets per-solver, derivare il target dal catalogo; quando serve il caso senza sorgenti di momentum attive, prevedere soltanto un target opzionale *di gruppo*. Migrare o rifiutare esplicitamente la vecchia sintassi nativa; nessuna reinterpretazione tacita. Preservare il legacy input senza `SOURCE_GROUPS`.
+5. **Eliminazione del livello sotto-solver:** dopo la migrazione dei chiamanti, eliminare `source_solver_type`, `solver_entries`, `implicit_solver_ids`, `analytic_solver_ids`, il passaggio `solver=` negli assemblatori e gli array duplicati di metadati; il solver indicizzato deve ricevere il solo gruppo e la sua lista di equazioni.
+6. **Gate di accettazione della semplificazione:** test di gruppo Newton 1x1, 2x2 e 3x3, Jacobiana complex-step con derivate incrociate, gruppi distinti, analitico, input nativo/legacy, test negativo per sotto-solve, assenza di termini mancanti o doppi e prova `rheology_newmodel` di D17.18a. Nessuna cancellazione della vecchia rappresentazione prima di aver migrato ogni chiamante; nessun rinvio indefinito dell'eliminazione dopo il gate.
+
+**Politica dei commit:** usare unità coerenti e verificabili, registrare gli SHA nelle sezioni interessate e in D17.22. Avviare le due Actions manualmente ai gate significativi, mai su ogni push. Un esito verde di compilazione o registro non certifica automaticamente l'equivalenza numerica.
+
 ## D17.19 — Piano implementativo aggiornato (ordine consigliato)
 
 | Passo | Azione | Tipo | Accettazione mirata |
@@ -768,3 +787,8 @@ Questo gate copre anche gli ultimi cambiamenti ai gruppi Newton fino al commit i
 Commit [`67aab829`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/67aab8293ae288fc70877826fbfb4fd0f00e2712): il validatore dell'assemblatore `equation_terms_2d::validate_newton_selection` richiede ora che l'unico solver Newton includa **tutte e sole** le sorgenti fisiche presenti nel gruppo. In assenza di corrispondenza esatta, la selezione viene rifiutata prima di assemblare i rate SI/IM. I controlli restano compatibili con i descrittori legacy basati su `term_ids` durante la migrazione nominale. Nessuna formula fisica o Jacobiana modificata.
 
 **Stato:** commit pubblicato; questa modifica **non è stata ancora compilata o testata**. Completare i test specifici di selezione delle sorgenti, poi avviare manualmente compile e registry Actions al prossimo gate coerente. Il successivo intervento dovrà continuare con il gruppo nominale unico previsto da D17.19, senza conservare permanentemente gli ID fisici.
+
+
+### D17.22.13 — Chiarimento architetturale e ordine di migrazione (24 ottobre 2026)
+
+Inserita la **Guida di lettura e priorità di migrazione** immediatamente prima di D17.19. D17.19 resta l'unico piano sequenziale; i passi 3/4/5/6/9/10c si devono eseguire come **una migrazione coordinata** verso il catalogo e il gruppo minimali, non come accumulo di strutture legacy con controlli aggiuntivi. La specifica tecnica D17.0–D17.18a è conservata integralmente, inclusi gli stati di avanzamento. Il gate compile+registry precedente rimane valido per lo SHA verificato; le nuove modifiche richiederanno un nuovo controllo.
