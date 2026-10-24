@@ -5,9 +5,9 @@ MODULE mass_exchange_assembly_2d
   USE parameters_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source, &
-       eval_pore_pressure_gas_loss
+  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source
   USE thermal_laws_2d, ONLY : eval_vaporization_mass_rate, eval_vaporization_energy_rate
+  USE mass_exchange_carrier_loss_2d, ONLY : eval_total_carrier_loss_rate
   USE mass_exchange_laws_2d, ONLY : eval_settling_fluid_properties, &
        settling_velocity, eval_solid_deposition_rate, eval_erosion_rates, &
        eval_continuous_phase_loss_rate, eval_air_entrainment_rate
@@ -123,7 +123,6 @@ CONTAINS
     REAL(wp) :: vapor_mass_rate
     REAL(wp) :: vapor_energy_rate
 
-    REAL(wp) :: pore_pressure_term
 
     erosion_term(1:n_solid) = 0.0_wp
     deposition_term(1:n_solid) = 0.0_wp
@@ -133,7 +132,6 @@ CONTAINS
     topo_term = 0.0_wp
     r_Zs = 0.0_wp
     r_exc_pore_pres = 0.0_wp
-    pore_pressure_term = 0.0_wp
     kin_visc_c_local = kin_visc_c
 
     IF ( qpj(1) .LE. epsilon(1.0_wp) ) THEN
@@ -226,39 +224,9 @@ CONTAINS
 
     END DO
 
-    IF ( liquid_flag ) THEN
-
-       ! set the rate of loss of continuous phase
-       continuous_phase_loss_term = loss_rate
-
-    ELSE
-
-       continuous_phase_loss_term = 0.0_wp
-
-    END IF
-
-    ! add the loss associated with solid deposition
-    continuous_phase_loss_term =  continuous_phase_loss_term +                  &
-         coeff_porosity * SUM( deposition_term(1:n_solid) )
-
-    IF ( pore_pressure_flag .AND. gas_loss_flag ) THEN
-
-       IF ( alphas_tot .LT. maximum_solid_packing ) THEN
-
-         CALL eval_pore_pressure_gas_loss(r_h, r_T, r_alphas, alphas_tot,      &
-              r_rho_c, r_exc_pore_pres, pore_pressure_term)
-
-         continuous_phase_loss_term = continuous_phase_loss_term +             &
-               pore_pressure_term
-
-       END IF
-
-    END IF
-
-    ! Limit carrier loss by solid packing and the available carrier reserve.
-    continuous_phase_loss_term = eval_continuous_phase_loss_rate(             &
-         continuous_phase_loss_term, r_h, alphas_tot, maximum_solid_packing,  &
-         coeff_porosity, deposition_term(1:n_solid), dt)
+    CALL eval_total_carrier_loss_rate(r_h, r_T, r_alphas, alphas_tot, &
+         r_rho_c, r_exc_pore_pres, deposition_term, dt, &
+         continuous_phase_loss_term)
 
 
     ! Re-erodible deposits use the current flow temperature by model policy,

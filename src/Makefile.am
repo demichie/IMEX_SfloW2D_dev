@@ -139,6 +139,10 @@ physics/pore_pressure_laws_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)         \
 physics/mass_exchange_laws_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)         \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      physics/rheology_laws/rheology_lahar_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_carrier_loss_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+                                      core/constitutive_parameters_2d.$(OBJEXT) \
+                                      physics/mass_exchange_laws_2d.$(OBJEXT) \
+                                      physics/pore_pressure_laws_2d.$(OBJEXT)
 physics/mass_exchange_assembly_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      state/state_conversion_2d.$(OBJEXT) \
