@@ -944,3 +944,8 @@ Introdotto in `source_catalog_2d` l'array `RHEOLOGY_LAWS` con una sola voce nomi
 ### D17.22.37 — Identità canoniche persistenti nel gruppo (24 ottobre 2026)
 
 `source_group_type` contiene ora `source_names(:)`, popolato una sola volta durante `initialize` insieme alla rappresentazione transitoria degli addendi (`term_ids` e `term_names`). `source_names` espone una sola identità per legge reologica completa e una voce per ogni altra sorgente; la validazione verifica che il campo coincida con il raggruppamento canonico calcolato dal catalogo. La matrice di regressione legacy controlla la disponibilità e coerenza di questo campo per ogni gruppo di stage. **Non sono stati eliminati `term_ids` o `term_names`**, tuttora richiesti dai kernel; la migrazione del dispatcher e la rimozione degli addendi dal catalogo schedulabile restano in corso. Nuovo HEAD ancora da verificare con le Actions.
+
+
+### D17.22.38 — Selezione nominale effettiva nel dispatcher SI/IM (24 ottobre 2026)
+
+In `equation_terms_2d`, `group_has_role` verifica l'appartenenza della legge reologica attraverso `group%source_names` prima del controllo interno della presenza del ruolo e degli addendi. In `source_registry_2d`, `group_contains_name` risolve prioritariamente i nomi canonici `source_names`, mantenendo l'accesso transitorio agli addendi `term_names` per la compatibilità con il dispatcher corrente. Estesa la matrice dei test legacy alla risoluzione nominale delle leggi complete. Non sono mutate le formulazioni fisiche SI/IM, il Newton o gli schemi RK. **La migrazione non è completata**: `term_ids` e il catalogo legacy restano necessari alla valutazione fisica. Il nuovo HEAD richiede verifica delle Actions e delle regressioni numeriche.

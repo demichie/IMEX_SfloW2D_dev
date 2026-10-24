@@ -66,6 +66,13 @@ CONTAINS
     TYPE(source_group_type), INTENT(IN) :: group
     CHARACTER(*), INTENT(IN) :: name
     found=.FALSE.
+    ! Complete rheological laws and other schedulable sources are addressed
+    ! by their canonical identities when the group has been normalized.
+    IF (ALLOCATED(group%source_names)) THEN
+      found=ANY(group%source_names==TRIM(name))
+      IF (found) RETURN
+    END IF
+    ! Transitional support for callers identifying mathematical addends.
     IF (ALLOCATED(group%term_names)) THEN
       found=ANY(group%term_names==TRIM(name))
     ELSE IF (ALLOCATED(group%term_ids)) THEN

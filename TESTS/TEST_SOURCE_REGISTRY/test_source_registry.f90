@@ -167,6 +167,12 @@ PROGRAM test_source_registry
              'canonical source count matches physical grouping')
         CALL require(ALL(groups(j)%source_names==group_source_names(groups(j))), &
              'cached source identities match the complete physical laws')
+        IF (ANY(groups(j)%equation_ids==2) .AND. &
+             groups(j)%method/=SOURCE_METHOD_EXPLICIT) THEN
+          CALL require(group_contains_name(groups(j), &
+               rheology_source_name(MERGE(3,1,enabled(2)))), &
+               'normalized group resolves canonical complete rheology')
+        END IF
       END DO
       CALL require(SIZE(groups)==position+1,'only one additional EX group')
       CALL require(groups(position+1)%id==4,'reserved EX ID')

@@ -690,6 +690,11 @@ CONTAINS
     TYPE(source_term_type) :: term
     INTEGER :: i
     found=.FALSE.
+    ! Canonical law identity is authoritative for normalized groups.
+    ! Retain role-specific checks on internal addends until dispatch migrates.
+    IF (model_id/=0 .AND. ALLOCATED(group%source_names)) THEN
+      IF (.NOT.ANY(group%source_names==rheology_source_name(model_id))) RETURN
+    END IF
     ! Registered groups own canonical names; numeric membership is only a
     ! compatibility fallback for pre-normalized legacy descriptors.
     IF (ALLOCATED(group%term_names)) THEN
