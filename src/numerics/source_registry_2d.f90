@@ -21,7 +21,8 @@ MODULE source_registry_2d
     INTEGER :: execution_order=0 !< Position within its group.
     INTEGER, ALLOCATABLE :: target_ids(:) !< Scalar/vector target blocks.
     INTEGER, ALLOCATABLE :: equation_ids(:) !< Full conservative equation indices.
-    INTEGER, ALLOCATABLE :: term_ids(:) !< Includes SI terms when momentum is Newton.
+    INTEGER, ALLOCATABLE :: term_ids(:) !< Temporary compatibility representation.
+    CHARACTER(LEN=64), ALLOCATABLE :: term_names(:) !< Canonical physical source names.
   END TYPE source_solver_type
 
   !> \brief Homogeneous source group; identity is cadence plus id, not order.
@@ -32,7 +33,8 @@ MODULE source_registry_2d
     INTEGER :: method=0 !< Explicit, Newton or analytic.
     INTEGER :: phase=0 !< Implicit sweep, requested EX evaluation, or post-RK.
     INTEGER :: execution_order=0 !< Explicit order within its phase.
-    INTEGER, ALLOCATABLE :: term_ids(:) !< Physical terms; never dependent children.
+    INTEGER, ALLOCATABLE :: term_ids(:) !< Temporary compatibility representation.
+    CHARACTER(LEN=64), ALLOCATABLE :: term_names(:) !< Canonical physical source names.
     INTEGER, ALLOCATABLE :: equation_ids(:) !< Union of target equations or explicit footprint.
     INTEGER, ALLOCATABLE :: implicit_solver_ids(:) !< Registry-local Newton solve IDs.
     INTEGER, ALLOCATABLE :: analytic_solver_ids(:) !< Exactly one for an analytic group.
@@ -73,12 +75,12 @@ CONTAINS
   PURE LOGICAL FUNCTION group_contains_name(group,name) RESULT(found)
     TYPE(source_group_type), INTENT(IN) :: group
     CHARACTER(*), INTENT(IN) :: name
-    TYPE(source_term_type) :: term
-
-    term=source_term_descriptor_by_name(name)
     found=.FALSE.
-    IF (term%id==0) RETURN
-    found=group_contains(group,term%id)
+    IF (ALLOCATED(group%term_names)) THEN
+      found=ANY(group%term_names==TRIM(name))
+    ELSE IF (ALLOCATED(group%term_ids)) THEN
+      found=ANY(source_names_for_ids(group%term_ids)==TRIM(name))
+    END IF
   END FUNCTION group_contains_name
 
   !> \brief Copy and validate complete group/solve metadata transactionally.
@@ -101,6 +103,7 @@ CONTAINS
     this%stage_entries=stage_groups
     this%step_entries=step_groups
     this%solver_entries=solvers
+    CALL populate_registry_term_names(this)
     CALL this%validate(error)
     IF (LEN_TRIM(error)>0) THEN
       CALL this%finalize()
@@ -242,6 +245,40 @@ CONTAINS
     CALL this%initialize(partition%n_equations,pore_equation,stages,steps,solves,error)
   END SUBROUTINE initialize_legacy_registry
 
+  !> Translate legacy catalog positions to their canonical source names.
+  PURE FUNCTION source_names_for_ids(ids) RESULT(names)
+    INTEGER, INTENT(IN) :: ids(:)
+    CHARACTER(LEN=64) :: names(SIZE(ids))
+    TYPE(source_term_type) :: term
+    INTEGER :: i
+
+    names=''
+    DO i=1,SIZE(ids)
+      term=source_term_descriptor(ids(i))
+      names(i)=term%name
+    END DO
+  END FUNCTION source_names_for_ids
+
+  !> Materialize source identities once at registry initialization, outside
+  !> stage and cell loops. Existing ID-backed consumers remain supported.
+  SUBROUTINE populate_registry_term_names(this)
+    CLASS(source_registry_type), INTENT(INOUT) :: this
+    INTEGER :: i
+
+    DO i=1,SIZE(this%stage_entries)
+      IF (ALLOCATED(this%stage_entries(i)%term_ids)) &
+           this%stage_entries(i)%term_names=source_names_for_ids(this%stage_entries(i)%term_ids)
+    END DO
+    DO i=1,SIZE(this%step_entries)
+      IF (ALLOCATED(this%step_entries(i)%term_ids)) &
+           this%step_entries(i)%term_names=source_names_for_ids(this%step_entries(i)%term_ids)
+    END DO
+    DO i=1,SIZE(this%solver_entries)
+      IF (ALLOCATED(this%solver_entries(i)%term_ids)) &
+           this%solver_entries(i)%term_names=source_names_for_ids(this%solver_entries(i)%term_ids)
+    END DO
+  END SUBROUTINE populate_registry_term_names
+
   !> \brief Validate native or normalized descriptors before making them visible.
   !> \param[in] this Candidate metadata; validation does not mutate it.
   !> \param[out] error Empty when all membership/capability/block checks pass.
@@ -256,6 +293,8 @@ CONTAINS
     LOGICAL :: seen(SOURCE_TERM_COUNT)
     INTEGER :: i,j,k,id,si,nstage,family,mass_group,term_group(SOURCE_TERM_COUNT)
     LOGICAL, ALLOCATABLE :: used_solver(:),equation_seen(:)
+    error='D17: invalid or duplicate source catalog name'
+    IF (.NOT.source_catalog_names_unique()) RETURN
     error='D17: incomplete source registry'
     IF (.NOT.ALLOCATED(this%stage_entries)) RETURN
     IF (.NOT.ALLOCATED(this%step_entries)) RETURN
@@ -303,6 +342,10 @@ CONTAINS
       IF (.NOT.ALLOCATED(group%analytic_solver_ids)) RETURN
       error='D17: invalid or repeated group equation'
       IF (.NOT.valid_equations(group%equation_ids,this%n_equations)) RETURN
+      error='D17: group source name and legacy membership disagree'
+      IF (.NOT.ALLOCATED(group%term_names)) RETURN
+      IF (SIZE(group%term_names)/=SIZE(group%term_ids)) RETURN
+      IF (ANY(group%term_names/=source_names_for_ids(group%term_ids))) RETURN
       error='D17: physical term duplicated, unknown or dependent'
       DO j=1,SIZE(group%term_ids)
         id=group%term_ids(j)
