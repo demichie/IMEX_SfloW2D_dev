@@ -254,8 +254,8 @@ spatial/hp_reconstruction_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)           \
                                         geometry/geometry_2d.$(OBJEXT)
 spatial/reconstruction_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)              \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
-                                     physics/equation_terms_2d.$(OBJEXT)
-                                     physics/source_terms_2d.$(OBJEXT) \        \
+                                     physics/equation_terms_2d.$(OBJEXT) \
+                                     physics/source_terms_2d.$(OBJEXT)        \
                                      geometry/geometry_2d.$(OBJEXT)             \
                                      spatial/hp_reconstruction_2d.$(OBJEXT)     \
                                      state/state_conversion_2d.$(OBJEXT)
