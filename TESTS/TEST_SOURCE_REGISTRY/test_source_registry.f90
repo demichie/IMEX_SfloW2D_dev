@@ -209,7 +209,7 @@ PROGRAM test_source_registry
     snapshot=trial%stage_groups();CALL require(SIZE(snapshot)==0,'failed initialization releases storage')
     negative=negative+1
   END DO
-  ! Native metadata can represent independent Newton blocks without merging equations.
+  ! Reject multiple Newton solvers within one source group (D17.19 step 2).
   badgroups=[groups(1),groups(3),groups(4)];badsolves=solves
   badgroups(1)%method=SOURCE_METHOD_NEWTON
   badgroups(1)%equation_ids=[4,7]
@@ -219,7 +219,9 @@ PROGRAM test_source_registry
   badsolves(1)%kind=SOURCE_SOLVE_NEWTON_BLOCK;badsolves(2)%kind=SOURCE_SOLVE_NEWTON_BLOCK
   badsolves(2)%execution_order=2
   CALL trial%initialize(7,7,badgroups,steps,badsolves,error)
-  CALL require(error=='','multiple independent Newton blocks: '//TRIM(error))
+  CALL require(INDEX(error,'invalid solver count')>0, &
+       'multiple Newton solves in the same group rejected')
+  negative=negative+1
   ! A partial analytic velocity bundle must never silently evaluate the full law.
   badgroups=groups;badsolves=solves
   badgroups(3)%method=SOURCE_METHOD_ANALYTIC

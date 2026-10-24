@@ -384,7 +384,7 @@ CONTAINS
       CASE(SOURCE_METHOD_EXPLICIT)
         IF (SIZE(group%implicit_solver_ids)+SIZE(group%analytic_solver_ids)/=0) RETURN
       CASE(SOURCE_METHOD_NEWTON)
-        IF (SIZE(group%implicit_solver_ids)<1 .OR. SIZE(group%analytic_solver_ids)/=0) RETURN
+        IF (SIZE(group%implicit_solver_ids)/=1 .OR. SIZE(group%analytic_solver_ids)/=0) RETURN
       CASE(SOURCE_METHOD_ANALYTIC)
         IF (SIZE(group%analytic_solver_ids)/=1 .OR. SIZE(group%implicit_solver_ids)/=0) RETURN
       END SELECT
