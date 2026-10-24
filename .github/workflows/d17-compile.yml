@@ -1,0 +1,93 @@
+name: D17 compile diagnostics
+
+on:
+  push:
+    branches:
+      - feature/d17-source-refactor
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    name: GNU Fortran compilation (D17)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout current revision
+        uses: actions/checkout@v4
+
+      - name: Prepare log directory
+        run: mkdir -p build-logs
+
+      - name: Install compiler and libraries
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            sudo apt-get update
+            sudo apt-get install --yes \
+              autoconf automake gfortran make \
+              liblapack-dev libnetcdff-dev
+          } 2>&1 | tee build-logs/dependencies.log
+
+      - name: Record toolchain and revision
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            printf 'Commit: %s\n' "$GITHUB_SHA"
+            printf 'Ref: %s\n' "$GITHUB_REF"
+            gfortran --version
+            nf-config --version
+            nf-config --fflags
+            nf-config --flibs
+            make --version | head -1
+          } 2>&1 | tee build-logs/environment.log
+
+      - name: Generate Autotools files
+        shell: bash
+        run: |
+          set -o pipefail
+          autoreconf -fi 2>&1 | tee build-logs/autoreconf.log
+
+      - name: Configure build
+        shell: bash
+        env:
+          FC: gfortran
+        run: |
+          set -o pipefail
+          ./configure --with-netcdf=/usr 2>&1 | tee build-logs/configure.log
+
+      - name: Compile only (no tests)
+        shell: bash
+        run: |
+          set -o pipefail
+          make -j2 2>&1 | tee build-logs/compile.log
+
+      - name: Record binary
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            test -f src/IMEX_SfloW2D
+            file src/IMEX_SfloW2D
+          } 2>&1 | tee build-logs/binary.log
+
+      - name: Preserve configure diagnostics
+        if: always()
+        shell: bash
+        run: |
+          if [ -f config.log ]; then cp config.log build-logs/config.log; fi
+          printf 'Commit: %s\nRef: %s\n' "$GITHUB_SHA" "$GITHUB_REF" > build-logs/revision.txt
+
+      - name: Upload compilation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d17-compile-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: build-logs/
+          if-no-files-found: warn
+          retention-days: 30
