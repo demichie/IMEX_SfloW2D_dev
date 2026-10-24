@@ -26,6 +26,27 @@ PROGRAM test_source_registry
     IF (term%schedulable) nphysical=nphysical+1
   END DO
   CALL require(nphysical==SOURCE_PHYSICAL_TERM_COUNT,'physical catalog count')
+  ! Transitional regression: preserve the legacy method matrix while the
+  ! numerical capabilities are moved from roles into the catalog.
+  DO k=1,SOURCE_TERM_COUNT
+    term=source_term_descriptor(k)
+    SELECT CASE(term%role)
+    CASE(SOURCE_ROLE_IMPLICIT,SOURCE_ROLE_THERMAL,SOURCE_ROLE_PORE)
+      CALL require(.NOT.term%has_explicit,'legacy implicit source is not explicit')
+      CALL require(term%has_newton .EQV. term%complex_rate, &
+           'legacy complex Newton capability')
+      CALL require(term%has_analytic,'legacy analytic eligibility')
+    CASE(SOURCE_ROLE_SEMI_IMPLICIT)
+      CALL require(.NOT.term%has_explicit .AND. term%has_newton &
+           .AND. term%has_analytic,'semi-implicit contribution in Newton contract')
+    CASE(SOURCE_ROLE_CELL,SOURCE_ROLE_BOUNDARY,SOURCE_ROLE_MASS)
+      CALL require(term%has_explicit .AND. .NOT.term%has_newton &
+           .AND. .NOT.term%has_analytic,'explicit source capabilities')
+    CASE(SOURCE_ROLE_DERIVED)
+      CALL require(.NOT.term%has_explicit .AND. .NOT.term%has_newton &
+           .AND. .NOT.term%has_analytic,'dependent contributions not schedulable')
+    END SELECT
+  END DO
   CALL require(source_catalog_names_unique(),'catalog canonical names are unique')
   term=source_term_descriptor_by_name('SOURCE_TERM_MASS_EXCHANGE_DEPOSITION')
   CALL require(term%id==SOURCE_TERM_MASS_EXCHANGE_DEPOSITION, &
