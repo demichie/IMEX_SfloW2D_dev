@@ -1,6 +1,6 @@
 !> Assemble the complete physical post-RK mass exchange source.
 !> Kernel moved unchanged from equation_terms_2d; no change to rates or limiting.
-MODULE mass_source_terms_2d
+MODULE mass_exchange_terms_2d
   USE diagnostics_2d, ONLY : fatal_error
   USE parameters_2d
   USE constitutive_parameters_2d
@@ -181,4 +181,4 @@ CONTAINS
     RETURN
 
   END SUBROUTINE eval_mass_exchange_terms
-END MODULE mass_source_terms_2d
+END MODULE mass_exchange_terms_2d
