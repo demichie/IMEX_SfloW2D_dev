@@ -116,7 +116,7 @@ PROGRAM test_source_registry
         methods(g)=MERGE(IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_NEWTON,BTEST(bits,g-1))
       END DO
       CALL make_partition()
-      CALL registry%initialize_legacy(partition,original,methods,pore,terms,error)
+      CALL registry%initialize_legacy(partition,original,methods,pore,catalog_names_for_test(terms),error)
       IF (error/='' .OR. .NOT.registry%is_initialized()) THEN
         WRITE(error_unit,'(A,5(I0,1X),A,A)') &
              'Legacy normalization failure (mode,a,b,c,bits): ',mode,a,b,c,bits, &
@@ -303,7 +303,7 @@ PROGRAM test_source_registry
     IF (enabled(3)) pore=7
     CALL make_partition()
     terms=bundle(:SIZE(bundle)-1)
-    CALL trial%initialize_legacy(partition,original,methods,pore,terms,error)
+    CALL trial%initialize_legacy(partition,original,methods,pore,catalog_names_for_test(terms),error)
     IF (term%model_id/=0) THEN
       CALL require(INDEX(error,'complete law bundle')>0, &
            'incomplete rheological atomic batch rejected as partial law')
@@ -316,7 +316,7 @@ PROGRAM test_source_registry
   original=[3,1,2]; methods=[IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_NEWTON]
   CALL make_partition()
   terms=[SOURCE_TERM_THERMAL_RADIATIVE_COOLING,SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
-  CALL trial%initialize_legacy(partition,original,methods,pore,terms,error)
+  CALL trial%initialize_legacy(partition,original,methods,pore,catalog_names_for_test(terms),error)
   CALL require(INDEX(error,'enabled legacy target')>0,'active source cannot disappear on an inactive target')
   negative=negative+1
   ! Input/source activation may be empty while momentum remains an implicit block.
@@ -338,12 +338,12 @@ PROGRAM test_source_registry
        'explicit-only partition has no implicit group')
   mask=.FALSE.;mask(2)=.TRUE.
   CALL partition%initialize(mask)
-  CALL trial%initialize_legacy(partition,original,methods,0,[INTEGER::],error)
+  CALL trial%initialize_legacy(partition,original,methods,0,[CHARACTER(LEN=64)::],error)
   CALL require(INDEX(error,'two-equation block')>0,'split legacy momentum rejected');negative=negative+1
   enabled=[.TRUE.,.FALSE.,.FALSE.];CALL make_partition()
-  CALL trial%initialize_legacy(partition,[0,1,2],methods,0,[INTEGER::],error)
+  CALL trial%initialize_legacy(partition,[0,1,2],methods,0,[CHARACTER(LEN=64)::],error)
   CALL require(INDEX(error,'group IDs')>0,'invalid legacy ID rejected');negative=negative+1
-  CALL trial%initialize_legacy(partition,original,[99,99,99],0,[INTEGER::],error)
+  CALL trial%initialize_legacy(partition,original,[99,99,99],0,[CHARACTER(LEN=64)::],error)
   CALL require(INDEX(error,'legacy method')>0,'invalid legacy method rejected');negative=negative+1
   CALL registry%finalize();CALL registry%finalize()
   CALL require(.NOT.registry%is_initialized(),'idempotent finalization')
@@ -351,6 +351,20 @@ PROGRAM test_source_registry
   WRITE(*,'(A,I0,A,I0,A)') 'PASS: D17 registry, 864 legacy configurations; ',checks,' assertions; ',negative, &
        ' rejected invalid configurations'
 CONTAINS
+  ! Legacy test scenarios may still use catalog indexes to enumerate rates;
+  ! the registry interface itself accepts physical source names only.
+  FUNCTION catalog_names_for_test(ids) RESULT(names)
+    INTEGER, INTENT(IN) :: ids(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: names(:)
+    INTEGER :: i
+    TYPE(source_term_type) :: component
+    ALLOCATE(names(SIZE(ids)))
+    DO i=1,SIZE(ids)
+      component=source_term_descriptor(ids(i))
+      names(i)=component%name
+    END DO
+  END FUNCTION catalog_names_for_test
+
   SUBROUTINE require(condition,label)
     LOGICAL, INTENT(IN) :: condition
     CHARACTER(*), INTENT(IN) :: label
