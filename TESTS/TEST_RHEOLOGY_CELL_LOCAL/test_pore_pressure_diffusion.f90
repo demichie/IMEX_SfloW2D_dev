@@ -4,8 +4,8 @@ PROGRAM test_pore_pressure_diffusion
   USE constitutive_parameters_2d, ONLY : f_inhibit_mode, hydraulic_permeability, &
        kin_visc_c, sp_heat_a, sp_gas_const_a, pres, dynamic_permeability_flag
   USE geometry_2d, ONLY : pi_g
-  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_diffusion_source,       &
-       advance_pore_pressure_diffusion, solve_analytic_pore_pressure
+  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_dissipation_implicit,       &
+       advance_pore_pressure_diffusion, solve_pore_pressure_dissipation_analytic
 
   IMPLICIT NONE
 
@@ -33,7 +33,7 @@ PROGRAM test_pore_pressure_diffusion
   pi_g = 4.0_wp * ATAN(1.0_wp)
   solid_fractions = 0.2_wp / REAL(n_solid,wp)
 
-  CALL eval_pore_pressure_diffusion_source(                                  &
+  CALL eval_pore_pressure_dissipation_implicit(                                  &
        CMPLX(flow_depth,0.0_wp,wp), CMPLX(temperature,0.0_wp,wp),            &
        CMPLX(mixture_density,0.0_wp,wp),                                     &
        CMPLX(solid_fractions,0.0_wp,wp),                                     &
@@ -46,7 +46,7 @@ PROGRAM test_pore_pressure_diffusion
        flow_depth, temperature, solid_fractions, after_full)
   CALL assert_close(after_full, expected_pressure, 2.0E-14_wp,               &
        'diffusion integrator disagrees with the source-derived decay rate')
-  CALL solve_analytic_pore_pressure(initial_pressure, integration_step,       &
+  CALL solve_pore_pressure_dissipation_analytic(initial_pressure, integration_step,       &
        flow_depth, temperature, solid_fractions, after_first)
   CALL assert_close(after_first, after_full, 0.0_wp,                          &
        'legacy and canonical exact-flow names return different pressures')

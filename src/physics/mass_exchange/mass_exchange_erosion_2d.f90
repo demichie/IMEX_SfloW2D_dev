@@ -10,7 +10,7 @@ MODULE mass_exchange_erosion_2d
   PUBLIC :: eval_erosion_explicit
   PUBLIC :: eval_erosion_semi_implicit
   PUBLIC :: eval_erosion_implicit
-  PUBLIC :: eval_erosion_analytic
+  PUBLIC :: solve_erosion_analytic
 CONTAINS
   SUBROUTINE eval_erosion_explicit(r_h, mod_vel, alphas_tot, erodible, dt, &
        erosion_term, continuous_phase_erosion_term)
@@ -69,9 +69,9 @@ CONTAINS
     CALL fatal_error('erosion: implicit treatment is unsupported')
   END SUBROUTINE eval_erosion_implicit
 
-  SUBROUTINE eval_erosion_analytic(r_h, mod_vel, alphas_tot, erodible, dt, erosion_term, continuous_phase_erosion_term)
+  SUBROUTINE solve_erosion_analytic(r_h, mod_vel, alphas_tot, erodible, dt, erosion_term, continuous_phase_erosion_term)
     REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
     REAL(wp), INTENT(OUT) :: erosion_term(n_solid), continuous_phase_erosion_term
     CALL fatal_error('erosion: analytic treatment is unsupported')
-  END SUBROUTINE eval_erosion_analytic
+  END SUBROUTINE solve_erosion_analytic
 END MODULE mass_exchange_erosion_2d

@@ -26,24 +26,16 @@ MODULE pore_pressure_laws_2d
 
   PRIVATE
 
-  PUBLIC :: eval_pore_pressure_diffusion_source
-  PUBLIC :: solve_analytic_pore_pressure
+  PUBLIC :: eval_pore_pressure_dissipation_implicit
+  PUBLIC :: solve_pore_pressure_dissipation_analytic
   PUBLIC :: advance_pore_pressure_diffusion
   PUBLIC :: eval_pore_pressure_gas_loss
   PUBLIC :: eval_pore_pressure_inlet_source
   PUBLIC :: eval_pore_pressure_mass_exchange_source
 
   ! Uniform treatment surface for this source family.
-  PUBLIC :: eval_pore_pressure_explicit
-  PUBLIC :: eval_pore_pressure_semi_implicit
-  PUBLIC :: eval_pore_pressure_implicit
-  INTERFACE eval_pore_pressure_implicit
-    MODULE PROCEDURE eval_pore_pressure_diffusion_source
-  END INTERFACE eval_pore_pressure_implicit
-  PUBLIC :: solve_pore_pressure_analytic
-  INTERFACE solve_pore_pressure_analytic
-    MODULE PROCEDURE solve_analytic_pore_pressure
-  END INTERFACE solve_pore_pressure_analytic
+  PUBLIC :: eval_pore_pressure_dissipation_explicit
+  PUBLIC :: eval_pore_pressure_dissipation_semi_implicit
 
 CONTAINS
 
@@ -65,7 +57,7 @@ CONTAINS
   !> \note Returns zero for dry cells, negative excess pressure, absent pore volume, or
   !>       inactive diffusion closure.
   !******************************************************************************
-  SUBROUTINE eval_pore_pressure_diffusion_source(flow_depth, temperature,      &
+  SUBROUTINE eval_pore_pressure_dissipation_implicit(flow_depth, temperature,      &
        mixture_density, solid_fractions, excess_pressure, source)
 
     COMPLEX(wp), INTENT(IN) :: flow_depth
@@ -92,7 +84,7 @@ CONTAINS
     source = -mixture_density * (pi_g / 2.0_wp)**2 * diffusion_coefficient   &
          / MAX(h_threshold, flow_depth) * excess_pressure * inhibition
 
-  END SUBROUTINE eval_pore_pressure_diffusion_source
+  END SUBROUTINE eval_pore_pressure_dissipation_implicit
 
   !******************************************************************************
   !> \brief Solve exact-flow excess pore pressure over a stage interval.
@@ -114,7 +106,7 @@ CONTAINS
   !> \note Requires finite inputs and a nonnegative integration step. A negative step,
   !>       nonfinite input, or nonpositive temperature in an active state is fatal.
   !******************************************************************************
-  SUBROUTINE solve_analytic_pore_pressure(excess_pressure, integration_step,   &
+  SUBROUTINE solve_pore_pressure_dissipation_analytic(excess_pressure, integration_step,   &
        flow_depth, temperature, solid_fractions, pressure_after)
 
     REAL(wp), INTENT(IN) :: excess_pressure, integration_step, flow_depth
@@ -169,7 +161,7 @@ CONTAINS
     decay_exponent = integration_step * decay_rate
     pressure_after = excess_pressure * EXP(-decay_exponent)
 
-  END SUBROUTINE solve_analytic_pore_pressure
+  END SUBROUTINE solve_pore_pressure_dissipation_analytic
 
   !******************************************************************************
   !> \brief Backward-compatible name for the exact-flow pore-pressure solver.
@@ -187,7 +179,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: temperature, solid_fractions(n_solid)
     REAL(wp), INTENT(OUT) :: pressure_after
 
-    CALL solve_analytic_pore_pressure(excess_pressure, integration_step,     &
+    CALL solve_pore_pressure_dissipation_analytic(excess_pressure, integration_step,     &
          flow_depth, temperature, solid_fractions, pressure_after)
 
   END SUBROUTINE advance_pore_pressure_diffusion
@@ -503,12 +495,12 @@ CONTAINS
 
   END SUBROUTINE eval_pore_pressure_diffusion_factors
 
-  SUBROUTINE eval_pore_pressure_explicit()
+  SUBROUTINE eval_pore_pressure_dissipation_explicit()
     CALL fatal_error('pore_pressure: explicit treatment is unsupported')
-  END SUBROUTINE eval_pore_pressure_explicit
+  END SUBROUTINE eval_pore_pressure_dissipation_explicit
 
-  SUBROUTINE eval_pore_pressure_semi_implicit()
+  SUBROUTINE eval_pore_pressure_dissipation_semi_implicit()
     CALL fatal_error('pore_pressure: semi_implicit treatment is unsupported')
-  END SUBROUTINE eval_pore_pressure_semi_implicit
+  END SUBROUTINE eval_pore_pressure_dissipation_semi_implicit
 
 END MODULE pore_pressure_laws_2d

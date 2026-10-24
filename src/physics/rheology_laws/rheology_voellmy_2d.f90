@@ -15,50 +15,29 @@
 !> \f]
 !> where \f$a_c\f$ is the optional curvature acceleration and the pore
 !> pressure subtraction is enabled only when requested. The module provides
-!> \ref eval_voellmy_implicit_momentum_rate for the turbulent term and
-!> \ref eval_voellmy_semi_implicit_momentum_rate for the Coulomb term; \ref mu and
+!> \ref eval_rheology_voellmy_implicit for the turbulent term and
+!> \ref eval_rheology_voellmy_semi_implicit for the Coulomb term; \ref mu and
 !> \ref xi are their respective friction parameters. When enabled,
 !> \f$a_c=c_{xx}u_x^2+2c_{xy}u_xu_y+c_{yy}u_y^2\f$.
-!> \ref solve_voellmy_analytic_velocity exactly integrates the frozen
+!> \ref solve_rheology_voellmy_analytic exactly integrates the frozen
 !> combined velocity source while holding non-velocity inputs fixed.
 !********************************************************************************
-
 MODULE rheology_voellmy_2d
   USE diagnostics_2d, ONLY : fatal_error
-
   USE parameters_2d, ONLY : wp
   USE rheology_parameters_2d, ONLY : xi
   USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs, &
        fatal_analytic_input_error, solve_exact_velocity_flow,                &
        EXACT_FLOW_QUADRATIC_POLYNOMIAL
-
   IMPLICIT NONE
-
   PRIVATE
-
-  PUBLIC :: mu, eval_voellmy_implicit_momentum_rate
-  PUBLIC :: eval_voellmy_semi_implicit_momentum_rate
-  PUBLIC :: solve_voellmy_analytic_velocity
-
+  PUBLIC :: mu, eval_rheology_voellmy_implicit
+  PUBLIC :: eval_rheology_voellmy_semi_implicit
+  PUBLIC :: solve_rheology_voellmy_analytic
   REAL(wp) :: mu
-
   ! Uniform source treatment entry points. Existing kernels remain unchanged.
   PUBLIC :: eval_rheology_voellmy_explicit
-  PUBLIC :: eval_rheology_voellmy_semi_implicit
-  INTERFACE eval_rheology_voellmy_semi_implicit
-    MODULE PROCEDURE eval_voellmy_semi_implicit_momentum_rate
-  END INTERFACE eval_rheology_voellmy_semi_implicit
-  PUBLIC :: eval_rheology_voellmy_implicit
-  INTERFACE eval_rheology_voellmy_implicit
-    MODULE PROCEDURE eval_voellmy_implicit_momentum_rate
-  END INTERFACE eval_rheology_voellmy_implicit
-  PUBLIC :: solve_rheology_voellmy_analytic
-  INTERFACE solve_rheology_voellmy_analytic
-    MODULE PROCEDURE solve_voellmy_analytic_velocity
-  END INTERFACE solve_rheology_voellmy_analytic
-
 CONTAINS
-
   !******************************************************************************
   !> \brief Integrate the Voellmy velocity source exactly.
   !> \details Combines the frozen Coulomb stress with quadratic turbulent
@@ -78,12 +57,11 @@ CONTAINS
   !> \param[in] stochastic_xi_value Explicit stochastic \f$\xi\f$ increment.
   !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
   !******************************************************************************
-  SUBROUTINE solve_voellmy_analytic_velocity(integration_step, flow_depth, &
+  SUBROUTINE solve_rheology_voellmy_analytic(integration_step, flow_depth, &
        speed_ratio, velocity_before, mixture_density, reduced_gravity,        &
        gravity_coefficient, curvature_acceleration, use_pore_pressure,       &
        excess_pore_pressure, use_stochastic_xi, stochastic_xi_value,          &
        velocity_after)
-
     REAL(wp), INTENT(IN) :: integration_step, flow_depth, speed_ratio
     REAL(wp), INTENT(IN) :: velocity_before(2), mixture_density
     REAL(wp), INTENT(IN) :: reduced_gravity, gravity_coefficient
@@ -91,10 +69,8 @@ CONTAINS
     LOGICAL, INTENT(IN) :: use_pore_pressure, use_stochastic_xi
     REAL(wp), INTENT(IN) :: stochastic_xi_value
     REAL(wp), INTENT(OUT) :: velocity_after(2)
-
     REAL(wp) :: speed_before, speed_after, xi_effective
     REAL(wp) :: coulomb_stress, constant_drag, quadratic_drag
-
     velocity_after = velocity_before
     speed_before = SQRT(SUM(velocity_before**2))
     CALL validate_analytic_velocity_inputs(integration_step, flow_depth,    &
@@ -106,7 +82,6 @@ CONTAINS
     IF (gravity_coefficient .LE. 0.0_wp) THEN
        CALL fatal_analytic_input_error('Nonpositive gravity multiplier in Voellmy analytic solver')
     END IF
-
     xi_effective = xi
     IF (use_stochastic_xi) THEN
        xi_effective = xi + stochastic_xi_value
@@ -114,7 +89,6 @@ CONTAINS
     ELSEIF (xi_effective .LE. 0.0_wp) THEN
        CALL fatal_analytic_input_error('Nonpositive xi in Voellmy analytic solver')
     END IF
-
     coulomb_stress = mu * mixture_density * (reduced_gravity +              &
          curvature_acceleration) * flow_depth * SQRT(gravity_coefficient)
     coulomb_stress = MAX(0.0_wp, coulomb_stress)
@@ -122,14 +96,11 @@ CONTAINS
          mu * SQRT(gravity_coefficient) * excess_pore_pressure)
     constant_drag = coulomb_stress / (mixture_density * flow_depth * speed_ratio)
     quadratic_drag = reduced_gravity * speed_ratio / (xi_effective*flow_depth)
-
     CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,         &
          [constant_drag, 0.0_wp, quadratic_drag], integration_step,          &
          speed_before, speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
-
-  END SUBROUTINE solve_voellmy_analytic_velocity
-
+  END SUBROUTINE solve_rheology_voellmy_analytic
   !******************************************************************************
   !> \brief Evaluate the implicit turbulent Voellmy source.
   !> \details Computes the velocity-squared stress using \f$\xi\f$ and returns
@@ -148,24 +119,20 @@ CONTAINS
   !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !> \note Complex-valued state and rates preserve complex-step derivatives.
   !******************************************************************************
-  SUBROUTINE eval_voellmy_implicit_momentum_rate(velocity_x, velocity_y, mixture_density, &
+  SUBROUTINE eval_rheology_voellmy_implicit(velocity_x, velocity_y, mixture_density, &
        reduced_gravity, speed, speed_squared, moving, use_stochastic_xi,          &
        stochastic_value, rate_x, rate_y)
-
     COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y
     COMPLEX(wp), INTENT(IN) :: mixture_density, reduced_gravity
     COMPLEX(wp), INTENT(IN) :: speed, speed_squared
     LOGICAL, INTENT(IN) :: moving, use_stochastic_xi
     REAL(wp), INTENT(IN) :: stochastic_value
     COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
-
     REAL(wp) :: xi_effective
     COMPLEX(wp) :: turbulent_stress
-
     rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
     rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
     IF (.NOT. moving) RETURN
-
     IF (use_stochastic_xi) THEN
        xi_effective = xi + stochastic_value
        IF (xi_effective .LT. 1.0_wp) xi_effective = 1.0_wp
@@ -173,13 +140,10 @@ CONTAINS
     ELSE
        xi_effective = xi
     END IF
-
     turbulent_stress = mixture_density * reduced_gravity / xi_effective * speed_squared
     rate_x = -turbulent_stress * (velocity_x / speed)
     rate_y = -turbulent_stress * (velocity_y / speed)
-
-  END SUBROUTINE eval_voellmy_implicit_momentum_rate
-
+  END SUBROUTINE eval_rheology_voellmy_implicit
   !******************************************************************************
   !> \brief Evaluate the semi-implicit Coulomb Voellmy momentum rate.
   !> \details Builds the basal stress from flow depth, reduced gravity and
@@ -202,46 +166,37 @@ CONTAINS
   !> \param[out] rate_x x momentum source rate.
   !> \param[out] rate_y y momentum source rate.
   !******************************************************************************
-  SUBROUTINE eval_voellmy_semi_implicit_momentum_rate(flow_depth, velocity_x, velocity_y, &
+  SUBROUTINE eval_rheology_voellmy_semi_implicit(flow_depth, velocity_x, velocity_y, &
        speed, mixture_density, reduced_gravity, gravity_coefficient,            &
        curvature_term, curvature_xx, curvature_xy, curvature_yy,                &
        use_pore_pressure, excess_pore_pressure, rate_x, rate_y)
-
     REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
     REAL(wp), INTENT(IN) :: mixture_density, reduced_gravity, gravity_coefficient
     LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure
     REAL(wp), INTENT(IN) :: curvature_xx, curvature_xy, curvature_yy
     REAL(wp), INTENT(IN) :: excess_pore_pressure
     REAL(wp), INTENT(OUT) :: rate_x, rate_y
-
     REAL(wp) :: curvature_acceleration, friction_stress
-
     rate_x = 0.0_wp
     rate_y = 0.0_wp
     IF (speed .LE. 0.0_wp) RETURN
-
     curvature_acceleration = 0.0_wp
     IF (curvature_term) THEN
        curvature_acceleration = curvature_xx * velocity_x**2                &
             + 2.0_wp * curvature_xy * velocity_x * velocity_y                &
             + curvature_yy * velocity_y**2
     END IF
-
     friction_stress = mu * mixture_density *                                  &
          (reduced_gravity + curvature_acceleration) * flow_depth              &
          * SQRT(gravity_coefficient)
     friction_stress = MAX(0.0_wp, friction_stress)
     IF (use_pore_pressure) friction_stress = MAX(0.0_wp, friction_stress      &
          - mu * SQRT(gravity_coefficient) * excess_pore_pressure)
-
     rate_x = -friction_stress * velocity_x / speed
     rate_y = -friction_stress * velocity_y / speed
-
-  END SUBROUTINE eval_voellmy_semi_implicit_momentum_rate
-
+  END SUBROUTINE eval_rheology_voellmy_semi_implicit
   ! Unsupported physical treatment, rejected by the source catalog.
   SUBROUTINE eval_rheology_voellmy_explicit()
     CALL fatal_error('rheology_voellmy: explicit treatment is unsupported')
   END SUBROUTINE eval_rheology_voellmy_explicit
-
 END MODULE rheology_voellmy_2d

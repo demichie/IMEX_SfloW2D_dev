@@ -22,9 +22,9 @@ PROGRAM test_grouped_implicit_stage
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
   USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var
-  USE pore_pressure_laws_2d, ONLY : solve_analytic_pore_pressure
-  USE thermal_laws_2d, ONLY : solve_lava_analytic_temperature
-  USE rheology_lava_2d, ONLY : solve_lava_analytic_velocity
+  USE pore_pressure_laws_2d, ONLY : solve_pore_pressure_dissipation_analytic
+  USE thermal_laws_2d, ONLY : solve_thermal_cooling_analytic
+  USE rheology_lava_2d, ONLY : solve_rheology_lava_analytic
 
   IMPLICIT NONE
 
@@ -327,7 +327,7 @@ PROGRAM test_grouped_implicit_stage
 
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
   areal_heat_capacity = q_stage_check(4) / qp_known(4)
-  CALL solve_lava_analytic_temperature(qp_known(4), dt_step*a_diag,         &
+  CALL solve_thermal_cooling_analytic(qp_known(4), dt_step*a_diag,         &
        areal_heat_capacity, radiative_term_coeff, convective_term_coeff,    &
        T_env, exact_temperature)
   exact_energy = areal_heat_capacity * exact_temperature
@@ -338,7 +338,7 @@ PROGRAM test_grouped_implicit_stage
        expected_alphal, expected_alphag, expected_red_grav, expected_p_dyn,   &
        expected_Zs, expected_pore_pressure)
   pressure_known = q_expected(7) / q_expected(1)
-  CALL solve_analytic_pore_pressure(pressure_known, dt_step*a_diag,          &
+  CALL solve_pore_pressure_dissipation_analytic(pressure_known, dt_step*a_diag,          &
        expected_h, expected_temperature, expected_alphas, expected_pressure)
   CALL solve_imex_stage(partition, source_registry%stage_groups(),            &
        source_registry%solvers(), q_stage_check, q_stage_check,               &
@@ -514,7 +514,7 @@ PROGRAM test_grouped_implicit_stage
        expected_alphal, expected_alphag, expected_red_grav, expected_p_dyn,&
        expected_Zs, expected_pore_pressure)
   speed_ratio = 1.0_wp
-  CALL solve_lava_analytic_velocity(dt_step*a_diag, expected_h,            &
+  CALL solve_rheology_lava_analytic(dt_step*a_diag, expected_h,            &
        expected_temperature, expected_density, speed_ratio,                &
        [expected_u, expected_v], analytic_velocity)
   CALL solve_imex_stage(partition, source_registry%stage_groups(),          &

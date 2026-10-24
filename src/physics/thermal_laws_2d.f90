@@ -16,9 +16,9 @@ MODULE thermal_laws_2d
   PRIVATE
 
   PUBLIC :: eval_inlet_thermal_energy_source
-  PUBLIC :: eval_lava_cooling_energy_rate
+  PUBLIC :: eval_thermal_cooling_implicit
   PUBLIC :: eval_rheology_cooling_energy_rate
-  PUBLIC :: solve_lava_analytic_temperature
+  PUBLIC :: solve_thermal_cooling_analytic
   PUBLIC :: advance_lava_cooling_temperature
   PUBLIC :: eval_vaporization_mass_rate
   PUBLIC :: eval_vaporization_energy_rate
@@ -29,16 +29,8 @@ MODULE thermal_laws_2d
   REAL(wp), PARAMETER :: vaporization_liquid_heat_capacity = 4184.0_wp
 
   ! Uniform treatment surface for this source family.
-  PUBLIC :: eval_lava_cooling_explicit
-  INTERFACE eval_lava_cooling_explicit
-    MODULE PROCEDURE eval_lava_cooling_energy_rate
-  END INTERFACE eval_lava_cooling_explicit
-  PUBLIC :: eval_lava_cooling_semi_implicit
-  PUBLIC :: eval_lava_cooling_implicit
-  PUBLIC :: solve_lava_cooling_analytic
-  INTERFACE solve_lava_cooling_analytic
-    MODULE PROCEDURE solve_lava_analytic_temperature
-  END INTERFACE solve_lava_cooling_analytic
+  PUBLIC :: eval_thermal_cooling_semi_implicit
+  PUBLIC :: eval_thermal_cooling_explicit
 
 CONTAINS
 
@@ -82,7 +74,7 @@ CONTAINS
   !> \param[in] ambient_temperature Ambient temperature T_a [K].
   !> \return Net cooling energy rate per unit area [W m^-2].
   !******************************************************************************
-  PURE FUNCTION eval_lava_cooling_energy_rate(temperature, radiative_coefficient, &
+  PURE FUNCTION eval_thermal_cooling_implicit(temperature, radiative_coefficient, &
        convective_coefficient, ambient_temperature) RESULT(source)
 
     COMPLEX(wp), INTENT(IN) :: temperature
@@ -94,7 +86,7 @@ CONTAINS
     source = -radiative_coefficient * (temperature**4 - ambient_temperature**4) &
          - convective_coefficient * (temperature - ambient_temperature)
 
-  END FUNCTION eval_lava_cooling_energy_rate
+  END FUNCTION eval_thermal_cooling_implicit
 
   !******************************************************************************
   !> \brief Evaluate the cooling energy rate associated with the selected rheology.
@@ -119,7 +111,7 @@ CONTAINS
 
     SELECT CASE (model_id)
     CASE (rheology_id_lava)
-       rate = eval_lava_cooling_energy_rate(temperature, radiative_coefficient, &
+       rate = eval_thermal_cooling_implicit(temperature, radiative_coefficient, &
             convective_coefficient, ambient_temperature)
     CASE DEFAULT
        rate = CMPLX(0.0_wp, 0.0_wp, wp)
@@ -146,7 +138,7 @@ CONTAINS
   !> \note Requires finite inputs, positive initial and ambient temperatures, positive heat
   !>       capacity, nonnegative integration step, and nonnegative cooling coefficients.
   !******************************************************************************
-  SUBROUTINE solve_lava_analytic_temperature(temperature, integration_step,   &
+  SUBROUTINE solve_thermal_cooling_analytic(temperature, integration_step,   &
        areal_heat_capacity, radiative_coefficient, convective_coefficient,     &
        ambient_temperature, temperature_after)
 
@@ -262,7 +254,7 @@ CONTAINS
             MAX(temperature, temperature_after))
     END IF
 
-  END SUBROUTINE solve_lava_analytic_temperature
+  END SUBROUTINE solve_thermal_cooling_analytic
 
   !******************************************************************************
   !> \brief Backward-compatible name for the exact-flow lava cooling solver.
@@ -283,7 +275,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: ambient_temperature
     REAL(wp), INTENT(OUT) :: temperature_after
 
-    CALL solve_lava_analytic_temperature(temperature, integration_step,      &
+    CALL solve_thermal_cooling_analytic(temperature, integration_step,      &
          areal_heat_capacity, radiative_coefficient, convective_coefficient,  &
          ambient_temperature, temperature_after)
 
@@ -423,12 +415,12 @@ CONTAINS
 
   END FUNCTION lava_cooling_time_primitive
 
-  SUBROUTINE eval_lava_cooling_semi_implicit()
+  SUBROUTINE eval_thermal_cooling_semi_implicit()
     CALL fatal_error('lava_cooling: semi_implicit treatment is unsupported')
-  END SUBROUTINE eval_lava_cooling_semi_implicit
+  END SUBROUTINE eval_thermal_cooling_semi_implicit
 
-  SUBROUTINE eval_lava_cooling_implicit()
+  SUBROUTINE eval_thermal_cooling_explicit()
     CALL fatal_error('lava_cooling: implicit treatment is unsupported')
-  END SUBROUTINE eval_lava_cooling_implicit
+  END SUBROUTINE eval_thermal_cooling_explicit
 
 END MODULE thermal_laws_2d

@@ -12,41 +12,25 @@
 !> gravity coefficient and \f$a_c\f$ is the curvature acceleration. Optional
 !> stochastic perturbations shift the Froude number for sufficiently deep
 !> flow and clamp it at zero. The module provides
-!> \ref eval_froude_momentum_rate to evaluate the two horizontal momentum rates.
-!> \ref solve_froude_analytic_velocity integrates the frozen Froude-dependent
+!> \ref eval_rheology_froude_semi_implicit to evaluate the two horizontal momentum rates.
+!> \ref solve_rheology_froude_analytic integrates the frozen Froude-dependent
 !> velocity source in time.
 !********************************************************************************
-
 MODULE rheology_froude_2d
   USE diagnostics_2d, ONLY : fatal_error
-
   USE parameters_2d, ONLY : wp
   USE rheology_parameters_2d, ONLY : mu_0, mu_inf, Fr_0
   USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,  &
        fatal_analytic_input_error, solve_exact_velocity_flow,                &
        EXACT_FLOW_FROUDE
-
   IMPLICIT NONE
-
   PRIVATE
-
-  PUBLIC :: eval_froude_momentum_rate
-  PUBLIC :: solve_froude_analytic_velocity
-
+  PUBLIC :: eval_rheology_froude_semi_implicit
+  PUBLIC :: solve_rheology_froude_analytic
   ! Uniform source treatment entry points. Existing kernels remain unchanged.
   PUBLIC :: eval_rheology_froude_explicit
-  PUBLIC :: eval_rheology_froude_semi_implicit
-  INTERFACE eval_rheology_froude_semi_implicit
-    MODULE PROCEDURE eval_froude_momentum_rate
-  END INTERFACE eval_rheology_froude_semi_implicit
   PUBLIC :: eval_rheology_froude_implicit
-  PUBLIC :: solve_rheology_froude_analytic
-  INTERFACE solve_rheology_froude_analytic
-    MODULE PROCEDURE solve_froude_analytic_velocity
-  END INTERFACE solve_rheology_froude_analytic
-
 CONTAINS
-
   !******************************************************************************
   !> \brief Integrate the Froude-dependent velocity source exactly.
   !> \details Holds depth, gravity, curvature, and the speed ratio fixed while
@@ -62,20 +46,17 @@ CONTAINS
   !> \param[in] stochastic_value Explicit stochastic increment [dimensionless].
   !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
   !******************************************************************************
-  SUBROUTINE solve_froude_analytic_velocity(integration_step, flow_depth,  &
+  SUBROUTINE solve_rheology_froude_analytic(integration_step, flow_depth,  &
        speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,   &
        curvature_term, stochastic, stochastic_value, velocity_after)
-
     REAL(wp), INTENT(IN) :: integration_step, flow_depth, speed_ratio
     REAL(wp), INTENT(IN) :: velocity_before(2), reduced_gravity
     REAL(wp), INTENT(IN) :: gravity_coefficient, curvature_term
     LOGICAL, INTENT(IN) :: stochastic
     REAL(wp), INTENT(IN) :: stochastic_value
     REAL(wp), INTENT(OUT) :: velocity_after(2)
-
     REAL(wp) :: speed_before, speed_after, shift, base_drag
     REAL(wp) :: froude_slope, froude_value_slope
-
     velocity_after = velocity_before
     speed_before = SQRT(SUM(velocity_before**2))
     CALL validate_analytic_velocity_inputs(integration_step, flow_depth,    &
@@ -86,10 +67,8 @@ CONTAINS
     IF (Fr_0 .LE. 0.0_wp) THEN
        CALL fatal_analytic_input_error('Nonpositive Fr_0 in Froude analytic solver')
     END IF
-
     base_drag = gravity_coefficient * (reduced_gravity + curvature_term)
     IF (base_drag .LE. 0.0_wp) RETURN
-
     shift = 0.0_wp
     IF (stochastic .AND. flow_depth .GT. 0.01_wp) shift = stochastic_value
     froude_value_slope = speed_ratio / SQRT(reduced_gravity*flow_depth)
@@ -98,9 +77,7 @@ CONTAINS
          [base_drag, froude_slope, shift/Fr_0, mu_0, mu_inf],                &
          integration_step, speed_before, speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
-
-  END SUBROUTINE solve_froude_analytic_velocity
-
+  END SUBROUTINE solve_rheology_froude_analytic
   !******************************************************************************
   !> \brief Evaluate model 9's Froude-dependent Coulomb source.
   !> \details Computes the Froude number and the exponentially weakening
@@ -121,50 +98,39 @@ CONTAINS
   !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
   !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !******************************************************************************
-
-  SUBROUTINE eval_froude_momentum_rate( flow_depth, velocity_x, velocity_y, speed, &
+  SUBROUTINE eval_rheology_froude_semi_implicit( flow_depth, velocity_x, velocity_y, speed, &
        horizontal_speed, mixture_density, reduced_gravity, gravity_coefficient, &
        curvature_term, stochastic, stochastic_value, rate_x, rate_y )
-
     REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
     REAL(wp), INTENT(IN) :: horizontal_speed, mixture_density, reduced_gravity
     REAL(wp), INTENT(IN) :: gravity_coefficient, curvature_term
     LOGICAL, INTENT(IN) :: stochastic
     REAL(wp), INTENT(IN) :: stochastic_value
     REAL(wp), INTENT(OUT) :: rate_x, rate_y
-
     REAL(wp) :: froude_number
     REAL(wp) :: friction_coefficient
     REAL(wp) :: friction_stress
-
     rate_x = 0.0_wp
     rate_y = 0.0_wp
-
     IF ( speed .GT. 0.0_wp .AND. reduced_gravity .GT. 0.0_wp ) THEN
        froude_number = speed / SQRT(reduced_gravity * flow_depth)
-
        IF ( stochastic ) THEN
           IF ( flow_depth .GT. 0.01_wp ) froude_number = froude_number + stochastic_value
           IF ( froude_number .LT. 0.0_wp ) froude_number = 0.0_wp
        END IF
-
        friction_coefficient = mu_inf + (mu_0 - mu_inf) * EXP(-froude_number/Fr_0)
        friction_stress = mixture_density * ( friction_coefficient * flow_depth * &
             gravity_coefficient * ( reduced_gravity + curvature_term ) )
        rate_x = rate_x - friction_stress * velocity_x / horizontal_speed
        rate_y = rate_y - friction_stress * velocity_y / horizontal_speed
     END IF
-
-  END SUBROUTINE eval_froude_momentum_rate
-
+  END SUBROUTINE eval_rheology_froude_semi_implicit
   ! Unsupported physical treatment, rejected by the source catalog.
   SUBROUTINE eval_rheology_froude_explicit()
     CALL fatal_error('rheology_froude: explicit treatment is unsupported')
   END SUBROUTINE eval_rheology_froude_explicit
-
   ! Unsupported physical treatment, rejected by the source catalog.
   SUBROUTINE eval_rheology_froude_implicit()
     CALL fatal_error('rheology_froude: semi-implicit treatment is unsupported')
   END SUBROUTINE eval_rheology_froude_implicit
-
 END MODULE rheology_froude_2d

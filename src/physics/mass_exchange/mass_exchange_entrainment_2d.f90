@@ -10,7 +10,7 @@ MODULE mass_exchange_entrainment_2d
   PUBLIC :: eval_entrainment_explicit
   PUBLIC :: eval_entrainment_semi_implicit
   PUBLIC :: eval_entrainment_implicit
-  PUBLIC :: eval_entrainment_analytic
+  PUBLIC :: solve_entrainment_analytic
 CONTAINS
   REAL(wp) FUNCTION eval_entrainment_explicit(r_h, r_Ri, mod_vel2)
     REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
@@ -49,9 +49,9 @@ CONTAINS
     eval_entrainment_implicit = 0.0_wp
   END FUNCTION eval_entrainment_implicit
 
-  REAL(wp) FUNCTION eval_entrainment_analytic(r_h, r_Ri, mod_vel2)
+  REAL(wp) FUNCTION solve_entrainment_analytic(r_h, r_Ri, mod_vel2)
     REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
     CALL fatal_error('entrainment: analytic treatment is unsupported')
-    eval_entrainment_analytic = 0.0_wp
-  END FUNCTION eval_entrainment_analytic
+    solve_entrainment_analytic = 0.0_wp
+  END FUNCTION solve_entrainment_analytic
 END MODULE mass_exchange_entrainment_2d

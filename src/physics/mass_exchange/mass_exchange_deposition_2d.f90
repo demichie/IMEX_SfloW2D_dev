@@ -16,7 +16,7 @@ MODULE mass_exchange_deposition_2d
   PUBLIC :: eval_deposition_explicit
   PUBLIC :: eval_deposition_semi_implicit
   PUBLIC :: eval_deposition_implicit
-  PUBLIC :: eval_deposition_analytic
+  PUBLIC :: solve_deposition_analytic
 CONTAINS
   SUBROUTINE eval_deposition_explicit(r_h, r_T, r_alphas, alphas_tot, &
        r_rho_m, r_rho_c, dt, deposition_term)
@@ -206,10 +206,10 @@ CONTAINS
     CALL fatal_error('deposition: implicit treatment is unsupported')
   END SUBROUTINE eval_deposition_implicit
 
-  SUBROUTINE eval_deposition_analytic(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
+  SUBROUTINE solve_deposition_analytic(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
     REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
     REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
     REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
     CALL fatal_error('deposition: analytic treatment is unsupported')
-  END SUBROUTINE eval_deposition_analytic
+  END SUBROUTINE solve_deposition_analytic
 END MODULE mass_exchange_deposition_2d

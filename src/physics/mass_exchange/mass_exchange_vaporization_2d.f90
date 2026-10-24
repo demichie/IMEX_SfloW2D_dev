@@ -10,7 +10,7 @@ MODULE mass_exchange_vaporization_2d
   PUBLIC :: eval_vaporization_explicit
   PUBLIC :: eval_vaporization_semi_implicit
   PUBLIC :: eval_vaporization_implicit
-  PUBLIC :: eval_vaporization_analytic
+  PUBLIC :: solve_vaporization_analytic
 CONTAINS
   SUBROUTINE eval_vaporization_explicit(B_zone, r_T, deposition_term, eqns_term)
     INTEGER, INTENT(IN) :: B_zone
@@ -45,10 +45,10 @@ CONTAINS
     CALL fatal_error('vaporization: implicit treatment is unsupported')
   END SUBROUTINE eval_vaporization_implicit
 
-  SUBROUTINE eval_vaporization_analytic(B_zone, r_T, deposition_term, eqns_term)
+  SUBROUTINE solve_vaporization_analytic(B_zone, r_T, deposition_term, eqns_term)
     INTEGER, INTENT(IN) :: B_zone
     REAL(wp), INTENT(IN) :: r_T, deposition_term(n_solid)
     REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns)
     CALL fatal_error('vaporization: analytic treatment is unsupported')
-  END SUBROUTINE eval_vaporization_analytic
+  END SUBROUTINE solve_vaporization_analytic
 END MODULE mass_exchange_vaporization_2d

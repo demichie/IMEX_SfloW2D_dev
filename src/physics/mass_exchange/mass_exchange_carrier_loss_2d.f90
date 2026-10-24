@@ -13,7 +13,7 @@ MODULE mass_exchange_carrier_loss_2d
   PUBLIC :: eval_carrier_loss_explicit
   PUBLIC :: eval_carrier_loss_semi_implicit
   PUBLIC :: eval_carrier_loss_implicit
-  PUBLIC :: eval_carrier_loss_analytic
+  PUBLIC :: solve_carrier_loss_analytic
 CONTAINS
   SUBROUTINE eval_carrier_loss_explicit(r_h, r_T, r_alphas, alphas_tot, &
        r_rho_c, r_exc_pore_pres, &
@@ -92,11 +92,11 @@ CONTAINS
     CALL fatal_error('carrier_loss: implicit treatment is unsupported')
   END SUBROUTINE eval_carrier_loss_implicit
 
-  SUBROUTINE eval_carrier_loss_analytic(r_h, r_T, r_alphas, alphas_tot, r_rho_c, r_exc_pore_pres, &
+  SUBROUTINE solve_carrier_loss_analytic(r_h, r_T, r_alphas, alphas_tot, r_rho_c, r_exc_pore_pres, &
        deposition_term, dt, continuous_phase_loss_term)
     REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
     REAL(wp), INTENT(IN) :: r_rho_c, r_exc_pore_pres, deposition_term(n_solid), dt
     REAL(wp), INTENT(OUT) :: continuous_phase_loss_term
     CALL fatal_error('carrier_loss: analytic treatment is unsupported')
-  END SUBROUTINE eval_carrier_loss_analytic
+  END SUBROUTINE solve_carrier_loss_analytic
 END MODULE mass_exchange_carrier_loss_2d

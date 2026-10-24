@@ -20,14 +20,14 @@ MODULE equation_terms_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
   USE rheology_2d, ONLY : curvature_acceleration, &
-       eval_implicit_rheology_rate, eval_semi_implicit_rheology_rate,        &
-       solve_analytic_rheology_velocity
-  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_diffusion_source,       &
+       eval_rheology_implicit, eval_rheology_semi_implicit,        &
+       solve_rheology_analytic
+  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_dissipation_implicit,       &
        eval_pore_pressure_gas_loss, eval_pore_pressure_inlet_source,            &
-       eval_pore_pressure_mass_exchange_source, solve_analytic_pore_pressure
+       eval_pore_pressure_mass_exchange_source, solve_pore_pressure_dissipation_analytic
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                 &
-       eval_lava_cooling_energy_rate, eval_vaporization_mass_rate,         &
-       eval_vaporization_energy_rate, solve_lava_analytic_temperature
+       eval_thermal_cooling_implicit, eval_vaporization_mass_rate,         &
+       eval_vaporization_energy_rate, solve_thermal_cooling_analytic
 
   USE equation_metadata_2d, ONLY : equation_partition_type,                   &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
@@ -163,7 +163,7 @@ CONTAINS
              context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,    &
              flow_u,flow_v)
         velocity_after=[flow_u,flow_v]
-        CALL solve_analytic_rheology_velocity(rheology_model_id,interval, &
+        CALL solve_rheology_analytic(rheology_model_id,interval, &
              flow_h,flow_temperature,flow_density,speed_ratio,            &
              [flow_u,flow_v],flow_red_grav,context%grav_coeff,flow_alphas,&
              curvature_accel,pore_pressure_flag,flow_pore_pressure,       &
@@ -190,7 +190,7 @@ CONTAINS
         RETURN
       END IF
       heat_capacity=q_before(4)/flow_temperature
-      CALL solve_lava_analytic_temperature(flow_temperature,interval,      &
+      CALL solve_thermal_cooling_analytic(flow_temperature,interval,      &
            heat_capacity,radiative_term_coeff,convective_term_coeff,      &
            T_env,temperature_after)
       q_after(4)=heat_capacity*temperature_after
@@ -202,7 +202,7 @@ CONTAINS
              flow_density,flow_temperature,flow_alphal,flow_alphag,       &
              flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure)
         pressure_known=q_before(idx_pore)/q_before(1)
-        CALL solve_analytic_pore_pressure(pressure_known,interval,flow_h,  &
+        CALL solve_pore_pressure_dissipation_analytic(pressure_known,interval,flow_h,  &
              flow_temperature,flow_alphas,pressure_after)
         q_after(idx_pore)=q_before(1)*pressure_after
       END IF
@@ -860,18 +860,18 @@ CONTAINS
        ! would erase it. This does not assign a derivative to Coulomb's cusp.
        moving = (REAL(mod_vel,wp) .NE. 0.0_wp) .OR. (AIMAG(mod_vel) .NE. 0.0_wp)
 
-       CALL eval_implicit_rheology_rate(rheology_model_id, h, T, rho_m,       &
+       CALL eval_rheology_implicit(rheology_model_id, h, T, rho_m,       &
             inv_rho_m, u, v, mod_vel, mod_vel_hor, mod_vel2, red_grav,       &
             alphas, moving, stochastic_flag, Zij, source_term(2:3))
     END IF
 
     IF (selected_thermal) THEN
-       source_term(4) = eval_lava_cooling_energy_rate( &
+       source_term(4) = eval_thermal_cooling_implicit( &
             T, radiative_term_coeff, convective_term_coeff, T_env)
     ENDIF
 
     IF ( pore_pressure_flag .AND. selected_pore ) &
-         CALL eval_pore_pressure_diffusion_source(h, T,                       &
+         CALL eval_pore_pressure_dissipation_implicit(h, T,                       &
          rho_m, alphas, exc_pore_pres, source_term(idx_poreEqn))
 
     nh_term = source_term
@@ -1010,7 +1010,7 @@ CONTAINS
 
        exc_pore_pres = 0.0_wp
        IF (pore_pressure_flag) exc_pore_pres = qpj(idx_pore)
-       CALL eval_semi_implicit_rheology_rate(rheology_model_id, r_h, r_u,  &
+       CALL eval_rheology_semi_implicit(rheology_model_id, r_h, r_u,  &
             r_v, mod_vel, mod_hor_vel, r_rho_m, r_red_grav, grav_coeff,    &
             r_alphas, curvature_term_flag, Bsecondj_xx, Bsecondj_xy,       &
             Bsecondj_yy, pore_pressure_flag, exc_pore_pres,                &

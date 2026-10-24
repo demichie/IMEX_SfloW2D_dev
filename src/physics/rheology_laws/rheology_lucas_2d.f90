@@ -13,41 +13,25 @@
 !> The source is \f$\boldsymbol{S}=-\rho_m\mu hG(g'+a_c)
 !> \boldsymbol{u}_h/|\boldsymbol{u}_h|\f$. When stochastic mode is enabled,
 !> its increment is added to the speed before evaluating the law. The module
-!> exposes \ref eval_lucas_momentum_rate for the x/y momentum rates and
-!> \ref solve_lucas_analytic_velocity for exact integration of the frozen
+!> exposes \ref eval_rheology_lucas_semi_implicit for the x/y momentum rates and
+!> \ref solve_rheology_lucas_analytic for exact integration of the frozen
 !> speed-decay law with non-velocity variables explicit.
 !********************************************************************************
-
 MODULE rheology_lucas_2d
   USE diagnostics_2d, ONLY : fatal_error
-
   USE parameters_2d, ONLY : wp
   USE rheology_parameters_2d, ONLY : mu_0, mu_inf, U_w
   USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs, &
        fatal_analytic_input_error, solve_exact_velocity_flow,                &
        EXACT_FLOW_LUCAS
-
   IMPLICIT NONE
-
   PRIVATE
-
-  PUBLIC :: eval_lucas_momentum_rate
-  PUBLIC :: solve_lucas_analytic_velocity
-
+  PUBLIC :: eval_rheology_lucas_semi_implicit
+  PUBLIC :: solve_rheology_lucas_analytic
   ! Uniform source treatment entry points. Existing kernels remain unchanged.
   PUBLIC :: eval_rheology_lucas_explicit
-  PUBLIC :: eval_rheology_lucas_semi_implicit
-  INTERFACE eval_rheology_lucas_semi_implicit
-    MODULE PROCEDURE eval_lucas_momentum_rate
-  END INTERFACE eval_rheology_lucas_semi_implicit
   PUBLIC :: eval_rheology_lucas_implicit
-  PUBLIC :: solve_rheology_lucas_analytic
-  INTERFACE solve_rheology_lucas_analytic
-    MODULE PROCEDURE solve_lucas_analytic_velocity
-  END INTERFACE solve_rheology_lucas_analytic
-
 CONTAINS
-
   !******************************************************************************
   !> \brief Integrate the Lucas velocity-weakening source exactly.
   !> \details Holds depth, gravity, curvature, stochastic speed shift, and
@@ -63,19 +47,16 @@ CONTAINS
   !> \param[in] stochastic_value Explicit stochastic increment [m s^-1].
   !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
   !******************************************************************************
-  SUBROUTINE solve_lucas_analytic_velocity(integration_step, flow_depth,   &
+  SUBROUTINE solve_rheology_lucas_analytic(integration_step, flow_depth,   &
        speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,    &
        curvature_term, stochastic, stochastic_value, velocity_after)
-
     REAL(wp), INTENT(IN) :: integration_step, flow_depth, speed_ratio
     REAL(wp), INTENT(IN) :: velocity_before(2), reduced_gravity
     REAL(wp), INTENT(IN) :: gravity_coefficient, curvature_term
     LOGICAL, INTENT(IN) :: stochastic
     REAL(wp), INTENT(IN) :: stochastic_value
     REAL(wp), INTENT(OUT) :: velocity_after(2)
-
     REAL(wp) :: speed_before, speed_after, shift, scale_factor, shallow
-
     velocity_after = velocity_before
     speed_before = SQRT(SUM(velocity_before**2))
     CALL validate_analytic_velocity_inputs(integration_step, flow_depth,    &
@@ -84,21 +65,17 @@ CONTAINS
     IF (U_w .LE. 0.0_wp) THEN
        CALL fatal_analytic_input_error('Nonpositive U_w in Lucas analytic solver')
     END IF
-
     scale_factor = gravity_coefficient * (reduced_gravity + curvature_term)
     IF (scale_factor .LE. 0.0_wp) RETURN
     shift = 0.0_wp
     IF (stochastic) shift = stochastic_value
-
     shallow = 0.0_wp
     IF (flow_depth .LT. 0.1_wp) shallow = 1.0_wp
     CALL solve_exact_velocity_flow(EXACT_FLOW_LUCAS,                        &
          [scale_factor, speed_ratio, shift, mu_0, mu_inf, U_w, shallow],    &
          integration_step, speed_before, speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
-
-  END SUBROUTINE solve_lucas_analytic_velocity
-
+  END SUBROUTINE solve_rheology_lucas_analytic
   !******************************************************************************
   !> \brief Evaluate model 10's velocity-dependent Coulomb source.
   !> \details Applies the Lucas transition-speed law, including its shallow
@@ -118,32 +95,26 @@ CONTAINS
   !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
   !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
   !******************************************************************************
-
-  SUBROUTINE eval_lucas_momentum_rate( flow_depth, velocity_x, velocity_y, speed, &
+  SUBROUTINE eval_rheology_lucas_semi_implicit( flow_depth, velocity_x, velocity_y, speed, &
        horizontal_speed, mixture_density, reduced_gravity, gravity_coefficient, &
        curvature_term, stochastic, stochastic_value, rate_x, rate_y )
-
     REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
     REAL(wp), INTENT(IN) :: horizontal_speed, mixture_density, reduced_gravity
     REAL(wp), INTENT(IN) :: gravity_coefficient, curvature_term
     LOGICAL, INTENT(IN) :: stochastic
     REAL(wp), INTENT(IN) :: stochastic_value
     REAL(wp), INTENT(OUT) :: rate_x, rate_y
-
     REAL(wp) :: friction_speed
     REAL(wp) :: friction_coefficient
     REAL(wp) :: friction_stress
-
     rate_x = 0.0_wp
     rate_y = 0.0_wp
-
     IF ( speed .GT. 0.0_wp ) THEN
        IF ( stochastic ) THEN
           friction_speed = speed + stochastic_value
        ELSE
           friction_speed = speed
        END IF
-
        IF ( friction_speed .LT. U_w ) THEN
           friction_coefficient = mu_0
        ELSE
@@ -153,23 +124,18 @@ CONTAINS
              friction_coefficient = mu_inf + (mu_0-mu_inf)/(friction_speed/U_w)
           END IF
        END IF
-
        friction_stress = mixture_density * ( friction_coefficient * flow_depth * &
             gravity_coefficient * ( reduced_gravity + curvature_term ) )
        rate_x = rate_x - friction_stress * velocity_x / horizontal_speed
        rate_y = rate_y - friction_stress * velocity_y / horizontal_speed
     END IF
-
-  END SUBROUTINE eval_lucas_momentum_rate
-
+  END SUBROUTINE eval_rheology_lucas_semi_implicit
   ! Unsupported physical treatment, rejected by the source catalog.
   SUBROUTINE eval_rheology_lucas_explicit()
     CALL fatal_error('rheology_lucas: explicit treatment is unsupported')
   END SUBROUTINE eval_rheology_lucas_explicit
-
   ! Unsupported physical treatment, rejected by the source catalog.
   SUBROUTINE eval_rheology_lucas_implicit()
     CALL fatal_error('rheology_lucas: semi-implicit treatment is unsupported')
   END SUBROUTINE eval_rheology_lucas_implicit
-
 END MODULE rheology_lucas_2d
