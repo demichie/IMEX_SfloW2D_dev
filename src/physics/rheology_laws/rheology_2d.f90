@@ -53,7 +53,6 @@ MODULE rheology_2d
 
   ! Uniform treatment surface for this source family.
   PUBLIC :: eval_rheology_explicit
-  PUBLIC :: eval_rheology_implicit
 
 CONTAINS
 
