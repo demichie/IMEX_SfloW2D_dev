@@ -964,3 +964,26 @@ Il campo allocabile `term_ids(:)` viene **eliminato** da `source_group_type`. I 
 ### D17.22.41 — Fix importazione del dispatcher dopo la rimozione degli ID (24 ottobre 2026)
 
 Il gate `D17 compile diagnostics` sul commit `91b16562` ha evidenziato un errore di compilazione in `equation_terms_2d.f90`: `rheology_source_name` veniva chiamata da `group_has_role` senza essere importata nella clausola `USE source_catalog_2d, ONLY`. Aggiunta l'importazione esplicita. La procedura del catalogo era già `PURE`: il secondo errore del compilatore era una conseguenza della risoluzione fallita del simbolo. Nessun cambiamento di fisica o scheduling. La compilazione e i test devono essere rieseguiti sul nuovo commit.
+
+### D17.22.42 — Chiusura CI della rimozione di `term_ids` dai gruppi (24 ottobre 2026)
+
+Dopo il passo D17.22.41, la compilazione ha superato l'errore di importazione del simbolo `rheology_source_name`. Il successivo errore di build nel modulo `mass_exchange_step_2d.f90` è stato risolto nel commit [`609f293`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/609f2931d937cf78ae08a9788bc4e8373e6f17a6): il dispatcher post-RK usa `group%term_names` e `source_term_descriptor_by_name`, senza accedere a `%term_ids`.
+
+I test del registro hanno poi richiesto interventi mirati: [`07bd36d`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/07bd36d0650facb97091c68189064d27d08592f0) evita il costruttore dinamico di stringhe di lunghezza non uniforme in `group_source_names`; [`acac97e`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/acac97ee22368e887d844c1417cc65ea9c24bc44) aggiunge diagnostica stderr per le combinazioni legacy rifiutate; [`c02ba1f`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/c02ba1fbcd12082188dae01008e06a21fbcd95c2) azzera il contesto `family` per ogni gruppo durante la validazione; [`f8420e5`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/f8420e5e5f22f03b8bf04b3e9d325ef3ae2491c1) adegua il test negativo dei bundle reologici al rifiuto più specifico `complete law bundle`.
+
+**Esito comunicato dall'utente:** entrambe le GitHub Actions (compilazione e test del registro) sono passate dopo questi interventi, sullo stato del branch culminato nel commit `f8420e5`. Non sono stati forniti in questa conversazione gli identificatori dei due run: la conferma è riportata come evidenza comunicata dall'utente, non come audit indipendente dei log CI. I precedenti errori della sequenza sono quindi risolti rispetto a questi gate; ciò non certifica l'equivalenza numerica complessiva D17.20–D17.21.
+
+### D17.22.43 — Audit del campo eliminato e inizializzazione esplicita di `make_group` (24 ottobre 2026)
+
+Sul commit `f8420e5` sono stati esaminati tutti i 50 file Fortran di `src/`: non risultano più riferimenti al campo `term_ids` né accessi `%term_ids` nei sorgenti di produzione. **La rimozione di `term_ids` da `source_group_type` e dai relativi consumatori è completata a livello di sorgente e sostenuta dai gate di build/test comunicati dall'utente.**
+
+Nel commit [`d3cfc58`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/d3cfc58fc1d01164d3669a19fd3db5f0889c6542), `make_group` in `source_registry_2d.f90` alloca esplicitamente `term_names` ed `equation_ids` prima delle assegnazioni, per affrontare i warning GNU `-Wmaybe-uninitialized` sugli allocabili. **La scomparsa dei warning e i nuovi gate CI dopo questo commit devono ancora essere verificati.**
+
+**Limite architetturale vincolante:** non confondere il risultato precedente con il completamento di D17.2 e D17.19/10c. Il catalogo corrente contiene ancora i 34 descrittori numerici dei contributi, `source_term_descriptor(id)`, la conversione `source_names_for_ids`, `group_term_ids` e la rappresentazione compatibile `term_names`; `source_names` rappresenta già le identità canoniche delle leggi complete, ma non è ancora l'unica struttura delle sorgenti. La specifica finale rimane il **catalogo minimale nominale, una sorgente per legge fisica**, senza ID numerici delle sorgenti né addendi schedulabili individualmente. Servono modifiche coordinate a catalogo, configurazione, registro, dispatcher e test, con verifica delle regressioni numeriche D17.20–D17.21.
+
+**Stato:** rimozione del campo `term_ids` dai gruppi **COMPLETATA**; ulteriore migrazione verso il catalogo minimale **IN CORSO**; accettazione D17 complessiva **NON COMPLETATA**.
+
+### D17.22.44 — Documento normativo unico per i successivi aggiornamenti (24 ottobre 2026)
+
+Per richiesta esplicita dell'utente, **questo file** `docs/D17_Source_Groups_Revised_Specification_2026-10-24.md` è il solo documento D17 da mantenere aggiornato. Le precedenti menzioni di altri handoff, documenti storici o roadmap in questa specifica descrivono il contesto della migrazione e non costituiscono un obbligo di aggiornarli. **Ogni successiva modifica di stato o registrazione di un'implementazione D17 va riportata qui**, preservando la specifica integrale e distinguendo tra codice modificato, compilazione riuscita, test del registro e regressioni numeriche scientifiche.
+
