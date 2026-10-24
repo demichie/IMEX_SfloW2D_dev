@@ -21,7 +21,7 @@ MODULE state_2d
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: correct_friction_momentum
+  PUBLIC :: correct_friction_momentum, finalize_imex_cell_state
 
   !> \brief Owned cell states and diagnostics for one simulation.
   !> \details State arrays use (component,x-cell,y-cell); diagnostic maps use
@@ -159,6 +159,95 @@ CONTAINS
     momentum_after_friction = friction_scale * momentum_before_friction
 
   END SUBROUTINE correct_friction_momentum
+
+  !> \brief Finalize a cell after the last IMEX Runge-Kutta assembly.
+  !> \details Called after the observer sees the unmodified assembled state.
+  !> Preserves legacy error thresholds, clipping, dry momentum projection,
+  !> solid mass roundoff handling, and no-data masking in their original order.
+  !> The previous conservative state is needed by the historical solid-mass
+  !> roundoff branch, which refreshes qp before rescaling component masses.
+  SUBROUTINE finalize_imex_cell_state(q_cell, qp_cell, q_previous, nodata)
+    USE diagnostics_2d, ONLY : fatal_error
+    USE state_conversion_2d, ONLY : qc_to_qp, project_dry_cell_momenta, &
+         clip_roundoff_negative_component_masses
+    USE parameters_2d, ONLY : n_vars, n_solid, dry_thickness_tolerance, idx_u, idx_v
+    REAL(wp), INTENT(INOUT) :: q_cell(n_vars), qp_cell(n_vars+2)
+    REAL(wp), INTENT(IN) :: q_previous(n_vars)
+    LOGICAL, INTENT(IN) :: nodata
+    REAL(wp) :: p_dyn
+    LOGICAL :: solid_excess_roundoff
+
+       IF ( ANY(ISNAN(q_cell)) ) THEN
+          CALL fatal_error('NaN detected after IMEX Runge-Kutta update')
+          
+       END IF
+
+       CALL clip_roundoff_negative_component_masses(q_cell)
+       
+       
+       negative_thickness_check:IF ( q_cell(1) .LT. EPSILON(1.0_wp) ) THEN
+
+          IF ( q_cell(1) .GT. -1.0E-7_wp ) THEN
+
+             q_cell(1) = 0.0_wp
+             q_cell(2:n_vars) = 0.0_wp
+
+          ELSE
+             CALL fatal_error('negative thickness after IMEX Runge-Kutta update')
+
+          END IF
+
+       END IF negative_thickness_check
+
+       negative_alpha_check:IF ( ANY(q_cell(5:4+n_solid) .LT. 0.0_wp ) ) THEN
+          CALL fatal_error('negative solid mass after IMEX Runge-Kutta update')
+       END IF negative_alpha_check
+
+       CALL qc_to_qp(q_cell , qp_cell , p_dyn )
+
+       ! Do not carry unresolved momentum into a later rewetting event.
+       ! The raw assembly has already been observed and checked above. Unlike
+       ! the existing machine-epsilon cleanup, this projection retains mass,
+       ! thermal energy and every transported component. Keep qp consistent
+       ! without repeating the thermodynamic conversion (depth is unchanged).
+       CALL project_dry_cell_momenta(q_cell, qp_cell(1))
+       IF (qp_cell(1) <= dry_thickness_tolerance) THEN
+          qp_cell(2:3) = 0.0_wp
+          qp_cell(idx_u:idx_v) = 0.0_wp
+       END IF
+
+       IF ( qp_cell(4) .LT. 273.0_wp ) THEN
+          CALL fatal_error('temperature below the admissible threshold')
+
+       END IF
+          
+       IF ( SUM(q_cell(5:4+n_solid)) .GT. q_cell(1) ) THEN
+
+          ! Fortran does not guarantee short-circuit evaluation of .OR.;
+          ! evaluate the relative excess only when the denominator is safe.
+          IF ( q_cell(1) .LT. EPSILON(1.0_wp) ) THEN
+             solid_excess_roundoff = .TRUE.
+          ELSE
+             solid_excess_roundoff = ( ( SUM(q_cell(5:4+n_solid))             &
+                  - q_cell(1) ) / q_cell(1) .LT. 1.0E-10_wp )
+          END IF
+
+          IF ( solid_excess_roundoff ) THEN
+
+             CALL qc_to_qp(q_previous , qp_cell , p_dyn )
+
+             q_cell(5:4+n_solid) = q_cell(5:4+n_solid)                            &
+                  / SUM(q_cell(5:4+n_solid)) * q_cell(1)
+
+          ELSE
+             CALL fatal_error('solid mass exceeds total mass after IMEX update')
+
+          END IF
+
+       END IF
+
+       IF ( nodata ) q_cell = 0.0_wp
+  END SUBROUTINE finalize_imex_cell_state
 
   !******************************************************************************
 END MODULE state_2d

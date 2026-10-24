@@ -242,7 +242,9 @@ geometry/domain_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
 state/state_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                         \
                           core/constitutive_parameters_2d.$(OBJEXT)            \
                           geometry/geometry_2d.$(OBJEXT)                       \
-                          core/model_layout_2d.$(OBJEXT)
+                          core/model_layout_2d.$(OBJEXT)                       \
+                          state/state_conversion_2d.$(OBJEXT)                 \
+                          core/diagnostics_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)           \
                                         core/diagnostics_2d.$(OBJEXT)           \
                                         numerics/equation_metadata_2d.$(OBJEXT) \
@@ -284,7 +286,8 @@ numerics/time_integration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                          geometry/geometry_2d.$(OBJEXT)          \
                                          numerics/nonlinear_solver_2d.$(OBJEXT)  \
                                          spatial/spatial_operator_2d.$(OBJEXT)  \
-                                         state/state_conversion_2d.$(OBJEXT)
+                                         state/state_conversion_2d.$(OBJEXT)  \
+                                         state/state_2d.$(OBJEXT)
 numerics/step_source_executor_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           core/constitutive_parameters_2d.$(OBJEXT) \
                                           core/diagnostics_2d.$(OBJEXT)       \

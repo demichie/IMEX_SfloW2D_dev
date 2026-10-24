@@ -261,7 +261,6 @@ CONTAINS
 
     USE state_conversion_2d, ONLY : qc_to_qp, project_dry_cell_momenta,      &
          clip_roundoff_negative_component_masses
-    USE parameters_2d, ONLY : dry_thickness_tolerance, idx_u, idx_v
 
     USE source_terms_2d, ONLY : eval_stage_source_explicit
 
@@ -298,7 +297,6 @@ CONTAINS
     REAL(wp) :: p_dyn
     CHARACTER(LEN=128) :: closure_context
 
-    LOGICAL :: solid_excess_roundoff
     LOGICAL :: need_explicit_stage
     LOGICAL :: boundary_source_enabled
 
@@ -615,7 +613,7 @@ CONTAINS
 
     END DO runge_kutta
 
-    !$OMP PARALLEL DO private(j,k,p_dyn,solid_excess_roundoff,                 &
+    !$OMP PARALLEL DO private(j,k,p_dyn,                                     &
     !$OMP & residual_cell,q_old_cell)
 
     assemble_sol:DO l = 1,domain%solve_cells
@@ -649,76 +647,8 @@ CONTAINS
        ! component repair or primitive-state conversion below.
        IF ( PRESENT(observer) ) CALL observer(3, 0, j, k, q(:,j,k), 0)
 
-       IF ( ANY(ISNAN(q(:,j,k))) ) THEN
-          CALL fatal_error('NaN detected after IMEX Runge-Kutta update')
-          
-       END IF
-
-       CALL clip_roundoff_negative_component_masses(q(:,j,k))
-       
-       
-       negative_thickness_check:IF ( q(1,j,k) .LT. EPSILON(1.0_wp) ) THEN
-
-          IF ( q(1,j,k) .GT. -1.0E-7_wp ) THEN
-
-             q(1,j,k) = 0.0_wp
-             q(2:n_vars,j,k) = 0.0_wp
-
-          ELSE
-             CALL fatal_error('negative thickness after IMEX Runge-Kutta update')
-
-          END IF
-
-       END IF negative_thickness_check
-
-       negative_alpha_check:IF ( ANY(q(5:4+n_solid,j,k) .LT. 0.0_wp ) ) THEN
-          CALL fatal_error('negative solid mass after IMEX Runge-Kutta update')
-       END IF negative_alpha_check
-
-       CALL qc_to_qp(q(1:n_vars,j,k) , qp(1:n_vars+2,j,k) , p_dyn )
-
-       ! Do not carry unresolved momentum into a later rewetting event.
-       ! The raw assembly has already been observed and checked above. Unlike
-       ! the existing machine-epsilon cleanup, this projection retains mass,
-       ! thermal energy and every transported component. Keep qp consistent
-       ! without repeating the thermodynamic conversion (depth is unchanged).
-       CALL project_dry_cell_momenta(q(:,j,k), qp(1,j,k))
-       IF (qp(1,j,k) <= dry_thickness_tolerance) THEN
-          qp(2:3,j,k) = 0.0_wp
-          qp(idx_u:idx_v,j,k) = 0.0_wp
-       END IF
-
-       IF ( qp(4,j,k) .LT. 273.0_wp ) THEN
-          CALL fatal_error('temperature below the admissible threshold')
-
-       END IF
-          
-       IF ( SUM(q(5:4+n_solid,j,k)) .GT. q(1,j,k) ) THEN
-
-          ! Fortran does not guarantee short-circuit evaluation of .OR.;
-          ! evaluate the relative excess only when the denominator is safe.
-          IF ( q(1,j,k) .LT. EPSILON(1.0_wp) ) THEN
-             solid_excess_roundoff = .TRUE.
-          ELSE
-             solid_excess_roundoff = ( ( SUM(q(5:4+n_solid,j,k))             &
-                  - q(1,j,k) ) / q(1,j,k) .LT. 1.0E-10_wp )
-          END IF
-
-          IF ( solid_excess_roundoff ) THEN
-
-             CALL qc_to_qp(q_old_cell , qp(1:n_vars+2,j,k) , p_dyn )
-
-             q(5:4+n_solid,j,k) = q(5:4+n_solid,j,k)                            &
-                  / SUM(q(5:4+n_solid,j,k)) * q(1,j,k)
-
-          ELSE
-             CALL fatal_error('solid mass exceeds total mass after IMEX update')
-
-          END IF
-
-       END IF
-
-       IF ( B_nodata(j,k) ) q(:,j,k) = 0.0_wp
+       CALL finalize_imex_cell_state(q(:,j,k), qp(:,j,k), q_old_cell, &
+            B_nodata(j,k))
 
     END DO assemble_sol
 
