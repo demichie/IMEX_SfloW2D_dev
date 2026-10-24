@@ -149,6 +149,27 @@ def main() -> int:
     if re.search(r"(?i)\bcall\s+eval_mass_exchange_terms\s*\(",
                  equation_bridge):
         failures.append("equation_terms must not call the mass-exchange kernel directly")
+    # D17 cleanup gate: callers must use the canonical source assemblers.
+    # Check real USE statements (rather than comments) across the Fortran tree.
+    removed = {
+        "eval_expl_terms", "eval_stage_expl_terms", "eval_step_expl_terms",
+        "eval_semi_implicit_terms", "eval_implicit_terms", "eval_analytic_terms",
+    }
+    for filename in (ROOT / "src").rglob("*.f90"):
+        code = filename.read_text(encoding="utf-8")
+        no_comments = "\n".join(line.split("!")[0] for line in code.splitlines())
+        for old_name in removed:
+            if re.search(rf"(?i)\\b(?:call|module\\s+procedure)\\s+{old_name}\\b", no_comments):
+                failures.append(f"legacy source assembler {old_name} in {filename.relative_to(ROOT)}")
+        if filename != ROOT / "src/physics/equation_terms_2d.f90":
+            for match in re.finditer(
+                r"(?im)^\\s*use\\s+equation_terms_2d\\s*,\\s*only\\s*:\\s*"
+                r"((?:[^\\n]|\\n\\s*&)*?)(?=\\n\\s*(?:use|implicit|integer|real|type|logical|character|contains|end|public|private|!|$))",
+                no_comments,
+            ):
+                exposed = match.group(1).lower()
+                if re.search(r"eval_(?:boundary|bottom|radial|geometry)_(?:injection|curvature)", exposed):
+                    failures.append(f"legacy source import through equation_terms in {filename.relative_to(ROOT)}")
     for failure in failures:
         print("FAIL:", failure, file=sys.stderr)
     print(f"D17 physical treatment audit: {len(catalog)} configured sources, "
