@@ -23,6 +23,20 @@ PROGRAM test_source_registry
   DO k=1,SOURCE_TERM_COUNT
     term=source_term_descriptor(k)
     CALL require(term%id==k .AND. LEN_TRIM(term%name)>0,'catalog ID/name')
+    ! Every catalog entry must resolve to the same descriptor by canonical name.
+    ! This also covers non-schedulable dependent contributions.
+    BLOCK
+      TYPE(source_term_type) :: named_term
+      named_term=source_term_descriptor_by_name(term%name)
+      CALL require(named_term%id==k .AND. named_term%target==term%target, &
+           'catalog name round trip')
+      CALL require(named_term%has_explicit .EQV. term%has_explicit, &
+           'catalog explicit capability round trip')
+      CALL require(named_term%has_newton .EQV. term%has_newton, &
+           'catalog Newton capability round trip')
+      CALL require(named_term%has_analytic .EQV. term%has_analytic, &
+           'catalog analytic capability round trip')
+    END BLOCK
     IF (term%schedulable) nphysical=nphysical+1
   END DO
   CALL require(nphysical==SOURCE_PHYSICAL_TERM_COUNT,'physical catalog count')
