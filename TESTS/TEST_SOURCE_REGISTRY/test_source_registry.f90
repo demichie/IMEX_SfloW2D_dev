@@ -245,7 +245,9 @@ PROGRAM test_source_registry
   CALL partition%initialize(mask)
   CALL initialize_configured_sources(registry,partition,error)
   CALL require(error=='','empty implicit partition accepted')
-  CALL require(SIZE(groups)==1,'explicit-only partition has no implicit group')
+  groups=registry%stage_groups()
+  CALL require(SIZE(groups)==1 .AND. groups(1)%method==SOURCE_METHOD_EXPLICIT, &
+       'explicit-only partition has no implicit group')
   mask=.FALSE.;mask(2)=.TRUE.
   CALL partition%initialize(mask)
   CALL trial%initialize_legacy(partition,original,methods,0,[INTEGER::],error)

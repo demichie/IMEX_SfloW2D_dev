@@ -90,7 +90,6 @@ CONTAINS
     CHARACTER(*), INTENT(OUT) :: error
     TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:)
     TYPE(source_group_type) :: group
-    TYPE(source_term_type) :: term
     INTEGER, ALLOCATABLE :: parsed_terms(:,:),ordered(:),targets(:),equations(:)
     INTEGER, ALLOCATABLE :: group_terms(:),active_terms(:)
     INTEGER :: cadence(SOURCE_INPUT_MAX_GROUPS),method(SOURCE_INPUT_MAX_GROUPS)
@@ -100,8 +99,7 @@ CONTAINS
          SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: target_group(3),methods(SOURCE_INPUT_MAX_GROUPS),membership(n_eqns)
     LOGICAL :: implicit_mask(n_eqns),seen_terms(SOURCE_TERM_COUNT),expected_targets(3)
-    INTEGER :: i,j,k,g,s,t,slot,compact_group,stage_count,step_count,term_id,target, &
-         order_position
+    INTEGER :: i,j,k,g,s,t,slot,compact_group,stage_count,step_count,term_id,target
     CHARACTER(LEN=256) :: validation_error
 
     CALL registry%finalize()
