@@ -260,7 +260,7 @@ CONTAINS
        source_registry, domain, spatial_operator, observer)
 
     USE state_conversion_2d, ONLY : qc_to_qp, clip_roundoff_negative_component_masses
-    USE state_2d, ONLY : finalize_imex_cell_state
+    USE state_2d, ONLY : finalize_imex_cell_state, initialize_dry_physical_cell
 
     USE source_terms_2d, ONLY : eval_stage_source_explicit
 
@@ -353,8 +353,7 @@ CONTAINS
     DO l = 1,domain%reconstruction_cells
        j = domain%j_reconstruction(l)
        k = domain%k_reconstruction(l)
-       this%qp_rk(:,j,k) = 0.0_wp
-       this%qp_rk(4,j,k) = T_ambient
+       CALL initialize_dry_physical_cell(this%qp_rk(:,j,k))
     END DO
     !$OMP END DO
 
@@ -574,8 +573,7 @@ CONTAINS
 
              ELSE
 
-                this%qp_rk(1:n_vars+2,j,k) = 0.0_wp
-                this%qp_rk(4,j,k) = T_ambient
+                CALL initialize_dry_physical_cell(this%qp_rk(1:n_vars+2,j,k))
 
              END IF
 

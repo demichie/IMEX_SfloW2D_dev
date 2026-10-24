@@ -22,6 +22,7 @@ MODULE state_2d
 
   PRIVATE
   PUBLIC :: correct_friction_momentum, finalize_imex_cell_state
+  PUBLIC :: initialize_dry_physical_cell
 
   !> \brief Owned cell states and diagnostics for one simulation.
   !> \details State arrays use (component,x-cell,y-cell); diagnostic maps use
@@ -248,6 +249,14 @@ CONTAINS
 
        IF ( nodata ) q_cell = 0.0_wp
   END SUBROUTINE finalize_imex_cell_state
+
+  !> \brief Set one primitive state (including reconstruction halo) to dry.
+  !> \details Preserve the established zero state and ambient temperature.
+  PURE SUBROUTINE initialize_dry_physical_cell(qp_cell)
+    REAL(wp), INTENT(OUT) :: qp_cell(:)
+    qp_cell = 0.0_wp
+    qp_cell(4) = T_ambient
+  END SUBROUTINE initialize_dry_physical_cell
 
   !******************************************************************************
 END MODULE state_2d
