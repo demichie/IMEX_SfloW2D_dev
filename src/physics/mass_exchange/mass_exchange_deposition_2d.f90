@@ -13,6 +13,14 @@ MODULE mass_exchange_deposition_2d
   PUBLIC :: eval_lahar_deposition_rate
   PUBLIC :: eval_hindered_settling_deposition_rate
   PUBLIC :: eval_mass_exchange_deposition
+  ! Four-entry physical treatment contract; only EXPLICIT is supported.
+  PUBLIC :: eval_deposition_explicit
+  PUBLIC :: eval_deposition_semi_implicit
+  PUBLIC :: eval_deposition_implicit
+  PUBLIC :: eval_deposition_analytic
+  INTERFACE eval_deposition_explicit
+    MODULE PROCEDURE eval_mass_exchange_deposition
+  END INTERFACE eval_deposition_explicit
 CONTAINS
   SUBROUTINE eval_mass_exchange_deposition(r_h, r_T, r_alphas, alphas_tot, &
        r_rho_m, r_rho_c, dt, deposition_term)
@@ -187,4 +195,25 @@ CONTAINS
     rate = MIN(rate, flow_depth * solid_fraction / time_step)
 
   END FUNCTION eval_hindered_settling_deposition_rate
+
+  SUBROUTINE eval_deposition_semi_implicit(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
+    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
+    REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
+    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
+    CALL fatal_error('deposition: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_deposition_semi_implicit
+
+  SUBROUTINE eval_deposition_implicit(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
+    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
+    REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
+    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
+    CALL fatal_error('deposition: implicit treatment is unsupported')
+  END SUBROUTINE eval_deposition_implicit
+
+  SUBROUTINE eval_deposition_analytic(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
+    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
+    REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
+    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
+    CALL fatal_error('deposition: analytic treatment is unsupported')
+  END SUBROUTINE eval_deposition_analytic
 END MODULE mass_exchange_deposition_2d

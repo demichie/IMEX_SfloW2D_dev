@@ -1,11 +1,20 @@
 !> Air entrainment contribution to mass exchange.
 MODULE mass_exchange_entrainment_2d
   USE parameters_2d, ONLY : wp
+  USE diagnostics_2d, ONLY : fatal_error
   USE constitutive_parameters_2d, ONLY : entrainment_flag
 
   PRIVATE
   PUBLIC :: eval_air_entrainment_rate
   PUBLIC :: eval_mass_exchange_air_entrainment
+  ! Four-entry physical treatment contract; only EXPLICIT is supported.
+  PUBLIC :: eval_entrainment_explicit
+  PUBLIC :: eval_entrainment_semi_implicit
+  PUBLIC :: eval_entrainment_implicit
+  PUBLIC :: eval_entrainment_analytic
+  INTERFACE eval_entrainment_explicit
+    MODULE PROCEDURE eval_mass_exchange_air_entrainment
+  END INTERFACE eval_entrainment_explicit
 CONTAINS
   REAL(wp) FUNCTION eval_mass_exchange_air_entrainment(r_h, r_Ri, mod_vel2)
     REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
@@ -31,4 +40,22 @@ CONTAINS
     entrainment_rate = entrainment_coefficient * SQRT(speed_squared)
 
   END FUNCTION eval_air_entrainment_rate
+
+  REAL(wp) FUNCTION eval_entrainment_semi_implicit(r_h, r_Ri, mod_vel2)
+    REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
+    CALL fatal_error('entrainment: semi_implicit treatment is unsupported')
+    eval_entrainment_semi_implicit = 0.0_wp
+  END FUNCTION eval_entrainment_semi_implicit
+
+  REAL(wp) FUNCTION eval_entrainment_implicit(r_h, r_Ri, mod_vel2)
+    REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
+    CALL fatal_error('entrainment: implicit treatment is unsupported')
+    eval_entrainment_implicit = 0.0_wp
+  END FUNCTION eval_entrainment_implicit
+
+  REAL(wp) FUNCTION eval_entrainment_analytic(r_h, r_Ri, mod_vel2)
+    REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
+    CALL fatal_error('entrainment: analytic treatment is unsupported')
+    eval_entrainment_analytic = 0.0_wp
+  END FUNCTION eval_entrainment_analytic
 END MODULE mass_exchange_entrainment_2d

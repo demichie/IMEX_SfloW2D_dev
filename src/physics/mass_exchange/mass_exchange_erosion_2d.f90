@@ -1,11 +1,20 @@
 !> Erosion process: limit solid and carrier entrainment by available bed inventory.
 MODULE mass_exchange_erosion_2d
   USE parameters_2d, ONLY : wp, n_solid
+  USE diagnostics_2d, ONLY : fatal_error
   USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity, erodible_fract
 
   PRIVATE
   PUBLIC :: eval_erosion_rates
   PUBLIC :: eval_mass_exchange_erosion
+  ! Four-entry physical treatment contract; only EXPLICIT is supported.
+  PUBLIC :: eval_erosion_explicit
+  PUBLIC :: eval_erosion_semi_implicit
+  PUBLIC :: eval_erosion_implicit
+  PUBLIC :: eval_erosion_analytic
+  INTERFACE eval_erosion_explicit
+    MODULE PROCEDURE eval_mass_exchange_erosion
+  END INTERFACE eval_erosion_explicit
 CONTAINS
   SUBROUTINE eval_mass_exchange_erosion(r_h, mod_vel, alphas_tot, erodible, dt, &
        erosion_term, continuous_phase_erosion_term)
@@ -51,4 +60,22 @@ CONTAINS
     continuous_phase_erosion_rate = total_erosion * erodible_porosity
 
   END SUBROUTINE eval_erosion_rates
+
+  SUBROUTINE eval_erosion_semi_implicit(r_h, mod_vel, alphas_tot, erodible, dt, erosion_term, continuous_phase_erosion_term)
+    REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
+    REAL(wp), INTENT(OUT) :: erosion_term(n_solid), continuous_phase_erosion_term
+    CALL fatal_error('erosion: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_erosion_semi_implicit
+
+  SUBROUTINE eval_erosion_implicit(r_h, mod_vel, alphas_tot, erodible, dt, erosion_term, continuous_phase_erosion_term)
+    REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
+    REAL(wp), INTENT(OUT) :: erosion_term(n_solid), continuous_phase_erosion_term
+    CALL fatal_error('erosion: implicit treatment is unsupported')
+  END SUBROUTINE eval_erosion_implicit
+
+  SUBROUTINE eval_erosion_analytic(r_h, mod_vel, alphas_tot, erodible, dt, erosion_term, continuous_phase_erosion_term)
+    REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
+    REAL(wp), INTENT(OUT) :: erosion_term(n_solid), continuous_phase_erosion_term
+    CALL fatal_error('erosion: analytic treatment is unsupported')
+  END SUBROUTINE eval_erosion_analytic
 END MODULE mass_exchange_erosion_2d

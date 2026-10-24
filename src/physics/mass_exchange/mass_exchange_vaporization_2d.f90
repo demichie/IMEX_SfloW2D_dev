@@ -1,11 +1,20 @@
 !> Vaporization source contribution to conserved mass, energy and gas.
 MODULE mass_exchange_vaporization_2d
   USE parameters_2d, ONLY : wp, n_eqns, n_solid, gas_flag, liquid_vaporization_flag
+  USE diagnostics_2d, ONLY : fatal_error
   USE constitutive_parameters_2d, ONLY : rho_s, sp_heat_s, gamma_steam, sp_heat_g
   USE thermal_laws_2d, ONLY : eval_vaporization_mass_rate, eval_vaporization_energy_rate
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: add_mass_exchange_vaporization
+  ! Four-entry physical treatment contract; only EXPLICIT is supported.
+  PUBLIC :: eval_vaporization_explicit
+  PUBLIC :: eval_vaporization_semi_implicit
+  PUBLIC :: eval_vaporization_implicit
+  PUBLIC :: eval_vaporization_analytic
+  INTERFACE eval_vaporization_explicit
+    MODULE PROCEDURE add_mass_exchange_vaporization
+  END INTERFACE eval_vaporization_explicit
 CONTAINS
   SUBROUTINE add_mass_exchange_vaporization(B_zone, r_T, deposition_term, eqns_term)
     INTEGER, INTENT(IN) :: B_zone
@@ -25,4 +34,25 @@ CONTAINS
 
     END IF
   END SUBROUTINE add_mass_exchange_vaporization
+
+  SUBROUTINE eval_vaporization_semi_implicit(B_zone, r_T, deposition_term, eqns_term)
+    INTEGER, INTENT(IN) :: B_zone
+    REAL(wp), INTENT(IN) :: r_T, deposition_term(n_solid)
+    REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns)
+    CALL fatal_error('vaporization: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_vaporization_semi_implicit
+
+  SUBROUTINE eval_vaporization_implicit(B_zone, r_T, deposition_term, eqns_term)
+    INTEGER, INTENT(IN) :: B_zone
+    REAL(wp), INTENT(IN) :: r_T, deposition_term(n_solid)
+    REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns)
+    CALL fatal_error('vaporization: implicit treatment is unsupported')
+  END SUBROUTINE eval_vaporization_implicit
+
+  SUBROUTINE eval_vaporization_analytic(B_zone, r_T, deposition_term, eqns_term)
+    INTEGER, INTENT(IN) :: B_zone
+    REAL(wp), INTENT(IN) :: r_T, deposition_term(n_solid)
+    REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns)
+    CALL fatal_error('vaporization: analytic treatment is unsupported')
+  END SUBROUTINE eval_vaporization_analytic
 END MODULE mass_exchange_vaporization_2d

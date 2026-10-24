@@ -6,10 +6,10 @@ MODULE mass_exchange_assembly_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
   USE mass_exchange_balance_2d, ONLY : assemble_mass_exchange_balance
-  USE mass_exchange_carrier_loss_2d, ONLY : eval_total_carrier_loss_rate
-  USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion
-  USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition
-  USE mass_exchange_entrainment_2d, ONLY : eval_mass_exchange_air_entrainment
+  USE mass_exchange_carrier_loss_2d, ONLY : eval_carrier_loss_explicit
+  USE mass_exchange_erosion_2d, ONLY : eval_erosion_explicit
+  USE mass_exchange_deposition_2d, ONLY : eval_deposition_explicit
+  USE mass_exchange_entrainment_2d, ONLY : eval_entrainment_explicit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_mass_exchange_terms
@@ -150,7 +150,7 @@ CONTAINS
     mod_vel2 = r_u**2 + r_v**2 + r_w**2
     mod_vel = SQRT( mod_vel2 )
 
-    CALL eval_mass_exchange_erosion(r_h, mod_vel, alphas_tot, erodible, dt, &
+    CALL eval_erosion_explicit(r_h, mod_vel, alphas_tot, erodible, dt, &
          erosion_term, continuous_phase_erosion_term)
 
     r_T = qpj(4)
@@ -158,10 +158,10 @@ CONTAINS
     CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,             &
          r_sp_heat_mix)
 
-    CALL eval_mass_exchange_deposition(r_h, r_T, r_alphas, alphas_tot, &
+    CALL eval_deposition_explicit(r_h, r_T, r_alphas, alphas_tot, &
          r_rho_m, r_rho_c, dt, deposition_term)
 
-    CALL eval_total_carrier_loss_rate(r_h, r_T, r_alphas, alphas_tot, &
+    CALL eval_carrier_loss_explicit(r_h, r_T, r_alphas, alphas_tot, &
          r_rho_c, r_exc_pore_pres, deposition_term, dt, &
          continuous_phase_loss_term)
 
@@ -171,7 +171,7 @@ CONTAINS
     T_erodible_local = T_erodible
     IF ( erodible_deposit_flag ) T_erodible_local = r_T
 
-    air_entr = eval_mass_exchange_air_entrainment(r_h, r_Ri, mod_vel2)
+    air_entr = eval_entrainment_explicit(r_h, r_Ri, mod_vel2)
 
     CALL assemble_mass_exchange_balance(B_zone, r_u, r_v, r_T, r_rho_c, &
          r_sp_heat_c, T_erodible_local, air_entr, r_Zs, r_exc_pore_pres, &
