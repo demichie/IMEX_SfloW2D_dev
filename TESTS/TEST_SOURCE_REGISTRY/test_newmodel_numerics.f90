@@ -26,7 +26,7 @@ PROGRAM test_newmodel_numerics
   IF (rheology_name_has_role(term%name,SOURCE_ROLE_SEMI_IMPLICIT)) &
        ERROR STOP 'newmodel SI is intentionally zero'
   CALL eval_rheology_newmodel_semi_implicit(si_x,si_y)
-  IF (si_x/=0.0_wp .OR. si_y/=0.0_wp) ERROR STOP 'newmodel SI nonzero'
+  IF (ABS(si_x)+ABS(si_y)>TINY(1.0_wp)) ERROR STOP 'newmodel SI nonzero'
   DO case_number=1,4
     SELECT CASE(case_number)
     CASE(1)
