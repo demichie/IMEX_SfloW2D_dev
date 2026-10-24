@@ -934,3 +934,8 @@ Il registro rifiuta ora ogni gruppo implicito contenente soltanto un sottoinsiem
 ### D17.22.35 — Catalogo separato delle identità reologiche canoniche (24 ottobre 2026)
 
 Introdotto in `source_catalog_2d` l'array `RHEOLOGY_LAWS` con una sola voce nominale per ciascuna delle dieci leggi reologiche complete, distinta dall'array legacy `SOURCE_CATALOG` dei contributi matematici. La funzione `rheology_source_name` ora risolve il nome attraverso il catalogo canonico; `canonical_rheology_catalog_unique` ne valida nomi e model ID univoci, con test dedicato. Il parser `SOURCE_GROUPS` continua a espandere il nome della legge nelle componenti fisiche esistenti. Questa separazione costituisce la base per l'eliminazione successiva degli ID delle componenti dai gruppi e dal dispatcher; **non** rappresenta ancora la rimozione del catalogo legacy né il completamento del `source_term_type` minimale. Le Actions devono ancora verificare il nuovo commit.
+
+
+### D17.22.36 — Vista canonica delle sorgenti schedulabili per gruppo (24 ottobre 2026)
+
+`source_registry_2d` esporta `group_source_names(group)`, che espone ogni legge reologica come una sola sorgente nominale e deduplica gli addendi matematici appartenenti alla stessa famiglia, mantenendo distinti gli altri termini fisici. La rappresentazione interna `term_ids` non viene ancora eliminata: rimane necessaria agli assemblatori REAL/COMPLEX e alla compatibilità legacy. Inserita una regressione nella matrice delle configurazioni legacy che verifica l'identità canonica completa per i gruppi reologici. **Questo passo non equivale ancora a un registro esclusivamente nominale né alla rimozione dei 34 contributi del catalogo transitorio.** La compilazione e le Actions del nuovo HEAD sono ancora da verificare.

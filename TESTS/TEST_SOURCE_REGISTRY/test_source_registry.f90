@@ -118,6 +118,19 @@ PROGRAM test_source_registry
       CALL registry%initialize_legacy(partition,original,methods,pore,terms,error)
       CALL require(error=='' .AND. registry%is_initialized(),'legacy normalization: '//TRIM(error))
       groups=registry%stage_groups(); steps=registry%step_groups()
+      ! A scheduled rheology is exposed as one complete-law identity.
+      DO j=1,SIZE(groups)
+        IF (groups(j)%method==SOURCE_METHOD_EXPLICIT) CYCLE
+        IF (.NOT.ANY(groups(j)%equation_ids==2)) CYCLE
+        BLOCK
+          CHARACTER(LEN=64), ALLOCATABLE :: names(:)
+          names=group_source_names(groups(j))
+          IF (SIZE(rheology_source_terms(MERGE(3,1,enabled(2))))>0) THEN
+            CALL require(ANY(names==rheology_source_name(MERGE(3,1,enabled(2)))), &
+                 'complete rheology is one canonical schedule identity')
+          END IF
+        END BLOCK
+      END DO
       position=0
       DO g=1,3
         expected_targets=PACK([1,2,3],enabled .AND. original==g)

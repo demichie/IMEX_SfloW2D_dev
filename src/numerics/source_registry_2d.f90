@@ -12,7 +12,7 @@ MODULE source_registry_2d
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: source_group_type, source_registry_type
-  PUBLIC :: group_contains, group_contains_name
+  PUBLIC :: group_contains, group_contains_name, group_source_names
 
   !> \brief Homogeneous source group; identity is cadence plus id, not order.
   TYPE :: source_group_type
@@ -71,6 +71,26 @@ CONTAINS
       found=ANY(source_names_for_ids(group%term_ids)==TRIM(name))
     END IF
   END FUNCTION group_contains_name
+
+  !> Return one name per schedulable physical source. Rheological
+  !> component identities collapse to a single complete-law name; their
+  !> detailed term_ids remain internal for existing physical assemblers.
+  FUNCTION group_source_names(group) RESULT(names)
+    TYPE(source_group_type), INTENT(IN) :: group
+    CHARACTER(LEN=64), ALLOCATABLE :: names(:)
+    TYPE(source_term_type) :: term
+    CHARACTER(LEN=64) :: name
+    INTEGER :: i
+    ALLOCATE(names(0))
+    IF (.NOT.ALLOCATED(group%term_ids)) RETURN
+    DO i=1,SIZE(group%term_ids)
+      term=source_term_descriptor(group%term_ids(i))
+      name=term%name
+      IF (term%model_id/=0) name=rheology_source_name(term%model_id)
+      IF (LEN_TRIM(name)==0) CYCLE
+      IF (.NOT.ANY(names==name)) names=[names,name]
+    END DO
+  END FUNCTION group_source_names
 
   !> \brief Copy and validate complete group/solve metadata transactionally.
   !> \param[in,out] this Registry; reset even when validation fails.
