@@ -1,5 +1,6 @@
 !> \brief D17 metadata regressions: legacy schedules, coupling and invalid native groups.
 PROGRAM test_source_registry
+  USE, INTRINSIC :: iso_fortran_env, ONLY : error_unit
   USE source_catalog_2d
   USE source_registry_2d
   USE source_configuration_2d, ONLY : initialize_configured_sources
@@ -116,6 +117,11 @@ PROGRAM test_source_registry
       END DO
       CALL make_partition()
       CALL registry%initialize_legacy(partition,original,methods,pore,terms,error)
+      IF (error/='' .OR. .NOT.registry%is_initialized()) THEN
+        WRITE(error_unit,'(A,5(I0,1X),A,A)') &
+             'Legacy normalization failure (mode,a,b,c,bits): ',mode,a,b,c,bits, &
+             ' reason: ',TRIM(error)
+      END IF
       CALL require(error=='' .AND. registry%is_initialized(),'legacy normalization: '//TRIM(error))
       groups=registry%stage_groups(); steps=registry%step_groups()
       ! A scheduled rheology is exposed as one complete-law identity.
@@ -344,7 +350,7 @@ CONTAINS
     LOGICAL, INTENT(IN) :: condition
     CHARACTER(*), INTENT(IN) :: label
     IF (.NOT.condition) THEN
-      WRITE(*,*) 'FAIL: ',label
+      WRITE(error_unit,*) 'FAIL: ',label
       ERROR STOP 1
     END IF
     checks=checks+1
