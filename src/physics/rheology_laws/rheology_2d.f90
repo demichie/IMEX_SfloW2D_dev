@@ -29,6 +29,7 @@ MODULE rheology_2d
        solve_rheology_empirical_analytic
   USE rheology_quadratic_2d, ONLY : eval_rheology_quadratic_implicit,   &
        solve_rheology_quadratic_analytic
+  USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_implicit
   USE rheology_froude_2d, ONLY : eval_rheology_froude_semi_implicit,                  &
        solve_rheology_froude_analytic
   USE rheology_lucas_2d, ONLY : eval_rheology_lucas_semi_implicit,                    &
@@ -116,7 +117,7 @@ CONTAINS
             gravity_coefficient, solid_fractions, curvature_term_value,    &
             use_pore_pressure, excess_pore_pressure, rate(1), rate(2))
     CASE('none', 'rheology_plastic', 'rheology_empirical',       &
-         'rheology_quadratic')
+         'rheology_quadratic', 'rheology_newmodel')
        CONTINUE
     CASE DEFAULT
        CALL fatal_error('Invalid rheology name in semi-implicit momentum-rate dispatch')
@@ -163,6 +164,9 @@ CONTAINS
        CALL eval_rheology_empirical_implicit(flow_depth, velocity_x,    &
             velocity_y, horizontal_speed, speed, mixture_density, moving,   &
             rate(1), rate(2))
+    CASE('rheology_newmodel')
+       CALL eval_rheology_newmodel_implicit(velocity_x,velocity_y, &
+            mixture_density,rate(1),rate(2))
     CASE('rheology_quadratic')
        CALL eval_rheology_quadratic_implicit(velocity_x, velocity_y,   &
             horizontal_speed, speed_squared, mixture_density, moving,       &

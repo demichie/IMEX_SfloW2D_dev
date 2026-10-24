@@ -20,7 +20,7 @@ MODULE source_catalog_2d
     LOGICAL :: has_newton = .FALSE.
     LOGICAL :: has_analytic = .FALSE.
   END TYPE source_term_type
-  INTEGER, PARAMETER :: SOURCE_TERM_COUNT=24
+  INTEGER, PARAMETER :: SOURCE_TERM_COUNT=25
   TYPE(source_term_type), PARAMETER :: SOURCE_CATALOG(SOURCE_TERM_COUNT)=[ &
        source_term_type('rheology_voellmy','velocity',.FALSE.,.TRUE.,.TRUE.), &
        source_term_type('rheology_plastic','velocity',.FALSE.,.TRUE.,.TRUE.), &
@@ -32,6 +32,7 @@ MODULE source_catalog_2d
        source_term_type('rheology_lucas','velocity',.FALSE.,.TRUE.,.TRUE.), &
        source_term_type('rheology_mui','velocity',.FALSE.,.TRUE.,.TRUE.), &
        source_term_type('rheology_mui_voellmy','velocity',.FALSE.,.TRUE.,.TRUE.), &
+       source_term_type('rheology_newmodel','velocity',.FALSE.,.TRUE.,.FALSE.), &
        source_term_type('thermal_cooling','temperature',.FALSE.,.TRUE.,.TRUE.), &
        source_term_type('pore_pressure_dissipation','pore_pressure',.FALSE.,.TRUE.,.TRUE.), &
        source_term_type('bottom_circular_injection','explicit',.TRUE.,.FALSE.,.FALSE.), &
@@ -77,7 +78,8 @@ CONTAINS
     INTEGER :: i
     name=''
     IF (TRIM(model_name)=='none') RETURN
-    DO i=1,10
+    DO i=1,SOURCE_TERM_COUNT
+      IF (INDEX(TRIM(SOURCE_CATALOG(i)%name),'rheology_')/=1) CYCLE
       IF (TRIM(model_name)==TRIM(SOURCE_CATALOG(i)%name(10:))) THEN
         name=SOURCE_CATALOG(i)%name
         RETURN
@@ -87,8 +89,10 @@ CONTAINS
   PURE LOGICAL FUNCTION canonical_rheology_catalog_unique() RESULT(ok)
     INTEGER :: i,j
     ok=.FALSE.
-    DO i=1,10
-      DO j=i+1,10
+    DO i=1,SOURCE_TERM_COUNT
+      IF (INDEX(TRIM(SOURCE_CATALOG(i)%name),'rheology_')/=1) CYCLE
+      DO j=i+1,SOURCE_TERM_COUNT
+        IF (INDEX(TRIM(SOURCE_CATALOG(j)%name),'rheology_')/=1) CYCLE
         IF (SOURCE_CATALOG(i)%name==SOURCE_CATALOG(j)%name) RETURN
       END DO
     END DO
@@ -105,7 +109,7 @@ CONTAINS
       SELECT CASE(TRIM(source_name))
       CASE('rheology_voellmy','rheology_plastic','rheology_lava', &
            'rheology_lahar','rheology_empirical','rheology_quadratic', &
-           'rheology_mui_voellmy')
+           'rheology_mui_voellmy','rheology_newmodel')
         found=.TRUE.
       END SELECT
     CASE(SOURCE_ROLE_SEMI_IMPLICIT)

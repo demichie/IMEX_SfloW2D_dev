@@ -34,6 +34,7 @@ IMEX_SfloW2D_SOURCES = \
                 physics/rheology_laws/rheology_lahar_2d.f90 \
                 physics/rheology_laws/rheology_empirical_2d.f90 \
                 physics/rheology_laws/rheology_quadratic_2d.f90 \
+                physics/rheology_laws/rheology_newmodel_2d.f90 \
                 physics/rheology_laws/rheology_mui_2d.f90 \
                 physics/rheology_laws/rheology_mui_voellmy_2d.f90 \
                 physics/rheology_laws/rheology_2d.f90 \
@@ -94,6 +95,7 @@ physics/rheology_laws/rheology_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       
                                 physics/rheology_laws/rheology_lahar_2d.$(OBJEXT)         \
                                 physics/rheology_laws/rheology_empirical_2d.$(OBJEXT)     \
                                 physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT)     \
+                                physics/rheology_laws/rheology_newmodel_2d.$(OBJEXT)      \
                                 physics/rheology_laws/rheology_froude_2d.$(OBJEXT)        \
                                 physics/rheology_laws/rheology_lucas_2d.$(OBJEXT)         \
                                 physics/rheology_laws/rheology_mui_2d.$(OBJEXT)           \
