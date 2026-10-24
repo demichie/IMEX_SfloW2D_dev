@@ -12,22 +12,24 @@ MODULE source_terms_2d
   USE parameters_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source, eval_thermal_cooling_implicit
+  USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source, &
+       eval_thermal_cooling_implicit, solve_thermal_cooling_analytic
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source, &
-       eval_pore_pressure_dissipation_implicit
+       eval_pore_pressure_dissipation_implicit, solve_pore_pressure_dissipation_analytic
   USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
   USE mass_exchange_terms_2d, ONLY : eval_mass_exchange_terms
-  USE rheology_2d, ONLY : curvature_acceleration, &
+  USE rheology_2d, ONLY : curvature_acceleration, solve_rheology_analytic, &
        eval_rheology_implicit, eval_rheology_semi_implicit
   USE diagnostics_2d, ONLY : fatal_error
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_ROLE_IMPLICIT, &
        SOURCE_ROLE_SEMI_IMPLICIT, rheology_source_name, rheology_has_role
-  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC, SOURCE_CADENCE_STAGE
   USE source_registry_2d, ONLY : source_group_type, group_contains_name
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_step_source_explicit, eval_stage_source_explicit
-  PUBLIC :: eval_source_implicit, eval_source_semi_implicit
+  PUBLIC :: eval_source_implicit, eval_source_semi_implicit, eval_source_analytic
+  PUBLIC :: analytic_term_context_type
   PUBLIC :: eval_geometry_curvature_explicit
   PUBLIC :: eval_geometry_curvature_semi_implicit
   PUBLIC :: eval_geometry_curvature_implicit
@@ -53,7 +55,101 @@ MODULE source_terms_2d
   ! Shared source-window coefficients updated once before the RK stages.
   ! They remain private to the physics source layer, but are imported by
   ! the legacy window initializer until its migration.
+  TYPE :: analytic_term_context_type
+    REAL(wp) :: Bprime_x=0.0_wp, Bprime_y=0.0_wp
+    REAL(wp) :: Bsecond_xx=0.0_wp, Bsecond_xy=0.0_wp, Bsecond_yy=0.0_wp
+    REAL(wp) :: grav_coeff=0.0_wp, Zij=0.0_wp
+  END TYPE analytic_term_context_type
 CONTAINS
+
+  SUBROUTINE eval_source_analytic(group,q_before,context,interval,q_after,status)
+    TYPE(source_group_type), INTENT(IN) :: group
+    REAL(wp), INTENT(IN) :: q_before(n_vars),interval
+    TYPE(analytic_term_context_type), INTENT(IN) :: context
+    REAL(wp), INTENT(OUT) :: q_after(n_vars)
+    INTEGER, INTENT(OUT) :: status
+    REAL(wp) :: flow_h,flow_u,flow_v,flow_temperature,flow_density
+    REAL(wp) :: flow_alphas(n_solid),flow_alphag(n_add_gas),flow_alphal
+    REAL(wp) :: flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure
+    REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
+    REAL(wp) :: heat_capacity,temperature_after,pressure_known,pressure_after
+    LOGICAL :: supported
+
+    q_after=q_before
+    status=-5
+    IF (group%method/=SOURCE_METHOD_ANALYTIC) RETURN
+    IF (.NOT.ALLOCATED(group%equation_ids)) RETURN
+    ! The group owns the analytic operator and its complete equation target.
+    SELECT CASE(SIZE(group%equation_ids))
+    CASE(2)
+      IF (.NOT.(ANY(group%equation_ids==2) .AND. &
+           ANY(group%equation_ids==3))) RETURN
+      IF (rheology_flag) THEN
+        CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,         &
+             flow_density,flow_temperature,flow_alphal,flow_alphag,       &
+             flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure)
+        horizontal_speed=SQRT(flow_u**2+flow_v**2)
+        speed_ratio=1.0_wp
+        IF (horizontal_speed>0.0_wp) THEN
+          speed_ratio=SQRT(horizontal_speed**2+                           &
+               MERGE((flow_u*context%Bprime_x+flow_v*context%Bprime_y)**2,&
+               0.0_wp,slope_correction_flag))/horizontal_speed
+        END IF
+        curvature_accel=0.0_wp
+        IF (curvature_term_flag) curvature_accel=curvature_acceleration(  &
+             context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,    &
+             flow_u,flow_v)
+        velocity_after=[flow_u,flow_v]
+        CALL solve_rheology_analytic(rheology_model_id,interval, &
+             flow_h,flow_temperature,flow_density,speed_ratio,            &
+             [flow_u,flow_v],flow_red_grav,context%grav_coeff,flow_alphas,&
+             curvature_accel,pore_pressure_flag,flow_pore_pressure,       &
+             stochastic_flag,context%Zij,velocity_after,supported)
+        IF (.NOT.supported) THEN
+          status=-7
+          RETURN
+        END IF
+        q_after(2:3)=q_before(1)*velocity_after
+      END IF
+      status=0
+
+    CASE(1)
+      IF (group%equation_ids(1)==4) THEN
+      IF (.NOT.thermal_cooling_flag) THEN
+        status=-2
+        RETURN
+      END IF
+      CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,           &
+           flow_density,flow_temperature,flow_alphal,flow_alphag,         &
+           flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure)
+      IF (flow_temperature<=0.0_wp) THEN
+        status=-3
+        RETURN
+      END IF
+      heat_capacity=q_before(4)/flow_temperature
+      CALL solve_thermal_cooling_analytic(flow_temperature,interval,      &
+           heat_capacity,radiative_term_coeff,convective_term_coeff,      &
+           T_env,temperature_after)
+      q_after(4)=heat_capacity*temperature_after
+      status=0
+
+      ELSE IF (group%equation_ids(1)==idx_pore .AND. pore_pressure_flag) THEN
+      IF (q_before(1)>0.0_wp) THEN
+        CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,         &
+             flow_density,flow_temperature,flow_alphal,flow_alphag,       &
+             flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure)
+        pressure_known=q_before(idx_pore)/q_before(1)
+        CALL solve_pore_pressure_dissipation_analytic(pressure_known,interval,flow_h,  &
+             flow_temperature,flow_alphas,pressure_after)
+        q_after(idx_pore)=q_before(1)*pressure_after
+      END IF
+      status=0
+      ELSE
+        RETURN
+      END IF
+    END SELECT
+  END SUBROUTINE eval_source_analytic
+
 
   PURE LOGICAL FUNCTION group_has_role(group,role,model_id) RESULT(found)
     TYPE(source_group_type), INTENT(IN) :: group
