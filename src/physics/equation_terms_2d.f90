@@ -43,6 +43,7 @@ MODULE equation_terms_2d
        SOURCE_TERM_THERMAL_CONVECTIVE_COOLING,                               &
        SOURCE_TERM_PORE_PRESSURE_DISSIPATION, source_term_type,              &
        source_term_descriptor, source_term_descriptor_by_name,                &
+       rheology_source_name,                                                  &
        SOURCE_TERM_GEOMETRY_CURVATURE, SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION,&
        SOURCE_TERM_BOTTOM_FISSURAL_INJECTION, SOURCE_TERM_RADIAL_INJECTION
   USE source_registry_2d, ONLY : source_group_type, &
