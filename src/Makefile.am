@@ -172,7 +172,9 @@ physics/mass_exchange/mass_exchange_assembly_2d.$(OBJEXT): core/parameters_2d.$(
                                      physics/mass_exchange/mass_exchange_balance_2d.$(OBJEXT) \
                                      core/diagnostics_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
-                                     physics/mass_exchange/mass_exchange_assembly_2d.$(OBJEXT)
+                                     physics/mass_exchange/mass_exchange_assembly_2d.$(OBJEXT) \
+                                     physics/rheology_laws/rheology_2d.$(OBJEXT) \
+                                     core/diagnostics_2d.$(OBJEXT)
 physics/equation_terms_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      physics/thermal_laws_2d.$(OBJEXT)         \

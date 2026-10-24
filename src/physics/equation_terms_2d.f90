@@ -15,7 +15,9 @@
 MODULE equation_terms_2d
 
   USE diagnostics_2d, ONLY : fatal_error
-  USE source_terms_2d, ONLY : eval_step_source_explicit
+  USE source_terms_2d, ONLY : eval_step_source_explicit, &
+       eval_geometry_curvature_explicit, eval_geometry_curvature_semi_implicit, &
+       eval_geometry_curvature_implicit, solve_geometry_curvature_analytic
 
   USE constitutive_parameters_2d
   USE state_conversion_2d
@@ -1559,56 +1561,9 @@ CONTAINS
   !> \param[out] source_y Curvature contribution to the y-momentum source.
   !******************************************************************************
 
-  PURE SUBROUTINE eval_geometry_curvature_explicit( Bprime_x, Bprime_y,         &
-       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient,                 &
-       mixture_mass, velocity_x, velocity_y, source_x, source_y )
 
-    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
-    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
-    REAL(wp), INTENT(IN) :: grav_coefficient
-    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
-    REAL(wp), INTENT(OUT) :: source_x, source_y
-    REAL(wp) :: acceleration
 
-    acceleration = curvature_acceleration( Bsecond_xx, Bsecond_xy,          &
-         Bsecond_yy, velocity_x, velocity_y )
-    source_x = -grav_coefficient * mixture_mass * acceleration * Bprime_x
-    source_y = -grav_coefficient * mixture_mass * acceleration * Bprime_y
 
-  END SUBROUTINE eval_geometry_curvature_explicit
-
-  SUBROUTINE eval_geometry_curvature_semi_implicit(Bprime_x, Bprime_y, &
-       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
-       mixture_mass, velocity_x, velocity_y, source_x, source_y)
-    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
-    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
-    REAL(wp), INTENT(IN) :: grav_coefficient
-    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
-    REAL(wp), INTENT(OUT) :: source_x, source_y
-    CALL fatal_error('geometry_curvature: semi_implicit treatment is unsupported')
-  END SUBROUTINE eval_geometry_curvature_semi_implicit
-
-  SUBROUTINE eval_geometry_curvature_implicit(Bprime_x, Bprime_y, &
-       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
-       mixture_mass, velocity_x, velocity_y, source_x, source_y)
-    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
-    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
-    REAL(wp), INTENT(IN) :: grav_coefficient
-    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
-    REAL(wp), INTENT(OUT) :: source_x, source_y
-    CALL fatal_error('geometry_curvature: implicit treatment is unsupported')
-  END SUBROUTINE eval_geometry_curvature_implicit
-
-  SUBROUTINE solve_geometry_curvature_analytic(Bprime_x, Bprime_y, &
-       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
-       mixture_mass, velocity_x, velocity_y, source_x, source_y)
-    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
-    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
-    REAL(wp), INTENT(IN) :: grav_coefficient
-    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
-    REAL(wp), INTENT(OUT) :: source_x, source_y
-    CALL fatal_error('geometry_curvature: analytic treatment is unsupported')
-  END SUBROUTINE solve_geometry_curvature_analytic
 
 
   !******************************************************************************

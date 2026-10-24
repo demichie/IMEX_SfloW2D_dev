@@ -6,10 +6,68 @@
 MODULE source_terms_2d
   USE parameters_2d, ONLY : wp, n_vars, n_eqns, n_solid
   USE mass_exchange_assembly_2d, ONLY : eval_mass_exchange_terms
+  USE rheology_2d, ONLY : curvature_acceleration
+  USE diagnostics_2d, ONLY : fatal_error
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_step_source_explicit
+  PUBLIC :: eval_geometry_curvature_explicit
+  PUBLIC :: eval_geometry_curvature_semi_implicit
+  PUBLIC :: eval_geometry_curvature_implicit
+  PUBLIC :: solve_geometry_curvature_analytic
 CONTAINS
+
+  PURE SUBROUTINE eval_geometry_curvature_explicit( Bprime_x, Bprime_y,         &
+       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient,                 &
+       mixture_mass, velocity_x, velocity_y, source_x, source_y )
+
+    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
+    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
+    REAL(wp), INTENT(IN) :: grav_coefficient
+    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
+    REAL(wp), INTENT(OUT) :: source_x, source_y
+    REAL(wp) :: acceleration
+
+    acceleration = curvature_acceleration( Bsecond_xx, Bsecond_xy,          &
+         Bsecond_yy, velocity_x, velocity_y )
+    source_x = -grav_coefficient * mixture_mass * acceleration * Bprime_x
+    source_y = -grav_coefficient * mixture_mass * acceleration * Bprime_y
+
+  END SUBROUTINE eval_geometry_curvature_explicit
+
+  SUBROUTINE eval_geometry_curvature_semi_implicit(Bprime_x, Bprime_y, &
+       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
+       mixture_mass, velocity_x, velocity_y, source_x, source_y)
+    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
+    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
+    REAL(wp), INTENT(IN) :: grav_coefficient
+    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
+    REAL(wp), INTENT(OUT) :: source_x, source_y
+    CALL fatal_error('geometry_curvature: semi_implicit treatment is unsupported')
+  END SUBROUTINE eval_geometry_curvature_semi_implicit
+
+  SUBROUTINE eval_geometry_curvature_implicit(Bprime_x, Bprime_y, &
+       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
+       mixture_mass, velocity_x, velocity_y, source_x, source_y)
+    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
+    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
+    REAL(wp), INTENT(IN) :: grav_coefficient
+    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
+    REAL(wp), INTENT(OUT) :: source_x, source_y
+    CALL fatal_error('geometry_curvature: implicit treatment is unsupported')
+  END SUBROUTINE eval_geometry_curvature_implicit
+
+  SUBROUTINE solve_geometry_curvature_analytic(Bprime_x, Bprime_y, &
+       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
+       mixture_mass, velocity_x, velocity_y, source_x, source_y)
+    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
+    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
+    REAL(wp), INTENT(IN) :: grav_coefficient
+    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
+    REAL(wp), INTENT(OUT) :: source_x, source_y
+    CALL fatal_error('geometry_curvature: analytic treatment is unsupported')
+  END SUBROUTINE solve_geometry_curvature_analytic
+
   !> \brief Evaluate the atomic explicit STEP mass-exchange rate.
   !> \details Returns rates only; it never mutates conservative state, bed or inventory.
   !> \param[in] qpj Cell-local primitive state.
