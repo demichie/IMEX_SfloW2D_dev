@@ -342,10 +342,13 @@ CONTAINS
       IF (.NOT.ALLOCATED(group%analytic_solver_ids)) RETURN
       error='D17: invalid or repeated group equation'
       IF (.NOT.valid_equations(group%equation_ids,this%n_equations)) RETURN
-      error='D17: group source name and legacy membership disagree'
-      IF (.NOT.ALLOCATED(group%term_names)) RETURN
-      IF (SIZE(group%term_names)/=SIZE(group%term_ids)) RETURN
-      IF (ANY(group%term_names/=source_names_for_ids(group%term_ids))) RETURN
+      ! Name arrays are materialized on registry initialization. Keep direct
+      ! validation of pre-normalized legacy descriptors backward-compatible.
+      IF (ALLOCATED(group%term_names)) THEN
+        error='D17: group source name and legacy membership disagree'
+        IF (SIZE(group%term_names)/=SIZE(group%term_ids)) RETURN
+        IF (ANY(group%term_names/=source_names_for_ids(group%term_ids))) RETURN
+      END IF
       error='D17: physical term duplicated, unknown or dependent'
       DO j=1,SIZE(group%term_ids)
         id=group%term_ids(j)
