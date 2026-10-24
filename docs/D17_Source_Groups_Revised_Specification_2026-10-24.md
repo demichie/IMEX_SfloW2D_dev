@@ -1526,3 +1526,8 @@ Aggiunto `TESTS/ACCEPTANCE/test_d17_production_newton.f90` alla Action `d17-comp
 ### D17.20 — Newton 3x3 con accoppiamento fisico lava/raffreddamento (25 ottobre 2026)
 
 Esteso `TESTS/ACCEPTANCE/test_d17_production_newton.f90` con un gruppo NEWTON contenente `rheology_lava` e `thermal_cooling` sulle equazioni di momento x/y ed energia. Il test attiva la dipendenza reologica dalla temperatura e un raffreddamento convettivo non nullo; verifica che la derivata incrociata complex-step momento/energia sia non nulla, esegue `nonlinear_solver_2d::solve_rk_step` sul blocco unico 3x3 e controlla il residuo conservativo con l'assemblatore implicito di produzione. **Test implementato; CI da verificare.** Le regressioni legacy/native, RK, mass exchange e le due correzioni SI/IM restano aperte.
+
+
+### D17.20 — Test delle due correzioni reologiche nel solver di produzione (25 ottobre 2026)
+
+Esteso `TESTS/ACCEPTANCE/test_d17_production_newton.f90` con due chiamate a `nonlinear_solver_2d::solve_imex_stage` (percorso IMEX completo che applica il SI prima del Newton). Il caso lava usa un termine di snervamento SI deliberatamente elevato, verifica matematicamente che il contributo grezzo invertirebbe il momento e controlla che il risultato del solver non inverta il verso e non modifichi le equazioni non coinvolte. Il caso `rheology_newmodel` verifica la contrazione corretta lungo la direzione originaria dopo il Newton, confrontando anche il risultato con la soluzione implicita esatta. I test controllano gli effetti finali dei due punti di proiezione; **non strumentano i valori intermedi privati del solver** e non sostituiscono l'audit dell'ordine delle chiamate. **Esito della nuova CI ancora da verificare**. D17.20–21 ancora aperti.

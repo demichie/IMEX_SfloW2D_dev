@@ -6,7 +6,7 @@ PROGRAM test_d17_production_newton
   USE source_registry_2d, ONLY : source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON,SOURCE_CADENCE_STAGE, &
        SOURCE_PHASE_RK_IMPLICIT
-  USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,solve_rk_step
+  USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,solve_rk_step,solve_imex_stage
   USE source_terms_2d, ONLY : eval_source_implicit
   USE rheology_lava_2d, ONLY : nu_ref,visc_par,tau0
   USE rheology_parameters_2d, ONLY : T_ref
@@ -14,6 +14,7 @@ PROGRAM test_d17_production_newton
   TYPE(equation_partition_type) :: partition
   TYPE(source_group_type) :: group(1)
   REAL(wp) :: q(4),old(4),known(4),dt,expected(2),rate_real(4)
+  REAL(wp) :: im_term(4),raw_si(2),si_ratio,alpha
   COMPLEX(wp) :: complex_state(4),rate_complex(4)
   REAL(wp) :: cross_derivative(2)
   INTEGER :: iterations,info,k
@@ -108,6 +109,49 @@ PROGRAM test_d17_production_newton
   IF (ABS(q(4)-old(4))<=1.0E-8_wp) &
        ERROR STOP 'coupled thermal equation did not evolve'
   PRINT *, 'PASS D17 physically coupled Newton 3x3 lava/cooling'
+  ! D17.10.1: run the production IMEX stage with the semi-implicit
+  ! lava yield stress strong enough to reverse the raw momentum.
+  ! The post-SI projection must stop it before the Newton solve.
+  thermal_cooling_flag=.FALSE.;convective_term_coeff=0.0_wp
+  CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.], &
+       [0,1,1,0],[IM_GROUP_METHOD_NEWTON])
+  group(1)%equation_ids=[2,3]
+  group(1)%source_names=[CHARACTER(LEN=64)::'rheology_lava']
+  tau0=50000.0_wp
+  old=[1000.0_wp,3000.0_wp,-4000.0_wp,1.2E9_wp]
+  q=old;known=0.0_wp;dt=0.2_wp
+  si_ratio=SQRT(SUM((old(2:3)/old(1))**2))
+  raw_si=-tau0*(old(2:3)/old(1))/si_ratio
+  IF (DOT_PRODUCT(old(2:3),old(2:3)+dt*0.75_wp*raw_si)>=0.0_wp) &
+       ERROR STOP 'fixture does not induce SI reversal'
+  CALL solve_imex_stage(partition,group,old,old,dt,0.75_wp,known, &
+       0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
+       .FALSE.,.FALSE.,q,im_term,iterations,converged,info,search_failed)
+  IF (.NOT.converged .OR. info/=0 .OR. search_failed) &
+       ERROR STOP 'post-SI corrected production solve failed'
+  IF (MAXVAL(ABS(q(2:3)))>1.0E-6_wp) &
+       ERROR STOP 'post-SI projection failed to prevent reversed momentum'
+  IF (ABS(q(1)-old(1))>1.0E-12_wp .OR. ABS(q(4)-old(4))>1.0E-5_wp) &
+       ERROR STOP 'post-SI projection changed unrelated state'
+  PRINT *, 'PASS D17 production post-SI friction reversal guard'
+  ! D17.10.1: the post-Newton projection must also preserve the
+  ! original momentum ray for the strictly dissipative linear law.
+  rheology_model='newmodel'
+  group(1)%source_names=[CHARACTER(LEN=64)::'rheology_newmodel']
+  old=[1000.0_wp,3000.0_wp,-4000.0_wp,1.2E9_wp]
+  q=old;dt=0.2_wp
+  CALL solve_imex_stage(partition,group,old,old,dt,0.75_wp,known, &
+       0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
+       .FALSE.,.FALSE.,q,im_term,iterations,converged,info,search_failed)
+  IF (.NOT.converged .OR. info/=0 .OR. search_failed) &
+       ERROR STOP 'post-Newton production solve failed'
+  alpha=DOT_PRODUCT(q(2:3),old(2:3))/SUM(old(2:3)**2)
+  IF (alpha<0.0_wp .OR. alpha>1.0_wp) &
+       ERROR STOP 'post-Newton projection did not preserve dissipative scale'
+  CALL check(q(2:3),alpha*old(2:3),'post-Newton preserved momentum ray')
+  expected=old(2:3)/(1.0_wp+0.1_wp*dt*0.75_wp)
+  CALL check(q(2:3),expected,'post-Newton correct implicit drag')
+  PRINT *, 'PASS D17 production post-Newton friction ray guard'
 CONTAINS
   SUBROUTINE check(actual,reference,label)
     REAL(wp),INTENT(IN)::actual(2),reference(2)
