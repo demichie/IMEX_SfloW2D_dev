@@ -46,7 +46,7 @@ CONTAINS
     ALLOCATE(active_names(0))
     IF (rheology_flag) THEN
       law_names=rheology_component_names(rheology_model_id)
-      active_names=[active_names,law_names]
+      active_names=[CHARACTER(LEN=64) :: active_names,law_names]
       IF (SIZE(law_names)==0 .AND. rheology_model_id/=rheology_id_none) THEN
         error='D17: unsupported configured rheology'; RETURN
       END IF
@@ -236,7 +236,7 @@ CONTAINS
     ALLOCATE(active_names(0))
     IF (rheology_flag) THEN
       law_names=rheology_component_names(rheology_model_id)
-      active_names=[active_names,law_names]
+      active_names=[CHARACTER(LEN=64) :: active_names,law_names]
       IF (SIZE(law_names)==0 .AND. rheology_model_id/=rheology_id_none) THEN
         error='D17: unsupported configured rheology'; RETURN
       END IF
