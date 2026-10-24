@@ -222,7 +222,7 @@ Conservare il calcolo del residuo sui soli indici attivi, la Jacobiana complex-s
 **Tracciabilità:** `IMEX_SfloW2D_v2/src/solver_2d.f90` (`implicit_map`, `solve_rk_step`, `eval_jacobian`) e `IMEX_SfloW2D_dev/src/numerics/nonlinear_solver_2d.f90` (`solve_newton_group`, `eval_f`, `eval_jacobian`).
 
 
-**Stato di avanzamento D17.10 — IN CORSO (24 ottobre 2026).** Assemblaggio SI/IM e Newton indicizzato già esistenti; unico solve per gruppo applicato, ma copertura congiunta, correzioni e regressioni ancora incomplete. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
+**Stato di avanzamento D17.10 — IN CORSO (24 ottobre 2026).** Assemblaggio SI/IM e Newton indicizzato già esistenti; unico solve per gruppo applicato, ma copertura congiunta, correzioni e regressioni ancora incomplete. **Aggiornamento 24 ottobre:** commit `521f752c` allinea il solver alla lista completa `group_equations` e verifica che il singolo descrittore Newton copra esattamente quelle equazioni; le valutazioni SI/IM congiunte e i confronti numerici restano da completare. **Verifica:** le precedenti CI di compilazione e del registro sono passate, ma le modifiche recenti ai gruppi Newton (commit 079225a0, 209a6e0, db750a5b) non sono ancora state sottoposte a nuovi test; non dichiarare questa sezione completata senza i gate pertinenti di D17.20–D17.21.
 
 ## D17.11 — Kernel REAL/COMPLEX
 
@@ -744,3 +744,10 @@ In `source_configuration_2d::initialize_native_source_configuration`, il parsing
 Commit [`db750a5b`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/db750a5b5430b6e0e37c3b6d2013d79171ba2627): in `nonlinear_solver_2d.f90`, la gestione di un gruppo `NEWTON` verifica **esattamente un** `implicit_solver_id` e invoca una sola volta `solve_newton_group`, eliminando lo sweep `DO solver_index` ora vietato. Il solver mantiene la lista indicizzata delle equazioni, la valutazione SI, la correzione direzionale prima del Newton e quella successiva, nonché il solver lineare e la Jacobiana esistenti. Le modifiche sono limitate al controllo di cardinalità, alla scelta del primo/unico ID e alla rimozione del loop.
 
 **Stato:** commit pubblicato; non sono ancora state avviate Actions, per rispettare la politica manuale D17.22.6. Resta da semplificare la struttura del gruppo e da completare la migrazione nominale. Prima del prossimo refactoring strutturale eseguire compilation e test pertinenti su richiesta, oltre alle regressioni numericali proporzionate al cambiamento.
+
+
+### D17.22.10 — Unificazione della mappa delle equazioni Newton (24 ottobre 2026)
+
+Commit [`521f752c`](https://github.com/demichie/IMEX_SfloW2D_dev/commit/521f752c4b99e850f4d77e5ec45b5e5d740be29c): il percorso `NEWTON` di `nonlinear_solver_2d.f90` ora richiede che il descrittore dell'unico solver abbia esattamente tutte le equazioni del gruppo, controlla la copertura senza richiedere lo stesso ordine, usa `group_equations(:)` negli aggiornamenti SI e passa questa stessa lista al Newton indicizzato. Non modifica le routine della Jacobiana, le leggi fisiche né i tableaux. **Stato: implementato, non ancora verificato tramite compilazione/test dopo questo commit.** Restano da completare l'assemblaggio congiunto e la riorganizzazione dei descrittori secondo D17.19.
+
+**Politica Actions:** compilazione e registro possono essere eseguiti manualmente al prossimo gate di verifica del gruppo di modifiche; nessun trigger `push` deve essere reintrodotto.
