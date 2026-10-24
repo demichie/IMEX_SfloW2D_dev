@@ -6,7 +6,7 @@ MODULE mass_exchange_assembly_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source
-  USE thermal_laws_2d, ONLY : eval_vaporization_mass_rate, eval_vaporization_energy_rate
+  USE mass_exchange_vaporization_2d, ONLY : add_mass_exchange_vaporization
   USE mass_exchange_carrier_loss_2d, ONLY : eval_total_carrier_loss_rate
   USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion
   USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition
@@ -107,8 +107,6 @@ CONTAINS
     REAL(wp) :: rho_ers_tot
 
     REAL(wp) :: T_erodible_local !< cell-local substrate temperature [K]
-    REAL(wp) :: vapor_mass_rate
-    REAL(wp) :: vapor_energy_rate
 
 
     erosion_term(1:n_solid) = 0.0_wp
@@ -231,18 +229,7 @@ CONTAINS
     eqns_term(idx_solidEqn_first:idx_solidEqn_last) = rho_s(1:n_solid) *        &
          ( erosion_term(1:n_solid) - deposition_term(1:n_solid) )
 
-    IF ( gas_flag .AND. liquid_vaporization_flag .AND. ( B_zone .NE. 0 ) ) THEN
-
-       vapor_mass_rate = eval_vaporization_mass_rate(r_T, rho_s, sp_heat_s,   &
-            deposition_term, gamma_steam)
-       vapor_energy_rate = eval_vaporization_energy_rate(vapor_mass_rate,     &
-            sp_heat_g(1))
-
-       eqns_term(1) = eqns_term(1) + vapor_mass_rate
-       eqns_term(4) = eqns_term(4) + vapor_energy_rate
-       eqns_term(5+n_solid) = eqns_term(5+n_solid) + vapor_mass_rate
-
-    END IF
+    CALL add_mass_exchange_vaporization(B_zone, r_T, deposition_term, eqns_term)
 
     IF ( stoch_transport_flag) THEN
 
