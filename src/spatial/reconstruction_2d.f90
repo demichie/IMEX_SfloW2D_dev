@@ -38,10 +38,6 @@ MODULE reconstruction_2d
      ! Direct h_x-based states for the advective part of the PCCU flux.
      ! The existing interface states retain the eta-based reconstruction and
      ! are used for central-upwind dissipation and hydrostatic path terms.
-     REAL(wp), ALLOCATABLE :: q_adv_interfaceL(:,:,:)
-     REAL(wp), ALLOCATABLE :: q_adv_interfaceR(:,:,:)
-     REAL(wp), ALLOCATABLE :: q_adv_interfaceB(:,:,:)
-     REAL(wp), ALLOCATABLE :: q_adv_interfaceT(:,:,:)
      REAL(wp), ALLOCATABLE :: qp_adv_interfaceL(:,:,:)
      REAL(wp), ALLOCATABLE :: qp_adv_interfaceR(:,:,:)
      REAL(wp), ALLOCATABLE :: qp_adv_interfaceB(:,:,:)
@@ -89,10 +85,6 @@ CONTAINS
 
 
 
-    ALLOCATE( this%q_adv_interfaceL( n_vars, comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( this%q_adv_interfaceR( n_vars, comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( this%q_adv_interfaceB( n_vars, comp_cells_x, comp_interfaces_y ) )
-    ALLOCATE( this%q_adv_interfaceT( n_vars, comp_cells_x, comp_interfaces_y ) )
     ALLOCATE( this%qp_adv_interfaceL( n_vars+2, comp_interfaces_x, comp_cells_y ) )
     ALLOCATE( this%qp_adv_interfaceR( n_vars+2, comp_interfaces_x, comp_cells_y ) )
     ALLOCATE( this%qp_adv_interfaceB( n_vars+2, comp_cells_x, comp_interfaces_y ) )
@@ -139,10 +131,6 @@ CONTAINS
 
 
 
-    DEALLOCATE( this%q_adv_interfaceL )
-    DEALLOCATE( this%q_adv_interfaceR )
-    DEALLOCATE( this%q_adv_interfaceB )
-    DEALLOCATE( this%q_adv_interfaceT )
     DEALLOCATE( this%qp_adv_interfaceL )
     DEALLOCATE( this%qp_adv_interfaceR )
     DEALLOCATE( this%qp_adv_interfaceB )
@@ -832,21 +820,17 @@ CONTAINS
        CALL form_direct_face_momentum(this%qp_cellN(:,j,k))
        ! The unique transport face family is populated for every caller.
        CALL final_kt_state( this%qp_cellW(:,j,k),                         &
-               this%q_adv_interfaceR(:,j,k), this%qp_adv_interfaceR(:,j,k),  &
-               'KT reconstruction west', &
-               'KT reconstruction west unit-depth state' )
+               this%qp_adv_interfaceR(:,j,k),  &
+               'KT reconstruction west' )
           CALL final_kt_state( this%qp_cellE(:,j,k),                         &
-               this%q_adv_interfaceL(:,j+1,k), this%qp_adv_interfaceL(:,j+1,k), &
-               'KT reconstruction east', &
-               'KT reconstruction east unit-depth state' )
+               this%qp_adv_interfaceL(:,j+1,k), &
+               'KT reconstruction east' )
           CALL final_kt_state( this%qp_cellS(:,j,k),                         &
-               this%q_adv_interfaceT(:,j,k), this%qp_adv_interfaceT(:,j,k),  &
-               'KT reconstruction south', &
-               'KT reconstruction south unit-depth state' )
+               this%qp_adv_interfaceT(:,j,k),  &
+               'KT reconstruction south' )
           CALL final_kt_state( this%qp_cellN(:,j,k),                         &
-               this%q_adv_interfaceB(:,j,k+1), this%qp_adv_interfaceB(:,j,k+1), &
-               'KT reconstruction north', &
-               'KT reconstruction north unit-depth state' )
+               this%qp_adv_interfaceB(:,j,k+1), &
+               'KT reconstruction north' )
 
 
     END DO
@@ -1077,22 +1061,16 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !$OMP END PARALLEL DO
 
     DO k=1,comp_cells_y
-       this%q_adv_interfaceL(:,1,k)=this%q_adv_interfaceR(:,1,k)
        this%qp_adv_interfaceL(:,1,k)=this%qp_adv_interfaceR(:,1,k)
-       this%q_adv_interfaceR(:,comp_interfaces_x,k)= &
-            this%q_adv_interfaceL(:,comp_interfaces_x,k)
        this%qp_adv_interfaceR(:,comp_interfaces_x,k)= &
             this%qp_adv_interfaceL(:,comp_interfaces_x,k)
     END DO
     DO j=1,comp_cells_x
-       this%q_adv_interfaceB(:,j,1)=this%q_adv_interfaceT(:,j,1)
        this%qp_adv_interfaceB(:,j,1)=this%qp_adv_interfaceT(:,j,1)
-       this%q_adv_interfaceT(:,j,comp_interfaces_y)= &
-            this%q_adv_interfaceB(:,j,comp_interfaces_y)
        this%qp_adv_interfaceT(:,j,comp_interfaces_y)= &
             this%qp_adv_interfaceB(:,j,comp_interfaces_y)
     END DO
-    ! reconstruct() has already reflected the primitive/conservative states
+    ! reconstruct() has already reflected the primitive states
     ! at the internal radial-source wall. The eta pass above overwrites its
     ! scalar ghost traces: restore equal depths on both sides, including the
     ! selected transport reconstruction, before evaluating speeds and fluxes.
@@ -1274,7 +1252,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     INTEGER :: j, k, l
 
-    ! Final primitive/conservative traces are already populated by reconstruct().
+    ! Final primitive traces are already populated by reconstruct().
     ! This region handles only boundaries that require completed cell traces.
     !$OMP PARALLEL PRIVATE(l,j,k)
 
@@ -1282,10 +1260,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     ! the cell-owned traces.
     !$OMP DO
     DO k = 1, comp_cells_y
-       this%q_adv_interfaceL(:,1,k) = this%q_adv_interfaceR(:,1,k)
        this%qp_adv_interfaceL(:,1,k) = this%qp_adv_interfaceR(:,1,k)
-       this%q_adv_interfaceR(:,comp_interfaces_x,k) =                         &
-            this%q_adv_interfaceL(:,comp_interfaces_x,k)
        this%qp_adv_interfaceR(:,comp_interfaces_x,k) =                        &
             this%qp_adv_interfaceL(:,comp_interfaces_x,k)
     END DO
@@ -1293,18 +1268,14 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     !$OMP DO
     DO j = 1, comp_cells_x
-       this%q_adv_interfaceB(:,j,1) = this%q_adv_interfaceT(:,j,1)
        this%qp_adv_interfaceB(:,j,1) = this%qp_adv_interfaceT(:,j,1)
-       this%q_adv_interfaceT(:,j,comp_interfaces_y) =                        &
-            this%q_adv_interfaceB(:,j,comp_interfaces_y)
        this%qp_adv_interfaceT(:,j,comp_interfaces_y) =                       &
             this%qp_adv_interfaceB(:,j,comp_interfaces_y)
     END DO
     !$OMP END DO
 
     ! Rebuild the internal reflecting side of radial-source cells from the
-    ! reconstructed transport state.  The volumetric momentum and auxiliary normal velocity are both
-    ! reflected so qp and q remain consistent.
+    ! reconstructed transport state. Reflect primitive momentum and normal velocity.
     IF ( radial_source_flag ) THEN
        !$OMP DO
        DO l = 1, solve_cells
@@ -1313,9 +1284,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
           IF ( source_cell(j,k) .NE. 2 ) CYCLE
 
           IF ( sourceE(j,k) ) THEN
-             this%q_adv_interfaceR(:,j+1,k) = this%q_adv_interfaceL(:,j+1,k)
-             this%q_adv_interfaceR(2,j+1,k) =                                &
-                  -this%q_adv_interfaceR(2,j+1,k)
              this%qp_adv_interfaceR(:,j+1,k) =                                &
                   this%qp_adv_interfaceL(:,j+1,k)
              this%qp_adv_interfaceR(2,j+1,k) =                                &
@@ -1324,8 +1292,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                   -this%qp_adv_interfaceR(idx_u,j+1,k)
              this%eta_interfaceR(j+1,k) = this%eta_interfaceL(j+1,k)
           ELSEIF ( sourceW(j,k) ) THEN
-             this%q_adv_interfaceL(:,j,k) = this%q_adv_interfaceR(:,j,k)
-             this%q_adv_interfaceL(2,j,k) = -this%q_adv_interfaceL(2,j,k)
              this%qp_adv_interfaceL(:,j,k) = this%qp_adv_interfaceR(:,j,k)
              this%qp_adv_interfaceL(2,j,k) = -this%qp_adv_interfaceL(2,j,k)
              this%qp_adv_interfaceL(idx_u,j,k) =                             &
@@ -1334,10 +1300,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
           END IF
 
           IF ( sourceN(j,k) ) THEN
-             this%q_adv_interfaceT(:,j,k+1) =                                 &
-                  this%q_adv_interfaceB(:,j,k+1)
-             this%q_adv_interfaceT(3,j,k+1) =                                 &
-                  -this%q_adv_interfaceT(3,j,k+1)
              this%qp_adv_interfaceT(:,j,k+1) =                                &
                   this%qp_adv_interfaceB(:,j,k+1)
              this%qp_adv_interfaceT(3,j,k+1) =                                &
@@ -1346,8 +1308,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                   -this%qp_adv_interfaceT(idx_v,j,k+1)
              this%eta_interfaceT(j,k+1) = this%eta_interfaceB(j,k+1)
           ELSEIF ( sourceS(j,k) ) THEN
-             this%q_adv_interfaceB(:,j,k) = this%q_adv_interfaceT(:,j,k)
-             this%q_adv_interfaceB(3,j,k) = -this%q_adv_interfaceB(3,j,k)
              this%qp_adv_interfaceB(:,j,k) = this%qp_adv_interfaceT(:,j,k)
              this%qp_adv_interfaceB(3,j,k) = -this%qp_adv_interfaceB(3,j,k)
              this%qp_adv_interfaceB(idx_v,j,k) =                             &
@@ -1364,50 +1324,21 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
 
     !******************************************************************************
-    !> \brief Convert direct KT traces without the HP dry-state projection.
-    !> Python clamps reconstructed h to zero but keeps independently
-    !> reconstructed hu/hv for the inertial momentum flux. The unit-depth
-    !> conversion below retains that conservative momentum even when h is
-    !> clipped to zero, while mass-like quantities still scale with h.
-    !> \param[in] qp_candidate Reconstructed physical state at the face.
-    !> \param[out] q_conservative Conservative state converted from the trace.
-    !> \param[out] qp_reconstructed Physical state after depth and composition closure.
-    !> \param[in] j_cell X index of the adjacent cell.
-    !> \param[in] k_cell Y index of the adjacent cell.
-    !> \param[in] side Label identifying the face side for diagnostics.
+    !> \brief Finalize primitive KT traces without premature conservative conversion.
+    !> The selected transport depth is applied later in eval_pccu_interface.
     !******************************************************************************
-    SUBROUTINE final_kt_state(qp_candidate,q_conservative,qp_reconstructed,  &
-         context,unit_context)
-      USE state_conversion_2d, ONLY : qp_to_qc
+    SUBROUTINE final_kt_state(qp_candidate,qp_reconstructed,context)
       USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
 
       REAL(wp), INTENT(IN) :: qp_candidate(n_vars+2)
-      REAL(wp), INTENT(OUT) :: q_conservative(n_vars)
       REAL(wp), INTENT(OUT) :: qp_reconstructed(n_vars+2)
-      CHARACTER(LEN=*), INTENT(IN) :: context,unit_context
-
-      REAL(wp) :: qp_unit(n_vars+2),q_unit(n_vars),h_trace
-
-      ! The caller passes constant, side-specific diagnostic strings.
-      ! No formatting, trimming or concatenation is needed per KT face.
+      CHARACTER(LEN=*), INTENT(IN) :: context
 
       qp_reconstructed = qp_candidate
-      h_trace = MAX(qp_candidate(1),0.0_wp)
-      qp_reconstructed(1) = h_trace
+      qp_reconstructed(1) = MAX(qp_candidate(1),0.0_wp)
 
-      IF ( h_trace .GT. EPSILON(1.0_wp) ) THEN
-         CALL enforce_primitive_mass_fraction_closure(qp_reconstructed,      &
-              context)
-         CALL qp_to_qc(qp_reconstructed,q_conservative,context)
-      ELSE
-         qp_unit = qp_reconstructed
-         qp_unit(1) = 1.0_wp
-         CALL enforce_primitive_mass_fraction_closure(qp_unit,               &
-              unit_context)
-         CALL qp_to_qc(qp_unit,q_unit,unit_context)
-         q_conservative = h_trace*q_unit
-         q_conservative(2) = q_unit(2)
-         q_conservative(3) = q_unit(3)
+      IF ( qp_reconstructed(1) .GT. EPSILON(1.0_wp) ) THEN
+         CALL enforce_primitive_mass_fraction_closure(qp_reconstructed,context)
       END IF
 
     END SUBROUTINE final_kt_state
