@@ -2,6 +2,10 @@
 
 **Repository:** `demichie/IMEX_SfloW2D_dev`; **branch:** `feature/d17-source-refactor`; **audited HEAD:** `d5d4ad25083b3b2320e151fb9b736406bcad6bfd`.
 
+## Post-audit update — 25 October 2026
+
+On branch `feature/d17-source-refactor`, commit `1d60cc8f` hardens `create_inputfiles.py`, `launch_jobs.py` and `templatedir/run.sh`: selective text placeholder substitution, preservation of binary/symlink/unchanged files, atomic replacement, preflight executable checks and failure propagation. **User-reported functional verification: working** (25 October 2026). No accompanying log, member count, input/output comparison, or negative-case evidence was supplied. Therefore the fix is **implemented and user-verified**, not an automated or complete end-to-end acceptance. The open work is targeted failure-case tests, generated-input/parser evidence, and smoke-test execution of other D17 example families. The original findings below describe the state at the prior audited HEAD and should not be read as unresolved source defects without rechecking.
+
 ## Status and method
 
 **STATIC/PARTIAL — NOT AN END-TO-END ACCEPTANCE.** Queried the recursive Git tree (618 entries, not truncated), inventoried the 122 tracked files in `EXAMPLES/`, compared the D17 roadmap and earlier `D17_EXAMPLES_TESTS_INPUT_GENERATORS_AUDIT_2026_10_25.md`, checked the documented example release verification and inspected the principal generator/runner source code. No D17-HEAD solver execution or generated-input parser run was performed. The previous C06 example acceptance refers to earlier pinned revisions and must not be transferred to the D17 HEAD. Do not interpret a clean source scan as an executable PASS.
@@ -31,7 +35,7 @@ Separate facilities: `tools/docs/build_examples.py`, `tools/release/build_archiv
 |---|---|---|
 | Legacy-generated inputs: 2D, 2D_PP, BOX, BUMP (4), BW, BW2D, DAMBREAK, ENGWELL2016, INCLINED_EXCAVATION_2D, LATERAL_SOURCE, SLOPE | Templates and generators present; inspect outputs, dependencies and parser results | NOT RUN |
 | Tracked input examples: CF, ETNA, ETNA_LAVA, TAAL, TAAL_BOTTOM | Namelists present; previous C06 runs belong to older revisions | NOT RUN |
-| Etna ensemble sample/input generation, per-member launch, probability aggregation | Binary-safety and launch/preprocessing issues above | NOT RUN |
+| Etna ensemble sample/input generation, per-member launch, probability aggregation | Generator/launcher hardened in `1d60cc8f`; user reports workflow works; negative-case and full-member evidence not supplied | USER-VERIFIED (scope unspecified); FULL GATE OPEN |
 | TESTS-generated inputs, scripts, acceptance harness | Inventoried; no blanket compatibility claim | NOT RUN |
 | Docs/release catalogue builders and UTILS postprocessing | Inventoried; prior packaging evidence version-scoped | NOT RUN |
 
