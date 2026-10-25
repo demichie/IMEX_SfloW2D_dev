@@ -855,7 +855,6 @@ CONTAINS
 
     ! External procedures
     USE equation_terms_2d, ONLY : eval_local_speeds_direction
-    USE nonconservative_2d, ONLY : PATH_DIR_X, PATH_DIR_Y
 
     IMPLICIT NONE
 
@@ -865,57 +864,40 @@ CONTAINS
     INTEGER, INTENT(IN) :: j_stag_x(:), k_stag_x(:)
     INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
 
-    REAL(wp) :: min_r, max_r, eta_min_r, eta_max_r
+    REAL(wp) :: min_r, max_r
     REAL(wp) :: h_eta_minus, h_eta_plus
     REAL(wp) :: qp_eta_minus(n_vars+2), qp_eta_plus(n_vars+2)
-    LOGICAL :: source_trace_minus,source_trace_plus
 
-    INTEGER :: j,k,l,kt_mode
-
-    kt_mode=kt_depth_mode()
+    INTEGER :: j,k,l
 
     !$OMP PARALLEL
 
     IF ( comp_cells_x .GT. 1 ) THEN
 
-       !$OMP DO private(j,k,min_r,max_r,eta_min_r,eta_max_r, &
-       !$OMP& h_eta_minus,h_eta_plus,qp_eta_minus,qp_eta_plus, &
-       !$OMP& source_trace_minus,source_trace_plus)
+       !$OMP DO private(j,k,min_r,max_r,h_eta_minus,h_eta_plus, &
+       !$OMP& qp_eta_minus,qp_eta_plus)
 
        x_interfaces_loop:DO l = 1,solve_interfaces_x
 
           j = j_stag_x(l)
           k = k_stag_x(l)
-          CALL lateral_source_trace_sides(PATH_DIR_X,j,k,                  &
-               source_trace_minus,source_trace_plus)
-
-          CALL eval_interface_speed_bounds( recon%qp_adv_interfaceL(:,j,k), &
-               recon%qp_adv_interfaceR(:,j,k),grav_coeff_stag_x(j,k),idx_u,&
-               min_r,max_r )
-
-          IF ( kt_mode .NE. 1 ) THEN
-             ! The positivity blend can replace the direct h_x depth by the
-             ! eta-based depth. Include both endpoints in the speed bounds so
-             ! the admissibility interval contains the blended state.
-             h_eta_minus=recon%h_selected_interfaceL(j,k)
-              h_eta_plus=recon%h_selected_interfaceR(j,k)
-             qp_eta_minus=recon%qp_adv_interfaceL(:,j,k)
-             qp_eta_plus=recon%qp_adv_interfaceR(:,j,k)
-             qp_eta_minus(1)=h_eta_minus
-             qp_eta_plus(1)=h_eta_plus
-             IF ( h_eta_minus .LE. dry_thickness_tolerance ) &
-                  qp_eta_minus(idx_u:idx_v)=0.0_wp
-             IF ( h_eta_plus .LE. dry_thickness_tolerance ) &
-                  qp_eta_plus(idx_u:idx_v)=0.0_wp
-             qp_eta_minus(2)=h_eta_minus*qp_eta_minus(idx_u)
-             qp_eta_minus(3)=h_eta_minus*qp_eta_minus(idx_v)
-             qp_eta_plus(2)=h_eta_plus*qp_eta_plus(idx_u)
-             qp_eta_plus(3)=h_eta_plus*qp_eta_plus(idx_v)
-             CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus,    &
-                  grav_coeff_stag_x(j,k),idx_u,eta_min_r,eta_max_r)
-             min_r=eta_min_r
-             max_r=eta_max_r
-          END IF
+          ! Selected-depth endpoint states are the only wave-speed inputs.
+          h_eta_minus=recon%h_selected_interfaceL(j,k)
+          h_eta_plus=recon%h_selected_interfaceR(j,k)
+          qp_eta_minus=recon%qp_adv_interfaceL(:,j,k)
+          qp_eta_plus=recon%qp_adv_interfaceR(:,j,k)
+          qp_eta_minus(1)=h_eta_minus
+          qp_eta_plus(1)=h_eta_plus
+          IF (h_eta_minus .LE. dry_thickness_tolerance) &
+               qp_eta_minus(idx_u:idx_v)=0.0_wp
+          IF (h_eta_plus .LE. dry_thickness_tolerance) &
+               qp_eta_plus(idx_u:idx_v)=0.0_wp
+          qp_eta_minus(2)=h_eta_minus*qp_eta_minus(idx_u)
+          qp_eta_minus(3)=h_eta_minus*qp_eta_minus(idx_v)
+          qp_eta_plus(2)=h_eta_plus*qp_eta_plus(idx_u)
+          qp_eta_plus(3)=h_eta_plus*qp_eta_plus(idx_v)
+          CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus, &
+               grav_coeff_stag_x(j,k),idx_u,min_r,max_r)
 
           this%a_interface_xNeg(j,k) = min_r
           this%a_interface_xPos(j,k) = max_r
@@ -928,41 +910,30 @@ CONTAINS
 
     IF ( comp_cells_y .GT. 1 ) THEN
 
-       !$OMP DO private(j,k,min_r,max_r,eta_min_r,eta_max_r, &
-       !$OMP& h_eta_minus,h_eta_plus,qp_eta_minus,qp_eta_plus, &
-       !$OMP& source_trace_minus,source_trace_plus)
+       !$OMP DO private(j,k,min_r,max_r,h_eta_minus,h_eta_plus, &
+       !$OMP& qp_eta_minus,qp_eta_plus)
 
        y_interfaces_loop:DO l = 1,solve_interfaces_y
 
           j = j_stag_y(l)
           k = k_stag_y(l)
-          CALL lateral_source_trace_sides(PATH_DIR_Y,j,k,                  &
-               source_trace_minus,source_trace_plus)
-
-          CALL eval_interface_speed_bounds( recon%qp_adv_interfaceB(:,j,k), &
-               recon%qp_adv_interfaceT(:,j,k),grav_coeff_stag_y(j,k),idx_v,&
-               min_r,max_r )
-
-          IF ( kt_mode .NE. 1 ) THEN
-             h_eta_minus=recon%h_selected_interfaceB(j,k)
-              h_eta_plus=recon%h_selected_interfaceT(j,k)
-             qp_eta_minus=recon%qp_adv_interfaceB(:,j,k)
-             qp_eta_plus=recon%qp_adv_interfaceT(:,j,k)
-             qp_eta_minus(1)=h_eta_minus
-             qp_eta_plus(1)=h_eta_plus
-             IF ( h_eta_minus .LE. dry_thickness_tolerance ) &
-                  qp_eta_minus(idx_u:idx_v)=0.0_wp
-             IF ( h_eta_plus .LE. dry_thickness_tolerance ) &
-                  qp_eta_plus(idx_u:idx_v)=0.0_wp
-             qp_eta_minus(2)=h_eta_minus*qp_eta_minus(idx_u)
-             qp_eta_minus(3)=h_eta_minus*qp_eta_minus(idx_v)
-             qp_eta_plus(2)=h_eta_plus*qp_eta_plus(idx_u)
-             qp_eta_plus(3)=h_eta_plus*qp_eta_plus(idx_v)
-             CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus,    &
-                  grav_coeff_stag_y(j,k),idx_v,eta_min_r,eta_max_r)
-             min_r=eta_min_r
-             max_r=eta_max_r
-          END IF
+          ! Selected-depth endpoint states are the only wave-speed inputs.
+          h_eta_minus=recon%h_selected_interfaceB(j,k)
+          h_eta_plus=recon%h_selected_interfaceT(j,k)
+          qp_eta_minus=recon%qp_adv_interfaceB(:,j,k)
+          qp_eta_plus=recon%qp_adv_interfaceT(:,j,k)
+          qp_eta_minus(1)=h_eta_minus
+          qp_eta_plus(1)=h_eta_plus
+          IF (h_eta_minus .LE. dry_thickness_tolerance) &
+               qp_eta_minus(idx_u:idx_v)=0.0_wp
+          IF (h_eta_plus .LE. dry_thickness_tolerance) &
+               qp_eta_plus(idx_u:idx_v)=0.0_wp
+          qp_eta_minus(2)=h_eta_minus*qp_eta_minus(idx_u)
+          qp_eta_minus(3)=h_eta_minus*qp_eta_minus(idx_v)
+          qp_eta_plus(2)=h_eta_plus*qp_eta_plus(idx_u)
+          qp_eta_plus(3)=h_eta_plus*qp_eta_plus(idx_v)
+          CALL eval_interface_speed_bounds(qp_eta_minus,qp_eta_plus, &
+               grav_coeff_stag_y(j,k),idx_v,min_r,max_r)
 
           this%a_interface_yNeg(j,k) = min_r
           this%a_interface_yPos(j,k) = max_r
@@ -990,18 +961,6 @@ CONTAINS
   !> \param[out] speed_minus Minimum wave speed, bounded above by zero.
   !> \param[out] speed_plus Maximum wave speed, bounded below by zero.
   !> Resolve the configuration string outside all active-interface loops.
-  INTEGER FUNCTION kt_depth_mode() RESULT(mode)
-    SELECT CASE (TRIM(kt_trace_reconstruction))
-    CASE ('h_x')
-       mode=1
-    CASE ('minmod')
-       mode=3
-    CASE ('froude_blend')
-       mode=4
-    CASE DEFAULT
-       mode=2
-    END SELECT
-  END FUNCTION kt_depth_mode
 
 
   SUBROUTINE eval_interface_speed_bounds(qp_minus,qp_plus,grav_coeff,       &
