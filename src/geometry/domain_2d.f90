@@ -37,11 +37,14 @@ MODULE domain_2d
 
      INTEGER :: solve_cells
      INTEGER :: reconstruction_cells
+     INTEGER :: hp_eta_cells
      INTEGER :: solve_interfaces_x
      INTEGER :: solve_interfaces_y
 
      INTEGER, ALLOCATABLE :: j_cent(:)
      INTEGER, ALLOCATABLE :: k_cent(:)
+     LOGICAL, ALLOCATABLE :: hp_eta_mask(:,:)
+     INTEGER, ALLOCATABLE :: hp_eta_j(:), hp_eta_k(:)
      INTEGER, ALLOCATABLE :: j_reconstruction(:)
      INTEGER, ALLOCATABLE :: k_reconstruction(:)
      INTEGER, ALLOCATABLE :: j_stag_x(:)
@@ -71,6 +74,7 @@ CONTAINS
     ALLOCATE( this%solve_mask(comp_cells_x,comp_cells_y) )
     ALLOCATE( this%solve_mask_temp(comp_cells_x,comp_cells_y) )
     ALLOCATE( this%reconstruction_mask(comp_cells_x,comp_cells_y) )
+    ALLOCATE( this%hp_eta_mask(comp_cells_x,comp_cells_y) )
     ALLOCATE( this%solve_mask_x(comp_interfaces_x,comp_cells_y) )
     ALLOCATE( this%solve_mask_y(comp_cells_x,comp_interfaces_y) )
 
@@ -79,6 +83,7 @@ CONTAINS
     this%solve_mask = .FALSE.
     this%solve_mask_temp = .FALSE.
     this%reconstruction_mask = .FALSE.
+    this%hp_eta_mask = .FALSE.
     this%solve_mask_x = .FALSE.
     this%solve_mask_y = .FALSE.
 
@@ -91,6 +96,7 @@ CONTAINS
 
     ALLOCATE( this%j_cent(comp_cells_xy) )
     ALLOCATE( this%k_cent(comp_cells_xy) )
+    ALLOCATE( this%hp_eta_j(comp_cells_xy), this%hp_eta_k(comp_cells_xy) )
     ALLOCATE( this%j_reconstruction(comp_cells_xy) )
     ALLOCATE( this%k_reconstruction(comp_cells_xy) )
     ALLOCATE( this%j_stag_x(comp_interfaces_x*comp_cells_y) )
@@ -100,6 +106,7 @@ CONTAINS
 
     this%solve_cells = 0
     this%reconstruction_cells = 0
+    this%hp_eta_cells = 0
     this%solve_interfaces_x = 0
     this%solve_interfaces_y = 0
 
@@ -126,6 +133,7 @@ CONTAINS
     DEALLOCATE( this%solve_mask )
     DEALLOCATE( this%solve_mask_temp )
     DEALLOCATE( this%reconstruction_mask )
+    DEALLOCATE( this%hp_eta_mask, this%hp_eta_j, this%hp_eta_k )
     DEALLOCATE( this%solve_mask_x )
     DEALLOCATE( this%solve_mask_y )
 
@@ -293,6 +301,23 @@ CONTAINS
 
     this%solve_cells = i
 
+    ! Preserve the former HP workset order: active cells, then neighbours.
+    DO i = 1, this%hp_eta_cells
+       this%hp_eta_mask(this%hp_eta_j(i),this%hp_eta_k(i)) = .FALSE.
+    END DO
+    this%hp_eta_cells = 0
+    DO i = 1, this%solve_cells
+       CALL append_hp_cell(this%j_cent(i),this%k_cent(i))
+    END DO
+    DO i = 1, this%solve_cells
+       j = this%j_cent(i)
+       k = this%k_cent(i)
+       IF (j .GT. 1) CALL append_hp_cell(j-1,k)
+       IF (j .LT. comp_cells_x) CALL append_hp_cell(j+1,k)
+       IF (k .GT. 1) CALL append_hp_cell(j,k-1)
+       IF (k .LT. comp_cells_y) CALL append_hp_cell(j,k+1)
+    END DO
+
     ! HP reconstruction reads a two-cell stencil around every evolved cell.
     ! Keep this read-only halo separate from solve_mask so no additional cells
     ! are advanced by the time integrator.
@@ -374,6 +399,15 @@ CONTAINS
 
     RETURN
 
+  CONTAINS
+    SUBROUTINE append_hp_cell(j_cell,k_cell)
+      INTEGER, INTENT(IN) :: j_cell,k_cell
+      IF (this%hp_eta_mask(j_cell,k_cell)) RETURN
+      this%hp_eta_mask(j_cell,k_cell) = .TRUE.
+      this%hp_eta_cells = this%hp_eta_cells + 1
+      this%hp_eta_j(this%hp_eta_cells) = j_cell
+      this%hp_eta_k(this%hp_eta_cells) = k_cell
+    END SUBROUTINE append_hp_cell
   END SUBROUTINE check_solve
 
 END MODULE domain_2d

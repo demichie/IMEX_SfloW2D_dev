@@ -68,12 +68,14 @@ MODULE reconstruction_2d
        LOGICAL, ALLOCATABLE :: hp_eta_mask(:,:)
        INTEGER, ALLOCATABLE :: hp_eta_j(:), hp_eta_k(:)
        INTEGER :: hp_eta_cells
+       LOGICAL :: hp_workset_prepared = .FALSE.
        ! Per direction: h-/h+, normal momentum-/+, then tangential momentum-/+.
         
    CONTAINS
      PROCEDURE :: initialize => initialize_reconstruction
      PROCEDURE :: finalize => finalize_reconstruction
      PROCEDURE :: reconstruct => reconstruction
+     PROCEDURE :: prepare_hp_workset
      PROCEDURE :: reconstruct_kt_eta => reconstruct_kt_eta_traces
   END TYPE reconstruction_workspace_type
 
@@ -125,6 +127,7 @@ CONTAINS
       ALLOCATE( this%hp_eta_k(comp_cells_x*comp_cells_y) )
       this%hp_eta_mask = .FALSE.
       this%hp_eta_cells = 0
+      this%hp_workset_prepared = .FALSE.
 
 
   END SUBROUTINE initialize_reconstruction
@@ -238,6 +241,17 @@ CONTAINS
 
    END SUBROUTINE build_hp_workset
 
+   !> Accept the HP workset built once per domain refresh.
+   SUBROUTINE prepare_hp_workset(this, hp_cells, hp_j, hp_k)
+      CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
+      INTEGER, INTENT(IN) :: hp_cells
+      INTEGER, INTENT(IN) :: hp_j(:), hp_k(:)
+      this%hp_eta_cells = hp_cells
+      this%hp_eta_j(1:hp_cells) = hp_j(1:hp_cells)
+      this%hp_eta_k(1:hp_cells) = hp_k(1:hp_cells)
+      this%hp_workset_prepared = .TRUE.
+   END SUBROUTINE prepare_hp_workset
+
    !> \brief Reconstruct physical traces, apply boundary conditions and finalize HP states.
    !>
    !> \param[in,out] this Persistent reconstructed traces, HP candidates and per-thread scratch.
@@ -310,7 +324,8 @@ CONTAINS
     use_boundary_source=lateral_source_flag
     IF (PRESENT(source_boundary_enabled)) &
          use_boundary_source=source_boundary_enabled
-    CALL build_hp_workset(this, solve_cells, j_cent, k_cent)
+    IF (.NOT. this%hp_workset_prepared) &
+         CALL build_hp_workset(this, solve_cells, j_cent, k_cent)
 
     !$OMP PARALLEL DO private(l,j,k,i,qrecW,qrecE,qrecS,qrecN,x_stencil,y_stencil,&
     !$OMP & qrec_stencil,qrec_prime_x,qrec_prime_y,qp2recW,qp2recE,qp2recS,     &
