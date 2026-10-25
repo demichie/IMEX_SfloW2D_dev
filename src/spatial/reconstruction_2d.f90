@@ -39,9 +39,13 @@ MODULE reconstruction_2d
      ! The existing interface states retain the eta-based reconstruction and
      ! are used for central-upwind dissipation and hydrostatic path terms.
      REAL(wp), ALLOCATABLE :: qp_adv_interfaceL(:,:,:)
+     REAL(wp), ALLOCATABLE :: h_selected_interfaceL(:,:)
      REAL(wp), ALLOCATABLE :: qp_adv_interfaceR(:,:,:)
+     REAL(wp), ALLOCATABLE :: h_selected_interfaceR(:,:)
      REAL(wp), ALLOCATABLE :: qp_adv_interfaceB(:,:,:)
+     REAL(wp), ALLOCATABLE :: h_selected_interfaceB(:,:)
      REAL(wp), ALLOCATABLE :: qp_adv_interfaceT(:,:,:)
+     REAL(wp), ALLOCATABLE :: h_selected_interfaceT(:,:)
 
    ! Direct h_x-based cell-side candidates retained for the advective flux
    ! while the eta-based HP states are used by dissipation and path terms.
@@ -86,9 +90,13 @@ CONTAINS
 
 
     ALLOCATE( this%qp_adv_interfaceL( n_vars+2, comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%h_selected_interfaceL( comp_interfaces_x, comp_cells_y ) )
     ALLOCATE( this%qp_adv_interfaceR( n_vars+2, comp_interfaces_x, comp_cells_y ) )
+    ALLOCATE( this%h_selected_interfaceR( comp_interfaces_x, comp_cells_y ) )
     ALLOCATE( this%qp_adv_interfaceB( n_vars+2, comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%h_selected_interfaceB( comp_cells_x, comp_interfaces_y ) )
     ALLOCATE( this%qp_adv_interfaceT( n_vars+2, comp_cells_x, comp_interfaces_y ) )
+    ALLOCATE( this%h_selected_interfaceT( comp_cells_x, comp_interfaces_y ) )
 
     ALLOCATE( this%qp_cellW( n_vars+2, comp_cells_x, comp_cells_y ) )
     ALLOCATE( this%qp_cellE( n_vars+2, comp_cells_x, comp_cells_y ) )
@@ -132,9 +140,13 @@ CONTAINS
 
 
     DEALLOCATE( this%qp_adv_interfaceL )
+    DEALLOCATE( this%h_selected_interfaceL )
     DEALLOCATE( this%qp_adv_interfaceR )
+    DEALLOCATE( this%h_selected_interfaceR )
     DEALLOCATE( this%qp_adv_interfaceB )
+    DEALLOCATE( this%h_selected_interfaceB )
     DEALLOCATE( this%qp_adv_interfaceT )
+    DEALLOCATE( this%h_selected_interfaceT )
 
     DEALLOCATE( this%qp_cellW )
     DEALLOCATE( this%qp_cellE )
@@ -819,23 +831,6 @@ CONTAINS
        CALL form_direct_face_momentum(this%qp_cellE(:,j,k))
        CALL form_direct_face_momentum(this%qp_cellS(:,j,k))
        CALL form_direct_face_momentum(this%qp_cellN(:,j,k))
-       ! Close wet primitive traces before copying to the transport faces.
-       IF (this%qp_cellW(1,j,k) .GT. EPSILON(1.0_wp)) THEN
-          CALL enforce_primitive_mass_fraction_closure( &
-               this%qp_cellW(:,j,k), 'KT reconstruction west')
-       END IF
-       IF (this%qp_cellE(1,j,k) .GT. EPSILON(1.0_wp)) THEN
-          CALL enforce_primitive_mass_fraction_closure( &
-               this%qp_cellE(:,j,k), 'KT reconstruction east')
-       END IF
-       IF (this%qp_cellS(1,j,k) .GT. EPSILON(1.0_wp)) THEN
-          CALL enforce_primitive_mass_fraction_closure( &
-               this%qp_cellS(:,j,k), 'KT reconstruction south')
-       END IF
-       IF (this%qp_cellN(1,j,k) .GT. EPSILON(1.0_wp)) THEN
-          CALL enforce_primitive_mass_fraction_closure( &
-               this%qp_cellN(:,j,k), 'KT reconstruction north')
-       END IF
        ! The transport interface arrays retain the finalized primitive traces.
        this%qp_adv_interfaceR(:,j,k) = this%qp_cellW(:,j,k)
        this%qp_adv_interfaceL(:,j+1,k) = this%qp_cellE(:,j,k)
@@ -1118,6 +1113,47 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
           END IF
        END DO
     END IF
+
+    ! Select final depths after eta and radial boundary corrections.
+    ! Keep the direct h_x candidate available for characteristic speed bounds.
+    !$OMP PARALLEL DO PRIVATE(l,j,k)
+    DO l=1,this%hp_eta_cells
+       j=this%hp_eta_j(l)
+       k=this%hp_eta_k(l)
+       CALL select_final_transport_trace(this%qp_adv_interfaceR(:,j,k), &
+            this%eta_interfaceR(j,k),B_face_x(j,k), &
+            this%h_minmod_interfaceR(j,k),this%h_froude_interfaceR(j,k), &
+            lateral_source_flag .AND. j==1 .AND. source_cell(j,k)==2, &
+            this%h_selected_interfaceR(j,k),'KT reconstruction west')
+       CALL select_final_transport_trace(this%qp_adv_interfaceL(:,j+1,k), &
+            this%eta_interfaceL(j+1,k),B_face_x(j+1,k), &
+            this%h_minmod_interfaceL(j+1,k),this%h_froude_interfaceL(j+1,k), &
+            lateral_source_flag .AND. j==comp_cells_x .AND. source_cell(j,k)==2, &
+            this%h_selected_interfaceL(j+1,k),'KT reconstruction east')
+       CALL select_final_transport_trace(this%qp_adv_interfaceT(:,j,k), &
+            this%eta_interfaceT(j,k),B_face_y(j,k), &
+            this%h_minmod_interfaceT(j,k),this%h_froude_interfaceT(j,k), &
+            lateral_source_flag .AND. k==1 .AND. source_cell(j,k)==2, &
+            this%h_selected_interfaceT(j,k),'KT reconstruction south')
+       CALL select_final_transport_trace(this%qp_adv_interfaceB(:,j,k+1), &
+            this%eta_interfaceB(j,k+1),B_face_y(j,k+1), &
+            this%h_minmod_interfaceB(j,k+1),this%h_froude_interfaceB(j,k+1), &
+            lateral_source_flag .AND. k==comp_cells_y .AND. source_cell(j,k)==2, &
+            this%h_selected_interfaceB(j,k+1),'KT reconstruction north')
+    END DO
+    !$OMP END PARALLEL DO
+
+    ! External ghost states inherit the selected depths of their owners.
+    DO k=1,comp_cells_y
+       this%h_selected_interfaceL(1,k)=this%h_selected_interfaceR(1,k)
+       this%h_selected_interfaceR(comp_interfaces_x,k)= &
+            this%h_selected_interfaceL(comp_interfaces_x,k)
+    END DO
+    DO j=1,comp_cells_x
+       this%h_selected_interfaceB(j,1)=this%h_selected_interfaceT(j,1)
+       this%h_selected_interfaceT(j,comp_interfaces_y)= &
+            this%h_selected_interfaceB(j,comp_interfaces_y)
+    END DO
   END SUBROUTINE reconstruct_kt_eta_traces
 
   !******************************************************************************
@@ -1361,5 +1397,31 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     END SUBROUTINE form_direct_face_momentum
 
 
+
+
+  ! Transport depth and admissible component fractions are finalized together.
+  SUBROUTINE select_final_transport_trace(qp,eta,bed,h_minmod,h_froude, &
+       source_trace,h_selected,context)
+    USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
+    REAL(wp), INTENT(INOUT) :: qp(n_vars+2)
+    REAL(wp), INTENT(IN) :: eta,bed,h_minmod,h_froude
+    LOGICAL, INTENT(IN) :: source_trace
+    REAL(wp), INTENT(OUT) :: h_selected
+    CHARACTER(LEN=*), INTENT(IN) :: context
+
+    SELECT CASE (TRIM(kt_trace_reconstruction))
+    CASE ('h_x')
+       h_selected=MAX(qp(1),0.0_wp)
+    CASE ('minmod')
+       h_selected=MAX(h_minmod,0.0_wp)
+    CASE ('froude_blend')
+       h_selected=MAX(h_froude,0.0_wp)
+    CASE DEFAULT
+       h_selected=MAX(eta-bed,0.0_wp)
+    END SELECT
+    IF (source_trace) h_selected=MAX(qp(1),0.0_wp)
+    IF (h_selected .GT. dry_thickness_tolerance) &
+         CALL enforce_primitive_mass_fraction_closure(qp,context)
+  END SUBROUTINE select_final_transport_trace
 
 END MODULE reconstruction_2d

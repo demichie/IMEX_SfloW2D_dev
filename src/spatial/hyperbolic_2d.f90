@@ -349,9 +349,7 @@ CONTAINS
 
     REAL(wp) :: a_minus, a_plus
     LOGICAL :: dry_donor_left,dry_donor_right
-    INTEGER :: j, k, l, kt_mode
-
-    kt_mode=kt_depth_mode()
+    INTEGER :: j, k, l
 
     IF ( comp_cells_x .GT. 1 ) THEN
 
@@ -371,14 +369,12 @@ CONTAINS
                qp_center(1,j,k) .LE. dry_thickness_tolerance
           CALL eval_pccu_interface( recon%eta_interfaceL(j,k),              &
                recon%eta_interfaceR(j,k), B_face_x(j,k),                     &
-               recon%h_minmod_interfaceL(j,k),                                &
-               recon%h_minmod_interfaceR(j,k),                                &
-               recon%h_froude_interfaceL(j,k),                                &
-               recon%h_froude_interfaceR(j,k),                                &
+                recon%h_selected_interfaceL(j,k),                              &
+                recon%h_selected_interfaceR(j,k),                              &
                recon%qp_adv_interfaceL(:,j,k),                                &
                recon%qp_adv_interfaceR(:,j,k), grav_coeff_stag_x(j,k),       &
                a_minus, a_plus, PATH_DIR_X, 2, j, k, use_dry_donor,         &
-               dry_donor_left,dry_donor_right,t,kt_mode,                    &
+               dry_donor_left,dry_donor_right,t,                            &
                this%G_interface_xL(:,j,k), this%G_interface_xR(:,j,k) )
 
           ! Apply the boundary's one-way condition to the final numerical flux.
@@ -447,14 +443,12 @@ CONTAINS
                qp_center(1,j,k) .LE. dry_thickness_tolerance
           CALL eval_pccu_interface( recon%eta_interfaceB(j,k),              &
                recon%eta_interfaceT(j,k), B_face_y(j,k),                     &
-               recon%h_minmod_interfaceB(j,k),                                &
-               recon%h_minmod_interfaceT(j,k),                                &
-               recon%h_froude_interfaceB(j,k),                                &
-               recon%h_froude_interfaceT(j,k),                                &
+                recon%h_selected_interfaceB(j,k),                              &
+                recon%h_selected_interfaceT(j,k),                              &
                recon%qp_adv_interfaceB(:,j,k),                                &
                recon%qp_adv_interfaceT(:,j,k), grav_coeff_stag_y(j,k),       &
                a_minus, a_plus, PATH_DIR_Y, 3, j, k, use_dry_donor,         &
-               dry_donor_left,dry_donor_right,t,kt_mode,                    &
+               dry_donor_left,dry_donor_right,t,                            &
                this%G_interface_yB(:,j,k), this%G_interface_yT(:,j,k) )
 
           IF ( ( k .EQ. 1 ) .AND. ( source_cell(MIN(j,SIZE(source_cell,1)),  &
@@ -527,18 +521,16 @@ CONTAINS
   !> \param[out] value_left PCCU contribution assigned to the negative-side cell.
   !> \param[out] value_right PCCU contribution assigned to the positive-side cell.
   SUBROUTINE eval_pccu_interface(eta_left,eta_right,bed_face,                &
-       h_minmod_left,h_minmod_right,                                          &
-       h_froude_left,h_froude_right,                                          &
+       h_selected_left,h_selected_right,                                      &
        qp_adv_left,qp_adv_right,                                              &
        grav_coeff,a_minus,a_plus,direction,normal_momentum_index,face_i,     &
-       face_j,use_dry_donor,dry_donor_left,dry_donor_right,t,kt_mode,        &
+       face_j,use_dry_donor,dry_donor_left,dry_donor_right,t,                &
        value_left,value_right)
 
     USE equation_terms_2d, ONLY : eval_inertial_flux
     USE equation_terms_2d, ONLY : eval_hydrostatic_coefficient
     USE equation_terms_2d, ONLY : limit_component_mass_flux
     USE state_conversion_2d, ONLY : qp_to_qc
-    USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
     USE pccu_2d, ONLY : eval_hydrostatic_path
     USE pccu_2d, ONLY : eval_oriented_pccu_pair
     USE pccu_2d, ONLY : pccu_speed_tolerance
@@ -547,8 +539,7 @@ CONTAINS
     IMPLICIT NONE
 
     REAL(wp), INTENT(IN) :: eta_left, eta_right, bed_face
-    REAL(wp), INTENT(IN) :: h_minmod_left,h_minmod_right
-    REAL(wp), INTENT(IN) :: h_froude_left,h_froude_right
+    REAL(wp), INTENT(IN) :: h_selected_left,h_selected_right
     REAL(wp), INTENT(IN) :: qp_adv_left(:), qp_adv_right(:)
     REAL(wp), INTENT(IN) :: grav_coeff, a_minus, a_plus
     INTEGER, INTENT(IN) :: direction, normal_momentum_index
@@ -556,7 +547,6 @@ CONTAINS
     LOGICAL, INTENT(IN) :: use_dry_donor
     LOGICAL, INTENT(IN) :: dry_donor_left,dry_donor_right
     REAL(wp), INTENT(IN) :: t
-    INTEGER, INTENT(IN) :: kt_mode
     REAL(wp), INTENT(OUT) :: value_left(:), value_right(:)
 
     REAL(wp) :: q_adv_left_use(n_vars), q_adv_right_use(n_vars)
@@ -571,17 +561,11 @@ CONTAINS
     REAL(wp) :: eta_path_left, eta_path_right
     REAL(wp) :: h_eta_left,h_eta_right
     ! Constant contexts avoid expensive formatted I/O in each interface.
-    LOGICAL :: source_trace_left,source_trace_right
 
     qp_adv_left_use=qp_adv_left
     qp_adv_right_use=qp_adv_right
-    CALL lateral_source_trace_sides(direction,face_i,face_j,                &
-         source_trace_left,source_trace_right)
-
-    h_eta_left=selected_kt_depth(eta_left,bed_face,qp_adv_left(1), &
-         h_minmod_left,h_froude_left,source_trace_left,kt_mode)
-    h_eta_right=selected_kt_depth(eta_right,bed_face,qp_adv_right(1), &
-         h_minmod_right,h_froude_right,source_trace_right,kt_mode)
+    h_eta_left=h_selected_left
+    h_eta_right=h_selected_right
     ! Reconstruct u,v separately at cell centres and form the face
     ! momenta as h_face*u_face using the selected shared depth traces.
     qp_adv_left_use(1)=h_eta_left
@@ -600,10 +584,6 @@ CONTAINS
        qp_adv_right_use(2)=h_eta_right*qp_adv_right(idx_u)
        qp_adv_right_use(3)=h_eta_right*qp_adv_right(idx_v)
     END IF
-    CALL enforce_primitive_mass_fraction_closure(qp_adv_left_use,        &
-         'KT interface left advective trace')
-    CALL enforce_primitive_mass_fraction_closure(qp_adv_right_use,       &
-         'KT interface right advective trace')
     CALL qp_to_qc(qp_adv_left_use,q_adv_left_use,                        &
          'KT interface left advective trace')
     CALL qp_to_qc(qp_adv_right_use,q_adv_right_use,                      &
@@ -917,16 +897,8 @@ CONTAINS
              ! The positivity blend can replace the direct h_x depth by the
              ! eta-based depth. Include both endpoints in the speed bounds so
              ! the admissibility interval contains the blended state.
-             h_eta_minus=selected_kt_depth(recon%eta_interfaceL(j,k), &
-                  B_face_x(j,k),recon%qp_adv_interfaceL(1,j,k), &
-                  recon%h_minmod_interfaceL(j,k), &
-                  recon%h_froude_interfaceL(j,k),source_trace_minus, &
-                  kt_mode)
-             h_eta_plus=selected_kt_depth(recon%eta_interfaceR(j,k), &
-                  B_face_x(j,k),recon%qp_adv_interfaceR(1,j,k), &
-                  recon%h_minmod_interfaceR(j,k), &
-                  recon%h_froude_interfaceR(j,k),source_trace_plus, &
-                  kt_mode)
+             h_eta_minus=recon%h_selected_interfaceL(j,k)
+              h_eta_plus=recon%h_selected_interfaceR(j,k)
              qp_eta_minus=recon%qp_adv_interfaceL(:,j,k)
              qp_eta_plus=recon%qp_adv_interfaceR(:,j,k)
              qp_eta_minus(1)=h_eta_minus
@@ -972,16 +944,8 @@ CONTAINS
                min_r,max_r )
 
           IF ( kt_mode .NE. 1 ) THEN
-             h_eta_minus=selected_kt_depth(recon%eta_interfaceB(j,k), &
-                  B_face_y(j,k),recon%qp_adv_interfaceB(1,j,k), &
-                  recon%h_minmod_interfaceB(j,k), &
-                  recon%h_froude_interfaceB(j,k),source_trace_minus, &
-                  kt_mode)
-             h_eta_plus=selected_kt_depth(recon%eta_interfaceT(j,k), &
-                  B_face_y(j,k),recon%qp_adv_interfaceT(1,j,k), &
-                  recon%h_minmod_interfaceT(j,k), &
-                  recon%h_froude_interfaceT(j,k),source_trace_plus, &
-                  kt_mode)
+             h_eta_minus=recon%h_selected_interfaceB(j,k)
+              h_eta_plus=recon%h_selected_interfaceT(j,k)
              qp_eta_minus=recon%qp_adv_interfaceB(:,j,k)
              qp_eta_plus=recon%qp_adv_interfaceT(:,j,k)
              qp_eta_minus(1)=h_eta_minus
@@ -1039,26 +1003,6 @@ CONTAINS
     END SELECT
   END FUNCTION kt_depth_mode
 
-  !> Select the transport depth of one KT face endpoint. The caller applies
-  !> the dry-state momentum guard independently of this depth selection.
-  PURE FUNCTION selected_kt_depth(eta,bed,h_direct,h_minmod,h_froude, &
-       source_trace,mode) RESULT(h)
-    REAL(wp), INTENT(IN) :: eta,bed,h_direct,h_minmod,h_froude
-    LOGICAL, INTENT(IN) :: source_trace
-    INTEGER, INTENT(IN) :: mode
-    REAL(wp) :: h
-    SELECT CASE (mode)
-    CASE (1)
-       h=MAX(h_direct,0.0_wp)
-    CASE (3)
-       h=MAX(h_minmod,0.0_wp)
-    CASE (4)
-       h=MAX(h_froude,0.0_wp)
-    CASE DEFAULT
-       h=MAX(eta-bed,0.0_wp)
-    END SELECT
-    IF (source_trace) h=MAX(h_direct,0.0_wp)
-  END FUNCTION selected_kt_depth
 
   SUBROUTINE eval_interface_speed_bounds(qp_minus,qp_plus,grav_coeff,       &
        normal_velocity_index,speed_minus,speed_plus)
