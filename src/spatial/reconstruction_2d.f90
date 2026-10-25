@@ -1365,16 +1365,20 @@ CONTAINS
           k = this%hp_eta_k(l)
           CALL final_kt_state( this%qp_cellW(:,j,k),                         &
                this%q_adv_interfaceR(:,j,k), this%qp_adv_interfaceR(:,j,k),  &
-               j,k,'west' )
+               'KT reconstruction west', &
+               'KT reconstruction west unit-depth state' )
           CALL final_kt_state( this%qp_cellE(:,j,k),                         &
                this%q_adv_interfaceL(:,j+1,k), this%qp_adv_interfaceL(:,j+1,k), &
-               j,k,'east' )
+               'KT reconstruction east', &
+               'KT reconstruction east unit-depth state' )
           CALL final_kt_state( this%qp_cellS(:,j,k),                         &
                this%q_adv_interfaceT(:,j,k), this%qp_adv_interfaceT(:,j,k),  &
-               j,k,'south' )
+               'KT reconstruction south', &
+               'KT reconstruction south unit-depth state' )
           CALL final_kt_state( this%qp_cellN(:,j,k),                         &
                this%q_adv_interfaceB(:,j,k+1), this%qp_adv_interfaceB(:,j,k+1), &
-               j,k,'north' )
+               'KT reconstruction north', &
+               'KT reconstruction north unit-depth state' )
        END DO
        !$OMP END DO
     END IF
@@ -1574,20 +1578,17 @@ CONTAINS
     !> \param[in] side Label identifying the face side for diagnostics.
     !******************************************************************************
     SUBROUTINE final_kt_state(qp_candidate,q_conservative,qp_reconstructed,  &
-         j_cell,k_cell,side)
+         context,unit_context)
 
       REAL(wp), INTENT(IN) :: qp_candidate(n_vars+2)
       REAL(wp), INTENT(OUT) :: q_conservative(n_vars)
       REAL(wp), INTENT(OUT) :: qp_reconstructed(n_vars+2)
-      INTEGER, INTENT(IN) :: j_cell,k_cell
-      CHARACTER(LEN=*), INTENT(IN) :: side
+      CHARACTER(LEN=*), INTENT(IN) :: context,unit_context
 
       REAL(wp) :: qp_unit(n_vars+2),q_unit(n_vars),h_trace
-      CHARACTER(LEN=96) :: closure_context
 
-      ! Avoid formatted integer I/O on every reconstructed KT face.
-      ! Keep the side-specific context for mass-fraction diagnostics.
-      closure_context = 'KT reconstruction '//TRIM(side)
+      ! The caller passes constant, side-specific diagnostic strings.
+      ! No formatting, trimming or concatenation is needed per KT face.
 
       qp_reconstructed = qp_candidate
       h_trace = MAX(qp_candidate(1),0.0_wp)
@@ -1595,14 +1596,14 @@ CONTAINS
 
       IF ( h_trace .GT. EPSILON(1.0_wp) ) THEN
          CALL enforce_primitive_mass_fraction_closure(qp_reconstructed,      &
-              TRIM(closure_context))
-         CALL qp_to_qc(qp_reconstructed,q_conservative,TRIM(closure_context))
+              context)
+         CALL qp_to_qc(qp_reconstructed,q_conservative,context)
       ELSE
          qp_unit = qp_reconstructed
          qp_unit(1) = 1.0_wp
          CALL enforce_primitive_mass_fraction_closure(qp_unit,               &
-              TRIM(closure_context)//' unit-depth state')
-         CALL qp_to_qc(qp_unit,q_unit,TRIM(closure_context)//' unit-depth state')
+              unit_context)
+         CALL qp_to_qc(qp_unit,q_unit,unit_context)
          q_conservative = h_trace*q_unit
          q_conservative(2) = q_unit(2)
          q_conservative(3) = q_unit(3)
