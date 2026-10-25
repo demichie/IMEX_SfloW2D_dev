@@ -244,6 +244,7 @@ CONTAINS
 
     ! External procedures
       USE state_conversion_2d, ONLY : qp_to_qp2
+    USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
     USE source_terms_2d, ONLY : eval_boundary_injection_explicit
     USE parameters_2d, ONLY : limiter
 
@@ -818,19 +819,28 @@ CONTAINS
        CALL form_direct_face_momentum(this%qp_cellE(:,j,k))
        CALL form_direct_face_momentum(this%qp_cellS(:,j,k))
        CALL form_direct_face_momentum(this%qp_cellN(:,j,k))
-       ! The unique transport face family is populated for every caller.
-       CALL final_kt_state( this%qp_cellW(:,j,k),                         &
-               this%qp_adv_interfaceR(:,j,k),  &
-               'KT reconstruction west' )
-          CALL final_kt_state( this%qp_cellE(:,j,k),                         &
-               this%qp_adv_interfaceL(:,j+1,k), &
-               'KT reconstruction east' )
-          CALL final_kt_state( this%qp_cellS(:,j,k),                         &
-               this%qp_adv_interfaceT(:,j,k),  &
-               'KT reconstruction south' )
-          CALL final_kt_state( this%qp_cellN(:,j,k),                         &
-               this%qp_adv_interfaceB(:,j,k+1), &
-               'KT reconstruction north' )
+       ! Close wet primitive traces before copying to the transport faces.
+       IF (this%qp_cellW(1,j,k) .GT. EPSILON(1.0_wp)) THEN
+          CALL enforce_primitive_mass_fraction_closure( &
+               this%qp_cellW(:,j,k), 'KT reconstruction west')
+       END IF
+       IF (this%qp_cellE(1,j,k) .GT. EPSILON(1.0_wp)) THEN
+          CALL enforce_primitive_mass_fraction_closure( &
+               this%qp_cellE(:,j,k), 'KT reconstruction east')
+       END IF
+       IF (this%qp_cellS(1,j,k) .GT. EPSILON(1.0_wp)) THEN
+          CALL enforce_primitive_mass_fraction_closure( &
+               this%qp_cellS(:,j,k), 'KT reconstruction south')
+       END IF
+       IF (this%qp_cellN(1,j,k) .GT. EPSILON(1.0_wp)) THEN
+          CALL enforce_primitive_mass_fraction_closure( &
+               this%qp_cellN(:,j,k), 'KT reconstruction north')
+       END IF
+       ! The transport interface arrays retain the finalized primitive traces.
+       this%qp_adv_interfaceR(:,j,k) = this%qp_cellW(:,j,k)
+       this%qp_adv_interfaceL(:,j+1,k) = this%qp_cellE(:,j,k)
+       this%qp_adv_interfaceT(:,j,k) = this%qp_cellS(:,j,k)
+       this%qp_adv_interfaceB(:,j,k+1) = this%qp_cellN(:,j,k)
 
 
     END DO
@@ -1323,25 +1333,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
   END SUBROUTINE apply_hp_reconstruction
 
 
-    !******************************************************************************
-    !> \brief Finalize primitive KT traces without premature conservative conversion.
-    !> The selected transport depth is applied later in eval_pccu_interface.
-    !******************************************************************************
-    SUBROUTINE final_kt_state(qp_candidate,qp_reconstructed,context)
-      USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
 
-      REAL(wp), INTENT(IN) :: qp_candidate(n_vars+2)
-      REAL(wp), INTENT(OUT) :: qp_reconstructed(n_vars+2)
-      CHARACTER(LEN=*), INTENT(IN) :: context
-
-      qp_reconstructed = qp_candidate
-      qp_reconstructed(1) = MAX(qp_candidate(1),0.0_wp)
-
-      IF ( qp_reconstructed(1) .GT. EPSILON(1.0_wp) ) THEN
-         CALL enforce_primitive_mass_fraction_closure(qp_reconstructed,context)
-      END IF
-
-    END SUBROUTINE final_kt_state
 
     !> \brief Compute positivity-constrained free-surface traces for one parent-workset cell.
     !>
