@@ -254,7 +254,7 @@ CONTAINS
             'pore_pressure_dissipation')
     ELSE
        selected_rheology=rheology_flag
-       selected_thermal=rheology_flag
+       selected_thermal=thermal_cooling_flag
        selected_pore=pore_pressure_flag
     END IF
 
