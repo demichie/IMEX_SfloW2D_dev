@@ -984,6 +984,48 @@ CONTAINS
           this%h_minmod_interfaceB(j,k+1)= &
                MAX(eta_n_mm-B_face_y(j,k+1),0.0_wp)
        END IF
+IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
+       fr_weight_x=froude_h_blend_weight(qp_expl(1,j,k), &
+            qp_expl(idx_u,j,k),grav)
+       fr_weight_y=froude_h_blend_weight(qp_expl(1,j,k), &
+            qp_expl(idx_v,j,k),grav)
+       slope_eta2_x=reconstr_coeff*slope_hx + &
+            (B_face_x(j+1,k)-B_face_x(j,k))*one_by_dx
+       slope_eta2_y=reconstr_coeff*slope_hy + &
+            (B_face_y(j,k+1)-B_face_y(j,k))*one_by_dy
+       slope_blend_x=(1.0_wp-fr_weight_x)*reconstr_coeff*slope_x + &
+            fr_weight_x*slope_eta2_x
+       slope_blend_y=(1.0_wp-fr_weight_y)*reconstr_coeff*slope_y + &
+            fr_weight_y*slope_eta2_y
+
+       eta_blend_w=eta_center-dx2*slope_blend_x
+       eta_blend_e=eta_center+dx2*slope_blend_x
+       IF ( eta_blend_e .LT. B_face_x(j+1,k) ) THEN
+          eta_blend_e=B_face_x(j+1,k)
+          eta_blend_w=2.0_wp*eta_center-eta_blend_e
+       ELSEIF ( eta_blend_w .LT. B_face_x(j,k) ) THEN
+          eta_blend_w=B_face_x(j,k)
+          eta_blend_e=2.0_wp*eta_center-eta_blend_w
+       END IF
+       this%h_froude_interfaceR(j,k)= &
+            MAX(eta_blend_w-B_face_x(j,k),0.0_wp)
+       this%h_froude_interfaceL(j+1,k)= &
+            MAX(eta_blend_e-B_face_x(j+1,k),0.0_wp)
+
+       eta_blend_s=eta_center-dy2*slope_blend_y
+       eta_blend_n=eta_center+dy2*slope_blend_y
+       IF ( eta_blend_n .LT. B_face_y(j,k+1) ) THEN
+          eta_blend_n=B_face_y(j,k+1)
+          eta_blend_s=2.0_wp*eta_center-eta_blend_n
+       ELSEIF ( eta_blend_s .LT. B_face_y(j,k) ) THEN
+          eta_blend_s=B_face_y(j,k)
+          eta_blend_n=2.0_wp*eta_center-eta_blend_s
+       END IF
+       this%h_froude_interfaceT(j,k)= &
+            MAX(eta_blend_s-B_face_y(j,k),0.0_wp)
+       this%h_froude_interfaceB(j,k+1)= &
+            MAX(eta_blend_n-B_face_y(j,k+1),0.0_wp)
+       END IF
     END DO
     !$OMP END PARALLEL DO
 
@@ -1622,46 +1664,4 @@ CONTAINS
 
   END SUBROUTINE apply_hp_reconstruction
 
-END MODULE reconstruction_2d       IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
-       fr_weight_x=froude_h_blend_weight(qp_expl(1,j,k), &
-            qp_expl(idx_u,j,k),grav)
-       fr_weight_y=froude_h_blend_weight(qp_expl(1,j,k), &
-            qp_expl(idx_v,j,k),grav)
-       slope_eta2_x=reconstr_coeff*slope_hx + &
-            (B_face_x(j+1,k)-B_face_x(j,k))*one_by_dx
-       slope_eta2_y=reconstr_coeff*slope_hy + &
-            (B_face_y(j,k+1)-B_face_y(j,k))*one_by_dy
-       slope_blend_x=(1.0_wp-fr_weight_x)*reconstr_coeff*slope_x + &
-            fr_weight_x*slope_eta2_x
-       slope_blend_y=(1.0_wp-fr_weight_y)*reconstr_coeff*slope_y + &
-            fr_weight_y*slope_eta2_y
-
-       eta_blend_w=eta_center-dx2*slope_blend_x
-       eta_blend_e=eta_center+dx2*slope_blend_x
-       IF ( eta_blend_e .LT. B_face_x(j+1,k) ) THEN
-          eta_blend_e=B_face_x(j+1,k)
-          eta_blend_w=2.0_wp*eta_center-eta_blend_e
-       ELSEIF ( eta_blend_w .LT. B_face_x(j,k) ) THEN
-          eta_blend_w=B_face_x(j,k)
-          eta_blend_e=2.0_wp*eta_center-eta_blend_w
-       END IF
-       this%h_froude_interfaceR(j,k)= &
-            MAX(eta_blend_w-B_face_x(j,k),0.0_wp)
-       this%h_froude_interfaceL(j+1,k)= &
-            MAX(eta_blend_e-B_face_x(j+1,k),0.0_wp)
-
-       eta_blend_s=eta_center-dy2*slope_blend_y
-       eta_blend_n=eta_center+dy2*slope_blend_y
-       IF ( eta_blend_n .LT. B_face_y(j,k+1) ) THEN
-          eta_blend_n=B_face_y(j,k+1)
-          eta_blend_s=2.0_wp*eta_center-eta_blend_n
-       ELSEIF ( eta_blend_s .LT. B_face_y(j,k) ) THEN
-          eta_blend_s=B_face_y(j,k)
-          eta_blend_n=2.0_wp*eta_center-eta_blend_s
-       END IF
-       this%h_froude_interfaceT(j,k)= &
-            MAX(eta_blend_s-B_face_y(j,k),0.0_wp)
-       this%h_froude_interfaceB(j,k+1)= &
-            MAX(eta_blend_n-B_face_y(j,k+1),0.0_wp)
-       END IF
-
+END MODULE reconstruction_2d
