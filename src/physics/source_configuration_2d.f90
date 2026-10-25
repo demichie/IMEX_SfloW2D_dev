@@ -106,6 +106,7 @@ CONTAINS
          SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: target_group(3),methods(SOURCE_INPUT_MAX_GROUPS),membership(n_eqns)
     LOGICAL :: implicit_mask(n_eqns),expected_targets(3)
+    TYPE(source_term_type) :: active_term
     CHARACTER(LEN=64) :: seen_names(SOURCE_INPUT_MAX_GROUPS*SOURCE_INPUT_MAX_TERMS)
     INTEGER :: n_seen
     INTEGER :: i,j,k,g,s,t,slot,compact_group,stage_count,step_count,target
@@ -256,10 +257,24 @@ CONTAINS
       IF (.NOT.ANY(seen_names(1:n_seen)==active_names(i))) RETURN
     END DO
 
+    ! Resolve implicit equation membership from actually scheduled terms.
+    expected_targets=.FALSE.
+    DO g=1,source_group_count
+      IF (cadence(g)/=SOURCE_CADENCE_STAGE .OR. &
+           method(g)==SOURCE_METHOD_EXPLICIT) CYCLE
+      DO t=1,parsed_count(g)
+        active_term=source_term_descriptor_by_name(parsed_names(t,g))
+        SELECT CASE(TRIM(active_term%target))
+        CASE('velocity'); expected_targets(1)=.TRUE.
+        CASE('temperature'); expected_targets(2)=.TRUE.
+        CASE('pore_pressure'); expected_targets(3)=.TRUE.
+        END SELECT
+      END DO
+    END DO
     target_group=0
-    expected_targets=[.TRUE.,thermal_cooling_flag,pore_pressure_flag]
     DO g=1,source_group_count
       IF (cadence(g)/=SOURCE_CADENCE_STAGE .OR. method(g)==SOURCE_METHOD_EXPLICIT) CYCLE
+      IF (parsed_count(g)==0) CYCLE
       DO s=1,solver_count(g)
         DO t=1,target_count(s,g)
           target=target_ids(t,s,g)
@@ -280,7 +295,7 @@ CONTAINS
     END DO
 
     implicit_mask=.FALSE.; membership=0
-    implicit_mask(2:3)=.TRUE.
+    implicit_mask(2:3)=expected_targets(1)
     IF (expected_targets(2)) implicit_mask(4)=.TRUE.
     IF (expected_targets(3)) implicit_mask(idx_pore)=.TRUE.
     ordered=[(g,g=1,source_group_count)]
@@ -299,6 +314,7 @@ CONTAINS
     DO i=1,source_group_count
       g=ordered(i)
       IF (phase(g)/=SOURCE_PHASE_RK_IMPLICIT) CYCLE
+      IF (parsed_count(g)==0) CYCLE
       compact_group=compact_group+1
       methods(compact_group)=IM_GROUP_METHOD_NEWTON
       IF (method(g)==SOURCE_METHOD_ANALYTIC) methods(compact_group)=IM_GROUP_METHOD_ANALYTIC
@@ -313,12 +329,15 @@ CONTAINS
     END DO
     CALL partition%initialize(implicit_mask,membership,methods(1:compact_group))
 
-    stage_count=COUNT(cadence(1:source_group_count)==SOURCE_CADENCE_STAGE)
-    step_count=source_group_count-stage_count
+    stage_count=COUNT(cadence(1:source_group_count)==SOURCE_CADENCE_STAGE .AND. &
+         (method(1:source_group_count)==SOURCE_METHOD_EXPLICIT .OR. &
+          parsed_count(1:source_group_count)>0))
+    step_count=COUNT(cadence(1:source_group_count)==SOURCE_CADENCE_STEP)
     ALLOCATE(stages(stage_count),steps(step_count))
     j=0; k=0
     DO i=1,source_group_count
       g=ordered(i)
+      IF (phase(g)==SOURCE_PHASE_RK_IMPLICIT .AND. parsed_count(g)==0) CYCLE
       group%id=source_group_id(g); group%legacy_id=0
       group%cadence=cadence(g); group%method=method(g)
       group%phase=phase(g); group%execution_order=source_group_order(g)

@@ -61,6 +61,9 @@ CONTAINS
     USE parameters_2d, ONLY : imex_velocity_group, imex_energy_group,        &
          imex_pore_pressure_group, imex_group_method
     USE equation_metadata_2d, ONLY : resolve_imex_group_method
+    USE parameters_2d, ONLY : rheology_flag, rheology_model
+    USE source_catalog_2d, ONLY : canonical_rheology_source_name, &
+         rheology_name_has_role, SOURCE_ROLE_IMPLICIT, SOURCE_ROLE_SEMI_IMPLICIT
     IMPLICIT NONE
 
     TYPE(equation_partition_type), INTENT(INOUT) :: equation_partition
@@ -69,11 +72,16 @@ CONTAINS
     INTEGER :: IM_group(n_eqns)
     INTEGER :: IM_group_method(3), configured_group_method(3)
     INTEGER :: n_IM_groups, configured_group, compact_group
-    LOGICAL :: group_is_active(3)
+    LOGICAL :: group_is_active(3), velocity_source_active
+    CHARACTER(LEN=64) :: rheology_source
 
     implicit_mask(1:n_eqns) = .FALSE.
-    implicit_mask(2) = .TRUE.
-    implicit_mask(3) = .TRUE.
+    ! Velocity equations join the implicit partition only for active IM/SI laws.
+    rheology_source=''
+    IF (rheology_flag) rheology_source=canonical_rheology_source_name(rheology_model)
+    velocity_source_active=rheology_name_has_role(rheology_source,SOURCE_ROLE_IMPLICIT) .OR. &
+         rheology_name_has_role(rheology_source,SOURCE_ROLE_SEMI_IMPLICIT)
+    implicit_mask(2:3) = velocity_source_active
 
     ! Temperature
     IF (thermal_cooling_flag) THEN
