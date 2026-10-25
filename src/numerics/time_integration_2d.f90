@@ -449,8 +449,7 @@ CONTAINS
           ! map an inadmissible conservative state to a dry primitive state.
           IF ( PRESENT(observer) ) CALL observer(1, i_RK, j, k, q_fv_cell, 0)
 
-          WRITE(closure_context,'(A,I0,A,I0,A,I0)')                           &
-               'IMEX finite-volume stage=',i_RK,' cell=',j,',',k
+          closure_context = 'IMEX finite-volume stage'
           CALL clip_roundoff_negative_component_masses(q_fv_cell)
           CALL qc_to_qp(q_fv_cell , qp(1:n_vars+2,j,k) , p_dyn,               &
                TRIM(closure_context) )

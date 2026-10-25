@@ -181,7 +181,7 @@ CONTAINS
 
        j = domain%j_cent(l)
        k = domain%k_cent(l)
-       WRITE(closure_context,'(A,I0,A,I0)') 'mass exchange cell=',j,',',k
+       closure_context = 'mass exchange cell'
 
        IF (q(1,j,k) .GT. 0.0_wp) THEN
           CALL qc_to_qp(q(1:n_vars,j,k), qp(1:n_vars+2,j,k), p_dyn,         &
