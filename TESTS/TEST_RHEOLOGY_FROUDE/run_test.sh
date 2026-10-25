@@ -7,6 +7,14 @@ build_dir=$(mktemp -d /tmp/imex-rheology-froude.XXXXXX)
 trap 'rm -rf "$build_dir"' EXIT HUP INT TERM
 
 cd "$build_dir"
+sources=$(awk '
+    /^IMEX_SfloW2D_SOURCES =/ { inside=1; next }
+    inside && /^[[:space:]]*$/ { exit }
+    inside { gsub(/\\/, ""); if ($1 != "IMEX_SfloW2D.f90") print $1 }
+' "$repo_dir/src/Makefile.am")
+netcdf_fflags=$(nf-config --fflags)
+netcdf_flibs=$(nf-config --flibs)
+netcdf_clibs=$(nc-config --libs)
 
 # Trap invalid arithmetic in both profiles: optimized success alone must not
 # conceal a zero/negative Froude denominator. No scientific tolerance is relaxed.
@@ -17,55 +25,25 @@ for profile in strict optimized; do
     esac
     mkdir "$profile"
     cd "$profile"
-    gfortran $profile_flags -fopenmp -fbacktrace \
-        -ffpe-trap=invalid,zero,overflow -I"$repo_dir/src/state" -c \
-        "$repo_dir/src/core/parameters_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_parameters_2d.f90" \
-        "$repo_dir/src/core/diagnostics_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_analytic_utils_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_parameters_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_voellmy_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_plastic_2d.f90" \
-        "$repo_dir/src/core/constitutive_parameters_2d.f90" \
-        "$repo_dir/src/numerics/equation_metadata_2d.f90" \
-        "$repo_dir/src/numerics/source_catalog_2d.f90" \
-        "$repo_dir/src/numerics/source_registry_2d.f90" \
-        "$repo_dir/src/core/complexify.f90" \
-        "$repo_dir/src/geometry/geometry_2d.f90" \
-        "$repo_dir/src/state/state_conversion_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_lava_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_lahar_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_empirical_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_quadratic_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_froude_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_lucas_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_mui_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_mui_voellmy_2d.f90" \
-        "$repo_dir/src/physics/rheology_laws/rheology_2d.f90" \
-        "$repo_dir/src/physics/thermal_laws_2d.f90" \
-        "$repo_dir/src/physics/pore_pressure_laws_2d.f90" \
-        "$repo_dir/src/physics/mass_exchange_laws_2d.f90" \
-        "$repo_dir/src/physics/equation_terms_2d.f90"
+    objects=''
+    for source in $sources; do
+        object=${source##*/}
+        case "$source" in
+            *.c) ${CC:-cc} -c "$repo_dir/src/$source" -o "${object%.c}.o" ;;
+            *) gfortran ${profile_flags:--O0 -g -fcheck=all} -fopenmp -fbacktrace \
+                 -ffpe-trap=invalid,zero,overflow -I"$repo_dir/src/state" \
+                 $netcdf_fflags -c "$repo_dir/src/$source" ;;
+        esac
+        objects="$objects ${object%.*}.o"
+    done
 
     # Keep assertion/IEEE checks strict even when the numerical modules use
     # -Ofast, which otherwise permits optimizing away NaN/Inf checks.
     gfortran -O0 -g -fcheck=all -fopenmp -fbacktrace \
         -ffpe-trap=invalid,zero,overflow -c "$test_dir/test_rheology_froude.f90"
 
-    gfortran $profile_flags -fopenmp -fbacktrace \
-        -ffpe-trap=invalid,zero,overflow \
-        parameters_2d.o diagnostics_2d.o constitutive_parameters_2d.o \
-        rheology_analytic_utils_2d.o rheology_parameters_2d.o \
-        rheology_voellmy_2d.o rheology_plastic_2d.o \
-        rheology_lava_2d.o rheology_lahar_2d.o rheology_empirical_2d.o \
-        rheology_quadratic_2d.o rheology_froude_2d.o rheology_lucas_2d.o \
-        equation_metadata_2d.o complexify.o geometry_2d.o \
-        state_conversion_2d.o rheology_mui_2d.o rheology_mui_voellmy_2d.o \
-        rheology_2d.o thermal_laws_2d.o pore_pressure_laws_2d.o \
-        mass_exchange_laws_2d.o equation_terms_2d.o \
-        test_rheology_froude.o \
-        -llapack -o test_rheology_froude
-
+    gfortran $profile_flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+        $objects test_rheology_froude.o -llapack $netcdf_flibs $netcdf_clibs -o test_rheology_froude
     ./test_rheology_froude
     cd ..
 done

@@ -37,7 +37,7 @@ for profile in strict optimized; do
         objects="$objects ${object%.*}.o"
     done
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_model_names.f90"
-    model_objects='parameters_2d.o diagnostics_2d.o constitutive_parameters_2d.o geometry_2d.o state_conversion_2d.o rheology_parameters_2d.o rheology_analytic_utils_2d.o rheology_voellmy_2d.o rheology_plastic_2d.o rheology_froude_2d.o rheology_lucas_2d.o rheology_lava_2d.o rheology_lahar_2d.o rheology_empirical_2d.o rheology_quadratic_2d.o rheology_mui_2d.o rheology_mui_voellmy_2d.o rheology_2d.o'
+    model_objects="$objects"
     "$compiler" $common $model_objects test_model_names.o -llapack $netcdf_flibs $netcdf_clibs -o test_model_names
     ./test_model_names
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_source_modules.f90"
