@@ -826,6 +826,28 @@ CONTAINS
        this%qp_cellS(:,j,k) = qrecS
        this%qp_cellN(:,j,k) = qrecN
        CALL reconstruct_kt_eta_cell(this,qp_expl,j,k)
+       CALL form_direct_face_momentum(this%qp_cellW(:,j,k))
+       CALL form_direct_face_momentum(this%qp_cellE(:,j,k))
+       CALL form_direct_face_momentum(this%qp_cellS(:,j,k))
+       CALL form_direct_face_momentum(this%qp_cellN(:,j,k))
+       ! The unique transport face family is populated for every caller.
+       CALL final_kt_state( this%qp_cellW(:,j,k),                         &
+               this%q_adv_interfaceR(:,j,k), this%qp_adv_interfaceR(:,j,k),  &
+               'KT reconstruction west', &
+               'KT reconstruction west unit-depth state' )
+          CALL final_kt_state( this%qp_cellE(:,j,k),                         &
+               this%q_adv_interfaceL(:,j+1,k), this%qp_adv_interfaceL(:,j+1,k), &
+               'KT reconstruction east', &
+               'KT reconstruction east unit-depth state' )
+          CALL final_kt_state( this%qp_cellS(:,j,k),                         &
+               this%q_adv_interfaceT(:,j,k), this%qp_adv_interfaceT(:,j,k),  &
+               'KT reconstruction south', &
+               'KT reconstruction south unit-depth state' )
+          CALL final_kt_state( this%qp_cellN(:,j,k),                         &
+               this%q_adv_interfaceB(:,j,k+1), this%qp_adv_interfaceB(:,j,k+1), &
+               'KT reconstruction north', &
+               'KT reconstruction north unit-depth state' )
+
 
     END DO
 
@@ -1240,9 +1262,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
   SUBROUTINE apply_hp_reconstruction( this, qp_center, solve_cells, j_cent,    &
        k_cent, use_kt_direct )
 
-    USE state_conversion_2d, ONLY : qp_to_qc
-    USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
-    USE parameters_2d, ONLY : limiter, reconstr_coeff
     USE geometry_2d, ONLY : sourceW, sourceE, sourceS, sourceN
 
     IMPLICIT NONE
@@ -1255,38 +1274,9 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     INTEGER :: j, k, l
 
-    ! Reuse one thread team across dependent reconstruction phases. Each END DO keeps
-    ! its implicit barrier because the following phase consumes its results.
+    ! Final primitive/conservative traces are already populated by reconstruct().
+    ! This region handles only boundaries that require completed cell traces.
     !$OMP PARALLEL PRIVATE(l,j,k)
-
-    ! Independent cell-owned eta, direct momentum and conservative trace work.
-    !$OMP DO
-    DO l = 1, this%hp_eta_cells
-       j = this%hp_eta_j(l)
-       k = this%hp_eta_k(l)
-       CALL form_direct_face_momentum(this%qp_cellW(:,j,k))
-       CALL form_direct_face_momentum(this%qp_cellE(:,j,k))
-       CALL form_direct_face_momentum(this%qp_cellS(:,j,k))
-       CALL form_direct_face_momentum(this%qp_cellN(:,j,k))
-       ! The unique transport face family is populated for every caller.
-       CALL final_kt_state( this%qp_cellW(:,j,k),                         &
-               this%q_adv_interfaceR(:,j,k), this%qp_adv_interfaceR(:,j,k),  &
-               'KT reconstruction west', &
-               'KT reconstruction west unit-depth state' )
-          CALL final_kt_state( this%qp_cellE(:,j,k),                         &
-               this%q_adv_interfaceL(:,j+1,k), this%qp_adv_interfaceL(:,j+1,k), &
-               'KT reconstruction east', &
-               'KT reconstruction east unit-depth state' )
-          CALL final_kt_state( this%qp_cellS(:,j,k),                         &
-               this%q_adv_interfaceT(:,j,k), this%qp_adv_interfaceT(:,j,k),  &
-               'KT reconstruction south', &
-               'KT reconstruction south unit-depth state' )
-          CALL final_kt_state( this%qp_cellN(:,j,k),                         &
-               this%q_adv_interfaceB(:,j,k+1), this%qp_adv_interfaceB(:,j,k+1), &
-               'KT reconstruction north', &
-               'KT reconstruction north unit-depth state' )
-    END DO
-    !$OMP END DO
 
     ! Preserve the solver's existing external ghost convention after replacing
     ! the cell-owned traces.
@@ -1370,7 +1360,8 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     !$OMP END PARALLEL
 
-  CONTAINS
+  END SUBROUTINE apply_hp_reconstruction
+
 
     !******************************************************************************
     !> \brief Convert direct KT traces without the HP dry-state projection.
@@ -1387,6 +1378,8 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !******************************************************************************
     SUBROUTINE final_kt_state(qp_candidate,q_conservative,qp_reconstructed,  &
          context,unit_context)
+      USE state_conversion_2d, ONLY : qp_to_qc
+      USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
 
       REAL(wp), INTENT(IN) :: qp_candidate(n_vars+2)
       REAL(wp), INTENT(OUT) :: q_conservative(n_vars)
@@ -1444,6 +1437,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
       END IF
     END SUBROUTINE form_direct_face_momentum
 
-  END SUBROUTINE apply_hp_reconstruction
+
 
 END MODULE reconstruction_2d
