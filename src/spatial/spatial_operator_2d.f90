@@ -34,6 +34,7 @@ MODULE spatial_operator_2d
      PROCEDURE, PUBLIC :: finalize => finalize_spatial_operator
      PROCEDURE, PUBLIC :: evaluate => evaluate_spatial_operator
      PROCEDURE, PUBLIC :: compute_timestep => compute_spatial_timestep
+     PROCEDURE, PUBLIC :: prepare_hp_workset => prepare_spatial_hp_workset
   END TYPE spatial_operator_type
 
 CONTAINS
@@ -63,6 +64,14 @@ CONTAINS
     CALL this%reconstruction%finalize
 
   END SUBROUTINE finalize_spatial_operator
+
+  !> \brief Reuse the HP workset prepared by the domain refresh.
+  SUBROUTINE prepare_spatial_hp_workset(this, domain)
+    CLASS(spatial_operator_type), INTENT(INOUT) :: this
+    CLASS(domain_type), INTENT(IN) :: domain
+    CALL this%reconstruction%prepare_hp_workset( &
+         domain%hp_eta_cells, domain%hp_eta_j, domain%hp_eta_k)
+  END SUBROUTINE prepare_spatial_hp_workset
 
   !******************************************************************************
   !> \brief Evaluate the complete explicit spatial term on the active domain.
