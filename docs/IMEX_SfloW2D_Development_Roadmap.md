@@ -2289,7 +2289,7 @@ L'architettura D17 è implementata; la compatibilità dell'intero ecosistema di 
 
 #### D18.0 — Idea, obiettivo e motivazione
 
-La configurazione deve partire dalla **sorgente fisica**, non da una definizione separata di gruppi. Chi usa il modello seleziona la reologia, il raffreddamento, la dissipazione della pressione interstiziale, le iniezioni o gli scambi di massa nelle **namelist fisiche che già ne contengono i parametri**. Per ogni sorgente fisica attiva, in quella stessa namelist, deve poter specificare direttamente tre proprietà opzionali:
+La configurazione deve partire dalla **sorgente fisica**, non da una definizione separata di gruppi. Chi usa il modello seleziona la reologia, il raffreddamento, la dissipazione della pressione interstiziale, le iniezioni o gli scambi di massa nelle **namelist fisiche che già ne contengono i parametri**. Per ogni sorgente fisica attiva, in quella stessa namelist, deve poter specificare direttamente tre proprietà opzionali. **Eccezione strutturale obbligatoria:** i sei processi di mass exchange sono configurati attraverso una sola nuova namelist `MASS_EXCHANGE_PARAMETERS`, con una sola tripletta numerica comune a tutti i processi attivi del batch:
 
 1. **METHOD**: come risolvere la sorgente: EXPLICIT, NEWTON oppure ANALYTIC. La componente SEMI_IMPLICIT delle quattro interfacce fisiche è attualmente parte del trattamento NEWTON e non deve essere presentata come un quarto metodo di scheduling indipendente finché non venga definito e implementato un integratore autonomo.
 2. **CADENCE**: STAGE per partecipare a ciascuno stadio RK secondo il tableau IMEX, oppure STEP per un'integrazione **una sola volta dopo il completamento degli stadi RK**, sull'intero intervallo temporale del passo.
@@ -2359,7 +2359,7 @@ La condizione è necessaria ma **non sufficiente**: un gruppo deve anche essere 
 4. Tutte le sorgenti devono supportare realmente il metodo: NEWTON richiede il contributo SI/IM valido, ANALYTIC richiede la mappa analitica valida; uno stub di rifiuto non costituisce una capability.
 5. Un gruppo NEWTON con più termini risolve **un solo sistema accoppiato** su tutte le equazioni target, con residuo e Jacobiana congiunti, non vari sottosolver indipendenti.
 6. Un gruppo ANALYTIC con più leggi è ammesso soltanto se esiste **un operatore analitico congiunto**; la solvibilità analitica dei singoli addendi non basta.
-7. La deposizione comprende la perdita della fase vettore da essa indotta; il batch di mass exchange con limiter condiviso, inventari e topografia non può essere spezzato in gruppi autonomi non equivalenti.
+7. La deposizione comprende la perdita della fase vettore da essa indotta. **Tutti i processi mass exchange attivi appartengono obbligatoriamente allo stesso gruppo, con identici METHOD e CADENCE, assegnati esclusivamente dalla singola tripletta `MASS_EXCHANGE_PARAMETERS`**. Il batch con limiter condiviso, inventari e topografia è indivisibile anche quando soltanto un sottoinsieme delle sei leggi è attivo; non è configurabile separare erosione, deposizione, perdite, entrainment e vaporizzazione in gruppi differenti.
 8. L'ordine crescente di GROUP opera all'interno della stessa cadenza, ma non può scavalcare dipendenze obbligatorie del tableau IMEX o introdurre valutazioni esplicite in punti numericamente errati: dichiarare e validare queste restrizioni senza reintrodurre PHASE.
 
 I gruppi devono avere identificativi positivi e un'unione coerente dei target conservativi. Il registro normalizzato è costruito **una sola volta**; nel calcolo per cella non si devono confrontare stringhe, ricostruire liste o schedulare duplicati. Le diagnostiche di errore devono indicare sorgente, namelist, METHOD richiesto e coppia (CADENCE,GROUP) coinvolta.
@@ -2382,7 +2382,45 @@ Matrice di riferimento da precisare tramite audit esaustivo:
 
 Per specifiche **parziali** (solo METHOD, solo CADENCE, solo GROUP, oppure due campi), definire una risoluzione esplicita campo-per-campo e validare il gruppo risultante. Se i valori dichiarati confliggono con un accoppiamento legacy implicito non si deve cambiare silenciosamente l'accoppiamento: generare errore oppure applicare una regola di disaccoppiamento esplicitamente documentata e testata, da decidere prima dell'implementazione.
 
-Le namelist realmente presenti includono RHEOLOGY_PARAMETERS, TEMPERATURE_PARAMETERS e PORE_PRESSURE_PARAMETERS; per iniezioni, curvatura e componenti di mass exchange va mappata ciascuna legge alla **namelist fisica esistente pertinente**, senza inventare un secondo elenco globale di sorgenti. Se una namelist governa più processi indipendenti, utilizzare nomi con prefisso per **processo canonico**.
+Le namelist realmente presenti includono RHEOLOGY_PARAMETERS, TEMPERATURE_PARAMETERS e PORE_PRESSURE_PARAMETERS; iniezioni e curvatura devono essere associate alle loro namelist fisiche pertinenti. **Per gli scambi di massa si introduce invece la nuova `MASS_EXCHANGE_PARAMETERS`, che è la proprietaria unica dei parametri di attivazione e della tripletta comune dei sei processi.** Questa scelta non introduce una lista globale di sorgenti o gruppi: è una namelist fisica di un batch indivisibile. Se una namelist diversa governa più processi indipendenti, utilizzare nomi con prefisso per processo canonico.
+
+#### D18.3a — Nuova MASS_EXCHANGE_PARAMETERS: contenuti, ownership e contratto
+
+Creare una sola namelist `MASS_EXCHANGE_PARAMETERS` che contenga **una** tripletta opzionale `METHOD`, `CADENCE`, `GROUP` riferita all'intero batch, con default **EXPLICIT/STEP** e con GROUP scelto in modo da riprodurre esattamente la posizione attuale del mass exchange fra i gruppi STEP. La tripla è letta e validata una sola volta, poi assegnata a tutte e sole le sorgenti mass exchange effettivamente attive. Non introdurre `EROSION_METHOD`, `DEPOSITION_GROUP` o altre triplette per componente; non permettere di overrideare singole sorgenti mass exchange con `SOURCE_GROUPS`.
+
+Il catalogo **mantiene sei identità canoniche distinte**: `mass_exchange_erosion`, `mass_exchange_deposition` (inclusa la perdita della fase vettore indotta), `mass_exchange_carrier_liquid_loss`, `mass_exchange_carrier_darcy_loss`, `mass_exchange_entrainment` e `mass_exchange_vaporization`. La nuova namelist raccoglie i **parametri di processo** prima distribuiti fra le sezioni di trasporto e pressione interstiziale; restano nei rispettivi moduli fisici le proprietà del materiale che hanno significato autonomo fuori dal mass exchange (per esempio densità, viscosità e parametri della dissipazione pore pressure). Per i parametri usati da più leggi — inclusi permeabilità, proprietà di settling ed eventuali coefficienti termodinamici — identificare un **unico owner** dopo audit delle dipendenze e documentare la loro provenienza; niente duplicazione di parametri con due valori concorrenti.
+
+Inventario iniziale da verificare nelle routine di lettura e nelle leggi prima di spostare le dichiarazioni:
+
+| Processo canonico | Parametri/processi da ricollocare dalla namelist attuale | Provenienza attuale | Vincolo |
+|---|---|---|---|
+| `mass_exchange_erosion` | `EROSION_COEFF`, parametri direttamente connessi a erodibilità/erosione | `SOLID_TRANSPORT_PARAMETERS` | Non spostare automaticamente le proprietà di composizione del materiale erodibile se usate altrove |
+| `mass_exchange_deposition` | `SETTLING_FLAG`, opzioni di settling e deposizione direttamente legate allo scambio | `SOLID_TRANSPORT_PARAMETERS` | Deposizione e perdita indotta restano un solo processo canonico |
+| `mass_exchange_carrier_liquid_loss` | `LOSS_RATE` | `LIQUID_TRANSPORT_PARAMETERS` | La presenza della fase liquida è un prerequisito fisico, non una seconda configurazione numerica |
+| `mass_exchange_carrier_darcy_loss` | `GAS_LOSS_FLAG` e parametri specifici della perdita Darcy, dopo audit | `PORE_PRESSURE_PARAMETERS` | Non confondere la perdita di massa Darcy con la sorgente `pore_pressure_dissipation` |
+| `mass_exchange_entrainment` | `ENTRAINMENT_FLAG` e relativi parametri di processo | `GAS_TRANSPORT_PARAMETERS` | Preservare i controlli di compatibilità di fase già esistenti |
+| `mass_exchange_vaporization` | `LIQUID_VAPORIZATION_FLAG` e relativi parametri di processo | `GAS_TRANSPORT_PARAMETERS` | Preservare dipendenze da fase gas e trasferimenti termici |
+
+Esempio **illustrativo, non ancora supportato dal parser** (non è un elenco esaustivo dei parametri fisici):
+
+~~~fortran
+&MASS_EXCHANGE_PARAMETERS
+  EROSION_COEFF = 0.01,
+  SETTLING_FLAG = T,
+  LOSS_RATE = 0.0,
+  GAS_LOSS_FLAG = F,
+  ENTRAINMENT_FLAG = F,
+  LIQUID_VAPORIZATION_FLAG = F,
+  METHOD = 'EXPLICIT',
+  CADENCE = 'STEP',
+  GROUP = 1,
+/
+~~~
+
+La dichiarazione della namelist non crea sorgenti inesistenti: ogni processo rimane abilitato soltanto secondo i propri flag e prerequisiti fisici. Se **nessun processo mass exchange è attivo**, non schedulare un gruppo vuoto. Se ne è attivo anche uno solo, esso entra nel batch comune. La nuova collocazione dei parametri richiede un piano di migrazione degli input legacy: lettura compatibile temporanea o conversione esplicita, precedenza non ambigua per parametri trovati in vecchie e nuove namelist, aggiornamento di template, generatori, esempi, documentazione e test. Rifiutare valori doppi discordanti invece di selezionare silenziosamente una sezione.
+
+**Metodi supportati:** nel default attuale il batch usa `EXPLICIT/STEP`. `EXPLICIT/STAGE` è una futura opzione da supportare **solo dopo** aver garantito assemblaggio atomico dei rate, limiter e aggiornamenti conservativi coerenti con i coefficienti RK. `NEWTON` e `ANALYTIC`, sia a STAGE sia a STEP, **non sono automaticamente capacità del mass exchange**: restano vietati dal catalogo finché non saranno implementati e verificati un residuo/Jacobiana congiunti oppure una mappa analitica congiunta valida. La configurazione uniforme non giustifica risultati nulli o separazioni implicite del batch.
+
 
 La vecchia SOURCE_GROUPS, il relativo SOURCE_GROUP_ORDER e le opzioni legacy IMEX_* richiedono una migrazione pianificata: audit degli input presenti, parser di compatibilità di sola lettura ove necessario, diagnosi delle configurazioni miste ambigue, conversione di esempi/template/generatori e successiva rimozione degli adattatori obsoleti. **Non mantenere permanentemente due modelli di configurazione equivalenti né due fonti dell'ordine.** Anche i restart devono validare che schema di gruppi e metodi resti coerente.
 
@@ -2404,10 +2442,10 @@ D18 non introduce automaticamente subcycling, rejection/rollback né nuove polit
 
 #### D18.5 — Piano di implementazione coordinato
 
-1. **Inventario e matrice dei default.** Identificare ogni processo fisico canonico, attivazione, namelist esistente, target e dipendenze conservative; registrare default effettivi legacy per METHOD/CADENCE/GROUP, accoppiamenti, batch, gruppi vuoti ed eccezioni. Registrare le configurazioni già presenti in test, esempi e generatori.
-2. **Parametri opzionali nelle namelist fisiche.** Estendere la lettura in inpout_2d e nei moduli input pertinenti, usando nomi univoci prefissati per processo; inizializzare default prima del parsing. Controllare valori consentiti, interi positivi, input parziali, flag disabilitati e presenza di vecchie opzioni IMEX/SOURCE_GROUPS.
+1. **Inventario e matrice dei default.** Identificare ogni processo fisico canonico, attivazione, namelist esistente, target e dipendenze conservative; per mass exchange censire tutti i parametri oggi distribuiti nelle namelist solid/liquid/gas/pore pressure, separando parametri di processo da proprietà fisiche condivise e definendo un solo owner; registrare default effettivi legacy per METHOD/CADENCE/GROUP, accoppiamenti, batch, gruppi vuoti ed eccezioni. Registrare le configurazioni già presenti in test, esempi e generatori.
+2. **Parametri opzionali nelle namelist fisiche.** Estendere la lettura in inpout_2d e nei moduli input pertinenti, usando nomi univoci prefissati per processo **salvo la sola tripletta METHOD/CADENCE/GROUP della nuova MASS_EXCHANGE_PARAMETERS**; inizializzare default prima del parsing. Controllare valori consentiti, interi positivi, input parziali, flag disabilitati e presenza di vecchie opzioni IMEX/SOURCE_GROUPS.
 3. **Normalizzazione e registry.** In source_configuration_2d costruire una tripla efficace per ogni sorgente attiva; in source_registry_2d raggruppare per (CADENCE,GROUP), verificare METHOD identico, identità globalmente unica, target e capability, ordinare tramite GROUP. Eliminare execution_order come campo indipendente, SOURCE_GROUP_ORDER come impostazione canonica e ogni riferimento residuale a PHASE nel contratto corrente.
-4. **Validazione numerica dei gruppi.** Preservare il solve NEWTON congiunto e il sistema REAL/COMPLEX/complex-step per l'unione dei target; non suddividere il gruppo in sottosolver. Vietare gruppi ANALYTIC senza mappa congiunta e metodi non realmente supportati. Proteggere il batch mass exchange e il relativo aggiornamento del letto.
+4. **Validazione numerica dei gruppi.** Forzare tutte le sorgenti mass exchange attive nello stesso gruppo indivisibile e rifiutare configurazioni che separino il batch o ne duplichino il metodo/cadenza; preservare il solve NEWTON congiunto e il sistema REAL/COMPLEX/complex-step per l'unione dei target; non suddividere il gruppo in sottosolver. Vietare gruppi ANALYTIC senza mappa congiunta e metodi non realmente supportati. Proteggere il batch mass exchange e il relativo aggiornamento del letto.
 5. **Percorso STAGE senza regressioni.** Adeguare lo scheduler e i solver a consumare gruppi normalizzati senza alterare i tableaux RK, la semantica delle sorgenti esplicite, le correzioni numeriche o i passaggi SI/IM. Separare regole del tableau da sequenze di gruppi controllate dall'utente.
 6. **Esecutore STEP multimodale.** Estendere step_source_executor_2d oltre l'attuale percorso esplicito: dispatch per EXPLICIT/NEWTON/ANALYTIC e per GROUP; nei gruppi EXPLICIT/STAGE ed EXPLICIT/STEP separare rigorosamente fase di valutazione di **tutti** i rate sullo stesso stato, assemblaggio del rate di gruppo e applicazione dell'aggiornamento, vietando aggiornamenti sequenziali tra sorgenti dello stesso gruppo; integrazione implicita completa su dt e mappa analitica su dt, aggiornamento coerente di Q e QP, gestione degli stati secco/quasi secco e propagazione errori. Riusare i kernel fisici e il motore Newton, evitando formule duplicate.
 7. **Integrazione con runtime e output.** Collegare la nuova esecuzione STEP fra assemblaggio RK, applicazione delle transazioni finali, controlli di stato, aggiornamento topografico e avanzamento/output/restart; verificare finestre temporali, topografia evolutiva, stato stocastico e impossibilità di doppia applicazione.
@@ -2432,6 +2470,11 @@ Ogni passo deve costituire una modifica **sostanziale e coordinata** con i test 
 | stessa sorgente assegnata a STAGE e STEP | Errore: processo duplicato |
 | stesso GROUP con due cadenze diverse | Valido: namespace distinti |
 | gruppo ANALYTIC senza operatore congiunto | Errore preventivo |
+| sei processi mass exchange attivi con unica tripla in MASS_EXCHANGE_PARAMETERS | Unico gruppo, stesso METHOD/CADENCE/GROUP, rate sullo stesso stato e limiter post-somma |
+| uno o più processi mass exchange disattivati | Un solo gruppo per il sottoinsieme attivo, nessuna sorgente fittizia |
+| EXPLICIT/STAGE richiesto per il batch prima della sua validazione fisica | Rifiuto preventivo; nessun falso supporto |
+| NEWTON o ANALYTIC richiesto per il batch senza un operatore congiunto implementato | Rifiuto preventivo |
+| parametri mass exchange duplicati fra namelist legacy e nuova con valori discordanti | Errore esplicito; nessuna precedenza silenziosa |
 | mass exchange spezzato violando limiter/bed | Errore preventivo |
 | input legacy senza i nuovi parametri | Accoppiamenti, ordine e soluzioni della baseline riprodotti |
 
@@ -2439,7 +2482,7 @@ Ogni passo deve costituire una modifica **sostanziale e coordinata** con i test 
 
 **T1 — Contratto:** test del parser, dei default e dell'unicità globale; rifiuti espliciti, metodi/cadenze incompatibili, indici/target, nomi e gruppi. **T2 — Operatori:** includere test multi-sorgente EXPLICIT/STAGE ed EXPLICIT/STEP che confrontino la somma dei rate sullo stato comune contro un oracolo indipendente e che falliscano se l'ordine delle sorgenti altera il risultato; oracoli analitici per cooling e pore pressure; residui Newton STEP; bilanci conservativi, Q/QP, secco/quasi secco, limiter del mass exchange, contatori di quante volte viene eseguita ciascuna sorgente. **T3 — Integrazione:** test IMEX per n_RK=2/3/4 ove supportati, input legacy, lava con viscosità termodipendente, full/split binary restart, output/manifest, casi rappresentativi OpenMP e toolchain GNU/ifx secondo rischio. **T4 — Scientifico:** studio di raffinamento in dt e confronto fra NEWTON/STAGE, ANALYTIC/STAGE, NEWTON/STEP e ANALYTIC/STEP, quantificando accuratezza di splitting, stabilità e costo: nessuna equivalenza globale automatica.
 
-**Gate D18 COMPLETATO solo quando:** tutte le sorgenti fisiche configurabili hanno una tripla opzionale nella namelist fisica pertinente; ogni sorgente viene assegnata una volta sola; ogni gruppo ha METHOD omogeneo e GROUP come unico ordine configurabile; **EXPLICIT/STAGE** contribuisce correttamente al tableau EX, **EXPLICIT/STEP** applica un unico avanzamento esplicito su dt, e **NEWTON/STEP e ANALYTIC/STEP** sono implementati, realmente eseguiti e testati; il default conserva l'accoppiamento e il comportamento numerico legacy; nessun PHASE/execution_order indipendente sopravvive al contratto finale; mass exchange, topografia, conservazione, input e restart sono coerenti; test mirati e gate scientifici richiesti risultano documentati e superati.
+**Gate D18 COMPLETATO solo quando:** tutte le sorgenti fisiche configurabili hanno una tripla opzionale nella namelist fisica pertinente **oppure, per i sei processi mass exchange, una singola tripla comune nella nuova MASS_EXCHANGE_PARAMETERS con i parametri di processo migrati e ownership fisica non duplicata**; ogni sorgente viene assegnata una volta sola; ogni gruppo ha METHOD omogeneo e GROUP come unico ordine configurabile; **EXPLICIT/STAGE** contribuisce correttamente al tableau EX, **EXPLICIT/STEP** applica un unico avanzamento esplicito su dt, e **NEWTON/STEP e ANALYTIC/STEP** sono implementati, realmente eseguiti e testati; il default conserva l'accoppiamento e il comportamento numerico legacy; nessun PHASE/execution_order indipendente sopravvive al contratto finale; mass exchange, topografia, conservazione, input e restart sono coerenti; test mirati e gate scientifici richiesti risultano documentati e superati.
 
 ---
 
