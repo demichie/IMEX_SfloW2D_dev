@@ -1,8 +1,8 @@
 # IMEX_SfloW2D — Development Roadmap
 
-**Piano unico, integrato e consolidato | 14 ottobre 2026 | repository fd43e4ca2ee6**
+**Roadmap integrata e consolidata | 25 ottobre 2026 | baseline tecnica D17: `0e545ac9`**
 
-Questa roadmap raccoglie in un unico documento la visione scientifica, i principi architetturali, il piano di sviluppo e le schede operative. Le sezioni introduttive e il Master Development Plan costituiscono il riferimento generale; le schede delle fasi descrivono gli interventi implementativi e i relativi criteri di accettazione. Le attività implementate ma non ancora accettate sono mantenute distinte dalle milestone completate.
+Questa roadmap definisce lo stato attuale verificabile e il piano di sviluppo verso la visione scientifica finale, con le responsabilità e le interfacce architetturali vigenti. Le sezioni introduttive e il Master Development Plan costituiscono il riferimento generale; le schede delle fasi descrivono gli interventi implementativi e i relativi criteri di accettazione. Le attività implementate ma non ancora accettate sono distinte dalle milestone completate e dai gate scientifici futuri; gli stati si riferiscono al perimetro di evidenza dichiarato.
 
 # 1. Visione scientifica e funzionale del modello a sviluppo completato
 
@@ -24,9 +24,15 @@ La termodinamica delle miscele, la conversione fra frazioni massiche e volumetri
 
 ### C. Reologie alternative e proprietà costitutive
 
-La piattaforma dovrà consentire di selezionare reologie diverse senza modificare il ciclo IMEX o il motore generale di Newton. I modelli reologici esistenti verranno estratti in moduli autonomi, selezionati tramite identificatori leggibili e registrati all’inizializzazione. Le implementazioni dovranno conservare le specificità fisiche del modello, inclusi eventuali regimi limite, dissipazione, frenamento e dipendenze termiche, senza imporre una correzione della quantità di moto a sorgenti che non rappresentano esclusivamente attrito.
+La piattaforma dovrà consentire di selezionare reologie diverse senza modificare il ciclo IMEX o il motore generale di Newton. I modelli reologici sono organizzati in moduli autonomi, selezionati tramite nomi canonici e validati all’inizializzazione. Le implementazioni dovranno conservare le specificità fisiche del modello, inclusi eventuali regimi limite, dissipazione, frenamento e dipendenze termiche, senza imporre una correzione della quantità di moto a sorgenti che non rappresentano esclusivamente attrito.
 
-L’architettura dovrà garantire che l’aggiunta o il confronto di una reologia abbia un perimetro locale e sia accompagnata da caratterizzazione scientifica REAL/COMPLEX, controlli sulle derivate, test di stati degeneri e confronto rispetto alla baseline. Questa fase di modularizzazione riguarda per ora i soli modelli reologici: non autorizza un refactoring generalizzato e simultaneo di tutti i processi costitutivi.
+L’architettura dovrà garantire che l’aggiunta o il confronto di una reologia abbia un perimetro locale e sia accompagnata da caratterizzazione scientifica REAL/COMPLEX, controlli sulle derivate, test di stati degeneri e confronto rispetto alla baseline. L’architettura delle sorgenti fisiche è ora comune anche ai processi termici, di pressione interstiziale, iniezione e scambio di massa; future estensioni costitutive conserveranno le stesse interfacce e richiederanno validazione specifica.
+
+### C1. Sorgenti fisiche, integrazione e trasferimenti conservativi
+
+L’architettura unificata delle sorgenti permette di comporre reologie, termica, pressione interstiziale, iniezioni e scambi di massa attraverso nomi canonici e capacità numeriche dichiarate. Ogni legge espone quattro interfacce fisiche uniformi; la selezione dei metodi ammissibili è validata in fase di configurazione. Un gruppo Newton viene trattato come un unico sistema accoppiato, anche quando coinvolge più equazioni fisiche; le correzioni numeriche della quantità di moto sono proprietà dei blocchi di equazioni, non della scelta reologica. Il raffreddamento termico è attivabile indipendentemente dal modello reologico, rispettando i limiti energetici e la struttura depth-averaged.
+
+Gli scambi fra flusso e letto sono valutati come una transazione esplicita post-RK coerente: i contributi di erosione, deposizione, perdite della fase vettore, entrainment e vaporizzazione condividono limiti e bilanci. La perdita indotta dalla deposizione è parte della legge di deposizione; i rate conservativi, gli inventari e il fondo nodale Q1 sono aggiornati una sola volta. La separazione fra formulazione fisica, assemblaggio, integrazione temporale e gestione dello stato costituisce l’interfaccia sulla quale innestare anche i processi scientifici futuri senza imporre dipendenze reologiche al solver generale.
 
 ### D. Uno o due strati e processi di interazione
 
@@ -196,7 +202,7 @@ La fase C è **COMPLETATA per il perimetro tecnico di validazione**. L'automazio
 | D13 | P8            | Integrazione analitica esatta dei termini IM                | COMPLETATO (gate locale GNU/macOS) |
 | D14 | P8            | Gruppi misti e validazione                                  | COMPLETATO (gate locale GNU/macOS) |
 | D16 | —             | Consolidamento leggi fisiche, rate e assemblaggio IMEX      | COMPLETATO (gate locale + CI ifx completa) |
-| D17 | —             | Struttura unificata dei termini sorgente e separazione tra fisica e numerica | IN CORSO |
+| D17 | —             | Sorgenti canoniche, gruppi omogenei, Newton accoppiato e mass exchange STEP | IMPLEMENTATO (CI verde; gate scientifico D15 aperto) |
 | D15 | P9            | Acceptance finale della nuova architettura                  | GATE     |
 
 
@@ -479,7 +485,7 @@ A/A10-B/D-A10-AREA completate. Non riaprire automaticamente A10 per modifiche su
 
 Attività e verifiche operative: Exchange limitato per cella prima dell’assemblaggio nodale; topo_rate_cell unico; gather Q1 A_C/4 verso Bdot_vertex, contributor dry zero nel denominatore; restart esatto B_vertex.
 
-File interessati: src/mass_exchange_2d.f90; src/geometry_2d.f90; TESTS/TEST_MASS_EXCHANGE/\*; docs/acceptance/N8_A_CELL_EXCHANGE_2026_10_10.md; docs/acceptance/N8_B_PROJECTION_2026_10_10.md.
+File interessati: src/physics/mass_exchange/; src/numerics/step_source_executor_2d.f90; src/geometry_2d.f90; TESTS/TEST_MASS_EXCHANGE/\*; docs/acceptance/N8_A_CELL_EXCHANGE_2026_10_10.md; docs/acceptance/N8_B_PROJECTION_2026_10_10.md.
 
 Criteri di accettazione: Nessun inventario negativo; global bed-volume exchange a roundoff; geometria ricostruita coerente; regressioni con restart e OpenMP.
 
@@ -557,7 +563,7 @@ S2 — Topografia ad alta risoluzione e parametrizzazione sub-grid
 
 **Attività previste:** Definire rapporto DEM fine/griglia di calcolo; estrarre statistiche di microtopografia, distribuzione delle pendenze/asperità, connettività e anisotropia; sviluppare correzioni fisicamente interpretabili su drag/frizione, propagazione e/o conservazione compatibili con HP-PCCU. Separare quota Q1 risolta B_vertex dalle statistiche irrisolte e specificare aggiornamento quando erosione/deposizione modifica il fondo. Verificare impatto su CFL, bilanci, nonconservatività e lake-at-rest; distinguere offline preprocessing e campi dinamici.
 
-**File interessati / nuovi:** src/subgrid/terrain_statistics_2d.f90 \[FUTURE\]; subgrid_topography_2d.f90 \[FUTURE\]; subgrid_closure_2d.f90 \[FUTURE\]; src/geometry/geometry_2d.f90; src/spatial/spatial_operator_2d.f90; src/physics/mass_exchange_2d.f90; src/io/\*; TESTS/TEST_SUBGRID_TOPOGRAPHY/\* \[FUTURE\].
+**File interessati / nuovi:** src/subgrid/terrain_statistics_2d.f90 \[FUTURE\]; subgrid_topography_2d.f90 \[FUTURE\]; subgrid_closure_2d.f90 \[FUTURE\]; src/geometry/geometry_2d.f90; src/spatial/spatial_operator_2d.f90; src/physics/mass_exchange/; src/numerics/step_source_executor_2d.f90; src/io/\*; TESTS/TEST_SUBGRID_TOPOGRAPHY/\* \[FUTURE\].
 
 **Criteri di accettazione:** Confronti sistematici risoluzione fine/coarse, casi limite topografia uniforme (correzione nulla), lake-at-rest/positività conservati, scambi di massa e restart riproducibili, dipendenza da orientazione e scala documentata; gestione esplicita della topografia evolutiva.
 
@@ -2066,1350 +2072,176 @@ della velocità con coefficienti congelati, la ricorrenza degli stage e
 l’assemblaggio finale; l’ordine dei gruppi produce una differenza misurabile.
 Quest’ultima suite passa in strict e optimized con thread 1/4.
 
-### D16 — Consolidamento dell’architettura delle leggi fisiche, dei rate e dell’assemblaggio IMEX
-
-#### Logica e obiettivi
+### D16 — Leggi fisiche, rate e assemblaggio IMEX
 
-D16 completa la modularizzazione avviata in D05–D14 e prepara l’architettura consolidata per l’accettazione finale D15, separando chiaramente quattro responsabilità: (1) le leggi costitutive, che calcolano proprietà fisiche e rate; (2) `equation_terms_2d`, che assembla i contributi nelle equazioni; (3) le interfacce di dominio, che selezionano il modello fisico; (4) `time_integration_2d`, che integra e applica gli aggiornamenti allo stato. Non è autorizzata una nuova relocation indiscriminata né una modifica delle formule, della discretizzazione o della semantica REAL/COMPLEX già verificata.
+**Stato ufficiale: COMPLETATO nel perimetro del gate locale e della CI ifx documentata; il contratto definitivo delle sorgenti è D17.** D16 mantiene la responsabilità della separazione delle leggi e della consistenza dei rate, mentre D17 definisce catalogo canonico, quattro interfacce uniformi, gruppi, scheduler e transazione mass exchange. I gate D16 non costituiscono da soli l'accettazione scientifica D15 della nuova architettura complessiva.
 
-I termini reologici restituiti dalle routine specifiche sono fisicamente rate di quantità di moto: vengono calcolati dalla legge e poi integrati nel tempo. `source` descrive il loro ruolo nell’equazione, ma `rate` descrive meglio la quantità restituita. Lo stesso vale per erosione, deposizione, entrainment, perdita del carrier e vaporizzazione. La convenzione deve quindi distinguere:
+#### Obiettivi scientifici e numerici
 
-```text
-eval_*_rate       valuta una quantità fisica per unità di tempo
-eval_*_source     assembla un contributo sorgente dell’equazione
-solve_*_analytic_* integra analiticamente una variabile di stato
-apply_*            applica un incremento allo stato
-```
+Le formule dei processi fisici e reologici non sono proprietà dell'integratore né dei risolutori lineari. Ogni legge valuta contributi all'evoluzione della miscela multifase nello stato fisico locale, preservando unità, convenzioni dei segni, dipendenze su densità/temperatura/frazioni, limiti di ammissibilità e interpretazione dei regimi costitutivi. La reologia deve poter variare mantenendo invariati il solve Newton per gruppi e il tableau RK. Gli addendi costitutivi di una stessa legge rimangono all'interno della famiglia fisica, senza diventare termini configurabili indipendenti.
 
-I nomi devono usare i qualificatori completi `explicit`, `implicit` e `semi_implicit`:
+La conversione fra conservative e primitive e l'insieme di proprietà condivise rimangono in `state_conversion_2d`. Il percorso di derivazione delle sorgenti conserva i kernel REAL/COMPLEX e la valutazione complex-step dei Jacobiani, compreso il trattamento esplicito delle funzioni non analitiche, dei rami a soglia e dei punti degeneri. Le chiamate LAPACK restano tipizzate e l'ordine dei blocchi deriva dagli indici di equazione, non dal nome di una reologia.
 
-```text
-eval_<modello>_<trattamento>_<quantità>
-```
+#### Organizzazione vigente della fisica
 
-Per esempio:
+- Reologie: `src/physics/rheology_laws/` e dispatcher di famiglia `rheology_2d`; una voce canonica per legge completa, incluse componenti interne di attrito/drag. In una nuova legge si modificano esclusivamente modulo fisico, catalogo e collegamento statico della famiglia.
+- Termica e pressione interstiziale: `src/physics/thermal_laws_2d.f90` e `pore_pressure_laws_2d.f90`; la sorgente di raffreddamento è attivata da `thermal_cooling_flag` indipendentemente da `rheology_model`, con default retrocompatibile quando il parametro non compare negli input più vecchi.
+- Iniezioni di massa e geometria delle sorgenti: moduli in `src/physics/mass_injection_terms/`; supportano sorgenti circolari, fessurali, radiali/laterali, finestre temporali e maschere senza ridefinire il contributo idrostatico dell'operatore HP-PCCU.
+- Trasferimenti flusso/letto: processi distinti in `src/physics/mass_exchange/`, coordinati da `mass_exchange_laws_2d`; la perdita indotta dalla deposizione è interna alla deposizione e il limitatore sul carrier loss viene applicato a contributi sommati. Le variazioni conservative e topografiche sono assemblate insieme senza aggiornare direttamente lo stato fisico.
+- Assemblaggio: `source_terms_2d` espone rate espliciti, semi-impliciti, impliciti e operazioni analitiche; `equation_terms_2d` conserva i soli contributi spaziali pertinenti. Le regole di cadenza, gruppi e schemi sono riportate in D17.
 
-```text
-eval_voellmy_implicit_momentum_rate
-eval_voellmy_semi_implicit_momentum_rate
-eval_lahar_implicit_momentum_rate
-eval_lahar_semi_implicit_momentum_rate
-eval_mui_momentum_rate
-```
-
-#### Assemblaggio e selezione dei modelli
-
-`equation_terms_2d.f90` deve rimanere il modulo che assembla i termini delle equazioni, con una nomenclatura uniforme:
-
-```text
-eval_explicit_terms
-eval_implicit_terms
-eval_semi_implicit_terms
-eval_mass_exchange_terms
-eval_boundary_terms
-```
-
-Le abbreviazioni storiche `expl`, `impl` e `semi_impl` devono essere sostituite progressivamente. `equation_terms_2d` non deve però selezionare direttamente i modelli reologici. Condizioni come `IF (rheology_model_id .EQ. rheology_id_voellmy)` e i corrispondenti `SELECT CASE` devono essere spostati in `rheology_2d.f90`.
-
-`rheology_2d.f90` deve funzionare da dispatcher e fornire interfacce comuni, almeno per:
-
-```text
-eval_explicit_rheology_rate
-eval_implicit_rheology_rate
-eval_semi_implicit_rheology_rate
-solve_analytic_rheology_velocity
-```
-
-La selezione del modello deve essere fatta in un solo punto; i moduli specifici devono implementare soltanto la propria legge, i propri rate e le eventuali integrazioni analitiche.
-
-#### Moduli delle leggi fisiche
-
-I file che definiscono leggi fisiche devono usare `laws` nel nome:
-
-```text
-thermal_laws_2d.f90
-mass_exchange_laws_2d.f90
-pore_pressure_laws_2d.f90
-```
-
-Le reologie devono essere organizzate nella directory `rheology_laws/`, con moduli del tipo:
-
-```text
-rheology_voellmy_laws_2d.f90
-rheology_mui_laws_2d.f90
-rheology_lahar_laws_2d.f90
-rheology_plastic_laws_2d.f90
-```
-
-Il nome `pore_pressure` deve essere mantenuto per esteso: `pore` non identifica un modello, ma `pore_pressure` identifica la variabile fisica.
-
-#### Reologie e integrazioni analitiche
-
-Le routine oggi denominate `*_implicit_source`, `*_semi_impl_source` o `*_source` devono essere rinominate quando restituiscono effettivamente la variazione temporale della quantità di moto:
-
-```text
-eval_voellmy_implicit_source  -> eval_voellmy_implicit_momentum_rate
-eval_voellmy_semi_impl_source -> eval_voellmy_semi_implicit_momentum_rate
-eval_lahar_implicit_source    -> eval_lahar_implicit_momentum_rate
-eval_lahar_semi_impl_source   -> eval_lahar_semi_implicit_momentum_rate
-eval_mui_source               -> eval_mui_momentum_rate
-eval_lava_implicit_source     -> eval_lava_implicit_momentum_rate
-eval_lava_semi_impl_source    -> eval_lava_semi_implicit_momentum_rate
-eval_mui_voellmy_source       -> eval_mui_voellmy_momentum_rate
-eval_mui_voellmy_implicit_source -> eval_mui_voellmy_implicit_momentum_rate
-eval_plastic_implicit_source  -> eval_plastic_implicit_momentum_rate
-eval_empirical_implicit_source -> eval_empirical_implicit_momentum_rate
-eval_quadratic_implicit_source -> eval_quadratic_implicit_momentum_rate
-eval_froude_source            -> eval_froude_momentum_rate
-eval_lucas_source             -> eval_lucas_momentum_rate
-```
-
-Le routine di rate della quantità di moto selezionate in questa tranche sono
-state rinominate secondo la convenzione; i call site in `equation_terms_2d` e
-il test delle velocità analitiche usano i nuovi nomi. `TEST_RHEOLOGY_CELL_LOCAL/run_test.sh`
-passa in strict e optimized (255/255 fixture di caratterizzazione per profilo).
-
-La verifica deve essere fatta sulle unità e sul risultato reale di ogni routine. Le proprietà non sono rate: `eval_lahar_fluid_viscosity` rimane una valutazione di viscosità, mentre `eval_lahar_deposition_rate` identifica correttamente un rate.
-
-Le integrazioni analitiche devono seguire:
-
-```text
-solve_<modello>_analytic_<variabile>
-solve_analytic_<variabile>
-```
-
-con esempi:
-
-```text
-solve_lava_analytic_temperature
-solve_voellmy_analytic_velocity
-solve_mui_analytic_velocity
-solve_lahar_analytic_velocity
-solve_analytic_pore_pressure
-```
-
-`solve_lava_analytic_temperature` integra l’ODE di raffreddamento a
-coefficienti congelati ed è l’unico solve di temperatura usato da `ANALYTIC`.
-`advance_lava_cooling_temperature` mantiene il nome di compatibilità.
-Analogamente, `solve_analytic_pore_pressure` integra l’ODE di diffusione
-esponenziale con coefficienti congelati ed è l’unico solve di pressione usato
-da `ANALYTIC`; `advance_pore_pressure_diffusion` resta il wrapper di
-compatibilità. Non devono essere reintrodotti solve algebrici DIRK paralleli
-per queste quantità.
-
-#### Ruoli dei metodi e sequenza dello stage
-
-La roadmap deve mantenere distinti i seguenti trattamenti, perché risolvono
-problemi diversi:
-
-- **Esplicito:** `time_integration_2d` include nel contributo noto dello stage
-  i rate espliciti già valutati. Non è una modalità di solve dei gruppi
-  impliciti.
-- **Newton con SI dove previsto:** `IM_GROUP_METHOD_NEWTON` indica il
-  trattamento numerico dello stage: i contributi semi-impliciti sono applicati
-  dal coordinatore e Newton risolve i residui impliciti delle variabili
-  assegnate al gruppo. Non sono due opzioni di gruppo separate.
-- **Analitico:** `IM_GROUP_METHOD_ANALYTIC` integra nel tempo i termini IM
-  assegnati con i coefficienti non cinematici congelati; usa formule chiuse
-  quando disponibili e inversione numerica controllata dell’integrale
-  temporale altrimenti. Per la velocità il solve comprende già il contributo
-  semi-implicito e quello implicito; non si applica separatamente il SI prima
-  del solve analitico.
-
-Le sole modalità selezionabili per un gruppo sono quindi `NEWTON` e
-`ANALYTIC`.
-
-La sequenza target per uno stage è:
-
-1. `time_integration_2d` costruisce lo stato conservativo noto `q_known`, i
-   contributi degli stage precedenti e \f$\tau\f$.
-2. Il coordinatore locale inizializza lo stato di lavoro noto. Per ciascun
-   gruppo Newton della quantità di moto applica il contributo SI previsto e
-   poi risolve il residuo Newton; un gruppo analitico della quantità di moto
-   integra il termine sorgente combinato nell’intervallo dello stage.
-3. Il coordinatore percorre i gruppi nell’ordine definito da
-   `equation_partition`. Ogni gruppo riceve lo stato di lavoro aggiornato dal
-   gruppo precedente e usa uno dei due metodi: integrazione analitica a
-   coefficienti congelati oppure trattamento Newton (con SI per la quantità
-   di moto).
-4. Ogni metodo modifica soltanto le componenti conservative assegnate al
-   gruppo. Dopo ciascun aggiornamento si ricostruiscono da `q` le variabili
-   fisiche necessarie al gruppo successivo. Per il raffreddamento, per esempio,
-   restano fisse le altre componenti conservative e si aggiorna l’energia;
-   densità e profondità derivate si adeguano alla nuova temperatura senza
-   introdurre variazioni di massa, quantità di moto o masse dei componenti.
-   Non si deve riconvertire ciecamente l’intero stato fisico in `q` mantenendo
-   fisse profondità e velocità: ciò introdurrebbe incrementi conservativi non
-   presenti nel termine energetico.
-5. Al termine della sweep si restituisce un solo rate effettivo per lo stage,
-   ricavato dall’incremento conservativo netto rispetto a `q_known`,
-   \f$R_\mathrm{eff}=(q_\mathrm{final}-q_\mathrm{known})/\tau\f$. Questo
-   conteggia una volta sola SI e gli aggiornamenti dei gruppi; non è la somma
-   di rate finali ricalcolati separatamente e non presume che il rate medio
-   analitico medio coincida con quello implicito istantaneo.
-
-La responsabilità del dispatch e dell’ordine dei gruppi appartiene al
-coordinatore locale dello stage `solve_imex_stage`; `solve_implicit_stage`
-resta come wrapper di compatibilità. Il coordinatore possiede lo stato
-condiviso, applica SI, sceglie il metodo per ciascun gruppo, delega la sweep
-ordinata a `solve_implicit_groups` e calcola il rate netto finale.
-`time_integration_2d` rimane responsabile della sequenza RK globale e dei contributi noti;
-`equation_metadata_2d` descrive partizioni, ordine e metodi; `equation_terms_2d`
-valuta rate e sorgenti per uno stato fornito, ma non orchestra i gruppi. Il
-coordinatore chiama i solve Newton o i solve di integrazione analitica a
-coefficienti congelati appropriati al gruppo.
-
-#### Termini termici e scambio di massa
-
-`thermal_sources_2d.f90` è stato rinominato `thermal_laws_2d.f90`, perché contiene anche leggi costitutive e l’integrazione analitica della temperatura. Le routine devono riflettere la quantità restituita, ad esempio:
-
-```text
-eval_lava_cooling_energy_rate
-eval_vaporization_mass_rate
-eval_vaporization_energy_rate
-```
-
-Il contributo termico dello scambio di massa va assemblato direttamente in
-`eval_mass_exchange_terms`: una routine separata che esegue soltanto questo
-conto non aggiunge una responsabilità distinta. La vaporizzazione resta invece
-separata tra calcolo costitutivo dei rate in `thermal_laws_2d` e assemblaggio
-dei contributi di massa ed energia in `equation_terms_2d`.
-
-Le leggi per erosione, deposizione, sedimentazione, entrainment e perdita del carrier devono essere in `mass_exchange_laws_2d.f90`, con nomi del tipo:
-
-```text
-eval_erosion_rate
-eval_deposition_rate
-eval_settling_rate
-eval_entrainment_rate
-eval_carrier_loss_rate
-```
-
-`eval_mass_exchange_terms` resta in `equation_terms_2d`, perché trasforma i rate fisici nei contributi alle equazioni di massa, quantità di moto, energia e topografia.
-
-#### Aggiornamento temporale e geometria
-
-La parte di `mass_exchange_2d.f90` che applica l’incremento allo stato deve essere spostata in `time_integration_2d.f90`, con un nome come `apply_mass_exchange_increment`, oppure `apply_mass_exchange_stage` se l’operazione avviene esplicitamente a ogni stadio RK. Deve gestire `q <- q + dt * eqns_term`, gli inventari `deposit`, `erosion` ed `erodible`, i controlli di positività e conservazione e l’ordine rispetto agli stadi IMEX/RK.
-
-Le operazioni geometriche devono rimanere in `geometry_2d.f90`, per esempio `project_cell_field_to_vertices`, `apply_bed_evolution` e `refresh_topography_geometry`. `time_integration_2d` decide quando chiamarle; `geometry_2d` implementa le trasformazioni. `mass_exchange_2d.f90` potrà essere rimosso solo dopo l’audit dei simboli pubblici, dei `USE`, dei target di build e dei test.
-
-#### Roadmap operativa
-
-**D16.1 — Inventario semantico.** Elencare tutte le routine reologiche, termiche, di pressione dei pori e di scambio di massa, registrando chiamanti, argomenti, unità, risultato, dipendenza dal modello, trattamento numerico, uso REAL/COMPLEX e responsabilità futura. Distinguere proprietà, rate, sorgenti assemblate, solver analitici e aggiornamenti dello stato.
-
-**D16.2 — Interfacce comuni.** Definire le API generiche di `rheology_2d` e le interfacce delle leggi termiche, di massa e di pressione dei pori, dichiarando esplicitamente se restituiscono proprietà, rate, sorgenti o variabili aggiornate. Formalizzare e completare il contratto del coordinatore dello stage (`solve_imex_stage`, ora implementato): applicazione SI, dispatch ordinato dei gruppi e scelta fra le sole modalità Newton e analitica, aggiornamento dello stato conservativo condiviso, ricostruzione dello stato fisico per il gruppo successivo e calcolo del rate effettivo netto dalla differenza conservativa di stage. L'interfaccia di `rheology_2d` comprende ora anche il dispatcher dei solver analitici di velocità, con stato fisico esplicito e stato di supporto del modello restituito al chiamante.
-
-**D16.3 — Dispatcher reologico.** Spostare in `rheology_2d` tutti i rami basati su `rheology_model_id` o sul nome del modello e rimuovere le chiamate dirette ai moduli specifici da `equation_terms_2d`, mantenendo formule, argomenti e semantica complex-step.
-
-Prima tranche completata: `rheology_2d` espone dispatcher con argomenti espliciti
-per i rate reologici impliciti e semi-impliciti; `equation_terms_2d` delega a
-queste interfacce e `curvature_acceleration` appartiene ora a `rheology_2d`.
-Il dispatcher di velocità analitica è stato aggiunto a `rheology_2d` e
-`nonlinear_solver_2d` delega ora a questa API invece di selezionare direttamente
-i solver specifici. Il test dei flussi analitici copre tutti i modelli
-supportati, il modello `none` e un ID non supportato; l'eseguibile passa nei
-profili strict e optimized. La selezione del raffreddamento specifico della
-reologia è ora in `thermal_laws_2d`; la viscosità di settling lahar e la
-selezione della legge di deposizione sono in `mass_exchange_laws_2d`.
-`equation_terms_2d` mantiene l'assemblaggio dei termini, senza chiamate dirette
-alle leggi specifiche lava/lahar. Il mapping lava del gruppo di temperatura in
-`init_problem_param` resta una decisione di partizione delle equazioni, non una
-dispatch costitutiva. Il runner completo raggiunge i test Fortran ma non
-termina perché nell'ambiente manca NumPy, richiesto da `characterize.py`.
-
-**D16.4 — Relocation dei moduli.** Rinominare e organizzare i moduli in `thermal_laws_2d`, `mass_exchange_laws_2d`, `pore_pressure_laws_2d` e `rheology_laws`. Aggiornare `USE`, Makefile, liste di build, Doxygen e test. La relocation deve essere scientificamente neutra.
-
-Relocation completate: `thermal_sources_2d.f90` è ora
-`thermal_laws_2d.f90`, `pore_pressure_2d.f90` è ora
-`pore_pressure_laws_2d.f90` e `mass_exchange_laws_2d` contiene le leggi
-costitutive di scambio. I 13 sorgenti reologici sono ora in
-`src/physics/rheology_laws/`; Makefile e runner/test coinvolti usano i nuovi
-percorsi. Dopo lo spostamento, `TEST_RHEOLOGY_CELL_LOCAL` passa in strict e
-optimized (255/255 fixture per profilo) e la build completa dell'applicazione
-riesce.
-
-**D16.5 — Rinomina delle routine.** Applicare `eval_<modello>_<trattamento>_<quantità>`, usare `momentum_rate` per i rate reologici e sostituire `semi_impl` con `semi_implicit`. Usare `rate` soltanto per quantità effettivamente riferite al tempo.
-
-`eval_nh_semi_impl_terms` è stata rinominata `eval_semi_implicit_terms`;
-anche il dummy di output ora usa il qualificatore completo
-`semi_implicit_term`. Il solver e i test aggiornati usano la nuova API.
-
-**D16.6 — Riorganizzazione termica.** Usare `solve_lava_analytic_temperature` come nome canonico dell’integratore analitico (mantenendo `advance_lava_cooling_temperature` come wrapper di compatibilità), separare i rate di massa ed energia della vaporizzazione e mantenere l’assemblaggio energetico degli scambi in `equation_terms_2d`.
-
-Completata la separazione: `eval_vaporization_mass_rate` e
-`eval_vaporization_energy_rate` calcolano risultati distinti in
-`thermal_laws_2d`; il termine termico di scambio è assemblato direttamente in
-`eval_mass_exchange_terms`, senza una funzione separata che eseguiva soltanto
-quel conto. La legge di
-raffreddamento e il relativo dispatcher usano `energy_rate` nei nomi. Il
-solve canonico della temperatura esiste già con il nome previsto e il vecchio
-nome `advance_lava_cooling_temperature` resta un wrapper di compatibilità.
-I test sorgente verificano separatamente i rate di massa ed energia e il
-comportamento alla soglia di ebollizione.
-
-**D16.7 — Riorganizzazione dello scambio di massa.** Spostare le formule costitutive in `mass_exchange_laws_2d`, lasciando l’assemblaggio in `equation_terms_2d` e l’applicazione temporale in `time_integration_2d`.
-
-Estrazioni completate: `settling_velocity`, `eval_lahar_deposition_rate`, la
-legge di deposizione generale per sedimentazione ostacolata,
-`eval_erosion_rates`, il limite del rate di perdita del carrier e
-`eval_air_entrainment_rate` appartengono ora a `mass_exchange_laws_2d`. Il
-modulo ospita anche la selezione della viscosità per il settling e il dispatch
-tra le leggi di deposizione lahar e hindered settling; `equation_terms_2d`
-mantiene l'assemblaggio dei termini. `settling_velocity` conserva la formula
-esistente e i suoi chiamanti sono stati aggiornati. `TEST_MASS_EXCHANGE` passa
-in strict e optimized con 1 e 4 thread, includendo l’assembly di settling e la
-continuazione da checkpoint.
-
-**D16.8 — Aggiornamento per stage o per passo.** Trasferire l’applicazione dell’incremento, degli inventari e dei controlli da `mass_exchange_2d` a `time_integration_2d`; documentare l’ordine rispetto a RK/IMEX, positività, topografia e geometria.
-
-L’aggiornamento degli stati e degli inventari viene ora applicato per cella da
-`apply_mass_exchange_increment` in `time_integration_2d`. La sequenza resta una
-frazione post-IMEX, eseguita una volta per passo: i rate cell-locali sono
-valutati e limitati prima dell’incremento; l’incremento aggiorna insieme stato e
-inventari, applica i controlli di positività e ricostruisce lo stato primitivo;
-solo dopo il loop le proposte limitate del letto sono proiettate sui vertici e
-la geometria derivata viene aggiornata da `geometry_2d`. Il chiamante avanza
-l’orologio della simulazione dopo il completamento di questa sequenza.
-
-**D16.9 — Separazione geometrica.** Trasferire in `geometry_2d` proiezioni, evoluzione del letto e refresh geometrico, verificando che la topografia evolutiva resti aggiornabile e che il vertex gather conservi il bilancio globale.
-
-Le proposte di rate del letto, il workspace cella/vertice, il vertex gather,
-l’avanzamento del letto nodale e il refresh delle grandezze derivate sono ora
-posseduti da `geometry_2d`. `time_integration_2d` registra i rate cell-locali
-già limitati e invoca l’aggiornamento geometrico dopo il loop; la finalizzazione
-rilascia il workspace tramite il modulo geometrico. `TEST_MASS_EXCHANGE` e
-projection stress passano in strict e optimized con 1 e 4 thread, verificando
-bilancio del volume, celle asciutte/inattive e determinismo. Passano inoltre
-`TEST_TOPOGRAPHY_FACES`, `TEST_WORKSPACE_LIFECYCLE` e la sezione stage/boundary
-di `TEST_IMEX_STAGES` in entrambi i profili.
-
-**D16.10 — Rimozione controllata.** Eliminare `mass_exchange_2d.f90` solo quando ogni routine ha una destinazione verificata e non restano simboli, dipendenze o test non aggiornati.
-
-Il coordinatore `update_erosion_deposition_cell` è stato trasferito in
-`time_integration_2d` come `apply_mass_exchange_step`, mantenendo la chiamata
-una volta per passo dopo l’IMEX e prima dell’avanzamento dell’orologio. Il
-modulo `mass_exchange_2d` è stato rimosso dal codice, dai target di build e
-dai chiamanti; l’audit non trova più riferimenti a quel modulo o al vecchio
-simbolo in sorgenti e test. Le regressioni mass-exchange/projection, lifecycle,
-topography e IMEX stage/boundary passano in strict e optimized.
-
-In D17.17 il batch post-RK è stato successivamente estratto in
-`mass_exchange_step_2d`, mantenendo invariati chiamata temporale e ownership
-geometrica.
-
-**D16.11 — Documentazione e test.** Aggiornare Doxygen, dummy arguments, unità e semantica REAL/COMPLEX. Verificare la soluzione esatta, l’aggiornamento della sola componente energetica conservativa per il raffreddamento, la ricostruzione delle variabili fisiche derivate da q, il rate medio effettivo e la selezione per gruppo. Verificare che massa, quantità di moto e masse dei componenti restino invariate per il solo termine di raffreddamento, mentre densità e profondità derivate rispondono alla temperatura; la differenza dal rate implicito istantaneo è attesa. Verificare inoltre trattamenti espliciti/impliciti/semi-impliciti, solver analitici, vaporizzazione, conservazione, positività, topografia, restart e default reologico.
-
-**Esito D16.11: completato.** `TEST_RHEOLOGY_CELL_LOCAL` passa 255/255 fixture
-in strict e optimized; copre raffreddamento lava esatto e conservativo,
-ricostruzione dello stato, selezione per gruppo, solver analitici e rate
-effettivo dello stage IMEX. Passano inoltre `TEST_STATE_CONVERSION`,
-`TEST_RHEOLOGY_FROUDE`, `TEST_MASS_EXCHANGE` (strict/optimized, 1/4 thread),
-`TEST_TOPOGRAPHY_FACES` (1/4 thread) e la sezione stages di `TEST_IMEX_STAGES`
-(strict/optimized, entrambe le politiche CFL, 1/4 thread). Le regressioni
-`TEST_BINARY_RESTART` e `TEST_STOCHASTIC_RESTART` passano, inclusi confronto
-bit-a-bit del restart, evoluzione stocastica ripresa e casi di interruzione
-degli output. Il runner stocastico è stato reso robusto agli spazi di
-indentazione del namelist e conserva correttamente le virgolette del nome
-reologico.
-
-La verifica Doxygen mirata passa per tutti i 13 moduli in
-`src/physics/rheology_laws`; al momento della chiusura di D16.11 il controllo
-globale confermava che le linee eseguibili dei sorgenti coincidevano con
-`HEAD`, ma segnalava ancora 64 lacune preesistenti in `reconstruction_2d.f90`,
-`kt_ritter_1d.f90`, `hyperbolic_2d.f90` e `inpout_2d.f90`, fuori dai moduli
-D16 aggiornati. Queste lacune sono state chiuse nel gate Doxygen di D16.12,
-senza modifiche al codice eseguibile.
-
-**D16.12 — Gate di accettazione.** Accettare D16 solo quando la selezione reologica è centralizzata, le leggi sono nei moduli `*_laws_2d`, rate e sorgenti sono distinti, le integrazioni analitiche seguono la convenzione, gli aggiornamenti sono in `time_integration_2d`, la geometria è in `geometry_2d` e compilazione, test, restart, Doxygen e CI passano senza variazioni scientifiche non autorizzate. Il manifest deve riportare vecchio nome, nuovo nome, modulo proprietario, chiamanti aggiornati ed evidenze di regressione.
-
-**Esito della verifica locale D16.12: superata.** Il manifest
-`acceptance/D16_MIGRATION_MANIFEST.json` registra le migrazioni, i moduli
-proprietari, i chiamanti e le regressioni. Il controllo Doxygen globale passa su
-45 sorgenti e conferma che codice eseguibile e direttive sono invariati rispetto
-a `HEAD`; anche la build completa strict-debug passa. Passano
-`TEST_RHEOLOGY_CELL_LOCAL` (255/255 fixture in strict e optimized),
-`TEST_MASS_EXCHANGE` (strict/optimized, 1/4 thread),
-`TEST_TOPOGRAPHY_FACES` (1/4 thread), `TEST_WORKSPACE_LIFECYCLE`,
-la sezione stage/boundary di `TEST_IMEX_STAGES` (strict/optimized) e i test
-`TEST_BINARY_RESTART` e `TEST_STOCHASTIC_RESTART` (1/4 thread).
-
-La verifica integrata era stata precedentemente interrotta mentre
-`TEST_DAMBREAK/TEST_DYNAMIC_FINH` avanzava molto lentamente nella build locale
-strict-debug. L’indagine ha individuato la regressione nel passaggio al solver
-IMEX per gruppi: la correzione d’attrito sul contributo semi-implicito era
-applicata solo dopo Newton, invece che prima della soluzione con conseguente
-aggiornamento del rate e del residuo. Il commit `9b2a4989` ripristina la
-correzione pre-Newton e aggiunge a `test_grouped_implicit_stage` una regressione
-con impulso di snervamento sufficiente a invertire il momento se non limitato.
-
-**Aggiornamento 23 ottobre 2026 — gate locale completato.** `make check` passa
-nei build strict-debug e optimized, inclusi tutti i casi di
-`TEST_DAMBREAK`, `TEST_DYNAMIC_FINH` compreso. Il caso dinamico raggiunge
-`T_END=0.30` con `dt` circa `0.00068–0.00070` e completa in 19,29 s nel build
-optimized. Anche la sezione `order` di `TEST_IMEX_STAGES` passa in strict e
-optimized, con confronto e bilancio coerenti con i bordi outflow-only.
-
-**Aggiornamento 23 ottobre 2026 — CI remota ifx completata.** Il run completo
-[Intel ifx portability](https://github.com/demichie/IMEX_SfloW2D_dev/actions/runs/39964608238)
-è passato sulla revisione `b63d4eca`, discendente di `9b2a4989`. Tutti e quattro
-i job (optimized/diagnostic, 1/4 thread) hanno superato `make check`, i test di
-restart e le validazioni HP-PCCU e source-mass. Il run mirato precedente sullo
-stesso commit ha inoltre superato `TEST_DYNAMIC_FINH` con `-check all` in 87 s,
-senza warning di array temporanei. D16.12 è superato; D17 resta pianificato e
-non è coperto da questa CI.
-
-### D17 — Organizzazione unificata dei termini sorgente, gruppi e separazione tra fisica e numerica
-
-Stato ufficiale: IN CORSO — i metadati del registro, il bridge analitico,
-l’interfaccia esplicita D17.9 e il routing filtrato dei rate semi-impliciti e
-impliciti D17.10, incluso lo sweep ordinato dei solve Newton indipendenti nello
-stesso gruppo, sono implementati e verificati localmente. Restano da completare
-i requisiti successivi; D17 nel complesso non è completo. D17.9 è stato
-committato in `3fc18813`; il lavoro D17.10 è ancora locale.
-
-Baseline della fase A: `1310511e` (23 ottobre 2026). Specifica di compatibilità:
-[D17_SOURCE_CONTRACT_2026_10_23.md](acceptance/D17_SOURCE_CONTRACT_2026_10_23.md);
-inventario con 30 contributi fisici e 4 assemblaggi derivati:
-[D17_SOURCE_TERMS_MANIFEST_2026_10_23.json](acceptance/D17_SOURCE_TERMS_MANIFEST_2026_10_23.json).
-La fase A è una baseline documentale storica. Il catalogo e il registro
-definiscono i 34 ID Fortran, i descrittori dei gruppi/solve e i registri
-validati posseduti dalla simulazione, con adattatore dei gruppi IMEX legacy.
-Rapporto:
-[D17_B_SOURCE_REGISTRY_2026_10_23.md](acceptance/D17_B_SOURCE_REGISTRY_2026_10_23.md),
-[evidenza machine-readable](acceptance/results_d17_b_source_registry_2026_10_23.json).
-Il dispatch dei solve analitici è documentato in
-[D17_C_ANALYTIC_BRIDGE.md](acceptance/D17_C_ANALYTIC_BRIDGE.md); il routing
-esplicito stage, incluso l’hook distinto al bordo, è documentato in
-[D17_9_EXPLICIT_STAGE_ROUTING.md](acceptance/D17_9_EXPLICIT_STAGE_ROUTING.md).
-Il routing semi-implicito/implicito per gruppo e solver è documentato in
-[D17_10_GROUP_FILTERED_IMPLICIT_RATES.md](acceptance/D17_10_GROUP_FILTERED_IMPLICIT_RATES.md).
-
-Per il registro passano, in strict e optimized, 864 configurazioni legacy,
-14.857 asserzioni e 28 casi invalidi rifiutati. I test D17-C e D17.9 verificano
-localmente i percorsi analitici ed espliciti e le regressioni IMEX/spaziali
-indicate nei rispettivi report. I risultati di parser e integratore riportati
-nel rapporto B sono evidenza storica di quella fase, non una validazione
-completa del D17 attuale. La normalizzazione conserva i blocchi Newton
-congiunti e ordina i gruppi analitici legacy velocità/temperatura/pressione.
-Validazione e copie complete del registro restano fuori dai loop di cella e
-Newton.
-
-Nessuna nuova accettazione Intel ifx/Linux/CI è attestata. Lo stato per ciascun
-requisito numerato è:
-
-| Requisito | Stato al 23 ottobre 2026 | Evidenza o lavoro ancora necessario |
+#### Sequenza numerica e regole di compatibilità
+
+Per ciascuno stadio RK, gli addendi spaziali, espliciti e impliciti vengono assemblati senza doppio conteggio e senza moltiplicare arbitrariamente i rate per coefficienti o intervalli temporali a livelli fisici. Il solver Newton compone tutti i contributi delle equazioni del gruppo e applica le correzioni specifiche dei blocchi nei punti post-SI e post-Newton prescritti; la finalizzazione del passo appartiene a `state_2d`. Dopo il completamento RK, l'esecutore STEP tratta i trasferimenti di massa come una transazione indivisibile, applica una sola volta rate/inventari e aggiorna `B_vertex` mediante `geometry_2d`.
+
+Non cambiare per effetto di questo consolidamento: relazioni costitutive approvate, coefficienti dei tableaux IMEX RK, trattamento REAL/COMPLEX, convenzioni wet/dry, proprietà termodinamiche, maschere di sorgente e bilanci di erosione/deposizione. Ogni nuova proposta scientifica avrà una propria motivazione e un gate proporzionato al rischio.
+
+#### Evidenze, interfacce e dipendenze successive
+
+**Accettazione D16:** il consolidamento delle leggi, dei rate e del solve locale ha superato i gate locali e la CI ifx pertinenti documentati nel repository; le evidenze sono limitate alle revisioni e ai casi effettivamente eseguiti. **Accettazione D17:** il successivo contratto implementato è riassunto in D17, con due Actions verdi sul commit `0e545ac9`. **Accettazione complessiva:** D15 rimane il gate per confronti end-to-end selezionati con la baseline A11, restart/output, configurazioni miste e documentazione della validità scientifica. Non duplicare nel piano D16 nuove campagne di test già considerate nel gate D15.
+
+### D17 — Sorgenti fisiche configurabili e gruppi di integrazione omogenei
+
+**Stato ufficiale: IMPLEMENTATO — refactoring architetturale completato, con gate tecnico GNU/CI superato; accettazione scientifica end-to-end ancora da documentare in D15.** Riferimento: branch `feature/d17-source-refactor`, revisione `0e545ac9766f9633ad115fe240f5b3216f86578a`, due Actions manuali verdi confermate il 25 ottobre 2026. La successiva revisione `bc38fbc16c1c647f84a0654056e5573addfc4114` aggiorna unicamente la specifica. La chiusura tecnica non estende automaticamente la baseline scientifica A11 e non sostituisce il gate D15.
+
+**Obiettivo.** Le sorgenti fisiche sono leggi dotate di identità canonica e capacità numeriche dichiarate; il sistema di integrazione conosce gruppi, equazioni, cadenze e metodi, senza codificare l'identità numerica della singola legge. Una reologia è una sola sorgente configurabile anche quando contiene più contributi costitutivi interni. I termini di trasferimento di massa che condividono vincoli di disponibilità e limitazione costituiscono un batch atomico. Le routine numeriche e le leggi rimangono separabili e verificabili.
+
+**Perimetro implementato.** Il catalogo attuale contiene **24 sorgenti configurabili**, ognuna con **quattro procedure concrete** (`explicit`, `semi_implicit`, `implicit`, `analytic`), per **96 interfacce**. Un metodo non supportato dispone di una procedura di rifiuto esplicito: non è una capacità simulata da un risultato nullo. Le combinazioni abilitate sono dichiarate dai metadati e validate prima dell'avvio; la cadenza `STEP` ammette attualmente il mass exchange `EXPLICIT` come batch unico. Il kernel `rheology_newmodel` documenta l'estensibilità tecnica, non costituisce una nuova legge scientificamente calibrata.
+
+#### D17.0 — Architettura normativa e responsabilità
+
+- `source_catalog_2d`: elenco statico di leggi fisiche configurabili, ciascuna con `name`, `target`, `has_explicit`, `has_newton`, `has_analytic`. Nessuna identità fisica trasportata come ID numerico persistente, né ruoli/bundle numerici di sotto-termine. Gli indici numerici restano ammessi per equazioni, gruppi e metodi numerici, mai come identità fisica della legge.
+- `source_registry_2d`: costruzione immutabile, copia controllata e validazione dei gruppi; `source_group_type` espone ID del gruppo, `legacy_id` ove necessario, `cadence`, `method`, `phase`, `execution_order`, `source_names(:)`, `equation_ids(:)`. Nessun `term_ids` e nessun sotto-solver schedulato nel gruppo.
+- `source_input_2d` e `source_configuration_2d`: conversione dell'input testuale e della configurazione legacy in un registro validato una sola volta. I nomi delle leggi sono canonici e univoci; nomi inesistenti o incompatibili sono rifiutati prima della simulazione.
+- `source_terms_2d`: ingressi comuni per l'assemblaggio delle sorgenti, senza governare i tableaux RK né modificare gli inventari del letto. `equation_terms_2d` conserva solo i termini appartenenti all'operatore spaziale e non gestisce le leggi fisiche configurabili.
+- `nonlinear_solver_2d`: risoluzione locale dei blocchi di equazioni mediante indici, Jacobiana REAL/COMPLEX e complex-step, senza dispatch numerico della specifica reologia. `time_integration_2d` gestisce schemi e successione degli stadi, non controlli fisici hard-coded.
+- `state_2d`: stato secco/quasi secco, controlli e finalizzazione; le conversioni fisiche rimangono in `state_conversion_2d`. `step_source_executor_2d` applica una sola volta la transazione di massa, gli inventari e l'aggiornamento topografico post-RK.
+
+#### D17.1 — Contratto fisico uniforme e capacità
+
+Ogni legge configurabile possiede quattro procedure pubbliche con nomi e responsabilità uniformi:
+
+| Trattamento | Convenzione | Semantica |
 |---|---|---|
-| D17.1 | **Parziale** | Bridge analitico e dispatcher esplicito collegati; routing comune semi-implicito/implicito e mass-exchange da completare. |
-| D17.2–D17.5 | **Implementati localmente** | Catalogo, ID, descrittori e registri `stage`/`step`; coperti dai test del registro. |
-| D17.6 | **Implementato per i gruppi legacy supportati; builder nativo locale** | Validazione del solve unico e normalizzazione legacy; il builder nativo controlla copertura dei termini attivi e coerenza dei target (D17.16). |
-| D17.7 | **Implementato localmente per i gruppi stage supportati** | Sweep ordinato dei solve indipendenti; blocco Newton legacy congiunto preservato come solve unico. L’equivalenza end-to-end resta aperta nei requisiti pertinenti. |
-| D17.8 | **Parziale** | Le quattro interfacce ricevono metadati di gruppo/solve nei percorsi supportati; restano i percorsi numerici e di cadenza non ancora integrati. |
-| D17.9 | **Implementato e committato** | Rate espliciti e hook al bordo selezionati dal gruppo; test strict/optimized e build GNU superati (`3fc18813`). |
-| D17.10 | **Implementato localmente** | Rate semi-impliciti/impliciti filtrati per gruppo e solver, percorsi impliciti REAL/COMPLEX e sweep runtime ordinato dei solve Newton multipli; report e regressioni locali in D17.10. |
-| D17.11 | **Implementato localmente per i kernel REAL/COMPLEX duplicati individuati** | La correlazione di viscosità lahar condivide ora il kernel COMPLEX con il wrapper REAL; valore e derivata sono testati nei due rami. Per il perimetro verificato non serve un file `.inc`; report D17.11. |
-| D17.12 | **Implementato localmente** | Bridge analitico validato; vedere il report D17-C. |
-| D17.13–D17.16 | **Parziali** | D17.13 resta parziale: equivalenza per tutte le attivazioni non completata. D17.14 instrada il batch mass-exchange atomico dal registro `step` una sola volta dopo RK. D17.15 verifica l’ordine delle cinque fasi production source-window/OU/RK/step-source/clock e un aggiornamento OU attivo con seed fissato; il test nativo end-to-end verifica una sorgente circolare attiva a metà intervallo e il bilancio integrato nel passo production. Test equation-term separati coprono impulso parziale, rampa lineare, wrap, inattività, finestra fissurale e rampa cosinusoidale radiale. Selezione di `dt`, output end-to-end, trasporto stocastico e tutte le combinazioni di sorgente restano aperti. D17.16 implementa localmente `SOURCE_GROUPS`, la distinzione esplicito/default legacy, i controlli di conflitto e la copertura completa dei termini attivi; il flusso completo `read_param` è coperto per una configurazione nativa rappresentativa, mentre l’equivalenza per tutte le combinazioni fisiche resta da validare. Evidenze D17.13–D17.16. |
-| D17.17–D17.18 | **Parziali** | Dispatch analitico, esplicito e rate Newton filtrati sono dietro `equation_terms_2d`; il batch post-RK `step` è separato da `time_integration_2d` in `mass_exchange_step_2d`, mantenendo validazione del registro, atomicità e posizione temporale. Il test statico copre tutti i sorgenti `numerics/` e `spatial/`, proibisce import diretti dei moduli fisici e controlla l’allowlist delle API equazionali usate dallo spazio; i moduli `*_laws_2d` non dipendono dall’orchestrazione numerica/spaziale. Restano audit del call graph/runtime, integrazione term-selective e matrice D17.20. |
-| D17.19 | **In corso** | Stato puntuale dei 24 elementi nella sequenza implementativa sotto. |
-| D17.20 | **Parziale** | Le regressioni locali strict/optimized verificano il registro/parser, i solve analitici e Newton, i percorsi REAL/COMPLEX, gli hook spaziali, il batch post-RK e ora una finestra source attiva nel timestep production con budget di massa. Restano l’equivalenza su tutte le combinazioni fisiche, copertura end-to-end delle altre finestre/sorgenti, selezione di `dt`/output del driver, approvazione delle baseline e gate cross-platform/CI. |
-| D17.21 | **Non soddisfatto** | Criteri finali non raggiunti; D17 non può essere dichiarato completato. |
-
-#### D17.0 — Logica generale e obiettivo
-
-Il D17 introduce una struttura comune per tutti i termini sorgente delle equazioni e separa:
-
-1. leggi fisiche;
-2. calcolo dei rate;
-3. assemblaggio dei contributi nelle equazioni;
-4. integrazione RK-IMEX;
-5. solve impliciti;
-6. solve analitici.
-
-La struttura generale deve essere:
-
-```text
-time_integration_2d
-        |
-        v
-nonlinear_solver_2d
-        |
-        v
-equation_terms_2d
-        |
-        v
-moduli fisici e leggi costitutive
-```
-
-Le leggi fisiche non devono conoscere RK, IMEX, gruppi o il clock globale. I kernel analitici ricevono un intervallo esplicito, senza conoscere come sia stato ottenuto. I rate ordinari restano quantità per unità di tempo; i proposal limitati da intervallo/inventario mantengono un contratto esplicito distinto, senza eliminare i cap esistenti.
-
-Le routine numeriche devono invece gestire:
+| Esplicito | `eval_<nome>_explicit` | Restituisce il rate senza mutare lo stato |
+| Semi-implicito | `eval_<nome>_semi_implicit` | Restituisce i termini SI necessari al metodo Newton |
+| Implicito | `eval_<nome>_implicit` | Restituisce rate/residui IM, coerenti nel ramo REAL e COMPLEX |
+| Analitico | `solve_<nome>_analytic` | Aggiorna le sole equazioni target secondo un solve analitico ammesso |
 
-- stage;
-- time-step;
-- cadenze;
-- gruppi;
-- ordine dei solve;
-- integrazione dei rate.
+La capability `NEWTON` richiede congiuntamente le interfacce semi-implicita e implicita, anche se per una legge specifica la parte SI risulta identicamente zero. Le procedure di trattamenti non supportati generano errore in caso di invocazione: il validatore preventivo impedisce di schedularle. I nomi rimangono coerenti in reologie, termica, pore pressure, iniezioni, curvatura e trasferimenti di massa; la struttura delle chiamate non deve essere duplicata negli stadi numerici.
 
-`equation_terms_2d.f90` costituisce il livello di collegamento tra i due ambiti.
+**Modello di estensione ordinaria.** Per aggiungere `rheology_newmodel` o una nuova reologia: creare la legge completa in `src/physics/rheology_laws/`, fornire le quattro procedure e i rami REAL/COMPLEX pertinenti, aggiungere la voce canonica al catalogo e il collegamento statico nella famiglia reologica. Non cambiare `source_registry_2d`, `source_configuration_2d`, `source_terms_2d`, `nonlinear_solver_2d` né `time_integration_2d`. L'assenza di nuove eccezioni in questi moduli è un criterio architetturale verificabile.
 
----
+#### D17.2 — Regole dei gruppi e cadenze
 
-#### D17.1 — Contratto tra fisica e numerica
+Un gruppo ha un solo metodo (`EXPLICIT`, `NEWTON` o `ANALYTIC`), una sola cadenza (`STAGE` o `STEP`), un ordine definito e l'unione coerente delle equazioni target. La stessa legge fisica attiva non può essere presente in più gruppi. Sono vietati nomi derivati, duplicati, target incompatibili e frazionamenti che cambiano il significato di un termine fisico indivisibile.
 
-I moduli fisici devono:
+- `EXPLICIT/STAGE`: contribuisce a ciascuno stadio secondo i coefficienti dello schema, includendo iniezioni, curvature ed eventuali termini espliciti ammessi. I termini idrostatici dell'operatore spaziale non vengono reinseriti come sorgenti.
+- `NEWTON/STAGE`: un **unico sistema Newton accoppiato per gruppo** e tutte le equazioni incluse; il gruppo può comprendere contemporaneamente velocità e temperatura. Gruppi Newton distinti sono ammessi quando configurati e validati, ma i loro solve sono sequenziali e non vengono dichiarati equivalenti al solve monolitico.
+- `ANALYTIC/STAGE`: esattamente un solve analitico per gruppo. Reologia, raffreddamento e pore pressure possono richiedere gruppi distinti.
+- `EXPLICIT/STEP`: batch post-RK atomico, oggi per il mass exchange, eseguito come ultimo gruppo nella configurazione legacy. Le altre combinazioni `STEP` non supportate sono respinte esplicitamente, non implementate implicitamente.
 
-- definire le leggi costitutive;
-- calcolare rate;
-- calcolare eventuali soluzioni analitiche;
-- fornire kernel reali e complessi dove richiesto dalle capability del percorso;
-- non conoscere la struttura RK-IMEX.
+Il parser `SOURCE_GROUPS` deve conservare ordine, metodo, target ed esclusività. Senza `SOURCE_GROUPS`, la normalizzazione legacy conserva per i casi supportati la partizione dei blocchi implicitamente accoppiati, l'ordine e la scelta dei metodi IMEX; i gruppi misti analitici sono separati in solve singoli. Le liste di nomi di sorgenti e di equazioni sono immutabili durante il passo.
 
-`equation_terms_2d.f90` deve:
+#### D17.3 — Assemblaggio Newton accoppiato, Jacobiane e correzioni numeriche
 
-- ricevere un gruppo;
-- selezionare i termini fisici;
-- chiamare le leggi appropriate;
-- assemblare i contributi nelle equazioni;
-- restituire rate o risultati analitici.
+Il solve Newton usa `group_equations(:)` per costruire un residuo e una Jacobiana congiunti. Tutte le leggi appartenenti al gruppo devono contribuire alle componenti pertinenti; non è ammesso risolvere indipendentemente più sottoblocchi del medesimo gruppo. Si conserva il solve indicizzato della baseline, incluso il percorso linearizzato, le interfacce LAPACK tipizzate, il Jacobiano complex-step e il riuso dei kernel fisici REAL/COMPLEX. Sono coperti numericamente i blocchi 2×2 e 3×3 e l'accoppiamento reologia/raffreddamento nel perimetro dei test disponibili.
 
-Non deve reimplementare le leggi fisiche né eseguire un integratore temporale generale. Delega i solve analitici ai kernel fisici e converte il risultato nel blocco conservativo dichiarato; il coordinatore numerico compone i gruppi e ricava gli incrementi/rate effettivi.
+La correzione di direzione/verso della quantità di moto è un'operazione sul **blocco di equazioni**, non un'opzione dipendente dal nome del modello reologico. Si applica in due momenti distinti: **dopo SI**, con riferimento allo stato noto dello stadio, e **dopo Newton**, con riferimento allo stato post-SI/pre-Newton. Rimane in `state_2d` ed è richiamata dal solver nei punti prescritti, senza attivazione automatica nella finalizzazione generica. Conservare dissipazione, limite di arresto, casi SI nullo e assenza di inversioni spurie della quantità di moto.
 
-`time_integration_2d.f90` deve gestire il ciclo RK-IMEX e l’applicazione dei gruppi.
+#### D17.4 — Operatori espliciti, analitici e raffreddamento termico
 
-`nonlinear_solver_2d.f90` deve occuparsi esclusivamente dei solve numerici impliciti e non deve chiamare direttamente moduli come:
+`source_terms_2d::eval_source_explicit` è l'ingresso pubblico comune: un'interfaccia generica Fortran con procedure concrete distinte per firme STAGE e STEP. L'assemblaggio STAGE deve includere iniezioni di fondo circolari/fessurali, sorgenti radiali/laterali e curvatura soltanto nei casi pertinenti, rispettando finestre, frazioni di cella e maschere, senza doppio conteggio del contributo idrostatico. L'assemblaggio STEP delega al coordinatore mass exchange la preparazione dei rate conservativi e accessori.
 
-```fortran
-thermal_laws_2d
-pore_pressure_laws_2d
-rheology_2d
-```
+Il percorso `ANALYTIC` ammette un unico operatore coerente col metodo e con le equazioni target; gli accoppiamenti che richiedono Newton non vengono scomposti silenziosamente. Le leggi termiche e della pressione interstiziale rimangono indipendenti dalla legge reologica selezionata.
 
----
+**Attivazione termica:** `thermal_cooling_flag` in `TEMPERATURE_PARAMETERS` controlla il raffreddamento indipendentemente dalla scelta lava/non lava. L'assenza del flag nei vecchi input conserva il comportamento di default compatibile; le combinazioni non supportate vanno rifiutate all'avvio. I contributi radiativo, convettivo, la capacità termica della miscela e la natura depth-averaged del termine devono rimanere coerenti anche con spessori estremamente piccoli; la soluzione implicita/analitica locale non implica di per sé positività di ogni stadio RK. Eventuali sviluppi dei metodi devono preservare i bilanci energetici e le capability dichiarate.
 
-#### D17.2 — Termini fisici elementari
+#### D17.5 — Trasferimenti di massa e coordinatore STEP
 
-Ogni componente fisica deve essere identificata da un `term_id`.
+Il mass exchange è organizzato per processo in `src/physics/mass_exchange/`: erosione, deposizione, perdite di fase vettore, entrainment, vaporizzazione, assemblaggio di bilancio e coordinatore `mass_exchange_laws_2d`. Deposizione e relativa perdita indotta costituiscono **un unico termine fisico configurabile**, `mass_exchange_deposition`; il contributo `deposition_induced_carrier_loss` è calcolato internamente e **non** ha una voce separata nel catalogo. Restano configurabili gli altri processi indipendenti effettivamente supportati.
 
-Esempi:
+L'ordine delle operazioni fisiche è vincolante: ottenere i rate per classe e vettore; rispettare l'inventario erodibile e la disponibilità delle fasi; comporre le perdite di fase continua da liquid loss, perdita indotta dalla deposizione e Darcy; applicare **una sola volta** il limitatore post-somma e gli eventuali altri vincoli condivisi; assemblare massa totale, quantità di moto, energia, masse delle specie e tasso di variazione del fondo. Il batch non può essere spezzato in gruppi indipendenti che cambierebbero l'ordine dei rate o il limite dipendente da `dt`.
 
-```fortran
-SOURCE_TERM_RHEOLOGY_VOELLMY_COULOMB
-SOURCE_TERM_RHEOLOGY_VOELLMY_TURBULENT_DRAG
-SOURCE_TERM_THERMAL_RADIATIVE_COOLING
-SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION
-SOURCE_TERM_PORE_PRESSURE_DISSIPATION
-SOURCE_TERM_MASS_EXCHANGE_EROSION
-SOURCE_TERM_MASS_EXCHANGE_DEPOSITION
-SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT
-SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION
-SOURCE_TERM_BOTTOM_FISSURAL_INJECTION
-SOURCE_TERM_RADIAL_INJECTION
-SOURCE_TERM_BOUNDARY_INJECTION
-```
+`step_source_executor_2d` chiama `source_terms_2d::eval_source_explicit` una sola volta per cella risolta, applica il rate conservativo, aggiorna gli inventari `deposit`, `erosion`, `erodible` e delega a `geometry_2d` il gather nodale Q1 e il refresh della geometria. Evitare doppio aggiornamento di `B_cent`, doppia valutazione dei rate e applicazione prima del completamento dello stato RK. Le celle secche e le maschere delle sorgenti non devono consumare inventario senza aggiornare coerentemente flusso e topografia.
 
-Ogni termine deve avere:
+La topografia nodale `B_vertex` resta autoritativa e viene aggiornata dopo il gather delle proposte locali limitate; le quote/pendenze/derivate vengono poi rigenerate. Il batch legacy rimane l'ultimo `STEP/EXPLICIT` e deve preservare l'ordine temporale rispetto alle iniezioni, alla finalizzazione del passo e all'avanzamento del tempo simulato.
 
-- equazioni interessate;
-- modulo fisico responsabile;
-- interfacce disponibili;
-- metodo;
-- cadenza;
-- gruppo.
+#### D17.6 — Stato fisico e ordine completo del timestep
 
-##### Implementazione
+La sequenza di riferimento è: configurazione validata all'avvio → ricostruzione e contributi spaziali → per ciascuno stadio RK, contributi espliciti e gruppi impliciti/analitici previsti dal tableau → correzioni post-SI/post-Newton ove applicabili → finalizzazione dello stato RK e conversioni primitive → esecuzione ordinata dei gruppi STEP, incluso il batch atomico mass exchange per ultimo → aggiornamento geometrico nodale/derivate e osservatori pertinenti → avanzamento del tempo e operazioni di output/restart secondo la policy globale.
 
-Devono essere definiti tutti i `term_id` in un modulo comune. La selezione dei termini non deve dipendere dalla posizione delle chiamate nel codice.
+`time_integration_2d` controlla tableau e scheduling; `state_2d` conserva controlli numerici e riparazioni fisicamente definite su stato secco, solidi, temperatura e roundoff; `state_conversion_2d` conserva `q↔qp`. Inizializzazione di primitive secche, halo e stati intermedi usa la medesima semantica. Le correzioni numeriche nei due momenti del solve implicito restano distinte dalla finalizzazione dello stato.
 
----
+Questa fase **non** implementa time-step rejection/rollback o nuove policy CFL: tali funzioni appartengono alla fase E. Non cambia i tableaux RK approvati né introduce genericamente una capability STEP per metodi impliciti o analitici.
 
-#### D17.3 — Metodi e cadenze
+#### D17.7 — Default compatibili e regole di input
 
-Ogni termine deve essere organizzato mediante:
+La configurazione legacy supportata, quando `SOURCE_GROUPS` non è presente, si traduce in gruppi omogenei con le sorgenti effettivamente abilitate dai flag, senza nuove opzioni imposte all'utente. La matrice di default da mantenere e documentare è:
 
-```text
-method  = 'explicit' | 'newton' | 'analytic'
-cadence = 'stage'   | 'step'
-group   = intero positivo
-```
+| Famiglia | Fonte di attivazione legacy | Target | Metodo/cadenza |
+|---|---|---|---|
+| Reologia completa (una voce per legge) | `rheology_flag` e `rheology_model` | quantità di moto x/y | `NEWTON/STAGE` o `ANALYTIC/STAGE` secondo gruppo legacy |
+| Raffreddamento | `thermal_cooling_flag`, fallback di input legacy | energia | `NEWTON/STAGE` o `ANALYTIC/STAGE` se ammesso |
+| Dissipazione pressione interstiziale | `pore_pressure_flag` | equazione pore pressure | `NEWTON/STAGE` o `ANALYTIC/STAGE` |
+| Curvatura e iniezioni | flag fisici e finestre locali | equazioni conservative pertinenti | `EXPLICIT/STAGE` |
+| Erosione del letto | `erosion_coeff` | massa, specie, energia, letto | `EXPLICIT/STEP`, batch unico |
+| Deposizione, inclusa perdita indotta | `settling_flag` e porosità | massa, specie, energia, letto | `EXPLICIT/STEP`, batch unico |
+| Perdita liquida, Darcy, entrainment, vaporizzazione | flag/perdite dei processi | variabili conservative e accessori pertinenti | `EXPLICIT/STEP`, batch unico |
 
-Il metodo determina il trattamento:
+Per le reologie senza componente fisica attiva e per i layout disabilitati non si devono inventare rate né introdurre sorgenti fittizie. Un gruppo Newton può contenere velocità e temperatura **in un solo sistema accoppiato**, se l'input lo specifica. Un raggruppamento di metodi/cadenze non supportato, una sorgente ignota, un duplicato, una fonte derivata schedulata o una separazione del batch mass exchange è una configurazione non valida. Il parser deve emettere una diagnostica prima dell'avvio del tempo fisico.
 
-| Metodo | Interfacce |
-|---|---|
-| `explicit` | esplicita |
-| `newton` | semi-implicita e implicita |
-| `analytic` | analitica |
+#### D17.8 — Struttura del codice e invarianti dei moduli
 
-Non deve essere introdotto un parametro indipendente `treatment`.
+| Modulo o directory | Responsabilità stabile | Divieto architetturale |
+|---|---|---|
+| `src/numerics/source_catalog_2d.f90` | Catalogo statico 24 sorgenti, target, tre capability | ID numerici fisici e sotto-componenti come fonti indipendenti |
+| `src/numerics/source_registry_2d.f90` | Gruppi, ordine, indici di equazione e validazione | Sotto-solver Newton per gruppo |
+| `src/numerics/source_input_2d.f90` | Input `SOURCE_GROUPS` | Valutazione fisica nei parser |
+| `src/physics/source_configuration_2d.f90` | Normalizzazione legacy e attivazione sorgenti | Dipendenze dalla formula interna di ogni reologia |
+| `src/physics/source_terms_2d.f90` | Assemblatori e dispatch comune per trattamenti | Aggiornare inventari fisici o duplicare lo STEP |
+| `src/physics/rheology_laws/` | Leggi reologiche complete | Scheduling RK o solve di altri modelli |
+| `src/physics/mass_exchange/` | Processi, `mass_exchange_laws_2d`, rate e limitatori | Applicazione diretta del passo alla griglia |
+| `src/numerics/nonlinear_solver_2d.f90` | Newton indicizzato e correzioni collegate a blocchi | Selezione per ID di legge fisica |
+| `src/numerics/time_integration_2d.f90` | Stadi e scheduling | Riparazioni costitutive hard-coded |
+| `src/numerics/step_source_executor_2d.f90` | Transazione STEP, inventari, chiamata di geometria | Ricalcolo delle formule costitutive |
+| `src/state/state_2d.f90`, `src/state/state_conversion_2d.f90` | Ammissibilità, dry/halo, `q↔qp` | Modelli reologici hard-coded per correzioni di blocco |
+| `src/geometry/geometry_2d.f90` | Topografia Q1, gather e refresh | Quote aggiornate per vie indipendenti |
+| `src/physics/equation_terms_2d.f90` | Residui/termini propri dell'operatore spaziale | Routing delle sorgenti fisiche configurabili |
 
-La cadenza determina il momento della valutazione:
+Le directory indicano l'organizzazione attuale del codice. Gli step futuri G/H devono operare su layout e domini astratti e non reintrodurre dipendenze numeriche dall'identità della sorgente.
 
-- `stage`: dentro il ciclo RK-IMEX;
-- `step`: una volta per time-step, fuori dal ciclo RK.
+#### D17.9 — Piano di implementazione e stato operativo
 
-##### Implementazione
+Questa tabella è la **sequenza normativa di realizzazione**: descrive i componenti della roadmap e il loro stato, non la cronologia dei tentativi.
 
-Devono essere definiti enum o costanti per:
+| Passo | Attività implementativa e accettazione | Stato |
+|---|---|---|
+| 1 | Inventario delle sorgenti, catalogo e target; confronto con baseline e riferimenti approvati | **IMPLEMENTATO**; riferimento scientifico A11/D15 separato |
+| 2 | Contratto un gruppo/un metodo/una cadenza/un solve e gruppi immutabili | **COMPLETATO — CI** |
+| 3 | Registro e parser senza sotto-solver e senza ID fisici | **COMPLETATO — CI** |
+| 4 | Normalizzazione legacy e validazione preventiva dei nativi | **COMPLETATO — CI**, per configurazioni supportate |
+| 5 | Assemblaggio SI/IM congiunto su tutte le sorgenti del gruppo | **COMPLETATO — CI**, percorsi coperti |
+| 6 | Newton indicizzato unico, 2×2/3×3, complex-step e correzioni post-SI/post-Newton | **COMPLETATO — CI**, casi mirati |
+| 7 | Solve analitico unico per gruppo, senza miscelare metodi | **IMPLEMENTATO — CI** |
+| 8 | Sorgenti `EXPLICIT/STAGE`, boundary e finestre; raffreddamento indipendente | **IMPLEMENTATO — CI**, matrice end-to-end non esaustiva |
+| 9 | Quattro trattamenti fisici uniformi, rifiuto dei non supportati, estensibilità `rheology_newmodel` | **COMPLETATO — CI** |
+| 10 | Processi mass exchange per modulo, deposizione/perdita interna, limitatore unico, coordinatore e ingresso EXPLICIT comune | **COMPLETATO — CI** |
+| 11 | Separazione `state_2d` e finalizzazione post-RK/STEP, revisione hot loop | **COMPLETATO — CI**, regressioni observer mirate |
+| 12 | Regression testing risk-based su default/nativo, RK, bilanci, stato e source registry | **IMPLEMENTATO PER GATE TECNICO — CI**; equivalenza end-to-end scientifica da documentare in D15 |
+| 13 | Accettazione scientifica della nuova architettura contro reference approvate, output/restart e casi end-to-end | **GATE D15 — DA COMPLETARE** |
 
-- metodo;
-- cadenza;
-- `term_id`;
-- variabili target;
-- solve impliciti;
-- solve analitici.
+#### D17.10 — Verifiche e criteri di accettazione
 
----
+**Evidenza disponibile sul refactoring:** Actions di compilazione GNU e test source registry verdi sul commit `0e545ac9`; 24 sorgenti/96 interfacce; parser e registro; prova reologica estensibile; Newton accoppiato locale, SI/IM REAL/COMPLEX e complex-step; correzioni di direzione; bilanci conservativi locali; test di stato e dry/halo. Le verifiche mirate dei coefficienti RK non costituiscono un confronto generale dell'intero tableau su griglie reali.
 
-#### D17.4 — Appartenenza ai gruppi
+**Gate scientifico ancora pertinente (D15), senza campagne indefinite:** selezionare secondo T2/T3 i casi realmente rappresentativi della modifica, precisando revisioni, input, tolleranze, toolchain e baseline A11/precedente codice approvato. Valutare almeno, se richiesto dalle superfici effettivamente toccate: evoluzione di stati `Q/QP` e dry/wet, `n_RK=2,3,4`, finestre circolari/fessurali/radiali e BC, OU con restart, termica lava/non lava, mass exchange con limitatore saturo/non saturo, bilanci del letto, output full/split/restart e determinismo con thread pertinenti. Non attribuire a D17 i gate scientifici di nuove leggi o i futuri confronti verticali/subgrid.
 
-Ogni contributo fisico attivo deve essere registrato una sola volta, senza duplicarlo tra `stage` e `step`. Gli assemblaggi derivati (calore/composizione/pressione associati a una sorgente) seguono il padre e non costituiscono nuove applicazioni indipendenti.
+**Criteri D17 tecnici:** (i) 24 nomi canonici, nessun ID fisico; (ii) quattro entry point per legge e capability validate; (iii) un solve Newton o analitico secondo metodo per gruppo; (iv) residuale/Jacobiana su tutte le equazioni target con complex-step; (v) ingresso EXPLICIT comune STAGE/STEP; (vi) deposizione e perdita indotta inseparabili, un limiter aggregato; (vii) inventari e topografia aggiornati una sola volta; (viii) input legacy/nativo supportato e rigetto preventivo dei casi illegali; (ix) le due correzioni della quantità di moto e la gestione di dry state sono preservate; (x) codice compilato e due Actions verdi. **Questi criteri sono soddisfatti nel perimetro tecnico CI verificato.**
 
-Sono distinti:
+**Limite accettativo:** le regressioni complete end-to-end e l'approvazione delle baseline numeriche del nuovo HEAD non risultano documentate come gate scientifico finale. Fino alla decisione di D15, utilizzare lo stato **IMPLEMENTATO (GATE SCIENTIFICO APERTO)** e non dichiarare equivalenza numerica universale né chiusura senza riserve di ogni caso legacy.
 
-```text
-(stage, group=1)
-(step,  group=1)
-```
-
-All’interno di un gruppo deve essere presente un solo metodo. L’identità è `(cadence,id)`; un ID `stage` non può indicare contemporaneamente un gruppo esplicito e uno analitico. ID e ordine di esecuzione sono distinti: conservare fase temporale e ordine mediante metadati espliciti.
-
-##### Implementazione
-
-Devono essere gestiti separatamente:
-
-```fortran
-stage_groups(:)
-step_groups(:)
-```
-
-L’inizializzazione deve verificare:
-
-- unicità dell’appartenenza;
-- uniformità del metodo;
-- validità del gruppo;
-- coerenza tra termine e cadenza.
-
----
-
-#### D17.5 — Struttura del gruppo
-
-La struttura minima raccomandata è:
-
-```fortran
-TYPE :: source_group_type
-   INTEGER :: id
-   INTEGER :: cadence
-   INTEGER :: method
-   INTEGER :: execution_order
-   INTEGER :: legacy_id = 0
-
-   INTEGER, ALLOCATABLE :: term_ids(:)
-   INTEGER, ALLOCATABLE :: equation_ids(:)
-
-   INTEGER, ALLOCATABLE :: implicit_solver_ids(:)
-   INTEGER, ALLOCATABLE :: analytic_solver_ids(:)
-END TYPE source_group_type
-```
-
-Devono essere presenti due registri distinti:
-
-```fortran
-TYPE(source_group_type), ALLOCATABLE :: stage_groups(:)
-TYPE(source_group_type), ALLOCATABLE :: step_groups(:)
-```
-
-Deve inoltre essere disponibile una funzione del tipo:
-
-```fortran
-LOGICAL FUNCTION group_contains(group, term_id)
-```
-
----
-
-I descrittori dei solve devono associare ID, blocco target, termini e ordine. Il catalogo dei termini deve distinguere rate di cella, stato al bordo e assemblaggio derivato, con capability REAL/COMPLEX e bundle ammessi. Questi dati non introducono un nuovo selettore temporale `treatment`.
-
-#### D17.6 — Gruppi `analytic`
-
-Un gruppo `analytic` può contenere un solo solve analitico.
-
-Il solve aggiorna un solo blocco target, mantenendo congelati gli altri: temperatura, pressione dei pori oppure velocità vettoriale `(u,v)`. Le due componenti della velocità appartengono allo stesso solve; non sono due solve scalari indipendenti.
-
-Valido:
-
-```text
-gruppo analytic:
-    solve analitico della temperatura
-    contributo radiativo
-    contributo convettivo
-```
-
-Non valido:
-
-```text
-gruppo analytic:
-    solve analitico della temperatura
-    solve analitico della pressione dei pori
-```
-
-Nel nuovo formato nativo i due solve devono essere assegnati a gruppi distinti. Gli input legacy già validi che condividono un gruppo analitico restano accettati: l’adattatore li espande in gruppi interni distinti mantenendo l’ordine attuale velocità → temperatura → pressione, con ricostruzione dello stato tra i solve. I nuovi ID interni non ridefiniscono l’ordine né riscrivono i campi legacy nei backup.
-
-##### Implementazione
-
-Per ogni gruppo analitico deve essere verificato:
-
-```text
-SIZE(analytic_solver_ids) == 1
-```
-
-Deve inoltre essere definita la variabile target.
-
----
-
-#### D17.7 — Gruppi `newton`
-
-Un gruppo Newton può contenere più solve impliciti.
-
-Esempio:
-
-```text
-gruppo newton:
-    solve implicito della velocità
-    solve implicito della temperatura
-    solve implicito della pressione dei pori
-```
-
-I solve realmente indipendenti possono essere eseguiti secondo un ordine definito. Un blocco accoppiato resta però un unico solve Newton con tutte le equazioni e derivate incrociate: le configurazioni legacy con velocità/energia/pressione nello stesso gruppo non devono essere trasformate in sweep scalari. Metadati espliciti distinguono blocchi accoppiati e solve indipendenti; sovrapposizioni ambigue dei target sono rifiutate.
-
-##### Implementazione
-
-Ogni gruppo Newton deve contenere uno o più:
-
-```fortran
-implicit_solver_ids(:)
-```
-
-Ogni solve deve avere:
-
-- identificatore;
-- variabile target;
-- termini associati;
-- ordine di esecuzione;
-- interfaccia numerica.
-
----
-
-#### D17.8 — Interfacce comuni
-
-Le interfacce generiche devono essere definite in `equation_terms_2d.f90`:
-
-```fortran
-eval_expl_terms
-eval_semi_implicit_terms
-eval_implicit_terms
-eval_analytic_terms
-```
-
-Ogni routine di rate/solve deve:
-
-1. ricevere il gruppo e, quando necessario, lo specifico solver_id;
-2. inizializzare il risultato;
-3. selezionare i termini;
-4. chiamare le leggi fisiche;
-5. assemblare il risultato;
-6. restituire rate o risultato analitico.
-
-Firme indicative:
-
-```fortran
-SUBROUTINE eval_expl_terms(group, q, qp, time, rate)
-```
-
-```fortran
-SUBROUTINE eval_semi_implicit_terms(group, q, qp, time, rate)
-```
-
-```fortran
-SUBROUTINE eval_implicit_terms(group, q, qp, time, rate)
-```
-
-```fortran
-SUBROUTINE eval_analytic_terms(group, solver_id, q_before, context, interval, q_after)
-```
-
-`q_after` è lo stato conservativo completo: copiato da `q_before`, modifica solo il blocco target. Il wrapper converte temperatura/pressione/velocità primitive in Q4/Qp/Q2,Q3. Il coordinatore numerico passa `interval=dt*a_ii` negli stage e ricava il contributo IM effettivo `(q_stage-q_known)/(dt*a_ii)` dopo le correzioni; il percorso con diagonale zero non divide per tale intervallo. `analytic` conserva l’exact-flow a coefficienti congelati, non diventa un solve backward Euler.
-
-Le firme sono indicative: prima del codice va definito un contesto read-only con geometria, Hessiana, gravità, stato, valore stocastico congelato, coperture/arco delle sorgenti, snapshot delle finestre e tempo attuale. L’interfaccia al bordo `eval_source_bdry` resta distinta dai vettori di rate: restituisce uno stato primitivo alla ricostruzione e quindi al flusso spaziale.
-
----
-
-#### D17.9 — Interfaccia esplicita
-
-L’interfaccia esplicita deve assemblare tutti i contributi espliciti richiesti.
-
-Per esempio:
-
-\[
-R_{\mathrm{explicit}}
-=
-R_{\mathrm{Coulomb}}
-+
-R_{\mathrm{turbulent\ drag}}.
-\]
-
-Le formule fisiche non devono essere duplicate.
-
-##### Implementazione
-
-Modificare `eval_expl_terms` affinché:
-
-- inizializzi il vettore `rate`;
-- selezioni i `term_id`;
-- chiami i kernel fisici;
-- sommi i contributi;
-- distingua i gruppi `stage` dai gruppi `step`.
-
----
-
-#### D17.10 — Interfacce semi-implicite e implicite
-
-Un gruppo Newton può contenere più contributi semi-impliciti e più solve impliciti.
-
-Esempio:
-
-```text
-semi-implicito:
-    Coulomb friction
-
-implicito:
-    turbulent drag
-    thermal relaxation
-```
-
-##### Implementazione
-
-Modificare:
-
-```fortran
-eval_semi_implicit_terms
-eval_implicit_terms
-```
-
-per selezionare il gruppo, il termine e lo specifico `implicit_solver_id`.
-
-Devono essere supportate versioni reali e complesse quando richieste dal solutore.
-
-I valutatori selezionano i termini presenti sia nel gruppo sia nel descrittore
-del solver; il coordinatore esegue in ordine i solve Newton registrati nel
-gruppo. Evidenza e perimetro verificato: [D17.10 — group-filtered implicit
-rates](acceptance/D17_10_GROUP_FILTERED_IMPLICIT_RATES.md).
-
----
-
-#### D17.11 — Riutilizzo dei kernel REAL/COMPLEX
-
-Le formule comuni non devono essere duplicate tra versioni reali e complesse. Riutilizzare kernel complessi con wrapper reali o interfacce generiche già presenti; usare `.inc` matematici ristretti quando utili, senza imporre una nuova relocation delle leggi D16 o una complessificazione dei percorsi oggi reali.
-
-Esempi:
-
-```text
-rheology_voellmy_coulomb_rate.inc
-rheology_voellmy_turbulent_drag_rate.inc
-thermal_radiative_cooling_rate.inc
-```
-
-I file `.inc` devono contenere soltanto il kernel matematico comune.
-
-I wrapper devono gestire:
-
-- tipo reale o complesso;
-- dichiarazioni;
-- argomenti;
-- selezione del contributo;
-- risultato.
-
----
-
-#### D17.12 — Interfacce analitiche
-
-Le routine analitiche devono rimanere nei moduli fisici, ma devono essere chiamate attraverso `eval_analytic_terms`.
-
-Il flusso deve essere:
-
-```text
-time_integration_2d
-        ↓
-equation_terms_2d
-        ↓
-legge fisica analitica
-```
-
-##### Implementazione
-
-- aggiungere `eval_analytic_terms`;
-- rimuovere le chiamate dirette dai moduli numerici;
-- assicurare un solo solve analitico per gruppo;
-- utilizzare gruppi distinti per variabili analitiche diverse.
-
----
-
-#### D17.13 — Configurazione di default compatibile con il codice attuale
-
-In assenza di configurazioni esplicite nel file di input, il codice deve costruire automaticamente una configurazione equivalente al comportamento attuale.
-
-La configurazione di default deve essere determinata dall’inventario delle chiamate effettive presenti nel codice, non soltanto dal nome dei moduli.
-
-**Stato locale:** i default IMEX compilati sono verificati attraverso
-`initialize_configured_sources` nei casi senza sorgenti attive e con i solve
-analitici lava/energia/pressione abilitati; il test controlla ID, metodo,
-ordine, termini e target. Il test grouped-stage esegue inoltre la sequenza
-default energia analitica → pressione analitica → quantità di moto Newton;
-oracoli exact-flow, residui Newton e rate effettivi verificano gli aggiornamenti
-dei target. Resta aperta l’equivalenza per tutte le attivazioni e i percorsi
-temporali. Vedere
-[D17.13 — default configuration](acceptance/D17_13_DEFAULT_CONFIGURATION.md).
-
-##### D17.13.1 — Sorgenti esplicite `stage`
-
-Il gruppo esplicito `stage` proposto ha **ID 4**, per non collidere con gli ID
-impliciti legacy 1–3. Contiene curvatura, iniezione dal fondo circolare,
-iniezioni fissurali e iniezione radiale conservativa di cella. Calore,
-composizione e pressione dell’iniezione sono assemblaggi dipendenti del padre.
-
-L’iniezione laterale al bordo è catalogata nello stesso percorso esplicito ma
-mantiene la rappresentazione **stato primitivo → ricostruzione → flusso** tramite
-`eval_source_bdry`: non viene aggiunta come ulteriore rate di cella.
-Pressione idrostatica e pendenza ordinaria restano nel path spaziale.
-
-Preparare le finestre mediate una volta per step prima del RK; valutare i rate
-EX sullo stato dello stage richiesto, mantenendo ordine, `need_explicit_stage`
-e argomento temporale attuali. Lo stato al bordo conserva il suo gate temporale
-puntuale. I contributi inattivi sono omessi o nulli senza cambiare le equazioni.
-
----
-
-##### D17.13.2 — Termini Newton `stage`
-
-Il default della velocità è `stage / group=3 / method=newton`. Il catalogo
-elenca per ogni reologia i contributi SI e impliciti effettivi, inclusi i
-bundle aggregati (per esempio drag viscoso/turbolento lahar). La tabella
-machine-readable è la specifica, non una dicitura generica «termini attuali».
-
-Mantenere SI sullo stato pre-Newton, correzione dissipativa **prima** di Newton,
-solve del blocco implicito, correzione successiva e rate effettivo di stage.
-Il fix `9b2a4989` non deve essere riaperto dal refactoring. Residuo e Jacobiano
-usano lo stesso filtro gruppo/solve e conservano tolleranze e semantica COMPLEX.
-La partizione della quantità di moto resta implicita anche senza reologia.
-
-Le configurazioni legacy possono mettere energia/pressione nei gruppi Newton,
-anche insieme alla velocità: preservare il solve congiunto e le derivate
-incrociate, oltre all’ordine tra gruppi distinti.
-
----
-
-##### D17.13.3 — Solve analitici
-
-Il default attuale è **energia / gruppo 1 / analytic**, poi
-**pressione dei pori / gruppo 2 / analytic**, poi velocità Newton nel gruppo 3.
-I primi due sono attivi soltanto quando le rispettive equazioni lo richiedono.
-La pressione usa lo stato aggiornato dopo la temperatura.
-
-Sono disponibili anche i solve analitici della velocità delle reologie, quando
-selezionati tramite input. Ogni solve analitico consuma il bundle fisico previsto
-una sola volta: non aggiungere di nuovo gli stessi rate SI/impliciti.
-Le selezioni parziali di bundle non implementate vanno rifiutate.
-
-Nel formato nativo ogni gruppo ha un solo solve e un blocco target. L’adattatore
-legacy normalizza i gruppi analitici condivisi senza rifiutare configurazioni
-oggi supportate e testate; la specifica allegata descrive ordine e nuovi ID.
-
----
-
-##### D17.13.4 — Termini espliciti `step`
-
-I termini attualmente applicati fuori dal ciclo RK devono rimanere inizialmente `step`.
-
-Esempio:
-
-```text
-step group 1:
-    SOURCE_TERM_MASS_EXCHANGE_EROSION
-    SOURCE_TERM_MASS_EXCHANGE_DEPOSITION
-    SOURCE_TERM_MASS_EXCHANGE_ENTRAINMENT
-    SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS
-    SOURCE_TERM_MASS_EXCHANGE_CARRIER_DEPOSITION_LOSS
-    SOURCE_TERM_MASS_EXCHANGE_CARRIER_DARCY_LOSS
-    SOURCE_TERM_MASS_EXCHANGE_VAPORIZATION
-```
-
-Configurazione equivalente:
-
-```text
-method  = explicit
-cadence = step
-group   = 1
-```
-
-L’elenco completo è nel manifest allegato: erosione, deposizione, perdita
-liquida configurata, perdita associata alla deposizione, perdita Darcy,
-entrainment e vaporizzazione. La prima migrazione conserva un unico batch
-atomico: le perdite del carrier sono sommate prima del limitatore condiviso;
-deposizione, vaporizzazione, inventari e topografia restano collegati. I cap
-dipendenti da `dt`, il cutoff `alphastot_min`, la maschera delle sorgenti e le
-ricostruzioni non possono essere sostituiti da applicazioni indipendenti per ID.
-
-##### D17.13.5 — Inventario obbligatorio dei default
-
-Prima dell’implementazione deve essere costruita una tabella definitiva contenente, per ogni termine:
-
-| Campo | Contenuto |
-|---|---|
-| `term_id` | identificatore fisico |
-| modulo | file responsabile |
-| routine attuale | chiamata esistente |
-| metodo default | `explicit`, `newton`, `analytic` |
-| cadenza default | `stage` o `step` |
-| gruppo default | numero del gruppo |
-| solve target | variabile aggiornata |
-| ordine | posizione nell’elaborazione |
-| equazioni | componenti modificate |
-| rappresentazione/capability | rate di cella, stato al bordo, assemblaggio derivato; REAL/COMPLEX disponibili |
-| stato | stato pre/post solve usato, variabili congelate e refresh richiesti |
-| batch | dipendenze, cap condivisi, accumulo e applicazione atomica |
-| preparazione/applicazione | snapshot temporale e fase effettiva, distinti dalla sola cadenza |
-| side effect | inventari, geometria e controlli applicati dalla numerica |
-
-Questa tabella deve essere considerata la specifica di compatibilità con il codice attuale.
-
-##### D17.13.6 — Criterio di equivalenza
-
-La configurazione di default deve riprodurre:
-
-1. ordine delle chiamate;
-2. momento di valutazione;
-3. stato utilizzato per il rate;
-4. momento di applicazione;
-5. aggiornamento degli inventari;
-6. aggiornamento della topografia;
-7. controlli di positività;
-8. ricostruzione delle variabili fisiche.
-
-Il solo fatto di assegnare lo stesso metodo non è sufficiente a garantire la compatibilità.
-
----
-
-#### D17.14 — Separazione tra `stage` e `step`
-
-I gruppi `stage` vengono valutati nel ciclo RK-IMEX.
-
-I gruppi `step` vengono valutati una sola volta dopo il completamento del RK.
-
-##### Implementazione
-
-Modificare `time_integration_2d.f90` affinché:
-
-- elabori i gruppi `stage` durante il ciclo RK;
-- elabori i gruppi `step` in una fase separata;
-- non ricalcoli i gruppi `step` negli stage;
-- applichi i risultati nell’ordine definito dalla configurazione.
-
-##### Stato ed evidenza locale
-
-Il driver passa il registro validato al fractional step post-RK. La routine
-seleziona i gruppi `step` nell'ordine convalidato e applica una sola volta il
-batch mass-exchange indivisibile; un registro senza termini `step` non modifica
-stato, inventari o topografia. Il batch non viene invocato dal ciclo degli
-stage. I gruppi post-RK non mass-exchange sono rifiutati esplicitamente finché
-non esiste un kernel che li implementi.
-
-Regressione e limiti: [D17.14 — post-RK step routing](acceptance/D17_14_STEP_ROUTING.md).
-
----
-
-#### D17.15 — Ordine del time-step
-
-L’ordine compatibile è quello inventariato nella specifica allegata:
-
-1. scelta di `dt`, finestre delle sorgenti mediate sullo step e preparazione OU;
-2. per ogni stage: stato noto da contributi precedenti, controlli e conversione;
-3. sweep implicita ordinata (default temperatura, pressione, velocità), incluse SI/correzioni;
-4. contributo IM effettivo dopo le correzioni;
-5. valutazioni EX richieste sullo stato risolto e operatore spaziale con hook al bordo;
-6. completamento RK, controlli di positività/asciutto e ricostruzione già presenti;
-7. proposal comuni di mass exchange sullo stato post-RK e maschera di copertura;
-8. applicazione unica a stato/inventari, controlli/ricostruzione, aggiornamento del letto;
-9. avanzamento del tempo, diagnostiche e output.
-
-Non anticipare indiscriminatamente tutti i gruppi EX ai solve dello stage e non
-posticipare i controlli già presenti fino al termine dello step. La numerica
-coordina; il main conserva inizialmente l’ordine esterno attuale, senza imporre
-uno spostamento simultaneo del driver per introdurre i registri.
-
-##### Stato ed evidenza locale
-
-L’ordine del driver è centralizzato in `simulation%advance_timestep` e
-conserva: medie delle finestre, preparazione OU condizionale, avanzamento RK
-(con solve impliciti ordinati e EX/spaziale sullo stato risolto), assembly
-finale e proiezioni, batch mass-exchange con ricostruzione e aggiornamento del
-letto, quindi avanzamento dell’orologio. La scelta/limitazione di `dt` resta
-nel driver prima della routine; diagnostiche/output restano dopo.
-
-Le regressioni IMEX verificano traiettorie e assembly stage per N_RK=2/3/4,
-gruppi misti analitici/Newton e hook spaziali; le regressioni mass-exchange
-verificano l’aggiornamento aggregato, inventari, maschere, topografia e il
-routing post-RK. Entrambe le suite passano localmente in profili strict e
-optimized.
-
-**D17.15 resta parziale:** `TEST_IMEX_STAGES` verifica con un observer le
-cinque fasi della routine production e l’avanzamento finale dell’orologio.
-La fixture abilita un aggiornamento OU con seed fissato e ne verifica
-l’effetto sul campo stocastico dopo la fase dedicata; inoltre applica una
-sorgente circolare attiva per metà del timestep e verifica il bilancio integrato
-di massa e la positività. La suite `TEST_CURVATURE_SOURCE` verifica a livello
-equation-term le finestre per sorgenti circolari, fissurali e radiali. Restano
-la selezione/limitazione di `dt`, l’output del driver, il trasporto stocastico e
-l’equivalenza di tutte le sorgenti/configurazioni. Evidenza e limiti:
-[D17.15 — timestep ordering](acceptance/D17_15_TIMESTEP_ORDER.md).
-
----
-
-#### D17.16 — Validazione dell’input e dei gruppi
-
-Durante l’inizializzazione devono essere controllati:
-
-- metodo valido;
-- cadenza valida;
-- gruppo positivo;
-- contributo fisico registrato una sola volta globalmente, senza duplicazione stage/step;
-- metodo unico nel gruppo;
-- interfacce richieste disponibili;
-- un solo solve analitico nei gruppi `analytic`;
-- uno o più solve impliciti nei gruppi `newton`;
-- variabili target definite;
-- ordine dei solve non ambiguo;
-- termine fisico esistente.
-
-Gli errori devono essere rilevati prima dell’avvio della simulazione. Conservare
-la compatibilità dei campi `IMEX_*` attuali e distinguere input esplicitamente
-fornito da default inizializzati. Rifiutare la combinazione ambigua di nuova
-configurazione nativa e configurazione legacy esplicita, capability mancanti,
-bundle parziali non supportati e split di limitatori condivisi non validati.
-La namelist nativa opzionale si chiama `SOURCE_GROUPS`; cadenze, metodi,
-termini e target sono indicati con nomi simbolici.
-
-##### Stato ed evidenza locale
-
-La validazione esistente controlla i campi legacy `IMEX_*` letti dalla
-namelist prima dell’inizializzazione dei workspace: ID gruppo nell’intervallo
-1–3 e metodi ANALYTIC/NEWTON supportati. `source_registry_2d` valida inoltre
-identità e ordine dei gruppi, cadenza/fase/metodo, appartenenza dei termini,
-duplicazioni globali, target/equazioni, coverage e ordine dei solver, bundle
-atomici e descrittori mancanti o non validi; l’inizializzazione fallita libera
-i dati parziali.
-
-Il parser rileva namelist duplicate e input malformati e rifiuta la
-combinazione con campi legacy espliciti; i sentinels permettono di distinguere
-questi ultimi dai default. Il builder nativo richiede ogni termine fisico
-attivo esattamente una volta, verifica i target impliciti e valida gli indici
-equazione prima di costruire partizione e registro.
-
-`TEST_SOURCE_REGISTRY/run_test.sh` passa in strict e optimized: 864
-configurazioni legacy, 14.893 asserzioni e 28 configurazioni invalide
-rifiutate per profilo; include casi parser validi, assenti, malformati,
-duplicati e in conflitto. `TEST_MASS_EXCHANGE/run_test.sh` compila i moduli
-di produzione, incluso `inpout_2d`, e passa in entrambi i profili. Report:
-[D17.16 — input and source-schedule validation](acceptance/D17_16_VALIDATION.md).
-
-`TEST_IMEX_STAGES/run_test.sh` passa in strict e optimized con una fixture
-nativa che attraversa `init_param`/`read_param` e costruisce il registry per
-un blocco velocity e un termine mass-exchange attivo.
-
-**D17.16 resta parziale:** la fixture end-to-end copre una configurazione
-rappresentativa; equivalenza per tutte le combinazioni fisiche e accettazione
-cross-platform/CI restano aperte.
-
----
-
-#### D17.17 — Riorganizzazione dei moduli
-
-I moduli fisici devono essere organizzati, per esempio, in:
-
-```text
-rheology_2d.f90
-thermal_laws_2d.f90
-pore_pressure_laws_2d.f90
-```
-
-Essi non devono contenere:
-
-- ciclo RK;
-- gestione degli stage;
-- gestione delle cadenze;
-- selezione dei gruppi;
-- solutore Newton;
-- integrazione generale del time-step.
-
-Le routine di assemblaggio devono rimanere in `equation_terms_2d.f90`.
-
-##### Implementazione
-
-- spostare le formule fisiche nei moduli `*_laws_2d`;
-- spostare l’assemblaggio in `equation_terms_2d`;
-- eliminare le formule duplicate;
-- verificare che i moduli fisici non dipendano dalla numerica temporale.
-
-**Evidenza locale D17.17:** il batch atomico mass-exchange post-RK è stato
-estratto da `time_integration_2d` in `mass_exchange_step_2d`; l’integratore
-conserva il tableau RK e la sequenza degli stage, mentre la routine condivisa
-del timestep ne mantiene l’invocazione dopo RK e prima del clock. Rate,
-maschere, aggiornamento degli inventari e topografia conservano l’ordine
-precedente. Un controllo statico dei confini tra solver/integratore, bridge
-equazionale e leggi fisiche è aggiunto ai test ACCEPTANCE. L’audit degli altri
-percorsi e del call graph completo resta aperto:
-[D17.17 — post-RK step-source separation](acceptance/D17_17_STEP_SOURCE_SEPARATION.md).
-
----
-
-#### D17.18 — Adattamento delle routine esistenti
-
-Devono essere riorganizzate:
-
-```fortran
-eval_expl_terms
-eval_semi_implicit_terms
-eval_implicit_terms
-eval_mass_exchange_terms
-```
-
-La riorganizzazione deve:
-
-- utilizzare i `term_id`;
-- rispettare gruppi e cadenze;
-- distinguere rate da aggiornamenti temporali;
-- mantenere inizialmente il comportamento fisico attuale;
-- eliminare chiamate duplicate;
-- preservare l’ordine dei default.
-
-Il trasferimento di massa deve essere integrato progressivamente nella struttura generale, mantenendo inizialmente la cadenza attuale fuori dal RK.
-
-Il batch `step` post-RK è implementato localmente in `mass_exchange_step_2d`
-ed è invocato da `simulation%advance_timestep`; la valutazione dei contributi
-fisici resta in `equation_terms_2d`. La selezione term-selective resta
-intenzionalmente differita finché i kernel e i limitatori atomici non sono
-validati singolarmente.
-
----
-
-#### D17.19 — Sequenza implementativa
-
-Stato: IN CORSO. Le voci completate indicano l’implementazione locale e
-l’evidenza disponibile, non il completamento dell’accettazione D17.
-
-1. Inventariare tutte le chiamate attuali ai termini sorgente (fase A documentata nella specifica/manifest allegati). **COMPLETATO.**
-2. Definire i `term_id`. **COMPLETATO.**
-3. Definire metodi, cadenze e identificatori dei solve. **COMPLETATO nei metadati.**
-4. Costruire la tabella completa dei default. **COMPLETATO come baseline e adattatore legacy; la costruzione dei default è verificata nei casi inattivo e lava/energia/pressione attivi, mentre l’equivalenza runtime complessiva resta da verificare (D17.13).**
-5. Definire `source_group_type`. **COMPLETATO.**
-6. Creare i registri `stage_groups` e `step_groups`. **COMPLETATO.**
-7. Definire le firme delle quattro interfacce. **COMPLETATO per i percorsi supportati:** semi-implicita e implicita accettano anche gruppo e descrittore solver, mantenendo i call site legacy.
-8. Implementare i gruppi di default. **COMPLETATO nei metadati; il bridge predefinito è testato nei casi inattivo e attivo riportati in D17.13; dispatch ed equivalenza numerica completa con il comportamento legacy restano parziali.**
-9. Implementare il parsing dell’input. **IMPLEMENTATO localmente:** namelist opzionale `SOURCE_GROUPS`, rilevamento duplicati, errori sintattici e conflitti con campi legacy espliciti; parser e fixture rappresentativa end-to-end `init_param`/`read_param` testati in strict/optimized (D17.16).
-10. Implementare i controlli di consistenza. **PARZIALE:** validazione legacy e nativa; 864 configurazioni legacy, 14.893 asserzioni e 28 configurazioni invalide per profilo (D17.16). Il builder richiede ogni termine fisico attivo esattamente una volta e verifica gli obiettivi impliciti; equivalenza per tutte le combinazioni fisiche e accettazione cross-platform/CI restano aperte.
-11. Modificare `eval_expl_terms`. **COMPLETATO localmente per il routing esplicito `stage` e l’hook al bordo (D17.9).**
-12. Modificare `eval_semi_implicit_terms`. **IMPLEMENTATO localmente:** seleziona i termini semi-impliciti del gruppo e del solver Newton indicati.
-13. Modificare `eval_implicit_terms`. **IMPLEMENTATO localmente:** seleziona rate reologici, raffreddamento e dissipazione della pressione dei pori dal gruppo/solver; routing REAL/COMPLEX mantenuto.
-14. Aggiungere `eval_analytic_terms`. **COMPLETATO localmente (D17.12).**
-15. Modificare `time_integration_2d.f90`. **PARZIALE:** dispatch dei gruppi `stage` completato localmente (D17.9); la routine condivisa production `simulation%advance_timestep` e il test dell’ordine delle fasi sono implementati localmente (D17.15). Il batch post-RK `step` è delegato a `mass_exchange_step_2d`; la sorgente circolare a finestra parziale è verificata anche nel timestep production, mentre le medie equation-term coprono impulsi, rampe, wrap, inattività e le sorgenti fissurali/radiali. Restano da verificare selezione di `dt`, output driver e tutte le combinazioni fisiche.
-16. Modificare `nonlinear_solver_2d.f90`. **PARZIALE:** descrittori gruppo/solver propagati al residuo, alla Jacobiana complessa, al line search e al rate semi-implicito; sweep ordinato dei solver di un gruppo implementato localmente (D17.10). Restano i percorsi numerici e di cadenza ancora non integrati.
-17. Rimuovere le chiamate fisiche dirette dai moduli numerici. **PARZIALE, audit statico completato per i confini dei moduli:** nessun sorgente in `numerics/` o `spatial/` importa direttamente moduli `*_laws_2d`; l’uso spaziale di `equation_terms_2d` è limitato a un’allowlist di API per flussi, coefficienti idrostatici, velocità caratteristiche, hook al bordo e limiter di flusso. Le leggi non importano moduli di orchestrazione numerica/spaziale. Restano audit del call graph e verifica runtime/term-selective.
-18. Riutilizzare kernel REAL/COMPLEX comuni; introdurre `.inc` solo dove utili. **IMPLEMENTATO localmente per la duplicazione individuata:** la correlazione di viscosità lahar ha un solo kernel COMPLEX; non è stato introdotto un `.inc` non necessario. Evidenza: [D17.11 — REAL/COMPLEX kernel reuse](acceptance/D17_11_REAL_COMPLEX_KERNEL_REUSE.md).
-19. Creare wrapper reali e complessi. **IMPLEMENTATO localmente per la viscosità lahar:** il wrapper REAL conserva l’interfaccia generica e riusa il kernel COMPLEX; test di valore e derivata nei due rami della correlazione. La matrice D17.20 resta aperta.
-20. Organizzare i solve impliciti multipli. **IMPLEMENTATO localmente:** il coordinatore esegue i solver Newton nell’ordine registrato e limita ciascun solve ai propri termini/equazioni; il test runtime controlla i residui termico e di pressione dei pori nello stato sequenziale. Il blocco legacy accoppiato resta un unico solve.
-21. Organizzare i solve analitici singoli per gruppo. **COMPLETATO localmente per i gruppi supportati e verificato dal report D17-C.**
-22. Integrare il trasferimento di massa. **IMPLEMENTATO localmente per il batch post-RK:** il registro `step` valida il batch mass-exchange atomico; valutazione dei rate, maschere, aggiornamento di stato/inventari e topografia sono eseguiti da `mass_exchange_step_2d` dopo RK e prima dell’avanzamento del clock. Il dispatch term-selective e la matrice completa restano aperti.
-23. Verificare l’ordine delle operazioni. **PARZIALE:** ordine dei gruppi analitici legacy, routing esplicito e sequenza production source-window/OU/RK/step-source/clock verificati; aggiornamento OU attivo, media temporale equation-term di sorgenti circolari/fissurali/radiali e sorgente circolare a finestra parziale nel timestep production verificati; selezione di `dt` e ordine driver completo restano da validare.
-24. Eseguire i test di regressione. **PARZIALE:** suite locali mirate B, C, D17.9, D17.10, D17.15 e D17.17 superate, incluse reologia REAL/COMPLEX, registro, mass-exchange e IMEX strict/optimized; il controllo architetturale statico passa. Le regressioni source-window verificano impulso, rampa lineare/cosinusoidale, attraversamento del periodo, intervallo inattivo, contributo fissurale e bilancio production. Matrice D17.20 completa e gate CI/piattaforme non completati.
-
----
-
-#### D17.20 — Test obbligatori
-
-Stato ufficiale: **PARZIALE**. Le verifiche locali aggiornate coprono molte
-condizioni strutturali e numeriche elencate sotto; i report B, C, D17.9, D17.10,
-D17.15 e D17.17 attestano solo i percorsi e le asserzioni effettivamente
-eseguiti. Restano aperte l’equivalenza dei default per tutte le combinazioni
-fisiche, le finestre temporali di tutte le sorgenti nel percorso production,
-la selezione di `dt` e l’output del driver, nonché l’accettazione delle
-piattaforme/CI e l’approvazione scientifica delle baseline.
-
-**Evidenza locale eseguita il 2026-10-23:** `TEST_SOURCE_REGISTRY` passa in
-strict/optimized con 864 combinazioni legacy, 14.893 asserzioni e 28
-configurazioni invalide; `TEST_RHEOLOGY_CELL_LOCAL` passa con 255/255 fixture
-per profilo, inclusi rate REAL/COMPLEX e solve Newton ordinati; `TEST_IMEX_STAGES`
-passa in strict/optimized con 1/4 thread, tableau, gruppi nativi e misti,
-ordine production e budget di massa della sorgente temporizzata; `TEST_MASS_EXCHANGE`
-passa in strict/optimized con 1/4 thread; `TEST_CURVATURE_SOURCE` e
-`TEST_STATE_CONVERSION` passano; i controlli architetturali D17 e i contratti
-Doxygen passano. Questi risultati non equivalgono all’accettazione end-to-end
-completa della matrice.
-
-Devono essere verificati:
-
-1. assenza di configurazioni nell’input;
-2. sorgenti esplicite `stage`;
-3. sorgenti esplicite `step`;
-4. gruppo Newton con un solve implicito;
-5. gruppo Newton con più solve impliciti;
-6. gruppo analitico con un solo solve;
-7. rifiuto di due solve analitici nello stesso gruppo;
-8. gruppi `stage` e `step` con lo stesso numero;
-9. termine assegnato a due gruppi con la stessa cadenza;
-10. gruppo con metodi diversi;
-11. metodo Newton incompleto;
-12. metodo analitico senza solve analitico;
-13. verifica reale/complessa;
-14. sorgenti circolari, fissurali e al bordo;
-15. trasferimento di massa fuori dal RK;
-16. conservazione della massa;
-17. positività;
-18. ordine dei solve;
-19. equivalenza con i default attuali;
-20. indipendenza dei moduli numerici dai moduli fisici;
-21. conservazione dei gruppi Newton accoppiati e del residuo congiunto;
-22. compatibilità dei gruppi analitici legacy condivisi e ordine dei refresh;
-23. assenza di collisione tra gruppo EX e gruppi IM nello stesso namespace;
-24. rifiuto della doppia registrazione stage/step e dell’input nativo/legacy ambiguo;
-25. hook al bordo senza doppio rate di cella, e sorgente di curvatura;
-27. preservazione della correzione SI pre-Newton e dei rate effettivi corretti;
-28. batch mass-exchange, limitatori condivisi, inventari e topografia;
-29. rifiuto di selezioni parziali non supportate e confronto default/legacy normalizzati.
-
----
-
-#### D17.21 — Criteri di completamento
-
-Stato ufficiale: **DA FARE** — nessun criterio complessivo è dichiarato
-soddisfatto finché restano aperti i requisiti e i test indicati sopra.
-
-Il D17 sarà completato quando:
-
-- ogni termine fisico sarà identificato da un `term_id`;
-- la tabella dei default sarà completa;
-- ogni contributo fisico sarà registrato una volta senza doppia integrazione tra cadenze;
-- ogni gruppo avrà un solo metodo;
-- ogni gruppo `analytic` avrà un solo solve analitico;
-- ogni gruppo `newton` potrà contenere più solve impliciti;
-- i solve avranno variabili target e ordine definiti;
-- tutte le chiamate ai termini passeranno da `equation_terms_2d.f90`;
-- `nonlinear_solver_2d.f90` non conoscerà i modelli fisici;
-- `time_integration_2d.f90` non conterrà formule costitutive;
-- le leggi fisiche non conosceranno RK, IMEX o gruppi;
-- i rate reali e complessi saranno ottenuti senza duplicazioni;
-- i gruppi `stage` e `step` saranno indipendenti;
-- default e input legacy supportati riprodurranno il comportamento attuale, inclusi gruppi condivisi e accoppiati;
-- l’ordine temporale sarà documentato e compatibile con correzioni, finestre e limitatori condivisi;
-- gli errori saranno rilevati all’inizializzazione;
-- i test di regressione saranno superati.
+**Dipendenza successiva:** D15 valuta la nuova architettura nel suo insieme; D03/D07 ed E01–E03 hanno scopi diversi (ownership globale e readiness) e non riaprono la struttura delle sorgenti se le API D17 restano valide.
 
 ### D15 — Acceptance finale della nuova architettura
 
@@ -3604,7 +2436,7 @@ Stato ufficiale: DA FARE
 
 Attività e verifiche operative: Migrare q/qp e workspace a (var,layer,x_storage,y_storage), N_LAYERS=1; conservare prima dimensione contigua; letto Q1 condiviso; nessuna fisica multilayer.
 
-File interessati: src/state_2d.f90; src/domain_2d.f90; src/simulation_2d.f90; src/spatial_operator_2d.f90; src/time_integration_2d.f90; src/mass_exchange_2d.f90; TESTS/TEST_MODEL_LAYOUT/\*.
+File interessati: src/state_2d.f90; src/domain_2d.f90; src/simulation_2d.f90; src/spatial_operator_2d.f90; src/time_integration_2d.f90; src/physics/mass_exchange/; src/numerics/step_source_executor_2d.f90; TESTS/TEST_MODEL_LAYOUT/\*.
 
 Criteri di accettazione: Regressioni A11 dentro tolleranze, memoria e shape verificate; n_layers diverso da 1 rifiutato.
 
@@ -3746,7 +2578,7 @@ Different tile sizes produce equivalent scientific results.
 
 Attività e verifiche operative: Tile rettangolari owned e scheduling locality; conservare compact active-list; verificare vicini cross tile e gather ai vertici.
 
-File interessati: src/domain_2d.f90; src/hp_reconstruction_2d.f90; src/spatial_operator_2d.f90; src/mass_exchange_2d.f90; nuovi test tile.
+File interessati: src/domain_2d.f90; src/hp_reconstruction_2d.f90; src/spatial_operator_2d.f90; src/physics/mass_exchange/; src/numerics/step_source_executor_2d.f90; nuovi test tile.
 
 Criteri di accettazione: Risultati identici per tile sizes multipli, gestione stencil e rispetto bounds, OpenMP stabile.
 
@@ -3766,7 +2598,7 @@ Stato ufficiale: DA FARE
 
 Attività e verifiche operative: Decomposizione cartesiana MPI e halo exchange generico; B_vertex ownership condivisa e gather nodale across rank; continuità correlazioni stocastiche ai rank boundaries.
 
-File interessati: Nuovo communication/MPI module; src/domain_2d.f90; src/geometry_2d.f90; src/mass_exchange_2d.f90; src/stochastic_module.f90; nuovi test MPI.
+File interessati: Nuovo communication/MPI module; src/domain_2d.f90; src/geometry_2d.f90; src/physics/mass_exchange/; src/numerics/step_source_executor_2d.f90; src/stochastic_module.f90; nuovi test MPI.
 
 Criteri di accettazione: Confronto np=1/2/4 con seriale, bilancio globale e restart coerenti; nessun MPI interno al solver per cella.
 
