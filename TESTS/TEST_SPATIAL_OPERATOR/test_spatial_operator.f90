@@ -7,9 +7,8 @@ PROGRAM test_spatial_operator
   USE spatial_operator_2d, ONLY : spatial_operator_type
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
-  USE equation_terms_2d, ONLY : eval_expl_terms
-  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE, &
-       SOURCE_TERM_GEOMETRY_CURVATURE
+  USE source_terms_2d, ONLY : eval_source_explicit
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE
   USE source_registry_2d, ONLY : source_group_type
   USE omp_lib
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
@@ -45,9 +44,9 @@ PROGRAM test_spatial_operator
   CALL initialize_fixture
   explicit_group%method=SOURCE_METHOD_EXPLICIT
   explicit_group%cadence=SOURCE_CADENCE_STAGE
-  explicit_group%term_ids=[INTEGER::]
+  explicit_group%source_names=[CHARACTER(LEN=64)::]
   IF (curvature_term_flag) &
-       explicit_group%term_ids=[SOURCE_TERM_GEOMETRY_CURVATURE]
+       explicit_group%source_names=[CHARACTER(LEN=64)::'geometry_curvature']
   READ(input_unit,*) B_vertex
   READ(input_unit,*) q
   CLOSE(input_unit)
@@ -91,7 +90,7 @@ PROGRAM test_spatial_operator
   DO k=1,ny
      DO j=1,nx
         IF (.NOT.domain%solve_mask(j,k)) CYCLE
-        CALL eval_expl_terms(B_prime_x_geom(j,k),B_prime_y_geom(j,k),    &
+        CALL eval_source_explicit(B_prime_x_geom(j,k),B_prime_y_geom(j,k),    &
              B_second_xx_geom(j,k),B_second_xy_geom(j,k),              &
              B_second_yy_geom(j,k),grav_coeff(j,k),qp(:,j,k),           &
              cell_sources(:,j,k),0.0_wp,0.0_wp,no_fissures,            &

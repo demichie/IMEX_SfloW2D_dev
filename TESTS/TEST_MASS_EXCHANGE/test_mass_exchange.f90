@@ -12,10 +12,11 @@ PROGRAM test_mass_exchange
   USE state_conversion_2d, ONLY : qc_to_qp, mixt_var
   USE mass_exchange_deposition_2d, ONLY : settling_velocity
   USE mass_exchange_entrainment_2d, ONLY : eval_air_entrainment_rate
-  USE equation_terms_2d, ONLY : eval_mass_exchange_terms, init_problem_param
+  USE mass_exchange_laws_2d, ONLY : eval_mass_exchange_terms
+  USE equation_terms_2d, ONLY : init_problem_param
   USE step_source_executor_2d, ONLY : apply_mass_exchange_step => execute_step_source_groups
   USE equation_metadata_2d, ONLY : equation_partition_type
-  USE source_registry_2d, ONLY : source_registry_type, source_group_type, source_solver_type
+  USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, SOURCE_METHOD_EXPLICIT, SOURCE_PHASE_POST_RK
   USE source_configuration_2d, ONLY : initialize_configured_sources
   USE inpout_2d, ONLY : write_restart_file, read_restart_file, output_idx
@@ -161,7 +162,6 @@ CONTAINS
   SUBROUTINE test_empty_step_registry
     TYPE(source_group_type) :: empty_step
     TYPE(source_group_type) :: no_stages(0)
-    TYPE(source_solver_type) :: no_solvers(0)
     REAL(wp) :: q_before(nq,nx,ny), deposit_before(nx,ny,ns)
     REAL(wp) :: erosion_before(nx,ny,ns), inventory_before(ns,nx,ny)
     REAL(wp) :: bed_before(nx+1,ny+1)
@@ -175,11 +175,9 @@ CONTAINS
     empty_step%method=SOURCE_METHOD_EXPLICIT
     empty_step%phase=SOURCE_PHASE_POST_RK
     empty_step%execution_order=1
-    empty_step%term_ids=[INTEGER::]
+    empty_step%source_names=[CHARACTER(LEN=64)::]
     empty_step%equation_ids=[(i,i=1,nq)]
-    empty_step%implicit_solver_ids=[INTEGER::]
-    empty_step%analytic_solver_ids=[INTEGER::]
-    CALL source_registry%initialize(nq,0,no_stages,[empty_step],no_solvers,error)
+    CALL source_registry%initialize(nq,0,no_stages,[empty_step],error)
     IF (LEN_TRIM(error)>0) ERROR STOP 'failed to initialize empty step registry'
     q_before=state%q; deposit_before=deposit; erosion_before=erosion
     inventory_before=erodible; bed_before=B_vertex

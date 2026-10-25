@@ -12,8 +12,7 @@ PROGRAM test_stage_count
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_configuration_2d, ONLY : initialize_native_source_configuration
   USE equation_metadata_2d, ONLY : equation_partition_type
-  USE source_catalog_2d, ONLY : SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS, &
-       SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION, SOURCE_CADENCE_STAGE, &
+  USE source_catalog_2d, ONLY : SOURCE_CADENCE_STAGE, &
        SOURCE_CADENCE_STEP, SOURCE_METHOD_NEWTON, SOURCE_METHOD_EXPLICIT
   USE simulation_2d, ONLY : simulation, TIMESTEP_EVENT_SOURCE_WINDOWS, &
        TIMESTEP_EVENT_STOCHASTIC_PREPARED, TIMESTEP_EVENT_RK_COMPLETE, &
@@ -54,13 +53,13 @@ PROGRAM test_stage_count
           ERROR STOP 'native velocity target was not retained'
      IF (step_groups(1)%cadence/=SOURCE_CADENCE_STEP .OR. &
           step_groups(1)%method/=SOURCE_METHOD_EXPLICIT .OR. &
-          SIZE(step_groups(1)%term_ids)/=1 .OR. &
-          step_groups(1)%term_ids(1)/=SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS) &
+          SIZE(step_groups(1)%source_names)/=1 .OR. &
+          step_groups(1)%source_names(1)/='mass_exchange_carrier_liquid_loss') &
           ERROR STOP 'native active mass-exchange term was not retained'
      IF (stage_groups(2)%cadence/=SOURCE_CADENCE_STAGE .OR. &
           stage_groups(2)%method/=SOURCE_METHOD_EXPLICIT .OR. &
-          SIZE(stage_groups(2)%term_ids)/=1 .OR. &
-          stage_groups(2)%term_ids(1)/=SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION) &
+          SIZE(stage_groups(2)%source_names)/=1 .OR. &
+          stage_groups(2)%source_names(1)/='bottom_circular_injection') &
           ERROR STOP 'native circular source stage group was not retained'
      CALL init_grid
      CALL simulation%initialize

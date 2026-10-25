@@ -4,6 +4,14 @@
 
 > **Esito:** audit statico di inventario generale e analisi puntuale delle superfici D17. **Non è una certificazione di compatibilità completa**: emergono errori di compilazione certi in test storici, mentre la validazione dinamica di tutti gli esempi e l'ispezione approfondita di tutti gli script non sono ancora state eseguite. Non segnare un test come PASS perché la CI D17 non lo esegue.
 
+## Avanzamento bonifica — 25 ottobre 2026
+
+È stato preparato un primo change set unitario che aggiorna i test `TEST_IMEX_STAGES/test_stage_count.f90`, `TEST_SPATIAL_OPERATOR/test_spatial_operator.f90`, `TEST_CURVATURE_SOURCE/test_curvature_source.f90`, `TEST_MASS_EXCHANGE/test_mass_exchange.f90` e `TEST_RHEOLOGY_FROUDE/test_rheology_froude.f90` ai nomi e alle firme attuali. Il runner `TEST_RHEOLOGY_CELL_LOCAL/run_test.sh` deriva ora i sorgenti da `src/Makefile.am` e include le dipendenze C/NetCDF.
+
+**Stato delle verifiche:** modifiche di codice proposte e pubblicate, **non compilate né eseguite** in questo ambiente. Il cambiamento del runner non rende automaticamente compatibili `probe_sources.f90` e `test_grouped_implicit_stage.f90`, che richiedono ancora la migrazione del contratto a gruppi nominali e Newton unificato; `test_imex_stages.f90` conserva ancora vecchie costanti di catalogo. I test runtime possono inoltre richiedere esplicitamente un `source_group_type` con `source_names` per esercitare un rate attivo. Non dichiarare superato il gate P0 prima del risanamento dei file residui e di un run reale delle suite.
+
+---
+
 ## 1. Perimetro e strategia
 
 Nel tree di HEAD sono presenti **507 file versionati**, di cui **198 sotto TESTS** e **122 sotto EXAMPLES**. Le directory trasversali `tools/`, `UTILS/`, `.github/workflows/` sono rilevanti per generazione di input, orchestrazione, build e verifica. Sono state identificate **21 unità di input/template in EXAMPLES** e **38 sorgenti Fortran di test**. Tutti i 21 input/template principali sono stati letti per i campi D17 pertinenti; i 38 sorgenti Fortran sono stati ispezionati per riferimenti a API abolite o spostate. È stata inoltre ispezionata una selezione dei runner e generatori Python/Shell centrali. Rimangono da esaminare sistematicamente tutti gli altri script e tutti gli input delle sottodirectory TESTS e da eseguire gli smoke test.

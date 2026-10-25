@@ -19,37 +19,33 @@ for profile in strict optimized; do
     esac
     common='-fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow -ffree-line-length-none'
     objects=''
-    for source in core/parameters_2d core/diagnostics_2d \
-        physics/rheology_laws/rheology_analytic_utils_2d physics/rheology_laws/rheology_parameters_2d \
-        physics/rheology_laws/rheology_voellmy_2d physics/rheology_laws/rheology_plastic_2d \
-        physics/rheology_laws/rheology_froude_2d physics/rheology_laws/rheology_lucas_2d \
-        numerics/lapack_interfaces_2d \
-        core/constitutive_parameters_2d numerics/equation_metadata_2d \
-        numerics/source_catalog_2d numerics/source_input_2d numerics/source_registry_2d \
-        physics/source_configuration_2d \
-        core/complexify \
-        geometry/geometry_2d state/state_conversion_2d \
-        physics/rheology_laws/rheology_lava_2d physics/rheology_laws/rheology_lahar_2d \
-        physics/rheology_laws/rheology_empirical_2d physics/rheology_laws/rheology_quadratic_2d \
-        physics/rheology_laws/rheology_mui_2d physics/rheology_laws/rheology_mui_voellmy_2d \
-        physics/rheology_laws/rheology_2d \
-        physics/thermal_laws_2d physics/pore_pressure_laws_2d \
-        physics/mass_exchange_laws_2d \
-        physics/equation_terms_2d \
-        numerics/nonlinear_solver_2d; do
-        "$compiler" $flags $common -I"$repo_dir/src/state" -c "$repo_dir/src/$source.f90"
-        objects="$objects ${source##*/}.o"
+    sources=$(awk '
+        /^IMEX_SfloW2D_SOURCES =/ { found=1; next }
+        found && /^[[:space:]]*$/ { exit }
+        found { gsub(/\\/, ""); if ($1 != "IMEX_SfloW2D.f90") print $1 }
+    ' "$repo_dir/src/Makefile.am")
+    netcdf_fflags=$(nf-config --fflags)
+    netcdf_flibs=$(nf-config --flibs)
+    netcdf_clibs=$(nc-config --libs)
+    for source in $sources; do
+        object=${source##*/}
+        case "$source" in
+            *.c) ${CC:-cc} -c "$repo_dir/src/$source" -o "${object%.c}.o" ;;
+            *.f90) "$compiler" $flags $common -I"$repo_dir/src/state" \
+                $netcdf_fflags -c "$repo_dir/src/$source" ;;
+        esac
+        objects="$objects ${object%.*}.o"
     done
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_model_names.f90"
     model_objects='parameters_2d.o diagnostics_2d.o constitutive_parameters_2d.o geometry_2d.o state_conversion_2d.o rheology_parameters_2d.o rheology_analytic_utils_2d.o rheology_voellmy_2d.o rheology_plastic_2d.o rheology_froude_2d.o rheology_lucas_2d.o rheology_lava_2d.o rheology_lahar_2d.o rheology_empirical_2d.o rheology_quadratic_2d.o rheology_mui_2d.o rheology_mui_voellmy_2d.o rheology_2d.o'
-    "$compiler" $common $model_objects test_model_names.o -llapack -o test_model_names
+    "$compiler" $common $model_objects test_model_names.o -llapack $netcdf_flibs $netcdf_clibs -o test_model_names
     ./test_model_names
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_source_modules.f90"
-    "$compiler" $common $objects test_source_modules.o -llapack \
+    "$compiler" $common $objects test_source_modules.o -llapack $netcdf_flibs $netcdf_clibs \
         -o test_source_modules
     ./test_source_modules
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_analytic_velocity.f90"
-    "$compiler" $common $objects test_analytic_velocity.o -llapack \
+    "$compiler" $common $objects test_analytic_velocity.o -llapack $netcdf_flibs $netcdf_clibs \
         -o test_analytic_velocity
     ./test_analytic_velocity
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_lava_cooling.f90"
@@ -58,23 +54,23 @@ for profile in strict optimized; do
     ./test_lava_cooling
     "$compiler" -O0 -g -fcheck=all $common -c \
         "$test_dir/test_pore_pressure_diffusion.f90"
-    "$compiler" $common $objects test_pore_pressure_diffusion.o -llapack \
+    "$compiler" $common $objects test_pore_pressure_diffusion.o -llapack $netcdf_flibs $netcdf_clibs \
         -o test_pore_pressure_diffusion
     ./test_pore_pressure_diffusion
     "$compiler" -O0 -g -fcheck=all $common -I"$repo_dir/src/state" -c \
         "$test_dir/test_grouped_implicit_stage.f90"
-    "$compiler" $common $objects test_grouped_implicit_stage.o -llapack \
+    "$compiler" $common $objects test_grouped_implicit_stage.o -llapack $netcdf_flibs $netcdf_clibs \
         -o test_grouped_implicit_stage
     ./test_grouped_implicit_stage
     # IEEE checks and the test-side FD subtraction stay strict in both profiles.
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/probe_sources.f90"
-    "$compiler" $common $objects probe_sources.o -llapack -o probe_sources
+    "$compiler" $common $objects probe_sources.o -llapack $netcdf_flibs $netcdf_clibs -o probe_sources
     if [ "$profile" = optimized ]; then
         # Distinguish an exception exposed by traps from an ordinary optimized
         # run. Production module objects are identical in both executables.
         "$compiler" -O0 -g -fcheck=all -fopenmp -ffree-line-length-none \
             -c "$test_dir/probe_sources.f90" -o probe_untrapped.o
-        "$compiler" -fopenmp $objects probe_untrapped.o -llapack -o probe_untrapped
+        "$compiler" -fopenmp $objects probe_untrapped.o -llapack $netcdf_flibs $netcdf_clibs -o probe_untrapped
     fi
     PYTHONDONTWRITEBYTECODE=1 "$python" "$test_dir/characterize.py" \
         "$work_dir/$profile/probe_sources" "$work_dir/$profile" "$profile" || failed=1

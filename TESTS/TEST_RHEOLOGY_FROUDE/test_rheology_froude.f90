@@ -5,7 +5,7 @@ PROGRAM test_rheology_froude
   USE constitutive_parameters_2d
   USE rheology_parameters_2d, ONLY : mu_0, mu_inf, Fr_0
   USE state_conversion_2d, ONLY : mixt_var, qp_to_qc
-  USE equation_terms_2d, ONLY : eval_semi_implicit_terms, eval_implicit_terms
+  USE source_terms_2d, ONLY : eval_source_semi_implicit, eval_source_implicit
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
   IMPLICIT NONE
@@ -70,7 +70,7 @@ PROGRAM test_rheology_froude
           * (mu_inf + (mu_0 - mu_inf)*EXP(-Fr/Fr_0))
      expected = 0.0_wp
      expected(2:3) = -friction*[3.0_wp, -4.0_wp]/5.0_wp
-     CALL eval_semi_implicit_terms(slope_x, slope_y, 0.0_wp, 0.0_wp,    &
+     CALL eval_source_semi_implicit(slope_x, slope_y, 0.0_wp, 0.0_wp,    &
           0.0_wp, G, qp, source, z)
      CALL assert_finite(source)
      IF (MAXVAL(ABS(source-expected)) >                             &
@@ -154,7 +154,7 @@ CONTAINS
   SUBROUTINE assert_zero_source(label, bx, by)
     CHARACTER(LEN=*), INTENT(IN) :: label
     REAL(wp), INTENT(IN) :: bx, by
-    CALL eval_semi_implicit_terms(bx, by, 0.0_wp, 0.0_wp, 0.0_wp,      &
+    CALL eval_source_semi_implicit(bx, by, 0.0_wp, 0.0_wp, 0.0_wp,      &
          1.0_wp, qp, source, 0.2_wp)
     CALL assert_finite(source)
     IF (ANY(source /= 0.0_wp)) THEN
@@ -165,13 +165,13 @@ CONTAINS
     ! Model 9 is purely semi-implicit: the REAL and COMPLEX implicit paths
     ! must remain finite and zero, including a complex-step velocity probe.
     CALL qp_to_qc(qp, q)
-    CALL eval_implicit_terms(bx, by, 0.2_wp, r_qj=q,               &
+    CALL eval_source_implicit(bx, by, 0.2_wp, r_qj=q,               &
          r_nh_term_impl=implicit_source)
     CALL assert_finite(implicit_source)
     IF (ANY(implicit_source /= 0.0_wp)) ERROR STOP 'real implicit model 9 source'
     complex_q = CMPLX(q, 0.0_wp, wp)
     complex_q(2) = complex_q(2) + CMPLX(0.0_wp, 1.0E-20_wp, wp)
-    CALL eval_implicit_terms(bx, by, 0.2_wp, c_qj=complex_q,       &
+    CALL eval_source_implicit(bx, by, 0.2_wp, c_qj=complex_q,       &
          c_nh_term_impl=complex_source)
     CALL assert_finite(REAL(complex_source,wp))
     CALL assert_finite(AIMAG(complex_source))
