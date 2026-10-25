@@ -79,7 +79,7 @@ PROGRAM test_analytic_velocity
   tau = 1.0_wp
   CALL solve_rheology_plastic_analytic(integration_step, flow_depth,       &
        speed_ratio, velocity_before, velocity_after)
-  CALL assert_dispatch_matches('plastic', .FALSE., 0.0_wp,       &
+  CALL assert_dispatch_matches('rheology_plastic', .FALSE., 0.0_wp,       &
        .FALSE., 0.0_wp, velocity_after, 'plastic dispatch')
   expected_speed = MAX(0.0_wp, SQRT(SUM(velocity_before**2)) -              &
        integration_step*tau/(flow_depth*speed_ratio))
@@ -100,7 +100,7 @@ PROGRAM test_analytic_velocity
   T_ref = 300.0_wp
   CALL solve_rheology_lava_analytic(integration_step, flow_depth,           &
        temperature, mixture_density, speed_ratio, velocity_before, velocity_after)
-  CALL assert_dispatch_matches('lava', .FALSE., 0.0_wp,           &
+  CALL assert_dispatch_matches('rheology_lava', .FALSE., 0.0_wp,           &
        .FALSE., 0.0_wp, velocity_after, 'lava dispatch')
   linear_drag = 3.0_wp*nu_ref/flow_depth**2 *                               &
        EXP(-visc_par*(temperature-T_ref))
@@ -132,7 +132,7 @@ PROGRAM test_analytic_velocity
   CALL solve_rheology_lahar_analytic(integration_step, flow_depth,          &
        temperature, SUM(solid_fraction), mixture_density, speed_ratio,       &
        velocity_before, velocity_after)
-  CALL assert_dispatch_matches('lahar', .FALSE., 0.0_wp,          &
+  CALL assert_dispatch_matches('rheology_lahar', .FALSE., 0.0_wp,          &
        .FALSE., 0.0_wp, velocity_after, 'lahar dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
@@ -153,7 +153,7 @@ PROGRAM test_analytic_velocity
 
   CALL solve_rheology_empirical_analytic(integration_step, flow_depth,      &
        speed_ratio, velocity_before, velocity_after)
-  CALL assert_dispatch_matches('empirical', .FALSE., 0.0_wp,      &
+  CALL assert_dispatch_matches('rheology_empirical', .FALSE., 0.0_wp,      &
        .FALSE., 0.0_wp, velocity_after, 'empirical dispatch')
   linear_drag = 1.0E-3_wp*speed_ratio/                                     &
        (flow_depth*(1.0_wp+10.0_wp*flow_depth))
@@ -175,7 +175,7 @@ PROGRAM test_analytic_velocity
   friction_factor = 0.1_wp
   CALL solve_rheology_quadratic_analytic(integration_step, flow_depth,      &
        speed_ratio, velocity_before, velocity_after)
-  CALL assert_dispatch_matches('quadratic', .FALSE., 0.0_wp,      &
+  CALL assert_dispatch_matches('rheology_quadratic', .FALSE., 0.0_wp,      &
        .FALSE., 0.0_wp, velocity_after, 'quadratic dispatch')
   linear_drag = friction_factor*speed_ratio**2/flow_depth
   expected_speed = SQRT(SUM(velocity_before**2))/                           &
@@ -199,7 +199,7 @@ PROGRAM test_analytic_velocity
        speed_ratio, velocity_before, mixture_density, reduced_gravity,        &
        gravity_coefficient, 0.0_wp, .FALSE., 0.0_wp, .FALSE., 0.0_wp,        &
        velocity_after)
-  CALL assert_dispatch_matches('voellmy', .FALSE., 0.0_wp,        &
+  CALL assert_dispatch_matches('rheology_voellmy', .FALSE., 0.0_wp,        &
        .FALSE., 0.0_wp, velocity_after, 'Voellmy dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
@@ -231,7 +231,7 @@ PROGRAM test_analytic_velocity
   CALL solve_rheology_froude_analytic(integration_step, flow_depth,        &
        speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,   &
        0.0_wp, .FALSE., stochastic_value, velocity_after)
-  CALL assert_dispatch_matches('froude', .FALSE., 0.0_wp,          &
+  CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,          &
        .FALSE., stochastic_value, velocity_after, 'Froude dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
@@ -246,7 +246,7 @@ PROGRAM test_analytic_velocity
   CALL solve_rheology_froude_analytic(integration_step, flow_depth,        &
        speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,   &
        0.0_wp, .TRUE., stochastic_value, velocity_after)
-  CALL assert_dispatch_matches('froude', .FALSE., 0.0_wp,         &
+  CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,         &
        .TRUE., stochastic_value, velocity_after, 'Froude stochastic dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
@@ -263,7 +263,7 @@ PROGRAM test_analytic_velocity
   CALL solve_rheology_froude_analytic(integration_step, flow_depth,        &
        speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,   &
        0.0_wp, .FALSE., stochastic_value, velocity_after)
-  CALL assert_dispatch_matches('froude', .FALSE., 0.0_wp,         &
+  CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,         &
        .FALSE., stochastic_value, velocity_after, 'Froude zero-drag dispatch')
   CALL assert_close(velocity_after(1), velocity_before(1), 'Froude zero-drag x')
   CALL assert_close(velocity_after(2), velocity_before(2), 'Froude zero-drag y')
@@ -274,7 +274,7 @@ PROGRAM test_analytic_velocity
   CALL solve_rheology_lucas_analytic(integration_step, flow_depth,          &
        speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,    &
        0.0_wp, .FALSE., stochastic_value, velocity_after)
-  CALL assert_dispatch_matches('lucas', .FALSE., 0.0_wp,          &
+  CALL assert_dispatch_matches('rheology_lucas', .FALSE., 0.0_wp,          &
        .FALSE., stochastic_value, velocity_after, 'Lucas dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
@@ -289,7 +289,7 @@ PROGRAM test_analytic_velocity
   CALL solve_rheology_lucas_analytic(integration_step, flow_depth,          &
        speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,    &
        0.0_wp, .TRUE., stochastic_value, velocity_after)
-  CALL assert_dispatch_matches('lucas', .FALSE., 0.0_wp,          &
+  CALL assert_dispatch_matches('rheology_lucas', .FALSE., 0.0_wp,          &
        .TRUE., stochastic_value, velocity_after, 'Lucas stochastic dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
@@ -309,7 +309,7 @@ PROGRAM test_analytic_velocity
        speed_ratio, velocity_before, mixture_density, reduced_gravity,        &
        gravity_coefficient, solid_fraction, 0.0_wp, .FALSE., 0.0_wp,         &
        velocity_after)
-  CALL assert_dispatch_matches('mui', .FALSE., 0.0_wp,             &
+  CALL assert_dispatch_matches('rheology_mui', .FALSE., 0.0_wp,             &
        .FALSE., 0.0_wp, velocity_after, 'mu(I) dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   CALL eval_rheology_mui_semi_implicit(flow_depth, velocity_after(1), velocity_after(2), &
@@ -322,7 +322,7 @@ PROGRAM test_analytic_velocity
        speed_ratio, velocity_before, mixture_density, reduced_gravity,        &
        gravity_coefficient, solid_fraction, 0.0_wp, .TRUE., 1000.0_wp,       &
        velocity_after)
-  CALL assert_dispatch_matches('mui', .TRUE., 1000.0_wp,           &
+  CALL assert_dispatch_matches('rheology_mui', .TRUE., 1000.0_wp,           &
        .FALSE., 0.0_wp, velocity_after, 'mu(I) pore-pressure dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   CALL eval_rheology_mui_semi_implicit(flow_depth, velocity_after(1), velocity_after(2), &
@@ -335,7 +335,7 @@ PROGRAM test_analytic_velocity
        speed_ratio, velocity_before, mixture_density, reduced_gravity,       &
        gravity_coefficient, solid_fraction, 0.0_wp, .FALSE., 0.0_wp,         &
        .FALSE., 0.0_wp, velocity_after)
-  CALL assert_dispatch_matches('mui_voellmy', .FALSE., 0.0_wp,     &
+  CALL assert_dispatch_matches('rheology_mui_voellmy', .FALSE., 0.0_wp,     &
        .FALSE., 0.0_wp, velocity_after, 'mu(I)-Voellmy dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
@@ -367,7 +367,7 @@ PROGRAM test_analytic_velocity
        CMPLX(mixture_density,0.0_wp,wp), CMPLX(reduced_gravity,0.0_wp,wp),  &
        CMPLX(speed_after,0.0_wp,wp), CMPLX(speed_after**2,0.0_wp,wp),       &
        .TRUE., .TRUE., 100.0_wp, complex_source_x, complex_source_y)
-  CALL assert_dispatch_matches('mui_voellmy', .TRUE., 500.0_wp,   &
+  CALL assert_dispatch_matches('rheology_mui_voellmy', .TRUE., 500.0_wp,   &
        .TRUE., 100.0_wp, velocity_after,                                   &
        'mu(I)-Voellmy stochastic pore-pressure dispatch')
   source = [source_x+REAL(complex_source_x,wp),                              &

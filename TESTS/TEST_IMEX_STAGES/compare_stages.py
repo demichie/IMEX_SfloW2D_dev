@@ -692,24 +692,22 @@ def stage_count_suite(executable, profile):
  source_group_cadence(1)='STAGE',
  source_group_method(1)='NEWTON',
  source_group_term_count(1)=0,
- source_group_solver_count(1)=1,
- source_solver_order(1,1)=1,
- source_solver_target_count(1,1)=1,
- source_solver_targets(1,1,1)='VELOCITY',
+ source_group_target_count(1)=1,
+ source_group_targets(1,1)='VELOCITY',
  source_group_id(2)=1,
  source_group_order(2)=1,
  source_group_cadence(2)='STEP',
  source_group_method(2)='EXPLICIT',
  source_group_term_count(2)=1,
- source_group_terms(1,2)='SOURCE_TERM_MASS_EXCHANGE_CARRIER_LIQUID_LOSS',
- source_group_solver_count(2)=0
+ source_group_terms(1,2)='mass_exchange_carrier_liquid_loss',
+ source_group_target_count(2)=0,
  source_group_id(3)=2,
  source_group_order(3)=2,
  source_group_cadence(3)='STAGE',
  source_group_method(3)='EXPLICIT',
  source_group_term_count(3)=1,
- source_group_terms(1,3)='SOURCE_TERM_BOTTOM_CIRCULAR_INJECTION',
- source_group_solver_count(3)=0
+ source_group_terms(1,3)='bottom_circular_injection',
+ source_group_target_count(3)=0
 /
 """)
     env = {**os.environ, "OMP_NUM_THREADS": "1", "OMP_DYNAMIC": "FALSE"}
