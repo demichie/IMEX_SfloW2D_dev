@@ -213,11 +213,11 @@ PROGRAM probe_sources
      CALL initialize_nonlinear_solver
      active_names=[CHARACTER(LEN=64)::]
      IF (rheology_flag) active_names=[CHARACTER(LEN=64)::'rheology_'//TRIM(rheology_model)]
-     IF (partition%implicit(4)) active_names=[active_names,CHARACTER(LEN=64)::'thermal_cooling']
+     IF (partition%implicit(4)) active_names=[CHARACTER(LEN=64) :: active_names, 'thermal_cooling']
      pore_equation=0
      IF (pore_pressure_flag) THEN
         pore_equation=idx_pore
-        active_names=[active_names,CHARACTER(LEN=64)::'pore_pressure_dissipation']
+        active_names=[CHARACTER(LEN=64) :: active_names, 'pore_pressure_dissipation']
      END IF
      CALL source_registry%initialize_legacy(partition,[1,1,1], &
           [IM_GROUP_METHOD_NEWTON,IM_GROUP_METHOD_NEWTON,IM_GROUP_METHOD_NEWTON], &

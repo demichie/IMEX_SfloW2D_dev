@@ -579,12 +579,12 @@ CONTAINS
     IF (partition%implicit(4)) target_groups(2)=partition%IM_group(4)
     active_names=[CHARACTER(LEN=64)::]
     IF (rheology_flag) active_names=[CHARACTER(LEN=64)::'rheology_'//TRIM(rheology_model)]
-    IF (partition%implicit(4)) active_names=[active_names,CHARACTER(LEN=64)::'thermal_cooling']
+    IF (partition%implicit(4)) active_names=[CHARACTER(LEN=64) :: active_names, 'thermal_cooling']
     pore_equation=0
     IF (pore_pressure_flag) THEN
        pore_equation=idx_pore
        target_groups(3)=partition%IM_group(idx_pore)
-       active_names=[active_names,CHARACTER(LEN=64)::'pore_pressure_dissipation']
+       active_names=[CHARACTER(LEN=64) :: active_names, 'pore_pressure_dissipation']
     END IF
     CALL source_registry%initialize_legacy(partition,target_groups,methods, &
          pore_equation,active_names,error)
