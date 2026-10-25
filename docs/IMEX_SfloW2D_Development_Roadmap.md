@@ -2283,6 +2283,162 @@ L'architettura D17 è implementata; la compatibilità dell'intero ecosistema di 
 
 **Dipendenza successiva:** D15 valuta la nuova architettura nel suo insieme; D03/D07 ed E01–E03 hanno scopi diversi (ownership globale e readiness) e non riaprono la struttura delle sorgenti se le API D17 restano valide.
 
+### D18 — Configurazione per sorgente di metodo, cadenza e gruppo; metodi impliciti e analitici a STEP
+
+**Stato: DA FARE.** Questa è una nuova fase normativa, successiva a D17 e da includere nel gate scientifico D15. Il testo descrive capacità **da implementare**, non funzionalità già disponibili. D18 interviene sulla configurazione, sui gruppi e sull'integrazione temporale delle sorgenti fisiche esistenti; non modifica formule costitutive né tableaux RK approvati.
+
+#### D18.0 — Idea, obiettivo e motivazione
+
+La configurazione deve partire dalla **sorgente fisica**, non da una definizione separata di gruppi. Chi usa il modello seleziona la reologia, il raffreddamento, la dissipazione della pressione interstiziale, le iniezioni o gli scambi di massa nelle **namelist fisiche che già ne contengono i parametri**. Per ogni sorgente fisica attiva, in quella stessa namelist, deve poter specificare direttamente tre proprietà opzionali:
+
+1. **METHOD**: come risolvere la sorgente: EXPLICIT, NEWTON oppure ANALYTIC. La componente SEMI_IMPLICIT delle quattro interfacce fisiche è attualmente parte del trattamento NEWTON e non deve essere presentata come un quarto metodo di scheduling indipendente finché non venga definito e implementato un integratore autonomo.
+2. **CADENCE**: STAGE per partecipare a ciascuno stadio RK secondo il tableau IMEX, oppure STEP per un'integrazione **una sola volta dopo il completamento degli stadi RK**, sull'intero intervallo temporale del passo.
+3. **GROUP**: intero positivo che stabilisce **sia l'accoppiamento delle sorgenti sia l'ordine di esecuzione del gruppo**. A parità di cadenza, i gruppi sono eseguiti in ordine crescente di GROUP.
+
+**Non sono richiesti PHASE, execution_order o una seconda dichiarazione esplicita dei gruppi.** PHASE è ridondante ed è già stato rimosso dal registro nella revisione precedente; execution_order va eliminato come dato indipendente perché GROUP ne determina l'ordine. Il gruppo è ricostruito automaticamente dalle proprietà delle singole sorgenti. Questo è il modello canonico di D18; eventuali input storici SOURCE_GROUPS o IMEX_* hanno soltanto un percorso di migrazione chiaramente delimitato.
+
+**Invariante globale:** ogni processo fisico attivo compare **una sola volta in tutto lo schema temporale**. La stessa sorgente non può essere sia STAGE sia STEP, né appartenere a più gruppi. Le interfacce explicit, semi_implicit, implicit e analytic di una legge rappresentano metodi alternativi per **una stessa identità fisica**, non sorgenti diverse. Non è dunque lecito raffreddare la lava sia negli stage sia a fine passo.
+
+Lo scopo è permettere accoppiamenti Newton quando necessari, metodi analitici locali quando disponibili, splitting espliciti e combinazioni personalizzate, senza duplicare sorgenti, senza dispatcher specifici per le singole reologie e senza configurazioni ridondanti.
+
+#### D18.1 — Caso scientifico guida: lava con reologia NEWTON/STAGE e cooling ANALYTIC/STEP
+
+La configurazione richiesta deve permettere:
+
+- rheology_lava: METHOD=NEWTON, CADENCE=STAGE, GROUP=1;
+- thermal_cooling: METHOD=ANALYTIC, CADENCE=STEP, GROUP=1.
+
+Il numero GROUP=1 può essere riutilizzato nelle due cadenze: **(STAGE,1) e (STEP,1) identificano due gruppi distinti**. La reologia viene risolta implicitamente ad ogni stage IMEX; il raffreddamento viene applicato analiticamente **una sola volta** allo stato assemblato alla fine del passo, per il valore completo di dt. Il cooling non deve comparire contemporaneamente nei rate di stage.
+
+Esempio della **futura sintassi**, inserita nelle namelist già esistenti; i nuovi nomi dei parametri sono proposti e **non ancora riconosciuti dal codice**:
+
+~~~fortran
+&RHEOLOGY_PARAMETERS
+  RHEOLOGY_MODEL = 'lava',
+  RHEOLOGY_METHOD = 'NEWTON',
+  RHEOLOGY_CADENCE = 'STAGE',
+  RHEOLOGY_GROUP = 1,
+  ! ulteriori parametri fisici della legge ...
+/
+
+&TEMPERATURE_PARAMETERS
+  THERMAL_COOLING_FLAG = T,
+  THERMAL_METHOD = 'ANALYTIC',
+  THERMAL_CADENCE = 'STEP',
+  THERMAL_GROUP = 1,
+  ! ulteriori parametri termici ...
+/
+
+&PORE_PRESSURE_PARAMETERS
+  PORE_PRESSURE_METHOD = 'ANALYTIC',
+  PORE_PRESSURE_CADENCE = 'STAGE',
+  PORE_PRESSURE_GROUP = 2,
+  ! ulteriori parametri fisici ...
+/
+~~~
+
+L'ultimo esempio vale soltanto quando la relativa fisica è effettivamente abilitata. I nomi dei parametri nelle altre famiglie saranno definiti dopo l'audit delle namelist. In Fortran i nomi delle variabili di un modulo non sono isolati dal nome della namelist: occorrono prefissi univoci per processo, e più processi della medesima famiglia fisica possono richiedere più triplette nello stesso blocco di input.
+
+**Nota scientifica vincolante:** un solve analitico esatto del solo raffreddamento non rende esatto l'accoppiamento temperatura–viscosità sull'intero timestep. Lo splitting fa sì che il contributo del raffreddamento applicato a fine passo influenzi gli stage del passo successivo; accuratezza, ordine globale, dissipazione e stabilità devono essere verificati. D18 non assume equivalenza numerica fra ANALYTIC/STAGE, NEWTON/STAGE e ANALYTIC/STEP.
+
+#### D18.2 — Definizione dei gruppi derivati e vincoli di coerenza
+
+Sia S_active l'insieme delle sorgenti fisiche abilitate. Ciascuna sorgente s possiede esattamente una tripla efficace (M_s,C_s,G_s), ottenuta combinando i parametri facoltativi con i default compatibili. Un gruppo è l'insieme delle sorgenti con uguale coppia **(CADENCE,GROUP)**. Il metodo è una proprietà derivata: tutte le sorgenti del gruppo devono avere lo stesso METHOD.
+
+Formalmente, per ogni coppia di sorgenti attive i,j:
+
+\[
+(C_i=C_j \land G_i=G_j) \ \Rightarrow \ M_i=M_j .
+\]
+
+La condizione è necessaria ma **non sufficiente**: un gruppo deve anche essere risolvibile fisicamente e numericamente. Validare all'inizializzazione tutti i seguenti invarianti:
+
+1. Ogni sorgente fisica attiva ha un'unica identità canonica e una sola tripla; sorgenti inattive e sotto-componenti derivate non possono essere schedulate.
+2. Una stessa sorgente non può essere ripetuta in più gruppi, **nemmeno fra STAGE e STEP**. Duplicati e assenze sono errori di configurazione prima della simulazione.
+3. Gruppi con identica coppia (CADENCE,GROUP) richiedono METHOD identico per tutti i componenti. La medesima cifra GROUP è indipendente fra cadenze differenti.
+4. Tutte le sorgenti devono supportare realmente il metodo: NEWTON richiede il contributo SI/IM valido, ANALYTIC richiede la mappa analitica valida; uno stub di rifiuto non costituisce una capability.
+5. Un gruppo NEWTON con più termini risolve **un solo sistema accoppiato** su tutte le equazioni target, con residuo e Jacobiana congiunti, non vari sottosolver indipendenti.
+6. Un gruppo ANALYTIC con più leggi è ammesso soltanto se esiste **un operatore analitico congiunto**; la solvibilità analitica dei singoli addendi non basta.
+7. La deposizione comprende la perdita della fase vettore da essa indotta; il batch di mass exchange con limiter condiviso, inventari e topografia non può essere spezzato in gruppi autonomi non equivalenti.
+8. L'ordine crescente di GROUP opera all'interno della stessa cadenza, ma non può scavalcare dipendenze obbligatorie del tableau IMEX o introdurre valutazioni esplicite in punti numericamente errati: dichiarare e validare queste restrizioni senza reintrodurre PHASE.
+
+I gruppi devono avere identificativi positivi e un'unione coerente dei target conservativi. Il registro normalizzato è costruito **una sola volta**; nel calcolo per cella non si devono confrontare stringhe, ricostruire liste o schedulare duplicati. Le diagnostiche di errore devono indicare sorgente, namelist, METHOD richiesto e coppia (CADENCE,GROUP) coinvolta.
+
+#### D18.3 — Default opzionali, input legacy e migrazione
+
+I tre attributi sono **facoltativi**. Gli input già validi, senza alcun campo nuovo, devono continuare a riprodurre **la stessa fisica, gli stessi accoppiamenti Newton, le stesse cadenze, lo stesso ordine e gli stessi risultati numerici della baseline approvata**, entro le tolleranze esistenti.
+
+Non basta assegnare indiscriminatamente GROUP=1 o un gruppo separato a ogni sorgente: i vecchi input ammettono gruppi impliciti accoppiati, gruppi analitici separati e un batch STEP indivisibile. La matrice dei default deve essere derivata dall'inventario di tutte le sorgenti canoniche e dalle configurazioni IMEX storiche, non limitata ai tre casi reologia/termica/pore pressure.
+
+Matrice di riferimento da precisare tramite audit esaustivo:
+
+| Sorgente o famiglia | CADENCE legacy | METHOD legacy | Regola per GROUP omesso |
+|---|---|---|---|
+| Reologia attiva | STAGE | NEWTON oppure ANALYTIC, secondo configurazione IMEX | Ricostruire il blocco legacy, anche accoppiato |
+| thermal_cooling attivo | STAGE | NEWTON oppure ANALYTIC, secondo configurazione IMEX | Preservare gruppo e precedenze legacy |
+| pore_pressure_dissipation attiva | STAGE | NEWTON oppure ANALYTIC | Preservare gruppo e precedenze legacy |
+| Iniezioni e curvatura esplicite | STAGE | EXPLICIT | Preservare trattamento esplicito del tableau |
+| Mass exchange, inclusi i componenti del batch | STEP | EXPLICIT | Un unico batch coordinato e coerente |
+
+Per specifiche **parziali** (solo METHOD, solo CADENCE, solo GROUP, oppure due campi), definire una risoluzione esplicita campo-per-campo e validare il gruppo risultante. Se i valori dichiarati confliggono con un accoppiamento legacy implicito non si deve cambiare silenciosamente l'accoppiamento: generare errore oppure applicare una regola di disaccoppiamento esplicitamente documentata e testata, da decidere prima dell'implementazione.
+
+Le namelist realmente presenti includono RHEOLOGY_PARAMETERS, TEMPERATURE_PARAMETERS e PORE_PRESSURE_PARAMETERS; per iniezioni, curvatura e componenti di mass exchange va mappata ciascuna legge alla **namelist fisica esistente pertinente**, senza inventare un secondo elenco globale di sorgenti. Se una namelist governa più processi indipendenti, utilizzare nomi con prefisso per **processo canonico**.
+
+La vecchia SOURCE_GROUPS, il relativo SOURCE_GROUP_ORDER e le opzioni legacy IMEX_* richiedono una migrazione pianificata: audit degli input presenti, parser di compatibilità di sola lettura ove necessario, diagnosi delle configurazioni miste ambigue, conversione di esempi/template/generatori e successiva rimozione degli adattatori obsoleti. **Non mantenere permanentemente due modelli di configurazione equivalenti né due fonti dell'ordine.** Anche i restart devono validare che schema di gruppi e metodi resti coerente.
+
+#### D18.4 — Semantica dei metodi STAGE e STEP: requisiti imprescindibili
+
+STAGE è parte del metodo IMEX Runge–Kutta: le sorgenti esplicite partecipano ai coefficienti EX del tableau; NEWTON e ANALYTIC seguono il trattamento implicito/analitico prescritto per gli stage. Non cambiare tableau, numero di stadi, incremento IM effettivo, correzioni post-SI/post-Newton o ordine matematico.
+
+**STEP significa una sola applicazione post-RK sul passo completo dt**: prima si assembla lo stato conservativo dopo tutti gli stage, poi si eseguono i gruppi STEP in ordine GROUP, aggiornando stato conservativo e primitivo in modo coerente. La collocazione post-RK è una conseguenza di CADENCE=STEP, non un attributo PHASE separato.
+
+Le capacità **NEWTON/STEP e ANALYTIC/STEP sono requisiti obbligatori della fase D18** per tutte le leggi per cui il rispettivo operatore è fisicamente e numericamente valido; non basta sbloccare il validatore degli input:
+
+- **EXPLICIT/STEP:** mantenere le transazioni conservative e gli eventuali limiter dipendenti dal timestep. Il mass exchange e il refresh topografico restano indivisibili e nello stesso ordine relativo del default.
+- **NEWTON/STEP:** implementare un reale solve implicito sull'intero dt, con residuo e Jacobiana **del gruppo completo**, gestione SI pertinente, controlli di convergenza, fallimento e ammissibilità. Definire la discretizzazione temporale di STEP (per esempio backward Euler) senza riutilizzare coefficienti RK di stage come se fossero validi per il passo completo. Lo schema scelto va documentato, verificato e incluso nel confronto scientifico.
+- **ANALYTIC/STEP:** implementare la mappa di flusso analitica del gruppo su dt, **una sola volta**, con coefficienti congelati e target aggiornati secondo la legge. Per la lava riusare la routine di raffreddamento esatto già presente, attraverso il dispatcher fisico comune e non tramite chiamate specifiche nell'integratore. Estendere il percorso alla dissipazione della pressione interstiziale e ad altre leggi analiticamente risolvibili, ove compatibili.
+
+La presenza dell'interfaccia analitica di una legge non garantisce da sola che possa essere composta analiticamente con altre leggi. Tutti i gruppi STEP devono specificare lo stato iniziale (post-RK o aggiornato dal gruppo STEP precedente), l'intervallo dt, i coefficienti congelati, il trattamento dry/wet, l'aggiornamento dei target e la propagazione degli errori. Due gruppi STEP che toccano lo stesso target sono ordinati e in generale **non commutano**; l'ordine GROUP è quindi scientificamente significativo.
+
+D18 non introduce automaticamente subcycling, rejection/rollback né nuove politiche CFL: l'interfaccia con il futuro controllo di robustezza appartiene alla fase E. La composizione di stage e step è uno splitting da validare rispetto all'accuratezza temporale, non una riformulazione matematicamente equivalente per definizione.
+
+#### D18.5 — Piano di implementazione coordinato
+
+1. **Inventario e matrice dei default.** Identificare ogni processo fisico canonico, attivazione, namelist esistente, target e dipendenze conservative; registrare default effettivi legacy per METHOD/CADENCE/GROUP, accoppiamenti, batch, gruppi vuoti ed eccezioni. Registrare le configurazioni già presenti in test, esempi e generatori.
+2. **Parametri opzionali nelle namelist fisiche.** Estendere la lettura in inpout_2d e nei moduli input pertinenti, usando nomi univoci prefissati per processo; inizializzare default prima del parsing. Controllare valori consentiti, interi positivi, input parziali, flag disabilitati e presenza di vecchie opzioni IMEX/SOURCE_GROUPS.
+3. **Normalizzazione e registry.** In source_configuration_2d costruire una tripla efficace per ogni sorgente attiva; in source_registry_2d raggruppare per (CADENCE,GROUP), verificare METHOD identico, identità globalmente unica, target e capability, ordinare tramite GROUP. Eliminare execution_order come campo indipendente, SOURCE_GROUP_ORDER come impostazione canonica e ogni riferimento residuale a PHASE nel contratto corrente.
+4. **Validazione numerica dei gruppi.** Preservare il solve NEWTON congiunto e il sistema REAL/COMPLEX/complex-step per l'unione dei target; non suddividere il gruppo in sottosolver. Vietare gruppi ANALYTIC senza mappa congiunta e metodi non realmente supportati. Proteggere il batch mass exchange e il relativo aggiornamento del letto.
+5. **Percorso STAGE senza regressioni.** Adeguare lo scheduler e i solver a consumare gruppi normalizzati senza alterare i tableaux RK, la semantica delle sorgenti esplicite, le correzioni numeriche o i passaggi SI/IM. Separare regole del tableau da sequenze di gruppi controllate dall'utente.
+6. **Esecutore STEP multimodale.** Estendere step_source_executor_2d oltre l'attuale percorso esplicito: dispatch per EXPLICIT/NEWTON/ANALYTIC e per GROUP; integrazione implicita completa su dt e mappa analitica su dt, aggiornamento coerente di Q e QP, gestione degli stati secco/quasi secco e propagazione errori. Riusare i kernel fisici e il motore Newton, evitando formule duplicate.
+7. **Integrazione con runtime e output.** Collegare la nuova esecuzione STEP fra assemblaggio RK, applicazione delle transazioni finali, controlli di stato, aggiornamento topografico e avanzamento/output/restart; verificare finestre temporali, topografia evolutiva, stato stocastico e impossibilità di doppia applicazione.
+8. **Migrazione documentale e codice morto.** Aggiornare tutorial, input, template, generatori, test, manifest e documentazione del formato effettivo; rimuovere letture/adattatori superati una volta approvato il passaggio. Nessun dispatcher parallelo nascosto per sorgenti legacy.
+
+Ogni passo deve costituire una modifica **sostanziale e coordinata** con i test pertinenti; non disperdere la migrazione in piccole modifiche senza chiusura dell'intero contratto. Non cambiare formule fisiche, tolleranze o oracoli per ottenere PASS.
+
+#### D18.6 — Matrice di regressione e criteri di accettazione
+
+| Caso | Risultato obbligatorio |
+|---|---|
+| lava NEWTON/STAGE GROUP=1; cooling ANALYTIC/STEP GROUP=1 | Due gruppi distinti; Newton agli stage e un solo cooling esatto post-RK |
+| lava e cooling NEWTON/STAGE con stesso GROUP | Un **solo** sistema Newton accoppiato quantità di moto–energia |
+| cooling ANALYTIC/STAGE oppure NEWTON/STAGE | Modalità stage originale preservata |
+| cooling **NEWTON/STEP** | Solve implicito reale sul passo intero e residuo verificato |
+| cooling **ANALYTIC/STEP** | Mappa esatta su dt, aggiornamento conservativo e nessuna chiamata negli stage |
+| pore pressure **ANALYTIC/STEP** | Dissipazione post-RK realmente eseguita, quando attiva |
+| gruppo NEWTON/STEP multi-sorgente valido | Un sistema accoppiato, non solve sequenziali |
+| stessa coppia CADENCE/GROUP ma metodi diversi | Errore preventivo con nomi delle sorgenti |
+| stessa sorgente assegnata a STAGE e STEP | Errore: processo duplicato |
+| stesso GROUP con due cadenze diverse | Valido: namespace distinti |
+| gruppo ANALYTIC senza operatore congiunto | Errore preventivo |
+| mass exchange spezzato violando limiter/bed | Errore preventivo |
+| input legacy senza i nuovi parametri | Accoppiamenti, ordine e soluzioni della baseline riprodotti |
+
+**T1 — Contratto:** test del parser, dei default e dell'unicità globale; rifiuti espliciti, metodi/cadenze incompatibili, indici/target, nomi e gruppi. **T2 — Operatori:** oracoli analitici per cooling e pore pressure; residui Newton STEP; bilanci conservativi, Q/QP, secco/quasi secco, limiter del mass exchange, contatori di quante volte viene eseguita ciascuna sorgente. **T3 — Integrazione:** test IMEX per n_RK=2/3/4 ove supportati, input legacy, lava con viscosità termodipendente, full/split binary restart, output/manifest, casi rappresentativi OpenMP e toolchain GNU/ifx secondo rischio. **T4 — Scientifico:** studio di raffinamento in dt e confronto fra NEWTON/STAGE, ANALYTIC/STAGE, NEWTON/STEP e ANALYTIC/STEP, quantificando accuratezza di splitting, stabilità e costo: nessuna equivalenza globale automatica.
+
+**Gate D18 COMPLETATO solo quando:** tutte le sorgenti fisiche configurabili hanno una tripla opzionale nella namelist fisica pertinente; ogni sorgente viene assegnata una volta sola; ogni gruppo ha METHOD omogeneo e GROUP come unico ordine configurabile; NEWTON/STEP e ANALYTIC/STEP sono **implementati, realmente eseguiti e testati**; il default conserva l'accoppiamento e il comportamento numerico legacy; nessun PHASE/execution_order indipendente sopravvive al contratto finale; mass exchange, topografia, conservazione, input e restart sono coerenti; test mirati e gate scientifici richiesti risultano documentati e superati.
+
+---
+
 ### D15 — Acceptance finale della nuova architettura
 
 **Test proporzionati (nuove modifiche a questo step):** gate scientifico finale sul codice consolidato da D16: matrice reologie e IMEX, conservazione, REAL/COMPLEX, restart, baseline A11 e variazioni numeriche autorizzate; decisione scientifica autonoma. La selezione concreta segue la regola generale; non cambia lo stato o le evidenze storiche.
