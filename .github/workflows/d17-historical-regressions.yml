@@ -2,18 +2,6 @@ name: D17 historical physics regressions
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - feature/d17-source-refactor
-    paths:
-      - 'src/**'
-      - 'TESTS/TEST_IMEX_STAGES/**'
-      - 'TESTS/TEST_SPATIAL_OPERATOR/**'
-      - 'TESTS/TEST_MASS_EXCHANGE/**'
-      - 'TESTS/TEST_CURVATURE_SOURCE/**'
-      - 'TESTS/TEST_RHEOLOGY_FROUDE/**'
-      - 'TESTS/TEST_RHEOLOGY_CELL_LOCAL/**'
-      - '.github/workflows/d17-historical-regressions.yml'
 
 permissions:
   contents: read
