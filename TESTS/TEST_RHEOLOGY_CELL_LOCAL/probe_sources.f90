@@ -52,6 +52,8 @@ PROGRAM probe_sources
   bx=0.0_wp; by=0.0_wp; bxx=0.0_wp; bxy=0.0_wp; byy=0.0_wp; z=0.0_wp
   dt=0.05_wp; diagonal=1.0_wp
   rheology_flag=.TRUE.; rheology_model='quadratic'; gas_flag=.FALSE.
+  ! Preserve the original thermal-source characterization with D17's explicit flag.
+  thermal_cooling_flag=.TRUE.
   pore_pressure_flag=.FALSE.; dynamic_permeability_flag=.FALSE.
   sutherland_flag=.FALSE.; stochastic_flag=.FALSE.
   slope_correction_flag=.FALSE.; curvature_term_flag=.FALSE.

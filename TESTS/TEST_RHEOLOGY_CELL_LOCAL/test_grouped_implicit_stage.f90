@@ -71,6 +71,8 @@ PROGRAM test_grouped_implicit_stage
   idx_stoch = 0
   rheology_flag = .TRUE.
   rheology_model='lava'
+  ! D17 decouples cooling from rheology: enable it in this thermal fixture.
+  thermal_cooling_flag=.TRUE.
   pore_pressure_flag = .TRUE.
   gas_flag = .FALSE.
   liquid_flag = .TRUE.
