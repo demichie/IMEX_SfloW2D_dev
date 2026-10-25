@@ -14,6 +14,8 @@ unique elevation is stored at each face.  Slope correction and curvature are
 auxiliary LS-derived geometry and never redefine the HP face elevations.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 import numpy as np
 

@@ -2,7 +2,7 @@ PROGRAM test_source_modules
 
   USE parameters_2d, ONLY : wp
   USE rheology_lahar_2d, ONLY : alpha1_coeff, beta1, eval_lahar_fluid_viscosity
-  USE rheology_2d, ONLY : correct_friction_momentum
+  USE state_2d, ONLY : correct_friction_momentum
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source,           &
        eval_pore_pressure_mass_exchange_source
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source,                &
