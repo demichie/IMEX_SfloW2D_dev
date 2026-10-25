@@ -765,9 +765,17 @@ CONTAINS
                qp_path_plus,recon%eta_cellE(j,k),                             &
                grav_coeff_stag_x(j+1,k),PATH_DIR_X,this%P_cell_x(:,j,k) )
           ELSE
-             CALL eval_cell_hydrostatic_path( recon%qp_interfaceR(:,j,k),    &
-               recon%eta_cellW(j,k),grav_coeff_stag_x(j,k),                 &
-               recon%qp_interfaceL(:,j+1,k),recon%eta_cellE(j,k),           &
+             ! Hydrostatic depth is always reconstructed from eta, irrespective
+             ! of the selected advective depth or primitive donor family.
+             qp_path_minus=recon%qp_interfaceR(:,j,k)
+             qp_path_plus=recon%qp_interfaceL(:,j+1,k)
+             qp_path_minus(1)=MAX(recon%eta_cellW(j,k)-B_face_x(j,k),0.0_wp)
+             qp_path_plus(1)=MAX(recon%eta_cellE(j,k)-B_face_x(j+1,k),0.0_wp)
+             IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
+             IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
+             CALL eval_cell_hydrostatic_path( qp_path_minus,                  &
+               recon%eta_cellW(j,k),grav_coeff_stag_x(j,k),                  &
+               qp_path_plus,recon%eta_cellE(j,k),                             &
                grav_coeff_stag_x(j+1,k),PATH_DIR_X,this%P_cell_x(:,j,k) )
           END IF
        END IF
@@ -785,9 +793,15 @@ CONTAINS
                qp_path_plus,recon%eta_cellN(j,k),                             &
                grav_coeff_stag_y(j,k+1),PATH_DIR_Y,this%P_cell_y(:,j,k) )
           ELSE
-             CALL eval_cell_hydrostatic_path( recon%qp_interfaceT(:,j,k),    &
-               recon%eta_cellS(j,k),grav_coeff_stag_y(j,k),                 &
-               recon%qp_interfaceB(:,j,k+1),recon%eta_cellN(j,k),           &
+             qp_path_minus=recon%qp_interfaceT(:,j,k)
+             qp_path_plus=recon%qp_interfaceB(:,j,k+1)
+             qp_path_minus(1)=MAX(recon%eta_cellS(j,k)-B_face_y(j,k),0.0_wp)
+             qp_path_plus(1)=MAX(recon%eta_cellN(j,k)-B_face_y(j,k+1),0.0_wp)
+             IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
+             IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
+             CALL eval_cell_hydrostatic_path( qp_path_minus,                  &
+               recon%eta_cellS(j,k),grav_coeff_stag_y(j,k),                  &
+               qp_path_plus,recon%eta_cellN(j,k),                             &
                grav_coeff_stag_y(j,k+1),PATH_DIR_Y,this%P_cell_y(:,j,k) )
           END IF
 
