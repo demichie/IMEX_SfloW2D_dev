@@ -1585,8 +1585,9 @@ CONTAINS
       REAL(wp) :: qp_unit(n_vars+2),q_unit(n_vars),h_trace
       CHARACTER(LEN=96) :: closure_context
 
-      WRITE(closure_context,'(A,A,A,I0,A,I0)')                              &
-           'KT reconstruction ',TRIM(side),' cell=',j_cell,',',k_cell
+      ! Avoid formatted integer I/O on every reconstructed KT face.
+      ! Keep the side-specific context for mass-fraction diagnostics.
+      closure_context = 'KT reconstruction '//TRIM(side)
 
       qp_reconstructed = qp_candidate
       h_trace = MAX(qp_candidate(1),0.0_wp)
