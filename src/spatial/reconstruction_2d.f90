@@ -1013,9 +1013,19 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     REAL(wp) :: slope_eta2_x,slope_eta2_y
     REAL(wp) :: slope_blend_x,slope_blend_y,eta_blend_w,eta_blend_e
     REAL(wp) :: eta_blend_s,eta_blend_n,fr_weight_x,fr_weight_y
-    INTEGER :: l,j,k
+    INTEGER :: l,j,k,kt_mode
 
-
+    ! Decode the configuration once, outside the reconstruction face loop.
+    SELECT CASE (TRIM(kt_trace_reconstruction))
+    CASE ('h_x')
+       kt_mode=1
+    CASE ('minmod')
+       kt_mode=3
+    CASE ('froude_blend')
+       kt_mode=4
+    CASE DEFAULT
+       kt_mode=2
+    END SELECT
 
     IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
        DO k=1,comp_cells_y
@@ -1124,22 +1134,22 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
             this%eta_interfaceR(j,k),B_face_x(j,k), &
             this%h_minmod_interfaceR(j,k),this%h_froude_interfaceR(j,k), &
             lateral_source_flag .AND. j==1 .AND. source_cell(j,k)==2, &
-            this%h_selected_interfaceR(j,k),'KT reconstruction west')
+            this%h_selected_interfaceR(j,k),'KT reconstruction west',kt_mode)
        CALL select_final_transport_trace(this%qp_adv_interfaceL(:,j+1,k), &
             this%eta_interfaceL(j+1,k),B_face_x(j+1,k), &
             this%h_minmod_interfaceL(j+1,k),this%h_froude_interfaceL(j+1,k), &
             lateral_source_flag .AND. j==comp_cells_x .AND. source_cell(j,k)==2, &
-            this%h_selected_interfaceL(j+1,k),'KT reconstruction east')
+            this%h_selected_interfaceL(j+1,k),'KT reconstruction east',kt_mode)
        CALL select_final_transport_trace(this%qp_adv_interfaceT(:,j,k), &
             this%eta_interfaceT(j,k),B_face_y(j,k), &
             this%h_minmod_interfaceT(j,k),this%h_froude_interfaceT(j,k), &
             lateral_source_flag .AND. k==1 .AND. source_cell(j,k)==2, &
-            this%h_selected_interfaceT(j,k),'KT reconstruction south')
+            this%h_selected_interfaceT(j,k),'KT reconstruction south',kt_mode)
        CALL select_final_transport_trace(this%qp_adv_interfaceB(:,j,k+1), &
             this%eta_interfaceB(j,k+1),B_face_y(j,k+1), &
             this%h_minmod_interfaceB(j,k+1),this%h_froude_interfaceB(j,k+1), &
             lateral_source_flag .AND. k==comp_cells_y .AND. source_cell(j,k)==2, &
-            this%h_selected_interfaceB(j,k+1),'KT reconstruction north')
+            this%h_selected_interfaceB(j,k+1),'KT reconstruction north',kt_mode)
     END DO
     !$OMP END PARALLEL DO
 
@@ -1401,20 +1411,21 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
   ! Transport depth and admissible component fractions are finalized together.
   SUBROUTINE select_final_transport_trace(qp,eta,bed,h_minmod,h_froude, &
-       source_trace,h_selected,context)
+       source_trace,h_selected,context,kt_mode)
     USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2)
     REAL(wp), INTENT(IN) :: eta,bed,h_minmod,h_froude
     LOGICAL, INTENT(IN) :: source_trace
     REAL(wp), INTENT(OUT) :: h_selected
     CHARACTER(LEN=*), INTENT(IN) :: context
+    INTEGER, INTENT(IN) :: kt_mode
 
-    SELECT CASE (TRIM(kt_trace_reconstruction))
-    CASE ('h_x')
+    SELECT CASE (kt_mode)
+    CASE (1)
        h_selected=MAX(qp(1),0.0_wp)
-    CASE ('minmod')
+    CASE (3)
        h_selected=MAX(h_minmod,0.0_wp)
-    CASE ('froude_blend')
+    CASE (4)
        h_selected=MAX(h_froude,0.0_wp)
     CASE DEFAULT
        h_selected=MAX(eta-bed,0.0_wp)
