@@ -560,10 +560,7 @@ CONTAINS
     REAL(wp) :: qp_adv_left_use(n_vars+2), qp_adv_right_use(n_vars+2)
     REAL(wp) :: flux_left(n_eqns), flux_right(n_eqns)
     REAL(wp) :: path_contribution(n_eqns), interface_flux(n_eqns)
-    REAL(wp) :: q_diff_left(n_vars), q_diff_right(n_vars)
-    REAL(wp) :: qp_diff_left(n_vars+2), qp_diff_right(n_vars+2)
     REAL(wp) :: qp_path_left(n_vars+2), qp_path_right(n_vars+2)
-    REAL(wp) :: h_diff_left, h_diff_right
     REAL(wp) :: gamma_left, gamma_right
     REAL(wp) :: reduced_gravity_left, reduced_gravity_right
     REAL(wp) :: eta_scale, eta_roundoff
@@ -578,25 +575,10 @@ CONTAINS
     CALL lateral_source_trace_sides(direction,face_i,face_j,                &
          source_trace_left,source_trace_right)
 
-    h_eta_left=MAX(eta_left-bed_face,0.0_wp)
-    h_eta_right=MAX(eta_right-bed_face,0.0_wp)
-    ! Select one shared depth trace for advection and dissipation. The
-    ! hydrostatic/path term continues to use the eta_x traces passed above.
-    SELECT CASE (TRIM(kt_trace_reconstruction))
-    CASE ('h_x')
-       h_eta_left=MAX(qp_adv_left(1),0.0_wp)
-       h_eta_right=MAX(qp_adv_right(1),0.0_wp)
-    CASE ('minmod')
-       h_eta_left=MAX(h_minmod_left,0.0_wp)
-       h_eta_right=MAX(h_minmod_right,0.0_wp)
-    CASE ('froude_blend')
-       h_eta_left=MAX(h_froude_left,0.0_wp)
-       h_eta_right=MAX(h_froude_right,0.0_wp)
-    CASE DEFAULT
-       CONTINUE
-    END SELECT
-    IF ( source_trace_left ) h_eta_left=MAX(qp_adv_left(1),0.0_wp)
-    IF ( source_trace_right ) h_eta_right=MAX(qp_adv_right(1),0.0_wp)
+    h_eta_left=selected_kt_depth(eta_left,bed_face,qp_adv_left(1), &
+         h_minmod_left,h_froude_left,source_trace_left,kt_trace_reconstruction)
+    h_eta_right=selected_kt_depth(eta_right,bed_face,qp_adv_right(1), &
+         h_minmod_right,h_froude_right,source_trace_right,kt_trace_reconstruction)
     ! Reconstruct u,v separately at cell centres and form the face
     ! momenta as h_face*u_face using the selected shared depth traces.
     qp_adv_left_use(1)=h_eta_left
@@ -629,14 +611,8 @@ CONTAINS
 
     ! Build jump/path states from the same eta-based face depths. Both sides use
     ! the single shared bed value at the face.
-    h_diff_left = h_eta_left
-    h_diff_right = h_eta_right
-    qp_diff_left = qp_adv_left_use
-    qp_diff_right = qp_adv_right_use
-    qp_diff_left(1) = h_diff_left
-    qp_diff_right(1) = h_diff_right
-    q_diff_left=q_adv_left_use
-    q_diff_right=q_adv_right_use
+    ! The selected-depth conservative and primitive states are already ready.
+    ! Avoid copying four whole face vectors merely to name the flux endpoints.
 
     ! The advective and jump states share the selected depth traces. Keep
     ! separate primitive states for the hydrostatic path contribution.
@@ -658,8 +634,8 @@ CONTAINS
     IF ( qp_adv_left_use(1) .LE. EPSILON(1.0_wp) ) u_normal_left=0.0_wp
     IF ( qp_adv_right_use(1) .LE. EPSILON(1.0_wp) ) u_normal_right=0.0_wp
     IF ( denominator .GT. pccu_speed_tolerance ) THEN
-       interface_flux=(a_plus*(u_normal_left-a_minus)*q_diff_left          &
-            -a_minus*(u_normal_right-a_plus)*q_diff_right)/denominator
+       interface_flux=(a_plus*(u_normal_left-a_minus)*q_adv_left_use          &
+            -a_minus*(u_normal_right-a_plus)*q_adv_right_use)/denominator
     ELSE
        interface_flux=0.5_wp*(flux_left+flux_right)
     END IF
@@ -696,8 +672,8 @@ CONTAINS
        interface_flux(4:n_vars) = 0.0_wp
     END IF
 
-    qp_path_left=qp_diff_left
-    qp_path_right=qp_diff_right
+    qp_path_left=qp_adv_left_use
+    qp_path_right=qp_adv_right_use
     eta_path_left=eta_left
     eta_path_right=eta_right
     IF ( source_trace_left ) eta_path_left=bed_face+h_eta_left
@@ -951,22 +927,16 @@ CONTAINS
              ! The positivity blend can replace the direct h_x depth by the
              ! eta-based depth. Include both endpoints in the speed bounds so
              ! the admissibility interval contains the blended state.
-             h_eta_minus=MAX(recon%eta_interfaceL(j,k)-B_face_x(j,k),0.0_wp)
-             h_eta_plus=MAX(recon%eta_interfaceR(j,k)-B_face_x(j,k),0.0_wp)
-             SELECT CASE (TRIM(kt_trace_reconstruction))
-             CASE ('minmod')
-                h_eta_minus=recon%h_minmod_interfaceL(j,k)
-                h_eta_plus=recon%h_minmod_interfaceR(j,k)
-             CASE ('froude_blend')
-                h_eta_minus=recon%h_froude_interfaceL(j,k)
-                h_eta_plus=recon%h_froude_interfaceR(j,k)
-             CASE DEFAULT
-                CONTINUE
-             END SELECT
-             IF ( source_trace_minus ) h_eta_minus=MAX(                    &
-                  recon%qp_adv_interfaceL(1,j,k),0.0_wp)
-             IF ( source_trace_plus ) h_eta_plus=MAX(                      &
-                  recon%qp_adv_interfaceR(1,j,k),0.0_wp)
+             h_eta_minus=selected_kt_depth(recon%eta_interfaceL(j,k), &
+                  B_face_x(j,k),recon%qp_adv_interfaceL(1,j,k), &
+                  recon%h_minmod_interfaceL(j,k), &
+                  recon%h_froude_interfaceL(j,k),source_trace_minus, &
+                  kt_trace_reconstruction)
+             h_eta_plus=selected_kt_depth(recon%eta_interfaceR(j,k), &
+                  B_face_x(j,k),recon%qp_adv_interfaceR(1,j,k), &
+                  recon%h_minmod_interfaceR(j,k), &
+                  recon%h_froude_interfaceR(j,k),source_trace_plus, &
+                  kt_trace_reconstruction)
              qp_eta_minus=recon%qp_adv_interfaceL(:,j,k)
              qp_eta_plus=recon%qp_adv_interfaceR(:,j,k)
              qp_eta_minus(1)=h_eta_minus
@@ -1012,22 +982,16 @@ CONTAINS
                min_r,max_r )
 
           IF ( kt_trace_reconstruction .NE. 'h_x' ) THEN
-             h_eta_minus=MAX(recon%eta_interfaceB(j,k)-B_face_y(j,k),0.0_wp)
-             h_eta_plus=MAX(recon%eta_interfaceT(j,k)-B_face_y(j,k),0.0_wp)
-             SELECT CASE (TRIM(kt_trace_reconstruction))
-             CASE ('minmod')
-                h_eta_minus=recon%h_minmod_interfaceB(j,k)
-                h_eta_plus=recon%h_minmod_interfaceT(j,k)
-             CASE ('froude_blend')
-                h_eta_minus=recon%h_froude_interfaceB(j,k)
-                h_eta_plus=recon%h_froude_interfaceT(j,k)
-             CASE DEFAULT
-                CONTINUE
-             END SELECT
-             IF ( source_trace_minus ) h_eta_minus=MAX(                    &
-                  recon%qp_adv_interfaceB(1,j,k),0.0_wp)
-             IF ( source_trace_plus ) h_eta_plus=MAX(                      &
-                  recon%qp_adv_interfaceT(1,j,k),0.0_wp)
+             h_eta_minus=selected_kt_depth(recon%eta_interfaceB(j,k), &
+                  B_face_y(j,k),recon%qp_adv_interfaceB(1,j,k), &
+                  recon%h_minmod_interfaceB(j,k), &
+                  recon%h_froude_interfaceB(j,k),source_trace_minus, &
+                  kt_trace_reconstruction)
+             h_eta_plus=selected_kt_depth(recon%eta_interfaceT(j,k), &
+                  B_face_y(j,k),recon%qp_adv_interfaceT(1,j,k), &
+                  recon%h_minmod_interfaceT(j,k), &
+                  recon%h_froude_interfaceT(j,k),source_trace_plus, &
+                  kt_trace_reconstruction)
              qp_eta_minus=recon%qp_adv_interfaceB(:,j,k)
              qp_eta_plus=recon%qp_adv_interfaceT(:,j,k)
              qp_eta_minus(1)=h_eta_minus
@@ -1071,6 +1035,27 @@ CONTAINS
   !> \param[in] normal_velocity_index Index of the face-normal velocity.
   !> \param[out] speed_minus Minimum wave speed, bounded above by zero.
   !> \param[out] speed_plus Maximum wave speed, bounded below by zero.
+  !> Select the transport depth of one KT face endpoint. The caller applies
+  !> the dry-state momentum guard independently of this depth selection.
+  PURE FUNCTION selected_kt_depth(eta,bed,h_direct,h_minmod,h_froude, &
+       source_trace,mode) RESULT(h)
+    REAL(wp), INTENT(IN) :: eta,bed,h_direct,h_minmod,h_froude
+    LOGICAL, INTENT(IN) :: source_trace
+    CHARACTER(LEN=*), INTENT(IN) :: mode
+    REAL(wp) :: h
+    SELECT CASE (mode)
+    CASE ('h_x')
+       h=MAX(h_direct,0.0_wp)
+    CASE ('minmod')
+       h=MAX(h_minmod,0.0_wp)
+    CASE ('froude_blend')
+       h=MAX(h_froude,0.0_wp)
+    CASE DEFAULT
+       h=MAX(eta-bed,0.0_wp)
+    END SELECT
+    IF (source_trace) h=MAX(h_direct,0.0_wp)
+  END FUNCTION selected_kt_depth
+
   SUBROUTINE eval_interface_speed_bounds(qp_minus,qp_plus,grav_coeff,       &
        normal_velocity_index,speed_minus,speed_plus)
 
