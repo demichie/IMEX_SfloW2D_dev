@@ -46,9 +46,6 @@ PROGRAM test_imex_stages
   USE time_integration_2d, ONLY : time_integration_workspace_type
   USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_ANALYTIC, &
        IM_GROUP_METHOD_NEWTON
-  USE source_catalog_2d, ONLY : rheology_source_terms, SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
-       SOURCE_TERM_THERMAL_CONVECTIVE_COOLING, SOURCE_TERM_PORE_PRESSURE_DISSIPATION, &
-       SOURCE_TERM_GEOMETRY_CURVATURE
   USE source_registry_2d, ONLY : source_registry_type
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, finalize_nonlinear_solver
   USE state_conversion_2d, ONLY : qc_to_qp
@@ -654,7 +651,7 @@ CONTAINS
 
   SUBROUTINE configure_source_registry
     INTEGER :: target_groups(3),methods(3),pore_equation,group
-    INTEGER, ALLOCATABLE :: active_terms(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
     CHARACTER(LEN=256) :: error
 
     target_groups=1
@@ -665,23 +662,22 @@ CONTAINS
     IF (partition%implicit(2)) target_groups(1)=partition%IM_group(2)
     IF (partition%implicit(4)) target_groups(2)=partition%IM_group(4)
 
-    active_terms=[INTEGER::]
-    IF (rheology_flag) active_terms=rheology_source_terms(rheology_model)
+    active_names=[CHARACTER(LEN=64)::]
+    IF (rheology_flag) active_names=[CHARACTER(LEN=64)::'rheology_'//TRIM(rheology_model)]
     IF (curvature_term_flag) &
-         active_terms=[active_terms,SOURCE_TERM_GEOMETRY_CURVATURE]
-    IF (partition%implicit(4)) active_terms=[active_terms, &
-         SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
-         SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
+         active_names=[active_names,CHARACTER(LEN=64)::'geometry_curvature']
+    IF (partition%implicit(4)) active_names=[active_names,CHARACTER(LEN=64)::'thermal_radiative_cooling', &
+         'thermal_convective_cooling']
     pore_equation=0
     IF (pore_pressure_flag .AND. idx_pore>=5 .AND. idx_pore<=n_vars) THEN
        IF (partition%implicit(idx_pore)) THEN
           pore_equation=idx_pore
           target_groups(3)=partition%IM_group(idx_pore)
-          active_terms=[active_terms,SOURCE_TERM_PORE_PRESSURE_DISSIPATION]
+          active_names=[active_names,CHARACTER(LEN=64)::'pore_pressure_dissipation']
        END IF
     END IF
     CALL source_registry%initialize_legacy(partition,target_groups,methods, &
-         pore_equation,active_terms,error)
+         pore_equation,active_names,error)
     IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
   END SUBROUTINE configure_source_registry
 

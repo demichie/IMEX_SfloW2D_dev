@@ -13,11 +13,9 @@ PROGRAM probe_sources
   USE rheology_quadratic_2d, ONLY : friction_factor
   USE state_conversion_2d, ONLY : qc_to_qp
   USE geometry_2d, ONLY : pi_g
-  USE equation_terms_2d, ONLY : eval_implicit_terms, eval_semi_implicit_terms, &
-       eval_mass_exchange_terms
+  USE source_terms_2d, ONLY : eval_source_implicit, eval_source_semi_implicit
+  USE mass_exchange_laws_2d, ONLY : eval_mass_exchange_terms
   USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_NEWTON
-  USE source_catalog_2d, ONLY : rheology_source_terms, SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
-       SOURCE_TERM_THERMAL_CONVECTIVE_COOLING, SOURCE_TERM_PORE_PRESSURE_DISSIPATION
   USE source_registry_2d, ONLY : source_registry_type
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, solve_rk_step
   IMPLICIT NONE
@@ -35,7 +33,7 @@ PROGRAM probe_sources
   INTEGER :: iteration, actual_threads
   COMPLEX(wp) :: cq(7), complex_source(7), base_complex(7)
   LOGICAL :: mask(7)
-  INTEGER, ALLOCATABLE :: active_terms(:)
+  CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
   INTEGER :: pore_equation
   CHARACTER(LEN=256) :: registry_error
   NAMELIST /fixture/ operation, solids, input_q, bx, by, bxx, bxy, byy, z, &
@@ -116,13 +114,13 @@ PROGRAM probe_sources
   END IF
   IF (operation==7) THEN
      cq=CMPLX(q,0.0_wp,wp)
-     CALL eval_implicit_terms(bx,by,z,c_qj=cq(1:n_vars),c_nh_term_impl=complex_source(1:n_vars))
+     CALL eval_source_implicit(bx,by,z,c_qj=cq(1:n_vars),c_nh_term_impl=complex_source(1:n_vars))
      WRITE(*,'(A,7ES26.17E3)') 'COMPLEX_REAL ',REAL(complex_source(1:n_vars),wp)
      STOP
   END IF
   CALL qc_to_qp(q(1:n_vars),qp(1:n_vars+2),pressure)
   IF (operation==6) THEN
-     CALL eval_semi_implicit_terms(bx,by,bxx,bxy,byy,1.0_wp,qp(1:n_vars+2),si(1:n_vars),z)
+     CALL eval_source_semi_implicit(bx,by,bxx,bxy,byy,1.0_wp,qp(1:n_vars+2),si(1:n_vars),z)
      WRITE(*,'(A,7ES26.17E3)') 'SI ',si(1:n_vars)
      STOP
   END IF
@@ -141,7 +139,7 @@ PROGRAM probe_sources
      test_z=[-1000.0_wp,0.0_wp,500.0_wp,100000.0_wp]
      expected_parallel_source=0.0_wp
      DO j=1,SIZE(test_z)
-        CALL eval_implicit_terms(bx,by,test_z(j),r_qj=q(1:n_vars), &
+        CALL eval_source_implicit(bx,by,test_z(j),r_qj=q(1:n_vars), &
              r_nh_term_impl=expected_parallel_source(1:n_vars,j))
      END DO
      parallel_error=0.0_wp; actual_threads=0
@@ -151,7 +149,7 @@ PROGRAM probe_sources
      DO iteration=1,100000
         iz=MOD(iteration-1,SIZE(test_z))+1
         parallel_source=0.0_wp
-        CALL eval_implicit_terms(bx,by,test_z(iz),r_qj=q(1:n_vars), &
+        CALL eval_source_implicit(bx,by,test_z(iz),r_qj=q(1:n_vars), &
              r_nh_term_impl=parallel_source(1:n_vars))
         local_error=MAXVAL(ABS(parallel_source(1:n_vars)-expected_parallel_source(1:n_vars,iz)))
         parallel_error=MAX(parallel_error,local_error)
@@ -164,8 +162,8 @@ PROGRAM probe_sources
   real_source=0.0_wp; si=0.0_wp; cs=0.0_wp; normalized_cs=0.0_wp; fd=0.0_wp
   CALL implicit(q,real_source)
   cq=CMPLX(q,0.0_wp,wp); base_complex=0.0_wp
-  CALL eval_implicit_terms(bx,by,z,c_qj=cq(1:n_vars),c_nh_term_impl=base_complex(1:n_vars))
-  CALL eval_semi_implicit_terms(bx,by,bxx,bxy,byy,                  &
+  CALL eval_source_implicit(bx,by,z,c_qj=cq(1:n_vars),c_nh_term_impl=base_complex(1:n_vars))
+  CALL eval_source_semi_implicit(bx,by,bxx,bxy,byy,                  &
        1.0_wp/(1.0_wp+bx**2+by**2),qp(1:n_vars+2),si(1:n_vars),z)
   scale=MAX(ABS(q),1.0_wp)
   steps=[1.0E-5_wp,1.0E-6_wp,1.0E-7_wp,1.0E-8_wp]
@@ -173,12 +171,12 @@ PROGRAM probe_sources
      DO column=1,n_vars
         cq=CMPLX(q,0.0_wp,wp); delta=1.0E-25_wp*scale(column)
         cq(column)=cq(column)+CMPLX(0.0_wp,delta,wp)
-        CALL eval_implicit_terms(bx,by,z,c_qj=cq(1:n_vars),c_nh_term_impl=complex_source(1:n_vars))
+        CALL eval_source_implicit(bx,by,z,c_qj=cq(1:n_vars),c_nh_term_impl=complex_source(1:n_vars))
         cs(1:n_vars,column)=AIMAG(complex_source(1:n_vars))/delta
         cq=CMPLX(q,0.0_wp,wp)
         delta=n_vars*EPSILON(1.0_wp)
         cq(column)=cq(column)+CMPLX(0.0_wp,delta*MAX(ABS(q(column)),1.0E-3_wp),wp)
-        CALL eval_implicit_terms(bx,by,z,c_qj=cq(1:n_vars),c_nh_term_impl=complex_source(1:n_vars))
+        CALL eval_source_implicit(bx,by,z,c_qj=cq(1:n_vars),c_nh_term_impl=complex_source(1:n_vars))
         normalized_cs(1:n_vars,column)=AIMAG(complex_source(1:n_vars))/delta
         DO level=1,4
            delta=steps(level)*scale(column)
@@ -211,23 +209,22 @@ PROGRAM probe_sources
      IF (pore_pressure_flag) mask(n_vars)=.TRUE.
      CALL partition%initialize(mask(1:n_vars))
      CALL initialize_nonlinear_solver
-     active_terms=[INTEGER::]
-     IF (rheology_flag) active_terms=rheology_source_terms(rheology_model)
-     IF (partition%implicit(4)) active_terms=[active_terms, &
-          SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
-          SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
+     active_names=[CHARACTER(LEN=64)::]
+     IF (rheology_flag) active_names=[CHARACTER(LEN=64)::'rheology_'//TRIM(rheology_model)]
+     IF (partition%implicit(4)) active_names=[active_names,CHARACTER(LEN=64)::'thermal_radiative_cooling', &
+         'thermal_convective_cooling']
      pore_equation=0
      IF (pore_pressure_flag) THEN
         pore_equation=idx_pore
-        active_terms=[active_terms,SOURCE_TERM_PORE_PRESSURE_DISSIPATION]
+        active_names=[active_names,CHARACTER(LEN=64)::'pore_pressure_dissipation']
      END IF
      CALL source_registry%initialize_legacy(partition,[1,1,1], &
           [IM_GROUP_METHOD_NEWTON,IM_GROUP_METHOD_NEWTON,IM_GROUP_METHOD_NEWTON], &
-          pore_equation,active_terms,registry_error)
+          pore_equation,active_names,registry_error)
      IF (LEN_TRIM(registry_error)>0) ERROR STOP TRIM(registry_error)
      stage=q
      CALL solve_rk_step(partition,source_registry%stage_groups(), &
-          source_registry%solvers(),stage(1:n_vars),q(1:n_vars),dt,diagonal, &
+          stage(1:n_vars),q(1:n_vars),dt,diagonal, &
           0.0_wp*q(1:n_vars),bx,by,z,iterations,converged,linear_info,search_failed)
      CALL implicit(stage,residual)
      residual(1:n_vars)=stage(1:n_vars)-q(1:n_vars)-dt*diagonal*residual(1:n_vars)
@@ -244,6 +241,6 @@ CONTAINS
     REAL(wp), INTENT(IN) :: state(7)
     REAL(wp), INTENT(OUT) :: source(7)
     source=0.0_wp
-    CALL eval_implicit_terms(bx,by,z,r_qj=state(1:n_vars),r_nh_term_impl=source(1:n_vars))
+    CALL eval_source_implicit(bx,by,z,r_qj=state(1:n_vars),r_nh_term_impl=source(1:n_vars))
   END SUBROUTINE implicit
 END PROGRAM probe_sources
