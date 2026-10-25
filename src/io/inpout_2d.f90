@@ -5776,7 +5776,7 @@ CONTAINS
 
       output_file_2d = snapshot_file_path(TRIM(run_name)//'_'//idx_string//'.q_2d')
 
-      IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_file_2d
+      IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', TRIM(output_file_2d)
 
       OPEN (output_unit_2d, FILE=output_file_2d, status='unknown', form='formatted')
 
@@ -6100,7 +6100,7 @@ CONTAINS
     !Save max thickness
     output_max_file = output_file_path('diagnostics', TRIM(run_name)//'_max.asc')
 
-    IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_max_file
+    IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', TRIM(output_max_file)
 
     OPEN (output_max_unit, FILE=output_max_file, status='unknown', form='formatted')
 
@@ -6283,7 +6283,7 @@ CONTAINS
     !Save thickness
     output_esri_file = snapshot_file_path(TRIM(run_name)//'_'//idx_string//'.asc')
 
-    IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_esri_file
+    IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', TRIM(output_esri_file)
 
     OPEN (output_esri_unit, FILE=output_esri_file, status='unknown', form='formatted')
 
@@ -6313,7 +6313,7 @@ CONTAINS
     !Save temperature
     output_esri_file = snapshot_file_path(TRIM(run_name)//'_T_'//idx_string//'.asc')
 
-    IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_esri_file
+    IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', TRIM(output_esri_file)
 
     OPEN (output_esri_unit, FILE=output_esri_file, status='unknown', form='formatted')
 
@@ -6350,7 +6350,7 @@ CONTAINS
         output_esri_file = snapshot_file_path( &
             TRIM(run_name)//'_dep_'//isolid_string//'_'//idx_string//'.asc')
 
-        IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_esri_file
+        IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', TRIM(output_esri_file)
 
         OPEN (output_esri_unit, FILE=output_esri_file, status='unknown', &
               form='formatted')
@@ -6385,7 +6385,7 @@ CONTAINS
       output_esri_file = snapshot_file_path( &
         TRIM(run_name)//'_depTot_'//idx_string//'.asc')
 
-      IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_esri_file
+      IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', TRIM(output_esri_file)
 
       OPEN (output_esri_unit, FILE=output_esri_file, status='unknown', &
             form='formatted')
@@ -6433,7 +6433,7 @@ CONTAINS
         output_esri_file = snapshot_file_path( &
             TRIM(run_name)//'_ers_'//isolid_string//'_'//idx_string//'.asc')
 
-        IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_esri_file
+        IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', TRIM(output_esri_file)
 
         OPEN (output_esri_unit, FILE=output_esri_file, status='unknown', &
               form='formatted')
@@ -6468,7 +6468,7 @@ CONTAINS
       output_esri_file = snapshot_file_path( &
         TRIM(run_name)//'_ersTot_'//idx_string//'.asc')
 
-      IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', output_esri_file
+      IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'WRITING ', TRIM(output_esri_file)
 
       OPEN (output_esri_unit, FILE=output_esri_file, status='unknown', &
             form='formatted')
@@ -7641,7 +7641,7 @@ CONTAINS
 
     REAL(wp) :: denom
 
-    WRITE (*, *) 'Writing ', nc_filename
+    WRITE (*, *) 'Writing ', TRIM(nc_filename)
 
 
     ALLOCATE (Ri2D(SIZE(state%qp, 2), SIZE(state%qp, 3)))
@@ -8000,7 +8000,7 @@ END IF
          STATUS='REPLACE', ACTION='WRITE', IOSTAT=ierr, IOMSG=io_message)
     CALL check_restart_io(ierr, io_message, 'opening', filename)
 
-    WRITE (*, *) 'Writing restart file: ', filename, ' at time ', runtime%t
+    WRITE (*, *) 'Writing restart file: ', TRIM(filename), ' at time ', runtime%t
 
     WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) restart_format_magic
     CALL check_restart_io(ierr, io_message, 'writing header to', filename)
