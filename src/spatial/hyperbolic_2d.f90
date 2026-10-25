@@ -560,10 +560,13 @@ CONTAINS
     REAL(wp) :: denominator,u_normal_left,u_normal_right
     REAL(wp) :: eta_path_left, eta_path_right
     REAL(wp) :: h_eta_left,h_eta_right
-    ! Constant contexts avoid expensive formatted I/O in each interface.
+    LOGICAL :: source_trace_left,source_trace_right
+    ! Source-side flags remain necessary for hydrostatic path endpoints.
 
     qp_adv_left_use=qp_adv_left
     qp_adv_right_use=qp_adv_right
+    CALL lateral_source_trace_sides(direction,face_i,face_j, &
+         source_trace_left,source_trace_right)
     h_eta_left=h_selected_left
     h_eta_right=h_selected_right
     ! Reconstruct u,v separately at cell centres and form the face
