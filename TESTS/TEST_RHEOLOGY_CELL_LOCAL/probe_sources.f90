@@ -52,8 +52,6 @@ PROGRAM probe_sources
   bx=0.0_wp; by=0.0_wp; bxx=0.0_wp; bxy=0.0_wp; byy=0.0_wp; z=0.0_wp
   dt=0.05_wp; diagonal=1.0_wp
   rheology_flag=.TRUE.; rheology_model='quadratic'; gas_flag=.FALSE.
-  ! Preserve the original thermal-source characterization with D17's explicit flag.
-  thermal_cooling_flag=.TRUE.
   pore_pressure_flag=.FALSE.; dynamic_permeability_flag=.FALSE.
   sutherland_flag=.FALSE.; stochastic_flag=.FALSE.
   slope_correction_flag=.FALSE.; curvature_term_flag=.FALSE.
@@ -67,6 +65,9 @@ PROGRAM probe_sources
   hydraulic_permeability=1.0E-12_wp; maximum_solid_packing=0.64_wp
   alpha_trans=0.2_wp; N_inh=2; f_inhibit_mode='OFF'; gas_loss_flag=.FALSE.
   READ(*,NML=fixture)
+  ! The independent oracle applies radiative/convective cooling only for lava.
+  ! D17 makes the cooling switch independent of the rheology model.
+  thermal_cooling_flag=(TRIM(rheology_model)=='lava')
   IF (solids<1 .OR. solids>2) ERROR STOP 'fixture solids must be one or two'
   n_solid=solids; n_add_gas=0; n_stoch_vars=0
   n_pore_vars=MERGE(1,0,pore_pressure_flag)
