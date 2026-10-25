@@ -893,7 +893,10 @@ CONTAINS
 
     !$OMP PARALLEL DO PRIVATE(l,j,k,sx,sy,hx,hy,xx,yy,slope_x,slope_y,      &
     !$OMP& slope_hx,slope_hy,eta_center,eta_w,eta_e,eta_s,eta_n,            &
-    !$OMP& slope_eta2,slope_minmod,eta_w_mm,eta_e_mm,eta_s_mm,eta_n_mm)
+    !$OMP& slope_eta2,slope_minmod,eta_w_mm,eta_e_mm,eta_s_mm,eta_n_mm, &
+    !$OMP& slope_eta2_x,slope_eta2_y,slope_blend_x,slope_blend_y, &
+    !$OMP& eta_blend_w,eta_blend_e,eta_blend_s,eta_blend_n, &
+    !$OMP& fr_weight_x,fr_weight_y)
     DO l=1,this%hp_eta_cells
        j=this%hp_eta_j(l)
        k=this%hp_eta_k(l)
@@ -985,82 +988,6 @@ CONTAINS
     !$OMP END PARALLEL DO
 
     IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
-       ! Cell-local directional blend: eta_x below Fr=0.8, h_x+B_x above
-       ! Fr=1.2, with a smoothstep transition in between. The resulting
-       ! h-face traces are shared by the advective and dissipative fluxes;
-       ! eta_cell* above remains the independent hydrostatic/path state.
-       !$OMP PARALLEL DO PRIVATE(l,j,k,sx,sy,hx,hy,xx,yy,slope_x,slope_y,  &
-       !$OMP& slope_hx,slope_hy,eta_center,slope_eta2_x,slope_eta2_y,     &
-       !$OMP& slope_blend_x,slope_blend_y,eta_blend_w,eta_blend_e,        &
-       !$OMP& eta_blend_s,eta_blend_n,fr_weight_x,fr_weight_y)
-       DO l=1,this%hp_eta_cells
-          j=this%hp_eta_j(l)
-          k=this%hp_eta_k(l)
-          eta_center=qp_expl(1,j,k)+B_cent(j,k)
-          slope_x=0.0_wp
-          slope_y=0.0_wp
-          slope_hx=0.0_wp
-          slope_hy=0.0_wp
-          IF ((j.GT.1).AND.(j.LT.comp_cells_x)) THEN
-             sx=[qp_expl(1,j-1,k)+B_cent(j-1,k),eta_center, &
-                  qp_expl(1,j+1,k)+B_cent(j+1,k)]
-             hx=[qp_expl(1,j-1,k),qp_expl(1,j,k),qp_expl(1,j+1,k)]
-             xx=[x_comp(j-1),x_comp(j),x_comp(j+1)]
-             CALL limit(sx,xx,limiter(1),slope_x)
-             CALL limit(hx,xx,limiter(1),slope_hx)
-          END IF
-          IF ((k.GT.1).AND.(k.LT.comp_cells_y)) THEN
-             sy=[qp_expl(1,j,k-1)+B_cent(j,k-1),eta_center, &
-                  qp_expl(1,j,k+1)+B_cent(j,k+1)]
-             hy=[qp_expl(1,j,k-1),qp_expl(1,j,k),qp_expl(1,j,k+1)]
-             yy=[y_comp(k-1),y_comp(k),y_comp(k+1)]
-             CALL limit(sy,yy,limiter(1),slope_y)
-             CALL limit(hy,yy,limiter(1),slope_hy)
-          END IF
-
-          fr_weight_x=froude_h_blend_weight(qp_expl(1,j,k), &
-               qp_expl(idx_u,j,k),grav)
-          fr_weight_y=froude_h_blend_weight(qp_expl(1,j,k), &
-               qp_expl(idx_v,j,k),grav)
-          slope_eta2_x=reconstr_coeff*slope_hx + &
-               (B_face_x(j+1,k)-B_face_x(j,k))*one_by_dx
-          slope_eta2_y=reconstr_coeff*slope_hy + &
-               (B_face_y(j,k+1)-B_face_y(j,k))*one_by_dy
-          slope_blend_x=(1.0_wp-fr_weight_x)*reconstr_coeff*slope_x + &
-               fr_weight_x*slope_eta2_x
-          slope_blend_y=(1.0_wp-fr_weight_y)*reconstr_coeff*slope_y + &
-               fr_weight_y*slope_eta2_y
-
-          eta_blend_w=eta_center-dx2*slope_blend_x
-          eta_blend_e=eta_center+dx2*slope_blend_x
-          IF ( eta_blend_e .LT. B_face_x(j+1,k) ) THEN
-             eta_blend_e=B_face_x(j+1,k)
-             eta_blend_w=2.0_wp*eta_center-eta_blend_e
-          ELSEIF ( eta_blend_w .LT. B_face_x(j,k) ) THEN
-             eta_blend_w=B_face_x(j,k)
-             eta_blend_e=2.0_wp*eta_center-eta_blend_w
-          END IF
-          this%h_froude_interfaceR(j,k)= &
-               MAX(eta_blend_w-B_face_x(j,k),0.0_wp)
-          this%h_froude_interfaceL(j+1,k)= &
-               MAX(eta_blend_e-B_face_x(j+1,k),0.0_wp)
-
-          eta_blend_s=eta_center-dy2*slope_blend_y
-          eta_blend_n=eta_center+dy2*slope_blend_y
-          IF ( eta_blend_n .LT. B_face_y(j,k+1) ) THEN
-             eta_blend_n=B_face_y(j,k+1)
-             eta_blend_s=2.0_wp*eta_center-eta_blend_n
-          ELSEIF ( eta_blend_s .LT. B_face_y(j,k) ) THEN
-             eta_blend_s=B_face_y(j,k)
-             eta_blend_n=2.0_wp*eta_center-eta_blend_s
-          END IF
-          this%h_froude_interfaceT(j,k)= &
-               MAX(eta_blend_s-B_face_y(j,k),0.0_wp)
-          this%h_froude_interfaceB(j,k+1)= &
-               MAX(eta_blend_n-B_face_y(j,k+1),0.0_wp)
-       END DO
-       !$OMP END PARALLEL DO
-
        DO k=1,comp_cells_y
           this%h_froude_interfaceL(1,k)=this%h_froude_interfaceR(1,k)
           this%h_froude_interfaceR(comp_interfaces_x,k)= &
@@ -1315,35 +1242,17 @@ CONTAINS
     ! its implicit barrier because the following phase consumes its results.
     !$OMP PARALLEL PRIVATE(l,j,k,q_final,qp_final)
 
+    ! Independent cell-owned eta, direct momentum and conservative trace work.
     !$OMP DO
     DO l = 1, this%hp_eta_cells
        j = this%hp_eta_j(l)
        k = this%hp_eta_k(l)
        CALL compute_eta_traces(j,k)
-    END DO
-    !$OMP END DO
-
-    ! Reconstruct both face momenta from the directly limited velocity traces.
-    ! The PCCU interface evaluator selects the transport depth and recomputes
-    ! momentum using h_x, minmod, Froude blend or eta_x as configured.
-    !$OMP DO
-    DO l = 1, this%hp_eta_cells
-       j = this%hp_eta_j(l)
-       k = this%hp_eta_k(l)
        CALL form_direct_face_momentum(this%qp_cellW(:,j,k))
        CALL form_direct_face_momentum(this%qp_cellE(:,j,k))
        CALL form_direct_face_momentum(this%qp_cellS(:,j,k))
        CALL form_direct_face_momentum(this%qp_cellN(:,j,k))
-    END DO
-    !$OMP END DO
-
-    ! Preserve the direct face traces for the KT advection path. The selected
-    ! depth will be applied consistently to both momenta at each PCCU face.
-    IF ( use_kt_direct ) THEN
-       !$OMP DO
-       DO l = 1, this%hp_eta_cells
-          j = this%hp_eta_j(l)
-          k = this%hp_eta_k(l)
+       IF (use_kt_direct) THEN
           CALL final_kt_state( this%qp_cellW(:,j,k),                         &
                this%q_adv_interfaceR(:,j,k), this%qp_adv_interfaceR(:,j,k),  &
                'KT reconstruction west', &
@@ -1360,9 +1269,9 @@ CONTAINS
                this%q_adv_interfaceB(:,j,k+1), this%qp_adv_interfaceB(:,j,k+1), &
                'KT reconstruction north', &
                'KT reconstruction north unit-depth state' )
-       END DO
-       !$OMP END DO
-    END IF
+       END IF
+    END DO
+    !$OMP END DO
 
     ! Map all eta cell traces to their oriented face storage.  Conservative
     ! only workset cells can contribute to an active interface.
@@ -1713,4 +1622,46 @@ CONTAINS
 
   END SUBROUTINE apply_hp_reconstruction
 
-END MODULE reconstruction_2d
+END MODULE reconstruction_2d       IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
+       fr_weight_x=froude_h_blend_weight(qp_expl(1,j,k), &
+            qp_expl(idx_u,j,k),grav)
+       fr_weight_y=froude_h_blend_weight(qp_expl(1,j,k), &
+            qp_expl(idx_v,j,k),grav)
+       slope_eta2_x=reconstr_coeff*slope_hx + &
+            (B_face_x(j+1,k)-B_face_x(j,k))*one_by_dx
+       slope_eta2_y=reconstr_coeff*slope_hy + &
+            (B_face_y(j,k+1)-B_face_y(j,k))*one_by_dy
+       slope_blend_x=(1.0_wp-fr_weight_x)*reconstr_coeff*slope_x + &
+            fr_weight_x*slope_eta2_x
+       slope_blend_y=(1.0_wp-fr_weight_y)*reconstr_coeff*slope_y + &
+            fr_weight_y*slope_eta2_y
+
+       eta_blend_w=eta_center-dx2*slope_blend_x
+       eta_blend_e=eta_center+dx2*slope_blend_x
+       IF ( eta_blend_e .LT. B_face_x(j+1,k) ) THEN
+          eta_blend_e=B_face_x(j+1,k)
+          eta_blend_w=2.0_wp*eta_center-eta_blend_e
+       ELSEIF ( eta_blend_w .LT. B_face_x(j,k) ) THEN
+          eta_blend_w=B_face_x(j,k)
+          eta_blend_e=2.0_wp*eta_center-eta_blend_w
+       END IF
+       this%h_froude_interfaceR(j,k)= &
+            MAX(eta_blend_w-B_face_x(j,k),0.0_wp)
+       this%h_froude_interfaceL(j+1,k)= &
+            MAX(eta_blend_e-B_face_x(j+1,k),0.0_wp)
+
+       eta_blend_s=eta_center-dy2*slope_blend_y
+       eta_blend_n=eta_center+dy2*slope_blend_y
+       IF ( eta_blend_n .LT. B_face_y(j,k+1) ) THEN
+          eta_blend_n=B_face_y(j,k+1)
+          eta_blend_s=2.0_wp*eta_center-eta_blend_n
+       ELSEIF ( eta_blend_s .LT. B_face_y(j,k) ) THEN
+          eta_blend_s=B_face_y(j,k)
+          eta_blend_n=2.0_wp*eta_center-eta_blend_s
+       END IF
+       this%h_froude_interfaceT(j,k)= &
+            MAX(eta_blend_s-B_face_y(j,k),0.0_wp)
+       this%h_froude_interfaceB(j,k+1)= &
+            MAX(eta_blend_n-B_face_y(j,k+1),0.0_wp)
+       END IF
+
