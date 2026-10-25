@@ -7,18 +7,13 @@ PROGRAM test_grouped_implicit_stage
   USE geometry_2d, ONLY : pi_g
   USE equation_metadata_2d, ONLY : equation_partition_type,                 &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
-  USE equation_terms_2d, ONLY : eval_implicit_terms,                     &
-       eval_semi_implicit_terms, init_problem_param
-  USE source_registry_2d, ONLY : source_registry_type, source_group_type,   &
-       source_solver_type
+  USE source_terms_2d, ONLY : eval_source_implicit, eval_source_semi_implicit
+  USE equation_terms_2d, ONLY : init_problem_param
+  USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_configuration_2d, ONLY : initialize_configured_sources
-  USE source_catalog_2d, ONLY : rheology_source_terms, &
-       SOURCE_TERM_THERMAL_RADIATIVE_COOLING, SOURCE_TERM_THERMAL_CONVECTIVE_COOLING, &
-       SOURCE_TERM_PORE_PRESSURE_DISSIPATION, SOURCE_METHOD_NEWTON,          &
-       SOURCE_CADENCE_STAGE, SOURCE_PHASE_RK_IMPLICIT,                       &
-       SOURCE_SOLVE_NEWTON_BLOCK, SOURCE_TARGET_VELOCITY,                    &
-       SOURCE_TARGET_TEMPERATURE, SOURCE_TARGET_PORE_PRESSURE
-  USE rheology_2d, ONLY : correct_friction_momentum
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_CADENCE_STAGE, &
+       SOURCE_PHASE_RK_IMPLICIT
+  USE state_2d, ONLY : correct_friction_momentum
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
   USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var
@@ -33,7 +28,7 @@ PROGRAM test_grouped_implicit_stage
   TYPE(equation_partition_type) :: multi_partition
   TYPE(source_registry_type) :: multi_registry
   TYPE(source_group_type) :: filter_group
-  TYPE(source_solver_type) :: filter_solvers(3)
+  TYPE(source_group_type) :: filter_groups(3)
   LOGICAL :: implicit_mask(7), converged, line_search_failed
   INTEGER :: group_map(7), iterations, linear_info, i, equation
   REAL(wp) :: q_old(7), q_stage(7), known_residual(7), source(7), si_source(7)
@@ -140,32 +135,18 @@ PROGRAM test_grouped_implicit_stage
   filter_group%cadence=SOURCE_CADENCE_STAGE
   filter_group%method=SOURCE_METHOD_NEWTON
   filter_group%phase=SOURCE_PHASE_RK_IMPLICIT
-  filter_group%term_ids=[rheology_source_terms(rheology_model), &
-       SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
-       SOURCE_TERM_THERMAL_CONVECTIVE_COOLING, &
-       SOURCE_TERM_PORE_PRESSURE_DISSIPATION]
+  filter_group%source_names=[CHARACTER(LEN=64):: &
+       'rheology_lava', 'thermal_cooling', 'pore_pressure_dissipation']
   filter_group%equation_ids=[2,3,4,7]
-  filter_group%implicit_solver_ids=[1,2,3]
-  filter_group%analytic_solver_ids=[INTEGER::]
-  filter_solvers(1)%id=1
-  filter_solvers(1)%kind=SOURCE_SOLVE_NEWTON_BLOCK
-  filter_solvers(1)%execution_order=1
-  filter_solvers(1)%target_ids=[SOURCE_TARGET_VELOCITY]
-  filter_solvers(1)%equation_ids=[2,3]
-  filter_solvers(1)%term_ids=rheology_source_terms(rheology_model)
-  filter_solvers(2)%id=2
-  filter_solvers(2)%kind=SOURCE_SOLVE_NEWTON_BLOCK
-  filter_solvers(2)%execution_order=2
-  filter_solvers(2)%target_ids=[SOURCE_TARGET_TEMPERATURE]
-  filter_solvers(2)%equation_ids=[4]
-  filter_solvers(2)%term_ids=[SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
-       SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
-  filter_solvers(3)%id=3
-  filter_solvers(3)%kind=SOURCE_SOLVE_NEWTON_BLOCK
-  filter_solvers(3)%execution_order=3
-  filter_solvers(3)%target_ids=[SOURCE_TARGET_PORE_PRESSURE]
-  filter_solvers(3)%equation_ids=[7]
-  filter_solvers(3)%term_ids=[SOURCE_TERM_PORE_PRESSURE_DISSIPATION]
+  filter_groups(1)=filter_group
+  filter_groups(1)%source_names=[CHARACTER(LEN=64)::'rheology_lava']
+  filter_groups(1)%equation_ids=[2,3]
+  filter_groups(2)=filter_group
+  filter_groups(2)%source_names=[CHARACTER(LEN=64)::'thermal_cooling']
+  filter_groups(2)%equation_ids=[4]
+  filter_groups(3)=filter_group
+  filter_groups(3)%source_names=[CHARACTER(LEN=64)::'pore_pressure_dissipation']
+  filter_groups(3)%equation_ids=[7]
   q_old = [1200.0_wp, 2400.0_wp, -1200.0_wp, 4.0E9_wp,                     &
        180.0_wp, 120.0_wp, 6.0E6_wp]
   q_stage = q_old
@@ -174,7 +155,7 @@ PROGRAM test_grouped_implicit_stage
   a_diag = 0.75_wp
   CALL initialize_nonlinear_solver
   CALL solve_rk_step(partition, source_registry%stage_groups(),              &
-       source_registry%solvers(), q_stage, q_old, dt_step, a_diag,           &
+       q_stage, q_old, dt_step, a_diag,           &
        known_residual, 0.0_wp, 0.0_wp, 0.0_wp, iterations, converged,      &
        linear_info, line_search_failed)
   IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
@@ -183,40 +164,36 @@ PROGRAM test_grouped_implicit_stage
      ERROR STOP 'grouped implicit stage did not converge'
   END IF
 
-  CALL eval_implicit_terms(0.0_wp, 0.0_wp, 0.0_wp, r_qj=q_stage,            &
+  CALL eval_source_implicit(0.0_wp, 0.0_wp, 0.0_wp, r_qj=q_stage,            &
        r_nh_term_impl=source)
-  CALL eval_implicit_terms(0.0_wp,0.0_wp,0.0_wp,r_qj=q_stage,                &
-       r_nh_term_impl=filtered_implicit_source,group=filter_group,           &
-       solver=filter_solvers(1))
+  CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp,r_qj=q_stage,                &
+       r_nh_term_impl=filtered_implicit_source,group=filter_groups(1))
   IF (MAXVAL(ABS(filtered_implicit_source(2:3)-source(2:3))) .GT.           &
        1.0E-12_wp*MAX(1.0_wp,MAXVAL(ABS(source(2:3)))) .OR.                  &
        ANY(filtered_implicit_source([1,4,5,6,7])/=0.0_wp)) THEN
      ERROR STOP 'rheology solver selection leaked unrelated implicit terms'
   END IF
-  CALL eval_implicit_terms(0.0_wp,0.0_wp,0.0_wp,r_qj=q_stage,                &
-       r_nh_term_impl=filtered_implicit_source,group=filter_group,           &
-       solver=filter_solvers(2))
+  CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp,r_qj=q_stage,                &
+       r_nh_term_impl=filtered_implicit_source,group=filter_groups(2))
   IF (ABS(filtered_implicit_source(4)-source(4)) .GT.                       &
        1.0E-12_wp*MAX(1.0_wp,ABS(source(4))) .OR.                            &
        ANY(filtered_implicit_source([1,2,3,5,6,7])/=0.0_wp)) THEN
      ERROR STOP 'thermal solver selection leaked unrelated implicit terms'
   END IF
-  CALL eval_implicit_terms(0.0_wp,0.0_wp,0.0_wp,r_qj=q_stage,                &
-       r_nh_term_impl=filtered_implicit_source,group=filter_group,           &
-       solver=filter_solvers(3))
+  CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp,r_qj=q_stage,                &
+       r_nh_term_impl=filtered_implicit_source,group=filter_groups(3))
   IF (ABS(filtered_implicit_source(7)-source(7)) .GT.                       &
        1.0E-12_wp*MAX(1.0_wp,ABS(source(7))) .OR.                            &
        ANY(filtered_implicit_source([1,2,3,4,5,6])/=0.0_wp)) THEN
      ERROR STOP 'pore-pressure solver selection leaked unrelated implicit terms'
   END IF
 
-  CALL eval_implicit_terms(0.0_wp,0.0_wp,0.0_wp,r_qj=q_stage,                &
-       r_nh_term_impl=filtered_implicit_source,group=filter_group,           &
-       solver=filter_solvers(1))
+  CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp,r_qj=q_stage,                &
+       r_nh_term_impl=filtered_implicit_source,group=filter_groups(1))
   complex_q=CMPLX(q_stage,0.0_wp,wp)
   complex_q(2)=CMPLX(q_stage(2),1.0E-12_wp,wp)
-  CALL eval_implicit_terms(0.0_wp,0.0_wp,0.0_wp,c_qj=complex_q,             &
-       c_nh_term_impl=complex_source,group=filter_group,solver=filter_solvers(1))
+  CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp,c_qj=complex_q,             &
+       c_nh_term_impl=complex_source,group=filter_groups(1))
   IF (MAXVAL(ABS(REAL(complex_source(2:3),wp)-                              &
        filtered_implicit_source(2:3))) .GT.                                  &
        1.0E-12_wp*MAX(1.0_wp,MAXVAL(ABS(source(2:3))))) THEN
@@ -226,26 +203,24 @@ PROGRAM test_grouped_implicit_stage
        ANY(complex_source([1,4,5,6,7])/=(0.0_wp,0.0_wp))) THEN
      ERROR STOP 'complex rheology solver selection lost derivatives or leaked terms'
   END IF
-  CALL eval_implicit_terms(0.0_wp,0.0_wp,0.0_wp,r_qj=q_stage,                &
-       r_nh_term_impl=filtered_implicit_source,group=filter_group,           &
-       solver=filter_solvers(2))
+  CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp,r_qj=q_stage,                &
+       r_nh_term_impl=filtered_implicit_source,group=filter_groups(2))
   complex_q=CMPLX(q_stage,0.0_wp,wp)
   complex_q(4)=CMPLX(q_stage(4),1.0E-12_wp,wp)
-  CALL eval_implicit_terms(0.0_wp,0.0_wp,0.0_wp,c_qj=complex_q,             &
-       c_nh_term_impl=complex_source,group=filter_group,solver=filter_solvers(2))
+  CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp,c_qj=complex_q,             &
+       c_nh_term_impl=complex_source,group=filter_groups(2))
   IF (ABS(REAL(complex_source(4),wp)-filtered_implicit_source(4)) .GT.      &
        1.0E-12_wp*MAX(1.0_wp,ABS(source(4))) .OR.                           &
        ABS(AIMAG(complex_source(4)))==0.0_wp .OR.                           &
        ANY(complex_source([1,2,3,5,6,7])/=(0.0_wp,0.0_wp))) THEN
      ERROR STOP 'complex thermal solver selection failed'
   END IF
-  CALL eval_implicit_terms(0.0_wp,0.0_wp,0.0_wp,r_qj=q_stage,                &
-       r_nh_term_impl=filtered_implicit_source,group=filter_group,           &
-       solver=filter_solvers(3))
+  CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp,r_qj=q_stage,                &
+       r_nh_term_impl=filtered_implicit_source,group=filter_groups(3))
   complex_q=CMPLX(q_stage,0.0_wp,wp)
   complex_q(7)=CMPLX(q_stage(7),1.0E-12_wp,wp)
-  CALL eval_implicit_terms(0.0_wp,0.0_wp,0.0_wp,c_qj=complex_q,             &
-       c_nh_term_impl=complex_source,group=filter_group,solver=filter_solvers(3))
+  CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp,c_qj=complex_q,             &
+       c_nh_term_impl=complex_source,group=filter_groups(3))
   IF (ABS(REAL(complex_source(7),wp)-filtered_implicit_source(7)) .GT.      &
        1.0E-12_wp*MAX(1.0_wp,ABS(source(7))) .OR.                           &
        ABS(AIMAG(complex_source(7)))==0.0_wp .OR.                           &
@@ -254,24 +229,24 @@ PROGRAM test_grouped_implicit_stage
   END IF
 
   CALL qc_to_qp(q_stage,qp_known,dynamic_pressure)
-  CALL eval_semi_implicit_terms(0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,       &
+  CALL eval_source_semi_implicit(0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,       &
        grav,qp_known,si_source,0.0_wp)
-  CALL eval_semi_implicit_terms(0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,       &
+  CALL eval_source_semi_implicit(0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,       &
        grav,qp_known,filtered_semi_implicit_source,0.0_wp,                 &
-       group=filter_group,solver=filter_solvers(1))
+       group=filter_groups(1))
   IF (MAXVAL(ABS(filtered_semi_implicit_source-si_source)) .GT.            &
        1.0E-12_wp*MAX(1.0_wp,MAXVAL(ABS(si_source)))) THEN
      ERROR STOP 'semi-implicit rheology solver selection changed the rate'
   END IF
-  CALL eval_semi_implicit_terms(0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,       &
+  CALL eval_source_semi_implicit(0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,       &
        grav,qp_known,filtered_semi_implicit_source,0.0_wp,                 &
-       group=filter_group,solver=filter_solvers(2))
+       group=filter_groups(2))
   IF (ANY(filtered_semi_implicit_source/=0.0_wp)) THEN
      ERROR STOP 'thermal solver selection leaked a semi-implicit rate'
   END IF
-  CALL eval_semi_implicit_terms(0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,       &
+  CALL eval_source_semi_implicit(0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp,       &
        grav,qp_known,filtered_semi_implicit_source,0.0_wp,                 &
-       group=filter_group,solver=filter_solvers(3))
+       group=filter_groups(3))
   IF (ANY(filtered_semi_implicit_source/=0.0_wp)) THEN
      ERROR STOP 'pore-pressure solver selection leaked a semi-implicit rate'
   END IF
@@ -301,7 +276,7 @@ PROGRAM test_grouped_implicit_stage
   q_stage_check(2:3) = 0.0_wp
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
   CALL solve_imex_stage(partition, source_registry%stage_groups(),           &
-       source_registry%solvers(), q_stage_check, q_stage_check,              &
+       q_stage_check, q_stage_check,              &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                     &
        effective_stage_term, iterations, converged, linear_info,             &
@@ -341,7 +316,7 @@ PROGRAM test_grouped_implicit_stage
   CALL solve_pore_pressure_dissipation_analytic(pressure_known, dt_step*a_diag,          &
        expected_h, expected_temperature, expected_alphas, expected_pressure)
   CALL solve_imex_stage(partition, source_registry%stage_groups(),            &
-       source_registry%solvers(), q_stage_check, q_stage_check,               &
+       q_stage_check, q_stage_check,               &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                     &
        effective_stage_term, iterations, converged, linear_info,             &
@@ -387,7 +362,7 @@ PROGRAM test_grouped_implicit_stage
      ERROR STOP 'energy and pore pressure could not share an analytic group'
   END IF
   CALL solve_imex_stage(partition, source_registry%stage_groups(),          &
-       source_registry%solvers(), q_stage_check, q_stage_check,             &
+       q_stage_check, q_stage_check,             &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                    &
        effective_stage_term, iterations, converged, linear_info,            &
@@ -433,7 +408,7 @@ PROGRAM test_grouped_implicit_stage
 
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
   CALL solve_imex_stage(partition, source_registry%stage_groups(),           &
-       source_registry%solvers(), q_stage_check, q_stage_check,              &
+       q_stage_check, q_stage_check,              &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                     &
        effective_stage_term, iterations, converged, linear_info,             &
@@ -441,7 +416,7 @@ PROGRAM test_grouped_implicit_stage
   IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
      ERROR STOP 'single Newton group did not converge'
   END IF
-  CALL eval_implicit_terms(0.0_wp, 0.0_wp, 0.0_wp, r_qj=q_stage,            &
+  CALL eval_source_implicit(0.0_wp, 0.0_wp, 0.0_wp, r_qj=q_stage,            &
        r_nh_term_impl=source)
   DO i = 1, SIZE(partition%implicit_map)
      equation = partition%implicit_map(i)
@@ -458,14 +433,14 @@ PROGRAM test_grouped_implicit_stage
   tau0 = 20000.0_wp
   q_stage_check = q_old
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
-  CALL eval_semi_implicit_terms(0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
+  CALL eval_source_semi_implicit(0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
        grav, qp_known, si_source, 0.0_wp)
   q_expected = q_stage_check
   q_expected(2:3) = q_expected(2:3) +                                     &
        dt_step*a_diag*si_source(2:3)
   CALL correct_friction_momentum(q_stage_check(2:3), q_expected(2:3))
   CALL solve_imex_stage(partition, source_registry%stage_groups(),           &
-       source_registry%solvers(), q_stage_check, q_stage_check,              &
+       q_stage_check, q_stage_check,              &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                     &
        effective_stage_term, iterations, converged, linear_info,             &
@@ -481,10 +456,10 @@ PROGRAM test_grouped_implicit_stage
 
   q_stage_check = q_old
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
-  CALL eval_semi_implicit_terms(0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
+  CALL eval_source_semi_implicit(0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
        grav, qp_known, si_source, 0.0_wp)
   CALL solve_imex_stage(partition, source_registry%stage_groups(),          &
-       source_registry%solvers(), q_stage_check, q_stage_check,             &
+       q_stage_check, q_stage_check,             &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                    &
        effective_stage_term, iterations, converged, linear_info,            &
@@ -492,7 +467,7 @@ PROGRAM test_grouped_implicit_stage
   IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
      ERROR STOP 'Newton stage with SI momentum source did not converge'
   END IF
-  CALL eval_implicit_terms(0.0_wp, 0.0_wp, 0.0_wp, r_qj=q_stage,            &
+  CALL eval_source_implicit(0.0_wp, 0.0_wp, 0.0_wp, r_qj=q_stage,            &
        r_nh_term_impl=source)
   scale = MAX(1.0_wp, MAXVAL(ABS(q_stage(2:3))))
   IF (MAXVAL(ABS(q_stage(2:3) - q_stage_check(2:3) -                       &
@@ -518,7 +493,7 @@ PROGRAM test_grouped_implicit_stage
        expected_temperature, expected_density, speed_ratio,                &
        [expected_u, expected_v], analytic_velocity)
   CALL solve_imex_stage(partition, source_registry%stage_groups(),          &
-       source_registry%solvers(), q_stage_check, q_stage_check,             &
+       q_stage_check, q_stage_check,             &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
        0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                    &
        effective_stage_term, iterations, converged, linear_info,            &
@@ -543,13 +518,11 @@ PROGRAM test_grouped_implicit_stage
 
 CONTAINS
   SUBROUTINE test_ordered_multi_solver_group
-    TYPE(source_group_type), ALLOCATABLE :: groups(:),steps(:)
-    TYPE(source_solver_type), ALLOCATABLE :: solvers(:)
+    TYPE(source_group_type), ALLOCATABLE :: groups(:)
     LOGICAL :: multi_mask(7), multi_converged, multi_line_search_failed
-    INTEGER :: multi_map(7), multi_iterations, multi_linear_info
+    INTEGER :: multi_map(7), multi_iterations, multi_linear_info, target
     REAL(wp) :: multi_state(7), multi_stage(7), multi_effective_rate(7)
-    REAL(wp) :: filtered_rate(7)
-    REAL(wp) :: normalized_error
+    REAL(wp) :: joint_rate(7), normalized_error
     CHARACTER(LEN=256) :: error
 
     multi_mask=.FALSE.
@@ -558,41 +531,42 @@ CONTAINS
     multi_map([2,3,4,7])=1
     CALL multi_partition%initialize(multi_mask,multi_map, &
          [IM_GROUP_METHOD_NEWTON])
+    ! One joint Newton group owns all coupled velocity, temperature and
+    ! pore-pressure equations; no ordered internal solver schedule exists.
     CALL multi_registry%initialize(n_vars,idx_pore,[filter_group], &
-         [source_group_type::],filter_solvers,error)
+         [source_group_type::],error)
     IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
     groups=multi_registry%stage_groups()
-    steps=multi_registry%step_groups()
-    solvers=multi_registry%solvers()
     multi_state=q_old
-    CALL solve_imex_stage(multi_partition,groups,solvers,multi_state,q_old, &
+    CALL solve_imex_stage(multi_partition,groups,multi_state,q_old, &
          dt_step,a_diag,known_residual,0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
          0.0_wp,grav,0.0_wp,.FALSE.,.FALSE.,multi_stage, &
          multi_effective_rate,multi_iterations,multi_converged, &
          multi_linear_info,multi_line_search_failed)
     IF (.NOT.multi_converged .OR. multi_linear_info/=0 .OR. &
          multi_line_search_failed) THEN
-       ERROR STOP 'ordered multiple Newton solvers did not converge'
+       ERROR STOP 'joint Newton group did not converge'
     END IF
-
-    CALL eval_implicit_terms(0.0_wp,0.0_wp,0.0_wp,r_qj=multi_stage, &
-         r_nh_term_impl=filtered_rate,group=groups(1),solver=solvers(2))
-    normalized_error=ABS(multi_stage(4)-q_old(4)-dt_step*a_diag* &
-         filtered_rate(4))/MAX(1.0_wp,ABS(q_old(4)))
-    IF (normalized_error>5.0E-11_wp) &
-         ERROR STOP 'ordered thermal Newton solve has a residual'
-
-    CALL eval_implicit_terms(0.0_wp,0.0_wp,0.0_wp,r_qj=multi_stage, &
-         r_nh_term_impl=filtered_rate,group=groups(1),solver=solvers(3))
-    normalized_error=ABS(multi_stage(7)-q_old(7)-dt_step*a_diag* &
-         filtered_rate(7))/MAX(1.0_wp,ABS(q_old(7)))
-    IF (normalized_error>5.0E-11_wp) &
-         ERROR STOP 'ordered pore-pressure Newton solve has a residual'
+    CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp,r_qj=multi_stage, &
+         r_nh_term_impl=joint_rate,group=groups(1))
+    DO target=1,4
+       SELECT CASE(target)
+       CASE(1); equation=2
+       CASE(2); equation=3
+       CASE(3); equation=4
+       CASE(4); equation=7
+       END SELECT
+       normalized_error=ABS(multi_stage(equation)-q_old(equation)- &
+            dt_step*a_diag*joint_rate(equation))/ &
+            MAX(1.0_wp,ABS(q_old(equation)))
+       IF (normalized_error>5.0E-11_wp) &
+            ERROR STOP 'joint Newton group residual'
+    END DO
   END SUBROUTINE test_ordered_multi_solver_group
 
   SUBROUTINE refresh_source_registry
     INTEGER :: target_groups(3),methods(3),pore_equation,group
-    INTEGER, ALLOCATABLE :: active_terms(:)
+    CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
     CHARACTER(LEN=256) :: error
     target_groups=1
     methods=IM_GROUP_METHOD_NEWTON
@@ -601,19 +575,17 @@ CONTAINS
     END DO
     IF (partition%implicit(2)) target_groups(1)=partition%IM_group(2)
     IF (partition%implicit(4)) target_groups(2)=partition%IM_group(4)
-    active_terms=[INTEGER::]
-    IF (rheology_flag) active_terms=rheology_source_terms(rheology_model)
-    IF (partition%implicit(4)) active_terms=[active_terms, &
-         SOURCE_TERM_THERMAL_RADIATIVE_COOLING, &
-         SOURCE_TERM_THERMAL_CONVECTIVE_COOLING]
+    active_names=[CHARACTER(LEN=64)::]
+    IF (rheology_flag) active_names=[CHARACTER(LEN=64)::'rheology_'//TRIM(rheology_model)]
+    IF (partition%implicit(4)) active_names=[active_names,CHARACTER(LEN=64)::'thermal_cooling']
     pore_equation=0
     IF (pore_pressure_flag) THEN
        pore_equation=idx_pore
        target_groups(3)=partition%IM_group(idx_pore)
-       active_terms=[active_terms,SOURCE_TERM_PORE_PRESSURE_DISSIPATION]
+       active_names=[active_names,CHARACTER(LEN=64)::'pore_pressure_dissipation']
     END IF
     CALL source_registry%initialize_legacy(partition,target_groups,methods, &
-         pore_equation,active_terms,error)
+         pore_equation,active_names,error)
     IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
   END SUBROUTINE refresh_source_registry
 

@@ -666,8 +666,7 @@ CONTAINS
     IF (rheology_flag) active_names=[CHARACTER(LEN=64)::'rheology_'//TRIM(rheology_model)]
     IF (curvature_term_flag) &
          active_names=[active_names,CHARACTER(LEN=64)::'geometry_curvature']
-    IF (partition%implicit(4)) active_names=[active_names,CHARACTER(LEN=64)::'thermal_radiative_cooling', &
-         'thermal_convective_cooling']
+    IF (partition%implicit(4)) active_names=[active_names,CHARACTER(LEN=64)::'thermal_cooling']
     pore_equation=0
     IF (pore_pressure_flag .AND. idx_pore>=5 .AND. idx_pore<=n_vars) THEN
        IF (partition%implicit(idx_pore)) THEN
