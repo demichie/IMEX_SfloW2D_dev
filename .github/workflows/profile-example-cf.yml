@@ -1,0 +1,65 @@
+name: Profile EXAMPLE_CF
+
+on:
+  workflow_dispatch:
+    inputs:
+      end_time:
+        description: "Short profiling horizon in simulation seconds (1, 2, 5, 10, 20)"
+        required: true
+        default: "5"
+        type: choice
+        options: ["1", "2", "5", "10", "20"]
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    name: GNU gprof serial CF
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install compiler and profiling dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake gfortran make binutils liblapack-dev libnetcdff-dev unzip
+      - name: Build optimized solver with gprof instrumentation
+        env:
+          FC: gfortran
+          FCFLAGS: "-O2 -g -pg -fno-omit-frame-pointer"
+        run: |
+          autoreconf -fi
+          ./configure --with-netcdf=/usr
+          make -j2
+      - name: Run unmodified CF physics with shortened horizon
+        env:
+          OMP_NUM_THREADS: "1"
+          OMP_DYNAMIC: "FALSE"
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p profile-artifacts
+          cd EXAMPLES/EXAMPLE_CF
+          unzip -oq topo.zip
+          cp IMEX_SfloW2D.inp profile-original.inp
+          sed -E 's/^[[:space:]]*T_END[[:space:]]*=.*/ T_END= ${{ inputs.end_time }}.0D0,/' \
+            profile-original.inp > IMEX_SfloW2D.inp
+          /usr/bin/time -v ../../src/IMEX_SfloW2D > ../../profile-artifacts/solver.log 2> ../../profile-artifacts/time.txt
+          test -s gmon.out
+          mv gmon.out ../../profile-artifacts/gmon.out
+          cp IMEX_SfloW2D.inp ../../profile-artifacts/profile.inp
+      - name: Build symbol-level profiling report
+        shell: bash
+        run: |
+          gprof -b src/IMEX_SfloW2D profile-artifacts/gmon.out > profile-artifacts/gprof.txt
+          head -n 100 profile-artifacts/gprof.txt > profile-artifacts/top100.txt
+          git rev-parse HEAD > profile-artifacts/revision.txt
+      - name: Upload measurements and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cf-serial-gprof-${{ github.run_id }}
+          path: profile-artifacts/
+          if-no-files-found: warn
+          retention-days: 30
