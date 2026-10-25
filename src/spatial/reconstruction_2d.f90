@@ -1268,8 +1268,8 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
        CALL form_direct_face_momentum(this%qp_cellE(:,j,k))
        CALL form_direct_face_momentum(this%qp_cellS(:,j,k))
        CALL form_direct_face_momentum(this%qp_cellN(:,j,k))
-       IF (use_kt_direct) THEN
-          CALL final_kt_state( this%qp_cellW(:,j,k),                         &
+       ! The unique transport face family is populated for every caller.
+       CALL final_kt_state( this%qp_cellW(:,j,k),                         &
                this%q_adv_interfaceR(:,j,k), this%qp_adv_interfaceR(:,j,k),  &
                'KT reconstruction west', &
                'KT reconstruction west unit-depth state' )
@@ -1285,12 +1285,9 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                this%q_adv_interfaceB(:,j,k+1), this%qp_adv_interfaceB(:,j,k+1), &
                'KT reconstruction north', &
                'KT reconstruction north unit-depth state' )
-       END IF
     END DO
     !$OMP END DO
 
-    ! Map all eta cell traces to their oriented face storage.  Conservative
-    ! only workset cells can contribute to an active interface.
     ! Preserve the solver's existing external ghost convention after replacing
     ! the cell-owned traces.
     !$OMP DO
@@ -1315,8 +1312,8 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     END DO
     !$OMP END DO
 
-    ! Rebuild the internal reflecting side of radial-source cells from the new
-    ! HP state.  The volumetric momentum and auxiliary normal velocity are both
+    ! Rebuild the internal reflecting side of radial-source cells from the
+    ! reconstructed transport state.  The volumetric momentum and auxiliary normal velocity are both
     ! reflected so qp and q remain consistent.
     IF ( radial_source_flag ) THEN
        !$OMP DO
