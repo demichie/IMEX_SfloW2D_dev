@@ -243,8 +243,8 @@ CONTAINS
     CHARACTER(*), INTENT(IN) :: label
     INTEGER :: i
     CALL require(left%method==right%method .AND. &
-         left%cadence==right%cadence .AND. left%phase==right%phase, &
-         label//' method/cadence/phase')
+         left%cadence==right%cadence, &
+         label//' method/cadence')
     CALL require(ALLOCATED(left%equation_ids) .EQV. &
          ALLOCATED(right%equation_ids),label//' equations allocated')
     IF (ALLOCATED(left%equation_ids)) THEN

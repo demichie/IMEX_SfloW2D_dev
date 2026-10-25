@@ -7,8 +7,7 @@ PROGRAM test_d17_production_newton
   USE source_configuration_2d, ONLY : initialize_configured_sources, &
        initialize_native_source_configuration
   USE source_input_2d
-  USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON,SOURCE_CADENCE_STAGE, &
-       SOURCE_PHASE_RK_IMPLICIT
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON,SOURCE_CADENCE_STAGE
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,solve_rk_step,solve_imex_stage
   USE source_terms_2d, ONLY : eval_source_implicit
   USE rheology_lava_2d, ONLY : nu_ref,visc_par,tau0
@@ -64,7 +63,7 @@ PROGRAM test_d17_production_newton
     END IF
     group(1)%id=1;group(1)%cadence=SOURCE_CADENCE_STAGE
     group(1)%method=SOURCE_METHOD_NEWTON
-    group(1)%phase=SOURCE_PHASE_RK_IMPLICIT
+
     group(1)%execution_order=1
     old=[1000.0_wp,3000.0_wp,-4000.0_wp,1.2E9_wp]
     q=old;known=0.0_wp;dt=0.2_wp

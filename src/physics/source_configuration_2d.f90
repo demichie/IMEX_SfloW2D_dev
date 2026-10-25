@@ -23,6 +23,12 @@ MODULE source_configuration_2d
   PUBLIC :: initialize_configured_sources
   PUBLIC :: initialize_native_source_configuration
 CONTAINS
+  PURE INTEGER FUNCTION group_method_rank(group_method) RESULT(rank)
+    INTEGER, INTENT(IN) :: group_method
+    rank=1
+    IF (group_method==SOURCE_METHOD_EXPLICIT) rank=2
+  END FUNCTION group_method_rank
+
   !> \brief Build simulation-owned source metadata from current validated input.
   !> \param[in,out] registry Destination, cleared if translation fails.
   !> \param[in] partition Existing compact equation partition, never modified.
@@ -99,7 +105,7 @@ CONTAINS
     CHARACTER(LEN=64), ALLOCATABLE :: parsed_names(:,:)
     CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
     INTEGER :: cadence(SOURCE_INPUT_MAX_GROUPS),method(SOURCE_INPUT_MAX_GROUPS)
-    INTEGER :: phase(SOURCE_INPUT_MAX_GROUPS),solver_count(SOURCE_INPUT_MAX_GROUPS)
+    INTEGER :: solver_count(SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: parsed_count(SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: target_count(1,SOURCE_INPUT_MAX_GROUPS)
     INTEGER :: target_ids(SOURCE_INPUT_MAX_TARGETS,1, &
@@ -132,7 +138,7 @@ CONTAINS
     END IF
 
     ALLOCATE(parsed_names(SOURCE_INPUT_MAX_TERMS,source_group_count))
-    parsed_names=''; parsed_count=0; cadence=0; method=0; phase=0; solver_count=0
+    parsed_names=''; parsed_count=0; cadence=0; method=0; solver_count=0
     target_count=0; target_ids=0
     seen_names=''; n_seen=0
     DO g=1,source_group_count
@@ -148,23 +154,15 @@ CONTAINS
       method(g)=native_method(source_group_method(g))
       error='D17: unsupported source group cadence or method'
       IF (cadence(g)==0 .OR. method(g)==0) RETURN
-      SELECT CASE(cadence(g))
-      CASE(SOURCE_CADENCE_STAGE)
-        IF (method(g)==SOURCE_METHOD_EXPLICIT) THEN
-          phase(g)=SOURCE_PHASE_RK_EXPLICIT
-        ELSE
-          phase(g)=SOURCE_PHASE_RK_IMPLICIT
-        END IF
-      CASE(SOURCE_CADENCE_STEP)
-        phase(g)=SOURCE_PHASE_POST_RK
-        IF (method(g)/=SOURCE_METHOD_EXPLICIT) THEN
-          error='D17: post-RK source groups must be explicit'; RETURN
-        END IF
-      END SELECT
+      IF (cadence(g)==SOURCE_CADENCE_STEP .AND. method(g)/=SOURCE_METHOD_EXPLICIT) THEN
+        error='D17: post-RK source groups must be explicit'; RETURN
+      END IF
       DO i=1,g-1
-        IF (phase(g)==phase(i) .AND. cadence(g)==cadence(i) .AND. &
-             source_group_order(g)==source_group_order(i)) THEN
-          error='D17: duplicate execution order within a phase'; RETURN
+        IF (cadence(g)/=cadence(i)) CYCLE
+        IF ((method(g)==SOURCE_METHOD_EXPLICIT) .NEQV. &
+             (method(i)==SOURCE_METHOD_EXPLICIT)) CYCLE
+        IF (source_group_order(g)==source_group_order(i)) THEN
+          error='D17: duplicate execution order within a method class'; RETURN
         END IF
       END DO
       IF (source_group_term_count(g)<0 .OR. &
@@ -303,8 +301,9 @@ CONTAINS
       slot=ordered(i); j=i-1
       DO WHILE (j>=1)
         g=ordered(j)
-        IF (phase(g)<phase(slot)) EXIT
-        IF (phase(g)==phase(slot) .AND. source_group_order(g)<=source_group_order(slot)) EXIT
+        IF (group_method_rank(method(g))<group_method_rank(method(slot))) EXIT
+        IF (group_method_rank(method(g))==group_method_rank(method(slot)) .AND. &
+             source_group_order(g)<=source_group_order(slot)) EXIT
         ordered(j+1)=ordered(j); j=j-1
       END DO
       ordered(j+1)=slot
@@ -313,7 +312,7 @@ CONTAINS
     compact_group=0
     DO i=1,source_group_count
       g=ordered(i)
-      IF (phase(g)/=SOURCE_PHASE_RK_IMPLICIT) CYCLE
+      IF (cadence(g)/=SOURCE_CADENCE_STAGE .OR. method(g)==SOURCE_METHOD_EXPLICIT) CYCLE
       IF (parsed_count(g)==0) CYCLE
       compact_group=compact_group+1
       methods(compact_group)=IM_GROUP_METHOD_NEWTON
@@ -337,15 +336,16 @@ CONTAINS
     j=0; k=0
     DO i=1,source_group_count
       g=ordered(i)
-      IF (phase(g)==SOURCE_PHASE_RK_IMPLICIT .AND. parsed_count(g)==0) CYCLE
+      IF (cadence(g)==SOURCE_CADENCE_STAGE .AND. &
+           method(g)/=SOURCE_METHOD_EXPLICIT .AND. parsed_count(g)==0) CYCLE
       group%id=source_group_id(g); group%legacy_id=0
       group%cadence=cadence(g); group%method=method(g)
-      group%phase=phase(g); group%execution_order=source_group_order(g)
+      group%execution_order=source_group_order(g)
       IF (ALLOCATED(group%source_names)) DEALLOCATE(group%source_names)
       ALLOCATE(group%source_names(parsed_count(g)))
       group%source_names=parsed_names(1:parsed_count(g),g)
       group%equation_ids=[INTEGER::]
-      IF (phase(g)==SOURCE_PHASE_RK_IMPLICIT) THEN
+      IF (cadence(g)==SOURCE_CADENCE_STAGE .AND. method(g)/=SOURCE_METHOD_EXPLICIT) THEN
         equations=[INTEGER::]
         targets=target_ids(1:target_count(1,g),1,g)
         DO t=1,SIZE(targets)

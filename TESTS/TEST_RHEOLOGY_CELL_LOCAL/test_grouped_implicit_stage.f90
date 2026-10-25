@@ -11,8 +11,7 @@ PROGRAM test_grouped_implicit_stage
   USE equation_terms_2d, ONLY : init_problem_param
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_configuration_2d, ONLY : initialize_configured_sources
-  USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_CADENCE_STAGE, &
-       SOURCE_PHASE_RK_IMPLICIT
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_CADENCE_STAGE
   USE state_2d, ONLY : correct_friction_momentum
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
@@ -136,7 +135,7 @@ PROGRAM test_grouped_implicit_stage
   filter_group%execution_order=1
   filter_group%cadence=SOURCE_CADENCE_STAGE
   filter_group%method=SOURCE_METHOD_NEWTON
-  filter_group%phase=SOURCE_PHASE_RK_IMPLICIT
+
   filter_group%source_names=[CHARACTER(LEN=64):: &
        'rheology_lava', 'thermal_cooling', 'pore_pressure_dissipation']
   filter_group%equation_ids=[2,3,4,7]

@@ -20,8 +20,7 @@ MODULE source_registry_2d
     INTEGER :: legacy_id=0 !< Original IMEX input group, zero for non-IM work.
     INTEGER :: cadence=0 !< Stage or post-RK step application.
     INTEGER :: method=0 !< Explicit, Newton or analytic.
-    INTEGER :: phase=0 !< Implicit sweep, requested EX evaluation, or post-RK.
-    INTEGER :: execution_order=0 !< Explicit order within its phase.
+    INTEGER :: execution_order=0 !< Order within cadence and method class.
     CHARACTER(LEN=64), ALLOCATABLE :: source_names(:) !< Unique schedulable source identities.
     INTEGER, ALLOCATABLE :: equation_ids(:) !< Union of target equations or explicit footprint.
   END TYPE source_group_type
@@ -43,6 +42,12 @@ MODULE source_registry_2d
     PROCEDURE :: validate => validate_registry
   END TYPE source_registry_type
 CONTAINS
+  PURE INTEGER FUNCTION group_stage_rank(group) RESULT(rank)
+    TYPE(source_group_type), INTENT(IN) :: group
+    rank=1
+    IF (group%method==SOURCE_METHOD_EXPLICIT) rank=2
+  END FUNCTION group_stage_rank
+
   !> Membership in the single, canonical physical-source name array.
   PURE LOGICAL FUNCTION group_contains_name(group,name) RESULT(found)
     TYPE(source_group_type), INTENT(IN) :: group
@@ -183,8 +188,7 @@ CONTAINS
         names=names_for_targets(active_names,targets)
         equations=PACK([(i,i=1,partition%n_equations)],partition%IM_group== &
              partition%IM_group(target_equation_ids_first(targets(1),pore_equation)))
-        group=make_group(legacy,legacy,SOURCE_CADENCE_STAGE,method, &
-             SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,names,equations)
+        group=make_group(legacy,legacy,SOURCE_CADENCE_STAGE,method,SIZE(stages)+1,names,equations)
         stages=[stages,group]
       ELSE
         DO i=1,SIZE(targets)
@@ -196,20 +200,17 @@ CONTAINS
             split_id=split_id+1
             order=split_id
           END IF
-          group=make_group(order,legacy,SOURCE_CADENCE_STAGE,method, &
-               SOURCE_PHASE_RK_IMPLICIT,SIZE(stages)+1,names,equations)
+          group=make_group(order,legacy,SOURCE_CADENCE_STAGE,method,SIZE(stages)+1,names,equations)
           stages=[stages,group]
         END DO
       END IF
     END DO
     equations=[(i,i=1,partition%n_equations)]
     names=names_for_targets(active_names,[0])
-    group=make_group(4,0,SOURCE_CADENCE_STAGE,SOURCE_METHOD_EXPLICIT, &
-         SOURCE_PHASE_RK_EXPLICIT,1,names,equations)
+    group=make_group(4,0,SOURCE_CADENCE_STAGE,SOURCE_METHOD_EXPLICIT,1,names,equations)
     stages=[stages,group]
     names=names_for_targets(active_names,[-1])
-    group=make_group(1,0,SOURCE_CADENCE_STEP,SOURCE_METHOD_EXPLICIT, &
-         SOURCE_PHASE_POST_RK,1,names,equations)
+    group=make_group(1,0,SOURCE_CADENCE_STEP,SOURCE_METHOD_EXPLICIT,1,names,equations)
     steps=[group]
     CALL this%initialize(partition%n_equations,pore_equation,stages,steps,error)
   END SUBROUTINE initialize_legacy_registry
@@ -244,7 +245,7 @@ CONTAINS
     DO i=1,SIZE(groups)
       group=groups(i)
       rheology_name='' ! Rheology is one schedulable physical identity.
-      error='D17: invalid group identity, method, phase or order'
+      error='D17: invalid group identity, method, cadence or order'
       IF (group%id<1 .OR. group%execution_order<1 .OR. group%legacy_id<0) RETURN
       IF (i<=nstage) THEN
         IF (group%cadence/=SOURCE_CADENCE_STAGE) RETURN
@@ -253,21 +254,17 @@ CONTAINS
       END IF
       SELECT CASE(group%method)
       CASE(SOURCE_METHOD_EXPLICIT)
-        IF (group%cadence==SOURCE_CADENCE_STAGE) THEN
-          IF (group%phase/=SOURCE_PHASE_RK_EXPLICIT) RETURN
-        ELSE
-          IF (group%phase/=SOURCE_PHASE_POST_RK) RETURN
-        END IF
+        CONTINUE
       CASE(SOURCE_METHOD_NEWTON,SOURCE_METHOD_ANALYTIC)
-        IF (group%cadence/=SOURCE_CADENCE_STAGE .OR. group%phase/=SOURCE_PHASE_RK_IMPLICIT) RETURN
+        IF (group%cadence/=SOURCE_CADENCE_STAGE) RETURN
       CASE DEFAULT
         RETURN
       END SELECT
       DO j=1,i-1
         IF (groups(j)%cadence/=group%cadence) CYCLE
         IF (groups(j)%id==group%id) RETURN
-        IF (groups(j)%phase>group%phase) RETURN
-        IF (groups(j)%phase==group%phase .AND. &
+        IF (group_stage_rank(groups(j))>group_stage_rank(group)) RETURN
+        IF (group_stage_rank(groups(j))==group_stage_rank(group) .AND. &
              groups(j)%execution_order>=group%execution_order) RETURN
       END DO
       error='D17: unallocated group descriptor arrays'
@@ -438,17 +435,16 @@ CONTAINS
   !> \param[in] legacy Original input group, or zero for EX/step.
   !> \param[in] cadence Stage or step namespace.
   !> \param[in] method Group method.
-  !> \param[in] phase Evaluation phase within its cadence.
-  !> \param[in] order Explicit position within that phase.
+  !> \param[in] order Position within cadence and method class.
   !> \param[in] names Canonical component names, converted at the legacy boundary.
   !> \param[in] equations Conservative equation footprint.
   !> \return Group directly owning the equation footprint.
-  FUNCTION make_group(id,legacy,cadence,method,phase,order,names,equations) RESULT(group)
-    INTEGER, INTENT(IN) :: id,legacy,cadence,method,phase,order,equations(:)
+  FUNCTION make_group(id,legacy,cadence,method,order,names,equations) RESULT(group)
+    INTEGER, INTENT(IN) :: id,legacy,cadence,method,order,equations(:)
     CHARACTER(*), INTENT(IN) :: names(:)
     TYPE(source_group_type) :: group
     group%id=id; group%legacy_id=legacy; group%cadence=cadence
-    group%method=method; group%phase=phase; group%execution_order=order
+    group%method=method; group%execution_order=order
     ! Allocate the owned arrays explicitly to avoid compiler warnings about
     ! allocatable-component descriptor initialization on intrinsic assignment.
     ALLOCATE(group%source_names(SIZE(names)),group%equation_ids(SIZE(equations)))

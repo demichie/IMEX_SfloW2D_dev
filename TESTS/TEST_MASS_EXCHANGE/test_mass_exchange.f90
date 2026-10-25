@@ -17,7 +17,7 @@ PROGRAM test_mass_exchange
   USE step_source_executor_2d, ONLY : apply_mass_exchange_step => execute_step_source_groups
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
-  USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, SOURCE_METHOD_EXPLICIT, SOURCE_PHASE_POST_RK
+  USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, SOURCE_METHOD_EXPLICIT
   USE source_configuration_2d, ONLY : initialize_configured_sources
   USE inpout_2d, ONLY : write_restart_file, read_restart_file, output_idx
   USE omp_lib
@@ -173,7 +173,7 @@ CONTAINS
     empty_step%id=1
     empty_step%cadence=SOURCE_CADENCE_STEP
     empty_step%method=SOURCE_METHOD_EXPLICIT
-    empty_step%phase=SOURCE_PHASE_POST_RK
+
     empty_step%execution_order=1
     empty_step%source_names=[CHARACTER(LEN=64)::]
     empty_step%equation_ids=[(i,i=1,nq)]
