@@ -20,7 +20,15 @@ print(f"Start computation for {len(directories)} ensemble members")
 
 try:
     for directory in directories:
-        process = subprocess.Popen(["./run.sh", directory], cwd=directory)
+        runner = os.path.join(directory, "run.sh")
+        solver = os.path.join(directory, "IMEX_SfloW2D")
+        if not (os.path.isfile(runner) and os.access(runner, os.X_OK)):
+            failures.append((directory, "run.sh missing or not executable"))
+            continue
+        if not (os.path.isfile(solver) and os.access(solver, os.X_OK)):
+            failures.append((directory, "IMEX_SfloW2D missing or not executable"))
+            continue
+        process = subprocess.Popen(["./run.sh"], cwd=directory)
         running.append((process, directory))
         if len(running) >= max_processes:
             process, member = running.pop(0)

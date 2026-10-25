@@ -1,81 +1,49 @@
-import pandas as pd
+"""Create ensemble inputs while preserving binaries, symlinks and unchanged files."""
 import os
-import shutil as st
-from stat import S_ISREG
+from pathlib import Path
+import re
+import shutil
+import tempfile
+import pandas as pd
 
+TOKENS = re.compile(r"ENSEMBLE_[A-Za-z][A-Za-z0-9_]*")
+TEXT_SUFFIXES = {".inp", ".py", ".sh", ".txt", ".template"}
 
 def replace_strings(working_dir, df, header, i_row):
-
-    main_dir = os.getcwd()
-    os.chdir(working_dir)
-    directory = os.getcwd()
-
-    for fname in os.listdir(directory):
-
-        path = os.path.join(directory, fname)
-
-        try:
-            st = os.lstat(path)
-        except EnvironmentError:
+    values = {"ENSEMBLE_" + str(k): str(df.at[i_row, k]) for k in header}
+    for path in sorted(Path(working_dir).iterdir()):
+        if path.is_symlink() or not path.is_file() or path.suffix.lower() not in TEXT_SUFFIXES:
             continue
-        else:
-
-            if S_ISREG(st.st_mode):
-
-                #        if os.path.isfile(fname) and "template" in fname:
-
-                f = open(fname, 'r')
-                filedata = f.read()
-
-                for name in header:
-
-                    searchstring = 'ENSEMBLE_' + name
-                    # print(searchstring)
-                    f.seek(0)
-
-                    if searchstring in filedata:
-
-                        print('found string in file %s' % fname)
-                        print(searchstring)
-                        f.seek(0)
-
-                        for line in f:
-                            # replacing the string and write to output file
-                            filedata = filedata.replace(
-                                searchstring, str(df.at[i_row, name]))
-
-                f.close()
-                f_out = open(fname, 'w')
-                f_out.write(filedata)
-                f_out.close()
-
-    os.chdir(main_dir)
-
-
-##########################################
-
+        raw = path.read_bytes()
+        if b"ENSEMBLE_" not in raw:
+            continue
+        original = raw.decode("utf-8")
+        unknown = set(TOKENS.findall(original)) - set(values) - {"ENSEMBLE_vx", "ENSEMBLE_vy"}
+        if unknown:
+            raise ValueError(f"Unresolved placeholders in {path}: {sorted(unknown)}")
+        updated = TOKENS.sub(lambda m: values.get(m.group(), m.group()), original)
+        if updated == original:
+            continue
+        fd, tmp = tempfile.mkstemp(prefix=".ensemble-", dir=str(path.parent))
+        try:
+            with os.fdopen(fd, "wb") as out:
+                out.write(updated.encode("utf-8"))
+            os.chmod(tmp, path.stat().st_mode & 0o777)
+            os.replace(tmp, path)
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
 
 def main():
+    df = pd.read_csv("samples.csv")
+    for row in range(len(df.index)):
+        directory = Path.cwd() / f"ensemble.{row:05d}"
+        shutil.copytree("templatedir", directory, symlinks=True)
+        try:
+            replace_strings(directory, df, df.columns, row)
+        except Exception:
+            shutil.rmtree(directory)
+            raise
 
-    df = pd.read_csv('samples.csv')
-
-    print(df)
-
-    header = df.columns
-
-    print(header)
-
-    n_rows = len(df.index)
-    for i_row in range(n_rows):
-
-        working_dir = "ensemble." + "{:05d}".format(i_row)
-        working_dir = os.path.join(os.getcwd(), working_dir)
-
-        st.copytree('templatedir', working_dir, symlinks=True)
-
-        replace_strings(working_dir, df, header, i_row)
-
-
-if __name__ == '__main__':
-
+if __name__ == "__main__":
     main()
