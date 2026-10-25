@@ -12,6 +12,16 @@
 
 ---
 
+## Avanzamento migrazione al commit `edb72aa4` — 25 ottobre 2026
+
+I tre driver rimasti con riferimenti diretti all'architettura precedente sono stati migrati **nel sorgente**, senza disattivare le verifiche: `TEST_IMEX_STAGES/test_imex_stages.f90` e `TEST_RHEOLOGY_CELL_LOCAL/probe_sources.f90` costruiscono `active_names` dai nomi canonici (`rheology_*`, `thermal_cooling`, `pore_pressure_dissipation`, `geometry_curvature`) e usano i nuovi ingressi in `source_terms_2d`. Il probe elimina la lista di solvers dalla chiamata a `solve_rk_step`.
+
+`TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90` elimina il contratto dei tre sotto-solver Newton, ma **conserva** i test di isolamento dei rate tramite tre gruppi nominali filtrati, i confronti REAL/COMPLEX, le perturbazioni complex-step, le correzioni SI/IM e una verifica di residui sul **singolo gruppo accoppiato** contenente velocità, energia e pressione interstiziale. Il runner reologico usa la lista di sorgenti di `src/Makefile.am` con dipendenze C/NetCDF.
+
+**Stato:** la scansione statica dei tre file migrati non trova più `source_solver_type`, `term_ids`, `SOURCE_TERM_*` o chiamate ai sotto-solver. **Non compilato né eseguito** in questo ambiente. La CI deve ancora confermare le firme e i risultati numerici; eventuali problemi devono essere risolti mantenendo i controlli scientifici originali. L'audit generale degli script/generatori e la simulazione degli esempi non sono chiusi. Le tabelle precedenti descrivono i difetti riscontrati nella baseline di audit e non lo stato attuale delle tre suite migrate.
+
+---
+
 ## 1. Perimetro e strategia
 
 Nel tree di HEAD sono presenti **507 file versionati**, di cui **198 sotto TESTS** e **122 sotto EXAMPLES**. Le directory trasversali `tools/`, `UTILS/`, `.github/workflows/` sono rilevanti per generazione di input, orchestrazione, build e verifica. Sono state identificate **21 unità di input/template in EXAMPLES** e **38 sorgenti Fortran di test**. Tutti i 21 input/template principali sono stati letti per i campi D17 pertinenti; i 38 sorgenti Fortran sono stati ispezionati per riferimenti a API abolite o spostate. È stata inoltre ispezionata una selezione dei runner e generatori Python/Shell centrali. Rimangono da esaminare sistematicamente tutti gli altri script e tutti gli input delle sottodirectory TESTS e da eseguire gli smoke test.
