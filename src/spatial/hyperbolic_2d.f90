@@ -238,13 +238,13 @@ CONTAINS
     resting = ALL(qp_cell(2:3) .EQ. 0.0_wp)
     IF ( .NOT. resting ) RETURN
     IF ( comp_cells_x .GT. 1 ) THEN
-       resting = ALL(recon%qp_interfaceL(2:3,j:j+1,k) .EQ. 0.0_wp) .AND. &
-            ALL(recon%qp_interfaceR(2:3,j:j+1,k) .EQ. 0.0_wp)
+       resting = ALL(recon%qp_adv_interfaceL(2:3,j:j+1,k) .EQ. 0.0_wp) .AND. &
+            ALL(recon%qp_adv_interfaceR(2:3,j:j+1,k) .EQ. 0.0_wp)
        IF ( .NOT. resting ) RETURN
     END IF
     IF ( comp_cells_y .GT. 1 ) THEN
-       resting = ALL(recon%qp_interfaceB(2:3,j,k:k+1) .EQ. 0.0_wp) .AND. &
-            ALL(recon%qp_interfaceT(2:3,j,k:k+1) .EQ. 0.0_wp)
+       resting = ALL(recon%qp_adv_interfaceB(2:3,j,k:k+1) .EQ. 0.0_wp) .AND. &
+            ALL(recon%qp_adv_interfaceT(2:3,j,k:k+1) .EQ. 0.0_wp)
     END IF
   END FUNCTION exactly_resting_stencil
 
@@ -267,24 +267,24 @@ CONTAINS
 
     IF (axis .EQ. 1) THEN
        scale = MAX(                                                      &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceL(:,j,k),       &
+            hydrostatic_arithmetic_scale(recon%qp_adv_interfaceL(:,j,k),       &
             recon%eta_interfaceL(j,k),grav_coeff_stag_x(j,k)),             &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceR(:,j,k),       &
+            hydrostatic_arithmetic_scale(recon%qp_adv_interfaceR(:,j,k),       &
             recon%eta_interfaceR(j,k),grav_coeff_stag_x(j,k)),             &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceL(:,j+1,k),     &
+            hydrostatic_arithmetic_scale(recon%qp_adv_interfaceL(:,j+1,k),     &
             recon%eta_interfaceL(j+1,k),grav_coeff_stag_x(j+1,k)),          &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceR(:,j+1,k),     &
+            hydrostatic_arithmetic_scale(recon%qp_adv_interfaceR(:,j+1,k),     &
             recon%eta_interfaceR(j+1,k),grav_coeff_stag_x(j+1,k)) )
        inverse_spacing = one_by_dx
     ELSE
        scale = MAX(                                                      &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceB(:,j,k),       &
+            hydrostatic_arithmetic_scale(recon%qp_adv_interfaceB(:,j,k),       &
             recon%eta_interfaceB(j,k),grav_coeff_stag_y(j,k)),             &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceT(:,j,k),       &
+            hydrostatic_arithmetic_scale(recon%qp_adv_interfaceT(:,j,k),       &
             recon%eta_interfaceT(j,k),grav_coeff_stag_y(j,k)),             &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceB(:,j,k+1),     &
+            hydrostatic_arithmetic_scale(recon%qp_adv_interfaceB(:,j,k+1),     &
             recon%eta_interfaceB(j,k+1),grav_coeff_stag_y(j,k+1)),          &
-            hydrostatic_arithmetic_scale(recon%qp_interfaceT(:,j,k+1),     &
+            hydrostatic_arithmetic_scale(recon%qp_adv_interfaceT(:,j,k+1),     &
             recon%eta_interfaceT(j,k+1),grav_coeff_stag_y(j,k+1)) )
        inverse_spacing = one_by_dy
     END IF
@@ -753,58 +753,29 @@ CONTAINS
        END IF
 
        IF ( comp_cells_x .GT. 1 ) THEN
-          IF ( use_dry_donor ) THEN
-             qp_path_minus=recon%qp_adv_interfaceR(:,j,k)
-             qp_path_plus=recon%qp_adv_interfaceL(:,j+1,k)
-             qp_path_minus(1)=MAX(recon%eta_cellW(j,k)-B_face_x(j,k),0.0_wp)
-             qp_path_plus(1)=MAX(recon%eta_cellE(j,k)-B_face_x(j+1,k),0.0_wp)
-             IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
-             IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
-             CALL eval_cell_hydrostatic_path( qp_path_minus,                  &
-               recon%eta_cellW(j,k),grav_coeff_stag_x(j,k),                  &
-               qp_path_plus,recon%eta_cellE(j,k),                             &
+          qp_path_minus=recon%qp_adv_interfaceR(:,j,k)
+          qp_path_plus=recon%qp_adv_interfaceL(:,j+1,k)
+          qp_path_minus(1)=MAX(recon%eta_cellW(j,k)-B_face_x(j,k),0.0_wp)
+          qp_path_plus(1)=MAX(recon%eta_cellE(j,k)-B_face_x(j+1,k),0.0_wp)
+          IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
+          IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
+          CALL eval_cell_hydrostatic_path( qp_path_minus,                    &
+               recon%eta_cellW(j,k),grav_coeff_stag_x(j,k),                 &
+               qp_path_plus,recon%eta_cellE(j,k),                            &
                grav_coeff_stag_x(j+1,k),PATH_DIR_X,this%P_cell_x(:,j,k) )
-          ELSE
-             ! Hydrostatic depth is always reconstructed from eta, irrespective
-             ! of the selected advective depth or primitive donor family.
-             qp_path_minus=recon%qp_interfaceR(:,j,k)
-             qp_path_plus=recon%qp_interfaceL(:,j+1,k)
-             qp_path_minus(1)=MAX(recon%eta_cellW(j,k)-B_face_x(j,k),0.0_wp)
-             qp_path_plus(1)=MAX(recon%eta_cellE(j,k)-B_face_x(j+1,k),0.0_wp)
-             IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
-             IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
-             CALL eval_cell_hydrostatic_path( qp_path_minus,                  &
-               recon%eta_cellW(j,k),grav_coeff_stag_x(j,k),                  &
-               qp_path_plus,recon%eta_cellE(j,k),                             &
-               grav_coeff_stag_x(j+1,k),PATH_DIR_X,this%P_cell_x(:,j,k) )
-          END IF
        END IF
 
        IF ( comp_cells_y .GT. 1 ) THEN
-          IF ( use_dry_donor ) THEN
-             qp_path_minus=recon%qp_adv_interfaceT(:,j,k)
-             qp_path_plus=recon%qp_adv_interfaceB(:,j,k+1)
-             qp_path_minus(1)=MAX(recon%eta_cellS(j,k)-B_face_y(j,k),0.0_wp)
-             qp_path_plus(1)=MAX(recon%eta_cellN(j,k)-B_face_y(j,k+1),0.0_wp)
-             IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
-             IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
-             CALL eval_cell_hydrostatic_path( qp_path_minus,                  &
-               recon%eta_cellS(j,k),grav_coeff_stag_y(j,k),                  &
-               qp_path_plus,recon%eta_cellN(j,k),                             &
+          qp_path_minus=recon%qp_adv_interfaceT(:,j,k)
+          qp_path_plus=recon%qp_adv_interfaceB(:,j,k+1)
+          qp_path_minus(1)=MAX(recon%eta_cellS(j,k)-B_face_y(j,k),0.0_wp)
+          qp_path_plus(1)=MAX(recon%eta_cellN(j,k)-B_face_y(j,k+1),0.0_wp)
+          IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
+          IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
+          CALL eval_cell_hydrostatic_path( qp_path_minus,                    &
+               recon%eta_cellS(j,k),grav_coeff_stag_y(j,k),                 &
+               qp_path_plus,recon%eta_cellN(j,k),                            &
                grav_coeff_stag_y(j,k+1),PATH_DIR_Y,this%P_cell_y(:,j,k) )
-          ELSE
-             qp_path_minus=recon%qp_interfaceT(:,j,k)
-             qp_path_plus=recon%qp_interfaceB(:,j,k+1)
-             qp_path_minus(1)=MAX(recon%eta_cellS(j,k)-B_face_y(j,k),0.0_wp)
-             qp_path_plus(1)=MAX(recon%eta_cellN(j,k)-B_face_y(j,k+1),0.0_wp)
-             IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
-             IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
-             CALL eval_cell_hydrostatic_path( qp_path_minus,                  &
-               recon%eta_cellS(j,k),grav_coeff_stag_y(j,k),                  &
-               qp_path_plus,recon%eta_cellN(j,k),                             &
-               grav_coeff_stag_y(j,k+1),PATH_DIR_Y,this%P_cell_y(:,j,k) )
-          END IF
-
        END IF
 
     END DO

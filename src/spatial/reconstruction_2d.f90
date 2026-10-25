@@ -33,15 +33,7 @@ MODULE reconstruction_2d
 
   !> \brief Persistent cell and face traces for the selected depth reconstruction.
   TYPE, PUBLIC :: reconstruction_workspace_type
-     REAL(wp), ALLOCATABLE :: q_interfaceL(:,:,:)
-     REAL(wp), ALLOCATABLE :: q_interfaceR(:,:,:)
-     REAL(wp), ALLOCATABLE :: q_interfaceB(:,:,:)
-     REAL(wp), ALLOCATABLE :: q_interfaceT(:,:,:)
 
-     REAL(wp), ALLOCATABLE :: qp_interfaceL(:,:,:)
-     REAL(wp), ALLOCATABLE :: qp_interfaceR(:,:,:)
-     REAL(wp), ALLOCATABLE :: qp_interfaceB(:,:,:)
-     REAL(wp), ALLOCATABLE :: qp_interfaceT(:,:,:)
 
      ! Direct h_x-based states for the advective part of the PCCU flux.
      ! The existing interface states retain the eta-based reconstruction and
@@ -95,15 +87,7 @@ CONTAINS
 
     CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
 
-    ALLOCATE( this%q_interfaceL( n_vars, comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( this%q_interfaceR( n_vars, comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( this%q_interfaceB( n_vars, comp_cells_x, comp_interfaces_y ) )
-    ALLOCATE( this%q_interfaceT( n_vars, comp_cells_x, comp_interfaces_y ) )
 
-    ALLOCATE( this%qp_interfaceL( n_vars+2, comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( this%qp_interfaceR( n_vars+2, comp_interfaces_x, comp_cells_y ) )
-    ALLOCATE( this%qp_interfaceB( n_vars+2, comp_cells_x, comp_interfaces_y ) )
-    ALLOCATE( this%qp_interfaceT( n_vars+2, comp_cells_x, comp_interfaces_y ) )
 
     ALLOCATE( this%q_adv_interfaceL( n_vars, comp_interfaces_x, comp_cells_y ) )
     ALLOCATE( this%q_adv_interfaceR( n_vars, comp_interfaces_x, comp_cells_y ) )
@@ -153,15 +137,7 @@ CONTAINS
 
     CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
 
-    DEALLOCATE( this%q_interfaceL )
-    DEALLOCATE( this%q_interfaceR )
-    DEALLOCATE( this%q_interfaceB )
-    DEALLOCATE( this%q_interfaceT )
 
-    DEALLOCATE( this%qp_interfaceL )
-    DEALLOCATE( this%qp_interfaceR )
-    DEALLOCATE( this%qp_interfaceB )
-    DEALLOCATE( this%qp_interfaceT )
 
     DEALLOCATE( this%q_adv_interfaceL )
     DEALLOCATE( this%q_adv_interfaceR )
@@ -1265,7 +1241,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     USE state_conversion_2d, ONLY : qp_to_qc
     USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure
-    USE constitutive_parameters_2d, ONLY : T_ambient
     USE parameters_2d, ONLY : limiter, reconstr_coeff
     USE geometry_2d, ONLY : sourceW, sourceE, sourceS, sourceN
 
@@ -1277,12 +1252,11 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     INTEGER, INTENT(IN) :: j_cent(:), k_cent(:)
     LOGICAL, INTENT(IN) :: use_kt_direct
 
-    REAL(wp) :: q_final(n_vars), qp_final(n_vars+2)
     INTEGER :: j, k, l
 
     ! Reuse one thread team across dependent reconstruction phases. Each END DO keeps
     ! its implicit barrier because the following phase consumes its results.
-    !$OMP PARALLEL PRIVATE(l,j,k,q_final,qp_final)
+    !$OMP PARALLEL PRIVATE(l,j,k)
 
     ! Independent cell-owned eta, direct momentum and conservative trace work.
     !$OMP DO
@@ -1317,71 +1291,12 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     ! Map all eta cell traces to their oriented face storage.  Conservative
     ! only workset cells can contribute to an active interface.
-    !$OMP DO
-    DO l = 1, this%hp_eta_cells
-       j = this%hp_eta_j(l)
-       k = this%hp_eta_k(l)
-       this%eta_interfaceR(j,k) = this%eta_cellW(j,k)
-       this%eta_interfaceL(j+1,k) = this%eta_cellE(j,k)
-       this%eta_interfaceT(j,k) = this%eta_cellS(j,k)
-       this%eta_interfaceB(j,k+1) = this%eta_cellN(j,k)
-       IF ( j .EQ. 1 ) this%eta_interfaceL(1,k) = this%eta_interfaceR(1,k)
-       IF ( j .EQ. comp_cells_x ) this%eta_interfaceR(comp_interfaces_x,k) = &
-            this%eta_interfaceL(comp_interfaces_x,k)
-       IF ( k .EQ. 1 ) this%eta_interfaceB(j,1) = this%eta_interfaceT(j,1)
-       IF ( k .EQ. comp_cells_y ) this%eta_interfaceT(j,comp_interfaces_y) = &
-            this%eta_interfaceB(j,comp_interfaces_y)
-    END DO
-    !$OMP END DO
-
-    !$OMP DO
-    DO l = 1, this%hp_eta_cells
-
-   j = this%hp_eta_j(l)
-   k = this%hp_eta_k(l)
-
-       IF ( .NOT. use_kt_direct ) THEN
-          CALL final_hp_state( this%qp_cellW(:,j,k),                         &
-               this%q_adv_interfaceR(:,j,k), this%qp_adv_interfaceR(:,j,k) )
-          CALL final_hp_state( this%qp_cellE(:,j,k),                         &
-               this%q_adv_interfaceL(:,j+1,k), this%qp_adv_interfaceL(:,j+1,k) )
-          CALL final_hp_state( this%qp_cellS(:,j,k),                         &
-               this%q_adv_interfaceT(:,j,k), this%qp_adv_interfaceT(:,j,k) )
-          CALL final_hp_state( this%qp_cellN(:,j,k),                         &
-               this%q_adv_interfaceB(:,j,k+1), this%qp_adv_interfaceB(:,j,k+1) )
-       END IF
-
-       CALL final_hp_state( this%qp_cellW(:,j,k), q_final, qp_final )
-       this%q_interfaceR(:,j,k) = q_final
-       this%qp_interfaceR(:,j,k) = qp_final
-
-       CALL final_hp_state( this%qp_cellE(:,j,k), q_final, qp_final )
-       this%q_interfaceL(:,j+1,k) = q_final
-       this%qp_interfaceL(:,j+1,k) = qp_final
-
-       CALL final_hp_state( this%qp_cellS(:,j,k), q_final, qp_final )
-       this%q_interfaceT(:,j,k) = q_final
-       this%qp_interfaceT(:,j,k) = qp_final
-
-       CALL final_hp_state( this%qp_cellN(:,j,k), q_final, qp_final )
-       this%q_interfaceB(:,j,k+1) = q_final
-       this%qp_interfaceB(:,j,k+1) = qp_final
-
-    END DO
-    !$OMP END DO
-
     ! Preserve the solver's existing external ghost convention after replacing
     ! the cell-owned traces.
     !$OMP DO
     DO k = 1, comp_cells_y
-       this%q_interfaceL(:,1,k) = this%q_interfaceR(:,1,k)
-       this%qp_interfaceL(:,1,k) = this%qp_interfaceR(:,1,k)
        this%q_adv_interfaceL(:,1,k) = this%q_adv_interfaceR(:,1,k)
        this%qp_adv_interfaceL(:,1,k) = this%qp_adv_interfaceR(:,1,k)
-       this%q_interfaceR(:,comp_interfaces_x,k) =                             &
-            this%q_interfaceL(:,comp_interfaces_x,k)
-       this%qp_interfaceR(:,comp_interfaces_x,k) =                            &
-            this%qp_interfaceL(:,comp_interfaces_x,k)
        this%q_adv_interfaceR(:,comp_interfaces_x,k) =                         &
             this%q_adv_interfaceL(:,comp_interfaces_x,k)
        this%qp_adv_interfaceR(:,comp_interfaces_x,k) =                        &
@@ -1391,14 +1306,8 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     !$OMP DO
     DO j = 1, comp_cells_x
-       this%q_interfaceB(:,j,1) = this%q_interfaceT(:,j,1)
-       this%qp_interfaceB(:,j,1) = this%qp_interfaceT(:,j,1)
        this%q_adv_interfaceB(:,j,1) = this%q_adv_interfaceT(:,j,1)
        this%qp_adv_interfaceB(:,j,1) = this%qp_adv_interfaceT(:,j,1)
-       this%q_interfaceT(:,j,comp_interfaces_y) =                             &
-            this%q_interfaceB(:,j,comp_interfaces_y)
-       this%qp_interfaceT(:,j,comp_interfaces_y) =                            &
-            this%qp_interfaceB(:,j,comp_interfaces_y)
        this%q_adv_interfaceT(:,j,comp_interfaces_y) =                        &
             this%q_adv_interfaceB(:,j,comp_interfaces_y)
        this%qp_adv_interfaceT(:,j,comp_interfaces_y) =                       &
@@ -1417,12 +1326,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
           IF ( source_cell(j,k) .NE. 2 ) CYCLE
 
           IF ( sourceE(j,k) ) THEN
-             this%q_interfaceR(:,j+1,k) = this%q_interfaceL(:,j+1,k)
-             this%q_interfaceR(2,j+1,k) = -this%q_interfaceR(2,j+1,k)
-             this%qp_interfaceR(:,j+1,k) = this%qp_interfaceL(:,j+1,k)
-             this%qp_interfaceR(2,j+1,k) = -this%qp_interfaceR(2,j+1,k)
-             this%qp_interfaceR(idx_u,j+1,k) =                               &
-                  -this%qp_interfaceR(idx_u,j+1,k)
              this%q_adv_interfaceR(:,j+1,k) = this%q_adv_interfaceL(:,j+1,k)
              this%q_adv_interfaceR(2,j+1,k) =                                &
                   -this%q_adv_interfaceR(2,j+1,k)
@@ -1434,11 +1337,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                   -this%qp_adv_interfaceR(idx_u,j+1,k)
              this%eta_interfaceR(j+1,k) = this%eta_interfaceL(j+1,k)
           ELSEIF ( sourceW(j,k) ) THEN
-             this%q_interfaceL(:,j,k) = this%q_interfaceR(:,j,k)
-             this%q_interfaceL(2,j,k) = -this%q_interfaceL(2,j,k)
-             this%qp_interfaceL(:,j,k) = this%qp_interfaceR(:,j,k)
-             this%qp_interfaceL(2,j,k) = -this%qp_interfaceL(2,j,k)
-             this%qp_interfaceL(idx_u,j,k) = -this%qp_interfaceL(idx_u,j,k)
              this%q_adv_interfaceL(:,j,k) = this%q_adv_interfaceR(:,j,k)
              this%q_adv_interfaceL(2,j,k) = -this%q_adv_interfaceL(2,j,k)
              this%qp_adv_interfaceL(:,j,k) = this%qp_adv_interfaceR(:,j,k)
@@ -1449,12 +1347,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
           END IF
 
           IF ( sourceN(j,k) ) THEN
-             this%q_interfaceT(:,j,k+1) = this%q_interfaceB(:,j,k+1)
-             this%q_interfaceT(3,j,k+1) = -this%q_interfaceT(3,j,k+1)
-             this%qp_interfaceT(:,j,k+1) = this%qp_interfaceB(:,j,k+1)
-             this%qp_interfaceT(3,j,k+1) = -this%qp_interfaceT(3,j,k+1)
-             this%qp_interfaceT(idx_v,j,k+1) =                               &
-                  -this%qp_interfaceT(idx_v,j,k+1)
              this%q_adv_interfaceT(:,j,k+1) =                                 &
                   this%q_adv_interfaceB(:,j,k+1)
              this%q_adv_interfaceT(3,j,k+1) =                                 &
@@ -1467,11 +1359,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
                   -this%qp_adv_interfaceT(idx_v,j,k+1)
              this%eta_interfaceT(j,k+1) = this%eta_interfaceB(j,k+1)
           ELSEIF ( sourceS(j,k) ) THEN
-             this%q_interfaceB(:,j,k) = this%q_interfaceT(:,j,k)
-             this%q_interfaceB(3,j,k) = -this%q_interfaceB(3,j,k)
-             this%qp_interfaceB(:,j,k) = this%qp_interfaceT(:,j,k)
-             this%qp_interfaceB(3,j,k) = -this%qp_interfaceB(3,j,k)
-             this%qp_interfaceB(idx_v,j,k) = -this%qp_interfaceB(idx_v,j,k)
              this%q_adv_interfaceB(:,j,k) = this%q_adv_interfaceT(:,j,k)
              this%q_adv_interfaceB(3,j,k) = -this%q_adv_interfaceB(3,j,k)
              this%qp_adv_interfaceB(:,j,k) = this%qp_adv_interfaceT(:,j,k)
@@ -1634,33 +1521,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
          trace(3) = trace(1)*trace(idx_v)
       END IF
     END SUBROUTINE form_direct_face_momentum
-
-    !> \brief Close component fractions and convert a final HP candidate into conservative form.
-    !>
-    !> \param[in] qp_candidate Final HP physical candidate before composition closure.
-    !> \param[out] q_conservative Conservative state obtained from the closed physical candidate.
-    !> \param[out] qp_reconstructed Closed physical state retaining independently reconstructed
-    !>                              auxiliary velocity traces.
-
-    SUBROUTINE final_hp_state(qp_candidate,q_conservative,qp_reconstructed)
-
-      REAL(wp), INTENT(IN) :: qp_candidate(n_vars+2)
-      REAL(wp), INTENT(OUT) :: q_conservative(n_vars)
-      REAL(wp), INTENT(OUT) :: qp_reconstructed(n_vars+2)
-
-      qp_reconstructed = qp_candidate
-
-      IF ( qp_reconstructed(1) .LE. dry_thickness_tolerance ) THEN
-         qp_reconstructed = 0.0_wp
-         qp_reconstructed(4) = T_ambient
-         q_conservative = 0.0_wp
-         RETURN
-      END IF
-
-      CALL enforce_primitive_mass_fraction_closure(qp_reconstructed)
-      CALL qp_to_qc(qp_reconstructed,q_conservative)
-
-    END SUBROUTINE final_hp_state
 
   END SUBROUTINE apply_hp_reconstruction
 
