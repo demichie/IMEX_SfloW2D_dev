@@ -221,14 +221,24 @@ def compare(fields, q, vertices, bed, params, name):
             check(f"trace_{normal}{side}_eta", fields[f"eta_{normal}{side}"], eta, mask)
             check(f"primitive_{normal}{side}_temperature", actual_qp[..., 3], 300.0, mask)
 
-    check("normal_x_momentum_mean", 0.5*(fields["q_xL"][:, 1:, 1]+fields["q_xR"][:, :-1, 1]), q[..., 1], active)
-    check("normal_y_momentum_mean", 0.5*(fields["q_yB"][1:, :, 2]+fields["q_yT"][:-1, :, 2]), q[..., 2], active)
-    check("tangential_x_momentum_mean", 0.5*(fields["q_xL"][:, 1:, 2]+fields["q_xR"][:, :-1, 2]), q[..., 2], active)
-    check("tangential_y_momentum_mean", 0.5*(fields["q_yB"][1:, :, 1]+fields["q_yT"][:-1, :, 1]), q[..., 1], active)
-    check("x_mass_mean", 0.5*(fields["q_xL"][:, 1:, 0]+fields["q_xR"][:, :-1, 0]), q[..., 0], active)
-    check("y_mass_mean", 0.5*(fields["q_yB"][1:, :, 0]+fields["q_yT"][:-1, :, 0]), q[..., 0], active)
-    check("x_solid_mean", 0.5*(fields["q_xL"][:, 1:, 4]+fields["q_xR"][:, :-1, 4]), q[..., 3], active)
-    check("y_solid_mean", 0.5*(fields["q_yB"][1:, :, 4]+fields["q_yT"][:-1, :, 4]), q[..., 3], active)
+    # The selected-depth reconstruction no longer enforces equality of the
+    # arithmetic face-momentum mean with the cell-centred conservative moment.
+    # That property belonged to the removed five-point HP correction. Instead,
+    # check the actual production invariant: both reconstructed conservative
+    # momenta use the independently limited primitive face velocities and the
+    # *same* nonnegative trace mass. This detects inconsistent h*u and h*v
+    # construction without reinstating the obsolete mean constraint.
+    for normal, mask, sides in (("x", fx, ("L", "R")),
+                                ("y", fy, ("B", "T"))):
+        for side in sides:
+            qc = fields[f"q_{normal}{side}"]
+            qp = fields[f"qp_{normal}{side}"]
+            for component, velocity, direction in ((1, 5, "u"), (2, 6, "v")):
+                check(f"trace_{normal}{side}_momentum_{direction}_from_velocity",
+                      qc[..., component], qc[..., 0]*qp[..., velocity], mask)
+            # The single-solid closure must use the same mass density on all
+            # conservative components; its mass fraction is zero in this fixture.
+            check(f"trace_{normal}{side}_zero_solid", qc[..., 4], 0.0, mask)
 
     check("directional_dt_x",
           params.cfl*DX/float(np.max(np.maximum(-fields["ax_minus"], fields["ax_plus"]))), dt_x)
@@ -256,7 +266,7 @@ def negative_controls(fields, q, vertices, bed, params):
     """Require diagnostic failures for deliberate residual/trace/geometry/speed/CFL errors."""
     mutations = (
         ("residual_mass", "spatial", (8, 9, 0), 1.0),
-        ("tangential_x_momentum_mean", "q_xL", (8, 9, 2), 1.0),
+        ("trace_xL_momentum_v_from_velocity", "q_xL", (8, 9, 2), 1.0),
         ("primitive_trace_finite", "qp_xL", (8, 9, 5), float("inf")),
         ("G_x_faces", "Gx", (8, 9), 0.1),
         ("wave_x_plus", "ax_plus", (8, 9), 0.1),
