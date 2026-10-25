@@ -72,7 +72,7 @@ CONTAINS
        u_minus_candidate, u_plus_candidate, hydrostatic_residual,              &
        topographic_relief_ratio, limiter_id, reconstruction_coefficient,       &
        h_minus, h_plus, hu_minus, hu_plus,                                     &
-       eta_minus, eta_plus, w_eta, line_scratch )
+       eta_minus, eta_plus, w_eta, line_scratch, geometry_weights, reuse_geometry )
 
     REAL(wp), INTENT(IN) :: h_center(:)
     REAL(wp), INTENT(IN) :: u_center(:)
@@ -97,6 +97,8 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: eta_plus(:)
     REAL(wp), INTENT(OUT) :: w_eta(:)
    REAL(wp), OPTIONAL, TARGET, INTENT(INOUT) :: line_scratch(:,:)
+    REAL(wp), OPTIONAL, INTENT(INOUT) :: geometry_weights(:,:)
+    LOGICAL, OPTIONAL, INTENT(IN) :: reuse_geometry
 
    ! Allocate fallback storage only for callers without persistent scratch.
    REAL(wp), ALLOCATABLE, TARGET :: local_scratch(:,:)
@@ -115,10 +117,20 @@ CONTAINS
     REAL(wp) :: u_min, u_max
     REAL(wp), VOLATILE :: mean_momentum_minus, mean_momentum_plus
     INTEGER :: i, number_of_cells
+    LOGICAL :: reuse_shared_geometry
 
     number_of_cells = SIZE(h_center)
 
     IF ( number_of_cells .LE. 0 ) RETURN
+    reuse_shared_geometry = .FALSE.
+    IF (PRESENT(reuse_geometry)) reuse_shared_geometry = reuse_geometry
+    IF (reuse_shared_geometry .AND. .NOT. PRESENT(geometry_weights)) &
+         ERROR STOP 'reconstruct_hp_line: missing geometry weights'
+    IF (PRESENT(geometry_weights)) THEN
+       IF (SIZE(geometry_weights,1) .LT. number_of_cells .OR. &
+            SIZE(geometry_weights,2) .LT. 2) &
+            ERROR STOP 'reconstruct_hp_line: insufficient geometry weights'
+    END IF
 
     IF ( PRESENT(line_scratch) ) THEN
        IF ( ( SIZE(line_scratch,1) .LT. number_of_cells ) .OR.                &
@@ -161,6 +173,7 @@ CONTAINS
        ERROR STOP 'reconstruct_hp_line: inconsistent array sizes'
     END IF
 
+    IF (.NOT. reuse_shared_geometry) THEN
     eta_center = h_center + 0.5_wp * ( B_minus + B_plus )
     coordinate_stencil = [ -1.0_wp, 0.0_wp, 1.0_wp ]
     u_center_safe = u_center
@@ -213,8 +226,14 @@ CONTAINS
        Eeta(i+1) = Eeta(i+1) + ABS( h_plus_eta(i) - h_minus_eta(i+1) )
     END DO
 
+    END IF ! Shared scratch retains hydrostatic depths and eta on reuse.
+
     DO i = 1, number_of_cells
 
+       IF (reuse_shared_geometry) THEN
+          w_minus(i) = geometry_weights(i,1)
+          w_plus(i) = geometry_weights(i,2)
+       ELSE
        ! Prefer the candidate with the smaller jump; unresolved ties are blended
        ! equally. The wet/dry and rough-bed guards below can override this weight.
        denominator = Eh(i) + Eeta(i)
@@ -262,6 +281,12 @@ CONTAINS
        IF ( h_center(i) .GT. hp_dry_tolerance ) THEN
           w_minus(i) = diagnostic_blend_scale * w_minus(i)
           w_plus(i) = diagnostic_blend_scale * w_plus(i)
+       END IF
+
+       IF (PRESENT(geometry_weights)) THEN
+          geometry_weights(i,1) = w_minus(i)
+          geometry_weights(i,2) = w_plus(i)
+       END IF
        END IF
 
        ! Depth is reconstructed only from eta and the unique bed value at

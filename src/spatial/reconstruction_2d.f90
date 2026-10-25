@@ -1719,6 +1719,7 @@ CONTAINS
        REAL(wp) :: htm_line(5), htp_line(5), hm_tangent_line(5), hp_tangent_line(5)
        REAL(wp) :: eta_m_line(5), eta_p_line(5), weight_line(5)
        REAL(wp) :: eta_m_tangent(5), eta_p_tangent(5), weight_tangent(5)
+       REAL(wp) :: shared_geometry_weights(5,2)
        INTEGER :: line_start, line_end, line_size, center, offset
        INTEGER :: line_index, line_j, line_k, thread_id
 
@@ -1822,7 +1823,8 @@ CONTAINS
           limiter(1),reconstr_coeff,hm_line(1:line_size),                 &
           hp_line(1:line_size),hum_line(1:line_size),hup_line(1:line_size),&
           eta_m_line(1:line_size),eta_p_line(1:line_size),                 &
-          weight_line(1:line_size),this%hp_scratch(1:line_size,:,thread_id) )
+          weight_line(1:line_size),this%hp_scratch(1:line_size,:,thread_id), &
+          geometry_weights=shared_geometry_weights(1:line_size,:) )
 
        ! Apply the same HP depth blend and conservative, bounded momentum
        ! correction to the tangential velocity component. The second call uses
@@ -1839,7 +1841,9 @@ CONTAINS
           hp_tangent_line(1:line_size),htm_line(1:line_size),                &
           htp_line(1:line_size),eta_m_tangent(1:line_size),                  &
           eta_p_tangent(1:line_size),weight_tangent(1:line_size),           &
-          this%hp_scratch(1:line_size,:,thread_id) )
+          this%hp_scratch(1:line_size,:,thread_id), &
+          geometry_weights=shared_geometry_weights(1:line_size,:), &
+          reuse_geometry=.TRUE. )
 
        this%hp_blended(:,jc,kc,direction) = [ hm_line(center),hp_line(center), &
           hum_line(center),hup_line(center),htm_line(center),htp_line(center) ]
