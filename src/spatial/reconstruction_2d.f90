@@ -199,10 +199,15 @@ CONTAINS
       END DO
       this%hp_eta_cells = 0
 
+      ! Active cells first, followed by unique stencil halo neighbours.
       DO l = 1, solve_cells
           j = j_cent(l)
           k = k_cent(l)
           CALL append_eta_cell(j,k)
+      END DO
+      DO l = 1, solve_cells
+          j = j_cent(l)
+          k = k_cent(l)
           IF ( j .GT. 1 ) CALL append_eta_cell(j-1,k)
           IF ( j .LT. comp_cells_x ) CALL append_eta_cell(j+1,k)
           IF ( k .GT. 1 ) CALL append_eta_cell(j,k-1)
@@ -306,34 +311,20 @@ CONTAINS
          use_boundary_source=source_boundary_enabled
     CALL build_hp_workset(this, solve_cells, j_cent, k_cent)
 
-    !$OMP PARALLEL DO PRIVATE(l,j,k)
-    DO l = 1, this%hp_eta_cells
-       j = this%hp_eta_j(l)
-       k = this%hp_eta_k(l)
-       this%qp_cellW(:,j,k) = qp_expl(:,j,k)
-       IF (qp_expl(1,j,k) .LE. dry_thickness_tolerance) THEN
-          this%qp_cellW(idx_u:idx_v,j,k) = 0.0_wp
-       END IF
-       this%qp_cellE(:,j,k) = this%qp_cellW(:,j,k)
-       this%qp_cellS(:,j,k) = this%qp_cellW(:,j,k)
-       this%qp_cellN(:,j,k) = this%qp_cellW(:,j,k)
-    END DO
-    !$OMP END PARALLEL DO
-
-    !$OMP PARALLEL DO private(j,k,i,qrecW,qrecE,qrecS,qrecN,x_stencil,y_stencil,&
+    !$OMP PARALLEL DO private(l,j,k,i,qrecW,qrecE,qrecS,qrecN,x_stencil,y_stencil,&
     !$OMP & qrec_stencil,qrec_prime_x,qrec_prime_y,qp2recW,qp2recE,qp2recS,     &
     !$OMP & qp2recN,source_bdry,dq,regular_interior)
 
-    DO l = 1,solve_cells
-
-       j = j_cent(l)
-       k = k_cent(l)
-
-       qrecW(1:n_vars+2) = this%qp_cellW(1:n_vars+2,j,k)
-       qrecE(1:n_vars+2) = this%qp_cellE(1:n_vars+2,j,k)
-       qrecS(1:n_vars+2) = this%qp_cellS(1:n_vars+2,j,k)
-       qrecN(1:n_vars+2) = this%qp_cellN(1:n_vars+2,j,k)
-
+    DO l = 1, this%hp_eta_cells
+       j = this%hp_eta_j(l)
+       k = this%hp_eta_k(l)
+       qrecW = qp_expl(:,j,k)
+       IF (qp_expl(1,j,k) .LE. dry_thickness_tolerance) &
+            qrecW(idx_u:idx_v) = 0.0_wp
+       qrecE = qrecW
+       qrecS = qrecW
+       qrecN = qrecW
+       IF (l .LE. solve_cells) THEN
        x_stencil(2) = x_comp(j)
        y_stencil(2) = y_comp(k)
 
@@ -829,10 +820,12 @@ CONTAINS
 
        END IF
 
+       END IF ! active cell
        this%qp_cellW(:,j,k) = qrecW
        this%qp_cellE(:,j,k) = qrecE
        this%qp_cellS(:,j,k) = qrecS
        this%qp_cellN(:,j,k) = qrecN
+       CALL reconstruct_kt_eta_cell(this,qp_expl,j,k)
 
     END DO
 
@@ -850,14 +843,14 @@ CONTAINS
   !> \param[in,out] this Workspace containing the active HP-eta cell list and traces.
   !> \param[in] qp_expl Cell-centered physical states at the explicit stage.
   !******************************************************************************
-  SUBROUTINE reconstruct_kt_eta_traces(this,qp_expl)
+  ! All eta and selected transport-depth candidates for one workset cell.
+  SUBROUTINE reconstruct_kt_eta_cell(this,qp_expl,j,k)
     USE parameters_2d, ONLY : limiter,reconstr_coeff
     USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
-    USE geometry_2d, ONLY : sourceW,sourceE,sourceS,sourceN
     USE constitutive_parameters_2d, ONLY : grav
-
     CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
     REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
+    INTEGER, INTENT(IN) :: j,k
     REAL(wp) :: sx(3),sy(3),hx(3),hy(3),xx(3),yy(3)
     REAL(wp) :: slope_x,slope_y,slope_hx,slope_hy,eta_center
     REAL(wp) :: eta_w,eta_e,eta_s,eta_n,slope_eta2,slope_minmod
@@ -865,17 +858,6 @@ CONTAINS
     REAL(wp) :: slope_eta2_x,slope_eta2_y
     REAL(wp) :: slope_blend_x,slope_blend_y,eta_blend_w,eta_blend_e
     REAL(wp) :: eta_blend_s,eta_blend_n,fr_weight_x,fr_weight_y
-    INTEGER :: l,j,k
-
-    !$OMP PARALLEL DO PRIVATE(l,j,k,sx,sy,hx,hy,xx,yy,slope_x,slope_y,      &
-    !$OMP& slope_hx,slope_hy,eta_center,eta_w,eta_e,eta_s,eta_n,            &
-    !$OMP& slope_eta2,slope_minmod,eta_w_mm,eta_e_mm,eta_s_mm,eta_n_mm, &
-    !$OMP& slope_eta2_x,slope_eta2_y,slope_blend_x,slope_blend_y, &
-    !$OMP& eta_blend_w,eta_blend_e,eta_blend_s,eta_blend_n, &
-    !$OMP& fr_weight_x,fr_weight_y)
-    DO l=1,this%hp_eta_cells
-       j=this%hp_eta_j(l)
-       k=this%hp_eta_k(l)
        eta_center=qp_expl(1,j,k)+B_cent(j,k)
        slope_x=0.0_wp
        slope_y=0.0_wp
@@ -1002,8 +984,27 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
        this%h_froude_interfaceB(j,k+1)= &
             MAX(eta_blend_n-B_face_y(j,k+1),0.0_wp)
        END IF
-    END DO
-    !$OMP END PARALLEL DO
+
+  END SUBROUTINE reconstruct_kt_eta_cell
+
+  SUBROUTINE reconstruct_kt_eta_traces(this,qp_expl)
+    USE parameters_2d, ONLY : limiter,reconstr_coeff
+    USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
+    USE geometry_2d, ONLY : sourceW,sourceE,sourceS,sourceN
+    USE constitutive_parameters_2d, ONLY : grav
+
+    CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
+    REAL(wp), INTENT(IN) :: qp_expl(:,:,:)
+    REAL(wp) :: sx(3),sy(3),hx(3),hy(3),xx(3),yy(3)
+    REAL(wp) :: slope_x,slope_y,slope_hx,slope_hy,eta_center
+    REAL(wp) :: eta_w,eta_e,eta_s,eta_n,slope_eta2,slope_minmod
+    REAL(wp) :: eta_w_mm,eta_e_mm,eta_s_mm,eta_n_mm
+    REAL(wp) :: slope_eta2_x,slope_eta2_y
+    REAL(wp) :: slope_blend_x,slope_blend_y,eta_blend_w,eta_blend_e
+    REAL(wp) :: eta_blend_s,eta_blend_n,fr_weight_x,fr_weight_y
+    INTEGER :: l,j,k
+
+
 
     IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
        DO k=1,comp_cells_y
@@ -1263,7 +1264,6 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     DO l = 1, this%hp_eta_cells
        j = this%hp_eta_j(l)
        k = this%hp_eta_k(l)
-       CALL compute_eta_traces(j,k)
        CALL form_direct_face_momentum(this%qp_cellW(:,j,k))
        CALL form_direct_face_momentum(this%qp_cellE(:,j,k))
        CALL form_direct_face_momentum(this%qp_cellS(:,j,k))
@@ -1427,82 +1427,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     !> \note Reads the host qp_center and shared face bed; writes only this cell eta candidates in
     !>       the parent workspace.
 
-    SUBROUTINE compute_eta_traces(jc,kc)
 
-    INTEGER, INTENT(IN) :: jc, kc
-    REAL(wp) :: eta_left, eta_center, eta_right
-
-    eta_center = qp_center(1,jc,kc) +                                     &
-       0.5_wp * ( B_face_x(jc,kc) + B_face_x(jc+1,kc) )
-    eta_left = eta_center
-    eta_right = eta_center
-    IF ( ( jc .GT. 1 ) .AND. ( jc .LT. comp_cells_x ) ) THEN
-       eta_left = qp_center(1,jc-1,kc) +                                  &
-          0.5_wp * ( B_face_x(jc-1,kc) + B_face_x(jc,kc) )
-       eta_right = qp_center(1,jc+1,kc) +                                 &
-          0.5_wp * ( B_face_x(jc+1,kc) + B_face_x(jc+2,kc) )
-    END IF
-    CALL hp_eta_face_pair( eta_left, eta_center, eta_right,                &
-       B_face_x(jc,kc), B_face_x(jc+1,kc),                              &
-       ( jc .EQ. 1 ) .OR. ( jc .EQ. comp_cells_x ),                     &
-       this%eta_cellW(jc,kc), this%eta_cellE(jc,kc) )
-
-    eta_center = qp_center(1,jc,kc) +                                     &
-       0.5_wp * ( B_face_y(jc,kc) + B_face_y(jc,kc+1) )
-    eta_left = eta_center
-    eta_right = eta_center
-    IF ( ( kc .GT. 1 ) .AND. ( kc .LT. comp_cells_y ) ) THEN
-       eta_left = qp_center(1,jc,kc-1) +                                  &
-          0.5_wp * ( B_face_y(jc,kc-1) + B_face_y(jc,kc) )
-       eta_right = qp_center(1,jc,kc+1) +                                 &
-          0.5_wp * ( B_face_y(jc,kc+1) + B_face_y(jc,kc+2) )
-    END IF
-    CALL hp_eta_face_pair( eta_left, eta_center, eta_right,                &
-       B_face_y(jc,kc), B_face_y(jc,kc+1),                              &
-       ( kc .EQ. 1 ) .OR. ( kc .EQ. comp_cells_y ),                     &
-       this%eta_cellS(jc,kc), this%eta_cellN(jc,kc) )
-
-    END SUBROUTINE compute_eta_traces
-
-    !> \brief Limit a three-cell free-surface slope against both endpoint bed elevations.
-    !>
-    !> \param[in] eta_left Free-surface elevation at the negative/left endpoint or stencil neighbour
-    !>                     [m].
-    !> \param[in] eta_center Free-surface elevation at the central stencil cell [m].
-    !> \param[in] eta_right Free-surface elevation at the positive/right endpoint or stencil
-    !>                      neighbour [m].
-    !> \param[in] B_minus Bed elevations at the negative-side cell faces [m].
-    !> \param[in] B_plus Bed elevations at the positive-side cell faces [m].
-    !> \param[in] at_boundary True to use the zero-gradient boundary eta-slope convention.
-    !> \param[out] eta_minus Negative-side hydrostatic free-surface candidate [m].
-    !> \param[out] eta_plus Positive-side hydrostatic free-surface candidate [m].
-
-    SUBROUTINE hp_eta_face_pair( eta_left, eta_center, eta_right,            &
-       B_minus, B_plus, at_boundary, eta_minus, eta_plus )
-
-    REAL(wp), INTENT(IN) :: eta_left, eta_center, eta_right
-    REAL(wp), INTENT(IN) :: B_minus, B_plus
-    LOGICAL, INTENT(IN) :: at_boundary
-    REAL(wp), INTENT(OUT) :: eta_minus, eta_plus
-    REAL(wp) :: eta_stencil(3), coordinate_stencil(3)
-    REAL(wp) :: eta_slope, slope_min, slope_max
-
-    eta_slope = 0.0_wp
-    IF ( .NOT. at_boundary ) THEN
-       eta_stencil = [ eta_left, eta_center, eta_right ]
-       coordinate_stencil = [ -1.0_wp, 0.0_wp, 1.0_wp ]
-       CALL limit( eta_stencil, coordinate_stencil, limiter(1), eta_slope )
-       eta_slope = reconstr_coeff * eta_slope
-    END IF
-
-    slope_min = 2.0_wp * ( B_plus - eta_center )
-    slope_max = 2.0_wp * ( eta_center - B_minus )
-    eta_slope = MIN( MAX( eta_slope, slope_min ), slope_max )
-
-    eta_minus = eta_center - 0.5_wp * eta_slope
-    eta_plus = eta_center + 0.5_wp * eta_slope
-
-    END SUBROUTINE hp_eta_face_pair
 
     !> Combine directly limited velocity traces with a nonnegative depth.
     !> The selected transport depth is applied consistently to both moments
