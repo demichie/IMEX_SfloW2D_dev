@@ -490,12 +490,12 @@ CONTAINS
 
     CALL assert_dispatch_matches('none', .FALSE., 0.0_wp,        &
          .FALSE., 0.0_wp, velocity_before, 'none no-op')
-    CALL solve_rheology_analytic(HUGE(1), integration_step,       &
+    CALL solve_rheology_analytic('rheology_unsupported', integration_step,       &
          flow_depth, temperature, mixture_density, speed_ratio,              &
          velocity_before, reduced_gravity, gravity_coefficient,             &
          solid_fraction, 0.0_wp, .FALSE., 0.0_wp, .FALSE., 0.0_wp,          &
          actual, model_supported)
-    IF (model_supported) ERROR STOP 'Unsupported rheology ID was accepted'
+    IF (model_supported) ERROR STOP 'Unsupported rheology name was accepted'
     CALL assert_close(actual(1), velocity_before(1), 'unsupported model x')
     CALL assert_close(actual(2), velocity_before(2), 'unsupported model y')
 
