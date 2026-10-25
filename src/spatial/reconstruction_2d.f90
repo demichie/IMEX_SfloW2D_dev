@@ -24,9 +24,7 @@ MODULE reconstruction_2d
   USE geometry_2d, ONLY : limit
 
    USE hp_reconstruction_2d, ONLY : hp_dry_tolerance
-   USE hp_reconstruction_2d, ONLY : reconstruct_hp_line
    USE hp_reconstruction_2d, ONLY : hp_dynamic_residual_threshold
-   USE omp_lib, ONLY : omp_get_max_threads, omp_get_thread_num
 
   IMPLICIT NONE
 
@@ -85,9 +83,7 @@ MODULE reconstruction_2d
        INTEGER, ALLOCATABLE :: hp_eta_j(:), hp_eta_k(:)
        INTEGER :: hp_eta_cells
        ! Per direction: h-/h+, normal momentum-/+, then tangential momentum-/+.
-       REAL(wp), ALLOCATABLE :: hp_blended(:,:,:,:)
-       REAL(wp), ALLOCATABLE :: hp_scratch(:,:,:)
-
+        
    CONTAINS
      PROCEDURE :: initialize => initialize_reconstruction
      PROCEDURE :: finalize => finalize_reconstruction
@@ -149,8 +145,6 @@ CONTAINS
       ALLOCATE( this%hp_eta_mask(comp_cells_x,comp_cells_y) )
       ALLOCATE( this%hp_eta_j(comp_cells_x*comp_cells_y) )
       ALLOCATE( this%hp_eta_k(comp_cells_x*comp_cells_y) )
-      ALLOCATE( this%hp_blended(6,comp_cells_x,comp_cells_y,2) )
-      ALLOCATE( this%hp_scratch(5,8,MAX(1,omp_get_max_threads())) )
       this%hp_eta_mask = .FALSE.
       this%hp_eta_cells = 0
 
@@ -209,9 +203,7 @@ CONTAINS
       DEALLOCATE( this%hp_eta_mask )
       DEALLOCATE( this%hp_eta_j )
       DEALLOCATE( this%hp_eta_k )
-      DEALLOCATE( this%hp_blended )
-      DEALLOCATE( this%hp_scratch )
-
+    
 
   END SUBROUTINE finalize_reconstruction
 
@@ -1323,12 +1315,11 @@ CONTAINS
     LOGICAL, INTENT(IN) :: use_kt_direct
 
     REAL(wp) :: q_final(n_vars), qp_final(n_vars+2)
-    REAL(wp) :: relief2d, residual2d
     INTEGER :: j, k, l
 
-    ! Reuse one thread team across all dependent HP phases. Each END DO keeps
+    ! Reuse one thread team across dependent reconstruction phases. Each END DO keeps
     ! its implicit barrier because the following phase consumes its results.
-    !$OMP PARALLEL PRIVATE(l,j,k,relief2d,residual2d,q_final,qp_final)
+    !$OMP PARALLEL PRIVATE(l,j,k,q_final,qp_final)
 
     !$OMP DO
     DO l = 1, this%hp_eta_cells
@@ -1338,26 +1329,22 @@ CONTAINS
     END DO
     !$OMP END DO
 
-    ! Evaluate the eta-based HP states only on solve_cells.
+    ! Reconstruct both face momenta from the directly limited velocity traces.
+    ! The PCCU interface evaluator selects the transport depth and recomputes
+    ! momentum using h_x, minmod, Froude blend or eta_x as configured.
     !$OMP DO
-    DO l = 1, solve_cells
-       j = j_cent(l)
-       k = k_cent(l)
-       residual2d = local_hydrostatic_residual(j,k)
-       relief2d = MAX( B_face_x(j,k), B_face_x(j+1,k),                      &
-            B_face_y(j,k), B_face_y(j,k+1) ) -                              &
-            MIN( B_face_x(j,k), B_face_x(j+1,k),                            &
-            B_face_y(j,k), B_face_y(j,k+1) )
-       relief2d = relief2d /                                                &
-            MAX(qp_center(1,j,k),hp_dry_tolerance)
-       CALL evaluate_hp_cell(j,k,residual2d,relief2d,1)
-       CALL evaluate_hp_cell(j,k,residual2d,relief2d,2)
+    DO l = 1, this%hp_eta_cells
+       j = this%hp_eta_j(l)
+       k = this%hp_eta_k(l)
+       CALL form_direct_face_momentum(this%qp_cellW(:,j,k))
+       CALL form_direct_face_momentum(this%qp_cellE(:,j,k))
+       CALL form_direct_face_momentum(this%qp_cellS(:,j,k))
+       CALL form_direct_face_momentum(this%qp_cellN(:,j,k))
     END DO
     !$OMP END DO
 
-    ! The Python KT diagnostic reconstructs h, hu and u independently and
-    ! uses those direct traces for the inertial flux and wave speeds. Preserve
-    ! the raw states here, before commit_hp_cell replaces qp_cell* by HP states.
+    ! Preserve the direct face traces for the KT advection path. The selected
+    ! depth will be applied consistently to both momenta at each PCCU face.
     IF ( use_kt_direct ) THEN
        !$OMP DO
        DO l = 1, this%hp_eta_cells
@@ -1382,14 +1369,6 @@ CONTAINS
        END DO
        !$OMP END DO
     END IF
-
-    !$OMP DO
-    DO l = 1, solve_cells
-       j = j_cent(l)
-       k = k_cent(l)
-       CALL commit_hp_cell(j,k)
-    END DO
-    !$OMP END DO
 
     ! Map all eta cell traces to their oriented face storage.  Conservative
     ! only workset cells can contribute to an active interface.
@@ -1696,248 +1675,20 @@ CONTAINS
 
     END SUBROUTINE hp_eta_face_pair
 
-       !> \brief Evaluate the HP blend in either Cartesian direction.
-       !> \param[in] jc X index of the current cell.
-       !> \param[in] kc Y index of the current cell.
-       !> \param[in] residual Dimensionless 2-D hydrostatic residual.
-       !> \param[in] relief Dimensionless local bed-relief/depth ratio.
-       !> \param[in] direction 1 for x (W/E), 2 for y (S/N).
-       !> \details Reads immutable neighbouring candidates, uses the calling thread's
-       !>          scratch slice, and writes one direction of hp_blended. Final traces
-       !>          are committed after the existing OpenMP barrier.
-       SUBROUTINE evaluate_hp_cell(jc,kc,residual,relief,direction)
-
-       INTEGER, INTENT(IN) :: jc, kc, direction
-       REAL(wp), INTENT(IN) :: residual, relief
-       REAL(wp) :: h_line(5), u_line(5), Bm_line(5), Bp_line(5)
-       REAL(wp) :: hm_direct(5), hp_direct(5), hum_direct(5), hup_direct(5)
-       REAL(wp) :: um_candidate(5), up_candidate(5)
-       REAL(wp) :: tangent_line(5), htm_direct(5), htp_direct(5)
-       REAL(wp) :: vtm_candidate(5), vtp_candidate(5)
-       REAL(wp) :: residual_line(5), relief_line(5)
-       REAL(wp) :: hm_line(5), hp_line(5), hum_line(5), hup_line(5)
-       REAL(wp) :: htm_line(5), htp_line(5), hm_tangent_line(5), hp_tangent_line(5)
-       REAL(wp) :: eta_m_line(5), eta_p_line(5), weight_line(5)
-       REAL(wp) :: eta_m_tangent(5), eta_p_tangent(5), weight_tangent(5)
-       REAL(wp) :: shared_geometry_weights(5,2)
-       INTEGER :: line_start, line_end, line_size, center, offset
-       INTEGER :: line_index, line_j, line_k, thread_id
-
-       SELECT CASE(direction)
-       CASE(1)
-          line_start = MAX(1,jc-2)
-          line_end = MIN(comp_cells_x,jc+2)
-          center = jc-line_start+1
-       CASE(2)
-          line_start = MAX(1,kc-2)
-          line_end = MIN(comp_cells_y,kc+2)
-          center = kc-line_start+1
-       CASE DEFAULT
-          ERROR STOP 'evaluate_hp_cell: invalid direction'
-       END SELECT
-       line_size = line_end-line_start+1
-       residual_line = 0.0_wp
-       relief_line = 0.0_wp
-       tangent_line = 0.0_wp
-       htm_direct = 0.0_wp
-       htp_direct = 0.0_wp
-       vtm_candidate = 0.0_wp
-       vtp_candidate = 0.0_wp
-
-       DO offset = 1, line_size
-          line_index = line_start+offset-1
-          IF ( direction .EQ. 1 ) THEN
-             line_j = line_index
-             line_k = kc
-             h_line(offset) = qp_center(1,line_j,line_k)
-             u_line(offset) = qp_center(idx_u,line_j,line_k)
-             tangent_line(offset) = qp_center(idx_v,line_j,line_k)
-             Bm_line(offset) = B_face_x(line_j,line_k)
-             Bp_line(offset) = B_face_x(line_j+1,line_k)
-             IF ( this%hp_eta_mask(line_j,line_k) ) THEN
-                hm_direct(offset) = this%qp_cellW(1,line_j,line_k)
-                hp_direct(offset) = this%qp_cellE(1,line_j,line_k)
-                hum_direct(offset) = this%qp_cellW(2,line_j,line_k)
-                hup_direct(offset) = this%qp_cellE(2,line_j,line_k)
-                um_candidate(offset) = this%qp_cellW(idx_u,line_j,line_k)
-                up_candidate(offset) = this%qp_cellE(idx_u,line_j,line_k)
-                htm_direct(offset) = this%qp_cellW(3,line_j,line_k)
-                htp_direct(offset) = this%qp_cellE(3,line_j,line_k)
-                vtm_candidate(offset) = this%qp_cellW(idx_v,line_j,line_k)
-                vtp_candidate(offset) = this%qp_cellE(idx_v,line_j,line_k)
-             ELSE
-                hm_direct(offset) = qp_center(1,line_j,line_k)
-                hp_direct(offset) = qp_center(1,line_j,line_k)
-                hum_direct(offset) = qp_center(2,line_j,line_k)
-                hup_direct(offset) = qp_center(2,line_j,line_k)
-                um_candidate(offset) = qp_center(idx_u,line_j,line_k)
-                up_candidate(offset) = qp_center(idx_u,line_j,line_k)
-                htm_direct(offset) = qp_center(3,line_j,line_k)
-                htp_direct(offset) = qp_center(3,line_j,line_k)
-                vtm_candidate(offset) = qp_center(idx_v,line_j,line_k)
-                vtp_candidate(offset) = qp_center(idx_v,line_j,line_k)
-             END IF
-          ELSE
-             line_j = jc
-             line_k = line_index
-             h_line(offset) = qp_center(1,line_j,line_k)
-             u_line(offset) = qp_center(idx_v,line_j,line_k)
-             tangent_line(offset) = qp_center(idx_u,line_j,line_k)
-             Bm_line(offset) = B_face_y(line_j,line_k)
-             Bp_line(offset) = B_face_y(line_j,line_k+1)
-             IF ( this%hp_eta_mask(line_j,line_k) ) THEN
-                hm_direct(offset) = this%qp_cellS(1,line_j,line_k)
-                hp_direct(offset) = this%qp_cellN(1,line_j,line_k)
-                hum_direct(offset) = this%qp_cellS(3,line_j,line_k)
-                hup_direct(offset) = this%qp_cellN(3,line_j,line_k)
-                um_candidate(offset) = this%qp_cellS(idx_v,line_j,line_k)
-                up_candidate(offset) = this%qp_cellN(idx_v,line_j,line_k)
-                htm_direct(offset) = this%qp_cellS(2,line_j,line_k)
-                htp_direct(offset) = this%qp_cellN(2,line_j,line_k)
-                vtm_candidate(offset) = this%qp_cellS(idx_u,line_j,line_k)
-                vtp_candidate(offset) = this%qp_cellN(idx_u,line_j,line_k)
-             ELSE
-                hm_direct(offset) = qp_center(1,line_j,line_k)
-                hp_direct(offset) = qp_center(1,line_j,line_k)
-                hum_direct(offset) = qp_center(3,line_j,line_k)
-                hup_direct(offset) = qp_center(3,line_j,line_k)
-                um_candidate(offset) = qp_center(idx_v,line_j,line_k)
-                up_candidate(offset) = qp_center(idx_v,line_j,line_k)
-                htm_direct(offset) = qp_center(2,line_j,line_k)
-                htp_direct(offset) = qp_center(2,line_j,line_k)
-                vtm_candidate(offset) = qp_center(idx_u,line_j,line_k)
-                vtp_candidate(offset) = qp_center(idx_u,line_j,line_k)
-             END IF
-          END IF
-       END DO
-       residual_line(center) = residual
-       relief_line(center) = relief
-       thread_id = omp_get_thread_num()+1
-
-       CALL reconstruct_hp_line( h_line(1:line_size),u_line(1:line_size),    &
-          Bm_line(1:line_size),Bp_line(1:line_size),                       &
-          hm_direct(1:line_size),hp_direct(1:line_size),                   &
-          hum_direct(1:line_size),hup_direct(1:line_size),                 &
-          um_candidate(1:line_size),up_candidate(1:line_size),             &
-          residual_line(1:line_size),relief_line(1:line_size),             &
-          limiter(1),reconstr_coeff,hm_line(1:line_size),                 &
-          hp_line(1:line_size),hum_line(1:line_size),hup_line(1:line_size),&
-          eta_m_line(1:line_size),eta_p_line(1:line_size),                 &
-          weight_line(1:line_size),this%hp_scratch(1:line_size,:,thread_id), &
-          geometry_weights=shared_geometry_weights(1:line_size,:) )
-
-       ! Apply the same HP depth blend and conservative, bounded momentum
-       ! correction to the tangential velocity component. The second call uses
-       ! the same line geometry and depth data; only the velocity/momentum
-       ! components differ. Thus x/y faces no longer treat the vector
-       ! components differently merely because one is normal and one tangent.
-       CALL reconstruct_hp_line( h_line(1:line_size),tangent_line(1:line_size), &
-          Bm_line(1:line_size),Bp_line(1:line_size),                         &
-          hm_direct(1:line_size),hp_direct(1:line_size),                     &
-          htm_direct(1:line_size),htp_direct(1:line_size),                   &
-          vtm_candidate(1:line_size),vtp_candidate(1:line_size),             &
-          residual_line(1:line_size),relief_line(1:line_size),              &
-          limiter(1),reconstr_coeff,hm_tangent_line(1:line_size),            &
-          hp_tangent_line(1:line_size),htm_line(1:line_size),                &
-          htp_line(1:line_size),eta_m_tangent(1:line_size),                  &
-          eta_p_tangent(1:line_size),weight_tangent(1:line_size),           &
-          this%hp_scratch(1:line_size,:,thread_id), &
-          geometry_weights=shared_geometry_weights(1:line_size,:), &
-          reuse_geometry=.TRUE. )
-
-       this%hp_blended(:,jc,kc,direction) = [ hm_line(center),hp_line(center), &
-          hum_line(center),hup_line(center),htm_line(center),htp_line(center) ]
-
-       END SUBROUTINE evaluate_hp_cell
-
-       !> \brief Commit both directional HP blends to the final traces of one cell.
-       !>
-       !> \param[in] jc X index of the current cell in the parent reconstruction.
-       !> \param[in] kc Y index of the current cell in the parent reconstruction.
-       !>
-       !> \note Consumes both host hp_blended slices after candidate evaluation and writes the
-       !>       cell-owned physical traces.
-
-       SUBROUTINE commit_hp_cell(jc,kc)
-
-       INTEGER, INTENT(IN) :: jc, kc
-
-       this%qp_cellW(1,jc,kc) = this%hp_blended(1,jc,kc,1)
-       this%qp_cellE(1,jc,kc) = this%hp_blended(2,jc,kc,1)
-       this%qp_cellW(2,jc,kc) = this%hp_blended(3,jc,kc,1)
-       this%qp_cellE(2,jc,kc) = this%hp_blended(4,jc,kc,1)
-       this%qp_cellW(3,jc,kc) = this%hp_blended(5,jc,kc,1)
-       this%qp_cellE(3,jc,kc) = this%hp_blended(6,jc,kc,1)
-       ! Keep the independently limited u/v traces from the initial scalar
-       ! reconstruction, as in KT. HP still supplies h and conservative
-       ! h*u/h*v; auxiliary velocities are not recovered from those momenta.
-
-       this%qp_cellS(1,jc,kc) = this%hp_blended(1,jc,kc,2)
-       this%qp_cellN(1,jc,kc) = this%hp_blended(2,jc,kc,2)
-       this%qp_cellS(3,jc,kc) = this%hp_blended(3,jc,kc,2)
-       this%qp_cellN(3,jc,kc) = this%hp_blended(4,jc,kc,2)
-       this%qp_cellS(2,jc,kc) = this%hp_blended(5,jc,kc,2)
-       this%qp_cellN(2,jc,kc) = this%hp_blended(6,jc,kc,2)
-       ! As for x faces, retain the independently reconstructed velocity
-       ! components instead of recovering them from the HP-corrected momenta.
-
-       END SUBROUTINE commit_hp_cell
-
-    !> \brief Measure local free-surface disequilibrium relative to bed/depth variation.
-    !>
-    !> \param[in] jc X index of the current cell in the parent reconstruction.
-    !> \param[in] kc Y index of the current cell in the parent reconstruction.
-    !> \return Dimensionless residual in [0,1]; zero denotes local hydrostatic compensation.
-    !>
-    !> \note Reads neighbouring host qp_center values and B_cent; boundary cells use only existing
-    !>       neighbours.
-
-    FUNCTION local_hydrostatic_residual(jc,kc) RESULT(residual)
-
-      INTEGER, INTENT(IN) :: jc, kc
-      REAL(wp) :: residual
-      REAL(wp) :: h0, eta0, numerator, denominator, scale
-      REAL(wp) :: hn, etan
-      INTEGER :: jj, kk
-
-      h0 = qp_center(1,jc,kc)
-      eta0 = h0 + B_cent(jc,kc)
-      numerator = 0.0_wp
-      denominator = 0.0_wp
-
-      IF ( jc .GT. 1 ) THEN
-         jj = jc-1; kk = kc
-         hn = qp_center(1,jj,kk); etan = hn + B_cent(jj,kk)
-         numerator = numerator + ABS(etan-eta0)
-         denominator = denominator + ABS(hn-h0) + ABS(B_cent(jj,kk)-B_cent(jc,kc))
-      END IF
-      IF ( jc .LT. comp_cells_x ) THEN
-         jj = jc+1; kk = kc
-         hn = qp_center(1,jj,kk); etan = hn + B_cent(jj,kk)
-         numerator = numerator + ABS(etan-eta0)
-         denominator = denominator + ABS(hn-h0) + ABS(B_cent(jj,kk)-B_cent(jc,kc))
-      END IF
-      IF ( kc .GT. 1 ) THEN
-         jj = jc; kk = kc-1
-         hn = qp_center(1,jj,kk); etan = hn + B_cent(jj,kk)
-         numerator = numerator + ABS(etan-eta0)
-         denominator = denominator + ABS(hn-h0) + ABS(B_cent(jj,kk)-B_cent(jc,kc))
-      END IF
-      IF ( kc .LT. comp_cells_y ) THEN
-         jj = jc; kk = kc+1
-         hn = qp_center(1,jj,kk); etan = hn + B_cent(jj,kk)
-         numerator = numerator + ABS(etan-eta0)
-         denominator = denominator + ABS(hn-h0) + ABS(B_cent(jj,kk)-B_cent(jc,kc))
-      END IF
-
-      scale = 128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,ABS(eta0),ABS(h0),ABS(B_cent(jc,kc)))
-      IF ( denominator .GT. scale ) THEN
-         residual = MIN(1.0_wp,MAX(0.0_wp,numerator/denominator))
+    !> Combine directly limited velocity traces with a nonnegative depth.
+    !> The selected transport depth is applied consistently to both moments
+    !> by the downstream PCCU face evaluator.
+    SUBROUTINE form_direct_face_momentum(trace)
+      REAL(wp), INTENT(INOUT) :: trace(n_vars+2)
+      trace(1) = MAX(trace(1),0.0_wp)
+      IF (trace(1) .LE. hp_dry_tolerance) THEN
+         trace(1:3) = 0.0_wp
+         trace(idx_u:idx_v) = 0.0_wp
       ELSE
-         residual = 0.0_wp
+         trace(2) = trace(1)*trace(idx_u)
+         trace(3) = trace(1)*trace(idx_v)
       END IF
-
-    END FUNCTION local_hydrostatic_residual
+    END SUBROUTINE form_direct_face_momentum
 
     !> \brief Close component fractions and convert a final HP candidate into conservative form.
     !>
