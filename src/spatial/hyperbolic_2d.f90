@@ -12,6 +12,7 @@
 MODULE hyperbolic_2d
 
   USE parameters_2d, ONLY : wp, n_eqns, n_vars, idx_u, idx_v
+   USE parameters_2d, ONLY : dry_thickness_tolerance
   USE parameters_2d, ONLY : idx_solidEqn_first, idx_solidEqn_last
   USE parameters_2d, ONLY : idx_solid_first, idx_solid_last
   USE parameters_2d, ONLY : kt_trace_reconstruction
@@ -25,8 +26,6 @@ MODULE hyperbolic_2d
   USE geometry_2d, ONLY : source_cell
 
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
-  USE hp_reconstruction_2d, ONLY : hp_dry_tolerance
-
   IMPLICIT NONE
 
   PRIVATE
@@ -362,12 +361,12 @@ CONTAINS
 
           a_minus = this%a_interface_xNeg(j,k)
           a_plus = this%a_interface_xPos(j,k)
-          dry_donor_left = recon%qp_adv_interfaceL(1,j,k) .LE. hp_dry_tolerance
-          dry_donor_right = recon%qp_adv_interfaceR(1,j,k) .LE. hp_dry_tolerance
+          dry_donor_left = recon%qp_adv_interfaceL(1,j,k) .LE. dry_thickness_tolerance
+          dry_donor_right = recon%qp_adv_interfaceR(1,j,k) .LE. dry_thickness_tolerance
           IF ( j .GT. 1 ) dry_donor_left =                                  &
-               qp_center(1,j-1,k) .LE. hp_dry_tolerance
+               qp_center(1,j-1,k) .LE. dry_thickness_tolerance
           IF ( j .LE. comp_cells_x ) dry_donor_right =                      &
-               qp_center(1,j,k) .LE. hp_dry_tolerance
+               qp_center(1,j,k) .LE. dry_thickness_tolerance
           CALL eval_pccu_interface( recon%eta_interfaceL(j,k),              &
                recon%eta_interfaceR(j,k), B_face_x(j,k),                     &
                recon%h_minmod_interfaceL(j,k),                                &
@@ -438,12 +437,12 @@ CONTAINS
 
           a_minus = this%a_interface_yNeg(j,k)
           a_plus = this%a_interface_yPos(j,k)
-          dry_donor_left = recon%qp_adv_interfaceB(1,j,k) .LE. hp_dry_tolerance
-          dry_donor_right = recon%qp_adv_interfaceT(1,j,k) .LE. hp_dry_tolerance
+          dry_donor_left = recon%qp_adv_interfaceB(1,j,k) .LE. dry_thickness_tolerance
+          dry_donor_right = recon%qp_adv_interfaceT(1,j,k) .LE. dry_thickness_tolerance
           IF ( k .GT. 1 ) dry_donor_left =                                  &
-               qp_center(1,j,k-1) .LE. hp_dry_tolerance
+               qp_center(1,j,k-1) .LE. dry_thickness_tolerance
           IF ( k .LE. comp_cells_y ) dry_donor_right =                      &
-               qp_center(1,j,k) .LE. hp_dry_tolerance
+               qp_center(1,j,k) .LE. dry_thickness_tolerance
           CALL eval_pccu_interface( recon%eta_interfaceB(j,k),              &
                recon%eta_interfaceT(j,k), B_face_y(j,k),                     &
                recon%h_minmod_interfaceB(j,k),                                &
@@ -602,14 +601,14 @@ CONTAINS
     ! momenta as h_face*u_face using the selected shared depth traces.
     qp_adv_left_use(1)=h_eta_left
     qp_adv_right_use(1)=h_eta_right
-    IF ( h_eta_left .LE. hp_dry_tolerance ) THEN
+    IF ( h_eta_left .LE. dry_thickness_tolerance ) THEN
        qp_adv_left_use(1:3)=0.0_wp
        qp_adv_left_use(idx_u:idx_v)=0.0_wp
     ELSE
        qp_adv_left_use(2)=h_eta_left*qp_adv_left(idx_u)
        qp_adv_left_use(3)=h_eta_left*qp_adv_left(idx_v)
     END IF
-    IF ( h_eta_right .LE. hp_dry_tolerance ) THEN
+    IF ( h_eta_right .LE. dry_thickness_tolerance ) THEN
        qp_adv_right_use(1:3)=0.0_wp
        qp_adv_right_use(idx_u:idx_v)=0.0_wp
     ELSE
@@ -673,11 +672,11 @@ CONTAINS
     IF ( use_dry_donor ) THEN
        IF ( (interface_flux(1) .GT. 0.0_wp) .AND.                         &
             (dry_donor_left .OR.                                         &
-            (qp_adv_left_use(1) .LE. hp_dry_tolerance)) ) THEN
+            (qp_adv_left_use(1) .LE. dry_thickness_tolerance)) ) THEN
           interface_flux=0.0_wp
        ELSEIF ( (interface_flux(1) .LT. 0.0_wp) .AND.                    &
             (dry_donor_right .OR.                                        &
-            (qp_adv_right_use(1) .LE. hp_dry_tolerance)) ) THEN
+            (qp_adv_right_use(1) .LE. dry_thickness_tolerance)) ) THEN
           interface_flux=0.0_wp
        END IF
     END IF
@@ -704,11 +703,11 @@ CONTAINS
     IF ( source_trace_left ) eta_path_left=bed_face+h_eta_left
     IF ( source_trace_right ) eta_path_right=bed_face+h_eta_right
     IF ( use_dry_donor ) THEN
-       IF ( qp_adv_left_use(1) .LE. hp_dry_tolerance ) THEN
+       IF ( qp_adv_left_use(1) .LE. dry_thickness_tolerance ) THEN
           qp_path_left(1)=0.0_wp
           eta_path_left=bed_face
        END IF
-       IF ( qp_adv_right_use(1) .LE. hp_dry_tolerance ) THEN
+       IF ( qp_adv_right_use(1) .LE. dry_thickness_tolerance ) THEN
           qp_path_right(1)=0.0_wp
           eta_path_right=bed_face
        END IF
@@ -727,8 +726,8 @@ CONTAINS
     ! A dry adjacent column receives no share of the nonconservative path;
     ! the wet side retains its own oriented contribution.
     IF ( use_dry_donor ) THEN
-       IF ( qp_adv_left_use(1) .LE. hp_dry_tolerance ) value_left=interface_flux
-       IF ( qp_adv_right_use(1) .LE. hp_dry_tolerance ) value_right=interface_flux
+       IF ( qp_adv_left_use(1) .LE. dry_thickness_tolerance ) value_left=interface_flux
+       IF ( qp_adv_right_use(1) .LE. dry_thickness_tolerance ) value_right=interface_flux
     END IF
 
   END SUBROUTINE eval_pccu_interface
@@ -768,7 +767,7 @@ CONTAINS
        j = j_cent(l)
        k = k_cent(l)
 
-       IF ( use_dry_donor .AND. (qp_expl(1,j,k) .LE. hp_dry_tolerance) ) THEN
+       IF ( use_dry_donor .AND. (qp_expl(1,j,k) .LE. dry_thickness_tolerance) ) THEN
           this%P_cell_x(:,j,k)=0.0_wp
           this%P_cell_y(:,j,k)=0.0_wp
           CYCLE
@@ -780,8 +779,8 @@ CONTAINS
              qp_path_plus=recon%qp_adv_interfaceL(:,j+1,k)
              qp_path_minus(1)=MAX(recon%eta_cellW(j,k)-B_face_x(j,k),0.0_wp)
              qp_path_plus(1)=MAX(recon%eta_cellE(j,k)-B_face_x(j+1,k),0.0_wp)
-             IF (qp_path_minus(1).LE.hp_dry_tolerance) qp_path_minus(2:3)=0.0_wp
-             IF (qp_path_plus(1).LE.hp_dry_tolerance) qp_path_plus(2:3)=0.0_wp
+             IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
+             IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
              CALL eval_cell_hydrostatic_path( qp_path_minus,                  &
                recon%eta_cellW(j,k),grav_coeff_stag_x(j,k),                  &
                qp_path_plus,recon%eta_cellE(j,k),                             &
@@ -800,8 +799,8 @@ CONTAINS
              qp_path_plus=recon%qp_adv_interfaceB(:,j,k+1)
              qp_path_minus(1)=MAX(recon%eta_cellS(j,k)-B_face_y(j,k),0.0_wp)
              qp_path_plus(1)=MAX(recon%eta_cellN(j,k)-B_face_y(j,k+1),0.0_wp)
-             IF (qp_path_minus(1).LE.hp_dry_tolerance) qp_path_minus(2:3)=0.0_wp
-             IF (qp_path_plus(1).LE.hp_dry_tolerance) qp_path_plus(2:3)=0.0_wp
+             IF (qp_path_minus(1).LE.dry_thickness_tolerance) qp_path_minus(2:3)=0.0_wp
+             IF (qp_path_plus(1).LE.dry_thickness_tolerance) qp_path_plus(2:3)=0.0_wp
              CALL eval_cell_hydrostatic_path( qp_path_minus,                  &
                recon%eta_cellS(j,k),grav_coeff_stag_y(j,k),                  &
                qp_path_plus,recon%eta_cellN(j,k),                             &
@@ -879,11 +878,11 @@ CONTAINS
   PURE SUBROUTINE regularize_dry_gamma_pair(h_left,gamma_left,h_right,gamma_right)
     REAL(wp), INTENT(IN) :: h_left,h_right
     REAL(wp), INTENT(INOUT) :: gamma_left,gamma_right
-    IF ( ( h_left .LE. hp_dry_tolerance ) .AND.                              &
-         ( h_right .GT. hp_dry_tolerance ) ) THEN
+    IF ( ( h_left .LE. dry_thickness_tolerance ) .AND.                              &
+         ( h_right .GT. dry_thickness_tolerance ) ) THEN
        gamma_left = gamma_right
-    ELSEIF ( ( h_right .LE. hp_dry_tolerance ) .AND.                         &
-         ( h_left .GT. hp_dry_tolerance ) ) THEN
+    ELSEIF ( ( h_right .LE. dry_thickness_tolerance ) .AND.                         &
+         ( h_left .GT. dry_thickness_tolerance ) ) THEN
        gamma_right = gamma_left
     END IF
   END SUBROUTINE regularize_dry_gamma_pair
@@ -972,9 +971,9 @@ CONTAINS
              qp_eta_plus=recon%qp_adv_interfaceR(:,j,k)
              qp_eta_minus(1)=h_eta_minus
              qp_eta_plus(1)=h_eta_plus
-             IF ( h_eta_minus .LE. hp_dry_tolerance ) &
+             IF ( h_eta_minus .LE. dry_thickness_tolerance ) &
                   qp_eta_minus(idx_u:idx_v)=0.0_wp
-             IF ( h_eta_plus .LE. hp_dry_tolerance ) &
+             IF ( h_eta_plus .LE. dry_thickness_tolerance ) &
                   qp_eta_plus(idx_u:idx_v)=0.0_wp
              qp_eta_minus(2)=h_eta_minus*qp_eta_minus(idx_u)
              qp_eta_minus(3)=h_eta_minus*qp_eta_minus(idx_v)
@@ -1033,9 +1032,9 @@ CONTAINS
              qp_eta_plus=recon%qp_adv_interfaceT(:,j,k)
              qp_eta_minus(1)=h_eta_minus
              qp_eta_plus(1)=h_eta_plus
-             IF ( h_eta_minus .LE. hp_dry_tolerance ) &
+             IF ( h_eta_minus .LE. dry_thickness_tolerance ) &
                   qp_eta_minus(idx_u:idx_v)=0.0_wp
-             IF ( h_eta_plus .LE. hp_dry_tolerance ) &
+             IF ( h_eta_plus .LE. dry_thickness_tolerance ) &
                   qp_eta_plus(idx_u:idx_v)=0.0_wp
              qp_eta_minus(2)=h_eta_minus*qp_eta_minus(idx_u)
              qp_eta_minus(3)=h_eta_minus*qp_eta_minus(idx_v)

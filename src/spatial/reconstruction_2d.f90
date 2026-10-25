@@ -11,7 +11,7 @@
 
 MODULE reconstruction_2d
 
-  USE parameters_2d, ONLY : wp, n_vars, kt_trace_reconstruction
+  USE parameters_2d, ONLY : wp, n_vars, kt_trace_reconstruction, dry_thickness_tolerance
   USE parameters_2d, ONLY : lateral_source_flag, radial_source_flag
   USE parameters_2d, ONLY : bcW, bcE, bcS, bcN
   USE parameters_2d, ONLY : idx_u, idx_v
@@ -23,9 +23,6 @@ MODULE reconstruction_2d
   USE geometry_2d, ONLY : one_by_dx, one_by_dy, dx, dy
   USE geometry_2d, ONLY : limit
 
-   USE hp_reconstruction_2d, ONLY : hp_dry_tolerance
-   USE hp_reconstruction_2d, ONLY : hp_dynamic_residual_threshold
-
   IMPLICIT NONE
 
   PRIVATE
@@ -34,10 +31,7 @@ MODULE reconstruction_2d
   REAL(wp), PARAMETER :: fr_blend_lower = 0.8_wp
   REAL(wp), PARAMETER :: fr_blend_upper = 1.2_wp
 
-  !> \brief Persistent cell/face traces and thread-local storage for HP reconstruction.
-  !> \details Arrays are indexed by component, x and y; hp_scratch uses its last
-  !>          index to select the OpenMP thread. Allocation occurs at initialization,
-  !>          not on each reconstruction call.
+  !> \brief Persistent cell and face traces for the selected depth reconstruction.
   TYPE, PUBLIC :: reconstruction_workspace_type
      REAL(wp), ALLOCATABLE :: q_interfaceL(:,:,:)
      REAL(wp), ALLOCATABLE :: q_interfaceR(:,:,:)
@@ -341,7 +335,7 @@ CONTAINS
        j = this%hp_eta_j(l)
        k = this%hp_eta_k(l)
        this%qp_cellW(:,j,k) = qp_expl(:,j,k)
-       IF (qp_expl(1,j,k) .LE. hp_dry_tolerance) THEN
+       IF (qp_expl(1,j,k) .LE. dry_thickness_tolerance) THEN
           this%qp_cellW(idx_u:idx_v,j,k) = 0.0_wp
        END IF
        this%qp_cellE(:,j,k) = this%qp_cellW(:,j,k)
@@ -1182,7 +1176,7 @@ CONTAINS
     REAL(wp) :: weight,fr,scaled
 
     weight=0.0_wp
-    IF ( (h .LE. hp_dry_tolerance) .OR. (gravity .LE. 0.0_wp) ) RETURN
+    IF ( (h .LE. dry_thickness_tolerance) .OR. (gravity .LE. 0.0_wp) ) RETURN
 
     fr=ABS(u_normal)/SQRT(gravity*h)
     scaled=MIN(1.0_wp,MAX(0.0_wp, &
@@ -1277,7 +1271,7 @@ CONTAINS
 
     value = qp_center(component,j,k)
     IF ((component .EQ. idx_u) .OR. (component .EQ. idx_v)) THEN
-       IF (qp_center(1,j,k) .LE. hp_dry_tolerance) value = 0.0_wp
+       IF (qp_center(1,j,k) .LE. dry_thickness_tolerance) value = 0.0_wp
     END IF
   END FUNCTION reconstruction_cell_value
 
@@ -1681,7 +1675,7 @@ CONTAINS
     SUBROUTINE form_direct_face_momentum(trace)
       REAL(wp), INTENT(INOUT) :: trace(n_vars+2)
       trace(1) = MAX(trace(1),0.0_wp)
-      IF (trace(1) .LE. hp_dry_tolerance) THEN
+      IF (trace(1) .LE. dry_thickness_tolerance) THEN
          trace(1:3) = 0.0_wp
          trace(idx_u:idx_v) = 0.0_wp
       ELSE
@@ -1705,7 +1699,7 @@ CONTAINS
 
       qp_reconstructed = qp_candidate
 
-      IF ( qp_reconstructed(1) .LE. hp_dry_tolerance ) THEN
+      IF ( qp_reconstructed(1) .LE. dry_thickness_tolerance ) THEN
          qp_reconstructed = 0.0_wp
          qp_reconstructed(4) = T_ambient
          q_conservative = 0.0_wp
