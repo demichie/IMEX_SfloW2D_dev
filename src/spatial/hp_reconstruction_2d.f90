@@ -176,8 +176,6 @@ CONTAINS
     IF (.NOT. reuse_shared_geometry) THEN
     eta_center = h_center + 0.5_wp * ( B_minus + B_plus )
     coordinate_stencil = [ -1.0_wp, 0.0_wp, 1.0_wp ]
-    u_center_safe = u_center
-    WHERE ( h_center .LE. hp_dry_tolerance ) u_center_safe = 0.0_wp
 
     DO i = 1, number_of_cells
 
@@ -227,6 +225,10 @@ CONTAINS
     END DO
 
     END IF ! Shared scratch retains hydrostatic depths and eta on reuse.
+
+    ! Velocity-dependent limiting must be recomputed for each component.
+    u_center_safe = u_center
+    WHERE ( h_center .LE. hp_dry_tolerance ) u_center_safe = 0.0_wp
 
     DO i = 1, number_of_cells
 
