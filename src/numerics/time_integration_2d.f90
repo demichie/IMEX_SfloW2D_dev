@@ -405,7 +405,7 @@ CONTAINS
        a_diag = this%a_dirk_ij(i_RK,i_RK)
 
        !$OMP PARALLEL 
-       !$OMP DO schedule(guided)                                                &
+       !$OMP DO schedule(static)                                                &
        !$OMP & private(j,k,q_guess,q_fv_cell,known_stage_residual,p_dyn,       &
        !$OMP & closure_context,                                                &
        !$OMP & explicit_rate,explicit_group_index,                             &
