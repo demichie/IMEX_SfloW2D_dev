@@ -571,7 +571,7 @@ CONTAINS
     REAL(wp) :: denominator,u_normal_left,u_normal_right
     REAL(wp) :: eta_path_left, eta_path_right
     REAL(wp) :: h_eta_left,h_eta_right
-    CHARACTER(LEN=128) :: closure_context
+    ! Constant contexts avoid expensive formatted I/O in each interface.
     LOGICAL :: source_trace_left,source_trace_right
 
     qp_adv_left_use=qp_adv_left
@@ -616,17 +616,14 @@ CONTAINS
        qp_adv_right_use(2)=h_eta_right*qp_adv_right(idx_u)
        qp_adv_right_use(3)=h_eta_right*qp_adv_right(idx_v)
     END IF
-    WRITE(closure_context,'(A,I0,A,I0,A,I0,A,ES13.5)')                   &
-         'KT interface direction=',direction,' face=',face_i,',',face_j,  &
-         ' t=',t
     CALL enforce_primitive_mass_fraction_closure(qp_adv_left_use,        &
-         TRIM(closure_context)//' left advective trace')
+         'KT interface left advective trace')
     CALL enforce_primitive_mass_fraction_closure(qp_adv_right_use,       &
-         TRIM(closure_context)//' right advective trace')
+         'KT interface right advective trace')
     CALL qp_to_qc(qp_adv_left_use,q_adv_left_use,                        &
-         TRIM(closure_context)//' left advective trace')
+         'KT interface left advective trace')
     CALL qp_to_qc(qp_adv_right_use,q_adv_right_use,                      &
-         TRIM(closure_context)//' right advective trace')
+         'KT interface right advective trace')
 
     CALL eval_inertial_flux(q_adv_left_use,qp_adv_left_use,direction,flux_left)
     CALL eval_inertial_flux(q_adv_right_use,qp_adv_right_use,direction,flux_right)
