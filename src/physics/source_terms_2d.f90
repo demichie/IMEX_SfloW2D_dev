@@ -34,7 +34,6 @@ MODULE source_terms_2d
      MODULE PROCEDURE eval_stage_source_explicit, eval_step_source_explicit
   END INTERFACE
   PUBLIC :: eval_source_implicit, eval_source_semi_implicit, eval_source_analytic
-  PUBLIC :: eval_newton_source_explicit
   PUBLIC :: analytic_term_context_type
   PUBLIC :: eval_geometry_curvature_explicit
   PUBLIC :: eval_geometry_curvature_semi_implicit
@@ -65,25 +64,6 @@ MODULE source_terms_2d
     REAL(wp) :: grav_coeff=0.0_wp, Zij=0.0_wp
   END TYPE analytic_term_context_type
 CONTAINS
-
-  ! Evaluate the complete physical source rate from an existing Newton split.
-  ! The same immutable input state is used for the SI and IM contributions.
-  ! This routine does not perform any implicit solve or update its arguments.
-  SUBROUTINE eval_newton_source_explicit(qpj,context,group,rate)
-    REAL(wp), INTENT(IN) :: qpj(n_vars+2)
-    TYPE(analytic_term_context_type), INTENT(IN) :: context
-    TYPE(source_group_type), INTENT(IN) :: group
-    REAL(wp), INTENT(OUT) :: rate(n_eqns)
-    REAL(wp) :: qc(n_vars),si_rate(n_eqns),im_rate(n_eqns)
-
-    CALL qp_to_qc(qpj,qc)
-    CALL eval_source_semi_implicit(context%Bprime_x,context%Bprime_y, &
-         context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy, &
-         context%grav_coeff,qpj,si_rate,context%Zij,group)
-    CALL eval_source_implicit(context%Bprime_x,context%Bprime_y, &
-         context%Zij,r_qj=qc,r_nh_term_impl=im_rate,group=group)
-    rate=si_rate+im_rate
-  END SUBROUTINE eval_newton_source_explicit
 
   SUBROUTINE eval_source_analytic(group,q_before,context,interval,q_after,status)
     TYPE(source_group_type), INTENT(IN) :: group
