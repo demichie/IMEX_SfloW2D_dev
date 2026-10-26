@@ -181,11 +181,10 @@ CONTAINS
 
   SUBROUTINE verify_native_parser()
     INTEGER :: unit,i
-    CHARACTER(LEN=160), PARAMETER :: lines(11)=[CHARACTER(LEN=160):: &
+    CHARACTER(LEN=160), PARAMETER :: lines(10)=[CHARACTER(LEN=160):: &
          '&source_groups', &
          ' source_group_count=1,', &
          ' source_group_id(1)=5,', &
-         ' source_group_order(1)=1,', &
          " source_group_cadence(1)='STAGE',", &
          " source_group_method(1)='NEWTON',", &
          ' source_group_term_count(1)=1,', &
@@ -222,11 +221,10 @@ CONTAINS
     CALL clear_source_input()
   END SUBROUTINE verify_native_parser
 
-  SUBROUTINE set_native_group(slot,id,cadence,method,order,name,target)
-    INTEGER, INTENT(IN) :: slot,id,order
+  SUBROUTINE set_native_group(slot,id,cadence,method,name,target)
+    INTEGER, INTENT(IN) :: slot,id
     CHARACTER(*), INTENT(IN) :: cadence,method,name,target
     source_group_id(slot)=id
-    source_group_order(slot)=order
     source_group_cadence(slot)=cadence
     source_group_method(slot)=method
     source_group_term_count(slot)=1
@@ -284,11 +282,11 @@ CONTAINS
     CALL clear_source_input()
     native_source_configuration_present=.TRUE.
     source_group_count=5
-    CALL set_native_group(1,10,'STAGE','ANALYTIC',1,'THERMAL_COOLING','TEMPERATURE')
-    CALL set_native_group(2,11,'STAGE','ANALYTIC',2,'PORE_PRESSURE_DISSIPATION','PORE_PRESSURE')
-    CALL set_native_group(3,12,'STAGE','NEWTON',3,'RHEOLOGY_LAVA','VELOCITY')
-    CALL set_native_group(4,13,'STAGE','EXPLICIT',1,'BOUNDARY_INJECTION','')
-    CALL set_native_group(5,14,'STEP','EXPLICIT',1,'MASS_EXCHANGE_DEPOSITION','')
+    CALL set_native_group(1,10,'STAGE','ANALYTIC','THERMAL_COOLING','TEMPERATURE')
+    CALL set_native_group(2,11,'STAGE','ANALYTIC','PORE_PRESSURE_DISSIPATION','PORE_PRESSURE')
+    CALL set_native_group(3,12,'STAGE','NEWTON','RHEOLOGY_LAVA','VELOCITY')
+    CALL set_native_group(4,13,'STAGE','EXPLICIT','BOUNDARY_INJECTION','')
+    CALL set_native_group(5,14,'STEP','EXPLICIT','MASS_EXCHANGE_DEPOSITION','')
     CALL initialize_native_source_configuration(registry,partition,error)
     CALL require(error=='' .AND. registry%is_initialized(), &
          'native names case-insensitive and complete: '//TRIM(error))

@@ -183,7 +183,6 @@ PROGRAM test_d17_production_newton
   native_source_configuration_present=.TRUE.
   source_group_count=1
   source_group_id(1)=27
-  source_group_order(1)=1
   source_group_cadence(1)='STAGE'
   source_group_method(1)='NEWTON'
   source_group_term_count(1)=1

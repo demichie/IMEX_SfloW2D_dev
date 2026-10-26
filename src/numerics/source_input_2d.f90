@@ -14,7 +14,6 @@ MODULE source_input_2d
 
   INTEGER, PUBLIC :: source_group_count=0
   INTEGER, PUBLIC :: source_group_id(SOURCE_INPUT_MAX_GROUPS)=0
-  INTEGER, PUBLIC :: source_group_order(SOURCE_INPUT_MAX_GROUPS)=0
   CHARACTER(LEN=16), PUBLIC :: source_group_cadence(SOURCE_INPUT_MAX_GROUPS)=''
   CHARACTER(LEN=16), PUBLIC :: source_group_method(SOURCE_INPUT_MAX_GROUPS)=''
   INTEGER, PUBLIC :: source_group_term_count(SOURCE_INPUT_MAX_GROUPS)=0
@@ -37,7 +36,7 @@ MODULE source_input_2d
        mass_exchange_cadence, mass_exchange_group
   LOGICAL, PUBLIC :: native_source_configuration_present=.FALSE.
 
-  NAMELIST /source_groups/ source_group_count, source_group_id, source_group_order, &
+  NAMELIST /source_groups/ source_group_count, source_group_id, &
        source_group_cadence, source_group_method, source_group_term_count, source_group_terms, &
        source_group_target_count, source_group_targets
 
@@ -50,7 +49,6 @@ CONTAINS
   SUBROUTINE clear_source_input
     source_group_count=0
     source_group_id=0
-    source_group_order=0
     source_group_cadence=''
     source_group_method=''
     source_group_term_count=0

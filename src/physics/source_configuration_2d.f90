@@ -364,14 +364,8 @@ CONTAINS
     target_count=0; target_ids=0
     seen_names=''; n_seen=0
     DO g=1,source_group_count
-      error='D17: source group IDs and execution orders must be positive'
-      IF (source_group_id(g)<1 .OR. source_group_order(g)<1) RETURN
-      DO i=1,g-1
-        IF (source_group_cadence(g)==source_group_cadence(i) .AND. &
-             source_group_id(g)==source_group_id(i)) THEN
-          error='D17: duplicate source group ID within a cadence'; RETURN
-        END IF
-      END DO
+      error='D18: source GROUP must be nonnegative'
+      IF (source_group_id(g)<0) RETURN
       cadence(g)=native_cadence(source_group_cadence(g))
       method(g)=native_method(source_group_method(g))
       error='D17: unsupported source group cadence or method'
@@ -380,11 +374,9 @@ CONTAINS
         error='D17: post-RK source groups must be explicit'; RETURN
       END IF
       DO i=1,g-1
-        IF (cadence(g)/=cadence(i)) CYCLE
-        IF ((method(g)==SOURCE_METHOD_EXPLICIT) .NEQV. &
-             (method(i)==SOURCE_METHOD_EXPLICIT)) CYCLE
-        IF (source_group_order(g)==source_group_order(i)) THEN
-          error='D17: duplicate execution order within a method class'; RETURN
+        IF (cadence(g)==cadence(i) .AND. method(g)==method(i) .AND. &
+             source_group_id(g)==source_group_id(i)) THEN
+          error='D18: duplicate (CADENCE,METHOD,GROUP)'; RETURN
         END IF
       END DO
       IF (source_group_term_count(g)<0 .OR. &
@@ -500,7 +492,7 @@ CONTAINS
         g=ordered(j)
         IF (group_method_rank(method(g))<group_method_rank(method(slot))) EXIT
         IF (group_method_rank(method(g))==group_method_rank(method(slot)) .AND. &
-             source_group_order(g)<=source_group_order(slot)) EXIT
+             source_group_id(g)<=source_group_id(slot)) EXIT
         ordered(j+1)=ordered(j); j=j-1
       END DO
       ordered(j+1)=slot
