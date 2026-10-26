@@ -24,6 +24,17 @@ MODULE source_input_2d
   INTEGER, PUBLIC :: source_group_target_count(SOURCE_INPUT_MAX_GROUPS)=0
   CHARACTER(LEN=16), PUBLIC :: source_group_targets( &
        SOURCE_INPUT_MAX_TARGETS,SOURCE_INPUT_MAX_GROUPS)=''
+  ! D18: physical-source scheduling preferences, absent unless specified.
+  CHARACTER(LEN=16), PUBLIC :: rheology_method='', rheology_cadence=''
+  CHARACTER(LEN=16), PUBLIC :: thermal_method='', thermal_cadence=''
+  CHARACTER(LEN=16), PUBLIC :: pore_pressure_method='', pore_pressure_cadence=''
+  INTEGER, PUBLIC :: rheology_group=0, thermal_group=0, pore_pressure_group=0
+  CHARACTER(LEN=16), PUBLIC :: mass_exchange_method='EXPLICIT'
+  CHARACTER(LEN=16), PUBLIC :: mass_exchange_cadence='STEP'
+  INTEGER, PUBLIC :: mass_exchange_group=0
+  LOGICAL, PUBLIC :: mass_exchange_configuration_present=.FALSE.
+  NAMELIST /mass_exchange_parameters/ mass_exchange_method, &
+       mass_exchange_cadence, mass_exchange_group
   LOGICAL, PUBLIC :: native_source_configuration_present=.FALSE.
 
   NAMELIST /source_groups/ source_group_count, source_group_id, source_group_order, &
@@ -32,6 +43,7 @@ MODULE source_input_2d
 
   PUBLIC :: clear_source_input
   PUBLIC :: read_native_source_groups
+  PUBLIC :: read_mass_exchange_parameters
   PUBLIC :: uppercase_source_text
 CONTAINS
   !> \brief Reset all parsed native source-group input to the absent state.
@@ -46,6 +58,11 @@ CONTAINS
     source_group_target_count=0
     source_group_targets=''
     native_source_configuration_present=.FALSE.
+    mass_exchange_configuration_present=.FALSE.
+    rheology_method=''; rheology_cadence=''; rheology_group=0
+    thermal_method=''; thermal_cadence=''; thermal_group=0
+    pore_pressure_method=''; pore_pressure_cadence=''; pore_pressure_group=0
+    mass_exchange_method='EXPLICIT'; mass_exchange_cadence='STEP'; mass_exchange_group=0
   END SUBROUTINE clear_source_input
 
   !> \brief Find and parse the optional native source-group namelist.
@@ -105,6 +122,57 @@ CONTAINS
     REWIND(input_unit,IOSTAT=io_status)
     IF (io_status/=0) error='Unable to rewind input after reading SOURCE_GROUPS'
   END SUBROUTINE read_native_source_groups
+
+  ! Read the optional indivisible mass-exchange schedule.
+  SUBROUTINE read_mass_exchange_parameters(input_unit,error)
+    INTEGER, INTENT(IN) :: input_unit
+    CHARACTER(*), INTENT(OUT) :: error
+    CHARACTER(LEN=2048) :: line
+    INTEGER :: ios,count
+    error=''
+    count=0
+    mass_exchange_configuration_present=.FALSE.
+    REWIND(input_unit,IOSTAT=ios)
+    IF (ios/=0) THEN
+       error='Unable to scan MASS_EXCHANGE_PARAMETERS'; RETURN
+    END IF
+    DO
+       READ(input_unit,'(A)',IOSTAT=ios) line
+       IF (ios<0) EXIT
+       IF (ios>0) THEN
+          error='Unable to scan MASS_EXCHANGE_PARAMETERS'; RETURN
+       END IF
+       line=uppercase_source_text(ADJUSTL(line))
+       IF (INDEX(line,'&MASS_EXCHANGE_PARAMETERS')==1 .OR. &
+           INDEX(line,'$MASS_EXCHANGE_PARAMETERS')==1) count=count+1
+    END DO
+    IF (count>1) THEN
+       error='MASS_EXCHANGE_PARAMETERS may appear only once'; RETURN
+    END IF
+    IF (count==1) THEN
+       REWIND(input_unit)
+       READ(input_unit,NML=mass_exchange_parameters,IOSTAT=ios)
+       IF (ios/=0) THEN
+          error='Invalid MASS_EXCHANGE_PARAMETERS namelist'; RETURN
+       END IF
+       mass_exchange_configuration_present=.TRUE.
+       mass_exchange_method=uppercase_source_text(ADJUSTL(mass_exchange_method))
+       mass_exchange_cadence=uppercase_source_text(ADJUSTL(mass_exchange_cadence))
+       IF (mass_exchange_method/='EXPLICIT' .AND. &
+            mass_exchange_method/='NEWTON' .AND. &
+            mass_exchange_method/='ANALYTIC') THEN
+          error='Unsupported mass-exchange METHOD'; RETURN
+       END IF
+       IF (mass_exchange_cadence/='STEP' .AND. mass_exchange_cadence/='STAGE') THEN
+          error='Unsupported mass-exchange CADENCE'; RETURN
+       END IF
+       IF (mass_exchange_group<0) THEN
+          error='Mass-exchange GROUP must not be negative'; RETURN
+       END IF
+    END IF
+    REWIND(input_unit,IOSTAT=ios)
+    IF (ios/=0) error='Unable to rewind after MASS_EXCHANGE_PARAMETERS'
+  END SUBROUTINE read_mass_exchange_parameters
 
   !> \brief Convert ASCII lowercase letters in source input to uppercase.
   !> \param[in] text Input text.
