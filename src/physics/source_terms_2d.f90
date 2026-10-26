@@ -13,13 +13,16 @@ MODULE source_terms_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
   USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source, &
-       eval_thermal_cooling_implicit, solve_thermal_cooling_analytic
+       eval_thermal_cooling_implicit, eval_thermal_cooling_explicit, &
+       solve_thermal_cooling_analytic
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source, &
-       eval_pore_pressure_dissipation_implicit, solve_pore_pressure_dissipation_analytic
+       eval_pore_pressure_dissipation_implicit, &
+       eval_pore_pressure_dissipation_explicit, solve_pore_pressure_dissipation_analytic
   USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
   USE mass_exchange_laws_2d, ONLY : eval_mass_exchange_terms
   USE rheology_2d, ONLY : curvature_acceleration, solve_rheology_analytic, &
-       eval_rheology_implicit, eval_rheology_semi_implicit
+       eval_rheology_implicit, eval_rheology_semi_implicit, &
+       eval_rheology_explicit
   USE diagnostics_2d, ONLY : fatal_error
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_ROLE_IMPLICIT, &
        SOURCE_ROLE_SEMI_IMPLICIT, canonical_rheology_source_name, rheology_name_has_role
@@ -486,6 +489,11 @@ CONTAINS
 
     REAL(wp) :: q1
 
+    REAL(wp) :: rheology_rate(2), thermal_rate, pressure_rate
+    REAL(wp) :: solid_volumes(n_solid), gas_volumes(n_add_gas), liquid_volume
+    REAL(wp) :: speed, horizontal_speed, vertical_velocity, speed_squared
+    REAL(wp) :: inverse_density, pressure_excess
+    CHARACTER(LEN=64) :: active_rheology
     REAL(wp) :: vel_local
     INTEGER :: i_int
       INTEGER :: i_fissure
@@ -529,6 +537,40 @@ CONTAINS
 
        ! The hydrostatic path/source has no thermal-energy component.
        expl_term(4) = 0.0_wp
+
+       ! Source rates are evaluated at the same unmodified stage state.
+       ! The construction of EXPLICIT stays inside each physical module.
+       active_rheology=group_rheology_name(group)
+       IF (rheology_flag .AND. LEN_TRIM(active_rheology)>0 .AND. &
+            r_h>dry_thickness_tolerance) THEN
+          CALL primitive_to_volume_fractions(qpj,solid_volumes,gas_volumes,liquid_volume)
+          horizontal_speed=SQRT(r_u**2+r_v**2)
+          vertical_velocity=0.0_wp
+          IF (slope_correction_flag) vertical_velocity=r_u*Bprimej_x+r_v*Bprimej_y
+          speed_squared=horizontal_speed**2+vertical_velocity**2
+          speed=SQRT(speed_squared)
+          inverse_density=1.0_wp/r_rho_m
+          pressure_excess=0.0_wp
+          IF (pore_pressure_flag) pressure_excess=qpj(idx_pore)
+          CALL eval_rheology_explicit(active_rheology,r_h,qpj(idx_T),r_u,r_v, &
+               speed,horizontal_speed,speed_squared,r_rho_m,inverse_density, &
+               r_red_grav,grav_coeff,solid_volumes,curvature_term_flag, &
+               Bsecondj_xx,Bsecondj_xy,Bsecondj_yy,pore_pressure_flag, &
+               pressure_excess,speed>0.0_wp,stochastic_flag,0.0_wp,rheology_rate)
+          expl_term(2:3)=expl_term(2:3)+rheology_rate
+       END IF
+       IF (thermal_cooling_flag .AND. group_contains_name(group,'thermal_cooling')) THEN
+          CALL eval_thermal_cooling_explicit(qpj(idx_T),radiative_term_coeff, &
+               convective_term_coeff,T_env,thermal_rate)
+          expl_term(4)=expl_term(4)+thermal_rate
+       END IF
+       IF (pore_pressure_flag .AND. &
+            group_contains_name(group,'pore_pressure_dissipation')) THEN
+          CALL primitive_to_volume_fractions(qpj,solid_volumes,gas_volumes,liquid_volume)
+          CALL eval_pore_pressure_dissipation_explicit(r_h,qpj(idx_T), &
+               r_rho_m,solid_volumes,qpj(idx_pore),pressure_rate)
+          expl_term(idx_poreEqn)=expl_term(idx_poreEqn)+pressure_rate
+       END IF
 
     END IF
 
