@@ -111,58 +111,80 @@ CONTAINS
     END IF
   END SUBROUTINE initialize_configured_sources
 
-  !> Build a fully explicit physical STAGE schedule and its matching partition.
-  !> This mode is enabled only when every active legacy implicit physical term
-  !> explicitly selects EXPLICIT/STAGE; mixed schemes remain on the D18 roadmap.
+  !> Preserve implicit coupling while moving selected sources to EXPLICIT/STAGE.
+  !> Uses the existing registry and equation partition; no parallel scheduler.
   SUBROUTINE apply_explicit_physical_selection(registry,partition,error)
     TYPE(source_registry_type), INTENT(INOUT) :: registry
     TYPE(equation_partition_type), INTENT(INOUT) :: partition
     CHARACTER(*), INTENT(OUT) :: error
-    TYPE(source_group_type), ALLOCATABLE :: old_stage(:),new_stage(:),steps(:)
-    TYPE(source_group_type) :: group,tmp
+    TYPE(source_group_type), ALLOCATABLE :: original(:),stages(:),steps(:)
+    TYPE(source_group_type) :: group,swap_group
+    CHARACTER(LEN=64), ALLOCATABLE :: remaining(:)
     CHARACTER(LEN=64) :: name
-    CHARACTER(LEN=16) :: method,cadence
-    INTEGER :: i,j,k,id,order,pore,n
-    LOGICAL, ALLOCATABLE :: mask(:)
+    INTEGER :: i,j,k,n,id,compact,eq,pore
+    INTEGER :: membership(n_eqns),methods(3)
+    LOGICAL :: mask(n_eqns),promoted,velocity,energy,pressure
     error=''
-    old_stage=registry%stage_groups()
+    original=registry%stage_groups()
     steps=registry%step_groups()
-    ALLOCATE(new_stage(0))
-    DO i=1,SIZE(old_stage)
-      DO j=1,SIZE(old_stage(i)%source_names)
-        name=old_stage(i)%source_names(j)
-        method=''; cadence=''; id=0
-        SELECT CASE(TRIM(name))
-        CASE('thermal_cooling')
-          method=thermal_method; cadence=thermal_cadence; id=thermal_group
-        CASE('pore_pressure_dissipation')
-          method=pore_pressure_method; cadence=pore_pressure_cadence
-          id=pore_pressure_group
-        CASE DEFAULT
-          IF (INDEX(TRIM(name),'rheology_')==1) THEN
-            method=rheology_method; cadence=rheology_cadence; id=rheology_group
-          ELSE
-            ! Retain geometry and injections in their historical explicit stage.
-            method='EXPLICIT'; cadence='STAGE'; id=4
-          END IF
-        END SELECT
-        method=uppercase_source_text(ADJUSTL(method))
-        cadence=uppercase_source_text(ADJUSTL(cadence))
-        IF (method/='EXPLICIT' .OR. &
-             (LEN_TRIM(cadence)>0 .AND. cadence/='STAGE')) THEN
-          error='D18: fully explicit STAGE mode requires EXPLICIT/STAGE for every active source'
-          CALL registry%finalize()
-          RETURN
+    ALLOCATE(stages(0))
+    ! Remove only the promoted sources from their original coupled blocks.
+    DO i=1,SIZE(original)
+      IF (original(i)%method==SOURCE_METHOD_EXPLICIT) CYCLE
+      ALLOCATE(remaining(0))
+      velocity=.FALSE.; energy=.FALSE.; pressure=.FALSE.
+      DO j=1,SIZE(original(i)%source_names)
+        name=original(i)%source_names(j)
+        promoted=.FALSE.
+        IF (INDEX(TRIM(name),'rheology_')==1) &
+             promoted=TRIM(rheology_method)=='EXPLICIT'
+        IF (TRIM(name)=='thermal_cooling') promoted=TRIM(thermal_method)=='EXPLICIT'
+        IF (TRIM(name)=='pore_pressure_dissipation') &
+             promoted=TRIM(pore_pressure_method)=='EXPLICIT'
+        IF (promoted) CYCLE
+        remaining=[CHARACTER(LEN=64)::remaining,name]
+        IF (INDEX(TRIM(name),'rheology_')==1) velocity=.TRUE.
+        IF (TRIM(name)=='thermal_cooling') energy=.TRUE.
+        IF (TRIM(name)=='pore_pressure_dissipation') pressure=.TRUE.
+      END DO
+      IF (SIZE(remaining)>0) THEN
+        group=original(i)
+        group%source_names=remaining
+        group%equation_ids=[INTEGER::]
+        IF (velocity) group%equation_ids=[group%equation_ids,2,3]
+        IF (energy) group%equation_ids=[group%equation_ids,4]
+        IF (pressure) group%equation_ids=[group%equation_ids,idx_pore]
+        stages=[stages,group]
+      END IF
+      DEALLOCATE(remaining)
+    END DO
+    ! Append explicit sources, coalescing only equal (STAGE,GROUP).
+    DO i=1,SIZE(original)
+      DO j=1,SIZE(original(i)%source_names)
+        name=original(i)%source_names(j)
+        promoted=.FALSE.; id=4
+        IF (INDEX(TRIM(name),'rheology_')==1) THEN
+          promoted=TRIM(rheology_method)=='EXPLICIT'
+          IF (rheology_group>0) id=rheology_group
         END IF
-        IF (id<0) THEN
-          error='D18: physical GROUP must be nonnegative'
-          CALL registry%finalize()
-          RETURN
+        IF (TRIM(name)=='thermal_cooling') THEN
+          promoted=TRIM(thermal_method)=='EXPLICIT'
+          IF (thermal_group>0) id=thermal_group
         END IF
-        IF (id==0) id=4
+        IF (TRIM(name)=='pore_pressure_dissipation') THEN
+          promoted=TRIM(pore_pressure_method)=='EXPLICIT'
+          IF (pore_pressure_group>0) id=pore_pressure_group
+        END IF
+        IF (.NOT.promoted .AND. original(i)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
         k=0
-        DO n=1,SIZE(new_stage)
-          IF (new_stage(n)%id==id) k=n
+        DO n=1,SIZE(stages)
+          IF (stages(n)%id/=id) CYCLE
+          IF (stages(n)%method/=SOURCE_METHOD_EXPLICIT) THEN
+            error='D18: same STAGE/GROUP has incompatible methods'
+            CALL registry%finalize()
+            RETURN
+          END IF
+          k=n
         END DO
         IF (k==0) THEN
           group%id=id; group%legacy_id=0
@@ -171,28 +193,47 @@ CONTAINS
           group%execution_order=1
           group%source_names=[CHARACTER(LEN=64)::name]
           group%equation_ids=[(n,n=1,n_eqns)]
-          new_stage=[new_stage,group]
+          stages=[stages,group]
         ELSE
-          new_stage(k)%source_names=[CHARACTER(LEN=64):: &
-               new_stage(k)%source_names,name]
+          stages(k)%source_names=[CHARACTER(LEN=64)::stages(k)%source_names,name]
         END IF
       END DO
     END DO
-    ! Registry validation requires monotonically ordered EXPLICIT groups.
-    DO i=1,SIZE(new_stage)
-      DO j=i+1,SIZE(new_stage)
-        IF (new_stage(j)%id<new_stage(i)%id) THEN
-          tmp=new_stage(i); new_stage(i)=new_stage(j); new_stage(j)=tmp
+    ! Sort groups with implicit solves first, then by GROUP within a class.
+    DO i=1,SIZE(stages)
+      DO j=i+1,SIZE(stages)
+        IF (group_method_rank(stages(j)%method)<group_method_rank(stages(i)%method) .OR. &
+             (group_method_rank(stages(j)%method)==group_method_rank(stages(i)%method) .AND. &
+              stages(j)%id<stages(i)%id)) THEN
+          swap_group=stages(i); stages(i)=stages(j); stages(j)=swap_group
         END IF
       END DO
-      new_stage(i)%execution_order=i
+      stages(i)%execution_order=i
+    END DO
+    ! Keep one coupled solve for each remaining implicit group.
+    mask=.FALSE.; membership=0; methods=0; compact=0
+    DO i=1,SIZE(stages)
+      IF (stages(i)%method==SOURCE_METHOD_EXPLICIT) CYCLE
+      compact=compact+1
+      IF (compact>SIZE(methods)) THEN
+        error='D18: too many implicit blocks'; CALL registry%finalize(); RETURN
+      END IF
+      methods(compact)=IM_GROUP_METHOD_NEWTON
+      IF (stages(i)%method==SOURCE_METHOD_ANALYTIC) &
+           methods(compact)=IM_GROUP_METHOD_ANALYTIC
+      DO j=1,SIZE(stages(i)%equation_ids)
+        eq=stages(i)%equation_ids(j)
+        IF (membership(eq)/=0) THEN
+          error='D18: implicit equation assigned to multiple groups'
+          CALL registry%finalize(); RETURN
+        END IF
+        membership(eq)=compact; mask(eq)=.TRUE.
+      END DO
     END DO
     pore=0
     IF (pore_pressure_flag) pore=idx_pore
-    ALLOCATE(mask(n_eqns))
-    mask=.FALSE.
-    CALL partition%initialize(mask)
-    CALL registry%initialize(n_eqns,pore,new_stage,steps,error)
+    CALL partition%initialize(mask,membership,methods(1:compact))
+    CALL registry%initialize(n_eqns,pore,stages,steps,error)
   END SUBROUTINE apply_explicit_physical_selection
 
   !> \brief Translate the native namelist into an equation partition and registry.

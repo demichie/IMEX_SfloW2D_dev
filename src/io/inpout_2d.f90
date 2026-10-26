@@ -2217,13 +2217,22 @@ CONTAINS
              LEN_TRIM(pore_pressure_method)>0 .OR. rheology_group/=0 .OR. &
              thermal_group/=0 .OR. pore_pressure_group/=0)) &
             source_input_error='D18 physical settings conflict with SOURCE_GROUPS'
+       ! The explicit override may coexist with legacy Newton/analytic groups.
+       ! Other requested methods must match the legacy group until general
+       ! per-source method overrides are implemented.
        IF ((LEN_TRIM(rheology_method)>0 .AND. &
-            TRIM(rheology_method)/='EXPLICIT') .OR. &
+            TRIM(rheology_method)/='EXPLICIT' .AND. &
+            TRIM(rheology_method)/='NEWTON' .AND. &
+            TRIM(rheology_method)/='ANALYTIC') .OR. &
             (LEN_TRIM(thermal_method)>0 .AND. &
-            TRIM(thermal_method)/='EXPLICIT') .OR. &
+            TRIM(thermal_method)/='EXPLICIT' .AND. &
+            TRIM(thermal_method)/='NEWTON' .AND. &
+            TRIM(thermal_method)/='ANALYTIC') .OR. &
             (LEN_TRIM(pore_pressure_method)>0 .AND. &
-            TRIM(pore_pressure_method)/='EXPLICIT')) &
-            source_input_error='D18 physical METHOD currently supports EXPLICIT only'
+            TRIM(pore_pressure_method)/='EXPLICIT' .AND. &
+            TRIM(pore_pressure_method)/='NEWTON' .AND. &
+            TRIM(pore_pressure_method)/='ANALYTIC')) &
+            source_input_error='D18 physical METHOD must be EXPLICIT, NEWTON or ANALYTIC'
        IF ((LEN_TRIM(rheology_cadence)>0 .AND. &
             TRIM(rheology_cadence)/='STAGE') .OR. &
             (LEN_TRIM(thermal_cadence)>0 .AND. &
