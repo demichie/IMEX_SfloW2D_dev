@@ -36,8 +36,32 @@ MODULE rheology_mui_2d
   ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
 
-  SUBROUTINE eval_rheology_mui_explicit()
-    CALL fatal_error('rheology_mui: explicit treatment is unsupported')
+  SUBROUTINE eval_rheology_mui_explicit( &
+       flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
+       speed_squared, mixture_density, inverse_density, reduced_gravity, &
+       gravity_coefficient, solid_fractions, curvature_term, curvature_xx, curvature_xy, &
+       curvature_yy, use_pore_pressure, excess_pore_pressure, moving, use_stochastic, &
+       stochastic_value, rate )
+    REAL(wp), INTENT(IN) :: flow_depth, temperature, velocity_x, velocity_y
+    REAL(wp), INTENT(IN) :: speed, horizontal_speed, speed_squared
+    REAL(wp), INTENT(IN) :: mixture_density, inverse_density, reduced_gravity
+    REAL(wp), INTENT(IN) :: gravity_coefficient, solid_fractions(:)
+    REAL(wp), INTENT(IN) :: curvature_xx, curvature_xy, curvature_yy
+    REAL(wp), INTENT(IN) :: excess_pore_pressure, stochastic_value
+    LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
+    REAL(wp), INTENT(OUT) :: rate(2)
+    REAL(wp) :: sx, sy, curvature_accel
+    COMPLEX(wp) :: ix, iy
+    curvature_accel=0.0_wp
+    IF (curvature_term) curvature_accel=curvature_xx*velocity_x**2 + &
+         2.0_wp*curvature_xy*velocity_x*velocity_y+curvature_yy*velocity_y**2
+    CALL eval_rheology_mui_semi_implicit( &
+       flow_depth, velocity_x, velocity_y, speed, mixture_density, reduced_gravity, &
+       gravity_coefficient, solid_fractions, curvature_accel, use_pore_pressure, &
+       excess_pore_pressure, sx, sy )
+    CALL eval_rheology_mui_implicit( &
+       ix, iy )
+    rate=[sx,sy]+REAL([ix,iy],wp)
   END SUBROUTINE eval_rheology_mui_explicit
 
   SUBROUTINE eval_rheology_mui_semi_implicit( flow_depth, velocity_x, velocity_y, speed, &
