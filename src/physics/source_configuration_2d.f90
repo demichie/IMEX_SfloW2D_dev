@@ -328,16 +328,14 @@ CONTAINS
     END DO
     CALL partition%initialize(implicit_mask,membership,methods(1:compact_group))
 
-    stage_count=COUNT(cadence(1:source_group_count)==SOURCE_CADENCE_STAGE .AND. &
-         (method(1:source_group_count)==SOURCE_METHOD_EXPLICIT .OR. &
-          parsed_count(1:source_group_count)>0))
+    ! Preserve target-only NEWTON groups used by native source input.
+    stage_count=COUNT(cadence(1:source_group_count)==SOURCE_CADENCE_STAGE)
     step_count=COUNT(cadence(1:source_group_count)==SOURCE_CADENCE_STEP)
     ALLOCATE(stages(stage_count),steps(step_count))
     j=0; k=0
     DO i=1,source_group_count
       g=ordered(i)
-      IF (cadence(g)==SOURCE_CADENCE_STAGE .AND. &
-           method(g)/=SOURCE_METHOD_EXPLICIT .AND. parsed_count(g)==0) CYCLE
+
       group%id=source_group_id(g); group%legacy_id=0
       group%cadence=cadence(g); group%method=method(g)
       group%execution_order=source_group_order(g)

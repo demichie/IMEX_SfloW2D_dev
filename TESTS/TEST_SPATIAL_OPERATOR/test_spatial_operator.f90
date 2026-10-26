@@ -6,6 +6,7 @@ PROGRAM test_spatial_operator
   USE domain_2d, ONLY : domain_type
   USE spatial_operator_2d, ONLY : spatial_operator_type
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
+  USE state_conversion_2d, ONLY : qp_to_qc
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   USE source_terms_2d, ONLY : eval_source_explicit
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE
@@ -20,6 +21,7 @@ PROGRAM test_spatial_operator
   TYPE(reconstruction_workspace_type) :: reconstruction
   TYPE(hyperbolic_workspace_type) :: hyperbolic
   TYPE(source_group_type) :: explicit_group
+  REAL(wp), ALLOCATABLE :: q_faceL(:,:,:), q_faceR(:,:,:), q_faceB(:,:,:), q_faceT(:,:,:)
   REAL(wp), ALLOCATABLE :: q(:,:,:), q0(:,:,:), qp(:,:,:), term(:,:,:), direct(:,:,:), cell_sources(:,:,:)
   REAL(wp) :: dt, repeated_dt, saved_cfl, capped_dt, no_fissures(0)
   !> Independent rate derived from the public backend face payload [1/s].
@@ -170,6 +172,25 @@ PROGRAM test_spatial_operator
   CLOSE(output_unit)
 
   CALL normalize_inactive_face_payloads
+  ! Preserve the historic test payload layout, without obsolete production arrays.
+  ALLOCATE(q_faceL(n_vars,nx+1,ny),q_faceR(n_vars,nx+1,ny))
+  ALLOCATE(q_faceB(n_vars,nx,ny+1),q_faceT(n_vars,nx,ny+1))
+  q_faceL=0.0_wp; q_faceR=0.0_wp
+  q_faceB=0.0_wp; q_faceT=0.0_wp
+  DO k=1,ny
+    DO j=1,nx+1
+      IF (.NOT.domain%solve_mask_x(j,k)) CYCLE
+      CALL qp_to_qc(reconstruction%qp_adv_interfaceL(:,j,k),q_faceL(:,j,k))
+      CALL qp_to_qc(reconstruction%qp_adv_interfaceR(:,j,k),q_faceR(:,j,k))
+    END DO
+  END DO
+  DO k=1,ny+1
+    DO j=1,nx
+      IF (.NOT.domain%solve_mask_y(j,k)) CYCLE
+      CALL qp_to_qc(reconstruction%qp_adv_interfaceB(:,j,k),q_faceB(:,j,k))
+      CALL qp_to_qc(reconstruction%qp_adv_interfaceT(:,j,k),q_faceT(:,j,k))
+    END DO
+  END DO
   OPEN(NEWUNIT=output_unit,FILE='result.bin',ACCESS='STREAM',           &
        FORM='UNFORMATTED',STATUS='REPLACE')
   ! Version-two test-only stream order, decoded by compare_reference.py.
@@ -183,6 +204,7 @@ PROGRAM test_spatial_operator
        grav_coeff_stag_x,grav_coeff_stag_y
   WRITE(output_unit) hyperbolic%a_interface_xNeg,hyperbolic%a_interface_xPos, &
        hyperbolic%a_interface_yNeg,hyperbolic%a_interface_yPos
+  WRITE(output_unit) q_faceL,q_faceR,q_faceB,q_faceT
   WRITE(output_unit) reconstruction%qp_adv_interfaceL,reconstruction%qp_adv_interfaceR, &
        reconstruction%qp_adv_interfaceB,reconstruction%qp_adv_interfaceT
   WRITE(output_unit) reconstruction%eta_interfaceL,reconstruction%eta_interfaceR, &
