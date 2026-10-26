@@ -2466,6 +2466,8 @@ La medesima interfaccia EXPLICIT è impiegata indifferentemente per \`EXPLICIT/S
 
 **Avanzamento iniziale D18 (26 ottobre 2026; implementazione da verificare in CI):** le interfacce EXPLICIT di famiglia per reologia, cooling e dissipazione pore pressure sono state completate mediante il riuso di SI + REAL(IM), senza modificare le implementazioni SI/IM o i solve ANALYTIC. Le capability EXPLICIT delle relative 13 voci canoniche sono state abilitate nel catalogo. **Limite di questo passo:** l'assemblatore EXPLICIT generale, i test di identità, le nuove namelist e lo scheduling STAGE/STEP di D18 non sono ancora modificati; non dichiarare completata D18. La validazione di compilazione e regressione resta necessaria prima di considerare questa prima implementazione accettata.
 
+**Verifica D18 aggiunta (26 ottobre 2026; in attesa di CI):** esteso `TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90` con un confronto su stato comune, per le tre sorgenti raggruppate lava, cooling e pore-pressure, tra il nuovo valutatore EXPLICIT e la somma delle chiamate SI e IM del percorso Newton. Il test non equivale ancora a una verifica completa di tutte le reologie, né abilita lo scheduler D18.
+
 **Intervento successivo sul codice (26 ottobre 2026, da verificare in CI):** introdotta in `source_terms_2d` la routine `eval_newton_source_explicit`, che richiama le valutazioni SI e IM già utilizzate dal solutore, sul medesimo stato d'ingresso, e ne somma i rate reali. Non cambia il percorso predefinito e non abilita ancora lo scheduling EXPLICIT dei termini NEWTON. Mancano ancora i test numerici dedicati e l'integrazione del nuovo percorso nel dispatcher/scheduler per gruppi espliciti; il gate rimane aperto.
 
 #### D18.5 — Piano di implementazione coordinato

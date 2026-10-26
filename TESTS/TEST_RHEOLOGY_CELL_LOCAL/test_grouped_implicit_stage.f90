@@ -7,7 +7,8 @@ PROGRAM test_grouped_implicit_stage
   USE geometry_2d, ONLY : pi_g
   USE equation_metadata_2d, ONLY : equation_partition_type,                 &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
-  USE source_terms_2d, ONLY : eval_source_implicit, eval_source_semi_implicit
+  USE source_terms_2d, ONLY : eval_source_implicit, eval_source_semi_implicit, &
+       eval_newton_source_explicit, analytic_term_context_type
   USE equation_terms_2d, ONLY : init_problem_param
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_configuration_2d, ONLY : initialize_configured_sources
@@ -26,12 +27,14 @@ PROGRAM test_grouped_implicit_stage
   TYPE(source_registry_type) :: source_registry
   TYPE(equation_partition_type) :: multi_partition
   TYPE(source_registry_type) :: multi_registry
+  TYPE(analytic_term_context_type) :: explicit_context
   TYPE(source_group_type) :: filter_group
   TYPE(source_group_type) :: filter_groups(3)
   LOGICAL :: implicit_mask(7), converged, line_search_failed
   INTEGER :: group_map(7), iterations, linear_info, i, equation
   REAL(wp) :: q_old(7), q_stage(7), known_residual(7), source(7), si_source(7)
   REAL(wp) :: filtered_implicit_source(7), filtered_semi_implicit_source(7)
+  REAL(wp) :: explicit_rate(7), expected_explicit_rate(7), converted_state(7)
   REAL(wp) :: q_stage_check(7), q_expected(7), effective_stage_term(7)
   REAL(wp) :: qp_known(9), qp_expected(9), qp_actual(9)
   REAL(wp) :: dynamic_pressure, stage_rate_error
@@ -251,6 +254,22 @@ PROGRAM test_grouped_implicit_stage
   IF (ANY(filtered_semi_implicit_source/=0.0_wp)) THEN
      ERROR STOP 'pore-pressure solver selection leaked a semi-implicit rate'
   END IF
+  ! D18: each Newton-capable physical term must have a complete explicit
+  ! rate assembled from SI and IM on the same unchanged state.
+  explicit_context%grav_coeff=grav
+  CALL qp_to_qc(qp_known,converted_state)
+  DO i=1,SIZE(filter_groups)
+     CALL eval_newton_source_explicit(qp_known,explicit_context,filter_groups(i),explicit_rate)
+     CALL eval_source_semi_implicit(0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
+          grav,qp_known,filtered_semi_implicit_source,0.0_wp,group=filter_groups(i))
+     CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp,r_qj=converted_state, &
+          r_nh_term_impl=filtered_implicit_source,group=filter_groups(i))
+     expected_explicit_rate=filtered_semi_implicit_source+filtered_implicit_source
+     IF (MAXVAL(ABS(explicit_rate-expected_explicit_rate)) > &
+          1.0E-12_wp*MAX(1.0_wp,MAXVAL(ABS(expected_explicit_rate)))) &
+          ERROR STOP 'D18: explicit rate differs from SI + REAL(IM)'
+  END DO
+
   DO i = 1, SIZE(partition%implicit_map)
      IF (partition%implicit_map(i) .EQ. 4 .OR.                             &
           partition%implicit_map(i) .EQ. 7) CYCLE
