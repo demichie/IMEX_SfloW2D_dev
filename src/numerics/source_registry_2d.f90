@@ -14,7 +14,7 @@ MODULE source_registry_2d
   PUBLIC :: source_group_type, source_registry_type
   PUBLIC :: group_contains_name, group_source_names
 
-  !> \brief Homogeneous source group; identity is cadence plus id, not order.
+  !> \brief Source group identified by (cadence,method,id); id=0 is valid.
   TYPE :: source_group_type
     INTEGER :: id=0 !< Public or normalized internal group identity.
     INTEGER :: legacy_id=0 !< Original IMEX input group, zero for non-IM work.
@@ -246,7 +246,7 @@ CONTAINS
       group=groups(i)
       rheology_name='' ! Rheology is one schedulable physical identity.
       error='D17: invalid group identity, method, cadence or order'
-      IF (group%id<1 .OR. group%execution_order<1 .OR. group%legacy_id<0) RETURN
+      IF (group%id<0 .OR. group%execution_order<1 .OR. group%legacy_id<0) RETURN
       IF (i<=nstage) THEN
         IF (group%cadence/=SOURCE_CADENCE_STAGE) RETURN
       ELSE
@@ -262,7 +262,7 @@ CONTAINS
       END SELECT
       DO j=1,i-1
         IF (groups(j)%cadence/=group%cadence) CYCLE
-        IF (groups(j)%id==group%id) RETURN
+        IF (groups(j)%id==group%id .AND. groups(j)%method==group%method) RETURN
         IF (group_stage_rank(groups(j))>group_stage_rank(group)) RETURN
         IF (group_stage_rank(groups(j))==group_stage_rank(group) .AND. &
              groups(j)%execution_order>=group%execution_order) RETURN

@@ -162,7 +162,7 @@ CONTAINS
     DO i=1,SIZE(original)
       DO j=1,SIZE(original(i)%source_names)
         name=original(i)%source_names(j)
-        promoted=.FALSE.; id=4
+        promoted=.FALSE.; id=0
         IF (INDEX(TRIM(name),'rheology_')==1) THEN
           promoted=TRIM(rheology_method)=='EXPLICIT'
           IF (rheology_group>0) id=rheology_group
@@ -179,11 +179,7 @@ CONTAINS
         k=0
         DO n=1,SIZE(stages)
           IF (stages(n)%id/=id) CYCLE
-          IF (stages(n)%method/=SOURCE_METHOD_EXPLICIT) THEN
-            error='D18: same STAGE/GROUP has incompatible methods'
-            CALL registry%finalize()
-            RETURN
-          END IF
+          IF (stages(n)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
           k=n
         END DO
         IF (k==0) THEN
