@@ -183,10 +183,8 @@ PROGRAM test_spatial_operator
        grav_coeff_stag_x,grav_coeff_stag_y
   WRITE(output_unit) hyperbolic%a_interface_xNeg,hyperbolic%a_interface_xPos, &
        hyperbolic%a_interface_yNeg,hyperbolic%a_interface_yPos
-  WRITE(output_unit) reconstruction%q_interfaceL,reconstruction%q_interfaceR, &
-       reconstruction%q_interfaceB,reconstruction%q_interfaceT
-  WRITE(output_unit) reconstruction%qp_interfaceL,reconstruction%qp_interfaceR, &
-       reconstruction%qp_interfaceB,reconstruction%qp_interfaceT
+  WRITE(output_unit) reconstruction%qp_adv_interfaceL,reconstruction%qp_adv_interfaceR, &
+       reconstruction%qp_adv_interfaceB,reconstruction%qp_adv_interfaceT
   WRITE(output_unit) reconstruction%eta_interfaceL,reconstruction%eta_interfaceR, &
        reconstruction%eta_interfaceB,reconstruction%eta_interfaceT
   WRITE(output_unit) reconstruction%h_froude_interfaceL, &
@@ -264,16 +262,14 @@ CONTAINS
     DO k=1,ny
        DO j=1,nx+1
           IF (domain%solve_mask_x(j,k)) CYCLE
-          reconstruction%q_interfaceL(:,j,k)=0.0_wp; reconstruction%q_interfaceR(:,j,k)=0.0_wp
-          reconstruction%qp_interfaceL(:,j,k)=0.0_wp; reconstruction%qp_interfaceR(:,j,k)=0.0_wp
+          reconstruction%qp_adv_interfaceL(:,j,k)=0.0_wp; reconstruction%qp_adv_interfaceR(:,j,k)=0.0_wp
           reconstruction%eta_interfaceL(j,k)=0.0_wp; reconstruction%eta_interfaceR(j,k)=0.0_wp
        END DO
     END DO
     DO k=1,ny+1
        DO j=1,nx
           IF (domain%solve_mask_y(j,k)) CYCLE
-          reconstruction%q_interfaceB(:,j,k)=0.0_wp; reconstruction%q_interfaceT(:,j,k)=0.0_wp
-          reconstruction%qp_interfaceB(:,j,k)=0.0_wp; reconstruction%qp_interfaceT(:,j,k)=0.0_wp
+          reconstruction%qp_adv_interfaceB(:,j,k)=0.0_wp; reconstruction%qp_adv_interfaceT(:,j,k)=0.0_wp
           reconstruction%eta_interfaceB(j,k)=0.0_wp; reconstruction%eta_interfaceT(j,k)=0.0_wp
        END DO
     END DO

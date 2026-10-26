@@ -48,7 +48,7 @@ PROGRAM test_imex_stages
        IM_GROUP_METHOD_NEWTON
   USE source_registry_2d, ONLY : source_registry_type
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, finalize_nonlinear_solver
-  USE state_conversion_2d, ONLY : qc_to_qp
+  USE state_conversion_2d, ONLY : qc_to_qp, qp_to_qc
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   USE imex_test_observer
@@ -206,8 +206,8 @@ PROGRAM test_imex_stages
      ! Last-stage traces are retained without primitive postprocessing in Python.
      WRITE(output_unit) audit_reconstruction%qp_cellW,audit_reconstruction%qp_cellE
      WRITE(output_unit) audit_reconstruction%qp_cellS,audit_reconstruction%qp_cellN
-     WRITE(output_unit) audit_reconstruction%q_interfaceL,audit_reconstruction%q_interfaceR
-     WRITE(output_unit) audit_reconstruction%q_interfaceB,audit_reconstruction%q_interfaceT
+     WRITE(output_unit) audit_reconstruction%qp_adv_interfaceL,audit_reconstruction%qp_adv_interfaceR
+     WRITE(output_unit) audit_reconstruction%qp_adv_interfaceB,audit_reconstruction%qp_adv_interfaceT
      WRITE(output_unit) audit_rhs
      CLOSE(output_unit)
      CALL audit_hyperbolic%finalize
@@ -412,11 +412,11 @@ CONTAINS
             boundary_j,boundary_k,.TRUE.,source_boundary_enabled=.FALSE.)
        expected=boundary_qp(idx_T,cell_j,cell_k)
        CALL assert_boundary_value('unselected lateral source trace', &
-            boundary_reconstruction%qp_interfaceR(idx_T,cell_j,cell_k),expected)
+            boundary_reconstruction%qp_adv_interfaceR(idx_T,cell_j,cell_k),expected)
        CALL boundary_reconstruction%reconstruct(boundary_qp,0.0_wp,nx*ny, &
             boundary_j,boundary_k,.TRUE.,source_boundary_enabled=.TRUE.)
        CALL assert_boundary_value('selected lateral source trace', &
-            boundary_reconstruction%qp_interfaceR(idx_T,cell_j,cell_k), &
+            boundary_reconstruction%qp_adv_interfaceR(idx_T,cell_j,cell_k), &
             source_temperature)
        DO side=1,2
           source_cell=0
@@ -438,9 +438,9 @@ CONTAINS
                boundary_j,boundary_k,.TRUE.)
           SELECT CASE(side)
           CASE(1)
-             expected=boundary_reconstruction%qp_interfaceR(idx_T,cell_j,cell_k)
+             expected=boundary_reconstruction%qp_adv_interfaceR(idx_T,cell_j,cell_k)
           CASE(2)
-             expected=boundary_reconstruction%qp_interfaceL(idx_T,cell_j+1,cell_k)
+             expected=boundary_reconstruction%qp_adv_interfaceL(idx_T,cell_j+1,cell_k)
           END SELECT
           CALL assert_boundary_value('lateral source trace',expected,source_temperature)
        END DO
@@ -465,32 +465,32 @@ CONTAINS
           SELECT CASE(side)
           CASE(1)
              CALL assert_boundary_value('radial west momentum reflection', &
-                  boundary_reconstruction%qp_interfaceL(2,cell_j,cell_k), &
-                  -boundary_reconstruction%qp_interfaceR(2,cell_j,cell_k))
+                  boundary_reconstruction%qp_adv_interfaceL(2,cell_j,cell_k), &
+                  -boundary_reconstruction%qp_adv_interfaceR(2,cell_j,cell_k))
              CALL assert_boundary_value('radial west velocity reflection', &
-                  boundary_reconstruction%qp_interfaceL(idx_u,cell_j,cell_k), &
-                  -boundary_reconstruction%qp_interfaceR(idx_u,cell_j,cell_k))
+                  boundary_reconstruction%qp_adv_interfaceL(idx_u,cell_j,cell_k), &
+                  -boundary_reconstruction%qp_adv_interfaceR(idx_u,cell_j,cell_k))
           CASE(2)
              CALL assert_boundary_value('radial east momentum reflection', &
-                  boundary_reconstruction%qp_interfaceR(2,cell_j+1,cell_k), &
-                  -boundary_reconstruction%qp_interfaceL(2,cell_j+1,cell_k))
+                  boundary_reconstruction%qp_adv_interfaceR(2,cell_j+1,cell_k), &
+                  -boundary_reconstruction%qp_adv_interfaceL(2,cell_j+1,cell_k))
              CALL assert_boundary_value('radial east velocity reflection', &
-                  boundary_reconstruction%qp_interfaceR(idx_u,cell_j+1,cell_k), &
-                  -boundary_reconstruction%qp_interfaceL(idx_u,cell_j+1,cell_k))
+                  boundary_reconstruction%qp_adv_interfaceR(idx_u,cell_j+1,cell_k), &
+                  -boundary_reconstruction%qp_adv_interfaceL(idx_u,cell_j+1,cell_k))
           CASE(3)
              CALL assert_boundary_value('radial south momentum reflection', &
-                  boundary_reconstruction%qp_interfaceB(3,cell_j,cell_k), &
-                  -boundary_reconstruction%qp_interfaceT(3,cell_j,cell_k))
+                  boundary_reconstruction%qp_adv_interfaceB(3,cell_j,cell_k), &
+                  -boundary_reconstruction%qp_adv_interfaceT(3,cell_j,cell_k))
              CALL assert_boundary_value('radial south velocity reflection', &
-                  boundary_reconstruction%qp_interfaceB(idx_v,cell_j,cell_k), &
-                  -boundary_reconstruction%qp_interfaceT(idx_v,cell_j,cell_k))
+                  boundary_reconstruction%qp_adv_interfaceB(idx_v,cell_j,cell_k), &
+                  -boundary_reconstruction%qp_adv_interfaceT(idx_v,cell_j,cell_k))
           CASE(4)
              CALL assert_boundary_value('radial north momentum reflection', &
-                  boundary_reconstruction%qp_interfaceT(3,cell_j,cell_k+1), &
-                  -boundary_reconstruction%qp_interfaceB(3,cell_j,cell_k+1))
+                  boundary_reconstruction%qp_adv_interfaceT(3,cell_j,cell_k+1), &
+                  -boundary_reconstruction%qp_adv_interfaceB(3,cell_j,cell_k+1))
              CALL assert_boundary_value('radial north velocity reflection', &
-                  boundary_reconstruction%qp_interfaceT(idx_v,cell_j,cell_k+1), &
-                  -boundary_reconstruction%qp_interfaceB(idx_v,cell_j,cell_k+1))
+                  boundary_reconstruction%qp_adv_interfaceT(idx_v,cell_j,cell_k+1), &
+                  -boundary_reconstruction%qp_adv_interfaceB(idx_v,cell_j,cell_k+1))
           END SELECT
        END DO
     END IF
@@ -499,8 +499,8 @@ CONTAINS
          FORM='UNFORMATTED',STATUS='REPLACE')
     WRITE(unit) boundary_reconstruction%qp_cellW,boundary_reconstruction%qp_cellE
     WRITE(unit) boundary_reconstruction%qp_cellS,boundary_reconstruction%qp_cellN
-    WRITE(unit) boundary_reconstruction%qp_interfaceL,boundary_reconstruction%qp_interfaceR
-    WRITE(unit) boundary_reconstruction%qp_interfaceB,boundary_reconstruction%qp_interfaceT
+    WRITE(unit) boundary_reconstruction%qp_adv_interfaceL,boundary_reconstruction%qp_adv_interfaceR
+    WRITE(unit) boundary_reconstruction%qp_adv_interfaceB,boundary_reconstruction%qp_adv_interfaceT
     CLOSE(unit)
     CALL boundary_reconstruction%finalize
     WRITE(*,*) 'PASS: W/E/S/N boundary modes, sources and collapsed-axis reconstruction'
@@ -721,14 +721,14 @@ CONTAINS
             MAXVAL(ABS(audit_rhs(2:3,:,:))))
        DO cell_k=1,ny
           DO cell_j=1,nx+1
-             CALL audit_conservative_face(audit_reconstruction%q_interfaceL(:,cell_j,cell_k))
-             CALL audit_conservative_face(audit_reconstruction%q_interfaceR(:,cell_j,cell_k))
+             CALL audit_conservative_primitive_face(audit_reconstruction%qp_adv_interfaceL(:,cell_j,cell_k))
+             CALL audit_conservative_primitive_face(audit_reconstruction%qp_adv_interfaceR(:,cell_j,cell_k))
           END DO
        END DO
        DO cell_k=1,ny+1
           DO cell_j=1,nx
-             CALL audit_conservative_face(audit_reconstruction%q_interfaceB(:,cell_j,cell_k))
-             CALL audit_conservative_face(audit_reconstruction%q_interfaceT(:,cell_j,cell_k))
+             CALL audit_conservative_primitive_face(audit_reconstruction%qp_adv_interfaceB(:,cell_j,cell_k))
+             CALL audit_conservative_primitive_face(audit_reconstruction%qp_adv_interfaceT(:,cell_j,cell_k))
           END DO
        END DO
     END DO
@@ -780,6 +780,13 @@ CONTAINS
 
   !> \brief Record fraction and temperature admissibility of conservative face states.
   !> \param[in] state Conservative face after production primitive closure/conversion.
+  SUBROUTINE audit_conservative_primitive_face(physical)
+    REAL(wp), INTENT(IN) :: physical(:)
+    REAL(wp) :: conservative(n_vars)
+    CALL qp_to_qc(physical,conservative)
+    CALL audit_conservative_face(conservative)
+  END SUBROUTINE audit_conservative_primitive_face
+
   SUBROUTINE audit_conservative_face(state)
     REAL(wp), INTENT(IN) :: state(:)
     REAL(wp) :: minima(3)

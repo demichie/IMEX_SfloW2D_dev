@@ -18,7 +18,7 @@ PROGRAM test_rheology_model_names
       descriptor=source_term_descriptor_by_name(source_name)
       IF (descriptor%name/=source_name) ERROR STOP 'missing canonical source'
       IF (TRIM(names(model))=='newmodel') THEN
-        IF (.NOT.descriptor%has_newton .OR. descriptor%has_explicit .OR. &
+        IF (.NOT.descriptor%has_newton .OR. .NOT.descriptor%has_explicit .OR. &
              descriptor%has_analytic) ERROR STOP 'incorrect newmodel capabilities'
       END IF
     END IF
