@@ -64,7 +64,6 @@ PROGRAM test_d17_production_newton
     group(1)%id=1;group(1)%cadence=SOURCE_CADENCE_STAGE
     group(1)%method=SOURCE_METHOD_NEWTON
 
-    group(1)%execution_order=1
     old=[1000.0_wp,3000.0_wp,-4000.0_wp,1.2E9_wp]
     q=old;known=0.0_wp;dt=0.2_wp
     ! A zero cooling coefficient keeps temperature invariant while the

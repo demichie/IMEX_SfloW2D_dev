@@ -174,7 +174,6 @@ CONTAINS
     empty_step%cadence=SOURCE_CADENCE_STEP
     empty_step%method=SOURCE_METHOD_EXPLICIT
 
-    empty_step%execution_order=1
     empty_step%source_names=[CHARACTER(LEN=64)::]
     empty_step%equation_ids=[(i,i=1,nq)]
     CALL source_registry%initialize(nq,0,no_stages,[empty_step],error)

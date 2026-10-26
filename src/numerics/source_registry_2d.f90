@@ -17,10 +17,8 @@ MODULE source_registry_2d
   !> \brief Source group identified by (cadence,method,id); id=0 is valid.
   TYPE :: source_group_type
     INTEGER :: id=0 !< Public or normalized internal group identity.
-    INTEGER :: legacy_id=0 !< Original IMEX input group, zero for non-IM work.
     INTEGER :: cadence=0 !< Stage or post-RK step application.
     INTEGER :: method=0 !< Explicit, Newton or analytic.
-    INTEGER :: execution_order=0 !< Order within cadence and method class.
     CHARACTER(LEN=64), ALLOCATABLE :: source_names(:) !< Unique schedulable source identities.
     INTEGER, ALLOCATABLE :: equation_ids(:) !< Union of target equations or explicit footprint.
   END TYPE source_group_type
@@ -188,7 +186,7 @@ CONTAINS
         names=names_for_targets(active_names,targets)
         equations=PACK([(i,i=1,partition%n_equations)],partition%IM_group== &
              partition%IM_group(target_equation_ids_first(targets(1),pore_equation)))
-        group=make_group(legacy,legacy,SOURCE_CADENCE_STAGE,method,SIZE(stages)+1,names,equations)
+        group=make_group(legacy,SOURCE_CADENCE_STAGE,method,names,equations)
         stages=[stages,group]
       ELSE
         DO i=1,SIZE(targets)
@@ -200,17 +198,17 @@ CONTAINS
             split_id=split_id+1
             order=split_id
           END IF
-          group=make_group(order,legacy,SOURCE_CADENCE_STAGE,method,SIZE(stages)+1,names,equations)
+          group=make_group(order,SOURCE_CADENCE_STAGE,method,names,equations)
           stages=[stages,group]
         END DO
       END IF
     END DO
     equations=[(i,i=1,partition%n_equations)]
     names=names_for_targets(active_names,[0])
-    group=make_group(4,0,SOURCE_CADENCE_STAGE,SOURCE_METHOD_EXPLICIT,1,names,equations)
+    group=make_group(4,SOURCE_CADENCE_STAGE,SOURCE_METHOD_EXPLICIT,names,equations)
     stages=[stages,group]
     names=names_for_targets(active_names,[-1])
-    group=make_group(1,0,SOURCE_CADENCE_STEP,SOURCE_METHOD_EXPLICIT,1,names,equations)
+    group=make_group(1,SOURCE_CADENCE_STEP,SOURCE_METHOD_EXPLICIT,names,equations)
     steps=[group]
     CALL this%initialize(partition%n_equations,pore_equation,stages,steps,error)
   END SUBROUTINE initialize_legacy_registry
@@ -246,7 +244,7 @@ CONTAINS
       group=groups(i)
       rheology_name='' ! Rheology is one schedulable physical identity.
       error='D17: invalid group identity, method, cadence or order'
-      IF (group%id<0 .OR. group%execution_order<1 .OR. group%legacy_id<0) RETURN
+      IF (group%id<0) RETURN
       IF (i<=nstage) THEN
         IF (group%cadence/=SOURCE_CADENCE_STAGE) RETURN
       ELSE
@@ -264,8 +262,6 @@ CONTAINS
         IF (groups(j)%cadence/=group%cadence) CYCLE
         IF (groups(j)%id==group%id .AND. groups(j)%method==group%method) RETURN
         IF (group_stage_rank(groups(j))>group_stage_rank(group)) RETURN
-        IF (group_stage_rank(groups(j))==group_stage_rank(group) .AND. &
-             groups(j)%execution_order>=group%execution_order) RETURN
       END DO
       error='D17: unallocated group descriptor arrays'
       IF (.NOT.ALLOCATED(group%source_names)) RETURN
@@ -432,19 +428,17 @@ CONTAINS
   !> \brief Construct one block with fully allocated arrays.
   !> \brief Construct a fully allocated homogeneous group.
   !> \param[in] id Group identity, independent of order.
-  !> \param[in] legacy Original input group, or zero for EX/step.
   !> \param[in] cadence Stage or step namespace.
   !> \param[in] method Group method.
-  !> \param[in] order Position within cadence and method class.
   !> \param[in] names Canonical component names, converted at the legacy boundary.
   !> \param[in] equations Conservative equation footprint.
   !> \return Group directly owning the equation footprint.
-  FUNCTION make_group(id,legacy,cadence,method,order,names,equations) RESULT(group)
-    INTEGER, INTENT(IN) :: id,legacy,cadence,method,order,equations(:)
+  FUNCTION make_group(id,cadence,method,names,equations) RESULT(group)
+    INTEGER, INTENT(IN) :: id,cadence,method,equations(:)
     CHARACTER(*), INTENT(IN) :: names(:)
     TYPE(source_group_type) :: group
-    group%id=id; group%legacy_id=legacy; group%cadence=cadence
-    group%method=method; group%execution_order=order
+    group%id=id; group%cadence=cadence
+    group%method=method
     ! Allocate the owned arrays explicitly to avoid compiler warnings about
     ! allocatable-component descriptor initialization on intrinsic assignment.
     ALLOCATE(group%source_names(SIZE(names)),group%equation_ids(SIZE(equations)))

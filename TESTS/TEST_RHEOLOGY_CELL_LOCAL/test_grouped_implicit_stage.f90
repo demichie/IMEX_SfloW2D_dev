@@ -132,7 +132,6 @@ PROGRAM test_grouped_implicit_stage
   IF (SIZE(source_registry%stage_groups())/=4) &
        ERROR STOP 'default configuration did not build the expected stage groups'
   filter_group%id=1
-  filter_group%execution_order=1
   filter_group%cadence=SOURCE_CADENCE_STAGE
   filter_group%method=SOURCE_METHOD_NEWTON
 

@@ -221,9 +221,8 @@ CONTAINS
         END DO
       END IF
       IF (k==0) THEN
-        group%id=id; group%legacy_id=0
+        group%id=id
         group%method=method; group%cadence=cadence
-        group%execution_order=1
         group%source_names=[CHARACTER(LEN=64)::active_names(i)]
         group%equation_ids=[INTEGER::]
         IF (method==SOURCE_METHOD_EXPLICIT) THEN
@@ -256,16 +255,15 @@ CONTAINS
     ! Preserve the empty EXPLICIT/STAGE group expected by the legacy IMEX
     ! stage contract when no geometric or injection term is active.
     IF (.NOT.ANY([(stages(j)%method==SOURCE_METHOD_EXPLICIT,j=1,SIZE(stages))])) THEN
-      group%id=0; group%legacy_id=0
+      group%id=0
       group%method=SOURCE_METHOD_EXPLICIT
       group%cadence=SOURCE_CADENCE_STAGE
-      group%execution_order=1
       group%source_names=[CHARACTER(LEN=64)::]
       group%equation_ids=[(n,n=1,n_eqns)]
       stages=[stages,group]
     END IF
     ! Keep empty legacy stages available only where they are numerically needed.
-    ! Sort by method class and GROUP; execution_order is derived, never input.
+    ! Runtime array order derives from method class and GROUP; no extra state.
     DO i=1,SIZE(stages)
       DO j=i+1,SIZE(stages)
         ! Preserve the dependency order of the initialized legacy IMEX
@@ -289,10 +287,8 @@ CONTAINS
           tmp=stages(i); stages(i)=stages(j); stages(j)=tmp
         END IF
       END DO
-      stages(i)%execution_order=i
     END DO
     DO i=1,SIZE(steps)
-      steps(i)%execution_order=i
     END DO
     mask=.FALSE.; membership=0; partition_methods=0; compact=0
     DO i=1,SIZE(stages)
@@ -537,9 +533,8 @@ CONTAINS
     DO i=1,source_group_count
       g=ordered(i)
 
-      group%id=source_group_id(g); group%legacy_id=0
+      group%id=source_group_id(g)
       group%cadence=cadence(g); group%method=method(g)
-      group%execution_order=source_group_order(g)
       IF (ALLOCATED(group%source_names)) DEALLOCATE(group%source_names)
       ALLOCATE(group%source_names(parsed_count(g)))
       group%source_names=parsed_names(1:parsed_count(g),g)
