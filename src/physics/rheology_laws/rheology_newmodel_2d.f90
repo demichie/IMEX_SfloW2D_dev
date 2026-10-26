@@ -25,17 +25,9 @@ CONTAINS
     REAL(wp), INTENT(IN) :: excess_pore_pressure, stochastic_value
     LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
     REAL(wp), INTENT(OUT) :: rate(2)
-    REAL(wp) :: sx, sy, curvature_accel
-    COMPLEX(wp) :: ix, iy
-    curvature_accel=0.0_wp
-    IF (curvature_term) curvature_accel=curvature_xx*velocity_x**2 + &
-         2.0_wp*curvature_xy*velocity_x*velocity_y+curvature_yy*velocity_y**2
-    CALL eval_rheology_newmodel_semi_implicit( &
-       sx, sy )
-    CALL eval_rheology_newmodel_implicit( &
-       CMPLX(velocity_x,0.0_wp,wp), CMPLX(velocity_y,0.0_wp,wp), &
-       CMPLX(mixture_density,0.0_wp,wp), ix, iy )
-    rate=[sx,sy]+REAL([ix,iy],wp)
+    ! Keep the common four-treatment interface, but this fixture is Newton-only.
+    rate=0.0_wp
+    CALL fatal_error('rheology_newmodel: explicit treatment unsupported')
   END SUBROUTINE eval_rheology_newmodel_explicit
 
   SUBROUTINE eval_rheology_newmodel_semi_implicit(rate_x,rate_y)
