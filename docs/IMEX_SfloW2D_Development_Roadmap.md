@@ -2345,26 +2345,22 @@ L'ultimo esempio vale soltanto quando la relativa fisica è effettivamente abili
 
 #### D18.2 — Definizione dei gruppi derivati e vincoli di coerenza
 
-Sia S_active l'insieme delle sorgenti fisiche abilitate. Ciascuna sorgente s possiede esattamente una tripla efficace (M_s,C_s,G_s), ottenuta combinando i parametri facoltativi con i default compatibili. Un gruppo è l'insieme delle sorgenti con uguale coppia **(CADENCE,GROUP)**. Il metodo è una proprietà derivata: tutte le sorgenti del gruppo devono avere lo stesso METHOD.
+Sia S_active l'insieme delle sorgenti fisiche abilitate. Ciascuna sorgente s possiede esattamente una tripla efficace (M_s,C_s,G_s), ottenuta combinando i parametri facoltativi con i default compatibili. Un gruppo è l'insieme delle sorgenti con uguale tripla **(CADENCE,METHOD,GROUP)**. Questa definizione permette a gruppi di metodi differenti di condividere il valore numerico GROUP (incluso zero), restando gruppi separati. Tutte le sorgenti appartenenti a uno stesso gruppo hanno necessariamente lo stesso METHOD.
 
-Formalmente, per ogni coppia di sorgenti attive i,j:
-
-\[
-(C_i=C_j \land G_i=G_j) \ \Rightarrow \ M_i=M_j .
-\]
+Formalmente, per due sorgenti attive i,j, esse appartengono allo stesso gruppo se e solo se \((C_i,M_i,G_i)=(C_j,M_j,G_j)\).
 
 La condizione è necessaria ma **non sufficiente**: un gruppo deve anche essere risolvibile fisicamente e numericamente. Validare all'inizializzazione tutti i seguenti invarianti:
 
 1. Ogni sorgente fisica attiva ha un'unica identità canonica e una sola tripla; sorgenti inattive e sotto-componenti derivate non possono essere schedulate.
 2. Una stessa sorgente non può essere ripetuta in più gruppi, **nemmeno fra STAGE e STEP**. Duplicati e assenze sono errori di configurazione prima della simulazione.
-3. Gruppi con identica coppia (CADENCE,GROUP) richiedono METHOD identico per tutti i componenti. La medesima cifra GROUP è indipendente fra cadenze differenti.
+3. Gruppi con identica tripla (CADENCE,METHOD,GROUP) raccolgono le sorgenti interessate; la medesima cifra GROUP è indipendente sia fra cadenze sia fra metodi differenti.
 4. Tutte le sorgenti devono supportare realmente il metodo: NEWTON richiede il contributo SI/IM valido, ANALYTIC richiede la mappa analitica valida; uno stub di rifiuto non costituisce una capability.
 5. Un gruppo NEWTON con più termini risolve **un solo sistema accoppiato** su tutte le equazioni target, con residuo e Jacobiana congiunti, non vari sottosolver indipendenti.
 6. Un gruppo ANALYTIC con più leggi è ammesso soltanto se esiste **un operatore analitico congiunto**; la solvibilità analitica dei singoli addendi non basta.
 7. La deposizione comprende la perdita della fase vettore da essa indotta. **Tutti i processi mass exchange attivi appartengono obbligatoriamente allo stesso gruppo, con identici METHOD e CADENCE, assegnati esclusivamente dalla singola tripletta `MASS_EXCHANGE_PARAMETERS`**. Il batch con limiter condiviso, inventari e topografia è indivisibile anche quando soltanto un sottoinsieme delle sei leggi è attivo; non è configurabile separare erosione, deposizione, perdite, entrainment e vaporizzazione in gruppi differenti.
 8. L'ordine crescente di GROUP opera all'interno della stessa cadenza, ma non può scavalcare dipendenze obbligatorie del tableau IMEX o introdurre valutazioni esplicite in punti numericamente errati: dichiarare e validare queste restrizioni senza reintrodurre PHASE.
 
-I gruppi devono avere identificativi positivi e un'unione coerente dei target conservativi. Il registro normalizzato è costruito **una sola volta**; nel calcolo per cella non si devono confrontare stringhe, ricostruire liste o schedulare duplicati. Le diagnostiche di errore devono indicare sorgente, namelist, METHOD richiesto e coppia (CADENCE,GROUP) coinvolta.
+I gruppi devono avere identificativi non negativi (GROUP=0 valido) e un'unione coerente dei target conservativi. Il registro normalizzato è costruito **una sola volta**; nel calcolo per cella non si devono confrontare stringhe, ricostruire liste o schedulare duplicati. Le diagnostiche di errore devono indicare sorgente, namelist, METHOD richiesto e coppia (CADENCE,GROUP) coinvolta.
 
 #### D18.3 — Default opzionali, input legacy e migrazione
 
@@ -2487,6 +2483,18 @@ La medesima interfaccia EXPLICIT è impiegata indifferentemente per \`EXPLICIT/S
 **Semplificazione di D18 — 26 ottobre 2026 (CI da verificare):** eliminata l'interfaccia pubblica `initialize_explicit_physical_sources` e rimossa la biforcazione corrispondente in `simulation_2d`. Gli input fisici non nativi passano da `initialize_configured_sources`, che applica internamente la scelta esplicita quando richiesta, utilizzando le strutture già presenti. Non sono stati aggiunti scheduler, registry o moduli. Resta aperta la normalizzazione unificata per configurazioni miste EXPLICIT/NEWTON/ANALYTIC e la rimozione delle duplicazioni interne legacy. Stato: PARZIALE, non D18 completato.
 
 **Gruppi a metodi differenti — intervento parziale (26 ottobre 2026, CI da verificare):** la procedura privata `apply_explicit_physical_selection` nel modulo esistente ora preserva le sorgenti non promosse nei gruppi impliciti legacy, rimuove le sole sorgenti optate EXPLICIT/STAGE e ricostruisce insieme partizione IMEX e registry. Conserva i gruppi NEWTON residui accoppiati, senza introdurre strutture o sottosolver. I gruppi espliciti con stesso `(STAGE,GROUP)` vengono aggregati; collisioni METHOD sono respinte. **Non è ancora la normalizzazione D18 completa**: NEWTON/ANALYTIC espliciti nelle triplette non riscrivono il metodo legacy; nuovi GROUP su gruppi impliciti e metodi STEP restano aperti. Verifica CI necessaria.
+
+#### D18.4c — Audit dei contributi di curvatura e identificazione dei gruppi di default (26 ottobre 2026)
+
+**Riscontro sul codice:** `geometry_curvature` non è un alias della correzione reologica. In `source_terms_2d::eval_geometry_curvature_explicit`, la derivata seconda del fondo forma `a_c = B_xx u² + 2 B_xy uv + B_yy v²`; la sorgente autonoma di quantità di moto vale `S_x = -G_c (rho h) a_c B_x` e `S_y = -G_c (rho h) a_c B_y`. La chiamata avviene una volta nel gruppo EXPLICIT/STAGE quando `curvature_term_flag` è attivo. Nelle leggi reologiche (ad esempio Voellmy e mu(I)) la **stessa accelerazione geometrica** entra invece nel calcolo dello sforzo normale efficace e quindi dell'attrito: è una dipendenza costitutiva della sorgente reologica, non la stessa forza tangenziale addizionata una seconda volta. Le due espressioni sono diverse e hanno bersagli fisici distinti; **non rimuovere automaticamente** `geometry_curvature` per il solo fatto che una reologia usa `a_c`. L'audit statico non costituisce da solo una dimostrazione completa dell'assenza di doppi conteggi rispetto a ogni variante delle equazioni HP: conservarne la verifica scientifica nel gate D15.
+
+**Regola di configurazione approvata per D18, non ancora implementata nel registry:** identificare ogni gruppo con `(CADENCE, METHOD, GROUP)`, non con `(CADENCE, GROUP)`. `GROUP=0` deve essere un identificativo **valido** e il default universale per un campo GROUP omesso. Questo consente contemporaneamente `(STAGE,NEWTON,0)`, `(STAGE,EXPLICIT,0)` e `(STEP,EXPLICIT,0)`; le sorgenti di una stessa tripla sono raccolte nello stesso gruppo. All'interno di una stessa classe `(CADENCE,METHOD)`, l'ordine è crescente per GROUP. In caso di METHOD diversi con lo stesso numero GROUP non c'è conflitto: sono **gruppi distinti**, non gruppi eterogenei. L'ordine fra metodi diversi durante STAGE rimane imposto dal tableau IMEX, non dal numero GROUP.
+
+**Default fisici da rendere espliciti nel catalogo esistente `source_catalog_2d`:** per le reologie, thermal cooling e pore-pressure dissipation `NEWTON/STAGE/0` quando attive, formando **un unico solve Newton accoppiato** in assenza di override; per iniezioni e `geometry_curvature`, `EXPLICIT/STAGE/0`; per tutto il batch mass exchange, `EXPLICIT/STEP/0`. Le interfacce supportate rimangono le attuali capability della sorgente; `semi_implicit` è una componente di NEWTON e non un METHOD autonomo. Non aggiungere un secondo catalogo, né triplette indipendenti per ciascuna delle sei leggi mass exchange.
+
+**Compatibilità da verificare prima del cambio dei default:** il percorso IMEX legacy ammette opzioni esplicite `IMEX_*`, e il registry corrente considera validi solo identificativi GROUP positivi. Il comportamento richiesto di default è quello dichiarato per le simulazioni legacy con unico Newton accoppiato; preservare comunque i vecchi input che impostano esplicitamente gruppi/metodi diversi. Normalizzare tali input *una volta* all'avvio, poi eseguire lo stesso scheduler delle namelist fisiche. Non conservare due interpretazioni operative permanenti e non introdurre cambi di METHOD, CADENCE o GROUP durante la simulazione.
+
+**Esito audit curvatura:** `geometry_curvature` è una sorgente geometrica EXPLICIT/STAGE distinta dall'impiego di curvatura nel calcolo costitutivo reologico. Il catalogo deve riconoscerla separatamente, ma la formula ausiliaria `curvature_acceleration` va riutilizzata, non duplicata. Nessuna modifica alle formule o alle interfacce fisiche è giustificata da questo solo audit.
 
 #### D18.5 — Piano di implementazione coordinato
 
