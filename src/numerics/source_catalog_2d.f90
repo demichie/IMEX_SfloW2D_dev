@@ -33,7 +33,7 @@ MODULE source_catalog_2d
        source_term_type('rheology_lucas','velocity',.TRUE.,.TRUE.,.TRUE.), &
        source_term_type('rheology_mui','velocity',.TRUE.,.TRUE.,.TRUE.), &
        source_term_type('rheology_mui_voellmy','velocity',.TRUE.,.TRUE.,.TRUE.), &
-       source_term_type('rheology_newmodel','velocity',.TRUE.,.TRUE.,.FALSE.), &
+       source_term_type('rheology_newmodel','velocity',.FALSE.,.TRUE.,.FALSE.), &
        source_term_type('thermal_cooling','temperature',.TRUE.,.TRUE.,.TRUE.), &
        source_term_type('pore_pressure_dissipation','pore_pressure',.TRUE.,.TRUE.,.TRUE.), &
        source_term_type('bottom_circular_injection','explicit',.TRUE.,.FALSE.,.FALSE., &
