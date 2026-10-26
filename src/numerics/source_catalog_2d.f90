@@ -36,24 +36,24 @@ MODULE source_catalog_2d
        source_term_type('rheology_newmodel','velocity',.TRUE.,.TRUE.,.FALSE.), &
        source_term_type('thermal_cooling','temperature',.TRUE.,.TRUE.,.TRUE.), &
        source_term_type('pore_pressure_dissipation','pore_pressure',.TRUE.,.TRUE.,.TRUE.), &
-       source_term_type('bottom_circular_injection','explicit',.TRUE.,.FALSE.,.FALSE., &SOURCE_CADENCE_STAGE), &
+       source_term_type('bottom_circular_injection','explicit',.TRUE.,.FALSE.,.FALSE., &
             SOURCE_METHOD_EXPLICIT,SOURCE_CADENCE_STAGE), &
-       source_term_type('bottom_fissural_injection','explicit',.TRUE.,.FALSE.,.FALSE., &SOURCE_CADENCE_STAGE), &
+       source_term_type('bottom_fissural_injection','explicit',.TRUE.,.FALSE.,.FALSE., &
             SOURCE_METHOD_EXPLICIT,SOURCE_CADENCE_STAGE), &
        source_term_type('radial_injection','explicit',.TRUE.,.FALSE.,.FALSE.,SOURCE_METHOD_EXPLICIT,SOURCE_CADENCE_STAGE), &
        source_term_type('geometry_curvature','explicit',.TRUE.,.FALSE.,.FALSE.,SOURCE_METHOD_EXPLICIT,SOURCE_CADENCE_STAGE), &
        source_term_type('boundary_injection','explicit',.TRUE.,.FALSE.,.FALSE.,SOURCE_METHOD_EXPLICIT,SOURCE_CADENCE_STAGE), &
-       source_term_type('mass_exchange_erosion','mass_exchange',.TRUE.,.FALSE.,.FALSE., &SOURCE_CADENCE_STEP), &
+       source_term_type('mass_exchange_erosion','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             SOURCE_METHOD_EXPLICIT,SOURCE_CADENCE_STEP), &
-       source_term_type('mass_exchange_deposition','mass_exchange',.TRUE.,.FALSE.,.FALSE., &SOURCE_CADENCE_STEP), &
+       source_term_type('mass_exchange_deposition','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             SOURCE_METHOD_EXPLICIT,SOURCE_CADENCE_STEP), &
-       source_term_type('mass_exchange_carrier_liquid_loss','mass_exchange',.TRUE.,.FALSE.,.FALSE., &SOURCE_CADENCE_STEP), &
+       source_term_type('mass_exchange_carrier_liquid_loss','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             SOURCE_METHOD_EXPLICIT,SOURCE_CADENCE_STEP), &
-       source_term_type('mass_exchange_carrier_darcy_loss','mass_exchange',.TRUE.,.FALSE.,.FALSE., &SOURCE_CADENCE_STEP), &
+       source_term_type('mass_exchange_carrier_darcy_loss','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             SOURCE_METHOD_EXPLICIT,SOURCE_CADENCE_STEP), &
-       source_term_type('mass_exchange_entrainment','mass_exchange',.TRUE.,.FALSE.,.FALSE., &SOURCE_CADENCE_STEP), &
+       source_term_type('mass_exchange_entrainment','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             SOURCE_METHOD_EXPLICIT,SOURCE_CADENCE_STEP), &
-       source_term_type('mass_exchange_vaporization','mass_exchange',.TRUE.,.FALSE.,.FALSE., &SOURCE_CADENCE_STEP) &
+       source_term_type('mass_exchange_vaporization','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             SOURCE_METHOD_EXPLICIT,SOURCE_CADENCE_STEP) &
        ]
 CONTAINS
