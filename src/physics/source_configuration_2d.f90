@@ -89,6 +89,8 @@ CONTAINS
     END IF
     CALL collect_active_source_names(partition%implicit(4),active_names,error)
     IF (LEN_TRIM(error)>0) RETURN
+    pore=0
+    IF (pore_pressure_flag) pore=idx_pore
     DO i=1,3
       method=imex_group_method(i)
       CALL resolve_imex_group_method(method,methods(i))
