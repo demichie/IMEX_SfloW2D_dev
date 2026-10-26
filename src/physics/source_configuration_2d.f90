@@ -237,9 +237,13 @@ CONTAINS
           stages=[stages,group]
           ! Freeze legacy dependency order when the physical triplet is built.
           ! Explicit user GROUP selection takes precedence over that default.
-          IF (LEN_TRIM(requested_method)>0 .OR. &
-               (target>0 .AND. id/=group_ids(target) .AND. &
-                method/=SOURCE_METHOD_ANALYTIC)) source_order=0
+          IF (LEN_TRIM(requested_method)>0) source_order=0
+          ! Fortran does not guarantee short-circuit evaluation of .AND.;
+          ! never index group_ids with the zero target of explicit sources.
+          IF (target>0) THEN
+            IF (id/=group_ids(target) .AND. &
+                 method/=SOURCE_METHOD_ANALYTIC) source_order=0
+          END IF
           IF (source_order==0) source_order=id
           stage_order=[stage_order,source_order]
         ELSE
