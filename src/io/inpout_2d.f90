@@ -70,7 +70,12 @@ MODULE inpout_2d
   USE parameters_2d, ONLY: imex_velocity_group, imex_energy_group,          &
        imex_pore_pressure_group, imex_group_method
   USE equation_metadata_2d, ONLY: resolve_imex_group_method
-  USE source_input_2d, ONLY: read_native_source_groups
+  USE source_input_2d, ONLY: read_native_source_groups, read_mass_exchange_parameters, &
+       rheology_method, rheology_cadence, rheology_group, &
+       thermal_method, thermal_cadence, thermal_group, &
+       pore_pressure_method, pore_pressure_cadence, pore_pressure_group, &
+       mass_exchange_configuration_present, mass_exchange_method, &
+       mass_exchange_cadence, mass_exchange_group
 
   ! -- Variables for the namelist EXPL_TERMS_PARAMETERS
   USE constitutive_parameters_2d, ONLY: grav, inv_grav
@@ -381,11 +386,12 @@ MODULE inpout_2d
 
   NAMELIST /temperature_parameters/ thermal_cooling_flag, emissivity, atm_heat_transf_coeff, &
     thermal_conductivity, exp_area_fract, c_p, enne, emme, T_env, &
-    T_ground
+    T_ground, thermal_method, thermal_cadence, thermal_group
 
   NAMELIST /rheology_parameters/ rheology_model, mu, xi, tau, nu_ref, &
     visc_par, T_ref, alpha2, beta2, alpha1_ref, beta1, Kappa, n_td, &
-    friction_factor, tau0, mu_0, mu_inf, Fr_0, U_w, mu_s, mu_2, I_0, muI_inf
+    friction_factor, tau0, mu_0, mu_inf, Fr_0, U_w, mu_s, mu_2, I_0, muI_inf, &
+    rheology_method, rheology_cadence, rheology_group
 
   NAMELIST /runout_parameters/ x0_runout, y0_runout, dt_runout, &
     eps_stop, alphas_threshold
@@ -402,7 +408,8 @@ MODULE inpout_2d
 
   NAMELIST /pore_pressure_parameters/ hydraulic_permeability, pore_pres_fract, &
     gas_loss_flag, alpha_trans, N_inh, f_inhibit_mode, &
-    dynamic_permeability_flag
+    dynamic_permeability_flag, pore_pressure_method, pore_pressure_cadence, &
+    pore_pressure_group
 
   NAMELIST /west_boundary_conditions/ h_bcW, hu_bcW, hv_bcW, &
     xs_bcW, T_bcW, xg_bcW, xl_bcW, stoch_bcW, pore_bcW
@@ -2192,6 +2199,23 @@ CONTAINS
          imex_energy_group/=-HUGE(1) .OR. imex_pore_pressure_group/=-HUGE(1) .OR. &
          ANY(LEN_TRIM(imex_group_method)>0))
     CALL read_native_source_groups(input_unit,legacy_imex_explicit,source_input_error)
+    IF (LEN_TRIM(source_input_error)==0) &
+         CALL read_mass_exchange_parameters(input_unit,source_input_error)
+    ! The D18 input fields are parsed, but the physical scheduler is not yet
+    ! enabled. Reject non-default requests instead of silently ignoring them.
+    IF (LEN_TRIM(source_input_error)==0) THEN
+       IF (LEN_TRIM(rheology_method)>0 .OR. LEN_TRIM(rheology_cadence)>0 .OR. &
+            rheology_group/=0 .OR. LEN_TRIM(thermal_method)>0 .OR. &
+            LEN_TRIM(thermal_cadence)>0 .OR. thermal_group/=0 .OR. &
+            LEN_TRIM(pore_pressure_method)>0 .OR. &
+            LEN_TRIM(pore_pressure_cadence)>0 .OR. pore_pressure_group/=0) &
+            source_input_error='D18 physical source scheduling is not yet enabled'
+       IF (mass_exchange_configuration_present) THEN
+          IF (mass_exchange_method/='EXPLICIT' .OR. &
+               mass_exchange_cadence/='STEP' .OR. mass_exchange_group/=0) &
+               source_input_error='D18 mass exchange scheduling is not yet enabled'
+       END IF
+    END IF
     IF (LEN_TRIM(source_input_error)>0) CALL fatal_error(TRIM(source_input_error))
     IF (imex_velocity_group==-HUGE(1)) imex_velocity_group=3
     IF (imex_energy_group==-HUGE(1)) imex_energy_group=1
