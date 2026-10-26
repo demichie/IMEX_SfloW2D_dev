@@ -21,19 +21,19 @@ MODULE source_catalog_2d
   END TYPE source_term_type
   INTEGER, PARAMETER :: SOURCE_TERM_COUNT=24
   TYPE(source_term_type), PARAMETER :: SOURCE_CATALOG(SOURCE_TERM_COUNT)=[ &
-       source_term_type('rheology_voellmy','velocity',.FALSE.,.TRUE.,.TRUE.), &
-       source_term_type('rheology_plastic','velocity',.FALSE.,.TRUE.,.TRUE.), &
-       source_term_type('rheology_lava','velocity',.FALSE.,.TRUE.,.TRUE.), &
-       source_term_type('rheology_lahar','velocity',.FALSE.,.TRUE.,.TRUE.), &
-       source_term_type('rheology_empirical','velocity',.FALSE.,.TRUE.,.TRUE.), &
-       source_term_type('rheology_quadratic','velocity',.FALSE.,.TRUE.,.TRUE.), &
-       source_term_type('rheology_froude','velocity',.FALSE.,.TRUE.,.TRUE.), &
-       source_term_type('rheology_lucas','velocity',.FALSE.,.TRUE.,.TRUE.), &
-       source_term_type('rheology_mui','velocity',.FALSE.,.TRUE.,.TRUE.), &
-       source_term_type('rheology_mui_voellmy','velocity',.FALSE.,.TRUE.,.TRUE.), &
-       source_term_type('rheology_newmodel','velocity',.FALSE.,.TRUE.,.FALSE.), &
-       source_term_type('thermal_cooling','temperature',.FALSE.,.TRUE.,.TRUE.), &
-       source_term_type('pore_pressure_dissipation','pore_pressure',.FALSE.,.TRUE.,.TRUE.), &
+       source_term_type('rheology_voellmy','velocity',.TRUE.,.TRUE.,.TRUE.), &
+       source_term_type('rheology_plastic','velocity',.TRUE.,.TRUE.,.TRUE.), &
+       source_term_type('rheology_lava','velocity',.TRUE.,.TRUE.,.TRUE.), &
+       source_term_type('rheology_lahar','velocity',.TRUE.,.TRUE.,.TRUE.), &
+       source_term_type('rheology_empirical','velocity',.TRUE.,.TRUE.,.TRUE.), &
+       source_term_type('rheology_quadratic','velocity',.TRUE.,.TRUE.,.TRUE.), &
+       source_term_type('rheology_froude','velocity',.TRUE.,.TRUE.,.TRUE.), &
+       source_term_type('rheology_lucas','velocity',.TRUE.,.TRUE.,.TRUE.), &
+       source_term_type('rheology_mui','velocity',.TRUE.,.TRUE.,.TRUE.), &
+       source_term_type('rheology_mui_voellmy','velocity',.TRUE.,.TRUE.,.TRUE.), &
+       source_term_type('rheology_newmodel','velocity',.TRUE.,.TRUE.,.FALSE.), &
+       source_term_type('thermal_cooling','temperature',.TRUE.,.TRUE.,.TRUE.), &
+       source_term_type('pore_pressure_dissipation','pore_pressure',.TRUE.,.TRUE.,.TRUE.), &
        source_term_type('bottom_circular_injection','explicit',.TRUE.,.FALSE.,.FALSE.), &
        source_term_type('bottom_fissural_injection','explicit',.TRUE.,.FALSE.,.FALSE.), &
        source_term_type('radial_injection','explicit',.TRUE.,.FALSE.,.FALSE.), &

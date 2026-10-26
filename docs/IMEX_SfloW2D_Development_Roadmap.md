@@ -2460,6 +2460,8 @@ La medesima interfaccia EXPLICIT è impiegata indifferentemente per \`EXPLICIT/S
 
 **Test richiesti:** confronto numerico EXPLICIT contro SI+REAL(IM) sullo stesso stato, per ogni legge interessata; casi ordinari e degeneri, segni, dimensioni e target; nessuna modifica dei rate NEWTON, dei solve ANALYTIC o delle Jacobiane REAL/COMPLEX/complex-step. Test di gruppo con più sorgenti per escludere aggiornamenti sequenziali.
 
+**Avanzamento iniziale D18 (26 ottobre 2026; implementazione da verificare in CI):** le interfacce EXPLICIT di famiglia per reologia, cooling e dissipazione pore pressure sono state completate mediante il riuso di SI + REAL(IM), senza modificare le implementazioni SI/IM o i solve ANALYTIC. Le capability EXPLICIT delle relative 13 voci canoniche sono state abilitate nel catalogo. **Limite di questo passo:** l'assemblatore EXPLICIT generale, i test di identità, le nuove namelist e lo scheduling STAGE/STEP di D18 non sono ancora modificati; non dichiarare completata D18. La validazione di compilazione e regressione resta necessaria prima di considerare questa prima implementazione accettata.
+
 #### D18.5 — Piano di implementazione coordinato
 
 1. **Inventario e matrice dei default.** Identificare ogni processo fisico canonico, attivazione, namelist esistente, target e dipendenze conservative; per mass exchange censire tutti i parametri oggi distribuiti nelle namelist solid/liquid/gas/pore pressure, separando parametri di processo da proprietà fisiche condivise e definendo un solo owner; registrare default effettivi legacy per METHOD/CADENCE/GROUP, accoppiamenti, batch, gruppi vuoti ed eccezioni. Registrare le configurazioni già presenti in test, esempi e generatori.

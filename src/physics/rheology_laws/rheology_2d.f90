@@ -54,8 +54,39 @@ MODULE rheology_2d
 
 CONTAINS
 
-  SUBROUTINE eval_rheology_explicit()
-    CALL fatal_error('rheology: explicit treatment is unsupported')
+  ! Both Newton components are evaluated on the same, unchanged physical state.
+  SUBROUTINE eval_rheology_explicit(model_name, flow_depth, temperature, &
+       velocity_x, velocity_y, speed, horizontal_speed, speed_squared, &
+       mixture_density, inverse_density, reduced_gravity, gravity_coefficient, &
+       solid_fractions, curvature_term, curvature_xx, curvature_xy, curvature_yy, &
+       use_pore_pressure, excess_pore_pressure, moving, use_stochastic, &
+       stochastic_value, rate)
+    CHARACTER(*), INTENT(IN) :: model_name
+    REAL(wp), INTENT(IN) :: flow_depth, temperature, velocity_x, velocity_y
+    REAL(wp), INTENT(IN) :: speed, horizontal_speed, speed_squared
+    REAL(wp), INTENT(IN) :: mixture_density, inverse_density
+    REAL(wp), INTENT(IN) :: reduced_gravity, gravity_coefficient
+    REAL(wp), INTENT(IN) :: solid_fractions(:)
+    REAL(wp), INTENT(IN) :: curvature_xx, curvature_xy, curvature_yy
+    REAL(wp), INTENT(IN) :: excess_pore_pressure, stochastic_value
+    LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
+    REAL(wp), INTENT(OUT) :: rate(2)
+    REAL(wp) :: si_rate(2)
+    COMPLEX(wp) :: im_rate(2)
+
+    CALL eval_rheology_semi_implicit(model_name, flow_depth, velocity_x, &
+         velocity_y, speed, horizontal_speed, mixture_density, &
+         reduced_gravity, gravity_coefficient, solid_fractions, curvature_term, &
+         curvature_xx, curvature_xy, curvature_yy, use_pore_pressure, &
+         excess_pore_pressure, use_stochastic, stochastic_value, si_rate)
+    CALL eval_rheology_implicit(model_name, CMPLX(flow_depth,0.0_wp,wp), &
+         CMPLX(temperature,0.0_wp,wp), CMPLX(mixture_density,0.0_wp,wp), &
+         CMPLX(inverse_density,0.0_wp,wp), CMPLX(velocity_x,0.0_wp,wp), &
+         CMPLX(velocity_y,0.0_wp,wp), CMPLX(speed,0.0_wp,wp), &
+         CMPLX(horizontal_speed,0.0_wp,wp), CMPLX(speed_squared,0.0_wp,wp), &
+         CMPLX(reduced_gravity,0.0_wp,wp), CMPLX(solid_fractions,0.0_wp,wp), &
+         moving, use_stochastic, stochastic_value, im_rate)
+    rate = si_rate + REAL(im_rate,wp)
   END SUBROUTINE eval_rheology_explicit
 
   SUBROUTINE eval_rheology_semi_implicit(model_name, flow_depth,          &

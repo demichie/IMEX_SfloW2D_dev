@@ -39,8 +39,19 @@ MODULE pore_pressure_laws_2d
 
 CONTAINS
 
-  SUBROUTINE eval_pore_pressure_dissipation_explicit()
-    CALL fatal_error('pore_pressure: explicit treatment is unsupported')
+  SUBROUTINE eval_pore_pressure_dissipation_explicit(flow_depth, temperature, &
+       mixture_density, solid_fractions, excess_pressure, rate)
+    REAL(wp), INTENT(IN) :: flow_depth, temperature, mixture_density
+    REAL(wp), INTENT(IN) :: solid_fractions(n_solid), excess_pressure
+    REAL(wp), INTENT(OUT) :: rate
+    REAL(wp) :: si_rate
+    COMPLEX(wp) :: im_rate
+
+    CALL eval_pore_pressure_dissipation_semi_implicit(si_rate)
+    CALL eval_pore_pressure_dissipation_implicit(CMPLX(flow_depth,0.0_wp,wp), &
+         CMPLX(temperature,0.0_wp,wp), CMPLX(mixture_density,0.0_wp,wp), &
+         CMPLX(solid_fractions,0.0_wp,wp), CMPLX(excess_pressure,0.0_wp,wp), im_rate)
+    rate = si_rate + REAL(im_rate,wp)
   END SUBROUTINE eval_pore_pressure_dissipation_explicit
 
   SUBROUTINE eval_pore_pressure_dissipation_semi_implicit(rate)

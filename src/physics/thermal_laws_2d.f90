@@ -34,8 +34,18 @@ MODULE thermal_laws_2d
 
 CONTAINS
 
-  SUBROUTINE eval_thermal_cooling_explicit()
-    CALL fatal_error('thermal_cooling: explicit treatment is unsupported')
+  SUBROUTINE eval_thermal_cooling_explicit(temperature, radiative_coefficient, &
+       convective_coefficient, ambient_temperature, rate)
+    REAL(wp), INTENT(IN) :: temperature, radiative_coefficient
+    REAL(wp), INTENT(IN) :: convective_coefficient, ambient_temperature
+    REAL(wp), INTENT(OUT) :: rate
+    REAL(wp) :: si_rate
+    COMPLEX(wp) :: im_rate
+
+    CALL eval_thermal_cooling_semi_implicit(si_rate)
+    im_rate = eval_thermal_cooling_implicit(CMPLX(temperature,0.0_wp,wp), &
+         radiative_coefficient, convective_coefficient, ambient_temperature)
+    rate = si_rate + REAL(im_rate,wp)
   END SUBROUTINE eval_thermal_cooling_explicit
 
   SUBROUTINE eval_thermal_cooling_semi_implicit(rate)
