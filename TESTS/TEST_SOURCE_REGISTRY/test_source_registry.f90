@@ -219,6 +219,20 @@ CONTAINS
          'duplicate native namelist rejected')
     CLOSE(unit)
     CALL clear_source_input()
+    ! The D18 schedule has no independent SOURCE_GROUP_ORDER input.
+    ! Guard against stale generated input reintroducing the retired field.
+    OPEN(NEWUNIT=unit,STATUS='scratch',ACTION='readwrite',FORM='formatted')
+    WRITE(unit,'(A)') '&source_groups'
+    WRITE(unit,'(A)') ' source_group_count=1,'
+    WRITE(unit,'(A)') ' source_group_order(1)=1,'
+    WRITE(unit,'(A)') " source_group_cadence(1)='STAGE',"
+    WRITE(unit,'(A)') '/'
+    CALL read_native_source_groups(unit,.FALSE.,error)
+    CALL require(INDEX(error,'Invalid SOURCE_GROUPS namelist')>0 .AND. &
+         .NOT.native_source_configuration_present, &
+         'retired SOURCE_GROUP_ORDER rejected by native parser')
+    CLOSE(unit)
+    CALL clear_source_input()
   END SUBROUTINE verify_native_parser
 
   SUBROUTINE set_native_group(slot,id,cadence,method,name,target)
