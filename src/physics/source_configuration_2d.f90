@@ -7,7 +7,7 @@
 MODULE source_configuration_2d
   USE source_catalog_2d
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
-  USE equation_metadata_2d, ONLY : equation_partition_type, resolve_imex_group_method, &
+  USE equation_metadata_2d, ONLY : equation_partition_type, &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   USE source_input_2d
   USE parameters_2d, ONLY : wp, n_eqns, rheology_flag, rheology_model, &
@@ -15,7 +15,7 @@ MODULE source_configuration_2d
        pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag, &
        bottom_fissural_source_flag, radial_source_flag, lateral_source_flag, &
        liquid_flag, gas_flag, gas_loss_flag, liquid_vaporization_flag, &
-       imex_velocity_group, imex_energy_group, imex_pore_pressure_group, imex_group_method, idx_pore
+       imex_velocity_group, imex_energy_group, imex_pore_pressure_group, idx_pore
   USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag, &
        coeff_porosity, entrainment_flag
   IMPLICIT NONE
@@ -83,12 +83,12 @@ CONTAINS
     TYPE(source_group_type) :: group,tmp
     TYPE(source_term_type) :: term
     CHARACTER(LEN=16) :: requested_method,requested_cadence
-    INTEGER :: i,j,k,g,id,method,cadence,pore,eq,compact,n
-    INTEGER :: target,legacy_group,im_method,legacy_methods(3)
+    INTEGER :: i,j,k,id,method,cadence,pore,eq,compact,n
+    INTEGER :: target,legacy_group,im_method
     INTEGER :: membership(n_eqns),partition_methods(3)
     INTEGER :: group_ids(3),old_groups(n_eqns)
     INTEGER :: sort_i,sort_j
-    LOGICAL :: old_implicit(n_eqns),mask(n_eqns),selected_explicit
+    LOGICAL :: old_implicit(n_eqns),mask(n_eqns)
     CALL registry%finalize()
     error=''
     IF (.NOT.partition%is_initialized()) THEN
@@ -102,10 +102,6 @@ CONTAINS
     pore=0
     IF (pore_pressure_flag) pore=idx_pore
     group_ids=[imex_velocity_group,imex_energy_group,imex_pore_pressure_group]
-    DO i=1,3
-      requested_method=imex_group_method(i)
-      CALL resolve_imex_group_method(requested_method,legacy_methods(i))
-    END DO
     old_implicit=partition%implicit
     old_groups=partition%IM_group
     ALLOCATE(stages(0),steps(0))
@@ -287,8 +283,6 @@ CONTAINS
           tmp=stages(i); stages(i)=stages(j); stages(j)=tmp
         END IF
       END DO
-    END DO
-    DO i=1,SIZE(steps)
     END DO
     mask=.FALSE.; membership=0; partition_methods=0; compact=0
     DO i=1,SIZE(stages)
