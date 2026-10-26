@@ -71,175 +71,223 @@ CONTAINS
   !> \param[in] partition Existing compact equation partition, never modified.
   !> \param[out] error Empty on success, otherwise a pre-simulation diagnostic.
   !> \note This phase records possible activation; zero per-cell rates stay valid.
+  !> Construct final physical groups once, deriving the equation partition.
+  !> The previously initialized partition only supplies legacy IMEX defaults;
+  !> no temporary registry or subsequent source reassignment is constructed.
   SUBROUTINE initialize_configured_sources(registry,partition,error)
     TYPE(source_registry_type), INTENT(INOUT) :: registry
     TYPE(equation_partition_type), INTENT(INOUT) :: partition
     CHARACTER(*), INTENT(OUT) :: error
     CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
     TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:)
-    INTEGER :: methods(3),i,pore
-    CHARACTER(LEN=16) :: method
+    TYPE(source_group_type) :: group,tmp
+    TYPE(source_term_type) :: term
+    CHARACTER(LEN=16) :: requested_method,requested_cadence
+    INTEGER :: i,j,k,g,id,method,cadence,pore,eq,compact,n
+    INTEGER :: target,legacy_group,im_method,legacy_methods(3)
+    INTEGER :: membership(n_eqns),partition_methods(3)
+    INTEGER :: group_ids(3),old_groups(n_eqns)
+    LOGICAL :: old_implicit(n_eqns),mask(n_eqns),selected_explicit
     CALL registry%finalize()
     error=''
     IF (.NOT.partition%is_initialized()) THEN
-      error='D17: source configuration requires initialized equation metadata'; RETURN
+      error='D18: equation metadata must be initialized'; RETURN
     END IF
     IF (partition%n_equations<4) THEN
-      error='D17: source layout requires at least four equations'; RETURN
+      error='D18: invalid equation layout'; RETURN
     END IF
     CALL collect_active_source_names(partition%implicit(4),active_names,error)
     IF (LEN_TRIM(error)>0) RETURN
     pore=0
     IF (pore_pressure_flag) pore=idx_pore
+    group_ids=[imex_velocity_group,imex_energy_group,imex_pore_pressure_group]
     DO i=1,3
-      method=imex_group_method(i)
-      CALL resolve_imex_group_method(method,methods(i))
+      requested_method=imex_group_method(i)
+      CALL resolve_imex_group_method(requested_method,legacy_methods(i))
     END DO
-    CALL registry%initialize_legacy(partition, &
-         [imex_velocity_group,imex_energy_group,imex_pore_pressure_group], &
-         methods,pore,active_names,error)
-    IF (LEN_TRIM(error)>0) RETURN
-    ! The mass-exchange batch remains an indivisible STEP/EXPLICIT transaction.
-    ! Only its group identity is configurable until the physical D18 scheduler
-    ! also owns equation partitioning and cadence changes.
-    IF (mass_exchange_configuration_present .AND. mass_exchange_group>0) THEN
-      stages=registry%stage_groups()
-      steps=registry%step_groups()
-      IF (SIZE(steps)/=1) THEN
-        error='D18: legacy mass exchange requires exactly one STEP group'
-        CALL registry%finalize()
-        RETURN
+    old_implicit=partition%implicit
+    old_groups=partition%IM_group
+    ALLOCATE(stages(0),steps(0))
+    DO i=1,SIZE(active_names)
+      term=source_term_descriptor_by_name(active_names(i))
+      IF (LEN_TRIM(term%name)==0) THEN
+        error='D18: unknown active source'; RETURN
       END IF
-      steps(1)%id=mass_exchange_group
-      CALL registry%initialize(partition%n_equations,pore,stages,steps,error)
-    END IF
-    IF (TRIM(rheology_method)=='EXPLICIT' .OR. &
-         TRIM(thermal_method)=='EXPLICIT' .OR. &
-         TRIM(pore_pressure_method)=='EXPLICIT') THEN
-       CALL apply_explicit_physical_selection(registry,partition,error)
-    END IF
-  END SUBROUTINE initialize_configured_sources
-
-  !> Preserve implicit coupling while moving selected sources to EXPLICIT/STAGE.
-  !> Uses the existing registry and equation partition; no parallel scheduler.
-  SUBROUTINE apply_explicit_physical_selection(registry,partition,error)
-    TYPE(source_registry_type), INTENT(INOUT) :: registry
-    TYPE(equation_partition_type), INTENT(INOUT) :: partition
-    CHARACTER(*), INTENT(OUT) :: error
-    TYPE(source_group_type), ALLOCATABLE :: original(:),stages(:),steps(:)
-    TYPE(source_group_type) :: group,swap_group
-    CHARACTER(LEN=64), ALLOCATABLE :: remaining(:)
-    CHARACTER(LEN=64) :: name
-    INTEGER :: i,j,k,n,id,compact,eq,pore
-    INTEGER :: membership(n_eqns),methods(3)
-    LOGICAL :: mask(n_eqns),promoted,velocity,energy,pressure
-    error=''
-    original=registry%stage_groups()
-    steps=registry%step_groups()
-    ALLOCATE(stages(0))
-    ! Remove only the promoted sources from their original coupled blocks.
-    DO i=1,SIZE(original)
-      IF (original(i)%method==SOURCE_METHOD_EXPLICIT) CYCLE
-      ALLOCATE(remaining(0))
-      velocity=.FALSE.; energy=.FALSE.; pressure=.FALSE.
-      DO j=1,SIZE(original(i)%source_names)
-        name=original(i)%source_names(j)
-        promoted=.FALSE.
-        IF (INDEX(TRIM(name),'rheology_')==1) &
-             promoted=TRIM(rheology_method)=='EXPLICIT'
-        IF (TRIM(name)=='thermal_cooling') promoted=TRIM(thermal_method)=='EXPLICIT'
-        IF (TRIM(name)=='pore_pressure_dissipation') &
-             promoted=TRIM(pore_pressure_method)=='EXPLICIT'
-        IF (promoted) CYCLE
-        remaining=[CHARACTER(LEN=64)::remaining,name]
-        IF (INDEX(TRIM(name),'rheology_')==1) velocity=.TRUE.
-        IF (TRIM(name)=='thermal_cooling') energy=.TRUE.
-        IF (TRIM(name)=='pore_pressure_dissipation') pressure=.TRUE.
-      END DO
-      IF (SIZE(remaining)>0) THEN
-        group=original(i)
-        group%source_names=remaining
-        group%equation_ids=[INTEGER::]
-        IF (velocity) group%equation_ids=[group%equation_ids,2,3]
-        IF (energy) group%equation_ids=[group%equation_ids,4]
-        IF (pressure) group%equation_ids=[group%equation_ids,idx_pore]
-        stages=[stages,group]
+      method=term%default_method
+      cadence=term%default_cadence
+      id=0
+      requested_method=''; requested_cadence=''
+      SELECT CASE(TRIM(term%target))
+      CASE('velocity')
+        target=1
+        requested_method=rheology_method
+        requested_cadence=rheology_cadence
+        id=rheology_group
+      CASE('temperature')
+        target=2
+        requested_method=thermal_method
+        requested_cadence=thermal_cadence
+        id=thermal_group
+      CASE('pore_pressure')
+        target=3
+        requested_method=pore_pressure_method
+        requested_cadence=pore_pressure_cadence
+        id=pore_pressure_group
+      CASE('mass_exchange')
+        target=-1
+        requested_method=mass_exchange_method
+        requested_cadence=mass_exchange_cadence
+        id=mass_exchange_group
+      CASE DEFAULT
+        target=0
+      END SELECT
+      IF (id<0) THEN
+        error='D18: GROUP must be nonnegative'; RETURN
       END IF
-      DEALLOCATE(remaining)
-    END DO
-    ! Append explicit sources, coalescing only equal (STAGE,GROUP).
-    DO i=1,SIZE(original)
-      DO j=1,SIZE(original(i)%source_names)
-        name=original(i)%source_names(j)
-        promoted=.FALSE.; id=0
-        IF (INDEX(TRIM(name),'rheology_')==1) THEN
-          promoted=TRIM(rheology_method)=='EXPLICIT'
-          IF (rheology_group>0) id=rheology_group
+      IF (target>0) THEN
+        SELECT CASE(target)
+        CASE(1); eq=2
+        CASE(2); eq=4
+        CASE(3); eq=pore
+        END SELECT
+        IF (eq<1 .OR. eq>n_eqns) THEN
+          error='D18: invalid physical target equation'; RETURN
         END IF
-        IF (TRIM(name)=='thermal_cooling') THEN
-          promoted=TRIM(thermal_method)=='EXPLICIT'
-          IF (thermal_group>0) id=thermal_group
+        IF (old_implicit(eq)) THEN
+          legacy_group=old_groups(eq)
+          IF (legacy_group<1 .OR. legacy_group>3) THEN
+            error='D18: invalid legacy implicit group'; RETURN
+          END IF
+          im_method=partition%IM_group_method(legacy_group)
+          method=SOURCE_METHOD_NEWTON
+          IF (im_method==IM_GROUP_METHOD_ANALYTIC) method=SOURCE_METHOD_ANALYTIC
+          ! Preserve explicit legacy IMEX grouping when physical GROUP is omitted.
+          IF (id==0) id=group_ids(target)
         END IF
-        IF (TRIM(name)=='pore_pressure_dissipation') THEN
-          promoted=TRIM(pore_pressure_method)=='EXPLICIT'
-          IF (pore_pressure_group>0) id=pore_pressure_group
+      END IF
+      IF (LEN_TRIM(requested_method)>0) THEN
+        SELECT CASE(TRIM(requested_method))
+        CASE('EXPLICIT'); method=SOURCE_METHOD_EXPLICIT
+        CASE('NEWTON'); method=SOURCE_METHOD_NEWTON
+        CASE('ANALYTIC'); method=SOURCE_METHOD_ANALYTIC
+        CASE DEFAULT
+          error='D18: invalid source METHOD'; RETURN
+        END SELECT
+        ! An explicit physical choice without GROUP uses the D18 default zero.
+        IF (method==SOURCE_METHOD_EXPLICIT .AND. target>0) THEN
+          IF (id==group_ids(target)) id=0
         END IF
-        IF (.NOT.promoted .AND. original(i)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
-        k=0
-        DO n=1,SIZE(stages)
-          IF (stages(n)%id/=id) CYCLE
-          IF (stages(n)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
-          k=n
+      END IF
+      IF (LEN_TRIM(requested_cadence)>0) THEN
+        SELECT CASE(TRIM(requested_cadence))
+        CASE('STAGE'); cadence=SOURCE_CADENCE_STAGE
+        CASE('STEP'); cadence=SOURCE_CADENCE_STEP
+        CASE DEFAULT
+          error='D18: invalid source CADENCE'; RETURN
+        END SELECT
+      END IF
+      IF (target>0 .AND. method/=SOURCE_METHOD_EXPLICIT .AND. &
+           cadence==SOURCE_CADENCE_STEP) THEN
+        error='D18: implicit STEP execution is not implemented'; RETURN
+      END IF
+      IF (target>0 .AND. method==SOURCE_METHOD_EXPLICIT .AND. &
+           cadence==SOURCE_CADENCE_STEP) THEN
+        error='D18: physical explicit STEP execution is not implemented'; RETURN
+      END IF
+      IF (target>0 .AND. method==SOURCE_METHOD_ANALYTIC .AND. &
+           .NOT.term%has_analytic) THEN
+        error='D18: analytic interface unavailable for source'; RETURN
+      END IF
+      IF (target>0 .AND. method==SOURCE_METHOD_NEWTON .AND. &
+           .NOT.term%has_newton) THEN
+        error='D18: Newton interface unavailable for source'; RETURN
+      END IF
+      ! The legacy analytic velocity/energy/pressure solvers are independent.
+      ! Group identity is (cadence,method,id), not the group number alone.
+      IF (target>0 .AND. method==SOURCE_METHOD_ANALYTIC .AND. &
+           LEN_TRIM(requested_method)==0) THEN
+        id=group_ids(target)
+        IF (target>1) id=id+target*3
+      END IF
+      k=0
+      IF (cadence==SOURCE_CADENCE_STAGE) THEN
+        DO j=1,SIZE(stages)
+          IF (stages(j)%method==method .AND. stages(j)%id==id) k=j
         END DO
-        IF (k==0) THEN
-          group%id=id; group%legacy_id=0
-          group%method=SOURCE_METHOD_EXPLICIT
-          group%cadence=SOURCE_CADENCE_STAGE
-          group%execution_order=1
-          group%source_names=[CHARACTER(LEN=64)::name]
+      ELSE
+        DO j=1,SIZE(steps)
+          IF (steps(j)%method==method .AND. steps(j)%id==id) k=j
+        END DO
+      END IF
+      IF (k==0) THEN
+        group%id=id; group%legacy_id=0
+        group%method=method; group%cadence=cadence
+        group%execution_order=1
+        group%source_names=[CHARACTER(LEN=64)::active_names(i)]
+        group%equation_ids=[INTEGER::]
+        IF (method==SOURCE_METHOD_EXPLICIT) THEN
           group%equation_ids=[(n,n=1,n_eqns)]
+        ELSE
+          SELECT CASE(target)
+          CASE(1); group%equation_ids=[2,3]
+          CASE(2); group%equation_ids=[4]
+          CASE(3); group%equation_ids=[pore]
+          END SELECT
+        END IF
+        IF (cadence==SOURCE_CADENCE_STAGE) THEN
           stages=[stages,group]
         ELSE
-          stages(k)%source_names=[CHARACTER(LEN=64)::stages(k)%source_names,name]
+          steps=[steps,group]
         END IF
-      END DO
+      ELSE IF (cadence==SOURCE_CADENCE_STAGE) THEN
+        stages(k)%source_names=[CHARACTER(LEN=64)::stages(k)%source_names,active_names(i)]
+        IF (method/=SOURCE_METHOD_EXPLICIT) THEN
+          SELECT CASE(target)
+          CASE(1); stages(k)%equation_ids=[stages(k)%equation_ids,2,3]
+          CASE(2); stages(k)%equation_ids=[stages(k)%equation_ids,4]
+          CASE(3); stages(k)%equation_ids=[stages(k)%equation_ids,pore]
+          END SELECT
+        END IF
+      ELSE
+        steps(k)%source_names=[CHARACTER(LEN=64)::steps(k)%source_names,active_names(i)]
+      END IF
     END DO
-    ! Sort groups with implicit solves first, then by GROUP within a class.
+    ! Keep empty legacy stages available only where they are numerically needed.
+    ! Sort by method class and GROUP; execution_order is derived, never input.
     DO i=1,SIZE(stages)
       DO j=i+1,SIZE(stages)
         IF (group_method_rank(stages(j)%method)<group_method_rank(stages(i)%method) .OR. &
              (group_method_rank(stages(j)%method)==group_method_rank(stages(i)%method) .AND. &
               stages(j)%id<stages(i)%id)) THEN
-          swap_group=stages(i); stages(i)=stages(j); stages(j)=swap_group
+          tmp=stages(i); stages(i)=stages(j); stages(j)=tmp
         END IF
       END DO
       stages(i)%execution_order=i
     END DO
-    ! Keep one coupled solve for each remaining implicit group.
-    mask=.FALSE.; membership=0; methods=0; compact=0
+    DO i=1,SIZE(steps)
+      steps(i)%execution_order=i
+    END DO
+    mask=.FALSE.; membership=0; partition_methods=0; compact=0
     DO i=1,SIZE(stages)
       IF (stages(i)%method==SOURCE_METHOD_EXPLICIT) CYCLE
       compact=compact+1
-      IF (compact>SIZE(methods)) THEN
-        error='D18: too many implicit blocks'; CALL registry%finalize(); RETURN
+      IF (compact>3) THEN
+        error='D18: too many implicit source groups'; RETURN
       END IF
-      methods(compact)=IM_GROUP_METHOD_NEWTON
+      partition_methods(compact)=IM_GROUP_METHOD_NEWTON
       IF (stages(i)%method==SOURCE_METHOD_ANALYTIC) &
-           methods(compact)=IM_GROUP_METHOD_ANALYTIC
+           partition_methods(compact)=IM_GROUP_METHOD_ANALYTIC
       DO j=1,SIZE(stages(i)%equation_ids)
         eq=stages(i)%equation_ids(j)
-        IF (membership(eq)/=0) THEN
-          error='D18: implicit equation assigned to multiple groups'
-          CALL registry%finalize(); RETURN
+        IF (membership(eq)>0) THEN
+          error='D18: equation belongs to multiple implicit groups'; RETURN
         END IF
         membership(eq)=compact; mask(eq)=.TRUE.
       END DO
     END DO
-    pore=0
-    IF (pore_pressure_flag) pore=idx_pore
-    CALL partition%initialize(mask,membership,methods(1:compact))
+    CALL partition%initialize(mask,membership,partition_methods(1:compact))
     CALL registry%initialize(n_eqns,pore,stages,steps,error)
-  END SUBROUTINE apply_explicit_physical_selection
+  END SUBROUTINE initialize_configured_sources
 
   !> \brief Translate the native namelist into an equation partition and registry.
   !> \param[in,out] registry Registry destination, cleared on error.
