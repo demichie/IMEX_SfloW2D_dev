@@ -22,7 +22,6 @@ MODULE source_configuration_2d
   PRIVATE
   PUBLIC :: initialize_configured_sources
   PUBLIC :: initialize_native_source_configuration
-  PUBLIC :: initialize_explicit_physical_sources
 CONTAINS
   PURE INTEGER FUNCTION group_method_rank(group_method) RESULT(rank)
     INTEGER, INTENT(IN) :: group_method
@@ -37,7 +36,7 @@ CONTAINS
   !> \note This phase records possible activation; zero per-cell rates stay valid.
   SUBROUTINE initialize_configured_sources(registry,partition,error)
     TYPE(source_registry_type), INTENT(INOUT) :: registry
-    TYPE(equation_partition_type), INTENT(IN) :: partition
+    TYPE(equation_partition_type), INTENT(INOUT) :: partition
     CHARACTER(*), INTENT(OUT) :: error
     CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
     TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:)
@@ -105,12 +104,17 @@ CONTAINS
       steps(1)%id=mass_exchange_group
       CALL registry%initialize(partition%n_equations,pore,stages,steps,error)
     END IF
+    IF (TRIM(rheology_method)=='EXPLICIT' .OR. &
+         TRIM(thermal_method)=='EXPLICIT' .OR. &
+         TRIM(pore_pressure_method)=='EXPLICIT') THEN
+       CALL apply_explicit_physical_selection(registry,partition,error)
+    END IF
   END SUBROUTINE initialize_configured_sources
 
   !> Build a fully explicit physical STAGE schedule and its matching partition.
   !> This mode is enabled only when every active legacy implicit physical term
   !> explicitly selects EXPLICIT/STAGE; mixed schemes remain on the D18 roadmap.
-  SUBROUTINE initialize_explicit_physical_sources(registry,partition,error)
+  SUBROUTINE apply_explicit_physical_selection(registry,partition,error)
     TYPE(source_registry_type), INTENT(INOUT) :: registry
     TYPE(equation_partition_type), INTENT(INOUT) :: partition
     CHARACTER(*), INTENT(OUT) :: error
@@ -121,8 +125,6 @@ CONTAINS
     INTEGER :: i,j,k,id,order,pore,n
     LOGICAL, ALLOCATABLE :: mask(:)
     error=''
-    CALL initialize_configured_sources(registry,partition,error)
-    IF (LEN_TRIM(error)>0) RETURN
     old_stage=registry%stage_groups()
     steps=registry%step_groups()
     ALLOCATE(new_stage(0))
@@ -191,7 +193,7 @@ CONTAINS
     mask=.FALSE.
     CALL partition%initialize(mask)
     CALL registry%initialize(n_eqns,pore,new_stage,steps,error)
-  END SUBROUTINE initialize_explicit_physical_sources
+  END SUBROUTINE apply_explicit_physical_selection
 
   !> \brief Translate the native namelist into an equation partition and registry.
   !> \param[in,out] registry Registry destination, cleared on error.

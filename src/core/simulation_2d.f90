@@ -15,11 +15,9 @@ MODULE simulation_2d
   USE step_source_executor_2d, ONLY : execute_step_source_groups
 
   USE source_registry_2d, ONLY : source_registry_type
-  USE source_configuration_2d, ONLY : initialize_explicit_physical_sources, &
-       initialize_configured_sources, &
+  USE source_configuration_2d, ONLY : initialize_configured_sources, &
        initialize_native_source_configuration
-  USE source_input_2d, ONLY : native_source_configuration_present, &
-       rheology_method,thermal_method,pore_pressure_method
+  USE source_input_2d, ONLY : native_source_configuration_present
   USE diagnostics_2d, ONLY : fatal_error
 
   USE equation_metadata_2d, ONLY : equation_partition_type
@@ -113,15 +111,8 @@ CONTAINS
            this%equation_partition,source_error)
     ELSE
       CALL init_problem_param( this%equation_partition )
-      IF (TRIM(rheology_method)=='EXPLICIT' .OR. &
-           TRIM(thermal_method)=='EXPLICIT' .OR. &
-           TRIM(pore_pressure_method)=='EXPLICIT') THEN
-        CALL initialize_explicit_physical_sources(this%source_registry, &
-             this%equation_partition,source_error)
-      ELSE
-        CALL initialize_configured_sources(this%source_registry, &
-             this%equation_partition,source_error)
-      END IF
+      CALL initialize_configured_sources(this%source_registry, &
+           this%equation_partition,source_error)
     END IF
     IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
