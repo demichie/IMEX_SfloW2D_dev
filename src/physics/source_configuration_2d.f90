@@ -87,7 +87,8 @@ CONTAINS
     INTEGER :: target,legacy_group,im_method
     INTEGER :: membership(n_eqns),partition_methods(3)
     INTEGER :: group_ids(3),old_groups(n_eqns)
-    INTEGER :: sort_i,sort_j
+    INTEGER, ALLOCATABLE :: stage_order(:)
+    INTEGER :: source_order,swap_order
     LOGICAL :: old_implicit(n_eqns),mask(n_eqns)
     CALL registry%finalize()
     error=''
@@ -104,7 +105,7 @@ CONTAINS
     group_ids=[imex_velocity_group,imex_energy_group,imex_pore_pressure_group]
     old_implicit=partition%implicit
     old_groups=partition%IM_group
-    ALLOCATE(stages(0),steps(0))
+    ALLOCATE(stages(0),steps(0),stage_order(0))
     DO i=1,SIZE(active_names)
       term=source_term_descriptor_by_name(active_names(i))
       IF (LEN_TRIM(term%name)==0) THEN
@@ -114,6 +115,7 @@ CONTAINS
       cadence=term%default_cadence
       id=0
       requested_method=''; requested_cadence=''
+      source_order=0
       SELECT CASE(TRIM(term%target))
       CASE('velocity')
         target=1
@@ -155,6 +157,7 @@ CONTAINS
           IF (legacy_group<1 .OR. legacy_group>3) THEN
             error='D18: invalid legacy implicit group'; RETURN
           END IF
+          source_order=legacy_group
           im_method=partition%IM_group_method(legacy_group)
           method=SOURCE_METHOD_NEWTON
           IF (im_method==IM_GROUP_METHOD_ANALYTIC) method=SOURCE_METHOD_ANALYTIC
@@ -232,6 +235,13 @@ CONTAINS
         END IF
         IF (cadence==SOURCE_CADENCE_STAGE) THEN
           stages=[stages,group]
+          ! Freeze legacy dependency order when the physical triplet is built.
+          ! Explicit user GROUP selection takes precedence over that default.
+          IF (LEN_TRIM(requested_method)>0 .OR. &
+               (target>0 .AND. id/=group_ids(target) .AND. &
+                method/=SOURCE_METHOD_ANALYTIC)) source_order=0
+          IF (source_order==0) source_order=id
+          stage_order=[stage_order,source_order]
         ELSE
           steps=[steps,group]
         END IF
@@ -257,30 +267,21 @@ CONTAINS
       group%source_names=[CHARACTER(LEN=64)::]
       group%equation_ids=[(n,n=1,n_eqns)]
       stages=[stages,group]
+      stage_order=[stage_order,0]
     END IF
     ! Keep empty legacy stages available only where they are numerically needed.
     ! Runtime array order derives from method class and GROUP; no extra state.
     DO i=1,SIZE(stages)
       DO j=i+1,SIZE(stages)
-        ! Preserve the dependency order of the initialized legacy IMEX
-        ! partition (analytic cooling/pore before rheology, when configured).
-        ! For newly explicit sources, GROUP is the sole ordering key.
-        sort_i=stages(i)%id
-        sort_j=stages(j)%id
-        IF (stages(i)%method/=SOURCE_METHOD_EXPLICIT .AND. &
-             SIZE(stages(i)%equation_ids)>0) THEN
-          eq=stages(i)%equation_ids(1)
-          IF (old_groups(eq)>0) sort_i=old_groups(eq)
-        END IF
-        IF (stages(j)%method/=SOURCE_METHOD_EXPLICIT .AND. &
-             SIZE(stages(j)%equation_ids)>0) THEN
-          eq=stages(j)%equation_ids(1)
-          IF (old_groups(eq)>0) sort_j=old_groups(eq)
-        END IF
+        ! Ordering priority is fixed during group construction.
+        ! No query of the pre-existing equation partition in this sort.
         IF (group_method_rank(stages(j)%method)<group_method_rank(stages(i)%method) .OR. &
              (group_method_rank(stages(j)%method)==group_method_rank(stages(i)%method) .AND. &
-              sort_j<sort_i)) THEN
+              stage_order(j)<stage_order(i))) THEN
           tmp=stages(i); stages(i)=stages(j); stages(j)=tmp
+          swap_order=stage_order(i)
+          stage_order(i)=stage_order(j)
+          stage_order(j)=swap_order
         END IF
       END DO
     END DO
