@@ -23,6 +23,43 @@ MODULE source_configuration_2d
   PUBLIC :: initialize_configured_sources
   PUBLIC :: initialize_native_source_configuration
 CONTAINS
+  !> Identify active physical sources exactly once for both input syntaxes.
+  !> The thermal flag is resolved by the caller to preserve legacy partition
+  !> semantics where thermal activation follows the initialized IMEX mask.
+  SUBROUTINE collect_active_source_names(include_thermal,active_names,error)
+    LOGICAL, INTENT(IN) :: include_thermal
+    CHARACTER(LEN=64), ALLOCATABLE, INTENT(OUT) :: active_names(:)
+    CHARACTER(*), INTENT(OUT) :: error
+    ALLOCATE(active_names(0))
+    IF (rheology_flag) THEN
+      IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))>0) &
+           active_names=[CHARACTER(LEN=64) :: active_names,canonical_rheology_source_name(rheology_model)]
+      IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))==0 .AND. &
+           TRIM(rheology_model)/='none') THEN
+        error='D17: unsupported configured rheology'; RETURN
+      END IF
+    END IF
+    IF (include_thermal) active_names=[CHARACTER(LEN=64) :: active_names, &
+         'thermal_cooling']
+    IF (pore_pressure_flag) active_names=[CHARACTER(LEN=64) :: active_names,'pore_pressure_dissipation']
+    IF (curvature_term_flag) active_names=[CHARACTER(LEN=64) :: active_names,'geometry_curvature']
+    IF (bottom_radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_circular_injection']
+    IF (bottom_fissural_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_fissural_injection']
+    IF (radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'radial_injection']
+    IF (lateral_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'boundary_injection']
+    IF (erosion_coeff>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
+    IF (settling_flag) THEN
+      active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_deposition']
+    END IF
+    IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_liquid_loss']
+    IF (pore_pressure_flag .AND. gas_loss_flag) &
+         active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_darcy_loss']
+    IF (entrainment_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_entrainment']
+    IF (gas_flag .AND. liquid_vaporization_flag) &
+         active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_vaporization']
+    error=''
+  END SUBROUTINE collect_active_source_names
+
   PURE INTEGER FUNCTION group_method_rank(group_method) RESULT(rank)
     INTEGER, INTENT(IN) :: group_method
     rank=1
@@ -50,38 +87,8 @@ CONTAINS
     IF (partition%n_equations<4) THEN
       error='D17: source layout requires at least four equations'; RETURN
     END IF
-    ALLOCATE(active_names(0))
-    IF (rheology_flag) THEN
-      IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))>0) &
-           active_names=[CHARACTER(LEN=64) :: active_names,canonical_rheology_source_name(rheology_model)]
-      IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))==0 .AND. &
-           TRIM(rheology_model)/='none') THEN
-        error='D17: unsupported configured rheology'; RETURN
-      END IF
-    END IF
-    IF (partition%implicit(4)) active_names=[CHARACTER(LEN=64) :: active_names,'thermal_cooling']
-    pore=0
-    IF (pore_pressure_flag) THEN
-      pore=idx_pore
-      active_names=[CHARACTER(LEN=64) :: active_names,'pore_pressure_dissipation']
-    END IF
-    IF (curvature_term_flag) active_names=[CHARACTER(LEN=64) :: active_names,'geometry_curvature']
-    IF (bottom_radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_circular_injection']
-    IF (bottom_fissural_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_fissural_injection']
-    IF (radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'radial_injection']
-    IF (lateral_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'boundary_injection']
-    IF (erosion_coeff>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
-    IF (settling_flag) THEN
-      active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_deposition']
-    END IF
-    IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_liquid_loss']
-    IF (pore_pressure_flag .AND. gas_loss_flag) &
-         active_names=[CHARACTER(LEN=64) :: active_names, &
-         'mass_exchange_carrier_darcy_loss']
-    IF (entrainment_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_entrainment']
-    IF (gas_flag .AND. liquid_vaporization_flag) &
-         active_names=[CHARACTER(LEN=64) :: active_names, &
-         'mass_exchange_vaporization']
+    CALL collect_active_source_names(partition%implicit(4),active_names,error)
+    IF (LEN_TRIM(error)>0) RETURN
     DO i=1,3
       method=imex_group_method(i)
       CALL resolve_imex_group_method(method,methods(i))
@@ -364,33 +371,8 @@ CONTAINS
       END IF
     END DO
 
-    ALLOCATE(active_names(0))
-    IF (rheology_flag) THEN
-      IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))>0) &
-           active_names=[CHARACTER(LEN=64) :: active_names,canonical_rheology_source_name(rheology_model)]
-      IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))==0 .AND. &
-           TRIM(rheology_model)/='none') THEN
-        error='D17: unsupported configured rheology'; RETURN
-      END IF
-    END IF
-    IF (thermal_cooling_flag) active_names=[CHARACTER(LEN=64) :: active_names, &
-         'thermal_cooling']
-    IF (pore_pressure_flag) active_names=[CHARACTER(LEN=64) :: active_names,'pore_pressure_dissipation']
-    IF (curvature_term_flag) active_names=[CHARACTER(LEN=64) :: active_names,'geometry_curvature']
-    IF (bottom_radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_circular_injection']
-    IF (bottom_fissural_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_fissural_injection']
-    IF (radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'radial_injection']
-    IF (lateral_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'boundary_injection']
-    IF (erosion_coeff>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
-    IF (settling_flag) THEN
-      active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_deposition']
-    END IF
-    IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_liquid_loss']
-    IF (pore_pressure_flag .AND. gas_loss_flag) &
-         active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_darcy_loss']
-    IF (entrainment_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_entrainment']
-    IF (gas_flag .AND. liquid_vaporization_flag) &
-         active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_vaporization']
+    CALL collect_active_source_names(thermal_cooling_flag,active_names,error)
+    IF (LEN_TRIM(error)>0) RETURN
     error='D17: native schedule must register every configured active term exactly once'
     IF (n_seen/=SIZE(active_names)) RETURN
     DO i=1,SIZE(active_names)
