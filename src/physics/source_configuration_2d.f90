@@ -252,6 +252,17 @@ CONTAINS
         steps(k)%source_names=[CHARACTER(LEN=64)::steps(k)%source_names,active_names(i)]
       END IF
     END DO
+    ! Preserve the empty EXPLICIT/STAGE group expected by the legacy IMEX
+    ! stage contract when no geometric or injection term is active.
+    IF (.NOT.ANY([(stages(j)%method==SOURCE_METHOD_EXPLICIT,j=1,SIZE(stages))])) THEN
+      group%id=0; group%legacy_id=0
+      group%method=SOURCE_METHOD_EXPLICIT
+      group%cadence=SOURCE_CADENCE_STAGE
+      group%execution_order=1
+      group%source_names=[CHARACTER(LEN=64)::]
+      group%equation_ids=[(n,n=1,n_eqns)]
+      stages=[stages,group]
+    END IF
     ! Keep empty legacy stages available only where they are numerically needed.
     ! Sort by method class and GROUP; execution_order is derived, never input.
     DO i=1,SIZE(stages)
