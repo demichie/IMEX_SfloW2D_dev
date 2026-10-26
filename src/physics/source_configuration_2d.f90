@@ -87,6 +87,7 @@ CONTAINS
     INTEGER :: target,legacy_group,im_method,legacy_methods(3)
     INTEGER :: membership(n_eqns),partition_methods(3)
     INTEGER :: group_ids(3),old_groups(n_eqns)
+    INTEGER :: sort_i,sort_j
     LOGICAL :: old_implicit(n_eqns),mask(n_eqns),selected_explicit
     CALL registry%finalize()
     error=''
@@ -267,9 +268,24 @@ CONTAINS
     ! Sort by method class and GROUP; execution_order is derived, never input.
     DO i=1,SIZE(stages)
       DO j=i+1,SIZE(stages)
+        ! Preserve the dependency order of the initialized legacy IMEX
+        ! partition (analytic cooling/pore before rheology, when configured).
+        ! For newly explicit sources, GROUP is the sole ordering key.
+        sort_i=stages(i)%id
+        sort_j=stages(j)%id
+        IF (stages(i)%method/=SOURCE_METHOD_EXPLICIT .AND. &
+             SIZE(stages(i)%equation_ids)>0) THEN
+          eq=stages(i)%equation_ids(1)
+          IF (old_groups(eq)>0) sort_i=old_groups(eq)
+        END IF
+        IF (stages(j)%method/=SOURCE_METHOD_EXPLICIT .AND. &
+             SIZE(stages(j)%equation_ids)>0) THEN
+          eq=stages(j)%equation_ids(1)
+          IF (old_groups(eq)>0) sort_j=old_groups(eq)
+        END IF
         IF (group_method_rank(stages(j)%method)<group_method_rank(stages(i)%method) .OR. &
              (group_method_rank(stages(j)%method)==group_method_rank(stages(i)%method) .AND. &
-              stages(j)%id<stages(i)%id)) THEN
+              sort_j<sort_i)) THEN
           tmp=stages(i); stages(i)=stages(j); stages(j)=tmp
         END IF
       END DO
