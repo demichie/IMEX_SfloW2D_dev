@@ -2209,15 +2209,34 @@ CONTAINS
     CALL read_native_source_groups(input_unit,legacy_imex_explicit,source_input_error)
     IF (LEN_TRIM(source_input_error)==0) &
          CALL read_mass_exchange_parameters(input_unit,source_input_error)
-    ! The D18 input fields are parsed, but the physical scheduler is not yet
-    ! enabled. Reject non-default requests instead of silently ignoring them.
+    ! The first D18 executable mode is an entirely explicit STAGE partition.
+    ! Reject mixed requests instead of silently retaining implicit evaluation.
     IF (LEN_TRIM(source_input_error)==0) THEN
-       IF (LEN_TRIM(rheology_method)>0 .OR. LEN_TRIM(rheology_cadence)>0 .OR. &
-            rheology_group/=0 .OR. LEN_TRIM(thermal_method)>0 .OR. &
-            LEN_TRIM(thermal_cadence)>0 .OR. thermal_group/=0 .OR. &
-            LEN_TRIM(pore_pressure_method)>0 .OR. &
-            LEN_TRIM(pore_pressure_cadence)>0 .OR. pore_pressure_group/=0) &
-            source_input_error='D18 physical source scheduling is not yet enabled'
+       IF (native_source_configuration_present .AND. &
+            (LEN_TRIM(rheology_method)>0 .OR. LEN_TRIM(thermal_method)>0 .OR. &
+             LEN_TRIM(pore_pressure_method)>0 .OR. rheology_group/=0 .OR. &
+             thermal_group/=0 .OR. pore_pressure_group/=0)) &
+            source_input_error='D18 physical settings conflict with SOURCE_GROUPS'
+       IF ((LEN_TRIM(rheology_method)>0 .AND. &
+            TRIM(rheology_method)/='EXPLICIT') .OR. &
+            (LEN_TRIM(thermal_method)>0 .AND. &
+            TRIM(thermal_method)/='EXPLICIT') .OR. &
+            (LEN_TRIM(pore_pressure_method)>0 .AND. &
+            TRIM(pore_pressure_method)/='EXPLICIT')) &
+            source_input_error='D18 physical METHOD currently supports EXPLICIT only'
+       IF ((LEN_TRIM(rheology_cadence)>0 .AND. &
+            TRIM(rheology_cadence)/='STAGE') .OR. &
+            (LEN_TRIM(thermal_cadence)>0 .AND. &
+            TRIM(thermal_cadence)/='STAGE') .OR. &
+            (LEN_TRIM(pore_pressure_cadence)>0 .AND. &
+            TRIM(pore_pressure_cadence)/='STAGE')) &
+            source_input_error='D18 physical CADENCE currently supports STAGE only'
+       IF (rheology_group<0 .OR. thermal_group<0 .OR. pore_pressure_group<0) &
+            source_input_error='D18 physical GROUP must be nonnegative'
+       IF ((rheology_group>0 .AND. LEN_TRIM(rheology_method)==0) .OR. &
+            (thermal_group>0 .AND. LEN_TRIM(thermal_method)==0) .OR. &
+            (pore_pressure_group>0 .AND. LEN_TRIM(pore_pressure_method)==0)) &
+            source_input_error='D18 physical GROUP requires explicit METHOD'
        IF (mass_exchange_configuration_present) THEN
           IF (mass_exchange_method/='EXPLICIT' .OR. &
                mass_exchange_cadence/='STEP') &

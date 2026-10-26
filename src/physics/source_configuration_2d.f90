@@ -22,6 +22,7 @@ MODULE source_configuration_2d
   PRIVATE
   PUBLIC :: initialize_configured_sources
   PUBLIC :: initialize_native_source_configuration
+  PUBLIC :: initialize_explicit_physical_sources
 CONTAINS
   PURE INTEGER FUNCTION group_method_rank(group_method) RESULT(rank)
     INTEGER, INTENT(IN) :: group_method
@@ -105,6 +106,92 @@ CONTAINS
       CALL registry%initialize(partition%n_equations,pore,stages,steps,error)
     END IF
   END SUBROUTINE initialize_configured_sources
+
+  !> Build a fully explicit physical STAGE schedule and its matching partition.
+  !> This mode is enabled only when every active legacy implicit physical term
+  !> explicitly selects EXPLICIT/STAGE; mixed schemes remain on the D18 roadmap.
+  SUBROUTINE initialize_explicit_physical_sources(registry,partition,error)
+    TYPE(source_registry_type), INTENT(INOUT) :: registry
+    TYPE(equation_partition_type), INTENT(INOUT) :: partition
+    CHARACTER(*), INTENT(OUT) :: error
+    TYPE(source_group_type), ALLOCATABLE :: old_stage(:),new_stage(:),steps(:)
+    TYPE(source_group_type) :: group,tmp
+    CHARACTER(LEN=64) :: name
+    CHARACTER(LEN=16) :: method,cadence
+    INTEGER :: i,j,k,id,order,pore,n
+    LOGICAL, ALLOCATABLE :: mask(:)
+    error=''
+    CALL initialize_configured_sources(registry,partition,error)
+    IF (LEN_TRIM(error)>0) RETURN
+    old_stage=registry%stage_groups()
+    steps=registry%step_groups()
+    ALLOCATE(new_stage(0))
+    DO i=1,SIZE(old_stage)
+      DO j=1,SIZE(old_stage(i)%source_names)
+        name=old_stage(i)%source_names(j)
+        method=''; cadence=''; id=0
+        SELECT CASE(TRIM(name))
+        CASE('thermal_cooling')
+          method=thermal_method; cadence=thermal_cadence; id=thermal_group
+        CASE('pore_pressure_dissipation')
+          method=pore_pressure_method; cadence=pore_pressure_cadence
+          id=pore_pressure_group
+        CASE DEFAULT
+          IF (INDEX(TRIM(name),'rheology_')==1) THEN
+            method=rheology_method; cadence=rheology_cadence; id=rheology_group
+          ELSE
+            ! Retain geometry and injections in their historical explicit stage.
+            method='EXPLICIT'; cadence='STAGE'; id=4
+          END IF
+        END SELECT
+        method=uppercase_source_text(ADJUSTL(method))
+        cadence=uppercase_source_text(ADJUSTL(cadence))
+        IF (method/='EXPLICIT' .OR. &
+             (LEN_TRIM(cadence)>0 .AND. cadence/='STAGE')) THEN
+          error='D18: fully explicit STAGE mode requires EXPLICIT/STAGE for every active source'
+          CALL registry%finalize()
+          RETURN
+        END IF
+        IF (id<0) THEN
+          error='D18: physical GROUP must be nonnegative'
+          CALL registry%finalize()
+          RETURN
+        END IF
+        IF (id==0) id=4
+        k=0
+        DO n=1,SIZE(new_stage)
+          IF (new_stage(n)%id==id) k=n
+        END DO
+        IF (k==0) THEN
+          group%id=id; group%legacy_id=0
+          group%method=SOURCE_METHOD_EXPLICIT
+          group%cadence=SOURCE_CADENCE_STAGE
+          group%execution_order=1
+          group%source_names=[CHARACTER(LEN=64)::name]
+          group%equation_ids=[(n,n=1,n_eqns)]
+          new_stage=[new_stage,group]
+        ELSE
+          new_stage(k)%source_names=[CHARACTER(LEN=64):: &
+               new_stage(k)%source_names,name]
+        END IF
+      END DO
+    END DO
+    ! Registry validation requires monotonically ordered EXPLICIT groups.
+    DO i=1,SIZE(new_stage)
+      DO j=i+1,SIZE(new_stage)
+        IF (new_stage(j)%id<new_stage(i)%id) THEN
+          tmp=new_stage(i); new_stage(i)=new_stage(j); new_stage(j)=tmp
+        END IF
+      END DO
+      new_stage(i)%execution_order=i
+    END DO
+    pore=0
+    IF (pore_pressure_flag) pore=idx_pore
+    ALLOCATE(mask(n_eqns))
+    mask=.FALSE.
+    CALL partition%initialize(mask)
+    CALL registry%initialize(n_eqns,pore,new_stage,steps,error)
+  END SUBROUTINE initialize_explicit_physical_sources
 
   !> \brief Translate the native namelist into an equation partition and registry.
   !> \param[in,out] registry Registry destination, cleared on error.
