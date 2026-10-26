@@ -231,6 +231,13 @@ CONTAINS
     CALL require(INDEX(error,'Invalid SOURCE_GROUPS namelist')>0 .AND. &
          .NOT.native_source_configuration_present, &
          'retired SOURCE_GROUP_ORDER rejected by native parser')
+    CALL require(source_group_count==0 .AND. ALL(source_group_id==0) .AND. &
+         ALL(source_group_term_count==0) .AND. ALL(source_group_target_count==0), &
+         'failed SOURCE_GROUPS read clears all partially assigned counts')
+    CALL require(ALL(source_group_cadence=='') .AND. &
+         ALL(source_group_method=='') .AND. ALL(source_group_terms=='') .AND. &
+         ALL(source_group_targets==''), &
+         'failed SOURCE_GROUPS read clears all partially assigned names')
     CLOSE(unit)
     CALL clear_source_input()
   END SUBROUTINE verify_native_parser

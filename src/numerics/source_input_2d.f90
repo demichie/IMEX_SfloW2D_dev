@@ -103,6 +103,9 @@ CONTAINS
       END IF
       READ(input_unit,NML=source_groups,IOSTAT=io_status)
       IF (io_status/=0) THEN
+        ! A failed namelist read may have assigned only a prefix of fields.
+        ! Do not expose an invalid partial configuration to subsequent reads.
+        CALL clear_source_input()
         error='Invalid SOURCE_GROUPS namelist'
         RETURN
       END IF
