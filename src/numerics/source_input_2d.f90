@@ -58,11 +58,6 @@ CONTAINS
     source_group_target_count=0
     source_group_targets=''
     native_source_configuration_present=.FALSE.
-    mass_exchange_configuration_present=.FALSE.
-    rheology_method=''; rheology_cadence=''; rheology_group=0
-    thermal_method=''; thermal_cadence=''; thermal_group=0
-    pore_pressure_method=''; pore_pressure_cadence=''; pore_pressure_group=0
-    mass_exchange_method='EXPLICIT'; mass_exchange_cadence='STEP'; mass_exchange_group=0
   END SUBROUTINE clear_source_input
 
   !> \brief Find and parse the optional native source-group namelist.
