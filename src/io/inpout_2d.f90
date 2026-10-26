@@ -74,6 +74,7 @@ MODULE inpout_2d
        rheology_method, rheology_cadence, rheology_group, &
        thermal_method, thermal_cadence, thermal_group, &
        pore_pressure_method, pore_pressure_cadence, pore_pressure_group, &
+       native_source_configuration_present, &
        mass_exchange_configuration_present, mass_exchange_method, &
        mass_exchange_cadence, mass_exchange_group
 
@@ -2212,8 +2213,10 @@ CONTAINS
             source_input_error='D18 physical source scheduling is not yet enabled'
        IF (mass_exchange_configuration_present) THEN
           IF (mass_exchange_method/='EXPLICIT' .OR. &
-               mass_exchange_cadence/='STEP' .OR. mass_exchange_group/=0) &
-               source_input_error='D18 mass exchange scheduling is not yet enabled'
+               mass_exchange_cadence/='STEP') &
+               source_input_error='D18 mass exchange currently requires EXPLICIT/STEP'
+          IF (native_source_configuration_present .AND. mass_exchange_group>0) &
+               source_input_error='D18 mass exchange GROUP conflicts with SOURCE_GROUPS'
        END IF
     END IF
     IF (LEN_TRIM(source_input_error)>0) CALL fatal_error(TRIM(source_input_error))

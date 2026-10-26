@@ -39,6 +39,7 @@ CONTAINS
     TYPE(equation_partition_type), INTENT(IN) :: partition
     CHARACTER(*), INTENT(OUT) :: error
     CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
+    TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:)
     INTEGER :: methods(3),i,pore
     CHARACTER(LEN=16) :: method
     CALL registry%finalize()
@@ -88,6 +89,21 @@ CONTAINS
     CALL registry%initialize_legacy(partition, &
          [imex_velocity_group,imex_energy_group,imex_pore_pressure_group], &
          methods,pore,active_names,error)
+    IF (LEN_TRIM(error)>0) RETURN
+    ! The mass-exchange batch remains an indivisible STEP/EXPLICIT transaction.
+    ! Only its group identity is configurable until the physical D18 scheduler
+    ! also owns equation partitioning and cadence changes.
+    IF (mass_exchange_configuration_present .AND. mass_exchange_group>0) THEN
+      stages=registry%stage_groups()
+      steps=registry%step_groups()
+      IF (SIZE(steps)/=1) THEN
+        error='D18: legacy mass exchange requires exactly one STEP group'
+        CALL registry%finalize()
+        RETURN
+      END IF
+      steps(1)%id=mass_exchange_group
+      CALL registry%initialize(partition%n_equations,pore,stages,steps,error)
+    END IF
   END SUBROUTINE initialize_configured_sources
 
   !> \brief Translate the native namelist into an equation partition and registry.
