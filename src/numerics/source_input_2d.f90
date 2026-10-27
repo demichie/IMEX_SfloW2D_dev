@@ -1,8 +1,7 @@
 !********************************************************************************
 !> \brief Physical-source scheduling input.
-!> \details Fixed capacities are bounded by the source catalog: a schedulable
-!>          physical term can occur in only one group, and each implicit solve
-!>          can target only the three supported equation blocks.
+!> \details Physical METHOD, CADENCE and GROUP are specified in the owning
+!>          namelists; SOURCE_GROUPS is no longer accepted.
 !********************************************************************************
 MODULE source_input_2d
   IMPLICIT NONE

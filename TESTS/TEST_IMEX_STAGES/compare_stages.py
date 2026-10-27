@@ -683,30 +683,7 @@ def stage_count_suite(executable, profile):
  time_param=10.0D0,5.0D0,0.0D0,0.0D0,
 /
 """)
-    with (directory / "IMEX_SfloW2D.inp").open("a") as stream:
-        stream.write("""
-&SOURCE_GROUPS
- source_group_count=3,
- source_group_id(1)=1,
- source_group_cadence(1)='STAGE',
- source_group_method(1)='NEWTON',
- source_group_term_count(1)=0,
- source_group_target_count(1)=1,
- source_group_targets(1,1)='VELOCITY',
- source_group_id(2)=1,
- source_group_cadence(2)='STEP',
- source_group_method(2)='EXPLICIT',
- source_group_term_count(2)=1,
- source_group_terms(1,2)='mass_exchange_carrier_liquid_loss',
- source_group_target_count(2)=0,
- source_group_id(3)=2,
- source_group_cadence(3)='STAGE',
- source_group_method(3)='EXPLICIT',
- source_group_term_count(3)=1,
- source_group_terms(1,3)='bottom_circular_injection',
- source_group_target_count(3)=0
-/
-""")
+    # D18 derives groups from physical source settings; no SOURCE_GROUPS input.
     env = {**os.environ, "OMP_NUM_THREADS": "1", "OMP_DYNAMIC": "FALSE"}
     run = subprocess.run([str(executable), "native-source", "2"], cwd=directory, env=env,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=30)
@@ -714,7 +691,7 @@ def stage_count_suite(executable, profile):
     if run.returncode != 0 or "PASS: stage count accepted:" not in run.stdout or \
             "PASS: production timestep phase order" not in run.stdout:
         raise AssertionError(f"{directory}: native source input flow failed\n{run.stdout}")
-    print("PASS: SOURCE_GROUPS read_param flow, production timestep phase order, "
+    print("PASS: physical-source read_param flow, production timestep phase order, "
           "and active source-window mass budget", flush=True)
 
 

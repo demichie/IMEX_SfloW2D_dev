@@ -4,8 +4,7 @@ PROGRAM test_d17_production_newton
   USE constitutive_parameters_2d
   USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_NEWTON
   USE source_registry_2d, ONLY : source_group_type,source_registry_type
-  USE source_configuration_2d, ONLY : initialize_configured_sources, &
-       initialize_configured_sources
+  USE source_configuration_2d, ONLY : initialize_configured_sources
   USE source_input_2d
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON,SOURCE_CADENCE_STAGE
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,solve_rk_step,solve_imex_stage
