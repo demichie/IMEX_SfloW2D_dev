@@ -39,7 +39,9 @@ def main() -> int:
     catalog = re.findall(
         r"source_term_type\('([^']+)'\s*,\s*'([^']+)'\s*,"
         r"\s*\.(true|false)\.\s*,\s*\.(true|false)\.\s*,"
-        r"\s*\.(true|false)\.\s*\)",
+        r"\s*\.(true|false)\.\s*,\s*&?\s*"
+        r"default_method\s*=\s*SOURCE_METHOD_(?:EXPLICIT|NEWTON|ANALYTIC)\s*,\s*&?\s*"
+        r"default_cadence\s*=\s*SOURCE_CADENCE_(?:STAGE|STEP)\s*\)",
         text,
         flags=re.IGNORECASE,
     )
