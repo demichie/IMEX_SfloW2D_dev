@@ -112,11 +112,14 @@ CONTAINS
   !> \param[in] time_step Physical time increment [s].
   !> \param[in] domain Domain descriptor for active solve-cell indices.
   !> \param[in] source_registry Optional validated schedule for post-RK sources.
-  SUBROUTINE execute_step_source_groups(q, qp, time_step, domain, source_registry, stochastic_values)
+  SUBROUTINE execute_step_source_groups(q, qp, time_step, domain, source_registry, stochastic_values, step_start_time)
 
     USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,    &
          entrainment_flag, loss_rate
     USE geometry_2d, ONLY : B_prime_x_geom, B_prime_y_geom, cell_source_fractions
+    USE geometry_2d, ONLY : B_second_xx_geom, B_second_xy_geom, B_second_yy_geom, &
+         grav_coeff, cell_fissure_fractions, cell_arc_perim, cell_arc_n_x, &
+         cell_arc_n_y, dx, dy
     USE geometry_2d, ONLY : begin_topography_rate_update,                   &
          record_topography_rate_cell, apply_topography_rate_update
     USE geometry_2d, ONLY : deposit, erosion, erodible, B_zone
@@ -138,6 +141,7 @@ CONTAINS
     CLASS(domain_type), INTENT(IN) :: domain
     CLASS(source_registry_type), INTENT(IN), OPTIONAL :: source_registry
     REAL(wp), INTENT(IN), OPTIONAL :: stochastic_values(:,:)
+    REAL(wp), INTENT(IN), OPTIONAL :: step_start_time
 
     REAL(wp) :: erosion_term(n_solid)
     REAL(wp) :: deposition_term(n_solid)
@@ -152,7 +156,8 @@ CONTAINS
     INTEGER :: j, k, l
     INTEGER :: group_index, mass_group_count, analytic_status, cell_index
     TYPE(analytic_term_context_type) :: analytic_context
-    REAL(wp) :: analytic_state(n_vars), old_state(n_vars), step_noise
+    REAL(wp) :: analytic_state(n_vars), old_state(n_vars), step_noise, &
+         explicit_rate(n_eqns), source_time
     REAL(wp) :: empty_residual(n_eqns)
     LOGICAL :: implicit_mask(n_eqns), newton_converged, newton_search_failed
     INTEGER :: newton_iterations, newton_info
@@ -177,9 +182,9 @@ CONTAINS
             CALL fatal_error('D17: atomic mass-exchange batch split across step groups')
        ! The absence of mass exchange does not suppress other STEP groups.
        empty_residual=0.0_wp
+       source_time=0.0_wp
+       IF (PRESENT(step_start_time)) source_time=step_start_time
        DO group_index=1,SIZE(step_groups)
-          IF (step_groups(group_index)%method/=SOURCE_METHOD_ANALYTIC .AND. &
-               step_groups(group_index)%method/=SOURCE_METHOD_NEWTON) CYCLE
           IF (step_groups(group_index)%method==SOURCE_METHOD_NEWTON) THEN
              implicit_mask=.FALSE.
              implicit_mask(step_groups(group_index)%equation_ids)=.TRUE.
@@ -194,7 +199,16 @@ CONTAINS
           DO cell_index=1,domain%solve_cells
              j=domain%j_cent(cell_index); k=domain%k_cent(cell_index)
              IF (q(1,j,k)<=0.0_wp) CYCLE
-             IF (step_groups(group_index)%method==SOURCE_METHOD_ANALYTIC) THEN
+             IF (step_groups(group_index)%method==SOURCE_METHOD_EXPLICIT) THEN
+                CALL eval_source_explicit(B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
+                     B_second_xx_geom(j,k),B_second_xy_geom(j,k), &
+                     B_second_yy_geom(j,k),grav_coeff(j,k), &
+                     qp(1:n_vars+2,j,k),explicit_rate,source_time, &
+                     cell_source_fractions(j,k),cell_fissure_fractions(j,k,:), &
+                     cell_arc_perim(j,k),cell_arc_n_x(j,k),cell_arc_n_y(j,k), &
+                     dx*dy,step_groups(group_index))
+                q(1:n_eqns,j,k)=q(1:n_eqns,j,k)+time_step*explicit_rate
+             ELSE IF (step_groups(group_index)%method==SOURCE_METHOD_ANALYTIC) THEN
                 CALL eval_source_analytic(step_groups(group_index),q(1:n_vars,j,k), &
                      analytic_context,time_step,analytic_state,analytic_status)
                 IF (analytic_status/=0) &

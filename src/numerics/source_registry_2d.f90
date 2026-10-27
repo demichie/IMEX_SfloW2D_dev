@@ -324,7 +324,7 @@ CONTAINS
       IF (group%cadence==SOURCE_CADENCE_STAGE) THEN
         supported=supported .AND. INDEX(TRIM(term%name),'mass_exchange_')/=1
       ELSE IF (group%cadence==SOURCE_CADENCE_STEP) THEN
-        supported=supported .AND. INDEX(TRIM(term%name),'mass_exchange_')==1
+        supported=supported
       ELSE
         supported=.FALSE.
       END IF

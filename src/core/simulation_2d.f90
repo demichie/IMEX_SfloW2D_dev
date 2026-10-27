@@ -147,7 +147,7 @@ CONTAINS
     IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_RK_COMPLETE,step_start,step_length)
 
     CALL execute_step_source_groups(this%state%q,this%state%qp,step_length, &
-         this%domain,this%source_registry,this%stochastic%effective_Z)
+         this%domain,this%source_registry,this%stochastic%effective_Z,step_start)
     IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_STEP_SOURCES_COMPLETE, &
          step_start,step_length)
 

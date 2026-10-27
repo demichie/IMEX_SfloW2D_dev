@@ -150,10 +150,6 @@ CONTAINS
           error='D18: invalid source CADENCE'; RETURN
         END SELECT
       END IF
-      IF (target>0 .AND. method==SOURCE_METHOD_EXPLICIT .AND. &
-           cadence==SOURCE_CADENCE_STEP) THEN
-        error='D18: physical explicit STEP execution is not implemented'; RETURN
-      END IF
       IF (target>0 .AND. method==SOURCE_METHOD_ANALYTIC .AND. &
            .NOT.term%has_analytic) THEN
         error='D18: analytic interface unavailable for source'; RETURN
