@@ -74,6 +74,26 @@ PROGRAM test_source_registry
       thermal_method=MERGE('ANALYTIC','NEWTON  ',methods(ids(2))==IM_GROUP_METHOD_ANALYTIC)
       pore_pressure_method=MERGE('ANALYTIC','NEWTON  ',methods(ids(3))==IM_GROUP_METHOD_ANALYTIC)
       CALL initialize_configured_sources(registry,partition,error)
+      ! An analytic solve acts on one complete physical target, not a mixed
+      ! velocity/temperature/pore-pressure group, even if GROUP IDs agree.
+      BLOCK
+        LOGICAL :: incompatible_analytic
+        INTEGER :: ii,jj
+        incompatible_analytic=.FALSE.
+        DO ii=1,3
+          IF (.NOT.enabled(ii)) CYCLE
+          DO jj=ii+1,3
+            IF (.NOT.enabled(jj)) CYCLE
+            IF (ids(ii)/=ids(jj)) CYCLE
+            IF (methods(ids(ii))==IM_GROUP_METHOD_ANALYTIC) incompatible_analytic=.TRUE.
+          END DO
+        END DO
+        IF (incompatible_analytic) THEN
+          CALL require(error/='' .AND. .NOT.registry%is_initialized(), &
+               'mixed-target analytic group must be rejected')
+          CYCLE
+        END IF
+      END BLOCK
       CALL require(error=='' .AND. registry%is_initialized(), &
            'physical triplet combination normalizes: '//TRIM(error))
       stages=registry%stage_groups();steps=registry%step_groups()
