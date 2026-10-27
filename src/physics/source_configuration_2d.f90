@@ -205,9 +205,13 @@ CONTAINS
     ! Analytic groups precede the atomic explicit mass-exchange transaction.
     DO i=1,SIZE(steps)
       DO j=i+1,SIZE(steps)
-        IF (group_method_rank(steps(j)%method)<group_method_rank(steps(i)%method) .OR. &
-             (group_method_rank(steps(j)%method)==group_method_rank(steps(i)%method) .AND. &
-              steps(j)%id<steps(i)%id)) THEN
+        IF ((.NOT.ANY(INDEX(steps(j)%source_names,'mass_exchange_')==1) .AND. &
+             ANY(INDEX(steps(i)%source_names,'mass_exchange_')==1)) .OR. &
+             (.NOT.ANY(INDEX(steps(i)%source_names,'mass_exchange_')==1) .AND. &
+              .NOT.ANY(INDEX(steps(j)%source_names,'mass_exchange_')==1) .AND. &
+              (group_method_rank(steps(j)%method)<group_method_rank(steps(i)%method) .OR. &
+               (group_method_rank(steps(j)%method)==group_method_rank(steps(i)%method) .AND. &
+                steps(j)%id<steps(i)%id)))) THEN
           tmp=steps(i); steps(i)=steps(j); steps(j)=tmp
         END IF
       END DO
