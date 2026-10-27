@@ -29,7 +29,6 @@ MODULE nonlinear_solver_2d
   PUBLIC :: initialize_nonlinear_solver
   PUBLIC :: finalize_nonlinear_solver
   PUBLIC :: solve_imex_stage
-  PUBLIC :: solve_implicit_stage
   PUBLIC :: solve_rk_step
 
   !> Complex-step perturbation and its reciprocal.
@@ -104,60 +103,6 @@ CONTAINS
     effective_im_term(1:n_vars) = (q_stage - q_known) / (dt_step * a_diag)
 
   END SUBROUTINE solve_imex_stage
-
-  !******************************************************************************
-  !> \brief Legacy name for the local IMEX stage coordinator.
-  !> \param[in] equation_partition Implicit equation groups, order and solve methods.
-  !> \param[in] stage_groups Validated, normalized stage-group descriptors.
-  !> \param[in] q_known Conservative state including known stage contributions.
-  !> \param[in] q_old Conservative reference state at the start of the step.
-  !> \param[in] dt_step Stage time increment [s].
-  !> \param[in] a_diag Diagonal implicit Runge-Kutta coefficient [dimensionless].
-  !> \param[in] known_stage_residual Known stage source rates, excluding the current implicit rate.
-  !> \param[in] Bprimej_x Filtered bed slope in x [dimensionless].
-  !> \param[in] Bprimej_y Filtered bed slope in y [dimensionless].
-  !> \param[in] Bsecondj_xx Filtered bed curvature in xx [m^-1].
-  !> \param[in] Bsecondj_xy Filtered bed curvature in xy [m^-1].
-  !> \param[in] Bsecondj_yy Filtered bed curvature in yy [m^-1].
-  !> \param[in] grav_coeff Effective gravitational acceleration [m s^-2].
-  !> \param[in] Zij Local stochastic-process value supplied to the rheology.
-  !> \param[in] zero_x_momentum Reset the x-momentum component after the sweep.
-  !> \param[in] zero_y_momentum Reset the y-momentum component after the sweep.
-  !> \param[out] q_stage Conservative state after the ordered stage solve.
-  !> \param[out] effective_im_term Net conservative stage rate [state units s^-1].
-  !> \param[out] iterations_used Total Newton iterations attempted.
-  !> \param[out] converged True when all Newton solves satisfy their convergence criteria.
-  !> \param[out] linear_info Linear solver status; zero denotes success.
-  !> \param[out] line_search_failed True if a Newton line search could not accept a step.
-  !******************************************************************************
-  SUBROUTINE solve_implicit_stage(equation_partition, stage_groups,  &
-       q_known, q_old,                                                       &
-       dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,          &
-       Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij,               &
-       zero_x_momentum, zero_y_momentum, q_stage, effective_im_term,         &
-       iterations_used, converged, linear_info, line_search_failed)
-
-    TYPE(equation_partition_type), INTENT(IN) :: equation_partition
-    TYPE(source_group_type), INTENT(IN) :: stage_groups(:)
-    REAL(wp), INTENT(IN) :: q_known(n_vars), q_old(n_vars)
-    REAL(wp), INTENT(IN) :: dt_step, a_diag
-    REAL(wp), INTENT(IN) :: known_stage_residual(n_eqns)
-    REAL(wp), INTENT(IN) :: Bprimej_x, Bprimej_y
-    REAL(wp), INTENT(IN) :: Bsecondj_xx, Bsecondj_xy, Bsecondj_yy
-    REAL(wp), INTENT(IN) :: grav_coeff, Zij
-    LOGICAL, INTENT(IN) :: zero_x_momentum, zero_y_momentum
-    REAL(wp), INTENT(OUT) :: q_stage(n_vars), effective_im_term(n_eqns)
-    INTEGER, INTENT(OUT) :: iterations_used, linear_info
-    LOGICAL, INTENT(OUT) :: converged, line_search_failed
-
-    CALL solve_imex_stage(equation_partition, stage_groups,         &
-         q_known, q_old,                                                     &
-         dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,         &
-         Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij,              &
-         zero_x_momentum, zero_y_momentum, q_stage, effective_im_term,        &
-         iterations_used, converged, linear_info, line_search_failed)
-
-  END SUBROUTINE solve_implicit_stage
 
   !> \brief Set the complex-step perturbation and its reciprocal.
   !>

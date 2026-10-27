@@ -4740,8 +4740,8 @@ CONTAINS
       END IF
 
 
-      ! Set the velocity-dependent intensity law. For legacy inputs, use the
-      ! corresponding rheology scale when u_0 is not specified explicitly.
+      ! Set velocity-dependent stochastic intensity and its rheology scale
+      ! when no activation velocity is specified.
       WRITE (*, *) 'Setting stochastic intensity parameters...'
       if (TRIM(rheology_model) .EQ. 'froude') THEN
         std_min = 0.0_wp !std_max * (mu_0/mu_inf) ! mu_0 < mu_inf in mu(Fr)

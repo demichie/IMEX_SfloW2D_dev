@@ -256,17 +256,4 @@ CONTAINS
     CALL registry%initialize(n_eqns,pore,stages,steps,error)
   END SUBROUTINE initialize_configured_sources
 
-  !> Normalize user-supplied physical-source names without accepting legacy aliases.
-  PURE FUNCTION lowercase_source_text(value) RESULT(lower)
-    CHARACTER(*), INTENT(IN) :: value
-    CHARACTER(LEN(value)) :: lower
-    INTEGER :: i,code
-    lower=value
-    DO i=1,LEN(value)
-      code=IACHAR(value(i:i))
-      IF (code>=IACHAR('A') .AND. code<=IACHAR('Z')) &
-           lower(i:i)=ACHAR(code+IACHAR('a')-IACHAR('A'))
-    END DO
-  END FUNCTION lowercase_source_text
-
 END MODULE source_configuration_2d
