@@ -18,7 +18,12 @@ PROGRAM test_mass_exchange
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, SOURCE_METHOD_EXPLICIT
   USE source_configuration_2d, ONLY : initialize_configured_sources
-  USE source_input_2d, ONLY : thermal_method,thermal_cadence,thermal_group
+  USE source_input_2d, ONLY : thermal_method,thermal_cadence,thermal_group, &
+       rheology_method,rheology_cadence,rheology_group
+  USE rheology_lava_2d, ONLY : nu_ref,visc_par,tau0
+  USE rheology_parameters_2d, ONLY : T_ref
+  USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, &
+       finalize_nonlinear_solver,solve_imex_stage
   USE thermal_laws_2d, ONLY : solve_thermal_cooling_analytic
   USE inpout_2d, ONLY : write_restart_file, read_restart_file, output_idx
   USE omp_lib
@@ -197,6 +202,9 @@ CONTAINS
   SUBROUTINE test_analytic_cooling_step_executor
     REAL(wp) :: prior(nq,nx,ny), prior_qp(nq+2,nx,ny)
     REAL(wp) :: temperature,cap,expected_temperature,expected_energy,p_dyn
+    REAL(wp) :: before_stage(nq),after_stage(nq),im_rate(nq),residual(nq)
+    INTEGER :: iterations,linear_info
+    LOGICAL :: converged,line_search_failed
     REAL(wp), PARAMETER :: delta=0.15_wp
     INTEGER :: j,k,l
     CHARACTER(LEN=256) :: error
@@ -205,6 +213,9 @@ CONTAINS
     ! Retain the fixture's liquid carrier; zero loss_rate makes the
     ! mass-exchange transaction a no-op in this cooling-only experiment.
     thermal_cooling_flag=.TRUE.
+    rheology_flag=.TRUE.;rheology_model='lava'
+    rheology_method='NEWTON';rheology_cadence='STAGE';rheology_group=1
+    nu_ref=0.02_wp;visc_par=0.003_wp;tau0=0.0_wp;T_ref=900.0_wp
     radiative_term_coeff=5.103E-8_wp
     convective_term_coeff=9.0_wp
     T_env=300.0_wp
@@ -213,6 +224,28 @@ CONTAINS
     thermal_group=1
     CALL initialize_configured_sources(source_registry,equation_partition,error)
     IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
+    IF (equation_partition%n_IM_groups/=1) &
+         ERROR STOP 'D18: expected only lava Newton in IMEX stage groups'
+    CALL initialize_nonlinear_solver
+    ! Apply the actual stage coordinator to a wet cell, then feed its output
+    ! into the production post-RK executor on the full domain fixture.
+    before_stage=state%q(:,2,2)
+    residual=0.0_wp
+    CALL solve_imex_stage(equation_partition,source_registry%stage_groups(), &
+         before_stage,before_stage,delta,0.75_wp,residual, &
+         B_prime_x_geom(2,2),B_prime_y_geom(2,2), &
+         B_second_xx_geom(2,2),B_second_xy_geom(2,2), &
+         B_second_yy_geom(2,2),grav_coeff(2,2),0.0_wp, &
+         .FALSE.,.FALSE.,after_stage,im_rate,iterations,converged, &
+         linear_info,line_search_failed)
+    IF (.NOT.converged .OR. linear_info/=0 .OR. line_search_failed) &
+         ERROR STOP 'D18: lava NEWTON/STAGE stage did not converge'
+    IF (MAXVAL(ABS(after_stage(2:3)-before_stage(2:3)))<=0.0_wp) &
+         ERROR STOP 'D18: lava NEWTON/STAGE did not alter momentum'
+    IF (after_stage(4)/=before_stage(4)) &
+         ERROR STOP 'D18: STEP cooling leaked into Newton stage'
+    state%q(:,2,2)=after_stage
+    CALL finalize_nonlinear_solver
     DO l=1,domain%solve_cells
       j=domain%j_cent(l); k=domain%k_cent(l)
       IF (state%q(1,j,k)<=0.0_wp) CYCLE
@@ -245,9 +278,10 @@ CONTAINS
          ERROR STOP 'D18: STEP cooling modified inactive cell'
     CALL source_registry%finalize
     CALL equation_partition%finalize
-    thermal_cooling_flag=.FALSE.
+    thermal_cooling_flag=.FALSE.;rheology_flag=.FALSE.;rheology_model='none'
+    rheology_method='NEWTON';rheology_cadence='STAGE';rheology_group=0
     thermal_method='ANALYTIC';thermal_cadence='STAGE';thermal_group=0
-    WRITE(*,*) 'PASS D18 analytic cooling post-RK production executor'
+    WRITE(*,*) 'PASS D18 lava Newton stage followed by exact cooling STEP executor'
   END SUBROUTINE test_analytic_cooling_step_executor
 
   !> \brief Reset conservative inventories and an analytic initial bed before each independent case.
