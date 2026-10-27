@@ -67,9 +67,6 @@ MODULE inpout_2d
 
   ! -- Variables for the namelist NUMERIC_PARAMETERS
   USE parameters_2d, ONLY: dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, reconstr_coeff, n_RK
-  USE parameters_2d, ONLY: imex_velocity_group, imex_energy_group,          &
-       imex_pore_pressure_group, imex_group_method
-  USE equation_metadata_2d, ONLY: resolve_imex_group_method
   USE source_input_2d, ONLY: read_mass_exchange_parameters, &
        rheology_method, rheology_cadence, rheology_group, &
        thermal_method, thermal_cadence, thermal_group, &
@@ -357,8 +354,7 @@ MODULE inpout_2d
   NAMELIST /initial_conditions/ T_init, T_ambient
 
   NAMELIST /numeric_parameters/ dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, &
-    reconstr_coeff, n_RK, imex_velocity_group, imex_energy_group,            &
-    imex_pore_pressure_group, imex_group_method
+    reconstr_coeff, n_RK
 
   NAMELIST /expl_terms_parameters/ grav
 
@@ -549,12 +545,6 @@ CONTAINS
     cfl = 0.24_wp
     cfl_policy = 'directional_min'
     kt_trace_reconstruction = 'eta_x'
-    imex_velocity_group = 3
-    imex_energy_group = 1
-    imex_pore_pressure_group = 2
-    imex_group_method(1) = 'ANALYTIC'
-    imex_group_method(2) = 'ANALYTIC'
-    imex_group_method(3) = 'NEWTON'
     limiter(1:n_vars + 2) = 1
     theta = 1.0
     reconstr_coeff = 1.0
@@ -1100,7 +1090,6 @@ CONTAINS
     CHARACTER(LEN=15) :: chara
 
     INTEGER :: ios
-    LOGICAL :: legacy_imex_explicit
     CHARACTER(LEN=256) :: source_input_error
 
     REAL(wp) :: expA, expB, Tc
@@ -2182,10 +2171,6 @@ CONTAINS
 
     ! Previous optional namelist reads may legitimately leave ios at end-of-file.
     ! Reposition the input and always update ios for this mandatory namelist.
-    imex_velocity_group=-HUGE(1)
-    imex_energy_group=-HUGE(1)
-    imex_pore_pressure_group=-HUGE(1)
-    imex_group_method=''
     REWIND (input_unit)
     READ (input_unit, numeric_parameters, IOSTAT=ios)
 
@@ -2206,9 +2191,6 @@ CONTAINS
     ! The first D18 executable mode is an entirely explicit STAGE partition.
     ! Reject mixed requests instead of silently retaining implicit evaluation.
     IF (LEN_TRIM(source_input_error)==0) THEN
-       ! The explicit override may coexist with legacy Newton/analytic groups.
-       ! Other requested methods must match the legacy group until general
-       ! per-source method overrides are implemented.
        IF ((LEN_TRIM(rheology_method)>0 .AND. &
             TRIM(rheology_method)/='EXPLICIT' .AND. &
             TRIM(rheology_method)/='NEWTON' .AND. &
@@ -2242,30 +2224,6 @@ CONTAINS
        END IF
     END IF
     IF (LEN_TRIM(source_input_error)>0) CALL fatal_error(TRIM(source_input_error))
-    IF (imex_velocity_group==-HUGE(1)) imex_velocity_group=3
-    IF (imex_energy_group==-HUGE(1)) imex_energy_group=1
-    IF (imex_pore_pressure_group==-HUGE(1)) imex_pore_pressure_group=2
-    IF (LEN_TRIM(imex_group_method(1))==0) imex_group_method(1)='ANALYTIC'
-    IF (LEN_TRIM(imex_group_method(2))==0) imex_group_method(2)='ANALYTIC'
-    IF (LEN_TRIM(imex_group_method(3))==0) imex_group_method(3)='NEWTON'
-
-    BLOCK
-      INTEGER :: group_index, method_id
-      IF (MIN(imex_velocity_group, imex_energy_group,                       &
-           imex_pore_pressure_group) .LT. 1 .OR.                           &
-           MAX(imex_velocity_group, imex_energy_group,                      &
-           imex_pore_pressure_group) .GT. 3) THEN
-         CALL fatal_error('IMEX group IDs must be integers from 1 to 3')
-      END IF
-      DO group_index = 1, SIZE(imex_group_method)
-         CALL resolve_imex_group_method(imex_group_method(group_index),     &
-              method_id)
-         IF (method_id .LT. 0) THEN
-            CALL fatal_error('IMEX_GROUP_METHOD entries must be ANALYTIC or NEWTON')
-         END IF
-      END DO
-    END BLOCK
-
     ! Reject unsupported tableaux here, before simulation workspace initialization.
     CALL validate_runge_kutta_stages(n_RK)
 
