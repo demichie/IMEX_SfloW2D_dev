@@ -2586,6 +2586,10 @@ Ogni passo deve costituire una modifica **sostanziale e coordinata** con i test 
 3. Regressioni di default del mass exchange atomico, conservazione/topografia e restart; test di splitting e raffinamento temporale per lava termodipendente.
 4. Audit finale di input, rifiuti capability, namespace e ownership dei gruppi; aggiornamento delle tabelle storiche D18.4b, da mantenere etichettate come fotografia del 26 ottobre e non come stato corrente; registrazione della CI verde su master.
 
+**Avanzamento di validazione (27 ottobre 2026, commit `4251b3d` e `e7d2367`; CI da eseguire):** aggiunto in `TEST_RHEOLOGY_CELL_LOCAL` un test locale di un unico gruppo NEWTON/STEP che comprende reologia della lava, cooling e pressione interstiziale, con controllo del residuo conservativo sulle quattro equazioni implicite e dell'invarianza delle equazioni non target. In `TEST_MASS_EXCHANGE` il test production STEP cooling controlla ora anche la proprieta di composizione dell'operatore analitico (due intervalli dt contro soluzione esatta su 2 dt). Il test storico `run_restart` continua a verificare bit-per-bit stato, geometria e inventari del mass exchange dopo checkpoint, ma non e ancora un restart del caso lava misto.
+
+**Gate non completati:** (i) avanzamento vero attraverso tutti gli stage RK di `time_integration_workspace_type%advance` e successivo STEP cooling in un caso fisico della lava; (ii) gruppi EXPLICIT/STAGE ed EXPLICIT/STEP con piu sorgenti, usando uno stato comune e un oracolo di somma indipendente; (iii) restart della simulazione lava con split e regressione quantitativa contro configurazioni legacy; (iv) raffinare dt e documentare accuratezza e splitting. Non interpretare i test locali sopra come copertura di questi gate.
+
 #### D18.6 — Matrice di regressione e criteri di accettazione
 
 | Caso | Risultato obbligatorio |
