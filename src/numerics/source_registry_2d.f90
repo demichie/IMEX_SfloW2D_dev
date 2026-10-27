@@ -329,7 +329,8 @@ CONTAINS
         supported=.FALSE.
       END IF
     CASE(SOURCE_METHOD_NEWTON)
-      supported=group%cadence==SOURCE_CADENCE_STAGE .AND. term%has_newton
+      supported=(group%cadence==SOURCE_CADENCE_STAGE .OR. &
+           group%cadence==SOURCE_CADENCE_STEP) .AND. term%has_newton
     CASE(SOURCE_METHOD_ANALYTIC)
       supported=(group%cadence==SOURCE_CADENCE_STAGE .OR. &
            group%cadence==SOURCE_CADENCE_STEP) .AND. term%has_analytic

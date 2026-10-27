@@ -112,7 +112,7 @@ CONTAINS
   !> \param[in] time_step Physical time increment [s].
   !> \param[in] domain Domain descriptor for active solve-cell indices.
   !> \param[in] source_registry Optional validated schedule for post-RK sources.
-  SUBROUTINE execute_step_source_groups(q, qp, time_step, domain, source_registry)
+  SUBROUTINE execute_step_source_groups(q, qp, time_step, domain, source_registry, stochastic_values)
 
     USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,    &
          entrainment_flag, loss_rate
@@ -122,7 +122,10 @@ CONTAINS
     USE geometry_2d, ONLY : deposit, erosion, erodible, B_zone
     USE source_terms_2d, ONLY : eval_source_explicit, eval_source_analytic, &
          analytic_term_context_type
-    USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC, SOURCE_METHOD_EXPLICIT
+    USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC, SOURCE_METHOD_EXPLICIT, &
+         SOURCE_METHOD_NEWTON
+    USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_NEWTON
+    USE nonlinear_solver_2d, ONLY : solve_rk_step
     USE state_conversion_2d, ONLY : qc_to_qp
     USE parameters_2d, ONLY : topo_change_flag, bottom_radial_source_flag,  &
          bottom_fissural_source_flag, erodible_deposit_flag,                &
@@ -134,6 +137,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: time_step
     CLASS(domain_type), INTENT(IN) :: domain
     CLASS(source_registry_type), INTENT(IN), OPTIONAL :: source_registry
+    REAL(wp), INTENT(IN), OPTIONAL :: stochastic_values(:,:)
 
     REAL(wp) :: erosion_term(n_solid)
     REAL(wp) :: deposition_term(n_solid)
@@ -148,7 +152,11 @@ CONTAINS
     INTEGER :: j, k, l
     INTEGER :: group_index, mass_group_count, analytic_status, cell_index
     TYPE(analytic_term_context_type) :: analytic_context
-    REAL(wp) :: analytic_state(n_vars)
+    REAL(wp) :: analytic_state(n_vars), old_state(n_vars), step_noise
+    REAL(wp) :: empty_residual(n_eqns)
+    LOGICAL :: implicit_mask(n_eqns), newton_converged, newton_search_failed
+    INTEGER :: newton_iterations, newton_info
+    TYPE(equation_partition_type) :: step_partition
     LOGICAL :: liquid_loss_active
 
     liquid_loss_active = .FALSE.
@@ -168,20 +176,46 @@ CONTAINS
        IF (mass_group_count>1) &
             CALL fatal_error('D17: atomic mass-exchange batch split across step groups')
        ! The absence of mass exchange does not suppress other STEP groups.
+       empty_residual=0.0_wp
        DO group_index=1,SIZE(step_groups)
-          IF (step_groups(group_index)%method/=SOURCE_METHOD_ANALYTIC) CYCLE
+          IF (step_groups(group_index)%method/=SOURCE_METHOD_ANALYTIC .AND. &
+               step_groups(group_index)%method/=SOURCE_METHOD_NEWTON) CYCLE
+          IF (step_groups(group_index)%method==SOURCE_METHOD_NEWTON) THEN
+             implicit_mask=.FALSE.
+             implicit_mask(step_groups(group_index)%equation_ids)=.TRUE.
+             BLOCK
+               INTEGER :: group_membership(n_eqns)
+               group_membership=0
+               WHERE(implicit_mask) group_membership=1
+               CALL step_partition%initialize(implicit_mask,group_membership, &
+                    [IM_GROUP_METHOD_NEWTON])
+             END BLOCK
+          END IF
           DO cell_index=1,domain%solve_cells
              j=domain%j_cent(cell_index); k=domain%k_cent(cell_index)
              IF (q(1,j,k)<=0.0_wp) CYCLE
-             CALL eval_source_analytic(step_groups(group_index),q(1:n_vars,j,k), &
-                  analytic_context,time_step,analytic_state,analytic_status)
-             IF (analytic_status/=0) &
-                  CALL fatal_error('D18: analytical STEP group solve failed')
-             q(1:n_vars,j,k)=analytic_state
+             IF (step_groups(group_index)%method==SOURCE_METHOD_ANALYTIC) THEN
+                CALL eval_source_analytic(step_groups(group_index),q(1:n_vars,j,k), &
+                     analytic_context,time_step,analytic_state,analytic_status)
+                IF (analytic_status/=0) &
+                     CALL fatal_error('D18: analytical STEP group solve failed')
+                q(1:n_vars,j,k)=analytic_state
+             ELSE
+                old_state=q(1:n_vars,j,k)
+                step_noise=0.0_wp
+                IF (PRESENT(stochastic_values)) step_noise=stochastic_values(j,k)
+                CALL solve_rk_step(step_partition,[step_groups(group_index)], &
+                     q(1:n_vars,j,k),old_state,time_step,1.0_wp,empty_residual, &
+                     B_prime_x_geom(j,k),B_prime_y_geom(j,k),step_noise, &
+                     newton_iterations,newton_converged,newton_info,newton_search_failed)
+                IF (.NOT.newton_converged .OR. newton_info/=0 .OR. newton_search_failed) &
+                     CALL fatal_error('D18: Newton STEP group solve failed')
+             END IF
              CALL qc_to_qp(q(1:n_vars,j,k),qp(1:n_vars+2,j,k),p_dyn, &
                   'analytic STEP source')
           END DO
        END DO
+       CALL step_partition%finalize()
        IF (mass_group_count==0) RETURN
     END IF
 
