@@ -13,7 +13,6 @@ PROGRAM test_mass_exchange
   USE mass_exchange_deposition_2d, ONLY : settling_velocity
   USE mass_exchange_entrainment_2d, ONLY : eval_air_entrainment_rate
   USE mass_exchange_laws_2d, ONLY : eval_mass_exchange_terms
-  USE equation_terms_2d, ONLY : init_problem_param
   USE step_source_executor_2d, ONLY : apply_mass_exchange_step => execute_step_source_groups
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
@@ -153,7 +152,6 @@ CONTAINS
   !> \brief Build the production source schedule from the current fixture settings.
   SUBROUTINE configure_source_registry
     CHARACTER(LEN=256) :: error
-    CALL init_problem_param(equation_partition)
     CALL initialize_configured_sources(source_registry,equation_partition,error)
     IF (LEN_TRIM(error)>0) ERROR STOP 'failed to configure mass-exchange source registry'
   END SUBROUTINE configure_source_registry

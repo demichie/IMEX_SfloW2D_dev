@@ -294,7 +294,7 @@ PROGRAM test_grouped_implicit_stage
   END IF
 
   CALL initialize_configured_sources(source_registry,partition,source_error)
-  CALL refresh_source_registry
+  IF (LEN_TRIM(source_error)>0) ERROR STOP TRIM(source_error)
   IF (partition%IM_group_method(1) .NE. IM_GROUP_METHOD_ANALYTIC .OR.      &
        partition%IM_group_method(2) .NE. IM_GROUP_METHOD_ANALYTIC .OR.      &
        partition%IM_group_method(3) .NE. IM_GROUP_METHOD_NEWTON) THEN
@@ -351,7 +351,7 @@ PROGRAM test_grouped_implicit_stage
   pore_pressure_method='ANALYTIC'; pore_pressure_group=1
   rheology_method='ANALYTIC'; rheology_group=2
   CALL initialize_configured_sources(source_registry,partition,source_error)
-  CALL refresh_source_registry
+  IF (LEN_TRIM(source_error)>0) ERROR STOP TRIM(source_error)
   IF (partition%n_IM_groups .NE. 2 .OR.                                  &
        partition%n_IM_group_equations(1) .NE. 2 .OR.                      &
        partition%IM_group(4) .NE. 1 .OR.                                 &
@@ -381,7 +381,7 @@ PROGRAM test_grouped_implicit_stage
   pore_pressure_method='ANALYTIC'; pore_pressure_group=1
   rheology_method='ANALYTIC'; rheology_group=3
   CALL initialize_configured_sources(source_registry,partition,source_error)
-  CALL refresh_source_registry
+  IF (LEN_TRIM(source_error)>0) ERROR STOP TRIM(source_error)
   IF (partition%n_IM_groups .NE. 3 .OR.                               &
        partition%IM_group(7) .NE. 1 .OR.                               &
        partition%IM_group(4) .NE. 2 .OR.                               &
@@ -397,7 +397,7 @@ PROGRAM test_grouped_implicit_stage
   pore_pressure_method='NEWTON'; pore_pressure_group=1
   rheology_method='NEWTON'; rheology_group=1
   CALL initialize_configured_sources(source_registry,partition,source_error)
-  CALL refresh_source_registry
+  IF (LEN_TRIM(source_error)>0) ERROR STOP TRIM(source_error)
   IF (partition%n_IM_groups .NE. 1 .OR.                               &
        partition%n_IM_group_equations(1) .NE. 4 .OR.                   &
        partition%IM_group_method(1) .NE. IM_GROUP_METHOD_NEWTON) THEN
@@ -477,7 +477,7 @@ PROGRAM test_grouped_implicit_stage
   thermal_method='ANALYTIC'; thermal_group=2
   pore_pressure_method='ANALYTIC'; pore_pressure_group=3
   CALL initialize_configured_sources(source_registry,partition,source_error)
-  CALL refresh_source_registry
+  IF (LEN_TRIM(source_error)>0) ERROR STOP TRIM(source_error)
   q_stage_check = q_old
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
   CALL r_phys_var(q_stage_check, expected_h, expected_u, expected_v,      &
@@ -572,29 +572,6 @@ CONTAINS
     END DO
   END SUBROUTINE test_ordered_multi_solver_group
 
-  SUBROUTINE refresh_source_registry
-    INTEGER :: target_groups(3),methods(3),pore_equation,group
-    CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
-    CHARACTER(LEN=256) :: error
-    target_groups=1
-    methods=IM_GROUP_METHOD_NEWTON
-    DO group=1,partition%n_IM_groups
-       methods(group)=partition%IM_group_method(group)
-    END DO
-    IF (partition%implicit(2)) target_groups(1)=partition%IM_group(2)
-    IF (partition%implicit(4)) target_groups(2)=partition%IM_group(4)
-    active_names=[CHARACTER(LEN=64)::]
-    IF (rheology_flag) active_names=[CHARACTER(LEN=64)::'rheology_'//TRIM(rheology_model)]
-    IF (partition%implicit(4)) active_names=[CHARACTER(LEN=64) :: active_names, 'thermal_cooling']
-    pore_equation=0
-    IF (pore_pressure_flag) THEN
-       pore_equation=idx_pore
-       target_groups(3)=partition%IM_group(idx_pore)
-       active_names=[CHARACTER(LEN=64) :: active_names, 'pore_pressure_dissipation']
-    END IF
-    CALL source_registry%initialize_legacy(partition,target_groups,methods, &
-         pore_equation,active_names,error)
-    IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
-  END SUBROUTINE refresh_source_registry
+
 
 END PROGRAM test_grouped_implicit_stage
