@@ -15,7 +15,6 @@ active:
 &SOURCE_GROUPS
   source_group_count=1,
   source_group_id(1)=1,
-  source_group_order(1)=1,
   source_group_cadence(1)='STAGE',
   source_group_method(1)='NEWTON',
   source_group_term_count(1)=0,
@@ -31,7 +30,7 @@ and `NEWTON`; solver targets are `VELOCITY`, `TEMPERATURE` and
 `PORE_PRESSURE`. `STEP` groups must be explicit. The named term list must
 include every physical term activated by the other input options exactly once;
 omissions do not disable physics. Duplicate or unknown terms, missing implicit
-targets, duplicate group/order identities, invalid target layouts, malformed
+targets, duplicate group IDs, invalid target layouts, malformed
 or repeated namelists, and conflicts with explicit legacy `IMEX_*` settings
 are rejected.
 
@@ -39,7 +38,10 @@ Input storage has fixed catalog-bounded capacities: at most
 `SOURCE_PHYSICAL_TERM_COUNT` groups and terms per group, three solvers per
 group and three targets per solver. The native builder constructs the equation
 partition and registry only after validating the complete active-term
-inventory.
+inventory. `SOURCE_GROUP_ORDER` is retired and is rejected if present: the
+runtime ordering derives from `METHOD` and `GROUP`, with `CADENCE` determining
+whether each group executes at a Runge-Kutta stage or once per time step.
+No separate user-defined ordering parameter is maintained.
 
 ## Local evidence
 
