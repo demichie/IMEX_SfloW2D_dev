@@ -162,7 +162,7 @@ CONTAINS
        step_groups=source_registry%step_groups()
        mass_group_count=0
        DO group_index=1,SIZE(step_groups)
-          IF (SIZE(step_groups(group_index)%source_names)>0) &
+          IF (ANY(INDEX(step_groups(group_index)%source_names,'mass_exchange_')==1)) &
                mass_group_count=mass_group_count+1
        END DO
        IF (mass_group_count>1) &
