@@ -86,10 +86,10 @@ CONTAINS
     INTEGER :: i,j,k,id,method,cadence,pore,eq,compact,n
     INTEGER :: target,legacy_group,im_method
     INTEGER :: membership(n_eqns),partition_methods(3)
-    INTEGER :: group_ids(3),old_groups(n_eqns)
+    INTEGER :: group_ids(3)
     INTEGER, ALLOCATABLE :: stage_order(:)
     INTEGER :: source_order,swap_order
-    LOGICAL :: old_implicit(n_eqns),mask(n_eqns)
+    LOGICAL :: mask(n_eqns)
     CALL registry%finalize()
     error=''
     IF (.NOT.partition%is_initialized()) THEN
@@ -103,8 +103,6 @@ CONTAINS
     pore=0
     IF (pore_pressure_flag) pore=idx_pore
     group_ids=[imex_velocity_group,imex_energy_group,imex_pore_pressure_group]
-    old_implicit=partition%implicit
-    old_groups=partition%IM_group
     ALLOCATE(stages(0),steps(0),stage_order(0))
     DO i=1,SIZE(active_names)
       term=source_term_descriptor_by_name(active_names(i))
@@ -152,8 +150,8 @@ CONTAINS
         IF (eq<1 .OR. eq>n_eqns) THEN
           error='D18: invalid physical target equation'; RETURN
         END IF
-        IF (old_implicit(eq)) THEN
-          legacy_group=old_groups(eq)
+        IF (partition%implicit(eq)) THEN
+          legacy_group=partition%IM_group(eq)
           IF (legacy_group<1 .OR. legacy_group>3) THEN
             error='D18: invalid legacy implicit group'; RETURN
           END IF
