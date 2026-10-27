@@ -10,7 +10,6 @@ MODULE equation_metadata_2d
 
   PUBLIC :: equation_partition_type
   PUBLIC :: IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
-  PUBLIC :: resolve_imex_group_method
 
   !> Closed-form solution of the implicit stage equation.
   INTEGER, PARAMETER :: IM_GROUP_METHOD_ANALYTIC = 1
@@ -70,41 +69,12 @@ MODULE equation_metadata_2d
 
 CONTAINS
 
-  !> \brief Resolve a user-supplied IMEX group method name.
-  !> \param[in,out] method Method name, normalized to uppercase on success.
-  !> \param[out] method_id Solver identifier, or -1 for an unsupported name.
-  SUBROUTINE resolve_imex_group_method(method, method_id)
-
-    CHARACTER(LEN=*), INTENT(INOUT) :: method
-    INTEGER, INTENT(OUT) :: method_id
-    INTEGER :: i, character_code
-
-    method = ADJUSTL(method)
-    DO i = 1, LEN_TRIM(method)
-       character_code = IACHAR(method(i:i))
-       IF (character_code .GE. IACHAR('a') .AND. &
-            character_code .LE. IACHAR('z')) THEN
-          method(i:i) = ACHAR(character_code - IACHAR('a') + IACHAR('A'))
-       END IF
-    END DO
-
-    SELECT CASE (TRIM(method))
-    CASE ('ANALYTIC')
-       method_id = IM_GROUP_METHOD_ANALYTIC
-    CASE ('NEWTON')
-       method_id = IM_GROUP_METHOD_NEWTON
-    CASE DEFAULT
-       method_id = -1
-    END SELECT
-
-  END SUBROUTINE resolve_imex_group_method
-
   !******************************************************************************
   !> \brief Initialize the equation partition and implicit-group metadata.
   !> \details Builds the global explicit/implicit mask and compact index maps.
   !>          If both optional group arguments are omitted, all implicit
   !>          equations are assigned to one NEWTON group (or no group when
-  !>          every equation is explicit), preserving the legacy monolithic
+  !>          every equation is explicit), using the monolithic
   !>          solve contract. If supplied, group numbers must be dense and
   !>          positive for implicit equations, zero for explicit equations,
   !>          and each group's method must be supported. Also precomputes each

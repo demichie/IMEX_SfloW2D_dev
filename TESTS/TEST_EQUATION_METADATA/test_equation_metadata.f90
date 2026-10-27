@@ -1,8 +1,7 @@
 PROGRAM test_equation_metadata
 
   USE equation_metadata_2d, ONLY : equation_partition_type,                  &
-       IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON,                    &
-       resolve_imex_group_method
+       IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
 
   IMPLICIT NONE
 
@@ -10,20 +9,6 @@ PROGRAM test_equation_metadata
 
   LOGICAL :: implicit_mask(7)
   LOGICAL :: implicit_mask_five(5)
-  CHARACTER(LEN=16) :: method_name
-  INTEGER :: method_id
-
-  method_name = 'analytic'
-  CALL resolve_imex_group_method(method_name, method_id)
-  CALL assert_true('case-insensitive analytic method',                      &
-       method_id .EQ. IM_GROUP_METHOD_ANALYTIC .AND. method_name .EQ. 'ANALYTIC')
-  method_name = 'Newton'
-  CALL resolve_imex_group_method(method_name, method_id)
-  CALL assert_true('case-insensitive Newton method',                        &
-       method_id .EQ. IM_GROUP_METHOD_NEWTON .AND. method_name .EQ. 'NEWTON')
-  method_name = 'DIRK_CLOSED_FORM'
-  CALL resolve_imex_group_method(method_name, method_id)
-  CALL assert_true('legacy third method name rejected', method_id .LT. 0)
 
   implicit_mask = [ .FALSE., .TRUE., .TRUE., .FALSE., .FALSE., .FALSE.,    &
        .TRUE. ]
