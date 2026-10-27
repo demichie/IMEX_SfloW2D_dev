@@ -99,6 +99,7 @@ PROGRAM test_source_registry
   END DO
   CALL verify_default_schedule()
   CALL verify_thermal_activation_matrix()
+  CALL verify_analytic_step_schedule()
   WRITE(*,'(A)') 'D18 physical catalog and 864 physical triplet mappings verified'
 CONTAINS
   SUBROUTINE configure_lava_case()
@@ -144,6 +145,28 @@ CONTAINS
     CALL require(group_contains_name(s(1),'mass_exchange_deposition'), &
          'post-RK deposition scheduling')
   END SUBROUTINE verify_default_schedule
+
+  SUBROUTINE verify_analytic_step_schedule()
+    TYPE(source_group_type), ALLOCATABLE :: stage(:),post(:)
+    CALL configure_lava_case()
+    thermal_method='ANALYTIC'; thermal_cadence='STEP'; thermal_group=2
+    pore_pressure_method='ANALYTIC'; pore_pressure_cadence='STEP'; pore_pressure_group=1
+    CALL initialize_configured_sources(registry,partition,error)
+    CALL require(error=='','analytic STEP source configuration: '//TRIM(error))
+    stage=registry%stage_groups(); post=registry%step_groups()
+    CALL require(SIZE(post)==3,'two analytic STEP groups and one mass exchange batch')
+    CALL require(post(1)%method==SOURCE_METHOD_ANALYTIC .AND. &
+         group_contains_name(post(1),'pore_pressure_dissipation'), &
+         'pore STEP first by GROUP')
+    CALL require(post(2)%method==SOURCE_METHOD_ANALYTIC .AND. &
+         group_contains_name(post(2),'thermal_cooling'), &
+         'cooling STEP second by GROUP')
+    CALL require(post(3)%method==SOURCE_METHOD_EXPLICIT .AND. &
+         group_contains_name(post(3),'mass_exchange_deposition'), &
+         'mass exchange remains atomic and last')
+    CALL require(partition%n_IM_groups==1, &
+         'STEP analytic sources do not enter stage implicit partition')
+  END SUBROUTINE verify_analytic_step_schedule
 
   SUBROUTINE verify_thermal_activation_matrix()
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
