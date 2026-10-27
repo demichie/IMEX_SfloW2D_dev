@@ -46,11 +46,13 @@ PROGRAM test_imex_stages
   USE time_integration_2d, ONLY : time_integration_workspace_type
   USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_ANALYTIC, &
        IM_GROUP_METHOD_NEWTON
-  USE source_registry_2d, ONLY : source_registry_type
+  USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_configuration_2d, ONLY : initialize_configured_sources
   USE source_input_2d, ONLY : rheology_method, rheology_cadence, rheology_group, &
        thermal_method, thermal_cadence, thermal_group
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, finalize_nonlinear_solver
+  USE step_source_executor_2d, ONLY : execute_step_source_groups
+  USE thermal_laws_2d, ONLY : solve_thermal_cooling_analytic
   USE state_conversion_2d, ONLY : qc_to_qp, qp_to_qc
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
@@ -62,7 +64,7 @@ PROGRAM test_imex_stages
   TYPE(spatial_operator_type) :: spatial
   TYPE(time_integration_workspace_type) :: integration
   TYPE(equation_partition_type) :: partition
-  TYPE(source_registry_type) :: source_registry
+  TYPE(source_registry_type) :: source_registry, cooling_only_registry
   TYPE(reconstruction_workspace_type) :: audit_reconstruction
   TYPE(hyperbolic_workspace_type) :: audit_hyperbolic
   REAL(wp), ALLOCATABLE :: q(:,:,:),q0(:,:,:),qp(:,:,:),Z(:,:),statistics(:,:),initial_mask(:,:)
@@ -72,7 +74,11 @@ PROGRAM test_imex_stages
   INTEGER :: nx,ny,slope,curvature,limiter_id,input_unit,output_unit,j,k,i,step
   INTEGER :: threads,actual_threads,stages,steps,drag,observe,l
   INTEGER :: composition_mode,boundary_test_mode,source_test_model,analytic_mode
-  INTEGER :: mixed_group_mode
+  INTEGER :: mixed_group_mode, split_cooling_mode
+  REAL(wp), ALLOCATABLE :: pre_cooling(:,:,:), pre_cooling_qp(:,:,:)
+  REAL(wp) :: cooling_capacity, cooling_temperature, cooling_expected, cooling_pdyn
+  CHARACTER(LEN=256) :: cooling_error
+  TYPE(source_group_type), ALLOCATABLE :: cooling_groups(:)
 
   CALL get_command_argument(1,argument); READ(argument,*) threads
   CALL get_command_argument(2,argument); READ(argument,*) stages
@@ -110,6 +116,15 @@ PROGRAM test_imex_stages
   IF (mixed_group_mode<0 .OR. mixed_group_mode>2) ERROR STOP 'invalid mixed-group fixture mode'
   IF (mixed_group_mode>0 .AND. (source_test_model/=3 .OR. composition_mode/=0 .OR. &
        drag/=0 .OR. analytic_mode/=0)) ERROR STOP 'mixed-group fixture requires lava source model'
+  split_cooling_mode=0
+  argument=''
+  CALL get_command_argument(11,argument)
+  IF (LEN_TRIM(argument)>0) READ(argument,*) split_cooling_mode
+  IF (split_cooling_mode<0 .OR. split_cooling_mode>1) &
+       ERROR STOP 'invalid split cooling fixture mode'
+  IF (split_cooling_mode==1 .AND. (source_test_model/=3 .OR. &
+       composition_mode/=0 .OR. mixed_group_mode/=0)) &
+       ERROR STOP 'split cooling requires lava NEWTON/STAGE fixture'
   IF (stages<2 .OR. stages>4 .OR. steps<1) ERROR STOP 'invalid test controls'
   !$OMP PARALLEL
   !$OMP SINGLE
@@ -157,6 +172,30 @@ PROGRAM test_imex_stages
         CALL integration%advance(q,qp,t,dt,Z,partition,source_registry,domain,spatial,observer=capture_state)
      ELSE
         CALL integration%advance(q,qp,t,dt,Z,partition,source_registry,domain,spatial)
+     END IF
+     IF (split_cooling_mode==1) THEN
+        ! Exercise the production post-RK executor after ALL RK stages.
+        ! Keep the test focused on cooling: no mass-exchange transaction.
+        pre_cooling=q
+        pre_cooling_qp=qp
+        CALL execute_step_source_groups(q,qp,dt,domain,cooling_only_registry,Z,t)
+        DO l=1,domain%solve_cells
+           j=domain%j_cent(l);k=domain%k_cent(l)
+           IF (pre_cooling(1,j,k)<=0.0_wp) CYCLE
+           CALL qc_to_qp(pre_cooling(:,j,k),pre_cooling_qp(:,j,k),cooling_pdyn)
+           cooling_capacity=pre_cooling(4,j,k)/pre_cooling_qp(4,j,k)
+           CALL solve_thermal_cooling_analytic(pre_cooling_qp(4,j,k),dt, &
+                cooling_capacity,radiative_term_coeff,convective_term_coeff, &
+                T_env,cooling_temperature)
+           cooling_expected=cooling_capacity*cooling_temperature
+           IF (ABS(q(4,j,k)-cooling_expected)> &
+                2.0E-12_wp*MAX(1.0_wp,ABS(cooling_expected))) &
+                ERROR STOP 'D18 full RK: cooling STEP not exact'
+           IF (ANY(q([1,2,3,5],j,k)/=pre_cooling([1,2,3,5],j,k))) &
+                ERROR STOP 'D18 full RK: cooling altered other conserved fields'
+        END DO
+        IF (COUNT(implicit_statuses>0)==0 .AND. observe/=0) &
+             ERROR STOP 'D18 full RK: no Newton stage observed'
      END IF
      statistics(:,step)=0.0_wp
      statistics(1,step)=dt; statistics(2,step)=dt_bound
@@ -665,8 +704,26 @@ CONTAINS
       thermal_method='NEWTON'; thermal_group=1
     END IF
     thermal_cooling_flag=(source_test_model==3 .AND. composition_mode==0)
+    IF (split_cooling_mode==1) THEN
+       thermal_method='ANALYTIC';thermal_cadence='STEP';thermal_group=1
+    END IF
     CALL initialize_configured_sources(source_registry,partition,error)
     IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
+    IF (split_cooling_mode==1) THEN
+       cooling_groups=source_registry%step_groups()
+       BLOCK
+          INTEGER :: group_id
+          group_id=0
+          DO i=1,SIZE(cooling_groups)
+             IF (ANY(cooling_groups(i)%source_names=='thermal_cooling')) group_id=i
+          END DO
+          IF (group_id==0) ERROR STOP 'D18 full RK: cooling STEP not registered'
+          CALL cooling_only_registry%initialize(n_vars,0,[source_group_type::], &
+               [cooling_groups(group_id)],cooling_error)
+          IF (LEN_TRIM(cooling_error)>0) ERROR STOP TRIM(cooling_error)
+       END BLOCK
+       ALLOCATE(pre_cooling(n_vars,nx,ny),pre_cooling_qp(n_vars+2,nx,ny))
+    END IF
   END SUBROUTINE configure_source_registry
 
   !> \brief Audit all raw-stage inventories and independent reconstructed traces for one step.
