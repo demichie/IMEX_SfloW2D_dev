@@ -202,7 +202,8 @@ CONTAINS
     CHARACTER(LEN=256) :: error
 
     CALL reset_fixture
-    liquid_flag=.FALSE.
+    ! Retain the fixture's liquid carrier; zero loss_rate makes the
+    ! mass-exchange transaction a no-op in this cooling-only experiment.
     thermal_cooling_flag=.TRUE.
     radiative_term_coeff=5.103E-8_wp
     convective_term_coeff=9.0_wp
@@ -245,7 +246,6 @@ CONTAINS
     CALL source_registry%finalize
     CALL equation_partition%finalize
     thermal_cooling_flag=.FALSE.
-    liquid_flag=.TRUE.
     thermal_method='ANALYTIC';thermal_cadence='STAGE';thermal_group=0
     WRITE(*,*) 'PASS D18 analytic cooling post-RK production executor'
   END SUBROUTINE test_analytic_cooling_step_executor
