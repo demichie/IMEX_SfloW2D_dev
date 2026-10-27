@@ -185,6 +185,10 @@ CONTAINS
        source_time=0.0_wp
        IF (PRESENT(step_start_time)) source_time=step_start_time
        DO group_index=1,SIZE(step_groups)
+          ! Empty groups are valid no-op descriptors. Mass exchange is
+          ! executed atomically by the dedicated transaction below.
+          IF (SIZE(step_groups(group_index)%source_names)==0) CYCLE
+          IF (ANY(INDEX(step_groups(group_index)%source_names,'mass_exchange_')==1)) CYCLE
           IF (step_groups(group_index)%method==SOURCE_METHOD_NEWTON) THEN
              implicit_mask=.FALSE.
              implicit_mask(step_groups(group_index)%equation_ids)=.TRUE.
