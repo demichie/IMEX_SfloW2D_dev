@@ -183,21 +183,17 @@ CONTAINS
       IF (group%method==SOURCE_METHOD_NEWTON) THEN
         IF (SIZE(group%equation_ids)==0) RETURN
       ELSE IF (group%method==SOURCE_METHOD_ANALYTIC) THEN
-        SELECT CASE(SIZE(group%equation_ids))
-        CASE(2)
-          IF (.NOT.same_set(group%equation_ids,[2,3])) RETURN
-          IF (LEN_TRIM(rheology_name)==0) RETURN
-          IF (SIZE(group%source_names)/=1 .OR. &
-               .NOT.ANY(group%source_names==rheology_name)) THEN
-            error='D17: analytic velocity requires the complete law'; RETURN
-          END IF
-        CASE(1)
-          id=group%equation_ids(1)
-          IF (id/=4 .AND. id/=this%pore_equation) RETURN
-          IF (id==this%pore_equation .AND. this%pore_equation==0) RETURN
-        CASE DEFAULT
-          RETURN
-        END SELECT
+        ! A group may combine independent complete analytic operators.
+        ! The momentum pair is indivisible; energy and pore are scalar.
+        IF (SIZE(group%equation_ids)==0) RETURN
+        IF (ANY(group%equation_ids==2) .NEQV. &
+             ANY(group%equation_ids==3)) RETURN
+        DO j=1,SIZE(group%equation_ids)
+          id=group%equation_ids(j)
+          IF (id/=2 .AND. id/=3 .AND. id/=4 .AND. &
+               (this%pore_equation==0 .OR. id/=this%pore_equation)) RETURN
+        END DO
+        IF (ANY(group%equation_ids==2) .AND. LEN_TRIM(rheology_name)==0) RETURN
       END IF
     END DO
     error=''

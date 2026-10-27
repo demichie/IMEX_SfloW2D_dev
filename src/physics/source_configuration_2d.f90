@@ -202,6 +202,13 @@ CONTAINS
         END IF
       ELSE
         steps(k)%source_names=[CHARACTER(LEN=64)::steps(k)%source_names,active_names(i)]
+        IF (method/=SOURCE_METHOD_EXPLICIT) THEN
+          SELECT CASE(target)
+          CASE(1); steps(k)%equation_ids=[steps(k)%equation_ids,2,3]
+          CASE(2); steps(k)%equation_ids=[steps(k)%equation_ids,4]
+          CASE(3); steps(k)%equation_ids=[steps(k)%equation_ids,pore]
+          END SELECT
+        END IF
       END IF
     END DO
     ! Sort post-RK groups by method class and configured group ID.

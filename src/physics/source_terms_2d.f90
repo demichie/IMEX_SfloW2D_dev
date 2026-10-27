@@ -68,7 +68,7 @@ MODULE source_terms_2d
   END TYPE analytic_term_context_type
 CONTAINS
 
-  SUBROUTINE eval_source_analytic(group,q_before,context,interval,q_after,status)
+  RECURSIVE SUBROUTINE eval_source_analytic(group,q_before,context,interval,q_after,status)
     TYPE(source_group_type), INTENT(IN) :: group
     REAL(wp), INTENT(IN) :: q_before(n_vars),interval
     TYPE(analytic_term_context_type), INTENT(IN) :: context
@@ -81,11 +81,40 @@ CONTAINS
     REAL(wp) :: heat_capacity,temperature_after,pressure_known,pressure_after
     LOGICAL :: supported
     CHARACTER(LEN=64) :: selected_model_name
+    TYPE(source_group_type) :: component
+    REAL(wp) :: component_state(n_vars)
+    INTEGER :: part
 
     q_after=q_before
     status=-5
     IF (group%method/=SOURCE_METHOD_ANALYTIC) RETURN
     IF (.NOT.ALLOCATED(group%equation_ids)) RETURN
+    ! A mixed group is one ordered sweep of complete physical operators.
+    IF (SIZE(group%equation_ids)>1 .AND. &
+         .NOT.(SIZE(group%equation_ids)==2 .AND. &
+         ANY(group%equation_ids==2) .AND. ANY(group%equation_ids==3))) THEN
+      component=group
+      DO part=1,3
+        SELECT CASE(part)
+        CASE(1)
+          IF (.NOT.ANY(group%equation_ids==2)) CYCLE
+          component%equation_ids=[2,3]
+        CASE(2)
+          IF (.NOT.ANY(group%equation_ids==4)) CYCLE
+          component%equation_ids=[4]
+        CASE(3)
+          IF (.NOT.pore_pressure_flag) CYCLE
+          IF (.NOT.ANY(group%equation_ids==idx_pore)) CYCLE
+          component%equation_ids=[idx_pore]
+        END SELECT
+        CALL eval_source_analytic(component,q_after,context,interval, &
+             component_state,status)
+        IF (status/=0) RETURN
+        q_after=component_state
+      END DO
+      status=0
+      RETURN
+    END IF
     ! The group owns the analytic operator and its complete equation target.
     SELECT CASE(SIZE(group%equation_ids))
     CASE(2)
