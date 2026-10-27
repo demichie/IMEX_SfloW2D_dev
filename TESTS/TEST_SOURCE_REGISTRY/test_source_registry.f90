@@ -66,9 +66,16 @@ PROGRAM test_source_registry
         END DO
         CALL partition%initialize(mask,membership,selected(1:nm))
       END BLOCK
-      CALL registry%initialize_legacy(partition,ids,methods,MERGE(7,0,enabled(3)),active,error)
+      CALL configure_lava_case()
+      thermal_cooling_flag=enabled(2)
+      pore_pressure_flag=enabled(3)
+      rheology_group=ids(1); thermal_group=ids(2); pore_pressure_group=ids(3)
+      rheology_method=MERGE('ANALYTIC','NEWTON  ',methods(ids(1))==IM_GROUP_METHOD_ANALYTIC)
+      thermal_method=MERGE('ANALYTIC','NEWTON  ',methods(ids(2))==IM_GROUP_METHOD_ANALYTIC)
+      pore_pressure_method=MERGE('ANALYTIC','NEWTON  ',methods(ids(3))==IM_GROUP_METHOD_ANALYTIC)
+      CALL initialize_configured_sources(registry,partition,error)
       CALL require(error=='' .AND. registry%is_initialized(), &
-           'legacy combination normalizes: '//TRIM(error))
+           'physical triplet combination normalizes: '//TRIM(error))
       stages=registry%stage_groups();steps=registry%step_groups()
       CALL require(SIZE(steps)==1,'one post-RK source group')
       CALL require(group_contains_name(steps(1),'mass_exchange_deposition'),'mass source ownership')
@@ -92,7 +99,7 @@ PROGRAM test_source_registry
   END DO
   CALL verify_default_schedule()
   CALL verify_thermal_activation_matrix()
-  WRITE(*,'(A)') 'D17 physical catalog, native configuration and 864 legacy mappings verified'
+  WRITE(*,'(A)') 'D18 physical catalog and 864 physical triplet mappings verified'
 CONTAINS
   SUBROUTINE configure_lava_case()
     n_eqns=7;idx_pore=7

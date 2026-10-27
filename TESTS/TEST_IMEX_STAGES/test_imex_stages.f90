@@ -47,6 +47,9 @@ PROGRAM test_imex_stages
   USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_ANALYTIC, &
        IM_GROUP_METHOD_NEWTON
   USE source_registry_2d, ONLY : source_registry_type
+  USE source_configuration_2d, ONLY : initialize_configured_sources
+  USE source_input_2d, ONLY : rheology_method, rheology_cadence, rheology_group, &
+       thermal_method, thermal_cadence, thermal_group
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, finalize_nonlinear_solver
   USE state_conversion_2d, ONLY : qc_to_qp, qp_to_qc
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
@@ -650,33 +653,19 @@ CONTAINS
   END SUBROUTINE initialize_fixture
 
   SUBROUTINE configure_source_registry
-    INTEGER :: target_groups(3),methods(3),pore_equation,group
-    CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
     CHARACTER(LEN=256) :: error
-
-    target_groups=1
-    methods=IM_GROUP_METHOD_NEWTON
-    DO group=1,partition%n_IM_groups
-       methods(group)=partition%IM_group_method(group)
-    END DO
-    IF (partition%implicit(2)) target_groups(1)=partition%IM_group(2)
-    IF (partition%implicit(4)) target_groups(2)=partition%IM_group(4)
-
-    active_names=[CHARACTER(LEN=64)::]
-    IF (rheology_flag) active_names=[CHARACTER(LEN=64)::'rheology_'//TRIM(rheology_model)]
-    IF (curvature_term_flag) &
-         active_names=[CHARACTER(LEN=64) :: active_names, 'geometry_curvature']
-    IF (partition%implicit(4)) active_names=[CHARACTER(LEN=64) :: active_names, 'thermal_cooling']
-    pore_equation=0
-    IF (pore_pressure_flag .AND. idx_pore>=5 .AND. idx_pore<=n_vars) THEN
-       IF (partition%implicit(idx_pore)) THEN
-          pore_equation=idx_pore
-          target_groups(3)=partition%IM_group(idx_pore)
-          active_names=[CHARACTER(LEN=64) :: active_names, 'pore_pressure_dissipation']
-       END IF
+    rheology_method='NEWTON'; rheology_cadence='STAGE'; rheology_group=1
+    thermal_method='NEWTON'; thermal_cadence='STAGE'; thermal_group=1
+    IF (analytic_mode==1) rheology_method='ANALYTIC'
+    IF (mixed_group_mode==1) THEN
+      rheology_method='ANALYTIC'; rheology_group=1
+      thermal_method='NEWTON'; thermal_group=2
+    ELSE IF (mixed_group_mode==2) THEN
+      rheology_method='ANALYTIC'; rheology_group=2
+      thermal_method='NEWTON'; thermal_group=1
     END IF
-    CALL source_registry%initialize_legacy(partition,target_groups,methods, &
-         pore_equation,active_names,error)
+    thermal_cooling_flag=(source_test_model==3 .AND. composition_mode==0)
+    CALL initialize_configured_sources(source_registry,partition,error)
     IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
   END SUBROUTINE configure_source_registry
 

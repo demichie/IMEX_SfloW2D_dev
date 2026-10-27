@@ -1,9 +1,9 @@
 !********************************************************************************
-!> \brief Validated, simulation-owned D17 source groups and legacy normalization.
+!> \brief Validated source groups derived from physical source configuration.
 !> \details Builds metadata once, outside cell/stage loops. Does not evaluate
 !>          physics or change equation_partition_type, tableaux or solver calls.
 !>          Private storage is exposed only through copies; failed initialization
-!>          releases all storage. Legacy joint Newton blocks remain coupled.
+!>          releases all storage. Joint Newton blocks remain coupled.
 !********************************************************************************
 MODULE source_registry_2d
   USE source_catalog_2d
@@ -32,7 +32,6 @@ MODULE source_registry_2d
     TYPE(source_group_type), ALLOCATABLE :: stage_entries(:), step_entries(:)
   CONTAINS
     PROCEDURE :: initialize => initialize_registry
-    PROCEDURE :: initialize_legacy => initialize_legacy_registry
     PROCEDURE :: finalize => finalize_registry
     PROCEDURE :: is_initialized => registry_is_initialized
     PROCEDURE :: stage_groups => copy_stage_groups
@@ -87,132 +86,6 @@ CONTAINS
     END IF
     this%initialized=.TRUE.
   END SUBROUTINE initialize_registry
-
-  !> \brief Normalize legacy groups while retaining the original partition.
-  !> \param[in,out] this Destination registry, cleared on failure.
-  !> \param[in] partition Already validated, compact legacy equation partition.
-  !> \param[in] legacy_target_groups Original velocity/temperature/pressure IDs.
-  !> \param[in] legacy_methods Three resolved legacy group methods.
-  !> \param[in] pore_equation Pore equation index, zero when inactive.
-  !> \param[in] active_names Names of potentially active physical addends (cell guards still apply).
-  !> \param[out] error Empty on success, otherwise a configuration diagnostic.
-  !> \note Mixed analytic groups expand in velocity/temperature/pressure order;
-  !>       split IDs start at five. Newton groups retain their full equation block.
-  SUBROUTINE initialize_legacy_registry(this,partition,legacy_target_groups,legacy_methods, &
-       pore_equation,active_names,error)
-    CLASS(source_registry_type), INTENT(INOUT) :: this
-    TYPE(equation_partition_type), INTENT(IN) :: partition
-    INTEGER, INTENT(IN) :: legacy_target_groups(3),legacy_methods(3)
-    INTEGER, INTENT(IN) :: pore_equation
-    CHARACTER(*), INTENT(IN) :: active_names(:)
-    CHARACTER(*), INTENT(OUT) :: error
-    TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:)
-    TYPE(source_group_type) :: group
-    TYPE(source_term_type) :: term
-    INTEGER, ALLOCATABLE :: targets(:),equations(:),target_equations(:)
-    CHARACTER(LEN=64), ALLOCATABLE :: names(:)
-    INTEGER :: legacy,target,split_id,i,method,order
-    LOGICAL :: enabled(3)
-    CALL this%finalize()
-    error=''
-    IF (.NOT.partition%is_initialized()) THEN
-      error='D17: invalid legacy equation partition'; RETURN
-    END IF
-    IF (partition%n_equations<4) THEN
-      error='D17: source layout requires at least four equations'; RETURN
-    END IF
-    IF (ANY(legacy_target_groups<1) .OR. ANY(legacy_target_groups>3)) THEN
-      error='D17: legacy group IDs must be from one to three'; RETURN
-    END IF
-    IF (ANY(legacy_methods/=IM_GROUP_METHOD_NEWTON .AND. &
-         legacy_methods/=IM_GROUP_METHOD_ANALYTIC)) THEN
-      error='D17: invalid legacy method'; RETURN
-    END IF
-    IF (partition%implicit(2) .NEQV. partition%implicit(3)) THEN
-      error='D17: velocity must remain a two-equation block'; RETURN
-    END IF
-    IF (pore_equation/=0) THEN
-      IF (pore_equation<5 .OR. pore_equation>partition%n_equations) THEN
-        error='D17: invalid pore equation index'; RETURN
-      END IF
-      IF (.NOT.partition%implicit(pore_equation)) THEN
-        error='D17: pore target must be implicit in the legacy partition'; RETURN
-      END IF
-    END IF
-    enabled=[partition%implicit(2),partition%implicit(4),pore_equation/=0]
-    ! Normalize legacy catalog IDs before checking group membership/targets.
-    DO i=1,SIZE(active_names)
-      term=source_term_descriptor_by_name(active_names(i))
-      IF (LEN_TRIM(term%name)==0) THEN
-        error='D17: active ID is unknown or dependent'; RETURN
-      END IF
-      IF (target_index(term%target)>0) THEN
-        IF (.NOT.enabled(target_index(term%target))) THEN
-          error='D17: active term has no enabled legacy target'; RETURN
-        END IF
-      END IF
-    END DO
-    ! Verify the original IDs map to exactly the partition's compact groups.
-    order=0
-    DO legacy=1,3
-      IF (.NOT.ANY(enabled .AND. legacy_target_groups==legacy)) CYCLE
-      order=order+1
-      IF (order>partition%n_IM_groups) THEN
-        error='D17: legacy input does not match equation partition'; RETURN
-      END IF
-      IF (partition%IM_group_method(order)/=legacy_methods(legacy)) THEN
-        error='D17: legacy method does not match equation partition'; RETURN
-      END IF
-      DO target=1,3
-        IF (.NOT.enabled(target) .OR. legacy_target_groups(target)/=legacy) CYCLE
-        target_equations=target_equation_ids(target,pore_equation)
-        IF (ANY(partition%IM_group(target_equations)/=order)) THEN
-          error='D17: legacy target does not match equation partition'; RETURN
-        END IF
-      END DO
-    END DO
-    IF (order/=partition%n_IM_groups .OR. &
-         partition%n_implicit/=2*MERGE(1,0,enabled(1))+COUNT(enabled(2:3))) THEN
-      error='D17: unsupported or missing legacy implicit target'; RETURN
-    END IF
-    ALLOCATE(stages(0),steps(0))
-    split_id=4
-    DO legacy=1,3
-      targets=PACK([1,2,3],enabled .AND. legacy_target_groups==legacy)
-      IF (SIZE(targets)==0) CYCLE
-      method=SOURCE_METHOD_NEWTON
-      IF (legacy_methods(legacy)==IM_GROUP_METHOD_ANALYTIC) method=SOURCE_METHOD_ANALYTIC
-      IF (method==SOURCE_METHOD_NEWTON) THEN
-        names=names_for_targets(active_names,targets)
-        equations=PACK([(i,i=1,partition%n_equations)],partition%IM_group== &
-             partition%IM_group(target_equation_ids_first(targets(1),pore_equation)))
-        group=make_group(legacy,SOURCE_CADENCE_STAGE,method,names,equations)
-        stages=[stages,group]
-      ELSE
-        DO i=1,SIZE(targets)
-          target=targets(i)
-          names=names_for_targets(active_names,[target])
-          equations=target_equation_ids(target,pore_equation)
-          order=legacy
-          IF (SIZE(targets)>1) THEN
-            split_id=split_id+1
-            order=split_id
-          END IF
-          group=make_group(order,SOURCE_CADENCE_STAGE,method,names,equations)
-          stages=[stages,group]
-        END DO
-      END IF
-    END DO
-    equations=[(i,i=1,partition%n_equations)]
-    names=names_for_targets(active_names,[0])
-    group=make_group(4,SOURCE_CADENCE_STAGE,SOURCE_METHOD_EXPLICIT,names,equations)
-    stages=[stages,group]
-    names=names_for_targets(active_names,[-1])
-    group=make_group(1,SOURCE_CADENCE_STEP,SOURCE_METHOD_EXPLICIT,names,equations)
-    steps=[group]
-    CALL this%initialize(partition%n_equations,pore_equation,stages,steps,error)
-  END SUBROUTINE initialize_legacy_registry
-
 
   !> \brief Validate native or normalized descriptors before making them visible.
   !> \param[in] this Candidate metadata; validation does not mutate it.
