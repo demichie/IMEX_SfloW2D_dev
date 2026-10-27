@@ -2572,6 +2572,20 @@ Non produrre prima gruppi legacy e poi «spostare» sorgenti; ogni sorgente rice
 
 Ogni passo deve costituire una modifica **sostanziale e coordinata** con i test pertinenti; non disperdere la migrazione in piccole modifiche senza chiusura dell'intero contratto. Non cambiare formule fisiche, tolleranze o oracoli per ottenere PASS.
 
+#### D18.6a — Audit di chiusura del 27 ottobre 2026 (master; nuovi test in attesa della CI)
+
+**Implementazione:** triplette METHOD/CADENCE/GROUP operative in produzione; percorsi STAGE esplicito, Newton e analitico e STEP esplicito, Newton e analitico collegati ai kernel esistenti; batch mass exchange esplicito/STEP mantenuto atomico. Rimossi i principali adattatori legacy. La configurazione guida lava NEWTON/STAGE + cooling ANALYTIC/STEP e stata verificata a livello di partizione, Newton di stage e mappa analitica cell-local (CI segnalata verde dopo `eb3b460`).
+
+**Audit condivisione (commit `1d6ed4e`, `fa242ca`):** adattatore geometrico unico `eval_cell_source_explicit` per STAGE e STEP; contesto fisico/stocastico analitico STEP popolato con `cell_analytic_source_context`; i due coordinatori temporali restano distinti perche una sorgente STAGE contribuisce al tableau mentre STEP aggiorna lo stato completato. Questi commit richiedono ancora conferma dalle Actions.
+
+**Nuovo test di produzione (commit `493dc7e`, `375cf82`; CI da ripetere):** `TEST_MASS_EXCHANGE/test_mass_exchange.f90::test_analytic_cooling_step_executor` passa attraverso `execute_step_source_groups` e confronta l'energia con l'oracolo del cooling esatto su dt. Controlla aggiornamento del primitivo, conservazione delle altre variabili conservative, celle asciutte e celle non attive. La fixture e isoterma solo nel senso della legge applicata: resta una fase liquida per una conversione fisica coerente. Questo test copre la fase post-RK, ma **non** attraversa in una singola simulazione il precedente RK Newton della lava.
+
+**Gate ancora aperti (non dichiarare COMPLETATO prima della CI e delle prove pertinenti):**
+1. Integrazione completa di produzione lava NEWTON/STAGE + cooling ANALYTIC/STEP nello stesso avanzamento e verifica che il cooling sia applicato una sola volta.
+2. Oracoli indipendenti per gruppi EXPLICIT multi-sorgente STAGE/STEP sullo stesso stato iniziale, ordine invariante all'interno del gruppo; NEWTON/STEP multi-sorgente con residuo di sistema accoppiato.
+3. Regressioni di default del mass exchange atomico, conservazione/topografia e restart; test di splitting e raffinamento temporale per lava termodipendente.
+4. Audit finale di input, rifiuti capability, namespace e ownership dei gruppi; aggiornamento delle tabelle storiche D18.4b, da mantenere etichettate come fotografia del 26 ottobre e non come stato corrente; registrazione della CI verde su master.
+
 #### D18.6 — Matrice di regressione e criteri di accettazione
 
 | Caso | Risultato obbligatorio |
