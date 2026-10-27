@@ -45,7 +45,10 @@ CONTAINS
     IF (bottom_fissural_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_fissural_injection']
     IF (radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'radial_injection']
     IF (lateral_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'boundary_injection']
-    IF (erosion_coeff>0.0_wp) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
+    IF (ALLOCATED(erosion_coeff)) THEN
+      IF (erosion_coeff>0.0_wp) &
+           active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
+    END IF
     IF (settling_flag) THEN
       active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_deposition']
     END IF
