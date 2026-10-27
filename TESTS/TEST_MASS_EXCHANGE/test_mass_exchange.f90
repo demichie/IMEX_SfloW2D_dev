@@ -276,6 +276,23 @@ CONTAINS
     END DO
     IF (ANY(state%q(:,nx,ny)/=prior(:,nx,ny))) &
          ERROR STOP 'D18: STEP cooling modified inactive cell'
+    ! Exact cooling is a flow map: two full steps must equal one
+    ! analytic application over twice the physical interval.
+    CALL apply_mass_exchange_step(state%q,state%qp,delta,domain,source_registry)
+    DO l=1,domain%solve_cells
+      j=domain%j_cent(l);k=domain%k_cent(l)
+      IF (prior(1,j,k)<=0.0_wp) CYCLE
+      temperature=prior_qp(4,j,k)
+      cap=prior(4,j,k)/temperature
+      CALL solve_thermal_cooling_analytic(temperature,2.0_wp*delta,cap, &
+           radiative_term_coeff,convective_term_coeff,T_env,expected_temperature)
+      expected_energy=cap*expected_temperature
+      IF (ABS(state%q(4,j,k)-expected_energy)> &
+           2.0E-12_wp*MAX(1.0_wp,ABS(expected_energy))) &
+           ERROR STOP 'D18: cooling STEP violates exact semigroup property'
+      IF (ANY(state%q([1,2,3,5,6],j,k)/=prior([1,2,3,5,6],j,k))) &
+           ERROR STOP 'D18: repeated cooling altered unrelated equations'
+    END DO
     CALL source_registry%finalize
     CALL equation_partition%finalize
     thermal_cooling_flag=.FALSE.;rheology_flag=.FALSE.;rheology_model='none'
