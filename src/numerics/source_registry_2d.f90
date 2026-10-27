@@ -152,7 +152,7 @@ CONTAINS
         ! Unknown names yield an empty descriptor. No numeric identity
         ! is needed to validate membership or scheduling capabilities.
         IF (LEN_TRIM(term%name)==0) RETURN
-        ! Mathematical rheology addends are catalogued only for legacy
+        ! Mathematical rheology addends are not physical schedule entries
         ! evaluation; native and normalized groups own complete laws.
                 IF (ANY(seen_names==term%name)) RETURN
         seen_names=[CHARACTER(LEN=64) :: seen_names,term%name]
@@ -254,17 +254,6 @@ CONTAINS
     END SELECT
   END FUNCTION target_equation_ids
 
-  !> \brief Obtain a target's first equation for legacy compact-group lookup.
-  !> \param[in] target Valid enabled target.
-  !> \param[in] pore Valid pore index when the target is pressure.
-  !> \return First conservative index.
-  INTEGER FUNCTION target_equation_ids_first(target,pore) RESULT(id)
-    INTEGER, INTENT(IN) :: target,pore
-    INTEGER, ALLOCATABLE :: ids(:)
-    ids=target_equation_ids(target,pore)
-    id=ids(1)
-  END FUNCTION target_equation_ids_first
-
   INTEGER FUNCTION target_index(name) RESULT(target)
     CHARACTER(*), INTENT(IN) :: name
     target=0
@@ -275,50 +264,6 @@ CONTAINS
     CASE('mass_exchange'); target=-1
     END SELECT
   END FUNCTION target_index
-  !> \brief Select source names for target blocks, EX (0) or mass exchange (-1).
-  !> \param[in] active_names Names normalized at the legacy boundary.
-  !> \param[in] targets Target IDs, zero for EX or minus one for step mass.
-  !> \return Stable-order canonical addend names; invalid IDs reach validation.
-  FUNCTION names_for_targets(active_names,targets) RESULT(names)
-    CHARACTER(*), INTENT(IN) :: active_names(:)
-    INTEGER, INTENT(IN) :: targets(:)
-    CHARACTER(LEN=64), ALLOCATABLE :: names(:)
-    TYPE(source_term_type) :: term
-    INTEGER :: i,target,n
-    ALLOCATE(names(SIZE(active_names)))
-    n=0
-    DO i=1,SIZE(active_names)
-      term=source_term_descriptor_by_name(active_names(i)); target=target_index(term%target)
-      IF (INDEX(TRIM(term%name),'mass_exchange_')==1) target=-1
-      IF (ANY(targets==target)) THEN
-        n=n+1
-        names(n)=active_names(i)
-      END IF
-    END DO
-    names=names(:n)
-  END FUNCTION names_for_targets
-
-  !> \brief Construct one block with fully allocated arrays.
-  !> \brief Construct a fully allocated homogeneous group.
-  !> \param[in] id Group identity, independent of order.
-  !> \param[in] cadence Stage or step namespace.
-  !> \param[in] method Group method.
-  !> \param[in] names Canonical component names, converted at the legacy boundary.
-  !> \param[in] equations Conservative equation footprint.
-  !> \return Group directly owning the equation footprint.
-  FUNCTION make_group(id,cadence,method,names,equations) RESULT(group)
-    INTEGER, INTENT(IN) :: id,cadence,method,equations(:)
-    CHARACTER(*), INTENT(IN) :: names(:)
-    TYPE(source_group_type) :: group
-    group%id=id; group%cadence=cadence
-    group%method=method
-    ! Allocate the owned arrays explicitly to avoid compiler warnings about
-    ! allocatable-component descriptor initialization on intrinsic assignment.
-    ALLOCATE(group%source_names(SIZE(names)),group%equation_ids(SIZE(equations)))
-    group%source_names=names
-    group%equation_ids=equations
-  END FUNCTION make_group
-
   !> \brief Check index bounds and uniqueness before any vector indexing.
   !> \param[in] ids Conservative equation IDs.
   !> \param[in] n Equation count.
