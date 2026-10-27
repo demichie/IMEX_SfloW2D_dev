@@ -100,6 +100,7 @@ PROGRAM test_source_registry
   CALL verify_default_schedule()
   CALL verify_thermal_activation_matrix()
   CALL verify_analytic_step_schedule()
+  CALL verify_newton_explicit_step_schedule()
   WRITE(*,'(A)') 'D18 physical catalog and 864 physical triplet mappings verified'
 CONTAINS
   SUBROUTINE configure_lava_case()
@@ -167,6 +168,27 @@ CONTAINS
     CALL require(partition%n_IM_groups==1, &
          'STEP analytic sources do not enter stage implicit partition')
   END SUBROUTINE verify_analytic_step_schedule
+
+  SUBROUTINE verify_newton_explicit_step_schedule()
+    TYPE(source_group_type), ALLOCATABLE :: g(:),post(:)
+    CALL configure_lava_case()
+    rheology_method='NEWTON'; rheology_cadence='STEP'; rheology_group=1
+    thermal_method='EXPLICIT'; thermal_cadence='STEP'; thermal_group=2
+    pore_pressure_method='ANALYTIC'; pore_pressure_cadence='STAGE'; pore_pressure_group=1
+    CALL initialize_configured_sources(registry,partition,error)
+    CALL require(error=='','Newton and explicit STEP scheduling: '//TRIM(error))
+    g=registry%stage_groups();post=registry%step_groups()
+    CALL require(partition%n_IM_groups==1,'only pore pressure is implicit during RK')
+    CALL require(SIZE(post)==3,'Newton, explicit and mass-exchange STEP groups')
+    CALL require(post(1)%method==SOURCE_METHOD_NEWTON .AND. &
+         group_contains_name(post(1),'rheology_lava'), &
+         'Newton STEP complete rheology group')
+    CALL require(post(2)%method==SOURCE_METHOD_EXPLICIT .AND. &
+         group_contains_name(post(2),'thermal_cooling'), &
+         'explicit STEP thermal source')
+    CALL require(group_contains_name(post(3),'mass_exchange_deposition'), &
+         'atomic mass-exchange STEP group preserved')
+  END SUBROUTINE verify_newton_explicit_step_schedule
 
   SUBROUTINE verify_thermal_activation_matrix()
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
