@@ -44,15 +44,6 @@ MODULE parameters_2d
   !> The hydrostatic/path term continues to use eta_x independently.
   CHARACTER(LEN=32) :: kt_trace_reconstruction = 'eta_x'
 
-  !> IMEX group assignments: velocity, energy and pore pressure are ordered
-  !> by ascending group ID; equal IDs place terms in the same group.
-  INTEGER :: imex_velocity_group = 3
-  INTEGER :: imex_energy_group = 1
-  INTEGER :: imex_pore_pressure_group = 2
-  !> Solver method for each group ID: ANALYTIC or NEWTON.
-  CHARACTER(LEN=16) :: imex_group_method(3) = [CHARACTER(LEN=16) ::          &
-       'ANALYTIC', 'ANALYTIC', 'NEWTON']
-
   REAL(wp) :: eps_sing          !< parameter for desingularization
   REAL(wp) :: eps_sing4         !< parameter for desingularization**4
 

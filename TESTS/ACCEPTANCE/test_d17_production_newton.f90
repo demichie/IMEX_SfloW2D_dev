@@ -169,8 +169,7 @@ PROGRAM test_d17_production_newton
   gas_loss_flag=.FALSE.;liquid_vaporization_flag=.FALSE.
   liquid_flag=.FALSE.;settling_flag=.FALSE.;entrainment_flag=.FALSE.
   erosion_coeff=0.0_wp
-  imex_velocity_group=1;imex_energy_group=2;imex_pore_pressure_group=3
-  imex_group_method=[CHARACTER(LEN=16)::'NEWTON','NEWTON','NEWTON']
+
   CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.], &
        [0,1,1,0],[IM_GROUP_METHOD_NEWTON])
   CALL initialize_configured_sources(legacy_registry,partition,config_error)

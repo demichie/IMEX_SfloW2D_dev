@@ -8,9 +8,11 @@ PROGRAM test_grouped_implicit_stage
   USE equation_metadata_2d, ONLY : equation_partition_type,                 &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   USE source_terms_2d, ONLY : eval_source_implicit, eval_source_semi_implicit
-  USE equation_terms_2d, ONLY : init_problem_param
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_configuration_2d, ONLY : initialize_configured_sources
+  USE source_input_2d, ONLY : rheology_method, rheology_cadence, rheology_group, &
+       thermal_method, thermal_cadence, thermal_group, &
+       pore_pressure_method, pore_pressure_cadence, pore_pressure_group
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_CADENCE_STAGE
   USE state_2d, ONLY : correct_friction_momentum
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
@@ -123,10 +125,9 @@ PROGRAM test_grouped_implicit_stage
   CALL partition%initialize(implicit_mask, group_map,                       &
        [IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_ANALYTIC,                 &
        IM_GROUP_METHOD_NEWTON])
-  imex_velocity_group=3
-  imex_energy_group=1
-  imex_pore_pressure_group=2
-  imex_group_method=[CHARACTER(LEN=16)::'ANALYTIC','ANALYTIC','NEWTON']
+  rheology_method='NEWTON'; rheology_cadence='STAGE'; rheology_group=3
+  thermal_method='ANALYTIC'; thermal_cadence='STAGE'; thermal_group=1
+  pore_pressure_method='ANALYTIC'; pore_pressure_cadence='STAGE'; pore_pressure_group=2
   CALL initialize_configured_sources(source_registry,partition,source_error)
   IF (LEN_TRIM(source_error)>0) ERROR STOP TRIM(source_error)
   IF (SIZE(source_registry%stage_groups())/=4) &
@@ -292,7 +293,7 @@ PROGRAM test_grouped_implicit_stage
      ERROR STOP 'effective IM rate does not match the net stage increment'
   END IF
 
-  CALL init_problem_param(partition)
+  CALL initialize_configured_sources(source_registry,partition,source_error)
   CALL refresh_source_registry
   IF (partition%IM_group_method(1) .NE. IM_GROUP_METHOD_ANALYTIC .OR.      &
        partition%IM_group_method(2) .NE. IM_GROUP_METHOD_ANALYTIC .OR.      &
@@ -346,11 +347,10 @@ PROGRAM test_grouped_implicit_stage
      ERROR STOP 'analytic effective rate does not match its net stage increment'
   END IF
 
-  imex_energy_group = 1
-  imex_pore_pressure_group = 1
-  imex_velocity_group = 2
-  imex_group_method(1:2) = [CHARACTER(LEN=16) :: 'ANALYTIC', 'ANALYTIC']
-  CALL init_problem_param(partition)
+  thermal_method='ANALYTIC'; thermal_group=1
+  pore_pressure_method='ANALYTIC'; pore_pressure_group=1
+  rheology_method='ANALYTIC'; rheology_group=2
+  CALL initialize_configured_sources(source_registry,partition,source_error)
   CALL refresh_source_registry
   IF (partition%n_IM_groups .NE. 2 .OR.                                  &
        partition%n_IM_group_equations(1) .NE. 2 .OR.                      &
@@ -377,11 +377,10 @@ PROGRAM test_grouped_implicit_stage
      ERROR STOP 'shared analytic group produced an inconsistent stage'
   END IF
 
-  imex_energy_group = 2
-  imex_pore_pressure_group = 1
-  imex_velocity_group = 3
-  imex_group_method = [CHARACTER(LEN=16) :: 'ANALYTIC', 'NEWTON', 'ANALYTIC']
-  CALL init_problem_param(partition)
+  thermal_method='NEWTON'; thermal_group=2
+  pore_pressure_method='ANALYTIC'; pore_pressure_group=1
+  rheology_method='ANALYTIC'; rheology_group=3
+  CALL initialize_configured_sources(source_registry,partition,source_error)
   CALL refresh_source_registry
   IF (partition%n_IM_groups .NE. 3 .OR.                               &
        partition%IM_group(7) .NE. 1 .OR.                               &
@@ -394,11 +393,10 @@ PROGRAM test_grouped_implicit_stage
      ERROR STOP 'configured IMEX group order or methods were not preserved'
   END IF
 
-  imex_energy_group = 1
-  imex_pore_pressure_group = 1
-  imex_velocity_group = 1
-  imex_group_method(1) = 'newton'
-  CALL init_problem_param(partition)
+  thermal_method='NEWTON'; thermal_group=1
+  pore_pressure_method='NEWTON'; pore_pressure_group=1
+  rheology_method='NEWTON'; rheology_group=1
+  CALL initialize_configured_sources(source_registry,partition,source_error)
   CALL refresh_source_registry
   IF (partition%n_IM_groups .NE. 1 .OR.                               &
        partition%n_IM_group_equations(1) .NE. 4 .OR.                   &
@@ -475,12 +473,10 @@ PROGRAM test_grouped_implicit_stage
      ERROR STOP 'Newton momentum group did not combine SI and implicit sources'
   END IF
 
-  imex_velocity_group = 1
-  imex_energy_group = 2
-  imex_pore_pressure_group = 3
-  imex_group_method = [CHARACTER(LEN=16) ::                             &
-       'ANALYTIC', 'ANALYTIC', 'ANALYTIC']
-  CALL init_problem_param(partition)
+  rheology_method='ANALYTIC'; rheology_group=1
+  thermal_method='ANALYTIC'; thermal_group=2
+  pore_pressure_method='ANALYTIC'; pore_pressure_group=3
+  CALL initialize_configured_sources(source_registry,partition,source_error)
   CALL refresh_source_registry
   q_stage_check = q_old
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
