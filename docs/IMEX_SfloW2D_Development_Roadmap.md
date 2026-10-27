@@ -2590,6 +2590,10 @@ Ogni passo deve costituire una modifica **sostanziale e coordinata** con i test 
 
 **Gate non completati:** (i) avanzamento vero attraverso tutti gli stage RK di `time_integration_workspace_type%advance` e successivo STEP cooling in un caso fisico della lava; (ii) gruppi EXPLICIT/STAGE ed EXPLICIT/STEP con piu sorgenti, usando uno stato comune e un oracolo di somma indipendente; (iii) restart della simulazione lava con split e regressione quantitativa contro configurazioni legacy; (iv) raffinare dt e documentare accuratezza e splitting. Non interpretare i test locali sopra come copertura di questi gate.
 
+**Gate full RK aggiunto (27 ottobre 2026; commit `6401132`, `bb18ed0`; CI non ancora verificata):** il driver gia usato da `TEST_IMEX_STAGES` esegue ora, su richiesta della fixture, tutta la sequenza `time_integration_workspace_type%advance` con lava `NEWTON/STAGE`, seguita dalla chiamata reale `execute_step_source_groups` per cooling `ANALYTIC/STEP`. Per isolare il problema termico il registry post-RK del test contiene soltanto il gruppo cooling, senza mass exchange: questo non sostituisce un test con tutti i processi attivi. Si controllano mappa analitica esatta per cella, invarianza delle variabili non target e presenza di stage Newton. `compare_stages.py` esegue questa fixture per `n_RK=2,3,4`, due passi e 1/4 thread, confrontando byte-per-byte i risultati paralleli. Resta da raccogliere l'esito della CI.
+
+**Ancora aperti per chiusura D18:** test EXPLICIT STAGE/STEP multi-sorgente con oracoli di somma indipendenti, restart della lava mixed-mode, raffinatezza temporale e accuratezza dello splitting, regressione con mass exchange simultaneo, audit del parser e dell'ownership delle configurazioni.
+
 #### D18.6 — Matrice di regressione e criteri di accettazione
 
 | Caso | Risultato obbligatorio |
