@@ -82,7 +82,8 @@ CONTAINS
     CHARACTER(LEN=16) :: requested_method,requested_cadence
     INTEGER :: i,j,k,id,method,cadence,pore,eq,compact,n
     INTEGER :: target
-    INTEGER :: membership(n_eqns),partition_methods(3)
+    INTEGER :: membership(n_eqns)
+    INTEGER, ALLOCATABLE :: partition_methods(:)
     INTEGER, ALLOCATABLE :: stage_order(:)
     INTEGER :: swap_order
     LOGICAL :: mask(n_eqns)
@@ -234,13 +235,11 @@ CONTAINS
         END IF
       END DO
     END DO
+    ALLOCATE(partition_methods(SIZE(stages)))
     mask=.FALSE.; membership=0; partition_methods=0; compact=0
     DO i=1,SIZE(stages)
       IF (stages(i)%method==SOURCE_METHOD_EXPLICIT) CYCLE
       compact=compact+1
-      IF (compact>3) THEN
-        error='D18: too many implicit source groups'; RETURN
-      END IF
       partition_methods(compact)=IM_GROUP_METHOD_NEWTON
       IF (stages(i)%method==SOURCE_METHOD_ANALYTIC) &
            partition_methods(compact)=IM_GROUP_METHOD_ANALYTIC
