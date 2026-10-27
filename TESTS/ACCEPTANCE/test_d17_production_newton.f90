@@ -159,8 +159,8 @@ PROGRAM test_d17_production_newton
   expected=old(2:3)/(1.0_wp+0.1_wp*dt*0.75_wp)
   CALL check(q(2:3),expected,'post-Newton correct implicit drag')
   PRINT *, 'PASS D17 production post-Newton friction ray guard'
-  ! Quantitative legacy/native configuration equivalence: both paths
-  ! construct their own validated source groups, then call the real solver.
+  ! Verify that two independently constructed physical configurations yield
+  ! the same production Newton stage and its exact reference solution.
   rheology_flag=.TRUE.;rheology_model='newmodel'
   thermal_cooling_flag=.FALSE.;pore_pressure_flag=.FALSE.
   curvature_term_flag=.FALSE.;bottom_radial_source_flag=.FALSE.
@@ -181,8 +181,13 @@ PROGRAM test_d17_production_newton
   rheology_method='NEWTON'
   rheology_cadence='STAGE'
   rheology_group=1
+  CALL native_partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.], &
+       [0,1,1,0],[IM_GROUP_METHOD_NEWTON])
   CALL initialize_configured_sources(native_registry,native_partition,config_error)
-  IF (LEN_TRIM(config_error)>0) ERROR STOP 'physical numeric configuration rejected'
+  IF (LEN_TRIM(config_error)>0) THEN
+    PRINT *, TRIM(config_error)
+    ERROR STOP 'physical numeric configuration rejected'
+  END IF
   old=[1000.0_wp,3000.0_wp,-4000.0_wp,1.2E9_wp]
   legacy_q=old;native_q=old;known=0.0_wp;dt=0.2_wp
   CALL solve_rk_step(partition,legacy_registry%stage_groups(),legacy_q,old, &
