@@ -41,7 +41,7 @@ field remains unchanged through source-window preparation, then becomes
 nonzero during stochastic preparation. Stochastic transport remains disabled,
 so the fixture does not change the restart state layout.
 
-The native-source fixture now enables a bottom circular source whose periodic
+The physical-source fixture now enables a bottom circular source whose periodic
 pulse ends halfway through the 0.2-second timestep. The
 production call therefore uses a 0.5 interval-mean coefficient; the test
 checks the exact integrated mass addition, positivity, and the full five-phase
@@ -62,6 +62,6 @@ budgets, bed updates, and checkpoint continuation.
 The test starts after the driver has selected and limited `dt`; it does not
 exercise the driver's `dt` selection/limiting logic or subsequent
 diagnostics/output, and stochastic transport is not validated. The production
-test verifies the active bottom-source mean for one native configuration, not
+test verifies the active bottom-source mean for one physical-source configuration, not
 all source types or physical combinations. Therefore D17.15 is **partially
 verified**, not complete. No cross-platform or CI acceptance is claimed.

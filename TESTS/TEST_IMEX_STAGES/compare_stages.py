@@ -653,7 +653,7 @@ def stage_count_suite(executable, profile):
                   "requested_n_RK": stages, "effective_n_RK": expected, "accepted": accepted,
                   "runs": evidence}, sort_keys=True), flush=True)
     print("PASS: unsupported N_RK rejected by input and workspace; default remains 2", flush=True)
-    directory = Path("source-groups-native")
+    directory = Path("source-groups-physical")
     directory.mkdir()
     subprocess.run([sys.executable, str(generator)], cwd=directory, check=True)
     inp = directory / "IMEX_SfloW2D.inp"
@@ -683,11 +683,11 @@ def stage_count_suite(executable, profile):
  time_param=10.0D0,5.0D0,0.0D0,0.0D0,
 /
 """)
-    # D18 derives groups from physical source settings; no SOURCE_GROUPS input.
+    # D18 derives groups solely from physical source settings.
     env = {**os.environ, "OMP_NUM_THREADS": "1", "OMP_DYNAMIC": "FALSE"}
-    run = subprocess.run([str(executable), "native-source", "2"], cwd=directory, env=env,
+    run = subprocess.run([str(executable), "physical-source", "2"], cwd=directory, env=env,
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=30)
-    (directory / "native-source.log").write_text(run.stdout)
+    (directory / "physical-source.log").write_text(run.stdout)
     if run.returncode != 0 or "PASS: stage count accepted:" not in run.stdout or \
             "PASS: production timestep phase order" not in run.stdout:
         raise AssertionError(f"{directory}: native source input flow failed\n{run.stdout}")

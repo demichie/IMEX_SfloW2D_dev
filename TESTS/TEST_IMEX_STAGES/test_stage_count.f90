@@ -34,7 +34,7 @@ PROGRAM test_stage_count
      CALL init_param
      CALL read_param
      IF (n_RK /= expected) ERROR STOP 'input stage count changed unexpectedly'
-  CASE ('native-source')
+  CASE ('physical-source')
      CALL init_param
      CALL read_param
      IF (.NOT.stochastic_flag) ERROR STOP 'stochastic physics was not enabled'
