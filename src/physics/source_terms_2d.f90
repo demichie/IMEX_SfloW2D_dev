@@ -30,7 +30,8 @@ MODULE source_terms_2d
   USE source_registry_2d, ONLY : source_group_type, group_contains_name
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: eval_source_explicit
+  PUBLIC :: eval_source_explicit, eval_cell_source_explicit
+  PUBLIC :: cell_analytic_source_context
   ! Source evaluation is dispatched through one public generic: STAGE
   ! carries injection geometry; STEP carries atomic exchange rates/inventories.
   INTERFACE eval_source_explicit
@@ -67,6 +68,39 @@ MODULE source_terms_2d
     REAL(wp) :: grav_coeff=0.0_wp, Zij=0.0_wp
   END TYPE analytic_term_context_type
 CONTAINS
+  ! Shared cell adapters: STAGE and STEP use identical physical geometry.
+  SUBROUTINE eval_cell_source_explicit(j,k,qp_cell,time,group,rate)
+    USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
+         B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
+         cell_source_fractions,cell_fissure_fractions,cell_arc_perim, &
+         cell_arc_n_x,cell_arc_n_y,dx,dy
+    INTEGER, INTENT(IN) :: j,k
+    REAL(wp), INTENT(IN) :: qp_cell(n_vars+2),time
+    TYPE(source_group_type), INTENT(IN) :: group
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    CALL eval_source_explicit(B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
+         B_second_xx_geom(j,k),B_second_xy_geom(j,k), &
+         B_second_yy_geom(j,k),grav_coeff(j,k),qp_cell,rate,time, &
+         cell_source_fractions(j,k),cell_fissure_fractions(j,k,:), &
+         cell_arc_perim(j,k),cell_arc_n_x(j,k),cell_arc_n_y(j,k), &
+         dx*dy,group)
+  END SUBROUTINE eval_cell_source_explicit
+
+  FUNCTION cell_analytic_source_context(j,k,Zij) RESULT(context)
+    USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
+         B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff
+    INTEGER, INTENT(IN) :: j,k
+    REAL(wp), INTENT(IN) :: Zij
+    TYPE(analytic_term_context_type) :: context
+    context%Bprime_x=B_prime_x_geom(j,k)
+    context%Bprime_y=B_prime_y_geom(j,k)
+    context%Bsecond_xx=B_second_xx_geom(j,k)
+    context%Bsecond_xy=B_second_xy_geom(j,k)
+    context%Bsecond_yy=B_second_yy_geom(j,k)
+    context%grav_coeff=grav_coeff(j,k)
+    context%Zij=Zij
+  END FUNCTION cell_analytic_source_context
+
 
   RECURSIVE SUBROUTINE eval_source_analytic(group,q_before,context,interval,q_after,status)
     TYPE(source_group_type), INTENT(IN) :: group

@@ -124,6 +124,7 @@ CONTAINS
          record_topography_rate_cell, apply_topography_rate_update
     USE geometry_2d, ONLY : deposit, erosion, erodible, B_zone
     USE source_terms_2d, ONLY : eval_source_explicit, eval_source_analytic, &
+         eval_cell_source_explicit, cell_analytic_source_context, &
          analytic_term_context_type
     USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC, SOURCE_METHOD_EXPLICIT, &
          SOURCE_METHOD_NEWTON
@@ -204,15 +205,13 @@ CONTAINS
              j=domain%j_cent(cell_index); k=domain%k_cent(cell_index)
              IF (q(1,j,k)<=0.0_wp) CYCLE
              IF (step_groups(group_index)%method==SOURCE_METHOD_EXPLICIT) THEN
-                CALL eval_source_explicit(B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
-                     B_second_xx_geom(j,k),B_second_xy_geom(j,k), &
-                     B_second_yy_geom(j,k),grav_coeff(j,k), &
-                     qp(1:n_vars+2,j,k),explicit_rate,source_time, &
-                     cell_source_fractions(j,k),cell_fissure_fractions(j,k,:), &
-                     cell_arc_perim(j,k),cell_arc_n_x(j,k),cell_arc_n_y(j,k), &
-                     dx*dy,step_groups(group_index))
+                CALL eval_cell_source_explicit(j,k,qp(1:n_vars+2,j,k), &
+                     source_time,step_groups(group_index),explicit_rate)
                 q(1:n_eqns,j,k)=q(1:n_eqns,j,k)+time_step*explicit_rate
              ELSE IF (step_groups(group_index)%method==SOURCE_METHOD_ANALYTIC) THEN
+                step_noise=0.0_wp
+                IF (PRESENT(stochastic_values)) step_noise=stochastic_values(j,k)
+                analytic_context=cell_analytic_source_context(j,k,step_noise)
                 CALL eval_source_analytic(step_groups(group_index),q(1:n_vars,j,k), &
                      analytic_context,time_step,analytic_state,analytic_status)
                 IF (analytic_status/=0) &

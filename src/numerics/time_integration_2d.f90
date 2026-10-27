@@ -262,7 +262,7 @@ CONTAINS
     USE state_conversion_2d, ONLY : qc_to_qp, clip_roundoff_negative_component_masses
     USE state_2d, ONLY : finalize_imex_cell_state, initialize_dry_physical_cell
 
-    USE source_terms_2d, ONLY : eval_source_explicit
+    USE source_terms_2d, ONLY : eval_cell_source_explicit
 
     USE constitutive_parameters_2d, ONLY : T_ambient
 
@@ -580,13 +580,9 @@ CONTAINS
              ! hydrostatic path contribution handled by spatial_operator.
              this%EX_terms(1:n_eqns,j,k,i_RK)=0.0_wp
              DO explicit_group_index=1,SIZE(explicit_groups)
-                CALL eval_source_explicit( B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
-                     B_second_xx_geom(j,k),B_second_xy_geom(j,k),             &
-                     B_second_yy_geom(j,k),grav_coeff(j,k),                   &
-                     this%qp_rk(1:n_vars+2,j,k),explicit_rate,t,               &
-                     cell_source_fractions(j,k),cell_fissure_fractions(j,k,:),&
-                     cell_arc_perim(j,k),cell_arc_n_x(j,k),cell_arc_n_y(j,k), &
-                     dx*dy,explicit_groups(explicit_group_index))
+                CALL eval_cell_source_explicit(j,k, &
+                     this%qp_rk(1:n_vars+2,j,k),t, &
+                     explicit_groups(explicit_group_index),explicit_rate)
                 this%EX_terms(1:n_eqns,j,k,i_RK)=                              &
                      this%EX_terms(1:n_eqns,j,k,i_RK)+explicit_rate
              END DO
