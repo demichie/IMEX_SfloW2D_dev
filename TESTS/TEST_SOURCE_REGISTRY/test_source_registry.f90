@@ -10,8 +10,7 @@ PROGRAM test_source_registry
        rheology_flag, rheology_model, pore_pressure_flag, thermal_cooling_flag, &
        curvature_term_flag, bottom_radial_source_flag, bottom_fissural_source_flag, &
        radial_source_flag, lateral_source_flag, liquid_flag, gas_flag, &
-       gas_loss_flag, liquid_vaporization_flag, imex_velocity_group, &
-       imex_energy_group, imex_pore_pressure_group, imex_group_method
+       gas_loss_flag, liquid_vaporization_flag
   USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag, &
        coeff_porosity, entrainment_flag
   IMPLICIT NONE
@@ -109,8 +108,9 @@ CONTAINS
     gas_loss_flag=.FALSE.;liquid_vaporization_flag=.FALSE.
     erosion_coeff=0.0_wp;settling_flag=.TRUE.
     coeff_porosity=0.0_wp;entrainment_flag=.FALSE.
-    imex_velocity_group=3;imex_energy_group=1;imex_pore_pressure_group=2
-    imex_group_method=[CHARACTER(LEN=16)::'ANALYTIC','ANALYTIC','NEWTON']
+    rheology_method='NEWTON'; rheology_cadence='STAGE'; rheology_group=3
+    thermal_method='ANALYTIC'; thermal_cadence='STAGE'; thermal_group=1
+    pore_pressure_method='ANALYTIC'; pore_pressure_cadence='STAGE'; pore_pressure_group=2
   END SUBROUTINE configure_lava_case
 
   SUBROUTINE verify_default_schedule()

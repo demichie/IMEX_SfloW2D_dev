@@ -8,7 +8,6 @@ PROGRAM test_stage_count
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, cell_size, init_grid
   USE time_integration_2d, ONLY : time_integration_workspace_type
   USE inpout_2d, ONLY : init_param, read_param, read_solution
-  USE equation_terms_2d, ONLY : init_problem_param
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_configuration_2d, ONLY : initialize_configured_sources
   USE equation_metadata_2d, ONLY : equation_partition_type
@@ -39,7 +38,6 @@ PROGRAM test_stage_count
      CALL init_param
      CALL read_param
      IF (.NOT.stochastic_flag) ERROR STOP 'stochastic physics was not enabled'
-     CALL init_problem_param(partition)
      CALL initialize_configured_sources(registry,partition,error)
      IF (LEN_TRIM(error)>0) ERROR STOP 'physical source schedule rejected: '//TRIM(error)
      stage_groups=registry%stage_groups()
