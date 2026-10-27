@@ -1,6 +1,6 @@
 !********************************************************************************
 !> \brief Translate configured source activation into validated D17 metadata.
-!> \details Runs once after legacy equation partition initialization. Owns no
+!> \details Runs once from physical source settings. Owns no
 !>          physical state and performs no rate evaluation or temporal update.
 !>          Per-cell wetness, packing and window gates remain in existing kernels.
 !********************************************************************************
@@ -15,7 +15,7 @@ MODULE source_configuration_2d
        pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag, &
        bottom_fissural_source_flag, radial_source_flag, lateral_source_flag, &
        liquid_flag, gas_flag, gas_loss_flag, liquid_vaporization_flag, &
-       imex_velocity_group, imex_energy_group, imex_pore_pressure_group, idx_pore
+       idx_pore
   USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag, &
        coeff_porosity, entrainment_flag
   IMPLICIT NONE
@@ -23,8 +23,7 @@ MODULE source_configuration_2d
   PUBLIC :: initialize_configured_sources
 CONTAINS
   !> Identify active physical sources exactly once for both input syntaxes.
-  !> The thermal flag is resolved by the caller to preserve legacy partition
-  !> semantics where thermal activation follows the initialized IMEX mask.
+  !> Thermal activation is determined by the physical cooling flag.
   SUBROUTINE collect_active_source_names(include_thermal,active_names,error)
     LOGICAL, INTENT(IN) :: include_thermal
     CHARACTER(LEN=64), ALLOCATABLE, INTENT(OUT) :: active_names(:)
@@ -71,8 +70,7 @@ CONTAINS
   !> \param[out] error Empty on success, otherwise a pre-simulation diagnostic.
   !> \note This phase records possible activation; zero per-cell rates stay valid.
   !> Construct final physical groups once, deriving the equation partition.
-  !> The previously initialized partition only supplies legacy IMEX defaults;
-  !> no temporary registry or subsequent source reassignment is constructed.
+  !> No temporary registry or subsequent source reassignment is constructed.
   SUBROUTINE initialize_configured_sources(registry,partition,error)
     TYPE(source_registry_type), INTENT(INOUT) :: registry
     TYPE(equation_partition_type), INTENT(INOUT) :: partition
@@ -83,25 +81,20 @@ CONTAINS
     TYPE(source_term_type) :: term
     CHARACTER(LEN=16) :: requested_method,requested_cadence
     INTEGER :: i,j,k,id,method,cadence,pore,eq,compact,n
-    INTEGER :: target,legacy_group,im_method
+    INTEGER :: target
     INTEGER :: membership(n_eqns),partition_methods(3)
-    INTEGER :: group_ids(3)
     INTEGER, ALLOCATABLE :: stage_order(:)
-    INTEGER :: source_order,swap_order
+    INTEGER :: swap_order
     LOGICAL :: mask(n_eqns)
     CALL registry%finalize()
     error=''
-    IF (.NOT.partition%is_initialized()) THEN
-      error='D18: equation metadata must be initialized'; RETURN
-    END IF
-    IF (partition%n_equations<4) THEN
+    IF (n_eqns<4) THEN
       error='D18: invalid equation layout'; RETURN
     END IF
-    CALL collect_active_source_names(partition%implicit(4),active_names,error)
+    CALL collect_active_source_names(thermal_cooling_flag,active_names,error)
     IF (LEN_TRIM(error)>0) RETURN
     pore=0
     IF (pore_pressure_flag) pore=idx_pore
-    group_ids=[imex_velocity_group,imex_energy_group,imex_pore_pressure_group]
     ALLOCATE(stages(0),steps(0),stage_order(0))
     DO i=1,SIZE(active_names)
       term=source_term_descriptor_by_name(active_names(i))
@@ -112,7 +105,6 @@ CONTAINS
       cadence=term%default_cadence
       id=0
       requested_method=''; requested_cadence=''
-      source_order=0
       SELECT CASE(TRIM(term%target))
       CASE('velocity')
         target=1
@@ -140,28 +132,6 @@ CONTAINS
       IF (id<0) THEN
         error='D18: GROUP must be nonnegative'; RETURN
       END IF
-      IF (target>0) THEN
-        SELECT CASE(target)
-        CASE(1); eq=2
-        CASE(2); eq=4
-        CASE(3); eq=pore
-        END SELECT
-        IF (eq<1 .OR. eq>n_eqns) THEN
-          error='D18: invalid physical target equation'; RETURN
-        END IF
-        IF (partition%implicit(eq)) THEN
-          legacy_group=partition%IM_group(eq)
-          IF (legacy_group<1 .OR. legacy_group>3) THEN
-            error='D18: invalid legacy implicit group'; RETURN
-          END IF
-          source_order=legacy_group
-          im_method=partition%IM_group_method(legacy_group)
-          method=SOURCE_METHOD_NEWTON
-          IF (im_method==IM_GROUP_METHOD_ANALYTIC) method=SOURCE_METHOD_ANALYTIC
-          ! Preserve explicit legacy IMEX grouping when physical GROUP is omitted.
-          IF (id==0) id=group_ids(target)
-        END IF
-      END IF
       IF (LEN_TRIM(requested_method)>0) THEN
         SELECT CASE(TRIM(requested_method))
         CASE('EXPLICIT'); method=SOURCE_METHOD_EXPLICIT
@@ -170,10 +140,7 @@ CONTAINS
         CASE DEFAULT
           error='D18: invalid source METHOD'; RETURN
         END SELECT
-        ! An explicit physical choice without GROUP uses the D18 default zero.
-        IF (method==SOURCE_METHOD_EXPLICIT .AND. target>0) THEN
-          IF (id==group_ids(target)) id=0
-        END IF
+      END IF
       END IF
       IF (LEN_TRIM(requested_cadence)>0) THEN
         SELECT CASE(TRIM(requested_cadence))
@@ -198,13 +165,6 @@ CONTAINS
       IF (target>0 .AND. method==SOURCE_METHOD_NEWTON .AND. &
            .NOT.term%has_newton) THEN
         error='D18: Newton interface unavailable for source'; RETURN
-      END IF
-      ! The legacy analytic velocity/energy/pressure solvers are independent.
-      ! Group identity is (cadence,method,id), not the group number alone.
-      IF (target>0 .AND. method==SOURCE_METHOD_ANALYTIC .AND. &
-           LEN_TRIM(requested_method)==0) THEN
-        id=group_ids(target)
-        IF (target>1) id=id+target*3
       END IF
       k=0
       IF (cadence==SOURCE_CADENCE_STAGE) THEN
@@ -232,17 +192,7 @@ CONTAINS
         END IF
         IF (cadence==SOURCE_CADENCE_STAGE) THEN
           stages=[stages,group]
-          ! Freeze legacy dependency order when the physical triplet is built.
-          ! Explicit user GROUP selection takes precedence over that default.
-          IF (LEN_TRIM(requested_method)>0) source_order=0
-          ! Fortran does not guarantee short-circuit evaluation of .AND.;
-          ! never index group_ids with the zero target of explicit sources.
-          IF (target>0) THEN
-            IF (id/=group_ids(target) .AND. &
-                 method/=SOURCE_METHOD_ANALYTIC) source_order=0
-          END IF
-          IF (source_order==0) source_order=id
-          stage_order=[stage_order,source_order]
+          stage_order=[stage_order,id]
         ELSE
           steps=[steps,group]
         END IF
@@ -259,8 +209,7 @@ CONTAINS
         steps(k)%source_names=[CHARACTER(LEN=64)::steps(k)%source_names,active_names(i)]
       END IF
     END DO
-    ! Preserve the empty EXPLICIT/STAGE group expected by the legacy IMEX
-    ! stage contract when no geometric or injection term is active.
+    ! Keep an empty explicit stage group required by the RK stage interface.
     IF (.NOT.ANY([(stages(j)%method==SOURCE_METHOD_EXPLICIT,j=1,SIZE(stages))])) THEN
       group%id=0
       group%method=SOURCE_METHOD_EXPLICIT
@@ -270,7 +219,7 @@ CONTAINS
       stages=[stages,group]
       stage_order=[stage_order,0]
     END IF
-    ! Keep empty legacy stages available only where they are numerically needed.
+    ! Keep only the empty stage group required by the RK interface.
     ! Runtime array order derives from method class and GROUP; no extra state.
     DO i=1,SIZE(stages)
       DO j=i+1,SIZE(stages)

@@ -10,7 +10,6 @@
 
 MODULE simulation_2d
 
-  USE equation_terms_2d, ONLY : init_problem_param
   USE mass_injection_coefficients_2d, ONLY : set_source_time_coefficients
   USE step_source_executor_2d, ONLY : execute_step_source_groups
 
@@ -104,7 +103,6 @@ CONTAINS
     CALL this%model_layout%initialize( n_layers, n_vars, n_eqns, n_solid,   &
          n_add_gas, n_stoch_vars, n_pore_vars, liquid_flag .AND. gas_flag )
 
-    CALL init_problem_param(this%equation_partition)
     CALL initialize_configured_sources(this%source_registry, &
          this%equation_partition,source_error)
     IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))

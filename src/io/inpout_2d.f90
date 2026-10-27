@@ -2202,9 +2202,6 @@ CONTAINS
 
     END IF
 
-    legacy_imex_explicit=(imex_velocity_group/=-HUGE(1) .OR. &
-         imex_energy_group/=-HUGE(1) .OR. imex_pore_pressure_group/=-HUGE(1) .OR. &
-         ANY(LEN_TRIM(imex_group_method)>0))
     CALL read_mass_exchange_parameters(input_unit,source_input_error)
     ! The first D18 executable mode is an entirely explicit STAGE partition.
     ! Reject mixed requests instead of silently retaining implicit evaluation.
