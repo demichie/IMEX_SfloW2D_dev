@@ -18,6 +18,8 @@ PROGRAM test_mass_exchange
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, SOURCE_METHOD_EXPLICIT
   USE source_configuration_2d, ONLY : initialize_configured_sources
+  USE source_input_2d, ONLY : thermal_method,thermal_cadence,thermal_group
+  USE thermal_laws_2d, ONLY : solve_thermal_cooling_analytic
   USE inpout_2d, ONLY : write_restart_file, read_restart_file, output_idx
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
@@ -52,6 +54,7 @@ PROGRAM test_mass_exchange
   IF (status /= 0) selected = 'all'
   CALL initialize_fixture
   CALL test_empty_step_registry
+  CALL test_analytic_cooling_step_executor
   OPEN(NEWUNIT=snapshot_unit, FILE='snapshot.bin', ACCESS='STREAM',      &
        FORM='UNFORMATTED', STATUS='REPLACE')
   OPEN(NEWUNIT=extension_unit, FILE='flat_evaluations.bin', ACCESS='STREAM', &
@@ -189,6 +192,63 @@ CONTAINS
     CALL same_bits('empty step bed',RESHAPE(B_vertex,[SIZE(bed_before)]),RESHAPE(bed_before,[SIZE(bed_before)]))
     CALL source_registry%finalize()
   END SUBROUTINE test_empty_step_registry
+
+  !> D18: production post-RK dispatcher applies exact cooling once over dt.
+  SUBROUTINE test_analytic_cooling_step_executor
+    REAL(wp) :: prior(nq,nx,ny), prior_qp(nq+2,nx,ny)
+    REAL(wp) :: temperature,cap,expected_temperature,expected_energy,p_dyn
+    REAL(wp), PARAMETER :: delta=0.15_wp
+    INTEGER :: j,k,l
+    CHARACTER(LEN=256) :: error
+
+    CALL reset_fixture
+    liquid_flag=.FALSE.
+    thermal_cooling_flag=.TRUE.
+    radiative_term_coeff=5.103E-8_wp
+    convective_term_coeff=9.0_wp
+    T_env=300.0_wp
+    thermal_method='ANALYTIC'
+    thermal_cadence='STEP'
+    thermal_group=1
+    CALL initialize_configured_sources(source_registry,equation_partition,error)
+    IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
+    DO l=1,domain%solve_cells
+      j=domain%j_cent(l); k=domain%k_cent(l)
+      IF (state%q(1,j,k)<=0.0_wp) CYCLE
+      CALL qc_to_qp(state%q(:,j,k),state%qp(:,j,k),p_dyn)
+    END DO
+    prior=state%q;prior_qp=state%qp
+    CALL apply_mass_exchange_step(state%q,state%qp,delta,domain,source_registry)
+    DO l=1,domain%solve_cells
+      j=domain%j_cent(l);k=domain%k_cent(l)
+      IF (prior(1,j,k)<=0.0_wp) THEN
+        IF (ANY(state%q(:,j,k)/=prior(:,j,k))) &
+             ERROR STOP 'D18: analytic STEP modified dry conservative state'
+        CYCLE
+      END IF
+      temperature=prior_qp(4,j,k)
+      cap=prior(4,j,k)/temperature
+      CALL solve_thermal_cooling_analytic(temperature,delta,cap, &
+           radiative_term_coeff,convective_term_coeff,T_env,expected_temperature)
+      expected_energy=cap*expected_temperature
+      IF (ABS(state%q(4,j,k)-expected_energy)> &
+           1.0E-12_wp*MAX(1.0_wp,ABS(expected_energy))) &
+           ERROR STOP 'D18: STEP cooling does not match exact full-step map'
+      IF (ANY(state%q([1,2,3,5,6],j,k)/=prior([1,2,3,5,6],j,k))) &
+           ERROR STOP 'D18: STEP cooling changed unrelated conservative equations'
+      IF (ABS(state%qp(4,j,k)-expected_temperature)> &
+           1.0E-12_wp*MAX(1.0_wp,ABS(expected_temperature))) &
+           ERROR STOP 'D18: STEP cooling did not synchronize primitive state'
+    END DO
+    IF (ANY(state%q(:,nx,ny)/=prior(:,nx,ny))) &
+         ERROR STOP 'D18: STEP cooling modified inactive cell'
+    CALL source_registry%finalize
+    CALL equation_partition%finalize
+    thermal_cooling_flag=.FALSE.
+    liquid_flag=.TRUE.
+    thermal_method='ANALYTIC';thermal_cadence='STAGE';thermal_group=0
+    WRITE(*,*) 'PASS D18 analytic cooling post-RK production executor'
+  END SUBROUTINE test_analytic_cooling_step_executor
 
   !> \brief Reset conservative inventories and an analytic initial bed before each independent case.
   SUBROUTINE reset_fixture
