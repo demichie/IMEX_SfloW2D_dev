@@ -506,6 +506,7 @@ PROGRAM test_grouped_implicit_stage
   END IF
 
   CALL test_ordered_multi_solver_group
+  CALL test_multi_source_newton_step
   CALL test_lava_newton_stage_cooling_analytic_step
 
   CALL partition%finalize
@@ -577,6 +578,60 @@ CONTAINS
          ERROR STOP 'D18: cooling STEP modified unrelated state'
     WRITE(*,*) 'PASS D18 lava Newton/STAGE and analytic cooling/STEP'
   END SUBROUTINE test_lava_newton_stage_cooling_analytic_step
+
+  ! D18: STEP Newton advances all selected equations in one joint solve.
+  SUBROUTINE test_multi_source_newton_step
+    TYPE(equation_partition_type) :: step_partition
+    TYPE(source_registry_type) :: step_registry
+    TYPE(source_group_type) :: step_group
+    TYPE(source_group_type), ALLOCATABLE :: groups(:)
+    LOGICAL :: mask(7),success,failed
+    INTEGER :: memberships(7),iters,info,target
+    REAL(wp) :: before(7),after(7),rates(7),normalized
+    CHARACTER(LEN=256) :: error
+
+    mask=.FALSE.;mask([2,3,4,7])=.TRUE.
+    memberships=0;memberships([2,3,4,7])=1
+    CALL step_partition%initialize(mask,memberships,[IM_GROUP_METHOD_NEWTON])
+    step_group=filter_group
+    step_group%id=1
+    step_group%source_names=[CHARACTER(LEN=64):: &
+         'rheology_lava','thermal_cooling','pore_pressure_dissipation']
+    step_group%equation_ids=[2,3,4,7]
+    step_group%cadence=SOURCE_CADENCE_STEP
+    CALL step_registry%initialize(n_vars,idx_pore,[source_group_type::], &
+         [step_group],error)
+    IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
+    groups=step_registry%step_groups()
+    IF (SIZE(groups)/=1) ERROR STOP 'D18: STEP Newton group split'
+    before=q_old
+    after=before
+    CALL solve_rk_step(step_partition,groups,after,before,dt_step,1.0_wp, &
+         known_residual,0.0_wp,0.0_wp,0.0_wp,iters,success,info,failed)
+    IF (.NOT.success .OR. failed .OR. info/=0) &
+         ERROR STOP 'D18: joint NEWTON/STEP failed'
+    IF (ANY(after([1,5,6])/=before([1,5,6]))) &
+         ERROR STOP 'D18: joint NEWTON/STEP changed explicit equations'
+    CALL eval_source_implicit(0.0_wp,0.0_wp,0.0_wp,r_qj=after, &
+         r_nh_term_impl=rates,group=groups(1))
+    DO target=1,4
+      SELECT CASE(target)
+      CASE(1);equation=2
+      CASE(2);equation=3
+      CASE(3);equation=4
+      CASE(4);equation=7
+      END SELECT
+      normalized=ABS(after(equation)-before(equation)-dt_step*rates(equation))/ &
+           MAX(1.0_wp,ABS(before(equation)))
+      IF (normalized>2.0E-5_wp) THEN
+        WRITE(*,*) 'FAIL NEWTON/STEP multi-source residual',equation,normalized
+        ERROR STOP 'D18: joint NEWTON/STEP residual'
+      END IF
+    END DO
+    CALL step_registry%finalize
+    CALL step_partition%finalize
+    WRITE(*,*) 'PASS D18 multi-source coupled NEWTON/STEP'
+  END SUBROUTINE test_multi_source_newton_step
 
   SUBROUTINE test_ordered_multi_solver_group
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
