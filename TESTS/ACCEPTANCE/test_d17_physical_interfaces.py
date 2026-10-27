@@ -148,8 +148,14 @@ def main() -> int:
         executor,
     ):
         failures.append("STEP executor must import the common explicit source bridge")
-    if len(re.findall(r"(?i)\bcall\s+eval_source_explicit\s*\(", executor)) != 1:
-        failures.append("STEP executor must evaluate the explicit source bridge once per cell")
+    # D18 has two distinct explicit dispatches through the same public generic:
+    # physical EXPLICIT/STEP groups and the atomic mass-exchange transaction.
+    if len(re.findall(r"(?i)\bcall\s+eval_source_explicit\s*\(", executor)) != 2:
+        failures.append("STEP executor must dispatch explicit physical and mass-exchange sources")
+    if not re.search(r"(?is)call\s+eval_source_explicit\s*\(\s*B_prime_x_geom\s*\(", executor):
+        failures.append("STEP executor must reuse the physical stage explicit kernel")
+    if not re.search(r"(?is)call\s+eval_source_explicit\s*\(\s*qp\s*\(", executor):
+        failures.append("STEP executor must retain the atomic mass-exchange explicit bridge")
     if re.search(r"(?im)^\s*use\s+(?:equation_terms_2d|mass_exchange_assembly_2d)\b",
                  executor):
         failures.append("STEP executor must not import the old equation/mass-rate bridge")
