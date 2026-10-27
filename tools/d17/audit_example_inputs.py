@@ -28,7 +28,7 @@ CASES = [
     "EXAMPLE_TAAL",
     "EXAMPLE_TAAL_BOTTOM"
 ]
-LEGACY_INTERNAL = re.compile(r"\b(?:rheology_model_id|rheology_id_[A-Za-z_0-9]+|source_solver_type|term_ids|SOURCE_TERM_[A-Z_0-9]+)\b")
+LEGACY_INTERNAL = re.compile(r"\b(?:rheology_model_id|rheology_id_[A-Za-z_0-9]+|source_solver_type|term_ids|SOURCE_TERM_[A-Z_0-9]+|IMEX_VELOCITY_GROUP|IMEX_ENERGY_GROUP|IMEX_PORE_PRESSURE_GROUP|IMEX_GROUP_METHOD|SOURCE_GROUP_ORDER)\b|(?im)^\s*[&$]SOURCE_GROUPS\b", re.IGNORECASE)
 NAMELIST = re.compile(r"(?m)^\s*&[A-Za-z_][A-Za-z0-9_]*\s*$")
 PLACEHOLDER = re.compile(r"(?<![A-Za-z0-9_])(?:runname|restartfile|nx_cells|ny_cells|x_min|y_min|x_left|dx|n_cells)\b")
 
@@ -64,8 +64,7 @@ def examine(root, name):
     generator = directory / ("create_dambreak.py" if name == "EXAMPLE_DAMBREAK" else "create_example.py")
     if templates and not generator.exists():
         issues.append(f"template present but generator missing: {generator.name}")
-    # Legacy SOURCE_GROUPS absence is intentional: do not infer a failed parser.
-    evidence["checks"]["legacy_defaults_preserved"] = "STATIC_ONLY"
+    evidence["checks"]["physical_configuration_only"] = "PASS" if not any("retired internal identifiers" in issue for issue in issues) else "FAIL"
     evidence["checks"]["solver_run"] = "NOT_RUN"
     evidence["checks"]["generated_input"] = "NOT_RUN" if templates else "NOT_APPLICABLE"
     if issues:
