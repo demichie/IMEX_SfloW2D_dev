@@ -1,11 +1,19 @@
 # D17 — Source-system refactoring: implementation roadmap and handoff log
 
+> **Historical D17 record (superseded):** This file records decisions and CI evidence
+> from an earlier implementation branch. It is not an operational guide for the
+> current D18 source architecture. The active configuration uses physical
+> METHOD/CADENCE/GROUP settings and `initialize_configured_sources`;
+> `SOURCE_GROUPS`, `initialize_legacy_registry`, and
+> `mass_exchange_step_2d` are removed. Use the D18 roadmap status and the
+> current source registry tests for implementation guidance.
+
 **Repository:** [demichie/IMEX_SfloW2D_dev](https://github.com/demichie/IMEX_SfloW2D_dev)  
 **Working branch:** `feature/d17-source-refactor` (branched from `master`)  
 **Last updated:** 2026-10-24  
 **Status:** IN PROGRESS — **not accepted**; GNU build **passed** and focused source-registry strict/optimized CI **passed**; complete numerical regression matrix not yet executed.
 
-> **Read this file first when resuming work in another chat.** This document records the agreed *target architecture*, observed repository state, actual branch commits, CI evidence, and the next action. It is not a declaration that a change has passed compilation or numerical regression tests. Update this file in the same branch whenever D17 code changes or CI status changes.
+> **Historical handoff only.** This document records the agreed *target architecture*, observed repository state, actual branch commits, CI evidence, and the next action. It is not a declaration that a change has passed compilation or numerical regression tests. Update this file in the same branch whenever D17 code changes or CI status changes.
 
 ## 1. Scope and authority
 

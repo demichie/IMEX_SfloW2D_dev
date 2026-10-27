@@ -1,5 +1,11 @@
 # D17.17 — Post-RK step-source separation
 
+> **Historical implementation evidence.** The dedicated `mass_exchange_step_2d`
+> module referred to below was later removed. The current post-RK execution
+> resides in `step_source_executor_2d` and is called by
+> `simulation%advance_timestep`. The following account is not a current
+> module dependency guide.
+
 ## Change
 
 The post-RK mass-exchange transaction has been moved from
