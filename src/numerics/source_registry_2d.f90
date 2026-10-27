@@ -127,7 +127,8 @@ CONTAINS
       CASE(SOURCE_METHOD_EXPLICIT)
         CONTINUE
       CASE(SOURCE_METHOD_NEWTON,SOURCE_METHOD_ANALYTIC)
-        IF (group%cadence/=SOURCE_CADENCE_STAGE) RETURN
+        IF (group%cadence/=SOURCE_CADENCE_STAGE .AND. &
+             group%cadence/=SOURCE_CADENCE_STEP) RETURN
       CASE DEFAULT
         RETURN
       END SELECT
@@ -330,7 +331,8 @@ CONTAINS
     CASE(SOURCE_METHOD_NEWTON)
       supported=group%cadence==SOURCE_CADENCE_STAGE .AND. term%has_newton
     CASE(SOURCE_METHOD_ANALYTIC)
-      supported=group%cadence==SOURCE_CADENCE_STAGE .AND. term%has_analytic
+      supported=(group%cadence==SOURCE_CADENCE_STAGE .OR. &
+           group%cadence==SOURCE_CADENCE_STEP) .AND. term%has_analytic
     END SELECT
   END FUNCTION supports_group
 END MODULE source_registry_2d

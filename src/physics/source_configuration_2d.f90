@@ -150,9 +150,9 @@ CONTAINS
           error='D18: invalid source CADENCE'; RETURN
         END SELECT
       END IF
-      IF (target>0 .AND. method/=SOURCE_METHOD_EXPLICIT .AND. &
+      IF (target>0 .AND. method==SOURCE_METHOD_NEWTON .AND. &
            cadence==SOURCE_CADENCE_STEP) THEN
-        error='D18: implicit STEP execution is not implemented'; RETURN
+        error='D18: NEWTON/STEP requires a coupled post-RK kernel'; RETURN
       END IF
       IF (target>0 .AND. method==SOURCE_METHOD_EXPLICIT .AND. &
            cadence==SOURCE_CADENCE_STEP) THEN
@@ -208,6 +208,17 @@ CONTAINS
       ELSE
         steps(k)%source_names=[CHARACTER(LEN=64)::steps(k)%source_names,active_names(i)]
       END IF
+    END DO
+    ! Sort post-RK groups by method class and configured group ID.
+    ! Analytic groups precede the atomic explicit mass-exchange transaction.
+    DO i=1,SIZE(steps)
+      DO j=i+1,SIZE(steps)
+        IF (group_method_rank(steps(j)%method)<group_method_rank(steps(i)%method) .OR. &
+             (group_method_rank(steps(j)%method)==group_method_rank(steps(i)%method) .AND. &
+              steps(j)%id<steps(i)%id)) THEN
+          tmp=steps(i); steps(i)=steps(j); steps(j)=tmp
+        END IF
+      END DO
     END DO
     ! Keep an empty explicit stage group required by the RK stage interface.
     IF (.NOT.ANY([(stages(j)%method==SOURCE_METHOD_EXPLICIT,j=1,SIZE(stages))])) THEN

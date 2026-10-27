@@ -120,7 +120,9 @@ CONTAINS
     USE geometry_2d, ONLY : begin_topography_rate_update,                   &
          record_topography_rate_cell, apply_topography_rate_update
     USE geometry_2d, ONLY : deposit, erosion, erodible, B_zone
-    USE source_terms_2d, ONLY : eval_source_explicit
+    USE source_terms_2d, ONLY : eval_source_explicit, eval_source_analytic, &
+         analytic_term_context_type
+    USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC, SOURCE_METHOD_EXPLICIT
     USE state_conversion_2d, ONLY : qc_to_qp
     USE parameters_2d, ONLY : topo_change_flag, bottom_radial_source_flag,  &
          bottom_fissural_source_flag, erodible_deposit_flag,                &
@@ -144,7 +146,9 @@ CONTAINS
     CHARACTER(LEN=96) :: closure_context
     TYPE(source_group_type), ALLOCATABLE :: step_groups(:)
     INTEGER :: j, k, l
-    INTEGER :: group_index, mass_group_count
+    INTEGER :: group_index, mass_group_count, analytic_status, cell_index
+    TYPE(analytic_term_context_type) :: analytic_context
+    REAL(wp) :: analytic_state(n_vars)
     LOGICAL :: liquid_loss_active
 
     liquid_loss_active = .FALSE.
@@ -163,6 +167,21 @@ CONTAINS
        END DO
        IF (mass_group_count>1) &
             CALL fatal_error('D17: atomic mass-exchange batch split across step groups')
+       ! The absence of mass exchange does not suppress other STEP groups.
+       DO group_index=1,SIZE(step_groups)
+          IF (step_groups(group_index)%method/=SOURCE_METHOD_ANALYTIC) CYCLE
+          DO cell_index=1,domain%solve_cells
+             j=domain%j_cent(cell_index); k=domain%k_cent(cell_index)
+             IF (q(1,j,k)<=0.0_wp) CYCLE
+             CALL eval_source_analytic(step_groups(group_index),q(1:n_vars,j,k), &
+                  analytic_context,time_step,analytic_state,analytic_status)
+             IF (analytic_status/=0) &
+                  CALL fatal_error('D18: analytical STEP group solve failed')
+             q(1:n_vars,j,k)=analytic_state
+             CALL qc_to_qp(q(1:n_vars,j,k),qp(1:n_vars+2,j,k),p_dyn, &
+                  'analytic STEP source')
+          END DO
+       END DO
        IF (mass_group_count==0) RETURN
     END IF
 
