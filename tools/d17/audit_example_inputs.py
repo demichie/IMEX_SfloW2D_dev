@@ -28,7 +28,7 @@ CASES = [
     "EXAMPLE_TAAL",
     "EXAMPLE_TAAL_BOTTOM"
 ]
-LEGACY_INTERNAL = re.compile(r"\b(?:rheology_model_id|rheology_id_[A-Za-z_0-9]+|source_solver_type|term_ids|SOURCE_TERM_[A-Z_0-9]+|IMEX_VELOCITY_GROUP|IMEX_ENERGY_GROUP|IMEX_PORE_PRESSURE_GROUP|IMEX_GROUP_METHOD|SOURCE_GROUP_ORDER)\b|(?im)^\s*[&$]SOURCE_GROUPS\b", re.IGNORECASE)
+LEGACY_INTERNAL = re.compile(r"\b(?:rheology_model_id|rheology_id_[A-Za-z_0-9]+|source_solver_type|term_ids|SOURCE_TERM_[A-Z_0-9]+|IMEX_VELOCITY_GROUP|IMEX_ENERGY_GROUP|IMEX_PORE_PRESSURE_GROUP|IMEX_GROUP_METHOD|SOURCE_GROUP_ORDER)\b|^\s*[&$]SOURCE_GROUPS\b", re.IGNORECASE | re.MULTILINE)
 NAMELIST = re.compile(r"(?m)^\s*&[A-Za-z_][A-Za-z0-9_]*\s*$")
 PLACEHOLDER = re.compile(r"(?<![A-Za-z0-9_])(?:runname|restartfile|nx_cells|ny_cells|x_min|y_min|x_left|dx|n_cells)\b")
 
