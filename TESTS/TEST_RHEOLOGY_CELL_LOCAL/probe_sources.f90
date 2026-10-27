@@ -17,6 +17,10 @@ PROGRAM probe_sources
   USE mass_exchange_laws_2d, ONLY : eval_mass_exchange_terms
   USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_NEWTON
   USE source_registry_2d, ONLY : source_registry_type
+  USE source_configuration_2d, ONLY : initialize_configured_sources
+  USE source_input_2d, ONLY : rheology_method, rheology_cadence, rheology_group, &
+       thermal_method, thermal_cadence, thermal_group, &
+       pore_pressure_method, pore_pressure_cadence, pore_pressure_group
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, solve_rk_step
   IMPLICIT NONE
   INTEGER :: operation, solids, column, j, level, iterations, linear_info, iz
@@ -33,8 +37,6 @@ PROGRAM probe_sources
   INTEGER :: iteration, actual_threads
   COMPLEX(wp) :: cq(7), complex_source(7), base_complex(7)
   LOGICAL :: mask(7)
-  CHARACTER(LEN=64), ALLOCATABLE :: active_names(:)
-  INTEGER :: pore_equation
   CHARACTER(LEN=256) :: registry_error
   NAMELIST /fixture/ operation, solids, input_q, bx, by, bxx, bxy, byy, z, &
        dt, diagonal, derivatives, one_sided_pressure, rheology_flag, rheology_model, gas_flag, &
@@ -212,17 +214,10 @@ PROGRAM probe_sources
      IF (pore_pressure_flag) mask(n_vars)=.TRUE.
      CALL partition%initialize(mask(1:n_vars))
      CALL initialize_nonlinear_solver
-     active_names=[CHARACTER(LEN=64)::]
-     IF (rheology_flag) active_names=[CHARACTER(LEN=64)::'rheology_'//TRIM(rheology_model)]
-     IF (partition%implicit(4)) active_names=[CHARACTER(LEN=64) :: active_names, 'thermal_cooling']
-     pore_equation=0
-     IF (pore_pressure_flag) THEN
-        pore_equation=idx_pore
-        active_names=[CHARACTER(LEN=64) :: active_names, 'pore_pressure_dissipation']
-     END IF
-     CALL source_registry%initialize_legacy(partition,[1,1,1], &
-          [IM_GROUP_METHOD_NEWTON,IM_GROUP_METHOD_NEWTON,IM_GROUP_METHOD_NEWTON], &
-          pore_equation,active_names,registry_error)
+     rheology_method='NEWTON'; rheology_cadence='STAGE'; rheology_group=1
+     thermal_method='NEWTON'; thermal_cadence='STAGE'; thermal_group=1
+     pore_pressure_method='NEWTON'; pore_pressure_cadence='STAGE'; pore_pressure_group=1
+     CALL initialize_configured_sources(source_registry,partition,registry_error)
      IF (LEN_TRIM(registry_error)>0) ERROR STOP TRIM(registry_error)
      stage=q
      CALL solve_rk_step(partition,source_registry%stage_groups(), &
