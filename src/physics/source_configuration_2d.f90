@@ -141,7 +141,6 @@ CONTAINS
           error='D18: invalid source METHOD'; RETURN
         END SELECT
       END IF
-      END IF
       IF (LEN_TRIM(requested_cadence)>0) THEN
         SELECT CASE(TRIM(requested_cadence))
         CASE('STAGE'); cadence=SOURCE_CADENCE_STAGE
