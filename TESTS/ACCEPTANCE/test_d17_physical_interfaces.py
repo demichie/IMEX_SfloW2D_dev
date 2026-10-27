@@ -150,13 +150,13 @@ def main() -> int:
         failures.append("STEP executor must import the common explicit source bridge")
     # D18: geometry and physical explicit evaluation share one cell adapter
     # between STAGE and STEP; mass exchange keeps its atomic transaction.
-    if len(re.findall(r"(?i)\\bcall\\s+eval_cell_source_explicit\\s*\\(", executor)) != 1:
+    if len(re.findall(r"(?i)\bcall\s+eval_cell_source_explicit\s*\(", executor)) != 1:
         failures.append("STEP physical groups must use the shared cell explicit adapter")
-    if len(re.findall(r"(?i)\\bcall\\s+eval_source_explicit\\s*\\(", executor)) != 1:
+    if len(re.findall(r"(?i)\bcall\s+eval_source_explicit\s*\(", executor)) != 1:
         failures.append("STEP mass exchange must retain one atomic explicit dispatch")
-    if not re.search(r"(?is)call\\s+eval_source_explicit\\s*\\(\\s*qp\\s*\\(", executor):
+    if not re.search(r"(?is)call\s+eval_source_explicit\s*\(\s*qp\s*\(", executor):
         failures.append("STEP executor must retain the atomic mass-exchange explicit bridge")
-    if not re.search(r"(?is)call\\s+eval_source_explicit\\s*\\(\\s*B_prime_x_geom\\s*\\(", bridge):
+    if not re.search(r"(?is)call\s+eval_source_explicit\s*\(\s*B_prime_x_geom\s*\(", bridge):
         failures.append("shared cell adapter must invoke the physical explicit kernel")
     if re.search(r"(?im)^\s*use\s+(?:equation_terms_2d|mass_exchange_assembly_2d)\b",
                  executor):
