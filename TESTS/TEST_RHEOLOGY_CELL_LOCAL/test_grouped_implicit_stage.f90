@@ -7,13 +7,15 @@ PROGRAM test_grouped_implicit_stage
   USE geometry_2d, ONLY : pi_g
   USE equation_metadata_2d, ONLY : equation_partition_type,                 &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
-  USE source_terms_2d, ONLY : eval_source_implicit, eval_source_semi_implicit
+  USE source_terms_2d, ONLY : eval_source_implicit, eval_source_semi_implicit, &
+       eval_source_analytic, analytic_term_context_type
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_configuration_2d, ONLY : initialize_configured_sources
   USE source_input_2d, ONLY : rheology_method, rheology_cadence, rheology_group, &
        thermal_method, thermal_cadence, thermal_group, &
        pore_pressure_method, pore_pressure_cadence, pore_pressure_group
-  USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_CADENCE_STAGE
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_METHOD_ANALYTIC, &
+       SOURCE_CADENCE_STAGE, SOURCE_CADENCE_STEP
   USE state_2d, ONLY : correct_friction_momentum
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
@@ -504,6 +506,7 @@ PROGRAM test_grouped_implicit_stage
   END IF
 
   CALL test_ordered_multi_solver_group
+  CALL test_lava_newton_stage_cooling_analytic_step
 
   CALL partition%finalize
   CALL source_registry%finalize
@@ -513,6 +516,68 @@ PROGRAM test_grouped_implicit_stage
   WRITE(*,*) 'PASS: grouped DIRK and effective IMEX stage-rate contracts'
 
 CONTAINS
+  ! D18: lava momentum solved during DIRK, cooling once after the RK step.
+  SUBROUTINE test_lava_newton_stage_cooling_analytic_step
+    TYPE(source_group_type), ALLOCATABLE :: stage_groups(:),step_groups(:)
+    TYPE(analytic_term_context_type) :: context
+    REAL(wp) :: state_before(7),state_stage(7),state_cooled(7)
+    REAL(wp) :: stage_source(7),heat_capacity,reference_temperature
+    INTEGER :: iters,info,status,g
+    LOGICAL :: success,failed,found_cooling
+    CHARACTER(LEN=256) :: error
+
+    rheology_method='NEWTON';rheology_cadence='STAGE';rheology_group=1
+    thermal_method='ANALYTIC';thermal_cadence='STEP';thermal_group=2
+    pore_pressure_method='ANALYTIC';pore_pressure_cadence='STAGE';pore_pressure_group=3
+    CALL initialize_configured_sources(source_registry,partition,error)
+    IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
+    stage_groups=source_registry%stage_groups()
+    step_groups=source_registry%step_groups()
+    IF (partition%n_IM_groups/=2) ERROR STOP 'D18: cooling entered DIRK partition'
+    IF (ANY(partition%IM_group(4:4)/=0)) ERROR STOP 'D18: energy in DIRK partition'
+    IF (partition%IM_group_method(1)/=IM_GROUP_METHOD_NEWTON) &
+         ERROR STOP 'D18: lava stage no longer Newton'
+    found_cooling=.FALSE.
+    DO g=1,SIZE(step_groups)
+      IF (.NOT.ANY(step_groups(g)%source_names=='thermal_cooling')) CYCLE
+      IF (step_groups(g)%method/=SOURCE_METHOD_ANALYTIC .OR. &
+           step_groups(g)%cadence/=SOURCE_CADENCE_STEP) &
+           ERROR STOP 'D18: incorrect cooling STEP triplet'
+      found_cooling=.TRUE.
+    END DO
+    IF (.NOT.found_cooling) ERROR STOP 'D18: cooling missing from STEP schedule'
+    state_before=q_old
+    state_stage=state_before
+    CALL solve_imex_stage(partition,stage_groups,state_before,state_before, &
+         dt_step,a_diag,known_residual,0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
+         0.0_wp,grav,0.0_wp,.FALSE.,.FALSE.,state_stage,stage_source, &
+         iters,success,info,failed)
+    IF (.NOT.success .OR. info/=0 .OR. failed) &
+         ERROR STOP 'D18: lava Newton/STAGE did not converge'
+    IF (MAXVAL(ABS(state_stage(2:3)-state_before(2:3)))<=0.0_wp) &
+         ERROR STOP 'D18: Newton/STAGE did not update lava momentum'
+    IF (state_stage(4)/=state_before(4)) &
+         ERROR STOP 'D18: STEP cooling erroneously applied during DIRK'
+    CALL qc_to_qp(state_stage,qp_known,dynamic_pressure)
+    heat_capacity=state_stage(4)/qp_known(4)
+    CALL solve_thermal_cooling_analytic(qp_known(4),dt_step,heat_capacity, &
+         radiative_term_coeff,convective_term_coeff,T_env,reference_temperature)
+    DO g=1,SIZE(step_groups)
+      IF (.NOT.ANY(step_groups(g)%source_names=='thermal_cooling')) CYCLE
+      context=analytic_term_context_type()
+      CALL eval_source_analytic(step_groups(g),state_stage,context,dt_step, &
+           state_cooled,status)
+      IF (status/=0) ERROR STOP 'D18: analytic cooling STEP failed'
+      EXIT
+    END DO
+    IF (ABS(state_cooled(4)-heat_capacity*reference_temperature)> &
+         5.0E-14_wp*MAX(1.0_wp,ABS(state_cooled(4)))) &
+         ERROR STOP 'D18: cooling STEP does not match exact flow'
+    IF (ANY(state_cooled([1,2,3,5,6,7])/=state_stage([1,2,3,5,6,7]))) &
+         ERROR STOP 'D18: cooling STEP modified unrelated state'
+    WRITE(*,*) 'PASS D18 lava Newton/STAGE and analytic cooling/STEP'
+  END SUBROUTINE test_lava_newton_stage_cooling_analytic_step
+
   SUBROUTINE test_ordered_multi_solver_group
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
     LOGICAL :: multi_mask(7), multi_converged, multi_line_search_failed
