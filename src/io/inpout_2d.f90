@@ -70,11 +70,10 @@ MODULE inpout_2d
   USE parameters_2d, ONLY: imex_velocity_group, imex_energy_group,          &
        imex_pore_pressure_group, imex_group_method
   USE equation_metadata_2d, ONLY: resolve_imex_group_method
-  USE source_input_2d, ONLY: read_native_source_groups, read_mass_exchange_parameters, &
+  USE source_input_2d, ONLY: read_mass_exchange_parameters, &
        rheology_method, rheology_cadence, rheology_group, &
        thermal_method, thermal_cadence, thermal_group, &
        pore_pressure_method, pore_pressure_cadence, pore_pressure_group, &
-       native_source_configuration_present, &
        mass_exchange_configuration_present, mass_exchange_method, &
        mass_exchange_cadence, mass_exchange_group
 
@@ -2206,17 +2205,10 @@ CONTAINS
     legacy_imex_explicit=(imex_velocity_group/=-HUGE(1) .OR. &
          imex_energy_group/=-HUGE(1) .OR. imex_pore_pressure_group/=-HUGE(1) .OR. &
          ANY(LEN_TRIM(imex_group_method)>0))
-    CALL read_native_source_groups(input_unit,legacy_imex_explicit,source_input_error)
-    IF (LEN_TRIM(source_input_error)==0) &
-         CALL read_mass_exchange_parameters(input_unit,source_input_error)
+    CALL read_mass_exchange_parameters(input_unit,source_input_error)
     ! The first D18 executable mode is an entirely explicit STAGE partition.
     ! Reject mixed requests instead of silently retaining implicit evaluation.
     IF (LEN_TRIM(source_input_error)==0) THEN
-       IF (native_source_configuration_present .AND. &
-            (LEN_TRIM(rheology_method)>0 .OR. LEN_TRIM(thermal_method)>0 .OR. &
-             LEN_TRIM(pore_pressure_method)>0 .OR. rheology_group/=0 .OR. &
-             thermal_group/=0 .OR. pore_pressure_group/=0)) &
-            source_input_error='D18 physical settings conflict with SOURCE_GROUPS'
        ! The explicit override may coexist with legacy Newton/analytic groups.
        ! Other requested methods must match the legacy group until general
        ! per-source method overrides are implemented.
@@ -2250,8 +2242,6 @@ CONTAINS
           IF (mass_exchange_method/='EXPLICIT' .OR. &
                mass_exchange_cadence/='STEP') &
                source_input_error='D18 mass exchange currently requires EXPLICIT/STEP'
-          IF (native_source_configuration_present .AND. mass_exchange_group>0) &
-               source_input_error='D18 mass exchange GROUP conflicts with SOURCE_GROUPS'
        END IF
     END IF
     IF (LEN_TRIM(source_input_error)>0) CALL fatal_error(TRIM(source_input_error))

@@ -8,9 +8,9 @@ PROGRAM test_stage_count
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, cell_size, init_grid
   USE time_integration_2d, ONLY : time_integration_workspace_type
   USE inpout_2d, ONLY : init_param, read_param, read_solution
-  USE source_input_2d, ONLY : native_source_configuration_present, source_group_count
+  USE equation_terms_2d, ONLY : init_problem_param
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
-  USE source_configuration_2d, ONLY : initialize_native_source_configuration
+  USE source_configuration_2d, ONLY : initialize_configured_sources
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE source_catalog_2d, ONLY : SOURCE_CADENCE_STAGE, &
        SOURCE_CADENCE_STEP, SOURCE_METHOD_NEWTON, SOURCE_METHOD_EXPLICIT
@@ -39,10 +39,9 @@ PROGRAM test_stage_count
      CALL init_param
      CALL read_param
      IF (.NOT.stochastic_flag) ERROR STOP 'stochastic physics was not enabled'
-     IF (.NOT.native_source_configuration_present) ERROR STOP 'native source namelist was not parsed'
-     IF (source_group_count/=3) ERROR STOP 'native source group count changed unexpectedly'
-     CALL initialize_native_source_configuration(registry,partition,error)
-     IF (LEN_TRIM(error)>0) ERROR STOP 'native source schedule rejected: '//TRIM(error)
+     CALL init_problem_param(partition)
+     CALL initialize_configured_sources(registry,partition,error)
+     IF (LEN_TRIM(error)>0) ERROR STOP 'physical source schedule rejected: '//TRIM(error)
      stage_groups=registry%stage_groups()
      step_groups=registry%step_groups()
      IF (SIZE(stage_groups)/=2 .OR. SIZE(step_groups)/=1) &

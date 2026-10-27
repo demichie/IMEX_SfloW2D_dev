@@ -4,7 +4,7 @@ PROGRAM test_source_registry
   USE source_registry_2d
   USE equation_metadata_2d, ONLY : equation_partition_type, &
        IM_GROUP_METHOD_NEWTON, IM_GROUP_METHOD_ANALYTIC
-  USE source_configuration_2d, ONLY : initialize_native_source_configuration, initialize_configured_sources
+  USE source_configuration_2d, ONLY : initialize_configured_sources
   USE source_input_2d
   USE parameters_2d, ONLY : wp, n_eqns, idx_pore, &
        rheology_flag, rheology_model, pore_pressure_flag, thermal_cooling_flag, &
@@ -93,8 +93,6 @@ PROGRAM test_source_registry
   END DO
   CALL verify_default_schedule()
   CALL verify_thermal_activation_matrix()
-  CALL verify_native_parser()
-  CALL verify_native_schedule()
   WRITE(*,'(A)') 'D17 physical catalog, native configuration and 864 legacy mappings verified'
 CONTAINS
   SUBROUTINE configure_lava_case()
@@ -178,169 +176,6 @@ CONTAINS
       END DO
     END DO
   END SUBROUTINE verify_thermal_activation_matrix
-
-  SUBROUTINE verify_native_parser()
-    INTEGER :: unit,i
-    CHARACTER(LEN=160), PARAMETER :: lines(10)=[CHARACTER(LEN=160):: &
-         '&source_groups', &
-         ' source_group_count=1,', &
-         ' source_group_id(1)=5,', &
-         " source_group_cadence(1)='STAGE',", &
-         " source_group_method(1)='NEWTON',", &
-         ' source_group_term_count(1)=1,', &
-         " source_group_terms(1,1)='RHEOLOGY_LAVA',", &
-         ' source_group_target_count(1)=1,', &
-         " source_group_targets(1,1)='VELOCITY',", &
-         '/']
-    OPEN(NEWUNIT=unit,STATUS='scratch',ACTION='readwrite',FORM='formatted')
-    DO i=1,SIZE(lines)
-      WRITE(unit,'(A)') TRIM(lines(i))
-    END DO
-    CALL read_native_source_groups(unit,.FALSE.,error)
-    CALL require(error=='' .AND. native_source_configuration_present, &
-         'native SOURCE_GROUPS namelist parsed')
-    CALL require(source_group_terms(1,1)=='RHEOLOGY_LAVA', &
-         'native parser preserves user source spelling')
-    REWIND(unit)
-    CALL read_native_source_groups(unit,.TRUE.,error)
-    CALL require(INDEX(error,'cannot be combined')>0, &
-         'native and explicit legacy IMEX input conflict')
-    CLOSE(unit)
-    CALL clear_source_input()
-    OPEN(NEWUNIT=unit,STATUS='scratch',ACTION='readwrite',FORM='formatted')
-    WRITE(unit,'(A)') '&source_groups'
-    WRITE(unit,'(A)') ' source_group_count=1'
-    WRITE(unit,'(A)') '/'
-    WRITE(unit,'(A)') '&source_groups'
-    WRITE(unit,'(A)') ' source_group_count=1'
-    WRITE(unit,'(A)') '/'
-    CALL read_native_source_groups(unit,.FALSE.,error)
-    CALL require(INDEX(error,'may appear only once')>0, &
-         'duplicate native namelist rejected')
-    CLOSE(unit)
-    CALL clear_source_input()
-    ! The D18 schedule has no independent SOURCE_GROUP_ORDER input.
-    ! Guard against stale generated input reintroducing the retired field.
-    OPEN(NEWUNIT=unit,STATUS='scratch',ACTION='readwrite',FORM='formatted')
-    WRITE(unit,'(A)') '&source_groups'
-    WRITE(unit,'(A)') ' source_group_count=1,'
-    WRITE(unit,'(A)') ' source_group_order(1)=1,'
-    WRITE(unit,'(A)') " source_group_cadence(1)='STAGE',"
-    WRITE(unit,'(A)') '/'
-    CALL read_native_source_groups(unit,.FALSE.,error)
-    CALL require(INDEX(error,'Invalid SOURCE_GROUPS namelist')>0 .AND. &
-         .NOT.native_source_configuration_present, &
-         'retired SOURCE_GROUP_ORDER rejected by native parser')
-    CALL require(source_group_count==0 .AND. ALL(source_group_id==0) .AND. &
-         ALL(source_group_term_count==0) .AND. ALL(source_group_target_count==0), &
-         'failed SOURCE_GROUPS read clears all partially assigned counts')
-    CALL require(ALL(source_group_cadence=='') .AND. &
-         ALL(source_group_method=='') .AND. ALL(source_group_terms=='') .AND. &
-         ALL(source_group_targets==''), &
-         'failed SOURCE_GROUPS read clears all partially assigned names')
-    CLOSE(unit)
-    CALL clear_source_input()
-  END SUBROUTINE verify_native_parser
-
-  SUBROUTINE set_native_group(slot,id,cadence,method,name,target)
-    INTEGER, INTENT(IN) :: slot,id
-    CHARACTER(*), INTENT(IN) :: cadence,method,name,target
-    source_group_id(slot)=id
-    source_group_cadence(slot)=cadence
-    source_group_method(slot)=method
-    source_group_term_count(slot)=1
-    source_group_terms(1,slot)=name
-    source_group_target_count(slot)=0
-    IF (LEN_TRIM(target)>0) THEN
-      source_group_target_count(slot)=1
-      source_group_targets(1,slot)=target
-    END IF
-  END SUBROUTINE set_native_group
-
-  SUBROUTINE compare_groups(left,right,label)
-    TYPE(source_group_type), INTENT(IN) :: left,right
-    CHARACTER(*), INTENT(IN) :: label
-    INTEGER :: i
-    CALL require(left%method==right%method .AND. &
-         left%cadence==right%cadence, &
-         label//' method/cadence')
-    CALL require(ALLOCATED(left%equation_ids) .EQV. &
-         ALLOCATED(right%equation_ids),label//' equations allocated')
-    IF (ALLOCATED(left%equation_ids)) THEN
-      CALL require(SIZE(left%equation_ids)==SIZE(right%equation_ids), &
-           label//' equation count')
-      CALL require(ALL(left%equation_ids==right%equation_ids), &
-           label//' equation indices')
-    END IF
-    CALL require(ALLOCATED(left%source_names) .AND. &
-         ALLOCATED(right%source_names),label//' source names allocated')
-    CALL require(SIZE(left%source_names)==SIZE(right%source_names), &
-         label//' source count')
-    DO i=1,SIZE(left%source_names)
-      CALL require(ANY(right%source_names==left%source_names(i)), &
-           label//' canonical source membership')
-    END DO
-  END SUBROUTINE compare_groups
-
-  SUBROUTINE verify_native_schedule()
-    TYPE(source_group_type), ALLOCATABLE :: g(:),s(:),legacy_g(:),legacy_s(:)
-    INTEGER :: i
-    CALL configure_lava_case()
-    ! Obtain an independently normalized legacy schedule before building
-    ! the native equivalent. Compare full equation/source footprints below.
-    BLOCK
-      LOGICAL :: active_eq(7)
-      INTEGER :: assigned(7)
-      active_eq=.FALSE.;active_eq(2:4)=.TRUE.;active_eq(7)=.TRUE.
-      assigned=0;assigned(2:3)=3;assigned(4)=1;assigned(7)=2
-      CALL partition%initialize(active_eq,assigned, &
-           [IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_NEWTON])
-    END BLOCK
-    CALL initialize_configured_sources(registry,partition,error)
-    CALL require(error=='','legacy schedule for native equivalence: '//TRIM(error))
-    legacy_g=registry%stage_groups()
-    legacy_s=registry%step_groups()
-    CALL clear_source_input()
-    native_source_configuration_present=.TRUE.
-    source_group_count=5
-    CALL set_native_group(1,10,'STAGE','ANALYTIC','THERMAL_COOLING','TEMPERATURE')
-    CALL set_native_group(2,11,'STAGE','ANALYTIC','PORE_PRESSURE_DISSIPATION','PORE_PRESSURE')
-    CALL set_native_group(3,12,'STAGE','NEWTON','RHEOLOGY_LAVA','VELOCITY')
-    CALL set_native_group(4,13,'STAGE','EXPLICIT','BOUNDARY_INJECTION','')
-    CALL set_native_group(5,14,'STEP','EXPLICIT','MASS_EXCHANGE_DEPOSITION','')
-    CALL initialize_native_source_configuration(registry,partition,error)
-    CALL require(error=='' .AND. registry%is_initialized(), &
-         'native names case-insensitive and complete: '//TRIM(error))
-    g=registry%stage_groups();s=registry%step_groups()
-    CALL require(SIZE(g)==4 .AND. SIZE(s)==1,'native schedule retains five groups')
-    CALL require(group_contains_name(g(1),'thermal_cooling') .AND. &
-         group_contains_name(g(3),'rheology_lava'),'native canonical physical names')
-    CALL require(group_contains_name(s(1),'mass_exchange_deposition'), &
-         'native post-RK physical group')
-    CALL require(SIZE(g)==SIZE(legacy_g) .AND. SIZE(s)==SIZE(legacy_s), &
-         'legacy/native same group counts')
-    DO i=1,SIZE(g)
-      CALL compare_groups(legacy_g(i),g(i),'legacy/native STAGE')
-    END DO
-    DO i=1,SIZE(s)
-      CALL compare_groups(legacy_s(i),s(i),'legacy/native STEP')
-    END DO
-    source_group_terms(1,3)='SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS'
-    CALL initialize_native_source_configuration(invalid,partition,error)
-    CALL require(error/='' .AND. .NOT.invalid%is_initialized(), &
-         'native mathematical addend rejected')
-    source_group_terms(1,3)='RHEOLOGY_LAVA'
-    source_group_targets(1,3)='UNKNOWN'
-    CALL initialize_native_source_configuration(invalid,partition,error)
-    CALL require(INDEX(error,'unknown or duplicate group target')>0, &
-         'native unsupported target rejected')
-    source_group_targets(1,3)='VELOCITY'
-    source_group_terms(1,5)='BOUNDARY_INJECTION'
-    CALL initialize_native_source_configuration(invalid,partition,error)
-    CALL require(error/='' .AND. .NOT.invalid%is_initialized(), &
-         'native missing and duplicated physical source rejected')
-    CALL clear_source_input()
-  END SUBROUTINE verify_native_schedule
 
   SUBROUTINE require(valid,message)
     LOGICAL, INTENT(IN) :: valid

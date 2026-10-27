@@ -15,9 +15,7 @@ MODULE simulation_2d
   USE step_source_executor_2d, ONLY : execute_step_source_groups
 
   USE source_registry_2d, ONLY : source_registry_type
-  USE source_configuration_2d, ONLY : initialize_configured_sources, &
-       initialize_native_source_configuration
-  USE source_input_2d, ONLY : native_source_configuration_present
+  USE source_configuration_2d, ONLY : initialize_configured_sources
   USE diagnostics_2d, ONLY : fatal_error
 
   USE equation_metadata_2d, ONLY : equation_partition_type
@@ -106,14 +104,9 @@ CONTAINS
     CALL this%model_layout%initialize( n_layers, n_vars, n_eqns, n_solid,   &
          n_add_gas, n_stoch_vars, n_pore_vars, liquid_flag .AND. gas_flag )
 
-    IF (native_source_configuration_present) THEN
-      CALL initialize_native_source_configuration(this%source_registry, &
-           this%equation_partition,source_error)
-    ELSE
-      CALL init_problem_param( this%equation_partition )
-      CALL initialize_configured_sources(this%source_registry, &
-           this%equation_partition,source_error)
-    END IF
+    CALL init_problem_param(this%equation_partition)
+    CALL initialize_configured_sources(this%source_registry, &
+         this%equation_partition,source_error)
     IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
     CALL this%state%initialize( this%model_layout )

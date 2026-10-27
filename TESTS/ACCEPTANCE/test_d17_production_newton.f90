@@ -5,7 +5,7 @@ PROGRAM test_d17_production_newton
   USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_NEWTON
   USE source_registry_2d, ONLY : source_group_type,source_registry_type
   USE source_configuration_2d, ONLY : initialize_configured_sources, &
-       initialize_native_source_configuration
+       initialize_configured_sources
   USE source_input_2d
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON,SOURCE_CADENCE_STAGE
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,solve_rk_step,solve_imex_stage
@@ -179,21 +179,11 @@ PROGRAM test_d17_production_newton
     PRINT *, TRIM(config_error)
     ERROR STOP 'legacy numeric configuration rejected'
   END IF
-  CALL clear_source_input()
-  native_source_configuration_present=.TRUE.
-  source_group_count=1
-  source_group_id(1)=27
-  source_group_cadence(1)='STAGE'
-  source_group_method(1)='NEWTON'
-  source_group_term_count(1)=1
-  source_group_terms(1,1)='RHEOLOGY_NEWMODEL'
-  source_group_target_count(1)=1
-  source_group_targets(1,1)='VELOCITY'
-  CALL initialize_native_source_configuration(native_registry,native_partition,config_error)
-  IF (LEN_TRIM(config_error)>0) THEN
-    PRINT *, TRIM(config_error)
-    ERROR STOP 'native numeric configuration rejected'
-  END IF
+  rheology_method='NEWTON'
+  rheology_cadence='STAGE'
+  rheology_group=1
+  CALL initialize_configured_sources(native_registry,native_partition,config_error)
+  IF (LEN_TRIM(config_error)>0) ERROR STOP 'physical numeric configuration rejected'
   old=[1000.0_wp,3000.0_wp,-4000.0_wp,1.2E9_wp]
   legacy_q=old;native_q=old;known=0.0_wp;dt=0.2_wp
   CALL solve_rk_step(partition,legacy_registry%stage_groups(),legacy_q,old, &
@@ -215,8 +205,7 @@ PROGRAM test_d17_production_newton
   IF (ABS(legacy_q(1)-old(1))>1.0E-12_wp .OR. &
        ABS(legacy_q(4)-old(4))>1.0E-5_wp) &
        ERROR STOP 'legacy/native non-source equations changed'
-  CALL clear_source_input()
-  PRINT *, 'PASS D17 legacy/native quantitative Newton stage equivalence'
+  PRINT *, 'PASS D17 numerical Newton stage equivalence'
   ! Stage-local diagonal coefficient regression, including zero diagonal
   ! explicit stages and representative DIRK coefficients used by RK schemes.
   CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.], &
