@@ -100,7 +100,8 @@ def read_payload(path, nx, ny, n, steps):
 
 def launch(executable, directory, vertices, production, n, steps, dt, drag=0,
            slope=False, curvature=False, limiter=3, dx=0.75, dy=1.25, observe=1,
-           analytic_mode=0, source_test_model=0, mixed_group_mode=0):
+           analytic_mode=0, source_test_model=0, mixed_group_mode=0,
+           split_cooling_mode=0):
     directory.mkdir(parents=True)
     write_fixture(directory/"fixture.inp", vertices, production, slope, curvature, limiter, dt, dx, dy)
     results = []
@@ -114,6 +115,8 @@ def launch(executable, directory, vertices, production, n, steps, dt, drag=0,
                 command.extend(("0", "0", "0", str(analytic_mode)))
             elif mixed_group_mode:
                 command.extend(("0", "0", str(source_test_model), "0", str(mixed_group_mode)))
+            elif split_cooling_mode:
+                command.extend(("0", "0", str(source_test_model), "0", "0", "1"))
             run = subprocess.run(command, cwd=work, env=env, stdout=stream,
                                  stderr=subprocess.STDOUT, timeout=180)
         if run.returncode:
@@ -504,6 +507,36 @@ def mixed_group_stage_checks(fields, n, dt, group_order):
     return fields["q"][..., 1:3][interior].copy()
 
 
+def lava_split_full_tableau_suite(args):
+    """Check full RK/STAGE lava Newton followed by production cooling STEP."""
+    ny, nx = 17, 18
+    vertices = np.zeros((ny+1, nx+1))
+    initial = np.zeros((ny, nx, 5))
+    initial[..., 0] = RHO
+    initial[..., 1] = 600.0
+    initial[..., 2] = 800.0
+    initial[..., 3] = RHO * CP * 1000.0
+    for n in TABLEAU_STAGES:
+        directory = Path(f"lava-split-{args.profile}-{os.getpid()}-RK{n}")
+        fields, hashes = launch(
+            args.executable, directory, vertices, initial, n, 2, 0.1,
+            limiter=0, dx=100.0, dy=100.0,
+            source_test_model=3, split_cooling_mode=1)
+        if np.min(fields["statistics"][:, 7]) <= 0.0:
+            raise AssertionError(f"RK{n} had no converged lava Newton stages")
+        mask = np.zeros(fields["active"].shape, dtype=bool)
+        mask[4:-4, 4:-4] = True
+        energy = fields["q"][..., 3]
+        if not np.all(np.isfinite(energy[mask])):
+            raise AssertionError(f"RK{n} produced nonfinite split energy")
+        if not np.all(energy[mask] < initial[..., 3][mask]):
+            raise AssertionError(f"RK{n} did not cool the interior lava")
+        print("D18_LAVA_SPLIT_TABLEAU_EVIDENCE " + json.dumps({
+            "profile": args.profile, "n_RK": n, **hashes
+        }, sort_keys=True, allow_nan=False), flush=True)
+    print("PASS: full RK lava Newton/STAGE plus cooling ANALYTIC/STEP", flush=True)
+
+
 def mixed_group_tableau_suite(args):
     """Exercise both mixed-method orderings through every supported tableau."""
     ny, nx = 17, 18
@@ -751,6 +784,7 @@ def main():
         analytic_tableau_suite(args)
     if args.section in (None, "groups"):
         mixed_group_tableau_suite(args)
+        lava_split_full_tableau_suite(args)
 
 
 if __name__ == "__main__":
