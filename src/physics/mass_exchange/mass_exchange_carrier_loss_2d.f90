@@ -72,7 +72,7 @@ CONTAINS
   REAL(wp) FUNCTION eval_mass_exchange_carrier_liquid_loss_explicit() RESULT(rate)
     ! Requested constituent carrier loss; limiting is applied by the batch.
     rate = 0.0_wp
-    IF (liquid_flag) rate = loss_rate
+    IF (liquid_flag .AND. ALLOCATED(loss_rate)) rate = loss_rate
   END FUNCTION eval_mass_exchange_carrier_liquid_loss_explicit
 
   REAL(wp) FUNCTION eval_mass_exchange_carrier_liquid_loss_semi_implicit() RESULT(rate)

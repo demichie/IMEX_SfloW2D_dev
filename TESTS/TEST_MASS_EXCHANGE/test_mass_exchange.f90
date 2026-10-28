@@ -60,6 +60,7 @@ PROGRAM test_mass_exchange
   CALL get_environment_variable('N8_CASE', selected, STATUS=status)
   IF (status /= 0) selected = 'all'
   CALL initialize_fixture
+  CALL test_liquid_loss_without_solids
   CALL test_empty_step_registry
   CALL test_analytic_cooling_step_executor
   CALL test_explicit_multi_source_groups
@@ -176,6 +177,56 @@ CONTAINS
     CALL initialize_configured_sources(source_registry,equation_partition,error)
     IF (LEN_TRIM(error)>0) ERROR STOP 'failed to configure mass-exchange source registry'
   END SUBROUTINE configure_source_registry
+
+  !> \\brief Exercise prescribed liquid loss with zero transported solid fraction.
+  !> \\details The limiter must preserve carrier availability, velocity and
+  !>          temperature while leaving dry cells and bed inventories unchanged.
+  SUBROUTINE test_liquid_loss_without_solids
+    REAL(wp) :: before(nq,nx,ny), bed_before(nx+1,ny+1)
+    REAL(wp) :: expected_mass,expected_energy,flow_temperature,carrier_loss
+    REAL(wp), PARAMETER :: delta=0.1_wp
+    INTEGER :: j,k,l
+    CALL reset_fixture
+    IF (.NOT.ALLOCATED(loss_rate)) ERROR STOP 'D18 liquid loss fixture unallocated'
+    loss_rate=0.02_wp
+    DO k=1,ny
+       DO j=1,nx
+          CALL set_cell(j,k,0.5_wp,[0.0_wp,0.0_wp],350.0_wp)
+       END DO
+    END DO
+    state%q(:,5,4)=0.0_wp
+    before=state%q
+    bed_before=B_vertex
+    CALL configure_source_registry
+    CALL apply_mass_exchange_step(state%q,state%qp,delta,domain,source_registry)
+    DO l=1,domain%solve_cells
+       j=domain%j_cent(l); k=domain%k_cent(l)
+       IF (before(1,j,k)<=0.0_wp) THEN
+          IF (ANY(state%q(:,j,k)/=before(:,j,k))) &
+               ERROR STOP 'D18 liquid loss altered dry cell'
+          CYCLE
+       END IF
+       carrier_loss=rho_l*loss_rate*delta
+       expected_mass=before(1,j,k)-carrier_loss
+       flow_temperature=350.0_wp
+       expected_energy=before(4,j,k)-carrier_loss*sp_heat_l*flow_temperature
+       CALL assert_small('D18 zero-solid liquid mass',ABS(state%q(1,j,k)-expected_mass),expected_mass)
+       CALL assert_small('D18 zero-solid liquid energy',ABS(state%q(4,j,k)-expected_energy),expected_energy)
+       CALL assert_small('D18 zero-solid liquid momentum x', &
+            ABS(state%q(2,j,k)-before(2,j,k)*expected_mass/before(1,j,k)),before(2,j,k))
+       CALL assert_small('D18 zero-solid liquid momentum y', &
+            ABS(state%q(3,j,k)-before(3,j,k)*expected_mass/before(1,j,k)),before(3,j,k))
+       IF (ANY(state%q(5:6,j,k)/=0.0_wp)) ERROR STOP 'D18 liquid loss created solids'
+    END DO
+    CALL same_bits('D18 zero-solid unchanged bed',RESHAPE(B_vertex,[SIZE(B_vertex)]), &
+         RESHAPE(bed_before,[SIZE(bed_before)]))
+    IF (ANY(deposit/=0.0_wp) .OR. ANY(erosion/=0.0_wp)) &
+         ERROR STOP 'D18 liquid loss changed solid inventories'
+    CALL source_registry%finalize
+    CALL equation_partition%finalize
+    loss_rate=0.0_wp
+    WRITE(*,*) 'PASS D18 prescribed carrier loss without solid fraction'
+  END SUBROUTINE test_liquid_loss_without_solids
 
   !> \brief Ensure an empty registered post-RK schedule suppresses legacy-active sources.
   SUBROUTINE test_empty_step_registry

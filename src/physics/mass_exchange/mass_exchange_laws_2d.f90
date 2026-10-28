@@ -97,6 +97,7 @@ CONTAINS
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
 
+    LOGICAL :: solid_processes_enabled, liquid_loss_requested
     REAL(wp) :: air_entr
 
     REAL(wp) :: T_erodible_local !< cell-local substrate temperature [K]
@@ -117,8 +118,6 @@ CONTAINS
 
     END IF
 
-    IF ( qpj(1) .LE. EPSILON(1.0_wp) ) RETURN
-
     r_h = qpj(1)
     r_u = qpj(idx_u)
     r_v = qpj(idx_v)
@@ -127,10 +126,14 @@ CONTAINS
 
     alphas_tot = SUM(r_alphas)
 
-    ! Below the configured cutoff no conservative or bed source is applied.
-    ! Return before proposing any erosion too: otherwise the caller would
-    ! consume substrate inventory while eqns_term and topo_term stay zero.
-    IF ( alphas_tot .LE. alphastot_min ) RETURN
+    ! The solid-fraction cutoff governs solid exchange, not liquid carrier loss.
+    ! Preserve the legacy cutoff for all other processes when liquid loss
+    ! is not requested, and never consume substrate below the cutoff.
+    solid_processes_enabled = alphas_tot > alphastot_min
+    liquid_loss_requested = .FALSE.
+    IF (liquid_flag .AND. ALLOCATED(loss_rate)) &
+         liquid_loss_requested = loss_rate > 0.0_wp
+    IF (.NOT.solid_processes_enabled .AND. .NOT.liquid_loss_requested) RETURN
 
     IF ( stoch_transport_flag ) r_Zs = qpj(idx_stoch)
 
@@ -149,16 +152,20 @@ CONTAINS
     mod_vel2 = r_u**2 + r_v**2 + r_w**2
     mod_vel = SQRT( mod_vel2 )
 
-    CALL eval_mass_exchange_erosion_explicit(r_h, mod_vel, alphas_tot, erodible, dt, &
-         erosion_term, continuous_phase_erosion_term)
+    IF (solid_processes_enabled) THEN
+       CALL eval_mass_exchange_erosion_explicit(r_h, mod_vel, alphas_tot, erodible, dt, &
+            erosion_term, continuous_phase_erosion_term)
+    END IF
 
     r_T = qpj(4)
 
     CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,             &
          r_sp_heat_mix)
 
-    CALL eval_mass_exchange_deposition_explicit(r_h, r_T, r_alphas, alphas_tot, &
-         r_rho_m, r_rho_c, dt, deposition_term)
+    IF (solid_processes_enabled) THEN
+       CALL eval_mass_exchange_deposition_explicit(r_h, r_T, r_alphas, alphas_tot, &
+            r_rho_m, r_rho_c, dt, deposition_term)
+    END IF
 
     CALL eval_mass_exchange_carrier_loss_explicit(r_h, r_T, r_alphas, alphas_tot, &
          r_rho_c, r_exc_pore_pres, deposition_term, dt, &
@@ -170,7 +177,9 @@ CONTAINS
     T_erodible_local = T_erodible
     IF ( erodible_deposit_flag ) T_erodible_local = r_T
 
-    air_entr = eval_mass_exchange_entrainment_explicit(r_h, r_Ri, mod_vel2)
+    air_entr = 0.0_wp
+    IF (solid_processes_enabled) &
+         air_entr = eval_mass_exchange_entrainment_explicit(r_h, r_Ri, mod_vel2)
 
     CALL assemble_mass_exchange_balance(B_zone, r_u, r_v, r_T, r_rho_c, &
          r_sp_heat_c, T_erodible_local, air_entr, r_Zs, r_exc_pore_pres, &
