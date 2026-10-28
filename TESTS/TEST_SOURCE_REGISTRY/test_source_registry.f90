@@ -120,6 +120,7 @@ PROGRAM test_source_registry
   CALL verify_thermal_activation_matrix()
   CALL verify_analytic_step_schedule()
   CALL verify_group_method_contract()
+  CALL verify_geometry_source_triplets()
   CALL verify_newton_explicit_step_schedule()
   WRITE(*,'(A)') 'D18 physical catalog and 864 physical triplet mappings verified'
 CONTAINS
@@ -209,6 +210,46 @@ CONTAINS
          group_contains_name(post(3),'thermal_cooling'), &
          'explicit STEP GROUP=2 after Newton')
   END SUBROUTINE verify_newton_explicit_step_schedule
+
+  ! Verify each formerly fixed EXPLICIT/STAGE physical source is configurable.
+  SUBROUTINE verify_geometry_source_triplets()
+    TYPE(source_group_type), ALLOCATABLE :: groups(:)
+    INTEGER :: i,j
+    CALL configure_lava_case()
+    rheology_flag=.FALSE.
+    thermal_cooling_flag=.FALSE.
+    pore_pressure_flag=.FALSE.
+    lateral_source_flag=.TRUE.
+    curvature_term_flag=.TRUE.
+    bottom_radial_source_flag=.TRUE.
+    radial_source_flag=.TRUE.
+    bottom_fissural_source_flag=.TRUE.
+    geometry_curvature_group=2
+    bottom_circular_group=3
+    bottom_fissural_group=4
+    radial_injection_group=5
+    boundary_injection_group=6
+    CALL initialize_configured_sources(registry,partition,error)
+    CALL require(error=='','five geometric source GROUP overrides: '//TRIM(error))
+    groups=registry%stage_groups()
+    DO i=2,6
+      CALL require(ANY([(groups(j)%id==i,j=1,SIZE(groups))]), &
+           'configured geometry GROUP was retained')
+    END DO
+    geometry_curvature_method='NEWTON'
+    CALL initialize_configured_sources(registry,partition,error)
+    CALL require(error/='','unsupported geometry NEWTON rejected')
+    geometry_curvature_method=''
+    bottom_circular_method='ANALYTIC'
+    CALL initialize_configured_sources(registry,partition,error)
+    CALL require(error/='','unsupported injection ANALYTIC rejected')
+    bottom_circular_method=''
+    bottom_circular_group=0; bottom_fissural_group=0
+    radial_injection_group=0; geometry_curvature_group=0
+    boundary_injection_group=0
+    bottom_radial_source_flag=.FALSE.; bottom_fissural_source_flag=.FALSE.
+    radial_source_flag=.FALSE.;curvature_term_flag=.FALSE.
+  END SUBROUTINE verify_geometry_source_triplets
 
   SUBROUTINE verify_group_method_contract()
     TYPE(source_group_type), ALLOCATABLE :: g(:),post(:)
