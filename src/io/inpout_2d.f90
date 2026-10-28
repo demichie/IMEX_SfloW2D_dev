@@ -87,9 +87,7 @@ MODULE inpout_2d
                            T_source, h_source, alphas_source, alphal_source, alphag_source, &
                            time_param, Ri_source, mfr_source, xs_source, xl_source, xg_source, &
                            r2_source, angle_source, azimuth_source, arc_width_source, &
-                           n_intervals, t_intervals, vel_intervals, &
-    bottom_circular_method, bottom_circular_cadence, bottom_circular_group, &
-    radial_injection_method, radial_injection_cadence, radial_injection_group
+                           n_intervals, t_intervals, vel_intervals
 
   USE parameters_2d, ONLY: x_fissures_end_points, y_fissures_end_points,        &
                            width_fissures, linear_vel_fissures, T_fissures,    &
