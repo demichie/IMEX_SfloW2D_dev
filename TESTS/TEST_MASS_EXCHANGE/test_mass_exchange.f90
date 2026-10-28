@@ -61,6 +61,7 @@ PROGRAM test_mass_exchange
   IF (status /= 0) selected = 'all'
   CALL initialize_fixture
   CALL test_lava_deposition_transaction
+  CALL test_integrated_lava_deposition_cooling_restart
   CALL test_liquid_loss_without_solids
   CALL test_empty_step_registry
   CALL test_analytic_cooling_step_executor
@@ -233,7 +234,149 @@ CONTAINS
     WRITE(*,*) 'PASS D18 immobile lava deposition STEP and production restart'
   END SUBROUTINE test_lava_deposition_transaction
 
-  !>          temperature while leaving dry cells and bed inventories unchanged.
+  !> \brief Full D18 lava stage/deposition/cooling/restart integration gate.
+  !> \details Production NEWTON stage, two ordered STEP groups, physical
+  !>          viscosity feedback and bitwise continuation from a real checkpoint.
+  SUBROUTINE test_integrated_lava_deposition_cooling_restart
+    USE source_input_2d, ONLY : lava_deposition_flag,lava_deposition_model, &
+         lava_deposition_rate,lava_deposition_visc_ref,lava_deposition_exponent, &
+         mass_exchange_group
+    USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC
+    TYPE(source_group_type), ALLOCATABLE :: groups(:)
+    REAL(wp) :: initial_mass, temp_after_one, initial_temp
+    REAL(wp) :: before_stage(nq),after_stage(nq),im_rate(nq),residual(nq)
+    REAL(wp) :: before_deposition,first_deposition,second_deposition
+    REAL(wp) :: saved_q(nq,nx,ny),full_q(nq,nx,ny)
+    REAL(wp) :: saved_b(nx+1,ny+1),full_b(nx+1,ny+1)
+    REAL(wp) :: saved_lava(nx,ny),full_lava(nx,ny)
+    REAL(wp) :: saved_deposit(nx,ny,ns),full_deposit(nx,ny,ns)
+    REAL(wp) :: saved_erosion(nx,ny,ns),full_erosion(nx,ny,ns)
+    REAL(wp) :: saved_erodible(ns,nx,ny),full_erodible(ns,nx,ny)
+    REAL(wp) :: pdyn
+    REAL(wp), PARAMETER :: delta=0.1_wp
+    INTEGER :: l,j,k,iterations,linear_info,mass_group,cooling_group,i
+    LOGICAL :: converged,line_search_failed
+    CHARACTER(LEN=256) :: error
+
+    CALL reset_fixture
+    rheology_flag=.TRUE.;rheology_model='lava'
+    rheology_method='NEWTON';rheology_cadence='STAGE';rheology_group=0
+    thermal_cooling_flag=.TRUE.
+    thermal_method='ANALYTIC';thermal_cadence='STEP';thermal_group=1
+    mass_exchange_group=0
+    lava_deposition_flag=.TRUE.
+    lava_deposition_model='VISCOSITY'
+    lava_deposition_rate=0.02_wp
+    lava_deposition_visc_ref=0.03_wp
+    lava_deposition_exponent=1.0_wp
+    nu_ref=0.02_wp;visc_par=0.003_wp;tau0=0.0_wp;T_ref=900.0_wp
+    radiative_term_coeff=5.103E-8_wp
+    convective_term_coeff=9.0_wp
+    T_env=300.0_wp
+    DO k=1,ny
+       DO j=1,nx
+          CALL set_cell(j,k,0.5_wp,[0.0_wp,0.0_wp],900.0_wp)
+       END DO
+    END DO
+    state%q(:,5,4)=0.0_wp
+    CALL configure_source_registry
+    IF (equation_partition%n_IM_groups/=1) &
+         ERROR STOP 'D18 integrated lava stage partition'
+    groups=source_registry%step_groups()
+    IF (SIZE(groups)/=2) ERROR STOP 'D18 integrated lava STEP group count'
+    mass_group=0;cooling_group=0
+    DO i=1,SIZE(groups)
+       IF (ANY(groups(i)%source_names=='mass_exchange_lava_deposition')) mass_group=i
+       IF (ANY(groups(i)%source_names=='thermal_cooling')) cooling_group=i
+    END DO
+    IF (mass_group/=1 .OR. cooling_group/=2) ERROR STOP 'D18 lava STEP group ordering'
+    IF (groups(mass_group)%method/=SOURCE_METHOD_EXPLICIT .OR. &
+         groups(cooling_group)%method/=SOURCE_METHOD_ANALYTIC) &
+         ERROR STOP 'D18 integrated lava STEP methods'
+
+    CALL initialize_nonlinear_solver
+    before_stage=state%q(:,2,2)
+    initial_mass=before_stage(1)
+    residual=0.0_wp
+    CALL solve_imex_stage(equation_partition,source_registry%stage_groups(), &
+         before_stage,before_stage,delta,0.75_wp,residual, &
+         B_prime_x_geom(2,2),B_prime_y_geom(2,2), &
+         B_second_xx_geom(2,2),B_second_xy_geom(2,2), &
+         B_second_yy_geom(2,2),grav_coeff(2,2),0.0_wp, &
+         .FALSE.,.FALSE.,after_stage,im_rate,iterations,converged, &
+         linear_info,line_search_failed)
+    IF (.NOT.converged .OR. linear_info/=0 .OR. line_search_failed) &
+         ERROR STOP 'D18 integrated lava Newton stage failed'
+    IF (MAXVAL(ABS(after_stage(2:3)-before_stage(2:3)))<=0.0_wp) &
+         ERROR STOP 'D18 integrated lava stage inactive'
+    IF (after_stage(4)/=before_stage(4)) ERROR STOP 'D18 stage performed STEP cooling'
+    state%q(:,2,2)=after_stage
+    CALL finalize_nonlinear_solver
+    DO l=1,domain%solve_cells
+       j=domain%j_cent(l);k=domain%k_cent(l)
+       IF (state%q(1,j,k)<=0.0_wp) CYCLE
+       CALL qc_to_qp(state%q(:,j,k),state%qp(:,j,k),pdyn)
+    END DO
+    initial_temp=state%qp(4,2,2)
+    CALL apply_mass_exchange_step(state%q,state%qp,delta,domain,source_registry)
+    first_deposition=lava_deposit(2,2)
+    IF (first_deposition<=0.0_wp) ERROR STOP 'D18 first lava STEP deposition inactive'
+    IF (ABS(initial_mass-(state%q(1,2,2)+rho_l*first_deposition))> &
+         1.0E-10_wp*initial_mass) ERROR STOP 'D18 combined mobile+immobile mass'
+    temp_after_one=state%qp(4,2,2)
+    IF (temp_after_one>=initial_temp) ERROR STOP 'D18 STEP cooling did not lower temperature'
+    IF (ALL(lava_deposit<=0.0_wp)) ERROR STOP 'D18 lava deposit inventory missing'
+    saved_q=state%q;saved_b=B_vertex;saved_lava=lava_deposit
+    saved_deposit=deposit;saved_erosion=erosion;saved_erodible=erodible
+    runtime%t=delta;runtime%dt=delta
+    CALL write_restart_file('integrated_lava_checkpoint.bin',runtime,stochastic,state,domain)
+
+    CALL apply_mass_exchange_step(state%q,state%qp,delta,domain,source_registry)
+    second_deposition=lava_deposit(2,2)-first_deposition
+    IF (second_deposition<=first_deposition) &
+         ERROR STOP 'D18 cooling did not increase viscosity-controlled deposition'
+    full_q=state%q;full_b=B_vertex;full_lava=lava_deposit
+    full_deposit=deposit;full_erosion=erosion;full_erodible=erodible
+
+    state%q=-999.0_wp;state%qp=-999.0_wp;lava_deposit=-999.0_wp
+    CALL read_restart_file('integrated_lava_checkpoint.bin',runtime,stochastic,state,domain)
+    CALL same_bits('integrated lava restart q',RESHAPE(state%q,[SIZE(saved_q)]), &
+         RESHAPE(saved_q,[SIZE(saved_q)]))
+    CALL same_bits('integrated lava restart bed',RESHAPE(B_vertex,[SIZE(saved_b)]), &
+         RESHAPE(saved_b,[SIZE(saved_b)]))
+    CALL same_bits('integrated lava restart inventory',RESHAPE(lava_deposit,[SIZE(saved_lava)]), &
+         RESHAPE(saved_lava,[SIZE(saved_lava)]))
+    CALL source_registry%finalize
+    CALL equation_partition%finalize
+    CALL configure_source_registry
+    state%qp=0.0_wp;state%qp(4,:,:)=T_ambient
+    DO l=1,domain%solve_cells
+       j=domain%j_cent(l);k=domain%k_cent(l)
+       IF (state%q(1,j,k)<=0.0_wp) CYCLE
+       CALL qc_to_qp(state%q(:,j,k),state%qp(:,j,k),pdyn)
+    END DO
+    CALL apply_mass_exchange_step(state%q,state%qp,delta,domain,source_registry)
+    CALL same_bits('integrated resumed lava q',RESHAPE(state%q,[SIZE(full_q)]), &
+         RESHAPE(full_q,[SIZE(full_q)]))
+    CALL same_bits('integrated resumed lava bed',RESHAPE(B_vertex,[SIZE(full_b)]), &
+         RESHAPE(full_b,[SIZE(full_b)]))
+    CALL same_bits('integrated resumed lava inventory',RESHAPE(lava_deposit,[SIZE(full_lava)]), &
+         RESHAPE(full_lava,[SIZE(full_lava)]))
+    CALL same_bits('integrated resumed granular deposit',RESHAPE(deposit,[SIZE(full_deposit)]), &
+         RESHAPE(full_deposit,[SIZE(full_deposit)]))
+    CALL same_bits('integrated resumed erosion',RESHAPE(erosion,[SIZE(full_erosion)]), &
+         RESHAPE(full_erosion,[SIZE(full_erosion)]))
+    CALL same_bits('integrated resumed erodible',RESHAPE(erodible,[SIZE(full_erodible)]), &
+         RESHAPE(full_erodible,[SIZE(full_erodible)]))
+    CALL source_registry%finalize;CALL equation_partition%finalize
+    rheology_flag=.FALSE.;rheology_model='none'
+    thermal_cooling_flag=.FALSE.;lava_deposition_flag=.FALSE.
+    lava_deposition_rate=0.0_wp
+    thermal_cadence='STAGE';thermal_group=0
+    WRITE(*,*) 'PASS D18 lava Newton/STEP deposition/STEP cooling/restart integration'
+  END SUBROUTINE test_integrated_lava_deposition_cooling_restart
+
+  !> \brief Exercise prescribed liquid loss with zero transported solid fraction.
   SUBROUTINE test_liquid_loss_without_solids
     REAL(wp) :: before(nq,nx,ny), bed_before(nx+1,ny+1)
     REAL(wp) :: expected_mass,expected_energy,flow_temperature,carrier_loss
