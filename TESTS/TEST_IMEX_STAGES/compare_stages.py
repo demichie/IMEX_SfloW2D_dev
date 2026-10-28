@@ -627,8 +627,11 @@ def lava_deposition_full_rk_checkpoint_suite(args):
                 if run.returncode:
                     raise AssertionError(
                         f"RK{n} {label} mode {mode}: {run.stdout} {run.stderr}")
+            # Continuous run writes two statistics records; the resumed
+            # process writes one. The physical q/qp fields have equal shapes.
             trajectories[label] = (
-                read_payload(work / "result.bin", nx, ny, n, 1),
+                read_payload(work / "result.bin", nx, ny, n,
+                             2 if label == "continuous" else 1),
                 (work / "lava_inventory.bin").read_bytes(),
             )
         continuous, c_inventory = trajectories["continuous"]
