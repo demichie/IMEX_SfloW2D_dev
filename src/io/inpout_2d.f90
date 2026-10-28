@@ -1061,7 +1061,7 @@ CONTAINS
     USE parameters_2d, ONLY: limiter
     USE parameters_2d, ONLY: bcW, bcE, bcS, bcN
 
-    USE geometry_2d, ONLY: deposit, deposit_tot, erosion, erodible, erosion_tot
+    USE geometry_2d, ONLY: deposit, deposit_tot, erosion, erodible, erosion_tot, lava_deposit
 
     USE constitutive_parameters_2d, ONLY: rho_a_amb, rho_c_sub, kin_visc_c
 
