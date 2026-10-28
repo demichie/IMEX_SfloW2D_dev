@@ -10,6 +10,7 @@ MODULE source_configuration_2d
   USE equation_metadata_2d, ONLY : equation_partition_type, &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   USE source_input_2d
+  USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag
   USE parameters_2d, ONLY : wp, n_eqns, rheology_flag, rheology_model, &
         thermal_cooling_flag, &
        pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag, &

@@ -24,7 +24,6 @@ IMEX_SfloW2D_SOURCES = \
                 core/model_layout_2d.f90 \
                 numerics/equation_metadata_2d.f90 \
                 numerics/source_catalog_2d.f90 \
-                numerics/source_input_2d.f90 \
                 numerics/source_registry_2d.f90 \
                 core/runtime_2d.f90 \
                 core/complexify.f90 \
@@ -44,6 +43,7 @@ IMEX_SfloW2D_SOURCES = \
                 physics/mass_exchange/mass_exchange_erosion_2d.f90 \
                 physics/mass_exchange/mass_exchange_deposition_2d.f90 \
                 physics/mass_exchange/mass_exchange_lava_deposition_2d.f90 \
+                numerics/source_input_2d.f90 \
                 physics/mass_exchange/mass_exchange_vaporization_2d.f90 \
                 physics/mass_exchange/mass_exchange_entrainment_2d.f90 \
                 physics/mass_exchange/mass_exchange_balance_2d.f90 \
@@ -162,7 +162,6 @@ physics/mass_exchange/mass_exchange_deposition_2d.$(OBJEXT): core/parameters_2d.
                                      core/diagnostics_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                                      core/diagnostics_2d.$(OBJEXT) \
-                                     numerics/source_input_2d.$(OBJEXT) \
                                      physics/rheology_laws/rheology_lava_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
@@ -368,7 +367,8 @@ IMEX_SfloW2D_LDADD = @NETCDF_LIBS@ @LAPACK_LIBS@ -lm
 # D17 metadata is built once and consumed by stage dispatch through the analytic
 # bridge; no registry validation or copying is performed inside cell loops.
 numerics/source_catalog_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
-numerics/source_input_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
+numerics/source_input_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
+                                     physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT)
 numerics/source_registry_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
                                       numerics/equation_metadata_2d.$(OBJEXT)
 physics/source_configuration_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \

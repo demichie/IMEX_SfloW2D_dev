@@ -4,6 +4,9 @@
 !>          namelists; SOURCE_GROUPS is no longer accepted.
 !********************************************************************************
 MODULE source_input_2d
+  USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag, &
+       lava_deposition_model, lava_deposition_rate, lava_deposition_visc_ref, &
+       lava_deposition_exponent, lava_deposition_temp_ref, lava_deposition_temp_width
   USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag, &
        loss_rate, entrainment_flag
   USE parameters_2d, ONLY : wp, gas_loss_flag, liquid_vaporization_flag
@@ -27,13 +30,6 @@ MODULE source_input_2d
   CHARACTER(LEN=16), PUBLIC :: mass_exchange_method='EXPLICIT'
   CHARACTER(LEN=16), PUBLIC :: mass_exchange_cadence='STEP'
   INTEGER, PUBLIC :: mass_exchange_group=0
-  LOGICAL, PUBLIC :: lava_deposition_flag=.FALSE.
-  CHARACTER(LEN=16), PUBLIC :: lava_deposition_model='CONSTANT'
-  REAL(wp), PUBLIC :: lava_deposition_rate=0.0_wp
-  REAL(wp), PUBLIC :: lava_deposition_visc_ref=1.0E-2_wp
-  REAL(wp), PUBLIC :: lava_deposition_exponent=1.0_wp
-  REAL(wp), PUBLIC :: lava_deposition_temp_ref=900.0_wp
-  REAL(wp), PUBLIC :: lava_deposition_temp_width=100.0_wp
   LOGICAL, PUBLIC :: mass_exchange_configuration_present=.FALSE.
   NAMELIST /mass_exchange_parameters/ mass_exchange_method, &
        mass_exchange_cadence, mass_exchange_group, erosion_coeff, &
@@ -42,7 +38,7 @@ MODULE source_input_2d
        lava_deposition_rate, lava_deposition_visc_ref, lava_deposition_exponent, &
        lava_deposition_temp_ref, lava_deposition_temp_width
   PUBLIC :: read_mass_exchange_parameters, write_mass_exchange_parameters
-  PUBLIC :: eval_lava_deposition_rate, uppercase_source_text
+  PUBLIC :: uppercase_source_text
 CONTAINS
   ! Read the optional indivisible mass-exchange schedule.
   SUBROUTINE read_mass_exchange_parameters(input_unit,error)
@@ -116,26 +112,6 @@ CONTAINS
     INTEGER, INTENT(IN) :: output_unit
     WRITE(output_unit,NML=mass_exchange_parameters)
   END SUBROUTINE write_mass_exchange_parameters
-
-  !> \brief Requested immobile lava deposition thickness rate.
-  !> \details Caller enforces available thickness over dt.
-  !> \param[in] temperature Current mobile temperature [K].
-  !> \param[in] viscosity Lava kinematic viscosity [m2/s].
-  !> \return Prescribed deposition rate [m/s].
-  PURE REAL(wp) FUNCTION eval_lava_deposition_rate(temperature,viscosity) RESULT(rate)
-    REAL(wp), INTENT(IN) :: temperature,viscosity
-    REAL(wp) :: factor
-    factor=1.0_wp
-    SELECT CASE(TRIM(lava_deposition_model))
-    CASE('TEMPERATURE')
-       factor=MIN(1.0_wp,MAX(0.0_wp,(lava_deposition_temp_ref-temperature)/ &
-            lava_deposition_temp_width))
-    CASE('VISCOSITY')
-       factor=MIN(1.0_wp,(MAX(0.0_wp,viscosity)/lava_deposition_visc_ref)** &
-            lava_deposition_exponent)
-    END SELECT
-    rate=MAX(0.0_wp,lava_deposition_rate)*factor
-  END FUNCTION eval_lava_deposition_rate
 
   !> \brief Convert ASCII lowercase letters in source input to uppercase.
   !> \param[in] text Input text.

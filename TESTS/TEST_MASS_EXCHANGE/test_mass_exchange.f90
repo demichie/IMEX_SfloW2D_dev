@@ -185,7 +185,7 @@ CONTAINS
   !> \brief Verify prescribed lava solidification as an immobile STEP deposit.
   !> \details Check mass-energy transfer, nodal geometry and official restart.
   SUBROUTINE test_lava_deposition_transaction
-    USE source_input_2d, ONLY : lava_deposition_flag,lava_deposition_model, &
+    USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag,lava_deposition_model, &
          lava_deposition_rate
     REAL(wp), PARAMETER :: delta=0.1_wp, rate=0.01_wp
     REAL(wp) :: mass_before,energy_before,bed_before(nx+1,ny+1)
@@ -239,8 +239,8 @@ CONTAINS
   !>          viscosity feedback and bitwise continuation from a real checkpoint.
   SUBROUTINE test_integrated_lava_deposition_cooling_restart
     USE source_input_2d, ONLY : lava_deposition_flag,lava_deposition_model, &
-         lava_deposition_rate,lava_deposition_visc_ref,lava_deposition_exponent, &
-         mass_exchange_group
+         lava_deposition_rate,lava_deposition_visc_ref,lava_deposition_exponent
+    USE source_input_2d, ONLY : mass_exchange_group
     USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
     REAL(wp) :: initial_mass, temp_after_one, initial_temp

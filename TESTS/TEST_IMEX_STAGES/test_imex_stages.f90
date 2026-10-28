@@ -49,8 +49,9 @@ PROGRAM test_imex_stages
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_configuration_2d, ONLY : initialize_configured_sources
   USE source_input_2d, ONLY : rheology_method, rheology_cadence, rheology_group, &
-       thermal_method, thermal_cadence, thermal_group, mass_exchange_group, &
-       lava_deposition_flag, lava_deposition_model, lava_deposition_rate, &
+       thermal_method, thermal_cadence, thermal_group, mass_exchange_group
+  USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag, &
+       lava_deposition_model, lava_deposition_rate, &
        lava_deposition_visc_ref, lava_deposition_exponent
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, finalize_nonlinear_solver
   USE step_source_executor_2d, ONLY : execute_step_source_groups
