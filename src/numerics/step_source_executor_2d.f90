@@ -135,7 +135,7 @@ CONTAINS
          bottom_fissural_source_flag, erodible_deposit_flag,                &
          pore_pressure_flag, liquid_flag
     USE state_2d, ONLY : initialize_dry_physical_cell
-    USE source_input_2d, ONLY : lava_deposition_flag
+    USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag
     USE mass_exchange_lava_deposition_2d, ONLY : eval_mass_exchange_lava_deposition_explicit
     USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
 
