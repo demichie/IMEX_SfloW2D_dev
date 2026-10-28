@@ -4,6 +4,9 @@
 !>          namelists; SOURCE_GROUPS is no longer accepted.
 !********************************************************************************
 MODULE source_input_2d
+  USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag, &
+       loss_rate, entrainment_flag
+  USE parameters_2d, ONLY : gas_loss_flag, liquid_vaporization_flag
   IMPLICIT NONE
   PRIVATE
   ! D18: physical-source scheduling preferences, absent unless specified.
@@ -26,8 +29,10 @@ MODULE source_input_2d
   INTEGER, PUBLIC :: mass_exchange_group=0
   LOGICAL, PUBLIC :: mass_exchange_configuration_present=.FALSE.
   NAMELIST /mass_exchange_parameters/ mass_exchange_method, &
-       mass_exchange_cadence, mass_exchange_group
-  PUBLIC :: read_mass_exchange_parameters
+       mass_exchange_cadence, mass_exchange_group, erosion_coeff, &
+       settling_flag, loss_rate, entrainment_flag, gas_loss_flag, &
+       liquid_vaporization_flag
+  PUBLIC :: read_mass_exchange_parameters, write_mass_exchange_parameters
   PUBLIC :: uppercase_source_text
 CONTAINS
   ! Read the optional indivisible mass-exchange schedule.
@@ -85,6 +90,11 @@ CONTAINS
     REWIND(input_unit,IOSTAT=ios)
     IF (ios/=0) error='Unable to rewind after MASS_EXCHANGE_PARAMETERS'
   END SUBROUTINE read_mass_exchange_parameters
+
+  SUBROUTINE write_mass_exchange_parameters(output_unit)
+    INTEGER, INTENT(IN) :: output_unit
+    WRITE(output_unit,NML=mass_exchange_parameters)
+  END SUBROUTINE write_mass_exchange_parameters
 
   !> \brief Convert ASCII lowercase letters in source input to uppercase.
   !> \param[in] text Input text.

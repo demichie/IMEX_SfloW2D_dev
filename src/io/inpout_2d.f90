@@ -67,7 +67,7 @@ MODULE inpout_2d
 
   ! -- Variables for the namelist NUMERIC_PARAMETERS
   USE parameters_2d, ONLY: dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, reconstr_coeff, n_RK
-  USE source_input_2d, ONLY: read_mass_exchange_parameters, &
+  USE source_input_2d, ONLY: read_mass_exchange_parameters, write_mass_exchange_parameters, &
        rheology_method, rheology_cadence, rheology_group, &
        thermal_method, thermal_cadence, thermal_group, &
        pore_pressure_method, pore_pressure_cadence, pore_pressure_group, &
@@ -400,8 +400,7 @@ MODULE inpout_2d
   NAMELIST /runout_parameters/ x0_runout, y0_runout, dt_runout, &
     eps_stop, alphas_threshold
 
-  NAMELIST /liquid_transport_parameters/ sp_heat_l, rho_l, kin_visc_l, &
-    loss_rate
+  NAMELIST /liquid_transport_parameters/ sp_heat_l, rho_l, kin_visc_l
 
   NAMELIST /vulnerability_table_parameters/ thickness_levels0, dyn_pres_levels0
 
@@ -411,7 +410,7 @@ MODULE inpout_2d
     stochastic_seed, noise_activation_velocity
 
   NAMELIST /pore_pressure_parameters/ hydraulic_permeability, pore_pres_fract, &
-    gas_loss_flag, alpha_trans, N_inh, f_inhibit_mode, &
+    alpha_trans, N_inh, f_inhibit_mode, &
     dynamic_permeability_flag, pore_pressure_method, pore_pressure_cadence, &
     pore_pressure_group
 
@@ -424,13 +423,13 @@ MODULE inpout_2d
   NAMELIST /north_boundary_conditions/ h_bcN, hu_bcN, hv_bcN, &
     xs_bcN, T_bcN, xg_bcN, xl_bcN, stoch_bcN, pore_bcN
   NAMELIST /solid_transport_parameters/ rho_s, diam_s, sphericity_s, &
-    sp_heat_s, erosion_coeff, erodible_porosity, settling_flag, &
+    sp_heat_s, erodible_porosity, &
     T_erodible, erodible_file, erodible_fract, alphastot_min, &
     initial_erodible_thickness, erodible_deposit_flag, &
     maximum_solid_packing, A_drag, B_drag, collective_settling_flag, vonK
   NAMELIST /gas_transport_parameters/ sp_heat_a, sp_gas_const_a, kin_visc_a, &
-    pres, T_ambient, entrainment_flag, sp_heat_g, sp_gas_const_g, &
-    liquid_vaporization_flag, water_level, gamma_steam, sutherland_flag, &
+    pres, T_ambient, sp_heat_g, sp_gas_const_g, &
+    water_level, gamma_steam, sutherland_flag, &
     Tref_Suth, muRef_Suth, S_mu
 
 CONTAINS
@@ -1214,6 +1213,10 @@ CONTAINS
       STOP
 
     END IF
+
+    ! Read mass-exchange process values before transport validation.
+    CALL read_mass_exchange_parameters(input_unit,source_input_error)
+    IF (LEN_TRIM(source_input_error)>0) ERROR STOP TRIM(source_input_error)
 
     ! ------- READ gas_transport_parameters NAMELIST --------------------------
 
@@ -2200,7 +2203,6 @@ CONTAINS
 
     END IF
 
-    CALL read_mass_exchange_parameters(input_unit,source_input_error)
     ! The first D18 executable mode is an entirely explicit STAGE partition.
     ! Reject mixed requests instead of silently retaining implicit evaluation.
     IF (LEN_TRIM(source_input_error)==0) THEN
@@ -4919,6 +4921,7 @@ CONTAINS
     IF (rheology_flag) WRITE (backup_unit, rheology_parameters)
 
 
+    CALL write_mass_exchange_parameters(backup_unit)
     WRITE (backup_unit, solid_transport_parameters)
     WRITE (backup_unit, gas_transport_parameters)
 
