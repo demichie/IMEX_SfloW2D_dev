@@ -346,6 +346,7 @@ CONTAINS
     IF (ALL(bed_full==initial_bed)) ERROR STOP 'D18 combined STEP exchange inactive'
 
     CALL reset_fixture
+    erosion_coeff=0.1_wp
     CALL apply_mass_exchange_step(state%q,state%qp,0.1_wp,domain,first_group)
     CALL apply_mass_exchange_step(state%q,state%qp,0.1_wp,domain,second_group)
     CALL same_bits('D18 combined STEP Q',RESHAPE(state%q,[SIZE(q_full)]),RESHAPE(q_full,[SIZE(q_full)]))
