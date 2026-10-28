@@ -686,6 +686,9 @@ CONTAINS
     END IF
     ALLOCATE(q(n_vars,nx,ny),q0(n_vars,nx,ny),qp(n_vars+2,nx,ny))
     IF (lava_deposition_mode==1) THEN
+       IF (.NOT.ALLOCATED(erosion_coeff)) ALLOCATE(erosion_coeff)
+       IF (.NOT.ALLOCATED(loss_rate)) ALLOCATE(loss_rate)
+       erosion_coeff=0.0_wp;loss_rate=0.0_wp;settling_flag=.FALSE.
        ALLOCATE(lava_deposit(nx,ny),deposit(nx,ny,n_solid), &
             erosion(nx,ny,n_solid),erodible(n_solid,nx,ny),B_zone(nx,ny))
        lava_deposit=0.0_wp;deposit=0.0_wp;erosion=0.0_wp
