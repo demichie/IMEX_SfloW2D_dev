@@ -754,6 +754,20 @@ def stage_count_suite(executable, profile):
                 subprocess.run([sys.executable, str(generator)], cwd=directory, check=True)
                 inp = directory / "IMEX_SfloW2D.inp"
                 content = inp.read_text()
+                # D18: the shared fixture must use the owning mass-exchange
+                # namelist, not legacy transport blocks. Otherwise the parser
+                # fails before the N_RK validation exercised by this suite.
+                blocks = {}
+                for block in content.split("&")[1:]:
+                    name = block.split(None, 1)[0].upper()
+                    blocks[name] = block.split("/", 1)[0].upper()
+                exchange = blocks.get("MASS_EXCHANGE_PARAMETERS", "")
+                if not all(name in exchange for name in ("ENTRAINMENT_FLAG", "LOSS_RATE")):
+                    raise AssertionError("lake-at-rest fixture lacks D18 mass-exchange ownership")
+                for block_name in ("GAS_TRANSPORT_PARAMETERS", "LIQUID_TRANSPORT_PARAMETERS"):
+                    if any(name in blocks.get(block_name, "") for name in
+                           ("ENTRAINMENT_FLAG", "LOSS_RATE")):
+                        raise AssertionError(f"{block_name} contains legacy mass-exchange input")
                 assert content.count("N_RK=2,") == 1
                 inp.write_text(content.replace("N_RK=2,", "" if stages is None else f"N_RK={stages},"))
             expected = 2 if stages is None else stages
