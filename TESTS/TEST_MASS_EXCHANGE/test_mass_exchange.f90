@@ -238,7 +238,7 @@ CONTAINS
   !> \details Production NEWTON stage, two ordered STEP groups, physical
   !>          viscosity feedback and bitwise continuation from a real checkpoint.
   SUBROUTINE test_integrated_lava_deposition_cooling_restart
-    USE source_input_2d, ONLY : lava_deposition_flag,lava_deposition_model, &
+    USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag,lava_deposition_model, &
          lava_deposition_rate,lava_deposition_visc_ref,lava_deposition_exponent
     USE source_input_2d, ONLY : mass_exchange_group
     USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC
