@@ -29,12 +29,20 @@ MODULE rheology_lava_2d
   PUBLIC :: eval_rheology_lava_semi_implicit
   PUBLIC :: eval_rheology_lava_implicit
   PUBLIC :: solve_rheology_lava_analytic
-  PUBLIC :: nu_ref, visc_par, tau0
+  PUBLIC :: nu_ref, visc_par, tau0, lava_kinematic_viscosity
   REAL(wp) :: nu_ref
   REAL(wp) :: visc_par
   REAL(wp) :: tau0
   ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
+  !> \brief Kinematic viscosity shared by lava rheology and deposition.
+  !> \param[in] temperature Lava temperature [K].
+  !> \return Kinematic viscosity [m2/s].
+  PURE REAL(wp) FUNCTION lava_kinematic_viscosity(temperature) RESULT(nu)
+    REAL(wp), INTENT(IN) :: temperature
+    nu=nu_ref*EXP(-visc_par*(temperature-T_ref))
+  END FUNCTION lava_kinematic_viscosity
+
 
   SUBROUTINE eval_rheology_lava_explicit( &
        flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
