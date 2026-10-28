@@ -60,6 +60,7 @@ PROGRAM test_mass_exchange
   CALL get_environment_variable('N8_CASE', selected, STATUS=status)
   IF (status /= 0) selected = 'all'
   CALL initialize_fixture
+  CALL test_lava_deposition_transaction
   CALL test_liquid_loss_without_solids
   CALL test_empty_step_registry
   CALL test_analytic_cooling_step_executor
@@ -180,6 +181,58 @@ CONTAINS
 
   !> \\brief Exercise prescribed liquid loss with zero transported solid fraction.
   !> \\details The limiter must preserve carrier availability, velocity and
+  !> \brief Verify prescribed lava solidification as an immobile STEP deposit.
+  !> \details Check mass-energy transfer, nodal geometry and official restart.
+  SUBROUTINE test_lava_deposition_transaction
+    USE source_input_2d, ONLY : lava_deposition_flag,lava_deposition_model, &
+         lava_deposition_rate
+    REAL(wp), PARAMETER :: delta=0.1_wp, rate=0.01_wp
+    REAL(wp) :: mass_before,energy_before,bed_before(nx+1,ny+1)
+    REAL(wp) :: checkpoint(nx,ny),post_restart(nx,ny)
+    REAL(wp) :: expected_mass,expected_energy
+    INTEGER :: j,k
+    CALL reset_fixture
+    rheology_model='lava'
+    lava_deposition_flag=.TRUE.
+    lava_deposition_model='CONSTANT'
+    lava_deposition_rate=rate
+    DO k=1,ny
+       DO j=1,nx
+          CALL set_cell(j,k,0.5_wp,[0.0_wp,0.0_wp],900.0_wp)
+       END DO
+    END DO
+    state%q(:,5,4)=0.0_wp
+    mass_before=state%q(1,2,2)
+    energy_before=state%q(4,2,2)
+    bed_before=B_vertex
+    CALL configure_source_registry
+    CALL apply_mass_exchange_step(state%q,state%qp,delta,domain,source_registry)
+    expected_mass=mass_before-rho_l*rate*delta
+    expected_energy=energy_before-rho_l*sp_heat_l*900.0_wp*rate*delta
+    IF (ABS(state%q(1,2,2)-expected_mass)>1.0E-10_wp*mass_before) &
+         ERROR STOP 'D18 lava deposit mass imbalance'
+    IF (ABS(state%q(4,2,2)-expected_energy)>1.0E-10_wp*energy_before) &
+         ERROR STOP 'D18 lava deposit thermal imbalance'
+    IF (ABS(lava_deposit(2,2)-rate*delta)>1.0E-12_wp) &
+         ERROR STOP 'D18 lava deposit inventory not updated'
+    IF (ALL(B_vertex==bed_before)) ERROR STOP 'D18 lava deposit did not raise topography'
+    IF (ANY(deposit/=0.0_wp) .OR. ANY(erosion/=0.0_wp)) &
+         ERROR STOP 'D18 lava deposit altered granular inventories'
+    checkpoint=lava_deposit
+    runtime%t=delta;runtime%dt=delta
+    CALL write_restart_file('lava_deposit_checkpoint.bin',runtime,stochastic,state,domain)
+    lava_deposit=-999.0_wp
+    CALL read_restart_file('lava_deposit_checkpoint.bin',runtime,stochastic,state,domain)
+    post_restart=lava_deposit
+    CALL same_bits('D18 lava deposit restart',RESHAPE(post_restart,[SIZE(post_restart)]), &
+         RESHAPE(checkpoint,[SIZE(checkpoint)]))
+    CALL source_registry%finalize
+    CALL equation_partition%finalize
+    lava_deposition_flag=.FALSE.;lava_deposition_rate=0.0_wp
+    rheology_model='none'
+    WRITE(*,*) 'PASS D18 immobile lava deposition STEP and production restart'
+  END SUBROUTINE test_lava_deposition_transaction
+
   !>          temperature while leaving dry cells and bed inventories unchanged.
   SUBROUTINE test_liquid_loss_without_solids
     REAL(wp) :: before(nq,nx,ny), bed_before(nx+1,ny+1)
