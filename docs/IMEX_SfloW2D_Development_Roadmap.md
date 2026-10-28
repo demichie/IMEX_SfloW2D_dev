@@ -2594,6 +2594,8 @@ Ogni passo deve costituire una modifica **sostanziale e coordinata** con i test 
 
 **Ancora aperti per chiusura D18:** test EXPLICIT STAGE/STEP multi-sorgente con oracoli di somma indipendenti, restart della lava mixed-mode, raffinatezza temporale e accuratezza dello splitting, regressione con mass exchange simultaneo, audit del parser e dell'ownership delle configurazioni.
 
+**Avanzamento EXPLICIT multi-sorgente (28 ottobre 2026; commit `7bb6154`; CI da verificare):** `TEST_MASS_EXCHANGE` esercita un gruppo con cooling termico esplicito e curvatura geometrica, ciascuno con contributo indipendente alla sorgente. Per entrambe le cadenze STAGE e STEP confronta la valutazione congiunta con la somma delle valutazioni separate sullo stesso stato conservativo, includendo il controllo di invarianza rispetto all'ordine dei nomi; per STEP confronta inoltre l'incremento attraverso `execute_step_source_groups` con `dt` per il tasso calcolato dallo stato iniziale. Il test STAGE verifica direttamente l'adattatore di produzione comune all'integratore RK, ma non e un test integrale con piu sorgenti esplicite attraverso l'intero tableau. Non dichiarare il gate chiuso prima della CI. Restano restart della lava, splitting/raffinamento temporale e regressioni combinate mass exchange.
+
 #### D18.6 — Matrice di regressione e criteri di accettazione
 
 | Caso | Risultato obbligatorio |
