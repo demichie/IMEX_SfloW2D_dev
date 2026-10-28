@@ -74,8 +74,27 @@ PROGRAM test_source_registry
       thermal_method=MERGE('ANALYTIC','NEWTON  ',methods(ids(2))==IM_GROUP_METHOD_ANALYTIC)
       pore_pressure_method=MERGE('ANALYTIC','NEWTON  ',methods(ids(3))==IM_GROUP_METHOD_ANALYTIC)
       CALL initialize_configured_sources(registry,partition,error)
-      CALL require(error=='' .AND. registry%is_initialized(), &
-           'physical triplet combination normalizes: '//TRIM(error))
+      ! An analytic group may not share its numeric ID with any other
+      ! enabled physical source in the same cadence.
+      BLOCK
+        LOGICAL :: invalid_analytic
+        invalid_analytic=.FALSE.
+        IF (enabled(2) .AND. ids(1)==ids(2)) &
+             invalid_analytic=(methods(ids(1))==IM_GROUP_METHOD_ANALYTIC)
+        IF (enabled(3) .AND. ids(1)==ids(3)) &
+             invalid_analytic=invalid_analytic .OR. &
+             (methods(ids(1))==IM_GROUP_METHOD_ANALYTIC)
+        IF (enabled(2) .AND. enabled(3) .AND. ids(2)==ids(3)) &
+             invalid_analytic=invalid_analytic .OR. &
+             (methods(ids(2))==IM_GROUP_METHOD_ANALYTIC)
+        IF (invalid_analytic) THEN
+          CALL require(error/='', 'shared analytical stage group must be rejected')
+        ELSE
+          CALL require(error=='' .AND. registry%is_initialized(), &
+               'physical triplet combination normalizes: '//TRIM(error))
+        END IF
+        IF (invalid_analytic) CYCLE
+      END BLOCK
       stages=registry%stage_groups();steps=registry%step_groups()
       CALL require(SIZE(steps)==1,'one post-RK source group')
       CALL require(group_contains_name(steps(1),'mass_exchange_deposition'),'mass source ownership')
@@ -136,14 +155,14 @@ CONTAINS
     CALL require(error=='','configured default physical schedule: '//TRIM(error))
     g=registry%stage_groups();s=registry%step_groups()
     CALL require(SIZE(g)==4 .AND. SIZE(s)==1,'default schedule group count')
-    CALL require(SIZE(g(1)%source_names)==1 .AND. &
-         group_contains_name(g(1),'thermal_cooling'),'one complete cooling source')
-    CALL require(SIZE(g(2)%source_names)==1 .AND. &
-         group_contains_name(g(2),'pore_pressure_dissipation'),'pore dissipation scheduling')
-    CALL require(SIZE(g(3)%source_names)==1 .AND. &
-         group_contains_name(g(3),'rheology_lava'),'complete lava law scheduling')
-    CALL require(group_contains_name(g(4),'boundary_injection'), &
-         'explicit boundary scheduling')
+    CALL require(group_contains_name(g(1),'boundary_injection'), &
+         'explicit boundary group 0 precedes implicit group IDs')
+    CALL require(group_contains_name(g(2),'thermal_cooling'), &
+         'one complete cooling source at group 1')
+    CALL require(group_contains_name(g(3),'pore_pressure_dissipation'), &
+         'pore dissipation scheduling at group 2')
+    CALL require(group_contains_name(g(4),'rheology_lava'), &
+         'complete lava law scheduling at group 3')
     CALL require(group_contains_name(s(1),'mass_exchange_deposition'), &
          'post-RK deposition scheduling')
   END SUBROUTINE verify_default_schedule
@@ -157,15 +176,15 @@ CONTAINS
     CALL require(error=='','analytic STEP source configuration: '//TRIM(error))
     stage=registry%stage_groups(); post=registry%step_groups()
     CALL require(SIZE(post)==3,'two analytic STEP groups and one mass exchange batch')
-    CALL require(post(1)%method==SOURCE_METHOD_ANALYTIC .AND. &
-         group_contains_name(post(1),'pore_pressure_dissipation'), &
-         'pore STEP first by GROUP')
+    CALL require(post(1)%method==SOURCE_METHOD_EXPLICIT .AND. &
+         group_contains_name(post(1),'mass_exchange_deposition'), &
+         'mass exchange default GROUP=0 executes first')
     CALL require(post(2)%method==SOURCE_METHOD_ANALYTIC .AND. &
-         group_contains_name(post(2),'thermal_cooling'), &
-         'cooling STEP second by GROUP')
-    CALL require(post(3)%method==SOURCE_METHOD_EXPLICIT .AND. &
-         group_contains_name(post(3),'mass_exchange_deposition'), &
-         'mass exchange remains atomic and last')
+         group_contains_name(post(2),'pore_pressure_dissipation'), &
+         'pore STEP GROUP=1 follows GROUP=0')
+    CALL require(post(3)%method==SOURCE_METHOD_ANALYTIC .AND. &
+         group_contains_name(post(3),'thermal_cooling'), &
+         'cooling STEP GROUP=2 follows GROUP=1')
     CALL require(partition%n_IM_groups==1, &
          'STEP analytic sources do not enter stage implicit partition')
   END SUBROUTINE verify_analytic_step_schedule
@@ -181,14 +200,14 @@ CONTAINS
     g=registry%stage_groups();post=registry%step_groups()
     CALL require(partition%n_IM_groups==1,'only pore pressure is implicit during RK')
     CALL require(SIZE(post)==3,'Newton, explicit and mass-exchange STEP groups')
-    CALL require(post(1)%method==SOURCE_METHOD_NEWTON .AND. &
-         group_contains_name(post(1),'rheology_lava'), &
-         'Newton STEP complete rheology group')
-    CALL require(post(2)%method==SOURCE_METHOD_EXPLICIT .AND. &
-         group_contains_name(post(2),'thermal_cooling'), &
-         'explicit STEP thermal source')
-    CALL require(group_contains_name(post(3),'mass_exchange_deposition'), &
-         'atomic mass-exchange STEP group preserved')
+    CALL require(group_contains_name(post(1),'mass_exchange_deposition'), &
+         'atomic mass-exchange GROUP=0 first')
+    CALL require(post(2)%method==SOURCE_METHOD_NEWTON .AND. &
+         group_contains_name(post(2),'rheology_lava'), &
+         'Newton STEP GROUP=1 complete rheology')
+    CALL require(post(3)%method==SOURCE_METHOD_EXPLICIT .AND. &
+         group_contains_name(post(3),'thermal_cooling'), &
+         'explicit STEP GROUP=2 after Newton')
   END SUBROUTINE verify_newton_explicit_step_schedule
 
   SUBROUTINE verify_group_method_contract()

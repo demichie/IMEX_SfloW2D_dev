@@ -141,7 +141,7 @@ CONTAINS
           IF (group%method==SOURCE_METHOD_ANALYTIC .OR. &
                groups(j)%method==SOURCE_METHOD_ANALYTIC) RETURN
         END IF
-        IF (group_stage_rank(groups(j))>group_stage_rank(group)) RETURN
+        IF (groups(j)%id>group%id) RETURN
       END DO
       error='D17: unallocated group descriptor arrays'
       IF (.NOT.ALLOCATED(group%source_names)) RETURN
