@@ -366,11 +366,16 @@ CONTAINS
   ! D18: official production restart round trip with analytical STEP cooling.
   SUBROUTINE test_official_cooling_restart
     REAL(wp) :: checkpoint_state(nq,nx,ny),continuous(nq,nx,ny)
+    REAL(wp) :: checkpoint_bed(nx+1,ny+1), continuous_bed(nx+1,ny+1)
+    REAL(wp) :: checkpoint_deposit(nx,ny,ns),continuous_deposit(nx,ny,ns)
+    REAL(wp) :: checkpoint_erosion(nx,ny,ns),continuous_erosion(nx,ny,ns)
+    REAL(wp) :: checkpoint_inventory(ns,nx,ny),continuous_inventory(ns,nx,ny)
     REAL(wp), PARAMETER :: delta=0.05_wp
     CHARACTER(LEN=256) :: error
     INTEGER :: l,j,k
     REAL(wp) :: pressure
     CALL reset_fixture
+    erosion_coeff=0.1_wp
     thermal_cooling_flag=.TRUE.
     thermal_method='ANALYTIC'
     thermal_cadence='STEP'
@@ -387,16 +392,29 @@ CONTAINS
     END DO
     CALL apply_mass_exchange_step(state%q,state%qp,delta,domain,source_registry)
     checkpoint_state=state%q
+    checkpoint_bed=B_vertex;checkpoint_deposit=deposit
+    checkpoint_erosion=erosion;checkpoint_inventory=erodible
+    IF (ALL(checkpoint_erosion==0.0_wp)) ERROR STOP 'D18 restart erosion inactive'
     runtime%t=delta;runtime%dt=delta
     CALL write_restart_file('cooling_checkpoint.bin',runtime,stochastic,state,domain)
     CALL apply_mass_exchange_step(state%q,state%qp,delta,domain,source_registry)
     continuous=state%q
+    continuous_bed=B_vertex;continuous_deposit=deposit
+    continuous_erosion=erosion;continuous_inventory=erodible
     state%q=-999.0_wp
     state%qp=-999.0_wp
     CALL read_restart_file('cooling_checkpoint.bin',runtime,stochastic,state,domain)
     CALL same_bits('official cooling restart state', &
          RESHAPE(state%q,[SIZE(checkpoint_state)]), &
          RESHAPE(checkpoint_state,[SIZE(checkpoint_state)]))
+    CALL same_bits('official restart B_vertex',RESHAPE(B_vertex,[SIZE(checkpoint_bed)]), &
+         RESHAPE(checkpoint_bed,[SIZE(checkpoint_bed)]))
+    CALL same_bits('official restart deposit',RESHAPE(deposit,[SIZE(checkpoint_deposit)]), &
+         RESHAPE(checkpoint_deposit,[SIZE(checkpoint_deposit)]))
+    CALL same_bits('official restart erosion',RESHAPE(erosion,[SIZE(checkpoint_erosion)]), &
+         RESHAPE(checkpoint_erosion,[SIZE(checkpoint_erosion)]))
+    CALL same_bits('official restart erodible',RESHAPE(erodible,[SIZE(checkpoint_inventory)]), &
+         RESHAPE(checkpoint_inventory,[SIZE(checkpoint_inventory)]))
     CALL source_registry%finalize
     CALL equation_partition%finalize
     CALL initialize_configured_sources(source_registry,equation_partition,error)
@@ -412,8 +430,17 @@ CONTAINS
     CALL same_bits('official cooling restart continuation', &
          RESHAPE(state%q,[SIZE(continuous)]), &
          RESHAPE(continuous,[SIZE(continuous)]))
+    CALL same_bits('official restart resumed bed',RESHAPE(B_vertex,[SIZE(continuous_bed)]), &
+         RESHAPE(continuous_bed,[SIZE(continuous_bed)]))
+    CALL same_bits('official restart resumed deposit',RESHAPE(deposit,[SIZE(continuous_deposit)]), &
+         RESHAPE(continuous_deposit,[SIZE(continuous_deposit)]))
+    CALL same_bits('official restart resumed erosion',RESHAPE(erosion,[SIZE(continuous_erosion)]), &
+         RESHAPE(continuous_erosion,[SIZE(continuous_erosion)]))
+    CALL same_bits('official restart resumed erodible',RESHAPE(erodible,[SIZE(continuous_inventory)]), &
+         RESHAPE(continuous_inventory,[SIZE(continuous_inventory)]))
     CALL source_registry%finalize
     CALL equation_partition%finalize
+    erosion_coeff=0.0_wp
     thermal_cooling_flag=.FALSE.
     thermal_method='ANALYTIC'
     thermal_cadence='STAGE'
