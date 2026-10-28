@@ -16,7 +16,9 @@ PROGRAM test_mass_exchange
   USE step_source_executor_2d, ONLY : apply_mass_exchange_step => execute_step_source_groups
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
-  USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, SOURCE_METHOD_EXPLICIT
+  USE source_terms_2d, ONLY : eval_cell_source_explicit
+  USE source_catalog_2d, ONLY : SOURCE_CADENCE_STEP, &
+       SOURCE_CADENCE_STAGE, SOURCE_METHOD_EXPLICIT
   USE source_configuration_2d, ONLY : initialize_configured_sources
   USE source_input_2d, ONLY : thermal_method,thermal_cadence,thermal_group, &
        rheology_method,rheology_cadence,rheology_group
@@ -60,6 +62,7 @@ PROGRAM test_mass_exchange
   CALL initialize_fixture
   CALL test_empty_step_registry
   CALL test_analytic_cooling_step_executor
+  CALL test_explicit_multi_source_groups
   OPEN(NEWUNIT=snapshot_unit, FILE='snapshot.bin', ACCESS='STREAM',      &
        FORM='UNFORMATTED', STATUS='REPLACE')
   OPEN(NEWUNIT=extension_unit, FILE='flat_evaluations.bin', ACCESS='STREAM', &
@@ -197,6 +200,101 @@ CONTAINS
     CALL same_bits('empty step bed',RESHAPE(B_vertex,[SIZE(bed_before)]),RESHAPE(bed_before,[SIZE(bed_before)]))
     CALL source_registry%finalize()
   END SUBROUTINE test_empty_step_registry
+
+  ! D18: explicit group members are evaluated against the same state.
+  ! Exercise the shared STAGE adapter and the production STEP executor.
+  SUBROUTINE test_explicit_multi_source_groups
+    TYPE(source_registry_type) :: test_registry
+    TYPE(source_group_type) :: joint, reversed, thermal_only, curvature_only
+    REAL(wp) :: rate_joint(nq),rate_reverse(nq),rate_thermal(nq)
+    REAL(wp) :: rate_curvature(nq),rate_reference(nq),before(nq,nx,ny)
+    REAL(wp) :: qp_cell(nq+2),p_dyn
+    REAL(wp), PARAMETER :: delta=0.01_wp
+    CHARACTER(LEN=256) :: error
+    INTEGER :: j,k,l,mode
+    CALL reset_fixture
+    thermal_cooling_flag=.TRUE.
+    curvature_term_flag=.TRUE.
+    radiative_term_coeff=5.103E-8_wp
+    convective_term_coeff=9.0_wp
+    T_env=300.0_wp
+    joint%id=1
+    joint%method=SOURCE_METHOD_EXPLICIT
+    joint%equation_ids=[2,3,4]
+    joint%source_names=[CHARACTER(LEN=64):: &
+         'thermal_cooling','geometry_curvature']
+    reversed=joint
+    reversed%source_names=[CHARACTER(LEN=64):: &
+         'geometry_curvature','thermal_cooling']
+    thermal_only=joint
+    thermal_only%source_names=[CHARACTER(LEN=64)::'thermal_cooling']
+    thermal_only%equation_ids=[4]
+    curvature_only=joint
+    curvature_only%source_names=[CHARACTER(LEN=64)::'geometry_curvature']
+    curvature_only%equation_ids=[2,3]
+    DO mode=1,2
+       IF (mode==1) THEN
+          joint%cadence=SOURCE_CADENCE_STAGE
+       ELSE
+          joint%cadence=SOURCE_CADENCE_STEP
+       END IF
+       reversed%cadence=joint%cadence
+       thermal_only%cadence=joint%cadence
+       curvature_only%cadence=joint%cadence
+       IF (mode==1) THEN
+          CALL test_registry%initialize(nq,0,[joint], &
+               [source_group_type::],error)
+       ELSE
+          CALL test_registry%initialize(nq,0,[source_group_type::], &
+               [joint],error)
+       END IF
+       IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
+       before=state%q
+       DO l=1,domain%solve_cells
+          j=domain%j_cent(l);k=domain%k_cent(l)
+          IF (before(1,j,k)<=0.0_wp) CYCLE
+          CALL qc_to_qp(before(:,j,k),qp_cell,p_dyn)
+          CALL eval_cell_source_explicit(j,k,qp_cell,0.0_wp, &
+               joint,rate_joint)
+          CALL eval_cell_source_explicit(j,k,qp_cell,0.0_wp, &
+               reversed,rate_reverse)
+          CALL eval_cell_source_explicit(j,k,qp_cell,0.0_wp, &
+               thermal_only,rate_thermal)
+          CALL eval_cell_source_explicit(j,k,qp_cell,0.0_wp, &
+               curvature_only,rate_curvature)
+          rate_reference=rate_thermal+rate_curvature
+          IF (MAXVAL(ABS(rate_joint-rate_reference))> &
+               tol*MAX(1.0_wp,MAXVAL(ABS(rate_reference)))) &
+               ERROR STOP 'D18: explicit group did not sum initial-state rates'
+          IF (ANY(rate_joint/=rate_reverse)) &
+               ERROR STOP 'D18: explicit group depends on member order'
+       END DO
+       IF (mode==2) THEN
+          DO l=1,domain%solve_cells
+             j=domain%j_cent(l);k=domain%k_cent(l)
+             IF (before(1,j,k)<=0.0_wp) CYCLE
+             CALL qc_to_qp(before(:,j,k),state%qp(:,j,k),p_dyn)
+          END DO
+          CALL apply_mass_exchange_step(state%q,state%qp,delta, &
+               domain,test_registry)
+          DO l=1,domain%solve_cells
+             j=domain%j_cent(l);k=domain%k_cent(l)
+             IF (before(1,j,k)<=0.0_wp) CYCLE
+             CALL qc_to_qp(before(:,j,k),qp_cell,p_dyn)
+             CALL eval_cell_source_explicit(j,k,qp_cell,0.0_wp, &
+                  joint,rate_reference)
+             IF (MAXVAL(ABS(state%q(:,j,k)-before(:,j,k)- &
+                  delta*rate_reference))> &
+                  tol*MAX(1.0_wp,MAXVAL(ABS(before(:,j,k))))) &
+                  ERROR STOP 'D18: explicit STEP executor mismatch'
+          END DO
+       END IF
+       CALL test_registry%finalize
+    END DO
+    thermal_cooling_flag=.FALSE.
+    curvature_term_flag=.FALSE.
+    WRITE(*,*) 'PASS D18 explicit multi-source STAGE/STEP common-state rates'
+  END SUBROUTINE test_explicit_multi_source_groups
 
   !> D18: production post-RK dispatcher applies exact cooling once over dt.
   SUBROUTINE test_analytic_cooling_step_executor
