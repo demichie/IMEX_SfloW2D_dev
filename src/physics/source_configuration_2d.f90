@@ -125,6 +125,30 @@ CONTAINS
         requested_method=pore_pressure_method
         requested_cadence=pore_pressure_cadence
         id=pore_pressure_group
+      CASE('explicit')
+        target=0
+        SELECT CASE(TRIM(active_names(i)))
+        CASE('bottom_circular_injection')
+          requested_method=bottom_circular_method
+          requested_cadence=bottom_circular_cadence
+          id=bottom_circular_group
+        CASE('bottom_fissural_injection')
+          requested_method=bottom_fissural_method
+          requested_cadence=bottom_fissural_cadence
+          id=bottom_fissural_group
+        CASE('radial_injection')
+          requested_method=radial_injection_method
+          requested_cadence=radial_injection_cadence
+          id=radial_injection_group
+        CASE('geometry_curvature')
+          requested_method=geometry_curvature_method
+          requested_cadence=geometry_curvature_cadence
+          id=geometry_curvature_group
+        CASE('boundary_injection')
+          requested_method=boundary_injection_method
+          requested_cadence=boundary_injection_cadence
+          id=boundary_injection_group
+        END SELECT
       CASE('mass_exchange')
         target=-1
         requested_method=mass_exchange_method
@@ -152,6 +176,15 @@ CONTAINS
         CASE DEFAULT
           error='D18: invalid source CADENCE'; RETURN
         END SELECT
+      END IF
+      IF (method==SOURCE_METHOD_EXPLICIT .AND. .NOT.term%has_explicit) THEN
+        error='D18: explicit interface unavailable for source'; RETURN
+      END IF
+      IF (method==SOURCE_METHOD_ANALYTIC .AND. .NOT.term%has_analytic) THEN
+        error='D18: analytic interface unavailable for source'; RETURN
+      END IF
+      IF (method==SOURCE_METHOD_NEWTON .AND. .NOT.term%has_newton) THEN
+        error='D18: Newton interface unavailable for source'; RETURN
       END IF
       IF (target>0 .AND. method==SOURCE_METHOD_ANALYTIC .AND. &
            .NOT.term%has_analytic) THEN

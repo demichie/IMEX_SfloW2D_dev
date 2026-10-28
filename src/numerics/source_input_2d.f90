@@ -11,6 +11,16 @@ MODULE source_input_2d
   CHARACTER(LEN=16), PUBLIC :: thermal_method='', thermal_cadence=''
   CHARACTER(LEN=16), PUBLIC :: pore_pressure_method='', pore_pressure_cadence=''
   INTEGER, PUBLIC :: rheology_group=0, thermal_group=0, pore_pressure_group=0
+  CHARACTER(LEN=16), PUBLIC :: bottom_circular_method='', bottom_circular_cadence=''
+  INTEGER, PUBLIC :: bottom_circular_group=0
+  CHARACTER(LEN=16), PUBLIC :: bottom_fissural_method='', bottom_fissural_cadence=''
+  INTEGER, PUBLIC :: bottom_fissural_group=0
+  CHARACTER(LEN=16), PUBLIC :: radial_injection_method='', radial_injection_cadence=''
+  INTEGER, PUBLIC :: radial_injection_group=0
+  CHARACTER(LEN=16), PUBLIC :: geometry_curvature_method='', geometry_curvature_cadence=''
+  INTEGER, PUBLIC :: geometry_curvature_group=0
+  CHARACTER(LEN=16), PUBLIC :: boundary_injection_method='', boundary_injection_cadence=''
+  INTEGER, PUBLIC :: boundary_injection_group=0
   CHARACTER(LEN=16), PUBLIC :: mass_exchange_method='EXPLICIT'
   CHARACTER(LEN=16), PUBLIC :: mass_exchange_cadence='STEP'
   INTEGER, PUBLIC :: mass_exchange_group=0

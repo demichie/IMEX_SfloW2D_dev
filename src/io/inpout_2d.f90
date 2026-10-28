@@ -71,6 +71,11 @@ MODULE inpout_2d
        rheology_method, rheology_cadence, rheology_group, &
        thermal_method, thermal_cadence, thermal_group, &
        pore_pressure_method, pore_pressure_cadence, pore_pressure_group, &
+       bottom_circular_method, bottom_circular_cadence, bottom_circular_group, &
+       bottom_fissural_method, bottom_fissural_cadence, bottom_fissural_group, &
+       radial_injection_method, radial_injection_cadence, radial_injection_group, &
+       geometry_curvature_method, geometry_curvature_cadence, geometry_curvature_group, &
+       boundary_injection_method, boundary_injection_cadence, boundary_injection_group, &
        mass_exchange_configuration_present, mass_exchange_method, &
        mass_exchange_cadence, mass_exchange_group
 
@@ -82,7 +87,9 @@ MODULE inpout_2d
                            T_source, h_source, alphas_source, alphal_source, alphag_source, &
                            time_param, Ri_source, mfr_source, xs_source, xl_source, xg_source, &
                            r2_source, angle_source, azimuth_source, arc_width_source, &
-                           n_intervals, t_intervals, vel_intervals
+                           n_intervals, t_intervals, vel_intervals, &
+    bottom_circular_method, bottom_circular_cadence, bottom_circular_group, &
+    radial_injection_method, radial_injection_cadence, radial_injection_group
 
   USE parameters_2d, ONLY: x_fissures_end_points, y_fissures_end_points,        &
                            width_fissures, linear_vel_fissures, T_fissures,    &
@@ -356,7 +363,8 @@ MODULE inpout_2d
   NAMELIST /numeric_parameters/ dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, &
     reconstr_coeff, n_RK
 
-  NAMELIST /expl_terms_parameters/ grav
+  NAMELIST /expl_terms_parameters/ grav, &
+       geometry_curvature_method, geometry_curvature_cadence, geometry_curvature_group
 
   NAMELIST /radial_source_parameters/ x_source, y_source, r_source, &
     r2_source, angle_source, vel_source, T_source, h_source, &
@@ -370,12 +378,14 @@ MODULE inpout_2d
   NAMELIST /lateral_source_parameters/ source_side, x1_source, x2_source, &
     y1_source, y2_source, vel_source, T_source, h_source, alphas_source, &
     alphal_source, alphag_source, time_param, Ri_source, mfr_source, &
-    xs_source, xl_source, xg_source
+    xs_source, xl_source, xg_source, &
+    boundary_injection_method, boundary_injection_cadence, boundary_injection_group
 
   NAMELIST /fissural_source_parameters/ x_fissures_end_points,                &
       y_fissures_end_points, width_fissures, linear_vel_fissures,              &
       T_fissures, time_param_fissures, alphas_source, alphag_source,           &
-      alphal_source, xs_source, xg_source, xl_source
+      alphal_source, xs_source, xg_source, xl_source, &
+      bottom_fissural_method, bottom_fissural_cadence, bottom_fissural_group
 
   NAMELIST /collapsing_volume_parameters/ x_collapse, y_collapse, &
     r_collapse, T_collapse, h_collapse, alphas_collapse, alphag_collapse
@@ -475,6 +485,11 @@ CONTAINS
     rheology_method=''; rheology_cadence=''; rheology_group=0
     thermal_method=''; thermal_cadence=''; thermal_group=0
     pore_pressure_method=''; pore_pressure_cadence=''; pore_pressure_group=0
+    bottom_circular_method=''; bottom_circular_cadence=''; bottom_circular_group=0
+    bottom_fissural_method=''; bottom_fissural_cadence=''; bottom_fissural_group=0
+    radial_injection_method=''; radial_injection_cadence=''; radial_injection_group=0
+    geometry_curvature_method=''; geometry_curvature_cadence=''; geometry_curvature_group=0
+    boundary_injection_method=''; boundary_injection_cadence=''; boundary_injection_group=0
     mass_exchange_configuration_present=.FALSE.
     mass_exchange_method='EXPLICIT'; mass_exchange_cadence='STEP'; mass_exchange_group=0
 
