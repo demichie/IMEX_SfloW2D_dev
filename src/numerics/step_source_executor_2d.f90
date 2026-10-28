@@ -186,10 +186,12 @@ CONTAINS
        source_time=0.0_wp
        IF (PRESENT(step_start_time)) source_time=step_start_time
        DO group_index=1,SIZE(step_groups)
-          ! Empty groups are valid no-op descriptors. Mass exchange is
-          ! executed atomically by the dedicated transaction below.
+          ! Honor GROUP ordering; exchange remains one atomic transaction.
           IF (SIZE(step_groups(group_index)%source_names)==0) CYCLE
-          IF (ANY(INDEX(step_groups(group_index)%source_names,'mass_exchange_')==1)) CYCLE
+          IF (ANY(INDEX(step_groups(group_index)%source_names,'mass_exchange_')==1)) THEN
+             CALL execute_mass_exchange_transaction()
+             CYCLE
+          END IF
           IF (step_groups(group_index)%method==SOURCE_METHOD_NEWTON) THEN
              implicit_mask=.FALSE.
              implicit_mask(step_groups(group_index)%equation_ids)=.TRUE.
@@ -233,9 +235,17 @@ CONTAINS
           END DO
        END DO
        CALL step_partition%finalize()
-       IF (mass_group_count==0) RETURN
+       RETURN
     END IF
 
+    ! Preserve direct legacy calls without a registry.
+    CALL execute_mass_exchange_transaction()
+
+  CONTAINS
+
+    !> \\brief Execute one atomic bed-and-inventory transaction.
+    !> \\details Called in ascending STEP GROUP order when configured.
+    SUBROUTINE execute_mass_exchange_transaction()
     IF ((erosion_coeff .EQ. 0.0_wp) .AND. (.NOT.settling_flag)            &
          .AND. (.NOT.pore_pressure_flag) .AND. (.NOT.entrainment_flag)     &
          .AND. (.NOT.liquid_loss_active)) RETURN
@@ -285,6 +295,8 @@ CONTAINS
     !$OMP END PARALLEL DO
 
     IF (topo_change_flag) CALL apply_topography_rate_update(time_step)
+
+    END SUBROUTINE execute_mass_exchange_transaction
 
   END SUBROUTINE execute_step_source_groups
 
