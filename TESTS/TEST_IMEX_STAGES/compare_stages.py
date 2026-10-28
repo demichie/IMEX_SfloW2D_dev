@@ -596,6 +596,58 @@ def lava_split_checkpoint_suite(args):
     print("PASS: split-process lava RK plus cooling fixture continuation", flush=True)
 
 
+def lava_deposition_full_rk_checkpoint_suite(args):
+    """Full production RK plus ordered lava immobilization and cooling.
+
+    Uses a fixture stream checkpoint for process-continuation comparison.
+    Official production restart is checked separately by TEST_MASS_EXCHANGE.
+    """
+    ny, nx = 17, 18
+    vertices = np.zeros((ny + 1, nx + 1))
+    initial = np.zeros((ny, nx, 5))
+    initial[..., 0] = RHO
+    initial[..., 1] = 600.0
+    initial[..., 2] = 800.0
+    initial[..., 3] = RHO * CP * 1000.0
+    env = {**os.environ, "OMP_NUM_THREADS": "1", "OMP_DYNAMIC": "FALSE"}
+    for n in TABLEAU_STAGES:
+        base = Path(f"lava-deposition-{args.profile}-{os.getpid()}-RK{n}")
+        trajectories = {}
+        for label in ("continuous", "restart"):
+            work = base / label
+            work.mkdir(parents=True, exist_ok=True)
+            write_fixture(work / "fixture.inp", vertices, initial, False, False,
+                          0, 0.1, 100.0, 100.0)
+            modes = [(0, 2)] if label == "continuous" else [(1, 1), (2, 1)]
+            for mode, count in modes:
+                cmd = [str(args.executable), "1", str(n), str(count), "0", "1",
+                       "0", "0", "3", "0", "0", "1", str(mode), "1"]
+                run = subprocess.run(cmd, cwd=work, env=env,
+                                     capture_output=True, text=True, timeout=180)
+                if run.returncode:
+                    raise AssertionError(
+                        f"RK{n} {label} mode {mode}: {run.stdout} {run.stderr}")
+            trajectories[label] = (
+                read_payload(work / "result.bin", nx, ny, n, 1),
+                (work / "lava_inventory.bin").read_bytes(),
+            )
+        continuous, c_inventory = trajectories["continuous"]
+        resumed, r_inventory = trajectories["restart"]
+        for field in ("q", "qp"):
+            if not np.array_equal(continuous[field], resumed[field]):
+                raise AssertionError(f"RK{n} lava deposited restart differs in {field}")
+        if c_inventory != r_inventory:
+            raise AssertionError(f"RK{n} lava bed/inventory restart mismatch")
+        inventory = np.frombuffer(c_inventory, dtype=np.float64)
+        if np.max(inventory[(nx + 1) * (ny + 1):]) <= 0.0:
+            raise AssertionError(f"RK{n} deposited no lava")
+        print("D18_LAVA_DEPOSITION_FULL_RK_EVIDENCE " + json.dumps({
+            "profile": args.profile, "n_RK": n,
+            "inventory_sha256": hashlib.sha256(c_inventory).hexdigest()
+        }, sort_keys=True), flush=True)
+    print("PASS: full RK lava deposition/cooling and fixture continuation", flush=True)
+
+
 def lava_split_full_tableau_suite(args):
     """Check full RK/STAGE lava Newton followed by production cooling STEP."""
     ny, nx = 17, 18
@@ -889,6 +941,7 @@ def main():
         mixed_group_tableau_suite(args)
         lava_split_full_tableau_suite(args)
         lava_split_checkpoint_suite(args)
+        lava_deposition_full_rk_checkpoint_suite(args)
         lava_split_refinement_suite(args)
 
 
