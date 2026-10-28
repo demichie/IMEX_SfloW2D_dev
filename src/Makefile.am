@@ -170,7 +170,8 @@ physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): core/parameters_2d
 physics/mass_exchange/mass_exchange_balance_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      physics/pore_pressure_laws_2d.$(OBJEXT) \
-                                     physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT)
+                                     physics/mass_exchange/mass_exchange_vaporization_2d.$(OBJEXT) \
+                                     physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT)
 physics/mass_exchange/mass_exchange_laws_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      state/state_conversion_2d.$(OBJEXT) \
@@ -299,6 +300,7 @@ numerics/step_source_executor_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           numerics/source_catalog_2d.$(OBJEXT) \
                                           physics/source_terms_2d.$(OBJEXT) \
                                           physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT) \
+                                          physics/mass_exchange/mass_exchange_balance_2d.$(OBJEXT) \
                                           numerics/nonlinear_solver_2d.$(OBJEXT) \
                                           numerics/equation_metadata_2d.$(OBJEXT) \
                                           state/state_2d.$(OBJEXT) \

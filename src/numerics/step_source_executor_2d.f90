@@ -136,8 +136,7 @@ CONTAINS
          pore_pressure_flag, liquid_flag
     USE state_2d, ONLY : initialize_dry_physical_cell
     USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag
-    USE mass_exchange_lava_deposition_2d, ONLY : eval_mass_exchange_lava_deposition_explicit
-    USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
+    USE mass_exchange_balance_2d, ONLY : add_lava_deposition_balance
 
     REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
@@ -285,13 +284,8 @@ CONTAINS
        IF (lava_deposition_flag .AND. q(1,j,k)>0.0_wp) THEN
           IF (SUM(q(5:4+n_solid,j,k))>0.0_wp) &
                CALL fatal_error('lava deposition requires a pure liquid cell')
-          CALL eval_mass_exchange_lava_deposition_explicit( &
-               qp(1,j,k),qp(4,j,k),time_step,lava_rate)
-          eqns_term(1)=eqns_term(1)-rho_l*lava_rate
-          eqns_term(2)=eqns_term(2)-rho_l*lava_rate*qp(n_vars+1,j,k)
-          eqns_term(3)=eqns_term(3)-rho_l*lava_rate*qp(n_vars+2,j,k)
-          eqns_term(4)=eqns_term(4)-rho_l*sp_heat_l*qp(4,j,k)*lava_rate
-          topo_term=topo_term+lava_rate
+          CALL add_lava_deposition_balance(qp(:,j,k),time_step, &
+               continuous_phase_loss_term,eqns_term,topo_term,lava_rate)
        END IF
 
        IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
