@@ -46,6 +46,9 @@ CONTAINS
     USE source_input_2d, ONLY : lava_deposition_flag, eval_lava_deposition_rate
     USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
     USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
+    USE source_input_2d, ONLY : lava_deposition_flag, eval_lava_deposition_rate
+    USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
+    USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
 
     REAL(wp), INTENT(INOUT) :: q_cell(n_vars), qp_cell(n_vars+2)
     REAL(wp), INTENT(IN) :: time_step, equation_rate(n_eqns)
