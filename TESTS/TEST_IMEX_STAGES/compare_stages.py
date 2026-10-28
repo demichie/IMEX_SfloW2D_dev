@@ -507,6 +507,46 @@ def mixed_group_stage_checks(fields, n, dt, group_order):
     return fields["q"][..., 1:3][interior].copy()
 
 
+def lava_split_refinement_suite(args):
+    """Cauchy refinement of the fully split lava dynamics at fixed final time.
+
+    This checks convergence trends without asserting the RK tableau order
+    for a composition of two separately advanced source operators.
+    """
+    ny, nx = 17, 18
+    vertices = np.zeros((ny+1, nx+1))
+    initial = np.zeros((ny, nx, 5))
+    initial[..., 0] = RHO
+    initial[..., 1] = 600.0
+    initial[..., 2] = 800.0
+    initial[..., 3] = RHO*CP*1000.0
+    final_time = 0.2
+    for n in TABLEAU_STAGES:
+        trajectories = []
+        for steps in (2, 4, 8, 16):
+            directory = Path(
+                f"lava-refinement-{args.profile}-{os.getpid()}-RK{n}-N{steps}")
+            fields, _ = launch(
+                args.executable, directory, vertices, initial,
+                n, steps, final_time/steps, limiter=0, dx=100.0, dy=100.0,
+                source_test_model=3, split_cooling_mode=1)
+            trajectories.append(fields["q"][4:-4, 4:-4, 1:4].copy())
+        differences = [
+            float(np.max(np.abs(trajectories[i+1]-trajectories[i])))
+            for i in range(len(trajectories)-1)]
+        if not np.all(np.isfinite(differences)) or min(differences) <= 0:
+            raise AssertionError(f"RK{n} invalid split refinement {differences}")
+        if differences[-1] >= differences[0]:
+            raise AssertionError(
+                f"RK{n} lava split did not approach a timestep limit: {differences}")
+        print("D18_LAVA_SPLIT_REFINEMENT_EVIDENCE "+json.dumps({
+            "profile": args.profile, "n_RK": n,
+            "final_time": final_time, "step_counts": [2, 4, 8, 16],
+            "successive_max_differences": differences
+        }, sort_keys=True, allow_nan=False), flush=True)
+    print("PASS: split lava RK temporal refinement for N_RK=2/3/4", flush=True)
+
+
 def lava_split_checkpoint_suite(args):
     """Compare continuous RK lava integration with restart in a new process.
 
@@ -835,6 +875,7 @@ def main():
         mixed_group_tableau_suite(args)
         lava_split_full_tableau_suite(args)
         lava_split_checkpoint_suite(args)
+        lava_split_refinement_suite(args)
 
 
 if __name__ == "__main__":
