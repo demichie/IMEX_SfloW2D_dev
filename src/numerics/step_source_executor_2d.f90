@@ -135,8 +135,8 @@ CONTAINS
          bottom_fissural_source_flag, erodible_deposit_flag,                &
          pore_pressure_flag, liquid_flag
     USE state_2d, ONLY : initialize_dry_physical_cell
-    USE source_input_2d, ONLY : lava_deposition_flag, eval_lava_deposition_rate
-    USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
+    USE source_input_2d, ONLY : lava_deposition_flag
+    USE mass_exchange_lava_deposition_2d, ONLY : eval_mass_exchange_lava_deposition_explicit
     USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
 
     REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
@@ -285,9 +285,8 @@ CONTAINS
        IF (lava_deposition_flag .AND. q(1,j,k)>0.0_wp) THEN
           IF (SUM(q(5:4+n_solid,j,k))>0.0_wp) &
                CALL fatal_error('lava deposition requires a pure liquid cell')
-          IF (time_step<=0.0_wp) CALL fatal_error('lava deposition requires positive dt')
-          lava_rate=MIN(qp(1,j,k)/time_step, &
-               eval_lava_deposition_rate(qp(4,j,k),lava_kinematic_viscosity(qp(4,j,k))))
+          CALL eval_mass_exchange_lava_deposition_explicit( &
+               qp(1,j,k),qp(4,j,k),time_step,lava_rate)
           eqns_term(1)=eqns_term(1)-rho_l*lava_rate
           eqns_term(2)=eqns_term(2)-rho_l*lava_rate*qp(n_vars+1,j,k)
           eqns_term(3)=eqns_term(3)-rho_l*lava_rate*qp(n_vars+2,j,k)
