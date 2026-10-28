@@ -49,7 +49,9 @@ PROGRAM test_imex_stages
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
   USE source_configuration_2d, ONLY : initialize_configured_sources
   USE source_input_2d, ONLY : rheology_method, rheology_cadence, rheology_group, &
-       thermal_method, thermal_cadence, thermal_group
+       thermal_method, thermal_cadence, thermal_group, mass_exchange_group, &
+       lava_deposition_flag, lava_deposition_model, lava_deposition_rate, &
+       lava_deposition_visc_ref, lava_deposition_exponent
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, finalize_nonlinear_solver
   USE step_source_executor_2d, ONLY : execute_step_source_groups
   USE thermal_laws_2d, ONLY : solve_thermal_cooling_analytic
@@ -75,6 +77,8 @@ PROGRAM test_imex_stages
   INTEGER :: threads,actual_threads,stages,steps,drag,observe,l
   INTEGER :: composition_mode,boundary_test_mode,source_test_model,analytic_mode
   INTEGER :: mixed_group_mode, split_cooling_mode, checkpoint_mode, checkpoint_unit
+  INTEGER :: lava_deposition_mode
+  REAL(wp) :: deposited_before,temperature_before
   REAL(wp), ALLOCATABLE :: pre_cooling(:,:,:), pre_cooling_qp(:,:,:)
   REAL(wp) :: cooling_capacity, cooling_temperature, cooling_expected, cooling_pdyn
   CHARACTER(LEN=256) :: cooling_error
@@ -132,6 +136,13 @@ PROGRAM test_imex_stages
   IF (checkpoint_mode<0 .OR. checkpoint_mode>2) ERROR STOP 'invalid checkpoint fixture mode'
   IF (checkpoint_mode>0 .AND. split_cooling_mode/=1) &
        ERROR STOP 'checkpoint fixture requires lava split cooling'
+  lava_deposition_mode=0
+  argument=''
+  CALL get_command_argument(13,argument)
+  IF (LEN_TRIM(argument)>0) READ(argument,*) lava_deposition_mode
+  IF (lava_deposition_mode<0 .OR. lava_deposition_mode>1) ERROR STOP 'invalid lava deposition mode'
+  IF (lava_deposition_mode==1 .AND. (split_cooling_mode/=1 .OR. composition_mode/=0)) &
+       ERROR STOP 'lava deposition requires full RK lava split cooling mode'
   IF (stages<2 .OR. stages>4 .OR. steps<1) ERROR STOP 'invalid test controls'
   !$OMP PARALLEL
   !$OMP SINGLE
@@ -153,7 +164,12 @@ PROGRAM test_imex_stages
   IF (checkpoint_mode==2) THEN
      OPEN(NEWUNIT=checkpoint_unit,FILE='checkpoint.bin', &
           ACCESS='STREAM',FORM='UNFORMATTED',STATUS='OLD',ACTION='READ')
-     READ(checkpoint_unit) q,qp,t
+     IF (lava_deposition_mode==1) THEN
+        READ(checkpoint_unit) q,qp,t,B_vertex,lava_deposit
+        CALL refresh_topography_geometry
+     ELSE
+        READ(checkpoint_unit) q,qp,t
+     END IF
      CLOSE(checkpoint_unit)
      IF (.NOT.ALL(ieee_is_finite(q)) .OR. .NOT.ALL(ieee_is_finite(qp))) &
           ERROR STOP 'D18 checkpoint contains nonfinite state'
@@ -190,13 +206,25 @@ PROGRAM test_imex_stages
      END IF
      IF (split_cooling_mode==1) THEN
         ! Exercise the production post-RK executor after ALL RK stages.
-        ! Keep the test focused on cooling: no mass-exchange transaction.
+        ! Select the complete mass-exchange + cooling schedule for the
+        ! lava deposition fixture; legacy mode remains cooling-only.
         pre_cooling=q
         pre_cooling_qp=qp
-        CALL execute_step_source_groups(q,qp,dt,domain,cooling_only_registry,Z,t)
+        IF (lava_deposition_mode==1) THEN
+           deposited_before=SUM(lava_deposit)
+           temperature_before=pre_cooling_qp(4,nx/2,ny/2)
+           CALL execute_step_source_groups(q,qp,dt,domain,source_registry,Z,t)
+           IF (SUM(lava_deposit)<=deposited_before) &
+                ERROR STOP 'D18 full RK: lava deposition not activated'
+           IF (qp(4,nx/2,ny/2)>=temperature_before) &
+                ERROR STOP 'D18 full RK: analytic cooling not applied after deposition'
+        ELSE
+           CALL execute_step_source_groups(q,qp,dt,domain,cooling_only_registry,Z,t)
+        END IF
         DO l=1,domain%solve_cells
            j=domain%j_cent(l);k=domain%k_cent(l)
            IF (pre_cooling(1,j,k)<=0.0_wp) CYCLE
+           IF (lava_deposition_mode==1) CYCLE
            CALL qc_to_qp(pre_cooling(:,j,k),pre_cooling_qp(:,j,k),cooling_pdyn)
            cooling_capacity=pre_cooling(4,j,k)/pre_cooling_qp(4,j,k)
            CALL solve_thermal_cooling_analytic(pre_cooling_qp(4,j,k),dt, &
@@ -255,7 +283,11 @@ PROGRAM test_imex_stages
      IF (checkpoint_mode==1) THEN
         OPEN(NEWUNIT=checkpoint_unit,FILE='checkpoint.bin', &
              ACCESS='STREAM',FORM='UNFORMATTED',STATUS='REPLACE')
-        WRITE(checkpoint_unit) q,qp,t
+        IF (lava_deposition_mode==1) THEN
+           WRITE(checkpoint_unit) q,qp,t,B_vertex,lava_deposit
+        ELSE
+           WRITE(checkpoint_unit) q,qp,t
+        END IF
         CLOSE(checkpoint_unit)
      END IF
   END DO
@@ -647,6 +679,19 @@ CONTAINS
        bcS(3)%flag=0; bcN(3)%flag=0
     END IF
     ALLOCATE(q(n_vars,nx,ny),q0(n_vars,nx,ny),qp(n_vars+2,nx,ny))
+    IF (lava_deposition_mode==1) THEN
+       ALLOCATE(lava_deposit(nx,ny),deposit(nx,ny,n_solid), &
+            erosion(nx,ny,n_solid),erodible(n_solid,nx,ny),B_zone(nx,ny))
+       lava_deposit=0.0_wp;deposit=0.0_wp;erosion=0.0_wp
+       erodible=0.0_wp;B_zone=0
+       topo_change_flag=.TRUE.
+       lava_deposition_flag=.TRUE.
+       lava_deposition_model='VISCOSITY'
+       lava_deposition_rate=0.02_wp
+       lava_deposition_visc_ref=0.03_wp
+       lava_deposition_exponent=1.0_wp
+       mass_exchange_group=0
+    END IF
     ALLOCATE(Z(nx,ny))
     ALLOCATE(B_vertex(nx+1,ny+1),B_cent(nx,ny),B_face_x(nx+1,ny),B_face_y(nx,ny+1))
     ALLOCATE(B_prime_x_geom(nx,ny),B_prime_y_geom(nx,ny))
