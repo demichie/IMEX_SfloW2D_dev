@@ -43,6 +43,9 @@ CONTAINS
 
     USE state_conversion_2d, ONLY : qc_to_qp, mixt_var
     USE state_2d, ONLY : initialize_dry_physical_cell
+    USE source_input_2d, ONLY : lava_deposition_flag, eval_lava_deposition_rate
+    USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
+    USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
 
     REAL(wp), INTENT(INOUT) :: q_cell(n_vars), qp_cell(n_vars+2)
     REAL(wp), INTENT(IN) :: time_step, equation_rate(n_eqns)
@@ -122,7 +125,7 @@ CONTAINS
          cell_arc_n_y, dx, dy
     USE geometry_2d, ONLY : begin_topography_rate_update,                   &
          record_topography_rate_cell, apply_topography_rate_update
-    USE geometry_2d, ONLY : deposit, erosion, erodible, B_zone
+    USE geometry_2d, ONLY : deposit, erosion, erodible, B_zone, lava_deposit
     USE source_terms_2d, ONLY : eval_source_explicit, eval_source_analytic, &
          eval_cell_source_explicit, cell_analytic_source_context, &
          analytic_term_context_type
@@ -149,7 +152,7 @@ CONTAINS
     REAL(wp) :: continuous_phase_erosion_term
     REAL(wp) :: continuous_phase_loss_term
     REAL(wp) :: eqns_term(n_eqns)
-    REAL(wp) :: topo_term
+    REAL(wp) :: topo_term, lava_rate
     REAL(wp) :: out_of_source_fraction
     REAL(wp) :: p_dyn
     CHARACTER(LEN=96) :: closure_context
@@ -248,15 +251,17 @@ CONTAINS
     SUBROUTINE execute_mass_exchange_transaction()
     IF ((erosion_coeff .EQ. 0.0_wp) .AND. (.NOT.settling_flag)            &
          .AND. (.NOT.pore_pressure_flag) .AND. (.NOT.entrainment_flag)     &
-         .AND. (.NOT.liquid_loss_active)) RETURN
+         .AND. (.NOT.liquid_loss_active) .AND. (.NOT.lava_deposition_flag)) RETURN
 
+    IF (lava_deposition_flag .AND. .NOT.topo_change_flag) &
+         CALL fatal_error('lava deposition requires TOPO_CHANGE_FLAG')
     IF (topo_change_flag) CALL begin_topography_rate_update
 
     !$OMP PARALLEL DO private(j,k,closure_context,erosion_term,deposition_term, &
     !$OMP & eqns_term,                                                          &
     !$OMP & topo_term,                                                          &
     !$OMP & continuous_phase_erosion_term,continuous_phase_loss_term,           &
-    !$OMP & out_of_source_fraction,p_dyn)
+    !$OMP & out_of_source_fraction,p_dyn,lava_rate)
     DO l = 1, domain%solve_cells
 
        j = domain%j_cent(l)
@@ -276,12 +281,27 @@ CONTAINS
             deposition_term, continuous_phase_erosion_term,                &
             continuous_phase_loss_term, eqns_term, topo_term)
 
+       lava_rate=0.0_wp
+       IF (lava_deposition_flag .AND. q(1,j,k)>0.0_wp) THEN
+          IF (SUM(q(5:4+n_solid,j,k))>0.0_wp) &
+               CALL fatal_error('lava deposition requires a pure liquid cell')
+          IF (time_step<=0.0_wp) CALL fatal_error('lava deposition requires positive dt')
+          lava_rate=MIN(qp(1,j,k)/time_step, &
+               eval_lava_deposition_rate(qp(4,j,k),lava_kinematic_viscosity(qp(4,j,k))))
+          eqns_term(1)=eqns_term(1)-rho_l*lava_rate
+          eqns_term(2)=eqns_term(2)-rho_l*lava_rate*qp(n_vars+1,j,k)
+          eqns_term(3)=eqns_term(3)-rho_l*lava_rate*qp(n_vars+2,j,k)
+          eqns_term(4)=eqns_term(4)-rho_l*sp_heat_l*qp(4,j,k)*lava_rate
+          topo_term=topo_term+lava_rate
+       END IF
+
        IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
           out_of_source_fraction = 1.0_wp - cell_source_fractions(j,k)
           deposition_term = deposition_term * out_of_source_fraction
           erosion_term = erosion_term * out_of_source_fraction
           eqns_term = eqns_term * out_of_source_fraction
           topo_term = topo_term * out_of_source_fraction
+          lava_rate = lava_rate * out_of_source_fraction
        END IF
 
        CALL apply_mass_exchange_increment(q(1:n_vars,j,k),                 &
@@ -289,6 +309,7 @@ CONTAINS
             erosion_term, deposit(j,k,1:n_solid), erosion(j,k,1:n_solid),  &
             erodible(1:n_solid,j,k), erodible_deposit_flag, closure_context)
 
+       IF (lava_deposition_flag) lava_deposit(j,k)=lava_deposit(j,k)+time_step*lava_rate
        IF (topo_change_flag) CALL record_topography_rate_cell(j, k, topo_term)
 
     END DO

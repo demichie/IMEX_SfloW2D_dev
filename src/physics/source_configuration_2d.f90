@@ -49,6 +49,12 @@ CONTAINS
       IF (erosion_coeff>0.0_wp) &
            active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
     END IF
+    IF (lava_deposition_flag) THEN
+      IF (.NOT.liquid_flag .OR. TRIM(rheology_model)/='lava') THEN
+        error='Lava deposition requires liquid lava rheology'; RETURN
+      END IF
+      active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_lava_deposition']
+    END IF
     IF (settling_flag) THEN
       active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_deposition']
     END IF

@@ -93,6 +93,8 @@ MODULE geometry_2d
 
   !> total deposit 
   REAL(wp), ALLOCATABLE :: deposit_tot(:,:)
+  !> Accumulated immobile lava deposit [m], distinct from granular classes.
+  REAL(wp), ALLOCATABLE :: lava_deposit(:,:)
 
   !> erosion for the different classes
   REAL(wp), ALLOCATABLE :: erosion(:,:,:)

@@ -210,7 +210,7 @@ MODULE inpout_2d
   INTEGER, PARAMETER :: output_manifest_unit = 29
   CHARACTER(LEN=16), PARAMETER :: restart_format_magic = 'IMEX_SFLOW2D_RST'
   ! Version 5 adds self-contained runout and steady-stop diagnostic history.
-  INTEGER, PARAMETER :: restart_format_version = 5
+  INTEGER, PARAMETER :: restart_format_version = 6
 
   !> Counter for the output files
   INTEGER :: output_idx
@@ -2053,6 +2053,8 @@ CONTAINS
     ALLOCATE (deposit(comp_cells_x, comp_cells_y, n_solid))
     deposit(1:comp_cells_x, 1:comp_cells_y, 1:n_solid) = 0.0_wp
 
+    ALLOCATE (lava_deposit(comp_cells_x, comp_cells_y))
+    lava_deposit=0.0_wp
     ALLOCATE (deposit_tot(comp_cells_x, comp_cells_y))
     deposit_tot(1:comp_cells_x, 1:comp_cells_y) = 0.0_wp
 
@@ -8005,7 +8007,7 @@ END IF
     USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,     &
                              n_pore_vars
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex, erodible,  &
-                           deposit, erosion
+                           deposit, erosion, lava_deposit
     USE parameters_2d, ONLY: stochastic_flag, topo_change_flag
 
     IMPLICIT NONE
@@ -8108,6 +8110,8 @@ END IF
          runtime%runout%last_distance, runtime%runout%maximum_distance, &
          runtime%runout%runout_row, runtime%runout%mass_center_row
     CALL check_restart_io(ierr, io_message, 'writing runout history to', filename)
+    WRITE(unit_rst, IOSTAT=ierr, IOMSG=io_message) lava_deposit
+    CALL check_restart_io(ierr, io_message, 'writing lava deposit to', filename)
 
     CLOSE (unit_rst, IOSTAT=ierr, IOMSG=io_message)
     CALL check_restart_io(ierr, io_message, 'closing', filename)
@@ -8140,7 +8144,7 @@ END IF
     USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,     &
                              n_pore_vars
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex, erodible,  &
-                           deposit, erosion
+                           deposit, erosion, lava_deposit
     USE parameters_2d, ONLY: stochastic_flag, topo_change_flag
     USE geometry_2d, ONLY: refresh_topography_geometry
 
@@ -8179,7 +8183,7 @@ END IF
     CALL check_restart_io(ierr, io_message, 'reading version from', filename)
     IF (format_version /= restart_format_version) THEN
       WRITE(*,*) 'ERROR: Unsupported restart format version:', format_version
-      WRITE(*,*) 'Version 5 is required: earlier checkpoints lack complete runout/stop history.'
+      WRITE(*,*) 'The current restart format with lava deposition inventory is required.'
       ERROR STOP 1
     END IF
 
@@ -8297,6 +8301,8 @@ END IF
          runtime%runout%last_distance, runtime%runout%maximum_distance, &
          runtime%runout%runout_row, runtime%runout%mass_center_row
     CALL check_restart_io(ierr, io_message, 'reading runout history from', filename)
+    READ(unit_rst, IOSTAT=ierr, IOMSG=io_message) lava_deposit
+    CALL check_restart_io(ierr, io_message, 'reading lava deposit from', filename)
     IF (output_runout_flag .AND. .NOT. runtime%runout%initialized) &
          CALL fatal_error('Restart is missing initialized runout diagnostic history.')
 

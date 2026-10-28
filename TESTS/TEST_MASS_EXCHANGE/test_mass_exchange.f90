@@ -142,7 +142,7 @@ CONTAINS
     ALLOCATE(B_prime_x_geom(nx,ny), B_prime_y_geom(nx,ny))
     ALLOCATE(B_second_xx_geom(nx,ny), B_second_xy_geom(nx,ny), B_second_yy_geom(nx,ny))
     ALLOCATE(grav_coeff(nx,ny), grav_coeff_stag_x(nx+1,ny), grav_coeff_stag_y(nx,ny+1))
-    ALLOCATE(deposit(nx,ny,ns), erosion(nx,ny,ns), erodible(ns,nx,ny))
+    ALLOCATE(deposit(nx,ny,ns), erosion(nx,ny,ns), erodible(ns,nx,ny),lava_deposit(nx,ny))
     ALLOCATE(B_zone(nx,ny), cell_source_fractions(nx,ny))
     ! The shared explicit source adapter also accesses injection geometry.
     ! This mass-exchange fixture has no fissures or lateral injection arcs.
@@ -614,7 +614,7 @@ CONTAINS
     erodible_deposit_flag=.FALSE.; bottom_radial_source_flag=.FALSE.
     bottom_fissural_source_flag=.FALSE.
     T_erodible=317.0_wp; verbose_level=2
-    deposit=0.0_wp; erosion=0.0_wp; erodible=0.0_wp
+    deposit=0.0_wp; erosion=0.0_wp; erodible=0.0_wp;lava_deposit=0.0_wp
     B_zone=0; cell_source_fractions=0.0_wp
     DO k=1,ny+1
        y=REAL(k-1,wp)*dy
