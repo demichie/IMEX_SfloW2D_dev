@@ -295,6 +295,12 @@ PROGRAM test_imex_stages
   WRITE(output_unit) q0,q,qp,initial_mask,known,solved,raw_final
   WRITE(output_unit) REAL(implicit_statuses,wp),statistics
   CLOSE(output_unit)
+  IF (lava_deposition_mode==1) THEN
+     OPEN(NEWUNIT=output_unit,FILE='lava_inventory.bin',ACCESS='STREAM', &
+          FORM='UNFORMATTED',STATUS='REPLACE')
+     WRITE(output_unit) B_vertex,lava_deposit
+     CLOSE(output_unit)
+  END IF
   IF (composition_mode>0) THEN
      OPEN(NEWUNIT=output_unit,FILE='composition.bin',ACCESS='STREAM',FORM='UNFORMATTED',STATUS='REPLACE')
      WRITE(output_unit) composition_audit
