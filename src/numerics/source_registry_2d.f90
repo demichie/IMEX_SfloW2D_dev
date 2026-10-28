@@ -135,6 +135,10 @@ CONTAINS
       END SELECT
       DO j=1,i-1
         IF (groups(j)%cadence/=group%cadence) CYCLE
+        ! An empty EXPLICIT/STAGE descriptor is only an RK interface
+        ! placeholder, not a configured physical source group.
+        IF (SIZE(groups(j)%source_names)==0 .OR. &
+             SIZE(group%source_names)==0) CYCLE
         IF (groups(j)%id==group%id) THEN
           IF (groups(j)%method==group%method) RETURN
           IF (group%cadence==SOURCE_CADENCE_STEP) RETURN
