@@ -507,6 +507,55 @@ def mixed_group_stage_checks(fields, n, dt, group_order):
     return fields["q"][..., 1:3][interior].copy()
 
 
+def lava_split_checkpoint_suite(args):
+    """Compare continuous RK lava integration with restart in a new process.
+
+    The fixture uses its own stream checkpoint; this does not validate the
+    production inpout_2d restart format.
+    """
+    ny, nx = 17, 18
+    vertices = np.zeros((ny+1, nx+1))
+    initial = np.zeros((ny, nx, 5))
+    initial[..., 0] = RHO
+    initial[..., 1] = 600.0
+    initial[..., 2] = 800.0
+    initial[..., 3] = RHO*CP*1000.0
+    for n in TABLEAU_STAGES:
+        base = Path(f"lava-checkpoint-{args.profile}-{os.getpid()}-RK{n}")
+        continuous, _ = launch(
+            args.executable, base/"continuous", vertices, initial, n, 2, 0.1,
+            limiter=0, dx=100.0, dy=100.0, source_test_model=3,
+            split_cooling_mode=1)
+        work = base/"restart"
+        work.mkdir(parents=True)
+        write_fixture(work/"fixture.inp", vertices, initial, False, False,
+                      0, 0.1, 100.0, 100.0)
+        env = {**os.environ, "OMP_NUM_THREADS": "1", "OMP_DYNAMIC": "FALSE"}
+        for mode in (1, 2):
+            command = [str(args.executable), "1", str(n), "1", "0", "1",
+                       "0", "0", "3", "0", "0", "1", str(mode)]
+            run = subprocess.run(
+                command, cwd=work, env=env, capture_output=True,
+                text=True, timeout=180)
+            if run.returncode:
+                raise AssertionError(
+                    f"RK{n} checkpoint mode {mode}: {run.stdout} {run.stderr}")
+            if mode == 1 and not (work/"checkpoint.bin").is_file():
+                raise AssertionError(f"RK{n} checkpoint was not written")
+        resumed = read_payload(work/"result.bin", nx, ny, n, 1)
+        for field in ("q", "qp"):
+            if not np.array_equal(continuous[field], resumed[field]):
+                difference = np.max(np.abs(continuous[field]-resumed[field]))
+                raise AssertionError(
+                    f"RK{n} restart differs for {field}, max={difference:.17g}")
+        print("D18_LAVA_CHECKPOINT_EVIDENCE " + json.dumps({
+            "profile": args.profile, "n_RK": n,
+            "resumed_sha256": hashlib.sha256(
+                (work/"result.bin").read_bytes()).hexdigest()
+        }, sort_keys=True), flush=True)
+    print("PASS: split-process lava RK plus cooling fixture continuation", flush=True)
+
+
 def lava_split_full_tableau_suite(args):
     """Check full RK/STAGE lava Newton followed by production cooling STEP."""
     ny, nx = 17, 18
@@ -785,6 +834,7 @@ def main():
     if args.section in (None, "groups"):
         mixed_group_tableau_suite(args)
         lava_split_full_tableau_suite(args)
+        lava_split_checkpoint_suite(args)
 
 
 if __name__ == "__main__":
