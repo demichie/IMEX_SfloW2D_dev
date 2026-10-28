@@ -43,12 +43,6 @@ CONTAINS
 
     USE state_conversion_2d, ONLY : qc_to_qp, mixt_var
     USE state_2d, ONLY : initialize_dry_physical_cell
-    USE source_input_2d, ONLY : lava_deposition_flag, eval_lava_deposition_rate
-    USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
-    USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
-    USE source_input_2d, ONLY : lava_deposition_flag, eval_lava_deposition_rate
-    USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
-    USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
 
     REAL(wp), INTENT(INOUT) :: q_cell(n_vars), qp_cell(n_vars+2)
     REAL(wp), INTENT(IN) :: time_step, equation_rate(n_eqns)
@@ -141,6 +135,9 @@ CONTAINS
          bottom_fissural_source_flag, erodible_deposit_flag,                &
          pore_pressure_flag, liquid_flag
     USE state_2d, ONLY : initialize_dry_physical_cell
+    USE source_input_2d, ONLY : lava_deposition_flag, eval_lava_deposition_rate
+    USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
+    USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
 
     REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
