@@ -63,6 +63,7 @@ PROGRAM test_mass_exchange
   CALL test_empty_step_registry
   CALL test_analytic_cooling_step_executor
   CALL test_explicit_multi_source_groups
+  CALL test_combined_step_sources
   CALL test_official_cooling_restart
   OPEN(NEWUNIT=snapshot_unit, FILE='snapshot.bin', ACCESS='STREAM',      &
        FORM='UNFORMATTED', STATUS='REPLACE')
@@ -304,6 +305,62 @@ CONTAINS
     curvature_term_flag=.FALSE.
     WRITE(*,*) 'PASS D18 explicit multi-source STAGE/STEP common-state rates'
   END SUBROUTINE test_explicit_multi_source_groups
+
+  !> \\brief Check sequential STEP groups with simultaneous cooling and erosion.
+  !> \\details Compare the combined production executor with separately
+  !>          executed registry groups and retain bed/inventory comparisons.
+  SUBROUTINE test_combined_step_sources
+    TYPE(source_registry_type) :: first_group, second_group
+    TYPE(source_group_type), ALLOCATABLE :: groups(:)
+    REAL(wp) :: q_full(nq,nx,ny), bed_full(nx+1,ny+1)
+    REAL(wp) :: dep_full(nx,ny,ns), ers_full(nx,ny,ns), inv_full(ns,nx,ny)
+    REAL(wp) :: initial_bed(nx+1,ny+1)
+    CHARACTER(LEN=256) :: error
+    INTEGER :: i,mass_idx,cooling_idx
+
+    CALL reset_fixture
+    erosion_coeff=0.1_wp
+    thermal_cooling_flag=.TRUE.
+    thermal_method='ANALYTIC'; thermal_cadence='STEP'; thermal_group=1
+    radiative_term_coeff=5.103E-8_wp
+    convective_term_coeff=9.0_wp
+    T_env=300.0_wp
+    CALL configure_source_registry
+    groups=source_registry%step_groups()
+    mass_idx=0; cooling_idx=0
+    DO i=1,SIZE(groups)
+       IF (ANY(groups(i)%source_names=='mass_exchange_erosion')) mass_idx=i
+       IF (ANY(groups(i)%source_names=='thermal_cooling')) cooling_idx=i
+    END DO
+    IF (mass_idx==0 .OR. cooling_idx==0) &
+         ERROR STOP 'D18 combined STEP missing mass exchange or cooling'
+    IF (mass_idx>=cooling_idx) ERROR STOP 'D18 combined STEP group ordering'
+    CALL first_group%initialize(nq,0,[source_group_type::],[groups(mass_idx)],error)
+    IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
+    CALL second_group%initialize(nq,0,[source_group_type::],[groups(cooling_idx)],error)
+    IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
+    initial_bed=B_vertex
+    CALL apply_mass_exchange_step(state%q,state%qp,0.1_wp,domain,source_registry)
+    q_full=state%q; bed_full=B_vertex
+    dep_full=deposit; ers_full=erosion; inv_full=erodible
+    IF (ALL(bed_full==initial_bed)) ERROR STOP 'D18 combined STEP exchange inactive'
+
+    CALL reset_fixture
+    CALL apply_mass_exchange_step(state%q,state%qp,0.1_wp,domain,first_group)
+    CALL apply_mass_exchange_step(state%q,state%qp,0.1_wp,domain,second_group)
+    CALL same_bits('D18 combined STEP Q',RESHAPE(state%q,[SIZE(q_full)]),RESHAPE(q_full,[SIZE(q_full)]))
+    CALL same_bits('D18 combined STEP bed',RESHAPE(B_vertex,[SIZE(bed_full)]),RESHAPE(bed_full,[SIZE(bed_full)]))
+    CALL same_bits('D18 combined STEP deposit',RESHAPE(deposit,[SIZE(dep_full)]),RESHAPE(dep_full,[SIZE(dep_full)]))
+    CALL same_bits('D18 combined STEP erosion',RESHAPE(erosion,[SIZE(ers_full)]),RESHAPE(ers_full,[SIZE(ers_full)]))
+    CALL same_bits('D18 combined STEP inventory',RESHAPE(erodible,[SIZE(inv_full)]),RESHAPE(inv_full,[SIZE(inv_full)]))
+    CALL first_group%finalize
+    CALL second_group%finalize
+    CALL source_registry%finalize
+    CALL equation_partition%finalize
+    thermal_cooling_flag=.FALSE.
+    thermal_method='ANALYTIC';thermal_cadence='STAGE';thermal_group=0
+    WRITE(*,*) 'PASS D18 combined STEP mass exchange and analytic cooling'
+  END SUBROUTINE test_combined_step_sources
 
   ! D18: official production restart round trip with analytical STEP cooling.
   SUBROUTINE test_official_cooling_restart
