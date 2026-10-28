@@ -349,34 +349,39 @@ PROGRAM test_grouped_implicit_stage
      ERROR STOP 'analytic effective rate does not match its net stage increment'
   END IF
 
+  ! A combined ANALYTIC group is forbidden: analytical maps are
+  ! individual physical operators, even for disjoint scalar equations.
   thermal_method='ANALYTIC'; thermal_group=1
   pore_pressure_method='ANALYTIC'; pore_pressure_group=1
   rheology_method='ANALYTIC'; rheology_group=2
   CALL initialize_configured_sources(source_registry,partition,source_error)
+  IF (LEN_TRIM(source_error)==0) THEN
+     ERROR STOP 'shared analytic stage group should be rejected'
+  END IF
+
+  ! Separate ordered groups preserve the sequential exact-flow checks.
+  pore_pressure_group=2
+  rheology_group=3
+  CALL initialize_configured_sources(source_registry,partition,source_error)
   IF (LEN_TRIM(source_error)>0) ERROR STOP TRIM(source_error)
-  IF (partition%n_IM_groups .NE. 2 .OR.                                  &
-       partition%n_IM_group_equations(1) .NE. 2 .OR.                      &
-       partition%IM_group(4) .NE. 1 .OR.                                 &
-       partition%IM_group(7) .NE. 1 .OR.                                 &
-       partition%IM_group(2) .NE. 2 .OR.                                 &
-       partition%IM_group_method(1) .NE. IM_GROUP_METHOD_ANALYTIC .OR.   &
-       partition%IM_group_method(2) .NE. IM_GROUP_METHOD_ANALYTIC) THEN
-     ERROR STOP 'energy and pore pressure could not share an analytic group'
+  IF (partition%n_IM_groups/=3 .OR. &
+       partition%IM_group(4)/=1 .OR. partition%IM_group(7)/=2 .OR. &
+       partition%IM_group(2)/=3 .OR. &
+       ANY(partition%IM_group_method(1:3)/=IM_GROUP_METHOD_ANALYTIC)) THEN
+     ERROR STOP 'separate analytic stage groups were not preserved'
   END IF
-  CALL solve_imex_stage(partition, source_registry%stage_groups(),          &
-       q_stage_check, q_stage_check,             &
-       dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
-       0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                    &
-       effective_stage_term, iterations, converged, linear_info,            &
-       line_search_failed)
-  IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
-     ERROR STOP 'mixed analytic group stage did not converge'
-  END IF
-  IF (ABS(q_stage(4) - exact_energy) / MAX(1.0_wp, ABS(exact_energy)) .GT. &
-       5.0E-14_wp .OR.                                                   &
-       ABS(q_stage(7) - q_expected(1)*expected_pressure) /                &
-       MAX(1.0_wp, ABS(q_expected(1)*expected_pressure)) .GT. 5.0E-14_wp) THEN
-     ERROR STOP 'shared analytic group produced an inconsistent stage'
+  CALL solve_imex_stage(partition, source_registry%stage_groups(), &
+       q_stage_check, q_stage_check, dt_step, a_diag, known_residual, &
+       0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, grav, 0.0_wp, &
+       .FALSE., .FALSE., q_stage, effective_stage_term, iterations, &
+       converged, linear_info, line_search_failed)
+  IF (.NOT.converged .OR. linear_info/=0 .OR. line_search_failed) &
+       ERROR STOP 'separate analytic stage groups did not converge'
+  IF (ABS(q_stage(4)-exact_energy)/MAX(1.0_wp,ABS(exact_energy))> &
+       5.0E-14_wp .OR. &
+       ABS(q_stage(7)-q_expected(1)*expected_pressure)/ &
+       MAX(1.0_wp,ABS(q_expected(1)*expected_pressure))>5.0E-14_wp) THEN
+     ERROR STOP 'separate analytic groups produced inconsistent stage'
   END IF
 
   thermal_method='NEWTON'; thermal_group=2
