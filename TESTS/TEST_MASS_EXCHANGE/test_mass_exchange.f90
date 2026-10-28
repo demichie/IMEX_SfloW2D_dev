@@ -63,6 +63,7 @@ PROGRAM test_mass_exchange
   CALL test_empty_step_registry
   CALL test_analytic_cooling_step_executor
   CALL test_explicit_multi_source_groups
+  CALL test_official_cooling_restart
   OPEN(NEWUNIT=snapshot_unit, FILE='snapshot.bin', ACCESS='STREAM',      &
        FORM='UNFORMATTED', STATUS='REPLACE')
   OPEN(NEWUNIT=extension_unit, FILE='flat_evaluations.bin', ACCESS='STREAM', &
@@ -303,6 +304,64 @@ CONTAINS
     curvature_term_flag=.FALSE.
     WRITE(*,*) 'PASS D18 explicit multi-source STAGE/STEP common-state rates'
   END SUBROUTINE test_explicit_multi_source_groups
+
+  ! D18: official production restart round trip with analytical STEP cooling.
+  SUBROUTINE test_official_cooling_restart
+    REAL(wp) :: checkpoint_state(nq,nx,ny),continuous(nq,nx,ny)
+    REAL(wp), PARAMETER :: delta=0.05_wp
+    CHARACTER(LEN=256) :: error
+    INTEGER :: l,j,k
+    REAL(wp) :: pressure
+    CALL reset_fixture
+    thermal_cooling_flag=.TRUE.
+    thermal_method='ANALYTIC'
+    thermal_cadence='STEP'
+    thermal_group=1
+    radiative_term_coeff=5.103E-8_wp
+    convective_term_coeff=9.0_wp
+    T_env=300.0_wp
+    CALL initialize_configured_sources(source_registry,equation_partition,error)
+    IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
+    DO l=1,domain%solve_cells
+       j=domain%j_cent(l);k=domain%k_cent(l)
+       IF (state%q(1,j,k)<=0.0_wp) CYCLE
+       CALL qc_to_qp(state%q(:,j,k),state%qp(:,j,k),pressure)
+    END DO
+    CALL apply_mass_exchange_step(state%q,state%qp,delta,domain,source_registry)
+    checkpoint_state=state%q
+    runtime%t=delta;runtime%dt=delta
+    CALL write_restart_file('cooling_checkpoint.bin',runtime,stochastic,state,domain)
+    CALL apply_mass_exchange_step(state%q,state%qp,delta,domain,source_registry)
+    continuous=state%q
+    state%q=-999.0_wp
+    state%qp=-999.0_wp
+    CALL read_restart_file('cooling_checkpoint.bin',runtime,stochastic,state,domain)
+    CALL same_bits('official cooling restart state', &
+         RESHAPE(state%q,[SIZE(checkpoint_state)]), &
+         RESHAPE(checkpoint_state,[SIZE(checkpoint_state)]))
+    CALL source_registry%finalize
+    CALL equation_partition%finalize
+    CALL initialize_configured_sources(source_registry,equation_partition,error)
+    IF (LEN_TRIM(error)>0) ERROR STOP TRIM(error)
+    state%qp=0.0_wp
+    state%qp(4,:,:)=T_ambient
+    DO l=1,domain%solve_cells
+       j=domain%j_cent(l);k=domain%k_cent(l)
+       IF (state%q(1,j,k)<=0.0_wp) CYCLE
+       CALL qc_to_qp(state%q(:,j,k),state%qp(:,j,k),pressure)
+    END DO
+    CALL apply_mass_exchange_step(state%q,state%qp,delta,domain,source_registry)
+    CALL same_bits('official cooling restart continuation', &
+         RESHAPE(state%q,[SIZE(continuous)]), &
+         RESHAPE(continuous,[SIZE(continuous)]))
+    CALL source_registry%finalize
+    CALL equation_partition%finalize
+    thermal_cooling_flag=.FALSE.
+    thermal_method='ANALYTIC'
+    thermal_cadence='STAGE'
+    thermal_group=0
+    WRITE(*,*) 'PASS D18 production restart with analytic cooling STEP'
+  END SUBROUTINE test_official_cooling_restart
 
   !> D18: production post-RK dispatcher applies exact cooling once over dt.
   SUBROUTINE test_analytic_cooling_step_executor
