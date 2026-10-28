@@ -14,7 +14,8 @@ MODULE source_registry_2d
   PUBLIC :: source_group_type, source_registry_type
   PUBLIC :: group_contains_name, group_source_names
 
-  !> \brief Source group identified by (cadence,method,id); id=0 is valid.
+  !> \brief Runtime method subgroup; id=0 is valid.
+  !> STAGE may share an ID between EXPLICIT and NEWTON only.
   TYPE :: source_group_type
     INTEGER :: id=0 !< Public or normalized internal group identity.
     INTEGER :: cadence=0 !< Stage or post-RK step application.
@@ -134,7 +135,12 @@ CONTAINS
       END SELECT
       DO j=1,i-1
         IF (groups(j)%cadence/=group%cadence) CYCLE
-        IF (groups(j)%id==group%id .AND. groups(j)%method==group%method) RETURN
+        IF (groups(j)%id==group%id) THEN
+          IF (groups(j)%method==group%method) RETURN
+          IF (group%cadence==SOURCE_CADENCE_STEP) RETURN
+          IF (group%method==SOURCE_METHOD_ANALYTIC .OR. &
+               groups(j)%method==SOURCE_METHOD_ANALYTIC) RETURN
+        END IF
         IF (group_stage_rank(groups(j))>group_stage_rank(group)) RETURN
       END DO
       error='D17: unallocated group descriptor arrays'
@@ -183,7 +189,8 @@ CONTAINS
       IF (group%method==SOURCE_METHOD_NEWTON) THEN
         IF (SIZE(group%equation_ids)==0) RETURN
       ELSE IF (group%method==SOURCE_METHOD_ANALYTIC) THEN
-        ! A group may combine independent complete analytic operators.
+        ! Analytical maps are individual operators, never joint groups.
+        IF (SIZE(group%source_names)/=1) RETURN
         ! The momentum pair is indivisible; energy and pore are scalar.
         IF (SIZE(group%equation_ids)==0) RETURN
         IF (ANY(group%equation_ids==2) .NEQV. &

@@ -171,6 +171,30 @@ CONTAINS
           IF (steps(j)%method==method .AND. steps(j)%id==id) k=j
         END DO
       END IF
+      ! A numeric ID identifies one STEP operator, independent of method.
+      ! At STAGE, only EXPLICIT and NEWTON may share an ID: the IMEX
+      ! tableau determines their distinct numerical contributions.
+      IF (cadence==SOURCE_CADENCE_STEP) THEN
+        DO j=1,SIZE(steps)
+          IF (steps(j)%id==id .AND. steps(j)%method/=method) THEN
+            error='D18: STEP GROUP cannot mix METHOD values'
+            RETURN
+          END IF
+        END DO
+      ELSE
+        DO j=1,SIZE(stages)
+          IF (stages(j)%id/=id .OR. stages(j)%method==method) CYCLE
+          IF (method==SOURCE_METHOD_ANALYTIC .OR. &
+               stages(j)%method==SOURCE_METHOD_ANALYTIC) THEN
+            error='D18: ANALYTIC STAGE GROUP must be exclusive'
+            RETURN
+          END IF
+        END DO
+      END IF
+      IF (k/=0 .AND. method==SOURCE_METHOD_ANALYTIC) THEN
+        error='D18: ANALYTIC GROUP must contain a single source'
+        RETURN
+      END IF
       IF (k==0) THEN
         group%id=id
         group%method=method; group%cadence=cadence
@@ -211,17 +235,11 @@ CONTAINS
         END IF
       END IF
     END DO
-    ! Sort post-RK groups by method class and configured group ID.
-    ! Analytic groups precede the atomic explicit mass-exchange transaction.
+    ! STEP is a true post-RK operator sequence ordered by GROUP.
+    ! Sources inside a single group use the same input state.
     DO i=1,SIZE(steps)
       DO j=i+1,SIZE(steps)
-        IF ((.NOT.ANY(INDEX(steps(j)%source_names,'mass_exchange_')==1) .AND. &
-             ANY(INDEX(steps(i)%source_names,'mass_exchange_')==1)) .OR. &
-             (.NOT.ANY(INDEX(steps(i)%source_names,'mass_exchange_')==1) .AND. &
-              .NOT.ANY(INDEX(steps(j)%source_names,'mass_exchange_')==1) .AND. &
-              (group_method_rank(steps(j)%method)<group_method_rank(steps(i)%method) .OR. &
-               (group_method_rank(steps(j)%method)==group_method_rank(steps(i)%method) .AND. &
-                steps(j)%id<steps(i)%id)))) THEN
+        IF (steps(j)%id<steps(i)%id) THEN
           tmp=steps(i); steps(i)=steps(j); steps(j)=tmp
         END IF
       END DO
@@ -242,9 +260,9 @@ CONTAINS
       DO j=i+1,SIZE(stages)
         ! Ordering priority is fixed during group construction.
         ! No query of the pre-existing equation partition in this sort.
-        IF (group_method_rank(stages(j)%method)<group_method_rank(stages(i)%method) .OR. &
-             (group_method_rank(stages(j)%method)==group_method_rank(stages(i)%method) .AND. &
-              stage_order(j)<stage_order(i))) THEN
+        IF (stage_order(j)<stage_order(i) .OR. &
+             (stage_order(j)==stage_order(i) .AND. &
+              group_method_rank(stages(j)%method)<group_method_rank(stages(i)%method))) THEN
           tmp=stages(i); stages(i)=stages(j); stages(j)=tmp
           swap_order=stage_order(i)
           stage_order(i)=stage_order(j)

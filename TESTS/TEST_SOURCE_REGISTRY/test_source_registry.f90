@@ -100,6 +100,7 @@ PROGRAM test_source_registry
   CALL verify_default_schedule()
   CALL verify_thermal_activation_matrix()
   CALL verify_analytic_step_schedule()
+  CALL verify_group_method_contract()
   CALL verify_newton_explicit_step_schedule()
   WRITE(*,'(A)') 'D18 physical catalog and 864 physical triplet mappings verified'
 CONTAINS
@@ -189,6 +190,41 @@ CONTAINS
     CALL require(group_contains_name(post(3),'mass_exchange_deposition'), &
          'atomic mass-exchange STEP group preserved')
   END SUBROUTINE verify_newton_explicit_step_schedule
+
+  SUBROUTINE verify_group_method_contract()
+    TYPE(source_group_type), ALLOCATABLE :: g(:),post(:)
+    CALL configure_lava_case()
+    thermal_method='ANALYTIC';thermal_cadence='STAGE';thermal_group=1
+    pore_pressure_method='ANALYTIC';pore_pressure_cadence='STAGE';pore_pressure_group=1
+    CALL initialize_configured_sources(registry,partition,error)
+    CALL require(LEN_TRIM(error)>0,'shared ANALYTIC STAGE group rejected')
+    CALL configure_lava_case()
+    thermal_method='ANALYTIC';thermal_cadence='STAGE';thermal_group=3
+    CALL initialize_configured_sources(registry,partition,error)
+    CALL require(LEN_TRIM(error)>0,'ANALYTIC plus NEWTON STAGE group rejected')
+    CALL configure_lava_case()
+    thermal_method='EXPLICIT';thermal_cadence='STAGE';thermal_group=3
+    CALL initialize_configured_sources(registry,partition,error)
+    CALL require(error=='','EXPLICIT and NEWTON may share STAGE id')
+    g=registry%stage_groups()
+    CALL require(ANY([(g(i)%method==SOURCE_METHOD_EXPLICIT .AND. &
+         g(i)%id==3,i=1,SIZE(g))]),'explicit STAGE group id retained')
+    CALL require(ANY([(g(i)%method==SOURCE_METHOD_NEWTON .AND. &
+         g(i)%id==3,i=1,SIZE(g))]),'Newton STAGE group id retained')
+    CALL configure_lava_case()
+    rheology_method='NEWTON';rheology_cadence='STEP';rheology_group=2
+    thermal_method='EXPLICIT';thermal_cadence='STEP';thermal_group=2
+    CALL initialize_configured_sources(registry,partition,error)
+    CALL require(LEN_TRIM(error)>0,'mixed METHOD STEP group rejected')
+    CALL configure_lava_case()
+    rheology_method='NEWTON';rheology_cadence='STEP';rheology_group=3
+    thermal_method='EXPLICIT';thermal_cadence='STEP';thermal_group=2
+    CALL initialize_configured_sources(registry,partition,error)
+    CALL require(error=='','different STEP groups accepted')
+    post=registry%step_groups()
+    CALL require(ALL([(post(i)%id<=post(i+1)%id,i=1,SIZE(post)-1)]), &
+         'STEP groups sorted by GROUP independent of METHOD')
+  END SUBROUTINE verify_group_method_contract
 
   SUBROUTINE verify_thermal_activation_matrix()
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
