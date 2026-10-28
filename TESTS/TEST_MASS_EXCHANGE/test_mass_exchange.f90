@@ -141,6 +141,14 @@ CONTAINS
     ALLOCATE(grav_coeff(nx,ny), grav_coeff_stag_x(nx+1,ny), grav_coeff_stag_y(nx,ny+1))
     ALLOCATE(deposit(nx,ny,ns), erosion(nx,ny,ns), erodible(ns,nx,ny))
     ALLOCATE(B_zone(nx,ny), cell_source_fractions(nx,ny))
+    ! The shared explicit source adapter also accesses injection geometry.
+    ! This mass-exchange fixture has no fissures or lateral injection arcs.
+    ALLOCATE(cell_fissure_fractions(nx,ny,0))
+    ALLOCATE(cell_arc_perim(nx,ny),cell_arc_n_x(nx,ny),cell_arc_n_y(nx,ny))
+    cell_fissure_fractions=0.0_wp
+    cell_arc_perim=0.0_wp
+    cell_arc_n_x=0.0_wp
+    cell_arc_n_y=0.0_wp
     CALL layout%initialize(1,nq,nq,ns,0,0,0,.FALSE.)
     CALL state%initialize(layout)
     CALL domain%initialize
