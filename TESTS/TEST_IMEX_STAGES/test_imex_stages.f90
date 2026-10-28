@@ -74,7 +74,7 @@ PROGRAM test_imex_stages
   INTEGER :: nx,ny,slope,curvature,limiter_id,input_unit,output_unit,j,k,i,step
   INTEGER :: threads,actual_threads,stages,steps,drag,observe,l
   INTEGER :: composition_mode,boundary_test_mode,source_test_model,analytic_mode
-  INTEGER :: mixed_group_mode, split_cooling_mode
+  INTEGER :: mixed_group_mode, split_cooling_mode, checkpoint_mode, checkpoint_unit
   REAL(wp), ALLOCATABLE :: pre_cooling(:,:,:), pre_cooling_qp(:,:,:)
   REAL(wp) :: cooling_capacity, cooling_temperature, cooling_expected, cooling_pdyn
   CHARACTER(LEN=256) :: cooling_error
@@ -125,6 +125,13 @@ PROGRAM test_imex_stages
   IF (split_cooling_mode==1 .AND. (source_test_model/=3 .OR. &
        composition_mode/=0 .OR. mixed_group_mode/=0)) &
        ERROR STOP 'split cooling requires lava NEWTON/STAGE fixture'
+  checkpoint_mode=0
+  argument=''
+  CALL get_command_argument(12,argument)
+  IF (LEN_TRIM(argument)>0) READ(argument,*) checkpoint_mode
+  IF (checkpoint_mode<0 .OR. checkpoint_mode>2) ERROR STOP 'invalid checkpoint fixture mode'
+  IF (checkpoint_mode>0 .AND. split_cooling_mode/=1) &
+       ERROR STOP 'checkpoint fixture requires lava split cooling'
   IF (stages<2 .OR. stages>4 .OR. steps<1) ERROR STOP 'invalid test controls'
   !$OMP PARALLEL
   !$OMP SINGLE
@@ -143,6 +150,14 @@ PROGRAM test_imex_stages
   CLOSE(input_unit)
   q0=q; qp=0.0_wp; qp(4,:,:)=T_ambient; Z=0.0_wp; t=0.0_wp
   CALL refresh_topography_geometry
+  IF (checkpoint_mode==2) THEN
+     OPEN(NEWUNIT=checkpoint_unit,FILE='checkpoint.bin', &
+          ACCESS='STREAM',FORM='UNFORMATTED',STATUS='OLD',ACTION='READ')
+     READ(checkpoint_unit) q,qp,t
+     CLOSE(checkpoint_unit)
+     IF (.NOT.ALL(ieee_is_finite(q)) .OR. .NOT.ALL(ieee_is_finite(qp))) &
+          ERROR STOP 'D18 checkpoint contains nonfinite state'
+  END IF
   IF (boundary_test_mode==1) THEN
      CALL run_boundary_reconstruction_tests
      STOP 0
@@ -237,6 +252,12 @@ PROGRAM test_imex_stages
      statistics(12,step)=t+dt
      IF (composition_mode>0) CALL audit_composition_step
      t=t+dt
+     IF (checkpoint_mode==1) THEN
+        OPEN(NEWUNIT=checkpoint_unit,FILE='checkpoint.bin', &
+             ACCESS='STREAM',FORM='UNFORMATTED',STATUS='REPLACE')
+        WRITE(checkpoint_unit) q,qp,t
+        CLOSE(checkpoint_unit)
+     END IF
   END DO
   OPEN(NEWUNIT=output_unit,FILE='result.bin',ACCESS='STREAM',FORM='UNFORMATTED',STATUS='REPLACE')
   WRITE(output_unit) q0,q,qp,initial_mask,known,solved,raw_final
