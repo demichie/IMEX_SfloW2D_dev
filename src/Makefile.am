@@ -219,6 +219,7 @@ physics/mass_injection_terms/mass_radial_injection_2d.$(OBJEXT): core/parameters
                                      physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT) \
                                      core/diagnostics_2d.$(OBJEXT)
 physics/source_terms_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+                                      physics/mass_exchange/mass_exchange_2d.$(OBJEXT) \
                                      core/constitutive_parameters_2d.$(OBJEXT) \
                                      state/state_conversion_2d.$(OBJEXT) \
                                      geometry/geometry_2d.$(OBJEXT) \
