@@ -1,5 +1,5 @@
 PROGRAM test_d17_state_numeric
-  USE parameters_2d, ONLY : wp, n_vars, n_solid, n_add_gas, idx_u, idx_v, &
+  USE parameters_2d, ONLY : wp, n_vars, n_solid, n_add_gas, idx_h, idx_hu, idx_hv, idx_T, idx_u, idx_v, &
        idx_solid_first, idx_solid_last, idx_add_gas_first, idx_add_gas_last, &
        gas_flag, liquid_flag
   USE constitutive_parameters_2d, ONLY : T_ambient
@@ -13,6 +13,10 @@ PROGRAM test_d17_state_numeric
   idx_solid_last=4
   idx_add_gas_first=5
   idx_add_gas_last=4
+  idx_h=1
+  idx_hu=2
+  idx_hv=3
+  idx_T=4
   idx_u=5
   idx_v=6
   gas_flag=.FALSE.
