@@ -32,6 +32,7 @@ PROGRAM probe_sources
   REAL(wp) :: cs(7,7), normalized_cs(7,7), fd(7,7,4), steps(4), delta, env_before
   REAL(wp) :: stage(7), residual(7), erosion(2), deposition(2), exchange(7)
   REAL(wp) :: carrier_erosion, carrier_loss, topo, substrate(2)
+  TYPE(mass_exchange_rates_type) :: total_rates
   REAL(wp) :: test_z(4), expected_parallel_source(7,4), parallel_source(7)
   REAL(wp) :: parallel_error, local_error
   INTEGER :: iteration, actual_threads
@@ -131,9 +132,9 @@ PROGRAM probe_sources
   END IF
   IF (operation==3) THEN
      substrate=0.0_wp
-     CALL eval_mass_exchange_terms(qp(1:n_vars+2),0,bx,by,              &
-          substrate(1:solids),dt,erosion(1:solids),                  &
-          deposition(1:solids),carrier_erosion,carrier_loss,exchange(1:n_vars),topo)
+     CALL eval_mass_exchange_terms(qp(1:n_vars+2),0,bx,by, &
+          substrate(1:solids),dt,total_rates,exchange(1:n_vars))
+     carrier_loss=total_rates%carrier_withdrawal_volume_rate
      WRITE(*,'(A,ES26.17E3)') 'LOSS ',carrier_loss
      WRITE(*,'(A,7ES26.17E3)') 'EXCHANGE ',exchange(1:n_vars)
      STOP
