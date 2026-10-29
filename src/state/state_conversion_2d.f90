@@ -7,7 +7,8 @@
 !********************************************************************************
 
 MODULE state_conversion_2d
-  USE parameters_2d, ONLY : idx_hu, idx_hv
+  USE parameters_2d, ONLY : idx_hu, idx_hv, idx_totMassEqn, &
+       idx_uEqn, idx_vEqn, idx_engyEqn
 
     USE parameters_2d, ONLY : idx_h, idx_T
   USE constitutive_parameters_2d
@@ -90,7 +91,7 @@ CONTAINS
     REAL(wp), INTENT(INOUT) :: qc(:)
     REAL(wp), INTENT(IN) :: h
 
-    IF (h <= dry_thickness_tolerance) qc(2:3) = 0.0_wp
+    IF (h <= dry_thickness_tolerance) qc(idx_uEqn:idx_vEqn) = 0.0_wp
   END SUBROUTINE project_dry_cell_momenta
 
   !> \brief Recover real velocities from mixture mass and momenta with dry-state regularization.
@@ -209,9 +210,9 @@ CONTAINS
     REAL(wp), INTENT(INOUT) :: qc(n_vars)
     REAL(wp) :: tolerance
 
-    IF (qc(1) .LE. 0.0_wp) RETURN
+    IF (qc(idx_totMassEqn) .LE. 0.0_wp) RETURN
     tolerance = mass_fraction_roundoff_tolerance *                         &
-         MAX(ABS(qc(1)),TINY(1.0_wp))
+         MAX(ABS(qc(idx_totMassEqn)),TINY(1.0_wp))
 
     IF (n_solid .GT. 0) THEN
        WHERE ((qc(idx_solid_first:idx_solid_last) .LT. 0.0_wp) .AND.       &
@@ -756,9 +757,9 @@ CONTAINS
 
     r_xs = 0.0_wp
     r_xg = 0.0_wp
-    IF ( qc(1) .GT. EPSILON(1.0_wp) ) THEN
-       r_xs = qc(idx_solid_first:idx_solid_last) / qc(1)
-       r_xg = qc(idx_add_gas_first:idx_add_gas_last) / qc(1)
+    IF ( qc(idx_totMassEqn) .GT. EPSILON(1.0_wp) ) THEN
+       r_xs = qc(idx_solid_first:idx_solid_last) / qc(idx_totMassEqn)
+       r_xg = qc(idx_add_gas_first:idx_add_gas_last) / qc(idx_totMassEqn)
        IF (PRESENT(context)) THEN
           CALL enforce_mass_fraction_closure(r_xs, r_xg, context)
        ELSE
@@ -884,21 +885,21 @@ CONTAINS
 
     IF ( pore_pressure_flag ) r_exc_pore_pres = qp(idx_pore)
 
-    qc(1) = r_rho_m * r_h
+    qc(idx_totMassEqn) = r_rho_m * r_h
 
-    qc(2) = r_rho_m * r_hu
-    qc(3) = r_rho_m * r_hv
+    qc(idx_uEqn) = r_rho_m * r_hu
+    qc(idx_vEqn) = r_rho_m * r_hv
 
     ! Thermal energy per unit horizontal area. Kinetic energy is not part of
     ! the fourth conservative variable.
-    qc(4) = r_h * r_rho_m * r_sp_heat_mix * r_T
+    qc(idx_engyEqn) = r_h * r_rho_m * r_sp_heat_mix * r_T
 
-    qc(idx_solid_first:idx_solid_last) = r_xs * qc(1)
-    qc(idx_add_gas_first:idx_add_gas_last) = r_xg * qc(1)
+    qc(idx_solid_first:idx_solid_last) = r_xs * qc(idx_totMassEqn)
+    qc(idx_add_gas_first:idx_add_gas_last) = r_xg * qc(idx_totMassEqn)
 
-    IF ( stoch_transport_flag ) qc(idx_stoch) = r_Zs * qc(1)
+    IF ( stoch_transport_flag ) qc(idx_stoch) = r_Zs * qc(idx_totMassEqn)
 
-    IF ( pore_pressure_flag ) qc(idx_pore) = r_exc_pore_pres * qc(1)
+    IF ( pore_pressure_flag ) qc(idx_pore) = r_exc_pore_pres * qc(idx_totMassEqn)
 
 
     RETURN
