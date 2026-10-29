@@ -1,6 +1,7 @@
 PROGRAM test_d17_state_numeric
   USE parameters_2d, ONLY : wp, n_vars, n_solid, n_add_gas, idx_h, idx_hu, idx_hv, idx_T, idx_u, idx_v, &
-       idx_solid_first, idx_solid_last, idx_add_gas_first, idx_add_gas_last, &
+       idx_solid_first, idx_solid_last, idx_solidEqn_first, idx_solidEqn_last, &
+       idx_add_gas_first, idx_add_gas_last, &
        gas_flag, liquid_flag
   USE constitutive_parameters_2d, ONLY : T_ambient
   USE state_2d, ONLY : finalize_imex_cell_state, initialize_dry_physical_cell
@@ -11,6 +12,8 @@ PROGRAM test_d17_state_numeric
   n_add_gas=0
   idx_solid_first=5
   idx_solid_last=4
+  idx_solidEqn_first=5
+  idx_solidEqn_last=4
   idx_add_gas_first=5
   idx_add_gas_last=4
   idx_h=1
