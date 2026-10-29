@@ -9,7 +9,7 @@ PROGRAM test_source_registry
   USE parameters_2d, ONLY : wp, n_eqns, idx_pore, &
        rheology_flag, rheology_model, pore_pressure_flag, thermal_cooling_flag, &
        curvature_term_flag, bottom_radial_source_flag, bottom_fissural_source_flag, &
-       radial_source_flag, lateral_source_flag, liquid_flag, gas_flag, &
+       radial_source_flag, lateral_source_flag, liquid_flag, gas_flag, lava_flag, &
        gas_loss_flag, liquid_vaporization_flag
   USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag, &
        coeff_porosity, entrainment_flag
@@ -46,7 +46,7 @@ PROGRAM test_source_registry
   DO mode=0,3
     enabled=[.TRUE.,BTEST(mode,0),BTEST(mode,1)]
     mask=.FALSE.;mask(2:3)=.TRUE.;mask(4)=enabled(2);mask(7)=enabled(3)
-    active=[CHARACTER(LEN=64)::'rheology_lava','geometry_curvature', &
+    active=[CHARACTER(LEN=64)::'rheology_voellmy','geometry_curvature', &
          'bottom_circular_injection','boundary_injection','mass_exchange_deposition']
     IF (enabled(2)) active=[active,'thermal_cooling']
     IF (enabled(3)) active=[active,'pore_pressure_dissipation']
@@ -70,7 +70,7 @@ PROGRAM test_source_registry
         END DO
         CALL partition%initialize(mask,membership,selected(1:nm))
       END BLOCK
-      CALL configure_lava_case()
+      CALL configure_liquid_case()
       thermal_cooling_flag=enabled(2)
       pore_pressure_flag=enabled(3)
       rheology_group=ids(1); thermal_group=ids(2); pore_pressure_group=ids(3)
@@ -102,7 +102,7 @@ PROGRAM test_source_registry
       stages=registry%stage_groups();steps=registry%step_groups()
       CALL require(SIZE(steps)==1,'one post-RK source group')
       CALL require(group_contains_name(steps(1),'mass_exchange_deposition'),'mass source ownership')
-      CALL require(.NOT.group_contains_name(steps(1),'rheology_lava'),'no stage source in step')
+      CALL require(.NOT.group_contains_name(steps(1),'rheology_voellmy'),'no stage source in step')
       CALL registry%validate(error)
       CALL require(error=='','repeat physical registry validation')
       wrong=stages
@@ -128,9 +128,9 @@ PROGRAM test_source_registry
   CALL verify_newton_explicit_step_schedule()
   WRITE(*,'(A)') 'D18 physical catalog and 864 physical triplet mappings verified'
 CONTAINS
-  SUBROUTINE configure_lava_case()
+  SUBROUTINE configure_liquid_case()
     n_eqns=7;idx_pore=7
-    rheology_flag=.TRUE.;rheology_model='lava'
+    rheology_flag=.TRUE.;rheology_model='voellmy'
     thermal_cooling_flag=.TRUE.
     pore_pressure_flag=.TRUE.
     curvature_term_flag=.FALSE.
@@ -138,20 +138,20 @@ CONTAINS
     bottom_fissural_source_flag=.FALSE.
     radial_source_flag=.FALSE.
     lateral_source_flag=.TRUE.
-    liquid_flag=.FALSE.;gas_flag=.FALSE.
+    liquid_flag=.TRUE.;gas_flag=.FALSE.;lava_flag=.FALSE.
     gas_loss_flag=.FALSE.;liquid_vaporization_flag=.FALSE.
     erosion_coeff=0.0_wp;settling_flag=.TRUE.
     coeff_porosity=0.0_wp;entrainment_flag=.FALSE.
     rheology_method='NEWTON'; rheology_cadence='STAGE'; rheology_group=3
     thermal_method='ANALYTIC'; thermal_cadence='STAGE'; thermal_group=1
     pore_pressure_method='ANALYTIC'; pore_pressure_cadence='STAGE'; pore_pressure_group=2
-  END SUBROUTINE configure_lava_case
+  END SUBROUTINE configure_liquid_case
 
   SUBROUTINE verify_default_schedule()
     TYPE(source_group_type), ALLOCATABLE :: g(:),s(:)
     LOGICAL :: enabled_eq(7)
     INTEGER :: assigned(7)
-    CALL configure_lava_case()
+    CALL configure_liquid_case()
     enabled_eq=.FALSE.;enabled_eq(2:4)=.TRUE.;enabled_eq(7)=.TRUE.
     assigned=0;assigned(2:3)=3;assigned(4)=1;assigned(7)=2
     CALL partition%initialize(enabled_eq,assigned, &
@@ -166,7 +166,7 @@ CONTAINS
          'one complete cooling source at group 1')
     CALL require(group_contains_name(g(3),'pore_pressure_dissipation'), &
          'pore dissipation scheduling at group 2')
-    CALL require(group_contains_name(g(4),'rheology_lava'), &
+    CALL require(group_contains_name(g(4),'rheology_voellmy'), &
          'complete lava law scheduling at group 3')
     CALL require(group_contains_name(s(1),'mass_exchange_deposition'), &
          'post-RK deposition scheduling')
@@ -174,7 +174,7 @@ CONTAINS
 
   SUBROUTINE verify_analytic_step_schedule()
     TYPE(source_group_type), ALLOCATABLE :: stage(:),post(:)
-    CALL configure_lava_case()
+    CALL configure_liquid_case()
     thermal_method='ANALYTIC'; thermal_cadence='STEP'; thermal_group=2
     pore_pressure_method='ANALYTIC'; pore_pressure_cadence='STEP'; pore_pressure_group=1
     CALL initialize_configured_sources(registry,partition,error)
@@ -196,7 +196,7 @@ CONTAINS
 
   SUBROUTINE verify_newton_explicit_step_schedule()
     TYPE(source_group_type), ALLOCATABLE :: g(:),post(:)
-    CALL configure_lava_case()
+    CALL configure_liquid_case()
     rheology_method='NEWTON'; rheology_cadence='STEP'; rheology_group=1
     thermal_method='EXPLICIT'; thermal_cadence='STEP'; thermal_group=2
     pore_pressure_method='ANALYTIC'; pore_pressure_cadence='STAGE'; pore_pressure_group=1
@@ -208,7 +208,7 @@ CONTAINS
     CALL require(group_contains_name(post(1),'mass_exchange_deposition'), &
          'atomic mass-exchange GROUP=0 first')
     CALL require(post(2)%method==SOURCE_METHOD_NEWTON .AND. &
-         group_contains_name(post(2),'rheology_lava'), &
+         group_contains_name(post(2),'rheology_voellmy'), &
          'Newton STEP GROUP=1 complete rheology')
     CALL require(post(3)%method==SOURCE_METHOD_EXPLICIT .AND. &
          group_contains_name(post(3),'thermal_cooling'), &
@@ -219,7 +219,7 @@ CONTAINS
   SUBROUTINE verify_geometry_source_triplets()
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
     INTEGER :: i,j
-    CALL configure_lava_case()
+    CALL configure_liquid_case()
     rheology_flag=.FALSE.
     thermal_cooling_flag=.FALSE.
     pore_pressure_flag=.FALSE.
@@ -257,16 +257,16 @@ CONTAINS
 
   SUBROUTINE verify_group_method_contract()
     TYPE(source_group_type), ALLOCATABLE :: g(:),post(:)
-    CALL configure_lava_case()
+    CALL configure_liquid_case()
     thermal_method='ANALYTIC';thermal_cadence='STAGE';thermal_group=1
     pore_pressure_method='ANALYTIC';pore_pressure_cadence='STAGE';pore_pressure_group=1
     CALL initialize_configured_sources(registry,partition,error)
     CALL require(LEN_TRIM(error)>0,'shared ANALYTIC STAGE group rejected')
-    CALL configure_lava_case()
+    CALL configure_liquid_case()
     thermal_method='ANALYTIC';thermal_cadence='STAGE';thermal_group=3
     CALL initialize_configured_sources(registry,partition,error)
     CALL require(LEN_TRIM(error)>0,'ANALYTIC plus NEWTON STAGE group rejected')
-    CALL configure_lava_case()
+    CALL configure_liquid_case()
     thermal_method='EXPLICIT';thermal_cadence='STAGE';thermal_group=3
     CALL initialize_configured_sources(registry,partition,error)
     CALL require(error=='','EXPLICIT and NEWTON may share STAGE id')
@@ -275,12 +275,12 @@ CONTAINS
          g(i)%id==3,i=1,SIZE(g))]),'explicit STAGE group id retained')
     CALL require(ANY([(g(i)%method==SOURCE_METHOD_NEWTON .AND. &
          g(i)%id==3,i=1,SIZE(g))]),'Newton STAGE group id retained')
-    CALL configure_lava_case()
+    CALL configure_liquid_case()
     rheology_method='NEWTON';rheology_cadence='STEP';rheology_group=2
     thermal_method='EXPLICIT';thermal_cadence='STEP';thermal_group=2
     CALL initialize_configured_sources(registry,partition,error)
     CALL require(LEN_TRIM(error)>0,'mixed METHOD STEP group rejected')
-    CALL configure_lava_case()
+    CALL configure_liquid_case()
     rheology_method='NEWTON';rheology_cadence='STEP';rheology_group=3
     thermal_method='EXPLICIT';thermal_cadence='STEP';thermal_group=2
     CALL initialize_configured_sources(registry,partition,error)
@@ -296,8 +296,9 @@ CONTAINS
     INTEGER :: assigned(7),model,choice,method(2),i
     DO model=1,2
       DO choice=1,2
-        CALL configure_lava_case()
+        CALL configure_liquid_case()
         rheology_model=MERGE('lava   ','voellmy',model==2)
+        lava_flag=(model==2); liquid_flag=(model/=2)
         thermal_cooling_flag=(choice==2)
         pore_pressure_flag=.FALSE.
         lateral_source_flag=.FALSE.

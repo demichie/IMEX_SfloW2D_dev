@@ -381,16 +381,15 @@ CONTAINS
     flux(2:4) = [3.0_wp, -4.0_wp, 7.0_wp]
     flux(idx_solidEqn_first:idx_solidEqn_last) = [1.2_wp, 0.6_wp]
     flux(idx_addGasEqn_first:idx_addGasEqn_last) = 0.6_wp
-    flux(n_vars) = 0.6_wp
     original = flux
     CALL limit_component_mass_flux(flux)
     component_sum = SUM(flux(idx_solidEqn_first:idx_solidEqn_last))           &
-         + SUM(flux(idx_addGasEqn_first:idx_addGasEqn_last)) + flux(n_vars)
+         + SUM(flux(idx_addGasEqn_first:idx_addGasEqn_last))
     CALL assert_close_scalar('positive component flux sum', component_sum,    &
          flux(1), 2.0E-12_wp)
     CALL assert_close_scalar('positive component flux common scale',         &
          flux(idx_solidEqn_first)/original(idx_solidEqn_first),               &
-         flux(n_vars)/original(n_vars), 2.0E-12_wp)
+         flux(idx_addGasEqn_first)/original(idx_addGasEqn_first), 2.0E-12_wp)
     CALL assert_close_vector('positive limiter preserves non-mass fluxes',    &
          flux(2:4), original(2:4), 0.0_wp)
 
@@ -399,12 +398,12 @@ CONTAINS
     original = flux
     CALL limit_component_mass_flux(flux)
     component_sum = SUM(flux(idx_solidEqn_first:idx_solidEqn_last))           &
-         + SUM(flux(idx_addGasEqn_first:idx_addGasEqn_last)) + flux(n_vars)
+         + SUM(flux(idx_addGasEqn_first:idx_addGasEqn_last))
     CALL assert_close_scalar('negative component flux sum', component_sum,    &
          flux(1), 2.0E-12_wp)
     CALL assert_close_scalar('negative component flux common scale',         &
          flux(idx_solidEqn_first)/original(idx_solidEqn_first),               &
-         flux(n_vars)/original(n_vars), 2.0E-12_wp)
+         flux(idx_addGasEqn_first)/original(idx_addGasEqn_first), 2.0E-12_wp)
     CALL assert_close_vector('negative limiter preserves non-mass fluxes',    &
          flux(2:4), original(2:4), 0.0_wp)
 
