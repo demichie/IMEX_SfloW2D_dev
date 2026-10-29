@@ -2,16 +2,6 @@ name: D18.MX acceptance regressions
 
 on:
   workflow_dispatch:
-  push:
-    paths:
-      - 'src/physics/mass_exchange/**'
-      - 'src/numerics/step_source_executor_2d.f90'
-      - 'src/numerics/time_integration_2d.f90'
-      - 'src/core/parameters_2d.f90'
-      - 'TESTS/TEST_MASS_EXCHANGE/**'
-      - 'TESTS/TEST_IMEX_STAGES/**'
-      - 'TESTS/TEST_STATE_CONVERSION/**'
-      - '.github/workflows/d18-mx-acceptance.yml'
 
 permissions:
   contents: read

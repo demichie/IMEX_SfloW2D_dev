@@ -8,11 +8,6 @@ on:
         required: false
         type: boolean
         default: false
-  push:
-    tags:
-      - '**'
-  release:
-    types: [published]
 
 permissions:
   contents: read
