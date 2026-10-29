@@ -18,11 +18,10 @@ MODULE parameters_2d
   INTEGER, PARAMETER :: wp = dp
 
   TYPE mass_exchange_rates_type
-    REAL(wp) :: mixture_mass_rate=0.0_wp, liquid_mass_rate=0.0_wp
+    REAL(wp) :: mixture_mass_rate=0.0_wp
     REAL(wp) :: energy_rate=0.0_wp, dB_dt=0.0_wp
     REAL(wp) :: lava_deposit_rate=0.0_wp
-    REAL(wp) :: gas_withdrawal_volume_rate=0.0_wp
-    REAL(wp) :: liquid_withdrawal_volume_rate=0.0_wp
+    REAL(wp) :: carrier_withdrawal_volume_rate=0.0_wp
     REAL(wp) :: carrier_erosion_rate=0.0_wp
     REAL(wp) :: carrier_deposition_rate=0.0_wp
     REAL(wp), ALLOCATABLE :: solid_mass_rate(:), add_gas_mass_rate(:)
@@ -396,12 +395,10 @@ CONTAINS
     IF (.NOT.ALLOCATED(r%solid_erosion_rate)) ALLOCATE(r%solid_erosion_rate(n_solid))
     IF (.NOT.ALLOCATED(r%solid_deposition_rate)) ALLOCATE(r%solid_deposition_rate(n_solid))
     r%mixture_mass_rate=0.0_wp
-    r%liquid_mass_rate=0.0_wp
     r%energy_rate=0.0_wp
     r%dB_dt=0.0_wp
     r%lava_deposit_rate=0.0_wp
-    r%gas_withdrawal_volume_rate=0.0_wp
-    r%liquid_withdrawal_volume_rate=0.0_wp
+    r%carrier_withdrawal_volume_rate=0.0_wp
     r%carrier_erosion_rate=0.0_wp
     r%carrier_deposition_rate=0.0_wp
     r%solid_mass_rate=0.0_wp

@@ -30,10 +30,10 @@ CONTAINS
         IF (liquid_flag .AND. ALLOCATED(loss_rate)) THEN
             T=qp(4)
             CALL mixt_var(qp,Ri,rhom,rho_c,redgrav,cp_c,cpm)
-            r%liquid_withdrawal_volume_rate=MAX(0.0_wp,loss_rate)
+            r%carrier_withdrawal_volume_rate=MAX(0.0_wp,loss_rate)
 
             ! The liquid is the only carrier in this configuration.
-            r%mixture_mass_rate=-rho_c*r%liquid_withdrawal_volume_rate
+            r%mixture_mass_rate=-rho_c*r%carrier_withdrawal_volume_rate
             r%energy_rate=T*cp_c*r%mixture_mass_rate
         END IF
 

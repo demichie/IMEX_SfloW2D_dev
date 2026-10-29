@@ -87,11 +87,11 @@ CONTAINS
 
             IF (gas_flag) THEN
 
-                carrier_loss=MAX(0.0_wp,darcy_loss_rates%gas_withdrawal_volume_rate)
+                carrier_loss=MAX(0.0_wp,darcy_loss_rates%carrier_withdrawal_volume_rate)
 
             ELSE
 
-                carrier_loss=MAX(0.0_wp,liquid_loss_rates%liquid_withdrawal_volume_rate)
+                carrier_loss=MAX(0.0_wp,liquid_loss_rates%carrier_withdrawal_volume_rate)
             END IF
 
             ! The carrier occupies the volume not filled by dispersed solids.
@@ -218,7 +218,6 @@ CONTAINS
         IF (n_add_gas>0) eqns_term(idx_addGasEqn_first:idx_addGasEqn_last)= &
                   eqns_term(idx_addGasEqn_first:idx_addGasEqn_last)+p%add_gas_mass_rate
         total%mixture_mass_rate=total%mixture_mass_rate+p%mixture_mass_rate
-        total%liquid_mass_rate=total%liquid_mass_rate+p%liquid_mass_rate
         total%energy_rate=total%energy_rate+p%energy_rate
         total%solid_mass_rate=total%solid_mass_rate+p%solid_mass_rate
         total%add_gas_mass_rate=total%add_gas_mass_rate+p%add_gas_mass_rate
@@ -230,10 +229,8 @@ CONTAINS
                   total%carrier_deposition_rate+p%carrier_deposition_rate
         total%dB_dt=total%dB_dt+p%dB_dt
         total%lava_deposit_rate=total%lava_deposit_rate+p%lava_deposit_rate
-        total%gas_withdrawal_volume_rate= &
-                  total%gas_withdrawal_volume_rate+p%gas_withdrawal_volume_rate
-        total%liquid_withdrawal_volume_rate= &
-                  total%liquid_withdrawal_volume_rate+p%liquid_withdrawal_volume_rate
+        total%carrier_withdrawal_volume_rate= &
+                  total%carrier_withdrawal_volume_rate+p%carrier_withdrawal_volume_rate
     END SUBROUTINE accumulate_process
 
     !> @brief Apply a common resource-limiting factor to every contribution from one process.
@@ -244,7 +241,6 @@ CONTAINS
         REAL(wp), INTENT(IN) :: factor
 
         p%mixture_mass_rate=p%mixture_mass_rate*factor
-        p%liquid_mass_rate=p%liquid_mass_rate*factor
         p%energy_rate=p%energy_rate*factor
         p%solid_mass_rate=p%solid_mass_rate*factor
         p%add_gas_mass_rate=p%add_gas_mass_rate*factor
@@ -254,8 +250,7 @@ CONTAINS
         p%carrier_deposition_rate=p%carrier_deposition_rate*factor
         p%dB_dt=p%dB_dt*factor
         p%lava_deposit_rate=p%lava_deposit_rate*factor
-        p%gas_withdrawal_volume_rate=p%gas_withdrawal_volume_rate*factor
-        p%liquid_withdrawal_volume_rate=p%liquid_withdrawal_volume_rate*factor
+        p%carrier_withdrawal_volume_rate=p%carrier_withdrawal_volume_rate*factor
     END SUBROUTINE scale_process
 
 END MODULE mass_exchange_2d

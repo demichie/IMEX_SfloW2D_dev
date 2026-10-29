@@ -49,8 +49,8 @@ CONTAINS
         IF (gas_flag .AND. pore_pressure_flag .AND. gas_loss_flag .AND. &
                   alpha<maximum_solid_packing) &
                   CALL eval_pore_pressure_gas_loss(h,T,alphas,alpha,rho_c,pore,volume_loss)
-        r%gas_withdrawal_volume_rate=MAX(0.0_wp,volume_loss)
-        r%mixture_mass_rate=-rho_c*r%gas_withdrawal_volume_rate
+        r%carrier_withdrawal_volume_rate=MAX(0.0_wp,volume_loss)
+        r%mixture_mass_rate=-rho_c*r%carrier_withdrawal_volume_rate
         r%energy_rate=T*cp_c*r%mixture_mass_rate
         IF (n_add_gas>0 .AND. gas_phase_mass_fraction>0.0_wp) &
                   r%add_gas_mass_rate=r%mixture_mass_rate* &
