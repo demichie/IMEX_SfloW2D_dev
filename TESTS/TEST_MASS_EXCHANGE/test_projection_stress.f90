@@ -114,7 +114,7 @@ CONTAINS
     ALLOCATE(B_prime_x_geom(nx,ny),B_prime_y_geom(nx,ny))
     ALLOCATE(B_second_xx_geom(nx,ny),B_second_xy_geom(nx,ny),B_second_yy_geom(nx,ny))
     ALLOCATE(grav_coeff(nx,ny),grav_coeff_stag_x(nx+1,ny),grav_coeff_stag_y(nx,ny+1))
-    ALLOCATE(deposit(nx,ny,ns),erosion(nx,ny,ns),erodible(ns,nx,ny))
+    ALLOCATE(deposit(nx,ny,ns),erosion(nx,ny,ns),erodible(ns,nx,ny),lava_deposit(nx,ny))
     ALLOCATE(B_zone(nx,ny),cell_source_fractions(nx,ny))
     CALL domain%initialize
   END SUBROUTINE allocate_grid
@@ -125,7 +125,8 @@ CONTAINS
     LOGICAL, INTENT(IN) :: wet_dry
     INTEGER :: a,b,l
     REAL(wp) :: x,y,carrier_mass
-    deposit=0.0_wp; erosion=0.0_wp; erodible=0.0_wp; B_zone=0; cell_source_fractions=0.0_wp
+    deposit=0.0_wp; erosion=0.0_wp; erodible=0.0_wp; lava_deposit=0.0_wp
+    B_zone=0; cell_source_fractions=0.0_wp
     qp=0.0_wp; qp(4,:,:)=T_ambient
     l=0
     DO b=1,ny
@@ -362,6 +363,6 @@ CONTAINS
     CALL domain%finalize
     DEALLOCATE(q,qp,rate,nodes,weights,B_vertex,B_cent,B_face_x,B_face_y)
     DEALLOCATE(B_prime_x_geom,B_prime_y_geom,B_second_xx_geom,B_second_xy_geom,B_second_yy_geom)
-    DEALLOCATE(grav_coeff,grav_coeff_stag_x,grav_coeff_stag_y,deposit,erosion,erodible,B_zone,cell_source_fractions)
+    DEALLOCATE(grav_coeff,grav_coeff_stag_x,grav_coeff_stag_y,deposit,erosion,erodible,lava_deposit,B_zone,cell_source_fractions)
   END SUBROUTINE release_grid
 END PROGRAM test_projection_stress
