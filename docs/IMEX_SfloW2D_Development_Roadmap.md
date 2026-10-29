@@ -2605,6 +2605,12 @@ Questo audit confronta il codice `source_catalog_2d`, `source_configuration_2d`,
 
 Ogni passo deve costituire una modifica **sostanziale e coordinata** con i test pertinenti; non disperdere la migrazione in piccole modifiche senza chiusura dell'intero contratto. Non cambiare formule fisiche, tolleranze o oracoli per ottenere PASS.
 
+#### D18.MX — Indicizzazione simbolica dello stato (29 ottobre 2026)
+
+**Audit dei sorgenti di produzione:** gli accessi a spessore e temperatura delle primitive usano `idx_h` e `idx_T`, quelli ai momenti primitive `idx_hu`/`idx_hv`. I termini conservativi usano `idx_totMassEqn`, `idx_uEqn`, `idx_vEqn` e `idx_engyEqn`. Aggiornati coordinatore mass exchange, leggi fisiche, conversioni, injection, executor STEP, equazioni, operatori spaziali, I/O, stocastico e driver. Array locali compatti (per esempio `qp2j(1:3)`) e fixture numerici con dimensioni prestabilite **non** sono indici dello stato globale e non vanno convertiti meccanicamente.
+
+**Gate di non regressione:** `TESTS/ACCEPTANCE/test_state_index_contract.py` verifica i sorgenti Fortran per accessi numerici alle componenti fisiche nelle forme principali e viene eseguito dal workflow `d17-source-registry.yml`. Lo scan e le modifiche sono statici: compilation/run CI sui commit di indicizzazione **da confermare**; non interpretare come automaticamente verde il run N8 precedente.
+
 #### D18.MX — Consolidamento del carrier unico (29 ottobre 2026)
 
 **Stato dell'implementazione:** unico coordinatore `src/physics/mass_exchange/mass_exchange_2d.f90`; `mass_exchange_rates_type` condiviso; interfacce EXPLICIT/SEMI_IMPLICIT/IMPLICIT/ANALYTIC dei processi; budget condiviso di carrier e packing, con limite preventivo di erosione; nessuna equazione separata per il liquido disperso. I moduli `mass_exchange_laws_2d` e `mass_exchange_balance_2d` non fanno piu parte dell'architettura corrente. La configurazione valida seleziona esattamente uno tra gas, liquido e lava, senza compatibilita con le configurazioni precedenti.

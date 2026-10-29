@@ -29,6 +29,11 @@ jobs:
           mkdir -p "$D17_WORK_DIR"
           python3 TESTS/ACCEPTANCE/test_d17_physical_interfaces.py 2>&1 | tee "$D17_WORK_DIR/interface-audit.log"
 
+      - name: Check semantic state indexing
+        shell: bash
+        run: |
+          python3 TESTS/ACCEPTANCE/test_state_index_contract.py
+
       - name: Check post-RK state finalization and observer ordering
         shell: bash
         env:
