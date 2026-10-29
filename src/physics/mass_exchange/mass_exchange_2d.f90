@@ -2,7 +2,7 @@
 MODULE mass_exchange_2d
   USE parameters_2d
   USE constitutive_parameters_2d
-  USE state_conversion_2d, ONLY: primitive_to_volume_fractions, mixt_var
+  USE state_conversion_2d, ONLY: primitive_to_volume_fractions
   USE pore_pressure_laws_2d, ONLY: eval_pore_pressure_mass_exchange_source
   USE mass_exchange_erosion_2d, ONLY: eval_mass_exchange_erosion_explicit
   USE mass_exchange_deposition_2d, ONLY: eval_mass_exchange_deposition_explicit
@@ -23,11 +23,8 @@ CONTAINS
     TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates,darcy_loss_rates
     REAL(wp) :: alphas(n_solid),alphag(n_add_gas),alphal,alpha
     REAL(wp) :: u,v,h,T,pore,stoch
-    REAL(wp) :: Ri,rhom,rhoc,redgrav,cpc,cpm
-    REAL(wp) :: species(n_add_gas),gas_fraction
     REAL(wp) :: gas_available,liquid_available,gas_factor,liquid_factor
     REAL(wp) :: gas_withdrawals(2),liquid_withdrawals(2),carrier_volume
-    REAL(wp) :: liquid_volume_rate,gas_volume_rate
     LOGICAL :: solids_enabled
     CALL reset_mass_exchange_rates(total_rates)
     eqns_term=0.0_wp
@@ -46,14 +43,6 @@ CONTAINS
     stoch=0.0_wp
     IF (pore_pressure_flag) pore=qp(idx_pore)
     IF (stoch_transport_flag) stoch=qp(idx_stoch)
-    species=qp(idx_add_gas_first:idx_add_gas_last)
-    gas_fraction=0.0_wp
-    IF (gas_flag) THEN
-      gas_fraction=1.0_wp-SUM(qp(idx_solid_first:idx_solid_last))
-      IF (liquid_flag) gas_fraction=gas_fraction-qp(n_vars)
-      gas_fraction=MAX(0.0_wp,gas_fraction)
-    END IF
-    CALL mixt_var(qp,Ri,rhom,rhoc,redgrav,cpc,cpm)
     IF (solids_enabled) THEN
       CALL eval_mass_exchange_erosion_explicit(h,u,v,Bx,By,alpha,erodible, &
            dt,T,qp,process_rates)
@@ -62,24 +51,20 @@ CONTAINS
     ELSE
       CALL reset_mass_exchange_rates(deposition_rates)
     END IF
-    CALL eval_mass_exchange_carrier_liquid_loss_explicit(rhoc,T,cpc,liquid_loss_rates)
-    CALL eval_mass_exchange_carrier_darcy_loss_explicit(h,T,alphas,alpha,rhoc,pore,cpc, &
-         species,gas_fraction,darcy_loss_rates)
+    CALL eval_mass_exchange_carrier_liquid_loss_explicit(qp,liquid_loss_rates)
+    CALL eval_mass_exchange_carrier_darcy_loss_explicit(qp,darcy_loss_rates)
     ! Resource budgets use gross withdrawals, never signed net mass exchange.
     ! Gas and liquid are different inventories when both phases are present.
     ! The solid deposition rate is limited only when its required pore phase
     ! cannot be supplied; a later Darcy/liquid sink cannot consume it twice.
     carrier_volume=deposition_rates%continuous_phase_deposition_rate
-    gas_volume_rate=MAX(0.0_wp,-darcy_loss_rates%mixture_mass_rate/MAX(rhoc,TINY(1.0_wp)))
-    liquid_volume_rate=MAX(0.0_wp,-liquid_loss_rates%mixture_mass_rate/ &
-         MAX(MERGE(rho_l,rhoc,gas_flag),TINY(1.0_wp)))
     gas_factor=1.0_wp
     liquid_factor=1.0_wp
     IF (gas_flag) THEN
       ! Subtract dispersed solids and liquid from the available gas volume.
       gas_available=MIN(h*MAX(0.0_wp,1.0_wp-alpha-alphal)/dt, &
            h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt)
-      gas_withdrawals=[-carrier_volume,-gas_volume_rate]
+      gas_withdrawals=[-carrier_volume,-darcy_loss_rates%gas_withdrawal_volume_rate]
       gas_factor=shared_withdrawal_factor(gas_withdrawals,gas_available)
       CALL scale_process(deposition_rates,gas_factor)
       CALL scale_process(darcy_loss_rates,gas_factor)
@@ -87,7 +72,7 @@ CONTAINS
       ! In a liquid-only run, pore filling and prescribed loss share one pool.
       liquid_available=MIN(h*MAX(0.0_wp,1.0_wp-alpha)/dt, &
            h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt)
-      liquid_withdrawals=[-carrier_volume,-liquid_volume_rate]
+      liquid_withdrawals=[-carrier_volume,-liquid_loss_rates%liquid_withdrawal_volume_rate]
       liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
       CALL scale_process(deposition_rates,liquid_factor)
       CALL scale_process(liquid_loss_rates,liquid_factor)
@@ -95,7 +80,7 @@ CONTAINS
     IF (gas_flag .AND. liquid_flag) THEN
       ! Prescribed liquid loss consumes dispersed liquid, NOT carrier gas.
       liquid_available=h*MAX(0.0_wp,alphal)/dt
-      liquid_withdrawals=[-liquid_volume_rate,0.0_wp]
+      liquid_withdrawals=[-liquid_loss_rates%liquid_withdrawal_volume_rate,0.0_wp]
       liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
       CALL scale_process(liquid_loss_rates,liquid_factor)
     END IF
@@ -155,6 +140,10 @@ CONTAINS
          total%continuous_phase_deposition_rate+p%continuous_phase_deposition_rate
     total%dB_dt=total%dB_dt+p%dB_dt
     total%lava_deposit_rate=total%lava_deposit_rate+p%lava_deposit_rate
+    total%gas_withdrawal_volume_rate= &
+         total%gas_withdrawal_volume_rate+p%gas_withdrawal_volume_rate
+    total%liquid_withdrawal_volume_rate= &
+         total%liquid_withdrawal_volume_rate+p%liquid_withdrawal_volume_rate
   END SUBROUTINE accumulate_process
 
   SUBROUTINE scale_process(p,factor)
@@ -171,5 +160,7 @@ CONTAINS
     p%continuous_phase_deposition_rate=p%continuous_phase_deposition_rate*factor
     p%dB_dt=p%dB_dt*factor
     p%lava_deposit_rate=p%lava_deposit_rate*factor
+    p%gas_withdrawal_volume_rate=p%gas_withdrawal_volume_rate*factor
+    p%liquid_withdrawal_volume_rate=p%liquid_withdrawal_volume_rate*factor
   END SUBROUTINE scale_process
 END MODULE mass_exchange_2d
