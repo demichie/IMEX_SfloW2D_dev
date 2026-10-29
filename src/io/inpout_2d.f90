@@ -5365,7 +5365,7 @@ CONTAINS
           READ (restart_unit, '(2e20.12,100(e20.12))') xj, yk, &
             (state%q(i_vars, j, k), i_vars=1, n_vars)
 
-          IF (state%q(idx_totMassEqn, j, k) .LE. 0.0_wp) state%q(1:n_vars, j, k) = 0.0_wp
+          IF (state%q(1, j, k) .LE. 0.0_wp) state%q(1:n_vars, j, k) = 0.0_wp
 
           DO solid_idx = 5, 4 + n_solid
 

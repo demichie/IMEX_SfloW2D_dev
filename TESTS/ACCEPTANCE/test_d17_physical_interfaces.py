@@ -26,7 +26,7 @@ def procedure_body(code: str, name: str) -> str | None:
     if not header:
         return None
     end = re.search(
-        rf"(?im)^\s*end\s+(?:subroutine|function)\s+{escaped}\b",
+        rf"(?im)^\s*end\s+(?:subroutine|function)(?:\s+{escaped}\b)?\s*$",
         code[header.end():],
     )
     if not end:
