@@ -47,6 +47,8 @@ CONTAINS
         REAL(wp) :: u,v,h,T,pore,stoch
         REAL(wp) :: gas_available,liquid_available,gas_factor,liquid_factor
         REAL(wp) :: gas_withdrawals(2),liquid_withdrawals(2),carrier_volume
+        REAL(wp) :: solid_erosion,carrier_erosion,solid_deposition
+        REAL(wp) :: liquid_loss,gas_loss,packing_factor
 
         CALL reset_mass_exchange_rates(total_rates)
         eqns_term=0.0_wp
@@ -76,40 +78,55 @@ CONTAINS
             ! Gas and liquid are different inventories when both phases are present.
             ! The solid deposition rate is limited only when its required pore phase
             ! cannot be supplied; a later Darcy/liquid sink cannot consume it twice.
-            carrier_volume=deposition_rates%continuous_phase_deposition_rate
+            carrier_volume=MAX(0.0_wp,deposition_rates%continuous_phase_deposition_rate)
+            solid_deposition=SUM(MAX(0.0_wp,deposition_rates%solid_deposition_rate))
+            solid_erosion=SUM(MAX(0.0_wp,process_rates%solid_erosion_rate))
+            carrier_erosion=MAX(0.0_wp,process_rates%continuous_phase_erosion_rate)
+            gas_loss=MAX(0.0_wp,darcy_loss_rates%gas_withdrawal_volume_rate)
+            liquid_loss=MAX(0.0_wp,liquid_loss_rates%liquid_withdrawal_volume_rate)
             gas_factor=1.0_wp
             liquid_factor=1.0_wp
+
+            ! Limit the dispersed-liquid sink first in two-carrier flows. It
+            ! shares neither the gas inventory nor the deposition pore gas.
+            IF (gas_flag .AND. liquid_flag) THEN
+
+                liquid_available=h*MAX(0.0_wp,alphal)/dt
+                liquid_factor=shared_withdrawal_factor([-liquid_loss],liquid_available)
+                CALL scale_process(liquid_loss_rates,liquid_factor)
+                liquid_loss=liquid_loss*liquid_factor
+            END IF
 
             ! Gas withdrawal and pore filling draw on the same gas inventory;
             ! do not offset physical sinks with any positive source.
             IF (gas_flag) THEN
 
                 ! Subtract dispersed solids and liquid from the available gas volume.
-                gas_available=MIN(h*MAX(0.0_wp,1.0_wp-alpha-alphal)/dt, &
-                          h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt)
-                gas_withdrawals=[-carrier_volume,-darcy_loss_rates%gas_withdrawal_volume_rate]
+                gas_available=h*MAX(0.0_wp,1.0_wp-alpha-alphal)/dt
+                gas_withdrawals=[-carrier_volume,-gas_loss]
                 gas_factor=shared_withdrawal_factor(gas_withdrawals,gas_available)
+
+                ! Erosion increases the mobile solid and carrier volumes.
+                ! Solid deposition reduces both solid volume and total depth:
+                ! the packing constraint must use these coupled increments.
+                packing_factor=packing_withdrawal_factor(h,alpha,solid_erosion, &
+                          carrier_erosion,solid_deposition,carrier_volume, &
+                          gas_loss,liquid_loss,maximum_solid_packing,dt)
+                gas_factor=MIN(gas_factor,packing_factor)
                 CALL scale_process(deposition_rates,gas_factor)
                 CALL scale_process(darcy_loss_rates,gas_factor)
 
             ELSE
 
                 ! In a liquid-only run, pore filling and prescribed loss share one pool.
-                liquid_available=MIN(h*MAX(0.0_wp,1.0_wp-alpha)/dt, &
-                          h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt)
-                liquid_withdrawals=[-carrier_volume,-liquid_loss_rates%liquid_withdrawal_volume_rate]
+                liquid_available=h*MAX(0.0_wp,1.0_wp-alpha)/dt
+                liquid_withdrawals=[-carrier_volume,-liquid_loss]
                 liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
+                packing_factor=packing_withdrawal_factor(h,alpha,solid_erosion, &
+                          carrier_erosion,solid_deposition,carrier_volume, &
+                          liquid_loss,0.0_wp,maximum_solid_packing,dt)
+                liquid_factor=MIN(liquid_factor,packing_factor)
                 CALL scale_process(deposition_rates,liquid_factor)
-                CALL scale_process(liquid_loss_rates,liquid_factor)
-            END IF
-
-            ! In two-carrier runs, dispersed liquid has its own budget.
-            IF (gas_flag .AND. liquid_flag) THEN
-
-                ! Prescribed liquid loss consumes dispersed liquid, NOT carrier gas.
-                liquid_available=h*MAX(0.0_wp,alphal)/dt
-                liquid_withdrawals=[-liquid_loss_rates%liquid_withdrawal_volume_rate,0.0_wp]
-                liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
                 CALL scale_process(liquid_loss_rates,liquid_factor)
             END IF
 
@@ -153,6 +170,44 @@ CONTAINS
         IF (total_withdrawal>0.0_wp) &
                   f=MIN(1.0_wp,MAX(0.0_wp,available)/total_withdrawal)
     END FUNCTION shared_withdrawal_factor
+
+    !> @brief Limit a coupled deposition/carrier withdrawal by final solid packing.
+    !> @details Erosion is already committed. Deposition removes both mobile
+    !> solids and its associated pore carrier; other_loss is independently
+    !> limited and therefore included in the fixed depth budget.
+    !> @param[in] h Initial mobile thickness [m].
+    !> @param[in] alpha Initial total solid volume fraction.
+    !> @param[in] solid_erosion Solid-volume influx from erosion [m/s].
+    !> @param[in] carrier_erosion Carrier-volume influx from erosion [m/s].
+    !> @param[in] solid_deposition Solid-volume sink proposed for deposition [m/s].
+    !> @param[in] carrier_deposition Carrier-volume sink proposed by deposition [m/s].
+    !> @param[in] shared_loss Additional carrier sink sharing the deposition factor [m/s].
+    !> @param[in] other_loss Separately limited carrier sink [m/s].
+    !> @param[in] packing Maximum admissible solid volume fraction.
+    !> @param[in] dt Physical exchange step duration [s].
+    !> @return Maximum permitted common scaling factor in [0,1].
+    PURE REAL(wp) FUNCTION packing_withdrawal_factor(h,alpha,solid_erosion, &
+              carrier_erosion,solid_deposition,carrier_deposition,shared_loss, &
+              other_loss,packing,dt) RESULT(f)
+        REAL(wp), INTENT(IN) :: h,alpha,solid_erosion,carrier_erosion
+        REAL(wp), INTENT(IN) :: solid_deposition,carrier_deposition,shared_loss
+        REAL(wp), INTENT(IN) :: other_loss,packing,dt
+        REAL(wp) :: margin,coefficient
+
+        ! Enforce S_final <= packing * H_final without assuming that
+        ! deposition leaves the solid volume unchanged.
+        margin=packing*(h+dt*(solid_erosion+carrier_erosion-other_loss)) &
+                  -(h*alpha+dt*solid_erosion)
+        coefficient=packing*(solid_deposition+carrier_deposition+shared_loss) &
+                  -solid_deposition
+        f=1.0_wp
+
+        IF (coefficient>0.0_wp) THEN
+
+            f=MIN(1.0_wp,MAX(0.0_wp,margin)/(dt*coefficient))
+        END IF
+
+    END FUNCTION packing_withdrawal_factor
 
     !> @brief Add one process contribution to conserved equations and diagnostic rate totals.
     !> @details Sink momentum is advected with the local horizontal velocity.
