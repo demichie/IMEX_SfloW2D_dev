@@ -1,0 +1,149 @@
+name: Physics regressions (D17/D18)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  source-registry:
+    name: Source registry (strict and optimized)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout current revision
+        uses: actions/checkout@v4
+
+      - name: Install GNU Fortran
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran
+
+      - name: Check four concrete physics interfaces per configured source
+        shell: bash
+        env:
+          D17_WORK_DIR: ${{ runner.temp }}/d17-registry-tests
+        run: |
+          set -o pipefail
+          mkdir -p "$D17_WORK_DIR"
+          python3 TESTS/ACCEPTANCE/test_d17_physical_interfaces.py 2>&1 | tee "$D17_WORK_DIR/interface-audit.log"
+
+      - name: Check semantic state indexing
+        shell: bash
+        run: |
+          python3 TESTS/ACCEPTANCE/test_state_index_contract.py
+          python3 tools/d17/check_canonical_indices.py
+
+      - name: Check post-RK state finalization and observer ordering
+        shell: bash
+        env:
+          D17_WORK_DIR: ${{ runner.temp }}/d17-registry-tests
+        run: |
+          set -o pipefail
+          mkdir -p "$D17_WORK_DIR"
+          python3 TESTS/ACCEPTANCE/test_d17_state_finalization.py 2>&1 | tee "$D17_WORK_DIR/state-finalization.log"
+
+      - name: Run existing D17 registry regression
+        shell: bash
+        env:
+          D17_WORK_DIR: ${{ runner.temp }}/d17-registry-tests
+        run: |
+          set -o pipefail
+          mkdir -p "$D17_WORK_DIR"
+          sh TESTS/TEST_SOURCE_REGISTRY/run_test.sh 2>&1 | tee "$D17_WORK_DIR/test-run.log"
+
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d17-registry-logs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/d17-registry-tests/
+          if-no-files-found: warn
+          retention-days: 30
+
+  historical-regression:
+    name: ${{ matrix.suite }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        suite:
+          - TEST_IMEX_STAGES
+          - TEST_SPATIAL_OPERATOR
+          - TEST_MASS_EXCHANGE
+          - TEST_CURVATURE_SOURCE
+          - TEST_RHEOLOGY_FROUDE
+          - TEST_RHEOLOGY_CELL_LOCAL
+          - TEST_STATE_CONVERSION
+          - TEST_STATE_INITIALIZATION
+          - TEST_STOCHASTIC_EVOLUTION
+          - TEST_WORKSPACE_LIFECYCLE
+    steps:
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+      - name: Install test toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran libnetcdff-dev libnetcdf-dev liblapack-dev libblas-dev pkg-config python3-numpy
+      - name: Run existing suite (all profiles)
+        shell: bash
+        env:
+          PYTHON: /usr/bin/python3
+          OMP_DYNAMIC: 'FALSE'
+        run: |
+          set -o pipefail
+          mkdir -p evidence
+          printf 'commit=%s\nsuite=%s\n' "$GITHUB_SHA" "${{ matrix.suite }}" | tee evidence/context.txt
+          sh "TESTS/${{ matrix.suite }}/run_test.sh" 2>&1 | tee evidence/test-run.log
+      - name: Upload suite evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d17-historical-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: evidence/
+          if-no-files-found: warn
+          retention-days: 30
+
+  example-static-contract:
+    name: ${{ matrix.example }}
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        example:
+          - EXAMPLE_2D
+          - EXAMPLE_2D_PP
+          - EXAMPLE_BOX
+          - EXAMPLE_BUMP/SUBCRITICAL
+          - EXAMPLE_BUMP/SUPERCRITICAL
+          - EXAMPLE_BUMP/TRANSCRITICAL_WITHOUT_SHOCK
+          - EXAMPLE_BUMP/TRANSCRITICAL_WITH_SHOCK
+          - EXAMPLE_BW
+          - EXAMPLE_BW2D
+          - EXAMPLE_CF
+          - EXAMPLE_DAMBREAK
+          - EXAMPLE_ENGWELL2016
+          - EXAMPLE_ETNA
+          - EXAMPLE_ETNA_LAVA
+          - EXAMPLE_INCLINED_EXCAVATION_2D
+          - EXAMPLE_LATERAL_SOURCE
+          - EXAMPLE_SLOPE
+          - EXAMPLE_TAAL
+          - EXAMPLE_TAAL_BOTTOM
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect example input and generator contracts
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p evidence
+          python3 tools/d17/audit_example_inputs.py --case "${{ matrix.example }}" --output evidence/result.json > evidence/audit.log 2>&1
+      - name: Preserve evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: d17-example-${{ strategy.job-index }}-${{ github.run_id }}
+          path: evidence/
+          if-no-files-found: warn
