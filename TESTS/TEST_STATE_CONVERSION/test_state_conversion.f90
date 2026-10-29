@@ -243,7 +243,7 @@ CONTAINS
 
     REAL(wp) :: alphas_qp(n_solid), alphag_qp(n_add_gas)
     REAL(wp) :: alphas_mass(n_solid), alphag_mass(n_add_gas)
-    REAL(wp) :: xs(n_solid), xg(n_add_gas), xl, xc
+    REAL(wp) :: xs(n_solid), xg(n_add_gas), xc
     REAL(wp) :: rho_mass, inv_rho_mass, rho_c_mass
     REAL(wp) :: rho_mix, rho_c_mix, red_grav, Ri
     REAL(wp) :: cp_c_mass, cp_mix_mass, cp_c_mix, cp_mix
@@ -253,7 +253,6 @@ CONTAINS
 
     xs = q(idx_solid_first:idx_solid_last)/q(1)
     xg = q(idx_add_gas_first:idx_add_gas_last)/q(1)
-    xl = 0.0_wp
     CALL eval_mixture_properties_from_mass_fractions(                          &
          ! IN
          qp(4), xs, xg,                                                    &
@@ -365,7 +364,7 @@ CONTAINS
     REAL(wp), ALLOCATABLE :: qp_cold(:), qp_hot(:), q(:), qp_roundtrip(:)
     REAL(wp) :: alphas_cold(n_solid), alphas_hot(n_solid)
     REAL(wp) :: alphag_cold(n_add_gas), alphag_hot(n_add_gas)
-    REAL(wp) :: alphal_cold, p_dyn
+    REAL(wp) :: p_dyn
 
     CALL configure_layout(.TRUE.)
     ALLOCATE (qp_cold(n_vars+2), qp_hot(n_vars+2), q(n_vars),                  &
@@ -376,10 +375,8 @@ CONTAINS
     qp_cold(4) = 300.0_wp
     qp_hot(4) = 600.0_wp
 
-    CALL primitive_to_volume_fractions(qp_cold, alphas_cold, alphag_cold,     &
-         )
-    CALL primitive_to_volume_fractions(qp_hot, alphas_hot, alphag_hot,        &
-         )
+    CALL primitive_to_volume_fractions(qp_cold, alphas_cold, alphag_cold)
+    CALL primitive_to_volume_fractions(qp_hot, alphas_hot, alphag_hot)
 
     CALL assert_true('volume fractions depend on temperature',               &
          MAXVAL(ABS(alphas_hot-alphas_cold)) .GT. 1.0E-8_wp)
