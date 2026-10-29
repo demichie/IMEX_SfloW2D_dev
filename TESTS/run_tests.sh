@@ -82,7 +82,22 @@ run_case() {
             run_started_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
             run_started_epoch=$(date +%s)
         fi
-        if [ -n "${IMEX_TEST_CASE_TIMEOUT:-}" ]; then
+        if [ "${IMEX_DEBUG_TEST_CF:-0}" = 1 ] && [ "$(basename "$case_dir")" = TEST_CF ]; then
+            # Run the failing fixture under GDB, not post-mortem: GitHub
+            # runners may pipe core dumps away from the working directory.
+            if gdb -q -batch -return-child-result \
+                -ex 'set pagination off' \
+                -ex 'run' \
+                -ex 'thread apply all bt full 20' \
+                --args "$executable" > "$solver_log" 2>&1; then
+                :
+            else
+                solver_status=$?
+            fi
+            if grep -q 'Program received signal' "$solver_log"; then
+                solver_status=139
+            fi
+        elif [ -n "${IMEX_TEST_CASE_TIMEOUT:-}" ]; then
             if timeout --signal=TERM --kill-after=30s \
                 "$IMEX_TEST_CASE_TIMEOUT" "$executable" > "$solver_log" 2>&1; then
                 :
