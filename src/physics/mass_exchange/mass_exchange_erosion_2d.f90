@@ -1,10 +1,10 @@
 !> Erosion process: limit solid and carrier entrainment by available bed inventory.
 MODULE mass_exchange_erosion_2d
-  USE parameters_2d, ONLY : wp, n_solid, n_vars, alphastot_min, slope_correction_flag, &
+  USE parameters_2d, ONLY : wp, n_solid, n_vars, slope_correction_flag, &
        erodible_deposit_flag, mass_exchange_rates_type, reset_mass_exchange_rates
   USE diagnostics_2d, ONLY : fatal_error
   USE state_conversion_2d, ONLY : mixt_var
-  USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity, erodible_fract
+  USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity, erodible_fract, alphastot_min
 
   USE constitutive_parameters_2d, ONLY: rho_s, rho_c_sub, sp_heat_s, T_erodible
   IMPLICIT NONE
