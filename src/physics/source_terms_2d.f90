@@ -19,7 +19,7 @@ MODULE source_terms_2d
        eval_pore_pressure_dissipation_implicit, &
        eval_pore_pressure_dissipation_explicit, solve_pore_pressure_dissipation_analytic
   USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
-  USE mass_exchange_laws_2d, ONLY : eval_mass_exchange_terms
+  USE mass_exchange_2d, ONLY : eval_mass_exchange_terms
   USE rheology_2d, ONLY : curvature_acceleration, solve_rheology_analytic, &
        eval_rheology_implicit, eval_rheology_semi_implicit, &
        eval_rheology_explicit
