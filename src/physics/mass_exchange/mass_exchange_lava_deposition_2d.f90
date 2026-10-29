@@ -8,7 +8,7 @@ MODULE mass_exchange_lava_deposition_2d
   USE constitutive_parameters_2d, ONLY: rho_l, sp_heat_l
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: eval_mass_exchange_lava_deposition_rates_explicit
+  PUBLIC :: eval_mass_exchange_lava_deposition_explicit
   LOGICAL, PUBLIC :: lava_deposition_flag=.FALSE.
   CHARACTER(LEN=16), PUBLIC :: lava_deposition_model='CONSTANT'
   REAL(wp), PUBLIC :: lava_deposition_rate=0.0_wp
@@ -46,7 +46,7 @@ CONTAINS
   !> \param[in] temperature Mobile lava temperature [K].
   !> \param[in] dt Physical step duration [s].
   !> \param[out] rate Immobile lava thickness gained per unit time [m/s].
-  SUBROUTINE eval_mass_exchange_lava_deposition_explicit(depth,temperature,dt,rate)
+  SUBROUTINE eval_lava_deposition_volume_kernel(depth,temperature,dt,rate)
     REAL(wp), INTENT(IN) :: depth,temperature,dt
     REAL(wp), INTENT(OUT) :: rate
     rate=0.0_wp
@@ -54,27 +54,36 @@ CONTAINS
     IF (dt<=0.0_wp) CALL fatal_error('lava deposition requires positive dt')
     rate=MIN(depth/dt,eval_lava_deposition_rate(temperature, &
          lava_kinematic_viscosity(temperature)))
-  END SUBROUTINE eval_mass_exchange_lava_deposition_explicit
+  END SUBROUTINE eval_lava_deposition_volume_kernel
 
   !> \brief Unsupported semi-implicit lava deposition.
-  SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit()
-    CALL fatal_error('unsupported semi_implicit lava deposition')
-  END SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit
-
-  !> \brief Unsupported implicit lava deposition.
-  SUBROUTINE eval_mass_exchange_lava_deposition_implicit()
-    CALL fatal_error('unsupported implicit lava deposition')
-  END SUBROUTINE eval_mass_exchange_lava_deposition_implicit
-
-  !> \brief Unsupported analytic lava deposition.
-  SUBROUTINE solve_mass_exchange_lava_deposition_analytic()
-    CALL fatal_error('unsupported analytic lava deposition')
-  END SUBROUTINE solve_mass_exchange_lava_deposition_analytic
-  SUBROUTINE eval_mass_exchange_lava_deposition_rates_explicit(depth,T,dt,r)
+  SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit(depth,T,dt,r)
     REAL(wp), INTENT(IN) :: depth,T,dt
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
-    CALL eval_mass_exchange_lava_deposition_explicit(depth,T,dt, &
+    CALL fatal_error('lava_deposition: unsupported physical treatment')
+  END SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit
+
+  !> \brief Unsupported implicit lava deposition.
+  SUBROUTINE eval_mass_exchange_lava_deposition_implicit(depth,T,dt,r)
+    REAL(wp), INTENT(IN) :: depth,T,dt
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('lava_deposition: unsupported physical treatment')
+  END SUBROUTINE eval_mass_exchange_lava_deposition_implicit
+
+  !> \brief Unsupported analytic lava deposition.
+  SUBROUTINE solve_mass_exchange_lava_deposition_analytic(depth,T,dt,r)
+    REAL(wp), INTENT(IN) :: depth,T,dt
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('lava_deposition: unsupported physical treatment')
+  END SUBROUTINE solve_mass_exchange_lava_deposition_analytic
+  SUBROUTINE eval_mass_exchange_lava_deposition_explicit(depth,T,dt,r)
+    REAL(wp), INTENT(IN) :: depth,T,dt
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL eval_lava_deposition_volume_kernel(depth,T,dt, &
          r%continuous_phase_deposition_rate)
     r%mixture_mass_rate=-rho_l*r%continuous_phase_deposition_rate
     r%energy_rate=sp_heat_l*T*r%mixture_mass_rate

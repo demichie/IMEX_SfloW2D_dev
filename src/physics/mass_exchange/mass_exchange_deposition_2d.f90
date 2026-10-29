@@ -11,7 +11,6 @@ MODULE mass_exchange_deposition_2d
   USE constitutive_parameters_2d, ONLY: rho_s, sp_heat_s, coeff_porosity
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: eval_mass_exchange_deposition_rates_explicit
   PUBLIC :: eval_mass_exchange_deposition_explicit
   PUBLIC :: eval_mass_exchange_deposition_semi_implicit
   PUBLIC :: eval_mass_exchange_deposition_implicit
@@ -24,7 +23,7 @@ MODULE mass_exchange_deposition_2d
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
 CONTAINS
 
-  SUBROUTINE eval_mass_exchange_deposition_explicit(r_h, r_T, r_alphas, alphas_tot, &
+  SUBROUTINE eval_deposition_volume_kernel(r_h, r_T, r_alphas, alphas_tot, &
        r_rho_m, r_rho_c, dt, deposition_term)
     REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
     REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
@@ -70,27 +69,27 @@ CONTAINS
        END IF
 
     END DO
-  END SUBROUTINE eval_mass_exchange_deposition_explicit
+  END SUBROUTINE eval_deposition_volume_kernel
 
-  SUBROUTINE eval_mass_exchange_deposition_semi_implicit(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
-    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
-    REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
-    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
-    CALL fatal_error('deposition: semi_implicit treatment is unsupported')
+  SUBROUTINE eval_mass_exchange_deposition_semi_implicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,r)
+    REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('deposition: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_deposition_semi_implicit
 
-  SUBROUTINE eval_mass_exchange_deposition_implicit(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
-    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
-    REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
-    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
-    CALL fatal_error('deposition: implicit treatment is unsupported')
+  SUBROUTINE eval_mass_exchange_deposition_implicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,r)
+    REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('deposition: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_deposition_implicit
 
-  SUBROUTINE solve_mass_exchange_deposition_analytic(r_h, r_T, r_alphas, alphas_tot, r_rho_m, r_rho_c, dt, deposition_term)
-    REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
-    REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
-    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
-    CALL fatal_error('deposition: analytic treatment is unsupported')
+  SUBROUTINE solve_mass_exchange_deposition_analytic(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,r)
+    REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('deposition: unsupported physical treatment')
   END SUBROUTINE solve_mass_exchange_deposition_analytic
 
   REAL(wp) FUNCTION settling_velocity(diam, rhos, rhoc, inv_kin_visc)
@@ -222,11 +221,11 @@ CONTAINS
 
 
 
-  SUBROUTINE eval_mass_exchange_deposition_rates_explicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,r)
+  SUBROUTINE eval_mass_exchange_deposition_explicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,r)
     REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
-    CALL eval_mass_exchange_deposition_explicit(h,T,alphas,alpha,rho_m,rho_c, &
+    CALL eval_deposition_volume_kernel(h,T,alphas,alpha,rho_m,rho_c, &
          dt,r%solid_deposition_rate)
     r%continuous_phase_deposition_rate=coeff_porosity*SUM(r%solid_deposition_rate)
     r%solid_mass_rate=-rho_s*r%solid_deposition_rate

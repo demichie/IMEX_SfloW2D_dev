@@ -8,7 +8,6 @@ MODULE mass_exchange_erosion_2d
   USE constitutive_parameters_2d, ONLY: rho_s, rho_c_sub, sp_heat_s, erodible_porosity
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: eval_mass_exchange_erosion_rates_explicit
   PUBLIC :: eval_mass_exchange_erosion_explicit
   PUBLIC :: eval_mass_exchange_erosion_semi_implicit
   PUBLIC :: eval_mass_exchange_erosion_implicit
@@ -17,7 +16,7 @@ MODULE mass_exchange_erosion_2d
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
 CONTAINS
 
-  SUBROUTINE eval_mass_exchange_erosion_explicit(r_h, mod_vel, alphas_tot, erodible, dt, &
+  SUBROUTINE eval_erosion_volume_kernel(r_h, mod_vel, alphas_tot, erodible, dt, &
        erosion_term, continuous_phase_erosion_term)
     REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
     REAL(wp), INTENT(OUT) :: erosion_term(n_solid), continuous_phase_erosion_term
@@ -30,27 +29,27 @@ CONTAINS
        erosion_term = 0.0_wp
        continuous_phase_erosion_term = 0.0_wp
     END IF
-  END SUBROUTINE eval_mass_exchange_erosion_explicit
+  END SUBROUTINE eval_erosion_volume_kernel
 
-  SUBROUTINE eval_mass_exchange_erosion_semi_implicit(r_h, mod_vel, alphas_tot, erodible, dt, &
-       erosion_term, continuous_phase_erosion_term)
-    REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
-    REAL(wp), INTENT(OUT) :: erosion_term(n_solid), continuous_phase_erosion_term
-    CALL fatal_error('erosion: semi_implicit treatment is unsupported')
+  SUBROUTINE eval_mass_exchange_erosion_semi_implicit(h,speed,alpha,erodible,dt,T_sub,cp_sub,r)
+    REAL(wp), INTENT(IN) :: h,speed,alpha,erodible(n_solid),dt,T_sub,cp_sub
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('erosion: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_erosion_semi_implicit
 
-  SUBROUTINE eval_mass_exchange_erosion_implicit(r_h, mod_vel, alphas_tot, erodible, dt, &
-       erosion_term, continuous_phase_erosion_term)
-    REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
-    REAL(wp), INTENT(OUT) :: erosion_term(n_solid), continuous_phase_erosion_term
-    CALL fatal_error('erosion: implicit treatment is unsupported')
+  SUBROUTINE eval_mass_exchange_erosion_implicit(h,speed,alpha,erodible,dt,T_sub,cp_sub,r)
+    REAL(wp), INTENT(IN) :: h,speed,alpha,erodible(n_solid),dt,T_sub,cp_sub
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('erosion: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_erosion_implicit
 
-  SUBROUTINE solve_mass_exchange_erosion_analytic(r_h, mod_vel, alphas_tot, erodible, dt, &
-       erosion_term, continuous_phase_erosion_term)
-    REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
-    REAL(wp), INTENT(OUT) :: erosion_term(n_solid), continuous_phase_erosion_term
-    CALL fatal_error('erosion: analytic treatment is unsupported')
+  SUBROUTINE solve_mass_exchange_erosion_analytic(h,speed,alpha,erodible,dt,T_sub,cp_sub,r)
+    REAL(wp), INTENT(IN) :: h,speed,alpha,erodible(n_solid),dt,T_sub,cp_sub
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('erosion: unsupported physical treatment')
   END SUBROUTINE solve_mass_exchange_erosion_analytic
 
   PURE SUBROUTINE eval_erosion_rates(flow_depth, speed, total_solid_fraction, &
@@ -86,11 +85,11 @@ CONTAINS
 
 
 
-  SUBROUTINE eval_mass_exchange_erosion_rates_explicit(h,speed,alpha,erodible,dt,T_sub,cp_sub,r)
+  SUBROUTINE eval_mass_exchange_erosion_explicit(h,speed,alpha,erodible,dt,T_sub,cp_sub,r)
     REAL(wp), INTENT(IN) :: h,speed,alpha,erodible(n_solid),dt,T_sub,cp_sub
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
-    CALL eval_mass_exchange_erosion_explicit(h,speed,alpha,erodible,dt, &
+    CALL eval_erosion_volume_kernel(h,speed,alpha,erodible,dt, &
          r%solid_erosion_rate,r%continuous_phase_erosion_rate)
     r%solid_mass_rate=rho_s*r%solid_erosion_rate
     r%mixture_mass_rate=SUM(r%solid_mass_rate)+rho_c_sub*r%continuous_phase_erosion_rate

@@ -8,7 +8,6 @@ MODULE mass_exchange_vaporization_2d
 
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: eval_mass_exchange_vaporization_process_explicit
   PUBLIC :: eval_mass_exchange_vaporization_explicit
   PUBLIC :: eval_mass_exchange_vaporization_rates_explicit
   PUBLIC :: eval_mass_exchange_vaporization_semi_implicit
@@ -36,44 +35,34 @@ CONTAINS
   END SUBROUTINE eval_mass_exchange_vaporization_rates_explicit
 
   !> Compatibility entry point until all process interfaces use physical rates.
-  SUBROUTINE eval_mass_exchange_vaporization_explicit(B_zone, r_T, deposition_term, eqns_term)
+  SUBROUTINE eval_mass_exchange_vaporization_semi_implicit(B_zone,T,deposition,r)
     INTEGER, INTENT(IN) :: B_zone
-    REAL(wp), INTENT(IN) :: r_T, deposition_term(n_solid)
-    REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns)
-    REAL(wp) :: mixture_mass_rate, add_gas_mass_rate, energy_rate
-    CALL eval_mass_exchange_vaporization_rates_explicit(B_zone, r_T, deposition_term, &
-         mixture_mass_rate, add_gas_mass_rate, energy_rate)
-    eqns_term(1) = eqns_term(1) + mixture_mass_rate
-    eqns_term(4) = eqns_term(4) + energy_rate
-    IF (gas_flag .AND. liquid_vaporization_flag .AND. B_zone /= 0) &
-         eqns_term(5+n_solid) = eqns_term(5+n_solid) + add_gas_mass_rate
-  END SUBROUTINE eval_mass_exchange_vaporization_explicit
-
-  SUBROUTINE eval_mass_exchange_vaporization_semi_implicit(B_zone, r_T, deposition_term, eqns_term)
-    INTEGER, INTENT(IN) :: B_zone
-    REAL(wp), INTENT(IN) :: r_T, deposition_term(n_solid)
-    REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns)
-    CALL fatal_error('vaporization: semi_implicit treatment is unsupported')
+    REAL(wp), INTENT(IN) :: T,deposition(n_solid)
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('vaporization: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_vaporization_semi_implicit
 
-  SUBROUTINE eval_mass_exchange_vaporization_implicit(B_zone, r_T, deposition_term, eqns_term)
+  SUBROUTINE eval_mass_exchange_vaporization_implicit(B_zone,T,deposition,r)
     INTEGER, INTENT(IN) :: B_zone
-    REAL(wp), INTENT(IN) :: r_T, deposition_term(n_solid)
-    REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns)
-    CALL fatal_error('vaporization: implicit treatment is unsupported')
+    REAL(wp), INTENT(IN) :: T,deposition(n_solid)
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('vaporization: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_vaporization_implicit
 
-  SUBROUTINE solve_mass_exchange_vaporization_analytic(B_zone, r_T, deposition_term, eqns_term)
+  SUBROUTINE solve_mass_exchange_vaporization_analytic(B_zone,T,deposition,r)
     INTEGER, INTENT(IN) :: B_zone
-    REAL(wp), INTENT(IN) :: r_T, deposition_term(n_solid)
-    REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns)
-    CALL fatal_error('vaporization: analytic treatment is unsupported')
+    REAL(wp), INTENT(IN) :: T,deposition(n_solid)
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('vaporization: unsupported physical treatment')
   END SUBROUTINE solve_mass_exchange_vaporization_analytic
 
 
 
 
-  SUBROUTINE eval_mass_exchange_vaporization_process_explicit(B_zone,T,deposition,r)
+  SUBROUTINE eval_mass_exchange_vaporization_explicit(B_zone,T,deposition,r)
     INTEGER, INTENT(IN) :: B_zone
     REAL(wp), INTENT(IN) :: T,deposition(n_solid)
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r

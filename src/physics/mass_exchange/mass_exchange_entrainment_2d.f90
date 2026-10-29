@@ -17,37 +17,40 @@ MODULE mass_exchange_entrainment_2d
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
 CONTAINS
 
-  REAL(wp) FUNCTION eval_mass_exchange_entrainment_explicit(r_h, r_Ri, mod_vel2)
+  REAL(wp) FUNCTION eval_entrainment_volume_kernel(r_h, r_Ri, mod_vel2)
     REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
     IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                      &
          ( r_Ri .GT. 0.0_wp ) ) THEN
 
-       eval_mass_exchange_entrainment_explicit = eval_air_entrainment_rate(r_Ri, mod_vel2)
+       eval_entrainment_volume_kernel = eval_air_entrainment_rate(r_Ri, mod_vel2)
 
     ELSE
 
-       eval_mass_exchange_entrainment_explicit = 0.0_wp
+       eval_entrainment_volume_kernel = 0.0_wp
 
     END IF
-  END FUNCTION eval_mass_exchange_entrainment_explicit
+  END FUNCTION eval_entrainment_volume_kernel
 
-  REAL(wp) FUNCTION eval_mass_exchange_entrainment_semi_implicit(r_h, r_Ri, mod_vel2)
-    REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
-    CALL fatal_error('entrainment: semi_implicit treatment is unsupported')
-    eval_mass_exchange_entrainment_semi_implicit = 0.0_wp
-  END FUNCTION eval_mass_exchange_entrainment_semi_implicit
+  SUBROUTINE eval_mass_exchange_entrainment_semi_implicit(h,Ri,speed_squared,r)
+    REAL(wp), INTENT(IN) :: h,Ri,speed_squared
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('entrainment: unsupported physical treatment')
+  END SUBROUTINE eval_mass_exchange_entrainment_semi_implicit
 
-  REAL(wp) FUNCTION eval_mass_exchange_entrainment_implicit(r_h, r_Ri, mod_vel2)
-    REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
-    CALL fatal_error('entrainment: implicit treatment is unsupported')
-    eval_mass_exchange_entrainment_implicit = 0.0_wp
-  END FUNCTION eval_mass_exchange_entrainment_implicit
+  SUBROUTINE eval_mass_exchange_entrainment_implicit(h,Ri,speed_squared,r)
+    REAL(wp), INTENT(IN) :: h,Ri,speed_squared
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('entrainment: unsupported physical treatment')
+  END SUBROUTINE eval_mass_exchange_entrainment_implicit
 
-  REAL(wp) FUNCTION solve_mass_exchange_entrainment_analytic(r_h, r_Ri, mod_vel2)
-    REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
-    CALL fatal_error('entrainment: analytic treatment is unsupported')
-    solve_mass_exchange_entrainment_analytic = 0.0_wp
-  END FUNCTION solve_mass_exchange_entrainment_analytic
+  SUBROUTINE solve_mass_exchange_entrainment_analytic(h,Ri,speed_squared,r)
+    REAL(wp), INTENT(IN) :: h,Ri,speed_squared
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL fatal_error('entrainment: unsupported physical treatment')
+  END SUBROUTINE solve_mass_exchange_entrainment_analytic
 
   PURE FUNCTION eval_air_entrainment_rate(richardson_number, speed_squared)  &
        RESULT(entrainment_rate)
@@ -63,11 +66,11 @@ CONTAINS
 
 
 
-  SUBROUTINE eval_mass_exchange_entrainment_rates_explicit(h,Ri,speed_squared,r)
+  SUBROUTINE eval_mass_exchange_entrainment_explicit(h,Ri,speed_squared,r)
     REAL(wp), INTENT(IN) :: h,Ri,speed_squared
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
-    r%mixture_mass_rate=rho_a_amb*eval_mass_exchange_entrainment_explicit(h,Ri,speed_squared)
+    r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(h,Ri,speed_squared)
     r%energy_rate=T_ambient*sp_heat_a*r%mixture_mass_rate
   END SUBROUTINE
 END MODULE mass_exchange_entrainment_2d
