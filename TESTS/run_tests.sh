@@ -105,6 +105,14 @@ run_case() {
         if [ "$solver_status" -ne 0 ]; then
             echo "FAIL: solver exited unsuccessfully in $case_dir" >&2
             cat "$solver_log" >&2
+            # Preserve the first-failure stack in CI without rerunning a costly
+            # simulation or changing the numerical configuration.
+            core_file=$(find . -maxdepth 1 -type f -name 'core*' -print -quit)
+            if [ -n "$core_file" ] && command -v gdb >/dev/null 2>&1; then
+                echo "DEBUG: native crash backtrace for $(basename "$case_dir")" >&2
+                gdb -batch -q -ex 'set pagination off' \
+                    -ex 'thread apply all bt 18' "$executable" "$core_file" >&2 || true
+            fi
             exit "$solver_status"
         fi
         set -- "$case_dir/OUTPUT/$run_name"/snapshots/*/"$run_name"_*.q_2d

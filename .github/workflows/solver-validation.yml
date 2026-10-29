@@ -20,7 +20,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install --yes \
             autoconf automake gfortran make \
-            liblapack-dev libnetcdff-dev python3-numpy unzip
+            liblapack-dev libnetcdff-dev python3-numpy unzip gdb
 
       - name: Generate build system
         run: autoreconf -fi
@@ -39,7 +39,9 @@ jobs:
         run: make -j2
 
       - name: Run integration tests
-        run: make check
+        run: |
+          ulimit -c unlimited
+          make check
 
       - name: Verify binary restart and runout diagnostics
         env:
