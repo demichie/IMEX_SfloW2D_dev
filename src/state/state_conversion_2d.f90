@@ -403,7 +403,6 @@ CONTAINS
   !> \param[out] rho_c Density of the carrier mixture [kg m^-3].
   !> \param[out] xs Solid mass fractions, one entry per solid class.
   !> \param[out] xg Additional-gas mass fractions, excluding ambient air.
-  !>                both present.
   !> \param[out] xc Total carrier mass fraction, including any additional gas components.
   !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity [J kg^-1 K^-1].
   !> \param[out] sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].

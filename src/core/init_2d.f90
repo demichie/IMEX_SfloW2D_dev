@@ -150,7 +150,6 @@ CONTAINS
       qp_init(n_vars+1:n_vars+2) = 0.0_wp
 
       alphas_local = alphas_collapse(1:n_solid)
-      alphal_local = 0.0_wp
       CALL eval_mixture_properties_from_volume_fractions(                     &
            T_collapse, alphag_collapse(1:n_add_gas), alphas_local,            &
            rho_m, inv_rhom, rho_c, xs_collapse, xg_collapse,               &
