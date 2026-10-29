@@ -36,14 +36,9 @@ CONTAINS
     u=qp(idx_u)
     v=qp(idx_v)
     T=qp(4)
-    ! Lava deposition is a standalone physical phase, not a carrier loss.
-    IF (lava_flag) THEN
-      IF (lava_deposition_flag) THEN
-        CALL eval_mass_exchange_lava_deposition_explicit(h,T,dt,process)
-        CALL accumulate_process(process,u,v,rates,eq)
-      END IF
-      RETURN
-    END IF
+    ! Processes requiring a gas/liquid carrier are evaluated only when that
+    ! physical phase exists. Lava deposition is dispatched independently below.
+    IF (gas_flag .OR. liquid_flag) THEN
     CALL primitive_to_volume_fractions(qp,alphas,alphag,alphal)
     alpha=SUM(alphas)
     solids_enabled=alpha>alphastot_min
@@ -119,6 +114,12 @@ CONTAINS
     IF (stoch_transport_flag) eq(idx_stochEqn)=eq(1)*stoch
     IF (pore_pressure_flag) eq(idx_poreEqn)= &
          eval_pore_pressure_mass_exchange_source(eq(1),pore)
+    END IF
+    ! Lava deposition follows the same process-rate accumulation contract.
+    IF (lava_deposition_flag) THEN
+      CALL eval_mass_exchange_lava_deposition_explicit(h,T,dt,process)
+      CALL accumulate_process(process,u,v,rates,eq)
+    END IF
   END SUBROUTINE eval_mass_exchange_terms
 
   ! Limit simultaneous withdrawal demands from one physical inventory.
