@@ -40,7 +40,7 @@ jobs:
 
       - name: Run integration tests
         env:
-          IMEX_DEBUG_TEST_CF: ${{ matrix.profile == 'strict-debug' && '1' || '0' }}
+          IMEX_DEBUG_TEST_CF: '1'
         run: |
           ulimit -c unlimited
           make check
