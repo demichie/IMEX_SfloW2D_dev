@@ -24,11 +24,11 @@ CONTAINS
     REAL(wp) :: alphas(n_solid),alphag(n_add_gas),alphal,alpha
     REAL(wp) :: u,v,w,speed2,h,T,pore,stoch
     REAL(wp) :: Ri,rhom,rhoc,redgrav,cpc,cpm,substrate_T
-    REAL(wp) :: species(n_add_gas),gas_fraction,carrier_dep
+    REAL(wp) :: species(n_add_gas),gas_fraction
     REAL(wp) :: gas_available,liquid_available,gas_factor,liquid_factor
     REAL(wp) :: gas_withdrawals(2),liquid_withdrawals(2),carrier_volume
     REAL(wp) :: liquid_volume_rate,gas_volume_rate
-    LOGICAL :: solids_enabled,loss_enabled
+    LOGICAL :: solids_enabled
     CALL reset_mass_exchange_rates(rates)
     eq=0.0_wp
     h=qp(1)
@@ -47,9 +47,6 @@ CONTAINS
     CALL primitive_to_volume_fractions(qp,alphas,alphag,alphal)
     alpha=SUM(alphas)
     solids_enabled=alpha>alphastot_min
-    loss_enabled=.FALSE.
-    IF (liquid_flag .AND. ALLOCATED(loss_rate)) loss_enabled=loss_rate>0.0_wp
-    IF (.NOT.solids_enabled .AND. .NOT.loss_enabled) RETURN
     pore=0.0_wp
     stoch=0.0_wp
     IF (pore_pressure_flag) pore=qp(idx_pore)
@@ -115,12 +112,10 @@ CONTAINS
     CALL accumulate_process(deposit_rates,u,v,rates,eq)
     CALL accumulate_process(liquid_rates,u,v,rates,eq)
     CALL accumulate_process(darcy_rates,u,v,rates,eq)
-    IF (solids_enabled) THEN
-      CALL eval_mass_exchange_entrainment_explicit(h,Ri,speed2,process)
-      CALL accumulate_process(process,u,v,rates,eq)
-      CALL eval_mass_exchange_vaporization_explicit(B_zone,T,deposit_rates%solid_deposition_rate,process)
-      CALL accumulate_process(process,u,v,rates,eq)
-    END IF
+    CALL eval_mass_exchange_entrainment_explicit(h,Ri,speed2,process)
+    CALL accumulate_process(process,u,v,rates,eq)
+    CALL eval_mass_exchange_vaporization_explicit(B_zone,T,deposit_rates%solid_deposition_rate,process)
+    CALL accumulate_process(process,u,v,rates,eq)
     IF (stoch_transport_flag) eq(idx_stochEqn)=eq(1)*stoch
     IF (pore_pressure_flag) eq(idx_poreEqn)= &
          eval_pore_pressure_mass_exchange_source(eq(1),pore)
