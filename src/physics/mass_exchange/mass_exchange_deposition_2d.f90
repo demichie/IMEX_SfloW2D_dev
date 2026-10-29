@@ -73,10 +73,10 @@ CONTAINS
   END SUBROUTINE solve_mass_exchange_deposition_analytic
 
   SUBROUTINE eval_deposition_volume_kernel(r_h, r_T, r_alphas, alphas_tot, &
-       r_rho_m, r_rho_c, dt, deposition_term)
+       r_rho_m, r_rho_c, dt, deposition_rate)
     REAL(wp), INTENT(IN) :: r_h, r_T, r_alphas(n_solid), alphas_tot
     REAL(wp), INTENT(IN) :: r_rho_m, r_rho_c, dt
-    REAL(wp), INTENT(OUT) :: deposition_term(n_solid)
+    REAL(wp), INTENT(OUT) :: deposition_rate(n_solid)
     REAL(wp) :: alpha_max, hind_exp, kin_visc_c_local
     REAL(wp) :: dyn_visc_c, rho_c, rhoc, inv_kin_visc, settling_vel
     INTEGER :: i_solid
@@ -84,7 +84,7 @@ CONTAINS
     alpha_max = 0.6_wp
     hind_exp = 4.65_wp
     kin_visc_c_local = kin_visc_c
-    deposition_term = 0.0_wp
+    deposition_rate = 0.0_wp
 
     IF ( gas_flag .AND. sutherland_flag ) THEN
 
@@ -106,11 +106,11 @@ CONTAINS
           settling_vel = settling_velocity( diam_s(i_solid) , rho_s(i_solid) ,  &
                rhoc , inv_kin_visc )
 
-          deposition_term(i_solid) = eval_solid_deposition_rate(              &
+          deposition_rate(i_solid) = eval_solid_deposition_rate(              &
                rheology_model, r_alphas(i_solid), settling_vel, r_h, dt,  &
                alphas_tot, alpha_max, hind_exp)
 
-          IF ( deposition_term(i_solid) .LT. 0.0_wp ) THEN
+          IF ( deposition_rate(i_solid) .LT. 0.0_wp ) THEN
              CALL fatal_error('negative solid deposition rate')
 
           END IF

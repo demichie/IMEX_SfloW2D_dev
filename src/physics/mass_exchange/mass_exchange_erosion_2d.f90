@@ -52,17 +52,17 @@ CONTAINS
   END SUBROUTINE solve_mass_exchange_erosion_analytic
 
   SUBROUTINE eval_erosion_volume_kernel(r_h, mod_vel, alphas_tot, erodible, dt, &
-       erosion_term, continuous_phase_erosion_term)
+       erosion_rate, continuous_phase_erosion_rate)
     REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
-    REAL(wp), INTENT(OUT) :: erosion_term(n_solid), continuous_phase_erosion_term
+    REAL(wp), INTENT(OUT) :: erosion_rate(n_solid), continuous_phase_erosion_rate
     IF (erosion_coeff .GT. 0.0_wp) THEN
        CALL eval_erosion_rates(r_h, mod_vel, alphas_tot, erosion_coeff,       &
             erodible_porosity, erodible_fract(1:n_solid),                    &
-            erodible(1:n_solid), dt, erosion_term(1:n_solid),                &
-            continuous_phase_erosion_term)
+            erodible(1:n_solid), dt, erosion_rate(1:n_solid),                &
+            continuous_phase_erosion_rate)
     ELSE
-       erosion_term = 0.0_wp
-       continuous_phase_erosion_term = 0.0_wp
+       erosion_rate = 0.0_wp
+       continuous_phase_erosion_rate = 0.0_wp
     END IF
   END SUBROUTINE eval_erosion_volume_kernel
 
