@@ -177,7 +177,12 @@ CONTAINS
   SUBROUTINE configure_source_registry
     CHARACTER(LEN=256) :: error
     CALL initialize_configured_sources(source_registry,equation_partition,error)
-    IF (LEN_TRIM(error)>0) ERROR STOP 'failed to configure mass-exchange source registry'
+    IF (LEN_TRIM(error)>0) THEN
+      WRITE(*,*) 'Mass-exchange source registry error: ',TRIM(error)
+      WRITE(*,*) 'Physical phase flags (gas, liquid, lava): ', &
+           gas_flag,liquid_flag,lava_flag
+      ERROR STOP 'failed to configure mass-exchange source registry'
+    END IF
   END SUBROUTINE configure_source_registry
 
   !> \\brief Exercise prescribed liquid loss with zero transported solid fraction.
