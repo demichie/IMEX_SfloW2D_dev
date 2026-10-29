@@ -23,7 +23,7 @@ CONTAINS
     TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates,darcy_loss_rates
     REAL(wp) :: alphas(n_solid),alphag(n_add_gas),alphal,alpha
     REAL(wp) :: u,v,h,T,pore,stoch
-    REAL(wp) :: Ri,rhom,rhoc,redgrav,cpc,cpm,substrate_T
+    REAL(wp) :: Ri,rhom,rhoc,redgrav,cpc,cpm
     REAL(wp) :: species(n_add_gas),gas_fraction
     REAL(wp) :: gas_available,liquid_available,gas_factor,liquid_factor
     REAL(wp) :: gas_withdrawals(2),liquid_withdrawals(2),carrier_volume
@@ -54,11 +54,9 @@ CONTAINS
       gas_fraction=MAX(0.0_wp,gas_fraction)
     END IF
     CALL mixt_var(qp,Ri,rhom,rhoc,redgrav,cpc,cpm)
-    substrate_T=T_erodible
-    IF (erodible_deposit_flag) substrate_T=T
     IF (solids_enabled) THEN
       CALL eval_mass_exchange_erosion_explicit(h,u,v,Bx,By,alpha,erodible, &
-           dt,substrate_T,cpc,process_rates)
+           dt,T,cpc,process_rates)
       CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
       CALL eval_mass_exchange_deposition_explicit(h,T,alphas,alpha,rhom,rhoc,cpc,dt, &
            species,gas_fraction,deposition_rates)
@@ -105,7 +103,7 @@ CONTAINS
     CALL accumulate_process(deposition_rates,u,v,total_rates,eqns_term)
     CALL accumulate_process(liquid_loss_rates,u,v,total_rates,eqns_term)
     CALL accumulate_process(darcy_loss_rates,u,v,total_rates,eqns_term)
-    CALL eval_mass_exchange_entrainment_explicit(h,Ri,u,v,Bx,By,process_rates)
+    CALL eval_mass_exchange_entrainment_explicit(qp,u,v,Bx,By,process_rates)
     CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
     CALL eval_mass_exchange_vaporization_explicit(B_zone,T,deposition_rates%solid_deposition_rate,process_rates)
     CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)

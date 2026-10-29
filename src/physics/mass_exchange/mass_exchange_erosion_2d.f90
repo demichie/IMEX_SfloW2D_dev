@@ -1,10 +1,10 @@
 !> Erosion process: limit solid and carrier entrainment by available bed inventory.
 MODULE mass_exchange_erosion_2d
-  USE parameters_2d, ONLY : wp, n_solid, slope_correction_flag, mass_exchange_rates_type, reset_mass_exchange_rates
+  USE parameters_2d, ONLY : wp, n_solid, slope_correction_flag, erodible_deposit_flag, mass_exchange_rates_type, reset_mass_exchange_rates
   USE diagnostics_2d, ONLY : fatal_error
   USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity, erodible_fract
 
-  USE constitutive_parameters_2d, ONLY: rho_s, rho_c_sub, sp_heat_s
+  USE constitutive_parameters_2d, ONLY: rho_s, rho_c_sub, sp_heat_s, T_erodible
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_mass_exchange_erosion_explicit
@@ -17,10 +17,10 @@ CONTAINS
 
 
 
-  SUBROUTINE eval_mass_exchange_erosion_explicit(h,u,v,Bx,By,alpha,erodible,dt,T_sub,cp_sub,r)
-    REAL(wp), INTENT(IN) :: h,u,v,Bx,By,alpha,erodible(n_solid),dt,T_sub,cp_sub
+  SUBROUTINE eval_mass_exchange_erosion_explicit(h,u,v,Bx,By,alpha,erodible,dt,T_flow,cp_sub,r)
+    REAL(wp), INTENT(IN) :: h,u,v,Bx,By,alpha,erodible(n_solid),dt,T_flow,cp_sub
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
-    REAL(wp) :: normal_speed,vertical_velocity
+    REAL(wp) :: normal_speed,vertical_velocity,substrate_temperature
     CALL reset_mass_exchange_rates(r)
     vertical_velocity=0.0_wp
     IF (slope_correction_flag) vertical_velocity=u*Bx+v*By
@@ -29,27 +29,29 @@ CONTAINS
          r%solid_erosion_rate,r%continuous_phase_erosion_rate)
     r%solid_mass_rate=rho_s*r%solid_erosion_rate
     r%mixture_mass_rate=SUM(r%solid_mass_rate)+rho_c_sub*r%continuous_phase_erosion_rate
-    r%energy_rate=T_sub*(SUM(sp_heat_s*r%solid_mass_rate)+ &
+    substrate_temperature=T_erodible
+    IF (erodible_deposit_flag) substrate_temperature=T_flow
+    r%energy_rate=substrate_temperature*(SUM(sp_heat_s*r%solid_mass_rate)+ &
          rho_c_sub*cp_sub*r%continuous_phase_erosion_rate)
     r%dB_dt=-SUM(r%solid_erosion_rate)/(1.0_wp-erodible_porosity)
   END SUBROUTINE
 
-  SUBROUTINE eval_mass_exchange_erosion_semi_implicit(h,u,v,Bx,By,alpha,erodible,dt,T_sub,cp_sub,r)
-    REAL(wp), INTENT(IN) :: h,u,v,Bx,By,alpha,erodible(n_solid),dt,T_sub,cp_sub
+  SUBROUTINE eval_mass_exchange_erosion_semi_implicit(h,u,v,Bx,By,alpha,erodible,dt,T_flow,cp_sub,r)
+    REAL(wp), INTENT(IN) :: h,u,v,Bx,By,alpha,erodible(n_solid),dt,T_flow,cp_sub
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('erosion: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_erosion_semi_implicit
 
-  SUBROUTINE eval_mass_exchange_erosion_implicit(h,u,v,Bx,By,alpha,erodible,dt,T_sub,cp_sub,r)
-    REAL(wp), INTENT(IN) :: h,u,v,Bx,By,alpha,erodible(n_solid),dt,T_sub,cp_sub
+  SUBROUTINE eval_mass_exchange_erosion_implicit(h,u,v,Bx,By,alpha,erodible,dt,T_flow,cp_sub,r)
+    REAL(wp), INTENT(IN) :: h,u,v,Bx,By,alpha,erodible(n_solid),dt,T_flow,cp_sub
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('erosion: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_erosion_implicit
 
-  SUBROUTINE solve_mass_exchange_erosion_analytic(h,u,v,Bx,By,alpha,erodible,dt,T_sub,cp_sub,r)
-    REAL(wp), INTENT(IN) :: h,u,v,Bx,By,alpha,erodible(n_solid),dt,T_sub,cp_sub
+  SUBROUTINE solve_mass_exchange_erosion_analytic(h,u,v,Bx,By,alpha,erodible,dt,T_flow,cp_sub,r)
+    REAL(wp), INTENT(IN) :: h,u,v,Bx,By,alpha,erodible(n_solid),dt,T_flow,cp_sub
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('erosion: unsupported physical treatment')
