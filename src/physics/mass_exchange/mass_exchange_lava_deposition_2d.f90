@@ -94,6 +94,7 @@ CONTAINS
         factor=1.0_wp
 
         ! Temperature and viscosity choices modulate the prescribed immobilization flux.
+
         SELECT CASE(TRIM(lava_deposition_model))
         CASE('TEMPERATURE')
               factor=MIN(1.0_wp,MAX(0.0_wp,(lava_deposition_temp_ref-temperature)/ &
@@ -102,6 +103,7 @@ CONTAINS
               factor=MIN(1.0_wp,(MAX(0.0_wp,viscosity)/lava_deposition_visc_ref)** &
                         lava_deposition_exponent)
         END SELECT
+
         rate=MAX(0.0_wp,lava_deposition_rate)*factor
     END FUNCTION eval_lava_deposition_rate
 

@@ -58,6 +58,7 @@ CONTAINS
 
         ! Processes requiring a gas/liquid carrier are evaluated only when that
         ! physical phase exists. Lava deposition is dispatched independently below.
+
         IF (gas_flag .OR. liquid_flag) THEN
             CALL primitive_to_volume_fractions(qp,alphas,alphag,alphal)
             alpha=SUM(alphas)
@@ -82,6 +83,7 @@ CONTAINS
 
             ! Gas withdrawal and pore filling draw on the same gas inventory;
             ! do not offset physical sinks with any positive source.
+
             IF (gas_flag) THEN
 
                 ! Subtract dispersed solids and liquid from the available gas volume.
@@ -101,6 +103,7 @@ CONTAINS
                 CALL scale_process(liquid_loss_rates,liquid_factor)
             END IF
             ! In two-carrier runs, dispersed liquid has its own budget.
+
             IF (gas_flag .AND. liquid_flag) THEN
 
                 ! Prescribed liquid loss consumes dispersed liquid, NOT carrier gas.
@@ -124,10 +127,12 @@ CONTAINS
                       eval_pore_pressure_mass_exchange_source(eqns_term(1),pore)
         END IF  ! gas_flag .OR. liquid_flag
         ! Lava deposition follows the same process_rates-rate accumulation contract.
+
         IF (lava_deposition_flag) THEN
             CALL eval_mass_exchange_lava_deposition_explicit(h,T,dt,process_rates)
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
         END IF
+
     END SUBROUTINE eval_mass_exchange_terms
 
     ! Limit simultaneous withdrawal demands from one physical inventory.

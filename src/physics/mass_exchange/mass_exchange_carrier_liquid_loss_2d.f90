@@ -26,12 +26,14 @@ CONTAINS
         REAL(wp) :: rho_c,T,cp_c,Ri,rhom,redgrav,cpm
 
         CALL reset_mass_exchange_rates(r)
+
         IF (liquid_flag .AND. ALLOCATED(loss_rate)) THEN
             T=qp(4)
             CALL mixt_var(qp,Ri,rhom,rho_c,redgrav,cp_c,cpm)
             r%liquid_withdrawal_volume_rate=MAX(0.0_wp,loss_rate)
 
             ! In mixed-phase flow the removed liquid has its own density and enthalpy.
+
             IF (gas_flag) THEN
                 r%mixture_mass_rate=-rho_l*MAX(0.0_wp,loss_rate)
                 r%liquid_mass_rate=r%mixture_mass_rate
@@ -41,6 +43,7 @@ CONTAINS
                 r%energy_rate=T*cp_c*r%mixture_mass_rate
             END IF
         END IF
+
     END SUBROUTINE eval_mass_exchange_carrier_liquid_loss_explicit
 
     !> @brief Reject unsupported semi-implicit treatment for carrier liquid loss.

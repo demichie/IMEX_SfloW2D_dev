@@ -135,6 +135,7 @@ CONTAINS
               erosion_rate = 0.0_wp
               continuous_phase_erosion_rate = 0.0_wp
         END IF
+
     END SUBROUTINE eval_erosion_volume_kernel
 
     !> @brief Apply the empirical erosion flux and cap solid removal by available bed material.

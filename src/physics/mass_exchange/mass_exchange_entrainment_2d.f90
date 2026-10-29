@@ -109,6 +109,7 @@ CONTAINS
               eval_entrainment_volume_kernel = 0.0_wp
 
         END IF
+
     END FUNCTION eval_entrainment_volume_kernel
 
     !> @brief Evaluate the Richardson-number-dependent ambient-air entrainment law.

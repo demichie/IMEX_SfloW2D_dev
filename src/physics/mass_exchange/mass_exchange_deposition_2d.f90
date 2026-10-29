@@ -51,6 +51,7 @@ CONTAINS
         CALL mixt_var(qp,Ri,rho_m,rho_c,redgrav,cp_c,cpm)
         gas_species_mass_fraction=qp(idx_add_gas_first:idx_add_gas_last)
         gas_phase_mass_fraction=0.0_wp
+
         IF (gas_flag) THEN
             gas_phase_mass_fraction=1.0_wp-SUM(qp(idx_solid_first:idx_solid_last))
             IF (liquid_flag) gas_phase_mass_fraction=gas_phase_mass_fraction-qp(n_vars)
@@ -133,6 +134,7 @@ CONTAINS
         deposition_rate = 0.0_wp
 
         ! For the gas carrier, use temperature-dependent viscosity and ideal-gas density.
+
         IF ( gas_flag .AND. sutherland_flag ) THEN
 
               dyn_visc_c = muRef_Suth * ( r_T / Tref_Suth )**1.5_wp *               &
@@ -165,6 +167,7 @@ CONTAINS
               END IF
 
         END DO
+
     END SUBROUTINE eval_deposition_volume_kernel
 
     !> @brief Iteratively evaluate terminal settling speed using the configured drag closure.
@@ -199,7 +202,9 @@ CONTAINS
         Rey = diam * settling_velocity * inv_kin_visc
 
         ! Iterate the drag coefficient because Reynolds number depends on terminal speed.
+
         IF (Rey <= 1000.0_wp) THEN
+
               C_D_loop: DO i = 1, 20
                     set_vel_old = settling_velocity
 
