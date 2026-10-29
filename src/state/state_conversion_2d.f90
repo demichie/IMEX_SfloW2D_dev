@@ -612,7 +612,6 @@ CONTAINS
     REAL(wp) :: r_alphas(n_solid)         !< real-value solid volume fractions
     REAL(wp) :: r_alphag(n_add_gas)       !< real-value add.gas volume fractions
     REAL(wp) :: r_T                       !< real-value temperature [K]
-    REAL(wp) :: r_alphal
     REAL(wp) :: r_inv_rhom, r_inv_rho_c
     REAL(wp) :: r_xs(n_solid), r_xg(n_add_gas)
     REAL(wp) :: r_xc
@@ -735,7 +734,6 @@ CONTAINS
     REAL(wp) :: r_alphas(n_solid) !< real-value solid volume fractions
     REAL(wp) :: r_rho_m           !< real-value mixture density [kg/m3]
     REAL(wp) :: r_T               !< real-value temperature [K]
-    REAL(wp) :: r_alphal
     REAL(wp) :: r_alphag(n_add_gas) !< real-value add. gas volume fractions
     REAL(wp) :: r_red_grav
     REAL(wp) :: r_Zs             !< real-value stochastic variable
@@ -745,7 +743,7 @@ CONTAINS
     qp = 0.0_wp
 
     CALL r_phys_var( qc , r_h , r_u , r_v , r_alphas , r_rho_m , r_T ,          &
-         r_alphal , r_alphag , r_red_grav , p_dyn , r_Zs , r_exc_pore_pres )
+         r_alphag , r_red_grav , p_dyn , r_Zs , r_exc_pore_pres )
 
     qp(1) = r_h
 
@@ -828,7 +826,6 @@ CONTAINS
     REAL(wp) :: r_alphag(n_add_gas)!< real-value add.gas volume fractions
     REAL(wp) :: r_xc              !< real-value carrier phase mass fraction
     REAL(wp) :: r_T               !< real-value temperature [K]
-    REAL(wp) :: r_alphal
     REAL(wp) :: r_rho_m           !< real-value mixture density [kg/m3]
     REAL(wp) :: r_rho_c           !< real-value carrier phase density [kg/m3]
     REAL(wp) :: r_xs(n_solid)     !< real-value solid mass fractions
