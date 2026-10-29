@@ -159,7 +159,6 @@ CONTAINS
 
     component_flux = SUM(flux(idx_solidEqn_first:idx_solidEqn_last))          &
          + SUM(flux(idx_addGasEqn_first:idx_addGasEqn_last))
-         + flux(n_vars)
 
     IF ((flux(1) .GT. 0.0_wp .AND. component_flux .GT. flux(1)) .OR.          &
         (flux(1) .LT. 0.0_wp .AND. component_flux .LT. flux(1))) THEN
