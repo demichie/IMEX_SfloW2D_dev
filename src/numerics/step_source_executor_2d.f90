@@ -133,7 +133,7 @@ CONTAINS
     USE state_conversion_2d, ONLY : qc_to_qp
     USE parameters_2d, ONLY : topo_change_flag, bottom_radial_source_flag,  &
          bottom_fissural_source_flag, erodible_deposit_flag,                &
-         pore_pressure_flag, liquid_flag
+         pore_pressure_flag, liquid_flag, lava_flag
     USE state_2d, ONLY : initialize_dry_physical_cell
     USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag
 
@@ -285,7 +285,7 @@ CONTAINS
             exchange_rates%solid_erosion_rate, deposit(j,k,1:n_solid), erosion(j,k,1:n_solid),  &
             erodible(1:n_solid,j,k), erodible_deposit_flag, closure_context)
 
-       IF (lava_deposition_flag) lava_deposit(j,k)=lava_deposit(j,k)+time_step*exchange_rates%continuous_phase_deposition_rate
+       IF (lava_flag) lava_deposit(j,k)=lava_deposit(j,k)+time_step*exchange_rates%continuous_phase_deposition_rate
        IF (topo_change_flag) CALL record_topography_rate_cell(j, k, exchange_rates%dB_dt)
 
     END DO

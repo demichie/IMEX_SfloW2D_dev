@@ -7,7 +7,6 @@ MODULE mass_exchange_lava_deposition_2d
   USE constitutive_parameters_2d, ONLY: rho_l, sp_heat_l
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: eval_mass_exchange_lava_deposition_explicit
   LOGICAL, PUBLIC :: lava_deposition_flag=.FALSE.
   CHARACTER(LEN=16), PUBLIC :: lava_deposition_model='CONSTANT'
   REAL(wp), PUBLIC :: lava_deposition_rate=0.0_wp

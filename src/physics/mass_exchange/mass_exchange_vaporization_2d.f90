@@ -8,7 +8,6 @@ MODULE mass_exchange_vaporization_2d
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_mass_exchange_vaporization_explicit
-  PUBLIC :: eval_mass_exchange_vaporization_rates_explicit
   PUBLIC :: eval_mass_exchange_vaporization_semi_implicit
   PUBLIC :: eval_mass_exchange_vaporization_implicit
   PUBLIC :: solve_mass_exchange_vaporization_analytic

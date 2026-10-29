@@ -25,7 +25,9 @@ CONTAINS
     REAL(wp) :: u,v,w,speed2,h,T,pore,stoch
     REAL(wp) :: Ri,rhom,rhoc,redgrav,cpc,cpm,substrate_T
     REAL(wp) :: species(n_add_gas),gas_fraction,carrier_dep
-    REAL(wp) :: available,factor,withdrawal_rates(3)
+    REAL(wp) :: gas_available,liquid_available,gas_factor,liquid_factor
+    REAL(wp) :: gas_withdrawals(2),liquid_withdrawals(2),carrier_volume
+    REAL(wp) :: liquid_volume_rate,gas_volume_rate
     LOGICAL :: solids_enabled,loss_enabled
     CALL reset_mass_exchange_rates(rates)
     eq=0.0_wp
@@ -76,21 +78,38 @@ CONTAINS
     CALL eval_mass_exchange_carrier_liquid_loss_explicit(rhoc,T,cpc,liquid_rates)
     CALL eval_mass_exchange_carrier_darcy_loss_explicit(h,T,alphas,alpha,rhoc,pore,cpc, &
          species,gas_fraction,darcy_rates)
-    ! ONE limiter for all processes drawing on the same continuous-phase pool.
-    ! Never apply available inventory independently to competing processes.
-    carrier_dep=deposit_rates%continuous_phase_deposition_rate
-    ! Signed physical volume rates: withdrawals are negative, additions positive.
-    ! Independent positive additions must NEVER cancel simultaneous withdrawals.
-    ! These three processes consume the same carrier-phase inventory.
-    withdrawal_rates=[-carrier_dep, &
-         liquid_rates%mixture_mass_rate/rhoc, darcy_rates%mixture_mass_rate/rhoc]
-    available=MIN(h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt, &
-         MAX(0.0_wp,(h*(1.0_wp-alpha)-coeff_porosity* &
-         (h*alpha-dt*SUM(deposit_rates%solid_deposition_rate)))/dt))
-    factor=shared_withdrawal_factor(withdrawal_rates,available)
-    CALL scale_process(deposit_rates,factor)
-    CALL scale_process(liquid_rates,factor)
-    CALL scale_process(darcy_rates,factor)
+    ! Resource budgets use gross withdrawals, never signed net mass exchange.
+    ! Gas and liquid are different inventories when both phases are present.
+    ! The solid deposition rate is limited only when its required pore phase
+    ! cannot be supplied; a later Darcy/liquid sink cannot consume it twice.
+    carrier_volume=deposit_rates%continuous_phase_deposition_rate
+    gas_volume_rate=MAX(0.0_wp,-darcy_rates%mixture_mass_rate/MAX(rhoc,TINY(1.0_wp)))
+    liquid_volume_rate=MAX(0.0_wp,-liquid_rates%mixture_mass_rate/ &
+         MAX(MERGE(rho_l,rhoc,gas_flag),TINY(1.0_wp)))
+    gas_factor=1.0_wp
+    liquid_factor=1.0_wp
+    IF (gas_flag) THEN
+      ! Subtract dispersed solids and liquid from the available gas volume.
+      gas_available=h*MAX(0.0_wp,1.0_wp-alpha-alphal)/dt
+      gas_withdrawals=[-carrier_volume,-gas_volume_rate]
+      gas_factor=shared_withdrawal_factor(gas_withdrawals,gas_available)
+      CALL scale_process(deposit_rates,gas_factor)
+      CALL scale_process(darcy_rates,gas_factor)
+    ELSE
+      ! In a liquid-only run, pore filling and prescribed loss share one pool.
+      liquid_available=h*MAX(0.0_wp,1.0_wp-alpha)/dt
+      liquid_withdrawals=[-carrier_volume,-liquid_volume_rate]
+      liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
+      CALL scale_process(deposit_rates,liquid_factor)
+      CALL scale_process(liquid_rates,liquid_factor)
+    END IF
+    IF (gas_flag .AND. liquid_flag) THEN
+      ! Prescribed liquid loss consumes dispersed liquid, NOT carrier gas.
+      liquid_available=h*MAX(0.0_wp,alphal)/dt
+      liquid_withdrawals=[-liquid_volume_rate,0.0_wp]
+      liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
+      CALL scale_process(liquid_rates,liquid_factor)
+    END IF
     CALL accumulate_process(deposit_rates,u,v,rates,eq)
     CALL accumulate_process(liquid_rates,u,v,rates,eq)
     CALL accumulate_process(darcy_rates,u,v,rates,eq)
@@ -127,6 +146,7 @@ CONTAINS
     eq(4)=eq(4)+p%energy_rate
     eq(idx_solidEqn_first:idx_solidEqn_last)= &
          eq(idx_solidEqn_first:idx_solidEqn_last)+p%solid_mass_rate
+    IF (gas_flag .AND. liquid_flag) eq(n_eqns)=eq(n_eqns)+p%liquid_mass_rate
     IF (n_add_gas>0) eq(idx_addGasEqn_first:idx_addGasEqn_last)= &
          eq(idx_addGasEqn_first:idx_addGasEqn_last)+p%add_gas_mass_rate
     total%mixture_mass_rate=total%mixture_mass_rate+p%mixture_mass_rate
