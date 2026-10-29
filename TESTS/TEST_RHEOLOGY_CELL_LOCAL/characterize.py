@@ -252,7 +252,7 @@ def cases():
             for dynamic in (False,True):
                 for suth in (False,True):
                     a = (.55,) if n==1 else (.35,.2)
-                    result.append(fixture(f'pore-{n}-{mode}-{int(dynamic)}-{int(suth)}','lava',gas=True,
+                    result.append(fixture(f'pore-{n}-{mode}-{int(dynamic)}-{int(suth)}','quadratic',gas=True,
                         temperature=700.,h=.05,alpha=a,pore_pressure_flag=True,
                         f_inhibit_mode=mode,dynamic_permeability_flag=dynamic,sutherland_flag=suth))
     for pressure in (-100.,0.,100.):
