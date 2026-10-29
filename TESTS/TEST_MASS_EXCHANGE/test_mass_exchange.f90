@@ -1165,7 +1165,13 @@ CONTAINS
              CALL assert_small(name//' saturated erosion',MAXVAL(ABS(ers-inv0(:,j,k))),1.0_wp)
           END SELECT
           IF (name=='loss_only' .AND. loss<=tol) ERROR STOP 'carrier loss not exercised'
-          IF (name=='loss_reserve' .AND. loss/=0.0_wp) ERROR STOP 'carrier reserve not exhausted'
+          IF (name=='loss_reserve') THEN
+             ! The carrier can be withdrawn until maximum solid packing.
+             IF (loss<=tol) ERROR STOP 'carrier packing reserve not exercised'
+             CALL assert_small('carrier packing reserve exhausted', &
+                  ABS(loss-(h-SUM(q0(5:6,j,k)/rho_s)/maximum_solid_packing)), &
+                  MAX(1.0_wp,h))
+          END IF
           SELECT CASE(name)
           CASE('gas_packing')
              IF (loss<=tol) ERROR STOP 'gas packing loss not exercised'
