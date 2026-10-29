@@ -1,6 +1,6 @@
 !> Erosion process: limit solid and carrier entrainment by available bed inventory.
 MODULE mass_exchange_erosion_2d
-  USE parameters_2d, ONLY : wp, n_solid, n_vars, slope_correction_flag, &
+  USE parameters_2d, ONLY : wp, n_solid, n_vars, alphastot_min, slope_correction_flag, &
        erodible_deposit_flag, mass_exchange_rates_type, reset_mass_exchange_rates
   USE diagnostics_2d, ONLY : fatal_error
   USE state_conversion_2d, ONLY : mixt_var
@@ -26,6 +26,7 @@ CONTAINS
     REAL(wp) :: normal_speed,vertical_velocity,substrate_temperature
     REAL(wp) :: Ri,rhom,rhoc,redgrav,cp_sub,cpm
     CALL reset_mass_exchange_rates(r)
+    IF (alpha<=alphastot_min) RETURN
     vertical_velocity=0.0_wp
     IF (slope_correction_flag) vertical_velocity=u*Bx+v*By
     normal_speed=SQRT(u*u+v*v+vertical_velocity*vertical_velocity)

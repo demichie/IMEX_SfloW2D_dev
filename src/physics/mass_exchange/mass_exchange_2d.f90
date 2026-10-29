@@ -25,7 +25,6 @@ CONTAINS
     REAL(wp) :: u,v,h,T,pore,stoch
     REAL(wp) :: gas_available,liquid_available,gas_factor,liquid_factor
     REAL(wp) :: gas_withdrawals(2),liquid_withdrawals(2),carrier_volume
-    LOGICAL :: solids_enabled
     CALL reset_mass_exchange_rates(total_rates)
     eqns_term=0.0_wp
     h=qp(1)
@@ -38,19 +37,14 @@ CONTAINS
     IF (gas_flag .OR. liquid_flag) THEN
     CALL primitive_to_volume_fractions(qp,alphas,alphag,alphal)
     alpha=SUM(alphas)
-    solids_enabled=alpha>alphastot_min
     pore=0.0_wp
     stoch=0.0_wp
     IF (pore_pressure_flag) pore=qp(idx_pore)
     IF (stoch_transport_flag) stoch=qp(idx_stoch)
-    IF (solids_enabled) THEN
-      CALL eval_mass_exchange_erosion_explicit(h,u,v,Bx,By,alpha,erodible, &
-           dt,T,qp,process_rates)
-      CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
-      CALL eval_mass_exchange_deposition_explicit(qp,dt,deposition_rates)
-    ELSE
-      CALL reset_mass_exchange_rates(deposition_rates)
-    END IF
+    CALL eval_mass_exchange_erosion_explicit(h,u,v,Bx,By,alpha,erodible, &
+         dt,T,qp,process_rates)
+    CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
+    CALL eval_mass_exchange_deposition_explicit(qp,dt,deposition_rates)
     CALL eval_mass_exchange_carrier_liquid_loss_explicit(qp,liquid_loss_rates)
     CALL eval_mass_exchange_carrier_darcy_loss_explicit(qp,darcy_loss_rates)
     ! Resource budgets use gross withdrawals, never signed net mass exchange.
