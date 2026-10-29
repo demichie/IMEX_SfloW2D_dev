@@ -165,8 +165,8 @@ PROGRAM test_curvature_source
 
   bottom_radial_source_flag=.FALSE.; bottom_fissural_source_flag=.TRUE.
   n_fissures=1
-  ALLOCATE(xs_fissures(1,1),xg_fissures(0,1),xl_fissures(1))
-  xs_fissures=0.0_wp; xg_fissures=0.0_wp; xl_fissures=1.0_wp
+  ALLOCATE(xs_fissures(1,1),xg_fissures(0,1))
+  xs_fissures=0.0_wp; xg_fissures=0.0_wp
   linear_vel_fissures(1)=0.02_wp; T_fissures(1)=T_source
   time_param_fissures(:,1)=[10.0_wp,5.0_wp,0.0_wp,0.0_wp]
   CALL set_source_time_coefficients(4.0_wp,2.0_wp)

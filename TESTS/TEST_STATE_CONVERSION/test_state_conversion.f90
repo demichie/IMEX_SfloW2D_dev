@@ -163,7 +163,6 @@ CONTAINS
     idx_poreEqn = idx_pore
 
     n_vars = 4 + n_solid + n_add_gas + n_stoch_vars + n_pore_vars
-    IF (liquid_flag) n_vars = n_vars + 1
     n_eqns = n_vars
     idx_u = n_vars + 1
     idx_v = n_vars + 2
@@ -454,14 +453,12 @@ CONTAINS
     xg_source = 0.0_wp
     xs_source(1:n_solid) = [0.20_wp, 0.10_wp]
     xg_source(1:n_add_gas) = [0.05_wp]
-    xl_source = 0.15_wp
     time_param = [10.0_wp, 4.0_wp, 0.0_wp, 100.0_wp]
 
     expected = 0.0_wp
     expected(1:4) = [2.0_wp, 3.6_wp, 4.8_wp, T_source]
     expected(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)
     expected(idx_add_gas_first:idx_add_gas_last) = xg_source(1:n_add_gas)
-    expected(n_vars) = xl_source
     expected(idx_u) = 1.8_wp
     expected(idx_v) = 2.4_wp
 
