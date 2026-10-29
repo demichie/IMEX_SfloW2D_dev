@@ -14,16 +14,27 @@ for profile in strict optimized; do
       strict) flags='-O0 -g -Wall -Wextra -fcheck=all -finit-real=snan' ;;
       optimized) flags='-Ofast -funroll-all-loops' ;;
     esac
-    "$compiler" $flags -fbacktrace -ffpe-trap=invalid,zero,overflow -c \
-      "$repo_dir/src/core/parameters_2d.f90" \
-      "$repo_dir/src/core/constitutive_parameters_2d.f90" \
-      "$repo_dir/src/numerics/equation_metadata_2d.f90" \
-      "$repo_dir/src/numerics/source_catalog_2d.f90" \
-      "$repo_dir/src/numerics/source_input_2d.f90" \
-      "$repo_dir/src/numerics/source_registry_2d.f90" \
-      "$repo_dir/src/physics/source_configuration_2d.f90" \
-      "$test_dir/test_source_registry.f90"
-    "$compiler" -fbacktrace -ffpe-trap=invalid,zero,overflow ./*.o -o test_source_registry
+    # Follow production compilation order: source_input_2d depends on
+    # physical mass-exchange modules, including lava deposition.
+    sources=$(awk '
+      /^IMEX_SfloW2D_SOURCES =/ { inside=1; next }
+      inside && /^[[:space:]]*$/ { exit }
+      inside { gsub(/\\/, ""); if ($1 != "IMEX_SfloW2D.f90") print $1 }
+    ' "$repo_dir/src/Makefile.am")
+    netcdf_fflags=$(nf-config --fflags)
+    netcdf_flibs=$(nf-config --flibs)
+    netcdf_clibs=$(nc-config --libs)
+    for source in $sources; do
+      case "$source" in
+        *.c) cc -c "$repo_dir/src/$source" ;;
+        *) "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+             -I"$repo_dir/src/state" $netcdf_fflags -c "$repo_dir/src/$source" ;;
+      esac
+    done
+    "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+      $netcdf_fflags -c "$test_dir/test_source_registry.f90"
+    "$compiler" -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+      ./*.o -llapack $netcdf_flibs $netcdf_clibs -o test_source_registry
     # D17.20 independent Newton-only extension fixture (no historical solver API).
     "$compiler" $flags -fbacktrace -ffpe-trap=invalid,zero,overflow -c \
       "$repo_dir/src/core/diagnostics_2d.f90" \

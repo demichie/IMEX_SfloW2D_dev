@@ -721,6 +721,9 @@ CONTAINS
     END IF
     IF (source_test_model/=0) THEN
        rheology_flag=.TRUE.; rheology_model=MERGE('lava   ','voellmy',source_test_model==3)
+       IF (source_test_model==3) THEN
+          lava_flag=.TRUE.; liquid_flag=.FALSE.; gas_flag=.FALSE.
+       END IF
        mu=0.3_wp; xi=500.0_wp; tau0=20.0_wp
        nu_ref=0.02_wp; visc_par=0.003_wp;        T_ref=900.0_wp; T_env=300.0_wp
        radiative_term_coeff=3.0E-8_wp; convective_term_coeff=4.0_wp
