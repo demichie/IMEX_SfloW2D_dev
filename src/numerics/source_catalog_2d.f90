@@ -96,7 +96,7 @@ MODULE source_catalog_2d
              default_cadence=SOURCE_CADENCE_STEP), &
        source_term_type('mass_exchange_carrier_liquid_loss','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STEP, allows_gas=.FALSE.), &
+             default_cadence=SOURCE_CADENCE_STEP), &
        source_term_type('mass_exchange_carrier_darcy_loss','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
              default_cadence=SOURCE_CADENCE_STEP, allows_liquid=.FALSE.), &
