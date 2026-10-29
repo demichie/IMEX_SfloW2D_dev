@@ -1,4 +1,6 @@
-!> Erosion process: limit solid and carrier entrainment by available bed inventory.
+!> @brief mass exchange erosion 2d: physical mass-exchange components and rate evaluation.
+!> @details Explicit physics is evaluated locally; unsupported treatment entry points
+!> fail explicitly. The coordinator alone enforces shared carrier inventories.
 MODULE mass_exchange_erosion_2d
     USE parameters_2d, ONLY : wp, n_solid, n_vars, idx_u, idx_v, slope_correction_flag, &
               erodible_deposit_flag, mass_exchange_rates_type, reset_mass_exchange_rates
@@ -15,7 +17,14 @@ MODULE mass_exchange_erosion_2d
     PUBLIC :: eval_erosion_rates
     ! Four-entry physical treatment contract; only EXPLICIT is supported.
 CONTAINS
-
+    !> @brief Evaluate explicit erosion from erodible substrate.
+    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
+    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
+    !> @param[in] alpha Total dispersed-solid volume fraction [dimensionless].
+    !> @param[in] erodible Available erodible solid inventory by species [m].
+    !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+    !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_erosion_explicit(qp,Bx,By,alpha,erodible,dt,r)
         REAL(wp), INTENT(IN) :: qp(n_vars+2), Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
@@ -32,6 +41,7 @@ CONTAINS
         vertical_velocity=0.0_wp
         IF (slope_correction_flag) vertical_velocity=u*Bx+v*By
         normal_speed=SQRT(u*u+v*v+vertical_velocity*vertical_velocity)
+        ! Erodible inventory limits species withdrawal before constructing mass and bed terms.
         CALL eval_erosion_volume_kernel(h,normal_speed,alpha,erodible,dt, &
                   r%solid_erosion_rate,r%continuous_phase_erosion_rate)
         r%solid_mass_rate=rho_s*r%solid_erosion_rate
@@ -43,7 +53,15 @@ CONTAINS
                   rho_c_sub*cp_sub*r%continuous_phase_erosion_rate)
         r%dB_dt=-SUM(r%solid_erosion_rate)/(1.0_wp-erodible_porosity)
     END SUBROUTINE
-
+    !> @brief Reject unsupported implicit treatment for erosion_semi.
+    !> @details This entry point raises fatal_error; the rates are reset first.
+    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
+    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
+    !> @param[in] alpha Total dispersed-solid volume fraction [dimensionless].
+    !> @param[in] erodible Available erodible solid inventory by species [m].
+    !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+    !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_erosion_semi_implicit(qp,Bx,By,alpha,erodible,dt,r)
         REAL(wp), INTENT(IN) :: qp(n_vars+2), Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
@@ -51,7 +69,15 @@ CONTAINS
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('erosion: unsupported physical treatment')
     END SUBROUTINE eval_mass_exchange_erosion_semi_implicit
-
+    !> @brief Reject unsupported implicit treatment for erosion from erodible substrate.
+    !> @details This entry point raises fatal_error; the rates are reset first.
+    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
+    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
+    !> @param[in] alpha Total dispersed-solid volume fraction [dimensionless].
+    !> @param[in] erodible Available erodible solid inventory by species [m].
+    !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+    !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_erosion_implicit(qp,Bx,By,alpha,erodible,dt,r)
         REAL(wp), INTENT(IN) :: qp(n_vars+2), Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
@@ -59,7 +85,15 @@ CONTAINS
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('erosion: unsupported physical treatment')
     END SUBROUTINE eval_mass_exchange_erosion_implicit
-
+    !> @brief Reject unsupported analytic treatment for erosion from erodible substrate.
+    !> @details This entry point raises fatal_error; the rates are reset first.
+    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
+    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
+    !> @param[in] alpha Total dispersed-solid volume fraction [dimensionless].
+    !> @param[in] erodible Available erodible solid inventory by species [m].
+    !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+    !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE solve_mass_exchange_erosion_analytic(qp,Bx,By,alpha,erodible,dt,r)
         REAL(wp), INTENT(IN) :: qp(n_vars+2), Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
@@ -67,7 +101,14 @@ CONTAINS
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('erosion: unsupported physical treatment')
     END SUBROUTINE solve_mass_exchange_erosion_analytic
-
+    !> @brief Compute erosion volumes under the finite erodible-bed inventory constraint.
+    !> @param[in] r_h Mobile flow thickness [m].
+    !> @param[in] mod_vel Slope-corrected flow speed [m/s].
+    !> @param[in] alphas_tot Total solid volume fraction.
+    !> @param[in] erodible Available erodible solid inventory by species [m].
+    !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+    !> @param[out] erosion_rate Solid erosion volume fluxes by species [m/s].
+    !> @param[out] continuous_phase_erosion_rate Companion continuous-phase erosion volume flux [m/s].
     SUBROUTINE eval_erosion_volume_kernel(r_h, mod_vel, alphas_tot, erodible, dt, &
               erosion_rate, continuous_phase_erosion_rate)
         REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
@@ -82,7 +123,17 @@ CONTAINS
               continuous_phase_erosion_rate = 0.0_wp
         END IF
     END SUBROUTINE eval_erosion_volume_kernel
-
+    !> @brief Apply the empirical erosion flux and cap solid removal by available bed material.
+    !> @param[in] flow_depth Mobile flow thickness [m].
+    !> @param[in] speed Flow speed used by the erosion closure [m/s].
+    !> @param[in] total_solid_fraction Total solid volume fraction.
+    !> @param[in] erosion_coefficient Empirical coefficient in the erosion closure.
+    !> @param[in] erodible_porosity Porosity of the erodible substrate [dimensionless].
+    !> @param[in] erodible_fraction Species composition of the erodible bed [dimensionless].
+    !> @param[in] erodible_inventory Available substrate inventory by species [m].
+    !> @param[in] time_step Physical time-step duration [s].
+    !> @param[out] solid_erosion_rate Capped solid erosion volume fluxes by species [m/s].
+    !> @param[out] continuous_phase_erosion_rate Companion continuous-phase erosion volume flux [m/s].
     PURE SUBROUTINE eval_erosion_rates(flow_depth, speed, total_solid_fraction, &
               erosion_coefficient, erodible_porosity, erodible_fraction,            &
               erodible_inventory, time_step, solid_erosion_rate,                    &
@@ -106,6 +157,7 @@ CONTAINS
               solid_erosion_rate = 0.0_wp
         END IF
 
+        ! Restrict each species independently: the bed cannot supply more than it contains.
         solid_erosion_rate = MAX(0.0_wp, MIN(solid_erosion_rate,                 &
                   erodible_inventory / time_step))
         total_solid_erosion = SUM(solid_erosion_rate)

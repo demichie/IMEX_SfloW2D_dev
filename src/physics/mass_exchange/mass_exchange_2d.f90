@@ -1,4 +1,6 @@
-!> Cell-local mass exchange: process_rates dispatch, shared-resource limiting, conservative assembly.
+!> @brief mass exchange 2d: physical mass-exchange components and rate evaluation.
+!> @details Explicit physics is evaluated locally; unsupported treatment entry points
+!> fail explicitly. The coordinator alone enforces shared carrier inventories.
 MODULE mass_exchange_2d
     USE parameters_2d, ONLY : wp, n_vars, n_eqns, n_solid, n_add_gas, &
               idx_u, idx_v, idx_pore, idx_stoch, idx_stochEqn, idx_poreEqn, &
@@ -20,6 +22,17 @@ MODULE mass_exchange_2d
     PRIVATE
     PUBLIC :: eval_mass_exchange_terms
 CONTAINS
+    !> @brief Coordinate cell-local mass exchange, shared phase budgets and conservative source assembly.
+    !> @details Applies available-phase limits before conservative assembly.
+    !> Positive sources never cancel gross withdrawals in a shared inventory.
+    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
+    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
+    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
+    !> @param[in] erodible Available erodible solid inventory by species [m].
+    !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+    !> @param[in,out] total_rates Accumulated process rates and bed changes for this cell.
+    !> @param[out] eqns_term Conservative mass, momentum, energy and species source vector.
     SUBROUTINE eval_mass_exchange_terms(qp,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
         REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By,erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
@@ -59,6 +72,8 @@ CONTAINS
             carrier_volume=deposition_rates%continuous_phase_deposition_rate
             gas_factor=1.0_wp
             liquid_factor=1.0_wp
+            ! Gas withdrawal and pore filling draw on the same gas inventory;
+            ! do not offset physical sinks with any positive source.
             IF (gas_flag) THEN
                 ! Subtract dispersed solids and liquid from the available gas volume.
                 gas_available=MIN(h*MAX(0.0_wp,1.0_wp-alpha-alphal)/dt, &
@@ -76,6 +91,7 @@ CONTAINS
                 CALL scale_process(deposition_rates,liquid_factor)
                 CALL scale_process(liquid_loss_rates,liquid_factor)
             END IF
+            ! In two-carrier runs, dispersed liquid has its own budget.
             IF (gas_flag .AND. liquid_flag) THEN
                 ! Prescribed liquid loss consumes dispersed liquid, NOT carrier gas.
                 liquid_available=h*MAX(0.0_wp,alphal)/dt
@@ -83,6 +99,7 @@ CONTAINS
                 liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
                 CALL scale_process(liquid_loss_rates,liquid_factor)
             END IF
+            ! Assemble only the rates after all common-inventory limiters have acted.
             CALL accumulate_process(deposition_rates,u,v,total_rates,eqns_term)
             CALL accumulate_process(liquid_loss_rates,u,v,total_rates,eqns_term)
             CALL accumulate_process(darcy_loss_rates,u,v,total_rates,eqns_term)
@@ -90,6 +107,7 @@ CONTAINS
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
             CALL eval_mass_exchange_vaporization_explicit(B_zone,T,deposition_rates%solid_deposition_rate,process_rates)
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
+            ! Scalar transport and pore-pressure sources inherit the net mass exchange.
             IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(1)*stoch
             IF (pore_pressure_flag) eqns_term(idx_poreEqn)= &
                       eval_pore_pressure_mass_exchange_source(eqns_term(1),pore)
@@ -100,9 +118,13 @@ CONTAINS
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
         END IF
     END SUBROUTINE eval_mass_exchange_terms
-
     ! Limit simultaneous withdrawal demands from one physical inventory.
     ! Positive source total_rates are excluded from the budget, not netted against sinks.
+    !> @brief Limit simultaneous positive withdrawal demands against a single available inventory.
+    !> @details Positive signed rates are excluded from gross withdrawal budgets.
+    !> @param[in] signed_rates Signed process flux demands; negative values mean withdrawals.
+    !> @param[in] available Maximum withdrawal flux available from the shared phase inventory.
+    !> @return Dimensionless limiter in [0, 1].
     PURE REAL(wp) FUNCTION shared_withdrawal_factor(signed_rates,available) RESULT(f)
         REAL(wp), INTENT(IN) :: signed_rates(:),available
         REAL(wp) :: total_withdrawal
@@ -111,7 +133,13 @@ CONTAINS
         IF (total_withdrawal>0.0_wp) &
                   f=MIN(1.0_wp,MAX(0.0_wp,available)/total_withdrawal)
     END FUNCTION shared_withdrawal_factor
-
+    !> @brief Add one process contribution to conserved equations and diagnostic rate totals.
+    !> @details Sink momentum is advected with the local horizontal velocity.
+    !> @param[in] p Rates produced by one mass-exchange process.
+    !> @param[in] u Horizontal x velocity of the mobile material [m/s].
+    !> @param[in] v Horizontal y velocity of the mobile material [m/s].
+    !> @param[in,out] total Accumulated mass-exchange rates for the cell.
+    !> @param[in,out] eqns_term Conservative mass, momentum, energy and species source vector.
     SUBROUTINE accumulate_process(p,u,v,total,eqns_term)
         TYPE(mass_exchange_rates_type), INTENT(IN) :: p
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total
@@ -144,7 +172,9 @@ CONTAINS
         total%liquid_withdrawal_volume_rate= &
                   total%liquid_withdrawal_volume_rate+p%liquid_withdrawal_volume_rate
     END SUBROUTINE accumulate_process
-
+    !> @brief Apply a common resource-limiting factor to every contribution from one process.
+    !> @param[in,out] p Rates produced by one mass-exchange process.
+    !> @param[in] factor Common dimensionless reduction factor between zero and one.
     SUBROUTINE scale_process(p,factor)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: p
         REAL(wp), INTENT(IN) :: factor

@@ -1,5 +1,6 @@
-!> \brief Prescribed immobilization of liquid lava into a bed deposit.
-!> \details Only EXPLICIT is supported; all other treatments fail explicitly.
+!> @brief mass exchange lava deposition 2d: physical mass-exchange components and rate evaluation.
+!> @details Explicit physics is evaluated locally; unsupported treatment entry points
+!> fail explicitly. The coordinator alone enforces shared carrier inventories.
 MODULE mass_exchange_lava_deposition_2d
     USE parameters_2d, ONLY : wp, mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
@@ -19,6 +20,11 @@ MODULE mass_exchange_lava_deposition_2d
     PUBLIC :: eval_mass_exchange_lava_deposition_implicit
     PUBLIC :: solve_mass_exchange_lava_deposition_analytic
 CONTAINS
+    !> @brief Evaluate explicit immobilization of mobile lava.
+    !> @param[in] depth Mobile lava thickness [m].
+    !> @param[in] T Mobile flow temperature [K].
+    !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+    !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_lava_deposition_explicit(depth,T,dt,r)
         REAL(wp), INTENT(IN) :: depth,T,dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
@@ -30,40 +36,51 @@ CONTAINS
         r%lava_deposit_rate=r%continuous_phase_deposition_rate
         r%dB_dt=r%continuous_phase_deposition_rate
     END SUBROUTINE
-
-    !> \brief Unsupported semi-implicit lava deposition.
+    !> @brief Reject unsupported implicit treatment for lava_deposition_semi.
+    !> @details This entry point raises fatal_error; the rates are reset first.
+    !> @param[in] depth Mobile lava thickness [m].
+    !> @param[in] T Mobile flow temperature [K].
+    !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+    !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit(depth,T,dt,r)
         REAL(wp), INTENT(IN) :: depth,T,dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('lava_deposition: unsupported physical treatment')
     END SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit
-
-    !> \brief Unsupported implicit lava deposition.
+    !> @brief Reject unsupported implicit treatment for immobilization of mobile lava.
+    !> @details This entry point raises fatal_error; the rates are reset first.
+    !> @param[in] depth Mobile lava thickness [m].
+    !> @param[in] T Mobile flow temperature [K].
+    !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+    !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_lava_deposition_implicit(depth,T,dt,r)
         REAL(wp), INTENT(IN) :: depth,T,dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('lava_deposition: unsupported physical treatment')
     END SUBROUTINE eval_mass_exchange_lava_deposition_implicit
-
-    !> \brief Unsupported analytic lava deposition.
+    !> @brief Reject unsupported analytic treatment for immobilization of mobile lava.
+    !> @details This entry point raises fatal_error; the rates are reset first.
+    !> @param[in] depth Mobile lava thickness [m].
+    !> @param[in] T Mobile flow temperature [K].
+    !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+    !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE solve_mass_exchange_lava_deposition_analytic(depth,T,dt,r)
         REAL(wp), INTENT(IN) :: depth,T,dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('lava_deposition: unsupported physical treatment')
     END SUBROUTINE solve_mass_exchange_lava_deposition_analytic
-
-    !> \brief Requested immobile lava deposition thickness rate.
-    !> \details Caller enforces available thickness over dt.
-    !> \param[in] temperature Current mobile temperature [K].
-    !> \param[in] viscosity Lava kinematic viscosity [m2/s].
-    !> \return Prescribed deposition rate [m/s].
+    !> @brief Evaluate the configured temperature- or viscosity-dependent lava immobilization rate.
+    !> @param[in] temperature Material temperature [K].
+    !> @param[in] viscosity Lava kinematic viscosity [m2/s].
+    !> @return Physical rate from the indicated constitutive closure.
     PURE REAL(wp) FUNCTION eval_lava_deposition_rate(temperature,viscosity) RESULT(rate)
         REAL(wp), INTENT(IN) :: temperature,viscosity
         REAL(wp) :: factor
         factor=1.0_wp
+        ! Temperature and viscosity choices modulate the prescribed immobilization flux.
         SELECT CASE(TRIM(lava_deposition_model))
         CASE('TEMPERATURE')
               factor=MIN(1.0_wp,MAX(0.0_wp,(lava_deposition_temp_ref-temperature)/ &
@@ -74,12 +91,11 @@ CONTAINS
         END SELECT
         rate=MAX(0.0_wp,lava_deposition_rate)*factor
     END FUNCTION eval_lava_deposition_rate
-
-    !> \brief Evaluate an available-depth-limited lava immobilization rate.
-    !> \param[in] depth Mobile lava thickness [m].
-    !> \param[in] temperature Mobile lava temperature [K].
-    !> \param[in] dt Physical step duration [s].
-    !> \param[out] rate Immobile lava thickness gained per unit time [m/s].
+    !> @brief Cap lava immobilization by the mobile layer depth available over the time step.
+    !> @param[in] depth Mobile lava thickness [m].
+    !> @param[in] temperature Material temperature [K].
+    !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+    !> @param[out] rate Requested immobilization thickness rate [m/s].
     SUBROUTINE eval_lava_deposition_volume_kernel(depth,temperature,dt,rate)
         REAL(wp), INTENT(IN) :: depth,temperature,dt
         REAL(wp), INTENT(OUT) :: rate
