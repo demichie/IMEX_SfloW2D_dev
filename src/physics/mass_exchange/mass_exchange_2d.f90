@@ -43,7 +43,7 @@ CONTAINS
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
         REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
         TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates,darcy_loss_rates
-        REAL(wp) :: alphas(n_solid), alphag(n_add_gas), alphal, alpha
+        REAL(wp) :: alphas(n_solid), alphag(n_add_gas), alpha
         REAL(wp) :: u,v,h,T,pore,stoch
         REAL(wp) :: carrier_available,carrier_factor,carrier_volume,carrier_loss
         REAL(wp) :: carrier_withdrawals(2),solid_erosion,carrier_erosion
@@ -60,7 +60,7 @@ CONTAINS
         ! Processes requiring a gas/liquid carrier are evaluated only when that
         ! physical phase exists. Lava deposition is dispatched independently below.
         IF (gas_flag .OR. liquid_flag) THEN
-            CALL primitive_to_volume_fractions(qp,alphas,alphag,alphal)
+            CALL primitive_to_volume_fractions(qp,alphas,alphag)
             alpha=SUM(alphas)
             pore=0.0_wp
             stoch=0.0_wp

@@ -236,17 +236,16 @@ CONTAINS
   !> \param[out] alphas Solid volume fractions, one entry per solid class.
   !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
 
-  SUBROUTINE primitive_to_volume_fractions(qp, alphas, alphag, alphal)
+  SUBROUTINE primitive_to_volume_fractions(qp, alphas, alphag)
 
     REAL(wp), INTENT(IN) :: qp(n_vars+2)
-    REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas), alphal
+    REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
 
     REAL(wp) :: xs(n_solid), xg(n_add_gas)
     REAL(wp) :: rho_m, inv_rhom, rho_c, inv_rho_c
 
     alphas = 0.0_wp
     alphag = 0.0_wp
-    alphal = 0.0_wp
 
     IF (qp(1) .LE. EPSILON(1.0_wp)) RETURN
 
@@ -496,7 +495,7 @@ CONTAINS
   !>                           variable.
   !******************************************************************************
 
-  SUBROUTINE r_phys_var(qj, h, u, v, alphas, rho_m, T, alphal, alphag,          &
+  SUBROUTINE r_phys_var(qj, h, u, v, alphas, rho_m, T, alphag,          &
        red_grav, p_dyn, Zs, exc_pore_pres)
 
     IMPLICIT NONE
@@ -504,7 +503,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: qj(n_vars)
     REAL(wp), INTENT(OUT) :: h, u, v, T, rho_m
     REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
-    REAL(wp), INTENT(OUT) :: alphal, red_grav, p_dyn, Zs, exc_pore_pres
+    REAL(wp), INTENT(OUT) :: red_grav, p_dyn, Zs, exc_pore_pres
 
     REAL(wp) :: inv_rhom, rho_c, inv_rho_c
     REAL(wp) :: xs(n_solid), xg(n_add_gas)
@@ -561,7 +560,7 @@ CONTAINS
     COMPLEX(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
     COMPLEX(wp), INTENT(OUT) :: inv_rhom, Zs, exc_pore_pres
 
-    COMPLEX(wp) :: alphal, rho_c, inv_rho_c
+    COMPLEX(wp) :: rho_c, inv_rho_c
     COMPLEX(wp) :: xs(n_solid), xg(n_add_gas)
     COMPLEX(wp) :: xc, inv_qj1
     COMPLEX(wp) :: mixture_sp_heat_c, sp_heat_mix

@@ -38,14 +38,14 @@ CONTAINS
     SUBROUTINE eval_mass_exchange_deposition_explicit(qp,dt,r)
         REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
-        REAL(wp) :: alphas(n_solid),alphag(n_add_gas),alphal,alpha
+        REAL(wp) :: alphas(n_solid),alphag(n_add_gas),alpha
         REAL(wp) :: h,T,rho_m,rho_c,cp_c,Ri,redgrav,cpm,gas_phase_mass_fraction
         REAL(wp) :: gas_species_mass_fraction(n_add_gas)
 
         CALL reset_mass_exchange_rates(r)
         h=qp(1)
         T=qp(4)
-        CALL primitive_to_volume_fractions(qp,alphas,alphag,alphal)
+        CALL primitive_to_volume_fractions(qp,alphas,alphag)
         alpha=SUM(alphas)
         IF (alpha<=alphastot_min) RETURN
         CALL mixt_var(qp,Ri,rho_m,rho_c,redgrav,cp_c,cpm)

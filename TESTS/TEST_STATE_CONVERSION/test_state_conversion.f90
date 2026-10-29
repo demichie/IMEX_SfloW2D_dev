@@ -241,30 +241,28 @@ CONTAINS
     CHARACTER(LEN=*), INTENT(IN) :: label
     REAL(wp), INTENT(IN) :: qp(n_vars + 2), q(n_vars), tolerance
 
-    REAL(wp) :: alphas_qp(n_solid), alphag_qp(n_add_gas), alphal_qp
-    REAL(wp) :: alphas_mass(n_solid), alphag_mass(n_add_gas), alphal_mass
+    REAL(wp) :: alphas_qp(n_solid), alphag_qp(n_add_gas)
+    REAL(wp) :: alphas_mass(n_solid), alphag_mass(n_add_gas)
     REAL(wp) :: xs(n_solid), xg(n_add_gas), xl, xc
     REAL(wp) :: rho_mass, inv_rho_mass, rho_c_mass
     REAL(wp) :: rho_mix, rho_c_mix, red_grav, Ri
     REAL(wp) :: cp_c_mass, cp_mix_mass, cp_c_mix, cp_mix
     REAL(wp) :: inv_rho_c_mass
 
-    CALL primitive_to_volume_fractions(qp, alphas_qp, alphag_qp, alphal_qp)
+    CALL primitive_to_volume_fractions(qp, alphas_qp, alphag_qp)
 
     xs = q(idx_solid_first:idx_solid_last)/q(1)
     xg = q(idx_add_gas_first:idx_add_gas_last)/q(1)
     xl = 0.0_wp
-    IF (gas_flag .AND. liquid_flag) xl = q(n_vars)/q(1)
-
     CALL eval_mixture_properties_from_mass_fractions(                          &
          ! IN
-         qp(4), xs, xg, xl,                                                    &
+         qp(4), xs, xg,                                                    &
          ! OUT
          rho_mass, inv_rho_mass, rho_c_mass, inv_rho_c_mass,                   &
-         alphas_mass, alphag_mass, alphal_mass)
+         alphas_mass, alphag_mass)
     CALL eval_mixture_heat_capacity(                                           &
          ! IN
-         xs, xg, xl,                                                           &
+         xs, xg,                                                           &
          ! OUT
          xc, cp_c_mass, cp_mix_mass)
 
@@ -278,7 +276,6 @@ CONTAINS
          q(1)*cp_mix_mass*qp(4), tolerance)
     CALL assert_close_vector(label//' kernel alphas', alphas_mass, alphas_qp, tolerance)
     CALL assert_close_vector(label//' kernel alphag', alphag_mass, alphag_qp, tolerance)
-    CALL assert_close_scalar(label//' kernel alphal', alphal_mass, alphal_qp, tolerance)
 
   END SUBROUTINE check_thermodynamic_kernels
 
@@ -368,7 +365,7 @@ CONTAINS
     REAL(wp), ALLOCATABLE :: qp_cold(:), qp_hot(:), q(:), qp_roundtrip(:)
     REAL(wp) :: alphas_cold(n_solid), alphas_hot(n_solid)
     REAL(wp) :: alphag_cold(n_add_gas), alphag_hot(n_add_gas)
-    REAL(wp) :: alphal_cold, alphal_hot, p_dyn
+    REAL(wp) :: alphal_cold, p_dyn
 
     CALL configure_layout(.TRUE.)
     ALLOCATE (qp_cold(n_vars+2), qp_hot(n_vars+2), q(n_vars),                  &
@@ -380,9 +377,9 @@ CONTAINS
     qp_hot(4) = 600.0_wp
 
     CALL primitive_to_volume_fractions(qp_cold, alphas_cold, alphag_cold,     &
-         alphal_cold)
+         )
     CALL primitive_to_volume_fractions(qp_hot, alphas_hot, alphag_hot,        &
-         alphal_hot)
+         )
 
     CALL assert_true('volume fractions depend on temperature',               &
          MAXVAL(ABS(alphas_hot-alphas_cold)) .GT. 1.0E-8_wp)
@@ -524,12 +521,12 @@ CONTAINS
     CHARACTER(LEN=*), INTENT(IN) :: label
     REAL(wp), INTENT(IN) :: q(n_vars), tolerance
 
-    REAL(wp) :: h, u, v, T, rho_m, alphal, red_grav, p_dyn, Zs, pore
+    REAL(wp) :: h, u, v, T, rho_m, red_grav, p_dyn, Zs, pore
     REAL(wp) :: alphas(n_solid), alphag(n_add_gas)
     COMPLEX(wp) :: cq(n_vars), ch, cu, cv, cT, crho_m, cinv_rhom, cZs, cpore
     COMPLEX(wp) :: calphas(n_solid), calphag(n_add_gas)
     cq = CMPLX(q, 0.0_wp, wp)
-    CALL r_phys_var(q, h, u, v, alphas, rho_m, T, alphal, alphag, red_grav, &
+    CALL r_phys_var(q, h, u, v, alphas, rho_m, T, alphag, red_grav, &
                     p_dyn, Zs, pore)
     CALL c_phys_var(cq, ch, cu, cv, cT, crho_m, calphas, calphag, cinv_rhom, &
                     cZs, cpore)
@@ -609,10 +606,10 @@ CONTAINS
 
     REAL(wp), INTENT(IN) :: q(n_vars)
     REAL(wp), INTENT(OUT) :: outputs(5)
-    REAL(wp) :: h, u, v, T, rho_m, alphal, red_grav, p_dyn, Zs, pore
+    REAL(wp) :: h, u, v, T, rho_m, red_grav, p_dyn, Zs, pore
     REAL(wp) :: alphas(n_solid), alphag(n_add_gas)
 
-    CALL r_phys_var(q, h, u, v, alphas, rho_m, T, alphal, alphag, red_grav, &
+    CALL r_phys_var(q, h, u, v, alphas, rho_m, T, alphag, red_grav, &
                     p_dyn, Zs, pore)
     outputs = [h, u, v, T, rho_m]
 

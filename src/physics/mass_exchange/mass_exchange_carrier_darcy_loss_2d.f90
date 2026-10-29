@@ -28,7 +28,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
         REAL(wp) :: volume_loss,h,T,alpha,rho_c,cp_c,pore
-        REAL(wp) :: alphas(n_solid),alphag(n_add_gas),alphal
+        REAL(wp) :: alphas(n_solid),alphag(n_add_gas)
         REAL(wp) :: Ri,rhom,redgrav,cpm,gas_phase_mass_fraction
         REAL(wp) :: gas_species_mass_fraction(n_add_gas)
 
@@ -37,7 +37,7 @@ CONTAINS
         h=qp(1)
         T=qp(4)
         pore=qp(idx_pore)
-        CALL primitive_to_volume_fractions(qp,alphas,alphag,alphal)
+        CALL primitive_to_volume_fractions(qp,alphas,alphag)
         alpha=SUM(alphas)
         CALL mixt_var(qp,Ri,rhom,rho_c,redgrav,cp_c,cpm)
         gas_species_mass_fraction=qp(idx_add_gas_first:idx_add_gas_last)

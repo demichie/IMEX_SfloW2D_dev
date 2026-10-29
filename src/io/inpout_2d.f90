@@ -317,7 +317,6 @@ MODULE inpout_2d
   INTEGER             :: Temp_varid        !> ID for T
   INTEGER, ALLOCATABLE :: solid_varid(:)    !> ID for solid fractions
   INTEGER, ALLOCATABLE :: gas_varid(:)      !> ID for gas fractions
-  INTEGER             :: alphal_varid      !> ID for liquid fraction
   INTEGER, ALLOCATABLE :: stoch_varid(:)    !> ID for stochastic variable
   INTEGER, ALLOCATABLE :: pore_varid(:)     !> ID for pore pressure
   INTEGER             :: hMax_varid        !> ID for max of thickness
@@ -4985,7 +4984,7 @@ CONTAINS
     REAL(wp) :: xl, xr, yl, yr
 
     REAL(wp) :: rho_c, rho_m, inv_rhom, mass_fract(n_solid)
-    REAL(wp) :: alphag_init_local(n_add_gas), alphal_init_local
+    REAL(wp) :: alphag_init_local(n_add_gas)
     REAL(wp) :: xg_init(n_add_gas), xl_init, xc_init
     REAL(wp) :: sp_heat_c, sp_heat_mix
 
@@ -5252,15 +5251,14 @@ CONTAINS
       !----- END NEW INITIALIZATION OF THICKNESS FROM RESTART
 
       alphag_init_local = 0.0_wp
-      alphal_init_local = 0.0_wp
       CALL eval_mixture_properties_from_volume_fractions(                      &
            ! IN
            T_init, alphag_init_local,                                          &
            ! INOUT
-           alphas_init, alphal_init_local,                                     &
+           alphas_init,                                     &
            ! OUT
            rho_m, inv_rhom, rho_c,                                             &
-           mass_fract, xg_init, xl_init, xc_init, sp_heat_c, sp_heat_mix)
+           mass_fract, xg_init, xc_init, sp_heat_c, sp_heat_mix)
 
       state%q(1, :, :) = thickness_init(:, :)*rho_m
 
@@ -6633,7 +6631,6 @@ CONTAINS
 
     REAL(wp) :: alphas_prb(n_solid)
     REAL(wp) :: alphag_prb(n_add_gas)
-    REAL(wp) :: alphal_prb
     REAL(wp) :: qp_prb(n_vars+2)
     REAL(wp) :: dep_probe(n_solid)
 
@@ -6777,8 +6774,7 @@ CONTAINS
         END DO
 
 
-        CALL primitive_to_volume_fractions(qp_prb, alphas_prb, alphag_prb,    &
-             alphal_prb)
+        CALL primitive_to_volume_fractions(qp_prb, alphas_prb, alphag_prb)
 
         DO i_solid = 1, n_solid
           WRITE (probes_unit, 1710, ADVANCE='no') alphas_prb(i_solid), ','
@@ -6885,7 +6881,7 @@ CONTAINS
 
     REAL(wp) :: vel_mass_center, vel_radial_growth
 
-    REAL(wp) :: alphas_local(n_solid), alphag_local(n_add_gas), alphal_local
+    REAL(wp) :: alphas_local(n_solid), alphag_local(n_add_gas)
 
     had_history = runtime%runout%initialized
 
@@ -6930,7 +6926,7 @@ CONTAINS
       DO j = 1, sX
         DO k = 1, sY
           CALL primitive_to_volume_fractions(state%qp(1:n_vars+2,j,k),        &
-               alphas_local, alphag_local, alphal_local)
+               alphas_local, alphag_local)
           alphas_tot(j,k) = SUM(alphas_local)
         END DO
       END DO

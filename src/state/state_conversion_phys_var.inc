@@ -4,7 +4,7 @@
     !> \par Inputs
     !> qj, component indices, phase flags, ambient state and material parameters.
     !> \par Outputs
-    !> h, u, v, T, rho_m, rho_c, their reciprocals, alphas, alphag, alphal,
+    !> h, u, v, T, rho_m, rho_c, their reciprocals, alphas, alphag,
     !> Zs and exc_pore_pres. Temporary fractions and heat capacities are local.
     !--------------------------------------------------------------------------
     ! Shared executable core that derives the physical state from conservative
@@ -14,7 +14,6 @@
     !--------------------------------------------------------------------------
 
     alphag = 0.0_wp
-    alphal = 0.0_wp
     Zs = 0.0_wp
     exc_pore_pres = 0.0_wp
     xg = 0.0_wp
