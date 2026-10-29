@@ -176,9 +176,6 @@ MODULE parameters_2d
   
   REAL(wp) :: alphas_source(100)
   REAL(wp) :: alphag_source(100)
-  REAL(wp) :: alphal_source
-
-
   !> Flag to use a parameterized grain-size distribution instead of explicit arrays
   LOGICAL :: particle_distribution_flag
 
@@ -194,8 +191,6 @@ MODULE parameters_2d
 
   REAL(wp) :: xs_source(100)
   REAL(wp) :: xg_source(100)
-  REAL(wp) :: xl_source
-
   REAL(wp) :: time_param(4)
 
 

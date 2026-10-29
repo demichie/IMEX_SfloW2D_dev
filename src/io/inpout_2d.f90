@@ -84,8 +84,8 @@ MODULE inpout_2d
 
   ! -- Variables for the namelist RADIAL_SOURCE_PARAMETERS
   USE parameters_2d, ONLY: x_source, y_source, r_source, vel_source, &
-                           T_source, h_source, alphas_source, alphal_source, alphag_source, &
-                           time_param, Ri_source, mfr_source, xs_source, xl_source, xg_source, &
+                           T_source, h_source, alphas_source, alphag_source, &
+                           time_param, Ri_source, mfr_source, xs_source, xg_source, &
                            r2_source, angle_source, azimuth_source, arc_width_source, &
                            n_intervals, t_intervals, vel_intervals
 
@@ -162,6 +162,9 @@ MODULE inpout_2d
   USE parameters_2d, ONLY: gas_loss_flag
 
   IMPLICIT NONE
+
+  ! Scratch only: a second liquid phase is never transported or accepted in input.
+  REAL(wp) :: alphal_source=0.0_wp, xl_source=0.0_wp
   PRIVATE :: make_runout_headers
   PRIVATE :: finite_input_value
 
@@ -365,8 +368,8 @@ MODULE inpout_2d
 
   NAMELIST /radial_source_parameters/ x_source, y_source, r_source, &
     r2_source, angle_source, vel_source, T_source, h_source, &
-    alphas_source, alphal_source, alphag_source, time_param, Ri_source, &
-    mfr_source, xs_source, xl_source, xg_source, azimuth_source, arc_width_source, &
+    alphas_source, alphag_source, time_param, Ri_source, &
+    mfr_source, xs_source, xg_source, azimuth_source, arc_width_source, &
     n_intervals, t_intervals, vel_intervals
 
   NAMELIST /particle_distribution_parameters/ fractal_dim, diam_min, diam_max, &
@@ -374,14 +377,14 @@ MODULE inpout_2d
 
   NAMELIST /lateral_source_parameters/ source_side, x1_source, x2_source, &
     y1_source, y2_source, vel_source, T_source, h_source, alphas_source, &
-    alphal_source, alphag_source, time_param, Ri_source, mfr_source, &
-    xs_source, xl_source, xg_source, &
+    alphag_source, time_param, Ri_source, mfr_source, &
+    xs_source, xg_source, &
     boundary_injection_method, boundary_injection_cadence, boundary_injection_group
 
   NAMELIST /fissural_source_parameters/ x_fissures_end_points,                &
       y_fissures_end_points, width_fissures, linear_vel_fissures,              &
       T_fissures, time_param_fissures, alphas_source, alphag_source,           &
-      alphal_source, xs_source, xg_source, xl_source, &
+      xs_source, xg_source, &
       bottom_fissural_method, bottom_fissural_cadence, bottom_fissural_group
 
   NAMELIST /collapsing_volume_parameters/ x_collapse, y_collapse, &
@@ -973,10 +976,10 @@ CONTAINS
     vel_intervals(1:100) = -1.0_wp
     alphas_source = -1.0_wp
     alphag_source = -1.0_wp
-    alphal_source = -1.0_wp
+    alphal_source = 0.0_wp
     xs_source = -1.0_wp
     xg_source = -1.0_wp
-    xl_source = -1.0_wp
+    xl_source = 0.0_wp
     azimuth_source = 0.0_wp
     arc_width_source = 360.0_wp
 
@@ -3710,7 +3713,7 @@ CONTAINS
                      .OR. (lateral_source_flag) .OR.                        &
                      (bottom_fissural_source_flag)) THEN
 
-      alphal_source = -1.0_wp
+      alphal_source = 0.0_wp
 
       ! Rewind first: the preceding reads leave the file positioned
       ! wherever they finished, and an absent optional group scans to
@@ -4157,10 +4160,6 @@ CONTAINS
 
 
           ! No dispersed liquid component exists in a gaseous carrier.
-          IF (alphal_source>-1.0_wp .OR. xl_source>-1.0_wp) THEN
-
-            CALL fatal_error('source liquid fractions are unsupported')
-          END IF
 
         END IF
 
@@ -4748,7 +4747,7 @@ CONTAINS
 
       IF ((radial_source_flag) .OR. (bottom_radial_source_flag)) THEN
 
-        alphal_source = -1.0_wp
+        alphal_source = 0.0_wp
 
         WRITE (backup_unit, radial_source_parameters)
 
