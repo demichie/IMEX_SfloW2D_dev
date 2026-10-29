@@ -11,9 +11,10 @@ MODULE mass_exchange_carrier_darcy_loss_2d
   PUBLIC :: eval_mass_exchange_carrier_darcy_loss_implicit
   PUBLIC :: solve_mass_exchange_carrier_darcy_loss_analytic
 CONTAINS
-  SUBROUTINE eval_mass_exchange_carrier_darcy_loss_explicit(h,T,alphas,alpha,rho_c,pore,cp_c,gas_species_fraction,r)
+  SUBROUTINE eval_mass_exchange_carrier_darcy_loss_explicit(h,T,alphas,alpha,rho_c,pore,cp_c,gas_species_mass_fraction,gas_phase_mass_fraction,r)
     REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_c,pore,cp_c
-    REAL(wp), INTENT(IN) :: gas_species_fraction(n_add_gas)
+    REAL(wp), INTENT(IN) :: gas_species_mass_fraction(n_add_gas)
+    REAL(wp), INTENT(IN) :: gas_phase_mass_fraction
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     REAL(wp) :: volume_loss
     CALL reset_mass_exchange_rates(r)
@@ -22,29 +23,33 @@ CONTAINS
          CALL eval_pore_pressure_gas_loss(h,T,alphas,alpha,rho_c,pore,volume_loss)
     r%mixture_mass_rate=-rho_c*MAX(0.0_wp,volume_loss)
     r%energy_rate=T*cp_c*r%mixture_mass_rate
-    IF (n_add_gas>0) r%add_gas_mass_rate= &
-         r%mixture_mass_rate*gas_species_fraction
+    IF (n_add_gas>0 .AND. gas_phase_mass_fraction>0.0_wp) &
+         r%add_gas_mass_rate=r%mixture_mass_rate* &
+         gas_species_mass_fraction/gas_phase_mass_fraction
   END SUBROUTINE eval_mass_exchange_carrier_darcy_loss_explicit
 
-  SUBROUTINE eval_mass_exchange_carrier_darcy_loss_semi_implicit(h,T,alphas,alpha,rho_c,pore,cp_c,gas_species_fraction,r)
+  SUBROUTINE eval_mass_exchange_carrier_darcy_loss_semi_implicit(h,T,alphas,alpha,rho_c,pore,cp_c,gas_species_mass_fraction,gas_phase_mass_fraction,r)
     REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_c,pore,cp_c
-    REAL(wp), INTENT(IN) :: gas_species_fraction(n_add_gas)
+    REAL(wp), INTENT(IN) :: gas_species_mass_fraction(n_add_gas)
+    REAL(wp), INTENT(IN) :: gas_phase_mass_fraction
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('carrier_darcy_loss: unsupported semi_implicit method')
   END SUBROUTINE eval_mass_exchange_carrier_darcy_loss_semi_implicit
 
-  SUBROUTINE eval_mass_exchange_carrier_darcy_loss_implicit(h,T,alphas,alpha,rho_c,pore,cp_c,gas_species_fraction,r)
+  SUBROUTINE eval_mass_exchange_carrier_darcy_loss_implicit(h,T,alphas,alpha,rho_c,pore,cp_c,gas_species_mass_fraction,gas_phase_mass_fraction,r)
     REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_c,pore,cp_c
-    REAL(wp), INTENT(IN) :: gas_species_fraction(n_add_gas)
+    REAL(wp), INTENT(IN) :: gas_species_mass_fraction(n_add_gas)
+    REAL(wp), INTENT(IN) :: gas_phase_mass_fraction
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('carrier_darcy_loss: unsupported implicit method')
   END SUBROUTINE eval_mass_exchange_carrier_darcy_loss_implicit
 
-  SUBROUTINE solve_mass_exchange_carrier_darcy_loss_analytic(h,T,alphas,alpha,rho_c,pore,cp_c,gas_species_fraction,r)
+  SUBROUTINE solve_mass_exchange_carrier_darcy_loss_analytic(h,T,alphas,alpha,rho_c,pore,cp_c,gas_species_mass_fraction,gas_phase_mass_fraction,r)
     REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_c,pore,cp_c
-    REAL(wp), INTENT(IN) :: gas_species_fraction(n_add_gas)
+    REAL(wp), INTENT(IN) :: gas_species_mass_fraction(n_add_gas)
+    REAL(wp), INTENT(IN) :: gas_phase_mass_fraction
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('carrier_darcy_loss: unsupported analytic method')
