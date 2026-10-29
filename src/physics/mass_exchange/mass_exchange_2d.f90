@@ -35,60 +35,60 @@ CONTAINS
     ! Processes requiring a gas/liquid carrier are evaluated only when that
     ! physical phase exists. Lava deposition is dispatched independently below.
     IF (gas_flag .OR. liquid_flag) THEN
-    CALL primitive_to_volume_fractions(qp,alphas,alphag,alphal)
-    alpha=SUM(alphas)
-    pore=0.0_wp
-    stoch=0.0_wp
-    IF (pore_pressure_flag) pore=qp(idx_pore)
-    IF (stoch_transport_flag) stoch=qp(idx_stoch)
-    CALL eval_mass_exchange_erosion_explicit(h,u,v,Bx,By,alpha,erodible, &
-         dt,T,qp,process_rates)
-    CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
-    CALL eval_mass_exchange_deposition_explicit(qp,dt,deposition_rates)
-    CALL eval_mass_exchange_carrier_liquid_loss_explicit(qp,liquid_loss_rates)
-    CALL eval_mass_exchange_carrier_darcy_loss_explicit(qp,darcy_loss_rates)
-    ! Resource budgets use gross withdrawals, never signed net mass exchange.
-    ! Gas and liquid are different inventories when both phases are present.
-    ! The solid deposition rate is limited only when its required pore phase
-    ! cannot be supplied; a later Darcy/liquid sink cannot consume it twice.
-    carrier_volume=deposition_rates%continuous_phase_deposition_rate
-    gas_factor=1.0_wp
-    liquid_factor=1.0_wp
-    IF (gas_flag) THEN
-      ! Subtract dispersed solids and liquid from the available gas volume.
-      gas_available=MIN(h*MAX(0.0_wp,1.0_wp-alpha-alphal)/dt, &
-           h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt)
-      gas_withdrawals=[-carrier_volume,-darcy_loss_rates%gas_withdrawal_volume_rate]
-      gas_factor=shared_withdrawal_factor(gas_withdrawals,gas_available)
-      CALL scale_process(deposition_rates,gas_factor)
-      CALL scale_process(darcy_loss_rates,gas_factor)
-    ELSE
-      ! In a liquid-only run, pore filling and prescribed loss share one pool.
-      liquid_available=MIN(h*MAX(0.0_wp,1.0_wp-alpha)/dt, &
-           h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt)
-      liquid_withdrawals=[-carrier_volume,-liquid_loss_rates%liquid_withdrawal_volume_rate]
-      liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
-      CALL scale_process(deposition_rates,liquid_factor)
-      CALL scale_process(liquid_loss_rates,liquid_factor)
-    END IF
-    IF (gas_flag .AND. liquid_flag) THEN
-      ! Prescribed liquid loss consumes dispersed liquid, NOT carrier gas.
-      liquid_available=h*MAX(0.0_wp,alphal)/dt
-      liquid_withdrawals=[-liquid_loss_rates%liquid_withdrawal_volume_rate,0.0_wp]
-      liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
-      CALL scale_process(liquid_loss_rates,liquid_factor)
-    END IF
-    CALL accumulate_process(deposition_rates,u,v,total_rates,eqns_term)
-    CALL accumulate_process(liquid_loss_rates,u,v,total_rates,eqns_term)
-    CALL accumulate_process(darcy_loss_rates,u,v,total_rates,eqns_term)
-    CALL eval_mass_exchange_entrainment_explicit(qp,u,v,Bx,By,process_rates)
-    CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
-    CALL eval_mass_exchange_vaporization_explicit(B_zone,T,deposition_rates%solid_deposition_rate,process_rates)
-    CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
-    IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(1)*stoch
-    IF (pore_pressure_flag) eqns_term(idx_poreEqn)= &
-         eval_pore_pressure_mass_exchange_source(eqns_term(1),pore)
-    END IF
+      CALL primitive_to_volume_fractions(qp,alphas,alphag,alphal)
+      alpha=SUM(alphas)
+      pore=0.0_wp
+      stoch=0.0_wp
+      IF (pore_pressure_flag) pore=qp(idx_pore)
+      IF (stoch_transport_flag) stoch=qp(idx_stoch)
+      CALL eval_mass_exchange_erosion_explicit(h,u,v,Bx,By,alpha,erodible, &
+           dt,T,qp,process_rates)
+      CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
+      CALL eval_mass_exchange_deposition_explicit(qp,dt,deposition_rates)
+      CALL eval_mass_exchange_carrier_liquid_loss_explicit(qp,liquid_loss_rates)
+      CALL eval_mass_exchange_carrier_darcy_loss_explicit(qp,darcy_loss_rates)
+      ! Resource budgets use gross withdrawals, never signed net mass exchange.
+      ! Gas and liquid are different inventories when both phases are present.
+      ! The solid deposition rate is limited only when its required pore phase
+      ! cannot be supplied; a later Darcy/liquid sink cannot consume it twice.
+      carrier_volume=deposition_rates%continuous_phase_deposition_rate
+      gas_factor=1.0_wp
+      liquid_factor=1.0_wp
+      IF (gas_flag) THEN
+        ! Subtract dispersed solids and liquid from the available gas volume.
+        gas_available=MIN(h*MAX(0.0_wp,1.0_wp-alpha-alphal)/dt, &
+             h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt)
+        gas_withdrawals=[-carrier_volume,-darcy_loss_rates%gas_withdrawal_volume_rate]
+        gas_factor=shared_withdrawal_factor(gas_withdrawals,gas_available)
+        CALL scale_process(deposition_rates,gas_factor)
+        CALL scale_process(darcy_loss_rates,gas_factor)
+      ELSE
+        ! In a liquid-only run, pore filling and prescribed loss share one pool.
+        liquid_available=MIN(h*MAX(0.0_wp,1.0_wp-alpha)/dt, &
+             h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt)
+        liquid_withdrawals=[-carrier_volume,-liquid_loss_rates%liquid_withdrawal_volume_rate]
+        liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
+        CALL scale_process(deposition_rates,liquid_factor)
+        CALL scale_process(liquid_loss_rates,liquid_factor)
+      END IF
+      IF (gas_flag .AND. liquid_flag) THEN
+        ! Prescribed liquid loss consumes dispersed liquid, NOT carrier gas.
+        liquid_available=h*MAX(0.0_wp,alphal)/dt
+        liquid_withdrawals=[-liquid_loss_rates%liquid_withdrawal_volume_rate,0.0_wp]
+        liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
+        CALL scale_process(liquid_loss_rates,liquid_factor)
+      END IF
+      CALL accumulate_process(deposition_rates,u,v,total_rates,eqns_term)
+      CALL accumulate_process(liquid_loss_rates,u,v,total_rates,eqns_term)
+      CALL accumulate_process(darcy_loss_rates,u,v,total_rates,eqns_term)
+      CALL eval_mass_exchange_entrainment_explicit(qp,u,v,Bx,By,process_rates)
+      CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
+      CALL eval_mass_exchange_vaporization_explicit(B_zone,T,deposition_rates%solid_deposition_rate,process_rates)
+      CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
+      IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(1)*stoch
+      IF (pore_pressure_flag) eqns_term(idx_poreEqn)= &
+           eval_pore_pressure_mass_exchange_source(eqns_term(1),pore)
+    END IF  ! gas_flag .OR. liquid_flag
     ! Lava deposition follows the same process_rates-rate accumulation contract.
     IF (lava_deposition_flag) THEN
       CALL eval_mass_exchange_lava_deposition_explicit(h,T,dt,process_rates)
