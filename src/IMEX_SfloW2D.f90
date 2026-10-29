@@ -73,7 +73,7 @@ PROGRAM IMEX_SfloW2D
 
    USE inpout_2d, ONLY : restart
 
-   USE parameters_2d, ONLY : wp
+   USE parameters_2d, ONLY : wp, idx_h, idx_T, idx_totMassEqn
 
    USE parameters_2d, ONLY : t_start
    USE parameters_2d, ONLY : t_end
