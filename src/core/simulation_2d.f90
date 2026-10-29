@@ -101,7 +101,7 @@ CONTAINS
     CHARACTER(LEN=256) :: source_error
 
     CALL this%model_layout%initialize( n_layers, n_vars, n_eqns, n_solid,   &
-         n_add_gas, n_stoch_vars, n_pore_vars, .FALSE. )
+         n_add_gas, n_stoch_vars, n_pore_vars )
 
     CALL initialize_configured_sources(this%source_registry, &
          this%equation_partition,source_error)

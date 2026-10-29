@@ -29,8 +29,6 @@ MODULE model_layout_2d
      INTEGER :: n_additional_gas = 0
      INTEGER :: n_stochastic = 0
      INTEGER :: n_pore_pressure = 0
-     LOGICAL :: has_liquid_fraction = .FALSE.
-
      INTEGER :: idx_mass = 0
      INTEGER :: idx_momentum_x = 0
      INTEGER :: idx_momentum_y = 0
@@ -41,7 +39,6 @@ MODULE model_layout_2d
      INTEGER :: idx_additional_gas_last = 0
      INTEGER :: idx_stochastic = 0
      INTEGER :: idx_pore_pressure = 0
-     INTEGER :: idx_liquid_fraction = 0
      INTEGER :: idx_velocity_x = 0
      INTEGER :: idx_velocity_y = 0
 
@@ -82,12 +79,11 @@ CONTAINS
   !> \param[in] n_additional_gas Number of additional gas components, excluding ambient air.
   !> \param[in] n_stochastic Number of transported stochastic variables, zero or one.
   !> \param[in] n_pore_pressure Number of transported pore-pressure variables, zero or one.
-  !> \param[in] has_liquid_fraction True when a liquid mass fraction is independently transported.
   !******************************************************************************
 
   SUBROUTINE initialize_model_layout( this, n_layers, n_variables,           &
        n_equations, n_solid, n_additional_gas, n_stochastic,                &
-       n_pore_pressure, has_liquid_fraction )
+       n_pore_pressure )
 
     CLASS(model_layout_type), INTENT(INOUT) :: this
     INTEGER, INTENT(IN) :: n_layers
@@ -97,8 +93,6 @@ CONTAINS
     INTEGER, INTENT(IN) :: n_additional_gas
     INTEGER, INTENT(IN) :: n_stochastic
     INTEGER, INTENT(IN) :: n_pore_pressure
-    LOGICAL, INTENT(IN) :: has_liquid_fraction
-
     INTEGER :: next_index
 
     CALL this%finalize
@@ -127,8 +121,6 @@ CONTAINS
     this%n_additional_gas = n_additional_gas
     this%n_stochastic = n_stochastic
     this%n_pore_pressure = n_pore_pressure
-    this%has_liquid_fraction = has_liquid_fraction
-
     this%idx_mass = 1
     this%idx_momentum_x = 2
     this%idx_momentum_y = 3
@@ -150,12 +142,6 @@ CONTAINS
        next_index = next_index + 1
        this%idx_pore_pressure = next_index
     END IF
-
-    IF ( has_liquid_fraction ) THEN
-       next_index = next_index + 1
-       this%idx_liquid_fraction = next_index
-    END IF
-
     this%idx_velocity_x = n_variables + 1
     this%idx_velocity_y = n_variables + 2
 
@@ -188,8 +174,6 @@ CONTAINS
     this%n_additional_gas = 0
     this%n_stochastic = 0
     this%n_pore_pressure = 0
-    this%has_liquid_fraction = .FALSE.
-
     this%idx_mass = 0
     this%idx_momentum_x = 0
     this%idx_momentum_y = 0
@@ -200,7 +184,6 @@ CONTAINS
     this%idx_additional_gas_last = 0
     this%idx_stochastic = 0
     this%idx_pore_pressure = 0
-    this%idx_liquid_fraction = 0
     this%idx_velocity_x = 0
     this%idx_velocity_y = 0
 
@@ -227,7 +210,6 @@ CONTAINS
          .AND. this%n_variables == 4 + this%n_solid                          &
               + this%n_additional_gas + this%n_stochastic                   &
               + this%n_pore_pressure                                        &
-              + MERGE(1, 0, this%has_liquid_fraction)                       &
          .AND. this%n_physical_variables == this%n_variables + 2            &
          .AND. this%n_equations == this%n_variables                         &
          .AND. this%idx_mass == 1                                           &
@@ -245,8 +227,6 @@ CONTAINS
          .AND. this%idx_pore_pressure == MERGE(                             &
               5 + this%n_solid + this%n_additional_gas                      &
               + this%n_stochastic, 0, this%n_pore_pressure == 1)            &
-         .AND. this%idx_liquid_fraction == MERGE(this%n_variables, 0,       &
-              this%has_liquid_fraction)                                     &
          .AND. this%idx_velocity_x == this%n_variables + 1                  &
          .AND. this%idx_velocity_y == this%n_variables + 2
 

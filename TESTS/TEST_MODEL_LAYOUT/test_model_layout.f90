@@ -10,7 +10,7 @@ PROGRAM test_model_layout
   CALL assert_true('zero layers rejected', .NOT. supported_layer_count(0))
   CALL assert_true('two layers rejected for now', .NOT. supported_layer_count(2))
 
-  CALL layout%initialize(1, 6, 6, 1, 1, 0, 0, .FALSE.)
+  CALL layout%initialize(1, 6, 6, 1, 1, 0, 0)
 
   CALL assert_true('basic layout initialized', layout%is_initialized())
   CALL assert_true('basic counts', layout%n_layers == 1 .AND.               &
@@ -24,22 +24,21 @@ PROGRAM test_model_layout
        .AND. layout%idx_velocity_y == 8)
 
   ! Reconfigure the same descriptor with every current optional component.
-  CALL layout%initialize(1, 10, 10, 2, 1, 1, 1, .TRUE.)
+  CALL layout%initialize(1, 9, 9, 2, 1, 1, 1)
 
   CALL assert_true('full layout initialized', layout%is_initialized())
   CALL assert_true('full component counts', layout%n_solid == 2 .AND.       &
        layout%n_additional_gas == 1 .AND. layout%n_stochastic == 1         &
-       .AND. layout%n_pore_pressure == 1 .AND. layout%has_liquid_fraction)
+       .AND. layout%n_pore_pressure == 1 )
   CALL assert_true('full solid range', layout%idx_solid_first == 5 .AND.    &
        layout%idx_solid_last == 6)
   CALL assert_true('full optional indices',                                &
        layout%idx_additional_gas_first == 7 .AND.                          &
        layout%idx_additional_gas_last == 7 .AND.                           &
        layout%idx_stochastic == 8 .AND.                                    &
-       layout%idx_pore_pressure == 9 .AND.                                 &
-       layout%idx_liquid_fraction == 10)
-  CALL assert_true('full velocity indices', layout%idx_velocity_x == 11    &
-       .AND. layout%idx_velocity_y == 12)
+       layout%idx_pore_pressure == 9)
+  CALL assert_true('full velocity indices', layout%idx_velocity_x == 10    &
+       .AND. layout%idx_velocity_y == 11)
 
   CALL layout%finalize
   CALL assert_true('layout finalized', .NOT. layout%is_initialized())

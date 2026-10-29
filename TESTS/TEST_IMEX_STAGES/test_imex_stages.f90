@@ -659,12 +659,11 @@ CONTAINS
     rho_s=2500.0_wp; inv_rho_s=1.0_wp/rho_s; sp_heat_s=1100.0_wp
     IF (composition_mode>0) THEN
        ! Genuine current closures: two distinct solids, optionally additional
-       ! gas and explicit liquid. The untransported remainder is liquid or air.
+       ! gas. The untransported carrier is either liquid or air.
        n_solid=2; n_add_gas=0
-       gas_flag=composition_mode>=2; liquid_flag=composition_mode/=2
+       gas_flag=composition_mode>=2; liquid_flag=.NOT.gas_flag
        IF (gas_flag) n_add_gas=1
        n_vars=4+n_solid+n_add_gas
-       IF (gas_flag .AND. liquid_flag) n_vars=n_vars+1
        n_eqns=n_vars; idx_u=n_vars+1; idx_v=n_vars+2
        idx_solid_last=6; idx_solidEqn_last=6
        idx_add_gas_first=7; idx_add_gas_last=6+n_add_gas
