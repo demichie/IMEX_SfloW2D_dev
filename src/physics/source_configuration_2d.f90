@@ -15,7 +15,7 @@ MODULE source_configuration_2d
         thermal_cooling_flag, &
        pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag, &
        bottom_fissural_source_flag, radial_source_flag, lateral_source_flag, &
-       liquid_flag, gas_flag, gas_loss_flag, liquid_vaporization_flag, &
+       liquid_flag, gas_flag, lava_flag, gas_loss_flag, liquid_vaporization_flag, &
        idx_pore
   USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag, &
        coeff_porosity, entrainment_flag
@@ -30,6 +30,13 @@ CONTAINS
     CHARACTER(LEN=64), ALLOCATABLE, INTENT(OUT) :: active_names(:)
     CHARACTER(*), INTENT(OUT) :: error
     ALLOCATE(active_names(0))
+    error=''
+    IF (lava_flag .AND. (gas_flag .OR. liquid_flag)) THEN
+      error='LAVA_FLAG requires GAS_FLAG=F and LIQUID_FLAG=F'; RETURN
+    END IF
+    IF (.NOT.(lava_flag .OR. gas_flag .OR. liquid_flag)) THEN
+      error='At least one physical phase flag must be true'; RETURN
+    END IF
     IF (rheology_flag) THEN
       IF (LEN_TRIM(canonical_rheology_source_name(rheology_model))>0) &
            active_names=[CHARACTER(LEN=64) :: active_names,canonical_rheology_source_name(rheology_model)]
@@ -51,8 +58,8 @@ CONTAINS
            active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
     END IF
     IF (lava_deposition_flag) THEN
-      IF (.NOT.liquid_flag .OR. TRIM(rheology_model)/='lava') THEN
-        error='Lava deposition requires liquid lava rheology'; RETURN
+      IF (.NOT.lava_flag) THEN
+        error='Lava deposition requires LAVA_FLAG=T'; RETURN
       END IF
       active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_lava_deposition']
     END IF
@@ -111,6 +118,12 @@ CONTAINS
       term=source_term_descriptor_by_name(active_names(i))
       IF (LEN_TRIM(term%name)==0) THEN
         error='D18: unknown active source'; RETURN
+      END IF
+      IF ((lava_flag .AND. .NOT.term%allows_lava) .OR. &
+           (gas_flag .AND. .NOT.term%allows_gas) .OR. &
+           (liquid_flag .AND. .NOT.term%allows_liquid)) THEN
+        error='D18: source '//TRIM(term%name)//' incompatible with physical phase flags'
+        RETURN
       END IF
       method=term%default_method
       cadence=term%default_cadence

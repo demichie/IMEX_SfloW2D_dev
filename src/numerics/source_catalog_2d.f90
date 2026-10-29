@@ -23,6 +23,9 @@ MODULE source_catalog_2d
     LOGICAL :: has_analytic = .FALSE.
     INTEGER :: default_method = SOURCE_METHOD_NEWTON
     INTEGER :: default_cadence = SOURCE_CADENCE_STAGE
+    LOGICAL :: allows_gas = .TRUE.
+    LOGICAL :: allows_liquid = .TRUE.
+    LOGICAL :: allows_lava = .FALSE.
   END TYPE source_term_type
   ! Default method/cadence are explicit in each catalog entry; constants
   ! SOURCE_METHOD_* remain generic method IDs also used by the solvers.
@@ -36,10 +39,10 @@ MODULE source_catalog_2d
              default_cadence=SOURCE_CADENCE_STAGE), &
        source_term_type('rheology_lava','velocity',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, allows_gas=.FALSE., allows_liquid=.FALSE., allows_lava=.TRUE.), &
        source_term_type('rheology_lahar','velocity',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, allows_gas=.FALSE.), &
        source_term_type('rheology_empirical','velocity',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
              default_cadence=SOURCE_CADENCE_STAGE), &
@@ -63,7 +66,7 @@ MODULE source_catalog_2d
              default_cadence=SOURCE_CADENCE_STAGE), &
        source_term_type('thermal_cooling','temperature',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, allows_lava=.TRUE.), &
        source_term_type('pore_pressure_dissipation','pore_pressure',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
              default_cadence=SOURCE_CADENCE_STAGE), &
@@ -84,7 +87,7 @@ MODULE source_catalog_2d
              default_cadence=SOURCE_CADENCE_STAGE), &
        source_term_type('mass_exchange_lava_deposition','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STEP), &
+             default_cadence=SOURCE_CADENCE_STEP, allows_gas=.FALSE., allows_liquid=.FALSE., allows_lava=.TRUE.), &
        source_term_type('mass_exchange_erosion','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
              default_cadence=SOURCE_CADENCE_STEP), &
@@ -93,13 +96,13 @@ MODULE source_catalog_2d
              default_cadence=SOURCE_CADENCE_STEP), &
        source_term_type('mass_exchange_carrier_liquid_loss','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STEP), &
+             default_cadence=SOURCE_CADENCE_STEP, allows_gas=.FALSE.), &
        source_term_type('mass_exchange_carrier_darcy_loss','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STEP), &
+             default_cadence=SOURCE_CADENCE_STEP, allows_liquid=.FALSE.), &
        source_term_type('mass_exchange_entrainment','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STEP), &
+             default_cadence=SOURCE_CADENCE_STEP, allows_liquid=.FALSE.), &
        source_term_type('mass_exchange_vaporization','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
              default_cadence=SOURCE_CADENCE_STEP) &

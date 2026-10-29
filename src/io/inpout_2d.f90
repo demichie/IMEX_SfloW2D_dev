@@ -48,7 +48,7 @@ MODULE inpout_2d
                            n_pore_vars
   USE parameters_2d, ONLY: rheology_flag, &
                            topo_change_flag, radial_source_flag, collapsing_volume_flag, &
-                           liquid_flag, gas_flag, subtract_init_flag, bottom_radial_source_flag, &
+                           liquid_flag, gas_flag, lava_flag, subtract_init_flag, bottom_radial_source_flag, &
                            lateral_source_flag, serial_flag, &
                            bottom_fissural_source_flag, n_fissures, &
                            stochastic_flag, stoch_transport_flag, &
@@ -350,7 +350,7 @@ MODULE inpout_2d
   NAMELIST /newrun_parameters/ n_solid, topography_file, x0, y0, &
     comp_cells_x, comp_cells_y, cell_size, rheology_flag, &
     liquid_flag, radial_source_flag, collapsing_volume_flag, &
-    topo_change_flag, gas_flag, subtract_init_flag, n_add_gas, &
+    topo_change_flag, gas_flag, lava_flag, subtract_init_flag, n_add_gas, &
     bottom_radial_source_flag, slope_correction_flag, curvature_term_flag, &
     lateral_source_flag, bottom_fissural_source_flag, n_fissures, &
     stochastic_flag, n_layers, &
@@ -542,6 +542,7 @@ CONTAINS
     n_fissures = 0
     liquid_flag = .FALSE.
     gas_flag = .TRUE.
+     lava_flag = .FALSE.
     subtract_init_flag = .FALSE.
     slope_correction_flag = .FALSE.
     curvature_term_flag = .FALSE.
@@ -1202,7 +1203,11 @@ CONTAINS
 
     END IF
 
-    IF ((.NOT. liquid_flag) .AND. (.NOT. gas_flag)) THEN
+    IF (lava_flag .AND. (gas_flag .OR. liquid_flag)) THEN
+      ERROR STOP 'LAVA_FLAG requires GAS_FLAG=F and LIQUID_FLAG=F'
+    END IF
+
+    IF ((.NOT. liquid_flag) .AND. (.NOT. gas_flag) .AND. (.NOT. lava_flag)) THEN
 
       WRITE (*, *) 'IOSTAT=', ios
       WRITE (*, *) 'ERROR: problem with namelist NEWRUN_PARAMETERS'

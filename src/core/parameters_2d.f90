@@ -64,6 +64,7 @@ MODULE parameters_2d
 
   LOGICAL :: liquid_flag
 
+  LOGICAL :: lava_flag = .FALSE.
   LOGICAL :: gas_flag
   
   LOGICAL :: topo_change_flag
