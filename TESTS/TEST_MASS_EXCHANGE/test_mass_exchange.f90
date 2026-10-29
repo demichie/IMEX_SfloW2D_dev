@@ -12,7 +12,7 @@ PROGRAM test_mass_exchange
   USE state_conversion_2d, ONLY : qc_to_qp, mixt_var
   USE mass_exchange_deposition_2d, ONLY : settling_velocity
   USE mass_exchange_entrainment_2d, ONLY : eval_air_entrainment_rate
-  USE mass_exchange_laws_2d, ONLY : eval_mass_exchange_terms
+  USE mass_exchange_2d, ONLY : eval_mass_exchange_terms
   USE step_source_executor_2d, ONLY : apply_mass_exchange_step => execute_step_source_groups
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE source_registry_2d, ONLY : source_registry_type, source_group_type

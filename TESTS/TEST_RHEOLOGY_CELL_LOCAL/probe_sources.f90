@@ -14,7 +14,7 @@ PROGRAM probe_sources
   USE state_conversion_2d, ONLY : qc_to_qp
   USE geometry_2d, ONLY : pi_g
   USE source_terms_2d, ONLY : eval_source_implicit, eval_source_semi_implicit
-  USE mass_exchange_laws_2d, ONLY : eval_mass_exchange_terms
+  USE mass_exchange_2d, ONLY : eval_mass_exchange_terms
   USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_NEWTON
   USE source_registry_2d, ONLY : source_registry_type
   USE source_configuration_2d, ONLY : initialize_configured_sources
