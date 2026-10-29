@@ -153,8 +153,8 @@ CONTAINS
       alphal_local = 0.0_wp
       CALL eval_mixture_properties_from_volume_fractions(                     &
            T_collapse, alphag_collapse(1:n_add_gas), alphas_local,            &
-           alphal_local, rho_m, inv_rhom, rho_c, xs_collapse, xg_collapse,    &
-           xl_collapse, xc, sp_heat_c, sp_heat_mix)
+           rho_m, inv_rhom, rho_c, xs_collapse, xg_collapse,               &
+           xc, sp_heat_c, sp_heat_mix)
 
       qp_init(5:4+n_solid) = xs_collapse
       qp_init(4+n_solid+1:4+n_solid+n_add_gas) = xg_collapse

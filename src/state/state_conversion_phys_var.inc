@@ -13,7 +13,6 @@
     ! Keep this fragment type-independent so both paths use identical formulas.
     !--------------------------------------------------------------------------
 
-    alphal = 0.0_wp
     alphag = 0.0_wp
     Zs = 0.0_wp
     exc_pore_pres = 0.0_wp

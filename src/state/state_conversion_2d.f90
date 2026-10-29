@@ -132,7 +132,6 @@ CONTAINS
   !>
   !> \param[in,out] xs Solid mass fractions, one entry per solid class.
   !> \param[in,out] xg Additional-gas mass fractions, excluding ambient air.
-  !>                   both present.
   !> \param[in] context Optional diagnostic context included in closure errors.
 
   SUBROUTINE enforce_mass_fraction_closure(xs, xg, context)
@@ -237,7 +236,7 @@ CONTAINS
   !> \param[out] alphas Solid volume fractions, one entry per solid class.
   !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
 
-  SUBROUTINE primitive_to_volume_fractions(qp, alphas, alphag)
+  SUBROUTINE primitive_to_volume_fractions(qp, alphas, alphag, alphal)
 
     REAL(wp), INTENT(IN) :: qp(n_vars+2)
     REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas), alphal
@@ -247,6 +246,7 @@ CONTAINS
 
     alphas = 0.0_wp
     alphag = 0.0_wp
+    alphal = 0.0_wp
 
     IF (qp(1) .LE. EPSILON(1.0_wp)) RETURN
 
@@ -359,7 +359,7 @@ CONTAINS
 
     REAL(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas)
     REAL(wp), INTENT(OUT) :: rho_m, inv_rhom, rho_c, inv_rho_c
-    REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas), alphal
+    REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
     REAL(wp) :: xc, sp_gas_const_c, inv_rho_g(n_add_gas)
 
     INCLUDE 'mixture_from_mass.inc'
@@ -383,7 +383,7 @@ CONTAINS
 
     COMPLEX(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas)
     COMPLEX(wp), INTENT(OUT) :: rho_m, inv_rhom, rho_c, inv_rho_c
-    COMPLEX(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas), alphal
+    COMPLEX(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas)
     COMPLEX(wp) :: xc, sp_gas_const_c, inv_rho_g(n_add_gas)
 
     INCLUDE 'mixture_from_mass.inc'
@@ -617,7 +617,7 @@ CONTAINS
     REAL(wp) :: r_alphal                  !< real-value liquid volume fraction
     REAL(wp) :: r_inv_rhom, r_inv_rho_c
     REAL(wp) :: r_xs(n_solid), r_xg(n_add_gas)
-    REAL(wp) :: r_xl, r_xc
+    REAL(wp) :: r_xc
     REAL(wp) :: speed_squared, buoyancy_depth
 
     r_h = qpj(1)
@@ -744,7 +744,7 @@ CONTAINS
     REAL(wp) :: r_red_grav
     REAL(wp) :: r_Zs             !< real-value stochastic variable
     REAL(wp) :: r_exc_pore_pres  !< real-value pore pressure
-    REAL(wp) :: r_xs(n_solid), r_xg(n_add_gas), r_xl
+    REAL(wp) :: r_xs(n_solid), r_xg(n_add_gas)
 
     qp = 0.0_wp
 
@@ -831,7 +831,6 @@ CONTAINS
     REAL(wp) :: r_hv              !< real-value volumetric y-flow
     REAL(wp) :: r_alphas(n_solid) !< real-value solid volume fractions
     REAL(wp) :: r_alphag(n_add_gas)!< real-value add.gas volume fractions
-    REAL(wp) :: r_xl              !< real-value liquid mass fraction
     REAL(wp) :: r_xc              !< real-value carrier phase mass fraction
     REAL(wp) :: r_T               !< real-value temperature [K]
     REAL(wp) :: r_alphal          !< real-value liquid volume fraction
