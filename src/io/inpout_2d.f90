@@ -4157,63 +4157,10 @@ CONTAINS
         END IF
 
 
-          IF ((ANY(alphag_source(1:n_add_gas) .GT. -1.0_wp)) .AND. &
-              (xl_source .GT. -1.0_wp)) THEN
+          ! No dispersed liquid component exists in a gaseous carrier.
+          IF (alphal_source>-1.0_wp .OR. xl_source>-1.0_wp) THEN
 
-            WRITE (*, *) 'ERROR: problem with namelist RADIAL_VOLUME_PARAMETERS'
-            WRITE (*, *) 'DEFINE ONLY volume fractions or mass fractions'
-            WRITE (*, *) 'alphag_source =', alphag_source(1:n_add_gas)
-            WRITE (*, *) 'xl_source =', xl_source
-            WRITE (*, *) 'Please check the input file'
-            STOP
-
-          END IF
-
-          IF ((ANY(alphas_source(1:n_solid) .GT. -1.0_wp)) .AND. &
-              (xl_source .GT. -1.0_wp)) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist RADIAL_VOLUME_PARAMETERS'
-            WRITE (*, *) 'DEFINE ONLY volume fractions or mass fractions'
-            WRITE (*, *) 'alphas_source =', alphas_source(1:n_solid)
-            WRITE (*, *) 'xl_source =', xl_source
-            WRITE (*, *) 'Please check the input file'
-            STOP
-
-          END IF
-
-          IF ((ANY(xg_source(1:n_add_gas) .GT. -1.0_wp)) .AND. &
-              (alphal_source .GT. -1.0_wp)) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist RADIAL_VOLUME_PARAMETERS'
-            WRITE (*, *) 'DEFINE ONLY volume fractions or mass fractions'
-            WRITE (*, *) 'xg_source =', xg_source(1:n_add_gas)
-            WRITE (*, *) 'alphal_source =', alphal_source
-            WRITE (*, *) 'Please check the input file'
-            STOP
-
-          END IF
-
-          IF ((ANY(xs_source(1:n_solid) .GT. -1.0_wp)) .AND. &
-              (alphal_source .GT. -1.0_wp)) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist RADIAL_VOLUME_PARAMETERS'
-            WRITE (*, *) 'DEFINE ONLY volume fractions or mass fractions'
-            WRITE (*, *) 'xs_source =', xs_source(1:n_solid)
-            WRITE (*, *) 'alphal_source =', alphal_source
-            WRITE (*, *) 'Please check the input file'
-            STOP
-
-          END IF
-
-          IF ((alphal_source .GT. -1.0_wp) .AND. (xl_source .GT. -1.0_wp)) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist RADIAL_VOLUME_PARAMETERS'
-            WRITE (*, *) 'DEFINE ONLY liquid volume fract. or liquid mass fract.'
-            WRITE (*, *) 'alphal_source =', alphal_source
-            WRITE (*, *) 'xl_source =', xl_source
-            WRITE (*, *) 'Please check the input file'
-            STOP
-
+            CALL fatal_error('source liquid fractions are unsupported')
           END IF
 
         END IF
