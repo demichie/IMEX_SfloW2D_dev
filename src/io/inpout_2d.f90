@@ -2031,8 +2031,10 @@ CONTAINS
     n_vars = n_vars + n_solid
     n_eqns = n_vars
 
-    idx_u = n_vars + 1
-    idx_v = n_vars + 2
+    ! The canonical indices are required by inlet-state construction below.
+    ! Configure them as soon as all component counts are known, rather than
+    ! waiting for simulation initialization or restart input.
+    CALL configure_canonical_state_indices()
 
     WRITE (*, *) 'Model variables = ', n_vars
 
