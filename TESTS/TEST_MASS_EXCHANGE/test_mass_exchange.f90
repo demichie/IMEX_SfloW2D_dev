@@ -376,6 +376,7 @@ CONTAINS
     thermal_cooling_flag=.FALSE.;lava_deposition_flag=.FALSE.
     lava_deposition_rate=0.0_wp
     thermal_cadence='STAGE';thermal_group=0
+    lava_flag=.FALSE.;liquid_flag=.TRUE.
     WRITE(*,*) 'PASS D18 lava Newton/STEP deposition/STEP cooling/restart integration'
   END SUBROUTINE test_integrated_lava_deposition_cooling_restart
 
