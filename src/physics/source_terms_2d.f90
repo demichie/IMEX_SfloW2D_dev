@@ -725,18 +725,13 @@ CONTAINS
   !> \param[out] continuous_phase_loss_term Limited carrier loss rate.
   !> \param[out] eqns_term Conservative equation source-rate vector.
   !> \param[out] topo_term Proposed bed-elevation rate.
-  SUBROUTINE eval_step_source_explicit(qpj, B_zone, B_prime_x, B_prime_y, &
-       erodible, dt, erosion_term, deposition_term, &
-       continuous_phase_erosion_term, continuous_phase_loss_term, eqns_term, topo_term, lava_rate)
-    REAL(wp), INTENT(IN) :: qpj(n_vars+2), B_prime_x, B_prime_y
-    REAL(wp), INTENT(IN) :: erodible(n_solid), dt
+  SUBROUTINE eval_step_source_explicit(qpj,B_zone,B_prime_x,B_prime_y, &
+       erodible,dt,rates,eqns_term)
+    REAL(wp), INTENT(IN) :: qpj(n_vars+2),B_prime_x,B_prime_y
+    REAL(wp), INTENT(IN) :: erodible(n_solid),dt
     INTEGER, INTENT(IN) :: B_zone
-    REAL(wp), INTENT(OUT) :: erosion_term(n_solid), deposition_term(n_solid)
-    REAL(wp), INTENT(OUT) :: continuous_phase_erosion_term, continuous_phase_loss_term
-    REAL(wp), INTENT(OUT) :: eqns_term(n_eqns), topo_term, lava_rate
-
-    CALL eval_mass_exchange_terms(qpj, B_zone, B_prime_x, B_prime_y, &
-         erodible, dt, erosion_term, deposition_term, &
-         continuous_phase_erosion_term, continuous_phase_loss_term, eqns_term, topo_term, lava_rate)
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: rates
+    REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
+    CALL eval_mass_exchange_terms(qpj,B_zone,B_prime_x,B_prime_y,erodible,dt,rates,eqns_term)
   END SUBROUTINE eval_step_source_explicit
 END MODULE source_terms_2d

@@ -8,7 +8,7 @@
 MODULE step_source_executor_2d
 
   USE diagnostics_2d, ONLY : fatal_error
-  USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid
+  USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, mass_exchange_rates_type
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
@@ -145,12 +145,8 @@ CONTAINS
     REAL(wp), INTENT(IN), OPTIONAL :: stochastic_values(:,:)
     REAL(wp), INTENT(IN), OPTIONAL :: step_start_time
 
-    REAL(wp) :: erosion_term(n_solid)
-    REAL(wp) :: deposition_term(n_solid)
-    REAL(wp) :: continuous_phase_erosion_term
-    REAL(wp) :: continuous_phase_loss_term
+    TYPE(mass_exchange_rates_type) :: exchange_rates
     REAL(wp) :: eqns_term(n_eqns)
-    REAL(wp) :: topo_term, lava_rate
     REAL(wp) :: out_of_source_fraction
     REAL(wp) :: p_dyn
     CHARACTER(LEN=96) :: closure_context
@@ -255,11 +251,8 @@ CONTAINS
          CALL fatal_error('lava deposition requires TOPO_CHANGE_FLAG')
     IF (topo_change_flag) CALL begin_topography_rate_update
 
-    !$OMP PARALLEL DO private(j,k,closure_context,erosion_term,deposition_term, &
-    !$OMP & eqns_term,                                                          &
-    !$OMP & topo_term,                                                          &
-    !$OMP & continuous_phase_erosion_term,continuous_phase_loss_term,           &
-    !$OMP & out_of_source_fraction,p_dyn,lava_rate)
+    !$OMP PARALLEL DO private(j,k,closure_context,exchange_rates,eqns_term, &
+    !$OMP & out_of_source_fraction,p_dyn)
     DO l = 1, domain%solve_cells
 
        j = domain%j_cent(l)
@@ -273,28 +266,27 @@ CONTAINS
           CALL initialize_dry_physical_cell(qp(1:n_vars+2,j,k))
        END IF
 
-       CALL eval_source_explicit(qp(1:n_vars+2,j,k), B_zone(j,k),      &
-            B_prime_x_geom(j,k), B_prime_y_geom(j,k),                      &
-            erodible(1:n_solid,j,k), time_step, erosion_term,              &
-            deposition_term, continuous_phase_erosion_term,                &
-            continuous_phase_loss_term, eqns_term, topo_term, lava_rate)
+       CALL eval_source_explicit(qp(1:n_vars+2,j,k), B_zone(j,k), &
+            B_prime_x_geom(j,k), B_prime_y_geom(j,k), &
+            erodible(1:n_solid,j,k), time_step, exchange_rates, eqns_term)
 
        IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
           out_of_source_fraction = 1.0_wp - cell_source_fractions(j,k)
-          deposition_term = deposition_term * out_of_source_fraction
-          erosion_term = erosion_term * out_of_source_fraction
+          exchange_rates%solid_deposition_rate = exchange_rates%solid_deposition_rate*out_of_source_fraction
+          exchange_rates%solid_erosion_rate = exchange_rates%solid_erosion_rate*out_of_source_fraction
+          exchange_rates%continuous_phase_deposition_rate = &
+               exchange_rates%continuous_phase_deposition_rate*out_of_source_fraction
           eqns_term = eqns_term * out_of_source_fraction
-          topo_term = topo_term * out_of_source_fraction
-          lava_rate = lava_rate * out_of_source_fraction
+          exchange_rates%dB_dt = exchange_rates%dB_dt*out_of_source_fraction
        END IF
 
        CALL apply_mass_exchange_increment(q(1:n_vars,j,k),                 &
-            qp(1:n_vars+2,j,k), time_step, eqns_term, deposition_term,     &
-            erosion_term, deposit(j,k,1:n_solid), erosion(j,k,1:n_solid),  &
+            qp(1:n_vars+2,j,k), time_step, eqns_term, exchange_rates%solid_deposition_rate, &
+            exchange_rates%solid_erosion_rate, deposit(j,k,1:n_solid), erosion(j,k,1:n_solid),  &
             erodible(1:n_solid,j,k), erodible_deposit_flag, closure_context)
 
-       IF (lava_deposition_flag) lava_deposit(j,k)=lava_deposit(j,k)+time_step*lava_rate
-       IF (topo_change_flag) CALL record_topography_rate_cell(j, k, topo_term)
+       IF (lava_deposition_flag) lava_deposit(j,k)=lava_deposit(j,k)+time_step*exchange_rates%continuous_phase_deposition_rate
+       IF (topo_change_flag) CALL record_topography_rate_cell(j, k, exchange_rates%dB_dt)
 
     END DO
     !$OMP END PARALLEL DO
