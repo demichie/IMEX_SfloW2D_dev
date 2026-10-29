@@ -58,7 +58,6 @@ CONTAINS
 
         ! Processes requiring a gas/liquid carrier are evaluated only when that
         ! physical phase exists. Lava deposition is dispatched independently below.
-
         IF (gas_flag .OR. liquid_flag) THEN
             CALL primitive_to_volume_fractions(qp,alphas,alphag,alphal)
             alpha=SUM(alphas)
@@ -83,7 +82,6 @@ CONTAINS
 
             ! Gas withdrawal and pore filling draw on the same gas inventory;
             ! do not offset physical sinks with any positive source.
-
             IF (gas_flag) THEN
 
                 ! Subtract dispersed solids and liquid from the available gas volume.
@@ -93,7 +91,9 @@ CONTAINS
                 gas_factor=shared_withdrawal_factor(gas_withdrawals,gas_available)
                 CALL scale_process(deposition_rates,gas_factor)
                 CALL scale_process(darcy_loss_rates,gas_factor)
+
             ELSE
+
                 ! In a liquid-only run, pore filling and prescribed loss share one pool.
                 liquid_available=MIN(h*MAX(0.0_wp,1.0_wp-alpha)/dt, &
                           h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt)
@@ -102,8 +102,8 @@ CONTAINS
                 CALL scale_process(deposition_rates,liquid_factor)
                 CALL scale_process(liquid_loss_rates,liquid_factor)
             END IF
-            ! In two-carrier runs, dispersed liquid has its own budget.
 
+            ! In two-carrier runs, dispersed liquid has its own budget.
             IF (gas_flag .AND. liquid_flag) THEN
 
                 ! Prescribed liquid loss consumes dispersed liquid, NOT carrier gas.
@@ -112,6 +112,7 @@ CONTAINS
                 liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
                 CALL scale_process(liquid_loss_rates,liquid_factor)
             END IF
+
             ! Assemble only the rates after all common-inventory limiters have acted.
             CALL accumulate_process(deposition_rates,u,v,total_rates,eqns_term)
             CALL accumulate_process(liquid_loss_rates,u,v,total_rates,eqns_term)
@@ -126,8 +127,8 @@ CONTAINS
             IF (pore_pressure_flag) eqns_term(idx_poreEqn)= &
                       eval_pore_pressure_mass_exchange_source(eqns_term(1),pore)
         END IF  ! gas_flag .OR. liquid_flag
-        ! Lava deposition follows the same process_rates-rate accumulation contract.
 
+        ! Lava deposition follows the same process_rates-rate accumulation contract.
         IF (lava_deposition_flag) THEN
             CALL eval_mass_exchange_lava_deposition_explicit(h,T,dt,process_rates)
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)

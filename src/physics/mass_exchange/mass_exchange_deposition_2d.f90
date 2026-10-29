@@ -57,6 +57,7 @@ CONTAINS
             IF (liquid_flag) gas_phase_mass_fraction=gas_phase_mass_fraction-qp(n_vars)
             gas_phase_mass_fraction=MAX(0.0_wp,gas_phase_mass_fraction)
         END IF
+
         ! Evaluate settling before producing the conservative species, energy and bed terms.
         CALL eval_deposition_volume_kernel(h,T,alphas,alpha,rho_m,rho_c, &
                   dt,r%solid_deposition_rate)
@@ -134,7 +135,6 @@ CONTAINS
         deposition_rate = 0.0_wp
 
         ! For the gas carrier, use temperature-dependent viscosity and ideal-gas density.
-
         IF ( gas_flag .AND. sutherland_flag ) THEN
 
               dyn_visc_c = muRef_Suth * ( r_T / Tref_Suth )**1.5_wp *               &
@@ -202,7 +202,6 @@ CONTAINS
         Rey = diam * settling_velocity * inv_kin_visc
 
         ! Iterate the drag coefficient because Reynolds number depends on terminal speed.
-
         IF (Rey <= 1000.0_wp) THEN
 
               C_D_loop: DO i = 1, 20
@@ -212,7 +211,9 @@ CONTAINS
                           inv_sqrt_C_D = SQRT(1.0_wp / (24.0_wp * (1.0_wp +               &
                                     0.15_wp * Rey**(0.687_wp)) / Rey +                          &
                                     A_drag * (LOG(Rey) - B_drag)))
+
                     ELSE
+
                           inv_sqrt_C_D = SQRT(Rey / (24.0_wp * (1.0_wp +                 &
                                     0.15_wp * Rey**(0.687_wp))))
                     END IF
@@ -226,6 +227,7 @@ CONTAINS
 
                     Rey = diam * settling_velocity * inv_kin_visc
               END DO C_D_loop
+
         END IF
 
         RETURN
@@ -260,7 +262,9 @@ CONTAINS
                         total_solid_fraction)
               carrier_density = mixture_density
               inverse_kinematic_viscosity = mixture_density / fluid_viscosity
+
         ELSE
+
               inverse_kinematic_viscosity = 1.0_wp / kinematic_viscosity_fallback
         END IF
 
@@ -289,7 +293,9 @@ CONTAINS
         IF (model_name .EQ. 'lahar') THEN
               rate = eval_lahar_deposition_rate(solid_fraction, settling_velocity,   &
                         flow_depth, time_step)
+
         ELSE
+
               rate = eval_hindered_settling_deposition_rate(solid_fraction,         &
                         settling_velocity, flow_depth, time_step, total_solid_fraction,  &
                         maximum_solid_fraction, hindered_settling_exponent)

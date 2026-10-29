@@ -131,7 +131,9 @@ CONTAINS
                         erodible_porosity, erodible_fract(1:n_solid),                    &
                         erodible(1:n_solid), dt, erosion_rate(1:n_solid),                &
                         continuous_phase_erosion_rate)
+
         ELSE
+
               erosion_rate = 0.0_wp
               continuous_phase_erosion_rate = 0.0_wp
         END IF
@@ -168,7 +170,9 @@ CONTAINS
                         (1.0_wp - total_solid_fraction)
               total_solid_erosion = total_erosion * (1.0_wp - erodible_porosity)
               solid_erosion_rate = erodible_fraction * total_solid_erosion
+
         ELSE
+
               solid_erosion_rate = 0.0_wp
         END IF
 

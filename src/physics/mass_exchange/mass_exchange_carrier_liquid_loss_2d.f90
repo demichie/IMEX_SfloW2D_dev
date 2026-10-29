@@ -33,15 +33,17 @@ CONTAINS
             r%liquid_withdrawal_volume_rate=MAX(0.0_wp,loss_rate)
 
             ! In mixed-phase flow the removed liquid has its own density and enthalpy.
-
             IF (gas_flag) THEN
                 r%mixture_mass_rate=-rho_l*MAX(0.0_wp,loss_rate)
                 r%liquid_mass_rate=r%mixture_mass_rate
                 r%energy_rate=T*sp_heat_l*r%mixture_mass_rate
+
             ELSE
+
                 r%mixture_mass_rate=-rho_c*MAX(0.0_wp,loss_rate)
                 r%energy_rate=T*cp_c*r%mixture_mass_rate
             END IF
+
         END IF
 
     END SUBROUTINE eval_mass_exchange_carrier_liquid_loss_explicit
