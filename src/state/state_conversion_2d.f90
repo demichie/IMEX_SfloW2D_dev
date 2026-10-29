@@ -614,7 +614,7 @@ CONTAINS
     REAL(wp) :: r_alphas(n_solid)         !< real-value solid volume fractions
     REAL(wp) :: r_alphag(n_add_gas)       !< real-value add.gas volume fractions
     REAL(wp) :: r_T                       !< real-value temperature [K]
-    REAL(wp) :: r_alphal                  !< real-value liquid volume fraction
+    REAL(wp) :: r_alphal
     REAL(wp) :: r_inv_rhom, r_inv_rho_c
     REAL(wp) :: r_xs(n_solid), r_xg(n_add_gas)
     REAL(wp) :: r_xc
@@ -653,8 +653,6 @@ CONTAINS
 
     r_xs = qpj(idx_solid_first:idx_solid_last)
     r_xg = qpj(idx_add_gas_first:idx_add_gas_last)
-    r_xl = 0.0_wp
-
     CALL enforce_mass_fraction_closure(r_xs, r_xg)
 
     CALL eval_mixture_properties_from_mass_fractions(                          &
@@ -739,7 +737,7 @@ CONTAINS
     REAL(wp) :: r_alphas(n_solid) !< real-value solid volume fractions
     REAL(wp) :: r_rho_m           !< real-value mixture density [kg/m3]
     REAL(wp) :: r_T               !< real-value temperature [K]
-    REAL(wp) :: r_alphal          !< real-value liquid volume fraction
+    REAL(wp) :: r_alphal
     REAL(wp) :: r_alphag(n_add_gas) !< real-value add. gas volume fractions
     REAL(wp) :: r_red_grav
     REAL(wp) :: r_Zs             !< real-value stochastic variable
@@ -760,7 +758,6 @@ CONTAINS
 
     r_xs = 0.0_wp
     r_xg = 0.0_wp
-    r_xl = 0.0_wp
     IF ( qc(1) .GT. EPSILON(1.0_wp) ) THEN
        r_xs = qc(idx_solid_first:idx_solid_last) / qc(1)
        r_xg = qc(idx_add_gas_first:idx_add_gas_last) / qc(1)
@@ -833,7 +830,7 @@ CONTAINS
     REAL(wp) :: r_alphag(n_add_gas)!< real-value add.gas volume fractions
     REAL(wp) :: r_xc              !< real-value carrier phase mass fraction
     REAL(wp) :: r_T               !< real-value temperature [K]
-    REAL(wp) :: r_alphal          !< real-value liquid volume fraction
+    REAL(wp) :: r_alphal
     REAL(wp) :: r_rho_m           !< real-value mixture density [kg/m3]
     REAL(wp) :: r_rho_c           !< real-value carrier phase density [kg/m3]
     REAL(wp) :: r_xs(n_solid)     !< real-value solid mass fractions
@@ -845,8 +842,6 @@ CONTAINS
     REAL(wp) :: r_sp_heat_c
 
     REAL(wp) :: r_inv_rhom, r_inv_rho_c
-
-    r_xl = 0.0_wp
     r_Zs = 0.0_wp
     r_exc_pore_pres = 0.0_wp
 
