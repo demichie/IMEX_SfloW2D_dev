@@ -23,8 +23,9 @@ MODULE source_catalog_2d
     LOGICAL :: has_analytic = .FALSE.
     INTEGER :: default_method = SOURCE_METHOD_NEWTON
     INTEGER :: default_cadence = SOURCE_CADENCE_STAGE
-    LOGICAL :: allows_gas = .TRUE.
-    LOGICAL :: allows_liquid = .TRUE.
+    ! Explicit per-entry permissions; absent permissions never enable a new source.
+    LOGICAL :: allows_gas = .FALSE.
+    LOGICAL :: allows_liquid = .FALSE.
     LOGICAL :: allows_lava = .FALSE.
   END TYPE source_term_type
   ! Default method/cadence are explicit in each catalog entry; constants
@@ -33,79 +34,104 @@ MODULE source_catalog_2d
   TYPE(source_term_type), PARAMETER :: SOURCE_CATALOG(SOURCE_TERM_COUNT)=[ &
        source_term_type('rheology_voellmy','velocity',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('rheology_plastic','velocity',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('rheology_lava','velocity',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE, allows_gas=.FALSE., allows_liquid=.FALSE., allows_lava=.TRUE.), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.FALSE., allows_liquid=.FALSE., allows_lava=.TRUE.), &
        source_term_type('rheology_lahar','velocity',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE, allows_gas=.FALSE.), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.FALSE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('rheology_empirical','velocity',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('rheology_quadratic','velocity',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('rheology_froude','velocity',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('rheology_lucas','velocity',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('rheology_mui','velocity',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('rheology_mui_voellmy','velocity',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('rheology_newmodel','velocity',.FALSE.,.TRUE.,.FALSE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('thermal_cooling','temperature',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE, allows_lava=.TRUE.), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.TRUE.), &
        source_term_type('pore_pressure_dissipation','pore_pressure',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('bottom_circular_injection','explicit',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('bottom_fissural_injection','explicit',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('radial_injection','explicit',.TRUE.,.FALSE.,.FALSE., &
              default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('geometry_curvature','explicit',.TRUE.,.FALSE.,.FALSE., &
              default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('boundary_injection','explicit',.TRUE.,.FALSE.,.FALSE., &
              default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STAGE), &
+             default_cadence=SOURCE_CADENCE_STAGE, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('mass_exchange_lava_deposition','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STEP, allows_gas=.FALSE., allows_liquid=.FALSE., allows_lava=.TRUE.), &
+             default_cadence=SOURCE_CADENCE_STEP, &
+             allows_gas=.FALSE., allows_liquid=.FALSE., allows_lava=.TRUE.), &
        source_term_type('mass_exchange_erosion','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STEP), &
+             default_cadence=SOURCE_CADENCE_STEP, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('mass_exchange_deposition','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STEP), &
+             default_cadence=SOURCE_CADENCE_STEP, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('mass_exchange_carrier_liquid_loss','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STEP), &
+             default_cadence=SOURCE_CADENCE_STEP, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('mass_exchange_carrier_darcy_loss','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STEP, allows_liquid=.FALSE.), &
+             default_cadence=SOURCE_CADENCE_STEP, &
+             allows_gas=.TRUE., allows_liquid=.FALSE., allows_lava=.FALSE.), &
        source_term_type('mass_exchange_entrainment','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STEP, allows_liquid=.FALSE.), &
+             default_cadence=SOURCE_CADENCE_STEP, &
+             allows_gas=.TRUE., allows_liquid=.FALSE., allows_lava=.FALSE.), &
        source_term_type('mass_exchange_vaporization','mass_exchange',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             default_cadence=SOURCE_CADENCE_STEP) &
+             default_cadence=SOURCE_CADENCE_STEP, &
+             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.) &
        ]
 CONTAINS
   PURE FUNCTION source_term_descriptor_by_name(name) RESULT(term)
