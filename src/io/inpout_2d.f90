@@ -6750,22 +6750,22 @@ CONTAINS
         WRITE (probes_unit, 1710, ADVANCE='no') v_prb, ','
 
         qp_prb = 0.0_wp
-        qp_prb(1) = h_prb
-        qp_prb(4) = T_prb
+        qp_prb(idx_h) = h_prb
+        qp_prb(idx_T) = T_prb
 
         DO i_solid = 1, n_solid
 
-          CALL interp_2d_scalarB(x_comp, y_comp, state%qp(4 + i_solid, :, :), &
+          CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_solid_first + i_solid - 1, :, :), &
                                  probes_coords(1, k), probes_coords(2, k),     &
-                                 qp_prb(4 + i_solid))
+                                 qp_prb(idx_solid_first + i_solid - 1))
 
         END DO
 
         DO i_gas = 1, n_add_gas
 
-          CALL interp_2d_scalarB(x_comp, y_comp, state%qp(4 + n_solid + i_gas, :, :), &
+          CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_add_gas_first + i_gas - 1, :, :), &
                                  probes_coords(1, k), probes_coords(2, k),     &
-                                 qp_prb(4 + n_solid + i_gas))
+                                 qp_prb(idx_add_gas_first + i_gas - 1))
 
         END DO
 

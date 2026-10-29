@@ -9,7 +9,7 @@
 !********************************************************************************
 
 MODULE state_2d
-    USE parameters_2d, ONLY : idx_T
+    USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T
 
   USE constitutive_parameters_2d, ONLY : T_ambient
 
@@ -212,13 +212,13 @@ CONTAINS
        ! the existing machine-epsilon cleanup, this projection retains mass,
        ! thermal energy and every transported component. Keep qp consistent
        ! without repeating the thermodynamic conversion (depth is unchanged).
-       CALL project_dry_cell_momenta(q_cell, qp_cell(1))
-       IF (qp_cell(1) <= dry_thickness_tolerance) THEN
-          qp_cell(2:3) = 0.0_wp
+       CALL project_dry_cell_momenta(q_cell, qp_cell(idx_h))
+       IF (qp_cell(idx_h) <= dry_thickness_tolerance) THEN
+          qp_cell(idx_hu:idx_hv) = 0.0_wp
           qp_cell(idx_u:idx_v) = 0.0_wp
        END IF
 
-       IF ( qp_cell(4) .LT. 273.0_wp ) THEN
+       IF ( qp_cell(idx_T) .LT. 273.0_wp ) THEN
           CALL fatal_error('temperature below the admissible threshold')
 
        END IF
@@ -256,7 +256,7 @@ CONTAINS
   PURE SUBROUTINE initialize_dry_physical_cell(qp_cell)
     REAL(wp), INTENT(OUT) :: qp_cell(:)
     qp_cell = 0.0_wp
-    qp_cell(4) = T_ambient
+    qp_cell(idx_T) = T_ambient
   END SUBROUTINE initialize_dry_physical_cell
 
   !******************************************************************************
