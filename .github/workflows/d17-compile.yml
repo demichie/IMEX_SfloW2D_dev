@@ -94,15 +94,14 @@ jobs:
             -lnetcdff -llapack -lblas -lm -o build-logs/test_d17_production_newton
           build-logs/test_d17_production_newton 2>&1 | tee build-logs/production-newton.log
 
-      - name: Execute D17 mass exchange quantitative balance regression
+      - name: Execute production mass-exchange conservation and restart regressions
         shell: bash
+        env:
+          OMP_DYNAMIC: 'FALSE'
+          PYTHON: /usr/bin/python3
         run: |
           set -o pipefail
-          gfortran -O0 -g -fcheck=all -fbacktrace -fopenmp -I src -I src/state \
-            TESTS/ACCEPTANCE/test_d17_mass_balance.f90 \
-            $(find src -name '*.o' ! -name 'IMEX_SfloW2D.o' | sort) \
-            -lnetcdff -llapack -lblas -lm -o build-logs/test_d17_mass_balance
-          build-logs/test_d17_mass_balance 2>&1 | tee build-logs/mass-balance.log
+          sh TESTS/TEST_MASS_EXCHANGE/run_test.sh 2>&1 | tee build-logs/mass-balance.log
 
       - name: Record binary
         shell: bash
