@@ -27,7 +27,7 @@ def records(path):
             assert len(payload) == size and stream.read(4) == marker
             result.append(payload)
     assert result[0] == b'IMEX_SFLOW2D_RST'
-    assert struct.unpack('<i', result[1])[0] in (4, 5)
+    assert struct.unpack('<i', result[1])[0] == 7
     return result
 
 
@@ -594,8 +594,8 @@ def main():
         for payload in payloads[:-2]:
             marker = struct.pack('<i',len(payload))
             stream.write(marker+payload+marker)
-    continuation(case); run(case, 'rejected.log', 'Version 5 is required')
-    passed('reject version 4 with an explicit missing-history explanation')
+    continuation(case); run(case, 'rejected.log', 'Unsupported restart format version:')
+    passed('reject legacy version 4 with an explicit incompatible-format error')
 
     source = text.replace(' EPS_STOP=0,', ' EPS_STOP=1.0E99,')
     full = prepare('positive-stop-full', parameter(source, 'T_END','0.03'))
