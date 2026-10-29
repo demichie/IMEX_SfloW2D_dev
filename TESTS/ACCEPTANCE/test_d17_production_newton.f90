@@ -167,7 +167,7 @@ PROGRAM test_d17_production_newton
   bottom_fissural_source_flag=.FALSE.;radial_source_flag=.FALSE.
   lateral_source_flag=.FALSE.;gas_flag=.FALSE.
   gas_loss_flag=.FALSE.;liquid_vaporization_flag=.FALSE.
-  liquid_flag=.FALSE.;settling_flag=.FALSE.;entrainment_flag=.FALSE.
+  liquid_flag=.TRUE.;settling_flag=.FALSE.;entrainment_flag=.FALSE.
   erosion_coeff=0.0_wp
 
   CALL partition%initialize([.FALSE.,.TRUE.,.TRUE.,.FALSE.], &
