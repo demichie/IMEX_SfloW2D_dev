@@ -1103,9 +1103,21 @@ CONTAINS
     ! Independent volume-balance oracle for the coupled deposition and loss.
     BLOCK
        REAL(wp) :: ds,es,ec,dc,requested,inventory,margin,k,factor
+       REAL(wp) :: erosion_deficit,erosion_margin,erosion_factor
        ds=SUM(dep)
        es=SUM(ers)
        ec=coeff_porosity*es
+       ! Erosion is limited first, using the same packing inequality as
+       ! the production coordinator but independently computed increments.
+       erosion_deficit=(1.0_wp-maximum_solid_packing)*es - &
+            maximum_solid_packing*ec
+       erosion_margin=MAX(0.0_wp,h*(maximum_solid_packing-SUM(phi)))
+       IF (erosion_deficit>0.0_wp) THEN
+          erosion_factor=MIN(1.0_wp,erosion_margin/erosion_deficit)
+          ers=ers*erosion_factor
+          es=SUM(ers)
+          ec=coeff_porosity*es
+       END IF
        dc=coeff_porosity*ds
 
        IF (gas_flag) THEN
@@ -1190,8 +1202,12 @@ CONTAINS
           CASE('gas_inflow')
              IF (loss<0.0_wp) ERROR STOP 'negative gas withdrawal'
           CASE('gas_combined','gas_masked')
-             CALL assert_small('gas saturated deposition',MAXVAL(ABS(dep-q0(5:6,j,k)/rho_s)),1.0_wp)
-             CALL assert_small('gas saturated erosion',MAXVAL(ABS(ers-inv0(:,j,k))),1.0_wp)
+             ! Concurrent Darcy loss competes with pore-filling deposition;
+             ! neither process is guaranteed to exhaust its separate reserve.
+             IF (ANY(dep< -tol) .OR. ANY(dep>q0(5:6,j,k)/rho_s+tol)) &
+                  ERROR STOP 'combined gas deposition exceeded available solids'
+             IF (ANY(ers< -tol) .OR. ANY(ers>inv0(:,j,k)+tol)) &
+                  ERROR STOP 'combined gas erosion exceeded available substrate'
              IF (loss<=tol) ERROR STOP 'combined gas loss not exercised'
           END SELECT
        END IF
