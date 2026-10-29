@@ -239,7 +239,7 @@ CONTAINS
 
              CALL qc_to_qp(q_previous , qp_cell , p_dyn )
 
-             q_cell(idx_solidEqn_first:idx_solidEqn_last) = q_cell(idx_solidEqn_first:idx_solidEqn_last)                            &
+             q_cell(idx_solidEqn_first:idx_solidEqn_last) = q_cell(idx_solidEqn_first:idx_solidEqn_last) &
                   / SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) * q_cell(idx_totMassEqn)
 
           ELSE
