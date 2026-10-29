@@ -193,6 +193,7 @@ CONTAINS
     REAL(wp) :: expected_mass,expected_energy
     INTEGER :: j,k
     CALL reset_fixture
+    gas_flag=.FALSE.; liquid_flag=.FALSE.; lava_flag=.TRUE.
     rheology_model='lava'
     lava_deposition_flag=.TRUE.
     lava_deposition_model='CONSTANT'
@@ -230,6 +231,7 @@ CONTAINS
     CALL source_registry%finalize
     CALL equation_partition%finalize
     lava_deposition_flag=.FALSE.;lava_deposition_rate=0.0_wp
+    lava_flag=.FALSE.;liquid_flag=.TRUE.
     rheology_model='none'
     WRITE(*,*) 'PASS D18 immobile lava deposition STEP and production restart'
   END SUBROUTINE test_lava_deposition_transaction
@@ -259,6 +261,7 @@ CONTAINS
     CHARACTER(LEN=256) :: error
 
     CALL reset_fixture
+    gas_flag=.FALSE.;liquid_flag=.FALSE.;lava_flag=.TRUE.
     rheology_flag=.TRUE.;rheology_model='lava'
     rheology_method='NEWTON';rheology_cadence='STAGE';rheology_group=0
     thermal_cooling_flag=.TRUE.
@@ -710,6 +713,7 @@ CONTAINS
     ! Retain the fixture's liquid carrier; zero loss_rate makes the
     ! mass-exchange transaction a no-op in this cooling-only experiment.
     thermal_cooling_flag=.TRUE.
+    gas_flag=.FALSE.;liquid_flag=.FALSE.;lava_flag=.TRUE.
     rheology_flag=.TRUE.;rheology_model='lava'
     rheology_method='NEWTON';rheology_cadence='STAGE';rheology_group=1
     nu_ref=0.02_wp;visc_par=0.003_wp;tau0=0.0_wp;T_ref=900.0_wp
@@ -795,6 +799,7 @@ CONTAINS
     thermal_cooling_flag=.FALSE.;rheology_flag=.FALSE.;rheology_model='none'
     rheology_method='NEWTON';rheology_cadence='STAGE';rheology_group=0
     thermal_method='ANALYTIC';thermal_cadence='STAGE';thermal_group=0
+    lava_flag=.FALSE.;liquid_flag=.TRUE.
     WRITE(*,*) 'PASS D18 lava Newton stage followed by exact cooling STEP executor'
   END SUBROUTINE test_analytic_cooling_step_executor
 
@@ -949,7 +954,8 @@ CONTAINS
     CALL layout%finalize
     nq=7; n_vars=nq; n_eqns=nq; n_pore_vars=1
     idx_pore=7; idx_poreEqn=7; idx_u=8; idx_v=9
-    gas_flag=.TRUE.; liquid_flag=.FALSE.; pore_pressure_flag=.TRUE.; gas_loss_flag=.TRUE.
+    gas_flag=.TRUE.; liquid_flag=.FALSE.; lava_flag=.FALSE.
+    pore_pressure_flag=.TRUE.; gas_loss_flag=.TRUE.
     dynamic_permeability_flag=.FALSE.; f_inhibit_mode='OFF'
     kin_visc_c=1.0E-5_wp; hydraulic_permeability=1.0E-6_wp
     rho_c_sub=1.2_wp; pi_g=ACOS(-1.0_wp)
