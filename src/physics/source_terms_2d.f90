@@ -497,12 +497,12 @@ CONTAINS
        lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group )
 
     USE parameters_2d, ONLY : vel_source , T_source , xs_source , xg_source,    &
-         xl_source , time_param , bottom_radial_source_flag,                    &
+         time_param , bottom_radial_source_flag,                    &
          pore_pressure_flag , pore_pres_fract ,                                &
          n_intervals , t_intervals , vel_intervals ,                            &
          radial_source_flag , h_source, bottom_fissural_source_flag,            &
          n_fissures, linear_vel_fissures, T_fissures, time_param_fissures,      &
-         xs_fissures, xg_fissures, xl_fissures
+         xs_fissures, xg_fissures
 
     USE geometry_2d, ONLY : pi_g , bottom_source_area_ratio
 
