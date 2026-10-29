@@ -8027,10 +8027,11 @@ END IF
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic_check,        &
          topo_change_check, gas_check, liquid_check, lava_check
     CALL check_restart_io(ierr, io_message, 'reading model flags from', filename)
-    IF (stochastic_check .NEQV. stochastic_flag .OR.                       &
-         topo_change_check .NEQV. topo_change_flag .OR.                      &
-         gas_check .NEQV. gas_flag .OR. liquid_check .NEQV. liquid_flag .OR.  &
-         lava_check .NEQV. lava_flag) THEN
+    IF ((stochastic_check .NEQV. stochastic_flag) .OR.                     &
+         (topo_change_check .NEQV. topo_change_flag) .OR.                    &
+         (gas_check .NEQV. gas_flag) .OR.                                    &
+         (liquid_check .NEQV. liquid_flag) .OR.                              &
+         (lava_check .NEQV. lava_flag)) THEN
       WRITE(*,*) 'ERROR: Restart carrier/stochastic/topography flags do not match.'
       ERROR STOP 1
     END IF
