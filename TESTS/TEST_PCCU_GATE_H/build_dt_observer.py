@@ -14,7 +14,7 @@ import subprocess
 
 def instrument(source, include_spatial=False):
     """Insert I/O immediately before the single production IMEX advance call."""
-    marker = "      CALL simulation%time_integration%advance("
+    marker = "      CALL simulation%advance_timestep()"
     if source.count(marker) != 1:
         raise AssertionError("unexpected main signature: exactly one advance hook required")
     hook = """      BLOCK
@@ -26,11 +26,12 @@ def instrument(source, include_spatial=False):
       END BLOCK
 """
     if include_spatial:
-        declaration = "  IMPLICIT NONE"
+        declaration = "   IMPLICIT NONE"
         if source.count(declaration) != 1:
             raise AssertionError("unexpected main declaration")
         source = source.replace(declaration, declaration + "\n  REAL(wp) :: observed_spatial_dt", 1)
-        proposal = "           simulation%runtime%dt, simulation%domain)"
+        proposal = ("            simulation%runtime%dt, simulation%domain,                         &\n"
+                    "            boundary_source_enabled=boundary_source_enabled)")
         if source.count(proposal) != 1:
             raise AssertionError("unexpected spatial proposal hook")
         source = source.replace(proposal, proposal + "\n      observed_spatial_dt = simulation%runtime%dt", 1)
