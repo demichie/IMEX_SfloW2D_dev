@@ -16,6 +16,14 @@ or, on a osx computer:
 > conda activate fortran_env
 
 
+Current source architecture uses exactly one physical phase flag (gas, liquid, or
+lava). The old dispersed-liquid conservative component and its `xl_source`
+input are no longer supported. Mass exchange is assembled by
+`src/physics/mass_exchange/mass_exchange_2d.f90`; the binary checkpoint
+format is v7 and is not compatible with older versions. For the active
+implementation and validation scope see
+[the D18.MX consolidation status](docs/IMEX_SfloW2D_Development_Roadmap.md).
+
 To compile:
 
 Generated Autotools files such as `configure` and `Makefile.in` are not tracked

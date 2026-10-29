@@ -2605,6 +2605,14 @@ Questo audit confronta il codice `source_catalog_2d`, `source_configuration_2d`,
 
 Ogni passo deve costituire una modifica **sostanziale e coordinata** con i test pertinenti; non disperdere la migrazione in piccole modifiche senza chiusura dell'intero contratto. Non cambiare formule fisiche, tolleranze o oracoli per ottenere PASS.
 
+#### D18.MX — Consolidamento del carrier unico (29 ottobre 2026)
+
+**Stato dell'implementazione:** unico coordinatore `src/physics/mass_exchange/mass_exchange_2d.f90`; `mass_exchange_rates_type` condiviso; interfacce EXPLICIT/SEMI_IMPLICIT/IMPLICIT/ANALYTIC dei processi; budget condiviso di carrier e packing, con limite preventivo di erosione; nessuna equazione separata per il liquido disperso. I moduli `mass_exchange_laws_2d` e `mass_exchange_balance_2d` non fanno piu parte dell'architettura corrente. La configurazione valida seleziona esattamente uno tra gas, liquido e lava, senza compatibilita con le configurazioni precedenti.
+
+**Evidenza riproducibile:** GitHub Action `D17 compile diagnostics` verde per il commit `d00981cdc03a0e3ba62c30e2d8d239b07341752f` (29 ottobre 2026), con suite `TEST_MASS_EXCHANGE` e test di bilancio/packing/restart, profili `strict` e `optimized`, team OpenMP 1/4. Il formato restart binario attuale e v7 e registra i flag di fase; i checkpoint v6 non sono compatibili. La suite comprende inoltre quattro test Python e 1.350 casi algebrici single-carrier.
+
+**Pulizia test e tooling successiva:** al commit `bd082d3e40f01bd414e6e35f40fab5e85692d512` quattro runner storici sono stati riallineati all'ordine delle sorgenti di produzione da `src/Makefile.am`; il gate `test_d17_physical_interfaces.py` riconosce il nuovo coordinatore. Questa modifica e verificata staticamente ma **non e coperta dal run verde sopra citato**. Evitare di trattare le vecchie istantanee di roadmap e acceptance come stato corrente, e non segnare D18 scientificamente completo finche non siano verificati gli altri gate richiesti (in particolare end-to-end full RK, accuratezza dello splitting, GNU/ifx e workflow storici).
+
 #### D18.MX - PRIORITA' 1: architettura unificata del mass exchange (28 ottobre 2026)
 
 **Stato: SPECIFICA DEFINITA / IMPLEMENTAZIONE DA COMPLETARE.** Questa sezione descrive direttamente l'architettura obiettivo per tutte le sorgenti di scambio di massa. E' il contratto normativo per i lavori futuri; D17.5, D17.8-D17.10 e D18.0-D18.6 documentano anche implementazioni storiche, i cui stati CI non certificano ancora questa architettura. Priorita' immediata prima dell'estensione delle leggi fisiche.

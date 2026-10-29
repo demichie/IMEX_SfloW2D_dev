@@ -23,7 +23,7 @@ variables; all physical fields have dimensions `(x, y, time)`.
 | velocity components | `u`, `v`, `w` |
 | solid fractions | `solid_frac_XX` |
 | additional-gas fractions | `add_gas_frac_XX` |
-| liquid fraction | `alphal` |
+| dispersed-liquid fraction (removed) | not emitted; no dispersed-liquid conservative component in the current state |
 | temperature | `T` |
 | mixture density | `rhomix` |
 | reduced gravity | `red grav` |
