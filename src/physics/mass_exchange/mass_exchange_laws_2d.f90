@@ -7,6 +7,8 @@ MODULE mass_exchange_laws_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
   USE mass_exchange_balance_2d, ONLY : assemble_mass_exchange_balance
+  USE mass_exchange_lava_deposition_2d, ONLY: lava_deposition_flag, eval_mass_exchange_lava_deposition_explicit
+  USE mass_exchange_rates_2d, ONLY: mass_exchange_rates_type
   USE mass_exchange_carrier_loss_2d, ONLY : eval_mass_exchange_carrier_loss_explicit
   USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
   USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
@@ -51,7 +53,7 @@ CONTAINS
   SUBROUTINE eval_mass_exchange_terms( qpj , B_zone , B_prime_x , B_prime_y ,   &
        erodible , dt , erosion_term , deposition_term ,                         &
        continuous_phase_erosion_term , continuous_phase_loss_term , eqns_term , &
-       topo_term  )
+       topo_term, lava_rate  )
 
     USE parameters_2d, ONLY : erodible_deposit_flag , liquid_vaporization_flag ,&
          pore_pressure_flag , gas_loss_flag
@@ -70,7 +72,8 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: continuous_phase_erosion_term
     REAL(wp), INTENT(OUT) :: continuous_phase_loss_term
     REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-    REAL(wp), INTENT(OUT) :: topo_term
+    REAL(wp), INTENT(OUT) :: topo_term, lava_rate
+    TYPE(mass_exchange_rates_type) :: lava_rates
 
 
     REAL(wp) :: mod_vel
@@ -109,6 +112,7 @@ CONTAINS
     continuous_phase_loss_term = 0.0_wp
     eqns_term(1:n_eqns) = 0.0_wp
     topo_term = 0.0_wp
+    lava_rate = 0.0_wp
     r_Zs = 0.0_wp
     r_exc_pore_pres = 0.0_wp
 
@@ -116,6 +120,18 @@ CONTAINS
 
        RETURN
 
+    END IF
+
+    IF (lava_deposition_flag) THEN
+      IF (.NOT.lava_flag) CALL fatal_error('lava deposition requires LAVA_FLAG=T')
+      CALL eval_mass_exchange_lava_deposition_explicit(qpj(1),qpj(4),dt,lava_rates)
+      lava_rate = lava_rates%continuous_phase_deposition_rate
+      eqns_term(1) = lava_rates%mixture_mass_rate
+      eqns_term(2) = qpj(idx_u)*MIN(0.0_wp,lava_rates%mixture_mass_rate)
+      eqns_term(3) = qpj(idx_v)*MIN(0.0_wp,lava_rates%mixture_mass_rate)
+      eqns_term(4) = lava_rates%energy_rate
+      topo_term = lava_rates%dB_dt
+      RETURN
     END IF
 
     r_h = qpj(1)

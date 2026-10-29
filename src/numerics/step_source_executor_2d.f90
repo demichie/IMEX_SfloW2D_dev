@@ -136,7 +136,6 @@ CONTAINS
          pore_pressure_flag, liquid_flag
     USE state_2d, ONLY : initialize_dry_physical_cell
     USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag
-    USE mass_exchange_balance_2d, ONLY : add_lava_deposition_balance
 
     REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
@@ -278,15 +277,7 @@ CONTAINS
             B_prime_x_geom(j,k), B_prime_y_geom(j,k),                      &
             erodible(1:n_solid,j,k), time_step, erosion_term,              &
             deposition_term, continuous_phase_erosion_term,                &
-            continuous_phase_loss_term, eqns_term, topo_term)
-
-       lava_rate=0.0_wp
-       IF (lava_deposition_flag .AND. q(1,j,k)>0.0_wp) THEN
-          IF (SUM(q(5:4+n_solid,j,k))>0.0_wp) &
-               CALL fatal_error('lava deposition requires a pure liquid cell')
-          CALL add_lava_deposition_balance(qp(:,j,k),time_step, &
-               continuous_phase_loss_term,eqns_term,topo_term,lava_rate)
-       END IF
+            continuous_phase_loss_term, eqns_term, topo_term, lava_rate)
 
        IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
           out_of_source_fraction = 1.0_wp - cell_source_fractions(j,k)

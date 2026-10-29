@@ -6,28 +6,10 @@ MODULE mass_exchange_balance_2d
   USE constitutive_parameters_2d
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source
   USE mass_exchange_vaporization_2d, ONLY : eval_mass_exchange_vaporization_rates_explicit
-  USE mass_exchange_lava_deposition_2d, ONLY : eval_mass_exchange_lava_deposition_explicit
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: assemble_mass_exchange_balance, add_lava_deposition_balance
+  PUBLIC :: assemble_mass_exchange_balance
 CONTAINS
-  !> Assemble lava source with physical exchange balances; reserve carrier loss first.
-  SUBROUTINE add_lava_deposition_balance(qp,dt,carrier_loss,eqns_term,topo_term,lava_rate)
-    REAL(wp), INTENT(IN) :: qp(n_vars+2),dt,carrier_loss
-    REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns),topo_term
-    REAL(wp), INTENT(OUT) :: lava_rate
-    REAL(wp) :: available_depth
-    lava_rate=0.0_wp
-    available_depth=MAX(0.0_wp,qp(1)-dt*MAX(0.0_wp,carrier_loss))
-    IF (available_depth<=0.0_wp) RETURN
-    CALL eval_mass_exchange_lava_deposition_explicit(available_depth,qp(4),dt,lava_rate)
-    eqns_term(1)=eqns_term(1)-rho_l*lava_rate
-    eqns_term(2)=eqns_term(2)-rho_l*lava_rate*qp(idx_u)
-    eqns_term(3)=eqns_term(3)-rho_l*lava_rate*qp(idx_v)
-    eqns_term(4)=eqns_term(4)-rho_l*sp_heat_l*qp(4)*lava_rate
-    topo_term=topo_term+lava_rate
-  END SUBROUTINE add_lava_deposition_balance
-
   SUBROUTINE assemble_mass_exchange_balance(B_zone, r_u, r_v, r_T, r_rho_c, &
        r_sp_heat_c, T_erodible_local, air_entr, r_Zs, r_exc_pore_pres, &
        erosion_term, deposition_term, continuous_phase_erosion_term, &
