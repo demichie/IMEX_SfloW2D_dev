@@ -7,6 +7,7 @@
 !********************************************************************************
 
 MODULE state_conversion_2d
+  USE parameters_2d, ONLY : idx_hu, idx_hv
 
     USE parameters_2d, ONLY : idx_h, idx_T
   USE constitutive_parameters_2d
@@ -748,8 +749,8 @@ CONTAINS
 
     qp(idx_h) = r_h
 
-    qp(2) = r_h*r_u
-    qp(3) = r_h*r_v
+    qp(idx_hu) = r_h*r_u
+    qp(idx_hv) = r_h*r_v
 
     qp(idx_T) = r_T
 
@@ -845,8 +846,8 @@ CONTAINS
 
     IF ( r_h .GT. EPSILON(1.0_wp) ) THEN
 
-       r_hu = qp(2)
-       r_hv = qp(3)
+       r_hu = qp(idx_hu)
+       r_hv = qp(idx_hv)
 
        r_u = qp(idx_u)
        r_v = qp(idx_v)
@@ -935,8 +936,8 @@ CONTAINS
 
     ELSE
 
-       qp2j(2) = qpj(2)/qpj(idx_h)
-       qp2j(3) = qpj(3)/qpj(idx_h)
+       qp2j(2) = qpj(idx_hu)/qpj(idx_h)
+       qp2j(3) = qpj(idx_hv)/qpj(idx_h)
 
     END IF
 
