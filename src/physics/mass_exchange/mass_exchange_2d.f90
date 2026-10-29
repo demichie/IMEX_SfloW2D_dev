@@ -93,6 +93,13 @@ CONTAINS
 
                 liquid_available=h*MAX(0.0_wp,alphal)/dt
                 liquid_factor=shared_withdrawal_factor([-liquid_loss],liquid_available)
+
+                ! A liquid withdrawal alone can raise the solid fraction.
+                ! Enforce packing before reserving the remaining margin for gas.
+                packing_factor=packing_withdrawal_factor(h,alpha,solid_erosion, &
+                          carrier_erosion,0.0_wp,0.0_wp,liquid_loss,0.0_wp, &
+                          maximum_solid_packing,dt)
+                liquid_factor=MIN(liquid_factor,packing_factor)
                 CALL scale_process(liquid_loss_rates,liquid_factor)
                 liquid_loss=liquid_loss*liquid_factor
             END IF
