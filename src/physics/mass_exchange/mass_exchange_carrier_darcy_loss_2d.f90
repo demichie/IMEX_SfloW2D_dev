@@ -10,13 +10,17 @@ MODULE mass_exchange_carrier_darcy_loss_2d
     USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_gas_loss
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : primitive_to_volume_fractions, mixt_var
+
     IMPLICIT NONE
     PRIVATE
+
     PUBLIC :: eval_mass_exchange_carrier_darcy_loss_explicit
     PUBLIC :: eval_mass_exchange_carrier_darcy_loss_semi_implicit
     PUBLIC :: eval_mass_exchange_carrier_darcy_loss_implicit
     PUBLIC :: solve_mass_exchange_carrier_darcy_loss_analytic
+
 CONTAINS
+
     !> @brief Evaluate explicit pressure-driven carrier gas loss.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
@@ -27,6 +31,7 @@ CONTAINS
         REAL(wp) :: alphas(n_solid),alphag(n_add_gas),alphal
         REAL(wp) :: Ri,rhom,redgrav,cpm,gas_phase_mass_fraction
         REAL(wp) :: gas_species_mass_fraction(n_add_gas)
+
         CALL reset_mass_exchange_rates(r)
         IF (.NOT.(gas_flag .AND. pore_pressure_flag .AND. gas_loss_flag)) RETURN
         h=qp(1)
@@ -36,6 +41,7 @@ CONTAINS
         alpha=SUM(alphas)
         CALL mixt_var(qp,Ri,rhom,rho_c,redgrav,cp_c,cpm)
         gas_species_mass_fraction=qp(idx_add_gas_first:idx_add_gas_last)
+
         ! Recover carrier gas mass fraction before partitioning withdrawal among gas species.
         gas_phase_mass_fraction=MAX(0.0_wp,1.0_wp- &
                   SUM(qp(idx_solid_first:idx_solid_last)))
@@ -52,6 +58,7 @@ CONTAINS
                   r%add_gas_mass_rate=r%mixture_mass_rate* &
                   gas_species_mass_fraction/gas_phase_mass_fraction
     END SUBROUTINE eval_mass_exchange_carrier_darcy_loss_explicit
+
     !> @brief Reject unsupported semi-implicit treatment for carrier darcy loss.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
@@ -59,9 +66,11 @@ CONTAINS
     SUBROUTINE eval_mass_exchange_carrier_darcy_loss_semi_implicit(qp,r)
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('carrier_darcy_loss: unsupported semi_implicit method')
     END SUBROUTINE eval_mass_exchange_carrier_darcy_loss_semi_implicit
+
     !> @brief Reject unsupported implicit treatment for pressure-driven carrier gas loss.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
@@ -69,9 +78,11 @@ CONTAINS
     SUBROUTINE eval_mass_exchange_carrier_darcy_loss_implicit(qp,r)
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('carrier_darcy_loss: unsupported implicit method')
     END SUBROUTINE eval_mass_exchange_carrier_darcy_loss_implicit
+
     !> @brief Reject unsupported analytic treatment for pressure-driven carrier gas loss.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
@@ -79,6 +90,7 @@ CONTAINS
     SUBROUTINE solve_mass_exchange_carrier_darcy_loss_analytic(qp,r)
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('carrier_darcy_loss: unsupported analytic method')
     END SUBROUTINE solve_mass_exchange_carrier_darcy_loss_analytic

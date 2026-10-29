@@ -18,10 +18,14 @@ MODULE mass_exchange_2d
     USE mass_exchange_entrainment_2d, ONLY : eval_mass_exchange_entrainment_explicit
     USE mass_exchange_vaporization_2d, ONLY : eval_mass_exchange_vaporization_explicit
     USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag, eval_mass_exchange_lava_deposition_explicit
+
     IMPLICIT NONE
     PRIVATE
+
     PUBLIC :: eval_mass_exchange_terms
+
 CONTAINS
+
     !> @brief Coordinate cell-local mass exchange, shared phase budgets and conservative source assembly.
     !> @details Applies available-phase limits before conservative assembly.
     !> Positive sources never cancel gross withdrawals in a shared inventory.
@@ -43,6 +47,7 @@ CONTAINS
         REAL(wp) :: u,v,h,T,pore,stoch
         REAL(wp) :: gas_available,liquid_available,gas_factor,liquid_factor
         REAL(wp) :: gas_withdrawals(2),liquid_withdrawals(2),carrier_volume
+
         CALL reset_mass_exchange_rates(total_rates)
         eqns_term=0.0_wp
         h=qp(1)
@@ -50,6 +55,7 @@ CONTAINS
         u=qp(idx_u)
         v=qp(idx_v)
         T=qp(4)
+
         ! Processes requiring a gas/liquid carrier are evaluated only when that
         ! physical phase exists. Lava deposition is dispatched independently below.
         IF (gas_flag .OR. liquid_flag) THEN
@@ -65,6 +71,7 @@ CONTAINS
             CALL eval_mass_exchange_deposition_explicit(qp,dt,deposition_rates)
             CALL eval_mass_exchange_carrier_liquid_loss_explicit(qp,liquid_loss_rates)
             CALL eval_mass_exchange_carrier_darcy_loss_explicit(qp,darcy_loss_rates)
+
             ! Resource budgets use gross withdrawals, never signed net mass exchange.
             ! Gas and liquid are different inventories when both phases are present.
             ! The solid deposition rate is limited only when its required pore phase
@@ -72,9 +79,11 @@ CONTAINS
             carrier_volume=deposition_rates%continuous_phase_deposition_rate
             gas_factor=1.0_wp
             liquid_factor=1.0_wp
+
             ! Gas withdrawal and pore filling draw on the same gas inventory;
             ! do not offset physical sinks with any positive source.
             IF (gas_flag) THEN
+
                 ! Subtract dispersed solids and liquid from the available gas volume.
                 gas_available=MIN(h*MAX(0.0_wp,1.0_wp-alpha-alphal)/dt, &
                           h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt)
@@ -93,6 +102,7 @@ CONTAINS
             END IF
             ! In two-carrier runs, dispersed liquid has its own budget.
             IF (gas_flag .AND. liquid_flag) THEN
+
                 ! Prescribed liquid loss consumes dispersed liquid, NOT carrier gas.
                 liquid_available=h*MAX(0.0_wp,alphal)/dt
                 liquid_withdrawals=[-liquid_loss_rates%liquid_withdrawal_volume_rate,0.0_wp]
@@ -107,6 +117,7 @@ CONTAINS
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
             CALL eval_mass_exchange_vaporization_explicit(B_zone,T,deposition_rates%solid_deposition_rate,process_rates)
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
+
             ! Scalar transport and pore-pressure sources inherit the net mass exchange.
             IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(1)*stoch
             IF (pore_pressure_flag) eqns_term(idx_poreEqn)= &
@@ -118,8 +129,10 @@ CONTAINS
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
         END IF
     END SUBROUTINE eval_mass_exchange_terms
+
     ! Limit simultaneous withdrawal demands from one physical inventory.
     ! Positive source total_rates are excluded from the budget, not netted against sinks.
+
     !> @brief Limit simultaneous positive withdrawal demands against a single available inventory.
     !> @details Positive signed rates are excluded from gross withdrawal budgets.
     !> @param[in] signed_rates Signed process flux demands; negative values mean withdrawals.
@@ -128,11 +141,13 @@ CONTAINS
     PURE REAL(wp) FUNCTION shared_withdrawal_factor(signed_rates,available) RESULT(f)
         REAL(wp), INTENT(IN) :: signed_rates(:),available
         REAL(wp) :: total_withdrawal
+
         total_withdrawal=SUM(MAX(0.0_wp,-signed_rates))
         f=1.0_wp
         IF (total_withdrawal>0.0_wp) &
                   f=MIN(1.0_wp,MAX(0.0_wp,available)/total_withdrawal)
     END FUNCTION shared_withdrawal_factor
+
     !> @brief Add one process contribution to conserved equations and diagnostic rate totals.
     !> @details Sink momentum is advected with the local horizontal velocity.
     !> @param[in] p Rates produced by one mass-exchange process.
@@ -172,12 +187,14 @@ CONTAINS
         total%liquid_withdrawal_volume_rate= &
                   total%liquid_withdrawal_volume_rate+p%liquid_withdrawal_volume_rate
     END SUBROUTINE accumulate_process
+
     !> @brief Apply a common resource-limiting factor to every contribution from one process.
     !> @param[in,out] p Rates produced by one mass-exchange process.
     !> @param[in] factor Common dimensionless reduction factor between zero and one.
     SUBROUTINE scale_process(p,factor)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: p
         REAL(wp), INTENT(IN) :: factor
+
         p%mixture_mass_rate=p%mixture_mass_rate*factor
         p%liquid_mass_rate=p%liquid_mass_rate*factor
         p%energy_rate=p%energy_rate*factor
@@ -192,4 +209,5 @@ CONTAINS
         p%gas_withdrawal_volume_rate=p%gas_withdrawal_volume_rate*factor
         p%liquid_withdrawal_volume_rate=p%liquid_withdrawal_volume_rate*factor
     END SUBROUTINE scale_process
+
 END MODULE mass_exchange_2d

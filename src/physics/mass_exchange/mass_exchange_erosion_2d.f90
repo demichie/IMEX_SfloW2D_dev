@@ -10,13 +10,16 @@ MODULE mass_exchange_erosion_2d
               erodible_fract, alphastot_min, rho_s, rho_c_sub, sp_heat_s, T_erodible
     IMPLICIT NONE
     PRIVATE
+
     PUBLIC :: eval_mass_exchange_erosion_explicit
     PUBLIC :: eval_mass_exchange_erosion_semi_implicit
     PUBLIC :: eval_mass_exchange_erosion_implicit
     PUBLIC :: solve_mass_exchange_erosion_analytic
     PUBLIC :: eval_erosion_rates
     ! Four-entry physical treatment contract; only EXPLICIT is supported.
+
 CONTAINS
+
     !> @brief Evaluate explicit erosion from erodible substrate.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
@@ -32,6 +35,7 @@ CONTAINS
         REAL(wp) :: h, u, v, T_flow
         REAL(wp) :: normal_speed, vertical_velocity, substrate_temperature
         REAL(wp) :: Ri,rhom,rhoc,redgrav,cp_sub,cpm
+
         CALL reset_mass_exchange_rates(r)
         IF (alpha<=alphastot_min) RETURN
         h=qp(1)
@@ -41,6 +45,7 @@ CONTAINS
         vertical_velocity=0.0_wp
         IF (slope_correction_flag) vertical_velocity=u*Bx+v*By
         normal_speed=SQRT(u*u+v*v+vertical_velocity*vertical_velocity)
+
         ! Erodible inventory limits species withdrawal before constructing mass and bed terms.
         CALL eval_erosion_volume_kernel(h,normal_speed,alpha,erodible,dt, &
                   r%solid_erosion_rate,r%continuous_phase_erosion_rate)
@@ -53,6 +58,7 @@ CONTAINS
                   rho_c_sub*cp_sub*r%continuous_phase_erosion_rate)
         r%dB_dt=-SUM(r%solid_erosion_rate)/(1.0_wp-erodible_porosity)
     END SUBROUTINE
+
     !> @brief Reject unsupported semi-implicit treatment for erosion.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
@@ -66,9 +72,11 @@ CONTAINS
         REAL(wp), INTENT(IN) :: qp(n_vars+2), Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('erosion: unsupported physical treatment')
     END SUBROUTINE eval_mass_exchange_erosion_semi_implicit
+
     !> @brief Reject unsupported implicit treatment for erosion from erodible substrate.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
@@ -82,9 +90,11 @@ CONTAINS
         REAL(wp), INTENT(IN) :: qp(n_vars+2), Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('erosion: unsupported physical treatment')
     END SUBROUTINE eval_mass_exchange_erosion_implicit
+
     !> @brief Reject unsupported analytic treatment for erosion from erodible substrate.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
@@ -98,9 +108,11 @@ CONTAINS
         REAL(wp), INTENT(IN) :: qp(n_vars+2), Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('erosion: unsupported physical treatment')
     END SUBROUTINE solve_mass_exchange_erosion_analytic
+
     !> @brief Compute erosion volumes under the finite erodible-bed inventory constraint.
     !> @param[in] r_h Mobile flow thickness [m].
     !> @param[in] mod_vel Slope-corrected flow speed [m/s].
@@ -113,6 +125,7 @@ CONTAINS
               erosion_rate, continuous_phase_erosion_rate)
         REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
         REAL(wp), INTENT(OUT) :: erosion_rate(n_solid), continuous_phase_erosion_rate
+
         IF (erosion_coeff .GT. 0.0_wp) THEN
               CALL eval_erosion_rates(r_h, mod_vel, alphas_tot, erosion_coeff,       &
                         erodible_porosity, erodible_fract(1:n_solid),                    &
@@ -123,6 +136,7 @@ CONTAINS
               continuous_phase_erosion_rate = 0.0_wp
         END IF
     END SUBROUTINE eval_erosion_volume_kernel
+
     !> @brief Apply the empirical erosion flux and cap solid removal by available bed material.
     !> @param[in] flow_depth Mobile flow thickness [m].
     !> @param[in] speed Flow speed used by the erosion closure [m/s].
@@ -165,4 +179,5 @@ CONTAINS
         continuous_phase_erosion_rate = total_erosion * erodible_porosity
 
     END SUBROUTINE eval_erosion_rates
+
 END MODULE mass_exchange_erosion_2d

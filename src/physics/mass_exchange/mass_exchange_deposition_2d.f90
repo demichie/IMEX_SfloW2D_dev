@@ -14,8 +14,10 @@ MODULE mass_exchange_deposition_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : primitive_to_volume_fractions, mixt_var
     USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
+
     IMPLICIT NONE
     PRIVATE
+
     PUBLIC :: eval_mass_exchange_deposition_explicit
     PUBLIC :: eval_mass_exchange_deposition_semi_implicit
     PUBLIC :: eval_mass_exchange_deposition_implicit
@@ -26,7 +28,9 @@ MODULE mass_exchange_deposition_2d
     PUBLIC :: eval_lahar_deposition_rate
     PUBLIC :: eval_hindered_settling_deposition_rate
     ! Four-entry physical treatment contract; only EXPLICIT is supported.
+
 CONTAINS
+
     !> @brief Evaluate explicit sediment settling and deposition.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
@@ -37,6 +41,7 @@ CONTAINS
         REAL(wp) :: alphas(n_solid),alphag(n_add_gas),alphal,alpha
         REAL(wp) :: h,T,rho_m,rho_c,cp_c,Ri,redgrav,cpm,gas_phase_mass_fraction
         REAL(wp) :: gas_species_mass_fraction(n_add_gas)
+
         CALL reset_mass_exchange_rates(r)
         h=qp(1)
         T=qp(4)
@@ -64,6 +69,7 @@ CONTAINS
                   gas_species_mass_fraction/gas_phase_mass_fraction
         r%dB_dt=SUM(r%solid_deposition_rate)+r%continuous_phase_deposition_rate
     END SUBROUTINE
+
     !> @brief Reject unsupported semi-implicit treatment for deposition.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
@@ -72,9 +78,11 @@ CONTAINS
     SUBROUTINE eval_mass_exchange_deposition_semi_implicit(qp,dt,r)
         REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('deposition: unsupported physical treatment')
     END SUBROUTINE eval_mass_exchange_deposition_semi_implicit
+
     !> @brief Reject unsupported implicit treatment for sediment settling and deposition.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
@@ -83,9 +91,11 @@ CONTAINS
     SUBROUTINE eval_mass_exchange_deposition_implicit(qp,dt,r)
         REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('deposition: unsupported physical treatment')
     END SUBROUTINE eval_mass_exchange_deposition_implicit
+
     !> @brief Reject unsupported analytic treatment for sediment settling and deposition.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
@@ -94,9 +104,11 @@ CONTAINS
     SUBROUTINE solve_mass_exchange_deposition_analytic(qp,dt,r)
         REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('deposition: unsupported physical treatment')
     END SUBROUTINE solve_mass_exchange_deposition_analytic
+
     !> @brief Compute per-species settling and choose carrier-fluid properties.
     !> @param[in] r_h Mobile flow thickness [m].
     !> @param[in] r_T Local flow temperature [K].
@@ -154,6 +166,7 @@ CONTAINS
 
         END DO
     END SUBROUTINE eval_deposition_volume_kernel
+
     !> @brief Iteratively evaluate terminal settling speed using the configured drag closure.
     !> @param[in] diam Solid particle diameter [m].
     !> @param[in] rhos Solid particle density [kg/m3].
@@ -213,6 +226,7 @@ CONTAINS
         RETURN
 
     END FUNCTION settling_velocity
+
     !> @brief Select carrier density and inverse kinematic viscosity for settling.
     !> @param[in] model_name Canonical rheology closure identifier.
     !> @param[in] temperature Material temperature [K].
@@ -246,6 +260,7 @@ CONTAINS
         END IF
 
     END SUBROUTINE eval_settling_fluid_properties
+
     !> @brief Dispatch the selected solid settling/deposition closure.
     !> @param[in] model_name Canonical rheology closure identifier.
     !> @param[in] solid_fraction Volume fraction of the settling solid species.
@@ -276,6 +291,7 @@ CONTAINS
         END IF
 
     END FUNCTION eval_solid_deposition_rate
+
     !> @brief Limit lahar settling flux by the mobile solid inventory per time step.
     !> @param[in] solid_fraction Volume fraction of the settling solid species.
     !> @param[in] settling_velocity Species terminal settling speed [m/s].
@@ -293,6 +309,7 @@ CONTAINS
                   flow_depth * solid_fraction / time_step)
 
     END FUNCTION eval_lahar_deposition_rate
+
     !> @brief Apply concentration-dependent settling hindrance and inventory limiting.
     !> @param[in] solid_fraction Volume fraction of the settling solid species.
     !> @param[in] settling_velocity Species terminal settling speed [m/s].
@@ -317,4 +334,5 @@ CONTAINS
         rate = MIN(rate, flow_depth * solid_fraction / time_step)
 
     END FUNCTION eval_hindered_settling_deposition_rate
+
 END MODULE mass_exchange_deposition_2d
