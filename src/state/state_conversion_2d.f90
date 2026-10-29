@@ -30,7 +30,6 @@ MODULE state_conversion_2d
   !> \brief Evaluate carrier and whole-mixture specific heat capacities.
   !> \param[in]  xs            Solid mass fractions.
   !> \param[in]  xg            Additional-gas mass fractions.
-  !> \param[in]  xl            Liquid mass fraction.
   !> \param[out] xc            Total carrier mass fraction.
   !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity.
   !> \param[out] sp_heat_mix   Whole-mixture specific heat capacity.
@@ -43,14 +42,12 @@ MODULE state_conversion_2d
   !> \param[in]  T         Mixture temperature.
   !> \param[in]  xs        Solid mass fractions.
   !> \param[in]  xg        Additional-gas mass fractions.
-  !> \param[in]  xl        Liquid mass fraction.
   !> \param[out] rho_m     Mixture density.
   !> \param[out] inv_rhom  Inverse mixture density.
   !> \param[out] rho_c     Carrier density.
   !> \param[out] inv_rho_c Inverse carrier density.
   !> \param[out] alphas    Solid volume fractions.
   !> \param[out] alphag    Additional-gas volume fractions.
-  !> \param[out] alphal    Liquid volume fraction.
   INTERFACE eval_mixture_properties_from_mass_fractions
      MODULE PROCEDURE eval_mixture_properties_from_mass_real
      MODULE PROCEDURE eval_mixture_properties_from_mass_complex
@@ -135,13 +132,12 @@ CONTAINS
   !>
   !> \param[in,out] xs Solid mass fractions, one entry per solid class.
   !> \param[in,out] xg Additional-gas mass fractions, excluding ambient air.
-  !> \param[in,out] xl Liquid mass fraction; independently transported only when gas and liquid are
   !>                   both present.
   !> \param[in] context Optional diagnostic context included in closure errors.
 
-  SUBROUTINE enforce_mass_fraction_closure(xs, xg, xl, context)
+  SUBROUTINE enforce_mass_fraction_closure(xs, xg, context)
 
-    REAL(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas), xl
+    REAL(wp), INTENT(INOUT) :: xs(n_solid), xg(n_add_gas)
     CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: context
     ! A few thousand machine epsilons allow accumulated cancellation noise in
     ! the explicit FV update to be clipped, while materially negative
@@ -164,13 +160,11 @@ CONTAINS
     END IF
 
     ! Only one continuous carrier is transported.
-    xl = 0.0_wp
 
-    explicit_mass_fraction = SUM(xs) + SUM(xg) + xl
+    explicit_mass_fraction = SUM(xs) + SUM(xg)
     IF (explicit_mass_fraction .GT. 1.0_wp) THEN
        xs = xs / explicit_mass_fraction
        xg = xg / explicit_mass_fraction
-       xl = xl / explicit_mass_fraction
     END IF
 
   END SUBROUTINE enforce_mass_fraction_closure
@@ -188,16 +182,15 @@ CONTAINS
 
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2)
     CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: context
-    REAL(wp) :: xs(n_solid), xg(n_add_gas), xl
+    REAL(wp) :: xs(n_solid), xg(n_add_gas)
 
     xs = qp(idx_solid_first:idx_solid_last)
     xg = qp(idx_add_gas_first:idx_add_gas_last)
-    xl = 0.0_wp
 
     IF (PRESENT(context)) THEN
-       CALL enforce_mass_fraction_closure(xs, xg, xl, context)
+       CALL enforce_mass_fraction_closure(xs, xg, context)
     ELSE
-       CALL enforce_mass_fraction_closure(xs, xg, xl)
+       CALL enforce_mass_fraction_closure(xs, xg)
     END IF
 
     qp(idx_solid_first:idx_solid_last) = xs
@@ -243,30 +236,27 @@ CONTAINS
   !>               u and v.
   !> \param[out] alphas Solid volume fractions, one entry per solid class.
   !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
-  !> \param[out] alphal Liquid volume fraction.
 
-  SUBROUTINE primitive_to_volume_fractions(qp, alphas, alphag, alphal)
+  SUBROUTINE primitive_to_volume_fractions(qp, alphas, alphag)
 
     REAL(wp), INTENT(IN) :: qp(n_vars+2)
     REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas), alphal
 
-    REAL(wp) :: xs(n_solid), xg(n_add_gas), xl
+    REAL(wp) :: xs(n_solid), xg(n_add_gas)
     REAL(wp) :: rho_m, inv_rhom, rho_c, inv_rho_c
 
     alphas = 0.0_wp
     alphag = 0.0_wp
-    alphal = 0.0_wp
 
     IF (qp(1) .LE. EPSILON(1.0_wp)) RETURN
 
     xs = qp(idx_solid_first:idx_solid_last)
     xg = qp(idx_add_gas_first:idx_add_gas_last)
-    xl = 0.0_wp
 
-    CALL enforce_mass_fraction_closure(xs, xg, xl)
+    CALL enforce_mass_fraction_closure(xs, xg)
     CALL eval_mixture_properties_from_mass_fractions(                         &
-         qp(4), xs, xg, xl, rho_m, inv_rhom, rho_c, inv_rho_c,               &
-         alphas, alphag, alphal)
+         qp(4), xs, xg, rho_m, inv_rhom, rho_c, inv_rho_c,               &
+         alphas, alphag)
 
   END SUBROUTINE primitive_to_volume_fractions
 
@@ -318,16 +308,14 @@ CONTAINS
   !>
   !> \param[in] xs Solid mass fractions, one entry per solid class.
   !> \param[in] xg Additional-gas mass fractions, excluding ambient air.
-  !> \param[in] xl Liquid mass fraction; independently transported only when gas and liquid are both
-  !>               present.
   !> \param[out] xc Total carrier mass fraction, including any additional gas components.
   !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity [J kg^-1 K^-1].
   !> \param[out] sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
 
-  SUBROUTINE eval_mixture_heat_capacity_real(xs, xg, xl, xc, sp_heat_c_mix,     &
+  SUBROUTINE eval_mixture_heat_capacity_real(xs, xg, xc, sp_heat_c_mix,     &
        sp_heat_mix)
 
-    REAL(wp), INTENT(IN) :: xs(n_solid), xg(n_add_gas), xl
+    REAL(wp), INTENT(IN) :: xs(n_solid), xg(n_add_gas)
     REAL(wp), INTENT(OUT) :: xc, sp_heat_c_mix, sp_heat_mix
     REAL(wp) :: carrier_sp_heat_mass
 
@@ -339,16 +327,14 @@ CONTAINS
   !>
   !> \param[in] xs Solid mass fractions, one entry per solid class.
   !> \param[in] xg Additional-gas mass fractions, excluding ambient air.
-  !> \param[in] xl Liquid mass fraction; independently transported only when gas and liquid are both
-  !>               present.
   !> \param[out] xc Total carrier mass fraction, including any additional gas components.
   !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity [J kg^-1 K^-1].
   !> \param[out] sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
 
-  SUBROUTINE eval_mixture_heat_capacity_complex(xs, xg, xl, xc,                &
+  SUBROUTINE eval_mixture_heat_capacity_complex(xs, xg, xc,                &
        sp_heat_c_mix, sp_heat_mix)
 
-    COMPLEX(wp), INTENT(IN) :: xs(n_solid), xg(n_add_gas), xl
+    COMPLEX(wp), INTENT(IN) :: xs(n_solid), xg(n_add_gas)
     COMPLEX(wp), INTENT(OUT) :: xc, sp_heat_c_mix, sp_heat_mix
     COMPLEX(wp) :: carrier_sp_heat_mass
 
@@ -361,20 +347,17 @@ CONTAINS
   !> \param[in] T Mixture temperature [K].
   !> \param[in] xs Solid mass fractions, one entry per solid class.
   !> \param[in] xg Additional-gas mass fractions, excluding ambient air.
-  !> \param[in] xl Liquid mass fraction; independently transported only when gas and liquid are both
-  !>               present.
   !> \param[out] rho_m Whole-mixture density [kg m^-3].
   !> \param[out] inv_rhom Reciprocal of the whole-mixture density [m^3 kg^-1].
   !> \param[out] rho_c Density of the carrier mixture [kg m^-3].
   !> \param[out] inv_rho_c Reciprocal of carrier-mixture density [m^3 kg^-1].
   !> \param[out] alphas Solid volume fractions, one entry per solid class.
   !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
-  !> \param[out] alphal Liquid volume fraction.
 
-  SUBROUTINE eval_mixture_properties_from_mass_real(T, xs, xg, xl, rho_m,     &
-       inv_rhom, rho_c, inv_rho_c, alphas, alphag, alphal)
+  SUBROUTINE eval_mixture_properties_from_mass_real(T, xs, xg, rho_m,     &
+       inv_rhom, rho_c, inv_rho_c, alphas, alphag)
 
-    REAL(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas), xl
+    REAL(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas)
     REAL(wp), INTENT(OUT) :: rho_m, inv_rhom, rho_c, inv_rho_c
     REAL(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas), alphal
     REAL(wp) :: xc, sp_gas_const_c, inv_rho_g(n_add_gas)
@@ -388,20 +371,17 @@ CONTAINS
   !> \param[in] T Mixture temperature [K].
   !> \param[in] xs Solid mass fractions, one entry per solid class.
   !> \param[in] xg Additional-gas mass fractions, excluding ambient air.
-  !> \param[in] xl Liquid mass fraction; independently transported only when gas and liquid are both
-  !>               present.
   !> \param[out] rho_m Whole-mixture density [kg m^-3].
   !> \param[out] inv_rhom Reciprocal of the whole-mixture density [m^3 kg^-1].
   !> \param[out] rho_c Density of the carrier mixture [kg m^-3].
   !> \param[out] inv_rho_c Reciprocal of carrier-mixture density [m^3 kg^-1].
   !> \param[out] alphas Solid volume fractions, one entry per solid class.
   !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
-  !> \param[out] alphal Liquid volume fraction.
 
-  SUBROUTINE eval_mixture_properties_from_mass_complex(T, xs, xg, xl, rho_m,  &
-       inv_rhom, rho_c, inv_rho_c, alphas, alphag, alphal)
+  SUBROUTINE eval_mixture_properties_from_mass_complex(T, xs, xg, rho_m,  &
+       inv_rhom, rho_c, inv_rho_c, alphas, alphag)
 
-    COMPLEX(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas), xl
+    COMPLEX(wp), INTENT(IN) :: T, xs(n_solid), xg(n_add_gas)
     COMPLEX(wp), INTENT(OUT) :: rho_m, inv_rhom, rho_c, inv_rho_c
     COMPLEX(wp), INTENT(OUT) :: alphas(n_solid), alphag(n_add_gas), alphal
     COMPLEX(wp) :: xc, sp_gas_const_c, inv_rho_g(n_add_gas)
@@ -417,28 +397,26 @@ CONTAINS
   !> \param[in] alphag Additional-gas volume fractions, excluding ambient air.
   !> \param[in,out] alphas Solid volume fractions; rescaled if the dispersed sum exceeds one,
   !>                       or reset if that sum is negative.
-  !> \param[in,out] alphal Liquid volume fraction, normalized with alphas when independent;
   !>                       otherwise reset to zero.
   !> \param[out] rho_m Whole-mixture density [kg m^-3].
   !> \param[out] inv_rhom Reciprocal of the whole-mixture density [m^3 kg^-1].
   !> \param[out] rho_c Density of the carrier mixture [kg m^-3].
   !> \param[out] xs Solid mass fractions, one entry per solid class.
   !> \param[out] xg Additional-gas mass fractions, excluding ambient air.
-  !> \param[out] xl Liquid mass fraction; independently transported only when gas and liquid are
   !>                both present.
   !> \param[out] xc Total carrier mass fraction, including any additional gas components.
   !> \param[out] sp_heat_c_mix Carrier-mixture specific heat capacity [J kg^-1 K^-1].
   !> \param[out] sp_heat_mix Whole-mixture specific heat capacity [J kg^-1 K^-1].
 
   SUBROUTINE eval_mixture_properties_from_volume_fractions(T, alphag, alphas, &
-       alphal, rho_m, inv_rhom, rho_c, xs, xg, xl, xc, sp_heat_c_mix,          &
+        rho_m, inv_rhom, rho_c, xs, xg, xc, sp_heat_c_mix,          &
        sp_heat_mix)
 
     REAL(wp), INTENT(IN) :: T
     REAL(wp), INTENT(IN) :: alphag(n_add_gas)
-    REAL(wp), INTENT(INOUT) :: alphas(n_solid), alphal
+    REAL(wp), INTENT(INOUT) :: alphas(n_solid)
     REAL(wp), INTENT(OUT) :: rho_m, inv_rhom, rho_c
-    REAL(wp), INTENT(OUT) :: xs(n_solid), xg(n_add_gas), xl, xc
+    REAL(wp), INTENT(OUT) :: xs(n_solid), xg(n_add_gas), xc
     REAL(wp), INTENT(OUT) :: sp_heat_c_mix, sp_heat_mix
 
     REAL(wp) :: alphas_tot, dispersed_tot, alphac, alpha_air
@@ -458,7 +436,6 @@ CONTAINS
     END IF
 
     alphas_tot = SUM(alphas)
-    alphal = 0.0_wp
     alphac = 1.0_wp - alphas_tot
 
     IF ( gas_flag ) THEN
@@ -485,11 +462,10 @@ CONTAINS
 
     xs = alphas * rho_s * inv_rhom
     xg = alphag * rho_g * inv_rhom
-    xl = 0.0_wp
 
     CALL eval_mixture_heat_capacity_real(                                      &
          ! IN
-         xs, xg, xl,                                                           &
+         xs, xg,                                                           &
          ! OUT
          xc, sp_heat_c_mix, sp_heat_mix)
 
@@ -513,7 +489,6 @@ CONTAINS
   !> \param[out] alphas Solid volume fractions, one entry per solid class.
   !> \param[out] rho_m Whole-mixture density [kg m^-3].
   !> \param[out] T Mixture temperature [K].
-  !> \param[out] alphal Liquid volume fraction.
   !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
   !> \param[out] red_grav Buoyancy-reduced gravitational acceleration [m s^-2].
   !> \param[out] p_dyn Dynamic pressure rho_m*(u^2+v^2)/2 [Pa].
@@ -534,7 +509,7 @@ CONTAINS
 
     REAL(wp) :: inv_rhom, rho_c, inv_rho_c
     REAL(wp) :: xs(n_solid), xg(n_add_gas)
-    REAL(wp) :: xl, xc, inv_qj1
+    REAL(wp) :: xc, inv_qj1
     REAL(wp) :: mixture_sp_heat_c, sp_heat_mix
     LOGICAL :: is_wet
 
@@ -589,7 +564,7 @@ CONTAINS
 
     COMPLEX(wp) :: alphal, rho_c, inv_rho_c
     COMPLEX(wp) :: xs(n_solid), xg(n_add_gas)
-    COMPLEX(wp) :: xl, xc, inv_qj1
+    COMPLEX(wp) :: xc, inv_qj1
     COMPLEX(wp) :: mixture_sp_heat_c, sp_heat_mix
     LOGICAL :: is_wet
 
@@ -680,16 +655,16 @@ CONTAINS
     r_xg = qpj(idx_add_gas_first:idx_add_gas_last)
     r_xl = 0.0_wp
 
-    CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl)
+    CALL enforce_mass_fraction_closure(r_xs, r_xg)
 
     CALL eval_mixture_properties_from_mass_fractions(                          &
          ! IN
-         r_T, r_xs, r_xg, r_xl,                                                &
+         r_T, r_xs, r_xg,                                                &
          ! OUT
          r_rho_m, r_inv_rhom, r_rho_c, r_inv_rho_c,                           &
-         r_alphas, r_alphag, r_alphal)
+         r_alphas, r_alphag)
 
-    CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xl, r_xc,                   &
+    CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xc,                   &
          r_sp_heat_c, r_sp_heat_mix)
 
     ! reduced gravity
@@ -729,7 +704,6 @@ CONTAINS
   !> - qp(4) = \f$ T \f$
   !> - qp(idx_solid_first:idx_solid_last) = \f$ Ys(1:n_solid) \f$
   !> - qp(idx_add_gas_first:idx_add_gas_last) = \f$ Yg(1:n_add_gas) \f$
-  !> - qp(n_vars) = \f$ Yl \f$ when liquid is independently transported
   !> - qp(idx_u) = \f$ u \f$
   !> - qp(idx_v) = \f$ v \f$
   !> .
@@ -791,9 +765,9 @@ CONTAINS
        r_xs = qc(idx_solid_first:idx_solid_last) / qc(1)
        r_xg = qc(idx_add_gas_first:idx_add_gas_last) / qc(1)
        IF (PRESENT(context)) THEN
-          CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl, context)
+          CALL enforce_mass_fraction_closure(r_xs, r_xg, context)
        ELSE
-          CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl)
+          CALL enforce_mass_fraction_closure(r_xs, r_xg)
        END IF
     END IF
 
@@ -823,7 +797,6 @@ CONTAINS
   !> - qp(4) = \f$ T \f$
   !> - qp(idx_solid_first:idx_solid_last) = \f$ Ys(1:n_s) \f$
   !> - qp(idx_add_gas_first:idx_add_gas_last) = \f$ Yg(1:n_g) \f$
-  !> - qp(n_vars) = \f$ Yl \f$ when liquid is independently transported
   !> - qp(idx_u) = \f$ u \f$
   !> - qp(idx_v) = \f$ v \f$
   !> .
@@ -901,19 +874,19 @@ CONTAINS
     r_xg = qp(idx_add_gas_first:idx_add_gas_last)
 
     IF (PRESENT(context)) THEN
-       CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl, context)
+       CALL enforce_mass_fraction_closure(r_xs, r_xg, context)
     ELSE
-       CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl)
+       CALL enforce_mass_fraction_closure(r_xs, r_xg)
     END IF
 
     CALL eval_mixture_properties_from_mass_fractions(                          &
          ! IN
-         r_T, r_xs, r_xg, r_xl,                                                &
+         r_T, r_xs, r_xg,                                                &
          ! OUT
          r_rho_m, r_inv_rhom, r_rho_c, r_inv_rho_c,                           &
-         r_alphas, r_alphag, r_alphal)
+         r_alphas, r_alphag)
 
-    CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xl, r_xc, r_sp_heat_c,      &
+    CALL eval_mixture_heat_capacity(r_xs, r_xg, r_xc, r_sp_heat_c,      &
          r_sp_heat_mix)
 
     IF ( stoch_transport_flag) r_Zs = qp(idx_stoch)

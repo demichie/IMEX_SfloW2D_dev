@@ -164,7 +164,6 @@ MODULE inpout_2d
   IMPLICIT NONE
 
   ! Scratch only: a second liquid phase is never transported or accepted in input.
-  REAL(wp) :: alphal_source=0.0_wp, xl_source=0.0_wp
   PRIVATE :: make_runout_headers
   PRIVATE :: finite_input_value
 
@@ -976,10 +975,8 @@ CONTAINS
     vel_intervals(1:100) = -1.0_wp
     alphas_source = -1.0_wp
     alphag_source = -1.0_wp
-    alphal_source = 0.0_wp
     xs_source = -1.0_wp
     xg_source = -1.0_wp
-    xl_source = 0.0_wp
     azimuth_source = 0.0_wp
     arc_width_source = 360.0_wp
 
@@ -1119,8 +1116,8 @@ CONTAINS
 
     ! Source composition as given, for the per-fissure conversion
     LOGICAL :: composition_by_volume
-    REAL(wp) :: alphas_given(100), alphag_given(100), alphal_given
-    REAL(wp) :: alphas_fissure(100), alphal_fissure
+    REAL(wp) :: alphas_given(100), alphag_given(100)
+    REAL(wp) :: alphas_fissure(100)
     REAL(wp) :: rho_m_fissure, inv_rhom_fissure, rho_c_fissure, xc_fissure
     REAL(wp) :: sp_heat_c_fissure, sp_heat_mix_fissure
     REAL(wp) :: Ri
@@ -3712,9 +3709,6 @@ CONTAINS
     source_flag: IF ((radial_source_flag) .OR. (bottom_radial_source_flag) &
                      .OR. (lateral_source_flag) .OR.                        &
                      (bottom_fissural_source_flag)) THEN
-
-      alphal_source = 0.0_wp
-
       ! Rewind first: the preceding reads leave the file positioned
       ! wherever they finished, and an absent optional group scans to
       ! end of file, which made this read return IOSTAT = -1 for a
@@ -4249,18 +4243,16 @@ CONTAINS
         composition_by_volume = .NOT. ANY(xs_source(1:n_solid) .GT. -1.0_wp)
         alphas_given(1:n_solid) = alphas_source(1:n_solid)
         alphag_given(1:n_add_gas) = alphag_source(1:n_add_gas)
-        alphal_given = alphal_source
-
         IF (.NOT. ANY(xs_source(1:n_solid) .GT. -1.0_wp)) THEN
 
           CALL eval_mixture_properties_from_volume_fractions(                &
                ! IN
                T_source, alphag_source(1:n_add_gas),                         &
                ! INOUT
-               alphas_source(1:n_solid), alphal_source,                      &
+               alphas_source(1:n_solid),                      &
                ! OUT
                rho_m, inv_rhom, rho_c, xs_source(1:n_solid),                 &
-               xg_source(1:n_add_gas), xl_source, xc_source, sp_heat_c,      &
+               xg_source(1:n_add_gas), xc_source, sp_heat_c,      &
                sp_heat_mix)
 
         END IF
@@ -4268,7 +4260,7 @@ CONTAINS
         ! Source composition is canonical from here on, including for the
         ! bottom radial source, which does not enter the source-flow setup.
         CALL enforce_mass_fraction_closure(                                  &
-             xs_source(1:n_solid), xg_source(1:n_add_gas), xl_source)
+             xs_source(1:n_solid), xg_source(1:n_add_gas))
 
         ! Every fissure carries the source composition at its own
         ! temperature. Converting volume fractions once, at T_FISSURES(1),
@@ -4283,20 +4275,18 @@ CONTAINS
             IF (composition_by_volume) THEN
 
               alphas_fissure(1:n_solid) = alphas_given(1:n_solid)
-              alphal_fissure = alphal_given
-
               CALL eval_mixture_properties_from_volume_fractions(            &
                    ! IN
                    T_fissures(i), alphag_given(1:n_add_gas),                 &
                    ! INOUT
-                   alphas_fissure(1:n_solid), alphal_fissure,                &
+                   alphas_fissure(1:n_solid),                &
                    ! OUT
                    rho_m_fissure, inv_rhom_fissure, rho_c_fissure,           &
-                   xs_fissures(:, i), xg_fissures(:, i), xl_source,          &
+                   xs_fissures(:, i), xg_fissures(:, i),          &
                    xc_fissure, sp_heat_c_fissure, sp_heat_mix_fissure)
 
               CALL enforce_mass_fraction_closure(xs_fissures(:, i),         &
-                   xg_fissures(:, i), xl_source)
+                   xg_fissures(:, i))
 
             ELSE
 
@@ -4330,10 +4320,10 @@ CONTAINS
 
           CALL eval_mixture_properties_from_mass_fractions(                    &
                ! IN
-               T_source, xs_source, xg_source, xl_source,                      &
+               T_source, xs_source, xg_source,                      &
                ! OUT
                rho_m, inv_rhom, rho_c, inv_rho_c,                              &
-               alphas_source, alphag_source, alphal_source)
+               alphas_source, alphag_source)
 
           WRITE (*, *) 'Source solid volume fraction =', alphas_source(1:n_solid)
 
@@ -4746,9 +4736,6 @@ CONTAINS
       WRITE (backup_unit, newrun_parameters)
 
       IF ((radial_source_flag) .OR. (bottom_radial_source_flag)) THEN
-
-        alphal_source = 0.0_wp
-
         WRITE (backup_unit, radial_source_parameters)
 
       ELSEIF (bottom_fissural_source_flag) THEN

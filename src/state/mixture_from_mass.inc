@@ -2,9 +2,9 @@
     !> \brief Shared REAL/COMPLEX closure for mass-fraction mixture properties.
     !> \details Included inside the typed wrappers in state_conversion_2d.
     !> \par Inputs
-    !> T, xs, xg, xl and the configured component densities/gas constants.
+    !> T, xs, xg and the configured component densities/gas constants.
     !> \par Outputs
-    !> rho_m, inv_rhom, rho_c, inv_rho_c, alphas, alphag and alphal.
+    !> rho_m, inv_rhom, rho_c, inv_rho_c, alphas, alphag.
     !> \par Local scratch
     !> xc, sp_gas_const_c and inv_rho_g are declared by the including wrapper.
     !--------------------------------------------------------------------------
@@ -48,4 +48,3 @@
     ! Recover volume fractions only after the whole-mixture density is known.
     alphas = xs * rho_m * inv_rho_s
     alphag = xg * rho_m * inv_rho_g
-    alphal = 0.0_wp

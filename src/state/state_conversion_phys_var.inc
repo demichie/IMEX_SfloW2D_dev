@@ -17,7 +17,6 @@
     alphag = 0.0_wp
     Zs = 0.0_wp
     exc_pore_pres = 0.0_wp
-    xl = 0.0_wp
     xg = 0.0_wp
 
     ! Branch on the real base state, but retain imaginary perturbations in the
@@ -56,7 +55,7 @@
 
     CALL eval_mixture_heat_capacity(                                           &
          ! IN
-         xs, xg, xl,                                                           &
+         xs, xg,                                                           &
          ! OUT
          xc, mixture_sp_heat_c, sp_heat_mix)
 
@@ -76,9 +75,9 @@
 
     CALL eval_mixture_properties_from_mass_fractions(                          &
          ! IN
-         T, xs, xg, xl,                                                        &
+         T, xs, xg,                                                        &
          ! OUT
-         rho_m, inv_rhom, rho_c, inv_rho_c, alphas, alphag, alphal)
+         rho_m, inv_rhom, rho_c, inv_rho_c, alphas, alphag)
 
     h = qj(1) * inv_rhom
 

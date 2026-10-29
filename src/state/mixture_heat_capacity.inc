@@ -2,7 +2,7 @@
     !> \brief Shared REAL/COMPLEX mass-weighted heat-capacity closure.
     !> \details Included inside the typed wrappers in state_conversion_2d.
     !> \par Inputs
-    !> xs, xg, xl, phase flags and configured component heat capacities.
+    !> xs, xg, phase flags and configured component heat capacities.
     !> \par Outputs
     !> xc, sp_heat_c_mix and sp_heat_mix [J kg^-1 K^-1 for heat capacities].
     !> \par Local scratch

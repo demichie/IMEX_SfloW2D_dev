@@ -118,8 +118,8 @@ CONTAINS
       INTEGER :: j,k
 
       REAL(wp) :: qp_init(n_vars+2) ,  qp0_init(n_vars+2)
-      REAL(wp) :: xs_collapse(n_solid), xg_collapse(n_add_gas), xl_collapse
-      REAL(wp) :: alphas_local(n_solid), alphal_local
+      REAL(wp) :: xs_collapse(n_solid), xg_collapse(n_add_gas)
+      REAL(wp) :: alphas_local(n_solid)
       REAL(wp) :: rho_m, inv_rhom, rho_c, xc, sp_heat_c, sp_heat_mix
 
       REAL(wp), ALLOCATABLE :: cell_fract(:,:)
