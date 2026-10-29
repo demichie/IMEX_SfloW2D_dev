@@ -56,10 +56,9 @@ CONTAINS
     CALL mixt_var(qp,Ri,rhom,rhoc,redgrav,cpc,cpm)
     IF (solids_enabled) THEN
       CALL eval_mass_exchange_erosion_explicit(h,u,v,Bx,By,alpha,erodible, &
-           dt,T,cpc,process_rates)
+           dt,T,qp,process_rates)
       CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
-      CALL eval_mass_exchange_deposition_explicit(h,T,alphas,alpha,rhom,rhoc,cpc,dt, &
-           species,gas_fraction,deposition_rates)
+      CALL eval_mass_exchange_deposition_explicit(qp,dt,deposition_rates)
     ELSE
       CALL reset_mass_exchange_rates(deposition_rates)
     END IF

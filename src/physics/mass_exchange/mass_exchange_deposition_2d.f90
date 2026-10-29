@@ -6,6 +6,7 @@ MODULE mass_exchange_deposition_2d
   USE constitutive_parameters_2d
 
   USE diagnostics_2d, ONLY : fatal_error
+  USE state_conversion_2d, ONLY : primitive_to_volume_fractions, mixt_var
   USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
   IMPLICIT NONE
   PRIVATE
@@ -23,13 +24,26 @@ CONTAINS
 
 
 
-  SUBROUTINE eval_mass_exchange_deposition_explicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt, &
-       gas_species_mass_fraction,gas_phase_mass_fraction,r)
-    REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
-    REAL(wp), INTENT(IN) :: gas_species_mass_fraction(n_add_gas)
-    REAL(wp), INTENT(IN) :: gas_phase_mass_fraction
+  SUBROUTINE eval_mass_exchange_deposition_explicit(qp,dt,r)
+    REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    REAL(wp) :: alphas(n_solid),alphag(n_add_gas),alphal,alpha
+    REAL(wp) :: h,T,rho_m,rho_c,cp_c,Ri,redgrav,cpm,gas_phase_mass_fraction
+    REAL(wp) :: gas_species_mass_fraction(n_add_gas)
     CALL reset_mass_exchange_rates(r)
+    h=qp(1)
+    T=qp(4)
+    CALL primitive_to_volume_fractions(qp,alphas,alphag,alphal)
+    alpha=SUM(alphas)
+    IF (alpha<=alphastot_min) RETURN
+    CALL mixt_var(qp,Ri,rho_m,rho_c,redgrav,cp_c,cpm)
+    gas_species_mass_fraction=qp(idx_add_gas_first:idx_add_gas_last)
+    gas_phase_mass_fraction=0.0_wp
+    IF (gas_flag) THEN
+      gas_phase_mass_fraction=1.0_wp-SUM(qp(idx_solid_first:idx_solid_last))
+      IF (liquid_flag) gas_phase_mass_fraction=gas_phase_mass_fraction-qp(n_vars)
+      gas_phase_mass_fraction=MAX(0.0_wp,gas_phase_mass_fraction)
+    END IF
     CALL eval_deposition_volume_kernel(h,T,alphas,alpha,rho_m,rho_c, &
          dt,r%solid_deposition_rate)
     r%continuous_phase_deposition_rate=coeff_porosity*SUM(r%solid_deposition_rate)
@@ -43,31 +57,22 @@ CONTAINS
     r%dB_dt=SUM(r%solid_deposition_rate)+r%continuous_phase_deposition_rate
   END SUBROUTINE
 
-  SUBROUTINE eval_mass_exchange_deposition_semi_implicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt, &
-       gas_species_mass_fraction,gas_phase_mass_fraction,r)
-    REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
-    REAL(wp), INTENT(IN) :: gas_species_mass_fraction(n_add_gas)
-    REAL(wp), INTENT(IN) :: gas_phase_mass_fraction
+  SUBROUTINE eval_mass_exchange_deposition_semi_implicit(qp,dt,r)
+    REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('deposition: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_deposition_semi_implicit
 
-  SUBROUTINE eval_mass_exchange_deposition_implicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt, &
-       gas_species_mass_fraction,gas_phase_mass_fraction,r)
-    REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
-    REAL(wp), INTENT(IN) :: gas_species_mass_fraction(n_add_gas)
-    REAL(wp), INTENT(IN) :: gas_phase_mass_fraction
+  SUBROUTINE eval_mass_exchange_deposition_implicit(qp,dt,r)
+    REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('deposition: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_deposition_implicit
 
-  SUBROUTINE solve_mass_exchange_deposition_analytic(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt, &
-       gas_species_mass_fraction,gas_phase_mass_fraction,r)
-    REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
-    REAL(wp), INTENT(IN) :: gas_species_mass_fraction(n_add_gas)
-    REAL(wp), INTENT(IN) :: gas_phase_mass_fraction
+  SUBROUTINE solve_mass_exchange_deposition_analytic(qp,dt,r)
+    REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('deposition: unsupported physical treatment')
