@@ -91,8 +91,7 @@ MODULE inpout_2d
 
   USE parameters_2d, ONLY: x_fissures_end_points, y_fissures_end_points,        &
                            width_fissures, linear_vel_fissures, T_fissures,    &
-                           time_param_fissures, xs_fissures, xg_fissures,      &
-                           xl_fissures
+                           time_param_fissures, xs_fissures, xg_fissures
 
   ! -- Variables for the optional PARTICLE_DISTRIBUTION_PARAMETERS namelist
   USE parameters_2d, ONLY: particle_distribution_flag, fractal_dim, diam_min,   &
@@ -4280,8 +4279,6 @@ CONTAINS
 
           ALLOCATE (xs_fissures(n_solid, n_fissures))
           ALLOCATE (xg_fissures(n_add_gas, n_fissures))
-          ALLOCATE (xl_fissures(n_fissures))
-
           DO i = 1, n_fissures
 
             IF (composition_by_volume) THEN
@@ -4296,18 +4293,16 @@ CONTAINS
                    alphas_fissure(1:n_solid), alphal_fissure,                &
                    ! OUT
                    rho_m_fissure, inv_rhom_fissure, rho_c_fissure,           &
-                   xs_fissures(:, i), xg_fissures(:, i), xl_fissures(i),     &
+                   xs_fissures(:, i), xg_fissures(:, i), xl_fissure,          &
                    xc_fissure, sp_heat_c_fissure, sp_heat_mix_fissure)
 
               CALL enforce_mass_fraction_closure(xs_fissures(:, i),         &
-                   xg_fissures(:, i), xl_fissures(i))
+                   xg_fissures(:, i), xl_fissure)
 
             ELSE
 
               xs_fissures(:, i) = xs_source(1:n_solid)
               xg_fissures(:, i) = xg_source(1:n_add_gas)
-              xl_fissures(i) = xl_source
-
             END IF
 
           END DO

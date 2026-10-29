@@ -250,8 +250,6 @@ MODULE parameters_2d
   ! fissures carry the same volume fractions.
   REAL(wp), ALLOCATABLE :: xs_fissures(:,:)
   REAL(wp), ALLOCATABLE :: xg_fissures(:,:)
-  REAL(wp), ALLOCATABLE :: xl_fissures(:)
-  
   !> Initial temperature of the pile of material
   REAL(wp) :: T_init
 
