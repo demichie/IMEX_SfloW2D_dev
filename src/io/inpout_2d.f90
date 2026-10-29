@@ -4293,11 +4293,11 @@ CONTAINS
                    alphas_fissure(1:n_solid), alphal_fissure,                &
                    ! OUT
                    rho_m_fissure, inv_rhom_fissure, rho_c_fissure,           &
-                   xs_fissures(:, i), xg_fissures(:, i), xl_fissure,          &
+                   xs_fissures(:, i), xg_fissures(:, i), xl_source,          &
                    xc_fissure, sp_heat_c_fissure, sp_heat_mix_fissure)
 
               CALL enforce_mass_fraction_closure(xs_fissures(:, i),         &
-                   xg_fissures(:, i), xl_fissure)
+                   xg_fissures(:, i), xl_source)
 
             ELSE
 
