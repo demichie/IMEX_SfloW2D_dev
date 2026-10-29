@@ -2,8 +2,8 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_carrier_liquid_loss_2d
-    USE parameters_2d, ONLY : wp,n_vars,liquid_flag,gas_flag,mass_exchange_rates_type,reset_mass_exchange_rates
-    USE constitutive_parameters_2d, ONLY : loss_rate, rho_l, sp_heat_l
+    USE parameters_2d, ONLY : wp,n_vars,liquid_flag,mass_exchange_rates_type,reset_mass_exchange_rates
+    USE constitutive_parameters_2d, ONLY : loss_rate
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : mixt_var
 
@@ -32,18 +32,9 @@ CONTAINS
             CALL mixt_var(qp,Ri,rhom,rho_c,redgrav,cp_c,cpm)
             r%liquid_withdrawal_volume_rate=MAX(0.0_wp,loss_rate)
 
-            ! In mixed-phase flow the removed liquid has its own density and enthalpy.
-            IF (gas_flag) THEN
-                r%mixture_mass_rate=-rho_l*MAX(0.0_wp,loss_rate)
-                r%liquid_mass_rate=r%mixture_mass_rate
-                r%energy_rate=T*sp_heat_l*r%mixture_mass_rate
-
-            ELSE
-
-                r%mixture_mass_rate=-rho_c*MAX(0.0_wp,loss_rate)
-                r%energy_rate=T*cp_c*r%mixture_mass_rate
-            END IF
-
+            ! The liquid is the only carrier in this configuration.
+            r%mixture_mass_rate=-rho_c*r%liquid_withdrawal_volume_rate
+            r%energy_rate=T*cp_c*r%mixture_mass_rate
         END IF
 
     END SUBROUTINE eval_mass_exchange_carrier_liquid_loss_explicit

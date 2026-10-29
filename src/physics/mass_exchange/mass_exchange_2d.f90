@@ -87,23 +87,6 @@ CONTAINS
             gas_factor=1.0_wp
             liquid_factor=1.0_wp
 
-            ! Limit the dispersed-liquid sink first in two-carrier flows. It
-            ! shares neither the gas inventory nor the deposition pore gas.
-            IF (gas_flag .AND. liquid_flag) THEN
-
-                liquid_available=h*MAX(0.0_wp,alphal)/dt
-                liquid_factor=shared_withdrawal_factor([-liquid_loss],liquid_available)
-
-                ! A liquid withdrawal alone can raise the solid fraction.
-                ! Enforce packing before reserving the remaining margin for gas.
-                packing_factor=packing_withdrawal_factor(h,alpha,solid_erosion, &
-                          carrier_erosion,0.0_wp,0.0_wp,liquid_loss,0.0_wp, &
-                          maximum_solid_packing,dt)
-                liquid_factor=MIN(liquid_factor,packing_factor)
-                CALL scale_process(liquid_loss_rates,liquid_factor)
-                liquid_loss=liquid_loss*liquid_factor
-            END IF
-
             ! Gas withdrawal and pore filling draw on the same gas inventory;
             ! do not offset physical sinks with any positive source.
             IF (gas_flag) THEN
@@ -118,7 +101,7 @@ CONTAINS
                 ! the packing constraint must use these coupled increments.
                 packing_factor=packing_withdrawal_factor(h,alpha,solid_erosion, &
                           carrier_erosion,solid_deposition,carrier_volume, &
-                          gas_loss,liquid_loss,maximum_solid_packing,dt)
+                          gas_loss,0.0_wp,maximum_solid_packing,dt)
                 gas_factor=MIN(gas_factor,packing_factor)
                 CALL scale_process(deposition_rates,gas_factor)
                 CALL scale_process(darcy_loss_rates,gas_factor)
@@ -234,7 +217,6 @@ CONTAINS
         eqns_term(4)=eqns_term(4)+p%energy_rate
         eqns_term(idx_solidEqn_first:idx_solidEqn_last)= &
                   eqns_term(idx_solidEqn_first:idx_solidEqn_last)+p%solid_mass_rate
-        IF (gas_flag .AND. liquid_flag) eqns_term(n_eqns)=eqns_term(n_eqns)+p%liquid_mass_rate
         IF (n_add_gas>0) eqns_term(idx_addGasEqn_first:idx_addGasEqn_last)= &
                   eqns_term(idx_addGasEqn_first:idx_addGasEqn_last)+p%add_gas_mass_rate
         total%mixture_mass_rate=total%mixture_mass_rate+p%mixture_mass_rate

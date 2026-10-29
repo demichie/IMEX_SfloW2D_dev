@@ -45,8 +45,6 @@ CONTAINS
         ! Recover carrier gas mass fraction before partitioning withdrawal among gas species.
         gas_phase_mass_fraction=MAX(0.0_wp,1.0_wp- &
                   SUM(qp(idx_solid_first:idx_solid_last)))
-        IF (liquid_flag) gas_phase_mass_fraction= &
-                  MAX(0.0_wp,gas_phase_mass_fraction-qp(n_vars))
         volume_loss=0.0_wp
         IF (gas_flag .AND. pore_pressure_flag .AND. gas_loss_flag .AND. &
                   alpha<maximum_solid_packing) &

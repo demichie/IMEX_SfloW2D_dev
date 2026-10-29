@@ -1203,6 +1203,12 @@ CONTAINS
 
     END IF
 
+    ! Exactly one continuous carrier is supported by the current state layout.
+    ! Gas may contain several gas species, but not a transported liquid phase.
+    IF (gas_flag .AND. liquid_flag) THEN
+      ERROR STOP 'GAS_FLAG and LIQUID_FLAG are mutually exclusive'
+    END IF
+
     IF (lava_flag .AND. (gas_flag .OR. liquid_flag)) THEN
       ERROR STOP 'LAVA_FLAG requires GAS_FLAG=F and LIQUID_FLAG=F'
     END IF
@@ -1548,8 +1554,6 @@ CONTAINS
     ! ------- READ liquid_transport_parameters NAMELIST -------------------------
 
     IF (liquid_flag) THEN
-
-      IF (gas_flag) n_vars = n_vars + 1
 
       READ (input_unit, liquid_transport_parameters, IOSTAT=ios)
 

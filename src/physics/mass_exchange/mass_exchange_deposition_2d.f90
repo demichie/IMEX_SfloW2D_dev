@@ -54,7 +54,6 @@ CONTAINS
 
         IF (gas_flag) THEN
             gas_phase_mass_fraction=1.0_wp-SUM(qp(idx_solid_first:idx_solid_last))
-            IF (liquid_flag) gas_phase_mass_fraction=gas_phase_mass_fraction-qp(n_vars)
             gas_phase_mass_fraction=MAX(0.0_wp,gas_phase_mass_fraction)
         END IF
 
