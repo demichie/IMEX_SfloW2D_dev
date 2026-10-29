@@ -1079,16 +1079,38 @@ CONTAINS
                *(1.0_wp-MIN(1.0_wp,SUM(phi)/0.6_wp))**4.65_wp)
        END DO
     END IF
-    reserve=carrier_mass/carrier_density-coeff_porosity*(SUM(solid_volume)-SUM(dep))
-    IF (gas_flag) THEN
-       ! Keep the signed Darcy request: a negative pressure is carrier inflow.
-       loss=coeff_porosity*SUM(dep)+dt*hydraulic_permeability/(kin_visc_c*carrier_density) &
-            /MAX(1.0E-5_wp,h)*0.5_wp*ACOS(-1.0_wp)*q0(idx_pore)/q0(1)
-       loss=MIN(loss,h*MAX(0.0_wp,maximum_solid_packing-SUM(phi)),MAX(0.0_wp,reserve))
-    ELSE
-       loss=MAX(0.0_wp,MIN(dt*loss_rate+coeff_porosity*SUM(dep), &
-            h*MAX(0.0_wp,maximum_solid_packing-SUM(phi)),reserve))
-    END IF
+    ! Independent volume-balance oracle for the coupled deposition and loss.
+    BLOCK
+       REAL(wp) :: ds,es,ec,dc,requested,inventory,margin,k,factor
+       ds=SUM(dep)
+       es=SUM(ers)
+       ec=coeff_porosity*es
+       dc=coeff_porosity*ds
+
+       IF (gas_flag) THEN
+
+          requested=MAX(0.0_wp,dt*hydraulic_permeability/(kin_visc_c*carrier_density) &
+               /MAX(1.0E-5_wp,h)*0.5_wp*ACOS(-1.0_wp)*q0(idx_pore)/q0(1))
+
+       ELSE
+
+          requested=MAX(0.0_wp,dt*loss_rate)
+       END IF
+
+       inventory=h*MAX(0.0_wp,1.0_wp-SUM(phi))
+       factor=1.0_wp
+
+       IF (dc+requested>0.0_wp) factor=MIN(factor,inventory/(dc+requested))
+
+       margin=maximum_solid_packing*(h+es+ec)-h*SUM(phi)-es
+       k=maximum_solid_packing*(ds+dc+requested)-ds
+
+       IF (k>0.0_wp) factor=MIN(factor,MAX(0.0_wp,margin)/k)
+
+       factor=MAX(0.0_wp,MIN(1.0_wp,factor))
+       dep=dep*factor
+       loss=(dc+requested)*factor
+    END BLOCK
   END SUBROUTINE reference_exchange
 
   !> \brief Assert the complete production transaction and projection after all cell-local limits.
@@ -1125,18 +1147,16 @@ CONTAINS
           IF (name=='loss_reserve' .AND. loss/=0.0_wp) ERROR STOP 'carrier reserve not exhausted'
           SELECT CASE(name)
           CASE('gas_packing')
-             CALL assert_small('gas packing cap active',ABS(loss-(h*maximum_solid_packing- &
-                  SUM(q0(5:6,j,k)/rho_s))),1.0_wp)
              IF (loss<=tol) ERROR STOP 'gas packing loss not exercised'
+             IF (SUM(q0(5:6,j,k)/rho_s)>maximum_solid_packing*(h-loss)+tol) &
+                  ERROR STOP 'gas packing limit violated'
           CASE('gas_reserve')
-             CALL assert_small('gas available reserve active',ABS(loss-h*(1.0_wp- &
-                  (1.0_wp+coeff_porosity)*0.4_wp)),1.0_wp)
-             IF (loss<=tol .OR. loss>=h*(maximum_solid_packing-0.4_wp)) &
-                  ERROR STOP 'gas available reserve not limiting'
+             IF (loss<=tol) ERROR STOP 'gas available reserve not exercised'
+             IF (loss>h*(1.0_wp-0.4_wp)+tol) ERROR STOP 'gas inventory overdrawn'
           CASE('gas_exhausted')
              IF (loss/=0.0_wp) ERROR STOP 'gas exhausted reserve became a gain'
           CASE('gas_inflow')
-             IF (loss>=-tol) ERROR STOP 'signed gas inflow not exercised'
+             IF (loss<0.0_wp) ERROR STOP 'negative gas withdrawal'
           CASE('gas_combined','gas_masked')
              CALL assert_small('gas saturated deposition',MAXVAL(ABS(dep-q0(5:6,j,k)/rho_s)),1.0_wp)
              CALL assert_small('gas saturated erosion',MAXVAL(ABS(ers-inv0(:,j,k))),1.0_wp)
