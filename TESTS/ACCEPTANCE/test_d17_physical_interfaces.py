@@ -41,10 +41,10 @@ def main() -> int:
         r"\s*\.(true|false)\.\s*,\s*\.(true|false)\.\s*,"
         r"\s*\.(true|false)\.\s*,\s*&?\s*"
         r"default_method\s*=\s*SOURCE_METHOD_(?:EXPLICIT|NEWTON|ANALYTIC)\s*,\s*&?\s*"
-        r"default_cadence\\s*=\\s*SOURCE_CADENCE_(?:STAGE|STEP)\\s*,"
-        r"\\s*&?\\s*allows_gas\\s*=\\s*\\.(?:true|false)\\.\\s*,"
-        r"\\s*&?\\s*allows_liquid\\s*=\\s*\\.(?:true|false)\\.\\s*,"
-        r"\\s*&?\\s*allows_lava\\s*=\\s*\\.(?:true|false)\\.\\s*\\)",
+        r"default_cadence\s*=\s*SOURCE_CADENCE_(?:STAGE|STEP)\s*,"
+        r"\s*&?\s*allows_gas\s*=\s*\.(?:true|false)\.\s*,"
+        r"\s*&?\s*allows_liquid\s*=\s*\.(?:true|false)\.\s*,"
+        r"\s*&?\s*allows_lava\s*=\s*\.(?:true|false)\.\s*\)",
         text,
         flags=re.IGNORECASE,
     )
