@@ -90,14 +90,16 @@ CONTAINS
     liquid_factor=1.0_wp
     IF (gas_flag) THEN
       ! Subtract dispersed solids and liquid from the available gas volume.
-      gas_available=h*MAX(0.0_wp,1.0_wp-alpha-alphal)/dt
+      gas_available=MIN(h*MAX(0.0_wp,1.0_wp-alpha-alphal)/dt, &
+           h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt)
       gas_withdrawals=[-carrier_volume,-gas_volume_rate]
       gas_factor=shared_withdrawal_factor(gas_withdrawals,gas_available)
       CALL scale_process(deposit_rates,gas_factor)
       CALL scale_process(darcy_rates,gas_factor)
     ELSE
       ! In a liquid-only run, pore filling and prescribed loss share one pool.
-      liquid_available=h*MAX(0.0_wp,1.0_wp-alpha)/dt
+      liquid_available=MIN(h*MAX(0.0_wp,1.0_wp-alpha)/dt, &
+           h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt)
       liquid_withdrawals=[-carrier_volume,-liquid_volume_rate]
       liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
       CALL scale_process(deposit_rates,liquid_factor)
