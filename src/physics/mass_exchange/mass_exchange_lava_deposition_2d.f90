@@ -1,6 +1,6 @@
-!> @brief mass exchange lava deposition 2d: physical mass-exchange components and rate evaluation.
-!> @details Explicit physics is evaluated locally; unsupported treatment entry points
-!> fail explicitly. The coordinator alone enforces shared carrier inventories.
+!> @brief Evaluate lava deposition process contributions to mass, energy and bed evolution.
+!> @details Explicit treatment is supported; other treatment interfaces reject
+!> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_lava_deposition_2d
     USE parameters_2d, ONLY : wp, mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
@@ -36,7 +36,7 @@ CONTAINS
         r%lava_deposit_rate=r%continuous_phase_deposition_rate
         r%dB_dt=r%continuous_phase_deposition_rate
     END SUBROUTINE
-    !> @brief Reject unsupported implicit treatment for lava_deposition_semi.
+    !> @brief Reject unsupported semi-implicit treatment for lava deposition.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] depth Mobile lava thickness [m].
     !> @param[in] T Mobile flow temperature [K].

@@ -1,6 +1,6 @@
-!> @brief mass exchange entrainment 2d: physical mass-exchange components and rate evaluation.
-!> @details Explicit physics is evaluated locally; unsupported treatment entry points
-!> fail explicitly. The coordinator alone enforces shared carrier inventories.
+!> @brief Evaluate entrainment process contributions to mass, energy and bed evolution.
+!> @details Explicit treatment is supported; other treatment interfaces reject
+!> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_entrainment_2d
     USE parameters_2d, ONLY : wp, n_vars, slope_correction_flag, mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
@@ -37,7 +37,7 @@ CONTAINS
         r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(qp(1),Ri,speed_squared)
         r%energy_rate=T_ambient*sp_heat_a*r%mixture_mass_rate
     END SUBROUTINE
-    !> @brief Reject unsupported implicit treatment for entrainment_semi.
+    !> @brief Reject unsupported semi-implicit treatment for entrainment.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in] u Horizontal x velocity of the mobile material [m/s].

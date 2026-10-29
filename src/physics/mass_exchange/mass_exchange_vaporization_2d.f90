@@ -1,6 +1,6 @@
-!> @brief mass exchange vaporization 2d: physical mass-exchange components and rate evaluation.
-!> @details Explicit physics is evaluated locally; unsupported treatment entry points
-!> fail explicitly. The coordinator alone enforces shared carrier inventories.
+!> @brief Evaluate vaporization process contributions to mass, energy and bed evolution.
+!> @details Explicit treatment is supported; other treatment interfaces reject
+!> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_vaporization_2d
     USE parameters_2d, ONLY : wp, n_solid, n_add_gas, gas_flag, &
               liquid_vaporization_flag, mass_exchange_rates_type, reset_mass_exchange_rates
@@ -34,7 +34,7 @@ CONTAINS
         r%add_gas_mass_rate(1)=r%mixture_mass_rate
         r%energy_rate=eval_vaporization_energy_rate(r%mixture_mass_rate,sp_heat_g(1))
     END SUBROUTINE
-    !> @brief Reject unsupported implicit treatment for vaporization_semi.
+    !> @brief Reject unsupported semi-implicit treatment for vaporization.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
     !> @param[in] T Mobile flow temperature [K].

@@ -1,6 +1,6 @@
-!> @brief mass exchange erosion 2d: physical mass-exchange components and rate evaluation.
-!> @details Explicit physics is evaluated locally; unsupported treatment entry points
-!> fail explicitly. The coordinator alone enforces shared carrier inventories.
+!> @brief Evaluate erosion process contributions to mass, energy and bed evolution.
+!> @details Explicit treatment is supported; other treatment interfaces reject
+!> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_erosion_2d
     USE parameters_2d, ONLY : wp, n_solid, n_vars, idx_u, idx_v, slope_correction_flag, &
               erodible_deposit_flag, mass_exchange_rates_type, reset_mass_exchange_rates
@@ -53,7 +53,7 @@ CONTAINS
                   rho_c_sub*cp_sub*r%continuous_phase_erosion_rate)
         r%dB_dt=-SUM(r%solid_erosion_rate)/(1.0_wp-erodible_porosity)
     END SUBROUTINE
-    !> @brief Reject unsupported implicit treatment for erosion_semi.
+    !> @brief Reject unsupported semi-implicit treatment for erosion.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].

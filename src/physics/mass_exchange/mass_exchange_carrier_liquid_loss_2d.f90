@@ -1,6 +1,6 @@
-!> @brief mass exchange carrier liquid loss 2d: physical mass-exchange components and rate evaluation.
-!> @details Explicit physics is evaluated locally; unsupported treatment entry points
-!> fail explicitly. The coordinator alone enforces shared carrier inventories.
+!> @brief Evaluate carrier liquid loss process contributions to mass, energy and bed evolution.
+!> @details Explicit treatment is supported; other treatment interfaces reject
+!> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_carrier_liquid_loss_2d
     USE parameters_2d, ONLY : wp,n_vars,liquid_flag,gas_flag,mass_exchange_rates_type,reset_mass_exchange_rates
     USE constitutive_parameters_2d, ONLY : loss_rate, rho_l, sp_heat_l
@@ -36,7 +36,7 @@ CONTAINS
             END IF
         END IF
     END SUBROUTINE eval_mass_exchange_carrier_liquid_loss_explicit
-    !> @brief Reject unsupported implicit treatment for carrier_liquid_loss_semi.
+    !> @brief Reject unsupported semi-implicit treatment for carrier liquid loss.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.

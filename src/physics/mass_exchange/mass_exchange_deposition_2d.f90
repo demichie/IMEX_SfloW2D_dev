@@ -1,6 +1,6 @@
-!> @brief mass exchange deposition 2d: physical mass-exchange components and rate evaluation.
-!> @details Explicit physics is evaluated locally; unsupported treatment entry points
-!> fail explicitly. The coordinator alone enforces shared carrier inventories.
+!> @brief Evaluate deposition process contributions to mass, energy and bed evolution.
+!> @details Explicit treatment is supported; other treatment interfaces reject
+!> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_deposition_2d
     USE parameters_2d, ONLY : wp, n_vars, n_solid, n_add_gas, &
               idx_solid_first, idx_solid_last, idx_add_gas_first, idx_add_gas_last, &
@@ -64,7 +64,7 @@ CONTAINS
                   gas_species_mass_fraction/gas_phase_mass_fraction
         r%dB_dt=SUM(r%solid_deposition_rate)+r%continuous_phase_deposition_rate
     END SUBROUTINE
-    !> @brief Reject unsupported implicit treatment for deposition_semi.
+    !> @brief Reject unsupported semi-implicit treatment for deposition.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
