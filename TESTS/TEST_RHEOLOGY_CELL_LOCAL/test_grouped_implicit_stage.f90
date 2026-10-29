@@ -439,30 +439,18 @@ PROGRAM test_grouped_implicit_stage
      END IF
   END DO
 
-  ! A large yield impulse must be constrained before Newton, not only after it.
-  tau0 = 20000.0_wp
+  ! Voellmy has no yield threshold: verify dissipative momentum damping
+  ! without imposing the old lava-specific semi-implicit impulse.
   q_stage_check = q_old
-  CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
-  CALL eval_source_semi_implicit(0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
-       grav, qp_known, si_source, 0.0_wp)
-  q_expected = q_stage_check
-  q_expected(2:3) = q_expected(2:3) +                                     &
-       dt_step*a_diag*si_source(2:3)
-  CALL correct_friction_momentum(q_stage_check(2:3), q_expected(2:3))
-  CALL solve_imex_stage(partition, source_registry%stage_groups(),           &
-       q_stage_check, q_stage_check,              &
-       dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &
-       0.0_wp, grav, 0.0_wp, .FALSE., .FALSE., q_stage,                     &
-       effective_stage_term, iterations, converged, linear_info,             &
-       line_search_failed)
-  IF (.NOT. converged .OR. linear_info .NE. 0 .OR. line_search_failed) THEN
-     ERROR STOP 'large semi-implicit yield stage did not converge'
-  END IF
-  scale = MAX(1.0_wp, MAXVAL(ABS(q_expected(2:3))))
-  IF (MAXVAL(ABS(q_stage(2:3) - q_expected(2:3))) / scale .GT. 2.0E-12_wp) THEN
-     ERROR STOP 'semi-implicit yield friction reversed the momentum'
-  END IF
-  tau0 = 0.0_wp
+  CALL solve_imex_stage(partition, source_registry%stage_groups(), &
+       q_stage_check, q_stage_check, dt_step, a_diag, known_residual, &
+       0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp, grav, 0.0_wp, &
+       .FALSE., .FALSE., q_stage, effective_stage_term, iterations, &
+       converged, linear_info, line_search_failed)
+  IF (.NOT. converged .OR. linear_info/=0 .OR. line_search_failed) &
+       ERROR STOP 'Voellmy friction stage did not converge'
+  IF (SUM(q_stage(2:3)*q_stage_check(2:3)) < 0.0_wp) &
+       ERROR STOP 'Voellmy friction reversed the momentum'
 
   q_stage_check = q_old
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)

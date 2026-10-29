@@ -339,7 +339,7 @@ CONTAINS
     REAL(wp) :: alphag_cold(n_add_gas), alphag_hot(n_add_gas)
     REAL(wp) :: p_dyn
 
-    CALL configure_layout(.TRUE.)
+    CALL configure_layout(.FALSE.)
     ALLOCATE (qp_cold(n_vars+2), qp_hot(n_vars+2), q(n_vars),                  &
               qp_roundtrip(n_vars+2))
 
