@@ -4307,11 +4307,11 @@ CONTAINS
           ! define the physical variable from the source values and the
           ! initial velocity
           qp_source = 0.0_wp
-          qp_source(1) = h_source
-          qp_source(2) = h_source*vel_source
-          qp_source(3) = 0.0_wp
+          qp_source(idx_h) = h_source
+          qp_source(idx_hu) = h_source*vel_source
+          qp_source(idx_hv) = 0.0_wp
 
-          qp_source(4) = T_source
+          qp_source(idx_T) = T_source
 
           CALL eval_mixture_properties_from_mass_fractions(                    &
                ! IN
@@ -4357,11 +4357,11 @@ CONTAINS
                 h_source = (mfr_source/(source_length*rho_m) &
                             *SQRT(Ri_source/red_grav))**(2.0_wp/3.0_wp)
 
-                qp_source(1) = h_source
-                qp_source(2) = h_source*vel_source
-                qp_source(3) = 0.0_wp
+                qp_source(idx_h) = h_source
+                qp_source(idx_hu) = h_source*vel_source
+                qp_source(idx_hv) = 0.0_wp
 
-                qp_source(4) = T_source
+                qp_source(idx_T) = T_source
 
                 qp_source(5:4 + n_solid) = xs_source(1:n_solid)
                 qp_source(4 + n_solid + 1:4 + n_solid + n_add_gas) =          &
@@ -4400,8 +4400,8 @@ CONTAINS
 
           END IF
 
-          qp_source(1) = h_source
-          qp_source(2) = h_source*vel_source
+          qp_source(idx_h) = h_source
+          qp_source(idx_hu) = h_source*vel_source
           qp_source(n_vars + 1) = vel_source
 
           ! Check that the Richardson number is correct
@@ -5256,27 +5256,27 @@ CONTAINS
            rho_m, inv_rhom, rho_c,                                             &
            mass_fract, xg_init, xc_init, sp_heat_c, sp_heat_mix)
 
-      state%q(1, :, :) = thickness_init(:, :)*rho_m
+      state%q(idx_totMassEqn, :, :) = thickness_init(:, :)*rho_m
 
       IF (VERBOSE_LEVEL .GE. 0) THEN
 
         WRITE (*, *) 'Total volume on computational grid =', cell_size**2* &
           SUM(thickness_init(:, :))
         WRITE (*, *) 'Total mass on computational grid =', cell_size**2* &
-          SUM(state%q(1, :, :))
+          SUM(state%q(idx_totMassEqn, :, :))
 
       END IF
       ! rhom*h*u
-      state%q(2, :, :) = state%q(1, :, :)*u_init
+      state%q(idx_uEqn, :, :) = state%q(idx_totMassEqn, :, :)*u_init
       ! rhom*h*v
-      state%q(3, :, :) = state%q(1, :, :)*v_init
+      state%q(idx_vEqn, :, :) = state%q(idx_totMassEqn, :, :)*v_init
 
       ! energy (total or internal)
-      state%q(4, :, :) = 0.0_wp
+      state%q(idx_engyEqn, :, :) = 0.0_wp
 
       WHERE (thickness_init .GT. 0.0_wp)
 
-        state%q(4, :, :) = state%q(1, :, :)*T_init*sp_heat_mix
+        state%q(idx_engyEqn, :, :) = state%q(idx_totMassEqn, :, :)*T_init*sp_heat_mix
 
       END WHERE
 
@@ -5334,9 +5334,9 @@ CONTAINS
 
       IF (verbose_level .GE. 1) THEN
 
-        WRITE (*, *) 'Min q(1,:,:) =', MINVAL(state%q(1, :, :))
-        WRITE (*, *) 'Max q(1,:,:) =', MAXVAL(state%q(1, :, :))
-        WRITE (*, *) 'SUM(q(1,:,:)) =', SUM(state%q(1, :, :))
+        WRITE (*, *) 'Min q(1,:,:) =', MINVAL(state%q(idx_totMassEqn, :, :))
+        WRITE (*, *) 'Max q(1,:,:) =', MAXVAL(state%q(idx_totMassEqn, :, :))
+        WRITE (*, *) 'SUM(q(1,:,:)) =', SUM(state%q(idx_totMassEqn, :, :))
 
         DO k = 1, nrows
 
@@ -5365,7 +5365,7 @@ CONTAINS
           READ (restart_unit, '(2e20.12,100(e20.12))') xj, yk, &
             (state%q(i_vars, j, k), i_vars=1, n_vars)
 
-          IF (state%q(1, j, k) .LE. 0.0_wp) state%q(1:n_vars, j, k) = 0.0_wp
+          IF (state%q(idx_totMassEqn, j, k) .LE. 0.0_wp) state%q(1:n_vars, j, k) = 0.0_wp
 
           DO solid_idx = 5, 4 + n_solid
 
@@ -5379,7 +5379,7 @@ CONTAINS
 
       END DO
 
-      IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'Total mass =', dx*dy*SUM(state%q(1, :, :))
+      IF (VERBOSE_LEVEL .GE. 0) WRITE (*, *) 'Total mass =', dx*dy*SUM(state%q(idx_totMassEqn, :, :))
 
       DO solid_idx = 5, 4 + n_solid
 
@@ -6160,9 +6160,9 @@ CONTAINS
 
     grid_output = -9999
 
-    WHERE (state%qp(1, :, :) .GE. 1.0E-5_wp)
+    WHERE (state%qp(idx_h, :, :) .GE. 1.0E-5_wp)
 
-      grid_output = state%qp(1, :, :)
+      grid_output = state%qp(idx_h, :, :)
 
     END WHERE
 
@@ -6190,9 +6190,9 @@ CONTAINS
 
     grid_output = -9999
 
-    WHERE (state%qp(1, :, :) .GE. 1.0E-5_wp)
+    WHERE (state%qp(idx_h, :, :) .GE. 1.0E-5_wp)
 
-      grid_output = state%qp(4, :, :)
+      grid_output = state%qp(idx_T, :, :)
 
     END WHERE
 
@@ -6720,21 +6720,21 @@ CONTAINS
 
       WRITE (probes_unit, 1710, ADVANCE='no') time, ','
 
-      CALL interp_2d_scalarB(x_comp, y_comp, state%qp(1, :, :), &
+      CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_h, :, :), &
                              probes_coords(1, k), probes_coords(2, k), h_prb)
 
       WRITE (probes_unit, 1710, ADVANCE='no') h_prb, ','
 
       IF (h_prb .GT. 1.0E-5_wp) THEN
 
-        CALL interp_2d_scalarB(x_comp, y_comp, state%q(1, :, :), &
+        CALL interp_2d_scalarB(x_comp, y_comp, state%q(idx_totMassEqn, :, :), &
                                probes_coords(1, k), probes_coords(2, k), hrhom_prb)
 
         rhom_prb = hrhom_prb/h_prb
 
         WRITE (probes_unit, 1710, ADVANCE='no') rhom_prb, ','
 
-        CALL interp_2d_scalarB(x_comp, y_comp, state%qp(4, :, :), &
+        CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_T, :, :), &
                                probes_coords(1, k), probes_coords(2, k), T_prb)
 
         WRITE (probes_unit, 1710, ADVANCE='no') T_prb, ','
@@ -6932,7 +6932,7 @@ CONTAINS
 
     IF (.NOT. had_history) THEN
 
-      IF (MAXVAL(state%qp(1, :, :)) .EQ. 0.0_wp) THEN
+      IF (MAXVAL(state%qp(idx_h, :, :)) .EQ. 0.0_wp) THEN
 
         ! An empty, source-free domain still has a defined diagnostic centre.
         x_mass_center = 0.5_wp*(x_comp(1) + x_comp(sX))
@@ -6962,14 +6962,14 @@ CONTAINS
 
       ELSE
 
-        x_mass_center = SUM(X*state%q(1, :, :))/SUM(state%q(1, :, :))
-        y_mass_center = SUM(Y*state%q(1, :, :))/SUM(state%q(1, :, :))
-        state%hpos = (state%qp(1, :, :) .GT. 1.0E-5_wp) .AND. &
+        x_mass_center = SUM(X*state%q(idx_totMassEqn, :, :))/SUM(state%q(idx_totMassEqn, :, :))
+        y_mass_center = SUM(Y*state%q(idx_totMassEqn, :, :))/SUM(state%q(idx_totMassEqn, :, :))
+        state%hpos = (state%qp(idx_h, :, :) .GT. 1.0E-5_wp) .AND. &
                (alphas_tot .GE. alphas_threshold)
 
       END IF
 
-      state%hpos_old = (state%qp(1, :, :) .GT. 1.0E-5_wp) .AND. &
+      state%hpos_old = (state%qp(idx_h, :, :) .GT. 1.0E-5_wp) .AND. &
                  (alphas_tot .GE. alphas_threshold)
 
       state%hpos = state%hpos_old
@@ -6978,7 +6978,7 @@ CONTAINS
 
       IF ((x0_runout .EQ. -1) .AND. (y0_runout .EQ. -1)) THEN
 
-        WHERE (state%qp(1, :, :) > 1.0E-5_wp) dist = B_cent
+        WHERE (state%qp(idx_h, :, :) > 1.0E-5_wp) dist = B_cent
         imin = MAXLOC(dist)
 
         x0_runout = X(imin(1), imin(2))
@@ -7021,19 +7021,19 @@ CONTAINS
 
     ELSE
 
-      IF (MAXVAL(state%qp(1, :, :)) .EQ. 0.0_wp) THEN
+      IF (MAXVAL(state%qp(idx_h, :, :)) .EQ. 0.0_wp) THEN
 
         x_mass_center = x_mass_center_old
         y_mass_center = y_mass_center_old
 
       ELSE
 
-        x_mass_center = SUM(X*state%q(1, :, :))/SUM(state%q(1, :, :))
-        y_mass_center = SUM(Y*state%q(1, :, :))/SUM(state%q(1, :, :))
+        x_mass_center = SUM(X*state%q(idx_totMassEqn, :, :))/SUM(state%q(idx_totMassEqn, :, :))
+        y_mass_center = SUM(Y*state%q(idx_totMassEqn, :, :))/SUM(state%q(idx_totMassEqn, :, :))
 
       END IF
 
-      state%hpos = (state%qp(1, :, :) .GT. 1.0E-5_wp) .AND. &
+      state%hpos = (state%qp(idx_h, :, :) .GT. 1.0E-5_wp) .AND. &
              (alphas_tot .GE. alphas_threshold)
 
     END IF
@@ -7527,16 +7527,16 @@ CONTAINS
 
       DO k = 1, comp_cells_y
 
-        IF (state%qp(1, j, k) .GT. dry_thickness_tolerance) THEN
+        IF (state%qp(idx_h, j, k) .GT. dry_thickness_tolerance) THEN
 
           CALL mixt_var(state%qp(1:n_vars + 2, j, k), r_Ri, r_rho_m, r_rho_c, &
                         r_red_grav, r_sp_heat_c, r_sp_heat_mix)
 
-          denom = state%q(2,j,k)**2 + state%q(3,j,k)**2
+          denom = state%q(idx_uEqn,j,k)**2 + state%q(idx_vEqn,j,k)**2
 
 IF (denom .GT. EPSILON(1.0_wp)) THEN
 
-   r_Ri = r_red_grav / r_rho_m * state%q(1,j,k)**3 / denom
+   r_Ri = r_red_grav / r_rho_m * state%q(idx_totMassEqn,j,k)**3 / denom
 
 ELSE
 
@@ -7559,9 +7559,9 @@ END IF
         rho_m2D(j, k) = r_rho_m
         red_grav2D(j, k) = r_red_grav
 
-        IF (state%qp(1, j, k) .LE. dry_thickness_tolerance) CYCLE
+        IF (state%qp(idx_h, j, k) .LE. dry_thickness_tolerance) CYCLE
 
-        r_h = state%qp(1, j, k)
+        r_h = state%qp(idx_h, j, k)
         r_u = state%qp(n_vars + 1, j, k)
         r_v = state%qp(n_vars + 2, j, k)
         vertical_velocity(j, k) = r_u*B_prime_x_geom(j, k)                    &
@@ -7637,9 +7637,9 @@ END IF
     CALL check(nf90_put_var(ncid, b_varid, B_cent, start=start, count=count))
 
     ! Write the flow thickness (h)
-    CALL check(nf90_put_var(ncid, h_varid, state%qp(1, :, :), start=start, count=count))
+    CALL check(nf90_put_var(ncid, h_varid, state%qp(idx_h, :, :), start=start, count=count))
 
-    temp_array(:, :) = state%qp(1, :, :) + B_cent(:, :)
+    temp_array(:, :) = state%qp(idx_h, :, :) + B_cent(:, :)
 
     ! Calculate and write the free surface elevation (eta = h + b)
     CALL check(nf90_put_var(ncid, eta_varid, temp_array, start=start, &
@@ -7652,19 +7652,19 @@ END IF
     ! Write velocity components.  A cell classified as numerically dry has no
     ! meaningful physical velocity; mask residual q/rho-h ratios in the output.
     temp_array = 0.0_wp
-    WHERE (state%qp(1, :, :) .GT. dry_thickness_tolerance)
+    WHERE (state%qp(idx_h, :, :) .GT. dry_thickness_tolerance)
       temp_array = state%qp(n_vars + 1, :, :)
     END WHERE
     CALL check(nf90_put_var(ncid, u_varid, temp_array, start=start, count=count))
 
     temp_array = 0.0_wp
-    WHERE (state%qp(1, :, :) .GT. dry_thickness_tolerance)
+    WHERE (state%qp(idx_h, :, :) .GT. dry_thickness_tolerance)
       temp_array = state%qp(n_vars + 2, :, :)
     END WHERE
     CALL check(nf90_put_var(ncid, v_varid, temp_array, start=start, count=count))
 
     ! Write the flow temperature (T)
-    CALL check(nf90_put_var(ncid, Temp_varid, state%qp(4, :, :), start=start, &
+    CALL check(nf90_put_var(ncid, Temp_varid, state%qp(idx_T, :, :), start=start, &
                             count=count))
 
     temp_array = 0.0_wp   ! initialize to zero
@@ -7710,7 +7710,7 @@ END IF
     ! Write pore pressure variable
     DO i = 1, n_pore_vars
       temp_array = pres
-      WHERE (state%qp(1, :, :) .GE. dry_thickness_tolerance)
+      WHERE (state%qp(idx_h, :, :) .GE. dry_thickness_tolerance)
         temp_array = state%qp(4 + n_solid + n_add_gas + n_stoch_vars + i, :, :) + pres
       END WHERE
       CALL check(nf90_put_var(ncid, pore_varid(i), temp_array, start=start, &

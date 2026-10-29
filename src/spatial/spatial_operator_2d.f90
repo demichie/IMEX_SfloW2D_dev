@@ -8,6 +8,7 @@
 !********************************************************************************
 
 MODULE spatial_operator_2d
+    USE parameters_2d, ONLY : idx_totMassEqn, idx_T
 
   USE parameters_2d, ONLY : wp, n_eqns, n_vars, max_dt, cfl, cfl_policy
   USE diagnostics_2d, ONLY : fatal_error
@@ -150,11 +151,11 @@ CONTAINS
        j = domain%j_reconstruction(l)
        k = domain%k_reconstruction(l)
 
-       IF ( q(1,j,k) .GT. 0.0_wp ) THEN
+       IF ( q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
           CALL qc_to_qp( q(:,j,k), qp(:,j,k), dynamic_pressure )
        ELSE
           qp(:,j,k) = 0.0_wp
-          qp(4,j,k) = T_ambient
+          qp(idx_T,j,k) = T_ambient
        END IF
     END DO
     !$OMP END PARALLEL DO

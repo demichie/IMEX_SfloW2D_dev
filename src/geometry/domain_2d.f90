@@ -9,6 +9,7 @@
 !********************************************************************************
 
 MODULE domain_2d
+    USE parameters_2d, ONLY : idx_totMassEqn
 
   USE parameters_2d, ONLY : wp, n_RK
   USE parameters_2d, ONLY : radial_source_flag, bottom_radial_source_flag,   &
@@ -181,7 +182,7 @@ CONTAINS
     !$OMP BARRIER
     
     !$OMP WORKSHARE
-    WHERE ( ( q(1,2:comp_cells_x-1,2:comp_cells_y-1) .GT. 0.0_wp ) .AND.        &
+    WHERE ( ( q(idx_totMassEqn,2:comp_cells_x-1,2:comp_cells_y-1) .GT. 0.0_wp ) .AND.        &
          ( this%solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1) .LE. t ) )       &
          this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE.
     !$OMP END WORKSHARE
