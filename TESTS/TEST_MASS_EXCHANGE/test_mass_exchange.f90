@@ -1181,7 +1181,12 @@ CONTAINS
              IF (loss<=tol) ERROR STOP 'gas available reserve not exercised'
              IF (loss>h*(1.0_wp-0.4_wp)+tol) ERROR STOP 'gas inventory overdrawn'
           CASE('gas_exhausted')
-             IF (loss/=0.0_wp) ERROR STOP 'gas exhausted reserve became a gain'
+             ! The gas reserve is positive at alpha_s=0.55 and is exhausted
+             ! only after the flow reaches maximum solid packing.
+             IF (loss<=tol) ERROR STOP 'gas packing reserve not exercised'
+             CALL assert_small('gas packing reserve exhausted', &
+                  ABS(loss-(h-SUM(q0(5:6,j,k)/rho_s)/maximum_solid_packing)), &
+                  MAX(1.0_wp,h))
           CASE('gas_inflow')
              IF (loss<0.0_wp) ERROR STOP 'negative gas withdrawal'
           CASE('gas_combined','gas_masked')
