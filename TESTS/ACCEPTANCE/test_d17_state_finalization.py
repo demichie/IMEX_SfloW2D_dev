@@ -38,8 +38,8 @@ def check():
         r"negative_alpha_check:",
         r"call\s+qc_to_qp\(q_cell\s*,\s*qp_cell",
         r"call\s+project_dry_cell_momenta",
-        r"qp_cell\(4\)\s*\.LT\.\s*273\.0_wp",
-        r"if\s*\(\s*SUM\(q_cell\(5:4\+n_solid\)\)",
+        r"qp_cell\(idx_T\)\s*\.LT\.\s*273\.0_wp",
+        r"if\s*\(\s*SUM\(q_cell\(idx_solidEqn_first:idx_solidEqn_last\)\)",
         r"IF\s*\(\s*nodata\s*\)",
     ])
     for term in ("-1.0E-7_wp", "1.0E-10_wp",
@@ -56,7 +56,7 @@ def check():
     assert "CALL initialize_dry_physical_cell(this%qp_rk(1:n_vars+2,j,k))" in rk
 
     dry = body(state, "initialize_dry_physical_cell")
-    ordered(dry, [r"qp_cell\s*=\s*0\.0_wp", r"qp_cell\(4\)\s*=\s*T_ambient"])
+    ordered(dry, [r"qp_cell\s*=\s*0\.0_wp", r"qp_cell\(idx_T\)\s*=\s*T_ambient"])
     assert step.count("CALL initialize_dry_physical_cell(") == 2
     print("PASS: D17 post-RK observer, repair order, dry halo and STEP guards")
 

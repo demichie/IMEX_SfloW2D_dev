@@ -18,7 +18,8 @@ MODULE inpout_2d
   USE diagnostics_2d, ONLY : interactive_debug_flag, debug_pause, fatal_error
   USE time_integration_2d, ONLY : validate_runge_kutta_stages
 
-  USE parameters_2d, ONLY: wp, dry_thickness_tolerance
+  USE parameters_2d, ONLY: wp, dry_thickness_tolerance, &
+       configure_canonical_state_indices
   USE runtime_2d, ONLY: runtime_state_type
   USE state_2d, ONLY: state_type
   USE domain_2d, ONLY: domain_type
