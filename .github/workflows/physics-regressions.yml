@@ -18,7 +18,7 @@ jobs:
       - name: Install GNU Fortran
         run: |
           sudo apt-get update
-          sudo apt-get install -y gfortran
+          sudo apt-get install -y gfortran libnetcdff-dev libnetcdf-dev liblapack-dev libblas-dev pkg-config
 
       - name: Check four concrete physics interfaces per configured source
         shell: bash
