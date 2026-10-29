@@ -7,8 +7,11 @@ MODULE mass_exchange_deposition_2d
 
   USE diagnostics_2d, ONLY : fatal_error
   USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
+  USE mass_exchange_rates_2d, ONLY: mass_exchange_rates_type, reset_mass_exchange_rates
+  USE constitutive_parameters_2d, ONLY: rho_s, sp_heat_s, coeff_porosity
   IMPLICIT NONE
   PRIVATE
+  PUBLIC :: eval_mass_exchange_deposition_rates_explicit
   PUBLIC :: eval_mass_exchange_deposition_explicit
   PUBLIC :: eval_mass_exchange_deposition_semi_implicit
   PUBLIC :: eval_mass_exchange_deposition_implicit
@@ -219,4 +222,17 @@ CONTAINS
 
 
 
+  SUBROUTINE eval_mass_exchange_deposition_rates_explicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,r)
+    REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL eval_mass_exchange_deposition_explicit(h,T,alphas,alpha,rho_m,rho_c, &
+         dt,r%solid_deposition_rate)
+    r%continuous_phase_deposition_rate=coeff_porosity*SUM(r%solid_deposition_rate)
+    r%solid_mass_rate=-rho_s*r%solid_deposition_rate
+    r%mixture_mass_rate=SUM(r%solid_mass_rate)-rho_c*r%continuous_phase_deposition_rate
+    r%energy_rate=T*(SUM(sp_heat_s*r%solid_mass_rate)- &
+         rho_c*cp_c*r%continuous_phase_deposition_rate)
+    r%dB_dt=SUM(r%solid_deposition_rate)+r%continuous_phase_deposition_rate
+  END SUBROUTINE
 END MODULE mass_exchange_deposition_2d

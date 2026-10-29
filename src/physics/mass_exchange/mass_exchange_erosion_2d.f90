@@ -4,7 +4,11 @@ MODULE mass_exchange_erosion_2d
   USE diagnostics_2d, ONLY : fatal_error
   USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity, erodible_fract
 
+  USE mass_exchange_rates_2d, ONLY: mass_exchange_rates_type, reset_mass_exchange_rates
+  USE constitutive_parameters_2d, ONLY: rho_s, rho_c_sub, sp_heat_s, erodible_porosity
+  IMPLICIT NONE
   PRIVATE
+  PUBLIC :: eval_mass_exchange_erosion_rates_explicit
   PUBLIC :: eval_mass_exchange_erosion_explicit
   PUBLIC :: eval_mass_exchange_erosion_semi_implicit
   PUBLIC :: eval_mass_exchange_erosion_implicit
@@ -82,4 +86,16 @@ CONTAINS
 
 
 
+  SUBROUTINE eval_mass_exchange_erosion_rates_explicit(h,speed,alpha,erodible,dt,T_sub,cp_sub,r)
+    REAL(wp), INTENT(IN) :: h,speed,alpha,erodible(n_solid),dt,T_sub,cp_sub
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL eval_mass_exchange_erosion_explicit(h,speed,alpha,erodible,dt, &
+         r%solid_erosion_rate,r%continuous_phase_erosion_rate)
+    r%solid_mass_rate=rho_s*r%solid_erosion_rate
+    r%mixture_mass_rate=SUM(r%solid_mass_rate)+rho_c_sub*r%continuous_phase_erosion_rate
+    r%energy_rate=T_sub*(SUM(sp_heat_s*r%solid_mass_rate)+ &
+         rho_c_sub*cp_sub*r%continuous_phase_erosion_rate)
+    r%dB_dt=-SUM(r%solid_erosion_rate)/(1.0_wp-erodible_porosity)
+  END SUBROUTINE
 END MODULE mass_exchange_erosion_2d

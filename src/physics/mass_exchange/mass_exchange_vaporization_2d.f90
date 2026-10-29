@@ -4,8 +4,11 @@ MODULE mass_exchange_vaporization_2d
   USE diagnostics_2d, ONLY : fatal_error
   USE constitutive_parameters_2d, ONLY : rho_s, sp_heat_s, gamma_steam, sp_heat_g
   USE thermal_laws_2d, ONLY : eval_vaporization_mass_rate, eval_vaporization_energy_rate
+  USE mass_exchange_rates_2d, ONLY: mass_exchange_rates_type, reset_mass_exchange_rates
+
   IMPLICIT NONE
   PRIVATE
+  PUBLIC :: eval_mass_exchange_vaporization_process_explicit
   PUBLIC :: eval_mass_exchange_vaporization_explicit
   PUBLIC :: eval_mass_exchange_vaporization_rates_explicit
   PUBLIC :: eval_mass_exchange_vaporization_semi_implicit
@@ -70,4 +73,14 @@ CONTAINS
 
 
 
+  SUBROUTINE eval_mass_exchange_vaporization_process_explicit(B_zone,T,deposition,r)
+    INTEGER, INTENT(IN) :: B_zone
+    REAL(wp), INTENT(IN) :: T,deposition(n_solid)
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    REAL(wp) :: gas_mass
+    CALL reset_mass_exchange_rates(r)
+    CALL eval_mass_exchange_vaporization_rates_explicit(B_zone,T,deposition, &
+         r%mixture_mass_rate,gas_mass,r%energy_rate)
+    IF (SIZE(r%add_gas_mass_rate)>0) r%add_gas_mass_rate(1)=gas_mass
+  END SUBROUTINE
 END MODULE mass_exchange_vaporization_2d

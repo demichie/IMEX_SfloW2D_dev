@@ -7,8 +7,11 @@ MODULE mass_exchange_carrier_loss_2d
   USE constitutive_parameters_2d, ONLY : loss_rate, coeff_porosity, maximum_solid_packing
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_gas_loss
 
+  USE mass_exchange_rates_2d, ONLY: mass_exchange_rates_type, reset_mass_exchange_rates
+
   IMPLICIT NONE
   PRIVATE
+  PUBLIC :: eval_mass_exchange_liquid_loss_rates_explicit, eval_mass_exchange_darcy_loss_rates_explicit
   PUBLIC :: eval_mass_exchange_carrier_loss_explicit
   PUBLIC :: eval_mass_exchange_carrier_loss_semi_implicit
   PUBLIC :: eval_mass_exchange_carrier_loss_implicit
@@ -175,4 +178,19 @@ CONTAINS
 
 
 
+  SUBROUTINE eval_mass_exchange_liquid_loss_rates_explicit(rho_c,T,cp_c,r)
+    REAL(wp), INTENT(IN) :: rho_c,T,cp_c
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    r%mixture_mass_rate=-rho_c*eval_mass_exchange_carrier_liquid_loss_explicit()
+    r%energy_rate=T*cp_c*r%mixture_mass_rate
+  END SUBROUTINE
+  SUBROUTINE eval_mass_exchange_darcy_loss_rates_explicit(h,T,alphas,alpha,rho_c,pore,cp_c,r)
+    REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_c,pore,cp_c
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    r%mixture_mass_rate=-rho_c*eval_mass_exchange_carrier_darcy_loss_explicit( &
+         h,T,alphas,alpha,rho_c,pore)
+    r%energy_rate=T*cp_c*r%mixture_mass_rate
+  END SUBROUTINE
 END MODULE mass_exchange_carrier_loss_2d

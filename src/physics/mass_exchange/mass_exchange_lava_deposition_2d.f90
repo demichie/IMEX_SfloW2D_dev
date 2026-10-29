@@ -4,8 +4,11 @@ MODULE mass_exchange_lava_deposition_2d
   USE parameters_2d, ONLY : wp
   USE diagnostics_2d, ONLY : fatal_error
   USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
+  USE mass_exchange_rates_2d, ONLY: mass_exchange_rates_type, reset_mass_exchange_rates
+  USE constitutive_parameters_2d, ONLY: rho_l, sp_heat_l
   IMPLICIT NONE
   PRIVATE
+  PUBLIC :: eval_mass_exchange_lava_deposition_rates_explicit
   LOGICAL, PUBLIC :: lava_deposition_flag=.FALSE.
   CHARACTER(LEN=16), PUBLIC :: lava_deposition_model='CONSTANT'
   REAL(wp), PUBLIC :: lava_deposition_rate=0.0_wp
@@ -67,4 +70,14 @@ CONTAINS
   SUBROUTINE solve_mass_exchange_lava_deposition_analytic()
     CALL fatal_error('unsupported analytic lava deposition')
   END SUBROUTINE solve_mass_exchange_lava_deposition_analytic
+  SUBROUTINE eval_mass_exchange_lava_deposition_rates_explicit(depth,T,dt,r)
+    REAL(wp), INTENT(IN) :: depth,T,dt
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL eval_mass_exchange_lava_deposition_explicit(depth,T,dt, &
+         r%continuous_phase_deposition_rate)
+    r%mixture_mass_rate=-rho_l*r%continuous_phase_deposition_rate
+    r%energy_rate=sp_heat_l*T*r%mixture_mass_rate
+    r%dB_dt=r%continuous_phase_deposition_rate
+  END SUBROUTINE
 END MODULE mass_exchange_lava_deposition_2d
