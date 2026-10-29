@@ -163,14 +163,8 @@ CONTAINS
        xg = MAX(xg, 0.0_wp)
     END IF
 
-    IF (gas_flag .AND. liquid_flag) THEN
-       IF (xl .LT. -mass_fraction_roundoff_tolerance)                         &
-            CALL mass_fraction_closure_error(                                &
-                 'Material negative liquid mass fraction', context)
-       xl = MAX(xl, 0.0_wp)
-    ELSE
-       xl = 0.0_wp
-    END IF
+    ! Only one continuous carrier is transported.
+    xl = 0.0_wp
 
     explicit_mass_fraction = SUM(xs) + SUM(xg) + xl
     IF (explicit_mass_fraction .GT. 1.0_wp) THEN
@@ -199,7 +193,6 @@ CONTAINS
     xs = qp(idx_solid_first:idx_solid_last)
     xg = qp(idx_add_gas_first:idx_add_gas_last)
     xl = 0.0_wp
-    IF (gas_flag .AND. liquid_flag) xl = qp(n_vars)
 
     IF (PRESENT(context)) THEN
        CALL enforce_mass_fraction_closure(xs, xg, xl, context)
@@ -209,7 +202,6 @@ CONTAINS
 
     qp(idx_solid_first:idx_solid_last) = xs
     qp(idx_add_gas_first:idx_add_gas_last) = xg
-    IF (gas_flag .AND. liquid_flag) qp(n_vars) = xl
 
   END SUBROUTINE enforce_primitive_mass_fraction_closure
 
@@ -238,10 +230,6 @@ CONTAINS
             (qc(idx_add_gas_first:idx_add_gas_last) .GE. -tolerance))
           qc(idx_add_gas_first:idx_add_gas_last) = 0.0_wp
        END WHERE
-    END IF
-    IF (gas_flag .AND. liquid_flag) THEN
-       IF ((qc(n_vars) .LT. 0.0_wp) .AND. (qc(n_vars) .GE. -tolerance))    &
-            qc(n_vars) = 0.0_wp
     END IF
 
   END SUBROUTINE clip_roundoff_negative_component_masses
@@ -274,7 +262,6 @@ CONTAINS
     xs = qp(idx_solid_first:idx_solid_last)
     xg = qp(idx_add_gas_first:idx_add_gas_last)
     xl = 0.0_wp
-    IF (gas_flag .AND. liquid_flag) xl = qp(n_vars)
 
     CALL enforce_mass_fraction_closure(xs, xg, xl)
     CALL eval_mixture_properties_from_mass_fractions(                         &
@@ -459,23 +446,20 @@ CONTAINS
 
     alphas_tot = SUM(alphas)
     dispersed_tot = alphas_tot
-    IF ( gas_flag .AND. liquid_flag ) dispersed_tot = dispersed_tot + alphal
 
     IF ( dispersed_tot .GT. 1.0_wp ) THEN
 
        alphas = alphas / dispersed_tot
-       IF ( gas_flag .AND. liquid_flag ) alphal = alphal / dispersed_tot
 
     ELSEIF ( dispersed_tot .LT. 0.0_wp ) THEN
 
        alphas = 0.0_wp
-       IF ( gas_flag .AND. liquid_flag ) alphal = 0.0_wp
 
     END IF
 
     alphas_tot = SUM(alphas)
-    IF ( .NOT. ( gas_flag .AND. liquid_flag ) ) alphal = 0.0_wp
-    alphac = 1.0_wp - alphas_tot - alphal
+    alphal = 0.0_wp
+    alphac = 1.0_wp - alphas_tot
 
     IF ( gas_flag ) THEN
 
@@ -497,13 +481,11 @@ CONTAINS
     END IF
 
     rho_m = SUM(alphas * rho_s) + alphac * rho_c
-    IF ( gas_flag .AND. liquid_flag ) rho_m = rho_m + alphal * rho_l
     inv_rhom = 1.0_wp / rho_m
 
     xs = alphas * rho_s * inv_rhom
     xg = alphag * rho_g * inv_rhom
     xl = 0.0_wp
-    IF ( gas_flag .AND. liquid_flag ) xl = alphal * rho_l * inv_rhom
 
     CALL eval_mixture_heat_capacity_real(                                      &
          ! IN
@@ -697,7 +679,6 @@ CONTAINS
     r_xs = qpj(idx_solid_first:idx_solid_last)
     r_xg = qpj(idx_add_gas_first:idx_add_gas_last)
     r_xl = 0.0_wp
-    IF ( gas_flag .AND. liquid_flag ) r_xl = qpj(n_vars)
 
     CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl)
 
@@ -809,7 +790,6 @@ CONTAINS
     IF ( qc(1) .GT. EPSILON(1.0_wp) ) THEN
        r_xs = qc(idx_solid_first:idx_solid_last) / qc(1)
        r_xg = qc(idx_add_gas_first:idx_add_gas_last) / qc(1)
-       IF ( gas_flag .AND. liquid_flag ) r_xl = qc(n_vars) / qc(1)
        IF (PRESENT(context)) THEN
           CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl, context)
        ELSE
@@ -819,7 +799,6 @@ CONTAINS
 
     qp(idx_solid_first:idx_solid_last) = r_xs
     qp(idx_add_gas_first:idx_add_gas_last) = r_xg
-    IF ( gas_flag .AND. liquid_flag ) qp(n_vars) = r_xl
 
     IF ( stoch_transport_flag) qp(idx_stoch) = r_Zs
 
@@ -920,7 +899,6 @@ CONTAINS
 
     r_xs = qp(idx_solid_first:idx_solid_last)
     r_xg = qp(idx_add_gas_first:idx_add_gas_last)
-    IF ( gas_flag .AND. liquid_flag ) r_xl = qp(n_vars)
 
     IF (PRESENT(context)) THEN
        CALL enforce_mass_fraction_closure(r_xs, r_xg, r_xl, context)
@@ -958,7 +936,6 @@ CONTAINS
 
     IF ( pore_pressure_flag ) qc(idx_pore) = r_exc_pore_pres * qc(1)
 
-    IF ( gas_flag .AND. liquid_flag ) qc(n_vars) = r_xl * qc(1)
 
     RETURN
 
