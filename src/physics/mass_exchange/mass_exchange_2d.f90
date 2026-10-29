@@ -47,7 +47,7 @@ CONTAINS
         REAL(wp) :: u,v,h,T,pore,stoch
         REAL(wp) :: carrier_available,carrier_factor,carrier_volume,carrier_loss
         REAL(wp) :: carrier_withdrawals(2),solid_erosion,carrier_erosion
-        REAL(wp) :: solid_deposition,packing_factor
+        REAL(wp) :: solid_deposition,packing_factor,erosion_factor
 
         CALL reset_mass_exchange_rates(total_rates)
         eqns_term=0.0_wp
@@ -68,6 +68,13 @@ CONTAINS
             IF (stoch_transport_flag) stoch=qp(idx_stoch)
             CALL eval_mass_exchange_erosion_explicit(qp,Bx,By,alpha,erodible, &
                       dt,process_rates)
+            ! Erosion can increase packing by importing a solid-rich substrate.
+            ! Limit it before accumulating any conservative or bed contribution.
+            erosion_factor=erosion_packing_factor(h,alpha, &
+                      SUM(MAX(0.0_wp,process_rates%solid_erosion_rate)), &
+                      MAX(0.0_wp,process_rates%carrier_erosion_rate), &
+                      maximum_solid_packing,dt)
+            CALL scale_process(process_rates,erosion_factor)
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
             CALL eval_mass_exchange_deposition_explicit(qp,dt,deposition_rates)
             CALL eval_mass_exchange_carrier_liquid_loss_explicit(qp,liquid_loss_rates)
@@ -158,6 +165,27 @@ CONTAINS
         IF (total_withdrawal>0.0_wp) &
                   f=MIN(1.0_wp,MAX(0.0_wp,available)/total_withdrawal)
     END FUNCTION shared_withdrawal_factor
+
+    !> @brief Bound solid-rich substrate erosion by the final packing limit.
+    !> @details The eroded carrier and solid volumes are scaled together.
+    !> @param[in] h Initial mobile thickness [m].
+    !> @param[in] alpha Initial solid volume fraction.
+    !> @param[in] solid_erosion Proposed solid erosion flux [m/s].
+    !> @param[in] carrier_erosion Proposed carrier erosion flux [m/s].
+    !> @param[in] packing Maximum admissible solid volume fraction.
+    !> @param[in] dt Physical timestep [s].
+    !> @return Common erosion factor within [0,1].
+    PURE REAL(wp) FUNCTION erosion_packing_factor(h,alpha,solid_erosion, &
+              carrier_erosion,packing,dt) RESULT(f)
+        REAL(wp), INTENT(IN) :: h,alpha,solid_erosion,carrier_erosion,packing,dt
+        REAL(wp) :: deficit,margin
+
+        f=1.0_wp
+        IF (dt<=0.0_wp) RETURN
+        deficit=(1.0_wp-packing)*solid_erosion-packing*carrier_erosion
+        margin=MAX(0.0_wp,h*(packing-alpha))
+        IF (deficit>0.0_wp) f=MIN(1.0_wp,margin/(dt*deficit))
+    END FUNCTION erosion_packing_factor
 
     !> @brief Limit a coupled deposition/carrier withdrawal by final solid packing.
     !> @details Erosion is already committed. Deposition removes both mobile
