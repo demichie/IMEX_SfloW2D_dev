@@ -18,7 +18,7 @@ CONTAINS
   SUBROUTINE eval_boundary_injection_explicit( time, vect_x , vect_y , source_bdry )
 
     USE parameters_2d, ONLY : h_source , vel_source , T_source , xs_source,    &
-         xg_source, xl_source, time_param
+         xg_source, time_param
 
     USE geometry_2d, ONLY : pi_g
 
