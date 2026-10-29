@@ -4,6 +4,7 @@ set -eu
 test_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 repo_dir=$(CDPATH= cd -- "$test_dir/../.." && pwd)
 python3 -B "$test_dir/test_projection_checker.py"
+python3 -B "$test_dir/check_coupled_limiters.py"
 build_dir=$(mktemp -d /tmp/imex-mass-exchange.XXXXXX)
 if [ "${KEEP_TEST_WORKDIR:-0}" = 1 ]; then
     echo "Keeping test work directory: $build_dir"
