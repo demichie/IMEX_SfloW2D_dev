@@ -10,7 +10,6 @@ MODULE mass_exchange_entrainment_2d
     IMPLICIT NONE
     PRIVATE
 
-    PUBLIC :: eval_mass_exchange_entrainment_rates_explicit
     PUBLIC :: eval_mass_exchange_entrainment_explicit
     PUBLIC :: eval_mass_exchange_entrainment_semi_implicit
     PUBLIC :: eval_mass_exchange_entrainment_implicit
