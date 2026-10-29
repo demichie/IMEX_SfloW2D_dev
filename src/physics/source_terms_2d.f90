@@ -109,7 +109,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: q_after(n_vars)
     INTEGER, INTENT(OUT) :: status
     REAL(wp) :: flow_h,flow_u,flow_v,flow_temperature,flow_density
-    REAL(wp) :: flow_alphas(n_solid),flow_alphag(n_add_gas),flow_alphal
+    REAL(wp) :: flow_alphas(n_solid),flow_alphag(n_add_gas)
     REAL(wp) :: flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure
     REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
     REAL(wp) :: heat_capacity,temperature_after,pressure_known,pressure_after
@@ -156,7 +156,7 @@ CONTAINS
            ANY(group%equation_ids==3))) RETURN
       IF (rheology_flag) THEN
         CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,         &
-             flow_density,flow_temperature,flow_alphal,flow_alphag,       &
+             flow_density,flow_temperature,flow_alphag,       &
              flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure)
         horizontal_speed=SQRT(flow_u**2+flow_v**2)
         speed_ratio=1.0_wp
@@ -195,7 +195,7 @@ CONTAINS
         RETURN
       END IF
       CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,           &
-           flow_density,flow_temperature,flow_alphal,flow_alphag,         &
+           flow_density,flow_temperature,flow_alphag,         &
            flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure)
       IF (flow_temperature<=0.0_wp) THEN
         status=-3
@@ -211,7 +211,7 @@ CONTAINS
       ELSE IF (group%equation_ids(1)==idx_pore .AND. pore_pressure_flag) THEN
       IF (q_before(1)>0.0_wp) THEN
         CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,         &
-             flow_density,flow_temperature,flow_alphal,flow_alphag,       &
+             flow_density,flow_temperature,flow_alphag,       &
              flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure)
         pressure_known=q_before(idx_pore)/q_before(1)
         CALL solve_pore_pressure_dissipation_analytic(pressure_known,interval,flow_h,  &
@@ -415,7 +415,6 @@ CONTAINS
     REAL(wp) :: r_w               !< real_value z-velocity
     REAL(wp) :: r_alphas(n_solid) !< real-value solid volume fractions
     REAL(wp) :: r_rho_m           !< real-value mixture density [kg/m3]
-    REAL(wp) :: r_alphal          !< real-value liquid volume fraction
     REAL(wp) :: r_alphag(n_add_gas) !< real-value add. gas volume fractions
     REAL(wp) :: r_red_grav
     REAL(wp) :: r_rho_c
@@ -454,7 +453,7 @@ CONTAINS
        ! a reciprocal of zero from a later moving-state branch.
        IF ((r_u .EQ. 0.0_wp) .AND. (r_v .EQ. 0.0_wp)) RETURN
 
-       CALL primitive_to_volume_fractions(qpj, r_alphas, r_alphag, r_alphal)
+       CALL primitive_to_volume_fractions(qpj, r_alphas, r_alphag)
 
        CALL mixt_var(qpj, r_Ri, r_rho_m, r_rho_c, r_red_grav,                  &
             r_sp_heat_c, r_sp_heat_mix)
@@ -553,7 +552,7 @@ CONTAINS
     REAL(wp) :: q1
 
     REAL(wp) :: rheology_rate(2), thermal_rate, pressure_rate
-    REAL(wp) :: solid_volumes(n_solid), gas_volumes(n_add_gas), liquid_volume
+    REAL(wp) :: solid_volumes(n_solid), gas_volumes(n_add_gas)
     REAL(wp) :: speed, horizontal_speed, vertical_velocity, speed_squared
     REAL(wp) :: inverse_density, pressure_excess
     CHARACTER(LEN=64) :: active_rheology
@@ -606,7 +605,7 @@ CONTAINS
        active_rheology=group_rheology_name(group)
        IF (rheology_flag .AND. LEN_TRIM(active_rheology)>0 .AND. &
             r_h>dry_thickness_tolerance) THEN
-          CALL primitive_to_volume_fractions(qpj,solid_volumes,gas_volumes,liquid_volume)
+          CALL primitive_to_volume_fractions(qpj,solid_volumes,gas_volumes)
           horizontal_speed=SQRT(r_u**2+r_v**2)
           vertical_velocity=0.0_wp
           IF (slope_correction_flag) vertical_velocity=r_u*Bprimej_x+r_v*Bprimej_y
@@ -629,7 +628,7 @@ CONTAINS
        END IF
        IF (pore_pressure_flag .AND. &
             group_contains_name(group,'pore_pressure_dissipation')) THEN
-          CALL primitive_to_volume_fractions(qpj,solid_volumes,gas_volumes,liquid_volume)
+          CALL primitive_to_volume_fractions(qpj,solid_volumes,gas_volumes)
           CALL eval_pore_pressure_dissipation_explicit(r_h,qpj(idx_T), &
                r_rho_m,solid_volumes,qpj(idx_pore),pressure_rate)
           expl_term(idx_poreEqn)=expl_term(idx_poreEqn)+pressure_rate

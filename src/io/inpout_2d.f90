@@ -4985,7 +4985,7 @@ CONTAINS
 
     REAL(wp) :: rho_c, rho_m, inv_rhom, mass_fract(n_solid)
     REAL(wp) :: alphag_init_local(n_add_gas)
-    REAL(wp) :: xg_init(n_add_gas), xl_init, xc_init
+    REAL(wp) :: xg_init(n_add_gas), xc_init
     REAL(wp) :: sp_heat_c, sp_heat_mix
 
     INTEGER :: solid_idx
@@ -7487,7 +7487,7 @@ CONTAINS
     REAL(wp) :: grav_coeff, vert_stress_eff, eff_normal_stress
     REAL(wp) :: diam_characteristic, rho_particle, shear_rate
     REAL(wp) :: exc_pore_pres
-    REAL(wp) :: r_alphas(n_solid), r_alphag(n_add_gas), r_alphal
+    REAL(wp) :: r_alphas(n_solid), r_alphag(n_add_gas)
 
     REAL(wp), ALLOCATABLE :: temp_array(:, :)
     REAL(wp), ALLOCATABLE :: vertical_velocity(:, :)
@@ -7495,7 +7495,7 @@ CONTAINS
     REAL(wp), ALLOCATABLE :: muEff(:, :)
     REAL(wp), ALLOCATABLE :: erodible2D(:, :), shearVel(:, :)
     REAL(wp), ALLOCATABLE :: Rouse(:, :, :), inertialNumber(:, :)
-    REAL(wp), ALLOCATABLE :: alphas2D(:, :, :), alphag2D(:, :, :), alphal2D(:, :)
+    REAL(wp), ALLOCATABLE :: alphas2D(:, :, :), alphag2D(:, :, :)
 
     REAL(wp) :: denom
 
@@ -7512,7 +7512,6 @@ CONTAINS
     ALLOCATE (inertialNumber(SIZE(state%qp, 2), SIZE(state%qp, 3)))
     ALLOCATE (alphas2D(n_solid,SIZE(state%qp, 2),SIZE(state%qp, 3)))
     ALLOCATE (alphag2D(n_add_gas,SIZE(state%qp, 2),SIZE(state%qp, 3)))
-    ALLOCATE (alphal2D(SIZE(state%qp, 2),SIZE(state%qp, 3)))
     ALLOCATE (vertical_velocity(SIZE(state%qp, 2),SIZE(state%qp, 3)))
 
     Ri2D = 0.0_wp
@@ -7526,7 +7525,6 @@ CONTAINS
     inertialNumber = 0.0_wp
     alphas2D = 0.0_wp
     alphag2D = 0.0_wp
-    alphal2D = 0.0_wp
     vertical_velocity = 0.0_wp
 
     DO j = 1, comp_cells_x
@@ -7574,11 +7572,9 @@ END IF
                                + r_v*B_prime_y_geom(j, k)
 
         CALL primitive_to_volume_fractions(state%qp(1:n_vars+2,j,k),          &
-             r_alphas, r_alphag, r_alphal)
+             r_alphas, r_alphag)
         alphas2D(:,j,k) = r_alphas
         alphag2D(:,j,k) = r_alphag
-        alphal2D(j,k) = r_alphal
-
         IF (slope_correction_flag) THEN
           grav_coeff = 1.0_wp/(1.0_wp + B_prime_x_geom(j, k)**2 +             &
                                B_prime_y_geom(j, k)**2)
@@ -7768,7 +7764,7 @@ END IF
 
     DEALLOCATE (Ri2D, rho_m2D, red_grav2D, muEff, erodible2D)
     DEALLOCATE (shearVel, Rouse, inertialNumber)
-    DEALLOCATE (alphas2D, alphag2D, alphal2D)
+    DEALLOCATE (alphas2D, alphag2D)
     DEALLOCATE (vertical_velocity)
     DEALLOCATE (temp_array)
 

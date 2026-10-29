@@ -42,7 +42,7 @@ PROGRAM test_grouped_implicit_stage
   REAL(wp) :: areal_heat_capacity, exact_temperature, exact_energy
   REAL(wp) :: pressure_known, expected_pressure
   REAL(wp) :: expected_h, expected_u, expected_v, expected_density
-  REAL(wp) :: expected_alphas(2), expected_alphag(0), expected_alphal
+  REAL(wp) :: expected_alphas(2), expected_alphag(0)
   REAL(wp) :: expected_temperature, expected_red_grav, expected_p_dyn
   REAL(wp) :: expected_Zs, expected_pore_pressure
   REAL(wp) :: speed_ratio, analytic_velocity(2)
@@ -313,7 +313,7 @@ PROGRAM test_grouped_implicit_stage
   q_expected(4) = exact_energy
   CALL r_phys_var(q_expected, expected_h, expected_u, expected_v,           &
        expected_alphas, expected_density, expected_temperature,              &
-       expected_alphal, expected_alphag, expected_red_grav, expected_p_dyn,   &
+       expected_alphag, expected_red_grav, expected_p_dyn,   &
        expected_Zs, expected_pore_pressure)
   pressure_known = q_expected(7) / q_expected(1)
   CALL solve_pore_pressure_dissipation_analytic(pressure_known, dt_step*a_diag,          &
@@ -489,7 +489,7 @@ PROGRAM test_grouped_implicit_stage
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
   CALL r_phys_var(q_stage_check, expected_h, expected_u, expected_v,      &
        expected_alphas, expected_density, expected_temperature,           &
-       expected_alphal, expected_alphag, expected_red_grav, expected_p_dyn,&
+       expected_alphag, expected_red_grav, expected_p_dyn,&
        expected_Zs, expected_pore_pressure)
   speed_ratio = 1.0_wp
   CALL solve_rheology_lava_analytic(dt_step*a_diag, expected_h,            &
