@@ -4992,6 +4992,9 @@ CONTAINS
 
     INTEGER :: i_file
 
+    ! The input layout is fixed before populating the conservative and primitive state.
+    CALL configure_canonical_state_indices()
+
     ALLOCATE (thickness_init(comp_cells_x, comp_cells_y))
 
     thickness_init(:, :) = 0.0_wp
@@ -5365,7 +5368,7 @@ CONTAINS
           READ (restart_unit, '(2e20.12,100(e20.12))') xj, yk, &
             (state%q(i_vars, j, k), i_vars=1, n_vars)
 
-          IF (state%q(1, j, k) .LE. 0.0_wp) state%q(1:n_vars, j, k) = 0.0_wp
+          IF (state%q(idx_totMassEqn, j, k) .LE. 0.0_wp) state%q(1:n_vars, j, k) = 0.0_wp
 
           DO solid_idx = 5, 4 + n_solid
 
