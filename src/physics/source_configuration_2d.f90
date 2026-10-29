@@ -31,6 +31,11 @@ CONTAINS
     CHARACTER(*), INTENT(OUT) :: error
     ALLOCATE(active_names(0))
     error=''
+    ! Exactly one continuous carrier may be active in the source registry.
+    IF (gas_flag .AND. liquid_flag) THEN
+      error='GAS_FLAG and LIQUID_FLAG are mutually exclusive'; RETURN
+    END IF
+
     IF (lava_flag .AND. (gas_flag .OR. liquid_flag)) THEN
       error='LAVA_FLAG requires GAS_FLAG=F and LIQUID_FLAG=F'; RETURN
     END IF

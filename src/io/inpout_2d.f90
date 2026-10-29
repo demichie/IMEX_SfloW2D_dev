@@ -7289,8 +7289,6 @@ CONTAINS
         CALL check(nf90_inq_varid(ncid, 'add_gas_frac_'//TRIM(idx_string),     &
                                   gas_varid(i)))
       END DO
-      IF (gas_flag .AND. liquid_flag)                                           &
-        CALL check(nf90_inq_varid(ncid, 'alphal', alphal_varid))
       DO i = 1, n_stoch_vars
         WRITE (idx_string, '(I2.2)') i
         CALL check(nf90_inq_varid(ncid, 'Zs_'//TRIM(idx_string), stoch_varid(i)))
