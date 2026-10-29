@@ -70,10 +70,8 @@ PROGRAM test_curvature_source
 
   ! Exercise the actual local-source caller, not a duplicate test-only guard.
   n_vars=5; n_eqns=5; n_solid=1; n_add_gas=0; n_fissures=0
-  idx_solid_first=5; idx_solid_last=5
-  idx_add_gas_first=6; idx_add_gas_last=5; idx_u=6; idx_v=7
-  idx_solidEqn_first=5; idx_solidEqn_last=5
-  idx_addGasEqn_first=6; idx_addGasEqn_last=5
+  n_stoch_vars=0; n_pore_vars=0
+  CALL configure_canonical_state_indices()
   liquid_flag=.TRUE.; gas_flag=.FALSE.; curvature_term_flag=.TRUE.
   bottom_radial_source_flag=.FALSE.; bottom_fissural_source_flag=.FALSE.
   radial_source_flag=.FALSE.; pore_pressure_flag=.FALSE.

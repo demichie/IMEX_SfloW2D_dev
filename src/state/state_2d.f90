@@ -89,7 +89,7 @@ CONTAINS
 
     this%q = 0.0_wp
     this%qp = 0.0_wp
-    this%qp(idx_T,1:comp_cells_x,1:comp_cells_y) = T_ambient
+    this%qp(model_layout%idx_energy,1:comp_cells_x,1:comp_cells_y) = T_ambient
 
     ALLOCATE( this%hmax(comp_cells_x,comp_cells_y) )
     ALLOCATE( this%pdynmax(comp_cells_x,comp_cells_y) )
