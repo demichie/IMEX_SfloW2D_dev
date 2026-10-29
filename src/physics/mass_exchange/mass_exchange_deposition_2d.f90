@@ -23,8 +23,9 @@ CONTAINS
 
 
 
-  SUBROUTINE eval_mass_exchange_deposition_explicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,r)
+  SUBROUTINE eval_mass_exchange_deposition_explicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,gas_species_fraction,r)
     REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
+    REAL(wp), INTENT(IN) :: gas_species_fraction(n_add_gas)
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
     CALL eval_deposition_volume_kernel(h,T,alphas,alpha,rho_m,rho_c, &
@@ -34,25 +35,30 @@ CONTAINS
     r%mixture_mass_rate=SUM(r%solid_mass_rate)-rho_c*r%continuous_phase_deposition_rate
     r%energy_rate=T*(SUM(sp_heat_s*r%solid_mass_rate)- &
          rho_c*cp_c*r%continuous_phase_deposition_rate)
+    IF (gas_flag .AND. n_add_gas>0) r%add_gas_mass_rate= &
+         -rho_c*r%continuous_phase_deposition_rate*gas_species_fraction
     r%dB_dt=SUM(r%solid_deposition_rate)+r%continuous_phase_deposition_rate
   END SUBROUTINE
 
-  SUBROUTINE eval_mass_exchange_deposition_semi_implicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,r)
+  SUBROUTINE eval_mass_exchange_deposition_semi_implicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,gas_species_fraction,r)
     REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
+    REAL(wp), INTENT(IN) :: gas_species_fraction(n_add_gas)
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('deposition: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_deposition_semi_implicit
 
-  SUBROUTINE eval_mass_exchange_deposition_implicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,r)
+  SUBROUTINE eval_mass_exchange_deposition_implicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,gas_species_fraction,r)
     REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
+    REAL(wp), INTENT(IN) :: gas_species_fraction(n_add_gas)
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('deposition: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_deposition_implicit
 
-  SUBROUTINE solve_mass_exchange_deposition_analytic(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,r)
+  SUBROUTINE solve_mass_exchange_deposition_analytic(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,gas_species_fraction,r)
     REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
+    REAL(wp), INTENT(IN) :: gas_species_fraction(n_add_gas)
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('deposition: unsupported physical treatment')
