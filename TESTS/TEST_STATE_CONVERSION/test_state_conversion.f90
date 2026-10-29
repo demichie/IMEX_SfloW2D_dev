@@ -139,6 +139,7 @@ CONTAINS
     LOGICAL, INTENT(IN) :: has_liquid
 
     liquid_flag = has_liquid
+    gas_flag = .NOT. has_liquid
 
     n_vars = 4 + n_solid + n_add_gas + n_stoch_vars + n_pore_vars
     n_eqns = n_vars

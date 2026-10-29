@@ -58,6 +58,7 @@ PROGRAM test_grouped_implicit_stage
   n_vars = 7
   n_eqns = 7
   n_RK = 2
+  CALL configure_canonical_state_indices()
   idx_totMassEqn = 1
   idx_uEqn = 2
   idx_vEqn = 3

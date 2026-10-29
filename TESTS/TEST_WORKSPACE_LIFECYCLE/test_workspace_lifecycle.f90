@@ -66,7 +66,7 @@ PROGRAM test_workspace_lifecycle
      CALL hyperbolic%finalize
      CALL reconstruction%finalize
      CALL assert_true('speed bounds released', .NOT.ALLOCATED(hyperbolic%a_interface_xNeg))
-     CALL assert_true('HP scratch released', .NOT.ALLOCATED(reconstruction%hp_scratch))
+     CALL assert_true('HP scratch released', .NOT.ALLOCATED(reconstruction%hp_eta_mask))
   END DO
   CALL release_topography_workspace
   CALL release_topography_workspace

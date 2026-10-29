@@ -5,7 +5,7 @@ PROGRAM test_stochastic_evolution
   USE model_layout_2d, ONLY : model_layout_type
   USE parameters_2d, ONLY : wp, idx_stoch, length_spatial_corr,             &
        n_add_gas, n_dyn_pres_levels, n_eqns, n_pore_vars, n_solid,         &
-       n_stoch_vars, n_thickness_levels, n_vars, &
+       n_stoch_vars, n_thickness_levels, n_vars, configure_canonical_state_indices, &
        rheology_model, stochastic_flag, stoch_transport_flag, idx_u, idx_v
   USE state_2d, ONLY : state_type
   USE stochastic_module, ONLY : stochastic_workspace_type, sym_noise,     &
@@ -30,9 +30,7 @@ PROGRAM test_stochastic_evolution
   n_pore_vars = 0
   n_eqns = 5
   n_vars = 5
-  idx_stoch = 5
-  idx_u = n_vars + 1
-  idx_v = n_vars + 2
+  CALL configure_canonical_state_indices()
   n_thickness_levels = 1
   n_dyn_pres_levels = 1
   T_ambient = 273.15_wp
