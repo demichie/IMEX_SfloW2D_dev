@@ -4293,7 +4293,7 @@ CONTAINS
 
         END IF
 
-        ALLOCATE (qp_source(n_vars + 2))
+        ALLOCATE (qp_source(idx_v))
 
         IF (lateral_source_flag .OR. radial_source_flag) THEN
 
@@ -4334,8 +4334,8 @@ CONTAINS
           qp_source(4 + n_solid + 1:4 + n_solid + n_add_gas) =                &
                xg_source(1:n_add_gas)
 
-          qp_source(n_vars + 1) = vel_source
-          qp_source(n_vars + 2) = 0.0_wp
+          qp_source(idx_u) = vel_source
+          qp_source(idx_v) = 0.0_wp
 
           ! compute the Richardson number for vel = 1.0 (or vel from input)
           CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c,     &
@@ -4367,8 +4367,8 @@ CONTAINS
                 qp_source(4 + n_solid + 1:4 + n_solid + n_add_gas) =          &
                      xg_source(1:n_add_gas)
 
-                qp_source(n_vars + 1) = vel_source
-                qp_source(n_vars + 2) = 0.0_wp
+                qp_source(idx_u) = vel_source
+                qp_source(idx_v) = 0.0_wp
 
                 ! compute the Richardson number for vel = 1.0
                 CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav,          &
@@ -4402,7 +4402,7 @@ CONTAINS
 
           qp_source(idx_h) = h_source
           qp_source(idx_hu) = h_source*vel_source
-          qp_source(n_vars + 1) = vel_source
+          qp_source(idx_u) = vel_source
 
           ! Check that the Richardson number is correct
           CALL mixt_var(qp_source, Ri, rho_m, rho_c, red_grav, sp_heat_c,     &
@@ -6739,12 +6739,12 @@ CONTAINS
 
         WRITE (probes_unit, 1710, ADVANCE='no') T_prb, ','
 
-        CALL interp_2d_scalarB(x_comp, y_comp, state%qp(n_vars + 1, :, :), &
+        CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_u, :, :), &
                                probes_coords(1, k), probes_coords(2, k), u_prb)
 
         WRITE (probes_unit, 1710, ADVANCE='no') u_prb, ','
 
-        CALL interp_2d_scalarB(x_comp, y_comp, state%qp(n_vars + 2, :, :), &
+        CALL interp_2d_scalarB(x_comp, y_comp, state%qp(idx_v, :, :), &
                                probes_coords(1, k), probes_coords(2, k), v_prb)
 
         WRITE (probes_unit, 1710, ADVANCE='no') v_prb, ','
@@ -7562,8 +7562,8 @@ END IF
         IF (state%qp(idx_h, j, k) .LE. dry_thickness_tolerance) CYCLE
 
         r_h = state%qp(idx_h, j, k)
-        r_u = state%qp(n_vars + 1, j, k)
-        r_v = state%qp(n_vars + 2, j, k)
+        r_u = state%qp(idx_u, j, k)
+        r_v = state%qp(idx_v, j, k)
         vertical_velocity(j, k) = r_u*B_prime_x_geom(j, k)                    &
                                + r_v*B_prime_y_geom(j, k)
 
@@ -7653,13 +7653,13 @@ END IF
     ! meaningful physical velocity; mask residual q/rho-h ratios in the output.
     temp_array = 0.0_wp
     WHERE (state%qp(idx_h, :, :) .GT. dry_thickness_tolerance)
-      temp_array = state%qp(n_vars + 1, :, :)
+      temp_array = state%qp(idx_u, :, :)
     END WHERE
     CALL check(nf90_put_var(ncid, u_varid, temp_array, start=start, count=count))
 
     temp_array = 0.0_wp
     WHERE (state%qp(idx_h, :, :) .GT. dry_thickness_tolerance)
-      temp_array = state%qp(n_vars + 2, :, :)
+      temp_array = state%qp(idx_v, :, :)
     END WHERE
     CALL check(nf90_put_var(ncid, v_varid, temp_array, start=start, count=count))
 
