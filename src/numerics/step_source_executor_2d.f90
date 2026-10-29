@@ -6,6 +6,7 @@
 !********************************************************************************
 
 MODULE step_source_executor_2d
+    USE parameters_2d, ONLY : idx_totMassEqn
 
   USE diagnostics_2d, ONLY : fatal_error
   USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, mass_exchange_rates_type
@@ -202,7 +203,7 @@ CONTAINS
           END IF
           DO cell_index=1,domain%solve_cells
              j=domain%j_cent(cell_index); k=domain%k_cent(cell_index)
-             IF (q(1,j,k)<=0.0_wp) CYCLE
+             IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
              IF (step_groups(group_index)%method==SOURCE_METHOD_EXPLICIT) THEN
                 CALL eval_cell_source_explicit(j,k,qp(1:n_vars+2,j,k), &
                      source_time,step_groups(group_index),explicit_rate)
@@ -259,7 +260,7 @@ CONTAINS
        k = domain%k_cent(l)
        closure_context = 'mass exchange cell'
 
-       IF (q(1,j,k) .GT. 0.0_wp) THEN
+       IF (q(idx_totMassEqn,j,k) .GT. 0.0_wp) THEN
           CALL qc_to_qp(q(1:n_vars,j,k), qp(1:n_vars+2,j,k), p_dyn,         &
                TRIM(closure_context))
        ELSE

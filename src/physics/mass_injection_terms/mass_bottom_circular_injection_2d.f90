@@ -1,5 +1,6 @@
 !> \brief Physical treatment interfaces for bottom_circular_injection.
 MODULE mass_bottom_circular_injection_2d
+    USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T
   USE parameters_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d, ONLY : mixt_var
@@ -114,10 +115,10 @@ CONTAINS
     END IF
 
     qp_source = 0.0_wp
-    qp_source(1) = 1.0_wp
-    qp_source(2) = 0.0_wp
-    qp_source(3) = 0.0_wp
-    qp_source(4) = t_source
+    qp_source(idx_h) = 1.0_wp
+    qp_source(idx_hu) = 0.0_wp
+    qp_source(idx_hv) = 0.0_wp
+    qp_source(idx_T) = t_source
 
     qp_source(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)
     qp_source(idx_add_gas_first:idx_add_gas_last) = xg_source(1:n_add_gas)

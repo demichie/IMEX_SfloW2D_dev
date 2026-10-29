@@ -4,6 +4,7 @@
 !> The bounded mass-exchange transaction and all inventory updates remain
 !> the responsibility of step_source_executor_2d.
 MODULE source_terms_2d
+    USE parameters_2d, ONLY : idx_h
   USE mass_boundary_injection_2d
   USE mass_bottom_circular_injection_2d
   USE mass_bottom_fissural_injection_2d
@@ -437,14 +438,14 @@ CONTAINS
     END IF
 
     ! A dry cell carries no friction source.
-    IF ( qpj(1) .LE. EPSILON(1.0_wp) ) RETURN
+    IF ( qpj(idx_h) .LE. EPSILON(1.0_wp) ) RETURN
 
     ! initialize and evaluate the forces terms
     source_term(1:n_eqns) = 0.0_wp
 
     rheology_if:IF (rheology_flag .AND. selected_rheology) THEN
 
-       r_h = qpj(1)
+       r_h = qpj(idx_h)
        r_u = qpj(idx_u)
        r_v = qpj(idx_v)
 
@@ -565,14 +566,14 @@ CONTAINS
     q1 = 0.0_wp
 
 
-      IF ( ( qpj(1) .LE. EPSILON(1.0_wp) ) .AND. ( cell_fract_jk .EQ. 0.0_wp )    &
+      IF ( ( qpj(idx_h) .LE. EPSILON(1.0_wp) ) .AND. ( cell_fract_jk .EQ. 0.0_wp )    &
              .AND. ( lat_arc_perim_jk .EQ. 0.0_wp ) .AND.                          &
              ALL(cell_fissure_fract .EQ. 0.0_wp) ) RETURN
 
     ! Gravity terms - only meaningful when the cell has mass.
-    IF ( qpj(1) .GT. EPSILON(1.0_wp) ) THEN
+    IF ( qpj(idx_h) .GT. EPSILON(1.0_wp) ) THEN
 
-       r_h = qpj(1)
+       r_h = qpj(idx_h)
        r_u = qpj(idx_u)
        r_v = qpj(idx_v)
 

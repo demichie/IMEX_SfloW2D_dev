@@ -1,5 +1,6 @@
 !> \brief Physical treatment interfaces for boundary_injection.
 MODULE mass_boundary_injection_2d
+    USE parameters_2d, ONLY : idx_T, idx_h, idx_hu, idx_hv
   USE parameters_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d, ONLY : mixt_var
@@ -33,7 +34,7 @@ CONTAINS
     REAL(wp) :: t_coeff
 
     source_bdry = 0.0_wp
-    source_bdry(4) = T_source
+    source_bdry(idx_T) = T_source
 
     IF ( time .GE. time_param(4) ) THEN
 
@@ -73,10 +74,10 @@ CONTAINS
     IF (t_coeff .LE. EPSILON(1.0_wp)) RETURN
 
     ! The exponents of t_coeff are such that Ri does not depend on t_coeff
-    source_bdry(1) = t_coeff * h_source
-    source_bdry(2) = t_coeff**1.5_wp * h_source * vel_source * vect_x
-    source_bdry(3) = t_coeff**1.5_wp * h_source * vel_source * vect_y
-    source_bdry(4) = T_source
+    source_bdry(idx_h) = t_coeff * h_source
+    source_bdry(idx_hu) = t_coeff**1.5_wp * h_source * vel_source * vect_x
+    source_bdry(idx_hv) = t_coeff**1.5_wp * h_source * vel_source * vect_y
+    source_bdry(idx_T) = T_source
 
     source_bdry(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)
     source_bdry(idx_add_gas_first:idx_add_gas_last) = xg_source(1:n_add_gas)

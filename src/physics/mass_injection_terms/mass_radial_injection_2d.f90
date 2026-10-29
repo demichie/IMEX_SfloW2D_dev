@@ -1,5 +1,6 @@
 !> \brief Physical treatment interfaces for radial_injection.
 MODULE mass_radial_injection_2d
+    USE parameters_2d, ONLY : idx_h, idx_T
   USE parameters_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d, ONLY : mixt_var
@@ -76,8 +77,8 @@ CONTAINS
        IF ( t_coeff .GT. 0.0_wp ) THEN
 
           qp_source(:) = 0.0_wp
-          qp_source(1) = 1.0_wp
-          qp_source(4) = T_source
+          qp_source(idx_h) = 1.0_wp
+          qp_source(idx_T) = T_source
 
           qp_source(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)
           qp_source(idx_add_gas_first:idx_add_gas_last) = xg_source(1:n_add_gas)
