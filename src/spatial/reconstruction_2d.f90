@@ -11,6 +11,7 @@
 
 MODULE reconstruction_2d
 
+    USE parameters_2d, ONLY : idx_h
   USE parameters_2d, ONLY : wp, n_vars, kt_trace_reconstruction, dry_thickness_tolerance
   USE parameters_2d, ONLY : lateral_source_flag, radial_source_flag
   USE parameters_2d, ONLY : bcW, bcE, bcS, bcN
@@ -1437,7 +1438,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     SELECT CASE (kt_mode)
     CASE (1)
-       h_selected=MAX(qp(1),0.0_wp)
+       h_selected=MAX(qp(idx_h),0.0_wp)
     CASE (3)
        h_selected=MAX(h_minmod,0.0_wp)
     CASE (4)
@@ -1445,7 +1446,7 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
     CASE DEFAULT
        h_selected=MAX(eta-bed,0.0_wp)
     END SELECT
-    IF (source_trace) h_selected=MAX(qp(1),0.0_wp)
+    IF (source_trace) h_selected=MAX(qp(idx_h),0.0_wp)
     IF (h_selected .GT. dry_thickness_tolerance) &
          CALL enforce_primitive_mass_fraction_closure(qp,context)
   END SUBROUTINE select_final_transport_trace

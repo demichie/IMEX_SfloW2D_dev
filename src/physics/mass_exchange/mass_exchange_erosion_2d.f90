@@ -2,6 +2,7 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_erosion_2d
+    USE parameters_2d, ONLY : idx_h, idx_T
     USE parameters_2d, ONLY : wp, n_solid, n_vars, idx_u, idx_v, slope_correction_flag, &
               erodible_deposit_flag, mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
@@ -38,10 +39,10 @@ CONTAINS
 
         CALL reset_mass_exchange_rates(r)
         IF (alpha<=alphastot_min) RETURN
-        h=qp(1)
+        h=qp(idx_h)
         u=qp(idx_u)
         v=qp(idx_v)
-        T_flow=qp(4)
+        T_flow=qp(idx_T)
         vertical_velocity=0.0_wp
         IF (slope_correction_flag) vertical_velocity=u*Bx+v*By
         normal_speed=SQRT(u*u+v*v+vertical_velocity*vertical_velocity)

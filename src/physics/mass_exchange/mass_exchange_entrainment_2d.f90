@@ -2,6 +2,7 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_entrainment_2d
+    USE parameters_2d, ONLY : idx_h
     USE parameters_2d, ONLY : wp, n_vars, slope_correction_flag, mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : mixt_var
@@ -38,7 +39,7 @@ CONTAINS
         CALL mixt_var(qp,Ri,rhom,rhoc,redgrav,cpc,cpm)
 
         ! Convert entrained ambient-air volume to mixture mass at ambient density.
-        r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(qp(1),Ri,speed_squared)
+        r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(qp(idx_h),Ri,speed_squared)
         r%energy_rate=T_ambient*sp_heat_a*r%mixture_mass_rate
     END SUBROUTINE
 

@@ -2,6 +2,7 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_deposition_2d
+    USE parameters_2d, ONLY : idx_h, idx_T
     USE parameters_2d, ONLY : wp, n_vars, n_solid, n_add_gas, &
               idx_solid_first, idx_solid_last, idx_add_gas_first, idx_add_gas_last, &
               gas_flag, liquid_flag, sutherland_flag, rheology_model, &
@@ -43,8 +44,8 @@ CONTAINS
         REAL(wp) :: gas_species_mass_fraction(n_add_gas)
 
         CALL reset_mass_exchange_rates(r)
-        h=qp(1)
-        T=qp(4)
+        h=qp(idx_h)
+        T=qp(idx_T)
         CALL primitive_to_volume_fractions(qp,alphas,alphag)
         alpha=SUM(alphas)
         IF (alpha<=alphastot_min) RETURN

@@ -8,6 +8,7 @@
 
 MODULE state_conversion_2d
 
+    USE parameters_2d, ONLY : idx_h, idx_T
   USE constitutive_parameters_2d
   USE diagnostics_2d, ONLY : fatal_error
 
@@ -247,14 +248,14 @@ CONTAINS
     alphas = 0.0_wp
     alphag = 0.0_wp
 
-    IF (qp(1) .LE. EPSILON(1.0_wp)) RETURN
+    IF (qp(idx_h) .LE. EPSILON(1.0_wp)) RETURN
 
     xs = qp(idx_solid_first:idx_solid_last)
     xg = qp(idx_add_gas_first:idx_add_gas_last)
 
     CALL enforce_mass_fraction_closure(xs, xg)
     CALL eval_mixture_properties_from_mass_fractions(                         &
-         qp(4), xs, xg, rho_m, inv_rhom, rho_c, inv_rho_c,               &
+         qp(idx_T), xs, xg, rho_m, inv_rhom, rho_c, inv_rho_c,               &
          alphas, alphag)
 
   END SUBROUTINE primitive_to_volume_fractions
@@ -617,9 +618,9 @@ CONTAINS
     REAL(wp) :: r_xc
     REAL(wp) :: speed_squared, buoyancy_depth
 
-    r_h = qpj(1)
+    r_h = qpj(idx_h)
 
-    IF ( qpj(1) .LE. EPSILON(1.0_wp) ) THEN
+    IF ( qpj(idx_h) .LE. EPSILON(1.0_wp) ) THEN
 
        r_red_grav = 0.0_wp
        r_rho_m = rho_a_amb
@@ -646,7 +647,7 @@ CONTAINS
 
     r_u = qpj(idx_u)
     r_v = qpj(idx_v)
-    r_T = qpj(4)
+    r_T = qpj(idx_T)
 
     r_xs = qpj(idx_solid_first:idx_solid_last)
     r_xg = qpj(idx_add_gas_first:idx_add_gas_last)
@@ -745,12 +746,12 @@ CONTAINS
     CALL r_phys_var( qc , r_h , r_u , r_v , r_alphas , r_rho_m , r_T ,          &
          r_alphag , r_red_grav , p_dyn , r_Zs , r_exc_pore_pres )
 
-    qp(1) = r_h
+    qp(idx_h) = r_h
 
     qp(2) = r_h*r_u
     qp(3) = r_h*r_v
 
-    qp(4) = r_T
+    qp(idx_T) = r_T
 
     r_xs = 0.0_wp
     r_xg = 0.0_wp
@@ -840,7 +841,7 @@ CONTAINS
     r_Zs = 0.0_wp
     r_exc_pore_pres = 0.0_wp
 
-    r_h = qp(1)
+    r_h = qp(idx_h)
 
     IF ( r_h .GT. EPSILON(1.0_wp) ) THEN
 
@@ -857,7 +858,7 @@ CONTAINS
 
     END IF
 
-    r_T  = qp(4)
+    r_T  = qp(idx_T)
 
     r_xs = qp(idx_solid_first:idx_solid_last)
     r_xg = qp(idx_add_gas_first:idx_add_gas_last)
@@ -925,17 +926,17 @@ CONTAINS
     REAL(wp), INTENT(IN) :: Bj
     REAL(wp), INTENT(OUT) :: qp2j(3)
 
-    qp2j(1) = qpj(1) + Bj
+    qp2j(1) = qpj(idx_h) + Bj
 
-    IF ( qpj(1) .LE. 0.0_wp ) THEN
+    IF ( qpj(idx_h) .LE. 0.0_wp ) THEN
 
        qp2j(2) = 0.0_wp
        qp2j(3) = 0.0_wp
 
     ELSE
 
-       qp2j(2) = qpj(2)/qpj(1)
-       qp2j(3) = qpj(3)/qpj(1)
+       qp2j(2) = qpj(2)/qpj(idx_h)
+       qp2j(3) = qpj(3)/qpj(idx_h)
 
     END IF
 

@@ -2,6 +2,7 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_carrier_darcy_loss_2d
+    USE parameters_2d, ONLY : idx_h, idx_T
     USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_vars,idx_pore, &
               idx_solid_first,idx_solid_last,idx_add_gas_first,idx_add_gas_last, &
               pore_pressure_flag,gas_loss_flag,gas_flag,liquid_flag, &
@@ -34,8 +35,8 @@ CONTAINS
 
         CALL reset_mass_exchange_rates(r)
         IF (.NOT.(gas_flag .AND. pore_pressure_flag .AND. gas_loss_flag)) RETURN
-        h=qp(1)
-        T=qp(4)
+        h=qp(idx_h)
+        T=qp(idx_T)
         pore=qp(idx_pore)
         CALL primitive_to_volume_fractions(qp,alphas,alphag)
         alpha=SUM(alphas)

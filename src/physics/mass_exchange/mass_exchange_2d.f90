@@ -2,6 +2,7 @@
 !> @details Explicit physics is evaluated locally; unsupported treatment entry points
 !> fail explicitly. The coordinator alone enforces shared carrier inventories.
 MODULE mass_exchange_2d
+    USE parameters_2d, ONLY : idx_h, idx_T, idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
     USE parameters_2d, ONLY : wp, n_vars, n_eqns, n_solid, n_add_gas, &
               idx_u, idx_v, idx_pore, idx_stoch, idx_stochEqn, idx_poreEqn, &
               idx_solidEqn_first, idx_solidEqn_last, &
@@ -51,11 +52,11 @@ CONTAINS
 
         CALL reset_mass_exchange_rates(total_rates)
         eqns_term=0.0_wp
-        h=qp(1)
+        h=qp(idx_h)
         IF (h<=EPSILON(1.0_wp)) RETURN
         u=qp(idx_u)
         v=qp(idx_v)
-        T=qp(4)
+        T=qp(idx_T)
 
         ! Processes requiring a gas/liquid carrier are evaluated only when that
         ! physical phase exists. Lava deposition is dispatched independently below.
@@ -135,9 +136,9 @@ CONTAINS
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
 
             ! Scalar transport and pore-pressure sources inherit the net mass exchange.
-            IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(1)*stoch
+            IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(idx_totMassEqn)*stoch
             IF (pore_pressure_flag) eqns_term(idx_poreEqn)= &
-                      eval_pore_pressure_mass_exchange_source(eqns_term(1),pore)
+                      eval_pore_pressure_mass_exchange_source(eqns_term(idx_totMassEqn),pore)
         END IF  ! gas_flag .OR. liquid_flag
 
         ! Lava deposition follows the same process_rates-rate accumulation contract.
@@ -237,10 +238,10 @@ CONTAINS
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total
         REAL(wp), INTENT(IN) :: u,v
         REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns)
-        eqns_term(1)=eqns_term(1)+p%mixture_mass_rate
-        eqns_term(2)=eqns_term(2)+u*MIN(0.0_wp,p%mixture_mass_rate)
-        eqns_term(3)=eqns_term(3)+v*MIN(0.0_wp,p%mixture_mass_rate)
-        eqns_term(4)=eqns_term(4)+p%energy_rate
+        eqns_term(idx_totMassEqn)=eqns_term(idx_totMassEqn)+p%mixture_mass_rate
+        eqns_term(idx_uEqn)=eqns_term(idx_uEqn)+u*MIN(0.0_wp,p%mixture_mass_rate)
+        eqns_term(idx_vEqn)=eqns_term(idx_vEqn)+v*MIN(0.0_wp,p%mixture_mass_rate)
+        eqns_term(idx_engyEqn)=eqns_term(idx_engyEqn)+p%energy_rate
         eqns_term(idx_solidEqn_first:idx_solidEqn_last)= &
                   eqns_term(idx_solidEqn_first:idx_solidEqn_last)+p%solid_mass_rate
         IF (n_add_gas>0) eqns_term(idx_addGasEqn_first:idx_addGasEqn_last)= &

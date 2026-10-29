@@ -6,6 +6,7 @@
 
 MODULE equation_terms_2d
 
+    USE parameters_2d, ONLY : idx_h, idx_totMassEqn
   USE diagnostics_2d, ONLY : fatal_error
   USE constitutive_parameters_2d
   USE state_conversion_2d
@@ -61,7 +62,7 @@ CONTAINS
     REAL(wp) :: normal_velocity
 
     flux = 0.0_wp
-    IF ( qpj(1) .LE. EPSILON(1.0_wp) ) RETURN
+    IF ( qpj(idx_h) .LE. EPSILON(1.0_wp) ) RETURN
 
     SELECT CASE ( dir )
     CASE ( 1 )
@@ -126,7 +127,7 @@ CONTAINS
 
     CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,          &
          r_sp_heat_mix)
-    r_h = qpj(1)
+    r_h = qpj(idx_h)
     normal_velocity = qpj(normal_velocity_index)
 
     IF ( r_red_grav * r_h .LT. 0.0_wp ) THEN
@@ -160,9 +161,9 @@ CONTAINS
     component_flux = SUM(flux(idx_solidEqn_first:idx_solidEqn_last))          &
          + SUM(flux(idx_addGasEqn_first:idx_addGasEqn_last))
 
-    IF ((flux(1) .GT. 0.0_wp .AND. component_flux .GT. flux(1)) .OR.          &
-        (flux(1) .LT. 0.0_wp .AND. component_flux .LT. flux(1))) THEN
-       scale = flux(1) / component_flux
+    IF ((flux(idx_totMassEqn) .GT. 0.0_wp .AND. component_flux .GT. flux(idx_totMassEqn)) .OR.          &
+        (flux(idx_totMassEqn) .LT. 0.0_wp .AND. component_flux .LT. flux(idx_totMassEqn))) THEN
+       scale = flux(idx_totMassEqn) / component_flux
        flux(idx_solidEqn_first:idx_solidEqn_last) =                           &
             scale * flux(idx_solidEqn_first:idx_solidEqn_last)
        flux(idx_addGasEqn_first:idx_addGasEqn_last) =                         &
