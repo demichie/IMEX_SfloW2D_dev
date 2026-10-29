@@ -1205,9 +1205,6 @@ CONTAINS
 
     ! Exactly one continuous carrier is supported by the current state layout.
     ! Gas may contain several gas species, but not a transported liquid phase.
-    IF (gas_flag .AND. liquid_flag) THEN
-      ERROR STOP 'GAS_FLAG and LIQUID_FLAG are mutually exclusive'
-    END IF
 
     IF (lava_flag .AND. (gas_flag .OR. liquid_flag)) THEN
       ERROR STOP 'LAVA_FLAG requires GAS_FLAG=F and LIQUID_FLAG=F'
@@ -2312,8 +2309,7 @@ CONTAINS
     ! Options 5--7 are one-sided/centred slopes and can create material
     ! negative face compositions before the closure guard is applied.
     IF (MAXVAL(limiter(idx_solid_first:idx_solid_last)) .GT. 4 .OR.           &
-        MAXVAL(limiter(idx_add_gas_first:idx_add_gas_last)) .GT. 4 .OR.         &
-        ((gas_flag .AND. liquid_flag) .AND. limiter(n_vars) .GT. 4)) THEN
+        MAXVAL(limiter(idx_add_gas_first:idx_add_gas_last)) .GT. 4) THEN
 
       CALL fatal_error('mass fractions require limiter options 0 through 4')
 
@@ -2416,20 +2412,6 @@ CONTAINS
 
       END IF
 
-      IF (gas_flag .AND. liquid_flag) THEN
-
-        IF (xl_bcW%flag .EQ. -1) THEN
-
-          WRITE (*, *) 'ERROR: problem with namelist WEST_BOUNDARY_CONDITIONS'
-          WRITE (*, *) 'B.C. for liquid mass fraction not set properly'
-          WRITE (*, *) 'Please check the input file'
-          WRITE (*, *) 'xl_bcW'
-          WRITE (*, *) xl_bcW
-          STOP
-
-        END IF
-
-      END IF
 
       IF ((stochastic_flag) .AND. (stoch_transport_flag)) THEN
 
@@ -2560,20 +2542,6 @@ CONTAINS
 
       END IF
 
-      IF (gas_flag .AND. liquid_flag) THEN
-
-          IF (xl_bcE%flag .EQ. -1) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist EAST_BOUNDARY_CONDITIONS'
-            WRITE (*, *) 'B.C. for additional gas components not set properly'
-            WRITE (*, *) 'Please check the input file'
-            WRITE (*, *) 'xl_bcE'
-            WRITE (*, *) xl_bcE
-            STOP
-
-          END IF
-
-      END IF
 
       IF ((stochastic_flag) .AND. (stoch_transport_flag)) THEN
 
@@ -2706,20 +2674,6 @@ CONTAINS
 
       END IF
 
-      IF (gas_flag .AND. liquid_flag) THEN
-
-          IF (xl_bcS%flag .EQ. -1) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist SOUTH_BOUNDARY_CONDITIONS'
-            WRITE (*, *) 'B.C. for additional gas components not set properly'
-            WRITE (*, *) 'Please check the input file'
-            WRITE (*, *) 'xl_bcS'
-            WRITE (*, *) xl_bcS
-            STOP
-
-          END IF
-
-      END IF
 
       IF ((stochastic_flag) .AND. (stoch_transport_flag)) THEN
 
@@ -2848,20 +2802,6 @@ CONTAINS
 
       END IF
 
-      IF (gas_flag .AND. liquid_flag) THEN
-
-          IF (xl_bcN%flag .EQ. -1) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist NORTH_BOUNDARY_CONDITIONS'
-            WRITE (*, *) 'B.C. for additional gas components not set properly'
-            WRITE (*, *) 'Please check the input file'
-            WRITE (*, *) 'xl_bcN'
-            WRITE (*, *) xl_bcN
-            STOP
-
-          END IF
-
-      END IF
 
       IF ((stochastic_flag) .AND. (stoch_transport_flag)) THEN
 
@@ -2943,12 +2883,6 @@ CONTAINS
       bcN(5 + n_solid + n_add_gas + n_stoch_vars:4 + n_solid + n_add_gas + n_stoch_vars + &
           n_pore_vars) = pore_bcN(1:n_pore_vars)
 
-    END IF
-    IF (gas_flag .AND. liquid_flag) THEN
-      bcW(n_vars) = xl_bcW
-      bcE(n_vars) = xl_bcE
-      bcS(n_vars) = xl_bcS
-      bcN(n_vars) = xl_bcN
     END IF
 
     ! ------- READ expl_terms_parameters NAMELIST -------------------------------
@@ -4222,18 +4156,6 @@ CONTAINS
 
         END IF
 
-        IF (gas_flag .AND. liquid_flag) THEN
-
-          IF ((alphal_source .EQ. -1.0_wp) .AND.                              &
-              (xl_source .EQ. -1.0_wp)) THEN
-
-            WRITE (*, *) 'ERROR: problem with namelist ', TRIM(source_name)
-            WRITE (*, *) 'Define the liquid source volume or mass fraction'
-            WRITE (*, *) 'alphal_source =', alphal_source
-            WRITE (*, *) 'xl_source =', xl_source
-            STOP
-
-          END IF
 
           IF ((ANY(alphag_source(1:n_add_gas) .GT. -1.0_wp)) .AND. &
               (xl_source .GT. -1.0_wp)) THEN
@@ -4481,16 +4403,10 @@ CONTAINS
 
           END IF
 
-          IF (gas_flag .AND. liquid_flag) THEN
-
-            WRITE (*, *) 'Source liquid volume fraction =', alphal_source
-
-          END IF
 
           qp_source(5:4 + n_solid) = xs_source(1:n_solid)
           qp_source(4 + n_solid + 1:4 + n_solid + n_add_gas) =                &
                xg_source(1:n_add_gas)
-          IF (gas_flag .AND. liquid_flag) qp_source(n_vars) = xl_source
 
           qp_source(n_vars + 1) = vel_source
           qp_source(n_vars + 2) = 0.0_wp
@@ -4524,7 +4440,6 @@ CONTAINS
                 qp_source(5:4 + n_solid) = xs_source(1:n_solid)
                 qp_source(4 + n_solid + 1:4 + n_solid + n_add_gas) =          &
                      xg_source(1:n_add_gas)
-                IF (gas_flag .AND. liquid_flag) qp_source(n_vars) = xl_source
 
                 qp_source(n_vars + 1) = vel_source
                 qp_source(n_vars + 2) = 0.0_wp
@@ -6933,10 +6848,6 @@ CONTAINS
 
         END DO
 
-        IF (gas_flag .AND. liquid_flag) THEN
-          CALL interp_2d_scalarB(x_comp, y_comp, state%qp(n_vars, :, :),      &
-               probes_coords(1, k), probes_coords(2, k), qp_prb(n_vars))
-        END IF
 
         CALL primitive_to_volume_fractions(qp_prb, alphas_prb, alphag_prb,    &
              alphal_prb)
@@ -7514,15 +7425,6 @@ CONTAINS
 
     END DO
 
-    IF (gas_flag .AND. liquid_flag) THEN
-
-      CALL check(nf90_def_var(ncid, 'alphal', nf90_double, dimids, &
-                              alphal_varid, deflate_level=5, shuffle=.true.))
-      CALL check(nf90_put_att(ncid, alphal_varid, 'units', ''))
-      CALL check(nf90_put_att(ncid, alphal_varid, 'long_name', &
-                              'liquid volume fraction'))
-
-    END IF
 
     DO i = 1, n_stoch_vars
 
@@ -7882,15 +7784,6 @@ END IF
 
     temp_array = 0.0_wp   ! initialize to zero
 
-    IF (gas_flag .AND. liquid_flag) THEN
-
-      temp_array = alphal2D
-
-      ! Write the liquid volume fraction (alphal)
-      CALL check(nf90_put_var(ncid, alphal_varid, temp_array, start=start, &
-                              count=count))
-
-    END IF
 
     temp_array = 0.0_wp   ! initialize to zero
 
