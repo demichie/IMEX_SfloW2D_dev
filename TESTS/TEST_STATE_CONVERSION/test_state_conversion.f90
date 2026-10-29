@@ -76,7 +76,7 @@ CONTAINS
     expected = reduced_gravity * qp(1) / (qp(idx_u)**2 + qp(idx_v)**2)
     IF (ABS(Ri-expected) > 128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp,ABS(expected))) &
          ERROR STOP 'ordinary Richardson formula changed'
-    qp(idx_u) = 1.0E-155_wp
+    qp(idx_u) = 1.0E-120_wp
     qp(idx_v) = 0.0_wp
     qp(2) = qp(1)*qp(idx_u)
     qp(3) = 0.0_wp

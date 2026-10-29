@@ -4,7 +4,8 @@ PROGRAM test_grouped_implicit_stage
   USE constitutive_parameters_2d
   USE rheology_parameters_2d, ONLY : T_ref
   USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0
-  USE rheology_voellmy_2d, ONLY : mu, xi, solve_rheology_voellmy_analytic
+  USE rheology_voellmy_2d, ONLY : mu, solve_rheology_voellmy_analytic
+  USE rheology_parameters_2d, ONLY : xi
   USE geometry_2d, ONLY : pi_g
   USE equation_metadata_2d, ONLY : equation_partition_type,                 &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON

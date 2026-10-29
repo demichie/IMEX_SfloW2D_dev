@@ -25,7 +25,7 @@ PROGRAM test_state_initialization
   n_dyn_pres_levels = 3
   T_ambient = 273.15_wp
 
-  CALL model_layout%initialize(1, 4, 4, 0, 0, 0, 0, .FALSE.)
+  CALL model_layout%initialize(1, 4, 4, 0, 0, 0, 0)
   CALL state%initialize(model_layout)
   CALL domain%initialize
 

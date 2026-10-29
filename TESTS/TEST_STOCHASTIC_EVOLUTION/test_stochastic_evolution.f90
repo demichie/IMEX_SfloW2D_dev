@@ -47,7 +47,7 @@ PROGRAM test_stochastic_evolution
   noise_pow_val = 2.0_wp
 
   CALL model_layout%initialize(1, n_vars, n_eqns, n_solid, n_add_gas,      &
-       n_stoch_vars, n_pore_vars, .FALSE.)
+       n_stoch_vars, n_pore_vars)
   CALL state%initialize(model_layout)
   CALL stochastic%initialize
 
