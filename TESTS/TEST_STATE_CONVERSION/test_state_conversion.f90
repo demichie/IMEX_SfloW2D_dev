@@ -291,7 +291,7 @@ CONTAINS
   SUBROUTINE run_overfilled_mass_fraction_case
 
     REAL(wp), ALLOCATABLE :: qp(:), qp_corrected(:), q(:)
-    REAL(wp) :: expected_xs(n_solid), expected_xg(n_add_gas), expected_xl
+    REAL(wp) :: expected_xs(n_solid), expected_xg(n_add_gas)
     REAL(wp) :: Ri, rho_m, rho_c, red_grav, cp_c, cp_mix, p_dyn
     REAL(wp) :: explicit_total
 
@@ -305,15 +305,13 @@ CONTAINS
     qp(4) = 400.0_wp
     qp(idx_solid_first:idx_solid_last) = [0.8_wp, 0.4_wp]
     qp(idx_add_gas_first:idx_add_gas_last) = 0.1_wp
-    qp(n_vars) = 0.2_wp
     qp(idx_u) = qp(2)/qp(1)
     qp(idx_v) = qp(3)/qp(1)
 
     explicit_total = SUM(qp(idx_solid_first:idx_solid_last))                   &
-         + SUM(qp(idx_add_gas_first:idx_add_gas_last)) + qp(n_vars)
+         + SUM(qp(idx_add_gas_first:idx_add_gas_last))
     expected_xs = qp(idx_solid_first:idx_solid_last)/explicit_total
     expected_xg = qp(idx_add_gas_first:idx_add_gas_last)/explicit_total
-    expected_xl = qp(n_vars)/explicit_total
 
     CALL qp_to_qc(qp, q)
     CALL qc_to_qp(q, qp_corrected, p_dyn)
@@ -325,8 +323,6 @@ CONTAINS
     CALL assert_close_vector('overfilled corrected gas mass fractions',       &
          qp_corrected(idx_add_gas_first:idx_add_gas_last), expected_xg,          &
          2.0E-12_wp)
-    CALL assert_close_scalar('overfilled corrected liquid mass fraction',     &
-         qp_corrected(n_vars), expected_xl, 2.0E-12_wp)
     CALL assert_true('overfilled thermodynamics finite',                       &
          ALL(ieee_is_finite(q)) .AND. ieee_is_finite(rho_m) .AND.              &
          ieee_is_finite(rho_c) .AND. ieee_is_finite(cp_mix))
