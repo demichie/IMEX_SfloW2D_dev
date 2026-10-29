@@ -7,7 +7,6 @@ MODULE mass_exchange_deposition_2d
 
   USE diagnostics_2d, ONLY : fatal_error
   USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
-  USE mass_exchange_rates_2d, ONLY: mass_exchange_rates_type, reset_mass_exchange_rates
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_mass_exchange_deposition_explicit

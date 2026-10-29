@@ -1,10 +1,9 @@
 !> Vaporization source contribution to conserved mass, energy and gas.
 MODULE mass_exchange_vaporization_2d
-  USE parameters_2d, ONLY : wp, n_eqns, n_solid, gas_flag, liquid_vaporization_flag
+  USE parameters_2d, ONLY : wp, n_eqns, n_solid, gas_flag, liquid_vaporization_flag, mass_exchange_rates_type, reset_mass_exchange_rates
   USE diagnostics_2d, ONLY : fatal_error
   USE constitutive_parameters_2d, ONLY : rho_s, sp_heat_s, gamma_steam, sp_heat_g
   USE thermal_laws_2d, ONLY : eval_vaporization_mass_rate, eval_vaporization_energy_rate
-  USE mass_exchange_rates_2d, ONLY: mass_exchange_rates_type, reset_mass_exchange_rates
 
   IMPLICIT NONE
   PRIVATE

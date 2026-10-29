@@ -1,10 +1,9 @@
 !> \brief Prescribed immobilization of liquid lava into a bed deposit.
 !> \details Only EXPLICIT is supported; all other treatments fail explicitly.
 MODULE mass_exchange_lava_deposition_2d
-  USE parameters_2d, ONLY : wp
+  USE parameters_2d, ONLY : wp, mass_exchange_rates_type, reset_mass_exchange_rates
   USE diagnostics_2d, ONLY : fatal_error
   USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
-  USE mass_exchange_rates_2d, ONLY: mass_exchange_rates_type, reset_mass_exchange_rates
   USE constitutive_parameters_2d, ONLY: rho_l, sp_heat_l
   IMPLICIT NONE
   PRIVATE

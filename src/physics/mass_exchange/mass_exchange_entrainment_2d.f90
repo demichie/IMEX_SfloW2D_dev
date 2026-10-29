@@ -1,10 +1,9 @@
 !> Air entrainment contribution to mass exchange.
 MODULE mass_exchange_entrainment_2d
-  USE parameters_2d, ONLY : wp
+  USE parameters_2d, ONLY : wp, mass_exchange_rates_type, reset_mass_exchange_rates
   USE diagnostics_2d, ONLY : fatal_error
   USE constitutive_parameters_2d, ONLY : entrainment_flag
 
-  USE mass_exchange_rates_2d, ONLY: mass_exchange_rates_type, reset_mass_exchange_rates
   USE constitutive_parameters_2d, ONLY: rho_a_amb, T_ambient, sp_heat_a
   IMPLICIT NONE
   PRIVATE
