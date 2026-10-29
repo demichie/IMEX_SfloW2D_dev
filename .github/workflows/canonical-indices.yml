@@ -1,0 +1,17 @@
+name: Canonical state index audit
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  canonical-indices:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify canonical fixture setup and conservative state access
+        run: python3 tools/d17/check_canonical_indices.py

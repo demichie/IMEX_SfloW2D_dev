@@ -140,32 +140,9 @@ CONTAINS
 
     liquid_flag = has_liquid
 
-    idx_h = 1
-    idx_hu = 2
-    idx_hv = 3
-    idx_T = 4
-    idx_solid_first = 5
-    idx_solid_last = 4 + n_solid
-    idx_add_gas_first = idx_solid_last + 1
-    idx_add_gas_last = idx_add_gas_first + n_add_gas - 1
-    idx_stoch = idx_add_gas_last + 1
-    idx_pore = idx_stoch + 1
-
-    idx_totMassEqn = 1
-    idx_uEqn = 2
-    idx_vEqn = 3
-    idx_engyEqn = 4
-    idx_solidEqn_first = idx_solid_first
-    idx_solidEqn_last = idx_solid_last
-    idx_addGasEqn_first = idx_add_gas_first
-    idx_addGasEqn_last = idx_add_gas_last
-    idx_stochEqn = idx_stoch
-    idx_poreEqn = idx_pore
-
     n_vars = 4 + n_solid + n_add_gas + n_stoch_vars + n_pore_vars
     n_eqns = n_vars
-    idx_u = n_vars + 1
-    idx_v = n_vars + 2
+    CALL configure_canonical_state_indices()
 
   END SUBROUTINE configure_layout
 
@@ -185,7 +162,7 @@ CONTAINS
     qp(1) = h
     qp(2) = h*u
     qp(3) = h*v
-    qp(4) = 450.0_wp
+    qp(idx_T) = 450.0_wp
 
     qp(idx_solid_first:idx_solid_last) = xs
     qp(idx_add_gas_first:idx_add_gas_last) = xg

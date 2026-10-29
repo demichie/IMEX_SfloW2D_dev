@@ -32,7 +32,7 @@ PROGRAM test_state_initialization
   CALL assert_true('conservative state', ALL(state%q .EQ. 0.0_wp))
   CALL assert_true('physical state',                                      &
        ALL(state%qp(1:3,:,:) .EQ. 0.0_wp) .AND.                           &
-       ALL(state%qp(4,:,:) .EQ. T_ambient) .AND.                          &
+       ALL(state%qp(model_layout%idx_energy,:,:) .EQ. T_ambient) .AND.                          &
        ALL(state%qp(5:6,:,:) .EQ. 0.0_wp))
   CALL assert_true('positive-thickness masks',                             &
        .NOT. ANY(state%hpos) .AND. .NOT. ANY(state%hpos_old))

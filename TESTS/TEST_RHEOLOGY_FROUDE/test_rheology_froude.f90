@@ -93,17 +93,7 @@ CONTAINS
     n_pore_vars = 0
     n_vars = 6
     n_eqns = 6
-    idx_h = 1
-    idx_hu = 2
-    idx_hv = 3
-    idx_T = 4
-    idx_solid_first = 5
-    idx_solid_last = 5
-    idx_add_gas_first = 6
-    idx_add_gas_last = 5
-    idx_stoch = 6
-    idx_u = 7
-    idx_v = 8
+    CALL configure_canonical_state_indices()
     ALLOCATE(rho_s(1), inv_rho_s(1), sp_heat_s(1))
     ALLOCATE(sp_heat_g(0), sp_gas_const_g(0))
     rho_s = 2000.0_wp
@@ -142,7 +132,7 @@ CONTAINS
     qp(1) = height
     qp(2) = height*u
     qp(3) = height*v
-    qp(4) = temperature
+    qp(idx_T) = temperature
     qp(5) = solid_fraction
     qp(idx_u) = u
     qp(idx_v) = v
