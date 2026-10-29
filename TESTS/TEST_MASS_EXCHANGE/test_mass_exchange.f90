@@ -154,7 +154,7 @@ CONTAINS
     cell_arc_perim=0.0_wp
     cell_arc_n_x=0.0_wp
     cell_arc_n_y=0.0_wp
-    CALL layout%initialize(1,nq,nq,ns,0,0,0,.FALSE.)
+    CALL layout%initialize(1,nq,nq,ns,0,0,0)
     CALL state%initialize(layout)
     CALL domain%initialize
     ! All cells except one wet inactive corner are on the production workset.
@@ -907,9 +907,8 @@ CONTAINS
     REAL(wp) :: qp_local(n_vars+2), dynamic_pressure
     REAL(wp) :: richardson, mixture_density, carrier_density, reduced_gravity
     REAL(wp) :: carrier_heat_capacity, mixture_heat_capacity
-    REAL(wp) :: erosion_rate(ns), deposition_rate(ns)
-    REAL(wp) :: carrier_erosion_rate, carrier_loss_rate
-    REAL(wp) :: equation_rate(n_eqns), topo_rate, air_rate, expected
+    TYPE(mass_exchange_rates_type) :: exchange_rates
+    REAL(wp) :: equation_rate(n_eqns), air_rate, expected
     REAL(wp) :: speed_squared
 
     CALL reset_fixture
@@ -926,12 +925,15 @@ CONTAINS
     IF (air_rate<=0.0_wp) ERROR STOP 'thermal entrainment fixture is inactive'
 
     CALL eval_mass_exchange_terms(qp_local,0,0.0_wp,0.0_wp,erodible(:,1,1), &
-         1.0_wp,erosion_rate,deposition_rate,carrier_erosion_rate,          &
-         carrier_loss_rate,equation_rate,topo_rate)
-    expected=-qp_local(4)*(SUM(rho_s*sp_heat_s*deposition_rate) +           &
-         carrier_density*carrier_heat_capacity*carrier_loss_rate) +        &
-         qp_local(4)*(SUM(rho_s*sp_heat_s*erosion_rate) +                   &
-         rho_c_sub*carrier_heat_capacity*carrier_erosion_rate) +            &
+         1.0_wp,exchange_rates,equation_rate)
+    expected=-qp_local(4)*( &
+         SUM(rho_s*sp_heat_s*exchange_rates%solid_deposition_rate) + &
+         carrier_density*carrier_heat_capacity* &
+         (exchange_rates%carrier_deposition_rate + &
+          exchange_rates%carrier_withdrawal_volume_rate)) + &
+         qp_local(4)*( &
+         SUM(rho_s*sp_heat_s*exchange_rates%solid_erosion_rate) + &
+         rho_c_sub*carrier_heat_capacity*exchange_rates%carrier_erosion_rate) + &
          T_ambient*sp_heat_a*rho_a_amb*air_rate
     CALL assert_small('thermal entrainment energy source',                  &
          ABS(equation_rate(4)-expected),MAX(1.0_wp,ABS(expected)))
@@ -953,7 +955,7 @@ CONTAINS
     rho_c_sub=1.2_wp; pi_g=ACOS(-1.0_wp)
     ! Gas-only execution must not require the optional liquid-loss allocation.
     DEALLOCATE(loss_rate)
-    CALL layout%initialize(1,nq,nq,ns,0,0,1,.FALSE.)
+    CALL layout%initialize(1,nq,nq,ns,0,0,1)
     CALL state%initialize(layout)
     OPEN(NEWUNIT=snapshot_unit,FILE='gas_snapshot.bin',ACCESS='STREAM', &
          FORM='UNFORMATTED',STATUS='REPLACE')
@@ -1035,9 +1037,16 @@ CONTAINS
   SUBROUTINE evaluate_local(qp0,inventory,dt,packed)
     REAL(wp), INTENT(IN) :: qp0(n_vars+2),inventory(ns),dt
     REAL(wp), INTENT(OUT) :: packed(2*ns+2+n_eqns+1)
+    TYPE(mass_exchange_rates_type) :: exchange_rates
+
     CALL eval_mass_exchange_terms(qp0,0,0.0_wp,0.0_wp,inventory,dt, &
-         packed(1:ns),packed(ns+1:2*ns),packed(2*ns+1),packed(2*ns+2), &
-         packed(2*ns+3:2*ns+2+n_eqns),packed(2*ns+3+n_eqns))
+         exchange_rates,packed(2*ns+3:2*ns+2+n_eqns))
+    packed(1:ns)=exchange_rates%solid_erosion_rate
+    packed(ns+1:2*ns)=exchange_rates%solid_deposition_rate
+    packed(2*ns+1)=exchange_rates%carrier_erosion_rate
+    packed(2*ns+2)=exchange_rates%carrier_deposition_rate + &
+         exchange_rates%carrier_withdrawal_volume_rate
+    packed(2*ns+3+n_eqns)=exchange_rates%dB_dt
   END SUBROUTINE evaluate_local
 
   !> \brief Independently limit two-solid liquid or signed pore-pressure gas exchange increments.
