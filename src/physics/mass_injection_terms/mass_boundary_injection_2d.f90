@@ -80,7 +80,6 @@ CONTAINS
 
     source_bdry(idx_solid_first:idx_solid_last) = xs_source(1:n_solid)
     source_bdry(idx_add_gas_first:idx_add_gas_last) = xg_source(1:n_add_gas)
-    IF ( gas_flag .AND. liquid_flag ) source_bdry(n_vars) = xl_source
 
     source_bdry(idx_u) = t_coeff**0.5_wp * vel_source * vect_x
     source_bdry(idx_v) = t_coeff**0.5_wp * vel_source * vect_y

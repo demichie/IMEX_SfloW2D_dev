@@ -73,8 +73,6 @@ CONTAINS
                xs_fissures(1:n_solid,i_fissure)
           qp_source(idx_add_gas_first:idx_add_gas_last) =                      &
                xg_fissures(1:n_add_gas,i_fissure)
-          IF (gas_flag .AND. liquid_flag) qp_source(n_vars) =                  &
-               xl_fissures(i_fissure)
           IF (stoch_transport_flag) qp_source(idx_stoch) = 0.0_wp
           IF (pore_pressure_flag) qp_source(idx_poreEqn) = 0.0_wp
           qp_source(idx_u) = 0.0_wp
@@ -93,10 +91,6 @@ CONTAINS
                expl_term(idx_addGasEqn_first:idx_addGasEqn_last) +             &
                t_coeff * h_dot * r_rho_m * xg_fissures(1:n_add_gas,i_fissure)
 
-          IF (gas_flag .AND. liquid_flag) THEN
-             expl_term(n_vars) = expl_term(n_vars) + t_coeff * h_dot         &
-                  * r_rho_m * xl_fissures(i_fissure)
-          END IF
 
           IF (pore_pressure_flag) THEN
              exc_pore_pres = qpj(idx_pore)

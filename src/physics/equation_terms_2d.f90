@@ -159,7 +159,6 @@ CONTAINS
 
     component_flux = SUM(flux(idx_solidEqn_first:idx_solidEqn_last))          &
          + SUM(flux(idx_addGasEqn_first:idx_addGasEqn_last))
-    IF (gas_flag .AND. liquid_flag) component_flux = component_flux           &
          + flux(n_vars)
 
     IF ((flux(1) .GT. 0.0_wp .AND. component_flux .GT. flux(1)) .OR.          &
@@ -169,7 +168,6 @@ CONTAINS
             scale * flux(idx_solidEqn_first:idx_solidEqn_last)
        flux(idx_addGasEqn_first:idx_addGasEqn_last) =                         &
             scale * flux(idx_addGasEqn_first:idx_addGasEqn_last)
-       IF (gas_flag .AND. liquid_flag) flux(n_vars) = scale * flux(n_vars)
     END IF
 
   END SUBROUTINE limit_component_mass_flux
