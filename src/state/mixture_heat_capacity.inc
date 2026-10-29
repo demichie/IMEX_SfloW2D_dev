@@ -15,7 +15,6 @@
     !--------------------------------------------------------------------------
 
     xc = 1.0_wp - SUM(xs)
-    IF ( gas_flag .AND. liquid_flag ) xc = xc - xl
 
     IF ( gas_flag ) THEN
 
@@ -38,4 +37,3 @@
     ! carrier_sp_heat_mass already includes its carrier mass fraction; do not
     ! multiply it by xc again when forming the mixture heat capacity.
     sp_heat_mix = SUM(xs * sp_heat_s) + carrier_sp_heat_mass
-    IF ( gas_flag .AND. liquid_flag ) sp_heat_mix = sp_heat_mix + xl * sp_heat_l

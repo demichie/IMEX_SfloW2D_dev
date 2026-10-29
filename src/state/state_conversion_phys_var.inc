@@ -54,12 +54,6 @@
     IF ( stoch_transport_flag ) Zs = qj(idx_stoch) * inv_qj1
     IF ( pore_pressure_flag ) exc_pore_pres = qj(idx_pore) * inv_qj1
 
-    IF ( gas_flag .AND. liquid_flag ) THEN
-
-       xl = qj(n_vars) * inv_qj1
-
-    END IF
-
     CALL eval_mixture_heat_capacity(                                           &
          ! IN
          xs, xg, xl,                                                           &

@@ -18,7 +18,6 @@
     ! Additional gases are part of xc, not a separate dispersed phase.
     ! Ambient air therefore has mass fraction xc-SUM(xg).
     xc = 1.0_wp - SUM(xs)
-    IF ( gas_flag .AND. liquid_flag ) xc = xc - xl
 
     IF ( gas_flag ) THEN
 
@@ -44,11 +43,9 @@
 
     ! Mass-fraction mixing is linear in specific volume (1/rho), not in rho.
     inv_rhom = SUM(xs * inv_rho_s) + xc * inv_rho_c
-    IF ( gas_flag .AND. liquid_flag ) inv_rhom = inv_rhom + xl * inv_rho_l
     rho_m = 1.0_wp / inv_rhom
 
     ! Recover volume fractions only after the whole-mixture density is known.
     alphas = xs * rho_m * inv_rho_s
     alphag = xg * rho_m * inv_rho_g
     alphal = 0.0_wp
-    IF ( gas_flag .AND. liquid_flag ) alphal = xl * rho_m * inv_rho_l
