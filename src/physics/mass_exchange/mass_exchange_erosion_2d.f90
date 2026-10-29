@@ -5,7 +5,7 @@ MODULE mass_exchange_erosion_2d
   USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity, erodible_fract
 
   USE mass_exchange_rates_2d, ONLY: mass_exchange_rates_type, reset_mass_exchange_rates
-  USE constitutive_parameters_2d, ONLY: rho_s, rho_c_sub, sp_heat_s, erodible_porosity
+  USE constitutive_parameters_2d, ONLY: rho_s, rho_c_sub, sp_heat_s
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_mass_exchange_erosion_explicit
@@ -16,20 +16,20 @@ MODULE mass_exchange_erosion_2d
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
 CONTAINS
 
-  SUBROUTINE eval_erosion_volume_kernel(r_h, mod_vel, alphas_tot, erodible, dt, &
-       erosion_term, continuous_phase_erosion_term)
-    REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
-    REAL(wp), INTENT(OUT) :: erosion_term(n_solid), continuous_phase_erosion_term
-    IF (erosion_coeff .GT. 0.0_wp) THEN
-       CALL eval_erosion_rates(r_h, mod_vel, alphas_tot, erosion_coeff,       &
-            erodible_porosity, erodible_fract(1:n_solid),                    &
-            erodible(1:n_solid), dt, erosion_term(1:n_solid),                &
-            continuous_phase_erosion_term)
-    ELSE
-       erosion_term = 0.0_wp
-       continuous_phase_erosion_term = 0.0_wp
-    END IF
-  END SUBROUTINE eval_erosion_volume_kernel
+
+
+  SUBROUTINE eval_mass_exchange_erosion_explicit(h,speed,alpha,erodible,dt,T_sub,cp_sub,r)
+    REAL(wp), INTENT(IN) :: h,speed,alpha,erodible(n_solid),dt,T_sub,cp_sub
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    CALL eval_erosion_volume_kernel(h,speed,alpha,erodible,dt, &
+         r%solid_erosion_rate,r%continuous_phase_erosion_rate)
+    r%solid_mass_rate=rho_s*r%solid_erosion_rate
+    r%mixture_mass_rate=SUM(r%solid_mass_rate)+rho_c_sub*r%continuous_phase_erosion_rate
+    r%energy_rate=T_sub*(SUM(sp_heat_s*r%solid_mass_rate)+ &
+         rho_c_sub*cp_sub*r%continuous_phase_erosion_rate)
+    r%dB_dt=-SUM(r%solid_erosion_rate)/(1.0_wp-erodible_porosity)
+  END SUBROUTINE
 
   SUBROUTINE eval_mass_exchange_erosion_semi_implicit(h,speed,alpha,erodible,dt,T_sub,cp_sub,r)
     REAL(wp), INTENT(IN) :: h,speed,alpha,erodible(n_solid),dt,T_sub,cp_sub
@@ -51,6 +51,21 @@ CONTAINS
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('erosion: unsupported physical treatment')
   END SUBROUTINE solve_mass_exchange_erosion_analytic
+
+  SUBROUTINE eval_erosion_volume_kernel(r_h, mod_vel, alphas_tot, erodible, dt, &
+       erosion_term, continuous_phase_erosion_term)
+    REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
+    REAL(wp), INTENT(OUT) :: erosion_term(n_solid), continuous_phase_erosion_term
+    IF (erosion_coeff .GT. 0.0_wp) THEN
+       CALL eval_erosion_rates(r_h, mod_vel, alphas_tot, erosion_coeff,       &
+            erodible_porosity, erodible_fract(1:n_solid),                    &
+            erodible(1:n_solid), dt, erosion_term(1:n_solid),                &
+            continuous_phase_erosion_term)
+    ELSE
+       erosion_term = 0.0_wp
+       continuous_phase_erosion_term = 0.0_wp
+    END IF
+  END SUBROUTINE eval_erosion_volume_kernel
 
   PURE SUBROUTINE eval_erosion_rates(flow_depth, speed, total_solid_fraction, &
        erosion_coefficient, erodible_porosity, erodible_fraction,            &
@@ -82,19 +97,4 @@ CONTAINS
     continuous_phase_erosion_rate = total_erosion * erodible_porosity
 
   END SUBROUTINE eval_erosion_rates
-
-
-
-  SUBROUTINE eval_mass_exchange_erosion_explicit(h,speed,alpha,erodible,dt,T_sub,cp_sub,r)
-    REAL(wp), INTENT(IN) :: h,speed,alpha,erodible(n_solid),dt,T_sub,cp_sub
-    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
-    CALL reset_mass_exchange_rates(r)
-    CALL eval_erosion_volume_kernel(h,speed,alpha,erodible,dt, &
-         r%solid_erosion_rate,r%continuous_phase_erosion_rate)
-    r%solid_mass_rate=rho_s*r%solid_erosion_rate
-    r%mixture_mass_rate=SUM(r%solid_mass_rate)+rho_c_sub*r%continuous_phase_erosion_rate
-    r%energy_rate=T_sub*(SUM(sp_heat_s*r%solid_mass_rate)+ &
-         rho_c_sub*cp_sub*r%continuous_phase_erosion_rate)
-    r%dB_dt=-SUM(r%solid_erosion_rate)/(1.0_wp-erodible_porosity)
-  END SUBROUTINE
 END MODULE mass_exchange_erosion_2d

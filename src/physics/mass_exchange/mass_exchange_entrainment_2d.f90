@@ -17,19 +17,15 @@ MODULE mass_exchange_entrainment_2d
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
 CONTAINS
 
-  REAL(wp) FUNCTION eval_entrainment_volume_kernel(r_h, r_Ri, mod_vel2)
-    REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
-    IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                      &
-         ( r_Ri .GT. 0.0_wp ) ) THEN
 
-       eval_entrainment_volume_kernel = eval_air_entrainment_rate(r_Ri, mod_vel2)
 
-    ELSE
-
-       eval_entrainment_volume_kernel = 0.0_wp
-
-    END IF
-  END FUNCTION eval_entrainment_volume_kernel
+  SUBROUTINE eval_mass_exchange_entrainment_explicit(h,Ri,speed_squared,r)
+    REAL(wp), INTENT(IN) :: h,Ri,speed_squared
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+    CALL reset_mass_exchange_rates(r)
+    r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(h,Ri,speed_squared)
+    r%energy_rate=T_ambient*sp_heat_a*r%mixture_mass_rate
+  END SUBROUTINE
 
   SUBROUTINE eval_mass_exchange_entrainment_semi_implicit(h,Ri,speed_squared,r)
     REAL(wp), INTENT(IN) :: h,Ri,speed_squared
@@ -52,6 +48,20 @@ CONTAINS
     CALL fatal_error('entrainment: unsupported physical treatment')
   END SUBROUTINE solve_mass_exchange_entrainment_analytic
 
+  REAL(wp) FUNCTION eval_entrainment_volume_kernel(r_h, r_Ri, mod_vel2)
+    REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
+    IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                      &
+         ( r_Ri .GT. 0.0_wp ) ) THEN
+
+       eval_entrainment_volume_kernel = eval_air_entrainment_rate(r_Ri, mod_vel2)
+
+    ELSE
+
+       eval_entrainment_volume_kernel = 0.0_wp
+
+    END IF
+  END FUNCTION eval_entrainment_volume_kernel
+
   PURE FUNCTION eval_air_entrainment_rate(richardson_number, speed_squared)  &
        RESULT(entrainment_rate)
 
@@ -63,14 +73,4 @@ CONTAINS
     entrainment_rate = entrainment_coefficient * SQRT(speed_squared)
 
   END FUNCTION eval_air_entrainment_rate
-
-
-
-  SUBROUTINE eval_mass_exchange_entrainment_explicit(h,Ri,speed_squared,r)
-    REAL(wp), INTENT(IN) :: h,Ri,speed_squared
-    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
-    CALL reset_mass_exchange_rates(r)
-    r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(h,Ri,speed_squared)
-    r%energy_rate=T_ambient*sp_heat_a*r%mixture_mass_rate
-  END SUBROUTINE
 END MODULE mass_exchange_entrainment_2d
