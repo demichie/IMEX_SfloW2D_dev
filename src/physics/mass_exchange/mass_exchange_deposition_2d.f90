@@ -2,8 +2,14 @@
 !> \details The explicit treatment preserves the established local fluid
 !> properties and settling closures; unsupported methods are rejected.
 MODULE mass_exchange_deposition_2d
-  USE parameters_2d
-  USE constitutive_parameters_2d
+  USE parameters_2d, ONLY : wp, n_vars, n_solid, n_add_gas, &
+       idx_solid_first, idx_solid_last, idx_add_gas_first, idx_add_gas_last, &
+       gas_flag, liquid_flag, sutherland_flag, rheology_model, &
+       mass_exchange_rates_type, reset_mass_exchange_rates
+  USE constitutive_parameters_2d, ONLY : alphastot_min, coeff_porosity, &
+       rho_s, sp_heat_s, kin_visc_c, muRef_Suth, Tref_Suth, S_mu, pres, &
+       sp_gas_const_a, settling_flag, grav, collective_settling_flag, &
+       A_drag, B_drag, diam_s
 
   USE diagnostics_2d, ONLY : fatal_error
   USE state_conversion_2d, ONLY : primitive_to_volume_fractions, mixt_var
@@ -21,8 +27,6 @@ MODULE mass_exchange_deposition_2d
   PUBLIC :: eval_hindered_settling_deposition_rate
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
 CONTAINS
-
-
 
   SUBROUTINE eval_mass_exchange_deposition_explicit(qp,dt,r)
     REAL(wp), INTENT(IN) :: qp(n_vars+2),dt

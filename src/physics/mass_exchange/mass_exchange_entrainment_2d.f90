@@ -3,9 +3,8 @@ MODULE mass_exchange_entrainment_2d
   USE parameters_2d, ONLY : wp, n_vars, slope_correction_flag, mass_exchange_rates_type, reset_mass_exchange_rates
   USE diagnostics_2d, ONLY : fatal_error
   USE state_conversion_2d, ONLY : mixt_var
-  USE constitutive_parameters_2d, ONLY : entrainment_flag
-
-  USE constitutive_parameters_2d, ONLY: rho_a_amb, T_ambient, sp_heat_a
+  USE constitutive_parameters_2d, ONLY : entrainment_flag, rho_a_amb, &
+       T_ambient, sp_heat_a
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_mass_exchange_entrainment_rates_explicit
@@ -16,8 +15,6 @@ MODULE mass_exchange_entrainment_2d
   PUBLIC :: eval_air_entrainment_rate
   ! Four-entry physical treatment contract; only EXPLICIT is supported.
 CONTAINS
-
-
 
   SUBROUTINE eval_mass_exchange_entrainment_explicit(qp,u,v,Bx,By,r)
     REAL(wp), INTENT(IN) :: qp(n_vars+2),u,v,Bx,By

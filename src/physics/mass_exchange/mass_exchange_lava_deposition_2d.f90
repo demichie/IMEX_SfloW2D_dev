@@ -4,7 +4,7 @@ MODULE mass_exchange_lava_deposition_2d
   USE parameters_2d, ONLY : wp, mass_exchange_rates_type, reset_mass_exchange_rates
   USE diagnostics_2d, ONLY : fatal_error
   USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
-  USE constitutive_parameters_2d, ONLY: rho_l, sp_heat_l
+  USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
   IMPLICIT NONE
   PRIVATE
   LOGICAL, PUBLIC :: lava_deposition_flag=.FALSE.
@@ -31,7 +31,6 @@ CONTAINS
     r%dB_dt=r%continuous_phase_deposition_rate
   END SUBROUTINE
 
-
   !> \brief Unsupported semi-implicit lava deposition.
   SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit(depth,T,dt,r)
     REAL(wp), INTENT(IN) :: depth,T,dt
@@ -40,7 +39,6 @@ CONTAINS
     CALL fatal_error('lava_deposition: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit
 
-
   !> \brief Unsupported implicit lava deposition.
   SUBROUTINE eval_mass_exchange_lava_deposition_implicit(depth,T,dt,r)
     REAL(wp), INTENT(IN) :: depth,T,dt
@@ -48,7 +46,6 @@ CONTAINS
     CALL reset_mass_exchange_rates(r)
     CALL fatal_error('lava_deposition: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_lava_deposition_implicit
-
 
   !> \brief Unsupported analytic lava deposition.
   SUBROUTINE solve_mass_exchange_lava_deposition_analytic(depth,T,dt,r)
@@ -77,7 +74,6 @@ CONTAINS
     END SELECT
     rate=MAX(0.0_wp,lava_deposition_rate)*factor
   END FUNCTION eval_lava_deposition_rate
-
 
   !> \brief Evaluate an available-depth-limited lava immobilization rate.
   !> \param[in] depth Mobile lava thickness [m].

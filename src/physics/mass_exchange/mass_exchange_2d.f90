@@ -1,16 +1,21 @@
 !> Cell-local mass exchange: process_rates dispatch, shared-resource limiting, conservative assembly.
 MODULE mass_exchange_2d
-  USE parameters_2d
-  USE constitutive_parameters_2d
-  USE state_conversion_2d, ONLY: primitive_to_volume_fractions
-  USE pore_pressure_laws_2d, ONLY: eval_pore_pressure_mass_exchange_source
-  USE mass_exchange_erosion_2d, ONLY: eval_mass_exchange_erosion_explicit
-  USE mass_exchange_deposition_2d, ONLY: eval_mass_exchange_deposition_explicit
-  USE mass_exchange_carrier_liquid_loss_2d, ONLY: eval_mass_exchange_carrier_liquid_loss_explicit
-  USE mass_exchange_carrier_darcy_loss_2d, ONLY: eval_mass_exchange_carrier_darcy_loss_explicit
-  USE mass_exchange_entrainment_2d, ONLY: eval_mass_exchange_entrainment_explicit
-  USE mass_exchange_vaporization_2d, ONLY: eval_mass_exchange_vaporization_explicit
-  USE mass_exchange_lava_deposition_2d, ONLY: lava_deposition_flag, eval_mass_exchange_lava_deposition_explicit
+  USE parameters_2d, ONLY : wp, n_vars, n_eqns, n_solid, n_add_gas, &
+       idx_u, idx_v, idx_pore, idx_stoch, idx_stochEqn, idx_poreEqn, &
+       idx_solidEqn_first, idx_solidEqn_last, &
+       idx_addGasEqn_first, idx_addGasEqn_last, gas_flag, liquid_flag, &
+       pore_pressure_flag, stoch_transport_flag, mass_exchange_rates_type, &
+       reset_mass_exchange_rates
+  USE constitutive_parameters_2d, ONLY : maximum_solid_packing
+  USE state_conversion_2d, ONLY : primitive_to_volume_fractions
+  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source
+  USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
+  USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
+  USE mass_exchange_carrier_liquid_loss_2d, ONLY : eval_mass_exchange_carrier_liquid_loss_explicit
+  USE mass_exchange_carrier_darcy_loss_2d, ONLY : eval_mass_exchange_carrier_darcy_loss_explicit
+  USE mass_exchange_entrainment_2d, ONLY : eval_mass_exchange_entrainment_explicit
+  USE mass_exchange_vaporization_2d, ONLY : eval_mass_exchange_vaporization_explicit
+  USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag, eval_mass_exchange_lava_deposition_explicit
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_mass_exchange_terms
@@ -21,7 +26,7 @@ CONTAINS
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
     REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
     TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates,darcy_loss_rates
-    REAL(wp) :: alphas(n_solid),alphag(n_add_gas),alphal,alpha
+    REAL(wp) :: alphas(n_solid), alphag(n_add_gas), alphal, alpha
     REAL(wp) :: u,v,h,T,pore,stoch
     REAL(wp) :: gas_available,liquid_available,gas_factor,liquid_factor
     REAL(wp) :: gas_withdrawals(2),liquid_withdrawals(2),carrier_volume
@@ -41,8 +46,8 @@ CONTAINS
       stoch=0.0_wp
       IF (pore_pressure_flag) pore=qp(idx_pore)
       IF (stoch_transport_flag) stoch=qp(idx_stoch)
-      CALL eval_mass_exchange_erosion_explicit(h,u,v,Bx,By,alpha,erodible, &
-           dt,T,qp,process_rates)
+      CALL eval_mass_exchange_erosion_explicit(qp,Bx,By,alpha,erodible, &
+           dt,process_rates)
       CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
       CALL eval_mass_exchange_deposition_explicit(qp,dt,deposition_rates)
       CALL eval_mass_exchange_carrier_liquid_loss_explicit(qp,liquid_loss_rates)
