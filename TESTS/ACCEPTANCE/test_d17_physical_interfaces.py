@@ -127,8 +127,8 @@ def main() -> int:
     if "source_term_type('mass_exchange_carrier_deposition_loss'" in text:
         failures.append("deposition-induced carrier loss must not be independently scheduled")
     mass_dir = PHYSICS / "mass_exchange"
-    if not (mass_dir / "mass_exchange_laws_2d.f90").is_file():
-        failures.append("missing mass_exchange_laws_2d production coordinator")
+    if not (mass_dir / "mass_exchange_2d.f90").is_file():
+        failures.append("missing mass_exchange_2d production coordinator")
     if (PHYSICS / "mass_exchange_terms").exists():
         failures.append("old mass_exchange_terms directory still exists")
     if not re.search(r"(?im)^\s*interface\s+eval_source_explicit\b", (
