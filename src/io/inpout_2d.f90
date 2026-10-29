@@ -4152,10 +4152,6 @@ CONTAINS
         END IF
 
 
-          ! No dispersed liquid component exists in a gaseous carrier.
-
-        END IF
-
         IF (.NOT. bottom_fissural_source_flag) THEN
 
         IF (ANY(time_param .LT. 0.0_wp)) THEN
