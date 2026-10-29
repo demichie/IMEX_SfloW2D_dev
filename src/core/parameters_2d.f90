@@ -369,6 +369,38 @@ MODULE parameters_2d
   TYPE(bc), ALLOCATABLE :: bcN(:)
 
 CONTAINS
+  !> Configure canonical physical and conservative indices for a complete state.
+  !> Called after setting n_solid, n_add_gas, n_stoch_vars, n_pore_vars and n_vars.
+  SUBROUTINE configure_canonical_state_indices()
+    INTEGER :: next_index
+    IF (n_solid<0 .OR. n_add_gas<0 .OR. n_stoch_vars<0 .OR. n_pore_vars<0) &
+         ERROR STOP 'Negative canonical component count'
+    IF (n_stoch_vars>1 .OR. n_pore_vars>1) &
+         ERROR STOP 'Unsupported optional component count'
+    IF (n_vars/=4+n_solid+n_add_gas+n_stoch_vars+n_pore_vars) &
+         ERROR STOP 'Inconsistent canonical variable count'
+    idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
+    idx_totMassEqn=1; idx_uEqn=2; idx_vEqn=3; idx_engyEqn=4
+    idx_solid_first=5; idx_solid_last=4+n_solid
+    idx_solidEqn_first=idx_solid_first; idx_solidEqn_last=idx_solid_last
+    idx_add_gas_first=idx_solid_last+1
+    idx_add_gas_last=idx_solid_last+n_add_gas
+    idx_addGasEqn_first=idx_add_gas_first
+    idx_addGasEqn_last=idx_add_gas_last
+    next_index=idx_add_gas_last
+    idx_stoch=0; idx_stochEqn=0
+    IF (n_stoch_vars==1) THEN
+       next_index=next_index+1
+       idx_stoch=next_index; idx_stochEqn=next_index
+    END IF
+    idx_pore=0; idx_poreEqn=0
+    IF (n_pore_vars==1) THEN
+       next_index=next_index+1
+       idx_pore=next_index; idx_poreEqn=next_index
+    END IF
+    idx_u=n_vars+1; idx_v=n_vars+2
+  END SUBROUTINE configure_canonical_state_indices
+
   SUBROUTINE reset_mass_exchange_rates(r)
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
     IF (ALLOCATED(r%solid_mass_rate)) THEN

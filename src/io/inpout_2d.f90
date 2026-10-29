@@ -7704,14 +7704,14 @@ END IF
     ! Write stochastic variable
     DO i = 1, n_stoch_vars
       CALL check(nf90_put_var(ncid, stoch_varid(i), &
-                              state%qp(4 + n_solid + n_add_gas + i, :, :), start=start, count=count))
+                              state%qp(idx_stoch + i - 1, :, :), start=start, count=count))
     END DO
 
     ! Write pore pressure variable
     DO i = 1, n_pore_vars
       temp_array = pres
       WHERE (state%qp(idx_h, :, :) .GE. dry_thickness_tolerance)
-        temp_array = state%qp(4 + n_solid + n_add_gas + n_stoch_vars + i, :, :) + pres
+        temp_array = state%qp(idx_pore + i - 1, :, :) + pres
       END WHERE
       CALL check(nf90_put_var(ncid, pore_varid(i), temp_array, start=start, &
                               count=count))
