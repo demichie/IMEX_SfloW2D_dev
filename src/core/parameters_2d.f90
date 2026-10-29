@@ -23,8 +23,8 @@ MODULE parameters_2d
     REAL(wp) :: lava_deposit_rate=0.0_wp
     REAL(wp) :: gas_withdrawal_volume_rate=0.0_wp
     REAL(wp) :: liquid_withdrawal_volume_rate=0.0_wp
-    REAL(wp) :: continuous_phase_erosion_rate=0.0_wp
-    REAL(wp) :: continuous_phase_deposition_rate=0.0_wp
+    REAL(wp) :: carrier_erosion_rate=0.0_wp
+    REAL(wp) :: carrier_deposition_rate=0.0_wp
     REAL(wp), ALLOCATABLE :: solid_mass_rate(:), add_gas_mass_rate(:)
     REAL(wp), ALLOCATABLE :: solid_erosion_rate(:), solid_deposition_rate(:)
   END TYPE
@@ -402,8 +402,8 @@ CONTAINS
     r%lava_deposit_rate=0.0_wp
     r%gas_withdrawal_volume_rate=0.0_wp
     r%liquid_withdrawal_volume_rate=0.0_wp
-    r%continuous_phase_erosion_rate=0.0_wp
-    r%continuous_phase_deposition_rate=0.0_wp
+    r%carrier_erosion_rate=0.0_wp
+    r%carrier_deposition_rate=0.0_wp
     r%solid_mass_rate=0.0_wp
     r%add_gas_mass_rate=0.0_wp
     r%solid_erosion_rate=0.0_wp

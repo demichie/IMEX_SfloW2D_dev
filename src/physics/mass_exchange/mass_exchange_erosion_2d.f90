@@ -48,14 +48,14 @@ CONTAINS
 
         ! Erodible inventory limits species withdrawal before constructing mass and bed terms.
         CALL eval_erosion_volume_kernel(h,normal_speed,alpha,erodible,dt, &
-                  r%solid_erosion_rate,r%continuous_phase_erosion_rate)
+                  r%solid_erosion_rate,r%carrier_erosion_rate)
         r%solid_mass_rate=rho_s*r%solid_erosion_rate
-        r%mixture_mass_rate=SUM(r%solid_mass_rate)+rho_c_sub*r%continuous_phase_erosion_rate
+        r%mixture_mass_rate=SUM(r%solid_mass_rate)+rho_c_sub*r%carrier_erosion_rate
         CALL mixt_var(qp,Ri,rhom,rhoc,redgrav,cp_sub,cpm)
         substrate_temperature=T_erodible
         IF (erodible_deposit_flag) substrate_temperature=T_flow
         r%energy_rate=substrate_temperature*(SUM(sp_heat_s*r%solid_mass_rate)+ &
-                  rho_c_sub*cp_sub*r%continuous_phase_erosion_rate)
+                  rho_c_sub*cp_sub*r%carrier_erosion_rate)
         r%dB_dt=-SUM(r%solid_erosion_rate)/(1.0_wp-erodible_porosity)
     END SUBROUTINE
 
@@ -120,22 +120,22 @@ CONTAINS
     !> @param[in] erodible Available erodible solid inventory by species [m].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[out] erosion_rate Solid erosion volume fluxes by species [m/s].
-    !> @param[out] continuous_phase_erosion_rate Companion continuous-phase erosion volume flux [m/s].
+    !> @param[out] carrier_erosion_rate Companion carrier erosion volume flux [m/s].
     SUBROUTINE eval_erosion_volume_kernel(r_h, mod_vel, alphas_tot, erodible, dt, &
-              erosion_rate, continuous_phase_erosion_rate)
+              erosion_rate, carrier_erosion_rate)
         REAL(wp), INTENT(IN) :: r_h, mod_vel, alphas_tot, erodible(n_solid), dt
-        REAL(wp), INTENT(OUT) :: erosion_rate(n_solid), continuous_phase_erosion_rate
+        REAL(wp), INTENT(OUT) :: erosion_rate(n_solid), carrier_erosion_rate
 
         IF (erosion_coeff .GT. 0.0_wp) THEN
               CALL eval_erosion_rates(r_h, mod_vel, alphas_tot, erosion_coeff,       &
                         erodible_porosity, erodible_fract(1:n_solid),                    &
                         erodible(1:n_solid), dt, erosion_rate(1:n_solid),                &
-                        continuous_phase_erosion_rate)
+                        carrier_erosion_rate)
 
         ELSE
 
               erosion_rate = 0.0_wp
-              continuous_phase_erosion_rate = 0.0_wp
+              carrier_erosion_rate = 0.0_wp
         END IF
 
     END SUBROUTINE eval_erosion_volume_kernel
@@ -150,18 +150,18 @@ CONTAINS
     !> @param[in] erodible_inventory Available substrate inventory by species [m].
     !> @param[in] time_step Physical time-step duration [s].
     !> @param[out] solid_erosion_rate Capped solid erosion volume fluxes by species [m/s].
-    !> @param[out] continuous_phase_erosion_rate Companion continuous-phase erosion volume flux [m/s].
+    !> @param[out] carrier_erosion_rate Companion carrier erosion volume flux [m/s].
     PURE SUBROUTINE eval_erosion_rates(flow_depth, speed, total_solid_fraction, &
               erosion_coefficient, erodible_porosity, erodible_fraction,            &
               erodible_inventory, time_step, solid_erosion_rate,                    &
-              continuous_phase_erosion_rate)
+              carrier_erosion_rate)
 
         REAL(wp), INTENT(IN) :: flow_depth, speed, total_solid_fraction
         REAL(wp), INTENT(IN) :: erosion_coefficient, erodible_porosity
         REAL(wp), INTENT(IN) :: erodible_fraction(:), erodible_inventory(:)
         REAL(wp), INTENT(IN) :: time_step
         REAL(wp), INTENT(OUT) :: solid_erosion_rate(:)
-        REAL(wp), INTENT(OUT) :: continuous_phase_erosion_rate
+        REAL(wp), INTENT(OUT) :: carrier_erosion_rate
 
         REAL(wp) :: total_erosion, total_solid_erosion
 
@@ -181,7 +181,7 @@ CONTAINS
                   erodible_inventory / time_step))
         total_solid_erosion = SUM(solid_erosion_rate)
         total_erosion = total_solid_erosion / (1.0_wp - erodible_porosity)
-        continuous_phase_erosion_rate = total_erosion * erodible_porosity
+        carrier_erosion_rate = total_erosion * erodible_porosity
 
     END SUBROUTINE eval_erosion_rates
 

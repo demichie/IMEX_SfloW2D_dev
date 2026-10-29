@@ -76,10 +76,10 @@ CONTAINS
             ! A single carrier inventory is shared by pore filling and its
             ! physical loss law. Gas and liquid have distinct laws, but the
             ! admissibility and maximum-packing limits are identical.
-            carrier_volume=MAX(0.0_wp,deposition_rates%continuous_phase_deposition_rate)
+            carrier_volume=MAX(0.0_wp,deposition_rates%carrier_deposition_rate)
             solid_deposition=SUM(MAX(0.0_wp,deposition_rates%solid_deposition_rate))
             solid_erosion=SUM(MAX(0.0_wp,process_rates%solid_erosion_rate))
-            carrier_erosion=MAX(0.0_wp,process_rates%continuous_phase_erosion_rate)
+            carrier_erosion=MAX(0.0_wp,process_rates%carrier_erosion_rate)
 
             ! The process-specific modules determine which carrier is removed.
             ! Mutually exclusive carrier flags ensure that only one loss is active.
@@ -224,10 +224,10 @@ CONTAINS
         total%add_gas_mass_rate=total%add_gas_mass_rate+p%add_gas_mass_rate
         total%solid_erosion_rate=total%solid_erosion_rate+p%solid_erosion_rate
         total%solid_deposition_rate=total%solid_deposition_rate+p%solid_deposition_rate
-        total%continuous_phase_erosion_rate= &
-                  total%continuous_phase_erosion_rate+p%continuous_phase_erosion_rate
-        total%continuous_phase_deposition_rate= &
-                  total%continuous_phase_deposition_rate+p%continuous_phase_deposition_rate
+        total%carrier_erosion_rate= &
+                  total%carrier_erosion_rate+p%carrier_erosion_rate
+        total%carrier_deposition_rate= &
+                  total%carrier_deposition_rate+p%carrier_deposition_rate
         total%dB_dt=total%dB_dt+p%dB_dt
         total%lava_deposit_rate=total%lava_deposit_rate+p%lava_deposit_rate
         total%gas_withdrawal_volume_rate= &
@@ -250,8 +250,8 @@ CONTAINS
         p%add_gas_mass_rate=p%add_gas_mass_rate*factor
         p%solid_erosion_rate=p%solid_erosion_rate*factor
         p%solid_deposition_rate=p%solid_deposition_rate*factor
-        p%continuous_phase_erosion_rate=p%continuous_phase_erosion_rate*factor
-        p%continuous_phase_deposition_rate=p%continuous_phase_deposition_rate*factor
+        p%carrier_erosion_rate=p%carrier_erosion_rate*factor
+        p%carrier_deposition_rate=p%carrier_deposition_rate*factor
         p%dB_dt=p%dB_dt*factor
         p%lava_deposit_rate=p%lava_deposit_rate*factor
         p%gas_withdrawal_volume_rate=p%gas_withdrawal_volume_rate*factor

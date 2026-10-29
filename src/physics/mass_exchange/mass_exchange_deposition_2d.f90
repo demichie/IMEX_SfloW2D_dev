@@ -60,15 +60,15 @@ CONTAINS
         ! Evaluate settling before producing the conservative species, energy and bed terms.
         CALL eval_deposition_volume_kernel(h,T,alphas,alpha,rho_m,rho_c, &
                   dt,r%solid_deposition_rate)
-        r%continuous_phase_deposition_rate=coeff_porosity*SUM(r%solid_deposition_rate)
+        r%carrier_deposition_rate=coeff_porosity*SUM(r%solid_deposition_rate)
         r%solid_mass_rate=-rho_s*r%solid_deposition_rate
-        r%mixture_mass_rate=SUM(r%solid_mass_rate)-rho_c*r%continuous_phase_deposition_rate
+        r%mixture_mass_rate=SUM(r%solid_mass_rate)-rho_c*r%carrier_deposition_rate
         r%energy_rate=T*(SUM(sp_heat_s*r%solid_mass_rate)- &
-                  rho_c*cp_c*r%continuous_phase_deposition_rate)
+                  rho_c*cp_c*r%carrier_deposition_rate)
         IF (gas_flag .AND. n_add_gas>0 .AND. gas_phase_mass_fraction>0.0_wp) &
-                  r%add_gas_mass_rate= -rho_c*r%continuous_phase_deposition_rate* &
+                  r%add_gas_mass_rate= -rho_c*r%carrier_deposition_rate* &
                   gas_species_mass_fraction/gas_phase_mass_fraction
-        r%dB_dt=SUM(r%solid_deposition_rate)+r%continuous_phase_deposition_rate
+        r%dB_dt=SUM(r%solid_deposition_rate)+r%carrier_deposition_rate
     END SUBROUTINE
 
     !> @brief Reject unsupported semi-implicit treatment for deposition.

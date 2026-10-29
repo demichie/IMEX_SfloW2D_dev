@@ -100,14 +100,14 @@ PROGRAM test_source_modules
   CALL assert_close(solid_erosion_rate(1), 0.36_wp, 'first solid erosion rate')
   CALL assert_close(solid_erosion_rate(2), 1.08_wp, 'second solid erosion rate')
   CALL assert_close(continuous_erosion_rate, 0.96_wp,                        &
-       'continuous-phase erosion rate')
+       'carrier erosion rate')
   CALL eval_erosion_rates(2.0_wp, 3.0_wp, 0.2_wp, 0.5_wp, 0.4_wp,          &
        [0.25_wp, 0.75_wp], [0.1_wp, 0.2_wp], 0.5_wp, solid_erosion_rate,    &
        continuous_erosion_rate)
   CALL assert_close(solid_erosion_rate(1), 0.2_wp, 'first erosion inventory cap')
   CALL assert_close(solid_erosion_rate(2), 0.4_wp, 'second erosion inventory cap')
   CALL assert_close(continuous_erosion_rate, 0.4_wp,                        &
-       'capped continuous-phase erosion rate')
+       'capped carrier erosion rate')
   actual = eval_continuous_phase_loss_rate(2.0_wp, 1.0_wp, 0.25_wp, 0.5_wp, &
        0.5_wp, [0.0625_wp, 0.0625_wp], 0.5_wp)
   CALL assert_close(actual, 0.5_wp, 'carrier loss solid-packing cap')

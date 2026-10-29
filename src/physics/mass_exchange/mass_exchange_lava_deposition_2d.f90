@@ -34,11 +34,11 @@ CONTAINS
 
         CALL reset_mass_exchange_rates(r)
         CALL eval_lava_deposition_volume_kernel(depth,T,dt, &
-                  r%continuous_phase_deposition_rate)
-        r%mixture_mass_rate=-rho_l*r%continuous_phase_deposition_rate
+                  r%carrier_deposition_rate)
+        r%mixture_mass_rate=-rho_l*r%carrier_deposition_rate
         r%energy_rate=sp_heat_l*T*r%mixture_mass_rate
-        r%lava_deposit_rate=r%continuous_phase_deposition_rate
-        r%dB_dt=r%continuous_phase_deposition_rate
+        r%lava_deposit_rate=r%carrier_deposition_rate
+        r%dB_dt=r%carrier_deposition_rate
     END SUBROUTINE
 
     !> @brief Reject unsupported semi-implicit treatment for lava deposition.

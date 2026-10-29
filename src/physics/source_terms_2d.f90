@@ -721,8 +721,8 @@ CONTAINS
   !> \param[in] dt Time-step length.
   !> \param[out] erosion_term Per-class substrate erosion rate.
   !> \param[out] deposition_term Per-class deposition rate.
-  !> \param[out] continuous_phase_erosion_term Carrier entrainment rate.
-  !> \param[out] continuous_phase_loss_term Limited carrier loss rate.
+  !> \param[out] carrier_erosion_term Carrier entrainment rate.
+  !> \param[out] carrier_loss_term Limited carrier loss rate.
   !> \param[out] eqns_term Conservative equation source-rate vector.
   !> \param[out] topo_term Proposed bed-elevation rate.
   SUBROUTINE eval_step_source_explicit(qpj,B_zone,B_prime_x,B_prime_y, &

@@ -274,8 +274,8 @@ CONTAINS
           out_of_source_fraction = 1.0_wp - cell_source_fractions(j,k)
           exchange_rates%solid_deposition_rate = exchange_rates%solid_deposition_rate*out_of_source_fraction
           exchange_rates%solid_erosion_rate = exchange_rates%solid_erosion_rate*out_of_source_fraction
-          exchange_rates%continuous_phase_deposition_rate = &
-               exchange_rates%continuous_phase_deposition_rate*out_of_source_fraction
+          exchange_rates%carrier_deposition_rate = &
+               exchange_rates%carrier_deposition_rate*out_of_source_fraction
           eqns_term = eqns_term * out_of_source_fraction
           exchange_rates%dB_dt = exchange_rates%dB_dt*out_of_source_fraction
           exchange_rates%lava_deposit_rate = exchange_rates%lava_deposit_rate*out_of_source_fraction
