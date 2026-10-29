@@ -27,7 +27,7 @@ MODULE mass_exchange_2d
 CONTAINS
 
     !> @brief Coordinate cell-local mass exchange, shared phase budgets and conservative source assembly.
-    !> @details Applies available-phase limits before conservative assembly.
+    !> @details A single gas or liquid carrier inventory is constrained before conservative assembly.
     !> Positive sources never cancel gross withdrawals in a shared inventory.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
@@ -45,10 +45,9 @@ CONTAINS
         TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates,darcy_loss_rates
         REAL(wp) :: alphas(n_solid), alphag(n_add_gas), alphal, alpha
         REAL(wp) :: u,v,h,T,pore,stoch
-        REAL(wp) :: gas_available,liquid_available,gas_factor,liquid_factor
-        REAL(wp) :: gas_withdrawals(2),liquid_withdrawals(2),carrier_volume
-        REAL(wp) :: solid_erosion,carrier_erosion,solid_deposition
-        REAL(wp) :: liquid_loss,gas_loss,packing_factor
+        REAL(wp) :: carrier_available,carrier_factor,carrier_volume,carrier_loss
+        REAL(wp) :: carrier_withdrawals(2),solid_erosion,carrier_erosion
+        REAL(wp) :: solid_deposition,packing_factor
 
         CALL reset_mass_exchange_rates(total_rates)
         eqns_term=0.0_wp
@@ -74,50 +73,49 @@ CONTAINS
             CALL eval_mass_exchange_carrier_liquid_loss_explicit(qp,liquid_loss_rates)
             CALL eval_mass_exchange_carrier_darcy_loss_explicit(qp,darcy_loss_rates)
 
-            ! Resource budgets use gross withdrawals, never signed net mass exchange.
-            ! Gas and liquid are different inventories when both phases are present.
-            ! The solid deposition rate is limited only when its required pore phase
-            ! cannot be supplied; a later Darcy/liquid sink cannot consume it twice.
+            ! A single carrier inventory is shared by pore filling and its
+            ! physical loss law. Gas and liquid have distinct laws, but the
+            ! admissibility and maximum-packing limits are identical.
             carrier_volume=MAX(0.0_wp,deposition_rates%continuous_phase_deposition_rate)
             solid_deposition=SUM(MAX(0.0_wp,deposition_rates%solid_deposition_rate))
             solid_erosion=SUM(MAX(0.0_wp,process_rates%solid_erosion_rate))
             carrier_erosion=MAX(0.0_wp,process_rates%continuous_phase_erosion_rate)
-            gas_loss=MAX(0.0_wp,darcy_loss_rates%gas_withdrawal_volume_rate)
-            liquid_loss=MAX(0.0_wp,liquid_loss_rates%liquid_withdrawal_volume_rate)
-            gas_factor=1.0_wp
-            liquid_factor=1.0_wp
 
-            ! Gas withdrawal and pore filling draw on the same gas inventory;
-            ! do not offset physical sinks with any positive source.
+            ! The process-specific modules determine which carrier is removed.
+            ! Mutually exclusive carrier flags ensure that only one loss is active.
+            carrier_loss=0.0_wp
+
             IF (gas_flag) THEN
 
-                ! Subtract dispersed solids and liquid from the available gas volume.
-                gas_available=h*MAX(0.0_wp,1.0_wp-alpha-alphal)/dt
-                gas_withdrawals=[-carrier_volume,-gas_loss]
-                gas_factor=shared_withdrawal_factor(gas_withdrawals,gas_available)
-
-                ! Erosion increases the mobile solid and carrier volumes.
-                ! Solid deposition reduces both solid volume and total depth:
-                ! the packing constraint must use these coupled increments.
-                packing_factor=packing_withdrawal_factor(h,alpha,solid_erosion, &
-                          carrier_erosion,solid_deposition,carrier_volume, &
-                          gas_loss,0.0_wp,maximum_solid_packing,dt)
-                gas_factor=MIN(gas_factor,packing_factor)
-                CALL scale_process(deposition_rates,gas_factor)
-                CALL scale_process(darcy_loss_rates,gas_factor)
+                carrier_loss=MAX(0.0_wp,darcy_loss_rates%gas_withdrawal_volume_rate)
 
             ELSE
 
-                ! In a liquid-only run, pore filling and prescribed loss share one pool.
-                liquid_available=h*MAX(0.0_wp,1.0_wp-alpha)/dt
-                liquid_withdrawals=[-carrier_volume,-liquid_loss]
-                liquid_factor=shared_withdrawal_factor(liquid_withdrawals,liquid_available)
-                packing_factor=packing_withdrawal_factor(h,alpha,solid_erosion, &
-                          carrier_erosion,solid_deposition,carrier_volume, &
-                          liquid_loss,0.0_wp,maximum_solid_packing,dt)
-                liquid_factor=MIN(liquid_factor,packing_factor)
-                CALL scale_process(deposition_rates,liquid_factor)
-                CALL scale_process(liquid_loss_rates,liquid_factor)
+                carrier_loss=MAX(0.0_wp,liquid_loss_rates%liquid_withdrawal_volume_rate)
+            END IF
+
+            ! The carrier occupies the volume not filled by dispersed solids.
+            ! Limit gross withdrawals independently of positive erosion inputs.
+            carrier_available=h*MAX(0.0_wp,1.0_wp-alpha)/dt
+            carrier_withdrawals=[-carrier_volume,-carrier_loss]
+            carrier_factor=shared_withdrawal_factor(carrier_withdrawals,carrier_available)
+
+            ! The packing constraint acts on the coupled changes in solid and
+            ! total volumes, including the solid removed by deposition.
+            packing_factor=packing_withdrawal_factor(h,alpha,solid_erosion, &
+                      carrier_erosion,solid_deposition,carrier_volume, &
+                      carrier_loss,0.0_wp,maximum_solid_packing,dt)
+            carrier_factor=MIN(carrier_factor,packing_factor)
+
+            CALL scale_process(deposition_rates,carrier_factor)
+
+            IF (gas_flag) THEN
+
+                CALL scale_process(darcy_loss_rates,carrier_factor)
+
+            ELSE
+
+                CALL scale_process(liquid_loss_rates,carrier_factor)
             END IF
 
             ! Assemble only the rates after all common-inventory limiters have acted.
