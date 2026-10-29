@@ -4,6 +4,7 @@ PROGRAM test_grouped_implicit_stage
   USE constitutive_parameters_2d
   USE rheology_parameters_2d, ONLY : T_ref
   USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0
+  USE rheology_voellmy_2d, ONLY : mu, xi, solve_rheology_voellmy_analytic
   USE geometry_2d, ONLY : pi_g
   USE equation_metadata_2d, ONLY : equation_partition_type,                 &
        IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
@@ -22,7 +23,6 @@ PROGRAM test_grouped_implicit_stage
   USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var
   USE pore_pressure_laws_2d, ONLY : solve_pore_pressure_dissipation_analytic
   USE thermal_laws_2d, ONLY : solve_thermal_cooling_analytic
-  USE rheology_lava_2d, ONLY : solve_rheology_lava_analytic
 
   IMPLICIT NONE
 
@@ -73,12 +73,13 @@ PROGRAM test_grouped_implicit_stage
   idx_v = n_vars + 2
   idx_stoch = 0
   rheology_flag = .TRUE.
-  rheology_model='lava'
+  rheology_model='voellmy'
   ! D17 decouples cooling from rheology: enable it in this thermal fixture.
   thermal_cooling_flag=.TRUE.
   pore_pressure_flag = .TRUE.
   gas_flag = .FALSE.
   liquid_flag = .TRUE.
+  lava_flag = .FALSE.
   gas_loss_flag = .FALSE.
   liquid_vaporization_flag = .FALSE.
   erosion_coeff = 0.0_wp
@@ -113,6 +114,8 @@ PROGRAM test_grouped_implicit_stage
   sp_gas_const_a = 287.0_wp
   kin_visc_c = 1.5E-5_wp
   hydraulic_permeability = 1.0E-10_wp
+  mu = 0.3_wp
+  xi = 500.0_wp
   nu_ref = 0.02_wp
   visc_par = 0.003_wp
   tau0 = 0.0_wp
@@ -139,10 +142,10 @@ PROGRAM test_grouped_implicit_stage
   filter_group%method=SOURCE_METHOD_NEWTON
 
   filter_group%source_names=[CHARACTER(LEN=64):: &
-       'rheology_lava', 'thermal_cooling', 'pore_pressure_dissipation']
+       'rheology_voellmy', 'thermal_cooling', 'pore_pressure_dissipation']
   filter_group%equation_ids=[2,3,4,7]
   filter_groups(1)=filter_group
-  filter_groups(1)%source_names=[CHARACTER(LEN=64)::'rheology_lava']
+  filter_groups(1)%source_names=[CHARACTER(LEN=64)::'rheology_voellmy']
   filter_groups(1)%equation_ids=[2,3]
   filter_groups(2)=filter_group
   filter_groups(2)%source_names=[CHARACTER(LEN=64)::'thermal_cooling']
@@ -492,9 +495,10 @@ PROGRAM test_grouped_implicit_stage
        expected_alphag, expected_red_grav, expected_p_dyn,&
        expected_Zs, expected_pore_pressure)
   speed_ratio = 1.0_wp
-  CALL solve_rheology_lava_analytic(dt_step*a_diag, expected_h,            &
-       expected_temperature, expected_density, speed_ratio,                &
-       [expected_u, expected_v], analytic_velocity)
+  CALL solve_rheology_voellmy_analytic(dt_step*a_diag, expected_h,         &
+       speed_ratio, [expected_u, expected_v], expected_density,             &
+       expected_red_grav, grav, 0.0_wp, pore_pressure_flag,               &
+       expected_pore_pressure, .FALSE., 0.0_wp, analytic_velocity)
   CALL solve_imex_stage(partition, source_registry%stage_groups(),          &
        q_stage_check, q_stage_check,             &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
@@ -601,7 +605,7 @@ CONTAINS
     step_group=filter_group
     step_group%id=1
     step_group%source_names=[CHARACTER(LEN=64):: &
-         'rheology_lava','thermal_cooling','pore_pressure_dissipation']
+         'rheology_voellmy','thermal_cooling','pore_pressure_dissipation']
     step_group%equation_ids=[2,3,4,7]
     step_group%cadence=SOURCE_CADENCE_STEP
     CALL step_registry%initialize(n_vars,idx_pore,[source_group_type::], &
