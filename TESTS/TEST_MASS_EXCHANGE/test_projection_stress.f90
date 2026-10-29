@@ -82,6 +82,7 @@ CONTAINS
     kt_trace_reconstruction = 'froude_blend'
     n_vars=nq; n_eqns=nq; n_RK=2
     idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
+    idx_totMassEqn=1; idx_uEqn=2; idx_vEqn=3; idx_engyEqn=4
     idx_solid_first=5; idx_solid_last=6; idx_solidEqn_first=5; idx_solidEqn_last=6
     idx_add_gas_first=7; idx_add_gas_last=6; idx_u=7; idx_v=8; idx_pore=0; idx_stoch=0
     gas_flag=.FALSE.; liquid_flag=.TRUE.; rheology_flag=.FALSE.; rheology_model='none'
