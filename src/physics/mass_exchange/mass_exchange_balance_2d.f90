@@ -5,7 +5,7 @@ MODULE mass_exchange_balance_2d
   USE parameters_2d
   USE constitutive_parameters_2d
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source
-  USE mass_exchange_vaporization_2d, ONLY : eval_mass_exchange_vaporization_explicit
+  USE mass_exchange_vaporization_2d, ONLY : eval_mass_exchange_vaporization_rates_explicit
   USE mass_exchange_lava_deposition_2d, ONLY : eval_mass_exchange_lava_deposition_explicit
   IMPLICIT NONE
   PRIVATE
@@ -39,6 +39,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: continuous_phase_erosion_term, continuous_phase_loss_term
     REAL(wp), INTENT(OUT) :: eqns_term(n_eqns), topo_term
     REAL(wp) :: dep_tot, ers_tot, rho_dep_tot, rho_ers_tot
+    REAL(wp) :: vapor_mass_rate, vapor_component_rate, vapor_energy_rate
 
     eqns_term(1:n_eqns) = 0.0_wp
 
@@ -81,7 +82,12 @@ CONTAINS
     eqns_term(idx_solidEqn_first:idx_solidEqn_last) = rho_s(1:n_solid) *        &
          ( erosion_term(1:n_solid) - deposition_term(1:n_solid) )
 
-    CALL eval_mass_exchange_vaporization_explicit(B_zone, r_T, deposition_term, eqns_term)
+    CALL eval_mass_exchange_vaporization_rates_explicit(B_zone, r_T, deposition_term, &
+         vapor_mass_rate, vapor_component_rate, vapor_energy_rate)
+    eqns_term(1) = eqns_term(1) + vapor_mass_rate
+    eqns_term(4) = eqns_term(4) + vapor_energy_rate
+    IF (gas_flag .AND. liquid_vaporization_flag .AND. B_zone /= 0) &
+         eqns_term(5+n_solid) = eqns_term(5+n_solid) + vapor_component_rate
 
     IF ( stoch_transport_flag) THEN
 
