@@ -21,7 +21,8 @@ MODULE simulation_2d
   USE model_layout_2d, ONLY : model_layout_type
 
   USE parameters_2d, ONLY : wp, n_layers, n_vars, n_eqns, n_solid, n_add_gas, &
-       n_stoch_vars, n_pore_vars, liquid_flag, gas_flag, stochastic_flag
+       n_stoch_vars, n_pore_vars, liquid_flag, gas_flag, stochastic_flag, &
+       configure_canonical_state_indices
 
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,                &
        finalize_nonlinear_solver
@@ -99,6 +100,10 @@ CONTAINS
     CLASS(simulation_context_type), INTENT(INOUT) :: this
 
     CHARACTER(LEN=256) :: source_error
+
+    ! Canonical state indices must be available before any initial-condition
+    ! conversion, including collapsing-volume initialization.
+    CALL configure_canonical_state_indices()
 
     CALL this%model_layout%initialize( n_layers, n_vars, n_eqns, n_solid,   &
          n_add_gas, n_stoch_vars, n_pore_vars )
