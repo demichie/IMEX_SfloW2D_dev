@@ -14,6 +14,7 @@
 !********************************************************************************
 
 MODULE stochastic_module
+    USE parameters_2d, ONLY : idx_totMassEqn
   
   ! external variables
   USE parameters_2d, ONLY : wp, rheology_model, idx_stoch, idx_u, idx_v
@@ -161,7 +162,7 @@ CONTAINS
           k = domain%k_cent(l)
           
           state%qp(idx_stoch,j,k) = this%Z(j,k)
-          state%q(idx_stoch,j,k) = state%q(1,j,k) *                         &
+          state%q(idx_stoch,j,k) = state%q(idx_totMassEqn,j,k) *                         &
                this%Z(j,k)
           
        END DO
@@ -304,16 +305,16 @@ CONTAINS
     IF (stoch_transport_flag) THEN
        ! In wet cells, the OU process starts from the value transported during
        ! the previous timestep. Dry cells retain their independently evolving Z.
-       WHERE (state%q(1,:,:) > EPSILON(1.0_wp))
-          this%Z = state%q(idx_stoch,:,:) / state%q(1,:,:)
+       WHERE (state%q(idx_totMassEqn,:,:) > EPSILON(1.0_wp))
+          this%Z = state%q(idx_stoch,:,:) / state%q(idx_totMassEqn,:,:)
        END WHERE
     END IF
 
     CALL this%update(state, dt)
 
     IF (stoch_transport_flag) THEN
-       WHERE (state%q(1,:,:) > EPSILON(1.0_wp))
-          state%q(idx_stoch,:,:) = state%q(1,:,:) * this%Z
+       WHERE (state%q(idx_totMassEqn,:,:) > EPSILON(1.0_wp))
+          state%q(idx_stoch,:,:) = state%q(idx_totMassEqn,:,:) * this%Z
           state%qp(idx_stoch,:,:) = this%Z
        ELSEWHERE
           state%q(idx_stoch,:,:) = 0.0_wp
@@ -357,7 +358,7 @@ CONTAINS
   CLASS(state_type), INTENT(IN) :: state
   INTEGER, INTENT(IN) :: j, k
 
-  IF (state%q(1,j,k) > EPSILON(1.0_wp)) THEN
+  IF (state%q(idx_totMassEqn,j,k) > EPSILON(1.0_wp)) THEN
      ! qp already stores the physical velocities associated with q. Reusing
      ! them avoids repeating the full thermodynamic conversion in every cell.
      VelocitySquared = state%qp(idx_u,j,k)**2 + state%qp(idx_v,j,k)**2
@@ -381,7 +382,7 @@ END FUNCTION VelocitySquared
     INTEGER, INTENT(IN) :: j, k
     REAL(wp) :: velocity_squared
 
-    IF (state%q(1,j,k) <= EPSILON(1.0_wp)) THEN
+    IF (state%q(idx_totMassEqn,j,k) <= EPSILON(1.0_wp)) THEN
       ! Keep fluctuations available when flow enters a previously dry cell.
       getSigmaNoise = std_max
     ELSEIF ((TRIM(rheology_model) == 'froude') .OR.                        &
