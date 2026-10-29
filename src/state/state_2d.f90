@@ -9,7 +9,8 @@
 !********************************************************************************
 
 MODULE state_2d
-    USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T
+    USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T, &
+       idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
 
   USE constitutive_parameters_2d, ONLY : T_ambient
 
@@ -187,11 +188,11 @@ CONTAINS
        CALL clip_roundoff_negative_component_masses(q_cell)
        
        
-       negative_thickness_check:IF ( q_cell(1) .LT. EPSILON(1.0_wp) ) THEN
+       negative_thickness_check:IF ( q_cell(idx_totMassEqn) .LT. EPSILON(1.0_wp) ) THEN
 
-          IF ( q_cell(1) .GT. -1.0E-7_wp ) THEN
+          IF ( q_cell(idx_totMassEqn) .GT. -1.0E-7_wp ) THEN
 
-             q_cell(1) = 0.0_wp
+             q_cell(idx_totMassEqn) = 0.0_wp
              q_cell(2:n_vars) = 0.0_wp
 
           ELSE
@@ -201,7 +202,7 @@ CONTAINS
 
        END IF negative_thickness_check
 
-       negative_alpha_check:IF ( ANY(q_cell(5:4+n_solid) .LT. 0.0_wp ) ) THEN
+       negative_alpha_check:IF ( ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last) .LT. 0.0_wp ) ) THEN
           CALL fatal_error('negative solid mass after IMEX Runge-Kutta update')
        END IF negative_alpha_check
 
@@ -223,23 +224,23 @@ CONTAINS
 
        END IF
           
-       IF ( SUM(q_cell(5:4+n_solid)) .GT. q_cell(1) ) THEN
+       IF ( SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) .GT. q_cell(idx_totMassEqn) ) THEN
 
           ! Fortran does not guarantee short-circuit evaluation of .OR.;
           ! evaluate the relative excess only when the denominator is safe.
-          IF ( q_cell(1) .LT. EPSILON(1.0_wp) ) THEN
+          IF ( q_cell(idx_totMassEqn) .LT. EPSILON(1.0_wp) ) THEN
              solid_excess_roundoff = .TRUE.
           ELSE
-             solid_excess_roundoff = ( ( SUM(q_cell(5:4+n_solid))             &
-                  - q_cell(1) ) / q_cell(1) .LT. 1.0E-10_wp )
+             solid_excess_roundoff = ( ( SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last))             &
+                  - q_cell(idx_totMassEqn) ) / q_cell(idx_totMassEqn) .LT. 1.0E-10_wp )
           END IF
 
           IF ( solid_excess_roundoff ) THEN
 
              CALL qc_to_qp(q_previous , qp_cell , p_dyn )
 
-             q_cell(5:4+n_solid) = q_cell(5:4+n_solid)                            &
-                  / SUM(q_cell(5:4+n_solid)) * q_cell(1)
+             q_cell(idx_solidEqn_first:idx_solidEqn_last) = q_cell(idx_solidEqn_first:idx_solidEqn_last)                            &
+                  / SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) * q_cell(idx_totMassEqn)
 
           ELSE
              CALL fatal_error('solid mass exceeds total mass after IMEX update')

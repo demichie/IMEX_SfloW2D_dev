@@ -6,7 +6,7 @@
 !********************************************************************************
 
 MODULE step_source_executor_2d
-    USE parameters_2d, ONLY : idx_totMassEqn
+    USE parameters_2d, ONLY : idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
 
   USE diagnostics_2d, ONLY : fatal_error
   USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, mass_exchange_rates_type
@@ -59,7 +59,7 @@ CONTAINS
     REAL(wp) :: r_sp_heat_c, r_sp_heat_mix
 
     q_cell(1:n_eqns) = q_cell(1:n_eqns) + time_step * equation_rate
-    q_cell(5:4+n_solid) = MAX(0.0_wp, q_cell(5:4+n_solid))
+    q_cell(idx_solidEqn_first:idx_solidEqn_last) = MAX(0.0_wp, q_cell(idx_solidEqn_first:idx_solidEqn_last))
 
     deposit_inventory = deposit_inventory + time_step * deposition_rate
     erosion_inventory = erosion_inventory + time_step * erosion_rate
@@ -69,28 +69,28 @@ CONTAINS
        erodible_inventory = erodible_inventory + time_step * deposition_rate
     END IF
 
-    IF (ANY(q_cell(5:4+n_solid) .LT. 0.0_wp)) THEN
+    IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last) .LT. 0.0_wp)) THEN
        CALL fatal_error('negative solid mass after mass exchange')
     END IF
 
-    IF (q_cell(1) .LE. 0.0_wp) THEN
-       IF (q_cell(1) .GT. -1.0E-10_wp) THEN
+    IF (q_cell(idx_totMassEqn) .LE. 0.0_wp) THEN
+       IF (q_cell(idx_totMassEqn) .GT. -1.0E-10_wp) THEN
           q_cell(1:n_vars) = 0.0_wp
        ELSE
           CALL fatal_error('negative total mass after mass exchange')
        END IF
     END IF
 
-    IF (SUM(q_cell(5:4+n_solid)) .GT. q_cell(1)) THEN
-       IF (q_cell(1) .LT. 1.0e-10_wp) THEN
-          q_cell(5:4+n_solid) = q_cell(5:4+n_solid)                   &
-               / SUM(q_cell(5:4+n_solid)) * q_cell(1)
+    IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) .GT. q_cell(idx_totMassEqn)) THEN
+       IF (q_cell(idx_totMassEqn) .LT. 1.0e-10_wp) THEN
+          q_cell(idx_solidEqn_first:idx_solidEqn_last) = q_cell(idx_solidEqn_first:idx_solidEqn_last)                   &
+               / SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) * q_cell(idx_totMassEqn)
        ELSE
           CALL fatal_error('solid mass exceeds total mass after mass exchange')
        END IF
     END IF
 
-    IF (q_cell(1) .GT. 0.0_wp) THEN
+    IF (q_cell(idx_totMassEqn) .GT. 0.0_wp) THEN
        CALL qc_to_qp(q_cell, qp_cell, p_dyn, TRIM(closure_context) // ' final state')
        CALL mixt_var(qp_cell, r_Ri, r_rho_m, r_rho_c, r_red_grav,       &
             r_sp_heat_c, r_sp_heat_mix)
