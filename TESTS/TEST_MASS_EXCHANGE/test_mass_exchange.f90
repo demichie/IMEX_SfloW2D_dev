@@ -117,6 +117,7 @@ CONTAINS
     n_vars=nq; n_eqns=nq; n_RK=2
     n_thickness_levels=1; n_dyn_pres_levels=1
     idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
+     idx_totMassEqn=1; idx_uEqn=2; idx_vEqn=3; idx_engyEqn=4
     idx_solid_first=5; idx_solid_last=6
     idx_solidEqn_first=5; idx_solidEqn_last=6
     idx_add_gas_first=7; idx_add_gas_last=6
