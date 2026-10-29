@@ -20,7 +20,7 @@
 
     ! Branch on the real base state, but retain imaginary perturbations in the
     ! algebra below so the COMPLEX wrapper can supply complex-step derivatives.
-    is_wet = REAL(qj(1), wp) .GT. EPSILON(1.0_wp)
+    is_wet = REAL(qj(idx_totMassEqn), wp) .GT. EPSILON(1.0_wp)
 
     IF ( .NOT. is_wet ) THEN
 
@@ -38,8 +38,8 @@
 
     END IF
 
-    ! The dry return above must precede every division by column mass M=qj(1).
-    inv_qj1 = 1.0_wp / qj(1)
+    ! The dry return above must precede every division by column mass M=qj(idx_totMassEqn).
+    inv_qj1 = 1.0_wp / qj(idx_totMassEqn)
 
     xs(1:n_solid) = qj(idx_solid_first:idx_solid_last) * inv_qj1
 
@@ -58,11 +58,11 @@
          ! OUT
          xc, mixture_sp_heat_c, sp_heat_mix)
 
-    ! qj(4)=M*cp*T contains thermal energy only, with no kinetic-energy term.
+    ! qj(idx_engyEqn)=M*cp*T contains thermal energy only, with no kinetic-energy term.
     ! The near-dry temperature fallback avoids amplification by negligible mass.
-    IF ( REAL(qj(1), wp) .GT. eps_sing ) THEN
+    IF ( REAL(qj(idx_totMassEqn), wp) .GT. eps_sing ) THEN
 
-       T = qj(4) / ( qj(1) * sp_heat_mix )
+       T = qj(idx_engyEqn) / ( qj(idx_totMassEqn) * sp_heat_mix )
 
        IF ( REAL(T, wp) .LE. 0.0_wp ) T = T_ambient
 
@@ -78,6 +78,6 @@
          ! OUT
          rho_m, inv_rhom, rho_c, inv_rho_c, alphas, alphag)
 
-    h = qj(1) * inv_rhom
+    h = qj(idx_totMassEqn) * inv_rhom
 
     CALL velocity_from_conservative(qj, u, v)
