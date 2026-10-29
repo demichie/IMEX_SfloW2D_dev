@@ -27,6 +27,7 @@ CONTAINS
          r%continuous_phase_deposition_rate)
     r%mixture_mass_rate=-rho_l*r%continuous_phase_deposition_rate
     r%energy_rate=sp_heat_l*T*r%mixture_mass_rate
+    r%lava_deposit_rate=r%continuous_phase_deposition_rate
     r%dB_dt=r%continuous_phase_deposition_rate
   END SUBROUTINE
 

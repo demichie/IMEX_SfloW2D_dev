@@ -163,6 +163,7 @@ CONTAINS
     total%continuous_phase_deposition_rate= &
          total%continuous_phase_deposition_rate+p%continuous_phase_deposition_rate
     total%dB_dt=total%dB_dt+p%dB_dt
+    total%lava_deposit_rate=total%lava_deposit_rate+p%lava_deposit_rate
   END SUBROUTINE accumulate_process
 
   SUBROUTINE scale_process(p,factor)
@@ -178,5 +179,6 @@ CONTAINS
     p%continuous_phase_erosion_rate=p%continuous_phase_erosion_rate*factor
     p%continuous_phase_deposition_rate=p%continuous_phase_deposition_rate*factor
     p%dB_dt=p%dB_dt*factor
+    p%lava_deposit_rate=p%lava_deposit_rate*factor
   END SUBROUTINE scale_process
 END MODULE mass_exchange_2d

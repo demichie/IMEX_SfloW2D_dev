@@ -278,6 +278,7 @@ CONTAINS
                exchange_rates%continuous_phase_deposition_rate*out_of_source_fraction
           eqns_term = eqns_term * out_of_source_fraction
           exchange_rates%dB_dt = exchange_rates%dB_dt*out_of_source_fraction
+          exchange_rates%lava_deposit_rate = exchange_rates%lava_deposit_rate*out_of_source_fraction
        END IF
 
        CALL apply_mass_exchange_increment(q(1:n_vars,j,k),                 &
@@ -285,7 +286,7 @@ CONTAINS
             exchange_rates%solid_erosion_rate, deposit(j,k,1:n_solid), erosion(j,k,1:n_solid),  &
             erodible(1:n_solid,j,k), erodible_deposit_flag, closure_context)
 
-       IF (lava_flag) lava_deposit(j,k)=lava_deposit(j,k)+time_step*exchange_rates%continuous_phase_deposition_rate
+       lava_deposit(j,k)=lava_deposit(j,k)+time_step*exchange_rates%lava_deposit_rate
        IF (topo_change_flag) CALL record_topography_rate_cell(j, k, exchange_rates%dB_dt)
 
     END DO

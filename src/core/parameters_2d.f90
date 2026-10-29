@@ -20,6 +20,7 @@ MODULE parameters_2d
   TYPE mass_exchange_rates_type
     REAL(wp) :: mixture_mass_rate=0.0_wp, liquid_mass_rate=0.0_wp
     REAL(wp) :: energy_rate=0.0_wp, dB_dt=0.0_wp
+    REAL(wp) :: lava_deposit_rate=0.0_wp
     REAL(wp) :: continuous_phase_erosion_rate=0.0_wp
     REAL(wp) :: continuous_phase_deposition_rate=0.0_wp
     REAL(wp), ALLOCATABLE :: solid_mass_rate(:), add_gas_mass_rate(:)
@@ -396,6 +397,7 @@ CONTAINS
     r%liquid_mass_rate=0.0_wp
     r%energy_rate=0.0_wp
     r%dB_dt=0.0_wp
+    r%lava_deposit_rate=0.0_wp
     r%continuous_phase_erosion_rate=0.0_wp
     r%continuous_phase_deposition_rate=0.0_wp
     r%solid_mass_rate=0.0_wp
