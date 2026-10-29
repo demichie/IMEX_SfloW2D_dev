@@ -85,7 +85,10 @@ PROGRAM probe_sources
   idx_addGasEqn_first=idx_add_gas_first; idx_addGasEqn_last=idx_add_gas_last
   idx_pore=n_vars; idx_poreEqn=n_vars; idx_stoch=0; idx_stochEqn=0
   idx_u=n_vars+1; idx_v=n_vars+2
-  liquid_flag=.NOT.gas_flag; stoch_transport_flag=.FALSE.
+  lava_flag=(TRIM(rheology_model)=='lava')
+  liquid_flag=.NOT.gas_flag .AND. .NOT.lava_flag
+  IF (lava_flag) gas_flag=.FALSE.
+  stoch_transport_flag=.FALSE.
   ALLOCATE(rho_s(solids),inv_rho_s(solids),sp_heat_s(solids),diam_s(solids),sphericity_s(solids))
   ALLOCATE(sp_heat_g(0),sp_gas_const_g(0))
   rho_s=2500.0_wp; sp_heat_s=900.0_wp; diam_s=1.0E-4_wp; sphericity_s=0.8_wp
