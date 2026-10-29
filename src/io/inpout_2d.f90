@@ -211,7 +211,7 @@ MODULE inpout_2d
   INTEGER, PARAMETER :: output_manifest_unit = 29
   CHARACTER(LEN=16), PARAMETER :: restart_format_magic = 'IMEX_SFLOW2D_RST'
   ! Version 5 adds self-contained runout and steady-stop diagnostic history.
-  INTEGER, PARAMETER :: restart_format_version = 6
+  INTEGER, PARAMETER :: restart_format_version = 7
 
   !> Counter for the output files
   INTEGER :: output_idx
@@ -7828,7 +7828,7 @@ END IF
                              n_pore_vars
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex, erodible,  &
                            deposit, erosion, lava_deposit
-    USE parameters_2d, ONLY: stochastic_flag, topo_change_flag
+    USE parameters_2d, ONLY: stochastic_flag, topo_change_flag, gas_flag, liquid_flag, lava_flag
 
     IMPLICIT NONE
     CHARACTER(LEN=*), INTENT(IN) :: filename
@@ -7857,7 +7857,7 @@ END IF
          n_pore_vars, n_thickness_levels, n_dyn_pres_levels
     CALL check_restart_io(ierr, io_message, 'writing dimensions to', filename)
     WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic_flag,        &
-         topo_change_flag
+         topo_change_flag, gas_flag, liquid_flag, lava_flag
     CALL check_restart_io(ierr, io_message, 'writing model flags to', filename)
 
     WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) runtime%t, runtime%dt,  &
@@ -7965,7 +7965,7 @@ END IF
                              n_pore_vars
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex, erodible,  &
                            deposit, erosion, lava_deposit
-    USE parameters_2d, ONLY: stochastic_flag, topo_change_flag
+    USE parameters_2d, ONLY: stochastic_flag, topo_change_flag, gas_flag, liquid_flag, lava_flag
     USE geometry_2d, ONLY: refresh_topography_geometry
 
     IMPLICIT NONE
@@ -7981,6 +7981,7 @@ END IF
     INTEGER :: seed_size, current_seed_size
     INTEGER, ALLOCATABLE :: random_seed_state(:)
     LOGICAL :: stochastic_check, topo_change_check, runout_check
+    LOGICAL :: gas_check, liquid_check, lava_check
     REAL(wp) :: dt_runout_check, eps_stop_check, threshold_check, origin_check(2)
     CHARACTER(LEN=16) :: format_magic
     CHARACTER(LEN=256) :: io_message
@@ -8024,11 +8025,13 @@ END IF
     END IF
 
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) stochastic_check,        &
-         topo_change_check
+         topo_change_check, gas_check, liquid_check, lava_check
     CALL check_restart_io(ierr, io_message, 'reading model flags from', filename)
     IF (stochastic_check .NEQV. stochastic_flag .OR.                       &
-         topo_change_check .NEQV. topo_change_flag) THEN
-      WRITE(*,*) 'ERROR: Restart stochastic/topography flags do not match.'
+         topo_change_check .NEQV. topo_change_flag .OR.                      &
+         gas_check .NEQV. gas_flag .OR. liquid_check .NEQV. liquid_flag .OR.  &
+         lava_check .NEQV. lava_flag) THEN
+      WRITE(*,*) 'ERROR: Restart carrier/stochastic/topography flags do not match.'
       ERROR STOP 1
     END IF
 
