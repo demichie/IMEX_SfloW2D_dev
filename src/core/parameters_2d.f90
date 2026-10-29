@@ -11,6 +11,12 @@
 MODULE parameters_2d
 
   IMPLICIT NONE
+  INTEGER, PARAMETER :: sp = Selected_Real_Kind (P=6,R=37)
+  INTEGER, PARAMETER :: dp = Selected_Real_Kind (P=15,R=307)
+
+  !> working precision
+  INTEGER, PARAMETER :: wp = dp
+
   TYPE mass_exchange_rates_type
     REAL(wp) :: mixture_mass_rate=0.0_wp, liquid_mass_rate=0.0_wp
     REAL(wp) :: energy_rate=0.0_wp, dB_dt=0.0_wp
@@ -21,11 +27,7 @@ MODULE parameters_2d
   END TYPE
 
 
-  INTEGER, PARAMETER :: sp = Selected_Real_Kind (P=6,R=37)
-  INTEGER, PARAMETER :: dp = Selected_Real_Kind (P=15,R=307)
 
-  !> working precision
-  INTEGER, PARAMETER :: wp = dp
 
   REAL(wp), PARAMETER :: xinf = HUGE(0.0_wp)
   

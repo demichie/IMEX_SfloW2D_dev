@@ -24,8 +24,8 @@ CONTAINS
     REAL(wp) :: alphas(n_solid),alphag(n_add_gas),alphal,alpha
     REAL(wp) :: u,v,w,speed2,h,T,pore,stoch
     REAL(wp) :: Ri,rhom,rhoc,redgrav,cpc,cpm,substrate_T
-    REAL(wp) :: species(n_add_gas),gas_fraction,liq_loss,darcy_loss,carrier_dep
-    REAL(wp) :: demand,available,factor
+    REAL(wp) :: species(n_add_gas),gas_fraction,carrier_dep
+    REAL(wp) :: available,factor,withdrawal_rates(3)
     LOGICAL :: solids_enabled,loss_enabled
     CALL reset_mass_exchange_rates(rates)
     eq=0.0_wp
@@ -78,15 +78,16 @@ CONTAINS
          species,gas_fraction,darcy_rates)
     ! ONE limiter for all processes drawing on the same continuous-phase pool.
     ! Never apply available inventory independently to competing processes.
-    liq_loss=MAX(0.0_wp,-liquid_rates%mixture_mass_rate/rhoc)
-    darcy_loss=MAX(0.0_wp,-darcy_rates%mixture_mass_rate/rhoc)
     carrier_dep=deposit_rates%continuous_phase_deposition_rate
-    demand=carrier_dep+liq_loss+darcy_loss
+    ! Signed physical volume rates: withdrawals are negative, additions positive.
+    ! Independent positive additions must NEVER cancel simultaneous withdrawals.
+    ! These three processes consume the same carrier-phase inventory.
+    withdrawal_rates=[-carrier_dep, &
+         liquid_rates%mixture_mass_rate/rhoc, darcy_rates%mixture_mass_rate/rhoc]
     available=MIN(h*MAX(0.0_wp,maximum_solid_packing-alpha)/dt, &
          MAX(0.0_wp,(h*(1.0_wp-alpha)-coeff_porosity* &
          (h*alpha-dt*SUM(deposit_rates%solid_deposition_rate)))/dt))
-    factor=1.0_wp
-    IF (demand>available .AND. demand>0.0_wp) factor=available/demand
+    factor=shared_withdrawal_factor(withdrawal_rates,available)
     CALL scale_process(deposit_rates,factor)
     CALL scale_process(liquid_rates,factor)
     CALL scale_process(darcy_rates,factor)
@@ -103,6 +104,17 @@ CONTAINS
     IF (pore_pressure_flag) eq(idx_poreEqn)= &
          eval_pore_pressure_mass_exchange_source(eq(1),pore)
   END SUBROUTINE eval_mass_exchange_terms
+
+  ! Limit simultaneous withdrawal demands from one physical inventory.
+  ! Positive source rates are excluded from the budget, not netted against sinks.
+  PURE REAL(wp) FUNCTION shared_withdrawal_factor(signed_rates,available) RESULT(f)
+    REAL(wp), INTENT(IN) :: signed_rates(:),available
+    REAL(wp) :: total_withdrawal
+    total_withdrawal=SUM(MAX(0.0_wp,-signed_rates))
+    f=1.0_wp
+    IF (total_withdrawal>0.0_wp) &
+         f=MIN(1.0_wp,MAX(0.0_wp,available)/total_withdrawal)
+  END FUNCTION shared_withdrawal_factor
 
   SUBROUTINE accumulate_process(p,u,v,total,eq)
     TYPE(mass_exchange_rates_type), INTENT(IN) :: p

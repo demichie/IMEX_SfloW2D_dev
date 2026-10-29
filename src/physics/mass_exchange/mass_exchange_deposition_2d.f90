@@ -23,7 +23,8 @@ CONTAINS
 
 
 
-  SUBROUTINE eval_mass_exchange_deposition_explicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,gas_species_mass_fraction,gas_phase_mass_fraction,r)
+  SUBROUTINE eval_mass_exchange_deposition_explicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt, &
+       gas_species_mass_fraction,gas_phase_mass_fraction,r)
     REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
     REAL(wp), INTENT(IN) :: gas_species_mass_fraction(n_add_gas)
     REAL(wp), INTENT(IN) :: gas_phase_mass_fraction
@@ -42,7 +43,8 @@ CONTAINS
     r%dB_dt=SUM(r%solid_deposition_rate)+r%continuous_phase_deposition_rate
   END SUBROUTINE
 
-  SUBROUTINE eval_mass_exchange_deposition_semi_implicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,gas_species_mass_fraction,gas_phase_mass_fraction,r)
+  SUBROUTINE eval_mass_exchange_deposition_semi_implicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt, &
+       gas_species_mass_fraction,gas_phase_mass_fraction,r)
     REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
     REAL(wp), INTENT(IN) :: gas_species_mass_fraction(n_add_gas)
     REAL(wp), INTENT(IN) :: gas_phase_mass_fraction
@@ -51,7 +53,8 @@ CONTAINS
     CALL fatal_error('deposition: unsupported physical treatment')
   END SUBROUTINE eval_mass_exchange_deposition_semi_implicit
 
-  SUBROUTINE eval_mass_exchange_deposition_implicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt,gas_species_mass_fraction,gas_phase_mass_fraction,r)
+  SUBROUTINE eval_mass_exchange_deposition_implicit(h,T,alphas,alpha,rho_m,rho_c,cp_c,dt, &
+       gas_species_mass_fraction,gas_phase_mass_fraction,r)
     REAL(wp), INTENT(IN) :: h,T,alphas(n_solid),alpha,rho_m,rho_c,cp_c,dt
     REAL(wp), INTENT(IN) :: gas_species_mass_fraction(n_add_gas)
     REAL(wp), INTENT(IN) :: gas_phase_mass_fraction
