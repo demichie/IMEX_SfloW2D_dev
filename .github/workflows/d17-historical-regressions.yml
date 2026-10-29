@@ -21,6 +21,10 @@ jobs:
           - TEST_CURVATURE_SOURCE
           - TEST_RHEOLOGY_FROUDE
           - TEST_RHEOLOGY_CELL_LOCAL
+          - TEST_STATE_CONVERSION
+          - TEST_STATE_INITIALIZATION
+          - TEST_STOCHASTIC_EVOLUTION
+          - TEST_WORKSPACE_LIFECYCLE
     steps:
       - name: Checkout target branch
         uses: actions/checkout@v4
