@@ -71,6 +71,7 @@ CONTAINS
             CMPLX(mod_vel,0.0_wp,wp), CMPLX(rhom,0.0_wp,wp), moving, ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_empirical_explicit
+
     !> \brief Evaluate the semi-implicit empirical momentum contribution.
     !> \details Evaluate the contribution of the empirical basal-friction parameterization assigned to this treatment. The returned rates act on the conservative horizontal momenta; zero-valued implementations intentionally provide no contribution.
     !> \param[out] rate_x x component of momentum source rate.
@@ -81,6 +82,7 @@ CONTAINS
         rate_x = 0.0_wp
         rate_y = 0.0_wp
     END SUBROUTINE eval_rheology_empirical_semi_implicit
+
     !> \brief Evaluate the implicit empirical momentum contribution.
     !> \details Evaluate the part of the empirical basal-friction parameterization assigned to the implicit treatment. Complex-valued arguments retain complex-step sensitivities where implemented; zero-valued implementations intentionally contribute no term.
     !> \param[in] h Flow depth [m].
@@ -107,6 +109,7 @@ CONTAINS
         rate_x = -rhom * friction_coefficient * (u / mod_hor_vel)
         rate_y = -rhom * friction_coefficient * (v / mod_hor_vel)
     END SUBROUTINE eval_rheology_empirical_implicit
+
     !> \brief Integrate the empirical velocity source over a frozen-state substep.
     !> \details Evaluate the exact or time-integral-based decay of horizontal speed under the empirical basal-friction parameterization. The velocity direction is retained and the updated components are returned without evolving the frozen thermodynamic and geometric inputs.
     !> \param[in] dt Duration of the analytic source substep [s].

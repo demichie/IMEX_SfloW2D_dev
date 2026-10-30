@@ -40,8 +40,10 @@ CONTAINS
     !> \return Kinematic viscosity [m2/s].
     PURE REAL(wp) FUNCTION lava_kinematic_viscosity(T) RESULT(nu)
         REAL(wp), INTENT(IN) :: T
+
         nu=nu_ref*EXP(-visc_par*(T-T_ref))
     END FUNCTION lava_kinematic_viscosity
+
     !> \brief Evaluate the explicit lava momentum contribution.
     !> \details Assemble the real-valued momentum source from the model's supported physical treatment contributions; unused model inputs are retained for the shared dispatch interface.
     !> \param[in] h Flow depth [m].
@@ -91,6 +93,7 @@ CONTAINS
             CMPLX(v,0.0_wp,wp), moving, ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_lava_explicit
+
     !> \brief Evaluate the semi-implicit lava momentum contribution.
     !> \details Evaluate the contribution of temperature-dependent viscous drag and a yield-stress contribution assigned to this treatment. The returned rates act on the conservative horizontal momenta; zero-valued implementations intentionally provide no contribution.
     !> \param[in] u Depth-averaged x velocity [m s^-1].
@@ -108,6 +111,7 @@ CONTAINS
         rate_x = -tau0 * u / mod_vel
         rate_y = -tau0 * v / mod_vel
     END SUBROUTINE eval_rheology_lava_semi_implicit
+
     !> \brief Evaluate the implicit lava momentum contribution.
     !> \details Evaluate the part of temperature-dependent viscous drag and a yield-stress contribution assigned to the implicit treatment. Complex-valued arguments retain complex-step sensitivities where implemented; zero-valued implementations intentionally contribute no term.
     !> \param[in] h Flow depth [m].
@@ -144,6 +148,7 @@ CONTAINS
         END IF
 
     END SUBROUTINE eval_rheology_lava_implicit
+
     !> \brief Integrate the lava velocity source over a frozen-state substep.
     !> \details Evaluate the exact or time-integral-based decay of horizontal speed under temperature-dependent viscous drag and a yield-stress contribution. The velocity direction is retained and the updated components are returned without evolving the frozen thermodynamic and geometric inputs.
     !> \param[in] dt Duration of the analytic source substep [s].

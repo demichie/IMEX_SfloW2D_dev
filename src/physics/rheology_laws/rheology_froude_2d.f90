@@ -71,6 +71,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy, curvature_accel
         COMPLEX(wp) :: ix, iy
+
         curvature_accel=0.0_wp
 
         IF (curvature_term) curvature_accel=B_second_xx*u**2 + &
@@ -83,6 +84,7 @@ CONTAINS
             ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_froude_explicit
+
     !> \brief Evaluate the semi-implicit froude momentum contribution.
     !> \details Evaluate the contribution of a Froude-dependent basal friction law assigned to this treatment. The returned rates act on the conservative horizontal momenta; zero-valued implementations intentionally provide no contribution.
     !> \param[in] h Flow depth [m].
@@ -130,6 +132,7 @@ CONTAINS
         END IF
 
     END SUBROUTINE eval_rheology_froude_semi_implicit
+
     !> \brief Evaluate the implicit froude momentum contribution.
     !> \details Evaluate the part of a Froude-dependent basal friction law assigned to the implicit treatment. Complex-valued arguments retain complex-step sensitivities where implemented; zero-valued implementations intentionally contribute no term.
     !> \param[out] rate_x x component of momentum source rate.
@@ -140,6 +143,7 @@ CONTAINS
         rate_x = CMPLX(0.0_wp,0.0_wp,wp)
         rate_y = CMPLX(0.0_wp,0.0_wp,wp)
     END SUBROUTINE eval_rheology_froude_implicit
+
     !> \brief Integrate the froude velocity source over a frozen-state substep.
     !> \details Evaluate the exact or time-integral-based decay of horizontal speed under a Froude-dependent basal friction law. The velocity direction is retained and the updated components are returned without evolving the frozen thermodynamic and geometric inputs.
     !> \param[in] dt Duration of the analytic source substep [s].

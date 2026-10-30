@@ -112,6 +112,7 @@ CONTAINS
             CMPLX(alphas,0.0_wp,wp), moving, ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_lahar_explicit
+
     !> \brief Evaluate the semi-implicit lahar momentum contribution.
     !> \details Evaluate the contribution of temperature-dependent carrier viscosity, turbulent resistance and a concentration-dependent yield stress assigned to this treatment. The returned rates act on the conservative horizontal momenta; zero-valued implementations intentionally provide no contribution.
     !> \param[in] h Flow depth [m].
@@ -149,6 +150,7 @@ CONTAINS
         rate_x = -friction_term * u / mod_hor_vel
         rate_y = -friction_term * v / mod_hor_vel
     END SUBROUTINE eval_rheology_lahar_semi_implicit
+
     !> \brief Evaluate the implicit lahar momentum contribution.
     !> \details Evaluate the part of temperature-dependent carrier viscosity, turbulent resistance and a concentration-dependent yield stress assigned to the implicit treatment. Complex-valued arguments retain complex-step sensitivities where implemented; zero-valued implementations intentionally contribute no term.
     !> \param[in] h Flow depth [m].
@@ -206,6 +208,7 @@ CONTAINS
         rate_x = -u * friction_term
         rate_y = -v * friction_term
     END SUBROUTINE eval_rheology_lahar_implicit
+
     !> \brief Integrate the lahar velocity source over a frozen-state substep.
     !> \details Evaluate the exact or time-integral-based decay of horizontal speed under temperature-dependent carrier viscosity, turbulent resistance and a concentration-dependent yield stress. The velocity direction is retained and the updated components are returned without evolving the frozen thermodynamic and geometric inputs.
     !> \param[in] dt Duration of the analytic source substep [s].
@@ -259,6 +262,7 @@ CONTAINS
                 speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_lahar_analytic
+
     !> \brief Evaluate the lahar carrier-fluid viscosity.
     !> \details Apply the piecewise temperature correlation and the exponential solid-concentration factor; the complex overload preserves complex-step derivatives.
     !> \param[in] T Mixture temperature [K].
@@ -273,6 +277,7 @@ CONTAINS
                 CMPLX(T,0.0_wp,wp),CMPLX(alphas_tot,0.0_wp,wp))
         fluid_viscosity = REAL(complex_viscosity,wp)
     END FUNCTION eval_lahar_fluid_viscosity_real
+
     !> \brief Evaluate the lahar carrier-fluid viscosity.
     !> \details Apply the piecewise temperature correlation and the exponential solid-concentration factor; the complex overload preserves complex-step derivatives.
     !> \param[in] T Mixture temperature [K].

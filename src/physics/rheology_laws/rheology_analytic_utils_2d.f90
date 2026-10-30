@@ -43,6 +43,7 @@ CONTAINS
         CALL fatal_error(message)
 
     END SUBROUTINE fatal_analytic_input_error
+
     !> \brief Validate inputs to a module-level exact velocity solve.
     !> \details Reject negative integration time, invalid depth or speed ratio, and nonfinite input before analytical source integration.
     !> \param[in] dt Exact-flow interval [s].
@@ -83,6 +84,7 @@ CONTAINS
         END IF
 
     END SUBROUTINE validate_analytic_velocity_inputs
+
     !> \brief Integrate a frozen-coefficient, direction-preserving velocity source.
     !> \details Simple constant, linear, affine, and quadratic laws use explicit
     !>          exact-flow formulas. Other supported laws are advanced by
@@ -221,6 +223,7 @@ CONTAINS
         END SELECT
 
     END SUBROUTINE solve_exact_velocity_flow
+
     !> \brief Select the largest real root of a quadratic in a closed interval.
     !> \param[in] a Quadratic coefficient in a*x**2+b*x+c=0.
     !> \param[in] b Linear coefficient in a*x**2+b*x+c=0.
@@ -291,6 +294,7 @@ CONTAINS
         END DO
 
     END SUBROUTINE solve_quadratic_in_interval
+
     !> \brief Select the largest real root of a cubic in a closed interval.
     !> \param[in] a Cubic coefficient in a*x**3+b*x**2+c*x+d=0.
     !> \param[in] b Quadratic coefficient in a*x**3+b*x**2+c*x+d=0.
@@ -369,6 +373,7 @@ CONTAINS
         END DO
 
     END SUBROUTINE solve_cubic_in_interval
+
     !> \brief Evaluate the principal real branch of Lambert W.
     !> \details Uses Halley's iteration to evaluate the special function defined
     !> by \f$W\exp(W)=x\f$ for \f$x\ge-1/e\f$.
@@ -437,6 +442,7 @@ CONTAINS
         END DO
 
     END SUBROUTINE lambert_w0
+
     !> \brief Advance a polynomial drag law c + a*r + b*r**2.
     !> \details Solve a nonnegative quadratic-polynomial speed-decay equation without reversing the velocity direction.
     !> \param[in] coefficients Constant, linear, and quadratic drag coefficients.
@@ -536,6 +542,7 @@ CONTAINS
         speed_after = lower+0.5_wp*(upper-lower)
 
     END SUBROUTINE solve_quadratic_polynomial_flow
+
     !> \brief Evaluate the elapsed time for a quadratic polynomial decay law.
     !> \details Evaluate the separated elapsed-time integral associated with constant, linear and quadratic drag.
     !> \param[in] mod_vel mod_vel at which to evaluate the separated time integral [m s^-1].
@@ -573,6 +580,7 @@ CONTAINS
         END IF
 
     END FUNCTION quadratic_decay_time
+
     !> \brief Invert the exact separated time integral for nonlinear mod_vel laws.
     !> \details Invert the monotone time integral of the reciprocal decay rate to recover the speed after the time step.
     !> \param[in] flow_model Exact-flow law identifier.
@@ -637,6 +645,7 @@ CONTAINS
         speed_after = lower + 0.5_wp*(upper-lower)
 
     END SUBROUTINE solve_by_exact_time_integral
+
     !> \brief Evaluate the frozen-coefficient scalar velocity-decay rate.
     !> \details Evaluate the nonnegative scalar drag rate for the selected exact-flow law.
     !> \param[in] flow_model Identifier of exact scalar flow law.
@@ -715,6 +724,7 @@ CONTAINS
         END SELECT
 
     END FUNCTION velocity_decay_rate
+
     !> \brief Integrate the reciprocal scalar decay rate.
     !> \details Compute elapsed time by integrating the reciprocal scalar decay rate over the supplied speed interval.
     !> \param[in] flow_model Identifier of exact scalar flow law.
@@ -758,6 +768,7 @@ CONTAINS
         END IF
 
     END FUNCTION integrate_inverse_decay_rate
+
     !> \brief Integrate reciprocal decay rate over a velocity interval.
     !> \details Evaluate a bounded reciprocal-decay integral with numerical safeguards around low rates.
     !> \param[in] flow_model Identifier of exact scalar flow law.
@@ -783,6 +794,7 @@ CONTAINS
                 f_lower, f_middle, f_upper, whole, tolerance, 24)
 
     END FUNCTION integrate_inverse_interval
+
     !> \brief Refine the reciprocal-decay integral using adaptive Simpson quadrature.
     !> \details Recursively subdivide Simpson quadrature panels until their estimated error meets tolerance or the recursion limit is reached.
     !> \param[in] flow_model Identifier of exact scalar flow law.
@@ -833,6 +845,7 @@ CONTAINS
                 f_middle, f_right, f_upper, right_estimate, 0.5_wp*tolerance, depth-1)
 
     END FUNCTION adaptive_simpson
+
     !> \brief Evaluate the reciprocal of the nonnegative speed-decay rate.
     !> \details Return 1/rate for a finite positive resistance; guard negative and nonfinite rates and avoid division by nearly zero.
     !> \param[in] flow_model Identifier of exact scalar flow law.
@@ -865,6 +878,7 @@ CONTAINS
         END IF
 
     END FUNCTION inverse_rate
+
     !> \brief Evaluate Simpson's one-panel quadrature estimate.
     !> \details Compute the standard weighted one-panel Simpson approximation on the supplied interval.
     !> \param[in] lower Lower integration or search bound.

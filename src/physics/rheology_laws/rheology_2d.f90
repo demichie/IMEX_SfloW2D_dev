@@ -448,6 +448,7 @@ CONTAINS
         END SELECT
 
     END SUBROUTINE solve_rheology_analytic
+
     !> \brief Compute curvature-induced normal acceleration.
     !> \details Contract the topographic Hessian with the horizontal velocity twice: Bxx*u**2 + 2*Bxy*u*v + Byy*v**2.
     !> \param[in] Bsecond_xx Second x derivative of topography [m^-1].
