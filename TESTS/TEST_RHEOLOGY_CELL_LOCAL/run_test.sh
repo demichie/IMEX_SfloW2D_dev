@@ -49,8 +49,8 @@ for profile in strict optimized; do
         -o test_analytic_velocity
     ./test_analytic_velocity
     "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/test_lava_cooling.f90"
-    "$compiler" $common parameters_2d.o diagnostics_2d.o thermal_laws_2d.o \
-        test_lava_cooling.o -o test_lava_cooling
+    "$compiler" $common parameters_2d.o diagnostics_2d.o thermal_cooling_2d.o \
+        thermal_laws_2d.o test_lava_cooling.o -o test_lava_cooling
     ./test_lava_cooling
     "$compiler" -O0 -g -fcheck=all $common -c \
         "$test_dir/test_pore_pressure_diffusion.f90"
