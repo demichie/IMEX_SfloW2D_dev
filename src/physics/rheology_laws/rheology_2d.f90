@@ -359,15 +359,6 @@ CONTAINS
 
     END SUBROUTINE solve_rheology_analytic
 
-    !******************************************************************************
-    !> \brief Contract the filtered bed Hessian with the Cartesian velocity.
-    !> \param[in] Bsecond_xx Filtered bed Hessian xx entry [m^-1].
-    !> \param[in] Bsecond_xy Filtered bed Hessian xy entry [m^-1].
-    !> \param[in] Bsecond_yy Filtered bed Hessian yy entry [m^-1].
-    !> \param[in] u Cartesian depth-averaged x velocity [m s^-1].
-    !> \param[in] v Cartesian depth-averaged y velocity [m s^-1].
-    !> \return Signed bed-curvature acceleration [m s^-2].
-    !******************************************************************************
     PURE FUNCTION curvature_acceleration(Bsecond_xx, Bsecond_xy, Bsecond_yy,  &
                 u, v) RESULT(acceleration)
 
@@ -379,77 +370,5 @@ CONTAINS
                     2.0_wp*Bsecond_xy*u*v + Bsecond_yy*v**2
 
     END FUNCTION curvature_acceleration
-
-    !******************************************************************************
-    !> \brief Evaluate the selected implicit rheology momentum rate.
-    !> \details All state values are explicit arguments so the dispatch has no
-    !> per-cell workspace allocation or hidden cell-state conversion.
-    !> \param[in] model_name Selected rheology identifier.
-    !> \param[in] h Flow depth [m].
-    !> \param[in] T Mixture T [K].
-    !> \param[in] rhom Mixture density [kg m^-3].
-    !> \param[in] inv_rhom Reciprocal mixture density [m^3 kg^-1].
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_vel Total flow-mod_vel magnitude [m s^-1].
-    !> \param[in] mod_hor_vel Horizontal flow-mod_vel magnitude [m s^-1].
-    !> \param[in] mod_vel2 Squared flow-mod_vel magnitude [m^2 s^-2].
-    !> \param[in] red_grav Reduced gravitational acceleration [m s^-2].
-    !> \param[in] alphas Solid volume fractions, one per class.
-    !> \param[in] moving True when the flow is moving.
-    !> \param[in] use_stochastic Enable the stochastic rheology correction.
-    !> \param[in] stochastic_value Local stochastic-process value.
-    !> \param[out] rate x/y conservative momentum source rates [kg m^-1 s^-2].
-    !> \note State arguments are complex-valued to preserve complex-step derivatives.
-    !******************************************************************************
-
-    !******************************************************************************
-    !> \brief Evaluate the selected semi-implicit rheology momentum rate.
-    !> \details Curvature acceleration is used by the MUI-family laws only,
-    !> matching their existing equation-term assembly semantics.
-    !> \param[in] model_name Selected rheology identifier.
-    !> \param[in] h Flow depth [m].
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_vel Total flow-mod_vel magnitude [m s^-1].
-    !> \param[in] mod_hor_vel Horizontal flow-mod_vel magnitude [m s^-1].
-    !> \param[in] rhom Mixture density [kg m^-3].
-    !> \param[in] red_grav Reduced gravitational acceleration [m s^-2].
-    !> \param[in] grav_coeff Effective gravity multiplier [dimensionless].
-    !> \param[in] alphas Solid volume fractions, one per class.
-    !> \param[in] curvature_term Enable curvature acceleration for applicable laws.
-    !> \param[in] B_second_xx Bed curvature in xx [m^-1].
-    !> \param[in] B_second_xy Bed curvature in xy [m^-1].
-    !> \param[in] B_second_yy Bed curvature in yy [m^-1].
-    !> \param[in] use_pore_pressure Enable the pore-pressure correction.
-    !> \param[in] exc_pore_pres Excess pore pressure [Pa].
-    !> \param[in] use_stochastic Enable the stochastic rheology correction.
-    !> \param[in] stochastic_value Local stochastic-process value.
-    !> \param[out] rate x/y conservative momentum source rates [kg m^-1 s^-2].
-    !******************************************************************************
-
-    !******************************************************************************
-    !> \brief Integrate the selected rheology velocity law analytically.
-    !> \details Dispatches to the model-specific exact-flow solver. All state
-    !>          values are passed explicitly; unsupported model IDs leave the
-    !>          output equal to the input and return model_supported as false.
-    !> \param[in] model_name Rheology model ID.
-    !> \param[in] dt Exact-flow interval [s].
-    !> \param[in] h Flow depth [m].
-    !> \param[in] T Flow T [K].
-    !> \param[in] rhom Mixture density [kg m^-3].
-    !> \param[in] speed_ratio Total-to-horizontal mod_vel ratio.
-    !> \param[in] velocity_before Horizontal velocity before integration [m s^-1].
-    !> \param[in] red_grav Reduced gravity [m s^-2].
-    !> \param[in] grav_coeff Gravity coefficient used by rheology laws.
-    !> \param[in] alphas Per-class solid volume fractions.
-    !> \param[in] curvature_acceleration Signed bed-curvature acceleration [m s^-2].
-    !> \param[in] use_pore_pressure Whether excess pore pressure is active.
-    !> \param[in] exc_pore_pres Excess pore pressure.
-    !> \param[in] use_stochastic Whether stochastic forcing is active.
-    !> \param[in] stochastic_value Local stochastic rheology value.
-    !> \param[out] velocity_after Horizontal velocity after integration [m s^-1].
-    !> \param[out] model_supported True when model_name has an analytic velocity law.
-    !******************************************************************************
 
 END MODULE rheology_2d

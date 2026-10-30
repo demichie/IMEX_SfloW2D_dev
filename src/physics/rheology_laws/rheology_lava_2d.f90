@@ -130,42 +130,5 @@ CONTAINS
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_lava_analytic
 
-    !******************************************************************************
-    !> \brief Integrate the lava-rheology velocity source exactly.
-    !> \details Holds depth, T, density, and mod_vel ratio fixed. The
-    !> affine mod_vel-decay law is integrated exactly, with stopping at zero.
-    !> \param[in] dt Exact-flow interval [s], normally dt * a_ii.
-    !> \param[in] h Explicit flow depth [m].
-    !> \param[in] T Explicit T [K].
-    !> \param[in] rhom Explicit mixture density [kg m^-3].
-    !> \param[in] speed_ratio Explicit total-to-horizontal mod_vel ratio.
-    !> \param[in] velocity_before Input horizontal velocity [m s^-1].
-    !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
-    !******************************************************************************
-    !******************************************************************************
-    !> \brief Evaluate the implicit T-dependent viscous drag.
-    !> \details Computes the depth-regularized drag coefficient and returns the
-    !> x/y momentum sources for a moving state. Complex inputs preserve
-    !> T, depth and velocity sensitivities in the implicit Jacobian.
-    !> \param[in] h Flow depth [m].
-    !> \param[in] T Lava T [K].
-    !> \param[in] rhom Mixture density [kg m^-3].
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] moving Whether the state is moving.
-    !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
-    !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
-    !> \note Complex-valued state and rates preserve complex-step derivatives.
-    !******************************************************************************
-    !******************************************************************************
-    !> \brief Evaluate the semi-implicit lava yield-stress momentum rate.
-    !> \details Returns \f$-\tau_0(u_x,u_y)/|\boldsymbol{u}|\f$ for positive
-    !> mod_vel and zero otherwise.
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_vel mod_vel magnitude [m s^-1].
-    !> \param[out] rate_x x momentum source rate.
-    !> \param[out] rate_y y momentum source rate.
-    !******************************************************************************
     ! Unsupported physical treatment, rejected by the source catalog.
 END MODULE rheology_lava_2d

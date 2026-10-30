@@ -88,31 +88,6 @@ CONTAINS
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_empirical_analytic
 
-    !******************************************************************************
-    !> \brief Integrate the empirical-drag velocity source exactly.
-    !> \details Holds depth and the mod_vel-to-horizontal-mod_vel ratio fixed. Since
-    !> the drag acceleration is proportional to mod_vel, the input velocity is
-    !> contracted exponentially.
-    !> \param[in] dt Exact-flow interval [s], normally dt * a_ii.
-    !> \param[in] h Explicit flow depth [m].
-    !> \param[in] speed_ratio Explicit total-to-horizontal mod_vel ratio.
-    !> \param[in] velocity_before Input horizontal velocity [m s^-1].
-    !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
-    !******************************************************************************
-    !******************************************************************************
-    !> \brief Evaluate the implicit empirical drag source.
-    !> \details Forms the depth-dependent coefficient proportional to mod_vel and
-    !> returns the x/y momentum sources opposite to horizontal flow.
-    !> \param[in] h Flow depth [m].
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_hor_vel Horizontal mod_vel magnitude [m s^-1].
-    !> \param[in] mod_vel mod_vel magnitude used by the empirical coefficient [m s^-1].
-    !> \param[in] rhom Mixture density [kg m^-3].
-    !> \param[in] moving Whether the state is moving.
-    !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
-    !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
-    !******************************************************************************
     ! Unsupported physical treatment, rejected by the source catalog.
     ! Valid zero component of the configured Newton treatment.
 END MODULE rheology_empirical_2d

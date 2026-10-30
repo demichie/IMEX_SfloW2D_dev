@@ -192,60 +192,6 @@ CONTAINS
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_lahar_analytic
 
-    !******************************************************************************
-    !> \brief Integrate the lahar velocity source exactly.
-    !> \details Holds T, concentration, depth, density, and mod_vel
-    !> ratio fixed while integrating the polynomial mod_vel-decay law.
-    !> \param[in] dt Exact-flow integration interval [s].
-    !> \param[in] h Explicit flow depth [m].
-    !> \param[in] T Explicit absolute T [K].
-    !> \param[in] alphas_tot Explicit total solid volume fraction.
-    !> \param[in] rhom Explicit mixture density [kg m^-3].
-    !> \param[in] speed_ratio Explicit total-to-horizontal mod_vel ratio.
-    !> \param[in] velocity_before Input horizontal velocity [m s^-1].
-    !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
-    !******************************************************************************
-    !******************************************************************************
-    !> \brief Evaluate the implicit viscous and turbulent lahar source.
-    !> \details Computes the T- and concentration-dependent fluid
-    !> viscosity, adds the viscous and turbulent contributions to the basal
-    !> slope, and returns their x/y momentum sources. A depth floor regularizes
-    !> the source in shallow states; complex arithmetic preserves state
-    !> sensitivities in the implicit Jacobian.
-    !> \param[in] h Flow depth [m].
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_vel mod_vel magnitude [m s^-1].
-    !> \param[in] mod_hor_vel Horizontal mod_vel magnitude [m s^-1].
-    !> \param[in] T Absolute T [K].
-    !> \param[in] rhom Mixture density [kg m^-3].
-    !> \param[in] inv_rhom Reciprocal mixture density [m^3 kg^-1].
-    !> \param[in] alphas Solid volume fractions by class.
-    !> \param[in] moving Whether the state is moving.
-    !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
-    !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
-    !******************************************************************************
-    !******************************************************************************
-    !> \brief Evaluate the semi-implicit lahar yield-stress momentum rate.
-    !> \details Computes \f$Y=\alpha_2[\exp(\beta_2 C)-1]\f$ and returns
-    !> \f$-Y\boldsymbol{u}_h/|\boldsymbol{u}_h|\f$ for moving flow.
-    !> \param[in] h Flow depth [m].
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_hor_vel Horizontal mod_vel magnitude [m s^-1].
-    !> \param[in] rhom Mixture density [kg m^-3].
-    !> \param[in] alphas_tot Sum of solid volume fractions.
-    !> \param[in] moving Whether the state is moving.
-    !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
-    !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
-    !******************************************************************************
-    !******************************************************************************
-    !> \brief Evaluate carrier-fluid viscosity for real state variables.
-    !> \details Wraps the complex correlation for real state variables.
-    !> \param[in] T Absolute T [K].
-    !> \param[in] alphas_tot Sum of solid volume fractions.
-    !> \return Carrier-fluid dynamic viscosity.
-    !******************************************************************************
     FUNCTION eval_lahar_fluid_viscosity_real(T, alphas_tot)  &
                 RESULT(fluid_viscosity)
         REAL(wp), INTENT(IN) :: T, alphas_tot
@@ -255,15 +201,6 @@ CONTAINS
                     CMPLX(T,0.0_wp,wp),CMPLX(alphas_tot,0.0_wp,wp))
         fluid_viscosity = REAL(complex_viscosity,wp)
     END FUNCTION eval_lahar_fluid_viscosity_real
-    !******************************************************************************
-    !> \brief Evaluate carrier-fluid viscosity for complex state variables.
-    !> \details Complex overload of the viscosity correlation. The branch in
-    !> the piecewise T law is selected from the real T;
-    !> algebra within that branch remains complex for derivative evaluation.
-    !> \param[in] T Absolute T [K].
-    !> \param[in] alphas_tot Sum of solid volume fractions.
-    !> \return Complex carrier-fluid dynamic viscosity.
-    !******************************************************************************
     FUNCTION eval_lahar_fluid_viscosity_complex(T, alphas_tot) &
                 RESULT(fluid_viscosity)
         COMPLEX(wp), INTENT(IN) :: T, alphas_tot

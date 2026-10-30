@@ -595,13 +595,6 @@ CONTAINS
 
     END SUBROUTINE solve_by_exact_time_integral
 
-    !******************************************************************************
-    !> \brief Evaluate the frozen-coefficient scalar mod_vel-decay rate.
-    !> \param[in] flow_model Exact-flow law identifier.
-    !> \param[in] coefficients Model-specific frozen decay coefficients.
-    !> \param[in] mod_vel mod_vel magnitude at which to evaluate the decay [m s^-1].
-    !> \return Nonnegative scalar mod_vel-decay rate [m s^-2].
-    !******************************************************************************
     PURE FUNCTION velocity_decay_rate(flow_model, coefficients, mod_vel)        &
                 RESULT(rate)
 
@@ -663,14 +656,6 @@ CONTAINS
 
     END FUNCTION velocity_decay_rate
 
-    !******************************************************************************
-    !> \brief Integrate reciprocal decay rate with adaptive Simpson quadrature.
-    !> \param[in] flow_model Exact-flow law identifier.
-    !> \param[in] coefficients Model-specific frozen decay coefficients.
-    !> \param[in] lower Lower mod_vel bound [m s^-1].
-    !> \param[in] upper Upper mod_vel bound [m s^-1].
-    !> \return Elapsed time across the mod_vel interval [s].
-    !******************************************************************************
     FUNCTION integrate_inverse_decay_rate(flow_model, coefficients, lower,   &
                 upper) RESULT(integral)
 
@@ -704,14 +689,6 @@ CONTAINS
 
     END FUNCTION integrate_inverse_decay_rate
 
-    !******************************************************************************
-    !> \brief Integrate reciprocal decay rate over one smooth mod_vel interval.
-    !> \param[in] flow_model Exact-flow law identifier.
-    !> \param[in] coefficients Model-specific frozen decay coefficients.
-    !> \param[in] lower Lower mod_vel bound [m s^-1].
-    !> \param[in] upper Upper mod_vel bound [m s^-1].
-    !> \return Elapsed time across the mod_vel interval [s].
-    !******************************************************************************
     FUNCTION integrate_inverse_interval(flow_model, coefficients, lower, upper) &
                 RESULT(integral)
 
@@ -731,20 +708,6 @@ CONTAINS
 
     END FUNCTION integrate_inverse_interval
 
-    !******************************************************************************
-    !> \brief Recursively refine a Simpson estimate of reciprocal decay rate.
-    !> \param[in] flow_model Exact-flow law identifier.
-    !> \param[in] coefficients Model-specific frozen decay coefficients.
-    !> \param[in] lower Lower mod_vel bound [m s^-1].
-    !> \param[in] upper Upper mod_vel bound [m s^-1].
-    !> \param[in] f_lower Reciprocal decay rate at the lower endpoint.
-    !> \param[in] f_middle Reciprocal decay rate at the interval midpoint.
-    !> \param[in] f_upper Reciprocal decay rate at the upper endpoint.
-    !> \param[in] whole Simpson estimate over the full interval.
-    !> \param[in] tolerance Absolute error tolerance.
-    !> \param[in] depth Remaining recursive subdivision budget.
-    !> \return Adaptively refined integral estimate [s].
-    !******************************************************************************
     RECURSIVE FUNCTION adaptive_simpson(flow_model, coefficients, lower, upper, &
                 f_lower, f_middle, f_upper, whole, tolerance, depth) RESULT(integral)
 
@@ -781,13 +744,6 @@ CONTAINS
 
     END FUNCTION adaptive_simpson
 
-    !******************************************************************************
-    !> \brief Evaluate the reciprocal of the frozen scalar mod_vel-decay rate.
-    !> \param[in] flow_model Exact-flow law identifier.
-    !> \param[in] coefficients Model-specific frozen decay coefficients.
-    !> \param[in] mod_vel mod_vel magnitude at which to evaluate the reciprocal [m s^-1].
-    !> \return Reciprocal decay rate, or a large sentinel for a zero rate.
-    !******************************************************************************
     FUNCTION inverse_rate(flow_model, coefficients, mod_vel) RESULT(value)
 
         INTEGER, INTENT(IN) :: flow_model
@@ -811,15 +767,6 @@ CONTAINS
 
     END FUNCTION inverse_rate
 
-    !******************************************************************************
-    !> \brief Compute a single Simpson-rule estimate on an interval.
-    !> \param[in] lower Lower integration bound.
-    !> \param[in] upper Upper integration bound.
-    !> \param[in] f_lower Integrand value at the lower endpoint.
-    !> \param[in] f_middle Integrand value at the midpoint.
-    !> \param[in] f_upper Integrand value at the upper endpoint.
-    !> \return Simpson-rule integral estimate.
-    !******************************************************************************
     PURE FUNCTION simpson_estimate(lower, upper, f_lower, f_middle, f_upper)  &
                 RESULT(value)
 

@@ -129,41 +129,6 @@ CONTAINS
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_froude_analytic
 
-    !******************************************************************************
-    !> \brief Integrate the Froude-dependent velocity source exactly.
-    !> \details Holds depth, gravity, curvature, and the mod_vel ratio fixed while
-    !> integrating the frozen scalar mod_vel-decay law.
-    !> \param[in] dt Exact-flow integration interval [s].
-    !> \param[in] h Explicit flow depth [m].
-    !> \param[in] speed_ratio Explicit total-to-horizontal mod_vel ratio.
-    !> \param[in] velocity_before Input horizontal velocity [m s^-1].
-    !> \param[in] red_grav Explicit reduced gravity [m s^-2].
-    !> \param[in] grav_coeff Explicit gravity multiplier [dimensionless].
-    !> \param[in] curvature_term Explicit curvature acceleration [m s^-2].
-    !> \param[in] stochastic Enable the explicit Froude shift.
-    !> \param[in] stochastic_value Explicit stochastic increment [dimensionless].
-    !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
-    !******************************************************************************
-    !******************************************************************************
-    !> \brief Evaluate model 9's Froude-dependent Coulomb source.
-    !> \details Computes the Froude number and the exponentially weakening
-    !> friction coefficient, then returns the x/y components of the basal
-    !> friction source. A stochastic perturbation is applied only when enabled;
-    !> the source is zero unless mod_vel and reduced gravity are positive.
-    !> \param[in] h Flow depth \f$h\f$ [m].
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_vel Magnitude used in the Froude number [m s^-1].
-    !> \param[in] mod_hor_vel Horizontal velocity magnitude [m s^-1].
-    !> \param[in] rhom Mixture density \f$\rho_m\f$ [kg m^-3].
-    !> \param[in] red_grav Reduced gravity \f$g'\f$ [m s^-2].
-    !> \param[in] grav_coeff Gravity multiplier \f$G\f$ [dimensionless].
-    !> \param[in] curvature_term Curvature acceleration \f$a_c\f$ [m s^-2].
-    !> \param[in] stochastic Enable the stochastic Froude perturbation.
-    !> \param[in] stochastic_value Stochastic increment to the Froude number.
-    !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
-    !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
-    !******************************************************************************
     ! Unsupported physical treatment, rejected by the source catalog.
     ! Valid zero component of the configured Newton treatment.
 END MODULE rheology_froude_2d
