@@ -20,6 +20,7 @@ PROGRAM test_state_conversion
   CALL run_dry_cases
   CALL run_dry_momentum_projection_cases
   CALL run_complex_step_check
+  CALL run_shared_physical_state_checks
   CALL run_richardson_near_rest_cases
 
   CALL finalize_test_properties
@@ -89,6 +90,47 @@ CONTAINS
          carrier_heat_capacity, mixture_heat_capacity)
     IF (Ri /= 0.0_wp) ERROR STOP 'exact-rest Richardson convention changed'
   END SUBROUTINE run_richardson_near_rest_cases
+
+  !> Validate both physical-state construction paths and complex real extraction.
+  SUBROUTINE run_shared_physical_state_checks
+    TYPE(physical_state_type) :: from_qp, from_complex
+    TYPE(complex_physical_state_type) :: complex_state
+    REAL(wp), ALLOCATABLE :: qp(:), q(:)
+    COMPLEX(wp), ALLOCATABLE :: cq(:)
+    INTEGER :: phase_case
+
+    DO phase_case = 1, 2
+       CALL configure_layout(phase_case==2)
+       ALLOCATE(qp(n_vars+2), q(n_vars), cq(n_vars))
+       CALL make_wet_state(qp)
+       CALL qp_to_qc(qp, q)
+       cq = CMPLX(q, 0.0_wp, wp)
+       CALL physical_state_from_qp(qp, from_qp)
+       CALL physical_state_from_q(cq, complex_state)
+       CALL real_part_physical_state(complex_state, from_complex)
+
+       CALL assert_close_scalar('shared state h', from_qp%h, from_complex%h, 2.0E-12_wp)
+       CALL assert_close_scalar('shared state u', from_qp%u, from_complex%u, 2.0E-12_wp)
+       CALL assert_close_scalar('shared state v', from_qp%v, from_complex%v, 2.0E-12_wp)
+       CALL assert_close_scalar('shared state T', from_qp%T, from_complex%T, 2.0E-12_wp)
+       CALL assert_close_scalar('shared state density', from_qp%rho_m, &
+            from_complex%rho_m, 2.0E-12_wp)
+       CALL assert_close_scalar('shared state inverse density', from_qp%inv_rhom, &
+            from_complex%inv_rhom, 2.0E-12_wp)
+       CALL assert_close_scalar('shared state reduced gravity', from_qp%red_grav, &
+            from_complex%red_grav, 2.0E-12_wp)
+       CALL assert_close_scalar('shared state stochastic', from_qp%Zs, &
+            from_complex%Zs, 2.0E-12_wp)
+       CALL assert_close_scalar('shared state pore pressure', from_qp%exc_pore_pres, &
+            from_complex%exc_pore_pres, 2.0E-12_wp)
+       CALL assert_close_vector('shared state solids', from_qp%alphas, &
+            from_complex%alphas, 2.0E-12_wp)
+       CALL assert_close_vector('shared state gases', from_qp%alphag, &
+            from_complex%alphag, 2.0E-12_wp)
+
+       DEALLOCATE(qp, q, cq)
+    END DO
+  END SUBROUTINE run_shared_physical_state_checks
 
   SUBROUTINE initialize_test_properties
 
