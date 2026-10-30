@@ -109,7 +109,7 @@ CONTAINS
 
        ! Thermal-energy equation.
           rate(4) = rate(4) + (t_coeff * &
-               t_coeff, h_dot * r_rho_m * r_sp_heat_mix * T_source)
+               h_dot * r_rho_m * r_sp_heat_mix * T_source)
 
           ! Solid transport.
           rate(idx_solidEqn_first:idx_solidEqn_last) =                   &

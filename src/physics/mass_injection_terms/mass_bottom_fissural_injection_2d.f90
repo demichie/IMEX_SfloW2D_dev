@@ -87,7 +87,7 @@ CONTAINS
 
           rate(1) = rate(1) + t_coeff * h_dot * r_rho_m
           rate(4) = rate(4) + (t_coeff * &
-               t_coeff, h_dot * r_rho_m * r_sp_heat_mix * T_fissures(i_fissure))
+               h_dot * r_rho_m * r_sp_heat_mix * T_fissures(i_fissure))
           rate(idx_solidEqn_first:idx_solidEqn_last) =                   &
                rate(idx_solidEqn_first:idx_solidEqn_last) +              &
                t_coeff * h_dot * r_rho_m * xs_fissures(1:n_solid,i_fissure)
