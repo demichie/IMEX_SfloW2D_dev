@@ -32,36 +32,22 @@ CONTAINS
     !> \details Compute the momentum source under the quadratic velocity-dependent resistance law,
     !> using the treatment-specific velocity and effective-stress inputs. Outputs are conservative
     !> x/y momentum source rates.
-    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
     !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
     !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
-    !> \param[in] grav_coeff Local dimensionless gravitational correction.
-    !> \param[in] curvature_term Enable curvature correction.
-    !> \param[in] B_second_xx Topographic second derivative in x [m^-1].
-    !> \param[in] B_second_xy Mixed topographic derivative [m^-1].
-    !> \param[in] B_second_yy Topographic second derivative in y [m^-1].
-    !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[in] moving True for a moving local state.
-    !> \param[in] use_stochastic Enable model stochastic parameter.
-    !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_quadratic_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
-            grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
-            use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
-
+    SUBROUTINE eval_rheology_quadratic_explicit(state, &
+            mod_hor_vel, &
+            mod_vel2, &
+            moving, &
+            rate)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2, grav_coeff
-        REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy, stochastic_value
-        LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
+        REAL(wp), INTENT(IN) :: mod_hor_vel, mod_vel2
+        LOGICAL, INTENT(IN) :: moving
         REAL(wp), INTENT(OUT) :: rate(2)
-        REAL(wp) :: sx, sy, curvature_accel
+        REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
         TYPE(complex_physical_state_type) :: cs
-
-        curvature_accel=0.0_wp
-
-        IF (curvature_term) curvature_accel=B_second_xx*state%u**2 +                                     &
-                2.0_wp*B_second_xy*state%u*state%v+B_second_yy*state%v**2
         CALL eval_rheology_quadratic_semi_implicit(state,sx,sy)
         cs%u = CMPLX(state%u,0.0_wp,wp)
         cs%v = CMPLX(state%v,0.0_wp,wp)
