@@ -30,11 +30,13 @@ MODULE source_registry_2d
     INTEGER :: n_equations=0 !< Conservative layout size.
     INTEGER :: pore_equation=0 !< Pore index, zero when absent.
     LOGICAL :: initialized=.FALSE. !< Cached successful-validation status.
+    LOGICAL :: implicit_sources_flag=.FALSE. !< Any validated NEWTON source group.
     TYPE(source_group_type), ALLOCATABLE :: stage_entries(:), step_entries(:)
   CONTAINS
     PROCEDURE :: initialize => initialize_registry
     PROCEDURE :: finalize => finalize_registry
     PROCEDURE :: is_initialized => registry_is_initialized
+    PROCEDURE :: has_implicit_sources => registry_has_implicit_sources
     PROCEDURE :: stage_groups => copy_stage_groups
     PROCEDURE :: step_groups => copy_step_groups
     PROCEDURE :: validate => validate_registry
@@ -85,6 +87,8 @@ CONTAINS
       CALL this%finalize()
       RETURN
     END IF
+    this%implicit_sources_flag = ANY(stage_groups%method==SOURCE_METHOD_NEWTON) .OR. &
+         ANY(step_groups%method==SOURCE_METHOD_NEWTON)
     this%initialized=.TRUE.
   END SUBROUTINE initialize_registry
 
@@ -217,11 +221,18 @@ CONTAINS
     IF (ALLOCATED(this%stage_entries)) DEALLOCATE(this%stage_entries)
     IF (ALLOCATED(this%step_entries)) DEALLOCATE(this%step_entries)
     this%n_equations=0; this%pore_equation=0; this%initialized=.FALSE.
+    this%implicit_sources_flag=.FALSE.
   END SUBROUTINE finalize_registry
 
   !> \brief Query cached initialization status without walking term arrays.
   !> \param[in] this Registry.
   !> \return True only after successful transactional validation.
+  !> Cached query, set once following successful registry validation.
+  PURE LOGICAL FUNCTION registry_has_implicit_sources(this)
+    CLASS(source_registry_type), INTENT(IN) :: this
+    registry_has_implicit_sources = this%initialized .AND. this%implicit_sources_flag
+  END FUNCTION registry_has_implicit_sources
+
   PURE LOGICAL FUNCTION registry_is_initialized(this)
     CLASS(source_registry_type), INTENT(IN) :: this
     registry_is_initialized=this%initialized

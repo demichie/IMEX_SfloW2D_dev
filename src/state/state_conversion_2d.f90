@@ -30,6 +30,24 @@ MODULE state_conversion_2d
   REAL(wp), PARAMETER :: mass_fraction_roundoff_tolerance =                 &
        4096.0_wp * EPSILON(1.0_wp)
 
+  !> Shared local physical state for non-Newton source evaluation.
+  !> Allocatable phase arrays accommodate the runtime model layout.
+  TYPE, PUBLIC :: physical_state_type
+     REAL(wp) :: h=0.0_wp, u=0.0_wp, v=0.0_wp, T=0.0_wp
+     REAL(wp) :: rho_m=0.0_wp, inv_rhom=0.0_wp, red_grav=0.0_wp
+     REAL(wp) :: Zs=0.0_wp, exc_pore_pres=0.0_wp
+     REAL(wp), ALLOCATABLE :: alphas(:), alphag(:)
+  END TYPE physical_state_type
+
+  !> Corresponding complex-step state; no loss of imaginary perturbations.
+  TYPE, PUBLIC :: complex_physical_state_type
+     COMPLEX(wp) :: h=(0.0_wp,0.0_wp), u=(0.0_wp,0.0_wp), v=(0.0_wp,0.0_wp)
+     COMPLEX(wp) :: T=(0.0_wp,0.0_wp), rho_m=(0.0_wp,0.0_wp)
+     COMPLEX(wp) :: inv_rhom=(0.0_wp,0.0_wp), red_grav=(0.0_wp,0.0_wp)
+     COMPLEX(wp) :: Zs=(0.0_wp,0.0_wp), exc_pore_pres=(0.0_wp,0.0_wp)
+     COMPLEX(wp), ALLOCATABLE :: alphas(:), alphag(:)
+  END TYPE complex_physical_state_type
+
   !> \brief Evaluate carrier and whole-mixture specific heat capacities.
   !> \param[in]  xs            Solid mass fractions.
   !> \param[in]  xg            Additional-gas mass fractions.
@@ -64,6 +82,7 @@ MODULE state_conversion_2d
   END INTERFACE velocity_from_conservative
 
   PUBLIC :: r_phys_var, c_phys_var
+  PUBLIC :: physical_state_from_qp, physical_state_from_q, real_part_physical_state
   PUBLIC :: qc_to_qp, qp_to_qc, qp_to_qp2
   PUBLIC :: mixt_var
   PUBLIC :: sauter_diameter, average_density_solids
@@ -78,6 +97,58 @@ MODULE state_conversion_2d
   PUBLIC :: project_dry_cell_momenta
 
 CONTAINS
+
+  !> Build the shared REAL source state directly from the available primitive vector.
+  !> No conservative-to-primitive conversion is performed on this path.
+  SUBROUTINE physical_state_from_qp(qp, state)
+    REAL(wp), INTENT(IN) :: qp(n_vars+2)
+    TYPE(physical_state_type), INTENT(OUT) :: state
+    REAL(wp) :: Ri, rho_c, sp_heat_c, sp_heat_mix
+
+    ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas))
+    state%h = qp(idx_h)
+    state%u = qp(idx_u)
+    state%v = qp(idx_v)
+    state%T = qp(idx_T)
+    state%Zs = 0.0_wp
+    state%exc_pore_pres = 0.0_wp
+    IF (stoch_transport_flag) state%Zs = qp(idx_stoch)
+    IF (pore_pressure_flag) state%exc_pore_pres = qp(idx_pore)
+    CALL mixt_var(qp, Ri, state%rho_m, rho_c, state%red_grav, &
+         sp_heat_c, sp_heat_mix)
+    state%inv_rhom = 1.0_wp / state%rho_m
+    CALL primitive_to_volume_fractions(qp, state%alphas, state%alphag)
+  END SUBROUTINE physical_state_from_qp
+
+  !> Build a COMPLEX physical source state through the existing complex-step kernel.
+  SUBROUTINE physical_state_from_q(q, state)
+    COMPLEX(wp), INTENT(IN) :: q(n_vars)
+    TYPE(complex_physical_state_type), INTENT(OUT) :: state
+
+    ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas))
+    CALL c_phys_var(q, state%h, state%u, state%v, state%T, state%rho_m, &
+         state%alphas, state%alphag, state%inv_rhom, state%Zs, &
+         state%exc_pore_pres)
+    state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
+  END SUBROUTINE physical_state_from_q
+
+  !> Extract a real source state without re-evaluating any constitutive formula.
+  SUBROUTINE real_part_physical_state(complex_state, state)
+    TYPE(complex_physical_state_type), INTENT(IN) :: complex_state
+    TYPE(physical_state_type), INTENT(OUT) :: state
+
+    state%h = REAL(complex_state%h,wp)
+    state%u = REAL(complex_state%u,wp)
+    state%v = REAL(complex_state%v,wp)
+    state%T = REAL(complex_state%T,wp)
+    state%rho_m = REAL(complex_state%rho_m,wp)
+    state%inv_rhom = REAL(complex_state%inv_rhom,wp)
+    state%red_grav = REAL(complex_state%red_grav,wp)
+    state%Zs = REAL(complex_state%Zs,wp)
+    state%exc_pore_pres = REAL(complex_state%exc_pore_pres,wp)
+    state%alphas = REAL(complex_state%alphas,wp)
+    state%alphag = REAL(complex_state%alphag,wp)
+  END SUBROUTINE real_part_physical_state
 
   !> \brief Remove unresolved cell momenta without discarding conservative mass.
   !> \param[in,out] qc Conservative cell state; only entries 2 and 3 may change.
