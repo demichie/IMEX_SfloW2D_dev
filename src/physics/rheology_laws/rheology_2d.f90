@@ -56,13 +56,9 @@ MODULE rheology_2d
 
     PRIVATE
 
-    PUBLIC :: eval_rheology_explicit
-    PUBLIC :: eval_rheology_semi_implicit
-    PUBLIC :: eval_rheology_implicit
-    PUBLIC :: solve_rheology_analytic
     PUBLIC :: curvature_acceleration
-    PUBLIC :: eval_rheology_explicit_processes, eval_rheology_semi_implicit_processes
-    PUBLIC :: eval_rheology_implicit_processes, solve_rheology_analytic_processes
+    PUBLIC :: eval_rheology_explicit, eval_rheology_semi_implicit
+    PUBLIC :: eval_rheology_implicit, solve_rheology_analytic
 
     ! Uniform treatment surface for this source family.
 
@@ -84,7 +80,7 @@ CONTAINS
     !> \param[in] use_stochastic Enable stochastic rheology coefficient.
     !> \param[in] stochastic_value Stochastic rheology coefficient.
     !> \param[out] rate Two-component momentum source.
-    SUBROUTINE eval_rheology_explicit(model_name, state, mod_vel, mod_hor_vel, mod_vel2, &
+    SUBROUTINE eval_rheology_explicit_dispatch(model_name, state, mod_vel, mod_hor_vel, mod_vel2, &
             grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
             use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
 
@@ -185,7 +181,7 @@ CONTAINS
             CALL fatal_error('Invalid rheology name in explicit dispatch')
 
         END SELECT
-    END SUBROUTINE eval_rheology_explicit
+    END SUBROUTINE eval_rheology_explicit_dispatch
 
     !> \brief Dispatch the semi-implicit real-valued rheology momentum source.
     !> \param[in] model_name Canonical rheology model name.
@@ -199,7 +195,7 @@ CONTAINS
     !> \param[in] use_stochastic Enable stochastic rheology coefficient.
     !> \param[in] stochastic_value Stochastic rheology coefficient.
     !> \param[out] rate Two-component momentum source.
-    SUBROUTINE eval_rheology_semi_implicit(model_name, state, mod_vel, mod_hor_vel, grav_coeff, curvature_term, &
+    SUBROUTINE eval_rheology_semi_implicit_dispatch(model_name, state, mod_vel, mod_hor_vel, grav_coeff, curvature_term, &
             B_second_xx, B_second_xy, B_second_yy, use_pore_pressure, &
             use_stochastic, stochastic_value, rate)
 
@@ -247,7 +243,7 @@ CONTAINS
             CALL fatal_error('Invalid rheology name in semi-implicit momentum-rate dispatch')
 
         END SELECT
-    END SUBROUTINE eval_rheology_semi_implicit
+    END SUBROUTINE eval_rheology_semi_implicit_dispatch
 
     !> \brief Dispatch the complex-valued implicit rheology momentum source.
     !> \param[in] model_name Canonical rheology model name.
@@ -259,7 +255,7 @@ CONTAINS
     !> \param[in] use_stochastic Enable stochastic rheology coefficient.
     !> \param[in] stochastic_value Stochastic rheology coefficient.
     !> \param[out] rate Two-component complex momentum source.
-    SUBROUTINE eval_rheology_implicit(model_name, state, mod_vel, mod_hor_vel, mod_vel2, &
+    SUBROUTINE eval_rheology_implicit_dispatch(model_name, state, mod_vel, mod_hor_vel, mod_vel2, &
             moving, use_stochastic, stochastic_value, rate)
 
         CHARACTER(*), INTENT(IN) :: model_name
@@ -296,7 +292,7 @@ CONTAINS
             CALL fatal_error('Invalid rheology name in implicit momentum-rate dispatch')
 
         END SELECT
-    END SUBROUTINE eval_rheology_implicit
+    END SUBROUTINE eval_rheology_implicit_dispatch
 
     !> \brief Dispatch exact velocity integration for the selected rheology.
     !> \param[in] model_name Canonical rheology model name.
@@ -310,7 +306,7 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic rheology coefficient.
     !> \param[out] velocity_after Velocity after the analytic source substep.
     !> \param[out] model_supported Whether the selected model has an analytic treatment.
-    SUBROUTINE solve_rheology_analytic(model_name, dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+    SUBROUTINE solve_rheology_analytic_dispatch(model_name, dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
             use_pore_pressure, use_stochastic, stochastic_value, velocity_after, model_supported)
 
         CHARACTER(*), INTENT(IN) :: model_name
@@ -357,7 +353,7 @@ CONTAINS
             model_supported = .FALSE.
 
         END SELECT
-    END SUBROUTINE solve_rheology_analytic
+    END SUBROUTINE solve_rheology_analytic_dispatch
 
     !> \brief Compute curvature-induced normal acceleration.
     !> \details Contract the topographic Hessian with the horizontal velocity twice: Bxx*u**2 +
@@ -382,7 +378,7 @@ CONTAINS
 
 
     ! Additive rates from all active rheology processes at the same stage state.
-    SUBROUTINE eval_rheology_explicit_processes(models,state,mod_vel,mod_hor_vel,mod_vel2, &
+    SUBROUTINE eval_rheology_explicit(models,state,mod_vel,mod_hor_vel,mod_vel2, &
          grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
          use_pore_pressure,moving,use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
@@ -395,14 +391,14 @@ CONTAINS
         INTEGER :: i
         rate=0.0_wp
         DO i=1,SIZE(models)
-            CALL eval_rheology_explicit(TRIM(models(i)),state,mod_vel,mod_hor_vel,mod_vel2, &
+            CALL eval_rheology_explicit_dispatch(TRIM(models(i)),state,mod_vel,mod_hor_vel,mod_vel2, &
                  grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
                  use_pore_pressure,moving,use_stochastic,stochastic_value,process_rate)
             rate=rate+process_rate
         END DO
-    END SUBROUTINE eval_rheology_explicit_processes
+    END SUBROUTINE eval_rheology_explicit
 
-    SUBROUTINE eval_rheology_semi_implicit_processes(models,state,mod_vel,mod_hor_vel, &
+    SUBROUTINE eval_rheology_semi_implicit(models,state,mod_vel,mod_hor_vel, &
          grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
          use_pore_pressure,use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
@@ -415,14 +411,14 @@ CONTAINS
         INTEGER :: i
         rate=0.0_wp
         DO i=1,SIZE(models)
-            CALL eval_rheology_semi_implicit(TRIM(models(i)),state,mod_vel,mod_hor_vel, &
+            CALL eval_rheology_semi_implicit_dispatch(TRIM(models(i)),state,mod_vel,mod_hor_vel, &
                  grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
                  use_pore_pressure,use_stochastic,stochastic_value,process_rate)
             rate=rate+process_rate
         END DO
-    END SUBROUTINE eval_rheology_semi_implicit_processes
+    END SUBROUTINE eval_rheology_semi_implicit
 
-    SUBROUTINE eval_rheology_implicit_processes(models,state,mod_vel,mod_hor_vel,mod_vel2, &
+    SUBROUTINE eval_rheology_implicit(models,state,mod_vel,mod_hor_vel,mod_vel2, &
          moving,use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(complex_physical_state_type), INTENT(IN) :: state
@@ -434,14 +430,14 @@ CONTAINS
         INTEGER :: i
         rate=CMPLX(0.0_wp,0.0_wp,wp)
         DO i=1,SIZE(models)
-            CALL eval_rheology_implicit(TRIM(models(i)),state,mod_vel,mod_hor_vel,mod_vel2, &
+            CALL eval_rheology_implicit_dispatch(TRIM(models(i)),state,mod_vel,mod_hor_vel,mod_vel2, &
                  moving,use_stochastic,stochastic_value,process_rate)
             rate=rate+process_rate
         END DO
-    END SUBROUTINE eval_rheology_implicit_processes
+    END SUBROUTINE eval_rheology_implicit
 
     ! Exact flows are composed in order, never added as rates.
-    SUBROUTINE solve_rheology_analytic_processes(models,dt,state,speed_ratio,grav_coeff, &
+    SUBROUTINE solve_rheology_analytic(models,dt,state,speed_ratio,grav_coeff, &
          curvature_acceleration,use_pore_pressure,use_stochastic,stochastic_value, &
          velocity_after,model_supported)
         CHARACTER(*), INTENT(IN) :: models(:)
@@ -456,13 +452,13 @@ CONTAINS
         velocity_after=[state%u,state%v]
         model_supported=.TRUE.
         DO i=1,SIZE(models)
-            CALL solve_rheology_analytic(TRIM(models(i)),dt,current_state,speed_ratio, &
+            CALL solve_rheology_analytic_dispatch(TRIM(models(i)),dt,current_state,speed_ratio, &
                  grav_coeff,curvature_acceleration,use_pore_pressure,use_stochastic, &
                  stochastic_value,velocity_after,model_supported)
             IF (.NOT.model_supported) RETURN
             current_state%u=velocity_after(1)
             current_state%v=velocity_after(2)
         END DO
-    END SUBROUTINE solve_rheology_analytic_processes
+    END SUBROUTINE solve_rheology_analytic
 
 END MODULE rheology_2d

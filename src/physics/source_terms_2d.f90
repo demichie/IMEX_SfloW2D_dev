@@ -169,7 +169,7 @@ CONTAINS
           status=-7
           RETURN
         END IF
-        CALL solve_rheology_analytic(selected_model_name, interval, physical_state, &
+        CALL solve_rheology_analytic([selected_model_name], interval, physical_state, &
              speed_ratio, context%grav_coeff, curvature_accel, pore_pressure_flag, &
              stochastic_flag, context%Zij, velocity_after, supported)
         IF (.NOT.supported) THEN
@@ -203,7 +203,7 @@ CONTAINS
         RETURN
       END IF
       heat_capacity=q_before(4)/flow_temperature
-      CALL solve_thermal_analytic('thermal_cooling',physical_state,interval, &
+      CALL solve_thermal_analytic(['thermal_cooling'],physical_state,interval, &
            heat_capacity,radiative_term_coeff,convective_term_coeff, &
            T_env,temperature_after)
       q_after(4)=heat_capacity*temperature_after
@@ -373,12 +373,12 @@ CONTAINS
        ! would erase it. This does not assign a derivative to Coulomb's cusp.
        moving = (REAL(mod_vel,wp) .NE. 0.0_wp) .OR. (AIMAG(mod_vel) .NE. 0.0_wp)
 
-       CALL eval_rheology_implicit(selected_model_name, physical_state, &
+       CALL eval_rheology_implicit([selected_model_name], physical_state, &
             mod_vel, mod_vel_hor, mod_vel2, moving, stochastic_flag, Zij, source_term(2:3))
     END IF
 
     IF (selected_thermal) THEN
-       CALL eval_thermal_implicit('thermal_cooling',physical_state, &
+       CALL eval_thermal_implicit(['thermal_cooling'],physical_state, &
             radiative_term_coeff,convective_term_coeff,T_env,source_term(4))
     ENDIF
 
@@ -496,7 +496,7 @@ CONTAINS
 
        exc_pore_pres = 0.0_wp
        IF (pore_pressure_flag) exc_pore_pres = qpj(idx_pore)
-       CALL eval_rheology_semi_implicit(selected_model_name, physical_state, &
+       CALL eval_rheology_semi_implicit([selected_model_name], physical_state, &
             mod_vel, mod_hor_vel, grav_coeff, curvature_term_flag, &
             Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, pore_pressure_flag, &
             stochastic_flag, Zj, source_term(2:3))
@@ -631,14 +631,14 @@ CONTAINS
           inverse_density=1.0_wp/r_rho_m
           pressure_excess=0.0_wp
           IF (pore_pressure_flag) pressure_excess=qpj(idx_pore)
-          CALL eval_rheology_explicit(active_rheology, physical_state, &
+          CALL eval_rheology_explicit([active_rheology], physical_state, &
                speed, horizontal_speed, speed_squared, grav_coeff, curvature_term_flag, &
                Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, pore_pressure_flag, &
                speed>0.0_wp, stochastic_flag, 0.0_wp, rheology_rate)
           expl_term(2:3)=expl_term(2:3)+rheology_rate
         END IF
         IF (thermal_cooling_flag .AND. group_contains_name(group,'thermal_cooling')) THEN
-          CALL eval_thermal_explicit('thermal_cooling',physical_state, &
+          CALL eval_thermal_explicit(['thermal_cooling'],physical_state, &
                radiative_term_coeff,convective_term_coeff,T_env,thermal_rate)
           expl_term(4)=expl_term(4)+thermal_rate
        END IF

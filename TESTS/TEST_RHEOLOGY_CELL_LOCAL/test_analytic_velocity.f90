@@ -672,7 +672,7 @@ CONTAINS
     physical_state%red_grav=reduced_gravity
     physical_state%alphas=solid_fraction
     physical_state%exc_pore_pres=excess_pore_pressure
-    CALL solve_rheology_analytic(model_id,integration_step,physical_state, &
+    CALL solve_rheology_analytic([model_id],integration_step,physical_state, &
          speed_ratio,gravity_coefficient,0.0_wp,use_pore_pressure, &
          use_stochastic,stochastic,actual,model_supported)
     IF (.NOT. model_supported) THEN
@@ -700,7 +700,7 @@ CONTAINS
     physical_state%red_grav=reduced_gravity
     physical_state%alphas=solid_fraction
     physical_state%exc_pore_pres=0.0_wp
-    CALL solve_rheology_analytic('rheology_unsupported',integration_step,physical_state, &
+    CALL solve_rheology_analytic(['rheology_unsupported'],integration_step,physical_state, &
          speed_ratio,gravity_coefficient,0.0_wp, .FALSE., &
          .FALSE.,0.0_wp,actual,model_supported)
     IF (model_supported) ERROR STOP 'Unsupported rheology name was accepted'

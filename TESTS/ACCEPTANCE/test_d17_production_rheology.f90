@@ -34,7 +34,7 @@ PROGRAM test_d17_production_rheology
     real_state%rho_m=density_real
     real_state%red_grav=8.0_wp
     real_state%alphas=solid
-    CALL eval_rheology_semi_implicit('rheology_newmodel',real_state, &
+    CALL eval_rheology_semi_implicit(['rheology_newmodel'],real_state, &
          SQRT(SUM(velocity**2)),SQRT(SUM(velocity**2)),9.81_wp,.FALSE., &
          0.0_wp,0.0_wp,0.0_wp,.FALSE.,.FALSE.,0.0_wp,si)
     CALL compare(si,[0.0_wp,0.0_wp],'production SI zero')
@@ -72,7 +72,7 @@ CONTAINS
     complex_state%v=v(2)
     complex_state%red_grav=CMPLX(8.0_wp,0.0_wp,wp)
     complex_state%alphas=CMPLX(solid,0.0_wp,wp)
-    CALL eval_rheology_implicit('rheology_newmodel',complex_state, &
+    CALL eval_rheology_implicit(['rheology_newmodel'],complex_state, &
          speed,horizontal,squared,.TRUE.,.FALSE.,0.0_wp,r)
   END SUBROUTINE implicit
   SUBROUTINE compare(actual,expected,label)

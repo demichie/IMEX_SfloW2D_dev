@@ -12,15 +12,13 @@ MODULE thermal_laws_2d
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_thermal_explicit, eval_thermal_semi_implicit
-  PUBLIC :: eval_thermal_explicit_processes, eval_thermal_semi_implicit_processes
-  PUBLIC :: eval_thermal_implicit_processes, solve_thermal_analytic_processes
   PUBLIC :: eval_thermal_implicit, solve_thermal_analytic
   ! Retain scalar entry points for existing callers and regression tests.
   PUBLIC :: eval_thermal_cooling_explicit, eval_thermal_cooling_semi_implicit
   PUBLIC :: eval_thermal_cooling_implicit, solve_thermal_cooling_analytic
   PUBLIC :: advance_lava_cooling_temperature
 CONTAINS
-  SUBROUTINE eval_thermal_explicit(model_name,state,radiative,convective,ambient,rate)
+  SUBROUTINE eval_thermal_explicit_dispatch(model_name,state,radiative,convective,ambient,rate)
     CHARACTER(*), INTENT(IN) :: model_name
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: radiative,convective,ambient
@@ -31,9 +29,9 @@ CONTAINS
     CASE DEFAULT
       CALL fatal_error('Unknown explicit thermal model: '//TRIM(model_name))
     END SELECT
-  END SUBROUTINE eval_thermal_explicit
+  END SUBROUTINE eval_thermal_explicit_dispatch
 
-  SUBROUTINE eval_thermal_semi_implicit(model_name,state,rate)
+  SUBROUTINE eval_thermal_semi_implicit_dispatch(model_name,state,rate)
     CHARACTER(*), INTENT(IN) :: model_name
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(OUT) :: rate
@@ -43,9 +41,9 @@ CONTAINS
     CASE DEFAULT
       CALL fatal_error('Unknown semi-implicit thermal model: '//TRIM(model_name))
     END SELECT
-  END SUBROUTINE eval_thermal_semi_implicit
+  END SUBROUTINE eval_thermal_semi_implicit_dispatch
 
-  SUBROUTINE eval_thermal_implicit(model_name,state,radiative,convective,ambient,rate)
+  SUBROUTINE eval_thermal_implicit_dispatch(model_name,state,radiative,convective,ambient,rate)
     CHARACTER(*), INTENT(IN) :: model_name
     TYPE(complex_physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: radiative,convective,ambient
@@ -56,9 +54,9 @@ CONTAINS
     CASE DEFAULT
       CALL fatal_error('Unknown implicit thermal model: '//TRIM(model_name))
     END SELECT
-  END SUBROUTINE eval_thermal_implicit
+  END SUBROUTINE eval_thermal_implicit_dispatch
 
-  SUBROUTINE solve_thermal_analytic(model_name,state,interval,heat_capacity, &
+  SUBROUTINE solve_thermal_analytic_dispatch(model_name,state,interval,heat_capacity, &
        radiative,convective,ambient,temperature_after)
     CHARACTER(*), INTENT(IN) :: model_name
     TYPE(physical_state_type), INTENT(IN) :: state
@@ -71,10 +69,10 @@ CONTAINS
     CASE DEFAULT
       CALL fatal_error('Unknown analytic thermal model: '//TRIM(model_name))
     END SELECT
-  END SUBROUTINE solve_thermal_analytic
+  END SUBROUTINE solve_thermal_analytic_dispatch
 
   ! All instantaneous thermal contributions are evaluated at one unchanged state.
-  SUBROUTINE eval_thermal_explicit_processes(models,state,radiative,convective,ambient,rate)
+  SUBROUTINE eval_thermal_explicit(models,state,radiative,convective,ambient,rate)
     CHARACTER(*), INTENT(IN) :: models(:)
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: radiative,convective,ambient
@@ -83,12 +81,12 @@ CONTAINS
     INTEGER :: i
     rate=0.0_wp
     DO i=1,SIZE(models)
-      CALL eval_thermal_explicit(TRIM(models(i)),state,radiative,convective,ambient,process_rate)
+      CALL eval_thermal_explicit_dispatch(TRIM(models(i)),state,radiative,convective,ambient,process_rate)
       rate=rate+process_rate
     END DO
-  END SUBROUTINE eval_thermal_explicit_processes
+  END SUBROUTINE eval_thermal_explicit
 
-  SUBROUTINE eval_thermal_semi_implicit_processes(models,state,rate)
+  SUBROUTINE eval_thermal_semi_implicit(models,state,rate)
     CHARACTER(*), INTENT(IN) :: models(:)
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(OUT) :: rate
@@ -96,12 +94,12 @@ CONTAINS
     INTEGER :: i
     rate=0.0_wp
     DO i=1,SIZE(models)
-      CALL eval_thermal_semi_implicit(TRIM(models(i)),state,process_rate)
+      CALL eval_thermal_semi_implicit_dispatch(TRIM(models(i)),state,process_rate)
       rate=rate+process_rate
     END DO
-  END SUBROUTINE eval_thermal_semi_implicit_processes
+  END SUBROUTINE eval_thermal_semi_implicit
 
-  SUBROUTINE eval_thermal_implicit_processes(models,state,radiative,convective,ambient,rate)
+  SUBROUTINE eval_thermal_implicit(models,state,radiative,convective,ambient,rate)
     CHARACTER(*), INTENT(IN) :: models(:)
     TYPE(complex_physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: radiative,convective,ambient
@@ -110,13 +108,13 @@ CONTAINS
     INTEGER :: i
     rate=CMPLX(0.0_wp,0.0_wp,wp)
     DO i=1,SIZE(models)
-      CALL eval_thermal_implicit(TRIM(models(i)),state,radiative,convective,ambient,process_rate)
+      CALL eval_thermal_implicit_dispatch(TRIM(models(i)),state,radiative,convective,ambient,process_rate)
       rate=rate+process_rate
     END DO
-  END SUBROUTINE eval_thermal_implicit_processes
+  END SUBROUTINE eval_thermal_implicit
 
   ! Exact operators are composed on the updated temperature in declaration order.
-  SUBROUTINE solve_thermal_analytic_processes(models,state,interval,heat_capacity, &
+  SUBROUTINE solve_thermal_analytic(models,state,interval,heat_capacity, &
        radiative,convective,ambient,temperature_after)
     CHARACTER(*), INTENT(IN) :: models(:)
     TYPE(physical_state_type), INTENT(IN) :: state
@@ -127,10 +125,10 @@ CONTAINS
     current_state=state
     temperature_after=state%T
     DO i=1,SIZE(models)
-      CALL solve_thermal_analytic(TRIM(models(i)),current_state,interval,heat_capacity, &
+      CALL solve_thermal_analytic_dispatch(TRIM(models(i)),current_state,interval,heat_capacity, &
            radiative,convective,ambient,temperature_after)
       current_state%T=temperature_after
     END DO
-  END SUBROUTINE solve_thermal_analytic_processes
+  END SUBROUTINE solve_thermal_analytic
 
 END MODULE thermal_laws_2d
