@@ -39,8 +39,30 @@ MODULE rheology_voellmy_2d
     REAL(wp) :: mu
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
-
-    !> \brief Evaluate the rheology model or supporting constitutive function.
+    !> \brief Evaluate the explicit voellmy contribution to the horizontal momentum source.
+    !> \details Compute the momentum source under the Voellmy Coulomb and turbulent basal resistance law, using the treatment-specific velocity and effective-stress inputs. Outputs are conservative x/y momentum source rates.
+    !> \param[in] h Flow depth [m].
+    !> \param[in] T Absolute mixture temperature [K].
+    !> \param[in] u Horizontal x velocity [m s^-1].
+    !> \param[in] v Horizontal y velocity [m s^-1].
+    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
+    !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
+    !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
+    !> \param[in] rhom Mixture density [kg m^-3].
+    !> \param[in] inv_rhom Reciprocal mixture density [m^3 kg^-1].
+    !> \param[in] red_grav Reduced gravitational acceleration [m s^-2].
+    !> \param[in] grav_coeff Local dimensionless gravitational correction.
+    !> \param[in] alphas Solid volume fractions by class.
+    !> \param[in] curvature_term Enable curvature correction.
+    !> \param[in] B_second_xx Topographic second derivative in x [m^-1].
+    !> \param[in] B_second_xy Mixed topographic derivative [m^-1].
+    !> \param[in] B_second_yy Topographic second derivative in y [m^-1].
+    !> \param[in] use_pore_pressure Enable pore-pressure correction.
+    !> \param[in] exc_pore_pres Excess pore pressure [Pa].
+    !> \param[in] moving True for a moving local state.
+    !> \param[in] use_stochastic Enable model stochastic parameter.
+    !> \param[in] stochastic_value Stochastic parameter value.
+    !> \param[out] rate Two-component conservative momentum source.
     SUBROUTINE eval_rheology_voellmy_explicit( &
             h, T, u, v, mod_vel, mod_hor_vel, &
             mod_vel2, rhom, inv_rhom, red_grav, &
@@ -69,8 +91,23 @@ CONTAINS
             stochastic_value, ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_voellmy_explicit
-
-    !> \brief Evaluate the rheology source contribution.
+    !> \brief Evaluate the semi-implicit voellmy contribution to the horizontal momentum source.
+    !> \details Return the contribution assigned to the semi-implicit treatment. This implementation supplies a zero source when the model has no term in this treatment.
+    !> \param[in] h Flow depth [m].
+    !> \param[in] u Horizontal x velocity [m s^-1].
+    !> \param[in] v Horizontal y velocity [m s^-1].
+    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
+    !> \param[in] rhom Mixture density [kg m^-3].
+    !> \param[in] red_grav Reduced gravitational acceleration [m s^-2].
+    !> \param[in] grav_coeff Local dimensionless gravitational correction.
+    !> \param[in] curvature_term Enable curvature correction.
+    !> \param[in] B_second_xx Topographic second derivative in x [m^-1].
+    !> \param[in] B_second_xy Mixed topographic derivative [m^-1].
+    !> \param[in] B_second_yy Topographic second derivative in y [m^-1].
+    !> \param[in] use_pore_pressure Enable pore-pressure correction.
+    !> \param[in] exc_pore_pres Excess pore pressure [Pa].
+    !> \param[out] rate_x x momentum source.
+    !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_voellmy_semi_implicit(h, u, v, &
 
             mod_vel, rhom, red_grav, grav_coeff,            &
@@ -103,8 +140,19 @@ CONTAINS
         rate_x = -friction_stress * u / mod_vel
         rate_y = -friction_stress * v / mod_vel
     END SUBROUTINE eval_rheology_voellmy_semi_implicit
-
-    !> \brief Evaluate the rheology source contribution.
+    !> \brief Evaluate the implicit voellmy contribution to the horizontal momentum source.
+    !> \details Return the contribution assigned to the implicit treatment. This implementation supplies a zero source when the model has no term in this treatment.
+    !> \param[in] u Horizontal x velocity [m s^-1].
+    !> \param[in] v Horizontal y velocity [m s^-1].
+    !> \param[in] rhom Mixture density [kg m^-3].
+    !> \param[in] red_grav Reduced gravitational acceleration [m s^-2].
+    !> \param[in] mod_vel Three-dimensional speed [m s^-1].
+    !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
+    !> \param[in] moving True for a moving local state.
+    !> \param[in] use_stochastic_xi Enable stochastic turbulent resistance.
+    !> \param[in] stochastic_value Stochastic parameter value.
+    !> \param[out] rate_x x momentum source.
+    !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_voellmy_implicit(u, v, rhom, &
             red_grav, mod_vel, mod_vel2, moving, use_stochastic_xi,          &
             stochastic_value, rate_x, rate_y)
@@ -134,8 +182,21 @@ CONTAINS
         rate_x = -turbulent_stress * (u / mod_vel)
         rate_y = -turbulent_stress * (v / mod_vel)
     END SUBROUTINE eval_rheology_voellmy_implicit
-
-    !> \brief Integrate the corresponding rheology source analytically.
+    !> \brief Integrate the voellmy velocity source in time.
+    !> \details Advance the scalar speed under the Voellmy Coulomb and turbulent basal resistance law with model coefficients fixed over dt; the horizontal direction is retained in the returned velocity vector.
+    !> \param[in] dt Source integration interval [s].
+    !> \param[in] h Flow depth [m].
+    !> \param[in] speed_ratio Ratio of total to horizontal speed.
+    !> \param[in] velocity_before Horizontal velocity vector before source integration [m s^-1].
+    !> \param[in] rhom Mixture density [kg m^-3].
+    !> \param[in] red_grav Reduced gravitational acceleration [m s^-2].
+    !> \param[in] grav_coeff Local dimensionless gravitational correction.
+    !> \param[in] curvature_acceleration Normal acceleration due to topographic curvature [m s^-2].
+    !> \param[in] use_pore_pressure Enable pore-pressure correction.
+    !> \param[in] exc_pore_pres Excess pore pressure [Pa].
+    !> \param[in] use_stochastic_xi Enable stochastic turbulent resistance.
+    !> \param[in] stochastic_xi_value Stochastic turbulent resistance parameter.
+    !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
     SUBROUTINE solve_rheology_voellmy_analytic(dt, h, &
             speed_ratio, velocity_before, rhom, red_grav,        &
             grav_coeff, curvature_acceleration, use_pore_pressure,       &
