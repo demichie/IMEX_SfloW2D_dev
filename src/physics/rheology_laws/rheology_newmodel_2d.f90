@@ -12,17 +12,17 @@ MODULE rheology_newmodel_2d
   PUBLIC :: solve_rheology_newmodel_analytic
 CONTAINS
   SUBROUTINE eval_rheology_newmodel_explicit( &
-       flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-       speed_squared, mixture_density, inverse_density, reduced_gravity, &
-       gravity_coefficient, solid_fractions, curvature_term, curvature_xx, curvature_xy, &
-       curvature_yy, use_pore_pressure, excess_pore_pressure, moving, use_stochastic, &
+       h, T, u, v, mod_vel, mod_hor_vel, &
+       mod_vel2, rhom, inv_rhom, red_grav, &
+       grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
+       B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
        stochastic_value, rate )
-    REAL(wp), INTENT(IN) :: flow_depth, temperature, velocity_x, velocity_y
-    REAL(wp), INTENT(IN) :: speed, horizontal_speed, speed_squared
-    REAL(wp), INTENT(IN) :: mixture_density, inverse_density, reduced_gravity
-    REAL(wp), INTENT(IN) :: gravity_coefficient, solid_fractions(:)
-    REAL(wp), INTENT(IN) :: curvature_xx, curvature_xy, curvature_yy
-    REAL(wp), INTENT(IN) :: excess_pore_pressure, stochastic_value
+    REAL(wp), INTENT(IN) :: h, T, u, v
+    REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
+    REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
+    REAL(wp), INTENT(IN) :: grav_coeff, alphas(:)
+    REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy
+    REAL(wp), INTENT(IN) :: exc_pore_pres, stochastic_value
     LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
     REAL(wp), INTENT(OUT) :: rate(2)
     ! Keep the common four-treatment interface, but this fixture is Newton-only.
@@ -36,13 +36,13 @@ CONTAINS
     rate_y=0.0_wp
   END SUBROUTINE eval_rheology_newmodel_semi_implicit
 
-  SUBROUTINE eval_rheology_newmodel_implicit(velocity_x,velocity_y, &
-       mixture_density,rate_x,rate_y)
-    COMPLEX(wp), INTENT(IN) :: velocity_x,velocity_y,mixture_density
+  SUBROUTINE eval_rheology_newmodel_implicit(u,v, &
+       rhom,rate_x,rate_y)
+    COMPLEX(wp), INTENT(IN) :: u,v,rhom
     COMPLEX(wp), INTENT(OUT) :: rate_x,rate_y
     REAL(wp), PARAMETER :: drag_coefficient=0.1_wp
-    rate_x=-drag_coefficient*mixture_density*velocity_x
-    rate_y=-drag_coefficient*mixture_density*velocity_y
+    rate_x=-drag_coefficient*rhom*u
+    rate_y=-drag_coefficient*rhom*v
   END SUBROUTINE eval_rheology_newmodel_implicit
 
   SUBROUTINE solve_rheology_newmodel_analytic()

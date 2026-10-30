@@ -1,11 +1,11 @@
 !********************************************************************************
 !> \brief Constant-strength plastic basal-friction model.
-!> \details The model applies a speed-independent resisting strength
+!> \details The model applies a mod_vel-independent resisting strength
 !> \f$\tau\f$ opposite to the horizontal flow direction:
 !> \f[
 !> \boldsymbol{S}=-\rho_m\tau\,\boldsymbol{u}_h/|\boldsymbol{u}|.
 !> \f]
-!> The supplied speed is the normalization used by the implementation. The
+!> The supplied mod_vel is the normalization used by the implementation. The
 !> source is zero when the caller indicates that the flow is not moving.
 !> \ref eval_rheology_plastic_implicit evaluates the complex-valued x/y rates
 !> for the implicit solve, while \ref solve_rheology_plastic_analytic
@@ -29,17 +29,17 @@ MODULE rheology_plastic_2d
 CONTAINS
 
   SUBROUTINE eval_rheology_plastic_explicit( &
-       flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-       speed_squared, mixture_density, inverse_density, reduced_gravity, &
-       gravity_coefficient, solid_fractions, curvature_term, curvature_xx, curvature_xy, &
-       curvature_yy, use_pore_pressure, excess_pore_pressure, moving, use_stochastic, &
+       h, T, u, v, mod_vel, mod_hor_vel, &
+       mod_vel2, rhom, inv_rhom, red_grav, &
+       grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
+       B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
        stochastic_value, rate )
-    REAL(wp), INTENT(IN) :: flow_depth, temperature, velocity_x, velocity_y
-    REAL(wp), INTENT(IN) :: speed, horizontal_speed, speed_squared
-    REAL(wp), INTENT(IN) :: mixture_density, inverse_density, reduced_gravity
-    REAL(wp), INTENT(IN) :: gravity_coefficient, solid_fractions(:)
-    REAL(wp), INTENT(IN) :: curvature_xx, curvature_xy, curvature_yy
-    REAL(wp), INTENT(IN) :: excess_pore_pressure, stochastic_value
+    REAL(wp), INTENT(IN) :: h, T, u, v
+    REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
+    REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
+    REAL(wp), INTENT(IN) :: grav_coeff, alphas(:)
+    REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy
+    REAL(wp), INTENT(IN) :: exc_pore_pres, stochastic_value
     LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
     REAL(wp), INTENT(OUT) :: rate(2)
     REAL(wp) :: sx, sy
@@ -47,8 +47,8 @@ CONTAINS
     CALL eval_rheology_plastic_semi_implicit( &
        sx, sy )
     CALL eval_rheology_plastic_implicit( &
-       CMPLX(velocity_x,0.0_wp,wp), CMPLX(velocity_y,0.0_wp,wp), CMPLX(speed,0.0_wp,wp), &
-       CMPLX(mixture_density,0.0_wp,wp), moving, ix, iy )
+       CMPLX(u,0.0_wp,wp), CMPLX(v,0.0_wp,wp), CMPLX(mod_vel,0.0_wp,wp), &
+       CMPLX(rhom,0.0_wp,wp), moving, ix, iy )
     rate=[sx,sy]+REAL([ix,iy],wp)
   END SUBROUTINE eval_rheology_plastic_explicit
 
@@ -58,44 +58,44 @@ CONTAINS
     rate_y = 0.0_wp
   END SUBROUTINE eval_rheology_plastic_semi_implicit
 
-  SUBROUTINE eval_rheology_plastic_implicit(velocity_x, velocity_y, speed, &
-       mixture_density, moving, rate_x, rate_y)
-    COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y, speed, mixture_density
+  SUBROUTINE eval_rheology_plastic_implicit(u, v, mod_vel, &
+       rhom, moving, rate_x, rate_y)
+    COMPLEX(wp), INTENT(IN) :: u, v, mod_vel, rhom
     LOGICAL, INTENT(IN) :: moving
     COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
     rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
     rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
     IF (.NOT. moving) RETURN
-    rate_x = -mixture_density * tau * (velocity_x / speed)
-    rate_y = -mixture_density * tau * (velocity_y / speed)
+    rate_x = -rhom * tau * (u / mod_vel)
+    rate_y = -rhom * tau * (v / mod_vel)
   END SUBROUTINE eval_rheology_plastic_implicit
 
-  SUBROUTINE solve_rheology_plastic_analytic(integration_step, flow_depth,  &
+  SUBROUTINE solve_rheology_plastic_analytic(dt, h,  &
        speed_ratio, velocity_before, velocity_after)
-    REAL(wp), INTENT(IN) :: integration_step, flow_depth, speed_ratio
+    REAL(wp), INTENT(IN) :: dt, h, speed_ratio
     REAL(wp), INTENT(IN) :: velocity_before(2)
     REAL(wp), INTENT(OUT) :: velocity_after(2)
     REAL(wp) :: speed_before, speed_after
     velocity_after = velocity_before
     speed_before = SQRT(SUM(velocity_before**2))
-    CALL validate_analytic_velocity_inputs(integration_step, flow_depth,    &
+    CALL validate_analytic_velocity_inputs(dt, h,    &
          speed_ratio, speed_before, 'plastic')
-    IF (integration_step .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+    IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
     CALL solve_exact_velocity_flow(EXACT_FLOW_CONSTANT,                     &
-         [tau/(flow_depth*speed_ratio)], integration_step, speed_before,    &
+         [tau/(h*speed_ratio)], dt, speed_before,    &
          speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
   END SUBROUTINE solve_rheology_plastic_analytic
 
   !******************************************************************************
   !> \brief Integrate the constant plastic-friction velocity source exactly.
-  !> \details Holds depth and the speed-to-horizontal-speed ratio fixed. The
-  !> speed is reduced by the constant friction acceleration until it reaches
+  !> \details Holds depth and the mod_vel-to-horizontal-mod_vel ratio fixed. The
+  !> mod_vel is reduced by the constant friction acceleration until it reaches
   !> zero; the horizontal velocity direction is preserved:
   !> \f$r^+=\max(0,r_0-\lambda\tau/(h\beta))\f$.
-  !> \param[in] integration_step Exact-flow interval, normally dt * a_ii.
-  !> \param[in] flow_depth Explicit flow depth.
-  !> \param[in] speed_ratio Explicit ratio of total to horizontal speed.
+  !> \param[in] dt Exact-flow interval, normally dt * a_ii.
+  !> \param[in] h Explicit flow depth.
+  !> \param[in] speed_ratio Explicit ratio of total to horizontal mod_vel.
   !> \param[in] velocity_before Horizontal velocity before integration.
   !> \param[out] velocity_after Horizontal velocity after integration.
   !******************************************************************************
@@ -104,10 +104,10 @@ CONTAINS
   !> \details Returns \f$-\rho_m\tau(u_x,u_y)/|\boldsymbol{u}|\f$ for a
   !> moving state and zero otherwise. Complex arithmetic preserves derivatives
   !> with respect to the state in the implicit Jacobian.
-  !> \param[in] velocity_x x velocity [m s^-1].
-  !> \param[in] velocity_y y velocity [m s^-1].
-  !> \param[in] speed Speed used to normalize the direction [m s^-1].
-  !> \param[in] mixture_density Mixture density \f$\rho_m\f$ [kg m^-3].
+  !> \param[in] u x velocity [m s^-1].
+  !> \param[in] v y velocity [m s^-1].
+  !> \param[in] mod_vel mod_vel used to normalize the direction [m s^-1].
+  !> \param[in] rhom Mixture density \f$\rho_m\f$ [kg m^-3].
   !> \param[in] moving Whether the state is moving.
   !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
   !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].

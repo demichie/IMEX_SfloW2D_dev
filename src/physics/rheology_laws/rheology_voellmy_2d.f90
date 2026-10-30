@@ -41,69 +41,69 @@ MODULE rheology_voellmy_2d
 CONTAINS
 
   SUBROUTINE eval_rheology_voellmy_explicit( &
-       flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-       speed_squared, mixture_density, inverse_density, reduced_gravity, &
-       gravity_coefficient, solid_fractions, curvature_term, curvature_xx, curvature_xy, &
-       curvature_yy, use_pore_pressure, excess_pore_pressure, moving, use_stochastic, &
+       h, T, u, v, mod_vel, mod_hor_vel, &
+       mod_vel2, rhom, inv_rhom, red_grav, &
+       grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
+       B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
        stochastic_value, rate )
-    REAL(wp), INTENT(IN) :: flow_depth, temperature, velocity_x, velocity_y
-    REAL(wp), INTENT(IN) :: speed, horizontal_speed, speed_squared
-    REAL(wp), INTENT(IN) :: mixture_density, inverse_density, reduced_gravity
-    REAL(wp), INTENT(IN) :: gravity_coefficient, solid_fractions(:)
-    REAL(wp), INTENT(IN) :: curvature_xx, curvature_xy, curvature_yy
-    REAL(wp), INTENT(IN) :: excess_pore_pressure, stochastic_value
+    REAL(wp), INTENT(IN) :: h, T, u, v
+    REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
+    REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
+    REAL(wp), INTENT(IN) :: grav_coeff, alphas(:)
+    REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy
+    REAL(wp), INTENT(IN) :: exc_pore_pres, stochastic_value
     LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
     REAL(wp), INTENT(OUT) :: rate(2)
     REAL(wp) :: sx, sy
     COMPLEX(wp) :: ix, iy
     CALL eval_rheology_voellmy_semi_implicit( &
-       flow_depth, velocity_x, velocity_y, speed, mixture_density, reduced_gravity, &
-       gravity_coefficient, curvature_term, curvature_xx, curvature_xy, curvature_yy, &
-       use_pore_pressure, excess_pore_pressure, sx, sy )
+       h, u, v, mod_vel, rhom, red_grav, &
+       grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
+       use_pore_pressure, exc_pore_pres, sx, sy )
     CALL eval_rheology_voellmy_implicit( &
-       CMPLX(velocity_x,0.0_wp,wp), CMPLX(velocity_y,0.0_wp,wp), &
-       CMPLX(mixture_density,0.0_wp,wp), CMPLX(reduced_gravity,0.0_wp,wp), &
-       CMPLX(speed,0.0_wp,wp), CMPLX(speed_squared,0.0_wp,wp), moving, use_stochastic, &
+       CMPLX(u,0.0_wp,wp), CMPLX(v,0.0_wp,wp), &
+       CMPLX(rhom,0.0_wp,wp), CMPLX(red_grav,0.0_wp,wp), &
+       CMPLX(mod_vel,0.0_wp,wp), CMPLX(mod_vel2,0.0_wp,wp), moving, use_stochastic, &
        stochastic_value, ix, iy )
     rate=[sx,sy]+REAL([ix,iy],wp)
   END SUBROUTINE eval_rheology_voellmy_explicit
 
-  SUBROUTINE eval_rheology_voellmy_semi_implicit(flow_depth, velocity_x, velocity_y, &
-       speed, mixture_density, reduced_gravity, gravity_coefficient,            &
-       curvature_term, curvature_xx, curvature_xy, curvature_yy,                &
-       use_pore_pressure, excess_pore_pressure, rate_x, rate_y)
-    REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
-    REAL(wp), INTENT(IN) :: mixture_density, reduced_gravity, gravity_coefficient
+  SUBROUTINE eval_rheology_voellmy_semi_implicit(h, u, v, &
+       mod_vel, rhom, red_grav, grav_coeff,            &
+       curvature_term, B_second_xx, B_second_xy, B_second_yy,                &
+       use_pore_pressure, exc_pore_pres, rate_x, rate_y)
+    REAL(wp), INTENT(IN) :: h, u, v, mod_vel
+    REAL(wp), INTENT(IN) :: rhom, red_grav, grav_coeff
     LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure
-    REAL(wp), INTENT(IN) :: curvature_xx, curvature_xy, curvature_yy
-    REAL(wp), INTENT(IN) :: excess_pore_pressure
+    REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy
+    REAL(wp), INTENT(IN) :: exc_pore_pres
     REAL(wp), INTENT(OUT) :: rate_x, rate_y
     REAL(wp) :: curvature_acceleration, friction_stress
     rate_x = 0.0_wp
     rate_y = 0.0_wp
-    IF (speed .LE. 0.0_wp) RETURN
+    IF (mod_vel .LE. 0.0_wp) RETURN
     curvature_acceleration = 0.0_wp
     IF (curvature_term) THEN
-       curvature_acceleration = curvature_xx * velocity_x**2                &
-            + 2.0_wp * curvature_xy * velocity_x * velocity_y                &
-            + curvature_yy * velocity_y**2
+       curvature_acceleration = B_second_xx * u**2                &
+            + 2.0_wp * B_second_xy * u * v                &
+            + B_second_yy * v**2
     END IF
-    friction_stress = mu * mixture_density *                                  &
-         (reduced_gravity + curvature_acceleration) * flow_depth              &
-         * SQRT(gravity_coefficient)
+    friction_stress = mu * rhom *                                  &
+         (red_grav + curvature_acceleration) * h              &
+         * SQRT(grav_coeff)
     friction_stress = MAX(0.0_wp, friction_stress)
     IF (use_pore_pressure) friction_stress = MAX(0.0_wp, friction_stress      &
-         - mu * SQRT(gravity_coefficient) * excess_pore_pressure)
-    rate_x = -friction_stress * velocity_x / speed
-    rate_y = -friction_stress * velocity_y / speed
+         - mu * SQRT(grav_coeff) * exc_pore_pres)
+    rate_x = -friction_stress * u / mod_vel
+    rate_y = -friction_stress * v / mod_vel
   END SUBROUTINE eval_rheology_voellmy_semi_implicit
 
-  SUBROUTINE eval_rheology_voellmy_implicit(velocity_x, velocity_y, mixture_density, &
-       reduced_gravity, speed, speed_squared, moving, use_stochastic_xi,          &
+  SUBROUTINE eval_rheology_voellmy_implicit(u, v, rhom, &
+       red_grav, mod_vel, mod_vel2, moving, use_stochastic_xi,          &
        stochastic_value, rate_x, rate_y)
-    COMPLEX(wp), INTENT(IN) :: velocity_x, velocity_y
-    COMPLEX(wp), INTENT(IN) :: mixture_density, reduced_gravity
-    COMPLEX(wp), INTENT(IN) :: speed, speed_squared
+    COMPLEX(wp), INTENT(IN) :: u, v
+    COMPLEX(wp), INTENT(IN) :: rhom, red_grav
+    COMPLEX(wp), INTENT(IN) :: mod_vel, mod_vel2
     LOGICAL, INTENT(IN) :: moving, use_stochastic_xi
     REAL(wp), INTENT(IN) :: stochastic_value
     COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
@@ -119,20 +119,20 @@ CONTAINS
     ELSE
        xi_effective = xi
     END IF
-    turbulent_stress = mixture_density * reduced_gravity / xi_effective * speed_squared
-    rate_x = -turbulent_stress * (velocity_x / speed)
-    rate_y = -turbulent_stress * (velocity_y / speed)
+    turbulent_stress = rhom * red_grav / xi_effective * mod_vel2
+    rate_x = -turbulent_stress * (u / mod_vel)
+    rate_y = -turbulent_stress * (v / mod_vel)
   END SUBROUTINE eval_rheology_voellmy_implicit
 
-  SUBROUTINE solve_rheology_voellmy_analytic(integration_step, flow_depth, &
-       speed_ratio, velocity_before, mixture_density, reduced_gravity,        &
-       gravity_coefficient, curvature_acceleration, use_pore_pressure,       &
-       excess_pore_pressure, use_stochastic_xi, stochastic_xi_value,          &
+  SUBROUTINE solve_rheology_voellmy_analytic(dt, h, &
+       speed_ratio, velocity_before, rhom, red_grav,        &
+       grav_coeff, curvature_acceleration, use_pore_pressure,       &
+       exc_pore_pres, use_stochastic_xi, stochastic_xi_value,          &
        velocity_after)
-    REAL(wp), INTENT(IN) :: integration_step, flow_depth, speed_ratio
-    REAL(wp), INTENT(IN) :: velocity_before(2), mixture_density
-    REAL(wp), INTENT(IN) :: reduced_gravity, gravity_coefficient
-    REAL(wp), INTENT(IN) :: curvature_acceleration, excess_pore_pressure
+    REAL(wp), INTENT(IN) :: dt, h, speed_ratio
+    REAL(wp), INTENT(IN) :: velocity_before(2), rhom
+    REAL(wp), INTENT(IN) :: red_grav, grav_coeff
+    REAL(wp), INTENT(IN) :: curvature_acceleration, exc_pore_pres
     LOGICAL, INTENT(IN) :: use_pore_pressure, use_stochastic_xi
     REAL(wp), INTENT(IN) :: stochastic_xi_value
     REAL(wp), INTENT(OUT) :: velocity_after(2)
@@ -140,13 +140,13 @@ CONTAINS
     REAL(wp) :: coulomb_stress, constant_drag, quadratic_drag
     velocity_after = velocity_before
     speed_before = SQRT(SUM(velocity_before**2))
-    CALL validate_analytic_velocity_inputs(integration_step, flow_depth,    &
+    CALL validate_analytic_velocity_inputs(dt, h,    &
          speed_ratio, speed_before, 'Voellmy')
-    IF (integration_step .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
-    IF (mixture_density .LE. 0.0_wp) THEN
+    IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+    IF (rhom .LE. 0.0_wp) THEN
        CALL fatal_analytic_input_error('Nonpositive mixture density in Voellmy analytic solver')
     END IF
-    IF (gravity_coefficient .LE. 0.0_wp) THEN
+    IF (grav_coeff .LE. 0.0_wp) THEN
        CALL fatal_analytic_input_error('Nonpositive gravity multiplier in Voellmy analytic solver')
     END IF
     xi_effective = xi
@@ -156,15 +156,15 @@ CONTAINS
     ELSEIF (xi_effective .LE. 0.0_wp) THEN
        CALL fatal_analytic_input_error('Nonpositive xi in Voellmy analytic solver')
     END IF
-    coulomb_stress = mu * mixture_density * (reduced_gravity +              &
-         curvature_acceleration) * flow_depth * SQRT(gravity_coefficient)
+    coulomb_stress = mu * rhom * (red_grav +              &
+         curvature_acceleration) * h * SQRT(grav_coeff)
     coulomb_stress = MAX(0.0_wp, coulomb_stress)
     IF (use_pore_pressure) coulomb_stress = MAX(0.0_wp, coulomb_stress -    &
-         mu * SQRT(gravity_coefficient) * excess_pore_pressure)
-    constant_drag = coulomb_stress / (mixture_density * flow_depth * speed_ratio)
-    quadratic_drag = reduced_gravity * speed_ratio / (xi_effective*flow_depth)
+         mu * SQRT(grav_coeff) * exc_pore_pres)
+    constant_drag = coulomb_stress / (rhom * h * speed_ratio)
+    quadratic_drag = red_grav * speed_ratio / (xi_effective*h)
     CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,         &
-         [constant_drag, 0.0_wp, quadratic_drag], integration_step,          &
+         [constant_drag, 0.0_wp, quadratic_drag], dt,          &
          speed_before, speed_after)
     velocity_after = (speed_after / speed_before) * velocity_before
   END SUBROUTINE solve_rheology_voellmy_analytic
@@ -173,17 +173,17 @@ CONTAINS
   !> \brief Integrate the Voellmy velocity source exactly.
   !> \details Combines the frozen Coulomb stress with quadratic turbulent
   !> drag. Depth, density, gravity, curvature, pore pressure, and the
-  !> speed-to-horizontal-speed ratio remain fixed during integration.
-  !> \param[in] integration_step Exact-flow integration interval [s].
-  !> \param[in] flow_depth Explicit flow depth [m].
-  !> \param[in] speed_ratio Explicit total-to-horizontal speed ratio.
+  !> mod_vel-to-horizontal-mod_vel ratio remain fixed during integration.
+  !> \param[in] dt Exact-flow integration interval [s].
+  !> \param[in] h Explicit flow depth [m].
+  !> \param[in] speed_ratio Explicit total-to-horizontal mod_vel ratio.
   !> \param[in] velocity_before Input horizontal velocity [m s^-1].
-  !> \param[in] mixture_density Explicit mixture density [kg m^-3].
-  !> \param[in] reduced_gravity Explicit reduced gravity [m s^-2].
-  !> \param[in] gravity_coefficient Explicit gravity multiplier [dimensionless].
+  !> \param[in] rhom Explicit mixture density [kg m^-3].
+  !> \param[in] red_grav Explicit reduced gravity [m s^-2].
+  !> \param[in] grav_coeff Explicit gravity multiplier [dimensionless].
   !> \param[in] curvature_acceleration Explicit curvature contribution [m s^-2].
   !> \param[in] use_pore_pressure Enable explicit pore-pressure reduction.
-  !> \param[in] excess_pore_pressure Explicit excess pore pressure [Pa].
+  !> \param[in] exc_pore_pres Explicit excess pore pressure [Pa].
   !> \param[in] use_stochastic_xi Enable stochastic \f$\xi\f$ adjustment.
   !> \param[in] stochastic_xi_value Explicit stochastic \f$\xi\f$ increment.
   !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
@@ -193,12 +193,12 @@ CONTAINS
   !> \details Computes the velocity-squared stress using \f$\xi\f$ and returns
   !> its x/y components opposite to the velocity direction. Optional
   !> stochastic variation of \f$\xi\f$ is bounded to [1, 10^5].
-  !> \param[in] velocity_x x velocity [m s^-1].
-  !> \param[in] velocity_y y velocity [m s^-1].
-  !> \param[in] mixture_density Mixture density \f$\rho_m\f$ [kg m^-3].
-  !> \param[in] reduced_gravity Reduced gravity \f$g'\f$ [m s^-2].
-  !> \param[in] speed Speed magnitude [m s^-1].
-  !> \param[in] speed_squared Squared speed used in the turbulent stress [m^2 s^-2].
+  !> \param[in] u x velocity [m s^-1].
+  !> \param[in] v y velocity [m s^-1].
+  !> \param[in] rhom Mixture density \f$\rho_m\f$ [kg m^-3].
+  !> \param[in] red_grav Reduced gravity \f$g'\f$ [m s^-2].
+  !> \param[in] mod_vel mod_vel magnitude [m s^-1].
+  !> \param[in] mod_vel2 Squared mod_vel used in the turbulent stress [m^2 s^-2].
   !> \param[in] moving Whether the state is moving.
   !> \param[in] use_stochastic_xi Enable the stochastic \f$\xi\f$ variation.
   !> \param[in] stochastic_value Stochastic increment to \f$\xi\f$.
@@ -212,19 +212,19 @@ CONTAINS
   !> optional curvature acceleration, clips negative stress to zero, and
   !> optionally reduces it by excess pore pressure. The returned x/y sources
   !> oppose the horizontal flow direction.
-  !> \param[in] flow_depth Flow depth [m].
-  !> \param[in] velocity_x x velocity [m s^-1].
-  !> \param[in] velocity_y y velocity [m s^-1].
-  !> \param[in] speed Speed magnitude [m s^-1].
-  !> \param[in] mixture_density Mixture density [kg m^-3].
-  !> \param[in] reduced_gravity Reduced gravity [m s^-2].
-  !> \param[in] gravity_coefficient Gravity multiplier [dimensionless].
+  !> \param[in] h Flow depth [m].
+  !> \param[in] u x velocity [m s^-1].
+  !> \param[in] v y velocity [m s^-1].
+  !> \param[in] mod_vel mod_vel magnitude [m s^-1].
+  !> \param[in] rhom Mixture density [kg m^-3].
+  !> \param[in] red_grav Reduced gravity [m s^-2].
+  !> \param[in] grav_coeff Gravity multiplier [dimensionless].
   !> \param[in] curvature_term Enable curvature acceleration.
-  !> \param[in] curvature_xx xx curvature coefficient [m^-1].
-  !> \param[in] curvature_xy xy curvature coefficient [m^-1].
-  !> \param[in] curvature_yy yy curvature coefficient [m^-1].
+  !> \param[in] B_second_xx xx curvature coefficient [m^-1].
+  !> \param[in] B_second_xy xy curvature coefficient [m^-1].
+  !> \param[in] B_second_yy yy curvature coefficient [m^-1].
   !> \param[in] use_pore_pressure Enable pore-pressure stress reduction.
-  !> \param[in] excess_pore_pressure Excess pore pressure [Pa].
+  !> \param[in] exc_pore_pres Excess pore pressure [Pa].
   !> \param[out] rate_x x momentum source rate.
   !> \param[out] rate_y y momentum source rate.
   !******************************************************************************
