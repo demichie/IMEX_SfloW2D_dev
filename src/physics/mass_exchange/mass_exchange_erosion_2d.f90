@@ -36,28 +36,23 @@ CONTAINS
         REAL(wp), INTENT(IN) :: Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
-        REAL(wp) :: h, u, v, T_flow
         REAL(wp) :: normal_speed, vertical_velocity, substrate_temperature
         REAL(wp) :: Ri,rhom,rhoc,redgrav,cp_sub,cpm
 
         CALL reset_mass_exchange_rates(r)
         IF (alpha<=alphastot_min) RETURN
-        h=state%h
-        u=state%u
-        v=state%v
-        T_flow=state%T
         vertical_velocity=0.0_wp
-        IF (slope_correction_flag) vertical_velocity=u*Bx+v*By
-        normal_speed=SQRT(u*u+v*v+vertical_velocity*vertical_velocity)
+        IF (slope_correction_flag) vertical_velocity=state%u*Bx+state%v*By
+        normal_speed=SQRT(state%u**2+state%v**2+vertical_velocity**2)
 
         ! Erodible inventory limits species withdrawal before constructing mass and bed terms.
-        CALL eval_erosion_volume_kernel(h,normal_speed,alpha,erodible,dt,                          &
+        CALL eval_erosion_volume_kernel(state%h,normal_speed,alpha,erodible,dt,                          &
                   r%solid_erosion_rate,r%carrier_erosion_rate)
         r%solid_mass_rate=rho_s*r%solid_erosion_rate
         r%mixture_mass_rate=SUM(r%solid_mass_rate)+rho_c_sub*r%carrier_erosion_rate
         CALL mixt_var_state(state,Ri,rhom,rhoc,redgrav,cp_sub,cpm)
         substrate_temperature=T_erodible
-        IF (erodible_deposit_flag) substrate_temperature=T_flow
+        IF (erodible_deposit_flag) substrate_temperature=state%T
         r%energy_rate=substrate_temperature*(SUM(sp_heat_s*r%solid_mass_rate)+                     &
                   rho_c_sub*cp_sub*r%carrier_erosion_rate)
         r%dB_dt=-SUM(r%solid_erosion_rate)/(1.0_wp-erodible_porosity)

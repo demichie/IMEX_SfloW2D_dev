@@ -30,21 +30,13 @@ CONTAINS
 
         TYPE(physical_state_type), INTENT(IN) :: state
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
-        REAL(wp) :: volume_loss,h,T,alpha,rho_c,cp_c,pore
-        REAL(wp) :: alphas(n_solid),alphag(n_add_gas)
+        REAL(wp) :: volume_loss,alpha,rho_c,cp_c
         REAL(wp) :: Ri,rhom,redgrav,cpm,gas_phase_mass_fraction
-        REAL(wp) :: gas_species_mass_fraction(n_add_gas)
 
         CALL reset_mass_exchange_rates(r)
         IF (.NOT.(gas_flag .AND. pore_pressure_flag .AND. gas_loss_flag)) RETURN
-        h=state%h
-        T=state%T
-        pore=state%exc_pore_pres
-        alphas=state%alphas
-        alphag=state%alphag
-        alpha=SUM(alphas)
+        alpha=SUM(state%alphas)
         CALL mixt_var_state(state,Ri,rhom,rho_c,redgrav,cp_c,cpm)
-        gas_species_mass_fraction=state%xg
 
         ! Recover carrier gas mass fraction before partitioning withdrawal among gas species.
         gas_phase_mass_fraction=MAX(0.0_wp,1.0_wp-                                                 &
@@ -52,13 +44,14 @@ CONTAINS
         volume_loss=0.0_wp
         IF (gas_flag .AND. pore_pressure_flag .AND. gas_loss_flag .AND.                            &
                   alpha<maximum_solid_packing)                                                     &
-                  CALL eval_pore_pressure_gas_loss(h,T,alphas,alpha,rho_c,pore,volume_loss)
+                  CALL eval_pore_pressure_gas_loss(state%h,state%T,state%alphas,alpha,rho_c, &
+                      state%exc_pore_pres,volume_loss)
         r%carrier_withdrawal_volume_rate=MAX(0.0_wp,volume_loss)
         r%mixture_mass_rate=-rho_c*r%carrier_withdrawal_volume_rate
-        r%energy_rate=T*cp_c*r%mixture_mass_rate
+        r%energy_rate=state%T*cp_c*r%mixture_mass_rate
         IF (n_add_gas>0 .AND. gas_phase_mass_fraction>0.0_wp)                                      &
                   r%add_gas_mass_rate=r%mixture_mass_rate*                                         &
-                  gas_species_mass_fraction/gas_phase_mass_fraction
+                  state%xg/gas_phase_mass_fraction
     END SUBROUTINE eval_mass_exchange_carrier_darcy_loss_explicit
 
     !> @brief Reject unsupported semi-implicit treatment for carrier darcy loss.
