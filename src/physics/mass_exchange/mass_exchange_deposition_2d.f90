@@ -13,6 +13,7 @@ MODULE mass_exchange_deposition_2d
               A_drag, B_drag, diam_s
 
     USE diagnostics_2d, ONLY : fatal_error
+    USE state_conversion_2d, ONLY : physical_state_type
     USE state_conversion_2d, ONLY : primitive_to_volume_fractions, mixt_var
     USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
 
@@ -33,11 +34,13 @@ MODULE mass_exchange_deposition_2d
 CONTAINS
 
     !> @brief Evaluate explicit sediment settling and deposition.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_deposition_explicit(qp,dt,r)
+    SUBROUTINE eval_mass_exchange_deposition_explicit(state,qp,dt,r)
 
+        TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
         REAL(wp) :: alphas(n_solid),alphag(n_add_gas),alpha
@@ -45,9 +48,10 @@ CONTAINS
         REAL(wp) :: gas_species_mass_fraction(n_add_gas)
 
         CALL reset_mass_exchange_rates(r)
-        h=qp(idx_h)
-        T=qp(idx_T)
-        CALL primitive_to_volume_fractions(qp,alphas,alphag)
+        h=state%h
+        T=state%T
+        alphas=state%alphas
+        alphag=state%alphag
         alpha=SUM(alphas)
         IF (alpha<=alphastot_min) RETURN
         CALL mixt_var(qp,Ri,rho_m,rho_c,redgrav,cp_c,cpm)
@@ -75,11 +79,13 @@ CONTAINS
 
     !> @brief Reject unsupported semi-implicit treatment for deposition.
     !> @details This entry point raises fatal_error; the rates are reset first.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_deposition_semi_implicit(qp,dt,r)
+    SUBROUTINE eval_mass_exchange_deposition_semi_implicit(state,qp,dt,r)
 
+        TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -89,11 +95,13 @@ CONTAINS
 
     !> @brief Reject unsupported implicit treatment for sediment settling and deposition.
     !> @details This entry point raises fatal_error; the rates are reset first.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_deposition_implicit(qp,dt,r)
+    SUBROUTINE eval_mass_exchange_deposition_implicit(state,qp,dt,r)
 
+        TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -103,11 +111,13 @@ CONTAINS
 
     !> @brief Reject unsupported analytic treatment for sediment settling and deposition.
     !> @details This entry point raises fatal_error; the rates are reset first.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE solve_mass_exchange_deposition_analytic(qp,dt,r)
+    SUBROUTINE solve_mass_exchange_deposition_analytic(state,qp,dt,r)
 
+        TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 

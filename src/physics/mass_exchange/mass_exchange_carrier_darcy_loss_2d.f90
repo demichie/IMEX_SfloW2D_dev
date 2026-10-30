@@ -10,6 +10,7 @@ MODULE mass_exchange_carrier_darcy_loss_2d
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
     USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_gas_loss
     USE diagnostics_2d, ONLY : fatal_error
+    USE state_conversion_2d, ONLY : physical_state_type
     USE state_conversion_2d, ONLY : primitive_to_volume_fractions, mixt_var
 
     IMPLICIT NONE
@@ -23,10 +24,12 @@ MODULE mass_exchange_carrier_darcy_loss_2d
 CONTAINS
 
     !> @brief Evaluate explicit pressure-driven carrier gas loss.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_carrier_darcy_loss_explicit(qp,r)
+    SUBROUTINE eval_mass_exchange_carrier_darcy_loss_explicit(state,qp,r)
 
+        TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
         REAL(wp) :: volume_loss,h,T,alpha,rho_c,cp_c,pore
@@ -36,10 +39,11 @@ CONTAINS
 
         CALL reset_mass_exchange_rates(r)
         IF (.NOT.(gas_flag .AND. pore_pressure_flag .AND. gas_loss_flag)) RETURN
-        h=qp(idx_h)
-        T=qp(idx_T)
-        pore=qp(idx_pore)
-        CALL primitive_to_volume_fractions(qp,alphas,alphag)
+        h=state%h
+        T=state%T
+        pore=state%exc_pore_pres
+        alphas=state%alphas
+        alphag=state%alphag
         alpha=SUM(alphas)
         CALL mixt_var(qp,Ri,rhom,rho_c,redgrav,cp_c,cpm)
         gas_species_mass_fraction=qp(idx_add_gas_first:idx_add_gas_last)
@@ -61,10 +65,12 @@ CONTAINS
 
     !> @brief Reject unsupported semi-implicit treatment for carrier darcy loss.
     !> @details This entry point raises fatal_error; the rates are reset first.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_carrier_darcy_loss_semi_implicit(qp,r)
+    SUBROUTINE eval_mass_exchange_carrier_darcy_loss_semi_implicit(state,qp,r)
 
+        TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -74,10 +80,12 @@ CONTAINS
 
     !> @brief Reject unsupported implicit treatment for pressure-driven carrier gas loss.
     !> @details This entry point raises fatal_error; the rates are reset first.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_carrier_darcy_loss_implicit(qp,r)
+    SUBROUTINE eval_mass_exchange_carrier_darcy_loss_implicit(state,qp,r)
 
+        TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -87,10 +95,12 @@ CONTAINS
 
     !> @brief Reject unsupported analytic treatment for pressure-driven carrier gas loss.
     !> @details This entry point raises fatal_error; the rates are reset first.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE solve_mass_exchange_carrier_darcy_loss_analytic(qp,r)
+    SUBROUTINE solve_mass_exchange_carrier_darcy_loss_analytic(state,qp,r)
 
+        TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 

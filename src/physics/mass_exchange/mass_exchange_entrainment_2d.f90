@@ -6,6 +6,7 @@ MODULE mass_exchange_entrainment_2d
     USE parameters_2d, ONLY : wp, n_vars, slope_correction_flag, mass_exchange_rates_type,         &
         reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
+    USE state_conversion_2d, ONLY : physical_state_type
     USE state_conversion_2d, ONLY : mixt_var
     USE constitutive_parameters_2d, ONLY : entrainment_flag, rho_a_amb,                            &
               T_ambient, sp_heat_a
@@ -22,40 +23,44 @@ MODULE mass_exchange_entrainment_2d
 CONTAINS
 
     !> @brief Evaluate explicit ambient-air entrainment.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] u Horizontal x velocity of the mobile material [m/s].
     !> @param[in] v Horizontal y velocity of the mobile material [m/s].
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_entrainment_explicit(qp,u,v,Bx,By,r)
+    SUBROUTINE eval_mass_exchange_entrainment_explicit(state,state,qp,Bx,By,r)
 
-        REAL(wp), INTENT(IN) :: qp(n_vars+2),u,v,Bx,By
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
         REAL(wp) :: vertical_velocity,speed_squared,Ri,rhom,rhoc,redgrav,cpc,cpm
 
         CALL reset_mass_exchange_rates(r)
         vertical_velocity=0.0_wp
-        IF (slope_correction_flag) vertical_velocity=u*Bx+v*By
-        speed_squared=u*u+v*v+vertical_velocity*vertical_velocity
+        IF (slope_correction_flag) vertical_velocity=state%u*Bx+state%v*By
+        speed_squared=state%u**2+state%v**2+vertical_velocity**2
         CALL mixt_var(qp,Ri,rhom,rhoc,redgrav,cpc,cpm)
 
         ! Convert entrained ambient-air volume to mixture mass at ambient density.
-        r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(qp(idx_h),Ri,speed_squared)
+        r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(state%h,Ri,speed_squared)
         r%energy_rate=T_ambient*sp_heat_a*r%mixture_mass_rate
     END SUBROUTINE
 
     !> @brief Reject unsupported semi-implicit treatment for entrainment.
     !> @details This entry point raises fatal_error; the rates are reset first.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] u Horizontal x velocity of the mobile material [m/s].
     !> @param[in] v Horizontal y velocity of the mobile material [m/s].
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_entrainment_semi_implicit(qp,u,v,Bx,By,r)
+    SUBROUTINE eval_mass_exchange_entrainment_semi_implicit(state,state,qp,Bx,By,r)
 
-        REAL(wp), INTENT(IN) :: qp(n_vars+2),u,v,Bx,By
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
@@ -64,15 +69,17 @@ CONTAINS
 
     !> @brief Reject unsupported implicit treatment for ambient-air entrainment.
     !> @details This entry point raises fatal_error; the rates are reset first.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] u Horizontal x velocity of the mobile material [m/s].
     !> @param[in] v Horizontal y velocity of the mobile material [m/s].
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_entrainment_implicit(qp,u,v,Bx,By,r)
+    SUBROUTINE eval_mass_exchange_entrainment_implicit(state,state,qp,Bx,By,r)
 
-        REAL(wp), INTENT(IN) :: qp(n_vars+2),u,v,Bx,By
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
@@ -81,15 +88,17 @@ CONTAINS
 
     !> @brief Reject unsupported analytic treatment for ambient-air entrainment.
     !> @details This entry point raises fatal_error; the rates are reset first.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] u Horizontal x velocity of the mobile material [m/s].
     !> @param[in] v Horizontal y velocity of the mobile material [m/s].
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE solve_mass_exchange_entrainment_analytic(qp,u,v,Bx,By,r)
+    SUBROUTINE solve_mass_exchange_entrainment_analytic(state,state,qp,Bx,By,r)
 
-        REAL(wp), INTENT(IN) :: qp(n_vars+2),u,v,Bx,By
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)

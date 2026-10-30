@@ -6,6 +6,7 @@ MODULE mass_exchange_erosion_2d
     USE parameters_2d, ONLY : wp, n_solid, n_vars, idx_u, idx_v, slope_correction_flag,            &
               erodible_deposit_flag, mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
+    USE state_conversion_2d, ONLY : physical_state_type
     USE state_conversion_2d, ONLY : mixt_var
     USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity,                       &
               erodible_fract, alphastot_min, rho_s, rho_c_sub, sp_heat_s, T_erodible
@@ -22,15 +23,17 @@ MODULE mass_exchange_erosion_2d
 CONTAINS
 
     !> @brief Evaluate explicit erosion from erodible substrate.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in] alpha Total dispersed-solid volume fraction [dimensionless].
     !> @param[in] erodible Available erodible solid inventory by species [m].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_erosion_explicit(qp,Bx,By,alpha,erodible,dt,r)
+    SUBROUTINE eval_mass_exchange_erosion_explicit(state,qp,Bx,By,alpha,erodible,dt,r)
 
+        TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2), Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
@@ -40,10 +43,10 @@ CONTAINS
 
         CALL reset_mass_exchange_rates(r)
         IF (alpha<=alphastot_min) RETURN
-        h=qp(idx_h)
-        u=qp(idx_u)
-        v=qp(idx_v)
-        T_flow=qp(idx_T)
+        h=state%h
+        u=state%u
+        v=state%v
+        T_flow=state%T
         vertical_velocity=0.0_wp
         IF (slope_correction_flag) vertical_velocity=u*Bx+v*By
         normal_speed=SQRT(u*u+v*v+vertical_velocity*vertical_velocity)
@@ -63,15 +66,17 @@ CONTAINS
 
     !> @brief Reject unsupported semi-implicit treatment for erosion.
     !> @details This entry point raises fatal_error; the rates are reset first.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in] alpha Total dispersed-solid volume fraction [dimensionless].
     !> @param[in] erodible Available erodible solid inventory by species [m].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_erosion_semi_implicit(qp,Bx,By,alpha,erodible,dt,r)
+    SUBROUTINE eval_mass_exchange_erosion_semi_implicit(state,qp,Bx,By,alpha,erodible,dt,r)
 
+        TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2), Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
@@ -82,15 +87,17 @@ CONTAINS
 
     !> @brief Reject unsupported implicit treatment for erosion from erodible substrate.
     !> @details This entry point raises fatal_error; the rates are reset first.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in] alpha Total dispersed-solid volume fraction [dimensionless].
     !> @param[in] erodible Available erodible solid inventory by species [m].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_erosion_implicit(qp,Bx,By,alpha,erodible,dt,r)
+    SUBROUTINE eval_mass_exchange_erosion_implicit(state,qp,Bx,By,alpha,erodible,dt,r)
 
+        TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2), Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
@@ -101,15 +108,17 @@ CONTAINS
 
     !> @brief Reject unsupported analytic treatment for erosion from erodible substrate.
     !> @details This entry point raises fatal_error; the rates are reset first.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] state Local real physical state.
+    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in] alpha Total dispersed-solid volume fraction [dimensionless].
     !> @param[in] erodible Available erodible solid inventory by species [m].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE solve_mass_exchange_erosion_analytic(qp,Bx,By,alpha,erodible,dt,r)
+    SUBROUTINE solve_mass_exchange_erosion_analytic(state,qp,Bx,By,alpha,erodible,dt,r)
 
+        TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2), Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
