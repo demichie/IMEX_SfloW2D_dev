@@ -152,19 +152,13 @@ CONTAINS
                     grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
                     use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE('rheology_mui')
-            CALL eval_rheology_mui_explicit(                                                       &
-                    h, T, u, v, mod_vel, mod_hor_vel,                                              &
-                    mod_vel2, rhom, inv_rhom, red_grav,                                            &
-                    grav_coeff, alphas, curvature_term, B_second_xx,                               &
-                    B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving,            &
-                    use_stochastic, stochastic_value, rate )
+            CALL eval_rheology_mui_explicit(state, mod_vel, mod_hor_vel, mod_vel2, grav_coeff, &
+                    curvature_term, B_second_xx, B_second_xy, B_second_yy, &
+                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE('rheology_mui_voellmy')
-            CALL eval_rheology_mui_voellmy_explicit(                                               &
-                    h, T, u, v, mod_vel, mod_hor_vel,                                              &
-                    mod_vel2, rhom, inv_rhom, red_grav,                                            &
-                    grav_coeff, alphas, curvature_term, B_second_xx,                               &
-                    B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving,            &
-                    use_stochastic, stochastic_value, rate )
+            CALL eval_rheology_mui_voellmy_explicit(state, mod_vel, mod_hor_vel, mod_vel2, grav_coeff, &
+                    curvature_term, B_second_xx, B_second_xy, B_second_yy, &
+                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE DEFAULT
             CALL fatal_error('Invalid rheology name in explicit dispatch')
 
@@ -235,18 +229,14 @@ CONTAINS
             curvature_term_value = 0.0_wp
             IF (curvature_term) curvature_term_value = curvature_acceleration(                     &
                     B_second_xx, B_second_xy, B_second_yy, u, v)
-            CALL eval_rheology_mui_semi_implicit(h, u, v,                                          &
-                    mod_vel, rhom, red_grav, grav_coeff,                                           &
-                    alphas, curvature_term_value, use_pore_pressure,                               &
-                    exc_pore_pres, rate(1), rate(2))
+            CALL eval_rheology_mui_semi_implicit(state, mod_vel, grav_coeff, curvature_term_value, &
+                    use_pore_pressure, rate(1), rate(2))
         CASE('rheology_mui_voellmy')
             curvature_term_value = 0.0_wp
             IF (curvature_term) curvature_term_value = curvature_acceleration(                     &
                     B_second_xx, B_second_xy, B_second_yy, u, v)
-            CALL eval_rheology_mui_voellmy_semi_implicit(h, u,                                     &
-                    v, mod_vel, rhom, red_grav,                                                    &
-                    grav_coeff, alphas, curvature_term_value,                                      &
-                    use_pore_pressure, exc_pore_pres, rate(1), rate(2))
+            CALL eval_rheology_mui_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term_value, &
+                    use_pore_pressure, rate(1), rate(2))
         CASE('none', 'rheology_plastic', 'rheology_empirical',                                     &
                 'rheology_quadratic', 'rheology_newmodel')
             CONTINUE
@@ -300,9 +290,8 @@ CONTAINS
             CALL eval_rheology_voellmy_implicit(state, mod_vel, mod_vel2, moving, use_stochastic, stochastic_value, &
                     rate(1), rate(2))
         CASE('rheology_mui_voellmy')
-            CALL eval_rheology_mui_voellmy_implicit(u, v,                                          &
-                    rhom, red_grav, mod_vel, mod_vel2, moving,                                     &
-                    use_stochastic, stochastic_value, rate(1), rate(2))
+            CALL eval_rheology_mui_voellmy_implicit(state, mod_vel, mod_vel2, moving, use_stochastic, &
+                    stochastic_value, rate(1), rate(2))
         CASE('rheology_plastic')
             CALL eval_rheology_plastic_implicit(state, mod_vel, moving, rate(1), rate(2))
         CASE('rheology_lava')
@@ -389,16 +378,11 @@ CONTAINS
             CALL solve_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
                     use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_mui')
-            CALL solve_rheology_mui_analytic(dt, h,                                                &
-                    speed_ratio, velocity_before, rhom, red_grav,                                  &
-                    grav_coeff, alphas, curvature_acceleration,                                    &
-                    use_pore_pressure, exc_pore_pres, velocity_after)
+            CALL solve_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+                    use_pore_pressure, velocity_after)
         CASE ('rheology_mui_voellmy')
-            CALL solve_rheology_mui_voellmy_analytic(dt,                                           &
-                    h, speed_ratio, velocity_before, rhom,                                         &
-                    red_grav, grav_coeff, alphas,                                                  &
-                    curvature_acceleration, use_pore_pressure, exc_pore_pres,                      &
-                    use_stochastic, stochastic_value, velocity_after)
+            CALL solve_rheology_mui_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+                    use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
         CASE DEFAULT
             model_supported = .FALSE.
 
