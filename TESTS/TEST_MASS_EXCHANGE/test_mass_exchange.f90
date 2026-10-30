@@ -932,6 +932,7 @@ CONTAINS
     air_rate=eval_air_entrainment_rate(richardson, speed_squared)
     IF (air_rate<=0.0_wp) ERROR STOP 'thermal entrainment fixture is inactive'
 
+    CALL physical_state_from_qp(qp_local,exchange_state)
     CALL eval_mass_exchange_explicit(exchange_state,0,0.0_wp,0.0_wp,erodible(:,1,1), &
          1.0_wp,exchange_rates,equation_rate)
     expected=-qp_local(4)*( &
@@ -1048,6 +1049,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: packed(2*ns+2+n_eqns+1)
     TYPE(mass_exchange_rates_type) :: exchange_rates
 
+    CALL physical_state_from_qp(qp0,exchange_state)
     CALL eval_mass_exchange_explicit(exchange_state,0,0.0_wp,0.0_wp,inventory,dt, &
          exchange_rates,packed(2*ns+3:2*ns+2+n_eqns))
     packed(1:ns)=exchange_rates%solid_erosion_rate
