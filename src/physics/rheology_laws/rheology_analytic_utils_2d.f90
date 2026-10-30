@@ -48,7 +48,7 @@ CONTAINS
     !> \details Reject negative integration time, invalid depth or speed ratio, and nonfinite input before analytical source integration.
     !> \param[in] dt Exact-flow interval [s].
     !> \param[in] h Flow depth [m].
-    !> \param[in] speed_ratio Ratio of total to horizontal mod_vel.
+    !> \param[in] speed_ratio Ratio of total to horizontal speed.
     !> \param[in] speed_before Initial speed magnitude [m s^-1].
     !> \param[in] rheology_name Model name used to identify validation errors.
     SUBROUTINE validate_analytic_velocity_inputs(dt, h, &
@@ -545,11 +545,11 @@ CONTAINS
 
     !> \brief Evaluate the elapsed time for a quadratic polynomial decay law.
     !> \details Evaluate the separated elapsed-time integral associated with constant, linear and quadratic drag.
-    !> \param[in] mod_vel mod_vel at which to evaluate the separated time integral [m s^-1].
+    !> \param[in] mod_vel Speed at which to evaluate the separated time integral [m s^-1].
     !> \param[in] constant_drag Constant decay coefficient.
     !> \param[in] linear_drag Linear decay coefficient.
     !> \param[in] quadratic_drag Quadratic decay coefficient.
-    !> \return Elapsed time from zero mod_vel to the supplied mod_vel [s].
+    !> \return Elapsed time from zero speed to the supplied speed [s].
     PURE FUNCTION quadratic_decay_time(mod_vel, constant_drag, linear_drag,     &
             quadratic_drag) RESULT(time)
 
@@ -581,14 +581,13 @@ CONTAINS
 
     END FUNCTION quadratic_decay_time
 
-    !> \brief Invert the exact separated time integral for nonlinear mod_vel laws.
+    !> \brief Invert the separated time integral for nonlinear velocity-decay laws.
     !> \details Invert the monotone time integral of the reciprocal decay rate to recover the speed after the time step.
     !> \param[in] flow_model Exact-flow law identifier.
     !> \param[in] coefficients Model-specific frozen decay coefficients.
     !> \param[in] time_step Integration interval [s].
     !> \param[in] speed_before Initial speed magnitude [m s^-1].
     !> \param[out] speed_after Integrated speed magnitude [m s^-1].
-    !> \brief Invert the velocity decay time integral to find the terminal speed.
     SUBROUTINE solve_by_exact_time_integral(flow_model, coefficients, time_step, &
             speed_before, speed_after)
 
