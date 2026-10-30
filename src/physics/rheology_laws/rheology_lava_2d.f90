@@ -165,6 +165,7 @@ CONTAINS
     SUBROUTINE solve_rheology_lava_analytic(dt, h,     &
             T, rhom, speed_ratio, velocity_before,           &
             velocity_after)
+
         REAL(wp), INTENT(IN) :: dt, h, T
         REAL(wp), INTENT(IN) :: rhom, speed_ratio
         REAL(wp), INTENT(IN) :: velocity_before(2)
