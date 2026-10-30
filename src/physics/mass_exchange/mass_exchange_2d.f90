@@ -2,7 +2,7 @@
 !> @details Explicit physics is evaluated locally; unsupported treatment entry points
 !> fail explicitly. The coordinator alone enforces shared carrier inventories.
 MODULE mass_exchange_2d
-    USE parameters_2d, ONLY : idx_h, idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
+    USE parameters_2d, ONLY : idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
     USE parameters_2d, ONLY : wp, n_vars, n_eqns, n_solid, n_add_gas,                              &
               idx_stochEqn, idx_poreEqn,                                                           &
               idx_solidEqn_first, idx_solidEqn_last,                                               &
@@ -11,7 +11,7 @@ MODULE mass_exchange_2d
               reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, physical_state_from_qp
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source
     USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
     USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
@@ -31,12 +31,13 @@ MODULE mass_exchange_2d
 CONTAINS
 
     !> Explicit cell-local coordinator: accumulates all enabled exchange processes.
-    SUBROUTINE eval_mass_exchange_explicit(qp,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
-        REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By,erodible(n_solid),dt
+    SUBROUTINE eval_mass_exchange_explicit(state,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: Bx,By,erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
         REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-        CALL eval_mass_exchange_terms(qp,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
+        CALL eval_mass_exchange_terms(state,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
     END SUBROUTINE eval_mass_exchange_explicit
 
     !> This family currently supports only explicit coordination.
@@ -81,13 +82,13 @@ CONTAINS
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] total_rates Accumulated process rates and bed changes for this cell.
     !> @param[out] eqns_term Conservative mass, momentum, energy and species source vector.
-    SUBROUTINE eval_mass_exchange_terms(qp,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
+    SUBROUTINE eval_mass_exchange_terms(physical_state,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
 
-        REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By,erodible(n_solid),dt
+        TYPE(physical_state_type), INTENT(IN) :: physical_state
+        REAL(wp), INTENT(IN) :: Bx,By,erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
         REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-        TYPE(physical_state_type) :: physical_state
         TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates,        &
             darcy_loss_rates
         REAL(wp) :: alpha
@@ -97,8 +98,7 @@ CONTAINS
 
         CALL reset_mass_exchange_rates(total_rates)
         eqns_term=0.0_wp
-        IF (qp(idx_h)<=EPSILON(1.0_wp)) RETURN
-        CALL physical_state_from_qp(qp,physical_state)
+        IF (physical_state%h<=EPSILON(1.0_wp)) RETURN
 
         ! Processes requiring a gas/liquid carrier are evaluated only when that
         ! physical phase exists. Lava deposition is dispatched independently below.

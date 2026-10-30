@@ -746,6 +746,10 @@ CONTAINS
     INTEGER, INTENT(IN) :: B_zone
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: rates
     REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-    CALL eval_mass_exchange_explicit(qpj,B_zone,B_prime_x,B_prime_y,erodible,dt,rates,eqns_term)
+    BLOCK
+      TYPE(physical_state_type) :: exchange_state
+      CALL physical_state_from_qp(qpj,exchange_state)
+      CALL eval_mass_exchange_explicit(exchange_state,B_zone,B_prime_x,B_prime_y,erodible,dt,rates,eqns_term)
+    END BLOCK
   END SUBROUTINE eval_step_source_explicit
 END MODULE source_terms_2d

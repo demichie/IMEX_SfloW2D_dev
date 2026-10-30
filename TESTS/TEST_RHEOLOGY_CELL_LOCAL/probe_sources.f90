@@ -11,7 +11,7 @@ PROGRAM probe_sources
   USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0
   USE rheology_lahar_2d, ONLY : alpha1_coeff, beta1, alpha2, beta2, Kappa, n_td2
   USE rheology_quadratic_2d, ONLY : friction_factor
-  USE state_conversion_2d, ONLY : qc_to_qp
+  USE state_conversion_2d, ONLY : qc_to_qp, physical_state_type, physical_state_from_qp
   USE geometry_2d, ONLY : pi_g
   USE source_terms_2d, ONLY : eval_source_implicit, eval_source_semi_implicit
   USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
@@ -33,6 +33,7 @@ PROGRAM probe_sources
   REAL(wp) :: stage(7), residual(7), erosion(2), deposition(2), exchange(7)
   REAL(wp) :: carrier_erosion, carrier_loss, topo, substrate(2)
   TYPE(mass_exchange_rates_type) :: total_rates
+  TYPE(physical_state_type) :: exchange_state
   REAL(wp) :: test_z(4), expected_parallel_source(7,4), parallel_source(7)
   REAL(wp) :: parallel_error, local_error
   INTEGER :: iteration, actual_threads
@@ -135,7 +136,8 @@ PROGRAM probe_sources
   END IF
   IF (operation==3) THEN
      substrate=0.0_wp
-     CALL eval_mass_exchange_explicit(qp(1:n_vars+2),0,bx,by, &
+     CALL physical_state_from_qp(qp(1:n_vars+2),exchange_state)
+     CALL eval_mass_exchange_explicit(exchange_state,0,bx,by, &
           substrate(1:solids),dt,total_rates,exchange(1:n_vars))
      carrier_loss=total_rates%carrier_withdrawal_volume_rate
      WRITE(*,'(A,ES26.17E3)') 'LOSS ',carrier_loss
