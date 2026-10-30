@@ -124,17 +124,22 @@ CONTAINS
                     grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
                     use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE('rheology_lava')
-            CALL eval_rheology_lava_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
-                    grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
-                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
+            CALL eval_rheology_lava_explicit(state, &
+                    mod_vel, &
+                    moving, &
+                    rate)
         CASE('rheology_lahar')
-            CALL eval_rheology_lahar_explicit(state, mod_vel, mod_hor_vel, mod_vel2, grav_coeff, &
-                    curvature_term, B_second_xx, B_second_xy, B_second_yy, &
-                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
+            CALL eval_rheology_lahar_explicit(state, &
+                    mod_vel, &
+                    mod_hor_vel, &
+                    moving, &
+                    rate)
         CASE('rheology_empirical')
-            CALL eval_rheology_empirical_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
-                    grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
-                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
+            CALL eval_rheology_empirical_explicit(state, &
+                    mod_vel, &
+                    mod_hor_vel, &
+                    moving, &
+                    rate)
         CASE('rheology_quadratic')
             CALL eval_rheology_quadratic_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
                     grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &

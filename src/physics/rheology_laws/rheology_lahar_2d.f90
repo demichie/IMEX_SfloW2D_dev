@@ -67,30 +67,20 @@ CONTAINS
     !> treatment contributions; unused model inputs are retained for the shared dispatch interface.
     !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
     !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
-    !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
-    !> \param[in] grav_coeff Dimensionless gravity correction for local topography.
-    !> \param[in] curvature_term Whether topographic curvature enters the source.
-    !> \param[in] B_second_xx Second x derivative of topography [m^-1].
-    !> \param[in] B_second_xy Mixed derivative of topography [m^-1].
-    !> \param[in] B_second_yy Second y derivative of topography [m^-1].
-    !> \param[in] use_pore_pressure Whether excess pore pressure modifies resistance.
     !> \param[in] moving Whether the local state is considered moving.
-    !> \param[in] use_stochastic Whether stochastic rheology parameters are enabled.
-    !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
     !> \param[out] rate Conservative horizontal momentum source vector.
-    SUBROUTINE eval_rheology_lahar_explicit(state, mod_vel, mod_hor_vel, mod_vel2, grav_coeff, &
-            curvature_term, B_second_xx, B_second_xy, B_second_yy, &
-            use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
-
+    SUBROUTINE eval_rheology_lahar_explicit(state, &
+            mod_vel, &
+            mod_hor_vel, &
+            moving, &
+            rate)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2, grav_coeff
-        REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy, stochastic_value
-        LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
+        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel
+        LOGICAL, INTENT(IN) :: moving
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
         TYPE(complex_physical_state_type) :: cs
-
         CALL eval_rheology_lahar_semi_implicit(state, mod_hor_vel, moving, sx, sy)
         cs%h=CMPLX(state%h,0.0_wp,wp)
         cs%u=CMPLX(state%u,0.0_wp,wp)
