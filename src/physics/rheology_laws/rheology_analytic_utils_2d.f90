@@ -45,13 +45,14 @@ CONTAINS
     END SUBROUTINE fatal_analytic_input_error
 
     !> \brief Validate inputs to a module-level exact velocity solve.
-    !> \details Reject negative integration time, invalid depth or speed ratio, and nonfinite input before analytical source integration.
+    !> \details Reject negative integration time, invalid depth or speed ratio, and nonfinite input
+    !> before analytical source integration.
     !> \param[in] dt Exact-flow interval [s].
     !> \param[in] h Flow depth [m].
     !> \param[in] speed_ratio Ratio of total to horizontal speed.
     !> \param[in] speed_before Initial speed magnitude [m s^-1].
     !> \param[in] rheology_name Model name used to identify validation errors.
-    SUBROUTINE validate_analytic_velocity_inputs(dt, h, &
+    SUBROUTINE validate_analytic_velocity_inputs(dt, h,                                            &
             speed_ratio, speed_before, rheology_name)
 
         REAL(wp), INTENT(IN) :: dt, h, speed_ratio
@@ -59,27 +60,31 @@ CONTAINS
         CHARACTER(LEN=*), INTENT(IN) :: rheology_name
 
         IF (dt .LT. 0.0_wp) THEN
-            CALL fatal_analytic_input_error('Negative integration step in '//TRIM(rheology_name)//' exact solver')
+            CALL fatal_analytic_input_error('Negative integration step in '//TRIM(                 &
+                rheology_name)//' exact solver')
 
         END IF
 
         IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
 
         IF (h .LE. 0.0_wp) THEN
-            CALL fatal_analytic_input_error('Nonpositive flow depth in '//TRIM(rheology_name)//' analytic solver')
+            CALL fatal_analytic_input_error('Nonpositive flow depth in '//TRIM(                    &
+                rheology_name)//' analytic solver')
 
         END IF
 
         IF (speed_ratio .LE. 0.0_wp) THEN
-            CALL fatal_analytic_input_error('Nonpositive mod_vel ratio in '//TRIM(rheology_name)//' analytic solver')
+            CALL fatal_analytic_input_error('Nonpositive mod_vel ratio in '//TRIM(                 &
+                rheology_name)//' analytic solver')
 
         END IF
 
-        IF (.NOT. ieee_is_finite(dt) .OR.                         &
-                .NOT. ieee_is_finite(h) .OR.                              &
-                .NOT. ieee_is_finite(speed_ratio) .OR.                             &
+        IF (.NOT. ieee_is_finite(dt) .OR.                                                          &
+                .NOT. ieee_is_finite(h) .OR.                                                       &
+                .NOT. ieee_is_finite(speed_ratio) .OR.                                             &
                 .NOT. ieee_is_finite(speed_before)) THEN
-            CALL fatal_analytic_input_error('Nonfinite input in '//TRIM(rheology_name)//' exact solver')
+            CALL fatal_analytic_input_error('Nonfinite input in '//TRIM(rheology_name)//           &
+                ' exact solver')
 
         END IF
 
@@ -95,7 +100,7 @@ CONTAINS
     !> \param[in] time_step Integration interval [s].
     !> \param[in] speed_before Initial speed magnitude [m s^-1].
     !> \param[out] speed_after Integrated speed magnitude [m s^-1].
-    SUBROUTINE solve_exact_velocity_flow(flow_model, coefficients, time_step, &
+    SUBROUTINE solve_exact_velocity_flow(flow_model, coefficients, time_step,                      &
             speed_before, speed_after)
 
         INTEGER, INTENT(IN) :: flow_model
@@ -112,8 +117,8 @@ CONTAINS
 
         END IF
 
-        IF (.NOT. ieee_is_finite(time_step) .OR.                               &
-                .NOT. ieee_is_finite(speed_before) .OR.                           &
+        IF (.NOT. ieee_is_finite(time_step) .OR.                                                   &
+                .NOT. ieee_is_finite(speed_before) .OR.                                            &
                 .NOT. ALL(ieee_is_finite(coefficients))) THEN
             CALL fatal_analytic_input_error('Nonfinite input to exact velocity integrator')
 
@@ -121,26 +126,33 @@ CONTAINS
 
         SELECT CASE (flow_model)
         CASE (EXACT_FLOW_CONSTANT, EXACT_FLOW_LINEAR, EXACT_FLOW_QUADRATIC)
-            IF (SIZE(coefficients) .NE. 1)                                      &
-                    CALL fatal_analytic_input_error('Invalid coefficient count for exact velocity flow')
+            IF (SIZE(coefficients) .NE. 1)                                                         &
+                    CALL fatal_analytic_input_error(                                               &
+                        'Invalid coefficient count for exact velocity flow')
         CASE (EXACT_FLOW_AFFINE)
-            IF (SIZE(coefficients) .NE. 2)                                      &
-                    CALL fatal_analytic_input_error('Invalid coefficient count for exact velocity flow')
+            IF (SIZE(coefficients) .NE. 2)                                                         &
+                    CALL fatal_analytic_input_error(                                               &
+                        'Invalid coefficient count for exact velocity flow')
         CASE (EXACT_FLOW_QUADRATIC_POLYNOMIAL)
-            IF (SIZE(coefficients) .NE. 3)                                      &
-                    CALL fatal_analytic_input_error('Invalid coefficient count for exact velocity flow')
+            IF (SIZE(coefficients) .NE. 3)                                                         &
+                    CALL fatal_analytic_input_error(                                               &
+                        'Invalid coefficient count for exact velocity flow')
         CASE (EXACT_FLOW_FROUDE)
-            IF (SIZE(coefficients) .NE. 5)                                      &
-                    CALL fatal_analytic_input_error('Invalid coefficient count for exact velocity flow')
+            IF (SIZE(coefficients) .NE. 5)                                                         &
+                    CALL fatal_analytic_input_error(                                               &
+                        'Invalid coefficient count for exact velocity flow')
         CASE (EXACT_FLOW_LUCAS)
-            IF (SIZE(coefficients) .NE. 7)                                      &
-                    CALL fatal_analytic_input_error('Invalid coefficient count for exact velocity flow')
+            IF (SIZE(coefficients) .NE. 7)                                                         &
+                    CALL fatal_analytic_input_error(                                               &
+                        'Invalid coefficient count for exact velocity flow')
         CASE (EXACT_FLOW_MUI)
-            IF (SIZE(coefficients) .NE. 5)                                      &
-                    CALL fatal_analytic_input_error('Invalid coefficient count for exact velocity flow')
+            IF (SIZE(coefficients) .NE. 5)                                                         &
+                    CALL fatal_analytic_input_error(                                               &
+                        'Invalid coefficient count for exact velocity flow')
         CASE (EXACT_FLOW_MUI_VOELLMY)
-            IF (SIZE(coefficients) .NE. 6)                                      &
-                    CALL fatal_analytic_input_error('Invalid coefficient count for exact velocity flow')
+            IF (SIZE(coefficients) .NE. 6)                                                         &
+                    CALL fatal_analytic_input_error(                                               &
+                        'Invalid coefficient count for exact velocity flow')
         CASE DEFAULT
             CALL fatal_analytic_input_error('Unknown exact velocity flow model')
 
@@ -158,7 +170,7 @@ CONTAINS
             linear_drag = coefficients(2)
             IF (linear_drag .GT. 0.0_wp) THEN
                 exponent = EXP(-linear_drag*time_step)
-                speed_after = MAX(0.0_wp, (speed_before + constant_drag/linear_drag)* &
+                speed_after = MAX(0.0_wp, (speed_before + constant_drag/linear_drag)*              &
                             exponent - constant_drag/linear_drag)
 
             ELSE
@@ -168,16 +180,16 @@ CONTAINS
 
         CASE (EXACT_FLOW_QUADRATIC)
             quadratic_drag = coefficients(1)
-            speed_after = speed_before /                                     &
+            speed_after = speed_before /                                                           &
                     (1.0_wp + quadratic_drag*speed_before*time_step)
         CASE (EXACT_FLOW_QUADRATIC_POLYNOMIAL)
-            CALL solve_quadratic_polynomial_flow(coefficients, time_step,        &
+            CALL solve_quadratic_polynomial_flow(coefficients, time_step,                          &
                     speed_before, speed_after)
         CASE (EXACT_FLOW_FROUDE)
-            IF (coefficients(3) .GE. 0.0_wp .AND.                               &
-                    coefficients(4) .GE. coefficients(5) .AND.                     &
+            IF (coefficients(3) .GE. 0.0_wp .AND.                                                  &
+                    coefficients(4) .GE. coefficients(5) .AND.                                     &
                     coefficients(1) .GT. 0.0_wp) THEN
-                exponential_offset = (coefficients(4)-coefficients(5))*          &
+                exponential_offset = (coefficients(4)-coefficients(5))*                            &
                             EXP(-coefficients(3))
                 rate_constant = coefficients(1)
                 IF (coefficients(2) .LE. 0.0_wp .OR. exponential_offset .EQ. 0.0_wp) THEN
@@ -185,9 +197,9 @@ CONTAINS
                         speed_after = MAX(0.0_wp, speed_before-rate_constant*value*time_step)
 
                 ELSEIF (coefficients(5) .GT. 0.0_wp) THEN
-                        value = coefficients(5)*EXP(coefficients(2)*speed_before) +   &
+                        value = coefficients(5)*EXP(coefficients(2)*speed_before) +                &
                                 exponential_offset
-                        value = value*EXP(-rate_constant*coefficients(2)*             &
+                        value = value*EXP(-rate_constant*coefficients(2)*                          &
                                 coefficients(5)*time_step) - exponential_offset
                         IF (value .LE. coefficients(5)) THEN
                             speed_after = 0.0_wp
@@ -198,7 +210,7 @@ CONTAINS
                         END IF
 
                 ELSE
-                        value = EXP(coefficients(2)*speed_before) -                   &
+                        value = EXP(coefficients(2)*speed_before) -                                &
                                 rate_constant*exponential_offset*coefficients(2)*time_step
                         IF (value .LE. 1.0_wp) THEN
                             speed_after = 0.0_wp
@@ -211,13 +223,13 @@ CONTAINS
                 END IF
 
             ELSE
-                CALL solve_by_exact_time_integral(flow_model, coefficients,       &
+                CALL solve_by_exact_time_integral(flow_model, coefficients,                        &
                             time_step, speed_before, speed_after)
 
             END IF
 
         CASE (EXACT_FLOW_LUCAS, EXACT_FLOW_MUI, EXACT_FLOW_MUI_VOELLMY)
-            CALL solve_by_exact_time_integral(flow_model, coefficients,          &
+            CALL solve_by_exact_time_integral(flow_model, coefficients,                            &
                     time_step, speed_before, speed_after)
 
         END SELECT
@@ -244,7 +256,7 @@ CONTAINS
 
         root = 0.0_wp
         found = .FALSE.
-        interval_tolerance = 32.0_wp * EPSILON(1.0_wp) *                       &
+        interval_tolerance = 32.0_wp * EPSILON(1.0_wp) *                                           &
                 MAX(1.0_wp, ABS(lower), ABS(upper))
 
         IF (a .EQ. 0.0_wp) THEN
@@ -264,7 +276,7 @@ CONTAINS
 
         ELSE
             discriminant = b*b - 4.0_wp*a*c
-            discriminant_tolerance = 64.0_wp * EPSILON(1.0_wp) *                &
+            discriminant_tolerance = 64.0_wp * EPSILON(1.0_wp) *                                   &
                     MAX(TINY(1.0_wp), ABS(b*b), ABS(4.0_wp*a*c))
             IF (discriminant .LT. -discriminant_tolerance) RETURN
             discriminant = MAX(0.0_wp, discriminant)
@@ -319,7 +331,7 @@ CONTAINS
         root = 0.0_wp
         found = .FALSE.
         IF (a .EQ. 0.0_wp) THEN
-            CALL solve_quadratic_in_interval(b, c, d, lower, upper,               &
+            CALL solve_quadratic_in_interval(b, c, d, lower, upper,                                &
                     quadratic_root, quadratic_found)
             root = quadratic_root
             found = quadratic_found
@@ -331,15 +343,15 @@ CONTAINS
         p = c / a - 3.0_wp*shift**2
         q = 2.0_wp*shift**3 - shift*(c/a) + d/a
         discriminant = 0.25_wp*q*q + (p/3.0_wp)**3
-        discriminant_tolerance = 64.0_wp * EPSILON(1.0_wp) *                   &
+        discriminant_tolerance = 64.0_wp * EPSILON(1.0_wp) *                                       &
                 MAX(TINY(1.0_wp), ABS(0.25_wp*q*q), ABS((p/3.0_wp)**3))
-        interval_tolerance = 32.0_wp * EPSILON(1.0_wp) *                       &
+        interval_tolerance = 32.0_wp * EPSILON(1.0_wp) *                                           &
                 MAX(1.0_wp, ABS(lower), ABS(upper))
 
         IF (discriminant .GT. discriminant_tolerance) THEN
-            roots(1) = SIGN(ABS(-0.5_wp*q + SQRT(discriminant))**(1.0_wp/3.0_wp), &
-                    -0.5_wp*q + SQRT(discriminant)) +                              &
-                    SIGN(ABS(-0.5_wp*q - SQRT(discriminant))**(1.0_wp/3.0_wp),      &
+            roots(1) = SIGN(ABS(-0.5_wp*q + SQRT(discriminant))**(1.0_wp/3.0_wp),                  &
+                    -0.5_wp*q + SQRT(discriminant)) +                                              &
+                    SIGN(ABS(-0.5_wp*q - SQRT(discriminant))**(1.0_wp/3.0_wp),                     &
                     -0.5_wp*q - SQRT(discriminant)) - shift
             roots(2:3) = roots(1)
 
@@ -351,10 +363,10 @@ CONTAINS
 
         ELSE
             radius = 2.0_wp * SQRT(-p/3.0_wp)
-            angle = ACOS(MAX(-1.0_wp, MIN(1.0_wp,                              &
+            angle = ACOS(MAX(-1.0_wp, MIN(1.0_wp,                                                  &
                     (3.0_wp*q/(2.0_wp*p))*SQRT(-3.0_wp/p))))
             DO i = 1, 3
-                roots(i) = radius * COS((angle - 2.0_wp*ACOS(-1.0_wp)*           &
+                roots(i) = radius * COS((angle - 2.0_wp*ACOS(-1.0_wp)*                             &
                             REAL(i-1,wp))/3.0_wp) - shift
 
             END DO
@@ -427,7 +439,7 @@ CONTAINS
         DO iteration = 1, 100
             exponential_value = EXP(value)
             residual = value*exponential_value - argument
-            denominator = exponential_value*(value + 1.0_wp) -                &
+            denominator = exponential_value*(value + 1.0_wp) -                                     &
                     (value + 2.0_wp)*residual/(2.0_wp*value + 2.0_wp)
             IF (denominator .EQ. 0.0_wp) RETURN
 
@@ -444,12 +456,13 @@ CONTAINS
     END SUBROUTINE lambert_w0
 
     !> \brief Advance a polynomial drag law c + a*r + b*r**2.
-    !> \details Solve a nonnegative quadratic-polynomial speed-decay equation without reversing the velocity direction.
+    !> \details Solve a nonnegative quadratic-polynomial speed-decay equation without reversing the
+    !> velocity direction.
     !> \param[in] coefficients Constant, linear, and quadratic drag coefficients.
     !> \param[in] time_step Integration interval [s].
     !> \param[in] speed_before Initial speed magnitude [m s^-1].
     !> \param[out] speed_after Integrated speed magnitude [m s^-1].
-    SUBROUTINE solve_quadratic_polynomial_flow(coefficients, time_step,       &
+    SUBROUTINE solve_quadratic_polynomial_flow(coefficients, time_step,                            &
             speed_before, speed_after)
 
         REAL(wp), INTENT(IN) :: coefficients(:), time_step, speed_before
@@ -467,7 +480,7 @@ CONTAINS
         speed_after = speed_before
 
         IF (MIN(constant_drag, linear_drag, quadratic_drag) .LT. 0.0_wp) THEN
-            CALL solve_by_exact_time_integral(EXACT_FLOW_QUADRATIC_POLYNOMIAL,   &
+            CALL solve_by_exact_time_integral(EXACT_FLOW_QUADRATIC_POLYNOMIAL,                     &
                     coefficients, time_step, speed_before, speed_after)
             RETURN
 
@@ -476,12 +489,12 @@ CONTAINS
         IF (constant_drag .EQ. 0.0_wp) THEN
             IF (linear_drag .GT. 0.0_wp) THEN
                 exponential_factor = EXP(-linear_drag*time_step)
-                speed_after = speed_before*exponential_factor /                   &
-                            (1.0_wp + (quadratic_drag*speed_before/linear_drag)*         &
+                speed_after = speed_before*exponential_factor /                                    &
+                            (1.0_wp + (quadratic_drag*speed_before/linear_drag)*                   &
                             (1.0_wp-exponential_factor))
 
             ELSEIF (quadratic_drag .GT. 0.0_wp) THEN
-                speed_after = speed_before /                                      &
+                speed_after = speed_before /                                                       &
                             (1.0_wp+quadratic_drag*speed_before*time_step)
 
             END IF
@@ -493,7 +506,7 @@ CONTAINS
         IF (quadratic_drag .EQ. 0.0_wp) THEN
             IF (linear_drag .GT. 0.0_wp) THEN
                 exponential_factor = EXP(-linear_drag*time_step)
-                speed_after = MAX(0.0_wp, (speed_before+constant_drag/linear_drag)*&
+                speed_after = MAX(0.0_wp, (speed_before+constant_drag/linear_drag)*                &
                             exponential_factor-constant_drag/linear_drag)
 
             ELSE
@@ -505,7 +518,7 @@ CONTAINS
 
         END IF
 
-        primitive = quadratic_decay_time(speed_before, constant_drag,           &
+        primitive = quadratic_decay_time(speed_before, constant_drag,                              &
                 linear_drag, quadratic_drag)
         target_primitive = primitive-time_step
         IF (target_primitive .LE. 0.0_wp) THEN
@@ -520,7 +533,7 @@ CONTAINS
         DO iteration = 1, max_iterations
             midpoint = lower+0.5_wp*(upper-lower)
             IF (midpoint .EQ. lower .OR. midpoint .EQ. upper) EXIT
-            primitive = quadratic_decay_time(midpoint, constant_drag,            &
+            primitive = quadratic_decay_time(midpoint, constant_drag,                              &
                     linear_drag, quadratic_drag)
             IF (primitive .LT. target_primitive) THEN
                 lower = midpoint
@@ -535,7 +548,8 @@ CONTAINS
         END DO
 
         IF (iteration .GT. max_iterations) THEN
-            CALL fatal_analytic_input_error('Polynomial exact velocity inversion failed to converge')
+            CALL fatal_analytic_input_error(                                                       &
+                'Polynomial exact velocity inversion failed to converge')
 
         END IF
 
@@ -544,37 +558,38 @@ CONTAINS
     END SUBROUTINE solve_quadratic_polynomial_flow
 
     !> \brief Evaluate the elapsed time for a quadratic polynomial decay law.
-    !> \details Evaluate the separated elapsed-time integral associated with constant, linear and quadratic drag.
+    !> \details Evaluate the separated elapsed-time integral associated with constant, linear and
+    !> quadratic drag.
     !> \param[in] mod_vel Speed at which to evaluate the separated time integral [m s^-1].
     !> \param[in] constant_drag Constant decay coefficient.
     !> \param[in] linear_drag Linear decay coefficient.
     !> \param[in] quadratic_drag Quadratic decay coefficient.
     !> \return Elapsed time from zero speed to the supplied speed [s].
-    PURE FUNCTION quadratic_decay_time(mod_vel, constant_drag, linear_drag,     &
+    PURE FUNCTION quadratic_decay_time(mod_vel, constant_drag, linear_drag,                        &
             quadratic_drag) RESULT(time)
 
         REAL(wp), INTENT(IN) :: mod_vel, constant_drag, linear_drag, quadratic_drag
         REAL(wp) :: time, discriminant, root_discriminant, numerator, denominator
 
         discriminant = 4.0_wp*quadratic_drag*constant_drag-linear_drag**2
-        IF (ABS(discriminant) .LE. 64.0_wp*EPSILON(1.0_wp)*                     &
-                MAX(1.0_wp, linear_drag**2,                                       &
+        IF (ABS(discriminant) .LE. 64.0_wp*EPSILON(1.0_wp)*                                        &
+                MAX(1.0_wp, linear_drag**2,                                                        &
                 4.0_wp*quadratic_drag*constant_drag)) THEN
-            time = 2.0_wp/linear_drag - 2.0_wp/                                  &
+            time = 2.0_wp/linear_drag - 2.0_wp/                                                    &
                     (2.0_wp*quadratic_drag*mod_vel+linear_drag)
 
         ELSEIF (discriminant .GT. 0.0_wp) THEN
             root_discriminant = SQRT(discriminant)
-            time = 2.0_wp/root_discriminant *                                    &
-                    (ATAN((2.0_wp*quadratic_drag*mod_vel+linear_drag)/                &
+            time = 2.0_wp/root_discriminant *                                                      &
+                    (ATAN((2.0_wp*quadratic_drag*mod_vel+linear_drag)/                             &
                     root_discriminant)-ATAN(linear_drag/root_discriminant))
 
         ELSE
             root_discriminant = SQRT(-discriminant)
             numerator = 2.0_wp*quadratic_drag*mod_vel + linear_drag
-            denominator = (numerator-root_discriminant) /                        &
+            denominator = (numerator-root_discriminant) /                                          &
                     (numerator+root_discriminant)
-            time = (LOG(denominator)-LOG((linear_drag-root_discriminant)/        &
+            time = (LOG(denominator)-LOG((linear_drag-root_discriminant)/                          &
                     (linear_drag+root_discriminant)))/root_discriminant
 
         END IF
@@ -582,13 +597,14 @@ CONTAINS
     END FUNCTION quadratic_decay_time
 
     !> \brief Invert the separated time integral for nonlinear velocity-decay laws.
-    !> \details Invert the monotone time integral of the reciprocal decay rate to recover the speed after the time step.
+    !> \details Invert the monotone time integral of the reciprocal decay rate to recover the speed
+    !> after the time step.
     !> \param[in] flow_model Exact-flow law identifier.
     !> \param[in] coefficients Model-specific frozen decay coefficients.
     !> \param[in] time_step Integration interval [s].
     !> \param[in] speed_before Initial speed magnitude [m s^-1].
     !> \param[out] speed_after Integrated speed magnitude [m s^-1].
-    SUBROUTINE solve_by_exact_time_integral(flow_model, coefficients, time_step, &
+    SUBROUTINE solve_by_exact_time_integral(flow_model, coefficients, time_step,                   &
             speed_before, speed_after)
 
         INTEGER, INTENT(IN) :: flow_model
@@ -602,11 +618,11 @@ CONTAINS
 
         speed_after = speed_before
 
-        IF (velocity_decay_rate(flow_model, coefficients, speed_before) .LE.   &
+        IF (velocity_decay_rate(flow_model, coefficients, speed_before) .LE.                       &
                 0.0_wp) RETURN
 
         IF (velocity_decay_rate(flow_model, coefficients, 0.0_wp) .GT. 0.0_wp) THEN
-            stop_time = integrate_inverse_decay_rate(flow_model, coefficients,   &
+            stop_time = integrate_inverse_decay_rate(flow_model, coefficients,                     &
                     0.0_wp, speed_before)
             IF (time_step .GE. stop_time) THEN
                 speed_after = 0.0_wp
@@ -621,7 +637,7 @@ CONTAINS
         DO iteration = 1, max_iterations
             midpoint = lower + 0.5_wp*(upper-lower)
             IF (midpoint .EQ. lower .OR. midpoint .EQ. upper) EXIT
-            elapsed = integrate_inverse_decay_rate(flow_model, coefficients,     &
+            elapsed = integrate_inverse_decay_rate(flow_model, coefficients,                       &
                     midpoint, speed_before)
             IF (elapsed .GT. time_step) THEN
                 lower = midpoint
@@ -637,7 +653,8 @@ CONTAINS
         END DO
 
         IF (iteration .GT. max_iterations) THEN
-            CALL fatal_analytic_input_error('Exact velocity time-integral inversion failed to converge')
+            CALL fatal_analytic_input_error(                                                       &
+                'Exact velocity time-integral inversion failed to converge')
 
         END IF
 
@@ -651,7 +668,7 @@ CONTAINS
     !> \param[in] coefficients Frozen coefficients defining the scalar decay law.
     !> \param[in] mod_vel Three-dimensional velocity magnitude [m s^-1].
     !> \return Computed rate for the requested model and inputs.
-    PURE FUNCTION velocity_decay_rate(flow_model, coefficients, mod_vel)        &
+    PURE FUNCTION velocity_decay_rate(flow_model, coefficients, mod_vel)                           &
             RESULT(rate)
 
         INTEGER, INTENT(IN) :: flow_model
@@ -660,27 +677,27 @@ CONTAINS
 
         SELECT CASE (flow_model)
         CASE (EXACT_FLOW_QUADRATIC_POLYNOMIAL)
-            rate = coefficients(1) + coefficients(2)*mod_vel +                    &
+            rate = coefficients(1) + coefficients(2)*mod_vel +                                     &
                     coefficients(3)*mod_vel**2
         CASE (EXACT_FLOW_FROUDE)
             IF (coefficients(2)*mod_vel+coefficients(3) .LE. 0.0_wp) THEN
                 rate = coefficients(1)*coefficients(4)
 
             ELSE
-                rate = coefficients(1) * (coefficients(5) +                      &
-                            (coefficients(4)-coefficients(5))*EXP(                      &
+                rate = coefficients(1) * (coefficients(5) +                                        &
+                            (coefficients(4)-coefficients(5))*EXP(                                 &
                             -coefficients(2)*mod_vel-coefficients(3)))
 
             END IF
 
         CASE (EXACT_FLOW_LUCAS)
             friction_speed = coefficients(2)*mod_vel + coefficients(3)
-            IF (coefficients(7) .GT. 0.5_wp .OR.                               &
+            IF (coefficients(7) .GT. 0.5_wp .OR.                                                   &
                     friction_speed .LT. coefficients(6)) THEN
                 rate = coefficients(1)*coefficients(4)
 
             ELSEIF (friction_speed .GT. 0.0_wp) THEN
-                rate = coefficients(1)*(coefficients(5) +                        &
+                rate = coefficients(1)*(coefficients(5) +                                          &
                             (coefficients(4)-coefficients(5))*coefficients(6)/friction_speed)
 
             ELSE
@@ -690,8 +707,8 @@ CONTAINS
 
         CASE (EXACT_FLOW_MUI)
             IF (coefficients(4)+coefficients(5)*mod_vel .GT. TINY(1.0_wp)) THEN
-                rate = (coefficients(1) + coefficients(2)*mod_vel +                 &
-                            coefficients(3)*mod_vel**2) /                                &
+                rate = (coefficients(1) + coefficients(2)*mod_vel +                                &
+                            coefficients(3)*mod_vel**2) /                                          &
                             (coefficients(4) + coefficients(5)*mod_vel)
 
             ELSEIF (coefficients(5) .GT. 0.0_wp) THEN
@@ -704,9 +721,9 @@ CONTAINS
 
         CASE (EXACT_FLOW_MUI_VOELLMY)
             IF (coefficients(4)+coefficients(5)*mod_vel .GT. TINY(1.0_wp)) THEN
-                rate = (coefficients(1) + coefficients(2)*mod_vel +                 &
-                            coefficients(3)*mod_vel**2) /                                &
-                            (coefficients(4) + coefficients(5)*mod_vel) +                &
+                rate = (coefficients(1) + coefficients(2)*mod_vel +                                &
+                            coefficients(3)*mod_vel**2) /                                          &
+                            (coefficients(4) + coefficients(5)*mod_vel) +                          &
                             coefficients(6)*mod_vel**2
 
             ELSEIF (coefficients(5) .GT. 0.0_wp) THEN
@@ -725,13 +742,14 @@ CONTAINS
     END FUNCTION velocity_decay_rate
 
     !> \brief Integrate the reciprocal scalar decay rate.
-    !> \details Compute elapsed time by integrating the reciprocal scalar decay rate over the supplied speed interval.
+    !> \details Compute elapsed time by integrating the reciprocal scalar decay rate over the
+    !> supplied speed interval.
     !> \param[in] flow_model Identifier of exact scalar flow law.
     !> \param[in] coefficients Frozen coefficients defining the scalar decay law.
     !> \param[in] lower Lower integration or search bound.
     !> \param[in] upper Upper integration or search bound.
     !> \return Computed integral for the requested model and inputs.
-    FUNCTION integrate_inverse_decay_rate(flow_model, coefficients, lower,   &
+    FUNCTION integrate_inverse_decay_rate(flow_model, coefficients, lower,                         &
             upper) RESULT(integral)
 
         INTEGER, INTENT(IN) :: flow_model
@@ -747,21 +765,21 @@ CONTAINS
         branch_speed = -HUGE(1.0_wp)
         SELECT CASE (flow_model)
         CASE (EXACT_FLOW_FROUDE)
-            IF (coefficients(2) .GT. 0.0_wp)                                &
+            IF (coefficients(2) .GT. 0.0_wp)                                                       &
                     branch_speed = -coefficients(3)/coefficients(2)
         CASE (EXACT_FLOW_LUCAS)
-            IF (coefficients(2) .GT. 0.0_wp .AND. coefficients(7) .LE. 0.5_wp) &
+            IF (coefficients(2) .GT. 0.0_wp .AND. coefficients(7) .LE. 0.5_wp)                     &
                     branch_speed = (coefficients(6)-coefficients(3))/coefficients(2)
 
         END SELECT
 
         IF (branch_speed .GT. lower .AND. branch_speed .LT. upper) THEN
-            integral = integrate_inverse_interval(flow_model, coefficients,     &
-                    lower, branch_speed) + integrate_inverse_interval(flow_model,  &
+            integral = integrate_inverse_interval(flow_model, coefficients,                        &
+                    lower, branch_speed) + integrate_inverse_interval(flow_model,                  &
                     coefficients, branch_speed, upper)
 
         ELSE
-            integral = integrate_inverse_interval(flow_model, coefficients,    &
+            integral = integrate_inverse_interval(flow_model, coefficients,                        &
                     lower, upper)
 
         END IF
@@ -769,13 +787,14 @@ CONTAINS
     END FUNCTION integrate_inverse_decay_rate
 
     !> \brief Integrate reciprocal decay rate over a velocity interval.
-    !> \details Evaluate a bounded reciprocal-decay integral with numerical safeguards around low rates.
+    !> \details Evaluate a bounded reciprocal-decay integral with numerical safeguards around low
+    !> rates.
     !> \param[in] flow_model Identifier of exact scalar flow law.
     !> \param[in] coefficients Frozen coefficients defining the scalar decay law.
     !> \param[in] lower Lower integration or search bound.
     !> \param[in] upper Upper integration or search bound.
     !> \return Computed integral for the requested model and inputs.
-    FUNCTION integrate_inverse_interval(flow_model, coefficients, lower, upper) &
+    FUNCTION integrate_inverse_interval(flow_model, coefficients, lower, upper)                    &
             RESULT(integral)
 
         INTEGER, INTENT(IN) :: flow_model
@@ -789,13 +808,14 @@ CONTAINS
         f_middle = inverse_rate(flow_model, coefficients, middle)
         whole = simpson_estimate(lower, upper, f_lower, f_middle, f_upper)
         tolerance = 2.0E-11_wp*MAX(1.0_wp, ABS(whole))
-        integral = adaptive_simpson(flow_model, coefficients, lower, upper,    &
+        integral = adaptive_simpson(flow_model, coefficients, lower, upper,                        &
                 f_lower, f_middle, f_upper, whole, tolerance, 24)
 
     END FUNCTION integrate_inverse_interval
 
     !> \brief Refine the reciprocal-decay integral using adaptive Simpson quadrature.
-    !> \details Recursively subdivide Simpson quadrature panels until their estimated error meets tolerance or the recursion limit is reached.
+    !> \details Recursively subdivide Simpson quadrature panels until their estimated error meets
+    !> tolerance or the recursion limit is reached.
     !> \param[in] flow_model Identifier of exact scalar flow law.
     !> \param[in] coefficients Frozen coefficients defining the scalar decay law.
     !> \param[in] lower Lower integration or search bound.
@@ -807,7 +827,7 @@ CONTAINS
     !> \param[in] tolerance Requested absolute error tolerance of the current quadrature interval.
     !> \param[in] depth Remaining maximum recursion depth for adaptive integration.
     !> \return Computed integral for the requested model and inputs.
-    RECURSIVE FUNCTION adaptive_simpson(flow_model, coefficients, lower, upper, &
+    RECURSIVE FUNCTION adaptive_simpson(flow_model, coefficients, lower, upper,                    &
             f_lower, f_middle, f_upper, whole, tolerance, depth) RESULT(integral)
 
         INTEGER, INTENT(IN) :: flow_model, depth
@@ -821,14 +841,15 @@ CONTAINS
         right_middle = midpoint + 0.5_wp*(upper-midpoint)
         f_left = inverse_rate(flow_model, coefficients, left_middle)
         f_right = inverse_rate(flow_model, coefficients, right_middle)
-        left_estimate = simpson_estimate(lower, midpoint, f_lower, f_left,     &
+        left_estimate = simpson_estimate(lower, midpoint, f_lower, f_left,                         &
                 f_middle)
-        right_estimate = simpson_estimate(midpoint, upper, f_middle, f_right,  &
+        right_estimate = simpson_estimate(midpoint, upper, f_middle, f_right,                      &
                 f_upper)
         delta = left_estimate + right_estimate - whole
 
         IF (depth .LE. 0 .AND. ABS(delta) .GT. 15.0_wp*tolerance) THEN
-            CALL fatal_analytic_input_error('Exact velocity time-integral quadrature failed to converge')
+            CALL fatal_analytic_input_error(                                                       &
+                'Exact velocity time-integral quadrature failed to converge')
 
         END IF
 
@@ -838,15 +859,16 @@ CONTAINS
 
         END IF
 
-        integral = adaptive_simpson(flow_model, coefficients, lower, midpoint, &
-                f_lower, f_left, f_middle, left_estimate, 0.5_wp*tolerance, depth-1) &
-                + adaptive_simpson(flow_model, coefficients, midpoint, upper,     &
+        integral = adaptive_simpson(flow_model, coefficients, lower, midpoint,                     &
+                f_lower, f_left, f_middle, left_estimate, 0.5_wp*tolerance, depth-1)               &
+                + adaptive_simpson(flow_model, coefficients, midpoint, upper,                      &
                 f_middle, f_right, f_upper, right_estimate, 0.5_wp*tolerance, depth-1)
 
     END FUNCTION adaptive_simpson
 
     !> \brief Evaluate the reciprocal of the nonnegative speed-decay rate.
-    !> \details Return 1/rate for a finite positive resistance; guard negative and nonfinite rates and avoid division by nearly zero.
+    !> \details Return 1/rate for a finite positive resistance; guard negative and nonfinite rates
+    !> and avoid division by nearly zero.
     !> \param[in] flow_model Identifier of exact scalar flow law.
     !> \param[in] coefficients Frozen coefficients defining the scalar decay law.
     !> \param[in] mod_vel Three-dimensional velocity magnitude [m s^-1].
@@ -879,14 +901,15 @@ CONTAINS
     END FUNCTION inverse_rate
 
     !> \brief Evaluate Simpson's one-panel quadrature estimate.
-    !> \details Compute the standard weighted one-panel Simpson approximation on the supplied interval.
+    !> \details Compute the standard weighted one-panel Simpson approximation on the supplied
+    !> interval.
     !> \param[in] lower Lower integration or search bound.
     !> \param[in] upper Upper integration or search bound.
     !> \param[in] f_lower Reciprocal decay-rate integrand at the lower endpoint.
     !> \param[in] f_middle Reciprocal decay-rate integrand at the midpoint.
     !> \param[in] f_upper Reciprocal decay-rate integrand at the upper endpoint.
     !> \return Computed value for the requested model and inputs.
-    PURE FUNCTION simpson_estimate(lower, upper, f_lower, f_middle, f_upper)  &
+    PURE FUNCTION simpson_estimate(lower, upper, f_lower, f_middle, f_upper)                       &
             RESULT(value)
 
         REAL(wp), INTENT(IN) :: lower, upper, f_lower, f_middle, f_upper

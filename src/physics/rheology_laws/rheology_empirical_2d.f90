@@ -12,7 +12,7 @@
 MODULE rheology_empirical_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
-    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,  &
+    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                      &
             solve_exact_velocity_flow, EXACT_FLOW_LINEAR
     IMPLICIT NONE
     PRIVATE
@@ -23,7 +23,8 @@ MODULE rheology_empirical_2d
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
     !> \brief Evaluate the explicit empirical momentum contribution.
-    !> \details Assemble the real-valued momentum source from the model's supported physical treatment contributions; unused model inputs are retained for the shared dispatch interface.
+    !> \details Assemble the real-valued momentum source from the model's supported physical
+    !> treatment contributions; unused model inputs are retained for the shared dispatch interface.
     !> \param[in] h Flow depth [m].
     !> \param[in] T Mixture temperature [K].
     !> \param[in] u Depth-averaged x velocity [m s^-1].
@@ -46,11 +47,11 @@ CONTAINS
     !> \param[in] use_stochastic Whether stochastic rheology parameters are enabled.
     !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
     !> \param[out] rate Conservative horizontal momentum source vector.
-    SUBROUTINE eval_rheology_empirical_explicit( &
-            h, T, u, v, mod_vel, mod_hor_vel, &
-            mod_vel2, rhom, inv_rhom, red_grav, &
-            grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
-            B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
+    SUBROUTINE eval_rheology_empirical_explicit(                                                   &
+            h, T, u, v, mod_vel, mod_hor_vel,                                                      &
+            mod_vel2, rhom, inv_rhom, red_grav,                                                    &
+            grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy,                          &
+            B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic,                 &
             stochastic_value, rate )
 
         REAL(wp), INTENT(IN) :: h, T, u, v
@@ -64,17 +65,19 @@ CONTAINS
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
 
-        CALL eval_rheology_empirical_semi_implicit( &
+        CALL eval_rheology_empirical_semi_implicit(                                                &
             sx, sy )
-        CALL eval_rheology_empirical_implicit( &
-            CMPLX(h,0.0_wp,wp), CMPLX(u,0.0_wp,wp), &
-            CMPLX(v,0.0_wp,wp), CMPLX(mod_hor_vel,0.0_wp,wp), &
+        CALL eval_rheology_empirical_implicit(                                                     &
+            CMPLX(h,0.0_wp,wp), CMPLX(u,0.0_wp,wp),                                                &
+            CMPLX(v,0.0_wp,wp), CMPLX(mod_hor_vel,0.0_wp,wp),                                      &
             CMPLX(mod_vel,0.0_wp,wp), CMPLX(rhom,0.0_wp,wp), moving, ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_empirical_explicit
 
     !> \brief Evaluate the semi-implicit empirical momentum contribution.
-    !> \details Evaluate the contribution of the empirical basal-friction parameterization assigned to this treatment. The returned rates act on the conservative horizontal momenta; zero-valued implementations intentionally provide no contribution.
+    !> \details Evaluate the contribution of the empirical basal-friction parameterization assigned
+    !> to this treatment. The returned rates act on the conservative horizontal momenta; zero-valued
+    !> implementations intentionally provide no contribution.
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
     SUBROUTINE eval_rheology_empirical_semi_implicit(rate_x, rate_y)
@@ -86,7 +89,9 @@ CONTAINS
     END SUBROUTINE eval_rheology_empirical_semi_implicit
 
     !> \brief Evaluate the implicit empirical momentum contribution.
-    !> \details Evaluate the part of the empirical basal-friction parameterization assigned to the implicit treatment. Complex-valued arguments retain complex-step sensitivities where implemented; zero-valued implementations intentionally contribute no term.
+    !> \details Evaluate the part of the empirical basal-friction parameterization assigned to the
+    !> implicit treatment. Complex-valued arguments retain complex-step sensitivities where
+    !> implemented; zero-valued implementations intentionally contribute no term.
     !> \param[in] h Flow depth [m].
     !> \param[in] u Depth-averaged x velocity [m s^-1].
     !> \param[in] v Depth-averaged y velocity [m s^-1].
@@ -96,7 +101,7 @@ CONTAINS
     !> \param[in] moving Whether the local state is considered moving.
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
-    SUBROUTINE eval_rheology_empirical_implicit(h, u, v, &
+    SUBROUTINE eval_rheology_empirical_implicit(h, u, v,                                           &
             mod_hor_vel, mod_vel, rhom, moving, rate_x, rate_y)
 
         COMPLEX(wp), INTENT(IN) :: h, u, v
@@ -114,13 +119,17 @@ CONTAINS
     END SUBROUTINE eval_rheology_empirical_implicit
 
     !> \brief Integrate the empirical velocity source over a frozen-state substep.
-    !> \details Evaluate the exact or time-integral-based decay of horizontal speed under the empirical basal-friction parameterization. The velocity direction is retained and the updated components are returned without evolving the frozen thermodynamic and geometric inputs.
+    !> \details Evaluate the exact or time-integral-based decay of horizontal speed under the
+    !> empirical basal-friction parameterization. The velocity direction is retained and the updated
+    !> components are returned without evolving the frozen thermodynamic and geometric inputs.
     !> \param[in] dt Duration of the analytic source substep [s].
     !> \param[in] h Flow depth [m].
     !> \param[in] speed_ratio Ratio of three-dimensional to horizontal speed.
-    !> \param[in] velocity_before Two-component horizontal velocity before source integration [m s^-1].
-    !> \param[out] velocity_after Two-component horizontal velocity after source integration [m s^-1].
-    SUBROUTINE solve_rheology_empirical_analytic(dt, h, &
+    !> \param[in] velocity_before Two-component horizontal velocity before source integration [m
+    !> s^-1].
+    !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
+    !> s^-1].
+    SUBROUTINE solve_rheology_empirical_analytic(dt, h,                                            &
             speed_ratio, velocity_before, velocity_after)
 
         REAL(wp), INTENT(IN) :: dt, h, speed_ratio
@@ -130,13 +139,13 @@ CONTAINS
 
         velocity_after = velocity_before
         speed_before = SQRT(SUM(velocity_before**2))
-        CALL validate_analytic_velocity_inputs(dt, h,    &
+        CALL validate_analytic_velocity_inputs(dt, h,                                              &
                 speed_ratio, speed_before, 'empirical')
         IF (dt .EQ. 0.0_wp) RETURN
         IF (speed_before .EQ. 0.0_wp) RETURN
-        linear_drag = 1.0E-3_wp * speed_ratio /                               &
+        linear_drag = 1.0E-3_wp * speed_ratio /                                                    &
                 (h * (1.0_wp + 10.0_wp*h))
-        CALL solve_exact_velocity_flow(EXACT_FLOW_LINEAR, [linear_drag],        &
+        CALL solve_exact_velocity_flow(EXACT_FLOW_LINEAR, [linear_drag],                           &
                 dt, speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_empirical_analytic
