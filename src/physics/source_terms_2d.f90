@@ -11,9 +11,8 @@ MODULE source_terms_2d
   USE parameters_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE thermal_laws_2d, ONLY : &
-       eval_thermal_cooling_implicit, eval_thermal_cooling_explicit, &
-       solve_thermal_cooling_analytic
+  USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit, &
+       solve_thermal_analytic
   USE pore_pressure_laws_2d, ONLY : &
        eval_pore_pressure_dissipation_implicit, &
        eval_pore_pressure_dissipation_explicit, solve_pore_pressure_dissipation_analytic
@@ -204,8 +203,8 @@ CONTAINS
         RETURN
       END IF
       heat_capacity=q_before(4)/flow_temperature
-      CALL solve_thermal_cooling_analytic(flow_temperature,interval,      &
-           heat_capacity,radiative_term_coeff,convective_term_coeff,      &
+      CALL solve_thermal_analytic('thermal_cooling',physical_state,interval, &
+           heat_capacity,radiative_term_coeff,convective_term_coeff, &
            T_env,temperature_after)
       q_after(4)=heat_capacity*temperature_after
       status=0
@@ -379,8 +378,8 @@ CONTAINS
     END IF
 
     IF (selected_thermal) THEN
-       source_term(4) = eval_thermal_cooling_implicit( &
-            T, radiative_term_coeff, convective_term_coeff, T_env)
+       CALL eval_thermal_implicit('thermal_cooling',physical_state, &
+            radiative_term_coeff,convective_term_coeff,T_env,source_term(4))
     ENDIF
 
     IF ( pore_pressure_flag .AND. selected_pore ) &
@@ -639,8 +638,8 @@ CONTAINS
           expl_term(2:3)=expl_term(2:3)+rheology_rate
         END IF
         IF (thermal_cooling_flag .AND. group_contains_name(group,'thermal_cooling')) THEN
-          CALL eval_thermal_cooling_explicit(qpj(idx_T),radiative_term_coeff, &
-               convective_term_coeff,T_env,thermal_rate)
+          CALL eval_thermal_explicit('thermal_cooling',physical_state, &
+               radiative_term_coeff,convective_term_coeff,T_env,thermal_rate)
           expl_term(4)=expl_term(4)+thermal_rate
        END IF
        IF (pore_pressure_flag .AND. &
