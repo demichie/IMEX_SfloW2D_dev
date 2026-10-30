@@ -61,6 +61,8 @@ MODULE rheology_2d
     PUBLIC :: eval_rheology_implicit
     PUBLIC :: solve_rheology_analytic
     PUBLIC :: curvature_acceleration
+    PUBLIC :: eval_rheology_explicit_processes, eval_rheology_semi_implicit_processes
+    PUBLIC :: eval_rheology_implicit_processes, solve_rheology_analytic_processes
 
     ! Uniform treatment surface for this source family.
 
@@ -377,5 +379,90 @@ CONTAINS
                 2.0_wp*Bsecond_xy*u*v + Bsecond_yy*v**2
 
     END FUNCTION curvature_acceleration
+
+
+    ! Additive rates from all active rheology processes at the same stage state.
+    SUBROUTINE eval_rheology_explicit_processes(models,state,mod_vel,mod_hor_vel,mod_vel2, &
+         grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
+         use_pore_pressure,moving,use_stochastic,stochastic_value,rate)
+        CHARACTER(*), INTENT(IN) :: models(:)
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: mod_vel,mod_hor_vel,mod_vel2,grav_coeff
+        REAL(wp), INTENT(IN) :: B_second_xx,B_second_xy,B_second_yy,stochastic_value
+        LOGICAL, INTENT(IN) :: curvature_term,use_pore_pressure,moving,use_stochastic
+        REAL(wp), INTENT(OUT) :: rate(2)
+        REAL(wp) :: process_rate(2)
+        INTEGER :: i
+        rate=0.0_wp
+        DO i=1,SIZE(models)
+            CALL eval_rheology_explicit(TRIM(models(i)),state,mod_vel,mod_hor_vel,mod_vel2, &
+                 grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
+                 use_pore_pressure,moving,use_stochastic,stochastic_value,process_rate)
+            rate=rate+process_rate
+        END DO
+    END SUBROUTINE eval_rheology_explicit_processes
+
+    SUBROUTINE eval_rheology_semi_implicit_processes(models,state,mod_vel,mod_hor_vel, &
+         grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
+         use_pore_pressure,use_stochastic,stochastic_value,rate)
+        CHARACTER(*), INTENT(IN) :: models(:)
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: mod_vel,mod_hor_vel,grav_coeff
+        REAL(wp), INTENT(IN) :: B_second_xx,B_second_xy,B_second_yy,stochastic_value
+        LOGICAL, INTENT(IN) :: curvature_term,use_pore_pressure,use_stochastic
+        REAL(wp), INTENT(OUT) :: rate(2)
+        REAL(wp) :: process_rate(2)
+        INTEGER :: i
+        rate=0.0_wp
+        DO i=1,SIZE(models)
+            CALL eval_rheology_semi_implicit(TRIM(models(i)),state,mod_vel,mod_hor_vel, &
+                 grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
+                 use_pore_pressure,use_stochastic,stochastic_value,process_rate)
+            rate=rate+process_rate
+        END DO
+    END SUBROUTINE eval_rheology_semi_implicit_processes
+
+    SUBROUTINE eval_rheology_implicit_processes(models,state,mod_vel,mod_hor_vel,mod_vel2, &
+         moving,use_stochastic,stochastic_value,rate)
+        CHARACTER(*), INTENT(IN) :: models(:)
+        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        COMPLEX(wp), INTENT(IN) :: mod_vel,mod_hor_vel,mod_vel2
+        LOGICAL, INTENT(IN) :: moving,use_stochastic
+        REAL(wp), INTENT(IN) :: stochastic_value
+        COMPLEX(wp), INTENT(OUT) :: rate(2)
+        COMPLEX(wp) :: process_rate(2)
+        INTEGER :: i
+        rate=CMPLX(0.0_wp,0.0_wp,wp)
+        DO i=1,SIZE(models)
+            CALL eval_rheology_implicit(TRIM(models(i)),state,mod_vel,mod_hor_vel,mod_vel2, &
+                 moving,use_stochastic,stochastic_value,process_rate)
+            rate=rate+process_rate
+        END DO
+    END SUBROUTINE eval_rheology_implicit_processes
+
+    ! Exact flows are composed in order, never added as rates.
+    SUBROUTINE solve_rheology_analytic_processes(models,dt,state,speed_ratio,grav_coeff, &
+         curvature_acceleration,use_pore_pressure,use_stochastic,stochastic_value, &
+         velocity_after,model_supported)
+        CHARACTER(*), INTENT(IN) :: models(:)
+        REAL(wp), INTENT(IN) :: dt,speed_ratio,grav_coeff,curvature_acceleration,stochastic_value
+        TYPE(physical_state_type), INTENT(IN) :: state
+        LOGICAL, INTENT(IN) :: use_pore_pressure,use_stochastic
+        REAL(wp), INTENT(OUT) :: velocity_after(2)
+        LOGICAL, INTENT(OUT) :: model_supported
+        TYPE(physical_state_type) :: current_state
+        INTEGER :: i
+        current_state=state
+        velocity_after=[state%u,state%v]
+        model_supported=.TRUE.
+        DO i=1,SIZE(models)
+            CALL solve_rheology_analytic(TRIM(models(i)),dt,current_state,speed_ratio, &
+                 grav_coeff,curvature_acceleration,use_pore_pressure,use_stochastic, &
+                 stochastic_value,velocity_after,model_supported)
+            IF (.NOT.model_supported) RETURN
+            current_state%u=velocity_after(1)
+            current_state%v=velocity_after(2)
+        END DO
+    END SUBROUTINE solve_rheology_analytic_processes
 
 END MODULE rheology_2d
