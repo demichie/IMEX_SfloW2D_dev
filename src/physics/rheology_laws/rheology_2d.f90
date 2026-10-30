@@ -100,7 +100,7 @@ CONTAINS
 
         CHARACTER(*), INTENT(IN) :: model_name
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2, grav_coeff, B_second_xx, B_second_xy, B_second_yy, stochastic_value
+        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2, grav_coeff, B_second_xx, B_second_xy, B_second_yy
         LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate(2)
@@ -228,7 +228,7 @@ CONTAINS
 
         CHARACTER(*), INTENT(IN) :: model_name
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, grav_coeff, B_second_xx, B_second_xy, B_second_yy, stochastic_value
+        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, grav_coeff, B_second_xx, B_second_xy, B_second_yy
         LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, use_stochastic
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate(2)
