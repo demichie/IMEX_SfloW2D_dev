@@ -243,23 +243,42 @@ PROGRAM test_analytic_velocity
 
   voellmy_mu = 0.3_wp
   xi = 500.0_wp
-  CALL solve_rheology_voellmy_analytic(integration_step, flow_depth,       &
-       speed_ratio, velocity_before, mixture_density, reduced_gravity,        &
-       gravity_coefficient, 0.0_wp, .FALSE., 0.0_wp, .FALSE., 0.0_wp,        &
-       velocity_after)
+    BLOCK
+    TYPE(physical_state_type) :: rs
+    rs%h = flow_depth
+    rs%u = velocity_before(1)
+    rs%v = velocity_before(2)
+    rs%rho_m = mixture_density
+    rs%red_grav = reduced_gravity
+    rs%exc_pore_pres = 0.0_wp
+    CALL solve_rheology_voellmy_analytic(integration_step, rs, speed_ratio, gravity_coefficient, &
+         0.0_wp, .FALSE., .FALSE., 0.0_wp, velocity_after)
+  END BLOCK
   CALL assert_dispatch_matches('rheology_voellmy', .FALSE., 0.0_wp,        &
        .FALSE., 0.0_wp, velocity_after, 'Voellmy dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_rheology_voellmy_implicit(                                 &
-       CMPLX(velocity_after(1),0.0_wp,wp), CMPLX(velocity_after(2),0.0_wp,wp), &
-       CMPLX(mixture_density,0.0_wp,wp), CMPLX(reduced_gravity,0.0_wp,wp),  &
-       CMPLX(speed_after,0.0_wp,wp), CMPLX(speed_after**2,0.0_wp,wp),       &
-       .TRUE., .FALSE., 0.0_wp, complex_source_x, complex_source_y)
-  CALL eval_rheology_voellmy_semi_implicit(flow_depth, velocity_after(1), &
-       velocity_after(2), speed_after, mixture_density, reduced_gravity,    &
-       gravity_coefficient, .FALSE., 0.0_wp, 0.0_wp, 0.0_wp, .FALSE.,        &
-       0.0_wp, source_x, source_y)
+  BLOCK
+    TYPE(complex_physical_state_type) :: cs
+    cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
+    cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
+    cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
+    cs%red_grav=CMPLX(reduced_gravity,0.0_wp,wp)
+    CALL eval_rheology_voellmy_implicit(cs, CMPLX(speed_after,0.0_wp,wp), &
+         CMPLX(speed_after**2,0.0_wp,wp), .TRUE., .FALSE., 0.0_wp, &
+         complex_source_x, complex_source_y)
+  END BLOCK
+  BLOCK
+    TYPE(physical_state_type) :: rs
+    rs%h=flow_depth
+    rs%u=velocity_after(1)
+    rs%v=velocity_after(2)
+    rs%rho_m=mixture_density
+    rs%red_grav=reduced_gravity
+    rs%exc_pore_pres=0.0_wp
+    CALL eval_rheology_voellmy_semi_implicit(rs, speed_after, gravity_coefficient, .FALSE., &
+         0.0_wp, 0.0_wp, 0.0_wp, .FALSE., source_x, source_y)
+  END BLOCK
   source = [REAL(complex_source_x,wp)+source_x,                              &
        REAL(complex_source_y,wp)+source_y]
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &

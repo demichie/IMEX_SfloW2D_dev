@@ -116,12 +116,9 @@ CONTAINS
             exc_pore_pres => state%exc_pore_pres)
         SELECT CASE(TRIM(model_name))
         CASE('rheology_voellmy')
-            CALL eval_rheology_voellmy_explicit(                                                   &
-                    h, T, u, v, mod_vel, mod_hor_vel,                                              &
-                    mod_vel2, rhom, inv_rhom, red_grav,                                            &
-                    grav_coeff, alphas, curvature_term, B_second_xx,                               &
-                    B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving,            &
-                    use_stochastic, stochastic_value, rate )
+            CALL eval_rheology_voellmy_explicit(state, mod_vel, mod_hor_vel, mod_vel2, grav_coeff, &
+                    curvature_term, B_second_xx, B_second_xy, B_second_yy, &
+                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE('rheology_plastic')
             CALL eval_rheology_plastic_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
                     grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
@@ -224,11 +221,8 @@ CONTAINS
             exc_pore_pres => state%exc_pore_pres)
         SELECT CASE(TRIM(model_name))
         CASE('rheology_voellmy')
-            CALL eval_rheology_voellmy_semi_implicit(h, u,                                         &
-                    v, mod_vel, rhom, red_grav,                                                    &
-                    grav_coeff, curvature_term, B_second_xx, B_second_xy,                          &
-                    B_second_yy, use_pore_pressure, exc_pore_pres,                                 &
-                    rate(1), rate(2))
+            CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term, &
+                    B_second_xx, B_second_xy, B_second_yy, use_pore_pressure, rate(1), rate(2))
         CASE('rheology_lava')
             CALL eval_rheology_lava_semi_implicit(u, v,                                            &
                     mod_vel, rate(1), rate(2))
@@ -308,9 +302,8 @@ CONTAINS
             alphas => state%alphas)
         SELECT CASE(TRIM(model_name))
         CASE('rheology_voellmy')
-            CALL eval_rheology_voellmy_implicit(u, v,                                              &
-                    rhom, red_grav, mod_vel, mod_vel2, moving,                                     &
-                    use_stochastic, stochastic_value, rate(1), rate(2))
+            CALL eval_rheology_voellmy_implicit(state, mod_vel, mod_vel2, moving, use_stochastic, stochastic_value, &
+                    rate(1), rate(2))
         CASE('rheology_mui_voellmy')
             CALL eval_rheology_mui_voellmy_implicit(u, v,                                          &
                     rhom, red_grav, mod_vel, mod_vel2, moving,                                     &
@@ -384,11 +377,8 @@ CONTAINS
         CASE ('none')
             CONTINUE
         CASE ('rheology_voellmy')
-            CALL solve_rheology_voellmy_analytic(dt, h,                                            &
-                    speed_ratio, velocity_before, rhom, red_grav,                                  &
-                    grav_coeff, curvature_acceleration, use_pore_pressure,                         &
-                    exc_pore_pres, use_stochastic, stochastic_value,                               &
-                    velocity_after)
+            CALL solve_rheology_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+                    use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_plastic')
             CALL solve_rheology_plastic_analytic(dt, state, speed_ratio, velocity_after)
         CASE ('rheology_lava')
