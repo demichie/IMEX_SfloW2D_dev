@@ -13,7 +13,7 @@ MODULE mass_exchange_deposition_2d
               A_drag, B_drag, diam_s
 
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_conversion_2d, ONLY : physical_state_type
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE state_conversion_2d, ONLY : primitive_to_volume_fractions, mixt_var
     USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
 
@@ -101,7 +101,7 @@ CONTAINS
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_deposition_implicit(state,qp,dt,r)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(complex_physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 

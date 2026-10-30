@@ -68,7 +68,7 @@ CONTAINS
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_vaporization_implicit(state,B_zone,deposition,r)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(complex_physical_state_type), INTENT(IN) :: state
         INTEGER, INTENT(IN) :: B_zone
         REAL(wp), INTENT(IN) :: deposition(n_solid)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r

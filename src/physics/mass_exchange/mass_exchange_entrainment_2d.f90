@@ -6,7 +6,7 @@ MODULE mass_exchange_entrainment_2d
     USE parameters_2d, ONLY : wp, n_vars, slope_correction_flag, mass_exchange_rates_type,         &
         reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_conversion_2d, ONLY : physical_state_type
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE state_conversion_2d, ONLY : mixt_var
     USE constitutive_parameters_2d, ONLY : entrainment_flag, rho_a_amb,                            &
               T_ambient, sp_heat_a
@@ -72,7 +72,7 @@ CONTAINS
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_entrainment_implicit(state,qp,Bx,By,r)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(complex_physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 

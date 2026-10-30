@@ -6,7 +6,7 @@ MODULE mass_exchange_erosion_2d
     USE parameters_2d, ONLY : wp, n_solid, n_vars, idx_u, idx_v, slope_correction_flag,            &
               erodible_deposit_flag, mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_conversion_2d, ONLY : physical_state_type
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE state_conversion_2d, ONLY : mixt_var
     USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity,                       &
               erodible_fract, alphastot_min, rho_s, rho_c_sub, sp_heat_s, T_erodible
@@ -97,7 +97,7 @@ CONTAINS
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_erosion_implicit(state,qp,Bx,By,alpha,erodible,dt,r)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(complex_physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2), Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r

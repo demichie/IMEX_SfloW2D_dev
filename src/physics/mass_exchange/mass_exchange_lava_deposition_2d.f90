@@ -68,7 +68,7 @@ CONTAINS
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_lava_deposition_implicit(state,dt,r)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(complex_physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 

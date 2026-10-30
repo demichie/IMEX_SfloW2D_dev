@@ -7,7 +7,7 @@ MODULE mass_exchange_carrier_liquid_loss_2d
         reset_mass_exchange_rates
     USE constitutive_parameters_2d, ONLY : loss_rate
     USE diagnostics_2d, ONLY : fatal_error
-    USE state_conversion_2d, ONLY : physical_state_type
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE state_conversion_2d, ONLY : mixt_var
 
     IMPLICIT NONE
@@ -67,7 +67,7 @@ CONTAINS
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_carrier_liquid_loss_implicit(state,qp,r)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(complex_physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
