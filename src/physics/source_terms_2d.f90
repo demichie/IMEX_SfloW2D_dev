@@ -288,6 +288,7 @@ CONTAINS
     COMPLEX(wp) :: Zs
 
     COMPLEX(wp) :: exc_pore_pres
+    TYPE(complex_physical_state_type) :: physical_state
 
     COMPLEX(wp) :: red_grav
     LOGICAL :: selected_rheology, selected_thermal, selected_pore
@@ -328,13 +329,22 @@ CONTAINS
     ! initialize the source terms
     source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)
     IF (selected_rheology .OR. selected_thermal .OR. selected_pore) THEN
-       CALL c_phys_var(qj,h,u,v,T,rho_m,alphas,alphag,inv_rho_m,Zs,             &
-            exc_pore_pres)
+       CALL physical_state_from_q(qj, physical_state)
+       h = physical_state%h
+       u = physical_state%u
+       v = physical_state%v
+       T = physical_state%T
+       rho_m = physical_state%rho_m
+       alphas = physical_state%alphas
+       alphag = physical_state%alphag
+       inv_rho_m = physical_state%inv_rhom
+       Zs = physical_state%Zs
+       exc_pore_pres = physical_state%exc_pore_pres
     END IF
 
     IF (rheology_flag .AND. selected_rheology) THEN
 
-       red_grav = ( rho_m - rho_a_amb ) / rho_m * grav
+       red_grav = physical_state%red_grav
 
        IF ( slope_correction_flag ) THEN
 
