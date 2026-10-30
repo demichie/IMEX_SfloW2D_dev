@@ -175,7 +175,7 @@ CONTAINS
     !> @param[in] packing Maximum admissible solid volume fraction.
     !> @param[in] dt Physical timestep [s].
     !> @return Common erosion factor within [0,1].
-    PURE REAL(wp) FUNCTION erosion_packing_factor(physical_state%h,alpha,solid_erosion,                           &
+    PURE REAL(wp) FUNCTION erosion_packing_factor(h,alpha,solid_erosion,                           &
               carrier_erosion,packing,dt) RESULT(f)
         REAL(wp), INTENT(IN) :: h,alpha,solid_erosion,carrier_erosion,packing,dt
         REAL(wp) :: deficit,margin
@@ -202,7 +202,7 @@ CONTAINS
     !> @param[in] packing Maximum admissible solid volume fraction.
     !> @param[in] dt Physical exchange step duration [s].
     !> @return Maximum permitted common scaling factor in [0,1].
-    PURE REAL(wp) FUNCTION packing_withdrawal_factor(physical_state%h,alpha,solid_erosion,                        &
+    PURE REAL(wp) FUNCTION packing_withdrawal_factor(h,alpha,solid_erosion,                        &
               carrier_erosion,solid_deposition,carrier_deposition,shared_loss,                     &
               other_loss,packing,dt) RESULT(f)
         REAL(wp), INTENT(IN) :: h,alpha,solid_erosion,carrier_erosion
