@@ -62,7 +62,17 @@ for case_dir in "$work_dir"/*/; do
         failed=1
         continue
     fi
-    python3 -B "$test_dir/check_mass.py" "$case_dir" "$tolerance" || failed=1
+    if ! python3 -B "$test_dir/check_mass.py" "$case_dir" "$tolerance"; then
+        case "$case_name" in
+            lateral_boundary_*)
+                echo "Source initialization diagnostics for $case_name:"
+                grep -E "Source (density|reduced gravity|Richardson number|velocity|thickness|mass flow rate)" "$case_dir/run.log" || :
+                echo "Final solver diagnostic lines:"
+                tail -12 "$case_dir/run.log"
+                ;;
+        esac
+        failed=1
+    fi
 done
 
 if [ "$failed" -ne 0 ]; then
