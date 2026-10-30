@@ -20,8 +20,8 @@
 !********************************************************************************
 MODULE rheology_mui_2d
     USE diagnostics_2d, ONLY : fatal_error
-    USE parameters_2d, ONLY : wp
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, n_solid
+    USE parameters_2d, ONLY : wp, n_solid
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE constitutive_parameters_2d, ONLY : diam_s, rho_s
     USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf
     USE state_conversion_2d, ONLY : sauter_diameter, average_density_solids
