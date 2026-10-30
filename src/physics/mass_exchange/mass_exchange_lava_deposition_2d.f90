@@ -36,7 +36,7 @@ CONTAINS
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
-        CALL eval_lava_deposition_volume_kernel(state%h,state%T,dt,                                        &
+        CALL eval_lava_deposition_volume_kernel(state%h,state%T,dt, &
                   r%carrier_deposition_rate)
         r%mixture_mass_rate=-rho_l*r%carrier_deposition_rate
         r%energy_rate=sp_heat_l*state%T*r%mixture_mass_rate

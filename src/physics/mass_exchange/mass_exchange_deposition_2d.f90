@@ -2,19 +2,15 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_deposition_2d
-    USE parameters_2d, ONLY : idx_h, idx_T
-    USE parameters_2d, ONLY : wp, n_vars, n_solid, n_add_gas,                                      &
-              idx_solid_first, idx_solid_last, idx_add_gas_first, idx_add_gas_last,                &
-              gas_flag, liquid_flag, sutherland_flag, rheology_model,                              &
-              mass_exchange_rates_type, reset_mass_exchange_rates
-    USE constitutive_parameters_2d, ONLY : alphastot_min, coeff_porosity,                          &
-              rho_s, sp_heat_s, kin_visc_c, muRef_Suth, Tref_Suth, S_mu, pres,                     &
-              sp_gas_const_a, settling_flag, grav, collective_settling_flag,                       &
-              A_drag, B_drag, diam_s
+    USE parameters_2d, ONLY : wp, n_solid, n_add_gas, gas_flag, sutherland_flag, &
+        rheology_model, mass_exchange_rates_type, reset_mass_exchange_rates
+    USE constitutive_parameters_2d, ONLY : alphastot_min, coeff_porosity, rho_s, sp_heat_s, &
+        kin_visc_c, muRef_Suth, Tref_Suth, S_mu, pres, sp_gas_const_a, settling_flag, grav, &
+        collective_settling_flag, A_drag, B_drag, diam_s
 
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-    USE state_conversion_2d, ONLY : primitive_to_volume_fractions, mixt_var_state
+    USE state_conversion_2d, ONLY : mixt_var_state
     USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
 
     IMPLICIT NONE
@@ -57,12 +53,12 @@ CONTAINS
         END IF
 
         ! Evaluate settling before producing the conservative species, energy and bed terms.
-        CALL eval_deposition_volume_kernel(state%h,state%T,state%alphas,alpha,rho_m,rho_c,                           &
+        CALL eval_deposition_volume_kernel(state%h,state%T,state%alphas,alpha,rho_m,rho_c, &
                   dt,r%solid_deposition_rate)
         r%carrier_deposition_rate=coeff_porosity*SUM(r%solid_deposition_rate)
         r%solid_mass_rate=-rho_s*r%solid_deposition_rate
         r%mixture_mass_rate=SUM(r%solid_mass_rate)-rho_c*r%carrier_deposition_rate
-        r%energy_rate=state%T*(SUM(sp_heat_s*r%solid_mass_rate)-                                         &
+        r%energy_rate=state%T*(SUM(sp_heat_s*r%solid_mass_rate)- &
                   rho_c*cp_c*r%carrier_deposition_rate)
         IF (gas_flag .AND. n_add_gas>0 .AND. gas_phase_mass_fraction>0.0_wp)                       &
                   r%add_gas_mass_rate= -rho_c*r%carrier_deposition_rate*                           &

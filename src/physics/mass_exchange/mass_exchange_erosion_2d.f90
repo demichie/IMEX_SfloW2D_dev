@@ -2,14 +2,13 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_erosion_2d
-    USE parameters_2d, ONLY : idx_h, idx_T
-    USE parameters_2d, ONLY : wp, n_solid, n_vars, idx_u, idx_v, slope_correction_flag,            &
-              erodible_deposit_flag, mass_exchange_rates_type, reset_mass_exchange_rates
+    USE parameters_2d, ONLY : wp, n_solid, slope_correction_flag, erodible_deposit_flag, &
+        mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE state_conversion_2d, ONLY : mixt_var_state
-    USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity,                       &
-              erodible_fract, alphastot_min, rho_s, rho_c_sub, sp_heat_s, T_erodible
+    USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity, erodible_fract, &
+        alphastot_min, rho_s, rho_c_sub, sp_heat_s, T_erodible
     IMPLICIT NONE
     PRIVATE
 
@@ -46,7 +45,7 @@ CONTAINS
         normal_speed=SQRT(state%u**2+state%v**2+vertical_velocity**2)
 
         ! Erodible inventory limits species withdrawal before constructing mass and bed terms.
-        CALL eval_erosion_volume_kernel(state%h,normal_speed,alpha,erodible,dt,                          &
+        CALL eval_erosion_volume_kernel(state%h,normal_speed,alpha,erodible,dt, &
                   r%solid_erosion_rate,r%carrier_erosion_rate)
         r%solid_mass_rate=rho_s*r%solid_erosion_rate
         r%mixture_mass_rate=SUM(r%solid_mass_rate)+rho_c_sub*r%carrier_erosion_rate
