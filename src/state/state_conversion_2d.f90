@@ -136,12 +136,6 @@ CONTAINS
          state%rho_m, state%inv_rhom, rho_c, inv_rho_c, &
          state%alphas, state%alphag)
     state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
-    state%xs = CMPLX(0.0_wp,0.0_wp,wp)
-    state%xg = CMPLX(0.0_wp,0.0_wp,wp)
-    IF (ABS(q(idx_totMassEqn)) > EPSILON(1.0_wp)) THEN
-       state%xs = q(idx_solid_first:idx_solid_last) / q(idx_totMassEqn)
-       state%xg = q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
-    END IF
   END SUBROUTINE physical_state_from_qp
 
   !> Construct real physical properties from the current conservative state.
@@ -176,23 +170,12 @@ CONTAINS
          state%alphas, state%alphag, state%inv_rhom, state%Zs, &
          state%exc_pore_pres)
     state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
-    ! Assemble the primitive vector from the same complex conservative state.
-    ! This keeps the imaginary perturbations when used in complex-step evaluation.
-    state%qp = CMPLX(0.0_wp,0.0_wp,wp)
-    state%qp(idx_h) = state%h
-    state%qp(idx_hu) = state%h * state%u
-    state%qp(idx_hv) = state%h * state%v
-    state%qp(idx_T) = state%T
-    state%qp(idx_u) = state%u
-    state%qp(idx_v) = state%v
+    state%xs = CMPLX(0.0_wp,0.0_wp,wp)
+    state%xg = CMPLX(0.0_wp,0.0_wp,wp)
     IF (ABS(q(idx_totMassEqn)) > EPSILON(1.0_wp)) THEN
-       state%qp(idx_solid_first:idx_solid_last) = &
-            q(idx_solid_first:idx_solid_last) / q(idx_totMassEqn)
-       state%qp(idx_add_gas_first:idx_add_gas_last) = &
-            q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
+       state%xs = q(idx_solid_first:idx_solid_last) / q(idx_totMassEqn)
+       state%xg = q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
     END IF
-    IF (stoch_transport_flag) state%qp(idx_stoch) = state%Zs
-    IF (pore_pressure_flag) state%qp(idx_pore) = state%exc_pore_pres
   END SUBROUTINE physical_state_from_q
 
   !> Convert a fully prepared real physical state to a complex one.
