@@ -4,6 +4,7 @@ PROGRAM test_analytic_velocity
   USE constitutive_parameters_2d, ONLY : grav, inv_grav, diam_s, rho_s
   USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf, mu_0, mu_inf, &
        Fr_0, U_w, xi, T_ref
+  USE state_conversion_2d, ONLY : physical_state_type
   USE rheology_analytic_utils_2d, ONLY : lambert_w0, solve_quadratic_in_interval, &
        solve_cubic_in_interval, solve_exact_velocity_flow,                    &
        EXACT_FLOW_CONSTANT, EXACT_FLOW_LINEAR, EXACT_FLOW_AFFINE,              &
@@ -467,13 +468,20 @@ CONTAINS
     REAL(wp), INTENT(IN) :: excess_pore_pressure, stochastic, expected(2)
     CHARACTER(LEN=*), INTENT(IN) :: label
     REAL(wp) :: actual(2)
+    TYPE(physical_state_type) :: physical_state
     LOGICAL :: model_supported
 
-    CALL solve_rheology_analytic(model_id, integration_step,       &
-         flow_depth, temperature, mixture_density, speed_ratio,              &
-         velocity_before, reduced_gravity, gravity_coefficient,             &
-         solid_fraction, 0.0_wp, use_pore_pressure, excess_pore_pressure,   &
-         use_stochastic, stochastic, actual, model_supported)
+    physical_state%h=flow_depth
+    physical_state%T=temperature
+    physical_state%rho_m=mixture_density
+    physical_state%u=velocity_before(1)
+    physical_state%v=velocity_before(2)
+    physical_state%red_grav=reduced_gravity
+    physical_state%alphas=solid_fraction
+    physical_state%exc_pore_pres=excess_pore_pressure
+    CALL solve_rheology_analytic(model_id,integration_step,physical_state, &
+         speed_ratio,gravity_coefficient,0.0_wp,use_pore_pressure, &
+         use_stochastic,stochastic,actual,model_supported)
     IF (.NOT. model_supported) THEN
        WRITE(*,*) 'FAIL: analytic dispatcher rejected supported model ', label
        ERROR STOP 1
@@ -490,11 +498,17 @@ CONTAINS
 
     CALL assert_dispatch_matches('none', .FALSE., 0.0_wp,        &
          .FALSE., 0.0_wp, velocity_before, 'none no-op')
-    CALL solve_rheology_analytic('rheology_unsupported', integration_step,       &
-         flow_depth, temperature, mixture_density, speed_ratio,              &
-         velocity_before, reduced_gravity, gravity_coefficient,             &
-         solid_fraction, 0.0_wp, .FALSE., 0.0_wp, .FALSE., 0.0_wp,          &
-         actual, model_supported)
+    physical_state%h=flow_depth
+    physical_state%T=temperature
+    physical_state%rho_m=mixture_density
+    physical_state%u=velocity_before(1)
+    physical_state%v=velocity_before(2)
+    physical_state%red_grav=reduced_gravity
+    physical_state%alphas=solid_fraction
+    physical_state%exc_pore_pres=0.0_wp
+    CALL solve_rheology_analytic('rheology_unsupported',integration_step,physical_state, &
+         speed_ratio,gravity_coefficient,0.0_wp, .FALSE., &
+         .FALSE.,0.0_wp,actual,model_supported)
     IF (model_supported) ERROR STOP 'Unsupported rheology name was accepted'
     CALL assert_close(actual(1), velocity_before(1), 'unsupported model x')
     CALL assert_close(actual(2), velocity_before(2), 'unsupported model y')

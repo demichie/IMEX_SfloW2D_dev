@@ -1,12 +1,15 @@
 ! Quantitative D17.20 test through the production rheology dispatcher.
 PROGRAM test_d17_production_rheology
   USE parameters_2d, ONLY : wp
+  USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
   USE rheology_2d, ONLY : eval_rheology_implicit,eval_rheology_semi_implicit
   IMPLICIT NONE
   REAL(wp), PARAMETER :: drag=0.1_wp, epsilon_cs=1.0E-24_wp
   REAL(wp) :: density_real,velocity(2),reference(2),jacobian(2,2)
   REAL(wp) :: si(2),solid(1),step
   COMPLEX(wp) :: density,vel(2),rate(2),rate_reference(2)
+  TYPE(physical_state_type) :: real_state
+  TYPE(complex_physical_state_type) :: complex_state
   INTEGER :: trial,j
   solid=0.0_wp
   DO trial=1,4
@@ -25,10 +28,15 @@ PROGRAM test_d17_production_rheology
     CALL implicit(vel,rate)
     reference=-drag*density_real*velocity
     CALL compare(REAL(rate,wp),reference,'production dispatch rate')
-    CALL eval_rheology_semi_implicit('rheology_newmodel',2.0_wp, &
-         velocity(1),velocity(2),SQRT(SUM(velocity**2)),SQRT(SUM(velocity**2)), &
-         density_real,8.0_wp,9.81_wp,solid,.FALSE., &
-         0.0_wp,0.0_wp,0.0_wp,.FALSE.,0.0_wp,.FALSE.,0.0_wp,si)
+    real_state%h=2.0_wp
+    real_state%u=velocity(1)
+    real_state%v=velocity(2)
+    real_state%rho_m=density_real
+    real_state%red_grav=8.0_wp
+    real_state%alphas=solid
+    CALL eval_rheology_semi_implicit('rheology_newmodel',real_state, &
+         SQRT(SUM(velocity**2)),SQRT(SUM(velocity**2)),9.81_wp,.FALSE., &
+         0.0_wp,0.0_wp,0.0_wp,.FALSE.,.FALSE.,0.0_wp,si)
     CALL compare(si,[0.0_wp,0.0_wp],'production SI zero')
     DO j=1,2
       vel=CMPLX(velocity,0.0_wp,wp)
@@ -56,11 +64,16 @@ CONTAINS
     horizontal=SQRT(v(1)**2+v(2)**2)
     speed=horizontal
     squared=speed**2
-    CALL eval_rheology_implicit('rheology_newmodel',CMPLX(2.0_wp,0.0_wp,wp), &
-         CMPLX(300.0_wp,0.0_wp,wp),density,1.0_wp/density, &
-         v(1),v(2),speed,horizontal,squared, &
-         CMPLX(8.0_wp,0.0_wp,wp),CMPLX(solid,0.0_wp,wp), &
-         .TRUE.,.FALSE.,0.0_wp,r)
+    complex_state%h=CMPLX(2.0_wp,0.0_wp,wp)
+    complex_state%T=CMPLX(300.0_wp,0.0_wp,wp)
+    complex_state%rho_m=density
+    complex_state%inv_rhom=1.0_wp/density
+    complex_state%u=v(1)
+    complex_state%v=v(2)
+    complex_state%red_grav=CMPLX(8.0_wp,0.0_wp,wp)
+    complex_state%alphas=CMPLX(solid,0.0_wp,wp)
+    CALL eval_rheology_implicit('rheology_newmodel',complex_state, &
+         speed,horizontal,squared,.TRUE.,.FALSE.,0.0_wp,r)
   END SUBROUTINE implicit
   SUBROUTINE compare(actual,expected,label)
     REAL(wp), INTENT(IN) :: actual(2),expected(2)
