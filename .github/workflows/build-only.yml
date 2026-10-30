@@ -1,0 +1,51 @@
+name: Build only
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Compilation profile"
+        required: true
+        type: choice
+        options:
+          - optimized
+          - strict-debug
+        default: optimized
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: gfortran / ${{ inputs.profile }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            autoconf automake gfortran make \
+            liblapack-dev libnetcdff-dev
+
+      - name: Generate build system
+        run: autoreconf -fi
+
+      - name: Configure
+        env:
+          FC: gfortran
+        run: |
+          if [ "${{ inputs.profile }}" = "strict-debug" ]; then
+            ./configure --with-netcdf=/usr --enable-strict-debug
+          else
+            ./configure --with-netcdf=/usr
+          fi
+
+      - name: Compile
+        run: make -j2
+
+      - name: Verify executable exists
+        run: test -f src/IMEX_SfloW2D
