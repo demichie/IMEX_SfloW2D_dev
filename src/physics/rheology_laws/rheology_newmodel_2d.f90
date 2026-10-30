@@ -41,6 +41,7 @@ CONTAINS
             grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
             B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
             stochastic_value, rate )
+
         REAL(wp), INTENT(IN) :: h, T, u, v
         REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
         REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
@@ -49,6 +50,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: exc_pore_pres, stochastic_value
         LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
+
         ! Keep the common four-treatment interface, but this fixture is Newton-only.
 
         rate=0.0_wp
@@ -60,6 +62,7 @@ CONTAINS
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_newmodel_semi_implicit(rate_x,rate_y)
+
         REAL(wp), INTENT(OUT) :: rate_x,rate_y
 
         rate_x=0.0_wp
@@ -75,6 +78,7 @@ CONTAINS
     !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_newmodel_implicit(u,v, &
             rhom,rate_x,rate_y)
+
         COMPLEX(wp), INTENT(IN) :: u,v,rhom
         COMPLEX(wp), INTENT(OUT) :: rate_x,rate_y
         REAL(wp), PARAMETER :: drag_coefficient=0.1_wp

@@ -69,6 +69,7 @@ CONTAINS
             grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
             B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
             stochastic_value, rate )
+
         REAL(wp), INTENT(IN) :: h, T, u, v
         REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
         REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
@@ -112,10 +113,10 @@ CONTAINS
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_mui_voellmy_semi_implicit( h, u, v, &
-
             mod_vel, rhom, red_grav, grav_coeff,         &
             solid_fraction, curvature_acceleration, use_pore_pressure,             &
             exc_pore_pres, rate_x, rate_y )
+
         REAL(wp), INTENT(IN) :: h, u, v, mod_vel
         REAL(wp), INTENT(IN) :: rhom, red_grav
         REAL(wp), INTENT(IN) :: grav_coeff
@@ -133,6 +134,7 @@ CONTAINS
         REAL(wp) :: inertial_number
         REAL(wp) :: friction_coefficient
         REAL(wp) :: friction_stress
+
         rate_x = 0.0_wp
         rate_y = 0.0_wp
         IF ( mod_vel .LE. 0.0_wp ) RETURN
@@ -195,6 +197,7 @@ CONTAINS
     SUBROUTINE eval_rheology_mui_voellmy_implicit(u, v, &
             rhom, red_grav, mod_vel, mod_vel2, moving,       &
             use_stochastic_xi, stochastic_value, rate_x, rate_y)
+
         COMPLEX(wp), INTENT(IN) :: u, v
         COMPLEX(wp), INTENT(IN) :: rhom, red_grav
         COMPLEX(wp), INTENT(IN) :: mod_vel, mod_vel2
@@ -243,6 +246,7 @@ CONTAINS
             red_grav, grav_coeff, solid_fraction,                  &
             curvature_acceleration, use_pore_pressure, exc_pore_pres,       &
             use_stochastic_xi, stochastic_xi_value, velocity_after)
+
         REAL(wp), INTENT(IN) :: dt, h, speed_ratio
         REAL(wp), INTENT(IN) :: velocity_before(2), rhom
         REAL(wp), INTENT(IN) :: red_grav, grav_coeff

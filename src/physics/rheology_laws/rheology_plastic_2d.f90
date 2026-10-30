@@ -57,6 +57,7 @@ CONTAINS
             grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
             B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
             stochastic_value, rate )
+
         REAL(wp), INTENT(IN) :: h, T, u, v
         REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
         REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
@@ -81,6 +82,7 @@ CONTAINS
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_plastic_semi_implicit(rate_x, rate_y)
+
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
 
         rate_x = 0.0_wp
@@ -98,6 +100,7 @@ CONTAINS
     !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_plastic_implicit(u, v, mod_vel, &
             rhom, moving, rate_x, rate_y)
+
         COMPLEX(wp), INTENT(IN) :: u, v, mod_vel, rhom
         LOGICAL, INTENT(IN) :: moving
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
@@ -118,6 +121,7 @@ CONTAINS
     !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
     SUBROUTINE solve_rheology_plastic_analytic(dt, h,  &
             speed_ratio, velocity_before, velocity_after)
+
         REAL(wp), INTENT(IN) :: dt, h, speed_ratio
         REAL(wp), INTENT(IN) :: velocity_before(2)
         REAL(wp), INTENT(OUT) :: velocity_after(2)
