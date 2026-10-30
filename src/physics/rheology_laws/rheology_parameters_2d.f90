@@ -7,27 +7,27 @@
 
 MODULE rheology_parameters_2d
 
-  USE parameters_2d, ONLY : wp
+    USE parameters_2d, ONLY : wp
 
-  IMPLICIT NONE
+    IMPLICIT NONE
 
-  PRIVATE
+    PRIVATE
 
-  PUBLIC :: I_0, mu_2, mu_s, muI_inf
-  PUBLIC :: mu_0, mu_inf, Fr_0, U_w
-  PUBLIC :: xi, T_ref
+    PUBLIC :: I_0, mu_2, mu_s, muI_inf
+    PUBLIC :: mu_0, mu_inf, Fr_0, U_w
+    PUBLIC :: xi, T_ref
 
-  REAL(wp) :: I_0
-  REAL(wp) :: mu_2
-  REAL(wp) :: mu_s
-  REAL(wp) :: muI_inf
+    REAL(wp) :: I_0
+    REAL(wp) :: mu_2
+    REAL(wp) :: mu_s
+    REAL(wp) :: muI_inf
 
-  REAL(wp) :: mu_0
-  REAL(wp) :: mu_inf
-  REAL(wp) :: Fr_0
-  REAL(wp) :: U_w
+    REAL(wp) :: mu_0
+    REAL(wp) :: mu_inf
+    REAL(wp) :: Fr_0
+    REAL(wp) :: U_w
 
-  REAL(wp) :: xi
-  REAL(wp) :: T_ref
+    REAL(wp) :: xi
+    REAL(wp) :: T_ref
 
 END MODULE rheology_parameters_2d
