@@ -166,12 +166,12 @@ def main() -> int:
     if re.search(r"(?im)^\s*use\s+(?:equation_terms_2d|mass_exchange_assembly_2d)\b",
                  executor):
         failures.append("STEP executor must not import the old equation/mass-rate bridge")
-    if re.search(r"(?i)\bcall\s+(?:eval_expl_terms|eval_mass_exchange_terms)\s*\(",
+    if re.search(r"(?i)\bcall\s+(?:eval_expl_terms|eval_mass_exchange_explicit)\s*\(",
                  executor):
         failures.append("STEP executor must not call the old physical rate entry point")
-    if not re.search(r"(?i)\bcall\s+eval_mass_exchange_terms\s*\(", bridge):
+    if not re.search(r"(?i)\bcall\s+eval_mass_exchange_explicit\s*\(", bridge):
         failures.append("common STEP bridge must delegate to the atomic mass-exchange assembly")
-    if re.search(r"(?i)\bcall\s+eval_mass_exchange_terms\s*\(",
+    if re.search(r"(?i)\bcall\s+eval_mass_exchange_explicit\s*\(",
                  equation_bridge):
         failures.append("equation_terms must not call the mass-exchange kernel directly")
     # D17 cleanup gate: callers must use the canonical source assemblers.

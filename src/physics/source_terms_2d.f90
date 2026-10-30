@@ -16,7 +16,7 @@ MODULE source_terms_2d
   USE pore_pressure_laws_2d, ONLY : &
        eval_pore_pressure_dissipation_implicit, &
        eval_pore_pressure_dissipation_explicit, solve_pore_pressure_dissipation_analytic
-  USE mass_exchange_2d, ONLY : eval_mass_exchange_terms
+  USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
   USE rheology_2d, ONLY : curvature_acceleration, solve_rheology_analytic, &
        eval_rheology_implicit, eval_rheology_semi_implicit, &
        eval_rheology_explicit
@@ -746,6 +746,6 @@ CONTAINS
     INTEGER, INTENT(IN) :: B_zone
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: rates
     REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-    CALL eval_mass_exchange_terms(qpj,B_zone,B_prime_x,B_prime_y,erodible,dt,rates,eqns_term)
+    CALL eval_mass_exchange_explicit(qpj,B_zone,B_prime_x,B_prime_y,erodible,dt,rates,eqns_term)
   END SUBROUTINE eval_step_source_explicit
 END MODULE source_terms_2d

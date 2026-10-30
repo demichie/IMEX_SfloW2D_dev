@@ -9,8 +9,9 @@ MODULE mass_exchange_2d
               idx_addGasEqn_first, idx_addGasEqn_last, gas_flag, liquid_flag,                      &
               pore_pressure_flag, stoch_transport_flag, mass_exchange_rates_type,                  &
               reset_mass_exchange_rates
+    USE diagnostics_2d, ONLY : fatal_error
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
-    USE state_conversion_2d, ONLY : physical_state_type, physical_state_from_qp
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, physical_state_from_qp
     USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source
     USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
     USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
@@ -24,9 +25,48 @@ MODULE mass_exchange_2d
     IMPLICIT NONE
     PRIVATE
 
-    PUBLIC :: eval_mass_exchange_terms
+    PUBLIC :: eval_mass_exchange_explicit, eval_mass_exchange_semi_implicit
+    PUBLIC :: eval_mass_exchange_implicit, solve_mass_exchange_analytic
 
 CONTAINS
+
+    !> Explicit cell-local coordinator: accumulates all enabled exchange processes.
+    SUBROUTINE eval_mass_exchange_explicit(qp,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
+        REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By,erodible(n_solid),dt
+        INTEGER, INTENT(IN) :: B_zone
+        TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
+        REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
+        CALL eval_mass_exchange_terms(qp,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
+    END SUBROUTINE eval_mass_exchange_explicit
+
+    !> This family currently supports only explicit coordination.
+    SUBROUTINE eval_mass_exchange_semi_implicit(state,total_rates,eqns_term)
+        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
+        REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
+        CALL reset_mass_exchange_rates(total_rates)
+        eqns_term=0.0_wp
+        CALL fatal_error('mass_exchange: semi-implicit coordination is unsupported')
+    END SUBROUTINE eval_mass_exchange_semi_implicit
+
+    SUBROUTINE eval_mass_exchange_implicit(state,total_rates,eqns_term)
+        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
+        COMPLEX(wp), INTENT(OUT) :: eqns_term(n_eqns)
+        CALL reset_mass_exchange_rates(total_rates)
+        eqns_term=CMPLX(0.0_wp,0.0_wp,wp)
+        CALL fatal_error('mass_exchange: implicit coordination is unsupported')
+    END SUBROUTINE eval_mass_exchange_implicit
+
+    SUBROUTINE solve_mass_exchange_analytic(state,total_rates,eqns_term)
+        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
+        REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
+        CALL reset_mass_exchange_rates(total_rates)
+        eqns_term=0.0_wp
+        CALL fatal_error('mass_exchange: analytic coordination is unsupported')
+    END SUBROUTINE solve_mass_exchange_analytic
+
 
     !> @brief Coordinate cell-local mass exchange, shared phase budgets and conservative source
     !> assembly.

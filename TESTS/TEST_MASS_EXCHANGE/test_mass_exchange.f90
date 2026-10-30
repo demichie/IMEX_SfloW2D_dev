@@ -12,7 +12,7 @@ PROGRAM test_mass_exchange
   USE state_conversion_2d, ONLY : qc_to_qp, mixt_var
   USE mass_exchange_deposition_2d, ONLY : settling_velocity
   USE mass_exchange_entrainment_2d, ONLY : eval_air_entrainment_rate
-  USE mass_exchange_2d, ONLY : eval_mass_exchange_terms
+  USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
   USE step_source_executor_2d, ONLY : apply_mass_exchange_step => execute_step_source_groups
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
@@ -931,7 +931,7 @@ CONTAINS
     air_rate=eval_air_entrainment_rate(richardson, speed_squared)
     IF (air_rate<=0.0_wp) ERROR STOP 'thermal entrainment fixture is inactive'
 
-    CALL eval_mass_exchange_terms(qp_local,0,0.0_wp,0.0_wp,erodible(:,1,1), &
+    CALL eval_mass_exchange_explicit(qp_local,0,0.0_wp,0.0_wp,erodible(:,1,1), &
          1.0_wp,exchange_rates,equation_rate)
     expected=-qp_local(4)*( &
          SUM(rho_s*sp_heat_s*exchange_rates%solid_deposition_rate) + &
@@ -1047,7 +1047,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: packed(2*ns+2+n_eqns+1)
     TYPE(mass_exchange_rates_type) :: exchange_rates
 
-    CALL eval_mass_exchange_terms(qp0,0,0.0_wp,0.0_wp,inventory,dt, &
+    CALL eval_mass_exchange_explicit(qp0,0,0.0_wp,0.0_wp,inventory,dt, &
          exchange_rates,packed(2*ns+3:2*ns+2+n_eqns))
     packed(1:ns)=exchange_rates%solid_erosion_rate
     packed(ns+1:2*ns)=exchange_rates%solid_deposition_rate
