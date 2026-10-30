@@ -15,6 +15,7 @@ PROGRAM test_analytic_velocity
        eval_rheology_voellmy_implicit,                                  &
        eval_rheology_voellmy_semi_implicit,                             &
        solve_rheology_voellmy_analytic
+  USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
   USE rheology_plastic_2d, ONLY : tau, eval_rheology_plastic_implicit,  &
        solve_rheology_plastic_analytic
   USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0,                       &
@@ -78,8 +79,13 @@ PROGRAM test_analytic_velocity
   CALL assert_close(root, 2.0_wp, 'cubic single real root')
 
   tau = 1.0_wp
-  CALL solve_rheology_plastic_analytic(integration_step, flow_depth,       &
-       speed_ratio, velocity_before, velocity_after)
+  BLOCK
+    TYPE(physical_state_type) :: ps
+    ps%h = flow_depth
+    ps%u = velocity_before(1)
+    ps%v = velocity_before(2)
+    CALL solve_rheology_plastic_analytic(integration_step, ps, speed_ratio, velocity_after)
+  END BLOCK
   CALL assert_dispatch_matches('rheology_plastic', .FALSE., 0.0_wp,       &
        .FALSE., 0.0_wp, velocity_after, 'plastic dispatch')
   expected_speed = MAX(0.0_wp, SQRT(SUM(velocity_before**2)) -              &
@@ -87,10 +93,14 @@ PROGRAM test_analytic_velocity
   CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
        'plastic exact constant-drag flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
-  CALL eval_rheology_plastic_implicit(CMPLX(velocity_after(1),0.0_wp,wp), &
-       CMPLX(velocity_after(2),0.0_wp,wp), CMPLX(speed_after,0.0_wp,wp),     &
-       CMPLX(mixture_density,0.0_wp,wp), .TRUE., complex_source_x,          &
-       complex_source_y)
+  BLOCK
+    TYPE(complex_physical_state_type) :: cs
+    cs%u = CMPLX(velocity_after(1),0.0_wp,wp)
+    cs%v = CMPLX(velocity_after(2),0.0_wp,wp)
+    cs%rho_m = CMPLX(mixture_density,0.0_wp,wp)
+    CALL eval_rheology_plastic_implicit(cs, CMPLX(speed_after,0.0_wp,wp), &
+         .TRUE., complex_source_x, complex_source_y)
+  END BLOCK
   CALL assert_stage(velocity_before, velocity_after, integration_step,     &
        mixture_density*flow_depth, [REAL(complex_source_x,wp),              &
        REAL(complex_source_y,wp)], 'plastic')

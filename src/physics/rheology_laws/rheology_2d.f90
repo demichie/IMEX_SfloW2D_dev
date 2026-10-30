@@ -123,12 +123,9 @@ CONTAINS
                     B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving,            &
                     use_stochastic, stochastic_value, rate )
         CASE('rheology_plastic')
-            CALL eval_rheology_plastic_explicit(                                                   &
-                    h, T, u, v, mod_vel, mod_hor_vel,                                              &
-                    mod_vel2, rhom, inv_rhom, red_grav,                                            &
-                    grav_coeff, alphas, curvature_term, B_second_xx,                               &
-                    B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving,            &
-                    use_stochastic, stochastic_value, rate )
+            CALL eval_rheology_plastic_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
+                    grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
+                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE('rheology_lava')
             CALL eval_rheology_lava_explicit(                                                      &
                     h, T, u, v, mod_vel, mod_hor_vel,                                              &
@@ -338,8 +335,7 @@ CONTAINS
                     rhom, red_grav, mod_vel, mod_vel2, moving,                                     &
                     use_stochastic, stochastic_value, rate(1), rate(2))
         CASE('rheology_plastic')
-            CALL eval_rheology_plastic_implicit(u, v,                                              &
-                    mod_vel, rhom, moving, rate(1), rate(2))
+            CALL eval_rheology_plastic_implicit(state, mod_vel, moving, rate(1), rate(2)), rate(2))
         CASE('rheology_lava')
             CALL eval_rheology_lava_implicit(h, T,                                                 &
                     rhom, u, v, moving,                                                            &
@@ -419,8 +415,7 @@ CONTAINS
                     exc_pore_pres, use_stochastic, stochastic_value,                               &
                     velocity_after)
         CASE ('rheology_plastic')
-            CALL solve_rheology_plastic_analytic(dt, h,                                            &
-                    speed_ratio, velocity_before, velocity_after)
+            CALL solve_rheology_plastic_analytic(dt, state, speed_ratio, velocity_after)
         CASE ('rheology_lava')
             CALL solve_rheology_lava_analytic(dt, h,                                               &
                     T, rhom, speed_ratio, velocity_before,                                         &
