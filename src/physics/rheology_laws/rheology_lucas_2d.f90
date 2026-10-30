@@ -55,13 +55,9 @@ CONTAINS
         REAL(wp), INTENT(IN) :: stochastic_value
         LOGICAL, INTENT(IN) :: use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
-        REAL(wp) :: sx, sy
-        COMPLEX(wp) :: ix, iy
-        TYPE(complex_physical_state_type) :: cs
+        ! The implicit component is identically zero for Lucas rheology.
         CALL eval_rheology_lucas_semi_implicit(state, mod_vel, mod_hor_vel, grav_coeff, &
-            0.0_wp, use_stochastic, stochastic_value, sx, sy)
-        CALL eval_rheology_lucas_implicit(cs, ix, iy)
-        rate=[sx,sy]+REAL([ix,iy],wp)
+            0.0_wp, use_stochastic, stochastic_value, rate(1), rate(2))
     END SUBROUTINE eval_rheology_lucas_explicit
 
     !> \param[in] state Shared physical state (complex for implicit treatment).
