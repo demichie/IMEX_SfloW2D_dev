@@ -10,7 +10,7 @@ MODULE mass_exchange_2d
               pore_pressure_flag, stoch_transport_flag, mass_exchange_rates_type,                  &
               reset_mass_exchange_rates
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
-    USE state_conversion_2d, ONLY : primitive_to_volume_fractions
+    USE state_conversion_2d, ONLY : primitive_to_volume_fractions, physical_state_type, physical_state_from_qp
     USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source
     USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
     USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
@@ -47,6 +47,7 @@ CONTAINS
         INTEGER, INTENT(IN) :: B_zone
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
         REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
+        TYPE(physical_state_type) :: physical_state
         TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates,        &
             darcy_loss_rates
         REAL(wp) :: alphas(n_solid), alphag(n_add_gas), alpha
@@ -62,6 +63,7 @@ CONTAINS
         u=qp(idx_u)
         v=qp(idx_v)
         T=qp(idx_T)
+        CALL physical_state_from_qp(qp,physical_state)
 
         ! Processes requiring a gas/liquid carrier are evaluated only when that
         ! physical phase exists. Lava deposition is dispatched independently below.
@@ -137,7 +139,7 @@ CONTAINS
             CALL accumulate_process(darcy_loss_rates,u,v,total_rates,eqns_term)
             CALL eval_mass_exchange_entrainment_explicit(qp,u,v,Bx,By,process_rates)
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
-            CALL eval_mass_exchange_vaporization_explicit(B_zone,T,                                &
+            CALL eval_mass_exchange_vaporization_explicit(physical_state,B_zone,                                &
                 deposition_rates%solid_deposition_rate,process_rates)
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
 
@@ -149,7 +151,7 @@ CONTAINS
 
         ! Lava deposition follows the same process_rates-rate accumulation contract.
         IF (lava_deposition_flag) THEN
-            CALL eval_mass_exchange_lava_deposition_explicit(h,T,dt,process_rates)
+            CALL eval_mass_exchange_lava_deposition_explicit(physical_state,dt,process_rates)
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
         END IF
 

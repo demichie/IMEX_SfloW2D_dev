@@ -4,6 +4,7 @@
 MODULE mass_exchange_lava_deposition_2d
     USE parameters_2d, ONLY : wp, mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
     USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
 
@@ -28,16 +29,17 @@ CONTAINS
     !> @param[in] T Mobile flow temperature [K].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_lava_deposition_explicit(depth,T,dt,r)
+    SUBROUTINE eval_mass_exchange_lava_deposition_explicit(state,dt,r)
 
-        REAL(wp), INTENT(IN) :: depth,T,dt
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
-        CALL eval_lava_deposition_volume_kernel(depth,T,dt,                                        &
+        CALL eval_lava_deposition_volume_kernel(state%h,state%T,dt,                                        &
                   r%carrier_deposition_rate)
         r%mixture_mass_rate=-rho_l*r%carrier_deposition_rate
-        r%energy_rate=sp_heat_l*T*r%mixture_mass_rate
+        r%energy_rate=sp_heat_l*state%T*r%mixture_mass_rate
         r%lava_deposit_rate=r%carrier_deposition_rate
         r%dB_dt=r%carrier_deposition_rate
     END SUBROUTINE
@@ -48,9 +50,10 @@ CONTAINS
     !> @param[in] T Mobile flow temperature [K].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit(depth,T,dt,r)
+    SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit(state,dt,r)
 
-        REAL(wp), INTENT(IN) :: depth,T,dt
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
@@ -63,9 +66,10 @@ CONTAINS
     !> @param[in] T Mobile flow temperature [K].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_lava_deposition_implicit(depth,T,dt,r)
+    SUBROUTINE eval_mass_exchange_lava_deposition_implicit(state,dt,r)
 
-        REAL(wp), INTENT(IN) :: depth,T,dt
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
@@ -78,9 +82,10 @@ CONTAINS
     !> @param[in] T Mobile flow temperature [K].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE solve_mass_exchange_lava_deposition_analytic(depth,T,dt,r)
+    SUBROUTINE solve_mass_exchange_lava_deposition_analytic(state,dt,r)
 
-        REAL(wp), INTENT(IN) :: depth,T,dt
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
