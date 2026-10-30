@@ -64,7 +64,6 @@ CONTAINS
     !> \brief Evaluate the combined lahar momentum source.
     !> \details Sum the yield-stress and viscous/turbulent contributions for a real state.
     !> \note Physical argument names follow the solver conventions.
-
     SUBROUTINE eval_rheology_lahar_explicit( &
             h, T, u, v, mod_vel, mod_hor_vel, &
             mod_vel2, rhom, inv_rhom, red_grav, &
@@ -97,7 +96,6 @@ CONTAINS
     !> \brief Evaluate the lahar yield-stress contribution.
     !> \details Return basal yield resistance projected onto the horizontal velocity.
     !> \note Physical argument names follow the solver conventions.
-
     SUBROUTINE eval_rheology_lahar_semi_implicit(h, u, v, &
             mod_hor_vel, rhom, alphas_tot, moving,          &
             rate_x, rate_y)
@@ -128,7 +126,6 @@ CONTAINS
     !> \brief Evaluate temperature-dependent viscous and turbulent lahar drag.
     !> \details Use complex arithmetic to preserve derivatives for the implicit Jacobian.
     !> \note Physical argument names follow the solver conventions.
-
     SUBROUTINE eval_rheology_lahar_implicit(h, u, v,    &
             mod_vel, mod_hor_vel, T, rhom, inv_rhom, &
             alphas, moving, rate_x, rate_y)
@@ -176,7 +173,6 @@ CONTAINS
     !> \brief Integrate the frozen lahar momentum source analytically.
     !> \details Keep depth, temperature, composition and density fixed over the substep.
     !> \note Physical argument names follow the solver conventions.
-
     SUBROUTINE solve_rheology_lahar_analytic(dt, h,   &
             T, alphas_tot, rhom, speed_ratio,       &
             velocity_before, velocity_after)
@@ -223,7 +219,6 @@ CONTAINS
 
     !> \brief Evaluate real-valued carrier-fluid viscosity.
     !> \note Physical argument names follow the solver conventions.
-
     FUNCTION eval_lahar_fluid_viscosity_real(T, alphas_tot)  &
             RESULT(fluid_viscosity)
         REAL(wp), INTENT(IN) :: T, alphas_tot
@@ -238,7 +233,6 @@ CONTAINS
     !> \brief Evaluate complex-valued carrier-fluid viscosity.
     !> \details Preserve the temperature and concentration derivatives for complex-step differentiation.
     !> \note Physical argument names follow the solver conventions.
-
     FUNCTION eval_lahar_fluid_viscosity_complex(T, alphas_tot) &
             RESULT(fluid_viscosity)
         COMPLEX(wp), INTENT(IN) :: T, alphas_tot
