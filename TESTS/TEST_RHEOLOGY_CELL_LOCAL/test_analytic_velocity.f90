@@ -82,6 +82,363 @@ PROGRAM test_analytic_velocity
   tau = 1.0_wp
   BLOCK
     TYPE(physical_state_type) :: ps
+    ps%h = flow_depth
+    ps%u = velocity_before(1)
+    ps%v = velocity_before(2)
+    CALL solve_rheology_plastic_analytic(integration_step, ps, speed_ratio, velocity_after)
+  END BLOCK
+  CALL assert_dispatch_matches('rheology_plastic', .FALSE., 0.0_wp,       &
+       .FALSE., 0.0_wp, velocity_after, 'plastic dispatch')
+  expected_speed = MAX(0.0_wp, SQRT(SUM(velocity_before**2)) -              &
+       integration_step*tau/(flow_depth*speed_ratio))
+  CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
+       'plastic exact constant-drag flow')
+  speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
+  BLOCK
+    TYPE(complex_physical_state_type) :: cs
+    cs%u = CMPLX(velocity_after(1),0.0_wp,wp)
+    cs%v = CMPLX(velocity_after(2),0.0_wp,wp)
+    cs%rho_m = CMPLX(mixture_density,0.0_wp,wp)
+    CALL eval_rheology_plastic_implicit(cs, CMPLX(speed_after,0.0_wp,wp), &
+         .TRUE., complex_source_x, complex_source_y)
+  END BLOCK
+  CALL assert_stage(velocity_before, velocity_after, integration_step,     &
+       mixture_density*flow_depth, [REAL(complex_source_x,wp),              &
+       REAL(complex_source_y,wp)], 'plastic')
+
+  nu_ref = 0.2_wp
+  visc_par = 0.01_wp
+  tau0 = 100.0_wp
+  T_ref = 300.0_wp
+  BLOCK
+    TYPE(physical_state_type) :: ps
+    ps%h=flow_depth
+    ps%T=temperature
+    ps%rho_m=mixture_density
+    ps%u=velocity_before(1)
+    ps%v=velocity_before(2)
+    CALL solve_rheology_lava_analytic(integration_step, ps, speed_ratio, velocity_after)
+  END BLOCK
+  CALL assert_dispatch_matches('rheology_lava', .FALSE., 0.0_wp,           &
+       .FALSE., 0.0_wp, velocity_after, 'lava dispatch')
+  linear_drag = 3.0_wp*nu_ref/flow_depth**2 *                               &
+       EXP(-visc_par*(temperature-T_ref))
+  yield_drag = tau0/(mixture_density*flow_depth*speed_ratio)
+  expected_speed = MAX(0.0_wp, (SQRT(SUM(velocity_before**2)) +             &
+       yield_drag/linear_drag)*EXP(-linear_drag*integration_step) -         &
+       yield_drag/linear_drag)
+  CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
+       'lava exact affine-drag flow')
+  speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
+  BLOCK
+    TYPE(complex_physical_state_type) :: cs
+    cs%h=CMPLX(flow_depth,0.0_wp,wp)
+    cs%T=CMPLX(temperature,0.0_wp,wp)
+    cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
+    cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
+    cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
+    CALL eval_rheology_lava_implicit(cs, .TRUE., complex_source_x, complex_source_y)
+  END BLOCK
+  BLOCK
+    TYPE(physical_state_type) :: ps
+    ps%u=velocity_after(1)
+    ps%v=velocity_after(2)
+    CALL eval_rheology_lava_semi_implicit(ps, speed_after, source_x, source_y)
+  END BLOCK
+  source = [REAL(complex_source_x,wp)+source_x,                              &
+       REAL(complex_source_y,wp)+source_y]
+  CALL assert_stage(velocity_before, velocity_after, integration_step,      &
+       mixture_density*flow_depth, source, 'lava')
+
+  alpha2 = 100.0_wp
+  beta2 = 2.0_wp
+  alpha1_coeff = 1.0_wp
+  beta1 = 2.0_wp
+  Kappa = 1.0_wp
+  n_td = 0.1_wp
+  n_td2 = 0.01_wp
+  BLOCK
+    TYPE(physical_state_type) :: ps
+    ps%h=flow_depth
+    ps%T=temperature
+    ps%u=velocity_before(1)
+    ps%v=velocity_before(2)
+    ps%rho_m=mixture_density
+    ps%alphas=solid_fraction
+    CALL solve_rheology_lahar_analytic(integration_step, ps, speed_ratio, velocity_after)
+  END BLOCK
+  CALL assert_dispatch_matches('rheology_lahar', .FALSE., 0.0_wp,          &
+       .FALSE., 0.0_wp, velocity_after, 'lahar dispatch')
+  speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
+  horizontal_speed = SQRT(SUM(velocity_after**2))
+  BLOCK
+    TYPE(complex_physical_state_type) :: cs
+    cs%h=CMPLX(flow_depth,0.0_wp,wp)
+    cs%T=CMPLX(temperature,0.0_wp,wp)
+    cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
+    cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
+    cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
+    cs%inv_rhom=CMPLX(1.0_wp/mixture_density,0.0_wp,wp)
+    cs%alphas=CMPLX(solid_fraction,0.0_wp,wp)
+    CALL eval_rheology_lahar_implicit(cs, CMPLX(speed_after,0.0_wp,wp), &
+         CMPLX(horizontal_speed,0.0_wp,wp), .TRUE., complex_source_x, complex_source_y)
+  END BLOCK
+  BLOCK
+    TYPE(physical_state_type) :: ps
+    ps%h=flow_depth
+    ps%u=velocity_after(1)
+    ps%v=velocity_after(2)
+    ps%rho_m=mixture_density
+    ps%alphas=solid_fraction
+    CALL eval_rheology_lahar_semi_implicit(ps, horizontal_speed, .TRUE., source_x, source_y)
+  END BLOCK
+  source = [REAL(complex_source_x,wp)+source_x,                              &
+       REAL(complex_source_y,wp)+source_y]
+  CALL assert_stage(velocity_before, velocity_after, integration_step,      &
+       mixture_density*flow_depth, source, 'lahar')
+
+  BLOCK
+    TYPE(physical_state_type) :: ps
+    ps%h=flow_depth
+    ps%T=temperature
+    ps%rho_m=mixture_density
+    ps%u=velocity_before(1)
+    ps%v=velocity_before(2)
+    CALL solve_rheology_empirical_analytic(integration_step, ps, speed_ratio, velocity_after)
+  END BLOCK
+  CALL assert_dispatch_matches('rheology_empirical', .FALSE., 0.0_wp,      &
+       .FALSE., 0.0_wp, velocity_after, 'empirical dispatch')
+  linear_drag = 1.0E-3_wp*speed_ratio/                                     &
+       (flow_depth*(1.0_wp+10.0_wp*flow_depth))
+  expected_speed = SQRT(SUM(velocity_before**2))*                           &
+       EXP(-linear_drag*integration_step)
+  CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
+       'empirical exact linear-drag flow')
+  speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
+  horizontal_speed = SQRT(SUM(velocity_after**2))
+  BLOCK
+    TYPE(complex_physical_state_type) :: cs
+    cs%h=CMPLX(flow_depth,0.0_wp,wp)
+    cs%T=CMPLX(temperature,0.0_wp,wp)
+    cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
+    cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
+    cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
+    CALL eval_rheology_empirical_implicit(cs, CMPLX(horizontal_speed,0.0_wp,wp), &
+         CMPLX(speed_after,0.0_wp,wp), .TRUE., complex_source_x, complex_source_y)
+  END BLOCK
+  CALL assert_stage(velocity_before, velocity_after, integration_step,      &
+       mixture_density*flow_depth, [REAL(complex_source_x,wp),               &
+       REAL(complex_source_y,wp)], 'empirical')
+
+  friction_factor = 0.1_wp
+  BLOCK
+    TYPE(physical_state_type) :: ps
+    ps%h=flow_depth
+    ps%u=velocity_before(1)
+    ps%v=velocity_before(2)
+    CALL solve_rheology_quadratic_analytic(integration_step, ps, speed_ratio, velocity_after)
+  END BLOCK
+  CALL assert_dispatch_matches('rheology_quadratic', .FALSE., 0.0_wp,      &
+       .FALSE., 0.0_wp, velocity_after, 'quadratic dispatch')
+  linear_drag = friction_factor*speed_ratio**2/flow_depth
+  expected_speed = SQRT(SUM(velocity_before**2))/                           &
+       (1.0_wp+linear_drag*SQRT(SUM(velocity_before**2))*integration_step)
+  CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
+       'quadratic exact reciprocal-speed flow')
+  speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
+  horizontal_speed = SQRT(SUM(velocity_after**2))
+  BLOCK
+    TYPE(complex_physical_state_type) :: cs
+    cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
+    cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
+    cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
+    CALL eval_rheology_quadratic_implicit(cs, CMPLX(horizontal_speed,0.0_wp,wp), &
+         CMPLX(speed_after**2,0.0_wp,wp), .TRUE., complex_source_x, complex_source_y)
+  END BLOCK
+  CALL assert_stage(velocity_before, velocity_after, integration_step,      &
+       mixture_density*flow_depth, [REAL(complex_source_x,wp),               &
+       REAL(complex_source_y,wp)], 'quadratic')
+
+  voellmy_mu = 0.3_wp
+  xi = 500.0_wp
+    BLOCK
+    TYPE(physical_state_type) :: rs
+    rs%h = flow_depth
+    rs%u = velocity_before(1)
+    rs%v = velocity_before(2)
+    rs%rho_m = mixture_density
+    rs%red_grav = reduced_gravity
+    rs%exc_pore_pres = 0.0_wp
+    CALL solve_rheology_voellmy_analytic(integration_step, rs, speed_ratio, gravity_coefficient, &
+         0.0_wp, .FALSE., .FALSE., 0.0_wp, velocity_after)
+  END BLOCK
+  CALL assert_dispatch_matches('rheology_voellmy', .FALSE., 0.0_wp,        &
+       .FALSE., 0.0_wp, velocity_after, 'Voellmy dispatch')
+  speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
+  horizontal_speed = SQRT(SUM(velocity_after**2))
+  BLOCK
+    TYPE(complex_physical_state_type) :: cs
+    cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
+    cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
+    cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
+    cs%red_grav=CMPLX(reduced_gravity,0.0_wp,wp)
+    CALL eval_rheology_voellmy_implicit(cs, CMPLX(speed_after,0.0_wp,wp), &
+         CMPLX(speed_after**2,0.0_wp,wp), .TRUE., .FALSE., 0.0_wp, &
+         complex_source_x, complex_source_y)
+  END BLOCK
+  BLOCK
+    TYPE(physical_state_type) :: rs
+    rs%h=flow_depth
+    rs%u=velocity_after(1)
+    rs%v=velocity_after(2)
+    rs%rho_m=mixture_density
+    rs%red_grav=reduced_gravity
+    rs%exc_pore_pres=0.0_wp
+    CALL eval_rheology_voellmy_semi_implicit(rs, speed_after, gravity_coefficient, .FALSE., &
+         0.0_wp, 0.0_wp, 0.0_wp, .FALSE., source_x, source_y)
+  END BLOCK
+  source = [REAL(complex_source_x,wp)+source_x,                              &
+       REAL(complex_source_y,wp)+source_y]
+  CALL assert_stage(velocity_before, velocity_after, integration_step,      &
+       mixture_density*flow_depth, source, 'voellmy')
+
+  CALL lambert_w0(1.0_wp, lambert_value, lambert_success)
+  IF (.NOT. lambert_success) ERROR STOP 'Lambert W evaluation failed'
+  CALL assert_close(lambert_value*EXP(lambert_value), 1.0_wp, 'Lambert W identity')
+  CALL lambert_w0(-0.2_wp, lambert_value, lambert_success)
+  IF (.NOT. lambert_success) ERROR STOP 'Lambert W negative-branch evaluation failed'
+  CALL assert_close(lambert_value*EXP(lambert_value), -0.2_wp,                &
+       'Lambert W negative identity')
+
+  mu_0 = 0.5_wp
+  mu_inf = 0.2_wp
+  Fr_0 = 0.8_wp
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_before(1)
+  rheo_state%v=velocity_before(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL solve_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+       .FALSE.,stochastic_value,velocity_after)
+  CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,          &
+       .FALSE., stochastic_value, velocity_after, 'Froude dispatch')
+  speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
+  horizontal_speed = SQRT(SUM(velocity_after**2))
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_after(1)
+  rheo_state%v=velocity_after(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL eval_rheology_froude_semi_implicit(rheo_state,speed_after,horizontal_speed,gravity_coefficient, &
+       0.0_wp,.FALSE.,stochastic_value,source_x,source_y)
+  CALL assert_stage(velocity_before, velocity_after, integration_step,      &
+       mixture_density*flow_depth, [source_x, source_y], 'Froude')
+
+  stochastic_value = -2.0_wp
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_before(1)
+  rheo_state%v=velocity_before(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL solve_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+       .TRUE.,stochastic_value,velocity_after)
+  CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,         &
+       .TRUE., stochastic_value, velocity_after, 'Froude stochastic dispatch')
+  speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
+  horizontal_speed = SQRT(SUM(velocity_after**2))
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_after(1)
+  rheo_state%v=velocity_after(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL eval_rheology_froude_semi_implicit(rheo_state,speed_after,horizontal_speed,gravity_coefficient, &
+       0.0_wp,.TRUE.,stochastic_value,source_x,source_y)
+  CALL assert_stage(velocity_before, velocity_after, integration_step,      &
+       mixture_density*flow_depth, [source_x, source_y], 'Froude clamp')
+  stochastic_value = 0.0_wp
+
+  mu_0 = 0.0_wp
+  mu_inf = 0.0_wp
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_before(1)
+  rheo_state%v=velocity_before(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL solve_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+       .FALSE.,stochastic_value,velocity_after)
+  CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,         &
+       .FALSE., stochastic_value, velocity_after, 'Froude zero-drag dispatch')
+  CALL assert_close(velocity_after(1), velocity_before(1), 'Froude zero-drag x')
+  CALL assert_close(velocity_after(2), velocity_before(2), 'Froude zero-drag y')
+  mu_0 = 0.5_wp
+  mu_inf = 0.2_wp
+
+  U_w = 2.0_wp
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_before(1)
+  rheo_state%v=velocity_before(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL solve_rheology_lucas_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+       .FALSE.,stochastic_value,velocity_after)
+  CALL assert_dispatch_matches('rheology_lucas', .FALSE., 0.0_wp,          &
+       .FALSE., stochastic_value, velocity_after, 'Lucas dispatch')
+  speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
+  horizontal_speed = SQRT(SUM(velocity_after**2))
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_after(1)
+  rheo_state%v=velocity_after(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL eval_rheology_lucas_semi_implicit(rheo_state,speed_after,horizontal_speed,gravity_coefficient, &
+       0.0_wp,.FALSE.,stochastic_value,source_x,source_y)
+  CALL assert_stage(velocity_before, velocity_after, integration_step,      &
+       mixture_density*flow_depth, [source_x, source_y], 'Lucas')
+
+  stochastic_value = -10.0_wp
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_before(1)
+  rheo_state%v=velocity_before(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL solve_rheology_lucas_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+       .TRUE.,stochastic_value,velocity_after)
+  CALL assert_dispatch_matches('rheology_lucas', .FALSE., 0.0_wp,          &
+       .TRUE., stochastic_value, velocity_after, 'Lucas stochastic dispatch')
+  speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
+  horizontal_speed = SQRT(SUM(velocity_after**2))
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_after(1)
+  rheo_state%v=velocity_after(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL eval_rheology_lucas_semi_implicit(rheo_state,speed_after,horizontal_speed,gravity_coefficient, &
+       0.0_wp,.TRUE.,stochastic_value,source_x,source_y)
+  CALL assert_stage(velocity_before, velocity_after, integration_step,      &
+       mixture_density*flow_depth, [source_x, source_y], 'Lucas stochastic branch')
+  stochastic_value = 0.0_wp
+
+  I_0 = 0.3_wp
+  mu_s = 0.4_wp
+  mu_2 = 0.7_wp
+  muI_inf = 0.8_wp
+  BLOCK
+    TYPE(physical_state_type) :: ps
+    ps%h=flow_depth
+    ps%u=velocity_before(1)
+    ps%v=velocity_before(2)
+    ps%rho_m=mixture_density
+    ps%red_grav=reduced_gravity
+    ps%alphas=solid_fraction
+    ps%exc_pore_pres=0.0_wp
+    CALL solve_rheology_mui_analytic(integration_step, ps, speed_ratio, &
+         gravity_coefficient, 0.0_wp, .FALSE., velocity_after)
+  END BLOCK
+  CALL assert_dispatch_matches('rheology_mui', .FALSE., 0.0_wp, &
+       .FALSE., 0.0_wp, velocity_after, 'mu(I) dispatch')
+  speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
+  BLOCK
+    TYPE(physical_state_type) :: ps
     ps%h=flow_depth
     ps%u=velocity_after(1)
     ps%v=velocity_after(2)
@@ -89,10 +446,10 @@ PROGRAM test_analytic_velocity
     ps%red_grav=reduced_gravity
     ps%alphas=solid_fraction
     ps%exc_pore_pres=0.0_wp
-    CALL eval_rheology_mui_semi_implicit(ps, speed_after, gravity_coefficient, 0.0_wp, &
-         .FALSE., source_x, source_y)
+    CALL eval_rheology_mui_semi_implicit(ps, speed_after, gravity_coefficient, &
+         0.0_wp, .FALSE., source_x, source_y)
   END BLOCK
-  CALL assert_stage(velocity_before, velocity_after, integration_step,      &
+  CALL assert_stage(velocity_before, velocity_after, integration_step, &
        mixture_density*flow_depth, [source_x, source_y], 'mu(I)')
 
   BLOCK
@@ -125,6 +482,7 @@ PROGRAM test_analytic_velocity
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [source_x, source_y], 'mu(I) pore pressure')
 
+  xi = 500.0_wp
   BLOCK
     TYPE(physical_state_type) :: ps
     ps%h=flow_depth
