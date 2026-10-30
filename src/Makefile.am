@@ -15,10 +15,6 @@ IMEX_SfloW2D_SOURCES = \
                 core/diagnostics_2d.f90 \
                 physics/rheology_laws/rheology_analytic_utils_2d.f90 \
                 physics/rheology_laws/rheology_parameters_2d.f90 \
-                physics/rheology_laws/rheology_voellmy_2d.f90 \
-                physics/rheology_laws/rheology_plastic_2d.f90 \
-                physics/rheology_laws/rheology_froude_2d.f90 \
-                physics/rheology_laws/rheology_lucas_2d.f90 \
                 numerics/lapack_interfaces_2d.f90 \
                 core/constitutive_parameters_2d.f90 \
                 core/model_layout_2d.f90 \
@@ -29,6 +25,10 @@ IMEX_SfloW2D_SOURCES = \
                 core/complexify.f90 \
                 geometry/geometry_2d.f90 \
                 state/state_conversion_2d.f90 \
+                physics/rheology_laws/rheology_voellmy_2d.f90 \
+                physics/rheology_laws/rheology_plastic_2d.f90 \
+                physics/rheology_laws/rheology_froude_2d.f90 \
+                physics/rheology_laws/rheology_lucas_2d.f90 \
                 physics/rheology_laws/rheology_lava_2d.f90 \
                 physics/rheology_laws/rheology_lahar_2d.f90 \
                 physics/rheology_laws/rheology_empirical_2d.f90 \
