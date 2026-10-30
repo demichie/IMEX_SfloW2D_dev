@@ -18,153 +18,154 @@
 !> source exactly with T and other non-velocity inputs explicit.
 !********************************************************************************
 MODULE rheology_lava_2d
-  USE diagnostics_2d, ONLY : fatal_error
-  USE parameters_2d, ONLY : wp
-  USE rheology_parameters_2d, ONLY : T_ref
-  USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,  &
-       fatal_analytic_input_error, solve_exact_velocity_flow, EXACT_FLOW_AFFINE
-  IMPLICIT NONE
-  PRIVATE
-  PUBLIC :: eval_rheology_lava_explicit
-  PUBLIC :: eval_rheology_lava_semi_implicit
-  PUBLIC :: eval_rheology_lava_implicit
-  PUBLIC :: solve_rheology_lava_analytic
-  PUBLIC :: nu_ref, visc_par, tau0, lava_kinematic_viscosity
-  REAL(wp) :: nu_ref
-  REAL(wp) :: visc_par
-  REAL(wp) :: tau0
-  ! Uniform source treatment entry points. Existing kernels remain unchanged.
+    USE diagnostics_2d, ONLY : fatal_error
+    USE parameters_2d, ONLY : wp
+    USE rheology_parameters_2d, ONLY : T_ref
+    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,  &
+                fatal_analytic_input_error, solve_exact_velocity_flow, EXACT_FLOW_AFFINE
+    IMPLICIT NONE
+    PRIVATE
+    PUBLIC :: eval_rheology_lava_explicit
+    PUBLIC :: eval_rheology_lava_semi_implicit
+    PUBLIC :: eval_rheology_lava_implicit
+    PUBLIC :: solve_rheology_lava_analytic
+    PUBLIC :: nu_ref, visc_par, tau0, lava_kinematic_viscosity
+    REAL(wp) :: nu_ref
+    REAL(wp) :: visc_par
+    REAL(wp) :: tau0
+    ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
-  !> \brief Kinematic viscosity shared by lava rheology and deposition.
-  !> \param[in] T Lava T [K].
-  !> \return Kinematic viscosity [m2/s].
-  PURE REAL(wp) FUNCTION lava_kinematic_viscosity(T) RESULT(nu)
-    REAL(wp), INTENT(IN) :: T
-    nu=nu_ref*EXP(-visc_par*(T-T_ref))
-  END FUNCTION lava_kinematic_viscosity
+    !> \brief Kinematic viscosity shared by lava rheology and deposition.
+    !> \param[in] T Lava T [K].
+    !> \return Kinematic viscosity [m2/s].
+    PURE REAL(wp) FUNCTION lava_kinematic_viscosity(T) RESULT(nu)
+        REAL(wp), INTENT(IN) :: T
+        nu=nu_ref*EXP(-visc_par*(T-T_ref))
+    END FUNCTION lava_kinematic_viscosity
 
+    SUBROUTINE eval_rheology_lava_explicit( &
+                h, T, u, v, mod_vel, mod_hor_vel, &
+                mod_vel2, rhom, inv_rhom, red_grav, &
+                grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
+                B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
+                stochastic_value, rate )
+        REAL(wp), INTENT(IN) :: h, T, u, v
+        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
+        REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
+        REAL(wp), INTENT(IN) :: grav_coeff, alphas(:)
+        REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy
+        REAL(wp), INTENT(IN) :: exc_pore_pres, stochastic_value
+        LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
+        REAL(wp), INTENT(OUT) :: rate(2)
+        REAL(wp) :: sx, sy
+        COMPLEX(wp) :: ix, iy
+        CALL eval_rheology_lava_semi_implicit( &
+                u, v, mod_vel, sx, sy )
+        CALL eval_rheology_lava_implicit( &
+                CMPLX(h,0.0_wp,wp), CMPLX(T,0.0_wp,wp), &
+                CMPLX(rhom,0.0_wp,wp), CMPLX(u,0.0_wp,wp), &
+                CMPLX(v,0.0_wp,wp), moving, ix, iy )
+        rate=[sx,sy]+REAL([ix,iy],wp)
+    END SUBROUTINE eval_rheology_lava_explicit
 
-  SUBROUTINE eval_rheology_lava_explicit( &
-       h, T, u, v, mod_vel, mod_hor_vel, &
-       mod_vel2, rhom, inv_rhom, red_grav, &
-       grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
-       B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
-       stochastic_value, rate )
-    REAL(wp), INTENT(IN) :: h, T, u, v
-    REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
-    REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
-    REAL(wp), INTENT(IN) :: grav_coeff, alphas(:)
-    REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy
-    REAL(wp), INTENT(IN) :: exc_pore_pres, stochastic_value
-    LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
-    REAL(wp), INTENT(OUT) :: rate(2)
-    REAL(wp) :: sx, sy
-    COMPLEX(wp) :: ix, iy
-    CALL eval_rheology_lava_semi_implicit( &
-       u, v, mod_vel, sx, sy )
-    CALL eval_rheology_lava_implicit( &
-       CMPLX(h,0.0_wp,wp), CMPLX(T,0.0_wp,wp), &
-       CMPLX(rhom,0.0_wp,wp), CMPLX(u,0.0_wp,wp), &
-       CMPLX(v,0.0_wp,wp), moving, ix, iy )
-    rate=[sx,sy]+REAL([ix,iy],wp)
-  END SUBROUTINE eval_rheology_lava_explicit
+    SUBROUTINE eval_rheology_lava_semi_implicit(u, v, mod_vel, rate_x, rate_y)
+        REAL(wp), INTENT(IN) :: u, v, mod_vel
+        REAL(wp), INTENT(OUT) :: rate_x, rate_y
+        rate_x = 0.0_wp
+        rate_y = 0.0_wp
+        IF (mod_vel .LE. 0.0_wp) RETURN
+        rate_x = -tau0 * u / mod_vel
+        rate_y = -tau0 * v / mod_vel
+    END SUBROUTINE eval_rheology_lava_semi_implicit
 
-  SUBROUTINE eval_rheology_lava_semi_implicit(u, v, mod_vel, rate_x, rate_y)
-    REAL(wp), INTENT(IN) :: u, v, mod_vel
-    REAL(wp), INTENT(OUT) :: rate_x, rate_y
-    rate_x = 0.0_wp
-    rate_y = 0.0_wp
-    IF (mod_vel .LE. 0.0_wp) RETURN
-    rate_x = -tau0 * u / mod_vel
-    rate_y = -tau0 * v / mod_vel
-  END SUBROUTINE eval_rheology_lava_semi_implicit
+    SUBROUTINE eval_rheology_lava_implicit(h, T, rhom, &
+                u, v, moving, rate_x, rate_y)
+        COMPLEX(wp), INTENT(IN) :: h, T, rhom
+        COMPLEX(wp), INTENT(IN) :: u, v
+        LOGICAL, INTENT(IN) :: moving
+        COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
+        COMPLEX(wp) :: gamma
+        REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
+        rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
+        rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
+        IF (REAL(h, wp) .GT. h_threshold) THEN
+                gamma = 3.0_wp * nu_ref / h * EXP(-visc_par * (T - T_ref))
+        ELSE
+                gamma = 3.0_wp * nu_ref / h_threshold * EXP(-visc_par * (T - T_ref))
+        END IF
 
-  SUBROUTINE eval_rheology_lava_implicit(h, T, rhom, &
-       u, v, moving, rate_x, rate_y)
-    COMPLEX(wp), INTENT(IN) :: h, T, rhom
-    COMPLEX(wp), INTENT(IN) :: u, v
-    LOGICAL, INTENT(IN) :: moving
-    COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
-    COMPLEX(wp) :: gamma
-    REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
-    rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
-    rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-    IF (REAL(h, wp) .GT. h_threshold) THEN
-       gamma = 3.0_wp * nu_ref / h * EXP(-visc_par * (T - T_ref))
-    ELSE
-       gamma = 3.0_wp * nu_ref / h_threshold * EXP(-visc_par * (T - T_ref))
-    END IF
-    IF (moving) THEN
-       rate_x = -rhom * gamma * u
-       rate_y = -rhom * gamma * v
-    END IF
-  END SUBROUTINE eval_rheology_lava_implicit
+        IF (moving) THEN
+                rate_x = -rhom * gamma * u
+                rate_y = -rhom * gamma * v
+        END IF
+    END SUBROUTINE eval_rheology_lava_implicit
 
-  SUBROUTINE solve_rheology_lava_analytic(dt, h,     &
-       T, rhom, speed_ratio, velocity_before,           &
-       velocity_after)
-    REAL(wp), INTENT(IN) :: dt, h, T
-    REAL(wp), INTENT(IN) :: rhom, speed_ratio
-    REAL(wp), INTENT(IN) :: velocity_before(2)
-    REAL(wp), INTENT(OUT) :: velocity_after(2)
-    REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
-    REAL(wp) :: speed_before, speed_after, effective_depth, gamma
-    REAL(wp) :: linear_drag, yield_drag
-    velocity_after = velocity_before
-    speed_before = SQRT(SUM(velocity_before**2))
-    CALL validate_analytic_velocity_inputs(dt, h,    &
-         speed_ratio, speed_before, 'lava')
-    IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
-    IF (rhom .LE. 0.0_wp) THEN
-       CALL fatal_analytic_input_error('Nonpositive mixture density in lava analytic solver')
-    END IF
-    effective_depth = MAX(h, h_threshold)
-    gamma = 3.0_wp * nu_ref / effective_depth *                             &
-         EXP(-visc_par * (T - T_ref))
-    linear_drag = gamma / h
-    yield_drag = tau0 / (rhom * h * speed_ratio)
-    CALL solve_exact_velocity_flow(EXACT_FLOW_AFFINE,                       &
-         [yield_drag, linear_drag], dt, speed_before,         &
-         speed_after)
-    velocity_after = (speed_after / speed_before) * velocity_before
-  END SUBROUTINE solve_rheology_lava_analytic
+    SUBROUTINE solve_rheology_lava_analytic(dt, h,     &
+                T, rhom, speed_ratio, velocity_before,           &
+                velocity_after)
+        REAL(wp), INTENT(IN) :: dt, h, T
+        REAL(wp), INTENT(IN) :: rhom, speed_ratio
+        REAL(wp), INTENT(IN) :: velocity_before(2)
+        REAL(wp), INTENT(OUT) :: velocity_after(2)
+        REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
+        REAL(wp) :: speed_before, speed_after, effective_depth, gamma
+        REAL(wp) :: linear_drag, yield_drag
+        velocity_after = velocity_before
+        speed_before = SQRT(SUM(velocity_before**2))
+        CALL validate_analytic_velocity_inputs(dt, h,    &
+                    speed_ratio, speed_before, 'lava')
+        IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+        IF (rhom .LE. 0.0_wp) THEN
+                CALL fatal_analytic_input_error('Nonpositive mixture density in lava analytic solver')
+        END IF
 
-  !******************************************************************************
-  !> \brief Integrate the lava-rheology velocity source exactly.
-  !> \details Holds depth, T, density, and mod_vel ratio fixed. The
-  !> affine mod_vel-decay law is integrated exactly, with stopping at zero.
-  !> \param[in] dt Exact-flow interval [s], normally dt * a_ii.
-  !> \param[in] h Explicit flow depth [m].
-  !> \param[in] T Explicit T [K].
-  !> \param[in] rhom Explicit mixture density [kg m^-3].
-  !> \param[in] speed_ratio Explicit total-to-horizontal mod_vel ratio.
-  !> \param[in] velocity_before Input horizontal velocity [m s^-1].
-  !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
-  !******************************************************************************
-  !******************************************************************************
-  !> \brief Evaluate the implicit T-dependent viscous drag.
-  !> \details Computes the depth-regularized drag coefficient and returns the
-  !> x/y momentum sources for a moving state. Complex inputs preserve
-  !> T, depth and velocity sensitivities in the implicit Jacobian.
-  !> \param[in] h Flow depth [m].
-  !> \param[in] T Lava T [K].
-  !> \param[in] rhom Mixture density [kg m^-3].
-  !> \param[in] u x velocity [m s^-1].
-  !> \param[in] v y velocity [m s^-1].
-  !> \param[in] moving Whether the state is moving.
-  !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
-  !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
-  !> \note Complex-valued state and rates preserve complex-step derivatives.
-  !******************************************************************************
-  !******************************************************************************
-  !> \brief Evaluate the semi-implicit lava yield-stress momentum rate.
-  !> \details Returns \f$-\tau_0(u_x,u_y)/|\boldsymbol{u}|\f$ for positive
-  !> mod_vel and zero otherwise.
-  !> \param[in] u x velocity [m s^-1].
-  !> \param[in] v y velocity [m s^-1].
-  !> \param[in] mod_vel mod_vel magnitude [m s^-1].
-  !> \param[out] rate_x x momentum source rate.
-  !> \param[out] rate_y y momentum source rate.
-  !******************************************************************************
-  ! Unsupported physical treatment, rejected by the source catalog.
+        effective_depth = MAX(h, h_threshold)
+        gamma = 3.0_wp * nu_ref / effective_depth *                             &
+                    EXP(-visc_par * (T - T_ref))
+        linear_drag = gamma / h
+        yield_drag = tau0 / (rhom * h * speed_ratio)
+        CALL solve_exact_velocity_flow(EXACT_FLOW_AFFINE,                       &
+                    [yield_drag, linear_drag], dt, speed_before,         &
+                    speed_after)
+        velocity_after = (speed_after / speed_before) * velocity_before
+    END SUBROUTINE solve_rheology_lava_analytic
+
+    !******************************************************************************
+    !> \brief Integrate the lava-rheology velocity source exactly.
+    !> \details Holds depth, T, density, and mod_vel ratio fixed. The
+    !> affine mod_vel-decay law is integrated exactly, with stopping at zero.
+    !> \param[in] dt Exact-flow interval [s], normally dt * a_ii.
+    !> \param[in] h Explicit flow depth [m].
+    !> \param[in] T Explicit T [K].
+    !> \param[in] rhom Explicit mixture density [kg m^-3].
+    !> \param[in] speed_ratio Explicit total-to-horizontal mod_vel ratio.
+    !> \param[in] velocity_before Input horizontal velocity [m s^-1].
+    !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
+    !******************************************************************************
+    !******************************************************************************
+    !> \brief Evaluate the implicit T-dependent viscous drag.
+    !> \details Computes the depth-regularized drag coefficient and returns the
+    !> x/y momentum sources for a moving state. Complex inputs preserve
+    !> T, depth and velocity sensitivities in the implicit Jacobian.
+    !> \param[in] h Flow depth [m].
+    !> \param[in] T Lava T [K].
+    !> \param[in] rhom Mixture density [kg m^-3].
+    !> \param[in] u x velocity [m s^-1].
+    !> \param[in] v y velocity [m s^-1].
+    !> \param[in] moving Whether the state is moving.
+    !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
+    !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
+    !> \note Complex-valued state and rates preserve complex-step derivatives.
+    !******************************************************************************
+    !******************************************************************************
+    !> \brief Evaluate the semi-implicit lava yield-stress momentum rate.
+    !> \details Returns \f$-\tau_0(u_x,u_y)/|\boldsymbol{u}|\f$ for positive
+    !> mod_vel and zero otherwise.
+    !> \param[in] u x velocity [m s^-1].
+    !> \param[in] v y velocity [m s^-1].
+    !> \param[in] mod_vel mod_vel magnitude [m s^-1].
+    !> \param[out] rate_x x momentum source rate.
+    !> \param[out] rate_y y momentum source rate.
+    !******************************************************************************
+    ! Unsupported physical treatment, rejected by the source catalog.
 END MODULE rheology_lava_2d
