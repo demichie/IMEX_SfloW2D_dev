@@ -256,8 +256,7 @@ CONTAINS
             CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term, &
                     B_second_xx, B_second_xy, B_second_yy, use_pore_pressure, rate(1), rate(2))
         CASE('rheology_lava')
-            CALL eval_rheology_lava_semi_implicit(u, v,                                            &
-                    mod_vel, rate(1), rate(2))
+            CALL eval_rheology_lava_semi_implicit(state, mod_vel, rate(1), rate(2))
         CASE('rheology_lahar')
             CALL eval_rheology_lahar_semi_implicit(state, mod_hor_vel, mod_hor_vel>0.0_wp, rate(1), rate(2))
         CASE('rheology_froude')
