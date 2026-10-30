@@ -39,6 +39,7 @@ CONTAINS
     !> \param[in] T lava temperature [K].
     !> \return Kinematic viscosity [m2/s].
     PURE REAL(wp) FUNCTION lava_kinematic_viscosity(T) RESULT(nu)
+
         REAL(wp), INTENT(IN) :: T
 
         nu=nu_ref*EXP(-visc_par*(T-T_ref))
@@ -74,6 +75,7 @@ CONTAINS
             grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
             B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
             stochastic_value, rate )
+
         REAL(wp), INTENT(IN) :: h, T, u, v
         REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
         REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
@@ -102,6 +104,7 @@ CONTAINS
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
     SUBROUTINE eval_rheology_lava_semi_implicit(u, v, mod_vel, rate_x, rate_y)
+
         REAL(wp), INTENT(IN) :: u, v, mod_vel
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
 
@@ -124,6 +127,7 @@ CONTAINS
     !> \param[out] rate_y y component of momentum source rate.
     SUBROUTINE eval_rheology_lava_implicit(h, T, rhom, &
             u, v, moving, rate_x, rate_y)
+
         COMPLEX(wp), INTENT(IN) :: h, T, rhom
         COMPLEX(wp), INTENT(IN) :: u, v
         LOGICAL, INTENT(IN) :: moving

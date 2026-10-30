@@ -90,6 +90,7 @@ CONTAINS
             grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
             B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
             stochastic_value, rate )
+
         REAL(wp), INTENT(IN) :: h, T, u, v
         REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
         REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
@@ -127,6 +128,7 @@ CONTAINS
     SUBROUTINE eval_rheology_lahar_semi_implicit(h, u, v, &
             mod_hor_vel, rhom, alphas_tot, moving,          &
             rate_x, rate_y)
+
         REAL(wp), INTENT(IN) :: h, u, v
         REAL(wp), INTENT(IN) :: mod_hor_vel, rhom, alphas_tot
         LOGICAL, INTENT(IN) :: moving
@@ -168,6 +170,7 @@ CONTAINS
     SUBROUTINE eval_rheology_lahar_implicit(h, u, v,    &
             mod_vel, mod_hor_vel, T, rhom, inv_rhom, &
             alphas, moving, rate_x, rate_y)
+
         COMPLEX(wp), INTENT(IN) :: h, u, v
         COMPLEX(wp), INTENT(IN) :: mod_vel, mod_hor_vel, T
         COMPLEX(wp), INTENT(IN) :: rhom, inv_rhom
@@ -222,6 +225,7 @@ CONTAINS
     SUBROUTINE solve_rheology_lahar_analytic(dt, h,   &
             T, alphas_tot, rhom, speed_ratio,       &
             velocity_before, velocity_after)
+
         REAL(wp), INTENT(IN) :: dt, h, T
         REAL(wp), INTENT(IN) :: alphas_tot, rhom, speed_ratio
         REAL(wp), INTENT(IN) :: velocity_before(2)
@@ -269,6 +273,7 @@ CONTAINS
     !> \param[in] alphas_tot Sum of solid volume fractions.
     FUNCTION eval_lahar_fluid_viscosity_real(T, alphas_tot)  &
             RESULT(fluid_viscosity)
+
         REAL(wp), INTENT(IN) :: T, alphas_tot
         REAL(wp) :: fluid_viscosity
         COMPLEX(wp) :: complex_viscosity
@@ -284,6 +289,7 @@ CONTAINS
     !> \param[in] alphas_tot Sum of solid volume fractions.
     FUNCTION eval_lahar_fluid_viscosity_complex(T, alphas_tot) &
             RESULT(fluid_viscosity)
+
         COMPLEX(wp), INTENT(IN) :: T, alphas_tot
         COMPLEX(wp) :: fluid_viscosity
         COMPLEX(wp) :: temperature_celsius, exponent_a, exponent_b, alpha1

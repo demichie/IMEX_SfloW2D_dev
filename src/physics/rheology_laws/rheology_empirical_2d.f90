@@ -52,6 +52,7 @@ CONTAINS
             grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
             B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
             stochastic_value, rate )
+
         REAL(wp), INTENT(IN) :: h, T, u, v
         REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
         REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
@@ -77,6 +78,7 @@ CONTAINS
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
     SUBROUTINE eval_rheology_empirical_semi_implicit(rate_x, rate_y)
+
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
 
         rate_x = 0.0_wp
@@ -96,6 +98,7 @@ CONTAINS
     !> \param[out] rate_y y component of momentum source rate.
     SUBROUTINE eval_rheology_empirical_implicit(h, u, v, &
             mod_hor_vel, mod_vel, rhom, moving, rate_x, rate_y)
+
         COMPLEX(wp), INTENT(IN) :: h, u, v
         COMPLEX(wp), INTENT(IN) :: mod_hor_vel, mod_vel, rhom
         LOGICAL, INTENT(IN) :: moving
@@ -119,6 +122,7 @@ CONTAINS
     !> \param[out] velocity_after Two-component horizontal velocity after source integration [m s^-1].
     SUBROUTINE solve_rheology_empirical_analytic(dt, h, &
             speed_ratio, velocity_before, velocity_after)
+
         REAL(wp), INTENT(IN) :: dt, h, speed_ratio
         REAL(wp), INTENT(IN) :: velocity_before(2)
         REAL(wp), INTENT(OUT) :: velocity_after(2)

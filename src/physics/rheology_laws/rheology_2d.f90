@@ -98,6 +98,7 @@ CONTAINS
             alphas, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
             use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
             stochastic_value, rate)
+
         CHARACTER(*), INTENT(IN) :: model_name
         REAL(wp), INTENT(IN) :: h, T, u, v
         REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2

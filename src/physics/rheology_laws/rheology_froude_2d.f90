@@ -61,6 +61,7 @@ CONTAINS
             grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
             B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
             stochastic_value, rate )
+
         REAL(wp), INTENT(IN) :: h, T, u, v
         REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
         REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
@@ -103,6 +104,7 @@ CONTAINS
     SUBROUTINE eval_rheology_froude_semi_implicit( h, u, v, mod_vel, &
             mod_hor_vel, rhom, red_grav, grav_coeff, &
             curvature_term, stochastic, stochastic_value, rate_x, rate_y )
+
         REAL(wp), INTENT(IN) :: h, u, v, mod_vel
         REAL(wp), INTENT(IN) :: mod_hor_vel, rhom, red_grav
         REAL(wp), INTENT(IN) :: grav_coeff, curvature_term
@@ -138,6 +140,7 @@ CONTAINS
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
     SUBROUTINE eval_rheology_froude_implicit(rate_x, rate_y)
+
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
 
         rate_x = CMPLX(0.0_wp,0.0_wp,wp)
@@ -159,6 +162,7 @@ CONTAINS
     SUBROUTINE solve_rheology_froude_analytic(dt, h,  &
             speed_ratio, velocity_before, red_grav, grav_coeff,   &
             curvature_term, stochastic, stochastic_value, velocity_after)
+
         REAL(wp), INTENT(IN) :: dt, h, speed_ratio
         REAL(wp), INTENT(IN) :: velocity_before(2), red_grav
         REAL(wp), INTENT(IN) :: grav_coeff, curvature_term
