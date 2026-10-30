@@ -42,8 +42,30 @@ CONTAINS
         REAL(wp), INTENT(IN) :: T
         nu=nu_ref*EXP(-visc_par*(T-T_ref))
     END FUNCTION lava_kinematic_viscosity
-
-    !> \brief Evaluate the specified rheology law.
+    !> \brief Evaluate the explicit lava momentum contribution.
+    !> \details Assemble the real-valued momentum source from the model's supported physical treatment contributions; unused model inputs are retained for the shared dispatch interface.
+    !> \param[in] h Flow depth [m].
+    !> \param[in] T Mixture temperature [K].
+    !> \param[in] u Depth-averaged x velocity [m s^-1].
+    !> \param[in] v Depth-averaged y velocity [m s^-1].
+    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
+    !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
+    !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
+    !> \param[in] rhom Mixture density [kg m^-3].
+    !> \param[in] inv_rhom Reciprocal mixture density [m^3 kg^-1].
+    !> \param[in] red_grav Buoyancy-reduced gravity [m s^-2].
+    !> \param[in] grav_coeff Dimensionless gravity correction for local topography.
+    !> \param[in] alphas Solid volume fractions by class.
+    !> \param[in] curvature_term Whether topographic curvature enters the source.
+    !> \param[in] B_second_xx Second x derivative of topography [m^-1].
+    !> \param[in] B_second_xy Mixed derivative of topography [m^-1].
+    !> \param[in] B_second_yy Second y derivative of topography [m^-1].
+    !> \param[in] use_pore_pressure Whether excess pore pressure modifies resistance.
+    !> \param[in] exc_pore_pres Excess pore pressure [Pa].
+    !> \param[in] moving Whether the local state is considered moving.
+    !> \param[in] use_stochastic Whether stochastic rheology parameters are enabled.
+    !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
+    !> \param[out] rate Conservative horizontal momentum source vector.
     SUBROUTINE eval_rheology_lava_explicit( &
             h, T, u, v, mod_vel, mod_hor_vel, &
             mod_vel2, rhom, inv_rhom, red_grav, &
@@ -69,8 +91,13 @@ CONTAINS
             CMPLX(v,0.0_wp,wp), moving, ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_lava_explicit
-
-    !> \brief Evaluate the corresponding rheology source contribution.
+    !> \brief Evaluate the semi-implicit lava momentum contribution.
+    !> \details Evaluate the contribution of temperature-dependent viscous drag and a yield-stress contribution assigned to this treatment. The returned rates act on the conservative horizontal momenta; zero-valued implementations intentionally provide no contribution.
+    !> \param[in] u Depth-averaged x velocity [m s^-1].
+    !> \param[in] v Depth-averaged y velocity [m s^-1].
+    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
+    !> \param[out] rate_x x component of momentum source rate.
+    !> \param[out] rate_y y component of momentum source rate.
     SUBROUTINE eval_rheology_lava_semi_implicit(u, v, mod_vel, rate_x, rate_y)
         REAL(wp), INTENT(IN) :: u, v, mod_vel
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
@@ -81,8 +108,16 @@ CONTAINS
         rate_x = -tau0 * u / mod_vel
         rate_y = -tau0 * v / mod_vel
     END SUBROUTINE eval_rheology_lava_semi_implicit
-
-    !> \brief Evaluate the corresponding rheology source contribution.
+    !> \brief Evaluate the implicit lava momentum contribution.
+    !> \details Evaluate the part of temperature-dependent viscous drag and a yield-stress contribution assigned to the implicit treatment. Complex-valued arguments retain complex-step sensitivities where implemented; zero-valued implementations intentionally contribute no term.
+    !> \param[in] h Flow depth [m].
+    !> \param[in] T Mixture temperature [K].
+    !> \param[in] rhom Mixture density [kg m^-3].
+    !> \param[in] u Depth-averaged x velocity [m s^-1].
+    !> \param[in] v Depth-averaged y velocity [m s^-1].
+    !> \param[in] moving Whether the local state is considered moving.
+    !> \param[out] rate_x x component of momentum source rate.
+    !> \param[out] rate_y y component of momentum source rate.
     SUBROUTINE eval_rheology_lava_implicit(h, T, rhom, &
             u, v, moving, rate_x, rate_y)
         COMPLEX(wp), INTENT(IN) :: h, T, rhom
@@ -109,8 +144,15 @@ CONTAINS
         END IF
 
     END SUBROUTINE eval_rheology_lava_implicit
-
-    !> \brief Integrate the lava rheology source analytically.
+    !> \brief Integrate the lava velocity source over a frozen-state substep.
+    !> \details Evaluate the exact or time-integral-based decay of horizontal speed under temperature-dependent viscous drag and a yield-stress contribution. The velocity direction is retained and the updated components are returned without evolving the frozen thermodynamic and geometric inputs.
+    !> \param[in] dt Duration of the analytic source substep [s].
+    !> \param[in] h Flow depth [m].
+    !> \param[in] T Mixture temperature [K].
+    !> \param[in] rhom Mixture density [kg m^-3].
+    !> \param[in] speed_ratio Ratio of three-dimensional to horizontal speed.
+    !> \param[in] velocity_before Two-component horizontal velocity before source integration [m s^-1].
+    !> \param[out] velocity_after Two-component horizontal velocity after source integration [m s^-1].
     SUBROUTINE solve_rheology_lava_analytic(dt, h,     &
             T, rhom, speed_ratio, velocity_before,           &
 
