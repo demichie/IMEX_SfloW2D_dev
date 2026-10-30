@@ -36,10 +36,10 @@ for profile in strict optimized; do
     "$compiler" -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
       ./*.o -llapack $netcdf_flibs $netcdf_clibs -o test_source_registry
     # D17.20 independent Newton-only extension fixture (no historical solver API).
-    "$compiler" $flags -fbacktrace -ffpe-trap=invalid,zero,overflow -c \
-      "$repo_dir/src/core/diagnostics_2d.f90" \
-      "$repo_dir/src/physics/rheology_laws/rheology_newmodel_2d.f90" \
-      "$test_dir/test_newmodel_numerics.f90"
+    # The production module objects are already built above in dependency order.
+    # Recompiling newmodel separately would require the shared state .mod file.
+    "$compiler" $flags -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
+      $netcdf_fflags -c "$test_dir/test_newmodel_numerics.f90"
     "$compiler" -fopenmp -fbacktrace -ffpe-trap=invalid,zero,overflow \
       parameters_2d.o diagnostics_2d.o source_catalog_2d.o \
       rheology_newmodel_2d.o test_newmodel_numerics.o -o test_newmodel_numerics
