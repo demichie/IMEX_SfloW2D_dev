@@ -3,8 +3,8 @@ MODULE mass_radial_injection_2d
     USE parameters_2d, ONLY : idx_h, idx_T
   USE parameters_2d
   USE constitutive_parameters_2d
-  USE state_conversion_2d, ONLY : mixt_var
-  USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source
+  USE state_conversion_2d, ONLY : mixt_var, physical_state_type, complex_physical_state_type
+
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source
   USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
   USE mass_injection_coefficients_2d
@@ -16,8 +16,8 @@ MODULE mass_radial_injection_2d
   PUBLIC :: eval_radial_injection_implicit
   PUBLIC :: solve_radial_injection_analytic
 CONTAINS
-  SUBROUTINE eval_radial_injection_explicit(qpj, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
-       cell_area_jk, q1, expl_term)
+  SUBROUTINE eval_radial_injection_explicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
+       cell_area_jk, rate)
     USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source, &
          time_param, bottom_radial_source_flag, pore_pressure_flag, &
          pore_pres_fract, n_intervals, t_intervals, vel_intervals, &
@@ -25,14 +25,17 @@ CONTAINS
          n_fissures, linear_vel_fissures, T_fissures, time_param_fissures, &
          xs_fissures, xg_fissures
     USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
-    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, lat_arc_perim_jk
-    REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk, q1
-    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
+    REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
     REAL(wp) :: t_rem, t_coeff, h_dot, vel_local
     REAL(wp) :: qp_source(n_vars+2)
     REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
     REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, exc_pore_pres
     INTEGER :: i_int, i_fissure
+
+    rate=0.0_wp
 
     ! ----------- LATERAL RADIAL SOURCE (volume formulation) ------------------
     !
@@ -96,34 +99,34 @@ CONTAINS
           h_dot = h_source * vel_source * lat_arc_perim_jk / cell_area_jk
 
           ! Mass equation.
-          expl_term(1) = expl_term(1) + t_coeff * h_dot * r_rho_m
+          rate(1) = rate(1) + t_coeff * h_dot * r_rho_m
 
           ! Momentum equations - emit along the cell's outward unit normal.
-          expl_term(2) = expl_term(2) + t_coeff * h_dot * r_rho_m * vel_source &
+          rate(2) = rate(2) + t_coeff * h_dot * r_rho_m * vel_source &
                * lat_n_x_jk
-          expl_term(3) = expl_term(3) + t_coeff * h_dot * r_rho_m * vel_source &
+          rate(3) = rate(3) + t_coeff * h_dot * r_rho_m * vel_source &
                * lat_n_y_jk
 
        ! Thermal-energy equation.
-          expl_term(4) = expl_term(4) + eval_inlet_thermal_energy_source(     &
-               t_coeff, h_dot, r_rho_m, r_sp_heat_mix, T_source)
+          rate(4) = rate(4) + (t_coeff * &
+               t_coeff, h_dot * r_rho_m * r_sp_heat_mix * T_source)
 
           ! Solid transport.
-          expl_term(idx_solidEqn_first:idx_solidEqn_last) =                   &
-               expl_term(idx_solidEqn_first:idx_solidEqn_last) +              &
+          rate(idx_solidEqn_first:idx_solidEqn_last) =                   &
+               rate(idx_solidEqn_first:idx_solidEqn_last) +              &
                t_coeff * h_dot * r_rho_m * xs_source(1:n_solid)
 
           ! Additional gases.
 
-          expl_term(idx_addGasEqn_first:idx_addGasEqn_last) =                  &
-               expl_term(idx_addGasEqn_first:idx_addGasEqn_last) +             &
+          rate(idx_addGasEqn_first:idx_addGasEqn_last) =                  &
+               rate(idx_addGasEqn_first:idx_addGasEqn_last) +             &
                t_coeff * h_dot * r_rho_m * xg_source(1:n_add_gas)
 
 
           IF ( pore_pressure_flag ) THEN
-             exc_pore_pres = qpj(idx_pore)
-             expl_term(idx_poreEqn) = expl_term(idx_poreEqn) +                &
-                  eval_pore_pressure_inlet_source(t_coeff, q1,                 &
+             exc_pore_pres = state%exc_pore_pres
+             rate(idx_poreEqn) = rate(idx_poreEqn) +                &
+                  eval_pore_pressure_inlet_source(t_coeff, state%h*state%rho_m,                 &
                   pore_pres_fract, h_dot, r_rho_m, r_red_grav, exc_pore_pres)
           END IF
 
@@ -132,27 +135,30 @@ CONTAINS
     END IF
   END SUBROUTINE eval_radial_injection_explicit
 
-  SUBROUTINE eval_radial_injection_semi_implicit(qpj, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
-       cell_area_jk, q1, expl_term)
-    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, lat_arc_perim_jk
-    REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk, q1
-    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+  SUBROUTINE eval_radial_injection_semi_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
+       cell_area_jk, rate)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
+    REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
     CALL fatal_error('radial_injection: semi_implicit treatment is unsupported')
   END SUBROUTINE eval_radial_injection_semi_implicit
 
-  SUBROUTINE eval_radial_injection_implicit(qpj, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
-       cell_area_jk, q1, expl_term)
-    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, lat_arc_perim_jk
-    REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk, q1
-    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+  SUBROUTINE eval_radial_injection_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
+       cell_area_jk, rate)
+    TYPE(complex_physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
+    REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
     CALL fatal_error('radial_injection: implicit treatment is unsupported')
   END SUBROUTINE eval_radial_injection_implicit
 
-  SUBROUTINE solve_radial_injection_analytic(qpj, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
-       cell_area_jk, q1, expl_term)
-    REAL(wp), INTENT(IN) :: qpj(n_vars+2), time, lat_arc_perim_jk
-    REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk, q1
-    REAL(wp), INTENT(INOUT) :: expl_term(n_eqns)
+  SUBROUTINE solve_radial_injection_analytic(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
+       cell_area_jk, rate)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
+    REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
     CALL fatal_error('radial_injection: analytic treatment is unsupported')
   END SUBROUTINE solve_radial_injection_analytic
 END MODULE mass_radial_injection_2d

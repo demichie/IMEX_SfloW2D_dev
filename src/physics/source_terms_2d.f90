@@ -9,6 +9,7 @@ MODULE source_terms_2d
   USE mass_bottom_circular_injection_2d
   USE mass_bottom_fissural_injection_2d
   USE mass_radial_injection_2d
+  USE mass_injection_2d, ONLY : eval_mass_injection_explicit
   USE mass_injection_coefficients_2d
   USE parameters_2d
   USE constitutive_parameters_2d
@@ -590,6 +591,7 @@ CONTAINS
     REAL(wp) :: q1
 
     REAL(wp) :: rheology_rate(2), thermal_rate, pressure_rate
+    REAL(wp) :: injection_rate(n_eqns)
     REAL(wp) :: solid_volumes(n_solid), gas_volumes(n_add_gas)
     REAL(wp) :: speed, horizontal_speed, vertical_velocity, speed_squared
     REAL(wp) :: inverse_density, pressure_excess
@@ -600,6 +602,7 @@ CONTAINS
 
 
     expl_term(1:n_eqns) = 0.0_wp
+    physical_state=physical_state_type()
     q1 = 0.0_wp
 
 
@@ -676,14 +679,12 @@ CONTAINS
 
     END IF
 
-    ! Each configured source owns exactly one explicit rate calculation.
-    IF (group_contains_name(group,'bottom_circular_injection')) &
-         CALL eval_bottom_circular_injection_explicit(qpj,time,cell_fract_jk,q1,expl_term)
-    IF (group_contains_name(group,'bottom_fissural_injection')) &
-         CALL eval_bottom_fissural_injection_explicit(qpj,time,cell_fissure_fract,q1,expl_term)
-    IF (group_contains_name(group,'radial_injection')) &
-         CALL eval_radial_injection_explicit(qpj,time,lat_arc_perim_jk, &
-         lat_n_x_jk,lat_n_y_jk,cell_area_jk,q1,expl_term)
+    CALL eval_mass_injection_explicit(physical_state,time,cell_fract_jk, &
+         cell_fissure_fract,lat_arc_perim_jk,lat_n_x_jk,lat_n_y_jk,cell_area_jk, &
+         group_contains_name(group,'bottom_circular_injection'), &
+         group_contains_name(group,'bottom_fissural_injection'), &
+         group_contains_name(group,'radial_injection'),injection_rate)
+    expl_term=expl_term+injection_rate
 
     RETURN
 
