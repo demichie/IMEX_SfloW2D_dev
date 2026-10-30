@@ -56,7 +56,7 @@ for case_dir in "$work_dir"/*/; do
         continue
     fi
 
-    if ! ( cd "$case_dir" && "$executable" > run.log 2>&1 ); then
+    if ! ( cd "$case_dir" && IMEX_SOURCE_BOUNDARY_BUDGET=1 "$executable" > run.log 2>&1 ); then
         echo "FAIL: solver exited unsuccessfully in $case_dir"
         tail -20 "$case_dir/run.log"
         failed=1
@@ -67,6 +67,8 @@ for case_dir in "$work_dir"/*/; do
             lateral_boundary_*)
                 echo "Source initialization diagnostics for $case_name:"
                 grep -E "Source (density|reduced gravity|Richardson number|velocity|thickness|mass flow rate)" "$case_dir/run.log" || :
+                echo "Boundary flux budget near the final time:"
+                grep "SOURCE_BOUNDARY_BUDGET" "$case_dir/run.log" | tail -8 || :
                 echo "Final solver diagnostic lines:"
                 tail -12 "$case_dir/run.log"
                 ;;

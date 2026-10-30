@@ -348,8 +348,10 @@ CONTAINS
     INTEGER, INTENT(IN) :: j_stag_y(:), k_stag_y(:)
 
     REAL(wp) :: a_minus, a_plus
+    REAL(wp) :: source_inflow, other_inflow, face_inflow
     LOGICAL :: dry_donor_left,dry_donor_right
-    INTEGER :: j, k, l
+    INTEGER :: j, k, l, diagnostic_status
+    CHARACTER(LEN=1) :: diagnostic_flag
 
     IF ( comp_cells_x .GT. 1 ) THEN
 
@@ -490,6 +492,63 @@ CONTAINS
        END DO
        !$OMP END PARALLEL DO
 
+    END IF
+
+    ! Optional stage-level boundary budget for source-mass CI diagnostics.
+    ! The oriented mass contributions are measured on the interior side of
+    ! each domain boundary, after the one-way boundary treatment.
+    IF (lateral_source_flag .AND. t .GE. 0.0999_wp .AND. t .LE. 0.1001_wp) THEN
+       CALL GET_ENVIRONMENT_VARIABLE('IMEX_SOURCE_BOUNDARY_BUDGET', &
+            diagnostic_flag, STATUS=diagnostic_status)
+       IF (diagnostic_status .EQ. 0 .AND. diagnostic_flag .EQ. '1') THEN
+          source_inflow = 0.0_wp
+          other_inflow = 0.0_wp
+
+          DO l = 1, solve_interfaces_x
+             j = j_stag_x(l)
+             k = k_stag_x(l)
+             IF (j .EQ. 1) THEN
+                face_inflow = this%G_interface_xR(1,j,k) / one_by_dy
+                IF (source_cell(1,k) .EQ. 2) THEN
+                   source_inflow = source_inflow + face_inflow
+                ELSE
+                   other_inflow = other_inflow + face_inflow
+                END IF
+             ELSEIF (j .EQ. comp_interfaces_x) THEN
+                face_inflow = -this%G_interface_xL(1,j,k) / one_by_dy
+                IF (source_cell(comp_cells_x,k) .EQ. 2) THEN
+                   source_inflow = source_inflow + face_inflow
+                ELSE
+                   other_inflow = other_inflow + face_inflow
+                END IF
+             END IF
+          END DO
+
+          DO l = 1, solve_interfaces_y
+             j = j_stag_y(l)
+             k = k_stag_y(l)
+             IF (k .EQ. 1) THEN
+                face_inflow = this%G_interface_yT(1,j,k) / one_by_dx
+                IF (source_cell(j,1) .EQ. 2) THEN
+                   source_inflow = source_inflow + face_inflow
+                ELSE
+                   other_inflow = other_inflow + face_inflow
+                END IF
+             ELSEIF (k .EQ. comp_interfaces_y) THEN
+                face_inflow = -this%G_interface_yB(1,j,k) / one_by_dx
+                IF (source_cell(j,comp_cells_y) .EQ. 2) THEN
+                   source_inflow = source_inflow + face_inflow
+                ELSE
+                   other_inflow = other_inflow + face_inflow
+                END IF
+             END IF
+          END DO
+
+          WRITE (*, '(A,ES23.15,A,ES23.15,A,ES23.15)') &
+               'SOURCE_BOUNDARY_BUDGET t=', t, &
+               ' source_kg_s=', source_inflow, &
+               ' other_kg_s=', other_inflow
+       END IF
     END IF
 
   END SUBROUTINE eval_flux_PCCU
