@@ -335,7 +335,7 @@ CONTAINS
                     rhom, red_grav, mod_vel, mod_vel2, moving,                                     &
                     use_stochastic, stochastic_value, rate(1), rate(2))
         CASE('rheology_plastic')
-            CALL eval_rheology_plastic_implicit(state, mod_vel, moving, rate(1), rate(2)), rate(2))
+            CALL eval_rheology_plastic_implicit(state, mod_vel, moving, rate(1), rate(2))
         CASE('rheology_lava')
             CALL eval_rheology_lava_implicit(h, T,                                                 &
                     rhom, u, v, moving,                                                            &
