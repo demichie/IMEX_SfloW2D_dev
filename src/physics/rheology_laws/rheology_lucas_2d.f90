@@ -15,15 +15,15 @@
 !> its increment is added to the mod_vel before evaluating the law. The module
 !> exposes \ref eval_rheology_lucas_semi_implicit for the x/y momentum rates and
 !> \ref solve_rheology_lucas_analytic for exact integration of the frozen
-!> mod_vel-decay law with non-velocity variables explicit.
+!> speed-decay law with non-velocity variables explicit.
 !********************************************************************************
 MODULE rheology_lucas_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
     USE rheology_parameters_2d, ONLY : mu_0, mu_inf, U_w
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs, &
-                fatal_analytic_input_error, solve_exact_velocity_flow,                &
-                EXACT_FLOW_LUCAS
+            fatal_analytic_input_error, solve_exact_velocity_flow,                &
+            EXACT_FLOW_LUCAS
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: eval_rheology_lucas_explicit
@@ -34,11 +34,11 @@ MODULE rheology_lucas_2d
 CONTAINS
 
     SUBROUTINE eval_rheology_lucas_explicit( &
-                h, T, u, v, mod_vel, mod_hor_vel, &
-                mod_vel2, rhom, inv_rhom, red_grav, &
-                grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
-                B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
-                stochastic_value, rate )
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
+            B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
+            stochastic_value, rate )
         REAL(wp), INTENT(IN) :: h, T, u, v
         REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
         REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
@@ -51,19 +51,19 @@ CONTAINS
         COMPLEX(wp) :: ix, iy
         curvature_accel=0.0_wp
         IF (curvature_term) curvature_accel=B_second_xx*u**2 + &
-                    2.0_wp*B_second_xy*u*v+B_second_yy*v**2
+                2.0_wp*B_second_xy*u*v+B_second_yy*v**2
         CALL eval_rheology_lucas_semi_implicit( &
-                h, u, v, mod_vel, mod_hor_vel, rhom, &
-                red_grav, grav_coeff, 0.0_wp, use_stochastic, stochastic_value, &
-                sx, sy )
+            h, u, v, mod_vel, mod_hor_vel, rhom, &
+            red_grav, grav_coeff, 0.0_wp, use_stochastic, stochastic_value, &
+            sx, sy )
         CALL eval_rheology_lucas_implicit( &
-                ix, iy )
+            ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_lucas_explicit
 
     SUBROUTINE eval_rheology_lucas_semi_implicit( h, u, v, mod_vel, &
-                mod_hor_vel, rhom, red_grav, grav_coeff, &
-                curvature_term, stochastic, stochastic_value, rate_x, rate_y )
+            mod_hor_vel, rhom, red_grav, grav_coeff, &
+            curvature_term, stochastic, stochastic_value, rate_x, rate_y )
         REAL(wp), INTENT(IN) :: h, u, v, mod_vel
         REAL(wp), INTENT(IN) :: mod_hor_vel, rhom, red_grav
         REAL(wp), INTENT(IN) :: grav_coeff, curvature_term
@@ -76,26 +76,26 @@ CONTAINS
         rate_x = 0.0_wp
         rate_y = 0.0_wp
         IF ( mod_vel .GT. 0.0_wp ) THEN
-                IF ( stochastic ) THEN
-                    friction_speed = mod_vel + stochastic_value
-                ELSE
-                    friction_speed = mod_vel
-                END IF
+            IF ( stochastic ) THEN
+                friction_speed = mod_vel + stochastic_value
+            ELSE
+                friction_speed = mod_vel
+            END IF
 
-                IF ( friction_speed .LT. U_w ) THEN
-                    friction_coefficient = mu_0
+            IF ( friction_speed .LT. U_w ) THEN
+                friction_coefficient = mu_0
+            ELSE
+                IF ( h .LT. 0.1_wp ) THEN
+                        friction_coefficient = mu_0
                 ELSE
-                    IF ( h .LT. 0.1_wp ) THEN
-                            friction_coefficient = mu_0
-                    ELSE
-                            friction_coefficient = mu_inf + (mu_0-mu_inf)/(friction_speed/U_w)
-                    END IF
+                        friction_coefficient = mu_inf + (mu_0-mu_inf)/(friction_speed/U_w)
                 END IF
+            END IF
 
-                friction_stress = rhom * ( friction_coefficient * h * &
-                        grav_coeff * ( red_grav + curvature_term ) )
-                rate_x = rate_x - friction_stress * u / mod_hor_vel
-                rate_y = rate_y - friction_stress * v / mod_hor_vel
+            friction_stress = rhom * ( friction_coefficient * h * &
+                    grav_coeff * ( red_grav + curvature_term ) )
+            rate_x = rate_x - friction_stress * u / mod_hor_vel
+            rate_y = rate_y - friction_stress * v / mod_hor_vel
         END IF
     END SUBROUTINE eval_rheology_lucas_semi_implicit
 
@@ -106,8 +106,8 @@ CONTAINS
     END SUBROUTINE eval_rheology_lucas_implicit
 
     SUBROUTINE solve_rheology_lucas_analytic(dt, h,   &
-                speed_ratio, velocity_before, red_grav, grav_coeff,    &
-                curvature_term, stochastic, stochastic_value, velocity_after)
+            speed_ratio, velocity_before, red_grav, grav_coeff,    &
+            curvature_term, stochastic, stochastic_value, velocity_after)
         REAL(wp), INTENT(IN) :: dt, h, speed_ratio
         REAL(wp), INTENT(IN) :: velocity_before(2), red_grav
         REAL(wp), INTENT(IN) :: grav_coeff, curvature_term
@@ -118,10 +118,10 @@ CONTAINS
         velocity_after = velocity_before
         speed_before = SQRT(SUM(velocity_before**2))
         CALL validate_analytic_velocity_inputs(dt, h,    &
-                    speed_ratio, speed_before, 'Lucas')
+                speed_ratio, speed_before, 'Lucas')
         IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
         IF (U_w .LE. 0.0_wp) THEN
-                CALL fatal_analytic_input_error('Nonpositive U_w in Lucas analytic solver')
+            CALL fatal_analytic_input_error('Nonpositive U_w in Lucas analytic solver')
         END IF
 
         scale_factor = grav_coeff * (red_grav + curvature_term)
@@ -131,8 +131,8 @@ CONTAINS
         shallow = 0.0_wp
         IF (h .LT. 0.1_wp) shallow = 1.0_wp
         CALL solve_exact_velocity_flow(EXACT_FLOW_LUCAS,                        &
-                    [scale_factor, speed_ratio, shift, mu_0, mu_inf, U_w, shallow],    &
-                    dt, speed_before, speed_after)
+                [scale_factor, speed_ratio, shift, mu_0, mu_inf, U_w, shallow],    &
+                dt, speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_lucas_analytic
 
