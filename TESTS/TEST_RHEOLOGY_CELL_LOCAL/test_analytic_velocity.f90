@@ -184,8 +184,13 @@ PROGRAM test_analytic_velocity
        REAL(complex_source_y,wp)], 'empirical')
 
   friction_factor = 0.1_wp
-  CALL solve_rheology_quadratic_analytic(integration_step, flow_depth,      &
-       speed_ratio, velocity_before, velocity_after)
+  BLOCK
+    TYPE(physical_state_type) :: ps
+    ps%h=flow_depth
+    ps%u=velocity_before(1)
+    ps%v=velocity_before(2)
+    CALL solve_rheology_quadratic_analytic(integration_step, ps, speed_ratio, velocity_after)
+  END BLOCK
   CALL assert_dispatch_matches('rheology_quadratic', .FALSE., 0.0_wp,      &
        .FALSE., 0.0_wp, velocity_after, 'quadratic dispatch')
   linear_drag = friction_factor*speed_ratio**2/flow_depth
@@ -195,11 +200,14 @@ PROGRAM test_analytic_velocity
        'quadratic exact reciprocal-speed flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_rheology_quadratic_implicit(                               &
-       CMPLX(velocity_after(1),0.0_wp,wp), CMPLX(velocity_after(2),0.0_wp,wp), &
-       CMPLX(horizontal_speed,0.0_wp,wp),                                   &
-       CMPLX(speed_after**2,0.0_wp,wp), CMPLX(mixture_density,0.0_wp,wp),  &
-       .TRUE., complex_source_x, complex_source_y)
+  BLOCK
+    TYPE(complex_physical_state_type) :: cs
+    cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
+    cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
+    cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
+    CALL eval_rheology_quadratic_implicit(cs, CMPLX(horizontal_speed,0.0_wp,wp), &
+         CMPLX(speed_after**2,0.0_wp,wp), .TRUE., complex_source_x, complex_source_y)
+  END BLOCK
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [REAL(complex_source_x,wp),               &
        REAL(complex_source_y,wp)], 'quadratic')
