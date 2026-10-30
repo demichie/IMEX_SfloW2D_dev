@@ -25,12 +25,10 @@ CONTAINS
     !> @brief Evaluate explicit ambient-air entrainment.
     !> @param[in] state Local real physical state.
     !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
-    !> @param[in] u Horizontal x velocity of the mobile material [m/s].
-    !> @param[in] v Horizontal y velocity of the mobile material [m/s].
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_entrainment_explicit(state,state,qp,Bx,By,r)
+    SUBROUTINE eval_mass_exchange_entrainment_explicit(state,qp,Bx,By,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By
@@ -52,12 +50,10 @@ CONTAINS
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
     !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
-    !> @param[in] u Horizontal x velocity of the mobile material [m/s].
-    !> @param[in] v Horizontal y velocity of the mobile material [m/s].
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_entrainment_semi_implicit(state,state,qp,Bx,By,r)
+    SUBROUTINE eval_mass_exchange_entrainment_semi_implicit(state,qp,Bx,By,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By
@@ -71,12 +67,10 @@ CONTAINS
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
     !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
-    !> @param[in] u Horizontal x velocity of the mobile material [m/s].
-    !> @param[in] v Horizontal y velocity of the mobile material [m/s].
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_entrainment_implicit(state,state,qp,Bx,By,r)
+    SUBROUTINE eval_mass_exchange_entrainment_implicit(state,qp,Bx,By,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By
@@ -90,12 +84,10 @@ CONTAINS
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
     !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
-    !> @param[in] u Horizontal x velocity of the mobile material [m/s].
-    !> @param[in] v Horizontal y velocity of the mobile material [m/s].
     !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE solve_mass_exchange_entrainment_analytic(state,state,qp,Bx,By,r)
+    SUBROUTINE solve_mass_exchange_entrainment_analytic(state,qp,Bx,By,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By
