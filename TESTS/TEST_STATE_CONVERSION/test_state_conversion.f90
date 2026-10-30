@@ -93,7 +93,7 @@ CONTAINS
 
   !> Validate both physical-state construction paths and complex real extraction.
   SUBROUTINE run_shared_physical_state_checks
-    TYPE(physical_state_type) :: from_qp, from_complex
+    TYPE(physical_state_type) :: from_qp, from_complex, from_real_q
     TYPE(complex_physical_state_type) :: complex_state
     REAL(wp), ALLOCATABLE :: qp(:), q(:)
     COMPLEX(wp), ALLOCATABLE :: cq(:)
@@ -106,9 +106,20 @@ CONTAINS
        CALL qp_to_qc(qp, q)
        cq = CMPLX(q, 0.0_wp, wp)
        CALL physical_state_from_qp(qp, from_qp)
+       CALL real_physical_state_from_q(q, from_real_q)
        CALL physical_state_from_q(cq, complex_state)
        CALL real_part_physical_state(complex_state, from_complex)
 
+       CALL assert_close_scalar('real conservative state h', from_real_q%h, from_qp%h, 2.0E-12_wp)
+       CALL assert_close_scalar('real conservative state T', from_real_q%T, from_qp%T, 2.0E-12_wp)
+       CALL assert_close_scalar('real conservative state density', from_real_q%rho_m, &
+            from_qp%rho_m, 2.0E-12_wp)
+       CALL assert_close_scalar('real conservative state gravity', from_real_q%red_grav, &
+            from_qp%red_grav, 2.0E-12_wp)
+       CALL assert_close_vector('real conservative state solids', from_real_q%alphas, &
+            from_qp%alphas, 2.0E-12_wp)
+       CALL assert_close_vector('real conservative state gases', from_real_q%alphag, &
+            from_qp%alphag, 2.0E-12_wp)
        CALL assert_close_scalar('shared state h', from_qp%h, from_complex%h, 2.0E-12_wp)
        CALL assert_close_scalar('shared state u', from_qp%u, from_complex%u, 2.0E-12_wp)
        CALL assert_close_scalar('shared state v', from_qp%v, from_complex%v, 2.0E-12_wp)
