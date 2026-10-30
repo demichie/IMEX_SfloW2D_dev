@@ -9,39 +9,6 @@ MODULE thermal_cooling_2d
   PUBLIC :: eval_thermal_cooling_explicit, eval_thermal_cooling_semi_implicit
   PUBLIC :: eval_thermal_cooling_implicit, solve_thermal_cooling_analytic
 CONTAINS
-SUBROUTINE cooling_scalar_explicit(temperature, radiative_coefficient, &
-       convective_coefficient, ambient_temperature, rate)
-    REAL(wp), INTENT(IN) :: temperature, radiative_coefficient
-    REAL(wp), INTENT(IN) :: convective_coefficient, ambient_temperature
-    REAL(wp), INTENT(OUT) :: rate
-    REAL(wp) :: si_rate
-    COMPLEX(wp) :: im_rate
-
-    CALL cooling_scalar_semi_implicit(si_rate)
-    im_rate = cooling_scalar_implicit(CMPLX(temperature,0.0_wp,wp), &
-         radiative_coefficient, convective_coefficient, ambient_temperature)
-    rate = si_rate + REAL(im_rate,wp)
-  END SUBROUTINE cooling_scalar_explicit
-
-SUBROUTINE cooling_scalar_semi_implicit(rate)
-    REAL(wp), INTENT(OUT) :: rate
-    rate = 0.0_wp
-  END SUBROUTINE cooling_scalar_semi_implicit
-
-PURE FUNCTION cooling_scalar_implicit(temperature, radiative_coefficient, &
-       convective_coefficient, ambient_temperature) RESULT(source)
-
-    COMPLEX(wp), INTENT(IN) :: temperature
-    REAL(wp), INTENT(IN) :: radiative_coefficient
-    REAL(wp), INTENT(IN) :: convective_coefficient
-    REAL(wp), INTENT(IN) :: ambient_temperature
-    COMPLEX(wp) :: source
-
-    source = -radiative_coefficient * (temperature**4 - ambient_temperature**4) &
-         - convective_coefficient * (temperature - ambient_temperature)
-
-  END FUNCTION cooling_scalar_implicit
-
 SUBROUTINE cooling_scalar_analytic(temperature, integration_step,   &
        areal_heat_capacity, radiative_coefficient, convective_coefficient,     &
        ambient_temperature, temperature_after)
@@ -160,20 +127,7 @@ SUBROUTINE cooling_scalar_analytic(temperature, integration_step,   &
 
   END SUBROUTINE cooling_scalar_analytic
 
-SUBROUTINE cooling_scalar_advance(temperature, integration_step,  &
-       areal_heat_capacity, radiative_coefficient, convective_coefficient,    &
-       ambient_temperature, temperature_after)
 
-    REAL(wp), INTENT(IN) :: temperature, integration_step, areal_heat_capacity
-    REAL(wp), INTENT(IN) :: radiative_coefficient, convective_coefficient
-    REAL(wp), INTENT(IN) :: ambient_temperature
-    REAL(wp), INTENT(OUT) :: temperature_after
-
-    CALL cooling_scalar_analytic(temperature, integration_step,      &
-         areal_heat_capacity, radiative_coefficient, convective_coefficient,  &
-         ambient_temperature, temperature_after)
-
-  END SUBROUTINE cooling_scalar_advance
 
 SUBROUTINE lava_cooling_cubic_root(beta, root)
 
