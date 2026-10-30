@@ -83,7 +83,7 @@ MODULE state_conversion_2d
 
   PUBLIC :: r_phys_var, c_phys_var
   PUBLIC :: physical_state_from_qp, physical_state_from_q, real_part_physical_state
-  PUBLIC :: real_physical_state_from_q
+  PUBLIC :: real_physical_state_from_q, complex_state_from_real
   PUBLIC :: qc_to_qp, qp_to_qc, qp_to_qp2
   PUBLIC :: mixt_var
   PUBLIC :: sauter_diameter, average_density_solids
@@ -157,6 +157,27 @@ CONTAINS
          state%exc_pore_pres)
     state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
   END SUBROUTINE physical_state_from_q
+
+  !> Convert a fully prepared real physical state to a complex one.
+  !> The mapping is exact (zero imaginary part) and does not recompute physics.
+  SUBROUTINE complex_state_from_real(real_state, complex_state)
+    TYPE(physical_state_type), INTENT(IN) :: real_state
+    TYPE(complex_physical_state_type), INTENT(OUT) :: complex_state
+
+    complex_state%h = CMPLX(real_state%h,0.0_wp,wp)
+    complex_state%u = CMPLX(real_state%u,0.0_wp,wp)
+    complex_state%v = CMPLX(real_state%v,0.0_wp,wp)
+    complex_state%T = CMPLX(real_state%T,0.0_wp,wp)
+    complex_state%rho_m = CMPLX(real_state%rho_m,0.0_wp,wp)
+    complex_state%inv_rhom = CMPLX(real_state%inv_rhom,0.0_wp,wp)
+    complex_state%red_grav = CMPLX(real_state%red_grav,0.0_wp,wp)
+    complex_state%Zs = CMPLX(real_state%Zs,0.0_wp,wp)
+    complex_state%exc_pore_pres = CMPLX(real_state%exc_pore_pres,0.0_wp,wp)
+    IF (ALLOCATED(real_state%alphas)) &
+         complex_state%alphas = CMPLX(real_state%alphas,0.0_wp,wp)
+    IF (ALLOCATED(real_state%alphag)) &
+         complex_state%alphag = CMPLX(real_state%alphag,0.0_wp,wp)
+  END SUBROUTINE complex_state_from_real
 
   !> Extract a real source state without re-evaluating any constitutive formula.
   SUBROUTINE real_part_physical_state(complex_state, state)
