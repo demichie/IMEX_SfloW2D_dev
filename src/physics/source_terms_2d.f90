@@ -434,6 +434,7 @@ CONTAINS
     REAL(wp) :: r_sp_heat_mix
 
     REAL(wp) :: exc_pore_pres       !< excess pore pressure
+    TYPE(physical_state_type) :: physical_state
     LOGICAL :: selected_rheology
     CHARACTER(LEN=64) :: selected_model_name
 
@@ -464,10 +465,11 @@ CONTAINS
        ! a reciprocal of zero from a later moving-state branch.
        IF ((r_u .EQ. 0.0_wp) .AND. (r_v .EQ. 0.0_wp)) RETURN
 
-       CALL primitive_to_volume_fractions(qpj, r_alphas, r_alphag)
-
-       CALL mixt_var(qpj, r_Ri, r_rho_m, r_rho_c, r_red_grav,                  &
-            r_sp_heat_c, r_sp_heat_mix)
+       CALL physical_state_from_qp(qpj, physical_state)
+       r_alphas = physical_state%alphas
+       r_alphag = physical_state%alphag
+       r_rho_m = physical_state%rho_m
+       r_red_grav = physical_state%red_grav
 
 
        IF ( slope_correction_flag ) THEN
@@ -556,6 +558,7 @@ CONTAINS
     REAL(wp) :: t_coeff
     REAL(wp) :: h_dot
 
+    TYPE(physical_state_type) :: physical_state
     REAL(wp) :: qp_source(n_vars+2)
 
     REAL(wp) :: exc_pore_pres
@@ -587,8 +590,9 @@ CONTAINS
        r_u = qpj(idx_u)
        r_v = qpj(idx_v)
 
-       CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,                      &
-            r_sp_heat_c,r_sp_heat_mix)
+       CALL physical_state_from_qp(qpj, physical_state)
+       r_rho_m = physical_state%rho_m
+       r_red_grav = physical_state%red_grav
 
        q1 = r_h * r_rho_m
 
@@ -616,7 +620,8 @@ CONTAINS
        active_rheology=group_rheology_name(group)
        IF (rheology_flag .AND. LEN_TRIM(active_rheology)>0 .AND. &
             r_h>dry_thickness_tolerance) THEN
-          CALL primitive_to_volume_fractions(qpj,solid_volumes,gas_volumes)
+          solid_volumes = physical_state%alphas
+          gas_volumes = physical_state%alphag
           horizontal_speed=SQRT(r_u**2+r_v**2)
           vertical_velocity=0.0_wp
           IF (slope_correction_flag) vertical_velocity=r_u*Bprimej_x+r_v*Bprimej_y
@@ -639,7 +644,8 @@ CONTAINS
        END IF
        IF (pore_pressure_flag .AND. &
             group_contains_name(group,'pore_pressure_dissipation')) THEN
-          CALL primitive_to_volume_fractions(qpj,solid_volumes,gas_volumes)
+          solid_volumes = physical_state%alphas
+          gas_volumes = physical_state%alphag
           CALL eval_pore_pressure_dissipation_explicit(r_h,qpj(idx_T), &
                r_rho_m,solid_volumes,qpj(idx_pore),pressure_rate)
           expl_term(idx_poreEqn)=expl_term(idx_poreEqn)+pressure_rate
