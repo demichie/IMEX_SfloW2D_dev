@@ -43,6 +43,7 @@ CONTAINS
         nu=nu_ref*EXP(-visc_par*(T-T_ref))
     END FUNCTION lava_kinematic_viscosity
 
+    !> \brief Evaluate the specified rheology law.
     SUBROUTINE eval_rheology_lava_explicit( &
             h, T, u, v, mod_vel, mod_hor_vel, &
             mod_vel2, rhom, inv_rhom, red_grav, &
@@ -59,6 +60,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
+
         CALL eval_rheology_lava_semi_implicit( &
             u, v, mod_vel, sx, sy )
         CALL eval_rheology_lava_implicit( &
@@ -68,9 +70,11 @@ CONTAINS
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_lava_explicit
 
+    !> \brief Evaluate the corresponding rheology source contribution.
     SUBROUTINE eval_rheology_lava_semi_implicit(u, v, mod_vel, rate_x, rate_y)
         REAL(wp), INTENT(IN) :: u, v, mod_vel
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
+
         rate_x = 0.0_wp
         rate_y = 0.0_wp
         IF (mod_vel .LE. 0.0_wp) RETURN
@@ -78,6 +82,7 @@ CONTAINS
         rate_y = -tau0 * v / mod_vel
     END SUBROUTINE eval_rheology_lava_semi_implicit
 
+    !> \brief Evaluate the corresponding rheology source contribution.
     SUBROUTINE eval_rheology_lava_implicit(h, T, rhom, &
             u, v, moving, rate_x, rate_y)
         COMPLEX(wp), INTENT(IN) :: h, T, rhom
@@ -86,22 +91,29 @@ CONTAINS
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         COMPLEX(wp) :: gamma
         REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
+
         rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
         rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
         IF (REAL(h, wp) .GT. h_threshold) THEN
             gamma = 3.0_wp * nu_ref / h * EXP(-visc_par * (T - T_ref))
+
         ELSE
             gamma = 3.0_wp * nu_ref / h_threshold * EXP(-visc_par * (T - T_ref))
+
         END IF
 
         IF (moving) THEN
             rate_x = -rhom * gamma * u
             rate_y = -rhom * gamma * v
+
         END IF
+
     END SUBROUTINE eval_rheology_lava_implicit
 
+    !> \brief Integrate the lava rheology source analytically.
     SUBROUTINE solve_rheology_lava_analytic(dt, h,     &
             T, rhom, speed_ratio, velocity_before,           &
+
             velocity_after)
         REAL(wp), INTENT(IN) :: dt, h, T
         REAL(wp), INTENT(IN) :: rhom, speed_ratio
@@ -117,6 +129,7 @@ CONTAINS
         IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
         IF (rhom .LE. 0.0_wp) THEN
             CALL fatal_analytic_input_error('Nonpositive mixture density in lava analytic solver')
+
         END IF
 
         effective_depth = MAX(h, h_threshold)

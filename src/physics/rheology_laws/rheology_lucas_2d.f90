@@ -33,6 +33,7 @@ MODULE rheology_lucas_2d
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
 
+    !> \brief Evaluate the specified rheology law.
     SUBROUTINE eval_rheology_lucas_explicit( &
             h, T, u, v, mod_vel, mod_hor_vel, &
             mod_vel2, rhom, inv_rhom, red_grav, &
@@ -50,6 +51,7 @@ CONTAINS
         REAL(wp) :: sx, sy, curvature_accel
         COMPLEX(wp) :: ix, iy
         curvature_accel=0.0_wp
+
         IF (curvature_term) curvature_accel=B_second_xx*u**2 + &
                 2.0_wp*B_second_xy*u*v+B_second_yy*v**2
         CALL eval_rheology_lucas_semi_implicit( &
@@ -61,6 +63,7 @@ CONTAINS
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_lucas_explicit
 
+    !> \brief Evaluate the corresponding rheology source contribution.
     SUBROUTINE eval_rheology_lucas_semi_implicit( h, u, v, mod_vel, &
             mod_hor_vel, rhom, red_grav, grav_coeff, &
             curvature_term, stochastic, stochastic_value, rate_x, rate_y )
@@ -73,38 +76,50 @@ CONTAINS
         REAL(wp) :: friction_speed
         REAL(wp) :: friction_coefficient
         REAL(wp) :: friction_stress
+
         rate_x = 0.0_wp
         rate_y = 0.0_wp
         IF ( mod_vel .GT. 0.0_wp ) THEN
             IF ( stochastic ) THEN
                 friction_speed = mod_vel + stochastic_value
+
             ELSE
                 friction_speed = mod_vel
+
             END IF
 
             IF ( friction_speed .LT. U_w ) THEN
                 friction_coefficient = mu_0
+
             ELSE
                 IF ( h .LT. 0.1_wp ) THEN
                         friction_coefficient = mu_0
+
                 ELSE
                         friction_coefficient = mu_inf + (mu_0-mu_inf)/(friction_speed/U_w)
+
                 END IF
+
             END IF
 
             friction_stress = rhom * ( friction_coefficient * h * &
                     grav_coeff * ( red_grav + curvature_term ) )
             rate_x = rate_x - friction_stress * u / mod_hor_vel
             rate_y = rate_y - friction_stress * v / mod_hor_vel
+
         END IF
+
     END SUBROUTINE eval_rheology_lucas_semi_implicit
 
+    !> \brief Evaluate the corresponding rheology source contribution.
     SUBROUTINE eval_rheology_lucas_implicit(rate_x, rate_y)
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
+
         rate_x = CMPLX(0.0_wp,0.0_wp,wp)
         rate_y = CMPLX(0.0_wp,0.0_wp,wp)
     END SUBROUTINE eval_rheology_lucas_implicit
 
+    !> \brief Integrate the lucas rheology source analytically.
     SUBROUTINE solve_rheology_lucas_analytic(dt, h,   &
             speed_ratio, velocity_before, red_grav, grav_coeff,    &
             curvature_term, stochastic, stochastic_value, velocity_after)
@@ -115,6 +130,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: velocity_after(2)
         REAL(wp) :: speed_before, speed_after, shift, scale_factor, shallow
+
         velocity_after = velocity_before
         speed_before = SQRT(SUM(velocity_before**2))
         CALL validate_analytic_velocity_inputs(dt, h,    &
@@ -122,6 +138,7 @@ CONTAINS
         IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
         IF (U_w .LE. 0.0_wp) THEN
             CALL fatal_analytic_input_error('Nonpositive U_w in Lucas analytic solver')
+
         END IF
 
         scale_factor = grav_coeff * (red_grav + curvature_term)

@@ -23,6 +23,7 @@ MODULE rheology_empirical_2d
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
 
+    !> \brief Evaluate the specified rheology law.
     SUBROUTINE eval_rheology_empirical_explicit( &
             h, T, u, v, mod_vel, mod_hor_vel, &
             mod_vel2, rhom, inv_rhom, red_grav, &
@@ -39,6 +40,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
+
         CALL eval_rheology_empirical_semi_implicit( &
             sx, sy )
         CALL eval_rheology_empirical_implicit( &
@@ -48,12 +50,15 @@ CONTAINS
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_empirical_explicit
 
+    !> \brief Evaluate the corresponding rheology source contribution.
     SUBROUTINE eval_rheology_empirical_semi_implicit(rate_x, rate_y)
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
+
         rate_x = 0.0_wp
         rate_y = 0.0_wp
     END SUBROUTINE eval_rheology_empirical_semi_implicit
 
+    !> \brief Evaluate the corresponding rheology source contribution.
     SUBROUTINE eval_rheology_empirical_implicit(h, u, v, &
             mod_hor_vel, mod_vel, rhom, moving, rate_x, rate_y)
         COMPLEX(wp), INTENT(IN) :: h, u, v
@@ -61,6 +66,7 @@ CONTAINS
         LOGICAL, INTENT(IN) :: moving
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         COMPLEX(wp) :: friction_coefficient
+
         rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
         rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
         IF (.NOT. moving) RETURN
@@ -69,12 +75,14 @@ CONTAINS
         rate_y = -rhom * friction_coefficient * (v / mod_hor_vel)
     END SUBROUTINE eval_rheology_empirical_implicit
 
+    !> \brief Integrate the empirical rheology source analytically.
     SUBROUTINE solve_rheology_empirical_analytic(dt, h, &
             speed_ratio, velocity_before, velocity_after)
         REAL(wp), INTENT(IN) :: dt, h, speed_ratio
         REAL(wp), INTENT(IN) :: velocity_before(2)
         REAL(wp), INTENT(OUT) :: velocity_after(2)
         REAL(wp) :: linear_drag, speed_before, speed_after
+
         velocity_after = velocity_before
         speed_before = SQRT(SUM(velocity_before**2))
         CALL validate_analytic_velocity_inputs(dt, h,    &

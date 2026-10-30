@@ -32,6 +32,7 @@ MODULE rheology_froude_2d
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
 
+    !> \brief Evaluate the specified rheology law.
     SUBROUTINE eval_rheology_froude_explicit( &
             h, T, u, v, mod_vel, mod_hor_vel, &
             mod_vel2, rhom, inv_rhom, red_grav, &
@@ -49,6 +50,7 @@ CONTAINS
         REAL(wp) :: sx, sy, curvature_accel
         COMPLEX(wp) :: ix, iy
         curvature_accel=0.0_wp
+
         IF (curvature_term) curvature_accel=B_second_xx*u**2 + &
                 2.0_wp*B_second_xy*u*v+B_second_yy*v**2
         CALL eval_rheology_froude_semi_implicit( &
@@ -60,6 +62,7 @@ CONTAINS
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_froude_explicit
 
+    !> \brief Evaluate the corresponding rheology source contribution.
     SUBROUTINE eval_rheology_froude_semi_implicit( h, u, v, mod_vel, &
             mod_hor_vel, rhom, red_grav, grav_coeff, &
             curvature_term, stochastic, stochastic_value, rate_x, rate_y )
@@ -72,6 +75,7 @@ CONTAINS
         REAL(wp) :: froude_number
         REAL(wp) :: friction_coefficient
         REAL(wp) :: friction_stress
+
         rate_x = 0.0_wp
         rate_y = 0.0_wp
         IF ( mod_vel .GT. 0.0_wp .AND. red_grav .GT. 0.0_wp ) THEN
@@ -79,6 +83,7 @@ CONTAINS
             IF ( stochastic ) THEN
                 IF ( h .GT. 0.01_wp ) froude_number = froude_number + stochastic_value
                 IF ( froude_number .LT. 0.0_wp ) froude_number = 0.0_wp
+
             END IF
 
             friction_coefficient = mu_inf + (mu_0 - mu_inf) * EXP(-froude_number/Fr_0)
@@ -86,15 +91,20 @@ CONTAINS
                     grav_coeff * ( red_grav + curvature_term ) )
             rate_x = rate_x - friction_stress * u / mod_hor_vel
             rate_y = rate_y - friction_stress * v / mod_hor_vel
+
         END IF
+
     END SUBROUTINE eval_rheology_froude_semi_implicit
 
+    !> \brief Evaluate the corresponding rheology source contribution.
     SUBROUTINE eval_rheology_froude_implicit(rate_x, rate_y)
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
+
         rate_x = CMPLX(0.0_wp,0.0_wp,wp)
         rate_y = CMPLX(0.0_wp,0.0_wp,wp)
     END SUBROUTINE eval_rheology_froude_implicit
 
+    !> \brief Integrate the froude rheology source analytically.
     SUBROUTINE solve_rheology_froude_analytic(dt, h,  &
             speed_ratio, velocity_before, red_grav, grav_coeff,   &
             curvature_term, stochastic, stochastic_value, velocity_after)
@@ -106,6 +116,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: velocity_after(2)
         REAL(wp) :: speed_before, speed_after, shift, base_drag
         REAL(wp) :: froude_slope, froude_value_slope
+
         velocity_after = velocity_before
         speed_before = SQRT(SUM(velocity_before**2))
         CALL validate_analytic_velocity_inputs(dt, h,    &
@@ -115,6 +126,7 @@ CONTAINS
                 speed_ratio .LE. 0.0_wp) RETURN
         IF (Fr_0 .LE. 0.0_wp) THEN
             CALL fatal_analytic_input_error('Nonpositive Fr_0 in Froude analytic solver')
+
         END IF
 
         base_drag = grav_coeff * (red_grav + curvature_term)

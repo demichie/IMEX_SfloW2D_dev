@@ -40,6 +40,7 @@ MODULE rheology_mui_voellmy_2d
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
 
+    !> \brief Evaluate the specified rheology law.
     SUBROUTINE eval_rheology_mui_voellmy_explicit( &
             h, T, u, v, mod_vel, mod_hor_vel, &
             mod_vel2, rhom, inv_rhom, red_grav, &
@@ -57,6 +58,7 @@ CONTAINS
         REAL(wp) :: sx, sy, curvature_accel
         COMPLEX(wp) :: ix, iy
         curvature_accel=0.0_wp
+
         IF (curvature_term) curvature_accel=B_second_xx*u**2 + &
                 2.0_wp*B_second_xy*u*v+B_second_yy*v**2
         CALL eval_rheology_mui_voellmy_semi_implicit( &
@@ -71,7 +73,9 @@ CONTAINS
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_mui_voellmy_explicit
 
+    !> \brief Evaluate the corresponding rheology source contribution.
     SUBROUTINE eval_rheology_mui_voellmy_semi_implicit( h, u, v, &
+
             mod_vel, rhom, red_grav, grav_coeff,         &
             solid_fraction, curvature_acceleration, use_pore_pressure,             &
             exc_pore_pres, rate_x, rate_y )
@@ -98,14 +102,17 @@ CONTAINS
         IF ( n_solid .GT. 1 ) THEN
             particle_diameter = sauter_diameter(solid_fraction)
             particle_density = average_density_solids(solid_fraction)
+
         ELSE
             particle_diameter = diam_s(1)
             particle_density = rho_s(1)
+
         END IF
 
         effective_depth = h
         IF ( effective_depth .LT. EPSILON(1.0_wp) ) THEN
             effective_depth = EPSILON(1.0_wp)
+
         END IF
 
         effective_vertical_stress = rhom *                          &
@@ -113,6 +120,7 @@ CONTAINS
         IF ( use_pore_pressure ) THEN
             effective_vertical_stress = effective_vertical_stress -              &
                     exc_pore_pres
+
         END IF
 
         effective_vertical_stress = MAX(effective_vertical_stress, 0.0_wp)
@@ -120,6 +128,7 @@ CONTAINS
                 SQRT(grav_coeff))
         IF ( effective_normal_stress .LT. EPSILON(1.0_wp) ) THEN
             effective_normal_stress = EPSILON(1.0_wp)
+
         END IF
 
         shear_rate = 5.0_wp/2.0_wp * mod_vel /                                    &
@@ -133,6 +142,7 @@ CONTAINS
         rate_y = rate_y - friction_stress * (v / mod_vel)
     END SUBROUTINE eval_rheology_mui_voellmy_semi_implicit
 
+    !> \brief Evaluate the corresponding rheology source contribution.
     SUBROUTINE eval_rheology_mui_voellmy_implicit(u, v, &
             rhom, red_grav, mod_vel, mod_vel2, moving,       &
             use_stochastic_xi, stochastic_value, rate_x, rate_y)
@@ -144,6 +154,7 @@ CONTAINS
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         REAL(wp) :: xi_effective
         COMPLEX(wp) :: turbulent_stress
+
         rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
         rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
         IF (.NOT. moving) RETURN
@@ -151,8 +162,10 @@ CONTAINS
             xi_effective = xi + stochastic_value
             IF (xi_effective .LT. 1.0_wp) xi_effective = 1.0_wp
             IF (xi_effective .GT. 1.0E5_wp) xi_effective = 1.0E5_wp
+
         ELSE
             xi_effective = xi
+
         END IF
 
         turbulent_stress = rhom * red_grav / xi_effective * mod_vel2
@@ -160,6 +173,7 @@ CONTAINS
         rate_y = -turbulent_stress * (v / mod_vel)
     END SUBROUTINE eval_rheology_mui_voellmy_implicit
 
+    !> \brief Integrate the mui_voellmy rheology source analytically.
     SUBROUTINE solve_rheology_mui_voellmy_analytic(dt,         &
             h, speed_ratio, velocity_before, rhom,             &
             red_grav, grav_coeff, solid_fraction,                  &
@@ -177,6 +191,7 @@ CONTAINS
         REAL(wp) :: effective_depth, vertical_stress, normal_stress
         REAL(wp) :: inertial_slope, basal_factor, sqrt_gravity
         REAL(wp) :: xi_effective, turbulent_drag
+
         velocity_after = velocity_before
         speed_before = SQRT(SUM(velocity_before**2))
         CALL validate_analytic_velocity_inputs(dt, h,    &
@@ -184,22 +199,27 @@ CONTAINS
         IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
         IF (rhom .LE. 0.0_wp .OR. grav_coeff .LE. 0.0_wp) THEN
             CALL fatal_analytic_input_error('Nonpositive density or gravity multiplier in mu(I)-Voellmy analytic solver')
+
         END IF
 
         IF (n_solid .GT. 1) THEN
             particle_diameter = sauter_diameter(solid_fraction)
             particle_density = average_density_solids(solid_fraction)
+
         ELSE
             particle_diameter = diam_s(1)
             particle_density = rho_s(1)
+
         END IF
 
         IF (particle_diameter .LE. 0.0_wp .OR. particle_density .LE. 0.0_wp) THEN
             CALL fatal_analytic_input_error('Nonpositive particle property in mu(I)-Voellmy analytic solver')
+
         END IF
 
         IF (I_0 .LT. 0.0_wp) THEN
             CALL fatal_analytic_input_error('Negative I_0 in mu(I)-Voellmy analytic solver')
+
         END IF
 
         effective_depth = MAX(h, EPSILON(1.0_wp))
@@ -219,8 +239,10 @@ CONTAINS
         IF (use_stochastic_xi) THEN
             xi_effective = xi + stochastic_xi_value
             xi_effective = MIN(1.0E5_wp, MAX(1.0_wp, xi_effective))
+
         ELSEIF (xi_effective .LE. 0.0_wp) THEN
             CALL fatal_analytic_input_error('Nonpositive xi in mu(I)-Voellmy analytic solver')
+
         END IF
 
         turbulent_drag = red_grav * speed_ratio / (xi_effective*h)
