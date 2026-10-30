@@ -6,21 +6,17 @@
 MODULE source_terms_2d
     USE parameters_2d, ONLY : idx_h
   USE mass_boundary_injection_2d
-  USE mass_bottom_circular_injection_2d
-  USE mass_bottom_fissural_injection_2d
-  USE mass_radial_injection_2d
   USE mass_injection_2d, ONLY : eval_mass_injection_explicit
   USE mass_injection_coefficients_2d
   USE parameters_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
-  USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source, &
+  USE thermal_laws_2d, ONLY : &
        eval_thermal_cooling_implicit, eval_thermal_cooling_explicit, &
        solve_thermal_cooling_analytic
-  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source, &
+  USE pore_pressure_laws_2d, ONLY : &
        eval_pore_pressure_dissipation_implicit, &
        eval_pore_pressure_dissipation_explicit, solve_pore_pressure_dissipation_analytic
-  USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
   USE mass_exchange_2d, ONLY : eval_mass_exchange_terms
   USE rheology_2d, ONLY : curvature_acceleration, solve_rheology_analytic, &
        eval_rheology_implicit, eval_rheology_semi_implicit, &
@@ -541,7 +537,6 @@ CONTAINS
          n_fissures, linear_vel_fissures, T_fissures, time_param_fissures,      &
          xs_fissures, xg_fissures
 
-    USE geometry_2d, ONLY : pi_g , bottom_source_area_ratio
 
 
     IMPLICIT NONE
@@ -579,12 +574,8 @@ CONTAINS
     REAL(wp) :: r_sp_heat_mix !< real_value mixture specific heat
     REAL(wp) :: r_sp_heat_c
 
-    REAL(wp) :: t_rem
-    REAL(wp) :: t_coeff
-    REAL(wp) :: h_dot
 
     TYPE(physical_state_type) :: physical_state
-    REAL(wp) :: qp_source(n_vars+2)
 
     REAL(wp) :: exc_pore_pres
 
@@ -596,9 +587,6 @@ CONTAINS
     REAL(wp) :: speed, horizontal_speed, vertical_velocity, speed_squared
     REAL(wp) :: inverse_density, pressure_excess
     CHARACTER(LEN=64) :: active_rheology
-    REAL(wp) :: vel_local
-    INTEGER :: i_int
-      INTEGER :: i_fissure
 
 
     expl_term(1:n_eqns) = 0.0_wp

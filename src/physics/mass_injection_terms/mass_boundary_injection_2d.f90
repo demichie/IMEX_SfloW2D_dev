@@ -2,12 +2,7 @@
 MODULE mass_boundary_injection_2d
     USE parameters_2d, ONLY : idx_T, idx_h, idx_hu, idx_hv
   USE parameters_2d
-  USE constitutive_parameters_2d
-  USE state_conversion_2d, ONLY : mixt_var
-  USE thermal_laws_2d, ONLY : eval_inlet_thermal_energy_source
-  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source
-  USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
-  USE mass_injection_coefficients_2d
+  USE geometry_2d, ONLY : pi_g
   USE diagnostics_2d, ONLY : fatal_error
   IMPLICIT NONE
   PRIVATE

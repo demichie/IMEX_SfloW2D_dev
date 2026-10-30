@@ -27,11 +27,11 @@ CONTAINS
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: time, cell_fissure_fract(:)
     REAL(wp), INTENT(OUT) :: rate(n_eqns)
-    REAL(wp) :: t_rem, t_coeff, h_dot, vel_local
+    REAL(wp) :: t_rem, t_coeff, h_dot
     REAL(wp) :: qp_source(n_vars+2)
     REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
     REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, exc_pore_pres
-    INTEGER :: i_int, i_fissure
+    INTEGER :: i_fissure
 
     rate=0.0_wp
 
