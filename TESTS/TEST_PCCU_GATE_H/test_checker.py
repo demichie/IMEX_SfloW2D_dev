@@ -16,7 +16,7 @@ class FieldCheckerTests(unittest.TestCase):
                 c.accepted_times(bad, 0.03)
 
     def test_observation_hook_is_unique_and_does_not_replace_advance(self):
-        marker = "      CALL simulation%time_integration%advance("
+        marker = "      CALL simulation%advance_timestep()"
         observed = instrument(marker)
         self.assertEqual(observed.count(marker), 1)
         self.assertIn("WRITE(accepted_time_unit)", observed)
