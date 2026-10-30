@@ -21,7 +21,7 @@ PROGRAM test_grouped_implicit_stage
   USE state_2d, ONLY : correct_friction_momentum
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
-  USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var
+  USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var, physical_state_type
   USE pore_pressure_laws_2d, ONLY : solve_pore_pressure_dissipation_analytic
   USE thermal_laws_2d, ONLY : solve_thermal_cooling_analytic
 
@@ -485,10 +485,18 @@ PROGRAM test_grouped_implicit_stage
        expected_alphag, expected_red_grav, expected_p_dyn,&
        expected_Zs, expected_pore_pressure)
   speed_ratio = 1.0_wp
-  CALL solve_rheology_voellmy_analytic(dt_step*a_diag, expected_h,         &
-       speed_ratio, [expected_u, expected_v], expected_density,             &
-       expected_red_grav, grav, 0.0_wp, pore_pressure_flag,               &
-       expected_pore_pressure, .FALSE., 0.0_wp, analytic_velocity)
+  BLOCK
+    TYPE(physical_state_type) :: rheology_state
+    rheology_state%h = expected_h
+    rheology_state%u = expected_u
+    rheology_state%v = expected_v
+    rheology_state%rho_m = expected_density
+    rheology_state%red_grav = expected_red_grav
+    rheology_state%exc_pore_pres = expected_pore_pressure
+    CALL solve_rheology_voellmy_analytic(dt_step*a_diag, rheology_state, &
+         speed_ratio, grav, 0.0_wp, pore_pressure_flag, .FALSE., 0.0_wp, &
+         analytic_velocity)
+  END BLOCK
   CALL solve_imex_stage(partition, source_registry%stage_groups(),          &
        q_stage_check, q_stage_check,             &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,   &
