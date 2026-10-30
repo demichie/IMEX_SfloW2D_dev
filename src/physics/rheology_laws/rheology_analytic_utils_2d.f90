@@ -56,7 +56,7 @@ CONTAINS
     !> \param[in] rheology_name Model name used to identify validation errors.
     !******************************************************************************
 
-    !> \brief Evaluate the rheology model or supporting constitutive function.
+    !> \brief Evaluate the corresponding exact-flow helper.
     SUBROUTINE validate_analytic_velocity_inputs(dt, h, &
             speed_ratio, speed_before, rheology_name)
 
@@ -104,7 +104,7 @@ CONTAINS
     !> \param[out] speed_after Integrated speed magnitude [m s^-1].
     !******************************************************************************
 
-    !> \brief Integrate the corresponding rheology source analytically.
+    !> \brief Evaluate the corresponding exact-flow helper.
     SUBROUTINE solve_exact_velocity_flow(flow_model, coefficients, time_step, &
             speed_before, speed_after)
 
@@ -467,7 +467,7 @@ CONTAINS
     !> \param[out] speed_after Integrated speed magnitude [m s^-1].
     !******************************************************************************
 
-    !> \brief Integrate the corresponding rheology source analytically.
+    !> \brief Evaluate the corresponding exact-flow helper.
     SUBROUTINE solve_quadratic_polynomial_flow(coefficients, time_step,       &
             speed_before, speed_after)
 
@@ -610,7 +610,7 @@ CONTAINS
     !> \param[out] speed_after Integrated speed magnitude [m s^-1].
     !******************************************************************************
 
-    !> \brief Integrate the corresponding rheology source analytically.
+    !> \brief Invert the velocity decay time integral to find the terminal speed.
     SUBROUTINE solve_by_exact_time_integral(flow_model, coefficients, time_step, &
             speed_before, speed_after)
 
@@ -668,6 +668,10 @@ CONTAINS
 
     END SUBROUTINE solve_by_exact_time_integral
 
+    !> \brief Evaluate the frozen-coefficient scalar velocity-decay rate.
+    !> \param[in] flow_model Identifier of exact scalar flow law.
+    !> \param[in] coefficients Frozen coefficients defining the scalar decay law.
+    !> \param[in] mod_vel Three-dimensional velocity magnitude [m s^-1].
     PURE FUNCTION velocity_decay_rate(flow_model, coefficients, mod_vel)        &
             RESULT(rate)
 
@@ -741,7 +745,11 @@ CONTAINS
 
     END FUNCTION velocity_decay_rate
 
-    !> \brief Evaluate the rheology model or supporting constitutive function.
+    !> \brief Integrate the reciprocal scalar decay rate.
+    !> \param[in] flow_model Identifier of exact scalar flow law.
+    !> \param[in] coefficients Frozen coefficients defining the scalar decay law.
+    !> \param[in] lower Lower integration or search bound.
+    !> \param[in] upper Upper integration or search bound.
     FUNCTION integrate_inverse_decay_rate(flow_model, coefficients, lower,   &
             upper) RESULT(integral)
 
@@ -779,7 +787,11 @@ CONTAINS
 
     END FUNCTION integrate_inverse_decay_rate
 
-    !> \brief Evaluate the rheology model or supporting constitutive function.
+    !> \brief Integrate reciprocal decay rate over a velocity interval.
+    !> \param[in] flow_model Identifier of exact scalar flow law.
+    !> \param[in] coefficients Frozen coefficients defining the scalar decay law.
+    !> \param[in] lower Lower integration or search bound.
+    !> \param[in] upper Upper integration or search bound.
     FUNCTION integrate_inverse_interval(flow_model, coefficients, lower, upper) &
             RESULT(integral)
 
@@ -799,6 +811,17 @@ CONTAINS
 
     END FUNCTION integrate_inverse_interval
 
+    !> \brief Refine the reciprocal-decay integral using adaptive Simpson quadrature.
+    !> \param[in] flow_model Identifier of exact scalar flow law.
+    !> \param[in] coefficients Frozen coefficients defining the scalar decay law.
+    !> \param[in] lower Lower integration or search bound.
+    !> \param[in] upper Upper integration or search bound.
+    !> \param[in] f_lower Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] f_middle Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] f_upper Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] whole Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] tolerance Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] depth Model-specific input, numerical coefficient or computed quantity.
     RECURSIVE FUNCTION adaptive_simpson(flow_model, coefficients, lower, upper, &
             f_lower, f_middle, f_upper, whole, tolerance, depth) RESULT(integral)
 
@@ -837,7 +860,11 @@ CONTAINS
 
     END FUNCTION adaptive_simpson
 
-    !> \brief Evaluate the rheology model or supporting constitutive function.
+    !> \brief Evaluate the reciprocal of the nonnegative speed-decay rate.
+    !> \details Return 1/rate for a finite positive resistance; guard negative and nonfinite rates and avoid division by nearly zero.
+    !> \param[in] flow_model Identifier of exact scalar flow law.
+    !> \param[in] coefficients Frozen coefficients defining the scalar decay law.
+    !> \param[in] mod_vel Three-dimensional velocity magnitude [m s^-1].
     FUNCTION inverse_rate(flow_model, coefficients, mod_vel) RESULT(value)
 
         INTEGER, INTENT(IN) :: flow_model
@@ -865,6 +892,13 @@ CONTAINS
 
     END FUNCTION inverse_rate
 
+    !> \brief Evaluate Simpson's one-panel quadrature estimate.
+    !> \details Compute the standard weighted one-panel Simpson approximation on the supplied interval.
+    !> \param[in] lower Lower integration or search bound.
+    !> \param[in] upper Upper integration or search bound.
+    !> \param[in] f_lower Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] f_middle Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] f_upper Model-specific input, numerical coefficient or computed quantity.
     PURE FUNCTION simpson_estimate(lower, upper, f_lower, f_middle, f_upper)  &
             RESULT(value)
 

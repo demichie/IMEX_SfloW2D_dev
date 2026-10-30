@@ -67,7 +67,31 @@ CONTAINS
 
     ! Both Newton components are evaluated on the same, unchanged physical state.
 
-    !> \brief Evaluate the rheology model or supporting constitutive function.
+    !> \brief Dispatch and evaluate the full real-valued rheology source.
+    !> \details Choose the requested law by its canonical name and evaluate the momentum contributions using one consistent physical state.
+    !> \param[in] model_name Canonical rheology model name.
+    !> \param[in] h Flow depth [m].
+    !> \param[in] T Temperature [K].
+    !> \param[in] u x velocity [m s^-1].
+    !> \param[in] v y velocity [m s^-1].
+    !> \param[in] mod_vel Three-dimensional velocity magnitude [m s^-1].
+    !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
+    !> \param[in] mod_vel2 Squared total speed [m^2 s^-2].
+    !> \param[in] rhom Mixture density [kg m^-3].
+    !> \param[in] inv_rhom Inverse mixture density [m^3 kg^-1].
+    !> \param[in] red_grav Reduced gravity [m s^-2].
+    !> \param[in] grav_coeff Topographic gravity correction.
+    !> \param[in] alphas Solid volume fractions.
+    !> \param[in] curvature_term Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] B_second_xx Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] B_second_xy Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] B_second_yy Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] use_pore_pressure Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] exc_pore_pres Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] moving Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] use_stochastic Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] stochastic_value Model-specific input, numerical coefficient or computed quantity.
+    !> \param[out] rate Horizontal momentum source vector.
     SUBROUTINE eval_rheology_explicit(model_name, h, T, &
             u, v, mod_vel, mod_hor_vel, mod_vel2, &
             rhom, inv_rhom, red_grav, grav_coeff, &
@@ -171,6 +195,26 @@ CONTAINS
     END SUBROUTINE eval_rheology_explicit
 
     !> \brief Evaluate the rheology source contribution.
+    !> \details Select the model's semi-implicit momentum resistance without changing state variables.
+    !> \param[in] model_name Canonical rheology model name.
+    !> \param[in] h Flow depth [m].
+    !> \param[in] u x velocity [m s^-1].
+    !> \param[in] v y velocity [m s^-1].
+    !> \param[in] mod_vel Three-dimensional velocity magnitude [m s^-1].
+    !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
+    !> \param[in] rhom Mixture density [kg m^-3].
+    !> \param[in] red_grav Reduced gravity [m s^-2].
+    !> \param[in] grav_coeff Topographic gravity correction.
+    !> \param[in] alphas Solid volume fractions.
+    !> \param[in] curvature_term Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] B_second_xx Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] B_second_xy Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] B_second_yy Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] use_pore_pressure Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] exc_pore_pres Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] use_stochastic Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] stochastic_value Model-specific input, numerical coefficient or computed quantity.
+    !> \param[out] rate Horizontal momentum source vector.
     SUBROUTINE eval_rheology_semi_implicit(model_name, h,          &
             u, v, mod_vel, mod_hor_vel, rhom,    &
             red_grav, grav_coeff, alphas, curvature_term, &
@@ -240,6 +284,23 @@ CONTAINS
     END SUBROUTINE eval_rheology_semi_implicit
 
     !> \brief Evaluate the rheology source contribution.
+    !> \details Select the implicit complex source used for complex-step Jacobians.
+    !> \param[in] model_name Canonical rheology model name.
+    !> \param[in] h Flow depth [m].
+    !> \param[in] T Temperature [K].
+    !> \param[in] rhom Mixture density [kg m^-3].
+    !> \param[in] inv_rhom Inverse mixture density [m^3 kg^-1].
+    !> \param[in] u x velocity [m s^-1].
+    !> \param[in] v y velocity [m s^-1].
+    !> \param[in] mod_vel Three-dimensional velocity magnitude [m s^-1].
+    !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
+    !> \param[in] mod_vel2 Squared total speed [m^2 s^-2].
+    !> \param[in] red_grav Reduced gravity [m s^-2].
+    !> \param[in] alphas Solid volume fractions.
+    !> \param[in] moving Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] use_stochastic Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] stochastic_value Model-specific input, numerical coefficient or computed quantity.
+    !> \param[out] rate Horizontal momentum source vector.
     SUBROUTINE eval_rheology_implicit(model_name, h, T,   &
             rhom, inv_rhom, u, v, mod_vel,      &
             mod_hor_vel, mod_vel2, red_grav, alphas,    &
@@ -295,7 +356,25 @@ CONTAINS
 
     END SUBROUTINE eval_rheology_implicit
 
-    !> \brief Integrate the corresponding rheology source analytically.
+    !> \brief Dispatch exact velocity integration for the selected rheology.
+    !> \details Apply the frozen-coefficient rheology velocity flow and return whether the requested model supports analytic integration.
+    !> \param[in] model_name Canonical rheology model name.
+    !> \param[in] dt Time integration interval [s].
+    !> \param[in] h Flow depth [m].
+    !> \param[in] T Temperature [K].
+    !> \param[in] rhom Mixture density [kg m^-3].
+    !> \param[in] speed_ratio Ratio of total to horizontal speed.
+    !> \param[in] velocity_before Horizontal velocity before source update [m s^-1].
+    !> \param[in] red_grav Reduced gravity [m s^-2].
+    !> \param[in] grav_coeff Topographic gravity correction.
+    !> \param[in] alphas Solid volume fractions.
+    !> \param[in] curvature_acceleration Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] use_pore_pressure Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] exc_pore_pres Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] use_stochastic Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] stochastic_value Model-specific input, numerical coefficient or computed quantity.
+    !> \param[out] velocity_after Horizontal velocity after source update [m s^-1].
+    !> \param[out] model_supported Model-specific input, numerical coefficient or computed quantity.
     SUBROUTINE solve_rheology_analytic(model_name, dt,    &
             h, T, rhom, speed_ratio, velocity_before, &
             red_grav, grav_coeff, alphas,                &
@@ -370,6 +449,13 @@ CONTAINS
 
     END SUBROUTINE solve_rheology_analytic
 
+    !> \brief Compute curvature-induced normal acceleration.
+    !> \details Contract the topographic Hessian with the horizontal velocity twice: Bxx*u**2 + 2*Bxy*u*v + Byy*v**2.
+    !> \param[in] Bsecond_xx Second x derivative of topography [m^-1].
+    !> \param[in] Bsecond_xy Mixed derivative of topography [m^-1].
+    !> \param[in] Bsecond_yy Second y derivative of topography [m^-1].
+    !> \param[in] u x velocity [m s^-1].
+    !> \param[in] v y velocity [m s^-1].
     PURE FUNCTION curvature_acceleration(Bsecond_xx, Bsecond_xy, Bsecond_yy,  &
             u, v) RESULT(acceleration)
 
