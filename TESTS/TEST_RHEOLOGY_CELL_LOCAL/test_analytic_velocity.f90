@@ -494,6 +494,7 @@ CONTAINS
   SUBROUTINE assert_dispatch_special_cases()
 
     REAL(wp) :: actual(2)
+    TYPE(physical_state_type) :: physical_state
     LOGICAL :: model_supported
 
     CALL assert_dispatch_matches('none', .FALSE., 0.0_wp,        &
