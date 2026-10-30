@@ -66,6 +66,8 @@ MODULE rheology_2d
 CONTAINS
 
     ! Both Newton components are evaluated on the same, unchanged physical state.
+
+    !> \brief Evaluate the rheology model or supporting constitutive function.
     SUBROUTINE eval_rheology_explicit(model_name, h, T, &
             u, v, mod_vel, mod_hor_vel, mod_vel2, &
             rhom, inv_rhom, red_grav, grav_coeff, &
@@ -82,6 +84,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: exc_pore_pres, stochastic_value
         LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
+
         SELECT CASE(TRIM(model_name))
         CASE('rheology_voellmy')
             CALL eval_rheology_voellmy_explicit( &
@@ -162,9 +165,12 @@ CONTAINS
                     use_stochastic, stochastic_value, rate )
         CASE DEFAULT
             CALL fatal_error('Invalid rheology name in explicit dispatch')
+
         END SELECT
+
     END SUBROUTINE eval_rheology_explicit
 
+    !> \brief Evaluate the rheology source contribution.
     SUBROUTINE eval_rheology_semi_implicit(model_name, h,          &
             u, v, mod_vel, mod_hor_vel, rhom,    &
             red_grav, grav_coeff, alphas, curvature_term, &
@@ -228,10 +234,12 @@ CONTAINS
             CONTINUE
         CASE DEFAULT
             CALL fatal_error('Invalid rheology name in semi-implicit momentum-rate dispatch')
+
         END SELECT
 
     END SUBROUTINE eval_rheology_semi_implicit
 
+    !> \brief Evaluate the rheology source contribution.
     SUBROUTINE eval_rheology_implicit(model_name, h, T,   &
             rhom, inv_rhom, u, v, mod_vel,      &
             mod_hor_vel, mod_vel2, red_grav, alphas,    &
@@ -282,10 +290,12 @@ CONTAINS
             CONTINUE
         CASE DEFAULT
             CALL fatal_error('Invalid rheology name in implicit momentum-rate dispatch')
+
         END SELECT
 
     END SUBROUTINE eval_rheology_implicit
 
+    !> \brief Integrate the corresponding rheology source analytically.
     SUBROUTINE solve_rheology_analytic(model_name, dt,    &
             h, T, rhom, speed_ratio, velocity_before, &
             red_grav, grav_coeff, alphas,                &
@@ -355,6 +365,7 @@ CONTAINS
                     use_stochastic, stochastic_value, velocity_after)
         CASE DEFAULT
             model_supported = .FALSE.
+
         END SELECT
 
     END SUBROUTINE solve_rheology_analytic

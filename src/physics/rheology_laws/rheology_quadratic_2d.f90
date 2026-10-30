@@ -27,6 +27,7 @@ MODULE rheology_quadratic_2d
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
 
+    !> \brief Evaluate the rheology model or supporting constitutive function.
     SUBROUTINE eval_rheology_quadratic_explicit( &
             h, T, u, v, mod_vel, mod_hor_vel, &
             mod_vel2, rhom, inv_rhom, red_grav, &
@@ -44,6 +45,7 @@ CONTAINS
         REAL(wp) :: sx, sy, curvature_accel
         COMPLEX(wp) :: ix, iy
         curvature_accel=0.0_wp
+
         IF (curvature_term) curvature_accel=B_second_xx*u**2 + &
                 2.0_wp*B_second_xy*u*v+B_second_yy*v**2
         CALL eval_rheology_quadratic_semi_implicit( &
@@ -55,18 +57,22 @@ CONTAINS
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_quadratic_explicit
 
+    !> \brief Evaluate the rheology source contribution.
     SUBROUTINE eval_rheology_quadratic_semi_implicit(rate_x, rate_y)
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
+
         rate_x = 0.0_wp
         rate_y = 0.0_wp
     END SUBROUTINE eval_rheology_quadratic_semi_implicit
 
+    !> \brief Evaluate the rheology source contribution.
     SUBROUTINE eval_rheology_quadratic_implicit(u, v,   &
             mod_hor_vel, mod_vel2, rhom, moving, rate_x, rate_y)
         COMPLEX(wp), INTENT(IN) :: u, v, mod_hor_vel
         COMPLEX(wp), INTENT(IN) :: mod_vel2, rhom
         LOGICAL, INTENT(IN) :: moving
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
+
         rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
         rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
         IF (.NOT. moving) RETURN
@@ -76,12 +82,14 @@ CONTAINS
                 * friction_factor * mod_vel2
     END SUBROUTINE eval_rheology_quadratic_implicit
 
+    !> \brief Integrate the corresponding rheology source analytically.
     SUBROUTINE solve_rheology_quadratic_analytic(dt, h, &
             speed_ratio, velocity_before, velocity_after)
         REAL(wp), INTENT(IN) :: dt, h, speed_ratio
         REAL(wp), INTENT(IN) :: velocity_before(2)
         REAL(wp), INTENT(OUT) :: velocity_after(2)
         REAL(wp) :: speed_before, speed_after, quadratic_drag
+
         velocity_after = velocity_before
         speed_before = SQRT(SUM(velocity_before**2))
         CALL validate_analytic_velocity_inputs(dt, h,    &

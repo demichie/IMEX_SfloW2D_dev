@@ -40,6 +40,7 @@ MODULE rheology_voellmy_2d
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
 
+    !> \brief Evaluate the rheology model or supporting constitutive function.
     SUBROUTINE eval_rheology_voellmy_explicit( &
             h, T, u, v, mod_vel, mod_hor_vel, &
             mod_vel2, rhom, inv_rhom, red_grav, &
@@ -56,6 +57,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
+
         CALL eval_rheology_voellmy_semi_implicit( &
             h, u, v, mod_vel, rhom, red_grav, &
             grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
@@ -68,7 +70,9 @@ CONTAINS
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_voellmy_explicit
 
+    !> \brief Evaluate the rheology source contribution.
     SUBROUTINE eval_rheology_voellmy_semi_implicit(h, u, v, &
+
             mod_vel, rhom, red_grav, grav_coeff,            &
             curvature_term, B_second_xx, B_second_xy, B_second_yy,                &
             use_pore_pressure, exc_pore_pres, rate_x, rate_y)
@@ -87,6 +91,7 @@ CONTAINS
             curvature_acceleration = B_second_xx * u**2                &
                     + 2.0_wp * B_second_xy * u * v                &
                     + B_second_yy * v**2
+
         END IF
 
         friction_stress = mu * rhom *                                  &
@@ -99,6 +104,7 @@ CONTAINS
         rate_y = -friction_stress * v / mod_vel
     END SUBROUTINE eval_rheology_voellmy_semi_implicit
 
+    !> \brief Evaluate the rheology source contribution.
     SUBROUTINE eval_rheology_voellmy_implicit(u, v, rhom, &
             red_grav, mod_vel, mod_vel2, moving, use_stochastic_xi,          &
             stochastic_value, rate_x, rate_y)
@@ -110,6 +116,7 @@ CONTAINS
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         REAL(wp) :: xi_effective
         COMPLEX(wp) :: turbulent_stress
+
         rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
         rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
         IF (.NOT. moving) RETURN
@@ -117,8 +124,10 @@ CONTAINS
             xi_effective = xi + stochastic_value
             IF (xi_effective .LT. 1.0_wp) xi_effective = 1.0_wp
             IF (xi_effective .GT. 1.0E5_wp) xi_effective = 1.0E5_wp
+
         ELSE
             xi_effective = xi
+
         END IF
 
         turbulent_stress = rhom * red_grav / xi_effective * mod_vel2
@@ -126,10 +135,12 @@ CONTAINS
         rate_y = -turbulent_stress * (v / mod_vel)
     END SUBROUTINE eval_rheology_voellmy_implicit
 
+    !> \brief Integrate the corresponding rheology source analytically.
     SUBROUTINE solve_rheology_voellmy_analytic(dt, h, &
             speed_ratio, velocity_before, rhom, red_grav,        &
             grav_coeff, curvature_acceleration, use_pore_pressure,       &
             exc_pore_pres, use_stochastic_xi, stochastic_xi_value,          &
+
             velocity_after)
         REAL(wp), INTENT(IN) :: dt, h, speed_ratio
         REAL(wp), INTENT(IN) :: velocity_before(2), rhom
@@ -147,18 +158,22 @@ CONTAINS
         IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
         IF (rhom .LE. 0.0_wp) THEN
             CALL fatal_analytic_input_error('Nonpositive mixture density in Voellmy analytic solver')
+
         END IF
 
         IF (grav_coeff .LE. 0.0_wp) THEN
             CALL fatal_analytic_input_error('Nonpositive gravity multiplier in Voellmy analytic solver')
+
         END IF
 
         xi_effective = xi
         IF (use_stochastic_xi) THEN
             xi_effective = xi + stochastic_xi_value
             xi_effective = MIN(1.0E5_wp, MAX(1.0_wp, xi_effective))
+
         ELSEIF (xi_effective .LE. 0.0_wp) THEN
             CALL fatal_analytic_input_error('Nonpositive xi in Voellmy analytic solver')
+
         END IF
 
         coulomb_stress = mu * rhom * (red_grav +              &
