@@ -27,7 +27,13 @@ valid hot volume-fraction case.
 `check_mass.py` sums the solid mass (the mixture mass for lateral sources,
 whose input is a mixture mass flow rate) in each `.q_2d` output and compares
 it with the time integral of the prescribed source, computed independently of
-the solver. It reads snapshots from `OUTPUT/<case>/snapshots/`. Every output
+the solver. It reads snapshots from `OUTPUT/<case>/snapshots/`. The test domain is impermeable outside the prescribed source segments:
+the normal momentum is set to zero on west/east (`HU`) and south/north
+(`HV`) boundaries. Source faces use their dedicated injected state and
+are exempt from this wall condition. Without those wall boundary conditions,
+the default outward-only treatment legitimately exports a small amount of
+material through non-source segments next to the inlet; comparing total
+domain mass to injected mass would then be incorrect. Every output
 must agree to `1e-9` relative.
 
 `lateral_window` also checks the impermeable inner boundary of the radial

@@ -76,8 +76,15 @@ def bcs():
     out = ''
     for side, c in (('WEST', 'W'), ('EAST', 'E'), ('SOUTH', 'S'), ('NORTH', 'N')):
         out += '&%s_BOUNDARY_CONDITIONS\n' % side
+        # These are closed-domain mass-budget tests. FLAG=1 permits
+        # outward transport on non-source boundary segments, so a lateral
+        # inlet may legitimately lose mass from its neighbouring segments.
+        # Prescribe zero normal momentum everywhere else; source-cell faces
+        # continue to use their own injection states and override these BCs.
+        normal = 'HU' if c in ('W', 'E') else 'HV'
         for v in ('H', 'HU', 'HV'):
-            out += ' %s_BC%s%%FLAG=1, %s_BC%s%%VALUE=0.0D0,\n' % (v, c, v, c)
+            flag = 0 if v == normal else 1
+            out += ' %s_BC%s%%FLAG=%d, %s_BC%s%%VALUE=0.0D0,\n' % (v, c, flag, v, c)
         out += ' XS_BC%s(1)%%FLAG=1, XS_BC%s(1)%%VALUE=0.0D0,\n' % (c, c)
         out += ' T_BC%s%%FLAG=1, T_BC%s%%VALUE=0.0D0,\n /\n' % (c, c)
     return out
