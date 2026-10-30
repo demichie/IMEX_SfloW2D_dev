@@ -116,9 +116,19 @@ CONTAINS
             exc_pore_pres => state%exc_pore_pres)
         SELECT CASE(TRIM(model_name))
         CASE('rheology_voellmy')
-            CALL eval_rheology_voellmy_explicit(state, mod_vel, mod_hor_vel, mod_vel2, grav_coeff, &
-                    curvature_term, B_second_xx, B_second_xy, B_second_yy, &
-                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
+            CALL eval_rheology_voellmy_explicit(state, &
+                    mod_vel, &
+                    mod_vel2, &
+                    grav_coeff, &
+                    curvature_term, &
+                    B_second_xx, &
+                    B_second_xy, &
+                    B_second_yy, &
+                    use_pore_pressure, &
+                    moving, &
+                    use_stochastic, &
+                    stochastic_value, &
+                    rate)
         CASE('rheology_plastic')
             CALL eval_rheology_plastic_explicit(state, &
                     mod_vel, &
@@ -177,9 +187,19 @@ CONTAINS
                     use_pore_pressure, &
                     rate)
         CASE('rheology_mui_voellmy')
-            CALL eval_rheology_mui_voellmy_explicit(state, mod_vel, mod_hor_vel, mod_vel2, grav_coeff, &
-                    curvature_term, B_second_xx, B_second_xy, B_second_yy, &
-                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
+            CALL eval_rheology_mui_voellmy_explicit(state, &
+                    mod_vel, &
+                    mod_vel2, &
+                    grav_coeff, &
+                    curvature_term, &
+                    B_second_xx, &
+                    B_second_xy, &
+                    B_second_yy, &
+                    use_pore_pressure, &
+                    moving, &
+                    use_stochastic, &
+                    stochastic_value, &
+                    rate)
         CASE DEFAULT
             CALL fatal_error('Invalid rheology name in explicit dispatch')
 

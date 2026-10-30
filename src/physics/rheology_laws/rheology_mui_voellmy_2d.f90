@@ -46,7 +46,6 @@ CONTAINS
     !> Voellmy-type velocity-dependent resistance, using the treatment-specific velocity and
     !> effective-stress inputs. Outputs are conservative x/y momentum source rates.
     !> \param[in] mod_vel Three-dimensional speed [m s^-1].
-    !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
     !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
     !> \param[in] grav_coeff Local dimensionless gravitational correction.
     !> \param[in] curvature_term Enable curvature correction.
@@ -58,12 +57,21 @@ CONTAINS
     !> \param[in] use_stochastic Enable model stochastic parameter.
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_mui_voellmy_explicit(state, mod_vel, mod_hor_vel, mod_vel2, grav_coeff, &
-            curvature_term, B_second_xx, B_second_xy, B_second_yy, &
-            use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
-
+    SUBROUTINE eval_rheology_mui_voellmy_explicit(state, &
+            mod_vel, &
+            mod_vel2, &
+            grav_coeff, &
+            curvature_term, &
+            B_second_xx, &
+            B_second_xy, &
+            B_second_yy, &
+            use_pore_pressure, &
+            moving, &
+            use_stochastic, &
+            stochastic_value, &
+            rate)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2, grav_coeff
+        REAL(wp), INTENT(IN) :: mod_vel, mod_vel2, grav_coeff
         REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy, stochastic_value
         LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
