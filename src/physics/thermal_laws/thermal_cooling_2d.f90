@@ -6,6 +6,8 @@ MODULE thermal_cooling_2d
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
   IMPLICIT NONE
   PRIVATE
+  PUBLIC :: eval_thermal_cooling_explicit, eval_thermal_cooling_semi_implicit
+  PUBLIC :: eval_thermal_cooling_implicit, solve_thermal_cooling_analytic
 CONTAINS
 SUBROUTINE cooling_scalar_explicit(temperature, radiative_coefficient, &
        convective_coefficient, ambient_temperature, rate)
