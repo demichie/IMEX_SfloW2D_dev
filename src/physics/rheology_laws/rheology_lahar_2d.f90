@@ -33,8 +33,8 @@
 !********************************************************************************
 MODULE rheology_lahar_2d
     USE diagnostics_2d, ONLY : fatal_error
-    USE parameters_2d, ONLY : wp
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, sp, four_thirds, neg_four_thirds
+    USE parameters_2d, ONLY : wp, sp, four_thirds, neg_four_thirds
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE constitutive_parameters_2d, ONLY : grav, inv_grav
     USE rheology_parameters_2d, ONLY : T_ref
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                      &
