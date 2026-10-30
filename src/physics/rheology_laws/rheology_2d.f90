@@ -13,6 +13,7 @@
 MODULE rheology_2d
 
     USE parameters_2d, ONLY : wp
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE diagnostics_2d, ONLY : fatal_error
     USE rheology_voellmy_2d, ONLY : eval_rheology_voellmy_explicit,                                &
             eval_rheology_voellmy_implicit,                                                        &
@@ -93,24 +94,26 @@ CONTAINS
     !> \param[in] use_stochastic Whether stochastic model coefficients are used.
     !> \param[in] stochastic_value Stochastic rheology coefficient used by the selected model.
     !> \param[out] rate Horizontal momentum source vector.
-    SUBROUTINE eval_rheology_explicit(model_name, h, T,                                            &
-            u, v, mod_vel, mod_hor_vel, mod_vel2,                                                  &
-            rhom, inv_rhom, red_grav, grav_coeff,                                                  &
-            alphas, curvature_term, B_second_xx, B_second_xy, B_second_yy,                         &
-            use_pore_pressure, exc_pore_pres, moving, use_stochastic,                              &
-            stochastic_value, rate)
+    SUBROUTINE eval_rheology_explicit(model_name, state, mod_vel, mod_hor_vel, mod_vel2, &
+            grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
+            use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
 
         CHARACTER(*), INTENT(IN) :: model_name
-        REAL(wp), INTENT(IN) :: h, T, u, v
-        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
-        REAL(wp), INTENT(IN) :: rhom, inv_rhom
-        REAL(wp), INTENT(IN) :: red_grav, grav_coeff
-        REAL(wp), INTENT(IN) :: alphas(:)
-        REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy
-        REAL(wp), INTENT(IN) :: exc_pore_pres, stochastic_value
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2, grav_coeff, B_second_xx, B_second_xy, B_second_yy, stochastic_value
         LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
+        REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate(2)
 
+        ASSOCIATE(h => state%h, &
+            T => state%T, &
+            u => state%u, &
+            v => state%v, &
+            rhom => state%rho_m, &
+            inv_rhom => state%inv_rhom, &
+            red_grav => state%red_grav, &
+            alphas => state%alphas, &
+            exc_pore_pres => state%exc_pore_pres)
         SELECT CASE(TRIM(model_name))
         CASE('rheology_voellmy')
             CALL eval_rheology_voellmy_explicit(                                                   &
@@ -193,6 +196,7 @@ CONTAINS
             CALL fatal_error('Invalid rheology name in explicit dispatch')
 
         END SELECT
+        END ASSOCIATE
 
     END SUBROUTINE eval_rheology_explicit
 
@@ -218,24 +222,27 @@ CONTAINS
     !> \param[in] use_stochastic Whether stochastic model coefficients are used.
     !> \param[in] stochastic_value Stochastic rheology coefficient used by the selected model.
     !> \param[out] rate Horizontal momentum source vector.
-    SUBROUTINE eval_rheology_semi_implicit(model_name, h,                                          &
-            u, v, mod_vel, mod_hor_vel, rhom,                                                      &
-            red_grav, grav_coeff, alphas, curvature_term,                                          &
-            B_second_xx, B_second_xy, B_second_yy, use_pore_pressure,                              &
-            exc_pore_pres, use_stochastic, stochastic_value, rate)
+    SUBROUTINE eval_rheology_semi_implicit(model_name, state, mod_vel, mod_hor_vel, grav_coeff, curvature_term, &
+            B_second_xx, B_second_xy, B_second_yy, use_pore_pressure, &
+            use_stochastic, stochastic_value, rate)
 
         CHARACTER(*), INTENT(IN) :: model_name
-        REAL(wp), INTENT(IN) :: h, u, v, mod_vel
-        REAL(wp), INTENT(IN) :: mod_hor_vel, rhom, red_grav
-        REAL(wp), INTENT(IN) :: grav_coeff, alphas(:)
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, grav_coeff, B_second_xx, B_second_xy, B_second_yy, stochastic_value
         LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, use_stochastic
-        REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy
-        REAL(wp), INTENT(IN) :: exc_pore_pres, stochastic_value
+        REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate(2)
 
         REAL(wp) :: curvature_term_value
 
         rate = 0.0_wp
+        ASSOCIATE(h => state%h, &
+            u => state%u, &
+            v => state%v, &
+            rhom => state%rho_m, &
+            red_grav => state%red_grav, &
+            alphas => state%alphas, &
+            exc_pore_pres => state%exc_pore_pres)
         SELECT CASE(TRIM(model_name))
         CASE('rheology_voellmy')
             CALL eval_rheology_voellmy_semi_implicit(h, u,                                         &
@@ -283,6 +290,7 @@ CONTAINS
             CALL fatal_error('Invalid rheology name in semi-implicit momentum-rate dispatch')
 
         END SELECT
+        END ASSOCIATE
 
     END SUBROUTINE eval_rheology_semi_implicit
 
@@ -304,21 +312,25 @@ CONTAINS
     !> \param[in] use_stochastic Whether stochastic model coefficients are used.
     !> \param[in] stochastic_value Stochastic rheology coefficient used by the selected model.
     !> \param[out] rate Horizontal momentum source vector.
-    SUBROUTINE eval_rheology_implicit(model_name, h, T,                                            &
-            rhom, inv_rhom, u, v, mod_vel,                                                         &
-            mod_hor_vel, mod_vel2, red_grav, alphas,                                               &
+    SUBROUTINE eval_rheology_implicit(model_name, state, mod_vel, mod_hor_vel, mod_vel2, &
             moving, use_stochastic, stochastic_value, rate)
 
         CHARACTER(*), INTENT(IN) :: model_name
-        COMPLEX(wp), INTENT(IN) :: h, T, rhom
-        COMPLEX(wp), INTENT(IN) :: inv_rhom, u, v
+        TYPE(complex_physical_state_type), INTENT(IN) :: state
         COMPLEX(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
-        COMPLEX(wp), INTENT(IN) :: red_grav, alphas(:)
         LOGICAL, INTENT(IN) :: moving, use_stochastic
         REAL(wp), INTENT(IN) :: stochastic_value
         COMPLEX(wp), INTENT(OUT) :: rate(2)
 
         rate = CMPLX(0.0_wp, 0.0_wp, wp)
+        ASSOCIATE(h => state%h, &
+            T => state%T, &
+            u => state%u, &
+            v => state%v, &
+            rhom => state%rho_m, &
+            inv_rhom => state%inv_rhom, &
+            red_grav => state%red_grav, &
+            alphas => state%alphas)
         SELECT CASE(TRIM(model_name))
         CASE('rheology_voellmy')
             CALL eval_rheology_voellmy_implicit(u, v,                                              &
@@ -356,6 +368,7 @@ CONTAINS
             CALL fatal_error('Invalid rheology name in implicit momentum-rate dispatch')
 
         END SELECT
+        END ASSOCIATE
 
     END SUBROUTINE eval_rheology_implicit
 
@@ -379,26 +392,27 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic rheology coefficient used by the selected model.
     !> \param[out] velocity_after Horizontal velocity after source update [m s^-1].
     !> \param[out] model_supported True when the selected model supports this analytic treatment.
-    SUBROUTINE solve_rheology_analytic(model_name, dt,                                             &
-            h, T, rhom, speed_ratio, velocity_before,                                              &
-            red_grav, grav_coeff, alphas,                                                          &
-            curvature_acceleration, use_pore_pressure, exc_pore_pres,                              &
-            use_stochastic, stochastic_value, velocity_after, model_supported)
+    SUBROUTINE solve_rheology_analytic(model_name, dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+            use_pore_pressure, use_stochastic, stochastic_value, velocity_after, model_supported)
 
         CHARACTER(*), INTENT(IN) :: model_name
-        REAL(wp), INTENT(IN) :: dt, h, T
-        REAL(wp), INTENT(IN) :: rhom, speed_ratio
-        REAL(wp), INTENT(IN) :: velocity_before(2), red_grav
-        REAL(wp), INTENT(IN) :: grav_coeff, alphas(:)
-        REAL(wp), INTENT(IN) :: curvature_acceleration, exc_pore_pres
-        REAL(wp), INTENT(IN) :: stochastic_value
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: dt, speed_ratio, grav_coeff, curvature_acceleration, stochastic_value
         LOGICAL, INTENT(IN) :: use_pore_pressure, use_stochastic
         REAL(wp), INTENT(OUT) :: velocity_after(2)
         LOGICAL, INTENT(OUT) :: model_supported
+        REAL(wp) :: velocity_before(2)
 
+        velocity_before = [state%u, state%v]
         velocity_after = velocity_before
         model_supported = .TRUE.
 
+        ASSOCIATE(h => state%h, &
+            T => state%T, &
+            rhom => state%rho_m, &
+            red_grav => state%red_grav, &
+            alphas => state%alphas, &
+            exc_pore_pres => state%exc_pore_pres)
         SELECT CASE(TRIM(model_name))
         CASE ('none')
             CONTINUE
@@ -450,6 +464,7 @@ CONTAINS
             model_supported = .FALSE.
 
         END SELECT
+        END ASSOCIATE
 
     END SUBROUTINE solve_rheology_analytic
 
