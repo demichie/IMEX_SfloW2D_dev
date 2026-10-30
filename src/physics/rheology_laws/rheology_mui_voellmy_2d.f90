@@ -25,7 +25,7 @@
 MODULE rheology_mui_voellmy_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp, n_solid
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
     USE constitutive_parameters_2d, ONLY : diam_s, rho_s
     USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf, xi
     USE state_conversion_2d, ONLY : sauter_diameter, average_density_solids
@@ -85,10 +85,7 @@ CONTAINS
                 2.0_wp*B_second_xy*state%u*state%v+B_second_yy*state%v**2
         CALL eval_rheology_mui_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_accel, &
              use_pore_pressure, sx, sy)
-        cs%u=CMPLX(state%u,0.0_wp,wp)
-        cs%v=CMPLX(state%v,0.0_wp,wp)
-        cs%rho_m=CMPLX(state%rho_m,0.0_wp,wp)
-        cs%red_grav=CMPLX(state%red_grav,0.0_wp,wp)
+        CALL complex_state_from_real(state, cs)
         CALL eval_rheology_mui_voellmy_implicit(cs, CMPLX(mod_vel,0.0_wp,wp), CMPLX(mod_vel2,0.0_wp,wp), &
              moving, use_stochastic, stochastic_value, ix, iy)
         rate=[sx,sy]+REAL([ix,iy],wp)

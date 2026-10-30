@@ -25,7 +25,7 @@
 MODULE rheology_voellmy_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
     USE rheology_parameters_2d, ONLY : xi
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                      &
             fatal_analytic_input_error, solve_exact_velocity_flow,                                 &
@@ -81,10 +81,7 @@ CONTAINS
 
         CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term, B_second_xx, &
                 B_second_xy, B_second_yy, use_pore_pressure, sx, sy)
-        cs%u = CMPLX(state%u, 0.0_wp, wp)
-        cs%v = CMPLX(state%v, 0.0_wp, wp)
-        cs%rho_m = CMPLX(state%rho_m, 0.0_wp, wp)
-        cs%red_grav = CMPLX(state%red_grav, 0.0_wp, wp)
+        CALL complex_state_from_real(state, cs)
         CALL eval_rheology_voellmy_implicit(cs, CMPLX(mod_vel,0.0_wp,wp), &
                 CMPLX(mod_vel2,0.0_wp,wp), moving, use_stochastic, &
                 stochastic_value, ix, iy)

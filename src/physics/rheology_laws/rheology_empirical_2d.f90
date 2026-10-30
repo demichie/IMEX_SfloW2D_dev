@@ -12,7 +12,7 @@
 MODULE rheology_empirical_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                      &
             solve_exact_velocity_flow, EXACT_FLOW_LINEAR
     IMPLICIT NONE
@@ -44,11 +44,7 @@ CONTAINS
         COMPLEX(wp) :: ix, iy
         TYPE(complex_physical_state_type) :: cs
         CALL eval_rheology_empirical_semi_implicit(state, sx, sy)
-        cs%h = CMPLX(state%h,0.0_wp,wp)
-        cs%T = CMPLX(state%T,0.0_wp,wp)
-        cs%u = CMPLX(state%u,0.0_wp,wp)
-        cs%v = CMPLX(state%v,0.0_wp,wp)
-        cs%rho_m = CMPLX(state%rho_m,0.0_wp,wp)
+        CALL complex_state_from_real(state, cs)
         CALL eval_rheology_empirical_implicit(cs, CMPLX(mod_hor_vel,0.0_wp,wp), CMPLX(mod_vel,0.0_wp,wp), moving, ix, iy)
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_empirical_explicit
