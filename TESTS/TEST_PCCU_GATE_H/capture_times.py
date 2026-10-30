@@ -19,8 +19,25 @@ def capture(executable, case):
         subprocess.run([str(executable.resolve())], cwd=directory,
                        env=os.environ.copy(), stdout=stream, stderr=subprocess.STDOUT,
                        check=True, timeout=600)
-    original_path = next((case/"OUTPUT/gateH/snapshots").glob("*/gateH_0001.q_2d"))
-    observed_path = next((directory/"OUTPUT/gateH/snapshots").glob("*/gateH_0001.q_2d"))
+    def snapshot(run_directory):
+        snapshots = run_directory/"OUTPUT/gateH/snapshots"
+        matches = sorted(snapshots.glob("*/gateH_0001.q_2d"))
+        if len(matches) != 1:
+            manifest = run_directory/"OUTPUT/gateH/metadata/output_manifest.csv"
+            manifest_text = manifest.read_text() if manifest.exists() else "<missing>"
+            logfile = run_directory/"run.log"
+            log_tail = "\\n".join(logfile.read_text(errors="replace").splitlines()[-50:]) if logfile.exists() else "<missing>"
+            found = sorted(str(path.relative_to(run_directory))
+                           for path in (run_directory/"OUTPUT").rglob("*.q_2d"))
+            raise AssertionError(
+                f"expected one gateH_0001.q_2d, found {len(matches)} in {run_directory}\\n"
+                f"available snapshots: {found}\\n"
+                f"output manifest:\\n{manifest_text}\\n"
+                f"solver log tail:\\n{log_tail}")
+        return matches[0]
+
+    original_path = snapshot(case)
+    observed_path = snapshot(directory)
     original = original_path.read_bytes()
     observed = observed_path.read_bytes()
     if original != observed:
