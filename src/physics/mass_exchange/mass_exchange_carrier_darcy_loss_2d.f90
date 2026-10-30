@@ -3,9 +3,9 @@
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_carrier_darcy_loss_2d
     USE parameters_2d, ONLY : idx_h, idx_T
-    USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_vars,idx_pore, &
-              idx_solid_first,idx_solid_last,idx_add_gas_first,idx_add_gas_last, &
-              pore_pressure_flag,gas_loss_flag,gas_flag,liquid_flag, &
+    USE parameters_2d, ONLY : wp,n_solid,n_add_gas,n_vars,idx_pore,                                &
+              idx_solid_first,idx_solid_last,idx_add_gas_first,idx_add_gas_last,                   &
+              pore_pressure_flag,gas_loss_flag,gas_flag,liquid_flag,                               &
               mass_exchange_rates_type,reset_mass_exchange_rates
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
     USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_gas_loss
@@ -26,6 +26,7 @@ CONTAINS
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_carrier_darcy_loss_explicit(qp,r)
+
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
         REAL(wp) :: volume_loss,h,T,alpha,rho_c,cp_c,pore
@@ -44,17 +45,17 @@ CONTAINS
         gas_species_mass_fraction=qp(idx_add_gas_first:idx_add_gas_last)
 
         ! Recover carrier gas mass fraction before partitioning withdrawal among gas species.
-        gas_phase_mass_fraction=MAX(0.0_wp,1.0_wp- &
+        gas_phase_mass_fraction=MAX(0.0_wp,1.0_wp-                                                 &
                   SUM(qp(idx_solid_first:idx_solid_last)))
         volume_loss=0.0_wp
-        IF (gas_flag .AND. pore_pressure_flag .AND. gas_loss_flag .AND. &
-                  alpha<maximum_solid_packing) &
+        IF (gas_flag .AND. pore_pressure_flag .AND. gas_loss_flag .AND.                            &
+                  alpha<maximum_solid_packing)                                                     &
                   CALL eval_pore_pressure_gas_loss(h,T,alphas,alpha,rho_c,pore,volume_loss)
         r%carrier_withdrawal_volume_rate=MAX(0.0_wp,volume_loss)
         r%mixture_mass_rate=-rho_c*r%carrier_withdrawal_volume_rate
         r%energy_rate=T*cp_c*r%mixture_mass_rate
-        IF (n_add_gas>0 .AND. gas_phase_mass_fraction>0.0_wp) &
-                  r%add_gas_mass_rate=r%mixture_mass_rate* &
+        IF (n_add_gas>0 .AND. gas_phase_mass_fraction>0.0_wp)                                      &
+                  r%add_gas_mass_rate=r%mixture_mass_rate*                                         &
                   gas_species_mass_fraction/gas_phase_mass_fraction
     END SUBROUTINE eval_mass_exchange_carrier_darcy_loss_explicit
 
@@ -63,6 +64,7 @@ CONTAINS
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_carrier_darcy_loss_semi_implicit(qp,r)
+
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -75,6 +77,7 @@ CONTAINS
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_carrier_darcy_loss_implicit(qp,r)
+
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -87,6 +90,7 @@ CONTAINS
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE solve_mass_exchange_carrier_darcy_loss_analytic(qp,r)
+
         REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 

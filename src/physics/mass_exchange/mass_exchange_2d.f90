@@ -3,11 +3,11 @@
 !> fail explicitly. The coordinator alone enforces shared carrier inventories.
 MODULE mass_exchange_2d
     USE parameters_2d, ONLY : idx_h, idx_T, idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
-    USE parameters_2d, ONLY : wp, n_vars, n_eqns, n_solid, n_add_gas, &
-              idx_u, idx_v, idx_pore, idx_stoch, idx_stochEqn, idx_poreEqn, &
-              idx_solidEqn_first, idx_solidEqn_last, &
-              idx_addGasEqn_first, idx_addGasEqn_last, gas_flag, liquid_flag, &
-              pore_pressure_flag, stoch_transport_flag, mass_exchange_rates_type, &
+    USE parameters_2d, ONLY : wp, n_vars, n_eqns, n_solid, n_add_gas,                              &
+              idx_u, idx_v, idx_pore, idx_stoch, idx_stochEqn, idx_poreEqn,                        &
+              idx_solidEqn_first, idx_solidEqn_last,                                               &
+              idx_addGasEqn_first, idx_addGasEqn_last, gas_flag, liquid_flag,                      &
+              pore_pressure_flag, stoch_transport_flag, mass_exchange_rates_type,                  &
               reset_mass_exchange_rates
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
     USE state_conversion_2d, ONLY : primitive_to_volume_fractions
@@ -18,7 +18,8 @@ MODULE mass_exchange_2d
     USE mass_exchange_carrier_darcy_loss_2d, ONLY : eval_mass_exchange_carrier_darcy_loss_explicit
     USE mass_exchange_entrainment_2d, ONLY : eval_mass_exchange_entrainment_explicit
     USE mass_exchange_vaporization_2d, ONLY : eval_mass_exchange_vaporization_explicit
-    USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag, eval_mass_exchange_lava_deposition_explicit
+    USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag,                             &
+        eval_mass_exchange_lava_deposition_explicit
 
     IMPLICIT NONE
     PRIVATE
@@ -27,8 +28,10 @@ MODULE mass_exchange_2d
 
 CONTAINS
 
-    !> @brief Coordinate cell-local mass exchange, shared phase budgets and conservative source assembly.
-    !> @details A single gas or liquid carrier inventory is constrained before conservative assembly.
+    !> @brief Coordinate cell-local mass exchange, shared phase budgets and conservative source
+    !> assembly.
+    !> @details A single gas or liquid carrier inventory is constrained before conservative
+    !> assembly.
     !> Positive sources never cancel gross withdrawals in a shared inventory.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
@@ -39,11 +42,13 @@ CONTAINS
     !> @param[in,out] total_rates Accumulated process rates and bed changes for this cell.
     !> @param[out] eqns_term Conservative mass, momentum, energy and species source vector.
     SUBROUTINE eval_mass_exchange_terms(qp,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
+
         REAL(wp), INTENT(IN) :: qp(n_vars+2),Bx,By,erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
         REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-        TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates,darcy_loss_rates
+        TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates,        &
+            darcy_loss_rates
         REAL(wp) :: alphas(n_solid), alphag(n_add_gas), alpha
         REAL(wp) :: u,v,h,T,pore,stoch
         REAL(wp) :: carrier_available,carrier_factor,carrier_volume,carrier_loss
@@ -67,13 +72,13 @@ CONTAINS
             stoch=0.0_wp
             IF (pore_pressure_flag) pore=qp(idx_pore)
             IF (stoch_transport_flag) stoch=qp(idx_stoch)
-            CALL eval_mass_exchange_erosion_explicit(qp,Bx,By,alpha,erodible, &
+            CALL eval_mass_exchange_erosion_explicit(qp,Bx,By,alpha,erodible,                      &
                       dt,process_rates)
             ! Erosion can increase packing by importing a solid-rich substrate.
             ! Limit it before accumulating any conservative or bed contribution.
-            erosion_factor=erosion_packing_factor(h,alpha, &
-                      SUM(MAX(0.0_wp,process_rates%solid_erosion_rate)), &
-                      MAX(0.0_wp,process_rates%carrier_erosion_rate), &
+            erosion_factor=erosion_packing_factor(h,alpha,                                         &
+                      SUM(MAX(0.0_wp,process_rates%solid_erosion_rate)),                           &
+                      MAX(0.0_wp,process_rates%carrier_erosion_rate),                              &
                       maximum_solid_packing,dt)
             CALL scale_process(process_rates,erosion_factor)
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
@@ -110,8 +115,8 @@ CONTAINS
 
             ! The packing constraint acts on the coupled changes in solid and
             ! total volumes, including the solid removed by deposition.
-            packing_factor=packing_withdrawal_factor(h,alpha,solid_erosion, &
-                      carrier_erosion,solid_deposition,carrier_volume, &
+            packing_factor=packing_withdrawal_factor(h,alpha,solid_erosion,                        &
+                      carrier_erosion,solid_deposition,carrier_volume,                             &
                       carrier_loss,0.0_wp,maximum_solid_packing,dt)
             carrier_factor=MIN(carrier_factor,packing_factor)
 
@@ -132,12 +137,13 @@ CONTAINS
             CALL accumulate_process(darcy_loss_rates,u,v,total_rates,eqns_term)
             CALL eval_mass_exchange_entrainment_explicit(qp,u,v,Bx,By,process_rates)
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
-            CALL eval_mass_exchange_vaporization_explicit(B_zone,T,deposition_rates%solid_deposition_rate,process_rates)
+            CALL eval_mass_exchange_vaporization_explicit(B_zone,T,                                &
+                deposition_rates%solid_deposition_rate,process_rates)
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
 
             ! Scalar transport and pore-pressure sources inherit the net mass exchange.
             IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(idx_totMassEqn)*stoch
-            IF (pore_pressure_flag) eqns_term(idx_poreEqn)= &
+            IF (pore_pressure_flag) eqns_term(idx_poreEqn)=                                        &
                       eval_pore_pressure_mass_exchange_source(eqns_term(idx_totMassEqn),pore)
         END IF  ! gas_flag .OR. liquid_flag
 
@@ -163,7 +169,7 @@ CONTAINS
 
         total_withdrawal=SUM(MAX(0.0_wp,-signed_rates))
         f=1.0_wp
-        IF (total_withdrawal>0.0_wp) &
+        IF (total_withdrawal>0.0_wp)                                                               &
                   f=MIN(1.0_wp,MAX(0.0_wp,available)/total_withdrawal)
     END FUNCTION shared_withdrawal_factor
 
@@ -176,7 +182,7 @@ CONTAINS
     !> @param[in] packing Maximum admissible solid volume fraction.
     !> @param[in] dt Physical timestep [s].
     !> @return Common erosion factor within [0,1].
-    PURE REAL(wp) FUNCTION erosion_packing_factor(h,alpha,solid_erosion, &
+    PURE REAL(wp) FUNCTION erosion_packing_factor(h,alpha,solid_erosion,                           &
               carrier_erosion,packing,dt) RESULT(f)
         REAL(wp), INTENT(IN) :: h,alpha,solid_erosion,carrier_erosion,packing,dt
         REAL(wp) :: deficit,margin
@@ -203,8 +209,8 @@ CONTAINS
     !> @param[in] packing Maximum admissible solid volume fraction.
     !> @param[in] dt Physical exchange step duration [s].
     !> @return Maximum permitted common scaling factor in [0,1].
-    PURE REAL(wp) FUNCTION packing_withdrawal_factor(h,alpha,solid_erosion, &
-              carrier_erosion,solid_deposition,carrier_deposition,shared_loss, &
+    PURE REAL(wp) FUNCTION packing_withdrawal_factor(h,alpha,solid_erosion,                        &
+              carrier_erosion,solid_deposition,carrier_deposition,shared_loss,                     &
               other_loss,packing,dt) RESULT(f)
         REAL(wp), INTENT(IN) :: h,alpha,solid_erosion,carrier_erosion
         REAL(wp), INTENT(IN) :: solid_deposition,carrier_deposition,shared_loss
@@ -213,9 +219,9 @@ CONTAINS
 
         ! Enforce S_final <= packing * H_final without assuming that
         ! deposition leaves the solid volume unchanged.
-        margin=packing*(h+dt*(solid_erosion+carrier_erosion-other_loss)) &
+        margin=packing*(h+dt*(solid_erosion+carrier_erosion-other_loss))                           &
                   -(h*alpha+dt*solid_erosion)
-        coefficient=packing*(solid_deposition+carrier_deposition+shared_loss) &
+        coefficient=packing*(solid_deposition+carrier_deposition+shared_loss)                      &
                   -solid_deposition
         f=1.0_wp
 
@@ -234,17 +240,19 @@ CONTAINS
     !> @param[in,out] total Accumulated mass-exchange rates for the cell.
     !> @param[in,out] eqns_term Conservative mass, momentum, energy and species source vector.
     SUBROUTINE accumulate_process(p,u,v,total,eqns_term)
+
         TYPE(mass_exchange_rates_type), INTENT(IN) :: p
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total
         REAL(wp), INTENT(IN) :: u,v
         REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns)
+
         eqns_term(idx_totMassEqn)=eqns_term(idx_totMassEqn)+p%mixture_mass_rate
         eqns_term(idx_uEqn)=eqns_term(idx_uEqn)+u*MIN(0.0_wp,p%mixture_mass_rate)
         eqns_term(idx_vEqn)=eqns_term(idx_vEqn)+v*MIN(0.0_wp,p%mixture_mass_rate)
         eqns_term(idx_engyEqn)=eqns_term(idx_engyEqn)+p%energy_rate
-        eqns_term(idx_solidEqn_first:idx_solidEqn_last)= &
+        eqns_term(idx_solidEqn_first:idx_solidEqn_last)=                                           &
                   eqns_term(idx_solidEqn_first:idx_solidEqn_last)+p%solid_mass_rate
-        IF (n_add_gas>0) eqns_term(idx_addGasEqn_first:idx_addGasEqn_last)= &
+        IF (n_add_gas>0) eqns_term(idx_addGasEqn_first:idx_addGasEqn_last)=                        &
                   eqns_term(idx_addGasEqn_first:idx_addGasEqn_last)+p%add_gas_mass_rate
         total%mixture_mass_rate=total%mixture_mass_rate+p%mixture_mass_rate
         total%energy_rate=total%energy_rate+p%energy_rate
@@ -252,13 +260,13 @@ CONTAINS
         total%add_gas_mass_rate=total%add_gas_mass_rate+p%add_gas_mass_rate
         total%solid_erosion_rate=total%solid_erosion_rate+p%solid_erosion_rate
         total%solid_deposition_rate=total%solid_deposition_rate+p%solid_deposition_rate
-        total%carrier_erosion_rate= &
+        total%carrier_erosion_rate=                                                                &
                   total%carrier_erosion_rate+p%carrier_erosion_rate
-        total%carrier_deposition_rate= &
+        total%carrier_deposition_rate=                                                             &
                   total%carrier_deposition_rate+p%carrier_deposition_rate
         total%dB_dt=total%dB_dt+p%dB_dt
         total%lava_deposit_rate=total%lava_deposit_rate+p%lava_deposit_rate
-        total%carrier_withdrawal_volume_rate= &
+        total%carrier_withdrawal_volume_rate=                                                      &
                   total%carrier_withdrawal_volume_rate+p%carrier_withdrawal_volume_rate
     END SUBROUTINE accumulate_process
 
@@ -266,6 +274,7 @@ CONTAINS
     !> @param[in,out] p Rates produced by one mass-exchange process.
     !> @param[in] factor Common dimensionless reduction factor between zero and one.
     SUBROUTINE scale_process(p,factor)
+
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: p
         REAL(wp), INTENT(IN) :: factor
 
