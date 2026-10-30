@@ -28,8 +28,8 @@ MODULE rheology_mui_voellmy_2d
     USE constitutive_parameters_2d, ONLY : diam_s, rho_s
     USE rheology_parameters_2d, ONLY : I_0, mu_2, mu_s, muI_inf, xi
     USE state_conversion_2d, ONLY : sauter_diameter, average_density_solids
-    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs, &
-            fatal_analytic_input_error, solve_exact_velocity_flow,                &
+    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                      &
+            fatal_analytic_input_error, solve_exact_velocity_flow,                                 &
             EXACT_FLOW_MUI_VOELLMY
     IMPLICIT NONE
     PRIVATE
@@ -40,7 +40,9 @@ MODULE rheology_mui_voellmy_2d
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
     !> \brief Evaluate the explicit mui_voellmy contribution to the horizontal momentum source.
-    !> \details Compute the momentum source under regularized mu(I) friction combined with Voellmy-type velocity-dependent resistance, using the treatment-specific velocity and effective-stress inputs. Outputs are conservative x/y momentum source rates.
+    !> \details Compute the momentum source under regularized mu(I) friction combined with
+    !> Voellmy-type velocity-dependent resistance, using the treatment-specific velocity and
+    !> effective-stress inputs. Outputs are conservative x/y momentum source rates.
     !> \param[in] h Flow depth [m].
     !> \param[in] T Absolute mixture temperature [K].
     !> \param[in] u Horizontal x velocity [m s^-1].
@@ -63,11 +65,11 @@ CONTAINS
     !> \param[in] use_stochastic Enable model stochastic parameter.
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_mui_voellmy_explicit( &
-            h, T, u, v, mod_vel, mod_hor_vel, &
-            mod_vel2, rhom, inv_rhom, red_grav, &
-            grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
-            B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
+    SUBROUTINE eval_rheology_mui_voellmy_explicit(                                                 &
+            h, T, u, v, mod_vel, mod_hor_vel,                                                      &
+            mod_vel2, rhom, inv_rhom, red_grav,                                                    &
+            grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy,                          &
+            B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic,                 &
             stochastic_value, rate )
 
         REAL(wp), INTENT(IN) :: h, T, u, v
@@ -83,22 +85,24 @@ CONTAINS
 
         curvature_accel=0.0_wp
 
-        IF (curvature_term) curvature_accel=B_second_xx*u**2 + &
+        IF (curvature_term) curvature_accel=B_second_xx*u**2 +                                     &
                 2.0_wp*B_second_xy*u*v+B_second_yy*v**2
-        CALL eval_rheology_mui_voellmy_semi_implicit( &
-            h, u, v, mod_vel, rhom, red_grav, &
-            grav_coeff, alphas, curvature_accel, use_pore_pressure, &
+        CALL eval_rheology_mui_voellmy_semi_implicit(                                              &
+            h, u, v, mod_vel, rhom, red_grav,                                                      &
+            grav_coeff, alphas, curvature_accel, use_pore_pressure,                                &
             exc_pore_pres, sx, sy )
-        CALL eval_rheology_mui_voellmy_implicit( &
-            CMPLX(u,0.0_wp,wp), CMPLX(v,0.0_wp,wp), &
-            CMPLX(rhom,0.0_wp,wp), CMPLX(red_grav,0.0_wp,wp), &
-            CMPLX(mod_vel,0.0_wp,wp), CMPLX(mod_vel2,0.0_wp,wp), moving, use_stochastic, &
+        CALL eval_rheology_mui_voellmy_implicit(                                                   &
+            CMPLX(u,0.0_wp,wp), CMPLX(v,0.0_wp,wp),                                                &
+            CMPLX(rhom,0.0_wp,wp), CMPLX(red_grav,0.0_wp,wp),                                      &
+            CMPLX(mod_vel,0.0_wp,wp), CMPLX(mod_vel2,0.0_wp,wp), moving, use_stochastic,           &
             stochastic_value, ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_mui_voellmy_explicit
 
     !> \brief Evaluate the semi-implicit mui_voellmy contribution to the horizontal momentum source.
-    !> \details Compute the momentum source under regularized mu(I) friction combined with Voellmy-type velocity-dependent resistance, using the treatment-specific velocity and effective-stress inputs. Outputs are conservative x/y momentum source rates.
+    !> \details Compute the momentum source under regularized mu(I) friction combined with
+    !> Voellmy-type velocity-dependent resistance, using the treatment-specific velocity and
+    !> effective-stress inputs. Outputs are conservative x/y momentum source rates.
     !> \param[in] h Flow depth [m].
     !> \param[in] u Horizontal x velocity [m s^-1].
     !> \param[in] v Horizontal y velocity [m s^-1].
@@ -112,9 +116,9 @@ CONTAINS
     !> \param[in] exc_pore_pres Excess pore pressure [Pa].
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_mui_voellmy_semi_implicit( h, u, v, &
-            mod_vel, rhom, red_grav, grav_coeff,         &
-            solid_fraction, curvature_acceleration, use_pore_pressure,             &
+    SUBROUTINE eval_rheology_mui_voellmy_semi_implicit( h, u, v,                                   &
+            mod_vel, rhom, red_grav, grav_coeff,                                                   &
+            solid_fraction, curvature_acceleration, use_pore_pressure,                             &
             exc_pore_pres, rate_x, rate_y )
 
         REAL(wp), INTENT(IN) :: h, u, v, mod_vel
@@ -154,27 +158,27 @@ CONTAINS
 
         END IF
 
-        effective_vertical_stress = rhom *                          &
+        effective_vertical_stress = rhom *                                                         &
                 ( red_grav + curvature_acceleration ) * effective_depth
         IF ( use_pore_pressure ) THEN
-            effective_vertical_stress = effective_vertical_stress -              &
+            effective_vertical_stress = effective_vertical_stress -                                &
                     exc_pore_pres
 
         END IF
 
         effective_vertical_stress = MAX(effective_vertical_stress, 0.0_wp)
-        effective_normal_stress = MAX(0.0_wp, effective_vertical_stress *       &
+        effective_normal_stress = MAX(0.0_wp, effective_vertical_stress *                          &
                 SQRT(grav_coeff))
         IF ( effective_normal_stress .LT. EPSILON(1.0_wp) ) THEN
             effective_normal_stress = EPSILON(1.0_wp)
 
         END IF
 
-        shear_rate = 5.0_wp/2.0_wp * mod_vel /                                    &
+        shear_rate = 5.0_wp/2.0_wp * mod_vel /                                                     &
                 (effective_depth * SQRT(grav_coeff))
-        inertial_number = particle_diameter * shear_rate /                      &
+        inertial_number = particle_diameter * shear_rate /                                         &
                 SQRT(effective_normal_stress / particle_density)
-        friction_coefficient = (mu_s * I_0 + mu_2 * inertial_number +            &
+        friction_coefficient = (mu_s * I_0 + mu_2 * inertial_number +                              &
                 muI_inf * inertial_number**2) / (I_0 + inertial_number)
         friction_stress = friction_coefficient * effective_normal_stress
         rate_x = rate_x - friction_stress * (u / mod_vel)
@@ -182,7 +186,8 @@ CONTAINS
     END SUBROUTINE eval_rheology_mui_voellmy_semi_implicit
 
     !> \brief Evaluate the implicit mui_voellmy contribution to the horizontal momentum source.
-    !> \details Return the contribution assigned to the implicit treatment. This implementation supplies a zero source when the model has no term in this treatment.
+    !> \details Return the contribution assigned to the implicit treatment. This implementation
+    !> supplies a zero source when the model has no term in this treatment.
     !> \param[in] u Horizontal x velocity [m s^-1].
     !> \param[in] v Horizontal y velocity [m s^-1].
     !> \param[in] rhom Mixture density [kg m^-3].
@@ -194,8 +199,8 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_mui_voellmy_implicit(u, v, &
-            rhom, red_grav, mod_vel, mod_vel2, moving,       &
+    SUBROUTINE eval_rheology_mui_voellmy_implicit(u, v,                                            &
+            rhom, red_grav, mod_vel, mod_vel2, moving,                                             &
             use_stochastic_xi, stochastic_value, rate_x, rate_y)
 
         COMPLEX(wp), INTENT(IN) :: u, v
@@ -226,7 +231,9 @@ CONTAINS
     END SUBROUTINE eval_rheology_mui_voellmy_implicit
 
     !> \brief Integrate the mui_voellmy velocity source in time.
-    !> \details Advance the scalar speed under regularized mu(I) friction combined with Voellmy-type velocity-dependent resistance with model coefficients fixed over dt; the horizontal direction is retained in the returned velocity vector.
+    !> \details Advance the scalar speed under regularized mu(I) friction combined with Voellmy-type
+    !> velocity-dependent resistance with model coefficients fixed over dt; the horizontal direction
+    !> is retained in the returned velocity vector.
     !> \param[in] dt Source integration interval [s].
     !> \param[in] h Flow depth [m].
     !> \param[in] speed_ratio Ratio of total to horizontal speed.
@@ -241,10 +248,10 @@ CONTAINS
     !> \param[in] use_stochastic_xi Enable stochastic turbulent resistance.
     !> \param[in] stochastic_xi_value Stochastic turbulent resistance parameter.
     !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
-    SUBROUTINE solve_rheology_mui_voellmy_analytic(dt,         &
-            h, speed_ratio, velocity_before, rhom,             &
-            red_grav, grav_coeff, solid_fraction,                  &
-            curvature_acceleration, use_pore_pressure, exc_pore_pres,       &
+    SUBROUTINE solve_rheology_mui_voellmy_analytic(dt,                                             &
+            h, speed_ratio, velocity_before, rhom,                                                 &
+            red_grav, grav_coeff, solid_fraction,                                                  &
+            curvature_acceleration, use_pore_pressure, exc_pore_pres,                              &
             use_stochastic_xi, stochastic_xi_value, velocity_after)
 
         REAL(wp), INTENT(IN) :: dt, h, speed_ratio
@@ -262,11 +269,12 @@ CONTAINS
 
         velocity_after = velocity_before
         speed_before = SQRT(SUM(velocity_before**2))
-        CALL validate_analytic_velocity_inputs(dt, h,    &
+        CALL validate_analytic_velocity_inputs(dt, h,                                              &
                 speed_ratio, speed_before, 'mu(I)-Voellmy')
         IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
         IF (rhom .LE. 0.0_wp .OR. grav_coeff .LE. 0.0_wp) THEN
-            CALL fatal_analytic_input_error('Nonpositive density or gravity multiplier in mu(I)-Voellmy analytic solver')
+            CALL fatal_analytic_input_error(                                                       &
+                'Nonpositive density or gravity multiplier in mu(I)-Voellmy analytic solver')
 
         END IF
 
@@ -281,7 +289,8 @@ CONTAINS
         END IF
 
         IF (particle_diameter .LE. 0.0_wp .OR. particle_density .LE. 0.0_wp) THEN
-            CALL fatal_analytic_input_error('Nonpositive particle property in mu(I)-Voellmy analytic solver')
+            CALL fatal_analytic_input_error(                                                       &
+                'Nonpositive particle property in mu(I)-Voellmy analytic solver')
 
         END IF
 
@@ -291,16 +300,16 @@ CONTAINS
         END IF
 
         effective_depth = MAX(h, EPSILON(1.0_wp))
-        vertical_stress = rhom *                                   &
+        vertical_stress = rhom *                                                                   &
                 (red_grav + curvature_acceleration) * effective_depth
-        IF (use_pore_pressure) vertical_stress = vertical_stress -             &
+        IF (use_pore_pressure) vertical_stress = vertical_stress -                                 &
                 exc_pore_pres
         vertical_stress = MAX(vertical_stress, 0.0_wp)
-        normal_stress = MAX(EPSILON(1.0_wp),                                  &
+        normal_stress = MAX(EPSILON(1.0_wp),                                                       &
                 vertical_stress * SQRT(grav_coeff))
         sqrt_gravity = SQRT(grav_coeff)
-        inertial_slope = 2.5_wp * particle_diameter * speed_ratio /             &
-                (effective_depth * sqrt_gravity *                                  &
+        inertial_slope = 2.5_wp * particle_diameter * speed_ratio /                                &
+                (effective_depth * sqrt_gravity *                                                  &
                 SQRT(normal_stress/particle_density))
         basal_factor = normal_stress / (rhom*h*speed_ratio)
         xi_effective = xi
@@ -314,9 +323,9 @@ CONTAINS
         END IF
 
         turbulent_drag = red_grav * speed_ratio / (xi_effective*h)
-        CALL solve_exact_velocity_flow(EXACT_FLOW_MUI_VOELLMY,                  &
-                [basal_factor*mu_s*I_0, basal_factor*mu_2*inertial_slope,         &
-                basal_factor*muI_inf*inertial_slope**2, I_0, inertial_slope,       &
+        CALL solve_exact_velocity_flow(EXACT_FLOW_MUI_VOELLMY,                                     &
+                [basal_factor*mu_s*I_0, basal_factor*mu_2*inertial_slope,                          &
+                basal_factor*muI_inf*inertial_slope**2, I_0, inertial_slope,                       &
                 turbulent_drag], dt, speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_mui_voellmy_analytic

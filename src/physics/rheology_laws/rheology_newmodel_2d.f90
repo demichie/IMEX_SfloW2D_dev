@@ -12,7 +12,9 @@ MODULE rheology_newmodel_2d
     PUBLIC :: solve_rheology_newmodel_analytic
 CONTAINS
     !> \brief Evaluate the explicit newmodel contribution to the horizontal momentum source.
-    !> \details Compute the momentum source under the configured newmodel rheology, with its currently supported source treatment, using the treatment-specific velocity and effective-stress inputs. Outputs are conservative x/y momentum source rates.
+    !> \details Compute the momentum source under the configured newmodel rheology, with its
+    !> currently supported source treatment, using the treatment-specific velocity and
+    !> effective-stress inputs. Outputs are conservative x/y momentum source rates.
     !> \param[in] h Flow depth [m].
     !> \param[in] T Absolute mixture temperature [K].
     !> \param[in] u Horizontal x velocity [m s^-1].
@@ -35,11 +37,11 @@ CONTAINS
     !> \param[in] use_stochastic Enable model stochastic parameter.
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_newmodel_explicit( &
-            h, T, u, v, mod_vel, mod_hor_vel, &
-            mod_vel2, rhom, inv_rhom, red_grav, &
-            grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
-            B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
+    SUBROUTINE eval_rheology_newmodel_explicit(                                                    &
+            h, T, u, v, mod_vel, mod_hor_vel,                                                      &
+            mod_vel2, rhom, inv_rhom, red_grav,                                                    &
+            grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy,                          &
+            B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic,                 &
             stochastic_value, rate )
 
         REAL(wp), INTENT(IN) :: h, T, u, v
@@ -58,7 +60,8 @@ CONTAINS
     END SUBROUTINE eval_rheology_newmodel_explicit
 
     !> \brief Evaluate the semi-implicit newmodel contribution to the horizontal momentum source.
-    !> \details Return the contribution assigned to the semi-implicit treatment. This implementation supplies a zero source when the model has no term in this treatment.
+    !> \details Return the contribution assigned to the semi-implicit treatment. This implementation
+    !> supplies a zero source when the model has no term in this treatment.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
     SUBROUTINE eval_rheology_newmodel_semi_implicit(rate_x,rate_y)
@@ -70,13 +73,15 @@ CONTAINS
     END SUBROUTINE eval_rheology_newmodel_semi_implicit
 
     !> \brief Evaluate the implicit newmodel contribution to the horizontal momentum source.
-    !> \details Compute the momentum source under the configured newmodel rheology, with its currently supported source treatment, using the treatment-specific velocity and effective-stress inputs. Outputs are conservative x/y momentum source rates.
+    !> \details Compute the momentum source under the configured newmodel rheology, with its
+    !> currently supported source treatment, using the treatment-specific velocity and
+    !> effective-stress inputs. Outputs are conservative x/y momentum source rates.
     !> \param[in] u Horizontal x velocity [m s^-1].
     !> \param[in] v Horizontal y velocity [m s^-1].
     !> \param[in] rhom Mixture density [kg m^-3].
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_newmodel_implicit(u,v, &
+    SUBROUTINE eval_rheology_newmodel_implicit(u,v,                                                &
             rhom,rate_x,rate_y)
 
         COMPLEX(wp), INTENT(IN) :: u,v,rhom
@@ -88,7 +93,9 @@ CONTAINS
     END SUBROUTINE eval_rheology_newmodel_implicit
 
     !> \brief Integrate the newmodel velocity source in time.
-    !> \details Advance the scalar speed under the configured newmodel rheology, with its currently supported source treatment with model coefficients fixed over dt; the horizontal direction is retained in the returned velocity vector.
+    !> \details Advance the scalar speed under the configured newmodel rheology, with its currently
+    !> supported source treatment with model coefficients fixed over dt; the horizontal direction is
+    !> retained in the returned velocity vector.
     SUBROUTINE solve_rheology_newmodel_analytic()
 
         CALL fatal_error('rheology_newmodel: analytic treatment unsupported')
