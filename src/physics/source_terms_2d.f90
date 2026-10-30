@@ -46,19 +46,6 @@ MODULE source_terms_2d
   PUBLIC :: eval_boundary_injection_semi_implicit
   PUBLIC :: eval_boundary_injection_implicit
   PUBLIC :: solve_boundary_injection_analytic
-  PUBLIC :: eval_bottom_circular_injection_explicit
-  PUBLIC :: eval_bottom_circular_injection_semi_implicit
-  PUBLIC :: eval_bottom_circular_injection_implicit
-  PUBLIC :: solve_bottom_circular_injection_analytic
-  PUBLIC :: eval_bottom_fissural_injection_explicit
-  PUBLIC :: eval_bottom_fissural_injection_semi_implicit
-  PUBLIC :: eval_bottom_fissural_injection_implicit
-  PUBLIC :: solve_bottom_fissural_injection_analytic
-  PUBLIC :: eval_radial_injection_explicit
-  PUBLIC :: eval_radial_injection_semi_implicit
-  PUBLIC :: eval_radial_injection_implicit
-  PUBLIC :: solve_radial_injection_analytic
-
   ! Cell-local geometry and stochastic context for analytic source solves.
   TYPE :: analytic_term_context_type
     REAL(wp) :: Bprime_x=0.0_wp, Bprime_y=0.0_wp
