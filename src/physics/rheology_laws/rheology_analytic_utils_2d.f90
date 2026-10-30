@@ -789,12 +789,12 @@ CONTAINS
     !> \param[in] coefficients Frozen coefficients defining the scalar decay law.
     !> \param[in] lower Lower integration or search bound.
     !> \param[in] upper Upper integration or search bound.
-    !> \param[in] f_lower Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] f_middle Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] f_upper Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] whole Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] tolerance Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] depth Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] f_lower Reciprocal decay-rate integrand at the lower endpoint.
+    !> \param[in] f_middle Reciprocal decay-rate integrand at the midpoint.
+    !> \param[in] f_upper Reciprocal decay-rate integrand at the upper endpoint.
+    !> \param[in] whole Simpson estimate over the current interval.
+    !> \param[in] tolerance Requested absolute error tolerance of the current quadrature interval.
+    !> \param[in] depth Remaining maximum recursion depth for adaptive integration.
     !> \return Computed integral for the requested model and inputs.
     RECURSIVE FUNCTION adaptive_simpson(flow_model, coefficients, lower, upper, &
             f_lower, f_middle, f_upper, whole, tolerance, depth) RESULT(integral)
@@ -869,9 +869,9 @@ CONTAINS
     !> \details Compute the standard weighted one-panel Simpson approximation on the supplied interval.
     !> \param[in] lower Lower integration or search bound.
     !> \param[in] upper Upper integration or search bound.
-    !> \param[in] f_lower Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] f_middle Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] f_upper Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] f_lower Reciprocal decay-rate integrand at the lower endpoint.
+    !> \param[in] f_middle Reciprocal decay-rate integrand at the midpoint.
+    !> \param[in] f_upper Reciprocal decay-rate integrand at the upper endpoint.
     !> \return Computed value for the requested model and inputs.
     PURE FUNCTION simpson_estimate(lower, upper, f_lower, f_middle, f_upper)  &
             RESULT(value)

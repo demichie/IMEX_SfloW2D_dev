@@ -82,15 +82,15 @@ CONTAINS
     !> \param[in] red_grav Reduced gravity [m s^-2].
     !> \param[in] grav_coeff Topographic gravity correction.
     !> \param[in] alphas Solid volume fractions.
-    !> \param[in] curvature_term Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] B_second_xx Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] B_second_xy Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] B_second_yy Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] use_pore_pressure Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] exc_pore_pres Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] moving Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] use_stochastic Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] stochastic_value Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] curvature_term Whether topographic curvature modifies the normal stress.
+    !> \param[in] B_second_xx Topographic second derivative in x [m^-1].
+    !> \param[in] B_second_xy Mixed topographic second derivative [m^-1].
+    !> \param[in] B_second_yy Topographic second derivative in y [m^-1].
+    !> \param[in] use_pore_pressure Whether excess pore pressure reduces effective normal stress.
+    !> \param[in] exc_pore_pres Excess pore pressure [Pa].
+    !> \param[in] moving Whether the local flow state is moving.
+    !> \param[in] use_stochastic Whether stochastic model coefficients are used.
+    !> \param[in] stochastic_value Stochastic rheology coefficient used by the selected model.
     !> \param[out] rate Horizontal momentum source vector.
     SUBROUTINE eval_rheology_explicit(model_name, h, T, &
             u, v, mod_vel, mod_hor_vel, mod_vel2, &
@@ -206,14 +206,14 @@ CONTAINS
     !> \param[in] red_grav Reduced gravity [m s^-2].
     !> \param[in] grav_coeff Topographic gravity correction.
     !> \param[in] alphas Solid volume fractions.
-    !> \param[in] curvature_term Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] B_second_xx Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] B_second_xy Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] B_second_yy Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] use_pore_pressure Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] exc_pore_pres Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] use_stochastic Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] stochastic_value Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] curvature_term Whether topographic curvature modifies the normal stress.
+    !> \param[in] B_second_xx Topographic second derivative in x [m^-1].
+    !> \param[in] B_second_xy Mixed topographic second derivative [m^-1].
+    !> \param[in] B_second_yy Topographic second derivative in y [m^-1].
+    !> \param[in] use_pore_pressure Whether excess pore pressure reduces effective normal stress.
+    !> \param[in] exc_pore_pres Excess pore pressure [Pa].
+    !> \param[in] use_stochastic Whether stochastic model coefficients are used.
+    !> \param[in] stochastic_value Stochastic rheology coefficient used by the selected model.
     !> \param[out] rate Horizontal momentum source vector.
     SUBROUTINE eval_rheology_semi_implicit(model_name, h,          &
             u, v, mod_vel, mod_hor_vel, rhom,    &
@@ -297,9 +297,9 @@ CONTAINS
     !> \param[in] mod_vel2 Squared total speed [m^2 s^-2].
     !> \param[in] red_grav Reduced gravity [m s^-2].
     !> \param[in] alphas Solid volume fractions.
-    !> \param[in] moving Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] use_stochastic Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] stochastic_value Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] moving Whether the local flow state is moving.
+    !> \param[in] use_stochastic Whether stochastic model coefficients are used.
+    !> \param[in] stochastic_value Stochastic rheology coefficient used by the selected model.
     !> \param[out] rate Horizontal momentum source vector.
     SUBROUTINE eval_rheology_implicit(model_name, h, T,   &
             rhom, inv_rhom, u, v, mod_vel,      &
@@ -368,13 +368,13 @@ CONTAINS
     !> \param[in] red_grav Reduced gravity [m s^-2].
     !> \param[in] grav_coeff Topographic gravity correction.
     !> \param[in] alphas Solid volume fractions.
-    !> \param[in] curvature_acceleration Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] use_pore_pressure Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] exc_pore_pres Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] use_stochastic Model-specific input, numerical coefficient or computed quantity.
-    !> \param[in] stochastic_value Model-specific input, numerical coefficient or computed quantity.
+    !> \param[in] curvature_acceleration Curvature-induced normal acceleration [m s^-2].
+    !> \param[in] use_pore_pressure Whether excess pore pressure reduces effective normal stress.
+    !> \param[in] exc_pore_pres Excess pore pressure [Pa].
+    !> \param[in] use_stochastic Whether stochastic model coefficients are used.
+    !> \param[in] stochastic_value Stochastic rheology coefficient used by the selected model.
     !> \param[out] velocity_after Horizontal velocity after source update [m s^-1].
-    !> \param[out] model_supported Model-specific input, numerical coefficient or computed quantity.
+    !> \param[out] model_supported True when the selected model supports this analytic treatment.
     SUBROUTINE solve_rheology_analytic(model_name, dt,    &
             h, T, rhom, speed_ratio, velocity_before, &
             red_grav, grav_coeff, alphas,                &
