@@ -35,13 +35,12 @@ CONTAINS
 
     !> @brief Evaluate explicit sediment settling and deposition.
     !> @param[in] state Local real physical state.
-    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_deposition_explicit(state,qp,dt,r)
+    SUBROUTINE eval_mass_exchange_deposition_explicit(state,dt,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
+        REAL(wp), INTENT(IN) :: dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
         REAL(wp) :: alphas(n_solid),alphag(n_add_gas),alpha
         REAL(wp) :: h,T,rho_m,rho_c,cp_c,Ri,redgrav,cpm,gas_phase_mass_fraction
@@ -54,12 +53,12 @@ CONTAINS
         alphag=state%alphag
         alpha=SUM(alphas)
         IF (alpha<=alphastot_min) RETURN
-        CALL mixt_var(qp,Ri,rho_m,rho_c,redgrav,cp_c,cpm)
-        gas_species_mass_fraction=qp(idx_add_gas_first:idx_add_gas_last)
+        CALL mixt_var(state%qp,Ri,rho_m,rho_c,redgrav,cp_c,cpm)
+        gas_species_mass_fraction=state%qp(idx_add_gas_first:idx_add_gas_last)
         gas_phase_mass_fraction=0.0_wp
 
         IF (gas_flag) THEN
-            gas_phase_mass_fraction=1.0_wp-SUM(qp(idx_solid_first:idx_solid_last))
+            gas_phase_mass_fraction=1.0_wp-SUM(state%qp(idx_solid_first:idx_solid_last))
             gas_phase_mass_fraction=MAX(0.0_wp,gas_phase_mass_fraction)
         END IF
 
@@ -80,13 +79,12 @@ CONTAINS
     !> @brief Reject unsupported semi-implicit treatment for deposition.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_deposition_semi_implicit(state,qp,dt,r)
+    SUBROUTINE eval_mass_exchange_deposition_semi_implicit(state,dt,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
+        REAL(wp), INTENT(IN) :: dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
@@ -96,13 +94,12 @@ CONTAINS
     !> @brief Reject unsupported implicit treatment for sediment settling and deposition.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_deposition_implicit(state,qp,dt,r)
+    SUBROUTINE eval_mass_exchange_deposition_implicit(state,dt,r)
 
         TYPE(complex_physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
+        REAL(wp), INTENT(IN) :: dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
@@ -112,13 +109,12 @@ CONTAINS
     !> @brief Reject unsupported analytic treatment for sediment settling and deposition.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE solve_mass_exchange_deposition_analytic(state,qp,dt,r)
+    SUBROUTINE solve_mass_exchange_deposition_analytic(state,dt,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: qp(n_vars+2),dt
+        REAL(wp), INTENT(IN) :: dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)

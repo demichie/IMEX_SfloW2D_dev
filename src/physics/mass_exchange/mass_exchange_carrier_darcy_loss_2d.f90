@@ -25,12 +25,10 @@ CONTAINS
 
     !> @brief Evaluate explicit pressure-driven carrier gas loss.
     !> @param[in] state Local real physical state.
-    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_carrier_darcy_loss_explicit(state,qp,r)
+    SUBROUTINE eval_mass_exchange_carrier_darcy_loss_explicit(state,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
         REAL(wp) :: volume_loss,h,T,alpha,rho_c,cp_c,pore
         REAL(wp) :: alphas(n_solid),alphag(n_add_gas)
@@ -45,12 +43,12 @@ CONTAINS
         alphas=state%alphas
         alphag=state%alphag
         alpha=SUM(alphas)
-        CALL mixt_var(qp,Ri,rhom,rho_c,redgrav,cp_c,cpm)
-        gas_species_mass_fraction=qp(idx_add_gas_first:idx_add_gas_last)
+        CALL mixt_var(state%qp,Ri,rhom,rho_c,redgrav,cp_c,cpm)
+        gas_species_mass_fraction=state%qp(idx_add_gas_first:idx_add_gas_last)
 
         ! Recover carrier gas mass fraction before partitioning withdrawal among gas species.
         gas_phase_mass_fraction=MAX(0.0_wp,1.0_wp-                                                 &
-                  SUM(qp(idx_solid_first:idx_solid_last)))
+                  SUM(state%qp(idx_solid_first:idx_solid_last)))
         volume_loss=0.0_wp
         IF (gas_flag .AND. pore_pressure_flag .AND. gas_loss_flag .AND.                            &
                   alpha<maximum_solid_packing)                                                     &
@@ -66,12 +64,10 @@ CONTAINS
     !> @brief Reject unsupported semi-implicit treatment for carrier darcy loss.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_carrier_darcy_loss_semi_implicit(state,qp,r)
+    SUBROUTINE eval_mass_exchange_carrier_darcy_loss_semi_implicit(state,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
@@ -81,12 +77,10 @@ CONTAINS
     !> @brief Reject unsupported implicit treatment for pressure-driven carrier gas loss.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_carrier_darcy_loss_implicit(state,qp,r)
+    SUBROUTINE eval_mass_exchange_carrier_darcy_loss_implicit(state,r)
 
         TYPE(complex_physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
@@ -96,12 +90,10 @@ CONTAINS
     !> @brief Reject unsupported analytic treatment for pressure-driven carrier gas loss.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE solve_mass_exchange_carrier_darcy_loss_analytic(state,qp,r)
+    SUBROUTINE solve_mass_exchange_carrier_darcy_loss_analytic(state,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)

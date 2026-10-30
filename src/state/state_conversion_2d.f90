@@ -36,6 +36,8 @@ MODULE state_conversion_2d
      REAL(wp) :: h=0.0_wp, u=0.0_wp, v=0.0_wp, T=0.0_wp
      REAL(wp) :: rho_m=0.0_wp, inv_rhom=0.0_wp, red_grav=0.0_wp
      REAL(wp) :: Zs=0.0_wp, exc_pore_pres=0.0_wp
+     ! Preserve every primitive entry, including hu/hv and component mass fractions.
+     REAL(wp) :: qp(n_vars+2)=0.0_wp
      REAL(wp), ALLOCATABLE :: alphas(:), alphag(:)
   END TYPE physical_state_type
 
@@ -45,6 +47,7 @@ MODULE state_conversion_2d
      COMPLEX(wp) :: T=(0.0_wp,0.0_wp), rho_m=(0.0_wp,0.0_wp)
      COMPLEX(wp) :: inv_rhom=(0.0_wp,0.0_wp), red_grav=(0.0_wp,0.0_wp)
      COMPLEX(wp) :: Zs=(0.0_wp,0.0_wp), exc_pore_pres=(0.0_wp,0.0_wp)
+     COMPLEX(wp) :: qp(n_vars+2)=(0.0_wp,0.0_wp)
      COMPLEX(wp), ALLOCATABLE :: alphas(:), alphag(:)
   END TYPE complex_physical_state_type
 
@@ -108,6 +111,7 @@ CONTAINS
     REAL(wp) :: xs(n_solid), xg(n_add_gas)
 
     ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas))
+    state%qp = qp
     state%h = qp(idx_h)
     state%u = qp(idx_u)
     state%v = qp(idx_v)
@@ -131,6 +135,23 @@ CONTAINS
          state%rho_m, state%inv_rhom, rho_c, inv_rho_c, &
          state%alphas, state%alphag)
     state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
+    ! Assemble the primitive vector from the same complex conservative state.
+    ! This keeps the imaginary perturbations when used in complex-step evaluation.
+    state%qp = CMPLX(0.0_wp,0.0_wp,wp)
+    state%qp(idx_h) = state%h
+    state%qp(idx_hu) = state%h * state%u
+    state%qp(idx_hv) = state%h * state%v
+    state%qp(idx_T) = state%T
+    state%qp(idx_u) = state%u
+    state%qp(idx_v) = state%v
+    IF (ABS(q(idx_totMassEqn)) > EPSILON(1.0_wp)) THEN
+       state%qp(idx_solid_first:idx_solid_last) = &
+            q(idx_solid_first:idx_solid_last) / q(idx_totMassEqn)
+       state%qp(idx_add_gas_first:idx_add_gas_last) = &
+            q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
+    END IF
+    IF (stoch_transport_flag) state%qp(idx_stoch) = state%Zs
+    IF (pore_pressure_flag) state%qp(idx_pore) = state%exc_pore_pres
   END SUBROUTINE physical_state_from_qp
 
   !> Construct real physical properties from the current conservative state.
@@ -144,6 +165,7 @@ CONTAINS
          state%rho_m, state%T, state%alphag, state%red_grav, &
          p_dyn, state%Zs, state%exc_pore_pres)
     state%inv_rhom = 1.0_wp / state%rho_m
+    CALL qc_to_qp(q, state%qp, p_dyn)
   END SUBROUTINE real_physical_state_from_q
 
   !> Build a COMPLEX physical source state through the existing complex-step kernel.
@@ -156,6 +178,23 @@ CONTAINS
          state%alphas, state%alphag, state%inv_rhom, state%Zs, &
          state%exc_pore_pres)
     state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
+    ! Assemble the primitive vector from the same complex conservative state.
+    ! This keeps the imaginary perturbations when used in complex-step evaluation.
+    state%qp = CMPLX(0.0_wp,0.0_wp,wp)
+    state%qp(idx_h) = state%h
+    state%qp(idx_hu) = state%h * state%u
+    state%qp(idx_hv) = state%h * state%v
+    state%qp(idx_T) = state%T
+    state%qp(idx_u) = state%u
+    state%qp(idx_v) = state%v
+    IF (ABS(q(idx_totMassEqn)) > EPSILON(1.0_wp)) THEN
+       state%qp(idx_solid_first:idx_solid_last) = &
+            q(idx_solid_first:idx_solid_last) / q(idx_totMassEqn)
+       state%qp(idx_add_gas_first:idx_add_gas_last) = &
+            q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
+    END IF
+    IF (stoch_transport_flag) state%qp(idx_stoch) = state%Zs
+    IF (pore_pressure_flag) state%qp(idx_pore) = state%exc_pore_pres
   END SUBROUTINE physical_state_from_q
 
   !> Convert a fully prepared real physical state to a complex one.
@@ -164,6 +203,7 @@ CONTAINS
     TYPE(physical_state_type), INTENT(IN) :: real_state
     TYPE(complex_physical_state_type), INTENT(OUT) :: complex_state
 
+    complex_state%qp = CMPLX(real_state%qp,0.0_wp,wp)
     complex_state%h = CMPLX(real_state%h,0.0_wp,wp)
     complex_state%u = CMPLX(real_state%u,0.0_wp,wp)
     complex_state%v = CMPLX(real_state%v,0.0_wp,wp)
@@ -184,6 +224,7 @@ CONTAINS
     TYPE(complex_physical_state_type), INTENT(IN) :: complex_state
     TYPE(physical_state_type), INTENT(OUT) :: state
 
+    state%qp = REAL(complex_state%qp,wp)
     state%h = REAL(complex_state%h,wp)
     state%u = REAL(complex_state%u,wp)
     state%v = REAL(complex_state%v,wp)

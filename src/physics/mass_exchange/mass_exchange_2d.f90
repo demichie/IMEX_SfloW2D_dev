@@ -74,7 +74,7 @@ CONTAINS
             stoch=0.0_wp
             IF (pore_pressure_flag) pore=qp(idx_pore)
             IF (stoch_transport_flag) stoch=qp(idx_stoch)
-            CALL eval_mass_exchange_erosion_explicit(physical_state,qp,Bx,By,alpha,erodible,                      &
+            CALL eval_mass_exchange_erosion_explicit(physical_state,Bx,By,alpha,erodible,                      &
                       dt,process_rates)
             ! Erosion can increase packing by importing a solid-rich substrate.
             ! Limit it before accumulating any conservative or bed contribution.
@@ -84,9 +84,9 @@ CONTAINS
                       maximum_solid_packing,dt)
             CALL scale_process(process_rates,erosion_factor)
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
-            CALL eval_mass_exchange_deposition_explicit(physical_state,qp,dt,deposition_rates)
-            CALL eval_mass_exchange_carrier_liquid_loss_explicit(physical_state,qp,liquid_loss_rates)
-            CALL eval_mass_exchange_carrier_darcy_loss_explicit(physical_state,qp,darcy_loss_rates)
+            CALL eval_mass_exchange_deposition_explicit(physical_state,dt,deposition_rates)
+            CALL eval_mass_exchange_carrier_liquid_loss_explicit(physical_state,liquid_loss_rates)
+            CALL eval_mass_exchange_carrier_darcy_loss_explicit(physical_state,darcy_loss_rates)
 
             ! A single carrier inventory is shared by pore filling and its
             ! physical loss law. Gas and liquid have distinct laws, but the
@@ -137,7 +137,7 @@ CONTAINS
             CALL accumulate_process(deposition_rates,u,v,total_rates,eqns_term)
             CALL accumulate_process(liquid_loss_rates,u,v,total_rates,eqns_term)
             CALL accumulate_process(darcy_loss_rates,u,v,total_rates,eqns_term)
-            CALL eval_mass_exchange_entrainment_explicit(physical_state,qp,Bx,By,process_rates)
+            CALL eval_mass_exchange_entrainment_explicit(physical_state,Bx,By,process_rates)
             CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
             CALL eval_mass_exchange_vaporization_explicit(physical_state,B_zone,                                &
                 deposition_rates%solid_deposition_rate,process_rates)

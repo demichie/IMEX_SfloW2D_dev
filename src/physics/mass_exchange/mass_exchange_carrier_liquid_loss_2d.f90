@@ -22,12 +22,10 @@ CONTAINS
 
     !> @brief Evaluate explicit prescribed liquid-carrier loss.
     !> @param[in] state Local real physical state.
-    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_carrier_liquid_loss_explicit(state,qp,r)
+    SUBROUTINE eval_mass_exchange_carrier_liquid_loss_explicit(state,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
         REAL(wp) :: rho_c,T,cp_c,Ri,rhom,redgrav,cpm
 
@@ -35,7 +33,7 @@ CONTAINS
 
         IF (liquid_flag .AND. ALLOCATED(loss_rate)) THEN
             T=state%T
-            CALL mixt_var(qp,Ri,rhom,rho_c,redgrav,cp_c,cpm)
+            CALL mixt_var(state%qp,Ri,rhom,rho_c,redgrav,cp_c,cpm)
             r%carrier_withdrawal_volume_rate=MAX(0.0_wp,loss_rate)
 
             ! The liquid is the only carrier in this configuration.
@@ -48,12 +46,10 @@ CONTAINS
     !> @brief Reject unsupported semi-implicit treatment for carrier liquid loss.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_carrier_liquid_loss_semi_implicit(state,qp,r)
+    SUBROUTINE eval_mass_exchange_carrier_liquid_loss_semi_implicit(state,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
@@ -63,12 +59,10 @@ CONTAINS
     !> @brief Reject unsupported implicit treatment for prescribed liquid-carrier loss.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_carrier_liquid_loss_implicit(state,qp,r)
+    SUBROUTINE eval_mass_exchange_carrier_liquid_loss_implicit(state,r)
 
         TYPE(complex_physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
@@ -78,12 +72,10 @@ CONTAINS
     !> @brief Reject unsupported analytic treatment for prescribed liquid-carrier loss.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] qp Primitive vector retained for mixture thermodynamic and species closures.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE solve_mass_exchange_carrier_liquid_loss_analytic(state,qp,r)
+    SUBROUTINE solve_mass_exchange_carrier_liquid_loss_analytic(state,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: qp(n_vars+2)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
