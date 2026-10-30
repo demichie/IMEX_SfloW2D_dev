@@ -151,17 +151,31 @@ CONTAINS
             CALL eval_rheology_newmodel_explicit(state, &
                     rate)
         CASE('rheology_froude')
-            CALL eval_rheology_froude_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
-                    grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
-                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
+            CALL eval_rheology_froude_explicit(state, &
+                    mod_vel, &
+                    mod_hor_vel, &
+                    grav_coeff, &
+                    use_stochastic, &
+                    stochastic_value, &
+                    rate)
         CASE('rheology_lucas')
-            CALL eval_rheology_lucas_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
-                    grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
-                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
+            CALL eval_rheology_lucas_explicit(state, &
+                    mod_vel, &
+                    mod_hor_vel, &
+                    grav_coeff, &
+                    use_stochastic, &
+                    stochastic_value, &
+                    rate)
         CASE('rheology_mui')
-            CALL eval_rheology_mui_explicit(state, mod_vel, mod_hor_vel, mod_vel2, grav_coeff, &
-                    curvature_term, B_second_xx, B_second_xy, B_second_yy, &
-                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
+            CALL eval_rheology_mui_explicit(state, &
+                    mod_vel, &
+                    grav_coeff, &
+                    curvature_term, &
+                    B_second_xx, &
+                    B_second_xy, &
+                    B_second_yy, &
+                    use_pore_pressure, &
+                    rate)
         CASE('rheology_mui_voellmy')
             CALL eval_rheology_mui_voellmy_explicit(state, mod_vel, mod_hor_vel, mod_vel2, grav_coeff, &
                     curvature_term, B_second_xx, B_second_xy, B_second_yy, &
