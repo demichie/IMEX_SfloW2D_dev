@@ -5,13 +5,13 @@ PROGRAM test_source_modules
   USE state_2d, ONLY : correct_friction_momentum
   USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source,           &
        eval_pore_pressure_mass_exchange_source
-  USE thermal_laws_2d, ONLY : eval_thermal_cooling_implicit
   USE mass_exchange_vaporization_2d, ONLY : eval_vaporization_mass_rate, &
        eval_vaporization_energy_rate
   USE mass_exchange_deposition_2d, ONLY : eval_hindered_settling_deposition_rate, &
        eval_lahar_deposition_rate, eval_settling_fluid_properties, eval_solid_deposition_rate
   USE mass_exchange_erosion_2d, ONLY : eval_erosion_rates
   USE mass_exchange_entrainment_2d, ONLY : eval_air_entrainment_rate
+  USE thermal_cooling_2d, ONLY : eval_thermal_cooling_implicit
 
   IMPLICIT NONE
 
@@ -150,7 +150,7 @@ PROGRAM test_source_modules
        'friction correction keeps zero y momentum at rest')
 
   temperature_perturbation = 1.0E-20_wp
-  complex_actual = eval_thermal_cooling_implicit(     &
+  complex_actual = test_cooling_implicit(     &
        CMPLX(900.0_wp, temperature_perturbation, wp), 3.0E-8_wp,           &
        4.0_wp, 300.0_wp)
   expected = -3.0E-8_wp * (900.0_wp**4 - 300.0_wp**4) -                    &
@@ -187,6 +187,16 @@ PROGRAM test_source_modules
   CALL assert_close(actual, -3000.0_wp, 'pore-pressure mass-exchange source')
 
 CONTAINS
+  FUNCTION test_cooling_implicit(temperature,radiative,convective,ambient) RESULT(result)
+    USE state_conversion_2d, ONLY : complex_physical_state_type
+    COMPLEX(wp), INTENT(IN) :: temperature
+    REAL(wp), INTENT(IN) :: radiative,convective,ambient
+    COMPLEX(wp) :: result
+    TYPE(complex_physical_state_type) :: state
+    state%T=temperature
+    CALL eval_thermal_cooling_implicit(state,radiative,convective,ambient,result)
+  END FUNCTION test_cooling_implicit
+
 
   SUBROUTINE assert_close(value, reference, label)
 

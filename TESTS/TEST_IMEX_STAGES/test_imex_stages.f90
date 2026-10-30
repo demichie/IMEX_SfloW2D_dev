@@ -1,6 +1,7 @@
 !> \brief Test-only thread-safe capture of raw production IMEX states.
 MODULE imex_test_observer
   USE parameters_2d, ONLY : wp
+  USE thermal_cooling_2d, ONLY : solve_thermal_cooling_analytic
   IMPLICIT NONE
   REAL(wp), ALLOCATABLE :: known(:,:,:,:), solved(:,:,:,:), raw_final(:,:,:)
   INTEGER, ALLOCATABLE :: seen(:,:,:,:), implicit_statuses(:,:,:)
@@ -55,7 +56,6 @@ PROGRAM test_imex_stages
        lava_deposition_visc_ref, lava_deposition_exponent
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, finalize_nonlinear_solver
   USE step_source_executor_2d, ONLY : execute_step_source_groups
-  USE thermal_laws_2d, ONLY : solve_thermal_cooling_analytic
   USE state_conversion_2d, ONLY : qc_to_qp, qp_to_qc
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
@@ -228,7 +228,7 @@ PROGRAM test_imex_stages
            IF (lava_deposition_mode==1) CYCLE
            CALL qc_to_qp(pre_cooling(:,j,k),pre_cooling_qp(:,j,k),cooling_pdyn)
            cooling_capacity=pre_cooling(4,j,k)/pre_cooling_qp(4,j,k)
-           CALL solve_thermal_cooling_analytic(pre_cooling_qp(4,j,k),dt, &
+           CALL test_cooling_analytic(pre_cooling_qp(4,j,k),dt, &
                 cooling_capacity,radiative_term_coeff,convective_term_coeff, &
                 T_env,cooling_temperature)
            cooling_expected=cooling_capacity*cooling_temperature
@@ -322,6 +322,15 @@ PROGRAM test_imex_stages
   CALL finalize_nonlinear_solver
   WRITE(*,*) 'PASS: raw IMEX observation, finite states and actual OpenMP team'
 CONTAINS
+  SUBROUTINE test_cooling_analytic(temperature,step,capacity,radiative,convective,ambient,result)
+    USE state_conversion_2d, ONLY : physical_state_type
+    REAL(wp), INTENT(IN) :: temperature,step,capacity,radiative,convective,ambient
+    REAL(wp), INTENT(OUT) :: result
+    TYPE(physical_state_type) :: state
+    state%T=temperature
+    CALL solve_thermal_cooling_analytic(state,step,capacity,radiative,convective,ambient,result)
+  END SUBROUTINE test_cooling_analytic
+
   !> \brief Reduce raw temperature and component/carrier fractions without primitive conversion.
   !> \param[in] cell Conservative liquid/zero-solid cell state.
   !> \param[in,out] minima Minimum temperature, solid fraction and carrier fraction for this step.

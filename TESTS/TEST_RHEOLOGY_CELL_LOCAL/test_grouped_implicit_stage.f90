@@ -23,7 +23,7 @@ PROGRAM test_grouped_implicit_stage
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
   USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var, physical_state_type
   USE pore_pressure_laws_2d, ONLY : solve_pore_pressure_dissipation_analytic
-  USE thermal_laws_2d, ONLY : solve_thermal_cooling_analytic
+  USE thermal_cooling_2d, ONLY : solve_thermal_cooling_analytic
 
   IMPLICIT NONE
 
@@ -310,7 +310,7 @@ PROGRAM test_grouped_implicit_stage
 
   CALL qc_to_qp(q_stage_check, qp_known, dynamic_pressure)
   areal_heat_capacity = q_stage_check(4) / qp_known(4)
-  CALL solve_thermal_cooling_analytic(qp_known(4), dt_step*a_diag,         &
+  CALL test_cooling_analytic(qp_known(4), dt_step*a_diag,         &
        areal_heat_capacity, radiative_term_coeff, convective_term_coeff,    &
        T_env, exact_temperature)
   exact_energy = areal_heat_capacity * exact_temperature
@@ -524,6 +524,15 @@ PROGRAM test_grouped_implicit_stage
   WRITE(*,*) 'PASS: grouped DIRK and effective IMEX stage-rate contracts'
 
 CONTAINS
+  SUBROUTINE test_cooling_analytic(temperature,step,capacity,radiative,convective,ambient,result)
+    USE state_conversion_2d, ONLY : physical_state_type
+    REAL(wp), INTENT(IN) :: temperature,step,capacity,radiative,convective,ambient
+    REAL(wp), INTENT(OUT) :: result
+    TYPE(physical_state_type) :: state
+    state%T=temperature
+    CALL solve_thermal_cooling_analytic(state,step,capacity,radiative,convective,ambient,result)
+  END SUBROUTINE test_cooling_analytic
+
   ! D18: lava momentum solved during DIRK, cooling once after the RK step.
   SUBROUTINE test_lava_newton_stage_cooling_analytic_step
     TYPE(source_group_type), ALLOCATABLE :: stage_groups(:),step_groups(:)
@@ -568,7 +577,7 @@ CONTAINS
          ERROR STOP 'D18: STEP cooling erroneously applied during DIRK'
     CALL qc_to_qp(state_stage,qp_known,dynamic_pressure)
     heat_capacity=state_stage(4)/qp_known(4)
-    CALL solve_thermal_cooling_analytic(qp_known(4),dt_step,heat_capacity, &
+    CALL test_cooling_analytic(qp_known(4),dt_step,heat_capacity, &
          radiative_term_coeff,convective_term_coeff,T_env,reference_temperature)
     DO g=1,SIZE(step_groups)
       IF (.NOT.ANY(step_groups(g)%source_names=='thermal_cooling')) CYCLE

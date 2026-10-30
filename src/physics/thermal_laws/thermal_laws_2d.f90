@@ -6,17 +6,11 @@ MODULE thermal_laws_2d
   USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
   USE thermal_cooling_2d, ONLY : eval_thermal_cooling_explicit, &
        eval_thermal_cooling_semi_implicit, eval_thermal_cooling_implicit, &
-       solve_thermal_cooling_analytic, advance_lava_cooling_temperature, &
-       eval_cooling_state_explicit, eval_cooling_state_semi_implicit, &
-       eval_cooling_state_implicit, solve_cooling_state_analytic
+       solve_thermal_cooling_analytic
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_thermal_explicit, eval_thermal_semi_implicit
   PUBLIC :: eval_thermal_implicit, solve_thermal_analytic
-  ! Retain scalar entry points for existing callers and regression tests.
-  PUBLIC :: eval_thermal_cooling_explicit, eval_thermal_cooling_semi_implicit
-  PUBLIC :: eval_thermal_cooling_implicit, solve_thermal_cooling_analytic
-  PUBLIC :: advance_lava_cooling_temperature
 CONTAINS
   SUBROUTINE eval_thermal_explicit_dispatch(model_name,state,radiative,convective,ambient,rate)
     CHARACTER(*), INTENT(IN) :: model_name
@@ -25,7 +19,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: rate
     SELECT CASE (TRIM(model_name))
     CASE ('thermal_cooling')
-      CALL eval_cooling_state_explicit(state,radiative,convective,ambient,rate)
+      CALL eval_thermal_cooling_explicit(state,radiative,convective,ambient,rate)
     CASE DEFAULT
       CALL fatal_error('Unknown explicit thermal model: '//TRIM(model_name))
     END SELECT
@@ -37,7 +31,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: rate
     SELECT CASE (TRIM(model_name))
     CASE ('thermal_cooling')
-      CALL eval_cooling_state_semi_implicit(state,rate)
+      CALL eval_thermal_cooling_semi_implicit(state,rate)
     CASE DEFAULT
       CALL fatal_error('Unknown semi-implicit thermal model: '//TRIM(model_name))
     END SELECT
@@ -50,7 +44,7 @@ CONTAINS
     COMPLEX(wp), INTENT(OUT) :: rate
     SELECT CASE (TRIM(model_name))
     CASE ('thermal_cooling')
-      CALL eval_cooling_state_implicit(state,radiative,convective,ambient,rate)
+      CALL eval_thermal_cooling_implicit(state,radiative,convective,ambient,rate)
     CASE DEFAULT
       CALL fatal_error('Unknown implicit thermal model: '//TRIM(model_name))
     END SELECT
@@ -64,7 +58,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: temperature_after
     SELECT CASE (TRIM(model_name))
     CASE ('thermal_cooling')
-      CALL solve_cooling_state_analytic(state,interval,heat_capacity, &
+      CALL solve_thermal_cooling_analytic(state,interval,heat_capacity, &
            radiative,convective,ambient,temperature_after)
     CASE DEFAULT
       CALL fatal_error('Unknown analytic thermal model: '//TRIM(model_name))

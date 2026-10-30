@@ -26,11 +26,11 @@ PROGRAM test_mass_exchange
   USE rheology_parameters_2d, ONLY : T_ref
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver, &
        finalize_nonlinear_solver,solve_imex_stage
-  USE thermal_laws_2d, ONLY : solve_thermal_cooling_analytic
   USE inpout_2d, ONLY : write_restart_file, read_restart_file, output_idx
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+  USE thermal_cooling_2d, ONLY : solve_thermal_cooling_analytic
 
   IMPLICIT NONE
   TYPE(physical_state_type) :: exchange_state
@@ -106,6 +106,15 @@ PROGRAM test_mass_exchange
   WRITE(*,*) 'PASS: production inventory limits, bed volume, geometry and restart'
 
 CONTAINS
+  SUBROUTINE test_cooling_analytic(temperature,step,capacity,radiative,convective,ambient,result)
+    USE state_conversion_2d, ONLY : physical_state_type
+    REAL(wp), INTENT(IN) :: temperature,step,capacity,radiative,convective,ambient
+    REAL(wp), INTENT(OUT) :: result
+    TYPE(physical_state_type) :: state
+    state%T=temperature
+    CALL solve_thermal_cooling_analytic(state,step,capacity,radiative,convective,ambient,result)
+  END SUBROUTINE test_cooling_analytic
+
 
   !> \brief Allocate a rectangular two-solid liquid fixture and the real restart dependencies.
   SUBROUTINE initialize_fixture
@@ -766,7 +775,7 @@ CONTAINS
       END IF
       temperature=prior_qp(4,j,k)
       cap=prior(4,j,k)/temperature
-      CALL solve_thermal_cooling_analytic(temperature,delta,cap, &
+      CALL test_cooling_analytic(temperature,delta,cap, &
            radiative_term_coeff,convective_term_coeff,T_env,expected_temperature)
       expected_energy=cap*expected_temperature
       IF (ABS(state%q(4,j,k)-expected_energy)> &
@@ -788,7 +797,7 @@ CONTAINS
       IF (prior(1,j,k)<=0.0_wp) CYCLE
       temperature=prior_qp(4,j,k)
       cap=prior(4,j,k)/temperature
-      CALL solve_thermal_cooling_analytic(temperature,2.0_wp*delta,cap, &
+      CALL test_cooling_analytic(temperature,2.0_wp*delta,cap, &
            radiative_term_coeff,convective_term_coeff,T_env,expected_temperature)
       expected_energy=cap*expected_temperature
       IF (ABS(state%q(4,j,k)-expected_energy)> &
