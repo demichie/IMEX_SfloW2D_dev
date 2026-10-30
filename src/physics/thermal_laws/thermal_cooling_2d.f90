@@ -9,6 +9,39 @@ MODULE thermal_cooling_2d
   PUBLIC :: eval_thermal_cooling_explicit, eval_thermal_cooling_semi_implicit
   PUBLIC :: eval_thermal_cooling_implicit, solve_thermal_cooling_analytic
 CONTAINS
+
+  SUBROUTINE eval_thermal_cooling_explicit(state,radiative,convective,ambient,rate)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(IN) :: radiative,convective,ambient
+    REAL(wp), INTENT(OUT) :: rate
+    rate=-radiative*(state%T**4-ambient**4)-convective*(state%T-ambient)
+  END SUBROUTINE eval_thermal_cooling_explicit
+
+
+  SUBROUTINE eval_thermal_cooling_semi_implicit(state,rate)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(OUT) :: rate
+    rate=0.0_wp
+  END SUBROUTINE eval_thermal_cooling_semi_implicit
+
+
+  SUBROUTINE eval_thermal_cooling_implicit(state,radiative,convective,ambient,rate)
+    TYPE(complex_physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(IN) :: radiative,convective,ambient
+    COMPLEX(wp), INTENT(OUT) :: rate
+    rate=-radiative*(state%T**4-ambient**4)-convective*(state%T-ambient)
+  END SUBROUTINE eval_thermal_cooling_implicit
+
+
+  SUBROUTINE solve_thermal_cooling_analytic(state,interval,heat_capacity, &
+       radiative,convective,ambient,temperature_after)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(IN) :: interval,heat_capacity,radiative,convective,ambient
+    REAL(wp), INTENT(OUT) :: temperature_after
+    CALL cooling_scalar_analytic(state%T,interval,heat_capacity, &
+         radiative,convective,ambient,temperature_after)
+  END SUBROUTINE solve_thermal_cooling_analytic
+
 SUBROUTINE cooling_scalar_analytic(temperature, integration_step,   &
        areal_heat_capacity, radiative_coefficient, convective_coefficient,     &
        ambient_temperature, temperature_after)
@@ -192,32 +225,7 @@ PURE FUNCTION lava_cooling_time_primitive(x, beta, cubic_root) RESULT(value)
   END FUNCTION lava_cooling_time_primitive
 
   ! All public model treatments take a physical state; scalar calculations are private.
-  SUBROUTINE eval_thermal_cooling_explicit(state,radiative,convective,ambient,rate)
-    TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(IN) :: radiative,convective,ambient
-    REAL(wp), INTENT(OUT) :: rate
-    rate=-radiative*(state%T**4-ambient**4)-convective*(state%T-ambient)
-  END SUBROUTINE eval_thermal_cooling_explicit
 
-  SUBROUTINE eval_thermal_cooling_semi_implicit(state,rate)
-    TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(OUT) :: rate
-    rate=0.0_wp
-  END SUBROUTINE eval_thermal_cooling_semi_implicit
 
-  SUBROUTINE eval_thermal_cooling_implicit(state,radiative,convective,ambient,rate)
-    TYPE(complex_physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(IN) :: radiative,convective,ambient
-    COMPLEX(wp), INTENT(OUT) :: rate
-    rate=-radiative*(state%T**4-ambient**4)-convective*(state%T-ambient)
-  END SUBROUTINE eval_thermal_cooling_implicit
 
-  SUBROUTINE solve_thermal_cooling_analytic(state,interval,heat_capacity, &
-       radiative,convective,ambient,temperature_after)
-    TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(IN) :: interval,heat_capacity,radiative,convective,ambient
-    REAL(wp), INTENT(OUT) :: temperature_after
-    CALL cooling_scalar_analytic(state%T,interval,heat_capacity, &
-         radiative,convective,ambient,temperature_after)
-  END SUBROUTINE solve_thermal_cooling_analytic
 END MODULE thermal_cooling_2d

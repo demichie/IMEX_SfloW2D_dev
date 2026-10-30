@@ -36,22 +36,7 @@ MODULE rheology_lava_2d
     REAL(wp) :: tau0
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
-    !> \brief Kinematic viscosity shared by lava rheology and deposition.
-    !> \return Kinematic viscosity [m2/s].
-    PURE REAL(wp) FUNCTION lava_kinematic_viscosity(T) RESULT(nu)
 
-        REAL(wp), INTENT(IN) :: T
-
-        nu=nu_ref*EXP(-visc_par*(T-T_ref))
-    END FUNCTION lava_kinematic_viscosity
-
-    !> \param[in] state Shared physical state (complex for implicit treatment).
-    !> \brief Evaluate the explicit lava momentum contribution.
-    !> \details Assemble the real-valued momentum source from the model's supported physical
-    !> treatment contributions; unused model inputs are retained for the shared dispatch interface.
-    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
-    !> \param[in] moving Whether the local state is considered moving.
-    !> \param[out] rate Conservative horizontal momentum source vector.
     SUBROUTINE eval_rheology_lava_explicit(state, &
             mod_vel, &
             moving, &
@@ -69,14 +54,7 @@ CONTAINS
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_lava_explicit
 
-    !> \param[in] state Shared physical state (complex for implicit treatment).
-    !> \brief Evaluate the semi-implicit lava momentum contribution.
-    !> \details Evaluate the contribution of temperature-dependent viscous drag and a yield-stress
-    !> contribution assigned to this treatment. The returned rates act on the conservative
-    !> horizontal momenta; zero-valued implementations intentionally provide no contribution.
-    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
-    !> \param[out] rate_x x component of momentum source rate.
-    !> \param[out] rate_y y component of momentum source rate.
+
     SUBROUTINE eval_rheology_lava_semi_implicit(state, mod_vel, rate_x, rate_y)
 
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -90,15 +68,7 @@ CONTAINS
         rate_y = -tau0 * state%v / mod_vel
     END SUBROUTINE eval_rheology_lava_semi_implicit
 
-    !> \param[in] state Shared physical state (complex for implicit treatment).
-    !> \brief Evaluate the implicit lava momentum contribution.
-    !> \details Evaluate the part of temperature-dependent viscous drag and a yield-stress
-    !> contribution assigned to the implicit treatment. Complex-valued arguments retain complex-step
-    !> sensitivities where implemented; zero-valued implementations intentionally contribute no
-    !> term.
-    !> \param[in] moving Whether the local state is considered moving.
-    !> \param[out] rate_x x component of momentum source rate.
-    !> \param[out] rate_y y component of momentum source rate.
+
     SUBROUTINE eval_rheology_lava_implicit(state, moving, rate_x, rate_y)
 
         TYPE(complex_physical_state_type), INTENT(IN) :: state
@@ -125,17 +95,7 @@ CONTAINS
 
     END SUBROUTINE eval_rheology_lava_implicit
 
-    !> \param[in] state Shared real physical state before the analytic substep.
-    !> \brief Integrate the lava velocity source over a frozen-state substep.
-    !> \details Evaluate the exact or time-integral-based decay of horizontal speed under
-    !> temperature-dependent viscous drag and a yield-stress contribution. The velocity direction is
-    !> retained and the updated components are returned without evolving the frozen thermodynamic
-    !> and geometric inputs.
-    !> \param[in] dt Duration of the analytic source substep [s].
-    !> \param[in] speed_ratio Ratio of three-dimensional to horizontal speed.
-    !> s^-1].
-    !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
-    !> s^-1].
+
     SUBROUTINE solve_rheology_lava_analytic(dt, state, speed_ratio, velocity_after)
 
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -167,6 +127,54 @@ CONTAINS
                 speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_lava_analytic
+
+    !> \brief Kinematic viscosity shared by lava rheology and deposition.
+    !> \return Kinematic viscosity [m2/s].
+    PURE REAL(wp) FUNCTION lava_kinematic_viscosity(T) RESULT(nu)
+
+        REAL(wp), INTENT(IN) :: T
+
+        nu=nu_ref*EXP(-visc_par*(T-T_ref))
+    END FUNCTION lava_kinematic_viscosity
+
+    !> \param[in] state Shared physical state (complex for implicit treatment).
+    !> \brief Evaluate the explicit lava momentum contribution.
+    !> \details Assemble the real-valued momentum source from the model's supported physical
+    !> treatment contributions; unused model inputs are retained for the shared dispatch interface.
+    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
+    !> \param[in] moving Whether the local state is considered moving.
+    !> \param[out] rate Conservative horizontal momentum source vector.
+
+    !> \param[in] state Shared physical state (complex for implicit treatment).
+    !> \brief Evaluate the semi-implicit lava momentum contribution.
+    !> \details Evaluate the contribution of temperature-dependent viscous drag and a yield-stress
+    !> contribution assigned to this treatment. The returned rates act on the conservative
+    !> horizontal momenta; zero-valued implementations intentionally provide no contribution.
+    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
+    !> \param[out] rate_x x component of momentum source rate.
+    !> \param[out] rate_y y component of momentum source rate.
+
+    !> \param[in] state Shared physical state (complex for implicit treatment).
+    !> \brief Evaluate the implicit lava momentum contribution.
+    !> \details Evaluate the part of temperature-dependent viscous drag and a yield-stress
+    !> contribution assigned to the implicit treatment. Complex-valued arguments retain complex-step
+    !> sensitivities where implemented; zero-valued implementations intentionally contribute no
+    !> term.
+    !> \param[in] moving Whether the local state is considered moving.
+    !> \param[out] rate_x x component of momentum source rate.
+    !> \param[out] rate_y y component of momentum source rate.
+
+    !> \param[in] state Shared real physical state before the analytic substep.
+    !> \brief Integrate the lava velocity source over a frozen-state substep.
+    !> \details Evaluate the exact or time-integral-based decay of horizontal speed under
+    !> temperature-dependent viscous drag and a yield-stress contribution. The velocity direction is
+    !> retained and the updated components are returned without evolving the frozen thermodynamic
+    !> and geometric inputs.
+    !> \param[in] dt Duration of the analytic source substep [s].
+    !> \param[in] speed_ratio Ratio of three-dimensional to horizontal speed.
+    !> s^-1].
+    !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
+    !> s^-1].
 
     ! Unsupported physical treatment, rejected by the source catalog.
 END MODULE rheology_lava_2d
