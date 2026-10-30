@@ -7,10 +7,15 @@ MODULE mass_exchange_vaporization_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE constitutive_parameters_2d, ONLY : rho_s, sp_heat_s, gamma_steam, sp_heat_g
-    USE thermal_laws_2d, ONLY : eval_vaporization_mass_rate, eval_vaporization_energy_rate
 
     IMPLICIT NONE
     PRIVATE
+
+    PUBLIC :: eval_vaporization_mass_rate, eval_vaporization_energy_rate
+    REAL(wp), PARAMETER :: vaporization_liquid_temperature = 290.0_wp
+    REAL(wp), PARAMETER :: vaporization_boiling_temperature = 373.15_wp
+    REAL(wp), PARAMETER :: vaporization_latent_heat = 2264705.0_wp
+    REAL(wp), PARAMETER :: vaporization_liquid_heat_capacity = 4184.0_wp
 
     PUBLIC :: eval_mass_exchange_vaporization_explicit
     PUBLIC :: eval_mass_exchange_vaporization_semi_implicit
@@ -93,5 +98,35 @@ CONTAINS
         CALL reset_mass_exchange_rates(r)
         CALL fatal_error('vaporization: unsupported physical treatment')
     END SUBROUTINE solve_mass_exchange_vaporization_analytic
+
+PURE FUNCTION eval_vaporization_mass_rate(flow_temperature, solid_density,   &
+       solid_heat_capacity, deposition_rate, steam_fraction) RESULT(rate)
+
+    REAL(wp), INTENT(IN) :: flow_temperature
+    REAL(wp), INTENT(IN) :: solid_density(:)
+    REAL(wp), INTENT(IN) :: solid_heat_capacity(:)
+    REAL(wp), INTENT(IN) :: deposition_rate(:)
+    REAL(wp), INTENT(IN) :: steam_fraction
+    REAL(wp) :: rate
+
+    rate = steam_fraction * MAX(0.0_wp, flow_temperature -                    &
+         vaporization_boiling_temperature) *                                 &
+         SUM(solid_density * solid_heat_capacity * deposition_rate) /         &
+         (vaporization_liquid_heat_capacity *                                 &
+         (vaporization_boiling_temperature -                                  &
+         vaporization_liquid_temperature) + vaporization_latent_heat)
+
+  END FUNCTION eval_vaporization_mass_rate
+
+PURE FUNCTION eval_vaporization_energy_rate(vapor_mass_rate,               &
+       gas_heat_capacity) RESULT(rate)
+
+    REAL(wp), INTENT(IN) :: vapor_mass_rate, gas_heat_capacity
+    REAL(wp) :: rate
+
+    rate = vapor_mass_rate * gas_heat_capacity *                             &
+         vaporization_boiling_temperature
+
+  END FUNCTION eval_vaporization_energy_rate
 
 END MODULE mass_exchange_vaporization_2d
