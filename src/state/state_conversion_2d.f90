@@ -103,7 +103,8 @@ CONTAINS
   SUBROUTINE physical_state_from_qp(qp, state)
     REAL(wp), INTENT(IN) :: qp(n_vars+2)
     TYPE(physical_state_type), INTENT(OUT) :: state
-    REAL(wp) :: Ri, rho_c, sp_heat_c, sp_heat_mix
+    REAL(wp) :: rho_c, inv_rho_c
+    REAL(wp) :: xs(n_solid), xg(n_add_gas)
 
     ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas))
     state%h = qp(idx_h)
@@ -114,10 +115,21 @@ CONTAINS
     state%exc_pore_pres = 0.0_wp
     IF (stoch_transport_flag) state%Zs = qp(idx_stoch)
     IF (pore_pressure_flag) state%exc_pore_pres = qp(idx_pore)
-    CALL mixt_var(qp, Ri, state%rho_m, rho_c, state%red_grav, &
-         sp_heat_c, sp_heat_mix)
-    state%inv_rhom = 1.0_wp / state%rho_m
-    CALL primitive_to_volume_fractions(qp, state%alphas, state%alphag)
+    state%alphas = 0.0_wp
+    state%alphag = 0.0_wp
+    IF (state%h <= EPSILON(1.0_wp)) THEN
+       state%rho_m = rho_a_amb
+       state%inv_rhom = 1.0_wp / state%rho_m
+       state%red_grav = 0.0_wp
+       RETURN
+    END IF
+    xs = qp(idx_solid_first:idx_solid_last)
+    xg = qp(idx_add_gas_first:idx_add_gas_last)
+    CALL enforce_mass_fraction_closure(xs, xg)
+    CALL eval_mixture_properties_from_mass_fractions(state%T, xs, xg, &
+         state%rho_m, state%inv_rhom, rho_c, inv_rho_c, &
+         state%alphas, state%alphag)
+    state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
   END SUBROUTINE physical_state_from_qp
 
   !> Build a COMPLEX physical source state through the existing complex-step kernel.
