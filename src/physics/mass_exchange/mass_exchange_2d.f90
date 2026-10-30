@@ -2,15 +2,15 @@
 !> @details Explicit physics is evaluated locally; unsupported treatment entry points
 !> fail explicitly. The coordinator alone enforces shared carrier inventories.
 MODULE mass_exchange_2d
-    USE parameters_2d, ONLY : idx_h, idx_T, idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
+    USE parameters_2d, ONLY : idx_h, idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
     USE parameters_2d, ONLY : wp, n_vars, n_eqns, n_solid, n_add_gas,                              &
-              idx_u, idx_v, idx_pore, idx_stoch, idx_stochEqn, idx_poreEqn,                        &
+              idx_stochEqn, idx_poreEqn,                                                           &
               idx_solidEqn_first, idx_solidEqn_last,                                               &
               idx_addGasEqn_first, idx_addGasEqn_last, gas_flag, liquid_flag,                      &
               pore_pressure_flag, stoch_transport_flag, mass_exchange_rates_type,                  &
               reset_mass_exchange_rates
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
-    USE state_conversion_2d, ONLY : primitive_to_volume_fractions, physical_state_type, physical_state_from_qp
+    USE state_conversion_2d, ONLY : physical_state_type, physical_state_from_qp
     USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_mass_exchange_source
     USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
     USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
@@ -50,40 +50,30 @@ CONTAINS
         TYPE(physical_state_type) :: physical_state
         TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates,        &
             darcy_loss_rates
-        REAL(wp) :: alphas(n_solid), alphag(n_add_gas), alpha
-        REAL(wp) :: u,v,h,T,pore,stoch
+        REAL(wp) :: alpha
         REAL(wp) :: carrier_available,carrier_factor,carrier_volume,carrier_loss
         REAL(wp) :: carrier_withdrawals(2),solid_erosion,carrier_erosion
         REAL(wp) :: solid_deposition,packing_factor,erosion_factor
 
         CALL reset_mass_exchange_rates(total_rates)
         eqns_term=0.0_wp
-        h=qp(idx_h)
-        IF (h<=EPSILON(1.0_wp)) RETURN
-        u=qp(idx_u)
-        v=qp(idx_v)
-        T=qp(idx_T)
+        IF (qp(idx_h)<=EPSILON(1.0_wp)) RETURN
         CALL physical_state_from_qp(qp,physical_state)
 
         ! Processes requiring a gas/liquid carrier are evaluated only when that
         ! physical phase exists. Lava deposition is dispatched independently below.
         IF (gas_flag .OR. liquid_flag) THEN
-            CALL primitive_to_volume_fractions(qp,alphas,alphag)
-            alpha=SUM(alphas)
-            pore=0.0_wp
-            stoch=0.0_wp
-            IF (pore_pressure_flag) pore=qp(idx_pore)
-            IF (stoch_transport_flag) stoch=qp(idx_stoch)
-            CALL eval_mass_exchange_erosion_explicit(physical_state,Bx,By,alpha,erodible,                      &
+            alpha=SUM(physical_state%alphas)
+            CALL eval_mass_exchange_erosion_explicit(physical_state,Bx,By,alpha,erodible, &
                       dt,process_rates)
             ! Erosion can increase packing by importing a solid-rich substrate.
             ! Limit it before accumulating any conservative or bed contribution.
-            erosion_factor=erosion_packing_factor(h,alpha,                                         &
+            erosion_factor=erosion_packing_factor(physical_state%h,alpha,                                         &
                       SUM(MAX(0.0_wp,process_rates%solid_erosion_rate)),                           &
                       MAX(0.0_wp,process_rates%carrier_erosion_rate),                              &
                       maximum_solid_packing,dt)
             CALL scale_process(process_rates,erosion_factor)
-            CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
+            CALL accumulate_process(process_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
             CALL eval_mass_exchange_deposition_explicit(physical_state,dt,deposition_rates)
             CALL eval_mass_exchange_carrier_liquid_loss_explicit(physical_state,liquid_loss_rates)
             CALL eval_mass_exchange_carrier_darcy_loss_explicit(physical_state,darcy_loss_rates)
@@ -111,13 +101,13 @@ CONTAINS
 
             ! The carrier occupies the volume not filled by dispersed solids.
             ! Limit gross withdrawals independently of positive erosion inputs.
-            carrier_available=h*MAX(0.0_wp,1.0_wp-alpha)/dt
+            carrier_available=physical_state%h*MAX(0.0_wp,1.0_wp-alpha)/dt
             carrier_withdrawals=[-carrier_volume,-carrier_loss]
             carrier_factor=shared_withdrawal_factor(carrier_withdrawals,carrier_available)
 
             ! The packing constraint acts on the coupled changes in solid and
             ! total volumes, including the solid removed by deposition.
-            packing_factor=packing_withdrawal_factor(h,alpha,solid_erosion,                        &
+            packing_factor=packing_withdrawal_factor(physical_state%h,alpha,solid_erosion,                        &
                       carrier_erosion,solid_deposition,carrier_volume,                             &
                       carrier_loss,0.0_wp,maximum_solid_packing,dt)
             carrier_factor=MIN(carrier_factor,packing_factor)
@@ -134,25 +124,26 @@ CONTAINS
             END IF
 
             ! Assemble only the rates after all common-inventory limiters have acted.
-            CALL accumulate_process(deposition_rates,u,v,total_rates,eqns_term)
-            CALL accumulate_process(liquid_loss_rates,u,v,total_rates,eqns_term)
-            CALL accumulate_process(darcy_loss_rates,u,v,total_rates,eqns_term)
+            CALL accumulate_process(deposition_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
+            CALL accumulate_process(liquid_loss_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
+            CALL accumulate_process(darcy_loss_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
             CALL eval_mass_exchange_entrainment_explicit(physical_state,Bx,By,process_rates)
-            CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
-            CALL eval_mass_exchange_vaporization_explicit(physical_state,B_zone,                                &
+            CALL accumulate_process(process_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
+            CALL eval_mass_exchange_vaporization_explicit(physical_state,B_zone, &
                 deposition_rates%solid_deposition_rate,process_rates)
-            CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
+            CALL accumulate_process(process_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
 
             ! Scalar transport and pore-pressure sources inherit the net mass exchange.
-            IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(idx_totMassEqn)*stoch
+            IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(idx_totMassEqn)*physical_state%Zs
             IF (pore_pressure_flag) eqns_term(idx_poreEqn)=                                        &
-                      eval_pore_pressure_mass_exchange_source(eqns_term(idx_totMassEqn),pore)
+                      eval_pore_pressure_mass_exchange_source(eqns_term(idx_totMassEqn), &
+                      physical_state%exc_pore_pres)
         END IF  ! gas_flag .OR. liquid_flag
 
         ! Lava deposition follows the same process_rates-rate accumulation contract.
         IF (lava_deposition_flag) THEN
             CALL eval_mass_exchange_lava_deposition_explicit(physical_state,dt,process_rates)
-            CALL accumulate_process(process_rates,u,v,total_rates,eqns_term)
+            CALL accumulate_process(process_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
         END IF
 
     END SUBROUTINE eval_mass_exchange_terms
@@ -184,7 +175,7 @@ CONTAINS
     !> @param[in] packing Maximum admissible solid volume fraction.
     !> @param[in] dt Physical timestep [s].
     !> @return Common erosion factor within [0,1].
-    PURE REAL(wp) FUNCTION erosion_packing_factor(h,alpha,solid_erosion,                           &
+    PURE REAL(wp) FUNCTION erosion_packing_factor(physical_state%h,alpha,solid_erosion,                           &
               carrier_erosion,packing,dt) RESULT(f)
         REAL(wp), INTENT(IN) :: h,alpha,solid_erosion,carrier_erosion,packing,dt
         REAL(wp) :: deficit,margin
@@ -211,7 +202,7 @@ CONTAINS
     !> @param[in] packing Maximum admissible solid volume fraction.
     !> @param[in] dt Physical exchange step duration [s].
     !> @return Maximum permitted common scaling factor in [0,1].
-    PURE REAL(wp) FUNCTION packing_withdrawal_factor(h,alpha,solid_erosion,                        &
+    PURE REAL(wp) FUNCTION packing_withdrawal_factor(physical_state%h,alpha,solid_erosion,                        &
               carrier_erosion,solid_deposition,carrier_deposition,shared_loss,                     &
               other_loss,packing,dt) RESULT(f)
         REAL(wp), INTENT(IN) :: h,alpha,solid_erosion,carrier_erosion
