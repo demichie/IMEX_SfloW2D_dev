@@ -40,6 +40,7 @@ PROGRAM test_analytic_velocity
 
   IMPLICIT NONE
 
+  TYPE(physical_state_type) :: rheo_state
   REAL(wp), PARAMETER :: integration_step = 0.01_wp
   REAL(wp), PARAMETER :: flow_depth = 1.8_wp
   REAL(wp), PARAMETER :: mixture_density = 1800.0_wp
@@ -275,41 +276,59 @@ PROGRAM test_analytic_velocity
   mu_0 = 0.5_wp
   mu_inf = 0.2_wp
   Fr_0 = 0.8_wp
-  CALL solve_rheology_froude_analytic(integration_step, flow_depth,        &
-       speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,   &
-       0.0_wp, .FALSE., stochastic_value, velocity_after)
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_before(1)
+  rheo_state%v=velocity_before(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL solve_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+       .FALSE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,          &
        .FALSE., stochastic_value, velocity_after, 'Froude dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_rheology_froude_semi_implicit(flow_depth, velocity_after(1), velocity_after(2), &
-       speed_after, horizontal_speed, mixture_density, reduced_gravity,      &
-       gravity_coefficient, 0.0_wp, .FALSE., stochastic_value,              &
-       source_x, source_y)
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_after(1)
+  rheo_state%v=velocity_after(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL eval_rheology_froude_semi_implicit(rheo_state,speed_after,horizontal_speed,gravity_coefficient, &
+       0.0_wp,.FALSE.,stochastic_value,source_x,source_y)
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [source_x, source_y], 'Froude')
 
   stochastic_value = -2.0_wp
-  CALL solve_rheology_froude_analytic(integration_step, flow_depth,        &
-       speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,   &
-       0.0_wp, .TRUE., stochastic_value, velocity_after)
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_before(1)
+  rheo_state%v=velocity_before(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL solve_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+       .TRUE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,         &
        .TRUE., stochastic_value, velocity_after, 'Froude stochastic dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_rheology_froude_semi_implicit(flow_depth, velocity_after(1), velocity_after(2), &
-       speed_after, horizontal_speed, mixture_density, reduced_gravity,      &
-       gravity_coefficient, 0.0_wp, .TRUE., stochastic_value,               &
-       source_x, source_y)
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_after(1)
+  rheo_state%v=velocity_after(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL eval_rheology_froude_semi_implicit(rheo_state,speed_after,horizontal_speed,gravity_coefficient, &
+       0.0_wp,.TRUE.,stochastic_value,source_x,source_y)
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [source_x, source_y], 'Froude clamp')
   stochastic_value = 0.0_wp
 
   mu_0 = 0.0_wp
   mu_inf = 0.0_wp
-  CALL solve_rheology_froude_analytic(integration_step, flow_depth,        &
-       speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,   &
-       0.0_wp, .FALSE., stochastic_value, velocity_after)
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_before(1)
+  rheo_state%v=velocity_before(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL solve_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+       .FALSE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,         &
        .FALSE., stochastic_value, velocity_after, 'Froude zero-drag dispatch')
   CALL assert_close(velocity_after(1), velocity_before(1), 'Froude zero-drag x')
@@ -318,32 +337,46 @@ PROGRAM test_analytic_velocity
   mu_inf = 0.2_wp
 
   U_w = 2.0_wp
-  CALL solve_rheology_lucas_analytic(integration_step, flow_depth,          &
-       speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,    &
-       0.0_wp, .FALSE., stochastic_value, velocity_after)
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_before(1)
+  rheo_state%v=velocity_before(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL solve_rheology_lucas_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+       .FALSE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_lucas', .FALSE., 0.0_wp,          &
        .FALSE., stochastic_value, velocity_after, 'Lucas dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_rheology_lucas_semi_implicit(flow_depth, velocity_after(1), velocity_after(2), &
-       speed_after, horizontal_speed, mixture_density, reduced_gravity,      &
-       gravity_coefficient, 0.0_wp, .FALSE., stochastic_value,               &
-       source_x, source_y)
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_after(1)
+  rheo_state%v=velocity_after(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL eval_rheology_lucas_semi_implicit(rheo_state,speed_after,horizontal_speed,gravity_coefficient, &
+       0.0_wp,.FALSE.,stochastic_value,source_x,source_y)
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [source_x, source_y], 'Lucas')
 
   stochastic_value = -10.0_wp
-  CALL solve_rheology_lucas_analytic(integration_step, flow_depth,          &
-       speed_ratio, velocity_before, reduced_gravity, gravity_coefficient,    &
-       0.0_wp, .TRUE., stochastic_value, velocity_after)
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_before(1)
+  rheo_state%v=velocity_before(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL solve_rheology_lucas_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+       .TRUE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_lucas', .FALSE., 0.0_wp,          &
        .TRUE., stochastic_value, velocity_after, 'Lucas stochastic dispatch')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_rheology_lucas_semi_implicit(flow_depth, velocity_after(1), velocity_after(2), &
-       speed_after, horizontal_speed, mixture_density, reduced_gravity,      &
-       gravity_coefficient, 0.0_wp, .TRUE., stochastic_value,               &
-       source_x, source_y)
+  rheo_state%h=flow_depth
+  rheo_state%u=velocity_after(1)
+  rheo_state%v=velocity_after(2)
+  rheo_state%rho_m=mixture_density
+  rheo_state%red_grav=reduced_gravity
+  CALL eval_rheology_lucas_semi_implicit(rheo_state,speed_after,horizontal_speed,gravity_coefficient, &
+       0.0_wp,.TRUE.,stochastic_value,source_x,source_y)
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [source_x, source_y], 'Lucas stochastic branch')
   stochastic_value = 0.0_wp

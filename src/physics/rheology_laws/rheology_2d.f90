@@ -150,19 +150,13 @@ CONTAINS
                     mod_vel2, grav_coeff, curvature_term, B_second_xx, B_second_xy, &
                     B_second_yy, use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE('rheology_froude')
-            CALL eval_rheology_froude_explicit(                                                    &
-                    h, T, u, v, mod_vel, mod_hor_vel,                                              &
-                    mod_vel2, rhom, inv_rhom, red_grav,                                            &
-                    grav_coeff, alphas, curvature_term, B_second_xx,                               &
-                    B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving,            &
-                    use_stochastic, stochastic_value, rate )
+            CALL eval_rheology_froude_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
+                    grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
+                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE('rheology_lucas')
-            CALL eval_rheology_lucas_explicit(                                                     &
-                    h, T, u, v, mod_vel, mod_hor_vel,                                              &
-                    mod_vel2, rhom, inv_rhom, red_grav,                                            &
-                    grav_coeff, alphas, curvature_term, B_second_xx,                               &
-                    B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving,            &
-                    use_stochastic, stochastic_value, rate )
+            CALL eval_rheology_lucas_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
+                    grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
+                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE('rheology_mui')
             CALL eval_rheology_mui_explicit(                                                       &
                     h, T, u, v, mod_vel, mod_hor_vel,                                              &
@@ -243,15 +237,11 @@ CONTAINS
                     v, mod_hor_vel, rhom,                                                          &
                     SUM(alphas), mod_vel .GT. 0.0_wp, rate(1), rate(2))
         CASE('rheology_froude')
-            CALL eval_rheology_froude_semi_implicit(h, u, v,                                       &
-                    mod_vel, mod_hor_vel, rhom, red_grav,                                          &
-                    grav_coeff, 0.0_wp, use_stochastic, stochastic_value,                          &
-                    rate(1), rate(2))
+            CALL eval_rheology_froude_semi_implicit(state, mod_vel, mod_hor_vel, grav_coeff, &
+                    0.0_wp, use_stochastic, stochastic_value, rate(1), rate(2))
         CASE('rheology_lucas')
-            CALL eval_rheology_lucas_semi_implicit(h, u, v,                                        &
-                    mod_vel, mod_hor_vel, rhom, red_grav,                                          &
-                    grav_coeff, 0.0_wp, use_stochastic, stochastic_value,                          &
-                    rate(1), rate(2))
+            CALL eval_rheology_lucas_semi_implicit(state, mod_vel, mod_hor_vel, grav_coeff, &
+                    0.0_wp, use_stochastic, stochastic_value, rate(1), rate(2))
         CASE('rheology_mui')
             curvature_term_value = 0.0_wp
             IF (curvature_term) curvature_term_value = curvature_acceleration(                     &
@@ -412,15 +402,11 @@ CONTAINS
         CASE ('rheology_quadratic')
             CALL solve_rheology_quadratic_analytic(dt, state, speed_ratio, velocity_after)
         CASE ('rheology_froude')
-            CALL solve_rheology_froude_analytic(dt, h,                                             &
-                    speed_ratio, velocity_before, red_grav,                                        &
-                    grav_coeff, curvature_acceleration, use_stochastic,                            &
-                    stochastic_value, velocity_after)
+            CALL solve_rheology_froude_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+                    use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_lucas')
-            CALL solve_rheology_lucas_analytic(dt, h,                                              &
-                    speed_ratio, velocity_before, red_grav,                                        &
-                    grav_coeff, curvature_acceleration, use_stochastic,                            &
-                    stochastic_value, velocity_after)
+            CALL solve_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+                    use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_mui')
             CALL solve_rheology_mui_analytic(dt, h,                                                &
                     speed_ratio, velocity_before, rhom, red_grav,                                  &
