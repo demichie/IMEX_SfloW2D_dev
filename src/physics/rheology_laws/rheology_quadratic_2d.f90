@@ -93,31 +93,6 @@ CONTAINS
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_quadratic_analytic
 
-    !******************************************************************************
-    !> \brief Integrate the quadratic-friction velocity source exactly.
-    !> \details Holds depth and the mod_vel-to-horizontal-mod_vel ratio fixed and
-    !> applies the reciprocal-mod_vel exact solution of the quadratic drag law.
-    !> \param[in] dt Exact-flow integration interval [s].
-    !> \param[in] h Explicit flow depth [m].
-    !> \param[in] speed_ratio Explicit total-to-horizontal mod_vel ratio.
-    !> \param[in] velocity_before Input horizontal velocity [m s^-1].
-    !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
-    !******************************************************************************
-    !******************************************************************************
-    !> \brief Evaluate the implicit quadratic-friction source.
-    !> \details Applies the quadratic mod_vel-dependent drag opposite to the
-    !> horizontal velocity direction. Complex arithmetic retains sensitivities
-    !> for the implicit Jacobian.
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_hor_vel Horizontal mod_vel magnitude [m s^-1].
-    !> \param[in] mod_vel2 Squared mod_vel used by the quadratic law [m^2 s^-2].
-    !> \param[in] rhom Mixture density [kg m^-3].
-    !> \param[in] moving Whether the state is moving.
-    !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
-    !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
-    !> \note Complex-valued state and rates preserve complex-step derivatives.
-    !******************************************************************************
     ! Unsupported physical treatment, rejected by the source catalog.
     ! Valid zero component of the configured Newton treatment.
 END MODULE rheology_quadratic_2d

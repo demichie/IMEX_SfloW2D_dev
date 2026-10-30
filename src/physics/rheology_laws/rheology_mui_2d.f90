@@ -191,42 +191,6 @@ CONTAINS
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_mui_analytic
 
-    !******************************************************************************
-    !> \brief Integrate the regularized \f$\mu(I)\f$ source in time.
-    !> \details Holds particle properties, effective stress, depth, and the
-    !> mod_vel ratio fixed while integrating the rational mod_vel-decay law.
-    !> \param[in] dt Exact-flow integration interval [s].
-    !> \param[in] h Explicit flow depth [m].
-    !> \param[in] speed_ratio Explicit total-to-horizontal mod_vel ratio.
-    !> \param[in] velocity_before Input horizontal velocity [m s^-1].
-    !> \param[in] rhom Explicit mixture density [kg m^-3].
-    !> \param[in] red_grav Explicit reduced gravity [m s^-2].
-    !> \param[in] grav_coeff Explicit gravity multiplier [dimensionless].
-    !> \param[in] solid_fraction Explicit solid volume fractions by class.
-    !> \param[in] curvature_acceleration Explicit curvature contribution [m s^-2].
-    !> \param[in] use_pore_pressure Enable explicit pore-pressure reduction.
-    !> \param[in] exc_pore_pres Explicit excess pore pressure [Pa].
-    !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
-    !******************************************************************************
-    !******************************************************************************
-    !> \brief Evaluate model 11's regularized \f$\mu(I)\f$ source.
-    !> \details Computes particle properties, effective normal stress, inertial
-    !> number and regularized friction coefficient, then projects basal stress
-    !> onto the horizontal velocity direction. Stationary states return zero.
-    !> \param[in] h Flow depth [m].
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_vel mod_vel magnitude [m s^-1].
-    !> \param[in] rhom Mixture density [kg m^-3].
-    !> \param[in] red_grav Reduced gravity [m s^-2].
-    !> \param[in] grav_coeff Gravity multiplier [dimensionless].
-    !> \param[in] solid_fraction Solid volume fractions by class.
-    !> \param[in] curvature_acceleration Curvature contribution [m s^-2].
-    !> \param[in] use_pore_pressure Enable pore-pressure reduction.
-    !> \param[in] exc_pore_pres Excess pore pressure [Pa].
-    !> \param[out] rate_x x momentum source rate.
-    !> \param[out] rate_y y momentum source rate.
-    !******************************************************************************
     ! Unsupported physical treatment, rejected by the source catalog.
     ! Valid zero component of the configured Newton treatment.
 END MODULE rheology_mui_2d

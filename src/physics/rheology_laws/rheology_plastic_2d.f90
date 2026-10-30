@@ -87,32 +87,6 @@ CONTAINS
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_plastic_analytic
 
-    !******************************************************************************
-    !> \brief Integrate the constant plastic-friction velocity source exactly.
-    !> \details Holds depth and the mod_vel-to-horizontal-mod_vel ratio fixed. The
-    !> mod_vel is reduced by the constant friction acceleration until it reaches
-    !> zero; the horizontal velocity direction is preserved:
-    !> \f$r^+=\max(0,r_0-\lambda\tau/(h\beta))\f$.
-    !> \param[in] dt Exact-flow interval, normally dt * a_ii.
-    !> \param[in] h Explicit flow depth.
-    !> \param[in] speed_ratio Explicit ratio of total to horizontal mod_vel.
-    !> \param[in] velocity_before Horizontal velocity before integration.
-    !> \param[out] velocity_after Horizontal velocity after integration.
-    !******************************************************************************
-    !******************************************************************************
-    !> \brief Evaluate the implicit plastic-friction source.
-    !> \details Returns \f$-\rho_m\tau(u_x,u_y)/|\boldsymbol{u}|\f$ for a
-    !> moving state and zero otherwise. Complex arithmetic preserves derivatives
-    !> with respect to the state in the implicit Jacobian.
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_vel mod_vel used to normalize the direction [m s^-1].
-    !> \param[in] rhom Mixture density \f$\rho_m\f$ [kg m^-3].
-    !> \param[in] moving Whether the state is moving.
-    !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
-    !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
-    !> \note Complex-valued state and rates preserve complex-step derivatives.
-    !******************************************************************************
     ! Unsupported physical treatment, rejected by the source catalog.
     ! Valid zero component of the configured Newton treatment.
 END MODULE rheology_plastic_2d

@@ -136,40 +136,6 @@ CONTAINS
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_lucas_analytic
 
-    !******************************************************************************
-    !> \brief Integrate the Lucas velocity-weakening source exactly.
-    !> \details Holds depth, gravity, curvature, stochastic mod_vel shift, and
-    !> mod_vel ratio fixed while integrating the scalar mod_vel-decay law.
-    !> \param[in] dt Exact-flow integration interval [s].
-    !> \param[in] h Explicit flow depth [m].
-    !> \param[in] speed_ratio Explicit total-to-horizontal mod_vel ratio.
-    !> \param[in] velocity_before Input horizontal velocity [m s^-1].
-    !> \param[in] red_grav Explicit reduced gravity [m s^-2].
-    !> \param[in] grav_coeff Explicit gravity multiplier [dimensionless].
-    !> \param[in] curvature_term Explicit curvature acceleration [m s^-2].
-    !> \param[in] stochastic Enable the explicit mod_vel shift.
-    !> \param[in] stochastic_value Explicit stochastic increment [m s^-1].
-    !> \param[out] velocity_after Returned horizontal velocity [m s^-1].
-    !******************************************************************************
-    !******************************************************************************
-    !> \brief Evaluate model 10's velocity-dependent Coulomb source.
-    !> \details Applies the Lucas transition-mod_vel law, including its shallow
-    !> flow branch, and returns the horizontal momentum-source components. No
-    !> source is produced at zero mod_vel.
-    !> \param[in] h Flow depth \f$h\f$ [m].
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_vel mod_vel used by the weakening law [m s^-1].
-    !> \param[in] mod_hor_vel Horizontal velocity magnitude [m s^-1].
-    !> \param[in] rhom Mixture density \f$\rho_m\f$ [kg m^-3].
-    !> \param[in] red_grav Reduced gravity \f$g'\f$ [m s^-2].
-    !> \param[in] grav_coeff Gravity multiplier \f$G\f$ [dimensionless].
-    !> \param[in] curvature_term Curvature acceleration \f$a_c\f$ [m s^-2].
-    !> \param[in] stochastic Enable the stochastic mod_vel increment.
-    !> \param[in] stochastic_value Stochastic mod_vel increment [m s^-1].
-    !> \param[out] rate_x x conservative momentum source rate [kg m^-1 s^-2].
-    !> \param[out] rate_y y conservative momentum source rate [kg m^-1 s^-2].
-    !******************************************************************************
     ! Unsupported physical treatment, rejected by the source catalog.
     ! Valid zero component of the configured Newton treatment.
 END MODULE rheology_lucas_2d
