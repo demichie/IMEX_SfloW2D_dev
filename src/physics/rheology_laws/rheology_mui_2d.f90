@@ -63,16 +63,13 @@ CONTAINS
         REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy
         LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure
         REAL(wp), INTENT(OUT) :: rate(2)
-        REAL(wp) :: sx, sy, curvature_accel
-        COMPLEX(wp) :: ix, iy
-        TYPE(complex_physical_state_type) :: cs
+        REAL(wp) :: curvature_accel
         curvature_accel=0.0_wp
         IF (curvature_term) curvature_accel=B_second_xx*state%u**2 +                                     &
                 2.0_wp*B_second_xy*state%u*state%v+B_second_yy*state%v**2
+        ! The mu(I) implicit component is identically zero.
         CALL eval_rheology_mui_semi_implicit(state, mod_vel, grav_coeff, curvature_accel, &
-             use_pore_pressure, sx, sy)
-        CALL eval_rheology_mui_implicit(cs, ix, iy)
-        rate=[sx,sy]+REAL([ix,iy],wp)
+             use_pore_pressure, rate(1), rate(2))
     END SUBROUTINE eval_rheology_mui_explicit
 
     !> \param[in] state Shared real or complex physical state.
