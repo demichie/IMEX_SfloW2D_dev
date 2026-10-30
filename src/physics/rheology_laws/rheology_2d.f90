@@ -66,118 +66,118 @@ MODULE rheology_2d
 CONTAINS
 
   ! Both Newton components are evaluated on the same, unchanged physical state.
-  SUBROUTINE eval_rheology_explicit(model_name, flow_depth, temperature, &
-       velocity_x, velocity_y, speed, horizontal_speed, speed_squared, &
-       mixture_density, inverse_density, reduced_gravity, gravity_coefficient, &
-       solid_fractions, curvature_term, curvature_xx, curvature_xy, curvature_yy, &
-       use_pore_pressure, excess_pore_pressure, moving, use_stochastic, &
+  SUBROUTINE eval_rheology_explicit(model_name, h, T, &
+       u, v, mod_vel, mod_hor_vel, mod_vel2, &
+       rhom, inv_rhom, red_grav, grav_coeff, &
+       alphas, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
+       use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
        stochastic_value, rate)
     CHARACTER(*), INTENT(IN) :: model_name
-    REAL(wp), INTENT(IN) :: flow_depth, temperature, velocity_x, velocity_y
-    REAL(wp), INTENT(IN) :: speed, horizontal_speed, speed_squared
-    REAL(wp), INTENT(IN) :: mixture_density, inverse_density
-    REAL(wp), INTENT(IN) :: reduced_gravity, gravity_coefficient
-    REAL(wp), INTENT(IN) :: solid_fractions(:)
-    REAL(wp), INTENT(IN) :: curvature_xx, curvature_xy, curvature_yy
-    REAL(wp), INTENT(IN) :: excess_pore_pressure, stochastic_value
+    REAL(wp), INTENT(IN) :: h, T, u, v
+    REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
+    REAL(wp), INTENT(IN) :: rhom, inv_rhom
+    REAL(wp), INTENT(IN) :: red_grav, grav_coeff
+    REAL(wp), INTENT(IN) :: alphas(:)
+    REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy
+    REAL(wp), INTENT(IN) :: exc_pore_pres, stochastic_value
     LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
     REAL(wp), INTENT(OUT) :: rate(2)
     SELECT CASE(TRIM(model_name))
     CASE('rheology_voellmy')
        CALL eval_rheology_voellmy_explicit( &
-            flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-            speed_squared, mixture_density, inverse_density, reduced_gravity, &
-            gravity_coefficient, solid_fractions, curvature_term, curvature_xx, &
-            curvature_xy, curvature_yy, use_pore_pressure, excess_pore_pressure, moving, &
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, &
+            B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving, &
             use_stochastic, stochastic_value, rate )
     CASE('rheology_plastic')
        CALL eval_rheology_plastic_explicit( &
-            flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-            speed_squared, mixture_density, inverse_density, reduced_gravity, &
-            gravity_coefficient, solid_fractions, curvature_term, curvature_xx, &
-            curvature_xy, curvature_yy, use_pore_pressure, excess_pore_pressure, moving, &
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, &
+            B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving, &
             use_stochastic, stochastic_value, rate )
     CASE('rheology_lava')
        CALL eval_rheology_lava_explicit( &
-            flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-            speed_squared, mixture_density, inverse_density, reduced_gravity, &
-            gravity_coefficient, solid_fractions, curvature_term, curvature_xx, &
-            curvature_xy, curvature_yy, use_pore_pressure, excess_pore_pressure, moving, &
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, &
+            B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving, &
             use_stochastic, stochastic_value, rate )
     CASE('rheology_lahar')
        CALL eval_rheology_lahar_explicit( &
-            flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-            speed_squared, mixture_density, inverse_density, reduced_gravity, &
-            gravity_coefficient, solid_fractions, curvature_term, curvature_xx, &
-            curvature_xy, curvature_yy, use_pore_pressure, excess_pore_pressure, moving, &
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, &
+            B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving, &
             use_stochastic, stochastic_value, rate )
     CASE('rheology_empirical')
        CALL eval_rheology_empirical_explicit( &
-            flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-            speed_squared, mixture_density, inverse_density, reduced_gravity, &
-            gravity_coefficient, solid_fractions, curvature_term, curvature_xx, &
-            curvature_xy, curvature_yy, use_pore_pressure, excess_pore_pressure, moving, &
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, &
+            B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving, &
             use_stochastic, stochastic_value, rate )
     CASE('rheology_quadratic')
        CALL eval_rheology_quadratic_explicit( &
-            flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-            speed_squared, mixture_density, inverse_density, reduced_gravity, &
-            gravity_coefficient, solid_fractions, curvature_term, curvature_xx, &
-            curvature_xy, curvature_yy, use_pore_pressure, excess_pore_pressure, moving, &
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, &
+            B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving, &
             use_stochastic, stochastic_value, rate )
     CASE('rheology_newmodel')
        CALL eval_rheology_newmodel_explicit( &
-            flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-            speed_squared, mixture_density, inverse_density, reduced_gravity, &
-            gravity_coefficient, solid_fractions, curvature_term, curvature_xx, &
-            curvature_xy, curvature_yy, use_pore_pressure, excess_pore_pressure, moving, &
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, &
+            B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving, &
             use_stochastic, stochastic_value, rate )
     CASE('rheology_froude')
        CALL eval_rheology_froude_explicit( &
-            flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-            speed_squared, mixture_density, inverse_density, reduced_gravity, &
-            gravity_coefficient, solid_fractions, curvature_term, curvature_xx, &
-            curvature_xy, curvature_yy, use_pore_pressure, excess_pore_pressure, moving, &
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, &
+            B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving, &
             use_stochastic, stochastic_value, rate )
     CASE('rheology_lucas')
        CALL eval_rheology_lucas_explicit( &
-            flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-            speed_squared, mixture_density, inverse_density, reduced_gravity, &
-            gravity_coefficient, solid_fractions, curvature_term, curvature_xx, &
-            curvature_xy, curvature_yy, use_pore_pressure, excess_pore_pressure, moving, &
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, &
+            B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving, &
             use_stochastic, stochastic_value, rate )
     CASE('rheology_mui')
        CALL eval_rheology_mui_explicit( &
-            flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-            speed_squared, mixture_density, inverse_density, reduced_gravity, &
-            gravity_coefficient, solid_fractions, curvature_term, curvature_xx, &
-            curvature_xy, curvature_yy, use_pore_pressure, excess_pore_pressure, moving, &
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, &
+            B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving, &
             use_stochastic, stochastic_value, rate )
     CASE('rheology_mui_voellmy')
        CALL eval_rheology_mui_voellmy_explicit( &
-            flow_depth, temperature, velocity_x, velocity_y, speed, horizontal_speed, &
-            speed_squared, mixture_density, inverse_density, reduced_gravity, &
-            gravity_coefficient, solid_fractions, curvature_term, curvature_xx, &
-            curvature_xy, curvature_yy, use_pore_pressure, excess_pore_pressure, moving, &
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, &
+            B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving, &
             use_stochastic, stochastic_value, rate )
     CASE DEFAULT
        CALL fatal_error('Invalid rheology name in explicit dispatch')
     END SELECT
   END SUBROUTINE eval_rheology_explicit
 
-  SUBROUTINE eval_rheology_semi_implicit(model_name, flow_depth,          &
-       velocity_x, velocity_y, speed, horizontal_speed, mixture_density,    &
-       reduced_gravity, gravity_coefficient, solid_fractions, curvature_term, &
-       curvature_xx, curvature_xy, curvature_yy, use_pore_pressure,          &
-       excess_pore_pressure, use_stochastic, stochastic_value, rate)
+  SUBROUTINE eval_rheology_semi_implicit(model_name, h,          &
+       u, v, mod_vel, mod_hor_vel, rhom,    &
+       red_grav, grav_coeff, alphas, curvature_term, &
+       B_second_xx, B_second_xy, B_second_yy, use_pore_pressure,          &
+       exc_pore_pres, use_stochastic, stochastic_value, rate)
 
     CHARACTER(*), INTENT(IN) :: model_name
-    REAL(wp), INTENT(IN) :: flow_depth, velocity_x, velocity_y, speed
-    REAL(wp), INTENT(IN) :: horizontal_speed, mixture_density, reduced_gravity
-    REAL(wp), INTENT(IN) :: gravity_coefficient, solid_fractions(:)
+    REAL(wp), INTENT(IN) :: h, u, v, mod_vel
+    REAL(wp), INTENT(IN) :: mod_hor_vel, rhom, red_grav
+    REAL(wp), INTENT(IN) :: grav_coeff, alphas(:)
     LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, use_stochastic
-    REAL(wp), INTENT(IN) :: curvature_xx, curvature_xy, curvature_yy
-    REAL(wp), INTENT(IN) :: excess_pore_pressure, stochastic_value
+    REAL(wp), INTENT(IN) :: B_second_xx, B_second_xy, B_second_yy
+    REAL(wp), INTENT(IN) :: exc_pore_pres, stochastic_value
     REAL(wp), INTENT(OUT) :: rate(2)
 
     REAL(wp) :: curvature_term_value
@@ -185,44 +185,44 @@ CONTAINS
     rate = 0.0_wp
     SELECT CASE(TRIM(model_name))
     CASE('rheology_voellmy')
-       CALL eval_rheology_voellmy_semi_implicit(flow_depth, velocity_x, &
-            velocity_y, speed, mixture_density, reduced_gravity,             &
-            gravity_coefficient, curvature_term, curvature_xx, curvature_xy, &
-            curvature_yy, use_pore_pressure, excess_pore_pressure,           &
+       CALL eval_rheology_voellmy_semi_implicit(h, u, &
+            v, mod_vel, rhom, red_grav,             &
+            grav_coeff, curvature_term, B_second_xx, B_second_xy, &
+            B_second_yy, use_pore_pressure, exc_pore_pres,           &
             rate(1), rate(2))
     CASE('rheology_lava')
-       CALL eval_rheology_lava_semi_implicit(velocity_x, velocity_y,   &
-            speed, rate(1), rate(2))
+       CALL eval_rheology_lava_semi_implicit(u, v,   &
+            mod_vel, rate(1), rate(2))
     CASE('rheology_lahar')
-       CALL eval_rheology_lahar_semi_implicit(flow_depth, velocity_x,  &
-            velocity_y, horizontal_speed, mixture_density,                  &
-            SUM(solid_fractions), speed .GT. 0.0_wp, rate(1), rate(2))
+       CALL eval_rheology_lahar_semi_implicit(h, u,  &
+            v, mod_hor_vel, rhom,                  &
+            SUM(alphas), mod_vel .GT. 0.0_wp, rate(1), rate(2))
     CASE('rheology_froude')
-       CALL eval_rheology_froude_semi_implicit(flow_depth, velocity_x, velocity_y,   &
-            speed, horizontal_speed, mixture_density, reduced_gravity,      &
-            gravity_coefficient, 0.0_wp, use_stochastic, stochastic_value,  &
+       CALL eval_rheology_froude_semi_implicit(h, u, v,   &
+            mod_vel, mod_hor_vel, rhom, red_grav,      &
+            grav_coeff, 0.0_wp, use_stochastic, stochastic_value,  &
             rate(1), rate(2))
     CASE('rheology_lucas')
-       CALL eval_rheology_lucas_semi_implicit(flow_depth, velocity_x, velocity_y,    &
-            speed, horizontal_speed, mixture_density, reduced_gravity,      &
-            gravity_coefficient, 0.0_wp, use_stochastic, stochastic_value,  &
+       CALL eval_rheology_lucas_semi_implicit(h, u, v,    &
+            mod_vel, mod_hor_vel, rhom, red_grav,      &
+            grav_coeff, 0.0_wp, use_stochastic, stochastic_value,  &
             rate(1), rate(2))
     CASE('rheology_mui')
        curvature_term_value = 0.0_wp
        IF (curvature_term) curvature_term_value = curvature_acceleration(   &
-            curvature_xx, curvature_xy, curvature_yy, velocity_x, velocity_y)
-       CALL eval_rheology_mui_semi_implicit(flow_depth, velocity_x, velocity_y,     &
-            speed, mixture_density, reduced_gravity, gravity_coefficient,  &
-            solid_fractions, curvature_term_value, use_pore_pressure,      &
-            excess_pore_pressure, rate(1), rate(2))
+            B_second_xx, B_second_xy, B_second_yy, u, v)
+       CALL eval_rheology_mui_semi_implicit(h, u, v,     &
+            mod_vel, rhom, red_grav, grav_coeff,  &
+            alphas, curvature_term_value, use_pore_pressure,      &
+            exc_pore_pres, rate(1), rate(2))
     CASE('rheology_mui_voellmy')
        curvature_term_value = 0.0_wp
        IF (curvature_term) curvature_term_value = curvature_acceleration(   &
-            curvature_xx, curvature_xy, curvature_yy, velocity_x, velocity_y)
-       CALL eval_rheology_mui_voellmy_semi_implicit(flow_depth, velocity_x,          &
-            velocity_y, speed, mixture_density, reduced_gravity,            &
-            gravity_coefficient, solid_fractions, curvature_term_value,    &
-            use_pore_pressure, excess_pore_pressure, rate(1), rate(2))
+            B_second_xx, B_second_xy, B_second_yy, u, v)
+       CALL eval_rheology_mui_voellmy_semi_implicit(h, u,          &
+            v, mod_vel, rhom, red_grav,            &
+            grav_coeff, alphas, curvature_term_value,    &
+            use_pore_pressure, exc_pore_pres, rate(1), rate(2))
     CASE('none', 'rheology_plastic', 'rheology_empirical',       &
          'rheology_quadratic', 'rheology_newmodel')
        CONTINUE
@@ -232,16 +232,16 @@ CONTAINS
 
   END SUBROUTINE eval_rheology_semi_implicit
 
-  SUBROUTINE eval_rheology_implicit(model_name, flow_depth, temperature,   &
-       mixture_density, inverse_density, velocity_x, velocity_y, speed,      &
-       horizontal_speed, speed_squared, reduced_gravity, solid_fractions,    &
+  SUBROUTINE eval_rheology_implicit(model_name, h, T,   &
+       rhom, inv_rhom, u, v, mod_vel,      &
+       mod_hor_vel, mod_vel2, red_grav, alphas,    &
        moving, use_stochastic, stochastic_value, rate)
 
     CHARACTER(*), INTENT(IN) :: model_name
-    COMPLEX(wp), INTENT(IN) :: flow_depth, temperature, mixture_density
-    COMPLEX(wp), INTENT(IN) :: inverse_density, velocity_x, velocity_y
-    COMPLEX(wp), INTENT(IN) :: speed, horizontal_speed, speed_squared
-    COMPLEX(wp), INTENT(IN) :: reduced_gravity, solid_fractions(:)
+    COMPLEX(wp), INTENT(IN) :: h, T, rhom
+    COMPLEX(wp), INTENT(IN) :: inv_rhom, u, v
+    COMPLEX(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
+    COMPLEX(wp), INTENT(IN) :: red_grav, alphas(:)
     LOGICAL, INTENT(IN) :: moving, use_stochastic
     REAL(wp), INTENT(IN) :: stochastic_value
     COMPLEX(wp), INTENT(OUT) :: rate(2)
@@ -249,34 +249,34 @@ CONTAINS
     rate = CMPLX(0.0_wp, 0.0_wp, wp)
     SELECT CASE(TRIM(model_name))
     CASE('rheology_voellmy')
-       CALL eval_rheology_voellmy_implicit(velocity_x, velocity_y,      &
-            mixture_density, reduced_gravity, speed, speed_squared, moving,  &
+       CALL eval_rheology_voellmy_implicit(u, v,      &
+            rhom, red_grav, mod_vel, mod_vel2, moving,  &
             use_stochastic, stochastic_value, rate(1), rate(2))
     CASE('rheology_mui_voellmy')
-       CALL eval_rheology_mui_voellmy_implicit(velocity_x, velocity_y,  &
-            mixture_density, reduced_gravity, speed, speed_squared, moving,  &
+       CALL eval_rheology_mui_voellmy_implicit(u, v,  &
+            rhom, red_grav, mod_vel, mod_vel2, moving,  &
             use_stochastic, stochastic_value, rate(1), rate(2))
     CASE('rheology_plastic')
-       CALL eval_rheology_plastic_implicit(velocity_x, velocity_y,      &
-            speed, mixture_density, moving, rate(1), rate(2))
+       CALL eval_rheology_plastic_implicit(u, v,      &
+            mod_vel, rhom, moving, rate(1), rate(2))
     CASE('rheology_lava')
-       CALL eval_rheology_lava_implicit(flow_depth, temperature,        &
-            mixture_density, velocity_x, velocity_y, moving,                &
+       CALL eval_rheology_lava_implicit(h, T,        &
+            rhom, u, v, moving,                &
             rate(1), rate(2))
     CASE('rheology_lahar')
-       CALL eval_rheology_lahar_implicit(flow_depth, velocity_x,        &
-            velocity_y, speed, horizontal_speed, temperature, mixture_density, &
-            inverse_density, solid_fractions, moving, rate(1), rate(2))
+       CALL eval_rheology_lahar_implicit(h, u,        &
+            v, mod_vel, mod_hor_vel, T, rhom, &
+            inv_rhom, alphas, moving, rate(1), rate(2))
     CASE('rheology_empirical')
-       CALL eval_rheology_empirical_implicit(flow_depth, velocity_x,    &
-            velocity_y, horizontal_speed, speed, mixture_density, moving,   &
+       CALL eval_rheology_empirical_implicit(h, u,    &
+            v, mod_hor_vel, mod_vel, rhom, moving,   &
             rate(1), rate(2))
     CASE('rheology_newmodel')
-       CALL eval_rheology_newmodel_implicit(velocity_x,velocity_y, &
-            mixture_density,rate(1),rate(2))
+       CALL eval_rheology_newmodel_implicit(u,v, &
+            rhom,rate(1),rate(2))
     CASE('rheology_quadratic')
-       CALL eval_rheology_quadratic_implicit(velocity_x, velocity_y,   &
-            horizontal_speed, speed_squared, mixture_density, moving,       &
+       CALL eval_rheology_quadratic_implicit(u, v,   &
+            mod_hor_vel, mod_vel2, rhom, moving,       &
             rate(1), rate(2))
     CASE('none', 'rheology_froude', 'rheology_lucas', 'rheology_mui')
        CONTINUE
@@ -286,18 +286,18 @@ CONTAINS
 
   END SUBROUTINE eval_rheology_implicit
 
-  SUBROUTINE solve_rheology_analytic(model_name, integration_step,    &
-       flow_depth, temperature, mixture_density, speed_ratio, velocity_before, &
-       reduced_gravity, gravity_coefficient, solid_fractions,                &
-       curvature_acceleration, use_pore_pressure, excess_pore_pressure,      &
+  SUBROUTINE solve_rheology_analytic(model_name, dt,    &
+       h, T, rhom, speed_ratio, velocity_before, &
+       red_grav, grav_coeff, alphas,                &
+       curvature_acceleration, use_pore_pressure, exc_pore_pres,      &
        use_stochastic, stochastic_value, velocity_after, model_supported)
 
     CHARACTER(*), INTENT(IN) :: model_name
-    REAL(wp), INTENT(IN) :: integration_step, flow_depth, temperature
-    REAL(wp), INTENT(IN) :: mixture_density, speed_ratio
-    REAL(wp), INTENT(IN) :: velocity_before(2), reduced_gravity
-    REAL(wp), INTENT(IN) :: gravity_coefficient, solid_fractions(:)
-    REAL(wp), INTENT(IN) :: curvature_acceleration, excess_pore_pressure
+    REAL(wp), INTENT(IN) :: dt, h, T
+    REAL(wp), INTENT(IN) :: rhom, speed_ratio
+    REAL(wp), INTENT(IN) :: velocity_before(2), red_grav
+    REAL(wp), INTENT(IN) :: grav_coeff, alphas(:)
+    REAL(wp), INTENT(IN) :: curvature_acceleration, exc_pore_pres
     REAL(wp), INTENT(IN) :: stochastic_value
     LOGICAL, INTENT(IN) :: use_pore_pressure, use_stochastic
     REAL(wp), INTENT(OUT) :: velocity_after(2)
@@ -310,48 +310,48 @@ CONTAINS
     CASE ('none')
        CONTINUE
     CASE ('rheology_voellmy')
-       CALL solve_rheology_voellmy_analytic(integration_step, flow_depth,    &
-            speed_ratio, velocity_before, mixture_density, reduced_gravity,  &
-            gravity_coefficient, curvature_acceleration, use_pore_pressure, &
-            excess_pore_pressure, use_stochastic, stochastic_value,         &
+       CALL solve_rheology_voellmy_analytic(dt, h,    &
+            speed_ratio, velocity_before, rhom, red_grav,  &
+            grav_coeff, curvature_acceleration, use_pore_pressure, &
+            exc_pore_pres, use_stochastic, stochastic_value,         &
             velocity_after)
     CASE ('rheology_plastic')
-       CALL solve_rheology_plastic_analytic(integration_step, flow_depth,    &
+       CALL solve_rheology_plastic_analytic(dt, h,    &
             speed_ratio, velocity_before, velocity_after)
     CASE ('rheology_lava')
-       CALL solve_rheology_lava_analytic(integration_step, flow_depth,      &
-            temperature, mixture_density, speed_ratio, velocity_before,     &
+       CALL solve_rheology_lava_analytic(dt, h,      &
+            T, rhom, speed_ratio, velocity_before,     &
             velocity_after)
     CASE ('rheology_lahar')
-       CALL solve_rheology_lahar_analytic(integration_step, flow_depth,     &
-            temperature, SUM(solid_fractions), mixture_density, speed_ratio,&
+       CALL solve_rheology_lahar_analytic(dt, h,     &
+            T, SUM(alphas), rhom, speed_ratio,&
             velocity_before, velocity_after)
     CASE ('rheology_empirical')
-       CALL solve_rheology_empirical_analytic(integration_step, flow_depth, &
+       CALL solve_rheology_empirical_analytic(dt, h, &
             speed_ratio, velocity_before, velocity_after)
     CASE ('rheology_quadratic')
-       CALL solve_rheology_quadratic_analytic(integration_step, flow_depth, &
+       CALL solve_rheology_quadratic_analytic(dt, h, &
             speed_ratio, velocity_before, velocity_after)
     CASE ('rheology_froude')
-       CALL solve_rheology_froude_analytic(integration_step, flow_depth,    &
-            speed_ratio, velocity_before, reduced_gravity,                  &
-            gravity_coefficient, curvature_acceleration, use_stochastic,   &
+       CALL solve_rheology_froude_analytic(dt, h,    &
+            speed_ratio, velocity_before, red_grav,                  &
+            grav_coeff, curvature_acceleration, use_stochastic,   &
             stochastic_value, velocity_after)
     CASE ('rheology_lucas')
-       CALL solve_rheology_lucas_analytic(integration_step, flow_depth,     &
-            speed_ratio, velocity_before, reduced_gravity,                  &
-            gravity_coefficient, curvature_acceleration, use_stochastic,   &
+       CALL solve_rheology_lucas_analytic(dt, h,     &
+            speed_ratio, velocity_before, red_grav,                  &
+            grav_coeff, curvature_acceleration, use_stochastic,   &
             stochastic_value, velocity_after)
     CASE ('rheology_mui')
-       CALL solve_rheology_mui_analytic(integration_step, flow_depth,       &
-            speed_ratio, velocity_before, mixture_density, reduced_gravity, &
-            gravity_coefficient, solid_fractions, curvature_acceleration,   &
-            use_pore_pressure, excess_pore_pressure, velocity_after)
+       CALL solve_rheology_mui_analytic(dt, h,       &
+            speed_ratio, velocity_before, rhom, red_grav, &
+            grav_coeff, alphas, curvature_acceleration,   &
+            use_pore_pressure, exc_pore_pres, velocity_after)
     CASE ('rheology_mui_voellmy')
-       CALL solve_rheology_mui_voellmy_analytic(integration_step,           &
-            flow_depth, speed_ratio, velocity_before, mixture_density,      &
-            reduced_gravity, gravity_coefficient, solid_fractions,           &
-            curvature_acceleration, use_pore_pressure, excess_pore_pressure, &
+       CALL solve_rheology_mui_voellmy_analytic(dt,           &
+            h, speed_ratio, velocity_before, rhom,      &
+            red_grav, grav_coeff, alphas,           &
+            curvature_acceleration, use_pore_pressure, exc_pore_pres, &
             use_stochastic, stochastic_value, velocity_after)
     CASE DEFAULT
        model_supported = .FALSE.
@@ -365,19 +365,19 @@ CONTAINS
   !> \param[in] Bsecond_xx Filtered bed Hessian xx entry [m^-1].
   !> \param[in] Bsecond_xy Filtered bed Hessian xy entry [m^-1].
   !> \param[in] Bsecond_yy Filtered bed Hessian yy entry [m^-1].
-  !> \param[in] velocity_x Cartesian depth-averaged x velocity [m s^-1].
-  !> \param[in] velocity_y Cartesian depth-averaged y velocity [m s^-1].
+  !> \param[in] u Cartesian depth-averaged x velocity [m s^-1].
+  !> \param[in] v Cartesian depth-averaged y velocity [m s^-1].
   !> \return Signed bed-curvature acceleration [m s^-2].
   !******************************************************************************
   PURE FUNCTION curvature_acceleration(Bsecond_xx, Bsecond_xy, Bsecond_yy,  &
-       velocity_x, velocity_y) RESULT(acceleration)
+       u, v) RESULT(acceleration)
 
     REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
-    REAL(wp), INTENT(IN) :: velocity_x, velocity_y
+    REAL(wp), INTENT(IN) :: u, v
     REAL(wp) :: acceleration
 
-    acceleration = Bsecond_xx*velocity_x**2 +                              &
-         2.0_wp*Bsecond_xy*velocity_x*velocity_y + Bsecond_yy*velocity_y**2
+    acceleration = Bsecond_xx*u**2 +                              &
+         2.0_wp*Bsecond_xy*u*v + Bsecond_yy*v**2
 
   END FUNCTION curvature_acceleration
 
@@ -386,17 +386,17 @@ CONTAINS
   !> \details All state values are explicit arguments so the dispatch has no
   !> per-cell workspace allocation or hidden cell-state conversion.
   !> \param[in] model_name Selected rheology identifier.
-  !> \param[in] flow_depth Flow depth [m].
-  !> \param[in] temperature Mixture temperature [K].
-  !> \param[in] mixture_density Mixture density [kg m^-3].
-  !> \param[in] inverse_density Reciprocal mixture density [m^3 kg^-1].
-  !> \param[in] velocity_x x velocity [m s^-1].
-  !> \param[in] velocity_y y velocity [m s^-1].
-  !> \param[in] speed Total flow-speed magnitude [m s^-1].
-  !> \param[in] horizontal_speed Horizontal flow-speed magnitude [m s^-1].
-  !> \param[in] speed_squared Squared flow-speed magnitude [m^2 s^-2].
-  !> \param[in] reduced_gravity Reduced gravitational acceleration [m s^-2].
-  !> \param[in] solid_fractions Solid volume fractions, one per class.
+  !> \param[in] h Flow depth [m].
+  !> \param[in] T Mixture T [K].
+  !> \param[in] rhom Mixture density [kg m^-3].
+  !> \param[in] inv_rhom Reciprocal mixture density [m^3 kg^-1].
+  !> \param[in] u x velocity [m s^-1].
+  !> \param[in] v y velocity [m s^-1].
+  !> \param[in] mod_vel Total flow-mod_vel magnitude [m s^-1].
+  !> \param[in] mod_hor_vel Horizontal flow-mod_vel magnitude [m s^-1].
+  !> \param[in] mod_vel2 Squared flow-mod_vel magnitude [m^2 s^-2].
+  !> \param[in] red_grav Reduced gravitational acceleration [m s^-2].
+  !> \param[in] alphas Solid volume fractions, one per class.
   !> \param[in] moving True when the flow is moving.
   !> \param[in] use_stochastic Enable the stochastic rheology correction.
   !> \param[in] stochastic_value Local stochastic-process value.
@@ -409,21 +409,21 @@ CONTAINS
   !> \details Curvature acceleration is used by the MUI-family laws only,
   !> matching their existing equation-term assembly semantics.
   !> \param[in] model_name Selected rheology identifier.
-  !> \param[in] flow_depth Flow depth [m].
-  !> \param[in] velocity_x x velocity [m s^-1].
-  !> \param[in] velocity_y y velocity [m s^-1].
-  !> \param[in] speed Total flow-speed magnitude [m s^-1].
-  !> \param[in] horizontal_speed Horizontal flow-speed magnitude [m s^-1].
-  !> \param[in] mixture_density Mixture density [kg m^-3].
-  !> \param[in] reduced_gravity Reduced gravitational acceleration [m s^-2].
-  !> \param[in] gravity_coefficient Effective gravity multiplier [dimensionless].
-  !> \param[in] solid_fractions Solid volume fractions, one per class.
+  !> \param[in] h Flow depth [m].
+  !> \param[in] u x velocity [m s^-1].
+  !> \param[in] v y velocity [m s^-1].
+  !> \param[in] mod_vel Total flow-mod_vel magnitude [m s^-1].
+  !> \param[in] mod_hor_vel Horizontal flow-mod_vel magnitude [m s^-1].
+  !> \param[in] rhom Mixture density [kg m^-3].
+  !> \param[in] red_grav Reduced gravitational acceleration [m s^-2].
+  !> \param[in] grav_coeff Effective gravity multiplier [dimensionless].
+  !> \param[in] alphas Solid volume fractions, one per class.
   !> \param[in] curvature_term Enable curvature acceleration for applicable laws.
-  !> \param[in] curvature_xx Bed curvature in xx [m^-1].
-  !> \param[in] curvature_xy Bed curvature in xy [m^-1].
-  !> \param[in] curvature_yy Bed curvature in yy [m^-1].
+  !> \param[in] B_second_xx Bed curvature in xx [m^-1].
+  !> \param[in] B_second_xy Bed curvature in xy [m^-1].
+  !> \param[in] B_second_yy Bed curvature in yy [m^-1].
   !> \param[in] use_pore_pressure Enable the pore-pressure correction.
-  !> \param[in] excess_pore_pressure Excess pore pressure [Pa].
+  !> \param[in] exc_pore_pres Excess pore pressure [Pa].
   !> \param[in] use_stochastic Enable the stochastic rheology correction.
   !> \param[in] stochastic_value Local stochastic-process value.
   !> \param[out] rate x/y conservative momentum source rates [kg m^-1 s^-2].
@@ -435,18 +435,18 @@ CONTAINS
   !>          values are passed explicitly; unsupported model IDs leave the
   !>          output equal to the input and return model_supported as false.
   !> \param[in] model_name Rheology model ID.
-  !> \param[in] integration_step Exact-flow interval [s].
-  !> \param[in] flow_depth Flow depth [m].
-  !> \param[in] temperature Flow temperature [K].
-  !> \param[in] mixture_density Mixture density [kg m^-3].
-  !> \param[in] speed_ratio Total-to-horizontal speed ratio.
+  !> \param[in] dt Exact-flow interval [s].
+  !> \param[in] h Flow depth [m].
+  !> \param[in] T Flow T [K].
+  !> \param[in] rhom Mixture density [kg m^-3].
+  !> \param[in] speed_ratio Total-to-horizontal mod_vel ratio.
   !> \param[in] velocity_before Horizontal velocity before integration [m s^-1].
-  !> \param[in] reduced_gravity Reduced gravity [m s^-2].
-  !> \param[in] gravity_coefficient Gravity coefficient used by rheology laws.
-  !> \param[in] solid_fractions Per-class solid volume fractions.
+  !> \param[in] red_grav Reduced gravity [m s^-2].
+  !> \param[in] grav_coeff Gravity coefficient used by rheology laws.
+  !> \param[in] alphas Per-class solid volume fractions.
   !> \param[in] curvature_acceleration Signed bed-curvature acceleration [m s^-2].
   !> \param[in] use_pore_pressure Whether excess pore pressure is active.
-  !> \param[in] excess_pore_pressure Excess pore pressure.
+  !> \param[in] exc_pore_pres Excess pore pressure.
   !> \param[in] use_stochastic Whether stochastic forcing is active.
   !> \param[in] stochastic_value Local stochastic rheology value.
   !> \param[out] velocity_after Horizontal velocity after integration [m s^-1].

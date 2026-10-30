@@ -49,32 +49,32 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Validate inputs to a module-level exact velocity solve.
-  !> \param[in] integration_step Exact-flow interval [s].
-  !> \param[in] flow_depth Flow depth [m].
-  !> \param[in] speed_ratio Ratio of total to horizontal speed.
-  !> \param[in] speed_before Initial speed magnitude [m s^-1].
+  !> \param[in] dt Exact-flow interval [s].
+  !> \param[in] h Flow depth [m].
+  !> \param[in] speed_ratio Ratio of total to horizontal mod_vel.
+  !> \param[in] speed_before Initial mod_vel magnitude [m s^-1].
   !> \param[in] rheology_name Model name used to identify validation errors.
   !******************************************************************************
-  SUBROUTINE validate_analytic_velocity_inputs(integration_step, flow_depth, &
+  SUBROUTINE validate_analytic_velocity_inputs(dt, h, &
        speed_ratio, speed_before, rheology_name)
 
-    REAL(wp), INTENT(IN) :: integration_step, flow_depth, speed_ratio
+    REAL(wp), INTENT(IN) :: dt, h, speed_ratio
     REAL(wp), INTENT(IN) :: speed_before
     CHARACTER(LEN=*), INTENT(IN) :: rheology_name
 
-    IF (integration_step .LT. 0.0_wp) THEN
+    IF (dt .LT. 0.0_wp) THEN
        CALL fatal_analytic_input_error('Negative integration step in '//TRIM(rheology_name)//' exact solver')
     END IF
-    IF (integration_step .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+    IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
 
-    IF (flow_depth .LE. 0.0_wp) THEN
+    IF (h .LE. 0.0_wp) THEN
        CALL fatal_analytic_input_error('Nonpositive flow depth in '//TRIM(rheology_name)//' analytic solver')
     END IF
     IF (speed_ratio .LE. 0.0_wp) THEN
-       CALL fatal_analytic_input_error('Nonpositive speed ratio in '//TRIM(rheology_name)//' analytic solver')
+       CALL fatal_analytic_input_error('Nonpositive mod_vel ratio in '//TRIM(rheology_name)//' analytic solver')
     END IF
-    IF (.NOT. ieee_is_finite(integration_step) .OR.                         &
-         .NOT. ieee_is_finite(flow_depth) .OR.                              &
+    IF (.NOT. ieee_is_finite(dt) .OR.                         &
+         .NOT. ieee_is_finite(h) .OR.                              &
          .NOT. ieee_is_finite(speed_ratio) .OR.                             &
          .NOT. ieee_is_finite(speed_before)) THEN
        CALL fatal_analytic_input_error('Nonfinite input in '//TRIM(rheology_name)//' exact solver')
@@ -91,8 +91,8 @@ CONTAINS
   !> \param[in] flow_model Exact-flow law identifier.
   !> \param[in] coefficients Model-specific frozen decay coefficients.
   !> \param[in] time_step Integration interval [s].
-  !> \param[in] speed_before Initial speed magnitude [m s^-1].
-  !> \param[out] speed_after Integrated speed magnitude [m s^-1].
+  !> \param[in] speed_before Initial mod_vel magnitude [m s^-1].
+  !> \param[out] speed_after Integrated mod_vel magnitude [m s^-1].
   !******************************************************************************
   SUBROUTINE solve_exact_velocity_flow(flow_model, coefficients, time_step, &
        speed_before, speed_after)
@@ -405,8 +405,8 @@ CONTAINS
   !> \brief Advance a polynomial drag law c + a*r + b*r**2.
   !> \param[in] coefficients Constant, linear, and quadratic drag coefficients.
   !> \param[in] time_step Integration interval [s].
-  !> \param[in] speed_before Initial speed magnitude [m s^-1].
-  !> \param[out] speed_after Integrated speed magnitude [m s^-1].
+  !> \param[in] speed_before Initial mod_vel magnitude [m s^-1].
+  !> \param[out] speed_after Integrated mod_vel magnitude [m s^-1].
   !******************************************************************************
   SUBROUTINE solve_quadratic_polynomial_flow(coefficients, time_step,       &
        speed_before, speed_after)
@@ -485,16 +485,16 @@ CONTAINS
 
   !******************************************************************************
   !> \brief Evaluate the elapsed time for a quadratic polynomial decay law.
-  !> \param[in] speed Speed at which to evaluate the separated time integral [m s^-1].
+  !> \param[in] mod_vel mod_vel at which to evaluate the separated time integral [m s^-1].
   !> \param[in] constant_drag Constant decay coefficient.
   !> \param[in] linear_drag Linear decay coefficient.
   !> \param[in] quadratic_drag Quadratic decay coefficient.
-  !> \return Elapsed time from zero speed to the supplied speed [s].
+  !> \return Elapsed time from zero mod_vel to the supplied mod_vel [s].
   !******************************************************************************
-  PURE FUNCTION quadratic_decay_time(speed, constant_drag, linear_drag,     &
+  PURE FUNCTION quadratic_decay_time(mod_vel, constant_drag, linear_drag,     &
        quadratic_drag) RESULT(time)
 
-    REAL(wp), INTENT(IN) :: speed, constant_drag, linear_drag, quadratic_drag
+    REAL(wp), INTENT(IN) :: mod_vel, constant_drag, linear_drag, quadratic_drag
     REAL(wp) :: time, discriminant, root_discriminant, numerator, denominator
 
     discriminant = 4.0_wp*quadratic_drag*constant_drag-linear_drag**2
@@ -502,15 +502,15 @@ CONTAINS
          MAX(1.0_wp, linear_drag**2,                                       &
          4.0_wp*quadratic_drag*constant_drag)) THEN
        time = 2.0_wp/linear_drag - 2.0_wp/                                  &
-            (2.0_wp*quadratic_drag*speed+linear_drag)
+            (2.0_wp*quadratic_drag*mod_vel+linear_drag)
     ELSEIF (discriminant .GT. 0.0_wp) THEN
        root_discriminant = SQRT(discriminant)
        time = 2.0_wp/root_discriminant *                                    &
-            (ATAN((2.0_wp*quadratic_drag*speed+linear_drag)/                &
+            (ATAN((2.0_wp*quadratic_drag*mod_vel+linear_drag)/                &
             root_discriminant)-ATAN(linear_drag/root_discriminant))
     ELSE
        root_discriminant = SQRT(-discriminant)
-       numerator = 2.0_wp*quadratic_drag*speed + linear_drag
+       numerator = 2.0_wp*quadratic_drag*mod_vel + linear_drag
        denominator = (numerator-root_discriminant) /                        &
             (numerator+root_discriminant)
        time = (LOG(denominator)-LOG((linear_drag-root_discriminant)/        &
@@ -520,12 +520,12 @@ CONTAINS
   END FUNCTION quadratic_decay_time
 
   !******************************************************************************
-  !> \brief Invert the exact separated time integral for nonlinear speed laws.
+  !> \brief Invert the exact separated time integral for nonlinear mod_vel laws.
   !> \param[in] flow_model Exact-flow law identifier.
   !> \param[in] coefficients Model-specific frozen decay coefficients.
   !> \param[in] time_step Integration interval [s].
-  !> \param[in] speed_before Initial speed magnitude [m s^-1].
-  !> \param[out] speed_after Integrated speed magnitude [m s^-1].
+  !> \param[in] speed_before Initial mod_vel magnitude [m s^-1].
+  !> \param[out] speed_after Integrated mod_vel magnitude [m s^-1].
   !******************************************************************************
   SUBROUTINE solve_by_exact_time_integral(flow_model, coefficients, time_step, &
        speed_before, speed_after)
@@ -575,33 +575,33 @@ CONTAINS
   END SUBROUTINE solve_by_exact_time_integral
 
   !******************************************************************************
-  !> \brief Evaluate the frozen-coefficient scalar speed-decay rate.
+  !> \brief Evaluate the frozen-coefficient scalar mod_vel-decay rate.
   !> \param[in] flow_model Exact-flow law identifier.
   !> \param[in] coefficients Model-specific frozen decay coefficients.
-  !> \param[in] speed Speed magnitude at which to evaluate the decay [m s^-1].
-  !> \return Nonnegative scalar speed-decay rate [m s^-2].
+  !> \param[in] mod_vel mod_vel magnitude at which to evaluate the decay [m s^-1].
+  !> \return Nonnegative scalar mod_vel-decay rate [m s^-2].
   !******************************************************************************
-  PURE FUNCTION velocity_decay_rate(flow_model, coefficients, speed)        &
+  PURE FUNCTION velocity_decay_rate(flow_model, coefficients, mod_vel)        &
        RESULT(rate)
 
     INTEGER, INTENT(IN) :: flow_model
-    REAL(wp), INTENT(IN) :: coefficients(:), speed
+    REAL(wp), INTENT(IN) :: coefficients(:), mod_vel
     REAL(wp) :: rate, friction_speed
 
     SELECT CASE (flow_model)
     CASE (EXACT_FLOW_QUADRATIC_POLYNOMIAL)
-       rate = coefficients(1) + coefficients(2)*speed +                    &
-            coefficients(3)*speed**2
+       rate = coefficients(1) + coefficients(2)*mod_vel +                    &
+            coefficients(3)*mod_vel**2
     CASE (EXACT_FLOW_FROUDE)
-       IF (coefficients(2)*speed+coefficients(3) .LE. 0.0_wp) THEN
+       IF (coefficients(2)*mod_vel+coefficients(3) .LE. 0.0_wp) THEN
           rate = coefficients(1)*coefficients(4)
        ELSE
           rate = coefficients(1) * (coefficients(5) +                      &
                (coefficients(4)-coefficients(5))*EXP(                      &
-               -coefficients(2)*speed-coefficients(3)))
+               -coefficients(2)*mod_vel-coefficients(3)))
        END IF
     CASE (EXACT_FLOW_LUCAS)
-       friction_speed = coefficients(2)*speed + coefficients(3)
+       friction_speed = coefficients(2)*mod_vel + coefficients(3)
        IF (coefficients(7) .GT. 0.5_wp .OR.                               &
             friction_speed .LT. coefficients(6)) THEN
           rate = coefficients(1)*coefficients(4)
@@ -612,23 +612,23 @@ CONTAINS
           rate = coefficients(1)*coefficients(4)
        END IF
     CASE (EXACT_FLOW_MUI)
-       IF (coefficients(4)+coefficients(5)*speed .GT. TINY(1.0_wp)) THEN
-          rate = (coefficients(1) + coefficients(2)*speed +                 &
-               coefficients(3)*speed**2) /                                &
-               (coefficients(4) + coefficients(5)*speed)
+       IF (coefficients(4)+coefficients(5)*mod_vel .GT. TINY(1.0_wp)) THEN
+          rate = (coefficients(1) + coefficients(2)*mod_vel +                 &
+               coefficients(3)*mod_vel**2) /                                &
+               (coefficients(4) + coefficients(5)*mod_vel)
        ELSEIF (coefficients(5) .GT. 0.0_wp) THEN
           rate = coefficients(2)/coefficients(5)
        ELSE
           rate = 0.0_wp
        END IF
     CASE (EXACT_FLOW_MUI_VOELLMY)
-       IF (coefficients(4)+coefficients(5)*speed .GT. TINY(1.0_wp)) THEN
-          rate = (coefficients(1) + coefficients(2)*speed +                 &
-               coefficients(3)*speed**2) /                                &
-               (coefficients(4) + coefficients(5)*speed) +                &
-               coefficients(6)*speed**2
+       IF (coefficients(4)+coefficients(5)*mod_vel .GT. TINY(1.0_wp)) THEN
+          rate = (coefficients(1) + coefficients(2)*mod_vel +                 &
+               coefficients(3)*mod_vel**2) /                                &
+               (coefficients(4) + coefficients(5)*mod_vel) +                &
+               coefficients(6)*mod_vel**2
        ELSEIF (coefficients(5) .GT. 0.0_wp) THEN
-          rate = coefficients(2)/coefficients(5) + coefficients(6)*speed**2
+          rate = coefficients(2)/coefficients(5) + coefficients(6)*mod_vel**2
        ELSE
           rate = 0.0_wp
        END IF
@@ -642,9 +642,9 @@ CONTAINS
   !> \brief Integrate reciprocal decay rate with adaptive Simpson quadrature.
   !> \param[in] flow_model Exact-flow law identifier.
   !> \param[in] coefficients Model-specific frozen decay coefficients.
-  !> \param[in] lower Lower speed bound [m s^-1].
-  !> \param[in] upper Upper speed bound [m s^-1].
-  !> \return Elapsed time across the speed interval [s].
+  !> \param[in] lower Lower mod_vel bound [m s^-1].
+  !> \param[in] upper Upper mod_vel bound [m s^-1].
+  !> \return Elapsed time across the mod_vel interval [s].
   !******************************************************************************
   FUNCTION integrate_inverse_decay_rate(flow_model, coefficients, lower,   &
        upper) RESULT(integral)
@@ -679,12 +679,12 @@ CONTAINS
   END FUNCTION integrate_inverse_decay_rate
 
   !******************************************************************************
-  !> \brief Integrate reciprocal decay rate over one smooth speed interval.
+  !> \brief Integrate reciprocal decay rate over one smooth mod_vel interval.
   !> \param[in] flow_model Exact-flow law identifier.
   !> \param[in] coefficients Model-specific frozen decay coefficients.
-  !> \param[in] lower Lower speed bound [m s^-1].
-  !> \param[in] upper Upper speed bound [m s^-1].
-  !> \return Elapsed time across the speed interval [s].
+  !> \param[in] lower Lower mod_vel bound [m s^-1].
+  !> \param[in] upper Upper mod_vel bound [m s^-1].
+  !> \return Elapsed time across the mod_vel interval [s].
   !******************************************************************************
   FUNCTION integrate_inverse_interval(flow_model, coefficients, lower, upper) &
        RESULT(integral)
@@ -709,8 +709,8 @@ CONTAINS
   !> \brief Recursively refine a Simpson estimate of reciprocal decay rate.
   !> \param[in] flow_model Exact-flow law identifier.
   !> \param[in] coefficients Model-specific frozen decay coefficients.
-  !> \param[in] lower Lower speed bound [m s^-1].
-  !> \param[in] upper Upper speed bound [m s^-1].
+  !> \param[in] lower Lower mod_vel bound [m s^-1].
+  !> \param[in] upper Upper mod_vel bound [m s^-1].
   !> \param[in] f_lower Reciprocal decay rate at the lower endpoint.
   !> \param[in] f_middle Reciprocal decay rate at the interval midpoint.
   !> \param[in] f_upper Reciprocal decay rate at the upper endpoint.
@@ -755,19 +755,19 @@ CONTAINS
   END FUNCTION adaptive_simpson
 
   !******************************************************************************
-  !> \brief Evaluate the reciprocal of the frozen scalar speed-decay rate.
+  !> \brief Evaluate the reciprocal of the frozen scalar mod_vel-decay rate.
   !> \param[in] flow_model Exact-flow law identifier.
   !> \param[in] coefficients Model-specific frozen decay coefficients.
-  !> \param[in] speed Speed magnitude at which to evaluate the reciprocal [m s^-1].
+  !> \param[in] mod_vel mod_vel magnitude at which to evaluate the reciprocal [m s^-1].
   !> \return Reciprocal decay rate, or a large sentinel for a zero rate.
   !******************************************************************************
-  FUNCTION inverse_rate(flow_model, coefficients, speed) RESULT(value)
+  FUNCTION inverse_rate(flow_model, coefficients, mod_vel) RESULT(value)
 
     INTEGER, INTENT(IN) :: flow_model
-    REAL(wp), INTENT(IN) :: coefficients(:), speed
+    REAL(wp), INTENT(IN) :: coefficients(:), mod_vel
     REAL(wp) :: value, rate
 
-    rate = velocity_decay_rate(flow_model, coefficients, speed)
+    rate = velocity_decay_rate(flow_model, coefficients, mod_vel)
     IF (.NOT. ieee_is_finite(rate)) THEN
        CALL fatal_analytic_input_error('Nonfinite source rate in exact velocity integrator')
     END IF
