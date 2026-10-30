@@ -58,8 +58,12 @@ MODULE rheology_lahar_2d
         MODULE PROCEDURE eval_lahar_fluid_viscosity_real
         MODULE PROCEDURE eval_lahar_fluid_viscosity_complex
     END INTERFACE eval_lahar_fluid_viscosity
-    ! Uniform source treatment entry points. Existing kernels remain unchanged.
+
 CONTAINS
+
+    !> \brief Evaluate the combined lahar momentum source.
+    !> \details Sum the yield-stress and viscous/turbulent contributions for a real state.
+    !> \note Physical argument names follow the solver conventions.
 
     SUBROUTINE eval_rheology_lahar_explicit( &
             h, T, u, v, mod_vel, mod_hor_vel, &
@@ -77,6 +81,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
+
         CALL eval_rheology_lahar_semi_implicit( &
             h, u, v, mod_hor_vel, rhom, &
             SUM(alphas), moving, sx, sy )
@@ -89,6 +94,10 @@ CONTAINS
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_lahar_explicit
 
+    !> \brief Evaluate the lahar yield-stress contribution.
+    !> \details Return basal yield resistance projected onto the horizontal velocity.
+    !> \note Physical argument names follow the solver conventions.
+
     SUBROUTINE eval_rheology_lahar_semi_implicit(h, u, v, &
             mod_hor_vel, rhom, alphas_tot, moving,          &
             rate_x, rate_y)
@@ -98,20 +107,27 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
         REAL(wp) :: yield_strength, yield_slope, friction_term
         REAL(wp), PARAMETER :: depth_threshold = 1.0E-20_wp
+
         rate_x = 0.0_wp
         rate_y = 0.0_wp
         IF (.NOT. moving) RETURN
         yield_strength = alpha2 * (EXP(beta2 * alphas_tot) - 1.0_wp)
         IF (h .GT. depth_threshold) THEN
             yield_slope = yield_strength / (grav * rhom * h)
+
         ELSE
             yield_slope = yield_strength / (grav * rhom * depth_threshold)
+
         END IF
 
         friction_term = grav * rhom * h * yield_slope
         rate_x = -friction_term * u / mod_hor_vel
         rate_y = -friction_term * v / mod_hor_vel
     END SUBROUTINE eval_rheology_lahar_semi_implicit
+
+    !> \brief Evaluate temperature-dependent viscous and turbulent lahar drag.
+    !> \details Use complex arithmetic to preserve derivatives for the implicit Jacobian.
+    !> \note Physical argument names follow the solver conventions.
 
     SUBROUTINE eval_rheology_lahar_implicit(h, u, v,    &
             mod_vel, mod_hor_vel, T, rhom, inv_rhom, &
@@ -125,12 +141,15 @@ CONTAINS
         COMPLEX(wp) :: fluid_viscosity, inverse_depth, viscous_slope
         COMPLEX(wp) :: turbulent_slope, total_slope, friction_term
         REAL(wp) :: depth_threshold
+
         rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
         rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
         IF (wp .EQ. sp) THEN
             depth_threshold = 1.0E-10_wp
+
         ELSE
             depth_threshold = 1.0E-20_wp
+
         END IF
 
         fluid_viscosity = eval_lahar_fluid_viscosity(T, SUM(alphas))
@@ -139,10 +158,12 @@ CONTAINS
             viscous_slope = Kappa * fluid_viscosity * mod_vel * 0.125_wp *          &
                     inv_rhom * inv_grav * inverse_depth**2
             turbulent_slope = n_td2 * mod_vel**2 * inverse_depth**four_thirds
+
         ELSE
             viscous_slope = Kappa * fluid_viscosity * mod_vel /                    &
                     (8.0_wp * rhom * grav * depth_threshold**2)
             turbulent_slope = n_td2 * mod_vel**2 * depth_threshold**neg_four_thirds
+
         END IF
 
         total_slope = viscous_slope + turbulent_slope
@@ -151,6 +172,10 @@ CONTAINS
         rate_x = -u * friction_term
         rate_y = -v * friction_term
     END SUBROUTINE eval_rheology_lahar_implicit
+
+    !> \brief Integrate the frozen lahar momentum source analytically.
+    !> \details Keep depth, temperature, composition and density fixed over the substep.
+    !> \note Physical argument names follow the solver conventions.
 
     SUBROUTINE solve_rheology_lahar_analytic(dt, h,   &
             T, alphas_tot, rhom, speed_ratio,       &
@@ -162,6 +187,7 @@ CONTAINS
         REAL(wp) :: speed_before, speed_after, effective_depth, depth_threshold
         REAL(wp) :: fluid_viscosity, yield_strength
         REAL(wp) :: constant_drag, linear_drag, quadratic_drag
+
         velocity_after = velocity_before
         speed_before = SQRT(SUM(velocity_before**2))
         CALL validate_analytic_velocity_inputs(dt, h,    &
@@ -169,12 +195,15 @@ CONTAINS
         IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
         IF (rhom .LE. 0.0_wp) THEN
             CALL fatal_analytic_input_error('Nonpositive mixture density in lahar analytic solver')
+
         END IF
 
         IF (wp .EQ. sp) THEN
             depth_threshold = 1.0E-10_wp
+
         ELSE
             depth_threshold = 1.0E-20_wp
+
         END IF
 
         effective_depth = MAX(h, depth_threshold)
@@ -192,34 +221,46 @@ CONTAINS
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_lahar_analytic
 
+    !> \brief Evaluate real-valued carrier-fluid viscosity.
+    !> \note Physical argument names follow the solver conventions.
+
     FUNCTION eval_lahar_fluid_viscosity_real(T, alphas_tot)  &
             RESULT(fluid_viscosity)
         REAL(wp), INTENT(IN) :: T, alphas_tot
         REAL(wp) :: fluid_viscosity
         COMPLEX(wp) :: complex_viscosity
+
         complex_viscosity = eval_lahar_fluid_viscosity_complex(                  &
                 CMPLX(T,0.0_wp,wp),CMPLX(alphas_tot,0.0_wp,wp))
         fluid_viscosity = REAL(complex_viscosity,wp)
     END FUNCTION eval_lahar_fluid_viscosity_real
+
+    !> \brief Evaluate complex-valued carrier-fluid viscosity.
+    !> \details Preserve the temperature and concentration derivatives for complex-step differentiation.
+    !> \note Physical argument names follow the solver conventions.
+
     FUNCTION eval_lahar_fluid_viscosity_complex(T, alphas_tot) &
             RESULT(fluid_viscosity)
         COMPLEX(wp), INTENT(IN) :: T, alphas_tot
         COMPLEX(wp) :: fluid_viscosity
         COMPLEX(wp) :: temperature_celsius, exponent_a, exponent_b, alpha1
+
         temperature_celsius = T - 273.15_wp
         IF (REAL(temperature_celsius, wp) .LT. 20.0_wp) THEN
             exponent_a = 1301.0_wp / (998.333_wp + 8.1855_wp *                    &
                     (temperature_celsius - 20.0_wp) + 0.00585_wp *                   &
                     (temperature_celsius - 20.0_wp)**2) - 1.30223_wp
             alpha1 = alpha1_coeff * 1.0E-3_wp * 10.0_wp**exponent_a
+
         ELSE
             exponent_b = (1.3272_wp * (20.0_wp - temperature_celsius)             &
                     - 0.001053_wp * (temperature_celsius - 20.0_wp)**2)              &
                     / (temperature_celsius + 105.0_wp)
             alpha1 = alpha1_coeff * 1.002E-3_wp * 10.0_wp**exponent_b
+
         END IF
 
         fluid_viscosity = alpha1 * EXP(beta1 * alphas_tot)
     END FUNCTION eval_lahar_fluid_viscosity_complex
-    ! Unsupported physical treatment, rejected by the source catalog.
+
 END MODULE rheology_lahar_2d
