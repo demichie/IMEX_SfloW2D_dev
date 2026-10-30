@@ -68,32 +68,20 @@ CONTAINS
 
     ! Both Newton components are evaluated on the same, unchanged physical state.
 
-    !> \brief Dispatch and evaluate the full real-valued rheology source.
-    !> \details Choose the requested law by its canonical name and evaluate the momentum
-    !> contributions using one consistent physical state.
+    !> \brief Dispatch the explicit real-valued rheology momentum source.
     !> \param[in] model_name Canonical rheology model name.
-    !> \param[in] h Flow depth [m].
-    !> \param[in] T Temperature [K].
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_vel Three-dimensional velocity magnitude [m s^-1].
+    !> \param[in] state Shared real-valued physical state.
+    !> \param[in] mod_vel Total speed [m s^-1].
     !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
     !> \param[in] mod_vel2 Squared total speed [m^2 s^-2].
-    !> \param[in] rhom Mixture density [kg m^-3].
-    !> \param[in] inv_rhom Inverse mixture density [m^3 kg^-1].
-    !> \param[in] red_grav Reduced gravity [m s^-2].
     !> \param[in] grav_coeff Topographic gravity correction.
-    !> \param[in] alphas Solid volume fractions.
-    !> \param[in] curvature_term Whether topographic curvature modifies the normal stress.
-    !> \param[in] B_second_xx Topographic second derivative in x [m^-1].
-    !> \param[in] B_second_xy Mixed topographic second derivative [m^-1].
-    !> \param[in] B_second_yy Topographic second derivative in y [m^-1].
-    !> \param[in] use_pore_pressure Whether excess pore pressure reduces effective normal stress.
-    !> \param[in] exc_pore_pres Excess pore pressure [Pa].
-    !> \param[in] moving Whether the local flow state is moving.
-    !> \param[in] use_stochastic Whether stochastic model coefficients are used.
-    !> \param[in] stochastic_value Stochastic rheology coefficient used by the selected model.
-    !> \param[out] rate Horizontal momentum source vector.
+    !> \param[in] curvature_term Enable curvature-dependent normal stress.
+    !> \param[in] B_second_xx, B_second_xy, B_second_yy Bed Hessian entries [m^-1].
+    !> \param[in] use_pore_pressure Enable effective-stress pore-pressure correction.
+    !> \param[in] moving Whether the flow is moving.
+    !> \param[in] use_stochastic Enable stochastic rheology coefficient.
+    !> \param[in] stochastic_value Stochastic rheology coefficient.
+    !> \param[out] rate Two-component momentum source.
     SUBROUTINE eval_rheology_explicit(model_name, state, mod_vel, mod_hor_vel, mod_vel2, &
             grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
             use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
@@ -105,15 +93,6 @@ CONTAINS
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate(2)
 
-        ASSOCIATE(h => state%h, &
-            T => state%T, &
-            u => state%u, &
-            v => state%v, &
-            rhom => state%rho_m, &
-            inv_rhom => state%inv_rhom, &
-            red_grav => state%red_grav, &
-            alphas => state%alphas, &
-            exc_pore_pres => state%exc_pore_pres)
         SELECT CASE(TRIM(model_name))
         CASE('rheology_voellmy')
             CALL eval_rheology_voellmy_explicit(state, &
@@ -204,32 +183,20 @@ CONTAINS
             CALL fatal_error('Invalid rheology name in explicit dispatch')
 
         END SELECT
-        END ASSOCIATE
-
     END SUBROUTINE eval_rheology_explicit
 
-    !> \brief Evaluate the rheology source contribution.
-    !> \details Select the model's semi-implicit momentum resistance without changing state
-    !> variables.
+    !> \brief Dispatch the semi-implicit real-valued rheology momentum source.
     !> \param[in] model_name Canonical rheology model name.
-    !> \param[in] h Flow depth [m].
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_vel Three-dimensional velocity magnitude [m s^-1].
+    !> \param[in] state Shared real-valued physical state.
+    !> \param[in] mod_vel Total speed [m s^-1].
     !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
-    !> \param[in] rhom Mixture density [kg m^-3].
-    !> \param[in] red_grav Reduced gravity [m s^-2].
     !> \param[in] grav_coeff Topographic gravity correction.
-    !> \param[in] alphas Solid volume fractions.
-    !> \param[in] curvature_term Whether topographic curvature modifies the normal stress.
-    !> \param[in] B_second_xx Topographic second derivative in x [m^-1].
-    !> \param[in] B_second_xy Mixed topographic second derivative [m^-1].
-    !> \param[in] B_second_yy Topographic second derivative in y [m^-1].
-    !> \param[in] use_pore_pressure Whether excess pore pressure reduces effective normal stress.
-    !> \param[in] exc_pore_pres Excess pore pressure [Pa].
-    !> \param[in] use_stochastic Whether stochastic model coefficients are used.
-    !> \param[in] stochastic_value Stochastic rheology coefficient used by the selected model.
-    !> \param[out] rate Horizontal momentum source vector.
+    !> \param[in] curvature_term Enable curvature-dependent normal stress.
+    !> \param[in] B_second_xx, B_second_xy, B_second_yy Bed Hessian entries [m^-1].
+    !> \param[in] use_pore_pressure Enable pore-pressure correction.
+    !> \param[in] use_stochastic Enable stochastic rheology coefficient.
+    !> \param[in] stochastic_value Stochastic rheology coefficient.
+    !> \param[out] rate Two-component momentum source.
     SUBROUTINE eval_rheology_semi_implicit(model_name, state, mod_vel, mod_hor_vel, grav_coeff, curvature_term, &
             B_second_xx, B_second_xy, B_second_yy, use_pore_pressure, &
             use_stochastic, stochastic_value, rate)
@@ -244,13 +211,7 @@ CONTAINS
         REAL(wp) :: curvature_term_value
 
         rate = 0.0_wp
-        ASSOCIATE(h => state%h, &
-            u => state%u, &
-            v => state%v, &
-            rhom => state%rho_m, &
-            red_grav => state%red_grav, &
-            alphas => state%alphas, &
-            exc_pore_pres => state%exc_pore_pres)
+
         SELECT CASE(TRIM(model_name))
         CASE('rheology_voellmy')
             CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term, &
@@ -268,13 +229,13 @@ CONTAINS
         CASE('rheology_mui')
             curvature_term_value = 0.0_wp
             IF (curvature_term) curvature_term_value = curvature_acceleration(                     &
-                    B_second_xx, B_second_xy, B_second_yy, u, v)
+                    B_second_xx, B_second_xy, B_second_yy, state%u, state%v)
             CALL eval_rheology_mui_semi_implicit(state, mod_vel, grav_coeff, curvature_term_value, &
                     use_pore_pressure, rate(1), rate(2))
         CASE('rheology_mui_voellmy')
             curvature_term_value = 0.0_wp
             IF (curvature_term) curvature_term_value = curvature_acceleration(                     &
-                    B_second_xx, B_second_xy, B_second_yy, u, v)
+                    B_second_xx, B_second_xy, B_second_yy, state%u, state%v)
             CALL eval_rheology_mui_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term_value, &
                     use_pore_pressure, rate(1), rate(2))
         CASE('none', 'rheology_plastic', 'rheology_empirical',                                     &
@@ -284,28 +245,18 @@ CONTAINS
             CALL fatal_error('Invalid rheology name in semi-implicit momentum-rate dispatch')
 
         END SELECT
-        END ASSOCIATE
-
     END SUBROUTINE eval_rheology_semi_implicit
 
-    !> \brief Evaluate the rheology source contribution.
-    !> \details Select the implicit complex source used for complex-step Jacobians.
+    !> \brief Dispatch the complex-valued implicit rheology momentum source.
     !> \param[in] model_name Canonical rheology model name.
-    !> \param[in] h Flow depth [m].
-    !> \param[in] T Temperature [K].
-    !> \param[in] rhom Mixture density [kg m^-3].
-    !> \param[in] inv_rhom Inverse mixture density [m^3 kg^-1].
-    !> \param[in] u x velocity [m s^-1].
-    !> \param[in] v y velocity [m s^-1].
-    !> \param[in] mod_vel Three-dimensional velocity magnitude [m s^-1].
-    !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
-    !> \param[in] mod_vel2 Squared total speed [m^2 s^-2].
-    !> \param[in] red_grav Reduced gravity [m s^-2].
-    !> \param[in] alphas Solid volume fractions.
-    !> \param[in] moving Whether the local flow state is moving.
-    !> \param[in] use_stochastic Whether stochastic model coefficients are used.
-    !> \param[in] stochastic_value Stochastic rheology coefficient used by the selected model.
-    !> \param[out] rate Horizontal momentum source vector.
+    !> \param[in] state Shared complex-valued physical state for complex-step differentiation.
+    !> \param[in] mod_vel Total complex speed.
+    !> \param[in] mod_hor_vel Horizontal complex speed.
+    !> \param[in] mod_vel2 Squared total complex speed.
+    !> \param[in] moving Whether the complex flow state is moving.
+    !> \param[in] use_stochastic Enable stochastic rheology coefficient.
+    !> \param[in] stochastic_value Stochastic rheology coefficient.
+    !> \param[out] rate Two-component complex momentum source.
     SUBROUTINE eval_rheology_implicit(model_name, state, mod_vel, mod_hor_vel, mod_vel2, &
             moving, use_stochastic, stochastic_value, rate)
 
@@ -317,14 +268,7 @@ CONTAINS
         COMPLEX(wp), INTENT(OUT) :: rate(2)
 
         rate = CMPLX(0.0_wp, 0.0_wp, wp)
-        ASSOCIATE(h => state%h, &
-            T => state%T, &
-            u => state%u, &
-            v => state%v, &
-            rhom => state%rho_m, &
-            inv_rhom => state%inv_rhom, &
-            red_grav => state%red_grav, &
-            alphas => state%alphas)
+
         SELECT CASE(TRIM(model_name))
         CASE('rheology_voellmy')
             CALL eval_rheology_voellmy_implicit(state, mod_vel, mod_vel2, moving, use_stochastic, stochastic_value, &
@@ -350,30 +294,20 @@ CONTAINS
             CALL fatal_error('Invalid rheology name in implicit momentum-rate dispatch')
 
         END SELECT
-        END ASSOCIATE
-
     END SUBROUTINE eval_rheology_implicit
 
     !> \brief Dispatch exact velocity integration for the selected rheology.
-    !> \details Apply the frozen-coefficient rheology velocity flow and return whether the requested
-    !> model supports analytic integration.
     !> \param[in] model_name Canonical rheology model name.
-    !> \param[in] dt Time integration interval [s].
-    !> \param[in] h Flow depth [m].
-    !> \param[in] T Temperature [K].
-    !> \param[in] rhom Mixture density [kg m^-3].
-    !> \param[in] speed_ratio Ratio of total to horizontal speed.
-    !> \param[in] velocity_before Horizontal velocity before source update [m s^-1].
-    !> \param[in] red_grav Reduced gravity [m s^-2].
+    !> \param[in] dt Source integration interval [s].
+    !> \param[in] state Shared real physical state before source integration.
+    !> \param[in] speed_ratio Total-to-horizontal speed ratio.
     !> \param[in] grav_coeff Topographic gravity correction.
-    !> \param[in] alphas Solid volume fractions.
     !> \param[in] curvature_acceleration Curvature-induced normal acceleration [m s^-2].
-    !> \param[in] use_pore_pressure Whether excess pore pressure reduces effective normal stress.
-    !> \param[in] exc_pore_pres Excess pore pressure [Pa].
-    !> \param[in] use_stochastic Whether stochastic model coefficients are used.
-    !> \param[in] stochastic_value Stochastic rheology coefficient used by the selected model.
-    !> \param[out] velocity_after Horizontal velocity after source update [m s^-1].
-    !> \param[out] model_supported True when the selected model supports this analytic treatment.
+    !> \param[in] use_pore_pressure Enable pore-pressure correction.
+    !> \param[in] use_stochastic Enable stochastic rheology coefficient.
+    !> \param[in] stochastic_value Stochastic rheology coefficient.
+    !> \param[out] velocity_after Velocity after the analytic source substep.
+    !> \param[out] model_supported Whether the selected model has an analytic treatment.
     SUBROUTINE solve_rheology_analytic(model_name, dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
             use_pore_pressure, use_stochastic, stochastic_value, velocity_after, model_supported)
 
@@ -389,12 +323,6 @@ CONTAINS
         velocity_after = velocity_before
         model_supported = .TRUE.
 
-        ASSOCIATE(h => state%h, &
-            T => state%T, &
-            rhom => state%rho_m, &
-            red_grav => state%red_grav, &
-            alphas => state%alphas, &
-            exc_pore_pres => state%exc_pore_pres)
         SELECT CASE(TRIM(model_name))
         CASE ('none')
             CONTINUE
@@ -427,8 +355,6 @@ CONTAINS
             model_supported = .FALSE.
 
         END SELECT
-        END ASSOCIATE
-
     END SUBROUTINE solve_rheology_analytic
 
     !> \brief Compute curvature-induced normal acceleration.
