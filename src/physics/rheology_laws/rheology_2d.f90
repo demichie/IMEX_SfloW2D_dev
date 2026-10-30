@@ -128,12 +128,9 @@ CONTAINS
                     grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
                     use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE('rheology_lahar')
-            CALL eval_rheology_lahar_explicit(                                                     &
-                    h, T, u, v, mod_vel, mod_hor_vel,                                              &
-                    mod_vel2, rhom, inv_rhom, red_grav,                                            &
-                    grav_coeff, alphas, curvature_term, B_second_xx,                               &
-                    B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving,            &
-                    use_stochastic, stochastic_value, rate )
+            CALL eval_rheology_lahar_explicit(state, mod_vel, mod_hor_vel, mod_vel2, grav_coeff, &
+                    curvature_term, B_second_xx, B_second_xy, B_second_yy, &
+                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE('rheology_empirical')
             CALL eval_rheology_empirical_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
                     grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
@@ -227,9 +224,7 @@ CONTAINS
             CALL eval_rheology_lava_semi_implicit(u, v,                                            &
                     mod_vel, rate(1), rate(2))
         CASE('rheology_lahar')
-            CALL eval_rheology_lahar_semi_implicit(h, u,                                           &
-                    v, mod_hor_vel, rhom,                                                          &
-                    SUM(alphas), mod_vel .GT. 0.0_wp, rate(1), rate(2))
+            CALL eval_rheology_lahar_semi_implicit(state, mod_hor_vel, mod_hor_vel>0.0_wp, rate(1), rate(2))
         CASE('rheology_froude')
             CALL eval_rheology_froude_semi_implicit(state, mod_vel, mod_hor_vel, grav_coeff, &
                     0.0_wp, use_stochastic, stochastic_value, rate(1), rate(2))
@@ -313,9 +308,7 @@ CONTAINS
         CASE('rheology_lava')
             CALL eval_rheology_lava_implicit(state, moving, rate(1), rate(2))
         CASE('rheology_lahar')
-            CALL eval_rheology_lahar_implicit(h, u,                                                &
-                    v, mod_vel, mod_hor_vel, T, rhom,                                              &
-                    inv_rhom, alphas, moving, rate(1), rate(2))
+            CALL eval_rheology_lahar_implicit(state, mod_vel, mod_hor_vel, moving, rate(1), rate(2))
         CASE('rheology_empirical')
             CALL eval_rheology_empirical_implicit(state, mod_hor_vel, mod_vel, moving, rate(1), rate(2))
         CASE('rheology_newmodel')
@@ -384,9 +377,7 @@ CONTAINS
         CASE ('rheology_lava')
             CALL solve_rheology_lava_analytic(dt, state, speed_ratio, velocity_after)
         CASE ('rheology_lahar')
-            CALL solve_rheology_lahar_analytic(dt, h,                                              &
-                    T, SUM(alphas), rhom, speed_ratio,                                             &
-                    velocity_before, velocity_after)
+            CALL solve_rheology_lahar_analytic(dt, state, speed_ratio, velocity_after)
         CASE ('rheology_empirical')
             CALL solve_rheology_empirical_analytic(dt, state, speed_ratio, velocity_after)
         CASE ('rheology_quadratic')
