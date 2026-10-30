@@ -3,10 +3,11 @@
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_entrainment_2d
     USE parameters_2d, ONLY : idx_h
-    USE parameters_2d, ONLY : wp, n_vars, slope_correction_flag, mass_exchange_rates_type, reset_mass_exchange_rates
+    USE parameters_2d, ONLY : wp, n_vars, slope_correction_flag, mass_exchange_rates_type,         &
+        reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : mixt_var
-    USE constitutive_parameters_2d, ONLY : entrainment_flag, rho_a_amb, &
+    USE constitutive_parameters_2d, ONLY : entrainment_flag, rho_a_amb,                            &
               T_ambient, sp_heat_a
     IMPLICIT NONE
     PRIVATE
@@ -28,6 +29,7 @@ CONTAINS
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_entrainment_explicit(qp,u,v,Bx,By,r)
+
         REAL(wp), INTENT(IN) :: qp(n_vars+2),u,v,Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
         REAL(wp) :: vertical_velocity,speed_squared,Ri,rhom,rhoc,redgrav,cpc,cpm
@@ -52,6 +54,7 @@ CONTAINS
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_entrainment_semi_implicit(qp,u,v,Bx,By,r)
+
         REAL(wp), INTENT(IN) :: qp(n_vars+2),u,v,Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -68,6 +71,7 @@ CONTAINS
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_entrainment_implicit(qp,u,v,Bx,By,r)
+
         REAL(wp), INTENT(IN) :: qp(n_vars+2),u,v,Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -84,6 +88,7 @@ CONTAINS
     !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE solve_mass_exchange_entrainment_analytic(qp,u,v,Bx,By,r)
+
         REAL(wp), INTENT(IN) :: qp(n_vars+2),u,v,Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -99,7 +104,7 @@ CONTAINS
     REAL(wp) FUNCTION eval_entrainment_volume_kernel(r_h, r_Ri, mod_vel2)
         REAL(wp), INTENT(IN) :: r_h, r_Ri, mod_vel2
 
-        IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                      &
+        IF ( entrainment_flag .AND.  ( r_h .GT. 0.0_wp ) .AND.                                     &
                   ( r_Ri .GT. 0.0_wp ) ) THEN
 
               eval_entrainment_volume_kernel = eval_air_entrainment_rate(r_Ri, mod_vel2)
@@ -116,13 +121,13 @@ CONTAINS
     !> @param[in] richardson_number Richardson number controlling entrainment [dimensionless].
     !> @param[in] speed_squared Squared three-dimensional flow speed [m2/s2].
     !> @return Physical rate from the indicated constitutive closure.
-    PURE FUNCTION eval_air_entrainment_rate(richardson_number, speed_squared)  &
+    PURE FUNCTION eval_air_entrainment_rate(richardson_number, speed_squared)                      &
               RESULT(entrainment_rate)
 
         REAL(wp), INTENT(IN) :: richardson_number, speed_squared
         REAL(wp) :: entrainment_coefficient, entrainment_rate
 
-        entrainment_coefficient = 0.075_wp / SQRT(1.0_wp + 718.0_wp *            &
+        entrainment_coefficient = 0.075_wp / SQRT(1.0_wp + 718.0_wp *                              &
                   richardson_number**2.4_wp)
         entrainment_rate = entrainment_coefficient * SQRT(speed_squared)
 

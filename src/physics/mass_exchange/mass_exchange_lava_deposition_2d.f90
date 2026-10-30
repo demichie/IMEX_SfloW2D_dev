@@ -29,11 +29,12 @@ CONTAINS
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_lava_deposition_explicit(depth,T,dt,r)
+
         REAL(wp), INTENT(IN) :: depth,T,dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
-        CALL eval_lava_deposition_volume_kernel(depth,T,dt, &
+        CALL eval_lava_deposition_volume_kernel(depth,T,dt,                                        &
                   r%carrier_deposition_rate)
         r%mixture_mass_rate=-rho_l*r%carrier_deposition_rate
         r%energy_rate=sp_heat_l*T*r%mixture_mass_rate
@@ -48,6 +49,7 @@ CONTAINS
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_lava_deposition_semi_implicit(depth,T,dt,r)
+
         REAL(wp), INTENT(IN) :: depth,T,dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -62,6 +64,7 @@ CONTAINS
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_lava_deposition_implicit(depth,T,dt,r)
+
         REAL(wp), INTENT(IN) :: depth,T,dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -76,6 +79,7 @@ CONTAINS
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE solve_mass_exchange_lava_deposition_analytic(depth,T,dt,r)
+
         REAL(wp), INTENT(IN) :: depth,T,dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -98,12 +102,12 @@ CONTAINS
 
         CASE('TEMPERATURE')
 
-              factor=MIN(1.0_wp,MAX(0.0_wp,(lava_deposition_temp_ref-temperature)/ &
+              factor=MIN(1.0_wp,MAX(0.0_wp,(lava_deposition_temp_ref-temperature)/                 &
                         lava_deposition_temp_width))
 
         CASE('VISCOSITY')
 
-              factor=MIN(1.0_wp,(MAX(0.0_wp,viscosity)/lava_deposition_visc_ref)** &
+              factor=MIN(1.0_wp,(MAX(0.0_wp,viscosity)/lava_deposition_visc_ref)**                 &
                         lava_deposition_exponent)
         END SELECT
 
@@ -116,13 +120,14 @@ CONTAINS
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[out] rate Requested immobilization thickness rate [m/s].
     SUBROUTINE eval_lava_deposition_volume_kernel(depth,temperature,dt,rate)
+
         REAL(wp), INTENT(IN) :: depth,temperature,dt
         REAL(wp), INTENT(OUT) :: rate
 
         rate=0.0_wp
         IF (depth<=0.0_wp) RETURN
         IF (dt<=0.0_wp) CALL fatal_error('lava deposition requires positive dt')
-        rate=MIN(depth/dt,eval_lava_deposition_rate(temperature, &
+        rate=MIN(depth/dt,eval_lava_deposition_rate(temperature,                                   &
                   lava_kinematic_viscosity(temperature)))
     END SUBROUTINE eval_lava_deposition_volume_kernel
 
