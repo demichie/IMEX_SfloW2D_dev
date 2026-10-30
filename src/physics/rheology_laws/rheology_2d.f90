@@ -127,12 +127,9 @@ CONTAINS
                     grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
                     use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE('rheology_lava')
-            CALL eval_rheology_lava_explicit(                                                      &
-                    h, T, u, v, mod_vel, mod_hor_vel,                                              &
-                    mod_vel2, rhom, inv_rhom, red_grav,                                            &
-                    grav_coeff, alphas, curvature_term, B_second_xx,                               &
-                    B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving,            &
-                    use_stochastic, stochastic_value, rate )
+            CALL eval_rheology_lava_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
+                    grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
+                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE('rheology_lahar')
             CALL eval_rheology_lahar_explicit(                                                     &
                     h, T, u, v, mod_vel, mod_hor_vel,                                              &
@@ -141,12 +138,9 @@ CONTAINS
                     B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving,            &
                     use_stochastic, stochastic_value, rate )
         CASE('rheology_empirical')
-            CALL eval_rheology_empirical_explicit(                                                 &
-                    h, T, u, v, mod_vel, mod_hor_vel,                                              &
-                    mod_vel2, rhom, inv_rhom, red_grav,                                            &
-                    grav_coeff, alphas, curvature_term, B_second_xx,                               &
-                    B_second_xy, B_second_yy, use_pore_pressure, exc_pore_pres, moving,            &
-                    use_stochastic, stochastic_value, rate )
+            CALL eval_rheology_empirical_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
+                    grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
+                    use_pore_pressure, moving, use_stochastic, stochastic_value, rate)
         CASE('rheology_quadratic')
             CALL eval_rheology_quadratic_explicit(state, mod_vel, mod_hor_vel, mod_vel2, &
                     grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
@@ -334,17 +328,13 @@ CONTAINS
         CASE('rheology_plastic')
             CALL eval_rheology_plastic_implicit(state, mod_vel, moving, rate(1), rate(2))
         CASE('rheology_lava')
-            CALL eval_rheology_lava_implicit(h, T,                                                 &
-                    rhom, u, v, moving,                                                            &
-                    rate(1), rate(2))
+            CALL eval_rheology_lava_implicit(state, moving, rate(1), rate(2))
         CASE('rheology_lahar')
             CALL eval_rheology_lahar_implicit(h, u,                                                &
                     v, mod_vel, mod_hor_vel, T, rhom,                                              &
                     inv_rhom, alphas, moving, rate(1), rate(2))
         CASE('rheology_empirical')
-            CALL eval_rheology_empirical_implicit(h, u,                                            &
-                    v, mod_hor_vel, mod_vel, rhom, moving,                                         &
-                    rate(1), rate(2))
+            CALL eval_rheology_empirical_implicit(state, mod_hor_vel, mod_vel, moving, rate(1), rate(2))
         CASE('rheology_newmodel')
             CALL eval_rheology_newmodel_implicit(state,rate(1),rate(2))
         CASE('rheology_quadratic')
@@ -412,16 +402,13 @@ CONTAINS
         CASE ('rheology_plastic')
             CALL solve_rheology_plastic_analytic(dt, state, speed_ratio, velocity_after)
         CASE ('rheology_lava')
-            CALL solve_rheology_lava_analytic(dt, h,                                               &
-                    T, rhom, speed_ratio, velocity_before,                                         &
-                    velocity_after)
+            CALL solve_rheology_lava_analytic(dt, state, speed_ratio, velocity_after)
         CASE ('rheology_lahar')
             CALL solve_rheology_lahar_analytic(dt, h,                                              &
                     T, SUM(alphas), rhom, speed_ratio,                                             &
                     velocity_before, velocity_after)
         CASE ('rheology_empirical')
-            CALL solve_rheology_empirical_analytic(dt, h,                                          &
-                    speed_ratio, velocity_before, velocity_after)
+            CALL solve_rheology_empirical_analytic(dt, state, speed_ratio, velocity_after)
         CASE ('rheology_quadratic')
             CALL solve_rheology_quadratic_analytic(dt, state, speed_ratio, velocity_after)
         CASE ('rheology_froude')

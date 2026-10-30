@@ -109,8 +109,15 @@ PROGRAM test_analytic_velocity
   visc_par = 0.01_wp
   tau0 = 100.0_wp
   T_ref = 300.0_wp
-  CALL solve_rheology_lava_analytic(integration_step, flow_depth,           &
-       temperature, mixture_density, speed_ratio, velocity_before, velocity_after)
+  BLOCK
+    TYPE(physical_state_type) :: ps
+    ps%h=flow_depth
+    ps%T=temperature
+    ps%rho_m=mixture_density
+    ps%u=velocity_before(1)
+    ps%v=velocity_before(2)
+    CALL solve_rheology_lava_analytic(integration_step, ps, speed_ratio, velocity_after)
+  END BLOCK
   CALL assert_dispatch_matches('rheology_lava', .FALSE., 0.0_wp,           &
        .FALSE., 0.0_wp, velocity_after, 'lava dispatch')
   linear_drag = 3.0_wp*nu_ref/flow_depth**2 *                               &
@@ -122,12 +129,21 @@ PROGRAM test_analytic_velocity
   CALL assert_close(SQRT(SUM(velocity_after**2)), expected_speed,           &
        'lava exact affine-drag flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
-  CALL eval_rheology_lava_implicit(CMPLX(flow_depth,0.0_wp,wp),        &
-       CMPLX(temperature,0.0_wp,wp), CMPLX(mixture_density,0.0_wp,wp),       &
-       CMPLX(velocity_after(1),0.0_wp,wp), CMPLX(velocity_after(2),0.0_wp,wp), &
-       .TRUE., complex_source_x, complex_source_y)
-  CALL eval_rheology_lava_semi_implicit(velocity_after(1), velocity_after(2), &
-       speed_after, source_x, source_y)
+  BLOCK
+    TYPE(complex_physical_state_type) :: cs
+    cs%h=CMPLX(flow_depth,0.0_wp,wp)
+    cs%T=CMPLX(temperature,0.0_wp,wp)
+    cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
+    cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
+    cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
+    CALL eval_rheology_lava_implicit(cs, .TRUE., complex_source_x, complex_source_y)
+  END BLOCK
+  BLOCK
+    TYPE(physical_state_type) :: ps
+    ps%u=velocity_after(1)
+    ps%v=velocity_after(2)
+    CALL eval_rheology_lava_semi_implicit(ps, speed_after, source_x, source_y)
+  END BLOCK
   source = [REAL(complex_source_x,wp)+source_x,                              &
        REAL(complex_source_y,wp)+source_y]
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
@@ -162,8 +178,15 @@ PROGRAM test_analytic_velocity
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, source, 'lahar')
 
-  CALL solve_rheology_empirical_analytic(integration_step, flow_depth,      &
-       speed_ratio, velocity_before, velocity_after)
+  BLOCK
+    TYPE(physical_state_type) :: ps
+    ps%h=flow_depth
+    ps%T=temperature
+    ps%rho_m=mixture_density
+    ps%u=velocity_before(1)
+    ps%v=velocity_before(2)
+    CALL solve_rheology_empirical_analytic(integration_step, ps, speed_ratio, velocity_after)
+  END BLOCK
   CALL assert_dispatch_matches('rheology_empirical', .FALSE., 0.0_wp,      &
        .FALSE., 0.0_wp, velocity_after, 'empirical dispatch')
   linear_drag = 1.0E-3_wp*speed_ratio/                                     &
@@ -174,11 +197,16 @@ PROGRAM test_analytic_velocity
        'empirical exact linear-drag flow')
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
   horizontal_speed = SQRT(SUM(velocity_after**2))
-  CALL eval_rheology_empirical_implicit(CMPLX(flow_depth,0.0_wp,wp),   &
-       CMPLX(velocity_after(1),0.0_wp,wp), CMPLX(velocity_after(2),0.0_wp,wp), &
-       CMPLX(horizontal_speed,0.0_wp,wp), CMPLX(speed_after,0.0_wp,wp),     &
-       CMPLX(mixture_density,0.0_wp,wp), .TRUE., complex_source_x,           &
-       complex_source_y)
+  BLOCK
+    TYPE(complex_physical_state_type) :: cs
+    cs%h=CMPLX(flow_depth,0.0_wp,wp)
+    cs%T=CMPLX(temperature,0.0_wp,wp)
+    cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
+    cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
+    cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
+    CALL eval_rheology_empirical_implicit(cs, CMPLX(horizontal_speed,0.0_wp,wp), &
+         CMPLX(speed_after,0.0_wp,wp), .TRUE., complex_source_x, complex_source_y)
+  END BLOCK
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [REAL(complex_source_x,wp),               &
        REAL(complex_source_y,wp)], 'empirical')
