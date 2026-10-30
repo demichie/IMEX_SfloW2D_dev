@@ -91,6 +91,7 @@ CONTAINS
             stochastic_value, ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_voellmy_explicit
+
     !> \brief Evaluate the semi-implicit voellmy contribution to the horizontal momentum source.
     !> \details Return the contribution assigned to the semi-implicit treatment. This implementation supplies a zero source when the model has no term in this treatment.
     !> \param[in] h Flow depth [m].
@@ -140,6 +141,7 @@ CONTAINS
         rate_x = -friction_stress * u / mod_vel
         rate_y = -friction_stress * v / mod_vel
     END SUBROUTINE eval_rheology_voellmy_semi_implicit
+
     !> \brief Evaluate the implicit voellmy contribution to the horizontal momentum source.
     !> \details Return the contribution assigned to the implicit treatment. This implementation supplies a zero source when the model has no term in this treatment.
     !> \param[in] u Horizontal x velocity [m s^-1].
@@ -182,6 +184,7 @@ CONTAINS
         rate_x = -turbulent_stress * (u / mod_vel)
         rate_y = -turbulent_stress * (v / mod_vel)
     END SUBROUTINE eval_rheology_voellmy_implicit
+
     !> \brief Integrate the voellmy velocity source in time.
     !> \details Advance the scalar speed under the Voellmy Coulomb and turbulent basal resistance law with model coefficients fixed over dt; the horizontal direction is retained in the returned velocity vector.
     !> \param[in] dt Source integration interval [s].

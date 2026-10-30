@@ -54,6 +54,7 @@ CONTAINS
         rate=0.0_wp
         CALL fatal_error('rheology_newmodel: explicit treatment unsupported')
     END SUBROUTINE eval_rheology_newmodel_explicit
+
     !> \brief Evaluate the semi-implicit newmodel contribution to the horizontal momentum source.
     !> \details Return the contribution assigned to the semi-implicit treatment. This implementation supplies a zero source when the model has no term in this treatment.
     !> \param[out] rate_x x momentum source.
@@ -64,6 +65,7 @@ CONTAINS
         rate_x=0.0_wp
         rate_y=0.0_wp
     END SUBROUTINE eval_rheology_newmodel_semi_implicit
+
     !> \brief Evaluate the implicit newmodel contribution to the horizontal momentum source.
     !> \details Compute the momentum source under the configured newmodel rheology, with its currently supported source treatment, using the treatment-specific velocity and effective-stress inputs. Outputs are conservative x/y momentum source rates.
     !> \param[in] u Horizontal x velocity [m s^-1].
@@ -80,6 +82,7 @@ CONTAINS
         rate_x=-drag_coefficient*rhom*u
         rate_y=-drag_coefficient*rhom*v
     END SUBROUTINE eval_rheology_newmodel_implicit
+
     !> \brief Integrate the newmodel velocity source in time.
     !> \details Advance the scalar speed under the configured newmodel rheology, with its currently supported source treatment with model coefficients fixed over dt; the horizontal direction is retained in the returned velocity vector.
     SUBROUTINE solve_rheology_newmodel_analytic()

@@ -75,6 +75,7 @@ CONTAINS
             CMPLX(rhom,0.0_wp,wp), moving, ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_plastic_explicit
+
     !> \brief Evaluate the semi-implicit plastic contribution to the horizontal momentum source.
     !> \details Return the contribution assigned to the semi-implicit treatment. This implementation supplies a zero source when the model has no term in this treatment.
     !> \param[out] rate_x x momentum source.
@@ -85,6 +86,7 @@ CONTAINS
         rate_x = 0.0_wp
         rate_y = 0.0_wp
     END SUBROUTINE eval_rheology_plastic_semi_implicit
+
     !> \brief Evaluate the implicit plastic contribution to the horizontal momentum source.
     !> \details Return the contribution assigned to the implicit treatment. This implementation supplies a zero source when the model has no term in this treatment.
     !> \param[in] u Horizontal x velocity [m s^-1].
@@ -106,6 +108,7 @@ CONTAINS
         rate_x = -rhom * tau * (u / mod_vel)
         rate_y = -rhom * tau * (v / mod_vel)
     END SUBROUTINE eval_rheology_plastic_implicit
+
     !> \brief Integrate the plastic velocity source in time.
     !> \details Advance the scalar speed under the basal plastic yield-resistance model with model coefficients fixed over dt; the horizontal direction is retained in the returned velocity vector.
     !> \param[in] dt Source integration interval [s].

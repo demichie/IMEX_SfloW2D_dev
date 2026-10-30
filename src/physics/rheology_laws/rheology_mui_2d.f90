@@ -75,6 +75,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy, curvature_accel
         COMPLEX(wp) :: ix, iy
+
         curvature_accel=0.0_wp
 
         IF (curvature_term) curvature_accel=B_second_xx*u**2 + &
@@ -87,6 +88,7 @@ CONTAINS
             ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_mui_explicit
+
     !> \brief Evaluate the semi-implicit mui contribution to the horizontal momentum source.
     !> \details Compute the momentum source under the regularized mu(I) friction law, including effective stress and granular inertial-number dependence, using the treatment-specific velocity and effective-stress inputs. Outputs are conservative x/y momentum source rates.
     !> \param[in] h Flow depth [m].
@@ -169,6 +171,7 @@ CONTAINS
         rate_x = rate_x - friction_stress * (u / mod_vel)
         rate_y = rate_y - friction_stress * (v / mod_vel)
     END SUBROUTINE eval_rheology_mui_semi_implicit
+
     !> \brief Evaluate the implicit mui contribution to the horizontal momentum source.
     !> \details Return the contribution assigned to the implicit treatment. This implementation supplies a zero source when the model has no term in this treatment.
     !> \param[out] rate_x x momentum source.
@@ -179,6 +182,7 @@ CONTAINS
         rate_x = CMPLX(0.0_wp,0.0_wp,wp)
         rate_y = CMPLX(0.0_wp,0.0_wp,wp)
     END SUBROUTINE eval_rheology_mui_implicit
+
     !> \brief Integrate the mui velocity source in time.
     !> \details Advance the scalar speed under the regularized mu(I) friction law, including effective stress and granular inertial-number dependence with model coefficients fixed over dt; the horizontal direction is retained in the returned velocity vector.
     !> \param[in] dt Source integration interval [s].

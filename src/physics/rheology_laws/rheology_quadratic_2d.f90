@@ -66,6 +66,7 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy, curvature_accel
         COMPLEX(wp) :: ix, iy
+
         curvature_accel=0.0_wp
 
         IF (curvature_term) curvature_accel=B_second_xx*u**2 + &
@@ -78,6 +79,7 @@ CONTAINS
             CMPLX(rhom,0.0_wp,wp), moving, ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_quadratic_explicit
+
     !> \brief Evaluate the semi-implicit quadratic contribution to the horizontal momentum source.
     !> \details Return the contribution assigned to the semi-implicit treatment. This implementation supplies a zero source when the model has no term in this treatment.
     !> \param[out] rate_x x momentum source.
@@ -88,6 +90,7 @@ CONTAINS
         rate_x = 0.0_wp
         rate_y = 0.0_wp
     END SUBROUTINE eval_rheology_quadratic_semi_implicit
+
     !> \brief Evaluate the implicit quadratic contribution to the horizontal momentum source.
     !> \details Return the contribution assigned to the implicit treatment. This implementation supplies a zero source when the model has no term in this treatment.
     !> \param[in] u Horizontal x velocity [m s^-1].
@@ -113,6 +116,7 @@ CONTAINS
         rate_y = -rhom * (v / mod_hor_vel)            &
                 * friction_factor * mod_vel2
     END SUBROUTINE eval_rheology_quadratic_implicit
+
     !> \brief Integrate the quadratic velocity source in time.
     !> \details Advance the scalar speed under the quadratic velocity-dependent resistance law with model coefficients fixed over dt; the horizontal direction is retained in the returned velocity vector.
     !> \param[in] dt Source integration interval [s].
