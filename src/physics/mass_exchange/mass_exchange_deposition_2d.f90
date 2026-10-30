@@ -14,7 +14,7 @@ MODULE mass_exchange_deposition_2d
 
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-    USE state_conversion_2d, ONLY : primitive_to_volume_fractions, mixt_var
+    USE state_conversion_2d, ONLY : primitive_to_volume_fractions, mixt_var_state
     USE rheology_lahar_2d, ONLY : eval_lahar_fluid_viscosity
 
     IMPLICIT NONE
@@ -53,12 +53,12 @@ CONTAINS
         alphag=state%alphag
         alpha=SUM(alphas)
         IF (alpha<=alphastot_min) RETURN
-        CALL mixt_var(state%qp,Ri,rho_m,rho_c,redgrav,cp_c,cpm)
-        gas_species_mass_fraction=state%qp(idx_add_gas_first:idx_add_gas_last)
+        CALL mixt_var_state(state,Ri,rho_m,rho_c,redgrav,cp_c,cpm)
+        gas_species_mass_fraction=state%xg
         gas_phase_mass_fraction=0.0_wp
 
         IF (gas_flag) THEN
-            gas_phase_mass_fraction=1.0_wp-SUM(state%qp(idx_solid_first:idx_solid_last))
+            gas_phase_mass_fraction=1.0_wp-SUM(state%xs)
             gas_phase_mass_fraction=MAX(0.0_wp,gas_phase_mass_fraction)
         END IF
 

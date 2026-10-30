@@ -8,7 +8,7 @@ MODULE mass_exchange_carrier_liquid_loss_2d
     USE constitutive_parameters_2d, ONLY : loss_rate
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-    USE state_conversion_2d, ONLY : mixt_var
+    USE state_conversion_2d, ONLY : mixt_var_state
 
     IMPLICIT NONE
     PRIVATE
@@ -33,7 +33,7 @@ CONTAINS
 
         IF (liquid_flag .AND. ALLOCATED(loss_rate)) THEN
             T=state%T
-            CALL mixt_var(state%qp,Ri,rhom,rho_c,redgrav,cp_c,cpm)
+            CALL mixt_var_state(state,Ri,rhom,rho_c,redgrav,cp_c,cpm)
             r%carrier_withdrawal_volume_rate=MAX(0.0_wp,loss_rate)
 
             ! The liquid is the only carrier in this configuration.

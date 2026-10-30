@@ -7,7 +7,7 @@ MODULE mass_exchange_erosion_2d
               erodible_deposit_flag, mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-    USE state_conversion_2d, ONLY : mixt_var
+    USE state_conversion_2d, ONLY : mixt_var_state
     USE constitutive_parameters_2d, ONLY : erosion_coeff, erodible_porosity,                       &
               erodible_fract, alphastot_min, rho_s, rho_c_sub, sp_heat_s, T_erodible
     IMPLICIT NONE
@@ -55,7 +55,7 @@ CONTAINS
                   r%solid_erosion_rate,r%carrier_erosion_rate)
         r%solid_mass_rate=rho_s*r%solid_erosion_rate
         r%mixture_mass_rate=SUM(r%solid_mass_rate)+rho_c_sub*r%carrier_erosion_rate
-        CALL mixt_var(state%qp,Ri,rhom,rhoc,redgrav,cp_sub,cpm)
+        CALL mixt_var_state(state,Ri,rhom,rhoc,redgrav,cp_sub,cpm)
         substrate_temperature=T_erodible
         IF (erodible_deposit_flag) substrate_temperature=T_flow
         r%energy_rate=substrate_temperature*(SUM(sp_heat_s*r%solid_mass_rate)+                     &

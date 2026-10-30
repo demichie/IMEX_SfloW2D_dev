@@ -11,7 +11,7 @@ MODULE mass_exchange_carrier_darcy_loss_2d
     USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_gas_loss
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-    USE state_conversion_2d, ONLY : primitive_to_volume_fractions, mixt_var
+    USE state_conversion_2d, ONLY : primitive_to_volume_fractions, mixt_var_state
 
     IMPLICIT NONE
     PRIVATE
@@ -43,12 +43,12 @@ CONTAINS
         alphas=state%alphas
         alphag=state%alphag
         alpha=SUM(alphas)
-        CALL mixt_var(state%qp,Ri,rhom,rho_c,redgrav,cp_c,cpm)
-        gas_species_mass_fraction=state%qp(idx_add_gas_first:idx_add_gas_last)
+        CALL mixt_var_state(state,Ri,rhom,rho_c,redgrav,cp_c,cpm)
+        gas_species_mass_fraction=state%xg
 
         ! Recover carrier gas mass fraction before partitioning withdrawal among gas species.
         gas_phase_mass_fraction=MAX(0.0_wp,1.0_wp-                                                 &
-                  SUM(state%qp(idx_solid_first:idx_solid_last)))
+                  SUM(state%xs))
         volume_loss=0.0_wp
         IF (gas_flag .AND. pore_pressure_flag .AND. gas_loss_flag .AND.                            &
                   alpha<maximum_solid_packing)                                                     &

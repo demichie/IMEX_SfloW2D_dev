@@ -7,7 +7,7 @@ MODULE mass_exchange_entrainment_2d
         reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-    USE state_conversion_2d, ONLY : mixt_var
+    USE state_conversion_2d, ONLY : mixt_var_state
     USE constitutive_parameters_2d, ONLY : entrainment_flag, rho_a_amb,                            &
               T_ambient, sp_heat_a
     IMPLICIT NONE
@@ -38,7 +38,7 @@ CONTAINS
         vertical_velocity=0.0_wp
         IF (slope_correction_flag) vertical_velocity=state%u*Bx+state%v*By
         speed_squared=state%u**2+state%v**2+vertical_velocity**2
-        CALL mixt_var(state%qp,Ri,rhom,rhoc,redgrav,cpc,cpm)
+        CALL mixt_var_state(state,Ri,rhom,rhoc,redgrav,cpc,cpm)
 
         ! Convert entrained ambient-air volume to mixture mass at ambient density.
         r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(state%h,Ri,speed_squared)

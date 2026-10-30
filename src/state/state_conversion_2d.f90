@@ -36,9 +36,7 @@ MODULE state_conversion_2d
      REAL(wp) :: h=0.0_wp, u=0.0_wp, v=0.0_wp, T=0.0_wp
      REAL(wp) :: rho_m=0.0_wp, inv_rhom=0.0_wp, red_grav=0.0_wp
      REAL(wp) :: Zs=0.0_wp, exc_pore_pres=0.0_wp
-     ! Preserve every primitive entry, including hu/hv and component mass fractions.
-     REAL(wp) :: qp(n_vars+2)=0.0_wp
-     REAL(wp), ALLOCATABLE :: alphas(:), alphag(:)
+     REAL(wp), ALLOCATABLE :: xs(:), xg(:), alphas(:), alphag(:)
   END TYPE physical_state_type
 
   !> Corresponding complex-step state; no loss of imaginary perturbations.
@@ -47,8 +45,7 @@ MODULE state_conversion_2d
      COMPLEX(wp) :: T=(0.0_wp,0.0_wp), rho_m=(0.0_wp,0.0_wp)
      COMPLEX(wp) :: inv_rhom=(0.0_wp,0.0_wp), red_grav=(0.0_wp,0.0_wp)
      COMPLEX(wp) :: Zs=(0.0_wp,0.0_wp), exc_pore_pres=(0.0_wp,0.0_wp)
-     COMPLEX(wp) :: qp(n_vars+2)=(0.0_wp,0.0_wp)
-     COMPLEX(wp), ALLOCATABLE :: alphas(:), alphag(:)
+     COMPLEX(wp), ALLOCATABLE :: xs(:), xg(:), alphas(:), alphag(:)
   END TYPE complex_physical_state_type
 
   !> \brief Evaluate carrier and whole-mixture specific heat capacities.
@@ -88,7 +85,7 @@ MODULE state_conversion_2d
   PUBLIC :: physical_state_from_qp, physical_state_from_q, real_part_physical_state
   PUBLIC :: real_physical_state_from_q, complex_state_from_real
   PUBLIC :: qc_to_qp, qp_to_qc, qp_to_qp2
-  PUBLIC :: mixt_var
+  PUBLIC :: mixt_var, mixt_var_state
   PUBLIC :: sauter_diameter, average_density_solids
   PUBLIC :: eval_mixture_heat_capacity
   PUBLIC :: eval_mixture_properties_from_mass_fractions
@@ -110,8 +107,10 @@ CONTAINS
     REAL(wp) :: rho_c, inv_rho_c
     REAL(wp) :: xs(n_solid), xg(n_add_gas)
 
-    ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas))
-    state%qp = qp
+    ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas), &
+         state%xs(n_solid), state%xg(n_add_gas))
+    state%xs = qp(idx_solid_first:idx_solid_last)
+    state%xg = qp(idx_add_gas_first:idx_add_gas_last)
     state%h = qp(idx_h)
     state%u = qp(idx_u)
     state%v = qp(idx_v)
@@ -128,30 +127,21 @@ CONTAINS
        state%red_grav = 0.0_wp
        RETURN
     END IF
-    xs = qp(idx_solid_first:idx_solid_last)
-    xg = qp(idx_add_gas_first:idx_add_gas_last)
+    xs = state%xs
+    xg = state%xg
     CALL enforce_mass_fraction_closure(xs, xg)
+    state%xs = xs
+    state%xg = xg
     CALL eval_mixture_properties_from_mass_fractions(state%T, xs, xg, &
          state%rho_m, state%inv_rhom, rho_c, inv_rho_c, &
          state%alphas, state%alphag)
     state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
-    ! Assemble the primitive vector from the same complex conservative state.
-    ! This keeps the imaginary perturbations when used in complex-step evaluation.
-    state%qp = CMPLX(0.0_wp,0.0_wp,wp)
-    state%qp(idx_h) = state%h
-    state%qp(idx_hu) = state%h * state%u
-    state%qp(idx_hv) = state%h * state%v
-    state%qp(idx_T) = state%T
-    state%qp(idx_u) = state%u
-    state%qp(idx_v) = state%v
+    state%xs = CMPLX(0.0_wp,0.0_wp,wp)
+    state%xg = CMPLX(0.0_wp,0.0_wp,wp)
     IF (ABS(q(idx_totMassEqn)) > EPSILON(1.0_wp)) THEN
-       state%qp(idx_solid_first:idx_solid_last) = &
-            q(idx_solid_first:idx_solid_last) / q(idx_totMassEqn)
-       state%qp(idx_add_gas_first:idx_add_gas_last) = &
-            q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
+       state%xs = q(idx_solid_first:idx_solid_last) / q(idx_totMassEqn)
+       state%xg = q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
     END IF
-    IF (stoch_transport_flag) state%qp(idx_stoch) = state%Zs
-    IF (pore_pressure_flag) state%qp(idx_pore) = state%exc_pore_pres
   END SUBROUTINE physical_state_from_qp
 
   !> Construct real physical properties from the current conservative state.
@@ -160,12 +150,19 @@ CONTAINS
     TYPE(physical_state_type), INTENT(OUT) :: state
     REAL(wp) :: p_dyn
 
-    ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas))
+    ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas), &
+         state%xs(n_solid), state%xg(n_add_gas))
     CALL r_phys_var(q, state%h, state%u, state%v, state%alphas, &
          state%rho_m, state%T, state%alphag, state%red_grav, &
          p_dyn, state%Zs, state%exc_pore_pres)
     state%inv_rhom = 1.0_wp / state%rho_m
-    CALL qc_to_qp(q, state%qp, p_dyn)
+    state%xs = 0.0_wp
+    state%xg = 0.0_wp
+    IF (q(idx_totMassEqn) > EPSILON(1.0_wp)) THEN
+       state%xs = q(idx_solid_first:idx_solid_last) / q(idx_totMassEqn)
+       state%xg = q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
+       CALL enforce_mass_fraction_closure(state%xs, state%xg)
+    END IF
   END SUBROUTINE real_physical_state_from_q
 
   !> Build a COMPLEX physical source state through the existing complex-step kernel.
@@ -173,7 +170,8 @@ CONTAINS
     COMPLEX(wp), INTENT(IN) :: q(n_vars)
     TYPE(complex_physical_state_type), INTENT(OUT) :: state
 
-    ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas))
+    ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas), &
+         state%xs(n_solid), state%xg(n_add_gas))
     CALL c_phys_var(q, state%h, state%u, state%v, state%T, state%rho_m, &
          state%alphas, state%alphag, state%inv_rhom, state%Zs, &
          state%exc_pore_pres)
@@ -203,7 +201,8 @@ CONTAINS
     TYPE(physical_state_type), INTENT(IN) :: real_state
     TYPE(complex_physical_state_type), INTENT(OUT) :: complex_state
 
-    complex_state%qp = CMPLX(real_state%qp,0.0_wp,wp)
+    IF (ALLOCATED(real_state%xs)) complex_state%xs = CMPLX(real_state%xs,0.0_wp,wp)
+    IF (ALLOCATED(real_state%xg)) complex_state%xg = CMPLX(real_state%xg,0.0_wp,wp)
     complex_state%h = CMPLX(real_state%h,0.0_wp,wp)
     complex_state%u = CMPLX(real_state%u,0.0_wp,wp)
     complex_state%v = CMPLX(real_state%v,0.0_wp,wp)
@@ -224,7 +223,8 @@ CONTAINS
     TYPE(complex_physical_state_type), INTENT(IN) :: complex_state
     TYPE(physical_state_type), INTENT(OUT) :: state
 
-    state%qp = REAL(complex_state%qp,wp)
+    IF (ALLOCATED(complex_state%xs)) state%xs = REAL(complex_state%xs,wp)
+    IF (ALLOCATED(complex_state%xg)) state%xg = REAL(complex_state%xg,wp)
     state%h = REAL(complex_state%h,wp)
     state%u = REAL(complex_state%u,wp)
     state%v = REAL(complex_state%v,wp)
@@ -237,6 +237,48 @@ CONTAINS
     state%alphas = REAL(complex_state%alphas,wp)
     state%alphag = REAL(complex_state%alphag,wp)
   END SUBROUTINE real_part_physical_state
+
+  !> Mixture properties from named state components, without rebuilding qp.
+  SUBROUTINE mixt_var_state(state,ri,rho_m,rho_c,red_grav,cp_c,cp_m)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(OUT) :: ri,rho_m,rho_c,red_grav,cp_c,cp_m
+    REAL(wp) :: inv_rho_m,inv_rho_c,xc,speed_squared,buoyancy_depth
+    REAL(wp) :: xs(n_solid),xg(n_add_gas)
+    REAL(wp) :: alphas(n_solid),alphag(n_add_gas)
+
+    IF (state%h <= EPSILON(1.0_wp)) THEN
+       ri=0.0_wp
+       red_grav=0.0_wp
+       rho_m=rho_a_amb
+       rho_c=rho_a_amb
+       IF (liquid_flag) THEN
+          cp_c=sp_heat_l
+          cp_m=sp_heat_l
+       ELSE
+          cp_c=sp_heat_a
+          cp_m=sp_heat_a
+       END IF
+       RETURN
+    END IF
+
+    xs=state%xs
+    xg=state%xg
+    CALL enforce_mass_fraction_closure(xs,xg)
+    CALL eval_mixture_properties_from_mass_fractions(state%T,xs,xg, &
+         rho_m,inv_rho_m,rho_c,inv_rho_c,alphas,alphag)
+    CALL eval_mixture_heat_capacity(xs,xg,xc,cp_c,cp_m)
+    red_grav=(rho_m-rho_a_amb)/rho_m*grav
+    speed_squared=state%u**2+state%v**2
+    buoyancy_depth=red_grav*state%h
+    ri=0.0_wp
+    IF (speed_squared > 0.0_wp) THEN
+       IF (buoyancy_depth/1.E15_wp > speed_squared) THEN
+          ri=1.E15_wp
+       ELSE
+          ri=MIN(1.E15_wp,buoyancy_depth/speed_squared)
+       END IF
+    END IF
+  END SUBROUTINE mixt_var_state
 
   !> \brief Remove unresolved cell momenta without discarding conservative mass.
   !> \param[in,out] qc Conservative cell state; only entries 2 and 3 may change.
