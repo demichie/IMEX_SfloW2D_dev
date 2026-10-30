@@ -5,10 +5,13 @@ PROGRAM test_newmodel_numerics
   USE source_catalog_2d, ONLY : source_term_descriptor_by_name, &
        canonical_rheology_source_name, source_term_type, rheology_name_has_role, &
        SOURCE_ROLE_IMPLICIT, SOURCE_ROLE_SEMI_IMPLICIT
+  USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
   USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_implicit, &
        eval_rheology_newmodel_semi_implicit
   IMPLICIT NONE
   TYPE(source_term_type) :: term
+  TYPE(physical_state_type) :: rs
+  TYPE(complex_physical_state_type) :: cs
   REAL(wp), PARAMETER :: k=0.1_wp, eps=1.0E-24_wp
   REAL(wp) :: rho, u(2), q_before(2), q_after(2), expected(2)
   REAL(wp) :: dt, analytic_jac(2,2), cs_jac(2,2), residual(2), &
@@ -25,7 +28,7 @@ PROGRAM test_newmodel_numerics
        ERROR STOP 'newmodel implicit component not selected'
   IF (rheology_name_has_role(term%name,SOURCE_ROLE_SEMI_IMPLICIT)) &
        ERROR STOP 'newmodel SI is intentionally zero'
-  CALL eval_rheology_newmodel_semi_implicit(si_x,si_y)
+  CALL eval_rheology_newmodel_semi_implicit(rs,si_x,si_y)
   IF (ABS(si_x)+ABS(si_y)>TINY(1.0_wp)) ERROR STOP 'newmodel SI nonzero'
   DO case_number=1,4
     SELECT CASE(case_number)
@@ -40,7 +43,10 @@ PROGRAM test_newmodel_numerics
     END SELECT
     density=CMPLX(rho,0.0_wp,wp)
     uc=CMPLX(u,0.0_wp,wp)
-    CALL eval_rheology_newmodel_implicit(uc(1),uc(2),density,rate(1),rate(2))
+    cs%u=uc(1)
+    cs%v=uc(2)
+    cs%rho_m=density
+    CALL eval_rheology_newmodel_implicit(cs,rate(1),rate(2))
     expected=-k*rho*u
     CALL close_vector(REAL(rate,wp),expected,'implicit rate')
     analytic_jac=0.0_wp
@@ -49,7 +55,10 @@ PROGRAM test_newmodel_numerics
     DO j=1,2
       uc=CMPLX(u,0.0_wp,wp)
       uc(j)=uc(j)+CMPLX(0.0_wp,eps,wp)
-      CALL eval_rheology_newmodel_implicit(uc(1),uc(2),density,rate(1),rate(2))
+      cs%u=uc(1)
+    cs%v=uc(2)
+    cs%rho_m=density
+    CALL eval_rheology_newmodel_implicit(cs,rate(1),rate(2))
       cs_jac(:,j)=AIMAG(rate)/eps
     END DO
     DO j=1,2
@@ -61,7 +70,10 @@ PROGRAM test_newmodel_numerics
     q_after=q_before
     DO i=1,5
       uc=CMPLX(q_after/rho,0.0_wp,wp)
-      CALL eval_rheology_newmodel_implicit(uc(1),uc(2),density,rate(1),rate(2))
+      cs%u=uc(1)
+    cs%v=uc(2)
+    cs%rho_m=density
+    CALL eval_rheology_newmodel_implicit(cs,rate(1),rate(2))
       residual=q_after-q_before-dt*REAL(rate,wp)
       ! Jacobian of the momentum residual (not of the velocity rate).
       inverse_jac=0.0_wp
@@ -73,7 +85,10 @@ PROGRAM test_newmodel_numerics
     expected=q_before/(1.0_wp+k*dt)
     CALL close_vector(q_after,expected,'Newton 2x2 versus exact step')
     uc=CMPLX(q_after/rho,0.0_wp,wp)
-    CALL eval_rheology_newmodel_implicit(uc(1),uc(2),density,rate(1),rate(2))
+    cs%u=uc(1)
+    cs%v=uc(2)
+    cs%rho_m=density
+    CALL eval_rheology_newmodel_implicit(cs,rate(1),rate(2))
     residual=q_after-q_before-dt*REAL(rate,wp)
     CALL close_vector(residual,[0.0_wp,0.0_wp],'Newton final residual')
   END DO
