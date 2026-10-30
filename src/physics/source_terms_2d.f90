@@ -112,6 +112,7 @@ CONTAINS
     REAL(wp) :: flow_h,flow_u,flow_v,flow_temperature,flow_density
     REAL(wp) :: flow_alphas(n_solid),flow_alphag(n_add_gas)
     REAL(wp) :: flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure
+    TYPE(physical_state_type) :: physical_state
     REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
     REAL(wp) :: heat_capacity,temperature_after,pressure_known,pressure_after
     LOGICAL :: supported
@@ -156,9 +157,18 @@ CONTAINS
       IF (.NOT.(ANY(group%equation_ids==2) .AND. &
            ANY(group%equation_ids==3))) RETURN
       IF (rheology_flag) THEN
-        CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,         &
-             flow_density,flow_temperature,flow_alphag,       &
-             flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure)
+
+        CALL real_physical_state_from_q(q_before, physical_state)
+        flow_h = physical_state%h
+        flow_u = physical_state%u
+        flow_v = physical_state%v
+        flow_temperature = physical_state%T
+        flow_density = physical_state%rho_m
+        flow_alphas = physical_state%alphas
+        flow_alphag = physical_state%alphag
+        flow_red_grav = physical_state%red_grav
+        flow_Zs = physical_state%Zs
+        flow_pore_pressure = physical_state%exc_pore_pres
         horizontal_speed=SQRT(flow_u**2+flow_v**2)
         speed_ratio=1.0_wp
         IF (horizontal_speed>0.0_wp) THEN
@@ -195,9 +205,18 @@ CONTAINS
         status=-2
         RETURN
       END IF
-      CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,           &
-           flow_density,flow_temperature,flow_alphag,         &
-           flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure)
+
+      CALL real_physical_state_from_q(q_before, physical_state)
+      flow_h = physical_state%h
+      flow_u = physical_state%u
+      flow_v = physical_state%v
+      flow_temperature = physical_state%T
+      flow_density = physical_state%rho_m
+      flow_alphas = physical_state%alphas
+      flow_alphag = physical_state%alphag
+      flow_red_grav = physical_state%red_grav
+      flow_Zs = physical_state%Zs
+      flow_pore_pressure = physical_state%exc_pore_pres
       IF (flow_temperature<=0.0_wp) THEN
         status=-3
         RETURN
@@ -211,9 +230,18 @@ CONTAINS
 
       ELSE IF (group%equation_ids(1)==idx_pore .AND. pore_pressure_flag) THEN
       IF (q_before(1)>0.0_wp) THEN
-        CALL r_phys_var(q_before,flow_h,flow_u,flow_v,flow_alphas,         &
-             flow_density,flow_temperature,flow_alphag,       &
-             flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure)
+
+        CALL real_physical_state_from_q(q_before, physical_state)
+        flow_h = physical_state%h
+        flow_u = physical_state%u
+        flow_v = physical_state%v
+        flow_temperature = physical_state%T
+        flow_density = physical_state%rho_m
+        flow_alphas = physical_state%alphas
+        flow_alphag = physical_state%alphag
+        flow_red_grav = physical_state%red_grav
+        flow_Zs = physical_state%Zs
+        flow_pore_pressure = physical_state%exc_pore_pres
         pressure_known=q_before(idx_pore)/q_before(1)
         CALL solve_pore_pressure_dissipation_analytic(pressure_known,interval,flow_h,  &
              flow_temperature,flow_alphas,pressure_after)

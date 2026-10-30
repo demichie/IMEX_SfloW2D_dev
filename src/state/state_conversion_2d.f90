@@ -83,6 +83,7 @@ MODULE state_conversion_2d
 
   PUBLIC :: r_phys_var, c_phys_var
   PUBLIC :: physical_state_from_qp, physical_state_from_q, real_part_physical_state
+  PUBLIC :: real_physical_state_from_q
   PUBLIC :: qc_to_qp, qp_to_qc, qp_to_qp2
   PUBLIC :: mixt_var
   PUBLIC :: sauter_diameter, average_density_solids
@@ -131,6 +132,19 @@ CONTAINS
          state%alphas, state%alphag)
     state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
   END SUBROUTINE physical_state_from_qp
+
+  !> Construct real physical properties from the current conservative state.
+  SUBROUTINE real_physical_state_from_q(q, state)
+    REAL(wp), INTENT(IN) :: q(n_vars)
+    TYPE(physical_state_type), INTENT(OUT) :: state
+    REAL(wp) :: p_dyn
+
+    ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas))
+    CALL r_phys_var(q, state%h, state%u, state%v, state%alphas, &
+         state%rho_m, state%T, state%alphag, state%red_grav, &
+         p_dyn, state%Zs, state%exc_pore_pres)
+    state%inv_rhom = 1.0_wp / state%rho_m
+  END SUBROUTINE real_physical_state_from_q
 
   !> Build a COMPLEX physical source state through the existing complex-step kernel.
   SUBROUTINE physical_state_from_q(q, state)
