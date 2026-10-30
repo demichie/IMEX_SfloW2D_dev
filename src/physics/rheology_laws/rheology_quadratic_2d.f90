@@ -15,7 +15,7 @@ MODULE rheology_quadratic_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE parameters_2d, ONLY : wp
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs, &
-                solve_exact_velocity_flow, EXACT_FLOW_QUADRATIC
+            solve_exact_velocity_flow, EXACT_FLOW_QUADRATIC
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: eval_rheology_quadratic_explicit
@@ -28,11 +28,11 @@ MODULE rheology_quadratic_2d
 CONTAINS
 
     SUBROUTINE eval_rheology_quadratic_explicit( &
-                h, T, u, v, mod_vel, mod_hor_vel, &
-                mod_vel2, rhom, inv_rhom, red_grav, &
-                grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
-                B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
-                stochastic_value, rate )
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
+            B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
+            stochastic_value, rate )
         REAL(wp), INTENT(IN) :: h, T, u, v
         REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
         REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
@@ -45,13 +45,13 @@ CONTAINS
         COMPLEX(wp) :: ix, iy
         curvature_accel=0.0_wp
         IF (curvature_term) curvature_accel=B_second_xx*u**2 + &
-                    2.0_wp*B_second_xy*u*v+B_second_yy*v**2
+                2.0_wp*B_second_xy*u*v+B_second_yy*v**2
         CALL eval_rheology_quadratic_semi_implicit( &
-                sx, sy )
+            sx, sy )
         CALL eval_rheology_quadratic_implicit( &
-                CMPLX(u,0.0_wp,wp), CMPLX(v,0.0_wp,wp), &
-                CMPLX(mod_hor_vel,0.0_wp,wp), CMPLX(mod_vel2,0.0_wp,wp), &
-                CMPLX(rhom,0.0_wp,wp), moving, ix, iy )
+            CMPLX(u,0.0_wp,wp), CMPLX(v,0.0_wp,wp), &
+            CMPLX(mod_hor_vel,0.0_wp,wp), CMPLX(mod_vel2,0.0_wp,wp), &
+            CMPLX(rhom,0.0_wp,wp), moving, ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_quadratic_explicit
 
@@ -62,7 +62,7 @@ CONTAINS
     END SUBROUTINE eval_rheology_quadratic_semi_implicit
 
     SUBROUTINE eval_rheology_quadratic_implicit(u, v,   &
-                mod_hor_vel, mod_vel2, rhom, moving, rate_x, rate_y)
+            mod_hor_vel, mod_vel2, rhom, moving, rate_x, rate_y)
         COMPLEX(wp), INTENT(IN) :: u, v, mod_hor_vel
         COMPLEX(wp), INTENT(IN) :: mod_vel2, rhom
         LOGICAL, INTENT(IN) :: moving
@@ -71,13 +71,13 @@ CONTAINS
         rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
         IF (.NOT. moving) RETURN
         rate_x = -rhom * (u / mod_hor_vel)            &
-                    * friction_factor * mod_vel2
+                * friction_factor * mod_vel2
         rate_y = -rhom * (v / mod_hor_vel)            &
-                    * friction_factor * mod_vel2
+                * friction_factor * mod_vel2
     END SUBROUTINE eval_rheology_quadratic_implicit
 
     SUBROUTINE solve_rheology_quadratic_analytic(dt, h, &
-                speed_ratio, velocity_before, velocity_after)
+            speed_ratio, velocity_before, velocity_after)
         REAL(wp), INTENT(IN) :: dt, h, speed_ratio
         REAL(wp), INTENT(IN) :: velocity_before(2)
         REAL(wp), INTENT(OUT) :: velocity_after(2)
@@ -85,11 +85,11 @@ CONTAINS
         velocity_after = velocity_before
         speed_before = SQRT(SUM(velocity_before**2))
         CALL validate_analytic_velocity_inputs(dt, h,    &
-                    speed_ratio, speed_before, 'quadratic')
+                speed_ratio, speed_before, 'quadratic')
         IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
         quadratic_drag = friction_factor * speed_ratio**2 / h
         CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC, [quadratic_drag],  &
-                    dt, speed_before, speed_after)
+                dt, speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_quadratic_analytic
 

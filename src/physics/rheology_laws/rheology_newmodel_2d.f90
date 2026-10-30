@@ -12,11 +12,11 @@ MODULE rheology_newmodel_2d
     PUBLIC :: solve_rheology_newmodel_analytic
 CONTAINS
     SUBROUTINE eval_rheology_newmodel_explicit( &
-                h, T, u, v, mod_vel, mod_hor_vel, &
-                mod_vel2, rhom, inv_rhom, red_grav, &
-                grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
-                B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
-                stochastic_value, rate )
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
+            B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
+            stochastic_value, rate )
         REAL(wp), INTENT(IN) :: h, T, u, v
         REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
         REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
@@ -37,7 +37,7 @@ CONTAINS
     END SUBROUTINE eval_rheology_newmodel_semi_implicit
 
     SUBROUTINE eval_rheology_newmodel_implicit(u,v, &
-                rhom,rate_x,rate_y)
+            rhom,rate_x,rate_y)
         COMPLEX(wp), INTENT(IN) :: u,v,rhom
         COMPLEX(wp), INTENT(OUT) :: rate_x,rate_y
         REAL(wp), PARAMETER :: drag_coefficient=0.1_wp

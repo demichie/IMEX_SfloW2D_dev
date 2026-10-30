@@ -27,8 +27,8 @@ MODULE rheology_voellmy_2d
     USE parameters_2d, ONLY : wp
     USE rheology_parameters_2d, ONLY : xi
     USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs, &
-                fatal_analytic_input_error, solve_exact_velocity_flow,                &
-                EXACT_FLOW_QUADRATIC_POLYNOMIAL
+            fatal_analytic_input_error, solve_exact_velocity_flow,                &
+            EXACT_FLOW_QUADRATIC_POLYNOMIAL
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: eval_rheology_voellmy_explicit
@@ -41,11 +41,11 @@ MODULE rheology_voellmy_2d
 CONTAINS
 
     SUBROUTINE eval_rheology_voellmy_explicit( &
-                h, T, u, v, mod_vel, mod_hor_vel, &
-                mod_vel2, rhom, inv_rhom, red_grav, &
-                grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
-                B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
-                stochastic_value, rate )
+            h, T, u, v, mod_vel, mod_hor_vel, &
+            mod_vel2, rhom, inv_rhom, red_grav, &
+            grav_coeff, alphas, curvature_term, B_second_xx, B_second_xy, &
+            B_second_yy, use_pore_pressure, exc_pore_pres, moving, use_stochastic, &
+            stochastic_value, rate )
         REAL(wp), INTENT(IN) :: h, T, u, v
         REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, mod_vel2
         REAL(wp), INTENT(IN) :: rhom, inv_rhom, red_grav
@@ -57,21 +57,21 @@ CONTAINS
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
         CALL eval_rheology_voellmy_semi_implicit( &
-                h, u, v, mod_vel, rhom, red_grav, &
-                grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
-                use_pore_pressure, exc_pore_pres, sx, sy )
+            h, u, v, mod_vel, rhom, red_grav, &
+            grav_coeff, curvature_term, B_second_xx, B_second_xy, B_second_yy, &
+            use_pore_pressure, exc_pore_pres, sx, sy )
         CALL eval_rheology_voellmy_implicit( &
-                CMPLX(u,0.0_wp,wp), CMPLX(v,0.0_wp,wp), &
-                CMPLX(rhom,0.0_wp,wp), CMPLX(red_grav,0.0_wp,wp), &
-                CMPLX(mod_vel,0.0_wp,wp), CMPLX(mod_vel2,0.0_wp,wp), moving, use_stochastic, &
-                stochastic_value, ix, iy )
+            CMPLX(u,0.0_wp,wp), CMPLX(v,0.0_wp,wp), &
+            CMPLX(rhom,0.0_wp,wp), CMPLX(red_grav,0.0_wp,wp), &
+            CMPLX(mod_vel,0.0_wp,wp), CMPLX(mod_vel2,0.0_wp,wp), moving, use_stochastic, &
+            stochastic_value, ix, iy )
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_voellmy_explicit
 
     SUBROUTINE eval_rheology_voellmy_semi_implicit(h, u, v, &
-                mod_vel, rhom, red_grav, grav_coeff,            &
-                curvature_term, B_second_xx, B_second_xy, B_second_yy,                &
-                use_pore_pressure, exc_pore_pres, rate_x, rate_y)
+            mod_vel, rhom, red_grav, grav_coeff,            &
+            curvature_term, B_second_xx, B_second_xy, B_second_yy,                &
+            use_pore_pressure, exc_pore_pres, rate_x, rate_y)
         REAL(wp), INTENT(IN) :: h, u, v, mod_vel
         REAL(wp), INTENT(IN) :: rhom, red_grav, grav_coeff
         LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure
@@ -84,24 +84,24 @@ CONTAINS
         IF (mod_vel .LE. 0.0_wp) RETURN
         curvature_acceleration = 0.0_wp
         IF (curvature_term) THEN
-                curvature_acceleration = B_second_xx * u**2                &
-                        + 2.0_wp * B_second_xy * u * v                &
-                        + B_second_yy * v**2
+            curvature_acceleration = B_second_xx * u**2                &
+                    + 2.0_wp * B_second_xy * u * v                &
+                    + B_second_yy * v**2
         END IF
 
         friction_stress = mu * rhom *                                  &
-                    (red_grav + curvature_acceleration) * h              &
-                    * SQRT(grav_coeff)
+                (red_grav + curvature_acceleration) * h              &
+                * SQRT(grav_coeff)
         friction_stress = MAX(0.0_wp, friction_stress)
         IF (use_pore_pressure) friction_stress = MAX(0.0_wp, friction_stress      &
-                    - mu * SQRT(grav_coeff) * exc_pore_pres)
+                - mu * SQRT(grav_coeff) * exc_pore_pres)
         rate_x = -friction_stress * u / mod_vel
         rate_y = -friction_stress * v / mod_vel
     END SUBROUTINE eval_rheology_voellmy_semi_implicit
 
     SUBROUTINE eval_rheology_voellmy_implicit(u, v, rhom, &
-                red_grav, mod_vel, mod_vel2, moving, use_stochastic_xi,          &
-                stochastic_value, rate_x, rate_y)
+            red_grav, mod_vel, mod_vel2, moving, use_stochastic_xi,          &
+            stochastic_value, rate_x, rate_y)
         COMPLEX(wp), INTENT(IN) :: u, v
         COMPLEX(wp), INTENT(IN) :: rhom, red_grav
         COMPLEX(wp), INTENT(IN) :: mod_vel, mod_vel2
@@ -114,11 +114,11 @@ CONTAINS
         rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
         IF (.NOT. moving) RETURN
         IF (use_stochastic_xi) THEN
-                xi_effective = xi + stochastic_value
-                IF (xi_effective .LT. 1.0_wp) xi_effective = 1.0_wp
-                IF (xi_effective .GT. 1.0E5_wp) xi_effective = 1.0E5_wp
+            xi_effective = xi + stochastic_value
+            IF (xi_effective .LT. 1.0_wp) xi_effective = 1.0_wp
+            IF (xi_effective .GT. 1.0E5_wp) xi_effective = 1.0E5_wp
         ELSE
-                xi_effective = xi
+            xi_effective = xi
         END IF
 
         turbulent_stress = rhom * red_grav / xi_effective * mod_vel2
@@ -127,10 +127,10 @@ CONTAINS
     END SUBROUTINE eval_rheology_voellmy_implicit
 
     SUBROUTINE solve_rheology_voellmy_analytic(dt, h, &
-                speed_ratio, velocity_before, rhom, red_grav,        &
-                grav_coeff, curvature_acceleration, use_pore_pressure,       &
-                exc_pore_pres, use_stochastic_xi, stochastic_xi_value,          &
-                velocity_after)
+            speed_ratio, velocity_before, rhom, red_grav,        &
+            grav_coeff, curvature_acceleration, use_pore_pressure,       &
+            exc_pore_pres, use_stochastic_xi, stochastic_xi_value,          &
+            velocity_after)
         REAL(wp), INTENT(IN) :: dt, h, speed_ratio
         REAL(wp), INTENT(IN) :: velocity_before(2), rhom
         REAL(wp), INTENT(IN) :: red_grav, grav_coeff
@@ -143,34 +143,34 @@ CONTAINS
         velocity_after = velocity_before
         speed_before = SQRT(SUM(velocity_before**2))
         CALL validate_analytic_velocity_inputs(dt, h,    &
-                    speed_ratio, speed_before, 'Voellmy')
+                speed_ratio, speed_before, 'Voellmy')
         IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
         IF (rhom .LE. 0.0_wp) THEN
-                CALL fatal_analytic_input_error('Nonpositive mixture density in Voellmy analytic solver')
+            CALL fatal_analytic_input_error('Nonpositive mixture density in Voellmy analytic solver')
         END IF
 
         IF (grav_coeff .LE. 0.0_wp) THEN
-                CALL fatal_analytic_input_error('Nonpositive gravity multiplier in Voellmy analytic solver')
+            CALL fatal_analytic_input_error('Nonpositive gravity multiplier in Voellmy analytic solver')
         END IF
 
         xi_effective = xi
         IF (use_stochastic_xi) THEN
-                xi_effective = xi + stochastic_xi_value
-                xi_effective = MIN(1.0E5_wp, MAX(1.0_wp, xi_effective))
+            xi_effective = xi + stochastic_xi_value
+            xi_effective = MIN(1.0E5_wp, MAX(1.0_wp, xi_effective))
         ELSEIF (xi_effective .LE. 0.0_wp) THEN
-                CALL fatal_analytic_input_error('Nonpositive xi in Voellmy analytic solver')
+            CALL fatal_analytic_input_error('Nonpositive xi in Voellmy analytic solver')
         END IF
 
         coulomb_stress = mu * rhom * (red_grav +              &
-                    curvature_acceleration) * h * SQRT(grav_coeff)
+                curvature_acceleration) * h * SQRT(grav_coeff)
         coulomb_stress = MAX(0.0_wp, coulomb_stress)
         IF (use_pore_pressure) coulomb_stress = MAX(0.0_wp, coulomb_stress -    &
-                    mu * SQRT(grav_coeff) * exc_pore_pres)
+                mu * SQRT(grav_coeff) * exc_pore_pres)
         constant_drag = coulomb_stress / (rhom * h * speed_ratio)
         quadratic_drag = red_grav * speed_ratio / (xi_effective*h)
         CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,         &
-                    [constant_drag, 0.0_wp, quadratic_drag], dt,          &
-                    speed_before, speed_after)
+                [constant_drag, 0.0_wp, quadratic_drag], dt,          &
+                speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
     END SUBROUTINE solve_rheology_voellmy_analytic
 
