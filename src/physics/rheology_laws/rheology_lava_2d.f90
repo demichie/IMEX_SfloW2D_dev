@@ -164,7 +164,6 @@ CONTAINS
     !> \param[out] velocity_after Two-component horizontal velocity after source integration [m s^-1].
     SUBROUTINE solve_rheology_lava_analytic(dt, h,     &
             T, rhom, speed_ratio, velocity_before,           &
-
             velocity_after)
         REAL(wp), INTENT(IN) :: dt, h, T
         REAL(wp), INTENT(IN) :: rhom, speed_ratio
@@ -173,6 +172,7 @@ CONTAINS
         REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
         REAL(wp) :: speed_before, speed_after, effective_depth, gamma
         REAL(wp) :: linear_drag, yield_drag
+
         velocity_after = velocity_before
         speed_before = SQRT(SUM(velocity_before**2))
         CALL validate_analytic_velocity_inputs(dt, h,    &
