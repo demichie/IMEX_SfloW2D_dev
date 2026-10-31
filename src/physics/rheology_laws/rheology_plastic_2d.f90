@@ -8,7 +8,7 @@
 !> The supplied mod_vel is the normalization used by the implementation. The
 !> source is zero when the caller indicates that the flow is not moving.
 !> \ref eval_rheology_plastic_implicit evaluates the complex-valued x/y rates
-!> for the implicit solve, while \ref solve_rheology_plastic_analytic
+!> for the implicit solve, while \ref eval_rheology_plastic_analytic
 !> integrates its frozen velocity source exactly.
 !> \ref tau stores the model strength.
 !********************************************************************************
@@ -24,7 +24,7 @@ MODULE rheology_plastic_2d
     PUBLIC :: eval_rheology_plastic_explicit
     PUBLIC :: eval_rheology_plastic_semi_implicit
     PUBLIC :: eval_rheology_plastic_implicit
-    PUBLIC :: solve_rheology_plastic_analytic
+    PUBLIC :: eval_rheology_plastic_analytic
     PUBLIC :: tau
     REAL(wp) :: tau
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
@@ -98,7 +98,7 @@ CONTAINS
     !> \param[in] dt Source integration interval [s].
     !> \param[in] speed_ratio Ratio of total to horizontal speed.
     !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
-    SUBROUTINE solve_rheology_plastic_analytic(dt, state, speed_ratio, velocity_after)
+    SUBROUTINE eval_rheology_plastic_analytic(dt, state, speed_ratio, velocity_after)
 
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt, speed_ratio
@@ -116,7 +116,7 @@ CONTAINS
                 [tau/(state%h*speed_ratio)], dt, speed_before,                                           &
                 speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
-    END SUBROUTINE solve_rheology_plastic_analytic
+    END SUBROUTINE eval_rheology_plastic_analytic
 
     ! Unsupported physical treatment, rejected by the source catalog.
     ! Valid zero component of the configured Newton treatment.

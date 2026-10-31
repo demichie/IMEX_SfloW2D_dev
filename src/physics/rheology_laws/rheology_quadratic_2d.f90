@@ -8,7 +8,7 @@
 !> where \f$f_q\f$ is \ref friction_factor. The module provides
 !> \ref eval_rheology_quadratic_implicit, which returns zero for a stationary
 !> state and otherwise evaluates the complex-valued x/y sources.
-!> \ref solve_rheology_quadratic_analytic integrates the frozen quadratic
+!> \ref eval_rheology_quadratic_analytic integrates the frozen quadratic
 !> velocity source and reconstructs both components along their input direction.
 !********************************************************************************
 MODULE rheology_quadratic_2d
@@ -22,7 +22,7 @@ MODULE rheology_quadratic_2d
     PUBLIC :: eval_rheology_quadratic_explicit
     PUBLIC :: eval_rheology_quadratic_semi_implicit
     PUBLIC :: eval_rheology_quadratic_implicit
-    PUBLIC :: solve_rheology_quadratic_analytic
+    PUBLIC :: eval_rheology_quadratic_analytic
     PUBLIC :: friction_factor
     REAL(wp) :: friction_factor
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
@@ -100,7 +100,7 @@ CONTAINS
     !> \param[in] dt Source integration interval [s].
     !> \param[in] speed_ratio Ratio of total to horizontal speed.
     !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
-    SUBROUTINE solve_rheology_quadratic_analytic(dt, state, speed_ratio, velocity_after)
+    SUBROUTINE eval_rheology_quadratic_analytic(dt, state, speed_ratio, velocity_after)
 
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt, speed_ratio
@@ -118,7 +118,7 @@ CONTAINS
         CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC, [quadratic_drag],                     &
                 dt, speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
-    END SUBROUTINE solve_rheology_quadratic_analytic
+    END SUBROUTINE eval_rheology_quadratic_analytic
 
     ! Unsupported physical treatment, rejected by the source catalog.
     ! Valid zero component of the configured Newton treatment.

@@ -19,7 +19,7 @@
 !> \ref eval_rheology_voellmy_semi_implicit for the Coulomb term; \ref mu and
 !> \ref xi are their respective friction parameters. When enabled,
 !> \f$a_c=c_{xx}u_x^2+2c_{xy}u_xu_y+c_{yy}u_y^2\f$.
-!> \ref solve_rheology_voellmy_analytic exactly integrates the frozen
+!> \ref eval_rheology_voellmy_analytic exactly integrates the frozen
 !> combined velocity source while holding non-velocity inputs fixed.
 !********************************************************************************
 MODULE rheology_voellmy_2d
@@ -35,7 +35,7 @@ MODULE rheology_voellmy_2d
     PUBLIC :: eval_rheology_voellmy_explicit
     PUBLIC :: eval_rheology_voellmy_semi_implicit
     PUBLIC :: eval_rheology_voellmy_implicit
-    PUBLIC :: solve_rheology_voellmy_analytic
+    PUBLIC :: eval_rheology_voellmy_analytic
     PUBLIC :: mu
     REAL(wp) :: mu
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
@@ -175,7 +175,7 @@ CONTAINS
     !> \param[in] use_stochastic_xi Enable stochastic turbulent resistance.
     !> \param[in] stochastic_xi_value Stochastic turbulent resistance parameter.
     !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
-    SUBROUTINE solve_rheology_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+    SUBROUTINE eval_rheology_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
             use_pore_pressure, use_stochastic_xi, stochastic_xi_value, velocity_after)
 
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -232,7 +232,7 @@ CONTAINS
         velocity_after = (speed_after / speed_before) * velocity_before
     
         END ASSOCIATE
-    END SUBROUTINE solve_rheology_voellmy_analytic
+    END SUBROUTINE eval_rheology_voellmy_analytic
 
     ! Unsupported physical treatment, rejected by the source catalog.
 END MODULE rheology_voellmy_2d

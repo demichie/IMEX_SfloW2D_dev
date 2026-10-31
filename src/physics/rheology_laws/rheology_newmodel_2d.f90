@@ -10,7 +10,7 @@ MODULE rheology_newmodel_2d
     PUBLIC :: eval_rheology_newmodel_explicit
     PUBLIC :: eval_rheology_newmodel_semi_implicit
     PUBLIC :: eval_rheology_newmodel_implicit
-    PUBLIC :: solve_rheology_newmodel_analytic
+    PUBLIC :: eval_rheology_newmodel_analytic
 CONTAINS
     !> \brief Evaluate the explicit newmodel contribution to the horizontal momentum source.
     !> \param[in] state Shared physical state (complex for implicit source).
@@ -64,10 +64,10 @@ CONTAINS
     !> \details Advance the scalar speed under the configured newmodel rheology, with its currently
     !> supported source treatment with model coefficients fixed over dt; the horizontal direction is
     !> retained in the returned velocity vector.
-    SUBROUTINE solve_rheology_newmodel_analytic(state)
+    SUBROUTINE eval_rheology_newmodel_analytic(state)
 
         TYPE(physical_state_type), INTENT(IN) :: state
         CALL fatal_error('rheology_newmodel: analytic treatment unsupported')
-    END SUBROUTINE solve_rheology_newmodel_analytic
+    END SUBROUTINE eval_rheology_newmodel_analytic
 
 END MODULE rheology_newmodel_2d
