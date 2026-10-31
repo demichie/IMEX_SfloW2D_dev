@@ -208,8 +208,8 @@ CONTAINS
         END SELECT
       END IF
       IF (TRIM(active_names(i))=='pore_pressure_dissipation') THEN
-        IF (method/=SOURCE_METHOD_ANALYTIC .OR. cadence/=SOURCE_CADENCE_STEP) THEN
-          error='D18: Darcy pore pressure requires ANALYTIC/STEP'
+        IF (method/=SOURCE_METHOD_ANALYTIC) THEN
+          error='D18: Darcy pore pressure requires ANALYTIC'
           RETURN
         END IF
       END IF

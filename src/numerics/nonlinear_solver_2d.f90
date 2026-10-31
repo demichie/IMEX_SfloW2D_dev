@@ -228,7 +228,7 @@ CONTAINS
     REAL(wp) :: momentum_before_newton(2)
     INTEGER :: group, group_size, equation, i
     INTEGER :: analytic_status
-    INTEGER :: group_equations(equation_partition%n_implicit)
+    INTEGER :: group_equations(n_eqns)
     LOGICAL :: group_has_momentum, apply_si_local
 
     iterations_used = 0
@@ -292,9 +292,7 @@ CONTAINS
        group_equations(1:group_size)=stage_groups(group)%equation_ids
 
        IF (stage_groups(group)%method==SOURCE_METHOD_ANALYTIC) THEN
-          DO i=1,group_size
-             qj(group_equations(i))=q_known(group_equations(i))
-          END DO
+          ! Analytic operators act on the state produced by preceding groups.
           group_has_momentum=ANY(group_equations(1:group_size)==2) .OR. &
                ANY(group_equations(1:group_size)==3)
           IF (group_has_momentum .AND. &
