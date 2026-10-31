@@ -194,3 +194,15 @@ The following decisions **supersede the corresponding open questions A1, A2, A5 
 ## 11. Zero-diagonal implicit stages (agreed)
 
 For an IMEX-RK stage with implicit diagonal coefficient `a_ii = 0`, the implicit substep interval is `tau_imp = a_ii * dt = 0`. **Skip all NEWTON/STAGE and ANALYTIC/STAGE group executions** for that stage and initialize its complete implicit source rate to zero. Do not call implicit numerical or analytic routines with a zero interval and do not divide by `tau_imp`. The EXPLICIT/STAGE path remains active, evaluated according to its own explicit RK tableau and sequential explicit-group rules. This is an agreed design requirement, not yet a claim of tested implementation.
+
+## 12. Newton equation and unknown indices (agreed)
+
+The Newton solver iterates directly on **conservative variables** `q`, not primitive variables `qp`. Every Newton source group owns one **group-local index list** `newton_equations(:)` containing the conservative equation indices that define its reduced system.
+
+- Use the **same list for residual rows and Jacobian columns**, so a single list is sufficient; do not add a separate `newton_unknowns` array without a demonstrated physical/numerical need.
+- For a rheology-only implicit group: `newton_equations = [idx_uEqn, idx_vEqn]`. These select the momentum residuals and the conservative momenta `q(idx_uEqn)`, `q(idx_vEqn)` as Newton unknowns. **Do not use primitive velocity indices** `idx_u`, `idx_v`, which address `qp` beyond the conservative state.
+- Construct the reduced Jacobian from the full implicit source evaluation as `J(newton_equations,newton_equations)`, retaining all needed cross derivatives within the selected group.
+- The list selects **only Newton residuals/unknowns**; it never limits which entries of the physical source rate `rate(1:n_eqns)` can be nonzero. Source-group membership and ordering remain independent of equation ownership.
+- Distinct sequential Newton groups may use overlapping index lists. Each uses the conservative state produced by preceding groups. No exclusive global equation-to-group partition is required.
+
+This decision replaces the question about separately selecting Newton rows and columns and strengthens decision A3. Any future exception must be justified by an actual model before adding abstraction.
