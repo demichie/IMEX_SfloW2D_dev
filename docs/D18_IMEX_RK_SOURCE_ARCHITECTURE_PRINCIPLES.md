@@ -206,3 +206,26 @@ The Newton solver iterates directly on **conservative variables** `q`, not primi
 - Distinct sequential Newton groups may use overlapping index lists. Each uses the conservative state produced by preceding groups. No exclusive global equation-to-group partition is required.
 
 This decision replaces the question about separately selecting Newton rows and columns and strengthens decision A3. Any future exception must be justified by an actual model before adding abstraction.
+
+## 13. Limiter ownership audit (2026-10-31)
+
+**Status:** design inventory only; no code relocation or numerical validation yet.
+
+**Agreed architecture:** physical source processes own physical limits and return limited effective full-vector conservative rates. The group executor sums and applies such rates; the Newton solver and RK integrator must not know friction-specific rules. Shared inventories of processes in the same group are limited jointly, whereas successive groups reevaluate limits using the updated state.
+
+| Current code | Observed behavior | Architecture decision |
+| --- | --- | --- |
+| `nonlinear_solver_2d.f90` | `correct_friction_momentum` is called after the semi-implicit predictor and after Newton convergence. | **Move the anti-reversal policy into rheology**, remove special-case friction logic from the general Newton solver. |
+| `state_2d.f90` | `correct_friction_momentum` projects onto `m_after=alpha*m_before`, `0<=alpha<=1`; also forbids rotation and increase in momentum. | Make the physical policy rheology-owned, using the momentum immediately before isolated rheological application. Do not project arbitrary non-rheological momentum updates. |
+| `rheology_analytic_utils_2d.f90` | Exact drag flows already enforce nonnegative final speed. | Keep in rheology; check consistency among numerical methods. |
+| `mass_exchange_2d.f90` | Shared carrier-withdrawal and packing limiters act on combined deposition/liquid-loss demands. | Keep as physical joint-inventory limiters. |
+| `pore_pressure_darcy_2d.f90` | Darcy caps gas withdrawal by available carrier inventory/mass and tests admissibility. | Keep in pore-pressure physics. |
+| `step_source_executor_2d.f90` | Checks negative total/solid mass after exchange. | Keep general post-update transaction checks, not physics-specific clipping. |
+| `state_conversion_2d.f90` | Roundoff clipping, mass-fraction closure, dry-momentum projection. | Keep generic state consistency and numerical regularization. |
+| `state_2d.f90` (`finalize_imex_cell_state`) | Final RK thickness, component mass and temperature checks, dry-state projection. | Keep final-state numerical validation; audit overlap with other generic checks. |
+| `time_integration_2d.f90` | Clips roundoff-negative component masses before primitive reconstruction. | Keep numeric reconstruction protection; not a source limiter. |
+| `nonlinear_solver_2d.f90` | Newton step-length control, line search and residual tolerances. | Keep numerical convergence safeguards. |
+
+**Points to settle before moving friction correction:** (1) explicit-rate friction needs the actual group interval to prevent reversal of the applied increment; (2) a projection **after** Newton convergence can invalidate the original nonlinear residual, so the physical restriction and convergence test must be designed together; (3) verify whether suppressing rotation as well as reversal is the intended constraint for each rheology model; (4) do not introduce a generic limiter wrapper solely to preserve existing calls.
+
+**Implementation/acceptance order:** specify one rheology-owned effective-rate contract; use it across explicit, semi-implicit, implicit and analytic treatment without duplicating logic; remove friction calls from the generic solver and obsolete state-module ownership; test friction-only monotonicity, sequential rate summation, Newton residual, representative rheologies and RK regression. No numerical code is modified by this inventory.
