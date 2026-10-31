@@ -70,6 +70,13 @@ This identity is an **invariant to test**. Do not evaluate each group against th
 - If `tau = 0`, implementation must avoid division by zero and define a zero-increment result.
 - Numerical order of the overall IMEX/RK plus sequential splitting is **not assumed**: verify using convergence tests.
 
+### Shared inventories and limiter ownership (agreed rule)
+
+- **Within the same group:** all member processes evaluate on the same group-entry conservative state. If two or more processes consume the **same finite inventory** (for example, carrier mass), their requested withdrawals must be **limited jointly** against that shared available inventory before the group's effective full-vector rate is assembled and applied. Independent process limits alone are insufficient.
+- **Between distinct groups:** each group first evaluates its own rates, applies all necessary process and shared-inventory limiters, and updates the conservative state. The next group **must reconstruct its physical quantities, available inventories, rates and limits from that already limited, updated state**, not the previous group's input state. No additional cross-group shared-inventory limiter is needed **provided that every group guarantees an admissible update**.
+- These rules apply to both `STAGE` and `STEP`, and to every permitted numerical treatment. A group may contain multiple explicit sources; an analytic group remains single-process. Shared limits are defined where the physical inventory is owned, not via a generic rate-clipping wrapper.
+- This rule concerns **sequential group updates**. It does not prove admissibility of the final combination of different Runge–Kutta stages; stage-combination admissibility requires separate verification.
+
 ## 4. Methods and group exclusivity
 
 - **ANALYTIC** groups contain **exactly one physical process** for either `STAGE` or `STEP`. They cannot contain or be merged with NEWTON or EXPLICIT processes under the same group identifier/cadence.
