@@ -170,6 +170,14 @@ CONTAINS
        state%rho_m = rho_a_amb
        state%inv_rhom = 1.0_wp / state%rho_m
        state%red_grav = 0.0_wp
+       geometry=0.0_wp
+       IF (PRESENT(bx)) geometry(1)=bx
+       IF (PRESENT(by)) geometry(2)=by
+       IF (PRESENT(bxx)) geometry(3)=bxx
+       IF (PRESENT(bxy)) geometry(4)=bxy
+       IF (PRESENT(byy)) geometry(5)=byy
+       CALL update_physical_state_kinematics(state,geometry(1),geometry(2), &
+            geometry(3),geometry(4),geometry(5))
        RETURN
     END IF
     xs = state%xs

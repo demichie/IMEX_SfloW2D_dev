@@ -61,7 +61,7 @@ CONTAINS
                       MAX(0.0_wp,process_rates%carrier_erosion_rate),                              &
                       maximum_solid_packing,dt)
             CALL scale_process(process_rates,erosion_factor)
-            CALL accumulate_process(process_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
+            CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
             CALL eval_mass_exchange_deposition_explicit(physical_state,dt,deposition_rates)
             CALL eval_mass_exchange_carrier_liquid_loss_explicit(physical_state,liquid_loss_rates)
             CALL eval_mass_exchange_carrier_darcy_loss_explicit(physical_state,darcy_loss_rates)
@@ -112,14 +112,14 @@ CONTAINS
             END IF
 
             ! Assemble only the rates after all common-inventory limiters have acted.
-            CALL accumulate_process(deposition_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
-            CALL accumulate_process(liquid_loss_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
-            CALL accumulate_process(darcy_loss_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
+            CALL accumulate_process(deposition_rates,physical_state,total_rates,eqns_term)
+            CALL accumulate_process(liquid_loss_rates,physical_state,total_rates,eqns_term)
+            CALL accumulate_process(darcy_loss_rates,physical_state,total_rates,eqns_term)
             CALL eval_mass_exchange_entrainment_explicit(physical_state,Bx,By,process_rates)
-            CALL accumulate_process(process_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
+            CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
             CALL eval_mass_exchange_vaporization_explicit(physical_state,B_zone, &
                 deposition_rates%solid_deposition_rate,process_rates)
-            CALL accumulate_process(process_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
+            CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
 
             ! Scalar transport and pore-pressure sources inherit the net mass exchange.
             IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(idx_totMassEqn)*physical_state%Zs
@@ -131,7 +131,7 @@ CONTAINS
         ! Lava deposition follows the same process_rates-rate accumulation contract.
         IF (lava_deposition_flag) THEN
             CALL eval_mass_exchange_lava_deposition_explicit(physical_state,dt,process_rates)
-            CALL accumulate_process(process_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
+            CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
         END IF
 
     END SUBROUTINE eval_mass_exchange_explicit
@@ -265,16 +265,16 @@ CONTAINS
     !> @param[in] v Horizontal y velocity of the mobile material [m/s].
     !> @param[in,out] total Accumulated mass-exchange rates for the cell.
     !> @param[in,out] eqns_term Conservative mass, momentum, energy and species source vector.
-    SUBROUTINE accumulate_process(p,u,v,total,eqns_term)
+    SUBROUTINE accumulate_process(p,state,total,eqns_term)
 
         TYPE(mass_exchange_rates_type), INTENT(IN) :: p
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total
-        REAL(wp), INTENT(IN) :: u,v
+        TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(INOUT) :: eqns_term(n_eqns)
 
         eqns_term(idx_totMassEqn)=eqns_term(idx_totMassEqn)+p%mixture_mass_rate
-        eqns_term(idx_uEqn)=eqns_term(idx_uEqn)+u*MIN(0.0_wp,p%mixture_mass_rate)
-        eqns_term(idx_vEqn)=eqns_term(idx_vEqn)+v*MIN(0.0_wp,p%mixture_mass_rate)
+        eqns_term(idx_uEqn)=eqns_term(idx_uEqn)+state%u*MIN(0.0_wp,p%mixture_mass_rate)
+        eqns_term(idx_vEqn)=eqns_term(idx_vEqn)+state%v*MIN(0.0_wp,p%mixture_mass_rate)
         eqns_term(idx_engyEqn)=eqns_term(idx_engyEqn)+p%energy_rate
         eqns_term(idx_solidEqn_first:idx_solidEqn_last)=                                           &
                   eqns_term(idx_solidEqn_first:idx_solidEqn_last)+p%solid_mass_rate
