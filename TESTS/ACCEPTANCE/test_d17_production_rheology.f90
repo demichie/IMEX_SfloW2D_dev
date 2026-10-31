@@ -1,7 +1,8 @@
 ! Quantitative D17.20 test through the production rheology dispatcher.
 PROGRAM test_d17_production_rheology
   USE parameters_2d, ONLY : wp
-  USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+  USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, &
+       update_physical_state_kinematics
   USE rheology_2d, ONLY : eval_rheology_implicit,eval_rheology_semi_implicit
   IMPLICIT NONE
   REAL(wp), PARAMETER :: drag=0.1_wp, epsilon_cs=1.0E-24_wp
@@ -31,6 +32,7 @@ PROGRAM test_d17_production_rheology
     real_state%h=2.0_wp
     real_state%u=velocity(1)
     real_state%v=velocity(2)
+    CALL update_physical_state_kinematics(real_state)
     real_state%rho_m=density_real
     real_state%red_grav=8.0_wp
     real_state%alphas=solid
@@ -59,16 +61,13 @@ CONTAINS
   SUBROUTINE implicit(v,r)
     COMPLEX(wp), INTENT(IN) :: v(2)
     COMPLEX(wp), INTENT(OUT) :: r(2)
-    COMPLEX(wp) :: speed,horizontal,squared
-    horizontal=SQRT(v(1)**2+v(2)**2)
-    speed=horizontal
-    squared=speed**2
     complex_state%h=CMPLX(2.0_wp,0.0_wp,wp)
     complex_state%T=CMPLX(300.0_wp,0.0_wp,wp)
     complex_state%rho_m=density
     complex_state%inv_rhom=1.0_wp/density
     complex_state%u=v(1)
     complex_state%v=v(2)
+    CALL update_physical_state_kinematics(complex_state)
     complex_state%red_grav=CMPLX(8.0_wp,0.0_wp,wp)
     complex_state%alphas=CMPLX(solid,0.0_wp,wp)
     CALL eval_rheology_implicit(['rheology_newmodel'],complex_state, &
