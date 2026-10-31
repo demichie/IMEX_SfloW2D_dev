@@ -187,23 +187,14 @@ CONTAINS
         error='D17: rheology group requires the complete law'
         IF (.NOT.ANY(group%source_names==rheology_name)) RETURN
       END IF
-      ! No independently scheduled sub-solves: validate group equation shape.
-      error='D17: incomplete or incompatible group equation target'
+      ! Newton equations specify internal unknowns, not source footprints.
       IF (group%method==SOURCE_METHOD_NEWTON) THEN
+        error='D17: Newton group requires solver unknowns'
         IF (SIZE(group%equation_ids)==0) RETURN
       ELSE IF (group%method==SOURCE_METHOD_ANALYTIC) THEN
-        ! Analytical maps are individual operators, never joint groups.
+        ! Analytic operators always return full conservative rates.
+        error='D17: analytic group must contain exactly one physical process'
         IF (SIZE(group%source_names)/=1) RETURN
-        ! The momentum pair is indivisible; energy and pore are scalar.
-        IF (SIZE(group%equation_ids)==0) RETURN
-        IF (ANY(group%equation_ids==2) .NEQV. &
-             ANY(group%equation_ids==3)) RETURN
-        DO j=1,SIZE(group%equation_ids)
-          id=group%equation_ids(j)
-          IF (id/=2 .AND. id/=3 .AND. id/=4 .AND. &
-               (this%pore_equation==0 .OR. id/=this%pore_equation)) RETURN
-        END DO
-        IF (ANY(group%equation_ids==2) .AND. LEN_TRIM(rheology_name)==0) RETURN
       END IF
     END DO
     error=''
