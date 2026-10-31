@@ -69,7 +69,7 @@ CONTAINS
          grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
          use_pore_pressure,use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: B_prime_x,B_prime_y,grav_coeff
         REAL(wp), INTENT(IN) :: B_second_xx,B_second_xy,B_second_yy,stochastic_value
         LOGICAL, INTENT(IN) :: curvature_term,use_pore_pressure,use_stochastic
@@ -77,21 +77,19 @@ CONTAINS
         REAL(wp) :: process_rate(2)
         REAL(wp) :: mod_vel,mod_hor_vel,mod_vel2,vertical_velocity
         LOGICAL :: moving
-        TYPE(physical_state_type) :: working_state
         INTEGER :: i
         rate=0.0_wp
-        working_state=state
-        CALL update_physical_state_kinematics(working_state,B_prime_x,B_prime_y, &
+        CALL update_physical_state_kinematics(state,B_prime_x,B_prime_y, &
              B_second_xx,B_second_xy,B_second_yy)
-        mod_hor_vel=working_state%mod_vel_hor
-        mod_vel2=working_state%mod_vel2
-        mod_vel=working_state%mod_vel
+        mod_hor_vel=state%mod_vel_hor
+        mod_vel2=state%mod_vel2
+        mod_vel=state%mod_vel
         moving=mod_vel>0.0_wp
         DO i=1,SIZE(models)
             process_rate = 0.0_wp
             SELECT CASE(TRIM(models(i)))
         CASE('rheology_voellmy')
-            CALL eval_rheology_voellmy_explicit(working_state, &
+            CALL eval_rheology_voellmy_explicit(state, &
                     mod_vel, &
                     mod_vel2, &
                     grav_coeff, &
@@ -105,38 +103,38 @@ CONTAINS
                     stochastic_value, &
                     process_rate)
         CASE('rheology_plastic')
-            CALL eval_rheology_plastic_explicit(working_state, &
+            CALL eval_rheology_plastic_explicit(state, &
                     mod_vel, &
                     moving, &
                     process_rate)
         CASE('rheology_lava')
-            CALL eval_rheology_lava_explicit(working_state, &
+            CALL eval_rheology_lava_explicit(state, &
                     mod_vel, &
                     moving, &
                     process_rate)
         CASE('rheology_lahar')
-            CALL eval_rheology_lahar_explicit(working_state, &
+            CALL eval_rheology_lahar_explicit(state, &
                     mod_vel, &
                     mod_hor_vel, &
                     moving, &
                     process_rate)
         CASE('rheology_empirical')
-            CALL eval_rheology_empirical_explicit(working_state, &
+            CALL eval_rheology_empirical_explicit(state, &
                     mod_vel, &
                     mod_hor_vel, &
                     moving, &
                     process_rate)
         CASE('rheology_quadratic')
-            CALL eval_rheology_quadratic_explicit(working_state, &
+            CALL eval_rheology_quadratic_explicit(state, &
                     mod_hor_vel, &
                     mod_vel2, &
                     moving, &
                     process_rate)
         CASE('rheology_newmodel')
-            CALL eval_rheology_newmodel_explicit(working_state, &
+            CALL eval_rheology_newmodel_explicit(state, &
                     process_rate)
         CASE('rheology_froude')
-            CALL eval_rheology_froude_explicit(working_state, &
+            CALL eval_rheology_froude_explicit(state, &
                     mod_vel, &
                     mod_hor_vel, &
                     grav_coeff, &
@@ -144,7 +142,7 @@ CONTAINS
                     stochastic_value, &
                     process_rate)
         CASE('rheology_lucas')
-            CALL eval_rheology_lucas_explicit(working_state, &
+            CALL eval_rheology_lucas_explicit(state, &
                     mod_vel, &
                     mod_hor_vel, &
                     grav_coeff, &
@@ -152,7 +150,7 @@ CONTAINS
                     stochastic_value, &
                     process_rate)
         CASE('rheology_mui')
-            CALL eval_rheology_mui_explicit(working_state, &
+            CALL eval_rheology_mui_explicit(state, &
                     mod_vel, &
                     grav_coeff, &
                     curvature_term, &
@@ -162,7 +160,7 @@ CONTAINS
                     use_pore_pressure, &
                     process_rate)
         CASE('rheology_mui_voellmy')
-            CALL eval_rheology_mui_voellmy_explicit(working_state, &
+            CALL eval_rheology_mui_voellmy_explicit(state, &
                     mod_vel, &
                     mod_vel2, &
                     grav_coeff, &
@@ -189,46 +187,44 @@ CONTAINS
          grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
          use_pore_pressure,use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(physical_state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: B_prime_x,B_prime_y,grav_coeff
         REAL(wp), INTENT(IN) :: B_second_xx,B_second_xy,B_second_yy,stochastic_value
         LOGICAL, INTENT(IN) :: curvature_term,use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: process_rate(2),curvature_term_value
         REAL(wp) :: mod_vel,mod_hor_vel,vertical_velocity
-        TYPE(physical_state_type) :: working_state
         INTEGER :: i
         rate=0.0_wp
-        working_state=state
-        CALL update_physical_state_kinematics(working_state,B_prime_x,B_prime_y, &
+        CALL update_physical_state_kinematics(state,B_prime_x,B_prime_y, &
              B_second_xx,B_second_xy,B_second_yy)
-        mod_hor_vel=working_state%mod_vel_hor
-        mod_vel=working_state%mod_vel
+        mod_hor_vel=state%mod_vel_hor
+        mod_vel=state%mod_vel
         DO i=1,SIZE(models)
             process_rate = 0.0_wp
             SELECT CASE(TRIM(models(i)))
         CASE('rheology_voellmy')
-            CALL eval_rheology_voellmy_semi_implicit(working_state, mod_vel, grav_coeff, curvature_term, &
+            CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term, &
                     B_second_xx, B_second_xy, B_second_yy, use_pore_pressure, process_rate(1), process_rate(2))
         CASE('rheology_lava')
-            CALL eval_rheology_lava_semi_implicit(working_state, mod_vel, process_rate(1), process_rate(2))
+            CALL eval_rheology_lava_semi_implicit(state, mod_vel, process_rate(1), process_rate(2))
         CASE('rheology_lahar')
-            CALL eval_rheology_lahar_semi_implicit(working_state, mod_hor_vel, mod_hor_vel>0.0_wp, process_rate(1), process_rate(2))
+            CALL eval_rheology_lahar_semi_implicit(state, mod_hor_vel, mod_hor_vel>0.0_wp, process_rate(1), process_rate(2))
         CASE('rheology_froude')
-            CALL eval_rheology_froude_semi_implicit(working_state, mod_vel, mod_hor_vel, grav_coeff, &
+            CALL eval_rheology_froude_semi_implicit(state, mod_vel, mod_hor_vel, grav_coeff, &
                     0.0_wp, use_stochastic, stochastic_value, process_rate(1), process_rate(2))
         CASE('rheology_lucas')
-            CALL eval_rheology_lucas_semi_implicit(working_state, mod_vel, mod_hor_vel, grav_coeff, &
+            CALL eval_rheology_lucas_semi_implicit(state, mod_vel, mod_hor_vel, grav_coeff, &
                     0.0_wp, use_stochastic, stochastic_value, process_rate(1), process_rate(2))
         CASE('rheology_mui')
             curvature_term_value = 0.0_wp
-            IF (curvature_term) curvature_term_value = working_state%curvature_acceleration
-            CALL eval_rheology_mui_semi_implicit(working_state, mod_vel, grav_coeff, curvature_term_value, &
+            IF (curvature_term) curvature_term_value = state%curvature_acceleration
+            CALL eval_rheology_mui_semi_implicit(state, mod_vel, grav_coeff, curvature_term_value, &
                     use_pore_pressure, process_rate(1), process_rate(2))
         CASE('rheology_mui_voellmy')
             curvature_term_value = 0.0_wp
-            IF (curvature_term) curvature_term_value = working_state%curvature_acceleration
-            CALL eval_rheology_mui_voellmy_semi_implicit(working_state, mod_vel, grav_coeff, curvature_term_value, &
+            IF (curvature_term) curvature_term_value = state%curvature_acceleration
+            CALL eval_rheology_mui_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term_value, &
                     use_pore_pressure, process_rate(1), process_rate(2))
         CASE('none', 'rheology_plastic', 'rheology_empirical',                                     &
                 'rheology_quadratic', 'rheology_newmodel')
@@ -246,7 +242,7 @@ CONTAINS
     SUBROUTINE eval_rheology_implicit(models,state,B_prime_x,B_prime_y, &
          use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(complex_physical_state_type), INTENT(INOUT) :: state
         REAL(wp), INTENT(IN) :: B_prime_x,B_prime_y
         LOGICAL, INTENT(IN) :: use_stochastic
         REAL(wp), INTENT(IN) :: stochastic_value
@@ -254,37 +250,35 @@ CONTAINS
         COMPLEX(wp) :: process_rate(2)
         COMPLEX(wp) :: mod_vel,mod_hor_vel,mod_vel2,vertical_velocity
         LOGICAL :: moving
-        TYPE(complex_physical_state_type) :: working_state
         INTEGER :: i
         rate=CMPLX(0.0_wp,0.0_wp,wp)
-        working_state=state
-        CALL update_physical_state_kinematics(working_state,B_prime_x,B_prime_y, &
+        CALL update_physical_state_kinematics(state,B_prime_x,B_prime_y, &
              0.0_wp,0.0_wp,0.0_wp)
-        mod_hor_vel=working_state%mod_vel_hor
-        mod_vel2=working_state%mod_vel2
-        mod_vel=working_state%mod_vel
+        mod_hor_vel=state%mod_vel_hor
+        mod_vel2=state%mod_vel2
+        mod_vel=state%mod_vel
         moving=(REAL(mod_vel,wp)/=0.0_wp).OR.(AIMAG(mod_vel)/=0.0_wp)
         DO i=1,SIZE(models)
             process_rate = CMPLX(0.0_wp,0.0_wp,wp)
             SELECT CASE(TRIM(models(i)))
         CASE('rheology_voellmy')
-            CALL eval_rheology_voellmy_implicit(working_state, mod_vel, mod_vel2, moving, use_stochastic, stochastic_value, &
+            CALL eval_rheology_voellmy_implicit(state, mod_vel, mod_vel2, moving, use_stochastic, stochastic_value, &
                     process_rate(1), process_rate(2))
         CASE('rheology_mui_voellmy')
-            CALL eval_rheology_mui_voellmy_implicit(working_state, mod_vel, mod_vel2, moving, use_stochastic, &
+            CALL eval_rheology_mui_voellmy_implicit(state, mod_vel, mod_vel2, moving, use_stochastic, &
                     stochastic_value, process_rate(1), process_rate(2))
         CASE('rheology_plastic')
-            CALL eval_rheology_plastic_implicit(working_state, mod_vel, moving, process_rate(1), process_rate(2))
+            CALL eval_rheology_plastic_implicit(state, mod_vel, moving, process_rate(1), process_rate(2))
         CASE('rheology_lava')
-            CALL eval_rheology_lava_implicit(working_state, moving, process_rate(1), process_rate(2))
+            CALL eval_rheology_lava_implicit(state, moving, process_rate(1), process_rate(2))
         CASE('rheology_lahar')
-            CALL eval_rheology_lahar_implicit(working_state, mod_vel, mod_hor_vel, moving, process_rate(1), process_rate(2))
+            CALL eval_rheology_lahar_implicit(state, mod_vel, mod_hor_vel, moving, process_rate(1), process_rate(2))
         CASE('rheology_empirical')
-            CALL eval_rheology_empirical_implicit(working_state, mod_hor_vel, mod_vel, moving, process_rate(1), process_rate(2))
+            CALL eval_rheology_empirical_implicit(state, mod_hor_vel, mod_vel, moving, process_rate(1), process_rate(2))
         CASE('rheology_newmodel')
-            CALL eval_rheology_newmodel_implicit(working_state,process_rate(1),process_rate(2))
+            CALL eval_rheology_newmodel_implicit(state,process_rate(1),process_rate(2))
         CASE('rheology_quadratic')
-            CALL eval_rheology_quadratic_implicit(working_state, mod_hor_vel, mod_vel2, moving, process_rate(1), process_rate(2))
+            CALL eval_rheology_quadratic_implicit(state, mod_hor_vel, mod_vel2, moving, process_rate(1), process_rate(2))
         CASE('none', 'rheology_froude', 'rheology_lucas', 'rheology_mui')
             CONTINUE
         CASE DEFAULT
