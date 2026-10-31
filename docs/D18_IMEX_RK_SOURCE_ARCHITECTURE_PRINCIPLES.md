@@ -368,3 +368,20 @@ CALL execute_source_groups(groups, q_in, dt, q_out, rate)
 - Avoid extra data abstractions or domain-wide copies merely to enforce this contract: the executor operates on **one cell** at a time.
 
 **Status:** architectural agreement only; executor implementation and tests pending.
+
+## 25. Reconstruction of non-Newton conservative components and actual dependency audit (agreed with conditions)
+
+**Chosen architecture:** retain one list `newton_equations` for nonlinear unknowns/residuals. Where an implicit group produces nonzero rates on other conservative components, **prefer reconstructing those other components after the reduced Newton solve**, from the full source evaluated on the solved state. Avoid introducing a general block-factorization engine unless a physical model actually needs it. Every group still returns a complete limited conservative rate.
+
+**Exactness condition:** partition into excluded components E and Newton components I. A direct post-Newton update `q_E,out=q_E,in+tau*S_E(q_I,out)` (with the appropriate group known state) is an exact solution of the full implicit equations only when the excluded source components do **not** depend on unknown `q_E,out`, and the Newton residual equations for I are independent of the excluded updated components (or any dependence is eliminated consistently). The corresponding source Jacobian has `J_S=[[0,B],[0,D]]`; the residual Jacobian is `J_R=[[I,-tau*B],[0,I-tau*D]]`. A nonzero B then costs an additional full-source evaluation/reconstruction, not a larger Newton solve. A missing lower-left block is a mathematical dependency condition, **not** something established merely by evaluating complex-step on only the selected columns. If either dependency condition fails, use a justified analytic/block elimination or expand the Newton unknown set; do not silently drop a residual.
+
+**Checked against current `dev` code:**
+- `src/physics/source_terms_2d.f90::eval_source_implicit` initializes the full rate to zero, dispatches rheology only into `source_term(2:3)`, and thermal cooling only into `source_term(4)`.
+- `src/physics/source_configuration_2d.f90` uses conservative indices `[2,3]` for rheology NEWTON and `[4]` for thermal NEWTON. The pore-pressure Darcy source is currently required to use ANALYTIC; mass-exchange sources are not currently dispatched as NEWTON in `eval_source_implicit`.
+- **Thus, for all actually dispatched current NEWTON groups, `S_E=0`**. Post-Newton reconstruction is an identity (`q_E,out=q_E,in` relative to that group's incoming/known state), and no nonzero B block arises from those source rows. Source rates `S_I` may still depend on E (e.g. rheology depends on mixture quantities), so `dS_I/dq_E` is not generally zero. Holding those E values fixed is consistent here because their source rates vanish for the group.
+- The current `src/numerics/nonlinear_solver_2d.f90::solve_newton_group` forms a reduced `J(I,I)`, solves it, and updates only selected conservative components; `eval_f` masks excluded residual rows. **That is sufficient for the existing source footprint**, provided the group-entry known state is preserved and no other process secretly modifies E during that group.
+- Reconfirm this dependency structure whenever adding a NEWTON-capable physical process or allowing a process to emit additional conservative rates.
+
+**Implementation decision:** do not add unused generalized B-block storage or reconstruction loops now. Preserve the chosen exact reconstruction strategy as the required extension when a real nonzero outside-group rate arises. Regression tests should verify unchanged excluded components for current rheology and thermal Newton groups, and a small synthetic triangular-source test should be added when reconstruction is implemented.
+
+**Status:** dependency audit and architectural rule recorded; no solver or test code modified in this commit.
