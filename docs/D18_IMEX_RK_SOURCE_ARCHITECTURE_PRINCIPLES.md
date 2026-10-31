@@ -229,3 +229,20 @@ This decision replaces the question about separately selecting Newton rows and c
 **Points to settle before moving friction correction:** (1) explicit-rate friction needs the actual group interval to prevent reversal of the applied increment; (2) a projection **after** Newton convergence can invalidate the original nonlinear residual, so the physical restriction and convergence test must be designed together; (3) verify whether suppressing rotation as well as reversal is the intended constraint for each rheology model; (4) do not introduce a generic limiter wrapper solely to preserve existing calls.
 
 **Implementation/acceptance order:** specify one rheology-owned effective-rate contract; use it across explicit, semi-implicit, implicit and analytic treatment without duplicating logic; remove friction calls from the generic solver and obsolete state-module ownership; test friction-only monotonicity, sequential rate summation, Newton residual, representative rheologies and RK regression. No numerical code is modified by this inventory.
+
+## 14. Rheological motion-reversal limiter (agreed)
+
+The rheology limiter must **prevent reversal of motion only**. It must **not** force the outgoing momentum to remain parallel to incoming momentum, and must **not** cap its magnitude solely because of this anti-reversal rule. The previous `m_after=alpha*m_before` constraint with `0<=alpha<=1` is therefore **not** the target behavior.
+
+For a rheology-only update with incoming momentum `m0=(Mu,Mv)` and candidate outgoing momentum `m1`, define reversal by `dot_product(m1,m0)<0` when `|m0|>0`. Limit only the reversing component, e.g. by the orthogonal projection onto `dot_product(m_after,m0)>=0`:
+
+```text
+if dot(m0,m0) > 0:
+    m_after = m1 - min(0, dot(m1,m0)/dot(m0,m0)) * m0
+else:
+    m_after = m1   ! no initial direction against which to define reversal
+```
+
+This preserves transverse momentum (so a change of direction without reversal remains possible) and does not impose an upper bound on speed. The anti-reversal reference is the **immediate input momentum of the isolated rheological group**, not the whole stage or contributions from non-rheological processes. The returned effective rheological rate must reflect the **limited** update. For Newton, check residual compatibility rather than applying an unexamined post-solve correction. Physical constitutive constraints other than anti-reversal (when present) remain separate.
+
+This agreed choice supersedes the unresolved rotation/magnitude question in section 13. **No Fortran implementation or test has been changed by this decision.**
