@@ -118,36 +118,28 @@ CONTAINS
                     process_rate)
         CASE('rheology_froude')
             CALL eval_rheology_froude_explicit(state, &
-                    mod_vel, &
-                    mod_hor_vel, &
-                    grav_coeff, &
-                    use_stochastic, &
-                    stochastic_value, &
-                    process_rate)
+             grav_coeff, &
+             use_stochastic, &
+             stochastic_value, &
+             process_rate)
         CASE('rheology_lucas')
             CALL eval_rheology_lucas_explicit(state, &
-                    mod_vel, &
-                    mod_hor_vel, &
-                    grav_coeff, &
-                    use_stochastic, &
-                    stochastic_value, &
-                    process_rate)
+             grav_coeff, &
+             use_stochastic, &
+             stochastic_value, &
+             process_rate)
         CASE('rheology_mui')
             CALL eval_rheology_mui_explicit(state, &
-                    mod_vel, &
-                    grav_coeff, &
-                    use_pore_pressure, &
-                    process_rate)
+             grav_coeff, &
+             use_pore_pressure, &
+             process_rate)
         CASE('rheology_mui_voellmy')
             CALL eval_rheology_mui_voellmy_explicit(state, &
-                    mod_vel, &
-                    mod_vel2, &
-                    grav_coeff, &
-                    use_pore_pressure, &
-                    moving, &
-                    use_stochastic, &
-                    stochastic_value, &
-                    process_rate)
+             grav_coeff, &
+             use_pore_pressure, &
+             use_stochastic, &
+             stochastic_value, &
+             process_rate)
         CASE DEFAULT
             CALL fatal_error('Invalid rheology name in explicit dispatch')
 
@@ -192,17 +184,31 @@ CONTAINS
              process_rate(1), &
              process_rate(2))
         CASE('rheology_froude')
-            CALL eval_rheology_froude_semi_implicit(state, mod_vel, mod_hor_vel, grav_coeff, &
-                    0.0_wp, use_stochastic, stochastic_value, process_rate(1), process_rate(2))
+            CALL eval_rheology_froude_semi_implicit(state, &
+             grav_coeff, &
+             use_stochastic, &
+             stochastic_value, &
+             process_rate(1), &
+             process_rate(2))
         CASE('rheology_lucas')
-            CALL eval_rheology_lucas_semi_implicit(state, mod_vel, mod_hor_vel, grav_coeff, &
-                    0.0_wp, use_stochastic, stochastic_value, process_rate(1), process_rate(2))
+            CALL eval_rheology_lucas_semi_implicit(state, &
+             grav_coeff, &
+             use_stochastic, &
+             stochastic_value, &
+             process_rate(1), &
+             process_rate(2))
         CASE('rheology_mui')
-            CALL eval_rheology_mui_semi_implicit(state, mod_vel, grav_coeff, state%curvature_acceleration, &
-                    use_pore_pressure, process_rate(1), process_rate(2))
+            CALL eval_rheology_mui_semi_implicit(state, &
+             grav_coeff, &
+             use_pore_pressure, &
+             process_rate(1), &
+             process_rate(2))
         CASE('rheology_mui_voellmy')
-            CALL eval_rheology_mui_voellmy_semi_implicit(state, mod_vel, grav_coeff, state%curvature_acceleration, &
-                    use_pore_pressure, process_rate(1), process_rate(2))
+            CALL eval_rheology_mui_voellmy_semi_implicit(state, &
+             grav_coeff, &
+             use_pore_pressure, &
+             process_rate(1), &
+             process_rate(2))
         CASE('none', 'rheology_plastic', 'rheology_empirical',                                     &
                 'rheology_quadratic', 'rheology_newmodel')
             CONTINUE
@@ -243,8 +249,11 @@ CONTAINS
                     process_rate(1), &
              process_rate(2))
         CASE('rheology_mui_voellmy')
-            CALL eval_rheology_mui_voellmy_implicit(state, mod_vel, mod_vel2, moving, use_stochastic, &
-                    stochastic_value, process_rate(1), process_rate(2))
+            CALL eval_rheology_mui_voellmy_implicit(state, &
+             use_stochastic, &
+             stochastic_value, &
+             process_rate(1), &
+             process_rate(2))
         CASE('rheology_plastic')
             CALL eval_rheology_plastic_implicit(state, &
              process_rate(1), &

@@ -43,21 +43,19 @@ CONTAINS
     !> \param[in] use_stochastic Whether stochastic rheology parameters are enabled.
     !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
     !> \param[out] rate Conservative horizontal momentum source vector.
-    SUBROUTINE eval_rheology_lucas_explicit(state, &
-            mod_vel, &
-            mod_hor_vel, &
-            grav_coeff, &
-            use_stochastic, &
-            stochastic_value, &
-            rate)
+    SUBROUTINE eval_rheology_lucas_explicit(state, grav_coeff, use_stochastic, stochastic_value, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, grav_coeff
+        REAL(wp), INTENT(IN) :: grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
         LOGICAL, INTENT(IN) :: use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         ! The implicit component is identically zero for Lucas rheology.
-        CALL eval_rheology_lucas_semi_implicit(state, mod_vel, mod_hor_vel, grav_coeff, &
-            0.0_wp, use_stochastic, stochastic_value, rate(1), rate(2))
+        CALL eval_rheology_lucas_semi_implicit(state, &
+             grav_coeff, &
+             use_stochastic, &
+             stochastic_value, &
+             rate(1), &
+             rate(2))
     END SUBROUTINE eval_rheology_lucas_explicit
 
     !> \param[in] state Shared physical state (complex for implicit treatment).
@@ -73,11 +71,10 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
-    SUBROUTINE eval_rheology_lucas_semi_implicit(state, mod_vel, mod_hor_vel, grav_coeff, curvature_term, &
-            stochastic, stochastic_value, rate_x, rate_y)
+    SUBROUTINE eval_rheology_lucas_semi_implicit(state, grav_coeff, stochastic, stochastic_value, rate_x, rate_y)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel, grav_coeff, curvature_term
+        REAL(wp), INTENT(IN) :: grav_coeff
         LOGICAL, INTENT(IN) :: stochastic
         REAL(wp), INTENT(IN) :: stochastic_value
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
@@ -87,12 +84,12 @@ CONTAINS
 
         rate_x = 0.0_wp
         rate_y = 0.0_wp
-        IF ( mod_vel .GT. 0.0_wp ) THEN
+        IF ( state%mod_vel .GT. 0.0_wp ) THEN
             IF ( stochastic ) THEN
-                friction_speed = mod_vel + stochastic_value
+                friction_speed = state%mod_vel + stochastic_value
 
             ELSE
-                friction_speed = mod_vel
+                friction_speed = state%mod_vel
 
             END IF
 
@@ -111,9 +108,9 @@ CONTAINS
             END IF
 
             friction_stress = state%rho_m * ( friction_coefficient * state%h *                                  &
-                    grav_coeff * ( state%red_grav + curvature_term ) )
-            rate_x = rate_x - friction_stress * state%u / mod_hor_vel
-            rate_y = rate_y - friction_stress * state%v / mod_hor_vel
+                    grav_coeff * ( state%red_grav + state%curvature_acceleration ) )
+            rate_x = rate_x - friction_stress * state%u / state%mod_vel_hor
+            rate_y = rate_y - friction_stress * state%v / state%mod_vel_hor
 
         END IF
 

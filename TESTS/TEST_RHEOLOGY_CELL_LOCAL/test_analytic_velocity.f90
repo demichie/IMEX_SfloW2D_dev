@@ -347,8 +347,14 @@ PROGRAM test_analytic_velocity
   rheo_state%v=velocity_after(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_froude_semi_implicit(rheo_state,speed_after,horizontal_speed,gravity_coefficient, &
-       0.0_wp,.FALSE.,stochastic_value,source_x,source_y)
+      rheo_state%mod_vel=speed_after
+    rheo_state%mod_vel_hor=horizontal_speed
+CALL eval_rheology_froude_semi_implicit(rheo_state, &
+             gravity_coefficient, &
+             .FALSE., &
+             stochastic_value, &
+             source_x, &
+             source_y)
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [source_x, source_y], 'Froude')
 
@@ -369,8 +375,14 @@ PROGRAM test_analytic_velocity
   rheo_state%v=velocity_after(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_froude_semi_implicit(rheo_state,speed_after,horizontal_speed,gravity_coefficient, &
-       0.0_wp,.TRUE.,stochastic_value,source_x,source_y)
+      rheo_state%mod_vel=speed_after
+    rheo_state%mod_vel_hor=horizontal_speed
+CALL eval_rheology_froude_semi_implicit(rheo_state, &
+             gravity_coefficient, &
+             .TRUE., &
+             stochastic_value, &
+             source_x, &
+             source_y)
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [source_x, source_y], 'Froude clamp')
   stochastic_value = 0.0_wp
@@ -408,8 +420,14 @@ PROGRAM test_analytic_velocity
   rheo_state%v=velocity_after(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_lucas_semi_implicit(rheo_state,speed_after,horizontal_speed,gravity_coefficient, &
-       0.0_wp,.FALSE.,stochastic_value,source_x,source_y)
+      rheo_state%mod_vel=speed_after
+    rheo_state%mod_vel_hor=horizontal_speed
+CALL eval_rheology_lucas_semi_implicit(rheo_state, &
+             gravity_coefficient, &
+             .FALSE., &
+             stochastic_value, &
+             source_x, &
+             source_y)
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [source_x, source_y], 'Lucas')
 
@@ -430,8 +448,14 @@ PROGRAM test_analytic_velocity
   rheo_state%v=velocity_after(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL eval_rheology_lucas_semi_implicit(rheo_state,speed_after,horizontal_speed,gravity_coefficient, &
-       0.0_wp,.TRUE.,stochastic_value,source_x,source_y)
+      rheo_state%mod_vel=speed_after
+    rheo_state%mod_vel_hor=horizontal_speed
+CALL eval_rheology_lucas_semi_implicit(rheo_state, &
+             gravity_coefficient, &
+             .TRUE., &
+             stochastic_value, &
+             source_x, &
+             source_y)
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [source_x, source_y], 'Lucas stochastic branch')
   stochastic_value = 0.0_wp
@@ -464,8 +488,13 @@ PROGRAM test_analytic_velocity
     ps%red_grav=reduced_gravity
     ps%alphas=solid_fraction
     ps%exc_pore_pres=0.0_wp
-    CALL eval_rheology_mui_semi_implicit(ps, speed_after, gravity_coefficient, &
-         0.0_wp, .FALSE., source_x, source_y)
+        ps%mod_vel=speed_after
+    ps%mod_vel_hor=horizontal_speed
+CALL eval_rheology_mui_semi_implicit(ps, &
+             gravity_coefficient, &
+             .FALSE., &
+             source_x, &
+             source_y)
   END BLOCK
   CALL assert_stage(velocity_before, velocity_after, integration_step, &
        mixture_density*flow_depth, [source_x, source_y], 'mu(I)')
@@ -494,8 +523,13 @@ PROGRAM test_analytic_velocity
     ps%red_grav=reduced_gravity
     ps%alphas=solid_fraction
     ps%exc_pore_pres=1000.0_wp
-    CALL eval_rheology_mui_semi_implicit(ps, speed_after, gravity_coefficient, 0.0_wp, &
-         .TRUE., source_x, source_y)
+        ps%mod_vel=speed_after
+    ps%mod_vel_hor=horizontal_speed
+CALL eval_rheology_mui_semi_implicit(ps, &
+             gravity_coefficient, &
+             .TRUE., &
+             source_x, &
+             source_y)
   END BLOCK
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [source_x, source_y], 'mu(I) pore pressure')
@@ -526,8 +560,13 @@ PROGRAM test_analytic_velocity
     ps%red_grav=reduced_gravity
     ps%alphas=solid_fraction
     ps%exc_pore_pres=0.0_wp
-    CALL eval_rheology_mui_voellmy_semi_implicit(ps, speed_after, gravity_coefficient, 0.0_wp, &
-         .FALSE., source_x, source_y)
+        ps%mod_vel=speed_after
+    ps%mod_vel_hor=horizontal_speed
+CALL eval_rheology_mui_voellmy_semi_implicit(ps, &
+             gravity_coefficient, &
+             .FALSE., &
+             source_x, &
+             source_y)
   END BLOCK
   BLOCK
     TYPE(complex_physical_state_type) :: cs
@@ -535,9 +574,14 @@ PROGRAM test_analytic_velocity
     cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
     cs%red_grav=CMPLX(reduced_gravity,0.0_wp,wp)
-    CALL eval_rheology_mui_voellmy_implicit(cs, CMPLX(speed_after,0.0_wp,wp), &
-         CMPLX(speed_after**2,0.0_wp,wp), .TRUE., .FALSE., 0.0_wp, &
-         complex_source_x, complex_source_y)
+        cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
+    cs%mod_vel2=cs%mod_vel**2
+    cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
+CALL eval_rheology_mui_voellmy_implicit(cs, &
+             .FALSE., &
+             0.0_wp, &
+             complex_source_x, &
+             complex_source_y)
   END BLOCK
   source = [source_x+REAL(complex_source_x,wp),                              &
        source_y+REAL(complex_source_y,wp)]
@@ -566,8 +610,13 @@ PROGRAM test_analytic_velocity
     ps%red_grav=reduced_gravity
     ps%alphas=solid_fraction
     ps%exc_pore_pres=500.0_wp
-    CALL eval_rheology_mui_voellmy_semi_implicit(ps, speed_after, gravity_coefficient, 0.0_wp, &
-         .TRUE., source_x, source_y)
+        ps%mod_vel=speed_after
+    ps%mod_vel_hor=horizontal_speed
+CALL eval_rheology_mui_voellmy_semi_implicit(ps, &
+             gravity_coefficient, &
+             .TRUE., &
+             source_x, &
+             source_y)
   END BLOCK
   BLOCK
     TYPE(complex_physical_state_type) :: cs
@@ -575,9 +624,14 @@ PROGRAM test_analytic_velocity
     cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
     cs%red_grav=CMPLX(reduced_gravity,0.0_wp,wp)
-    CALL eval_rheology_mui_voellmy_implicit(cs, CMPLX(speed_after,0.0_wp,wp), &
-         CMPLX(speed_after**2,0.0_wp,wp), .TRUE., .TRUE., 100.0_wp, &
-         complex_source_x, complex_source_y)
+        cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
+    cs%mod_vel2=cs%mod_vel**2
+    cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
+CALL eval_rheology_mui_voellmy_implicit(cs, &
+             .TRUE., &
+             100.0_wp, &
+             complex_source_x, &
+             complex_source_y)
   END BLOCK
   CALL assert_dispatch_matches('rheology_mui_voellmy', .TRUE., 500.0_wp,   &
        .TRUE., 100.0_wp, velocity_after,                                   &

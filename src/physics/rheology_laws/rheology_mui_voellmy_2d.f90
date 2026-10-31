@@ -53,19 +53,11 @@ CONTAINS
     !> \param[in] use_stochastic Enable model stochastic parameter.
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_mui_voellmy_explicit(state, &
-            mod_vel, &
-            mod_vel2, &
-            grav_coeff, &
-            use_pore_pressure, &
-            moving, &
-            use_stochastic, &
-            stochastic_value, &
-            rate)
+    SUBROUTINE eval_rheology_mui_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic, stochastic_value, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, mod_vel2, grav_coeff
+        REAL(wp), INTENT(IN) :: grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
-        LOGICAL, INTENT(IN) :: use_pore_pressure, moving, use_stochastic
+        LOGICAL, INTENT(IN) :: use_pore_pressure, use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy, curvature_accel
         COMPLEX(wp) :: ix, iy
@@ -74,11 +66,17 @@ CONTAINS
         curvature_accel=0.0_wp
 
         IF (curvature_term) curvature_accel=state%curvature_acceleration
-        CALL eval_rheology_mui_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_accel, &
-             use_pore_pressure, sx, sy)
+        CALL eval_rheology_mui_voellmy_semi_implicit(state, &
+             grav_coeff, &
+             use_pore_pressure, &
+             sx, &
+             sy)
         CALL complex_state_from_real(state, cs)
-        CALL eval_rheology_mui_voellmy_implicit(cs, CMPLX(mod_vel,0.0_wp,wp), CMPLX(mod_vel2,0.0_wp,wp), &
-             moving, use_stochastic, stochastic_value, ix, iy)
+        CALL eval_rheology_mui_voellmy_implicit(cs, &
+             use_stochastic, &
+             stochastic_value, &
+             ix, &
+             iy)
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_mui_voellmy_explicit
 
@@ -93,11 +91,10 @@ CONTAINS
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_mui_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_acceleration, &
-            use_pore_pressure, rate_x, rate_y)
+    SUBROUTINE eval_rheology_mui_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, rate_x, rate_y)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, grav_coeff, curvature_acceleration
+        REAL(wp), INTENT(IN) :: grav_coeff
         LOGICAL, INTENT(IN) :: use_pore_pressure
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
         REAL(wp) :: particle_diameter
@@ -119,7 +116,7 @@ CONTAINS
                   exc_pore_pres => state%exc_pore_pres)
         rate_x = 0.0_wp
         rate_y = 0.0_wp
-        IF ( mod_vel .LE. 0.0_wp ) RETURN
+        IF ( state%mod_vel .LE. 0.0_wp ) RETURN
         IF ( n_solid .GT. 1 ) THEN
             particle_diameter = sauter_diameter(solid_fraction)
             particle_density = average_density_solids(solid_fraction)
@@ -137,7 +134,7 @@ CONTAINS
         END IF
 
         effective_vertical_stress = rhom *                                                         &
-                ( red_grav + curvature_acceleration ) * effective_depth
+                ( red_grav + state%curvature_acceleration ) * effective_depth
         IF ( use_pore_pressure ) THEN
             effective_vertical_stress = effective_vertical_stress -                                &
                     exc_pore_pres
@@ -152,15 +149,15 @@ CONTAINS
 
         END IF
 
-        shear_rate = 5.0_wp/2.0_wp * mod_vel /                                                     &
+        shear_rate = 5.0_wp/2.0_wp * state%mod_vel /                                                     &
                 (effective_depth * SQRT(grav_coeff))
         inertial_number = particle_diameter * shear_rate /                                         &
                 SQRT(effective_normal_stress / particle_density)
         friction_coefficient = (mu_s * I_0 + mu_2 * inertial_number +                              &
                 muI_inf * inertial_number**2) / (I_0 + inertial_number)
         friction_stress = friction_coefficient * effective_normal_stress
-        rate_x = rate_x - friction_stress * (u / mod_vel)
-        rate_y = rate_y - friction_stress * (v / mod_vel)
+        rate_x = rate_x - friction_stress * (u / state%mod_vel)
+        rate_y = rate_y - friction_stress * (v / state%mod_vel)
     
         END ASSOCIATE
     END SUBROUTINE eval_rheology_mui_voellmy_semi_implicit
@@ -176,12 +173,11 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_mui_voellmy_implicit(state, mod_vel, mod_vel2, moving, use_stochastic_xi, &
-            stochastic_value, rate_x, rate_y)
+    SUBROUTINE eval_rheology_mui_voellmy_implicit(state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
 
         TYPE(complex_physical_state_type), INTENT(IN) :: state
-        COMPLEX(wp), INTENT(IN) :: mod_vel, mod_vel2
-        LOGICAL, INTENT(IN) :: moving, use_stochastic_xi
+
+        LOGICAL, INTENT(IN) :: use_stochastic_xi
         REAL(wp), INTENT(IN) :: stochastic_value
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         REAL(wp) :: xi_effective
@@ -193,7 +189,7 @@ CONTAINS
                   red_grav => state%red_grav)
         rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
         rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-        IF (.NOT. moving) RETURN
+        IF (.NOT. ((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) RETURN
         IF (use_stochastic_xi) THEN
             xi_effective = xi + stochastic_value
             IF (xi_effective .LT. 1.0_wp) xi_effective = 1.0_wp
@@ -204,9 +200,9 @@ CONTAINS
 
         END IF
 
-        turbulent_stress = rhom * red_grav / xi_effective * mod_vel2
-        rate_x = -turbulent_stress * (u / mod_vel)
-        rate_y = -turbulent_stress * (v / mod_vel)
+        turbulent_stress = rhom * red_grav / xi_effective * state%mod_vel2
+        rate_x = -turbulent_stress * (u / state%mod_vel)
+        rate_y = -turbulent_stress * (v / state%mod_vel)
     
         END ASSOCIATE
     END SUBROUTINE eval_rheology_mui_voellmy_implicit

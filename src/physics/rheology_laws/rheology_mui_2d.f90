@@ -45,21 +45,20 @@ CONTAINS
     !> \param[in] grav_coeff Local dimensionless gravitational correction.
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_mui_explicit(state, &
-            mod_vel, &
-            grav_coeff, &
-            use_pore_pressure, &
-            rate)
+    SUBROUTINE eval_rheology_mui_explicit(state, grav_coeff, use_pore_pressure, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, grav_coeff
+        REAL(wp), INTENT(IN) :: grav_coeff
 
         LOGICAL, INTENT(IN) :: use_pore_pressure
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: curvature_accel
         curvature_accel=state%curvature_acceleration
         ! The mu(I) implicit component is identically zero.
-        CALL eval_rheology_mui_semi_implicit(state, mod_vel, grav_coeff, curvature_accel, &
-             use_pore_pressure, rate(1), rate(2))
+        CALL eval_rheology_mui_semi_implicit(state, &
+             grav_coeff, &
+             use_pore_pressure, &
+             rate(1), &
+             rate(2))
     END SUBROUTINE eval_rheology_mui_explicit
 
     !> \param[in] state Shared real or complex physical state.
@@ -73,11 +72,10 @@ CONTAINS
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_mui_semi_implicit(state, mod_vel, grav_coeff, curvature_acceleration, &
-            use_pore_pressure, rate_x, rate_y)
+    SUBROUTINE eval_rheology_mui_semi_implicit(state, grav_coeff, use_pore_pressure, rate_x, rate_y)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, grav_coeff, curvature_acceleration
+        REAL(wp), INTENT(IN) :: grav_coeff
         LOGICAL, INTENT(IN) :: use_pore_pressure
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
         REAL(wp) :: particle_diameter
@@ -99,7 +97,7 @@ CONTAINS
                   exc_pore_pres => state%exc_pore_pres)
         rate_x = 0.0_wp
         rate_y = 0.0_wp
-        IF ( mod_vel .LE. 0.0_wp ) RETURN
+        IF ( state%mod_vel .LE. 0.0_wp ) RETURN
         IF ( n_solid .GT. 1 ) THEN
             particle_diameter = sauter_diameter(solid_fraction)
             particle_density = average_density_solids(solid_fraction)
@@ -117,7 +115,7 @@ CONTAINS
         END IF
 
         effective_vertical_stress = rhom *                                                         &
-                ( red_grav + curvature_acceleration ) * effective_depth
+                ( red_grav + state%curvature_acceleration ) * effective_depth
         IF ( use_pore_pressure ) THEN
             effective_vertical_stress = effective_vertical_stress -                                &
                     exc_pore_pres
@@ -132,15 +130,15 @@ CONTAINS
 
         END IF
 
-        shear_rate = 5.0_wp/2.0_wp * mod_vel /                                                     &
+        shear_rate = 5.0_wp/2.0_wp * state%mod_vel /                                                     &
                 (effective_depth * SQRT(grav_coeff))
         inertial_number = particle_diameter * shear_rate /                                         &
                 SQRT(effective_normal_stress / particle_density)
         friction_coefficient = (mu_s * I_0 + mu_2 * inertial_number +                              &
                 muI_inf * inertial_number**2) / (I_0 + inertial_number)
         friction_stress = friction_coefficient * effective_normal_stress
-        rate_x = rate_x - friction_stress * (u / mod_vel)
-        rate_y = rate_y - friction_stress * (v / mod_vel)
+        rate_x = rate_x - friction_stress * (u / state%mod_vel)
+        rate_y = rate_y - friction_stress * (v / state%mod_vel)
     
         END ASSOCIATE
     END SUBROUTINE eval_rheology_mui_semi_implicit
