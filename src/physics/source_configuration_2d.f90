@@ -339,20 +339,18 @@ CONTAINS
         END IF
       END DO
     END DO
-    ALLOCATE(partition_methods(SIZE(stages)))
-    mask=.FALSE.; membership=0; partition_methods=0; compact=0
+    ! The equation partition is only a union mask for Newton unknowns.
+    ! Source groups (and their order) live in the registry and may overlap.
+    ALLOCATE(partition_methods(1))
+    mask=.FALSE.; membership=0; compact=0
+    partition_methods=IM_GROUP_METHOD_NEWTON
     DO i=1,SIZE(stages)
-      ! Only Newton unknowns belong to the equation partition.
-      ! Analytic groups are complete sequential conservative operators.
       IF (stages(i)%method/=SOURCE_METHOD_NEWTON) CYCLE
-      compact=compact+1
-      partition_methods(compact)=IM_GROUP_METHOD_NEWTON
+      compact=1
       DO j=1,SIZE(stages(i)%equation_ids)
         eq=stages(i)%equation_ids(j)
-        ! Overlap of Newton unknowns across sequential groups is allowed.
-        ! The partition stores a representative membership only.
-        IF (membership(eq)==0) membership(eq)=compact
         mask(eq)=.TRUE.
+        membership(eq)=1
       END DO
     END DO
     CALL partition%initialize(mask,membership,partition_methods(1:compact))
