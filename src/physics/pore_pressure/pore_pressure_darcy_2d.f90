@@ -26,6 +26,7 @@ MODULE pore_pressure_darcy_2d
 
   PRIVATE
 
+  PUBLIC :: solve_frozen_darcy_mass_pressure
   PUBLIC :: eval_pore_pressure_dissipation_explicit
   PUBLIC :: eval_pore_pressure_dissipation_semi_implicit
   PUBLIC :: eval_pore_pressure_dissipation_implicit
@@ -520,5 +521,64 @@ CONTAINS
 
 
   ! Valid zero contribution for the semi-implicit part of Newton.
+
+  SUBROUTINE solve_frozen_darcy_mass_pressure(mass_before, pressure_before, &
+       interval, dissipation_rate, loss_coefficient, gas_loss_enabled, &
+       mass_after, pressure_after, conservative_pressure_after, &
+       gas_mass_lost, admissible)
+    REAL(wp), INTENT(IN) :: mass_before, pressure_before, interval
+    REAL(wp), INTENT(IN) :: dissipation_rate, loss_coefficient
+    LOGICAL, INTENT(IN) :: gas_loss_enabled
+    REAL(wp), INTENT(OUT) :: mass_after, pressure_after
+    REAL(wp), INTENT(OUT) :: conservative_pressure_after, gas_mass_lost
+    LOGICAL, INTENT(OUT) :: admissible
+    REAL(wp) :: exponential_factor, pressure_integral, coefficient
+
+    mass_after=mass_before
+    pressure_after=pressure_before
+    conservative_pressure_after=mass_before*pressure_before
+    gas_mass_lost=0.0_wp
+    admissible=.FALSE.
+
+    IF (.NOT.ieee_is_finite(mass_before) .OR. &
+        .NOT.ieee_is_finite(pressure_before) .OR. &
+        .NOT.ieee_is_finite(interval) .OR. &
+        .NOT.ieee_is_finite(dissipation_rate) .OR. &
+        .NOT.ieee_is_finite(loss_coefficient)) RETURN
+    IF (mass_before<=0.0_wp .OR. interval<0.0_wp .OR. &
+        dissipation_rate<0.0_wp .OR. loss_coefficient<0.0_wp) RETURN
+
+    ! The existing v2/dev diffusion closure does not dissipate
+    ! negative excess pore pressure; preserve that guard.
+    IF (pressure_before<=0.0_wp .OR. interval==0.0_wp) THEN
+      admissible=.TRUE.
+      RETURN
+    END IF
+
+    exponential_factor=EXP(-dissipation_rate*interval)
+    pressure_after=pressure_before*exponential_factor
+
+    coefficient=0.0_wp
+    IF (gas_loss_enabled) coefficient=loss_coefficient
+    IF (dissipation_rate>0.0_wp) THEN
+      ! Stable evaluation of (1-exp(-lambda*dt))/lambda,
+      ! including small lambda*dt without cancellation.
+      IF (ABS(dissipation_rate*interval)<1.0e-5_wp) THEN
+        pressure_integral=interval*(1.0_wp-0.5_wp*dissipation_rate*interval+ &
+             (dissipation_rate*interval)**2/6.0_wp- &
+             (dissipation_rate*interval)**3/24.0_wp)
+      ELSE
+        pressure_integral=(1.0_wp-exponential_factor)/dissipation_rate
+      END IF
+    ELSE
+      pressure_integral=interval
+    END IF
+
+    gas_mass_lost=coefficient*pressure_before*pressure_integral
+    mass_after=mass_before-gas_mass_lost
+    admissible=(mass_after>0.0_wp .AND. ieee_is_finite(mass_after))
+    IF (.NOT.admissible) RETURN
+    conservative_pressure_after=mass_after*pressure_after
+  END SUBROUTINE solve_frozen_darcy_mass_pressure
 
 END MODULE pore_pressure_darcy_2d

@@ -2,6 +2,7 @@
 !> Physical Darcy closures are implemented by pore_pressure_darcy_2d.
 MODULE pore_pressure_2d
  USE pore_pressure_darcy_2d, ONLY: &
+  solve_frozen_darcy_mass_pressure, &
   eval_pore_pressure_dissipation_explicit, &
   eval_pore_pressure_dissipation_semi_implicit, &
   eval_pore_pressure_dissipation_implicit, &
@@ -12,6 +13,7 @@ MODULE pore_pressure_2d
   eval_pore_pressure_mass_exchange_source
  IMPLICIT NONE
  PRIVATE
+ PUBLIC :: solve_frozen_darcy_mass_pressure
  PUBLIC :: eval_pore_pressure_dissipation_explicit
  PUBLIC :: eval_pore_pressure_dissipation_semi_implicit
  PUBLIC :: eval_pore_pressure_dissipation_implicit
