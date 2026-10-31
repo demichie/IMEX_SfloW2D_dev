@@ -91,27 +91,32 @@ CONTAINS
     END DO
   END SUBROUTINE eval_pore_pressure_implicit
 
-  SUBROUTINE solve_pore_pressure_analytic(models,state,interval,pressure_after)
+  !> Complete conservative average rate for the selected analytic operator.
+  !> For sequential operators, reconstruct the physical state before
+  !> extending this dispatch; do not reuse stale primitive coefficients.
+  SUBROUTINE solve_pore_pressure_analytic(models,state,q_before,interval,rate,admissible)
     CHARACTER(*), INTENT(IN) :: models(:)
     TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(IN) :: interval
-    REAL(wp), INTENT(OUT) :: pressure_after
-    TYPE(physical_state_type) :: current_state
+    REAL(wp), INTENT(IN) :: q_before(n_eqns),interval
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    LOGICAL, INTENT(OUT) :: admissible
     INTEGER :: i
-    current_state=state
-    pressure_after=state%exc_pore_pres
+    rate=0.0_wp
+    admissible=.TRUE.
     IF (.NOT.pore_pressure_flag) RETURN
+    IF (SIZE(models)>1) THEN
+      CALL fatal_error('Coupled pore-pressure analytic models require state reconstruction')
+    END IF
     DO i=1,SIZE(models)
       SELECT CASE(TRIM(models(i)))
       CASE('pore_pressure_darcy')
-        CALL darcy_analytic(current_state,interval,pressure_after)
+        CALL darcy_analytic(state,q_before,interval,rate,admissible)
       CASE DEFAULT
         CALL fatal_error('Unknown analytic pore-pressure model: '//TRIM(models(i)))
       END SELECT
-      current_state%exc_pore_pres=pressure_after
+      IF (.NOT.admissible) RETURN
     END DO
   END SUBROUTINE solve_pore_pressure_analytic
-
 
   !> Dispatch the full conservative analytic map; future pore-pressure
   !> models are added as separate CASE branches.

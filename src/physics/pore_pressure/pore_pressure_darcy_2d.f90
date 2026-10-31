@@ -685,14 +685,23 @@ CONTAINS
   !> The full coupled analytic map is a separate existing kernel. Until
   !> the source registry supports multi-equation pressure groups, this
   !> state-level adapter preserves the original pressure-only analytic step.
-  SUBROUTINE solve_pore_pressure_darcy_analytic(state,interval,pressure_after)
+  SUBROUTINE solve_pore_pressure_darcy_analytic(state,q_before,interval,rate,admissible)
     TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(IN) :: interval
-    REAL(wp), INTENT(OUT) :: pressure_after
-    pressure_after=state%exc_pore_pres
-    IF (.NOT.pore_pressure_flag) RETURN
-    CALL solve_pore_pressure_dissipation_analytic(state%exc_pore_pres, &
-         interval,state%h,state%T,state%alphas,pressure_after)
+    REAL(wp), INTENT(IN) :: q_before(n_eqns),interval
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    LOGICAL, INTENT(OUT) :: admissible
+    REAL(wp) :: q_after(n_eqns)
+    rate=0.0_wp
+    admissible=.FALSE.
+    IF (.NOT.ieee_is_finite(interval) .OR. interval<0.0_wp) RETURN
+    IF (interval==0.0_wp .OR. .NOT.pore_pressure_flag) THEN
+      admissible=.TRUE.
+      RETURN
+    END IF
+    CALL solve_pore_pressure_darcy_conservative_analytic( &
+         state,interval,q_before,q_after,admissible)
+    IF (.NOT.admissible) RETURN
+    rate=(q_after-q_before)/interval
   END SUBROUTINE solve_pore_pressure_darcy_analytic
 
 
