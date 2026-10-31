@@ -26,6 +26,7 @@ MODULE pore_pressure_darcy_2d
 
   PRIVATE
 
+  PUBLIC :: apply_frozen_darcy_withdrawal
   PUBLIC :: solve_frozen_darcy_mass_pressure
   PUBLIC :: eval_pore_pressure_dissipation_explicit
   PUBLIC :: eval_pore_pressure_dissipation_semi_implicit
@@ -580,5 +581,44 @@ CONTAINS
     IF (.NOT.admissible) RETURN
     conservative_pressure_after=mass_after*pressure_after
   END SUBROUTINE solve_frozen_darcy_mass_pressure
+
+
+  !> Conservative withdrawal using properties frozen at the start of the
+  !> analytic Darcy substep. The lost material is carrier gas alone.
+  !> gas_mass_fractions are normalized WITHIN the gas phase, not the mixture.
+  !> The caller must supply the energy per unit mass of removed gas in the
+  !> convention of the conservative energy equation (including kinetic energy
+  !> if that equation stores it).
+  SUBROUTINE apply_frozen_darcy_withdrawal(mass_lost, u, v, gas_energy, &
+       gas_mass_fractions, momentum_x, momentum_y, energy, gas_masses, admissible)
+    REAL(wp), INTENT(IN) :: mass_lost, u, v, gas_energy
+    REAL(wp), INTENT(IN) :: gas_mass_fractions(:)
+    REAL(wp), INTENT(INOUT) :: momentum_x, momentum_y, energy
+    REAL(wp), INTENT(INOUT) :: gas_masses(:)
+    LOGICAL, INTENT(OUT) :: admissible
+    REAL(wp) :: withdrawals(SIZE(gas_masses)), tolerance
+
+    admissible=.FALSE.
+    IF (SIZE(gas_mass_fractions)/=SIZE(gas_masses)) RETURN
+    IF (.NOT.ieee_is_finite(mass_lost) .OR. mass_lost<0.0_wp) RETURN
+    IF (.NOT.ieee_is_finite(u) .OR. .NOT.ieee_is_finite(v) .OR. &
+        .NOT.ieee_is_finite(gas_energy)) RETURN
+    IF (.NOT.ALL(ieee_is_finite(gas_masses)) .OR. &
+        .NOT.ALL(ieee_is_finite(gas_mass_fractions))) RETURN
+    IF (ANY(gas_mass_fractions<0.0_wp)) RETURN
+    IF (mass_lost>0.0_wp) THEN
+      tolerance=1.0e-10_wp
+      IF (ABS(SUM(gas_mass_fractions)-1.0_wp)>tolerance) RETURN
+    END IF
+    withdrawals=gas_mass_fractions*mass_lost
+    IF (ANY(withdrawals>gas_masses+ &
+         1.0e-12_wp*MAX(1.0_wp,ABS(gas_masses)))) RETURN
+    ! Perform all feasibility checks before touching any conservative variable.
+    momentum_x=momentum_x-u*mass_lost
+    momentum_y=momentum_y-v*mass_lost
+    energy=energy-gas_energy*mass_lost
+    gas_masses=MAX(0.0_wp,gas_masses-withdrawals)
+    admissible=.TRUE.
+  END SUBROUTINE apply_frozen_darcy_withdrawal
 
 END MODULE pore_pressure_darcy_2d
