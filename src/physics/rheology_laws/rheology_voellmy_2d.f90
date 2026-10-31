@@ -71,7 +71,6 @@ CONTAINS
         CALL complex_state_from_real(state, cs)
         CALL eval_rheology_voellmy_implicit(cs, &
              use_stochastic, &
-             &
                 stochastic_value, &
              ix, &
              iy)
