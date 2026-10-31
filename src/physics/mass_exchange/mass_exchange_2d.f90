@@ -15,7 +15,6 @@ MODULE mass_exchange_2d
     USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
     USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
     USE mass_exchange_carrier_liquid_loss_2d, ONLY : eval_mass_exchange_carrier_liquid_loss_explicit
-    USE mass_exchange_carrier_darcy_loss_2d, ONLY : eval_mass_exchange_carrier_darcy_loss_explicit
     USE mass_exchange_entrainment_2d, ONLY : eval_mass_exchange_entrainment_explicit
     USE mass_exchange_vaporization_2d, ONLY : eval_mass_exchange_vaporization_explicit
     USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag,                             &
@@ -36,8 +35,7 @@ CONTAINS
         INTEGER, INTENT(IN) :: B_zone
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
         REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-        TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates,        &
-            darcy_loss_rates
+        TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates
         REAL(wp) :: alpha
         REAL(wp) :: carrier_available,carrier_factor,carrier_volume,carrier_loss
         REAL(wp) :: carrier_withdrawals(2),solid_erosion,carrier_erosion
@@ -63,28 +61,14 @@ CONTAINS
             CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
             CALL eval_mass_exchange_deposition_explicit(physical_state,dt,deposition_rates)
             CALL eval_mass_exchange_carrier_liquid_loss_explicit(physical_state,liquid_loss_rates)
-            CALL eval_mass_exchange_carrier_darcy_loss_explicit(physical_state,darcy_loss_rates)
 
-            ! A single carrier inventory is shared by pore filling and its
-            ! physical loss law. Gas and liquid have distinct laws, but the
-            ! admissibility and maximum-packing limits are identical.
+            ! Deposition and liquid carrier loss share the exchange inventory.
+            ! Darcy gas loss is owned exclusively by the pore-pressure family.
             carrier_volume=MAX(0.0_wp,deposition_rates%carrier_deposition_rate)
             solid_deposition=SUM(MAX(0.0_wp,deposition_rates%solid_deposition_rate))
             solid_erosion=SUM(MAX(0.0_wp,process_rates%solid_erosion_rate))
             carrier_erosion=MAX(0.0_wp,process_rates%carrier_erosion_rate)
-
-            ! The process-specific modules determine which carrier is removed.
-            ! Mutually exclusive carrier flags ensure that only one loss is active.
-            carrier_loss=0.0_wp
-
-            IF (gas_flag) THEN
-
-                carrier_loss=MAX(0.0_wp,darcy_loss_rates%carrier_withdrawal_volume_rate)
-
-            ELSE
-
-                carrier_loss=MAX(0.0_wp,liquid_loss_rates%carrier_withdrawal_volume_rate)
-            END IF
+            carrier_loss=MAX(0.0_wp,liquid_loss_rates%carrier_withdrawal_volume_rate)
 
             ! The carrier occupies the volume not filled by dispersed solids.
             ! Limit gross withdrawals independently of positive erosion inputs.
@@ -101,19 +85,11 @@ CONTAINS
 
             CALL scale_process(deposition_rates,carrier_factor)
 
-            IF (gas_flag) THEN
-
-                CALL scale_process(darcy_loss_rates,carrier_factor)
-
-            ELSE
-
-                CALL scale_process(liquid_loss_rates,carrier_factor)
-            END IF
+            CALL scale_process(liquid_loss_rates,carrier_factor)
 
             ! Assemble only the rates after all common-inventory limiters have acted.
             CALL accumulate_process(deposition_rates,physical_state,total_rates,eqns_term)
             CALL accumulate_process(liquid_loss_rates,physical_state,total_rates,eqns_term)
-            CALL accumulate_process(darcy_loss_rates,physical_state,total_rates,eqns_term)
             CALL eval_mass_exchange_entrainment_explicit(physical_state,process_rates)
             CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
             CALL eval_mass_exchange_vaporization_explicit(physical_state,B_zone, &

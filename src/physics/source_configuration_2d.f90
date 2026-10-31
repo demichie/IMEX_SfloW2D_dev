@@ -15,7 +15,7 @@ MODULE source_configuration_2d
         thermal_cooling_flag, &
        pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag, &
        bottom_fissural_source_flag, radial_source_flag, lateral_source_flag, &
-       liquid_flag, gas_flag, lava_flag, gas_loss_flag, liquid_vaporization_flag, &
+       liquid_flag, gas_flag, lava_flag, liquid_vaporization_flag, &
        idx_pore
   USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag, &
        coeff_porosity, entrainment_flag
@@ -72,8 +72,6 @@ CONTAINS
       active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_deposition']
     END IF
     IF (liquid_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_liquid_loss']
-    IF (pore_pressure_flag .AND. gas_loss_flag) &
-         active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_carrier_darcy_loss']
     IF (entrainment_flag) active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_entrainment']
     IF (gas_flag .AND. liquid_vaporization_flag) &
          active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_vaporization']
@@ -180,7 +178,7 @@ CONTAINS
         END SELECT
       CASE('mass_exchange_lava_deposition','mass_exchange_erosion', &
             'mass_exchange_deposition','mass_exchange_carrier_liquid_loss', &
-            'mass_exchange_carrier_darcy_loss','mass_exchange_entrainment', &
+            'mass_exchange_entrainment', &
             'mass_exchange_vaporization')
         target=-1
         requested_method=mass_exchange_method
