@@ -63,9 +63,7 @@ CONTAINS
         COMPLEX(wp) :: ix, iy
         TYPE(complex_physical_state_type) :: cs
 
-        curvature_accel=0.0_wp
-
-        IF (curvature_term) curvature_accel=state%curvature_acceleration
+        curvature_accel=state%curvature_acceleration
         CALL eval_rheology_mui_voellmy_semi_implicit(state, &
              grav_coeff, &
              use_pore_pressure, &
