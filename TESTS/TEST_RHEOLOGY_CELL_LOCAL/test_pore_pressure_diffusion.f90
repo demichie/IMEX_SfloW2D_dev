@@ -6,7 +6,7 @@ PROGRAM test_pore_pressure_diffusion
   USE geometry_2d, ONLY : pi_g
   USE pore_pressure_2d, ONLY : eval_pore_pressure_dissipation_implicit,       &
        advance_pore_pressure_diffusion, solve_pore_pressure_dissipation_analytic, &
-       solve_frozen_darcy_mass_pressure
+       solve_frozen_darcy_mass_pressure, apply_frozen_darcy_withdrawal
 
   IMPLICIT NONE
 
@@ -22,6 +22,7 @@ PROGRAM test_pore_pressure_diffusion
   REAL(wp) :: m_after,p_after,qp_after,gas_lost
   REAL(wp) :: initial_mass,loss_coefficient,analytic_loss
   LOGICAL :: admissible
+  REAL(wp) :: mom_x,mom_y,energy,gas_masses(2),gas_fractions(2),loss_check
 
   n_solid = 2
   ALLOCATE(solid_fractions(n_solid))
@@ -153,6 +154,29 @@ PROGRAM test_pore_pressure_diffusion
        m_after,p_after,qp_after,gas_lost,admissible)
   IF (admissible) ERROR STOP 'Darcy accepted loss exceeding available mass'
 
+
+  ! Gas withdrawal carries momentum and energy while preserving the
+  ! initial gas-species mass ratios; solid masses are not touched.
+  mom_x=800.0_wp
+  mom_y=-400.0_wp
+  energy=12000.0_wp
+  gas_masses=[300.0_wp,100.0_wp]
+  gas_fractions=[0.75_wp,0.25_wp]
+  loss_check=20.0_wp
+  CALL apply_frozen_darcy_withdrawal(loss_check,2.0_wp,-1.0_wp,5.0_wp, &
+       gas_fractions,mom_x,mom_y,energy,gas_masses,admissible)
+  IF (.NOT.admissible) ERROR STOP 'valid conservative Darcy withdrawal rejected'
+  CALL assert_close(mom_x,760.0_wp,0.0_wp,'Darcy momentum-x accounting')
+  CALL assert_close(mom_y,-380.0_wp,0.0_wp,'Darcy momentum-y accounting')
+  CALL assert_close(energy,11900.0_wp,0.0_wp,'Darcy energy accounting')
+  CALL assert_close(gas_masses(1)/SUM(gas_masses),0.75_wp,2.0e-14_wp, &
+       'Darcy gas-species fraction changed')
+  CALL assert_close(gas_masses(2)/SUM(gas_masses),0.25_wp,2.0e-14_wp, &
+       'Darcy second gas-species fraction changed')
+  CALL apply_frozen_darcy_withdrawal(500.0_wp,2.0_wp,-1.0_wp,5.0_wp, &
+       gas_fractions,mom_x,mom_y,energy,gas_masses,admissible)
+  IF (admissible) ERROR STOP 'Darcy allowed withdrawal beyond gas inventory'
+  CALL assert_close(mom_x,760.0_wp,0.0_wp,'rejected Darcy loss modified momentum')
   WRITE(*,*) 'All exact pore-pressure diffusion and coupled Darcy checks passed.'
 
 CONTAINS
