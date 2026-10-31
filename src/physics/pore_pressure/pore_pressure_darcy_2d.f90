@@ -40,12 +40,155 @@ MODULE pore_pressure_darcy_2d
   PUBLIC :: eval_pore_pressure_inlet_source
   PUBLIC :: eval_pore_pressure_mass_exchange_source
 
-  ! Uniform treatment surface for this source family.
-
 CONTAINS
 
+  !> The model returns a single conservative source vector, including
+  !> diffusion and (when enabled) gas withdrawal. Coordination of shared
+  !> carrier limits belongs to the source executor, not this model.
+  SUBROUTINE eval_pore_pressure_darcy_explicit(state,rate,include_gas_loss)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
+    LOGICAL :: do_gas_loss
+    COMPLEX(wp) :: pressure_rate
+    REAL(wp) :: loss_volume, rho_c, cp_c, Ri, rhom, redgrav, cpm
+    REAL(wp) :: mass_rate, gas_mass_fraction
+    TYPE(complex_physical_state_type) :: cs
+    rate=0.0_wp
+    IF (.NOT.pore_pressure_flag) RETURN
+    CALL complex_state_from_real(state,cs)
+    CALL darcy_diffusion_source(cs%h,cs%T,cs%rho_m, &
+         cs%alphas,cs%exc_pore_pres,pressure_rate)
+    rate(idx_poreEqn)=REAL(pressure_rate,wp)
+    do_gas_loss=gas_flag .AND. gas_loss_flag
+    IF (PRESENT(include_gas_loss)) do_gas_loss=do_gas_loss .AND. include_gas_loss
+    IF (.NOT.do_gas_loss) RETURN
+    IF (SUM(state%alphas)>=maximum_solid_packing) RETURN
+    CALL mixt_var_state(state,Ri,rhom,rho_c,redgrav,cp_c,cpm)
+    loss_volume=0.0_wp
+    CALL eval_pore_pressure_gas_loss(state%h,state%T,state%alphas, &
+         SUM(state%alphas),rho_c,state%exc_pore_pres,loss_volume)
+    mass_rate=-rho_c*MAX(0.0_wp,loss_volume)
+    rate(idx_totMassEqn)=mass_rate
+    rate(idx_uEqn)=mass_rate*state%u
+    rate(idx_vEqn)=mass_rate*state%v
+    rate(idx_engyEqn)=mass_rate*state%T*cp_c
+    IF (n_add_gas>0) THEN
+      gas_mass_fraction=MAX(0.0_wp,1.0_wp-SUM(state%xs))
+      IF (gas_mass_fraction>0.0_wp) &
+        rate(idx_addGasEqn_first:idx_addGasEqn_first+n_add_gas-1)= &
+          mass_rate*state%xg/gas_mass_fraction
+    END IF
+    rate(idx_poreEqn)=rate(idx_poreEqn)+mass_rate*state%exc_pore_pres
+  END SUBROUTINE eval_pore_pressure_darcy_explicit
 
+  SUBROUTINE eval_pore_pressure_darcy_semi_implicit(state,rate)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    rate=0.0_wp
+  END SUBROUTINE eval_pore_pressure_darcy_semi_implicit
 
+  SUBROUTINE eval_pore_pressure_darcy_implicit(state,rate)
+    TYPE(complex_physical_state_type), INTENT(IN) :: state
+    COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
+    rate=CMPLX(0.0_wp,0.0_wp,wp)
+    IF (.NOT.pore_pressure_flag) RETURN
+    CALL darcy_diffusion_source(state%h,state%T, &
+         state%rho_m,state%alphas,state%exc_pore_pres,rate(idx_poreEqn))
+  END SUBROUTINE eval_pore_pressure_darcy_implicit
+
+  !> Integrate frozen-coefficient Darcy directly and return the full
+  !> conservative mean rate for the selected substep.
+  SUBROUTINE solve_pore_pressure_darcy_analytic( &
+       state,q_before,interval,rate,admissible,include_gas_loss)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(IN) :: interval,q_before(n_eqns)
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    LOGICAL, INTENT(OUT) :: admissible
+    REAL(wp) :: q_after(n_eqns)
+    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
+    LOGICAL :: do_gas_loss
+    COMPLEX(wp) :: diffusion, inhibition
+    REAL(wp) :: lambda, A, loss, mass_after, pressure_after, pressure_q
+    REAL(wp) :: rho_c, cp_c, Ri, rhom, redgrav, cpm
+    REAL(wp) :: gas_inventory, gas_fraction
+    LOGICAL :: active
+    COMPLEX(wp) :: solid_fractions(n_solid)
+    REAL(wp), PARAMETER :: h_min=1.0e-10_wp
+    REAL(wp), PARAMETER :: gas_h_min=1.0e-5_wp
+
+    q_after=q_before
+    rate=0.0_wp
+    admissible=.FALSE.
+    IF (.NOT.pore_pressure_flag) THEN
+      admissible=.TRUE.
+      RETURN
+    END IF
+    IF (interval<0.0_wp .OR. .NOT.ieee_is_finite(interval)) RETURN
+    IF (q_before(idx_totMassEqn)<=0.0_wp) RETURN
+    IF (state%h<=0.0_wp .OR. state%T<=0.0_wp) THEN
+      admissible=.TRUE.
+      RETURN
+    END IF
+    solid_fractions=CMPLX(state%alphas,0.0_wp,wp)
+    CALL eval_pore_pressure_diffusion_factors(CMPLX(state%h,0.0_wp,wp), &
+         CMPLX(state%T,0.0_wp,wp),solid_fractions,diffusion,inhibition,active)
+    lambda=0.0_wp
+    IF (active) lambda=REAL((pi_g/2.0_wp)**2*diffusion*inhibition,wp) / &
+         (state%h*MAX(h_min,state%h))
+    A=0.0_wp
+    do_gas_loss=gas_flag .AND. gas_loss_flag
+    IF (PRESENT(include_gas_loss)) do_gas_loss=do_gas_loss .AND. include_gas_loss
+    IF (do_gas_loss .AND. &
+         SUM(state%alphas)<maximum_solid_packing) THEN
+      CALL mixt_var_state(state,Ri,rhom,rho_c,redgrav,cp_c,cpm)
+      IF (state%exc_pore_pres>0.0_wp) THEN
+        ! This velocity is linear in p_e with the frozen closures.
+        ! Evaluate at p_e=1 Pa to obtain the mass-loss coefficient A.
+        CALL eval_pore_pressure_gas_loss(state%h,state%T,state%alphas, &
+             SUM(state%alphas),rho_c,1.0_wp,A)
+        A=rho_c*A
+      END IF
+    END IF
+    CALL solve_frozen_darcy_mass_pressure( &
+         q_before(idx_totMassEqn),state%exc_pore_pres,interval, &
+         lambda,A,do_gas_loss,mass_after,pressure_after, &
+         pressure_q,loss,admissible)
+    IF (.NOT.admissible) RETURN
+    gas_inventory=q_before(idx_totMassEqn)
+    gas_inventory=gas_inventory-SUM(q_before( &
+         idx_solidEqn_first:idx_solidEqn_last))
+    IF (loss>gas_inventory .OR. gas_inventory<0.0_wp) THEN
+      admissible=.FALSE.
+      RETURN
+    END IF
+    IF (n_add_gas>0 .AND. loss>0.0_wp) THEN
+      IF (ANY(q_before(idx_addGasEqn_first: &
+           idx_addGasEqn_first+n_add_gas-1)<0.0_wp)) THEN
+        admissible=.FALSE.
+        RETURN
+      END IF
+    END IF
+    q_after(idx_totMassEqn)=mass_after
+    q_after(idx_poreEqn)=pressure_q
+    q_after(idx_uEqn)=q_before(idx_uEqn)-state%u*loss
+    q_after(idx_vEqn)=q_before(idx_vEqn)-state%v*loss
+    IF (loss>0.0_wp) THEN
+      ! No gas is removed from solid-class conservative masses.
+      q_after(idx_engyEqn)=q_before(idx_engyEqn)- &
+           state%T*cp_c*loss
+      IF (n_add_gas>0) THEN
+        gas_fraction=loss/gas_inventory
+        q_after(idx_addGasEqn_first: &
+             idx_addGasEqn_first+n_add_gas-1)= &
+             q_before(idx_addGasEqn_first: &
+             idx_addGasEqn_first+n_add_gas-1)*(1.0_wp-gas_fraction)
+      END IF
+    END IF
+    IF (interval>0.0_wp) rate=(q_after-q_before)/interval
+  END SUBROUTINE solve_pore_pressure_darcy_analytic
+
+  ! Internal Darcy closures and other auxiliary source calculations.
 
 
   SUBROUTINE darcy_diffusion_source(flow_depth, temperature,      &
@@ -78,57 +221,6 @@ CONTAINS
   END SUBROUTINE darcy_diffusion_source
 
 
-
-
-  !******************************************************************************
-  !> \brief Evaluate the excess pore-pressure diffusion source.
-  !> \details For wet cells with nonnegative excess pressure and active pore
-  !>          volume, returns
-  !>          \f$S_p=-\rho_m(\pi/2)^2D p_e I/\max(h_{\mathrm{threshold}},h)\f$.
-  !>          D is the pressure-diffusion coefficient and I is the configured
-  !>          solid-fraction inhibition factor. Complex arguments preserve
-  !>          derivatives for the implicit Jacobian.
-  !> \param[in] flow_depth Flow depth h [m].
-  !> \param[in] temperature Gas/mixture temperature T [K].
-  !> \param[in] mixture_density Mixture density rho_m [kg m^-3].
-  !> \param[in] solid_fractions Per-class solid volume fractions.
-  !> \param[in] excess_pressure Nonnegative excess pore pressure p_e [Pa].
-  !> \param[out] source Conservative pore-pressure diffusion source S_p
-  !>                   [kg^2 m^-3 s^-3].
-  !> \note Returns zero for dry cells, negative excess pressure, absent pore volume, or
-  !>       inactive diffusion closure.
-  !******************************************************************************
-
-  !******************************************************************************
-  !> \brief Solve exact-flow excess pore pressure over a stage interval.
-  !> \details With mixture density, depth, temperature and solid fractions
-  !>          frozen, the transported variable
-  !>          \f$Q_p=\rho_m h p_e\f$ satisfies
-  !>          \f$\frac{dQ_p}{dt}=-\lambda Q_p\f$, where
-  !>          \f$\lambda=(\pi/2)^2DI/[h\max(h_{\mathrm{threshold}},h)]\f$.
-  !>          Therefore p_e is multiplied by
-  !>          \f$\exp(-\lambda\,\texttt{integration\_step})\f$.
-  !>          Dry states, nonpositive excess pressure, absent carrier phases and
-  !>          inactive diffusion closures are returned unchanged.
-  !> \param[in] excess_pressure Initial excess pore pressure p_e [Pa].
-  !> \param[in] integration_step Effective stage interval, normally dt*a_ii [s].
-  !> \param[in] flow_depth Frozen flow depth h [m].
-  !> \param[in] temperature Frozen temperature T [K].
-  !> \param[in] solid_fractions Frozen per-class solid volume fractions.
-  !> \param[out] pressure_after Exact-flow excess pore pressure after the interval [Pa].
-  !> \note Requires finite inputs and a nonnegative integration step. A negative step,
-  !>       nonfinite input, or nonpositive temperature in an active state is fatal.
-  !******************************************************************************
-
-  !******************************************************************************
-  !> \brief Backward-compatible name for the exact-flow pore-pressure solver.
-  !> \param[in] excess_pressure Initial excess pore pressure [Pa].
-  !> \param[in] integration_step Integration interval [s].
-  !> \param[in] flow_depth Flow depth [m].
-  !> \param[in] temperature Mixture temperature [K].
-  !> \param[in] solid_fractions Solid volume fractions, one per class.
-  !> \param[out] pressure_after Exact-flow excess pressure after the interval [Pa].
-  !******************************************************************************
 
 
   !******************************************************************************
@@ -443,8 +535,6 @@ CONTAINS
   END SUBROUTINE eval_pore_pressure_diffusion_factors
 
 
-  ! Valid zero contribution for the semi-implicit part of Newton.
-
   SUBROUTINE solve_frozen_darcy_mass_pressure(mass_before, pressure_before, &
        interval, dissipation_rate, loss_coefficient, gas_loss_enabled, &
        mass_after, pressure_after, conservative_pressure_after, &
@@ -544,150 +634,6 @@ CONTAINS
   END SUBROUTINE apply_frozen_darcy_withdrawal
 
 
-  !> The model returns a single conservative source vector, including
-  !> diffusion and (when enabled) gas withdrawal. Coordination of shared
-  !> carrier limits belongs to the source executor, not this model.
-  SUBROUTINE eval_pore_pressure_darcy_explicit(state,rate,include_gas_loss)
-    TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(OUT) :: rate(n_eqns)
-    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
-    LOGICAL :: do_gas_loss
-    COMPLEX(wp) :: pressure_rate
-    REAL(wp) :: loss_volume, rho_c, cp_c, Ri, rhom, redgrav, cpm
-    REAL(wp) :: mass_rate, gas_mass_fraction
-    TYPE(complex_physical_state_type) :: cs
-    rate=0.0_wp
-    IF (.NOT.pore_pressure_flag) RETURN
-    CALL complex_state_from_real(state,cs)
-    CALL darcy_diffusion_source(cs%h,cs%T,cs%rho_m, &
-         cs%alphas,cs%exc_pore_pres,pressure_rate)
-    rate(idx_poreEqn)=REAL(pressure_rate,wp)
-    do_gas_loss=gas_flag .AND. gas_loss_flag
-    IF (PRESENT(include_gas_loss)) do_gas_loss=do_gas_loss .AND. include_gas_loss
-    IF (.NOT.do_gas_loss) RETURN
-    IF (SUM(state%alphas)>=maximum_solid_packing) RETURN
-    CALL mixt_var_state(state,Ri,rhom,rho_c,redgrav,cp_c,cpm)
-    loss_volume=0.0_wp
-    CALL eval_pore_pressure_gas_loss(state%h,state%T,state%alphas, &
-         SUM(state%alphas),rho_c,state%exc_pore_pres,loss_volume)
-    mass_rate=-rho_c*MAX(0.0_wp,loss_volume)
-    rate(idx_totMassEqn)=mass_rate
-    rate(idx_uEqn)=mass_rate*state%u
-    rate(idx_vEqn)=mass_rate*state%v
-    rate(idx_engyEqn)=mass_rate*state%T*cp_c
-    IF (n_add_gas>0) THEN
-      gas_mass_fraction=MAX(0.0_wp,1.0_wp-SUM(state%xs))
-      IF (gas_mass_fraction>0.0_wp) &
-        rate(idx_addGasEqn_first:idx_addGasEqn_first+n_add_gas-1)= &
-          mass_rate*state%xg/gas_mass_fraction
-    END IF
-    rate(idx_poreEqn)=rate(idx_poreEqn)+mass_rate*state%exc_pore_pres
-  END SUBROUTINE eval_pore_pressure_darcy_explicit
 
-  SUBROUTINE eval_pore_pressure_darcy_semi_implicit(state,rate)
-    TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(OUT) :: rate(n_eqns)
-    rate=0.0_wp
-  END SUBROUTINE eval_pore_pressure_darcy_semi_implicit
-
-  SUBROUTINE eval_pore_pressure_darcy_implicit(state,rate)
-    TYPE(complex_physical_state_type), INTENT(IN) :: state
-    COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
-    rate=CMPLX(0.0_wp,0.0_wp,wp)
-    IF (.NOT.pore_pressure_flag) RETURN
-    CALL darcy_diffusion_source(state%h,state%T, &
-         state%rho_m,state%alphas,state%exc_pore_pres,rate(idx_poreEqn))
-  END SUBROUTINE eval_pore_pressure_darcy_implicit
-
-  !> Integrate frozen-coefficient Darcy directly and return the full
-  !> conservative mean rate for the selected substep.
-  SUBROUTINE solve_pore_pressure_darcy_analytic( &
-       state,q_before,interval,rate,admissible,include_gas_loss)
-    TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(IN) :: interval,q_before(n_eqns)
-    REAL(wp), INTENT(OUT) :: rate(n_eqns)
-    LOGICAL, INTENT(OUT) :: admissible
-    REAL(wp) :: q_after(n_eqns)
-    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
-    LOGICAL :: do_gas_loss
-    COMPLEX(wp) :: diffusion, inhibition
-    REAL(wp) :: lambda, A, loss, mass_after, pressure_after, pressure_q
-    REAL(wp) :: rho_c, cp_c, Ri, rhom, redgrav, cpm
-    REAL(wp) :: gas_inventory, gas_fraction
-    LOGICAL :: active
-    COMPLEX(wp) :: solid_fractions(n_solid)
-    REAL(wp), PARAMETER :: h_min=1.0e-10_wp
-    REAL(wp), PARAMETER :: gas_h_min=1.0e-5_wp
-
-    q_after=q_before
-    rate=0.0_wp
-    admissible=.FALSE.
-    IF (.NOT.pore_pressure_flag) THEN
-      admissible=.TRUE.
-      RETURN
-    END IF
-    IF (interval<0.0_wp .OR. .NOT.ieee_is_finite(interval)) RETURN
-    IF (q_before(idx_totMassEqn)<=0.0_wp) RETURN
-    IF (state%h<=0.0_wp .OR. state%T<=0.0_wp) THEN
-      admissible=.TRUE.
-      RETURN
-    END IF
-    solid_fractions=CMPLX(state%alphas,0.0_wp,wp)
-    CALL eval_pore_pressure_diffusion_factors(CMPLX(state%h,0.0_wp,wp), &
-         CMPLX(state%T,0.0_wp,wp),solid_fractions,diffusion,inhibition,active)
-    lambda=0.0_wp
-    IF (active) lambda=REAL((pi_g/2.0_wp)**2*diffusion*inhibition,wp) / &
-         (state%h*MAX(h_min,state%h))
-    A=0.0_wp
-    do_gas_loss=gas_flag .AND. gas_loss_flag
-    IF (PRESENT(include_gas_loss)) do_gas_loss=do_gas_loss .AND. include_gas_loss
-    IF (do_gas_loss .AND. &
-         SUM(state%alphas)<maximum_solid_packing) THEN
-      CALL mixt_var_state(state,Ri,rhom,rho_c,redgrav,cp_c,cpm)
-      IF (state%exc_pore_pres>0.0_wp) THEN
-        ! This velocity is linear in p_e with the frozen closures.
-        ! Evaluate at p_e=1 Pa to obtain the mass-loss coefficient A.
-        CALL eval_pore_pressure_gas_loss(state%h,state%T,state%alphas, &
-             SUM(state%alphas),rho_c,1.0_wp,A)
-        A=rho_c*A
-      END IF
-    END IF
-    CALL solve_frozen_darcy_mass_pressure( &
-         q_before(idx_totMassEqn),state%exc_pore_pres,interval, &
-         lambda,A,do_gas_loss,mass_after,pressure_after, &
-         pressure_q,loss,admissible)
-    IF (.NOT.admissible) RETURN
-    gas_inventory=q_before(idx_totMassEqn)
-    gas_inventory=gas_inventory-SUM(q_before( &
-         idx_solidEqn_first:idx_solidEqn_last))
-    IF (loss>gas_inventory .OR. gas_inventory<0.0_wp) THEN
-      admissible=.FALSE.
-      RETURN
-    END IF
-    IF (n_add_gas>0 .AND. loss>0.0_wp) THEN
-      IF (ANY(q_before(idx_addGasEqn_first: &
-           idx_addGasEqn_first+n_add_gas-1)<0.0_wp)) THEN
-        admissible=.FALSE.
-        RETURN
-      END IF
-    END IF
-    q_after(idx_totMassEqn)=mass_after
-    q_after(idx_poreEqn)=pressure_q
-    q_after(idx_uEqn)=q_before(idx_uEqn)-state%u*loss
-    q_after(idx_vEqn)=q_before(idx_vEqn)-state%v*loss
-    IF (loss>0.0_wp) THEN
-      ! No gas is removed from solid-class conservative masses.
-      q_after(idx_engyEqn)=q_before(idx_engyEqn)- &
-           state%T*cp_c*loss
-      IF (n_add_gas>0) THEN
-        gas_fraction=loss/gas_inventory
-        q_after(idx_addGasEqn_first: &
-             idx_addGasEqn_first+n_add_gas-1)= &
-             q_before(idx_addGasEqn_first: &
-             idx_addGasEqn_first+n_add_gas-1)*(1.0_wp-gas_fraction)
-      END IF
-    END IF
-    IF (interval>0.0_wp) rate=(q_after-q_before)/interval
-  END SUBROUTINE solve_pore_pressure_darcy_analytic
 
 END MODULE pore_pressure_darcy_2d
