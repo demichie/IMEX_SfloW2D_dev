@@ -189,6 +189,8 @@ CONTAINS
          state%rho_m, state%inv_rhom, rho_c, inv_rho_c, &
          state%alphas, state%alphag)
     state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
+    CALL update_physical_state_kinematics(state)
+    CALL update_physical_state_kinematics(state)
   END SUBROUTINE physical_state_from_qp
 
   !> Construct real physical properties from the current conservative state.
@@ -210,6 +212,7 @@ CONTAINS
        state%xg = q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
        CALL enforce_mass_fraction_closure(state%xs, state%xg)
     END IF
+    CALL update_physical_state_kinematics(state)
   END SUBROUTINE real_physical_state_from_q
 
   !> Build a COMPLEX physical source state through the existing complex-step kernel.
@@ -252,6 +255,12 @@ CONTAINS
          complex_state%alphas = CMPLX(real_state%alphas,0.0_wp,wp)
     IF (ALLOCATED(real_state%alphag)) &
          complex_state%alphag = CMPLX(real_state%alphag,0.0_wp,wp)
+    complex_state%B_prime_x = real_state%B_prime_x
+    complex_state%B_prime_y = real_state%B_prime_y
+    complex_state%B_second_xx = real_state%B_second_xx
+    complex_state%B_second_xy = real_state%B_second_xy
+    complex_state%B_second_yy = real_state%B_second_yy
+    CALL update_physical_state_kinematics(complex_state)
   END SUBROUTINE complex_state_from_real
 
   !> Extract a real source state without re-evaluating any constitutive formula.
@@ -272,6 +281,12 @@ CONTAINS
     state%exc_pore_pres = REAL(complex_state%exc_pore_pres,wp)
     state%alphas = REAL(complex_state%alphas,wp)
     state%alphag = REAL(complex_state%alphag,wp)
+    state%B_prime_x = complex_state%B_prime_x
+    state%B_prime_y = complex_state%B_prime_y
+    state%B_second_xx = complex_state%B_second_xx
+    state%B_second_xy = complex_state%B_second_xy
+    state%B_second_yy = complex_state%B_second_yy
+    CALL update_physical_state_kinematics(state)
   END SUBROUTINE real_part_physical_state
 
   !> Mixture properties from named state components, without rebuilding qp.
