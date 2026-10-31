@@ -1,7 +1,7 @@
 !> \brief Test-only thread-safe capture of raw production IMEX states.
 MODULE imex_test_observer
   USE parameters_2d, ONLY : wp
-  USE thermal_cooling_2d, ONLY : solve_thermal_cooling_analytic
+  USE thermal_cooling_2d, ONLY : eval_thermal_cooling_analytic
   IMPLICIT NONE
   REAL(wp), ALLOCATABLE :: known(:,:,:,:), solved(:,:,:,:), raw_final(:,:,:)
   INTEGER, ALLOCATABLE :: seen(:,:,:,:), implicit_statuses(:,:,:)
@@ -328,7 +328,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: result
     TYPE(physical_state_type) :: state
     state%T=temperature
-    CALL solve_thermal_cooling_analytic(state,step,capacity,radiative,convective,ambient,result)
+    CALL eval_thermal_cooling_analytic(state,step,capacity,radiative,convective,ambient,result)
   END SUBROUTINE test_cooling_analytic
 
   !> \brief Reduce raw temperature and component/carrier fractions without primitive conversion.
