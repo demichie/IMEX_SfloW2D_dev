@@ -13,7 +13,7 @@ MODULE mass_radial_injection_2d
   PUBLIC :: eval_radial_injection_explicit
   PUBLIC :: eval_radial_injection_semi_implicit
   PUBLIC :: eval_radial_injection_implicit
-  PUBLIC :: solve_radial_injection_analytic
+  PUBLIC :: eval_radial_injection_analytic
 CONTAINS
   SUBROUTINE eval_radial_injection_explicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
        cell_area_jk, rate)
@@ -151,12 +151,12 @@ CONTAINS
     CALL fatal_error('radial_injection: implicit treatment is unsupported')
   END SUBROUTINE eval_radial_injection_implicit
 
-  SUBROUTINE solve_radial_injection_analytic(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
+  SUBROUTINE eval_radial_injection_analytic(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
        cell_area_jk, rate)
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
     REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
     REAL(wp), INTENT(OUT) :: rate(n_eqns)
     CALL fatal_error('radial_injection: analytic treatment is unsupported')
-  END SUBROUTINE solve_radial_injection_analytic
+  END SUBROUTINE eval_radial_injection_analytic
 END MODULE mass_radial_injection_2d

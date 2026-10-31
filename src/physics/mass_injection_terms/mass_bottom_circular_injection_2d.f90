@@ -13,7 +13,7 @@ MODULE mass_bottom_circular_injection_2d
   PUBLIC :: eval_bottom_circular_injection_explicit
   PUBLIC :: eval_bottom_circular_injection_semi_implicit
   PUBLIC :: eval_bottom_circular_injection_implicit
-  PUBLIC :: solve_bottom_circular_injection_analytic
+  PUBLIC :: eval_bottom_circular_injection_analytic
 CONTAINS
   SUBROUTINE eval_bottom_circular_injection_explicit(state, time, cell_fract_jk, rate)
     USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source, &
@@ -184,10 +184,10 @@ CONTAINS
     CALL fatal_error('bottom_circular_injection: implicit treatment is unsupported')
   END SUBROUTINE eval_bottom_circular_injection_implicit
 
-  SUBROUTINE solve_bottom_circular_injection_analytic(state, time, cell_fract_jk, rate)
+  SUBROUTINE eval_bottom_circular_injection_analytic(state, time, cell_fract_jk, rate)
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: time, cell_fract_jk
     REAL(wp), INTENT(OUT) :: rate(n_eqns)
     CALL fatal_error('bottom_circular_injection: analytic treatment is unsupported')
-  END SUBROUTINE solve_bottom_circular_injection_analytic
+  END SUBROUTINE eval_bottom_circular_injection_analytic
 END MODULE mass_bottom_circular_injection_2d
