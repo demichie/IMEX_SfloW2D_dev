@@ -11,7 +11,9 @@
 
 MODULE pore_pressure_darcy_2d
 
-  USE parameters_2d, ONLY : wp, n_solid, gas_flag, sutherland_flag
+  USE parameters_2d, ONLY : wp, n_solid, gas_flag, gas_loss_flag, pore_pressure_flag, &
+       n_eqns, n_add_gas, idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn, &
+       idx_poreEqn, idx_addGasEqn_first, sutherland_flag
   USE COMPLEXIFY
   USE diagnostics_2d, ONLY : fatal_error
   USE constitutive_parameters_2d, ONLY : alpha_trans, N_inh, f_inhibit_mode,    &
@@ -19,7 +21,8 @@ MODULE pore_pressure_darcy_2d
        sp_gas_const_a, pres, diam_s, sphericity_s, maximum_solid_packing,       &
        dynamic_permeability_flag, muRef_Suth, Tref_Suth, S_mu
   USE geometry_2d, ONLY : pi_g
-  USE state_conversion_2d, ONLY : sauter_diameter
+  USE state_conversion_2d, ONLY : sauter_diameter, physical_state_type, &
+       complex_physical_state_type, complex_state_from_real, mixt_var_state
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
   IMPLICIT NONE
@@ -27,6 +30,10 @@ MODULE pore_pressure_darcy_2d
   PRIVATE
 
   PUBLIC :: apply_frozen_darcy_withdrawal
+  PUBLIC :: eval_pore_pressure_darcy_explicit
+  PUBLIC :: eval_pore_pressure_darcy_semi_implicit
+  PUBLIC :: eval_pore_pressure_darcy_implicit
+  PUBLIC :: solve_pore_pressure_darcy_analytic
   PUBLIC :: solve_frozen_darcy_mass_pressure
   PUBLIC :: eval_pore_pressure_dissipation_explicit
   PUBLIC :: eval_pore_pressure_dissipation_semi_implicit
@@ -620,5 +627,70 @@ CONTAINS
     gas_masses=MAX(0.0_wp,gas_masses-withdrawals)
     admissible=.TRUE.
   END SUBROUTINE apply_frozen_darcy_withdrawal
+
+
+  !> The model returns a single conservative source vector, including
+  !> diffusion and (when enabled) gas withdrawal. Coordination of shared
+  !> carrier limits belongs to the source executor, not this model.
+  SUBROUTINE eval_pore_pressure_darcy_explicit(state,rate)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    COMPLEX(wp) :: pressure_rate
+    REAL(wp) :: loss_volume, rho_c, cp_c, Ri, rhom, redgrav, cpm
+    REAL(wp) :: mass_rate, gas_mass_fraction
+    TYPE(complex_physical_state_type) :: cs
+    rate=0.0_wp
+    IF (.NOT.pore_pressure_flag) RETURN
+    CALL complex_state_from_real(state,cs)
+    CALL eval_pore_pressure_dissipation_implicit(cs%h,cs%T,cs%rho_m, &
+         cs%alphas,cs%exc_pore_pres,pressure_rate)
+    rate(idx_poreEqn)=REAL(pressure_rate,wp)
+    IF (.NOT.(gas_flag .AND. gas_loss_flag)) RETURN
+    IF (SUM(state%alphas)>=maximum_solid_packing) RETURN
+    CALL mixt_var_state(state,Ri,rhom,rho_c,redgrav,cp_c,cpm)
+    loss_volume=0.0_wp
+    CALL eval_pore_pressure_gas_loss(state%h,state%T,state%alphas, &
+         SUM(state%alphas),rho_c,state%exc_pore_pres,loss_volume)
+    mass_rate=-rho_c*MAX(0.0_wp,loss_volume)
+    rate(idx_totMassEqn)=mass_rate
+    rate(idx_uEqn)=mass_rate*state%u
+    rate(idx_vEqn)=mass_rate*state%v
+    rate(idx_engyEqn)=mass_rate*state%T*cp_c
+    IF (n_add_gas>0) THEN
+      gas_mass_fraction=MAX(0.0_wp,1.0_wp-SUM(state%xs))
+      IF (gas_mass_fraction>0.0_wp) &
+        rate(idx_addGasEqn_first:idx_addGasEqn_first+n_add_gas-1)= &
+          mass_rate*state%xg/gas_mass_fraction
+    END IF
+    rate(idx_poreEqn)=rate(idx_poreEqn)+mass_rate*state%exc_pore_pres
+  END SUBROUTINE eval_pore_pressure_darcy_explicit
+
+  SUBROUTINE eval_pore_pressure_darcy_semi_implicit(state,rate)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    rate=0.0_wp
+  END SUBROUTINE eval_pore_pressure_darcy_semi_implicit
+
+  SUBROUTINE eval_pore_pressure_darcy_implicit(state,rate)
+    TYPE(complex_physical_state_type), INTENT(IN) :: state
+    COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
+    rate=CMPLX(0.0_wp,0.0_wp,wp)
+    IF (.NOT.pore_pressure_flag) RETURN
+    CALL eval_pore_pressure_dissipation_implicit(state%h,state%T, &
+         state%rho_m,state%alphas,state%exc_pore_pres,rate(idx_poreEqn))
+  END SUBROUTINE eval_pore_pressure_darcy_implicit
+
+  !> The full coupled analytic map is a separate existing kernel. Until
+  !> the source registry supports multi-equation pressure groups, this
+  !> state-level adapter preserves the original pressure-only analytic step.
+  SUBROUTINE solve_pore_pressure_darcy_analytic(state,interval,pressure_after)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(IN) :: interval
+    REAL(wp), INTENT(OUT) :: pressure_after
+    pressure_after=state%exc_pore_pres
+    IF (.NOT.pore_pressure_flag) RETURN
+    CALL solve_pore_pressure_dissipation_analytic(state%exc_pore_pres, &
+         interval,state%h,state%T,state%alphas,pressure_after)
+  END SUBROUTINE solve_pore_pressure_darcy_analytic
 
 END MODULE pore_pressure_darcy_2d
