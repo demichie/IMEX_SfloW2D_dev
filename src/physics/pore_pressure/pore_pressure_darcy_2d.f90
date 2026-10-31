@@ -1,8 +1,6 @@
 !> Darcy pore-pressure diffusion and optional interstitial carrier-gas loss.
-!> The four model interfaces return conservative rates; the analytic interface
-!> integrates the coupled frozen-state mass and pressure system.
-!> Gas loss is also still used by the legacy mass-exchange transaction while
-!> shared carrier-inventory and packing limits are being migrated.
+!> The analytic operator integrates the frozen-state coupled mass-pressure system
+!> and returns a complete conservative average rate.
 
 MODULE pore_pressure_darcy_2d
 
@@ -17,95 +15,16 @@ MODULE pore_pressure_darcy_2d
        sp_gas_const_a, pres, diam_s, sphericity_s, maximum_solid_packing,       &
        dynamic_permeability_flag, muRef_Suth, Tref_Suth, S_mu
   USE geometry_2d, ONLY : pi_g
-  USE state_conversion_2d, ONLY : sauter_diameter, physical_state_type, &
-       complex_physical_state_type, complex_state_from_real, mixt_var_state, &
-       eval_mixture_heat_capacity
+  USE state_conversion_2d, ONLY : physical_state_type, mixt_var_state
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
   IMPLICIT NONE
 
   PRIVATE
 
-  PUBLIC :: eval_pore_pressure_darcy_explicit
-  PUBLIC :: eval_pore_pressure_darcy_semi_implicit
-  PUBLIC :: eval_pore_pressure_darcy_implicit
   PUBLIC :: solve_pore_pressure_darcy_analytic
 
 CONTAINS
-
-  !> The model returns a single conservative source vector, including
-  !> diffusion and (when enabled) gas withdrawal. Coordination of shared
-  !> carrier limits belongs to the source executor, not this model.
-  !> Assemble the complete real conservative rate without repeating physics.
-  SUBROUTINE eval_pore_pressure_darcy_explicit(state,rate,include_gas_loss)
-    TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(OUT) :: rate(n_eqns)
-    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
-    TYPE(complex_physical_state_type) :: complex_state
-    REAL(wp) :: semi_rate(n_eqns)
-    COMPLEX(wp) :: implicit_rate(n_eqns)
-
-    rate=0.0_wp
-    IF (.NOT.pore_pressure_flag) RETURN
-    CALL eval_pore_pressure_darcy_semi_implicit(state,semi_rate,include_gas_loss)
-    CALL complex_state_from_real(state,complex_state)
-    CALL eval_pore_pressure_darcy_implicit(complex_state,implicit_rate,include_gas_loss)
-    rate=semi_rate+REAL(implicit_rate,wp)
-  END SUBROUTINE eval_pore_pressure_darcy_explicit
-
-  !> No separately semi-implicit Darcy contribution.
-  SUBROUTINE eval_pore_pressure_darcy_semi_implicit(state,rate,include_gas_loss)
-    TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(OUT) :: rate(n_eqns)
-    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
-    rate=0.0_wp
-  END SUBROUTINE eval_pore_pressure_darcy_semi_implicit
-
-  !> Complete complex Darcy rate, including mass-pressure coupling.
-  SUBROUTINE eval_pore_pressure_darcy_implicit(state,rate,include_gas_loss)
-    TYPE(complex_physical_state_type), INTENT(IN) :: state
-    COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
-    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
-    COMPLEX(wp) :: mass_rate,cp_c,cp_m,xc,gas_fraction
-    COMPLEX(wp) :: diffusion_coefficient,inhibition
-    LOGICAL :: active
-    LOGICAL :: do_gas_loss
-
-    rate=CMPLX(0.0_wp,0.0_wp,wp)
-    IF (.NOT.pore_pressure_flag) RETURN
-    IF (REAL(state%h,wp)>0.0_wp .AND. &
-        REAL(state%exc_pore_pres,wp)>=0.0_wp) THEN
-      CALL eval_pore_pressure_diffusion_factors(state%h,state%T, &
-           state%alphas,diffusion_coefficient,inhibition,active)
-      IF (active) rate(idx_poreEqn)= &
-           -state%rho_m*(pi_g/2.0_wp)**2*diffusion_coefficient* &
-           state%exc_pore_pres*inhibition / &
-           MERGE(state%h,CMPLX(1.0e-10_wp,0.0_wp,wp), &
-           REAL(state%h,wp)>1.0e-10_wp)
-    END IF
-    do_gas_loss=gas_flag .AND. gas_loss_flag
-    IF (PRESENT(include_gas_loss)) do_gas_loss=do_gas_loss .AND. include_gas_loss
-    IF (.NOT.do_gas_loss) RETURN
-    IF (REAL(SUM(state%alphas),wp)>=maximum_solid_packing) RETURN
-    IF (REAL(state%exc_pore_pres,wp)<=0.0_wp) RETURN
-    ! With unit carrier density, Darcy velocity equals the mass-loss flux.
-    CALL pore_gas_loss_complex(state%h,state%T,state%alphas, &
-         SUM(state%alphas),CMPLX(1.0_wp,0.0_wp,wp), &
-         state%exc_pore_pres,mass_rate)
-    mass_rate=-mass_rate
-    CALL eval_mixture_heat_capacity(state%xs,state%xg,xc,cp_c,cp_m)
-    rate(idx_totMassEqn)=mass_rate
-    rate(idx_uEqn)=mass_rate*state%u
-    rate(idx_vEqn)=mass_rate*state%v
-    rate(idx_engyEqn)=mass_rate*state%T*cp_c
-    IF (n_add_gas>0) THEN
-      gas_fraction=1.0_wp-SUM(state%xs)
-      IF (REAL(gas_fraction,wp)>0.0_wp) &
-           rate(idx_addGasEqn_first:idx_addGasEqn_first+n_add_gas-1)= &
-           mass_rate*state%xg/gas_fraction
-    END IF
-    rate(idx_poreEqn)=rate(idx_poreEqn)+mass_rate*state%exc_pore_pres
-  END SUBROUTINE eval_pore_pressure_darcy_implicit
 
   !> Integrate frozen-coefficient Darcy directly and return the full
   !> conservative mean rate for the selected substep.
