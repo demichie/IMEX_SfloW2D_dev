@@ -43,8 +43,9 @@ PROGRAM test_source_registry
   CALL require(term%name=='','dependent deposition carrier loss is not independently schedulable')
   term=source_term_descriptor_by_name('SOURCE_TERM_THERMAL_RADIATIVE_COOLING')
   CALL require(term%name=='','thermal formula component is not schedulable')
-  DO mode=0,3
-    enabled=[.TRUE.,BTEST(mode,0),BTEST(mode,1)]
+  ! Stage partition combinations exclude Darcy, now an analytic STEP operator.
+  DO mode=0,1
+    enabled=[.TRUE.,BTEST(mode,0),.FALSE.]
     mask=.FALSE.;mask(2:3)=.TRUE.;mask(4)=enabled(2);mask(7)=enabled(3)
     active=[CHARACTER(LEN=64)::'rheology_voellmy','geometry_curvature', &
          'bottom_circular_injection','boundary_injection','mass_exchange_deposition']
@@ -144,7 +145,7 @@ CONTAINS
     coeff_porosity=0.0_wp;entrainment_flag=.FALSE.
     rheology_method='NEWTON'; rheology_cadence='STAGE'; rheology_group=3
     thermal_method='ANALYTIC'; thermal_cadence='STAGE'; thermal_group=1
-    pore_pressure_method='ANALYTIC'; pore_pressure_cadence='STAGE'; pore_pressure_group=2
+    pore_pressure_method='ANALYTIC'; pore_pressure_cadence='STEP'; pore_pressure_group=2
   END SUBROUTINE configure_liquid_case
 
   SUBROUTINE verify_default_schedule()
@@ -152,21 +153,21 @@ CONTAINS
     LOGICAL :: enabled_eq(7)
     INTEGER :: assigned(7)
     CALL configure_liquid_case()
-    enabled_eq=.FALSE.;enabled_eq(2:4)=.TRUE.;enabled_eq(7)=.TRUE.
-    assigned=0;assigned(2:3)=3;assigned(4)=1;assigned(7)=2
+    enabled_eq=.FALSE.;enabled_eq(2:4)=.TRUE.
+    assigned=0;assigned(2:3)=3;assigned(4)=1
     CALL partition%initialize(enabled_eq,assigned, &
          [IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_ANALYTIC,IM_GROUP_METHOD_NEWTON])
     CALL initialize_configured_sources(registry,partition,error)
     CALL require(error=='','configured default physical schedule: '//TRIM(error))
     g=registry%stage_groups();s=registry%step_groups()
-    CALL require(SIZE(g)==4 .AND. SIZE(s)==1,'default schedule group count')
+    CALL require(SIZE(g)==3 .AND. SIZE(s)==2,'default schedule group count')
     CALL require(group_contains_name(g(1),'boundary_injection'), &
          'explicit boundary group 0 precedes implicit group IDs')
     CALL require(group_contains_name(g(2),'thermal_cooling'), &
          'one complete cooling source at group 1')
-    CALL require(group_contains_name(g(3),'pore_pressure_dissipation'), &
-         'pore dissipation scheduling at group 2')
-    CALL require(group_contains_name(g(4),'rheology_voellmy'), &
+    CALL require(group_contains_name(s(2),'pore_pressure_dissipation'), &
+         'pore dissipation scheduling at STEP group 2')
+    CALL require(group_contains_name(g(3),'rheology_voellmy'), &
          'complete lava law scheduling at group 3')
     CALL require(group_contains_name(s(1),'mass_exchange_deposition'), &
          'post-RK deposition scheduling')
@@ -199,12 +200,12 @@ CONTAINS
     CALL configure_liquid_case()
     rheology_method='NEWTON'; rheology_cadence='STEP'; rheology_group=1
     thermal_method='EXPLICIT'; thermal_cadence='STEP'; thermal_group=2
-    pore_pressure_method='ANALYTIC'; pore_pressure_cadence='STAGE'; pore_pressure_group=1
+    pore_pressure_method='ANALYTIC'; pore_pressure_cadence='STEP'; pore_pressure_group=3
     CALL initialize_configured_sources(registry,partition,error)
     CALL require(error=='','Newton and explicit STEP scheduling: '//TRIM(error))
     g=registry%stage_groups();post=registry%step_groups()
-    CALL require(partition%n_IM_groups==1,'only pore pressure is implicit during RK')
-    CALL require(SIZE(post)==3,'Newton, explicit and mass-exchange STEP groups')
+    CALL require(partition%n_IM_groups==0,'no STEP source is implicit during RK')
+    CALL require(SIZE(post)==4,'Newton, explicit, Darcy and mass-exchange STEP groups')
     CALL require(group_contains_name(post(1),'mass_exchange_deposition'), &
          'atomic mass-exchange GROUP=0 first')
     CALL require(post(2)%method==SOURCE_METHOD_NEWTON .AND. &
@@ -213,6 +214,9 @@ CONTAINS
     CALL require(post(3)%method==SOURCE_METHOD_EXPLICIT .AND. &
          group_contains_name(post(3),'thermal_cooling'), &
          'explicit STEP GROUP=2 after Newton')
+    CALL require(post(4)%method==SOURCE_METHOD_ANALYTIC .AND. &
+         group_contains_name(post(4),'pore_pressure_dissipation'), &
+         'analytic Darcy STEP GROUP=3 after cooling')
   END SUBROUTINE verify_newton_explicit_step_schedule
 
   ! Verify each formerly fixed EXPLICIT/STAGE physical source is configurable.
