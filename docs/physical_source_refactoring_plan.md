@@ -113,3 +113,10 @@ ogni modello fisico. Nessun wrapper o livello di dispatch intermedio.
 - L'utente conferma Build e Physics Regressions entrambe riuscite
   dopo il blocco di pulizia delle sorgenti fino al commit `279f5b7`.
   Solver validation e confronto prestazionale ancora da eseguire.
+
+## Chiusura strutturale Rheology (2026-10-31)
+- Verificati 11 modelli: quattro trattamenti nell'ordine prescritto e tipi di stato coerenti (reale per explicit, semi-implicit, analytic; complesso per implicit).
+- Verificate conversioni locali negli espliciti compositi; nessun marcatore di continuazione isolato e nessuna riga oltre 132 caratteri nei file dei modelli.
+- Rimosse dal coordinatore variabili cinematiche temporanee inutilizzate; i modelli leggono la cinematica dallo stato.
+- **Refactoring strutturale Rheology concluso**. La validazione Build e Physics Regressions positiva riferita dall'utente precede l'ultima pulizia del coordinatore: ripetere entrambe sul commit finale prima di dichiarare la validazione completa. Benchmark prestazionale separato.
+- Prossima famiglia da chiudere: Mass exchange. La futura revisione Pore pressure rimane registrata sopra ed e' distinta.
