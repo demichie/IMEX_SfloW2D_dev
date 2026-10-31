@@ -32,7 +32,8 @@ PROGRAM test_d17_production_rheology
     real_state%h=2.0_wp
     real_state%u=velocity(1)
     real_state%v=velocity(2)
-    CALL update_physical_state_kinematics(real_state)
+    CALL update_physical_state_kinematics(real_state,0.0_wp,0.0_wp, &
+         0.0_wp,0.0_wp,0.0_wp)
     real_state%rho_m=density_real
     real_state%red_grav=8.0_wp
     real_state%alphas=solid
@@ -67,7 +68,8 @@ CONTAINS
     complex_state%inv_rhom=1.0_wp/density
     complex_state%u=v(1)
     complex_state%v=v(2)
-    CALL update_physical_state_kinematics(complex_state)
+    CALL update_physical_state_kinematics(complex_state,0.0_wp,0.0_wp, &
+         0.0_wp,0.0_wp,0.0_wp)
     complex_state%red_grav=CMPLX(8.0_wp,0.0_wp,wp)
     complex_state%alphas=CMPLX(solid,0.0_wp,wp)
     CALL eval_rheology_implicit(['rheology_newmodel'],complex_state, &

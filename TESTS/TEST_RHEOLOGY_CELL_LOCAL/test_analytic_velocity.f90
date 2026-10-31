@@ -148,9 +148,9 @@ PROGRAM test_analytic_velocity
     TYPE(physical_state_type) :: ps
     ps%u=velocity_after(1)
     ps%v=velocity_after(2)
-    ps%mod_vel=CMPLX(speed_after,0.0_wp,wp)
+    ps%mod_vel=speed_after
     ps%mod_vel2=ps%mod_vel**2
-    ps%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
+    ps%mod_vel_hor=horizontal_speed
     CALL eval_rheology_lava_semi_implicit(ps, source_x, source_y)
   END BLOCK
   source = [REAL(complex_source_x,wp)+source_x,                              &
@@ -200,9 +200,9 @@ PROGRAM test_analytic_velocity
     ps%v=velocity_after(2)
     ps%rho_m=mixture_density
     ps%alphas=solid_fraction
-    ps%mod_vel=CMPLX(speed_after,0.0_wp,wp)
+    ps%mod_vel=speed_after
     ps%mod_vel2=ps%mod_vel**2
-    ps%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
+    ps%mod_vel_hor=horizontal_speed
     CALL eval_rheology_lahar_semi_implicit(ps, source_x, source_y)
   END BLOCK
   source = [REAL(complex_source_x,wp)+source_x,                              &
