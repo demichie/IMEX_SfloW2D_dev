@@ -81,8 +81,7 @@ CONTAINS
 
         curvature_accel=0.0_wp
 
-        IF (curvature_term) curvature_accel=B_second_xx*state%u**2 +                                     &
-                2.0_wp*B_second_xy*state%u*state%v+B_second_yy*state%v**2
+        IF (curvature_term) curvature_accel=state%curvature_acceleration
         CALL eval_rheology_mui_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_accel, &
              use_pore_pressure, sx, sy)
         CALL complex_state_from_real(state, cs)

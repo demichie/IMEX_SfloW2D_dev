@@ -121,12 +121,7 @@ CONTAINS
         rate_y = 0.0_wp
         IF (mod_vel .LE. 0.0_wp) RETURN
         curvature_acceleration = 0.0_wp
-        IF (curvature_term) THEN
-            curvature_acceleration = B_second_xx * u**2                                            &
-                    + 2.0_wp * B_second_xy * u * v                                                 &
-                    + B_second_yy * v**2
-
-        END IF
+        IF (curvature_term) curvature_acceleration = state%curvature_acceleration
 
         friction_stress = mu * rhom *                                                              &
                 (red_grav + curvature_acceleration) * h                                            &
