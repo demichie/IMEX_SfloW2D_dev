@@ -226,21 +226,16 @@ def main() -> int:
             rf"(?is)\bSUBROUTINE\s+{routine}\s*\(\s*models\s*,.*?"
             rf"END\s+SUBROUTINE\s+{routine}\b", rheology_dispatch
         )
-        private_match = re.search(
-            rf"(?is)\bSUBROUTINE\s+{routine}_dispatch\s*\(.*?"
-            rf"END\s+SUBROUTINE\s+{routine}_dispatch\b", rheology_dispatch
-        )
         if (public_match is None
                 or not re.search(r"(?i)DO\s+\w+\s*=\s*1\s*,\s*SIZE\s*\(\s*models\s*\)",
                                  public_match.group(0))
-                or not re.search(rf"(?i)CALL\s+{routine}_dispatch\s*\(\s*TRIM\s*\(\s*models\s*\(",
-                                 public_match.group(0))
-                or private_match is None
-                or not re.search(r"(?i)SELECT\s+CASE\s*\(\s*TRIM\s*\(\s*model_name\s*\)\s*\)",
-                                 private_match.group(0))):
-            failures.append(f"{routine}: must dispatch every canonical model name")
-        elif re.search(r"(?i)\bCASE\s*\(\s*rheology_id_", private_match.group(0)):
+                or not re.search(r"(?i)SELECT\s+CASE\s*\(\s*TRIM\s*\(\s*models\s*\(\s*\w+\s*\)\s*\)\s*\)",
+                                 public_match.group(0))):
+            failures.append(f"{routine}: must select each canonical model directly")
+        elif re.search(r"(?i)\bCASE\s*\(\s*rheology_id_", public_match.group(0)):
             failures.append(f"{routine}: numeric rheology dispatch reintroduced")
+        if re.search(rf"(?i)\bSUBROUTINE\s+{routine}_dispatch\b", rheology_dispatch):
+            failures.append(f"{routine}: redundant dispatch layer reintroduced")
         if not re.search(
             rf"(?i)CALL\s+{routine}\s*\(\s*\[\s*selected_model_name\s*\]",
             assembly
