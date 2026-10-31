@@ -193,7 +193,8 @@ CONTAINS
             context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
             context%Bsecond_xy,context%Bsecond_yy)
         pressure_known=q_before(idx_pore)/q_before(1)
-        CALL solve_pore_pressure_dissipation_analytic(pressure_known,interval,physical_state%h,  &
+        CALL solve_pore_pressure_analytic(['pore_pressure_darcy'], &
+             pressure_known,interval,physical_state%h,  &
              physical_state%T,physical_state%alphas,pressure_after)
         q_after(idx_pore)=q_before(1)*pressure_after
       END IF
@@ -326,7 +327,7 @@ CONTAINS
     ENDIF
 
     IF ( pore_pressure_flag .AND. selected_pore ) &
-         CALL eval_pore_pressure_dissipation_implicit(h, T,                       &
+         CALL eval_pore_pressure_implicit(['pore_pressure_darcy'],h, T,                       &
          rho_m, alphas, exc_pore_pres, source_term(idx_poreEqn))
 
     nh_term = source_term
@@ -535,7 +536,7 @@ CONTAINS
        END IF
        IF (pore_pressure_flag .AND. &
             group_contains_name(group,'pore_pressure_dissipation')) THEN
-          CALL eval_pore_pressure_dissipation_explicit(r_h,qpj(idx_T), &
+          CALL eval_pore_pressure_explicit(['pore_pressure_darcy'],r_h,qpj(idx_T), &
                r_rho_m,physical_state%alphas,qpj(idx_pore),pressure_rate)
           expl_term(idx_poreEqn)=expl_term(idx_poreEqn)+pressure_rate
        END IF
