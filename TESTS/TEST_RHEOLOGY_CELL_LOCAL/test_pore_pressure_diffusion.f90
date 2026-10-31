@@ -6,7 +6,7 @@ PROGRAM test_pore_pressure_diffusion
   USE constitutive_parameters_2d, ONLY : f_inhibit_mode, hydraulic_permeability, &
        kin_visc_c, sp_heat_a, sp_gas_const_a, pres, dynamic_permeability_flag
   USE geometry_2d, ONLY : pi_g
-  USE pore_pressure_darcy_2d, ONLY : solve_pore_pressure_darcy_analytic
+  USE pore_pressure_darcy_2d, ONLY : eval_pore_pressure_darcy_analytic
   USE state_conversion_2d, ONLY : physical_state_type
 
   IMPLICIT NONE
@@ -147,7 +147,7 @@ CONTAINS
     q_before=0.0_wp
     q_before(1)=mass
     q_before(idx_poreEqn)=mass*p0
-    CALL solve_pore_pressure_darcy_analytic(state,q_before,dt,rate,ok)
+    CALL eval_pore_pressure_darcy_analytic(state,q_before,dt,rate,ok)
     IF (.NOT.ok) ERROR STOP 'analytic Darcy diffusion rejected valid state'
     p_after=(q_before(idx_poreEqn)+dt*rate(idx_poreEqn))/ &
          (q_before(1)+dt*rate(1))

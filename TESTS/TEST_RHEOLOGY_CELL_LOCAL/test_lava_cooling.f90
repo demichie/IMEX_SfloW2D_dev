@@ -1,7 +1,7 @@
 PROGRAM test_lava_cooling
 
   USE parameters_2d, ONLY : wp
-  USE thermal_cooling_2d, ONLY : solve_thermal_cooling_analytic, &
+  USE thermal_cooling_2d, ONLY : eval_thermal_cooling_analytic, &
        eval_thermal_cooling_implicit
 
   IMPLICIT NONE
@@ -100,7 +100,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: result
     TYPE(physical_state_type) :: state
     state%T=temperature
-    CALL solve_thermal_cooling_analytic(state,step,capacity,radiative,convective,ambient,result)
+    CALL eval_thermal_cooling_analytic(state,step,capacity,radiative,convective,ambient,result)
   END SUBROUTINE test_cooling_analytic
   FUNCTION test_cooling_implicit(temperature,radiative,convective,ambient) RESULT(result)
     USE state_conversion_2d, ONLY : complex_physical_state_type

@@ -4,7 +4,7 @@ PROGRAM test_grouped_implicit_stage
   USE constitutive_parameters_2d
   USE rheology_parameters_2d, ONLY : T_ref
   USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0
-  USE rheology_voellmy_2d, ONLY : mu, solve_rheology_voellmy_analytic
+  USE rheology_voellmy_2d, ONLY : mu, eval_rheology_voellmy_analytic
   USE rheology_parameters_2d, ONLY : xi
   USE geometry_2d, ONLY : pi_g
   USE equation_metadata_2d, ONLY : equation_partition_type,                 &
@@ -23,8 +23,8 @@ PROGRAM test_grouped_implicit_stage
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
   USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var, physical_state_type, &
        real_physical_state_from_q
-  USE pore_pressure_2d, ONLY : solve_pore_pressure_analytic
-  USE thermal_cooling_2d, ONLY : solve_thermal_cooling_analytic
+  USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
+  USE thermal_cooling_2d, ONLY : eval_thermal_cooling_analytic
 
   IMPLICIT NONE
 
@@ -328,7 +328,7 @@ PROGRAM test_grouped_implicit_stage
     TYPE(physical_state_type) :: local_pore_state
     CALL real_physical_state_from_q(q_expected,local_pore_state, &
          0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp)
-    CALL solve_pore_pressure_analytic(['pore_pressure_darcy'],local_pore_state, &
+    CALL eval_pore_pressure_analytic(['pore_pressure_darcy'],local_pore_state, &
          q_expected,dt_step*a_diag,pore_analytic_rate,pore_analytic_ok, &
          include_gas_loss=.FALSE.)
     IF (.NOT.pore_analytic_ok) ERROR STOP 'analytic pore-rate failure'
@@ -504,7 +504,7 @@ PROGRAM test_grouped_implicit_stage
     rheology_state%rho_m = expected_density
     rheology_state%red_grav = expected_red_grav
     rheology_state%exc_pore_pres = expected_pore_pressure
-    CALL solve_rheology_voellmy_analytic(dt_step*a_diag, rheology_state, &
+    CALL eval_rheology_voellmy_analytic(dt_step*a_diag, rheology_state, &
          speed_ratio, grav, 0.0_wp, pore_pressure_flag, .FALSE., 0.0_wp, &
          analytic_velocity)
   END BLOCK
@@ -541,7 +541,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: result
     TYPE(physical_state_type) :: state
     state%T=temperature
-    CALL solve_thermal_cooling_analytic(state,step,capacity,radiative,convective,ambient,result)
+    CALL eval_thermal_cooling_analytic(state,step,capacity,radiative,convective,ambient,result)
   END SUBROUTINE test_cooling_analytic
 
   ! D18: lava momentum solved during DIRK, cooling once after the RK step.

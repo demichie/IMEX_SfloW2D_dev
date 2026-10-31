@@ -14,29 +14,29 @@ PROGRAM test_analytic_velocity
   USE rheology_voellmy_2d, ONLY : voellmy_mu => mu,                          &
        eval_rheology_voellmy_implicit,                                  &
        eval_rheology_voellmy_semi_implicit,                             &
-       solve_rheology_voellmy_analytic
+       eval_rheology_voellmy_analytic
   USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
   USE rheology_plastic_2d, ONLY : tau, eval_rheology_plastic_implicit,  &
-       solve_rheology_plastic_analytic
+       eval_rheology_plastic_analytic
   USE rheology_lava_2d, ONLY : nu_ref, visc_par, tau0,                       &
        eval_rheology_lava_implicit, eval_rheology_lava_semi_implicit, &
-       solve_rheology_lava_analytic
+       eval_rheology_lava_analytic
   USE rheology_lahar_2d, ONLY : alpha2, beta2, alpha1_coeff, beta1, Kappa,   &
        n_td, n_td2, eval_rheology_lahar_implicit,                       &
        eval_rheology_lahar_semi_implicit,                               &
-       solve_rheology_lahar_analytic
+       eval_rheology_lahar_analytic
   USE rheology_empirical_2d, ONLY : eval_rheology_empirical_implicit,   &
-       solve_rheology_empirical_analytic
+       eval_rheology_empirical_analytic
   USE rheology_quadratic_2d, ONLY : friction_factor,                        &
-       eval_rheology_quadratic_implicit, solve_rheology_quadratic_analytic
+       eval_rheology_quadratic_implicit, eval_rheology_quadratic_analytic
   USE rheology_froude_2d, ONLY : eval_rheology_froude_semi_implicit,                  &
-       solve_rheology_froude_analytic
+       eval_rheology_froude_analytic
   USE rheology_lucas_2d, ONLY : eval_rheology_lucas_semi_implicit,                    &
-       solve_rheology_lucas_analytic
-  USE rheology_mui_2d, ONLY : eval_rheology_mui_semi_implicit, solve_rheology_mui_analytic
+       eval_rheology_lucas_analytic
+  USE rheology_mui_2d, ONLY : eval_rheology_mui_semi_implicit, eval_rheology_mui_analytic
   USE rheology_mui_voellmy_2d, ONLY : eval_rheology_mui_voellmy_semi_implicit,        &
-       eval_rheology_mui_voellmy_implicit, solve_rheology_mui_voellmy_analytic
-  USE rheology_2d, ONLY : solve_rheology_analytic
+       eval_rheology_mui_voellmy_implicit, eval_rheology_mui_voellmy_analytic
+  USE rheology_2d, ONLY : eval_rheology_analytic
 
   IMPLICIT NONE
 
@@ -85,7 +85,7 @@ PROGRAM test_analytic_velocity
     ps%h = flow_depth
     ps%u = velocity_before(1)
     ps%v = velocity_before(2)
-    CALL solve_rheology_plastic_analytic(integration_step, ps, speed_ratio, velocity_after)
+    CALL eval_rheology_plastic_analytic(integration_step, ps, speed_ratio, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_plastic', .FALSE., 0.0_wp,       &
        .FALSE., 0.0_wp, velocity_after, 'plastic dispatch')
@@ -119,7 +119,7 @@ PROGRAM test_analytic_velocity
     ps%rho_m=mixture_density
     ps%u=velocity_before(1)
     ps%v=velocity_before(2)
-    CALL solve_rheology_lava_analytic(integration_step, ps, speed_ratio, velocity_after)
+    CALL eval_rheology_lava_analytic(integration_step, ps, speed_ratio, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_lava', .FALSE., 0.0_wp,           &
        .FALSE., 0.0_wp, velocity_after, 'lava dispatch')
@@ -173,7 +173,7 @@ PROGRAM test_analytic_velocity
     ps%v=velocity_before(2)
     ps%rho_m=mixture_density
     ps%alphas=solid_fraction
-    CALL solve_rheology_lahar_analytic(integration_step, ps, speed_ratio, velocity_after)
+    CALL eval_rheology_lahar_analytic(integration_step, ps, speed_ratio, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_lahar', .FALSE., 0.0_wp,          &
        .FALSE., 0.0_wp, velocity_after, 'lahar dispatch')
@@ -217,7 +217,7 @@ PROGRAM test_analytic_velocity
     ps%rho_m=mixture_density
     ps%u=velocity_before(1)
     ps%v=velocity_before(2)
-    CALL solve_rheology_empirical_analytic(integration_step, ps, speed_ratio, velocity_after)
+    CALL eval_rheology_empirical_analytic(integration_step, ps, speed_ratio, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_empirical', .FALSE., 0.0_wp,      &
        .FALSE., 0.0_wp, velocity_after, 'empirical dispatch')
@@ -251,7 +251,7 @@ PROGRAM test_analytic_velocity
     ps%h=flow_depth
     ps%u=velocity_before(1)
     ps%v=velocity_before(2)
-    CALL solve_rheology_quadratic_analytic(integration_step, ps, speed_ratio, velocity_after)
+    CALL eval_rheology_quadratic_analytic(integration_step, ps, speed_ratio, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_quadratic', .FALSE., 0.0_wp,      &
        .FALSE., 0.0_wp, velocity_after, 'quadratic dispatch')
@@ -286,7 +286,7 @@ PROGRAM test_analytic_velocity
     rs%rho_m = mixture_density
     rs%red_grav = reduced_gravity
     rs%exc_pore_pres = 0.0_wp
-    CALL solve_rheology_voellmy_analytic(integration_step, rs, speed_ratio, gravity_coefficient, &
+    CALL eval_rheology_voellmy_analytic(integration_step, rs, speed_ratio, gravity_coefficient, &
          0.0_wp, .FALSE., .FALSE., 0.0_wp, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_voellmy', .FALSE., 0.0_wp,        &
@@ -336,7 +336,7 @@ PROGRAM test_analytic_velocity
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL solve_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
        .FALSE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,          &
        .FALSE., stochastic_value, velocity_after, 'Froude dispatch')
@@ -364,7 +364,7 @@ CALL eval_rheology_froude_semi_implicit(rheo_state, &
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL solve_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
        .TRUE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,         &
        .TRUE., stochastic_value, velocity_after, 'Froude stochastic dispatch')
@@ -394,7 +394,7 @@ CALL eval_rheology_froude_semi_implicit(rheo_state, &
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL solve_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_froude_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
        .FALSE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_froude', .FALSE., 0.0_wp,         &
        .FALSE., stochastic_value, velocity_after, 'Froude zero-drag dispatch')
@@ -409,7 +409,7 @@ CALL eval_rheology_froude_semi_implicit(rheo_state, &
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL solve_rheology_lucas_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_lucas_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
        .FALSE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_lucas', .FALSE., 0.0_wp,          &
        .FALSE., stochastic_value, velocity_after, 'Lucas dispatch')
@@ -437,7 +437,7 @@ CALL eval_rheology_lucas_semi_implicit(rheo_state, &
   rheo_state%v=velocity_before(2)
   rheo_state%rho_m=mixture_density
   rheo_state%red_grav=reduced_gravity
-  CALL solve_rheology_lucas_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
+  CALL eval_rheology_lucas_analytic(integration_step,rheo_state,speed_ratio,gravity_coefficient,0.0_wp, &
        .TRUE.,stochastic_value,velocity_after)
   CALL assert_dispatch_matches('rheology_lucas', .FALSE., 0.0_wp,          &
        .TRUE., stochastic_value, velocity_after, 'Lucas stochastic dispatch')
@@ -473,7 +473,7 @@ CALL eval_rheology_lucas_semi_implicit(rheo_state, &
     ps%red_grav=reduced_gravity
     ps%alphas=solid_fraction
     ps%exc_pore_pres=0.0_wp
-    CALL solve_rheology_mui_analytic(integration_step, ps, speed_ratio, &
+    CALL eval_rheology_mui_analytic(integration_step, ps, speed_ratio, &
          gravity_coefficient, 0.0_wp, .FALSE., velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_mui', .FALSE., 0.0_wp, &
@@ -508,7 +508,7 @@ CALL eval_rheology_mui_semi_implicit(ps, &
     ps%red_grav=reduced_gravity
     ps%alphas=solid_fraction
     ps%exc_pore_pres=1000.0_wp
-    CALL solve_rheology_mui_analytic(integration_step, ps, speed_ratio, gravity_coefficient, &
+    CALL eval_rheology_mui_analytic(integration_step, ps, speed_ratio, gravity_coefficient, &
          0.0_wp, .TRUE., velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_mui', .TRUE., 1000.0_wp,           &
@@ -544,7 +544,7 @@ CALL eval_rheology_mui_semi_implicit(ps, &
     ps%red_grav=reduced_gravity
     ps%alphas=solid_fraction
     ps%exc_pore_pres=0.0_wp
-    CALL solve_rheology_mui_voellmy_analytic(integration_step, ps, speed_ratio, gravity_coefficient, &
+    CALL eval_rheology_mui_voellmy_analytic(integration_step, ps, speed_ratio, gravity_coefficient, &
          0.0_wp, .FALSE., .FALSE., 0.0_wp, velocity_after)
   END BLOCK
   CALL assert_dispatch_matches('rheology_mui_voellmy', .FALSE., 0.0_wp,     &
@@ -597,7 +597,7 @@ CALL eval_rheology_mui_voellmy_implicit(cs, &
     ps%red_grav=reduced_gravity
     ps%alphas=solid_fraction
     ps%exc_pore_pres=500.0_wp
-    CALL solve_rheology_mui_voellmy_analytic(integration_step, ps, speed_ratio, gravity_coefficient, &
+    CALL eval_rheology_mui_voellmy_analytic(integration_step, ps, speed_ratio, gravity_coefficient, &
          0.0_wp, .TRUE., .TRUE., 100.0_wp, velocity_after)
   END BLOCK
   speed_after = speed_ratio * SQRT(SUM(velocity_after**2))
@@ -744,7 +744,7 @@ CONTAINS
     physical_state%red_grav=reduced_gravity
     physical_state%alphas=solid_fraction
     physical_state%exc_pore_pres=excess_pore_pressure
-    CALL solve_rheology_analytic([model_id],integration_step,physical_state, &
+    CALL eval_rheology_analytic([model_id],integration_step,physical_state, &
          speed_ratio,gravity_coefficient,0.0_wp,use_pore_pressure, &
          use_stochastic,stochastic,actual,model_supported, &
          0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp)
@@ -773,7 +773,7 @@ CONTAINS
     physical_state%red_grav=reduced_gravity
     physical_state%alphas=solid_fraction
     physical_state%exc_pore_pres=0.0_wp
-    CALL solve_rheology_analytic(['rheology_unsupported'],integration_step,physical_state, &
+    CALL eval_rheology_analytic(['rheology_unsupported'],integration_step,physical_state, &
          speed_ratio,gravity_coefficient,0.0_wp, .FALSE., &
          .FALSE.,0.0_wp,actual,model_supported, &
          0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp)
