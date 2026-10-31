@@ -340,3 +340,13 @@ The intermediate group states are **local to source splitting** and are **not ap
 **Numerical qualification:** this ordered, full-step stage-local splitting changes the effective source rate and is not automatically equivalent in accuracy or stability to the original unsplit IMEX-RK method. Verify conservation/admissibility and temporal order via targeted convergence and regression tests before claiming preservation of the underlying RK order.
 
 **Status:** design decision recorded; full Fortran integration and validation pending.
+
+## 23. Spatial operator participates in explicit group 0 update (agreed)
+
+**EXPLICIT/STAGE group 0 always includes the spatial discretization rate**, and may contain other explicitly configured physical source processes. Evaluate the spatial rate and every group-0 source contribution at **the same initial RK-stage conservative state**, before any group-local modification. Apply relevant joint physical limits to processes sharing a common inventory.
+
+Define `rate_group0 = rate_spatial + sum(rate_source_in_group0)`. Use this **combined** rate to form the group-0 intermediate state with the agreed full global step: `q_after_group0 = q_stage + dt_global * rate_group0`. Every subsequent explicit group evaluates its physical rate and limiters on the full updated state left by the preceding group; the spatial operator is **not** reevaluated at those later group states.
+
+Accumulate each group's effective full-vector rate once to produce the explicit rate passed to the unchanged RK tableau. Stage-local intermediate states are not applied again by the RK integrator. Group 0 is a group in the same ordered sequence, not a special separate spatial substep.
+
+**Numerical qualification:** stability, admissibility, and time-order behavior of this full-step stage-local sequential construction require dedicated verification. **Documentation only** in this commit.
