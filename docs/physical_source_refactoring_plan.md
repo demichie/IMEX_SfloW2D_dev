@@ -149,3 +149,18 @@ ogni modello fisico. Nessun wrapper o livello di dispatch intermedio.
   remain to be confirmed by the user.
 - The planned pore-pressure refactoring must account for the injection
   contribution already migrated into the individual injection models.
+
+## Thermal - structural audit (2026-10-31)
+- Coordinator and cooling model expose four ordered treatments: explicit,
+  semi_implicit, implicit, analytic.
+- Explicit, semi-implicit and analytic use physical_state_type and real
+  results; implicit uses complex_physical_state_type and complex results.
+- The coordinator only dispatches and combines model results. Physical
+  cooling formulae and exact propagation remain inside thermal_cooling_2d.
+- The analytic coordinator intentionally copies the state locally and
+  updates temperature after each model to preserve ordered composition.
+- No functional source changes are needed following this audit. The
+  structural refactoring of Thermal is complete; its existing runtime
+  behaviour is covered by the previously reported passing regressions.
+- Next planned work: pore-pressure family and model-specific source
+  ownership, followed by the final source_terms_2d assembly cleanup.
