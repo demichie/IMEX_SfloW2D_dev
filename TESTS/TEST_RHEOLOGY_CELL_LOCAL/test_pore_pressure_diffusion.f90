@@ -5,7 +5,8 @@ PROGRAM test_pore_pressure_diffusion
   USE constitutive_parameters_2d, ONLY : f_inhibit_mode, hydraulic_permeability, &
        kin_visc_c, sp_heat_a, sp_gas_const_a, pres, dynamic_permeability_flag
   USE geometry_2d, ONLY : pi_g
-  USE pore_pressure_darcy_2d, ONLY : eval_pore_pressure_darcy_implicit
+  USE pore_pressure_darcy_2d, ONLY : solve_pore_pressure_darcy_analytic
+  USE state_conversion_2d, ONLY : physical_state_type
 
   IMPLICIT NONE
 
@@ -106,34 +107,47 @@ PROGRAM test_pore_pressure_diffusion
 
 CONTAINS
 
-  ! The standalone diffusion reference is test-only and not a physics interface.
+  ! Independent reference for the fixed-permeability gas-free diffusion law.
   SUBROUTINE diffusion_rate_from_state(p0,h,temp,alpha,source)
-    USE state_conversion_2d, ONLY : complex_physical_state_type
-    USE parameters_2d, ONLY : n_eqns, idx_poreEqn
     REAL(wp), INTENT(IN) :: p0,h,temp,alpha(:)
     COMPLEX(wp), INTENT(OUT) :: source
-    TYPE(complex_physical_state_type) :: state
-    COMPLEX(wp), ALLOCATABLE :: rates(:)
-    ALLOCATE(state%alphas(SIZE(alpha)),rates(n_eqns))
-    state%h=CMPLX(h,0.0_wp,wp)
-    state%T=CMPLX(temp,0.0_wp,wp)
-    state%rho_m=CMPLX(mixture_density,0.0_wp,wp)
-    state%alphas=CMPLX(alpha,0.0_wp,wp)
-    state%exc_pore_pres=CMPLX(p0,0.0_wp,wp)
-    CALL eval_pore_pressure_darcy_implicit(state,rates)
-    source=rates(idx_poreEqn)
+    REAL(wp) :: gamma,gas_density,compressibility,porosity,diffusion
+    source=CMPLX(0.0_wp,0.0_wp,wp)
+    IF (h<=0.0_wp .OR. p0<0.0_wp) RETURN
+    porosity=1.0_wp-SUM(alpha)
+    IF (porosity<=EPSILON(1.0_wp)) RETURN
+    gamma=sp_heat_a/(sp_heat_a-sp_gas_const_a)
+    gas_density=pres/(sp_gas_const_a*temp)
+    compressibility=1.0_wp/(gamma*pres)
+    diffusion=hydraulic_permeability/ &
+         (porosity*kin_visc_c*gas_density*compressibility)
+    source=CMPLX(-mixture_density*(pi_g/2.0_wp)**2*diffusion*p0/ &
+         MAX(1.0e-10_wp,h),0.0_wp,wp)
   END SUBROUTINE diffusion_rate_from_state
 
+  ! Exercise the public analytic model instead of its removed Newton interface.
   SUBROUTINE advance_pore_pressure_diffusion(p0,dt,h,temp,alpha,p_after)
     REAL(wp), INTENT(IN) :: p0,dt,h,temp,alpha(:)
     REAL(wp), INTENT(OUT) :: p_after
-    COMPLEX(wp) :: source_local
-    REAL(wp) :: lambda
+    TYPE(physical_state_type) :: state
+    REAL(wp) :: q_before(n_eqns),rate(n_eqns),mass
+    LOGICAL :: ok
     p_after=p0
     IF (dt<=0.0_wp .OR. p0<=0.0_wp .OR. h<=0.0_wp) RETURN
-    CALL diffusion_rate_from_state(p0,h,temp,alpha,source_local)
-    lambda=-REAL(source_local,wp)/(mixture_density*h*p0)
-    IF (lambda>0.0_wp) p_after=p0*EXP(-lambda*dt)
+    state%h=h
+    state%T=temp
+    state%rho_m=mixture_density
+    state%exc_pore_pres=p0
+    ALLOCATE(state%alphas(SIZE(alpha)))
+    state%alphas=alpha
+    mass=mixture_density*h
+    q_before=0.0_wp
+    q_before(1)=mass
+    q_before(idx_poreEqn)=mass*p0
+    CALL solve_pore_pressure_darcy_analytic(state,q_before,dt,rate,ok)
+    IF (.NOT.ok) ERROR STOP 'analytic Darcy diffusion rejected valid state'
+    p_after=(q_before(idx_poreEqn)+dt*rate(idx_poreEqn))/ &
+         (q_before(1)+dt*rate(1))
   END SUBROUTINE advance_pore_pressure_diffusion
 
   SUBROUTINE assert_close(actual, expected, relative_tolerance, message)
