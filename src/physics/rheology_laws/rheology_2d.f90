@@ -92,9 +92,6 @@ CONTAINS
                     mod_vel2, &
                     grav_coeff, &
                     curvature_term, &
-                    state%B_second_xx, &
-                    state%B_second_xy, &
-                    state%B_second_yy, &
                     use_pore_pressure, &
                     moving, &
                     use_stochastic, &
@@ -152,9 +149,6 @@ CONTAINS
                     mod_vel, &
                     grav_coeff, &
                     curvature_term, &
-                    state%B_second_xx, &
-                    state%B_second_xy, &
-                    state%B_second_yy, &
                     use_pore_pressure, &
                     process_rate)
         CASE('rheology_mui_voellmy')
@@ -163,9 +157,6 @@ CONTAINS
                     mod_vel2, &
                     grav_coeff, &
                     curvature_term, &
-                    state%B_second_xx, &
-                    state%B_second_xy, &
-                    state%B_second_yy, &
                     use_pore_pressure, &
                     moving, &
                     use_stochastic, &
@@ -201,7 +192,7 @@ CONTAINS
             SELECT CASE(TRIM(models(i)))
         CASE('rheology_voellmy')
             CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term, &
-                    state%B_second_xx, state%B_second_xy, state%B_second_yy, use_pore_pressure, process_rate(1), process_rate(2))
+                    use_pore_pressure, process_rate(1), process_rate(2))
         CASE('rheology_lava')
             CALL eval_rheology_lava_semi_implicit(state, mod_vel, process_rate(1), process_rate(2))
         CASE('rheology_lahar')
@@ -286,7 +277,7 @@ CONTAINS
 
     SUBROUTINE solve_rheology_analytic(models,dt,state,speed_ratio,grav_coeff, &
          curvature_acceleration,use_pore_pressure,use_stochastic,stochastic_value, &
-         velocity_after,model_supported)
+         velocity_after,model_supported,bx,by,bxx,bxy,byy)
         CHARACTER(*), INTENT(IN) :: models(:)
         REAL(wp), INTENT(IN) :: dt,speed_ratio,grav_coeff,curvature_acceleration,stochastic_value
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -295,7 +286,15 @@ CONTAINS
         LOGICAL, INTENT(OUT) :: model_supported
         TYPE(physical_state_type) :: current_state
         REAL(wp) :: velocity_before(2)
+        REAL(wp), INTENT(IN), OPTIONAL :: bx,by,bxx,bxy,byy
+        REAL(wp) :: geometry(5)
         INTEGER :: i
+        geometry=0.0_wp
+        IF (PRESENT(bx)) geometry(1)=bx
+        IF (PRESENT(by)) geometry(2)=by
+        IF (PRESENT(bxx)) geometry(3)=bxx
+        IF (PRESENT(bxy)) geometry(4)=bxy
+        IF (PRESENT(byy)) geometry(5)=byy
         current_state=state
         velocity_after=[state%u,state%v]
         model_supported=.TRUE.
@@ -339,7 +338,8 @@ CONTAINS
             IF (.NOT.model_supported) RETURN
             current_state%u=velocity_after(1)
             current_state%v=velocity_after(2)
-            CALL update_physical_state_kinematics(current_state)
+            CALL update_physical_state_kinematics(current_state,geometry(1),geometry(2), &
+                 geometry(3),geometry(4),geometry(5))
         END DO
     END SUBROUTINE solve_rheology_analytic
 

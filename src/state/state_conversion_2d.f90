@@ -39,8 +39,6 @@ MODULE state_conversion_2d
      REAL(wp) :: Zs=0.0_wp, exc_pore_pres=0.0_wp
      REAL(wp) :: w=0.0_wp, mod_vel_hor=0.0_wp, mod_vel2=0.0_wp
      REAL(wp) :: mod_vel=0.0_wp, curvature_acceleration=0.0_wp
-     REAL(wp) :: B_prime_x=0.0_wp, B_prime_y=0.0_wp
-     REAL(wp) :: B_second_xx=0.0_wp, B_second_xy=0.0_wp, B_second_yy=0.0_wp
      REAL(wp), ALLOCATABLE :: xs(:), xg(:), alphas(:), alphag(:)
   END TYPE physical_state_type
 
@@ -53,8 +51,6 @@ MODULE state_conversion_2d
      COMPLEX(wp) :: w=(0.0_wp,0.0_wp), mod_vel_hor=(0.0_wp,0.0_wp)
      COMPLEX(wp) :: mod_vel2=(0.0_wp,0.0_wp), mod_vel=(0.0_wp,0.0_wp)
      COMPLEX(wp) :: curvature_acceleration=(0.0_wp,0.0_wp)
-     REAL(wp) :: B_prime_x=0.0_wp, B_prime_y=0.0_wp
-     REAL(wp) :: B_second_xx=0.0_wp, B_second_xy=0.0_wp, B_second_yy=0.0_wp
      COMPLEX(wp), ALLOCATABLE :: xs(:), xg(:), alphas(:), alphag(:)
   END TYPE complex_physical_state_type
 
@@ -117,38 +113,28 @@ CONTAINS
 
   SUBROUTINE update_real_state_kinematics(state, bx, by, bxx, bxy, byy)
     TYPE(physical_state_type), INTENT(INOUT) :: state
-    REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
-    IF (PRESENT(bx)) state%B_prime_x=bx
-    IF (PRESENT(by)) state%B_prime_y=by
-    IF (PRESENT(bxx)) state%B_second_xx=bxx
-    IF (PRESENT(bxy)) state%B_second_xy=bxy
-    IF (PRESENT(byy)) state%B_second_yy=byy
+    REAL(wp), INTENT(IN) :: bx, by, bxx, bxy, byy
     state%w=0.0_wp
     IF (slope_correction_flag) &
-         state%w=state%u*state%B_prime_x+state%v*state%B_prime_y
+         state%w=state%u*bx+state%v*by
     state%mod_vel_hor=SQRT(state%u**2+state%v**2)
     state%mod_vel2=state%u**2+state%v**2+state%w**2
     state%mod_vel=SQRT(state%mod_vel2)
-    state%curvature_acceleration=state%u**2*state%B_second_xx+ &
-         2.0_wp*state%u*state%v*state%B_second_xy+state%v**2*state%B_second_yy
+    state%curvature_acceleration=state%u**2*bxx+ &
+         2.0_wp*state%u*state%v*bxy+state%v**2*byy
   END SUBROUTINE update_real_state_kinematics
 
   SUBROUTINE update_complex_state_kinematics(state, bx, by, bxx, bxy, byy)
     TYPE(complex_physical_state_type), INTENT(INOUT) :: state
-    REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
-    IF (PRESENT(bx)) state%B_prime_x=bx
-    IF (PRESENT(by)) state%B_prime_y=by
-    IF (PRESENT(bxx)) state%B_second_xx=bxx
-    IF (PRESENT(bxy)) state%B_second_xy=bxy
-    IF (PRESENT(byy)) state%B_second_yy=byy
+    REAL(wp), INTENT(IN) :: bx, by, bxx, bxy, byy
     state%w=CMPLX(0.0_wp,0.0_wp,wp)
     IF (slope_correction_flag) &
-         state%w=state%u*state%B_prime_x+state%v*state%B_prime_y
+         state%w=state%u*bx+state%v*by
     state%mod_vel_hor=SQRT(state%u**2+state%v**2)
     state%mod_vel2=state%u**2+state%v**2+state%w**2
     state%mod_vel=SQRT(state%mod_vel2)
-    state%curvature_acceleration=state%u**2*state%B_second_xx+ &
-         2.0_wp*state%u*state%v*state%B_second_xy+state%v**2*state%B_second_yy
+    state%curvature_acceleration=state%u**2*bxx+ &
+         2.0_wp*state%u*state%v*bxy+state%v**2*byy
   END SUBROUTINE update_complex_state_kinematics
 
 
@@ -158,6 +144,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: qp(n_vars+2)
     TYPE(physical_state_type), INTENT(OUT) :: state
     REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
+    REAL(wp) :: geometry(5)
     REAL(wp) :: rho_c, inv_rho_c
     REAL(wp) :: xs(n_solid), xg(n_add_gas)
 
@@ -190,7 +177,14 @@ CONTAINS
          state%rho_m, state%inv_rhom, rho_c, inv_rho_c, &
          state%alphas, state%alphag)
     state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
-    CALL update_physical_state_kinematics(state,bx,by,bxx,bxy,byy)
+    geometry=0.0_wp
+    IF (PRESENT(bx)) geometry(1)=bx
+    IF (PRESENT(by)) geometry(2)=by
+    IF (PRESENT(bxx)) geometry(3)=bxx
+    IF (PRESENT(bxy)) geometry(4)=bxy
+    IF (PRESENT(byy)) geometry(5)=byy
+    CALL update_physical_state_kinematics(state,geometry(1),geometry(2), &
+         geometry(3),geometry(4),geometry(5))
   END SUBROUTINE physical_state_from_qp
 
   !> Construct real physical properties from the current conservative state.
@@ -198,6 +192,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: q(n_vars)
     TYPE(physical_state_type), INTENT(OUT) :: state
     REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
+    REAL(wp) :: geometry(5)
     REAL(wp) :: p_dyn
 
     ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas), &
@@ -213,7 +208,14 @@ CONTAINS
        state%xg = q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
        CALL enforce_mass_fraction_closure(state%xs, state%xg)
     END IF
-    CALL update_physical_state_kinematics(state,bx,by,bxx,bxy,byy)
+    geometry=0.0_wp
+    IF (PRESENT(bx)) geometry(1)=bx
+    IF (PRESENT(by)) geometry(2)=by
+    IF (PRESENT(bxx)) geometry(3)=bxx
+    IF (PRESENT(bxy)) geometry(4)=bxy
+    IF (PRESENT(byy)) geometry(5)=byy
+    CALL update_physical_state_kinematics(state,geometry(1),geometry(2), &
+         geometry(3),geometry(4),geometry(5))
   END SUBROUTINE real_physical_state_from_q
 
   !> Build a COMPLEX physical source state through the existing complex-step kernel.
@@ -221,6 +223,7 @@ CONTAINS
     COMPLEX(wp), INTENT(IN) :: q(n_vars)
     TYPE(complex_physical_state_type), INTENT(OUT) :: state
     REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
+    REAL(wp) :: geometry(5)
 
     ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas), &
          state%xs(n_solid), state%xg(n_add_gas))
@@ -234,7 +237,14 @@ CONTAINS
        state%xs = q(idx_solid_first:idx_solid_last) / q(idx_totMassEqn)
        state%xg = q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
     END IF
-    CALL update_physical_state_kinematics(state,bx,by,bxx,bxy,byy)
+    geometry=0.0_wp
+    IF (PRESENT(bx)) geometry(1)=bx
+    IF (PRESENT(by)) geometry(2)=by
+    IF (PRESENT(bxx)) geometry(3)=bxx
+    IF (PRESENT(bxy)) geometry(4)=bxy
+    IF (PRESENT(byy)) geometry(5)=byy
+    CALL update_physical_state_kinematics(state,geometry(1),geometry(2), &
+         geometry(3),geometry(4),geometry(5))
   END SUBROUTINE physical_state_from_q
 
   !> Convert a fully prepared real physical state to a complex one.
@@ -258,12 +268,11 @@ CONTAINS
          complex_state%alphas = CMPLX(real_state%alphas,0.0_wp,wp)
     IF (ALLOCATED(real_state%alphag)) &
          complex_state%alphag = CMPLX(real_state%alphag,0.0_wp,wp)
-    complex_state%B_prime_x = real_state%B_prime_x
-    complex_state%B_prime_y = real_state%B_prime_y
-    complex_state%B_second_xx = real_state%B_second_xx
-    complex_state%B_second_xy = real_state%B_second_xy
-    complex_state%B_second_yy = real_state%B_second_yy
-    CALL update_physical_state_kinematics(complex_state)
+    complex_state%w = CMPLX(real_state%w,0.0_wp,wp)
+    complex_state%mod_vel_hor = CMPLX(real_state%mod_vel_hor,0.0_wp,wp)
+    complex_state%mod_vel2 = CMPLX(real_state%mod_vel2,0.0_wp,wp)
+    complex_state%mod_vel = CMPLX(real_state%mod_vel,0.0_wp,wp)
+    complex_state%curvature_acceleration = CMPLX(real_state%curvature_acceleration,0.0_wp,wp)
   END SUBROUTINE complex_state_from_real
 
   !> Extract a real source state without re-evaluating any constitutive formula.
@@ -284,12 +293,11 @@ CONTAINS
     state%exc_pore_pres = REAL(complex_state%exc_pore_pres,wp)
     state%alphas = REAL(complex_state%alphas,wp)
     state%alphag = REAL(complex_state%alphag,wp)
-    state%B_prime_x = complex_state%B_prime_x
-    state%B_prime_y = complex_state%B_prime_y
-    state%B_second_xx = complex_state%B_second_xx
-    state%B_second_xy = complex_state%B_second_xy
-    state%B_second_yy = complex_state%B_second_yy
-    CALL update_physical_state_kinematics(state)
+    state%w = REAL(complex_state%w,wp)
+    state%mod_vel_hor = REAL(complex_state%mod_vel_hor,wp)
+    state%mod_vel2 = REAL(complex_state%mod_vel2,wp)
+    state%mod_vel = REAL(complex_state%mod_vel,wp)
+    state%curvature_acceleration = REAL(complex_state%curvature_acceleration,wp)
   END SUBROUTINE real_part_physical_state
 
   !> Mixture properties from named state components, without rebuilding qp.

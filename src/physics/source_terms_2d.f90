@@ -171,7 +171,9 @@ CONTAINS
         END IF
         CALL solve_rheology_analytic([selected_model_name], interval, physical_state, &
              speed_ratio, context%grav_coeff, curvature_accel, pore_pressure_flag, &
-             stochastic_flag, context%Zij, velocity_after, supported)
+             stochastic_flag, context%Zij, velocity_after, supported, &
+             context%Bprime_x, context%Bprime_y, context%Bsecond_xx, &
+             context%Bsecond_xy, context%Bsecond_yy)
         IF (.NOT.supported) THEN
           status=-7
           RETURN
