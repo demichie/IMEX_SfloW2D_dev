@@ -13,7 +13,7 @@
 !> stochastic perturbations shift the Froude number for sufficiently deep
 !> flow and clamp it at zero. The module provides
 !> \ref eval_rheology_froude_semi_implicit to evaluate the two horizontal momentum rates.
-!> \ref solve_rheology_froude_analytic integrates the frozen Froude-dependent
+!> \ref eval_rheology_froude_analytic integrates the frozen Froude-dependent
 !> velocity source in time.
 !********************************************************************************
 MODULE rheology_froude_2d
@@ -29,7 +29,7 @@ MODULE rheology_froude_2d
     PUBLIC :: eval_rheology_froude_explicit
     PUBLIC :: eval_rheology_froude_semi_implicit
     PUBLIC :: eval_rheology_froude_implicit
-    PUBLIC :: solve_rheology_froude_analytic
+    PUBLIC :: eval_rheology_froude_analytic
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
     !> \param[in] state Shared physical state (complex for implicit treatment).
@@ -131,7 +131,7 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
     !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
     !> s^-1].
-    SUBROUTINE solve_rheology_froude_analytic(dt, state, speed_ratio, grav_coeff, curvature_term, &
+    SUBROUTINE eval_rheology_froude_analytic(dt, state, speed_ratio, grav_coeff, curvature_term, &
             stochastic, stochastic_value, velocity_after)
 
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -166,7 +166,7 @@ CONTAINS
                 [base_drag, froude_slope, shift/Fr_0, mu_0, mu_inf],                               &
                 dt, speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
-    END SUBROUTINE solve_rheology_froude_analytic
+    END SUBROUTINE eval_rheology_froude_analytic
 
     ! Unsupported physical treatment, rejected by the source catalog.
     ! Valid zero component of the configured Newton treatment.

@@ -15,7 +15,7 @@
 !> \f$\boldsymbol{S}=-\tau_b\boldsymbol{u}_h/|\boldsymbol{u}|\f$.
 !> \ref eval_rheology_mui_semi_implicit evaluates the real-valued x/y momentum rates,
 !> choosing a Sauter diameter and average solid density for mixtures with
-!> multiple solid classes. \ref solve_rheology_mui_analytic solves its
+!> multiple solid classes. \ref eval_rheology_mui_analytic solves its
 !> rational mod_vel-dependent frozen-coefficient source in time.
 !********************************************************************************
 MODULE rheology_mui_2d
@@ -33,7 +33,7 @@ MODULE rheology_mui_2d
     PUBLIC :: eval_rheology_mui_explicit
     PUBLIC :: eval_rheology_mui_semi_implicit
     PUBLIC :: eval_rheology_mui_implicit
-    PUBLIC :: solve_rheology_mui_analytic
+    PUBLIC :: eval_rheology_mui_analytic
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
     !> \param[in] state Shared real or complex physical state.
@@ -169,7 +169,7 @@ CONTAINS
     !> \param[in] curvature_acceleration Normal acceleration due to topographic curvature [m s^-2].
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] velocity_after Horizontal velocity vector after integration [m s^-1].
-    SUBROUTINE solve_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+    SUBROUTINE eval_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
             use_pore_pressure, velocity_after)
 
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -239,7 +239,7 @@ CONTAINS
         velocity_after = (speed_after / speed_before) * velocity_before
     
         END ASSOCIATE
-    END SUBROUTINE solve_rheology_mui_analytic
+    END SUBROUTINE eval_rheology_mui_analytic
 
     ! Unsupported physical treatment, rejected by the source catalog.
     ! Valid zero component of the configured Newton treatment.

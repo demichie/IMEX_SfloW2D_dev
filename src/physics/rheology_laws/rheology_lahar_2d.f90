@@ -28,7 +28,7 @@
 !> \ref eval_rheology_lahar_semi_implicit evaluates the yield-stress term. The
 !> real and complex overloads of \ref eval_lahar_fluid_viscosity implement
 !> the same fluid-viscosity correlation.
-!> \ref solve_rheology_lahar_analytic integrates the frozen polynomial
+!> \ref eval_rheology_lahar_analytic integrates the frozen polynomial
 !> velocity source with depth, T and concentration explicit.
 !********************************************************************************
 MODULE rheology_lahar_2d
@@ -45,7 +45,7 @@ MODULE rheology_lahar_2d
     PUBLIC :: eval_rheology_lahar_explicit
     PUBLIC :: eval_rheology_lahar_semi_implicit
     PUBLIC :: eval_rheology_lahar_implicit
-    PUBLIC :: solve_rheology_lahar_analytic
+    PUBLIC :: eval_rheology_lahar_analytic
     PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
     PUBLIC :: eval_lahar_fluid_viscosity
     REAL(wp) :: alpha2
@@ -189,7 +189,7 @@ CONTAINS
     !> s^-1].
     !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
     !> s^-1].
-    SUBROUTINE solve_rheology_lahar_analytic(dt, state, speed_ratio, velocity_after)
+    SUBROUTINE eval_rheology_lahar_analytic(dt, state, speed_ratio, velocity_after)
 
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt, speed_ratio
@@ -232,7 +232,7 @@ CONTAINS
                 [constant_drag, linear_drag, quadratic_drag], dt,                                  &
                 speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
-    END SUBROUTINE solve_rheology_lahar_analytic
+    END SUBROUTINE eval_rheology_lahar_analytic
 
     !> \param[in] state Shared physical state (complex for implicit treatment).
     !> \brief Evaluate the lahar carrier-fluid viscosity.

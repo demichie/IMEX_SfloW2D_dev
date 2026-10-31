@@ -14,7 +14,7 @@
 !> \ref eval_rheology_lava_semi_implicit evaluates the real-valued yield rate.
 !> \ref nu_ref, \ref visc_par and \ref tau0 are the model parameters. Thermal
 !> cooling is owned by the thermal-source module, not by this rheology.
-!> \ref solve_rheology_lava_analytic integrates the frozen affine velocity
+!> \ref eval_rheology_lava_analytic integrates the frozen affine velocity
 !> source exactly with T and other non-velocity inputs explicit.
 !********************************************************************************
 MODULE rheology_lava_2d
@@ -29,7 +29,7 @@ MODULE rheology_lava_2d
     PUBLIC :: eval_rheology_lava_explicit
     PUBLIC :: eval_rheology_lava_semi_implicit
     PUBLIC :: eval_rheology_lava_implicit
-    PUBLIC :: solve_rheology_lava_analytic
+    PUBLIC :: eval_rheology_lava_analytic
     PUBLIC :: nu_ref, visc_par, tau0, lava_kinematic_viscosity
     REAL(wp) :: nu_ref
     REAL(wp) :: visc_par
@@ -97,7 +97,7 @@ CONTAINS
     END SUBROUTINE eval_rheology_lava_implicit
 
 
-    SUBROUTINE solve_rheology_lava_analytic(dt, state, speed_ratio, velocity_after)
+    SUBROUTINE eval_rheology_lava_analytic(dt, state, speed_ratio, velocity_after)
 
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt, speed_ratio
@@ -127,7 +127,7 @@ CONTAINS
                 [yield_drag, linear_drag], dt, speed_before,                                       &
                 speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
-    END SUBROUTINE solve_rheology_lava_analytic
+    END SUBROUTINE eval_rheology_lava_analytic
 
     !> \brief Kinematic viscosity shared by lava rheology and deposition.
     !> \return Kinematic viscosity [m2/s].

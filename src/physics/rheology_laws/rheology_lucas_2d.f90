@@ -14,7 +14,7 @@
 !> \boldsymbol{u}_h/|\boldsymbol{u}_h|\f$. When stochastic mode is enabled,
 !> its increment is added to the mod_vel before evaluating the law. The module
 !> exposes \ref eval_rheology_lucas_semi_implicit for the x/y momentum rates and
-!> \ref solve_rheology_lucas_analytic for exact integration of the frozen
+!> \ref eval_rheology_lucas_analytic for exact integration of the frozen
 !> speed-decay law with non-velocity variables explicit.
 !********************************************************************************
 MODULE rheology_lucas_2d
@@ -30,7 +30,7 @@ MODULE rheology_lucas_2d
     PUBLIC :: eval_rheology_lucas_explicit
     PUBLIC :: eval_rheology_lucas_semi_implicit
     PUBLIC :: eval_rheology_lucas_implicit
-    PUBLIC :: solve_rheology_lucas_analytic
+    PUBLIC :: eval_rheology_lucas_analytic
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
     !> \param[in] state Shared physical state (complex for implicit treatment).
@@ -146,7 +146,7 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
     !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
     !> s^-1].
-    SUBROUTINE solve_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_term, &
+    SUBROUTINE eval_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_term, &
             stochastic, stochastic_value, velocity_after)
 
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -178,7 +178,7 @@ CONTAINS
                 [scale_factor, speed_ratio, shift, mu_0, mu_inf, U_w, shallow],                    &
                 dt, speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
-    END SUBROUTINE solve_rheology_lucas_analytic
+    END SUBROUTINE eval_rheology_lucas_analytic
 
     ! Unsupported physical treatment, rejected by the source catalog.
     ! Valid zero component of the configured Newton treatment.
