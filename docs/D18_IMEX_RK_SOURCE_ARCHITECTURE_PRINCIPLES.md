@@ -190,3 +190,7 @@ The following decisions **supersede the corresponding open questions A1, A2, A5 
 **Consequence for architecture:** do not force one mixed EXPLICIT/NEWTON/ANALYTIC STAGE sweep. An implementation may share a minimal group-evaluation primitive, but the explicit and implicit tableau contributions remain separate. A single complete conservative state and full-vector rates are used within each sequence; source groups do not partition equations.
 
 **Remaining numerical checks:** establish the precise value of the explicit RK stage interval for each supported tableau; verify how the separately accumulated `EX_terms` and `IM_terms` enter the RK recurrence; and test the temporal order and admissibility. These checks do not reopen the decisions above.
+
+## 11. Zero-diagonal implicit stages (agreed)
+
+For an IMEX-RK stage with implicit diagonal coefficient `a_ii = 0`, the implicit substep interval is `tau_imp = a_ii * dt = 0`. **Skip all NEWTON/STAGE and ANALYTIC/STAGE group executions** for that stage and initialize its complete implicit source rate to zero. Do not call implicit numerical or analytic routines with a zero interval and do not divide by `tau_imp`. The EXPLICIT/STAGE path remains active, evaluated according to its own explicit RK tableau and sequential explicit-group rules. This is an agreed design requirement, not yet a claim of tested implementation.
