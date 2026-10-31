@@ -3,8 +3,6 @@ PROGRAM test_source_modules
   USE parameters_2d, ONLY : wp
   USE rheology_lahar_2d, ONLY : alpha1_coeff, beta1, eval_lahar_fluid_viscosity
   USE state_2d, ONLY : correct_friction_momentum
-  USE pore_pressure_2d, ONLY : eval_pore_pressure_inlet_source,           &
-       eval_pore_pressure_mass_exchange_source
   USE mass_exchange_vaporization_2d, ONLY : eval_vaporization_mass_rate, &
        eval_vaporization_energy_rate
   USE mass_exchange_deposition_2d, ONLY : eval_hindered_settling_deposition_rate, &
@@ -177,14 +175,6 @@ PROGRAM test_source_modules
   actual = eval_vaporization_energy_rate(actual, 2010.0_wp)
   CALL assert_close(actual, 0.0_wp, 'vaporization threshold energy rate')
 
-  actual = eval_pore_pressure_inlet_source(0.4_wp, 1.2_wp, 0.03_wp, 0.02_wp,  &
-       900.0_wp, 0.7_wp, 5000.0_wp)
-  expected = 0.4_wp * (1.2_wp * 0.03_wp * 0.02_wp * 900.0_wp * 0.7_wp +       &
-       5000.0_wp * 0.02_wp * 900.0_wp)
-  CALL assert_close(actual, expected, 'pore-pressure inlet source')
-
-  actual = eval_pore_pressure_mass_exchange_source(-2.5_wp, 1200.0_wp)
-  CALL assert_close(actual, -3000.0_wp, 'pore-pressure mass-exchange source')
 
 CONTAINS
   FUNCTION test_cooling_implicit(temperature,radiative,convective,ambient) RESULT(result)

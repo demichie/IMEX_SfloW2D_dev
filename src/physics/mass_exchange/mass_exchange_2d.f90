@@ -12,7 +12,6 @@ MODULE mass_exchange_2d
     USE diagnostics_2d, ONLY : fatal_error
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-    USE pore_pressure_2d, ONLY : eval_pore_pressure_mass_exchange_source
     USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
     USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
     USE mass_exchange_carrier_liquid_loss_2d, ONLY : eval_mass_exchange_carrier_liquid_loss_explicit
@@ -124,8 +123,7 @@ CONTAINS
             ! Scalar transport and pore-pressure sources inherit the net mass exchange.
             IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(idx_totMassEqn)*physical_state%Zs
             IF (pore_pressure_flag) eqns_term(idx_poreEqn)=                                        &
-                      eval_pore_pressure_mass_exchange_source(eqns_term(idx_totMassEqn), &
-                      physical_state%exc_pore_pres)
+                      eqns_term(idx_totMassEqn)*physical_state%exc_pore_pres
         END IF  ! gas_flag .OR. liquid_flag
 
         ! Lava deposition follows the same process_rates-rate accumulation contract.

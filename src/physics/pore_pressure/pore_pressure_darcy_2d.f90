@@ -37,8 +37,6 @@ MODULE pore_pressure_darcy_2d
   PUBLIC :: solve_pore_pressure_darcy_analytic
   PUBLIC :: solve_frozen_darcy_mass_pressure
   PUBLIC :: eval_pore_pressure_gas_loss
-  PUBLIC :: eval_pore_pressure_inlet_source
-  PUBLIC :: eval_pore_pressure_mass_exchange_source
 
 CONTAINS
 
@@ -352,59 +350,6 @@ CONTAINS
     gas_loss = velocity_loss * inhibition
 
   END SUBROUTINE eval_pore_pressure_gas_loss
-
-  !******************************************************************************
-  !> \brief Compute the excess pore-pressure source associated with inlet injection.
-  !> \details Returns the time-weighted source
-  !>          \f$S_p=c_t\dot{H}\rho_m(q_1f_pg'+p_e)\f$,
-  !>          where \f$q_1=\rho_mh\f$,
-  !>          combining the hydrostatic pressure carried by injected mixture
-  !>          with the injected excess-pressure fraction.
-  !> \param[in] time_coefficient Dimensionless temporal activation or step-averaged weight.
-  !> \param[in] q1 Local mass-per-area/carrier state quantity used by the inlet closure.
-  !> \param[in] pressure_fraction Configured fraction f_p of the injected hydrostatic pressure.
-  !> \param[in] injection_rate Equivalent injected layer-thickness rate Hdot [m s^-1].
-  !> \param[in] mixture_density Density of the injected mixture rho_m [kg m^-3].
-  !> \param[in] reduced_gravity Buoyancy-reduced gravitational acceleration g' [m s^-2].
-  !> \param[in] excess_pressure Local excess pore pressure p_e [Pa].
-  !> \return Conservative excess-pore-pressure source [kg^2 m^-3 s^-3].
-  !******************************************************************************
-  PURE FUNCTION eval_pore_pressure_inlet_source(time_coefficient, q1,          &
-       pressure_fraction, injection_rate, mixture_density, reduced_gravity,    &
-       excess_pressure) RESULT(source)
-
-    REAL(wp), INTENT(IN) :: time_coefficient
-    REAL(wp), INTENT(IN) :: q1
-    REAL(wp), INTENT(IN) :: pressure_fraction
-    REAL(wp), INTENT(IN) :: injection_rate
-    REAL(wp), INTENT(IN) :: mixture_density
-    REAL(wp), INTENT(IN) :: reduced_gravity
-    REAL(wp), INTENT(IN) :: excess_pressure
-    REAL(wp) :: source
-
-    source = time_coefficient * (q1 * pressure_fraction * injection_rate *    &
-         mixture_density * reduced_gravity + excess_pressure * injection_rate &
-         * mixture_density)
-
-  END FUNCTION eval_pore_pressure_inlet_source
-
-  !******************************************************************************
-  !> \brief Compute the excess-pressure source induced by a mass exchange.
-  !> \details Applies the local proportional closure S_p = S_m*p_e.
-  !> \param[in] mass_source Conservative mass source S_m for the exchanged carrier phase.
-  !> \param[in] excess_pressure Local excess pore pressure p_e [Pa].
-  !> \return Excess-pore-pressure equation source [kg^2 m^-3 s^-3].
-  !******************************************************************************
-  PURE FUNCTION eval_pore_pressure_mass_exchange_source(mass_source,           &
-       excess_pressure) RESULT(source)
-
-    REAL(wp), INTENT(IN) :: mass_source
-    REAL(wp), INTENT(IN) :: excess_pressure
-    REAL(wp) :: source
-
-    source = mass_source * excess_pressure
-
-  END FUNCTION eval_pore_pressure_mass_exchange_source
 
   !******************************************************************************
   !> \brief Compute pressure-diffusion and inhibition factors for a local mixture.

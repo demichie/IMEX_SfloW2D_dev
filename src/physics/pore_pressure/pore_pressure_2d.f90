@@ -11,8 +11,7 @@ MODULE pore_pressure_2d
        darcy_implicit => eval_pore_pressure_darcy_implicit, &
        darcy_analytic => solve_pore_pressure_darcy_analytic, &
        solve_frozen_darcy_mass_pressure, apply_frozen_darcy_withdrawal, &
-       eval_pore_pressure_gas_loss, &
-       eval_pore_pressure_inlet_source, eval_pore_pressure_mass_exchange_source
+       eval_pore_pressure_gas_loss
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_pore_pressure_explicit, eval_pore_pressure_semi_implicit
@@ -21,7 +20,6 @@ MODULE pore_pressure_2d
   ! and the shared carrier-inventory limiters are migrated.
   PUBLIC :: solve_frozen_darcy_mass_pressure, apply_frozen_darcy_withdrawal
   PUBLIC :: eval_pore_pressure_gas_loss
-  PUBLIC :: eval_pore_pressure_inlet_source, eval_pore_pressure_mass_exchange_source
 CONTAINS
 
   SUBROUTINE eval_pore_pressure_explicit(models,state,rate,include_gas_loss)
