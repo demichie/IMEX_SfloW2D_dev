@@ -1,413 +1,148 @@
-# D18 — IMEX-RK source integration: design principles and target contract
+# D18 — IMEX-RK source architecture: target specification
 
-**Status:** agreed design requirements; implementation and validation are **not** complete.  
-**Scope:** source-term integration in IMEX-RK stages (`STAGE`) and post-RK source splitting (`STEP`).  
-**Date:** 2026-10-31.
+**Status:** target architecture agreed; full Fortran implementation and regression validation pending.  
+**Scope:** source contributions during IMEX-RK stages (`STAGE`) and source operators applied after each RK step (`STEP`).
 
-This document is the **design contract** for the next source-integration refactoring. It describes the desired behavior independently of the existing Fortran types, registry, and solver. Historical D17/D18 implementation notes are not reasons to preserve obsolete abstractions.
+This document specifies **only the current target design**. It is not a chronology of discussions or superseded approaches. Where a physical limiter's detailed algorithm has not been selected, that is stated explicitly; no unagreed algorithm is implied.
 
-## 1. Design process: architecture first
+## 1. Design and ownership
 
-1. Specify the required mathematics, data flow, interface contracts, execution order, and failure behavior **before** altering existing modules.
-2. Design the **simplest sufficient target architecture from scratch**, without assuming that existing wrappers, partitions, registries, or adapters must survive.
-3. Compare the target to the current implementation. Identify **keep / change / delete**, including obsolete tests and compatibility layers.
-4. Prefer removing redundant layers, duplicated state, transformations, and indirection over introducing bridge wrappers to fit old assumptions.
-5. Preserve only deliberately established public contracts (e.g. four numerical interfaces per physical model), not incidental implementation details.
-6. Implement the target consistently across all callers; add focused tests for the target behavior and delete tests whose only purpose was to preserve removed internal interfaces.
-7. Require build, numerical regression, conservation/limiter, sequencing and temporal-accuracy checks before declaring the refactor complete. Do not treat a committed change as validated without evidence.
+- Refactor to the **simplest architecture that satisfies the mathematical contract**. Avoid compatibility wrappers, redundant partition types, duplicate state conversion, and extra orchestration layers without independent purpose. Determine KEEP / CHANGE / DELETE from the actual call graph.
+- Physical processes are organized by their physics, not by exclusive ownership of conservative equations. Distinct processes and groups may contribute to the **same** components.
+- A physical source provides its complete conservative rate vector, length `n_eqns`, with zeros only on components it does not affect. A group similarly returns a complete vector; group metadata does not restrict which equations may receive a rate.
+- A source configuration identifies physical process name(s), available numerical METHOD, CADENCE (`STAGE` or `STEP`), and GROUP identity/order. Unsupported methods or physically incompatible configurations are rejected at configuration/preflight, and unsupported model entry points fail explicitly rather than silently returning zero.
+- Keep four model-specific interfaces, consistently named `eval_<model>_explicit`, `eval_<model>_semi_implicit`, `eval_<model>_implicit`, and `eval_<model>_analytic`. Numerical responsibilities and real/complex state types remain appropriate to the interface. Do not invent a universal wrapper state merely to preserve legacy calls.
+- The RK integrator owns the Butcher tableau, stage states, and final weighted assembly. Source physics owns constitutive calculations and physical limiting; generic Newton owns only nonlinear/linear numerical solution and line search.
 
-## 2. Physical sources, groups, and conservative rates
+## 2. Methods, grouping, and time intervals
 
-- **Groups partition the *application of physical source processes*, never the conservative equations.**
-- Every physical source interface returns a rate vector of length `n_eqns`; components not affected by that process are zero.
-- A group identifies its source process(es), numerical `METHOD`, `CADENCE` (`STAGE` or `STEP`), and execution `GROUP` order. The group does **not** grant or prohibit writes to a subset of conservative equations.
-- Different groups may act on the **same** conservative components. This is necessary for sequential source splitting.
-- **Within one EXPLICIT group**, evaluate every member source on the **same group-entry state** `q^(g-1)`, apply each process's own limits as defined for that common state, and sum the resulting full conservative rate vectors. **Do not update the state between members of the same explicit group.** Update the conservative state **once** using the group's summed rate before executing the next group.
-- A Newton solver may choose a **smaller set of unknowns** to compute a group's full conservative rate. Those solver unknowns are a numerical detail, **not** group membership or a restriction on source-rate components.
-- Avoid representing a general source group through an exclusive equation membership map. If a Newton unknown map is useful, keep it internal to the relevant solve.
-
-### Within-group versus between-group execution
-
-For an EXPLICIT group `g` containing sources `k=1,...,m`:
-
-```text
-q_in = q^(g-1)
-S_g = sum_k S_(g,k)(q_in)         ! All processes see identical input q_in
-q^(g) = q_in + tau * S_g         ! One update, after summing
-```
-
-**Explicit GROUP 0 contains spatial discretization and may contain explicit source processes:** the spatial flux/divergence operator belongs to explicit group `0`, together with any explicit sources configured in that group. **All contributions in GROUP 0 are evaluated on exactly the same initial explicit-stage state**, with no update between them. Their full-vector rates are added, then the group update is applied once. Spatial fluxes are not recomputed on intermediate states of groups `1,2,...`; subsequent explicit groups receive the updated state and execute sequentially.
-
-**Distinct EXPLICIT groups are sequential:** evaluate each explicit group's rates using the conservative state already modified by all preceding groups, including preceding EXPLICIT groups. This applies to both `STAGE` and `STEP`; explicit groups are not evaluated independently against a common original state. The correct intermediate update coefficient at `STAGE` must be derived from the explicit IMEX-RK tableau rather than assumed equal to the implicit diagonal coefficient.
-
-The sequential updated-state rule applies **between** groups. An explicit group's member processes are **not** a sequential sub-splitting. If their combined increment needs additional admissibility control, its behavior must be defined explicitly rather than silently changing the common-input evaluation contract.
-
-## 3. Sequential splitting contract (both CADENCE values)
-
-For each cell and each ordered source group `g`, let `q^(g-1)` be the **current conservative state** after the preceding group. All source evaluations and limiters of group `g` use this state (reconstructing primitive/physical variables as needed).
-
-The group computes its limited conservative rate `S_g` and updates:
-
-```text
-q^(0) = starting conservative state
-for g in configured order:
-    S_g = compute_limited_group_rate(q^(g-1), tau)
-    q^(g) = q^(g-1) + tau * S_g
-S_total = sum_g S_g
-```
-
-For a common nonzero interval `tau`:
-
-```text
-S_total = (q^(last) - q^(0)) / tau
-```
-
-This identity is an **invariant to test**. Do not evaluate each group against the same original state. Do not reset previously updated components when moving to a subsequent group. Do not apply the same increments again during assembly.
-
-- `STAGE`: execute the source-group sweep as part of the IMEX-RK stage, using the appropriate diagonal-stage interval (`tau = a_ii * dt` in the currently discussed diagonal stage design).
-- `STEP`: execute an ordered source-group sweep after the RK step using `tau = dt`.
-- Both modes have the **same sequential splitting semantics**, differing in placement and interval.
-- If `tau = 0`, implementation must avoid division by zero and define a zero-increment result.
-- Numerical order of the overall IMEX/RK plus sequential splitting is **not assumed**: verify using convergence tests.
-
-### Shared inventories and limiter ownership (agreed rule)
-
-- **Within the same group:** all member processes evaluate on the same group-entry conservative state. If two or more processes consume the **same finite inventory** (for example, carrier mass), their requested withdrawals must be **limited jointly** against that shared available inventory before the group's effective full-vector rate is assembled and applied. Independent process limits alone are insufficient.
-- **Between distinct groups:** each group first evaluates its own rates, applies all necessary process and shared-inventory limiters, and updates the conservative state. The next group **must reconstruct its physical quantities, available inventories, rates and limits from that already limited, updated state**, not the previous group's input state. No additional cross-group shared-inventory limiter is needed **provided that every group guarantees an admissible update**.
-- These rules apply to both `STAGE` and `STEP`, and to every permitted numerical treatment. A group may contain multiple explicit sources; an analytic group remains single-process. Shared limits are defined where the physical inventory is owned, not via a generic rate-clipping wrapper.
-- This rule concerns **sequential group updates**. It does not prove admissibility of the final combination of different Runge–Kutta stages; stage-combination admissibility requires separate verification.
-
-## 4. Methods and group exclusivity
-
-- **ANALYTIC** groups contain **exactly one physical process** for either `STAGE` or `STEP`. They cannot contain or be merged with NEWTON or EXPLICIT processes under the same group identifier/cadence.
-- The analytic physical model evolves the received state over `tau` (possibly with frozen coefficients), applies its own process-specific limiters and returns the **full conservative mean rate** `(q_after-q_before)/tau`.
-- NEWTON groups solve their configured physical source contributions with the appropriate coupled unknowns, using the current sequential input state, and expose the complete limited rate.
-- EXPLICIT and semi-implicit behavior must be specified consistently with the configured group/order and existing IMEX tableau; their detailed placement relative to the RK explicit stage is an **implementation/design verification point**, not permission to violate sequential state propagation.
-- No artificial disjointness requirement may be imposed between different groups' affected equations or between a group's affected equations and another group's Newton unknowns.
-
-## 5. Physical model interface contract
-
-Keep the four standard model entry points even when a method is unavailable:
-
-- explicit;
-- semi-implicit;
-- implicit/Newton;
-- analytic.
-
-Unsupported entries **fail explicitly** (e.g. `fatal_error`), not a silent zero source. Registry/preflight validation must reject configurations using unavailable methods before integration.
-
-### Darcy pore-pressure process
-
-- Darcy pore-pressure diffusion and optional interstitial carrier-gas withdrawal belong to the pore-pressure physical model, not to mass exchange.
-- Darcy supports **ANALYTIC/STAGE** and **ANALYTIC/STEP**, with `ANALYTIC/STAGE` as the intended default. The three other numerical methods remain present but unsupported.
-- Its analytic operator can change total mass, momenta, energy, gas components and conservative pore pressure. It always returns the **complete conservative rate**; no `equation_ids` filtering of its update.
-- Limiting (including gas inventory and any physical admissibility bounds) is owned by the Darcy process, not retrofitted by the group registry.
-
-## 6. Minimal target responsibilities (conceptual, not mandatory module names)
-
-| Responsibility | Required behavior |
-| --- | --- |
-| Source descriptor/configuration | Declares available methods, cadence, group order and source membership; validates incompatible configurations. |
-| Physical source model | Computes full conservative rates and process-specific admissibility/limiting. |
-| Source-group executor | Applies ordered groups to the **updated** conservative state for STAGE/STEP; sums effective rates and prevents double application. |
-| Newton numerical solver | Resolves only necessary unknowns for its source group and returns an effective **full** rate; cannot define group membership by equation ownership. |
-| IMEX-RK integrator | Provides stage state and interval, consumes the stage's effective total source rate exactly once with correct RK bookkeeping. |
-
-**No extra wrapper or metadata layer is justified merely to retain the old equation-partition architecture.** Decide actual modules/types only after tracing the minimal required data through callers.
-
-## 7. Refactoring review and acceptance checklist
-
-Before further structural code changes, write a concise inventory of current source executors, group metadata, equation partitions, stage rate assembly, and call chains. Draw a minimal target call/data flow and a **keep / change / delete** map.
-
-Acceptance requires tests of:
-
-1. Two sequential groups changing the same conservative component: second sees the first's updated state.
-2. Both NEWTON → ANALYTIC and ANALYTIC → NEWTON at STAGE, and corresponding ordered STEP combinations where supported.
-3. Full-vector rate and limiter conservation/admissibility, notably Darcy with and without gas loss.
-4. Per-group and total-rate identities; **no duplicate increments** in RK stage or post-step assembly.
-5. Rejection of mixed/duplicate ANALYTIC groups and unsupported numerical methods; retained unsupported entry points fail.
-6. Pure explicit, pure Newton, pure analytic and mixed runs; relevant legacy physical regressions.
-7. Temporal-convergence behavior of chosen IMEX tableau **with splitting**.
-8. Build and automated tests, documenting precisely what was run and what remains unverified.
-
-## 8. Decisions still to make by reading the full RK implementation
-
-These are deliberately **not** frozen as architecture until independently checked:
-
-- Exact semantics of EXPLICIT and semi-implicit stage groups within the Butcher tableau.
-- How the RK integrator carries and combines effective per-stage source rates without altering order or applying updates twice.
-- Whether any current `equation_partition_type` or intermediate wrapper serves a necessary independent role; prefer removing it if not.
-- Internal representation of Newton-group unknowns when two sequential groups solve overlapping conservative variables.
-- Zero-diagonal stages (`a_ii=0`) and consistent zero-interval behavior.
-- Interaction between sequential splitting, stage-order accuracy and non-source RK flux updates.
-
-**Rule of interpretation:** the numbered requirements above take precedence over old implementation constraints; unresolved points must be analyzed from the RK mathematics and current call graph before deciding a minimal code structure.
-
-## 9. Architectural decisions to resolve before implementation (review 2026-10-31)
-
-These are **open design decisions**, not implementation approvals. Resolve them from the IMEX-RK equations, then record each choice and its tests **before** restructuring code. In particular, do not retain an old type merely because an existing caller expects it.
-
-| ID | Decision | Minimal option to assess | Required verification |
+| METHOD / CADENCE | Execution | State propagation | Relevant interval |
 | --- | --- | --- | --- |
-| A1 | **One STAGE execution path:** how do spatial discretization and any explicit sources in GROUP 0 share one input state, before sequential groups 1, 2, ...? | One group executor with method-specific evaluations, rather than separate explicit accumulation and implicit loop. | Butcher-tableau consistency, sequential observation of updated state, complete rate bookkeeping. |
-| A2 | **EXPLICIT at STAGE:** what stage-consistent intermediate state increment allows sequential explicit groups with a distinct explicit RK tableau? | Distinguish RK explicit evaluation from an actual state-advancing split operator where mathematically necessary; do not silently assign the same `a_ii dt` to both. | Derive stage and end-of-step formulas; check RK order on noncommuting and coupled source examples. |
-| A3 | **Newton group unknowns:** what is the smallest representation of active unknowns when successive groups touch the same equations? | A group-local unknown-index array passed only to Newton; eliminate or radically shrink `equation_partition_type` if no independent user remains. | Overlapping-group solves in both orders; convergence and residual correctness. |
-| A4 | **Single rate contract:** should group evaluation return only complete conservative `rate(n_eqns)`, or also a candidate state/status? | Prefer `rate(n_eqns)` plus admissibility/status; a single executor owns the `q += tau*rate` update. | Conservation, limiter semantics, no duplicate updates, error paths. |
-| A5 | **STAGE effective rate:** how are all sequential increments represented in `IM_terms` and `EX_terms`? | Compute one effective increment from final minus starting stage state for the relevant tableau contribution, not a second independently applied source. | Stage reconstruction, no double counting, correct RK recurrence. |
-| A6 | **STAGE vs STEP executor:** one shared loop or two? | Share the minimal `apply_group` operation and sequential state update; keep distinct orchestration only where RK/stage context or bed updates require it. | Equivalent operator semantics; avoid wrappers and duplicate dispatch. |
-| A7 | **Group identity and order:** are `METHOD`, `CADENCE`, `GROUP`, and process names sufficient? | Remove source-group `equation_ids` for non-Newton methods; group identity comes only from source membership and configuration. | Exclusive analytic groups; shared conservative components; deterministic order. |
-| A8 | **Semi-implicit method:** is it a standalone group method, a modifier to a Newton solve, or an independent numerical option? | Decide its actual mathematical role before representing it as an additional layer. | Existing friction/limiter behavior and correctness under sequential splitting. |
-| A9 | **Zero-diagonal RK stages:** how do groups behave when `a_ii=0`? | No division by `a_ii dt`; distinguish zero-duration analytic/implicit increments from explicit RK source evaluations. | Schemes with explicit first stage, dry states, no invalid divisions. |
-| A10 | **STEP mass exchange and bed state:** how does a conservative full-vector source group coexist with source transactions that also update bed/inventories? | Explicitly define a transactional group result when non-conservative-state side effects are necessary; do not hide bed mutation behind a rate-only interface. | Bed + fluid conservation, sequential visibility and rollback/failure behavior. |
-| A11 | **Primitive-state reconstruction and limits:** who owns re-evaluation of physical state and limiters between groups? | Executor passes current `q`; the physical process reconstructs only necessary state and owns process-specific limiting. | Group B uses post-A temperature/mass/velocity; limiting under overlapping processes. |
-| A12 | **Lifetime of compatibility types and wrappers:** which existing modules are truly needed? | Build a call graph and explicit **KEEP / CHANGE / DELETE** inventory before coding, including `equation_partition_type`, dispatch coordinators and old tests. | No dead paths, no duplicate interface conversion or stale API compatibility. |
+| EXPLICIT / STAGE | All explicit processes, including the spatial operator, evaluated at one common RK stage state | **No advancement between groups** | No splitting interval; explicit rheology limiter horizon is `dt_global` |
+| NEWTON / STAGE | Ordered implicit groups, each acting on current implicit working state | Sequential between implicit groups | `tau_imp=a_ii*dt_global` |
+| ANALYTIC / STAGE | Ordered exact/analytic implicit group | Sequential with implicit groups | `tau_imp=a_ii*dt_global` |
+| EXPLICIT / STEP | Ordered post-RK groups | Advance after each group | `dt_global` |
+| Other supported STEP methods | Apply their configured method as post-RK operators | Sequential between groups | `dt_global` |
 
-### Evidence motivating these questions
+- The explicit stage channel contributes **only** to the explicit RK weights. Newton and analytic STAGE groups contribute **only** to the implicit RK weights. Semi-implicit rates are internal to their associated Newton group; there is no third RK rate channel and no standalone semi-implicit group.
+- An ANALYTIC group contains **exactly one physical process**. It is never merged with EXPLICIT or NEWTON. NEWTON and ANALYTIC groups remain distinct even where they have the same cadence or affect overlapping equations.
+- For each implicit RK stage, skip NEWTON/STAGE and ANALYTIC/STAGE when `a_ii=0`, set the full implicit rate to zero, and avoid division by zero. Explicit rates must nevertheless be evaluated whenever later explicit tableau coefficients or final weights require them, even if the implicit diagonal coefficient or an explicit tableau entry is zero.
+- The argument name `dt` in source-family interfaces denotes the **interval relevant to that call**; the caller supplies `dt_global` at STEP, `a_ii*dt_global` for applicable implicit/semi-implicit STAGE operations, and `dt_global` as the explicit rheology limiter **horizon**. The latter does not authorize a stage-local state update.
+- The currently supported tableau stage counts are 2, 3, and 4. The existing RK tableaux and weights are **not changed** by this architecture.
 
-- In `src/numerics/time_integration_2d.f90`, explicit STAGE source groups are currently evaluated against the same `qp_rk` and their rates added into `EX_terms`; the spatial operator is evaluated separately. **Target contract:** spatial discretization and any source processes configured in explicit GROUP 0 use the same original explicit-stage state; their rates are summed before one update. Only subsequent explicit groups see sequentially updated states. The implicit stage uses `solve_imex_stage` and returns an effective `IM_terms` separately.
-- `src/numerics/nonlinear_solver_2d.f90` currently reconstructs the effective implicit rate as `(q_stage-q_known)/(dt*a_diag)` and uses Newton unknown lists in the same stage coordinator as analytic groups.
-- `src/numerics/step_source_executor_2d.f90` already loops sequentially through STEP groups, but contains method-specific paths and a distinct mass-exchange transaction updating the bed.
-- `src/physics/source_configuration_2d.f90` and `src/numerics/equation_metadata_2d.f90` still carry historical equation-partition metadata. Its continued existence must be justified from actual numerical requirements, not historical usage.
+## 3. EXPLICIT/STAGE: simultaneous evaluation
 
-### Proposed decision order
+For each RK stage `i`, let `q_i` be the conservative stage state constructed by the IMEX integrator.
 
-First resolve **A2 and A5** from the RK mathematics: these control whether a fully unified STAGE sweep is meaningful without changing the integration scheme. Then resolve **A1, A3, A4, A6, A7, A8 and A9** as the smallest implementation consistent with that mathematics. Finally resolve the non-fluid-state transaction **A10**, physical-state ownership **A11**, and keep/change/delete inventory **A12**.
+1. Evaluate the spatial operator `F(q_i)` and **every** EXPLICIT/STAGE process `S_p(q_i)` from exactly this same, **unmodified** stage state.
+2. Explicit GROUP 0 includes the spatial operator and may include source processes. Other explicit GROUP values remain useful for source organization and configuration, **not** for propagation of intermediate states at STAGE.
+3. Preserve the **separate process-rate vectors**, across physical families and group boundaries, until simultaneous physical joint limiting is complete (section 6). Apply any justified process/family-specific constitutive constraints as specified there.
+4. Aggregate the physically adjusted contributions exactly once:
+   ```text
+   R_exp,i = F(q_i) + sum_p S_p,limited(q_i)
+   ```
+   Assemble this rate with the existing **explicit** RK tableau. No `q_i += dt*S` update is performed between explicit STAGE groups, and no local split update is added a second time by the integrator.
+5. The spatial operator is evaluated on the common stage state, not reevaluated in each group. Its discretized intercell fluxes retain conservation; do **not** locally rescale a flux-divergence vector as though it were an independently disposable source contribution.
+6. Different explicit STAGE groups are **simultaneous for evaluation and joint inventory limiting**, even if their configuration GROUP IDs differ.
 
-**Naming convention agreed:** numerical model interfaces use `eval_<model>_explicit`, `eval_<model>_semi_implicit`, `eval_<model>_implicit`, and `eval_<model>_analytic`. This is a naming contract; it does not by itself certify that older analytic implementations already return complete conservative rates.
+**Numerical rationale:** a sequential stage-local Euler update (using `dt_global`, `a_ii*dt_global`, or another fixed nonzero multiple) modifies the stage RHS by an order-`dt` term and can reduce a nominal second-/third-order RK scheme to first order. The target therefore uses a **common stage state** and an unchanged explicit RK rate.
 
-**Acceptance gate:** do not start a broad source architecture rewrite until the selected options above have been recorded, the RK formula has been checked, and the minimum set of needed types and executors has been drawn.
+## 4. STEP: genuinely sequential source operators
 
-## 10. Confirmed RK integration decisions (2026-10-31)
-
-The following decisions **supersede the corresponding open questions A1, A2, A5 and A8 in section 9**. They are design requirements, not claims that the current code already implements them.
-
-1. **Explicit integration interval:** between sequential EXPLICIT source groups at `STAGE`, advance the intermediate conservative state with the interval associated with that **explicit RK stage**. For `STEP`, use the **complete time step** `dt`. The actual explicit-stage interval is to be taken from the implemented explicit RK discretization; do not substitute the diagonal implicit coefficient automatically.
-2. **Distinct RK rate channels:** EXPLICIT source groups (including spatial discretization in EXPLICIT GROUP 0) contribute **only to the explicit RK rates** (`EX_terms`, with spatial terms handled consistently). NEWTON and ANALYTIC groups contribute **only to the implicit RK rates** (`IM_terms`). Do not mix explicit groups into an implicit-group solve or vice versa. Splitting is sequential *within each channel* in configured group order.
-3. **NEWTON versus ANALYTIC groups:** both belong to the implicit channel but **must remain different groups**; neither method may be combined with the other in the same group. Execute the ordered implicit-group sequence with each group receiving the conservative state already updated by its predecessors.
-4. **Effective rate accumulation:** initialize the complete rate accumulator for each RK channel to zero, then **add each group's effective, limited full-vector rate** to it after evaluating and applying that group. Thus `S_exp_total = sum_g S_exp_g` and `S_imp_total = sum_g S_imp_g`, independently. Never reapply the accumulated increments when assembling stage rates.
-5. **Semi-implicit treatment:** semi-implicit contributions are **always evaluated together with their implicit/Newton group**, as in the existing implementation. They are not independent source groups, and do not introduce a third RK rate channel.
-
-**Consequence for architecture:** do not force one mixed EXPLICIT/NEWTON/ANALYTIC STAGE sweep. An implementation may share a minimal group-evaluation primitive, but the explicit and implicit tableau contributions remain separate. A single complete conservative state and full-vector rates are used within each sequence; source groups do not partition equations.
-
-**Remaining numerical checks:** establish the precise value of the explicit RK stage interval for each supported tableau; verify how the separately accumulated `EX_terms` and `IM_terms` enter the RK recurrence; and test the temporal order and admissibility. These checks do not reopen the decisions above.
-
-## 11. Zero-diagonal implicit stages (agreed)
-
-For an IMEX-RK stage with implicit diagonal coefficient `a_ii = 0`, the implicit substep interval is `tau_imp = a_ii * dt = 0`. **Skip all NEWTON/STAGE and ANALYTIC/STAGE group executions** for that stage and initialize its complete implicit source rate to zero. Do not call implicit numerical or analytic routines with a zero interval and do not divide by `tau_imp`. The EXPLICIT/STAGE path remains active, evaluated according to its own explicit RK tableau and sequential explicit-group rules. This is an agreed design requirement, not yet a claim of tested implementation.
-
-## 12. Newton equation and unknown indices (agreed)
-
-The Newton solver iterates directly on **conservative variables** `q`, not primitive variables `qp`. Every Newton source group owns one **group-local index list** `newton_equations(:)` containing the conservative equation indices that define its reduced system.
-
-- Use the **same list for residual rows and Jacobian columns**, so a single list is sufficient; do not add a separate `newton_unknowns` array without a demonstrated physical/numerical need.
-- For a rheology-only implicit group: `newton_equations = [idx_uEqn, idx_vEqn]`. These select the momentum residuals and the conservative momenta `q(idx_uEqn)`, `q(idx_vEqn)` as Newton unknowns. **Do not use primitive velocity indices** `idx_u`, `idx_v`, which address `qp` beyond the conservative state.
-- Construct the reduced Jacobian from the full implicit source evaluation as `J(newton_equations,newton_equations)`, retaining all needed cross derivatives within the selected group.
-- The list selects **only Newton residuals/unknowns**; it never limits which entries of the physical source rate `rate(1:n_eqns)` can be nonzero. Source-group membership and ordering remain independent of equation ownership.
-- Distinct sequential Newton groups may use overlapping index lists. Each uses the conservative state produced by preceding groups. No exclusive global equation-to-group partition is required.
-
-This decision replaces the question about separately selecting Newton rows and columns and strengthens decision A3. Any future exception must be justified by an actual model before adding abstraction.
-
-## 13. Limiter ownership audit (2026-10-31)
-
-**Status:** design inventory only; no code relocation or numerical validation yet.
-
-**Agreed architecture:** physical source processes own physical limits and return limited effective full-vector conservative rates. The group executor sums and applies such rates; the Newton solver and RK integrator must not know friction-specific rules. Shared inventories of processes in the same group are limited jointly, whereas successive groups reevaluate limits using the updated state.
-
-| Current code | Observed behavior | Architecture decision |
-| --- | --- | --- |
-| `nonlinear_solver_2d.f90` | `correct_friction_momentum` is called after the semi-implicit predictor and after Newton convergence. | **Move the anti-reversal policy into rheology**, remove special-case friction logic from the general Newton solver. |
-| `state_2d.f90` | `correct_friction_momentum` projects onto `m_after=alpha*m_before`, `0<=alpha<=1`; also forbids rotation and increase in momentum. | Make the physical policy rheology-owned, using the momentum immediately before isolated rheological application. Do not project arbitrary non-rheological momentum updates. |
-| `rheology_analytic_utils_2d.f90` | Exact drag flows already enforce nonnegative final speed. | Keep in rheology; check consistency among numerical methods. |
-| `mass_exchange_2d.f90` | Shared carrier-withdrawal and packing limiters act on combined deposition/liquid-loss demands. | Keep as physical joint-inventory limiters. |
-| `pore_pressure_darcy_2d.f90` | Darcy caps gas withdrawal by available carrier inventory/mass and tests admissibility. | Keep in pore-pressure physics. |
-| `step_source_executor_2d.f90` | Checks negative total/solid mass after exchange. | Keep general post-update transaction checks, not physics-specific clipping. |
-| `state_conversion_2d.f90` | Roundoff clipping, mass-fraction closure, dry-momentum projection. | Keep generic state consistency and numerical regularization. |
-| `state_2d.f90` (`finalize_imex_cell_state`) | Final RK thickness, component mass and temperature checks, dry-state projection. | Keep final-state numerical validation; audit overlap with other generic checks. |
-| `time_integration_2d.f90` | Clips roundoff-negative component masses before primitive reconstruction. | Keep numeric reconstruction protection; not a source limiter. |
-| `nonlinear_solver_2d.f90` | Newton step-length control, line search and residual tolerances. | Keep numerical convergence safeguards. |
-
-**Points to settle before moving friction correction:** (1) explicit-rate friction needs the actual group interval to prevent reversal of the applied increment; (2) a projection **after** Newton convergence can invalidate the original nonlinear residual, so the physical restriction and convergence test must be designed together; (3) verify whether suppressing rotation as well as reversal is the intended constraint for each rheology model; (4) do not introduce a generic limiter wrapper solely to preserve existing calls.
-
-**Implementation/acceptance order:** specify one rheology-owned effective-rate contract; use it across explicit, semi-implicit, implicit and analytic treatment without duplicating logic; remove friction calls from the generic solver and obsolete state-module ownership; test friction-only monotonicity, sequential rate summation, Newton residual, representative rheologies and RK regression. No numerical code is modified by this inventory.
-
-## 14. Rheological motion-reversal limiter (agreed)
-
-The rheology limiter must **prevent reversal of motion only**. It must **not** force the outgoing momentum to remain parallel to incoming momentum, and must **not** cap its magnitude solely because of this anti-reversal rule. The previous `m_after=alpha*m_before` constraint with `0<=alpha<=1` is therefore **not** the target behavior.
-
-For a rheology-only update with incoming momentum `m0=(Mu,Mv)` and candidate outgoing momentum `m1`, define reversal by `dot_product(m1,m0)<0` when `|m0|>0`. Limit only the reversing component, e.g. by the orthogonal projection onto `dot_product(m_after,m0)>=0`:
+After completing the RK step, start from `q^(0)=q_RK,out` and apply configured STEP groups in their specified order.
 
 ```text
-if dot(m0,m0) > 0:
-    m_after = m1 - min(0, dot(m1,m0)/dot(m0,m0)) * m0
-else:
-    m_after = m1   ! no initial direction against which to define reversal
+q_work = q_RK,out
+for each STEP group g in order:
+    evaluate each member process on q_work (same state for all members)
+    jointly limit competing contributions within this group
+    rate_g = sum of adjusted full conservative rates
+    q_work = q_work + dt_global * rate_g
+    commit associated bed/substrate/deposit inventory changes atomically
+q_out = q_work
+rate_total = (q_out - q_RK,out) / dt_global
 ```
 
-This preserves transverse momentum (so a change of direction without reversal remains possible) and does not impose an upper bound on speed. The anti-reversal reference is the **immediate input momentum of the isolated rheological group**, not the whole stage or contributions from non-rheological processes. The returned effective rheological rate must reflect the **limited** update. For Newton, check residual compatibility rather than applying an unexamined post-solve correction. Physical constitutive constraints other than anti-reversal (when present) remain separate.
+- All sources **inside one group** see the same group-entry state and do not update it individually. A subsequent group reconstructs its physical state from the **already updated** conserved state and inventories.
+- Competing processes within one STEP group must be jointly limited against the available inventory. Distinct STEP groups are **not** one simultaneous limiter domain: each sees the remaining inventory after the preceding committed update.
+- STEP processes that affect bed elevation `B`, erodible thickness, or deposit inventories must update those quantities consistently with their conservative fluid increments; maintain a single coherent transaction per group, including failure handling. These substrate quantities are **not additional RK-integrated conservative variables**.
+- STEP rates are not inserted into `EX_terms` or `IM_terms` and are not reapplied by RK final assembly.
+- Ordered first-order STEP composition is **not claimed** to preserve the order of the full RK+STEP method for dynamic sources. Temporal convergence of combined problems must be measured.
 
-This agreed choice supersedes the unresolved rotation/magnitude question in section 13. **No Fortran implementation or test has been changed by this decision.**
+## 5. Implicit STAGE sequence and reduced Newton
 
-## 15. Velocity-reversal limiter by numerical treatment (agreed)
+- At an implicit RK stage with `tau_imp=a_ii*dt_global>0`, build the proper stage-known state from the IMEX tableau. Apply configured NEWTON and ANALYTIC groups **in order**; each receives the full conservative state resulting from its predecessor. Rates may overlap in conservative components; no global equation-exclusive partition is imposed.
+- NEWTON iterates on **conservative `q`**, never primitive `qp`. Each group has one local list `newton_equations(:)`, used for **both** residual rows and Jacobian columns; do not maintain separate unknown and equation lists merely to describe the same reduced system.
+- For a rheology-only Newton group, the reduced list comprises conservative momenta `[idx_uEqn,idx_vEqn]`, **not** the primitive velocity indices. Complex-step differentiation builds the required reduced Jacobian and the solver handles convergence/line search. Other conservative quantities can affect rate calculations while remaining fixed because the present group's sources do not evolve them.
+- A group's *physical source* can return nonzero rates outside its Newton list. Where outside components E depend only on solved implicit components I, and the I residual is independent of the **updated** E, solve I first and then reconstruct E **exactly** from the complete source evaluated at the solved state. This is the triangular block case
+  ```text
+  J_source = [ 0  B ]
+             [ 0  D ]
+  J_resid  = [ I -tau*B ]
+             [ 0 I-tau*D ]
+  ```
+  with ordering `(E,I)`. No extra Newton unknowns or generic Schur solver are needed for this case. The actual dependency conditions must be checked, not inferred from which columns a partial Jacobian routine happens to evaluate.
+- If the source on E depends on unknown updated E, or the I residual depends on updated E, the simple reconstruction is **not justified**. Use a physically justified analytic elimination or enlarge the Newton system; never silently omit nonzero coupled residuals.
+- **Current source dependency audit:** the existing implicit dispatcher writes rheology rates only in momenta `(2:3)` and thermal cooling only in energy `(4)`, with corresponding reduced Newton lists. Consequently, rates outside the selected components are currently zero for these groups. Rheology rates can nevertheless depend on other conserved quantities (mass, composition, energy) held fixed through that group. Darcy pore pressure is currently ANALYTIC, not NEWTON; mass-exchange models are not currently dispatched in the Newton implicit-source path. The generalized reconstruction is a **future-required behavior when a real nonzero outside-list rate appears**, not a reason to introduce unused block machinery now.
+- ANALYTIC solves the specified physical evolution over `tau_imp` (including relevant physical admissibility) and returns the complete effective conservative rate. Do not apply an extra Newton projection to an analytic result.
+- The implicit rate for the RK tableau represents the full effective change from the stage-known state over the implicit diagonal interval, **exactly once**. Validate effective-rate bookkeeping when multiple implicit groups are applied sequentially.
 
-The rheology-specific **velocity/momentum reversal limiter applies only to EXPLICIT and SEMI_IMPLICIT contributions**. It does **not** apply to the fully implicit NEWTON solution, and no post-convergence momentum projection may alter a converged Newton state. ANALYTIC solutions also receive no extra reversal projection; each analytic constitutive flow must enforce its own physically correct evolution.
+## 6. Physical limiters: ownership and simultaneous contributions
 
-For an explicit rheology group, form the candidate update over its actual group interval, limit only the reversing component relative to momentum immediately before that rheological contribution, and return the **effective rate corresponding to the limited update**. For the semi-implicit contribution used within a Newton group, limit its isolated predictor increment **before** the Newton solve and use the corrected semi-implicit rate in the implicit residual construction. The Newton solve then proceeds without any post-solve friction projection.
+**Rule:** the limiter of a simultaneously applied set of processes receives their **separate full-vector rate contributions**, the common input state, and relevant inventory/physical context. Preserve process identity through limiting; **sum only the adjusted rates** to form the final conservative contribution. Rates from different physics families and distinct explicit STAGE GROUP IDs can compete for the same quantity.
 
-The limiter must **only prevent reversal**: it must not suppress transverse momentum or impose an additional upper bound on the momentum magnitude. The converged nonlinear residual must remain authoritative; verify separately whether a particular fully implicit constitutive law admits nonphysical reversal, rather than masking it by projecting the Newton result.
+- **Constitutive constraints** specific to one law belong in its physical model/family and may be enforced during model evaluation; do not duplicate them at the generic RK/Newton level.
+- **Shared-inventory limits** (mass, phase inventory, erodible substrate, etc.) must consider **all simultaneous demands**, not only each process in isolation. Distinguish production from consumption and retain process provenance; limiting a net sum alone can hide an inadmissible withdrawal.
+- For EXPLICIT/STAGE, cross-family and cross-group joint limiting is coordinated **after collecting all common-state source contributions** and before returning the rate to RK. A limiter cannot mutate the common input stage state. The spatial contribution may need to be considered by a **separate conservation-preserving admissibility strategy**; do not arbitrarily clip local spatial flux-divergence rates.
+- For EXPLICIT/STEP, joint limiting occurs among members of the **current** group, followed by the group's state/inventory update. The next group performs a fresh physical-state and inventory evaluation.
+- The assembler coordinates the limiter call and keeps individual rates available; the **physical domain defining the constraint** owns the rule for how individual contributions are adjusted. The generic RK or Newton solver must not impose a universal scalar clipping of all conservation laws.
+- Generic dry-state handling, roundoff repair, conversion constraints, and final RK admissibility checks remain distinct from physical source limiters. **The weighted RK combination may still need its own validation:** limiting instantaneous stage rates does not prove final-state admissibility.
 
-This decision refines sections 13-14. In particular, the *current* second limiter call after `solve_newton_group` in `src/numerics/nonlinear_solver_2d.f90` must be removed at implementation time; the remaining semi-implicit call must ultimately move out of the generic Newton solver to rheology-owned rate construction. This documentation change alone does **not** implement those code changes.
+**Detailed physical limiter algorithms not yet fully specified:** which joint constraints require cross-family adjustment, how competing withdrawals are apportioned, and exactly how source admissibility interacts with the conservative spatial flux discretization. These are the remaining limiter-design tasks; no generic algorithm is assumed.
 
-## 16. Placement of the rheology reversal limiter (agreed: option B)
+### 6.1 Rheology momentum reversal
 
-Place the **common velocity-reversal limiter in `src/physics/rheology_laws/rheology_2d.f90`**, at the rheology-family dispatch/aggregation level, **not inside each individual rheological model interface**.
+- The common rheology anti-reversal limiter is owned by `src/physics/rheology_laws/rheology_2d.f90`, at the **family aggregation** level, after summing rheology-model contributions on the same state, not redundantly inside every rheological law.
+- It applies to **EXPLICIT** and **SEMI_IMPLICIT** rheology only. The explicit limiter uses the **full global `dt` as its limiter horizon**, even when RK requires a rate at a stage with zero explicit tableau coefficient. This does not advance the STAGE state. The semi-implicit limiter uses `tau_imp=a_ii*dt_global` for its predictor **before Newton**.
+- For the incoming momentum vector `m0` and candidate isolated rheology-updated momentum `m1`, prevent **actual reversal**, `dot(m1,m0)<0`, by removing only the reversing component along `m0`. Preserve transverse momentum and impose **no upper bound on momentum magnitude** solely for this rule. One possible expression is `m_after=m1-min(0,dot(m1,m0)/dot(m0,m0))*m0` when `dot(m0,m0)>0`; the effective rheology rate reflects that limited increment.
+- When both incoming conservative momentum components are **exactly zero**, return zero explicit or semi-implicit rheology momentum rate immediately; this is separate from dry-state tolerances. Do not generalize the shortcut to unrelated sources.
+- Do **not** apply this extra reversal projection after a fully implicit NEWTON solve, or to ANALYTIC rheology. A post-Newton projection could invalidate the converged residual; analytic flows must satisfy their own model physics.
+- A rheology-specific limiter is **not** a blanket limiter on the assembled sum of rheology plus gravity, injection, spatial fluxes, etc. Any shared total-update constraint would need its own justified physical rule.
 
-- `eval_rheology_explicit`: evaluate every model's explicit contribution on the **same incoming physical state**, sum those contributions, then apply the reversal limiter **once** to the aggregate rheological momentum rate using the actual explicit-group time interval. Return the effective limited rate.
-- `eval_rheology_semi_implicit`: likewise sum semi-implicit contributions on one group-entry state, then limit the aggregate semi-implicit momentum increment **once**, before the Newton solve, with its actual associated interval. Return the effective limited rate used to construct the nonlinear residual.
-- `eval_rheology_implicit` and `eval_rheology_analytic`: **no additional reversal limiter**.
-- Individual constitutive-law interfaces retain responsibility for their own physics but do not duplicate this family-wide numerical anti-reversal control.
-- The generic Newton solver and RK integrator must not apply rheology-specific reversal projections. Avoid additional wrappers: adapt the existing family-level interfaces and pass interval/state information directly where needed.
-- Preserve transverse momentum and do not cap magnitude merely for this rule; an initially zero momentum has no reversal direction.
+### 6.2 Other physical limiter domains
 
-This refines sections 13-15 and is a **design decision only**; Fortran implementation and validation remain pending.
+- Mass exchange owns shared carrier-withdrawal/packing and erosion/deposition inventory logic, including its STEP substrate transaction.
+- Darcy pore-pressure physics owns its gas withdrawal and pore-pressure admissibility constraints, independently of mass-exchange source ownership.
+- State conversion, generic admissibility verification and Newton line search are numerical safeguards, not substitutes for physically identified shared-inventory limiters.
 
-## 17. Standard source-interface time-interval argument (agreed)
+## 7. Single source-executor contract
 
-Use the argument name **`dt`** consistently in source-family interfaces, including `eval_rheology_explicit` and `eval_rheology_semi_implicit`, matching the existing mass-exchange naming convention. `dt` always means the **effective interval over which that source/group contribution is applied**, not necessarily the global simulation time step.
-
-- At **EXPLICIT/STAGE**, pass the applicable explicit RK stage/group interval (defined from the actual tableau and execution contract).
-- At **SEMI_IMPLICIT/STAGE**, pass `a_ii * dt_global` for the implicit stage.
-- At **STEP**, pass the full global time step `dt_global`.
-- The relevant rheology family routine sums process rates evaluated at a common group-entry state and limits the aggregate explicit or semi-implicit update over `dt` exactly once; implicit Newton and analytic methods receive no extra anti-reversal limiter.
-- This is a naming and interface contract. Existing integration-local variable names need not change; callers must pass the correct value. Avoid introducing adapters or alternative names such as `dt_group` solely for rheology.
-
-**Status:** architecture recorded; no Fortran interface edits or tests in this documentation commit.
-
-## 18. Zero-momentum rheology short circuit (agreed)
-
-When the **incoming conservative momentum is exactly zero in both horizontal components**, the **rheological momentum rate is zero**. The rheology family evaluator should return zero momentum rate immediately; no constitutive model evaluation and no velocity-reversal projection are needed. This applies to the explicit and semi-implicit rheological momentum contribution (and is the physical zero-motion expectation for implicit/analytic rheological momentum evaluation).
-
-The test refers to the **incoming state for this rheology group**, not to the initial state of the global RK step. Do not generalize this short circuit to other source families or to non-momentum physics such as thermal evolution. Near-zero but nonzero momenta are not automatically zeroed by this rule; any numerical dry-state threshold is a separate general-state policy.
-
-**Status:** agreed architecture only; Fortran implementation and regression tests pending.
-
-## 19. Positive source-group interval precondition (agreed)
-
-All executed source-group evaluations receive **`dt>0`**. This argument is the effective group interval, not necessarily the global simulation time step. A group whose required interval is zero is **skipped by its caller**; in particular, implicit STAGE groups are skipped when `a_ii=0`. The source family does not need a special `dt=0` limiter branch. The actual explicit-stage interval must be determined from the chosen RK tableau/execution design before implementing the rate-level anti-reversal limiter. This precondition must not turn a zero-weight RK stage into a spurious source step.
-
-**Implementation progress:** removed the post-Newton rheology motion projection from `src/numerics/nonlinear_solver_2d.f90`, preserving the converged nonlinear state. The existing semi-implicit call still lives in that generic solver and the explicit rate-level limiter / `dt` interface plumbing remain to be migrated. **No compilation or regression tests run in this commit.**
-
-## 20. Explicit rate evaluation at zero interval (agreed; supersedes section 19)
-
-**Explicit source rates must be evaluated whenever the RK scheme requires them, even if the interval argument `dt=0`.** A zero explicit tableau coefficient does not imply that the stage's explicit rate can be skipped: that rate can contribute to later stages or to final RK assembly. Use the existing RK-stage dependency/weight logic to decide whether a rate is required, not the value of `dt` alone.
-
-**Increment-dependent physical limiters apply only when `dt>0`.** At `dt=0`, evaluate and return the original explicit physical rate without an increment-dependent reversal projection. This is not a request to set the rate to zero or to skip its evaluation. The zero-incoming-momentum rheology rate shortcut remains a separate physical rule.
-
-Implicit/semi-implicit groups with zero effective implicit interval (e.g. `a_ii=0`) remain skipped as previously agreed; that convention does not extend to needed explicit rate evaluations.
-
-**Still open:** the precise definition of an effective `dt` used to limit an explicit RK source rate when that same rate enters different later stages with different tableau weights. Do not assume a unique coefficient-driven increment without analyzing the RK assembly.
-
-This section explicitly supersedes the blanket `dt>0` precondition in section 19. **Documentation only; Fortran implementation and tests pending.**
-
-## 21. Time interval used by the rheology reversal limiter (final agreed distinction)
-
-**Explicit and semi-implicit rheology use different limiter intervals:**
-
-- **EXPLICIT/STAGE:** the rheology anti-reversal limiter uses the **full current global time step `dt_global`**, even if the explicit source rate is evaluated at an RK stage where some explicit tableau coefficients are zero. Compute the rate whenever RK requires it; do not skip evaluation due to a zero tableau coefficient. The full-step interval is the limiter horizon, **not** an instruction to multiply that rate by a full step during the stage or to change the RK tableau.
-- **SEMI_IMPLICIT/STAGE:** the rheology anti-reversal limiter uses the **actual implicit-stage interval `dt = a_ii * dt_global`**, which is also the interval of the applied semi-implicit predictor increment. When `a_ii=0`, the implicit group is skipped, as agreed. In the currently implemented RK tableaux, every executed implicit stage has `a_ii>0`.
-- **NEWTON and ANALYTIC:** no additional rheology anti-reversal limiter.
-- Where `eval_rheology_explicit` or `eval_rheology_semi_implicit` receives the argument named `dt`, the **caller** passes the interval specified above. The rheology family sums its physical-model contributions at one incoming state and applies the limiter once to the aggregate rate.
-- This explicit/implicit distinction supersedes the earlier contradictory interval statements in sections 17, 19, 20, and the previous form of section 21. Do not infer the explicit limiter interval from any particular explicit RK tableau entry.
-- **Numerical caveat for future validation:** independently limiting stage rates over the global step does not itself guarantee that the final weighted RK combination cannot reverse motion; verify end-of-step behavior in regression tests without inserting an additional hidden RK-level friction projection.
-
-**Status:** corrected architecture decision only; full Fortran interface propagation, relocation of the remaining semi-implicit limiter, explicit rate limiter and tests are not yet complete.
-
-## 22. Explicit STAGE group-splitting interval (agreed)
-
-For sequential splitting **between distinct EXPLICIT/STAGE groups**, use the **full global current time step `dt_global`** to form each intermediate conservative state, regardless of the current RK stage and of individual explicit tableau coefficients:
-
-```text
-q_group(0) = q_stage_in
-for g in ordered_explicit_stage_groups:
-    rate_g = evaluate_group_on(q_group(g-1), dt_global)
-    q_group(g) = q_group(g-1) + dt_global * rate_g
-    rate_total += rate_g
-```
-
-As previously decided, **all processes within a single explicit group evaluate their rates on that same group's incoming state**, with joint limiting when inventories overlap. Group 0 includes the spatial operator and may include other explicit sources; the spatial operator is evaluated **only once** at the incoming stage state, not reevaluated after later explicit groups.
-
-The intermediate group states are **local to source splitting** and are **not applied a second time** by the RK integrator. The full explicit rate returned for the stage is assembled with the **unchanged explicit RK tableau coefficients**. The rheology explicit limiter's horizon is also `dt_global`, as specified in section 21.
-
-**Numerical qualification:** this ordered, full-step stage-local splitting changes the effective source rate and is not automatically equivalent in accuracy or stability to the original unsplit IMEX-RK method. Verify conservation/admissibility and temporal order via targeted convergence and regression tests before claiming preservation of the underlying RK order.
-
-**Status:** design decision recorded; full Fortran integration and validation pending.
-
-## 23. Spatial operator participates in explicit group 0 update (agreed)
-
-**EXPLICIT/STAGE group 0 always includes the spatial discretization rate**, and may contain other explicitly configured physical source processes. Evaluate the spatial rate and every group-0 source contribution at **the same initial RK-stage conservative state**, before any group-local modification. Apply relevant joint physical limits to processes sharing a common inventory.
-
-Define `rate_group0 = rate_spatial + sum(rate_source_in_group0)`. Use this **combined** rate to form the group-0 intermediate state with the agreed full global step: `q_after_group0 = q_stage + dt_global * rate_group0`. Every subsequent explicit group evaluates its physical rate and limiters on the full updated state left by the preceding group; the spatial operator is **not** reevaluated at those later group states.
-
-Accumulate each group's effective full-vector rate once to produce the explicit rate passed to the unchanged RK tableau. Stage-local intermediate states are not applied again by the RK integrator. Group 0 is a group in the same ordered sequence, not a special separate spatial substep.
-
-**Numerical qualification:** stability, admissibility, and time-order behavior of this full-step stage-local sequential construction require dedicated verification. **Documentation only** in this commit.
-
-## 24. Source-group executor input/output state contract (agreed)
-
-Use **one source-group executor** for STAGE and STEP with **distinct incoming and outgoing cell states**, not a mutable `q` INOUT argument. Conceptual interface:
+The design uses **one shared source-group execution mechanism**, with the orchestration appropriate to cadence/method. Conceptually:
 
 ```fortran
-CALL execute_source_groups(groups, q_in, dt, q_out, rate)
+CALL execute_source_groups(groups, q_in, dt, q_out, rate, ...)
 ```
 
-- `q_in`, `INTENT(IN)`: full incoming conservative cell state, **never modified** by the executor.
-- `q_out`, `INTENT(OUT)`: conservative cell state after applying the groups sequentially, with the configured group interval and each group's effective rate.
-- `rate`, `INTENT(OUT)`: full-vector effective total source rate, the sum of effective limited group rates (each counted only once). Additional context/bed-inventory arguments may be needed for STEP mass exchange; the sketch above is not a complete Fortran signature.
-- Within the executor, use a **local working state** initialized from `q_in`. Each group evaluates on the state left by preceding groups, updates the local state and adds its effective rate.
-- At **STAGE**, preserve `q_in` because the RK integrator still needs the unmodified stage state. Use the returned `rate` in RK assembly; **do not replace the RK stage state with `q_out` or apply the splitting increment twice**.
-- At **STEP**, the caller adopts `q_out` as the post-source conservative state and applies the corresponding coordinated substrate/bed updates for mass exchange.
-- Avoid extra data abstractions or domain-wide copies merely to enforce this contract: the executor operates on **one cell** at a time.
+- `q_in`, `INTENT(IN)`: immutable conservative cell state.
+- `q_out`, `INTENT(OUT)`: resulting conservative cell state where an operator actually advances state (STEP or an ordered implicit group operation); it must **not** replace the common STAGE state between explicit groups.
+- `rate`, `INTENT(OUT)`: full conservative effective rate, already limited and counted once. For EXPLICIT/STAGE it is the sum of simultaneously evaluated rates; for STEP with positive `dt` it matches `(q_out-q_in)/dt`.
+- Maintain local cell workspaces; reconstruct primitive/physical state when the input conservative state actually changes. No domain-wide copy or bespoke wrapper type is needed just to satisfy the interface.
+- The same evaluation/dispatch primitives can be reused between cadences, but the **explicit STAGE common-state path and sequential STEP/implicit paths have different advancement semantics**. Do not force one mixed explicit/implicit stage sweep that violates distinct tableau channels.
+- Bed and inventory context are provided only where physically required, notably mass exchange at STEP. Errors must not leave a partially committed coupled fluid/bed transaction.
+- For EXPLICIT/STAGE, `q_out` is **not** an intermediate state handed to another group. Where the interface demands a candidate state, it may be derived for diagnostics, but the RK update remains owned exclusively by the tableau.
 
-**Status:** architectural agreement only; executor implementation and tests pending.
+## 8. Verification and implementation requirements
 
-## 25. Reconstruction of non-Newton conservative components and actual dependency audit (agreed with conditions)
+**Required tests:**
 
-**Chosen architecture:** retain one list `newton_equations` for nonlinear unknowns/residuals. Where an implicit group produces nonzero rates on other conservative components, **prefer reconstructing those other components after the reduced Newton solve**, from the full source evaluated on the solved state. Avoid introducing a general block-factorization engine unless a physical model actually needs it. Every group still returns a complete limited conservative rate.
+1. EXPLICIT/STAGE: spatial operator and all source groups evaluate at the identical stage state; no stage-local inter-group update; RK weights and order (pure explicit 2-/3-/4-stage tests) remain unchanged.
+2. EXPLICIT/STAGE: two physical processes in different groups removing the same inventory; verify a **joint** limiter receives both separate contributions; verify no false admissibility from individually limited rates.
+3. EXPLICIT/STEP: sequential groups modifying overlapping equations; later groups see prior limited fluid and substrate state; within-group processes see the same group-entry state.
+4. Reduced rheology/thermal Newton: correct residuals, frozen non-evolving conserved components, correct complex-step Jacobian, and overlapping sequential implicit groups.
+5. NEWTON/ANALYTIC combinations in both permissible orders, full-vector effective rates, skipped implicit stages with `a_ii=0`, explicit rate evaluation as RK requires, no double application.
+6. Rheology explicit/semi-implicit anti-reversal including transverse motion, zero momentum, absence of post-Newton projection, and interactions with other momentum sources.
+7. Conservation and admissibility for fluid, gas, solids, bed erosion/deposition, Darcy with and without gas loss; stage and final RK admissibility.
+8. Temporal convergence of the **combined** IMEX-RK + STEP process, especially when STEP contains dynamic operators; do not claim RK order transfers automatically.
+9. Build/CI regressions and performance comparisons against relevant v2 cases; report what was actually compiled/run.
 
-**Exactness condition:** partition into excluded components E and Newton components I. A direct post-Newton update `q_E,out=q_E,in+tau*S_E(q_I,out)` (with the appropriate group known state) is an exact solution of the full implicit equations only when the excluded source components do **not** depend on unknown `q_E,out`, and the Newton residual equations for I are independent of the excluded updated components (or any dependence is eliminated consistently). The corresponding source Jacobian has `J_S=[[0,B],[0,D]]`; the residual Jacobian is `J_R=[[I,-tau*B],[0,I-tau*D]]`. A nonzero B then costs an additional full-source evaluation/reconstruction, not a larger Newton solve. A missing lower-left block is a mathematical dependency condition, **not** something established merely by evaluating complex-step on only the selected columns. If either dependency condition fails, use a justified analytic/block elimination or expand the Newton unknown set; do not silently drop a residual.
-
-**Checked against current `dev` code:**
-- `src/physics/source_terms_2d.f90::eval_source_implicit` initializes the full rate to zero, dispatches rheology only into `source_term(2:3)`, and thermal cooling only into `source_term(4)`.
-- `src/physics/source_configuration_2d.f90` uses conservative indices `[2,3]` for rheology NEWTON and `[4]` for thermal NEWTON. The pore-pressure Darcy source is currently required to use ANALYTIC; mass-exchange sources are not currently dispatched as NEWTON in `eval_source_implicit`.
-- **Thus, for all actually dispatched current NEWTON groups, `S_E=0`**. Post-Newton reconstruction is an identity (`q_E,out=q_E,in` relative to that group's incoming/known state), and no nonzero B block arises from those source rows. Source rates `S_I` may still depend on E (e.g. rheology depends on mixture quantities), so `dS_I/dq_E` is not generally zero. Holding those E values fixed is consistent here because their source rates vanish for the group.
-- The current `src/numerics/nonlinear_solver_2d.f90::solve_newton_group` forms a reduced `J(I,I)`, solves it, and updates only selected conservative components; `eval_f` masks excluded residual rows. **That is sufficient for the existing source footprint**, provided the group-entry known state is preserved and no other process secretly modifies E during that group.
-- Reconfirm this dependency structure whenever adding a NEWTON-capable physical process or allowing a process to emit additional conservative rates.
-
-**Implementation decision:** do not add unused generalized B-block storage or reconstruction loops now. Preserve the chosen exact reconstruction strategy as the required extension when a real nonzero outside-group rate arises. Regression tests should verify unchanged excluded components for current rheology and thermal Newton groups, and a small synthetic triangular-source test should be added when reconstruction is implemented.
-
-**Status:** dependency audit and architectural rule recorded; no solver or test code modified in this commit.
-
-## 26. Explicit STAGE uses a common state; sequential advancement is STEP-only (agreed; supersedes prior explicit-STAGE splitting)
-
-**Final decision following an analytic temporal-order check:** at each IMEX-RK stage, evaluate the spatial operator and **every EXPLICIT/STAGE source group** on the **same unmodified RK stage conservative state** `q_stage`. Groups remain useful for configuration, ownership, physical-model aggregation, and limiting, but **do not advance a local state between distinct explicit STAGE groups**. In particular, GROUP 0 evaluates the spatial operator and any configured source rates at `q_stage`; groups 1, 2, ... also evaluate at `q_stage`. The full explicit source/spatial rate is the sum of those contributions and is assembled using the **unchanged explicit RK tableau**. Do not apply an extra `dt_global`, `a_ii*dt`, or explicit-stage coefficient to intermediate STAGE states.
-
-This **explicitly supersedes** the EXPLICIT/STAGE sequential-update instructions in sections 2, 3, 14, 17, 22, 23 and any other earlier section asserting updated-state propagation between explicit STAGE groups. In particular, there is **no STAGE intermediate update after spatial GROUP 0**. Previous descriptions remain historical context, not implementation requirements. The section-21 decision that the explicit rheology momentum-reversal limiter uses `dt_global` as a **limiter horizon** is unchanged; this horizon must **not** be interpreted as a group-to-group STAGE advancement. A limiter may adjust a returned group rate, but never mutate `q_stage` or change the input seen by any other explicit STAGE group. When multiple independent STAGE groups consume a shared finite inventory, admissibility of their aggregate rate must be handled jointly or checked at the combined update; per-group limiting alone may not suffice.
-
-**EXPLICIT/STEP keeps true sequential splitting.** Starting from the post-RK state `q^(0)`, evaluate each ordered STEP group `g` on the state left by the previous group, and apply `q^(g)=q^(g-1)+dt_global*rate_g` after the group's own aggregate physical limiting. Within each group, member source processes still use one common group-entry state. The next group sees the preceding update, including any substrate/bed changes carried by STEP context. STEP groups do not contribute to RK stage rate arrays. This sequential first-order composition **does not imply** preservation of second-/third-order accuracy of the full RK+STEP algorithm when STEP processes are dynamical sources; assess separately.
-
-**Single executor contract retained:** `q_in` is immutable, `q_out` separate, and a full conservative rate is returned; for EXPLICIT/STAGE, `q_out` is not used as a next-group input and the executor returns the rate sum from common-state evaluations (no internal group-to-group advancement). For EXPLICIT/STEP, `q_out` is the physically updated state after sequential groups, and the effective full conservative rate satisfies `(q_out-q_in)/dt_global` for positive dt. Implicit STAGE/STEP handling and the implicit interval `a_ii*dt` remain governed by their separate existing decisions.
-
-**Reason for the change:** with two overlapping explicit source operators, feeding a stage-local sequential effective rate into an otherwise unchanged RK2/RK3 tableau introduces an O(dt) perturbation to the RHS and can reduce global temporal order to one. Replacing the intermediate interval by `a_ii*dt` does not generally fix this. Therefore preserve same-state explicit stage evaluations and reserve ordered advancement for STEP.
-
-**Status:** architecture decision recorded; superseding the earlier explicit-STAGE update specification. No Fortran change or regression test is claimed here.
-
-## 27. Joint physical limiters receive separate process rates (agreed)
-
-**Decision:** when multiple explicitly evaluated physical processes contribute to the **same simultaneous update**, the limiter receives **each process's full conservative rate separately**, as well as the common input state and any relevant physical inventories/context. The assembler preserves process identity through limiting, then sums the adjusted individual rates into the **single final conservative rate** passed to the RK tableau or STEP update. Do not discard provenance by summing first and exposing only the net vector to the limiter.
-
-At **EXPLICIT/STAGE**, every applicable spatial/source rate is evaluated on the same unmodified RK stage state (section 26), including rates from distinct source families and groups. Any joint physical limiter for overlapping inventories or momentum effects must account for the contributions that are applied together, potentially across group boundaries. Limiting does not advance or mutate the shared stage state. Preserve the spatial flux operator's conservative intercell formulation: a local limiter must not arbitrarily rescale flux-divergence contributions without a conservation-preserving flux-level construction.
-
-At **EXPLICIT/STEP**, processes within one group share the same incoming state and must be limited jointly if they compete for shared physical inventories. After applying that group's limited aggregate increment over the full dt, the next STEP group uses the updated state. There is no blanket joint limiter spanning sequential STEP groups, because they are not simultaneous.
-
-**Ownership:** physical models compute raw individual rates and may enforce constitutive constraints intrinsic to their own law; the coordinating source assembler/executor gathers the separate contributions and invokes physical-domain joint limiters that understand inventories and process meaning. The generic Newton or RK algebra routines do not invent broad, indiscriminate clipping rules. Retain per-process outputs until joint limiting is complete, then expose the aggregate rate and appropriate state transaction. Specific limiter algorithms and exact module/routine placement remain implementation work, not newly decided here.
-
-**Status:** architectural rule recorded; no Fortran or numerical tests changed.
+**Implementation state:** this is a target specification, not a certification of completed refactoring. The code already contains parts of the source registry, reduced Newton and STEP transaction, but the unified executor, joint limiter wiring, and explicit rheology limiter interface still require implementation/verification. The remaining semi-implicit limiter in the generic nonlinear solver must be moved to the rheology-family owner; the post-Newton reversal projection has already been removed. No build or regression test is claimed by this documentation rewrite.
