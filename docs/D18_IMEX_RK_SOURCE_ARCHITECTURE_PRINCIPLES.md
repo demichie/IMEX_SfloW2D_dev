@@ -281,3 +281,11 @@ Use the argument name **`dt`** consistently in source-family interfaces, includi
 - This is a naming and interface contract. Existing integration-local variable names need not change; callers must pass the correct value. Avoid introducing adapters or alternative names such as `dt_group` solely for rheology.
 
 **Status:** architecture recorded; no Fortran interface edits or tests in this documentation commit.
+
+## 18. Zero-momentum rheology short circuit (agreed)
+
+When the **incoming conservative momentum is exactly zero in both horizontal components**, the **rheological momentum rate is zero**. The rheology family evaluator should return zero momentum rate immediately; no constitutive model evaluation and no velocity-reversal projection are needed. This applies to the explicit and semi-implicit rheological momentum contribution (and is the physical zero-motion expectation for implicit/analytic rheological momentum evaluation).
+
+The test refers to the **incoming state for this rheology group**, not to the initial state of the global RK step. Do not generalize this short circuit to other source families or to non-momentum physics such as thermal evolution. Near-zero but nonzero momenta are not automatically zeroed by this rule; any numerical dry-state threshold is a separate general-state policy.
+
+**Status:** agreed architecture only; Fortran implementation and regression tests pending.
