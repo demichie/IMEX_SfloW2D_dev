@@ -25,9 +25,6 @@ MODULE pore_pressure_darcy_2d
   IMPLICIT NONE
 
   PRIVATE
-  INTERFACE eval_pore_pressure_gas_loss
-    MODULE PROCEDURE pore_gas_loss_real, pore_gas_loss_complex
-  END INTERFACE
 
   PUBLIC :: apply_frozen_darcy_withdrawal
   PUBLIC :: eval_pore_pressure_darcy_explicit
@@ -35,7 +32,6 @@ MODULE pore_pressure_darcy_2d
   PUBLIC :: eval_pore_pressure_darcy_implicit
   PUBLIC :: solve_pore_pressure_darcy_analytic
   PUBLIC :: solve_frozen_darcy_mass_pressure
-  PUBLIC :: eval_pore_pressure_gas_loss
 
 CONTAINS
 
@@ -151,9 +147,15 @@ CONTAINS
       IF (state%exc_pore_pres>0.0_wp) THEN
         ! This velocity is linear in p_e with the frozen closures.
         ! Evaluate at p_e=1 Pa to obtain the mass-loss coefficient A.
-        CALL eval_pore_pressure_gas_loss(state%h,state%T,state%alphas, &
-             SUM(state%alphas),rho_c,1.0_wp,A)
-        A=rho_c*A
+        BLOCK
+          COMPLEX(wp) :: gas_loss_coefficient
+          CALL pore_gas_loss_complex(CMPLX(state%h,0.0_wp,wp), &
+               CMPLX(state%T,0.0_wp,wp),CMPLX(state%alphas,0.0_wp,wp), &
+               CMPLX(SUM(state%alphas),0.0_wp,wp), &
+               CMPLX(rho_c,0.0_wp,wp),CMPLX(1.0_wp,0.0_wp,wp), &
+               gas_loss_coefficient)
+          A=rho_c*REAL(gas_loss_coefficient,wp)
+        END BLOCK
       END IF
     END IF
     CALL solve_frozen_darcy_mass_pressure( &
@@ -246,19 +248,7 @@ CONTAINS
   !> \param[in] excess_pressure Excess pore pressure p_e [Pa].
   !> \param[out] gas_loss Inhibited upward carrier-gas loss velocity [m s^-1].
   !******************************************************************************
-  SUBROUTINE pore_gas_loss_real(flow_depth,temperature,solid_fractions, &
-       total_solid_fraction,carrier_density,excess_pressure,gas_loss)
-    REAL(wp), INTENT(IN) :: flow_depth,temperature,solid_fractions(n_solid)
-    REAL(wp), INTENT(IN) :: total_solid_fraction,carrier_density,excess_pressure
-    REAL(wp), INTENT(OUT) :: gas_loss
-    COMPLEX(wp) :: complex_loss
-    CALL pore_gas_loss_complex(CMPLX(flow_depth,0.0_wp,wp), &
-         CMPLX(temperature,0.0_wp,wp),CMPLX(solid_fractions,0.0_wp,wp), &
-         CMPLX(total_solid_fraction,0.0_wp,wp), &
-         CMPLX(carrier_density,0.0_wp,wp), &
-         CMPLX(excess_pressure,0.0_wp,wp),complex_loss)
-    gas_loss=REAL(complex_loss,wp)
-  END SUBROUTINE pore_gas_loss_real
+
 
   SUBROUTINE pore_gas_loss_complex(flow_depth, temperature,              &
        solid_fractions, total_solid_fraction, carrier_density, excess_pressure,&
