@@ -38,23 +38,20 @@ CONTAINS
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: interval,heat_capacity,radiative,convective,ambient
     REAL(wp), INTENT(OUT) :: temperature_after
-    CALL cooling_scalar_analytic(state%T,interval,heat_capacity, &
-         radiative,convective,ambient,temperature_after)
-  END SUBROUTINE solve_thermal_cooling_analytic
-
-SUBROUTINE cooling_scalar_analytic(temperature, integration_step,   &
-       areal_heat_capacity, radiative_coefficient, convective_coefficient,     &
-       ambient_temperature, temperature_after)
-
-    REAL(wp), INTENT(IN) :: temperature, integration_step, areal_heat_capacity
-    REAL(wp), INTENT(IN) :: radiative_coefficient, convective_coefficient
-    REAL(wp), INTENT(IN) :: ambient_temperature
-    REAL(wp), INTENT(OUT) :: temperature_after
-
+    REAL(wp) :: temperature, integration_step, areal_heat_capacity
+    REAL(wp) :: radiative_coefficient, convective_coefficient, ambient_temperature
     REAL(wp) :: beta, cubic_root, lower, upper, midpoint
     REAL(wp) :: initial_primitive, target_primitive, midpoint_primitive
     REAL(wp) :: elapsed_scale, tolerance
     INTEGER :: iteration
+
+
+    temperature = state%T
+    integration_step = interval
+    areal_heat_capacity = heat_capacity
+    radiative_coefficient = radiative
+    convective_coefficient = convective
+    ambient_temperature = ambient
 
     IF (.NOT. ieee_is_finite(temperature) .OR.                              &
          .NOT. ieee_is_finite(integration_step) .OR.                        &
@@ -158,7 +155,9 @@ SUBROUTINE cooling_scalar_analytic(temperature, integration_step,   &
             MAX(temperature, temperature_after))
     END IF
 
-  END SUBROUTINE cooling_scalar_analytic
+    END SUBROUTINE solve_thermal_cooling_analytic
+
+
 
 
 
