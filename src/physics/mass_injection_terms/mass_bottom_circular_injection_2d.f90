@@ -5,7 +5,6 @@ MODULE mass_bottom_circular_injection_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d, ONLY : mixt_var, physical_state_type, complex_physical_state_type
 
-  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_inlet_source
   USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
   USE mass_injection_coefficients_2d
   USE diagnostics_2d, ONLY : fatal_error
@@ -163,8 +162,8 @@ CONTAINS
        ! Pore-pressure contribution uses the existing cell mixture mass.
        ! the units of this source term are: kg^2 m^-3 s^-3
        rate(idx_poreEqn) = rate(idx_poreEqn) +                       &
-            eval_pore_pressure_inlet_source(t_coeff, state%h*state%rho_m, pore_pres_fract,      &
-            h_dot, r_rho_m, r_red_grav, exc_pore_pres)
+            t_coeff * ((state%h*state%rho_m) * pore_pres_fract * h_dot * &
+                  r_rho_m * r_red_grav + exc_pore_pres * h_dot * r_rho_m)
 
     END IF
 
