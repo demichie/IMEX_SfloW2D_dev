@@ -320,3 +320,23 @@ This section explicitly supersedes the blanket `dt>0` precondition in section 19
 - **Numerical caveat for future validation:** independently limiting stage rates over the global step does not itself guarantee that the final weighted RK combination cannot reverse motion; verify end-of-step behavior in regression tests without inserting an additional hidden RK-level friction projection.
 
 **Status:** corrected architecture decision only; full Fortran interface propagation, relocation of the remaining semi-implicit limiter, explicit rate limiter and tests are not yet complete.
+
+## 22. Explicit STAGE group-splitting interval (agreed)
+
+For sequential splitting **between distinct EXPLICIT/STAGE groups**, use the **full global current time step `dt_global`** to form each intermediate conservative state, regardless of the current RK stage and of individual explicit tableau coefficients:
+
+```text
+q_group(0) = q_stage_in
+for g in ordered_explicit_stage_groups:
+    rate_g = evaluate_group_on(q_group(g-1), dt_global)
+    q_group(g) = q_group(g-1) + dt_global * rate_g
+    rate_total += rate_g
+```
+
+As previously decided, **all processes within a single explicit group evaluate their rates on that same group's incoming state**, with joint limiting when inventories overlap. Group 0 includes the spatial operator and may include other explicit sources; the spatial operator is evaluated **only once** at the incoming stage state, not reevaluated after later explicit groups.
+
+The intermediate group states are **local to source splitting** and are **not applied a second time** by the RK integrator. The full explicit rate returned for the stage is assembled with the **unchanged explicit RK tableau coefficients**. The rheology explicit limiter's horizon is also `dt_global`, as specified in section 21.
+
+**Numerical qualification:** this ordered, full-step stage-local splitting changes the effective source rate and is not automatically equivalent in accuracy or stability to the original unsplit IMEX-RK method. Verify conservation/admissibility and temporal order via targeted convergence and regression tests before claiming preservation of the underlying RK order.
+
+**Status:** design decision recorded; full Fortran integration and validation pending.
