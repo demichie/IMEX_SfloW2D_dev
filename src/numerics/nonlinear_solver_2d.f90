@@ -225,7 +225,6 @@ CONTAINS
     TYPE(analytic_term_context_type) :: analytic_context
     REAL(wp) :: qp_current(n_vars+2)
     REAL(wp) :: dynamic_pressure, si_term(n_eqns), residual_without_si(n_eqns)
-    REAL(wp) :: momentum_before_newton(2)
     INTEGER :: group, group_size, equation, i
     INTEGER :: analytic_status
     INTEGER :: group_equations(n_eqns)
@@ -337,7 +336,6 @@ CONTAINS
                 END DO
              END IF
              residual_without_si=-a_diag*si_term
-             momentum_before_newton=qj(2:3)
              CALL solve_newton_group(stage_groups(group),&
                   group_equations(1:group_size),qj,q_group_before,dt_step,a_diag,&
                   residual_without_si,Bprimej_x,Bprimej_y,Zij,coeff_f,      &
@@ -346,9 +344,6 @@ CONTAINS
              IF (.NOT.converged) THEN
                 qj=qj_init
                 RETURN
-             END IF
-             IF (group_has_momentum) THEN
-                CALL limit_rheology_momentum_reversal(momentum_before_newton,qj(2:3))
              END IF
        ELSE
           linear_info = -5

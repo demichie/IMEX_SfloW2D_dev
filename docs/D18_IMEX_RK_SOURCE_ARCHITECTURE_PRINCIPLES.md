@@ -289,3 +289,9 @@ When the **incoming conservative momentum is exactly zero in both horizontal com
 The test refers to the **incoming state for this rheology group**, not to the initial state of the global RK step. Do not generalize this short circuit to other source families or to non-momentum physics such as thermal evolution. Near-zero but nonzero momenta are not automatically zeroed by this rule; any numerical dry-state threshold is a separate general-state policy.
 
 **Status:** agreed architecture only; Fortran implementation and regression tests pending.
+
+## 19. Positive source-group interval precondition (agreed)
+
+All executed source-group evaluations receive **`dt>0`**. This argument is the effective group interval, not necessarily the global simulation time step. A group whose required interval is zero is **skipped by its caller**; in particular, implicit STAGE groups are skipped when `a_ii=0`. The source family does not need a special `dt=0` limiter branch. The actual explicit-stage interval must be determined from the chosen RK tableau/execution design before implementing the rate-level anti-reversal limiter. This precondition must not turn a zero-weight RK stage into a spurious source step.
+
+**Implementation progress:** removed the post-Newton rheology motion projection from `src/numerics/nonlinear_solver_2d.f90`, preserving the converged nonlinear state. The existing semi-implicit call still lives in that generic solver and the explicit rate-level limiter / `dt` interface plumbing remain to be migrated. **No compilation or regression tests run in this commit.**
