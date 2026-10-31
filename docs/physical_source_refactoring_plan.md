@@ -76,3 +76,40 @@ ogni modello fisico. Nessun wrapper o livello di dispatch intermedio.
 - [ ] Riutilizzare gli stati costruiti in source assembly.
 - [ ] Verificare Build only e Physics regressions (D17/D18) al termine
       dell'intero blocco, poi Solver validation.
+
+## Decisione approvata: futuro refactoring pore pressure (DA ESEGUIRE)
+- Creare `src/physics/pore_pressure_laws/` con coordinatore
+  `pore_pressure_laws_2d.f90` e modello
+  `pore_pressure_dissipation_2d.f90`, ognuno con quattro ingressi
+  ordinati (explicit, semi_implicit, implicit, analytic), stato reale
+  salvo implicit complesso. La famiglia comprende esclusivamente
+  dissipazione/diffusione della pressione interstiziale.
+- La fisica dovuta a scambio di massa e iniezione NON risiede nella
+  famiglia pore pressure e NON va calcolata nei coordinatori
+  `mass_exchange_2d.f90` e `mass_injection_2d.f90`.
+  Ogni modulo di processo specifico calcola tutti i rate delle equazioni
+  conservative che il processo modifica, incluso il rate di pressione
+  interstiziale; ogni coordinatore seleziona, limita e somma.
+- Spostare `eval_pore_pressure_gas_loss` nel modello Darcy di mass
+  exchange; `eval_pore_pressure_inlet_source` nei modelli specifici
+  di iniezione; distribuire
+  `eval_pore_pressure_mass_exchange_source` nei modelli specifici
+  di mass exchange. Le proprietà costitutive veramente condivise
+  possono restare in un helper fisico separato, non nel coordinatore.
+- Particolare attenzione allo scambio di massa: oggi il contributo
+  di pressione è determinato dal rate netto dopo i limitatori.
+  Verificare matematicamente linearità e ripartizione per processo;
+  estendere `mass_exchange_rates_type` ai rate di pressione se necessario,
+  scalando tali rate assieme al processo. Preservare il totale ottenuto
+  dopo vincoli carrier/packing e impedire doppi conteggi.
+- Aggiornare Makefile.am, import, test e chiamanti; preservare le
+  verifiche complex-step e propagazione analitica. Nessun nuovo tipo
+  di stato, wrapper o formula di coordinamento.
+- Questa sezione registra una decisione progettuale, NON una modifica
+  già implementata. Procedere prima con il refactoring in corso e
+  convalidare le modifiche con Build e Physics Regressions.
+
+## Baseline di validazione
+- L'utente conferma Build e Physics Regressions entrambe riuscite
+  dopo il blocco di pulizia delle sorgenti fino al commit `279f5b7`.
+  Solver validation e confronto prestazionale ancora da eseguire.
