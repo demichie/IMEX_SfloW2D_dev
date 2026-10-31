@@ -308,13 +308,15 @@ Implicit/semi-implicit groups with zero effective implicit interval (e.g. `a_ii=
 
 This section explicitly supersedes the blanket `dt>0` precondition in section 19. **Documentation only; Fortran implementation and tests pending.**
 
-## 21. Time interval used by rheology reversal limiter (corrected agreement)
+## 21. Time interval used by the rheology reversal limiter (final agreed distinction)
 
-**Correction to the previous wording:** the anti-reversal limiter uses the **time interval of the current RK stage (`dt` of the stage)**, **not** the full global simulation step `Delta t`. The preceding statement that the limiter always uses the global step is withdrawn.
+**Explicit and semi-implicit rheology use different limiter intervals:**
 
-- At each explicit RK stage, the rheological rate is evaluated if required by the tableau, including when one or more coefficients are zero. Its anti-reversal limiter uses the stage interval **when positive**; if the interval supplied for this particular rate evaluation is zero, the rate must still be evaluated and the interval-dependent limiter is skipped.
-- For a semi-implicit stage contribution, use its actual stage interval consistently with the applied semi-implicit increment. The Newton result is never projected afterward.
-- Do **not** infer the explicit-stage interval from one arbitrary tableau entry. The precise convention for the explicit group splitting interval must be established in the RK splitting design before threading the value through the Fortran call chain.
-- No change to the RK tableau coefficients or rate assembly is implied.
+- **EXPLICIT/STAGE:** the rheology anti-reversal limiter uses the **full current global time step `dt_global`**, even if the explicit source rate is evaluated at an RK stage where some explicit tableau coefficients are zero. Compute the rate whenever RK requires it; do not skip evaluation due to a zero tableau coefficient. The full-step interval is the limiter horizon, **not** an instruction to multiply that rate by a full step during the stage or to change the RK tableau.
+- **SEMI_IMPLICIT/STAGE:** the rheology anti-reversal limiter uses the **actual implicit-stage interval `dt = a_ii * dt_global`**, which is also the interval of the applied semi-implicit predictor increment. When `a_ii=0`, the implicit group is skipped, as agreed. In the currently implemented RK tableaux, every executed implicit stage has `a_ii>0`.
+- **NEWTON and ANALYTIC:** no additional rheology anti-reversal limiter.
+- Where `eval_rheology_explicit` or `eval_rheology_semi_implicit` receives the argument named `dt`, the **caller** passes the interval specified above. The rheology family sums its physical-model contributions at one incoming state and applies the limiter once to the aggregate rate.
+- This explicit/implicit distinction supersedes the earlier contradictory interval statements in sections 17, 19, 20, and the previous form of section 21. Do not infer the explicit limiter interval from any particular explicit RK tableau entry.
+- **Numerical caveat for future validation:** independently limiting stage rates over the global step does not itself guarantee that the final weighted RK combination cannot reverse motion; verify end-of-step behavior in regression tests without inserting an additional hidden RK-level friction projection.
 
-**Status:** corrected design record; implementation and testing pending.
+**Status:** corrected architecture decision only; full Fortran interface propagation, relocation of the remaining semi-implicit limiter, explicit rate limiter and tests are not yet complete.
