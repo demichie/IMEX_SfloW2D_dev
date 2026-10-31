@@ -30,7 +30,7 @@ PROGRAM test_mass_exchange
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
-  USE thermal_cooling_2d, ONLY : solve_thermal_cooling_analytic
+  USE thermal_cooling_2d, ONLY : eval_thermal_cooling_analytic
 
   IMPLICIT NONE
 
@@ -111,7 +111,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: result
     TYPE(physical_state_type) :: state
     state%T=temperature
-    CALL solve_thermal_cooling_analytic(state,step,capacity,radiative,convective,ambient,result)
+    CALL eval_thermal_cooling_analytic(state,step,capacity,radiative,convective,ambient,result)
   END SUBROUTINE test_cooling_analytic
 
 
