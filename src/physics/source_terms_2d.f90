@@ -368,15 +368,8 @@ CONTAINS
 
     REAL(wp) :: source_term(n_eqns)
 
-
-    REAL(wp) :: r_h               !< real-value flow thickness
     REAL(wp) :: r_u               !< real-value x-velocity
     REAL(wp) :: r_v               !< real-value y-velocity
-    REAL(wp) :: r_rho_c
-    REAL(wp) :: r_Ri
-    REAL(wp) :: r_sp_heat_c
-    REAL(wp) :: r_sp_heat_mix
-
     TYPE(physical_state_type) :: physical_state
     LOGICAL :: selected_rheology
     CHARACTER(LEN=64) :: selected_model_name
@@ -398,8 +391,6 @@ CONTAINS
     source_term(1:n_eqns) = 0.0_wp
 
     rheology_if:IF (rheology_flag .AND. selected_rheology) THEN
-
-       r_h = qpj(idx_h)
        r_u = qpj(idx_u)
        r_v = qpj(idx_v)
 
