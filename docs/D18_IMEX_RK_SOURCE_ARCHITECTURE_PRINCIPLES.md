@@ -399,3 +399,15 @@ This **explicitly supersedes** the EXPLICIT/STAGE sequential-update instructions
 **Reason for the change:** with two overlapping explicit source operators, feeding a stage-local sequential effective rate into an otherwise unchanged RK2/RK3 tableau introduces an O(dt) perturbation to the RHS and can reduce global temporal order to one. Replacing the intermediate interval by `a_ii*dt` does not generally fix this. Therefore preserve same-state explicit stage evaluations and reserve ordered advancement for STEP.
 
 **Status:** architecture decision recorded; superseding the earlier explicit-STAGE update specification. No Fortran change or regression test is claimed here.
+
+## 27. Joint physical limiters receive separate process rates (agreed)
+
+**Decision:** when multiple explicitly evaluated physical processes contribute to the **same simultaneous update**, the limiter receives **each process's full conservative rate separately**, as well as the common input state and any relevant physical inventories/context. The assembler preserves process identity through limiting, then sums the adjusted individual rates into the **single final conservative rate** passed to the RK tableau or STEP update. Do not discard provenance by summing first and exposing only the net vector to the limiter.
+
+At **EXPLICIT/STAGE**, every applicable spatial/source rate is evaluated on the same unmodified RK stage state (section 26), including rates from distinct source families and groups. Any joint physical limiter for overlapping inventories or momentum effects must account for the contributions that are applied together, potentially across group boundaries. Limiting does not advance or mutate the shared stage state. Preserve the spatial flux operator's conservative intercell formulation: a local limiter must not arbitrarily rescale flux-divergence contributions without a conservation-preserving flux-level construction.
+
+At **EXPLICIT/STEP**, processes within one group share the same incoming state and must be limited jointly if they compete for shared physical inventories. After applying that group's limited aggregate increment over the full dt, the next STEP group uses the updated state. There is no blanket joint limiter spanning sequential STEP groups, because they are not simultaneous.
+
+**Ownership:** physical models compute raw individual rates and may enforce constitutive constraints intrinsic to their own law; the coordinating source assembler/executor gathers the separate contributions and invokes physical-domain joint limiters that understand inventories and process meaning. The generic Newton or RK algebra routines do not invent broad, indiscriminate clipping rules. Retain per-process outputs until joint limiting is complete, then expose the aggregate rate and appropriate state transaction. Specific limiter algorithms and exact module/routine placement remain implementation work, not newly decided here.
+
+**Status:** architectural rule recorded; no Fortran or numerical tests changed.
