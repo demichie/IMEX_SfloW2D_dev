@@ -33,6 +33,14 @@ ogni modello fisico. Nessun wrapper o livello di dispatch intermedio.
   Mantenere invece gli argomenti realmente esterni: tempo, geometria,
   condizioni ambientali, substrato e parametri della legge.
   Valutare il costo dei ricalcoli per non introdurre regressioni.
+- Gli stati reali e complessi contengono le grandezze cinematiche derivate
+  `w`, `mod_vel_hor`, `mod_vel2`, `mod_vel` e
+  `curvature_acceleration`, insieme alle derivate topografiche necessarie.
+  Ogni modifica di `u`, `v` o delle derivate topografiche deve essere
+  seguita da `update_physical_state_kinematics`. Le valutazioni complex-step
+  impiegano somme di quadrati complessi, mai `ABS` delle velocità.
+  La geometria deve essere passata esplicitamente per la cella interessata;
+  i valori zero iniziali non sono sostituti di una topografia non piana.
 - Assemblare lo stato una volta quando possibile, senza conversioni
   reali/complesse superflue. Gli stati temporanei devono essere locali
   e thread-safe. Nessun nuovo tipo specifico di famiglia.
@@ -47,6 +55,9 @@ ogni modello fisico. Nessun wrapper o livello di dispatch intermedio.
 - [x] Rimossi livelli privati di dispatch ridondanti in thermal e rheology.
 - [x] Rimossa la routine di forwarding esplicita del mass exchange.
 - [ ] Eliminare gli argomenti derivabili dallo stato laddove possibile.
+- [x] Aggiungere i campi cinematici ai due stati e aggiornamento esplicito.
+- [ ] Passare geometria allo stato direttamente nel punto di costruzione,
+      evitando la copia locale del coordinatore e verificando tutti i chiamanti.
 - [x] Confermare il contratto: espliciti sempre reali; conversione locale negli espliciti compositi.
 - [ ] Verificare tutte le firme e le conversioni degli espliciti compositi.
 - [ ] Semplificare selezione/configurazione dei processi senza duplicazione.
