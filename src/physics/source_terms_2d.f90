@@ -120,45 +120,13 @@ CONTAINS
     LOGICAL :: pore_ok
     LOGICAL :: supported
     CHARACTER(LEN=64) :: selected_model_name
-    TYPE(source_group_type) :: component
-    REAL(wp) :: component_state(n_vars)
-    INTEGER :: part
-
     q_after=q_before
     status=-5
     IF (group%method/=SOURCE_METHOD_ANALYTIC) RETURN
-    IF (.NOT.ALLOCATED(group%equation_ids)) RETURN
-    ! A mixed group is one ordered sweep of complete physical operators.
-    IF (SIZE(group%equation_ids)>1 .AND. &
-         .NOT.(SIZE(group%equation_ids)==2 .AND. &
-         ANY(group%equation_ids==2) .AND. ANY(group%equation_ids==3))) THEN
-      component=group
-      DO part=1,3
-        SELECT CASE(part)
-        CASE(1)
-          IF (.NOT.ANY(group%equation_ids==2)) CYCLE
-          component%equation_ids=[2,3]
-        CASE(2)
-          IF (.NOT.ANY(group%equation_ids==4)) CYCLE
-          component%equation_ids=[4]
-        CASE(3)
-          IF (.NOT.pore_pressure_flag) CYCLE
-          IF (.NOT.ANY(group%equation_ids==idx_pore)) CYCLE
-          component%equation_ids=[idx_pore]
-        END SELECT
-        CALL eval_source_analytic_state(component,q_after,context,interval, &
-             component_state,status)
-        IF (status/=0) RETURN
-        q_after=component_state
-      END DO
-      status=0
-      RETURN
-    END IF
-    ! The group owns the analytic operator and its complete equation target.
-    SELECT CASE(SIZE(group%equation_ids))
-    CASE(2)
-      IF (.NOT.(ANY(group%equation_ids==2) .AND. &
-           ANY(group%equation_ids==3))) RETURN
+    IF (.NOT.ALLOCATED(group%source_names)) RETURN
+    IF (SIZE(group%source_names)/=1) RETURN
+    selected_model_name=TRIM(group%source_names(1))
+    IF (INDEX(selected_model_name,'rheology_')==1) THEN
       IF (rheology_flag) THEN
 
         CALL real_physical_state_from_q(q_before, physical_state, &
@@ -170,7 +138,6 @@ CONTAINS
              speed_ratio=physical_state%mod_vel/horizontal_speed
         curvature_accel=physical_state%curvature_acceleration
         velocity_after=[physical_state%u,physical_state%v]
-        selected_model_name=group_rheology_name(group)
         IF (LEN_TRIM(selected_model_name)==0) THEN
           status=-7
           RETURN
@@ -188,8 +155,7 @@ CONTAINS
       END IF
       status=0
 
-    CASE(1)
-      IF (group%equation_ids(1)==4) THEN
+    ELSE IF (selected_model_name=='thermal_cooling') THEN
       IF (.NOT.thermal_cooling_flag) THEN
         status=-2
         RETURN
@@ -209,7 +175,7 @@ CONTAINS
       q_after(4)=heat_capacity*temperature_after
       status=0
 
-      ELSE IF (group%equation_ids(1)==idx_pore .AND. pore_pressure_flag) THEN
+    ELSE IF (selected_model_name=='pore_pressure_dissipation' .AND. pore_pressure_flag) THEN
       IF (q_before(1)>0.0_wp) THEN
 
         CALL real_physical_state_from_q(q_before, physical_state, &
@@ -224,10 +190,9 @@ CONTAINS
         q_after(1:n_eqns)=q_before(1:n_eqns)+interval*pore_rate
       END IF
       status=0
-      ELSE
-        RETURN
-      END IF
-    END SELECT
+    ELSE
+      RETURN
+    END IF
   END SUBROUTINE eval_source_analytic
 
 
