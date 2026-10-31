@@ -217,24 +217,35 @@ def main() -> int:
         failures.append("missing canonical name-based rheology role selector")
     elif "rheology_id_" in role_match.group(1).lower():
         failures.append("canonical rheology role selector must not use numeric rheology IDs")
-    # Verify the three concrete physical dispatchers and their assembly callers.
+    # Verify the canonical multi-process public contract and private model dispatch.
     rheology_dispatch = (PHYSICS / "rheology_laws/rheology_2d.f90").read_text(encoding="utf-8")
     assembly = (PHYSICS / "source_terms_2d.f90").read_text(encoding="utf-8")
     for routine in ("eval_rheology_semi_implicit", "eval_rheology_implicit",
                     "solve_rheology_analytic"):
-        match = re.search(
-            rf"(?is)\bSUBROUTINE\s+{routine}\s*\(.*?"
-            rf"END\s+SUBROUTINE\s+{routine}\b", rheology_dispatch
+        public_match = re.search(
+            rf"(?is)\\bSUBROUTINE\\s+{routine}\\s*\\(\\s*models\\s*,.*?"
+            rf"END\\s+SUBROUTINE\\s+{routine}\\b", rheology_dispatch
         )
-        if match is None or "SELECT CASE(TRIM(model_name))" not in match.group(0):
-            failures.append(f"{routine}: must dispatch by canonical model_name")
-        elif re.search(r"(?i)\bCASE\s*\(\s*rheology_id_", match.group(0)):
+        private_match = re.search(
+            rf"(?is)\\bSUBROUTINE\\s+{routine}_dispatch\\s*\\(.*?"
+            rf"END\\s+SUBROUTINE\\s+{routine}_dispatch\\b", rheology_dispatch
+        )
+        if (public_match is None
+                or not re.search(r"(?i)DO\\s+\\w+\\s*=\\s*1\\s*,\\s*SIZE\\s*\\(\\s*models\\s*\\)",
+                                 public_match.group(0))
+                or not re.search(rf"(?i)CALL\\s+{routine}_dispatch\\s*\\(\\s*TRIM\\s*\\(\\s*models\\s*\\(",
+                                 public_match.group(0))
+                or private_match is None
+                or not re.search(r"(?i)SELECT\\s+CASE\\s*\\(\\s*TRIM\\s*\\(\\s*model_name\\s*\\)\\s*\\)",
+                                 private_match.group(0))):
+            failures.append(f"{routine}: must dispatch every canonical model name")
+        elif re.search(r"(?i)\\bCASE\\s*\\(\\s*rheology_id_", private_match.group(0)):
             failures.append(f"{routine}: numeric rheology dispatch reintroduced")
         if not re.search(
-            rf"(?i)CALL\s+{routine}\s*\(\s*selected_model_name\b",
+            rf"(?i)CALL\\s+{routine}\\s*\\(\\s*\\[\\s*selected_model_name\\s*\\]",
             assembly
         ):
-            failures.append(f"{routine}: source assembly must pass selected canonical name")
+            failures.append(f"{routine}: source assembly must pass canonical model-name list")
     if "selected_model_name=group_rheology_name(group)" not in assembly:
         failures.append("group source names must determine the active rheology")
     if re.search(r"(?i)group_has_role\(\s*group\s*,[^)]*rheology_model_id", assembly):
