@@ -15,16 +15,42 @@ MODULE pore_pressure_darcy_2d
        sp_gas_const_a, pres, diam_s, sphericity_s, maximum_solid_packing,       &
        dynamic_permeability_flag, muRef_Suth, Tref_Suth, S_mu
   USE geometry_2d, ONLY : pi_g
-  USE state_conversion_2d, ONLY : physical_state_type, mixt_var_state
+  USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, &
+       mixt_var_state
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
   IMPLICIT NONE
 
   PRIVATE
 
+  PUBLIC :: eval_pore_pressure_darcy_explicit
+  PUBLIC :: eval_pore_pressure_darcy_semi_implicit
+  PUBLIC :: eval_pore_pressure_darcy_implicit
   PUBLIC :: solve_pore_pressure_darcy_analytic
 
 CONTAINS
+
+  !> Unsupported methods are deliberate errors, never zero-valued sources.
+  SUBROUTINE eval_pore_pressure_darcy_explicit(state,rate,include_gas_loss)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
+    CALL fatal_error('Darcy pore pressure supports ANALYTIC/STEP only (EXPLICIT unavailable)')
+  END SUBROUTINE eval_pore_pressure_darcy_explicit
+
+  SUBROUTINE eval_pore_pressure_darcy_semi_implicit(state,rate,include_gas_loss)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
+    CALL fatal_error('Darcy pore pressure supports ANALYTIC/STEP only (SEMI_IMPLICIT unavailable)')
+  END SUBROUTINE eval_pore_pressure_darcy_semi_implicit
+
+  SUBROUTINE eval_pore_pressure_darcy_implicit(state,rate,include_gas_loss)
+    TYPE(complex_physical_state_type), INTENT(IN) :: state
+    COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
+    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
+    CALL fatal_error('Darcy pore pressure supports ANALYTIC/STEP only (NEWTON unavailable)')
+  END SUBROUTINE eval_pore_pressure_darcy_implicit
 
   !> Integrate frozen-coefficient Darcy directly and return the full
   !> conservative mean rate for the selected substep.

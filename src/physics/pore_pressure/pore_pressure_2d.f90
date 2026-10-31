@@ -1,4 +1,4 @@
-!> Dispatch pore-pressure analytic models through the conservative rate interface.
+!> Dispatch pore-pressure models through four standard numerical interfaces.
 !> The model list contains canonical names, allowing future physical models
 !> to be added without changing any caller. Darcy is the only model today.
 MODULE pore_pressure_2d
@@ -6,11 +6,64 @@ MODULE pore_pressure_2d
   USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
   USE diagnostics_2d, ONLY : fatal_error
   USE pore_pressure_darcy_2d, ONLY : &
+       darcy_explicit => eval_pore_pressure_darcy_explicit, &
+       darcy_semi_implicit => eval_pore_pressure_darcy_semi_implicit, &
+       darcy_implicit => eval_pore_pressure_darcy_implicit, &
        darcy_analytic => solve_pore_pressure_darcy_analytic
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: solve_pore_pressure_analytic
+  PUBLIC :: eval_pore_pressure_explicit, eval_pore_pressure_semi_implicit
+  PUBLIC :: eval_pore_pressure_implicit, solve_pore_pressure_analytic
 CONTAINS
+
+  SUBROUTINE eval_pore_pressure_explicit(models,state,rate,include_gas_loss)
+    CHARACTER(*), INTENT(IN) :: models(:)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
+    INTEGER :: i
+    rate=0.0_wp
+    DO i=1,SIZE(models)
+      SELECT CASE(TRIM(models(i)))
+      CASE('pore_pressure_darcy')
+        CALL darcy_explicit(state,rate,include_gas_loss)
+      CASE DEFAULT
+        CALL fatal_error('Unknown explicit pore-pressure model: '//TRIM(models(i)))
+      END SELECT
+    END DO
+  END SUBROUTINE eval_pore_pressure_explicit
+
+  SUBROUTINE eval_pore_pressure_semi_implicit(models,state,rate)
+    CHARACTER(*), INTENT(IN) :: models(:)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    INTEGER :: i
+    rate=0.0_wp
+    DO i=1,SIZE(models)
+      SELECT CASE(TRIM(models(i)))
+      CASE('pore_pressure_darcy')
+        CALL darcy_semi_implicit(state,rate)
+      CASE DEFAULT
+        CALL fatal_error('Unknown semi-implicit pore-pressure model: '//TRIM(models(i)))
+      END SELECT
+    END DO
+  END SUBROUTINE eval_pore_pressure_semi_implicit
+
+  SUBROUTINE eval_pore_pressure_implicit(models,state,rate)
+    CHARACTER(*), INTENT(IN) :: models(:)
+    TYPE(complex_physical_state_type), INTENT(IN) :: state
+    COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
+    INTEGER :: i
+    rate=CMPLX(0.0_wp,0.0_wp,wp)
+    DO i=1,SIZE(models)
+      SELECT CASE(TRIM(models(i)))
+      CASE('pore_pressure_darcy')
+        CALL darcy_implicit(state,rate)
+      CASE DEFAULT
+        CALL fatal_error('Unknown implicit pore-pressure model: '//TRIM(models(i)))
+      END SELECT
+    END DO
+  END SUBROUTINE eval_pore_pressure_implicit
 
   !> Complete conservative average rate for the selected analytic operator.
   !> For sequential operators, reconstruct the physical state before
