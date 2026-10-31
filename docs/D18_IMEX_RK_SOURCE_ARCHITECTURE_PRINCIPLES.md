@@ -36,6 +36,8 @@ S_g = sum_k S_(g,k)(q_in)         ! All processes see identical input q_in
 q^(g) = q_in + tau * S_g         ! One update, after summing
 ```
 
+**Distinct EXPLICIT groups are sequential:** evaluate each explicit group's rates using the conservative state already modified by all preceding groups, including preceding EXPLICIT groups. This applies to both `STAGE` and `STEP`; explicit groups are not evaluated independently against a common original state. The correct intermediate update coefficient at `STAGE` must be derived from the explicit IMEX-RK tableau rather than assumed equal to the implicit diagonal coefficient.
+
 The sequential updated-state rule applies **between** groups. An explicit group's member processes are **not** a sequential sub-splitting. If their combined increment needs additional admissibility control, its behavior must be defined explicitly rather than silently changing the common-input evaluation contract.
 
 ## 3. Sequential splitting contract (both CADENCE values)
@@ -139,7 +141,7 @@ These are **open design decisions**, not implementation approvals. Resolve them 
 | ID | Decision | Minimal option to assess | Required verification |
 | --- | --- | --- | --- |
 | A1 | **One STAGE execution path:** how do EXPLICIT, NEWTON, ANALYTIC and semi-implicit contributions enter a sequential ordered stage sweep? | One group executor with method-specific evaluations, rather than separate explicit accumulation and implicit loop. | Butcher-tableau consistency, sequential observation of updated state, complete rate bookkeeping. |
-| A2 | **EXPLICIT at STAGE:** what does sequential application mean when an explicit RK contribution belongs to a different tableau than the diagonal implicit source increment? | Distinguish RK explicit evaluation from an actual state-advancing split operator where mathematically necessary; do not silently assign the same `a_ii dt` to both. | Derive stage and end-of-step formulas; check RK order on noncommuting and coupled source examples. |
+| A2 | **EXPLICIT at STAGE:** what stage-consistent intermediate state increment allows sequential explicit groups with a distinct explicit RK tableau? | Distinguish RK explicit evaluation from an actual state-advancing split operator where mathematically necessary; do not silently assign the same `a_ii dt` to both. | Derive stage and end-of-step formulas; check RK order on noncommuting and coupled source examples. |
 | A3 | **Newton group unknowns:** what is the smallest representation of active unknowns when successive groups touch the same equations? | A group-local unknown-index array passed only to Newton; eliminate or radically shrink `equation_partition_type` if no independent user remains. | Overlapping-group solves in both orders; convergence and residual correctness. |
 | A4 | **Single rate contract:** should group evaluation return only complete conservative `rate(n_eqns)`, or also a candidate state/status? | Prefer `rate(n_eqns)` plus admissibility/status; a single executor owns the `q += tau*rate` update. | Conservation, limiter semantics, no duplicate updates, error paths. |
 | A5 | **STAGE effective rate:** how are all sequential increments represented in `IM_terms` and `EX_terms`? | Compute one effective increment from final minus starting stage state for the relevant tableau contribution, not a second independently applied source. | Stage reconstruction, no double counting, correct RK recurrence. |
