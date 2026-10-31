@@ -52,7 +52,7 @@ CONTAINS
         ! physical phase exists. Lava deposition is dispatched independently below.
         IF (gas_flag .OR. liquid_flag) THEN
             alpha=SUM(physical_state%alphas)
-            CALL eval_mass_exchange_erosion_explicit(physical_state,Bx,By,erodible, &
+            CALL eval_mass_exchange_erosion_explicit(physical_state,erodible, &
                       dt,process_rates)
             ! Erosion can increase packing by importing a solid-rich substrate.
             ! Limit it before accumulating any conservative or bed contribution.
