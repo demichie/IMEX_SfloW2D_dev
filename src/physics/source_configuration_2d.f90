@@ -342,17 +342,17 @@ CONTAINS
     ALLOCATE(partition_methods(SIZE(stages)))
     mask=.FALSE.; membership=0; partition_methods=0; compact=0
     DO i=1,SIZE(stages)
-      IF (stages(i)%method==SOURCE_METHOD_EXPLICIT) CYCLE
+      ! Only Newton unknowns belong to the equation partition.
+      ! Analytic groups are complete sequential conservative operators.
+      IF (stages(i)%method/=SOURCE_METHOD_NEWTON) CYCLE
       compact=compact+1
       partition_methods(compact)=IM_GROUP_METHOD_NEWTON
-      IF (stages(i)%method==SOURCE_METHOD_ANALYTIC) &
-           partition_methods(compact)=IM_GROUP_METHOD_ANALYTIC
       DO j=1,SIZE(stages(i)%equation_ids)
         eq=stages(i)%equation_ids(j)
-        IF (membership(eq)>0) THEN
-          error='D18: equation belongs to multiple implicit groups'; RETURN
-        END IF
-        membership(eq)=compact; mask(eq)=.TRUE.
+        ! Overlap of Newton unknowns across sequential groups is allowed.
+        ! The partition stores a representative membership only.
+        IF (membership(eq)==0) membership(eq)=compact
+        mask(eq)=.TRUE.
       END DO
     END DO
     CALL partition%initialize(mask,membership,partition_methods(1:compact))
