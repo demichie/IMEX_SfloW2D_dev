@@ -38,8 +38,7 @@ CONTAINS
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: interval,heat_capacity,radiative,convective,ambient
     REAL(wp), INTENT(OUT) :: temperature_after
-    REAL(wp) :: temperature, integration_step, areal_heat_capacity
-    REAL(wp) :: radiative_coefficient, convective_coefficient, ambient_temperature
+    REAL(wp) :: temperature
     REAL(wp) :: beta, cubic_root, lower, upper, midpoint
     REAL(wp) :: initial_primitive, target_primitive, midpoint_primitive
     REAL(wp) :: elapsed_scale, tolerance
@@ -47,66 +46,61 @@ CONTAINS
 
 
     temperature = state%T
-    integration_step = interval
-    areal_heat_capacity = heat_capacity
-    radiative_coefficient = radiative
-    convective_coefficient = convective
-    ambient_temperature = ambient
 
     IF (.NOT. ieee_is_finite(temperature) .OR.                              &
-         .NOT. ieee_is_finite(integration_step) .OR.                        &
-         .NOT. ieee_is_finite(areal_heat_capacity) .OR.                    &
-         .NOT. ieee_is_finite(radiative_coefficient) .OR.                  &
-         .NOT. ieee_is_finite(convective_coefficient) .OR.                 &
-         .NOT. ieee_is_finite(ambient_temperature)) THEN
+         .NOT. ieee_is_finite(interval) .OR.                        &
+         .NOT. ieee_is_finite(heat_capacity) .OR.                    &
+         .NOT. ieee_is_finite(radiative) .OR.                  &
+         .NOT. ieee_is_finite(convective) .OR.                 &
+         .NOT. ieee_is_finite(ambient)) THEN
        CALL fatal_error('Nonfinite input to exact lava cooling integrator')
     END IF
-    IF (temperature .LE. 0.0_wp .OR. ambient_temperature .LE. 0.0_wp) THEN
+    IF (temperature .LE. 0.0_wp .OR. ambient .LE. 0.0_wp) THEN
        CALL fatal_error('Nonpositive temperature in exact lava cooling integrator')
     END IF
-    IF (integration_step .LT. 0.0_wp .OR. areal_heat_capacity .LE. 0.0_wp) THEN
+    IF (interval .LT. 0.0_wp .OR. heat_capacity .LE. 0.0_wp) THEN
        CALL fatal_error('Invalid time or heat capacity in exact lava cooling integrator')
     END IF
-    IF (radiative_coefficient .LT. 0.0_wp .OR.                            &
-         convective_coefficient .LT. 0.0_wp) THEN
+    IF (radiative .LT. 0.0_wp .OR.                            &
+         convective .LT. 0.0_wp) THEN
        CALL fatal_error('Negative cooling coefficient in exact lava cooling integrator')
     END IF
 
     temperature_after = temperature
-    IF (integration_step .EQ. 0.0_wp .OR.                                   &
-         (radiative_coefficient .EQ. 0.0_wp .AND.                          &
-         convective_coefficient .EQ. 0.0_wp) .OR.                          &
-         temperature .EQ. ambient_temperature) RETURN
+    IF (interval .EQ. 0.0_wp .OR.                                   &
+         (radiative .EQ. 0.0_wp .AND.                          &
+         convective .EQ. 0.0_wp) .OR.                          &
+         temperature .EQ. ambient) RETURN
 
-    IF (radiative_coefficient .EQ. 0.0_wp) THEN
-       temperature_after = ambient_temperature + (temperature -             &
-            ambient_temperature) * EXP(-convective_coefficient *          &
-            integration_step / areal_heat_capacity)
+    IF (radiative .EQ. 0.0_wp) THEN
+       temperature_after = ambient + (temperature -             &
+            ambient) * EXP(-convective *          &
+            interval / heat_capacity)
        RETURN
     END IF
 
-    beta = convective_coefficient / (radiative_coefficient *               &
-         ambient_temperature**3)
+    beta = convective / (radiative *               &
+         ambient**3)
     IF (.NOT. ieee_is_finite(beta)) THEN
        CALL fatal_error('Cooling coefficient ratio overflow in lava integrator')
     END IF
     CALL lava_cooling_cubic_root(beta, cubic_root)
 
     initial_primitive = lava_cooling_time_primitive(                        &
-         temperature / ambient_temperature, beta, cubic_root)
-    elapsed_scale = radiative_coefficient * ambient_temperature**3 *        &
-         integration_step / areal_heat_capacity
+         temperature / ambient, beta, cubic_root)
+    elapsed_scale = radiative * ambient**3 *        &
+         interval / heat_capacity
     IF (.NOT. ieee_is_finite(elapsed_scale)) THEN
-       temperature_after = ambient_temperature
+       temperature_after = ambient
        RETURN
     END IF
     target_primitive = initial_primitive - elapsed_scale
 
-    IF (temperature .GT. ambient_temperature) THEN
+    IF (temperature .GT. ambient) THEN
        lower = 1.0_wp
-       upper = temperature / ambient_temperature
+       upper = temperature / ambient
     ELSE
-       lower = temperature / ambient_temperature
+       lower = temperature / ambient
        upper = 1.0_wp
     END IF
 
@@ -117,7 +111,7 @@ CONTAINS
        IF (midpoint .EQ. lower .OR. midpoint .EQ. upper .OR.                &
             ABS(upper - lower) .LE. tolerance) EXIT
        IF (midpoint .EQ. 1.0_wp) THEN
-          IF (temperature .GT. ambient_temperature) THEN
+          IF (temperature .GT. ambient) THEN
              lower = midpoint
           ELSE
              upper = midpoint
@@ -127,7 +121,7 @@ CONTAINS
 
        midpoint_primitive = lava_cooling_time_primitive(midpoint, beta,       &
             cubic_root)
-       IF (temperature .GT. ambient_temperature) THEN
+       IF (temperature .GT. ambient) THEN
           IF (midpoint_primitive .LT. target_primitive) THEN
              lower = midpoint
           ELSE
@@ -146,12 +140,12 @@ CONTAINS
     END IF
 
     midpoint = lower + 0.5_wp * (upper - lower)
-    temperature_after = ambient_temperature * midpoint
-    IF (temperature .GT. ambient_temperature) THEN
-       temperature_after = MAX(ambient_temperature,                        &
+    temperature_after = ambient * midpoint
+    IF (temperature .GT. ambient) THEN
+       temperature_after = MAX(ambient,                        &
             MIN(temperature, temperature_after))
     ELSE
-       temperature_after = MIN(ambient_temperature,                        &
+       temperature_after = MIN(ambient,                        &
             MAX(temperature, temperature_after))
     END IF
 
