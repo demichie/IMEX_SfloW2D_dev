@@ -6,11 +6,11 @@ MODULE thermal_laws_2d
   USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
   USE thermal_cooling_2d, ONLY : eval_thermal_cooling_explicit, &
        eval_thermal_cooling_semi_implicit, eval_thermal_cooling_implicit, &
-       solve_thermal_cooling_analytic
+       eval_thermal_cooling_analytic
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_thermal_explicit, eval_thermal_semi_implicit
-  PUBLIC :: eval_thermal_implicit, solve_thermal_analytic
+  PUBLIC :: eval_thermal_implicit, eval_thermal_analytic
 CONTAINS
 
   SUBROUTINE eval_thermal_explicit(models,state,radiative,convective,ambient,rate)
@@ -72,7 +72,7 @@ CONTAINS
   END SUBROUTINE eval_thermal_implicit
 
 
-  SUBROUTINE solve_thermal_analytic(models,state,interval,heat_capacity, &
+  SUBROUTINE eval_thermal_analytic(models,state,interval,heat_capacity, &
        radiative,convective,ambient,temperature_after)
     CHARACTER(*), INTENT(IN) :: models(:)
     TYPE(physical_state_type), INTENT(IN) :: state
@@ -85,13 +85,13 @@ CONTAINS
     DO i=1,SIZE(models)
       SELECT CASE (TRIM(models(i)))
       CASE ('thermal_cooling')
-        CALL solve_thermal_cooling_analytic(current_state,interval,heat_capacity, &
+        CALL eval_thermal_cooling_analytic(current_state,interval,heat_capacity, &
            radiative,convective,ambient,temperature_after)
       CASE DEFAULT
         CALL fatal_error('Unknown analytic thermal model: '//TRIM(models(i)))
       END SELECT
       current_state%T=temperature_after
     END DO
-  END SUBROUTINE solve_thermal_analytic
+  END SUBROUTINE eval_thermal_analytic
 
 END MODULE thermal_laws_2d

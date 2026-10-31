@@ -9,7 +9,7 @@ MODULE mass_boundary_injection_2d
   PUBLIC :: eval_boundary_injection_explicit
   PUBLIC :: eval_boundary_injection_semi_implicit
   PUBLIC :: eval_boundary_injection_implicit
-  PUBLIC :: solve_boundary_injection_analytic
+  PUBLIC :: eval_boundary_injection_analytic
 CONTAINS
   SUBROUTINE eval_boundary_injection_explicit( time, vect_x , vect_y , source_bdry )
 
@@ -96,9 +96,9 @@ CONTAINS
     CALL fatal_error('boundary_injection: implicit treatment is unsupported')
   END SUBROUTINE eval_boundary_injection_implicit
 
-  SUBROUTINE solve_boundary_injection_analytic(time, vect_x, vect_y, source_bdry)
+  SUBROUTINE eval_boundary_injection_analytic(time, vect_x, vect_y, source_bdry)
     REAL(wp), INTENT(IN) :: time, vect_x, vect_y
     REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
     CALL fatal_error('boundary_injection: analytic treatment is unsupported')
-  END SUBROUTINE solve_boundary_injection_analytic
+  END SUBROUTINE eval_boundary_injection_analytic
 END MODULE mass_boundary_injection_2d

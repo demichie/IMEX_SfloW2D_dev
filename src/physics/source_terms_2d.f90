@@ -12,10 +12,10 @@ MODULE source_terms_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
   USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit, &
-       solve_thermal_analytic
-  USE pore_pressure_2d, ONLY : solve_pore_pressure_analytic
+       eval_thermal_analytic
+  USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
   USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
-  USE rheology_2d, ONLY : curvature_acceleration, solve_rheology_analytic, &
+  USE rheology_2d, ONLY : curvature_acceleration, eval_rheology_analytic, &
        eval_rheology_implicit, eval_rheology_semi_implicit, &
        eval_rheology_explicit
   USE diagnostics_2d, ONLY : fatal_error
@@ -37,12 +37,12 @@ MODULE source_terms_2d
   PUBLIC :: eval_geometry_curvature_explicit
   PUBLIC :: eval_geometry_curvature_semi_implicit
   PUBLIC :: eval_geometry_curvature_implicit
-  PUBLIC :: solve_geometry_curvature_analytic
+  PUBLIC :: eval_geometry_curvature_analytic
   PUBLIC :: bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step
   PUBLIC :: eval_boundary_injection_explicit
   PUBLIC :: eval_boundary_injection_semi_implicit
   PUBLIC :: eval_boundary_injection_implicit
-  PUBLIC :: solve_boundary_injection_analytic
+  PUBLIC :: eval_boundary_injection_analytic
   ! Cell-local geometry and stochastic context for analytic source solves.
   TYPE :: analytic_term_context_type
     REAL(wp) :: Bprime_x=0.0_wp, Bprime_y=0.0_wp
@@ -142,7 +142,7 @@ CONTAINS
           status=-7
           RETURN
         END IF
-        CALL solve_rheology_analytic([selected_model_name], interval, physical_state, &
+        CALL eval_rheology_analytic([selected_model_name], interval, physical_state, &
              speed_ratio, context%grav_coeff, curvature_accel, pore_pressure_flag, &
              stochastic_flag, context%Zij, velocity_after, supported, &
              context%Bprime_x, context%Bprime_y, context%Bsecond_xx, &
@@ -169,7 +169,7 @@ CONTAINS
         RETURN
       END IF
       heat_capacity=q_before(4)/physical_state%T
-      CALL solve_thermal_analytic(['thermal_cooling'],physical_state,interval, &
+      CALL eval_thermal_analytic(['thermal_cooling'],physical_state,interval, &
            heat_capacity,radiative_term_coeff,convective_term_coeff, &
            T_env,temperature_after)
       q_after(4)=heat_capacity*temperature_after
@@ -181,7 +181,7 @@ CONTAINS
         CALL real_physical_state_from_q(q_before, physical_state, &
             context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
             context%Bsecond_xy,context%Bsecond_yy)
-        CALL solve_pore_pressure_analytic(['pore_pressure_darcy'], &
+        CALL eval_pore_pressure_analytic(['pore_pressure_darcy'], &
              physical_state,q_before(1:n_eqns),interval,pore_rate,pore_ok)
         IF (.NOT.pore_ok) THEN
           status=-9
@@ -580,7 +580,7 @@ CONTAINS
     CALL fatal_error('geometry_curvature: implicit treatment is unsupported')
   END SUBROUTINE eval_geometry_curvature_implicit
 
-  SUBROUTINE solve_geometry_curvature_analytic(Bprime_x, Bprime_y, &
+  SUBROUTINE eval_geometry_curvature_analytic(Bprime_x, Bprime_y, &
        Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
        mixture_mass, velocity_x, velocity_y, source_x, source_y)
     REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
@@ -589,7 +589,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
     REAL(wp), INTENT(OUT) :: source_x, source_y
     CALL fatal_error('geometry_curvature: analytic treatment is unsupported')
-  END SUBROUTINE solve_geometry_curvature_analytic
+  END SUBROUTINE eval_geometry_curvature_analytic
 
   !> \brief Evaluate the atomic explicit STEP mass-exchange rate.
   !> \details Returns rates only; it never mutates conservative state, bed or inventory.

@@ -7,7 +7,7 @@ MODULE thermal_cooling_2d
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_thermal_cooling_explicit, eval_thermal_cooling_semi_implicit
-  PUBLIC :: eval_thermal_cooling_implicit, solve_thermal_cooling_analytic
+  PUBLIC :: eval_thermal_cooling_implicit, eval_thermal_cooling_analytic
 CONTAINS
 
   SUBROUTINE eval_thermal_cooling_explicit(state,radiative,convective,ambient,rate)
@@ -33,7 +33,7 @@ CONTAINS
   END SUBROUTINE eval_thermal_cooling_implicit
 
 
-  SUBROUTINE solve_thermal_cooling_analytic(state,interval,heat_capacity, &
+  SUBROUTINE eval_thermal_cooling_analytic(state,interval,heat_capacity, &
        radiative,convective,ambient,temperature_after)
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: interval,heat_capacity,radiative,convective,ambient
@@ -149,7 +149,7 @@ CONTAINS
             MAX(temperature, temperature_after))
     END IF
 
-    END SUBROUTINE solve_thermal_cooling_analytic
+    END SUBROUTINE eval_thermal_cooling_analytic
 
 
 
