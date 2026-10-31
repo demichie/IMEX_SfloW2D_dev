@@ -307,3 +307,15 @@ Implicit/semi-implicit groups with zero effective implicit interval (e.g. `a_ii=
 **Still open:** the precise definition of an effective `dt` used to limit an explicit RK source rate when that same rate enters different later stages with different tableau weights. Do not assume a unique coefficient-driven increment without analyzing the RK assembly.
 
 This section explicitly supersedes the blanket `dt>0` precondition in section 19. **Documentation only; Fortran implementation and tests pending.**
+
+## 21. Time interval used by rheology reversal limiter (agreed)
+
+For the **rheology anti-reversal limiter**, use **the current full simulation step `dt` (global Δt)**, independent of the RK stage index and tableau coefficient. This is the physical limiting horizon; do **not** use a particular `a_ij*dt` or `a_ii*dt` as the limiter's `dt`. This resolves the open choice recorded in section 20.
+
+- An explicit RK rate is evaluated whenever required by RK dependencies, even if some tableau coefficients vanish. Its rheology anti-reversal limiter uses the **positive full-step `dt`**, so a zero tableau coefficient is **not** interpreted as `dt=0` for the limiter.
+- Semi-implicit rheology also uses the full current step as the **limiter horizon**, while the associated implicit predictor increment continues to use its mathematically required effective stage interval `a_ii*Δt`. The limiting horizon and the actually applied stage interval are distinct concepts and must be represented clearly in the implementation.
+- The generic RK stage equations and IMEX assembly retain the original tableau weights; this rule must not change them.
+- This applies specifically to the anti-reversal limiter, and supersedes the earlier proposal to use a tableau-derived effective interval as its time horizon. If a source evaluator also needs the actual applied interval for some other operation, do not silently conflate the two.
+- **Implementation check before coding:** ensure the full-step-limited semi-implicit *rate* is applied with `a_ii*Δt` exactly once and the Newton residual remains consistent. In particular, do not interpret `dt` as both full-step limiter horizon and applied predictor interval.
+
+**Design decision recorded; not yet implemented or tested.**
