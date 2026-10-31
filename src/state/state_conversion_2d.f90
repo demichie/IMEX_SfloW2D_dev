@@ -191,7 +191,6 @@ CONTAINS
          state%alphas, state%alphag)
     state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
     CALL update_physical_state_kinematics(state,bx,by,bxx,bxy,byy)
-    CALL update_physical_state_kinematics(state)
   END SUBROUTINE physical_state_from_qp
 
   !> Construct real physical properties from the current conservative state.
@@ -235,6 +234,7 @@ CONTAINS
        state%xs = q(idx_solid_first:idx_solid_last) / q(idx_totMassEqn)
        state%xg = q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
     END IF
+    CALL update_physical_state_kinematics(state,bx,by,bxx,bxy,byy)
   END SUBROUTINE physical_state_from_q
 
   !> Convert a fully prepared real physical state to a complex one.
