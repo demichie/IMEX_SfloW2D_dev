@@ -445,6 +445,9 @@ CONTAINS
 
 
 
+       CALL physical_state_from_qp(qpj, physical_state, Bprimej_x, Bprimej_y, &
+            Bsecondj_xx, Bsecondj_xy, Bsecondj_yy)
+
        CALL eval_rheology_semi_implicit([selected_model_name], physical_state, &
             grav_coeff, pore_pressure_flag, &
             stochastic_flag, Zj, source_term(2:3))
@@ -534,8 +537,6 @@ CONTAINS
        r_u = qpj(idx_u)
        r_v = qpj(idx_v)
 
-       CALL physical_state_from_qp(qpj, physical_state, Bprimej_x, Bprimej_y, &
-            Bsecondj_xx, Bsecondj_xy, Bsecondj_yy)
        r_rho_m = physical_state%rho_m
 
        q1 = r_h * r_rho_m
