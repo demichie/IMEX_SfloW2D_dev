@@ -74,9 +74,9 @@ MODULE source_catalog_2d
              default_method=SOURCE_METHOD_NEWTON, &
              default_cadence=SOURCE_CADENCE_STAGE, &
              allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.TRUE.), &
-       source_term_type('pore_pressure_dissipation',.TRUE.,.TRUE.,.TRUE., &
-             default_method=SOURCE_METHOD_NEWTON, &
-             default_cadence=SOURCE_CADENCE_STAGE, &
+       source_term_type('pore_pressure_dissipation',.FALSE.,.FALSE.,.TRUE., &
+             default_method=SOURCE_METHOD_ANALYTIC, &
+             default_cadence=SOURCE_CADENCE_STEP, &
              allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('bottom_circular_injection',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &

@@ -207,6 +207,12 @@ CONTAINS
           error='D18: invalid source CADENCE'; RETURN
         END SELECT
       END IF
+      IF (TRIM(active_names(i))=='pore_pressure_dissipation') THEN
+        IF (method/=SOURCE_METHOD_ANALYTIC .OR. cadence/=SOURCE_CADENCE_STEP) THEN
+          error='D18: Darcy pore pressure requires ANALYTIC/STEP'
+          RETURN
+        END IF
+      END IF
       IF (method==SOURCE_METHOD_EXPLICIT .AND. .NOT.term%has_explicit) THEN
         error='D18: explicit interface unavailable for source'; RETURN
       END IF
