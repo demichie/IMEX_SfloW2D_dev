@@ -154,7 +154,7 @@ CONTAINS
         flow_red_grav = physical_state%red_grav
         flow_Zs = physical_state%Zs
         flow_pore_pressure = physical_state%exc_pore_pres
-        horizontal_speed=SQRT(flow_u**2+flow_v**2)
+        horizontal_speed=physical_state%mod_vel_hor
         speed_ratio=1.0_wp
         IF (horizontal_speed>0.0_wp) &
              speed_ratio=physical_state%mod_vel/horizontal_speed
@@ -185,7 +185,9 @@ CONTAINS
         RETURN
       END IF
 
-      CALL real_physical_state_from_q(q_before, physical_state)
+      CALL real_physical_state_from_q(q_before, physical_state, &
+            context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
+            context%Bsecond_xy,context%Bsecond_yy)
       flow_h = physical_state%h
       flow_u = physical_state%u
       flow_v = physical_state%v
@@ -210,7 +212,9 @@ CONTAINS
       ELSE IF (group%equation_ids(1)==idx_pore .AND. pore_pressure_flag) THEN
       IF (q_before(1)>0.0_wp) THEN
 
-        CALL real_physical_state_from_q(q_before, physical_state)
+        CALL real_physical_state_from_q(q_before, physical_state, &
+            context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
+            context%Bsecond_xy,context%Bsecond_yy)
         flow_h = physical_state%h
         flow_u = physical_state%u
         flow_v = physical_state%v
