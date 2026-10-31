@@ -441,8 +441,7 @@ CONTAINS
        ! a reciprocal of zero from a later moving-state branch.
        IF ((r_u .EQ. 0.0_wp) .AND. (r_v .EQ. 0.0_wp)) RETURN
 
-       CALL physical_state_from_qp(qpj, physical_state, Bprimej_x, Bprimej_y, &
-            Bsecondj_xx, Bsecondj_xy, Bsecondj_yy)
+
 
 
        CALL eval_rheology_semi_implicit([selected_model_name], physical_state, &
@@ -515,13 +514,17 @@ CONTAINS
 
 
     expl_term(1:n_eqns) = 0.0_wp
-    physical_state=physical_state_type()
+
     q1 = 0.0_wp
 
 
       IF ( ( qpj(idx_h) .LE. EPSILON(1.0_wp) ) .AND. ( cell_fract_jk .EQ. 0.0_wp )    &
              .AND. ( lat_arc_perim_jk .EQ. 0.0_wp ) .AND.                          &
              ALL(cell_fissure_fract .EQ. 0.0_wp) ) RETURN
+
+    ! Injection into a dry cell still needs density and pore-pressure state.
+    CALL physical_state_from_qp(qpj, physical_state, Bprimej_x, Bprimej_y, &
+         Bsecondj_xx, Bsecondj_xy, Bsecondj_yy)
 
     ! Gravity terms - only meaningful when the cell has mass.
     IF ( qpj(idx_h) .GT. EPSILON(1.0_wp) ) THEN
