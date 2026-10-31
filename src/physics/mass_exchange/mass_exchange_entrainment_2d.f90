@@ -22,13 +22,10 @@ CONTAINS
 
     !> @brief Evaluate explicit ambient-air entrainment.
     !> @param[in] state Local real physical state.
-    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
-    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_entrainment_explicit(state,Bx,By,r)
+    SUBROUTINE eval_mass_exchange_entrainment_explicit(state,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
         REAL(wp) :: speed_squared,Ri,rhom,rhoc,redgrav,cpc,cpm
 
@@ -44,13 +41,10 @@ CONTAINS
     !> @brief Reject unsupported semi-implicit treatment for entrainment.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
-    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_entrainment_semi_implicit(state,Bx,By,r)
+    SUBROUTINE eval_mass_exchange_entrainment_semi_implicit(state,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
@@ -60,13 +54,10 @@ CONTAINS
     !> @brief Reject unsupported implicit treatment for ambient-air entrainment.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
-    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_entrainment_implicit(state,Bx,By,r)
+    SUBROUTINE eval_mass_exchange_entrainment_implicit(state,r)
 
         TYPE(complex_physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)
@@ -76,13 +67,10 @@ CONTAINS
     !> @brief Reject unsupported analytic treatment for ambient-air entrainment.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
-    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE solve_mass_exchange_entrainment_analytic(state,Bx,By,r)
+    SUBROUTINE solve_mass_exchange_entrainment_analytic(state,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
         CALL reset_mass_exchange_rates(r)

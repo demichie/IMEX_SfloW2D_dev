@@ -115,7 +115,7 @@ CONTAINS
             CALL accumulate_process(deposition_rates,physical_state,total_rates,eqns_term)
             CALL accumulate_process(liquid_loss_rates,physical_state,total_rates,eqns_term)
             CALL accumulate_process(darcy_loss_rates,physical_state,total_rates,eqns_term)
-            CALL eval_mass_exchange_entrainment_explicit(physical_state,Bx,By,process_rates)
+            CALL eval_mass_exchange_entrainment_explicit(physical_state,process_rates)
             CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
             CALL eval_mass_exchange_vaporization_explicit(physical_state,B_zone, &
                 deposition_rates%solid_deposition_rate,process_rates)
