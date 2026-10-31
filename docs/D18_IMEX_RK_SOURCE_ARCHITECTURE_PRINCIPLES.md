@@ -118,3 +118,37 @@ These are deliberately **not** frozen as architecture until independently checke
 - Interaction between sequential splitting, stage-order accuracy and non-source RK flux updates.
 
 **Rule of interpretation:** the numbered requirements above take precedence over old implementation constraints; unresolved points must be analyzed from the RK mathematics and current call graph before deciding a minimal code structure.
+
+## 9. Architectural decisions to resolve before implementation (review 2026-10-31)
+
+These are **open design decisions**, not implementation approvals. Resolve them from the IMEX-RK equations, then record each choice and its tests **before** restructuring code. In particular, do not retain an old type merely because an existing caller expects it.
+
+| ID | Decision | Minimal option to assess | Required verification |
+| --- | --- | --- | --- |
+| A1 | **One STAGE execution path:** how do EXPLICIT, NEWTON, ANALYTIC and semi-implicit contributions enter a sequential ordered stage sweep? | One group executor with method-specific evaluations, rather than separate explicit accumulation and implicit loop. | Butcher-tableau consistency, sequential observation of updated state, complete rate bookkeeping. |
+| A2 | **EXPLICIT at STAGE:** what does sequential application mean when an explicit RK contribution belongs to a different tableau than the diagonal implicit source increment? | Distinguish RK explicit evaluation from an actual state-advancing split operator where mathematically necessary; do not silently assign the same `a_ii dt` to both. | Derive stage and end-of-step formulas; check RK order on noncommuting and coupled source examples. |
+| A3 | **Newton group unknowns:** what is the smallest representation of active unknowns when successive groups touch the same equations? | A group-local unknown-index array passed only to Newton; eliminate or radically shrink `equation_partition_type` if no independent user remains. | Overlapping-group solves in both orders; convergence and residual correctness. |
+| A4 | **Single rate contract:** should group evaluation return only complete conservative `rate(n_eqns)`, or also a candidate state/status? | Prefer `rate(n_eqns)` plus admissibility/status; a single executor owns the `q += tau*rate` update. | Conservation, limiter semantics, no duplicate updates, error paths. |
+| A5 | **STAGE effective rate:** how are all sequential increments represented in `IM_terms` and `EX_terms`? | Compute one effective increment from final minus starting stage state for the relevant tableau contribution, not a second independently applied source. | Stage reconstruction, no double counting, correct RK recurrence. |
+| A6 | **STAGE vs STEP executor:** one shared loop or two? | Share the minimal `apply_group` operation and sequential state update; keep distinct orchestration only where RK/stage context or bed updates require it. | Equivalent operator semantics; avoid wrappers and duplicate dispatch. |
+| A7 | **Group identity and order:** are `METHOD`, `CADENCE`, `GROUP`, and process names sufficient? | Remove source-group `equation_ids` for non-Newton methods; group identity comes only from source membership and configuration. | Exclusive analytic groups; shared conservative components; deterministic order. |
+| A8 | **Semi-implicit method:** is it a standalone group method, a modifier to a Newton solve, or an independent numerical option? | Decide its actual mathematical role before representing it as an additional layer. | Existing friction/limiter behavior and correctness under sequential splitting. |
+| A9 | **Zero-diagonal RK stages:** how do groups behave when `a_ii=0`? | No division by `a_ii dt`; distinguish zero-duration analytic/implicit increments from explicit RK source evaluations. | Schemes with explicit first stage, dry states, no invalid divisions. |
+| A10 | **STEP mass exchange and bed state:** how does a conservative full-vector source group coexist with source transactions that also update bed/inventories? | Explicitly define a transactional group result when non-conservative-state side effects are necessary; do not hide bed mutation behind a rate-only interface. | Bed + fluid conservation, sequential visibility and rollback/failure behavior. |
+| A11 | **Primitive-state reconstruction and limits:** who owns re-evaluation of physical state and limiters between groups? | Executor passes current `q`; the physical process reconstructs only necessary state and owns process-specific limiting. | Group B uses post-A temperature/mass/velocity; limiting under overlapping processes. |
+| A12 | **Lifetime of compatibility types and wrappers:** which existing modules are truly needed? | Build a call graph and explicit **KEEP / CHANGE / DELETE** inventory before coding, including `equation_partition_type`, dispatch coordinators and old tests. | No dead paths, no duplicate interface conversion or stale API compatibility. |
+
+### Evidence motivating these questions
+
+- In `src/numerics/time_integration_2d.f90`, explicit STAGE groups are currently evaluated against the same `qp_rk` and their rates added into `EX_terms`. The implicit stage uses `solve_imex_stage` and returns an effective `IM_terms` separately.
+- `src/numerics/nonlinear_solver_2d.f90` currently reconstructs the effective implicit rate as `(q_stage-q_known)/(dt*a_diag)` and uses Newton unknown lists in the same stage coordinator as analytic groups.
+- `src/numerics/step_source_executor_2d.f90` already loops sequentially through STEP groups, but contains method-specific paths and a distinct mass-exchange transaction updating the bed.
+- `src/physics/source_configuration_2d.f90` and `src/numerics/equation_metadata_2d.f90` still carry historical equation-partition metadata. Its continued existence must be justified from actual numerical requirements, not historical usage.
+
+### Proposed decision order
+
+First resolve **A2 and A5** from the RK mathematics: these control whether a fully unified STAGE sweep is meaningful without changing the integration scheme. Then resolve **A1, A3, A4, A6, A7, A8 and A9** as the smallest implementation consistent with that mathematics. Finally resolve the non-fluid-state transaction **A10**, physical-state ownership **A11**, and keep/change/delete inventory **A12**.
+
+**Naming convention agreed:** numerical model interfaces use `eval_<model>_explicit`, `eval_<model>_semi_implicit`, `eval_<model>_implicit`, and `eval_<model>_analytic`. This is a naming contract; it does not by itself certify that older analytic implementations already return complete conservative rates.
+
+**Acceptance gate:** do not start a broad source architecture rewrite until the selected options above have been recorded, the RK formula has been checked, and the minimum set of needed types and executors has been drawn.
