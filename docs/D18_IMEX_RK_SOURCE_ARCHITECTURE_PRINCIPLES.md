@@ -269,3 +269,15 @@ Place the **common velocity-reversal limiter in `src/physics/rheology_laws/rheol
 - Preserve transverse momentum and do not cap magnitude merely for this rule; an initially zero momentum has no reversal direction.
 
 This refines sections 13-15 and is a **design decision only**; Fortran implementation and validation remain pending.
+
+## 17. Standard source-interface time-interval argument (agreed)
+
+Use the argument name **`dt`** consistently in source-family interfaces, including `eval_rheology_explicit` and `eval_rheology_semi_implicit`, matching the existing mass-exchange naming convention. `dt` always means the **effective interval over which that source/group contribution is applied**, not necessarily the global simulation time step.
+
+- At **EXPLICIT/STAGE**, pass the applicable explicit RK stage/group interval (defined from the actual tableau and execution contract).
+- At **SEMI_IMPLICIT/STAGE**, pass `a_ii * dt_global` for the implicit stage.
+- At **STEP**, pass the full global time step `dt_global`.
+- The relevant rheology family routine sums process rates evaluated at a common group-entry state and limits the aggregate explicit or semi-implicit update over `dt` exactly once; implicit Newton and analytic methods receive no extra anti-reversal limiter.
+- This is a naming and interface contract. Existing integration-local variable names need not change; callers must pass the correct value. Avoid introducing adapters or alternative names such as `dt_group` solely for rheology.
+
+**Status:** architecture recorded; no Fortran interface edits or tests in this documentation commit.
