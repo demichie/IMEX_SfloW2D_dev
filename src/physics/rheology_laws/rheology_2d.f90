@@ -222,14 +222,12 @@ CONTAINS
                     0.0_wp, use_stochastic, stochastic_value, process_rate(1), process_rate(2))
         CASE('rheology_mui')
             curvature_term_value = 0.0_wp
-            IF (curvature_term) curvature_term_value = curvature_acceleration( &
-                    B_second_xx, B_second_xy, B_second_yy, state%u, state%v)
+            IF (curvature_term) curvature_term_value = working_state%curvature_acceleration
             CALL eval_rheology_mui_semi_implicit(working_state, mod_vel, grav_coeff, curvature_term_value, &
                     use_pore_pressure, process_rate(1), process_rate(2))
         CASE('rheology_mui_voellmy')
             curvature_term_value = 0.0_wp
-            IF (curvature_term) curvature_term_value = curvature_acceleration( &
-                    B_second_xx, B_second_xy, B_second_yy, state%u, state%v)
+            IF (curvature_term) curvature_term_value = working_state%curvature_acceleration
             CALL eval_rheology_mui_voellmy_semi_implicit(working_state, mod_vel, grav_coeff, curvature_term_value, &
                     use_pore_pressure, process_rate(1), process_rate(2))
         CASE('none', 'rheology_plastic', 'rheology_empirical',                                     &
