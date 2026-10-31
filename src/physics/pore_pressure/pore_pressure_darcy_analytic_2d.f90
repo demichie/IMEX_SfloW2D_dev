@@ -54,7 +54,13 @@ CONTAINS
     IF (dissipation_rate>0.0_wp) THEN
       ! Stable evaluation of (1-exp(-lambda*dt))/lambda,
       ! including small lambda*dt without cancellation.
-      pressure_integral=-EXPM1(-dissipation_rate*interval)/dissipation_rate
+      IF (ABS(dissipation_rate*interval)<1.0e-5_wp) THEN
+        pressure_integral=interval*(1.0_wp-0.5_wp*dissipation_rate*interval+ &
+             (dissipation_rate*interval)**2/6.0_wp- &
+             (dissipation_rate*interval)**3/24.0_wp)
+      ELSE
+        pressure_integral=(1.0_wp-exponential_factor)/dissipation_rate
+      END IF
     ELSE
       pressure_integral=interval
     END IF
