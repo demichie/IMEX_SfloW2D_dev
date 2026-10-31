@@ -331,7 +331,8 @@ CONTAINS
     ! initialize the source terms
     source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)
     IF (selected_rheology .OR. selected_thermal .OR. selected_pore) THEN
-       CALL physical_state_from_q(qj, physical_state)
+       CALL physical_state_from_q(qj, physical_state, Bprimej_x, Bprimej_y, &
+            Bsecondj_xx, Bsecondj_xy, Bsecondj_yy)
        h = physical_state%h
        T = physical_state%T
        rho_m = physical_state%rho_m
@@ -438,7 +439,8 @@ CONTAINS
        ! a reciprocal of zero from a later moving-state branch.
        IF ((r_u .EQ. 0.0_wp) .AND. (r_v .EQ. 0.0_wp)) RETURN
 
-       CALL physical_state_from_qp(qpj, physical_state)
+       CALL physical_state_from_qp(qpj, physical_state, Bprimej_x, Bprimej_y, &
+            Bsecondj_xx, Bsecondj_xy, Bsecondj_yy)
 
 
        CALL eval_rheology_semi_implicit([selected_model_name], physical_state, &
@@ -527,7 +529,8 @@ CONTAINS
        r_u = qpj(idx_u)
        r_v = qpj(idx_v)
 
-       CALL physical_state_from_qp(qpj, physical_state)
+       CALL physical_state_from_qp(qpj, physical_state, Bprimej_x, Bprimej_y, &
+            Bsecondj_xx, Bsecondj_xy, Bsecondj_yy)
        r_rho_m = physical_state%rho_m
 
        q1 = r_h * r_rho_m
