@@ -127,7 +127,7 @@ PROGRAM test_source_registry
   CALL verify_group_method_contract()
   CALL verify_geometry_source_triplets()
   CALL verify_newton_explicit_step_schedule()
-  WRITE(*,'(A)') 'D18 physical catalog and 864 physical triplet mappings verified'
+  WRITE(*,'(A)') 'D18 physical catalog and 432 non-Darcy stage mappings verified'
 CONTAINS
   SUBROUTINE configure_liquid_case()
     n_eqns=7;idx_pore=7
