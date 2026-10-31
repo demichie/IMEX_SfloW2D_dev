@@ -56,8 +56,12 @@ ogni modello fisico. Nessun wrapper o livello di dispatch intermedio.
 - [x] Rimossa la routine di forwarding esplicita del mass exchange.
 - [ ] Eliminare gli argomenti derivabili dallo stato laddove possibile.
 - [x] Aggiungere i campi cinematici ai due stati e aggiornamento esplicito.
-- [ ] Passare geometria allo stato direttamente nel punto di costruzione,
-      evitando la copia locale del coordinatore e verificando tutti i chiamanti.
+- [x] I costruttori degli stati accettano la geometria locale opzionale e
+      le valutazioni STAGE reali/complesse la trasmettono immediatamente.
+- [x] Eliminata la copia completa dello stato nel coordinatore reologico.
+- [ ] Eliminare il ricalcolo duplicato della cinematica nel coordinatore
+      quando lo stato e' gia' completo e verificare i chiamanti senza geometria.
+- [ ] Completare l'audit degli aggiornamenti diretti degli stati, inclusi i test.
 - [x] Confermare il contratto: espliciti sempre reali; conversione locale negli espliciti compositi.
 - [ ] Verificare tutte le firme e le conversioni degli espliciti compositi.
 - [ ] Semplificare selezione/configurazione dei processi senza duplicazione.
