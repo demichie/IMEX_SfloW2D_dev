@@ -218,7 +218,7 @@ CONTAINS
     INTEGER, INTENT(OUT) :: linear_info
     LOGICAL, INTENT(OUT) :: line_search_failed
 
-    REAL(wp) :: qj_init(n_vars), q_known(n_vars)
+    REAL(wp) :: qj_init(n_vars), q_known(n_vars), q_group_before(n_vars)
     REAL(wp) :: coeff_f(n_eqns)
     REAL(wp) :: tol_abs_local, tol_rel_local
     REAL(wp) :: analytic_rate(n_eqns)
@@ -313,7 +313,8 @@ CONTAINS
           qj=qj+dt_step*a_diag*analytic_rate(1:n_vars)
 
        ELSEIF (stage_groups(group)%method==SOURCE_METHOD_NEWTON) THEN
-          ! Equation membership was validated at registry initialization.
+          ! A group solves against the state left by preceding groups.
+          q_group_before=qj
              si_term=0.0_wp
              group_has_momentum = ANY(group_equations(1:group_size)==2) .OR. &
                   ANY(group_equations(1:group_size)==3)
@@ -325,20 +326,20 @@ CONTAINS
              END IF
              DO i=1,group_size
                 equation=group_equations(i)
-                qj(equation)=q_known(equation)+dt_step*a_diag*si_term(equation)
+                qj(equation)=q_group_before(equation)+dt_step*a_diag*si_term(equation)
              END DO
              IF (group_has_momentum .AND. apply_si_local) THEN
-                CALL correct_friction_momentum(q_known(2:3),qj(2:3))
+                CALL correct_friction_momentum(q_group_before(2:3),qj(2:3))
                 DO i=1,group_size
                    equation=group_equations(i)
                    si_term(equation)=                                        &
-                        (qj(equation)-q_known(equation))/(dt_step*a_diag)
+                        (qj(equation)-q_group_before(equation))/(dt_step*a_diag)
                 END DO
              END IF
-             residual_without_si=Rj_not_impl-a_diag*si_term
+             residual_without_si=-a_diag*si_term
              momentum_before_newton=qj(2:3)
              CALL solve_newton_group(stage_groups(group),&
-                  group_equations(1:group_size),qj,qj_old,dt_step,a_diag,&
+                  group_equations(1:group_size),qj,q_group_before,dt_step,a_diag,&
                   residual_without_si,Bprimej_x,Bprimej_y,Zij,coeff_f,      &
                   tol_abs_local,tol_rel_local,iterations_used,converged,   &
                   linear_info,line_search_failed)
