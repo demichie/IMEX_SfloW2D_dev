@@ -75,14 +75,8 @@ CONTAINS
         LOGICAL, INTENT(IN) :: use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: process_rate(2)
-        REAL(wp) :: mod_vel,mod_hor_vel,mod_vel2
-        LOGICAL :: moving
         INTEGER :: i
         rate=0.0_wp
-        mod_hor_vel=state%mod_vel_hor
-        mod_vel2=state%mod_vel2
-        mod_vel=state%mod_vel
-        moving=mod_vel>0.0_wp
         DO i=1,SIZE(models)
             process_rate = 0.0_wp
             SELECT CASE(TRIM(models(i)))
@@ -155,11 +149,8 @@ CONTAINS
         LOGICAL, INTENT(IN) :: use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: process_rate(2)
-        REAL(wp) :: mod_vel,mod_hor_vel
         INTEGER :: i
         rate=0.0_wp
-        mod_hor_vel=state%mod_vel_hor
-        mod_vel=state%mod_vel
         DO i=1,SIZE(models)
             process_rate = 0.0_wp
             SELECT CASE(TRIM(models(i)))
@@ -224,14 +215,8 @@ CONTAINS
         REAL(wp), INTENT(IN) :: stochastic_value
         COMPLEX(wp), INTENT(OUT) :: rate(2)
         COMPLEX(wp) :: process_rate(2)
-        COMPLEX(wp) :: mod_vel,mod_hor_vel,mod_vel2
-        LOGICAL :: moving
         INTEGER :: i
         rate=CMPLX(0.0_wp,0.0_wp,wp)
-        mod_hor_vel=state%mod_vel_hor
-        mod_vel2=state%mod_vel2
-        mod_vel=state%mod_vel
-        moving=(REAL(mod_vel,wp)/=0.0_wp).OR.(AIMAG(mod_vel)/=0.0_wp)
         DO i=1,SIZE(models)
             process_rate = CMPLX(0.0_wp,0.0_wp,wp)
             SELECT CASE(TRIM(models(i)))
