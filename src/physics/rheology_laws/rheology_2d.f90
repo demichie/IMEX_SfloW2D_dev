@@ -186,7 +186,8 @@ CONTAINS
         REAL(wp) :: process_rate(2),curvature_term_value
         INTEGER :: i
         rate=0.0_wp
-                   process_rate = 0.0_wp
+        DO i=1,SIZE(models)
+            process_rate = 0.0_wp
             SELECT CASE(TRIM(models(i)))
         CASE('rheology_voellmy')
             CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term, &
@@ -220,7 +221,7 @@ CONTAINS
             CALL fatal_error('Invalid rheology name in semi-implicit momentum-process_rate dispatch')
 
         END SELECT
-    c_value,process_rate)
+    
             rate=rate+process_rate
         END DO
     END SUBROUTINE eval_rheology_semi_implicit
@@ -284,42 +285,44 @@ CONTAINS
         INTEGER :: i
         current_state=state
         velocity_after=[state%u,state%v]
-        model_suppor            velocity_before = [current_state%u, current_state%v]
-            velocity_after = velocity_before
-            model_supported = .TRUE.
+        model_supported=.TRUE.
+        DO i=1,SIZE(models)
+            velocity_before = [current_state%u,current_state%v]
+            velocity_after=velocity_before
+            model_supported=.TRUE.
             SELECT CASE(TRIM(models(i)))
         CASE ('none')
             CONTINUE
         CASE ('rheology_voellmy')
-            CALL solve_rheology_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+            CALL solve_rheology_voellmy_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
                     use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_plastic')
-            CALL solve_rheology_plastic_analytic(dt, state, speed_ratio, velocity_after)
+            CALL solve_rheology_plastic_analytic(dt, current_state, speed_ratio, velocity_after)
         CASE ('rheology_lava')
-            CALL solve_rheology_lava_analytic(dt, state, speed_ratio, velocity_after)
+            CALL solve_rheology_lava_analytic(dt, current_state, speed_ratio, velocity_after)
         CASE ('rheology_lahar')
-            CALL solve_rheology_lahar_analytic(dt, state, speed_ratio, velocity_after)
+            CALL solve_rheology_lahar_analytic(dt, current_state, speed_ratio, velocity_after)
         CASE ('rheology_empirical')
-            CALL solve_rheology_empirical_analytic(dt, state, speed_ratio, velocity_after)
+            CALL solve_rheology_empirical_analytic(dt, current_state, speed_ratio, velocity_after)
         CASE ('rheology_quadratic')
-            CALL solve_rheology_quadratic_analytic(dt, state, speed_ratio, velocity_after)
+            CALL solve_rheology_quadratic_analytic(dt, current_state, speed_ratio, velocity_after)
         CASE ('rheology_froude')
-            CALL solve_rheology_froude_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+            CALL solve_rheology_froude_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
                     use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_lucas')
-            CALL solve_rheology_lucas_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+            CALL solve_rheology_lucas_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
                     use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_mui')
-            CALL solve_rheology_mui_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+            CALL solve_rheology_mui_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
                     use_pore_pressure, velocity_after)
         CASE ('rheology_mui_voellmy')
-            CALL solve_rheology_mui_voellmy_analytic(dt, state, speed_ratio, grav_coeff, curvature_acceleration, &
+            CALL solve_rheology_mui_voellmy_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
                     use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
         CASE DEFAULT
             model_supported = .FALSE.
 
         END SELECT
-    c_value,velocity_after,model_supported)
+    
             IF (.NOT.model_supported) RETURN
             current_state%u=velocity_after(1)
             current_state%v=velocity_after(2)
@@ -343,7 +346,7 @@ CONTAINS
     !> \param[in] use_stochastic Enable stochastic rheology coefficient.
     !> \param[in] stochastic_value Stochastic rheology coefficient.
     !> \param[out] rate Two-component momentum source.
-
+    
 
     !> \brief Dispatch the semi-implicit real-valued rheology momentum source.
     !> \param[in] model_name Canonical rheology model name.
@@ -357,7 +360,7 @@ CONTAINS
     !> \param[in] use_stochastic Enable stochastic rheology coefficient.
     !> \param[in] stochastic_value Stochastic rheology coefficient.
     !> \param[out] rate Two-component momentum source.
-
+    
 
     !> \brief Dispatch the complex-valued implicit rheology momentum source.
     !> \param[in] model_name Canonical rheology model name.
@@ -369,7 +372,7 @@ CONTAINS
     !> \param[in] use_stochastic Enable stochastic rheology coefficient.
     !> \param[in] stochastic_value Stochastic rheology coefficient.
     !> \param[out] rate Two-component complex momentum source.
-
+    
 
     !> \brief Dispatch exact velocity integration for the selected rheology.
     !> \param[in] model_name Canonical rheology model name.
@@ -383,7 +386,7 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic rheology coefficient.
     !> \param[out] velocity_after Velocity after the analytic source substep.
     !> \param[out] model_supported Whether the selected model has an analytic treatment.
-
+    
 
     !> \brief Compute curvature-induced normal acceleration.
     !> \details Contract the topographic Hessian with the horizontal velocity twice: Bxx*u**2 +
