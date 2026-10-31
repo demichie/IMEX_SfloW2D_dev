@@ -35,9 +35,10 @@ ogni modello fisico. Nessun wrapper o livello di dispatch intermedio.
   Valutare il costo dei ricalcoli per non introdurre regressioni.
 - Gli stati reali e complessi contengono le grandezze cinematiche derivate
   `w`, `mod_vel_hor`, `mod_vel2`, `mod_vel` e
-  `curvature_acceleration`, insieme alle derivate topografiche necessarie.
-  Ogni modifica di `u`, `v` o delle derivate topografiche deve essere
-  seguita da `update_physical_state_kinematics`. Le valutazioni complex-step
+  `curvature_acceleration`. Le derivate topografiche non sono campi dello
+  stato: sono argomenti obbligatori di `update_physical_state_kinematics`.
+  Ogni modifica di `u` o `v` richiede di ricalcolare queste grandezze con
+  la geometria locale appropriata. Le valutazioni complex-step
   impiegano somme di quadrati complessi, mai `ABS` delle velocità.
   La geometria deve essere passata esplicitamente per la cella interessata;
   i valori zero iniziali non sono sostituti di una topografia non piana.
@@ -61,8 +62,12 @@ ogni modello fisico. Nessun wrapper o livello di dispatch intermedio.
 - [x] Eliminata la copia completa dello stato nel coordinatore reologico.
 - [x] Eliminato il ricalcolo duplicato della cinematica dal coordinatore:
       usa i campi dello stato e riceve la geometria gia' applicata.
-- [ ] Audit degli stati costruiti senza geometria, specialmente negli
-      integratori analitici: la topografia deve essere coerente con la cella.
+- [x] Rimosse le derivate topografiche dai due tipi di stato; il refresh
+      cinematico riceve cinque argomenti geometrici obbligatori.
+- [ ] Audit degli stati costruiti senza geometria: i costruttori mantengono
+      parametri opzionali per i test esistenti e assumono zero se assenti.
+      Nel propagatore reologico analitico la geometria STAGE viene passata
+      dal chiamante; verificare gli altri percorsi.
 - [ ] Completare l'audit degli aggiornamenti diretti degli stati, inclusi i test.
 - [x] Confermare il contratto: espliciti sempre reali; conversione locale negli espliciti compositi.
 - [ ] Verificare tutte le firme e le conversioni degli espliciti compositi.
