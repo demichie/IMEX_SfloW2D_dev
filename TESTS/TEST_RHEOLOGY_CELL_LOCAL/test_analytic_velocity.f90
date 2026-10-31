@@ -282,8 +282,9 @@ PROGRAM test_analytic_velocity
     cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
     cs%red_grav=CMPLX(reduced_gravity,0.0_wp,wp)
-    CALL eval_rheology_voellmy_implicit(cs, CMPLX(speed_after,0.0_wp,wp), &
-         CMPLX(speed_after**2,0.0_wp,wp), .TRUE., .FALSE., 0.0_wp, &
+    cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
+    cs%mod_vel2=CMPLX(speed_after**2,0.0_wp,wp)
+    CALL eval_rheology_voellmy_implicit(cs, .FALSE., 0.0_wp, &
          complex_source_x, complex_source_y)
   END BLOCK
   BLOCK
@@ -294,8 +295,8 @@ PROGRAM test_analytic_velocity
     rs%rho_m=mixture_density
     rs%red_grav=reduced_gravity
     rs%exc_pore_pres=0.0_wp
-    CALL eval_rheology_voellmy_semi_implicit(rs, speed_after, gravity_coefficient, .FALSE., &
-         0.0_wp, 0.0_wp, 0.0_wp, .FALSE., source_x, source_y)
+    rs%mod_vel=speed_after
+    CALL eval_rheology_voellmy_semi_implicit(rs, gravity_coefficient, .FALSE., source_x, source_y)
   END BLOCK
   source = [REAL(complex_source_x,wp)+source_x,                              &
        REAL(complex_source_y,wp)+source_y]

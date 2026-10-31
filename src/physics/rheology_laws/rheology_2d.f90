@@ -88,13 +88,15 @@ CONTAINS
             SELECT CASE(TRIM(models(i)))
         CASE('rheology_voellmy')
             CALL eval_rheology_voellmy_explicit(state, &
-                    mod_vel, &
-                    mod_vel2, &
+             &
                     grav_coeff, &
+             &
                     use_pore_pressure, &
-                    moving, &
+             &
                     use_stochastic, &
+             &
                     stochastic_value, &
+             &
                     process_rate)
         CASE('rheology_plastic')
             CALL eval_rheology_plastic_explicit(state, &
@@ -188,8 +190,12 @@ CONTAINS
             process_rate = 0.0_wp
             SELECT CASE(TRIM(models(i)))
         CASE('rheology_voellmy')
-            CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, &
-                    use_pore_pressure, process_rate(1), process_rate(2))
+            CALL eval_rheology_voellmy_semi_implicit(state, &
+             grav_coeff, &
+             &
+                    use_pore_pressure, &
+             process_rate(1), &
+             process_rate(2))
         CASE('rheology_lava')
             CALL eval_rheology_lava_semi_implicit(state, mod_vel, process_rate(1), process_rate(2))
         CASE('rheology_lahar')
@@ -239,8 +245,12 @@ CONTAINS
             process_rate = CMPLX(0.0_wp,0.0_wp,wp)
             SELECT CASE(TRIM(models(i)))
         CASE('rheology_voellmy')
-            CALL eval_rheology_voellmy_implicit(state, mod_vel, mod_vel2, moving, use_stochastic, stochastic_value, &
-                    process_rate(1), process_rate(2))
+            CALL eval_rheology_voellmy_implicit(state, &
+             use_stochastic, &
+             stochastic_value, &
+             &
+                    process_rate(1), &
+             process_rate(2))
         CASE('rheology_mui_voellmy')
             CALL eval_rheology_mui_voellmy_implicit(state, mod_vel, mod_vel2, moving, use_stochastic, &
                     stochastic_value, process_rate(1), process_rate(2))

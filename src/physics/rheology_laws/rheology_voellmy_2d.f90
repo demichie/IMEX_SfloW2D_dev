@@ -53,29 +53,28 @@ CONTAINS
     !> \param[in] use_stochastic Enable model stochastic parameter.
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_voellmy_explicit(state, &
-            mod_vel, &
-            mod_vel2, &
-            grav_coeff, &
-            use_pore_pressure, &
-            moving, &
-            use_stochastic, &
-            stochastic_value, &
-            rate)
+    SUBROUTINE eval_rheology_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic, stochastic_value, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, mod_vel2, grav_coeff
+        REAL(wp), INTENT(IN) :: grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
-        LOGICAL, INTENT(IN) :: use_pore_pressure, moving, use_stochastic
+        LOGICAL, INTENT(IN) :: use_pore_pressure, use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
         TYPE(complex_physical_state_type) :: cs
 
-        CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, use_pore_pressure, sx, sy)
+        CALL eval_rheology_voellmy_semi_implicit(state, &
+             grav_coeff, &
+             use_pore_pressure, &
+             sx, &
+             sy)
         CALL complex_state_from_real(state, cs)
-        CALL eval_rheology_voellmy_implicit(cs, CMPLX(mod_vel,0.0_wp,wp), &
-                CMPLX(mod_vel2,0.0_wp,wp), moving, use_stochastic, &
-                stochastic_value, ix, iy)
+        CALL eval_rheology_voellmy_implicit(cs, &
+             use_stochastic, &
+             &
+                stochastic_value, &
+             ix, &
+             iy)
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_voellmy_explicit
 
@@ -88,10 +87,10 @@ CONTAINS
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, use_pore_pressure, rate_x, rate_y)
+    SUBROUTINE eval_rheology_voellmy_semi_implicit(state, grav_coeff, use_pore_pressure, rate_x, rate_y)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, grav_coeff
+        REAL(wp), INTENT(IN) :: grav_coeff
         LOGICAL, INTENT(IN) :: use_pore_pressure
 
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
@@ -105,7 +104,7 @@ CONTAINS
                   exc_pore_pres => state%exc_pore_pres)
         rate_x = 0.0_wp
         rate_y = 0.0_wp
-        IF (mod_vel .LE. 0.0_wp) RETURN
+        IF (state%mod_vel .LE. 0.0_wp) RETURN
 
         friction_stress = mu * rhom *                                                              &
                 (red_grav + state%curvature_acceleration) * h                                            &
@@ -113,8 +112,8 @@ CONTAINS
         friction_stress = MAX(0.0_wp, friction_stress)
         IF (use_pore_pressure) friction_stress = MAX(0.0_wp, friction_stress                       &
                 - mu * SQRT(grav_coeff) * exc_pore_pres)
-        rate_x = -friction_stress * u / mod_vel
-        rate_y = -friction_stress * v / mod_vel
+        rate_x = -friction_stress * u / state%mod_vel
+        rate_y = -friction_stress * v / state%mod_vel
     
         END ASSOCIATE
     END SUBROUTINE eval_rheology_voellmy_semi_implicit
@@ -130,12 +129,11 @@ CONTAINS
     !> \param[in] stochastic_value Stochastic parameter value.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_voellmy_implicit(state, mod_vel, mod_vel2, moving, use_stochastic_xi, &
-            stochastic_value, rate_x, rate_y)
+    SUBROUTINE eval_rheology_voellmy_implicit(state, use_stochastic_xi, stochastic_value, rate_x, rate_y)
 
         TYPE(complex_physical_state_type), INTENT(IN) :: state
-        COMPLEX(wp), INTENT(IN) :: mod_vel, mod_vel2
-        LOGICAL, INTENT(IN) :: moving, use_stochastic_xi
+
+        LOGICAL, INTENT(IN) :: use_stochastic_xi
         REAL(wp), INTENT(IN) :: stochastic_value
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         REAL(wp) :: xi_effective
@@ -147,7 +145,7 @@ CONTAINS
                   red_grav => state%red_grav)
         rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
         rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-        IF (.NOT. moving) RETURN
+        IF (.NOT. ((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) RETURN
         IF (use_stochastic_xi) THEN
             xi_effective = xi + stochastic_value
             IF (xi_effective .LT. 1.0_wp) xi_effective = 1.0_wp
@@ -158,9 +156,9 @@ CONTAINS
 
         END IF
 
-        turbulent_stress = rhom * red_grav / xi_effective * mod_vel2
-        rate_x = -turbulent_stress * (u / mod_vel)
-        rate_y = -turbulent_stress * (v / mod_vel)
+        turbulent_stress = rhom * red_grav / xi_effective * state%mod_vel2
+        rate_x = -turbulent_stress * (u / state%mod_vel)
+        rate_y = -turbulent_stress * (v / state%mod_vel)
     
         END ASSOCIATE
     END SUBROUTINE eval_rheology_voellmy_implicit
