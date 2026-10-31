@@ -23,12 +23,16 @@ MODULE pore_pressure_darcy_2d
        dynamic_permeability_flag, muRef_Suth, Tref_Suth, S_mu
   USE geometry_2d, ONLY : pi_g
   USE state_conversion_2d, ONLY : sauter_diameter, physical_state_type, &
-       complex_physical_state_type, complex_state_from_real, mixt_var_state
+       complex_physical_state_type, complex_state_from_real, mixt_var_state, &
+       eval_mixture_heat_capacity
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
   IMPLICIT NONE
 
   PRIVATE
+  INTERFACE eval_pore_pressure_gas_loss
+    MODULE PROCEDURE pore_gas_loss_real, pore_gas_loss_complex
+  END INTERFACE
 
   PUBLIC :: apply_frozen_darcy_withdrawal
   PUBLIC :: eval_pore_pressure_darcy_explicit
@@ -56,50 +60,53 @@ CONTAINS
     IF (.NOT.pore_pressure_flag) RETURN
     CALL eval_pore_pressure_darcy_semi_implicit(state,semi_rate,include_gas_loss)
     CALL complex_state_from_real(state,complex_state)
-    CALL eval_pore_pressure_darcy_implicit(complex_state,implicit_rate)
+    CALL eval_pore_pressure_darcy_implicit(complex_state,implicit_rate,include_gas_loss)
     rate=semi_rate+REAL(implicit_rate,wp)
   END SUBROUTINE eval_pore_pressure_darcy_explicit
 
   !> Conservative gas-withdrawal component of the Darcy source.
+  !> No separately semi-implicit Darcy contribution.
   SUBROUTINE eval_pore_pressure_darcy_semi_implicit(state,rate,include_gas_loss)
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(OUT) :: rate(n_eqns)
     LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
-    LOGICAL :: do_gas_loss
-    REAL(wp) :: loss_volume,rho_c,cp_c,Ri,rhom,redgrav,cpm
-    REAL(wp) :: mass_rate,gas_mass_fraction
-
     rate=0.0_wp
+  END SUBROUTINE eval_pore_pressure_darcy_semi_implicit
+
+  !> Complete complex Darcy rate, including mass-pressure coupling.
+  SUBROUTINE eval_pore_pressure_darcy_implicit(state,rate,include_gas_loss)
+    TYPE(complex_physical_state_type), INTENT(IN) :: state
+    COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
+    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
+    COMPLEX(wp) :: mass_rate,cp_c,cp_m,xc,gas_fraction
+    LOGICAL :: do_gas_loss
+
+    rate=CMPLX(0.0_wp,0.0_wp,wp)
     IF (.NOT.pore_pressure_flag) RETURN
+    CALL darcy_diffusion_source(state%h,state%T, &
+         state%rho_m,state%alphas,state%exc_pore_pres,rate(idx_poreEqn))
     do_gas_loss=gas_flag .AND. gas_loss_flag
     IF (PRESENT(include_gas_loss)) do_gas_loss=do_gas_loss .AND. include_gas_loss
     IF (.NOT.do_gas_loss) RETURN
-    IF (SUM(state%alphas)>=maximum_solid_packing) RETURN
-    CALL mixt_var_state(state,Ri,rhom,rho_c,redgrav,cp_c,cpm)
-    loss_volume=0.0_wp
-    CALL eval_pore_pressure_gas_loss(state%h,state%T,state%alphas, &
-         SUM(state%alphas),rho_c,state%exc_pore_pres,loss_volume)
-    mass_rate=-rho_c*MAX(0.0_wp,loss_volume)
+    IF (REAL(SUM(state%alphas),wp)>=maximum_solid_packing) RETURN
+    IF (REAL(state%exc_pore_pres,wp)<=0.0_wp) RETURN
+    ! With unit carrier density, Darcy velocity equals the mass-loss flux.
+    CALL pore_gas_loss_complex(state%h,state%T,state%alphas, &
+         SUM(state%alphas),CMPLX(1.0_wp,0.0_wp,wp), &
+         state%exc_pore_pres,mass_rate)
+    mass_rate=-mass_rate
+    CALL eval_mixture_heat_capacity(state%xs,state%xg,xc,cp_c,cp_m)
     rate(idx_totMassEqn)=mass_rate
     rate(idx_uEqn)=mass_rate*state%u
     rate(idx_vEqn)=mass_rate*state%v
     rate(idx_engyEqn)=mass_rate*state%T*cp_c
     IF (n_add_gas>0) THEN
-      gas_mass_fraction=MAX(0.0_wp,1.0_wp-SUM(state%xs))
-      IF (gas_mass_fraction>0.0_wp) &
-        rate(idx_addGasEqn_first:idx_addGasEqn_first+n_add_gas-1)= &
-          mass_rate*state%xg/gas_mass_fraction
+      gas_fraction=1.0_wp-SUM(state%xs)
+      IF (REAL(gas_fraction,wp)>0.0_wp) &
+           rate(idx_addGasEqn_first:idx_addGasEqn_first+n_add_gas-1)= &
+           mass_rate*state%xg/gas_fraction
     END IF
     rate(idx_poreEqn)=rate(idx_poreEqn)+mass_rate*state%exc_pore_pres
-  END SUBROUTINE eval_pore_pressure_darcy_semi_implicit
-
-  SUBROUTINE eval_pore_pressure_darcy_implicit(state,rate)
-    TYPE(complex_physical_state_type), INTENT(IN) :: state
-    COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
-    rate=CMPLX(0.0_wp,0.0_wp,wp)
-    IF (.NOT.pore_pressure_flag) RETURN
-    CALL darcy_diffusion_source(state%h,state%T, &
-         state%rho_m,state%alphas,state%exc_pore_pres,rate(idx_poreEqn))
   END SUBROUTINE eval_pore_pressure_darcy_implicit
 
   !> Integrate frozen-coefficient Darcy directly and return the full
@@ -245,32 +252,46 @@ CONTAINS
   !> \param[in] excess_pressure Excess pore pressure p_e [Pa].
   !> \param[out] gas_loss Inhibited upward carrier-gas loss velocity [m s^-1].
   !******************************************************************************
-  SUBROUTINE eval_pore_pressure_gas_loss(flow_depth, temperature,              &
+  SUBROUTINE pore_gas_loss_real(flow_depth,temperature,solid_fractions, &
+       total_solid_fraction,carrier_density,excess_pressure,gas_loss)
+    REAL(wp), INTENT(IN) :: flow_depth,temperature,solid_fractions(n_solid)
+    REAL(wp), INTENT(IN) :: total_solid_fraction,carrier_density,excess_pressure
+    REAL(wp), INTENT(OUT) :: gas_loss
+    COMPLEX(wp) :: complex_loss
+    CALL pore_gas_loss_complex(CMPLX(flow_depth,0.0_wp,wp), &
+         CMPLX(temperature,0.0_wp,wp),CMPLX(solid_fractions,0.0_wp,wp), &
+         CMPLX(total_solid_fraction,0.0_wp,wp), &
+         CMPLX(carrier_density,0.0_wp,wp), &
+         CMPLX(excess_pressure,0.0_wp,wp),complex_loss)
+    gas_loss=REAL(complex_loss,wp)
+  END SUBROUTINE pore_gas_loss_real
+
+  SUBROUTINE pore_gas_loss_complex(flow_depth, temperature,              &
        solid_fractions, total_solid_fraction, carrier_density, excess_pressure,&
        gas_loss)
 
-    REAL(wp), INTENT(IN) :: flow_depth
-    REAL(wp), INTENT(IN) :: temperature
-    REAL(wp), INTENT(IN) :: solid_fractions(n_solid)
-    REAL(wp), INTENT(IN) :: total_solid_fraction
-    REAL(wp), INTENT(IN) :: carrier_density
-    REAL(wp), INTENT(IN) :: excess_pressure
-    REAL(wp), INTENT(OUT) :: gas_loss
+    COMPLEX(wp), INTENT(IN) :: flow_depth
+    COMPLEX(wp), INTENT(IN) :: temperature
+    COMPLEX(wp), INTENT(IN) :: solid_fractions(n_solid)
+    COMPLEX(wp), INTENT(IN) :: total_solid_fraction
+    COMPLEX(wp), INTENT(IN) :: carrier_density
+    COMPLEX(wp), INTENT(IN) :: excess_pressure
+    COMPLEX(wp), INTENT(OUT) :: gas_loss
 
-    REAL(wp) :: inhibition
-    REAL(wp) :: velocity_loss
-    REAL(wp) :: sauter_diam
-    REAL(wp) :: mean_sphericity
-    REAL(wp) :: x
-    REAL(wp) :: smoothstep
-    REAL(wp) :: normalized_fraction
-    REAL(wp) :: term
-    REAL(wp) :: width
-    REAL(wp) :: dynamic_transition
-    REAL(wp) :: dynamic_viscosity
-    REAL(wp) :: gas_density
-    REAL(wp) :: local_permeability
-    REAL(wp) :: local_kinematic_viscosity
+    COMPLEX(wp) :: inhibition
+    COMPLEX(wp) :: velocity_loss
+    COMPLEX(wp) :: sauter_diam
+    COMPLEX(wp) :: mean_sphericity
+    COMPLEX(wp) :: x
+    COMPLEX(wp) :: smoothstep
+    COMPLEX(wp) :: normalized_fraction
+    COMPLEX(wp) :: term
+    COMPLEX(wp) :: width
+    COMPLEX(wp) :: dynamic_transition
+    COMPLEX(wp) :: dynamic_viscosity
+    COMPLEX(wp) :: gas_density
+    COMPLEX(wp) :: local_permeability
+    COMPLEX(wp) :: local_kinematic_viscosity
     INTEGER :: n
 
     gas_loss = 0.0_wp
@@ -283,7 +304,7 @@ CONTAINS
        inhibition = 1.0_wp
 
     CASE ('STEP')
-       IF (total_solid_fraction .LT. maximum_solid_packing) THEN
+       IF (REAL(total_solid_fraction,wp) .LT. maximum_solid_packing) THEN
           inhibition = 1.0_wp
        ELSE
           inhibition = 0.0_wp
@@ -297,8 +318,8 @@ CONTAINS
        x = total_solid_fraction
        width = maximum_solid_packing - alpha_trans
        normalized_fraction = (x - alpha_trans) / width
-       IF (normalized_fraction .LT. 0.0_wp) normalized_fraction = 0.0_wp
-       IF (normalized_fraction .GT. 1.0_wp) normalized_fraction = 1.0_wp
+       IF (REAL(normalized_fraction,wp) .LT. 0.0_wp) normalized_fraction = 0.0_wp
+       IF (REAL(normalized_fraction,wp) .GT. 1.0_wp) normalized_fraction = 1.0_wp
        smoothstep = 0.0_wp
        DO n = 0, N_inh
           term = pascal_coeff(n) * normalized_fraction**(N_inh + n + 1.0_wp)
@@ -308,8 +329,8 @@ CONTAINS
 
     CASE ('DYNAMIC')
        dynamic_transition = 10.0_wp**(-0.28_wp) *                           &
-            MAX(flow_depth, EPSILON(1.0_wp))**0.12_wp
-       IF (dynamic_transition .GE. maximum_solid_packing) THEN
+            MERGE(flow_depth,CMPLX(EPSILON(1.0_wp),0.0_wp,wp),REAL(flow_depth,wp)>EPSILON(1.0_wp))**0.12_wp
+       IF (REAL(dynamic_transition,wp) .GE. maximum_solid_packing) THEN
           dynamic_transition = 0.99_wp * maximum_solid_packing
        END IF
        IF (N_inh .LT. 0) THEN
@@ -319,8 +340,8 @@ CONTAINS
        x = total_solid_fraction
        width = maximum_solid_packing - dynamic_transition
        normalized_fraction = (x - dynamic_transition) / width
-       IF (normalized_fraction .LT. 0.0_wp) normalized_fraction = 0.0_wp
-       IF (normalized_fraction .GT. 1.0_wp) normalized_fraction = 1.0_wp
+       IF (REAL(normalized_fraction,wp) .LT. 0.0_wp) normalized_fraction = 0.0_wp
+       IF (REAL(normalized_fraction,wp) .GT. 1.0_wp) normalized_fraction = 1.0_wp
        smoothstep = 0.0_wp
        DO n = 0, N_inh
           term = pascal_coeff(n) * normalized_fraction**(N_inh + n + 1.0_wp)
@@ -330,9 +351,9 @@ CONTAINS
     END SELECT
 
     IF (dynamic_permeability_flag .AND.                                     &
-         (total_solid_fraction .GT. EPSILON(1.0_wp))) THEN
+         (REAL(total_solid_fraction,wp) .GT. EPSILON(1.0_wp))) THEN
        IF (n_solid .GT. 1) THEN
-          sauter_diam = sauter_diameter(solid_fractions)
+          sauter_diam = SUM(solid_fractions)/SUM(solid_fractions/diam_s)
           mean_sphericity = DOT_PRODUCT(solid_fractions / diam_s, sphericity_s) &
                / SUM(solid_fractions / diam_s)
        ELSE
@@ -352,11 +373,11 @@ CONTAINS
     END IF
 
     velocity_loss = local_permeability / (local_kinematic_viscosity *         &
-         carrier_density) / MAX(1.0e-5_wp,flow_depth) * 0.5_wp * pi_g *       &
+         carrier_density) / MERGE(flow_depth,CMPLX(1.0e-5_wp,0.0_wp,wp),REAL(flow_depth,wp)>1.0e-5_wp) * 0.5_wp * pi_g *       &
          excess_pressure
     gas_loss = velocity_loss * inhibition
 
-  END SUBROUTINE eval_pore_pressure_gas_loss
+  END SUBROUTINE pore_gas_loss_complex
 
   !******************************************************************************
   !> \brief Compute pressure-diffusion and inhibition factors for a local mixture.
