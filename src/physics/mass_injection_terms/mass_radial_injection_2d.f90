@@ -149,7 +149,7 @@ CONTAINS
     TYPE(complex_physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
     REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
-    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
     CALL fatal_error('radial_injection: implicit treatment is unsupported')
   END SUBROUTINE eval_radial_injection_implicit
 

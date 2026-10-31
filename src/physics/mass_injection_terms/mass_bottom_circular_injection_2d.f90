@@ -181,7 +181,7 @@ CONTAINS
   SUBROUTINE eval_bottom_circular_injection_implicit(state, time, cell_fract_jk, rate)
     TYPE(complex_physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: time, cell_fract_jk
-    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
     CALL fatal_error('bottom_circular_injection: implicit treatment is unsupported')
   END SUBROUTINE eval_bottom_circular_injection_implicit
 
