@@ -22,7 +22,7 @@ PROGRAM test_source_registry
   CHARACTER(LEN=256) :: error
   INTEGER :: i,mode,a,b,c,bits,ids(3),methods(3),membership(7),nm
   LOGICAL :: mask(7),enabled(3)
-  CALL require(SOURCE_TERM_COUNT==25,'physical catalog includes lava deposition and newmodel')
+  CALL require(SOURCE_TERM_COUNT==24,'physical catalog includes lava deposition and newmodel')
   CALL require(source_catalog_names_unique(),'unique physical source names')
   CALL require(canonical_rheology_catalog_unique(),'unique complete rheology names')
   term=source_term_descriptor_by_name('rheology_newmodel')

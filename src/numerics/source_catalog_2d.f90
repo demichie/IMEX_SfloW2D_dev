@@ -24,7 +24,7 @@ MODULE source_catalog_2d
   END TYPE source_term_type
   ! Default method/cadence are explicit in each catalog entry; constants
   ! SOURCE_METHOD_* remain generic method IDs also used by the solvers.
-  INTEGER, PARAMETER :: SOURCE_TERM_COUNT=25
+  INTEGER, PARAMETER :: SOURCE_TERM_COUNT=24
   TYPE(source_term_type), PARAMETER :: SOURCE_CATALOG(SOURCE_TERM_COUNT)=[ &
        source_term_type('rheology_voellmy',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
