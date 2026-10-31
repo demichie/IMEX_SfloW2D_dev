@@ -19,39 +19,39 @@ MODULE rheology_2d
     USE rheology_voellmy_2d, ONLY : eval_rheology_voellmy_explicit,                                &
             eval_rheology_voellmy_implicit,                                                        &
             eval_rheology_voellmy_semi_implicit,                                                   &
-            solve_rheology_voellmy_analytic
+            eval_rheology_voellmy_analytic
     USE rheology_plastic_2d, ONLY : eval_rheology_plastic_explicit,                                &
             eval_rheology_plastic_implicit,                                                        &
-            solve_rheology_plastic_analytic
+            eval_rheology_plastic_analytic
     USE rheology_lava_2d, ONLY : eval_rheology_lava_explicit,                                      &
             eval_rheology_lava_implicit,                                                           &
             eval_rheology_lava_semi_implicit,                                                      &
-            solve_rheology_lava_analytic
+            eval_rheology_lava_analytic
     USE rheology_lahar_2d, ONLY : eval_rheology_lahar_explicit,                                    &
             eval_rheology_lahar_implicit,                                                          &
             eval_rheology_lahar_semi_implicit,                                                     &
-            solve_rheology_lahar_analytic
+            eval_rheology_lahar_analytic
     USE rheology_empirical_2d, ONLY : eval_rheology_empirical_explicit,                            &
             eval_rheology_empirical_implicit,                                                      &
-            solve_rheology_empirical_analytic
+            eval_rheology_empirical_analytic
     USE rheology_quadratic_2d, ONLY : eval_rheology_quadratic_explicit,                            &
             eval_rheology_quadratic_implicit,                                                      &
-            solve_rheology_quadratic_analytic
+            eval_rheology_quadratic_analytic
     USE rheology_newmodel_2d, ONLY : eval_rheology_newmodel_explicit,                              &
             eval_rheology_newmodel_implicit
     USE rheology_froude_2d, ONLY : eval_rheology_froude_explicit,                                  &
             eval_rheology_froude_semi_implicit,                                                    &
-            solve_rheology_froude_analytic
+            eval_rheology_froude_analytic
     USE rheology_lucas_2d, ONLY : eval_rheology_lucas_explicit,                                    &
             eval_rheology_lucas_semi_implicit,                                                     &
-            solve_rheology_lucas_analytic
+            eval_rheology_lucas_analytic
     USE rheology_mui_2d, ONLY : eval_rheology_mui_explicit,                                        &
             eval_rheology_mui_semi_implicit,                                                       &
-            solve_rheology_mui_analytic
+            eval_rheology_mui_analytic
     USE rheology_mui_voellmy_2d, ONLY : eval_rheology_mui_voellmy_explicit,                        &
             eval_rheology_mui_voellmy_semi_implicit,                                               &
             eval_rheology_mui_voellmy_implicit,                                                    &
-            solve_rheology_mui_voellmy_analytic
+            eval_rheology_mui_voellmy_analytic
 
     IMPLICIT NONE
 
@@ -59,7 +59,7 @@ MODULE rheology_2d
 
     PUBLIC :: curvature_acceleration
     PUBLIC :: eval_rheology_explicit, eval_rheology_semi_implicit
-    PUBLIC :: eval_rheology_implicit, solve_rheology_analytic
+    PUBLIC :: eval_rheology_implicit, eval_rheology_analytic
 
     ! Uniform treatment surface for this source family.
 
@@ -266,7 +266,7 @@ CONTAINS
     END SUBROUTINE eval_rheology_implicit
 
 
-    SUBROUTINE solve_rheology_analytic(models,dt,state,speed_ratio,grav_coeff, &
+    SUBROUTINE eval_rheology_analytic(models,dt,state,speed_ratio,grav_coeff, &
          curvature_acceleration,use_pore_pressure,use_stochastic,stochastic_value, &
          velocity_after,model_supported,bx,by,bxx,bxy,byy)
         CHARACTER(*), INTENT(IN) :: models(:)
@@ -290,29 +290,29 @@ CONTAINS
         CASE ('none')
             CONTINUE
         CASE ('rheology_voellmy')
-            CALL solve_rheology_voellmy_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
+            CALL eval_rheology_voellmy_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
                     use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_plastic')
-            CALL solve_rheology_plastic_analytic(dt, current_state, speed_ratio, velocity_after)
+            CALL eval_rheology_plastic_analytic(dt, current_state, speed_ratio, velocity_after)
         CASE ('rheology_lava')
-            CALL solve_rheology_lava_analytic(dt, current_state, speed_ratio, velocity_after)
+            CALL eval_rheology_lava_analytic(dt, current_state, speed_ratio, velocity_after)
         CASE ('rheology_lahar')
-            CALL solve_rheology_lahar_analytic(dt, current_state, speed_ratio, velocity_after)
+            CALL eval_rheology_lahar_analytic(dt, current_state, speed_ratio, velocity_after)
         CASE ('rheology_empirical')
-            CALL solve_rheology_empirical_analytic(dt, current_state, speed_ratio, velocity_after)
+            CALL eval_rheology_empirical_analytic(dt, current_state, speed_ratio, velocity_after)
         CASE ('rheology_quadratic')
-            CALL solve_rheology_quadratic_analytic(dt, current_state, speed_ratio, velocity_after)
+            CALL eval_rheology_quadratic_analytic(dt, current_state, speed_ratio, velocity_after)
         CASE ('rheology_froude')
-            CALL solve_rheology_froude_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
+            CALL eval_rheology_froude_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
                     use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_lucas')
-            CALL solve_rheology_lucas_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
+            CALL eval_rheology_lucas_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
                     use_stochastic, stochastic_value, velocity_after)
         CASE ('rheology_mui')
-            CALL solve_rheology_mui_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
+            CALL eval_rheology_mui_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
                     use_pore_pressure, velocity_after)
         CASE ('rheology_mui_voellmy')
-            CALL solve_rheology_mui_voellmy_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
+            CALL eval_rheology_mui_voellmy_analytic(dt, current_state, speed_ratio, grav_coeff, curvature_acceleration, &
                     use_pore_pressure, use_stochastic, stochastic_value, velocity_after)
         CASE DEFAULT
             model_supported = .FALSE.
@@ -324,7 +324,7 @@ CONTAINS
             current_state%v=velocity_after(2)
             CALL update_physical_state_kinematics(current_state,bx,by,bxx,bxy,byy)
         END DO
-    END SUBROUTINE solve_rheology_analytic
+    END SUBROUTINE eval_rheology_analytic
 
 
     ! Both Newton components are evaluated on the same, unchanged physical state.

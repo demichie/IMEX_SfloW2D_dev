@@ -26,7 +26,7 @@ MODULE pore_pressure_darcy_2d
   PUBLIC :: eval_pore_pressure_darcy_explicit
   PUBLIC :: eval_pore_pressure_darcy_semi_implicit
   PUBLIC :: eval_pore_pressure_darcy_implicit
-  PUBLIC :: solve_pore_pressure_darcy_analytic
+  PUBLIC :: eval_pore_pressure_darcy_analytic
 
 CONTAINS
 
@@ -54,7 +54,7 @@ CONTAINS
 
   !> Integrate frozen-coefficient Darcy directly and return the full
   !> conservative mean rate for the selected substep.
-  SUBROUTINE solve_pore_pressure_darcy_analytic( &
+  SUBROUTINE eval_pore_pressure_darcy_analytic( &
        state,q_before,interval,rate,admissible,include_gas_loss)
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: interval,q_before(n_eqns)
@@ -197,7 +197,7 @@ CONTAINS
       END IF
     END IF
     IF (interval>0.0_wp) rate=(q_after-q_before)/interval
-  END SUBROUTINE solve_pore_pressure_darcy_analytic
+  END SUBROUTINE eval_pore_pressure_darcy_analytic
 
   ! Internal Darcy closures and other auxiliary source calculations.
 

@@ -9,11 +9,11 @@ MODULE pore_pressure_2d
        darcy_explicit => eval_pore_pressure_darcy_explicit, &
        darcy_semi_implicit => eval_pore_pressure_darcy_semi_implicit, &
        darcy_implicit => eval_pore_pressure_darcy_implicit, &
-       darcy_analytic => solve_pore_pressure_darcy_analytic
+       darcy_analytic => eval_pore_pressure_darcy_analytic
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_pore_pressure_explicit, eval_pore_pressure_semi_implicit
-  PUBLIC :: eval_pore_pressure_implicit, solve_pore_pressure_analytic
+  PUBLIC :: eval_pore_pressure_implicit, eval_pore_pressure_analytic
 CONTAINS
 
   SUBROUTINE eval_pore_pressure_explicit(models,state,rate,include_gas_loss)
@@ -68,7 +68,7 @@ CONTAINS
   !> Complete conservative average rate for the selected analytic operator.
   !> For sequential operators, reconstruct the physical state before
   !> extending this dispatch; do not reuse stale primitive coefficients.
-  SUBROUTINE solve_pore_pressure_analytic(models,state,q_before,interval,rate,admissible, &
+  SUBROUTINE eval_pore_pressure_analytic(models,state,q_before,interval,rate,admissible, &
        include_gas_loss)
     CHARACTER(*), INTENT(IN) :: models(:)
     TYPE(physical_state_type), INTENT(IN) :: state
@@ -92,6 +92,6 @@ CONTAINS
       END SELECT
       IF (.NOT.admissible) RETURN
     END DO
-  END SUBROUTINE solve_pore_pressure_analytic
+  END SUBROUTINE eval_pore_pressure_analytic
 
 END MODULE pore_pressure_2d

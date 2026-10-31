@@ -6,7 +6,7 @@
 !> \f$\boldsymbol{S}=-\rho_m C\boldsymbol{u}_h/|\boldsymbol{u}_h|\f$.
 !> \ref eval_rheology_empirical_implicit evaluates its complex-valued x/y
 !> components for a moving state; the empirical constants are fixed in the
-!> routine. \ref solve_rheology_empirical_analytic integrates its frozen
+!> routine. \ref eval_rheology_empirical_analytic integrates its frozen
 !> linear-drag velocity source exactly.
 !********************************************************************************
 MODULE rheology_empirical_2d
@@ -20,7 +20,7 @@ MODULE rheology_empirical_2d
     PUBLIC :: eval_rheology_empirical_explicit
     PUBLIC :: eval_rheology_empirical_semi_implicit
     PUBLIC :: eval_rheology_empirical_implicit
-    PUBLIC :: solve_rheology_empirical_analytic
+    PUBLIC :: eval_rheology_empirical_analytic
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
     !> \param[in] state Shared physical state (complex for implicit treatment).
@@ -99,7 +99,7 @@ CONTAINS
     !> s^-1].
     !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
     !> s^-1].
-    SUBROUTINE solve_rheology_empirical_analytic(dt, state, speed_ratio, velocity_after)
+    SUBROUTINE eval_rheology_empirical_analytic(dt, state, speed_ratio, velocity_after)
 
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: dt, speed_ratio
@@ -119,7 +119,7 @@ CONTAINS
         CALL solve_exact_velocity_flow(EXACT_FLOW_LINEAR, [linear_drag],                           &
                 dt, speed_before, speed_after)
         velocity_after = (speed_after / speed_before) * velocity_before
-    END SUBROUTINE solve_rheology_empirical_analytic
+    END SUBROUTINE eval_rheology_empirical_analytic
 
     ! Unsupported physical treatment, rejected by the source catalog.
     ! Valid zero component of the configured Newton treatment.
