@@ -10,6 +10,7 @@ MODULE pore_pressure_2d
        darcy_semi_implicit => eval_pore_pressure_darcy_semi_implicit, &
        darcy_implicit => eval_pore_pressure_darcy_implicit, &
        darcy_analytic => solve_pore_pressure_darcy_analytic, &
+       darcy_conservative => solve_pore_pressure_darcy_conservative_analytic, &
        legacy_explicit => eval_pore_pressure_dissipation_explicit, &
        legacy_semi => eval_pore_pressure_dissipation_semi_implicit, &
        legacy_implicit => eval_pore_pressure_dissipation_implicit, &
@@ -21,6 +22,7 @@ MODULE pore_pressure_2d
   PRIVATE
   PUBLIC :: eval_pore_pressure_explicit, eval_pore_pressure_semi_implicit
   PUBLIC :: eval_pore_pressure_implicit, solve_pore_pressure_analytic
+  PUBLIC :: solve_pore_pressure_conservative_analytic
   ! Compatibility entry points while the full conservative source contract
   ! and the shared carrier-inventory limiters are migrated.
   PUBLIC :: eval_pore_pressure_dissipation_explicit
@@ -109,6 +111,41 @@ CONTAINS
       current_state%exc_pore_pres=pressure_after
     END DO
   END SUBROUTINE solve_pore_pressure_analytic
+
+
+  !> Dispatch the full conservative analytic map; future pore-pressure
+  !> models are added as separate CASE branches.
+  SUBROUTINE solve_pore_pressure_conservative_analytic( &
+       models,state,interval,q_before,q_after,admissible)
+    CHARACTER(*), INTENT(IN) :: models(:)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(IN) :: interval,q_before(n_eqns)
+    REAL(wp), INTENT(OUT) :: q_after(n_eqns)
+    LOGICAL, INTENT(OUT) :: admissible
+    REAL(wp) :: next_state(n_eqns)
+    TYPE(physical_state_type) :: current_state
+    INTEGER :: i
+    q_after=q_before
+    admissible=.TRUE.
+    IF (.NOT.pore_pressure_flag) RETURN
+    current_state=state
+    DO i=1,SIZE(models)
+      SELECT CASE(TRIM(models(i)))
+      CASE('pore_pressure_darcy')
+        CALL darcy_conservative(current_state,interval,q_after, &
+             next_state,admissible)
+      CASE DEFAULT
+        CALL fatal_error('Unknown analytic pore-pressure model: '//TRIM(models(i)))
+      END SELECT
+      IF (.NOT.admissible) RETURN
+      q_after=next_state
+      ! Additional analytic models require reconstruction of the physical
+      ! state before the next step; avoid silently reusing frozen inputs.
+      IF (i<SIZE(models)) THEN
+        CALL fatal_error('Sequential coupled pore-pressure analytic models need state reconstruction')
+      END IF
+    END DO
+  END SUBROUTINE solve_pore_pressure_conservative_analytic
 
   ! Transitional adapters: existing tests and source assembly still call
   ! the old scalar-only interface until the full process rates are wired.
