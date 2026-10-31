@@ -166,9 +166,18 @@ CONTAINS
     gas_inventory=q_before(idx_totMassEqn)
     gas_inventory=gas_inventory-SUM(q_before( &
          idx_solidEqn_first:idx_solidEqn_last))
-    IF (loss>gas_inventory .OR. gas_inventory<0.0_wp) THEN
+    IF (gas_inventory<0.0_wp) THEN
       admissible=.FALSE.
       RETURN
+    END IF
+    ! Independent Darcy inventory limiter: do not withdraw more carrier
+    ! mass than the frozen state contains. Preserve a positive total mass.
+    IF (loss>0.0_wp) THEN
+      loss=MIN(loss,MAX(0.0_wp,gas_inventory), &
+           MAX(0.0_wp,q_before(idx_totMassEqn)- &
+           EPSILON(1.0_wp)*MAX(1.0_wp,q_before(idx_totMassEqn))))
+      mass_after=q_before(idx_totMassEqn)-loss
+      pressure_q=mass_after*pressure_after
     END IF
     IF (n_add_gas>0 .AND. loss>0.0_wp) THEN
       IF (ANY(q_before(idx_addGasEqn_first: &
