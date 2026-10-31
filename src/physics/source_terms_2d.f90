@@ -330,7 +330,7 @@ CONTAINS
     source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)
     IF (selected_rheology .OR. selected_thermal .OR. selected_pore) THEN
        CALL physical_state_from_q(qj, physical_state, Bprimej_x, Bprimej_y, &
-            Bsecondj_xx, Bsecondj_xy, Bsecondj_yy)
+            0.0_wp, 0.0_wp, 0.0_wp)
        h = physical_state%h
        T = physical_state%T
        rho_m = physical_state%rho_m
