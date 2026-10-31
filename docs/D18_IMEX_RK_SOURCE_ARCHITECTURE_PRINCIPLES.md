@@ -295,3 +295,15 @@ The test refers to the **incoming state for this rheology group**, not to the in
 All executed source-group evaluations receive **`dt>0`**. This argument is the effective group interval, not necessarily the global simulation time step. A group whose required interval is zero is **skipped by its caller**; in particular, implicit STAGE groups are skipped when `a_ii=0`. The source family does not need a special `dt=0` limiter branch. The actual explicit-stage interval must be determined from the chosen RK tableau/execution design before implementing the rate-level anti-reversal limiter. This precondition must not turn a zero-weight RK stage into a spurious source step.
 
 **Implementation progress:** removed the post-Newton rheology motion projection from `src/numerics/nonlinear_solver_2d.f90`, preserving the converged nonlinear state. The existing semi-implicit call still lives in that generic solver and the explicit rate-level limiter / `dt` interface plumbing remain to be migrated. **No compilation or regression tests run in this commit.**
+
+## 20. Explicit rate evaluation at zero interval (agreed; supersedes section 19)
+
+**Explicit source rates must be evaluated whenever the RK scheme requires them, even if the interval argument `dt=0`.** A zero explicit tableau coefficient does not imply that the stage's explicit rate can be skipped: that rate can contribute to later stages or to final RK assembly. Use the existing RK-stage dependency/weight logic to decide whether a rate is required, not the value of `dt` alone.
+
+**Increment-dependent physical limiters apply only when `dt>0`.** At `dt=0`, evaluate and return the original explicit physical rate without an increment-dependent reversal projection. This is not a request to set the rate to zero or to skip its evaluation. The zero-incoming-momentum rheology rate shortcut remains a separate physical rule.
+
+Implicit/semi-implicit groups with zero effective implicit interval (e.g. `a_ii=0`) remain skipped as previously agreed; that convention does not extend to needed explicit rate evaluations.
+
+**Still open:** the precise definition of an effective `dt` used to limit an explicit RK source rate when that same rate enters different later stages with different tableau weights. Do not assume a unique coefficient-driven increment without analyzing the RK assembly.
+
+This section explicitly supersedes the blanket `dt>0` precondition in section 19. **Documentation only; Fortran implementation and tests pending.**
