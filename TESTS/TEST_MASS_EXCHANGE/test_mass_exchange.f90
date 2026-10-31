@@ -33,7 +33,6 @@ PROGRAM test_mass_exchange
   USE thermal_cooling_2d, ONLY : solve_thermal_cooling_analytic
 
   IMPLICIT NONE
-  TYPE(physical_state_type) :: exchange_state
 
   INTEGER, PARAMETER :: nx=8, ny=7, ns=2
   INTEGER :: nq=6
@@ -921,6 +920,7 @@ CONTAINS
 
   !> \brief Verify that production thermal assembly includes entrained ambient-air energy.
   SUBROUTINE check_thermal_entrainment
+    TYPE(physical_state_type) :: exchange_state
     REAL(wp) :: qp_local(n_vars+2), dynamic_pressure
     REAL(wp) :: richardson, mixture_density, carrier_density, reduced_gravity
     REAL(wp) :: carrier_heat_capacity, mixture_heat_capacity
@@ -1054,6 +1054,7 @@ CONTAINS
   !> \param[in] dt Transaction duration [s].
   !> \param[out] packed Erosion, deposition, carrier rates, equation rates and bed rate.
   SUBROUTINE evaluate_local(qp0,inventory,dt,packed)
+    TYPE(physical_state_type) :: exchange_state
     REAL(wp), INTENT(IN) :: qp0(n_vars+2),inventory(ns),dt
     REAL(wp), INTENT(OUT) :: packed(2*ns+2+n_eqns+1)
     TYPE(mass_exchange_rates_type) :: exchange_rates
