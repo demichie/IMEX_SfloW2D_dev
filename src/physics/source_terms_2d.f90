@@ -14,8 +14,8 @@ MODULE source_terms_2d
   USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit, &
        solve_thermal_analytic
   USE pore_pressure_2d, ONLY : &
-       eval_pore_pressure_dissipation_implicit, &
-       eval_pore_pressure_dissipation_explicit, solve_pore_pressure_dissipation_analytic
+       eval_pore_pressure_implicit, &
+       eval_pore_pressure_explicit, solve_pore_pressure_analytic
   USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
   USE rheology_2d, ONLY : curvature_acceleration, solve_rheology_analytic, &
        eval_rheology_implicit, eval_rheology_semi_implicit, &
@@ -117,7 +117,9 @@ CONTAINS
     INTEGER, INTENT(OUT) :: status
     TYPE(physical_state_type) :: physical_state
     REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
-    REAL(wp) :: heat_capacity,temperature_after,pressure_known,pressure_after
+    REAL(wp) :: heat_capacity,temperature_after
+    REAL(wp) :: pore_rate(n_eqns)
+    LOGICAL :: pore_ok
     LOGICAL :: supported
     CHARACTER(LEN=64) :: selected_model_name
     TYPE(source_group_type) :: component
@@ -215,10 +217,14 @@ CONTAINS
         CALL real_physical_state_from_q(q_before, physical_state, &
             context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
             context%Bsecond_xy,context%Bsecond_yy)
-        pressure_known=q_before(idx_pore)/q_before(1)
-        CALL solve_pore_pressure_dissipation_analytic(pressure_known,interval,physical_state%h,  &
-             physical_state%T,physical_state%alphas,pressure_after)
-        q_after(idx_pore)=q_before(1)*pressure_after
+        CALL solve_pore_pressure_analytic(['pore_pressure_darcy'], &
+             physical_state,q_before(1:n_eqns),interval,pore_rate,pore_ok, &
+             include_gas_loss=.FALSE.)
+        IF (.NOT.pore_ok) THEN
+          status=-9
+          RETURN
+        END IF
+        q_after(1:n_eqns)=q_before(1:n_eqns)+interval*pore_rate
       END IF
       status=0
       ELSE
@@ -348,9 +354,14 @@ CONTAINS
             radiative_term_coeff,convective_term_coeff,T_env,source_term(4))
     ENDIF
 
-    IF ( pore_pressure_flag .AND. selected_pore ) &
-         CALL eval_pore_pressure_dissipation_implicit(h, T,                       &
-         rho_m, alphas, exc_pore_pres, source_term(idx_poreEqn))
+    IF (pore_pressure_flag .AND. selected_pore) THEN
+       BLOCK
+         COMPLEX(wp) :: pore_rate(n_eqns)
+         CALL eval_pore_pressure_implicit(['pore_pressure_darcy'], &
+              physical_state,pore_rate)
+         source_term=source_term+pore_rate
+       END BLOCK
+    END IF
 
     nh_term = source_term
 
@@ -558,9 +569,12 @@ CONTAINS
        END IF
        IF (pore_pressure_flag .AND. &
             group_contains_name(group,'pore_pressure_dissipation')) THEN
-          CALL eval_pore_pressure_dissipation_explicit(r_h,qpj(idx_T), &
-               r_rho_m,physical_state%alphas,qpj(idx_pore),pressure_rate)
-          expl_term(idx_poreEqn)=expl_term(idx_poreEqn)+pressure_rate
+          BLOCK
+            REAL(wp) :: pore_rate(n_eqns)
+            CALL eval_pore_pressure_explicit(['pore_pressure_darcy'], &
+                 physical_state,pore_rate,include_gas_loss=.FALSE.)
+            expl_term=expl_term+pore_rate
+          END BLOCK
        END IF
 
     END IF

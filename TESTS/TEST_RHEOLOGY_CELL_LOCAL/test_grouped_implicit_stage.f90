@@ -21,8 +21,9 @@ PROGRAM test_grouped_implicit_stage
   USE state_2d, ONLY : correct_friction_momentum
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
-  USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var, physical_state_type
-  USE pore_pressure_2d, ONLY : solve_pore_pressure_dissipation_analytic
+  USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var, physical_state_type, &
+       real_physical_state_from_q
+  USE pore_pressure_2d, ONLY : solve_pore_pressure_analytic
   USE thermal_cooling_2d, ONLY : solve_thermal_cooling_analytic
 
   IMPLICIT NONE
@@ -42,6 +43,8 @@ PROGRAM test_grouped_implicit_stage
   REAL(wp) :: dynamic_pressure, stage_rate_error
   REAL(wp) :: areal_heat_capacity, exact_temperature, exact_energy
   REAL(wp) :: pressure_known, expected_pressure
+  REAL(wp) :: pore_analytic_rate(7)
+  LOGICAL :: pore_analytic_ok
   REAL(wp) :: expected_h, expected_u, expected_v, expected_density
   REAL(wp) :: expected_alphas(2), expected_alphag(0)
   REAL(wp) :: expected_temperature, expected_red_grav, expected_p_dyn
@@ -321,8 +324,16 @@ PROGRAM test_grouped_implicit_stage
        expected_alphag, expected_red_grav, expected_p_dyn,   &
        expected_Zs, expected_pore_pressure)
   pressure_known = q_expected(7) / q_expected(1)
-  CALL solve_pore_pressure_dissipation_analytic(pressure_known, dt_step*a_diag,          &
-       expected_h, expected_temperature, expected_alphas, expected_pressure)
+  BLOCK
+    TYPE(physical_state_type) :: local_pore_state
+    CALL real_physical_state_from_q(q_expected,local_pore_state, &
+         0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp)
+    CALL solve_pore_pressure_analytic(['pore_pressure_darcy'],local_pore_state, &
+         q_expected,dt_step*a_diag,pore_analytic_rate,pore_analytic_ok, &
+         include_gas_loss=.FALSE.)
+    IF (.NOT.pore_analytic_ok) ERROR STOP 'analytic pore-rate failure'
+    expected_pressure=pressure_known+dt_step*a_diag*pore_analytic_rate(7)/q_expected(1)
+  END BLOCK
   CALL solve_imex_stage(partition, source_registry%stage_groups(),            &
        q_stage_check, q_stage_check,               &
        dt_step, a_diag, known_residual, 0.0_wp, 0.0_wp, 0.0_wp, 0.0_wp,    &

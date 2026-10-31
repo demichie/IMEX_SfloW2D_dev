@@ -10,12 +10,8 @@ MODULE pore_pressure_2d
        darcy_semi_implicit => eval_pore_pressure_darcy_semi_implicit, &
        darcy_implicit => eval_pore_pressure_darcy_implicit, &
        darcy_analytic => solve_pore_pressure_darcy_analytic, &
-       legacy_explicit => eval_pore_pressure_dissipation_explicit, &
-       legacy_semi => eval_pore_pressure_dissipation_semi_implicit, &
-       legacy_implicit => eval_pore_pressure_dissipation_implicit, &
-       legacy_analytic => solve_pore_pressure_dissipation_analytic, &
        solve_frozen_darcy_mass_pressure, apply_frozen_darcy_withdrawal, &
-       advance_pore_pressure_diffusion, eval_pore_pressure_gas_loss, &
+       eval_pore_pressure_gas_loss, &
        eval_pore_pressure_inlet_source, eval_pore_pressure_mass_exchange_source
   IMPLICIT NONE
   PRIVATE
@@ -23,19 +19,16 @@ MODULE pore_pressure_2d
   PUBLIC :: eval_pore_pressure_implicit, solve_pore_pressure_analytic
   ! Compatibility entry points while the full conservative source contract
   ! and the shared carrier-inventory limiters are migrated.
-  PUBLIC :: eval_pore_pressure_dissipation_explicit
-  PUBLIC :: eval_pore_pressure_dissipation_semi_implicit
-  PUBLIC :: eval_pore_pressure_dissipation_implicit
-  PUBLIC :: solve_pore_pressure_dissipation_analytic
   PUBLIC :: solve_frozen_darcy_mass_pressure, apply_frozen_darcy_withdrawal
-  PUBLIC :: advance_pore_pressure_diffusion, eval_pore_pressure_gas_loss
+  PUBLIC :: eval_pore_pressure_gas_loss
   PUBLIC :: eval_pore_pressure_inlet_source, eval_pore_pressure_mass_exchange_source
 CONTAINS
 
-  SUBROUTINE eval_pore_pressure_explicit(models,state,rate)
+  SUBROUTINE eval_pore_pressure_explicit(models,state,rate,include_gas_loss)
     CHARACTER(*), INTENT(IN) :: models(:)
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
     REAL(wp) :: model_rate(n_eqns)
     INTEGER :: i
     rate=0.0_wp
@@ -43,7 +36,7 @@ CONTAINS
     DO i=1,SIZE(models)
       SELECT CASE(TRIM(models(i)))
       CASE('pore_pressure_darcy')
-        CALL darcy_explicit(state,model_rate)
+        CALL darcy_explicit(state,model_rate,include_gas_loss)
       CASE DEFAULT
         CALL fatal_error('Unknown explicit pore-pressure model: '//TRIM(models(i)))
       END SELECT
@@ -92,12 +85,14 @@ CONTAINS
   !> Complete conservative average rate for the selected analytic operator.
   !> For sequential operators, reconstruct the physical state before
   !> extending this dispatch; do not reuse stale primitive coefficients.
-  SUBROUTINE solve_pore_pressure_analytic(models,state,q_before,interval,rate,admissible)
+  SUBROUTINE solve_pore_pressure_analytic(models,state,q_before,interval,rate,admissible, &
+       include_gas_loss)
     CHARACTER(*), INTENT(IN) :: models(:)
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(IN) :: q_before(n_eqns),interval
     REAL(wp), INTENT(OUT) :: rate(n_eqns)
     LOGICAL, INTENT(OUT) :: admissible
+    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
     INTEGER :: i
     rate=0.0_wp
     admissible=.TRUE.
@@ -108,7 +103,7 @@ CONTAINS
     DO i=1,SIZE(models)
       SELECT CASE(TRIM(models(i)))
       CASE('pore_pressure_darcy')
-        CALL darcy_analytic(state,q_before,interval,rate,admissible)
+        CALL darcy_analytic(state,q_before,interval,rate,admissible,include_gas_loss)
       CASE DEFAULT
         CALL fatal_error('Unknown analytic pore-pressure model: '//TRIM(models(i)))
       END SELECT
@@ -118,27 +113,12 @@ CONTAINS
 
   ! Transitional adapters: existing tests and source assembly still call
   ! the old scalar-only interface until the full process rates are wired.
-  SUBROUTINE eval_pore_pressure_dissipation_explicit(h,t,rho,alpha,p,rate)
-    REAL(wp), INTENT(IN) :: h,t,rho,alpha(n_solid),p
-    REAL(wp), INTENT(OUT) :: rate
-    CALL legacy_explicit(h,t,rho,alpha,p,rate)
-  END SUBROUTINE eval_pore_pressure_dissipation_explicit
 
-  SUBROUTINE eval_pore_pressure_dissipation_semi_implicit(rate)
-    REAL(wp), INTENT(OUT) :: rate
-    CALL legacy_semi(rate)
-  END SUBROUTINE eval_pore_pressure_dissipation_semi_implicit
 
-  SUBROUTINE eval_pore_pressure_dissipation_implicit(h,t,rho,alpha,p,rate)
-    COMPLEX(wp), INTENT(IN) :: h,t,rho,alpha(n_solid),p
-    COMPLEX(wp), INTENT(OUT) :: rate
-    CALL legacy_implicit(h,t,rho,alpha,p,rate)
-  END SUBROUTINE eval_pore_pressure_dissipation_implicit
 
-  SUBROUTINE solve_pore_pressure_dissipation_analytic(p,dt,h,t,alpha,p_after)
-    REAL(wp), INTENT(IN) :: p,dt,h,t,alpha(n_solid)
-    REAL(wp), INTENT(OUT) :: p_after
-    CALL legacy_analytic(p,dt,h,t,alpha,p_after)
-  END SUBROUTINE solve_pore_pressure_dissipation_analytic
+
+
+
+
 
 END MODULE pore_pressure_2d

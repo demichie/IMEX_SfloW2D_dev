@@ -4,9 +4,9 @@ PROGRAM test_pore_pressure_diffusion
   USE constitutive_parameters_2d, ONLY : f_inhibit_mode, hydraulic_permeability, &
        kin_visc_c, sp_heat_a, sp_gas_const_a, pres, dynamic_permeability_flag
   USE geometry_2d, ONLY : pi_g
-  USE pore_pressure_2d, ONLY : eval_pore_pressure_dissipation_implicit,       &
-       advance_pore_pressure_diffusion, solve_pore_pressure_dissipation_analytic, &
-       solve_frozen_darcy_mass_pressure, apply_frozen_darcy_withdrawal
+  USE pore_pressure_darcy_2d, ONLY : eval_pore_pressure_darcy_implicit
+  USE pore_pressure_2d, ONLY : solve_frozen_darcy_mass_pressure, &
+       apply_frozen_darcy_withdrawal
 
   IMPLICIT NONE
 
@@ -38,11 +38,8 @@ PROGRAM test_pore_pressure_diffusion
   pi_g = 4.0_wp * ATAN(1.0_wp)
   solid_fractions = 0.2_wp / REAL(n_solid,wp)
 
-  CALL eval_pore_pressure_dissipation_implicit(                                  &
-       CMPLX(flow_depth,0.0_wp,wp), CMPLX(temperature,0.0_wp,wp),            &
-       CMPLX(mixture_density,0.0_wp,wp),                                     &
-       CMPLX(solid_fractions,0.0_wp,wp),                                     &
-       CMPLX(initial_pressure,0.0_wp,wp), source)
+  CALL diffusion_rate_from_state(initial_pressure,flow_depth,temperature, &
+       solid_fractions,source)
   decay_rate = -REAL(source,wp) /                                            &
        (mixture_density * flow_depth * initial_pressure)
   expected_pressure = initial_pressure * EXP(-decay_rate * integration_step)
@@ -51,10 +48,6 @@ PROGRAM test_pore_pressure_diffusion
        flow_depth, temperature, solid_fractions, after_full)
   CALL assert_close(after_full, expected_pressure, 2.0E-14_wp,               &
        'diffusion integrator disagrees with the source-derived decay rate')
-  CALL solve_pore_pressure_dissipation_analytic(initial_pressure, integration_step,       &
-       flow_depth, temperature, solid_fractions, after_first)
-  CALL assert_close(after_first, after_full, 0.0_wp,                          &
-       'legacy and canonical exact-flow names return different pressures')
 
   CALL advance_pore_pressure_diffusion(initial_pressure, 0.15_wp,            &
        flow_depth, temperature, solid_fractions, after_first)
@@ -180,6 +173,36 @@ PROGRAM test_pore_pressure_diffusion
   WRITE(*,*) 'All exact pore-pressure diffusion and coupled Darcy checks passed.'
 
 CONTAINS
+
+  ! The standalone diffusion reference is test-only and not a physics interface.
+  SUBROUTINE diffusion_rate_from_state(p0,h,temp,alpha,source)
+    USE state_conversion_2d, ONLY : complex_physical_state_type
+    USE parameters_2d, ONLY : n_eqns, idx_poreEqn
+    REAL(wp), INTENT(IN) :: p0,h,temp,alpha(:)
+    COMPLEX(wp), INTENT(OUT) :: source
+    TYPE(complex_physical_state_type) :: state
+    COMPLEX(wp), ALLOCATABLE :: rates(:)
+    ALLOCATE(state%alphas(SIZE(alpha)),rates(n_eqns))
+    state%h=CMPLX(h,0.0_wp,wp)
+    state%T=CMPLX(temp,0.0_wp,wp)
+    state%rho_m=CMPLX(mixture_density,0.0_wp,wp)
+    state%alphas=CMPLX(alpha,0.0_wp,wp)
+    state%exc_pore_pres=CMPLX(p0,0.0_wp,wp)
+    CALL eval_pore_pressure_darcy_implicit(state,rates)
+    source=rates(idx_poreEqn)
+  END SUBROUTINE diffusion_rate_from_state
+
+  SUBROUTINE advance_pore_pressure_diffusion(p0,dt,h,temp,alpha,p_after)
+    REAL(wp), INTENT(IN) :: p0,dt,h,temp,alpha(:)
+    REAL(wp), INTENT(OUT) :: p_after
+    COMPLEX(wp) :: source_local
+    REAL(wp) :: lambda
+    p_after=p0
+    IF (dt<=0.0_wp .OR. p0<=0.0_wp .OR. h<=0.0_wp) RETURN
+    CALL diffusion_rate_from_state(p0,h,temp,alpha,source_local)
+    lambda=-REAL(source_local,wp)/(mixture_density*h*p0)
+    IF (lambda>0.0_wp) p_after=p0*EXP(-lambda*dt)
+  END SUBROUTINE advance_pore_pressure_diffusion
 
   SUBROUTINE assert_close(actual, expected, relative_tolerance, message)
 
