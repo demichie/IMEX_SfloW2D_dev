@@ -631,7 +631,7 @@ CONTAINS
        IF (pore_pressure_flag .AND. &
             group_contains_name(group,'pore_pressure_dissipation')) THEN
           CALL eval_pore_pressure_dissipation_explicit(r_h,qpj(idx_T), &
-               r_rho_m,solid_volumes,qpj(idx_pore),pressure_rate)
+               r_rho_m,physical_state%alphas,qpj(idx_pore),pressure_rate)
           expl_term(idx_poreEqn)=expl_term(idx_poreEqn)+pressure_rate
        END IF
 
@@ -730,10 +730,10 @@ CONTAINS
     INTEGER, INTENT(IN) :: B_zone
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: rates
     REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-    BLOCK
-      TYPE(physical_state_type) :: exchange_state
-      CALL physical_state_from_qp(qpj,exchange_state)
-      CALL eval_mass_exchange_explicit(exchange_state,B_zone,B_prime_x,B_prime_y,erodible,dt,rates,eqns_term)
-    END BLOCK
+    TYPE(physical_state_type) :: exchange_state
+
+    CALL physical_state_from_qp(qpj,exchange_state)
+    CALL eval_mass_exchange_explicit(exchange_state,B_zone,B_prime_x,B_prime_y, &
+         erodible,dt,rates,eqns_term)
   END SUBROUTINE eval_step_source_explicit
 END MODULE source_terms_2d
