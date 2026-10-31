@@ -281,117 +281,24 @@ CONTAINS
   !******************************************************************************
 
 
-  SUBROUTINE pore_gas_loss_complex(flow_depth, temperature,              &
-       solid_fractions, total_solid_fraction, carrier_density, excess_pressure,&
-       gas_loss)
-
-    COMPLEX(wp), INTENT(IN) :: flow_depth
-    COMPLEX(wp), INTENT(IN) :: temperature
+  SUBROUTINE pore_gas_loss_complex(flow_depth,temperature,solid_fractions, &
+       total_solid_fraction,carrier_density,excess_pressure,gas_loss)
+    COMPLEX(wp), INTENT(IN) :: flow_depth,temperature
     COMPLEX(wp), INTENT(IN) :: solid_fractions(n_solid)
-    COMPLEX(wp), INTENT(IN) :: total_solid_fraction
-    COMPLEX(wp), INTENT(IN) :: carrier_density
-    COMPLEX(wp), INTENT(IN) :: excess_pressure
+    COMPLEX(wp), INTENT(IN) :: total_solid_fraction,carrier_density,excess_pressure
     COMPLEX(wp), INTENT(OUT) :: gas_loss
+    COMPLEX(wp) :: diffusion,inhibition,mobility,depth
+    LOGICAL :: active
 
-    COMPLEX(wp) :: inhibition
-    COMPLEX(wp) :: velocity_loss
-    COMPLEX(wp) :: sauter_diam
-    COMPLEX(wp) :: mean_sphericity
-    COMPLEX(wp) :: x
-    COMPLEX(wp) :: smoothstep
-    COMPLEX(wp) :: normalized_fraction
-    COMPLEX(wp) :: term
-    COMPLEX(wp) :: width
-    COMPLEX(wp) :: dynamic_transition
-    COMPLEX(wp) :: dynamic_viscosity
-    COMPLEX(wp) :: gas_density
-    COMPLEX(wp) :: local_permeability
-    COMPLEX(wp) :: local_kinematic_viscosity
-    INTEGER :: n
-
-    gas_loss = 0.0_wp
-    inhibition = 1.0_wp
-    local_permeability = hydraulic_permeability
-    local_kinematic_viscosity = kin_visc_c
-
-    SELECT CASE (TRIM(ADJUSTL(f_inhibit_mode)))
-    CASE ('OFF')
-       inhibition = 1.0_wp
-
-    CASE ('STEP')
-       IF (REAL(total_solid_fraction,wp) .LT. maximum_solid_packing) THEN
-          inhibition = 1.0_wp
-       ELSE
-          inhibition = 0.0_wp
-       END IF
-
-    CASE ('STATIC')
-       IF (N_inh .LT. 0) THEN
-          WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', N_inh
-          STOP
-       END IF
-       x = total_solid_fraction
-       width = maximum_solid_packing - alpha_trans
-       normalized_fraction = (x - alpha_trans) / width
-       IF (REAL(normalized_fraction,wp) .LT. 0.0_wp) normalized_fraction = 0.0_wp
-       IF (REAL(normalized_fraction,wp) .GT. 1.0_wp) normalized_fraction = 1.0_wp
-       smoothstep = 0.0_wp
-       DO n = 0, N_inh
-          term = pascal_coeff(n) * normalized_fraction**(N_inh + n + 1.0_wp)
-          smoothstep = smoothstep + term
-       END DO
-       inhibition = 1.0_wp - smoothstep
-
-    CASE ('DYNAMIC')
-       dynamic_transition = 10.0_wp**(-0.28_wp) *                           &
-            MERGE(flow_depth,CMPLX(EPSILON(1.0_wp),0.0_wp,wp),REAL(flow_depth,wp)>EPSILON(1.0_wp))**0.12_wp
-       IF (REAL(dynamic_transition,wp) .GE. maximum_solid_packing) THEN
-          dynamic_transition = 0.99_wp * maximum_solid_packing
-       END IF
-       IF (N_inh .LT. 0) THEN
-          WRITE(*,*) 'ERROR: N_inh must be >= 0. N_inh=', N_inh
-          STOP
-       END IF
-       x = total_solid_fraction
-       width = maximum_solid_packing - dynamic_transition
-       normalized_fraction = (x - dynamic_transition) / width
-       IF (REAL(normalized_fraction,wp) .LT. 0.0_wp) normalized_fraction = 0.0_wp
-       IF (REAL(normalized_fraction,wp) .GT. 1.0_wp) normalized_fraction = 1.0_wp
-       smoothstep = 0.0_wp
-       DO n = 0, N_inh
-          term = pascal_coeff(n) * normalized_fraction**(N_inh + n + 1.0_wp)
-          smoothstep = smoothstep + term
-       END DO
-       inhibition = 1.0_wp - smoothstep
-    END SELECT
-
-    IF (dynamic_permeability_flag .AND.                                     &
-         (REAL(total_solid_fraction,wp) .GT. EPSILON(1.0_wp))) THEN
-       IF (n_solid .GT. 1) THEN
-          sauter_diam = SUM(solid_fractions)/SUM(solid_fractions/diam_s)
-          mean_sphericity = DOT_PRODUCT(solid_fractions / diam_s, sphericity_s) &
-               / SUM(solid_fractions / diam_s)
-       ELSE
-          sauter_diam = diam_s(1)
-          mean_sphericity = sphericity_s(1)
-       END IF
-       local_permeability = ((1.0_wp-total_solid_fraction)**3.0_wp *         &
-            (sauter_diam * mean_sphericity)**2.0_wp) /                       &
-            (150.0_wp * total_solid_fraction**2.0_wp)
-    END IF
-
-    IF (gas_flag .AND. sutherland_flag) THEN
-       dynamic_viscosity = muRef_Suth * (temperature / Tref_Suth)**1.5_wp *  &
-            (Tref_Suth + S_mu) / (temperature + S_mu)
-       gas_density = pres / (sp_gas_const_a * temperature)
-       local_kinematic_viscosity = dynamic_viscosity / gas_density
-    END IF
-
-    velocity_loss = local_permeability / (local_kinematic_viscosity *         &
-         carrier_density) / MERGE(flow_depth,CMPLX(1.0e-5_wp,0.0_wp,wp),REAL(flow_depth,wp)>1.0e-5_wp) * 0.5_wp * pi_g *       &
-         excess_pressure
-    gas_loss = velocity_loss * inhibition
-
+    gas_loss=CMPLX(0.0_wp,0.0_wp,wp)
+    CALL eval_pore_pressure_diffusion_factors(flow_depth,temperature, &
+         solid_fractions,diffusion,inhibition,active,mobility)
+    IF (.NOT.active) RETURN
+    IF (REAL(carrier_density,wp)<=0.0_wp) RETURN
+    depth=MERGE(flow_depth,CMPLX(1.0e-5_wp,0.0_wp,wp), &
+         REAL(flow_depth,wp)>1.0e-5_wp)
+    gas_loss=(pi_g/2.0_wp)*mobility*excess_pressure*inhibition/ &
+         (carrier_density*depth)
   END SUBROUTINE pore_gas_loss_complex
 
   !******************************************************************************
@@ -414,12 +321,13 @@ CONTAINS
   !>       complex perturbations for complex-step differentiation.
   !******************************************************************************
   SUBROUTINE eval_pore_pressure_diffusion_factors(flow_depth, temperature,    &
-       solid_fractions, diffusion_coefficient, inhibition, active)
+       solid_fractions, diffusion_coefficient, inhibition, active, mobility)
 
     COMPLEX(wp), INTENT(IN) :: flow_depth, temperature
     COMPLEX(wp), INTENT(IN) :: solid_fractions(n_solid)
     COMPLEX(wp), INTENT(OUT) :: diffusion_coefficient, inhibition
     LOGICAL, INTENT(OUT) :: active
+    COMPLEX(wp), INTENT(OUT), OPTIONAL :: mobility
 
     COMPLEX(wp) :: gas_compressibility, gas_density, porosity
     COMPLEX(wp) :: dynamic_viscosity, local_permeability
@@ -432,6 +340,7 @@ CONTAINS
     diffusion_coefficient = CMPLX(0.0_wp, 0.0_wp, wp)
     inhibition = CMPLX(1.0_wp, 0.0_wp, wp)
     active = .FALSE.
+    IF (PRESENT(mobility)) mobility=CMPLX(0.0_wp,0.0_wp,wp)
 
     IF (REAL(1.0_wp-SUM(solid_fractions),wp) .LE. EPSILON(1.0_wp)) RETURN
     IF (dynamic_permeability_flag) THEN
@@ -466,6 +375,7 @@ CONTAINS
        local_kinematic_viscosity = dynamic_viscosity / gas_density
     END IF
 
+    IF (PRESENT(mobility)) mobility=local_permeability/local_kinematic_viscosity
     diffusion_coefficient = local_permeability /                            &
          (porosity * local_kinematic_viscosity * gas_density *               &
          gas_compressibility)
@@ -475,7 +385,7 @@ CONTAINS
        inhibition = 1.0_wp
 
     CASE ('STEP')
-       IF (SUM(solid_fractions) .LT. maximum_solid_packing) THEN
+       IF (REAL(SUM(solid_fractions),wp) .LT. maximum_solid_packing) THEN
           inhibition = 1.0_wp
        ELSE
           inhibition = 0.0_wp
