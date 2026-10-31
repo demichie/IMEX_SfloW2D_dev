@@ -12,7 +12,7 @@
 
 MODULE rheology_2d
 
-    USE parameters_2d, ONLY : wp, slope_correction_flag
+    USE parameters_2d, ONLY : wp
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, &
          update_physical_state_kinematics
     USE diagnostics_2d, ONLY : fatal_error
@@ -338,8 +338,6 @@ CONTAINS
     !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
     !> \param[in] mod_vel2 Squared total speed [m^2 s^-2].
     !> \param[in] grav_coeff Topographic gravity correction.
-    !> \param[in] curvature_term Enable curvature-dependent normal stress.
-    !> \param[in] B_second_xx, B_second_xy, B_second_yy Bed Hessian entries [m^-1].
     !> \param[in] use_pore_pressure Enable effective-stress pore-pressure correction.
     !> \param[in] moving Whether the flow is moving.
     !> \param[in] use_stochastic Enable stochastic rheology coefficient.
@@ -353,8 +351,6 @@ CONTAINS
     !> \param[in] mod_vel Total speed [m s^-1].
     !> \param[in] mod_hor_vel Horizontal speed [m s^-1].
     !> \param[in] grav_coeff Topographic gravity correction.
-    !> \param[in] curvature_term Enable curvature-dependent normal stress.
-    !> \param[in] B_second_xx, B_second_xy, B_second_yy Bed Hessian entries [m^-1].
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[in] use_stochastic Enable stochastic rheology coefficient.
     !> \param[in] stochastic_value Stochastic rheology coefficient.

@@ -43,10 +43,6 @@ CONTAINS
     !> velocity and effective-stress inputs. Outputs are conservative x/y momentum source rates.
     !> \param[in] mod_vel Three-dimensional speed [m s^-1].
     !> \param[in] grav_coeff Local dimensionless gravitational correction.
-    !> \param[in] curvature_term Enable curvature correction.
-    !> \param[in] B_second_xx Topographic second derivative in x [m^-1].
-    !> \param[in] B_second_xy Mixed topographic derivative [m^-1].
-    !> \param[in] B_second_yy Topographic second derivative in y [m^-1].
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate Two-component conservative momentum source.
     SUBROUTINE eval_rheology_mui_explicit(state, &

@@ -48,10 +48,6 @@ CONTAINS
     !> \param[in] mod_vel Three-dimensional speed [m s^-1].
     !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
     !> \param[in] grav_coeff Local dimensionless gravitational correction.
-    !> \param[in] curvature_term Enable curvature correction.
-    !> \param[in] B_second_xx Topographic second derivative in x [m^-1].
-    !> \param[in] B_second_xy Mixed topographic derivative [m^-1].
-    !> \param[in] B_second_yy Topographic second derivative in y [m^-1].
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[in] moving True for a moving local state.
     !> \param[in] use_stochastic Enable model stochastic parameter.
@@ -89,10 +85,6 @@ CONTAINS
     !> supplies a zero source when the model has no term in this treatment.
     !> \param[in] mod_vel Three-dimensional speed [m s^-1].
     !> \param[in] grav_coeff Local dimensionless gravitational correction.
-    !> \param[in] curvature_term Enable curvature correction.
-    !> \param[in] B_second_xx Topographic second derivative in x [m^-1].
-    !> \param[in] B_second_xy Mixed topographic derivative [m^-1].
-    !> \param[in] B_second_yy Topographic second derivative in y [m^-1].
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
