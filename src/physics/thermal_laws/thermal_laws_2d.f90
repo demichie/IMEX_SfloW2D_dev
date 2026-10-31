@@ -92,7 +92,7 @@ CONTAINS
 
     SELECT CASE (TRIM(models(i)))
     CASE ('thermal_cooling')
-      CALL solve_thermal_cooling_analytic(state,interval,heat_capacity, &
+      CALL solve_thermal_cooling_analytic(current_state,interval,heat_capacity, &
            radiative,convective,ambient,temperature_after)
     CASE DEFAULT
       CALL fatal_error('Unknown analytic thermal model: '//TRIM(models(i)))
