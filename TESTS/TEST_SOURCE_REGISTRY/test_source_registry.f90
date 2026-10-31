@@ -30,12 +30,12 @@ PROGRAM test_source_registry
        .NOT.term%has_analytic,'Newton-only extension capabilities')
   term=source_term_descriptor_by_name('mass_exchange_lava_deposition')
   CALL require(term%has_explicit .AND. .NOT.term%has_newton .AND. &
-       .NOT.term%has_analytic .AND. TRIM(term%target)=='mass_exchange', &
+       .NOT.term%has_analytic, &
        'lava deposition is a STEP-capable explicit mass-exchange source')
   DO i=1,SOURCE_TERM_COUNT
     term=source_term_descriptor_by_name(SOURCE_CATALOG(i)%name)
     CALL require(term%name==SOURCE_CATALOG(i)%name,'physical catalog lookup')
-    CALL require(LEN_TRIM(term%target)>0,'physical target declared')
+    CALL require(LEN_TRIM(term%name)>0,'physical source identity declared')
   END DO
   term=source_term_descriptor_by_name('SOURCE_TERM_RHEOLOGY_LAVA_VISCOUS')
   CALL require(term%name=='','legacy mathematical addend removed')

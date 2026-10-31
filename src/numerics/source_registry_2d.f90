@@ -21,7 +21,7 @@ MODULE source_registry_2d
     INTEGER :: cadence=0 !< Stage or post-RK step application.
     INTEGER :: method=0 !< Explicit, Newton or analytic.
     CHARACTER(LEN=64), ALLOCATABLE :: source_names(:) !< Unique schedulable source identities.
-    INTEGER, ALLOCATABLE :: equation_ids(:) !< Union of target equations or explicit footprint.
+    INTEGER, ALLOCATABLE :: equation_ids(:) !< Implicit equation block or explicit footprint.
   END TYPE source_group_type
 
   !> \brief Validated metadata owned and finalized by one simulation context.
@@ -173,11 +173,6 @@ CONTAINS
         seen_names=[CHARACTER(LEN=64) :: seen_names,term%name]
       error='D17: term does not support this method/cadence or target'
         IF (.NOT.supports_group(term,group)) RETURN
-        IF (target_index(term%target)>0) THEN
-          expected=target_equation_ids(target_index(term%target),this%pore_equation)
-          IF (ANY(expected<1)) RETURN
-          IF (.NOT.ALL(in_list(expected,group%equation_ids))) RETURN
-        END IF
         IF (INDEX(TRIM(term%name),'rheology_')==1) THEN
           IF (LEN_TRIM(rheology_name)>0 .AND. rheology_name/=term%name) RETURN
           rheology_name=term%name
@@ -262,27 +257,6 @@ CONTAINS
   !> \param[in] target Velocity, energy or pore target ID.
   !> \param[in] pore Pore equation index, zero when absent.
   !> \return Ordered equations; an invalid target returns an empty list.
-  FUNCTION target_equation_ids(target,pore) RESULT(ids)
-    INTEGER, INTENT(IN) :: target,pore
-    INTEGER, ALLOCATABLE :: ids(:)
-    SELECT CASE(target)
-    CASE(SOURCE_TARGET_VELOCITY); ids=[2,3]
-    CASE(SOURCE_TARGET_TEMPERATURE); ids=[4]
-    CASE(SOURCE_TARGET_PORE_PRESSURE); ids=[pore]
-    CASE DEFAULT; ids=[INTEGER::]
-    END SELECT
-  END FUNCTION target_equation_ids
-
-  INTEGER FUNCTION target_index(name) RESULT(target)
-    CHARACTER(*), INTENT(IN) :: name
-    target=0
-    SELECT CASE(TRIM(name))
-    CASE('velocity'); target=1
-    CASE('temperature'); target=2
-    CASE('pore_pressure'); target=3
-    CASE('mass_exchange'); target=-1
-    END SELECT
-  END FUNCTION target_index
   !> \brief Check index bounds and uniqueness before any vector indexing.
   !> \param[in] ids Conservative equation IDs.
   !> \param[in] n Equation count.

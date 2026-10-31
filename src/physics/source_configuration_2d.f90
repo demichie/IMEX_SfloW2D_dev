@@ -134,23 +134,27 @@ CONTAINS
       cadence=term%default_cadence
       id=0
       requested_method=''; requested_cadence=''
-      SELECT CASE(TRIM(term%target))
-      CASE('velocity')
+      SELECT CASE(TRIM(active_names(i)))
+      CASE('rheology_voellmy','rheology_plastic','rheology_lava', &
+            'rheology_lahar','rheology_empirical','rheology_quadratic', &
+            'rheology_froude','rheology_lucas','rheology_mui', &
+            'rheology_mui_voellmy','rheology_newmodel')
         target=1
         requested_method=rheology_method
         requested_cadence=rheology_cadence
         id=rheology_group
-      CASE('temperature')
+      CASE('thermal_cooling')
         target=2
         requested_method=thermal_method
         requested_cadence=thermal_cadence
         id=thermal_group
-      CASE('pore_pressure')
+      CASE('pore_pressure_dissipation')
         target=3
         requested_method=pore_pressure_method
         requested_cadence=pore_pressure_cadence
         id=pore_pressure_group
-      CASE('explicit')
+      CASE('bottom_circular_injection','bottom_fissural_injection', &
+            'radial_injection','geometry_curvature','boundary_injection')
         target=0
         SELECT CASE(TRIM(active_names(i)))
         CASE('bottom_circular_injection')
@@ -174,7 +178,10 @@ CONTAINS
           requested_cadence=boundary_injection_cadence
           id=boundary_injection_group
         END SELECT
-      CASE('mass_exchange')
+      CASE('mass_exchange_lava_deposition','mass_exchange_erosion', &
+            'mass_exchange_deposition','mass_exchange_carrier_liquid_loss', &
+            'mass_exchange_carrier_darcy_loss','mass_exchange_entrainment', &
+            'mass_exchange_vaporization')
         target=-1
         requested_method=mass_exchange_method
         requested_cadence=mass_exchange_cadence
