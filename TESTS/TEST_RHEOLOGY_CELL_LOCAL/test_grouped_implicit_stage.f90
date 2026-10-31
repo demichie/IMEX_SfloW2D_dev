@@ -22,7 +22,7 @@ PROGRAM test_grouped_implicit_stage
   USE nonlinear_solver_2d, ONLY : initialize_nonlinear_solver,               &
        finalize_nonlinear_solver, solve_imex_stage, solve_rk_step
   USE state_conversion_2d, ONLY : qc_to_qp, r_phys_var, physical_state_type
-  USE pore_pressure_laws_2d, ONLY : solve_pore_pressure_dissipation_analytic
+  USE pore_pressure_2d, ONLY : solve_pore_pressure_dissipation_analytic
   USE thermal_cooling_2d, ONLY : solve_thermal_cooling_analytic
 
   IMPLICIT NONE

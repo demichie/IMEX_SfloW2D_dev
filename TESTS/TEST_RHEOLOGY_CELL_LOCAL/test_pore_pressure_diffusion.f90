@@ -4,7 +4,7 @@ PROGRAM test_pore_pressure_diffusion
   USE constitutive_parameters_2d, ONLY : f_inhibit_mode, hydraulic_permeability, &
        kin_visc_c, sp_heat_a, sp_gas_const_a, pres, dynamic_permeability_flag
   USE geometry_2d, ONLY : pi_g
-  USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_dissipation_implicit,       &
+  USE pore_pressure_2d, ONLY : eval_pore_pressure_dissipation_implicit,       &
        advance_pore_pressure_diffusion, solve_pore_pressure_dissipation_analytic
 
   IMPLICIT NONE
