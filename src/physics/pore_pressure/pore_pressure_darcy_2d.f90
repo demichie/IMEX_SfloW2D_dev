@@ -43,21 +43,34 @@ CONTAINS
   !> The model returns a single conservative source vector, including
   !> diffusion and (when enabled) gas withdrawal. Coordination of shared
   !> carrier limits belongs to the source executor, not this model.
+  !> Assemble the complete real conservative rate without repeating physics.
   SUBROUTINE eval_pore_pressure_darcy_explicit(state,rate,include_gas_loss)
     TYPE(physical_state_type), INTENT(IN) :: state
     REAL(wp), INTENT(OUT) :: rate(n_eqns)
     LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
-    LOGICAL :: do_gas_loss
-    COMPLEX(wp) :: pressure_rate
-    REAL(wp) :: loss_volume, rho_c, cp_c, Ri, rhom, redgrav, cpm
-    REAL(wp) :: mass_rate, gas_mass_fraction
-    TYPE(complex_physical_state_type) :: cs
+    TYPE(complex_physical_state_type) :: complex_state
+    REAL(wp) :: semi_rate(n_eqns)
+    COMPLEX(wp) :: implicit_rate(n_eqns)
+
     rate=0.0_wp
     IF (.NOT.pore_pressure_flag) RETURN
-    CALL complex_state_from_real(state,cs)
-    CALL darcy_diffusion_source(cs%h,cs%T,cs%rho_m, &
-         cs%alphas,cs%exc_pore_pres,pressure_rate)
-    rate(idx_poreEqn)=REAL(pressure_rate,wp)
+    CALL eval_pore_pressure_darcy_semi_implicit(state,semi_rate,include_gas_loss)
+    CALL complex_state_from_real(state,complex_state)
+    CALL eval_pore_pressure_darcy_implicit(complex_state,implicit_rate)
+    rate=semi_rate+REAL(implicit_rate,wp)
+  END SUBROUTINE eval_pore_pressure_darcy_explicit
+
+  !> Conservative gas-withdrawal component of the Darcy source.
+  SUBROUTINE eval_pore_pressure_darcy_semi_implicit(state,rate,include_gas_loss)
+    TYPE(physical_state_type), INTENT(IN) :: state
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
+    LOGICAL :: do_gas_loss
+    REAL(wp) :: loss_volume,rho_c,cp_c,Ri,rhom,redgrav,cpm
+    REAL(wp) :: mass_rate,gas_mass_fraction
+
+    rate=0.0_wp
+    IF (.NOT.pore_pressure_flag) RETURN
     do_gas_loss=gas_flag .AND. gas_loss_flag
     IF (PRESENT(include_gas_loss)) do_gas_loss=do_gas_loss .AND. include_gas_loss
     IF (.NOT.do_gas_loss) RETURN
@@ -78,12 +91,6 @@ CONTAINS
           mass_rate*state%xg/gas_mass_fraction
     END IF
     rate(idx_poreEqn)=rate(idx_poreEqn)+mass_rate*state%exc_pore_pres
-  END SUBROUTINE eval_pore_pressure_darcy_explicit
-
-  SUBROUTINE eval_pore_pressure_darcy_semi_implicit(state,rate)
-    TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(OUT) :: rate(n_eqns)
-    rate=0.0_wp
   END SUBROUTINE eval_pore_pressure_darcy_semi_implicit
 
   SUBROUTINE eval_pore_pressure_darcy_implicit(state,rate)
