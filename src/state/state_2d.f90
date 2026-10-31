@@ -23,7 +23,7 @@ MODULE state_2d
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: correct_friction_momentum, finalize_imex_cell_state
+  PUBLIC :: finalize_imex_cell_state
   PUBLIC :: initialize_dry_physical_cell
 
   !> \brief Owned cell states and diagnostics for one simulation.
@@ -139,29 +139,7 @@ CONTAINS
   !> \param[in] momentum_before_friction Momentum immediately before friction.
   !> \param[in,out] momentum_after_friction Candidate momentum immediately after friction.
   !******************************************************************************
-  PURE SUBROUTINE correct_friction_momentum(momentum_before_friction,         &
-       momentum_after_friction)
 
-    USE parameters_2d, ONLY : wp
-    REAL(wp), INTENT(IN) :: momentum_before_friction(2)
-    REAL(wp), INTENT(INOUT) :: momentum_after_friction(2)
-
-    REAL(wp) :: momentum_before_squared
-    REAL(wp) :: friction_scale
-
-    momentum_before_squared = DOT_PRODUCT(momentum_before_friction,           &
-         momentum_before_friction)
-    IF (momentum_before_squared .EQ. 0.0_wp) THEN
-       momentum_after_friction = 0.0_wp
-       RETURN
-    END IF
-
-    friction_scale = DOT_PRODUCT(momentum_before_friction,                   &
-         momentum_after_friction) / momentum_before_squared
-    friction_scale = MAX(0.0_wp, MIN(1.0_wp, friction_scale))
-    momentum_after_friction = friction_scale * momentum_before_friction
-
-  END SUBROUTINE correct_friction_momentum
 
   !> \brief Finalize a cell after the last IMEX Runge-Kutta assembly.
   !> \details Called after the observer sees the unmodified assembled state.

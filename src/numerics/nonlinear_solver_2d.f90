@@ -21,7 +21,7 @@ MODULE nonlinear_solver_2d
        SOURCE_METHOD_ANALYTIC
   USE source_terms_2d, ONLY : analytic_term_context_type, &
        eval_source_analytic, eval_source_semi_implicit
-  USE state_2d, ONLY : correct_friction_momentum
+  USE rheology_2d, ONLY : limit_rheology_momentum_reversal
 
   IMPLICIT NONE
 
@@ -329,7 +329,7 @@ CONTAINS
                 qj(equation)=q_group_before(equation)+dt_step*a_diag*si_term(equation)
              END DO
              IF (group_has_momentum .AND. apply_si_local) THEN
-                CALL correct_friction_momentum(q_group_before(2:3),qj(2:3))
+                CALL limit_rheology_momentum_reversal(q_group_before(2:3),qj(2:3))
                 DO i=1,group_size
                    equation=group_equations(i)
                    si_term(equation)=                                        &
@@ -348,7 +348,7 @@ CONTAINS
                 RETURN
              END IF
              IF (group_has_momentum) THEN
-                CALL correct_friction_momentum(momentum_before_newton,qj(2:3))
+                CALL limit_rheology_momentum_reversal(momentum_before_newton,qj(2:3))
              END IF
        ELSE
           linear_info = -5

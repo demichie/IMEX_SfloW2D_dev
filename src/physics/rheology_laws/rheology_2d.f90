@@ -60,10 +60,27 @@ MODULE rheology_2d
     PUBLIC :: curvature_acceleration
     PUBLIC :: eval_rheology_explicit, eval_rheology_semi_implicit
     PUBLIC :: eval_rheology_implicit, eval_rheology_analytic
+    PUBLIC :: limit_rheology_momentum_reversal
 
     ! Uniform treatment surface for this source family.
 
 CONTAINS
+
+  !> Reject only motion reversal caused by an isolated rheology update.
+  PURE SUBROUTINE limit_rheology_momentum_reversal(momentum_before, momentum_after)
+    REAL(wp), INTENT(IN) :: momentum_before(2)
+    REAL(wp), INTENT(INOUT) :: momentum_after(2)
+    REAL(wp) :: initial_norm2, reversed_component
+
+    initial_norm2=DOT_PRODUCT(momentum_before,momentum_before)
+    IF (initial_norm2<=0.0_wp) RETURN
+    reversed_component=DOT_PRODUCT(momentum_after,momentum_before)
+    IF (reversed_component<0.0_wp) THEN
+      momentum_after=momentum_after- &
+           (reversed_component/initial_norm2)*momentum_before
+    END IF
+  END SUBROUTINE limit_rheology_momentum_reversal
+
 
     SUBROUTINE eval_rheology_explicit(models,state, &
          grav_coeff, &
