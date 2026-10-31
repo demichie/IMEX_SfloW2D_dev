@@ -674,7 +674,8 @@ CONTAINS
     physical_state%exc_pore_pres=excess_pore_pressure
     CALL solve_rheology_analytic([model_id],integration_step,physical_state, &
          speed_ratio,gravity_coefficient,0.0_wp,use_pore_pressure, &
-         use_stochastic,stochastic,actual,model_supported)
+         use_stochastic,stochastic,actual,model_supported, &
+         0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp)
     IF (.NOT. model_supported) THEN
        WRITE(*,*) 'FAIL: analytic dispatcher rejected supported model ', label
        ERROR STOP 1
@@ -702,7 +703,8 @@ CONTAINS
     physical_state%exc_pore_pres=0.0_wp
     CALL solve_rheology_analytic(['rheology_unsupported'],integration_step,physical_state, &
          speed_ratio,gravity_coefficient,0.0_wp, .FALSE., &
-         .FALSE.,0.0_wp,actual,model_supported)
+         .FALSE.,0.0_wp,actual,model_supported, &
+         0.0_wp,0.0_wp,0.0_wp,0.0_wp,0.0_wp)
     IF (model_supported) ERROR STOP 'Unsupported rheology name was accepted'
     CALL assert_close(actual(1), velocity_before(1), 'unsupported model x')
     CALL assert_close(actual(2), velocity_before(2), 'unsupported model y')

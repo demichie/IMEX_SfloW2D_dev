@@ -286,15 +286,8 @@ CONTAINS
         LOGICAL, INTENT(OUT) :: model_supported
         TYPE(physical_state_type) :: current_state
         REAL(wp) :: velocity_before(2)
-        REAL(wp), INTENT(IN), OPTIONAL :: bx,by,bxx,bxy,byy
-        REAL(wp) :: geometry(5)
+        REAL(wp), INTENT(IN) :: bx,by,bxx,bxy,byy
         INTEGER :: i
-        geometry=0.0_wp
-        IF (PRESENT(bx)) geometry(1)=bx
-        IF (PRESENT(by)) geometry(2)=by
-        IF (PRESENT(bxx)) geometry(3)=bxx
-        IF (PRESENT(bxy)) geometry(4)=bxy
-        IF (PRESENT(byy)) geometry(5)=byy
         current_state=state
         velocity_after=[state%u,state%v]
         model_supported=.TRUE.
@@ -338,8 +331,7 @@ CONTAINS
             IF (.NOT.model_supported) RETURN
             current_state%u=velocity_after(1)
             current_state%v=velocity_after(2)
-            CALL update_physical_state_kinematics(current_state,geometry(1),geometry(2), &
-                 geometry(3),geometry(4),geometry(5))
+            CALL update_physical_state_kinematics(current_state,bx,by,bxx,bxy,byy)
         END DO
     END SUBROUTINE solve_rheology_analytic
 
