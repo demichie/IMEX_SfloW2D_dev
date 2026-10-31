@@ -99,8 +99,10 @@ PROGRAM test_analytic_velocity
     cs%u = CMPLX(velocity_after(1),0.0_wp,wp)
     cs%v = CMPLX(velocity_after(2),0.0_wp,wp)
     cs%rho_m = CMPLX(mixture_density,0.0_wp,wp)
-    CALL eval_rheology_plastic_implicit(cs, CMPLX(speed_after,0.0_wp,wp), &
-         .TRUE., complex_source_x, complex_source_y)
+    cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
+    cs%mod_vel2=cs%mod_vel**2
+    cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
+    CALL eval_rheology_plastic_implicit(cs, complex_source_x, complex_source_y)
   END BLOCK
   CALL assert_stage(velocity_before, velocity_after, integration_step,     &
        mixture_density*flow_depth, [REAL(complex_source_x,wp),              &
@@ -137,13 +139,19 @@ PROGRAM test_analytic_velocity
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
     cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
     cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
-    CALL eval_rheology_lava_implicit(cs, .TRUE., complex_source_x, complex_source_y)
+    cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
+    cs%mod_vel2=cs%mod_vel**2
+    cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
+    CALL eval_rheology_lava_implicit(cs, complex_source_x, complex_source_y)
   END BLOCK
   BLOCK
     TYPE(physical_state_type) :: ps
     ps%u=velocity_after(1)
     ps%v=velocity_after(2)
-    CALL eval_rheology_lava_semi_implicit(ps, speed_after, source_x, source_y)
+    ps%mod_vel=CMPLX(speed_after,0.0_wp,wp)
+    ps%mod_vel2=ps%mod_vel**2
+    ps%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
+    CALL eval_rheology_lava_semi_implicit(ps, source_x, source_y)
   END BLOCK
   source = [REAL(complex_source_x,wp)+source_x,                              &
        REAL(complex_source_y,wp)+source_y]
@@ -180,8 +188,10 @@ PROGRAM test_analytic_velocity
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
     cs%inv_rhom=CMPLX(1.0_wp/mixture_density,0.0_wp,wp)
     cs%alphas=CMPLX(solid_fraction,0.0_wp,wp)
-    CALL eval_rheology_lahar_implicit(cs, CMPLX(speed_after,0.0_wp,wp), &
-         CMPLX(horizontal_speed,0.0_wp,wp), .TRUE., complex_source_x, complex_source_y)
+    cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
+    cs%mod_vel2=cs%mod_vel**2
+    cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
+    CALL eval_rheology_lahar_implicit(cs, complex_source_x, complex_source_y)
   END BLOCK
   BLOCK
     TYPE(physical_state_type) :: ps
@@ -190,7 +200,10 @@ PROGRAM test_analytic_velocity
     ps%v=velocity_after(2)
     ps%rho_m=mixture_density
     ps%alphas=solid_fraction
-    CALL eval_rheology_lahar_semi_implicit(ps, horizontal_speed, .TRUE., source_x, source_y)
+    ps%mod_vel=CMPLX(speed_after,0.0_wp,wp)
+    ps%mod_vel2=ps%mod_vel**2
+    ps%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
+    CALL eval_rheology_lahar_semi_implicit(ps, source_x, source_y)
   END BLOCK
   source = [REAL(complex_source_x,wp)+source_x,                              &
        REAL(complex_source_y,wp)+source_y]
@@ -223,8 +236,10 @@ PROGRAM test_analytic_velocity
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
     cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
     cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
-    CALL eval_rheology_empirical_implicit(cs, CMPLX(horizontal_speed,0.0_wp,wp), &
-         CMPLX(speed_after,0.0_wp,wp), .TRUE., complex_source_x, complex_source_y)
+    cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
+    cs%mod_vel2=cs%mod_vel**2
+    cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
+    CALL eval_rheology_empirical_implicit(cs, complex_source_x, complex_source_y)
   END BLOCK
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [REAL(complex_source_x,wp),               &
@@ -252,8 +267,10 @@ PROGRAM test_analytic_velocity
     cs%u=CMPLX(velocity_after(1),0.0_wp,wp)
     cs%v=CMPLX(velocity_after(2),0.0_wp,wp)
     cs%rho_m=CMPLX(mixture_density,0.0_wp,wp)
-    CALL eval_rheology_quadratic_implicit(cs, CMPLX(horizontal_speed,0.0_wp,wp), &
-         CMPLX(speed_after**2,0.0_wp,wp), .TRUE., complex_source_x, complex_source_y)
+    cs%mod_vel=CMPLX(speed_after,0.0_wp,wp)
+    cs%mod_vel2=cs%mod_vel**2
+    cs%mod_vel_hor=CMPLX(horizontal_speed,0.0_wp,wp)
+    CALL eval_rheology_quadratic_implicit(cs, complex_source_x, complex_source_y)
   END BLOCK
   CALL assert_stage(velocity_before, velocity_after, integration_step,      &
        mixture_density*flow_depth, [REAL(complex_source_x,wp),               &

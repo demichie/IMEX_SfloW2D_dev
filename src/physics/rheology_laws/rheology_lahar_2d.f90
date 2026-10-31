@@ -69,22 +69,21 @@ CONTAINS
     !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
     !> \param[in] moving Whether the local state is considered moving.
     !> \param[out] rate Conservative horizontal momentum source vector.
-    SUBROUTINE eval_rheology_lahar_explicit(state, &
-            mod_vel, &
-            mod_hor_vel, &
-            moving, &
-            rate)
+    SUBROUTINE eval_rheology_lahar_explicit(state, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel
-        LOGICAL, INTENT(IN) :: moving
+
+
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
         TYPE(complex_physical_state_type) :: cs
-        CALL eval_rheology_lahar_semi_implicit(state, mod_hor_vel, moving, sx, sy)
+        CALL eval_rheology_lahar_semi_implicit(state, &
+             sx, &
+             sy)
         CALL complex_state_from_real(state, cs)
-        CALL eval_rheology_lahar_implicit(cs, CMPLX(mod_vel,0.0_wp,wp), &
-             CMPLX(mod_hor_vel,0.0_wp,wp), moving, ix, iy)
+        CALL eval_rheology_lahar_implicit(cs, &
+             ix, &
+             iy)
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_lahar_explicit
 
@@ -98,11 +97,11 @@ CONTAINS
     !> \param[in] moving Whether the local state is considered moving.
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
-    SUBROUTINE eval_rheology_lahar_semi_implicit(state, mod_hor_vel, moving, rate_x, rate_y)
+    SUBROUTINE eval_rheology_lahar_semi_implicit(state, rate_x, rate_y)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_hor_vel
-        LOGICAL, INTENT(IN) :: moving
+
+
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
         REAL(wp) :: yield_strength, yield_slope, friction_term
         REAL(wp), PARAMETER :: depth_threshold = 1.0E-20_wp
@@ -112,7 +111,7 @@ CONTAINS
         alphas_tot = SUM(state%alphas)
         rate_x = 0.0_wp
         rate_y = 0.0_wp
-        IF (.NOT. moving) RETURN
+        IF (.NOT. (state%mod_vel>0.0_wp)) RETURN
         yield_strength = alpha2 * (EXP(beta2 * alphas_tot) - 1.0_wp)
         IF (state%h .GT. depth_threshold) THEN
             yield_slope = yield_strength / (grav * state%rho_m * state%h)
@@ -123,8 +122,8 @@ CONTAINS
         END IF
 
         friction_term = grav * state%rho_m * state%h * yield_slope
-        rate_x = -friction_term * state%u / mod_hor_vel
-        rate_y = -friction_term * state%v / mod_hor_vel
+        rate_x = -friction_term * state%u / state%mod_vel_hor
+        rate_y = -friction_term * state%v / state%mod_vel_hor
     END SUBROUTINE eval_rheology_lahar_semi_implicit
 
     !> \param[in] state Shared physical state (complex for implicit treatment).
@@ -138,11 +137,11 @@ CONTAINS
     !> \param[in] moving Whether the local state is considered moving.
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
-    SUBROUTINE eval_rheology_lahar_implicit(state, mod_vel, mod_hor_vel, moving, rate_x, rate_y)
+    SUBROUTINE eval_rheology_lahar_implicit(state, rate_x, rate_y)
 
         TYPE(complex_physical_state_type), INTENT(IN) :: state
-        COMPLEX(wp), INTENT(IN) :: mod_vel, mod_hor_vel
-        LOGICAL, INTENT(IN) :: moving
+
+
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         COMPLEX(wp) :: fluid_viscosity, inverse_depth, viscous_slope
         COMPLEX(wp) :: turbulent_slope, total_slope, friction_term
@@ -161,20 +160,20 @@ CONTAINS
         fluid_viscosity = eval_lahar_fluid_viscosity(state%T, SUM(state%alphas))
         IF (REAL(state%h, wp) .GT. depth_threshold) THEN
             inverse_depth = 1.0_wp / state%h
-            viscous_slope = Kappa * fluid_viscosity * mod_vel * 0.125_wp *                         &
+            viscous_slope = Kappa * fluid_viscosity * state%mod_vel * 0.125_wp *                         &
                     state%inv_rhom * inv_grav * inverse_depth**2
-            turbulent_slope = n_td2 * mod_vel**2 * inverse_depth**four_thirds
+            turbulent_slope = n_td2 * state%mod_vel**2 * inverse_depth**four_thirds
 
         ELSE
-            viscous_slope = Kappa * fluid_viscosity * mod_vel /                                    &
+            viscous_slope = Kappa * fluid_viscosity * state%mod_vel /                                    &
                     (8.0_wp * state%rho_m * grav * depth_threshold**2)
-            turbulent_slope = n_td2 * mod_vel**2 * depth_threshold**neg_four_thirds
+            turbulent_slope = n_td2 * state%mod_vel**2 * depth_threshold**neg_four_thirds
 
         END IF
 
         total_slope = viscous_slope + turbulent_slope
-        IF (.NOT. moving) RETURN
-        friction_term = grav * state%rho_m * state%h * total_slope / mod_hor_vel
+        IF (.NOT. ((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) RETURN
+        friction_term = grav * state%rho_m * state%h * total_slope / state%mod_vel_hor
         rate_x = -state%u * friction_term
         rate_y = -state%v * friction_term
     END SUBROUTINE eval_rheology_lahar_implicit

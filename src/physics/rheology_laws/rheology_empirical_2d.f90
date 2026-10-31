@@ -31,21 +31,19 @@ CONTAINS
     !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
     !> \param[in] moving Whether the local state is considered moving.
     !> \param[out] rate Conservative horizontal momentum source vector.
-    SUBROUTINE eval_rheology_empirical_explicit(state, &
-            mod_vel, &
-            mod_hor_vel, &
-            moving, &
-            rate)
+    SUBROUTINE eval_rheology_empirical_explicit(state, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel, mod_hor_vel
-        LOGICAL, INTENT(IN) :: moving
+
+
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
         TYPE(complex_physical_state_type) :: cs
         CALL eval_rheology_empirical_semi_implicit(state, sx, sy)
         CALL complex_state_from_real(state, cs)
-        CALL eval_rheology_empirical_implicit(cs, CMPLX(mod_hor_vel,0.0_wp,wp), CMPLX(mod_vel,0.0_wp,wp), moving, ix, iy)
+        CALL eval_rheology_empirical_implicit(cs, &
+             ix, &
+             iy)
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_empirical_explicit
 
@@ -75,20 +73,20 @@ CONTAINS
     !> \param[in] moving Whether the local state is considered moving.
     !> \param[out] rate_x x component of momentum source rate.
     !> \param[out] rate_y y component of momentum source rate.
-    SUBROUTINE eval_rheology_empirical_implicit(state, mod_hor_vel, mod_vel, moving, rate_x, rate_y)
+    SUBROUTINE eval_rheology_empirical_implicit(state, rate_x, rate_y)
 
         TYPE(complex_physical_state_type), INTENT(IN) :: state
-        COMPLEX(wp), INTENT(IN) :: mod_hor_vel, mod_vel
-        LOGICAL, INTENT(IN) :: moving
+
+
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         COMPLEX(wp) :: friction_coefficient
 
         rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
         rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-        IF (.NOT. moving) RETURN
-        friction_coefficient = 1.0E-3_wp / (1.0_wp + 10.0_wp * state%h) * mod_vel
-        rate_x = -state%rho_m * friction_coefficient * (state%u / mod_hor_vel)
-        rate_y = -state%rho_m * friction_coefficient * (state%v / mod_hor_vel)
+        IF (.NOT. ((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) RETURN
+        friction_coefficient = 1.0E-3_wp / (1.0_wp + 10.0_wp * state%h) * state%mod_vel
+        rate_x = -state%rho_m * friction_coefficient * (state%u / state%mod_vel_hor)
+        rate_y = -state%rho_m * friction_coefficient * (state%v / state%mod_vel_hor)
     END SUBROUTINE eval_rheology_empirical_implicit
 
     !> \param[in] state Shared real physical state before the analytic substep.

@@ -37,42 +37,43 @@ MODULE rheology_lava_2d
     ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
 
-    SUBROUTINE eval_rheology_lava_explicit(state, &
-            mod_vel, &
-            moving, &
-            rate)
+    SUBROUTINE eval_rheology_lava_explicit(state, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel
-        LOGICAL, INTENT(IN) :: moving
+
+
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
         TYPE(complex_physical_state_type) :: cs
-        CALL eval_rheology_lava_semi_implicit(state, mod_vel, sx, sy)
+        CALL eval_rheology_lava_semi_implicit(state, &
+             sx, &
+             sy)
         CALL complex_state_from_real(state, cs)
-        CALL eval_rheology_lava_implicit(cs, moving, ix, iy)
+        CALL eval_rheology_lava_implicit(cs, &
+             ix, &
+             iy)
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_lava_explicit
 
 
-    SUBROUTINE eval_rheology_lava_semi_implicit(state, mod_vel, rate_x, rate_y)
+    SUBROUTINE eval_rheology_lava_semi_implicit(state, rate_x, rate_y)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel
+
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
 
         rate_x = 0.0_wp
         rate_y = 0.0_wp
-        IF (mod_vel .LE. 0.0_wp) RETURN
-        rate_x = -tau0 * state%u / mod_vel
-        rate_y = -tau0 * state%v / mod_vel
+        IF (state%mod_vel .LE. 0.0_wp) RETURN
+        rate_x = -tau0 * state%u / state%mod_vel
+        rate_y = -tau0 * state%v / state%mod_vel
     END SUBROUTINE eval_rheology_lava_semi_implicit
 
 
-    SUBROUTINE eval_rheology_lava_implicit(state, moving, rate_x, rate_y)
+    SUBROUTINE eval_rheology_lava_implicit(state, rate_x, rate_y)
 
         TYPE(complex_physical_state_type), INTENT(IN) :: state
-        LOGICAL, INTENT(IN) :: moving
+
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
         COMPLEX(wp) :: gamma
         REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
@@ -87,7 +88,7 @@ CONTAINS
 
         END IF
 
-        IF (moving) THEN
+        IF (((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) THEN
             rate_x = -state%rho_m * gamma * state%u
             rate_y = -state%rho_m * gamma * state%v
 

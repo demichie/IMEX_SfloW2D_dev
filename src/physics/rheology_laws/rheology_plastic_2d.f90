@@ -37,21 +37,19 @@ CONTAINS
     !> \param[in] mod_vel Three-dimensional speed [m s^-1].
     !> \param[in] moving True for a moving local state.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_plastic_explicit(state, &
-            mod_vel, &
-            moving, &
-            rate)
+    SUBROUTINE eval_rheology_plastic_explicit(state, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel
-        LOGICAL, INTENT(IN) :: moving
+
+
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
         TYPE(complex_physical_state_type) :: cs
         CALL eval_rheology_plastic_semi_implicit(state, sx, sy)
         CALL complex_state_from_real(state, cs)
-        CALL eval_rheology_plastic_implicit(cs, CMPLX(mod_vel,0.0_wp,wp), &
-             moving, ix, iy)
+        CALL eval_rheology_plastic_implicit(cs, &
+             ix, &
+             iy)
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_plastic_explicit
 
@@ -78,18 +76,18 @@ CONTAINS
     !> \param[in] moving True for a moving local state.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_plastic_implicit(state, mod_vel, moving, rate_x, rate_y)
+    SUBROUTINE eval_rheology_plastic_implicit(state, rate_x, rate_y)
 
         TYPE(complex_physical_state_type), INTENT(IN) :: state
-        COMPLEX(wp), INTENT(IN) :: mod_vel
-        LOGICAL, INTENT(IN) :: moving
+
+
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
 
         rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
         rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-        IF (.NOT. moving) RETURN
-        rate_x = -state%rho_m * tau * (state%u / mod_vel)
-        rate_y = -state%rho_m * tau * (state%v / mod_vel)
+        IF (.NOT. ((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) RETURN
+        rate_x = -state%rho_m * tau * (state%u / state%mod_vel)
+        rate_y = -state%rho_m * tau * (state%v / state%mod_vel)
     END SUBROUTINE eval_rheology_plastic_implicit
 
     !> \param[in] state Shared real physical state at the start of the analytic substep.

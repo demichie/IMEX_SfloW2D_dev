@@ -36,22 +36,19 @@ CONTAINS
     !> \param[in] mod_vel2 Squared three-dimensional speed [m^2 s^-2].
     !> \param[in] moving True for a moving local state.
     !> \param[out] rate Two-component conservative momentum source.
-    SUBROUTINE eval_rheology_quadratic_explicit(state, &
-            mod_hor_vel, &
-            mod_vel2, &
-            moving, &
-            rate)
+    SUBROUTINE eval_rheology_quadratic_explicit(state, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_hor_vel, mod_vel2
-        LOGICAL, INTENT(IN) :: moving
+
+
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
         TYPE(complex_physical_state_type) :: cs
         CALL eval_rheology_quadratic_semi_implicit(state,sx,sy)
         CALL complex_state_from_real(state, cs)
-        CALL eval_rheology_quadratic_implicit(cs, CMPLX(mod_hor_vel,0.0_wp,wp), &
-             CMPLX(mod_vel2,0.0_wp,wp), moving, ix, iy)
+        CALL eval_rheology_quadratic_implicit(cs, &
+             ix, &
+             iy)
         rate=[sx,sy]+REAL([ix,iy],wp)
     END SUBROUTINE eval_rheology_quadratic_explicit
 
@@ -79,21 +76,20 @@ CONTAINS
     !> \param[in] moving True for a moving local state.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_quadratic_implicit(state, mod_hor_vel, mod_vel2, &
-            moving, rate_x, rate_y)
+    SUBROUTINE eval_rheology_quadratic_implicit(state, rate_x, rate_y)
 
         TYPE(complex_physical_state_type), INTENT(IN) :: state
-        COMPLEX(wp), INTENT(IN) :: mod_hor_vel, mod_vel2
-        LOGICAL, INTENT(IN) :: moving
+
+
         COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
 
         rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
         rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-        IF (.NOT. moving) RETURN
-        rate_x = -state%rho_m * (state%u / mod_hor_vel)                                                         &
-                * friction_factor * mod_vel2
-        rate_y = -state%rho_m * (state%v / mod_hor_vel)                                                         &
-                * friction_factor * mod_vel2
+        IF (.NOT. ((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) RETURN
+        rate_x = -state%rho_m * (state%u / state%mod_vel_hor)                                                         &
+                * friction_factor * state%mod_vel2
+        rate_y = -state%rho_m * (state%v / state%mod_vel_hor)                                                         &
+                * friction_factor * state%mod_vel2
     END SUBROUTINE eval_rheology_quadratic_implicit
 
     !> \param[in] state Shared real state at the start of the analytic source step.
