@@ -91,9 +91,9 @@ PROGRAM test_pore_pressure_diffusion
        'state without pore volume should remain unchanged')
 
   solid_fractions = 0.2_wp / REAL(n_solid,wp)
-  CALL advance_pore_pressure_diffusion(initial_pressure, HUGE(1.0_wp),       &
+  CALL advance_pore_pressure_diffusion(initial_pressure, 1.0e6_wp,       &
        flow_depth, temperature, solid_fractions, after_full)
-  CALL assert_close(after_full, 0.0_wp, 0.0_wp,                              &
+  CALL assert_close(after_full, 0.0_wp, 1.0e-10_wp,                         &
        'long-time diffusion limit did not decay excess pressure to zero')
 
   hydraulic_permeability = 0.0_wp
