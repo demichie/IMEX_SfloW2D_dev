@@ -92,9 +92,9 @@ CONTAINS
                     mod_vel2, &
                     grav_coeff, &
                     curvature_term, &
-                    B_second_xx, &
-                    B_second_xy, &
-                    B_second_yy, &
+                    state%B_second_xx, &
+                    state%B_second_xy, &
+                    state%B_second_yy, &
                     use_pore_pressure, &
                     moving, &
                     use_stochastic, &
@@ -152,9 +152,9 @@ CONTAINS
                     mod_vel, &
                     grav_coeff, &
                     curvature_term, &
-                    B_second_xx, &
-                    B_second_xy, &
-                    B_second_yy, &
+                    state%B_second_xx, &
+                    state%B_second_xy, &
+                    state%B_second_yy, &
                     use_pore_pressure, &
                     process_rate)
         CASE('rheology_mui_voellmy')
@@ -163,9 +163,9 @@ CONTAINS
                     mod_vel2, &
                     grav_coeff, &
                     curvature_term, &
-                    B_second_xx, &
-                    B_second_xy, &
-                    B_second_yy, &
+                    state%B_second_xx, &
+                    state%B_second_xy, &
+                    state%B_second_yy, &
                     use_pore_pressure, &
                     moving, &
                     use_stochastic, &
