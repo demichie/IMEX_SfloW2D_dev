@@ -154,9 +154,10 @@ CONTAINS
 
   !> Build the shared REAL source state directly from the available primitive vector.
   !> No conservative-to-primitive conversion is performed on this path.
-  SUBROUTINE physical_state_from_qp(qp, state)
+  SUBROUTINE physical_state_from_qp(qp, state, bx, by, bxx, bxy, byy)
     REAL(wp), INTENT(IN) :: qp(n_vars+2)
     TYPE(physical_state_type), INTENT(OUT) :: state
+    REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
     REAL(wp) :: rho_c, inv_rho_c
     REAL(wp) :: xs(n_solid), xg(n_add_gas)
 
@@ -189,14 +190,15 @@ CONTAINS
          state%rho_m, state%inv_rhom, rho_c, inv_rho_c, &
          state%alphas, state%alphag)
     state%red_grav = (state%rho_m - rho_a_amb) * state%inv_rhom * grav
-    CALL update_physical_state_kinematics(state)
+    CALL update_physical_state_kinematics(state,bx,by,bxx,bxy,byy)
     CALL update_physical_state_kinematics(state)
   END SUBROUTINE physical_state_from_qp
 
   !> Construct real physical properties from the current conservative state.
-  SUBROUTINE real_physical_state_from_q(q, state)
+  SUBROUTINE real_physical_state_from_q(q, state, bx, by, bxx, bxy, byy)
     REAL(wp), INTENT(IN) :: q(n_vars)
     TYPE(physical_state_type), INTENT(OUT) :: state
+    REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
     REAL(wp) :: p_dyn
 
     ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas), &
@@ -212,13 +214,14 @@ CONTAINS
        state%xg = q(idx_add_gas_first:idx_add_gas_last) / q(idx_totMassEqn)
        CALL enforce_mass_fraction_closure(state%xs, state%xg)
     END IF
-    CALL update_physical_state_kinematics(state)
+    CALL update_physical_state_kinematics(state,bx,by,bxx,bxy,byy)
   END SUBROUTINE real_physical_state_from_q
 
   !> Build a COMPLEX physical source state through the existing complex-step kernel.
-  SUBROUTINE physical_state_from_q(q, state)
+  SUBROUTINE physical_state_from_q(q, state, bx, by, bxx, bxy, byy)
     COMPLEX(wp), INTENT(IN) :: q(n_vars)
     TYPE(complex_physical_state_type), INTENT(OUT) :: state
+    REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
 
     ALLOCATE(state%alphas(n_solid), state%alphag(n_add_gas), &
          state%xs(n_solid), state%xg(n_add_gas))
