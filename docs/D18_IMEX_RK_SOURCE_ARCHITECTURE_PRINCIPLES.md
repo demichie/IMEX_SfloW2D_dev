@@ -256,3 +256,16 @@ For an explicit rheology group, form the candidate update over its actual group 
 The limiter must **only prevent reversal**: it must not suppress transverse momentum or impose an additional upper bound on the momentum magnitude. The converged nonlinear residual must remain authoritative; verify separately whether a particular fully implicit constitutive law admits nonphysical reversal, rather than masking it by projecting the Newton result.
 
 This decision refines sections 13-14. In particular, the *current* second limiter call after `solve_newton_group` in `src/numerics/nonlinear_solver_2d.f90` must be removed at implementation time; the remaining semi-implicit call must ultimately move out of the generic Newton solver to rheology-owned rate construction. This documentation change alone does **not** implement those code changes.
+
+## 16. Placement of the rheology reversal limiter (agreed: option B)
+
+Place the **common velocity-reversal limiter in `src/physics/rheology_laws/rheology_2d.f90`**, at the rheology-family dispatch/aggregation level, **not inside each individual rheological model interface**.
+
+- `eval_rheology_explicit`: evaluate every model's explicit contribution on the **same incoming physical state**, sum those contributions, then apply the reversal limiter **once** to the aggregate rheological momentum rate using the actual explicit-group time interval. Return the effective limited rate.
+- `eval_rheology_semi_implicit`: likewise sum semi-implicit contributions on one group-entry state, then limit the aggregate semi-implicit momentum increment **once**, before the Newton solve, with its actual associated interval. Return the effective limited rate used to construct the nonlinear residual.
+- `eval_rheology_implicit` and `eval_rheology_analytic`: **no additional reversal limiter**.
+- Individual constitutive-law interfaces retain responsibility for their own physics but do not duplicate this family-wide numerical anti-reversal control.
+- The generic Newton solver and RK integrator must not apply rheology-specific reversal projections. Avoid additional wrappers: adapt the existing family-level interfaces and pass interval/state information directly where needed.
+- Preserve transverse momentum and do not cap magnitude merely for this rule; an initially zero momentum has no reversal direction.
+
+This refines sections 13-15 and is a **design decision only**; Fortran implementation and validation remain pending.
