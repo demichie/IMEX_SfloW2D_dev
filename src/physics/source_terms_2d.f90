@@ -355,26 +355,8 @@ CONTAINS
 
        red_grav = physical_state%red_grav
 
-       IF ( slope_correction_flag ) THEN
-
-          w = u * Bprimej_x + v * Bprimej_y
-
-       ELSE
-
-          w = CMPLX( 0.0_wp , 0.0_wp , wp )
-
-       END IF
-
-       mod_vel2 = u**2 + v**2 + w**2
-       mod_vel = SQRT( mod_vel2 )
-       mod_vel_hor = SQRT( u**2 + v**2 )
-       ! A purely imaginary velocity perturbation about rest still carries
-       ! the derivative of linear viscous laws. Branching on REAL(V) alone
-       ! would erase it. This does not assign a derivative to Coulomb's cusp.
-       moving = (REAL(mod_vel,wp) .NE. 0.0_wp) .OR. (AIMAG(mod_vel) .NE. 0.0_wp)
-
        CALL eval_rheology_implicit([selected_model_name], physical_state, &
-            mod_vel, mod_vel_hor, mod_vel2, moving, stochastic_flag, Zij, source_term(2:3))
+            Bprimej_x, Bprimej_y, stochastic_flag, Zij, source_term(2:3))
     END IF
 
     IF (selected_thermal) THEN
@@ -480,24 +462,8 @@ CONTAINS
        r_red_grav = physical_state%red_grav
 
 
-       IF ( slope_correction_flag ) THEN
-
-          r_w = r_u * Bprimej_x + r_v * Bprimej_y
-
-       ELSE
-
-          r_w = 0.0_wp
-
-       END IF
-
-       mod_vel = SQRT( r_u**2 + r_v**2 + r_w**2 )
-
-       mod_hor_vel = SQRT( r_u**2 + r_v**2 )
-
-       exc_pore_pres = 0.0_wp
-       IF (pore_pressure_flag) exc_pore_pres = qpj(idx_pore)
        CALL eval_rheology_semi_implicit([selected_model_name], physical_state, &
-            mod_vel, mod_hor_vel, grav_coeff, curvature_term_flag, &
+            Bprimej_x, Bprimej_y, grav_coeff, curvature_term_flag, &
             Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, pore_pressure_flag, &
             stochastic_flag, Zj, source_term(2:3))
 
@@ -612,15 +578,10 @@ CONTAINS
        active_rheology=group_rheology_name(group)
        IF (rheology_flag .AND. LEN_TRIM(active_rheology)>0 .AND. &
             r_h>dry_thickness_tolerance) THEN
-          horizontal_speed=SQRT(r_u**2+r_v**2)
-          vertical_velocity=0.0_wp
-          IF (slope_correction_flag) vertical_velocity=r_u*Bprimej_x+r_v*Bprimej_y
-          speed_squared=horizontal_speed**2+vertical_velocity**2
-          speed=SQRT(speed_squared)
           CALL eval_rheology_explicit([active_rheology], physical_state, &
-               speed, horizontal_speed, speed_squared, grav_coeff, curvature_term_flag, &
+               Bprimej_x, Bprimej_y, grav_coeff, curvature_term_flag, &
                Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, pore_pressure_flag, &
-               speed>0.0_wp, stochastic_flag, 0.0_wp, rheology_rate)
+               stochastic_flag, 0.0_wp, rheology_rate)
           expl_term(2:3)=expl_term(2:3)+rheology_rate
         END IF
         IF (thermal_cooling_flag .AND. group_contains_name(group,'thermal_cooling')) THEN

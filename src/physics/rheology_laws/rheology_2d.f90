@@ -12,7 +12,7 @@
 
 MODULE rheology_2d
 
-    USE parameters_2d, ONLY : wp
+    USE parameters_2d, ONLY : wp, slope_correction_flag
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE diagnostics_2d, ONLY : fatal_error
     USE rheology_voellmy_2d, ONLY : eval_rheology_voellmy_explicit,                                &
@@ -64,18 +64,26 @@ MODULE rheology_2d
 
 CONTAINS
 
-    SUBROUTINE eval_rheology_explicit(models,state,mod_vel,mod_hor_vel,mod_vel2, &
+    SUBROUTINE eval_rheology_explicit(models,state,B_prime_x,B_prime_y, &
          grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
-         use_pore_pressure,moving,use_stochastic,stochastic_value,rate)
+         use_pore_pressure,use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel,mod_hor_vel,mod_vel2,grav_coeff
+        REAL(wp), INTENT(IN) :: B_prime_x,B_prime_y,grav_coeff
         REAL(wp), INTENT(IN) :: B_second_xx,B_second_xy,B_second_yy,stochastic_value
-        LOGICAL, INTENT(IN) :: curvature_term,use_pore_pressure,moving,use_stochastic
+        LOGICAL, INTENT(IN) :: curvature_term,use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: process_rate(2)
+        REAL(wp) :: mod_vel,mod_hor_vel,mod_vel2,vertical_velocity
+        LOGICAL :: moving
         INTEGER :: i
         rate=0.0_wp
+        mod_hor_vel=SQRT(state%u**2+state%v**2)
+                vertical_velocity=0.0_wp
+                IF (slope_correction_flag) vertical_velocity=state%u*B_prime_x+state%v*B_prime_y
+                mod_vel2=mod_hor_vel**2+vertical_velocity**2
+                mod_vel=SQRT(mod_vel2)
+        moving=mod_vel>0.0_wp
         DO i=1,SIZE(models)
             process_rate = 0.0_wp
             SELECT CASE(TRIM(models(i)))
@@ -174,18 +182,23 @@ CONTAINS
     END SUBROUTINE eval_rheology_explicit
 
 
-    SUBROUTINE eval_rheology_semi_implicit(models,state,mod_vel,mod_hor_vel, &
+    SUBROUTINE eval_rheology_semi_implicit(models,state,B_prime_x,B_prime_y, &
          grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
          use_pore_pressure,use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: mod_vel,mod_hor_vel,grav_coeff
+        REAL(wp), INTENT(IN) :: B_prime_x,B_prime_y,grav_coeff
         REAL(wp), INTENT(IN) :: B_second_xx,B_second_xy,B_second_yy,stochastic_value
         LOGICAL, INTENT(IN) :: curvature_term,use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: process_rate(2),curvature_term_value
+        REAL(wp) :: mod_vel,mod_hor_vel,vertical_velocity
         INTEGER :: i
         rate=0.0_wp
+        mod_hor_vel=SQRT(state%u**2+state%v**2)
+                vertical_velocity=0.0_wp
+                IF (slope_correction_flag) vertical_velocity=state%u*B_prime_x+state%v*B_prime_y
+                mod_vel=SQRT(mod_hor_vel**2+vertical_velocity**2)
         DO i=1,SIZE(models)
             process_rate = 0.0_wp
             SELECT CASE(TRIM(models(i)))
@@ -227,17 +240,25 @@ CONTAINS
     END SUBROUTINE eval_rheology_semi_implicit
 
 
-    SUBROUTINE eval_rheology_implicit(models,state,mod_vel,mod_hor_vel,mod_vel2, &
-         moving,use_stochastic,stochastic_value,rate)
+    SUBROUTINE eval_rheology_implicit(models,state,B_prime_x,B_prime_y, &
+         use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(complex_physical_state_type), INTENT(IN) :: state
-        COMPLEX(wp), INTENT(IN) :: mod_vel,mod_hor_vel,mod_vel2
-        LOGICAL, INTENT(IN) :: moving,use_stochastic
+        REAL(wp), INTENT(IN) :: B_prime_x,B_prime_y
+        LOGICAL, INTENT(IN) :: use_stochastic
         REAL(wp), INTENT(IN) :: stochastic_value
         COMPLEX(wp), INTENT(OUT) :: rate(2)
         COMPLEX(wp) :: process_rate(2)
+        COMPLEX(wp) :: mod_vel,mod_hor_vel,mod_vel2,vertical_velocity
+        LOGICAL :: moving
         INTEGER :: i
         rate=CMPLX(0.0_wp,0.0_wp,wp)
+        mod_hor_vel=SQRT(state%u**2+state%v**2)
+                vertical_velocity=CMPLX(0.0_wp,0.0_wp,wp)
+                IF (slope_correction_flag) vertical_velocity=state%u*B_prime_x+state%v*B_prime_y
+                mod_vel2=state%u**2+state%v**2+vertical_velocity**2
+                mod_vel=SQRT(mod_vel2)
+        moving=(REAL(mod_vel,wp)/=0.0_wp).OR.(AIMAG(mod_vel)/=0.0_wp)
         DO i=1,SIZE(models)
             process_rate = CMPLX(0.0_wp,0.0_wp,wp)
             SELECT CASE(TRIM(models(i)))
