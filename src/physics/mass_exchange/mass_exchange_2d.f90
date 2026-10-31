@@ -30,16 +30,6 @@ MODULE mass_exchange_2d
 
 CONTAINS
 
-    !> Explicit cell-local coordinator: accumulates all enabled exchange processes.
-    SUBROUTINE eval_mass_exchange_explicit(state,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
-        TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: Bx,By,erodible(n_solid),dt
-        INTEGER, INTENT(IN) :: B_zone
-        TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
-        REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-        CALL eval_mass_exchange_terms(state,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
-    END SUBROUTINE eval_mass_exchange_explicit
-
     !> This family currently supports only explicit coordination.
     SUBROUTINE eval_mass_exchange_semi_implicit(state,total_rates,eqns_term)
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -82,7 +72,7 @@ CONTAINS
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] total_rates Accumulated process rates and bed changes for this cell.
     !> @param[out] eqns_term Conservative mass, momentum, energy and species source vector.
-    SUBROUTINE eval_mass_exchange_terms(physical_state,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
+    SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
 
         TYPE(physical_state_type), INTENT(IN) :: physical_state
         REAL(wp), INTENT(IN) :: Bx,By,erodible(n_solid),dt
@@ -186,7 +176,7 @@ CONTAINS
             CALL accumulate_process(process_rates,physical_state%u,physical_state%v,total_rates,eqns_term)
         END IF
 
-    END SUBROUTINE eval_mass_exchange_terms
+    END SUBROUTINE eval_mass_exchange_explicit
 
     ! Limit simultaneous withdrawal demands from one physical inventory.
     ! Positive source total_rates are excluded from the budget, not netted against sinks.

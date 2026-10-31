@@ -22,7 +22,14 @@ CONTAINS
     INTEGER :: i
     rate=0.0_wp
     DO i=1,SIZE(models)
-      CALL eval_thermal_explicit_dispatch(TRIM(models(i)),state,radiative,convective,ambient,process_rate)
+
+    SELECT CASE (TRIM(models(i)))
+    CASE ('thermal_cooling')
+      CALL eval_thermal_cooling_explicit(state,radiative,convective,ambient,rate)
+    CASE DEFAULT
+      CALL fatal_error('Unknown explicit thermal model: '//TRIM(models(i)))
+    END SELECT
+
       rate=rate+process_rate
     END DO
   END SUBROUTINE eval_thermal_explicit
@@ -36,7 +43,14 @@ CONTAINS
     INTEGER :: i
     rate=0.0_wp
     DO i=1,SIZE(models)
-      CALL eval_thermal_semi_implicit_dispatch(TRIM(models(i)),state,process_rate)
+
+    SELECT CASE (TRIM(models(i)))
+    CASE ('thermal_cooling')
+      CALL eval_thermal_cooling_semi_implicit(state,rate)
+    CASE DEFAULT
+      CALL fatal_error('Unknown semi-implicit thermal model: '//TRIM(models(i)))
+    END SELECT
+
       rate=rate+process_rate
     END DO
   END SUBROUTINE eval_thermal_semi_implicit
@@ -51,7 +65,14 @@ CONTAINS
     INTEGER :: i
     rate=CMPLX(0.0_wp,0.0_wp,wp)
     DO i=1,SIZE(models)
-      CALL eval_thermal_implicit_dispatch(TRIM(models(i)),state,radiative,convective,ambient,process_rate)
+
+    SELECT CASE (TRIM(models(i)))
+    CASE ('thermal_cooling')
+      CALL eval_thermal_cooling_implicit(state,radiative,convective,ambient,rate)
+    CASE DEFAULT
+      CALL fatal_error('Unknown implicit thermal model: '//TRIM(models(i)))
+    END SELECT
+
       rate=rate+process_rate
     END DO
   END SUBROUTINE eval_thermal_implicit
@@ -68,64 +89,26 @@ CONTAINS
     current_state=state
     temperature_after=state%T
     DO i=1,SIZE(models)
-      CALL solve_thermal_analytic_dispatch(TRIM(models(i)),current_state,interval,heat_capacity, &
-           radiative,convective,ambient,temperature_after)
-      current_state%T=temperature_after
-    END DO
-  END SUBROUTINE solve_thermal_analytic
 
-  SUBROUTINE eval_thermal_explicit_dispatch(model_name,state,radiative,convective,ambient,rate)
-    CHARACTER(*), INTENT(IN) :: model_name
-    TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(IN) :: radiative,convective,ambient
-    REAL(wp), INTENT(OUT) :: rate
-    SELECT CASE (TRIM(model_name))
-    CASE ('thermal_cooling')
-      CALL eval_thermal_cooling_explicit(state,radiative,convective,ambient,rate)
-    CASE DEFAULT
-      CALL fatal_error('Unknown explicit thermal model: '//TRIM(model_name))
-    END SELECT
-  END SUBROUTINE eval_thermal_explicit_dispatch
-
-  SUBROUTINE eval_thermal_semi_implicit_dispatch(model_name,state,rate)
-    CHARACTER(*), INTENT(IN) :: model_name
-    TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(OUT) :: rate
-    SELECT CASE (TRIM(model_name))
-    CASE ('thermal_cooling')
-      CALL eval_thermal_cooling_semi_implicit(state,rate)
-    CASE DEFAULT
-      CALL fatal_error('Unknown semi-implicit thermal model: '//TRIM(model_name))
-    END SELECT
-  END SUBROUTINE eval_thermal_semi_implicit_dispatch
-
-  SUBROUTINE eval_thermal_implicit_dispatch(model_name,state,radiative,convective,ambient,rate)
-    CHARACTER(*), INTENT(IN) :: model_name
-    TYPE(complex_physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(IN) :: radiative,convective,ambient
-    COMPLEX(wp), INTENT(OUT) :: rate
-    SELECT CASE (TRIM(model_name))
-    CASE ('thermal_cooling')
-      CALL eval_thermal_cooling_implicit(state,radiative,convective,ambient,rate)
-    CASE DEFAULT
-      CALL fatal_error('Unknown implicit thermal model: '//TRIM(model_name))
-    END SELECT
-  END SUBROUTINE eval_thermal_implicit_dispatch
-
-  SUBROUTINE solve_thermal_analytic_dispatch(model_name,state,interval,heat_capacity, &
-       radiative,convective,ambient,temperature_after)
-    CHARACTER(*), INTENT(IN) :: model_name
-    TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(IN) :: interval,heat_capacity,radiative,convective,ambient
-    REAL(wp), INTENT(OUT) :: temperature_after
-    SELECT CASE (TRIM(model_name))
+    SELECT CASE (TRIM(models(i)))
     CASE ('thermal_cooling')
       CALL solve_thermal_cooling_analytic(state,interval,heat_capacity, &
            radiative,convective,ambient,temperature_after)
     CASE DEFAULT
-      CALL fatal_error('Unknown analytic thermal model: '//TRIM(model_name))
+      CALL fatal_error('Unknown analytic thermal model: '//TRIM(models(i)))
     END SELECT
-  END SUBROUTINE solve_thermal_analytic_dispatch
+
+      current_state%T=temperature_after
+    END DO
+  END SUBROUTINE solve_thermal_analytic
+
+
+
+
+
+
+
+
 
   ! All instantaneous thermal contributions are evaluated at one unchanged state.
 
