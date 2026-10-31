@@ -86,7 +86,30 @@ CONTAINS
   END FUNCTION cell_analytic_source_context
 
 
-  RECURSIVE SUBROUTINE eval_source_analytic(group,q_before,context,interval,q_after,status)
+  !> Return the conservative equivalent rate of the exact source substep.
+  !> STAGE callers use interval=dt*a_ii; STEP callers use interval=dt.
+  SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status)
+    TYPE(source_group_type), INTENT(IN) :: group
+    REAL(wp), INTENT(IN) :: q_before(n_vars),interval
+    TYPE(analytic_term_context_type), INTENT(IN) :: context
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    INTEGER, INTENT(OUT) :: status
+    REAL(wp) :: q_after(n_vars)
+    rate=0.0_wp
+    IF (interval<0.0_wp) THEN
+      status=-8
+      RETURN
+    END IF
+    IF (interval==0.0_wp) THEN
+      status=0
+      RETURN
+    END IF
+    CALL eval_source_analytic_state(group,q_before,context,interval,q_after,status)
+    IF (status/=0) RETURN
+    rate(1:n_vars)=(q_after-q_before)/interval
+  END SUBROUTINE eval_source_analytic_state
+
+  RECURSIVE SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status)
     TYPE(source_group_type), INTENT(IN) :: group
     REAL(wp), INTENT(IN) :: q_before(n_vars),interval
     TYPE(analytic_term_context_type), INTENT(IN) :: context
@@ -123,7 +146,7 @@ CONTAINS
           IF (.NOT.ANY(group%equation_ids==idx_pore)) CYCLE
           component%equation_ids=[idx_pore]
         END SELECT
-        CALL eval_source_analytic(component,q_after,context,interval, &
+        CALL eval_source_analytic_state(component,q_after,context,interval, &
              component_state,status)
         IF (status/=0) RETURN
         q_after=component_state

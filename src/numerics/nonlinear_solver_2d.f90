@@ -221,7 +221,7 @@ CONTAINS
     REAL(wp) :: qj_init(n_vars), q_known(n_vars)
     REAL(wp) :: coeff_f(n_eqns)
     REAL(wp) :: tol_abs_local, tol_rel_local
-    REAL(wp) :: analytic_state(n_vars)
+    REAL(wp) :: analytic_rate(n_eqns)
     TYPE(analytic_term_context_type) :: analytic_context
     REAL(wp) :: qp_current(n_vars+2)
     REAL(wp) :: dynamic_pressure, si_term(n_eqns), residual_without_si(n_eqns)
@@ -305,14 +305,14 @@ CONTAINS
              RETURN
           END IF
           CALL eval_source_analytic(stage_groups(group),qj, &
-               analytic_context,dt_step*a_diag,analytic_state,             &
+               analytic_context,dt_step*a_diag,analytic_rate,             &
                status=analytic_status)
           IF (analytic_status/=0) THEN
              linear_info=analytic_status
              qj=qj_init
              RETURN
           END IF
-          qj=analytic_state
+          qj=qj+dt_step*a_diag*analytic_rate(1:n_vars)
 
        ELSEIF (stage_groups(group)%method==SOURCE_METHOD_NEWTON) THEN
           ! Equation membership was validated at registry initialization.

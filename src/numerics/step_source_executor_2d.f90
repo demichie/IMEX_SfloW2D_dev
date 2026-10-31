@@ -155,7 +155,7 @@ CONTAINS
     INTEGER :: j, k, l
     INTEGER :: group_index, mass_group_count, analytic_status, cell_index
     TYPE(analytic_term_context_type) :: analytic_context
-    REAL(wp) :: analytic_state(n_vars), old_state(n_vars), step_noise, &
+    REAL(wp) :: analytic_rate(n_eqns), old_state(n_vars), step_noise, &
          explicit_rate(n_eqns), source_time
     REAL(wp) :: empty_residual(n_eqns)
     LOGICAL :: implicit_mask(n_eqns), newton_converged, newton_search_failed
@@ -213,10 +213,10 @@ CONTAINS
                 IF (PRESENT(stochastic_values)) step_noise=stochastic_values(j,k)
                 analytic_context=cell_analytic_source_context(j,k,step_noise)
                 CALL eval_source_analytic(step_groups(group_index),q(1:n_vars,j,k), &
-                     analytic_context,time_step,analytic_state,analytic_status)
+                     analytic_context,time_step,analytic_rate,analytic_status)
                 IF (analytic_status/=0) &
                      CALL fatal_error('D18: analytical STEP group solve failed')
-                q(1:n_vars,j,k)=analytic_state
+                q(1:n_vars,j,k)=q(1:n_vars,j,k)+time_step*analytic_rate(1:n_vars)
              ELSE
                 old_state=q(1:n_vars,j,k)
                 step_noise=0.0_wp
