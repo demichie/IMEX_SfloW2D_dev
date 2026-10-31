@@ -130,12 +130,22 @@ ogni modello fisico. Nessun wrapper o livello di dispatch intermedio.
   argomenti gia' disponibili nello stato o non utilizzati.
 - Il coordinatore mantiene correttamente limitatori condivisi di
   carrier e packing e assembla i processi dopo la loro applicazione.
-- Nel coordinatore restano Bx e By nell'interfaccia esplicita,
-  ormai inutilizzati internamente: eliminare in fase di aggiornamento
-  congiunto di source_terms_2d.f90 e dei chiamanti/test, per non
-  modificare adesso il contratto pubblico esterno.
+- Bx e By sono stati rimossi dall'interfaccia esplicita del coordinatore; chiamanti e test aggiornati nel commit 059cc9c.
 - La migrazione dei contributi alla pressione di poro nei singoli
   modelli fisici resta differita alla ristrutturazione pore pressure
   gia' descritta; deve preservare i rate dopo i limitatori.
 - Dopo queste modifiche eseguire Build e Physics Regressions; non
   attribuire all'ultimo commit i test riusciti sul commit precedente.
+
+## Mass injection - structural review (2026-10-31)
+- The three volumetric injection models retain four ordered entrypoints.
+- Implicit entrypoints now use complex state and complex rate arrays.
+- Circular, fissural, and radial injection calculate their own pore-pressure
+  source contributions, preserving the previous physical formula.
+- These three modules no longer call eval_pore_pressure_inlet_source.
+- Boundary injection remains a boundary-state condition, not a volumetric
+  conservative cell source, and therefore retains its distinct interface.
+- Structural review completed; Build and Physics Regressions on f95e972
+  remain to be confirmed by the user.
+- The planned pore-pressure refactoring must account for the injection
+  contribution already migrated into the individual injection models.
