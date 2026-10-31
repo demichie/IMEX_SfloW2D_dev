@@ -36,6 +36,8 @@ S_g = sum_k S_(g,k)(q_in)         ! All processes see identical input q_in
 q^(g) = q_in + tau * S_g         ! One update, after summing
 ```
 
+**Explicit GROUP 0 is reserved for spatial discretization:** the spatial flux/divergence operator (including its associated spatial contributions) belongs to explicit group `0` and is evaluated on the **initial state of the explicit stage evaluation**, before any modifications by subsequent explicit source groups. Its rate is not recomputed on the intermediate states of groups `1,2,...`. Other processes, if assigned to explicit group `0`, must also be evaluated on this same initial state; no within-group state update is permitted. After completing group `0`, subsequent explicit source groups follow sequential updated-state semantics.
+
 **Distinct EXPLICIT groups are sequential:** evaluate each explicit group's rates using the conservative state already modified by all preceding groups, including preceding EXPLICIT groups. This applies to both `STAGE` and `STEP`; explicit groups are not evaluated independently against a common original state. The correct intermediate update coefficient at `STAGE` must be derived from the explicit IMEX-RK tableau rather than assumed equal to the implicit diagonal coefficient.
 
 The sequential updated-state rule applies **between** groups. An explicit group's member processes are **not** a sequential sub-splitting. If their combined increment needs additional admissibility control, its behavior must be defined explicitly rather than silently changing the common-input evaluation contract.
@@ -140,7 +142,7 @@ These are **open design decisions**, not implementation approvals. Resolve them 
 
 | ID | Decision | Minimal option to assess | Required verification |
 | --- | --- | --- | --- |
-| A1 | **One STAGE execution path:** how do EXPLICIT, NEWTON, ANALYTIC and semi-implicit contributions enter a sequential ordered stage sweep? | One group executor with method-specific evaluations, rather than separate explicit accumulation and implicit loop. | Butcher-tableau consistency, sequential observation of updated state, complete rate bookkeeping. |
+| A1 | **One STAGE execution path:** how does spatial discretization execute first in EXPLICIT GROUP 0, before sequential explicit source groups and the other methods? | One group executor with method-specific evaluations, rather than separate explicit accumulation and implicit loop. | Butcher-tableau consistency, sequential observation of updated state, complete rate bookkeeping. |
 | A2 | **EXPLICIT at STAGE:** what stage-consistent intermediate state increment allows sequential explicit groups with a distinct explicit RK tableau? | Distinguish RK explicit evaluation from an actual state-advancing split operator where mathematically necessary; do not silently assign the same `a_ii dt` to both. | Derive stage and end-of-step formulas; check RK order on noncommuting and coupled source examples. |
 | A3 | **Newton group unknowns:** what is the smallest representation of active unknowns when successive groups touch the same equations? | A group-local unknown-index array passed only to Newton; eliminate or radically shrink `equation_partition_type` if no independent user remains. | Overlapping-group solves in both orders; convergence and residual correctness. |
 | A4 | **Single rate contract:** should group evaluation return only complete conservative `rate(n_eqns)`, or also a candidate state/status? | Prefer `rate(n_eqns)` plus admissibility/status; a single executor owns the `q += tau*rate` update. | Conservation, limiter semantics, no duplicate updates, error paths. |
@@ -155,7 +157,7 @@ These are **open design decisions**, not implementation approvals. Resolve them 
 
 ### Evidence motivating these questions
 
-- In `src/numerics/time_integration_2d.f90`, explicit STAGE groups are currently evaluated against the same `qp_rk` and their rates added into `EX_terms`. The implicit stage uses `solve_imex_stage` and returns an effective `IM_terms` separately.
+- In `src/numerics/time_integration_2d.f90`, explicit STAGE source groups are currently evaluated against the same `qp_rk` and their rates added into `EX_terms`; the spatial operator is evaluated separately. **Target contract:** spatial discretization must be first, in explicit GROUP 0, using the original explicit-stage state; only subsequent explicit groups see sequentially updated states. The implicit stage uses `solve_imex_stage` and returns an effective `IM_terms` separately.
 - `src/numerics/nonlinear_solver_2d.f90` currently reconstructs the effective implicit rate as `(q_stage-q_known)/(dt*a_diag)` and uses Newton unknown lists in the same stage coordinator as analytic groups.
 - `src/numerics/step_source_executor_2d.f90` already loops sequentially through STEP groups, but contains method-specific paths and a distinct mass-exchange transaction updating the bed.
 - `src/physics/source_configuration_2d.f90` and `src/numerics/equation_metadata_2d.f90` still carry historical equation-partition metadata. Its continued existence must be justified from actual numerical requirements, not historical usage.
