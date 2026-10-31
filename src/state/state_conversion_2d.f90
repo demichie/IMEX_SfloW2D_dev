@@ -17,7 +17,7 @@ MODULE state_conversion_2d
   USE parameters_2d, ONLY : wp
   USE parameters_2d, ONLY : n_vars, n_solid, n_add_gas
   USE parameters_2d, ONLY : eps_sing, eps_sing4, dry_thickness_tolerance
-  USE parameters_2d, ONLY : slope_correction_flag
+  USE parameters_2d, ONLY : slope_correction_flag, curvature_term_flag
   USE parameters_2d, ONLY : liquid_flag, gas_flag,                              &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag
 
@@ -120,8 +120,10 @@ CONTAINS
     state%mod_vel_hor=SQRT(state%u**2+state%v**2)
     state%mod_vel2=state%u**2+state%v**2+state%w**2
     state%mod_vel=SQRT(state%mod_vel2)
-    state%curvature_acceleration=state%u**2*bxx+ &
-         2.0_wp*state%u*state%v*bxy+state%v**2*byy
+    state%curvature_acceleration=0.0_wp
+    IF (curvature_term_flag) &
+         state%curvature_acceleration=state%u**2*bxx+ &
+              2.0_wp*state%u*state%v*bxy+state%v**2*byy
   END SUBROUTINE update_real_state_kinematics
 
   SUBROUTINE update_complex_state_kinematics(state, bx, by, bxx, bxy, byy)
@@ -133,8 +135,10 @@ CONTAINS
     state%mod_vel_hor=SQRT(state%u**2+state%v**2)
     state%mod_vel2=state%u**2+state%v**2+state%w**2
     state%mod_vel=SQRT(state%mod_vel2)
-    state%curvature_acceleration=state%u**2*bxx+ &
-         2.0_wp*state%u*state%v*bxy+state%v**2*byy
+    state%curvature_acceleration=0.0_wp
+    IF (curvature_term_flag) &
+         state%curvature_acceleration=state%u**2*bxx+ &
+              2.0_wp*state%u*state%v*bxy+state%v**2*byy
   END SUBROUTINE update_complex_state_kinematics
 
 

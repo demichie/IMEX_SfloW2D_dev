@@ -66,13 +66,13 @@ MODULE rheology_2d
 CONTAINS
 
     SUBROUTINE eval_rheology_explicit(models,state, &
-         grav_coeff,curvature_term, &
+         grav_coeff, &
          use_pore_pressure,use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
-        LOGICAL, INTENT(IN) :: curvature_term,use_pore_pressure,use_stochastic
+        LOGICAL, INTENT(IN) :: use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: process_rate(2)
         REAL(wp) :: mod_vel,mod_hor_vel,mod_vel2
@@ -91,7 +91,6 @@ CONTAINS
                     mod_vel, &
                     mod_vel2, &
                     grav_coeff, &
-                    curvature_term, &
                     use_pore_pressure, &
                     moving, &
                     use_stochastic, &
@@ -148,7 +147,6 @@ CONTAINS
             CALL eval_rheology_mui_explicit(state, &
                     mod_vel, &
                     grav_coeff, &
-                    curvature_term, &
                     use_pore_pressure, &
                     process_rate)
         CASE('rheology_mui_voellmy')
@@ -156,7 +154,6 @@ CONTAINS
                     mod_vel, &
                     mod_vel2, &
                     grav_coeff, &
-                    curvature_term, &
                     use_pore_pressure, &
                     moving, &
                     use_stochastic, &
@@ -173,15 +170,15 @@ CONTAINS
 
 
     SUBROUTINE eval_rheology_semi_implicit(models,state, &
-         grav_coeff,curvature_term, &
+         grav_coeff, &
          use_pore_pressure,use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
-        LOGICAL, INTENT(IN) :: curvature_term,use_pore_pressure,use_stochastic
+        LOGICAL, INTENT(IN) :: use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
-        REAL(wp) :: process_rate(2),curvature_term_value
+        REAL(wp) :: process_rate(2)
         REAL(wp) :: mod_vel,mod_hor_vel
         INTEGER :: i
         rate=0.0_wp
@@ -191,7 +188,7 @@ CONTAINS
             process_rate = 0.0_wp
             SELECT CASE(TRIM(models(i)))
         CASE('rheology_voellmy')
-            CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term, &
+            CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, &
                     use_pore_pressure, process_rate(1), process_rate(2))
         CASE('rheology_lava')
             CALL eval_rheology_lava_semi_implicit(state, mod_vel, process_rate(1), process_rate(2))
@@ -204,14 +201,10 @@ CONTAINS
             CALL eval_rheology_lucas_semi_implicit(state, mod_vel, mod_hor_vel, grav_coeff, &
                     0.0_wp, use_stochastic, stochastic_value, process_rate(1), process_rate(2))
         CASE('rheology_mui')
-            curvature_term_value = 0.0_wp
-            IF (curvature_term) curvature_term_value = state%curvature_acceleration
-            CALL eval_rheology_mui_semi_implicit(state, mod_vel, grav_coeff, curvature_term_value, &
+            CALL eval_rheology_mui_semi_implicit(state, mod_vel, grav_coeff, state%curvature_acceleration, &
                     use_pore_pressure, process_rate(1), process_rate(2))
         CASE('rheology_mui_voellmy')
-            curvature_term_value = 0.0_wp
-            IF (curvature_term) curvature_term_value = state%curvature_acceleration
-            CALL eval_rheology_mui_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term_value, &
+            CALL eval_rheology_mui_voellmy_semi_implicit(state, mod_vel, grav_coeff, state%curvature_acceleration, &
                     use_pore_pressure, process_rate(1), process_rate(2))
         CASE('none', 'rheology_plastic', 'rheology_empirical',                                     &
                 'rheology_quadratic', 'rheology_newmodel')

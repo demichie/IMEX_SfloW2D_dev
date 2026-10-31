@@ -2,7 +2,7 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_erosion_2d
-    USE parameters_2d, ONLY : wp, n_solid, slope_correction_flag, erodible_deposit_flag, &
+    USE parameters_2d, ONLY : wp, n_solid, erodible_deposit_flag, &
         mass_exchange_rates_type, reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
@@ -35,14 +35,12 @@ CONTAINS
         REAL(wp), INTENT(IN) :: Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
-        REAL(wp) :: normal_speed, vertical_velocity, substrate_temperature
+        REAL(wp) :: normal_speed, substrate_temperature
         REAL(wp) :: Ri,rhom,rhoc,redgrav,cp_sub,cpm
 
         CALL reset_mass_exchange_rates(r)
         IF (alpha<=alphastot_min) RETURN
-        vertical_velocity=0.0_wp
-        IF (slope_correction_flag) vertical_velocity=state%u*Bx+state%v*By
-        normal_speed=SQRT(state%u**2+state%v**2+vertical_velocity**2)
+        normal_speed=state%mod_vel
 
         ! Erodible inventory limits species withdrawal before constructing mass and bed terms.
         CALL eval_erosion_volume_kernel(state%h,normal_speed,alpha,erodible,dt, &

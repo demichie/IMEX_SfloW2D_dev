@@ -2,7 +2,7 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_entrainment_2d
-    USE parameters_2d, ONLY : wp, slope_correction_flag, mass_exchange_rates_type, &
+    USE parameters_2d, ONLY : wp, mass_exchange_rates_type, &
         reset_mass_exchange_rates
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
@@ -30,12 +30,10 @@ CONTAINS
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: Bx,By
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
-        REAL(wp) :: vertical_velocity,speed_squared,Ri,rhom,rhoc,redgrav,cpc,cpm
+        REAL(wp) :: speed_squared,Ri,rhom,rhoc,redgrav,cpc,cpm
 
         CALL reset_mass_exchange_rates(r)
-        vertical_velocity=0.0_wp
-        IF (slope_correction_flag) vertical_velocity=state%u*Bx+state%v*By
-        speed_squared=state%u**2+state%v**2+vertical_velocity**2
+        speed_squared=state%mod_vel2
         CALL mixt_var_state(state,Ri,rhom,rhoc,redgrav,cpc,cpm)
 
         ! Convert entrained ambient-air volume to mixture mass at ambient density.

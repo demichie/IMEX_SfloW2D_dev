@@ -61,7 +61,6 @@ CONTAINS
             mod_vel, &
             mod_vel2, &
             grav_coeff, &
-            curvature_term, &
             use_pore_pressure, &
             moving, &
             use_stochastic, &
@@ -70,7 +69,7 @@ CONTAINS
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: mod_vel, mod_vel2, grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
-        LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
+        LOGICAL, INTENT(IN) :: use_pore_pressure, moving, use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy, curvature_accel
         COMPLEX(wp) :: ix, iy

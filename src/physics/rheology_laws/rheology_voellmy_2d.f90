@@ -61,7 +61,6 @@ CONTAINS
             mod_vel, &
             mod_vel2, &
             grav_coeff, &
-            curvature_term, &
             use_pore_pressure, &
             moving, &
             use_stochastic, &
@@ -70,13 +69,13 @@ CONTAINS
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: mod_vel, mod_vel2, grav_coeff
         REAL(wp), INTENT(IN) :: stochastic_value
-        LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure, moving, use_stochastic
+        LOGICAL, INTENT(IN) :: use_pore_pressure, moving, use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: sx, sy
         COMPLEX(wp) :: ix, iy
         TYPE(complex_physical_state_type) :: cs
 
-        CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term, use_pore_pressure, sx, sy)
+        CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, use_pore_pressure, sx, sy)
         CALL complex_state_from_real(state, cs)
         CALL eval_rheology_voellmy_implicit(cs, CMPLX(mod_vel,0.0_wp,wp), &
                 CMPLX(mod_vel2,0.0_wp,wp), moving, use_stochastic, &
@@ -97,14 +96,14 @@ CONTAINS
     !> \param[in] use_pore_pressure Enable pore-pressure correction.
     !> \param[out] rate_x x momentum source.
     !> \param[out] rate_y y momentum source.
-    SUBROUTINE eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term, use_pore_pressure, rate_x, rate_y)
+    SUBROUTINE eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, use_pore_pressure, rate_x, rate_y)
 
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: mod_vel, grav_coeff
-        LOGICAL, INTENT(IN) :: curvature_term, use_pore_pressure
+        LOGICAL, INTENT(IN) :: use_pore_pressure
 
         REAL(wp), INTENT(OUT) :: rate_x, rate_y
-        REAL(wp) :: curvature_acceleration, friction_stress
+        REAL(wp) :: friction_stress
 
         ASSOCIATE(h => state%h, &
                   u => state%u, &
@@ -115,11 +114,9 @@ CONTAINS
         rate_x = 0.0_wp
         rate_y = 0.0_wp
         IF (mod_vel .LE. 0.0_wp) RETURN
-        curvature_acceleration = 0.0_wp
-        IF (curvature_term) curvature_acceleration = state%curvature_acceleration
 
         friction_stress = mu * rhom *                                                              &
-                (red_grav + curvature_acceleration) * h                                            &
+                (red_grav + state%curvature_acceleration) * h                                            &
                 * SQRT(grav_coeff)
         friction_stress = MAX(0.0_wp, friction_stress)
         IF (use_pore_pressure) friction_stress = MAX(0.0_wp, friction_stress                       &

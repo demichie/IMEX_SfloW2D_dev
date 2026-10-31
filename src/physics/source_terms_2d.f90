@@ -141,7 +141,9 @@ CONTAINS
            ANY(group%equation_ids==3))) RETURN
       IF (rheology_flag) THEN
 
-        CALL real_physical_state_from_q(q_before, physical_state)
+        CALL real_physical_state_from_q(q_before, physical_state, &
+             context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
+             context%Bsecond_xy,context%Bsecond_yy)
         flow_h = physical_state%h
         flow_u = physical_state%u
         flow_v = physical_state%v
@@ -154,15 +156,9 @@ CONTAINS
         flow_pore_pressure = physical_state%exc_pore_pres
         horizontal_speed=SQRT(flow_u**2+flow_v**2)
         speed_ratio=1.0_wp
-        IF (horizontal_speed>0.0_wp) THEN
-          speed_ratio=SQRT(horizontal_speed**2+                           &
-               MERGE((flow_u*context%Bprime_x+flow_v*context%Bprime_y)**2,&
-               0.0_wp,slope_correction_flag))/horizontal_speed
-        END IF
-        curvature_accel=0.0_wp
-        IF (curvature_term_flag) curvature_accel=curvature_acceleration(  &
-             context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy,    &
-             flow_u,flow_v)
+        IF (horizontal_speed>0.0_wp) &
+             speed_ratio=physical_state%mod_vel/horizontal_speed
+        curvature_accel=physical_state%curvature_acceleration
         velocity_after=[flow_u,flow_v]
         selected_model_name=group_rheology_name(group)
         IF (LEN_TRIM(selected_model_name)==0) THEN
@@ -446,7 +442,7 @@ CONTAINS
 
 
        CALL eval_rheology_semi_implicit([selected_model_name], physical_state, &
-            grav_coeff, curvature_term_flag, pore_pressure_flag, &
+            grav_coeff, pore_pressure_flag, &
             stochastic_flag, Zj, source_term(2:3))
 
     ENDIF rheology_if
@@ -561,7 +557,7 @@ CONTAINS
        IF (rheology_flag .AND. LEN_TRIM(active_rheology)>0 .AND. &
             r_h>dry_thickness_tolerance) THEN
           CALL eval_rheology_explicit([active_rheology], physical_state, &
-               grav_coeff, curvature_term_flag, pore_pressure_flag, &
+               grav_coeff, pore_pressure_flag, &
                stochastic_flag, 0.0_wp, rheology_rate)
           expl_term(2:3)=expl_term(2:3)+rheology_rate
         END IF
@@ -674,7 +670,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
     TYPE(physical_state_type) :: exchange_state
 
-    CALL physical_state_from_qp(qpj,exchange_state)
+    CALL physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
     CALL eval_mass_exchange_explicit(exchange_state,B_zone,B_prime_x,B_prime_y, &
          erodible,dt,rates,eqns_term)
   END SUBROUTINE eval_step_source_explicit
