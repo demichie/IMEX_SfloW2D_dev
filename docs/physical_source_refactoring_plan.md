@@ -120,3 +120,22 @@ ogni modello fisico. Nessun wrapper o livello di dispatch intermedio.
 - Rimosse dal coordinatore variabili cinematiche temporanee inutilizzate; i modelli leggono la cinematica dallo stato.
 - **Refactoring strutturale Rheology concluso**. La validazione Build e Physics Regressions positiva riferita dall'utente precede l'ultima pulizia del coordinatore: ripetere entrambe sul commit finale prima di dichiarare la validazione completa. Benchmark prestazionale separato.
 - Prossima famiglia da chiudere: Mass exchange. La futura revisione Pore pressure rimane registrata sopra ed e' distinta.
+
+## Audit Mass exchange (2026-10-31)
+- Verificati il coordinatore e i sette modelli specifici: ciascuno espone
+  le quattro interfacce ordinate (explicit, semi_implicit, implicit,
+  analytic), con stato reale/complesso conforme; i trattamenti non
+  disponibili sono esplicitamente rifiutati.
+- Uniformate le interfacce di erosione e di entrainment rimuovendo
+  argomenti gia' disponibili nello stato o non utilizzati.
+- Il coordinatore mantiene correttamente limitatori condivisi di
+  carrier e packing e assembla i processi dopo la loro applicazione.
+- Nel coordinatore restano Bx e By nell'interfaccia esplicita,
+  ormai inutilizzati internamente: eliminare in fase di aggiornamento
+  congiunto di source_terms_2d.f90 e dei chiamanti/test, per non
+  modificare adesso il contratto pubblico esterno.
+- La migrazione dei contributi alla pressione di poro nei singoli
+  modelli fisici resta differita alla ristrutturazione pore pressure
+  gia' descritta; deve preservare i rate dopo i limitatori.
+- Dopo queste modifiche eseguire Build e Physics Regressions; non
+  attribuire all'ultimo commit i test riusciti sul commit precedente.
