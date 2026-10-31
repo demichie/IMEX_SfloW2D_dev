@@ -350,3 +350,21 @@ Define `rate_group0 = rate_spatial + sum(rate_source_in_group0)`. Use this **com
 Accumulate each group's effective full-vector rate once to produce the explicit rate passed to the unchanged RK tableau. Stage-local intermediate states are not applied again by the RK integrator. Group 0 is a group in the same ordered sequence, not a special separate spatial substep.
 
 **Numerical qualification:** stability, admissibility, and time-order behavior of this full-step stage-local sequential construction require dedicated verification. **Documentation only** in this commit.
+
+## 24. Source-group executor input/output state contract (agreed)
+
+Use **one source-group executor** for STAGE and STEP with **distinct incoming and outgoing cell states**, not a mutable `q` INOUT argument. Conceptual interface:
+
+```fortran
+CALL execute_source_groups(groups, q_in, dt, q_out, rate)
+```
+
+- `q_in`, `INTENT(IN)`: full incoming conservative cell state, **never modified** by the executor.
+- `q_out`, `INTENT(OUT)`: conservative cell state after applying the groups sequentially, with the configured group interval and each group's effective rate.
+- `rate`, `INTENT(OUT)`: full-vector effective total source rate, the sum of effective limited group rates (each counted only once). Additional context/bed-inventory arguments may be needed for STEP mass exchange; the sketch above is not a complete Fortran signature.
+- Within the executor, use a **local working state** initialized from `q_in`. Each group evaluates on the state left by preceding groups, updates the local state and adds its effective rate.
+- At **STAGE**, preserve `q_in` because the RK integrator still needs the unmodified stage state. Use the returned `rate` in RK assembly; **do not replace the RK stage state with `q_out` or apply the splitting increment twice**.
+- At **STEP**, the caller adopts `q_out` as the post-source conservative state and applies the corresponding coordinated substrate/bed updates for mass exchange.
+- Avoid extra data abstractions or domain-wide copies merely to enforce this contract: the executor operates on **one cell** at a time.
+
+**Status:** architectural agreement only; executor implementation and tests pending.
