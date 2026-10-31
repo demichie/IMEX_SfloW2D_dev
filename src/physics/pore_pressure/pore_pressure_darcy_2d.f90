@@ -26,12 +26,10 @@ MODULE pore_pressure_darcy_2d
 
   PRIVATE
 
-  PUBLIC :: apply_frozen_darcy_withdrawal
   PUBLIC :: eval_pore_pressure_darcy_explicit
   PUBLIC :: eval_pore_pressure_darcy_semi_implicit
   PUBLIC :: eval_pore_pressure_darcy_implicit
   PUBLIC :: solve_pore_pressure_darcy_analytic
-  PUBLIC :: solve_frozen_darcy_mass_pressure
 
 CONTAINS
 
@@ -124,6 +122,7 @@ CONTAINS
     REAL(wp) :: lambda, A, loss, mass_after, pressure_after, pressure_q
     REAL(wp) :: rho_c, cp_c, Ri, rhom, redgrav, cpm
     REAL(wp) :: gas_inventory, gas_fraction
+    REAL(wp) :: exponential_factor, pressure_integral, coefficient
     LOGICAL :: active
     COMPLEX(wp) :: solid_fractions(n_solid)
     REAL(wp), PARAMETER :: h_min=1.0e-10_wp
@@ -168,11 +167,51 @@ CONTAINS
         END BLOCK
       END IF
     END IF
-    CALL solve_frozen_darcy_mass_pressure( &
-         q_before(idx_totMassEqn),state%exc_pore_pres,interval, &
-         lambda,A,do_gas_loss,mass_after,pressure_after, &
-         pressure_q,loss,admissible)
-    IF (.NOT.admissible) RETURN
+    mass_after=q_before(idx_totMassEqn)
+    pressure_after=state%exc_pore_pres
+    pressure_q=mass_after*pressure_after
+    loss=0.0_wp
+    IF (.NOT.ieee_is_finite(lambda) .OR. .NOT.ieee_is_finite(A) .OR. &
+        .NOT.ieee_is_finite(state%exc_pore_pres)) RETURN
+    IF (lambda<0.0_wp .OR. A<0.0_wp) RETURN
+    admissible=.TRUE.
+    IF (state%exc_pore_pres>0.0_wp .AND. interval>0.0_wp) THEN
+      IF (.NOT.ieee_is_finite(q_before(idx_totMassEqn)) .OR. &
+          .NOT.ieee_is_finite(state%exc_pore_pres) .OR. &
+          .NOT.ieee_is_finite(interval) .OR. &
+          .NOT.ieee_is_finite(lambda) .OR. &
+          .NOT.ieee_is_finite(A)) RETURN
+      IF (q_before(idx_totMassEqn)<=0.0_wp .OR. interval<0.0_wp .OR. &
+          lambda<0.0_wp .OR. A<0.0_wp) RETURN
+  
+      ! The existing v2/dev diffusion closure does not dissipate
+      ! negative excess pore pressure; preserve that guard.
+  
+      exponential_factor=EXP(-lambda*interval)
+      pressure_after=state%exc_pore_pres*exponential_factor
+  
+      coefficient=0.0_wp
+      IF (do_gas_loss) coefficient=A
+      IF (lambda>0.0_wp) THEN
+        ! Stable evaluation of (1-exp(-lambda*dt))/lambda,
+        ! including small lambda*dt without cancellation.
+        IF (ABS(lambda*interval)<1.0e-5_wp) THEN
+          pressure_integral=interval*(1.0_wp-0.5_wp*lambda*interval+ &
+               (lambda*interval)**2/6.0_wp- &
+               (lambda*interval)**3/24.0_wp)
+        ELSE
+          pressure_integral=(1.0_wp-exponential_factor)/lambda
+        END IF
+      ELSE
+        pressure_integral=interval
+      END IF
+  
+      loss=coefficient*state%exc_pore_pres*pressure_integral
+      mass_after=q_before(idx_totMassEqn)-loss
+      IF (.NOT.ieee_is_finite(mass_after)) RETURN
+      pressure_q=mass_after*pressure_after
+  
+    END IF
     gas_inventory=q_before(idx_totMassEqn)
     gas_inventory=gas_inventory-SUM(q_before( &
          idx_solidEqn_first:idx_solidEqn_last))
@@ -482,106 +521,6 @@ CONTAINS
     END SELECT
 
   END SUBROUTINE eval_pore_pressure_diffusion_factors
-
-
-  SUBROUTINE solve_frozen_darcy_mass_pressure(mass_before, pressure_before, &
-       interval, dissipation_rate, loss_coefficient, gas_loss_enabled, &
-       mass_after, pressure_after, conservative_pressure_after, &
-       gas_mass_lost, admissible)
-    REAL(wp), INTENT(IN) :: mass_before, pressure_before, interval
-    REAL(wp), INTENT(IN) :: dissipation_rate, loss_coefficient
-    LOGICAL, INTENT(IN) :: gas_loss_enabled
-    REAL(wp), INTENT(OUT) :: mass_after, pressure_after
-    REAL(wp), INTENT(OUT) :: conservative_pressure_after, gas_mass_lost
-    LOGICAL, INTENT(OUT) :: admissible
-    REAL(wp) :: exponential_factor, pressure_integral, coefficient
-
-    mass_after=mass_before
-    pressure_after=pressure_before
-    conservative_pressure_after=mass_before*pressure_before
-    gas_mass_lost=0.0_wp
-    admissible=.FALSE.
-
-    IF (.NOT.ieee_is_finite(mass_before) .OR. &
-        .NOT.ieee_is_finite(pressure_before) .OR. &
-        .NOT.ieee_is_finite(interval) .OR. &
-        .NOT.ieee_is_finite(dissipation_rate) .OR. &
-        .NOT.ieee_is_finite(loss_coefficient)) RETURN
-    IF (mass_before<=0.0_wp .OR. interval<0.0_wp .OR. &
-        dissipation_rate<0.0_wp .OR. loss_coefficient<0.0_wp) RETURN
-
-    ! The existing v2/dev diffusion closure does not dissipate
-    ! negative excess pore pressure; preserve that guard.
-    IF (pressure_before<=0.0_wp .OR. interval==0.0_wp) THEN
-      admissible=.TRUE.
-      RETURN
-    END IF
-
-    exponential_factor=EXP(-dissipation_rate*interval)
-    pressure_after=pressure_before*exponential_factor
-
-    coefficient=0.0_wp
-    IF (gas_loss_enabled) coefficient=loss_coefficient
-    IF (dissipation_rate>0.0_wp) THEN
-      ! Stable evaluation of (1-exp(-lambda*dt))/lambda,
-      ! including small lambda*dt without cancellation.
-      IF (ABS(dissipation_rate*interval)<1.0e-5_wp) THEN
-        pressure_integral=interval*(1.0_wp-0.5_wp*dissipation_rate*interval+ &
-             (dissipation_rate*interval)**2/6.0_wp- &
-             (dissipation_rate*interval)**3/24.0_wp)
-      ELSE
-        pressure_integral=(1.0_wp-exponential_factor)/dissipation_rate
-      END IF
-    ELSE
-      pressure_integral=interval
-    END IF
-
-    gas_mass_lost=coefficient*pressure_before*pressure_integral
-    mass_after=mass_before-gas_mass_lost
-    admissible=(mass_after>0.0_wp .AND. ieee_is_finite(mass_after))
-    IF (.NOT.admissible) RETURN
-    conservative_pressure_after=mass_after*pressure_after
-  END SUBROUTINE solve_frozen_darcy_mass_pressure
-
-
-  !> Conservative withdrawal using properties frozen at the start of the
-  !> analytic Darcy substep. The lost material is carrier gas alone.
-  !> gas_mass_fractions are normalized WITHIN the gas phase, not the mixture.
-  !> The caller must supply the energy per unit mass of removed gas in the
-  !> convention of the conservative energy equation (including kinetic energy
-  !> if that equation stores it).
-  SUBROUTINE apply_frozen_darcy_withdrawal(mass_lost, u, v, gas_energy, &
-       gas_mass_fractions, momentum_x, momentum_y, energy, gas_masses, admissible)
-    REAL(wp), INTENT(IN) :: mass_lost, u, v, gas_energy
-    REAL(wp), INTENT(IN) :: gas_mass_fractions(:)
-    REAL(wp), INTENT(INOUT) :: momentum_x, momentum_y, energy
-    REAL(wp), INTENT(INOUT) :: gas_masses(:)
-    LOGICAL, INTENT(OUT) :: admissible
-    REAL(wp) :: withdrawals(SIZE(gas_masses)), tolerance
-
-    admissible=.FALSE.
-    IF (SIZE(gas_mass_fractions)/=SIZE(gas_masses)) RETURN
-    IF (.NOT.ieee_is_finite(mass_lost) .OR. mass_lost<0.0_wp) RETURN
-    IF (.NOT.ieee_is_finite(u) .OR. .NOT.ieee_is_finite(v) .OR. &
-        .NOT.ieee_is_finite(gas_energy)) RETURN
-    IF (.NOT.ALL(ieee_is_finite(gas_masses)) .OR. &
-        .NOT.ALL(ieee_is_finite(gas_mass_fractions))) RETURN
-    IF (ANY(gas_mass_fractions<0.0_wp)) RETURN
-    IF (mass_lost>0.0_wp) THEN
-      tolerance=1.0e-10_wp
-      IF (ABS(SUM(gas_mass_fractions)-1.0_wp)>tolerance) RETURN
-    END IF
-    withdrawals=gas_mass_fractions*mass_lost
-    IF (ANY(withdrawals>gas_masses+ &
-         1.0e-12_wp*MAX(1.0_wp,ABS(gas_masses)))) RETURN
-    ! Perform all feasibility checks before touching any conservative variable.
-    momentum_x=momentum_x-u*mass_lost
-    momentum_y=momentum_y-v*mass_lost
-    energy=energy-gas_energy*mass_lost
-    gas_masses=MAX(0.0_wp,gas_masses-withdrawals)
-    admissible=.TRUE.
-  END SUBROUTINE apply_frozen_darcy_withdrawal
-
 
 
 
