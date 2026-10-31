@@ -65,13 +65,13 @@ MODULE rheology_2d
 
 CONTAINS
 
-    SUBROUTINE eval_rheology_explicit(models,state,B_prime_x,B_prime_y, &
-         grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
+    SUBROUTINE eval_rheology_explicit(models,state, &
+         grav_coeff,curvature_term, &
          use_pore_pressure,use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(physical_state_type), INTENT(INOUT) :: state
-        REAL(wp), INTENT(IN) :: B_prime_x,B_prime_y,grav_coeff
-        REAL(wp), INTENT(IN) :: B_second_xx,B_second_xy,B_second_yy,stochastic_value
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: grav_coeff
+        REAL(wp), INTENT(IN) :: stochastic_value
         LOGICAL, INTENT(IN) :: curvature_term,use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: process_rate(2)
@@ -79,8 +79,6 @@ CONTAINS
         LOGICAL :: moving
         INTEGER :: i
         rate=0.0_wp
-        CALL update_physical_state_kinematics(state,B_prime_x,B_prime_y, &
-             B_second_xx,B_second_xy,B_second_yy)
         mod_hor_vel=state%mod_vel_hor
         mod_vel2=state%mod_vel2
         mod_vel=state%mod_vel
@@ -183,21 +181,19 @@ CONTAINS
     END SUBROUTINE eval_rheology_explicit
 
 
-    SUBROUTINE eval_rheology_semi_implicit(models,state,B_prime_x,B_prime_y, &
-         grav_coeff,curvature_term,B_second_xx,B_second_xy,B_second_yy, &
+    SUBROUTINE eval_rheology_semi_implicit(models,state, &
+         grav_coeff,curvature_term, &
          use_pore_pressure,use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(physical_state_type), INTENT(INOUT) :: state
-        REAL(wp), INTENT(IN) :: B_prime_x,B_prime_y,grav_coeff
-        REAL(wp), INTENT(IN) :: B_second_xx,B_second_xy,B_second_yy,stochastic_value
+        TYPE(physical_state_type), INTENT(IN) :: state
+        REAL(wp), INTENT(IN) :: grav_coeff
+        REAL(wp), INTENT(IN) :: stochastic_value
         LOGICAL, INTENT(IN) :: curvature_term,use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: process_rate(2),curvature_term_value
         REAL(wp) :: mod_vel,mod_hor_vel,vertical_velocity
         INTEGER :: i
         rate=0.0_wp
-        CALL update_physical_state_kinematics(state,B_prime_x,B_prime_y, &
-             B_second_xx,B_second_xy,B_second_yy)
         mod_hor_vel=state%mod_vel_hor
         mod_vel=state%mod_vel
         DO i=1,SIZE(models)
@@ -205,7 +201,7 @@ CONTAINS
             SELECT CASE(TRIM(models(i)))
         CASE('rheology_voellmy')
             CALL eval_rheology_voellmy_semi_implicit(state, mod_vel, grav_coeff, curvature_term, &
-                    B_second_xx, B_second_xy, B_second_yy, use_pore_pressure, process_rate(1), process_rate(2))
+                    state%B_second_xx, state%B_second_xy, state%B_second_yy, use_pore_pressure, process_rate(1), process_rate(2))
         CASE('rheology_lava')
             CALL eval_rheology_lava_semi_implicit(state, mod_vel, process_rate(1), process_rate(2))
         CASE('rheology_lahar')
@@ -239,11 +235,10 @@ CONTAINS
     END SUBROUTINE eval_rheology_semi_implicit
 
 
-    SUBROUTINE eval_rheology_implicit(models,state,B_prime_x,B_prime_y, &
+    SUBROUTINE eval_rheology_implicit(models,state, &
          use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
-        TYPE(complex_physical_state_type), INTENT(INOUT) :: state
-        REAL(wp), INTENT(IN) :: B_prime_x,B_prime_y
+        TYPE(complex_physical_state_type), INTENT(IN) :: state
         LOGICAL, INTENT(IN) :: use_stochastic
         REAL(wp), INTENT(IN) :: stochastic_value
         COMPLEX(wp), INTENT(OUT) :: rate(2)
@@ -252,8 +247,6 @@ CONTAINS
         LOGICAL :: moving
         INTEGER :: i
         rate=CMPLX(0.0_wp,0.0_wp,wp)
-        CALL update_physical_state_kinematics(state,B_prime_x,B_prime_y, &
-             0.0_wp,0.0_wp,0.0_wp)
         mod_hor_vel=state%mod_vel_hor
         mod_vel2=state%mod_vel2
         mod_vel=state%mod_vel

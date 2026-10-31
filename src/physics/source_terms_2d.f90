@@ -348,7 +348,7 @@ CONTAINS
        red_grav = physical_state%red_grav
 
        CALL eval_rheology_implicit([selected_model_name], physical_state, &
-            Bprimej_x, Bprimej_y, stochastic_flag, Zij, source_term(2:3))
+            stochastic_flag, Zij, source_term(2:3))
     END IF
 
     IF (selected_thermal) THEN
@@ -444,8 +444,7 @@ CONTAINS
 
 
        CALL eval_rheology_semi_implicit([selected_model_name], physical_state, &
-            Bprimej_x, Bprimej_y, grav_coeff, curvature_term_flag, &
-            Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, pore_pressure_flag, &
+            grav_coeff, curvature_term_flag, pore_pressure_flag, &
             stochastic_flag, Zj, source_term(2:3))
 
     ENDIF rheology_if
@@ -560,8 +559,7 @@ CONTAINS
        IF (rheology_flag .AND. LEN_TRIM(active_rheology)>0 .AND. &
             r_h>dry_thickness_tolerance) THEN
           CALL eval_rheology_explicit([active_rheology], physical_state, &
-               Bprimej_x, Bprimej_y, grav_coeff, curvature_term_flag, &
-               Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, pore_pressure_flag, &
+               grav_coeff, curvature_term_flag, pore_pressure_flag, &
                stochastic_flag, 0.0_wp, rheology_rate)
           expl_term(2:3)=expl_term(2:3)+rheology_rate
         END IF
