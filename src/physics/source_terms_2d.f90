@@ -13,9 +13,7 @@ MODULE source_terms_2d
   USE state_conversion_2d
   USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit, &
        solve_thermal_analytic
-  USE pore_pressure_2d, ONLY : &
-       eval_pore_pressure_implicit, &
-       eval_pore_pressure_explicit, solve_pore_pressure_analytic
+  USE pore_pressure_2d, ONLY : solve_pore_pressure_analytic
   USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
   USE rheology_2d, ONLY : curvature_acceleration, solve_rheology_analytic, &
        eval_rheology_implicit, eval_rheology_semi_implicit, &
@@ -290,7 +288,7 @@ CONTAINS
     TYPE(complex_physical_state_type) :: physical_state
 
     COMPLEX(wp) :: red_grav
-    LOGICAL :: selected_rheology, selected_thermal, selected_pore
+    LOGICAL :: selected_rheology, selected_thermal
     CHARACTER(LEN=64) :: selected_model_name
 
     IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
@@ -317,17 +315,14 @@ CONTAINS
        selected_model_name=group_rheology_name(group)
        selected_rheology=group_has_role(group,SOURCE_ROLE_IMPLICIT)
        selected_thermal=group_contains_name(group,'thermal_cooling')
-       selected_pore=group_contains_name(group, &
-            'pore_pressure_dissipation')
     ELSE
        selected_rheology=rheology_flag
        selected_thermal=thermal_cooling_flag
-       selected_pore=pore_pressure_flag
     END IF
 
     ! initialize the source terms
     source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)
-    IF (selected_rheology .OR. selected_thermal .OR. selected_pore) THEN
+    IF (selected_rheology .OR. selected_thermal) THEN
        CALL physical_state_from_q(qj, physical_state, Bprimej_x, Bprimej_y, &
             0.0_wp, 0.0_wp, 0.0_wp)
        h = physical_state%h
@@ -352,15 +347,6 @@ CONTAINS
        CALL eval_thermal_implicit(['thermal_cooling'],physical_state, &
             radiative_term_coeff,convective_term_coeff,T_env,source_term(4))
     ENDIF
-
-    IF (pore_pressure_flag .AND. selected_pore) THEN
-       BLOCK
-         COMPLEX(wp) :: pore_rate(n_eqns)
-         CALL eval_pore_pressure_implicit(['pore_pressure_darcy'], &
-              physical_state,pore_rate)
-         source_term=source_term+pore_rate
-       END BLOCK
-    END IF
 
     nh_term = source_term
 
@@ -566,16 +552,6 @@ CONTAINS
                radiative_term_coeff,convective_term_coeff,T_env,thermal_rate)
           expl_term(4)=expl_term(4)+thermal_rate
        END IF
-       IF (pore_pressure_flag .AND. &
-            group_contains_name(group,'pore_pressure_dissipation')) THEN
-          BLOCK
-            REAL(wp) :: pore_rate(n_eqns)
-            CALL eval_pore_pressure_explicit(['pore_pressure_darcy'], &
-                 physical_state,pore_rate)
-            expl_term=expl_term+pore_rate
-          END BLOCK
-       END IF
-
     END IF
 
     CALL eval_mass_injection_explicit(physical_state,time,cell_fract_jk, &
