@@ -246,3 +246,13 @@ else:
 This preserves transverse momentum (so a change of direction without reversal remains possible) and does not impose an upper bound on speed. The anti-reversal reference is the **immediate input momentum of the isolated rheological group**, not the whole stage or contributions from non-rheological processes. The returned effective rheological rate must reflect the **limited** update. For Newton, check residual compatibility rather than applying an unexamined post-solve correction. Physical constitutive constraints other than anti-reversal (when present) remain separate.
 
 This agreed choice supersedes the unresolved rotation/magnitude question in section 13. **No Fortran implementation or test has been changed by this decision.**
+
+## 15. Velocity-reversal limiter by numerical treatment (agreed)
+
+The rheology-specific **velocity/momentum reversal limiter applies only to EXPLICIT and SEMI_IMPLICIT contributions**. It does **not** apply to the fully implicit NEWTON solution, and no post-convergence momentum projection may alter a converged Newton state. ANALYTIC solutions also receive no extra reversal projection; each analytic constitutive flow must enforce its own physically correct evolution.
+
+For an explicit rheology group, form the candidate update over its actual group interval, limit only the reversing component relative to momentum immediately before that rheological contribution, and return the **effective rate corresponding to the limited update**. For the semi-implicit contribution used within a Newton group, limit its isolated predictor increment **before** the Newton solve and use the corrected semi-implicit rate in the implicit residual construction. The Newton solve then proceeds without any post-solve friction projection.
+
+The limiter must **only prevent reversal**: it must not suppress transverse momentum or impose an additional upper bound on the momentum magnitude. The converged nonlinear residual must remain authoritative; verify separately whether a particular fully implicit constitutive law admits nonphysical reversal, rather than masking it by projecting the Newton result.
+
+This decision refines sections 13-14. In particular, the *current* second limiter call after `solve_newton_group` in `src/numerics/nonlinear_solver_2d.f90` must be removed at implementation time; the remaining semi-implicit call must ultimately move out of the generic Newton solver to rheology-owned rate construction. This documentation change alone does **not** implement those code changes.
