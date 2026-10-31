@@ -275,9 +275,6 @@ CONTAINS
     TYPE(source_group_type), INTENT(IN), OPTIONAL :: group
 
     COMPLEX(wp) :: h                       !< height [m]
-    COMPLEX(wp) :: u                       !< velocity (x direction) [m/s]
-    COMPLEX(wp) :: v                       !< velocity (y direction) [m/s]
-    COMPLEX(wp) :: w                       !< velocity (z direction) [m/s]
     COMPLEX(wp) :: T                       !< temperature [K]
     COMPLEX(wp) :: rho_m                   !< mixture density [kg/m3]
     COMPLEX(wp) :: alphas(n_solid)         !< sediment volume fractions
@@ -288,11 +285,7 @@ CONTAINS
     COMPLEX(wp) :: nh_term(n_eqns)
     COMPLEX(wp) :: source_term(n_eqns)
 
-    COMPLEX(wp) :: mod_vel
-    COMPLEX(wp) :: mod_vel_hor
-    COMPLEX(wp) :: mod_vel2
     INTEGER :: i
-    LOGICAL :: moving
 
     COMPLEX(wp) :: Zs
 
@@ -340,8 +333,6 @@ CONTAINS
     IF (selected_rheology .OR. selected_thermal .OR. selected_pore) THEN
        CALL physical_state_from_q(qj, physical_state)
        h = physical_state%h
-       u = physical_state%u
-       v = physical_state%v
        T = physical_state%T
        rho_m = physical_state%rho_m
        alphas = physical_state%alphas
@@ -407,23 +398,15 @@ CONTAINS
 
     REAL(wp) :: source_term(n_eqns)
 
-    REAL(wp) :: mod_vel
-    REAL(wp) :: mod_hor_vel
 
     REAL(wp) :: r_h               !< real-value flow thickness
     REAL(wp) :: r_u               !< real-value x-velocity
     REAL(wp) :: r_v               !< real-value y-velocity
-    REAL(wp) :: r_w               !< real_value z-velocity
-    REAL(wp) :: r_alphas(n_solid) !< real-value solid volume fractions
-    REAL(wp) :: r_rho_m           !< real-value mixture density [kg/m3]
-    REAL(wp) :: r_alphag(n_add_gas) !< real-value add. gas volume fractions
-    REAL(wp) :: r_red_grav
     REAL(wp) :: r_rho_c
     REAL(wp) :: r_Ri
     REAL(wp) :: r_sp_heat_c
     REAL(wp) :: r_sp_heat_mix
 
-    REAL(wp) :: exc_pore_pres       !< excess pore pressure
     TYPE(physical_state_type) :: physical_state
     LOGICAL :: selected_rheology
     CHARACTER(LEN=64) :: selected_model_name
@@ -456,10 +439,6 @@ CONTAINS
        IF ((r_u .EQ. 0.0_wp) .AND. (r_v .EQ. 0.0_wp)) RETURN
 
        CALL physical_state_from_qp(qpj, physical_state)
-       r_alphas = physical_state%alphas
-       r_alphag = physical_state%alphag
-       r_rho_m = physical_state%rho_m
-       r_red_grav = physical_state%red_grav
 
 
        CALL eval_rheology_semi_implicit([selected_model_name], physical_state, &
@@ -529,7 +508,6 @@ CONTAINS
 
     REAL(wp) :: rheology_rate(2), thermal_rate, pressure_rate
     REAL(wp) :: injection_rate(n_eqns)
-    REAL(wp) :: speed, horizontal_speed, vertical_velocity, speed_squared
     CHARACTER(LEN=64) :: active_rheology
 
 
