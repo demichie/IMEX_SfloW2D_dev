@@ -88,15 +88,10 @@ CONTAINS
             SELECT CASE(TRIM(models(i)))
         CASE('rheology_voellmy')
             CALL eval_rheology_voellmy_explicit(state, &
-             &
                     grav_coeff, &
-             &
                     use_pore_pressure, &
-             &
                     use_stochastic, &
-             &
                     stochastic_value, &
-             &
                     process_rate)
         CASE('rheology_plastic')
             CALL eval_rheology_plastic_explicit(state, &
@@ -171,7 +166,6 @@ CONTAINS
         CASE('rheology_voellmy')
             CALL eval_rheology_voellmy_semi_implicit(state, &
              grav_coeff, &
-             &
                     use_pore_pressure, &
              process_rate(1), &
              process_rate(2))
@@ -245,7 +239,6 @@ CONTAINS
             CALL eval_rheology_voellmy_implicit(state, &
              use_stochastic, &
              stochastic_value, &
-             &
                     process_rate(1), &
              process_rate(2))
         CASE('rheology_mui_voellmy')
