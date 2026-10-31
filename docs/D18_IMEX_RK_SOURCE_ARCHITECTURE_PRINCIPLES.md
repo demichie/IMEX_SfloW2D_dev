@@ -22,8 +22,21 @@ This document is the **design contract** for the next source-integration refacto
 - Every physical source interface returns a rate vector of length `n_eqns`; components not affected by that process are zero.
 - A group identifies its source process(es), numerical `METHOD`, `CADENCE` (`STAGE` or `STEP`), and execution `GROUP` order. The group does **not** grant or prohibit writes to a subset of conservative equations.
 - Different groups may act on the **same** conservative components. This is necessary for sequential source splitting.
+- **Within one EXPLICIT group**, evaluate every member source on the **same group-entry state** `q^(g-1)`, apply each process's own limits as defined for that common state, and sum the resulting full conservative rate vectors. **Do not update the state between members of the same explicit group.** Update the conservative state **once** using the group's summed rate before executing the next group.
 - A Newton solver may choose a **smaller set of unknowns** to compute a group's full conservative rate. Those solver unknowns are a numerical detail, **not** group membership or a restriction on source-rate components.
 - Avoid representing a general source group through an exclusive equation membership map. If a Newton unknown map is useful, keep it internal to the relevant solve.
+
+### Within-group versus between-group execution
+
+For an EXPLICIT group `g` containing sources `k=1,...,m`:
+
+```text
+q_in = q^(g-1)
+S_g = sum_k S_(g,k)(q_in)         ! All processes see identical input q_in
+q^(g) = q_in + tau * S_g         ! One update, after summing
+```
+
+The sequential updated-state rule applies **between** groups. An explicit group's member processes are **not** a sequential sub-splitting. If their combined increment needs additional admissibility control, its behavior must be defined explicitly rather than silently changing the common-input evaluation contract.
 
 ## 3. Sequential splitting contract (both CADENCE values)
 
