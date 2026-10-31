@@ -218,8 +218,7 @@ CONTAINS
             context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
             context%Bsecond_xy,context%Bsecond_yy)
         CALL solve_pore_pressure_analytic(['pore_pressure_darcy'], &
-             physical_state,q_before(1:n_eqns),interval,pore_rate,pore_ok, &
-             include_gas_loss=.FALSE.)
+             physical_state,q_before(1:n_eqns),interval,pore_rate,pore_ok)
         IF (.NOT.pore_ok) THEN
           status=-9
           RETURN
@@ -572,7 +571,7 @@ CONTAINS
           BLOCK
             REAL(wp) :: pore_rate(n_eqns)
             CALL eval_pore_pressure_explicit(['pore_pressure_darcy'], &
-                 physical_state,pore_rate,include_gas_loss=.FALSE.)
+                 physical_state,pore_rate)
             expl_term=expl_term+pore_rate
           END BLOCK
        END IF
