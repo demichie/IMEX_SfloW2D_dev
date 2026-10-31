@@ -5,7 +5,7 @@ MODULE mass_exchange_carrier_darcy_loss_2d
     USE parameters_2d, ONLY : wp, n_add_gas, pore_pressure_flag, gas_loss_flag, gas_flag, &
         mass_exchange_rates_type, reset_mass_exchange_rates
     USE constitutive_parameters_2d, ONLY : maximum_solid_packing
-    USE pore_pressure_laws_2d, ONLY : eval_pore_pressure_gas_loss
+    USE pore_pressure_2d, ONLY : eval_pore_pressure_gas_loss
     USE diagnostics_2d, ONLY : fatal_error
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
     USE state_conversion_2d, ONLY : mixt_var_state

@@ -13,7 +13,7 @@ MODULE source_terms_2d
   USE state_conversion_2d
   USE thermal_laws_2d, ONLY : eval_thermal_explicit, eval_thermal_implicit, &
        solve_thermal_analytic
-  USE pore_pressure_laws_2d, ONLY : &
+  USE pore_pressure_2d, ONLY : &
        eval_pore_pressure_dissipation_implicit, &
        eval_pore_pressure_dissipation_explicit, solve_pore_pressure_dissipation_analytic
   USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit

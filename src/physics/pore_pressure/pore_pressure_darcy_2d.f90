@@ -9,7 +9,7 @@
 !>          DIRK stage solve.
 !********************************************************************************
 
-MODULE pore_pressure_laws_2d
+MODULE pore_pressure_darcy_2d
 
   USE parameters_2d, ONLY : wp, n_solid, gas_flag, sutherland_flag
   USE COMPLEXIFY
@@ -521,4 +521,4 @@ CONTAINS
 
   ! Valid zero contribution for the semi-implicit part of Newton.
 
-END MODULE pore_pressure_laws_2d
+END MODULE pore_pressure_darcy_2d
