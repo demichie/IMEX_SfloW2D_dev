@@ -75,7 +75,7 @@ CONTAINS
         LOGICAL, INTENT(IN) :: curvature_term,use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: process_rate(2)
-        REAL(wp) :: mod_vel,mod_hor_vel,mod_vel2,vertical_velocity
+        REAL(wp) :: mod_vel,mod_hor_vel,mod_vel2
         LOGICAL :: moving
         INTEGER :: i
         rate=0.0_wp
@@ -182,7 +182,7 @@ CONTAINS
         LOGICAL, INTENT(IN) :: curvature_term,use_pore_pressure,use_stochastic
         REAL(wp), INTENT(OUT) :: rate(2)
         REAL(wp) :: process_rate(2),curvature_term_value
-        REAL(wp) :: mod_vel,mod_hor_vel,vertical_velocity
+        REAL(wp) :: mod_vel,mod_hor_vel
         INTEGER :: i
         rate=0.0_wp
         mod_hor_vel=state%mod_vel_hor
@@ -234,7 +234,7 @@ CONTAINS
         REAL(wp), INTENT(IN) :: stochastic_value
         COMPLEX(wp), INTENT(OUT) :: rate(2)
         COMPLEX(wp) :: process_rate(2)
-        COMPLEX(wp) :: mod_vel,mod_hor_vel,mod_vel2,vertical_velocity
+        COMPLEX(wp) :: mod_vel,mod_hor_vel,mod_vel2
         LOGICAL :: moving
         INTEGER :: i
         rate=CMPLX(0.0_wp,0.0_wp,wp)
