@@ -30,10 +30,10 @@ MODULE mass_exchange_2d
 
 CONTAINS
 
-    SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
+    SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,erodible,dt,total_rates,eqns_term)
 
         TYPE(physical_state_type), INTENT(IN) :: physical_state
-        REAL(wp), INTENT(IN) :: Bx,By,erodible(n_solid),dt
+        REAL(wp), INTENT(IN) :: erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
         REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
@@ -173,8 +173,6 @@ CONTAINS
     !> Positive sources never cancel gross withdrawals in a shared inventory.
     !> @param[in] qp Local primitive flow state; component order follows model configuration.
     !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
-    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
-    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
     !> @param[in] erodible Available erodible solid inventory by species [m].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] total_rates Accumulated process rates and bed changes for this cell.

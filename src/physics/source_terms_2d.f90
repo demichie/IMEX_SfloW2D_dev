@@ -638,7 +638,7 @@ CONTAINS
     TYPE(physical_state_type) :: exchange_state
 
     CALL physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
-    CALL eval_mass_exchange_explicit(exchange_state,B_zone,B_prime_x,B_prime_y, &
+    CALL eval_mass_exchange_explicit(exchange_state,B_zone, &
          erodible,dt,rates,eqns_term)
   END SUBROUTINE eval_step_source_explicit
 END MODULE source_terms_2d

@@ -137,7 +137,7 @@ PROGRAM probe_sources
   IF (operation==3) THEN
      substrate=0.0_wp
      CALL physical_state_from_qp(qp(1:n_vars+2),exchange_state)
-     CALL eval_mass_exchange_explicit(exchange_state,0,bx,by, &
+     CALL eval_mass_exchange_explicit(exchange_state,0, &
           substrate(1:solids),dt,total_rates,exchange(1:n_vars))
      carrier_loss=total_rates%carrier_withdrawal_volume_rate
      WRITE(*,'(A,ES26.17E3)') 'LOSS ',carrier_loss
