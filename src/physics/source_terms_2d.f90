@@ -92,9 +92,6 @@ CONTAINS
     TYPE(analytic_term_context_type), INTENT(IN) :: context
     REAL(wp), INTENT(OUT) :: q_after(n_vars)
     INTEGER, INTENT(OUT) :: status
-    REAL(wp) :: flow_h,flow_u,flow_v,flow_temperature,flow_density
-    REAL(wp) :: flow_alphas(n_solid),flow_alphag(n_add_gas)
-    REAL(wp) :: flow_red_grav,flow_p_dyn,flow_Zs,flow_pore_pressure
     TYPE(physical_state_type) :: physical_state
     REAL(wp) :: horizontal_speed,speed_ratio,curvature_accel,velocity_after(2)
     REAL(wp) :: heat_capacity,temperature_after,pressure_known,pressure_after
@@ -144,22 +141,12 @@ CONTAINS
         CALL real_physical_state_from_q(q_before, physical_state, &
              context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
              context%Bsecond_xy,context%Bsecond_yy)
-        flow_h = physical_state%h
-        flow_u = physical_state%u
-        flow_v = physical_state%v
-        flow_temperature = physical_state%T
-        flow_density = physical_state%rho_m
-        flow_alphas = physical_state%alphas
-        flow_alphag = physical_state%alphag
-        flow_red_grav = physical_state%red_grav
-        flow_Zs = physical_state%Zs
-        flow_pore_pressure = physical_state%exc_pore_pres
         horizontal_speed=physical_state%mod_vel_hor
         speed_ratio=1.0_wp
         IF (horizontal_speed>0.0_wp) &
              speed_ratio=physical_state%mod_vel/horizontal_speed
         curvature_accel=physical_state%curvature_acceleration
-        velocity_after=[flow_u,flow_v]
+        velocity_after=[physical_state%u,physical_state%v]
         selected_model_name=group_rheology_name(group)
         IF (LEN_TRIM(selected_model_name)==0) THEN
           status=-7
@@ -188,21 +175,11 @@ CONTAINS
       CALL real_physical_state_from_q(q_before, physical_state, &
             context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
             context%Bsecond_xy,context%Bsecond_yy)
-      flow_h = physical_state%h
-      flow_u = physical_state%u
-      flow_v = physical_state%v
-      flow_temperature = physical_state%T
-      flow_density = physical_state%rho_m
-      flow_alphas = physical_state%alphas
-      flow_alphag = physical_state%alphag
-      flow_red_grav = physical_state%red_grav
-      flow_Zs = physical_state%Zs
-      flow_pore_pressure = physical_state%exc_pore_pres
-      IF (flow_temperature<=0.0_wp) THEN
+      IF (physical_state%T<=0.0_wp) THEN
         status=-3
         RETURN
       END IF
-      heat_capacity=q_before(4)/flow_temperature
+      heat_capacity=q_before(4)/physical_state%T
       CALL solve_thermal_analytic(['thermal_cooling'],physical_state,interval, &
            heat_capacity,radiative_term_coeff,convective_term_coeff, &
            T_env,temperature_after)
@@ -215,19 +192,9 @@ CONTAINS
         CALL real_physical_state_from_q(q_before, physical_state, &
             context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
             context%Bsecond_xy,context%Bsecond_yy)
-        flow_h = physical_state%h
-        flow_u = physical_state%u
-        flow_v = physical_state%v
-        flow_temperature = physical_state%T
-        flow_density = physical_state%rho_m
-        flow_alphas = physical_state%alphas
-        flow_alphag = physical_state%alphag
-        flow_red_grav = physical_state%red_grav
-        flow_Zs = physical_state%Zs
-        flow_pore_pressure = physical_state%exc_pore_pres
         pressure_known=q_before(idx_pore)/q_before(1)
-        CALL solve_pore_pressure_dissipation_analytic(pressure_known,interval,flow_h,  &
-             flow_temperature,flow_alphas,pressure_after)
+        CALL solve_pore_pressure_dissipation_analytic(pressure_known,interval,physical_state%h,  &
+             physical_state%T,physical_state%alphas,pressure_after)
         q_after(idx_pore)=q_before(1)*pressure_after
       END IF
       status=0
