@@ -39,8 +39,7 @@ CONTAINS
         gas_phase_mass_fraction=MAX(0.0_wp,1.0_wp-                                                 &
                   SUM(state%xs))
         volume_loss=0.0_wp
-        IF (gas_flag .AND. pore_pressure_flag .AND. gas_loss_flag .AND.                            &
-                  alpha<maximum_solid_packing)                                                     &
+        IF (alpha<maximum_solid_packing) &
                   CALL eval_pore_pressure_gas_loss(state%h,state%T,state%alphas,alpha,rho_c, &
                       state%exc_pore_pres,volume_loss)
         r%carrier_withdrawal_volume_rate=MAX(0.0_wp,volume_loss)
