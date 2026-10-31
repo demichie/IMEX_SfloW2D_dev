@@ -69,12 +69,22 @@ CONTAINS
     COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
     LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
     COMPLEX(wp) :: mass_rate,cp_c,cp_m,xc,gas_fraction
+    COMPLEX(wp) :: diffusion_coefficient,inhibition
+    LOGICAL :: active
     LOGICAL :: do_gas_loss
 
     rate=CMPLX(0.0_wp,0.0_wp,wp)
     IF (.NOT.pore_pressure_flag) RETURN
-    CALL darcy_diffusion_source(state%h,state%T, &
-         state%rho_m,state%alphas,state%exc_pore_pres,rate(idx_poreEqn))
+    IF (REAL(state%h,wp)>0.0_wp .AND. &
+        REAL(state%exc_pore_pres,wp)>=0.0_wp) THEN
+      CALL eval_pore_pressure_diffusion_factors(state%h,state%T, &
+           state%alphas,diffusion_coefficient,inhibition,active)
+      IF (active) rate(idx_poreEqn)= &
+           -state%rho_m*(pi_g/2.0_wp)**2*diffusion_coefficient* &
+           state%exc_pore_pres*inhibition / &
+           MERGE(state%h,CMPLX(1.0e-10_wp,0.0_wp,wp), &
+           REAL(state%h,wp)>1.0e-10_wp)
+    END IF
     do_gas_loss=gas_flag .AND. gas_loss_flag
     IF (PRESENT(include_gas_loss)) do_gas_loss=do_gas_loss .AND. include_gas_loss
     IF (.NOT.do_gas_loss) RETURN
@@ -208,34 +218,7 @@ CONTAINS
   ! Internal Darcy closures and other auxiliary source calculations.
 
 
-  SUBROUTINE darcy_diffusion_source(flow_depth, temperature,      &
-       mixture_density, solid_fractions, excess_pressure, source)
 
-    COMPLEX(wp), INTENT(IN) :: flow_depth
-    COMPLEX(wp), INTENT(IN) :: temperature
-    COMPLEX(wp), INTENT(IN) :: mixture_density
-    COMPLEX(wp), INTENT(IN) :: solid_fractions(n_solid)
-    COMPLEX(wp), INTENT(IN) :: excess_pressure
-    COMPLEX(wp), INTENT(OUT) :: source
-
-    COMPLEX(wp) :: diffusion_coefficient
-    COMPLEX(wp) :: inhibition
-    LOGICAL :: active
-    REAL(wp), PARAMETER :: h_threshold = 1.0E-10_wp
-
-    source = CMPLX(0.0_wp, 0.0_wp, wp)
-
-    IF (.NOT. (REAL(flow_depth,wp) .GT. 0.0_wp)) RETURN
-    IF (.NOT. (REAL(excess_pressure,wp) .GE. 0.0_wp)) RETURN
-
-    CALL eval_pore_pressure_diffusion_factors(flow_depth, temperature,         &
-         solid_fractions, diffusion_coefficient, inhibition, active)
-    IF (.NOT. active) RETURN
-
-    source = -mixture_density * (pi_g / 2.0_wp)**2 * diffusion_coefficient   &
-         / MAX(h_threshold, flow_depth) * excess_pressure * inhibition
-
-  END SUBROUTINE darcy_diffusion_source
 
 
 
