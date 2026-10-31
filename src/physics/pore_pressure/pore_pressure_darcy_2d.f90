@@ -1,13 +1,8 @@
-!********************************************************************************
-!> \brief Excess pore-pressure diffusion and gas-loss source laws.
-!> \details Evaluates Darcy-type excess-pressure diffusion, pore-gas loss,
-!>          pressure sources induced by inlet injection and mass exchange, and
-!>          the constitutive diffusion/inhibition factors shared by those
-!>          calculations. The diffusion routine accepts complex states for
-!>          Jacobian differentiation. Separate real-valued routines provide
-!>          both the exact frozen-state ODE flow and the closed-form algebraic
-!>          DIRK stage solve.
-!********************************************************************************
+!> Darcy pore-pressure diffusion and optional interstitial carrier-gas loss.
+!> The four model interfaces return conservative rates; the analytic interface
+!> integrates the coupled frozen-state mass and pressure system.
+!> Gas loss is also still used by the legacy mass-exchange transaction while
+!> shared carrier-inventory and packing limits are being migrated.
 
 MODULE pore_pressure_darcy_2d
 
@@ -64,7 +59,6 @@ CONTAINS
     rate=semi_rate+REAL(implicit_rate,wp)
   END SUBROUTINE eval_pore_pressure_darcy_explicit
 
-  !> Conservative gas-withdrawal component of the Darcy source.
   !> No separately semi-implicit Darcy contribution.
   SUBROUTINE eval_pore_pressure_darcy_semi_implicit(state,rate,include_gas_loss)
     TYPE(physical_state_type), INTENT(IN) :: state
