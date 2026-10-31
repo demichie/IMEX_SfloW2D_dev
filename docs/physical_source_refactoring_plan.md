@@ -15,14 +15,19 @@ ogni modello fisico. Nessun wrapper o livello di dispatch intermedio.
   automaticamente con la soluzione esatta della somma delle sorgenti.
 - Ogni modulo specifico contiene la propria fisica. Gli helper privati
   devono eseguire calcoli reali, non limitarsi a inoltrare chiamate.
-- Le interfacce esplicite **dei modelli** che sommano le componenti
-  semi-implicita e implicita ricevono `complex_physical_state_type`.
-  Quando l'esplicito costruisce direttamente la sorgente può ricevere
-  `physical_state_type`. Semi-implicito e analitico: stato reale;
-  implicito: stato complesso.
-- In un coordinatore che supporta modelli espliciti eterogenei il punto
-  di conversione va definito una volta sola, non ripetuto all'interno
-  di ogni modello; non introdurre un framework di adattatori.
+- **Tutte** le interfacce esplicite, sia dei coordinatori sia dei
+  modelli specifici, ricevono sempre `physical_state_type`.
+  La firma esplicita non accetta mai `complex_physical_state_type`.
+- Se un esplicito combina la parte semi-implicita e quella implicita,
+  converte lo stato reale in `complex_physical_state_type` **al proprio
+  interno**, poi richiama direttamente l'interfaccia implicita complessa.
+  La conversione non va spostata nel coordinatore e non richiede wrapper.
+  Se l'esplicito valuta direttamente la sorgente, usa lo stato reale.
+- Le interfacce semi-implicite e analitiche ricevono lo stato reale;
+  quelle implicite ricevono lo stato complesso.
+- Le conversioni effettuate dentro gli espliciti compositi sono
+  intenzionali. Devono usare stati temporanei locali e thread-safe;
+  non duplicare conversioni ulteriori a monte.
 - Non passare separatamente temperatura, velocità, densità e altre
   grandezze intrinseche già contenute o ricavabili dallo stato.
   Mantenere invece gli argomenti realmente esterni: tempo, geometria,
@@ -42,7 +47,8 @@ ogni modello fisico. Nessun wrapper o livello di dispatch intermedio.
 - [x] Rimossi livelli privati di dispatch ridondanti in thermal e rheology.
 - [x] Rimossa la routine di forwarding esplicita del mass exchange.
 - [ ] Eliminare gli argomenti derivabili dallo stato laddove possibile.
-- [ ] Consolidare la conversione complessa per gli espliciti compositi.
+- [x] Confermare il contratto: espliciti sempre reali; conversione locale negli espliciti compositi.
+- [ ] Verificare tutte le firme e le conversioni degli espliciti compositi.
 - [ ] Semplificare selezione/configurazione dei processi senza duplicazione.
 - [ ] Eliminare altri helper che siano solo inoltri.
 - [ ] Riutilizzare gli stati costruiti in source assembly.
