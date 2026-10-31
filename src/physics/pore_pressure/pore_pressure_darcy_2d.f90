@@ -35,7 +35,6 @@ MODULE pore_pressure_darcy_2d
   PUBLIC :: eval_pore_pressure_darcy_semi_implicit
   PUBLIC :: eval_pore_pressure_darcy_implicit
   PUBLIC :: solve_pore_pressure_darcy_analytic
-  PUBLIC :: solve_pore_pressure_darcy_conservative_analytic
   PUBLIC :: solve_frozen_darcy_mass_pressure
   PUBLIC :: eval_pore_pressure_dissipation_explicit
   PUBLIC :: eval_pore_pressure_dissipation_semi_implicit
@@ -682,42 +681,15 @@ CONTAINS
          state%rho_m,state%alphas,state%exc_pore_pres,rate(idx_poreEqn))
   END SUBROUTINE eval_pore_pressure_darcy_implicit
 
-  !> The full coupled analytic map is a separate existing kernel. Until
-  !> the source registry supports multi-equation pressure groups, this
-  !> state-level adapter preserves the original pressure-only analytic step.
-  SUBROUTINE solve_pore_pressure_darcy_analytic(state,q_before,interval,rate,admissible)
+  !> Integrate frozen-coefficient Darcy directly and return the full
+  !> conservative mean rate for the selected substep.
+  SUBROUTINE solve_pore_pressure_darcy_analytic( &
+       state,q_before,interval,rate,admissible)
     TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(IN) :: q_before(n_eqns),interval
+    REAL(wp), INTENT(IN) :: interval,q_before(n_eqns)
     REAL(wp), INTENT(OUT) :: rate(n_eqns)
     LOGICAL, INTENT(OUT) :: admissible
     REAL(wp) :: q_after(n_eqns)
-    rate=0.0_wp
-    admissible=.FALSE.
-    IF (.NOT.ieee_is_finite(interval) .OR. interval<0.0_wp) RETURN
-    IF (interval==0.0_wp .OR. .NOT.pore_pressure_flag) THEN
-      admissible=.TRUE.
-      RETURN
-    END IF
-    CALL solve_pore_pressure_darcy_conservative_analytic( &
-         state,interval,q_before,q_after,admissible)
-    IF (.NOT.admissible) RETURN
-    rate=(q_after-q_before)/interval
-  END SUBROUTINE solve_pore_pressure_darcy_analytic
-
-
-  !> Frozen-state coupled Darcy map in conservative variables.
-  !> Only the two scalar ODEs for total mass and pore pressure are solved.
-  !> Other conservative fields are corrected using the gas actually removed,
-  !> preserving the initial horizontal velocity and gas-species proportions.
-  !> The energy removal follows the existing Darcy mass-exchange convention;
-  !> a full integration with stage budget constraints is still required.
-  SUBROUTINE solve_pore_pressure_darcy_conservative_analytic( &
-       state, interval, conservative_before, conservative_after, admissible)
-    TYPE(physical_state_type), INTENT(IN) :: state
-    REAL(wp), INTENT(IN) :: interval
-    REAL(wp), INTENT(IN) :: conservative_before(n_eqns)
-    REAL(wp), INTENT(OUT) :: conservative_after(n_eqns)
-    LOGICAL, INTENT(OUT) :: admissible
     COMPLEX(wp) :: diffusion, inhibition
     REAL(wp) :: lambda, A, loss, mass_after, pressure_after, pressure_q
     REAL(wp) :: rho_c, cp_c, Ri, rhom, redgrav, cpm
@@ -727,14 +699,15 @@ CONTAINS
     REAL(wp), PARAMETER :: h_min=1.0e-10_wp
     REAL(wp), PARAMETER :: gas_h_min=1.0e-5_wp
 
-    conservative_after=conservative_before
+    q_after=q_before
+    rate=0.0_wp
     admissible=.FALSE.
     IF (.NOT.pore_pressure_flag) THEN
       admissible=.TRUE.
       RETURN
     END IF
     IF (interval<0.0_wp .OR. .NOT.ieee_is_finite(interval)) RETURN
-    IF (conservative_before(idx_totMassEqn)<=0.0_wp) RETURN
+    IF (q_before(idx_totMassEqn)<=0.0_wp) RETURN
     IF (state%h<=0.0_wp .OR. state%T<=0.0_wp) THEN
       admissible=.TRUE.
       RETURN
@@ -758,40 +731,41 @@ CONTAINS
       END IF
     END IF
     CALL solve_frozen_darcy_mass_pressure( &
-         conservative_before(idx_totMassEqn),state%exc_pore_pres,interval, &
+         q_before(idx_totMassEqn),state%exc_pore_pres,interval, &
          lambda,A,gas_flag .AND. gas_loss_flag,mass_after,pressure_after, &
          pressure_q,loss,admissible)
     IF (.NOT.admissible) RETURN
-    gas_inventory=conservative_before(idx_totMassEqn)
-    gas_inventory=gas_inventory-SUM(conservative_before( &
+    gas_inventory=q_before(idx_totMassEqn)
+    gas_inventory=gas_inventory-SUM(q_before( &
          idx_solidEqn_first:idx_solidEqn_last))
     IF (loss>gas_inventory .OR. gas_inventory<0.0_wp) THEN
       admissible=.FALSE.
       RETURN
     END IF
     IF (n_add_gas>0 .AND. loss>0.0_wp) THEN
-      IF (ANY(conservative_before(idx_addGasEqn_first: &
+      IF (ANY(q_before(idx_addGasEqn_first: &
            idx_addGasEqn_first+n_add_gas-1)<0.0_wp)) THEN
         admissible=.FALSE.
         RETURN
       END IF
     END IF
-    conservative_after(idx_totMassEqn)=mass_after
-    conservative_after(idx_poreEqn)=pressure_q
-    conservative_after(idx_uEqn)=conservative_before(idx_uEqn)-state%u*loss
-    conservative_after(idx_vEqn)=conservative_before(idx_vEqn)-state%v*loss
+    q_after(idx_totMassEqn)=mass_after
+    q_after(idx_poreEqn)=pressure_q
+    q_after(idx_uEqn)=q_before(idx_uEqn)-state%u*loss
+    q_after(idx_vEqn)=q_before(idx_vEqn)-state%v*loss
     IF (loss>0.0_wp) THEN
       ! No gas is removed from solid-class conservative masses.
-      conservative_after(idx_engyEqn)=conservative_before(idx_engyEqn)- &
+      q_after(idx_engyEqn)=q_before(idx_engyEqn)- &
            state%T*cp_c*loss
       IF (n_add_gas>0) THEN
         gas_fraction=loss/gas_inventory
-        conservative_after(idx_addGasEqn_first: &
+        q_after(idx_addGasEqn_first: &
              idx_addGasEqn_first+n_add_gas-1)= &
-             conservative_before(idx_addGasEqn_first: &
+             q_before(idx_addGasEqn_first: &
              idx_addGasEqn_first+n_add_gas-1)*(1.0_wp-gas_fraction)
       END IF
     END IF
-  END SUBROUTINE solve_pore_pressure_darcy_conservative_analytic
+    IF (interval>0.0_wp) rate=(q_after-q_before)/interval
+  END SUBROUTINE solve_pore_pressure_darcy_analytic
 
 END MODULE pore_pressure_darcy_2d
