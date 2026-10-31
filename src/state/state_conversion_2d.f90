@@ -17,6 +17,7 @@ MODULE state_conversion_2d
   USE parameters_2d, ONLY : wp
   USE parameters_2d, ONLY : n_vars, n_solid, n_add_gas
   USE parameters_2d, ONLY : eps_sing, eps_sing4, dry_thickness_tolerance
+  USE parameters_2d, ONLY : slope_correction_flag
   USE parameters_2d, ONLY : liquid_flag, gas_flag,                              &
        stoch_transport_flag, pore_pressure_flag, sutherland_flag
 
@@ -36,6 +37,10 @@ MODULE state_conversion_2d
      REAL(wp) :: h=0.0_wp, u=0.0_wp, v=0.0_wp, T=0.0_wp
      REAL(wp) :: rho_m=0.0_wp, inv_rhom=0.0_wp, red_grav=0.0_wp
      REAL(wp) :: Zs=0.0_wp, exc_pore_pres=0.0_wp
+     REAL(wp) :: w=0.0_wp, mod_vel_hor=0.0_wp, mod_vel2=0.0_wp
+     REAL(wp) :: mod_vel=0.0_wp, curvature_acceleration=0.0_wp
+     REAL(wp) :: B_prime_x=0.0_wp, B_prime_y=0.0_wp
+     REAL(wp) :: B_second_xx=0.0_wp, B_second_xy=0.0_wp, B_second_yy=0.0_wp
      REAL(wp), ALLOCATABLE :: xs(:), xg(:), alphas(:), alphag(:)
   END TYPE physical_state_type
 
@@ -45,6 +50,11 @@ MODULE state_conversion_2d
      COMPLEX(wp) :: T=(0.0_wp,0.0_wp), rho_m=(0.0_wp,0.0_wp)
      COMPLEX(wp) :: inv_rhom=(0.0_wp,0.0_wp), red_grav=(0.0_wp,0.0_wp)
      COMPLEX(wp) :: Zs=(0.0_wp,0.0_wp), exc_pore_pres=(0.0_wp,0.0_wp)
+     COMPLEX(wp) :: w=(0.0_wp,0.0_wp), mod_vel_hor=(0.0_wp,0.0_wp)
+     COMPLEX(wp) :: mod_vel2=(0.0_wp,0.0_wp), mod_vel=(0.0_wp,0.0_wp)
+     COMPLEX(wp) :: curvature_acceleration=(0.0_wp,0.0_wp)
+     REAL(wp) :: B_prime_x=0.0_wp, B_prime_y=0.0_wp
+     REAL(wp) :: B_second_xx=0.0_wp, B_second_xy=0.0_wp, B_second_yy=0.0_wp
      COMPLEX(wp), ALLOCATABLE :: xs(:), xg(:), alphas(:), alphag(:)
   END TYPE complex_physical_state_type
 
@@ -83,6 +93,12 @@ MODULE state_conversion_2d
 
   PUBLIC :: r_phys_var, c_phys_var
   PUBLIC :: physical_state_from_qp, physical_state_from_q, real_part_physical_state
+  INTERFACE update_physical_state_kinematics
+     MODULE PROCEDURE update_real_state_kinematics
+     MODULE PROCEDURE update_complex_state_kinematics
+  END INTERFACE update_physical_state_kinematics
+
+  PUBLIC :: update_physical_state_kinematics
   PUBLIC :: real_physical_state_from_q, complex_state_from_real
   PUBLIC :: qc_to_qp, qp_to_qc, qp_to_qp2
   PUBLIC :: mixt_var, mixt_var_state
@@ -98,6 +114,43 @@ MODULE state_conversion_2d
   PUBLIC :: project_dry_cell_momenta
 
 CONTAINS
+
+  SUBROUTINE update_real_state_kinematics(state, bx, by, bxx, bxy, byy)
+    TYPE(physical_state_type), INTENT(INOUT) :: state
+    REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
+    IF (PRESENT(bx)) state%B_prime_x=bx
+    IF (PRESENT(by)) state%B_prime_y=by
+    IF (PRESENT(bxx)) state%B_second_xx=bxx
+    IF (PRESENT(bxy)) state%B_second_xy=bxy
+    IF (PRESENT(byy)) state%B_second_yy=byy
+    state%w=0.0_wp
+    IF (slope_correction_flag) &
+         state%w=state%u*state%B_prime_x+state%v*state%B_prime_y
+    state%mod_vel_hor=SQRT(state%u**2+state%v**2)
+    state%mod_vel2=state%u**2+state%v**2+state%w**2
+    state%mod_vel=SQRT(state%mod_vel2)
+    state%curvature_acceleration=state%u**2*state%B_second_xx+ &
+         2.0_wp*state%u*state%v*state%B_second_xy+state%v**2*state%B_second_yy
+  END SUBROUTINE update_real_state_kinematics
+
+  SUBROUTINE update_complex_state_kinematics(state, bx, by, bxx, bxy, byy)
+    TYPE(complex_physical_state_type), INTENT(INOUT) :: state
+    REAL(wp), INTENT(IN), OPTIONAL :: bx, by, bxx, bxy, byy
+    IF (PRESENT(bx)) state%B_prime_x=bx
+    IF (PRESENT(by)) state%B_prime_y=by
+    IF (PRESENT(bxx)) state%B_second_xx=bxx
+    IF (PRESENT(bxy)) state%B_second_xy=bxy
+    IF (PRESENT(byy)) state%B_second_yy=byy
+    state%w=CMPLX(0.0_wp,0.0_wp,wp)
+    IF (slope_correction_flag) &
+         state%w=state%u*state%B_prime_x+state%v*state%B_prime_y
+    state%mod_vel_hor=SQRT(state%u**2+state%v**2)
+    state%mod_vel2=state%u**2+state%v**2+state%w**2
+    state%mod_vel=SQRT(state%mod_vel2)
+    state%curvature_acceleration=state%u**2*state%B_second_xx+ &
+         2.0_wp*state%u*state%v*state%B_second_xy+state%v**2*state%B_second_yy
+  END SUBROUTINE update_complex_state_kinematics
+
 
   !> Build the shared REAL source state directly from the available primitive vector.
   !> No conservative-to-primitive conversion is performed on this path.
