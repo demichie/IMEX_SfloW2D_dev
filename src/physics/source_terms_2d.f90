@@ -552,26 +552,18 @@ CONTAINS
     REAL(wp) :: r_h          !< real-value flow thickness
     REAL(wp) :: r_u          !< real-value x-velocity
     REAL(wp) :: r_v          !< real-value y-velocity
-    REAL(wp) :: r_Ri         !< real-value Richardson number
     REAL(wp) :: r_rho_m      !< real-value mixture density [kg/m3]
-    REAL(wp) :: r_rho_c      !< real-value carrier phase density [kg/m3]
-    REAL(wp) :: r_red_grav   !< real-value reduced gravity
 
-    REAL(wp) :: r_sp_heat_mix !< real_value mixture specific heat
-    REAL(wp) :: r_sp_heat_c
 
 
     TYPE(physical_state_type) :: physical_state
 
-    REAL(wp) :: exc_pore_pres
 
     REAL(wp) :: q1
 
     REAL(wp) :: rheology_rate(2), thermal_rate, pressure_rate
     REAL(wp) :: injection_rate(n_eqns)
-    REAL(wp) :: solid_volumes(n_solid), gas_volumes(n_add_gas)
     REAL(wp) :: speed, horizontal_speed, vertical_velocity, speed_squared
-    REAL(wp) :: inverse_density, pressure_excess
     CHARACTER(LEN=64) :: active_rheology
 
 
@@ -593,7 +585,6 @@ CONTAINS
 
        CALL physical_state_from_qp(qpj, physical_state)
        r_rho_m = physical_state%rho_m
-       r_red_grav = physical_state%red_grav
 
        q1 = r_h * r_rho_m
 
@@ -621,16 +612,11 @@ CONTAINS
        active_rheology=group_rheology_name(group)
        IF (rheology_flag .AND. LEN_TRIM(active_rheology)>0 .AND. &
             r_h>dry_thickness_tolerance) THEN
-          solid_volumes = physical_state%alphas
-          gas_volumes = physical_state%alphag
           horizontal_speed=SQRT(r_u**2+r_v**2)
           vertical_velocity=0.0_wp
           IF (slope_correction_flag) vertical_velocity=r_u*Bprimej_x+r_v*Bprimej_y
           speed_squared=horizontal_speed**2+vertical_velocity**2
           speed=SQRT(speed_squared)
-          inverse_density=1.0_wp/r_rho_m
-          pressure_excess=0.0_wp
-          IF (pore_pressure_flag) pressure_excess=qpj(idx_pore)
           CALL eval_rheology_explicit([active_rheology], physical_state, &
                speed, horizontal_speed, speed_squared, grav_coeff, curvature_term_flag, &
                Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, pore_pressure_flag, &
@@ -644,8 +630,6 @@ CONTAINS
        END IF
        IF (pore_pressure_flag .AND. &
             group_contains_name(group,'pore_pressure_dissipation')) THEN
-          solid_volumes = physical_state%alphas
-          gas_volumes = physical_state%alphag
           CALL eval_pore_pressure_dissipation_explicit(r_h,qpj(idx_T), &
                r_rho_m,solid_volumes,qpj(idx_pore),pressure_rate)
           expl_term(idx_poreEqn)=expl_term(idx_poreEqn)+pressure_rate
