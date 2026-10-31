@@ -23,7 +23,7 @@ CONTAINS
 
     !> @brief Evaluate explicit erosion from erodible substrate.
     !> @param[in] state Local real physical state.
-        !> @param[in] erodible Available erodible solid inventory by species [m].
+    !> @param[in] erodible Available erodible solid inventory by species [m].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
     SUBROUTINE eval_mass_exchange_erosion_explicit(state,erodible,dt,r)
@@ -55,16 +55,12 @@ CONTAINS
     !> @brief Reject unsupported semi-implicit treatment for erosion.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
-    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
-    !> @param[in] alpha Total dispersed-solid volume fraction [dimensionless].
     !> @param[in] erodible Available erodible solid inventory by species [m].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_erosion_semi_implicit(state,Bx,By,alpha,erodible,dt,r)
+    SUBROUTINE eval_mass_exchange_erosion_semi_implicit(state,erodible,dt,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -75,16 +71,12 @@ CONTAINS
     !> @brief Reject unsupported implicit treatment for erosion from erodible substrate.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
-    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
-    !> @param[in] alpha Total dispersed-solid volume fraction [dimensionless].
     !> @param[in] erodible Available erodible solid inventory by species [m].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE eval_mass_exchange_erosion_implicit(state,Bx,By,alpha,erodible,dt,r)
+    SUBROUTINE eval_mass_exchange_erosion_implicit(state,erodible,dt,r)
 
         TYPE(complex_physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
@@ -95,16 +87,12 @@ CONTAINS
     !> @brief Reject unsupported analytic treatment for erosion from erodible substrate.
     !> @details This entry point raises fatal_error; the rates are reset first.
     !> @param[in] state Local real physical state.
-    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
-    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
-    !> @param[in] alpha Total dispersed-solid volume fraction [dimensionless].
     !> @param[in] erodible Available erodible solid inventory by species [m].
     !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
     !> @param[in,out] r Process rate record; reset or overwritten by the selected treatment.
-    SUBROUTINE solve_mass_exchange_erosion_analytic(state,Bx,By,alpha,erodible,dt,r)
+    SUBROUTINE solve_mass_exchange_erosion_analytic(state,erodible,dt,r)
 
         TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: Bx, By, alpha
         REAL(wp), INTENT(IN) :: erodible(n_solid), dt
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
