@@ -30,48 +30,6 @@ MODULE mass_exchange_2d
 
 CONTAINS
 
-    !> This family currently supports only explicit coordination.
-    SUBROUTINE eval_mass_exchange_semi_implicit(state,total_rates,eqns_term)
-        TYPE(physical_state_type), INTENT(IN) :: state
-        TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
-        REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-        CALL reset_mass_exchange_rates(total_rates)
-        eqns_term=0.0_wp
-        CALL fatal_error('mass_exchange: semi-implicit coordination is unsupported')
-    END SUBROUTINE eval_mass_exchange_semi_implicit
-
-    SUBROUTINE eval_mass_exchange_implicit(state,total_rates,eqns_term)
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
-        TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
-        COMPLEX(wp), INTENT(OUT) :: eqns_term(n_eqns)
-        CALL reset_mass_exchange_rates(total_rates)
-        eqns_term=CMPLX(0.0_wp,0.0_wp,wp)
-        CALL fatal_error('mass_exchange: implicit coordination is unsupported')
-    END SUBROUTINE eval_mass_exchange_implicit
-
-    SUBROUTINE solve_mass_exchange_analytic(state,total_rates,eqns_term)
-        TYPE(physical_state_type), INTENT(IN) :: state
-        TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
-        REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
-        CALL reset_mass_exchange_rates(total_rates)
-        eqns_term=0.0_wp
-        CALL fatal_error('mass_exchange: analytic coordination is unsupported')
-    END SUBROUTINE solve_mass_exchange_analytic
-
-
-    !> @brief Coordinate cell-local mass exchange, shared phase budgets and conservative source
-    !> assembly.
-    !> @details A single gas or liquid carrier inventory is constrained before conservative
-    !> assembly.
-    !> Positive sources never cancel gross withdrawals in a shared inventory.
-    !> @param[in] qp Local primitive flow state; component order follows model configuration.
-    !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
-    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
-    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
-    !> @param[in] erodible Available erodible solid inventory by species [m].
-    !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
-    !> @param[in,out] total_rates Accumulated process rates and bed changes for this cell.
-    !> @param[out] eqns_term Conservative mass, momentum, energy and species source vector.
     SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,Bx,By,erodible,dt,total_rates,eqns_term)
 
         TYPE(physical_state_type), INTENT(IN) :: physical_state
@@ -177,6 +135,51 @@ CONTAINS
         END IF
 
     END SUBROUTINE eval_mass_exchange_explicit
+
+
+    !> This family currently supports only explicit coordination.
+    SUBROUTINE eval_mass_exchange_semi_implicit(state,total_rates,eqns_term)
+        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
+        REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
+        CALL reset_mass_exchange_rates(total_rates)
+        eqns_term=0.0_wp
+        CALL fatal_error('mass_exchange: semi-implicit coordination is unsupported')
+    END SUBROUTINE eval_mass_exchange_semi_implicit
+
+    SUBROUTINE eval_mass_exchange_implicit(state,total_rates,eqns_term)
+        TYPE(complex_physical_state_type), INTENT(IN) :: state
+        TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
+        COMPLEX(wp), INTENT(OUT) :: eqns_term(n_eqns)
+        CALL reset_mass_exchange_rates(total_rates)
+        eqns_term=CMPLX(0.0_wp,0.0_wp,wp)
+        CALL fatal_error('mass_exchange: implicit coordination is unsupported')
+    END SUBROUTINE eval_mass_exchange_implicit
+
+    SUBROUTINE solve_mass_exchange_analytic(state,total_rates,eqns_term)
+        TYPE(physical_state_type), INTENT(IN) :: state
+        TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
+        REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
+        CALL reset_mass_exchange_rates(total_rates)
+        eqns_term=0.0_wp
+        CALL fatal_error('mass_exchange: analytic coordination is unsupported')
+    END SUBROUTINE solve_mass_exchange_analytic
+
+
+    !> @brief Coordinate cell-local mass exchange, shared phase budgets and conservative source
+    !> assembly.
+    !> @details A single gas or liquid carrier inventory is constrained before conservative
+    !> assembly.
+    !> Positive sources never cancel gross withdrawals in a shared inventory.
+    !> @param[in] qp Local primitive flow state; component order follows model configuration.
+    !> @param[in] B_zone Substrate zone identifier controlling vaporization eligibility.
+    !> @param[in] Bx Bed elevation gradient in the x direction [dimensionless].
+    !> @param[in] By Bed elevation gradient in the y direction [dimensionless].
+    !> @param[in] erodible Available erodible solid inventory by species [m].
+    !> @param[in] dt Physical step duration [s]; must be positive where used as a divisor.
+    !> @param[in,out] total_rates Accumulated process rates and bed changes for this cell.
+    !> @param[out] eqns_term Conservative mass, momentum, energy and species source vector.
+
 
     ! Limit simultaneous withdrawal demands from one physical inventory.
     ! Positive source total_rates are excluded from the budget, not netted against sinks.

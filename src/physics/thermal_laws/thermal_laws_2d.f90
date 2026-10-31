@@ -25,7 +25,7 @@ CONTAINS
 
     SELECT CASE (TRIM(models(i)))
     CASE ('thermal_cooling')
-      CALL eval_thermal_cooling_explicit(state,radiative,convective,ambient,rate)
+      CALL eval_thermal_cooling_explicit(state,radiative,convective,ambient,process_rate)
     CASE DEFAULT
       CALL fatal_error('Unknown explicit thermal model: '//TRIM(models(i)))
     END SELECT
@@ -46,7 +46,7 @@ CONTAINS
 
     SELECT CASE (TRIM(models(i)))
     CASE ('thermal_cooling')
-      CALL eval_thermal_cooling_semi_implicit(state,rate)
+      CALL eval_thermal_cooling_semi_implicit(state,process_rate)
     CASE DEFAULT
       CALL fatal_error('Unknown semi-implicit thermal model: '//TRIM(models(i)))
     END SELECT
@@ -68,7 +68,7 @@ CONTAINS
 
     SELECT CASE (TRIM(models(i)))
     CASE ('thermal_cooling')
-      CALL eval_thermal_cooling_implicit(state,radiative,convective,ambient,rate)
+      CALL eval_thermal_cooling_implicit(state,radiative,convective,ambient,process_rate)
     CASE DEFAULT
       CALL fatal_error('Unknown implicit thermal model: '//TRIM(models(i)))
     END SELECT
