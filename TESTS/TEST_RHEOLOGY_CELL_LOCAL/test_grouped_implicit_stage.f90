@@ -537,7 +537,7 @@ CONTAINS
   SUBROUTINE test_lava_newton_stage_cooling_analytic_step
     TYPE(source_group_type), ALLOCATABLE :: stage_groups(:),step_groups(:)
     TYPE(analytic_term_context_type) :: context
-    REAL(wp) :: state_before(7),state_stage(7),state_cooled(7)
+    REAL(wp) :: state_before(7),state_stage(7),state_cooled(7),analytic_rate(7)
     REAL(wp) :: stage_source(7),heat_capacity,reference_temperature
     INTEGER :: iters,info,status,g
     LOGICAL :: success,failed,found_cooling

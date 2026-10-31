@@ -107,7 +107,7 @@ CONTAINS
     CALL eval_source_analytic_state(group,q_before,context,interval,q_after,status)
     IF (status/=0) RETURN
     rate(1:n_vars)=(q_after-q_before)/interval
-  END SUBROUTINE eval_source_analytic_state
+  END SUBROUTINE eval_source_analytic
 
   RECURSIVE SUBROUTINE eval_source_analytic_state(group,q_before,context,interval,q_after,status)
     TYPE(source_group_type), INTENT(IN) :: group
