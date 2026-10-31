@@ -1,6 +1,7 @@
 PROGRAM test_pore_pressure_diffusion
 
-  USE parameters_2d, ONLY : wp, n_solid, gas_flag, sutherland_flag
+  USE parameters_2d, ONLY : wp, n_solid, n_eqns, idx_poreEqn, &
+       gas_flag, pore_pressure_flag, sutherland_flag
   USE constitutive_parameters_2d, ONLY : f_inhibit_mode, hydraulic_permeability, &
        kin_visc_c, sp_heat_a, sp_gas_const_a, pres, dynamic_permeability_flag
   USE geometry_2d, ONLY : pi_g
@@ -25,6 +26,9 @@ PROGRAM test_pore_pressure_diffusion
   REAL(wp) :: mom_x,mom_y,energy,gas_masses(2),gas_fractions(2),loss_check
 
   n_solid = 2
+  n_eqns = 7
+  idx_poreEqn = 7
+  pore_pressure_flag = .TRUE.
   ALLOCATE(solid_fractions(n_solid))
   gas_flag = .FALSE.
   sutherland_flag = .FALSE.
