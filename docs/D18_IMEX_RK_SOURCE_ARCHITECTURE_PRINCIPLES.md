@@ -18,7 +18,7 @@ state_(n+1) = state_work
 
 The complete state includes conservative fluid unknowns and, for processes that require them, topography, deposit, erodible material, and related physical inventories. A group call may be implemented with local input/output states, preserving an immutable input for evaluation. Do not copy the entire simulation domain unnecessarily.
 
-**Reference configuration:**
+**Illustrative configuration (not prescribed):**
 
 | Order | Physical operator/group | Local integrator |
 | --- | --- | --- |
@@ -27,22 +27,22 @@ The complete state includes conservative fluid unknowns and, for processes that 
 | 2 | Mass exchange, including deposition/erosion and substrate transaction | Forward Euler explicit with physical joint limits |
 | 3 | Darcy pore-pressure process | Analytic evolution |
 
-This is an **example ordering**, not a hard-coded universal source order. The key recommended adjacency is spatial acceleration followed immediately by implicit rheology. Source-group order remains configurable where physics and method capabilities allow. With Lie, swapping groups may change results by an order-`dt` global splitting error.
+The example assigns methods only to illustrate one valid configuration. **No source family is permanently assigned EXPLICIT, NEWTON, or ANALYTIC by this architecture:** rheology, for example, can be explicit, implicit/Newton, or analytic where the selected model supports it. The spatial finite-volume operator itself remains explicit. Group order and method remain configured and validated; placing friction immediately after spatial acceleration is an optional configuration choice. Lie order affects the result.
 
 Each group advances its own physical subsystem over the **same full interval** `dt_global`, even though the operators are called successively. Their calls are not consecutive independent physical-time intervals; one overall Lie step advances time from `t_n` to `t_n+dt_global`. **Time-dependent source laws**, including injection schedules, must receive the appropriate physical-time argument and be treated consistently with the chosen first-order discretization (e.g., left endpoint for forward Euler). Never increment the physical clock by `dt_global` after each group.
 
 ## 2. Group contract and minimal responsibilities
 
-- A group consists of one or more physical processes sharing a numerical integration method and an application transaction. Different groups may modify **overlapping conservative equations**. There is no global exclusive equation partition.
+- A group consists of one or more physical processes configured with a compatible numerical treatment and application transaction. Each source family retains its supported EXPLICIT, NEWTON/implicit, and ANALYTIC choices, rather than having one hard-coded treatment. The semi-implicit interface is retained as an auxiliary part of its associated NEWTON solve, not a standalone global Lie method. Different groups may modify **overlapping conservative equations**. There is no global exclusive equation partition.
 - Every physical process returns a complete conservative rate vector `rate(1:n_eqns)`; unaffected components are zero. **Keep individual process contributions distinct until their joint limiter runs**.
 - All processes **within one explicit group** evaluate the same immutable group-entry fluid and inventory state. Assemble and jointly limit them, then apply one limited group update. A subsequent group reconstructs its primitive and physical variables from the updated state.
 - Conceptually, `advance_group(group, state_in, time, dt, state_out)` advances the group in one cell or an appropriate domain/spatial transaction. The actual Fortran signature should be minimal. `state_in` is never mutated, `state_out` includes all affected fluid/bed inventories. Separate `q_in`/`q_out` are preferred; additional bed/inventory arguments are introduced only where physically required.
 - The **spatial operator is domain-coupled**, unlike cell-local source groups. Evaluate face fluxes consistently across the domain, update conservative cells with the FV discretization and handle boundaries before subsequent cell-local groups. Group 0 may contain injection terms evaluated on the same pre-update cell states as the spatial fluxes. Do not arbitrarily clip a local flux-divergence vector if doing so would destroy intercell conservation.
 - A step must not be partially committed after an error in a coupled fluid/bed transaction; implement validation and coherent commit/rollback or fail-before-commit handling as needed.
-- Preserve the existing four physics-model entry points named `eval_<model>_explicit`, `eval_<model>_semi_implicit`, `eval_<model>_implicit`, `eval_<model>_analytic` where they are an established interface contract. Unsupported methods fail explicitly and source configuration rejects invalid assignments. A semi-implicit contribution, where used, belongs inside the associated implicit group; it is not a global time channel or an independent RK stage.
+- Preserve the existing four physics-model entry points named `eval_<model>_explicit`, `eval_<model>_semi_implicit`, `eval_<model>_implicit`, `eval_<model>_analytic` where they are an established interface contract. Unsupported methods fail explicitly and source configuration rejects invalid assignments. A semi-implicit contribution, where used, belongs inside the associated NEWTON group; it is not a global time channel or an independent RK stage.
 - Avoid extra wrapper state types, duplicate conversions, equation-partition compatibility layers, or unused solvers. Derive a KEEP / CHANGE / DELETE list from the actual source call graph before implementation.
 
-## 3. Explicit group update
+## 3. EXPLICIT group update (any supported physical family)
 
 For an explicit group with process rates `S_p`:
 
@@ -56,20 +56,20 @@ q_out = q_in + dt_global * rate_g
 
 Any associated inventory or topographic update must use the **same limited physical transfers**. Source input states must not be updated between member processes. Group 0 additionally includes conservative spatial face-flux divergence, assembled consistently with these simultaneous injection rates. The explicit state update must respect the spatial CFL and physical admissibility constraints; time-step selection is not solely controlled by the implicit friction method.
 
-An explicit group can use the first-order forward Euler method regardless of whether the source is stiff; **stiffness imposes stability/positivity restrictions** on any source left explicit. A source requiring unconditional or large-step stability must be assigned a suitable implicit/analytic treatment or reduce the step.
+A group configured as EXPLICIT uses the first-order forward Euler method regardless of whether the source is stiff; **stiffness imposes stability/positivity restrictions** on any source left explicit. A source requiring unconditional or large-step stability must be assigned a suitable implicit/analytic treatment or reduce the step.
 
-## 4. Implicit rheology group
+## 4. NEWTON group: generic implicit treatment
 
-- Rheology/friction is advanced for the **full `dt_global`** using backward Euler solved by Newton; no global IMEX tableau remains.
-- Newton works on **conservative** variables. For a rheology-only group, the reduced unknown/residual index list is `[idx_uEqn,idx_vEqn]`, not primitive velocity indices. One list `newton_equations(:)` is used for both residual rows and Jacobian columns; groups do not claim exclusive equation ownership.
+- **Any group configured as NEWTON** is advanced over the full `dt_global` by backward Euler solved with Newton. This is a method-specific contract, **not a requirement that rheology always use Newton**. Rheology may instead use EXPLICIT or ANALYTIC when the selected law supports them; no global IMEX tableau remains.
+- Newton works on **conservative** variables. For a rheology-only group **configured as NEWTON**, the reduced unknown/residual index list is `[idx_uEqn,idx_vEqn]`, not primitive velocity indices. One list `newton_equations(:)` is used for both residual rows and Jacobian columns; groups do not claim exclusive equation ownership.
 - The group-entry state is fixed as the backward-Euler reference. The full physical source is evaluated at the implicit outgoing state, and the solved residual must be respected; the Newton solver manages numerical convergence and line search, not rheology-specific physical clipping.
 - Current supported NEWTON sources affect only the selected momenta for rheology or energy for cooling, so all other components stay at group-entry values. For a future source that modifies conservative components **outside** the reduced Newton list, reconstruct them after solving only when the exact triangular dependence conditions hold: outside-component rates must not depend on updated outside unknowns, and Newton-equation residuals must not depend on their updated values. Otherwise enlarge the Newton system or use an exact justified elimination. Do not discard nonzero residual components.
 - The existing semi-implicit reological predictor, if still used by a model, is an **internal part of the implicit group** over `dt_global`, and its physical limiter is applied before the nonlinear solve. Do not apply an extra rheology momentum projection after convergence because it invalidates the solved residual.
 
-## 5. Analytic group
+## 5. ANALYTIC group: generic analytic treatment
 
 - An ANALYTIC group contains **exactly one physical process**, integrated by its analytic physical evolution operator over `dt_global`. It updates the **complete relevant conservative state**, without an equation-ID filter or a second Euler application of its increment.
-- The Darcy pore-pressure process remains an **analytic** group, not an implicit-Newton group. Its model owns pore-pressure admissibility and any interstitial gas withdrawal. The process can affect total mass, momentum, energy, gas and pore-pressure conservative variables as dictated by the physical equations.
+- The currently supported Darcy pore-pressure model is **ANALYTIC** in the illustrative configuration; its model-specific method capabilities do not constrain those of other source families. Its model owns pore-pressure admissibility and any interstitial gas withdrawal. The process can affect total mass, momentum, energy, gas and pore-pressure conservative variables as dictated by the physical equations.
 - Analytic evolution may require input-state assumptions or frozen coefficients; document and test their validity. The exactness claim applies to the stated subproblem, not automatically to the full split coupled evolution.
 
 ## 6. Physical limiter ownership and joint rates
@@ -93,7 +93,11 @@ An explicit group can use the first-order forward Euler method regardless of whe
 - Mass exchange physically coordinates erosion, deposition, entrainment, carrier withdrawal, packing limits and the corresponding fluid–substrate transfers; keep competing processes affecting one substrate/inventory in a **joint group transaction** unless a genuinely conservative alternative split is demonstrated.
 - Darcy owns interstitial-gas depletion limitations and any conservative change implied by its pore-pressure evolution; it is not silently folded into mass exchange.
 
-## 7. Data flow and implementation cleanup
+## 7. Configurable group dispatch and implementation cleanup
+
+All existing source-group membership and ordering rules remain, but without the obsolete STAGE/STEP cadence. The group METHOD is independently configured and validated against the selected model's capabilities. The source-family dispatcher must invoke the selected numerical interface, not infer it from names such as rheology or mass exchange. No group is required to own exclusive conservative equations.
+
+## 8. Data flow and implementation cleanup
 
 Target global loop:
 
@@ -102,11 +106,10 @@ while t < t_final:
     dt_global = choose_admissible_dt(current_state, geometry, CFL, source_limits)
     dt_global = min(dt_global, t_final - t)
 
-    advance_spatial_and_injection_explicit(dt_global)
-    advance_rheology_implicit(dt_global)
-    advance_mass_exchange_explicit(dt_global)
-    advance_pore_pressure_analytic(dt_global)
-    # actual ordered groups follow validated configuration, not hardcoded calls
+    for group in configured_Lie_order:
+        state_out = advance_group(group, state_in, t, dt_global)
+        state_in = state_out  # fluid, topography, and inventories
+    # method dispatch comes from group configuration, not process family
 
     validate_and_commit_complete_state()
     t = t + dt_global
@@ -116,17 +119,17 @@ Remove RK-stage bookkeeping used only by IMEX integration (`q_rk`, `qp_rk`, `EX_
 
 Eliminate source `CADENCE=STAGE/STEP` from the target configuration and merge the currently separate STAGE/STEP orchestrators into an ordered Lie group executor. Preserve a distinct domain-wide spatial advance primitive and atomic STEP-like substrate transactions as required by the physical methods. Use a **single full-step time variable**, with local interval parameter `dt`; there are no RK stage weights or rates to accumulate into final RK assembly.
 
-## 8. Verification and acceptance
+## 9. Verification and acceptance
 
 1. Pure spatial FV+injection forward Euler: conservation, hydrostatic well-balancing where applicable, CFL and positivity, time-dependent source scheduling, dry/wet transitions and boundary-source handling.
 2. Lie ordering: later groups use the actually updated fluid/bed/inventory state; all members of one simultaneous explicit group use the same initial state; no double application; configured group order is deterministic.
 3. Shared finite-inventory limiter: retain distinct individual process rates until joint limiting, including competing consumption and production, conservation across fluid/substrate, and proper mass-exchange bed transaction.
-4. Backward-Euler rheology: reduced Newton residual/Jacobian, convergence and failed-solve handling, zero-momentum shortcut, no post-Newton momentum projection; test stiff linear friction against `u' = a-ku` and more representative nonlinear rheology.
+4. Configurable family methods: test rheology EXPLICIT, NEWTON, and ANALYTIC when supported, and reject invalid method/model combinations. For NEWTON rheology check reduced residual/Jacobian, convergence, zero-momentum shortcut, and no post-Newton momentum projection; test stiff linear friction against `u' = a-ku`.
 5. Analytic Darcy: correct complete conservative update, pore-pressure-only versus interstitial gas-loss behavior, and physical admissibility.
 6. Multiple operators on the same conservative components: Lie-order sensitivity, temporal convergence **to first order** on coupled noncommuting test problems, and relevant legacy v2 physical regressions. Do not mistake first-order splitting for a well-balanced or uniformly stiff-accurate method.
 7. Whole-step state/geometry consistency and failure behavior, including updated topography before subsequent spatial flux evaluation; reject invalid method configurations and unsupported entries.
 8. Compare wall-clock performance and memory with the prior IMEX-RK version; run relevant CI, and report exact tests actually executed.
 
-**Known limitations:** Lie splitting generally has first-order global temporal accuracy even when component operators are exact. Treating friction implicitly avoids an explicit friction stability restriction but does **not** guarantee accurate gravity–friction equilibrium for arbitrarily large `dt`; test on stiff balanced regimes. No numerical convergence or production performance claim is made by this architecture document.
+**Known limitations:** Lie splitting generally has first-order global temporal accuracy even when component operators are exact. Configuring friction implicitly avoids an explicit friction stability restriction but does **not** guarantee accurate gravity–friction equilibrium for arbitrarily large `dt`; test on stiff balanced regimes. No numerical convergence or production performance claim is made by this architecture document.
 
 **Implementation status:** D18 is the target specification, not evidence that the Fortran refactoring is complete. No source edits or tests are claimed as part of this documentation revision.
