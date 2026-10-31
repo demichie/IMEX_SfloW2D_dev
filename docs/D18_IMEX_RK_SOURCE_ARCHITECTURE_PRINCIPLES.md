@@ -176,3 +176,17 @@ First resolve **A2 and A5** from the RK mathematics: these control whether a ful
 **Naming convention agreed:** numerical model interfaces use `eval_<model>_explicit`, `eval_<model>_semi_implicit`, `eval_<model>_implicit`, and `eval_<model>_analytic`. This is a naming contract; it does not by itself certify that older analytic implementations already return complete conservative rates.
 
 **Acceptance gate:** do not start a broad source architecture rewrite until the selected options above have been recorded, the RK formula has been checked, and the minimum set of needed types and executors has been drawn.
+
+## 10. Confirmed RK integration decisions (2026-10-31)
+
+The following decisions **supersede the corresponding open questions A1, A2, A5 and A8 in section 9**. They are design requirements, not claims that the current code already implements them.
+
+1. **Explicit integration interval:** between sequential EXPLICIT source groups at `STAGE`, advance the intermediate conservative state with the interval associated with that **explicit RK stage**. For `STEP`, use the **complete time step** `dt`. The actual explicit-stage interval is to be taken from the implemented explicit RK discretization; do not substitute the diagonal implicit coefficient automatically.
+2. **Distinct RK rate channels:** EXPLICIT source groups (including spatial discretization in EXPLICIT GROUP 0) contribute **only to the explicit RK rates** (`EX_terms`, with spatial terms handled consistently). NEWTON and ANALYTIC groups contribute **only to the implicit RK rates** (`IM_terms`). Do not mix explicit groups into an implicit-group solve or vice versa. Splitting is sequential *within each channel* in configured group order.
+3. **NEWTON versus ANALYTIC groups:** both belong to the implicit channel but **must remain different groups**; neither method may be combined with the other in the same group. Execute the ordered implicit-group sequence with each group receiving the conservative state already updated by its predecessors.
+4. **Effective rate accumulation:** initialize the complete rate accumulator for each RK channel to zero, then **add each group's effective, limited full-vector rate** to it after evaluating and applying that group. Thus `S_exp_total = sum_g S_exp_g` and `S_imp_total = sum_g S_imp_g`, independently. Never reapply the accumulated increments when assembling stage rates.
+5. **Semi-implicit treatment:** semi-implicit contributions are **always evaluated together with their implicit/Newton group**, as in the existing implementation. They are not independent source groups, and do not introduce a third RK rate channel.
+
+**Consequence for architecture:** do not force one mixed EXPLICIT/NEWTON/ANALYTIC STAGE sweep. An implementation may share a minimal group-evaluation primitive, but the explicit and implicit tableau contributions remain separate. A single complete conservative state and full-vector rates are used within each sequence; source groups do not partition equations.
+
+**Remaining numerical checks:** establish the precise value of the explicit RK stage interval for each supported tableau; verify how the separately accumulated `EX_terms` and `IM_terms` enter the RK recurrence; and test the temporal order and admissibility. These checks do not reopen the decisions above.
