@@ -1,5 +1,5 @@
 !********************************************************************************
-!> \brief Local nonlinear solver for the implicit IMEX stage
+!> \brief Cell-local backward-Euler source group nonlinear solver
 !>
 !> Newton iteration, line search, residual/Jacobian evaluation and small dense
 !> linear solves.  This module is intentionally independent of the spatial
@@ -75,14 +75,14 @@ CONTAINS
 
   END SUBROUTINE finalize_nonlinear_solver
 
-  !> \brief Apply the ordered implicit-group sweep using Newton or closed-form DIRK solves.
+  !> \brief Apply ordered cell-local source groups using Newton or analytic flows.
   !>
   !> \param[in] equation_partition Explicit/implicit equation mask and compact index maps.
-  !> \param[in] stage_groups Validated ordered stage groups; explicit groups are skipped.
+  !> \param[in] lie_groups Validated ordered Lie source groups; explicit groups are skipped.
   !> \param[in,out] qj Local conservative state vector; mass and momenta are per unit horizontal
   !>                   area.
-  !> \param[in] qj_old Cell conservative reference state used in the implicit-stage residual.
-  !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
+  !> \param[in] q_group_input Conservative input state for the backward-Euler group residual.
+  !> \param[in] dt_step Full Lie group timestep [s].
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[in] Bsecondj_xx Filtered bed curvature in xx [m^-1].
@@ -91,14 +91,14 @@ CONTAINS
   !> \param[in] grav_coeff Effective gravitational acceleration [m s^-2].
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !> \param[in] apply_semi_implicit Apply the semi-implicit momentum contribution before the sweep.
-  !> \param[out] iterations_used Number of Newton iterations attempted for this cell/stage.
-  !> \param[out] converged True when every Newton stage residual meets its bound.
+  !> \param[out] iterations_used Number of Newton iterations attempted for this source-group cell solve.
+  !> \param[out] converged True when every Newton group residual meets its bound.
   !> \param[out] linear_info Linear-solver status: zero for success, nonzero for a failed solve.
   !> \param[out] line_search_failed True when backtracking fails to accept a step.
   !******************************************************************************
 
-  SUBROUTINE solve_implicit_groups(equation_partition, stage_groups, &
-       qj, qj_old, dt_step,                                                  &
+  SUBROUTINE solve_implicit_groups(equation_partition, lie_groups, &
+       qj, q_group_input, dt_step,                                                  &
 Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
        Bsecondj_yy, grav_coeff, Zij,                                         &
        iterations_used, converged, linear_info, line_search_failed,          &
@@ -110,9 +110,9 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
     IMPLICIT NONE
 
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
-    TYPE(source_group_type), INTENT(IN) :: stage_groups(:)
+    TYPE(source_group_type), INTENT(IN) :: lie_groups(:)
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
-    REAL(wp), INTENT(IN) :: qj_old(n_vars)
+    REAL(wp), INTENT(IN) :: q_group_input(n_vars)
     REAL(wp), INTENT(IN) :: dt_step
     REAL(wp), INTENT(IN) :: Bprimej_x
     REAL(wp), INTENT(IN) :: Bprimej_y
@@ -145,7 +145,7 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
     IF (.NOT. equation_partition%is_initialized() .OR.                     &
          equation_partition%n_equations .NE. n_eqns .OR.                   &
          n_eqns .NE. n_vars .OR. equation_partition%n_implicit .GT. n_vars .OR. &
-         (equation_partition%n_IM_groups>0 .AND. SIZE(stage_groups)==0)) THEN
+         (equation_partition%n_IM_groups>0 .AND. SIZE(lie_groups)==0)) THEN
        linear_info = -1
        RETURN
     END IF
@@ -156,7 +156,7 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
     tol_rel_local = tol_rel
 
     qj_init = qj
-    q_known = qj_old
+    q_known = q_group_input
     qj = q_known
     apply_si_local = .FALSE.
     IF (PRESENT(apply_semi_implicit)) apply_si_local = apply_semi_implicit
@@ -168,29 +168,29 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
     analytic_context%grav_coeff=grav_coeff
     analytic_context%Zij=Zij
 
-    ! Explicit equations have no current-stage implicit source and are solved
+    ! Explicit equations have no current-group implicit source and are solved
     ! directly before the ordered implicit-group sweep.
     DO i = 1, equation_partition%n_explicit
        equation = equation_partition%explicit_map(i)
        qj(equation) = q_known(equation)
     END DO
 
-    DO group = 1, SIZE(stage_groups)
-       IF (stage_groups(group)%method==SOURCE_METHOD_EXPLICIT) CYCLE
-       IF (.NOT.ALLOCATED(stage_groups(group)%equation_ids)) THEN
+    DO group = 1, SIZE(lie_groups)
+       IF (lie_groups(group)%method==SOURCE_METHOD_EXPLICIT) CYCLE
+       IF (.NOT.ALLOCATED(lie_groups(group)%equation_ids)) THEN
           linear_info=-1
           qj=qj_init
           RETURN
        END IF
-       group_size=SIZE(stage_groups(group)%equation_ids)
+       group_size=SIZE(lie_groups(group)%equation_ids)
        IF (group_size<1 .OR. group_size>SIZE(group_equations)) THEN
           linear_info=-1
           qj=qj_init
           RETURN
        END IF
-       group_equations(1:group_size)=stage_groups(group)%equation_ids
+       group_equations(1:group_size)=lie_groups(group)%equation_ids
 
-       IF (stage_groups(group)%method==SOURCE_METHOD_ANALYTIC) THEN
+       IF (lie_groups(group)%method==SOURCE_METHOD_ANALYTIC) THEN
           ! Analytic operators act on the state produced by preceding groups.
           group_has_momentum=ANY(group_equations(1:group_size)==2) .OR. &
                ANY(group_equations(1:group_size)==3)
@@ -201,7 +201,7 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
              qj=qj_init
              RETURN
           END IF
-          CALL eval_source_analytic(stage_groups(group),qj, &
+          CALL eval_source_analytic(lie_groups(group),qj, &
                analytic_context,dt_step,analytic_rate,             &
                status=analytic_status)
           IF (analytic_status/=0) THEN
@@ -211,7 +211,7 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
           END IF
           qj=qj+dt_step*analytic_rate(1:n_vars)
 
-       ELSEIF (stage_groups(group)%method==SOURCE_METHOD_NEWTON) THEN
+       ELSEIF (lie_groups(group)%method==SOURCE_METHOD_NEWTON) THEN
           ! A group solves against the state left by preceding groups.
           q_group_before=qj
              si_term=0.0_wp
@@ -221,7 +221,7 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
                 CALL qc_to_qp(qj, qp_current, dynamic_pressure)
                 CALL eval_source_semi_implicit(Bprimej_x, Bprimej_y,          &
                      Bsecondj_xx,Bsecondj_xy,Bsecondj_yy,grav_coeff,        &
-                     qp_current,si_term,Zij,group=stage_groups(group))
+                     qp_current,si_term,Zij,group=lie_groups(group))
              END IF
              DO i=1,group_size
                 equation=group_equations(i)
@@ -237,7 +237,7 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
              END IF
              ! Semi-implicit information seeds the Newton initial guess only.
              ! The backward-Euler residual contains the full implicit source once.
-             CALL solve_newton_group(stage_groups(group),&
+             CALL solve_newton_group(lie_groups(group),&
                   group_equations(1:group_size),qj,q_group_before,dt_step,&
                   Bprimej_x,Bprimej_y,Zij,coeff_f,      &
                   tol_abs_local,tol_rel_local,iterations_used,converged,   &
@@ -260,8 +260,8 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
   !> \brief Solve one backward-Euler Newton group while holding other equations fixed.
   !> \param[in] group_equations Indices of the conservative equations in this group.
   !> \param[in,out] qj Local conservative state; only group equations are updated.
-  !> \param[in] qj_old Conservative reference state at the start of the step.
-  !> \param[in] dt_step Stage time increment [s].
+  !> \param[in] q_group_input Conservative reference state at the start of the step.
+  !> \param[in] dt_step Full Lie group time interval [s].
   !> \param[in] Bprimej_x Filtered bed slope in x [dimensionless].
   !> \param[in] Bprimej_y Filtered bed slope in y [dimensionless].
   !> \param[in] Zij Local stochastic-process value supplied to the rheology.
@@ -275,7 +275,7 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
   !> \param[out] linear_info Linear solver status; zero denotes success.
   !> \param[out] line_search_failed True if backtracking cannot accept a step.
   SUBROUTINE solve_newton_group(source_group,group_equations,   &
-       qj,qj_old,dt_step,Bprimej_x,Bprimej_y,Zij,coeff_f, &
+       qj,q_group_input,dt_step,Bprimej_x,Bprimej_y,Zij,coeff_f, &
        tol_abs_local,                                                         &
        tol_rel_local, iterations_used, converged, linear_info,               &
        line_search_failed)
@@ -287,7 +287,7 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
     TYPE(source_group_type), INTENT(IN) :: source_group
     INTEGER, INTENT(IN) :: group_equations(:)
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
-    REAL(wp), INTENT(IN) :: qj_old(n_vars), dt_step
+    REAL(wp), INTENT(IN) :: q_group_input(n_vars), dt_step
     REAL(wp), INTENT(IN) :: Bprimej_x, Bprimej_y, Zij
     REAL(wp), INTENT(IN) :: coeff_f(n_eqns), tol_abs_local, tol_rel_local
     INTEGER, INTENT(INOUT) :: iterations_used
@@ -316,7 +316,7 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
 
     DO nl_iter = 1, max_nl_iter
        iterations_used = iterations_used + 1
-       CALL eval_f(qj, qj_old, dt_step, coeff_f,       &
+       CALL eval_f(qj, q_group_input, dt_step, coeff_f,       &
             Bprimej_x, Bprimej_y, right_term, scal_f, Zij, group_equations, &
             source_group)
 
@@ -360,7 +360,7 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
 
        IF (nl_iter .GT. 1) THEN
           stpmax = STPMX * MAX(NORM2(qj_rel),REAL(SIZE(qj_rel),wp))
-          CALL lnsrch(qj_rel_old, qj_org, qj, qj_old, scal_f_old, grad_f,   &
+          CALL lnsrch(qj_rel_old, qj_org, qj, q_group_input, scal_f_old, grad_f,   &
                desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax,      &
                check, dt_step, Bprimej_x, Bprimej_y,  &
                Zij, group_equations,source_group)
@@ -375,7 +375,7 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
              qj_trial(group_equations(i)) =                                &
                   qj_rel(group_equations(i))*qj_org(group_equations(i))
           END DO
-          CALL eval_f(qj_trial, qj_old, dt_step, coeff_f,           &
+          CALL eval_f(qj_trial, q_group_input, dt_step, coeff_f,           &
 Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
                group_equations,source_group)
        END IF
@@ -626,19 +626,19 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
   !>
   !> \param[in] qj_rel_NR_old Normalized state at the start of the current line search.
   !> \param[in] qj_org Per-variable scaling factors for normalized Newton variables.
-  !> \param[in] qj_old Cell conservative reference state used in the implicit-stage residual.
+  !> \param[in] q_group_input Conservative input state for the backward-Euler group residual.
   !> \param[in] qj_fixed Non-group conservative components held bitwise fixed during the line search.
   !> \param[in] scal_f_old Initial value of the half-squared scaled residual norm.
   !> \param[in] grad_f Gradient of the scalar residual merit function at the starting point.
   !> \param[in,out] desc_dir Newton descent direction, limited to the maximum permitted step length.
-  !> \param[in] coeff_f Per-equation scaling factors applied to the stage residual.
+  !> \param[in] coeff_f Per-equation scaling factors applied to the group residual.
   !> \param[out] qj_rel Dimensionless normalized conservative state, qj=qj_rel*qj_org.
   !> \param[out] scal_f Half the squared Euclidean norm of the scaled nonlinear residual.
   !> \param[in,out] right_term Initial residual on entry; residual of the accepted line-search state
   !>                           on exit.
   !> \param[in] stpmax Maximum Euclidean length of the normalized trial step.
   !> \param[out] check True when the line search cannot find a usable decrease.
-  !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
+  !> \param[in] dt_step Full Lie group timestep [s].
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
@@ -646,7 +646,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
   !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
     !******************************************************************************
 
-  SUBROUTINE lnsrch( qj_rel_NR_old, qj_org, qj_fixed, qj_old, scal_f_old,      &
+  SUBROUTINE lnsrch( qj_rel_NR_old, qj_org, qj_fixed, q_group_input, scal_f_old,      &
        grad_f, desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax, check,  &
        dt_step  , Bprimej_x , Bprimej_y, Zij,           &
        active_equations,source_group )
@@ -663,7 +663,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
     REAL(wp), INTENT(IN) :: qj_fixed(n_vars)
 
     !> Initial point
-    REAL(wp), DIMENSION(:), INTENT(IN) :: qj_old
+    REAL(wp), DIMENSION(:), INTENT(IN) :: q_group_input
 
     !> Gradient at xold
     REAL(wp), DIMENSION(:), INTENT(IN) :: grad_f
@@ -775,7 +775,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
           qj(equation) = qj_rel(equation)*qj_org(equation)
        END DO
 
-       CALL eval_f( qj , qj_old , dt_step  , coeff_f ,             &
+       CALL eval_f( qj , q_group_input , dt_step  , coeff_f ,             &
 Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
             active_equations,source_group )
 
@@ -870,7 +870,7 @@ Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
   END SUBROUTINE lnsrch
 
   !******************************************************************************
-  !> \brief Evaluate the scaled implicit-stage residual and its scalar merit function.
+  !> \brief Evaluate the scaled backward-Euler group residual and its scalar merit function.
   !
   !> This subroutine evaluate the value of the nonlinear system in the state
   !> defined by the variables qj.
@@ -879,19 +879,19 @@ Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
   !> Mattia de' Michieli Vitturi
   !>
   !> \param[in] qj Local conservative state vector; mass and momenta are per unit horizontal area.
-  !> \param[in] qj_old Cell conservative reference state used in the implicit-stage residual.
-  !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
-  !> \param[in] coeff_f Per-equation scaling factors applied to the stage residual.
+  !> \param[in] q_group_input Conservative input state for the backward-Euler group residual.
+  !> \param[in] dt_step Full Lie group timestep [s].
+  !> \param[in] coeff_f Per-equation scaling factors applied to the group residual.
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
-  !> \param[out] f_nl Scaled nonlinear stage residual, one entry per equation.
+  !> \param[out] f_nl Scaled nonlinear group residual, one entry per equation.
   !> \param[out] scal_f Half the squared Euclidean norm of the scaled nonlinear residual.
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
   !> \param[in] active_equations Equation indices whose residual rows and Jacobian columns are active.
   !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
     !******************************************************************************
 
-  SUBROUTINE eval_f( qj , qj_old , dt_step , coeff_f ,    &
+  SUBROUTINE eval_f( qj , q_group_input , dt_step , coeff_f ,    &
        Bprimej_x ,                                                              &
        Bprimej_y , f_nl , scal_f, Zij, active_equations,source_group )
 
@@ -900,7 +900,7 @@ Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
     IMPLICIT NONE
 
     REAL(wp), INTENT(IN) :: qj(n_vars)
-    REAL(wp), INTENT(IN) :: qj_old(n_vars)
+    REAL(wp), INTENT(IN) :: q_group_input(n_vars)
     REAL(wp), INTENT(IN) :: dt_step
     REAL(wp), INTENT(IN) :: coeff_f(n_eqns)
     REAL(wp), INTENT(IN) :: Bprimej_x
@@ -926,7 +926,7 @@ Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
 
     Rj = -nh_term_impl
 
-    delta_q = qj - qj_old
+    delta_q = qj - q_group_input
     f_nl = delta_q + dt_step * Rj
     f_nl = coeff_f * f_nl
     WHERE (.NOT. equation_is_active(active_equations))
@@ -940,7 +940,7 @@ Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
   END SUBROUTINE eval_f
 
   !******************************************************************************
-  !> \brief Build the scaled implicit-stage Jacobian using complex-step differentiation.
+  !> \brief Build the scaled backward-Euler group Jacobian using complex-step differentiation.
   !
   !> This subroutine evaluate the jacobian of the non-linear system
   !> with respect to the conservative variables.
@@ -952,8 +952,8 @@ Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
   !>
   !> \param[in] qj_rel Dimensionless normalized conservative state, qj=qj_rel*qj_org.
   !> \param[in] qj_org Per-variable scaling factors for normalized Newton variables.
-  !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
-  !> \param[in] coeff_f Per-equation scaling factors applied to the stage residual.
+  !> \param[in] dt_step Full Lie group timestep [s].
+  !> \param[in] coeff_f Per-equation scaling factors applied to the group residual.
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[out] left_matrix Jacobian of the scaled residual with respect to the normalized state.

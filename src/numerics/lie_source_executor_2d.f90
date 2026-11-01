@@ -40,7 +40,6 @@ CONTAINS
     USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
     USE state_conversion_2d, ONLY : qc_to_qp
     USE state_2d, ONLY : initialize_dry_physical_cell
-    USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
     USE parameters_2d, ONLY : topo_change_flag,bottom_radial_source_flag, &
          bottom_fissural_source_flag
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
@@ -127,6 +126,14 @@ CONTAINS
                 END IF
              END IF
              total_rate=physical_rate+exchange_rate
+             IF (.NOT.ALL(ieee_is_finite(total_rate))) &
+                  CALL fatal_error('D19: non-finite explicit source rate')
+             IF (with_exchange) THEN
+                IF (.NOT.ALL(ieee_is_finite(transfers%solid_deposition_rate)) .OR. &
+                     .NOT.ALL(ieee_is_finite(transfers%solid_erosion_rate)) .OR. &
+                     .NOT.ieee_is_finite(transfers%dB_dt)) &
+                     CALL fatal_error('D19: non-finite coupled mass-exchange transfer')
+             END IF
              ! One common limiter scales the coupled fluid + substrate transaction.
              ! It never touches the previously committed spatial FV rate.
              factor=1.0_wp

@@ -54,7 +54,7 @@ Use statuses `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Add date, commit and test
 | L00 | Baseline: record build/CI result and search all callers/namelists/restarts/tests for RK, STAGE, STEP and CADENCE | TODO | Static inventory above is not a complete call-graph/test audit. |
 | L01 | Single method-capable source-group registry and validation, including always-explicit GROUP 0 | IN_PROGRESS | Single Lie registry implemented; final validation pending. |
 | L02 | Remove CADENCE from catalog, source configuration, source input and I/O | IN_PROGRESS | Production configuration and input moved away from STAGE/STEP; examples and tests pending. |
-| L03 | Implement RK-independent group-local backward-Euler Newton API and analytic dispatcher | IN_PROGRESS | RK adapters removed from Newton core; residual and Jacobian review pending. |
+| L03 | Implement RK-independent group-local backward-Euler Newton API and analytic dispatcher | IN_PROGRESS | Renamed internal group/input-state symbols and removed misleading stage/DIRK documentation; numerical coupling review pending. |
 | L04 | Generic explicit/NEWTON/ANALYTIC source-group executor | IN_PROGRESS | Lie source executor in place; shared rate-limiter and coupled inventory verification pending. |
 | L05 | Lie time driver with GROUP-0 spatial update, source rates evaluated on `q_n`, source-rate limits applied to `q_sp`, then GROUP 1+ | IN_PROGRESS | Lie spatial-first driver in place, GROUP 0 rates evaluated from original state; spatial and group state reject non-finite values; final acceptance pending. |
 | L06 | Simplify production timestep, observers, diagnostics and stochastic/source-window plumbing | IN_PROGRESS | Production timestep now calls single driver; event/test cleanup pending. |
@@ -83,6 +83,7 @@ Do not claim that first-order Lie is unconditionally stable or well-balanced for
 
 | Date | Change | Commit | Checks executed | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-11-01 | Removed remaining stage-group terminology from the cell-local Newton solver, clarified Lie-group input-state naming and checked explicit rates/transfers for non-finite values before committing inventory updates. | Pending commit | Static inspection only; no compilation/tests | Additional coupled-source and rollback review required. |
 | 2026-11-01 | Strengthened spatial and source-group admissibility: reject infinities as well as NaNs; enforce solid-mass <= mixture-mass after every completed source-group cell update. | Pending commit | Static review only; no compilation/tests (migration policy) | No post-update clipping; all failures are explicit. |
 | 2026-11-01 | Large in-place migration: replaced RK tableau with Lie driver, removed STAGE/STEP catalog and registry, removed N_RK from primary input, routed sources through group executor, removed RK Newton wrappers. | 5dfa59b3, a47087c1, b7ca9c28, bad22a6d, 8f757be7, 67edbf78, 9ce49244 | Deliberately not run | Major integration and physics-consistency work remains. |
 | 2026-11-01 | Replaced transitional Lie configuration bridge with a direct METHOD/GROUP builder; spatial GROUP 0 remains mandatory and explicit. | 46ba9be3 | Not run | Production remains on the legacy integrator; further validation of defaults and collision rules required. |
