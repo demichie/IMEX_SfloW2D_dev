@@ -1,6 +1,6 @@
 !********************************************************************************
 !> \brief Physical-source scheduling input.
-!> \details Physical METHOD, CADENCE and GROUP are specified in the owning
+!> \details Physical METHOD and GROUP are specified in the owning
 !>          namelists; SOURCE_GROUPS is no longer accepted.
 !********************************************************************************
 MODULE source_input_2d
@@ -13,19 +13,19 @@ MODULE source_input_2d
   IMPLICIT NONE
   PRIVATE
   ! D18: physical-source scheduling preferences, absent unless specified.
-  CHARACTER(LEN=16), PUBLIC :: rheology_method=''=''
-  CHARACTER(LEN=16), PUBLIC :: thermal_method=''=''
-  CHARACTER(LEN=16), PUBLIC :: pore_pressure_method=''=''
+  CHARACTER(LEN=16), PUBLIC :: rheology_method=''
+  CHARACTER(LEN=16), PUBLIC :: thermal_method=''
+  CHARACTER(LEN=16), PUBLIC :: pore_pressure_method=''
   INTEGER, PUBLIC :: rheology_group=1, thermal_group=2, pore_pressure_group=3
-  CHARACTER(LEN=16), PUBLIC :: bottom_circular_method=''=''
+  CHARACTER(LEN=16), PUBLIC :: bottom_circular_method=''
   INTEGER, PUBLIC :: bottom_circular_group=0
-  CHARACTER(LEN=16), PUBLIC :: bottom_fissural_method=''=''
+  CHARACTER(LEN=16), PUBLIC :: bottom_fissural_method=''
   INTEGER, PUBLIC :: bottom_fissural_group=0
-  CHARACTER(LEN=16), PUBLIC :: radial_injection_method=''=''
+  CHARACTER(LEN=16), PUBLIC :: radial_injection_method=''
   INTEGER, PUBLIC :: radial_injection_group=0
-  CHARACTER(LEN=16), PUBLIC :: geometry_curvature_method=''=''
+  CHARACTER(LEN=16), PUBLIC :: geometry_curvature_method=''
   INTEGER, PUBLIC :: geometry_curvature_group=0
-  CHARACTER(LEN=16), PUBLIC :: boundary_injection_method=''=''
+  CHARACTER(LEN=16), PUBLIC :: boundary_injection_method=''
   INTEGER, PUBLIC :: boundary_injection_group=0
   CHARACTER(LEN=16), PUBLIC :: mass_exchange_method='EXPLICIT'
   INTEGER, PUBLIC :: mass_exchange_group=4
@@ -61,7 +61,7 @@ CONTAINS
        line=uppercase_source_text(ADJUSTL(line))
        IF (INDEX(line,'&SOURCE_GROUPS')==1 .OR. &
            INDEX(line,'$SOURCE_GROUPS')==1) THEN
-          error='SOURCE_GROUPS is removed; use physical METHOD, CADENCE, GROUP'
+          error='SOURCE_GROUPS is removed; use physical METHOD and GROUP'
           RETURN
        END IF
        IF (INDEX(line,'&MASS_EXCHANGE_PARAMETERS')==1 .OR. &
