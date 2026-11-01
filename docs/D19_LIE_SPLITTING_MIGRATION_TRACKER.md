@@ -131,3 +131,9 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Per i gruppi successivi ANALYTIC usa il proprio stato di ingresso `q_group`. Il salto di aggiornamento non viene pubblicato prima della validazione dell'intero gruppo.
 - L'audit statico delle vecchie API `begin_lie_geometry_transaction`, `rollback_lie_geometry_transaction`, `release_topography_workspace` e `project_lie_bed_rate` non trova chiamanti Fortran di produzione residui; rimane una menzione documentale storica.
 - Non attribuire lo stato «validato» all'architettura finche non siano stati eseguiti compilazione e test di integrazione nella fase conclusiva.
+
+### Eliminazione dell'equation partition legacy (2026-11-01)
+
+- Rimosso da `simulation_context_type` il campo `equation_partition_type`, che non esiste piu nella sorgente.
+- La chiamata `initialize_configured_sources` riceve ora soltanto registro e stringa d'errore, coerentemente con la sua interfaccia in `source_configuration_2d`.
+- Le partizioni dei gradi di liberta impliciti sono definite dai metadati dei gruppi sorgente e non da una partizione globale parallela.

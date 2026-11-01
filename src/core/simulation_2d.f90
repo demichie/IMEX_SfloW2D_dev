@@ -4,7 +4,7 @@
 !> This module owns the state, runtime data and numerical workspaces that form
 !> one simulation and coordinates their lifecycle.
 !>
-!> Owns state, runtime, domain, layout, equation partition, source registry and numerical workspaces. Initialization
+!> Owns state, runtime, domain, layout, source registry and numerical workspaces. Initialization
 !> follows their dependency order; finalization releases their storage.
 !********************************************************************************
 
@@ -68,7 +68,6 @@ MODULE simulation_2d
      TYPE(runtime_state_type) :: runtime
      TYPE(model_layout_type) :: model_layout
      TYPE(source_registry_type) :: source_registry !< Ordered method-capable Lie source groups.
-     TYPE(equation_partition_type) :: equation_partition
      TYPE(state_type) :: state
      TYPE(domain_type) :: domain
      TYPE(spatial_operator_type) :: spatial_operator
@@ -104,8 +103,7 @@ CONTAINS
     CALL this%model_layout%initialize( n_layers, n_vars, n_eqns, n_solid,   &
          n_add_gas, n_stoch_vars, n_pore_vars )
 
-    CALL initialize_configured_sources(this%source_registry, &
-         this%equation_partition,source_error)
+    CALL initialize_configured_sources(this%source_registry,source_error)
     IF (LEN_TRIM(source_error)>0) CALL fatal_error(TRIM(source_error))
 
     CALL this%state%initialize( this%model_layout )
