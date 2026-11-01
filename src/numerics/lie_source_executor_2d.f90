@@ -29,7 +29,7 @@ CONTAINS
        stochastic_values,step_start_time,q_original,qp_original,step_failed,failure_message)
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
          B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
-         project_cell_field_to_vertices,assign_lie_bed,B_vertex, &
+         project_cell_field_to_vertices,assign_topography_vertices,B_vertex, &
          deposit,erosion,erodible,lava_deposit,comp_interfaces_x,comp_interfaces_y
     USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, &
          eval_source_analytic,cell_analytic_source_context, &
@@ -266,7 +266,7 @@ CONTAINS
           ! A rejected geometric refresh therefore leaves both inventories
           ! and the conserved/primitive group state unmodified.
           IF (topo_change_flag) THEN
-             CALL assign_lie_bed(bed_candidate,bed_accepted)
+             CALL assign_topography_vertices(bed_candidate,bed_accepted)
              IF (.NOT.bed_accepted) THEN
                 CALL reject_cell('D19: invalid refreshed geometry')
                 IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)

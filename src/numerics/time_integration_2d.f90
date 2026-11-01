@@ -2,8 +2,8 @@
 MODULE time_integration_2d
   USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_totMassEqn
   USE geometry_2d, ONLY : comp_cells_x,comp_cells_y, &
-       begin_lie_geometry_transaction,commit_lie_geometry_transaction, &
-       rollback_lie_geometry_transaction,deposit,erosion,erodible,lava_deposit
+       begin_geometry_transaction,commit_geometry_transaction, &
+       rollback_geometry_transaction,deposit,erosion,erodible,lava_deposit
   USE state_conversion_2d, ONLY : qc_to_qp
   USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible
   USE diagnostics_2d, ONLY : fatal_error
@@ -96,7 +96,7 @@ CONTAINS
     erosion_before=erosion
     erodible_before=erodible
     lava_before=lava_deposit
-    CALL begin_lie_geometry_transaction
+    CALL begin_geometry_transaction
     CALL execute_lie_source_groups(this%q_trial,this%qp_trial,dt,domain, &
          source_registry,Z,t,this%q_before,this%qp_before,source_step_failed,source_failure)
     IF (source_step_failed) THEN
@@ -104,13 +104,13 @@ CONTAINS
       erosion=erosion_before
       erodible=erodible_before
       lava_deposit=lava_before
-      CALL rollback_lie_geometry_transaction
+      CALL rollback_geometry_transaction
       CALL fatal_error('Lie timestep rolled back: '//TRIM(source_failure))
     END IF
     ! Publish the accepted fluid fields only after all Lie source groups return.
     ! The integrator owns evolving inventories; geometry owns only bed caches.
     q=this%q_trial
     qp=this%qp_trial
-    CALL commit_lie_geometry_transaction
+    CALL commit_geometry_transaction
   END SUBROUTINE
 END MODULE time_integration_2d

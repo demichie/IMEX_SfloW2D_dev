@@ -20,13 +20,13 @@ MODULE geometry_2d
   PRIVATE :: reconstruct_short_1d_line
   PRIVATE :: copy_derivative_halo_x, copy_derivative_halo_y
 
-  PUBLIC :: begin_lie_geometry_transaction, commit_lie_geometry_transaction
-  PUBLIC :: rollback_lie_geometry_transaction
-  PUBLIC :: project_cell_field_to_vertices,assign_lie_bed
+  PUBLIC :: begin_geometry_transaction, commit_geometry_transaction
+  PUBLIC :: rollback_geometry_transaction
+  PUBLIC :: project_cell_field_to_vertices,assign_topography_vertices
 
   ! Saved authoritative fields for a recoverable Lie step. Derived geometry is
   ! reconstructed on rollback, so later groups still see intermediate bed updates.
-  LOGICAL, PRIVATE :: lie_geometry_transaction_active=.FALSE.
+  LOGICAL, PRIVATE :: geometry_transaction_active=.FALSE.
   REAL(wp), ALLOCATABLE, PRIVATE :: lie_bed_before(:,:)
   REAL(wp), ALLOCATABLE, PRIVATE :: lie_cent_before(:,:),lie_face_x_before(:,:),lie_face_y_before(:,:)
   REAL(wp), ALLOCATABLE, PRIVATE :: lie_slope_x_before(:,:),lie_slope_y_before(:,:)
@@ -481,12 +481,12 @@ CONTAINS
   !>       slopes/curvatures and centre/face gravity coefficients.
   !******************************************************************************
 
-  !> Save authoritative geometry and substrate inventories before Lie groups.
-  SUBROUTINE begin_lie_geometry_transaction
-    IF (lie_geometry_transaction_active) &
-         ERROR STOP 'nested Lie geometry transaction'
+  !> Snapshot authoritative topography and derived geometry before a transaction.
+  SUBROUTINE begin_geometry_transaction
+    IF (geometry_transaction_active) &
+         ERROR STOP 'nested geometry transaction'
     IF (.NOT.ALLOCATED(B_vertex)) &
-         ERROR STOP 'Lie geometry transaction started before initialization'
+         ERROR STOP 'geometry transaction started before initialization'
     lie_bed_before=B_vertex
     lie_cent_before=B_cent
     lie_face_x_before=B_face_x
@@ -499,19 +499,19 @@ CONTAINS
     lie_gravity_before=grav_coeff
     lie_gravity_x_before=grav_coeff_stag_x
     lie_gravity_y_before=grav_coeff_stag_y
-    lie_geometry_transaction_active=.TRUE.
-  END SUBROUTINE begin_lie_geometry_transaction
+    geometry_transaction_active=.TRUE.
+  END SUBROUTINE begin_geometry_transaction
 
-  !> Accept all intermediate geometry and inventory updates of the Lie step.
-  SUBROUTINE commit_lie_geometry_transaction
-    IF (.NOT.lie_geometry_transaction_active) &
-         ERROR STOP 'no Lie geometry transaction to commit'
-    CALL clear_lie_geometry_transaction
-  END SUBROUTINE commit_lie_geometry_transaction
+  !> Accept geometric changes and discard the pre-transaction snapshot.
+  SUBROUTINE commit_geometry_transaction
+    IF (.NOT.geometry_transaction_active) &
+         ERROR STOP 'no geometry transaction to commit'
+    CALL clear_geometry_transaction
+  END SUBROUTINE commit_geometry_transaction
 
-  !> Restore only the pre-step bed and derived geometry on rejection.
-  SUBROUTINE rollback_lie_geometry_transaction
-    IF (.NOT.lie_geometry_transaction_active) RETURN
+  !> Restore the original bed and derived geometric fields on rejection.
+  SUBROUTINE rollback_geometry_transaction
+    IF (.NOT.geometry_transaction_active) RETURN
     B_vertex=lie_bed_before
     ! Restore the exact pre-step caches: reconstruction itself may have failed.
     B_cent=lie_cent_before
@@ -525,10 +525,10 @@ CONTAINS
     grav_coeff=lie_gravity_before
     grav_coeff_stag_x=lie_gravity_x_before
     grav_coeff_stag_y=lie_gravity_y_before
-    CALL clear_lie_geometry_transaction
-  END SUBROUTINE rollback_lie_geometry_transaction
+    CALL clear_geometry_transaction
+  END SUBROUTINE rollback_geometry_transaction
 
-  SUBROUTINE clear_lie_geometry_transaction
+  SUBROUTINE clear_geometry_transaction
     IF (ALLOCATED(lie_bed_before)) DEALLOCATE(lie_bed_before)
     IF (ALLOCATED(lie_cent_before)) DEALLOCATE(lie_cent_before)
     IF (ALLOCATED(lie_face_x_before)) DEALLOCATE(lie_face_x_before)
@@ -541,8 +541,8 @@ CONTAINS
     IF (ALLOCATED(lie_gravity_before)) DEALLOCATE(lie_gravity_before)
     IF (ALLOCATED(lie_gravity_x_before)) DEALLOCATE(lie_gravity_x_before)
     IF (ALLOCATED(lie_gravity_y_before)) DEALLOCATE(lie_gravity_y_before)
-    lie_geometry_transaction_active=.FALSE.
-  END SUBROUTINE clear_lie_geometry_transaction
+    geometry_transaction_active=.FALSE.
+  END SUBROUTINE clear_geometry_transaction
 
   !> Validate every geometry field used by subsequent Lie groups.
   LOGICAL FUNCTION topography_geometry_is_finite()
@@ -579,7 +579,7 @@ CONTAINS
   !>          initializes all cells, including inactive and dry cells, to zero.
   !******************************************************************************
   !> Assign an already time-integrated bed and refresh its derived geometry.
-  SUBROUTINE assign_lie_bed(bed_candidate,accepted)
+  SUBROUTINE assign_topography_vertices(bed_candidate,accepted)
     REAL(wp), INTENT(IN) :: bed_candidate(:,:)
     LOGICAL, INTENT(OUT) :: accepted
     REAL(wp), ALLOCATABLE :: old_bed(:,:),old_cent(:,:),old_face_x(:,:),old_face_y(:,:)
@@ -621,7 +621,7 @@ CONTAINS
     grav_coeff=old_gravity
     grav_coeff_stag_x=old_gravity_x
     grav_coeff_stag_y=old_gravity_y
-  END SUBROUTINE assign_lie_bed
+  END SUBROUTINE assign_topography_vertices
 
   !******************************************************************************
   !> \brief Release the geometry-owned topography update workspace.
