@@ -34,6 +34,11 @@ MODULE geometry_2d
   REAL(wp), ALLOCATABLE, PRIVATE :: lie_erosion_before(:,:,:)
   REAL(wp), ALLOCATABLE, PRIVATE :: lie_erodible_before(:,:,:)
   REAL(wp), ALLOCATABLE, PRIVATE :: lie_lava_before(:,:)
+  REAL(wp), ALLOCATABLE, PRIVATE :: lie_cent_before(:,:),lie_face_x_before(:,:),lie_face_y_before(:,:)
+  REAL(wp), ALLOCATABLE, PRIVATE :: lie_slope_x_before(:,:),lie_slope_y_before(:,:)
+  REAL(wp), ALLOCATABLE, PRIVATE :: lie_curvature_xx_before(:,:),lie_curvature_yy_before(:,:)
+  REAL(wp), ALLOCATABLE, PRIVATE :: lie_curvature_xy_before(:,:)
+  REAL(wp), ALLOCATABLE, PRIVATE :: lie_gravity_before(:,:),lie_gravity_x_before(:,:),lie_gravity_y_before(:,:)
 
   !> Location of the centers (x) of the control volume of the domain
   REAL(wp), ALLOCATABLE :: x_comp(:)
@@ -497,6 +502,17 @@ CONTAINS
     lie_erosion_before=erosion
     lie_erodible_before=erodible
     lie_lava_before=lava_deposit
+    lie_cent_before=B_cent
+    lie_face_x_before=B_face_x
+    lie_face_y_before=B_face_y
+    lie_slope_x_before=B_prime_x_geom
+    lie_slope_y_before=B_prime_y_geom
+    lie_curvature_xx_before=B_second_xx_geom
+    lie_curvature_yy_before=B_second_yy_geom
+    lie_curvature_xy_before=B_second_xy_geom
+    lie_gravity_before=grav_coeff
+    lie_gravity_x_before=grav_coeff_stag_x
+    lie_gravity_y_before=grav_coeff_stag_y
     lie_geometry_transaction_active=.TRUE.
   END SUBROUTINE begin_lie_geometry_transaction
 
@@ -515,7 +531,18 @@ CONTAINS
     erosion=lie_erosion_before
     erodible=lie_erodible_before
     lava_deposit=lie_lava_before
-    CALL refresh_topography_geometry
+    ! Restore the exact pre-step caches: reconstruction itself may have failed.
+    B_cent=lie_cent_before
+    B_face_x=lie_face_x_before
+    B_face_y=lie_face_y_before
+    B_prime_x_geom=lie_slope_x_before
+    B_prime_y_geom=lie_slope_y_before
+    B_second_xx_geom=lie_curvature_xx_before
+    B_second_yy_geom=lie_curvature_yy_before
+    B_second_xy_geom=lie_curvature_xy_before
+    grav_coeff=lie_gravity_before
+    grav_coeff_stag_x=lie_gravity_x_before
+    grav_coeff_stag_y=lie_gravity_y_before
     CALL clear_lie_geometry_transaction
   END SUBROUTINE rollback_lie_geometry_transaction
 
@@ -525,6 +552,17 @@ CONTAINS
     IF (ALLOCATED(lie_erosion_before)) DEALLOCATE(lie_erosion_before)
     IF (ALLOCATED(lie_erodible_before)) DEALLOCATE(lie_erodible_before)
     IF (ALLOCATED(lie_lava_before)) DEALLOCATE(lie_lava_before)
+    IF (ALLOCATED(lie_cent_before)) DEALLOCATE(lie_cent_before)
+    IF (ALLOCATED(lie_face_x_before)) DEALLOCATE(lie_face_x_before)
+    IF (ALLOCATED(lie_face_y_before)) DEALLOCATE(lie_face_y_before)
+    IF (ALLOCATED(lie_slope_x_before)) DEALLOCATE(lie_slope_x_before)
+    IF (ALLOCATED(lie_slope_y_before)) DEALLOCATE(lie_slope_y_before)
+    IF (ALLOCATED(lie_curvature_xx_before)) DEALLOCATE(lie_curvature_xx_before)
+    IF (ALLOCATED(lie_curvature_yy_before)) DEALLOCATE(lie_curvature_yy_before)
+    IF (ALLOCATED(lie_curvature_xy_before)) DEALLOCATE(lie_curvature_xy_before)
+    IF (ALLOCATED(lie_gravity_before)) DEALLOCATE(lie_gravity_before)
+    IF (ALLOCATED(lie_gravity_x_before)) DEALLOCATE(lie_gravity_x_before)
+    IF (ALLOCATED(lie_gravity_y_before)) DEALLOCATE(lie_gravity_y_before)
     lie_geometry_transaction_active=.FALSE.
   END SUBROUTINE clear_lie_geometry_transaction
 
