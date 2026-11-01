@@ -83,6 +83,7 @@ Do not claim that first-order Lie is unconditionally stable or well-balanced for
 
 | Date | Change | Commit | Checks executed | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-11-01 | Reject negative transported additional-gas masses before primitive conversion in spatial and source candidate states; source-side failures use rollback. | Pending commit | Static only; no build/tests | Other physical conversion failures can still terminate internally; no blanket claim of full recoverability. |
 | 2026-11-01 | Made candidate nodal-bed update return recoverable rejection to Lie executor and step rollback, preserving existing fatal API for callers without status. | Pending commit | Static review only; no build/tests | Geometry reconstruction and primitive conversion can still fatal-stop internally; full recovery requires status-aware lower-level APIs. |
 | 2026-11-01 | Route explicit Lie cell validation failures through the same step_failed return path as Newton/analytic failures; the caller rolls back the authoritative bed and substrate snapshot. | Pending commit | Static only; no build/tests | Configuration errors and internal conversion ERROR STOP remain fatal. Automatic retry is not implemented. |
 | 2026-11-01 | Propagate analytic/NEWTON group failure to Lie driver; rollback geometry and substrate snapshot before fatal rejection, without publishing q/qp trial fields. | Pending commit | Static review only; no tests or build | Not yet universal: fatal validators still stop directly and automatic retry is not implemented. |

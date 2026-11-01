@@ -27,7 +27,7 @@ CONTAINS
   !> state, but cap and apply the combined source increment to the post-FV state.
   SUBROUTINE execute_lie_source_groups(q,qp,time_step,domain,source_registry, &
        stochastic_values,step_start_time,q_original,qp_original,step_failed)
-    USE parameters_2d, ONLY : erodible_deposit_flag
+    USE parameters_2d, ONLY : erodible_deposit_flag,idx_add_gas_first,idx_add_gas_last
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,cell_source_fractions, &
          begin_topography_rate_update,record_topography_rate_cell, &
          apply_topography_rate_update,deposit,erosion,erodible,B_zone,lava_deposit
@@ -191,6 +191,10 @@ CONTAINS
                   ANY(q_candidate(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) &
                   CALL reject_cell('D19: negative mass in group candidate')
                   IF (step_failed) EXIT cell_loop
+             IF (ANY(q_candidate(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) THEN
+                CALL reject_cell('D19: negative additional-gas mass in candidate')
+                EXIT cell_loop
+             END IF
              IF (SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))> &
                   q_candidate(idx_totMassEqn)) &
                   CALL reject_cell('D19: group candidate solids exceed total mass')
@@ -264,6 +268,10 @@ CONTAINS
           IF (ANY(q(idx_solidEqn_first:idx_solidEqn_last,j,k)<0.0_wp)) &
                CALL reject_cell('D19: negative solid mass')
                IF (step_failed) EXIT cell_loop
+          IF (ANY(q(idx_add_gas_first:idx_add_gas_last,j,k)<0.0_wp)) THEN
+             CALL reject_cell('D19: negative additional-gas mass after group')
+             EXIT cell_loop
+          END IF
           IF (SUM(q(idx_solidEqn_first:idx_solidEqn_last,j,k))> &
                q(idx_totMassEqn,j,k)) &
                CALL reject_cell('D19: source group solids exceed mixture mass')

@@ -1,7 +1,7 @@
 ! First-order Lie integration. GROUP 0: spatial update first; physical rates from q^n.
 MODULE time_integration_2d
   USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_solidEqn_first,idx_solidEqn_last, &
-       idx_totMassEqn
+       idx_totMassEqn,idx_add_gas_first,idx_add_gas_last
   USE geometry_2d, ONLY : comp_cells_x,comp_cells_y, &
        begin_lie_geometry_transaction,commit_lie_geometry_transaction, &
        rollback_lie_geometry_transaction
@@ -81,6 +81,8 @@ CONTAINS
            CALL fatal_error('Lie spatial update: negative mass')
       IF (ANY(this%q_trial(idx_solidEqn_first:idx_solidEqn_last,j,k)<0.0_wp)) &
            CALL fatal_error('Lie spatial update: negative solid mass')
+      IF (ANY(this%q_trial(idx_add_gas_first:idx_add_gas_last,j,k)<0.0_wp)) &
+           CALL fatal_error('Lie spatial update: negative additional gas mass')
       IF (SUM(this%q_trial(idx_solidEqn_first:idx_solidEqn_last,j,k))> &
            this%q_trial(idx_totMassEqn,j,k)) &
            CALL fatal_error('Lie spatial update: solids exceed total mass')
