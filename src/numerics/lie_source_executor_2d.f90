@@ -59,6 +59,8 @@ CONTAINS
     REAL(wp) :: qpentry(n_vars+2),q_candidate(n_vars),qp_candidate(n_vars+2)
     REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
     REAL(wp) :: erodible_candidate(n_solid),lava_candidate
+    REAL(wp), ALLOCATABLE :: staged_deposit(:,:),staged_erosion(:,:), &
+         staged_erodible(:,:),staged_lava(:),staged_bed_rate(:)
     REAL(wp) :: total_rate(n_eqns)
     REAL(wp) :: analytic_rate(n_eqns),pressure,source_time,noise
     LOGICAL :: with_exchange,ok,failed,bed_accepted,conversion_ok
@@ -81,7 +83,15 @@ CONTAINS
     DO group_index=1,SIZE(groups)
        with_exchange=ANY(INDEX(groups(group_index)%source_names,'mass_exchange_')==1)
        IF (SIZE(groups(group_index)%source_names)==0) CYCLE
-       IF (with_exchange .AND. topo_change_flag) CALL begin_topography_rate_update
+       IF (with_exchange) THEN
+          IF (groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) &
+               CALL fatal_error('D19: mass exchange requires explicit group method')
+          ALLOCATE(staged_deposit(n_solid,domain%solve_cells), &
+               staged_erosion(n_solid,domain%solve_cells), &
+               staged_erodible(n_solid,domain%solve_cells), &
+               staged_lava(domain%solve_cells),staged_bed_rate(domain%solve_cells))
+          IF (topo_change_flag) CALL begin_topography_rate_update
+       END IF
 
        cell_loop: DO cell=1,domain%solve_cells
           j=domain%j_cent(cell)
@@ -168,12 +178,11 @@ CONTAINS
              q(:,j,k)=q_candidate
              qp(:,j,k)=qp_candidate
              IF (with_exchange) THEN
-                deposit(j,k,1:n_solid)=deposit_candidate
-                erosion(j,k,1:n_solid)=erosion_candidate
-                erodible(1:n_solid,j,k)=erodible_candidate
-                lava_deposit(j,k)=lava_candidate
-                IF (topo_change_flag) CALL record_topography_rate_cell(j,k, &
-                     transfers%dB_dt)
+                staged_deposit(:,cell)=deposit_candidate
+                staged_erosion(:,cell)=erosion_candidate
+                staged_erodible(:,cell)=erodible_candidate
+                staged_lava(cell)=lava_candidate
+                staged_bed_rate(cell)=transfers%dB_dt
              END IF
           CASE(SOURCE_METHOD_ANALYTIC)
              IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
@@ -223,6 +232,21 @@ CONTAINS
        IF (step_failed) THEN
           IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
           RETURN
+       END IF
+       ! Publish inventory changes only after all cells in the group succeed.
+       IF (with_exchange) THEN
+          DO cell=1,domain%solve_cells
+             j=domain%j_cent(cell)
+             k=domain%k_cent(cell)
+             deposit(j,k,1:n_solid)=staged_deposit(:,cell)
+             erosion(j,k,1:n_solid)=staged_erosion(:,cell)
+             erodible(1:n_solid,j,k)=staged_erodible(:,cell)
+             lava_deposit(j,k)=staged_lava(cell)
+             IF (topo_change_flag) CALL record_topography_rate_cell(j,k, &
+                  staged_bed_rate(cell))
+          END DO
+          DEALLOCATE(staged_deposit,staged_erosion,staged_erodible, &
+               staged_lava,staged_bed_rate)
        END IF
        IF (with_exchange .AND. topo_change_flag) THEN
           CALL apply_topography_rate_update(time_step,bed_accepted)
