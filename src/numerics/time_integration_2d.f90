@@ -41,10 +41,10 @@ CONTAINS
     IF (ALLOCATED(this%q_trial)) DEALLOCATE(this%q_trial)
     IF (ALLOCATED(this%qp_trial)) DEALLOCATE(this%qp_trial)
   END SUBROUTINE
-  SUBROUTINE advance_lie(this,state,t,dt,Z,source_registry,domain,spatial_operator)
+  SUBROUTINE advance_lie(this,state,t,dt,stochastic_values,source_registry,domain,spatial_operator)
     CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
     CLASS(state_type), INTENT(INOUT) :: state
-    REAL(wp), INTENT(IN) :: t,dt,Z(comp_cells_x,comp_cells_y)
+    REAL(wp), INTENT(IN) :: t,dt,stochastic_values(comp_cells_x,comp_cells_y)
     TYPE(source_registry_type), INTENT(IN) :: source_registry
     CLASS(domain_type), INTENT(IN) :: domain
     CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
@@ -94,7 +94,8 @@ CONTAINS
     CALL state%snapshot_substrate(substrate_before)
     CALL begin_geometry_transaction
     CALL execute_lie_source_groups(state,this%q_trial,this%qp_trial,dt,domain, &
-         source_registry,Z,t,this%q_before,this%qp_before,source_step_failed,source_failure)
+         source_registry,stochastic_values,t,this%q_before,this%qp_before, &
+         source_step_failed,source_failure)
     IF (source_step_failed) THEN
       CALL state%restore_substrate(substrate_before)
       CALL rollback_geometry_transaction
