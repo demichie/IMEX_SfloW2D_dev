@@ -1,7 +1,7 @@
 # D19 — Lie splitting migration: implementation guide and live tracker
 
 **Status:** PLANNED — no Fortran implementation claimed.
-**Branch:** `refactor/pore-pressure-family`
+**Branch:** `master`
 **Companion architecture:** [D18](D18_IMEX_RK_SOURCE_ARCHITECTURE_PRINCIPLES.md). D18 describes the numerical contract; **D19 tracks the implementation**, file-by-file changes, dependencies, evidence, and remaining work.
 **Last reviewed:** 2026-11-01
 **Rule for maintenance:** update this file in the *same commit* as each completed code phase. Do not mark a task DONE without citing a commit and executed checks. Mark code not yet audited as TO_VERIFY rather than guessing.
@@ -54,7 +54,7 @@ Use statuses `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Add date, commit and test
 | L00 | Baseline: record build/CI result and search all callers/namelists/restarts/tests for RK, STAGE, STEP and CADENCE | TODO | Static inventory above is not a complete call-graph/test audit. |
 | L01 | Single method-capable source-group registry and validation, including always-explicit GROUP 0 | TODO | Keep valid model/method combinations and group IDs; update associated tests. |
 | L02 | Remove CADENCE from catalog, source configuration, source input and I/O | TODO | Depends on L01. Explicitly migrate examples and generated inputs. |
-| L03 | Implement RK-independent group-local backward-Euler Newton API and analytic dispatcher | TODO | Test identical reduced residual/Jacobian and status behavior. |
+| L03 | Implement RK-independent group-local backward-Euler Newton API and analytic dispatcher | IN_PROGRESS | Transitional `solve_backward_euler_group` API added; internals still call legacy RK engine. Compile and numerical verification pending. |
 | L04 | Generic explicit/NEWTON/ANALYTIC source-group executor | TODO | Preserve same-input process rates, physical joint limiters, and atomic mass-exchange/substrate transactions. |
 | L05 | Lie time driver with GROUP-0 spatial update, source rates evaluated on `q_n`, source-rate limits applied to `q_sp`, then GROUP 1+ | TODO | Requires L01-L04; separate spatial and source admissibility checks. |
 | L06 | Simplify production timestep, observers, diagnostics and stochastic/source-window plumbing | TODO | Preserve a single clock increment and time-dependent injection evaluation. |
@@ -83,6 +83,7 @@ Do not claim that first-order Lie is unconditionally stable or well-balanced for
 
 | Date | Change | Commit | Checks executed | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-11-01 | Added first RK-independent public backward-Euler group entry point and migrated existing STEP Newton caller; full Lie driver not yet present. | This change | Not executed (remote edit) | Compile/test verification required before marking L03 DONE. |
 | 2026-11-01 | Created migration guide and pending checklist from static code inventory. | This document's initial commit | None (documentation only) | All code phases remain TODO. |
 
 ## 6. Open engineering details — resolve during implementation

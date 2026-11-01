@@ -130,7 +130,7 @@ CONTAINS
     USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC, SOURCE_METHOD_EXPLICIT, &
          SOURCE_METHOD_NEWTON
     USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_NEWTON
-    USE nonlinear_solver_2d, ONLY : solve_rk_step
+    USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
     USE state_conversion_2d, ONLY : qc_to_qp
     USE parameters_2d, ONLY : topo_change_flag, bottom_radial_source_flag,  &
          bottom_fissural_source_flag, erodible_deposit_flag,                &
@@ -155,9 +155,8 @@ CONTAINS
     INTEGER :: j, k, l
     INTEGER :: group_index, mass_group_count, analytic_status, cell_index
     TYPE(analytic_term_context_type) :: analytic_context
-    REAL(wp) :: analytic_rate(n_eqns), old_state(n_vars), step_noise, &
+    REAL(wp) :: analytic_rate(n_eqns), step_noise, &
          explicit_rate(n_eqns), source_time
-    REAL(wp) :: empty_residual(n_eqns)
     LOGICAL :: implicit_mask(n_eqns), newton_converged, newton_search_failed
     INTEGER :: newton_iterations, newton_info
     TYPE(equation_partition_type) :: step_partition
@@ -180,7 +179,6 @@ CONTAINS
        IF (mass_group_count>1) &
             CALL fatal_error('D17: atomic mass-exchange batch split across step groups')
        ! The absence of mass exchange does not suppress other STEP groups.
-       empty_residual=0.0_wp
        source_time=0.0_wp
        IF (PRESENT(step_start_time)) source_time=step_start_time
        DO group_index=1,SIZE(step_groups)
@@ -218,11 +216,10 @@ CONTAINS
                      CALL fatal_error('D18: analytical STEP group solve failed')
                 q(1:n_vars,j,k)=q(1:n_vars,j,k)+time_step*analytic_rate(1:n_vars)
              ELSE
-                old_state=q(1:n_vars,j,k)
                 step_noise=0.0_wp
                 IF (PRESENT(stochastic_values)) step_noise=stochastic_values(j,k)
-                CALL solve_rk_step(step_partition,[step_groups(group_index)], &
-                     q(1:n_vars,j,k),old_state,time_step,1.0_wp,empty_residual, &
+                CALL solve_backward_euler_group(step_partition,step_groups(group_index), &
+                     q(1:n_vars,j,k),time_step, &
                      B_prime_x_geom(j,k),B_prime_y_geom(j,k),step_noise, &
                      newton_iterations,newton_converged,newton_info,newton_search_failed)
                 IF (.NOT.newton_converged .OR. newton_info/=0 .OR. newton_search_failed) &

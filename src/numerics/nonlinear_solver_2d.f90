@@ -30,6 +30,7 @@ MODULE nonlinear_solver_2d
   PUBLIC :: finalize_nonlinear_solver
   PUBLIC :: solve_imex_stage
   PUBLIC :: solve_rk_step
+  PUBLIC :: solve_backward_euler_group
 
   !> Complex-step perturbation and its reciprocal.
   REAL(wp) :: h, one_by_h
@@ -103,6 +104,29 @@ CONTAINS
     effective_im_term(1:n_vars) = (q_stage - q_known) / (dt_step * a_diag)
 
   END SUBROUTINE solve_imex_stage
+
+  !> \brief Advance one configured Newton source group for a full Lie substep.
+  !> \details The transitional implementation reuses the existing nonlinear
+  !>          machinery with unit DIRK diagonal and no pre-accumulated RK rate.
+  !>          The public signature has no RK-specific parameters.
+  SUBROUTINE solve_backward_euler_group(equation_partition, source_group, &
+       q_cell, dt, Bprime_x, Bprime_y, stochastic_value, &
+       iterations_used, converged, linear_info, line_search_failed)
+    TYPE(equation_partition_type), INTENT(IN) :: equation_partition
+    TYPE(source_group_type), INTENT(IN) :: source_group
+    REAL(wp), INTENT(INOUT) :: q_cell(n_vars)
+    REAL(wp), INTENT(IN) :: dt, Bprime_x, Bprime_y, stochastic_value
+    INTEGER, INTENT(OUT) :: iterations_used, linear_info
+    LOGICAL, INTENT(OUT) :: converged, line_search_failed
+    REAL(wp) :: q_in(n_vars), no_external_rate(n_eqns)
+
+    q_in = q_cell
+    no_external_rate = 0.0_wp
+    CALL solve_rk_step(equation_partition, [source_group], q_cell, q_in, &
+         dt, 1.0_wp, no_external_rate, Bprime_x, Bprime_y, &
+         stochastic_value, iterations_used, converged, linear_info, &
+         line_search_failed)
+  END SUBROUTINE solve_backward_euler_group
 
   !> \brief Set the complex-step perturbation and its reciprocal.
   !>
