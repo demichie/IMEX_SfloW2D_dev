@@ -88,13 +88,13 @@ MODULE source_catalog_2d
              allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('mass_exchange_carrier_liquid_loss',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
+             allows_gas=.FALSE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('mass_exchange_entrainment',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
              allows_gas=.TRUE., allows_liquid=.FALSE., allows_lava=.FALSE.), &
        source_term_type('mass_exchange_vaporization',.TRUE.,.FALSE.,.FALSE., &
             default_method=SOURCE_METHOD_EXPLICIT, &
-             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.) &
+             allows_gas=.TRUE., allows_liquid=.FALSE., allows_lava=.FALSE.) &
        ]
 CONTAINS
   !> Structurally affected conservative equations for a Newton-capable source.

@@ -62,12 +62,14 @@ CONTAINS
                       dt,process_rates)
             ! Erosion can increase packing by importing a solid-rich substrate.
             ! Limit it before accumulating any conservative or bed contribution.
-            erosion_factor=erosion_packing_factor(physical_state%h,alpha,                                         &
-                      SUM(MAX(0.0_wp,process_rates%solid_erosion_rate)),                           &
-                      MAX(0.0_wp,process_rates%carrier_erosion_rate),                              &
+            IF (do_erosion) THEN
+                erosion_factor=erosion_packing_factor(physical_state%h,alpha, &
+                      SUM(MAX(0.0_wp,process_rates%solid_erosion_rate)), &
+                      MAX(0.0_wp,process_rates%carrier_erosion_rate), &
                       maximum_solid_packing,dt)
-            CALL scale_process(process_rates,erosion_factor)
-            CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
+                CALL scale_process(process_rates,erosion_factor)
+                CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
+            END IF
             CALL reset_mass_exchange_rates(deposition_rates)
             CALL reset_mass_exchange_rates(liquid_loss_rates)
             IF (do_deposition) CALL eval_mass_exchange_deposition_explicit(physical_state,dt,deposition_rates)
