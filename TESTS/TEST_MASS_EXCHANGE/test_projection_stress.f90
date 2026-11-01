@@ -3,6 +3,7 @@ PROGRAM test_projection_stress
   USE parameters_2d
   USE constitutive_parameters_2d
   USE geometry_2d
+  USE state_2d, ONLY : state_type
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type,source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
@@ -19,6 +20,7 @@ PROGRAM test_projection_stress
   CHARACTER(LEN=16) :: arg
   REAL(wp), ALLOCATABLE :: q(:,:,:),qp(:,:,:),rate(:,:),nodes(:,:),weights(:,:)
   TYPE(domain_type) :: domain
+  TYPE(state_type) :: state
 
   CALL get_command_argument(1,arg)
   READ(arg,*) requested
@@ -69,8 +71,6 @@ PROGRAM test_projection_stress
      END DO
   END DO
   CLOSE(unit)
-  CALL release_topography_workspace
-  CALL release_topography_workspace
   WRITE(*,*) 'PASS: Lie-compatible prescribed projection refinement and geometry checks'
 CONTAINS
 
@@ -110,7 +110,10 @@ CONTAINS
     ALLOCATE(B_prime_x_geom(nx,ny),B_prime_y_geom(nx,ny))
     ALLOCATE(B_second_xx_geom(nx,ny),B_second_xy_geom(nx,ny),B_second_yy_geom(nx,ny))
     ALLOCATE(grav_coeff(nx,ny),grav_coeff_stag_x(nx+1,ny),grav_coeff_stag_y(nx,ny+1))
-    ALLOCATE(deposit(nx,ny,ns),erosion(nx,ny,ns),erodible(ns,nx,ny),lava_deposit(nx,ny))
+    ALLOCATE(state%deposit(nx,ny,ns),state%erosion(nx,ny,ns), &
+         state%erodible(ns,nx,ny),state%lava_deposit(nx,ny))
+    ALLOCATE(state%deposit_tot(nx,ny),state%erosion_tot(nx,ny))
+    state%deposit_tot=0.0_wp;state%erosion_tot=0.0_wp
     ALLOCATE(B_zone(nx,ny),cell_source_fractions(nx,ny))
     CALL domain%initialize
   END SUBROUTINE allocate_grid
@@ -121,7 +124,7 @@ CONTAINS
     LOGICAL, INTENT(IN) :: wet_dry
     INTEGER :: a,b,l
     REAL(wp) :: x,y,carrier_mass
-    deposit=0.0_wp; erosion=0.0_wp; erodible=0.0_wp; lava_deposit=0.0_wp
+    state%deposit=0.0_wp; state%erosion=0.0_wp; state%erodible=0.0_wp; state%lava_deposit=0.0_wp
     B_zone=0; cell_source_fractions=0.0_wp
     qp=0.0_wp; qp(4,:,:)=T_ambient
     l=0
@@ -174,13 +177,13 @@ CONTAINS
        DO a=1,nx
           CALL qc_to_qp(q(:,a,b),qp(:,a,b),pressure,'Lie exchange test',accepted)
           IF (.NOT.accepted) ERROR STOP 'Lie exchange initial state conversion'
-          erodible(:,a,b)=[0.002_wp,0.001_wp]
+          state%erodible(:,a,b)=[0.002_wp,0.001_wp]
        END DO
     END DO
     q_before=q;qp_before=qp
-    deposited_before=deposit;eroded_before=erosion
-    bed_before=B_vertex;available_before=erodible
-    CALL execute_lie_source_groups(q,qp,1.0_wp,domain,registry, &
+    deposited_before=state%deposit;eroded_before=state%erosion
+    bed_before=B_vertex;available_before=state%erodible
+    CALL execute_lie_source_groups(state,q,qp,1.0_wp,domain,registry, &
          q_original=q_before,qp_original=qp_before, &
          step_failed=failed,failure_message=message)
     IF (failed) THEN
@@ -189,23 +192,23 @@ CONTAINS
     END IF
     fluid_delta=SUM(q(1,:,:)-q_before(1,:,:))
     solid_delta=SUM(q(5:6,:,:)-q_before(5:6,:,:))
-    inventory_delta=SUM(erosion-eroded_before)
-    CALL require_small('Lie solid mass gain / erosion inventory', &
+    inventory_delta=SUM(state%erosion-eroded_before)
+    CALL require_small('Lie solid mass gain / state%erosion inventory', &
          ABS(solid_delta-DOT_PRODUCT(rho_s, &
-         [SUM(erosion(:,:,1)-eroded_before(:,:,1)), &
-          SUM(erosion(:,:,2)-eroded_before(:,:,2))])), &
+         [SUM(state%erosion(:,:,1)-eroded_before(:,:,1)), &
+          SUM(state%erosion(:,:,2)-eroded_before(:,:,2))])), &
          MAX(1.0_wp,ABS(solid_delta)))
-    IF (ANY(erodible<0.0_wp)) ERROR STOP 'Lie erodible inventory negative'
-    IF (ANY(erodible>available_before)) ERROR STOP 'Lie erodible inventory increased'
+    IF (ANY(state%erodible<0.0_wp)) ERROR STOP 'Lie state%erodible inventory negative'
+    IF (ANY(state%erodible>available_before)) ERROR STOP 'Lie state%erodible inventory increased'
     DO l=1,ns
-       CALL require_small('Lie erodible transfer balance', &
-            MAXVAL(ABS(erodible(l,:,:)+erosion(:,:,l)-eroded_before(:,:,l) &
+       CALL require_small('Lie state%erodible transfer balance', &
+            MAXVAL(ABS(state%erodible(l,:,:)+state%erosion(:,:,l)-eroded_before(:,:,l) &
             -available_before(l,:,:))),1.0_wp)
     END DO
     IF (.NOT.ALL(ieee_is_finite(q)) .OR. .NOT.ALL(ieee_is_finite(B_vertex))) &
          ERROR STOP 'Lie exchange non-finite state'
     IF (fluid_delta<0.0_wp .OR. solid_delta<0.0_wp .OR. inventory_delta<0.0_wp) &
-         ERROR STOP 'Lie erosion transfer changed sign'
+         ERROR STOP 'Lie state%erosion transfer changed sign'
     CALL check_geometry
     CALL registry%finalize()
     CALL reset_state(.FALSE.)
@@ -238,32 +241,32 @@ CONTAINS
        DO a=1,nx
           CALL qc_to_qp(q(:,a,b),qp(:,a,b),pressure,'Lie rejection test',accepted)
           IF (.NOT.accepted) ERROR STOP 'Lie rejection primitive conversion'
-          erodible(:,a,b)=[0.002_wp,0.001_wp]
+          state%erodible(:,a,b)=[0.002_wp,0.001_wp]
        END DO
     END DO
     q_before=q;qp_before=qp
     bed_before=B_vertex
-    deposited_before=deposit;eroded_before=erosion
-    erodible_before=erodible;lava_before=lava_deposit
+    deposited_before=state%deposit;eroded_before=state%erosion
+    erodible_before=state%erodible;lava_before=state%lava_deposit
     centers_before=B_cent;slope_before=B_prime_x_geom
     q_trial=q_before;qp_trial=qp_before
     ! Cell 2 is rejected after cell 1 has been considered for transfer.
     qp_trial(:,2,1)=ieee_value(0.0_wp,ieee_quiet_nan)
-    CALL begin_lie_geometry_transaction
-    CALL execute_lie_source_groups(q_trial,qp_trial,1.0_wp,domain,registry, &
+    CALL begin_geometry_transaction
+    CALL execute_lie_source_groups(state,q_trial,qp_trial,1.0_wp,domain,registry, &
          q_original=q_before,qp_original=qp_trial, &
          step_failed=failed,failure_message=message)
     IF (.NOT.failed) ERROR STOP 'Lie exchange rejection not reported'
     IF (LEN_TRIM(message)==0) ERROR STOP 'Lie rejection missing diagnostic'
-    CALL rollback_lie_geometry_transaction
+    CALL rollback_geometry_transaction
     ! Fluid workspaces are not published by the Lie driver on rejection.
     q_trial=q_before;qp_trial=qp_before
     IF (ANY(q_trial/=q_before) .OR. ANY(qp_trial/=qp_before)) &
          ERROR STOP 'Rejected Lie fluid state changed'
     IF (ANY(B_vertex/=bed_before) .OR. ANY(B_cent/=centers_before) .OR. &
          ANY(B_prime_x_geom/=slope_before)) ERROR STOP 'Lie bed rollback mismatch'
-    IF (ANY(deposit/=deposited_before) .OR. ANY(erosion/=eroded_before) .OR. &
-         ANY(erodible/=erodible_before) .OR. ANY(lava_deposit/=lava_before)) &
+    IF (ANY(state%deposit/=deposited_before) .OR. ANY(state%erosion/=eroded_before) .OR. &
+         ANY(state%erodible/=erodible_before) .OR. ANY(state%lava_deposit/=lava_before)) &
          ERROR STOP 'Lie inventory rollback mismatch'
     CALL registry%finalize()
     CALL reset_state(.FALSE.)
@@ -363,7 +366,7 @@ CONTAINS
     ! Capture intermediate fields too: final-only equality could hide a transient race.
     WRITE(unit) q,qp,B_vertex,B_cent,B_face_x,B_face_y,B_prime_x_geom,B_prime_y_geom, &
          B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
-         grav_coeff_stag_x,grav_coeff_stag_y,deposit,erosion,erodible
+         grav_coeff_stag_x,grav_coeff_stag_y,state%deposit,state%erosion,state%erodible
   END SUBROUTINE check_update
 
   !> \brief Independently differentiate Q1 cell means with retained five-point LS kernels.
@@ -436,10 +439,11 @@ CONTAINS
 
   !> \brief Release test-grid allocations before changing resolution or dimension.
   SUBROUTINE release_grid
-    CALL release_topography_workspace
     CALL domain%finalize
     DEALLOCATE(q,qp,rate,nodes,weights,B_vertex,B_cent,B_face_x,B_face_y)
     DEALLOCATE(B_prime_x_geom,B_prime_y_geom,B_second_xx_geom,B_second_xy_geom,B_second_yy_geom)
-    DEALLOCATE(grav_coeff,grav_coeff_stag_x,grav_coeff_stag_y,deposit,erosion,erodible,lava_deposit,B_zone,cell_source_fractions)
+    DEALLOCATE(grav_coeff,grav_coeff_stag_x,grav_coeff_stag_y,B_zone,cell_source_fractions)
+    DEALLOCATE(state%deposit,state%erosion,state%erodible,state%lava_deposit, &
+         state%deposit_tot,state%erosion_tot)
   END SUBROUTINE release_grid
 END PROGRAM test_projection_stress

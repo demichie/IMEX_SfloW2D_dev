@@ -6,8 +6,7 @@ PROGRAM test_workspace_lifecycle
        curvature_term_flag, liquid_vaporization_flag
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, cell_size, x0, y0,   &
        topography_profile, nodata_topo, init_grid, B_vertex,                &
-       sourceE_vect_x, sourceW_vect_x, sourceS_vect_x, sourceN_vect_x,      &
-       release_topography_workspace
+       sourceE_vect_x, sourceW_vect_x, sourceS_vect_x, sourceN_vect_x
   USE init_2d, ONLY : thickness_init, erodible_init, release_initialization_fields
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
@@ -68,8 +67,6 @@ PROGRAM test_workspace_lifecycle
      CALL assert_true('speed bounds released', .NOT.ALLOCATED(hyperbolic%a_interface_xNeg))
      CALL assert_true('HP scratch released', .NOT.ALLOCATED(reconstruction%hp_eta_mask))
   END DO
-  CALL release_topography_workspace
-  CALL release_topography_workspace
 
   PRINT *, 'PASS: initialization storage and HP-PCCU workspace lifecycle verified'
 

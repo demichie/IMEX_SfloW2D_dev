@@ -104,3 +104,10 @@ Mantenere **una sola versione** del contratto in §1. Quando una decisione viene
 ### Audit inventari Lie (2026-11-01)
 
 Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione, erodibile e lava immobilizzata sia allo stato di ingresso sia per i candidati; nessun clipping.
+
+### Migrazione organica dei test strutturali (2026-11-01)
+
+- `TEST_MASS_EXCHANGE/test_projection_stress.f90`: usa `state_type` per gli inventari e la firma corrente di `execute_lie_source_groups(state,...)`; mantiene il confronto dei bilanci fisici e della geometria, senza facciate globali di deposito/erosione/lava.
+- Transazioni di geometria: test aggiornati a `begin_geometry_transaction` / `rollback_geometry_transaction`.
+- `TEST_WORKSPACE_LIFECYCLE`: eliminate le chiamate al workspace topografico temporale rimosso da `geometry_2d`.
+- Non eseguiti compilazione o test; gli altri test legacy e i percorsi di produzione rimangono oggetto della verifica statica finale.
