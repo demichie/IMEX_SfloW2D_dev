@@ -213,3 +213,10 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Corretto il controllo per imporre `SUM(solid masses) + SUM(additional gas masses) <= total mixture mass` senza clipping e senza limiter. Per gli insiemi di componenti vuoti la somma Fortran e' zero. Gli indici canonici sono gia' importati dal modulo.
 - La correzione vale per stato post-spaziale e candidati dei gruppi in quanto condividono lo stesso guard. Non attesta superamento dei test: compilazione e GitHub Actions restano riservate all'utente dopo D19.
 - Il censimento integrale delle firme/import e degli ulteriori percorsi resta aperto; audit non ancora dichiarato concluso.
+
+### Limiter EXPLICIT e chiusura delle masse di componente (2026-11-01)
+
+- Riscontrata incoerenza fra il controllo di ammissibilita' conservativa aggiornato e `limit_explicit_source_rates`: quest'ultimo limitava le diminuzioni di massa dei solidi, ma non quelle dei gas addizionali; inoltre definiva il carrier residuo sottraendo soltanto i solidi alla massa totale.
+- Corretto il limiter in `source_terms_2d` per controllare separatamente i rate negativi di tutte le masse solide e dei gas addizionali con i rispettivi indici canonici. La disponibilita' e il consumo del carrier derivano ora da massa totale meno solidi meno gas addizionali.
+- La scalatura resta unica per tutti i rate sorgente e i campi trasferiti tramite `scale_mass_exchange_transfer`; nessun limiter viene applicato al flusso spaziale. I nuovi controlli si allineano alla stessa condizione di ammissibilita' `m_s + m_g <= m_tot`.
+- Verificato staticamente il percorso `assemble_lie_explicit_transaction` -> `limit_explicit_source_rates` -> controllo di finitezza dei rate/trasferimenti, ma resta da controllare la totalita' dei sottoprocessi e dei test. Nessuna compilazione/Action eseguita.
