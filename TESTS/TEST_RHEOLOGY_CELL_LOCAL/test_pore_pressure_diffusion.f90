@@ -1,7 +1,8 @@
 PROGRAM test_pore_pressure_diffusion
 
-  USE parameters_2d, ONLY : wp, n_solid, n_eqns, idx_poreEqn, &
-       idx_solidEqn_first, idx_solidEqn_last, &
+  USE parameters_2d, ONLY : wp, n_solid, n_eqns, n_vars, n_add_gas, &
+       n_stoch_vars, n_pore_vars, configure_canonical_state_indices, &
+       idx_poreEqn, idx_solidEqn_first, idx_solidEqn_last, &
        gas_flag, pore_pressure_flag, sutherland_flag
   USE constitutive_parameters_2d, ONLY : f_inhibit_mode, hydraulic_permeability, &
        kin_visc_c, sp_heat_a, sp_gas_const_a, pres, dynamic_permeability_flag
@@ -24,9 +25,11 @@ PROGRAM test_pore_pressure_diffusion
 
   n_solid = 2
   n_eqns = 7
-  idx_poreEqn = 7
-  idx_solidEqn_first = 5
-  idx_solidEqn_last = 6
+  n_vars = 7
+  n_add_gas = 0
+  n_stoch_vars = 0
+  n_pore_vars = 1
+  CALL configure_canonical_state_indices()
   pore_pressure_flag = .TRUE.
   ALLOCATE(solid_fractions(n_solid))
   gas_flag = .FALSE.
