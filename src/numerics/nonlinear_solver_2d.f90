@@ -27,7 +27,7 @@ MODULE nonlinear_solver_2d
     PUBLIC :: solve_backward_euler_group
 
     !> Complex-step perturbation and its reciprocal.
-    REAL(wp) :: h, one_by_h
+    REAL(wp) :: complex_step_perturbation, inverse_complex_step_perturbation
 
     !> Relative threshold used to reject numerically singular small systems.
     REAL(wp), PARAMETER :: pivot_tol_factor = 64.0_wp
@@ -36,8 +36,8 @@ CONTAINS
 
     !> Initialize the complex-step perturbation for the cell-local Newton solver.
     SUBROUTINE initialize_nonlinear_solver
-        h = n_vars * EPSILON(1.0_wp)
-        one_by_h = 1.0_wp / h
+        complex_step_perturbation = n_vars * EPSILON(1.0_wp)
+        inverse_complex_step_perturbation = 1.0_wp / complex_step_perturbation
     END SUBROUTINE initialize_nonlinear_solver
 
     SUBROUTINE finalize_nonlinear_solver
@@ -857,7 +857,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
             left_matrix(equation,equation) = coeff_f(equation) * qj_org(equation)
 
             qj_rel_cmplx = qj_rel_cmplx_init
-            qj_rel_cmplx(equation) = CMPLX(qj_rel(equation), h, wp)
+            qj_rel_cmplx(equation) = CMPLX(qj_rel(equation), complex_step_perturbation, wp)
             qj_cmplx = qj_rel_cmplx * qj_org
 
             CALL eval_source_implicit(Bprimej_x, Bprimej_y, Zij,                   &
@@ -867,7 +867,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
             DO j = 1, SIZE(active_equations)
                 Jacob_relax(active_equations(j),equation) =                         &
                     coeff_f(active_equations(j)) *                                &
-                    AIMAG(nh_terms_cmplx_impl(active_equations(j))) * one_by_h
+                    AIMAG(nh_terms_cmplx_impl(active_equations(j))) * inverse_complex_step_perturbation
             END DO
             DO j = 1, n_eqns
                 left_matrix(j,equation) = left_matrix(j,equation) -                 &
