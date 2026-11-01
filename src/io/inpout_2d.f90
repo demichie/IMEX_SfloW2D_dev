@@ -6770,7 +6770,7 @@ CONTAINS
 
         DO i_solid = 1, n_solid
 
-          CALL interp_2d_scalarB(x_comp, y_comp, DEPOSIT(:, :, i_solid), &
+          CALL interp_2d_scalarB(x_comp, y_comp, state%deposit(:, :, i_solid), &
                                  probes_coords(1, k), probes_coords(2, k), dep_probe(i_solid))
 
           WRITE (probes_unit, 1710, ADVANCE='no') dep_probe(i_solid), ','
