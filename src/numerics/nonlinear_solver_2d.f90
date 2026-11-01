@@ -155,9 +155,6 @@ CONTAINS
 
     coeff_f = 1.0_wp
 
-    ! The four-stage third-order method needs a more accurate solution of
-    ! each implicit stage than the default tolerances provide. Keep the
-    ! configured tolerances for lower-order methods; tighten only this solve.
     tol_abs_local = tol_abs
     tol_rel_local = tol_rel
 
@@ -241,7 +238,9 @@ CONTAINS
                         (qj(equation)-q_group_before(equation))/(dt_step)
                 END DO
              END IF
-             residual_without_si=-si_term
+             ! Semi-implicit information seeds the Newton initial guess only.
+             ! The backward-Euler residual contains the full implicit source once.
+             residual_without_si=0.0_wp
              CALL solve_newton_group(stage_groups(group),&
                   group_equations(1:group_size),qj,q_group_before,dt_step,&
                   residual_without_si,Bprimej_x,Bprimej_y,Zij,coeff_f,      &
