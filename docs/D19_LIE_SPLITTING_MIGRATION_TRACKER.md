@@ -315,3 +315,9 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - `mass_exchange_vaporization` usa esclusivamente la deposizione calcolata e limitata nella medesima transazione Lie. In precedenza la vaporizzazione configurata senza deposizione riceveva un rate nullo, divenendo silenziosamente inefficace.
 - Validazione introdotta in `source_configuration_2d` e `source_registry_2d`: vaporizzazione richiede la presenza di deposizione; il vincolo preesistente di un solo gruppo mass exchange garantisce che i processi siano nello stesso gruppo EXPLICIT. `mass_exchange_2d` verifica anche il contratto direttamente al proprio ingresso.
 - Non modificati gruppi analitici, `B_zone`, test o workflow; nessuna compilazione eseguita. La chiusura statica completa di D19 resta subordinata alla revisione finale delle interfacce non ancora accertate.
+
+### Unicita' globale del modello reologico nella registry Lie (2026-11-01)
+
+- Rilevata una incongruenza tra il registro, che poteva accettare due sorgenti `rheology_*`, e `group_rheology_name`, che restituisce intenzionalmente un solo modello. L'input di produzione attuale seleziona gia' una sola reologia, ma un registro costruito direttamente poteva essere accettato e poi eseguito solo parzialmente.
+- `source_registry_2d%initialize` ora rifiuta piu' di una sorgente reologica complessivamente, anche se assegnate a gruppi distinti. La regola vale per i metodi EXPLICIT, NEWTON e ANALYTIC; restano obbligatori gruppi omogenei e un solo sorgente ANALYTIC per gruppo.
+- Nessun cambiamento ai modelli, alle zone `B_zone`, a test, workflow o compilazione. La verifica statica delle chiamate di tutte le leggi fisiche non e' certificata esaustiva.

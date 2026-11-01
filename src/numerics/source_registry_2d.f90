@@ -84,10 +84,11 @@ CONTAINS
     CHARACTER(*), INTENT(OUT) :: error
     TYPE(source_term_type) :: term
     CHARACTER(LEN=64), ALLOCATABLE :: seen(:)
-    INTEGER :: i,j,mass_group,k,eq
+    INTEGER :: i,j,mass_group,k,eq,rheology_count
     INTEGER, ALLOCATABLE :: expected(:),affected(:)
     CALL this%finalize()
     mass_group=-1
+    rheology_count=0
     ALLOCATE(seen(0))
     error='D19: invalid Lie group configuration'
     IF (n_equations<4 .OR. SIZE(groups)==0) RETURN
@@ -126,6 +127,10 @@ CONTAINS
           IF (groups(i)%method/=SOURCE_METHOD_EXPLICIT) RETURN
           IF (mass_group>=0 .AND. mass_group/=groups(i)%id) RETURN
           mass_group=groups(i)%id
+        END IF
+        IF (INDEX(TRIM(term%name),'rheology_')==1) THEN
+          rheology_count=rheology_count+1
+          IF (rheology_count>1) RETURN
         END IF
         IF (ANY(seen==term%name)) RETURN
         seen=[CHARACTER(LEN=64) :: seen,term%name]
