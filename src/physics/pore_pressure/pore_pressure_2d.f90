@@ -1,4 +1,4 @@
-!> Dispatch pore-pressure models through four standard numerical interfaces.
+!> @brief Dispatch pore-pressure models through four standard numerical interfaces.
 !> The model list contains canonical names, allowing future physical models
 !> to be added without changing any caller. Darcy is the only model today.
 MODULE pore_pressure_2d
@@ -16,6 +16,13 @@ MODULE pore_pressure_2d
     PUBLIC :: eval_pore_pressure_implicit, eval_pore_pressure_analytic
 CONTAINS
 
+    !> @brief Dispatch explicit pressure sources; unsupported Darcy treatment is an error.
+    !> @details The dispatcher retains each of the four numerical interfaces;
+    !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] models Canonical pressure model names.
+    !> @param[in] state Read-only real physical cell state.
+    !> @param[out] rate Conservative explicit rate vector.
+    !> @param[in] include_gas_loss Optional switch for coupled interstitial gas loss.
     SUBROUTINE eval_pore_pressure_explicit(models,state,rate,include_gas_loss)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -33,6 +40,12 @@ CONTAINS
         END DO
     END SUBROUTINE eval_pore_pressure_explicit
 
+    !> @brief Dispatch pressure sources through the semi-implicit interface.
+    !> @details The dispatcher retains each of the four numerical interfaces;
+    !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] models Canonical pressure model names.
+    !> @param[in] state Read-only real physical cell state.
+    !> @param[out] rate Conservative semi-implicit rate vector.
     SUBROUTINE eval_pore_pressure_semi_implicit(models,state,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -49,6 +62,12 @@ CONTAINS
         END DO
     END SUBROUTINE eval_pore_pressure_semi_implicit
 
+    !> @brief Dispatch pressure sources through the complex Newton interface.
+    !> @details The dispatcher retains each of the four numerical interfaces;
+    !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] models Canonical pressure model names.
+    !> @param[in] state Read-only complex physical cell state.
+    !> @param[out] rate Complex conservative source vector.
     SUBROUTINE eval_pore_pressure_implicit(models,state,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(complex_physical_state_type), INTENT(IN) :: state
@@ -68,6 +87,16 @@ CONTAINS
     !> Complete conservative average rate for the selected analytic operator.
     !> For sequential operators, reconstruct the physical state before
     !> extending this dispatch; do not reuse stale primitive coefficients.
+    !> @brief Integrate supported pore-pressure sources analytically over a Lie substep.
+    !> @details The dispatcher retains each of the four numerical interfaces;
+    !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] models Canonical pressure model names.
+    !> @param[in] state Frozen real physical cell state.
+    !> @param[in] q_before Conservative state at the beginning of the substep.
+    !> @param[in] interval Nonnegative substep duration [s].
+    !> @param[out] rate Mean conservative rate across the substep.
+    !> @param[out] admissible Acceptance flag for the resulting local state.
+    !> @param[in] include_gas_loss Optional coupled pore-gas loss switch.
     SUBROUTINE eval_pore_pressure_analytic(models,state,q_before,interval,rate,admissible, &
             include_gas_loss)
         CHARACTER(*), INTENT(IN) :: models(:)

@@ -1,4 +1,4 @@
-!> Assemble complete conservative rates from volumetric injection processes.
+!> @brief Assemble complete conservative rates from volumetric injection processes.
 MODULE mass_injection_2d
     USE parameters_2d, ONLY : wp, n_eqns
     USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
@@ -16,6 +16,21 @@ MODULE mass_injection_2d
     PUBLIC :: eval_mass_injection_explicit, eval_mass_injection_semi_implicit
     PUBLIC :: eval_mass_injection_implicit, eval_mass_injection_analytic
 CONTAINS
+    !> @brief Assemble explicit volumetric injection contributions from selected models.
+    !> @details The dispatcher retains each of the four numerical interfaces;
+    !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] state Local real physical cell state.
+    !> @param[in] time Current physical time [s].
+    !> @param[in] cell_fract Bottom circular injection coverage of this cell.
+    !> @param[in] cell_fissure_fract Cell-local coverage fractions for fissural injection.
+    !> @param[in] lat_arc_perim Local lateral arc perimeter.
+    !> @param[in] lat_n_x Local lateral inward normal x component.
+    !> @param[in] lat_n_y Local lateral inward normal y component.
+    !> @param[in] cell_area Horizontal cell area.
+    !> @param[in] use_circular Enable bottom circular injection.
+    !> @param[in] use_fissural Enable bottom fissural injection.
+    !> @param[in] use_radial Enable lateral radial injection.
+    !> @param[out] rate Assembled conservative injection source rate.
     SUBROUTINE eval_mass_injection_explicit(state,time,cell_fract,cell_fissure_fract, &
             lat_arc_perim,lat_n_x,lat_n_y,cell_area,use_circular,use_fissural,use_radial,rate)
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -42,6 +57,21 @@ CONTAINS
 
     !> Combine active injection processes for the semi_implicit treatment.
     !> Individual models reject configurations for which this treatment is unsupported.
+    !> @brief Assemble semi-implicit volumetric injection contributions from selected models.
+    !> @details The dispatcher retains each of the four numerical interfaces;
+    !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] state Local real physical cell state.
+    !> @param[in] time Current physical time [s].
+    !> @param[in] cell_fract Bottom circular injection coverage of this cell.
+    !> @param[in] cell_fissure_fract Cell-local coverage fractions for fissural injection.
+    !> @param[in] lat_arc_perim Local lateral arc perimeter.
+    !> @param[in] lat_n_x Local lateral inward normal x component.
+    !> @param[in] lat_n_y Local lateral inward normal y component.
+    !> @param[in] cell_area Horizontal cell area.
+    !> @param[in] use_circular Enable bottom circular injection.
+    !> @param[in] use_fissural Enable bottom fissural injection.
+    !> @param[in] use_radial Enable lateral radial injection.
+    !> @param[out] rate Assembled conservative injection source rate.
     SUBROUTINE eval_mass_injection_semi_implicit(state,time,cell_fract,cell_fissure_fract, &
             lat_arc_perim,lat_n_x,lat_n_y,cell_area,use_circular,use_fissural,use_radial,rate)
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -69,6 +99,21 @@ CONTAINS
 
     !> Combine active injection processes for the implicit treatment.
     !> Individual models reject configurations for which this treatment is unsupported.
+    !> @brief Assemble implicit volumetric injection contributions from selected models.
+    !> @details The dispatcher retains each of the four numerical interfaces;
+    !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] state Local complex physical cell state.
+    !> @param[in] time Current physical time [s].
+    !> @param[in] cell_fract Bottom circular injection coverage of this cell.
+    !> @param[in] cell_fissure_fract Cell-local coverage fractions for fissural injection.
+    !> @param[in] lat_arc_perim Local lateral arc perimeter.
+    !> @param[in] lat_n_x Local lateral inward normal x component.
+    !> @param[in] lat_n_y Local lateral inward normal y component.
+    !> @param[in] cell_area Horizontal cell area.
+    !> @param[in] use_circular Enable bottom circular injection.
+    !> @param[in] use_fissural Enable bottom fissural injection.
+    !> @param[in] use_radial Enable lateral radial injection.
+    !> @param[out] rate Assembled conservative injection source rate.
     SUBROUTINE eval_mass_injection_implicit(state,time,cell_fract,cell_fissure_fract, &
             lat_arc_perim,lat_n_x,lat_n_y,cell_area,use_circular,use_fissural,use_radial,rate)
         TYPE(complex_physical_state_type), INTENT(IN) :: state
@@ -96,6 +141,21 @@ CONTAINS
 
     !> Combine active injection processes for the analytic treatment.
     !> Individual models reject configurations for which this treatment is unsupported.
+    !> @brief Assemble analytic volumetric injection contributions from selected models.
+    !> @details The dispatcher retains each of the four numerical interfaces;
+    !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] state Local real physical cell state.
+    !> @param[in] time Current physical time [s].
+    !> @param[in] cell_fract Bottom circular injection coverage of this cell.
+    !> @param[in] cell_fissure_fract Cell-local coverage fractions for fissural injection.
+    !> @param[in] lat_arc_perim Local lateral arc perimeter.
+    !> @param[in] lat_n_x Local lateral inward normal x component.
+    !> @param[in] lat_n_y Local lateral inward normal y component.
+    !> @param[in] cell_area Horizontal cell area.
+    !> @param[in] use_circular Enable bottom circular injection.
+    !> @param[in] use_fissural Enable bottom fissural injection.
+    !> @param[in] use_radial Enable lateral radial injection.
+    !> @param[out] rate Assembled conservative injection source rate.
     SUBROUTINE eval_mass_injection_analytic(state,time,cell_fract,cell_fissure_fract, &
             lat_arc_perim,lat_n_x,lat_n_y,cell_area,use_circular,use_fissural,use_radial,rate)
         TYPE(physical_state_type), INTENT(IN) :: state

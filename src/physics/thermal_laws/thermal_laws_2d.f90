@@ -1,4 +1,4 @@
-!> Dispatch thermal source models through a common four-treatment interface.
+!> @brief Dispatch thermal source models through a common four-treatment interface.
 !> Add future models in the SELECT CASE statements below.
 MODULE thermal_laws_2d
     USE parameters_2d, ONLY : wp
@@ -13,6 +13,15 @@ MODULE thermal_laws_2d
     PUBLIC :: eval_thermal_implicit, eval_thermal_analytic
 CONTAINS
 
+    !> @brief Dispatch and sum explicit thermal sources.
+    !> @details The dispatcher retains each of the four numerical interfaces;
+    !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] models Canonical thermal source names.
+    !> @param[in] state Real physical cell state.
+    !> @param[in] radiative Radiative heat-exchange coefficient.
+    !> @param[in] convective Convective heat-exchange coefficient.
+    !> @param[in] ambient Ambient temperature [K].
+    !> @param[out] rate Assembled real thermal source rate.
     SUBROUTINE eval_thermal_explicit(models,state,radiative,convective,ambient,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -33,6 +42,12 @@ CONTAINS
     END SUBROUTINE eval_thermal_explicit
 
 
+    !> @brief Dispatch and sum semi-implicit thermal contributions.
+    !> @details The dispatcher retains each of the four numerical interfaces;
+    !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] models Canonical thermal source names.
+    !> @param[in] state Real physical cell state.
+    !> @param[out] rate Assembled real thermal source rate.
     SUBROUTINE eval_thermal_semi_implicit(models,state,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -54,6 +69,15 @@ CONTAINS
 
     ! Complex-step source evaluation is side-effect free with respect to
     ! substrate, topography and other shared integration state.
+    !> @brief Dispatch and sum complex thermal contributions for Newton.
+    !> @details The dispatcher retains each of the four numerical interfaces;
+    !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] models Canonical thermal source names.
+    !> @param[in] state Complex physical cell state.
+    !> @param[in] radiative Radiative heat-exchange coefficient.
+    !> @param[in] convective Convective heat-exchange coefficient.
+    !> @param[in] ambient Ambient temperature [K].
+    !> @param[out] rate Assembled complex thermal source rate.
     SUBROUTINE eval_thermal_implicit(models,state,radiative,convective,ambient,rate)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(complex_physical_state_type), INTENT(IN) :: state
@@ -74,6 +98,17 @@ CONTAINS
     END SUBROUTINE eval_thermal_implicit
 
 
+    !> @brief Advance thermal temperature analytically over the given interval.
+    !> @details The dispatcher retains each of the four numerical interfaces;
+    !>          unsupported model treatments fail through the model implementation.
+    !> @param[in] models Canonical thermal source names.
+    !> @param[in] state Frozen real physical cell state.
+    !> @param[in] interval Analytic substep duration [s].
+    !> @param[in] heat_capacity Thermal capacity of the frozen mixture.
+    !> @param[in] radiative Radiative heat-exchange coefficient.
+    !> @param[in] convective Convective heat-exchange coefficient.
+    !> @param[in] ambient Ambient temperature [K].
+    !> @param[out] temperature_after Temperature after the thermal substep [K].
     SUBROUTINE eval_thermal_analytic(models,state,interval,heat_capacity, &
             radiative,convective,ambient,temperature_after)
         CHARACTER(*), INTENT(IN) :: models(:)
