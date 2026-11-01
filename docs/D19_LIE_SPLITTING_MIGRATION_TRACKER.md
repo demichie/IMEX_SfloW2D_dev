@@ -362,3 +362,9 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Verifica automatica esaustiva di tutte le chiamate e degli `USE ONLY` nelle 64 unita' di produzione; compilazione e test restano una fase successiva concordata.
 
 **Esito:** nessuna incongruenza certa rilevata nel solo censimento nominale di questo passaggio. Non trasformare il censimento nominale in una certificazione dei tipi/rank o dell'audit statico integrale. Nessuna compilazione, test, workflow o modifica alle zone `B_zone`.
+
+### Verifica effettiva tipo/rank: sei processi mass exchange EXPLICIT (2026-11-01)
+
+Confrontate le dichiarazioni degli argomenti e le chiamate in `mass_exchange_2d` con le implementazioni `mass_exchange_erosion`, `deposition`, `carrier_liquid_loss`, `entrainment`, `vaporization` e `lava_deposition`. Nessuna incongruenza tipo/rank rilevata in questi sei callsite: `physical_state_type` e `mass_exchange_rates_type` sono i tipi trasmessi; `dt` e' scalare `REAL(wp)`; `erodible` e `deposition` sono vettori `REAL(wp)` di `n_solid`; `B_zone` e' `INTEGER` scalare. Il coordinatore riceve `selected_names(:)` carattere e dispatcha solo i nomi selezionati. L'interfaccia sorgente `eval_mass_exchange_source_explicit` inoltra `B_zone`, `erodible`, `dt` e `selected_names` con i corrispondenti tipi e rank. Gli argomenti `r` dei modelli sono `INTENT(INOUT)` e vengono inizializzati dal coordinatore mediante le routine di reset.
+
+Limite preciso: questa verifica certifica **solo i sei callsite EXPLICIT e la catena del coordinatore mass exchange**, non le interfacce storiche semi-implicite/implicite inutilizzate dal percorso Lie. Rimane da confrontare allo stesso livello ogni callsite reologico, termico, Darcy, injection e stato/geometria; nessuna compilazione o test e nessun intervento su `B_zone`.
