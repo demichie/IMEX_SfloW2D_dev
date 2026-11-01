@@ -49,6 +49,8 @@ CONTAINS
         do_entrainment=ANY(selected_names=='mass_exchange_entrainment')
         do_vaporization=ANY(selected_names=='mass_exchange_vaporization')
         do_lava=ANY(selected_names=='mass_exchange_lava_deposition')
+        IF (do_vaporization .AND. .NOT.do_deposition) &
+             CALL fatal_error('mass_exchange: vaporization requires same-group deposition')
         CALL reset_mass_exchange_rates(total_rates)
         eqns_term=0.0_wp
         IF (physical_state%h<=EPSILON(1.0_wp)) RETURN

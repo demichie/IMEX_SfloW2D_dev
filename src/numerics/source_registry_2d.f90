@@ -151,6 +151,9 @@ CONTAINS
       END IF
       DEALLOCATE(expected)
     END DO
+    ! A vaporization-only group would silently evaluate a zero deposition rate.
+    IF (ANY(seen=='mass_exchange_vaporization') .AND. &
+         .NOT.ANY(seen=='mass_exchange_deposition')) RETURN
     this%n_equations=n_equations
     this%pore_equation=pore_equation
     this%lie_entries=groups

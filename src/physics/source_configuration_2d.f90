@@ -208,6 +208,12 @@ CONTAINS
         END DO
       END IF
     END DO
+    ! Vaporization produces steam from material deposited in the same Lie
+    ! transaction. A separate (or absent) deposition source has no rate to use.
+    IF (ANY(names=='mass_exchange_vaporization') .AND. &
+         .NOT.ANY(names=='mass_exchange_deposition')) THEN
+      error='D19: vaporization requires deposition in the same mass-exchange group'; RETURN
+    END IF
     DO i=1,SIZE(groups)
       DO j=i+1,SIZE(groups)
         IF (groups(j)%id<groups(i)%id) THEN
