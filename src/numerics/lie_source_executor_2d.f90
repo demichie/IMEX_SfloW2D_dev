@@ -5,7 +5,7 @@
 !>          while bed projection and geometry refresh remain in geometry_2d.
 !********************************************************************************
 
-MODULE step_source_executor_2d
+MODULE lie_source_executor_2d
     USE parameters_2d, ONLY : idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
 
   USE diagnostics_2d, ONLY : fatal_error
@@ -198,4 +198,4 @@ CONTAINS
     END DO
   END SUBROUTINE execute_lie_source_groups
 
-END MODULE step_source_executor_2d
+END MODULE lie_source_executor_2d

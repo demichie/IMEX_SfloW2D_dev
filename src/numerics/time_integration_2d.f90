@@ -10,7 +10,7 @@ MODULE time_integration_2d
   USE equation_metadata_2d, ONLY : equation_partition_type
   USE spatial_operator_2d, ONLY : spatial_operator_type
   USE domain_2d, ONLY : domain_type
-  USE step_source_executor_2d, ONLY : execute_lie_source_groups
+  USE lie_source_executor_2d, ONLY : execute_lie_source_groups
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: time_integration_workspace_type
