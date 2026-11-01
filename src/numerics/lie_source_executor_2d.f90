@@ -132,9 +132,17 @@ CONTAINS
              EXIT cell_loop
           END IF
           IF (with_exchange) THEN
+             ! All immobilized and erodible inventories are nonnegative.
+             ! Validate the group input before computing any exchange rate.
              IF (.NOT.ALL(ieee_is_finite(state%erodible(1:n_solid,j,k))) .OR. &
-                  ANY(state%erodible(1:n_solid,j,k)<0.0_wp)) THEN
-                CALL reject_cell('D19: invalid erodible inventory before mass exchange')
+                  .NOT.ALL(ieee_is_finite(state%deposit(j,k,1:n_solid))) .OR. &
+                  .NOT.ALL(ieee_is_finite(state%erosion(j,k,1:n_solid))) .OR. &
+                  .NOT.ieee_is_finite(state%lava_deposit(j,k)) .OR. &
+                  ANY(state%erodible(1:n_solid,j,k)<0.0_wp) .OR. &
+                  ANY(state%deposit(j,k,1:n_solid)<0.0_wp) .OR. &
+                  ANY(state%erosion(j,k,1:n_solid)<0.0_wp) .OR. &
+                  state%lava_deposit(j,k)<0.0_wp) THEN
+                CALL reject_cell('D19: invalid substrate inventory before mass exchange')
                 EXIT cell_loop
              END IF
           END IF
@@ -169,7 +177,10 @@ CONTAINS
                      .NOT.ALL(ieee_is_finite(erosion_candidate)) .OR. &
                      .NOT.ALL(ieee_is_finite(erodible_candidate)) .OR. &
                      .NOT.ieee_is_finite(lava_candidate) .OR. &
-                     ANY(erodible_candidate<0.0_wp)) THEN
+                     ANY(erodible_candidate<0.0_wp) .OR. &
+                     ANY(deposit_candidate<0.0_wp) .OR. &
+                     ANY(erosion_candidate<0.0_wp) .OR. &
+                     lava_candidate<0.0_wp) THEN
                    CALL reject_cell('D19: invalid candidate substrate inventory')
                    EXIT cell_loop
                 END IF

@@ -100,3 +100,7 @@ Le voci seguenti descrivono il codice **già registrato su `master`**, non attes
 ## 5. Manutenzione del documento
 
 Mantenere **una sola versione** del contratto in §1. Quando una decisione viene precisata, aggiornare direttamente la descrizione dell'architettura e la checklist, **senza aggiungere una nuova regola contraddittoria o una cronologia di decisioni**. Registrare i progressi soltanto nello stato di implementazione (§2) e nella checklist (§3). Un commit non implica compilazione o test superati.
+
+### Audit inventari Lie (2026-11-01)
+
+Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione, erodibile e lava immobilizzata sia allo stato di ingresso sia per i candidati; nessun clipping.
