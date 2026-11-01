@@ -31,8 +31,8 @@ CONTAINS
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
          B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
          begin_topography_rate_update,record_topography_rate_cell, &
-         apply_topography_rate_update,commit_lie_group_inventories, &
-         deposit,erosion,erodible,lava_deposit
+         project_lie_bed_rate,assign_lie_bed,B_vertex, &
+         deposit,erosion,erodible,lava_deposit,comp_interfaces_x,comp_interfaces_y
     USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, &
          eval_source_analytic,cell_analytic_source_context, &
          analytic_term_context_type
@@ -42,7 +42,7 @@ CONTAINS
     USE state_conversion_2d, ONLY : qc_to_qp
     USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible, &
          physical_cell_state_finite
-    USE parameters_2d, ONLY : topo_change_flag
+    USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
     TYPE(mass_exchange_rates_type) :: transfers
     TYPE(analytic_term_context_type) :: analytic_context
@@ -61,6 +61,7 @@ CONTAINS
     REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
     REAL(wp) :: erodible_candidate(n_solid),lava_candidate
     INTEGER, ALLOCATABLE :: group_j(:),group_k(:)
+    REAL(wp), ALLOCATABLE :: bed_rate_vertex(:,:),bed_candidate(:,:)
     REAL(wp), ALLOCATABLE :: staged_deposit(:,:),staged_erosion(:,:), &
          staged_erodible(:,:),staged_lava(:),staged_bed_rate(:)
     REAL(wp) :: total_rate(n_eqns)
@@ -161,12 +162,11 @@ CONTAINS
                 IF (.NOT.ALL(ieee_is_finite(deposit_candidate)) .OR. &
                      .NOT.ALL(ieee_is_finite(erosion_candidate)) .OR. &
                      .NOT.ALL(ieee_is_finite(erodible_candidate)) .OR. &
-                     .NOT.ieee_is_finite(lava_candidate)) &
-                     CALL reject_cell('D19: non-finite mass-exchange candidate inventory')
-                     IF (step_failed) EXIT cell_loop
-                IF (ANY(erodible_candidate<0.0_wp)) &
-                     CALL reject_cell('D19: negative candidate erodible inventory')
-                     IF (step_failed) EXIT cell_loop
+                     .NOT.ieee_is_finite(lava_candidate) .OR. &
+                     ANY(erodible_candidate<0.0_wp)) THEN
+                   CALL reject_cell('D19: invalid candidate substrate inventory')
+                   EXIT cell_loop
+                END IF
              END IF
              IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
                 CALL qc_to_qp(q_candidate,qp_candidate,pressure,'Lie explicit group candidate',conversion_ok)
@@ -239,22 +239,52 @@ CONTAINS
           RETURN
        END IF
        ! Publish inventory changes only after all cells in the group succeed.
-       IF (with_exchange) THEN
-          CALL commit_lie_group_inventories(group_j,group_k,staged_deposit, &
-               staged_erosion,staged_erodible,staged_lava,staged_bed_rate,topo_change_flag)
-          DEALLOCATE(group_j,group_k,staged_deposit,staged_erosion, &
-               staged_erodible,staged_lava,staged_bed_rate)
-       END IF
        IF (with_exchange .AND. topo_change_flag) THEN
-          CALL apply_topography_rate_update(time_step,bed_accepted)
+          ALLOCATE(bed_rate_vertex(comp_interfaces_x,comp_interfaces_y))
+          CALL record_group_bed_rates
+          CALL project_lie_bed_rate(bed_rate_vertex,bed_accepted)
+          IF (bed_accepted) THEN
+             bed_candidate=B_vertex+time_step*bed_rate_vertex
+             IF (.NOT.ALL(ieee_is_finite(bed_candidate))) bed_accepted=.FALSE.
+          END IF
           IF (.NOT.bed_accepted) THEN
-             CALL reject_cell('D19: projected topography update failed')
+             CALL reject_cell('D19: invalid candidate projected bed')
              IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
              RETURN
           END IF
        END IF
+       IF (with_exchange) THEN
+          DO cell=1,domain%solve_cells
+             j=group_j(cell)
+             k=group_k(cell)
+             deposit(j,k,1:n_solid)=staged_deposit(:,cell)
+             erosion(j,k,1:n_solid)=staged_erosion(:,cell)
+             erodible(1:n_solid,j,k)=staged_erodible(:,cell)
+             lava_deposit(j,k)=staged_lava(cell)
+          END DO
+          IF (topo_change_flag) THEN
+             CALL assign_lie_bed(bed_candidate,bed_accepted)
+             IF (.NOT.bed_accepted) THEN
+                CALL reject_cell('D19: invalid refreshed geometry')
+                IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
+                RETURN
+             END IF
+             DEALLOCATE(bed_rate_vertex,bed_candidate)
+          END IF
+          DEALLOCATE(group_j,group_k,staged_deposit,staged_erosion, &
+               staged_erodible,staged_lava,staged_bed_rate)
+       END IF
     END DO
   CONTAINS
+    SUBROUTINE record_group_bed_rates
+      INTEGER :: n,j_cell,k_cell
+      DO n=1,domain%solve_cells
+         j_cell=group_j(n)
+         k_cell=group_k(n)
+         CALL record_topography_rate_cell(j_cell,k_cell,staged_bed_rate(n))
+      END DO
+    END SUBROUTINE record_group_bed_rates
+
     ! Return a recoverable cell/group rejection without leaving the executor
     ! before returning the source-group status.
     SUBROUTINE reject_cell(message)

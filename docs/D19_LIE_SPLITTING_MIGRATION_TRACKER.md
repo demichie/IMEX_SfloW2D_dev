@@ -67,18 +67,18 @@ Le voci seguenti descrivono il codice **già registrato su `master`**, non attes
 | `source_terms_2d`: assemblaggio esplicito e limiter comune | Presente `assemble_lie_explicit_transaction`; i trasferimenti conservativi e al substrato vengono limitati con un fattore coerente. |
 | `state_2d`: controlli di ammissibilità | Presenti le funzioni di verifica utilizzate dai percorsi Lie. |
 | `lie_source_executor_2d`: staging per gruppo | Presenti array temporanei per depositi, erosione, erodibile, lava e rate del fondo, pubblicati dopo il ciclo sulle celle. |
-| `geometry_2d`: pubblicazione degli inventari | **Transitorio, da sostituire**: `commit_lie_group_inventories` pubblica ancora direttamente gli inventari. |
-| `geometry_2d`: calcolo dei candidati temporali | **Non implementato su master** come nuova funzione; non introdurlo qui. Il calcolo deve appartenere all'integrazione. |
-| `geometry_2d`: aggiornamento del fondo | **Transitorio, da sostituire**: `apply_topography_rate_update(dt,...)` integra ancora nel tempo all'interno di `geometry_2d`. Separare proiezione geometrica e avanzamento temporale. |
+| `geometry_2d`: pubblicazione degli inventari | Il commit degli inventari è ora coordinato dall'esecutore Lie; controllare la separazione definitiva di storage e integrazione. |
+| `geometry_2d`: calcolo dei candidati temporali | Calcolato dall'esecutore Lie a partire dai rate già limitati; nessuna routine temporale di candidatura nel modulo geometrico. |
+| `geometry_2d`: aggiornamento del fondo | La proiezione `project_lie_bed_rate` e l'assegnazione/refresh `assign_lie_bed` non usano `dt`; l'incremento temporale del fondo è calcolato nell'esecutore. |
 | Transazione di rollback | Presente snapshot dell'intero passo per fondo, inventari e cache geometriche; riallinearne il possesso dei dati durante il refactoring. |
 | Pulizia completa delle API storiche RK/STEP/STAGE | Ancora da terminare. |
 | Compilazione e suite finale | **Non eseguite**: per decisione progettuale si effettuano soltanto dopo tutte le modifiche al codice di produzione. |
 
 ## 3. Passi necessari per completare l'implementazione
 
-- [ ] **Separare l'evoluzione temporale dalla geometria**: estrarre da `geometry_2d` il calcolo `B + dt * rate`. Conservare lì soltanto rappresentazione/proiezione geometrica e refresh di pendenze, curvature e coefficienti; l'integratore effettua il calcolo temporale sul fondo.
-- [ ] **Spostare la costruzione temporale degli inventari nel livello di integrazione**: preparazione di depositi, erosione, erodibile e lava tramite `dt` e i rate già limitati; nessuna di queste formule dentro `geometry_2d`.
-- [ ] **Rimuovere la gestione evolutiva da `geometry_2d`**: sostituire `commit_lie_group_inventories` e le altre interfacce che conoscono il progresso temporale con un'assegnazione coerente dei dati accettati e un'interfaccia puramente geometrica per aggiornare i campi derivati. Definire l'ownership finale delle variabili evolutive senza mischiare fisica e geometria.
+- [x] **Separare l'evoluzione temporale dalla geometria**: estrarre da `geometry_2d` il calcolo `B + dt * rate`. Conservare lì soltanto rappresentazione/proiezione geometrica e refresh di pendenze, curvature e coefficienti; l'integratore effettua il calcolo temporale sul fondo.
+- [x] **Spostare la costruzione temporale degli inventari nel livello di integrazione**: preparazione di depositi, erosione, erodibile e lava tramite `dt` e i rate già limitati; nessuna di queste formule dentro `geometry_2d`.
+- [x] **Rimuovere la gestione evolutiva da `geometry_2d`**: sostituire `commit_lie_group_inventories` e le altre interfacce che conoscono il progresso temporale con un'assegnazione coerente dei dati accettati e un'interfaccia puramente geometrica per aggiornare i campi derivati. Definire l'ownership finale delle variabili evolutive senza mischiare fisica e geometria.
 - [ ] **Garantire il commit atomico del gruppo**: tutti i candidati devono essere validati prima della pubblicazione; dopo l'accettazione aggiornare gli inventari e il fondo insieme e ricalcolare la geometria derivata se necessario.
 - [ ] **Mantenere la geometria congelata durante Newton** e verificare che nessuna routine invocata nei residui/Jacobiani modifichi inventari o geometria.
 - [ ] **Verificare l'integrità del rollback di passo** dopo lo spostamento delle variabili evolutive, incluso il ripristino delle cache geometriche.

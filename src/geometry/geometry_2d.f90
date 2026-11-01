@@ -23,10 +23,10 @@ MODULE geometry_2d
   PRIVATE :: ensure_topography_rate_workspace
 
   PUBLIC :: begin_topography_rate_update, record_topography_rate_cell
-  PUBLIC :: apply_topography_rate_update, release_topography_workspace
+  PUBLIC :: release_topography_workspace
   PUBLIC :: begin_lie_geometry_transaction, commit_lie_geometry_transaction
   PUBLIC :: rollback_lie_geometry_transaction
-  PUBLIC :: commit_lie_group_inventories
+  PUBLIC :: project_lie_bed_rate,assign_lie_bed
 
   ! Saved authoritative fields for a recoverable Lie step. Derived geometry is
   ! reconstructed on rollback, so later groups still see intermediate bed updates.
@@ -491,44 +491,6 @@ CONTAINS
   !******************************************************************************
 
   !> Save authoritative geometry and substrate inventories before Lie groups.
-  !> Publish a completely validated group substrate inventory at its boundary.
-  !> The caller stages all cells before invoking this routine; geometry owns
-  !> all authoritative inventory mutation and the optional bed-rate proposal.
-  SUBROUTINE commit_lie_group_inventories(j_cells,k_cells,solid_deposit, &
-       solid_erosion,solid_erodible,lava,bed_rate,update_bed)
-    INTEGER, INTENT(IN) :: j_cells(:),k_cells(:)
-    REAL(wp), INTENT(IN) :: solid_deposit(:,:),solid_erosion(:,:),solid_erodible(:,:)
-    REAL(wp), INTENT(IN) :: lava(:),bed_rate(:)
-    LOGICAL, INTENT(IN) :: update_bed
-    INTEGER :: cell,j,k,n
-    n=SIZE(j_cells)
-    IF (SIZE(k_cells)/=n .OR. SIZE(lava)/=n .OR. SIZE(bed_rate)/=n) &
-         ERROR STOP 'invalid Lie group inventory dimensions'
-    IF (SIZE(solid_deposit,2)/=n .OR. SIZE(solid_erosion,2)/=n .OR. &
-         SIZE(solid_erodible,2)/=n) ERROR STOP 'invalid Lie inventory cell count'
-    IF (SIZE(solid_deposit,1)/=SIZE(deposit,3) .OR. &
-         SIZE(solid_erosion,1)/=SIZE(erosion,3) .OR. &
-         SIZE(solid_erodible,1)/=SIZE(erodible,1)) &
-         ERROR STOP 'invalid Lie inventory component count'
-    IF (.NOT.ALL(ieee_is_finite(solid_deposit)) .OR. &
-         .NOT.ALL(ieee_is_finite(solid_erosion)) .OR. &
-         .NOT.ALL(ieee_is_finite(solid_erodible)) .OR. &
-         .NOT.ALL(ieee_is_finite(lava)) .OR. &
-         .NOT.ALL(ieee_is_finite(bed_rate))) &
-         ERROR STOP 'non-finite Lie group inventory transaction'
-    IF (ANY(solid_erodible<0.0_wp)) &
-         ERROR STOP 'negative Lie group erodible inventory'
-    DO cell=1,n
-       j=j_cells(cell)
-       k=k_cells(cell)
-       deposit(j,k,:)=solid_deposit(:,cell)
-       erosion(j,k,:)=solid_erosion(:,cell)
-       erodible(:,j,k)=solid_erodible(:,cell)
-       lava_deposit(j,k)=lava(cell)
-       IF (update_bed) CALL record_topography_rate_cell(j,k,bed_rate(cell))
-    END DO
-  END SUBROUTINE commit_lie_group_inventories
-
   SUBROUTINE begin_lie_geometry_transaction
     IF (lie_geometry_transaction_active) &
          ERROR STOP 'nested Lie geometry transaction'
@@ -682,59 +644,31 @@ CONTAINS
 
   END SUBROUTINE record_topography_rate_cell
 
-  !******************************************************************************
-  !> \brief Project cell bed-rate proposals and update the authoritative bed.
-  !> \details Gathers adjacent cell proposals at vertices, advances B_vertex
-  !>          once by the time increment and refreshes all derived geometry.
-  !> \param[in] time_step Physical time increment [s].
-  !******************************************************************************
-  SUBROUTINE apply_topography_rate_update(time_step,accepted)
+  !> Purely geometric mapping from cell rate proposals to nodal values.
+  !> There is no timestep and no modification of the authoritative bed.
+  SUBROUTINE project_lie_bed_rate(rate_vertex,accepted)
+    REAL(wp), INTENT(OUT) :: rate_vertex(:,:)
+    LOGICAL, INTENT(OUT) :: accepted
+    accepted=.FALSE.
+    IF (.NOT.ALLOCATED(topography_rate_cell)) RETURN
+    IF (SIZE(rate_vertex,1)/=comp_interfaces_x .OR. &
+         SIZE(rate_vertex,2)/=comp_interfaces_y) RETURN
+    CALL project_cell_field_to_vertices(topography_rate_cell,rate_vertex)
+    accepted=ALL(ieee_is_finite(rate_vertex))
+  END SUBROUTINE project_lie_bed_rate
 
-    IMPLICIT NONE
-
-    REAL(wp), INTENT(IN) :: time_step
-    LOGICAL, INTENT(OUT), OPTIONAL :: accepted
-    LOGICAL :: valid
-    REAL(wp), ALLOCATABLE :: bed_candidate(:,:)
-
-    IF (PRESENT(accepted)) accepted=.FALSE.
-
-    IF (.NOT.ieee_is_finite(time_step) .OR. time_step<=0.0_wp) THEN
-       IF (PRESENT(accepted)) RETURN
-       ERROR STOP 'invalid Lie topography time interval'
-    END IF
-    IF (.NOT.ALLOCATED(B_vertex)) THEN
-       IF (PRESENT(accepted)) RETURN
-       ERROR STOP 'topography vertices are not initialized'
-    END IF
-    IF (.NOT.ALLOCATED(topography_rate_cell) .OR.                         &
-         .NOT.ALLOCATED(topography_rate_vertex)) THEN
-       IF (PRESENT(accepted)) RETURN
-       ERROR STOP 'topography rate workspace is not initialized'
-    END IF
-
-    CALL project_cell_field_to_vertices(topography_rate_cell,             &
-         topography_rate_vertex)
-
-    ! Validate the entire nodal candidate before changing authoritative B_vertex.
-    IF (.NOT.ALL(ieee_is_finite(topography_rate_vertex))) THEN
-       IF (PRESENT(accepted)) RETURN
-       ERROR STOP 'non-finite projected Lie topography rate'
-    END IF
-    bed_candidate=B_vertex+time_step*topography_rate_vertex
-    IF (.NOT.ALL(ieee_is_finite(bed_candidate))) THEN
-       IF (PRESENT(accepted)) RETURN
-       ERROR STOP 'non-finite Lie topography candidate'
-    END IF
+  !> Assign an already time-integrated bed and refresh its derived geometry.
+  SUBROUTINE assign_lie_bed(bed_candidate,accepted)
+    REAL(wp), INTENT(IN) :: bed_candidate(:,:)
+    LOGICAL, INTENT(OUT) :: accepted
+    accepted=.FALSE.
+    IF (.NOT.ALLOCATED(B_vertex)) RETURN
+    IF (ANY(SHAPE(bed_candidate)/=SHAPE(B_vertex))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(bed_candidate))) RETURN
     B_vertex=bed_candidate
-
     CALL refresh_topography_geometry
-    IF (PRESENT(accepted)) THEN
-       IF (.NOT.topography_geometry_is_finite()) RETURN
-       accepted=.TRUE.
-    END IF
-
-  END SUBROUTINE apply_topography_rate_update
+    accepted=topography_geometry_is_finite()
+  END SUBROUTINE assign_lie_bed
 
   !******************************************************************************
   !> \brief Release the geometry-owned topography update workspace.
