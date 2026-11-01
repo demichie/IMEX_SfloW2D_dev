@@ -64,6 +64,15 @@ MODULE state_2d
 
    CONTAINS
 
+     PROCEDURE :: initialize => initialize_state
+     PROCEDURE :: finalize => finalize_state
+     PROCEDURE :: refresh_substrate_totals => refresh_substrate_totals
+
+  END TYPE state_type
+
+CONTAINS
+
+
   !> Validate a primitive cell state without changing it.
   PURE LOGICAL FUNCTION physical_cell_state_finite(qp_cell) RESULT(valid)
     REAL(wp), INTENT(IN) :: qp_cell(:)
@@ -83,14 +92,6 @@ MODULE state_2d
   END FUNCTION conservative_mass_admissible
 
 
-
-     PROCEDURE :: initialize => initialize_state
-     PROCEDURE :: finalize => finalize_state
-     PROCEDURE :: refresh_substrate_totals => refresh_substrate_totals
-
-  END TYPE state_type
-
-CONTAINS
 
   !******************************************************************************
   !> \brief Allocate and reset cell states and accumulated diagnostics for one model layout.
