@@ -42,13 +42,12 @@ MODULE simulation_2d
   PUBLIC :: simulation_context_type
   PUBLIC :: simulation
   PUBLIC :: TIMESTEP_EVENT_SOURCE_WINDOWS, TIMESTEP_EVENT_STOCHASTIC_PREPARED
-  PUBLIC :: TIMESTEP_EVENT_RK_COMPLETE, TIMESTEP_EVENT_STEP_SOURCES_COMPLETE
+  PUBLIC :: TIMESTEP_EVENT_LIE_COMPLETE
   PUBLIC :: TIMESTEP_EVENT_CLOCK_ADVANCED
 
   INTEGER, PARAMETER :: TIMESTEP_EVENT_SOURCE_WINDOWS=1
   INTEGER, PARAMETER :: TIMESTEP_EVENT_STOCHASTIC_PREPARED=2
-  INTEGER, PARAMETER :: TIMESTEP_EVENT_RK_COMPLETE=3
-  INTEGER, PARAMETER :: TIMESTEP_EVENT_STEP_SOURCES_COMPLETE=4
+  INTEGER, PARAMETER :: TIMESTEP_EVENT_LIE_COMPLETE=3
   INTEGER, PARAMETER :: TIMESTEP_EVENT_CLOCK_ADVANCED=5
 
   ABSTRACT INTERFACE
@@ -70,7 +69,7 @@ MODULE simulation_2d
 
      TYPE(runtime_state_type) :: runtime
      TYPE(model_layout_type) :: model_layout
-     TYPE(source_registry_type) :: source_registry !< Validated metadata for stage dispatch and source scheduling.
+     TYPE(source_registry_type) :: source_registry !< Ordered method-capable Lie source groups.
      TYPE(equation_partition_type) :: equation_partition
      TYPE(state_type) :: state
      TYPE(domain_type) :: domain
@@ -127,7 +126,7 @@ CONTAINS
 
   !> \brief Apply one production timestep after the driver has selected dt.
   !> \details Preserves the fractional-step ordering: source-window averages,
-  !>          OU preparation, RK-IMEX, post-RK step sources, then clock advance.
+  !>          OU preparation, full Lie spatial/source advancement, then one clock advance.
   !> \param[in,out] this Initialized simulation context.
   !> \param[in] observer Optional test hook called after each completed phase.
   SUBROUTINE advance_simulation_timestep(this,observer)
@@ -146,9 +145,9 @@ CONTAINS
          step_start,step_length)
 
     CALL this%time_integration%advance(this%state%q,this%state%qp,step_start, &
-         step_length,this%stochastic%effective_Z,this%equation_partition, &
+         step_length,this%stochastic%effective_Z, &
          this%source_registry,this%domain,this%spatial_operator)
-    IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_RK_COMPLETE,step_start,step_length)
+    IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_LIE_COMPLETE,step_start,step_length)
 
 
     this%runtime%t=step_start+step_length

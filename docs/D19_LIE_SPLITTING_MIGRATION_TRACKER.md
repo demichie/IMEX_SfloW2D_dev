@@ -57,7 +57,7 @@ Use statuses `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Add date, commit and test
 | L03 | Implement RK-independent group-local backward-Euler Newton API and analytic dispatcher | IN_PROGRESS | Renamed internal group/input-state symbols and removed misleading stage/DIRK documentation; numerical coupling review pending. |
 | L04 | Generic explicit/NEWTON/ANALYTIC source-group executor | IN_PROGRESS | Lie source executor in place; shared rate-limiter and coupled inventory verification pending. |
 | L05 | Lie time driver with GROUP-0 spatial update, source rates evaluated on `q_n`, source-rate limits applied to `q_sp`, then GROUP 1+ | IN_PROGRESS | Lie spatial-first driver in place, GROUP 0 rates evaluated from original state; spatial and group state reject non-finite values; final acceptance pending. |
-| L06 | Simplify production timestep, observers, diagnostics and stochastic/source-window plumbing | IN_PROGRESS | Production timestep now calls single driver; event/test cleanup pending. |
+| L06 | Simplify production timestep, observers, diagnostics and stochastic/source-window plumbing | IN_PROGRESS | Removed RK_COMPLETE observer and unused global equation partition from Lie driver; tests and events still require final review. |
 | L07 | Delete IMEX-RK tableau, stage arrays, RK stage loops, adapters and `N_RK` across build/input/tests | IN_PROGRESS | RK tableau and workspaces removed; obsolete references/tests pending. |
 | L08 | Exhaustive reference cleanup, formatting and documentation updates, D18 alignment | TODO | No obsolete symbols or contradictory architecture descriptions in current-source docs. |
 | L09 | Comprehensive acceptance: unit, integration, conservation, stability, restart, examples and performance | TODO | Explicit executed suite names, commits, failures and resolutions. |
@@ -83,6 +83,7 @@ Do not claim that first-order Lie is unconditionally stable or well-balanced for
 
 | Date | Change | Commit | Checks executed | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-11-01 | Decoupled Lie driver from unused global equation partition and replaced misleading RK-completion observer with Lie-completion event. | Pending commit | Static inspection only; compilation intentionally deferred | Full step-level atomicity still open, including geometry state and failure rollback. |
 | 2026-11-01 | Strengthened source transaction preconditions: finite timestep, valid source coverage, complete mass-exchange transfer finiteness, valid group limiter and post-transfer erodible inventory checks. | Pending commit | Static review, not compiled/tested | Final coherent rollback and model-specific physical tests remain pending. |
 | 2026-11-01 | Removed remaining stage-group terminology from the cell-local Newton solver, clarified Lie-group input-state naming and checked explicit rates/transfers for non-finite values before committing inventory updates. | Pending commit | Static inspection only; no compilation/tests | Additional coupled-source and rollback review required. |
 | 2026-11-01 | Strengthened spatial and source-group admissibility: reject infinities as well as NaNs; enforce solid-mass <= mixture-mass after every completed source-group cell update. | Pending commit | Static review only; no compilation/tests (migration policy) | No post-update clipping; all failures are explicit. |

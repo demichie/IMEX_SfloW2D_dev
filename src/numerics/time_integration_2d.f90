@@ -8,7 +8,6 @@ MODULE time_integration_2d
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
   USE diagnostics_2d, ONLY : fatal_error
   USE source_registry_2d, ONLY : source_registry_type
-  USE equation_metadata_2d, ONLY : equation_partition_type
   USE spatial_operator_2d, ONLY : spatial_operator_type
   USE domain_2d, ONLY : domain_type
   USE lie_source_executor_2d, ONLY : execute_lie_source_groups
@@ -36,12 +35,11 @@ CONTAINS
     IF (ALLOCATED(this%q_before)) DEALLOCATE(this%q_before)
     IF (ALLOCATED(this%qp_before)) DEALLOCATE(this%qp_before)
   END SUBROUTINE
-  SUBROUTINE advance_lie(this,q,qp,t,dt,Z,equation_partition,source_registry,domain,spatial_operator)
+  SUBROUTINE advance_lie(this,q,qp,t,dt,Z,source_registry,domain,spatial_operator)
     CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
     REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: t,dt,Z(comp_cells_x,comp_cells_y)
-    TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     TYPE(source_registry_type), INTENT(IN) :: source_registry
     CLASS(domain_type), INTENT(IN) :: domain
     CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
