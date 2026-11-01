@@ -280,11 +280,6 @@ CONTAINS
       status=0
 
     ELSE IF (selected_model_name=='thermal_cooling') THEN
-      IF (.NOT.thermal_cooling_flag) THEN
-        status=-2
-        RETURN
-      END IF
-
       CALL real_physical_state_from_q(q_before, physical_state, &
             context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
             context%Bsecond_xy,context%Bsecond_yy)
@@ -299,7 +294,7 @@ CONTAINS
       q_after(4)=heat_capacity*temperature_after
       status=0
 
-    ELSE IF (selected_model_name=='pore_pressure_dissipation' .AND. pore_pressure_flag) THEN
+    ELSE IF (selected_model_name=='pore_pressure_dissipation') THEN
       IF (q_before(1)>0.0_wp) THEN
 
         CALL real_physical_state_from_q(q_before, physical_state, &
@@ -539,7 +534,7 @@ CONTAINS
                stochastic_flag, stochastic_value, rheology_rate)
           expl_term(2:3)=expl_term(2:3)+rheology_rate
         END IF
-        IF (thermal_cooling_flag .AND. group_contains_name(group,'thermal_cooling')) THEN
+        IF (group_contains_name(group,'thermal_cooling')) THEN
           CALL eval_thermal_explicit(['thermal_cooling'],physical_state, &
                radiative_term_coeff,convective_term_coeff,T_env,thermal_rate)
           expl_term(4)=expl_term(4)+thermal_rate
