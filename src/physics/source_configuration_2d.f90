@@ -87,6 +87,8 @@ CONTAINS
     CHARACTER(LEN=16) :: requested_method
     INTEGER :: i,j,k,id,method,pore,n,affected_idx
     INTEGER, ALLOCATABLE :: affected(:)
+    ! A failed reconfiguration must never leave a previous registry active.
+    CALL registry%finalize()
     CALL collect_active_source_names(thermal_cooling_flag,names,error)
     IF (LEN_TRIM(error)>0) RETURN
     ALLOCATE(groups(1))
