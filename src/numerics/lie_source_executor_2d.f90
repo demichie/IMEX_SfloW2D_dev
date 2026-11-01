@@ -70,6 +70,7 @@ CONTAINS
     groups=source_registry%groups()
     source_time=0.0_wp
     IF (PRESENT(step_start_time)) source_time=step_start_time
+    IF (.NOT.ieee_is_finite(time_step)) CALL fatal_error('D19: non-finite Lie timestep')
     IF (time_step<=0.0_wp) CALL fatal_error('D19: nonpositive time interval')
 
     DO group_index=1,SIZE(groups)
@@ -117,6 +118,9 @@ CONTAINS
                      erodible(1:n_solid,j,k),time_step,transfers,exchange_rate)
                 IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
                    coverage=1.0_wp-cell_source_fractions(j,k)
+                   IF (.NOT.ieee_is_finite(coverage) .OR. &
+                        coverage<0.0_wp .OR. coverage>1.0_wp) &
+                        CALL fatal_error('D19: invalid mass-exchange source coverage')
                    exchange_rate=coverage*exchange_rate
                    transfers%solid_deposition_rate=coverage*transfers%solid_deposition_rate
                    transfers%solid_erosion_rate=coverage*transfers%solid_erosion_rate
@@ -131,6 +135,14 @@ CONTAINS
              IF (with_exchange) THEN
                 IF (.NOT.ALL(ieee_is_finite(transfers%solid_deposition_rate)) .OR. &
                      .NOT.ALL(ieee_is_finite(transfers%solid_erosion_rate)) .OR. &
+                     .NOT.ALL(ieee_is_finite(transfers%solid_mass_rate)) .OR. &
+                     .NOT.ALL(ieee_is_finite(transfers%add_gas_mass_rate)) .OR. &
+                     .NOT.ieee_is_finite(transfers%mixture_mass_rate) .OR. &
+                     .NOT.ieee_is_finite(transfers%energy_rate) .OR. &
+                     .NOT.ieee_is_finite(transfers%carrier_erosion_rate) .OR. &
+                     .NOT.ieee_is_finite(transfers%carrier_deposition_rate) .OR. &
+                     .NOT.ieee_is_finite(transfers%carrier_withdrawal_volume_rate) .OR. &
+                     .NOT.ieee_is_finite(transfers%lava_deposit_rate) .OR. &
                      .NOT.ieee_is_finite(transfers%dB_dt)) &
                      CALL fatal_error('D19: non-finite coupled mass-exchange transfer')
              END IF
@@ -157,6 +169,8 @@ CONTAINS
                   -total_rate(idx_totMassEqn)
              IF (change_in_solid>0.0_wp) factor=MIN(factor, &
                   MAX(0.0_wp,remaining_mass/(time_step*change_in_solid)))
+             IF (.NOT.ieee_is_finite(factor) .OR. factor<0.0_wp .OR. factor>1.0_wp) &
+                  CALL fatal_error('D19: invalid Lie source limiter factor')
              q(1:n_eqns,j,k)=q(1:n_eqns,j,k)+time_step*factor*total_rate
              IF (with_exchange) THEN
                 deposit(j,k,1:n_solid)=deposit(j,k,1:n_solid)+ &
@@ -168,6 +182,13 @@ CONTAINS
                 IF (erodible_deposit_flag) erodible(1:n_solid,j,k)= &
                      erodible(1:n_solid,j,k)+time_step*factor*transfers%solid_deposition_rate
                 lava_deposit(j,k)=lava_deposit(j,k)+time_step*factor*transfers%lava_deposit_rate
+                IF (.NOT.ALL(ieee_is_finite(deposit(j,k,1:n_solid))) .OR. &
+                     .NOT.ALL(ieee_is_finite(erosion(j,k,1:n_solid))) .OR. &
+                     .NOT.ALL(ieee_is_finite(erodible(1:n_solid,j,k))) .OR. &
+                     .NOT.ieee_is_finite(lava_deposit(j,k))) &
+                     CALL fatal_error('D19: non-finite mass-exchange inventory')
+                IF (ANY(erodible(1:n_solid,j,k)<0.0_wp)) &
+                     CALL fatal_error('D19: negative erodible inventory after Lie group')
                 IF (topo_change_flag) CALL record_topography_rate_cell(j,k, &
                      factor*transfers%dB_dt)
              END IF

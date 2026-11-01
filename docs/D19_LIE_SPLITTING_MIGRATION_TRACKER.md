@@ -83,6 +83,7 @@ Do not claim that first-order Lie is unconditionally stable or well-balanced for
 
 | Date | Change | Commit | Checks executed | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-11-01 | Strengthened source transaction preconditions: finite timestep, valid source coverage, complete mass-exchange transfer finiteness, valid group limiter and post-transfer erodible inventory checks. | Pending commit | Static review, not compiled/tested | Final coherent rollback and model-specific physical tests remain pending. |
 | 2026-11-01 | Removed remaining stage-group terminology from the cell-local Newton solver, clarified Lie-group input-state naming and checked explicit rates/transfers for non-finite values before committing inventory updates. | Pending commit | Static inspection only; no compilation/tests | Additional coupled-source and rollback review required. |
 | 2026-11-01 | Strengthened spatial and source-group admissibility: reject infinities as well as NaNs; enforce solid-mass <= mixture-mass after every completed source-group cell update. | Pending commit | Static review only; no compilation/tests (migration policy) | No post-update clipping; all failures are explicit. |
 | 2026-11-01 | Large in-place migration: replaced RK tableau with Lie driver, removed STAGE/STEP catalog and registry, removed N_RK from primary input, routed sources through group executor, removed RK Newton wrappers. | 5dfa59b3, a47087c1, b7ca9c28, bad22a6d, 8f757be7, 67edbf78, 9ce49244 | Deliberately not run | Major integration and physics-consistency work remains. |
