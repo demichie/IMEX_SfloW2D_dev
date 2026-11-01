@@ -1,5 +1,5 @@
 !********************************************************************************
-!> \brief Immutable structural description of one configured model
+!> @brief Describe immutable structural component indices for one configured model.
 !>
 !> The layout snapshots variable counts and component indices before solver
 !> workspaces are allocated. State arrays remain three-dimensional in this
@@ -15,14 +15,18 @@ MODULE model_layout_2d
     PUBLIC :: model_layout_type
     PUBLIC :: supported_layer_count
 
-    !> \brief Validated component indices shared by states and numerical workspaces.
-    !> \details Zero optional indices mean that the corresponding transported
+    !> @brief Validated component indices shared by states and numerical workspaces.
+    !> @details Zero optional indices mean that the corresponding transported
     !>          variable is absent. Appended physical velocities are not equations.
     TYPE :: model_layout_type
 
+        !> Number of material layers; currently only one is implemented.
         INTEGER :: n_layers = 0
+        !> Number of conservative state components per cell.
         INTEGER :: n_variables = 0
+        !> Primitive state size including appended horizontal velocities.
         INTEGER :: n_physical_variables = 0
+        !> Number of conservative balance equations.
         INTEGER :: n_equations = 0
 
         INTEGER :: n_solid = 0
@@ -53,10 +57,10 @@ MODULE model_layout_2d
 CONTAINS
 
     !******************************************************************************
-    !> \brief Report whether the requested layer count is implemented.
+    !> @brief Report whether the requested layer count is implemented.
     !>
-    !> \param[in] n_layers Requested material-layer count; only one layer is currently supported.
-    !> \return True only for the currently implemented single-layer model.
+    !> @param[in] n_layers Requested material-layer count; only one layer is currently supported.
+    !> @return True only for the currently implemented single-layer model.
     !******************************************************************************
 
     PURE LOGICAL FUNCTION supported_layer_count( n_layers )
@@ -69,16 +73,16 @@ CONTAINS
 
 
     !******************************************************************************
-    !> \brief Validate variable counts and build the canonical component index layout.
+    !> @brief Validate variable counts and build the canonical component index layout.
     !>
-    !> \param[in,out] this Canonical model variable-count and component-index descriptor.
-    !> \param[in] n_layers Requested material-layer count; only one layer is currently supported.
-    !> \param[in] n_variables Number of conservative variables in each cell state.
-    !> \param[in] n_equations Number of balance equations; currently equal to n_variables.
-    !> \param[in] n_solid Number of independently transported solid classes.
-    !> \param[in] n_additional_gas Number of additional gas components, excluding ambient air.
-    !> \param[in] n_stochastic Number of transported stochastic variables, zero or one.
-    !> \param[in] n_pore_pressure Number of transported pore-pressure variables, zero or one.
+    !> @param[in,out] this Canonical model variable-count and component-index descriptor.
+    !> @param[in] n_layers Requested material-layer count; only one layer is currently supported.
+    !> @param[in] n_variables Number of conservative variables in each cell state.
+    !> @param[in] n_equations Number of balance equations; currently equal to n_variables.
+    !> @param[in] n_solid Number of independently transported solid classes.
+    !> @param[in] n_additional_gas Number of additional gas components, excluding ambient air.
+    !> @param[in] n_stochastic Number of transported stochastic variables, zero or one.
+    !> @param[in] n_pore_pressure Number of transported pore-pressure variables, zero or one.
     !******************************************************************************
 
     SUBROUTINE initialize_model_layout( this, n_layers, n_variables,           &
@@ -157,9 +161,9 @@ CONTAINS
 
 
     !******************************************************************************
-    !> \brief Reset all counts and indices to the uninitialized state.
+    !> @brief Reset all counts and indices to the uninitialized state.
     !>
-    !> \param[in,out] this Canonical model variable-count and component-index descriptor.
+    !> @param[in,out] this Canonical model variable-count and component-index descriptor.
     !******************************************************************************
 
     SUBROUTINE finalize_model_layout( this )
@@ -191,10 +195,10 @@ CONTAINS
 
 
     !******************************************************************************
-    !> \brief Check that all layout counts and indices are mutually consistent.
+    !> @brief Check that all layout counts and indices are mutually consistent.
     !>
-    !> \param[in] this Canonical model variable-count and component-index descriptor.
-    !> \return True when the descriptor contains a complete supported layout.
+    !> @param[in] this Canonical model variable-count and component-index descriptor.
+    !> @return True when the descriptor contains a complete supported layout.
     !******************************************************************************
 
     LOGICAL FUNCTION model_layout_is_initialized( this )

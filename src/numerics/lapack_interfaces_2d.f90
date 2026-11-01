@@ -1,5 +1,5 @@
 !********************************************************************************
-!> \brief Type-safe interfaces to the LAPACK dense linear solvers
+!> @brief Provide type-safe interfaces to LAPACK dense linear solvers.
 !>
 !> The generic solve_dense_system interface selects SGESV or DGESV from the
 !> kind of the matrix. The wrappers adapt the solver's rank-one right-hand side
@@ -17,8 +17,8 @@ MODULE lapack_interfaces_2d
 
     PUBLIC :: solve_dense_system
 
-    !> \brief Select the single/double-precision dense solver from the argument kinds.
-    !> \details Both overloads overwrite the matrix with LU factors and the right-hand
+    !> @brief Select the single/double-precision dense solver from the argument kinds.
+    !> @details Both overloads overwrite the matrix with LU factors and the right-hand
     !>          side with the solution; their individual headers document all arguments.
     INTERFACE solve_dense_system
         MODULE PROCEDURE solve_dense_system_sp
@@ -27,16 +27,16 @@ MODULE lapack_interfaces_2d
 
     INTERFACE
 
-        !> \brief Declare the single-precision LAPACK LU solver ABI.
+        !> @brief Declare the single-precision LAPACK LU solver ABI.
         !>
-        !> \param[in] n Order of the square coefficient matrix.
-        !> \param[in] nrhs Number of right-hand-side columns.
-        !> \param[in,out] a Coefficient matrix on entry; overwritten by its LU factors.
-        !> \param[in] lda Leading dimension of the coefficient matrix storage.
-        !> \param[out] ipiv Pivot indices returned by LU factorization.
-        !> \param[in,out] b Right-hand-side columns on entry; solution columns on successful exit.
-        !> \param[in] ldb Leading dimension of the right-hand-side storage.
-        !> \param[out] info Zero on success; positive for a singular pivot, negative for invalid
+        !> @param[in] n Order of the square coefficient matrix.
+        !> @param[in] nrhs Number of right-hand-side columns.
+        !> @param[in,out] a Coefficient matrix on entry; overwritten by its LU factors.
+        !> @param[in] lda Leading dimension of the coefficient matrix storage.
+        !> @param[out] ipiv Pivot indices returned by LU factorization.
+        !> @param[in,out] b Right-hand-side columns on entry; solution columns on successful exit.
+        !> @param[in] ldb Leading dimension of the right-hand-side storage.
+        !> @param[out] info Zero on success; positive for a singular pivot, negative for invalid
         !>                  arguments/shapes.
 
         SUBROUTINE SGESV(n, nrhs, a, lda, ipiv, b, ldb, info)
@@ -47,16 +47,16 @@ MODULE lapack_interfaces_2d
             INTEGER, INTENT(OUT) :: info
         END SUBROUTINE SGESV
 
-        !> \brief Declare the double-precision LAPACK LU solver ABI.
+        !> @brief Declare the double-precision LAPACK LU solver ABI.
         !>
-        !> \param[in] n Order of the square coefficient matrix.
-        !> \param[in] nrhs Number of right-hand-side columns.
-        !> \param[in,out] a Coefficient matrix on entry; overwritten by its LU factors.
-        !> \param[in] lda Leading dimension of the coefficient matrix storage.
-        !> \param[out] ipiv Pivot indices returned by LU factorization.
-        !> \param[in,out] b Right-hand-side columns on entry; solution columns on successful exit.
-        !> \param[in] ldb Leading dimension of the right-hand-side storage.
-        !> \param[out] info Zero on success; positive for a singular pivot, negative for invalid
+        !> @param[in] n Order of the square coefficient matrix.
+        !> @param[in] nrhs Number of right-hand-side columns.
+        !> @param[in,out] a Coefficient matrix on entry; overwritten by its LU factors.
+        !> @param[in] lda Leading dimension of the coefficient matrix storage.
+        !> @param[out] ipiv Pivot indices returned by LU factorization.
+        !> @param[in,out] b Right-hand-side columns on entry; solution columns on successful exit.
+        !> @param[in] ldb Leading dimension of the right-hand-side storage.
+        !> @param[out] info Zero on success; positive for a singular pivot, negative for invalid
         !>                  arguments/shapes.
 
         SUBROUTINE DGESV(n, nrhs, a, lda, ipiv, b, ldb, info)
@@ -72,12 +72,12 @@ MODULE lapack_interfaces_2d
 CONTAINS
 
     !******************************************************************************
-    !> \brief Solve a dense single-precision linear system with pivoted LU factorization.
+    !> @brief Solve a dense single-precision linear system with pivoted LU factorization.
     !>
-    !> \param[in,out] a Square coefficient matrix on entry; overwritten by its LU factors.
-    !> \param[in,out] b Right-hand side on entry; solution vector on successful exit.
-    !> \param[out] ipiv Pivot indices returned by LU factorization.
-    !> \param[out] info Zero on success; positive for a singular pivot, negative for invalid
+    !> @param[in,out] a Square coefficient matrix on entry; overwritten by its LU factors.
+    !> @param[in,out] b Right-hand side on entry; solution vector on successful exit.
+    !> @param[out] ipiv Pivot indices returned by LU factorization.
+    !> @param[out] info Zero on success; positive for a singular pivot, negative for invalid
     !>                  arguments/shapes.
     !******************************************************************************
 
@@ -104,12 +104,12 @@ CONTAINS
     END SUBROUTINE solve_dense_system_sp
 
     !******************************************************************************
-    !> \brief Solve a dense double-precision linear system with pivoted LU factorization.
+    !> @brief Solve a dense double-precision linear system with pivoted LU factorization.
     !>
-    !> \param[in,out] a Square coefficient matrix on entry; overwritten by its LU factors.
-    !> \param[in,out] b Right-hand side on entry; solution vector on successful exit.
-    !> \param[out] ipiv Pivot indices returned by LU factorization.
-    !> \param[out] info Zero on success; positive for a singular pivot, negative for invalid
+    !> @param[in,out] a Square coefficient matrix on entry; overwritten by its LU factors.
+    !> @param[in,out] b Right-hand side on entry; solution vector on successful exit.
+    !> @param[out] ipiv Pivot indices returned by LU factorization.
+    !> @param[out] info Zero on success; positive for a singular pivot, negative for invalid
     !>                  arguments/shapes.
     !******************************************************************************
 

@@ -1,5 +1,5 @@
 !********************************************************************************
-!> \brief Random-number support for the stochastic model
+!> @brief Provide reproducibly seeded random samples for stochastic physics.
 !
 !> The intrinsic generator is seeded once during stochastic-workspace
 !> initialization.  A non-negative stochastic_seed gives reproducible runs;
@@ -15,6 +15,7 @@ MODULE stochastic_random_2d
 
     PRIVATE
 
+    !> Configured RNG seed; negative values select compiler-dependent initialization.
     INTEGER, PUBLIC :: stochastic_seed = -1
 
     PUBLIC :: initialize_stochastic_rng
@@ -22,7 +23,9 @@ MODULE stochastic_random_2d
 
 CONTAINS
 
-    !> \brief Initialize the intrinsic generator from the configured stochastic seed.
+    !> @brief Initialize the intrinsic generator using the configured stochastic seed.
+    !> @details Updates process-wide intrinsic RNG state; call outside parallel
+    !>          cell loops to preserve deterministic scheduling of random draws.
     !>
     !> \note Reads stochastic_seed and changes the intrinsic RNG state. A negative seed requests
     !>       processor-dependent initialization.
@@ -53,10 +56,12 @@ CONTAINS
 
     END SUBROUTINE initialize_stochastic_rng
 
-    !> \brief Generate independent standard-normal samples with the Box-Muller transform.
+    !> @brief Generate standard-normal samples using Box-Muller transformation.
+    !> @details Consumes intrinsic RNG state, so draws must be coordinated
+    !>          outside OpenMP cell loops to avoid scheduling dependence.
     !>
-    !> \param[in] noise_size Number of independent standard-normal values to generate.
-    !> \return Vector of noise_size independent, zero-mean, unit-variance Gaussian samples.
+    !> @param[in] noise_size Number of independent standard-normal values to generate.
+    !> @return Vector of noise_size independent, zero-mean, unit-variance Gaussian samples.
     !>
     !> \note Advances the intrinsic RNG state; generate samples outside OpenMP cell loops to avoid
     !>       schedule-dependent random draws.
