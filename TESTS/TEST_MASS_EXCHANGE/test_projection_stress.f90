@@ -84,6 +84,7 @@ CONTAINS
     stochastic_flag=.FALSE.; stoch_transport_flag=.FALSE.; pore_pressure_flag=.FALSE.
     gas_loss_flag=.FALSE.; liquid_vaporization_flag=.FALSE.; entrainment_flag=.FALSE.
     sutherland_flag=.FALSE.; slope_correction_flag=.TRUE.; topo_change_flag=.TRUE.
+    n_fissures=0
     erodible_deposit_flag=.FALSE.; bottom_radial_source_flag=.FALSE.
     bottom_fissural_source_flag=.FALSE.; radial_source_flag=.FALSE.
     erosion_coeff=1000.0_wp; settling_flag=.FALSE.; alphastot_min=0.0_wp
@@ -115,6 +116,10 @@ CONTAINS
     ALLOCATE(state%deposit_tot(nx,ny),state%erosion_tot(nx,ny))
     state%deposit_tot=0.0_wp;state%erosion_tot=0.0_wp
     ALLOCATE(B_zone(nx,ny),cell_source_fractions(nx,ny))
+    ALLOCATE(cell_fissure_fractions(nx,ny,n_fissures))
+    ALLOCATE(cell_arc_perim(nx,ny),cell_arc_n_x(nx,ny),cell_arc_n_y(nx,ny))
+    cell_fissure_fractions=0.0_wp
+    cell_arc_perim=0.0_wp;cell_arc_n_x=0.0_wp;cell_arc_n_y=0.0_wp
     CALL domain%initialize
   END SUBROUTINE allocate_grid
 
@@ -443,6 +448,7 @@ CONTAINS
     DEALLOCATE(q,qp,rate,nodes,weights,B_vertex,B_cent,B_face_x,B_face_y)
     DEALLOCATE(B_prime_x_geom,B_prime_y_geom,B_second_xx_geom,B_second_xy_geom,B_second_yy_geom)
     DEALLOCATE(grav_coeff,grav_coeff_stag_x,grav_coeff_stag_y,B_zone,cell_source_fractions)
+    DEALLOCATE(cell_fissure_fractions,cell_arc_perim,cell_arc_n_x,cell_arc_n_y)
     DEALLOCATE(state%deposit,state%erosion,state%erodible,state%lava_deposit, &
          state%deposit_tot,state%erosion_tot)
   END SUBROUTINE release_grid
