@@ -103,42 +103,32 @@ CONTAINS
 
   END SUBROUTINE apply_mass_exchange_increment
 
-  !> \brief Evaluate and apply the post-IMEX mass-exchange fractional step.
-  !> \details Evaluates cell-local exchange sources, applies source-coverage
-  !>          masks, updates the conservative state and material inventories,
-  !>          then delegates any nodal bed update to geometry_2d. Call once
-  !>          after the IMEX update and before advancing the simulation clock.
-  !> \param[in,out] q Cell-centered conservative state.
-  !> \param[in,out] qp Cell-centered primitive state, refreshed for solved cells.
-  !> \param[in] time_step Physical time increment [s].
-  !> \param[in] domain Domain descriptor for active solve-cell indices.
-  !> \param[in] source_registry Optional validated schedule for post-RK sources.
-  SUBROUTINE execute_lie_source_groups(q, qp, time_step, domain, source_registry, stochastic_values, &
-       step_start_time, q_original, qp_original)
-
-    USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,    &
-         entrainment_flag, loss_rate
-    USE geometry_2d, ONLY : B_prime_x_geom, B_prime_y_geom, cell_source_fractions
-    USE geometry_2d, ONLY : B_second_xx_geom, B_second_xy_geom, B_second_yy_geom, &
-         grav_coeff, cell_fissure_fractions, cell_arc_perim, cell_arc_n_x, &
-         cell_arc_n_y, dx, dy
-    USE geometry_2d, ONLY : begin_topography_rate_update,                   &
-         record_topography_rate_cell, apply_topography_rate_update
-    USE geometry_2d, ONLY : deposit, erosion, erodible, B_zone, lava_deposit
-    USE source_terms_2d, ONLY : eval_source_explicit, eval_source_analytic, &
-         eval_cell_source_explicit, cell_analytic_source_context, &
+  !> Evaluate and commit one complete Lie source group at a time.
+  !> For GROUP 0, evaluate every physical rate at the original pre-spatial
+  !> state, but cap and apply the combined source increment to the post-FV state.
+  SUBROUTINE execute_lie_source_groups(q,qp,time_step,domain,source_registry, &
+       stochastic_values,step_start_time,q_original,qp_original)
+    USE parameters_2d, ONLY : erodible_deposit_flag
+    USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,cell_source_fractions, &
+         begin_topography_rate_update,record_topography_rate_cell, &
+         apply_topography_rate_update,deposit,erosion,erodible,B_zone,lava_deposit
+    USE source_terms_2d, ONLY : eval_source_explicit,eval_source_analytic, &
+         eval_cell_source_explicit,cell_analytic_source_context, &
          analytic_term_context_type
-    USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC, SOURCE_METHOD_EXPLICIT, &
+    USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, &
          SOURCE_METHOD_NEWTON
-    USE equation_metadata_2d, ONLY : equation_partition_type, IM_GROUP_METHOD_NEWTON
+    USE equation_metadata_2d, ONLY : equation_partition_type,IM_GROUP_METHOD_NEWTON
     USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
     USE state_conversion_2d, ONLY : qc_to_qp
-    USE parameters_2d, ONLY : topo_change_flag, bottom_radial_source_flag,  &
-         bottom_fissural_source_flag, erodible_deposit_flag,                &
-         pore_pressure_flag, liquid_flag, lava_flag
     USE state_2d, ONLY : initialize_dry_physical_cell
-    USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag
-
+    USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
+    USE parameters_2d, ONLY : topo_change_flag,bottom_radial_source_flag, &
+         bottom_fissural_source_flag
+    TYPE(source_group_type), ALLOCATABLE :: groups(:)
+    TYPE(source_group_type) :: other_sources
+    TYPE(mass_exchange_rates_type) :: transfers
+    TYPE(analytic_term_context_type) :: analytic_context
+    TYPE(equation_partition_type) :: local_partition
     REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: time_step
@@ -148,193 +138,146 @@ CONTAINS
     REAL(wp), INTENT(IN), OPTIONAL :: step_start_time
     REAL(wp), INTENT(IN) :: q_original(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: qp_original(n_vars+2,comp_cells_x,comp_cells_y)
+    REAL(wp) :: qpentry(n_vars+2)
+    REAL(wp) :: physical_rate(n_eqns),exchange_rate(n_eqns),total_rate(n_eqns)
+    REAL(wp) :: analytic_rate(n_eqns),factor,coverage,pressure,source_time,noise
+    REAL(wp) :: remaining_mass,change_in_solid
+    LOGICAL :: with_exchange,has_other,implicit_mask(n_eqns),ok,failed
+    INTEGER :: group_index,cell,j,k,i,solid_eq,status,iterations,linear_info
+    INTEGER :: membership(n_eqns)
+    CHARACTER(LEN=96) :: context
 
-    TYPE(mass_exchange_rates_type) :: exchange_rates
-    REAL(wp) :: eqns_term(n_eqns)
-    REAL(wp) :: out_of_source_fraction
-    REAL(wp) :: p_dyn
-    CHARACTER(LEN=96) :: closure_context
-    TYPE(source_group_type), ALLOCATABLE :: step_groups(:)
-    TYPE(source_group_type) :: process_group
-    LOGICAL :: has_exchange
-    INTEGER :: j, k, l
-    INTEGER :: group_index, mass_group_count, analytic_status, cell_index
-    TYPE(analytic_term_context_type) :: analytic_context
-    REAL(wp) :: analytic_rate(n_eqns), step_noise, &
-         explicit_rate(n_eqns), source_time, source_fraction
-    LOGICAL :: implicit_mask(n_eqns), newton_converged, newton_search_failed
-    INTEGER :: newton_iterations, newton_info
-    TYPE(equation_partition_type) :: step_partition
-    LOGICAL :: liquid_loss_active
+    IF (.NOT.source_registry%is_initialized()) &
+         CALL fatal_error('D19: uninitialized Lie source registry')
+    groups=source_registry%groups()
+    source_time=0.0_wp
+    IF (PRESENT(step_start_time)) source_time=step_start_time
+    IF (time_step<=0.0_wp) CALL fatal_error('D19: nonpositive time interval')
 
-    liquid_loss_active = .FALSE.
-    IF (liquid_flag) THEN
-       IF (ALLOCATED(loss_rate)) liquid_loss_active = loss_rate .GT. 0.0_wp
-    END IF
-
-    BLOCK
-       IF (.NOT.source_registry%is_initialized()) &
-            CALL fatal_error('D19: Lie source dispatch requires an initialized registry')
-       step_groups=source_registry%groups()
-       mass_group_count=0
-       DO group_index=1,SIZE(step_groups)
-          IF (ANY(INDEX(step_groups(group_index)%source_names,'mass_exchange_')==1)) &
-               mass_group_count=mass_group_count+1
-       END DO
-       IF (mass_group_count>1) &
-            CALL fatal_error('D19: mass-exchange batch split between groups')
-       ! The absence of mass exchange does not suppress other STEP groups.
-       source_time=0.0_wp
-       IF (PRESENT(step_start_time)) source_time=step_start_time
-       DO group_index=1,SIZE(step_groups)
-          ! Honor GROUP ordering; exchange remains one atomic transaction.
-          IF (SIZE(step_groups(group_index)%source_names)==0) CYCLE
-          process_group=step_groups(group_index)
-          has_exchange=ANY(INDEX(process_group%source_names,'mass_exchange_')==1)
-          IF (has_exchange) THEN
-             process_group%source_names=PACK(process_group%source_names, &
-                  INDEX(process_group%source_names,'mass_exchange_')/=1)
-          END IF
-          IF (SIZE(process_group%source_names)==0 .AND. .NOT.has_exchange) CYCLE
-          IF (process_group%method==SOURCE_METHOD_NEWTON) THEN
-             implicit_mask=.FALSE.
-             implicit_mask(process_group%equation_ids)=.TRUE.
-             BLOCK
-               INTEGER :: group_membership(n_eqns)
-               group_membership=0
-               WHERE(implicit_mask) group_membership=1
-               CALL step_partition%initialize(implicit_mask,group_membership, &
-                    [IM_GROUP_METHOD_NEWTON])
-             END BLOCK
-          END IF
-          IF (SIZE(process_group%source_names)>0) THEN
-          DO cell_index=1,domain%solve_cells
-             j=domain%j_cent(cell_index); k=domain%k_cent(cell_index)
-             IF (q(idx_totMassEqn,j,k)<=0.0_wp .AND. process_group%id/=0) CYCLE
-             IF (process_group%method==SOURCE_METHOD_EXPLICIT) THEN
-                IF (process_group%id==0) THEN
-                   CALL eval_cell_source_explicit(j,k,qp_original(:,j,k), &
-                        source_time,process_group,explicit_rate)
-                ELSE
-                   CALL eval_cell_source_explicit(j,k,qp(:,j,k), &
-                        source_time,process_group,explicit_rate)
-                END IF
-                ! Only source rates may be scaled; spatial FV divergence is fixed.
-                source_fraction=1.0_wp
-                IF (explicit_rate(idx_totMassEqn)<0.0_wp) THEN
-                   source_fraction=MIN(source_fraction,MAX(0.0_wp, &
-                        q(idx_totMassEqn,j,k)/(-time_step*explicit_rate(idx_totMassEqn))))
-                END IF
-                IF (idx_solidEqn_first>0 .AND. idx_solidEqn_last>=idx_solidEqn_first) THEN
-                   BLOCK
-                     INTEGER :: solid_eq
-                     DO solid_eq=idx_solidEqn_first,idx_solidEqn_last
-                       IF (explicit_rate(solid_eq)<0.0_wp) &
-                            source_fraction=MIN(source_fraction,MAX(0.0_wp, &
-                            q(solid_eq,j,k)/(-time_step*explicit_rate(solid_eq))))
-                     END DO
-                   END BLOCK
-                END IF
-                q(1:n_eqns,j,k)=q(1:n_eqns,j,k)+ &
-                     time_step*source_fraction*explicit_rate
-             ELSE IF (process_group%method==SOURCE_METHOD_ANALYTIC) THEN
-                step_noise=0.0_wp
-                IF (PRESENT(stochastic_values)) step_noise=stochastic_values(j,k)
-                analytic_context=cell_analytic_source_context(j,k,step_noise)
-                CALL eval_source_analytic(process_group,q(1:n_vars,j,k), &
-                     analytic_context,time_step,analytic_rate,analytic_status)
-                IF (analytic_status/=0) &
-                     CALL fatal_error('D19: analytic group solve failed')
-                q(1:n_vars,j,k)=q(1:n_vars,j,k)+time_step*analytic_rate(1:n_vars)
-             ELSE
-                step_noise=0.0_wp
-                IF (PRESENT(stochastic_values)) step_noise=stochastic_values(j,k)
-                CALL solve_backward_euler_group(step_partition,process_group, &
-                     q(1:n_vars,j,k),time_step, &
-                     B_prime_x_geom(j,k),B_prime_y_geom(j,k),step_noise, &
-                     newton_iterations,newton_converged,newton_info,newton_search_failed)
-                IF (.NOT.newton_converged .OR. newton_info/=0 .OR. newton_search_failed) &
-                     CALL fatal_error('D19: Newton group solve failed')
-             END IF
-             ! Post-group admissibility; never project an accepted implicit state.
-             IF (.NOT.ALL(q(1:n_eqns,j,k)==q(1:n_eqns,j,k))) &
-                  CALL fatal_error('D19: non-finite conservative source state')
-             IF (q(idx_totMassEqn,j,k)<0.0_wp) &
-                  CALL fatal_error('D19: negative mass after Lie source group')
-             IF (q(idx_totMassEqn,j,k)>0.0_wp) THEN
-                CALL qc_to_qp(q(1:n_vars,j,k),qp(1:n_vars+2,j,k),p_dyn, &
-                     'Lie group output')
-             ELSE
-                CALL initialize_dry_physical_cell(qp(:,j,k))
-             END IF
-          END DO
-          END IF
-          IF (has_exchange) CALL execute_mass_exchange_transaction()
-       END DO
-       CALL step_partition%finalize()
-    END BLOCK
-
-  CONTAINS
-
-    !> \\brief Execute one atomic bed-and-inventory transaction.
-    !> \\details Called at the configured Lie group; fluid and bed transfers are coupled.
-    SUBROUTINE execute_mass_exchange_transaction()
-    REAL(wp) :: qp_eval(n_vars+2)
-    IF ((erosion_coeff .EQ. 0.0_wp) .AND. (.NOT.settling_flag)            &
-         .AND. (.NOT.entrainment_flag)     &
-         .AND. (.NOT.liquid_loss_active) .AND. (.NOT.lava_deposition_flag)) RETURN
-
-    IF (lava_deposition_flag .AND. .NOT.topo_change_flag) &
-         CALL fatal_error('lava deposition requires TOPO_CHANGE_FLAG')
-    IF (topo_change_flag) CALL begin_topography_rate_update
-
-    !$OMP PARALLEL DO private(j,k,closure_context,exchange_rates,eqns_term, &
-    !$OMP & out_of_source_fraction,p_dyn,qp_eval)
-    DO l = 1, domain%solve_cells
-
-       j = domain%j_cent(l)
-       k = domain%k_cent(l)
-       closure_context = 'mass exchange cell'
-
-       IF (q(idx_totMassEqn,j,k) .GT. 0.0_wp) THEN
-          CALL qc_to_qp(q(1:n_vars,j,k), qp(1:n_vars+2,j,k), p_dyn,         &
-               TRIM(closure_context))
-       ELSE
-          CALL initialize_dry_physical_cell(qp(1:n_vars+2,j,k))
+    DO group_index=1,SIZE(groups)
+       other_sources=groups(group_index)
+       with_exchange=ANY(INDEX(other_sources%source_names,'mass_exchange_')==1)
+       IF (with_exchange) THEN
+          IF (groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) &
+               CALL fatal_error('D19: mass exchange must use its supported explicit method')
+          other_sources%source_names=PACK(other_sources%source_names, &
+               INDEX(other_sources%source_names,'mass_exchange_')/=1)
        END IF
+       has_other=SIZE(other_sources%source_names)>0
+       IF (.NOT.has_other .AND. .NOT.with_exchange) CYCLE
 
-       qp_eval=qp(1:n_vars+2,j,k)
-       IF (step_groups(group_index)%id==0) qp_eval=qp_original(1:n_vars+2,j,k)
-       CALL eval_source_explicit(qp_eval, B_zone(j,k), &
-            B_prime_x_geom(j,k), B_prime_y_geom(j,k), &
-            erodible(1:n_solid,j,k), time_step, exchange_rates, eqns_term)
-
-       IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
-          out_of_source_fraction = 1.0_wp - cell_source_fractions(j,k)
-          exchange_rates%solid_deposition_rate = exchange_rates%solid_deposition_rate*out_of_source_fraction
-          exchange_rates%solid_erosion_rate = exchange_rates%solid_erosion_rate*out_of_source_fraction
-          exchange_rates%carrier_deposition_rate = &
-               exchange_rates%carrier_deposition_rate*out_of_source_fraction
-          eqns_term = eqns_term * out_of_source_fraction
-          exchange_rates%dB_dt = exchange_rates%dB_dt*out_of_source_fraction
-          exchange_rates%lava_deposit_rate = exchange_rates%lava_deposit_rate*out_of_source_fraction
+       IF (groups(group_index)%method==SOURCE_METHOD_NEWTON) THEN
+          implicit_mask=.FALSE.
+          implicit_mask(groups(group_index)%equation_ids)=.TRUE.
+          membership=0
+          WHERE (implicit_mask) membership=1
+          CALL local_partition%initialize(implicit_mask,membership,[IM_GROUP_METHOD_NEWTON])
        END IF
+       IF (with_exchange .AND. topo_change_flag) CALL begin_topography_rate_update
 
-       CALL apply_mass_exchange_increment(q(1:n_vars,j,k),                 &
-            qp(1:n_vars+2,j,k), time_step, eqns_term, exchange_rates%solid_deposition_rate, &
-            exchange_rates%solid_erosion_rate, deposit(j,k,1:n_solid), erosion(j,k,1:n_solid),  &
-            erodible(1:n_solid,j,k), erodible_deposit_flag, closure_context)
+       DO cell=1,domain%solve_cells
+          j=domain%j_cent(cell)
+          k=domain%k_cent(cell)
+          IF (groups(group_index)%id==0) THEN
+             qpentry=qp_original(:,j,k)
+          ELSE
+             qpentry=qp(:,j,k)
+          END IF
+          context='Lie source group'
+          noise=0.0_wp
+          IF (PRESENT(stochastic_values)) noise=stochastic_values(j,k)
 
-       lava_deposit(j,k)=lava_deposit(j,k)+time_step*exchange_rates%lava_deposit_rate
-       IF (topo_change_flag) CALL record_topography_rate_cell(j, k, exchange_rates%dB_dt)
-
+          SELECT CASE(groups(group_index)%method)
+          CASE(SOURCE_METHOD_EXPLICIT)
+             physical_rate=0.0_wp
+             exchange_rate=0.0_wp
+             IF (has_other) CALL eval_cell_source_explicit(j,k,qpentry, &
+                  source_time,other_sources,physical_rate)
+             IF (with_exchange) THEN
+                CALL eval_source_explicit(qpentry,B_zone(j,k), &
+                     B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
+                     erodible(1:n_solid,j,k),time_step,transfers,exchange_rate)
+                IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
+                   coverage=1.0_wp-cell_source_fractions(j,k)
+                   exchange_rate=coverage*exchange_rate
+                   transfers%solid_deposition_rate=coverage*transfers%solid_deposition_rate
+                   transfers%solid_erosion_rate=coverage*transfers%solid_erosion_rate
+                   transfers%carrier_deposition_rate=coverage*transfers%carrier_deposition_rate
+                   transfers%dB_dt=coverage*transfers%dB_dt
+                   transfers%lava_deposit_rate=coverage*transfers%lava_deposit_rate
+                END IF
+             END IF
+             total_rate=physical_rate+exchange_rate
+             ! One common limiter scales the coupled fluid + substrate transaction.
+             ! It never touches the previously committed spatial FV rate.
+             factor=1.0_wp
+             IF (total_rate(idx_totMassEqn)<0.0_wp) factor=MIN(factor, &
+                  MAX(0.0_wp,q(idx_totMassEqn,j,k)/ &
+                  (-time_step*total_rate(idx_totMassEqn))))
+             DO solid_eq=idx_solidEqn_first,idx_solidEqn_last
+                IF (total_rate(solid_eq)<0.0_wp) factor=MIN(factor, &
+                     MAX(0.0_wp,q(solid_eq,j,k)/(-time_step*total_rate(solid_eq))))
+             END DO
+             IF (with_exchange) THEN
+                DO i=1,n_solid
+                   IF (transfers%solid_erosion_rate(i)>0.0_wp) &
+                        factor=MIN(factor,MAX(0.0_wp,erodible(i,j,k)/ &
+                        (time_step*transfers%solid_erosion_rate(i))))
+                END DO
+             END IF
+             remaining_mass=q(idx_totMassEqn,j,k)- &
+                  SUM(q(idx_solidEqn_first:idx_solidEqn_last,j,k))
+             change_in_solid=SUM(total_rate(idx_solidEqn_first:idx_solidEqn_last)) &
+                  -total_rate(idx_totMassEqn)
+             IF (change_in_solid>0.0_wp) factor=MIN(factor, &
+                  MAX(0.0_wp,remaining_mass/(time_step*change_in_solid)))
+             q(1:n_eqns,j,k)=q(1:n_eqns,j,k)+time_step*factor*total_rate
+             IF (with_exchange) THEN
+                deposit(j,k,1:n_solid)=deposit(j,k,1:n_solid)+ &
+                     time_step*factor*transfers%solid_deposition_rate
+                erosion(j,k,1:n_solid)=erosion(j,k,1:n_solid)+ &
+                     time_step*factor*transfers%solid_erosion_rate
+                erodible(1:n_solid,j,k)=erodible(1:n_solid,j,k)- &
+                     time_step*factor*transfers%solid_erosion_rate
+                IF (erodible_deposit_flag) erodible(1:n_solid,j,k)= &
+                     erodible(1:n_solid,j,k)+time_step*factor*transfers%solid_deposition_rate
+                lava_deposit(j,k)=lava_deposit(j,k)+time_step*factor*transfers%lava_deposit_rate
+                IF (topo_change_flag) CALL record_topography_rate_cell(j,k, &
+                     factor*transfers%dB_dt)
+             END IF
+          CASE(SOURCE_METHOD_ANALYTIC)
+             IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
+             analytic_context=cell_analytic_source_context(j,k,noise)
+             CALL eval_source_analytic(groups(group_index),q(:,j,k), &
+                  analytic_context,time_step,analytic_rate,status)
+             IF (status/=0) CALL fatal_error('D19: analytic group failed')
+             q(1:n_vars,j,k)=q(1:n_vars,j,k)+time_step*analytic_rate(1:n_vars)
+          CASE(SOURCE_METHOD_NEWTON)
+             IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
+             CALL solve_backward_euler_group(local_partition,groups(group_index), &
+                  q(:,j,k),time_step,B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
+                  noise,iterations,ok,linear_info,failed)
+             IF (.NOT.ok .OR. failed .OR. linear_info/=0) &
+                  CALL fatal_error('D19: Newton group failed')
+          CASE DEFAULT
+             CALL fatal_error('D19: invalid group method')
+          END SELECT
+          ! This is an admissibility check only, not an implicit post-solve clip.
+          IF (.NOT.ALL(q(1:n_eqns,j,k)==q(1:n_eqns,j,k))) &
+               CALL fatal_error('D19: source group produced NaN')
+          IF (q(idx_totMassEqn,j,k)<0.0_wp) &
+               CALL fatal_error('D19: negative mixture mass')
+          IF (ANY(q(idx_solidEqn_first:idx_solidEqn_last,j,k)<0.0_wp)) &
+               CALL fatal_error('D19: negative solid mass')
+          IF (q(idx_totMassEqn,j,k)>0.0_wp) THEN
+             CALL qc_to_qp(q(:,j,k),qp(:,j,k),pressure,TRIM(context))
+          ELSE
+             CALL initialize_dry_physical_cell(qp(:,j,k))
+          END IF
+       END DO
+       IF (with_exchange .AND. topo_change_flag) CALL apply_topography_rate_update(time_step)
+       IF (groups(group_index)%method==SOURCE_METHOD_NEWTON) CALL local_partition%finalize()
     END DO
-    !$OMP END PARALLEL DO
-
-    IF (topo_change_flag) CALL apply_topography_rate_update(time_step)
-
-    END SUBROUTINE execute_mass_exchange_transaction
-
   END SUBROUTINE execute_lie_source_groups
 
 END MODULE step_source_executor_2d
