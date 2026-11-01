@@ -309,3 +309,9 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - I commit `72fdfb7` e `a735293` hanno reso il coordinatore di mass exchange dipendente dalle sorgenti selezionate nel gruppo e allineato le compatibilita' di fase per perdita del carrier liquido e vaporizzazione.
 - Sono invarianti `B_zone` e il calcolo delle zone topografiche. Non sono stati eseguiti test, compilazioni o workflow.
 - **Stato: audit statico delle principali dipendenze e dei dispatcher svolto; D19 NON certificato concluso sul piano della correttezza Fortran/numerica.** La verifica completa delle firme in ogni callsite e la compilazione finale sono ancora non eseguite, per scelta concordata.
+
+### Dipendenza deposizione-vaporizzazione verificata (2026-11-01)
+
+- `mass_exchange_vaporization` usa esclusivamente la deposizione calcolata e limitata nella medesima transazione Lie. In precedenza la vaporizzazione configurata senza deposizione riceveva un rate nullo, divenendo silenziosamente inefficace.
+- Validazione introdotta in `source_configuration_2d` e `source_registry_2d`: vaporizzazione richiede la presenza di deposizione; il vincolo preesistente di un solo gruppo mass exchange garantisce che i processi siano nello stesso gruppo EXPLICIT. `mass_exchange_2d` verifica anche il contratto direttamente al proprio ingresso.
+- Non modificati gruppi analitici, `B_zone`, test o workflow; nessuna compilazione eseguita. La chiusura statica completa di D19 resta subordinata alla revisione finale delle interfacce non ancora accertate.
