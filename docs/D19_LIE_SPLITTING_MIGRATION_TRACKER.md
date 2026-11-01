@@ -287,3 +287,9 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Rimossi `boundary_injection_method` e `boundary_injection_group` dalla dichiarazione di configurazione in `source_input_2d`, dagli import, default e namelist `/lateral_source_parameters/` in `inpout_2d`. Non sono parametri dei sorgenti volumetrici Lie: il bordo resta una condizione spaziale.
 - Rimosso l'import inutilizzato `lateral_source_flag` da `source_configuration_2d`. Si completa l'intervento iniziato nel commit `d9d9da5`: l'iniezione laterale non e' piu' schedulata tra i sorgenti Lie.
 - Non modificati i test, nessuna compilazione o Action eseguita.
+
+### Catalogo Lie limitato a sorgenti realmente schedulabili (2026-11-01)
+
+- Consolidata la separazione tra condizione al contorno laterale e sorgenti volumetrici: rimosso `boundary_injection` da `source_catalog_2d%SOURCE_CATALOG`, ora di 23 sorgenti. Il modulo fisico `mass_boundary_injection_2d` resta utilizzato direttamente da `reconstruction_2d` per le tracce alle interfacce.
+- Il registro Lie non puo' ora piu' accettare un gruppo fittizio `boundary_injection` tramite il catalogo. Eliminato anche un commento sul vecchio concetto di cadence STAGE/STEP. La configurazione del bordo rimane esclusivamente spaziale.
+- Nessuna modifica ai test, nessuna compilazione o Action. I controlli di firma e i restanti percorsi fisici non sono ancora dichiarati esaustivamente conclusi.

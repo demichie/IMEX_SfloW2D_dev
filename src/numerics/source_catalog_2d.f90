@@ -22,9 +22,9 @@ MODULE source_catalog_2d
     LOGICAL :: allows_liquid = .FALSE.
     LOGICAL :: allows_lava = .FALSE.
   END TYPE source_term_type
-  ! Default method/cadence are explicit in each catalog entry; constants
+  ! Default method is explicit in each Lie source catalog entry; constants
   ! SOURCE_METHOD_* remain generic method IDs also used by the solvers.
-  INTEGER, PARAMETER :: SOURCE_TERM_COUNT=24
+  INTEGER, PARAMETER :: SOURCE_TERM_COUNT=23
   TYPE(source_term_type), PARAMETER :: SOURCE_CATALOG(SOURCE_TERM_COUNT)=[ &
        source_term_type('rheology_voellmy',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
@@ -75,9 +75,6 @@ MODULE source_catalog_2d
              default_method=SOURCE_METHOD_EXPLICIT, &
              allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('geometry_curvature',.TRUE.,.FALSE.,.FALSE., &
-             default_method=SOURCE_METHOD_EXPLICIT, &
-             allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
-       source_term_type('boundary_injection',.TRUE.,.FALSE.,.FALSE., &
              default_method=SOURCE_METHOD_EXPLICIT, &
              allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('mass_exchange_lava_deposition',.TRUE.,.FALSE.,.FALSE., &
