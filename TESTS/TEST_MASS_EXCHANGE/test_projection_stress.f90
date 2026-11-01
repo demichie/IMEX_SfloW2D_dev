@@ -67,6 +67,14 @@ PROGRAM test_projection_stress
            CALL random_rates(.TRUE.)
            CALL projection_update('rough',step)
         END DO
+
+        ! Independently seeded repeated geometry updates for the N8-B oracle.
+        CALL reset_state(.FALSE.)
+        seed=130363_int64
+        DO step=1,64
+           CALL random_rates(.TRUE.)
+           CALL projection_update('repeated',step)
+        END DO
         CALL release_grid
      END DO
   END DO
