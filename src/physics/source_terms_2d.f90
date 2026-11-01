@@ -16,11 +16,11 @@ MODULE source_terms_2d
   USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
   USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
   USE rheology_2d, ONLY : curvature_acceleration, eval_rheology_analytic, &
-       eval_rheology_implicit, eval_rheology_semi_implicit, &
+       eval_rheology_implicit, &
        eval_rheology_explicit
   USE diagnostics_2d, ONLY : fatal_error
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_ROLE_IMPLICIT, &
-       SOURCE_ROLE_SEMI_IMPLICIT, canonical_rheology_source_name, rheology_name_has_role
+       canonical_rheology_source_name, rheology_name_has_role
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC
   USE source_registry_2d, ONLY : source_group_type, group_contains_name
   IMPLICIT NONE
@@ -33,7 +33,7 @@ MODULE source_terms_2d
   INTERFACE eval_source_explicit
      MODULE PROCEDURE eval_geometry_cell_source_explicit, eval_mass_exchange_source_explicit
   END INTERFACE
-  PUBLIC :: eval_source_implicit, eval_source_semi_implicit, eval_source_analytic
+  PUBLIC :: eval_source_implicit, eval_source_analytic
   PUBLIC :: analytic_term_context_type
   PUBLIC :: eval_geometry_curvature_explicit
   PUBLIC :: bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step
@@ -445,78 +445,7 @@ CONTAINS
 
   END SUBROUTINE eval_source_implicit
 
-  SUBROUTINE eval_source_semi_implicit( Bprimej_x , Bprimej_y , Bsecondj_xx ,    &
-       Bsecondj_xy , Bsecondj_yy , grav_coeff , qpj , semi_implicit_term ,     &
-       Zj, group )
 
-    USE parameters_2D, ONLY: pore_pressure_flag
-
-    IMPLICIT NONE
-
-    REAL(wp), INTENT(IN) :: Bprimej_x
-    REAL(wp), INTENT(IN) :: Bprimej_y
-    REAL(wp), INTENT(IN) :: Bsecondj_xx
-    REAL(wp), INTENT(IN) :: Bsecondj_xy
-    REAL(wp), INTENT(IN) :: Bsecondj_yy
-    REAL(wp), INTENT(IN) :: grav_coeff
-
-    REAL(wp), INTENT(IN) :: qpj(n_vars+2)
-    REAL(wp), INTENT(IN) :: Zj ! value stochastic process
-
-    REAL(wp), INTENT(OUT) :: semi_implicit_term(n_eqns)
-    TYPE(source_group_type), INTENT(IN), OPTIONAL :: group
-
-    REAL(wp) :: source_term(n_eqns)
-
-    REAL(wp) :: r_u               !< real-value x-velocity
-    REAL(wp) :: r_v               !< real-value y-velocity
-    TYPE(physical_state_type) :: physical_state
-    LOGICAL :: selected_rheology
-    CHARACTER(LEN=64) :: selected_model_name
-
-    semi_implicit_term(1:n_eqns) = 0.0_wp
-
-    selected_model_name=canonical_rheology_source_name(rheology_model)
-    IF (PRESENT(group)) THEN
-       selected_model_name=group_rheology_name(group)
-       selected_rheology=group_has_role(group,SOURCE_ROLE_SEMI_IMPLICIT)
-    ELSE
-       selected_rheology=rheology_flag
-    END IF
-
-    ! A dry cell carries no friction source.
-    IF ( qpj(idx_h) .LE. EPSILON(1.0_wp) ) RETURN
-
-    ! initialize and evaluate the forces terms
-    source_term(1:n_eqns) = 0.0_wp
-
-    rheology_if:IF (rheology_flag .AND. selected_rheology) THEN
-       r_u = qpj(idx_u)
-       r_v = qpj(idx_v)
-
-       ! Every SI law below is zero at exact rest. Return before norms and
-       ! divisions so optimized builds with arithmetic traps cannot speculate
-       ! a reciprocal of zero from a later moving-state branch.
-       IF ((r_u .EQ. 0.0_wp) .AND. (r_v .EQ. 0.0_wp)) RETURN
-
-
-
-
-
-       CALL physical_state_from_qp(qpj, physical_state, Bprimej_x, Bprimej_y, &
-            Bsecondj_xx, Bsecondj_xy, Bsecondj_yy)
-
-       CALL eval_rheology_semi_implicit([selected_model_name], physical_state, &
-            grav_coeff, pore_pressure_flag, &
-            stochastic_flag, Zj, source_term(2:3))
-
-    ENDIF rheology_if
-
-    semi_implicit_term = source_term
-
-    RETURN
-
-  END SUBROUTINE eval_source_semi_implicit
 
 
   SUBROUTINE eval_geometry_cell_source_explicit( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy , &
