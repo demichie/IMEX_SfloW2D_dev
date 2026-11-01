@@ -2,7 +2,6 @@ PROGRAM test_source_modules
 
   USE parameters_2d, ONLY : wp
   USE rheology_lahar_2d, ONLY : alpha1_coeff, beta1, eval_lahar_fluid_viscosity
-  USE state_2d, ONLY : correct_friction_momentum
   USE mass_exchange_vaporization_2d, ONLY : eval_vaporization_mass_rate, &
        eval_vaporization_energy_rate
   USE mass_exchange_deposition_2d, ONLY : eval_hindered_settling_deposition_rate, &
@@ -26,8 +25,6 @@ PROGRAM test_source_modules
   REAL(wp) :: solid_heat_capacity(2)
   REAL(wp) :: deposition_rate(2)
   REAL(wp) :: erosion_rate(2)
-  REAL(wp) :: momentum_before_friction(2)
-  REAL(wp) :: momentum_after_friction(2)
   REAL(wp) :: solid_erosion_rate(2), continuous_erosion_rate
   REAL(wp) :: carrier_density, inverse_kinematic_viscosity, expected_viscosity
   INTEGER :: i
@@ -110,42 +107,8 @@ PROGRAM test_source_modules
   expected = 0.075_wp / SQRT(1.0_wp + 718.0_wp * 0.25_wp**2.4_wp) * 5.0_wp
   CALL assert_close(actual, expected, 'air entrainment rate')
 
-  momentum_before_friction = [3.0_wp, 4.0_wp]
-  momentum_after_friction = [1.8_wp, 2.4_wp]
-  CALL correct_friction_momentum(momentum_before_friction, momentum_after_friction)
-  CALL assert_close(momentum_after_friction(1), 1.8_wp,                    &
-       'friction correction preserves x direction')
-  CALL assert_close(momentum_after_friction(2), 2.4_wp,                    &
-       'friction correction preserves y direction')
-
-  momentum_after_friction = [6.0_wp, 8.0_wp]
-  CALL correct_friction_momentum(momentum_before_friction, momentum_after_friction)
-  CALL assert_close(momentum_after_friction(1), 3.0_wp,                    &
-       'friction correction caps momentum increase x')
-  CALL assert_close(momentum_after_friction(2), 4.0_wp,                    &
-       'friction correction caps momentum increase y')
-
-  momentum_after_friction = [-1.0_wp, 3.0_wp]
-  CALL correct_friction_momentum(momentum_before_friction, momentum_after_friction)
-  CALL assert_close(momentum_after_friction(1), 1.08_wp,                   &
-       'friction correction projects x without rotation')
-  CALL assert_close(momentum_after_friction(2), 1.44_wp,                   &
-       'friction correction projects y without rotation')
-
-  momentum_after_friction = [-3.0_wp, -4.0_wp]
-  CALL correct_friction_momentum(momentum_before_friction, momentum_after_friction)
-  CALL assert_close(momentum_after_friction(1), 0.0_wp,                    &
-       'friction correction stops reversed x momentum')
-  CALL assert_close(momentum_after_friction(2), 0.0_wp,                    &
-       'friction correction stops reversed y momentum')
-
-  momentum_before_friction = 0.0_wp
-  momentum_after_friction = [2.0_wp, 3.0_wp]
-  CALL correct_friction_momentum(momentum_before_friction, momentum_after_friction)
-  CALL assert_close(momentum_after_friction(1), 0.0_wp,                    &
-       'friction correction keeps zero x momentum at rest')
-  CALL assert_close(momentum_after_friction(2), 0.0_wp,                    &
-       'friction correction keeps zero y momentum at rest')
+  ! The obsolete state-level friction correction was removed by Lie splitting.
+  ! Momentum sign limiting is now exercised through the Newton group executor.
 
   temperature_perturbation = 1.0E-20_wp
   complex_actual = test_cooling_implicit(     &
