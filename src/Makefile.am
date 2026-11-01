@@ -405,3 +405,33 @@ numerics/nonlinear_solver_2d.$(OBJEXT): physics/source_terms_2d.$(OBJEXT)
 physics/source_configuration_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
                                           physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT)
+
+# Remaining direct USE dependencies, audited against all production .f90 sources.
+IMEX_SfloW2D.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \
+    numerics/source_catalog_2d.$(OBJEXT)
+core/simulation_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+io/inpout_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
+numerics/source_input_2d.$(OBJEXT): core/constitutive_parameters_2d.$(OBJEXT) \
+    core/parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_carrier_liquid_loss_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_entrainment_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT) \
+    core/constitutive_parameters_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_erosion_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT): state/state_conversion_2d.$(OBJEXT) \
+    core/constitutive_parameters_2d.$(OBJEXT)
+physics/pore_pressure/pore_pressure_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/rheology_laws/rheology_empirical_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/rheology_laws/rheology_froude_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/rheology_laws/rheology_lahar_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/rheology_laws/rheology_lava_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/rheology_laws/rheology_lucas_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/rheology_laws/rheology_mui_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/rheology_laws/rheology_mui_voellmy_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/rheology_laws/rheology_plastic_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/rheology_laws/rheology_quadratic_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/rheology_laws/rheology_voellmy_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
+physics/source_configuration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
+physics/source_terms_2d.$(OBJEXT): core/complexify.$(OBJEXT)
+spatial/hyperbolic_2d.$(OBJEXT): state/state_conversion_2d.$(OBJEXT)
+spatial/reconstruction_2d.$(OBJEXT): physics/mass_injection_terms/mass_boundary_injection_2d.$(OBJEXT)
+state/state_conversion_2d.$(OBJEXT): core/diagnostics_2d.$(OBJEXT)
