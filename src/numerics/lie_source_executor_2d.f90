@@ -301,6 +301,7 @@ CONTAINS
              state%erodible(1:n_solid,j,k)=staged_erodible(:,cell)
              state%lava_deposit(j,k)=staged_lava(cell)
           END DO
+          CALL state%refresh_substrate_totals()
           DEALLOCATE(group_j,group_k,staged_deposit,staged_erosion, &
                staged_erodible,staged_lava,staged_bed_rate)
        END IF

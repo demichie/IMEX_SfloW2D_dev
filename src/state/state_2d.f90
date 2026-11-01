@@ -34,6 +34,7 @@ MODULE state_2d
   TYPE :: substrate_snapshot_type
      REAL(wp), ALLOCATABLE :: deposit(:,:,:),erosion(:,:,:),erodible(:,:,:)
      REAL(wp), ALLOCATABLE :: lava_deposit(:,:)
+     REAL(wp), ALLOCATABLE :: deposit_tot(:,:),erosion_tot(:,:)
   END TYPE substrate_snapshot_type
 
   !> \brief Owned cell states and diagnostics for one simulation.
@@ -191,6 +192,8 @@ CONTAINS
     snapshot%erosion=this%erosion
     snapshot%erodible=this%erodible
     snapshot%lava_deposit=this%lava_deposit
+    snapshot%deposit_tot=this%deposit_tot
+    snapshot%erosion_tot=this%erosion_tot
   END SUBROUTINE snapshot_substrate
 
   !> Restore exactly the pre-step inventories when the source sweep fails.
@@ -201,7 +204,8 @@ CONTAINS
     this%erosion=snapshot%erosion
     this%erodible=snapshot%erodible
     this%lava_deposit=snapshot%lava_deposit
-    CALL this%refresh_substrate_totals()
+    this%deposit_tot=snapshot%deposit_tot
+    this%erosion_tot=snapshot%erosion_tot
   END SUBROUTINE restore_substrate
 
   !> Refresh diagnostic totals from the owned per-species inventories.

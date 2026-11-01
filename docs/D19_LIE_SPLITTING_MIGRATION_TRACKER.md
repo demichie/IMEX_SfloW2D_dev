@@ -137,3 +137,10 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Rimosso da `simulation_context_type` il campo `equation_partition_type`, che non esiste piu nella sorgente.
 - La chiamata `initialize_configured_sources` riceve ora soltanto registro e stringa d'errore, coerentemente con la sua interfaccia in `source_configuration_2d`.
 - Le partizioni dei gradi di liberta impliciti sono definite dai metadati dei gruppi sorgente e non da una partizione globale parallela.
+
+### Coerenza transazionale degli inventari per gruppo (2026-11-01)
+
+- `substrate_snapshot_type` include ora anche `deposit_tot` e `erosion_tot`; il rollback ripristina esattamente i sei campi originali, senza ricalcolare durante il ripristino.
+- Ogni gruppo mass-exchange pubblicato sincronizza i totali nello stesso confine di gruppo in cui pubblica deposito, erosione, erodibile e lava. I gruppi successivi osservano quindi uno stato di substrato internamente consistente.
+- Lo stato completo rimane pubblicato dall'integratore solo alla conclusione del passo; in caso di errore, geometria e inventari tornano allo snapshot pre-step.
+- Ancora non compilato o testato: la verifica dinamica resta fase successiva alla chiusura dell'audit statico.
