@@ -5,6 +5,7 @@ MODULE time_integration_2d
   USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
   USE state_conversion_2d, ONLY : qc_to_qp
   USE state_2d, ONLY : initialize_dry_physical_cell
+  USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
   USE diagnostics_2d, ONLY : fatal_error
   USE source_registry_2d, ONLY : source_registry_type
   USE equation_metadata_2d, ONLY : equation_partition_type
@@ -66,8 +67,8 @@ CONTAINS
       k=domain%k_cent(l)
       q(1:n_eqns,j,k)=this%q_before(1:n_eqns,j,k)-dt*this%spatial_rate(:,j,k)
       ! Spatial admissibility check. Do not limit or clip its conservative rate.
-      IF (.NOT.ALL(q(1:n_eqns,j,k)==q(1:n_eqns,j,k))) &
-           CALL fatal_error('Lie spatial update produced NaN')
+      IF (.NOT.ALL(ieee_is_finite(q(1:n_eqns,j,k)))) &
+           CALL fatal_error('Lie spatial update produced non-finite state')
       IF (q(idx_totMassEqn,j,k)<0.0_wp) &
            CALL fatal_error('Lie spatial update: negative mass')
       IF (ANY(q(idx_solidEqn_first:idx_solidEqn_last,j,k)<0.0_wp)) &

@@ -8,6 +8,7 @@
 MODULE lie_source_executor_2d
     USE parameters_2d, ONLY : idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
 
+  USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
   USE diagnostics_2d, ONLY : fatal_error
   USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, mass_exchange_rates_type
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
@@ -181,12 +182,15 @@ CONTAINS
              CALL fatal_error('D19: invalid group method')
           END SELECT
           ! This is an admissibility check only, not an implicit post-solve clip.
-          IF (.NOT.ALL(q(1:n_eqns,j,k)==q(1:n_eqns,j,k))) &
-               CALL fatal_error('D19: source group produced NaN')
+          IF (.NOT.ALL(ieee_is_finite(q(1:n_eqns,j,k)))) &
+               CALL fatal_error('D19: source group produced non-finite state')
           IF (q(idx_totMassEqn,j,k)<0.0_wp) &
                CALL fatal_error('D19: negative mixture mass')
           IF (ANY(q(idx_solidEqn_first:idx_solidEqn_last,j,k)<0.0_wp)) &
                CALL fatal_error('D19: negative solid mass')
+          IF (SUM(q(idx_solidEqn_first:idx_solidEqn_last,j,k))> &
+               q(idx_totMassEqn,j,k)) &
+               CALL fatal_error('D19: source group solids exceed mixture mass')
           IF (q(idx_totMassEqn,j,k)>0.0_wp) THEN
              CALL qc_to_qp(q(:,j,k),qp(:,j,k),pressure,TRIM(context))
           ELSE
