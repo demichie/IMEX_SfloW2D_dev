@@ -8,74 +8,74 @@
 
 MODULE stochastic_random_2d
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : int64
-  USE parameters_2d, ONLY : wp
+    USE, INTRINSIC :: iso_fortran_env, ONLY : int64
+    USE parameters_2d, ONLY : wp
 
-  IMPLICIT NONE
+    IMPLICIT NONE
 
-  PRIVATE
+    PRIVATE
 
-  INTEGER, PUBLIC :: stochastic_seed = -1
+    INTEGER, PUBLIC :: stochastic_seed = -1
 
-  PUBLIC :: initialize_stochastic_rng
-  PUBLIC :: gaussian_noise
+    PUBLIC :: initialize_stochastic_rng
+    PUBLIC :: gaussian_noise
 
 CONTAINS
 
-  !> \brief Initialize the intrinsic generator from the configured stochastic seed.
-  !>
-  !> \note Reads stochastic_seed and changes the intrinsic RNG state. A negative seed requests
-  !>       processor-dependent initialization.
+    !> \brief Initialize the intrinsic generator from the configured stochastic seed.
+    !>
+    !> \note Reads stochastic_seed and changes the intrinsic RNG state. A negative seed requests
+    !>       processor-dependent initialization.
 
-  SUBROUTINE initialize_stochastic_rng
+    SUBROUTINE initialize_stochastic_rng
 
-    INTEGER :: i
-    INTEGER :: seed_size
-    INTEGER, ALLOCATABLE :: seed_state(:)
-    INTEGER(int64) :: seed_modulus
+        INTEGER :: i
+        INTEGER :: seed_size
+        INTEGER, ALLOCATABLE :: seed_state(:)
+        INTEGER(int64) :: seed_modulus
 
-    IF (stochastic_seed < 0) THEN
-       CALL random_seed
-       RETURN
-    END IF
+        IF (stochastic_seed < 0) THEN
+            CALL random_seed
+            RETURN
+        END IF
 
-    CALL random_seed(SIZE=seed_size)
-    ALLOCATE(seed_state(seed_size))
+        CALL random_seed(SIZE=seed_size)
+        ALLOCATE(seed_state(seed_size))
 
-    seed_modulus = INT(HUGE(0), int64)
-    DO i = 1, seed_size
-       seed_state(i) = INT(MODULO(INT(stochastic_seed, int64) +             &
-            104729_int64 * INT(i, int64), seed_modulus))
-    END DO
+        seed_modulus = INT(HUGE(0), int64)
+        DO i = 1, seed_size
+            seed_state(i) = INT(MODULO(INT(stochastic_seed, int64) +             &
+                104729_int64 * INT(i, int64), seed_modulus))
+        END DO
 
-    CALL random_seed(PUT=seed_state)
-    DEALLOCATE(seed_state)
+        CALL random_seed(PUT=seed_state)
+        DEALLOCATE(seed_state)
 
-  END SUBROUTINE initialize_stochastic_rng
+    END SUBROUTINE initialize_stochastic_rng
 
-  !> \brief Generate independent standard-normal samples with the Box-Muller transform.
-  !>
-  !> \param[in] noise_size Number of independent standard-normal values to generate.
-  !> \return Vector of noise_size independent, zero-mean, unit-variance Gaussian samples.
-  !>
-  !> \note Advances the intrinsic RNG state; generate samples outside OpenMP cell loops to avoid
-  !>       schedule-dependent random draws.
+    !> \brief Generate independent standard-normal samples with the Box-Muller transform.
+    !>
+    !> \param[in] noise_size Number of independent standard-normal values to generate.
+    !> \return Vector of noise_size independent, zero-mean, unit-variance Gaussian samples.
+    !>
+    !> \note Advances the intrinsic RNG state; generate samples outside OpenMP cell loops to avoid
+    !>       schedule-dependent random draws.
 
-  FUNCTION gaussian_noise(noise_size) RESULT(noise)
+    FUNCTION gaussian_noise(noise_size) RESULT(noise)
 
-    INTEGER, INTENT(IN) :: noise_size
-    REAL(wp) :: noise(noise_size)
+        INTEGER, INTENT(IN) :: noise_size
+        REAL(wp) :: noise(noise_size)
 
-    REAL(wp) :: uniform_samples(noise_size, 2)
-    REAL(wp), PARAMETER :: two_pi = 2.0_wp * ACOS(-1.0_wp)
+        REAL(wp) :: uniform_samples(noise_size, 2)
+        REAL(wp), PARAMETER :: two_pi = 2.0_wp * ACOS(-1.0_wp)
 
-    CALL random_number(uniform_samples)
+        CALL random_number(uniform_samples)
 
-    ! Box-Muller transform. RANDOM_NUMBER returns values in [0,1), so
-    ! 1-uniform_samples(:,1) is strictly positive and LOG is well-defined.
-    noise = SQRT(-2.0_wp * LOG(1.0_wp - uniform_samples(:, 1))) *           &
-         COS(two_pi * uniform_samples(:, 2))
+        ! Box-Muller transform. RANDOM_NUMBER returns values in [0,1), so
+        ! 1-uniform_samples(:,1) is strictly positive and LOG is well-defined.
+        noise = SQRT(-2.0_wp * LOG(1.0_wp - uniform_samples(:, 1))) *           &
+            COS(two_pi * uniform_samples(:, 2))
 
-  END FUNCTION gaussian_noise
+    END FUNCTION gaussian_noise
 
 END MODULE stochastic_random_2d
