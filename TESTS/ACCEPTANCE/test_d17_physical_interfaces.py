@@ -48,7 +48,12 @@ def main() -> int:
         r"\.(true|false)\.\s*,\s*\.(true|false)\.\s*,\s*"
         r"\.(true|false)\.\s*,\s*default_method\s*=\s*"
         r"SOURCE_METHOD_(EXPLICIT|NEWTON|ANALYTIC)", catalog, re.I)
-    require(len(entries) == 24, f"expected 24 source catalog entries, found {len(entries)}", failures)
+    declared_count = re.search(r"(?i)SOURCE_TERM_COUNT\s*=\s*(\d+)", catalog)
+    require(declared_count is not None, "missing SOURCE_TERM_COUNT declaration", failures)
+    if declared_count is not None:
+        expected_count = int(declared_count.group(1))
+        require(len(entries) == expected_count,
+                f"expected {expected_count} source catalog entries, found {len(entries)}", failures)
     names = [e[0] for e in entries]
     require(len(set(names)) == len(names), "duplicate source identities", failures)
     expected_families = {
@@ -89,7 +94,7 @@ def main() -> int:
     require(bool(re.search(r"interface\s+eval_source_explicit\b", assembly, re.I)),
             "missing explicit generic", failures)
     for proc in ("eval_geometry_cell_source_explicit", "eval_mass_exchange_source_explicit",
-                 "assemble_lie_explicit_transaction", "eval_cell_source_explicit",
+                 "assemble_lie_explicit_transaction", "eval_source_semi_implicit",
                  "eval_source_implicit", "eval_source_analytic"):
         require(has_procedure(assembly, proc), f"missing source assembler {proc}", failures)
     for fragment in ("groups(1)%id/=0", "groups(1)%method/=SOURCE_METHOD_EXPLICIT",
