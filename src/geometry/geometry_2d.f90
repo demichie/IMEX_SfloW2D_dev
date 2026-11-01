@@ -654,15 +654,14 @@ CONTAINS
     INTEGER :: i,j,k
 
     INTEGER :: zone_counter
-    INTEGER :: equi_list(0:1000)
-    INTEGER :: equi_list_new(0:1000)
-    INTEGER :: zone , zone_max
-    INTEGER :: zone_cells(1:1000)
+    INTEGER, ALLOCATABLE :: equi_list(:),equi_list_new(:),zone_cells(:)
+    INTEGER :: zone , zone_max,maximum_zones
 
-    DO i=0,1000
-
-       equi_list(i) = i
-
+    maximum_zones=comp_cells_x*comp_cells_y
+    ALLOCATE(equi_list(0:maximum_zones),equi_list_new(0:maximum_zones), &
+         zone_cells(maximum_zones))
+    DO i=0,maximum_zones
+       equi_list(i)=i
     END DO
 
     B_zone=0

@@ -299,3 +299,8 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Rilevato che `B_zone`, utilizzato anche dallo scambio di massa, era calcolato solo all'inizializzazione: dopo un aggiornamento Lie della topografia i gruppi seguenti potevano leggere nuove quote e vecchie zone.
 - La ricostruzione geometrica aggiorna adesso le zone quando la vaporizzazione e' attiva e la mappa e' allocata. `topography_zones` azzera la mappa prima di ricalcolare le zone connesse; l'inizializzazione resta valida.
 - Snapshot e rollback geometrico includono ora anche `B_zone`; `assign_topography_vertices` ripristina le zone dopo un rigetto. Non eseguiti test, compilazione o Action. Rimane da esaminare il limite storico delle 1000 zone nella routine.
+
+### Eliminazione del limite arbitrario sulle zone geometriche (2026-11-01)
+
+- Completato il riassetto della riclassificazione topografica dinamica eliminando da `topography_zones` gli array fissi `equi_list(0:1000)`, `equi_list_new(0:1000)` e `zone_cells(1:1000)`. Sono ora dimensionati in base al numero di celle della griglia: una mappa puo' teoricamente contenere una zona provvisoria per cella.
+- La correzione previene accessi fuori limite nelle topografie complesse; l'algoritmo di equivalenza e la scelta della regione principale rimangono invariati. Insieme al commit precedente, il ricalcolo delle zone e il rollback sono coerenti con la topografia evolutiva. Nessun test o compilazione eseguito.
