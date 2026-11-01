@@ -29,6 +29,7 @@ CONTAINS
        stochastic_values,step_start_time,q_original,qp_original,step_failed,failure_message)
     USE parameters_2d, ONLY : erodible_deposit_flag,idx_add_gas_first,idx_add_gas_last
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,cell_source_fractions, &
+         B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
          begin_topography_rate_update,record_topography_rate_cell, &
          apply_topography_rate_update,deposit,erosion,erodible,B_zone,lava_deposit
     USE source_terms_2d, ONLY : eval_source_explicit,eval_source_analytic, &
@@ -113,6 +114,30 @@ CONTAINS
           context='Lie source group'
           noise=0.0_wp
           IF (PRESENT(stochastic_values)) noise=stochastic_values(j,k)
+
+          ! Validate constitutive inputs before dispatch. Model/method errors
+          ! remain configuration errors, not recoverable timestep rejections.
+          IF (.NOT.ALL(ieee_is_finite(qpentry)) .OR. &
+               .NOT.ieee_is_finite(noise)) THEN
+             CALL reject_cell('D19: non-finite source-group physical input')
+             EXIT cell_loop
+          END IF
+          IF (.NOT.ieee_is_finite(B_prime_x_geom(j,k)) .OR. &
+               .NOT.ieee_is_finite(B_prime_y_geom(j,k)) .OR. &
+               .NOT.ieee_is_finite(B_second_xx_geom(j,k)) .OR. &
+               .NOT.ieee_is_finite(B_second_xy_geom(j,k)) .OR. &
+               .NOT.ieee_is_finite(B_second_yy_geom(j,k)) .OR. &
+               .NOT.ieee_is_finite(grav_coeff(j,k))) THEN
+             CALL reject_cell('D19: non-finite source-group geometry')
+             EXIT cell_loop
+          END IF
+          IF (with_exchange) THEN
+             IF (.NOT.ALL(ieee_is_finite(erodible(1:n_solid,j,k))) .OR. &
+                  ANY(erodible(1:n_solid,j,k)<0.0_wp)) THEN
+                CALL reject_cell('D19: invalid erodible inventory before mass exchange')
+                EXIT cell_loop
+             END IF
+          END IF
 
           SELECT CASE(groups(group_index)%method)
           CASE(SOURCE_METHOD_EXPLICIT)
