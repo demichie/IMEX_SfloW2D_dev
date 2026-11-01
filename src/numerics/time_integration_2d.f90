@@ -86,33 +86,33 @@ CONTAINS
         this%qp_trial=state%qp
         ! Reconstruct a defined primitive halo from the conserved pre-step state.
         DO l=1,domain%reconstruction_cells
-                j=domain%j_reconstruction(l)
-                k=domain%k_reconstruction(l)
-                IF (this%q_before(idx_totMassEqn,j,k)>0.0_wp) THEN
-                    CALL qc_to_qp(this%q_before(:,j,k),this%qp_before(:,j,k),pd, &
+            j=domain%j_reconstruction(l)
+            k=domain%k_reconstruction(l)
+            IF (this%q_before(idx_totMassEqn,j,k)>0.0_wp) THEN
+                CALL qc_to_qp(this%q_before(:,j,k),this%qp_before(:,j,k),pd, &
                     'Lie pre-spatial reconstruction state',conversion_ok)
-                    IF (.NOT.conversion_ok) &
+                IF (.NOT.conversion_ok) &
                     CALL fatal_error('Lie pre-spatial state conversion rejected')
-                ELSE
-                    CALL initialize_dry_physical_cell(this%qp_before(:,j,k))
-                END IF
+            ELSE
+                CALL initialize_dry_physical_cell(this%qp_before(:,j,k))
+            END IF
         END DO
         ! The spatial step is conservative; only admissibility is checked.
         CALL spatial_operator%evaluate(this%qp_before,this%spatial_rate,t,domain)
         DO l=1,domain%solve_cells
-                j=domain%j_cent(l)
-                k=domain%k_cent(l)
-                this%q_trial(1:n_eqns,j,k)=this%q_before(1:n_eqns,j,k)-dt*this%spatial_rate(:,j,k)
-        ! Spatial admissibility check. Do not limit or clip its conservative rate.
-                IF (.NOT.conservative_mass_admissible(this%q_trial(1:n_eqns,j,k))) &
-                CALL fatal_error('Lie spatial update: inadmissible conservative state')
-                IF (this%q_trial(idx_totMassEqn,j,k)>0.0_wp) THEN
-                    CALL qc_to_qp(this%q_trial(:,j,k),this%qp_trial(:,j,k),pd,'Lie spatial update',conversion_ok)
-                    IF (.NOT.conversion_ok) &
+            j=domain%j_cent(l)
+            k=domain%k_cent(l)
+            this%q_trial(1:n_eqns,j,k)=this%q_before(1:n_eqns,j,k)-dt*this%spatial_rate(:,j,k)
+            ! Spatial admissibility check. Do not limit or clip its conservative rate.
+            IF (.NOT.conservative_mass_admissible(this%q_trial(1:n_eqns,j,k))) &
+            CALL fatal_error('Lie spatial update: inadmissible conservative state')
+            IF (this%q_trial(idx_totMassEqn,j,k)>0.0_wp) THEN
+                CALL qc_to_qp(this%q_trial(:,j,k),this%qp_trial(:,j,k),pd,'Lie spatial update',conversion_ok)
+                IF (.NOT.conversion_ok) &
                     CALL fatal_error('Lie spatial state conversion rejected')
-                ELSE
-                    CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))
-                END IF
+            ELSE
+                CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))
+            END IF
         END DO
         ! GROUP-0 source rates use immutable q^n/qp^n, while applying to post-spatial q.
         ! Later groups evaluate from each predecessor's updated state.
