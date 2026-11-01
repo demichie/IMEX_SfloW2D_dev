@@ -51,7 +51,7 @@ CONTAINS
     CLASS(domain_type), INTENT(IN) :: domain
     CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
     INTEGER :: l,j,k
-    LOGICAL :: source_step_failed
+    LOGICAL :: source_step_failed,conversion_ok
     REAL(wp) :: pd
     IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
     this%q_before=q
@@ -87,7 +87,9 @@ CONTAINS
            this%q_trial(idx_totMassEqn,j,k)) &
            CALL fatal_error('Lie spatial update: solids exceed total mass')
       IF (this%q_trial(idx_totMassEqn,j,k)>0.0_wp) THEN
-        CALL qc_to_qp(this%q_trial(:,j,k),this%qp_trial(:,j,k),pd,'Lie spatial update')
+        CALL qc_to_qp(this%q_trial(:,j,k),this%qp_trial(:,j,k),pd,'Lie spatial update',conversion_ok)
+        IF (.NOT.conversion_ok) &
+             CALL fatal_error('Lie spatial state conversion rejected')
       ELSE
         CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))
       END IF

@@ -63,7 +63,7 @@ CONTAINS
     REAL(wp) :: physical_rate(n_eqns),exchange_rate(n_eqns),total_rate(n_eqns)
     REAL(wp) :: analytic_rate(n_eqns),factor,coverage,pressure,source_time,noise
     REAL(wp) :: remaining_mass,change_in_solid
-    LOGICAL :: with_exchange,has_other,implicit_mask(n_eqns),ok,failed,bed_accepted
+    LOGICAL :: with_exchange,has_other,implicit_mask(n_eqns),ok,failed,bed_accepted,conversion_ok
     INTEGER :: group_index,cell,j,k,i,solid_eq,status,iterations,linear_info
     INTEGER :: membership(n_eqns)
     CHARACTER(LEN=96) :: context
@@ -220,7 +220,11 @@ CONTAINS
                      IF (step_failed) EXIT cell_loop
              END IF
              IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
-                CALL qc_to_qp(q_candidate,qp_candidate,pressure,'Lie explicit group candidate')
+                CALL qc_to_qp(q_candidate,qp_candidate,pressure,'Lie explicit group candidate',conversion_ok)
+                IF (.NOT.conversion_ok) THEN
+                   CALL reject_cell('D19: explicit candidate conversion failed')
+                   EXIT cell_loop
+                END IF
              ELSE
                 CALL initialize_dry_physical_cell(qp_candidate)
              END IF
@@ -277,7 +281,11 @@ CONTAINS
                CALL reject_cell('D19: source group solids exceed mixture mass')
                IF (step_failed) EXIT cell_loop
           IF (q(idx_totMassEqn,j,k)>0.0_wp) THEN
-             CALL qc_to_qp(q(:,j,k),qp(:,j,k),pressure,TRIM(context))
+             CALL qc_to_qp(q(:,j,k),qp(:,j,k),pressure,TRIM(context),conversion_ok)
+             IF (.NOT.conversion_ok) THEN
+                CALL reject_cell('D19: source group conversion failed')
+                EXIT cell_loop
+             END IF
           ELSE
              CALL initialize_dry_physical_cell(qp(:,j,k))
           END IF

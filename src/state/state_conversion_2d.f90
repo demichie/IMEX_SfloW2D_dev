@@ -7,6 +7,7 @@
 !********************************************************************************
 
 MODULE state_conversion_2d
+  USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
   USE parameters_2d, ONLY : idx_hu, idx_hv, idx_totMassEqn, &
        idx_uEqn, idx_vEqn, idx_engyEqn
 
@@ -997,7 +998,7 @@ CONTAINS
   !> \param[in] context Optional diagnostic context included in conversion errors.
   !******************************************************************************
 
-  SUBROUTINE qc_to_qp(qc,qp,p_dyn,context)
+  SUBROUTINE qc_to_qp(qc,qp,p_dyn,context,accepted)
 
     IMPLICIT none
 
@@ -1005,6 +1006,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: qp(n_vars+2)
     REAL(wp), INTENT(OUT) :: p_dyn
     CHARACTER(LEN=*), INTENT(IN), OPTIONAL :: context
+    LOGICAL, INTENT(OUT), OPTIONAL :: accepted
 
     REAL(wp) :: r_h               !< real-value flow thickness
     REAL(wp) :: r_u               !< real-value x-velocity
@@ -1017,6 +1019,20 @@ CONTAINS
     REAL(wp) :: r_Zs             !< real-value stochastic variable
     REAL(wp) :: r_exc_pore_pres  !< real-value pore pressure
     REAL(wp) :: r_xs(n_solid), r_xg(n_add_gas)
+
+    IF (PRESENT(accepted)) THEN
+       accepted=.FALSE.
+       qp=0.0_wp
+       p_dyn=0.0_wp
+       IF (.NOT.ALL(ieee_is_finite(qc))) RETURN
+       IF (qc(idx_totMassEqn)<0.0_wp) RETURN
+       IF (qc(idx_totMassEqn)>EPSILON(1.0_wp)) THEN
+          r_xs=qc(idx_solid_first:idx_solid_last)/qc(idx_totMassEqn)
+          r_xg=qc(idx_add_gas_first:idx_add_gas_last)/qc(idx_totMassEqn)
+          IF (ANY(r_xs< -mass_fraction_roundoff_tolerance) .OR. &
+               ANY(r_xg< -mass_fraction_roundoff_tolerance)) RETURN
+       END IF
+    END IF
 
     qp = 0.0_wp
 
@@ -1052,6 +1068,10 @@ CONTAINS
     qp(idx_u) = r_u
     qp(idx_v) = r_v
 
+    IF (PRESENT(accepted)) THEN
+       IF (.NOT.ALL(ieee_is_finite(qp)) .OR. .NOT.ieee_is_finite(p_dyn)) RETURN
+       accepted=.TRUE.
+    END IF
     RETURN
 
   END SUBROUTINE qc_to_qp
