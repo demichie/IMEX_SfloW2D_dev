@@ -63,7 +63,7 @@ CONTAINS
     REAL(wp) :: physical_rate(n_eqns),exchange_rate(n_eqns),total_rate(n_eqns)
     REAL(wp) :: analytic_rate(n_eqns),factor,coverage,pressure,source_time,noise
     REAL(wp) :: remaining_mass,change_in_solid
-    LOGICAL :: with_exchange,has_other,implicit_mask(n_eqns),ok,failed
+    LOGICAL :: with_exchange,has_other,implicit_mask(n_eqns),ok,failed,bed_accepted
     INTEGER :: group_index,cell,j,k,i,solid_eq,status,iterations,linear_info
     INTEGER :: membership(n_eqns)
     CHARACTER(LEN=96) :: context
@@ -278,7 +278,13 @@ CONTAINS
           IF (groups(group_index)%method==SOURCE_METHOD_NEWTON) CALL local_partition%finalize()
           RETURN
        END IF
-       IF (with_exchange .AND. topo_change_flag) CALL apply_topography_rate_update(time_step)
+       IF (with_exchange .AND. topo_change_flag) THEN
+          CALL apply_topography_rate_update(time_step,bed_accepted)
+          IF (.NOT.bed_accepted) THEN
+             step_failed=.TRUE.
+             RETURN
+          END IF
+       END IF
        IF (groups(group_index)%method==SOURCE_METHOD_NEWTON) CALL local_partition%finalize()
     END DO
   CONTAINS

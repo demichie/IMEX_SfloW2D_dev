@@ -593,19 +593,28 @@ CONTAINS
   !>          once by the time increment and refreshes all derived geometry.
   !> \param[in] time_step Physical time increment [s].
   !******************************************************************************
-  SUBROUTINE apply_topography_rate_update(time_step)
+  SUBROUTINE apply_topography_rate_update(time_step,accepted)
 
     IMPLICIT NONE
 
     REAL(wp), INTENT(IN) :: time_step
+    LOGICAL, INTENT(OUT), OPTIONAL :: accepted
+    LOGICAL :: valid
     REAL(wp), ALLOCATABLE :: bed_candidate(:,:)
 
-    IF (.NOT.ieee_is_finite(time_step) .OR. time_step<=0.0_wp) &
-         ERROR STOP 'invalid Lie topography time interval'
-    IF (.NOT.ALLOCATED(B_vertex)) &
-         ERROR STOP 'topography vertices are not initialized'
+    IF (PRESENT(accepted)) accepted=.FALSE.
+
+    IF (.NOT.ieee_is_finite(time_step) .OR. time_step<=0.0_wp) THEN
+       IF (PRESENT(accepted)) RETURN
+       ERROR STOP 'invalid Lie topography time interval'
+    END IF
+    IF (.NOT.ALLOCATED(B_vertex)) THEN
+       IF (PRESENT(accepted)) RETURN
+       ERROR STOP 'topography vertices are not initialized'
+    END IF
     IF (.NOT.ALLOCATED(topography_rate_cell) .OR.                         &
          .NOT.ALLOCATED(topography_rate_vertex)) THEN
+       IF (PRESENT(accepted)) RETURN
        ERROR STOP 'topography rate workspace is not initialized'
     END IF
 
@@ -613,14 +622,19 @@ CONTAINS
          topography_rate_vertex)
 
     ! Validate the entire nodal candidate before changing authoritative B_vertex.
-    IF (.NOT.ALL(ieee_is_finite(topography_rate_vertex))) &
-         ERROR STOP 'non-finite projected Lie topography rate'
+    IF (.NOT.ALL(ieee_is_finite(topography_rate_vertex))) THEN
+       IF (PRESENT(accepted)) RETURN
+       ERROR STOP 'non-finite projected Lie topography rate'
+    END IF
     bed_candidate=B_vertex+time_step*topography_rate_vertex
-    IF (.NOT.ALL(ieee_is_finite(bed_candidate))) &
-         ERROR STOP 'non-finite Lie topography candidate'
+    IF (.NOT.ALL(ieee_is_finite(bed_candidate))) THEN
+       IF (PRESENT(accepted)) RETURN
+       ERROR STOP 'non-finite Lie topography candidate'
+    END IF
     B_vertex=bed_candidate
 
     CALL refresh_topography_geometry
+    IF (PRESENT(accepted)) accepted=.TRUE.
 
   END SUBROUTINE apply_topography_rate_update
 
