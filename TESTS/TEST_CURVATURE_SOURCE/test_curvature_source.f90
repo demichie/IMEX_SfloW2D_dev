@@ -8,7 +8,7 @@ PROGRAM test_curvature_source
   USE source_terms_2d, ONLY : eval_geometry_curvature_explicit
   USE source_terms_2d, ONLY : eval_source_explicit
   USE mass_injection_coefficients_2d, ONLY : set_source_time_coefficients
-  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
   USE source_registry_2d, ONLY : source_group_type
 
   IMPLICIT NONE
@@ -32,16 +32,12 @@ PROGRAM test_curvature_source
   INTEGER :: sample
 
   curvature_group%method=SOURCE_METHOD_EXPLICIT
-  curvature_group%cadence=SOURCE_CADENCE_STAGE
   curvature_group%source_names=[CHARACTER(LEN=64)::'geometry_curvature']
   circular_injection_group%method=SOURCE_METHOD_EXPLICIT
-  circular_injection_group%cadence=SOURCE_CADENCE_STAGE
   circular_injection_group%source_names=[CHARACTER(LEN=64)::'bottom_circular_injection']
   fissural_injection_group%method=SOURCE_METHOD_EXPLICIT
-  fissural_injection_group%cadence=SOURCE_CADENCE_STAGE
   fissural_injection_group%source_names=[CHARACTER(LEN=64)::'bottom_fissural_injection']
   radial_injection_group%method=SOURCE_METHOD_EXPLICIT
-  radial_injection_group%cadence=SOURCE_CADENCE_STAGE
   radial_injection_group%source_names=[CHARACTER(LEN=64)::'radial_injection']
 
   expected_acceleration = Bxx*u*u + 2.0_wp*Bxy*u*v + Byy*v*v
