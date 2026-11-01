@@ -97,7 +97,9 @@ CONTAINS
     IF (q_cell(idx_totMassEqn)<0.0_wp) RETURN
     IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) RETURN
     IF (ANY(q_cell(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
-    IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last))>q_cell(idx_totMassEqn)) RETURN
+    ! All transported component masses share the same total-mixture budget.
+    IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) + &
+         SUM(q_cell(idx_add_gas_first:idx_add_gas_last)) > q_cell(idx_totMassEqn)) RETURN
     valid=.TRUE.
   END FUNCTION conservative_mass_admissible
 

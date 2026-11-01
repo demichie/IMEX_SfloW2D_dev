@@ -206,3 +206,10 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Inserito `CALL registry%finalize()` all'ingresso di `initialize_configured_sources`: anche gli errori precoci invalidano il registro e impediscono l'uso di metadati stale. `initialize_lie_registry` resta responsabile della successiva validazione transazionale.
 - Esaminati i metadati del catalogo relativi ai metodi: Froude, Lucas e mui non dichiarano NEWTON; i mass exchange dichiarano il solo EXPLICIT. La configurazione e il registro controllano le capacità richieste.
 - Nessuna compilazione o Action eseguita per accordo. Il controllo integrale di ogni firma e percorso, inclusi i test, resta aperto; questa nota non dichiara concluso D19.
+
+### Chiusura del vincolo sulle masse di componente (2026-11-01)
+
+- Controllo end-to-end di `conservative_mass_admissible` e dei campi di composizione in `state_conversion_2d`: le masse conservative dei solidi e dei gas addizionali sono entrambe parti della massa totale della miscela. Prima il guard verificava la nonnegativita' di ciascuna componente ma confrontava solo la somma dei solidi con la massa totale. Uno stato con solidi + gas addizionali superiori alla massa totale poteva superare questo guard e fallire soltanto durante la conversione o la chiusura delle frazioni.
+- Corretto il controllo per imporre `SUM(solid masses) + SUM(additional gas masses) <= total mixture mass` senza clipping e senza limiter. Per gli insiemi di componenti vuoti la somma Fortran e' zero. Gli indici canonici sono gia' importati dal modulo.
+- La correzione vale per stato post-spaziale e candidati dei gruppi in quanto condividono lo stesso guard. Non attesta superamento dei test: compilazione e GitHub Actions restano riservate all'utente dopo D19.
+- Il censimento integrale delle firme/import e degli ulteriori percorsi resta aperto; audit non ancora dichiarato concluso.
