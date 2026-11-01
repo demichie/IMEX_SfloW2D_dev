@@ -1,3 +1,6 @@
+!> @brief Define supported Lie source identities and their method capabilities.
+!> @details This immutable catalog describes physical method availability,
+!>          permitted phases and the conservative equations touched by Newton.
 MODULE source_catalog_2d
     USE parameters_2d, ONLY : idx_uEqn,idx_vEqn,idx_engyEqn,idx_poreEqn
     IMPLICIT NONE
@@ -11,6 +14,7 @@ MODULE source_catalog_2d
     INTEGER, PARAMETER, PUBLIC :: SOURCE_SOLVE_ANALYTIC_TEMPERATURE=3, SOURCE_SOLVE_ANALYTIC_PORE_PRESSURE=4
     INTEGER, PARAMETER, PUBLIC :: SOURCE_ROLE_IMPLICIT=1, SOURCE_ROLE_SEMI_IMPLICIT=2
     ! Equation-group membership is configured independently of source identity.
+    !> @brief Immutable capabilities and phase permissions for one source term.
     TYPE :: source_term_type
         CHARACTER(LEN=64) :: name = ''
         LOGICAL :: has_explicit = .FALSE.
@@ -100,6 +104,11 @@ CONTAINS
     !> Structurally affected conservative equations for a Newton-capable source.
     !> A zero instantaneous rate does not remove an equation from this set.
     !> An unsupported source/method returns an empty set.
+    !> @brief Return conservative equation indices structurally affected by Newton.
+    !> @details Inactive instantaneous rates do not remove structural equations;
+    !>          unsupported methods return an empty array.
+    !> @param[in] name Canonical source name.
+    !> @return Allocatable list of conservative equation indices.
     FUNCTION source_newton_affected_equations(name) RESULT(ids)
         CHARACTER(*), INTENT(IN) :: name
         INTEGER, ALLOCATABLE :: ids(:)
@@ -120,6 +129,9 @@ CONTAINS
     END FUNCTION source_newton_affected_equations
 
 
+    !> @brief Look up one catalog descriptor by its canonical source name.
+    !> @param[in] name Exact registered source name.
+    !> @return Descriptor, or default-disabled descriptor when unknown.
     PURE FUNCTION source_term_descriptor_by_name(name) RESULT(term)
         CHARACTER(*), INTENT(IN) :: name
         TYPE(source_term_type) :: term
@@ -132,6 +144,9 @@ CONTAINS
         END IF
         END DO
     END FUNCTION source_term_descriptor_by_name
+
+    !> @brief Check uniqueness and nonempty names across source descriptors.
+    !> @return True if all registered source names are valid and unique.
     PURE LOGICAL FUNCTION source_catalog_names_unique() RESULT(ok)
         INTEGER :: i,j
         ok=.FALSE.
@@ -143,6 +158,10 @@ CONTAINS
         END DO
         ok=.TRUE.
     END FUNCTION source_catalog_names_unique
+
+    !> @brief Resolve a rheology model name to its canonical source identity.
+    !> @param[in] model_name Text identifier of the rheology constitutive law.
+    !> @return Registered rheology source name, empty when not found or disabled.
     PURE FUNCTION canonical_rheology_source_name(model_name) RESULT(name)
         CHARACTER(*), INTENT(IN) :: model_name
         CHARACTER(LEN=64) :: name
@@ -157,6 +176,9 @@ CONTAINS
         END IF
         END DO
     END FUNCTION canonical_rheology_source_name
+
+    !> @brief Ensure the rheology subset contains no duplicate source names.
+    !> @return True if rheology source identities are unique.
     PURE LOGICAL FUNCTION canonical_rheology_catalog_unique() RESULT(ok)
         INTEGER :: i,j
         ok=.FALSE.
@@ -169,8 +191,13 @@ CONTAINS
         END DO
         ok=.TRUE.
     END FUNCTION canonical_rheology_catalog_unique
+
     !> Check a rheology's actual SI/IM contribution by canonical source name.
     !> This is independent of the legacy numeric model ID.
+    !> @brief Query whether a rheology implements a requested physical treatment.
+    !> @param[in] source_name Canonical rheology source name.
+    !> @param[in] role Requested implicit or semi-implicit contribution identifier.
+    !> @return True if that rheology supports the selected contribution.
     PURE LOGICAL FUNCTION rheology_name_has_role(source_name,role) RESULT(found)
         CHARACTER(*), INTENT(IN) :: source_name
         INTEGER, INTENT(IN) :: role

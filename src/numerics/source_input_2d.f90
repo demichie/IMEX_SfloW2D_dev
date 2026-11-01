@@ -37,7 +37,11 @@ MODULE source_input_2d
     PUBLIC :: read_mass_exchange_parameters, write_mass_exchange_parameters
     PUBLIC :: uppercase_source_text
 CONTAINS
-    ! Read the optional indivisible mass-exchange schedule.
+    !> @brief Read the optional common schedule for all mass-exchange terms.
+    !> @details Rejects the retired SOURCE_GROUPS syntax while preserving the
+    !>          caller's unit position for later namelist processing.
+    !> @param[in] input_unit Open Fortran input unit containing source namelists.
+    !> @param[out] error Nonempty diagnostic when scanning or reading fails.
     SUBROUTINE read_mass_exchange_parameters(input_unit,error)
         INTEGER, INTENT(IN) :: input_unit
         CHARACTER(*), INTENT(OUT) :: error
@@ -101,6 +105,8 @@ CONTAINS
         IF (ios/=0) error='Unable to rewind after MASS_EXCHANGE_PARAMETERS'
     END SUBROUTINE read_mass_exchange_parameters
 
+    !> @brief Write the configured mass-exchange namelist to an output unit.
+    !> @param[in] output_unit Open formatted Fortran output unit.
     SUBROUTINE write_mass_exchange_parameters(output_unit)
         INTEGER, INTENT(IN) :: output_unit
         WRITE(output_unit,NML=mass_exchange_parameters)

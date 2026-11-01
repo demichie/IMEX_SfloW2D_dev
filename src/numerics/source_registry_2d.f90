@@ -36,7 +36,10 @@ MODULE source_registry_2d
         PROCEDURE :: has_implicit_sources => registry_has_implicit_sources
     END TYPE source_registry_type
 CONTAINS
-    !> Membership in the single, canonical physical-source name array.
+    !> @brief Test whether a group schedules the named physical source.
+    !> @param[in] group Lie group and its configured canonical identities.
+    !> @param[in] name Canonical identity to search for.
+    !> @return True if the name occurs in the allocated group source list.
     PURE LOGICAL FUNCTION group_contains_name(group,name) RESULT(found)
         TYPE(source_group_type), INTENT(IN) :: group
         CHARACTER(*), INTENT(IN) :: name
@@ -45,7 +48,9 @@ CONTAINS
         found=ANY(group%source_names==TRIM(name))
     END FUNCTION group_contains_name
 
-    !> Return the group-owned names without an additional canonicalization layer.
+    !> @brief Copy the source identities owned by a Lie group.
+    !> @param[in] group Lie group with an optional allocated source list.
+    !> @return Independent source name array, empty if none are configured.
     FUNCTION group_source_names(group) RESULT(names)
         TYPE(source_group_type), INTENT(IN) :: group
         CHARACTER(LEN=64), ALLOCATABLE :: names(:)
@@ -71,12 +76,22 @@ CONTAINS
         registry_has_implicit_sources = this%initialized .AND. this%implicit_sources_flag
     END FUNCTION registry_has_implicit_sources
 
+    !> @brief Query whether group metadata passed initialization and validation.
+    !> @param[in] this Lie registry to examine.
+    !> @return True only after successful initialization.
     PURE LOGICAL FUNCTION registry_is_initialized(this)
         CLASS(source_registry_type), INTENT(IN) :: this
         registry_is_initialized=this%initialized
     END FUNCTION registry_is_initialized
 
-    !> Initialize the ordered groups for the first-order Lie integrator.
+    !> @brief Validate and store groups for the first-order Lie integrator.
+    !> @details Rejects inconsistent methods, duplicated identities and invalid
+    !>          equation footprints; updates registry ownership on successful validation.
+    !> @param[in,out] this Registry receiving validated group metadata.
+    !> @param[in] n_equations Number of conservative equations.
+    !> @param[in] pore_equation Pressure-of-pore equation index, zero when absent.
+    !> @param[in] groups Ordered source group candidates from input configuration.
+    !> @param[out] error Validation diagnostic; empty on success.
     SUBROUTINE initialize_lie_registry(this,n_equations,pore_equation,groups,error)
         CLASS(source_registry_type), INTENT(INOUT) :: this
         INTEGER, INTENT(IN) :: n_equations,pore_equation
@@ -167,7 +182,9 @@ CONTAINS
         error=''
     END SUBROUTINE initialize_lie_registry
 
-    !> \brief Return a detached copy of the single Lie group registry.
+    !> @brief Return a detached copy of the ordered Lie source groups.
+    !> @param[in] this Initialized source registry.
+    !> @return Independently allocated group descriptors for the caller.
     FUNCTION copy_lie_groups(this) RESULT(groups)
         CLASS(source_registry_type), INTENT(IN) :: this
         TYPE(source_group_type), ALLOCATABLE :: groups(:)
