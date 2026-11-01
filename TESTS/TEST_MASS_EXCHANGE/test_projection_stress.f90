@@ -235,6 +235,7 @@ CONTAINS
     TYPE(source_group_type) :: groups(1)
     REAL(wp) :: q_before(nq,nx,ny),qp_before(nq+2,nx,ny)
     REAL(wp) :: q_trial(nq,nx,ny),qp_trial(nq+2,nx,ny)
+    REAL(wp) :: qp_invalid(nq+2,nx,ny)
     REAL(wp) :: bed_before(nx+1,ny+1)
     REAL(wp) :: deposited_before(nx,ny,ns),eroded_before(nx,ny,ns)
     REAL(wp) :: erodible_before(ns,nx,ny),lava_before(nx,ny)
@@ -264,10 +265,13 @@ CONTAINS
     centers_before=B_cent;slope_before=B_prime_x_geom
     q_trial=q_before;qp_trial=qp_before
     ! Cell 2 is rejected after cell 1 has been considered for transfer.
-    qp_trial(:,2,1)=ieee_value(0.0_wp,ieee_quiet_nan)
+    ! An independent immutable pre-spatial input avoids aliasing an INTENT(INOUT)
+    ! candidate with the executor's INTENT(IN) GROUP-0 reference.
+    qp_invalid=qp_before
+    qp_invalid(:,2,1)=ieee_value(0.0_wp,ieee_quiet_nan)
     CALL begin_geometry_transaction
     CALL execute_lie_source_groups(state,q_trial,qp_trial,1.0_wp,domain,registry, &
-         q_original=q_before,qp_original=qp_trial, &
+         q_original=q_before,qp_original=qp_invalid, &
          step_failed=failed,failure_message=message)
     IF (.NOT.failed) ERROR STOP 'Lie exchange rejection not reported'
     IF (LEN_TRIM(message)==0) ERROR STOP 'Lie rejection missing diagnostic'
