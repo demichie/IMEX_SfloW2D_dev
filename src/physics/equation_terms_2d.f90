@@ -11,7 +11,6 @@ MODULE equation_terms_2d
   USE constitutive_parameters_2d
   USE state_conversion_2d
 
-  USE equation_metadata_2d, ONLY : equation_partition_type
   USE parameters_2d, ONLY : wp, &
        n_eqns, &
        n_vars, &

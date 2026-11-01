@@ -1,7 +1,7 @@
 !********************************************************************************
 !> \brief Validated source groups derived from physical source configuration.
 !> \details Builds metadata once, outside cell/stage loops. Does not evaluate
-!>          physics or change equation_partition_type, tableaux or solver calls.
+!>          physics or depend on legacy global equation partitions.
 !>          Private storage is exposed only through copies; failed initialization
 !>          releases all storage. Joint Newton blocks remain coupled.
 !********************************************************************************
@@ -17,7 +17,7 @@ MODULE source_registry_2d
     INTEGER :: id=0 !< Public or normalized internal group identity.
     INTEGER :: method=0 !< Explicit, Newton or analytic.
     CHARACTER(LEN=64), ALLOCATABLE :: source_names(:) !< Unique schedulable source identities.
-    INTEGER, ALLOCATABLE :: equation_ids(:) !< Implicit equation block or explicit footprint.
+    INTEGER, ALLOCATABLE :: equation_ids(:) !< Full structurally affected Newton equation set or explicit footprint.
   END TYPE source_group_type
 
   !> \brief Validated metadata owned and finalized by one simulation context.
@@ -178,19 +178,6 @@ CONTAINS
     valid=.TRUE.
   END FUNCTION valid_equations
 
-  !> \brief Elementwise membership, also for empty descriptor lists.
-  !> \param[in] ids Requested IDs.
-  !> \param[in] list Candidate set.
-  !> \return One flag per requested ID.
-  FUNCTION in_list(ids,list) RESULT(found)
-    INTEGER, INTENT(IN) :: ids(:),list(:)
-    LOGICAL :: found(SIZE(ids))
-    INTEGER :: i
-    DO i=1,SIZE(ids)
-      found(i)=ANY(list==ids(i))
-    END DO
-  END FUNCTION in_list
-
   !> \brief Compare unique ID sets without changing their recorded order.
   !> \param[in] left First list.
   !> \param[in] right Second list.
@@ -200,7 +187,9 @@ CONTAINS
     INTEGER :: i
     equal=.FALSE.
     IF (SIZE(left)/=SIZE(right)) RETURN
-    IF (.NOT.ALL(in_list(left,right))) RETURN
+    DO i=1,SIZE(left)
+      IF (.NOT.ANY(right==left(i))) RETURN
+    END DO
     DO i=1,SIZE(left)
       IF (COUNT(left==left(i))/=1 .OR. COUNT(right==left(i))/=1) RETURN
     END DO

@@ -47,6 +47,8 @@ For every Lie source group whose configured method is **NEWTON**, define the con
 
 **Cleanup 2026-11-01:** Removed duplicated simulation-global and executor-local equation partitions from the production Lie/Newton call path. `source_group%equation_ids` now provides the index set directly; `equation_metadata_2d.f90` remains for the final legacy/test reference audit. No intermediate compilation or tests.
 
+**Reference audit following partition cleanup:** `src/physics/equation_terms_2d.f90` contained a now-unused `USE equation_metadata_2d`, removed. The registry's one-use `in_list` helper was inlined in `same_set`. The legacy `equation_metadata_2d.f90` module is still referenced by old test targets and `src/Makefile.am`; do not delete it until those tests/build targets are migrated or removed as part of L07–L08. No intermediate compilation or tests were run.
+
 ## 2. Scope: KEEP / CHANGE / DELETE inventory
 
 Based on static inspection of the branch at the planning stage. **All code operations below are pending.** File-specific names must be audited for remaining references before deleting.
