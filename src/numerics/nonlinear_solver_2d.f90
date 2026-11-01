@@ -619,7 +619,7 @@ Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
             END DO
 
             CALL eval_f( qj , q_group_input , dt_step  , coeff_f ,             &
-Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
+                Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
                 active_equations,source_group )
 
             IF ( verbose_level .GE. 4 ) THEN

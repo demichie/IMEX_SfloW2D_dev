@@ -92,7 +92,7 @@ def main():
             if not line.lstrip().startswith("#") and prefix % 4:
                 errors.append(f"{path}:{line_no}: indentation is not a multiple of 4")
     if args.structural_report:
-        print('\\n'.join(nesting_warnings)) if nesting_warnings else print('No conservative nesting warnings')
+        print(*nesting_warnings, sep=chr(10)) if nesting_warnings else print('No conservative nesting warnings')
         print(f'Structural warnings: {len(nesting_warnings)}')
     if errors:
         print("\n".join(errors))

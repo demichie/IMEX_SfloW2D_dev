@@ -402,7 +402,7 @@ CONTAINS
         IF (selected_thermal) THEN
             CALL eval_thermal_implicit(['thermal_cooling'],physical_state, &
                 radiative_term_coeff,convective_term_coeff,T_env,source_term(4))
-        ENDIF
+        END IF
 
         IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
 
