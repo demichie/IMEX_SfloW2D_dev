@@ -50,7 +50,7 @@ CONTAINS
             r%energy_rate=substrate_temperature*(SUM(sp_heat_s*r%solid_mass_rate)+                     &
                         rho_c_sub*cp_sub*r%carrier_erosion_rate)
             r%dB_dt=-SUM(r%solid_erosion_rate)/(1.0_wp-erodible_porosity)
-        END SUBROUTINE
+        END SUBROUTINE eval_mass_exchange_erosion_explicit
 
         !> @brief Reject unsupported semi-implicit treatment for erosion.
         !> @details This entry point raises fatal_error; the rates are reset first.

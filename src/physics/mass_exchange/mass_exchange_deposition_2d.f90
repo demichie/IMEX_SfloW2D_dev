@@ -64,7 +64,7 @@ CONTAINS
                         r%add_gas_mass_rate= -rho_c*r%carrier_deposition_rate*                           &
                         state%xg/gas_phase_mass_fraction
             r%dB_dt=SUM(r%solid_deposition_rate)+r%carrier_deposition_rate
-        END SUBROUTINE
+        END SUBROUTINE eval_mass_exchange_deposition_explicit
 
         !> @brief Reject unsupported semi-implicit treatment for deposition.
         !> @details This entry point raises fatal_error; the rates are reset first.

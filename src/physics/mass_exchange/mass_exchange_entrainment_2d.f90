@@ -36,7 +36,7 @@ CONTAINS
             ! Convert entrained ambient-air volume to mixture mass at ambient density.
             r%mixture_mass_rate=rho_a_amb*eval_entrainment_volume_kernel(state%h,Ri,speed_squared)
             r%energy_rate=T_ambient*sp_heat_a*r%mixture_mass_rate
-        END SUBROUTINE
+        END SUBROUTINE eval_mass_exchange_entrainment_explicit
 
         !> @brief Reject unsupported semi-implicit treatment for entrainment.
         !> @details This entry point raises fatal_error; the rates are reset first.
