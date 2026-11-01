@@ -439,3 +439,7 @@ Durante l'audit residuo sono state identificate tre verifiche ridondanti di `rhe
 ### Allineamento ulteriore dei dispatcher ANALYTIC ed EXPLICIT (2026-11-01)
 
 Dopo la correzione dei gate `rheology_flag`, eliminati anche i doppi gate `thermal_cooling_flag` nei rami ANALYTIC ed EXPLICIT e il controllo `pore_pressure_flag` nella selezione ANALYTIC. La scelta dei processi viene effettuata in `source_configuration_2d` e validata per gruppo nel registry; i dispatcher invocati con il gruppo eseguono il processo selezionato, senza annullarlo silenziosamente a seguito di modifiche a flag globali. I flag che parametrizzano la fisica rimangono invariati. Nessuna compilazione o test eseguito.
+
+### Eliminazione del doppio gate della curvatura (2026-11-01)
+
+La routine `eval_geometry_cell_source_explicit` seleziona ora `geometry_curvature` direttamente dalla membership nel gruppo Lie, senza subordinare l'esecuzione anche a `curvature_term_flag`. L'attivazione del termine resta nella configurazione; il dispatcher mantiene la condizione di profondita' `r_h>dry_thickness_tolerance` e la valutazione della curvatura dal campo geometrico corrente. Questo completa l'allineamento dei selettori EXPLICIT reologia/termica/curvatura e ANALYTIC reologia/termica/pressione di poro al registry, senza intervenire su topografia o `B_zone`. Non eseguite compilazioni, test o workflow.

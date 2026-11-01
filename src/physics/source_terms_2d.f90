@@ -505,8 +505,7 @@ CONTAINS
 
        q1 = r_h * r_rho_m
 
-       IF ( curvature_term_flag .AND.                                      &
-            group_contains_name(group,'geometry_curvature') .AND.     &
+       IF ( group_contains_name(group,'geometry_curvature') .AND.     &
             r_h .GT. dry_thickness_tolerance ) THEN
 
           ! Hydrostatic pressure and the ordinary bed-slope source are already
