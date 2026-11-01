@@ -167,3 +167,7 @@ Removed `TESTS/TEST_MASS_EXCHANGE/test_mass_exchange.f90` because its RK-stage s
 ### Restored independent projection regression (2026-11-01)
 
 Refactored `test_projection_stress.f90` to test only the independent production geometry projector: smooth, wet/dry and signed random fields, with conservative-flow invariance, bed/cached-geometry consistency and nodal integral checks. Removed calls to deleted STEP source executor and historical RK count. The mass-exchange runner now compiles and runs that projection test in strict/optimized profiles on 1 and 4 OpenMP threads and compares their binary snapshots, in addition to retained physics source-check scripts. **This does not restore mass-exchange inventory/restart transaction coverage**, which remains L09. No intermediate compilation or execution performed.
+
+### Lie mass-exchange transactional regression (2026-11-01)
+
+Added a cell-grid Lie GROUP-0 erosion regression to `test_projection_stress.f90`: initializes a real registry, evaluates original conservative-to-primitive states, calls the actual `execute_lie_source_groups` with `q_original` and `qp_original`, checks conservative solid-mass / erosion inventory transfer, erodible depletion, nonnegative inventories, finite results and refreshed geometry. The runner already executes this fixture in strict/optimized and 1-/4-thread configurations. Final compilation, runtime acceptance, and restart/rollback tests are still pending. No intermediate compilation/tests.

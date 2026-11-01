@@ -4,6 +4,10 @@ PROGRAM test_projection_stress
   USE constitutive_parameters_2d
   USE geometry_2d
   USE domain_2d, ONLY : domain_type
+  USE source_registry_2d, ONLY : source_registry_type,source_group_type
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
+  USE lie_source_executor_2d, ONLY : execute_lie_source_groups
+  USE state_conversion_2d, ONLY : qc_to_qp
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
@@ -35,6 +39,7 @@ PROGRAM test_projection_stress
         IF (dimension==2) ny=12*2**level
         CALL allocate_grid
         CALL reset_state(.FALSE.)
+        IF (level==0) CALL check_lie_exchange_transaction
         DO k=1,ny
            DO j=1,nx
               rate(j,k)=-0.001_wp*(2.0_wp+COS(2.0_wp*ACOS(-1.0_wp)*(REAL(j,wp)-0.5_wp)*dx))
@@ -143,6 +148,65 @@ CONTAINS
     CALL refresh_topography_geometry
     CALL check_geometry
   END SUBROUTINE reset_state
+
+  !> Lie group-0 exchange: verify complete conservative/inventory accounting.
+  !> Use the production rate evaluator, executor and geometry update.
+  SUBROUTINE check_lie_exchange_transaction
+    TYPE(source_registry_type) :: registry
+    TYPE(source_group_type) :: groups(1)
+    REAL(wp) :: q_before(nq,nx,ny),qp_before(nq+2,nx,ny)
+    REAL(wp) :: deposited_before(nx,ny,ns),eroded_before(nx,ny,ns)
+    REAL(wp) :: bed_before(nx+1,ny+1),available_before(ns,nx,ny)
+    REAL(wp) :: pressure,fluid_delta,solid_delta,inventory_delta
+    INTEGER :: a,b,l
+    LOGICAL :: failed,accepted
+    CHARACTER(LEN=256) :: message,error
+    groups(1)%id=0
+    groups(1)%method=SOURCE_METHOD_EXPLICIT
+    groups(1)%source_names=[CHARACTER(LEN=64)::'mass_exchange_erosion']
+    groups(1)%equation_ids=[(l,l=1,nq)]
+    CALL registry%initialize(nq,0,groups,error)
+    IF (LEN_TRIM(error)>0) ERROR STOP 'Lie exchange registry initialization'
+    DO b=1,ny
+       DO a=1,nx
+          CALL qc_to_qp(q(:,a,b),qp(:,a,b),pressure,'Lie exchange test',accepted)
+          IF (.NOT.accepted) ERROR STOP 'Lie exchange initial state conversion'
+          erodible(:,a,b)=[0.002_wp,0.001_wp]
+       END DO
+    END DO
+    q_before=q;qp_before=qp
+    deposited_before=deposit;eroded_before=erosion
+    bed_before=B_vertex;available_before=erodible
+    CALL execute_lie_source_groups(q,qp,1.0_wp,domain,registry, &
+         q_original=q_before,qp_original=qp_before, &
+         step_failed=failed,failure_message=message)
+    IF (failed) THEN
+       PRINT *, TRIM(message)
+       ERROR STOP 'Lie exchange transaction rejected'
+    END IF
+    fluid_delta=SUM(q(1,:,:)-q_before(1,:,:))
+    solid_delta=SUM(q(5:6,:,:)-q_before(5:6,:,:))
+    inventory_delta=SUM(erosion-eroded_before)
+    CALL require_small('Lie solid mass gain / erosion inventory', &
+         ABS(solid_delta-DOT_PRODUCT(rho_s, &
+         [SUM(erosion(:,:,1)-eroded_before(:,:,1)), &
+          SUM(erosion(:,:,2)-eroded_before(:,:,2))])), &
+         MAX(1.0_wp,ABS(solid_delta)))
+    IF (ANY(erodible<0.0_wp)) ERROR STOP 'Lie erodible inventory negative'
+    IF (ANY(erodible>available_before)) ERROR STOP 'Lie erodible inventory increased'
+    DO l=1,ns
+       CALL require_small('Lie erodible transfer balance', &
+            MAXVAL(ABS(erodible(l,:,:)+erosion(:,:,l)-eroded_before(:,:,l) &
+            -available_before(l,:,:))),1.0_wp)
+    END DO
+    IF (.NOT.ALL(ieee_is_finite(q)) .OR. .NOT.ALL(ieee_is_finite(B_vertex))) &
+         ERROR STOP 'Lie exchange non-finite state'
+    IF (fluid_delta<0.0_wp .OR. solid_delta<0.0_wp .OR. inventory_delta<0.0_wp) &
+         ERROR STOP 'Lie erosion transfer changed sign'
+    CALL check_geometry
+    CALL registry%finalize()
+    CALL reset_state(.FALSE.)
+  END SUBROUTINE check_lie_exchange_transaction
 
   !> \brief Generate reproducible rates with a portable nonoverflowing integer generator.
   !> \param[in] signed_rate Allow either deposition-like or erosion-like bed proposals.
