@@ -155,3 +155,7 @@ The legacy `src/numerics/equation_metadata_2d.f90` module and its dedicated `TES
 ### IMEX-RK test retirement (2026-11-01)
 
 Removed all `TESTS/TEST_IMEX_STAGES` files (stage-count/RK tableau/reconstruction-stage checks); removed its physics-regressions CI matrix entry. Retired obsolete `test_grouped_implicit_stage.f90` and `probe_sources.f90` plus their invocation/characterization from the rheology runner. Kept independent rheology model, analytical velocity, cooling, and pore-pressure tests. The remaining `TEST_SOURCE_REGISTRY/test_source_registry.f90`, `TEST_MASS_EXCHANGE/test_mass_exchange.f90` and `ACCEPTANCE/test_d17_production_newton.f90` still contain legacy partition and IMEX calls and **must be replaced with Lie tests**, not left in final CI. No intermediate compilation/tests.
+
+### Lie test conversion (2026-11-01)
+
+Replaced the RK-era source-registry regression with Lie group-order, method and Newton footprint checks, including co-grouped rheology/cooling. Replaced the production Newton acceptance fixture with a group-local backward-Euler solve and residual validation using `solve_backward_euler_group`. Both require final compilation and acceptance. The large N8 mass-exchange harness still contains obsolete RK/STEP APIs and requires separate test restructuring.
