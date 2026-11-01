@@ -338,7 +338,6 @@ CONTAINS
 
     USE COMPLEXIFY
 
-    USE parameters_2d, ONLY : pore_pressure_flag
     IMPLICIT NONE
 
     REAL(wp), INTENT(IN) :: Bprimej_x

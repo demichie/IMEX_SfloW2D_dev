@@ -80,14 +80,13 @@ CONTAINS
   !> \brief Solve one backward-Euler Newton group while holding other equations fixed.
   !> \param[in] group_equations Indices of the conservative equations in this group.
   !> \param[in,out] qj Local conservative state; only group equations are updated.
-  !> \param[in] q_group_input Conservative reference state at the start of the step.
+  !> \param[in] q_group_input Frozen conservative reference state at this Lie group's entry.
   !> \param[in] dt_step Full Lie group time interval [s].
   !> \param[in] Bprimej_x Filtered bed slope in x [dimensionless].
   !> \param[in] Bprimej_y Filtered bed slope in y [dimensionless].
   !> \param[in] Zij Local stochastic-process value supplied to the rheology.
   !> \param[in] coeff_f Per-equation residual scaling factors.
   !> \param[in] source_group Validated Newton source group being solved.
-  !> \param[in] source_solver Validated solver descriptor selecting rates and target equations.
   !> \param[in] tol_abs_local Absolute residual tolerance.
   !> \param[in] tol_rel_local Relative residual tolerance.
   !> \param[in,out] iterations_used Cumulative Newton iterations attempted.
