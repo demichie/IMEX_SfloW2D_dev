@@ -96,7 +96,7 @@ PROGRAM test_spatial_operator
              B_second_xx_geom(j,k),B_second_xy_geom(j,k),              &
              B_second_yy_geom(j,k),grav_coeff(j,k),qp(:,j,k),           &
              cell_sources(:,j,k),0.0_wp,0.0_wp,no_fissures,            &
-             0.0_wp,0.0_wp,0.0_wp,dx*dy,explicit_group)
+             0.0_wp,0.0_wp,0.0_wp,dx*dy,explicit_group,0.0_wp)
      END DO
   END DO
   IF (.NOT.ALL(ieee_is_finite(cell_sources))) ERROR STOP 'nonfinite local source'
