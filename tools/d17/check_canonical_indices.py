@@ -9,7 +9,6 @@ required = {
     "TESTS/TEST_STATE_CONVERSION/test_state_conversion.f90": "CALL configure_canonical_state_indices()",
     "TESTS/TEST_RHEOLOGY_FROUDE/test_rheology_froude.f90": "CALL configure_canonical_state_indices()",
     "TESTS/TEST_SPATIAL_OPERATOR/test_spatial_operator.f90": "CALL configure_canonical_state_indices()",
-    "TESTS/TEST_MASS_EXCHANGE/test_mass_exchange.f90": "CALL configure_canonical_state_indices()",
     "TESTS/TEST_MASS_EXCHANGE/test_projection_stress.f90": "CALL configure_canonical_state_indices()",
     "TESTS/ACCEPTANCE/test_d17_state_numeric.f90": "CALL configure_canonical_state_indices()",
 }
