@@ -56,7 +56,9 @@ CONTAINS
     REAL(wp), INTENT(IN), OPTIONAL :: step_start_time
     REAL(wp), INTENT(IN) :: q_original(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: qp_original(n_vars+2,comp_cells_x,comp_cells_y)
-    REAL(wp) :: qpentry(n_vars+2)
+    REAL(wp) :: qpentry(n_vars+2),q_candidate(n_vars),qp_candidate(n_vars+2)
+    REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
+    REAL(wp) :: erodible_candidate(n_solid),lava_candidate
     REAL(wp) :: physical_rate(n_eqns),exchange_rate(n_eqns),total_rate(n_eqns)
     REAL(wp) :: analytic_rate(n_eqns),factor,coverage,pressure,source_time,noise
     REAL(wp) :: remaining_mass,change_in_solid
@@ -171,24 +173,48 @@ CONTAINS
                   MAX(0.0_wp,remaining_mass/(time_step*change_in_solid)))
              IF (.NOT.ieee_is_finite(factor) .OR. factor<0.0_wp .OR. factor>1.0_wp) &
                   CALL fatal_error('D19: invalid Lie source limiter factor')
-             q(1:n_eqns,j,k)=q(1:n_eqns,j,k)+time_step*factor*total_rate
+             ! Stage the entire local fluid/substrate transfer before committing it.
+             q_candidate=q(:,j,k)
+             q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*factor*total_rate
+             IF (.NOT.ALL(ieee_is_finite(q_candidate(1:n_eqns)))) &
+                  CALL fatal_error('D19: non-finite explicit group candidate')
+             IF (q_candidate(idx_totMassEqn)<0.0_wp .OR. &
+                  ANY(q_candidate(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) &
+                  CALL fatal_error('D19: negative mass in group candidate')
+             IF (SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))> &
+                  q_candidate(idx_totMassEqn)) &
+                  CALL fatal_error('D19: group candidate solids exceed total mass')
              IF (with_exchange) THEN
-                deposit(j,k,1:n_solid)=deposit(j,k,1:n_solid)+ &
+                deposit_candidate=deposit(j,k,1:n_solid)+ &
                      time_step*factor*transfers%solid_deposition_rate
-                erosion(j,k,1:n_solid)=erosion(j,k,1:n_solid)+ &
+                erosion_candidate=erosion(j,k,1:n_solid)+ &
                      time_step*factor*transfers%solid_erosion_rate
-                erodible(1:n_solid,j,k)=erodible(1:n_solid,j,k)- &
+                erodible_candidate=erodible(1:n_solid,j,k)- &
                      time_step*factor*transfers%solid_erosion_rate
-                IF (erodible_deposit_flag) erodible(1:n_solid,j,k)= &
-                     erodible(1:n_solid,j,k)+time_step*factor*transfers%solid_deposition_rate
-                lava_deposit(j,k)=lava_deposit(j,k)+time_step*factor*transfers%lava_deposit_rate
-                IF (.NOT.ALL(ieee_is_finite(deposit(j,k,1:n_solid))) .OR. &
-                     .NOT.ALL(ieee_is_finite(erosion(j,k,1:n_solid))) .OR. &
-                     .NOT.ALL(ieee_is_finite(erodible(1:n_solid,j,k))) .OR. &
-                     .NOT.ieee_is_finite(lava_deposit(j,k))) &
-                     CALL fatal_error('D19: non-finite mass-exchange inventory')
-                IF (ANY(erodible(1:n_solid,j,k)<0.0_wp)) &
-                     CALL fatal_error('D19: negative erodible inventory after Lie group')
+                IF (erodible_deposit_flag) erodible_candidate= &
+                     erodible_candidate+time_step*factor*transfers%solid_deposition_rate
+                lava_candidate=lava_deposit(j,k)+time_step*factor*transfers%lava_deposit_rate
+                IF (.NOT.ALL(ieee_is_finite(deposit_candidate)) .OR. &
+                     .NOT.ALL(ieee_is_finite(erosion_candidate)) .OR. &
+                     .NOT.ALL(ieee_is_finite(erodible_candidate)) .OR. &
+                     .NOT.ieee_is_finite(lava_candidate)) &
+                     CALL fatal_error('D19: non-finite mass-exchange candidate inventory')
+                IF (ANY(erodible_candidate<0.0_wp)) &
+                     CALL fatal_error('D19: negative candidate erodible inventory')
+             END IF
+             IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
+                CALL qc_to_qp(q_candidate,qp_candidate,pressure,'Lie explicit group candidate')
+             ELSE
+                CALL initialize_dry_physical_cell(qp_candidate)
+             END IF
+             ! Commit only after the complete cell-local candidate is admissible.
+             q(:,j,k)=q_candidate
+             qp(:,j,k)=qp_candidate
+             IF (with_exchange) THEN
+                deposit(j,k,1:n_solid)=deposit_candidate
+                erosion(j,k,1:n_solid)=erosion_candidate
+                erodible(1:n_solid,j,k)=erodible_candidate
+                lava_deposit(j,k)=lava_candidate
                 IF (topo_change_flag) CALL record_topography_rate_cell(j,k, &
                      factor*transfers%dB_dt)
              END IF
