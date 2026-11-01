@@ -300,3 +300,12 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 
 - Su indicazione esplicita del responsabile scientifico, le zone topografiche `B_zone` **non devono essere modificate** dalla migrazione Lie. Ripristinato integralmente `src/geometry/geometry_2d.f90` alla versione precedente ai commit `1ad9018` e `c684437`, annullando sia il ricalcolo nelle transazioni dinamiche sia gli interventi sulle dimensioni/inizializzazione degli array della classificazione. L'architettura dei sorgenti Lie rimane separata dalla gestione originale delle zone.
 - Non eseguiti test, compilazione o Actions.
+
+### Verifica finale delle interfacce di produzione - 2026-11-01
+
+- Controllati i 64 sorgenti Fortran presenti in `src/`: gli import `USE` sono associati a moduli del repository o a dipendenze esterne previste (`netcdf`, `omp_lib`, moduli intrinseci). Questo controllo NON equivale a una compilazione e non prova tutte le firme di procedura.
+- Verificata la catena `simulation_2d` -> `time_integration_2d` -> `lie_source_executor_2d` -> `source_terms_2d` e il percorso `source_terms_2d` -> `mass_exchange_2d`, ora con `selected_names` propagato esplicitamente.
+- Le sorgenti Lie sono raggruppate con un solo METHOD per gruppo; ANALYTIC ammette un solo sorgente; GROUP 0 e' EXPLICIT. `source_registry_2d` verifica anche il footprint delle equazioni (NEWTON: insieme esatto; ANALYTIC: vuoto; EXPLICIT: tutte le equazioni conservative).
+- I commit `72fdfb7` e `a735293` hanno reso il coordinatore di mass exchange dipendente dalle sorgenti selezionate nel gruppo e allineato le compatibilita' di fase per perdita del carrier liquido e vaporizzazione.
+- Sono invarianti `B_zone` e il calcolo delle zone topografiche. Non sono stati eseguiti test, compilazioni o workflow.
+- **Stato: audit statico delle principali dipendenze e dei dispatcher svolto; D19 NON certificato concluso sul piano della correttezza Fortran/numerica.** La verifica completa delle firme in ogni callsite e la compilazione finale sono ancora non eseguite, per scelta concordata.
