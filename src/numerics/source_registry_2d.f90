@@ -108,68 +108,68 @@ CONTAINS
         error='D19: invalid Lie group configuration'
         IF (n_equations<4 .OR. SIZE(groups)==0) RETURN
         IF (pore_equation/=0) THEN
-        IF (pore_equation<5 .OR. pore_equation>n_equations) RETURN
+            IF (pore_equation<5 .OR. pore_equation>n_equations) RETURN
         END IF
         IF (groups(1)%id/=0 .OR. groups(1)%method/=SOURCE_METHOD_EXPLICIT) RETURN
         DO i=1,SIZE(groups)
-        IF (i>1) THEN
-            IF (groups(i)%id<=groups(i-1)%id) RETURN
-        END IF
-        IF (.NOT.ALLOCATED(groups(i)%source_names)) RETURN
-        IF (i>1 .AND. SIZE(groups(i)%source_names)==0) RETURN
-        IF (.NOT.ALLOCATED(groups(i)%equation_ids)) RETURN
-        IF (.NOT.valid_equations(groups(i)%equation_ids,n_equations)) RETURN
-        SELECT CASE(groups(i)%method)
-        CASE(SOURCE_METHOD_EXPLICIT)
-            IF (SIZE(groups(i)%equation_ids)/=n_equations) RETURN
-        CASE(SOURCE_METHOD_NEWTON)
-            IF (SIZE(groups(i)%equation_ids)==0) RETURN
-        CASE(SOURCE_METHOD_ANALYTIC)
-            IF (SIZE(groups(i)%source_names)/=1) RETURN
-            IF (SIZE(groups(i)%equation_ids)/=0) RETURN
-        CASE DEFAULT
-            RETURN
-        END SELECT
-        IF (groups(i)%method==SOURCE_METHOD_NEWTON .AND. SIZE(groups(i)%equation_ids)==0) RETURN
-        IF (groups(i)%method==SOURCE_METHOD_ANALYTIC .AND. SIZE(groups(i)%source_names)/=1) RETURN
-        ALLOCATE(expected(0))
-        DO j=1,SIZE(groups(i)%source_names)
-            term=source_term_descriptor_by_name(groups(i)%source_names(j))
-            IF (LEN_TRIM(term%name)==0) RETURN
-            IF (INDEX(TRIM(term%name),'mass_exchange_')==1) THEN
-                ! Inventory-coupled mass exchange currently supports only an
-                ! explicit Lie group; reject incompatible configurations here.
-                IF (groups(i)%method/=SOURCE_METHOD_EXPLICIT) RETURN
-                IF (mass_group>=0 .AND. mass_group/=groups(i)%id) RETURN
-                mass_group=groups(i)%id
+            IF (i>1) THEN
+                IF (groups(i)%id<=groups(i-1)%id) RETURN
             END IF
-            IF (INDEX(TRIM(term%name),'rheology_')==1) THEN
-                rheology_count=rheology_count+1
-                IF (rheology_count>1) RETURN
-            END IF
-            IF (ANY(seen==term%name)) RETURN
-            seen=[CHARACTER(LEN=64) :: seen,term%name]
-            IF (groups(i)%method==SOURCE_METHOD_NEWTON) THEN
-                affected=source_newton_affected_equations(term%name)
-                IF (SIZE(affected)==0) RETURN
-                DO k=1,SIZE(affected)
-                eq=affected(k)
-                IF (.NOT.ANY(expected==eq)) expected=[expected,eq]
-                END DO
-            END IF
+            IF (.NOT.ALLOCATED(groups(i)%source_names)) RETURN
+            IF (i>1 .AND. SIZE(groups(i)%source_names)==0) RETURN
+            IF (.NOT.ALLOCATED(groups(i)%equation_ids)) RETURN
+            IF (.NOT.valid_equations(groups(i)%equation_ids,n_equations)) RETURN
             SELECT CASE(groups(i)%method)
             CASE(SOURCE_METHOD_EXPLICIT)
-                IF (.NOT.term%has_explicit) RETURN
+                IF (SIZE(groups(i)%equation_ids)/=n_equations) RETURN
             CASE(SOURCE_METHOD_NEWTON)
-                IF (.NOT.term%has_newton) RETURN
+                IF (SIZE(groups(i)%equation_ids)==0) RETURN
             CASE(SOURCE_METHOD_ANALYTIC)
-                IF (.NOT.term%has_analytic) RETURN
+                IF (SIZE(groups(i)%source_names)/=1) RETURN
+                IF (SIZE(groups(i)%equation_ids)/=0) RETURN
+            CASE DEFAULT
+                RETURN
             END SELECT
-        END DO
-        IF (groups(i)%method==SOURCE_METHOD_NEWTON) THEN
-            IF (.NOT.same_set(groups(i)%equation_ids,expected)) RETURN
-        END IF
-        DEALLOCATE(expected)
+            IF (groups(i)%method==SOURCE_METHOD_NEWTON .AND. SIZE(groups(i)%equation_ids)==0) RETURN
+            IF (groups(i)%method==SOURCE_METHOD_ANALYTIC .AND. SIZE(groups(i)%source_names)/=1) RETURN
+            ALLOCATE(expected(0))
+            DO j=1,SIZE(groups(i)%source_names)
+                term=source_term_descriptor_by_name(groups(i)%source_names(j))
+                IF (LEN_TRIM(term%name)==0) RETURN
+                IF (INDEX(TRIM(term%name),'mass_exchange_')==1) THEN
+                    ! Inventory-coupled mass exchange currently supports only an
+                    ! explicit Lie group; reject incompatible configurations here.
+                    IF (groups(i)%method/=SOURCE_METHOD_EXPLICIT) RETURN
+                    IF (mass_group>=0 .AND. mass_group/=groups(i)%id) RETURN
+                    mass_group=groups(i)%id
+                END IF
+                IF (INDEX(TRIM(term%name),'rheology_')==1) THEN
+                    rheology_count=rheology_count+1
+                    IF (rheology_count>1) RETURN
+                END IF
+                IF (ANY(seen==term%name)) RETURN
+                seen=[CHARACTER(LEN=64) :: seen,term%name]
+                IF (groups(i)%method==SOURCE_METHOD_NEWTON) THEN
+                    affected=source_newton_affected_equations(term%name)
+                    IF (SIZE(affected)==0) RETURN
+                    DO k=1,SIZE(affected)
+                        eq=affected(k)
+                        IF (.NOT.ANY(expected==eq)) expected=[expected,eq]
+                        END DO
+                END IF
+                SELECT CASE(groups(i)%method)
+                CASE(SOURCE_METHOD_EXPLICIT)
+                    IF (.NOT.term%has_explicit) RETURN
+                CASE(SOURCE_METHOD_NEWTON)
+                    IF (.NOT.term%has_newton) RETURN
+                CASE(SOURCE_METHOD_ANALYTIC)
+                    IF (.NOT.term%has_analytic) RETURN
+                END SELECT
+            END DO
+            IF (groups(i)%method==SOURCE_METHOD_NEWTON) THEN
+                IF (.NOT.same_set(groups(i)%equation_ids,expected)) RETURN
+            END IF
+            DEALLOCATE(expected)
         END DO
         ! A vaporization-only group would silently evaluate a zero deposition rate.
         IF (ANY(seen=='mass_exchange_vaporization') .AND. &
