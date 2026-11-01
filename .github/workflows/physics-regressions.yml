@@ -35,7 +35,7 @@ jobs:
           python3 TESTS/ACCEPTANCE/test_state_index_contract.py
           python3 tools/d17/check_canonical_indices.py
 
-      - name: Check post-RK state finalization and observer ordering
+      - name: Check Lie state finalization and observer ordering
         shell: bash
         env:
           D17_WORK_DIR: ${{ runner.temp }}/d17-registry-tests
@@ -62,7 +62,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-  historical-regression:
+  physics-regression:
     name: ${{ matrix.suite }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -70,7 +70,6 @@ jobs:
       fail-fast: false
       matrix:
         suite:
-          - TEST_IMEX_STAGES
           - TEST_SPATIAL_OPERATOR
           - TEST_MASS_EXCHANGE
           - TEST_CURVATURE_SOURCE
@@ -101,7 +100,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: d17-historical-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: lie-regression-${{ matrix.suite }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: evidence/
           if-no-files-found: warn
           retention-days: 30

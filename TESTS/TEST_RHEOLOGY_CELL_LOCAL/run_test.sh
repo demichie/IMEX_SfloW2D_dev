@@ -57,22 +57,7 @@ for profile in strict optimized; do
     "$compiler" $common $objects test_pore_pressure_diffusion.o -llapack $netcdf_flibs $netcdf_clibs \
         -o test_pore_pressure_diffusion
     ./test_pore_pressure_diffusion
-    "$compiler" -O0 -g -fcheck=all $common -I"$repo_dir/src/state" -c \
-        "$test_dir/test_grouped_implicit_stage.f90"
-    "$compiler" $common $objects test_grouped_implicit_stage.o -llapack $netcdf_flibs $netcdf_clibs \
-        -o test_grouped_implicit_stage
-    ./test_grouped_implicit_stage
-    # IEEE checks and the test-side FD subtraction stay strict in both profiles.
-    "$compiler" -O0 -g -fcheck=all $common -c "$test_dir/probe_sources.f90"
-    "$compiler" $common $objects probe_sources.o -llapack $netcdf_flibs $netcdf_clibs -o probe_sources
-    if [ "$profile" = optimized ]; then
-        # Distinguish an exception exposed by traps from an ordinary optimized
-        # run. Production module objects are identical in both executables.
-        "$compiler" -O0 -g -fcheck=all -fopenmp -ffree-line-length-none \
-            -c "$test_dir/probe_sources.f90" -o probe_untrapped.o
-        "$compiler" -fopenmp $objects probe_untrapped.o -llapack $netcdf_flibs $netcdf_clibs -o probe_untrapped
-    fi
-    PYTHONDONTWRITEBYTECODE=1 "$python" "$test_dir/characterize.py" \
-        "$work_dir/$profile/probe_sources" "$work_dir/$profile" "$profile" || failed=1
+    # The grouped IMEX-stage and probe characterization harnesses were
+    # retired; Lie group-local Newton coverage is tracked in D19.
 done
 exit "$failed"
