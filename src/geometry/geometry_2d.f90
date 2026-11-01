@@ -28,7 +28,6 @@ MODULE geometry_2d
   ! reconstructed on rollback, so later groups still see intermediate bed updates.
   LOGICAL, PRIVATE :: geometry_transaction_active=.FALSE.
   REAL(wp), ALLOCATABLE, PRIVATE :: lie_bed_before(:,:)
-  INTEGER, ALLOCATABLE, PRIVATE :: lie_zone_before(:,:)
   REAL(wp), ALLOCATABLE, PRIVATE :: lie_cent_before(:,:),lie_face_x_before(:,:),lie_face_y_before(:,:)
   REAL(wp), ALLOCATABLE, PRIVATE :: lie_slope_x_before(:,:),lie_slope_y_before(:,:)
   REAL(wp), ALLOCATABLE, PRIVATE :: lie_curvature_xx_before(:,:),lie_curvature_yy_before(:,:)
@@ -483,7 +482,6 @@ CONTAINS
     IF (.NOT.ALLOCATED(B_vertex)) &
          ERROR STOP 'geometry transaction started before initialization'
     lie_bed_before=B_vertex
-    IF (ALLOCATED(B_zone)) lie_zone_before=B_zone
     lie_cent_before=B_cent
     lie_face_x_before=B_face_x
     lie_face_y_before=B_face_y
@@ -509,7 +507,6 @@ CONTAINS
   SUBROUTINE rollback_geometry_transaction
     IF (.NOT.geometry_transaction_active) RETURN
     B_vertex=lie_bed_before
-    IF (ALLOCATED(lie_zone_before)) B_zone=lie_zone_before
     ! Restore the exact pre-step caches: reconstruction itself may have failed.
     B_cent=lie_cent_before
     B_face_x=lie_face_x_before
@@ -527,7 +524,6 @@ CONTAINS
 
   SUBROUTINE clear_geometry_transaction
     IF (ALLOCATED(lie_bed_before)) DEALLOCATE(lie_bed_before)
-    IF (ALLOCATED(lie_zone_before)) DEALLOCATE(lie_zone_before)
     IF (ALLOCATED(lie_cent_before)) DEALLOCATE(lie_cent_before)
     IF (ALLOCATED(lie_face_x_before)) DEALLOCATE(lie_face_x_before)
     IF (ALLOCATED(lie_face_y_before)) DEALLOCATE(lie_face_y_before)
@@ -568,7 +564,6 @@ CONTAINS
     ! derived bed only; it must never overwrite the authoritative B_vertex.
     CALL derive_topography_from_vertices
     CALL topography_reconstruction
-    IF (liquid_vaporization_flag .AND. ALLOCATED(B_zone)) CALL topography_zones
 
   END SUBROUTINE refresh_topography_geometry
 
@@ -585,14 +580,12 @@ CONTAINS
     REAL(wp), ALLOCATABLE :: old_slope_x(:,:),old_slope_y(:,:)
     REAL(wp), ALLOCATABLE :: old_xx(:,:),old_xy(:,:),old_yy(:,:)
     REAL(wp), ALLOCATABLE :: old_gravity(:,:),old_gravity_x(:,:),old_gravity_y(:,:)
-    INTEGER, ALLOCATABLE :: old_zone(:,:)
     accepted=.FALSE.
     IF (.NOT.ALLOCATED(B_vertex)) RETURN
     IF (ANY(SHAPE(bed_candidate)/=SHAPE(B_vertex))) RETURN
     IF (.NOT.ALL(ieee_is_finite(bed_candidate))) RETURN
     ! A rejected refresh must not expose a partial bed or derivative update.
     old_bed=B_vertex
-    IF (ALLOCATED(B_zone)) old_zone=B_zone
     old_cent=B_cent
     old_face_x=B_face_x
     old_face_y=B_face_y
@@ -611,7 +604,6 @@ CONTAINS
        RETURN
     END IF
     B_vertex=old_bed
-    IF (ALLOCATED(old_zone)) B_zone=old_zone
     B_cent=old_cent
     B_face_x=old_face_x
     B_face_y=old_face_y
@@ -654,18 +646,23 @@ CONTAINS
     INTEGER :: i,j,k
 
     INTEGER :: zone_counter
-    INTEGER, ALLOCATABLE :: equi_list(:),equi_list_new(:),zone_cells(:)
-    INTEGER :: zone , zone_max,maximum_zones
+    INTEGER :: equi_list(0:1000)
+    INTEGER :: equi_list_new(0:1000)
+    INTEGER :: zone , zone_max
+    INTEGER :: zone_cells(1:1000)
 
-    maximum_zones=comp_cells_x*comp_cells_y
-    ALLOCATE(equi_list(0:maximum_zones),equi_list_new(0:maximum_zones), &
-         zone_cells(maximum_zones))
-    DO i=0,maximum_zones
-       equi_list(i)=i
+    WHERE ( ABS( B_cent - water_level ) .LE. 1.0E-1_wp )
+
+       B_zone = -1
+
+    END WHERE
+
+    DO i=0,1000
+
+       equi_list(i) = i
+
     END DO
 
-    B_zone=0
-    WHERE (ABS(B_cent-water_level)<=1.0E-1_wp) B_zone=-1
     zone_counter = 0
 
     y_loop:DO k = 1,comp_cells_y

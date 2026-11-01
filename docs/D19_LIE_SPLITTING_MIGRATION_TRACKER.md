@@ -294,13 +294,9 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Il registro Lie non puo' ora piu' accettare un gruppo fittizio `boundary_injection` tramite il catalogo. Eliminato anche un commento sul vecchio concetto di cadence STAGE/STEP. La configurazione del bordo rimane esclusivamente spaziale.
 - Nessuna modifica ai test, nessuna compilazione o Action. I controlli di firma e i restanti percorsi fisici non sono ancora dichiarati esaustivamente conclusi.
 
-### Coerenza della geometria dinamica e delle zone connesse (2026-11-01)
 
-- Rilevato che `B_zone`, utilizzato anche dallo scambio di massa, era calcolato solo all'inizializzazione: dopo un aggiornamento Lie della topografia i gruppi seguenti potevano leggere nuove quote e vecchie zone.
-- La ricostruzione geometrica aggiorna adesso le zone quando la vaporizzazione e' attiva e la mappa e' allocata. `topography_zones` azzera la mappa prima di ricalcolare le zone connesse; l'inizializzazione resta valida.
-- Snapshot e rollback geometrico includono ora anche `B_zone`; `assign_topography_vertices` ripristina le zone dopo un rigetto. Non eseguiti test, compilazione o Action. Rimane da esaminare il limite storico delle 1000 zone nella routine.
 
-### Eliminazione del limite arbitrario sulle zone geometriche (2026-11-01)
+### Rettifica: zone topografiche invarianti (2026-11-01)
 
-- Completato il riassetto della riclassificazione topografica dinamica eliminando da `topography_zones` gli array fissi `equi_list(0:1000)`, `equi_list_new(0:1000)` e `zone_cells(1:1000)`. Sono ora dimensionati in base al numero di celle della griglia: una mappa puo' teoricamente contenere una zona provvisoria per cella.
-- La correzione previene accessi fuori limite nelle topografie complesse; l'algoritmo di equivalenza e la scelta della regione principale rimangono invariati. Insieme al commit precedente, il ricalcolo delle zone e il rollback sono coerenti con la topografia evolutiva. Nessun test o compilazione eseguito.
+- Su indicazione esplicita del responsabile scientifico, le zone topografiche `B_zone` **non devono essere modificate** dalla migrazione Lie. Ripristinato integralmente `src/geometry/geometry_2d.f90` alla versione precedente ai commit `1ad9018` e `c684437`, annullando sia il ricalcolo nelle transazioni dinamiche sia gli interventi sulle dimensioni/inizializzazione degli array della classificazione. L'architettura dei sorgenti Lie rimane separata dalla gestione originale delle zone.
+- Non eseguiti test, compilazione o Actions.
