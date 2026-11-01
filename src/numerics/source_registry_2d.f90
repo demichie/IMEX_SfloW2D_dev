@@ -104,8 +104,13 @@ CONTAINS
       IF (.NOT.ALLOCATED(groups(i)%equation_ids)) RETURN
       IF (.NOT.valid_equations(groups(i)%equation_ids,n_equations)) RETURN
       SELECT CASE(groups(i)%method)
-      CASE(SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_NEWTON,SOURCE_METHOD_ANALYTIC)
-        CONTINUE
+      CASE(SOURCE_METHOD_EXPLICIT)
+        IF (SIZE(groups(i)%equation_ids)/=n_equations) RETURN
+      CASE(SOURCE_METHOD_NEWTON)
+        IF (SIZE(groups(i)%equation_ids)==0) RETURN
+      CASE(SOURCE_METHOD_ANALYTIC)
+        IF (SIZE(groups(i)%source_names)/=1) RETURN
+        IF (SIZE(groups(i)%equation_ids)/=0) RETURN
       CASE DEFAULT
         RETURN
       END SELECT
