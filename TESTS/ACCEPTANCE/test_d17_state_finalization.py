@@ -11,11 +11,17 @@ def load(path):
 
 
 def body(text, name):
-    match = re.search(
-        rf"(?is)\bsubroutine\s+{re.escape(name)}\s*\(.*?\n(.*?)"
-        rf"\bend\s+subroutine(?:\s+{re.escape(name)})?\b", text)
-    assert match, f"missing routine {name}"
-    return match.group(1)
+    # Match the declaration and closing line independently.  Fortran permits
+    # END SUBROUTINE without a repeated name; the source also uses this form.
+    opening = re.search(
+        rf"(?im)^[ \\t]*subroutine[ \\t]+{re.escape(name)}[ \\t]*\\(",
+        text)
+    assert opening, f"missing routine {name}"
+    closing = re.search(
+        rf"(?im)^[ \\t]*end[ \\t]+subroutine(?:[ \\t]+{re.escape(name)})?[ \\t]*$",
+        text[opening.end():])
+    assert closing, f"missing END SUBROUTINE for {name}"
+    return text[opening.end():opening.end() + closing.start()]
 
 
 def ordered(code, patterns):
