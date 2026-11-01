@@ -329,6 +329,18 @@ CONTAINS
     !> \param[in] k_stag_y Y-face indices paired with j_stag_y.
     !******************************************************************************
 
+    !> @brief Evaluate oriented PCCU numerical fluxes for active faces.
+    !> @param[in,out] this Hyperbolic workspace receiving face fluxes.
+    !> @param[in] recon Accepted reconstructed interface traces.
+    !> @param[in] qp_center Cell-centered physical state arrays.
+    !> @param[in] use_dry_donor Select dry-donor face treatment.
+    !> @param[in] t Physical evaluation time [s].
+    !> @param[in] solve_interfaces_x Number of active x faces.
+    !> @param[in] j_stag_x X indices of active x faces.
+    !> @param[in] k_stag_x Y indices of active x faces.
+    !> @param[in] solve_interfaces_y Number of active y faces.
+    !> @param[in] j_stag_y X indices of active y faces.
+    !> @param[in] k_stag_y Y indices of active y faces.
     SUBROUTINE eval_flux_PCCU( this, recon, qp_center, use_dry_donor, t,       &
             solve_interfaces_x,                                                   &
             j_stag_x,                                                             &
@@ -765,6 +777,14 @@ CONTAINS
     !> \param[in] k_cent Y indices of active cells; only the first solve_cells entries are used.
     !******************************************************************************
 
+    !> @brief Integrate within-cell nonconservative hydrostatic paths.
+    !> @param[in,out] this Hyperbolic workspace receiving path integrals.
+    !> @param[in] recon Prepared reconstruction state and traces.
+    !> @param[in] qp_expl Cell-centered primitive flow states.
+    !> @param[in] use_dry_donor Enable dry-state donor treatment.
+    !> @param[in] solve_cells Number of active cells.
+    !> @param[in] j_cent X indices of active cells.
+    !> @param[in] k_cent Y indices of active cells.
     SUBROUTINE eval_cell_hydrostatic_paths( this, recon, qp_expl, use_dry_donor,&
             solve_cells, j_cent, k_cent )
 
@@ -881,6 +901,11 @@ CONTAINS
     !>                            is dry.
     !******************************************************************************
 
+    !> @brief Extend the wet-side hydrostatic coefficient across a dry interface.
+    !> @param[in] h_left Depth at the negative-side face state [m].
+    !> @param[in,out] gamma_left Hydrostatic coefficient at the negative-side face state.
+    !> @param[in] h_right Depth at the positive-side face state [m].
+    !> @param[in,out] gamma_right Hydrostatic coefficient at the positive-side face state.
     PURE SUBROUTINE regularize_dry_gamma_pair(h_left,gamma_left,h_right,gamma_right)
         REAL(wp), INTENT(IN) :: h_left,h_right
         REAL(wp), INTENT(INOUT) :: gamma_left,gamma_right
@@ -912,6 +937,15 @@ CONTAINS
     !> \param[in] k_stag_y Y-face indices paired with j_stag_y.
     !******************************************************************************
 
+    !> @brief Compute characteristic wave-speed bounds at reconstructed faces.
+    !> @param[in,out] this Hyperbolic workspace receiving speed bounds.
+    !> @param[in] recon Reconstructed left and right states.
+    !> @param[in] solve_interfaces_x Number of active x-oriented interfaces.
+    !> @param[in] j_stag_x X indices of active x interfaces.
+    !> @param[in] k_stag_x Y indices of active x interfaces.
+    !> @param[in] solve_interfaces_y Number of active y-oriented interfaces.
+    !> @param[in] j_stag_y X indices of active y interfaces.
+    !> @param[in] k_stag_y Y indices of active y interfaces.
     SUBROUTINE eval_speeds( this, recon, solve_interfaces_x, j_stag_x,         &
             k_stag_x, solve_interfaces_y, j_stag_y, k_stag_y )
 
@@ -1025,6 +1059,13 @@ CONTAINS
     !> Resolve the configuration string outside all active-interface loops.
 
 
+    !> @brief Combine endpoint characteristic bounds for one oriented interface.
+    !> @param[in] qp_minus Primitive state on the negative side.
+    !> @param[in] qp_plus Primitive state on the positive side.
+    !> @param[in] grav_coeff Effective gravitational coefficient.
+    !> @param[in] normal_velocity_index Primitive normal-velocity component index.
+    !> @param[out] speed_minus Lower characteristic bound.
+    !> @param[out] speed_plus Upper characteristic bound.
     SUBROUTINE eval_interface_speed_bounds(qp_minus,qp_plus,grav_coeff,       &
             normal_velocity_index,speed_minus,speed_plus)
 
