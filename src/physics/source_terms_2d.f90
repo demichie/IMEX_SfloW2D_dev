@@ -102,17 +102,7 @@ CONTAINS
     END IF
     rate=physical+exchange
     IF (has_exchange) THEN
-       IF (.NOT.ALL(ieee_is_finite(transfer%solid_deposition_rate))) RETURN
-       IF (.NOT.ALL(ieee_is_finite(transfer%solid_erosion_rate))) RETURN
-       IF (.NOT.ALL(ieee_is_finite(transfer%solid_mass_rate))) RETURN
-       IF (.NOT.ALL(ieee_is_finite(transfer%add_gas_mass_rate))) RETURN
-       IF (.NOT.ieee_is_finite(transfer%mixture_mass_rate)) RETURN
-       IF (.NOT.ieee_is_finite(transfer%energy_rate)) RETURN
-       IF (.NOT.ieee_is_finite(transfer%carrier_erosion_rate)) RETURN
-       IF (.NOT.ieee_is_finite(transfer%carrier_deposition_rate)) RETURN
-       IF (.NOT.ieee_is_finite(transfer%carrier_withdrawal_volume_rate)) RETURN
-       IF (.NOT.ieee_is_finite(transfer%lava_deposit_rate)) RETURN
-       IF (.NOT.ieee_is_finite(transfer%dB_dt)) RETURN
+       IF (.NOT.mass_exchange_transfer_is_finite(transfer)) RETURN
     END IF
     IF (has_exchange) THEN
        CALL limit_explicit_source_rates(q_recipient,inventory,dt,rate, &
@@ -125,7 +115,28 @@ CONTAINS
     rate=scale*rate
     IF (has_exchange) CALL scale_mass_exchange_transfer(transfer,scale)
     valid=ALL(ieee_is_finite(rate))
+    IF (has_exchange) valid=valid .AND. mass_exchange_transfer_is_finite(transfer)
   END SUBROUTINE assemble_lie_explicit_transaction
+
+  !> Validate every part of a coupled physical transfer before and after
+  !> applying coverage and the common group limiter.
+  LOGICAL FUNCTION mass_exchange_transfer_is_finite(transfer) RESULT(valid)
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+    TYPE(mass_exchange_rates_type), INTENT(IN) :: transfer
+    valid=.FALSE.
+    IF (.NOT.ALL(ieee_is_finite(transfer%solid_deposition_rate))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(transfer%solid_erosion_rate))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(transfer%solid_mass_rate))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(transfer%add_gas_mass_rate))) RETURN
+    IF (.NOT.ieee_is_finite(transfer%mixture_mass_rate)) RETURN
+    IF (.NOT.ieee_is_finite(transfer%energy_rate)) RETURN
+    IF (.NOT.ieee_is_finite(transfer%carrier_erosion_rate)) RETURN
+    IF (.NOT.ieee_is_finite(transfer%carrier_deposition_rate)) RETURN
+    IF (.NOT.ieee_is_finite(transfer%carrier_withdrawal_volume_rate)) RETURN
+    IF (.NOT.ieee_is_finite(transfer%lava_deposit_rate)) RETURN
+    IF (.NOT.ieee_is_finite(transfer%dB_dt)) RETURN
+    valid=.TRUE.
+  END FUNCTION mass_exchange_transfer_is_finite
 
 
   !> Scale a complete cell-local physical source transaction only after
