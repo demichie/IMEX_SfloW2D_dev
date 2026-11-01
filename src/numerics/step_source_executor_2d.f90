@@ -17,7 +17,7 @@ MODULE step_source_executor_2d
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: execute_step_source_groups
+  PUBLIC :: execute_lie_source_groups
   PUBLIC :: apply_mass_exchange_increment
 
 CONTAINS
@@ -113,7 +113,8 @@ CONTAINS
   !> \param[in] time_step Physical time increment [s].
   !> \param[in] domain Domain descriptor for active solve-cell indices.
   !> \param[in] source_registry Optional validated schedule for post-RK sources.
-  SUBROUTINE execute_step_source_groups(q, qp, time_step, domain, source_registry, stochastic_values, step_start_time)
+  SUBROUTINE execute_lie_source_groups(q, qp, time_step, domain, source_registry, stochastic_values, &
+       step_start_time, q_original, qp_original)
 
     USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag,    &
          entrainment_flag, loss_rate
@@ -145,6 +146,8 @@ CONTAINS
     CLASS(source_registry_type), INTENT(IN), OPTIONAL :: source_registry
     REAL(wp), INTENT(IN), OPTIONAL :: stochastic_values(:,:)
     REAL(wp), INTENT(IN), OPTIONAL :: step_start_time
+    REAL(wp), INTENT(IN) :: q_original(n_vars,comp_cells_x,comp_cells_y)
+    REAL(wp), INTENT(IN) :: qp_original(n_vars+2,comp_cells_x,comp_cells_y)
 
     TYPE(mass_exchange_rates_type) :: exchange_rates
     REAL(wp) :: eqns_term(n_eqns)
@@ -170,7 +173,7 @@ CONTAINS
     IF (PRESENT(source_registry)) THEN
        IF (.NOT.source_registry%is_initialized()) &
             CALL fatal_error('D17: post-RK source dispatch requires an initialized registry')
-       step_groups=source_registry%step_groups()
+       step_groups=source_registry%groups()
        mass_group_count=0
        DO group_index=1,SIZE(step_groups)
           IF (ANY(INDEX(step_groups(group_index)%source_names,'mass_exchange_')==1)) &
@@ -201,10 +204,15 @@ CONTAINS
           END IF
           DO cell_index=1,domain%solve_cells
              j=domain%j_cent(cell_index); k=domain%k_cent(cell_index)
-             IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
+             IF (q(idx_totMassEqn,j,k)<=0.0_wp .AND. step_groups(group_index)%id/=0) CYCLE
              IF (step_groups(group_index)%method==SOURCE_METHOD_EXPLICIT) THEN
-                CALL eval_cell_source_explicit(j,k,qp(1:n_vars+2,j,k), &
-                     source_time,step_groups(group_index),explicit_rate)
+                IF (step_groups(group_index)%id==0) THEN
+                   CALL eval_cell_source_explicit(j,k,qp_original(:,j,k), &
+                        source_time,step_groups(group_index),explicit_rate)
+                ELSE
+                   CALL eval_cell_source_explicit(j,k,qp(:,j,k), &
+                        source_time,step_groups(group_index),explicit_rate)
+                END IF
                 q(1:n_eqns,j,k)=q(1:n_eqns,j,k)+time_step*explicit_rate
              ELSE IF (step_groups(group_index)%method==SOURCE_METHOD_ANALYTIC) THEN
                 step_noise=0.0_wp
@@ -294,6 +302,6 @@ CONTAINS
 
     END SUBROUTINE execute_mass_exchange_transaction
 
-  END SUBROUTINE execute_step_source_groups
+  END SUBROUTINE execute_lie_source_groups
 
 END MODULE step_source_executor_2d
