@@ -220,3 +220,10 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Corretto il limiter in `source_terms_2d` per controllare separatamente i rate negativi di tutte le masse solide e dei gas addizionali con i rispettivi indici canonici. La disponibilita' e il consumo del carrier derivano ora da massa totale meno solidi meno gas addizionali.
 - La scalatura resta unica per tutti i rate sorgente e i campi trasferiti tramite `scale_mass_exchange_transfer`; nessun limiter viene applicato al flusso spaziale. I nuovi controlli si allineano alla stessa condizione di ammissibilita' `m_s + m_g <= m_tot`.
 - Verificato staticamente il percorso `assemble_lie_explicit_transaction` -> `limit_explicit_source_rates` -> controllo di finitezza dei rate/trasferimenti, ma resta da controllare la totalita' dei sottoprocessi e dei test. Nessuna compilazione/Action eseguita.
+
+### Rettifica fisica del limiter della fase gassosa (2026-11-01)
+
+- Su revisione della semantica fisica, la modifica al limiter del commit `f466782` e' stata corretta: i gas aggiuntivi sono componenti della fase gassosa complessiva, non un inventario carrier indipendente da sottrarre alla sua massa disponibile. La disponibilita' del carrier e' `m_tot - SUM(m_solidi)`.
+- In `mass_exchange_deposition_2d` il rate negativo dei gas aggiuntivi e' proporzionale alle loro frazioni rispetto alla massa della fase gassosa; `mass_exchange_vaporization_2d` aggiunge invece massa al gas. Si torna quindi a limitare esplicitamente massa totale, singole masse solide e disponibilita' della fase carrier come insieme, **senza limiter aggiuntivi per ciascun gas**.
+- Rimane il distinto controllo di ammissibilita' in `state_2d`: ogni massa trasportata e' nonnegativa e la somma di solidi e gas aggiuntivi non supera la massa totale. Tale controllo accerta la consistenza delle frazioni massiche e non scala i rate ne' corregge lo stato.
+- Nessuna compilazione o Action eseguita. La verifica completa delle firme/import e dei restanti percorsi resta aperta.

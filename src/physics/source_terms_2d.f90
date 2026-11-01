@@ -150,7 +150,7 @@ CONTAINS
     REAL(wp), INTENT(OUT) :: limiter
     LOGICAL, INTENT(OUT) :: valid
     REAL(wp) :: available_carrier,carrier_consumption
-    INTEGER :: component_eq,i
+    INTEGER :: solid_eq,i
     limiter=1.0_wp
     valid=.FALSE.
     IF (.NOT.ALL(ieee_is_finite(q_reference))) RETURN
@@ -161,24 +161,19 @@ CONTAINS
     IF (SIZE(inventory)/=SIZE(solid_erosion_rate)) RETURN
     IF (rate(idx_totMassEqn)<0.0_wp) limiter=MIN(limiter, &
          MAX(0.0_wp,q_reference(idx_totMassEqn)/(-dt*rate(idx_totMassEqn))))
-    ! Every transported non-carrier component must remain nonnegative.
-    DO component_eq=idx_solidEqn_first,idx_solidEqn_last
-       IF (rate(component_eq)<0.0_wp) limiter=MIN(limiter, &
-            MAX(0.0_wp,q_reference(component_eq)/(-dt*rate(component_eq))))
-    END DO
-    DO component_eq=idx_addGasEqn_first,idx_addGasEqn_last
-       IF (rate(component_eq)<0.0_wp) limiter=MIN(limiter, &
-            MAX(0.0_wp,q_reference(component_eq)/(-dt*rate(component_eq))))
+    ! Additional gases belong to the gas carrier, whose withdrawal is
+    ! limited as a whole. Their deposition rates follow gas composition.
+    DO solid_eq=idx_solidEqn_first,idx_solidEqn_last
+       IF (rate(solid_eq)<0.0_wp) limiter=MIN(limiter, &
+            MAX(0.0_wp,q_reference(solid_eq)/(-dt*rate(solid_eq))))
     END DO
     DO i=1,SIZE(inventory)
        IF (solid_erosion_rate(i)>0.0_wp) limiter=MIN(limiter, &
             MAX(0.0_wp,inventory(i)/(dt*solid_erosion_rate(i))))
     END DO
     available_carrier=q_reference(idx_totMassEqn)- &
-         SUM(q_reference(idx_solidEqn_first:idx_solidEqn_last))- &
-         SUM(q_reference(idx_addGasEqn_first:idx_addGasEqn_last))
-    carrier_consumption=SUM(rate(idx_solidEqn_first:idx_solidEqn_last))+ &
-         SUM(rate(idx_addGasEqn_first:idx_addGasEqn_last))-rate(idx_totMassEqn)
+         SUM(q_reference(idx_solidEqn_first:idx_solidEqn_last))
+    carrier_consumption=SUM(rate(idx_solidEqn_first:idx_solidEqn_last))-rate(idx_totMassEqn)
     IF (carrier_consumption>0.0_wp) limiter=MIN(limiter, &
          MAX(0.0_wp,available_carrier/(dt*carrier_consumption)))
     valid=ieee_is_finite(limiter) .AND. limiter>=0.0_wp .AND. limiter<=1.0_wp
