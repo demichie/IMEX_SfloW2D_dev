@@ -24,9 +24,8 @@ MODULE source_terms_2d
   USE source_registry_2d, ONLY : source_group_type, group_contains_name
   IMPLICIT NONE
   PRIVATE
-  PUBLIC :: eval_source_explicit, eval_cell_source_explicit
+  PUBLIC :: eval_source_explicit
   PUBLIC :: limit_explicit_source_rates,assemble_lie_explicit_transaction
-  PUBLIC :: cell_analytic_source_context
   ! Explicit physical-source evaluation provides distinct cell/geometry
   ! and mass-exchange signatures, independent of time-integration stages.
   INTERFACE eval_source_explicit
@@ -62,11 +61,14 @@ CONTAINS
   END SUBROUTINE scale_mass_exchange_transfer
 
   !> Assemble and limit a complete explicit Lie group, without committing state.
-  SUBROUTINE assemble_lie_explicit_transaction(j,k,qp_eval,q_recipient,dt,t,group, &
-       inventory,rate,transfer,has_exchange,valid,stochastic_value)
+  SUBROUTINE assemble_lie_explicit_transaction(qp_eval,q_recipient,dt,t,group, &
+       inventory,rate,transfer,has_exchange,valid,stochastic_value, &
+       B_zone_cell,context,cell_fract,cell_fissure_fract,arc_perim,arc_n_x,arc_n_y,cell_area)
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
-    USE geometry_2d, ONLY : B_zone,B_prime_x_geom,B_prime_y_geom,cell_source_fractions
-    INTEGER, INTENT(IN) :: j,k
+    INTEGER, INTENT(IN) :: B_zone_cell
+    TYPE(analytic_term_context_type), INTENT(IN) :: context
+    REAL(wp), INTENT(IN) :: cell_fract,cell_fissure_fract(:)
+    REAL(wp), INTENT(IN) :: arc_perim,arc_n_x,arc_n_y,cell_area
     REAL(wp), INTENT(IN) :: qp_eval(n_vars+2),q_recipient(n_eqns),dt,t
     TYPE(source_group_type), INTENT(IN) :: group
     REAL(wp), INTENT(IN) :: inventory(n_solid)
@@ -84,13 +86,16 @@ CONTAINS
     physical=0.0_wp
     exchange=0.0_wp
     IF (SIZE(non_exchange%source_names)>0) &
-         CALL eval_cell_source_explicit(j,k,qp_eval,t,non_exchange,physical,stochastic_value)
+         CALL eval_source_explicit(context%Bprime_x,context%Bprime_y, &
+              context%Bsecond_xx,context%Bsecond_xy,context%Bsecond_yy, &
+              context%grav_coeff,qp_eval,physical,t,cell_fract,cell_fissure_fract, &
+              arc_perim,arc_n_x,arc_n_y,cell_area,non_exchange,stochastic_value)
     IF (has_exchange) THEN
-       CALL eval_source_explicit(qp_eval,B_zone(j,k), &
-            B_prime_x_geom(j,k),B_prime_y_geom(j,k),inventory,dt, &
+       CALL eval_source_explicit(qp_eval,B_zone_cell, &
+            context%Bprime_x,context%Bprime_y,inventory,dt, &
             group%source_names,transfer,exchange)
        IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
-          coverage=1.0_wp-cell_source_fractions(j,k)
+          coverage=1.0_wp-cell_fract
           IF (.NOT.ieee_is_finite(coverage)) RETURN
           IF (coverage<0.0_wp .OR. coverage>1.0_wp) RETURN
           exchange=coverage*exchange
@@ -175,40 +180,6 @@ CONTAINS
          MAX(0.0_wp,available_carrier/(dt*carrier_consumption)))
     valid=ieee_is_finite(limiter) .AND. limiter>=0.0_wp .AND. limiter<=1.0_wp
   END SUBROUTINE limit_explicit_source_rates
-
-  ! Cell-local physical source adapters use the same geometric fields.
-  SUBROUTINE eval_cell_source_explicit(j,k,qp_cell,time,group,rate,stochastic_value)
-    USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
-         B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
-         cell_source_fractions,cell_fissure_fractions,cell_arc_perim, &
-         cell_arc_n_x,cell_arc_n_y,dx,dy
-    INTEGER, INTENT(IN) :: j,k
-    REAL(wp), INTENT(IN) :: qp_cell(n_vars+2),time,stochastic_value
-    TYPE(source_group_type), INTENT(IN) :: group
-    REAL(wp), INTENT(OUT) :: rate(n_eqns)
-    CALL eval_source_explicit(B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
-         B_second_xx_geom(j,k),B_second_xy_geom(j,k), &
-         B_second_yy_geom(j,k),grav_coeff(j,k),qp_cell,rate,time, &
-         cell_source_fractions(j,k),cell_fissure_fractions(j,k,:), &
-         cell_arc_perim(j,k),cell_arc_n_x(j,k),cell_arc_n_y(j,k), &
-         dx*dy,group,stochastic_value)
-  END SUBROUTINE eval_cell_source_explicit
-
-  FUNCTION cell_analytic_source_context(j,k,Zij) RESULT(context)
-    USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
-         B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff
-    INTEGER, INTENT(IN) :: j,k
-    REAL(wp), INTENT(IN) :: Zij
-    TYPE(analytic_term_context_type) :: context
-    context%Bprime_x=B_prime_x_geom(j,k)
-    context%Bprime_y=B_prime_y_geom(j,k)
-    context%Bsecond_xx=B_second_xx_geom(j,k)
-    context%Bsecond_xy=B_second_xy_geom(j,k)
-    context%Bsecond_yy=B_second_yy_geom(j,k)
-    context%grav_coeff=grav_coeff(j,k)
-    context%Zij=Zij
-  END FUNCTION cell_analytic_source_context
-
 
   !> Return the conservative equivalent rate of the exact source substep.
   !> The interval is supplied by the selected Lie group operator.

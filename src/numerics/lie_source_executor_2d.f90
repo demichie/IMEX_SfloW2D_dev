@@ -31,10 +31,10 @@ CONTAINS
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
          B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
          project_cell_field_to_vertices,assign_topography_vertices,B_vertex, &
-         comp_interfaces_x,comp_interfaces_y
+         comp_interfaces_x,comp_interfaces_y, B_zone, cell_source_fractions, &
+         cell_fissure_fractions,cell_arc_perim,cell_arc_n_x,cell_arc_n_y,dx,dy
     USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, &
-         eval_source_analytic,cell_analytic_source_context, &
-         analytic_term_context_type
+         eval_source_analytic,analytic_term_context_type
     USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, &
          SOURCE_METHOD_NEWTON
     USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
@@ -112,8 +112,15 @@ CONTAINS
              qpentry=qp_group(:,j,k)
           END IF
           context='Lie source group'
+          analytic_context%Bprime_x=B_prime_x_geom(j,k)
+          analytic_context%Bprime_y=B_prime_y_geom(j,k)
+          analytic_context%Bsecond_xx=B_second_xx_geom(j,k)
+          analytic_context%Bsecond_xy=B_second_xy_geom(j,k)
+          analytic_context%Bsecond_yy=B_second_yy_geom(j,k)
+          analytic_context%grav_coeff=grav_coeff(j,k)
           noise=0.0_wp
           IF (PRESENT(stochastic_values)) noise=stochastic_values(j,k)
+          analytic_context%Zij=noise
 
           ! Validate constitutive inputs before dispatch. Model/method errors
           ! remain configuration errors, not recoverable timestep rejections.
@@ -149,9 +156,11 @@ CONTAINS
 
           SELECT CASE(groups(group_index)%method)
           CASE(SOURCE_METHOD_EXPLICIT)
-             CALL assemble_lie_explicit_transaction(j,k,qpentry,q_group(1:n_eqns,j,k), &
+             CALL assemble_lie_explicit_transaction(qpentry,q_group(1:n_eqns,j,k), &
                   time_step,source_time,groups(group_index),state%erodible(1:n_solid,j,k), &
-                  total_rate,transfers,with_exchange,ok,noise)
+                  total_rate,transfers,with_exchange,ok,noise,B_zone(j,k),analytic_context, &
+                  cell_source_fractions(j,k),cell_fissure_fractions(j,k,:), &
+                  cell_arc_perim(j,k),cell_arc_n_x(j,k),cell_arc_n_y(j,k),dx*dy)
              IF (.NOT.ok) THEN
                 CALL reject_cell('D19: physical source transaction rejected')
                 EXIT cell_loop
@@ -212,7 +221,6 @@ CONTAINS
              analytic_input=q_group(:,j,k)
              IF (groups(group_index)%id==0) analytic_input=q_original(:,j,k)
              IF (analytic_input(idx_totMassEqn)<=0.0_wp) CYCLE
-             analytic_context=cell_analytic_source_context(j,k,noise)
              CALL eval_source_analytic(groups(group_index),analytic_input, &
                   analytic_context,time_step,analytic_rate,status)
              IF (status/=0) THEN
