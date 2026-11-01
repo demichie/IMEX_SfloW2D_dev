@@ -55,7 +55,7 @@ CONTAINS
     IF (bottom_radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_circular_injection']
     IF (bottom_fissural_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'bottom_fissural_injection']
     IF (radial_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'radial_injection']
-    IF (lateral_source_flag) active_names=[CHARACTER(LEN=64) :: active_names,'boundary_injection']
+    ! Lateral boundary injection is a spatial boundary condition, not a Lie cell source.
     IF (ALLOCATED(erosion_coeff)) THEN
       IF (erosion_coeff>0.0_wp) &
            active_names=[CHARACTER(LEN=64) :: active_names,'mass_exchange_erosion']
@@ -118,7 +118,7 @@ CONTAINS
         requested_method=pore_pressure_method
         id=pore_pressure_group
       CASE('bottom_circular_injection','bottom_fissural_injection', &
-            'radial_injection','geometry_curvature','boundary_injection')
+            'radial_injection','geometry_curvature')
         SELECT CASE(TRIM(active_names(1)))
         CASE('bottom_circular_injection')
           requested_method=bottom_circular_method
@@ -132,9 +132,6 @@ CONTAINS
         CASE('geometry_curvature')
           requested_method=geometry_curvature_method
           id=geometry_curvature_group
-        CASE('boundary_injection')
-          requested_method=boundary_injection_method
-          id=boundary_injection_group
         END SELECT
       CASE('mass_exchange_lava_deposition','mass_exchange_erosion', &
             'mass_exchange_deposition','mass_exchange_carrier_liquid_loss', &

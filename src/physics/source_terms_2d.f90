@@ -5,7 +5,6 @@
 !> fluid/substrate candidates at group boundaries.
 MODULE source_terms_2d
     USE parameters_2d, ONLY : idx_h
-  USE mass_boundary_injection_2d
   USE mass_injection_2d, ONLY : eval_mass_injection_explicit
   USE mass_injection_coefficients_2d
   USE parameters_2d
@@ -37,10 +36,6 @@ MODULE source_terms_2d
   PUBLIC :: analytic_term_context_type
   PUBLIC :: eval_geometry_curvature_explicit
   PUBLIC :: bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step
-  PUBLIC :: eval_boundary_injection_explicit
-  PUBLIC :: eval_boundary_injection_semi_implicit
-  PUBLIC :: eval_boundary_injection_implicit
-  PUBLIC :: eval_boundary_injection_analytic
   ! Cell-local geometry and stochastic context for analytic source solves.
   TYPE :: analytic_term_context_type
     REAL(wp) :: Bprime_x=0.0_wp, Bprime_y=0.0_wp
