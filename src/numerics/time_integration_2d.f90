@@ -3,7 +3,8 @@ MODULE time_integration_2d
   USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_solidEqn_first,idx_solidEqn_last, &
        idx_totMassEqn
   USE geometry_2d, ONLY : comp_cells_x,comp_cells_y, &
-       begin_lie_geometry_transaction,commit_lie_geometry_transaction
+       begin_lie_geometry_transaction,commit_lie_geometry_transaction, &
+       rollback_lie_geometry_transaction
   USE state_conversion_2d, ONLY : qc_to_qp
   USE state_2d, ONLY : initialize_dry_physical_cell
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
@@ -50,6 +51,7 @@ CONTAINS
     CLASS(domain_type), INTENT(IN) :: domain
     CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
     INTEGER :: l,j,k
+    LOGICAL :: source_step_failed
     REAL(wp) :: pd
     IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
     this%q_before=q
@@ -94,7 +96,11 @@ CONTAINS
     ! pre-step authoritative fields until the complete Lie sweep succeeds.
     CALL begin_lie_geometry_transaction
     CALL execute_lie_source_groups(this%q_trial,this%qp_trial,dt,domain, &
-         source_registry,Z,t,this%q_before,this%qp_before)
+         source_registry,Z,t,this%q_before,this%qp_before,source_step_failed)
+    IF (source_step_failed) THEN
+      CALL rollback_lie_geometry_transaction
+      CALL fatal_error('Lie source group failed; complete timestep discarded')
+    END IF
     ! Publish the accepted fluid fields only after all Lie source groups return.
     ! Geometry and substrate still require separate transactional ownership.
     q=this%q_trial
