@@ -29,8 +29,7 @@ CONTAINS
        stochastic_values,step_start_time,q_original,qp_original,step_failed,failure_message)
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
          B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
-         begin_topography_rate_update,record_topography_rate_cell, &
-         project_lie_bed_rate,assign_lie_bed,B_vertex, &
+         project_cell_field_to_vertices,assign_lie_bed,B_vertex, &
          deposit,erosion,erodible,lava_deposit,comp_interfaces_x,comp_interfaces_y
     USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, &
          eval_source_analytic,cell_analytic_source_context, &
@@ -61,7 +60,7 @@ CONTAINS
     REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
     REAL(wp) :: erodible_candidate(n_solid),lava_candidate
     INTEGER, ALLOCATABLE :: group_j(:),group_k(:)
-    REAL(wp), ALLOCATABLE :: bed_rate_vertex(:,:),bed_candidate(:,:)
+    REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:),bed_rate_vertex(:,:),bed_candidate(:,:)
     REAL(wp), ALLOCATABLE :: staged_deposit(:,:),staged_erosion(:,:), &
          staged_erodible(:,:),staged_lava(:),staged_bed_rate(:)
     REAL(wp) :: total_rate(n_eqns)
@@ -96,7 +95,10 @@ CONTAINS
                staged_erosion(n_solid,domain%solve_cells), &
                staged_erodible(n_solid,domain%solve_cells), &
                staged_lava(domain%solve_cells),staged_bed_rate(domain%solve_cells))
-          IF (topo_change_flag) CALL begin_topography_rate_update
+          IF (topo_change_flag) THEN
+             ALLOCATE(bed_rate_cell(comp_cells_x,comp_cells_y))
+             bed_rate_cell=0.0_wp
+          END IF
        END IF
 
        cell_loop: DO cell=1,domain%solve_cells
@@ -244,7 +246,11 @@ CONTAINS
        IF (with_exchange .AND. topo_change_flag) THEN
           ALLOCATE(bed_rate_vertex(comp_interfaces_x,comp_interfaces_y))
           CALL record_group_bed_rates
-          CALL project_lie_bed_rate(bed_rate_vertex,bed_accepted)
+          bed_accepted=ALL(ieee_is_finite(bed_rate_cell))
+          IF (bed_accepted) THEN
+             CALL project_cell_field_to_vertices(bed_rate_cell,bed_rate_vertex)
+             bed_accepted=ALL(ieee_is_finite(bed_rate_vertex))
+          END IF
           IF (bed_accepted) THEN
              bed_candidate=B_vertex+time_step*bed_rate_vertex
              IF (.NOT.ALL(ieee_is_finite(bed_candidate))) bed_accepted=.FALSE.
@@ -266,7 +272,7 @@ CONTAINS
                 IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
                 RETURN
              END IF
-             DEALLOCATE(bed_rate_vertex,bed_candidate)
+             DEALLOCATE(bed_rate_cell,bed_rate_vertex,bed_candidate)
           END IF
           DO cell=1,domain%solve_cells
              j=group_j(cell)
@@ -288,7 +294,7 @@ CONTAINS
       DO n=1,domain%solve_cells
          j_cell=group_j(n)
          k_cell=group_k(n)
-         CALL record_topography_rate_cell(j_cell,k_cell,staged_bed_rate(n))
+         bed_rate_cell(j_cell,k_cell)=staged_bed_rate(n)
       END DO
     END SUBROUTINE record_group_bed_rates
 
