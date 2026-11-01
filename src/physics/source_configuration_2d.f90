@@ -88,7 +88,8 @@ CONTAINS
     TYPE(source_term_type) :: term
     CHARACTER(LEN=64), ALLOCATABLE :: names(:)
     CHARACTER(LEN=16) :: requested_method
-    INTEGER :: i,j,k,id,method,target,pore,n,eq
+    INTEGER :: i,j,k,id,method,target,pore,n,eq,affected_idx
+    INTEGER, ALLOCATABLE :: affected(:)
     INTEGER :: membership(n_eqns)
     LOGICAL :: mask(n_eqns)
     CALL collect_active_source_names(thermal_cooling_flag,names,error)
@@ -208,16 +209,15 @@ CONTAINS
       END IF
       groups(k)%source_names=[CHARACTER(LEN=64)::groups(k)%source_names,names(i)]
       IF (method==SOURCE_METHOD_NEWTON) THEN
-        SELECT CASE(target)
-        CASE(1)
-          groups(k)%equation_ids=[groups(k)%equation_ids,2,3]
-        CASE(2)
-          groups(k)%equation_ids=[groups(k)%equation_ids,4]
-        CASE(3)
-          groups(k)%equation_ids=[groups(k)%equation_ids,idx_pore]
-        CASE DEFAULT
-          error='D19: unsupported Newton target'; RETURN
-        END SELECT
+        affected=source_newton_affected_equations(names(i))
+        IF (SIZE(affected)==0) THEN
+          error='D19: Newton source has no structurally affected equations'; RETURN
+        END IF
+        DO j=1,SIZE(affected)
+          affected_idx=affected(j)
+          IF (.NOT.ANY(groups(k)%equation_ids==affected_idx)) &
+               groups(k)%equation_ids=[groups(k)%equation_ids,affected_idx]
+        END DO
       END IF
     END DO
     DO i=1,SIZE(groups)

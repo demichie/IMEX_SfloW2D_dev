@@ -84,7 +84,8 @@ CONTAINS
     CHARACTER(*), INTENT(OUT) :: error
     TYPE(source_term_type) :: term
     CHARACTER(LEN=64), ALLOCATABLE :: seen(:)
-    INTEGER :: i,j,mass_group
+    INTEGER :: i,j,mass_group,k,eq
+    INTEGER, ALLOCATABLE :: expected(:),affected(:)
     CALL this%finalize()
     mass_group=-1
     ALLOCATE(seen(0))
@@ -110,6 +111,7 @@ CONTAINS
       END SELECT
       IF (groups(i)%method==SOURCE_METHOD_NEWTON .AND. SIZE(groups(i)%equation_ids)==0) RETURN
       IF (groups(i)%method==SOURCE_METHOD_ANALYTIC .AND. SIZE(groups(i)%source_names)/=1) RETURN
+      ALLOCATE(expected(0))
       DO j=1,SIZE(groups(i)%source_names)
         term=source_term_descriptor_by_name(groups(i)%source_names(j))
         IF (LEN_TRIM(term%name)==0) RETURN
@@ -119,6 +121,14 @@ CONTAINS
         END IF
         IF (ANY(seen==term%name)) RETURN
         seen=[CHARACTER(LEN=64) :: seen,term%name]
+        IF (groups(i)%method==SOURCE_METHOD_NEWTON) THEN
+          affected=source_newton_affected_equations(term%name)
+          IF (SIZE(affected)==0) RETURN
+          DO k=1,SIZE(affected)
+            eq=affected(k)
+            IF (.NOT.ANY(expected==eq)) expected=[expected,eq]
+          END DO
+        END IF
         SELECT CASE(groups(i)%method)
         CASE(SOURCE_METHOD_EXPLICIT)
           IF (.NOT.term%has_explicit) RETURN
@@ -128,6 +138,10 @@ CONTAINS
           IF (.NOT.term%has_analytic) RETURN
         END SELECT
       END DO
+      IF (groups(i)%method==SOURCE_METHOD_NEWTON) THEN
+        IF (.NOT.same_set(groups(i)%equation_ids,expected)) RETURN
+      END IF
+      DEALLOCATE(expected)
     END DO
     this%n_equations=n_equations
     this%pore_equation=pore_equation

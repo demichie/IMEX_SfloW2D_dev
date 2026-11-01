@@ -1,8 +1,10 @@
 MODULE source_catalog_2d
+  USE parameters_2d, ONLY : idx_uEqn,idx_vEqn,idx_engyEqn,idx_poreEqn
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: source_term_type, SOURCE_CATALOG, SOURCE_TERM_COUNT
   PUBLIC :: source_term_descriptor_by_name, source_catalog_names_unique
+  PUBLIC :: source_newton_affected_equations
   PUBLIC :: canonical_rheology_source_name, rheology_name_has_role, canonical_rheology_catalog_unique
   INTEGER, PARAMETER, PUBLIC :: SOURCE_METHOD_EXPLICIT=1, SOURCE_METHOD_NEWTON=2, SOURCE_METHOD_ANALYTIC=3
   INTEGER, PARAMETER, PUBLIC :: SOURCE_SOLVE_NEWTON_BLOCK=1, SOURCE_SOLVE_ANALYTIC_VELOCITY=2
@@ -98,6 +100,30 @@ MODULE source_catalog_2d
              allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.) &
        ]
 CONTAINS
+  !> Structurally affected conservative equations for a Newton-capable source.
+  !> A zero instantaneous rate does not remove an equation from this set.
+  !> An unsupported source/method returns an empty set.
+  FUNCTION source_newton_affected_equations(name) RESULT(ids)
+    CHARACTER(*), INTENT(IN) :: name
+    INTEGER, ALLOCATABLE :: ids(:)
+    TYPE(source_term_type) :: descriptor
+    descriptor=source_term_descriptor_by_name(name)
+    ALLOCATE(ids(0))
+    IF (.NOT.descriptor%has_newton) RETURN
+    SELECT CASE(TRIM(name))
+    CASE('rheology_voellmy','rheology_plastic','rheology_lava', &
+         'rheology_lahar','rheology_empirical','rheology_quadratic', &
+         'rheology_froude','rheology_lucas','rheology_mui', &
+         'rheology_mui_voellmy','rheology_newmodel')
+      ids=[idx_uEqn,idx_vEqn]
+    CASE('thermal_cooling')
+      ids=[idx_engyEqn]
+    CASE('pore_pressure_dissipation')
+      IF (idx_poreEqn>0) ids=[idx_poreEqn]
+    END SELECT
+  END FUNCTION source_newton_affected_equations
+
+
   PURE FUNCTION source_term_descriptor_by_name(name) RESULT(term)
     CHARACTER(*), INTENT(IN) :: name
     TYPE(source_term_type) :: term
