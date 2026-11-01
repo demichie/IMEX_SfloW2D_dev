@@ -26,7 +26,7 @@ CONTAINS
   !> For GROUP 0, evaluate every physical rate at the original pre-spatial
   !> state, but cap and apply the combined source increment to the post-FV state.
   SUBROUTINE execute_lie_source_groups(q,qp,time_step,domain,source_registry, &
-       stochastic_values,step_start_time,q_original,qp_original,step_failed)
+       stochastic_values,step_start_time,q_original,qp_original,step_failed,failure_message)
     USE parameters_2d, ONLY : erodible_deposit_flag,idx_add_gas_first,idx_add_gas_last
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,cell_source_fractions, &
          begin_topography_rate_update,record_topography_rate_cell, &
@@ -57,6 +57,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: q_original(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: qp_original(n_vars+2,comp_cells_x,comp_cells_y)
     LOGICAL, INTENT(OUT) :: step_failed
+    CHARACTER(LEN=*), INTENT(OUT), OPTIONAL :: failure_message
     REAL(wp) :: qpentry(n_vars+2),q_candidate(n_vars),qp_candidate(n_vars+2)
     REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
     REAL(wp) :: erodible_candidate(n_solid),lava_candidate
@@ -71,6 +72,7 @@ CONTAINS
 
     step_failed=.FALSE.
     failure_reason=''
+    IF (PRESENT(failure_message)) failure_message=''
     IF (.NOT.source_registry%is_initialized()) &
          CALL fatal_error('D19: uninitialized Lie source registry')
     groups=source_registry%groups()
@@ -245,8 +247,13 @@ CONTAINS
              CALL eval_source_analytic(groups(group_index),q(:,j,k), &
                   analytic_context,time_step,analytic_rate,status)
              IF (status/=0) THEN
+                WRITE(failure_reason,'(A,I0)') 'D19: analytic group status ',status
                 step_failed=.TRUE.
-                EXIT
+                EXIT cell_loop
+             END IF
+             IF (.NOT.ALL(ieee_is_finite(analytic_rate))) THEN
+                CALL reject_cell('D19: analytic source returned non-finite rate')
+                EXIT cell_loop
              END IF
              q(1:n_vars,j,k)=q(1:n_vars,j,k)+time_step*analytic_rate(1:n_vars)
           CASE(SOURCE_METHOD_NEWTON)
@@ -255,8 +262,10 @@ CONTAINS
                   q(:,j,k),time_step,B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
                   noise,iterations,ok,linear_info,failed)
              IF (.NOT.ok .OR. failed .OR. linear_info/=0) THEN
+                WRITE(failure_reason,'(A,I0,A,I0)') &
+                     'D19: Newton failed, linear_info=',linear_info,', iterations=',iterations
                 step_failed=.TRUE.
-                EXIT
+                EXIT cell_loop
              END IF
           CASE DEFAULT
              CALL reject_cell('D19: invalid group method')
@@ -292,12 +301,14 @@ CONTAINS
        END DO cell_loop
        IF (step_failed) THEN
           IF (groups(group_index)%method==SOURCE_METHOD_NEWTON) CALL local_partition%finalize()
+          IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
           RETURN
        END IF
        IF (with_exchange .AND. topo_change_flag) THEN
           CALL apply_topography_rate_update(time_step,bed_accepted)
           IF (.NOT.bed_accepted) THEN
-             step_failed=.TRUE.
+             CALL reject_cell('D19: projected topography update failed')
+             IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
              RETURN
           END IF
        END IF
