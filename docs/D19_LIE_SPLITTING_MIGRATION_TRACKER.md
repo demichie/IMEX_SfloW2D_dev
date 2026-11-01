@@ -1,7 +1,7 @@
 # D19 — Architettura Lie definitiva e stato della migrazione
 
 **Branch di lavoro:** `master`  
-**Stato:** migrazione del codice di produzione in corso; architettura finale non ancora completamente implementata.  
+**Stato:** revisione architetturale dei percorsi Lie principali conclusa; verifica esaustiva di firme/rami Fortran e validazione eseguibile ancora aperte.  
 **Ultima revisione:** 2026-11-01  
 **Scopo:** questo è il riferimento operativo unico per l'architettura desiderata, lo stato verificabile dell'implementazione e i lavori ancora necessari. Le sezioni descrivono esclusivamente il progetto finale: non contengono versioni storiche o regole alternative.
 
@@ -328,3 +328,18 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Verificati i due callsite di produzione in `nonlinear_solver_2d` (residuo reale e Jacobiano complex-step): entrambi gia' passano `group=source_group`. Nessuna modifica necessaria al solver.
 - La ricerca globale mostra anche chiamate dirette nei test storici: il loro eventuale adeguamento e' rinviato alla fase concordata di compilazione e test, senza condizionare l'architettura finale.
 - Non modificati `B_zone`, test o workflow; non eseguita compilazione. D19 resta aperto per le verifiche statiche ancora non esaustive.
+
+## Esito consolidato dell'audit architetturale D19 (2026-11-01)
+
+**Concluso per i percorsi di produzione verificati:**
+
+1. `simulation_2d` -> `time_integration_2d` -> `lie_source_executor_2d`: avanzamento spaziale senza limiter, controllo di ammissibilita', gruppo zero valutato sullo stato pre-spaziale e applicato allo stato post-spaziale, successivi gruppi in sequenza.
+2. Registro `source_registry_2d`: gruppo zero EXPLICIT, metodi omogenei, massimo una sorgente ANALYTIC per gruppo, footprint coerente con il metodo, una sola reologia, mass exchange nello stesso gruppo EXPLICIT.
+3. `source_terms_2d` e `mass_exchange_2d`: valutazione dei soli processi selezionati, limiter accoppiati sul gruppo, dipendenza deposizione-vaporizzazione, nessun ricalcolo indipendente della deposizione nel modello della vaporizzazione.
+4. Newton: residuo reale e Jacobiano complex-step ricevono il gruppo Lie validato, nessun fallback ai flag globali nel dispatcher implicito.
+5. Stato e geometria: pubblicazione conservativa finale, snapshot/rollback degli inventari e dei campi geometrici derivati; zone topografiche `B_zone` non modificate dalla migrazione.
+6. Ricognizione delle dipendenze `USE` dei 64 sorgenti di `src/` svolta in piu' blocchi; non individuati import verso moduli di progetto rimossi. Il confronto esaustivo di ogni `USE ONLY` e firma non e' dimostrato da questa ricognizione.
+
+**Non attestato e quindi non segnato come completato:** confronto automatico/esaustivo di tutte le firme, rank, optional, keyword e rami fisici; compilazione; suite di test e regressione. Questi aspetti restano una fase di verifica distinta. Il completamento dell'audit architetturale sopra elencato NON certifica che ogni unita' Fortran compili, ne' che la correttezza numerica sia dimostrata.
+
+**Decisione operativa:** nessun ulteriore cambiamento strutturale individuato nei percorsi critici verificati. La prossima fase e' la validazione di integrazione, che non e' stata avviata su richiesta del responsabile scientifico. Non usare il termine 'D19 completamente chiuso' finche' le verifiche residue richieste dal tracker non sono effettivamente eseguite.
