@@ -11,7 +11,7 @@
 MODULE domain_2d
     USE parameters_2d, ONLY : idx_totMassEqn
 
-  USE parameters_2d, ONLY : wp, n_RK
+  USE parameters_2d, ONLY : wp
   USE parameters_2d, ONLY : radial_source_flag, bottom_radial_source_flag,   &
      bottom_fissural_source_flag
 
@@ -22,6 +22,10 @@ MODULE domain_2d
   IMPLICIT NONE
 
   PRIVATE
+
+  ! Two spatial cell layers cover the face and three-point reconstruction stencil.
+  ! This width is independent of any temporal Runge-Kutta stage count.
+  INTEGER, PARAMETER :: active_halo_layers = 2
 
   !> \brief Active-cell/face indices and the wider reconstruction halo.
   !> \details Solve lists determine where equations are advanced; reconstruction
@@ -224,7 +228,7 @@ CONTAINS
     !$OMP BARRIER
     !$OMP MASTER
 
-    DO i = 1,n_RK
+    DO i = 1,active_halo_layers
 
        this%solve_mask_temp = this%solve_mask
        
