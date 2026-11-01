@@ -224,6 +224,8 @@ CONTAINS
     END SUBROUTINE eval_rheology_semi_implicit
 
 
+    ! Newton/complex-step contract: read-only state and coefficients; return rates only.
+    ! Never advance shared inventories or geometry while evaluating this dispatch.
     SUBROUTINE eval_rheology_implicit(models,state, &
          use_stochastic,stochastic_value,rate)
         CHARACTER(*), INTENT(IN) :: models(:)

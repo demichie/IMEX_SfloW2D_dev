@@ -52,6 +52,8 @@ CONTAINS
   END SUBROUTINE eval_thermal_semi_implicit
 
 
+  ! Complex-step source evaluation is side-effect free with respect to
+  ! substrate, topography and other shared integration state.
   SUBROUTINE eval_thermal_implicit(models,state,radiative,convective,ambient,rate)
     CHARACTER(*), INTENT(IN) :: models(:)
     TYPE(complex_physical_state_type), INTENT(IN) :: state
