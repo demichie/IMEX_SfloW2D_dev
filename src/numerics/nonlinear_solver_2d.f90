@@ -48,11 +48,10 @@ CONTAINS
     REAL(wp), INTENT(IN) :: dt,Bprime_x,Bprime_y,stochastic_value
     INTEGER, INTENT(OUT) :: iterations_used,linear_info
     LOGICAL, INTENT(OUT) :: converged,line_search_failed
-    REAL(wp) :: q_in(n_vars),zero_predictor(n_eqns)
+    REAL(wp) :: q_in(n_vars)
     q_in=q_cell
-    zero_predictor=0.0_wp
     CALL solve_implicit_groups(equation_partition,[source_group],q_cell,q_in, &
-         dt,zero_predictor,Bprime_x,Bprime_y,0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
+         dt,Bprime_x,Bprime_y,0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
          stochastic_value,iterations_used,converged,linear_info,line_search_failed)
   END SUBROUTINE solve_backward_euler_group
 
@@ -84,7 +83,6 @@ CONTAINS
   !>                   area.
   !> \param[in] qj_old Cell conservative reference state used in the implicit-stage residual.
   !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
-  !> \param[in] predictor_rate Already known stage contribution excluding the current implicit source.
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[in] Bsecondj_xx Filtered bed curvature in xx [m^-1].
@@ -101,7 +99,7 @@ CONTAINS
 
   SUBROUTINE solve_implicit_groups(equation_partition, stage_groups, &
        qj, qj_old, dt_step,                                                  &
-       predictor_rate, Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
+Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
        Bsecondj_yy, grav_coeff, Zij,                                         &
        iterations_used, converged, linear_info, line_search_failed,          &
        apply_semi_implicit )
@@ -116,7 +114,6 @@ CONTAINS
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
     REAL(wp), INTENT(IN) :: qj_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step
-    REAL(wp), INTENT(IN) :: predictor_rate(n_eqns)
     REAL(wp), INTENT(IN) :: Bprimej_x
     REAL(wp), INTENT(IN) :: Bprimej_y
     REAL(wp), INTENT(IN) :: Bsecondj_xx, Bsecondj_xy, Bsecondj_yy
@@ -134,7 +131,7 @@ CONTAINS
     REAL(wp) :: analytic_rate(n_eqns)
     TYPE(analytic_term_context_type) :: analytic_context
     REAL(wp) :: qp_current(n_vars+2)
-    REAL(wp) :: dynamic_pressure, si_term(n_eqns), residual_without_si(n_eqns)
+    REAL(wp) :: dynamic_pressure, si_term(n_eqns)
     INTEGER :: group, group_size, equation, i
     INTEGER :: analytic_status
     INTEGER :: group_equations(n_eqns)
@@ -159,7 +156,7 @@ CONTAINS
     tol_rel_local = tol_rel
 
     qj_init = qj
-    q_known = qj_old - dt_step * predictor_rate(1:n_vars)
+    q_known = qj_old
     qj = q_known
     apply_si_local = .FALSE.
     IF (PRESENT(apply_semi_implicit)) apply_si_local = apply_semi_implicit
@@ -240,10 +237,9 @@ CONTAINS
              END IF
              ! Semi-implicit information seeds the Newton initial guess only.
              ! The backward-Euler residual contains the full implicit source once.
-             residual_without_si=0.0_wp
              CALL solve_newton_group(stage_groups(group),&
                   group_equations(1:group_size),qj,q_group_before,dt_step,&
-                  residual_without_si,Bprimej_x,Bprimej_y,Zij,coeff_f,      &
+                  Bprimej_x,Bprimej_y,Zij,coeff_f,      &
                   tol_abs_local,tol_rel_local,iterations_used,converged,   &
                   linear_info,line_search_failed)
              IF (.NOT.converged) THEN
@@ -261,12 +257,11 @@ CONTAINS
 
   END SUBROUTINE solve_implicit_groups
 
-  !> \brief Solve one implicit Newton group while holding other equations fixed.
+  !> \brief Solve one backward-Euler Newton group while holding other equations fixed.
   !> \param[in] group_equations Indices of the conservative equations in this group.
   !> \param[in,out] qj Local conservative state; only group equations are updated.
   !> \param[in] qj_old Conservative reference state at the start of the step.
   !> \param[in] dt_step Stage time increment [s].
-  !> \param[in] predictor_rate Known stage source rates, excluding the current implicit rate.
   !> \param[in] Bprimej_x Filtered bed slope in x [dimensionless].
   !> \param[in] Bprimej_y Filtered bed slope in y [dimensionless].
   !> \param[in] Zij Local stochastic-process value supplied to the rheology.
@@ -280,7 +275,7 @@ CONTAINS
   !> \param[out] linear_info Linear solver status; zero denotes success.
   !> \param[out] line_search_failed True if backtracking cannot accept a step.
   SUBROUTINE solve_newton_group(source_group,group_equations,   &
-       qj,qj_old,dt_step,predictor_rate,Bprimej_x,Bprimej_y,Zij,coeff_f, &
+       qj,qj_old,dt_step,Bprimej_x,Bprimej_y,Zij,coeff_f, &
        tol_abs_local,                                                         &
        tol_rel_local, iterations_used, converged, linear_info,               &
        line_search_failed)
@@ -293,7 +288,7 @@ CONTAINS
     INTEGER, INTENT(IN) :: group_equations(:)
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
     REAL(wp), INTENT(IN) :: qj_old(n_vars), dt_step
-    REAL(wp), INTENT(IN) :: predictor_rate(n_eqns), Bprimej_x, Bprimej_y, Zij
+    REAL(wp), INTENT(IN) :: Bprimej_x, Bprimej_y, Zij
     REAL(wp), INTENT(IN) :: coeff_f(n_eqns), tol_abs_local, tol_rel_local
     INTEGER, INTENT(INOUT) :: iterations_used
     LOGICAL, INTENT(OUT) :: converged, line_search_failed
@@ -321,7 +316,7 @@ CONTAINS
 
     DO nl_iter = 1, max_nl_iter
        iterations_used = iterations_used + 1
-       CALL eval_f(qj, qj_old, dt_step, coeff_f, predictor_rate,       &
+       CALL eval_f(qj, qj_old, dt_step, coeff_f,       &
             Bprimej_x, Bprimej_y, right_term, scal_f, Zij, group_equations, &
             source_group)
 
@@ -367,7 +362,7 @@ CONTAINS
           stpmax = STPMX * MAX(NORM2(qj_rel),REAL(SIZE(qj_rel),wp))
           CALL lnsrch(qj_rel_old, qj_org, qj, qj_old, scal_f_old, grad_f,   &
                desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax,      &
-               check, dt_step, predictor_rate, Bprimej_x, Bprimej_y,  &
+               check, dt_step, Bprimej_x, Bprimej_y,  &
                Zij, group_equations,source_group)
           IF (check) THEN
              line_search_failed = .TRUE.
@@ -381,7 +376,7 @@ CONTAINS
                   qj_rel(group_equations(i))*qj_org(group_equations(i))
           END DO
           CALL eval_f(qj_trial, qj_old, dt_step, coeff_f,           &
-               predictor_rate, Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
+Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
                group_equations,source_group)
        END IF
 
@@ -644,7 +639,6 @@ CONTAINS
   !> \param[in] stpmax Maximum Euclidean length of the normalized trial step.
   !> \param[out] check True when the line search cannot find a usable decrease.
   !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
-  !> \param[in] predictor_rate Already known stage contribution excluding the current implicit source.
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
@@ -654,7 +648,7 @@ CONTAINS
 
   SUBROUTINE lnsrch( qj_rel_NR_old, qj_org, qj_fixed, qj_old, scal_f_old,      &
        grad_f, desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax, check,  &
-       dt_step  , predictor_rate , Bprimej_x , Bprimej_y, Zij,           &
+       dt_step  , Bprimej_x , Bprimej_y, Zij,           &
        active_equations,source_group )
 
     IMPLICIT NONE
@@ -698,8 +692,6 @@ CONTAINS
     LOGICAL, INTENT(OUT) :: check
 
     REAL(wp), INTENT(IN) :: dt_step
-    REAL(wp), INTENT(IN) :: predictor_rate(n_eqns)
-
     REAL(wp), INTENT(IN) :: Bprimej_x
     REAL(wp), INTENT(IN) :: Bprimej_y
 
@@ -784,7 +776,7 @@ CONTAINS
        END DO
 
        CALL eval_f( qj , qj_old , dt_step  , coeff_f ,             &
-            predictor_rate , Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
+Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
             active_equations,source_group )
 
        IF ( verbose_level .GE. 4 ) THEN
@@ -890,7 +882,6 @@ CONTAINS
   !> \param[in] qj_old Cell conservative reference state used in the implicit-stage residual.
   !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
   !> \param[in] coeff_f Per-equation scaling factors applied to the stage residual.
-  !> \param[in] predictor_rate Already known stage contribution excluding the current implicit source.
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[out] f_nl Scaled nonlinear stage residual, one entry per equation.
@@ -900,7 +891,7 @@ CONTAINS
   !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
     !******************************************************************************
 
-  SUBROUTINE eval_f( qj , qj_old , dt_step , coeff_f , predictor_rate ,    &
+  SUBROUTINE eval_f( qj , qj_old , dt_step , coeff_f ,    &
        Bprimej_x ,                                                              &
        Bprimej_y , f_nl , scal_f, Zij, active_equations,source_group )
 
@@ -912,8 +903,6 @@ CONTAINS
     REAL(wp), INTENT(IN) :: qj_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step
     REAL(wp), INTENT(IN) :: coeff_f(n_eqns)
-    REAL(wp), INTENT(IN) :: predictor_rate(n_eqns)
-
     REAL(wp), INTENT(IN) :: Bprimej_x
     REAL(wp), INTENT(IN) :: Bprimej_y
 
@@ -935,7 +924,7 @@ CONTAINS
     CALL eval_source_implicit( Bprimej_x , Bprimej_y, Zij, r_qj = qj ,           &
          r_nh_term_impl=nh_term_impl,group=source_group )
 
-    Rj = predictor_rate - nh_term_impl
+    Rj = -nh_term_impl
 
     delta_q = qj - qj_old
     f_nl = delta_q + dt_step * Rj
