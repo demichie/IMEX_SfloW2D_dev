@@ -343,3 +343,22 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 **Non attestato e quindi non segnato come completato:** confronto automatico/esaustivo di tutte le firme, rank, optional, keyword e rami fisici; compilazione; suite di test e regressione. Questi aspetti restano una fase di verifica distinta. Il completamento dell'audit architetturale sopra elencato NON certifica che ogni unita' Fortran compili, ne' che la correttezza numerica sia dimostrata.
 
 **Decisione operativa:** nessun ulteriore cambiamento strutturale individuato nei percorsi critici verificati. La prossima fase e' la validazione di integrazione, che non e' stata avviata su richiesta del responsabile scientifico. Non usare il termine 'D19 completamente chiuso' finche' le verifiche residue richieste dal tracker non sono effettivamente eseguite.
+
+## Verifica mirata firme dei modelli specifici (2026-11-01)
+
+### Svolto
+
+- Censite le dichiarazioni degli entrypoint degli 11 modelli reologici (`voellmy`, `plastic`, `lava`, `lahar`, `empirical`, `quadratic`, `newmodel`, `froude`, `lucas`, `mui`, `mui_voellmy`) e le chiamate nel dispatcher `rheology_2d`, per le quattro famiglie di interfaccia esposte quando disponibili. La ricognizione ha identificato le routine attive e la loro struttura di argomenti; non prova ancora per tutte le chiamate il rank e il tipo effettivo.
+- Censite e confrontate nominalmente le sei interfacce mass exchange EXPLICIT (`erosion`, `deposition`, `carrier_liquid_loss`, `entrainment`, `vaporization`, `lava_deposition`) con il coordinatore, incluso l'argomento `deposition` passato alla vaporizzazione.
+- Censite e confrontate nominalmente le dodici interfacce dei tre modelli di mass injection (bottom circular, bottom fissural e radial) con il relativo dispatcher per EXPLICIT, SEMI_IMPLICIT, IMPLICIT e ANALYTIC.
+- Censite le quattro interfacce del raffreddamento (`thermal_cooling`) e le quattro del modello di pressione di poro Darcy, insieme ai corrispondenti dispatcher.
+- Riletti i due callsite di produzione di `eval_source_implicit` per Newton reale e complex-step: entrambi inoltrano il gruppo validato.
+
+### Rimane da verificare prima di certificare tutte le firme
+
+- Confronto completo delle liste di argomenti multilinea dei dispatcher reologici con le implementazioni, inclusi tipi, `INTENT`, rank, optional e chiamate per ogni ramo raggiungibile (non limitato ai nomi dei primi argomenti).
+- Confronto completo di tipi/rank/optional delle firme termiche, Darcy, mass exchange e injection gia' censite nominalmente.
+- Conversioni e chiamate di geometria/stato non comprese nel censimento delle famiglie fisiche, incluse chiamate indirette e funzioni type-bound.
+- Verifica automatica esaustiva di tutte le chiamate e degli `USE ONLY` nelle 64 unita' di produzione; compilazione e test restano una fase successiva concordata.
+
+**Esito:** nessuna incongruenza certa rilevata nel solo censimento nominale di questo passaggio. Non trasformare il censimento nominale in una certificazione dei tipi/rank o dell'audit statico integrale. Nessuna compilazione, test, workflow o modifica alle zone `B_zone`.
