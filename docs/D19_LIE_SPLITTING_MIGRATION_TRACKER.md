@@ -179,3 +179,7 @@ Added a late-cell nonfinite-input rejection fixture in `test_projection_stress.f
 ### Production Newton separation (2026-11-01)
 
 Removed the obsolete multi-group implicit/analytic sweep and semi-implicit momentum seed from `nonlinear_solver_2d.f90`. The exported `solve_backward_euler_group` now validates the single NEWTON group's unique equation index set and directly calls the existing complex-step Newton kernel over precisely that set; all non-group conservative components remain fixed and failed solves restore the group input. The Lie executor retains the EXPLICIT / NEWTON / ANALYTIC dispatch; no model-dependent reconstruction, RK stage, or separate equation partition is introduced. **No tests or compilation until architecture completion.**
+
+### Lie executor cleanup: coherent coverage and admissibility (2026-11-01)
+
+In `lie_source_executor_2d.f90`, consolidated source-only conservative-mass admissibility checks in a side-effect-free predicate, used before committing explicit candidates and after group advances. Centralized source-coverage scaling of the *complete* `mass_exchange_rates_type` transfer record (including coupled mixture, solid/gas mass, energy, carrier erosion/deposition, withdrawal volume, lava and bed rates), while scaling the conservative exchange-rate vector exactly once. The group-0 spatial operator remains independently advanced and **never rate-limited**. This is production-only refactoring; tests/build deferred.

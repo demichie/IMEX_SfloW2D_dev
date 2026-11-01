@@ -22,12 +22,43 @@ MODULE lie_source_executor_2d
 
 CONTAINS
 
+  !> Check finite conservative mass budgets without modifying the state.
+  PURE LOGICAL FUNCTION conservative_mass_admissible(q_cell) RESULT(valid)
+    USE parameters_2d, ONLY : idx_add_gas_first,idx_add_gas_last
+    REAL(wp), INTENT(IN) :: q_cell(n_eqns)
+    valid=.FALSE.
+    IF (.NOT.ALL(ieee_is_finite(q_cell))) RETURN
+    IF (q_cell(idx_totMassEqn)<0.0_wp) RETURN
+    IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) RETURN
+    IF (ANY(q_cell(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
+    IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last))>q_cell(idx_totMassEqn)) RETURN
+    valid=.TRUE.
+  END FUNCTION conservative_mass_admissible
+
+  !> Apply the same physical coverage to every rate of one exchange transaction.
+  !> Fluid conservative source rates are scaled separately by the caller.
+  SUBROUTINE scale_mass_exchange_transfer(transfer,coverage)
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: transfer
+    REAL(wp), INTENT(IN) :: coverage
+    transfer%solid_deposition_rate=coverage*transfer%solid_deposition_rate
+    transfer%solid_erosion_rate=coverage*transfer%solid_erosion_rate
+    transfer%solid_mass_rate=coverage*transfer%solid_mass_rate
+    transfer%add_gas_mass_rate=coverage*transfer%add_gas_mass_rate
+    transfer%mixture_mass_rate=coverage*transfer%mixture_mass_rate
+    transfer%energy_rate=coverage*transfer%energy_rate
+    transfer%carrier_erosion_rate=coverage*transfer%carrier_erosion_rate
+    transfer%carrier_deposition_rate=coverage*transfer%carrier_deposition_rate
+    transfer%carrier_withdrawal_volume_rate=coverage*transfer%carrier_withdrawal_volume_rate
+    transfer%lava_deposit_rate=coverage*transfer%lava_deposit_rate
+    transfer%dB_dt=coverage*transfer%dB_dt
+  END SUBROUTINE scale_mass_exchange_transfer
+
   !> Evaluate and commit one complete Lie source group at a time.
   !> For GROUP 0, evaluate every physical rate at the original pre-spatial
   !> state, but cap and apply the combined source increment to the post-FV state.
   SUBROUTINE execute_lie_source_groups(q,qp,time_step,domain,source_registry, &
        stochastic_values,step_start_time,q_original,qp_original,step_failed,failure_message)
-    USE parameters_2d, ONLY : erodible_deposit_flag,idx_add_gas_first,idx_add_gas_last
+    USE parameters_2d, ONLY : erodible_deposit_flag
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,cell_source_fractions, &
          B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
          begin_topography_rate_update,record_topography_rate_cell, &
@@ -147,11 +178,7 @@ CONTAINS
                         CALL reject_cell('D19: invalid mass-exchange source coverage')
                         IF (step_failed) EXIT cell_loop
                    exchange_rate=coverage*exchange_rate
-                   transfers%solid_deposition_rate=coverage*transfers%solid_deposition_rate
-                   transfers%solid_erosion_rate=coverage*transfers%solid_erosion_rate
-                   transfers%carrier_deposition_rate=coverage*transfers%carrier_deposition_rate
-                   transfers%dB_dt=coverage*transfers%dB_dt
-                   transfers%lava_deposit_rate=coverage*transfers%lava_deposit_rate
+                   CALL scale_mass_exchange_transfer(transfers,coverage)
                 END IF
              END IF
              total_rate=physical_rate+exchange_rate
@@ -205,18 +232,10 @@ CONTAINS
              IF (.NOT.ALL(ieee_is_finite(q_candidate(1:n_eqns)))) &
                   CALL reject_cell('D19: non-finite explicit group candidate')
                   IF (step_failed) EXIT cell_loop
-             IF (q_candidate(idx_totMassEqn)<0.0_wp .OR. &
-                  ANY(q_candidate(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) &
-                  CALL reject_cell('D19: negative mass in group candidate')
-                  IF (step_failed) EXIT cell_loop
-             IF (ANY(q_candidate(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) THEN
-                CALL reject_cell('D19: negative additional-gas mass in candidate')
+             IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
+                CALL reject_cell('D19: inadmissible conservative mass candidate')
                 EXIT cell_loop
              END IF
-             IF (SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))> &
-                  q_candidate(idx_totMassEqn)) &
-                  CALL reject_cell('D19: group candidate solids exceed total mass')
-                  IF (step_failed) EXIT cell_loop
              IF (with_exchange) THEN
                 deposit_candidate=deposit(j,k,1:n_solid)+ &
                      time_step*factor*transfers%solid_deposition_rate
@@ -287,24 +306,11 @@ CONTAINS
              CALL reject_cell('D19: invalid group method')
              IF (step_failed) EXIT cell_loop
           END SELECT
-          ! This is an admissibility check only, not an implicit post-solve clip.
-          IF (.NOT.ALL(ieee_is_finite(q(1:n_eqns,j,k)))) &
-               CALL reject_cell('D19: source group produced non-finite state')
-               IF (step_failed) EXIT cell_loop
-          IF (q(idx_totMassEqn,j,k)<0.0_wp) &
-               CALL reject_cell('D19: negative mixture mass')
-               IF (step_failed) EXIT cell_loop
-          IF (ANY(q(idx_solidEqn_first:idx_solidEqn_last,j,k)<0.0_wp)) &
-               CALL reject_cell('D19: negative solid mass')
-               IF (step_failed) EXIT cell_loop
-          IF (ANY(q(idx_add_gas_first:idx_add_gas_last,j,k)<0.0_wp)) THEN
-             CALL reject_cell('D19: negative additional-gas mass after group')
+          ! Only check admissibility: never clip the accepted source update.
+          IF (.NOT.conservative_mass_admissible(q(1:n_eqns,j,k))) THEN
+             CALL reject_cell('D19: inadmissible conservative source group state')
              EXIT cell_loop
           END IF
-          IF (SUM(q(idx_solidEqn_first:idx_solidEqn_last,j,k))> &
-               q(idx_totMassEqn,j,k)) &
-               CALL reject_cell('D19: source group solids exceed mixture mass')
-               IF (step_failed) EXIT cell_loop
           IF (q(idx_totMassEqn,j,k)>0.0_wp) THEN
              CALL qc_to_qp(q(:,j,k),qp(:,j,k),pressure,TRIM(context),conversion_ok)
              IF (.NOT.conversion_ok) THEN
