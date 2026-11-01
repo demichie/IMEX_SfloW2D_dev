@@ -386,8 +386,7 @@ CONTAINS
 
     ELSE
 
-      WRITE(*,*) 'Constitutive, eval_source_implicit: problem with arguments'
-       STOP
+       CALL fatal_error('eval_source_implicit: provide matching real or complex input/output arguments')
 
     END IF
 
