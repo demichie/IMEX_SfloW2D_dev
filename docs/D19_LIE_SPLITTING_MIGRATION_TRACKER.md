@@ -402,3 +402,9 @@ Limite preciso: questa verifica certifica **solo i sei callsite EXPLICIT e la ca
 - **Chiuso: controllo globale dell'esistenza dei moduli importati.** Il controllo e' stato effettuato su tutti i 64 file, non su un campione. Il tentativo iniziale in una singola chiamata ha superato il limite del connettore ed e' stato sostituito dalla lettura in blocchi.
 - **Non ancora chiuso: confronto esaustivo di ogni simbolo importato con `USE ONLY`, accessibilita' pubblica/privata, renaming, generic, type-bound e di ogni chiamata e funzione indiretta.** Questa distinzione non puo' essere convertita in un esito positivo senza un controllo specifico; i confini Lie/modelli principali hanno gia' verifiche mirate nelle sezioni precedenti.
 - Non eseguite compilazioni, test o workflow, e nessuna modifica a `B_zone`.
+
+### Risoluzione mirata USE ONLY nei moduli Lie centrali (2026-11-01)
+
+- Analizzati `lie_source_executor_2d`, `time_integration_2d`, `source_terms_2d`, `source_registry_2d`, `geometry_2d`, `state_2d`, `state_conversion_2d`, `nonlinear_solver_2d`. Confrontati **67 riferimenti di import `USE ONLY` interni a questo insieme** con i testi dei moduli fornitori della stessa revisione: nessun nome non trovato. La ricerca per presenza testuale del simbolo NON verifica `PRIVATE`/`PUBLIC`, rinomine complesse e generic interface: risultato mirato, non verifica semantica del compilatore.
+- Rimane aperta la certificazione esaustiva dei simboli `USE ONLY` dell'intero repository, delle chiamate indirette e dell'accessibilita' pubblica, in particolare nei moduli non compresi nell'insieme sopra. La compilazione e i test restano differiti secondo accordo.
+- Nessuna modifica a `B_zone`, test, workflow o al codice di produzione.
