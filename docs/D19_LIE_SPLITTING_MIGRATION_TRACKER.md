@@ -191,3 +191,7 @@ Moved `conservative_mass_admissible` from `numerics/lie_source_executor_2d.f90` 
 ### Lie state checks: primitive-state ownership and duplicate removal (2026-11-01)
 
 Added `physical_cell_state_finite` to `state_2d` and routed the Lie source executor's original/predecessor primitive-state check through this state-owned predicate. Removed a duplicated conservative-candidate finite-value check already covered by `conservative_mass_admissible`. Rate finiteness, geometry finiteness, and physical substrate inventory checks remain distinct from state validation. No intermediate build or tests.
+
+### Physical rate limiter ownership (2026-11-01)
+
+Moved the coupled explicit-source rate limiter out of `numerics/lie_source_executor_2d.f90` into `physics/source_terms_2d.f90` as `limit_explicit_source_rates`. The physical assembler determines the single shared scale factor from the post-spatial reference conservative inventory, mass components, remaining carrier, and erodible substrate inventory. The Lie executor only applies that factor to the already assembled source rates and synchronized substrate transaction. No spatial-rate limiter is introduced. State admissibility remains in `state_2d`. No tests/build.

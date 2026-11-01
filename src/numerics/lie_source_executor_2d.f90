@@ -51,6 +51,7 @@ CONTAINS
          begin_topography_rate_update,record_topography_rate_cell, &
          apply_topography_rate_update,deposit,erosion,erodible,B_zone,lava_deposit
     USE source_terms_2d, ONLY : eval_source_explicit,eval_source_analytic, &
+         limit_explicit_source_rates,
          eval_cell_source_explicit,cell_analytic_source_context, &
          analytic_term_context_type
     USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, &
@@ -81,9 +82,8 @@ CONTAINS
     REAL(wp) :: erodible_candidate(n_solid),lava_candidate
     REAL(wp) :: physical_rate(n_eqns),exchange_rate(n_eqns),total_rate(n_eqns)
     REAL(wp) :: analytic_rate(n_eqns),factor,coverage,pressure,source_time,noise
-    REAL(wp) :: remaining_mass,change_in_solid
     LOGICAL :: with_exchange,has_other,ok,failed,bed_accepted,conversion_ok
-    INTEGER :: group_index,cell,j,k,i,solid_eq,status,iterations,linear_info
+    INTEGER :: group_index,cell,j,k,status,iterations,linear_info
 
     CHARACTER(LEN=96) :: context
     CHARACTER(LEN=256) :: failure_reason
@@ -188,32 +188,20 @@ CONTAINS
                      CALL reject_cell('D19: non-finite coupled mass-exchange transfer')
                      IF (step_failed) EXIT cell_loop
              END IF
-             ! One common limiter scales the coupled fluid + substrate transaction.
-             ! It never touches the previously committed spatial FV rate.
-             factor=1.0_wp
-             IF (total_rate(idx_totMassEqn)<0.0_wp) factor=MIN(factor, &
-                  MAX(0.0_wp,q(idx_totMassEqn,j,k)/ &
-                  (-time_step*total_rate(idx_totMassEqn))))
-             DO solid_eq=idx_solidEqn_first,idx_solidEqn_last
-                IF (total_rate(solid_eq)<0.0_wp) factor=MIN(factor, &
-                     MAX(0.0_wp,q(solid_eq,j,k)/(-time_step*total_rate(solid_eq))))
-             END DO
+             ! Source rate limiter is owned by the physical source assembly.
              IF (with_exchange) THEN
-                DO i=1,n_solid
-                   IF (transfers%solid_erosion_rate(i)>0.0_wp) &
-                        factor=MIN(factor,MAX(0.0_wp,erodible(i,j,k)/ &
-                        (time_step*transfers%solid_erosion_rate(i))))
-                END DO
+                CALL limit_explicit_source_rates(q(1:n_eqns,j,k), &
+                     erodible(1:n_solid,j,k),time_step,total_rate, &
+                     transfers%solid_erosion_rate,factor,ok)
+             ELSE
+                CALL limit_explicit_source_rates(q(1:n_eqns,j,k), &
+                     [REAL(wp)::],time_step,total_rate, &
+                     [REAL(wp)::],factor,ok)
              END IF
-             remaining_mass=q(idx_totMassEqn,j,k)- &
-                  SUM(q(idx_solidEqn_first:idx_solidEqn_last,j,k))
-             change_in_solid=SUM(total_rate(idx_solidEqn_first:idx_solidEqn_last)) &
-                  -total_rate(idx_totMassEqn)
-             IF (change_in_solid>0.0_wp) factor=MIN(factor, &
-                  MAX(0.0_wp,remaining_mass/(time_step*change_in_solid)))
-             IF (.NOT.ieee_is_finite(factor) .OR. factor<0.0_wp .OR. factor>1.0_wp) &
-                  CALL reject_cell('D19: invalid Lie source limiter factor')
-                  IF (step_failed) EXIT cell_loop
+             IF (.NOT.ok) THEN
+                CALL reject_cell('D19: invalid physical source limiter')
+                EXIT cell_loop
+             END IF
              ! Stage the entire local fluid/substrate transfer before committing it.
              q_candidate=q(:,j,k)
              q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*factor*total_rate

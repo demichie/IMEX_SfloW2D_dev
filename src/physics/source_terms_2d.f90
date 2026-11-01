@@ -26,6 +26,7 @@ MODULE source_terms_2d
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_source_explicit, eval_cell_source_explicit
+  PUBLIC :: limit_explicit_source_rates
   PUBLIC :: cell_analytic_source_context
   ! Source evaluation is dispatched through one public generic: STAGE
   ! carries injection geometry; STEP carries atomic exchange rates/inventories.
@@ -50,6 +51,45 @@ MODULE source_terms_2d
     REAL(wp) :: grav_coeff=0.0_wp, Zij=0.0_wp
   END TYPE analytic_term_context_type
 CONTAINS
+
+  !> Scale a complete cell-local physical source transaction only after
+  !> assembling all explicit source rates. Reference inventories belong to
+  !> the post-spatial Lie state; group zero rate evaluation stays at q^n.
+  SUBROUTINE limit_explicit_source_rates(q_reference,inventory,dt,rate, &
+       solid_erosion_rate,limiter,valid)
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+    REAL(wp), INTENT(IN) :: q_reference(n_eqns),inventory(:),dt
+    REAL(wp), INTENT(IN) :: rate(n_eqns),solid_erosion_rate(:)
+    REAL(wp), INTENT(OUT) :: limiter
+    LOGICAL, INTENT(OUT) :: valid
+    REAL(wp) :: available_carrier,carrier_consumption
+    INTEGER :: solid_eq,i
+    limiter=1.0_wp
+    valid=.FALSE.
+    IF (.NOT.ALL(ieee_is_finite(q_reference))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(rate))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(inventory))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(solid_erosion_rate))) RETURN
+    IF (.NOT.ieee_is_finite(dt) .OR. dt<=0.0_wp) RETURN
+    IF (SIZE(inventory)/=SIZE(solid_erosion_rate)) RETURN
+    IF (rate(idx_totMassEqn)<0.0_wp) limiter=MIN(limiter, &
+         MAX(0.0_wp,q_reference(idx_totMassEqn)/(-dt*rate(idx_totMassEqn))))
+    DO solid_eq=idx_solidEqn_first,idx_solidEqn_last
+       IF (rate(solid_eq)<0.0_wp) limiter=MIN(limiter, &
+            MAX(0.0_wp,q_reference(solid_eq)/(-dt*rate(solid_eq))))
+    END DO
+    DO i=1,SIZE(inventory)
+       IF (solid_erosion_rate(i)>0.0_wp) limiter=MIN(limiter, &
+            MAX(0.0_wp,inventory(i)/(dt*solid_erosion_rate(i))))
+    END DO
+    available_carrier=q_reference(idx_totMassEqn)- &
+         SUM(q_reference(idx_solidEqn_first:idx_solidEqn_last))
+    carrier_consumption=SUM(rate(idx_solidEqn_first:idx_solidEqn_last))-rate(idx_totMassEqn)
+    IF (carrier_consumption>0.0_wp) limiter=MIN(limiter, &
+         MAX(0.0_wp,available_carrier/(dt*carrier_consumption)))
+    valid=ieee_is_finite(limiter) .AND. limiter>=0.0_wp .AND. limiter<=1.0_wp
+  END SUBROUTINE limit_explicit_source_rates
+
   ! Shared cell adapters: STAGE and STEP use identical physical geometry.
   SUBROUTINE eval_cell_source_explicit(j,k,qp_cell,time,group,rate)
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
