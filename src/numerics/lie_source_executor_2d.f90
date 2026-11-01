@@ -256,14 +256,9 @@ CONTAINS
           END IF
        END IF
        IF (with_exchange) THEN
-          DO cell=1,domain%solve_cells
-             j=group_j(cell)
-             k=group_k(cell)
-             deposit(j,k,1:n_solid)=staged_deposit(:,cell)
-             erosion(j,k,1:n_solid)=staged_erosion(:,cell)
-             erodible(1:n_solid,j,k)=staged_erodible(:,cell)
-             lava_deposit(j,k)=staged_lava(cell)
-          END DO
+          ! Accept the geometric projection before publishing inventory changes.
+          ! A rejected geometric refresh therefore leaves both inventories
+          ! and the conserved/primitive group state unmodified.
           IF (topo_change_flag) THEN
              CALL assign_lie_bed(bed_candidate,bed_accepted)
              IF (.NOT.bed_accepted) THEN
@@ -273,6 +268,14 @@ CONTAINS
              END IF
              DEALLOCATE(bed_rate_vertex,bed_candidate)
           END IF
+          DO cell=1,domain%solve_cells
+             j=group_j(cell)
+             k=group_k(cell)
+             deposit(j,k,1:n_solid)=staged_deposit(:,cell)
+             erosion(j,k,1:n_solid)=staged_erosion(:,cell)
+             erodible(1:n_solid,j,k)=staged_erodible(:,cell)
+             lava_deposit(j,k)=staged_lava(cell)
+          END DO
           DEALLOCATE(group_j,group_k,staged_deposit,staged_erosion, &
                staged_erodible,staged_lava,staged_bed_rate)
        END IF
