@@ -312,7 +312,7 @@ CONTAINS
     ELSE
       RETURN
     END IF
-  END SUBROUTINE eval_source_analytic
+  END SUBROUTINE eval_source_analytic_state
 
 
   !> Recover the rheology directly from a validated group's canonical sources.
