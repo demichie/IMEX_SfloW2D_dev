@@ -22,7 +22,7 @@ MODULE step_source_executor_2d
 
 CONTAINS
 
-  !> \brief Apply and validate a cell's post-IMEX mass-exchange update.
+  !> \brief Apply and validate one atomic cell mass-exchange update.
   !> \details Applies conservative equation sources and material-inventory
   !>          increments for the completed time step, then enforces the
   !>          mass-exchange positivity checks and refreshes the primitive state.
@@ -143,7 +143,7 @@ CONTAINS
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: time_step
     CLASS(domain_type), INTENT(IN) :: domain
-    CLASS(source_registry_type), INTENT(IN), OPTIONAL :: source_registry
+    CLASS(source_registry_type), INTENT(IN) :: source_registry
     REAL(wp), INTENT(IN), OPTIONAL :: stochastic_values(:,:)
     REAL(wp), INTENT(IN), OPTIONAL :: step_start_time
     REAL(wp), INTENT(IN) :: q_original(n_vars,comp_cells_x,comp_cells_y)
@@ -170,9 +170,9 @@ CONTAINS
        IF (ALLOCATED(loss_rate)) liquid_loss_active = loss_rate .GT. 0.0_wp
     END IF
 
-    IF (PRESENT(source_registry)) THEN
+    BLOCK
        IF (.NOT.source_registry%is_initialized()) &
-            CALL fatal_error('D17: post-RK source dispatch requires an initialized registry')
+            CALL fatal_error('D19: Lie source dispatch requires an initialized registry')
        step_groups=source_registry%groups()
        mass_group_count=0
        DO group_index=1,SIZE(step_groups)
@@ -180,7 +180,7 @@ CONTAINS
                mass_group_count=mass_group_count+1
        END DO
        IF (mass_group_count>1) &
-            CALL fatal_error('D17: atomic mass-exchange batch split across step groups')
+            CALL fatal_error('D19: mass-exchange batch split between groups')
        ! The absence of mass exchange does not suppress other STEP groups.
        source_time=0.0_wp
        IF (PRESENT(step_start_time)) source_time=step_start_time
@@ -221,7 +221,7 @@ CONTAINS
                 CALL eval_source_analytic(step_groups(group_index),q(1:n_vars,j,k), &
                      analytic_context,time_step,analytic_rate,analytic_status)
                 IF (analytic_status/=0) &
-                     CALL fatal_error('D18: analytical STEP group solve failed')
+                     CALL fatal_error('D19: analytic group solve failed')
                 q(1:n_vars,j,k)=q(1:n_vars,j,k)+time_step*analytic_rate(1:n_vars)
              ELSE
                 step_noise=0.0_wp
@@ -231,18 +231,23 @@ CONTAINS
                      B_prime_x_geom(j,k),B_prime_y_geom(j,k),step_noise, &
                      newton_iterations,newton_converged,newton_info,newton_search_failed)
                 IF (.NOT.newton_converged .OR. newton_info/=0 .OR. newton_search_failed) &
-                     CALL fatal_error('D18: Newton STEP group solve failed')
+                     CALL fatal_error('D19: Newton group solve failed')
              END IF
-             CALL qc_to_qp(q(1:n_vars,j,k),qp(1:n_vars+2,j,k),p_dyn, &
-                  'analytic STEP source')
+             ! Post-group admissibility; never project an accepted implicit state.
+             IF (.NOT.ALL(q(1:n_eqns,j,k)==q(1:n_eqns,j,k))) &
+                  CALL fatal_error('D19: non-finite conservative source state')
+             IF (q(idx_totMassEqn,j,k)<0.0_wp) &
+                  CALL fatal_error('D19: negative mass after Lie source group')
+             IF (q(idx_totMassEqn,j,k)>0.0_wp) THEN
+                CALL qc_to_qp(q(1:n_vars,j,k),qp(1:n_vars+2,j,k),p_dyn, &
+                     'Lie group output')
+             ELSE
+                CALL initialize_dry_physical_cell(qp(:,j,k))
+             END IF
           END DO
        END DO
        CALL step_partition%finalize()
-       RETURN
-    END IF
-
-    ! Preserve direct legacy calls without a registry.
-    CALL execute_mass_exchange_transaction()
+    END BLOCK
 
   CONTAINS
 
