@@ -28,6 +28,7 @@ MODULE state_2d
   PUBLIC :: finalize_imex_cell_state
   PUBLIC :: initialize_dry_physical_cell
   PUBLIC :: conservative_mass_admissible
+  PUBLIC :: physical_cell_state_finite
 
   !> \brief Owned cell states and diagnostics for one simulation.
   !> \details State arrays use (component,x-cell,y-cell); diagnostic maps use
@@ -58,6 +59,12 @@ MODULE state_2d
      LOGICAL, ALLOCATABLE :: vuln_table(:,:,:)
 
    CONTAINS
+
+  !> Validate a primitive cell state without changing it.
+  PURE LOGICAL FUNCTION physical_cell_state_finite(qp_cell) RESULT(valid)
+    REAL(wp), INTENT(IN) :: qp_cell(:)
+    valid=ALL(ieee_is_finite(qp_cell))
+  END FUNCTION physical_cell_state_finite
 
   !> Check finite conservative mass budgets without modifying the state.
   PURE LOGICAL FUNCTION conservative_mass_admissible(q_cell) RESULT(valid)

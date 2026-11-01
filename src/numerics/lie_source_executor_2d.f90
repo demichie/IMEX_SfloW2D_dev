@@ -57,7 +57,8 @@ CONTAINS
          SOURCE_METHOD_NEWTON
     USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
     USE state_conversion_2d, ONLY : qc_to_qp
-    USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible
+    USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible, &
+         physical_cell_state_finite
     USE parameters_2d, ONLY : topo_change_flag,bottom_radial_source_flag, &
          bottom_fissural_source_flag
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
@@ -126,7 +127,7 @@ CONTAINS
 
           ! Validate constitutive inputs before dispatch. Model/method errors
           ! remain configuration errors, not recoverable timestep rejections.
-          IF (.NOT.ALL(ieee_is_finite(qpentry)) .OR. &
+          IF (.NOT.physical_cell_state_finite(qpentry) .OR. &
                .NOT.ieee_is_finite(noise)) THEN
              CALL reject_cell('D19: non-finite source-group physical input')
              EXIT cell_loop
@@ -216,9 +217,6 @@ CONTAINS
              ! Stage the entire local fluid/substrate transfer before committing it.
              q_candidate=q(:,j,k)
              q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*factor*total_rate
-             IF (.NOT.ALL(ieee_is_finite(q_candidate(1:n_eqns)))) &
-                  CALL reject_cell('D19: non-finite explicit group candidate')
-                  IF (step_failed) EXIT cell_loop
              IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
                 CALL reject_cell('D19: inadmissible conservative mass candidate')
                 EXIT cell_loop

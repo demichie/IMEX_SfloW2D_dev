@@ -187,3 +187,7 @@ In `lie_source_executor_2d.f90`, consolidated source-only conservative-mass admi
 ### State-validation ownership (2026-11-01)
 
 Moved `conservative_mass_admissible` from `numerics/lie_source_executor_2d.f90` to the public state API in `state/state_2d.f90`. Both the Lie spatial-only admissibility check in `time_integration_2d.f90` and source-group candidate/post-group checks invoke the same side-effect-free state predicate. Numerical orchestration no longer embeds the conservative mass-budget validity policy. No rate limiting or clipping was introduced for the spatial update. Build/tests intentionally deferred.
+
+### Lie state checks: primitive-state ownership and duplicate removal (2026-11-01)
+
+Added `physical_cell_state_finite` to `state_2d` and routed the Lie source executor's original/predecessor primitive-state check through this state-owned predicate. Removed a duplicated conservative-candidate finite-value check already covered by `conservative_mass_admissible`. Rate finiteness, geometry finiteness, and physical substrate inventory checks remain distinct from state validation. No intermediate build or tests.
