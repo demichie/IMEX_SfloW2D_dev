@@ -1,7 +1,7 @@
 # D19 — Architettura Lie definitiva e stato della migrazione
 
 **Branch di lavoro:** `master`  
-**Stato:** revisione architetturale dei percorsi Lie principali conclusa; verifica esaustiva di firme/rami Fortran e validazione eseguibile ancora aperte.  
+**Stato (2026-11-01):** revisione statica architetturale dei percorsi Lie di produzione conclusa. Validazione semantica esaustiva con compilatore e regressioni NON eseguite; il successivo gate e' la compilazione finale, non ulteriori micro-audit documentali.  
 **Ultima revisione:** 2026-11-01  
 **Scopo:** questo è il riferimento operativo unico per l'architettura desiderata, lo stato verificabile dell'implementazione e i lavori ancora necessari. Le sezioni descrivono esclusivamente il progetto finale: non contengono versioni storiche o regole alternative.
 
@@ -443,3 +443,16 @@ Dopo la correzione dei gate `rheology_flag`, eliminati anche i doppi gate `therm
 ### Eliminazione del doppio gate della curvatura (2026-11-01)
 
 La routine `eval_geometry_cell_source_explicit` seleziona ora `geometry_curvature` direttamente dalla membership nel gruppo Lie, senza subordinare l'esecuzione anche a `curvature_term_flag`. L'attivazione del termine resta nella configurazione; il dispatcher mantiene la condizione di profondita' `r_h>dry_thickness_tolerance` e la valutazione della curvatura dal campo geometrico corrente. Questo completa l'allineamento dei selettori EXPLICIT reologia/termica/curvatura e ANALYTIC reologia/termica/pressione di poro al registry, senza intervenire su topografia o `B_zone`. Non eseguite compilazioni, test o workflow.
+
+## Chiusura della revisione statica architetturale (2026-11-01)
+
+**Decisione di fase:** conclusa la revisione statica mirata all'architettura Lie di produzione; per questo perimetro non rimangono modifiche confermate in attesa. L'audit non costituisce una prova esaustiva della correttezza semantica Fortran o numerica: tali garanzie richiedono compilazione e regressioni successive. Le precedenti checklist aperte restano come storico delle verifiche approfondite, non come richiesta di ripetere indefinitamente micro-audit documentali.
+
+**Evidenza di chiusura:**
+
+1. `advance_lie` evolve prima il solo contributo spaziale e verifica l'ammissibilita' senza limiter sui rate spaziali; `q_before/qp_before` preservano lo stato precedente per la valutazione delle sorgenti del gruppo 0.
+2. `execute_lie_source_groups` esegue i gruppi in ordine, costruisce i candidati locali prima di pubblicarli e per gli scambi di massa convalida inventari e geometria; l'integratore detiene gli snapshot e ripristina inventari e geometria su errore.
+3. `source_configuration_2d` costruisce i gruppi dai flag/configurazione; il registry valida il metodo e la membership. I dispatcher reologico, termico, Darcy e della curvatura sono stati corretti per non ignorare sorgenti selezionate a causa di un secondo gate globale.
+4. Confrontate le interfacce dei modelli fisici, le 36 chiamate reologiche, le interfacce Lie/stato/geometria e le dichiarazioni dei moduli importati nei 64 file `src/*.f90` (ricorsivi); effettuati ulteriori controlli mirati di `USE ONLY`, visibilita' pubblica e type-bound.
+
+**Gate successivo, separato:** compilare il codice finale e correggere gli errori di integrazione, quindi eseguire test Lie e regressioni. Non avviati in questa fase per decisione concordata. Non si dichiara riuscita alcuna prova eseguibile e non si afferma una verifica meccanica completa di ogni singola chiamata Fortran; eventuali problemi trovati dalla compilazione appartengono alla fase successiva. Nessuna modifica a `B_zone`, CI o test durante questa chiusura.
