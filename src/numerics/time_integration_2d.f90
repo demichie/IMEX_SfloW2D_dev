@@ -2,7 +2,8 @@
 MODULE time_integration_2d
   USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_solidEqn_first,idx_solidEqn_last, &
        idx_totMassEqn
-  USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
+  USE geometry_2d, ONLY : comp_cells_x,comp_cells_y, &
+       begin_lie_geometry_transaction,commit_lie_geometry_transaction
   USE state_conversion_2d, ONLY : qc_to_qp
   USE state_2d, ONLY : initialize_dry_physical_cell
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
@@ -89,11 +90,15 @@ CONTAINS
     END DO
     ! GROUP-0 source rates use immutable q^n/qp^n, while applying to post-spatial q.
     ! Later groups evaluate from each predecessor's updated state.
+    ! The groups may update live geometry for successor groups; retain the
+    ! pre-step authoritative fields until the complete Lie sweep succeeds.
+    CALL begin_lie_geometry_transaction
     CALL execute_lie_source_groups(this%q_trial,this%qp_trial,dt,domain, &
          source_registry,Z,t,this%q_before,this%qp_before)
     ! Publish the accepted fluid fields only after all Lie source groups return.
     ! Geometry and substrate still require separate transactional ownership.
     q=this%q_trial
     qp=this%qp_trial
+    CALL commit_lie_geometry_transaction
   END SUBROUTINE
 END MODULE time_integration_2d

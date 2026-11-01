@@ -24,6 +24,16 @@ MODULE geometry_2d
 
   PUBLIC :: begin_topography_rate_update, record_topography_rate_cell
   PUBLIC :: apply_topography_rate_update, release_topography_workspace
+  PUBLIC :: begin_lie_geometry_transaction, commit_lie_geometry_transaction
+  PUBLIC :: rollback_lie_geometry_transaction
+
+  ! Saved authoritative fields for a recoverable Lie step. Derived geometry is
+  ! reconstructed on rollback, so later groups still see intermediate bed updates.
+  LOGICAL, PRIVATE :: lie_geometry_transaction_active=.FALSE.
+  REAL(wp), ALLOCATABLE, PRIVATE :: lie_bed_before(:,:),lie_deposit_before(:,:,:)
+  REAL(wp), ALLOCATABLE, PRIVATE :: lie_erosion_before(:,:,:)
+  REAL(wp), ALLOCATABLE, PRIVATE :: lie_erodible_before(:,:,:)
+  REAL(wp), ALLOCATABLE, PRIVATE :: lie_lava_before(:,:)
 
   !> Location of the centers (x) of the control volume of the domain
   REAL(wp), ALLOCATABLE :: x_comp(:)
@@ -473,6 +483,50 @@ CONTAINS
   !> \note Reads the current B_vertex and grid spacing. Updates all derived elevations, fitted
   !>       slopes/curvatures and centre/face gravity coefficients.
   !******************************************************************************
+
+  !> Save authoritative geometry and substrate inventories before Lie groups.
+  SUBROUTINE begin_lie_geometry_transaction
+    IF (lie_geometry_transaction_active) &
+         ERROR STOP 'nested Lie geometry transaction'
+    IF (.NOT.ALLOCATED(B_vertex) .OR. .NOT.ALLOCATED(deposit) .OR. &
+         .NOT.ALLOCATED(erosion) .OR. .NOT.ALLOCATED(erodible) .OR. &
+         .NOT.ALLOCATED(lava_deposit)) &
+         ERROR STOP 'Lie geometry transaction started before initialization'
+    lie_bed_before=B_vertex
+    lie_deposit_before=deposit
+    lie_erosion_before=erosion
+    lie_erodible_before=erodible
+    lie_lava_before=lava_deposit
+    lie_geometry_transaction_active=.TRUE.
+  END SUBROUTINE begin_lie_geometry_transaction
+
+  !> Accept all intermediate geometry and inventory updates of the Lie step.
+  SUBROUTINE commit_lie_geometry_transaction
+    IF (.NOT.lie_geometry_transaction_active) &
+         ERROR STOP 'no Lie geometry transaction to commit'
+    CALL clear_lie_geometry_transaction
+  END SUBROUTINE commit_lie_geometry_transaction
+
+  !> Restore the pre-step geometry and inventories on recoverable rejection.
+  SUBROUTINE rollback_lie_geometry_transaction
+    IF (.NOT.lie_geometry_transaction_active) RETURN
+    B_vertex=lie_bed_before
+    deposit=lie_deposit_before
+    erosion=lie_erosion_before
+    erodible=lie_erodible_before
+    lava_deposit=lie_lava_before
+    CALL refresh_topography_geometry
+    CALL clear_lie_geometry_transaction
+  END SUBROUTINE rollback_lie_geometry_transaction
+
+  SUBROUTINE clear_lie_geometry_transaction
+    IF (ALLOCATED(lie_bed_before)) DEALLOCATE(lie_bed_before)
+    IF (ALLOCATED(lie_deposit_before)) DEALLOCATE(lie_deposit_before)
+    IF (ALLOCATED(lie_erosion_before)) DEALLOCATE(lie_erosion_before)
+    IF (ALLOCATED(lie_erodible_before)) DEALLOCATE(lie_erodible_before)
+    IF (ALLOCATED(lie_lava_before)) DEALLOCATE(lie_lava_before)
+    lie_geometry_transaction_active=.FALSE.
+  END SUBROUTINE clear_lie_geometry_transaction
 
   SUBROUTINE refresh_topography_geometry
 
