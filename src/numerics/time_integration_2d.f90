@@ -17,6 +17,7 @@ MODULE time_integration_2d
   TYPE :: time_integration_workspace_type
     REAL(wp), ALLOCATABLE :: spatial_rate(:,:,:)
     REAL(wp), ALLOCATABLE :: q_before(:,:,:), qp_before(:,:,:)
+    REAL(wp), ALLOCATABLE :: q_trial(:,:,:), qp_trial(:,:,:)
   CONTAINS
     PROCEDURE :: initialize => initialize_time_integration
     PROCEDURE :: finalize => finalize_time_integration
@@ -28,12 +29,16 @@ CONTAINS
     ALLOCATE(this%spatial_rate(n_eqns,comp_cells_x,comp_cells_y))
     ALLOCATE(this%q_before(n_vars,comp_cells_x,comp_cells_y))
     ALLOCATE(this%qp_before(n_vars+2,comp_cells_x,comp_cells_y))
+    ALLOCATE(this%q_trial(n_vars,comp_cells_x,comp_cells_y))
+    ALLOCATE(this%qp_trial(n_vars+2,comp_cells_x,comp_cells_y))
   END SUBROUTINE
   SUBROUTINE finalize_time_integration(this)
     CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
     IF (ALLOCATED(this%spatial_rate)) DEALLOCATE(this%spatial_rate)
     IF (ALLOCATED(this%q_before)) DEALLOCATE(this%q_before)
     IF (ALLOCATED(this%qp_before)) DEALLOCATE(this%qp_before)
+    IF (ALLOCATED(this%q_trial)) DEALLOCATE(this%q_trial)
+    IF (ALLOCATED(this%qp_trial)) DEALLOCATE(this%qp_trial)
   END SUBROUTINE
   SUBROUTINE advance_lie(this,q,qp,t,dt,Z,source_registry,domain,spatial_operator)
     CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
@@ -48,6 +53,8 @@ CONTAINS
     IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
     this%q_before=q
     this%qp_before=qp
+    this%q_trial=q
+    this%qp_trial=qp
     ! Reconstruct a defined primitive halo from the conserved pre-step state.
     DO l=1,domain%reconstruction_cells
       j=domain%j_reconstruction(l)
@@ -63,26 +70,30 @@ CONTAINS
     DO l=1,domain%solve_cells
       j=domain%j_cent(l)
       k=domain%k_cent(l)
-      q(1:n_eqns,j,k)=this%q_before(1:n_eqns,j,k)-dt*this%spatial_rate(:,j,k)
+      this%q_trial(1:n_eqns,j,k)=this%q_before(1:n_eqns,j,k)-dt*this%spatial_rate(:,j,k)
       ! Spatial admissibility check. Do not limit or clip its conservative rate.
-      IF (.NOT.ALL(ieee_is_finite(q(1:n_eqns,j,k)))) &
+      IF (.NOT.ALL(ieee_is_finite(this%q_trial(1:n_eqns,j,k)))) &
            CALL fatal_error('Lie spatial update produced non-finite state')
-      IF (q(idx_totMassEqn,j,k)<0.0_wp) &
+      IF (this%q_trial(idx_totMassEqn,j,k)<0.0_wp) &
            CALL fatal_error('Lie spatial update: negative mass')
-      IF (ANY(q(idx_solidEqn_first:idx_solidEqn_last,j,k)<0.0_wp)) &
+      IF (ANY(this%q_trial(idx_solidEqn_first:idx_solidEqn_last,j,k)<0.0_wp)) &
            CALL fatal_error('Lie spatial update: negative solid mass')
-      IF (SUM(q(idx_solidEqn_first:idx_solidEqn_last,j,k))> &
-           q(idx_totMassEqn,j,k)) &
+      IF (SUM(this%q_trial(idx_solidEqn_first:idx_solidEqn_last,j,k))> &
+           this%q_trial(idx_totMassEqn,j,k)) &
            CALL fatal_error('Lie spatial update: solids exceed total mass')
-      IF (q(idx_totMassEqn,j,k)>0.0_wp) THEN
-        CALL qc_to_qp(q(:,j,k),qp(:,j,k),pd,'Lie spatial update')
+      IF (this%q_trial(idx_totMassEqn,j,k)>0.0_wp) THEN
+        CALL qc_to_qp(this%q_trial(:,j,k),this%qp_trial(:,j,k),pd,'Lie spatial update')
       ELSE
-        CALL initialize_dry_physical_cell(qp(:,j,k))
+        CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))
       END IF
     END DO
     ! GROUP-0 source rates use immutable q^n/qp^n, while applying to post-spatial q.
     ! Later groups evaluate from each predecessor's updated state.
-    CALL execute_lie_source_groups(q,qp,dt,domain,source_registry,Z,t, &
-         this%q_before,this%qp_before)
+    CALL execute_lie_source_groups(this%q_trial,this%qp_trial,dt,domain, &
+         source_registry,Z,t,this%q_before,this%qp_before)
+    ! Publish the accepted fluid fields only after all Lie source groups return.
+    ! Geometry and substrate still require separate transactional ownership.
+    q=this%q_trial
+    qp=this%qp_trial
   END SUBROUTINE
 END MODULE time_integration_2d
