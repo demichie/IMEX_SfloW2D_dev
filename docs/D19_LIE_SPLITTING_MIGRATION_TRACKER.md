@@ -293,3 +293,9 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Consolidata la separazione tra condizione al contorno laterale e sorgenti volumetrici: rimosso `boundary_injection` da `source_catalog_2d%SOURCE_CATALOG`, ora di 23 sorgenti. Il modulo fisico `mass_boundary_injection_2d` resta utilizzato direttamente da `reconstruction_2d` per le tracce alle interfacce.
 - Il registro Lie non puo' ora piu' accettare un gruppo fittizio `boundary_injection` tramite il catalogo. Eliminato anche un commento sul vecchio concetto di cadence STAGE/STEP. La configurazione del bordo rimane esclusivamente spaziale.
 - Nessuna modifica ai test, nessuna compilazione o Action. I controlli di firma e i restanti percorsi fisici non sono ancora dichiarati esaustivamente conclusi.
+
+### Coerenza della geometria dinamica e delle zone connesse (2026-11-01)
+
+- Rilevato che `B_zone`, utilizzato anche dallo scambio di massa, era calcolato solo all'inizializzazione: dopo un aggiornamento Lie della topografia i gruppi seguenti potevano leggere nuove quote e vecchie zone.
+- La ricostruzione geometrica aggiorna adesso le zone quando la vaporizzazione e' attiva e la mappa e' allocata. `topography_zones` azzera la mappa prima di ricalcolare le zone connesse; l'inizializzazione resta valida.
+- Snapshot e rollback geometrico includono ora anche `B_zone`; `assign_topography_vertices` ripristina le zone dopo un rigetto. Non eseguiti test, compilazione o Action. Rimane da esaminare il limite storico delle 1000 zone nella routine.
