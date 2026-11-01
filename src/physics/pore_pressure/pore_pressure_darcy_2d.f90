@@ -30,7 +30,10 @@ MODULE pore_pressure_darcy_2d
 
 CONTAINS
 
-    !> Unsupported methods are deliberate errors, never zero-valued sources.
+    !> @brief Reject the unsupported explicit Darcy pressure treatment.
+  !> @param[in] state Local real physical cell state.
+  !> @param[out] rate Conservative source rate, unused before failure.
+  !> @param[in] include_gas_loss Optional interstitial gas-loss selection.
     SUBROUTINE eval_pore_pressure_darcy_explicit(state,rate,include_gas_loss)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
@@ -38,14 +41,22 @@ CONTAINS
         CALL fatal_error('Darcy pore pressure supports ANALYTIC/STEP only (EXPLICIT unavailable)')
     END SUBROUTINE eval_pore_pressure_darcy_explicit
 
-    SUBROUTINE eval_pore_pressure_darcy_semi_implicit(state,rate,include_gas_loss)
+    !> @brief Reject the unsupported semi-implicit Darcy treatment.
+  !> @param[in] state Local real physical cell state.
+  !> @param[out] rate Conservative source rate, unused before failure.
+  !> @param[in] include_gas_loss Optional interstitial gas-loss selection.
+  SUBROUTINE eval_pore_pressure_darcy_semi_implicit(state,rate,include_gas_loss)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
         CALL fatal_error('Darcy pore pressure supports ANALYTIC/STEP only (SEMI_IMPLICIT unavailable)')
     END SUBROUTINE eval_pore_pressure_darcy_semi_implicit
 
-    SUBROUTINE eval_pore_pressure_darcy_implicit(state,rate,include_gas_loss)
+    !> @brief Reject the unsupported Newton Darcy treatment.
+  !> @param[in] state Local complex physical cell state.
+  !> @param[out] rate Complex conservative rate, unused before failure.
+  !> @param[in] include_gas_loss Optional interstitial gas-loss selection.
+  SUBROUTINE eval_pore_pressure_darcy_implicit(state,rate,include_gas_loss)
         TYPE(complex_physical_state_type), INTENT(IN) :: state
         COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
         LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss

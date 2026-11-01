@@ -1,4 +1,4 @@
-!> Radiative and convective cooling source model and exact integrator.
+!> @brief Radiative and convective cooling source model with exact integration.
 MODULE thermal_cooling_2d
     USE parameters_2d, ONLY : wp
     USE diagnostics_2d, ONLY : fatal_error
@@ -10,6 +10,12 @@ MODULE thermal_cooling_2d
     PUBLIC :: eval_thermal_cooling_implicit, eval_thermal_cooling_analytic
 CONTAINS
 
+    !> @brief Evaluate radiative and convective energy cooling in real arithmetic.
+    !> @param[in] state Local real physical state.
+    !> @param[in] radiative Radiative cooling coefficient.
+    !> @param[in] convective Convective cooling coefficient.
+    !> @param[in] ambient Ambient temperature [K].
+    !> @param[out] rate Thermal source rate.
     SUBROUTINE eval_thermal_cooling_explicit(state,radiative,convective,ambient,rate)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: radiative,convective,ambient
@@ -18,6 +24,9 @@ CONTAINS
     END SUBROUTINE eval_thermal_cooling_explicit
 
 
+    !> @brief Return the zero semi-implicit component of the cooling model.
+    !> @param[in] state Local real physical state.
+    !> @param[out] rate Zero thermal semi-implicit rate.
     SUBROUTINE eval_thermal_cooling_semi_implicit(state,rate)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(OUT) :: rate
@@ -25,6 +34,12 @@ CONTAINS
     END SUBROUTINE eval_thermal_cooling_semi_implicit
 
 
+    !> @brief Evaluate differentiable complex radiative and convective cooling.
+    !> @param[in] state Local complex physical state.
+    !> @param[in] radiative Radiative cooling coefficient.
+    !> @param[in] convective Convective cooling coefficient.
+    !> @param[in] ambient Ambient temperature [K].
+    !> @param[out] rate Complex thermal source rate.
     SUBROUTINE eval_thermal_cooling_implicit(state,radiative,convective,ambient,rate)
         TYPE(complex_physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: radiative,convective,ambient
@@ -33,6 +48,14 @@ CONTAINS
     END SUBROUTINE eval_thermal_cooling_implicit
 
 
+    !> @brief Advance temperature under frozen-coefficient exact cooling.
+    !> @param[in] state Local frozen real physical state.
+    !> @param[in] interval Nonnegative cooling interval [s].
+    !> @param[in] heat_capacity Positive mixture thermal capacity.
+    !> @param[in] radiative Nonnegative radiative cooling coefficient.
+    !> @param[in] convective Nonnegative convective cooling coefficient.
+    !> @param[in] ambient Positive ambient temperature [K].
+    !> @param[out] temperature_after Temperature following cooling interval [K].
     SUBROUTINE eval_thermal_cooling_analytic(state,interval,heat_capacity, &
             radiative,convective,ambient,temperature_after)
         TYPE(physical_state_type), INTENT(IN) :: state

@@ -28,6 +28,16 @@ MODULE mass_exchange_2d
 
 CONTAINS
 
+        !> @brief Assemble explicit cell-local exchange rates with shared inventory limiters.
+        !> @details The coordinator preserves the four-treatment contract;
+        !>          unsupported treatments terminate with a diagnostic.
+        !> @param[in] physical_state Local frozen physical state.
+        !> @param[in] B_zone Substrate zone selecting eligible processes.
+        !> @param[in] erodible Available erodible solid thickness by class.
+        !> @param[in] dt Positive source integration interval [s].
+        !> @param[in] selected_names Canonical selected mass-exchange process names.
+        !> @param[in,out] total_rates Aggregated substrate and carrier exchange rates.
+        !> @param[out] eqns_term Conservative source vector [equations/s].
         SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,erodible,dt,selected_names,total_rates,eqns_term)
 
             TYPE(physical_state_type), INTENT(IN) :: physical_state
@@ -132,6 +142,12 @@ CONTAINS
 
 
         !> This family currently supports only explicit coordination.
+        !> @brief Reject unsupported semi-implicit mass-exchange scheduling.
+        !> @details The coordinator preserves the four-treatment contract;
+        !>          unsupported treatments terminate with a diagnostic.
+        !> @param[in] state Local real physical state.
+        !> @param[in,out] total_rates Reset mass exchange rates before reporting error.
+        !> @param[out] eqns_term Zero-initialized conservative rate before reporting error.
         SUBROUTINE eval_mass_exchange_semi_implicit(state,total_rates,eqns_term)
             TYPE(physical_state_type), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
@@ -141,6 +157,12 @@ CONTAINS
             CALL fatal_error('mass_exchange: semi-implicit coordination is unsupported')
         END SUBROUTINE eval_mass_exchange_semi_implicit
 
+        !> @brief Reject unsupported Newton mass-exchange scheduling.
+        !> @details The coordinator preserves the four-treatment contract;
+        !>          unsupported treatments terminate with a diagnostic.
+        !> @param[in] state Local complex physical state.
+        !> @param[in,out] total_rates Reset mass exchange rates before reporting error.
+        !> @param[out] eqns_term Zero-initialized complex conservative rate before reporting error.
         SUBROUTINE eval_mass_exchange_implicit(state,total_rates,eqns_term)
             TYPE(complex_physical_state_type), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
@@ -150,6 +172,12 @@ CONTAINS
             CALL fatal_error('mass_exchange: implicit coordination is unsupported')
         END SUBROUTINE eval_mass_exchange_implicit
 
+        !> @brief Reject unsupported analytic mass-exchange scheduling.
+        !> @details The coordinator preserves the four-treatment contract;
+        !>          unsupported treatments terminate with a diagnostic.
+        !> @param[in] state Local real physical state.
+        !> @param[in,out] total_rates Reset mass exchange rates before reporting error.
+        !> @param[out] eqns_term Zero-initialized conservative rate before reporting error.
         SUBROUTINE solve_mass_exchange_analytic(state,total_rates,eqns_term)
             TYPE(physical_state_type), INTENT(IN) :: state
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
