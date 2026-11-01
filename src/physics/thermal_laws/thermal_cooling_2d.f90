@@ -172,13 +172,13 @@ CONTAINS
                 MAX(temperature, temperature_after))
         END IF
 
-        END SUBROUTINE eval_thermal_cooling_analytic
+    END SUBROUTINE eval_thermal_cooling_analytic
 
-
-
-
-
-SUBROUTINE lava_cooling_cubic_root(beta, root)
+    !> @brief Find the negative cubic root needed by the exact cooling integral.
+    !> @details Uses bracketed bisection and fails explicitly on nonconvergence.
+    !> @param[in] beta Nondimensional positive cooling-law ratio.
+    !> @param[out] root Selected negative root of the cooling cubic.
+    SUBROUTINE lava_cooling_cubic_root(beta, root)
 
         REAL(wp), INTENT(IN) :: beta
         REAL(wp), INTENT(OUT) :: root
@@ -212,7 +212,12 @@ SUBROUTINE lava_cooling_cubic_root(beta, root)
 
     END SUBROUTINE lava_cooling_cubic_root
 
-PURE FUNCTION lava_cooling_time_primitive(x, beta, cubic_root) RESULT(value)
+    !> @brief Evaluate the exact cooling-time integral primitive.
+    !> @param[in] x Dimensionless temperature ratio.
+    !> @param[in] beta Nondimensional coefficient of convective cooling.
+    !> @param[in] cubic_root Negative root of the integral cubic.
+    !> @return Integral primitive evaluated at the supplied temperature ratio.
+    PURE FUNCTION lava_cooling_time_primitive(x, beta, cubic_root) RESULT(value)
 
         REAL(wp), INTENT(IN) :: x, beta, cubic_root
         REAL(wp) :: value
