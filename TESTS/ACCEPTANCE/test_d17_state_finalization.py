@@ -13,7 +13,7 @@ def load(path):
 def body(text, name):
     match = re.search(
         rf"(?is)\bsubroutine\s+{re.escape(name)}\s*\(.*?\n(.*?)"
-        rf"\bend\s+subroutine\s+{re.escape(name)}\b", text)
+        rf"\bend\s+subroutine(?:\s+{re.escape(name)})?\b", text)
     assert match, f"missing routine {name}"
     return match.group(1)
 
