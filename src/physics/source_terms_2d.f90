@@ -248,40 +248,40 @@ CONTAINS
                 RETURN
             END IF
             q_after(2:3)=q_before(1)*velocity_after
-        status=0
+            status=0
 
         ELSE IF (selected_model_name=='thermal_cooling') THEN
-        CALL real_physical_state_from_q(q_before, physical_state, &
-                context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
-                context%Bsecond_xy,context%Bsecond_yy)
-        IF (physical_state%T<=0.0_wp) THEN
-            status=-3
-            RETURN
-        END IF
-        heat_capacity=q_before(4)/physical_state%T
-        CALL eval_thermal_analytic(['thermal_cooling'],physical_state,interval, &
-                heat_capacity,radiative_term_coeff,convective_term_coeff, &
-                T_env,temperature_after)
-        q_after(4)=heat_capacity*temperature_after
-        status=0
-
-        ELSE IF (selected_model_name=='pore_pressure_dissipation') THEN
-        IF (q_before(1)>0.0_wp) THEN
-
             CALL real_physical_state_from_q(q_before, physical_state, &
-                context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
-                context%Bsecond_xy,context%Bsecond_yy)
-            CALL eval_pore_pressure_analytic(['pore_pressure_darcy'], &
-                    physical_state,q_before(1:n_eqns),interval,pore_rate,pore_ok)
-            IF (.NOT.pore_ok) THEN
-                status=-9
+                    context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
+                    context%Bsecond_xy,context%Bsecond_yy)
+            IF (physical_state%T<=0.0_wp) THEN
+                status=-3
                 RETURN
             END IF
-            q_after(1:n_eqns)=q_before(1:n_eqns)+interval*pore_rate
-        END IF
-        status=0
+            heat_capacity=q_before(4)/physical_state%T
+            CALL eval_thermal_analytic(['thermal_cooling'],physical_state,interval, &
+                    heat_capacity,radiative_term_coeff,convective_term_coeff, &
+                    T_env,temperature_after)
+            q_after(4)=heat_capacity*temperature_after
+            status=0
+
+        ELSE IF (selected_model_name=='pore_pressure_dissipation') THEN
+            IF (q_before(1)>0.0_wp) THEN
+
+                CALL real_physical_state_from_q(q_before, physical_state, &
+                    context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
+                    context%Bsecond_xy,context%Bsecond_yy)
+                CALL eval_pore_pressure_analytic(['pore_pressure_darcy'], &
+                        physical_state,q_before(1:n_eqns),interval,pore_rate,pore_ok)
+                IF (.NOT.pore_ok) THEN
+                    status=-9
+                    RETURN
+                END IF
+                q_after(1:n_eqns)=q_before(1:n_eqns)+interval*pore_rate
+            END IF
+            status=0
         ELSE
-        RETURN
+            RETURN
         END IF
     END SUBROUTINE eval_source_analytic_state
 
