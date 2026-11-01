@@ -85,7 +85,7 @@ CONTAINS
     TYPE(source_term_type) :: term
     CHARACTER(LEN=64), ALLOCATABLE :: names(:)
     CHARACTER(LEN=16) :: requested_method
-    INTEGER :: i,j,k,id,method,target,pore,n,affected_idx
+    INTEGER :: i,j,k,id,method,pore,n,affected_idx
     INTEGER, ALLOCATABLE :: affected(:)
     CALL collect_active_source_names(thermal_cooling_flag,names,error)
     IF (LEN_TRIM(error)>0) RETURN
@@ -107,20 +107,16 @@ CONTAINS
             'rheology_lahar','rheology_empirical','rheology_quadratic', &
             'rheology_froude','rheology_lucas','rheology_mui', &
             'rheology_mui_voellmy','rheology_newmodel')
-        target=1
         requested_method=rheology_method
         id=rheology_group
       CASE('thermal_cooling')
-        target=2
         requested_method=thermal_method
         id=thermal_group
       CASE('pore_pressure_dissipation')
-        target=3
         requested_method=pore_pressure_method
         id=pore_pressure_group
       CASE('bottom_circular_injection','bottom_fissural_injection', &
             'radial_injection','geometry_curvature','boundary_injection')
-        target=0
         SELECT CASE(TRIM(active_names(1)))
         CASE('bottom_circular_injection')
           requested_method=bottom_circular_method
@@ -142,11 +138,9 @@ CONTAINS
             'mass_exchange_deposition','mass_exchange_carrier_liquid_loss', &
             'mass_exchange_entrainment', &
             'mass_exchange_vaporization')
-        target=-1
         requested_method=mass_exchange_method
         id=mass_exchange_group
       CASE DEFAULT
-        target=0
       END SELECT
       END BLOCK
       SELECT CASE(TRIM(requested_method))
