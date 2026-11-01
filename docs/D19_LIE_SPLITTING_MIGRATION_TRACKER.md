@@ -1,6 +1,6 @@
 # D19 — Lie splitting migration: implementation guide and live tracker
 
-**Status:** PLANNED — no Fortran implementation claimed.
+**Status:** IN PROGRESS — migration is not yet operational.
 **Branch:** `master`
 **Companion architecture:** [D18](D18_IMEX_RK_SOURCE_ARCHITECTURE_PRINCIPLES.md). D18 describes the numerical contract; **D19 tracks the implementation**, file-by-file changes, dependencies, evidence, and remaining work.
 **Last reviewed:** 2026-11-01
@@ -52,7 +52,7 @@ Use statuses `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Add date, commit and test
 | ID | Phase / deliverable | Status | Evidence / dependencies |
 | --- | --- | --- | --- |
 | L00 | Baseline: record build/CI result and search all callers/namelists/restarts/tests for RK, STAGE, STEP and CADENCE | TODO | Static inventory above is not a complete call-graph/test audit. |
-| L01 | Single method-capable source-group registry and validation, including always-explicit GROUP 0 | TODO | Keep valid model/method combinations and group IDs; update associated tests. |
+| L01 | Single method-capable source-group registry and validation, including always-explicit GROUP 0 | IN_PROGRESS | Opt-in Lie registry and validation added; legacy paths remain. Compilation and tests pending. |
 | L02 | Remove CADENCE from catalog, source configuration, source input and I/O | TODO | Depends on L01. Explicitly migrate examples and generated inputs. |
 | L03 | Implement RK-independent group-local backward-Euler Newton API and analytic dispatcher | IN_PROGRESS | Transitional `solve_backward_euler_group` API added; internals still call legacy RK engine. Compile and numerical verification pending. |
 | L04 | Generic explicit/NEWTON/ANALYTIC source-group executor | TODO | Preserve same-input process rates, physical joint limiters, and atomic mass-exchange/substrate transactions. |
@@ -83,6 +83,7 @@ Do not claim that first-order Lie is unconditionally stable or well-balanced for
 
 | Date | Change | Commit | Checks executed | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-11-01 | Introduced opt-in Lie source group registry, mandatory explicit GROUP 0, ordered IDs, method capability and duplicate-source checks. | This commit | Not run | Legacy STAGE/STEP callers remain; L01 IN_PROGRESS. |
 | 2026-11-01 | Added first RK-independent public backward-Euler group entry point and migrated existing STEP Newton caller; full Lie driver not yet present. | This change | Not executed (remote edit) | Compile/test verification required before marking L03 DONE. |
 | 2026-11-01 | Created migration guide and pending checklist from static code inventory. | This document's initial commit | None (documentation only) | All code phases remain TODO. |
 

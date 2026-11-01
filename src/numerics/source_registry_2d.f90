@@ -32,8 +32,11 @@ MODULE source_registry_2d
     LOGICAL :: initialized=.FALSE. !< Cached successful-validation status.
     LOGICAL :: implicit_sources_flag=.FALSE. !< Any validated NEWTON source group.
     TYPE(source_group_type), ALLOCATABLE :: stage_entries(:), step_entries(:)
+    TYPE(source_group_type), ALLOCATABLE :: lie_entries(:)
   CONTAINS
     PROCEDURE :: initialize => initialize_registry
+    PROCEDURE :: groups => copy_lie_groups
+    PROCEDURE :: initialize_lie => initialize_lie_registry
     PROCEDURE :: finalize => finalize_registry
     PROCEDURE :: is_initialized => registry_is_initialized
     PROCEDURE :: has_implicit_sources => registry_has_implicit_sources
@@ -204,6 +207,7 @@ CONTAINS
   !> \param[in,out] this Registry to release; repeated calls are safe.
   SUBROUTINE finalize_registry(this)
     CLASS(source_registry_type), INTENT(INOUT) :: this
+    IF (ALLOCATED(this%lie_entries)) DEALLOCATE(this%lie_entries)
     IF (ALLOCATED(this%stage_entries)) DEALLOCATE(this%stage_entries)
     IF (ALLOCATED(this%step_entries)) DEALLOCATE(this%step_entries)
     this%n_equations=0; this%pore_equation=0; this%initialized=.FALSE.
@@ -223,6 +227,69 @@ CONTAINS
     CLASS(source_registry_type), INTENT(IN) :: this
     registry_is_initialized=this%initialized
   END FUNCTION registry_is_initialized
+
+  !> Initialize one ordered group list for the future Lie integrator.
+  SUBROUTINE initialize_lie_registry(this,n_equations,pore_equation,groups,error)
+    CLASS(source_registry_type), INTENT(INOUT) :: this
+    INTEGER, INTENT(IN) :: n_equations,pore_equation
+    TYPE(source_group_type), INTENT(IN) :: groups(:)
+    CHARACTER(*), INTENT(OUT) :: error
+    TYPE(source_term_type) :: term
+    CHARACTER(LEN=64), ALLOCATABLE :: seen(:)
+    INTEGER :: i,j
+    CALL this%finalize()
+    ALLOCATE(seen(0))
+    error='D19: invalid Lie group configuration'
+    IF (n_equations<4 .OR. SIZE(groups)==0) RETURN
+    IF (pore_equation/=0) THEN
+      IF (pore_equation<5 .OR. pore_equation>n_equations) RETURN
+    END IF
+    IF (groups(1)%id/=0 .OR. groups(1)%method/=SOURCE_METHOD_EXPLICIT) RETURN
+    DO i=1,SIZE(groups)
+      IF (i>1) THEN
+        IF (groups(i)%id<=groups(i-1)%id) RETURN
+      END IF
+      IF (.NOT.ALLOCATED(groups(i)%source_names)) RETURN
+      IF (.NOT.ALLOCATED(groups(i)%equation_ids)) RETURN
+      IF (.NOT.valid_equations(groups(i)%equation_ids,n_equations)) RETURN
+      SELECT CASE(groups(i)%method)
+      CASE(SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_NEWTON,SOURCE_METHOD_ANALYTIC)
+        CONTINUE
+      CASE DEFAULT
+        RETURN
+      END SELECT
+      IF (groups(i)%method==SOURCE_METHOD_NEWTON .AND. SIZE(groups(i)%equation_ids)==0) RETURN
+      IF (groups(i)%method==SOURCE_METHOD_ANALYTIC .AND. SIZE(groups(i)%source_names)/=1) RETURN
+      DO j=1,SIZE(groups(i)%source_names)
+        term=source_term_descriptor_by_name(groups(i)%source_names(j))
+        IF (LEN_TRIM(term%name)==0) RETURN
+        IF (ANY(seen==term%name)) RETURN
+        seen=[CHARACTER(LEN=64) :: seen,term%name]
+        SELECT CASE(groups(i)%method)
+        CASE(SOURCE_METHOD_EXPLICIT)
+          IF (.NOT.term%has_explicit) RETURN
+        CASE(SOURCE_METHOD_NEWTON)
+          IF (.NOT.term%has_newton) RETURN
+        CASE(SOURCE_METHOD_ANALYTIC)
+          IF (.NOT.term%has_analytic) RETURN
+        END SELECT
+      END DO
+    END DO
+    this%n_equations=n_equations
+    this%pore_equation=pore_equation
+    this%lie_entries=groups
+    this%implicit_sources_flag=ANY(groups%method==SOURCE_METHOD_NEWTON)
+    this%initialized=.TRUE.
+    error=''
+  END SUBROUTINE initialize_lie_registry
+
+  !> \brief Return a detached copy of the single Lie group registry.
+  FUNCTION copy_lie_groups(this) RESULT(groups)
+    CLASS(source_registry_type), INTENT(IN) :: this
+    TYPE(source_group_type), ALLOCATABLE :: groups(:)
+    ALLOCATE(groups(0))
+    IF (ALLOCATED(this%lie_entries)) groups=this%lie_entries
+  END FUNCTION copy_lie_groups
 
   !> \brief Return a detached copy of ordered stage metadata.
   !> \param[in] this Registry.
