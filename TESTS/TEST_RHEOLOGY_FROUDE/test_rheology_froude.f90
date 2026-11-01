@@ -4,14 +4,18 @@ PROGRAM test_rheology_froude
   USE parameters_2d
   USE constitutive_parameters_2d
   USE rheology_parameters_2d, ONLY : mu_0, mu_inf, Fr_0
-  USE state_conversion_2d, ONLY : mixt_var, qp_to_qc
-  USE source_terms_2d, ONLY : eval_source_semi_implicit, eval_source_implicit
+  USE state_conversion_2d, ONLY : mixt_var, physical_state_from_qp, &
+       complex_state_from_real, physical_state_type, complex_physical_state_type
+  USE rheology_froude_2d, ONLY : eval_rheology_froude_semi_implicit, &
+       eval_rheology_froude_implicit
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
 
   IMPLICIT NONE
 
-  REAL(wp) :: qp(8), source(6), expected(6), q(6), implicit_source(6)
-  COMPLEX(wp) :: complex_q(6), complex_source(6)
+  REAL(wp) :: qp(8), source(6), expected(6)
+  COMPLEX(wp) :: complex_source(6)
+  TYPE(physical_state_type) :: local_state
+  TYPE(complex_physical_state_type) :: complex_state
   REAL(wp) :: Ri, rho_m, rho_c, g_reduced, cp_c, cp_mix
   REAL(wp) :: speed, Fr, friction, slope_x, slope_y, G, z
   INTEGER :: mode
@@ -70,8 +74,10 @@ PROGRAM test_rheology_froude
           * (mu_inf + (mu_0 - mu_inf)*EXP(-Fr/Fr_0))
      expected = 0.0_wp
      expected(2:3) = -friction*[3.0_wp, -4.0_wp]/5.0_wp
-     CALL eval_source_semi_implicit(slope_x, slope_y, 0.0_wp, 0.0_wp,    &
-          0.0_wp, G, qp, source, z)
+     source=0.0_wp
+     CALL physical_state_from_qp(qp,local_state,slope_x,slope_y,0.0_wp,0.0_wp,0.0_wp)
+     CALL eval_rheology_froude_semi_implicit(local_state,G,stochastic_flag,z, &
+          source(2),source(3))
      CALL assert_finite(source)
      IF (MAXVAL(ABS(source-expected)) >                             &
           128.0_wp*EPSILON(1.0_wp)*MAX(1.0_wp, MAXVAL(ABS(expected)))) &
@@ -144,28 +150,24 @@ CONTAINS
   SUBROUTINE assert_zero_source(label, bx, by)
     CHARACTER(LEN=*), INTENT(IN) :: label
     REAL(wp), INTENT(IN) :: bx, by
-    CALL eval_source_semi_implicit(bx, by, 0.0_wp, 0.0_wp, 0.0_wp,      &
-         1.0_wp, qp, source, 0.2_wp)
+    source=0.0_wp
+    CALL physical_state_from_qp(qp,local_state,bx,by,0.0_wp,0.0_wp,0.0_wp)
+    CALL eval_rheology_froude_semi_implicit(local_state,1.0_wp,stochastic_flag, &
+         0.2_wp,source(2),source(3))
     CALL assert_finite(source)
     IF (ANY(source /= 0.0_wp)) THEN
        WRITE(*,*) 'FAIL: ', label, source
        ERROR STOP 1
     END IF
 
-    ! Model 9 is purely semi-implicit: the REAL and COMPLEX implicit paths
-    ! must remain finite and zero, including a complex-step velocity probe.
-    CALL qp_to_qc(qp, q)
-    CALL eval_source_implicit(bx, by, 0.2_wp, r_qj=q,               &
-         r_nh_term_impl=implicit_source)
-    CALL assert_finite(implicit_source)
-    IF (ANY(implicit_source /= 0.0_wp)) ERROR STOP 'real implicit model 9 source'
-    complex_q = CMPLX(q, 0.0_wp, wp)
-    complex_q(2) = complex_q(2) + CMPLX(0.0_wp, 1.0E-20_wp, wp)
-    CALL eval_source_implicit(bx, by, 0.2_wp, c_qj=complex_q,       &
-         c_nh_term_impl=complex_source)
+    ! Froude has no implicit contribution. Exercise its physical complex API.
+    CALL complex_state_from_real(local_state,complex_state)
+    complex_state%u=complex_state%u+CMPLX(0.0_wp,1.0E-20_wp,wp)
+    complex_source=CMPLX(0.0_wp,0.0_wp,wp)
+    CALL eval_rheology_froude_implicit(complex_state,complex_source(2),complex_source(3))
     CALL assert_finite(REAL(complex_source,wp))
     CALL assert_finite(AIMAG(complex_source))
-    IF (ANY(complex_source /= CMPLX(0.0_wp,0.0_wp,wp)))           &
+    IF (ANY(complex_source /= CMPLX(0.0_wp,0.0_wp,wp))) &
          ERROR STOP 'complex implicit model 9 source'
   END SUBROUTINE assert_zero_source
 
