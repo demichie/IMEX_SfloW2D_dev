@@ -177,6 +177,11 @@ CONTAINS
   !> Refresh diagnostic totals from the owned per-species inventories.
   SUBROUTINE refresh_substrate_totals(this)
     CLASS(state_type), INTENT(INOUT) :: this
+    ! Totals include the carrier-filled pore volume of the deposited/eroded layer.
+    ! A zero-solid-volume substrate (porosity=1) cannot define this conversion.
+    IF (.NOT.ieee_is_finite(erodible_porosity) .OR. &
+         erodible_porosity<0.0_wp .OR. erodible_porosity>=1.0_wp) &
+         ERROR STOP 'Invalid substrate porosity for aggregate thickness'
     this%deposit_tot=SUM(this%deposit,DIM=3)/(1.0_wp-erodible_porosity)
     this%erosion_tot=SUM(this%erosion,DIM=3)/(1.0_wp-erodible_porosity)
   END SUBROUTINE refresh_substrate_totals

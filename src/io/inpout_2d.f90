@@ -5186,7 +5186,7 @@ CONTAINS
           IF (MAXVAL(erodible_init(:, :)) .GT. 0.0_wp) THEN
 
             WRITE (*, *)
-            WRITE (*, *) 'Subtracting initial thickness from state%erodible thickness'
+            WRITE (*, *) 'Subtracting initial thickness from erodible thickness'
             erodible_init(:, :) = erodible_init(:, :) - thickness_init(:, :)* &
                                   (SUM(alphas_init(1:n_solid))/ &
                                    (1.0_wp - erodible_porosity))
@@ -5195,7 +5195,7 @@ CONTAINS
 
               WRITE (*, *) 'WARNING: MINVAL(erodible_init) = ', &
                 MINVAL(erodible_init(:, :))
-              WRITE (*, *) 'Initial state%erodible thick. negative values changed to 0'
+              WRITE (*, *) 'Initial erodible thick. negative values changed to 0'
 
               erodible_init = MAX(0.0_wp, erodible_init)
 
@@ -5377,6 +5377,9 @@ CONTAINS
     END IF
 
     CLOSE (restart_unit)
+
+    ! Keep aggregate substrate diagnostics consistent with the initial inventory.
+    CALL state%refresh_substrate_totals()
 
   END SUBROUTINE read_solution
 
