@@ -6,6 +6,44 @@
 **Last reviewed:** 2026-11-01
 **Rule for maintenance:** commits may deliberately be non-compilable during the large migration. Do not require intermediate builds; compile and run the complete acceptance suite once the end-to-end architecture and references are finished. Record actual commits and checks; do not mark a task DONE without evidence.
 
+## 0. Frozen ownership and group-transaction rules (2026-11-01)
+
+The following architectural decisions are **binding for subsequent production refactoring**. They supersede any transitional code organization documented below. Implement them completely before compiling or migrating tests.
+
+### Module ownership
+
+- `spatial_operator_2d` and its spatial/flux collaborators assemble **only spatial terms**. No spatial rate, flux or FV increment passes through a physical source limiter.
+- `physics/source_terms_2d.f90` assembles **only physical source rates** (including group-combined contributions, mass-exchange transfers and source-related physical geometry inputs) and **owns their rate limiters**. Evaluating a source against a bed slope does not make that source part of the spatial operator.
+- `state_2d` owns conservative/primitive **state validity and admissibility**, without silently limiting physical source rates.
+- `geometry_2d` owns substrate/deposit/erodible and topography update operations, geometric cache refresh (slopes, curvature, etc.) and the rollback-capable geometry transaction.
+- `lie_source_executor_2d` sequences groups and commits already assembled, physically consistent results. It must not independently compute physical rate limiters or silently apply partial transfer scalings.
+- `nonlinear_solver_2d` solves fixed-geometry, fixed-inventory backward-Euler residuals on the complete structurally affected conservative equation set. Newton residual/Jacobian evaluations and line-search trials **never commit** substrate, deposit, erodible or topography changes.
+
+### One coherent limiter for one coupled explicit group
+
+After assembling **all** explicit physical contributions of group `G`, `source_terms_2d` determines a single admissible factor `lambda_G` between zero and one. The availability constraints are evaluated against the actual **recipient** fluid state and substrate inventory. For GROUP 0 specifically, evaluate rates on `q_n`, but limit their application against the post-spatial state `q_sp` and the current inventory. Never apply this limiter to the spatial rate itself.
+
+The **same** factor must scale every coupled component of the group transaction: conservative source vector, solid and carrier deposition/erosion, change in erodible material, gas/mass and energy transfers, lava inventory and topography/bed rate. Symbolically: `S_G_limited=lambda_G*S_G`, `Ddot_limited=lambda_G*Ddot`, `Edot_limited=lambda_G*Edot`, `Bdot_limited=lambda_G*Bdot`. No component may be multiplied twice or left unscaled. The source assembler should return **an already limited, complete transaction**, rather than requiring the Lie executor to apply a separately returned factor. The physical coupling must be preserved even if different processes share a group. This applies to explicit-source rate limiting; do not invent a post-hoc Newton or analytic increment limiter that would invalidate the chosen integrator.
+
+### Group boundaries are the only substrate/geometry commit points
+
+For each ordered Lie group:
+
+1. Freeze its input fluid state, deposit/erodible inventories, and current geometry while assembling sources and, when selected, evaluating Newton iterations or analytic operators. The group uses the geometry left by **the preceding completed group**.
+2. Build the group's candidate fluid and substrate/topography changes consistently. Check state admissibility through `state` and physical transfer validity through the responsible physics/geometry modules.
+3. **Only after the whole group succeeds**, commit its deposit, erosion, erodible and bed changes consistently. If topography changes, apply the projected update and refresh all derived geometry before starting the next group; later groups must see the updated slopes and curvatures.
+4. If the group makes **no** substrate/topographic changes, skip unnecessary geometry/inventory updates. Do not refresh topography per cell or during a Newton iteration.
+5. Retain a transaction spanning the **entire Lie timestep**. A failure in any later group restores the pre-timestep fluid state, substrate inventories, authoritative bed and geometric caches, even if earlier groups had updated geometry for subsequent groups.
+
+The group boundary is the visibility point for these coupled changes. Per-cell candidate preparation may be temporary, but must not expose partially committed substrate/topography to another cell or to the solver while the same group is being evaluated. Group-0 spatial admissibility remains an independent check without clipping or rate limiting.
+
+### Required production changes, before tests
+
+- Refactor `source_terms_2d` to return a complete, jointly limited explicit-source transaction (not raw physical and exchange rate fragments plus a limiter factor for the executor to combine).
+- Remove source-rate limiter calculations and mass-exchange-specific coverage/transfer scaling from the Lie executor, giving them to physical source assembly.
+- Stage deposit/erodible and topography changes across a group, then publish/refresh geometry at group completion. Keep Newton's geometry and inventories immutable across its evaluations.
+- Preserve whole-step rollback, and retire obsolete RK-era source APIs/comments as part of the production cleanup. **Only once this production structure is complete** should build and tests be resumed.
+
 ## 1. Frozen target contract
 
 The **only global temporal integration method** is first-order Lie splitting. Retain configurable physical source groups, their order (from GROUP 1 onward), method selection, per-model numerical interfaces and physical ownership of limiters. Do not hard-code a source family to EXPLICIT, NEWTON or ANALYTIC. Preserve semi-implicit interfaces as supported model/NNewton auxiliaries, rather than RK channels.
