@@ -12,7 +12,7 @@ MODULE source_registry_2d
   PUBLIC :: source_group_type, source_registry_type
   PUBLIC :: group_contains_name, group_source_names
 
-  !> \brief Runtime method subgroup; id=0 is valid.
+  !> \brief Ordered Lie source group; id=0 is the explicit spatial/source group.
   TYPE :: source_group_type
     INTEGER :: id=0 !< Public or normalized internal group identity.
     INTEGER :: method=0 !< Explicit, Newton or analytic.
@@ -76,7 +76,7 @@ CONTAINS
     registry_is_initialized=this%initialized
   END FUNCTION registry_is_initialized
 
-  !> Initialize one ordered group list for the future Lie integrator.
+  !> Initialize the ordered groups for the first-order Lie integrator.
   SUBROUTINE initialize_lie_registry(this,n_equations,pore_equation,groups,error)
     CLASS(source_registry_type), INTENT(INOUT) :: this
     INTEGER, INTENT(IN) :: n_equations,pore_equation
@@ -116,6 +116,9 @@ CONTAINS
         term=source_term_descriptor_by_name(groups(i)%source_names(j))
         IF (LEN_TRIM(term%name)==0) RETURN
         IF (INDEX(TRIM(term%name),'mass_exchange_')==1) THEN
+          ! Inventory-coupled mass exchange currently supports only an
+          ! explicit Lie group; reject incompatible configurations here.
+          IF (groups(i)%method/=SOURCE_METHOD_EXPLICIT) RETURN
           IF (mass_group>=0 .AND. mass_group/=groups(i)%id) RETURN
           mass_group=groups(i)%id
         END IF

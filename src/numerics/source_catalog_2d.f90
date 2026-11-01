@@ -44,14 +44,14 @@ MODULE source_catalog_2d
        source_term_type('rheology_quadratic',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
              allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
-       source_term_type('rheology_froude',.TRUE.,.TRUE.,.TRUE., &
-             default_method=SOURCE_METHOD_NEWTON, &
+       source_term_type('rheology_froude',.TRUE.,.FALSE.,.TRUE., &
+             default_method=SOURCE_METHOD_EXPLICIT, &
              allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
-       source_term_type('rheology_lucas',.TRUE.,.TRUE.,.TRUE., &
-             default_method=SOURCE_METHOD_NEWTON, &
+       source_term_type('rheology_lucas',.TRUE.,.FALSE.,.TRUE., &
+             default_method=SOURCE_METHOD_EXPLICIT, &
              allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
-       source_term_type('rheology_mui',.TRUE.,.TRUE.,.TRUE., &
-             default_method=SOURCE_METHOD_NEWTON, &
+       source_term_type('rheology_mui',.TRUE.,.FALSE.,.TRUE., &
+             default_method=SOURCE_METHOD_EXPLICIT, &
              allows_gas=.TRUE., allows_liquid=.TRUE., allows_lava=.FALSE.), &
        source_term_type('rheology_mui_voellmy',.TRUE.,.TRUE.,.TRUE., &
              default_method=SOURCE_METHOD_NEWTON, &
@@ -113,7 +113,6 @@ CONTAINS
     SELECT CASE(TRIM(name))
     CASE('rheology_voellmy','rheology_plastic','rheology_lava', &
          'rheology_lahar','rheology_empirical','rheology_quadratic', &
-         'rheology_froude','rheology_lucas','rheology_mui', &
          'rheology_mui_voellmy','rheology_newmodel')
       ids=[idx_uEqn,idx_vEqn]
     CASE('thermal_cooling')
