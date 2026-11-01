@@ -144,3 +144,9 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Ogni gruppo mass-exchange pubblicato sincronizza i totali nello stesso confine di gruppo in cui pubblica deposito, erosione, erodibile e lava. I gruppi successivi osservano quindi uno stato di substrato internamente consistente.
 - Lo stato completo rimane pubblicato dall'integratore solo alla conclusione del passo; in caso di errore, geometria e inventari tornano allo snapshot pre-step.
 - Ancora non compilato o testato: la verifica dinamica resta fase successiva alla chiusura dell'audit statico.
+
+### Audit statico delle dipendenze build (2026-11-01)
+
+- `time_integration_2d` usa `lie_source_executor_2d`: corretta in `src/Makefile.am` la dipendenza oggetto `time_integration_2d.$(OBJEXT)` -> `lie_source_executor_2d.$(OBJEXT)` e riordinati i sorgenti.
+- Verificati i riferimenti legacy principali in produzione: la chiamata `initialize_configured_sources(registry,error)` coincide con la firma, e gli inventari fisici non sono piu importati dalla geometria nei moduli centrali controllati.
+- Audit statico non dichiarato esaustivo finche non vengono esaminati sistematicamente tutti i moduli e gli altri file di build. Compilazione e test non eseguiti come concordato.

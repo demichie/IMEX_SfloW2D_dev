@@ -65,8 +65,8 @@ IMEX_SfloW2D_SOURCES = \
                 spatial/reconstruction_2d.f90 \
                 spatial/hyperbolic_2d.f90 \
                 spatial/spatial_operator_2d.f90 \
-                numerics/time_integration_2d.f90 \
                 numerics/lie_source_executor_2d.f90 \
+                numerics/time_integration_2d.f90 \
                 stochastic/stochastic_random_2d.f90 \
                 stochastic/stochastic_module.f90 \
                 core/simulation_2d.f90 \
@@ -309,7 +309,8 @@ numerics/time_integration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                          numerics/nonlinear_solver_2d.$(OBJEXT)  \
                                          spatial/spatial_operator_2d.$(OBJEXT)  \
                                          state/state_conversion_2d.$(OBJEXT)  \
-                                         state/state_2d.$(OBJEXT)
+                                         state/state_2d.$(OBJEXT) \
+                                         numerics/lie_source_executor_2d.$(OBJEXT)
 numerics/lie_source_executor_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           core/constitutive_parameters_2d.$(OBJEXT) \
                                           core/diagnostics_2d.$(OBJEXT)       \
