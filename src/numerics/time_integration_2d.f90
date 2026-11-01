@@ -3,9 +3,9 @@ MODULE time_integration_2d
   USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_totMassEqn
   USE geometry_2d, ONLY : comp_cells_x,comp_cells_y, &
        begin_geometry_transaction,commit_geometry_transaction, &
-       rollback_geometry_transaction,deposit,erosion,erodible,lava_deposit
+       rollback_geometry_transaction
   USE state_conversion_2d, ONLY : qc_to_qp
-  USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible
+  USE state_2d, ONLY : state_type,initialize_dry_physical_cell,conservative_mass_admissible
   USE diagnostics_2d, ONLY : fatal_error
   USE source_registry_2d, ONLY : source_registry_type
   USE spatial_operator_2d, ONLY : spatial_operator_type
@@ -40,10 +40,9 @@ CONTAINS
     IF (ALLOCATED(this%q_trial)) DEALLOCATE(this%q_trial)
     IF (ALLOCATED(this%qp_trial)) DEALLOCATE(this%qp_trial)
   END SUBROUTINE
-  SUBROUTINE advance_lie(this,q,qp,t,dt,Z,source_registry,domain,spatial_operator)
+  SUBROUTINE advance_lie(this,state,t,dt,Z,source_registry,domain,spatial_operator)
     CLASS(time_integration_workspace_type), INTENT(INOUT) :: this
-    REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
-    REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
+    CLASS(state_type), INTENT(INOUT) :: state
     REAL(wp), INTENT(IN) :: t,dt,Z(comp_cells_x,comp_cells_y)
     TYPE(source_registry_type), INTENT(IN) :: source_registry
     CLASS(domain_type), INTENT(IN) :: domain
@@ -55,10 +54,10 @@ CONTAINS
     REAL(wp), ALLOCATABLE :: deposit_before(:,:,:),erosion_before(:,:,:)
     REAL(wp), ALLOCATABLE :: erodible_before(:,:,:),lava_before(:,:)
     IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
-    this%q_before=q
-    this%qp_before=qp
-    this%q_trial=q
-    this%qp_trial=qp
+    this%q_before=state%q
+    this%qp_before=state%qp
+    this%q_trial=state%q
+    this%qp_trial=state%qp
     ! Reconstruct a defined primitive halo from the conserved pre-step state.
     DO l=1,domain%reconstruction_cells
       j=domain%j_reconstruction(l)
@@ -92,25 +91,25 @@ CONTAINS
     ! Later groups evaluate from each predecessor's updated state.
     ! The groups may update live geometry for successor groups; retain the
     ! pre-step authoritative fields until the complete Lie sweep succeeds.
-    deposit_before=deposit
-    erosion_before=erosion
-    erodible_before=erodible
-    lava_before=lava_deposit
+    deposit_before=state%deposit
+    erosion_before=state%erosion
+    erodible_before=state%erodible
+    lava_before=state%lava_deposit
     CALL begin_geometry_transaction
-    CALL execute_lie_source_groups(this%q_trial,this%qp_trial,dt,domain, &
+    CALL execute_lie_source_groups(state,this%q_trial,this%qp_trial,dt,domain, &
          source_registry,Z,t,this%q_before,this%qp_before,source_step_failed,source_failure)
     IF (source_step_failed) THEN
-      deposit=deposit_before
-      erosion=erosion_before
-      erodible=erodible_before
-      lava_deposit=lava_before
+      state%deposit=deposit_before
+      state%erosion=erosion_before
+      state%erodible=erodible_before
+      state%lava_deposit=lava_before
       CALL rollback_geometry_transaction
       CALL fatal_error('Lie timestep rolled back: '//TRIM(source_failure))
     END IF
     ! Publish the accepted fluid fields only after all Lie source groups return.
     ! The integrator owns evolving inventories; geometry owns only bed caches.
-    q=this%q_trial
-    qp=this%qp_trial
+    state%q=this%q_trial
+    state%qp=this%qp_trial
     CALL commit_geometry_transaction
   END SUBROUTINE
 END MODULE time_integration_2d

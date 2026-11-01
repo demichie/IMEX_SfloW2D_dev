@@ -14,6 +14,7 @@ MODULE lie_source_executor_2d
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
+  USE state_2d, ONLY : state_type
 
   IMPLICIT NONE
 
@@ -25,12 +26,12 @@ CONTAINS
   !> Evaluate and commit one complete Lie source group at a time.
   !> For GROUP 0, evaluate every physical rate at the original pre-spatial
   !> state, but cap and apply the combined source increment to the post-FV state.
-  SUBROUTINE execute_lie_source_groups(q,qp,time_step,domain,source_registry, &
+  SUBROUTINE execute_lie_source_groups(state,q,qp,time_step,domain,source_registry, &
        stochastic_values,step_start_time,q_original,qp_original,step_failed,failure_message)
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
          B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
          project_cell_field_to_vertices,assign_topography_vertices,B_vertex, &
-         deposit,erosion,erodible,lava_deposit,comp_interfaces_x,comp_interfaces_y
+         comp_interfaces_x,comp_interfaces_y
     USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, &
          eval_source_analytic,cell_analytic_source_context, &
          analytic_term_context_type
@@ -41,6 +42,7 @@ CONTAINS
     USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible, &
          physical_cell_state_finite
     USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag
+    CLASS(state_type), INTENT(INOUT) :: state
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
     TYPE(mass_exchange_rates_type) :: transfers
     TYPE(analytic_term_context_type) :: analytic_context
@@ -130,8 +132,8 @@ CONTAINS
              EXIT cell_loop
           END IF
           IF (with_exchange) THEN
-             IF (.NOT.ALL(ieee_is_finite(erodible(1:n_solid,j,k))) .OR. &
-                  ANY(erodible(1:n_solid,j,k)<0.0_wp)) THEN
+             IF (.NOT.ALL(ieee_is_finite(state%erodible(1:n_solid,j,k))) .OR. &
+                  ANY(state%erodible(1:n_solid,j,k)<0.0_wp)) THEN
                 CALL reject_cell('D19: invalid erodible inventory before mass exchange')
                 EXIT cell_loop
              END IF
@@ -140,7 +142,7 @@ CONTAINS
           SELECT CASE(groups(group_index)%method)
           CASE(SOURCE_METHOD_EXPLICIT)
              CALL assemble_lie_explicit_transaction(j,k,qpentry,q_group(1:n_eqns,j,k), &
-                  time_step,source_time,groups(group_index),erodible(1:n_solid,j,k), &
+                  time_step,source_time,groups(group_index),state%erodible(1:n_solid,j,k), &
                   total_rate,transfers,with_exchange,ok)
              IF (.NOT.ok) THEN
                 CALL reject_cell('D19: physical source transaction rejected')
@@ -154,15 +156,15 @@ CONTAINS
                 EXIT cell_loop
              END IF
              IF (with_exchange) THEN
-                deposit_candidate=deposit(j,k,1:n_solid)+ &
+                deposit_candidate=state%deposit(j,k,1:n_solid)+ &
                      time_step*transfers%solid_deposition_rate
-                erosion_candidate=erosion(j,k,1:n_solid)+ &
+                erosion_candidate=state%erosion(j,k,1:n_solid)+ &
                      time_step*transfers%solid_erosion_rate
-                erodible_candidate=erodible(1:n_solid,j,k)- &
+                erodible_candidate=state%erodible(1:n_solid,j,k)- &
                      time_step*transfers%solid_erosion_rate
                 IF (erodible_deposit_flag) erodible_candidate= &
                      erodible_candidate+time_step*transfers%solid_deposition_rate
-                lava_candidate=lava_deposit(j,k)+time_step*transfers%lava_deposit_rate
+                lava_candidate=state%lava_deposit(j,k)+time_step*transfers%lava_deposit_rate
                 IF (.NOT.ALL(ieee_is_finite(deposit_candidate)) .OR. &
                      .NOT.ALL(ieee_is_finite(erosion_candidate)) .OR. &
                      .NOT.ALL(ieee_is_finite(erodible_candidate)) .OR. &
@@ -277,10 +279,10 @@ CONTAINS
           DO cell=1,domain%solve_cells
              j=group_j(cell)
              k=group_k(cell)
-             deposit(j,k,1:n_solid)=staged_deposit(:,cell)
-             erosion(j,k,1:n_solid)=staged_erosion(:,cell)
-             erodible(1:n_solid,j,k)=staged_erodible(:,cell)
-             lava_deposit(j,k)=staged_lava(cell)
+             state%deposit(j,k,1:n_solid)=staged_deposit(:,cell)
+             state%erosion(j,k,1:n_solid)=staged_erosion(:,cell)
+             state%erodible(1:n_solid,j,k)=staged_erodible(:,cell)
+             state%lava_deposit(j,k)=staged_lava(cell)
           END DO
           DEALLOCATE(group_j,group_k,staged_deposit,staged_erosion, &
                staged_erodible,staged_lava,staged_bed_rate)

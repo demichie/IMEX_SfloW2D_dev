@@ -142,7 +142,7 @@ CONTAINS
     IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_STOCHASTIC_PREPARED, &
          step_start,step_length)
 
-    CALL this%time_integration%advance(this%state%q,this%state%qp,step_start, &
+    CALL this%time_integration%advance(this%state,step_start, &
          step_length,this%stochastic%effective_Z, &
          this%source_registry,this%domain,this%spatial_operator)
     IF (PRESENT(observer)) CALL observer(TIMESTEP_EVENT_LIE_COMPLETE,step_start,step_length)

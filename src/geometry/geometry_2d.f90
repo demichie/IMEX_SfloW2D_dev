@@ -97,21 +97,15 @@ MODULE geometry_2d
   REAL(wp), ALLOCATABLE :: grav_coeff_stag_y(:,:)
 
   !> deposit for the different classes
-  REAL(wp), ALLOCATABLE :: deposit(:,:,:)
 
   !> total deposit 
-  REAL(wp), ALLOCATABLE :: deposit_tot(:,:)
   !> Accumulated immobile lava deposit [m], distinct from granular classes.
-  REAL(wp), ALLOCATABLE :: lava_deposit(:,:)
 
   !> erosion for the different classes
-  REAL(wp), ALLOCATABLE :: erosion(:,:,:)
 
   !> total erosion 
-  REAL(wp), ALLOCATABLE :: erosion_tot(:,:)
 
   !> erosdible substrate for the different classes
-  REAL(wp), ALLOCATABLE :: erodible(:,:,:)
 
   REAL(wp), ALLOCATABLE :: topography_profile(:,:,:)
 

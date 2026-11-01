@@ -1059,7 +1059,6 @@ CONTAINS
     USE parameters_2d, ONLY: limiter
     USE parameters_2d, ONLY: bcW, bcE, bcS, bcN
 
-    USE geometry_2d, ONLY: deposit, deposit_tot, erosion, erodible, erosion_tot, lava_deposit
 
     USE constitutive_parameters_2d, ONLY: rho_a_amb, rho_c_sub, kin_visc_c
 
@@ -1653,10 +1652,8 @@ CONTAINS
     ! ------- READ solid_transport_parameters NAMELIST --------------------------
 
     ALLOCATE (erodible_init(comp_cells_x, comp_cells_y))
-    ALLOCATE (erodible(n_solid, comp_cells_x, comp_cells_y))
 
     erodible_init(:, :) = 0.0E+0_wp
-    erodible(1:n_solid, 1:comp_cells_x, 1:comp_cells_y) = 0.0_wp
 
     read_solid: IF (n_solid .GE. 1) THEN
 
@@ -1977,12 +1974,6 @@ CONTAINS
 
       END IF check_erodible_file
 
-      DO i_solid = 1, n_solid
-
-        erodible(i_solid, :, :) = erodible_fract(i_solid)* &
-                                  (1.0_wp - erodible_porosity)*erodible_init(:, :)
-
-      END DO
 
       IF ((maximum_solid_packing .LE. 0.0_wp) .OR. &
           (maximum_solid_packing .GE. 1.0_wp)) THEN
@@ -2054,20 +2045,6 @@ CONTAINS
     ALLOCATE (alphas_init(n_solid))
 
     inv_rho_s(1:n_solid) = 1.0_wp/rho_s(1:n_solid)
-
-    ALLOCATE (deposit(comp_cells_x, comp_cells_y, n_solid))
-    deposit(1:comp_cells_x, 1:comp_cells_y, 1:n_solid) = 0.0_wp
-
-    ALLOCATE (lava_deposit(comp_cells_x, comp_cells_y))
-    lava_deposit=0.0_wp
-    ALLOCATE (deposit_tot(comp_cells_x, comp_cells_y))
-    deposit_tot(1:comp_cells_x, 1:comp_cells_y) = 0.0_wp
-
-    ALLOCATE (erosion(comp_cells_x, comp_cells_y, n_solid))
-    erosion(1:comp_cells_x, 1:comp_cells_y, 1:n_solid) = 0.0_wp
-
-    ALLOCATE (erosion_tot(comp_cells_x, comp_cells_y))
-    erosion_tot(1:comp_cells_x, 1:comp_cells_y) = 0.0_wp
 
     IF ((alphastot_min .LT. 0.0_wp) .OR. (alphastot_min .GE. 1.0_wp)) THEN
 
@@ -4925,7 +4902,7 @@ CONTAINS
          eval_mixture_properties_from_volume_fractions
     ! External variables
     USE geometry_2d, ONLY: comp_cells_x, x0, comp_cells_y, y0, dx, dy
-    USE geometry_2d, ONLY: B_cent, B_vertex, erodible
+    USE geometry_2d, ONLY: B_cent, B_vertex
     USE geometry_2d, ONLY: project_cell_field_to_vertices,                    &
          refresh_topography_geometry
     USE init_2d, ONLY: thickness_init, erodible_init
@@ -4934,6 +4911,9 @@ CONTAINS
 
     CLASS(state_type), INTENT(INOUT) :: state
     CLASS(domain_type), INTENT(INOUT) :: domain
+
+    ! The input phase prepares erodible_init before state allocation.
+    ! Initialize the owned inventory here, then apply any collapsing correction.
 
     CHARACTER(LEN=15) :: chara
 
@@ -4977,6 +4957,12 @@ CONTAINS
 
     ! The input layout is fixed before populating the conservative and primitive state.
     CALL configure_canonical_state_indices()
+    ! Initialize the simulation-owned erodible inventory from input rasters.
+    ! A later collapse correction in this routine may replace these values.
+    DO i_solid=1,n_solid
+      state%erodible(i_solid,:,:)=erodible_fract(i_solid)* &
+           (1.0_wp-erodible_porosity)*erodible_init(:,:)
+    END DO
 
     ALLOCATE (thickness_init(comp_cells_x, comp_cells_y))
 
@@ -5200,7 +5186,7 @@ CONTAINS
           IF (MAXVAL(erodible_init(:, :)) .GT. 0.0_wp) THEN
 
             WRITE (*, *)
-            WRITE (*, *) 'Subtracting initial thickness from erodible thickness'
+            WRITE (*, *) 'Subtracting initial thickness from state%erodible thickness'
             erodible_init(:, :) = erodible_init(:, :) - thickness_init(:, :)* &
                                   (SUM(alphas_init(1:n_solid))/ &
                                    (1.0_wp - erodible_porosity))
@@ -5209,7 +5195,7 @@ CONTAINS
 
               WRITE (*, *) 'WARNING: MINVAL(erodible_init) = ', &
                 MINVAL(erodible_init(:, :))
-              WRITE (*, *) 'Initial erodible thick. negative values changed to 0'
+              WRITE (*, *) 'Initial state%erodible thick. negative values changed to 0'
 
               erodible_init = MAX(0.0_wp, erodible_init)
 
@@ -5217,7 +5203,7 @@ CONTAINS
 
             DO i_solid = 1, n_solid
 
-              erodible(i_solid, :, :) = erodible_fract(i_solid)* &
+              state%erodible(i_solid, :, :) = erodible_fract(i_solid)* &
                                         (1.0_wp - erodible_porosity)*erodible_init(:, :)
 
             END DO
@@ -5604,7 +5590,7 @@ CONTAINS
   SUBROUTINE output_solution(time, state, runtime)
 
     USE geometry_2d, ONLY: comp_cells_x, B_cent, comp_cells_y, x_comp, &
-                           y_comp, deposit, erosion, erodible
+                           y_comp
 
     USE parameters_2d, ONLY: n_vars
     USE parameters_2d, ONLY: dt_output
@@ -5685,17 +5671,17 @@ CONTAINS
           IF (erosion_coeff .GT. 0.0_wp) THEN
 
             WRITE (output_unit_erosion, '(2e20.12,100(e20.12))') x_comp(j), y_comp(k), &
-              (erosion(j, k, i_vars), i_vars=1, n_solid)
+              (state%erosion(j, k, i_vars), i_vars=1, n_solid)
 
             WRITE (output_unit_erodible, '(2e20.12,100(e20.12))') x_comp(j), y_comp(k), &
-              (erodible(i_vars, j, k), i_vars=1, n_solid)
+              (state%erodible(i_vars, j, k), i_vars=1, n_solid)
 
           END IF
 
           IF (settling_flag) THEN
 
             WRITE (output_unit_deposit, '(2e20.12,100(e20.12))') x_comp(j), y_comp(k), &
-              (deposit(j, k, i_vars), i_vars=1, n_solid)
+              (state%deposit(j, k, i_vars), i_vars=1, n_solid)
 
           END IF
 
@@ -6058,8 +6044,8 @@ CONTAINS
 
   SUBROUTINE output_esri(output_idx, state)
 
-    USE geometry_2d, ONLY: B_cent, grid_output, deposit, erosion, B_nodata
-    USE geometry_2d, ONLY: deposit_tot, erosion_tot, B_zone
+    USE geometry_2d, ONLY: B_cent, grid_output, B_nodata
+    USE geometry_2d, ONLY: B_zone
     ! USE geometry_2d, ONLY : comp_interfaces_x , comp_interfaces_y
     IMPLICIT NONE
 
@@ -6214,9 +6200,9 @@ CONTAINS
 
         grid_output = -9999
 
-        WHERE (deposit(:, :, i_solid) .GT. 0.0_wp)
+        WHERE (state%deposit(:, :, i_solid) .GT. 0.0_wp)
 
-          grid_output = deposit(:, :, i_solid)
+          grid_output = state%deposit(:, :, i_solid)
 
         END WHERE
 
@@ -6251,14 +6237,14 @@ CONTAINS
 
       DO j = 1, comp_cells_y
 
-        deposit_tot(:, j) = SUM(deposit(:, j, :), DIM=2)/(1.0_wp - &
+        state%deposit_tot(:, j) = SUM(state%deposit(:, j, :), DIM=2)/(1.0_wp - &
                                                           erodible_porosity)
 
       END DO
 
-      WHERE (deposit_tot(:, :) .GT. 0.0_wp)
+      WHERE (state%deposit_tot(:, :) .GT. 0.0_wp)
 
-        grid_output = deposit_tot
+        grid_output = state%deposit_tot
 
       END WHERE
 
@@ -6297,9 +6283,9 @@ CONTAINS
 
         grid_output = -9999
 
-        WHERE (erosion(:, :, i_solid) .GT. 0.0_wp)
+        WHERE (state%erosion(:, :, i_solid) .GT. 0.0_wp)
 
-          grid_output = erosion(:, :, i_solid)
+          grid_output = state%erosion(:, :, i_solid)
 
         END WHERE
 
@@ -6334,14 +6320,14 @@ CONTAINS
 
       DO j = 1, comp_cells_y
 
-        erosion_tot(:, j) = SUM(erosion(:, j, :), DIM=2)/(1.0_wp - &
+        state%erosion_tot(:, j) = SUM(state%erosion(:, j, :), DIM=2)/(1.0_wp - &
                                                           erodible_porosity)
 
       END DO
 
-      WHERE (erosion_tot(:, :) .GT. 0.0_wp)
+      WHERE (state%erosion_tot(:, :) .GT. 0.0_wp)
 
-        grid_output = erosion_tot
+        grid_output = state%erosion_tot
 
       END WHERE
 
@@ -6590,7 +6576,7 @@ CONTAINS
   !******************************************************************************
   SUBROUTINE output_probes(time, state, runtime)
 
-    USE geometry_2d, ONLY: x_comp, y_comp, deposit
+    USE geometry_2d, ONLY: x_comp, y_comp
     USE parameters_2d, ONLY: n_vars
     USE geometry_2d, ONLY: interp_2d_scalarB
     USE state_conversion_2d, ONLY: primitive_to_volume_fractions
@@ -7450,7 +7436,6 @@ CONTAINS
     USE netcdf
     USE geometry_2d, ONLY: B_cent, B_prime_x_geom, B_prime_y_geom
     USE geometry_2d, ONLY: comp_cells_x, comp_cells_y
-    USE geometry_2d, ONLY: deposit, erosion, erodible
     USE parameters_2d, ONLY: n_vars
     USE state_conversion_2d, ONLY: mixt_var, primitive_to_volume_fractions
 
@@ -7500,7 +7485,7 @@ CONTAINS
     rho_m2D = 0.0_wp
     red_grav2D = 0.0_wp
     muEff = 0.0_wp
-    erodible2D = SUM(erodible(1:n_solid, :, :), DIM=1) / &
+    erodible2D = SUM(state%erodible(1:n_solid, :, :), DIM=1) / &
                  (1.0_wp - erodible_porosity)
     shearVel = 0.0_wp
     Rouse = 0.0_wp
@@ -7663,10 +7648,10 @@ END IF
       CALL check(nf90_put_var(ncid, solid_varid(i), temp_array, start=start, &
                               count=count))
 
-      CALL check(nf90_put_var(ncid, deposit_varid(i), deposit(:, :, i), &
+      CALL check(nf90_put_var(ncid, deposit_varid(i), state%deposit(:, :, i), &
                               start=start, count=count))
 
-      CALL check(nf90_put_var(ncid, erosion_varid(i), erosion(:, :, i), &
+      CALL check(nf90_put_var(ncid, erosion_varid(i), state%erosion(:, :, i), &
                               start=start, count=count))
 
     END DO
@@ -7808,8 +7793,7 @@ END IF
   SUBROUTINE write_restart_file(filename, runtime, stochastic, state, domain)
     USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,     &
                              n_pore_vars
-    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex, erodible,  &
-                           deposit, erosion, lava_deposit
+    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex
     USE parameters_2d, ONLY: stochastic_flag, topo_change_flag, gas_flag, liquid_flag, lava_flag
 
     IMPLICIT NONE
@@ -7855,13 +7839,13 @@ END IF
     WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) B_vertex
     CALL check_restart_io(ierr, io_message, 'writing nodal topography to',  &
          filename)
-    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) erodible
-    CALL check_restart_io(ierr, io_message, 'writing erodible material to', &
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%erodible
+    CALL check_restart_io(ierr, io_message, 'writing state%erodible material to', &
          filename)
-    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) deposit
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%deposit
     CALL check_restart_io(ierr, io_message, 'writing deposits to', filename)
-    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) erosion
-    CALL check_restart_io(ierr, io_message, 'writing erosion to', filename)
+    WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%erosion
+    CALL check_restart_io(ierr, io_message, 'writing state%erosion to', filename)
 
     WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%hmax
     CALL check_restart_io(ierr, io_message, 'writing maximum thickness to', &
@@ -7912,8 +7896,8 @@ END IF
          runtime%runout%last_distance, runtime%runout%maximum_distance, &
          runtime%runout%runout_row, runtime%runout%mass_center_row
     CALL check_restart_io(ierr, io_message, 'writing runout history to', filename)
-    WRITE(unit_rst, IOSTAT=ierr, IOMSG=io_message) lava_deposit
-    CALL check_restart_io(ierr, io_message, 'writing lava deposit to', filename)
+    WRITE(unit_rst, IOSTAT=ierr, IOMSG=io_message) state%lava_deposit
+    CALL check_restart_io(ierr, io_message, 'writing lava state%deposit to', filename)
 
     CLOSE (unit_rst, IOSTAT=ierr, IOMSG=io_message)
     CALL check_restart_io(ierr, io_message, 'closing', filename)
@@ -7945,8 +7929,7 @@ END IF
   SUBROUTINE read_restart_file(filename, runtime, stochastic, state, domain)
     USE parameters_2d, ONLY: n_vars, n_solid, n_add_gas, n_stoch_vars,     &
                              n_pore_vars
-    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex, erodible,  &
-                           deposit, erosion, lava_deposit
+    USE geometry_2d, ONLY: comp_cells_x, comp_cells_y, B_vertex
     USE parameters_2d, ONLY: stochastic_flag, topo_change_flag, gas_flag, liquid_flag, lava_flag
     USE geometry_2d, ONLY: refresh_topography_geometry
 
@@ -8033,13 +8016,13 @@ END IF
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) B_vertex
     CALL check_restart_io(ierr, io_message, 'reading nodal topography from', &
          filename)
-    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) erodible
-    CALL check_restart_io(ierr, io_message, 'reading erodible material from', &
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%erodible
+    CALL check_restart_io(ierr, io_message, 'reading state%erodible material from', &
          filename)
-    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) deposit
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%deposit
     CALL check_restart_io(ierr, io_message, 'reading deposits from', filename)
-    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) erosion
-    CALL check_restart_io(ierr, io_message, 'reading erosion from', filename)
+    READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%erosion
+    CALL check_restart_io(ierr, io_message, 'reading state%erosion from', filename)
 
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%hmax
     CALL check_restart_io(ierr, io_message, 'reading maximum thickness from', &
@@ -8107,8 +8090,8 @@ END IF
          runtime%runout%last_distance, runtime%runout%maximum_distance, &
          runtime%runout%runout_row, runtime%runout%mass_center_row
     CALL check_restart_io(ierr, io_message, 'reading runout history from', filename)
-    READ(unit_rst, IOSTAT=ierr, IOMSG=io_message) lava_deposit
-    CALL check_restart_io(ierr, io_message, 'reading lava deposit from', filename)
+    READ(unit_rst, IOSTAT=ierr, IOMSG=io_message) state%lava_deposit
+    CALL check_restart_io(ierr, io_message, 'reading lava state%deposit from', filename)
     IF (output_runout_flag .AND. .NOT. runtime%runout%initialized) &
          CALL fatal_error('Restart is missing initialized runout diagnostic history.')
 

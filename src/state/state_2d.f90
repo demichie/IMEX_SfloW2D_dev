@@ -19,7 +19,7 @@ MODULE state_2d
 
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
   USE parameters_2d, ONLY : n_eqns,idx_add_gas_first,idx_add_gas_last
-  USE parameters_2d, ONLY : wp
+  USE parameters_2d, ONLY : wp,n_solid
   USE parameters_2d, ONLY : n_thickness_levels, n_dyn_pres_levels
 
   IMPLICIT NONE
@@ -39,6 +39,11 @@ MODULE state_2d
 
      !> Physical variables: h, h*u, h*v, T, mass fractions, and appended u and v.
      REAL(wp), ALLOCATABLE :: qp(:,:,:)
+
+     !> Physical substrate inventories owned by the same simulation state as q and qp.
+     REAL(wp), ALLOCATABLE :: deposit(:,:,:),deposit_tot(:,:)
+     REAL(wp), ALLOCATABLE :: erosion(:,:,:),erosion_tot(:,:)
+     REAL(wp), ALLOCATABLE :: erodible(:,:,:),lava_deposit(:,:)
 
      !> Map of positive thickness
      LOGICAL, ALLOCATABLE :: hpos(:,:)
@@ -110,6 +115,18 @@ CONTAINS
     ALLOCATE( this%qp(model_layout%n_physical_variables,comp_cells_x,        &
          comp_cells_y) )
 
+    ALLOCATE(this%deposit(comp_cells_x,comp_cells_y,n_solid))
+    ALLOCATE(this%erosion(comp_cells_x,comp_cells_y,n_solid))
+    ALLOCATE(this%erodible(n_solid,comp_cells_x,comp_cells_y))
+    ALLOCATE(this%lava_deposit(comp_cells_x,comp_cells_y))
+    ALLOCATE(this%deposit_tot(comp_cells_x,comp_cells_y))
+    ALLOCATE(this%erosion_tot(comp_cells_x,comp_cells_y))
+    this%deposit=0.0_wp
+    this%erosion=0.0_wp
+    this%erodible=0.0_wp
+    this%lava_deposit=0.0_wp
+    this%deposit_tot=0.0_wp
+    this%erosion_tot=0.0_wp
     this%q = 0.0_wp
     this%qp = 0.0_wp
     this%qp(model_layout%idx_energy,1:comp_cells_x,1:comp_cells_y) = T_ambient
@@ -149,6 +166,8 @@ CONTAINS
     DEALLOCATE( this%vuln_table )
 
 
+    DEALLOCATE(this%deposit,this%deposit_tot,this%erosion,this%erosion_tot, &
+         this%erodible,this%lava_deposit)
     DEALLOCATE( this%qp )
 
   END SUBROUTINE finalize_state
