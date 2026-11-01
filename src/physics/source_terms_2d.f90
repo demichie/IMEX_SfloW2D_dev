@@ -87,7 +87,8 @@ CONTAINS
          CALL eval_cell_source_explicit(j,k,qp_eval,t,non_exchange,physical,stochastic_value)
     IF (has_exchange) THEN
        CALL eval_source_explicit(qp_eval,B_zone(j,k), &
-            B_prime_x_geom(j,k),B_prime_y_geom(j,k),inventory,dt,transfer,exchange)
+            B_prime_x_geom(j,k),B_prime_y_geom(j,k),inventory,dt, &
+            group%source_names,transfer,exchange)
        IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
           coverage=1.0_wp-cell_source_fractions(j,k)
           IF (.NOT.ieee_is_finite(coverage)) RETURN
@@ -608,16 +609,17 @@ CONTAINS
   !> \param[out] eqns_term Conservative equation source-rate vector.
   !> \param[out] topo_term Proposed bed-elevation rate.
   SUBROUTINE eval_mass_exchange_source_explicit(qpj,B_zone,B_prime_x,B_prime_y, &
-       erodible,dt,rates,eqns_term)
+       erodible,dt,selected_names,rates,eqns_term)
     REAL(wp), INTENT(IN) :: qpj(n_vars+2),B_prime_x,B_prime_y
     REAL(wp), INTENT(IN) :: erodible(n_solid),dt
     INTEGER, INTENT(IN) :: B_zone
+    CHARACTER(*), INTENT(IN) :: selected_names(:)
     TYPE(mass_exchange_rates_type), INTENT(INOUT) :: rates
     REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
     TYPE(physical_state_type) :: exchange_state
 
     CALL physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
     CALL eval_mass_exchange_explicit(exchange_state,B_zone, &
-         erodible,dt,rates,eqns_term)
+         erodible,dt,selected_names,rates,eqns_term)
   END SUBROUTINE eval_mass_exchange_source_explicit
 END MODULE source_terms_2d

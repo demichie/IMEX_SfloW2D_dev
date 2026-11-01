@@ -28,11 +28,12 @@ MODULE mass_exchange_2d
 
 CONTAINS
 
-    SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,erodible,dt,total_rates,eqns_term)
+    SUBROUTINE eval_mass_exchange_explicit(physical_state,B_zone,erodible,dt,selected_names,total_rates,eqns_term)
 
         TYPE(physical_state_type), INTENT(IN) :: physical_state
         REAL(wp), INTENT(IN) :: erodible(n_solid),dt
         INTEGER, INTENT(IN) :: B_zone
+        CHARACTER(*), INTENT(IN) :: selected_names(:)
         TYPE(mass_exchange_rates_type), INTENT(INOUT) :: total_rates
         REAL(wp), INTENT(OUT) :: eqns_term(n_eqns)
         TYPE(mass_exchange_rates_type) :: process_rates,deposition_rates,liquid_loss_rates
@@ -40,7 +41,14 @@ CONTAINS
         REAL(wp) :: carrier_available,carrier_factor,carrier_volume,carrier_loss
         REAL(wp) :: carrier_withdrawals(2),solid_erosion,carrier_erosion
         REAL(wp) :: solid_deposition,packing_factor,erosion_factor
+        LOGICAL :: do_erosion,do_deposition,do_liquid_loss,do_entrainment,do_vaporization,do_lava
 
+        do_erosion=ANY(selected_names=='mass_exchange_erosion')
+        do_deposition=ANY(selected_names=='mass_exchange_deposition')
+        do_liquid_loss=ANY(selected_names=='mass_exchange_carrier_liquid_loss')
+        do_entrainment=ANY(selected_names=='mass_exchange_entrainment')
+        do_vaporization=ANY(selected_names=='mass_exchange_vaporization')
+        do_lava=ANY(selected_names=='mass_exchange_lava_deposition')
         CALL reset_mass_exchange_rates(total_rates)
         eqns_term=0.0_wp
         IF (physical_state%h<=EPSILON(1.0_wp)) RETURN
@@ -49,7 +57,8 @@ CONTAINS
         ! physical phase exists. Lava deposition is dispatched independently below.
         IF (gas_flag .OR. liquid_flag) THEN
             alpha=SUM(physical_state%alphas)
-            CALL eval_mass_exchange_erosion_explicit(physical_state,erodible, &
+            CALL reset_mass_exchange_rates(process_rates)
+            IF (do_erosion) CALL eval_mass_exchange_erosion_explicit(physical_state,erodible, &
                       dt,process_rates)
             ! Erosion can increase packing by importing a solid-rich substrate.
             ! Limit it before accumulating any conservative or bed contribution.
@@ -59,8 +68,11 @@ CONTAINS
                       maximum_solid_packing,dt)
             CALL scale_process(process_rates,erosion_factor)
             CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
-            CALL eval_mass_exchange_deposition_explicit(physical_state,dt,deposition_rates)
-            CALL eval_mass_exchange_carrier_liquid_loss_explicit(physical_state,liquid_loss_rates)
+            CALL reset_mass_exchange_rates(deposition_rates)
+            CALL reset_mass_exchange_rates(liquid_loss_rates)
+            IF (do_deposition) CALL eval_mass_exchange_deposition_explicit(physical_state,dt,deposition_rates)
+            IF (do_liquid_loss) &
+                 CALL eval_mass_exchange_carrier_liquid_loss_explicit(physical_state,liquid_loss_rates)
 
             ! Deposition and liquid carrier loss share the exchange inventory.
             ! Darcy gas loss is owned exclusively by the pore-pressure family.
@@ -90,11 +102,15 @@ CONTAINS
             ! Assemble only the rates after all common-inventory limiters have acted.
             CALL accumulate_process(deposition_rates,physical_state,total_rates,eqns_term)
             CALL accumulate_process(liquid_loss_rates,physical_state,total_rates,eqns_term)
-            CALL eval_mass_exchange_entrainment_explicit(physical_state,process_rates)
-            CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
-            CALL eval_mass_exchange_vaporization_explicit(physical_state,B_zone, &
-                deposition_rates%solid_deposition_rate,process_rates)
-            CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
+            IF (do_entrainment) THEN
+                CALL eval_mass_exchange_entrainment_explicit(physical_state,process_rates)
+                CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
+            END IF
+            IF (do_vaporization) THEN
+                CALL eval_mass_exchange_vaporization_explicit(physical_state,B_zone, &
+                    deposition_rates%solid_deposition_rate,process_rates)
+                CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
+            END IF
 
             ! Scalar transport and pore-pressure sources inherit the net mass exchange.
             IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(idx_totMassEqn)*physical_state%Zs
@@ -103,7 +119,7 @@ CONTAINS
         END IF  ! gas_flag .OR. liquid_flag
 
         ! Lava deposition follows the same process_rates-rate accumulation contract.
-        IF (lava_deposition_flag) THEN
+        IF (do_lava .AND. lava_deposition_flag) THEN
             CALL eval_mass_exchange_lava_deposition_explicit(physical_state,dt,process_rates)
             CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
         END IF
