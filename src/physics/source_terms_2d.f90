@@ -105,6 +105,19 @@ CONTAINS
     END IF
     rate=physical+exchange
     IF (has_exchange) THEN
+       IF (.NOT.ALL(ieee_is_finite(transfer%solid_deposition_rate))) RETURN
+       IF (.NOT.ALL(ieee_is_finite(transfer%solid_erosion_rate))) RETURN
+       IF (.NOT.ALL(ieee_is_finite(transfer%solid_mass_rate))) RETURN
+       IF (.NOT.ALL(ieee_is_finite(transfer%add_gas_mass_rate))) RETURN
+       IF (.NOT.ieee_is_finite(transfer%mixture_mass_rate)) RETURN
+       IF (.NOT.ieee_is_finite(transfer%energy_rate)) RETURN
+       IF (.NOT.ieee_is_finite(transfer%carrier_erosion_rate)) RETURN
+       IF (.NOT.ieee_is_finite(transfer%carrier_deposition_rate)) RETURN
+       IF (.NOT.ieee_is_finite(transfer%carrier_withdrawal_volume_rate)) RETURN
+       IF (.NOT.ieee_is_finite(transfer%lava_deposit_rate)) RETURN
+       IF (.NOT.ieee_is_finite(transfer%dB_dt)) RETURN
+    END IF
+    IF (has_exchange) THEN
        CALL limit_explicit_source_rates(q_recipient,inventory,dt,rate, &
             transfer%solid_erosion_rate,scale,valid)
     ELSE
