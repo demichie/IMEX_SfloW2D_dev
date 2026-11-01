@@ -1,8 +1,8 @@
 !> \brief Common physical source assembly entry points.
-!> \details Owns STAGE/STEP explicit, semi-implicit, implicit and analytic
-!> source assembly independently of spatial fluxes in equation_terms_2d.
-!> The bounded mass-exchange transaction and all inventory updates remain
-!> the responsibility of step_source_executor_2d.
+!> \details Assembles physical source rates and their coupled limiters.
+!> Spatial finite-volume operators belong exclusively to spatial modules.
+!> The Lie executor applies the resulting limited rates and publishes
+!> fluid/substrate candidates at group boundaries.
 MODULE source_terms_2d
     USE parameters_2d, ONLY : idx_h
   USE mass_boundary_injection_2d
@@ -28,10 +28,10 @@ MODULE source_terms_2d
   PUBLIC :: eval_source_explicit, eval_cell_source_explicit
   PUBLIC :: limit_explicit_source_rates,assemble_lie_explicit_transaction
   PUBLIC :: cell_analytic_source_context
-  ! Source evaluation is dispatched through one public generic: STAGE
-  ! carries injection geometry; STEP carries atomic exchange rates/inventories.
+  ! Explicit physical-source evaluation provides distinct cell/geometry
+  ! and mass-exchange signatures, independent of time-integration stages.
   INTERFACE eval_source_explicit
-     MODULE PROCEDURE eval_stage_source_explicit, eval_step_source_explicit
+     MODULE PROCEDURE eval_geometry_cell_source_explicit, eval_mass_exchange_source_explicit
   END INTERFACE
   PUBLIC :: eval_source_implicit, eval_source_semi_implicit, eval_source_analytic
   PUBLIC :: analytic_term_context_type
@@ -169,7 +169,7 @@ CONTAINS
     valid=ieee_is_finite(limiter) .AND. limiter>=0.0_wp .AND. limiter<=1.0_wp
   END SUBROUTINE limit_explicit_source_rates
 
-  ! Shared cell adapters: STAGE and STEP use identical physical geometry.
+  ! Cell-local physical source adapters use the same geometric fields.
   SUBROUTINE eval_cell_source_explicit(j,k,qp_cell,time,group,rate)
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
          B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
@@ -204,7 +204,7 @@ CONTAINS
 
 
   !> Return the conservative equivalent rate of the exact source substep.
-  !> STAGE callers use interval=dt*a_ii; STEP callers use interval=dt.
+  !> The interval is supplied by the selected Lie group operator.
   SUBROUTINE eval_source_analytic(group,q_before,context,interval,rate,status)
     TYPE(source_group_type), INTENT(IN) :: group
     REAL(wp), INTENT(IN) :: q_before(n_vars),interval
@@ -522,7 +522,7 @@ CONTAINS
   END SUBROUTINE eval_source_semi_implicit
 
 
-  SUBROUTINE eval_stage_source_explicit( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy , &
+  SUBROUTINE eval_geometry_cell_source_explicit( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy , &
        Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,             &
        cell_fissure_fract,                                                       &
        lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group )
@@ -647,7 +647,7 @@ CONTAINS
 
     RETURN
 
-  END SUBROUTINE eval_stage_source_explicit
+  END SUBROUTINE eval_geometry_cell_source_explicit
 
 
 
@@ -710,7 +710,7 @@ CONTAINS
     CALL fatal_error('geometry_curvature: analytic treatment is unsupported')
   END SUBROUTINE eval_geometry_curvature_analytic
 
-  !> \brief Evaluate the atomic explicit STEP mass-exchange rate.
+  !> \brief Evaluate the atomic explicit mass-exchange rate.
   !> \details Returns rates only; it never mutates conservative state, bed or inventory.
   !> \param[in] qpj Cell-local primitive state.
   !> \param[in] B_zone Connected-water-region indicator.
@@ -724,7 +724,7 @@ CONTAINS
   !> \param[out] carrier_loss_term Limited carrier loss rate.
   !> \param[out] eqns_term Conservative equation source-rate vector.
   !> \param[out] topo_term Proposed bed-elevation rate.
-  SUBROUTINE eval_step_source_explicit(qpj,B_zone,B_prime_x,B_prime_y, &
+  SUBROUTINE eval_mass_exchange_source_explicit(qpj,B_zone,B_prime_x,B_prime_y, &
        erodible,dt,rates,eqns_term)
     REAL(wp), INTENT(IN) :: qpj(n_vars+2),B_prime_x,B_prime_y
     REAL(wp), INTENT(IN) :: erodible(n_solid),dt
@@ -736,5 +736,5 @@ CONTAINS
     CALL physical_state_from_qp(qpj,exchange_state,B_prime_x,B_prime_y)
     CALL eval_mass_exchange_explicit(exchange_state,B_zone, &
          erodible,dt,rates,eqns_term)
-  END SUBROUTINE eval_step_source_explicit
+  END SUBROUTINE eval_mass_exchange_source_explicit
 END MODULE source_terms_2d

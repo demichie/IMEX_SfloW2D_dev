@@ -82,7 +82,7 @@ Le voci seguenti descrivono il codice **già registrato su `master`**, non attes
 - [x] **Differire la pubblicazione degli stati fino a fine gruppo**: candidati fluidi e inventari rimangono separati durante l'elaborazione delle celle. L'aggiornamento del fondo e della geometria derivata avviene dopo la validazione dei candidati. Il refresh geometrico usa ora una copia locale dei campi geometrici: se i campi derivati risultano non finiti, ripristina il fondo e tutte le cache senza esporre un aggiornamento parziale. Rimangono da verificare in fase finale i percorsi di errore numerici e l'integrazione dei moduli.
 - [ ] **Mantenere la geometria congelata durante Newton** e verificare che nessuna routine invocata nei residui/Jacobiani modifichi inventari o geometria.
 - [ ] **Verificare l'integrità del rollback di passo** dopo lo spostamento delle variabili evolutive, incluso il ripristino delle cache geometriche.
-- [ ] **Completare l'audit del codice di produzione**: eliminare API, variabili, commenti e dipendenze RK/STAGE/STEP residue senza introdurre compatibilità legacy.
+- [ ] **Completare l'audit del codice di produzione**: eliminare le ulteriori API, variabili, commenti e dipendenze RK/STAGE/STEP residue senza introdurre compatibilità legacy. I due entrypoint espliciti interni a `source_terms_2d` sono ora denominati in base alla funzione fisica (`eval_geometry_cell_source_explicit`, `eval_mass_exchange_source_explicit`), mantenendo il dispatch generico pubblico.
 - [ ] **Soltanto alla fine**, compilare e correggere i problemi di integrazione, poi aggiornare/eseguire i test Lie e la suite di regressione completa.
 
 ## 4. Criteri di accettazione finale
