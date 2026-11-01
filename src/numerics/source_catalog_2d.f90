@@ -120,11 +120,11 @@ CONTAINS
         CASE('rheology_voellmy','rheology_plastic','rheology_lava', &
             'rheology_lahar','rheology_empirical','rheology_quadratic', &
             'rheology_mui_voellmy','rheology_newmodel')
-        ids=[idx_uEqn,idx_vEqn]
+            ids=[idx_uEqn,idx_vEqn]
         CASE('thermal_cooling')
-        ids=[idx_engyEqn]
+            ids=[idx_engyEqn]
         CASE('pore_pressure_dissipation')
-        IF (idx_poreEqn>0) ids=[idx_poreEqn]
+            IF (idx_poreEqn>0) ids=[idx_poreEqn]
         END SELECT
     END FUNCTION source_newton_affected_equations
 
@@ -138,10 +138,10 @@ CONTAINS
         INTEGER :: i
         term=source_term_type()
         DO i=1,SOURCE_TERM_COUNT
-        IF (TRIM(name)==TRIM(SOURCE_CATALOG(i)%name)) THEN
-            term=SOURCE_CATALOG(i)
-            RETURN
-        END IF
+            IF (TRIM(name)==TRIM(SOURCE_CATALOG(i)%name)) THEN
+                term=SOURCE_CATALOG(i)
+                RETURN
+            END IF
         END DO
     END FUNCTION source_term_descriptor_by_name
 
@@ -151,10 +151,10 @@ CONTAINS
         INTEGER :: i,j
         ok=.FALSE.
         DO i=1,SOURCE_TERM_COUNT
-        IF (LEN_TRIM(SOURCE_CATALOG(i)%name)==0) RETURN
-        DO j=i+1,SOURCE_TERM_COUNT
-            IF (SOURCE_CATALOG(i)%name==SOURCE_CATALOG(j)%name) RETURN
-        END DO
+            IF (LEN_TRIM(SOURCE_CATALOG(i)%name)==0) RETURN
+            DO j=i+1,SOURCE_TERM_COUNT
+                IF (SOURCE_CATALOG(i)%name==SOURCE_CATALOG(j)%name) RETURN
+            END DO
         END DO
         ok=.TRUE.
     END FUNCTION source_catalog_names_unique
@@ -169,11 +169,11 @@ CONTAINS
         name=''
         IF (TRIM(model_name)=='none') RETURN
         DO i=1,SOURCE_TERM_COUNT
-        IF (INDEX(TRIM(SOURCE_CATALOG(i)%name),'rheology_')/=1) CYCLE
-        IF (TRIM(model_name)==TRIM(SOURCE_CATALOG(i)%name(10:))) THEN
-            name=SOURCE_CATALOG(i)%name
-            RETURN
-        END IF
+            IF (INDEX(TRIM(SOURCE_CATALOG(i)%name),'rheology_')/=1) CYCLE
+            IF (TRIM(model_name)==TRIM(SOURCE_CATALOG(i)%name(10:))) THEN
+                name=SOURCE_CATALOG(i)%name
+                RETURN
+            END IF
         END DO
     END FUNCTION canonical_rheology_source_name
 
@@ -183,11 +183,11 @@ CONTAINS
         INTEGER :: i,j
         ok=.FALSE.
         DO i=1,SOURCE_TERM_COUNT
-        IF (INDEX(TRIM(SOURCE_CATALOG(i)%name),'rheology_')/=1) CYCLE
-        DO j=i+1,SOURCE_TERM_COUNT
-            IF (INDEX(TRIM(SOURCE_CATALOG(j)%name),'rheology_')/=1) CYCLE
-            IF (SOURCE_CATALOG(i)%name==SOURCE_CATALOG(j)%name) RETURN
-        END DO
+            IF (INDEX(TRIM(SOURCE_CATALOG(i)%name),'rheology_')/=1) CYCLE
+            DO j=i+1,SOURCE_TERM_COUNT
+                IF (INDEX(TRIM(SOURCE_CATALOG(j)%name),'rheology_')/=1) CYCLE
+                IF (SOURCE_CATALOG(i)%name==SOURCE_CATALOG(j)%name) RETURN
+            END DO
         END DO
         ok=.TRUE.
     END FUNCTION canonical_rheology_catalog_unique
@@ -204,19 +204,19 @@ CONTAINS
         found=.FALSE.
         SELECT CASE(role)
         CASE(SOURCE_ROLE_IMPLICIT)
-        SELECT CASE(TRIM(source_name))
-        CASE('rheology_voellmy','rheology_plastic','rheology_lava', &
+            SELECT CASE(TRIM(source_name))
+            CASE('rheology_voellmy','rheology_plastic','rheology_lava', &
                 'rheology_lahar','rheology_empirical','rheology_quadratic', &
                 'rheology_mui_voellmy','rheology_newmodel')
-            found=.TRUE.
-        END SELECT
+                found=.TRUE.
+            END SELECT
         CASE(SOURCE_ROLE_SEMI_IMPLICIT)
-        SELECT CASE(TRIM(source_name))
-        CASE('rheology_voellmy','rheology_lava','rheology_lahar', &
+            SELECT CASE(TRIM(source_name))
+            CASE('rheology_voellmy','rheology_lava','rheology_lahar', &
                 'rheology_froude','rheology_lucas','rheology_mui', &
                 'rheology_mui_voellmy')
-            found=.TRUE.
-        END SELECT
+                found=.TRUE.
+            END SELECT
         END SELECT
     END FUNCTION rheology_name_has_role
 END MODULE source_catalog_2d
