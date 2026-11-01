@@ -239,7 +239,7 @@ CONTAINS
              IF (q_group(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
              CALL solve_backward_euler_group(groups(group_index), &
                   q_group(:,j,k),time_step,B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
-                  noise,iterations,ok,linear_info,failed)
+                  grav_coeff(j,k),noise,iterations,ok,linear_info,failed)
              IF (.NOT.ok .OR. failed .OR. linear_info/=0) THEN
                 WRITE(failure_reason,'(A,I0,A,I0)') &
                      'D19: Newton failed, linear_info=',linear_info,', iterations=',iterations

@@ -17,6 +17,7 @@ MODULE nonlinear_solver_2d
 
   USE source_registry_2d, ONLY : source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
+  USE source_terms_2d, ONLY : eval_source_semi_implicit
 
   IMPLICIT NONE
 
@@ -45,15 +46,15 @@ CONTAINS
   !> Solve the entire structurally affected conservative equation set.
   !> Every other conservative component remains fixed at its group input value.
   SUBROUTINE solve_backward_euler_group(source_group, &
-       q_cell,dt,Bprime_x,Bprime_y,stochastic_value, &
+       q_cell,dt,Bprime_x,Bprime_y,grav_correction,stochastic_value, &
        iterations_used,converged,linear_info,line_search_failed)
     USE parameters_2d, ONLY : tol_abs,tol_rel
     TYPE(source_group_type), INTENT(IN) :: source_group
     REAL(wp), INTENT(INOUT) :: q_cell(n_vars)
-    REAL(wp), INTENT(IN) :: dt,Bprime_x,Bprime_y,stochastic_value
+    REAL(wp), INTENT(IN) :: dt,Bprime_x,Bprime_y,grav_correction,stochastic_value
     INTEGER, INTENT(OUT) :: iterations_used,linear_info
     LOGICAL, INTENT(OUT) :: converged,line_search_failed
-    REAL(wp) :: q_in(n_vars),coeff_f(n_eqns)
+    REAL(wp) :: q_in(n_vars),q_si(n_vars),semi_rate(n_eqns),coeff_f(n_eqns)
     INTEGER :: n_active,i
     q_in=q_cell
     iterations_used=0
@@ -69,9 +70,25 @@ CONTAINS
     DO i=1,n_active
        IF (COUNT(source_group%equation_ids==source_group%equation_ids(i))/=1) RETURN
     END DO
+    ! v2 sequence: frozen semi-implicit rate, corrected momentum, then Newton.
+    CALL eval_source_semi_implicit(source_group,q_in,Bprime_x,Bprime_y, &
+         grav_correction,stochastic_value,semi_rate)
+    q_si=q_in+dt*semi_rate
+    IF (ANY(semi_rate(2:3)/=0.0_wp)) THEN
+       IF (DOT_PRODUCT(q_in(2:3),q_in(2:3))==0.0_wp) THEN
+          q_si(2:3)=0.0_wp
+       ELSEIF (ANY(q_si(2:3)*q_in(2:3)<0.0_wp)) THEN
+          q_si(2:3)=0.0_wp
+       ELSE
+          q_si(2:3)=SQRT(DOT_PRODUCT(q_si(2:3),q_si(2:3))) * &
+               q_in(2:3)/SQRT(DOT_PRODUCT(q_in(2:3),q_in(2:3)))
+       END IF
+    END IF
+    ! q_si is both the corrected RHS and the Newton initial guess.
+    q_cell=q_si
     coeff_f=1.0_wp
     linear_info=0
-    CALL solve_newton_group(source_group,source_group%equation_ids,q_cell,q_in,dt, &
+    CALL solve_newton_group(source_group,source_group%equation_ids,q_cell,q_si,dt, &
          Bprime_x,Bprime_y,stochastic_value,coeff_f,tol_abs,tol_rel, &
          iterations_used,converged,linear_info,line_search_failed)
     IF (.NOT.converged) q_cell=q_in

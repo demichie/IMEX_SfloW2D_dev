@@ -15,7 +15,7 @@ MODULE source_terms_2d
   USE pore_pressure_2d, ONLY : eval_pore_pressure_analytic
   USE mass_exchange_2d, ONLY : eval_mass_exchange_explicit
   USE rheology_2d, ONLY : curvature_acceleration, eval_rheology_analytic, &
-       eval_rheology_implicit, &
+       eval_rheology_implicit, eval_rheology_semi_implicit, &
        eval_rheology_explicit
   USE diagnostics_2d, ONLY : fatal_error
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_ROLE_IMPLICIT, &
@@ -31,7 +31,7 @@ MODULE source_terms_2d
   INTERFACE eval_source_explicit
      MODULE PROCEDURE eval_geometry_cell_source_explicit, eval_mass_exchange_source_explicit
   END INTERFACE
-  PUBLIC :: eval_source_implicit, eval_source_analytic
+  PUBLIC :: eval_source_semi_implicit, eval_source_implicit, eval_source_analytic
   PUBLIC :: analytic_term_context_type
   PUBLIC :: eval_geometry_curvature_explicit
   PUBLIC :: bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step
@@ -306,6 +306,32 @@ CONTAINS
     INTEGER, INTENT(IN) :: role
     found=rheology_name_has_role(group_rheology_name(group),role)
   END FUNCTION group_has_role
+
+
+  !> Evaluate the frozen semi-implicit contribution of one Newton Lie group.
+  !> All inputs refer to one cell; no domain indices or shared-state writes.
+  SUBROUTINE eval_source_semi_implicit(group,q_cell,Bprime_x,Bprime_y, &
+       grav_correction,stochastic_value,rate)
+    TYPE(source_group_type), INTENT(IN) :: group
+    REAL(wp), INTENT(IN) :: q_cell(n_vars)
+    REAL(wp), INTENT(IN) :: Bprime_x,Bprime_y,grav_correction,stochastic_value
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    TYPE(physical_state_type) :: physical_state
+    CHARACTER(LEN=64) :: selected_model_name
+
+    rate=0.0_wp
+    IF (group%method/=SOURCE_METHOD_NEWTON) &
+         CALL fatal_error('eval_source_semi_implicit requires a Newton Lie group')
+    IF (.NOT.group_has_role(group,SOURCE_ROLE_IMPLICIT)) RETURN
+    IF (q_cell(idx_totMassEqn)<=0.0_wp) RETURN
+
+    selected_model_name=group_rheology_name(group)
+    IF (LEN_TRIM(selected_model_name)==0) RETURN
+    CALL real_physical_state_from_q(q_cell,physical_state,Bprime_x,Bprime_y, &
+         0.0_wp,0.0_wp,0.0_wp)
+    CALL eval_rheology_semi_implicit([selected_model_name],physical_state, &
+         grav_correction,pore_pressure_flag,stochastic_flag,stochastic_value,rate(2:3))
+  END SUBROUTINE eval_source_semi_implicit
 
   SUBROUTINE eval_source_implicit( Bprimej_x, Bprimej_y, Zij, c_qj,              &
        c_nh_term_impl, r_qj , r_nh_term_impl, group )
