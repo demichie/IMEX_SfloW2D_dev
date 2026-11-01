@@ -5,7 +5,8 @@ MODULE time_integration_2d
        begin_geometry_transaction,commit_geometry_transaction, &
        rollback_geometry_transaction
   USE state_conversion_2d, ONLY : qc_to_qp
-  USE state_2d, ONLY : state_type,initialize_dry_physical_cell,conservative_mass_admissible
+  USE state_2d, ONLY : state_type,substrate_snapshot_type, &
+       initialize_dry_physical_cell,conservative_mass_admissible
   USE diagnostics_2d, ONLY : fatal_error
   USE source_registry_2d, ONLY : source_registry_type
   USE spatial_operator_2d, ONLY : spatial_operator_type
@@ -51,8 +52,7 @@ CONTAINS
     LOGICAL :: source_step_failed,conversion_ok
     CHARACTER(LEN=256) :: source_failure
     REAL(wp) :: pd
-    REAL(wp), ALLOCATABLE :: deposit_before(:,:,:),erosion_before(:,:,:)
-    REAL(wp), ALLOCATABLE :: erodible_before(:,:,:),lava_before(:,:)
+    TYPE(substrate_snapshot_type) :: substrate_before
     IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
     this%q_before=state%q
     this%qp_before=state%qp
@@ -91,18 +91,12 @@ CONTAINS
     ! Later groups evaluate from each predecessor's updated state.
     ! The groups may update live geometry for successor groups; retain the
     ! pre-step authoritative fields until the complete Lie sweep succeeds.
-    deposit_before=state%deposit
-    erosion_before=state%erosion
-    erodible_before=state%erodible
-    lava_before=state%lava_deposit
+    CALL state%snapshot_substrate(substrate_before)
     CALL begin_geometry_transaction
     CALL execute_lie_source_groups(state,this%q_trial,this%qp_trial,dt,domain, &
          source_registry,Z,t,this%q_before,this%qp_before,source_step_failed,source_failure)
     IF (source_step_failed) THEN
-      state%deposit=deposit_before
-      state%erosion=erosion_before
-      state%erodible=erodible_before
-      state%lava_deposit=lava_before
+      CALL state%restore_substrate(substrate_before)
       CALL rollback_geometry_transaction
       CALL fatal_error('Lie timestep rolled back: '//TRIM(source_failure))
     END IF

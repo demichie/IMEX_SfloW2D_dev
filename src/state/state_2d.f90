@@ -28,6 +28,13 @@ MODULE state_2d
   PUBLIC :: initialize_dry_physical_cell
   PUBLIC :: conservative_mass_admissible
   PUBLIC :: physical_cell_state_finite
+  PUBLIC :: substrate_snapshot_type
+
+  !> Pre-step substrate inventory snapshot for transactional time integration.
+  TYPE :: substrate_snapshot_type
+     REAL(wp), ALLOCATABLE :: deposit(:,:,:),erosion(:,:,:),erodible(:,:,:)
+     REAL(wp), ALLOCATABLE :: lava_deposit(:,:)
+  END TYPE substrate_snapshot_type
 
   !> \brief Owned cell states and diagnostics for one simulation.
   !> \details State arrays use (component,x-cell,y-cell); diagnostic maps use
@@ -67,6 +74,8 @@ MODULE state_2d
      PROCEDURE :: initialize => initialize_state
      PROCEDURE :: finalize => finalize_state
      PROCEDURE :: refresh_substrate_totals => refresh_substrate_totals
+     PROCEDURE :: snapshot_substrate => snapshot_substrate
+     PROCEDURE :: restore_substrate => restore_substrate
 
   END TYPE state_type
 
@@ -173,6 +182,27 @@ CONTAINS
     DEALLOCATE( this%qp )
 
   END SUBROUTINE finalize_state
+
+  !> Capture all substrate inventories before source groups can change them.
+  SUBROUTINE snapshot_substrate(this,snapshot)
+    CLASS(state_type), INTENT(IN) :: this
+    TYPE(substrate_snapshot_type), INTENT(OUT) :: snapshot
+    snapshot%deposit=this%deposit
+    snapshot%erosion=this%erosion
+    snapshot%erodible=this%erodible
+    snapshot%lava_deposit=this%lava_deposit
+  END SUBROUTINE snapshot_substrate
+
+  !> Restore exactly the pre-step inventories when the source sweep fails.
+  SUBROUTINE restore_substrate(this,snapshot)
+    CLASS(state_type), INTENT(INOUT) :: this
+    TYPE(substrate_snapshot_type), INTENT(IN) :: snapshot
+    this%deposit=snapshot%deposit
+    this%erosion=snapshot%erosion
+    this%erodible=snapshot%erodible
+    this%lava_deposit=snapshot%lava_deposit
+    CALL this%refresh_substrate_totals()
+  END SUBROUTINE restore_substrate
 
   !> Refresh diagnostic totals from the owned per-species inventories.
   SUBROUTINE refresh_substrate_totals(this)

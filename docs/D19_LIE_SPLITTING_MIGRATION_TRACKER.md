@@ -111,3 +111,10 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Transazioni di geometria: test aggiornati a `begin_geometry_transaction` / `rollback_geometry_transaction`.
 - `TEST_WORKSPACE_LIFECYCLE`: eliminate le chiamate al workspace topografico temporale rimosso da `geometry_2d`.
 - Non eseguiti compilazione o test; gli altri test legacy e i percorsi di produzione rimangono oggetto della verifica statica finale.
+
+### Transazione degli inventari nello stato (2026-11-01)
+
+- Introdotto `substrate_snapshot_type` in `state_2d`: snapshot con deposito, erosione, erodibile e lava immobilizzata.
+- `state%snapshot_substrate` e `state%restore_substrate` possiedono la cattura e il ripristino degli inventari; il ripristino sincronizza anche i campi aggregati.
+- `time_integration_2d` non conserva piu quattro copie indipendenti: orchestra la transazione dello stato e quella della geometria, mantenendo separata la topografia.
+- Adeguate le diagnostiche test del mass exchange. Restano la verifica integrale dei test legacy e la compilazione finale concordata.

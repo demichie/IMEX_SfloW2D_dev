@@ -198,17 +198,17 @@ CONTAINS
          [SUM(state%erosion(:,:,1)-eroded_before(:,:,1)), &
           SUM(state%erosion(:,:,2)-eroded_before(:,:,2))])), &
          MAX(1.0_wp,ABS(solid_delta)))
-    IF (ANY(state%erodible<0.0_wp)) ERROR STOP 'Lie state%erodible inventory negative'
-    IF (ANY(state%erodible>available_before)) ERROR STOP 'Lie state%erodible inventory increased'
+    IF (ANY(state%erodible<0.0_wp)) ERROR STOP 'Lie erodible inventory negative'
+    IF (ANY(state%erodible>available_before)) ERROR STOP 'Lie erodible inventory increased'
     DO l=1,ns
-       CALL require_small('Lie state%erodible transfer balance', &
+       CALL require_small('Lie erodible transfer balance', &
             MAXVAL(ABS(state%erodible(l,:,:)+state%erosion(:,:,l)-eroded_before(:,:,l) &
             -available_before(l,:,:))),1.0_wp)
     END DO
     IF (.NOT.ALL(ieee_is_finite(q)) .OR. .NOT.ALL(ieee_is_finite(B_vertex))) &
          ERROR STOP 'Lie exchange non-finite state'
     IF (fluid_delta<0.0_wp .OR. solid_delta<0.0_wp .OR. inventory_delta<0.0_wp) &
-         ERROR STOP 'Lie state%erosion transfer changed sign'
+         ERROR STOP 'Lie erosion transfer changed sign'
     CALL check_geometry
     CALL registry%finalize()
     CALL reset_state(.FALSE.)
