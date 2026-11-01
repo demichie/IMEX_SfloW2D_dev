@@ -27,7 +27,6 @@ CONTAINS
   !> state, but cap and apply the combined source increment to the post-FV state.
   SUBROUTINE execute_lie_source_groups(q,qp,time_step,domain,source_registry, &
        stochastic_values,step_start_time,q_original,qp_original,step_failed,failure_message)
-    USE parameters_2d, ONLY : erodible_deposit_flag
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
          B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
          begin_topography_rate_update,record_topography_rate_cell, &
@@ -58,6 +57,7 @@ CONTAINS
     LOGICAL, INTENT(OUT) :: step_failed
     CHARACTER(LEN=*), INTENT(OUT), OPTIONAL :: failure_message
     REAL(wp) :: qpentry(n_vars+2),q_candidate(n_vars),qp_candidate(n_vars+2)
+    REAL(wp), ALLOCATABLE :: q_group(:,:,:),qp_group(:,:,:)
     REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
     REAL(wp) :: erodible_candidate(n_solid),lava_candidate
     INTEGER, ALLOCATABLE :: group_j(:),group_k(:)
@@ -84,6 +84,8 @@ CONTAINS
     IF (time_step<=0.0_wp) CALL fatal_error('D19: nonpositive time interval')
 
     DO group_index=1,SIZE(groups)
+       q_group=q
+       qp_group=qp
        with_exchange=ANY(INDEX(groups(group_index)%source_names,'mass_exchange_')==1)
        IF (SIZE(groups(group_index)%source_names)==0) CYCLE
        IF (with_exchange) THEN
@@ -103,7 +105,7 @@ CONTAINS
           IF (groups(group_index)%id==0) THEN
              qpentry=qp_original(:,j,k)
           ELSE
-             qpentry=qp(:,j,k)
+             qpentry=qp_group(:,j,k)
           END IF
           context='Lie source group'
           noise=0.0_wp
@@ -135,7 +137,7 @@ CONTAINS
 
           SELECT CASE(groups(group_index)%method)
           CASE(SOURCE_METHOD_EXPLICIT)
-             CALL assemble_lie_explicit_transaction(j,k,qpentry,q(1:n_eqns,j,k), &
+             CALL assemble_lie_explicit_transaction(j,k,qpentry,q_group(1:n_eqns,j,k), &
                   time_step,source_time,groups(group_index),erodible(1:n_solid,j,k), &
                   total_rate,transfers,with_exchange,ok)
              IF (.NOT.ok) THEN
@@ -143,7 +145,7 @@ CONTAINS
                 EXIT cell_loop
              END IF
              ! Stage the entire local fluid/substrate transfer before committing it.
-             q_candidate=q(:,j,k)
+             q_candidate=q_group(:,j,k)
              q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*total_rate
              IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
                 CALL reject_cell('D19: inadmissible conservative mass candidate')
@@ -178,8 +180,8 @@ CONTAINS
                 CALL initialize_dry_physical_cell(qp_candidate)
              END IF
              ! Commit only after the complete cell-local candidate is admissible.
-             q(:,j,k)=q_candidate
-             qp(:,j,k)=qp_candidate
+             q_group(:,j,k)=q_candidate
+             qp_group(:,j,k)=qp_candidate
              IF (with_exchange) THEN
                 group_j(cell)=j
                 group_k(cell)=k
@@ -190,9 +192,9 @@ CONTAINS
                 staged_bed_rate(cell)=transfers%dB_dt
              END IF
           CASE(SOURCE_METHOD_ANALYTIC)
-             IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
+             IF (q_group(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
              analytic_context=cell_analytic_source_context(j,k,noise)
-             CALL eval_source_analytic(groups(group_index),q(:,j,k), &
+             CALL eval_source_analytic(groups(group_index),q_group(:,j,k), &
                   analytic_context,time_step,analytic_rate,status)
              IF (status/=0) THEN
                 WRITE(failure_reason,'(A,I0)') 'D19: analytic group status ',status
@@ -205,9 +207,9 @@ CONTAINS
              END IF
              q(1:n_vars,j,k)=q(1:n_vars,j,k)+time_step*analytic_rate(1:n_vars)
           CASE(SOURCE_METHOD_NEWTON)
-             IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
+             IF (q_group(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
              CALL solve_backward_euler_group(groups(group_index), &
-                  q(:,j,k),time_step,B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
+                  q_group(:,j,k),time_step,B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
                   noise,iterations,ok,linear_info,failed)
              IF (.NOT.ok .OR. failed .OR. linear_info/=0) THEN
                 WRITE(failure_reason,'(A,I0,A,I0)') &
@@ -220,18 +222,18 @@ CONTAINS
              IF (step_failed) EXIT cell_loop
           END SELECT
           ! Only check admissibility: never clip the accepted source update.
-          IF (.NOT.conservative_mass_admissible(q(1:n_eqns,j,k))) THEN
+          IF (.NOT.conservative_mass_admissible(q_group(1:n_eqns,j,k))) THEN
              CALL reject_cell('D19: inadmissible conservative source group state')
              EXIT cell_loop
           END IF
-          IF (q(idx_totMassEqn,j,k)>0.0_wp) THEN
-             CALL qc_to_qp(q(:,j,k),qp(:,j,k),pressure,TRIM(context),conversion_ok)
+          IF (q_group(idx_totMassEqn,j,k)>0.0_wp) THEN
+             CALL qc_to_qp(q_group(:,j,k),qp_group(:,j,k),pressure,TRIM(context),conversion_ok)
              IF (.NOT.conversion_ok) THEN
                 CALL reject_cell('D19: source group conversion failed')
                 EXIT cell_loop
              END IF
           ELSE
-             CALL initialize_dry_physical_cell(qp(:,j,k))
+             CALL initialize_dry_physical_cell(qp_group(:,j,k))
           END IF
        END DO cell_loop
        IF (step_failed) THEN
@@ -274,6 +276,8 @@ CONTAINS
           DEALLOCATE(group_j,group_k,staged_deposit,staged_erosion, &
                staged_erodible,staged_lava,staged_bed_rate)
        END IF
+       q=q_group
+       qp=qp_group
     END DO
   CONTAINS
     SUBROUTINE record_group_bed_rates
