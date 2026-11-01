@@ -55,6 +55,7 @@ CONTAINS
     INTEGER, INTENT(OUT) :: iterations_used,linear_info
     LOGICAL, INTENT(OUT) :: converged,line_search_failed
     REAL(wp) :: q_in(n_vars),q_si(n_vars),semi_rate(n_eqns),coeff_f(n_eqns)
+    REAL(wp) :: semi_scale,delta_momentum
     INTEGER :: n_active,i
     q_in=q_cell
     iterations_used=0
@@ -70,20 +71,26 @@ CONTAINS
     DO i=1,n_active
        IF (COUNT(source_group%equation_ids==source_group%equation_ids(i))/=1) RETURN
     END DO
-    ! v2 sequence: frozen semi-implicit rate, corrected momentum, then Newton.
+    ! Freeze the semi-implicit rate and limit its entire increment by one
+    ! nonnegative factor, so neither momentum component crosses zero.
+    ! Components initially at rest must not acquire a sign from friction.
     CALL eval_source_semi_implicit(source_group,q_in,Bprime_x,Bprime_y, &
          grav_correction,stochastic_value,semi_rate)
-    q_si=q_in+dt*semi_rate
-    IF (ANY(semi_rate(2:3)/=0.0_wp)) THEN
-       IF (DOT_PRODUCT(q_in(2:3),q_in(2:3))==0.0_wp) THEN
-          q_si(2:3)=0.0_wp
-       ELSEIF (ANY(q_si(2:3)*q_in(2:3)<0.0_wp)) THEN
-          q_si(2:3)=0.0_wp
-       ELSE
-          q_si(2:3)=SQRT(DOT_PRODUCT(q_si(2:3),q_si(2:3))) * &
-               q_in(2:3)/SQRT(DOT_PRODUCT(q_in(2:3),q_in(2:3)))
+    semi_scale=1.0_wp
+    DO i=2,3
+       delta_momentum=dt*semi_rate(i)
+       IF (q_in(i)==0.0_wp) THEN
+          IF (delta_momentum/=0.0_wp) semi_scale=0.0_wp
+       ELSEIF (q_in(i)*delta_momentum<0.0_wp) THEN
+          semi_scale=MIN(semi_scale,ABS(q_in(i)/delta_momentum))
        END IF
-    END IF
+    END DO
+    q_si=q_in+dt*semi_scale*semi_rate
+    ! Set a component exactly to zero at its limiting crossing.
+    DO i=2,3
+       IF (q_in(i)==0.0_wp) q_si(i)=0.0_wp
+       IF (q_in(i)*q_si(i)<0.0_wp) q_si(i)=0.0_wp
+    END DO
     ! q_si is both the corrected RHS and the Newton initial guess.
     q_cell=q_si
     coeff_f=1.0_wp
