@@ -171,3 +171,7 @@ Refactored `test_projection_stress.f90` to test only the independent production 
 ### Lie mass-exchange transactional regression (2026-11-01)
 
 Added a cell-grid Lie GROUP-0 erosion regression to `test_projection_stress.f90`: initializes a real registry, evaluates original conservative-to-primitive states, calls the actual `execute_lie_source_groups` with `q_original` and `qp_original`, checks conservative solid-mass / erosion inventory transfer, erodible depletion, nonnegative inventories, finite results and refreshed geometry. The runner already executes this fixture in strict/optimized and 1-/4-thread configurations. Final compilation, runtime acceptance, and restart/rollback tests are still pending. No intermediate compilation/tests.
+
+### Rejected Lie mass-exchange regression (2026-11-01)
+
+Added a late-cell nonfinite-input rejection fixture in `test_projection_stress.f90`, with a real group-0 erosion registry and the production Lie source executor. The test opens a geometry transaction, forces the second cell's original primitive input invalid, expects recoverable `step_failed` and a diagnostic, invokes `rollback_lie_geometry_transaction`, and checks bed, cached geometry and all inventory snapshots exactly. Fluid trial state is discarded by the test as in `advance_lie`. **Actual restart serialization/continuation remains outstanding**; do not count this as restart coverage. Final compile and runtime verification remain deferred.

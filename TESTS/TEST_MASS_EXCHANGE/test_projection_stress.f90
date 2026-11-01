@@ -10,7 +10,7 @@ PROGRAM test_projection_stress
   USE state_conversion_2d, ONLY : qc_to_qp
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
-  USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+  USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite,ieee_value,ieee_quiet_nan
   IMPLICIT NONE
   INTEGER, PARAMETER :: ns=2, nq=6, rough_steps=32
   REAL(wp), PARAMETER :: tolerance=2048.0_wp*EPSILON(1.0_wp)
@@ -39,7 +39,10 @@ PROGRAM test_projection_stress
         IF (dimension==2) ny=12*2**level
         CALL allocate_grid
         CALL reset_state(.FALSE.)
-        IF (level==0) CALL check_lie_exchange_transaction
+        IF (level==0) THEN
+           CALL check_lie_exchange_transaction
+           CALL check_lie_rejected_transaction
+        END IF
         DO k=1,ny
            DO j=1,nx
               rate(j,k)=-0.001_wp*(2.0_wp+COS(2.0_wp*ACOS(-1.0_wp)*(REAL(j,wp)-0.5_wp)*dx))
@@ -207,6 +210,64 @@ CONTAINS
     CALL registry%finalize()
     CALL reset_state(.FALSE.)
   END SUBROUTINE check_lie_exchange_transaction
+
+  !> A later-cell failure must not commit any earlier-cell exchange.
+  !> The caller uses trial fluid state and the geometry transaction rollback,
+  !> matching the Lie time driver. Reject without invoking fatal_error.
+  SUBROUTINE check_lie_rejected_transaction
+    TYPE(source_registry_type) :: registry
+    TYPE(source_group_type) :: groups(1)
+    REAL(wp) :: q_before(nq,nx,ny),qp_before(nq+2,nx,ny)
+    REAL(wp) :: q_trial(nq,nx,ny),qp_trial(nq+2,nx,ny)
+    REAL(wp) :: bed_before(nx+1,ny+1)
+    REAL(wp) :: deposited_before(nx,ny,ns),eroded_before(nx,ny,ns)
+    REAL(wp) :: erodible_before(ns,nx,ny),lava_before(nx,ny)
+    REAL(wp) :: centers_before(nx,ny),slope_before(nx,ny)
+    REAL(wp) :: pressure
+    INTEGER :: a,b,l
+    LOGICAL :: failed,accepted
+    CHARACTER(LEN=256) :: error,message
+    CALL reset_state(.FALSE.)
+    groups(1)%id=0
+    groups(1)%method=SOURCE_METHOD_EXPLICIT
+    groups(1)%source_names=[CHARACTER(LEN=64)::'mass_exchange_erosion']
+    groups(1)%equation_ids=[(l,l=1,nq)]
+    CALL registry%initialize(nq,0,groups,error)
+    IF (LEN_TRIM(error)>0) ERROR STOP 'Lie rejection registry initialization'
+    DO b=1,ny
+       DO a=1,nx
+          CALL qc_to_qp(q(:,a,b),qp(:,a,b),pressure,'Lie rejection test',accepted)
+          IF (.NOT.accepted) ERROR STOP 'Lie rejection primitive conversion'
+          erodible(:,a,b)=[0.002_wp,0.001_wp]
+       END DO
+    END DO
+    q_before=q;qp_before=qp
+    bed_before=B_vertex
+    deposited_before=deposit;eroded_before=erosion
+    erodible_before=erodible;lava_before=lava_deposit
+    centers_before=B_cent;slope_before=B_prime_x_geom
+    q_trial=q_before;qp_trial=qp_before
+    ! Cell 2 is rejected after cell 1 has been considered for transfer.
+    qp_trial(:,2,1)=ieee_value(0.0_wp,ieee_quiet_nan)
+    CALL begin_lie_geometry_transaction
+    CALL execute_lie_source_groups(q_trial,qp_trial,1.0_wp,domain,registry, &
+         q_original=q_before,qp_original=qp_trial, &
+         step_failed=failed,failure_message=message)
+    IF (.NOT.failed) ERROR STOP 'Lie exchange rejection not reported'
+    IF (LEN_TRIM(message)==0) ERROR STOP 'Lie rejection missing diagnostic'
+    CALL rollback_lie_geometry_transaction
+    ! Fluid workspaces are not published by the Lie driver on rejection.
+    q_trial=q_before;qp_trial=qp_before
+    IF (ANY(q_trial/=q_before) .OR. ANY(qp_trial/=qp_before)) &
+         ERROR STOP 'Rejected Lie fluid state changed'
+    IF (ANY(B_vertex/=bed_before) .OR. ANY(B_cent/=centers_before) .OR. &
+         ANY(B_prime_x_geom/=slope_before)) ERROR STOP 'Lie bed rollback mismatch'
+    IF (ANY(deposit/=deposited_before) .OR. ANY(erosion/=eroded_before) .OR. &
+         ANY(erodible/=erodible_before) .OR. ANY(lava_deposit/=lava_before)) &
+         ERROR STOP 'Lie inventory rollback mismatch'
+    CALL registry%finalize()
+    CALL reset_state(.FALSE.)
+  END SUBROUTINE check_lie_rejected_transaction
 
   !> \brief Generate reproducible rates with a portable nonoverflowing integer generator.
   !> \param[in] signed_rate Allow either deposition-like or erosion-like bed proposals.
