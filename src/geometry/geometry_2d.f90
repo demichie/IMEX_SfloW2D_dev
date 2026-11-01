@@ -11,6 +11,7 @@
 
 MODULE geometry_2d
 
+  USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
   USE parameters_2d, ONLY : wp , sp, xinf
   USE parameters_2d, ONLY : verbose_level
 
@@ -526,6 +527,8 @@ CONTAINS
        ERROR STOP 'topography rate cell index is outside the grid'
     END IF
 
+    IF (.NOT.ieee_is_finite(rate)) &
+         ERROR STOP 'non-finite Lie cell topography proposal'
     topography_rate_cell(j,k) = rate
 
   END SUBROUTINE record_topography_rate_cell
@@ -541,8 +544,12 @@ CONTAINS
     IMPLICIT NONE
 
     REAL(wp), INTENT(IN) :: time_step
-    INTEGER :: j, k
+    REAL(wp), ALLOCATABLE :: bed_candidate(:,:)
 
+    IF (.NOT.ieee_is_finite(time_step) .OR. time_step<=0.0_wp) &
+         ERROR STOP 'invalid Lie topography time interval'
+    IF (.NOT.ALLOCATED(B_vertex)) &
+         ERROR STOP 'topography vertices are not initialized'
     IF (.NOT.ALLOCATED(topography_rate_cell) .OR.                         &
          .NOT.ALLOCATED(topography_rate_vertex)) THEN
        ERROR STOP 'topography rate workspace is not initialized'
@@ -551,13 +558,13 @@ CONTAINS
     CALL project_cell_field_to_vertices(topography_rate_cell,             &
          topography_rate_vertex)
 
-    !$OMP PARALLEL DO COLLAPSE(2)
-    DO k = 1, comp_interfaces_y
-       DO j = 1, comp_interfaces_x
-          B_vertex(j,k) = B_vertex(j,k) + time_step * topography_rate_vertex(j,k)
-       END DO
-    END DO
-    !$OMP END PARALLEL DO
+    ! Validate the entire nodal candidate before changing authoritative B_vertex.
+    IF (.NOT.ALL(ieee_is_finite(topography_rate_vertex))) &
+         ERROR STOP 'non-finite projected Lie topography rate'
+    bed_candidate=B_vertex+time_step*topography_rate_vertex
+    IF (.NOT.ALL(ieee_is_finite(bed_candidate))) &
+         ERROR STOP 'non-finite Lie topography candidate'
+    B_vertex=bed_candidate
 
     CALL refresh_topography_geometry
 

@@ -83,6 +83,7 @@ Do not claim that first-order Lie is unconditionally stable or well-balanced for
 
 | Date | Change | Commit | Checks executed | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-11-01 | Validate complete candidate B_vertex and projected bed rates before changing the authoritative nodal topography; reject non-finite cell proposals. | Pending commit | Static review only, no build/tests | This is geometry-update staging, not full-step isolation; derived geometry refresh and substrate globals remain nontransactional. |
 | 2026-11-01 | Moved all spatial and Lie-source fluid updates into dedicated timestep q/qp trial arrays; publish both only after the full Lie executor returns. | Pending commit | Static review; no build/tests | Substrate and geometry remain global during execution, so full-timestep atomicity is NOT yet guaranteed. |
 | 2026-11-01 | Stage and validate complete cell-local explicit Lie fluid, primitive and substrate candidates before committing; remove partial candidate writes on failed inventory checks. | Pending commit | Static review only; compilation intentionally deferred | This is cell-local staging, not full-timestep rollback; bed geometry remains globally committed per mass-exchange group. |
 | 2026-11-01 | Decoupled Lie driver from unused global equation partition and replaced misleading RK-completion observer with Lie-completion event. | Pending commit | Static inspection only; compilation intentionally deferred | Full step-level atomicity still open, including geometry state and failure rollback. |
