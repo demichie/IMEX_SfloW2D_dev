@@ -13,26 +13,25 @@ MODULE source_input_2d
   IMPLICIT NONE
   PRIVATE
   ! D18: physical-source scheduling preferences, absent unless specified.
-  CHARACTER(LEN=16), PUBLIC :: rheology_method='', rheology_cadence=''
-  CHARACTER(LEN=16), PUBLIC :: thermal_method='', thermal_cadence=''
-  CHARACTER(LEN=16), PUBLIC :: pore_pressure_method='', pore_pressure_cadence=''
-  INTEGER, PUBLIC :: rheology_group=0, thermal_group=0, pore_pressure_group=0
-  CHARACTER(LEN=16), PUBLIC :: bottom_circular_method='', bottom_circular_cadence=''
+  CHARACTER(LEN=16), PUBLIC :: rheology_method=''=''
+  CHARACTER(LEN=16), PUBLIC :: thermal_method=''=''
+  CHARACTER(LEN=16), PUBLIC :: pore_pressure_method=''=''
+  INTEGER, PUBLIC :: rheology_group=1, thermal_group=2, pore_pressure_group=3
+  CHARACTER(LEN=16), PUBLIC :: bottom_circular_method=''=''
   INTEGER, PUBLIC :: bottom_circular_group=0
-  CHARACTER(LEN=16), PUBLIC :: bottom_fissural_method='', bottom_fissural_cadence=''
+  CHARACTER(LEN=16), PUBLIC :: bottom_fissural_method=''=''
   INTEGER, PUBLIC :: bottom_fissural_group=0
-  CHARACTER(LEN=16), PUBLIC :: radial_injection_method='', radial_injection_cadence=''
+  CHARACTER(LEN=16), PUBLIC :: radial_injection_method=''=''
   INTEGER, PUBLIC :: radial_injection_group=0
-  CHARACTER(LEN=16), PUBLIC :: geometry_curvature_method='', geometry_curvature_cadence=''
+  CHARACTER(LEN=16), PUBLIC :: geometry_curvature_method=''=''
   INTEGER, PUBLIC :: geometry_curvature_group=0
-  CHARACTER(LEN=16), PUBLIC :: boundary_injection_method='', boundary_injection_cadence=''
+  CHARACTER(LEN=16), PUBLIC :: boundary_injection_method=''=''
   INTEGER, PUBLIC :: boundary_injection_group=0
   CHARACTER(LEN=16), PUBLIC :: mass_exchange_method='EXPLICIT'
-  CHARACTER(LEN=16), PUBLIC :: mass_exchange_cadence='STEP'
-  INTEGER, PUBLIC :: mass_exchange_group=0
+  INTEGER, PUBLIC :: mass_exchange_group=4
   LOGICAL, PUBLIC :: mass_exchange_configuration_present=.FALSE.
   NAMELIST /mass_exchange_parameters/ mass_exchange_method, &
-       mass_exchange_cadence, mass_exchange_group, erosion_coeff, &
+       mass_exchange_group, erosion_coeff, &
        settling_flag, loss_rate, entrainment_flag, gas_loss_flag, &
        liquid_vaporization_flag, lava_deposition_flag, lava_deposition_model, &
        lava_deposition_rate, lava_deposition_visc_ref, lava_deposition_exponent, &
@@ -79,14 +78,10 @@ CONTAINS
        END IF
        mass_exchange_configuration_present=.TRUE.
        mass_exchange_method=uppercase_source_text(ADJUSTL(mass_exchange_method))
-       mass_exchange_cadence=uppercase_source_text(ADJUSTL(mass_exchange_cadence))
        IF (mass_exchange_method/='EXPLICIT' .AND. &
             mass_exchange_method/='NEWTON' .AND. &
             mass_exchange_method/='ANALYTIC') THEN
           error='Unsupported mass-exchange METHOD'; RETURN
-       END IF
-       IF (mass_exchange_cadence/='STEP' .AND. mass_exchange_cadence/='STAGE') THEN
-          error='Unsupported mass-exchange CADENCE'; RETURN
        END IF
        lava_deposition_model=uppercase_source_text(ADJUSTL(lava_deposition_model))
        IF (lava_deposition_flag) THEN

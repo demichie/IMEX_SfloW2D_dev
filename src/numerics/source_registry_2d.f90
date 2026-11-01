@@ -7,18 +7,14 @@
 !********************************************************************************
 MODULE source_registry_2d
   USE source_catalog_2d
-  USE equation_metadata_2d, ONLY : equation_partition_type, &
-       IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: source_group_type, source_registry_type
   PUBLIC :: group_contains_name, group_source_names
 
   !> \brief Runtime method subgroup; id=0 is valid.
-  !> STAGE may share an ID between EXPLICIT and NEWTON only.
   TYPE :: source_group_type
     INTEGER :: id=0 !< Public or normalized internal group identity.
-    INTEGER :: cadence=0 !< Stage or post-RK step application.
     INTEGER :: method=0 !< Explicit, Newton or analytic.
     CHARACTER(LEN=64), ALLOCATABLE :: source_names(:) !< Unique schedulable source identities.
     INTEGER, ALLOCATABLE :: equation_ids(:) !< Implicit equation block or explicit footprint.
@@ -31,26 +27,15 @@ MODULE source_registry_2d
     INTEGER :: pore_equation=0 !< Pore index, zero when absent.
     LOGICAL :: initialized=.FALSE. !< Cached successful-validation status.
     LOGICAL :: implicit_sources_flag=.FALSE. !< Any validated NEWTON source group.
-    TYPE(source_group_type), ALLOCATABLE :: stage_entries(:), step_entries(:)
     TYPE(source_group_type), ALLOCATABLE :: lie_entries(:)
   CONTAINS
-    PROCEDURE :: initialize => initialize_registry
     PROCEDURE :: groups => copy_lie_groups
-    PROCEDURE :: initialize_lie => initialize_lie_registry
+    PROCEDURE :: initialize => initialize_lie_registry
     PROCEDURE :: finalize => finalize_registry
     PROCEDURE :: is_initialized => registry_is_initialized
     PROCEDURE :: has_implicit_sources => registry_has_implicit_sources
-    PROCEDURE :: stage_groups => copy_stage_groups
-    PROCEDURE :: step_groups => copy_step_groups
-    PROCEDURE :: validate => validate_registry
   END TYPE source_registry_type
 CONTAINS
-  PURE INTEGER FUNCTION group_stage_rank(group) RESULT(rank)
-    TYPE(source_group_type), INTENT(IN) :: group
-    rank=1
-    IF (group%method==SOURCE_METHOD_EXPLICIT) rank=2
-  END FUNCTION group_stage_rank
-
   !> Membership in the single, canonical physical-source name array.
   PURE LOGICAL FUNCTION group_contains_name(group,name) RESULT(found)
     TYPE(source_group_type), INTENT(IN) :: group
@@ -68,148 +53,11 @@ CONTAINS
     IF (ALLOCATED(group%source_names)) names=group%source_names
   END FUNCTION group_source_names
 
-  !> \brief Copy and validate complete group/solve metadata transactionally.
-  !> \param[in,out] this Registry; reset even when validation fails.
-  !> \param[in] n_equations Conservative equation count.
-  !> \param[in] pore_equation Optional pore equation index, or zero when absent.
-  !> \param[in] stage_groups Ordered stage descriptors.
-  !> \param[in] step_groups Ordered post-RK descriptors.
-  !> \param[out] error Empty on success, otherwise a diagnostic before simulation.
-  SUBROUTINE initialize_registry(this,n_equations,pore_equation,stage_groups,step_groups,error)
-    CLASS(source_registry_type), INTENT(INOUT) :: this
-    INTEGER, INTENT(IN) :: n_equations,pore_equation
-    TYPE(source_group_type), INTENT(IN) :: stage_groups(:),step_groups(:)
-    CHARACTER(*), INTENT(OUT) :: error
-    CALL this%finalize()
-    this%n_equations=n_equations
-    this%pore_equation=pore_equation
-    this%stage_entries=stage_groups
-    this%step_entries=step_groups
-    CALL this%validate(error)
-    IF (LEN_TRIM(error)>0) THEN
-      CALL this%finalize()
-      RETURN
-    END IF
-    this%implicit_sources_flag = ANY(stage_groups%method==SOURCE_METHOD_NEWTON) .OR. &
-         ANY(step_groups%method==SOURCE_METHOD_NEWTON)
-    this%initialized=.TRUE.
-  END SUBROUTINE initialize_registry
-
-  !> \brief Validate native or normalized descriptors before making them visible.
-  !> \param[in] this Candidate metadata; validation does not mutate it.
-  !> \param[out] error Empty when all membership/capability/block checks pass.
-  SUBROUTINE validate_registry(this,error)
-    CLASS(source_registry_type), INTENT(IN) :: this
-    CHARACTER(*), INTENT(OUT) :: error
-    TYPE(source_group_type), ALLOCATABLE :: groups(:)
-    TYPE(source_group_type) :: group
-    TYPE(source_term_type) :: term
-    INTEGER, ALLOCATABLE :: expected(:)
-    CHARACTER(LEN=64) :: rheology_name
-    CHARACTER(LEN=64), ALLOCATABLE :: seen_names(:)
-    INTEGER :: i,j,id,nstage,mass_group
-    error='D17: invalid or duplicate source catalog name'
-    IF (.NOT.source_catalog_names_unique()) RETURN
-    error='D17: incomplete source registry'
-    IF (.NOT.ALLOCATED(this%stage_entries)) RETURN
-    IF (.NOT.ALLOCATED(this%step_entries)) RETURN
-    IF (this%n_equations<4) RETURN
-    IF (this%pore_equation/=0) THEN
-      IF (this%pore_equation<5 .OR. this%pore_equation>this%n_equations) RETURN
-    END IF
-    ALLOCATE(seen_names(0))
-    mass_group=0
-    nstage=SIZE(this%stage_entries)
-    groups=[this%stage_entries,this%step_entries]
-    DO i=1,SIZE(groups)
-      group=groups(i)
-      rheology_name='' ! Rheology is one schedulable physical identity.
-      error='D17: invalid group identity, method, cadence or order'
-      IF (group%id<0) RETURN
-      IF (i<=nstage) THEN
-        IF (group%cadence/=SOURCE_CADENCE_STAGE) RETURN
-      ELSE
-        IF (group%cadence/=SOURCE_CADENCE_STEP) RETURN
-      END IF
-      SELECT CASE(group%method)
-      CASE(SOURCE_METHOD_EXPLICIT)
-        CONTINUE
-      CASE(SOURCE_METHOD_NEWTON,SOURCE_METHOD_ANALYTIC)
-        IF (group%cadence/=SOURCE_CADENCE_STAGE .AND. &
-             group%cadence/=SOURCE_CADENCE_STEP) RETURN
-      CASE DEFAULT
-        RETURN
-      END SELECT
-      DO j=1,i-1
-        IF (groups(j)%cadence/=group%cadence) CYCLE
-        ! An empty EXPLICIT/STAGE descriptor is only an RK interface
-        ! placeholder, not a configured physical source group.
-        IF (SIZE(groups(j)%source_names)==0 .OR. &
-             SIZE(group%source_names)==0) CYCLE
-        IF (groups(j)%id==group%id) THEN
-          IF (groups(j)%method==group%method) RETURN
-          IF (group%cadence==SOURCE_CADENCE_STEP) RETURN
-          IF (group%method==SOURCE_METHOD_ANALYTIC .OR. &
-               groups(j)%method==SOURCE_METHOD_ANALYTIC) RETURN
-        END IF
-        IF (groups(j)%id>group%id) RETURN
-      END DO
-      error='D17: unallocated group descriptor arrays'
-      IF (.NOT.ALLOCATED(group%source_names)) RETURN
-      IF (.NOT.ALLOCATED(group%equation_ids)) RETURN
-      error='D17: invalid or repeated group equation'
-      IF (.NOT.valid_equations(group%equation_ids,this%n_equations)) RETURN
-      error='D17: repeated or empty canonical source name'
-      DO j=1,SIZE(group%source_names)
-        IF (LEN_TRIM(group%source_names(j))==0) RETURN
-        IF (COUNT(group%source_names==group%source_names(j))/=1) RETURN
-      END DO
-      error='D17: physical term duplicated, unknown or dependent'
-      DO j=1,SIZE(group%source_names)
-        term=source_term_descriptor_by_name(group%source_names(j))
-        ! Unknown names yield an empty descriptor. No numeric identity
-        ! is needed to validate membership or scheduling capabilities.
-        IF (LEN_TRIM(term%name)==0) RETURN
-        ! Mathematical rheology addends are not physical schedule entries
-        ! evaluation; native and normalized groups own complete laws.
-                IF (ANY(seen_names==term%name)) RETURN
-        seen_names=[CHARACTER(LEN=64) :: seen_names,term%name]
-      error='D17: term does not support this method/cadence or target'
-        IF (.NOT.supports_group(term,group)) RETURN
-        IF (INDEX(TRIM(term%name),'rheology_')==1) THEN
-          IF (LEN_TRIM(rheology_name)>0 .AND. rheology_name/=term%name) RETURN
-          rheology_name=term%name
-        END IF
-        IF (INDEX(TRIM(term%name),'mass_exchange_')==1) THEN
-          IF (mass_group/=0 .AND. mass_group/=i) RETURN
-          mass_group=i
-        END IF
-        error='D17: physical term duplicated, unknown or dependent'
-      END DO
-      IF (LEN_TRIM(rheology_name)>0 .AND. group%method/=SOURCE_METHOD_EXPLICIT) THEN
-        error='D17: rheology group requires the complete law'
-        IF (.NOT.ANY(group%source_names==rheology_name)) RETURN
-      END IF
-      ! Newton equations specify internal unknowns, not source footprints.
-      IF (group%method==SOURCE_METHOD_NEWTON) THEN
-        error='D17: Newton group requires solver unknowns'
-        IF (SIZE(group%equation_ids)==0) RETURN
-      ELSE IF (group%method==SOURCE_METHOD_ANALYTIC) THEN
-        ! Analytic operators always return full conservative rates.
-        error='D17: analytic group must contain exactly one physical process'
-        IF (SIZE(group%source_names)/=1) RETURN
-      END IF
-    END DO
-    error=''
-  END SUBROUTINE validate_registry
-
   !> \brief Release every owned descriptor and reset initialization status.
   !> \param[in,out] this Registry to release; repeated calls are safe.
   SUBROUTINE finalize_registry(this)
     CLASS(source_registry_type), INTENT(INOUT) :: this
     IF (ALLOCATED(this%lie_entries)) DEALLOCATE(this%lie_entries)
-    IF (ALLOCATED(this%stage_entries)) DEALLOCATE(this%stage_entries)
-    IF (ALLOCATED(this%step_entries)) DEALLOCATE(this%step_entries)
     this%n_equations=0; this%pore_equation=0; this%initialized=.FALSE.
     this%implicit_sources_flag=.FALSE.
   END SUBROUTINE finalize_registry
@@ -291,26 +139,6 @@ CONTAINS
     IF (ALLOCATED(this%lie_entries)) groups=this%lie_entries
   END FUNCTION copy_lie_groups
 
-  !> \brief Return a detached copy of ordered stage metadata.
-  !> \param[in] this Registry.
-  !> \return Stage groups, or an allocated empty list after finalization.
-  FUNCTION copy_stage_groups(this) RESULT(groups)
-    CLASS(source_registry_type), INTENT(IN) :: this
-    TYPE(source_group_type), ALLOCATABLE :: groups(:)
-    ALLOCATE(groups(0))
-    IF (ALLOCATED(this%stage_entries)) groups=this%stage_entries
-  END FUNCTION copy_stage_groups
-
-  !> \brief Return a detached copy of post-RK metadata.
-  !> \param[in] this Registry.
-  !> \return Step groups, or an allocated empty list after finalization.
-  FUNCTION copy_step_groups(this) RESULT(groups)
-    CLASS(source_registry_type), INTENT(IN) :: this
-    TYPE(source_group_type), ALLOCATABLE :: groups(:)
-    ALLOCATE(groups(0))
-    IF (ALLOCATED(this%step_entries)) groups=this%step_entries
-  END FUNCTION copy_step_groups
-
   !> \brief Map one target to conservative equation indices.
   !> \param[in] target Velocity, energy or pore target ID.
   !> \param[in] pore Pore equation index, zero when absent.
@@ -359,31 +187,4 @@ CONTAINS
     equal=.TRUE.
   END FUNCTION same_set
 
-  !> \brief Check implemented temporal capabilities for one physical term.
-  !> \param[in] term Valid schedulable catalog descriptor.
-  !> \param[in] group Candidate method/cadence.
-  !> \return True when the term's existing interface supports this group.
-  LOGICAL FUNCTION supports_group(term,group) RESULT(supported)
-    TYPE(source_term_type), INTENT(IN) :: term
-    TYPE(source_group_type), INTENT(IN) :: group
-    supported=.FALSE.
-    IF (LEN_TRIM(term%name)==0) RETURN
-    SELECT CASE(group%method)
-    CASE(SOURCE_METHOD_EXPLICIT)
-      supported=term%has_explicit
-      IF (group%cadence==SOURCE_CADENCE_STAGE) THEN
-        supported=supported .AND. INDEX(TRIM(term%name),'mass_exchange_')/=1
-      ELSE IF (group%cadence==SOURCE_CADENCE_STEP) THEN
-        supported=supported
-      ELSE
-        supported=.FALSE.
-      END IF
-    CASE(SOURCE_METHOD_NEWTON)
-      supported=(group%cadence==SOURCE_CADENCE_STAGE .OR. &
-           group%cadence==SOURCE_CADENCE_STEP) .AND. term%has_newton
-    CASE(SOURCE_METHOD_ANALYTIC)
-      supported=(group%cadence==SOURCE_CADENCE_STAGE .OR. &
-           group%cadence==SOURCE_CADENCE_STEP) .AND. term%has_analytic
-    END SELECT
-  END FUNCTION supports_group
 END MODULE source_registry_2d
