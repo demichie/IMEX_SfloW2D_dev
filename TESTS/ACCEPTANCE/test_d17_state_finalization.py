@@ -11,14 +11,13 @@ def load(path):
 
 
 def body(text, name):
-    # Match the declaration and closing line independently.  Fortran permits
-    # END SUBROUTINE without a repeated name; the source also uses this form.
+    # Use anchored lines: END SUBROUTINE may omit the routine name.
     opening = re.search(
-        rf"(?im)^[ \\t]*subroutine[ \\t]+{re.escape(name)}[ \\t]*\\(",
+        rf"(?im)^[ \t]*subroutine[ \t]+{re.escape(name)}[ \t]*\(",
         text)
     assert opening, f"missing routine {name}"
     closing = re.search(
-        rf"(?im)^[ \\t]*end[ \\t]+subroutine(?:[ \\t]+{re.escape(name)})?[ \\t]*$",
+        rf"(?im)^[ \t]*end[ \t]+subroutine(?:[ \t]+{re.escape(name)})?[ \t]*$",
         text[opening.end():])
     assert closing, f"missing END SUBROUTINE for {name}"
     return text[opening.end():opening.end() + closing.start()]
