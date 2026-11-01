@@ -350,33 +350,24 @@ CONTAINS
     REAL(wp), INTENT(OUT), OPTIONAL :: r_nh_term_impl(n_eqns)
     TYPE(source_group_type), INTENT(IN), OPTIONAL :: group
 
-    COMPLEX(wp) :: h                       !< height [m]
-    COMPLEX(wp) :: T                       !< temperature [K]
-    COMPLEX(wp) :: rho_m                   !< mixture density [kg/m3]
-    COMPLEX(wp) :: alphas(n_solid)         !< sediment volume fractions
-    COMPLEX(wp) :: alphag(n_add_gas)       !< add. gas volume fractions
-    COMPLEX(wp) :: inv_rho_m               !< 1/mixture density [kg-1 m3]
 
     COMPLEX(wp) :: qj(n_vars)
-    COMPLEX(wp) :: nh_term(n_eqns)
     COMPLEX(wp) :: source_term(n_eqns)
 
     INTEGER :: i
 
-    COMPLEX(wp) :: Zs
-
-    COMPLEX(wp) :: exc_pore_pres
     TYPE(complex_physical_state_type) :: physical_state
 
-    COMPLEX(wp) :: red_grav
     LOGICAL :: selected_rheology, selected_thermal
     CHARACTER(LEN=64) :: selected_model_name
 
-    IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
+    IF (PRESENT(c_qj) .AND. PRESENT(c_nh_term_impl) .AND. &
+         .NOT.PRESENT(r_qj) .AND. .NOT.PRESENT(r_nh_term_impl)) THEN
 
        qj = c_qj
 
-    ELSEIF ( present(r_qj) .AND. present(r_nh_term_impl) ) THEN
+    ELSEIF (PRESENT(r_qj) .AND. PRESENT(r_nh_term_impl) .AND. &
+         .NOT.PRESENT(c_qj) .AND. .NOT.PRESENT(c_nh_term_impl)) THEN
 
        DO i = 1,n_vars
 
@@ -405,19 +396,9 @@ CONTAINS
     IF (selected_rheology .OR. selected_thermal) THEN
        CALL physical_state_from_q(qj, physical_state, Bprimej_x, Bprimej_y, &
             0.0_wp, 0.0_wp, 0.0_wp)
-       h = physical_state%h
-       T = physical_state%T
-       rho_m = physical_state%rho_m
-       alphas = physical_state%alphas
-       alphag = physical_state%alphag
-       inv_rho_m = physical_state%inv_rhom
-       Zs = physical_state%Zs
-       exc_pore_pres = physical_state%exc_pore_pres
     END IF
 
     IF (rheology_flag .AND. selected_rheology) THEN
-
-       red_grav = physical_state%red_grav
 
        CALL eval_rheology_implicit([selected_model_name], physical_state, &
             stochastic_flag, Zij, source_term(2:3))
@@ -428,15 +409,13 @@ CONTAINS
             radiative_term_coeff,convective_term_coeff,T_env,source_term(4))
     ENDIF
 
-    nh_term = source_term
-
     IF ( present(c_qj) .AND. present(c_nh_term_impl) ) THEN
 
-       c_nh_term_impl = nh_term
+       c_nh_term_impl = source_term
 
     ELSEIF ( present(r_qj) .AND. present(r_nh_term_impl) ) THEN
 
-       r_nh_term_impl = REAL( nh_term )
+       r_nh_term_impl = REAL(source_term)
 
     END IF
 
