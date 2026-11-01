@@ -12,7 +12,7 @@ MODULE source_configuration_2d
   USE parameters_2d, ONLY : wp, n_eqns, rheology_flag, rheology_model, &
         thermal_cooling_flag, &
        pore_pressure_flag, curvature_term_flag, bottom_radial_source_flag, &
-       bottom_fissural_source_flag, radial_source_flag, lateral_source_flag, &
+       bottom_fissural_source_flag, radial_source_flag, &
        liquid_flag, gas_flag, lava_flag, liquid_vaporization_flag, &
        idx_pore
   USE constitutive_parameters_2d, ONLY : erosion_coeff, settling_flag, &

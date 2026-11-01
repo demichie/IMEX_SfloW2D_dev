@@ -281,3 +281,9 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Verificato il percorso effettivo: `reconstruction_2d` applica `eval_boundary_injection_explicit` come condizione di Dirichlet sulle tracce delle facce; `spatial_operator_2d` passa l'override `boundary_source_enabled` a tale ricostruzione. Non si tratta di un rate volumetrico di cella. Tuttavia `source_configuration_2d` inseriva `boundary_injection` fra i nomi di sorgenti Lie, e la sweep EXPLICIT non lo applicava come sorgente volumetrico: gruppo spurio, possibile configurazione METHOD/GROUP fuorviante.
 - Eliminata l'attivazione di `boundary_injection` dal registro Lie e dal dispatch per gruppi; l'iniezione laterale continua nel percorso spaziale. In `reconstruction_2d` il modulo fisico del bordo viene ora importato direttamente da `mass_boundary_injection_2d` invece di passare attraverso il re-export improprio di `source_terms_2d`; questi quattro re-export sono rimossi.
 - La voce `boundary_injection` del catalogo resta descrittiva della famiglia fisica, ma non e' schedulata come gruppo Lie; i vecchi parametri `boundary_injection_method/group` non devono pilotare il termine di bordo spaziale. Eventuale rimozione dell'input legacy va coordinata con il parser di input. Nessuna compilazione o Action eseguita.
+
+### Chiusura della separazione boundary/spatial (2026-11-01)
+
+- Rimossi `boundary_injection_method` e `boundary_injection_group` dalla dichiarazione di configurazione in `source_input_2d`, dagli import, default e namelist `/lateral_source_parameters/` in `inpout_2d`. Non sono parametri dei sorgenti volumetrici Lie: il bordo resta una condizione spaziale.
+- Rimosso l'import inutilizzato `lateral_source_flag` da `source_configuration_2d`. Si completa l'intervento iniziato nel commit `d9d9da5`: l'iniezione laterale non e' piu' schedulata tra i sorgenti Lie.
+- Non modificati i test, nessuna compilazione o Action eseguita.

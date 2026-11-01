@@ -25,8 +25,6 @@ MODULE source_input_2d
   INTEGER, PUBLIC :: radial_injection_group=0
   CHARACTER(LEN=16), PUBLIC :: geometry_curvature_method=''
   INTEGER, PUBLIC :: geometry_curvature_group=0
-  CHARACTER(LEN=16), PUBLIC :: boundary_injection_method=''
-  INTEGER, PUBLIC :: boundary_injection_group=0
   CHARACTER(LEN=16), PUBLIC :: mass_exchange_method='EXPLICIT'
   INTEGER, PUBLIC :: mass_exchange_group=4
   LOGICAL, PUBLIC :: mass_exchange_configuration_present=.FALSE.

@@ -75,7 +75,6 @@ MODULE inpout_2d
        bottom_fissural_method, bottom_fissural_group, &
        radial_injection_method, radial_injection_group, &
        geometry_curvature_method, geometry_curvature_group, &
-       boundary_injection_method, boundary_injection_group, &
        mass_exchange_configuration_present, mass_exchange_method, &
        mass_exchange_group
 
@@ -376,8 +375,7 @@ MODULE inpout_2d
   NAMELIST /lateral_source_parameters/ source_side, x1_source, x2_source, &
     y1_source, y2_source, vel_source, T_source, h_source, alphas_source, &
     alphag_source, time_param, Ri_source, mfr_source, &
-    xs_source, xg_source, &
-    boundary_injection_method, boundary_injection_group
+    xs_source, xg_source
 
   NAMELIST /fissural_source_parameters/ x_fissures_end_points,                &
       y_fissures_end_points, width_fissures, linear_vel_fissures,              &
@@ -486,7 +484,6 @@ CONTAINS
     bottom_fissural_method=''; bottom_fissural_group=0
     radial_injection_method=''; radial_injection_group=0
     geometry_curvature_method=''; geometry_curvature_group=0
-    boundary_injection_method=''; boundary_injection_group=0
     mass_exchange_configuration_present=.FALSE.
     mass_exchange_method='EXPLICIT'; mass_exchange_group=4
 
