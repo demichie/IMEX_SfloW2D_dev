@@ -9,410 +9,410 @@
 !********************************************************************************
 
 MODULE domain_2d
-    USE parameters_2d, ONLY : idx_totMassEqn
+        USE parameters_2d, ONLY : idx_totMassEqn
 
-  USE parameters_2d, ONLY : wp
-  USE parameters_2d, ONLY : radial_source_flag, bottom_radial_source_flag,   &
-     bottom_fissural_source_flag
+    USE parameters_2d, ONLY : wp
+    USE parameters_2d, ONLY : radial_source_flag, bottom_radial_source_flag,   &
+        bottom_fissural_source_flag
 
-  USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_cells_xy
-  USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
-   USE geometry_2d, ONLY : source_cell, cell_source_fractions
-
-  IMPLICIT NONE
-
-  PRIVATE
-
-  ! Two spatial cell layers cover the face and three-point reconstruction stencil.
-  ! This width is independent of any temporal Runge-Kutta stage count.
-  INTEGER, PARAMETER :: active_halo_layers = 2
-
-  !> \brief Active-cell/face indices and the wider reconstruction halo.
-  !> \details Solve lists determine where equations are advanced; reconstruction
-  !>          lists also contain neighbouring dry cells read by the HP stencil.
-  TYPE, PUBLIC :: domain_type
-
-     REAL(wp), ALLOCATABLE :: solve_mask_time(:,:)
-
-     LOGICAL, ALLOCATABLE :: solve_mask(:,:)
-     LOGICAL, ALLOCATABLE :: solve_mask_temp(:,:)
-     LOGICAL, ALLOCATABLE :: reconstruction_mask(:,:)
-     LOGICAL, ALLOCATABLE :: solve_mask_x(:,:)
-     LOGICAL, ALLOCATABLE :: solve_mask_y(:,:)
-
-     INTEGER :: solve_cells
-     INTEGER :: reconstruction_cells
-     INTEGER :: hp_eta_cells
-     INTEGER :: solve_interfaces_x
-     INTEGER :: solve_interfaces_y
-
-     INTEGER, ALLOCATABLE :: j_cent(:)
-     INTEGER, ALLOCATABLE :: k_cent(:)
-     LOGICAL, ALLOCATABLE :: hp_eta_mask(:,:)
-     INTEGER, ALLOCATABLE :: hp_eta_j(:), hp_eta_k(:)
-     INTEGER, ALLOCATABLE :: j_reconstruction(:)
-     INTEGER, ALLOCATABLE :: k_reconstruction(:)
-     INTEGER, ALLOCATABLE :: j_stag_x(:)
-     INTEGER, ALLOCATABLE :: k_stag_x(:)
-     INTEGER, ALLOCATABLE :: j_stag_y(:)
-     INTEGER, ALLOCATABLE :: k_stag_y(:)
-
-   CONTAINS
-
-     PROCEDURE :: initialize => initialize_domain
-     PROCEDURE :: finalize => finalize_domain
-     PROCEDURE :: check_solve
-
-  END TYPE domain_type
-
-CONTAINS
-
-  !> \brief Allocate and reset active-cell, halo and face worksets.
-  !>
-  !> \param[in,out] this Active-domain masks and compact cell/face worksets.
-
-  SUBROUTINE initialize_domain(this)
-
-    CLASS(domain_type), INTENT(INOUT) :: this
-
-    ALLOCATE( this%solve_mask_time(comp_cells_x,comp_cells_y) )
-    ALLOCATE( this%solve_mask(comp_cells_x,comp_cells_y) )
-    ALLOCATE( this%solve_mask_temp(comp_cells_x,comp_cells_y) )
-    ALLOCATE( this%reconstruction_mask(comp_cells_x,comp_cells_y) )
-    ALLOCATE( this%hp_eta_mask(comp_cells_x,comp_cells_y) )
-    ALLOCATE( this%solve_mask_x(comp_interfaces_x,comp_cells_y) )
-    ALLOCATE( this%solve_mask_y(comp_cells_x,comp_interfaces_y) )
-
-    this%solve_mask_time = 0.0_wp
-
-    this%solve_mask = .FALSE.
-    this%solve_mask_temp = .FALSE.
-    this%reconstruction_mask = .FALSE.
-    this%hp_eta_mask = .FALSE.
-    this%solve_mask_x = .FALSE.
-    this%solve_mask_y = .FALSE.
-
-    this%solve_mask(1,1:comp_cells_y) = .TRUE.
-    this%solve_mask(comp_cells_x,1:comp_cells_y) = .TRUE.
-    this%solve_mask(1:comp_cells_x,1) = .TRUE.
-    this%solve_mask(1:comp_cells_x,comp_cells_y) = .TRUE.
-
-    comp_cells_xy = comp_cells_x * comp_cells_y
-
-    ALLOCATE( this%j_cent(comp_cells_xy) )
-    ALLOCATE( this%k_cent(comp_cells_xy) )
-    ALLOCATE( this%hp_eta_j(comp_cells_xy), this%hp_eta_k(comp_cells_xy) )
-    ALLOCATE( this%j_reconstruction(comp_cells_xy) )
-    ALLOCATE( this%k_reconstruction(comp_cells_xy) )
-    ALLOCATE( this%j_stag_x(comp_interfaces_x*comp_cells_y) )
-    ALLOCATE( this%k_stag_x(comp_interfaces_x*comp_cells_y) )
-    ALLOCATE( this%j_stag_y(comp_cells_x*comp_interfaces_y) )
-    ALLOCATE( this%k_stag_y(comp_cells_x*comp_interfaces_y) )
-
-    this%solve_cells = 0
-    this%reconstruction_cells = 0
-    this%hp_eta_cells = 0
-    this%solve_interfaces_x = 0
-    this%solve_interfaces_y = 0
-
-    this%j_cent = 0
-    this%k_cent = 0
-    this%j_reconstruction = 0
-    this%k_reconstruction = 0
-    this%j_stag_x = 0
-    this%k_stag_x = 0
-    this%j_stag_y = 0
-    this%k_stag_y = 0
-
-  END SUBROUTINE initialize_domain
-
-  !> \brief Release active-domain masks and compact index lists.
-  !>
-  !> \param[in,out] this Active-domain masks and compact cell/face worksets.
-
-  SUBROUTINE finalize_domain(this)
-
-    CLASS(domain_type), INTENT(INOUT) :: this
-
-    DEALLOCATE( this%solve_mask_time )
-    DEALLOCATE( this%solve_mask )
-    DEALLOCATE( this%solve_mask_temp )
-    DEALLOCATE( this%reconstruction_mask )
-    DEALLOCATE( this%hp_eta_mask, this%hp_eta_j, this%hp_eta_k )
-    DEALLOCATE( this%solve_mask_x )
-    DEALLOCATE( this%solve_mask_y )
-
-    DEALLOCATE( this%j_cent, this%k_cent )
-    DEALLOCATE( this%j_reconstruction, this%k_reconstruction )
-    DEALLOCATE( this%j_stag_x, this%k_stag_x )
-    DEALLOCATE( this%j_stag_y, this%k_stag_y )
-
-  END SUBROUTINE finalize_domain
-
-  !> \brief Rebuild active-cell and face worksets from the current flow and source geometry.
-  !>
-  !> \param[in,out] this Active-domain masks and compact cell/face worksets.
-  !> \param[in] q Cell-centered conservative states, indexed as (variable,x-cell,y-cell).
-  !> \param[in] t Current simulation or stage time [s].
-  !> \param[in] solve_all When true, include the complete domain instead of only flow/source cells
-  !>                      and halos.
-
-  SUBROUTINE check_solve(this, q, t, solve_all)
+    USE geometry_2d, ONLY : comp_cells_x, comp_cells_y, comp_cells_xy
+    USE geometry_2d, ONLY : comp_interfaces_x, comp_interfaces_y
+    USE geometry_2d, ONLY : source_cell, cell_source_fractions
 
     IMPLICIT NONE
 
-    CLASS(domain_type), INTENT(INOUT) :: this
-    REAL(wp), INTENT(IN) :: q(:,:,:)
-    REAL(wp), INTENT(IN) :: t
-    LOGICAL, INTENT(IN) :: solve_all
-    
-    INTEGER :: i,j,k
+    PRIVATE
 
-    !$OMP PARALLEL
-         
-    IF ( solve_all ) THEN
+    ! Two spatial cell layers cover the face and three-point reconstruction stencil.
+    ! This width is independent of any temporal Runge-Kutta stage count.
+    INTEGER, PARAMETER :: active_halo_layers = 2
 
-       !$OMP WORKSHARE
-       this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE.
-       !$OMP END WORKSHARE
+    !> \brief Active-cell/face indices and the wider reconstruction halo.
+    !> \details Solve lists determine where equations are advanced; reconstruction
+    !>          lists also contain neighbouring dry cells read by the HP stencil.
+    TYPE, PUBLIC :: domain_type
 
-    ELSE
-       
-       !$OMP WORKSHARE
-       this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .FALSE.
-       !$OMP END WORKSHARE
+        REAL(wp), ALLOCATABLE :: solve_mask_time(:,:)
 
-    END IF
-    !$OMP BARRIER
-    
-    !$OMP WORKSHARE
-    WHERE ( ( q(idx_totMassEqn,2:comp_cells_x-1,2:comp_cells_y-1) .GT. 0.0_wp ) .AND.        &
-         ( this%solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1) .LE. t ) )       &
-         this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE.
-    !$OMP END WORKSHARE
-    
-    !$OMP BARRIER
+        LOGICAL, ALLOCATABLE :: solve_mask(:,:)
+        LOGICAL, ALLOCATABLE :: solve_mask_temp(:,:)
+        LOGICAL, ALLOCATABLE :: reconstruction_mask(:,:)
+        LOGICAL, ALLOCATABLE :: solve_mask_x(:,:)
+        LOGICAL, ALLOCATABLE :: solve_mask_y(:,:)
 
-      IF ( bottom_radial_source_flag .OR. bottom_fissural_source_flag ) THEN
+        INTEGER :: solve_cells
+        INTEGER :: reconstruction_cells
+        INTEGER :: hp_eta_cells
+        INTEGER :: solve_interfaces_x
+        INTEGER :: solve_interfaces_y
 
-       !$OMP WORKSHARE
-       WHERE ( cell_source_fractions .GT. 0.0_wp ) this%solve_mask = .TRUE.
-       !$OMP END WORKSHARE
-       
-       !$OMP BARRIER
+        INTEGER, ALLOCATABLE :: j_cent(:)
+        INTEGER, ALLOCATABLE :: k_cent(:)
+        LOGICAL, ALLOCATABLE :: hp_eta_mask(:,:)
+        INTEGER, ALLOCATABLE :: hp_eta_j(:), hp_eta_k(:)
+        INTEGER, ALLOCATABLE :: j_reconstruction(:)
+        INTEGER, ALLOCATABLE :: k_reconstruction(:)
+        INTEGER, ALLOCATABLE :: j_stag_x(:)
+        INTEGER, ALLOCATABLE :: k_stag_x(:)
+        INTEGER, ALLOCATABLE :: j_stag_y(:)
+        INTEGER, ALLOCATABLE :: k_stag_y(:)
 
-    END IF
+    CONTAINS
 
-    IF ( radial_source_flag ) THEN
-             
-       !$OMP DO private(j,k)
-    
-       DO k = 2,comp_cells_y-1
-   
-          DO j = 2,comp_cells_x-1
+        PROCEDURE :: initialize => initialize_domain
+        PROCEDURE :: finalize => finalize_domain
+        PROCEDURE :: check_solve
 
-             IF ( source_cell(j,k) .EQ. 2 ) THEN
-                
-                this%solve_mask(j,k) = .TRUE.
-                
-             END IF
+    END TYPE domain_type
 
-          END DO
-          
-       END DO
+CONTAINS
 
-       !$OMP END DO
+    !> \brief Allocate and reset active-cell, halo and face worksets.
+    !>
+    !> \param[in,out] this Active-domain masks and compact cell/face worksets.
 
-    END IF
+    SUBROUTINE initialize_domain(this)
 
-    !$OMP BARRIER
-    !$OMP MASTER
+        CLASS(domain_type), INTENT(INOUT) :: this
 
-    DO i = 1,active_halo_layers
+        ALLOCATE( this%solve_mask_time(comp_cells_x,comp_cells_y) )
+        ALLOCATE( this%solve_mask(comp_cells_x,comp_cells_y) )
+        ALLOCATE( this%solve_mask_temp(comp_cells_x,comp_cells_y) )
+        ALLOCATE( this%reconstruction_mask(comp_cells_x,comp_cells_y) )
+        ALLOCATE( this%hp_eta_mask(comp_cells_x,comp_cells_y) )
+        ALLOCATE( this%solve_mask_x(comp_interfaces_x,comp_cells_y) )
+        ALLOCATE( this%solve_mask_y(comp_cells_x,comp_interfaces_y) )
 
-       this%solve_mask_temp = this%solve_mask
-       
-       ! solution domain is extended to neighbours of positive-mass cells
-       this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
-            this%solve_mask_temp(1:comp_cells_x-2,2:comp_cells_y-1)
-       
-       this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
-            this%solve_mask_temp(3:comp_cells_x,2:comp_cells_y-1)
-       
-       this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
-            this%solve_mask_temp(2:comp_cells_x-1,1:comp_cells_y-2)
-       
-       this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
-            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
-            this%solve_mask_temp(2:comp_cells_x-1,3:comp_cells_y)
-       
-    END DO
+        this%solve_mask_time = 0.0_wp
 
-    !$OMP END MASTER
-    !$OMP BARRIER
+        this%solve_mask = .FALSE.
+        this%solve_mask_temp = .FALSE.
+        this%reconstruction_mask = .FALSE.
+        this%hp_eta_mask = .FALSE.
+        this%solve_mask_x = .FALSE.
+        this%solve_mask_y = .FALSE.
 
-    !$OMP DO private(j,k)
-    
-    DO k = 1,comp_cells_y
-       
-       DO j = 1,comp_cells_x
-          
-          IF ( radial_source_flag ) THEN
-             
-             IF ( source_cell(j,k) .EQ. 1 ) this%solve_mask(j,k) = .FALSE.
-             
-          END IF
-          
-       END DO
-       
-    END DO
-    
-    !$OMP END DO
-    !$OMP WORKSHARE
+        this%solve_mask(1,1:comp_cells_y) = .TRUE.
+        this%solve_mask(comp_cells_x,1:comp_cells_y) = .TRUE.
+        this%solve_mask(1:comp_cells_x,1) = .TRUE.
+        this%solve_mask(1:comp_cells_x,comp_cells_y) = .TRUE.
 
-    this%solve_mask_x(1:comp_interfaces_x,1:comp_cells_y) = .FALSE.
-    this%solve_mask_y(1:comp_cells_x,1:comp_interfaces_y) = .FALSE.
+        comp_cells_xy = comp_cells_x * comp_cells_y
 
-    !$OMP END WORKSHARE
+        ALLOCATE( this%j_cent(comp_cells_xy) )
+        ALLOCATE( this%k_cent(comp_cells_xy) )
+        ALLOCATE( this%hp_eta_j(comp_cells_xy), this%hp_eta_k(comp_cells_xy) )
+        ALLOCATE( this%j_reconstruction(comp_cells_xy) )
+        ALLOCATE( this%k_reconstruction(comp_cells_xy) )
+        ALLOCATE( this%j_stag_x(comp_interfaces_x*comp_cells_y) )
+        ALLOCATE( this%k_stag_x(comp_interfaces_x*comp_cells_y) )
+        ALLOCATE( this%j_stag_y(comp_cells_x*comp_interfaces_y) )
+        ALLOCATE( this%k_stag_y(comp_cells_x*comp_interfaces_y) )
 
-    !$OMP END PARALLEL
+        this%solve_cells = 0
+        this%reconstruction_cells = 0
+        this%hp_eta_cells = 0
+        this%solve_interfaces_x = 0
+        this%solve_interfaces_y = 0
 
-    !----- check for cells where computation is needed
-    i = 0
-        
-    DO k = 1,comp_cells_y
+        this%j_cent = 0
+        this%k_cent = 0
+        this%j_reconstruction = 0
+        this%k_reconstruction = 0
+        this%j_stag_x = 0
+        this%k_stag_x = 0
+        this%j_stag_y = 0
+        this%k_stag_y = 0
 
-       DO j = 1,comp_cells_x
+    END SUBROUTINE initialize_domain
 
-          IF ( this%solve_mask(j,k) ) THEN
+    !> \brief Release active-domain masks and compact index lists.
+    !>
+    !> \param[in,out] this Active-domain masks and compact cell/face worksets.
 
-             i = i+1
-             this%j_cent(i) = j
-             this%k_cent(i) = k
+    SUBROUTINE finalize_domain(this)
 
-             this%solve_mask_x(j,k) = .TRUE.
-             this%solve_mask_x(j+1,k) = .TRUE.
-             this%solve_mask_y(j,k) = .TRUE.
-             this%solve_mask_y(j,k+1) = .TRUE.
+        CLASS(domain_type), INTENT(INOUT) :: this
 
-          END IF
+        DEALLOCATE( this%solve_mask_time )
+        DEALLOCATE( this%solve_mask )
+        DEALLOCATE( this%solve_mask_temp )
+        DEALLOCATE( this%reconstruction_mask )
+        DEALLOCATE( this%hp_eta_mask, this%hp_eta_j, this%hp_eta_k )
+        DEALLOCATE( this%solve_mask_x )
+        DEALLOCATE( this%solve_mask_y )
 
-       END DO
+        DEALLOCATE( this%j_cent, this%k_cent )
+        DEALLOCATE( this%j_reconstruction, this%k_reconstruction )
+        DEALLOCATE( this%j_stag_x, this%k_stag_x )
+        DEALLOCATE( this%j_stag_y, this%k_stag_y )
 
-    END DO
+    END SUBROUTINE finalize_domain
 
-    this%solve_cells = i
+    !> \brief Rebuild active-cell and face worksets from the current flow and source geometry.
+    !>
+    !> \param[in,out] this Active-domain masks and compact cell/face worksets.
+    !> \param[in] q Cell-centered conservative states, indexed as (variable,x-cell,y-cell).
+    !> \param[in] t Current simulation or stage time [s].
+    !> \param[in] solve_all When true, include the complete domain instead of only flow/source cells
+    !>                      and halos.
 
-    ! Preserve the former HP workset order: active cells, then neighbours.
-    DO i = 1, this%hp_eta_cells
-       this%hp_eta_mask(this%hp_eta_j(i),this%hp_eta_k(i)) = .FALSE.
-    END DO
-    this%hp_eta_cells = 0
-    DO i = 1, this%solve_cells
-       CALL append_hp_cell(this%j_cent(i),this%k_cent(i))
-    END DO
-    DO i = 1, this%solve_cells
-       j = this%j_cent(i)
-       k = this%k_cent(i)
-       IF (j .GT. 1) CALL append_hp_cell(j-1,k)
-       IF (j .LT. comp_cells_x) CALL append_hp_cell(j+1,k)
-       IF (k .GT. 1) CALL append_hp_cell(j,k-1)
-       IF (k .LT. comp_cells_y) CALL append_hp_cell(j,k+1)
-    END DO
+    SUBROUTINE check_solve(this, q, t, solve_all)
 
-    ! HP reconstruction reads a two-cell stencil around every evolved cell.
-    ! Keep this read-only halo separate from solve_mask so no additional cells
-    ! are advanced by the time integrator.
-    this%reconstruction_mask = this%solve_mask
-    DO i = 1,2
-       this%solve_mask_temp = this%reconstruction_mask
-       IF ( comp_cells_x .GT. 1 ) THEN
-          this%reconstruction_mask(2:comp_cells_x,:) =                       &
-               this%reconstruction_mask(2:comp_cells_x,:) .OR.              &
-               this%solve_mask_temp(1:comp_cells_x-1,:)
-          this%reconstruction_mask(1:comp_cells_x-1,:) =                     &
-               this%reconstruction_mask(1:comp_cells_x-1,:) .OR.            &
-               this%solve_mask_temp(2:comp_cells_x,:)
-       END IF
-       IF ( comp_cells_y .GT. 1 ) THEN
-          this%reconstruction_mask(:,2:comp_cells_y) =                       &
-               this%reconstruction_mask(:,2:comp_cells_y) .OR.              &
-               this%solve_mask_temp(:,1:comp_cells_y-1)
-          this%reconstruction_mask(:,1:comp_cells_y-1) =                     &
-               this%reconstruction_mask(:,1:comp_cells_y-1) .OR.            &
-               this%solve_mask_temp(:,2:comp_cells_y)
-       END IF
-    END DO
+        IMPLICIT NONE
 
-    i = 0
-    DO k = 1,comp_cells_y
-       DO j = 1,comp_cells_x
-          IF ( this%reconstruction_mask(j,k) ) THEN
-             i = i+1
-             this%j_reconstruction(i) = j
-             this%k_reconstruction(i) = k
-          END IF
-       END DO
-    END DO
-    this%reconstruction_cells = i
-    
-    !----- check for y-interfaces where computation is needed
-    i = 0
-        
-    DO k = 1,comp_cells_y
+        CLASS(domain_type), INTENT(INOUT) :: this
+        REAL(wp), INTENT(IN) :: q(:,:,:)
+        REAL(wp), INTENT(IN) :: t
+        LOGICAL, INTENT(IN) :: solve_all
 
-       DO j = 1,comp_interfaces_x
+        INTEGER :: i,j,k
 
-          IF ( this%solve_mask_x(j,k) ) THEN
+        !$OMP PARALLEL
 
-             i = i+1
-             this%j_stag_x(i) = j
-             this%k_stag_x(i) = k
+        IF ( solve_all ) THEN
 
-          END IF
+            !$OMP WORKSHARE
+            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE.
+            !$OMP END WORKSHARE
 
-       END DO
+        ELSE
 
-    END DO
+            !$OMP WORKSHARE
+            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .FALSE.
+            !$OMP END WORKSHARE
 
-    this%solve_interfaces_x = i
-   
-    !----- check for y-interfaces where computation is needed
+        END IF
+        !$OMP BARRIER
 
-    i = 0
-        
-    DO k = 1,comp_interfaces_y
+        !$OMP WORKSHARE
+        WHERE ( ( q(idx_totMassEqn,2:comp_cells_x-1,2:comp_cells_y-1) .GT. 0.0_wp ) .AND.        &
+            ( this%solve_mask_time(2:comp_cells_x-1,2:comp_cells_y-1) .LE. t ) )       &
+            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) = .TRUE.
+        !$OMP END WORKSHARE
 
-       DO j = 1,comp_cells_x
+        !$OMP BARRIER
 
-          IF ( this%solve_mask_y(j,k) ) THEN
+        IF ( bottom_radial_source_flag .OR. bottom_fissural_source_flag ) THEN
 
-             i = i+1
-             this%j_stag_y(i) = j
-             this%k_stag_y(i) = k
+            !$OMP WORKSHARE
+            WHERE ( cell_source_fractions .GT. 0.0_wp ) this%solve_mask = .TRUE.
+            !$OMP END WORKSHARE
 
-          END IF
+            !$OMP BARRIER
 
-       END DO
+        END IF
 
-    END DO
+        IF ( radial_source_flag ) THEN
 
-    this%solve_interfaces_y = i
+            !$OMP DO private(j,k)
 
-    RETURN
+            DO k = 2,comp_cells_y-1
 
-  CONTAINS
-    SUBROUTINE append_hp_cell(j_cell,k_cell)
-      INTEGER, INTENT(IN) :: j_cell,k_cell
-      IF (this%hp_eta_mask(j_cell,k_cell)) RETURN
-      this%hp_eta_mask(j_cell,k_cell) = .TRUE.
-      this%hp_eta_cells = this%hp_eta_cells + 1
-      this%hp_eta_j(this%hp_eta_cells) = j_cell
-      this%hp_eta_k(this%hp_eta_cells) = k_cell
-    END SUBROUTINE append_hp_cell
-  END SUBROUTINE check_solve
+                DO j = 2,comp_cells_x-1
+
+                    IF ( source_cell(j,k) .EQ. 2 ) THEN
+
+                        this%solve_mask(j,k) = .TRUE.
+
+                    END IF
+
+                END DO
+
+            END DO
+
+            !$OMP END DO
+
+        END IF
+
+        !$OMP BARRIER
+        !$OMP MASTER
+
+        DO i = 1,active_halo_layers
+
+            this%solve_mask_temp = this%solve_mask
+
+            ! solution domain is extended to neighbours of positive-mass cells
+            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
+                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
+                this%solve_mask_temp(1:comp_cells_x-2,2:comp_cells_y-1)
+
+            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
+                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
+                this%solve_mask_temp(3:comp_cells_x,2:comp_cells_y-1)
+
+            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
+                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
+                this%solve_mask_temp(2:comp_cells_x-1,1:comp_cells_y-2)
+
+            this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) =                          &
+                this%solve_mask(2:comp_cells_x-1,2:comp_cells_y-1) .OR.                  &
+                this%solve_mask_temp(2:comp_cells_x-1,3:comp_cells_y)
+
+        END DO
+
+        !$OMP END MASTER
+        !$OMP BARRIER
+
+        !$OMP DO private(j,k)
+
+        DO k = 1,comp_cells_y
+
+            DO j = 1,comp_cells_x
+
+                IF ( radial_source_flag ) THEN
+
+                    IF ( source_cell(j,k) .EQ. 1 ) this%solve_mask(j,k) = .FALSE.
+
+                END IF
+
+            END DO
+
+        END DO
+
+        !$OMP END DO
+        !$OMP WORKSHARE
+
+        this%solve_mask_x(1:comp_interfaces_x,1:comp_cells_y) = .FALSE.
+        this%solve_mask_y(1:comp_cells_x,1:comp_interfaces_y) = .FALSE.
+
+        !$OMP END WORKSHARE
+
+        !$OMP END PARALLEL
+
+        !----- check for cells where computation is needed
+        i = 0
+
+        DO k = 1,comp_cells_y
+
+            DO j = 1,comp_cells_x
+
+                IF ( this%solve_mask(j,k) ) THEN
+
+                    i = i+1
+                    this%j_cent(i) = j
+                    this%k_cent(i) = k
+
+                    this%solve_mask_x(j,k) = .TRUE.
+                    this%solve_mask_x(j+1,k) = .TRUE.
+                    this%solve_mask_y(j,k) = .TRUE.
+                    this%solve_mask_y(j,k+1) = .TRUE.
+
+                END IF
+
+            END DO
+
+        END DO
+
+        this%solve_cells = i
+
+        ! Preserve the former HP workset order: active cells, then neighbours.
+        DO i = 1, this%hp_eta_cells
+            this%hp_eta_mask(this%hp_eta_j(i),this%hp_eta_k(i)) = .FALSE.
+        END DO
+        this%hp_eta_cells = 0
+        DO i = 1, this%solve_cells
+            CALL append_hp_cell(this%j_cent(i),this%k_cent(i))
+        END DO
+        DO i = 1, this%solve_cells
+            j = this%j_cent(i)
+            k = this%k_cent(i)
+            IF (j .GT. 1) CALL append_hp_cell(j-1,k)
+            IF (j .LT. comp_cells_x) CALL append_hp_cell(j+1,k)
+            IF (k .GT. 1) CALL append_hp_cell(j,k-1)
+            IF (k .LT. comp_cells_y) CALL append_hp_cell(j,k+1)
+        END DO
+
+        ! HP reconstruction reads a two-cell stencil around every evolved cell.
+        ! Keep this read-only halo separate from solve_mask so no additional cells
+        ! are advanced by the time integrator.
+        this%reconstruction_mask = this%solve_mask
+        DO i = 1,2
+            this%solve_mask_temp = this%reconstruction_mask
+            IF ( comp_cells_x .GT. 1 ) THEN
+                this%reconstruction_mask(2:comp_cells_x,:) =                       &
+                    this%reconstruction_mask(2:comp_cells_x,:) .OR.              &
+                    this%solve_mask_temp(1:comp_cells_x-1,:)
+                this%reconstruction_mask(1:comp_cells_x-1,:) =                     &
+                    this%reconstruction_mask(1:comp_cells_x-1,:) .OR.            &
+                    this%solve_mask_temp(2:comp_cells_x,:)
+            END IF
+            IF ( comp_cells_y .GT. 1 ) THEN
+                this%reconstruction_mask(:,2:comp_cells_y) =                       &
+                    this%reconstruction_mask(:,2:comp_cells_y) .OR.              &
+                    this%solve_mask_temp(:,1:comp_cells_y-1)
+                this%reconstruction_mask(:,1:comp_cells_y-1) =                     &
+                    this%reconstruction_mask(:,1:comp_cells_y-1) .OR.            &
+                    this%solve_mask_temp(:,2:comp_cells_y)
+            END IF
+        END DO
+
+        i = 0
+        DO k = 1,comp_cells_y
+            DO j = 1,comp_cells_x
+                IF ( this%reconstruction_mask(j,k) ) THEN
+                    i = i+1
+                    this%j_reconstruction(i) = j
+                    this%k_reconstruction(i) = k
+                END IF
+            END DO
+        END DO
+        this%reconstruction_cells = i
+
+        !----- check for y-interfaces where computation is needed
+        i = 0
+
+        DO k = 1,comp_cells_y
+
+            DO j = 1,comp_interfaces_x
+
+                IF ( this%solve_mask_x(j,k) ) THEN
+
+                    i = i+1
+                    this%j_stag_x(i) = j
+                    this%k_stag_x(i) = k
+
+                END IF
+
+            END DO
+
+        END DO
+
+        this%solve_interfaces_x = i
+
+        !----- check for y-interfaces where computation is needed
+
+        i = 0
+
+        DO k = 1,comp_interfaces_y
+
+            DO j = 1,comp_cells_x
+
+                IF ( this%solve_mask_y(j,k) ) THEN
+
+                    i = i+1
+                    this%j_stag_y(i) = j
+                    this%k_stag_y(i) = k
+
+                END IF
+
+            END DO
+
+        END DO
+
+        this%solve_interfaces_y = i
+
+        RETURN
+
+    CONTAINS
+        SUBROUTINE append_hp_cell(j_cell,k_cell)
+        INTEGER, INTENT(IN) :: j_cell,k_cell
+        IF (this%hp_eta_mask(j_cell,k_cell)) RETURN
+        this%hp_eta_mask(j_cell,k_cell) = .TRUE.
+        this%hp_eta_cells = this%hp_eta_cells + 1
+        this%hp_eta_j(this%hp_eta_cells) = j_cell
+        this%hp_eta_k(this%hp_eta_cells) = k_cell
+        END SUBROUTINE append_hp_cell
+    END SUBROUTINE check_solve
 
 END MODULE domain_2d
