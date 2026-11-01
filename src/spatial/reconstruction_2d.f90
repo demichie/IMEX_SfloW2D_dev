@@ -242,7 +242,11 @@ CONTAINS
 
     END SUBROUTINE build_hp_workset
 
-    !> Accept the HP workset built once per domain refresh.
+    !> @brief Store the HP workset built once by the active-domain refresh.
+    !> @param[in,out] this Reconstruction workspace whose HP list is updated.
+    !> @param[in] hp_cells Number of HP workset entries.
+    !> @param[in] hp_j X-cell indices of the HP workset.
+    !> @param[in] hp_k Y-cell indices of the HP workset.
     SUBROUTINE prepare_hp_workset(this, hp_cells, hp_j, hp_k)
         CLASS(reconstruction_workspace_type), INTENT(INOUT) :: this
         INTEGER, INTENT(IN) :: hp_cells
@@ -870,7 +874,13 @@ CONTAINS
     !> \param[in,out] this Workspace containing the active HP-eta cell list and traces.
     !> \param[in] qp_expl Cell-centered physical states at the explicit stage.
     !******************************************************************************
-    ! All eta and selected transport-depth candidates for one workset cell.
+    !> @brief Reconstruct free-surface elevation and transport-depth candidates for one cell.
+    !> @details Reconstructs local slopes using configured limiter and topography;
+    !>          preserves KT and Froude transport-depth candidates for face selection.
+    !> @param[in,out] this Reconstruction workspace containing reconstructed traces.
+    !> @param[in] qp_expl Cell-centered primitive states including stencil halo.
+    !> @param[in] j X index of the workset cell.
+    !> @param[in] k Y index of the workset cell.
     SUBROUTINE reconstruct_kt_eta_cell(this,qp_expl,j,k)
         USE parameters_2d, ONLY : limiter,reconstr_coeff
         USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
@@ -1014,6 +1024,10 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
     END SUBROUTINE reconstruct_kt_eta_cell
 
+    !> @brief Reconstruct KT free-surface and transport-depth traces on the HP workset.
+    !> @details Applies the configured trace reconstruction to prepared HP cells.
+    !> @param[in,out] this Reconstruction workspace and output face traces.
+    !> @param[in] qp_expl Cell-centered primitive states with stencil halo.
     SUBROUTINE reconstruct_kt_eta_traces(this,qp_expl)
         USE parameters_2d, ONLY : limiter,reconstr_coeff
         USE geometry_2d, ONLY : x_comp,y_comp,dx2,dy2
@@ -1407,25 +1421,35 @@ IF (kt_trace_reconstruction .EQ. 'froude_blend') THEN
 
 
 
-        !> Combine directly limited velocity traces with a nonnegative depth.
-        !> The selected transport depth is applied consistently to both moments
-        !> by the downstream PCCU face evaluator.
+        !> @brief Convert direct velocity traces to transport momenta using nonnegative depth.
+        !> @details A dry trace has zero momentum and velocity; wet traces use
+        !>          the same selected depth for both momentum components.
+        !> @param[in,out] trace Primitive face trace modified in place.
         SUBROUTINE form_direct_face_momentum(trace)
-        REAL(wp), INTENT(INOUT) :: trace(n_vars+2)
-        trace(1) = MAX(trace(1),0.0_wp)
-        IF (trace(1) .LE. dry_thickness_tolerance) THEN
-            trace(1:3) = 0.0_wp
-            trace(idx_u:idx_v) = 0.0_wp
-        ELSE
-            trace(2) = trace(1)*trace(idx_u)
-            trace(3) = trace(1)*trace(idx_v)
-        END IF
+            REAL(wp), INTENT(INOUT) :: trace(n_vars+2)
+            trace(1) = MAX(trace(1),0.0_wp)
+            IF (trace(1) .LE. dry_thickness_tolerance) THEN
+                trace(1:3) = 0.0_wp
+                trace(idx_u:idx_v) = 0.0_wp
+            ELSE
+                trace(2) = trace(1)*trace(idx_u)
+                trace(3) = trace(1)*trace(idx_v)
+            END IF
         END SUBROUTINE form_direct_face_momentum
 
 
-
-
-    ! Transport depth and admissible component fractions are finalized together.
+    !> @brief Select the admissible transport depth and finalize face fractions.
+    !> @details Couples the depth choice to the component-fraction closure rather
+    !>          than projecting those fields independently.
+    !> @param[in,out] qp Face primitive state whose fractions and depth are finalized.
+    !> @param[in] eta Reconstructed free-surface elevation [m].
+    !> @param[in] bed Bed elevation at the face [m].
+    !> @param[in] h_minmod Minmod transport-depth candidate [m].
+    !> @param[in] h_froude Froude-limited transport-depth candidate [m].
+    !> @param[in] source_trace Whether this face represents a source boundary.
+    !> @param[out] h_selected Accepted nonnegative transport depth [m].
+    !> @param[in] context Context string used in physical closure diagnostics.
+    !> @param[in] kt_mode Selected KT trace reconstruction mode.
     SUBROUTINE select_final_transport_trace(qp,eta,bed,h_minmod,h_froude, &
             source_trace,h_selected,context,kt_mode)
         USE state_conversion_2d, ONLY : enforce_primitive_mass_fraction_closure

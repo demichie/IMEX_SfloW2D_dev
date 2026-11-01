@@ -66,7 +66,9 @@ CONTAINS
 
     END SUBROUTINE finalize_spatial_operator
 
-    !> \brief Reuse the HP workset prepared by the domain refresh.
+    !> @brief Reuse the HP workset prepared by the active-domain refresh.
+    !> @param[in,out] this Spatial operator and owned reconstruction workset.
+    !> @param[in] domain Active-domain worklist supplying HP workset indices.
     SUBROUTINE prepare_spatial_hp_workset(this, domain)
         CLASS(spatial_operator_type), INTENT(INOUT) :: this
         CLASS(domain_type), INTENT(IN) :: domain
