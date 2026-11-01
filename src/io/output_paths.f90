@@ -1,4 +1,6 @@
-!> \brief Centralized per-run output path construction and safe directory setup.
+!> @brief Centralize per-run output paths and safe directory initialization.
+!> @details All generated files remain below the validated run directory;
+!>          snapshot paths are checked against existing index prefixes.
 !
 !> The module keeps all solver-generated files below the configured run directory.
 MODULE output_paths
@@ -14,7 +16,9 @@ MODULE output_paths
     PUBLIC :: snapshot_index_label, validate_snapshot_index
     PUBLIC :: ensure_output_directory
 
+    !> Absolute or configured run output root after safety validation.
     CHARACTER(LEN=1024), SAVE :: run_output_directory = ''
+    !> Currently selected snapshot destination, allocated during snapshot setup.
     CHARACTER(LEN=:), ALLOCATABLE, SAVE :: active_snapshot_directory
 
     INTERFACE

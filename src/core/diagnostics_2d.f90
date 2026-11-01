@@ -1,5 +1,7 @@
 !********************************************************************************
-!> \brief Runtime diagnostics and controlled debug pauses
+!> @brief Provide fatal diagnostics and optional controlled debug pauses.
+!> @details Diagnostic pauses are disabled in OpenMP regions to avoid blocking
+!>          worker threads; fatal errors terminate batch runs noninteractively.
 !>
 !> Verbosity only controls diagnostic output elsewhere in the solver. Optional
 !> interactive pauses are enabled independently and are never attempted from
@@ -16,6 +18,7 @@ MODULE diagnostics_2d
 
     PRIVATE
 
+    !> Enable optional interactive diagnostic pauses outside OpenMP regions.
     LOGICAL, PUBLIC :: interactive_debug_flag = .FALSE.
 
     PUBLIC :: debug_pause
