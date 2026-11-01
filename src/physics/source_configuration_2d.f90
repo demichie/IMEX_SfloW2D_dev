@@ -358,65 +358,170 @@ CONTAINS
     CALL registry%initialize(n_eqns,pore,stages,steps,error)
   END SUBROUTINE initialize_configured_sources
 
-  !> Transitional route from physical source configuration to Lie group metadata.
-  !> Reject legacy group-ID collisions rather than silently changing Lie order.
-  !> The production integrator still uses initialize_configured_sources.
+  !> Create Lie groups directly from physical METHOD and GROUP configuration.
   SUBROUTINE initialize_configured_lie_sources(registry,partition,error)
     TYPE(source_registry_type), INTENT(INOUT) :: registry
     TYPE(equation_partition_type), INTENT(INOUT) :: partition
     CHARACTER(*), INTENT(OUT) :: error
-    TYPE(source_registry_type) :: legacy
-    TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:),groups(:)
-    TYPE(source_group_type) :: tmp
-    INTEGER :: i,j,pore,n
-    CALL initialize_configured_sources(legacy,partition,error)
+    TYPE(source_group_type), ALLOCATABLE :: groups(:)
+    TYPE(source_group_type) :: g,tmp
+    TYPE(source_term_type) :: term
+    CHARACTER(LEN=64), ALLOCATABLE :: names(:)
+    CHARACTER(LEN=16) :: requested_method
+    INTEGER :: i,j,k,id,method,target,pore,n,eq
+    INTEGER :: membership(n_eqns)
+    LOGICAL :: mask(n_eqns)
+    CALL collect_active_source_names(thermal_cooling_flag,names,error)
     IF (LEN_TRIM(error)>0) RETURN
-    stages=legacy%stage_groups()
-    steps=legacy%step_groups()
-    ALLOCATE(groups(0))
-    DO i=1,SIZE(stages)
-      IF (SIZE(stages(i)%source_names)==0) CYCLE
-      groups=[groups,stages(i)]
-    END DO
-    DO i=1,SIZE(steps)
-      IF (SIZE(steps(i)%source_names)==0) CYCLE
-      groups=[groups,steps(i)]
+    ALLOCATE(groups(1))
+    groups(1)%id=0
+    groups(1)%method=SOURCE_METHOD_EXPLICIT
+    groups(1)%source_names=[CHARACTER(LEN=64)::]
+    groups(1)%equation_ids=[(n,n=1,n_eqns)]
+    DO i=1,SIZE(names)
+      term=source_term_descriptor_by_name(names(i))
+      method=term%default_method
+      id=0
+      requested_method=''
+      BLOCK
+        CHARACTER(LEN=64) :: active_names(1)
+        active_names(1)=names(i)
+      SELECT CASE(TRIM(active_names(1)))
+      CASE('rheology_voellmy','rheology_plastic','rheology_lava', &
+            'rheology_lahar','rheology_empirical','rheology_quadratic', &
+            'rheology_froude','rheology_lucas','rheology_mui', &
+            'rheology_mui_voellmy','rheology_newmodel')
+        target=1
+        requested_method=rheology_method
+        id=rheology_group
+      CASE('thermal_cooling')
+        target=2
+        requested_method=thermal_method
+        id=thermal_group
+      CASE('pore_pressure_dissipation')
+        target=3
+        requested_method=pore_pressure_method
+        id=pore_pressure_group
+      CASE('bottom_circular_injection','bottom_fissural_injection', &
+            'radial_injection','geometry_curvature','boundary_injection')
+        target=0
+        SELECT CASE(TRIM(active_names(1)))
+        CASE('bottom_circular_injection')
+          requested_method=bottom_circular_method
+          id=bottom_circular_group
+        CASE('bottom_fissural_injection')
+          requested_method=bottom_fissural_method
+          id=bottom_fissural_group
+        CASE('radial_injection')
+          requested_method=radial_injection_method
+          id=radial_injection_group
+        CASE('geometry_curvature')
+          requested_method=geometry_curvature_method
+          id=geometry_curvature_group
+        CASE('boundary_injection')
+          requested_method=boundary_injection_method
+          id=boundary_injection_group
+        END SELECT
+      CASE('mass_exchange_lava_deposition','mass_exchange_erosion', &
+            'mass_exchange_deposition','mass_exchange_carrier_liquid_loss', &
+            'mass_exchange_entrainment', &
+            'mass_exchange_vaporization')
+        target=-1
+        requested_method=mass_exchange_method
+        id=mass_exchange_group
+      CASE DEFAULT
+        target=0
+      END SELECT
+      END BLOCK
+      SELECT CASE(TRIM(requested_method))
+      CASE('')
+      CASE('EXPLICIT')
+        method=SOURCE_METHOD_EXPLICIT
+      CASE('NEWTON')
+        method=SOURCE_METHOD_NEWTON
+      CASE('ANALYTIC')
+        method=SOURCE_METHOD_ANALYTIC
+      CASE DEFAULT
+        error='D19: invalid METHOD'; RETURN
+      END SELECT
+      IF (id<0 .OR. (id==0 .AND. method/=SOURCE_METHOD_EXPLICIT)) THEN
+        error='D19: GROUP 0 requires EXPLICIT'; RETURN
+      END IF
+      SELECT CASE(method)
+      CASE(SOURCE_METHOD_EXPLICIT)
+        IF (.NOT.term%has_explicit) THEN
+          error='D19: unsupported EXPLICIT method'; RETURN
+        END IF
+      CASE(SOURCE_METHOD_NEWTON)
+        IF (.NOT.term%has_newton) THEN
+          error='D19: unsupported NEWTON method'; RETURN
+        END IF
+      CASE(SOURCE_METHOD_ANALYTIC)
+        IF (.NOT.term%has_analytic) THEN
+          error='D19: unsupported ANALYTIC method'; RETURN
+        END IF
+      END SELECT
+      k=0
+      DO j=1,SIZE(groups)
+        IF (groups(j)%id==id) k=j
+      END DO
+      IF (k==0) THEN
+        g%id=id
+        g%method=method
+        g%source_names=[CHARACTER(LEN=64)::]
+        g%equation_ids=[INTEGER::]
+        IF (method==SOURCE_METHOD_EXPLICIT) g%equation_ids=[(n,n=1,n_eqns)]
+        groups=[groups,g]
+        k=SIZE(groups)
+      END IF
+      IF (groups(k)%method/=method) THEN
+        error='D19: GROUP cannot mix METHOD'; RETURN
+      END IF
+      IF (method==SOURCE_METHOD_ANALYTIC .AND. SIZE(groups(k)%source_names)>0) THEN
+        error='D19: ANALYTIC group must be exclusive'; RETURN
+      END IF
+      groups(k)%source_names=[CHARACTER(LEN=64)::groups(k)%source_names,names(i)]
+      IF (method==SOURCE_METHOD_NEWTON) THEN
+        SELECT CASE(target)
+        CASE(1)
+          groups(k)%equation_ids=[groups(k)%equation_ids,2,3]
+        CASE(2)
+          groups(k)%equation_ids=[groups(k)%equation_ids,4]
+        CASE(3)
+          groups(k)%equation_ids=[groups(k)%equation_ids,idx_pore]
+        CASE DEFAULT
+          error='D19: unsupported Newton target'; RETURN
+        END SELECT
+      END IF
     END DO
     DO i=1,SIZE(groups)
       DO j=i+1,SIZE(groups)
         IF (groups(j)%id<groups(i)%id) THEN
-          tmp=groups(i)
-          groups(i)=groups(j)
-          groups(j)=tmp
+          tmp=groups(j); groups(j)=groups(i); groups(i)=tmp
         END IF
       END DO
     END DO
-    error='D19: GROUP 0 must be EXPLICIT and reserved for spatial advance'
-    DO i=1,SIZE(groups)
-      IF (groups(i)%id==0 .AND. groups(i)%method/=SOURCE_METHOD_EXPLICIT) RETURN
-    END DO
-    error='D19: legacy group IDs conflict; specify distinct Lie GROUP values'
-    DO i=2,SIZE(groups)
-      IF (groups(i)%id==groups(i-1)%id) RETURN
-    END DO
-    ! Even without a configured GROUP-0 source, the spatial group exists.
-    IF (SIZE(groups)==0) THEN
-      tmp%id=0
-      tmp%method=SOURCE_METHOD_EXPLICIT
-      tmp%source_names=[CHARACTER(LEN=64)::]
-      tmp%equation_ids=[(n,n=1,n_eqns)]
-      groups=[groups,tmp]
-    ELSE IF (groups(1)%id/=0) THEN
-      tmp%id=0
-      tmp%method=SOURCE_METHOD_EXPLICIT
-      tmp%source_names=[CHARACTER(LEN=64)::]
-      tmp%equation_ids=[(n,n=1,n_eqns)]
-      groups=[tmp,groups]
-    END IF
     pore=0
     IF (pore_pressure_flag) pore=idx_pore
+    mask=.FALSE.
+    membership=0
+    DO i=1,SIZE(groups)
+      IF (groups(i)%method/=SOURCE_METHOD_NEWTON) CYCLE
+      DO j=1,SIZE(groups(i)%equation_ids)
+        eq=groups(i)%equation_ids(j)
+        IF (eq<1 .OR. eq>n_eqns) THEN
+          error='D19: invalid implicit equation'; RETURN
+        END IF
+        mask(eq)=.TRUE.
+        membership(eq)=1
+      END DO
+    END DO
+    IF (ANY(mask)) THEN
+      CALL partition%initialize(mask,membership,[IM_GROUP_METHOD_NEWTON])
+    ELSE
+      CALL partition%initialize(mask,membership,[INTEGER::])
+    END IF
     CALL registry%initialize_lie(n_eqns,pore,groups,error)
-    CALL legacy%finalize()
   END SUBROUTINE initialize_configured_lie_sources
 
 END MODULE source_configuration_2d
