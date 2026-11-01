@@ -19,6 +19,6 @@ Comment substantial algorithmic blocks with the reason for ordering and key inva
 
 ## Checks
 
-The repository already provides `python3 TESTS/TEST_SOURCE_DOCUMENTATION/check_documentation.py` for Doxygen contract checks, including argument names/directions; it also supports `--check-against-git REF` to compare executable lines. The complementary `python3 tools/docs/check_fortran_style.py` checks four-space indentation, TABs and trailing whitespace. During migration, run it with explicit paths for the files normalized so far. Run it over `src/` only when all 64 production sources have been normalized.
+The repository already provides `python3 TESTS/TEST_SOURCE_DOCUMENTATION/check_documentation.py` for Doxygen contract checks, including argument names/directions; it also supports `--check-against-git REF` to compare executable lines. The complementary `python3 tools/docs/check_fortran_style.py` checks four-space indentation, TABs and trailing whitespace. All 64 production `.f90` sources have received the first whitespace-only normalization. The documentation suite invokes the style checker over `src/` on every run. Subsequent semantic reviews must still verify true lexical nesting, blank-line grouping and full Doxygen completeness; a multiples-of-four check alone does not prove these.
 
 This is a formatting/documentation phase, not an opportunity to alter formulas or the Lie algorithm.

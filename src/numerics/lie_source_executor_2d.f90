@@ -6,11 +6,10 @@
 !********************************************************************************
 
 MODULE lie_source_executor_2d
-        USE parameters_2d, ONLY : idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
-
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     USE diagnostics_2d, ONLY : fatal_error
-    USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, mass_exchange_rates_type
+    USE parameters_2d, ONLY : wp, n_eqns, n_vars, n_solid, mass_exchange_rates_type, &
+        idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
     USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
     USE domain_2d, ONLY : domain_type
     USE source_registry_2d, ONLY : source_registry_type, source_group_type
