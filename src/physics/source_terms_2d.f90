@@ -36,9 +36,6 @@ MODULE source_terms_2d
   PUBLIC :: eval_source_implicit, eval_source_semi_implicit, eval_source_analytic
   PUBLIC :: analytic_term_context_type
   PUBLIC :: eval_geometry_curvature_explicit
-  PUBLIC :: eval_geometry_curvature_semi_implicit
-  PUBLIC :: eval_geometry_curvature_implicit
-  PUBLIC :: eval_geometry_curvature_analytic
   PUBLIC :: bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step
   PUBLIC :: eval_boundary_injection_explicit
   PUBLIC :: eval_boundary_injection_semi_implicit
@@ -677,38 +674,8 @@ CONTAINS
 
   END SUBROUTINE eval_geometry_curvature_explicit
 
-  SUBROUTINE eval_geometry_curvature_semi_implicit(Bprime_x, Bprime_y, &
-       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
-       mixture_mass, velocity_x, velocity_y, source_x, source_y)
-    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
-    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
-    REAL(wp), INTENT(IN) :: grav_coefficient
-    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
-    REAL(wp), INTENT(OUT) :: source_x, source_y
-    CALL fatal_error('geometry_curvature: semi_implicit treatment is unsupported')
-  END SUBROUTINE eval_geometry_curvature_semi_implicit
 
-  SUBROUTINE eval_geometry_curvature_implicit(Bprime_x, Bprime_y, &
-       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
-       mixture_mass, velocity_x, velocity_y, source_x, source_y)
-    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
-    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
-    REAL(wp), INTENT(IN) :: grav_coefficient
-    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
-    REAL(wp), INTENT(OUT) :: source_x, source_y
-    CALL fatal_error('geometry_curvature: implicit treatment is unsupported')
-  END SUBROUTINE eval_geometry_curvature_implicit
 
-  SUBROUTINE eval_geometry_curvature_analytic(Bprime_x, Bprime_y, &
-       Bsecond_xx, Bsecond_xy, Bsecond_yy, grav_coefficient, &
-       mixture_mass, velocity_x, velocity_y, source_x, source_y)
-    REAL(wp), INTENT(IN) :: Bprime_x, Bprime_y
-    REAL(wp), INTENT(IN) :: Bsecond_xx, Bsecond_xy, Bsecond_yy
-    REAL(wp), INTENT(IN) :: grav_coefficient
-    REAL(wp), INTENT(IN) :: mixture_mass, velocity_x, velocity_y
-    REAL(wp), INTENT(OUT) :: source_x, source_y
-    CALL fatal_error('geometry_curvature: analytic treatment is unsupported')
-  END SUBROUTINE eval_geometry_curvature_analytic
 
   !> \brief Evaluate the atomic explicit mass-exchange rate.
   !> \details Returns rates only; it never mutates conservative state, bed or inventory.
