@@ -67,8 +67,10 @@ CONTAINS
     INTEGER :: group_index,cell,j,k,i,solid_eq,status,iterations,linear_info
     INTEGER :: membership(n_eqns)
     CHARACTER(LEN=96) :: context
+    CHARACTER(LEN=256) :: failure_reason
 
     step_failed=.FALSE.
+    failure_reason=''
     IF (.NOT.source_registry%is_initialized()) &
          CALL fatal_error('D19: uninitialized Lie source registry')
     groups=source_registry%groups()
@@ -98,7 +100,7 @@ CONTAINS
        END IF
        IF (with_exchange .AND. topo_change_flag) CALL begin_topography_rate_update
 
-       DO cell=1,domain%solve_cells
+       cell_loop: DO cell=1,domain%solve_cells
           j=domain%j_cent(cell)
           k=domain%k_cent(cell)
           IF (groups(group_index)%id==0) THEN
@@ -124,7 +126,8 @@ CONTAINS
                    coverage=1.0_wp-cell_source_fractions(j,k)
                    IF (.NOT.ieee_is_finite(coverage) .OR. &
                         coverage<0.0_wp .OR. coverage>1.0_wp) &
-                        CALL fatal_error('D19: invalid mass-exchange source coverage')
+                        CALL reject_cell('D19: invalid mass-exchange source coverage')
+                        IF (step_failed) EXIT cell_loop
                    exchange_rate=coverage*exchange_rate
                    transfers%solid_deposition_rate=coverage*transfers%solid_deposition_rate
                    transfers%solid_erosion_rate=coverage*transfers%solid_erosion_rate
@@ -135,7 +138,8 @@ CONTAINS
              END IF
              total_rate=physical_rate+exchange_rate
              IF (.NOT.ALL(ieee_is_finite(total_rate))) &
-                  CALL fatal_error('D19: non-finite explicit source rate')
+                  CALL reject_cell('D19: non-finite explicit source rate')
+                  IF (step_failed) EXIT cell_loop
              IF (with_exchange) THEN
                 IF (.NOT.ALL(ieee_is_finite(transfers%solid_deposition_rate)) .OR. &
                      .NOT.ALL(ieee_is_finite(transfers%solid_erosion_rate)) .OR. &
@@ -148,7 +152,8 @@ CONTAINS
                      .NOT.ieee_is_finite(transfers%carrier_withdrawal_volume_rate) .OR. &
                      .NOT.ieee_is_finite(transfers%lava_deposit_rate) .OR. &
                      .NOT.ieee_is_finite(transfers%dB_dt)) &
-                     CALL fatal_error('D19: non-finite coupled mass-exchange transfer')
+                     CALL reject_cell('D19: non-finite coupled mass-exchange transfer')
+                     IF (step_failed) EXIT cell_loop
              END IF
              ! One common limiter scales the coupled fluid + substrate transaction.
              ! It never touches the previously committed spatial FV rate.
@@ -174,18 +179,22 @@ CONTAINS
              IF (change_in_solid>0.0_wp) factor=MIN(factor, &
                   MAX(0.0_wp,remaining_mass/(time_step*change_in_solid)))
              IF (.NOT.ieee_is_finite(factor) .OR. factor<0.0_wp .OR. factor>1.0_wp) &
-                  CALL fatal_error('D19: invalid Lie source limiter factor')
+                  CALL reject_cell('D19: invalid Lie source limiter factor')
+                  IF (step_failed) EXIT cell_loop
              ! Stage the entire local fluid/substrate transfer before committing it.
              q_candidate=q(:,j,k)
              q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*factor*total_rate
              IF (.NOT.ALL(ieee_is_finite(q_candidate(1:n_eqns)))) &
-                  CALL fatal_error('D19: non-finite explicit group candidate')
+                  CALL reject_cell('D19: non-finite explicit group candidate')
+                  IF (step_failed) EXIT cell_loop
              IF (q_candidate(idx_totMassEqn)<0.0_wp .OR. &
                   ANY(q_candidate(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) &
-                  CALL fatal_error('D19: negative mass in group candidate')
+                  CALL reject_cell('D19: negative mass in group candidate')
+                  IF (step_failed) EXIT cell_loop
              IF (SUM(q_candidate(idx_solidEqn_first:idx_solidEqn_last))> &
                   q_candidate(idx_totMassEqn)) &
-                  CALL fatal_error('D19: group candidate solids exceed total mass')
+                  CALL reject_cell('D19: group candidate solids exceed total mass')
+                  IF (step_failed) EXIT cell_loop
              IF (with_exchange) THEN
                 deposit_candidate=deposit(j,k,1:n_solid)+ &
                      time_step*factor*transfers%solid_deposition_rate
@@ -200,9 +209,11 @@ CONTAINS
                      .NOT.ALL(ieee_is_finite(erosion_candidate)) .OR. &
                      .NOT.ALL(ieee_is_finite(erodible_candidate)) .OR. &
                      .NOT.ieee_is_finite(lava_candidate)) &
-                     CALL fatal_error('D19: non-finite mass-exchange candidate inventory')
+                     CALL reject_cell('D19: non-finite mass-exchange candidate inventory')
+                     IF (step_failed) EXIT cell_loop
                 IF (ANY(erodible_candidate<0.0_wp)) &
-                     CALL fatal_error('D19: negative candidate erodible inventory')
+                     CALL reject_cell('D19: negative candidate erodible inventory')
+                     IF (step_failed) EXIT cell_loop
              END IF
              IF (q_candidate(idx_totMassEqn)>0.0_wp) THEN
                 CALL qc_to_qp(q_candidate,qp_candidate,pressure,'Lie explicit group candidate')
@@ -240,24 +251,29 @@ CONTAINS
                 EXIT
              END IF
           CASE DEFAULT
-             CALL fatal_error('D19: invalid group method')
+             CALL reject_cell('D19: invalid group method')
+             IF (step_failed) EXIT cell_loop
           END SELECT
           ! This is an admissibility check only, not an implicit post-solve clip.
           IF (.NOT.ALL(ieee_is_finite(q(1:n_eqns,j,k)))) &
-               CALL fatal_error('D19: source group produced non-finite state')
+               CALL reject_cell('D19: source group produced non-finite state')
+               IF (step_failed) EXIT cell_loop
           IF (q(idx_totMassEqn,j,k)<0.0_wp) &
-               CALL fatal_error('D19: negative mixture mass')
+               CALL reject_cell('D19: negative mixture mass')
+               IF (step_failed) EXIT cell_loop
           IF (ANY(q(idx_solidEqn_first:idx_solidEqn_last,j,k)<0.0_wp)) &
-               CALL fatal_error('D19: negative solid mass')
+               CALL reject_cell('D19: negative solid mass')
+               IF (step_failed) EXIT cell_loop
           IF (SUM(q(idx_solidEqn_first:idx_solidEqn_last,j,k))> &
                q(idx_totMassEqn,j,k)) &
-               CALL fatal_error('D19: source group solids exceed mixture mass')
+               CALL reject_cell('D19: source group solids exceed mixture mass')
+               IF (step_failed) EXIT cell_loop
           IF (q(idx_totMassEqn,j,k)>0.0_wp) THEN
              CALL qc_to_qp(q(:,j,k),qp(:,j,k),pressure,TRIM(context))
           ELSE
              CALL initialize_dry_physical_cell(qp(:,j,k))
           END IF
-       END DO
+       END DO cell_loop
        IF (step_failed) THEN
           IF (groups(group_index)%method==SOURCE_METHOD_NEWTON) CALL local_partition%finalize()
           RETURN
@@ -265,6 +281,14 @@ CONTAINS
        IF (with_exchange .AND. topo_change_flag) CALL apply_topography_rate_update(time_step)
        IF (groups(group_index)%method==SOURCE_METHOD_NEWTON) CALL local_partition%finalize()
     END DO
+  CONTAINS
+    ! Return a recoverable cell/group rejection without leaving the executor
+    ! before the Newton partition is finalized by the caller loop.
+    SUBROUTINE reject_cell(message)
+      CHARACTER(*), INTENT(IN) :: message
+      failure_reason=message
+      step_failed=.TRUE.
+    END SUBROUTINE reject_cell
   END SUBROUTINE execute_lie_source_groups
 
 END MODULE lie_source_executor_2d
