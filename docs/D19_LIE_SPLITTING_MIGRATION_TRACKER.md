@@ -159,3 +159,7 @@ Removed all `TESTS/TEST_IMEX_STAGES` files (stage-count/RK tableau/reconstructio
 ### Lie test conversion (2026-11-01)
 
 Replaced the RK-era source-registry regression with Lie group-order, method and Newton footprint checks, including co-grouped rheology/cooling. Replaced the production Newton acceptance fixture with a group-local backward-Euler solve and residual validation using `solve_backward_euler_group`. Both require final compilation and acceptance. The large N8 mass-exchange harness still contains obsolete RK/STEP APIs and requires separate test restructuring.
+
+### Mass-exchange legacy harness retirement (2026-11-01)
+
+Removed `TESTS/TEST_MASS_EXCHANGE/test_mass_exchange.f90` because its RK-stage solver, cadence, legacy equation partition and step-source executor are deleted. The mass-exchange runner now executes the retained independent projection/limiter/process-momentum checks. **Important coverage gap:** the old Fortran harness also exercised inventory budgets, checkpoint restart and 1-/4-thread reproducibility. Those checks are **not replaced yet**; L09 must add direct Lie mass-exchange, topography transaction, restart and multithreading tests. Retained `test_projection_stress.f90` for subsequent migration to `execute_lie_source_groups` (it still refers to the removed step-source executor and is not invoked). No compilation/tests performed.
