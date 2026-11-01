@@ -28,8 +28,6 @@ MODULE nonlinear_solver_2d
   PRIVATE
   PUBLIC :: initialize_nonlinear_solver
   PUBLIC :: finalize_nonlinear_solver
-  PUBLIC :: solve_imex_stage
-  PUBLIC :: solve_rk_step
   PUBLIC :: solve_backward_euler_group
 
   !> Complex-step perturbation and its reciprocal.
@@ -40,92 +38,22 @@ MODULE nonlinear_solver_2d
 
 CONTAINS
 
-  !******************************************************************************
-  !> \brief Coordinate one IMEX stage and return its effective IM contribution.
-  !> \details Apply the semi-implicit contribution and its corrections before
-  !>          the ordered implicit-group sweep. The returned IM term is the
-  !>          net conservative increment over the stage interval.
-  !> \param[in] equation_partition Implicit equation groups, order and solve methods.
-  !> \param[in] stage_groups Validated, normalized stage-group descriptors.
-  !> \param[in] q_known Conservative state including known stage contributions.
-  !> \param[in] q_old Conservative reference state at the start of the step.
-  !> \param[in] dt_step Stage time increment [s].
-  !> \param[in] a_diag Diagonal implicit Runge-Kutta coefficient [dimensionless].
-  !> \param[in] known_stage_residual Known stage source rates, excluding the current implicit rate.
-  !> \param[in] Bprimej_x Filtered bed slope in x [dimensionless].
-  !> \param[in] Bprimej_y Filtered bed slope in y [dimensionless].
-  !> \param[in] Bsecondj_xx Filtered bed curvature in xx [m^-1].
-  !> \param[in] Bsecondj_xy Filtered bed curvature in xy [m^-1].
-  !> \param[in] Bsecondj_yy Filtered bed curvature in yy [m^-1].
-  !> \param[in] grav_coeff Effective gravitational acceleration [m s^-2].
-  !> \param[in] Zij Local stochastic-process value supplied to the rheology.
-  !> \param[in] zero_x_momentum Reset the x-momentum component after the sweep.
-  !> \param[in] zero_y_momentum Reset the y-momentum component after the sweep.
-  !> \param[out] q_stage Conservative state after the ordered stage solve.
-  !> \param[out] effective_im_term Net conservative stage rate [state units s^-1].
-  !> \param[out] iterations_used Total Newton iterations attempted.
-  !> \param[out] converged True when all Newton solves satisfy their convergence criteria.
-  !> \param[out] linear_info Linear solver status; zero denotes success.
-  !> \param[out] line_search_failed True if a Newton line search could not accept a step.
-  !******************************************************************************
-  SUBROUTINE solve_imex_stage(equation_partition, stage_groups,     &
-       q_known, q_old,                                                       &
-       dt_step, a_diag, known_stage_residual, Bprimej_x, Bprimej_y,            &
-       Bsecondj_xx, Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij,                &
-       zero_x_momentum, zero_y_momentum, q_stage, effective_im_term,          &
-       iterations_used, converged, linear_info, line_search_failed)
-
-    IMPLICIT NONE
-
-    TYPE(equation_partition_type), INTENT(IN) :: equation_partition
-    TYPE(source_group_type), INTENT(IN) :: stage_groups(:)
-    REAL(wp), INTENT(IN) :: q_known(n_vars), q_old(n_vars)
-    REAL(wp), INTENT(IN) :: dt_step, a_diag
-    REAL(wp), INTENT(IN) :: known_stage_residual(n_eqns)
-    REAL(wp), INTENT(IN) :: Bprimej_x, Bprimej_y
-    REAL(wp), INTENT(IN) :: Bsecondj_xx, Bsecondj_xy, Bsecondj_yy
-    REAL(wp), INTENT(IN) :: grav_coeff, Zij
-    LOGICAL, INTENT(IN) :: zero_x_momentum, zero_y_momentum
-    REAL(wp), INTENT(OUT) :: q_stage(n_vars), effective_im_term(n_eqns)
-    INTEGER, INTENT(OUT) :: iterations_used, linear_info
-    LOGICAL, INTENT(OUT) :: converged, line_search_failed
-
-    q_stage = q_known
-    CALL solve_implicit_groups(equation_partition, stage_groups,    &
-         q_stage, q_old, dt_step,                                             &
-         a_diag, known_stage_residual, Bprimej_x, Bprimej_y, Bsecondj_xx,    &
-         Bsecondj_xy, Bsecondj_yy, grav_coeff, Zij, iterations_used,          &
-         converged, linear_info, line_search_failed, .TRUE.)
-
-    IF (zero_y_momentum) q_stage(3) = 0.0_wp
-    IF (zero_x_momentum) q_stage(2) = 0.0_wp
-
-    effective_im_term = 0.0_wp
-    effective_im_term(1:n_vars) = (q_stage - q_known) / (dt_step * a_diag)
-
-  END SUBROUTINE solve_imex_stage
-
-  !> \brief Advance one configured Newton source group for a full Lie substep.
-  !> \details The transitional implementation reuses the existing nonlinear
-  !>          machinery with unit DIRK diagonal and no pre-accumulated RK rate.
-  !>          The public signature has no RK-specific parameters.
-  SUBROUTINE solve_backward_euler_group(equation_partition, source_group, &
-       q_cell, dt, Bprime_x, Bprime_y, stochastic_value, &
-       iterations_used, converged, linear_info, line_search_failed)
+  !> Solve one full backward-Euler Lie group without RK coefficients.
+  SUBROUTINE solve_backward_euler_group(equation_partition,source_group, &
+       q_cell,dt,Bprime_x,Bprime_y,stochastic_value, &
+       iterations_used,converged,linear_info,line_search_failed)
     TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     TYPE(source_group_type), INTENT(IN) :: source_group
     REAL(wp), INTENT(INOUT) :: q_cell(n_vars)
-    REAL(wp), INTENT(IN) :: dt, Bprime_x, Bprime_y, stochastic_value
-    INTEGER, INTENT(OUT) :: iterations_used, linear_info
-    LOGICAL, INTENT(OUT) :: converged, line_search_failed
-    REAL(wp) :: q_in(n_vars), no_external_rate(n_eqns)
-
-    q_in = q_cell
-    no_external_rate = 0.0_wp
-    CALL solve_rk_step(equation_partition, [source_group], q_cell, q_in, &
-         dt, 1.0_wp, no_external_rate, Bprime_x, Bprime_y, &
-         stochastic_value, iterations_used, converged, linear_info, &
-         line_search_failed)
+    REAL(wp), INTENT(IN) :: dt,Bprime_x,Bprime_y,stochastic_value
+    INTEGER, INTENT(OUT) :: iterations_used,linear_info
+    LOGICAL, INTENT(OUT) :: converged,line_search_failed
+    REAL(wp) :: q_in(n_vars),zero_predictor(n_eqns)
+    q_in=q_cell
+    zero_predictor=0.0_wp
+    CALL solve_implicit_groups(equation_partition,[source_group],q_cell,q_in, &
+         dt,zero_predictor,Bprime_x,Bprime_y,0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
+         stochastic_value,iterations_used,converged,linear_info,line_search_failed)
   END SUBROUTINE solve_backward_euler_group
 
   !> \brief Set the complex-step perturbation and its reciprocal.
@@ -148,46 +76,6 @@ CONTAINS
 
   END SUBROUTINE finalize_nonlinear_solver
 
-  !> \brief Backward-compatible entry point for the implicit-group sweep.
-  !> \param[in] equation_partition Implicit equation groups, order and solve methods.
-  !> \param[in] stage_groups Validated, normalized stage-group descriptors.
-  !> \param[in,out] qj Local conservative state vector updated by the group sweep.
-  !> \param[in] qj_old Conservative reference state at the start of the step.
-  !> \param[in] dt_step Stage time increment [s].
-  !> \param[in] a_diag Diagonal implicit Runge-Kutta coefficient [dimensionless].
-  !> \param[in] Rj_not_impl Known stage source rates, excluding the current implicit rate.
-  !> \param[in] Bprimej_x Filtered bed slope in x [dimensionless].
-  !> \param[in] Bprimej_y Filtered bed slope in y [dimensionless].
-  !> \param[in] Zij Local stochastic-process value supplied to the rheology.
-  !> \param[out] iterations_used Total Newton iterations attempted.
-  !> \param[out] converged True when all Newton solves satisfy their convergence criteria.
-  !> \param[out] linear_info Linear solver status; zero denotes success.
-  !> \param[out] line_search_failed True if a Newton line search could not accept a step.
-  !******************************************************************************
-  SUBROUTINE solve_rk_step(equation_partition, stage_groups, qj,    &
-       qj_old, dt_step, a_diag,                                              &
-       Rj_not_impl, Bprimej_x, Bprimej_y, Zij, iterations_used, converged,  &
-       linear_info, line_search_failed)
-
-    TYPE(equation_partition_type), INTENT(IN) :: equation_partition
-    TYPE(source_group_type), INTENT(IN) :: stage_groups(:)
-    REAL(wp), INTENT(INOUT) :: qj(n_vars)
-    REAL(wp), INTENT(IN) :: qj_old(n_vars)
-    REAL(wp), INTENT(IN) :: dt_step, a_diag
-    REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns)
-    REAL(wp), INTENT(IN) :: Bprimej_x, Bprimej_y
-    REAL(wp), INTENT(IN) :: Zij
-    INTEGER, INTENT(OUT) :: iterations_used, linear_info
-    LOGICAL, INTENT(OUT) :: converged, line_search_failed
-
-    CALL solve_implicit_groups(equation_partition, stage_groups,    &
-         qj, qj_old, dt_step,                                                &
-         a_diag, Rj_not_impl, Bprimej_x, Bprimej_y, 0.0_wp, 0.0_wp,          &
-         0.0_wp, 0.0_wp, Zij, iterations_used, converged, linear_info,       &
-         line_search_failed)
-
-  END SUBROUTINE solve_rk_step
-
   !> \brief Apply the ordered implicit-group sweep using Newton or closed-form DIRK solves.
   !>
   !> \param[in] equation_partition Explicit/implicit equation mask and compact index maps.
@@ -196,8 +84,7 @@ CONTAINS
   !>                   area.
   !> \param[in] qj_old Cell conservative reference state used in the implicit-stage residual.
   !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
-  !> \param[in] a_diag Diagonal coefficient of the current implicit Runge-Kutta stage.
-  !> \param[in] Rj_not_impl Already known stage contribution excluding the current implicit source.
+  !> \param[in] predictor_rate Already known stage contribution excluding the current implicit source.
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[in] Bsecondj_xx Filtered bed curvature in xx [m^-1].
@@ -214,12 +101,12 @@ CONTAINS
 
   SUBROUTINE solve_implicit_groups(equation_partition, stage_groups, &
        qj, qj_old, dt_step,                                                  &
-       a_diag, Rj_not_impl, Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
+       predictor_rate, Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
        Bsecondj_yy, grav_coeff, Zij,                                         &
        iterations_used, converged, linear_info, line_search_failed,          &
        apply_semi_implicit )
 
-    USE parameters_2d, ONLY : tol_rel, tol_abs, n_RK
+    USE parameters_2d, ONLY : tol_rel, tol_abs
     USE state_conversion_2d, ONLY : qc_to_qp
 
     IMPLICIT NONE
@@ -229,8 +116,7 @@ CONTAINS
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
     REAL(wp), INTENT(IN) :: qj_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step
-    REAL(wp), INTENT(IN) :: a_diag
-    REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns)
+    REAL(wp), INTENT(IN) :: predictor_rate(n_eqns)
     REAL(wp), INTENT(IN) :: Bprimej_x
     REAL(wp), INTENT(IN) :: Bprimej_y
     REAL(wp), INTENT(IN) :: Bsecondj_xx, Bsecondj_xy, Bsecondj_yy
@@ -274,13 +160,9 @@ CONTAINS
     ! configured tolerances for lower-order methods; tighten only this solve.
     tol_abs_local = tol_abs
     tol_rel_local = tol_rel
-    IF ( n_RK .EQ. 4 ) THEN
-       tol_abs_local = 1.0E-8_wp
-       tol_rel_local = 1.0E-12_wp
-    END IF
 
     qj_init = qj
-    q_known = qj_old - dt_step * Rj_not_impl(1:n_vars)
+    q_known = qj_old - dt_step * predictor_rate(1:n_vars)
     qj = q_known
     apply_si_local = .FALSE.
     IF (PRESENT(apply_semi_implicit)) apply_si_local = apply_semi_implicit
@@ -326,14 +208,14 @@ CONTAINS
              RETURN
           END IF
           CALL eval_source_analytic(stage_groups(group),qj, &
-               analytic_context,dt_step*a_diag,analytic_rate,             &
+               analytic_context,dt_step,analytic_rate,             &
                status=analytic_status)
           IF (analytic_status/=0) THEN
              linear_info=analytic_status
              qj=qj_init
              RETURN
           END IF
-          qj=qj+dt_step*a_diag*analytic_rate(1:n_vars)
+          qj=qj+dt_step*analytic_rate(1:n_vars)
 
        ELSEIF (stage_groups(group)%method==SOURCE_METHOD_NEWTON) THEN
           ! A group solves against the state left by preceding groups.
@@ -349,19 +231,19 @@ CONTAINS
              END IF
              DO i=1,group_size
                 equation=group_equations(i)
-                qj(equation)=q_group_before(equation)+dt_step*a_diag*si_term(equation)
+                qj(equation)=q_group_before(equation)+dt_step*si_term(equation)
              END DO
              IF (group_has_momentum .AND. apply_si_local) THEN
                 CALL limit_rheology_momentum_reversal(q_group_before(2:3),qj(2:3))
                 DO i=1,group_size
                    equation=group_equations(i)
                    si_term(equation)=                                        &
-                        (qj(equation)-q_group_before(equation))/(dt_step*a_diag)
+                        (qj(equation)-q_group_before(equation))/(dt_step)
                 END DO
              END IF
-             residual_without_si=-a_diag*si_term
+             residual_without_si=-si_term
              CALL solve_newton_group(stage_groups(group),&
-                  group_equations(1:group_size),qj,q_group_before,dt_step,a_diag,&
+                  group_equations(1:group_size),qj,q_group_before,dt_step,&
                   residual_without_si,Bprimej_x,Bprimej_y,Zij,coeff_f,      &
                   tol_abs_local,tol_rel_local,iterations_used,converged,   &
                   linear_info,line_search_failed)
@@ -385,8 +267,7 @@ CONTAINS
   !> \param[in,out] qj Local conservative state; only group equations are updated.
   !> \param[in] qj_old Conservative reference state at the start of the step.
   !> \param[in] dt_step Stage time increment [s].
-  !> \param[in] a_diag Diagonal implicit Runge-Kutta coefficient [dimensionless].
-  !> \param[in] Rj_not_impl Known stage source rates, excluding the current implicit rate.
+  !> \param[in] predictor_rate Known stage source rates, excluding the current implicit rate.
   !> \param[in] Bprimej_x Filtered bed slope in x [dimensionless].
   !> \param[in] Bprimej_y Filtered bed slope in y [dimensionless].
   !> \param[in] Zij Local stochastic-process value supplied to the rheology.
@@ -400,7 +281,7 @@ CONTAINS
   !> \param[out] linear_info Linear solver status; zero denotes success.
   !> \param[out] line_search_failed True if backtracking cannot accept a step.
   SUBROUTINE solve_newton_group(source_group,group_equations,   &
-       qj,qj_old,dt_step,a_diag,Rj_not_impl,Bprimej_x,Bprimej_y,Zij,coeff_f, &
+       qj,qj_old,dt_step,predictor_rate,Bprimej_x,Bprimej_y,Zij,coeff_f, &
        tol_abs_local,                                                         &
        tol_rel_local, iterations_used, converged, linear_info,               &
        line_search_failed)
@@ -412,8 +293,8 @@ CONTAINS
     TYPE(source_group_type), INTENT(IN) :: source_group
     INTEGER, INTENT(IN) :: group_equations(:)
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
-    REAL(wp), INTENT(IN) :: qj_old(n_vars), dt_step, a_diag
-    REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns), Bprimej_x, Bprimej_y, Zij
+    REAL(wp), INTENT(IN) :: qj_old(n_vars), dt_step
+    REAL(wp), INTENT(IN) :: predictor_rate(n_eqns), Bprimej_x, Bprimej_y, Zij
     REAL(wp), INTENT(IN) :: coeff_f(n_eqns), tol_abs_local, tol_rel_local
     INTEGER, INTENT(INOUT) :: iterations_used
     LOGICAL, INTENT(OUT) :: converged, line_search_failed
@@ -441,7 +322,7 @@ CONTAINS
 
     DO nl_iter = 1, max_nl_iter
        iterations_used = iterations_used + 1
-       CALL eval_f(qj, qj_old, dt_step, a_diag, coeff_f, Rj_not_impl,       &
+       CALL eval_f(qj, qj_old, dt_step, coeff_f, predictor_rate,       &
             Bprimej_x, Bprimej_y, right_term, scal_f, Zij, group_equations, &
             source_group)
 
@@ -452,7 +333,7 @@ CONTAINS
           EXIT
        END IF
 
-       CALL eval_jacobian(qj_rel, qj_org, dt_step, a_diag, coeff_f,         &
+       CALL eval_jacobian(qj_rel, qj_org, dt_step, coeff_f,         &
             Bprimej_x, Bprimej_y, left_matrix, Zij, group_equations,       &
             source_group)
        IF (nl_iter .GT. 1) grad_f = MATMUL(right_term,left_matrix)
@@ -487,7 +368,7 @@ CONTAINS
           stpmax = STPMX * MAX(NORM2(qj_rel),REAL(SIZE(qj_rel),wp))
           CALL lnsrch(qj_rel_old, qj_org, qj, qj_old, scal_f_old, grad_f,   &
                desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax,      &
-               check, dt_step, a_diag, Rj_not_impl, Bprimej_x, Bprimej_y,  &
+               check, dt_step, predictor_rate, Bprimej_x, Bprimej_y,  &
                Zij, group_equations,source_group)
           IF (check) THEN
              line_search_failed = .TRUE.
@@ -500,8 +381,8 @@ CONTAINS
              qj_trial(group_equations(i)) =                                &
                   qj_rel(group_equations(i))*qj_org(group_equations(i))
           END DO
-          CALL eval_f(qj_trial, qj_old, dt_step, a_diag, coeff_f,           &
-               Rj_not_impl, Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
+          CALL eval_f(qj_trial, qj_old, dt_step, coeff_f,           &
+               predictor_rate, Bprimej_x, Bprimej_y, right_term, scal_f, Zij, &
                group_equations,source_group)
        END IF
 
@@ -764,8 +645,7 @@ CONTAINS
   !> \param[in] stpmax Maximum Euclidean length of the normalized trial step.
   !> \param[out] check True when the line search cannot find a usable decrease.
   !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
-  !> \param[in] a_diag Diagonal coefficient of the current implicit Runge-Kutta stage.
-  !> \param[in] Rj_not_impl Already known stage contribution excluding the current implicit source.
+  !> \param[in] predictor_rate Already known stage contribution excluding the current implicit source.
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
@@ -775,7 +655,7 @@ CONTAINS
 
   SUBROUTINE lnsrch( qj_rel_NR_old, qj_org, qj_fixed, qj_old, scal_f_old,      &
        grad_f, desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax, check,  &
-       dt_step , a_diag , Rj_not_impl , Bprimej_x , Bprimej_y, Zij,           &
+       dt_step  , predictor_rate , Bprimej_x , Bprimej_y, Zij,           &
        active_equations,source_group )
 
     IMPLICIT NONE
@@ -819,8 +699,7 @@ CONTAINS
     LOGICAL, INTENT(OUT) :: check
 
     REAL(wp), INTENT(IN) :: dt_step
-    REAL(wp), INTENT(IN) :: a_diag
-    REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns)
+    REAL(wp), INTENT(IN) :: predictor_rate(n_eqns)
 
     REAL(wp), INTENT(IN) :: Bprimej_x
     REAL(wp), INTENT(IN) :: Bprimej_y
@@ -905,8 +784,8 @@ CONTAINS
           qj(equation) = qj_rel(equation)*qj_org(equation)
        END DO
 
-       CALL eval_f( qj , qj_old , dt_step , a_diag , coeff_f ,             &
-            Rj_not_impl , Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
+       CALL eval_f( qj , qj_old , dt_step  , coeff_f ,             &
+            predictor_rate , Bprimej_x , Bprimej_y, right_term , scal_f, Zij,  &
             active_equations,source_group )
 
        IF ( verbose_level .GE. 4 ) THEN
@@ -1011,9 +890,8 @@ CONTAINS
   !> \param[in] qj Local conservative state vector; mass and momenta are per unit horizontal area.
   !> \param[in] qj_old Cell conservative reference state used in the implicit-stage residual.
   !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
-  !> \param[in] a_diag Diagonal coefficient of the current implicit Runge-Kutta stage.
   !> \param[in] coeff_f Per-equation scaling factors applied to the stage residual.
-  !> \param[in] Rj_not_impl Already known stage contribution excluding the current implicit source.
+  !> \param[in] predictor_rate Already known stage contribution excluding the current implicit source.
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
   !> \param[out] f_nl Scaled nonlinear stage residual, one entry per equation.
@@ -1023,7 +901,7 @@ CONTAINS
   !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
     !******************************************************************************
 
-  SUBROUTINE eval_f( qj , qj_old , dt_step, a_diag , coeff_f , Rj_not_impl ,    &
+  SUBROUTINE eval_f( qj , qj_old , dt_step , coeff_f , predictor_rate ,    &
        Bprimej_x ,                                                              &
        Bprimej_y , f_nl , scal_f, Zij, active_equations,source_group )
 
@@ -1034,9 +912,8 @@ CONTAINS
     REAL(wp), INTENT(IN) :: qj(n_vars)
     REAL(wp), INTENT(IN) :: qj_old(n_vars)
     REAL(wp), INTENT(IN) :: dt_step
-    REAL(wp), INTENT(IN) :: a_diag
     REAL(wp), INTENT(IN) :: coeff_f(n_eqns)
-    REAL(wp), INTENT(IN) :: Rj_not_impl(n_eqns)
+    REAL(wp), INTENT(IN) :: predictor_rate(n_eqns)
 
     REAL(wp), INTENT(IN) :: Bprimej_x
     REAL(wp), INTENT(IN) :: Bprimej_y
@@ -1059,7 +936,7 @@ CONTAINS
     CALL eval_source_implicit( Bprimej_x , Bprimej_y, Zij, r_qj = qj ,           &
          r_nh_term_impl=nh_term_impl,group=source_group )
 
-    Rj = Rj_not_impl - a_diag * nh_term_impl
+    Rj = predictor_rate - nh_term_impl
 
     delta_q = qj - qj_old
     f_nl = delta_q + dt_step * Rj
@@ -1088,7 +965,6 @@ CONTAINS
   !> \param[in] qj_rel Dimensionless normalized conservative state, qj=qj_rel*qj_org.
   !> \param[in] qj_org Per-variable scaling factors for normalized Newton variables.
   !> \param[in] dt_step Timestep entering the implicit-stage equation [s].
-  !> \param[in] a_diag Diagonal coefficient of the current implicit Runge-Kutta stage.
   !> \param[in] coeff_f Per-equation scaling factors applied to the stage residual.
   !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
   !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
@@ -1101,7 +977,7 @@ CONTAINS
   !>          subtraction.
   !******************************************************************************
 
-  SUBROUTINE eval_jacobian( qj_rel, qj_org, dt_step, a_diag, coeff_f,        &
+  SUBROUTINE eval_jacobian( qj_rel, qj_org, dt_step, coeff_f,        &
        Bprimej_x, Bprimej_y, left_matrix, Zij, active_equations,             &
        source_group )
 
@@ -1112,7 +988,6 @@ CONTAINS
     REAL(wp), INTENT(IN) :: qj_rel(n_vars)
     REAL(wp), INTENT(IN) :: qj_org(n_vars)
     REAL(wp), INTENT(IN) :: dt_step
-    REAL(wp), INTENT(IN) :: a_diag
     REAL(wp), INTENT(IN) :: coeff_f(n_eqns)
 
     REAL(wp), INTENT(IN) :: Bprimej_x
@@ -1165,7 +1040,7 @@ CONTAINS
        END DO
        DO j = 1, n_eqns
           left_matrix(j,equation) = left_matrix(j,equation) -                 &
-               dt_step*a_diag*Jacob_relax(j,equation)
+               dt_step*Jacob_relax(j,equation)
        END DO
     END DO
 
