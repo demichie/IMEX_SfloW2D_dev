@@ -1,6 +1,7 @@
 ! First-order Lie integration. GROUP 0: spatial update first; physical rates from q^n.
 MODULE time_integration_2d
-  USE parameters_2d, ONLY : wp,n_eqns,n_vars
+  USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_solidEqn_first,idx_solidEqn_last, &
+       idx_totMassEqn
   USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
   USE state_conversion_2d, ONLY : qc_to_qp
   USE state_2d, ONLY : initialize_dry_physical_cell
@@ -67,8 +68,14 @@ CONTAINS
       ! Spatial admissibility check. Do not limit or clip its conservative rate.
       IF (.NOT.ALL(q(1:n_eqns,j,k)==q(1:n_eqns,j,k))) &
            CALL fatal_error('Lie spatial update produced NaN')
-      IF (q(1,j,k)<0.0_wp) CALL fatal_error('Lie spatial update: negative mass')
-      IF (q(1,j,k)>0.0_wp) THEN
+      IF (q(idx_totMassEqn,j,k)<0.0_wp) &
+           CALL fatal_error('Lie spatial update: negative mass')
+      IF (ANY(q(idx_solidEqn_first:idx_solidEqn_last,j,k)<0.0_wp)) &
+           CALL fatal_error('Lie spatial update: negative solid mass')
+      IF (SUM(q(idx_solidEqn_first:idx_solidEqn_last,j,k))> &
+           q(idx_totMassEqn,j,k)) &
+           CALL fatal_error('Lie spatial update: solids exceed total mass')
+      IF (q(idx_totMassEqn,j,k)>0.0_wp) THEN
         CALL qc_to_qp(q(:,j,k),qp(:,j,k),pd,'Lie spatial update')
       ELSE
         CALL initialize_dry_physical_cell(qp(:,j,k))

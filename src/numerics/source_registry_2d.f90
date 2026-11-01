@@ -84,8 +84,9 @@ CONTAINS
     CHARACTER(*), INTENT(OUT) :: error
     TYPE(source_term_type) :: term
     CHARACTER(LEN=64), ALLOCATABLE :: seen(:)
-    INTEGER :: i,j
+    INTEGER :: i,j,mass_group
     CALL this%finalize()
+    mass_group=-1
     ALLOCATE(seen(0))
     error='D19: invalid Lie group configuration'
     IF (n_equations<4 .OR. SIZE(groups)==0) RETURN
@@ -98,6 +99,7 @@ CONTAINS
         IF (groups(i)%id<=groups(i-1)%id) RETURN
       END IF
       IF (.NOT.ALLOCATED(groups(i)%source_names)) RETURN
+      IF (i>1 .AND. SIZE(groups(i)%source_names)==0) RETURN
       IF (.NOT.ALLOCATED(groups(i)%equation_ids)) RETURN
       IF (.NOT.valid_equations(groups(i)%equation_ids,n_equations)) RETURN
       SELECT CASE(groups(i)%method)
@@ -111,6 +113,10 @@ CONTAINS
       DO j=1,SIZE(groups(i)%source_names)
         term=source_term_descriptor_by_name(groups(i)%source_names(j))
         IF (LEN_TRIM(term%name)==0) RETURN
+        IF (INDEX(TRIM(term%name),'mass_exchange_')==1) THEN
+          IF (mass_group>=0 .AND. mass_group/=groups(i)%id) RETURN
+          mass_group=groups(i)%id
+        END IF
         IF (ANY(seen==term%name)) RETURN
         seen=[CHARACTER(LEN=64) :: seen,term%name]
         SELECT CASE(groups(i)%method)
