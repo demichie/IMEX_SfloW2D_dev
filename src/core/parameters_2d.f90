@@ -299,8 +299,6 @@ MODULE parameters_2d
   INTEGER :: idx_stochEqn
   INTEGER :: idx_poreEqn
   
-  INTEGER :: n_RK     !< Runge-Kutta stage count: 2, 3 or 4; not the temporal order
-  
   INTEGER, PARAMETER :: max_nl_iter = 100
 
   REAL(wp), PARAMETER :: tol_abs = 1.0E-5_wp

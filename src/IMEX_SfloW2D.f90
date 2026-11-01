@@ -69,7 +69,7 @@ PROGRAM IMEX_SfloW2D
 
    USE simulation_2d, ONLY : simulation
    USE source_registry_2d, ONLY : source_group_type, group_contains_name
-   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE
+   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
 
    USE inpout_2d, ONLY : restart
 
@@ -124,7 +124,7 @@ PROGRAM IMEX_SfloW2D
 
    INTEGER :: len_fname
    INTEGER :: i_source_group
-   TYPE(source_group_type), ALLOCATABLE :: stage_source_groups(:)
+   TYPE(source_group_type), ALLOCATABLE :: lie_source_groups(:)
    LOGICAL :: boundary_source_enabled
    CHARACTER(LEN=4) :: ext
    LOGICAL :: is_binary_restart
@@ -174,15 +174,15 @@ PROGRAM IMEX_SfloW2D
 
    CALL simulation%initialize
 
-   stage_source_groups=simulation%source_registry%stage_groups()
+   lie_source_groups=simulation%source_registry%groups()
    boundary_source_enabled=.FALSE.
-   DO i_source_group=1,SIZE(stage_source_groups)
-      IF (stage_source_groups(i_source_group)%cadence/=SOURCE_CADENCE_STAGE .OR. &
-           stage_source_groups(i_source_group)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
+   DO i_source_group=1,SIZE(lie_source_groups)
+      IF (lie_source_groups(i_source_group)%cadence/=SOURCE_CADENCE_STAGE .OR. &
+           lie_source_groups(i_source_group)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
       boundary_source_enabled=boundary_source_enabled .OR. group_contains_name( &
-           stage_source_groups(i_source_group),'boundary_injection')
+           lie_source_groups(i_source_group),'boundary_injection')
    END DO
-   DEALLOCATE(stage_source_groups)
+   DEALLOCATE(lie_source_groups)
 
    is_binary_restart = .FALSE.
    simulation%runtime%t = t_start

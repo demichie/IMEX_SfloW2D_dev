@@ -16,7 +16,6 @@
 MODULE inpout_2d
 
   USE diagnostics_2d, ONLY : interactive_debug_flag, debug_pause, fatal_error
-  USE time_integration_2d, ONLY : validate_runge_kutta_stages
 
   USE parameters_2d, ONLY: wp, dry_thickness_tolerance, &
        configure_canonical_state_indices
@@ -67,18 +66,18 @@ MODULE inpout_2d
   USE parameters_2d, ONLY: bc
 
   ! -- Variables for the namelist NUMERIC_PARAMETERS
-  USE parameters_2d, ONLY: dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, reconstr_coeff, n_RK
+  USE parameters_2d, ONLY: dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, reconstr_coeff
   USE source_input_2d, ONLY: read_mass_exchange_parameters, write_mass_exchange_parameters, &
-       rheology_method, rheology_cadence, rheology_group, &
-       thermal_method, thermal_cadence, thermal_group, &
-       pore_pressure_method, pore_pressure_cadence, pore_pressure_group, &
-       bottom_circular_method, bottom_circular_cadence, bottom_circular_group, &
-       bottom_fissural_method, bottom_fissural_cadence, bottom_fissural_group, &
-       radial_injection_method, radial_injection_cadence, radial_injection_group, &
-       geometry_curvature_method, geometry_curvature_cadence, geometry_curvature_group, &
-       boundary_injection_method, boundary_injection_cadence, boundary_injection_group, &
+       rheology_method, rheology_group, &
+       thermal_method, thermal_group, &
+       pore_pressure_method, pore_pressure_group, &
+       bottom_circular_method, bottom_circular_group, &
+       bottom_fissural_method, bottom_fissural_group, &
+       radial_injection_method, radial_injection_group, &
+       geometry_curvature_method, geometry_curvature_group, &
+       boundary_injection_method, boundary_injection_group, &
        mass_exchange_configuration_present, mass_exchange_method, &
-       mass_exchange_cadence, mass_exchange_group
+       mass_exchange_group
 
   ! -- Variables for the namelist EXPL_TERMS_PARAMETERS
   USE constitutive_parameters_2d, ONLY: grav, inv_grav
@@ -360,10 +359,10 @@ MODULE inpout_2d
   NAMELIST /initial_conditions/ T_init, T_ambient
 
   NAMELIST /numeric_parameters/ dt0, max_dt, cfl, cfl_policy, kt_trace_reconstruction, limiter, theta, &
-    reconstr_coeff, n_RK
+    reconstr_coeff
 
   NAMELIST /expl_terms_parameters/ grav, &
-       geometry_curvature_method, geometry_curvature_cadence, geometry_curvature_group
+       geometry_curvature_method, geometry_curvature_group
 
   NAMELIST /radial_source_parameters/ x_source, y_source, r_source, &
     r2_source, angle_source, vel_source, T_source, h_source, &
@@ -378,25 +377,25 @@ MODULE inpout_2d
     y1_source, y2_source, vel_source, T_source, h_source, alphas_source, &
     alphag_source, time_param, Ri_source, mfr_source, &
     xs_source, xg_source, &
-    boundary_injection_method, boundary_injection_cadence, boundary_injection_group
+    boundary_injection_method, boundary_injection_group
 
   NAMELIST /fissural_source_parameters/ x_fissures_end_points,                &
       y_fissures_end_points, width_fissures, linear_vel_fissures,              &
       T_fissures, time_param_fissures, alphas_source, alphag_source,           &
       xs_source, xg_source, &
-      bottom_fissural_method, bottom_fissural_cadence, bottom_fissural_group
+      bottom_fissural_method, bottom_fissural_group
 
   NAMELIST /collapsing_volume_parameters/ x_collapse, y_collapse, &
     r_collapse, T_collapse, h_collapse, alphas_collapse, alphag_collapse
 
   NAMELIST /temperature_parameters/ thermal_cooling_flag, emissivity, atm_heat_transf_coeff, &
     thermal_conductivity, exp_area_fract, c_p, enne, emme, T_env, &
-    T_ground, thermal_method, thermal_cadence, thermal_group
+    T_ground, thermal_method, thermal_group
 
   NAMELIST /rheology_parameters/ rheology_model, mu, xi, tau, nu_ref, &
     visc_par, T_ref, alpha2, beta2, alpha1_ref, beta1, Kappa, n_td, &
     friction_factor, tau0, mu_0, mu_inf, Fr_0, U_w, mu_s, mu_2, I_0, muI_inf, &
-    rheology_method, rheology_cadence, rheology_group
+    rheology_method, rheology_group
 
   NAMELIST /runout_parameters/ x0_runout, y0_runout, dt_runout, &
     eps_stop, alphas_threshold
@@ -412,7 +411,7 @@ MODULE inpout_2d
 
   NAMELIST /pore_pressure_parameters/ hydraulic_permeability, pore_pres_fract, &
     alpha_trans, N_inh, f_inhibit_mode, &
-    dynamic_permeability_flag, pore_pressure_method, pore_pressure_cadence, &
+    dynamic_permeability_flag, pore_pressure_method, &
     pore_pressure_group
 
   NAMELIST /west_boundary_conditions/ h_bcW, hu_bcW, hv_bcW, &
@@ -480,16 +479,16 @@ CONTAINS
     INTEGER :: ios
 
     ! Reset physical-source preferences before any namelist is parsed.
-    rheology_method=''; rheology_cadence=''; rheology_group=0
-    thermal_method=''; thermal_cadence=''; thermal_group=0
-    pore_pressure_method=''; pore_pressure_cadence=''; pore_pressure_group=0
-    bottom_circular_method=''; bottom_circular_cadence=''; bottom_circular_group=0
-    bottom_fissural_method=''; bottom_fissural_cadence=''; bottom_fissural_group=0
-    radial_injection_method=''; radial_injection_cadence=''; radial_injection_group=0
-    geometry_curvature_method=''; geometry_curvature_cadence=''; geometry_curvature_group=0
-    boundary_injection_method=''; boundary_injection_cadence=''; boundary_injection_group=0
+    rheology_method=''; rheology_group=1
+    thermal_method=''; thermal_group=2
+    pore_pressure_method=''; pore_pressure_group=3
+    bottom_circular_method=''; bottom_circular_group=0
+    bottom_fissural_method=''; bottom_fissural_group=0
+    radial_injection_method=''; radial_injection_group=0
+    geometry_curvature_method=''; geometry_curvature_group=0
+    boundary_injection_method=''; boundary_injection_group=0
     mass_exchange_configuration_present=.FALSE.
-    mass_exchange_method='EXPLICIT'; mass_exchange_cadence='STEP'; mass_exchange_group=0
+    mass_exchange_method='EXPLICIT'; mass_exchange_group=4
 
     n_vars = 3
     n_layers = 1
@@ -555,7 +554,6 @@ CONTAINS
     !-- Inizialization of the Variables for the namelist NUMERIC_PARAMETERS
     dt0 = 1.0E-4_wp
     max_dt = 1.0E-3_wp
-    n_RK = 2
     cfl = 0.24_wp
     cfl_policy = 'directional_min'
     kt_trace_reconstruction = 'eta_x'
@@ -2228,29 +2226,11 @@ CONTAINS
             TRIM(pore_pressure_method)/='NEWTON' .AND. &
             TRIM(pore_pressure_method)/='ANALYTIC')) &
             source_input_error='D18 physical METHOD must be EXPLICIT, NEWTON or ANALYTIC'
-       IF ((LEN_TRIM(rheology_cadence)>0 .AND. &
-            TRIM(rheology_cadence)/='STAGE') .OR. &
-            (LEN_TRIM(thermal_cadence)>0 .AND. &
-            TRIM(thermal_cadence)/='STAGE') .OR. &
-            (LEN_TRIM(pore_pressure_cadence)>0 .AND. &
-            TRIM(pore_pressure_cadence)/='STAGE')) &
-            source_input_error='D18 physical CADENCE currently supports STAGE only'
        IF (rheology_group<0 .OR. thermal_group<0 .OR. pore_pressure_group<0) &
             source_input_error='D18 physical GROUP must be nonnegative'
-       IF ((rheology_group>0 .AND. LEN_TRIM(rheology_method)==0) .OR. &
-            (thermal_group>0 .AND. LEN_TRIM(thermal_method)==0) .OR. &
-            (pore_pressure_group>0 .AND. LEN_TRIM(pore_pressure_method)==0)) &
-            source_input_error='D18 physical GROUP requires explicit METHOD'
-       IF (mass_exchange_configuration_present) THEN
-          IF (mass_exchange_method/='EXPLICIT' .OR. &
-               mass_exchange_cadence/='STEP') &
-               source_input_error='D18 mass exchange currently requires EXPLICIT/STEP'
-       END IF
     END IF
     IF (LEN_TRIM(source_input_error)>0) CALL fatal_error(TRIM(source_input_error))
     ! Reject unsupported tableaux here, before simulation workspace initialization.
-    CALL validate_runge_kutta_stages(n_RK)
-
     IF ((comp_cells_x .EQ. 1) .OR. (comp_cells_y .EQ. 1)) THEN
       max_cfl = 0.50_wp
     ELSE
