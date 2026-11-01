@@ -110,6 +110,7 @@ CONTAINS
     ! The integrator owns evolving inventories; geometry owns only bed caches.
     state%q=this%q_trial
     state%qp=this%qp_trial
+    CALL state%refresh_substrate_totals()
     CALL commit_geometry_transaction
   END SUBROUTINE
 END MODULE time_integration_2d

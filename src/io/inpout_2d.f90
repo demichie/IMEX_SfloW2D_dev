@@ -6235,13 +6235,6 @@ CONTAINS
 
       grid_output = -9999
 
-      DO j = 1, comp_cells_y
-
-        state%deposit_tot(:, j) = SUM(state%deposit(:, j, :), DIM=2)/(1.0_wp - &
-                                                          erodible_porosity)
-
-      END DO
-
       WHERE (state%deposit_tot(:, :) .GT. 0.0_wp)
 
         grid_output = state%deposit_tot
@@ -6317,13 +6310,6 @@ CONTAINS
             form='formatted')
 
       grid_output = -9999
-
-      DO j = 1, comp_cells_y
-
-        state%erosion_tot(:, j) = SUM(state%erosion(:, j, :), DIM=2)/(1.0_wp - &
-                                                          erodible_porosity)
-
-      END DO
 
       WHERE (state%erosion_tot(:, :) .GT. 0.0_wp)
 
@@ -7840,7 +7826,7 @@ END IF
     CALL check_restart_io(ierr, io_message, 'writing nodal topography to',  &
          filename)
     WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%erodible
-    CALL check_restart_io(ierr, io_message, 'writing state%erodible material to', &
+    CALL check_restart_io(ierr, io_message, 'writing erodible material to', &
          filename)
     WRITE (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%deposit
     CALL check_restart_io(ierr, io_message, 'writing deposits to', filename)
@@ -7897,7 +7883,7 @@ END IF
          runtime%runout%runout_row, runtime%runout%mass_center_row
     CALL check_restart_io(ierr, io_message, 'writing runout history to', filename)
     WRITE(unit_rst, IOSTAT=ierr, IOMSG=io_message) state%lava_deposit
-    CALL check_restart_io(ierr, io_message, 'writing lava state%deposit to', filename)
+    CALL check_restart_io(ierr, io_message, 'writing lava deposit to', filename)
 
     CLOSE (unit_rst, IOSTAT=ierr, IOMSG=io_message)
     CALL check_restart_io(ierr, io_message, 'closing', filename)
@@ -8017,7 +8003,7 @@ END IF
     CALL check_restart_io(ierr, io_message, 'reading nodal topography from', &
          filename)
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%erodible
-    CALL check_restart_io(ierr, io_message, 'reading state%erodible material from', &
+    CALL check_restart_io(ierr, io_message, 'reading erodible material from', &
          filename)
     READ (unit_rst, IOSTAT=ierr, IOMSG=io_message) state%deposit
     CALL check_restart_io(ierr, io_message, 'reading deposits from', filename)
@@ -8091,7 +8077,8 @@ END IF
          runtime%runout%runout_row, runtime%runout%mass_center_row
     CALL check_restart_io(ierr, io_message, 'reading runout history from', filename)
     READ(unit_rst, IOSTAT=ierr, IOMSG=io_message) state%lava_deposit
-    CALL check_restart_io(ierr, io_message, 'reading lava state%deposit from', filename)
+    CALL check_restart_io(ierr, io_message, 'reading lava deposit from', filename)
+    CALL state%refresh_substrate_totals()
     IF (output_runout_flag .AND. .NOT. runtime%runout%initialized) &
          CALL fatal_error('Restart is missing initialized runout diagnostic history.')
 

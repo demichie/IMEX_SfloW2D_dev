@@ -12,7 +12,7 @@ MODULE state_2d
     USE parameters_2d, ONLY : idx_h, idx_hu, idx_hv, idx_T, &
        idx_totMassEqn, idx_solidEqn_first, idx_solidEqn_last
 
-  USE constitutive_parameters_2d, ONLY : T_ambient
+  USE constitutive_parameters_2d, ONLY : T_ambient,erodible_porosity
 
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE model_layout_2d, ONLY : model_layout_type
@@ -86,6 +86,7 @@ MODULE state_2d
 
      PROCEDURE :: initialize => initialize_state
      PROCEDURE :: finalize => finalize_state
+     PROCEDURE :: refresh_substrate_totals => refresh_substrate_totals
 
   END TYPE state_type
 
@@ -171,6 +172,13 @@ CONTAINS
     DEALLOCATE( this%qp )
 
   END SUBROUTINE finalize_state
+
+  !> Refresh diagnostic totals from the owned per-species inventories.
+  SUBROUTINE refresh_substrate_totals(this)
+    CLASS(state_type), INTENT(INOUT) :: this
+    this%deposit_tot=SUM(this%deposit,DIM=3)/(1.0_wp-erodible_porosity)
+    this%erosion_tot=SUM(this%erosion,DIM=3)/(1.0_wp-erodible_porosity)
+  END SUBROUTINE refresh_substrate_totals
 
   !> \brief Set one primitive state (including reconstruction halo) to dry.
   !> \details Preserve the established zero state and ambient temperature.
