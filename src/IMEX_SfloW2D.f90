@@ -177,8 +177,7 @@ PROGRAM IMEX_SfloW2D
    lie_source_groups=simulation%source_registry%groups()
    boundary_source_enabled=.FALSE.
    DO i_source_group=1,SIZE(lie_source_groups)
-      IF (lie_source_groups(i_source_group)%cadence/=SOURCE_CADENCE_STAGE .OR. &
-           lie_source_groups(i_source_group)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
+      IF (lie_source_groups(i_source_group)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
       boundary_source_enabled=boundary_source_enabled .OR. group_contains_name( &
            lie_source_groups(i_source_group),'boundary_injection')
    END DO
