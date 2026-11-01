@@ -661,13 +661,45 @@ CONTAINS
   SUBROUTINE assign_lie_bed(bed_candidate,accepted)
     REAL(wp), INTENT(IN) :: bed_candidate(:,:)
     LOGICAL, INTENT(OUT) :: accepted
+    REAL(wp), ALLOCATABLE :: old_bed(:,:),old_cent(:,:),old_face_x(:,:),old_face_y(:,:)
+    REAL(wp), ALLOCATABLE :: old_slope_x(:,:),old_slope_y(:,:)
+    REAL(wp), ALLOCATABLE :: old_xx(:,:),old_xy(:,:),old_yy(:,:)
+    REAL(wp), ALLOCATABLE :: old_gravity(:,:),old_gravity_x(:,:),old_gravity_y(:,:)
     accepted=.FALSE.
     IF (.NOT.ALLOCATED(B_vertex)) RETURN
     IF (ANY(SHAPE(bed_candidate)/=SHAPE(B_vertex))) RETURN
     IF (.NOT.ALL(ieee_is_finite(bed_candidate))) RETURN
+    ! A rejected refresh must not expose a partial bed or derivative update.
+    old_bed=B_vertex
+    old_cent=B_cent
+    old_face_x=B_face_x
+    old_face_y=B_face_y
+    old_slope_x=B_prime_x_geom
+    old_slope_y=B_prime_y_geom
+    old_xx=B_second_xx_geom
+    old_xy=B_second_xy_geom
+    old_yy=B_second_yy_geom
+    old_gravity=grav_coeff
+    old_gravity_x=grav_coeff_stag_x
+    old_gravity_y=grav_coeff_stag_y
     B_vertex=bed_candidate
     CALL refresh_topography_geometry
-    accepted=topography_geometry_is_finite()
+    IF (topography_geometry_is_finite()) THEN
+       accepted=.TRUE.
+       RETURN
+    END IF
+    B_vertex=old_bed
+    B_cent=old_cent
+    B_face_x=old_face_x
+    B_face_y=old_face_y
+    B_prime_x_geom=old_slope_x
+    B_prime_y_geom=old_slope_y
+    B_second_xx_geom=old_xx
+    B_second_xy_geom=old_xy
+    B_second_yy_geom=old_yy
+    grav_coeff=old_gravity
+    grav_coeff_stag_x=old_gravity_x
+    grav_coeff_stag_y=old_gravity_y
   END SUBROUTINE assign_lie_bed
 
   !******************************************************************************
