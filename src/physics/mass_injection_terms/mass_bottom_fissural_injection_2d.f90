@@ -2,7 +2,7 @@
 !> @details Injection physics uses local state and geometric values; unsupported
 !>          numerical treatments terminate with a diagnostic rather than silent rates.
 MODULE mass_bottom_fissural_injection_2d
-        USE parameters_2d, ONLY : idx_h, idx_T
+    USE parameters_2d, ONLY : idx_h, idx_T
     USE parameters_2d
     USE constitutive_parameters_2d
     USE state_conversion_2d, ONLY : mixt_var, physical_state_type, complex_physical_state_type
@@ -122,7 +122,6 @@ CONTAINS
     !> @param[in] time Current source evaluation time [s].
     !> @param[in] cell_fissure_fract Local coverage fraction for each fissure.
     !> @param[out] rate Conservative injection rate vector.
-
     SUBROUTINE eval_bottom_fissural_injection_semi_implicit(state, time, cell_fissure_fract, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fissure_fract(:)
@@ -137,7 +136,6 @@ CONTAINS
     !> @param[in] time Current source evaluation time [s].
     !> @param[in] cell_fissure_fract Local coverage fraction for each fissure.
     !> @param[out] rate Conservative injection rate vector.
-
     SUBROUTINE eval_bottom_fissural_injection_implicit(state, time, cell_fissure_fract, rate)
         TYPE(complex_physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fissure_fract(:)
@@ -152,7 +150,6 @@ CONTAINS
     !> @param[in] time Current source evaluation time [s].
     !> @param[in] cell_fissure_fract Local coverage fraction for each fissure.
     !> @param[out] rate Conservative injection rate vector.
-
     SUBROUTINE eval_bottom_fissural_injection_analytic(state, time, cell_fissure_fract, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fissure_fract(:)

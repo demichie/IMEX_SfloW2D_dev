@@ -2,7 +2,7 @@
 !> @details Injection physics uses local state and geometric values; unsupported
 !>          numerical treatments terminate with a diagnostic rather than silent rates.
 MODULE mass_radial_injection_2d
-        USE parameters_2d, ONLY : idx_h, idx_T
+    USE parameters_2d, ONLY : idx_h, idx_T
     USE parameters_2d
     USE constitutive_parameters_2d
     USE state_conversion_2d, ONLY : mixt_var, physical_state_type, complex_physical_state_type
@@ -154,7 +154,6 @@ CONTAINS
     !> @param[in] lat_n_y_jk Local boundary normal y component.
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
-
     SUBROUTINE eval_radial_injection_semi_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
             cell_area_jk, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -174,7 +173,6 @@ CONTAINS
     !> @param[in] lat_n_y_jk Local boundary normal y component.
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
-
     SUBROUTINE eval_radial_injection_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
             cell_area_jk, rate)
         TYPE(complex_physical_state_type), INTENT(IN) :: state
@@ -194,7 +192,6 @@ CONTAINS
     !> @param[in] lat_n_y_jk Local boundary normal y component.
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
-
     SUBROUTINE eval_radial_injection_analytic(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
             cell_area_jk, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
