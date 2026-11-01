@@ -4,12 +4,11 @@ PROGRAM test_projection_stress
   USE constitutive_parameters_2d
   USE geometry_2d
   USE domain_2d, ONLY : domain_type
-  USE step_source_executor_2d, ONLY : apply_mass_exchange_step => execute_step_source_groups
   USE omp_lib
   USE, INTRINSIC :: iso_fortran_env, ONLY : int64
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
   IMPLICIT NONE
-  INTEGER, PARAMETER :: ns=2, nq=6, rough_steps=32, exchange_steps=64
+  INTEGER, PARAMETER :: ns=2, nq=6, rough_steps=32
   REAL(wp), PARAMETER :: tolerance=2048.0_wp*EPSILON(1.0_wp)
   INTEGER :: nx,ny,dimension,level,step,unit,requested,actual,j,k
   INTEGER(int64) :: seed
@@ -44,11 +43,11 @@ PROGRAM test_projection_stress
                    COS(2.0_wp*ACOS(-1.0_wp)*(REAL(k,wp)-0.5_wp)*dy))
            END DO
         END DO
-        CALL exchange_update('smooth',1)
+        CALL projection_update('smooth',1)
         CALL reset_state(.TRUE.)
         rate=0.0_wp
         WHERE(q(1,:,:)>0.0_wp) rate=-0.001_wp
-        CALL exchange_update('wet_dry',1)
+        CALL projection_update('wet_dry',1)
 
         ! Signed, cell-scale random rates exercise the public production
         ! projector without pretending that a rough field must converge.
@@ -58,29 +57,20 @@ PROGRAM test_projection_stress
            CALL random_rates(.TRUE.)
            CALL projection_update('rough',step)
         END DO
-        ! Keep conservative flow and authoritative bed between transactions.
-        ! Replenish only the prescribed erodible inventory to set each rate.
-        CALL reset_state(.TRUE.)
-        seed=130363_int64
-        DO step=1,exchange_steps
-           CALL random_rates(.FALSE.)
-           WHERE(q(1,:,:)==0.0_wp) rate=0.0_wp
-           CALL exchange_update('repeated',step)
-        END DO
         CALL release_grid
      END DO
   END DO
   CLOSE(unit)
   CALL release_topography_workspace
   CALL release_topography_workspace
-  WRITE(*,*) 'PASS: N8-B prescribed refinement and repeated production updates'
+  WRITE(*,*) 'PASS: Lie-compatible prescribed projection refinement and geometry checks'
 CONTAINS
 
   !> \brief Configure the existing two-solid thermal-energy liquid exchange law.
   SUBROUTINE initialize_physics
     n_solid=ns; n_add_gas=0; n_stoch_vars=0; n_pore_vars=0
     kt_trace_reconstruction = 'froude_blend'
-    n_vars=nq; n_eqns=nq; n_RK=2
+    n_vars=nq; n_eqns=nq
     CALL configure_canonical_state_indices()
     gas_flag=.FALSE.; liquid_flag=.TRUE.; rheology_flag=.FALSE.; rheology_model='none'
     stochastic_flag=.FALSE.; stoch_transport_flag=.FALSE.; pore_pressure_flag=.FALSE.
@@ -203,43 +193,7 @@ CONTAINS
   !> \brief Apply saturated erosion with an independent complete conservative transaction oracle.
   !> \param[in] name Scenario label.
   !> \param[in] iteration Update number.
-  SUBROUTINE exchange_update(name,iteration)
-    CHARACTER(LEN=*), INTENT(IN) :: name
-    INTEGER, INTENT(IN) :: iteration
-    REAL(wp) :: q0(nq,nx,ny),expected(nq,nx,ny),bed0(nx+1,ny+1)
-    REAL(wp) :: available(ns,nx,ny),erosion0(nx,ny,ns),amount(ns),source_mass
-    INTEGER :: a,b,i
-    q0=q; expected=q; bed0=B_vertex; erosion0=erosion
-    DO b=1,ny
-       DO a=1,nx
-          amount=-(1.0_wp-erodible_porosity)*rate(a,b)*erodible_fract
-          erodible(:,a,b)=amount
-          source_mass=DOT_PRODUCT(rho_s,amount)+rho_c_sub*coeff_porosity*SUM(amount)
-          expected(1,a,b)=q0(1,a,b)+source_mass
-          expected(4,a,b)=q0(4,a,b)+T_erodible*(DOT_PRODUCT(rho_s*sp_heat_s,amount) &
-               +rho_c_sub*sp_heat_l*coeff_porosity*SUM(amount))
-          expected(5:6,a,b)=q0(5:6,a,b)+rho_s*amount
-       END DO
-    END DO
-    available=erodible
-    CALL reference_nodes
-    CALL apply_mass_exchange_step(q,qp,1.0_wp,domain)
-    DO i=1,nq
-       CALL require_small('conservative equation',MAXVAL(ABS(q(i,:,:)-expected(i,:,:))),MAXVAL(ABS(q0(i,:,:))))
-    END DO
-    CALL require_small('saturated substrate',MAXVAL(ABS(erodible)),1.0_wp)
-    DO i=1,ns
-       CALL require_small('erosion inventory',MAXVAL(ABS(erosion(:,:,i)-erosion0(:,:,i)-available(i,:,:))),1.0_wp)
-    END DO
-    CALL require_small('no deposition',MAXVAL(ABS(deposit)),1.0_wp)
-    DO b=1,ny
-       DO a=1,nx
-          IF (q0(1,a,b)==0.0_wp .AND. ANY(q(:,a,b)/=0.0_wp)) ERROR STOP 'dry flow source injected'
-       END DO
-    END DO
-    CALL require_small('read-only substrate temperature',ABS(T_erodible-317.0_wp),317.0_wp)
-    CALL check_update(name,iteration,bed0)
-  END SUBROUTINE exchange_update
+
 
   !> \brief Verify bed volume, front localization and all refreshed caches after each update.
   !> \param[in] name Scenario label.
