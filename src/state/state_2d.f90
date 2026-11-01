@@ -25,7 +25,6 @@ MODULE state_2d
   IMPLICIT NONE
 
   PRIVATE
-  PUBLIC :: finalize_imex_cell_state
   PUBLIC :: initialize_dry_physical_cell
   PUBLIC :: conservative_mass_admissible
   PUBLIC :: physical_cell_state_finite
@@ -153,106 +152,6 @@ CONTAINS
     DEALLOCATE( this%qp )
 
   END SUBROUTINE finalize_state
-
-  !> \brief Constrain a momentum update from an isolated friction substep.
-  !> \details Projects the candidate post-friction momentum onto the ray
-  !> defined by the pre-friction momentum and clamps its scale factor to
-  !> \f$[0,1]\f$. This preserves direction, prevents reversal, and ensures
-  !> friction cannot increase momentum magnitude. If the pre-friction
-  !> momentum is zero, the post-friction momentum is set to zero.
-  !> \param[in] momentum_before_friction Momentum immediately before friction.
-  !> \param[in,out] momentum_after_friction Candidate momentum immediately after friction.
-  !******************************************************************************
-
-
-  !> \brief Finalize a cell after the last IMEX Runge-Kutta assembly.
-  !> \details Called after the observer sees the unmodified assembled state.
-  !> Preserves legacy error thresholds, clipping, dry momentum projection,
-  !> solid mass roundoff handling, and no-data masking in their original order.
-  !> The previous conservative state is needed by the historical solid-mass
-  !> roundoff branch, which refreshes qp before rescaling component masses.
-  SUBROUTINE finalize_imex_cell_state(q_cell, qp_cell, q_previous, nodata)
-    USE diagnostics_2d, ONLY : fatal_error
-    USE state_conversion_2d, ONLY : qc_to_qp, project_dry_cell_momenta, &
-         clip_roundoff_negative_component_masses
-    USE parameters_2d, ONLY : n_vars, n_solid, dry_thickness_tolerance, idx_u, idx_v
-    REAL(wp), INTENT(INOUT) :: q_cell(n_vars), qp_cell(n_vars+2)
-    REAL(wp), INTENT(IN) :: q_previous(n_vars)
-    LOGICAL, INTENT(IN) :: nodata
-    REAL(wp) :: p_dyn
-    LOGICAL :: solid_excess_roundoff
-
-       IF ( ANY(ISNAN(q_cell)) ) THEN
-          CALL fatal_error('NaN detected after IMEX Runge-Kutta update')
-          
-       END IF
-
-       CALL clip_roundoff_negative_component_masses(q_cell)
-       
-       
-       negative_thickness_check:IF ( q_cell(idx_totMassEqn) .LT. EPSILON(1.0_wp) ) THEN
-
-          IF ( q_cell(idx_totMassEqn) .GT. -1.0E-7_wp ) THEN
-
-             q_cell(idx_totMassEqn) = 0.0_wp
-             q_cell(2:n_vars) = 0.0_wp
-
-          ELSE
-             CALL fatal_error('negative thickness after IMEX Runge-Kutta update')
-
-          END IF
-
-       END IF negative_thickness_check
-
-       negative_alpha_check:IF ( ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last) .LT. 0.0_wp ) ) THEN
-          CALL fatal_error('negative solid mass after IMEX Runge-Kutta update')
-       END IF negative_alpha_check
-
-       CALL qc_to_qp(q_cell , qp_cell , p_dyn )
-
-       ! Do not carry unresolved momentum into a later rewetting event.
-       ! The raw assembly has already been observed and checked above. Unlike
-       ! the existing machine-epsilon cleanup, this projection retains mass,
-       ! thermal energy and every transported component. Keep qp consistent
-       ! without repeating the thermodynamic conversion (depth is unchanged).
-       CALL project_dry_cell_momenta(q_cell, qp_cell(idx_h))
-       IF (qp_cell(idx_h) <= dry_thickness_tolerance) THEN
-          qp_cell(idx_hu:idx_hv) = 0.0_wp
-          qp_cell(idx_u:idx_v) = 0.0_wp
-       END IF
-
-       IF ( qp_cell(idx_T) .LT. 273.0_wp ) THEN
-          CALL fatal_error('temperature below the admissible threshold')
-
-       END IF
-          
-       IF ( SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) .GT. q_cell(idx_totMassEqn) ) THEN
-
-          ! Fortran does not guarantee short-circuit evaluation of .OR.;
-          ! evaluate the relative excess only when the denominator is safe.
-          IF ( q_cell(idx_totMassEqn) .LT. EPSILON(1.0_wp) ) THEN
-             solid_excess_roundoff = .TRUE.
-          ELSE
-             solid_excess_roundoff = ( ( SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last))             &
-                  - q_cell(idx_totMassEqn) ) / q_cell(idx_totMassEqn) .LT. 1.0E-10_wp )
-          END IF
-
-          IF ( solid_excess_roundoff ) THEN
-
-             CALL qc_to_qp(q_previous , qp_cell , p_dyn )
-
-             q_cell(idx_solidEqn_first:idx_solidEqn_last) = q_cell(idx_solidEqn_first:idx_solidEqn_last) &
-                  / SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) * q_cell(idx_totMassEqn)
-
-          ELSE
-             CALL fatal_error('solid mass exceeds total mass after IMEX update')
-
-          END IF
-
-       END IF
-
-       IF ( nodata ) q_cell = 0.0_wp
-  END SUBROUTINE finalize_imex_cell_state
 
   !> \brief Set one primitive state (including reconstruction halo) to dry.
   !> \details Preserve the established zero state and ambient temperature.
