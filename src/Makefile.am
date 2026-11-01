@@ -382,15 +382,26 @@ IMEX_SfloW2D.$(OBJEXT): core/parameters_2d.$(OBJEXT)                         \
 IMEX_SfloW2D_LDFLAGS = @OPENMP_FCFLAGS@ @NETCDF_LDFLAGS@
 IMEX_SfloW2D_LDADD = @NETCDF_LIBS@ @LAPACK_LIBS@ -lm
 
-# D17 metadata is built once and consumed by stage dispatch through the analytic
-# bridge; no registry validation or copying is performed inside cell loops.
+# Explicit Fortran module dependencies for deterministic parallel builds.
 numerics/source_catalog_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 numerics/source_input_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
                                      physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT)
-numerics/source_registry_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
+numerics/source_registry_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT)
 physics/source_configuration_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \
                                          numerics/source_input_2d.$(OBJEXT) \
                                          core/constitutive_parameters_2d.$(OBJEXT)
 core/simulation_2d.$(OBJEXT): physics/source_configuration_2d.$(OBJEXT) \
                                      physics/mass_injection_terms/mass_injection_coefficients_2d.$(OBJEXT) \
                               numerics/source_input_2d.$(OBJEXT)
+
+# Additional module USE edges introduced by the Lie source architecture.
+physics/rheology_laws/rheology_2d.$(OBJEXT): state/state_conversion_2d.$(OBJEXT)
+physics/thermal_laws/thermal_laws_2d.$(OBJEXT): state/state_conversion_2d.$(OBJEXT)
+physics/pore_pressure/pore_pressure_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT) \
+                                     state/state_conversion_2d.$(OBJEXT)
+physics/source_terms_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
+                                  numerics/source_registry_2d.$(OBJEXT)
+numerics/nonlinear_solver_2d.$(OBJEXT): physics/source_terms_2d.$(OBJEXT)
+physics/source_configuration_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
+                                          physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT)
+core/simulation_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT)
