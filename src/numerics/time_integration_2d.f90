@@ -65,7 +65,9 @@ CONTAINS
       k=domain%k_reconstruction(l)
       IF (this%q_before(1,j,k)>0.0_wp) THEN
         CALL qc_to_qp(this%q_before(:,j,k),this%qp_before(:,j,k),pd, &
-             'Lie pre-spatial reconstruction state')
+             'Lie pre-spatial reconstruction state',conversion_ok)
+        IF (.NOT.conversion_ok) &
+             CALL fatal_error('Lie pre-spatial state conversion rejected')
       ELSE
         CALL initialize_dry_physical_cell(this%qp_before(:,j,k))
       END IF
