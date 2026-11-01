@@ -1,7 +1,7 @@
 !********************************************************************************
-!> \brief Execute validated STEP source groups after the RK update.
-!> \details Coordinates the atomic mass-exchange transaction after IMEX
-!>          integration. Physical rates are evaluated through source_terms_2d,
+!> \brief Execute ordered first-order Lie physical source groups.
+!> \details Coordinates simultaneous cell-local rate evaluation, physical
+!>          limitation and atomic fluid/substrate transfer. Rates come from source_terms_2d,
 !>          while bed projection and geometry refresh remain in geometry_2d.
 !********************************************************************************
 
@@ -18,90 +18,8 @@ MODULE step_source_executor_2d
 
   PRIVATE
   PUBLIC :: execute_lie_source_groups
-  PUBLIC :: apply_mass_exchange_increment
 
 CONTAINS
-
-  !> \brief Apply and validate one atomic cell mass-exchange update.
-  !> \details Applies conservative equation sources and material-inventory
-  !>          increments for the completed time step, then enforces the
-  !>          mass-exchange positivity checks and refreshes the primitive state.
-  !> \param[in,out] q_cell Conservative cell state.
-  !> \param[in,out] qp_cell Primitive cell state, refreshed from q_cell.
-  !> \param[in] time_step Physical time increment [s].
-  !> \param[in] equation_rate Conservative equation source rates.
-  !> \param[in] deposition_rate Per-class deposition rates.
-  !> \param[in] erosion_rate Per-class erosion rates.
-  !> \param[in,out] deposit_inventory Accumulated deposited solid thickness.
-  !> \param[in,out] erosion_inventory Accumulated eroded solid thickness.
-  !> \param[in,out] erodible_inventory Remaining per-class substrate thickness.
-  !> \param[in] redeposit_on_substrate Whether deposited solids replenish the substrate.
-  !> \param[in] closure_context Cell context used in physical-state diagnostics.
-  SUBROUTINE apply_mass_exchange_increment(q_cell, qp_cell, time_step,       &
-       equation_rate, deposition_rate, erosion_rate, deposit_inventory,      &
-       erosion_inventory, erodible_inventory, redeposit_on_substrate,        &
-       closure_context)
-
-    USE state_conversion_2d, ONLY : qc_to_qp, mixt_var
-    USE state_2d, ONLY : initialize_dry_physical_cell
-
-    REAL(wp), INTENT(INOUT) :: q_cell(n_vars), qp_cell(n_vars+2)
-    REAL(wp), INTENT(IN) :: time_step, equation_rate(n_eqns)
-    REAL(wp), INTENT(IN) :: deposition_rate(n_solid), erosion_rate(n_solid)
-    REAL(wp), INTENT(INOUT) :: deposit_inventory(:)
-    REAL(wp), INTENT(INOUT) :: erosion_inventory(:)
-    REAL(wp), INTENT(INOUT) :: erodible_inventory(:)
-    LOGICAL, INTENT(IN) :: redeposit_on_substrate
-    CHARACTER(*), INTENT(IN) :: closure_context
-
-    REAL(wp) :: p_dyn
-    REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
-    REAL(wp) :: r_sp_heat_c, r_sp_heat_mix
-
-    q_cell(1:n_eqns) = q_cell(1:n_eqns) + time_step * equation_rate
-    q_cell(idx_solidEqn_first:idx_solidEqn_last) = MAX(0.0_wp, q_cell(idx_solidEqn_first:idx_solidEqn_last))
-
-    deposit_inventory = deposit_inventory + time_step * deposition_rate
-    erosion_inventory = erosion_inventory + time_step * erosion_rate
-    erodible_inventory = erodible_inventory - time_step * erosion_rate
-
-    IF (redeposit_on_substrate) THEN
-       erodible_inventory = erodible_inventory + time_step * deposition_rate
-    END IF
-
-    IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last) .LT. 0.0_wp)) THEN
-       CALL fatal_error('negative solid mass after mass exchange')
-    END IF
-
-    IF (q_cell(idx_totMassEqn) .LE. 0.0_wp) THEN
-       IF (q_cell(idx_totMassEqn) .GT. -1.0E-10_wp) THEN
-          q_cell(1:n_vars) = 0.0_wp
-       ELSE
-          CALL fatal_error('negative total mass after mass exchange')
-       END IF
-    END IF
-
-    IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) .GT. q_cell(idx_totMassEqn)) THEN
-       IF (q_cell(idx_totMassEqn) .LT. 1.0e-10_wp) THEN
-          q_cell(idx_solidEqn_first:idx_solidEqn_last) = q_cell(idx_solidEqn_first:idx_solidEqn_last)                   &
-               / SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last)) * q_cell(idx_totMassEqn)
-       ELSE
-          CALL fatal_error('solid mass exceeds total mass after mass exchange')
-       END IF
-    END IF
-
-    IF (q_cell(idx_totMassEqn) .GT. 0.0_wp) THEN
-       CALL qc_to_qp(q_cell, qp_cell, p_dyn, TRIM(closure_context) // ' final state')
-       CALL mixt_var(qp_cell, r_Ri, r_rho_m, r_rho_c, r_red_grav,       &
-            r_sp_heat_c, r_sp_heat_mix)
-    ELSE
-       CALL initialize_dry_physical_cell(qp_cell)
-       r_red_grav = 0.0_wp
-    END IF
-
-    IF (r_red_grav .LE. 0.0_wp) q_cell(1:n_vars) = 0.0_wp
-
-  END SUBROUTINE apply_mass_exchange_increment
 
   !> Evaluate and commit one complete Lie source group at a time.
   !> For GROUP 0, evaluate every physical rate at the original pre-spatial
