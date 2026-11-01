@@ -13,7 +13,7 @@ MODULE mass_boundary_injection_2d
     PUBLIC :: eval_boundary_injection_implicit
     PUBLIC :: eval_boundary_injection_analytic
 CONTAINS
-    !> @brief Evaluate explicit spatial boundary injection boundary trace.
+    !> @brief Evaluate explicit spatial boundary injection trace.
     !> @details Computes cell-local rates using preconfigured source windows.
     !> @param[in] time Current source evaluation time [s].
     !> @param[in] vect_x Boundary outward-normal x component.
@@ -93,16 +93,11 @@ CONTAINS
     END SUBROUTINE eval_boundary_injection_explicit
 
 
-    !> @brief Reject unsupported semi-implicit spatial boundary injection boundary trace.
-
+    !> @brief Reject unsupported semi-implicit spatial boundary injection treatment.
     !> @details This interface is preserved but fails explicitly when invoked.
-
     !> @param[in] time Current source evaluation time [s].
-
     !> @param[in] vect_x Boundary outward-normal x component.
-
     !> @param[in] vect_y Boundary outward-normal y component.
-
     !> @param[out] source_bdry Primitive injection boundary trace.
 
     SUBROUTINE eval_boundary_injection_semi_implicit(time, vect_x, vect_y, source_bdry)
@@ -112,16 +107,11 @@ CONTAINS
     END SUBROUTINE eval_boundary_injection_semi_implicit
 
 
-    !> @brief Reject unsupported implicit spatial boundary injection boundary trace.
-
+    !> @brief Reject unsupported implicit spatial boundary injection treatment.
     !> @details This interface is preserved but fails explicitly when invoked.
-
     !> @param[in] time Current source evaluation time [s].
-
     !> @param[in] vect_x Boundary outward-normal x component.
-
     !> @param[in] vect_y Boundary outward-normal y component.
-
     !> @param[out] source_bdry Primitive injection boundary trace.
 
     SUBROUTINE eval_boundary_injection_implicit(time, vect_x, vect_y, source_bdry)
@@ -131,16 +121,11 @@ CONTAINS
     END SUBROUTINE eval_boundary_injection_implicit
 
 
-    !> @brief Reject unsupported analytic spatial boundary injection boundary trace.
-
+    !> @brief Reject unsupported analytic spatial boundary injection treatment.
     !> @details This interface is preserved but fails explicitly when invoked.
-
     !> @param[in] time Current source evaluation time [s].
-
     !> @param[in] vect_x Boundary outward-normal x component.
-
     !> @param[in] vect_y Boundary outward-normal y component.
-
     !> @param[out] source_bdry Primitive injection boundary trace.
 
     SUBROUTINE eval_boundary_injection_analytic(time, vect_x, vect_y, source_bdry)

@@ -146,21 +146,13 @@ CONTAINS
 
 
     !> @brief Reject unsupported semi-implicit radial lateral injection source.
-
     !> @details This interface is preserved but fails explicitly when invoked.
-
     !> @param[in] state Local physical cell state.
-
     !> @param[in] time Current source evaluation time [s].
-
     !> @param[in] lat_arc_perim_jk Local source arc perimeter [m].
-
     !> @param[in] lat_n_x_jk Local boundary normal x component.
-
     !> @param[in] lat_n_y_jk Local boundary normal y component.
-
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
-
     !> @param[out] rate Conservative injection rate vector.
 
     SUBROUTINE eval_radial_injection_semi_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
@@ -174,21 +166,13 @@ CONTAINS
 
 
     !> @brief Reject unsupported implicit radial lateral injection source.
-
     !> @details This interface is preserved but fails explicitly when invoked.
-
     !> @param[in] state Local physical cell state.
-
     !> @param[in] time Current source evaluation time [s].
-
     !> @param[in] lat_arc_perim_jk Local source arc perimeter [m].
-
     !> @param[in] lat_n_x_jk Local boundary normal x component.
-
     !> @param[in] lat_n_y_jk Local boundary normal y component.
-
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
-
     !> @param[out] rate Conservative injection rate vector.
 
     SUBROUTINE eval_radial_injection_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
@@ -202,21 +186,13 @@ CONTAINS
 
 
     !> @brief Reject unsupported analytic radial lateral injection source.
-
     !> @details This interface is preserved but fails explicitly when invoked.
-
     !> @param[in] state Local physical cell state.
-
     !> @param[in] time Current source evaluation time [s].
-
     !> @param[in] lat_arc_perim_jk Local source arc perimeter [m].
-
     !> @param[in] lat_n_x_jk Local boundary normal x component.
-
     !> @param[in] lat_n_y_jk Local boundary normal y component.
-
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
-
     !> @param[out] rate Conservative injection rate vector.
 
     SUBROUTINE eval_radial_injection_analytic(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &

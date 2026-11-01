@@ -180,15 +180,10 @@ CONTAINS
 
 
     !> @brief Reject unsupported semi-implicit bottom circular injection source.
-
     !> @details This interface is preserved but fails explicitly when invoked.
-
     !> @param[in] state Local physical cell state.
-
     !> @param[in] time Current source evaluation time [s].
-
     !> @param[in] cell_fract_jk Fraction of the cell covered by bottom circular injection.
-
     !> @param[out] rate Conservative injection rate vector.
 
     SUBROUTINE eval_bottom_circular_injection_semi_implicit(state, time, cell_fract_jk, rate)
@@ -200,15 +195,10 @@ CONTAINS
 
 
     !> @brief Reject unsupported implicit bottom circular injection source.
-
     !> @details This interface is preserved but fails explicitly when invoked.
-
     !> @param[in] state Local physical cell state.
-
     !> @param[in] time Current source evaluation time [s].
-
     !> @param[in] cell_fract_jk Fraction of the cell covered by bottom circular injection.
-
     !> @param[out] rate Conservative injection rate vector.
 
     SUBROUTINE eval_bottom_circular_injection_implicit(state, time, cell_fract_jk, rate)
@@ -220,15 +210,10 @@ CONTAINS
 
 
     !> @brief Reject unsupported analytic bottom circular injection source.
-
     !> @details This interface is preserved but fails explicitly when invoked.
-
     !> @param[in] state Local physical cell state.
-
     !> @param[in] time Current source evaluation time [s].
-
     !> @param[in] cell_fract_jk Fraction of the cell covered by bottom circular injection.
-
     !> @param[out] rate Conservative injection rate vector.
 
     SUBROUTINE eval_bottom_circular_injection_analytic(state, time, cell_fract_jk, rate)
