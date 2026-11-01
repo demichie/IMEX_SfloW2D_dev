@@ -31,10 +31,7 @@ MODULE geometry_2d
   ! Saved authoritative fields for a recoverable Lie step. Derived geometry is
   ! reconstructed on rollback, so later groups still see intermediate bed updates.
   LOGICAL, PRIVATE :: lie_geometry_transaction_active=.FALSE.
-  REAL(wp), ALLOCATABLE, PRIVATE :: lie_bed_before(:,:),lie_deposit_before(:,:,:)
-  REAL(wp), ALLOCATABLE, PRIVATE :: lie_erosion_before(:,:,:)
-  REAL(wp), ALLOCATABLE, PRIVATE :: lie_erodible_before(:,:,:)
-  REAL(wp), ALLOCATABLE, PRIVATE :: lie_lava_before(:,:)
+  REAL(wp), ALLOCATABLE, PRIVATE :: lie_bed_before(:,:)
   REAL(wp), ALLOCATABLE, PRIVATE :: lie_cent_before(:,:),lie_face_x_before(:,:),lie_face_y_before(:,:)
   REAL(wp), ALLOCATABLE, PRIVATE :: lie_slope_x_before(:,:),lie_slope_y_before(:,:)
   REAL(wp), ALLOCATABLE, PRIVATE :: lie_curvature_xx_before(:,:),lie_curvature_yy_before(:,:)
@@ -494,15 +491,9 @@ CONTAINS
   SUBROUTINE begin_lie_geometry_transaction
     IF (lie_geometry_transaction_active) &
          ERROR STOP 'nested Lie geometry transaction'
-    IF (.NOT.ALLOCATED(B_vertex) .OR. .NOT.ALLOCATED(deposit) .OR. &
-         .NOT.ALLOCATED(erosion) .OR. .NOT.ALLOCATED(erodible) .OR. &
-         .NOT.ALLOCATED(lava_deposit)) &
+    IF (.NOT.ALLOCATED(B_vertex)) &
          ERROR STOP 'Lie geometry transaction started before initialization'
     lie_bed_before=B_vertex
-    lie_deposit_before=deposit
-    lie_erosion_before=erosion
-    lie_erodible_before=erodible
-    lie_lava_before=lava_deposit
     lie_cent_before=B_cent
     lie_face_x_before=B_face_x
     lie_face_y_before=B_face_y
@@ -524,14 +515,10 @@ CONTAINS
     CALL clear_lie_geometry_transaction
   END SUBROUTINE commit_lie_geometry_transaction
 
-  !> Restore the pre-step geometry and inventories on recoverable rejection.
+  !> Restore only the pre-step bed and derived geometry on rejection.
   SUBROUTINE rollback_lie_geometry_transaction
     IF (.NOT.lie_geometry_transaction_active) RETURN
     B_vertex=lie_bed_before
-    deposit=lie_deposit_before
-    erosion=lie_erosion_before
-    erodible=lie_erodible_before
-    lava_deposit=lie_lava_before
     ! Restore the exact pre-step caches: reconstruction itself may have failed.
     B_cent=lie_cent_before
     B_face_x=lie_face_x_before
@@ -549,10 +536,6 @@ CONTAINS
 
   SUBROUTINE clear_lie_geometry_transaction
     IF (ALLOCATED(lie_bed_before)) DEALLOCATE(lie_bed_before)
-    IF (ALLOCATED(lie_deposit_before)) DEALLOCATE(lie_deposit_before)
-    IF (ALLOCATED(lie_erosion_before)) DEALLOCATE(lie_erosion_before)
-    IF (ALLOCATED(lie_erodible_before)) DEALLOCATE(lie_erodible_before)
-    IF (ALLOCATED(lie_lava_before)) DEALLOCATE(lie_lava_before)
     IF (ALLOCATED(lie_cent_before)) DEALLOCATE(lie_cent_before)
     IF (ALLOCATED(lie_face_x_before)) DEALLOCATE(lie_face_x_before)
     IF (ALLOCATED(lie_face_y_before)) DEALLOCATE(lie_face_y_before)
