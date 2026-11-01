@@ -17,6 +17,8 @@ MODULE state_2d
   USE geometry_2d, ONLY : comp_cells_x, comp_cells_y
   USE model_layout_2d, ONLY : model_layout_type
 
+  USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+  USE parameters_2d, ONLY : n_eqns,idx_add_gas_first,idx_add_gas_last
   USE parameters_2d, ONLY : wp
   USE parameters_2d, ONLY : n_thickness_levels, n_dyn_pres_levels
 
@@ -25,6 +27,7 @@ MODULE state_2d
   PRIVATE
   PUBLIC :: finalize_imex_cell_state
   PUBLIC :: initialize_dry_physical_cell
+  PUBLIC :: conservative_mass_admissible
 
   !> \brief Owned cell states and diagnostics for one simulation.
   !> \details State arrays use (component,x-cell,y-cell); diagnostic maps use
@@ -55,6 +58,20 @@ MODULE state_2d
      LOGICAL, ALLOCATABLE :: vuln_table(:,:,:)
 
    CONTAINS
+
+  !> Check finite conservative mass budgets without modifying the state.
+  PURE LOGICAL FUNCTION conservative_mass_admissible(q_cell) RESULT(valid)
+    REAL(wp), INTENT(IN) :: q_cell(n_eqns)
+    valid=.FALSE.
+    IF (.NOT.ALL(ieee_is_finite(q_cell))) RETURN
+    IF (q_cell(idx_totMassEqn)<0.0_wp) RETURN
+    IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) RETURN
+    IF (ANY(q_cell(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
+    IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last))>q_cell(idx_totMassEqn)) RETURN
+    valid=.TRUE.
+  END FUNCTION conservative_mass_admissible
+
+
 
      PROCEDURE :: initialize => initialize_state
      PROCEDURE :: finalize => finalize_state

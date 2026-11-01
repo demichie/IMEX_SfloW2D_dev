@@ -183,3 +183,7 @@ Removed the obsolete multi-group implicit/analytic sweep and semi-implicit momen
 ### Lie executor cleanup: coherent coverage and admissibility (2026-11-01)
 
 In `lie_source_executor_2d.f90`, consolidated source-only conservative-mass admissibility checks in a side-effect-free predicate, used before committing explicit candidates and after group advances. Centralized source-coverage scaling of the *complete* `mass_exchange_rates_type` transfer record (including coupled mixture, solid/gas mass, energy, carrier erosion/deposition, withdrawal volume, lava and bed rates), while scaling the conservative exchange-rate vector exactly once. The group-0 spatial operator remains independently advanced and **never rate-limited**. This is production-only refactoring; tests/build deferred.
+
+### State-validation ownership (2026-11-01)
+
+Moved `conservative_mass_admissible` from `numerics/lie_source_executor_2d.f90` to the public state API in `state/state_2d.f90`. Both the Lie spatial-only admissibility check in `time_integration_2d.f90` and source-group candidate/post-group checks invoke the same side-effect-free state predicate. Numerical orchestration no longer embeds the conservative mass-budget validity policy. No rate limiting or clipping was introduced for the spatial update. Build/tests intentionally deferred.

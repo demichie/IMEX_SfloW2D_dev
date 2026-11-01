@@ -1,13 +1,11 @@
 ! First-order Lie integration. GROUP 0: spatial update first; physical rates from q^n.
 MODULE time_integration_2d
-  USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_solidEqn_first,idx_solidEqn_last, &
-       idx_totMassEqn,idx_add_gas_first,idx_add_gas_last
+  USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_totMassEqn
   USE geometry_2d, ONLY : comp_cells_x,comp_cells_y, &
        begin_lie_geometry_transaction,commit_lie_geometry_transaction, &
        rollback_lie_geometry_transaction
   USE state_conversion_2d, ONLY : qc_to_qp
-  USE state_2d, ONLY : initialize_dry_physical_cell
-  USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+  USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible
   USE diagnostics_2d, ONLY : fatal_error
   USE source_registry_2d, ONLY : source_registry_type
   USE spatial_operator_2d, ONLY : spatial_operator_type
@@ -76,17 +74,8 @@ CONTAINS
       k=domain%k_cent(l)
       this%q_trial(1:n_eqns,j,k)=this%q_before(1:n_eqns,j,k)-dt*this%spatial_rate(:,j,k)
       ! Spatial admissibility check. Do not limit or clip its conservative rate.
-      IF (.NOT.ALL(ieee_is_finite(this%q_trial(1:n_eqns,j,k)))) &
-           CALL fatal_error('Lie spatial update produced non-finite state')
-      IF (this%q_trial(idx_totMassEqn,j,k)<0.0_wp) &
-           CALL fatal_error('Lie spatial update: negative mass')
-      IF (ANY(this%q_trial(idx_solidEqn_first:idx_solidEqn_last,j,k)<0.0_wp)) &
-           CALL fatal_error('Lie spatial update: negative solid mass')
-      IF (ANY(this%q_trial(idx_add_gas_first:idx_add_gas_last,j,k)<0.0_wp)) &
-           CALL fatal_error('Lie spatial update: negative additional gas mass')
-      IF (SUM(this%q_trial(idx_solidEqn_first:idx_solidEqn_last,j,k))> &
-           this%q_trial(idx_totMassEqn,j,k)) &
-           CALL fatal_error('Lie spatial update: solids exceed total mass')
+      IF (.NOT.conservative_mass_admissible(this%q_trial(1:n_eqns,j,k))) &
+           CALL fatal_error('Lie spatial update: inadmissible conservative state')
       IF (this%q_trial(idx_totMassEqn,j,k)>0.0_wp) THEN
         CALL qc_to_qp(this%q_trial(:,j,k),this%qp_trial(:,j,k),pd,'Lie spatial update',conversion_ok)
         IF (.NOT.conversion_ok) &

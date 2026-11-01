@@ -22,19 +22,6 @@ MODULE lie_source_executor_2d
 
 CONTAINS
 
-  !> Check finite conservative mass budgets without modifying the state.
-  PURE LOGICAL FUNCTION conservative_mass_admissible(q_cell) RESULT(valid)
-    USE parameters_2d, ONLY : idx_add_gas_first,idx_add_gas_last
-    REAL(wp), INTENT(IN) :: q_cell(n_eqns)
-    valid=.FALSE.
-    IF (.NOT.ALL(ieee_is_finite(q_cell))) RETURN
-    IF (q_cell(idx_totMassEqn)<0.0_wp) RETURN
-    IF (ANY(q_cell(idx_solidEqn_first:idx_solidEqn_last)<0.0_wp)) RETURN
-    IF (ANY(q_cell(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
-    IF (SUM(q_cell(idx_solidEqn_first:idx_solidEqn_last))>q_cell(idx_totMassEqn)) RETURN
-    valid=.TRUE.
-  END FUNCTION conservative_mass_admissible
-
   !> Apply the same physical coverage to every rate of one exchange transaction.
   !> Fluid conservative source rates are scaled separately by the caller.
   SUBROUTINE scale_mass_exchange_transfer(transfer,coverage)
@@ -70,7 +57,7 @@ CONTAINS
          SOURCE_METHOD_NEWTON
     USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
     USE state_conversion_2d, ONLY : qc_to_qp
-    USE state_2d, ONLY : initialize_dry_physical_cell
+    USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible
     USE parameters_2d, ONLY : topo_change_flag,bottom_radial_source_flag, &
          bottom_fissural_source_flag
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
