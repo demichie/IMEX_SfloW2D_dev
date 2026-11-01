@@ -18,7 +18,6 @@ IMEX_SfloW2D_SOURCES = \
                 numerics/lapack_interfaces_2d.f90 \
                 core/constitutive_parameters_2d.f90 \
                 core/model_layout_2d.f90 \
-                numerics/equation_metadata_2d.f90 \
                 numerics/source_catalog_2d.f90 \
                 numerics/source_registry_2d.f90 \
                 core/runtime_2d.f90 \
@@ -258,7 +257,6 @@ physics/equation_terms_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)             \
                                      physics/source_terms_2d.$(OBJEXT) \
                                      physics/rheology_laws/rheology_2d.$(OBJEXT)           \
                                      core/diagnostics_2d.$(OBJEXT)             \
-                                     numerics/equation_metadata_2d.$(OBJEXT)   \
                                      numerics/source_catalog_2d.$(OBJEXT)      \
                                      numerics/source_registry_2d.$(OBJEXT)     \
                                      core/complexify.$(OBJEXT)                 \
@@ -277,7 +275,6 @@ state/state_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                         \
                           core/diagnostics_2d.$(OBJEXT)
 numerics/nonlinear_solver_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)           \
                                         core/diagnostics_2d.$(OBJEXT)           \
-                                        numerics/equation_metadata_2d.$(OBJEXT) \
                                         physics/equation_terms_2d.$(OBJEXT)     \
                                         numerics/lapack_interfaces_2d.$(OBJEXT) \
                                         numerics/source_registry_2d.$(OBJEXT)   \
@@ -306,7 +303,6 @@ numerics/time_integration_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
                                          core/constitutive_parameters_2d.$(OBJEXT) \
                                          core/diagnostics_2d.$(OBJEXT)          \
                                          geometry/domain_2d.$(OBJEXT)            \
-                                         numerics/equation_metadata_2d.$(OBJEXT) \
                                          numerics/source_registry_2d.$(OBJEXT)   \
                                          physics/equation_terms_2d.$(OBJEXT)     \
                                          geometry/geometry_2d.$(OBJEXT)          \
@@ -323,7 +319,6 @@ numerics/lie_source_executor_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)       \
                                           physics/source_terms_2d.$(OBJEXT) \
                                           physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT) \
                                           numerics/nonlinear_solver_2d.$(OBJEXT) \
-                                          numerics/equation_metadata_2d.$(OBJEXT) \
                                           state/state_2d.$(OBJEXT) \
                                           geometry/geometry_2d.$(OBJEXT)     \
                                           state/state_conversion_2d.$(OBJEXT)
@@ -336,7 +331,6 @@ stochastic/stochastic_module.$(OBJEXT): core/parameters_2d.$(OBJEXT)          \
 core/simulation_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)                     \
                               geometry/geometry_2d.$(OBJEXT)                    \
                               geometry/domain_2d.$(OBJEXT)                      \
-                              numerics/equation_metadata_2d.$(OBJEXT)           \
                               physics/equation_terms_2d.$(OBJEXT)               \
                               core/model_layout_2d.$(OBJEXT)                    \
                               numerics/nonlinear_solver_2d.$(OBJEXT)            \
@@ -393,7 +387,6 @@ numerics/source_catalog_2d.$(OBJEXT): core/parameters_2d.$(OBJEXT)
 numerics/source_input_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
                                      physics/mass_exchange/mass_exchange_lava_deposition_2d.$(OBJEXT)
 numerics/source_registry_2d.$(OBJEXT): numerics/source_catalog_2d.$(OBJEXT) \
-                                      numerics/equation_metadata_2d.$(OBJEXT)
 physics/source_configuration_2d.$(OBJEXT): numerics/source_registry_2d.$(OBJEXT) \
                                          numerics/source_input_2d.$(OBJEXT) \
                                          core/constitutive_parameters_2d.$(OBJEXT)

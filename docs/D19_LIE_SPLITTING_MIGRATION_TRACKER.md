@@ -145,3 +145,9 @@ Do not claim that first-order Lie is unconditionally stable or well-balanced for
 7. **Non-FV physical source time:** evaluate all GROUP-0 sources from the same `q_n` but pass source time consistent with the timestep, time-window averaging and any stochastic sample.
 
 **Closure rule:** D19 is done only when all L00–L09 are DONE, acceptance evidence is linked, and D18 matches the implemented architecture. D19 must never itself substitute for executable evidence.
+
+### Legacy equation-partition retirement (2026-11-01)
+
+The legacy `src/numerics/equation_metadata_2d.f90` module and its dedicated `TESTS/TEST_EQUATION_METADATA` unit test were removed, with object/source entries deleted from `src/Makefile.am`. The production Lie Newton solver and source registry already use `source_group%equation_ids` directly.
+
+**Outstanding obsolete test callsites (must migrate/remove before final compile):** `TESTS/TEST_SOURCE_REGISTRY/test_source_registry.f90`, `TESTS/ACCEPTANCE/test_d17_production_newton.f90`, `TESTS/TEST_RHEOLOGY_CELL_LOCAL/test_grouped_implicit_stage.f90`, `TESTS/TEST_RHEOLOGY_CELL_LOCAL/probe_sources.f90`, `TESTS/TEST_MASS_EXCHANGE/test_mass_exchange.f90`, and `TESTS/TEST_IMEX_STAGES/*`. They reference obsolete equation partitions, source configuration signatures, or stage/step entrypoints. Do not reintroduce the removed module to keep them working; replace RK-specific tests with Lie-specific validation in L07–L09. **No build/tests run**.
