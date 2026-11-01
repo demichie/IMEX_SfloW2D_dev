@@ -68,6 +68,7 @@ MODULE state_2d
         !> Maximum over time of velocity magnitude
         REAL(wp), ALLOCATABLE :: mod_vel_max(:,:)
 
+        !> Vulnerability diagnostic table indexed by threshold and horizontal cell.
         LOGICAL, ALLOCATABLE :: vuln_table(:,:,:)
 
     CONTAINS
@@ -83,13 +84,19 @@ MODULE state_2d
 CONTAINS
 
 
-    !> Validate a primitive cell state without changing it.
+    !> @brief Check that all primitive cell components are finite.
+    !> @param[in] qp_cell One cell's physical variables, including velocities.
+    !> @return True if every entry is finite; this procedure does not change state.
     PURE LOGICAL FUNCTION physical_cell_state_finite(qp_cell) RESULT(valid)
         REAL(wp), INTENT(IN) :: qp_cell(:)
         valid=ALL(ieee_is_finite(qp_cell))
     END FUNCTION physical_cell_state_finite
 
-    !> Check finite conservative mass budgets without modifying the state.
+    !> @brief Test finite, nonnegative and internally consistent mass inventories.
+    !> @details Checks total mass against summed solid and additional gas mass;
+    !>          does not clip or otherwise modify a candidate conservative state.
+    !> @param[in] q_cell One conservative cell vector of n_eqns entries.
+    !> @return True if the candidate satisfies all mass admissibility guards.
     PURE LOGICAL FUNCTION conservative_mass_admissible(q_cell) RESULT(valid)
         REAL(wp), INTENT(IN) :: q_cell(n_eqns)
         valid=.FALSE.
@@ -102,7 +109,6 @@ CONTAINS
             SUM(q_cell(idx_add_gas_first:idx_add_gas_last)) > q_cell(idx_totMassEqn)) RETURN
         valid=.TRUE.
     END FUNCTION conservative_mass_admissible
-
 
 
     !******************************************************************************
@@ -186,7 +192,9 @@ CONTAINS
 
     END SUBROUTINE finalize_state
 
-    !> Capture all substrate inventories before source groups can change them.
+    !> @brief Snapshot all owned substrate inventories and their aggregates.
+    !> @param[in] this Authoritative state before the Lie source sweep.
+    !> @param[out] snapshot Independent substrate snapshot for rollback.
     SUBROUTINE snapshot_substrate(this,snapshot)
         CLASS(state_type), INTENT(IN) :: this
         TYPE(substrate_snapshot_type), INTENT(OUT) :: snapshot
@@ -198,7 +206,9 @@ CONTAINS
         snapshot%erosion_tot=this%erosion_tot
     END SUBROUTINE snapshot_substrate
 
-    !> Restore exactly the pre-step inventories when the source sweep fails.
+    !> @brief Restore substrate inventories after a rejected Lie source sweep.
+    !> @param[in,out] this State whose substrate fields are restored.
+    !> @param[in] snapshot Previously captured substrate snapshot.
     SUBROUTINE restore_substrate(this,snapshot)
         CLASS(state_type), INTENT(INOUT) :: this
         TYPE(substrate_snapshot_type), INTENT(IN) :: snapshot
@@ -210,7 +220,9 @@ CONTAINS
         this%erosion_tot=snapshot%erosion_tot
     END SUBROUTINE restore_substrate
 
-    !> Refresh diagnostic totals from the owned per-species inventories.
+    !> @brief Recompute deposit and erosion thickness totals from per-solid mass.
+    !> @details Rejects invalid substrate porosity instead of silently clipping.
+    !> @param[in,out] this State whose aggregate diagnostic fields are refreshed.
     SUBROUTINE refresh_substrate_totals(this)
         CLASS(state_type), INTENT(INOUT) :: this
         ! Totals include the carrier-filled pore volume of the deposited/eroded layer.
@@ -222,8 +234,9 @@ CONTAINS
         this%erosion_tot=SUM(this%erosion,DIM=3)/(1.0_wp-erodible_porosity)
     END SUBROUTINE refresh_substrate_totals
 
-    !> \brief Set one primitive state (including reconstruction halo) to dry.
-    !> \details Preserve the established zero state and ambient temperature.
+    !> @brief Initialize one primitive cell, including halo, to the dry state.
+    !> @details Sets all components to zero except ambient temperature.
+    !> @param[out] qp_cell Local physical state vector to reset.
     PURE SUBROUTINE initialize_dry_physical_cell(qp_cell)
         REAL(wp), INTENT(OUT) :: qp_cell(:)
         qp_cell = 0.0_wp
