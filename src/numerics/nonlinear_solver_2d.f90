@@ -16,11 +16,7 @@ MODULE nonlinear_solver_2d
 
 
   USE source_registry_2d, ONLY : source_group_type
-  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON, &
-       SOURCE_METHOD_ANALYTIC
-  USE source_terms_2d, ONLY : analytic_term_context_type, &
-       eval_source_analytic, eval_source_semi_implicit
-  USE rheology_2d, ONLY : limit_rheology_momentum_reversal
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON
 
   IMPLICIT NONE
 
@@ -37,213 +33,49 @@ MODULE nonlinear_solver_2d
 
 CONTAINS
 
-  !> Solve one full backward-Euler Lie group without RK coefficients.
+  !> Initialize the complex-step perturbation for the cell-local Newton solver.
+  SUBROUTINE initialize_nonlinear_solver
+    h = n_vars * EPSILON(1.0_wp)
+    one_by_h = 1.0_wp / h
+  END SUBROUTINE initialize_nonlinear_solver
+
+  SUBROUTINE finalize_nonlinear_solver
+  END SUBROUTINE finalize_nonlinear_solver
+
+  !> Solve the entire structurally affected conservative equation set.
+  !> Every other conservative component remains fixed at its group input value.
   SUBROUTINE solve_backward_euler_group(source_group, &
        q_cell,dt,Bprime_x,Bprime_y,stochastic_value, &
        iterations_used,converged,linear_info,line_search_failed)
+    USE parameters_2d, ONLY : tol_abs,tol_rel
     TYPE(source_group_type), INTENT(IN) :: source_group
     REAL(wp), INTENT(INOUT) :: q_cell(n_vars)
     REAL(wp), INTENT(IN) :: dt,Bprime_x,Bprime_y,stochastic_value
     INTEGER, INTENT(OUT) :: iterations_used,linear_info
     LOGICAL, INTENT(OUT) :: converged,line_search_failed
-    REAL(wp) :: q_in(n_vars)
+    REAL(wp) :: q_in(n_vars),coeff_f(n_eqns)
+    INTEGER :: n_active,i
     q_in=q_cell
-    CALL solve_implicit_groups([source_group],q_cell,q_in, &
-         dt,Bprime_x,Bprime_y,0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
-         stochastic_value,iterations_used,converged,linear_info,line_search_failed)
-  END SUBROUTINE solve_backward_euler_group
-
-  !> \brief Set the complex-step perturbation and its reciprocal.
-  !>
-  !> \note Writes h and one_by_h, used to differentiate the implicit source with a complex
-  !>       perturbation.
-
-  SUBROUTINE initialize_nonlinear_solver
-
-    h = n_vars * EPSILON(1.0_wp)
-    one_by_h = 1.0_wp / h
-
-  END SUBROUTINE initialize_nonlinear_solver
-
-  !> \brief Provide the matching lifecycle hook for the cell-local nonlinear solver.
-  !>
-  !> \note Currently a no-op: the nonlinear solver owns scalar constants, not allocated arrays.
-
-  SUBROUTINE finalize_nonlinear_solver
-
-  END SUBROUTINE finalize_nonlinear_solver
-
-  !> \brief Apply ordered cell-local source groups using Newton or analytic flows.
-  !>
-  !> \param[in] lie_groups Validated ordered Lie source groups; explicit groups are skipped.
-  !> \param[in,out] qj Local conservative state vector; mass and momenta are per unit horizontal
-  !>                   area.
-  !> \param[in] q_group_input Conservative input state for the backward-Euler group residual.
-  !> \param[in] dt_step Full Lie group timestep [s].
-  !> \param[in] Bprimej_x Filtered cell bed derivative dB/dx [dimensionless].
-  !> \param[in] Bprimej_y Filtered cell bed derivative dB/dy [dimensionless].
-  !> \param[in] Bsecondj_xx Filtered bed curvature in xx [m^-1].
-  !> \param[in] Bsecondj_xy Filtered bed curvature in xy [m^-1].
-  !> \param[in] Bsecondj_yy Filtered bed curvature in yy [m^-1].
-  !> \param[in] grav_coeff Effective gravitational acceleration [m s^-2].
-  !> \param[in] Zij Local effective stochastic fluctuation supplied to the rheology.
-  !> \param[in] apply_semi_implicit Apply the semi-implicit momentum contribution before the sweep.
-  !> \param[out] iterations_used Number of Newton iterations attempted for this source-group cell solve.
-  !> \param[out] converged True when every Newton group residual meets its bound.
-  !> \param[out] linear_info Linear-solver status: zero for success, nonzero for a failed solve.
-  !> \param[out] line_search_failed True when backtracking fails to accept a step.
-  !******************************************************************************
-
-  SUBROUTINE solve_implicit_groups(lie_groups, &
-       qj, q_group_input, dt_step,                                                  &
-Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
-       Bsecondj_yy, grav_coeff, Zij,                                         &
-       iterations_used, converged, linear_info, line_search_failed,          &
-       apply_semi_implicit )
-
-    USE parameters_2d, ONLY : tol_rel, tol_abs
-    USE state_conversion_2d, ONLY : qc_to_qp
-
-    IMPLICIT NONE
-
-    TYPE(source_group_type), INTENT(IN) :: lie_groups(:)
-    REAL(wp), INTENT(INOUT) :: qj(n_vars)
-    REAL(wp), INTENT(IN) :: q_group_input(n_vars)
-    REAL(wp), INTENT(IN) :: dt_step
-    REAL(wp), INTENT(IN) :: Bprimej_x
-    REAL(wp), INTENT(IN) :: Bprimej_y
-    REAL(wp), INTENT(IN) :: Bsecondj_xx, Bsecondj_xy, Bsecondj_yy
-    REAL(wp), INTENT(IN) :: grav_coeff
-    REAL(wp), INTENT(IN):: Zij ! value stochastic process
-    LOGICAL, INTENT(IN), OPTIONAL :: apply_semi_implicit
-    INTEGER, INTENT(OUT) :: iterations_used
-    LOGICAL, INTENT(OUT) :: converged
-    INTEGER, INTENT(OUT) :: linear_info
-    LOGICAL, INTENT(OUT) :: line_search_failed
-
-    REAL(wp) :: qj_init(n_vars), q_known(n_vars), q_group_before(n_vars)
-    REAL(wp) :: coeff_f(n_eqns)
-    REAL(wp) :: tol_abs_local, tol_rel_local
-    REAL(wp) :: analytic_rate(n_eqns)
-    TYPE(analytic_term_context_type) :: analytic_context
-    REAL(wp) :: qp_current(n_vars+2)
-    REAL(wp) :: dynamic_pressure, si_term(n_eqns)
-    INTEGER :: group, group_size, equation, i
-    INTEGER :: analytic_status
-    INTEGER :: group_equations(n_eqns)
-    LOGICAL :: group_has_momentum, apply_si_local
-
-    iterations_used = 0
-    converged = .FALSE.
-    linear_info = 0
-    line_search_failed = .FALSE.
-
-    IF (n_eqns /= n_vars .OR. SIZE(lie_groups)==0) THEN
-       linear_info = -1
-       RETURN
-    END IF
-
-    coeff_f = 1.0_wp
-
-    tol_abs_local = tol_abs
-    tol_rel_local = tol_rel
-
-    qj_init = qj
-    q_known = q_group_input
-    qj = q_known
-    apply_si_local = .FALSE.
-    IF (PRESENT(apply_semi_implicit)) apply_si_local = apply_semi_implicit
-    analytic_context%Bprime_x=Bprimej_x
-    analytic_context%Bprime_y=Bprimej_y
-    analytic_context%Bsecond_xx=Bsecondj_xx
-    analytic_context%Bsecond_xy=Bsecondj_xy
-    analytic_context%Bsecond_yy=Bsecondj_yy
-    analytic_context%grav_coeff=grav_coeff
-    analytic_context%Zij=Zij
-
-    ! All non-group equations remain at the incoming group state.
-
-    DO group = 1, SIZE(lie_groups)
-       IF (lie_groups(group)%method==SOURCE_METHOD_EXPLICIT) CYCLE
-       IF (.NOT.ALLOCATED(lie_groups(group)%equation_ids)) THEN
-          linear_info=-1
-          qj=qj_init
-          RETURN
-       END IF
-       group_size=SIZE(lie_groups(group)%equation_ids)
-       IF (group_size<1 .OR. group_size>SIZE(group_equations)) THEN
-          linear_info=-1
-          qj=qj_init
-          RETURN
-       END IF
-       group_equations(1:group_size)=lie_groups(group)%equation_ids
-
-       IF (lie_groups(group)%method==SOURCE_METHOD_ANALYTIC) THEN
-          ! Analytic operators act on the state produced by preceding groups.
-          group_has_momentum=ANY(group_equations(1:group_size)==2) .OR. &
-               ANY(group_equations(1:group_size)==3)
-          IF (group_has_momentum .AND. &
-               .NOT.(ANY(group_equations(1:group_size)==2) .AND. &
-               ANY(group_equations(1:group_size)==3))) THEN
-             linear_info=-6
-             qj=qj_init
-             RETURN
-          END IF
-          CALL eval_source_analytic(lie_groups(group),qj, &
-               analytic_context,dt_step,analytic_rate,             &
-               status=analytic_status)
-          IF (analytic_status/=0) THEN
-             linear_info=analytic_status
-             qj=qj_init
-             RETURN
-          END IF
-          qj=qj+dt_step*analytic_rate(1:n_vars)
-
-       ELSEIF (lie_groups(group)%method==SOURCE_METHOD_NEWTON) THEN
-          ! A group solves against the state left by preceding groups.
-          q_group_before=qj
-             si_term=0.0_wp
-             group_has_momentum = ANY(group_equations(1:group_size)==2) .OR. &
-                  ANY(group_equations(1:group_size)==3)
-             IF (group_has_momentum .AND. apply_si_local) THEN
-                CALL qc_to_qp(qj, qp_current, dynamic_pressure)
-                CALL eval_source_semi_implicit(Bprimej_x, Bprimej_y,          &
-                     Bsecondj_xx,Bsecondj_xy,Bsecondj_yy,grav_coeff,        &
-                     qp_current,si_term,Zij,group=lie_groups(group))
-             END IF
-             DO i=1,group_size
-                equation=group_equations(i)
-                qj(equation)=q_group_before(equation)+dt_step*si_term(equation)
-             END DO
-             IF (group_has_momentum .AND. apply_si_local) THEN
-                CALL limit_rheology_momentum_reversal(q_group_before(2:3),qj(2:3))
-                DO i=1,group_size
-                   equation=group_equations(i)
-                   si_term(equation)=                                        &
-                        (qj(equation)-q_group_before(equation))/(dt_step)
-                END DO
-             END IF
-             ! Semi-implicit information seeds the Newton initial guess only.
-             ! The backward-Euler residual contains the full implicit source once.
-             CALL solve_newton_group(lie_groups(group),&
-                  group_equations(1:group_size),qj,q_group_before,dt_step,&
-                  Bprimej_x,Bprimej_y,Zij,coeff_f,      &
-                  tol_abs_local,tol_rel_local,iterations_used,converged,   &
-                  linear_info,line_search_failed)
-             IF (.NOT.converged) THEN
-                qj=qj_init
-                RETURN
-             END IF
-       ELSE
-          linear_info = -5
-          qj = qj_init
-          RETURN
-       END IF
+    iterations_used=0
+    converged=.FALSE.
+    line_search_failed=.FALSE.
+    linear_info=-1
+    IF (n_vars/=n_eqns .OR. source_group%method/=SOURCE_METHOD_NEWTON) RETURN
+    IF (.NOT.ALLOCATED(source_group%equation_ids)) RETURN
+    n_active=SIZE(source_group%equation_ids)
+    IF (n_active<1 .OR. n_active>n_eqns) RETURN
+    IF (ANY(source_group%equation_ids<1) .OR. &
+        ANY(source_group%equation_ids>n_eqns)) RETURN
+    DO i=1,n_active
+       IF (COUNT(source_group%equation_ids==source_group%equation_ids(i))/=1) RETURN
     END DO
-
-    converged = .TRUE.
-
-  END SUBROUTINE solve_implicit_groups
+    coeff_f=1.0_wp
+    linear_info=0
+    CALL solve_newton_group(source_group,source_group%equation_ids,q_cell,q_in,dt, &
+         Bprime_x,Bprime_y,stochastic_value,coeff_f,tol_abs,tol_rel, &
+         iterations_used,converged,linear_info,line_search_failed)
+    IF (.NOT.converged) q_cell=q_in
+  END SUBROUTINE solve_backward_euler_group
 
   !> \brief Solve one backward-Euler Newton group while holding other equations fixed.
   !> \param[in] group_equations Indices of the conservative equations in this group.

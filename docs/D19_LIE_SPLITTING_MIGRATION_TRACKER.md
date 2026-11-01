@@ -175,3 +175,7 @@ Added a cell-grid Lie GROUP-0 erosion regression to `test_projection_stress.f90`
 ### Rejected Lie mass-exchange regression (2026-11-01)
 
 Added a late-cell nonfinite-input rejection fixture in `test_projection_stress.f90`, with a real group-0 erosion registry and the production Lie source executor. The test opens a geometry transaction, forces the second cell's original primitive input invalid, expects recoverable `step_failed` and a diagnostic, invokes `rollback_lie_geometry_transaction`, and checks bed, cached geometry and all inventory snapshots exactly. Fluid trial state is discarded by the test as in `advance_lie`. **Actual restart serialization/continuation remains outstanding**; do not count this as restart coverage. Final compile and runtime verification remain deferred.
+
+### Production Newton separation (2026-11-01)
+
+Removed the obsolete multi-group implicit/analytic sweep and semi-implicit momentum seed from `nonlinear_solver_2d.f90`. The exported `solve_backward_euler_group` now validates the single NEWTON group's unique equation index set and directly calls the existing complex-step Newton kernel over precisely that set; all non-group conservative components remain fixed and failed solves restore the group input. The Lie executor retains the EXPLICIT / NEWTON / ANALYTIC dispatch; no model-dependent reconstruction, RK stage, or separate equation partition is introduced. **No tests or compilation until architecture completion.**
