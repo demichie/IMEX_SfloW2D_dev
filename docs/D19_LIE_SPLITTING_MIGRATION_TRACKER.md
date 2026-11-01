@@ -83,6 +83,7 @@ Do not claim that first-order Lie is unconditionally stable or well-balanced for
 
 | Date | Change | Commit | Checks executed | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-11-01 | Added opt-in source-configuration bridge to unified Lie registry; conflict detection and mandatory spatial group. | This commit | Not run | Transitional: depends on legacy metadata; replace with direct physical METHOD/GROUP builder in L02. |
 | 2026-11-01 | Introduced opt-in Lie source group registry, mandatory explicit GROUP 0, ordered IDs, method capability and duplicate-source checks. | This commit | Not run | Legacy STAGE/STEP callers remain; L01 IN_PROGRESS. |
 | 2026-11-01 | Added first RK-independent public backward-Euler group entry point and migrated existing STEP Newton caller; full Lie driver not yet present. | This change | Not executed (remote edit) | Compile/test verification required before marking L03 DONE. |
 | 2026-11-01 | Created migration guide and pending checklist from static code inventory. | This document's initial commit | None (documentation only) | All code phases remain TODO. |

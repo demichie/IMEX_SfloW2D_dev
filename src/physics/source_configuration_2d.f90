@@ -22,6 +22,7 @@ MODULE source_configuration_2d
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: initialize_configured_sources
+  PUBLIC :: initialize_configured_lie_sources
 CONTAINS
   !> Identify active physical sources exactly once for both input syntaxes.
   !> Thermal activation is determined by the physical cooling flag.
@@ -356,5 +357,66 @@ CONTAINS
     CALL partition%initialize(mask,membership,partition_methods(1:compact))
     CALL registry%initialize(n_eqns,pore,stages,steps,error)
   END SUBROUTINE initialize_configured_sources
+
+  !> Transitional route from physical source configuration to Lie group metadata.
+  !> Reject legacy group-ID collisions rather than silently changing Lie order.
+  !> The production integrator still uses initialize_configured_sources.
+  SUBROUTINE initialize_configured_lie_sources(registry,partition,error)
+    TYPE(source_registry_type), INTENT(INOUT) :: registry
+    TYPE(equation_partition_type), INTENT(INOUT) :: partition
+    CHARACTER(*), INTENT(OUT) :: error
+    TYPE(source_registry_type) :: legacy
+    TYPE(source_group_type), ALLOCATABLE :: stages(:),steps(:),groups(:)
+    TYPE(source_group_type) :: tmp
+    INTEGER :: i,j,pore,n
+    CALL initialize_configured_sources(legacy,partition,error)
+    IF (LEN_TRIM(error)>0) RETURN
+    stages=legacy%stage_groups()
+    steps=legacy%step_groups()
+    ALLOCATE(groups(0))
+    DO i=1,SIZE(stages)
+      IF (SIZE(stages(i)%source_names)==0) CYCLE
+      groups=[groups,stages(i)]
+    END DO
+    DO i=1,SIZE(steps)
+      IF (SIZE(steps(i)%source_names)==0) CYCLE
+      groups=[groups,steps(i)]
+    END DO
+    DO i=1,SIZE(groups)
+      DO j=i+1,SIZE(groups)
+        IF (groups(j)%id<groups(i)%id) THEN
+          tmp=groups(i)
+          groups(i)=groups(j)
+          groups(j)=tmp
+        END IF
+      END DO
+    END DO
+    error='D19: GROUP 0 must be EXPLICIT and reserved for spatial advance'
+    DO i=1,SIZE(groups)
+      IF (groups(i)%id==0 .AND. groups(i)%method/=SOURCE_METHOD_EXPLICIT) RETURN
+    END DO
+    error='D19: legacy group IDs conflict; specify distinct Lie GROUP values'
+    DO i=2,SIZE(groups)
+      IF (groups(i)%id==groups(i-1)%id) RETURN
+    END DO
+    ! Even without a configured GROUP-0 source, the spatial group exists.
+    IF (SIZE(groups)==0) THEN
+      tmp%id=0
+      tmp%method=SOURCE_METHOD_EXPLICIT
+      tmp%source_names=[CHARACTER(LEN=64)::]
+      tmp%equation_ids=[(n,n=1,n_eqns)]
+      groups=[groups,tmp]
+    ELSE IF (groups(1)%id/=0) THEN
+      tmp%id=0
+      tmp%method=SOURCE_METHOD_EXPLICIT
+      tmp%source_names=[CHARACTER(LEN=64)::]
+      tmp%equation_ids=[(n,n=1,n_eqns)]
+      groups=[tmp,groups]
+    END IF
+    pore=0
+    IF (pore_pressure_flag) pore=idx_pore
+    CALL registry%initialize_lie(n_eqns,pore,groups,error)
+    CALL legacy%finalize()
+  END SUBROUTINE initialize_configured_lie_sources
 
 END MODULE source_configuration_2d
