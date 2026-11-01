@@ -261,3 +261,9 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 
 - Aggiornati i 10 callsite diretti di `eval_source_explicit` in `TESTS/TEST_CURVATURE_SOURCE/test_curvature_source.f90` e il callsite in `TESTS/TEST_SPATIAL_OPERATOR/test_spatial_operator.f90` per fornire esplicitamente `stochastic_value=0.0_wp`, evitando chiamate con la vecchia firma. Nei due test non viene esercitata la componente stocastica, perciò il valore nullo mantiene la fisica attesa.
 - L'esecutore Lie passa invece il campo stocastico effettivo della cella fino al modello reologico EXPLICIT, risolvendo il bug identificato nella scansione trasversale. Non sono state effettuate compilazioni o Action.
+
+### Sostituzione del gate legacy D17 con un gate statico Lie (2026-11-01)
+
+- Individuato un test di accettazione non piu' utilizzabile: `TESTS/ACCEPTANCE/test_d17_physical_interfaces.py` tentava di leggere `src/numerics/step_source_executor_2d.f90`, rimosso dalla migrazione; cercava catalog entries con `SOURCE_CADENCE_STAGE/STEP`, non piu' previste, e procedure `eval_stage_source_explicit`, anch'esse eliminate. Questo test falliva indipendentemente dalla correttezza del codice e impediva una chiusura credibile della migrazione.
+- Sostituito il controllo legacy con un gate statico per i 24 nomi di sorgente del catalogo corrente, verifica dei trattamenti dichiarati nei moduli reologia/mass-exchange/termica/pore pressure, condizioni di default METHOD, generic EXPLICIT, contratti di registro, ingresso della stocasticita' nel percorso EXPLICIT, snapshot/rollback e assenza dei principali identificatori STAGE/STEP di produzione.
+- Nessun compilatore, processo di test o Action avviato. Il test e' stato aggiornato come sorgente ma non eseguito; eventuali problemi del gate e i restanti controlli di firma/rank vanno verificati prima della chiusura definitiva di D19.
