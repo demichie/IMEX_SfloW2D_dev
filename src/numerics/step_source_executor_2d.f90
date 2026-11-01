@@ -155,11 +155,13 @@ CONTAINS
     REAL(wp) :: p_dyn
     CHARACTER(LEN=96) :: closure_context
     TYPE(source_group_type), ALLOCATABLE :: step_groups(:)
+    TYPE(source_group_type) :: process_group
+    LOGICAL :: has_exchange
     INTEGER :: j, k, l
     INTEGER :: group_index, mass_group_count, analytic_status, cell_index
     TYPE(analytic_term_context_type) :: analytic_context
     REAL(wp) :: analytic_rate(n_eqns), step_noise, &
-         explicit_rate(n_eqns), source_time
+         explicit_rate(n_eqns), source_time, source_fraction
     LOGICAL :: implicit_mask(n_eqns), newton_converged, newton_search_failed
     INTEGER :: newton_iterations, newton_info
     TYPE(equation_partition_type) :: step_partition
@@ -187,13 +189,16 @@ CONTAINS
        DO group_index=1,SIZE(step_groups)
           ! Honor GROUP ordering; exchange remains one atomic transaction.
           IF (SIZE(step_groups(group_index)%source_names)==0) CYCLE
-          IF (ANY(INDEX(step_groups(group_index)%source_names,'mass_exchange_')==1)) THEN
-             CALL execute_mass_exchange_transaction()
-             CYCLE
+          process_group=step_groups(group_index)
+          has_exchange=ANY(INDEX(process_group%source_names,'mass_exchange_')==1)
+          IF (has_exchange) THEN
+             process_group%source_names=PACK(process_group%source_names, &
+                  INDEX(process_group%source_names,'mass_exchange_')/=1)
           END IF
-          IF (step_groups(group_index)%method==SOURCE_METHOD_NEWTON) THEN
+          IF (SIZE(process_group%source_names)==0 .AND. .NOT.has_exchange) CYCLE
+          IF (process_group%method==SOURCE_METHOD_NEWTON) THEN
              implicit_mask=.FALSE.
-             implicit_mask(step_groups(group_index)%equation_ids)=.TRUE.
+             implicit_mask(process_group%equation_ids)=.TRUE.
              BLOCK
                INTEGER :: group_membership(n_eqns)
                group_membership=0
@@ -202,23 +207,41 @@ CONTAINS
                     [IM_GROUP_METHOD_NEWTON])
              END BLOCK
           END IF
+          IF (SIZE(process_group%source_names)>0) THEN
           DO cell_index=1,domain%solve_cells
              j=domain%j_cent(cell_index); k=domain%k_cent(cell_index)
-             IF (q(idx_totMassEqn,j,k)<=0.0_wp .AND. step_groups(group_index)%id/=0) CYCLE
-             IF (step_groups(group_index)%method==SOURCE_METHOD_EXPLICIT) THEN
-                IF (step_groups(group_index)%id==0) THEN
+             IF (q(idx_totMassEqn,j,k)<=0.0_wp .AND. process_group%id/=0) CYCLE
+             IF (process_group%method==SOURCE_METHOD_EXPLICIT) THEN
+                IF (process_group%id==0) THEN
                    CALL eval_cell_source_explicit(j,k,qp_original(:,j,k), &
-                        source_time,step_groups(group_index),explicit_rate)
+                        source_time,process_group,explicit_rate)
                 ELSE
                    CALL eval_cell_source_explicit(j,k,qp(:,j,k), &
                         source_time,step_groups(group_index),explicit_rate)
                 END IF
-                q(1:n_eqns,j,k)=q(1:n_eqns,j,k)+time_step*explicit_rate
-             ELSE IF (step_groups(group_index)%method==SOURCE_METHOD_ANALYTIC) THEN
+                ! Only source rates may be scaled; spatial FV divergence is fixed.
+                source_fraction=1.0_wp
+                IF (explicit_rate(idx_totMassEqn)<0.0_wp) THEN
+                   source_fraction=MIN(source_fraction,MAX(0.0_wp, &
+                        q(idx_totMassEqn,j,k)/(-time_step*explicit_rate(idx_totMassEqn))))
+                END IF
+                IF (idx_solidEqn_first>0 .AND. idx_solidEqn_last>=idx_solidEqn_first) THEN
+                   BLOCK
+                     INTEGER :: solid_eq
+                     DO solid_eq=idx_solidEqn_first,idx_solidEqn_last
+                       IF (explicit_rate(solid_eq)<0.0_wp) &
+                            source_fraction=MIN(source_fraction,MAX(0.0_wp, &
+                            q(solid_eq,j,k)/(-time_step*explicit_rate(solid_eq))))
+                     END DO
+                   END BLOCK
+                END IF
+                q(1:n_eqns,j,k)=q(1:n_eqns,j,k)+ &
+                     time_step*source_fraction*explicit_rate
+             ELSE IF (process_group%method==SOURCE_METHOD_ANALYTIC) THEN
                 step_noise=0.0_wp
                 IF (PRESENT(stochastic_values)) step_noise=stochastic_values(j,k)
                 analytic_context=cell_analytic_source_context(j,k,step_noise)
-                CALL eval_source_analytic(step_groups(group_index),q(1:n_vars,j,k), &
+                CALL eval_source_analytic(process_group,q(1:n_vars,j,k), &
                      analytic_context,time_step,analytic_rate,analytic_status)
                 IF (analytic_status/=0) &
                      CALL fatal_error('D19: analytic group solve failed')
@@ -226,7 +249,7 @@ CONTAINS
              ELSE
                 step_noise=0.0_wp
                 IF (PRESENT(stochastic_values)) step_noise=stochastic_values(j,k)
-                CALL solve_backward_euler_group(step_partition,step_groups(group_index), &
+                CALL solve_backward_euler_group(step_partition,process_group, &
                      q(1:n_vars,j,k),time_step, &
                      B_prime_x_geom(j,k),B_prime_y_geom(j,k),step_noise, &
                      newton_iterations,newton_converged,newton_info,newton_search_failed)
@@ -245,6 +268,8 @@ CONTAINS
                 CALL initialize_dry_physical_cell(qp(:,j,k))
              END IF
           END DO
+          END IF
+          IF (has_exchange) CALL execute_mass_exchange_transaction()
        END DO
        CALL step_partition%finalize()
     END BLOCK
@@ -254,6 +279,7 @@ CONTAINS
     !> \\brief Execute one atomic bed-and-inventory transaction.
     !> \\details Called in ascending STEP GROUP order when configured.
     SUBROUTINE execute_mass_exchange_transaction()
+    REAL(wp) :: qp_eval(n_vars+2)
     IF ((erosion_coeff .EQ. 0.0_wp) .AND. (.NOT.settling_flag)            &
          .AND. (.NOT.pore_pressure_flag) .AND. (.NOT.entrainment_flag)     &
          .AND. (.NOT.liquid_loss_active) .AND. (.NOT.lava_deposition_flag)) RETURN
@@ -277,7 +303,9 @@ CONTAINS
           CALL initialize_dry_physical_cell(qp(1:n_vars+2,j,k))
        END IF
 
-       CALL eval_source_explicit(qp(1:n_vars+2,j,k), B_zone(j,k), &
+       qp_eval=qp(1:n_vars+2,j,k)
+       IF (step_groups(group_index)%id==0) qp_eval=qp_original(1:n_vars+2,j,k)
+       CALL eval_source_explicit(qp_eval, B_zone(j,k), &
             B_prime_x_geom(j,k), B_prime_y_geom(j,k), &
             erodible(1:n_solid,j,k), time_step, exchange_rates, eqns_term)
 
