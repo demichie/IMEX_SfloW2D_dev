@@ -19,13 +19,13 @@ METHODS = ("explicit", "semi_implicit", "implicit", "analytic")
 def compact(path: Path) -> str:
     code = path.read_text(encoding="utf-8")
     code = re.sub(r"(?m)!.*$", "", code)
-    return re.sub(r"&\\s*\\n\\s*&?", " ", code)
+    return re.sub(r"&\s*\n\s*&?", " ", code)
 
 
 def has_procedure(code: str, name: str) -> bool:
     return bool(re.search(
-        rf"(?im)^\\s*(?:(?:pure|recursive|elemental)\\s+)*"
-        rf"(?:subroutine|function)\\s+{re.escape(name)}\\s*\\(", code))
+        rf"(?im)^\s*(?:(?:pure|recursive|elemental)\s+)*"
+        rf"(?:subroutine|function)\s+{re.escape(name)}\s*\(", code))
 
 
 def require(ok: bool, message: str, failures: list[str]) -> None:
@@ -44,9 +44,9 @@ def main() -> int:
     state = compact(SRC / "state/state_2d.f90")
     files = {path: compact(path) for path in PHYSICS.rglob("*.f90")}
     entries = re.findall(
-        r"source_term_type\\s*\\(\\s*'([^']+)'\\s*,\\s*"
-        r"\\.(true|false)\\.\\s*,\\s*\\.(true|false)\\.\\s*,\\s*"
-        r"\\.(true|false)\\.\\s*,\\s*default_method\\s*=\\s*"
+        r"source_term_type\s*\(\s*'([^']+)'\s*,\s*"
+        r"\.(true|false)\.\s*,\s*\.(true|false)\.\s*,\s*"
+        r"\.(true|false)\.\s*,\s*default_method\s*=\s*"
         r"SOURCE_METHOD_(EXPLICIT|NEWTON|ANALYTIC)", catalog, re.I)
     require(len(entries) == 24, f"expected 24 source catalog entries, found {len(entries)}", failures)
     names = [e[0] for e in entries]
@@ -86,7 +86,7 @@ def main() -> int:
         require(allowed[default].lower() == "true",
                 f"{name}: default METHOD {default} is not supported", failures)
 
-    require(bool(re.search(r"interface\\s+eval_source_explicit\\b", assembly, re.I)),
+    require(bool(re.search(r"interface\s+eval_source_explicit\b", assembly, re.I)),
             "missing explicit generic", failures)
     for proc in ("eval_geometry_cell_source_explicit", "eval_mass_exchange_source_explicit",
                  "assemble_lie_explicit_transaction", "eval_cell_source_explicit",
@@ -117,7 +117,7 @@ def main() -> int:
     for filename in SRC.rglob("*.f90"):
         production = compact(filename)
         for symbol in removed:
-            if re.search(rf"\\b{re.escape(symbol)}\\b", production, re.I):
+            if re.search(rf"\b{re.escape(symbol)}\b", production, re.I):
                 failures.append(f"legacy symbol {symbol}: {filename.relative_to(ROOT)}")
     for failure in failures:
         print("FAIL:", failure, file=sys.stderr)
