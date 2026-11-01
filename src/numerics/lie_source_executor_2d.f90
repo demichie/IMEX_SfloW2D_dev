@@ -22,37 +22,18 @@ MODULE lie_source_executor_2d
 
 CONTAINS
 
-  !> Apply the same physical coverage to every rate of one exchange transaction.
-  !> Fluid conservative source rates are scaled separately by the caller.
-  SUBROUTINE scale_mass_exchange_transfer(transfer,coverage)
-    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: transfer
-    REAL(wp), INTENT(IN) :: coverage
-    transfer%solid_deposition_rate=coverage*transfer%solid_deposition_rate
-    transfer%solid_erosion_rate=coverage*transfer%solid_erosion_rate
-    transfer%solid_mass_rate=coverage*transfer%solid_mass_rate
-    transfer%add_gas_mass_rate=coverage*transfer%add_gas_mass_rate
-    transfer%mixture_mass_rate=coverage*transfer%mixture_mass_rate
-    transfer%energy_rate=coverage*transfer%energy_rate
-    transfer%carrier_erosion_rate=coverage*transfer%carrier_erosion_rate
-    transfer%carrier_deposition_rate=coverage*transfer%carrier_deposition_rate
-    transfer%carrier_withdrawal_volume_rate=coverage*transfer%carrier_withdrawal_volume_rate
-    transfer%lava_deposit_rate=coverage*transfer%lava_deposit_rate
-    transfer%dB_dt=coverage*transfer%dB_dt
-  END SUBROUTINE scale_mass_exchange_transfer
-
   !> Evaluate and commit one complete Lie source group at a time.
   !> For GROUP 0, evaluate every physical rate at the original pre-spatial
   !> state, but cap and apply the combined source increment to the post-FV state.
   SUBROUTINE execute_lie_source_groups(q,qp,time_step,domain,source_registry, &
        stochastic_values,step_start_time,q_original,qp_original,step_failed,failure_message)
     USE parameters_2d, ONLY : erodible_deposit_flag
-    USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,cell_source_fractions, &
+    USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
          B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
          begin_topography_rate_update,record_topography_rate_cell, &
-         apply_topography_rate_update,deposit,erosion,erodible,B_zone,lava_deposit
-    USE source_terms_2d, ONLY : eval_source_explicit,eval_source_analytic, &
-         limit_explicit_source_rates,
-         eval_cell_source_explicit,cell_analytic_source_context, &
+         apply_topography_rate_update,deposit,erosion,erodible,lava_deposit
+    USE source_terms_2d, ONLY : assemble_lie_explicit_transaction, &
+         eval_source_analytic,cell_analytic_source_context, &
          analytic_term_context_type
     USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, &
          SOURCE_METHOD_NEWTON
@@ -60,10 +41,8 @@ CONTAINS
     USE state_conversion_2d, ONLY : qc_to_qp
     USE state_2d, ONLY : initialize_dry_physical_cell,conservative_mass_admissible, &
          physical_cell_state_finite
-    USE parameters_2d, ONLY : topo_change_flag,bottom_radial_source_flag, &
-         bottom_fissural_source_flag
+    USE parameters_2d, ONLY : topo_change_flag
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
-    TYPE(source_group_type) :: other_sources
     TYPE(mass_exchange_rates_type) :: transfers
     TYPE(analytic_term_context_type) :: analytic_context
     REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
@@ -80,9 +59,9 @@ CONTAINS
     REAL(wp) :: qpentry(n_vars+2),q_candidate(n_vars),qp_candidate(n_vars+2)
     REAL(wp) :: deposit_candidate(n_solid),erosion_candidate(n_solid)
     REAL(wp) :: erodible_candidate(n_solid),lava_candidate
-    REAL(wp) :: physical_rate(n_eqns),exchange_rate(n_eqns),total_rate(n_eqns)
-    REAL(wp) :: analytic_rate(n_eqns),factor,coverage,pressure,source_time,noise
-    LOGICAL :: with_exchange,has_other,ok,failed,bed_accepted,conversion_ok
+    REAL(wp) :: total_rate(n_eqns)
+    REAL(wp) :: analytic_rate(n_eqns),pressure,source_time,noise
+    LOGICAL :: with_exchange,ok,failed,bed_accepted,conversion_ok
     INTEGER :: group_index,cell,j,k,status,iterations,linear_info
 
     CHARACTER(LEN=96) :: context
@@ -100,17 +79,8 @@ CONTAINS
     IF (time_step<=0.0_wp) CALL fatal_error('D19: nonpositive time interval')
 
     DO group_index=1,SIZE(groups)
-       other_sources=groups(group_index)
-       with_exchange=ANY(INDEX(other_sources%source_names,'mass_exchange_')==1)
-       IF (with_exchange) THEN
-          IF (groups(group_index)%method/=SOURCE_METHOD_EXPLICIT) &
-               CALL fatal_error('D19: mass exchange must use its supported explicit method')
-          other_sources%source_names=PACK(other_sources%source_names, &
-               INDEX(other_sources%source_names,'mass_exchange_')/=1)
-       END IF
-       has_other=SIZE(other_sources%source_names)>0
-       IF (.NOT.has_other .AND. .NOT.with_exchange) CYCLE
-
+       with_exchange=ANY(INDEX(groups(group_index)%source_names,'mass_exchange_')==1)
+       IF (SIZE(groups(group_index)%source_names)==0) CYCLE
        IF (with_exchange .AND. topo_change_flag) CALL begin_topography_rate_update
 
        cell_loop: DO cell=1,domain%solve_cells
@@ -151,74 +121,30 @@ CONTAINS
 
           SELECT CASE(groups(group_index)%method)
           CASE(SOURCE_METHOD_EXPLICIT)
-             physical_rate=0.0_wp
-             exchange_rate=0.0_wp
-             IF (has_other) CALL eval_cell_source_explicit(j,k,qpentry, &
-                  source_time,other_sources,physical_rate)
-             IF (with_exchange) THEN
-                CALL eval_source_explicit(qpentry,B_zone(j,k), &
-                     B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
-                     erodible(1:n_solid,j,k),time_step,transfers,exchange_rate)
-                IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
-                   coverage=1.0_wp-cell_source_fractions(j,k)
-                   IF (.NOT.ieee_is_finite(coverage) .OR. &
-                        coverage<0.0_wp .OR. coverage>1.0_wp) &
-                        CALL reject_cell('D19: invalid mass-exchange source coverage')
-                        IF (step_failed) EXIT cell_loop
-                   exchange_rate=coverage*exchange_rate
-                   CALL scale_mass_exchange_transfer(transfers,coverage)
-                END IF
-             END IF
-             total_rate=physical_rate+exchange_rate
-             IF (.NOT.ALL(ieee_is_finite(total_rate))) &
-                  CALL reject_cell('D19: non-finite explicit source rate')
-                  IF (step_failed) EXIT cell_loop
-             IF (with_exchange) THEN
-                IF (.NOT.ALL(ieee_is_finite(transfers%solid_deposition_rate)) .OR. &
-                     .NOT.ALL(ieee_is_finite(transfers%solid_erosion_rate)) .OR. &
-                     .NOT.ALL(ieee_is_finite(transfers%solid_mass_rate)) .OR. &
-                     .NOT.ALL(ieee_is_finite(transfers%add_gas_mass_rate)) .OR. &
-                     .NOT.ieee_is_finite(transfers%mixture_mass_rate) .OR. &
-                     .NOT.ieee_is_finite(transfers%energy_rate) .OR. &
-                     .NOT.ieee_is_finite(transfers%carrier_erosion_rate) .OR. &
-                     .NOT.ieee_is_finite(transfers%carrier_deposition_rate) .OR. &
-                     .NOT.ieee_is_finite(transfers%carrier_withdrawal_volume_rate) .OR. &
-                     .NOT.ieee_is_finite(transfers%lava_deposit_rate) .OR. &
-                     .NOT.ieee_is_finite(transfers%dB_dt)) &
-                     CALL reject_cell('D19: non-finite coupled mass-exchange transfer')
-                     IF (step_failed) EXIT cell_loop
-             END IF
-             ! Source rate limiter is owned by the physical source assembly.
-             IF (with_exchange) THEN
-                CALL limit_explicit_source_rates(q(1:n_eqns,j,k), &
-                     erodible(1:n_solid,j,k),time_step,total_rate, &
-                     transfers%solid_erosion_rate,factor,ok)
-             ELSE
-                CALL limit_explicit_source_rates(q(1:n_eqns,j,k), &
-                     [REAL(wp)::],time_step,total_rate, &
-                     [REAL(wp)::],factor,ok)
-             END IF
+             CALL assemble_lie_explicit_transaction(j,k,qpentry,q(1:n_eqns,j,k), &
+                  time_step,source_time,groups(group_index),erodible(1:n_solid,j,k), &
+                  total_rate,transfers,with_exchange,ok)
              IF (.NOT.ok) THEN
-                CALL reject_cell('D19: invalid physical source limiter')
+                CALL reject_cell('D19: physical source transaction rejected')
                 EXIT cell_loop
              END IF
              ! Stage the entire local fluid/substrate transfer before committing it.
              q_candidate=q(:,j,k)
-             q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*factor*total_rate
+             q_candidate(1:n_eqns)=q_candidate(1:n_eqns)+time_step*total_rate
              IF (.NOT.conservative_mass_admissible(q_candidate(1:n_eqns))) THEN
                 CALL reject_cell('D19: inadmissible conservative mass candidate')
                 EXIT cell_loop
              END IF
              IF (with_exchange) THEN
                 deposit_candidate=deposit(j,k,1:n_solid)+ &
-                     time_step*factor*transfers%solid_deposition_rate
+                     time_step*transfers%solid_deposition_rate
                 erosion_candidate=erosion(j,k,1:n_solid)+ &
-                     time_step*factor*transfers%solid_erosion_rate
+                     time_step*transfers%solid_erosion_rate
                 erodible_candidate=erodible(1:n_solid,j,k)- &
-                     time_step*factor*transfers%solid_erosion_rate
+                     time_step*transfers%solid_erosion_rate
                 IF (erodible_deposit_flag) erodible_candidate= &
-                     erodible_candidate+time_step*factor*transfers%solid_deposition_rate
-                lava_candidate=lava_deposit(j,k)+time_step*factor*transfers%lava_deposit_rate
+                     erodible_candidate+time_step*transfers%solid_deposition_rate
+                lava_candidate=lava_deposit(j,k)+time_step*transfers%lava_deposit_rate
                 IF (.NOT.ALL(ieee_is_finite(deposit_candidate)) .OR. &
                      .NOT.ALL(ieee_is_finite(erosion_candidate)) .OR. &
                      .NOT.ALL(ieee_is_finite(erodible_candidate)) .OR. &
@@ -247,7 +173,7 @@ CONTAINS
                 erodible(1:n_solid,j,k)=erodible_candidate
                 lava_deposit(j,k)=lava_candidate
                 IF (topo_change_flag) CALL record_topography_rate_cell(j,k, &
-                     factor*transfers%dB_dt)
+                     transfers%dB_dt)
              END IF
           CASE(SOURCE_METHOD_ANALYTIC)
              IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE

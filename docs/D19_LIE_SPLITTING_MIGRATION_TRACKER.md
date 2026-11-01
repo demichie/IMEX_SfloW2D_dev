@@ -233,3 +233,7 @@ Added `physical_cell_state_finite` to `state_2d` and routed the Lie source execu
 ### Physical rate limiter ownership (2026-11-01)
 
 Moved the coupled explicit-source rate limiter out of `numerics/lie_source_executor_2d.f90` into `physics/source_terms_2d.f90` as `limit_explicit_source_rates`. The physical assembler determines the single shared scale factor from the post-spatial reference conservative inventory, mass components, remaining carrier, and erodible substrate inventory. The Lie executor only applies that factor to the already assembled source rates and synchronized substrate transaction. No spatial-rate limiter is introduced. State admissibility remains in `state_2d`. No tests/build.
+
+### Production explicit Lie transaction assembly (2026-11-01)
+
+The physical `source_terms_2d` module now defines `assemble_lie_explicit_transaction`: it combines all explicit contributors, applies the source-coverage correction to **all** coupled mass-exchange rates, determines the common physical limiter against the *recipient* conservative state/inventory, and scales both conservative and substrate rates exactly once. It does not modify fluid, inventory or geometry fields. `lie_source_executor_2d` requests that fully limited transaction and applies it without re-implementing physical rate assembly or applying a second factor. Group-end geometry projection remains separate. **Still pending:** staging all candidate inventory changes until group completion, geometry-only ownership of substrate updates, and the final build/test phase.

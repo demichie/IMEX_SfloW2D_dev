@@ -26,7 +26,7 @@ MODULE source_terms_2d
   IMPLICIT NONE
   PRIVATE
   PUBLIC :: eval_source_explicit, eval_cell_source_explicit
-  PUBLIC :: limit_explicit_source_rates
+  PUBLIC :: limit_explicit_source_rates,assemble_lie_explicit_transaction
   PUBLIC :: cell_analytic_source_context
   ! Source evaluation is dispatched through one public generic: STAGE
   ! carries injection geometry; STEP carries atomic exchange rates/inventories.
@@ -51,6 +51,72 @@ MODULE source_terms_2d
     REAL(wp) :: grav_coeff=0.0_wp, Zij=0.0_wp
   END TYPE analytic_term_context_type
 CONTAINS
+
+  !> Apply a uniform physical factor to all coupled exchange rates.
+  SUBROUTINE scale_mass_exchange_transfer(transfer,scale)
+    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: transfer
+    REAL(wp), INTENT(IN) :: scale
+    transfer%solid_deposition_rate=scale*transfer%solid_deposition_rate
+    transfer%solid_erosion_rate=scale*transfer%solid_erosion_rate
+    transfer%solid_mass_rate=scale*transfer%solid_mass_rate
+    transfer%add_gas_mass_rate=scale*transfer%add_gas_mass_rate
+    transfer%mixture_mass_rate=scale*transfer%mixture_mass_rate
+    transfer%energy_rate=scale*transfer%energy_rate
+    transfer%carrier_erosion_rate=scale*transfer%carrier_erosion_rate
+    transfer%carrier_deposition_rate=scale*transfer%carrier_deposition_rate
+    transfer%carrier_withdrawal_volume_rate=scale*transfer%carrier_withdrawal_volume_rate
+    transfer%lava_deposit_rate=scale*transfer%lava_deposit_rate
+    transfer%dB_dt=scale*transfer%dB_dt
+  END SUBROUTINE scale_mass_exchange_transfer
+
+  !> Assemble and limit a complete explicit Lie group, without committing state.
+  SUBROUTINE assemble_lie_explicit_transaction(j,k,qp_eval,q_recipient,dt,t,group, &
+       inventory,rate,transfer,has_exchange,valid)
+    USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
+    USE geometry_2d, ONLY : B_zone,B_prime_x_geom,B_prime_y_geom,cell_source_fractions
+    INTEGER, INTENT(IN) :: j,k
+    REAL(wp), INTENT(IN) :: qp_eval(n_vars+2),q_recipient(n_eqns),dt,t
+    TYPE(source_group_type), INTENT(IN) :: group
+    REAL(wp), INTENT(IN) :: inventory(n_solid)
+    REAL(wp), INTENT(OUT) :: rate(n_eqns)
+    TYPE(mass_exchange_rates_type), INTENT(OUT) :: transfer
+    LOGICAL, INTENT(OUT) :: has_exchange,valid
+    TYPE(source_group_type) :: non_exchange
+    REAL(wp) :: physical(n_eqns),exchange(n_eqns),coverage,scale
+    has_exchange=ANY(INDEX(group%source_names,'mass_exchange_')==1)
+    non_exchange=group
+    IF (has_exchange) non_exchange%source_names=PACK(group%source_names, &
+         INDEX(group%source_names,'mass_exchange_')/=1)
+    valid=.FALSE.
+    physical=0.0_wp
+    exchange=0.0_wp
+    IF (SIZE(non_exchange%source_names)>0) &
+         CALL eval_cell_source_explicit(j,k,qp_eval,t,non_exchange,physical)
+    IF (has_exchange) THEN
+       CALL eval_source_explicit(qp_eval,B_zone(j,k), &
+            B_prime_x_geom(j,k),B_prime_y_geom(j,k),inventory,dt,transfer,exchange)
+       IF (bottom_radial_source_flag .OR. bottom_fissural_source_flag) THEN
+          coverage=1.0_wp-cell_source_fractions(j,k)
+          IF (.NOT.ieee_is_finite(coverage)) RETURN
+          IF (coverage<0.0_wp .OR. coverage>1.0_wp) RETURN
+          exchange=coverage*exchange
+          CALL scale_mass_exchange_transfer(transfer,coverage)
+       END IF
+    END IF
+    rate=physical+exchange
+    IF (has_exchange) THEN
+       CALL limit_explicit_source_rates(q_recipient,inventory,dt,rate, &
+            transfer%solid_erosion_rate,scale,valid)
+    ELSE
+       CALL limit_explicit_source_rates(q_recipient,[REAL(wp)::],dt,rate, &
+            [REAL(wp)::],scale,valid)
+    END IF
+    IF (.NOT.valid) RETURN
+    rate=scale*rate
+    IF (has_exchange) CALL scale_mass_exchange_transfer(transfer,scale)
+    valid=ALL(ieee_is_finite(rate))
+  END SUBROUTINE assemble_lie_explicit_transaction
+
 
   !> Scale a complete cell-local physical source transaction only after
   !> assembling all explicit source rates. Reference inventories belong to
