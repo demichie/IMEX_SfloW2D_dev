@@ -19,7 +19,7 @@ MODULE source_terms_2d
        eval_rheology_explicit
   USE diagnostics_2d, ONLY : fatal_error
   USE source_catalog_2d, ONLY : SOURCE_METHOD_NEWTON, SOURCE_ROLE_IMPLICIT, &
-       canonical_rheology_source_name, rheology_name_has_role
+       rheology_name_has_role
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_ANALYTIC
   USE source_registry_2d, ONLY : source_group_type, group_contains_name
   IMPLICIT NONE
@@ -357,7 +357,7 @@ CONTAINS
     COMPLEX(wp), INTENT(OUT), OPTIONAL :: c_nh_term_impl(n_eqns)
     REAL(wp), INTENT(IN), OPTIONAL :: r_qj(n_vars)
     REAL(wp), INTENT(OUT), OPTIONAL :: r_nh_term_impl(n_eqns)
-    TYPE(source_group_type), INTENT(IN), OPTIONAL :: group
+    TYPE(source_group_type), INTENT(IN) :: group
 
 
     COMPLEX(wp) :: qj(n_vars)
@@ -390,15 +390,11 @@ CONTAINS
 
     END IF
 
-    selected_model_name=canonical_rheology_source_name(rheology_model)
-    IF (PRESENT(group)) THEN
-       selected_model_name=group_rheology_name(group)
-       selected_rheology=group_has_role(group,SOURCE_ROLE_IMPLICIT)
-       selected_thermal=group_contains_name(group,'thermal_cooling')
-    ELSE
-       selected_rheology=rheology_flag
-       selected_thermal=thermal_cooling_flag
-    END IF
+    IF (group%method/=SOURCE_METHOD_NEWTON) &
+         CALL fatal_error('eval_source_implicit requires a Newton Lie group')
+    selected_model_name=group_rheology_name(group)
+    selected_rheology=group_has_role(group,SOURCE_ROLE_IMPLICIT)
+    selected_thermal=group_contains_name(group,'thermal_cooling')
 
     ! initialize the source terms
     source_term(1:n_eqns) = CMPLX(0.0_wp,0.0_wp,wp)

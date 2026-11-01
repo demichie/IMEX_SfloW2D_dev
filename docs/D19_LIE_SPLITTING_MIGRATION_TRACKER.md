@@ -321,3 +321,10 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Rilevata una incongruenza tra il registro, che poteva accettare due sorgenti `rheology_*`, e `group_rheology_name`, che restituisce intenzionalmente un solo modello. L'input di produzione attuale seleziona gia' una sola reologia, ma un registro costruito direttamente poteva essere accettato e poi eseguito solo parzialmente.
 - `source_registry_2d%initialize` ora rifiuta piu' di una sorgente reologica complessivamente, anche se assegnate a gruppi distinti. La regola vale per i metodi EXPLICIT, NEWTON e ANALYTIC; restano obbligatori gruppi omogenei e un solo sorgente ANALYTIC per gruppo.
 - Nessun cambiamento ai modelli, alle zone `B_zone`, a test, workflow o compilazione. La verifica statica delle chiamate di tutte le leggi fisiche non e' certificata esaustiva.
+
+### Chiusura del fallback implicito fuori registro (2026-11-01)
+
+- Rimosso in `source_terms_2d%eval_source_implicit` il percorso alternativo che, in assenza del descrittore Lie, selezionava reologia e raffreddamento da flag globali. L'argomento `group` e' ora obbligatorio e il metodo deve essere `SOURCE_METHOD_NEWTON`; la selezione delle leggi segue esclusivamente i nomi validati del gruppo.
+- Verificati i due callsite di produzione in `nonlinear_solver_2d` (residuo reale e Jacobiano complex-step): entrambi gia' passano `group=source_group`. Nessuna modifica necessaria al solver.
+- La ricerca globale mostra anche chiamate dirette nei test storici: il loro eventuale adeguamento e' rinviato alla fase concordata di compilazione e test, senza condizionare l'architettura finale.
+- Non modificati `B_zone`, test o workflow; non eseguita compilazione. D19 resta aperto per le verifiche statiche ancora non esaustive.
