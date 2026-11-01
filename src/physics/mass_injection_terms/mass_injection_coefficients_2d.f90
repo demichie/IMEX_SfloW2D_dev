@@ -1,16 +1,26 @@
-!> \brief Per-step source-window coefficients shared by injection laws.
-!> \details Updated before the RK stages by the existing window initializer.
+!> @brief Time-averaged source-window coefficients shared by injection laws.
+!> @details Evaluates injection availability over the requested physical interval.
+!>          The coefficients are independent of retired Runge-Kutta stages.
 MODULE mass_injection_coefficients_2d
     USE parameters_2d, ONLY : wp
     IMPLICIT NONE
     PRIVATE
     PUBLIC :: set_source_time_coefficients
     PUBLIC :: bottom_coeff_step, bottom_vel_step, lateral_coeff_step, fissure_coeff_step
+    !> Time-averaged bottom circular injection window coefficient.
     REAL(wp) :: bottom_coeff_step = -1.0_wp
+    !> Time-averaged bottom injection velocity over configured intervals.
     REAL(wp) :: bottom_vel_step = -1.0_wp
+    !> Time-averaged radial lateral injection window coefficient.
     REAL(wp) :: lateral_coeff_step = -1.0_wp
+    !> Time-averaged injection window for each configured fissure.
     REAL(wp), ALLOCATABLE :: fissure_coeff_step(:)
 CONTAINS
+    !> @brief Compute average injection-window coefficients over one physical interval.
+    !> @details Reuses configured periodic, fissural, radial and tabulated
+    !>          injection windows; returns unchanged for nonpositive durations.
+    !> @param[in] time Beginning of the integration interval [s].
+    !> @param[in] dt Integration interval duration [s].
     SUBROUTINE set_source_time_coefficients( time , dt )
 
         USE parameters_2d, ONLY : time_param , bottom_radial_source_flag ,          &
@@ -65,7 +75,7 @@ CONTAINS
     END SUBROUTINE set_source_time_coefficients
 
     !******************************************************************************
-    !> \brief Mean of a periodic source window over [v0, v0+dt].
+    !> @brief Mean of a periodic source window over [v0, v0+dt].
     !>
     !> In each period the coefficient rises over the ramp (linearly, or as a half
     !> cosine), is 1 until act-ramp, falls to 0 at act and stays 0 to the end of
@@ -139,7 +149,7 @@ CONTAINS
     END FUNCTION window_mean
 
     !******************************************************************************
-    !> \brief Integral of one period of a source window between a and b.
+    !> @brief Integral of one period of a source window between a and b.
     !>
     !> Each segment is integrated in closed form, with the cosine ramps written as
     !> sin/cos products so that short intervals lose no precision.
@@ -216,7 +226,7 @@ CONTAINS
     END FUNCTION window_integral
 
     !******************************************************************************
-    !> \brief Mean velocity of the bottom radial source intervals over a step.
+    !> @brief Mean velocity of the bottom radial source intervals over a step.
     !>
     !> Interval i holds VEL_INTERVALS(i) from T_INTERVALS(i) to T_INTERVALS(i+1),
     !> the last one to the end of the run; before T_INTERVALS(1) the source is
