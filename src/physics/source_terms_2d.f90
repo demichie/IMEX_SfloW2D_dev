@@ -253,7 +253,6 @@ CONTAINS
     IF (SIZE(group%source_names)/=1) RETURN
     selected_model_name=TRIM(group%source_names(1))
     IF (INDEX(selected_model_name,'rheology_')==1) THEN
-      IF (rheology_flag) THEN
 
         CALL real_physical_state_from_q(q_before, physical_state, &
              context%Bprime_x,context%Bprime_y,context%Bsecond_xx, &
@@ -278,7 +277,6 @@ CONTAINS
           RETURN
         END IF
         q_after(2:3)=q_before(1)*velocity_after
-      END IF
       status=0
 
     ELSE IF (selected_model_name=='thermal_cooling') THEN
@@ -403,7 +401,7 @@ CONTAINS
             0.0_wp, 0.0_wp, 0.0_wp)
     END IF
 
-    IF (rheology_flag .AND. selected_rheology) THEN
+    IF (selected_rheology) THEN
 
        CALL eval_rheology_implicit([selected_model_name], physical_state, &
             stochastic_flag, Zij, source_term(2:3))
@@ -534,7 +532,7 @@ CONTAINS
        ! Source rates are evaluated at the same unmodified stage state.
        ! The construction of EXPLICIT stays inside each physical module.
        active_rheology=group_rheology_name(group)
-       IF (rheology_flag .AND. LEN_TRIM(active_rheology)>0 .AND. &
+       IF (LEN_TRIM(active_rheology)>0 .AND. &
             r_h>dry_thickness_tolerance) THEN
           CALL eval_rheology_explicit([active_rheology], physical_state, &
                grav_coeff, pore_pressure_flag, &
