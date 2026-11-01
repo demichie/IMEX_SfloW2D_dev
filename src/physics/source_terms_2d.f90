@@ -68,13 +68,14 @@ CONTAINS
 
   !> Assemble and limit a complete explicit Lie group, without committing state.
   SUBROUTINE assemble_lie_explicit_transaction(j,k,qp_eval,q_recipient,dt,t,group, &
-       inventory,rate,transfer,has_exchange,valid)
+       inventory,rate,transfer,has_exchange,valid,stochastic_value)
     USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
     USE geometry_2d, ONLY : B_zone,B_prime_x_geom,B_prime_y_geom,cell_source_fractions
     INTEGER, INTENT(IN) :: j,k
     REAL(wp), INTENT(IN) :: qp_eval(n_vars+2),q_recipient(n_eqns),dt,t
     TYPE(source_group_type), INTENT(IN) :: group
     REAL(wp), INTENT(IN) :: inventory(n_solid)
+    REAL(wp), INTENT(IN) :: stochastic_value
     REAL(wp), INTENT(OUT) :: rate(n_eqns)
     TYPE(mass_exchange_rates_type), INTENT(OUT) :: transfer
     LOGICAL, INTENT(OUT) :: has_exchange,valid
@@ -88,7 +89,7 @@ CONTAINS
     physical=0.0_wp
     exchange=0.0_wp
     IF (SIZE(non_exchange%source_names)>0) &
-         CALL eval_cell_source_explicit(j,k,qp_eval,t,non_exchange,physical)
+         CALL eval_cell_source_explicit(j,k,qp_eval,t,non_exchange,physical,stochastic_value)
     IF (has_exchange) THEN
        CALL eval_source_explicit(qp_eval,B_zone(j,k), &
             B_prime_x_geom(j,k),B_prime_y_geom(j,k),inventory,dt,transfer,exchange)
@@ -180,13 +181,13 @@ CONTAINS
   END SUBROUTINE limit_explicit_source_rates
 
   ! Cell-local physical source adapters use the same geometric fields.
-  SUBROUTINE eval_cell_source_explicit(j,k,qp_cell,time,group,rate)
+  SUBROUTINE eval_cell_source_explicit(j,k,qp_cell,time,group,rate,stochastic_value)
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &
          B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff, &
          cell_source_fractions,cell_fissure_fractions,cell_arc_perim, &
          cell_arc_n_x,cell_arc_n_y,dx,dy
     INTEGER, INTENT(IN) :: j,k
-    REAL(wp), INTENT(IN) :: qp_cell(n_vars+2),time
+    REAL(wp), INTENT(IN) :: qp_cell(n_vars+2),time,stochastic_value
     TYPE(source_group_type), INTENT(IN) :: group
     REAL(wp), INTENT(OUT) :: rate(n_eqns)
     CALL eval_source_explicit(B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
@@ -194,7 +195,7 @@ CONTAINS
          B_second_yy_geom(j,k),grav_coeff(j,k),qp_cell,rate,time, &
          cell_source_fractions(j,k),cell_fissure_fractions(j,k,:), &
          cell_arc_perim(j,k),cell_arc_n_x(j,k),cell_arc_n_y(j,k), &
-         dx*dy,group)
+         dx*dy,group,stochastic_value)
   END SUBROUTINE eval_cell_source_explicit
 
   FUNCTION cell_analytic_source_context(j,k,Zij) RESULT(context)
@@ -441,7 +442,7 @@ CONTAINS
   SUBROUTINE eval_geometry_cell_source_explicit( Bprimej_x, Bprimej_y, Bsecondj_xx , Bsecondj_xy , &
        Bsecondj_yy, grav_coeff, qpj, expl_term, time, cell_fract_jk,             &
        cell_fissure_fract,                                                       &
-       lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group )
+       lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, group, stochastic_value )
 
     USE parameters_2d, ONLY : vel_source , T_source , xs_source , xg_source,    &
          time_param , bottom_radial_source_flag,                    &
@@ -476,6 +477,7 @@ CONTAINS
     REAL(wp), INTENT(IN) :: lat_n_y_jk
     REAL(wp), INTENT(IN) :: cell_area_jk
     TYPE(source_group_type), INTENT(IN) :: group
+    REAL(wp), INTENT(IN) :: stochastic_value
 
     REAL(wp) :: r_h          !< real-value flow thickness
     REAL(wp) :: r_u          !< real-value x-velocity
@@ -544,7 +546,7 @@ CONTAINS
             r_h>dry_thickness_tolerance) THEN
           CALL eval_rheology_explicit([active_rheology], physical_state, &
                grav_coeff, pore_pressure_flag, &
-               stochastic_flag, 0.0_wp, rheology_rate)
+               stochastic_flag, stochastic_value, rheology_rate)
           expl_term(2:3)=expl_term(2:3)+rheology_rate
         END IF
         IF (thermal_cooling_flag .AND. group_contains_name(group,'thermal_cooling')) THEN

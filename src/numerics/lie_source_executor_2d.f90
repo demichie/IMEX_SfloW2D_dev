@@ -151,7 +151,7 @@ CONTAINS
           CASE(SOURCE_METHOD_EXPLICIT)
              CALL assemble_lie_explicit_transaction(j,k,qpentry,q_group(1:n_eqns,j,k), &
                   time_step,source_time,groups(group_index),state%erodible(1:n_solid,j,k), &
-                  total_rate,transfers,with_exchange,ok)
+                  total_rate,transfers,with_exchange,ok,noise)
              IF (.NOT.ok) THEN
                 CALL reject_cell('D19: physical source transaction rejected')
                 EXIT cell_loop
