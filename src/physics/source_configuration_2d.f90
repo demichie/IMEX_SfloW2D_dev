@@ -7,8 +7,6 @@
 MODULE source_configuration_2d
   USE source_catalog_2d
   USE source_registry_2d, ONLY : source_registry_type, source_group_type
-  USE equation_metadata_2d, ONLY : equation_partition_type, &
-       IM_GROUP_METHOD_ANALYTIC, IM_GROUP_METHOD_NEWTON
   USE source_input_2d
   USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag
   USE parameters_2d, ONLY : wp, n_eqns, rheology_flag, rheology_model, &
@@ -79,19 +77,16 @@ CONTAINS
   END SUBROUTINE collect_active_source_names
 
   !> Create Lie groups directly from physical METHOD and GROUP configuration.
-  SUBROUTINE initialize_configured_sources(registry,partition,error)
+  SUBROUTINE initialize_configured_sources(registry,error)
     TYPE(source_registry_type), INTENT(INOUT) :: registry
-    TYPE(equation_partition_type), INTENT(INOUT) :: partition
     CHARACTER(*), INTENT(OUT) :: error
     TYPE(source_group_type), ALLOCATABLE :: groups(:)
     TYPE(source_group_type) :: g,tmp
     TYPE(source_term_type) :: term
     CHARACTER(LEN=64), ALLOCATABLE :: names(:)
     CHARACTER(LEN=16) :: requested_method
-    INTEGER :: i,j,k,id,method,target,pore,n,eq,affected_idx
+    INTEGER :: i,j,k,id,method,target,pore,n,affected_idx
     INTEGER, ALLOCATABLE :: affected(:)
-    INTEGER :: membership(n_eqns)
-    LOGICAL :: mask(n_eqns)
     CALL collect_active_source_names(thermal_cooling_flag,names,error)
     IF (LEN_TRIM(error)>0) RETURN
     ALLOCATE(groups(1))
@@ -229,24 +224,6 @@ CONTAINS
     END DO
     pore=0
     IF (pore_pressure_flag) pore=idx_pore
-    mask=.FALSE.
-    membership=0
-    DO i=1,SIZE(groups)
-      IF (groups(i)%method/=SOURCE_METHOD_NEWTON) CYCLE
-      DO j=1,SIZE(groups(i)%equation_ids)
-        eq=groups(i)%equation_ids(j)
-        IF (eq<1 .OR. eq>n_eqns) THEN
-          error='D19: invalid implicit equation'; RETURN
-        END IF
-        mask(eq)=.TRUE.
-        membership(eq)=1
-      END DO
-    END DO
-    IF (ANY(mask)) THEN
-      CALL partition%initialize(mask,membership,[IM_GROUP_METHOD_NEWTON])
-    ELSE
-      CALL partition%initialize(mask,membership,[INTEGER::])
-    END IF
     CALL registry%initialize(n_eqns,pore,groups,error)
   END SUBROUTINE initialize_configured_sources
 

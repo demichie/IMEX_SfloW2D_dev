@@ -14,7 +14,6 @@ MODULE nonlinear_solver_2d
 
   USE parameters_2d, ONLY : wp, n_eqns, n_vars, verbose_level
 
-  USE equation_metadata_2d, ONLY : equation_partition_type
 
   USE source_registry_2d, ONLY : source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_METHOD_NEWTON, &
@@ -39,10 +38,9 @@ MODULE nonlinear_solver_2d
 CONTAINS
 
   !> Solve one full backward-Euler Lie group without RK coefficients.
-  SUBROUTINE solve_backward_euler_group(equation_partition,source_group, &
+  SUBROUTINE solve_backward_euler_group(source_group, &
        q_cell,dt,Bprime_x,Bprime_y,stochastic_value, &
        iterations_used,converged,linear_info,line_search_failed)
-    TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     TYPE(source_group_type), INTENT(IN) :: source_group
     REAL(wp), INTENT(INOUT) :: q_cell(n_vars)
     REAL(wp), INTENT(IN) :: dt,Bprime_x,Bprime_y,stochastic_value
@@ -50,7 +48,7 @@ CONTAINS
     LOGICAL, INTENT(OUT) :: converged,line_search_failed
     REAL(wp) :: q_in(n_vars)
     q_in=q_cell
-    CALL solve_implicit_groups(equation_partition,[source_group],q_cell,q_in, &
+    CALL solve_implicit_groups([source_group],q_cell,q_in, &
          dt,Bprime_x,Bprime_y,0.0_wp,0.0_wp,0.0_wp,0.0_wp, &
          stochastic_value,iterations_used,converged,linear_info,line_search_failed)
   END SUBROUTINE solve_backward_euler_group
@@ -77,7 +75,6 @@ CONTAINS
 
   !> \brief Apply ordered cell-local source groups using Newton or analytic flows.
   !>
-  !> \param[in] equation_partition Explicit/implicit equation mask and compact index maps.
   !> \param[in] lie_groups Validated ordered Lie source groups; explicit groups are skipped.
   !> \param[in,out] qj Local conservative state vector; mass and momenta are per unit horizontal
   !>                   area.
@@ -97,7 +94,7 @@ CONTAINS
   !> \param[out] line_search_failed True when backtracking fails to accept a step.
   !******************************************************************************
 
-  SUBROUTINE solve_implicit_groups(equation_partition, lie_groups, &
+  SUBROUTINE solve_implicit_groups(lie_groups, &
        qj, q_group_input, dt_step,                                                  &
 Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
        Bsecondj_yy, grav_coeff, Zij,                                         &
@@ -109,7 +106,6 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
 
     IMPLICIT NONE
 
-    TYPE(equation_partition_type), INTENT(IN) :: equation_partition
     TYPE(source_group_type), INTENT(IN) :: lie_groups(:)
     REAL(wp), INTENT(INOUT) :: qj(n_vars)
     REAL(wp), INTENT(IN) :: q_group_input(n_vars)
@@ -142,10 +138,7 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
     linear_info = 0
     line_search_failed = .FALSE.
 
-    IF (.NOT. equation_partition%is_initialized() .OR.                     &
-         equation_partition%n_equations .NE. n_eqns .OR.                   &
-         n_eqns .NE. n_vars .OR. equation_partition%n_implicit .GT. n_vars .OR. &
-         (equation_partition%n_IM_groups>0 .AND. SIZE(lie_groups)==0)) THEN
+    IF (n_eqns /= n_vars .OR. SIZE(lie_groups)==0) THEN
        linear_info = -1
        RETURN
     END IF
@@ -168,12 +161,7 @@ Bprimej_x, Bprimej_y, Bsecondj_xx, Bsecondj_xy, &
     analytic_context%grav_coeff=grav_coeff
     analytic_context%Zij=Zij
 
-    ! Explicit equations have no current-group implicit source and are solved
-    ! directly before the ordered implicit-group sweep.
-    DO i = 1, equation_partition%n_explicit
-       equation = equation_partition%explicit_map(i)
-       qj(equation) = q_known(equation)
-    END DO
+    ! All non-group equations remain at the incoming group state.
 
     DO group = 1, SIZE(lie_groups)
        IF (lie_groups(group)%method==SOURCE_METHOD_EXPLICIT) CYCLE

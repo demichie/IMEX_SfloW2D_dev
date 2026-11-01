@@ -37,7 +37,6 @@ CONTAINS
          analytic_term_context_type
     USE source_catalog_2d, ONLY : SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_EXPLICIT, &
          SOURCE_METHOD_NEWTON
-    USE equation_metadata_2d, ONLY : equation_partition_type,IM_GROUP_METHOD_NEWTON
     USE nonlinear_solver_2d, ONLY : solve_backward_euler_group
     USE state_conversion_2d, ONLY : qc_to_qp
     USE state_2d, ONLY : initialize_dry_physical_cell
@@ -47,7 +46,6 @@ CONTAINS
     TYPE(source_group_type) :: other_sources
     TYPE(mass_exchange_rates_type) :: transfers
     TYPE(analytic_term_context_type) :: analytic_context
-    TYPE(equation_partition_type) :: local_partition
     REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(INOUT) :: qp(n_vars+2,comp_cells_x,comp_cells_y)
     REAL(wp), INTENT(IN) :: time_step
@@ -65,9 +63,9 @@ CONTAINS
     REAL(wp) :: physical_rate(n_eqns),exchange_rate(n_eqns),total_rate(n_eqns)
     REAL(wp) :: analytic_rate(n_eqns),factor,coverage,pressure,source_time,noise
     REAL(wp) :: remaining_mass,change_in_solid
-    LOGICAL :: with_exchange,has_other,implicit_mask(n_eqns),ok,failed,bed_accepted,conversion_ok
+    LOGICAL :: with_exchange,has_other,ok,failed,bed_accepted,conversion_ok
     INTEGER :: group_index,cell,j,k,i,solid_eq,status,iterations,linear_info
-    INTEGER :: membership(n_eqns)
+
     CHARACTER(LEN=96) :: context
     CHARACTER(LEN=256) :: failure_reason
 
@@ -94,13 +92,6 @@ CONTAINS
        has_other=SIZE(other_sources%source_names)>0
        IF (.NOT.has_other .AND. .NOT.with_exchange) CYCLE
 
-       IF (groups(group_index)%method==SOURCE_METHOD_NEWTON) THEN
-          implicit_mask=.FALSE.
-          implicit_mask(groups(group_index)%equation_ids)=.TRUE.
-          membership=0
-          WHERE (implicit_mask) membership=1
-          CALL local_partition%initialize(implicit_mask,membership,[IM_GROUP_METHOD_NEWTON])
-       END IF
        IF (with_exchange .AND. topo_change_flag) CALL begin_topography_rate_update
 
        cell_loop: DO cell=1,domain%solve_cells
@@ -283,7 +274,7 @@ CONTAINS
              q(1:n_vars,j,k)=q(1:n_vars,j,k)+time_step*analytic_rate(1:n_vars)
           CASE(SOURCE_METHOD_NEWTON)
              IF (q(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
-             CALL solve_backward_euler_group(local_partition,groups(group_index), &
+             CALL solve_backward_euler_group(groups(group_index), &
                   q(:,j,k),time_step,B_prime_x_geom(j,k),B_prime_y_geom(j,k), &
                   noise,iterations,ok,linear_info,failed)
              IF (.NOT.ok .OR. failed .OR. linear_info/=0) THEN
@@ -325,7 +316,6 @@ CONTAINS
           END IF
        END DO cell_loop
        IF (step_failed) THEN
-          IF (groups(group_index)%method==SOURCE_METHOD_NEWTON) CALL local_partition%finalize()
           IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
           RETURN
        END IF
@@ -337,11 +327,10 @@ CONTAINS
              RETURN
           END IF
        END IF
-       IF (groups(group_index)%method==SOURCE_METHOD_NEWTON) CALL local_partition%finalize()
     END DO
   CONTAINS
     ! Return a recoverable cell/group rejection without leaving the executor
-    ! before the Newton partition is finalized by the caller loop.
+    ! before returning the source-group status.
     SUBROUTINE reject_cell(message)
       CHARACTER(*), INTENT(IN) :: message
       failure_reason=message

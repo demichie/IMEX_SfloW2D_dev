@@ -16,7 +16,6 @@ MODULE simulation_2d
   USE source_configuration_2d, ONLY : initialize_configured_sources
   USE diagnostics_2d, ONLY : fatal_error
 
-  USE equation_metadata_2d, ONLY : equation_partition_type
   USE model_layout_2d, ONLY : model_layout_type
 
   USE parameters_2d, ONLY : wp, n_layers, n_vars, n_eqns, n_solid, n_add_gas, &
@@ -172,7 +171,6 @@ CONTAINS
     CALL finalize_nonlinear_solver
 
     CALL this%source_registry%finalize()
-    CALL this%equation_partition%finalize
     CALL this%model_layout%finalize
     CALL this%stochastic%finalize
     CALL release_topography_workspace

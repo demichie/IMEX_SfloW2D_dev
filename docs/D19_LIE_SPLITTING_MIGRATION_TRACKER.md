@@ -45,6 +45,8 @@ For every Lie source group whose configured method is **NEWTON**, define the con
 
 **Metadata implementation (2026-11-01):** The catalog exposes `source_newton_affected_equations(name)`; group configuration forms a unique union and the registry rejects missing/extra indices. Currently Newton-capable rheology changes both momenta, and cooling changes energy; pore-pressure dissipation is analytic-only and therefore never entered in a Newton group. Any new Newton-capable process with mass or multi-equation exchange must declare its full conservative rate footprint here before enabling its capability.
 
+**Cleanup 2026-11-01:** Removed duplicated simulation-global and executor-local equation partitions from the production Lie/Newton call path. `source_group%equation_ids` now provides the index set directly; `equation_metadata_2d.f90` remains for the final legacy/test reference audit. No intermediate compilation or tests.
+
 ## 2. Scope: KEEP / CHANGE / DELETE inventory
 
 Based on static inspection of the branch at the planning stage. **All code operations below are pending.** File-specific names must be audited for remaining references before deleting.
@@ -76,7 +78,7 @@ Use statuses `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Add date, commit and test
 | L00 | Baseline: record build/CI result and search all callers/namelists/restarts/tests for RK, STAGE, STEP and CADENCE | TODO | Static inventory above is not a complete call-graph/test audit. |
 | L01 | Single method-capable source-group registry and validation, including always-explicit GROUP 0 | IN_PROGRESS | Single Lie registry implemented; final validation pending. |
 | L02 | Remove CADENCE from catalog, source configuration, source input and I/O | IN_PROGRESS | Production configuration and input moved away from STAGE/STEP; examples and tests pending. |
-| L03 | Implement RK-independent group-local backward-Euler Newton API and analytic dispatcher | IN_PROGRESS | Catalog now declares Newton structurally affected conservative indices; configuration unions indices without duplicates and registry verifies exact set. Newton core cleanup and coupled physical rate audit remain. |
+| L03 | Implement RK-independent group-local backward-Euler Newton API and analytic dispatcher | IN_PROGRESS | Catalog defines structurally affected indices and validates exact unions; removed redundant global and local equation partitions from production Lie Newton. Final reference and coupled-rate audit remain. |
 | L04 | Generic explicit/NEWTON/ANALYTIC source-group executor | IN_PROGRESS | Newton and analytic solver failures now propagate via status and trigger rollback of geometry and inventories; other fatal validation paths and retry policy remain. |
 | L05 | Lie time driver with GROUP-0 spatial update, source rates evaluated on `q_n`, source-rate limits applied to `q_sp`, then GROUP 1+ | IN_PROGRESS | Fluid q/qp now advance in trial workspaces and publish after all Lie groups return; substrate/topography transaction and final acceptance remain pending. |
 | L06 | Simplify production timestep, observers, diagnostics and stochastic/source-window plumbing | IN_PROGRESS | Removed RK_COMPLETE observer and unused global equation partition from Lie driver; tests and events still require final review. |
