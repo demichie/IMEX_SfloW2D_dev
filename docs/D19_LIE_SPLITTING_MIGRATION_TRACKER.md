@@ -23,6 +23,26 @@ The spatial finite-volume operator always belongs to **GROUP 0**, which is alway
 
 There is no `STAGE`/`STEP` source cadence, global IMEX-RK tableau, DIRK stage diagonal, interstage RK rates or Strang option.
 
+## 1.1. Frozen Newton unknown-set contract (decision 2026-11-01)
+
+For every Lie source group whose configured method is **NEWTON**, define the conservative equation index set
+
+`I_G = { i : the group's source rate S_G,i(q) is structurally nonzero }`.
+
+**Structural** means that the source process can produce a nonzero contribution to that conservative equation for an admissible physical state; a rate that happens to evaluate to zero in the current cell does **not** remove the equation from `I_G`. For a group containing multiple sources, `I_G` is the union of all equations potentially modified by any constituent source, including induced total mass, momentum, thermal energy, gas, solid and transported-variable changes. Do not infer the set by sampling rate values or by looking only at the process's primary physical quantity.
+
+1. Solve **all and only** equations in `I_G` simultaneously using backward Euler, with complete conservative candidate `q` supplied to the existing physical source-rate evaluator:
+   `F_i(q) = q_i - q_in,i - dt*S_G,i(q) = 0` for every `i in I_G`.
+2. All other conservative equations remain exactly at their incoming group values: `q_j=q_in,j` for `j not in I_G`, even if the rates in `I_G` depend on these fixed values.
+3. Assemble the complex-step Jacobian on **rows and columns indexed by `I_G`**: `J_ij = delta_ij - dt*dS_G,i/dq_j`, `i,j in I_G`. Extract these entries with the equation-index maps already used in the solver; do **not** physically permute the global state/Jacobian.
+4. **Do not eliminate additional nonzero-rate equations** merely to reduce the Newton dimension. In particular, no physics-specific reconstructed-variable equations, assumed zero off-diagonal blocks, general Schur-complement or block-factorization framework are required. A coupled process that changes solid mass, total mass, momentum and energy solves all affected conservative equations, not only the solid-mass unknown.
+5. The numerical Newton solver remains **physics-agnostic**: it accepts a validated group, its complete structurally affected equation indices, the generic real/complex source-rate evaluators and numerical parameters. The catalog/registry/configuration layer supplies and validates the affected-equation set. It must include coupled secondary conservative changes and must not be defined by whichever variables appear convenient as Newton unknowns.
+6. Check convergence and full backward-Euler residual on every equation in `I_G`; verify that equations outside `I_G` remain unchanged. Preserve existing small dense linear solvers, pivoting, line search, complex-step differentiation, failure reporting and physical admissibility checks.
+
+**Example:** if sedimentation can remove a solid constituent and therefore affect total mixture mass, both momenta and thermal energy, all those conservative equations belong to `I_G`, even though the process is driven by solid loss. This contract avoids deriving process-specific analytic reconstruction rules and keeps the solver independent of physical models.
+
+**Implementation audit:** check that each source catalog's declared affected-equation indices cover **all** structurally nonzero conservative rates, including indirect coupled contributions. Confirm that `source_group%equation_ids` represents this full union before simplifying `nonlinear_solver_2d.f90`.
+
 ## 2. Scope: KEEP / CHANGE / DELETE inventory
 
 Based on static inspection of the branch at the planning stage. **All code operations below are pending.** File-specific names must be audited for remaining references before deleting.
@@ -30,9 +50,9 @@ Based on static inspection of the branch at the planning stage. **All code opera
 | Path | DELETE (RK/cadence-only) | CHANGE / KEEP |
 | --- | --- | --- |
 | `src/numerics/time_integration_2d.f90` | `n_RK` handling, `validate_runge_kutta_stages`, Butcher tableaux (`a_tilde_ij`, `a_dirk_ij`, weights), `q_rk`, `qp_rk`, `EX_terms`, `IM_terms`, stage-indexed `spatial_terms`, stage loops, `imex_RK_solver`, RK observer events | Implement Lie driver, preserve `q_n` through GROUP 0, one spatial update, independent spatial admissibility, group-0 source-only limiter/update, then group loop and post-group checks. Keep only needed spatial/source workspaces. |
-| `src/numerics/nonlinear_solver_2d.f90` | `solve_imex_stage`, RK-only `solve_rk_step` adapters, `effective_im_term`, `a_diag`, `known_stage_residual`/`Rj_not_impl`, `n_RK==4` tolerance special-case | Retain reduced conservative-variable Newton, complex-step Jacobian, line search, diagnostics and model interfaces. Backward-Euler group residual `F(q_out)=q_out-q_in-dt*S(q_out)`. Preserve correct triangular treatment or expand unknown set when excluded components have nonzero coupled sources. |
+| `src/numerics/nonlinear_solver_2d.f90` | `solve_imex_stage`, RK-only `solve_rk_step` adapters, `effective_im_term`, `a_diag`, `known_stage_residual`/`Rj_not_impl`, `n_RK==4` tolerance special-case | Retain reduced conservative-variable Newton, complex-step Jacobian, line search, diagnostics and model interfaces. Backward-Euler group residual `F(q_out)=q_out-q_in-dt*S(q_out)`. The Newton unknown set is exactly the union of structurally nonzero conservative source-rate equations; do not eliminate coupled nonzero-rate components or introduce model-specific reconstruction. |
 | `src/numerics/source_catalog_2d.f90` | `SOURCE_CADENCE_STAGE/STEP`, `default_cadence` | Retain physical source catalog, capabilities and `SOURCE_METHOD_*` metadata. Model/method compatibility remains validated. |
-| `src/numerics/source_registry_2d.f90` | Group `cadence` field; separate `stage_entries`/`step_entries`; `stage_groups()`/`step_groups()`; stage/step-only validation and placeholders | Single ordered group registry with group ID, method, source names, numerical unknown equations as needed; GROUP-0 EXPLICIT validation and no repeated source application. |
+| `src/numerics/source_registry_2d.f90` | Group `cadence` field; separate `stage_entries`/`step_entries`; `stage_groups()`/`step_groups()`; stage/step-only validation and placeholders | Single ordered group registry with group ID, method, source names, full set of structurally affected conservative equations for Newton; GROUP-0 EXPLICIT validation and no repeated source application. |
 | `src/numerics/source_input_2d.f90` | Every `*_cadence` variable, namelist entry, parsing and validation | Retain `METHOD`, `GROUP`, physical coefficients and active-model selection; revise input documentation. |
 | `src/physics/source_configuration_2d.f90` | Two-list `stages`/`steps` builder, stage ordering, post-RK ordering, forced empty explicit-stage descriptor, cadence validation | Build one normalized group list; keep independent model method validation and physical grouping restrictions. |
 | `src/numerics/step_source_executor_2d.f90` | Post-RK `execute_step_source_groups` scheduling and special-case RK adapter calls | Refactor into generic group executor, possibly rename. **Preserve** atomic mass-exchange transactions, `apply_mass_exchange_increment`, deposits/erosion/erodible inventory and topography updates. |
@@ -54,7 +74,7 @@ Use statuses `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Add date, commit and test
 | L00 | Baseline: record build/CI result and search all callers/namelists/restarts/tests for RK, STAGE, STEP and CADENCE | TODO | Static inventory above is not a complete call-graph/test audit. |
 | L01 | Single method-capable source-group registry and validation, including always-explicit GROUP 0 | IN_PROGRESS | Single Lie registry implemented; final validation pending. |
 | L02 | Remove CADENCE from catalog, source configuration, source input and I/O | IN_PROGRESS | Production configuration and input moved away from STAGE/STEP; examples and tests pending. |
-| L03 | Implement RK-independent group-local backward-Euler Newton API and analytic dispatcher | IN_PROGRESS | Renamed internal group/input-state symbols and removed misleading stage/DIRK documentation; numerical coupling review pending. |
+| L03 | Implement RK-independent group-local backward-Euler Newton API and analytic dispatcher | IN_PROGRESS | Frozen Newton contract: solve every structurally nonzero-rate conservative equation in each group, hold all other equations fixed, index reduced Jacobian directly, no Schur complement or physics-specific reconstruction; catalog/index audit and implementation pending. |
 | L04 | Generic explicit/NEWTON/ANALYTIC source-group executor | IN_PROGRESS | Newton and analytic solver failures now propagate via status and trigger rollback of geometry and inventories; other fatal validation paths and retry policy remain. |
 | L05 | Lie time driver with GROUP-0 spatial update, source rates evaluated on `q_n`, source-rate limits applied to `q_sp`, then GROUP 1+ | IN_PROGRESS | Fluid q/qp now advance in trial workspaces and publish after all Lie groups return; substrate/topography transaction and final acceptance remain pending. |
 | L06 | Simplify production timestep, observers, diagnostics and stochastic/source-window plumbing | IN_PROGRESS | Removed RK_COMPLETE observer and unused global equation partition from Lie driver; tests and events still require final review. |
@@ -71,7 +91,7 @@ Recommended implementation order is L00–L07, followed by L08–L09; isolated c
 - **GROUP-0 limited source update:** multiple processes competing for the same inventory jointly limited using separate contributions; apply once, verify acceptance and no double counting; handle source demands whose full `dt` increment cannot fit in `q_sp`.
 - **Sequential groups:** each GROUP 1+ sees its immediate predecessor's accepted state; full `dt` per group; clock increment once. Changing group order changes only the expected splitting result.
 - **Method freedom:** test EXPLICIT, NEWTON and ANALYTIC for the same physical family when each is supported; reject unsupported combinations, including non-explicit GROUP 0.
-- **Newton:** residual `q_out-q_in-dt*S(q_out)`, complex-step Jacobian, reduced unknowns, failure reporting, no unphysical post-solve rate projection.
+- **Newton:** residual `q_out-q_in-dt*S(q_out)` on the **complete structurally affected conservative equation set**; verify coupled mass, constituent, momentum and energy rates are not omitted; inactive equations remain fixed; complex-step Jacobian on the same index rows/columns; failure reporting and no unphysical post-solve rate projection.
 - **Analytic:** physical output applied once with no RK weighting, including complete Darcy conservative gas/mass/momentum/energy/pore-pressure updates when the model prescribes them.
 - **Mass exchange:** same physically limited transfers applied to fluid, deposit, erosion, erodible substrate and optional changing topography, with coherent failure/commit.
 - **Physical regressions:** dry/wet transitions, hydrostatic balance, gravity/friction equilibrium, injection timing, stochastic forcing, OpenMP and boundary conditions.
@@ -83,6 +103,7 @@ Do not claim that first-order Lie is unconditionally stable or well-balanced for
 
 | Date | Change | Commit | Checks executed | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-11-01 | Froze the physics-agnostic Newton unknown set: every conservative equation with structurally nonzero source rate, indexed directly without permutation or Schur complement; untouched equations fixed. | Pending commit | Design decision documented; implementation and final tests pending | Audit source catalog's affected-equation maps for coupled changes before Newton simplification. |
 | 2026-11-01 | Added source-group entry validation for primitive states, stochastic values, terrain slopes/curvatures/gravity and erodible inventories before physical kernel calls; kept unsupported model/method errors fatal configuration errors. | Pending commit | Static review only; no build/tests | Kernel-internal arithmetic errors remain possible and require physical-specific status interfaces or final validation. |
 | 2026-11-01 | Propagated detailed source-group rejection messages (including Newton/analytic diagnostics and bed projection) through Lie rollback, with finite analytic-rate validation. | Pending commit | Static review only; compilation deferred | Underlying physical kernels may still terminate directly; exhaustive failure-path audit remains. |
 | 2026-11-01 | Snapshot and restore exact derived topography caches alongside B_vertex, avoiding reconstruction during rollback when reconstruction itself may be invalid. | Pending commit | Static review only; tests/build deferred | Fatal errors within physical kernels and full retry remain outside this change. |
