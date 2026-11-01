@@ -118,3 +118,9 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - `state%snapshot_substrate` e `state%restore_substrate` possiedono la cattura e il ripristino degli inventari; il ripristino sincronizza anche i campi aggregati.
 - `time_integration_2d` non conserva piu quattro copie indipendenti: orchestra la transazione dello stato e quella della geometria, mantenendo separata la topografia.
 - Adeguate le diagnostiche test del mass exchange. Restano la verifica integrale dei test legacy e la compilazione finale concordata.
+
+### Correzione critica di atomicita dei gruppi (2026-11-01)
+
+- Audit del dispatcher Lie: il ramo ANALYTIC scriveva direttamente nel vettore `q` autorevole, anziche nel candidato `q_group`. Corretto per aggiornare solo `q_group(1:n_eqns,j,k)` prima dei controlli di ammissibilita e della conversione; il commit dei campi `q` e `qp` rimane alla fine del gruppo, come per EXPLICIT e NEWTON.
+- Verificato staticamente che `solve_backward_euler_group` opera sul `q_group` passatogli per riferimento.
+- Nessuna compilazione o test ancora eseguiti, secondo il piano.

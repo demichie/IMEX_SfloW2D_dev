@@ -220,7 +220,9 @@ CONTAINS
                 CALL reject_cell('D19: analytic source returned non-finite rate')
                 EXIT cell_loop
              END IF
-             q(1:n_vars,j,k)=q(1:n_vars,j,k)+time_step*analytic_rate(1:n_vars)
+             ! The analytic method must update the group candidate only.
+             ! Publishing q here would bypass the atomic group commit.
+             q_group(1:n_eqns,j,k)=q_group(1:n_eqns,j,k)+time_step*analytic_rate
           CASE(SOURCE_METHOD_NEWTON)
              IF (q_group(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
              CALL solve_backward_euler_group(groups(group_index), &
