@@ -21,7 +21,7 @@ clibs=$(nc-config --libs)
 for profile in strict optimized; do
     mkdir -p "$build_dir/$profile"
     cd "$build_dir/$profile"
-    if [ "$profile" = strict ]; then flags='-O0 -g -fcheck=all'; else flags='-Ofast -funroll-all-loops'; fi
+    if [ "$profile" = strict ]; then flags='-O0 -g -fcheck=all'; else flags='-Ofast -funroll-all-loops -fno-finite-math-only'; fi
     for source in $sources; do
         case "$source" in
             *.c) ${CC:-cc} -c "$repo_dir/src/$source" ;;
