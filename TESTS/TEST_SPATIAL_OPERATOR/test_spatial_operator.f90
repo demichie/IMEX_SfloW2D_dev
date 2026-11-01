@@ -9,7 +9,7 @@ PROGRAM test_spatial_operator
   USE state_conversion_2d, ONLY : qp_to_qc
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   USE source_terms_2d, ONLY : eval_source_explicit
-  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT, SOURCE_CADENCE_STAGE
+  USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
   USE source_registry_2d, ONLY : source_group_type
   USE omp_lib
   USE, INTRINSIC :: ieee_arithmetic, ONLY : ieee_is_finite
@@ -45,7 +45,6 @@ PROGRAM test_spatial_operator
   READ(input_unit,*) dx,dy
   CALL initialize_fixture
   explicit_group%method=SOURCE_METHOD_EXPLICIT
-  explicit_group%cadence=SOURCE_CADENCE_STAGE
   explicit_group%source_names=[CHARACTER(LEN=64)::]
   IF (curvature_term_flag) &
        explicit_group%source_names=[CHARACTER(LEN=64)::'geometry_curvature']
@@ -232,7 +231,6 @@ CONTAINS
     one_by_dx=1.0_wp/dx; one_by_dy=1.0_wp/dy
     n_vars=5; n_eqns=5; n_solid=1; n_add_gas=0; n_stoch_vars=0; n_pore_vars=0
     kt_trace_reconstruction = 'froude_blend'
-    n_RK=2
     CALL configure_canonical_state_indices()
     liquid_flag=.TRUE.; gas_flag=.FALSE.; rheology_flag=.FALSE.; rheology_model='none'
     slope_correction_flag=slope/=0; curvature_term_flag=curvature/=0
