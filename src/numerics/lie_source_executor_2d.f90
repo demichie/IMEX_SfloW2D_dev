@@ -22,9 +22,23 @@ MODULE lie_source_executor_2d
 
 CONTAINS
 
-    !> Evaluate and commit one complete Lie source group at a time.
-    !> For GROUP 0, evaluate every physical rate at the original pre-spatial
-    !> state, but cap and apply the combined source increment to the post-FV state.
+    !> @brief Evaluate and commit each ordered Lie physical-source group.
+    !> @details In group zero evaluate source rates using the pre-spatial
+    !>          snapshots but apply their limited increments to the post-FV
+    !>          candidate. Later groups read the previously committed group
+    !>          state; an inadmissible candidate rejects the group transaction.
+    !> @param[in,out] state Owns cell-independent substrate inventories and aggregates.
+    !> @param[in,out] q Conservative cell states (component,x-cell,y-cell).
+    !> @param[in,out] qp Primitive cell states (component,x-cell,y-cell).
+    !> @param[in] time_step Positive Lie substep duration [s].
+    !> @param[in] domain Active cell list and per-cell coordinate lookup.
+    !> @param[in] source_registry Initialized ordered Lie group definitions.
+    !> @param[in] stochastic_values Optional stochastic cell samples.
+    !> @param[in] step_start_time Optional beginning time for time-dependent sources [s].
+    !> @param[in] q_original Pre-spatial conservative snapshot (read-only).
+    !> @param[in] qp_original Pre-spatial primitive snapshot (read-only).
+    !> @param[out] step_failed True when candidate group state is rejected.
+    !> @param[out] failure_message Optional diagnostic describing rejected group.
     SUBROUTINE execute_lie_source_groups(state,q,qp,time_step,domain,source_registry, &
             stochastic_values,step_start_time,q_original,qp_original,step_failed,failure_message)
         USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom, &

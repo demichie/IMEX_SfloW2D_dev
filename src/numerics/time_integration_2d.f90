@@ -97,6 +97,7 @@ CONTAINS
                 CALL initialize_dry_physical_cell(this%qp_before(:,j,k))
             END IF
         END DO
+
         ! The spatial step is conservative; only admissibility is checked.
         CALL spatial_operator%evaluate(this%qp_before,this%spatial_rate,t,domain)
         DO l=1,domain%solve_cells
@@ -105,7 +106,7 @@ CONTAINS
             this%q_trial(1:n_eqns,j,k)=this%q_before(1:n_eqns,j,k)-dt*this%spatial_rate(:,j,k)
             ! Spatial admissibility check. Do not limit or clip its conservative rate.
             IF (.NOT.conservative_mass_admissible(this%q_trial(1:n_eqns,j,k))) &
-            CALL fatal_error('Lie spatial update: inadmissible conservative state')
+                CALL fatal_error('Lie spatial update: inadmissible conservative state')
             IF (this%q_trial(idx_totMassEqn,j,k)>0.0_wp) THEN
                 CALL qc_to_qp(this%q_trial(:,j,k),this%qp_trial(:,j,k),pd,'Lie spatial update',conversion_ok)
                 IF (.NOT.conversion_ok) &
@@ -114,6 +115,7 @@ CONTAINS
                 CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))
             END IF
         END DO
+
         ! GROUP-0 source rates use immutable q^n/qp^n, while applying to post-spatial q.
         ! Later groups evaluate from each predecessor's updated state.
         ! The groups may update live geometry for successor groups; retain the
@@ -129,6 +131,7 @@ CONTAINS
             CALL rollback_geometry_transaction
             CALL fatal_error('Lie timestep rolled back: '//TRIM(source_failure))
         END IF
+
         ! Publish the accepted fluid fields only after all Lie source groups return.
         ! The integrator owns evolving inventories; geometry owns only bed caches.
         state%q=this%q_trial
