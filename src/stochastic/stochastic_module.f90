@@ -1,5 +1,5 @@
 !********************************************************************************
-!> \brief Stochastic module
+!> @brief Evolve stochastic Ornstein-Uhlenbeck fields and their effective rheological values.
 !
 !> This module contains all the procedures for the stochastic variable
 !
@@ -14,10 +14,7 @@
 !********************************************************************************
 
 MODULE stochastic_module
-        USE parameters_2d, ONLY : idx_totMassEqn
-
-    ! external variables
-    USE parameters_2d, ONLY : wp, rheology_model, idx_stoch, idx_u, idx_v
+    USE parameters_2d, ONLY : idx_totMassEqn, wp, rheology_model, idx_stoch, idx_u, idx_v
 
     USE domain_2d, ONLY: domain_type
     USE state_2d, ONLY: state_type
@@ -26,7 +23,7 @@ MODULE stochastic_module
     USE geometry_2d, ONLY : cell_size, comp_cells_x, comp_cells_y
     USE stochastic_random_2d, ONLY : initialize_stochastic_rng, gaussian_noise
 
-    ! variables related to OU process
+    ! Parameters controlling the Ornstein-Uhlenbeck process.
 
     !LOGICAL :: sym_noise_flag ! use symmetric noise or not
 
@@ -37,10 +34,13 @@ MODULE stochastic_module
     !> .
     REAL(wp) :: sym_noise
 
+    !> Ornstein-Uhlenbeck correlation time [s].
     REAL(wp) :: tau_stochastic
 
+    !> Upper and lower standard-deviation bounds for the noise amplitude.
     REAL(wp) :: std_max, std_min
 
+    !> Froude-dependent standard-deviation slope factor.
     REAL(wp) :: std_slope_factor ! Fr_0_stochastic
 
     !> Velocity scale u_0 in the stochastic intensity law.
