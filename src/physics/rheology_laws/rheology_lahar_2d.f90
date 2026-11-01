@@ -32,251 +32,251 @@
 !> velocity source with depth, T and concentration explicit.
 !********************************************************************************
 MODULE rheology_lahar_2d
-    USE diagnostics_2d, ONLY : fatal_error
-    USE parameters_2d, ONLY : wp, sp, four_thirds, neg_four_thirds
-    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
-    USE constitutive_parameters_2d, ONLY : grav, inv_grav
-    USE rheology_parameters_2d, ONLY : T_ref
-    USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                      &
-            fatal_analytic_input_error, solve_exact_velocity_flow,                                 &
-            EXACT_FLOW_QUADRATIC_POLYNOMIAL
-    IMPLICIT NONE
-    PRIVATE
-    PUBLIC :: eval_rheology_lahar_explicit
-    PUBLIC :: eval_rheology_lahar_semi_implicit
-    PUBLIC :: eval_rheology_lahar_implicit
-    PUBLIC :: eval_rheology_lahar_analytic
-    PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
-    PUBLIC :: eval_lahar_fluid_viscosity
-    REAL(wp) :: alpha2
-    REAL(wp) :: beta2
-    REAL(wp) :: alpha1_coeff
-    REAL(wp) :: beta1
-    REAL(wp) :: Kappa
-    REAL(wp) :: n_td
-    REAL(wp) :: n_td2
-    INTERFACE eval_lahar_fluid_viscosity
-        MODULE PROCEDURE eval_lahar_fluid_viscosity_real
-        MODULE PROCEDURE eval_lahar_fluid_viscosity_complex
-    END INTERFACE eval_lahar_fluid_viscosity
+        USE diagnostics_2d, ONLY : fatal_error
+        USE parameters_2d, ONLY : wp, sp, four_thirds, neg_four_thirds
+        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type, complex_state_from_real
+        USE constitutive_parameters_2d, ONLY : grav, inv_grav
+        USE rheology_parameters_2d, ONLY : T_ref
+        USE rheology_analytic_utils_2d, ONLY : validate_analytic_velocity_inputs,                      &
+                fatal_analytic_input_error, solve_exact_velocity_flow,                                 &
+                EXACT_FLOW_QUADRATIC_POLYNOMIAL
+        IMPLICIT NONE
+        PRIVATE
+        PUBLIC :: eval_rheology_lahar_explicit
+        PUBLIC :: eval_rheology_lahar_semi_implicit
+        PUBLIC :: eval_rheology_lahar_implicit
+        PUBLIC :: eval_rheology_lahar_analytic
+        PUBLIC :: alpha2, beta2, alpha1_coeff, beta1, Kappa, n_td, n_td2
+        PUBLIC :: eval_lahar_fluid_viscosity
+        REAL(wp) :: alpha2
+        REAL(wp) :: beta2
+        REAL(wp) :: alpha1_coeff
+        REAL(wp) :: beta1
+        REAL(wp) :: Kappa
+        REAL(wp) :: n_td
+        REAL(wp) :: n_td2
+        INTERFACE eval_lahar_fluid_viscosity
+            MODULE PROCEDURE eval_lahar_fluid_viscosity_real
+            MODULE PROCEDURE eval_lahar_fluid_viscosity_complex
+        END INTERFACE eval_lahar_fluid_viscosity
 
 CONTAINS
-    !> \param[in] state Shared physical state (complex for implicit treatment).
-    !> \brief Evaluate the explicit lahar momentum contribution.
-    !> \details Assemble the real-valued momentum source from the model's supported physical
-    !> treatment contributions; unused model inputs are retained for the shared dispatch interface.
-    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
-    !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
-    !> \param[in] moving Whether the local state is considered moving.
-    !> \param[out] rate Conservative horizontal momentum source vector.
-    SUBROUTINE eval_rheology_lahar_explicit(state, rate)
-        TYPE(physical_state_type), INTENT(IN) :: state
+        !> \param[in] state Shared physical state (complex for implicit treatment).
+        !> \brief Evaluate the explicit lahar momentum contribution.
+        !> \details Assemble the real-valued momentum source from the model's supported physical
+        !> treatment contributions; unused model inputs are retained for the shared dispatch interface.
+        !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
+        !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
+        !> \param[in] moving Whether the local state is considered moving.
+        !> \param[out] rate Conservative horizontal momentum source vector.
+        SUBROUTINE eval_rheology_lahar_explicit(state, rate)
+            TYPE(physical_state_type), INTENT(IN) :: state
 
 
-        REAL(wp), INTENT(OUT) :: rate(2)
-        REAL(wp) :: sx, sy
-        COMPLEX(wp) :: ix, iy
-        TYPE(complex_physical_state_type) :: cs
-        CALL eval_rheology_lahar_semi_implicit(state, &
-             sx, &
-             sy)
-        CALL complex_state_from_real(state, cs)
-        CALL eval_rheology_lahar_implicit(cs, &
-             ix, &
-             iy)
-        rate=[sx,sy]+REAL([ix,iy],wp)
-    END SUBROUTINE eval_rheology_lahar_explicit
+            REAL(wp), INTENT(OUT) :: rate(2)
+            REAL(wp) :: sx, sy
+            COMPLEX(wp) :: ix, iy
+            TYPE(complex_physical_state_type) :: cs
+            CALL eval_rheology_lahar_semi_implicit(state, &
+                    sx, &
+                    sy)
+            CALL complex_state_from_real(state, cs)
+            CALL eval_rheology_lahar_implicit(cs, &
+                    ix, &
+                    iy)
+            rate=[sx,sy]+REAL([ix,iy],wp)
+        END SUBROUTINE eval_rheology_lahar_explicit
 
-    !> \param[in] state Shared physical state (complex for implicit treatment).
-    !> \brief Evaluate the semi-implicit lahar momentum contribution.
-    !> \details Evaluate the contribution of temperature-dependent carrier viscosity, turbulent
-    !> resistance and a concentration-dependent yield stress assigned to this treatment. The
-    !> returned rates act on the conservative horizontal momenta; zero-valued implementations
-    !> intentionally provide no contribution.
-    !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
-    !> \param[in] moving Whether the local state is considered moving.
-    !> \param[out] rate_x x component of momentum source rate.
-    !> \param[out] rate_y y component of momentum source rate.
-    SUBROUTINE eval_rheology_lahar_semi_implicit(state, rate_x, rate_y)
+        !> \param[in] state Shared physical state (complex for implicit treatment).
+        !> \brief Evaluate the semi-implicit lahar momentum contribution.
+        !> \details Evaluate the contribution of temperature-dependent carrier viscosity, turbulent
+        !> resistance and a concentration-dependent yield stress assigned to this treatment. The
+        !> returned rates act on the conservative horizontal momenta; zero-valued implementations
+        !> intentionally provide no contribution.
+        !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
+        !> \param[in] moving Whether the local state is considered moving.
+        !> \param[out] rate_x x component of momentum source rate.
+        !> \param[out] rate_y y component of momentum source rate.
+        SUBROUTINE eval_rheology_lahar_semi_implicit(state, rate_x, rate_y)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
-
-
-        REAL(wp), INTENT(OUT) :: rate_x, rate_y
-        REAL(wp) :: yield_strength, yield_slope, friction_term
-        REAL(wp), PARAMETER :: depth_threshold = 1.0E-20_wp
-
-        REAL(wp) :: alphas_tot
-
-        alphas_tot = SUM(state%alphas)
-        rate_x = 0.0_wp
-        rate_y = 0.0_wp
-        IF (.NOT. (state%mod_vel>0.0_wp)) RETURN
-        yield_strength = alpha2 * (EXP(beta2 * alphas_tot) - 1.0_wp)
-        IF (state%h .GT. depth_threshold) THEN
-            yield_slope = yield_strength / (grav * state%rho_m * state%h)
-
-        ELSE
-            yield_slope = yield_strength / (grav * state%rho_m * depth_threshold)
-
-        END IF
-
-        friction_term = grav * state%rho_m * state%h * yield_slope
-        rate_x = -friction_term * state%u / state%mod_vel_hor
-        rate_y = -friction_term * state%v / state%mod_vel_hor
-    END SUBROUTINE eval_rheology_lahar_semi_implicit
-
-    !> \param[in] state Shared physical state (complex for implicit treatment).
-    !> \brief Evaluate the implicit lahar momentum contribution.
-    !> \details Evaluate the part of temperature-dependent carrier viscosity, turbulent resistance
-    !> and a concentration-dependent yield stress assigned to the implicit treatment. Complex-valued
-    !> arguments retain complex-step sensitivities where implemented; zero-valued implementations
-    !> intentionally contribute no term.
-    !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
-    !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
-    !> \param[in] moving Whether the local state is considered moving.
-    !> \param[out] rate_x x component of momentum source rate.
-    !> \param[out] rate_y y component of momentum source rate.
-    SUBROUTINE eval_rheology_lahar_implicit(state, rate_x, rate_y)
-
-        TYPE(complex_physical_state_type), INTENT(IN) :: state
+            TYPE(physical_state_type), INTENT(IN) :: state
 
 
-        COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
-        COMPLEX(wp) :: fluid_viscosity, inverse_depth, viscous_slope
-        COMPLEX(wp) :: turbulent_slope, total_slope, friction_term
-        REAL(wp) :: depth_threshold
+            REAL(wp), INTENT(OUT) :: rate_x, rate_y
+            REAL(wp) :: yield_strength, yield_slope, friction_term
+            REAL(wp), PARAMETER :: depth_threshold = 1.0E-20_wp
 
-        rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
-        rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
-        IF (wp .EQ. sp) THEN
-            depth_threshold = 1.0E-10_wp
+            REAL(wp) :: alphas_tot
 
-        ELSE
-            depth_threshold = 1.0E-20_wp
+            alphas_tot = SUM(state%alphas)
+            rate_x = 0.0_wp
+            rate_y = 0.0_wp
+            IF (.NOT. (state%mod_vel>0.0_wp)) RETURN
+            yield_strength = alpha2 * (EXP(beta2 * alphas_tot) - 1.0_wp)
+            IF (state%h .GT. depth_threshold) THEN
+                yield_slope = yield_strength / (grav * state%rho_m * state%h)
 
-        END IF
+            ELSE
+                yield_slope = yield_strength / (grav * state%rho_m * depth_threshold)
 
-        fluid_viscosity = eval_lahar_fluid_viscosity(state%T, SUM(state%alphas))
-        IF (REAL(state%h, wp) .GT. depth_threshold) THEN
-            inverse_depth = 1.0_wp / state%h
-            viscous_slope = Kappa * fluid_viscosity * state%mod_vel * 0.125_wp *                         &
-                    state%inv_rhom * inv_grav * inverse_depth**2
-            turbulent_slope = n_td2 * state%mod_vel**2 * inverse_depth**four_thirds
+            END IF
 
-        ELSE
-            viscous_slope = Kappa * fluid_viscosity * state%mod_vel /                                    &
-                    (8.0_wp * state%rho_m * grav * depth_threshold**2)
-            turbulent_slope = n_td2 * state%mod_vel**2 * depth_threshold**neg_four_thirds
+            friction_term = grav * state%rho_m * state%h * yield_slope
+            rate_x = -friction_term * state%u / state%mod_vel_hor
+            rate_y = -friction_term * state%v / state%mod_vel_hor
+        END SUBROUTINE eval_rheology_lahar_semi_implicit
 
-        END IF
+        !> \param[in] state Shared physical state (complex for implicit treatment).
+        !> \brief Evaluate the implicit lahar momentum contribution.
+        !> \details Evaluate the part of temperature-dependent carrier viscosity, turbulent resistance
+        !> and a concentration-dependent yield stress assigned to the implicit treatment. Complex-valued
+        !> arguments retain complex-step sensitivities where implemented; zero-valued implementations
+        !> intentionally contribute no term.
+        !> \param[in] mod_vel Magnitude of three-dimensional velocity [m s^-1].
+        !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
+        !> \param[in] moving Whether the local state is considered moving.
+        !> \param[out] rate_x x component of momentum source rate.
+        !> \param[out] rate_y y component of momentum source rate.
+        SUBROUTINE eval_rheology_lahar_implicit(state, rate_x, rate_y)
 
-        total_slope = viscous_slope + turbulent_slope
-        IF (.NOT. ((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) RETURN
-        friction_term = grav * state%rho_m * state%h * total_slope / state%mod_vel_hor
-        rate_x = -state%u * friction_term
-        rate_y = -state%v * friction_term
-    END SUBROUTINE eval_rheology_lahar_implicit
+            TYPE(complex_physical_state_type), INTENT(IN) :: state
 
-    !> \param[in] state Shared real physical state before analytic integration.
-    !> \brief Integrate the lahar velocity source over a frozen-state substep.
-    !> \details Evaluate the exact or time-integral-based decay of horizontal speed under
-    !> temperature-dependent carrier viscosity, turbulent resistance and a concentration-dependent
-    !> yield stress. The velocity direction is retained and the updated components are returned
-    !> without evolving the frozen thermodynamic and geometric inputs.
-    !> \param[in] dt Duration of the analytic source substep [s].
-    !> \param[in] speed_ratio Ratio of three-dimensional to horizontal speed.
-    !> s^-1].
-    !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
-    !> s^-1].
-    SUBROUTINE eval_rheology_lahar_analytic(dt, state, speed_ratio, velocity_after)
 
-        TYPE(physical_state_type), INTENT(IN) :: state
-        REAL(wp), INTENT(IN) :: dt, speed_ratio
-        REAL(wp), INTENT(OUT) :: velocity_after(2)
-        REAL(wp) :: velocity_before(2), alphas_tot
-        REAL(wp) :: speed_before, speed_after, effective_depth, depth_threshold
-        REAL(wp) :: fluid_viscosity, yield_strength
-        REAL(wp) :: constant_drag, linear_drag, quadratic_drag
+            COMPLEX(wp), INTENT(OUT) :: rate_x, rate_y
+            COMPLEX(wp) :: fluid_viscosity, inverse_depth, viscous_slope
+            COMPLEX(wp) :: turbulent_slope, total_slope, friction_term
+            REAL(wp) :: depth_threshold
 
-        velocity_before = [state%u,state%v]
-        alphas_tot = SUM(state%alphas)
-        velocity_after = velocity_before
-        speed_before = SQRT(SUM(velocity_before**2))
-        CALL validate_analytic_velocity_inputs(dt, state%h,                                              &
-                speed_ratio, speed_before, 'lahar')
-        IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
-        IF (state%rho_m .LE. 0.0_wp) THEN
-            CALL fatal_analytic_input_error('Nonpositive mixture density in lahar analytic solver')
+            rate_x = CMPLX(0.0_wp, 0.0_wp, wp)
+            rate_y = CMPLX(0.0_wp, 0.0_wp, wp)
+            IF (wp .EQ. sp) THEN
+                depth_threshold = 1.0E-10_wp
 
-        END IF
+            ELSE
+                depth_threshold = 1.0E-20_wp
 
-        IF (wp .EQ. sp) THEN
-            depth_threshold = 1.0E-10_wp
+            END IF
 
-        ELSE
-            depth_threshold = 1.0E-20_wp
+            fluid_viscosity = eval_lahar_fluid_viscosity(state%T, SUM(state%alphas))
+            IF (REAL(state%h, wp) .GT. depth_threshold) THEN
+                inverse_depth = 1.0_wp / state%h
+                viscous_slope = Kappa * fluid_viscosity * state%mod_vel * 0.125_wp *                         &
+                            state%inv_rhom * inv_grav * inverse_depth**2
+                turbulent_slope = n_td2 * state%mod_vel**2 * inverse_depth**four_thirds
 
-        END IF
+            ELSE
+                viscous_slope = Kappa * fluid_viscosity * state%mod_vel /                                    &
+                            (8.0_wp * state%rho_m * grav * depth_threshold**2)
+                turbulent_slope = n_td2 * state%mod_vel**2 * depth_threshold**neg_four_thirds
 
-        effective_depth = MAX(state%h, depth_threshold)
-        fluid_viscosity = eval_lahar_fluid_viscosity(state%T, alphas_tot)
-        yield_strength = alpha2 * (EXP(beta2 * alphas_tot) - 1.0_wp)
-        constant_drag = yield_strength / (state%rho_m *                                                   &
-                MAX(state%h, 1.0E-20_wp))
-        linear_drag = Kappa * fluid_viscosity * speed_ratio /                                      &
-                (8.0_wp * state%rho_m * effective_depth**2)
-        quadratic_drag = grav * n_td2 * speed_ratio**2 *                                           &
-                effective_depth**neg_four_thirds
-        CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,                            &
-                [constant_drag, linear_drag, quadratic_drag], dt,                                  &
-                speed_before, speed_after)
-        velocity_after = (speed_after / speed_before) * velocity_before
-    END SUBROUTINE eval_rheology_lahar_analytic
+            END IF
 
-    !> \param[in] state Shared physical state (complex for implicit treatment).
-    !> \brief Evaluate the lahar carrier-fluid viscosity.
-    !> \details Apply the piecewise temperature correlation and the exponential solid-concentration
-    !> factor; the complex overload preserves complex-step derivatives.
-    FUNCTION eval_lahar_fluid_viscosity_real(T, alphas_tot)                                        &
-            RESULT(fluid_viscosity)
+            total_slope = viscous_slope + turbulent_slope
+            IF (.NOT. ((REAL(state%mod_vel,wp)/=0.0_wp).OR.(AIMAG(state%mod_vel)/=0.0_wp))) RETURN
+            friction_term = grav * state%rho_m * state%h * total_slope / state%mod_vel_hor
+            rate_x = -state%u * friction_term
+            rate_y = -state%v * friction_term
+        END SUBROUTINE eval_rheology_lahar_implicit
 
-        REAL(wp), INTENT(IN) :: T, alphas_tot
-        REAL(wp) :: fluid_viscosity
-        COMPLEX(wp) :: complex_viscosity
+        !> \param[in] state Shared real physical state before analytic integration.
+        !> \brief Integrate the lahar velocity source over a frozen-state substep.
+        !> \details Evaluate the exact or time-integral-based decay of horizontal speed under
+        !> temperature-dependent carrier viscosity, turbulent resistance and a concentration-dependent
+        !> yield stress. The velocity direction is retained and the updated components are returned
+        !> without evolving the frozen thermodynamic and geometric inputs.
+        !> \param[in] dt Duration of the analytic source substep [s].
+        !> \param[in] speed_ratio Ratio of three-dimensional to horizontal speed.
+        !> s^-1].
+        !> \param[out] velocity_after Two-component horizontal velocity after source integration [m
+        !> s^-1].
+        SUBROUTINE eval_rheology_lahar_analytic(dt, state, speed_ratio, velocity_after)
 
-        complex_viscosity = eval_lahar_fluid_viscosity_complex(                                    &
-                CMPLX(T,0.0_wp,wp),CMPLX(alphas_tot,0.0_wp,wp))
-        fluid_viscosity = REAL(complex_viscosity,wp)
-    END FUNCTION eval_lahar_fluid_viscosity_real
+            TYPE(physical_state_type), INTENT(IN) :: state
+            REAL(wp), INTENT(IN) :: dt, speed_ratio
+            REAL(wp), INTENT(OUT) :: velocity_after(2)
+            REAL(wp) :: velocity_before(2), alphas_tot
+            REAL(wp) :: speed_before, speed_after, effective_depth, depth_threshold
+            REAL(wp) :: fluid_viscosity, yield_strength
+            REAL(wp) :: constant_drag, linear_drag, quadratic_drag
 
-    !> \param[in] state Shared physical state (complex for implicit treatment).
-    !> \brief Evaluate the lahar carrier-fluid viscosity.
-    !> \details Apply the piecewise temperature correlation and the exponential solid-concentration
-    !> factor; the complex overload preserves complex-step derivatives.
-    FUNCTION eval_lahar_fluid_viscosity_complex(T, alphas_tot)                                     &
-            RESULT(fluid_viscosity)
+            velocity_before = [state%u,state%v]
+            alphas_tot = SUM(state%alphas)
+            velocity_after = velocity_before
+            speed_before = SQRT(SUM(velocity_before**2))
+            CALL validate_analytic_velocity_inputs(dt, state%h,                                              &
+                        speed_ratio, speed_before, 'lahar')
+            IF (dt .EQ. 0.0_wp .OR. speed_before .EQ. 0.0_wp) RETURN
+            IF (state%rho_m .LE. 0.0_wp) THEN
+                CALL fatal_analytic_input_error('Nonpositive mixture density in lahar analytic solver')
 
-        COMPLEX(wp), INTENT(IN) :: T, alphas_tot
-        COMPLEX(wp) :: fluid_viscosity
-        COMPLEX(wp) :: temperature_celsius, exponent_a, exponent_b, alpha1
+            END IF
 
-        temperature_celsius = T - 273.15_wp
-        IF (REAL(temperature_celsius, wp) .LT. 20.0_wp) THEN
-            exponent_a = 1301.0_wp / (998.333_wp + 8.1855_wp *                                     &
-                    (temperature_celsius - 20.0_wp) + 0.00585_wp *                                 &
-                    (temperature_celsius - 20.0_wp)**2) - 1.30223_wp
-            alpha1 = alpha1_coeff * 1.0E-3_wp * 10.0_wp**exponent_a
+            IF (wp .EQ. sp) THEN
+                depth_threshold = 1.0E-10_wp
 
-        ELSE
-            exponent_b = (1.3272_wp * (20.0_wp - temperature_celsius)                              &
-                    - 0.001053_wp * (temperature_celsius - 20.0_wp)**2)                            &
-                    / (temperature_celsius + 105.0_wp)
-            alpha1 = alpha1_coeff * 1.002E-3_wp * 10.0_wp**exponent_b
+            ELSE
+                depth_threshold = 1.0E-20_wp
 
-        END IF
+            END IF
 
-        fluid_viscosity = alpha1 * EXP(beta1 * alphas_tot)
-    END FUNCTION eval_lahar_fluid_viscosity_complex
+            effective_depth = MAX(state%h, depth_threshold)
+            fluid_viscosity = eval_lahar_fluid_viscosity(state%T, alphas_tot)
+            yield_strength = alpha2 * (EXP(beta2 * alphas_tot) - 1.0_wp)
+            constant_drag = yield_strength / (state%rho_m *                                                   &
+                        MAX(state%h, 1.0E-20_wp))
+            linear_drag = Kappa * fluid_viscosity * speed_ratio /                                      &
+                        (8.0_wp * state%rho_m * effective_depth**2)
+            quadratic_drag = grav * n_td2 * speed_ratio**2 *                                           &
+                        effective_depth**neg_four_thirds
+            CALL solve_exact_velocity_flow(EXACT_FLOW_QUADRATIC_POLYNOMIAL,                            &
+                        [constant_drag, linear_drag, quadratic_drag], dt,                                  &
+                        speed_before, speed_after)
+            velocity_after = (speed_after / speed_before) * velocity_before
+        END SUBROUTINE eval_rheology_lahar_analytic
+
+        !> \param[in] state Shared physical state (complex for implicit treatment).
+        !> \brief Evaluate the lahar carrier-fluid viscosity.
+        !> \details Apply the piecewise temperature correlation and the exponential solid-concentration
+        !> factor; the complex overload preserves complex-step derivatives.
+        FUNCTION eval_lahar_fluid_viscosity_real(T, alphas_tot)                                        &
+                RESULT(fluid_viscosity)
+
+            REAL(wp), INTENT(IN) :: T, alphas_tot
+            REAL(wp) :: fluid_viscosity
+            COMPLEX(wp) :: complex_viscosity
+
+            complex_viscosity = eval_lahar_fluid_viscosity_complex(                                    &
+                        CMPLX(T,0.0_wp,wp),CMPLX(alphas_tot,0.0_wp,wp))
+            fluid_viscosity = REAL(complex_viscosity,wp)
+        END FUNCTION eval_lahar_fluid_viscosity_real
+
+        !> \param[in] state Shared physical state (complex for implicit treatment).
+        !> \brief Evaluate the lahar carrier-fluid viscosity.
+        !> \details Apply the piecewise temperature correlation and the exponential solid-concentration
+        !> factor; the complex overload preserves complex-step derivatives.
+        FUNCTION eval_lahar_fluid_viscosity_complex(T, alphas_tot)                                     &
+                RESULT(fluid_viscosity)
+
+            COMPLEX(wp), INTENT(IN) :: T, alphas_tot
+            COMPLEX(wp) :: fluid_viscosity
+            COMPLEX(wp) :: temperature_celsius, exponent_a, exponent_b, alpha1
+
+            temperature_celsius = T - 273.15_wp
+            IF (REAL(temperature_celsius, wp) .LT. 20.0_wp) THEN
+                exponent_a = 1301.0_wp / (998.333_wp + 8.1855_wp *                                     &
+                            (temperature_celsius - 20.0_wp) + 0.00585_wp *                                 &
+                            (temperature_celsius - 20.0_wp)**2) - 1.30223_wp
+                alpha1 = alpha1_coeff * 1.0E-3_wp * 10.0_wp**exponent_a
+
+            ELSE
+                exponent_b = (1.3272_wp * (20.0_wp - temperature_celsius)                              &
+                            - 0.001053_wp * (temperature_celsius - 20.0_wp)**2)                            &
+                            / (temperature_celsius + 105.0_wp)
+                alpha1 = alpha1_coeff * 1.002E-3_wp * 10.0_wp**exponent_b
+
+            END IF
+
+            fluid_viscosity = alpha1 * EXP(beta1 * alphas_tot)
+        END FUNCTION eval_lahar_fluid_viscosity_complex
 
 END MODULE rheology_lahar_2d
