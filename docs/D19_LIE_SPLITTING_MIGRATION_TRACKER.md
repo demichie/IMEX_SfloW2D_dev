@@ -1,10 +1,10 @@
 # D19 — Lie splitting migration: implementation guide and live tracker
 
-**Status:** IN PROGRESS — migration is not yet operational.
+**Status:** IN PROGRESS — architecture rewritten in production modules; no final compilation or tests yet.
 **Branch:** `master`
 **Companion architecture:** [D18](D18_IMEX_RK_SOURCE_ARCHITECTURE_PRINCIPLES.md). D18 describes the numerical contract; **D19 tracks the implementation**, file-by-file changes, dependencies, evidence, and remaining work.
 **Last reviewed:** 2026-11-01
-**Rule for maintenance:** update this file in the *same commit* as each completed code phase. Do not mark a task DONE without citing a commit and executed checks. Mark code not yet audited as TO_VERIFY rather than guessing.
+**Rule for maintenance:** commits may deliberately be non-compilable during the large migration. Do not require intermediate builds; compile and run the complete acceptance suite once the end-to-end architecture and references are finished. Record actual commits and checks; do not mark a task DONE without evidence.
 
 ## 1. Frozen target contract
 
@@ -52,13 +52,13 @@ Use statuses `TODO`, `IN_PROGRESS`, `BLOCKED`, `DONE`. Add date, commit and test
 | ID | Phase / deliverable | Status | Evidence / dependencies |
 | --- | --- | --- | --- |
 | L00 | Baseline: record build/CI result and search all callers/namelists/restarts/tests for RK, STAGE, STEP and CADENCE | TODO | Static inventory above is not a complete call-graph/test audit. |
-| L01 | Single method-capable source-group registry and validation, including always-explicit GROUP 0 | IN_PROGRESS | Opt-in Lie registry and validation added; legacy paths remain. Compilation and tests pending. |
-| L02 | Remove CADENCE from catalog, source configuration, source input and I/O | TODO | Depends on L01. Explicitly migrate examples and generated inputs. |
-| L03 | Implement RK-independent group-local backward-Euler Newton API and analytic dispatcher | IN_PROGRESS | Transitional `solve_backward_euler_group` API added; internals still call legacy RK engine. Compile and numerical verification pending. |
-| L04 | Generic explicit/NEWTON/ANALYTIC source-group executor | TODO | Preserve same-input process rates, physical joint limiters, and atomic mass-exchange/substrate transactions. |
-| L05 | Lie time driver with GROUP-0 spatial update, source rates evaluated on `q_n`, source-rate limits applied to `q_sp`, then GROUP 1+ | TODO | Requires L01-L04; separate spatial and source admissibility checks. |
-| L06 | Simplify production timestep, observers, diagnostics and stochastic/source-window plumbing | TODO | Preserve a single clock increment and time-dependent injection evaluation. |
-| L07 | Delete IMEX-RK tableau, stage arrays, RK stage loops, adapters and `N_RK` across build/input/tests | TODO | After new integrator reaches feature parity. |
+| L01 | Single method-capable source-group registry and validation, including always-explicit GROUP 0 | IN_PROGRESS | Single Lie registry implemented; final validation pending. |
+| L02 | Remove CADENCE from catalog, source configuration, source input and I/O | IN_PROGRESS | Production configuration and input moved away from STAGE/STEP; examples and tests pending. |
+| L03 | Implement RK-independent group-local backward-Euler Newton API and analytic dispatcher | IN_PROGRESS | RK adapters removed from Newton core; residual and Jacobian review pending. |
+| L04 | Generic explicit/NEWTON/ANALYTIC source-group executor | IN_PROGRESS | Lie source executor in place; shared rate-limiter and coupled inventory verification pending. |
+| L05 | Lie time driver with GROUP-0 spatial update, source rates evaluated on `q_n`, source-rate limits applied to `q_sp`, then GROUP 1+ | IN_PROGRESS | Lie spatial-first driver in place, GROUP 0 rates evaluated from original state; acceptance pending. |
+| L06 | Simplify production timestep, observers, diagnostics and stochastic/source-window plumbing | IN_PROGRESS | Production timestep now calls single driver; event/test cleanup pending. |
+| L07 | Delete IMEX-RK tableau, stage arrays, RK stage loops, adapters and `N_RK` across build/input/tests | IN_PROGRESS | RK tableau and workspaces removed; obsolete references/tests pending. |
 | L08 | Exhaustive reference cleanup, formatting and documentation updates, D18 alignment | TODO | No obsolete symbols or contradictory architecture descriptions in current-source docs. |
 | L09 | Comprehensive acceptance: unit, integration, conservation, stability, restart, examples and performance | TODO | Explicit executed suite names, commits, failures and resolutions. |
 
@@ -83,6 +83,7 @@ Do not claim that first-order Lie is unconditionally stable or well-balanced for
 
 | Date | Change | Commit | Checks executed | Notes |
 | --- | --- | --- | --- | --- |
+| 2026-11-01 | Large in-place migration: replaced RK tableau with Lie driver, removed STAGE/STEP catalog and registry, removed N_RK from primary input, routed sources through group executor, removed RK Newton wrappers. | 5dfa59b3, a47087c1, b7ca9c28, bad22a6d, 8f757be7, 67edbf78, 9ce49244 | Deliberately not run | Major integration and physics-consistency work remains. |
 | 2026-11-01 | Replaced transitional Lie configuration bridge with a direct METHOD/GROUP builder; spatial GROUP 0 remains mandatory and explicit. | 46ba9be3 | Not run | Production remains on the legacy integrator; further validation of defaults and collision rules required. |
 | 2026-11-01 | Added opt-in source-configuration bridge to unified Lie registry; conflict detection and mandatory spatial group. | This commit | Not run | Transitional: depends on legacy metadata; replace with direct physical METHOD/GROUP builder in L02. |
 | 2026-11-01 | Introduced opt-in Lie source group registry, mandatory explicit GROUP 0, ordered IDs, method capability and duplicate-source checks. | This commit | Not run | Legacy STAGE/STEP callers remain; L01 IN_PROGRESS. |

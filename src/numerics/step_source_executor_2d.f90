@@ -217,7 +217,7 @@ CONTAINS
                         source_time,process_group,explicit_rate)
                 ELSE
                    CALL eval_cell_source_explicit(j,k,qp(:,j,k), &
-                        source_time,step_groups(group_index),explicit_rate)
+                        source_time,process_group,explicit_rate)
                 END IF
                 ! Only source rates may be scaled; spatial FV divergence is fixed.
                 source_fraction=1.0_wp
@@ -277,11 +277,11 @@ CONTAINS
   CONTAINS
 
     !> \\brief Execute one atomic bed-and-inventory transaction.
-    !> \\details Called in ascending STEP GROUP order when configured.
+    !> \\details Called at the configured Lie group; fluid and bed transfers are coupled.
     SUBROUTINE execute_mass_exchange_transaction()
     REAL(wp) :: qp_eval(n_vars+2)
     IF ((erosion_coeff .EQ. 0.0_wp) .AND. (.NOT.settling_flag)            &
-         .AND. (.NOT.pore_pressure_flag) .AND. (.NOT.entrainment_flag)     &
+         .AND. (.NOT.entrainment_flag)     &
          .AND. (.NOT.liquid_loss_active) .AND. (.NOT.lava_deposition_flag)) RETURN
 
     IF (lava_deposition_flag .AND. .NOT.topo_change_flag) &
@@ -289,7 +289,7 @@ CONTAINS
     IF (topo_change_flag) CALL begin_topography_rate_update
 
     !$OMP PARALLEL DO private(j,k,closure_context,exchange_rates,eqns_term, &
-    !$OMP & out_of_source_fraction,p_dyn)
+    !$OMP & out_of_source_fraction,p_dyn,qp_eval)
     DO l = 1, domain%solve_cells
 
        j = domain%j_cent(l)
