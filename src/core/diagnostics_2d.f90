@@ -9,80 +9,80 @@
 
 MODULE diagnostics_2d
 
-  USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit
-  USE omp_lib, ONLY : omp_in_parallel
+    USE, INTRINSIC :: iso_fortran_env, ONLY : input_unit, output_unit, error_unit
+    USE omp_lib, ONLY : omp_in_parallel
 
-  IMPLICIT NONE
+    IMPLICIT NONE
 
-  PRIVATE
+    PRIVATE
 
-  LOGICAL, PUBLIC :: interactive_debug_flag = .FALSE.
+    LOGICAL, PUBLIC :: interactive_debug_flag = .FALSE.
 
-  PUBLIC :: debug_pause
-  PUBLIC :: fatal_error
+    PUBLIC :: debug_pause
+    PUBLIC :: fatal_error
 
 CONTAINS
 
-  !******************************************************************************
-  !> \brief Print an optional debug message and pause only when interactive debugging is enabled.
-  !>
-  !> Pauses requested from an OpenMP parallel region are skipped because stdin
-  !> access from worker threads is unsafe and can deadlock a batch execution.
-  !>
-  !> \param[in] message Diagnostic text describing the operation or failure.
-  !******************************************************************************
+    !******************************************************************************
+    !> \brief Print an optional debug message and pause only when interactive debugging is enabled.
+    !>
+    !> Pauses requested from an OpenMP parallel region are skipped because stdin
+    !> access from worker threads is unsafe and can deadlock a batch execution.
+    !>
+    !> \param[in] message Diagnostic text describing the operation or failure.
+    !******************************************************************************
 
-  SUBROUTINE debug_pause(message)
+    SUBROUTINE debug_pause(message)
 
-    CHARACTER(LEN=*), INTENT(IN) :: message
+        CHARACTER(LEN=*), INTENT(IN) :: message
 
-    CHARACTER(LEN=1) :: response
-    INTEGER :: io_status
+        CHARACTER(LEN=1) :: response
+        INTEGER :: io_status
 
-    IF (.NOT. interactive_debug_flag) RETURN
+        IF (.NOT. interactive_debug_flag) RETURN
 
-    IF (omp_in_parallel()) THEN
-       !$OMP CRITICAL(diagnostics_output)
-       WRITE(error_unit,*) 'DEBUG PAUSE SKIPPED inside OpenMP region: ',     &
-            TRIM(message)
-       CALL FLUSH(error_unit)
-       !$OMP END CRITICAL(diagnostics_output)
-       RETURN
-    END IF
+        IF (omp_in_parallel()) THEN
+            !$OMP CRITICAL(diagnostics_output)
+            WRITE(error_unit,*) 'DEBUG PAUSE SKIPPED inside OpenMP region: ',     &
+                TRIM(message)
+            CALL FLUSH(error_unit)
+            !$OMP END CRITICAL(diagnostics_output)
+            RETURN
+        END IF
 
-    WRITE(output_unit,*) 'DEBUG PAUSE: ', TRIM(message)
-    WRITE(output_unit,*) 'Press ENTER to continue.'
-    CALL FLUSH(output_unit)
-    READ(input_unit,'(A)',IOSTAT=io_status) response
+        WRITE(output_unit,*) 'DEBUG PAUSE: ', TRIM(message)
+        WRITE(output_unit,*) 'Press ENTER to continue.'
+        CALL FLUSH(output_unit)
+        READ(input_unit,'(A)',IOSTAT=io_status) response
 
-    IF (io_status /= 0) THEN
-       WRITE(error_unit,*) 'WARNING: Unable to read interactive debug input.'
-       CALL FLUSH(error_unit)
-    END IF
+        IF (io_status /= 0) THEN
+            WRITE(error_unit,*) 'WARNING: Unable to read interactive debug input.'
+            CALL FLUSH(error_unit)
+        END IF
 
-  END SUBROUTINE debug_pause
+    END SUBROUTINE debug_pause
 
-  !******************************************************************************
-  !> \brief Report an unrecoverable error and terminate without interactive input.
-  !>
-  !> \param[in] message Diagnostic text describing the operation or failure.
-  !******************************************************************************
+    !******************************************************************************
+    !> \brief Report an unrecoverable error and terminate without interactive input.
+    !>
+    !> \param[in] message Diagnostic text describing the operation or failure.
+    !******************************************************************************
 
-  SUBROUTINE fatal_error(message)
+    SUBROUTINE fatal_error(message)
 
-    CHARACTER(LEN=*), INTENT(IN) :: message
+        CHARACTER(LEN=*), INTENT(IN) :: message
 
-    !$OMP CRITICAL(diagnostics_output)
-    CALL FLUSH(output_unit)
-    WRITE(error_unit,*) 'FATAL ERROR: ', TRIM(message)
-    CALL FLUSH(error_unit)
-    !$OMP END CRITICAL(diagnostics_output)
+        !$OMP CRITICAL(diagnostics_output)
+        CALL FLUSH(output_unit)
+        WRITE(error_unit,*) 'FATAL ERROR: ', TRIM(message)
+        CALL FLUSH(error_unit)
+        !$OMP END CRITICAL(diagnostics_output)
 
-    IF (interactive_debug_flag .AND. (.NOT. omp_in_parallel()))             &
-         CALL debug_pause('fatal condition: '//TRIM(message))
+        IF (interactive_debug_flag .AND. (.NOT. omp_in_parallel()))             &
+            CALL debug_pause('fatal condition: '//TRIM(message))
 
-    ERROR STOP 1
+        ERROR STOP 1
 
-  END SUBROUTINE fatal_error
+    END SUBROUTINE fatal_error
 
 END MODULE diagnostics_2d

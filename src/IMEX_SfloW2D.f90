@@ -27,458 +27,283 @@
 
 PROGRAM IMEX_SfloW2D
 
-   USE, intrinsic :: iso_fortran_env
-   USE, intrinsic :: ieee_arithmetic
+    USE, intrinsic :: iso_fortran_env
+    USE, intrinsic :: ieee_arithmetic
 
-   USE constitutive_parameters_2d, ONLY : T_ambient
-
-
-   USE geometry_2d, ONLY : init_grid
-   USE geometry_2d, ONLY : init_source
-   USE geometry_2d, ONLY : refresh_topography_geometry
-
-   USE geometry_2d, ONLY : dx,dy
-   ! USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
-
-   USE init_2d, ONLY : collapsing_volume
-   USE init_2d, ONLY : init_empty, release_initialization_fields
-
-   USE inpout_2d, ONLY : init_param
-   USE inpout_2d, ONLY : read_param
-   USE inpout_2d, ONLY : update_param
-   USE inpout_2d, ONLY : output_solution
-   USE inpout_2d, ONLY : output_runout
-   USE inpout_2d, ONLY : open_runout_outputs
-   USE inpout_2d, ONLY : validate_runout_outputs
-   USE inpout_2d, ONLY : read_solution
-   USE inpout_2d, ONLY : close_units
-   USE inpout_2d, ONLY : n_probes
-   USE inpout_2d, ONLY : output_probes
-
-   USE inpout_2d, ONLY : init_netcdf_output
-   USE inpout_2d, ONLY : close_netcdf
-   USE inpout_2d, ONLY : restart, restart_file
-   USE inpout_2d, ONLY : read_restart_file, write_restart_file
-   USE inpout_2d, ONLY : validate_restart_output_manifest
-   USE inpout_2d, ONLY : write_param_backup
-   USE output_paths, ONLY : output_file_path
-   USE inpout_2d, ONLY : output_runout_flag
-   USE inpout_2d, ONLY : output_cons_flag
-   USE inpout_2d, ONLY : output_esri_flag
-   USE inpout_2d, ONLY : output_netcdf_flag
-
-   USE simulation_2d, ONLY : simulation
-   USE source_registry_2d, ONLY : source_group_type, group_contains_name
-   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
-
-   USE inpout_2d, ONLY : restart
-
-   USE parameters_2d, ONLY : wp, idx_h, idx_T, idx_totMassEqn
-
-   USE parameters_2d, ONLY : t_start
-   USE parameters_2d, ONLY : t_end
-   USE parameters_2d, ONLY : dt_output
-   USE parameters_2d, ONLY : dt0
-   USE parameters_2d, ONLY : topo_change_flag
-   USE parameters_2d, ONLY : verbose_level
-   USE parameters_2d, ONLY : n_solid
-   USE parameters_2d, ONLY : n_vars
-   USE parameters_2d, ONLY : radial_source_flag
-   USE parameters_2d, ONLY : lateral_source_flag
-   USE parameters_2d, ONLY : collapsing_volume_flag
-   USE parameters_2d, ONLY : serial_flag
-
-   USE parameters_2d, ONLY : stochastic_flag, length_spatial_corr
-
-   USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,          &
-      thickness_levels , dyn_pres_levels
-
-   USE state_conversion_2d, ONLY : qc_to_qp
+    USE constitutive_parameters_2d, ONLY : T_ambient
 
 
-   USE OMP_LIB
+    USE geometry_2d, ONLY : init_grid
+    USE geometry_2d, ONLY : init_source
+    USE geometry_2d, ONLY : refresh_topography_geometry
 
-   IMPLICIT NONE
+    USE geometry_2d, ONLY : dx,dy
+    ! USE geometry_2d, ONLY : comp_cells_x,comp_cells_y
 
-   REAL(wp) :: t1 , t2 , t3
+    USE init_2d, ONLY : collapsing_volume
+    USE init_2d, ONLY : init_empty, release_initialization_fields
 
-   REAL(wp) :: rate
-   INTEGER :: st1 , st2 , st3 , cr , cm
+    USE inpout_2d, ONLY : init_param
+    USE inpout_2d, ONLY : read_param
+    USE inpout_2d, ONLY : update_param
+    USE inpout_2d, ONLY : output_solution
+    USE inpout_2d, ONLY : output_runout
+    USE inpout_2d, ONLY : open_runout_outputs
+    USE inpout_2d, ONLY : validate_runout_outputs
+    USE inpout_2d, ONLY : read_solution
+    USE inpout_2d, ONLY : close_units
+    USE inpout_2d, ONLY : n_probes
+    USE inpout_2d, ONLY : output_probes
 
-   LOGICAL :: stop_flag
-   LOGICAL :: thickness_exceeds, pressure_exceeds
-   LOGICAL :: stop_flag_old
+    USE inpout_2d, ONLY : init_netcdf_output
+    USE inpout_2d, ONLY : close_netcdf
+    USE inpout_2d, ONLY : restart, restart_file
+    USE inpout_2d, ONLY : read_restart_file, write_restart_file
+    USE inpout_2d, ONLY : validate_restart_output_manifest
+    USE inpout_2d, ONLY : write_param_backup
+    USE output_paths, ONLY : output_file_path
+    USE inpout_2d, ONLY : output_runout_flag
+    USE inpout_2d, ONLY : output_cons_flag
+    USE inpout_2d, ONLY : output_esri_flag
+    USE inpout_2d, ONLY : output_netcdf_flag
 
-   INTEGER :: j,k,l
+    USE simulation_2d, ONLY : simulation
+    USE source_registry_2d, ONLY : source_group_type, group_contains_name
+    USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
 
-   INTEGER :: i_pdyn_lev , i_thk_lev , i_table
+    USE inpout_2d, ONLY : restart
 
-   INTEGER n_threads
+    USE parameters_2d, ONLY : wp, idx_h, idx_T, idx_totMassEqn
 
-   LOGICAL :: use_openmp = .false.
+    USE parameters_2d, ONLY : t_start
+    USE parameters_2d, ONLY : t_end
+    USE parameters_2d, ONLY : dt_output
+    USE parameters_2d, ONLY : dt0
+    USE parameters_2d, ONLY : topo_change_flag
+    USE parameters_2d, ONLY : verbose_level
+    USE parameters_2d, ONLY : n_solid
+    USE parameters_2d, ONLY : n_vars
+    USE parameters_2d, ONLY : radial_source_flag
+    USE parameters_2d, ONLY : lateral_source_flag
+    USE parameters_2d, ONLY : collapsing_volume_flag
+    USE parameters_2d, ONLY : serial_flag
 
-   !> Dynamic pressure
-   REAL(wp) :: p_dyn
+    USE parameters_2d, ONLY : stochastic_flag, length_spatial_corr
 
-   REAL(wp) :: mod_vel , mod_vel2, r_u, r_v
+    USE parameters_2d, ONLY : n_thickness_levels , n_dyn_pres_levels ,          &
+        thickness_levels , dyn_pres_levels
 
-   INTEGER :: len_fname
-   INTEGER :: i_source_group
-   TYPE(source_group_type), ALLOCATABLE :: lie_source_groups(:)
-   LOGICAL :: boundary_source_enabled
-   CHARACTER(LEN=4) :: ext
-   LOGICAL :: is_binary_restart
-   LOGICAL :: runout_exists, mass_exists
+    USE state_conversion_2d, ONLY : qc_to_qp
 
-   WRITE(*,*) '---------------------'
-   WRITE(*,*) 'IMEX_SfloW2D 2.0'
-   WRITE(*,*) '---------------------'
 
-   ! First initialize the system_clock
-   CALL system_clock(count_rate=cr)
-   CALL system_clock(count_max=cm)
-   rate = DBLE(cr)
+    USE OMP_LIB
 
-   CALL cpu_time(t1)
-   CALL system_clock (st1)
+    IMPLICIT NONE
 
-   CALL init_param
+    REAL(wp) :: t1 , t2 , t3
 
-   CALL read_param
+    REAL(wp) :: rate
+    INTEGER :: st1 , st2 , st3 , cr , cm
 
-   runout_exists = .FALSE.
-   mass_exists = .FALSE.
+    LOGICAL :: stop_flag
+    LOGICAL :: thickness_exceeds, pressure_exceeds
+    LOGICAL :: stop_flag_old
+
+    INTEGER :: j,k,l
+
+    INTEGER :: i_pdyn_lev , i_thk_lev , i_table
+
+    INTEGER n_threads
+
+    LOGICAL :: use_openmp = .false.
+
+    !> Dynamic pressure
+    REAL(wp) :: p_dyn
+
+    REAL(wp) :: mod_vel , mod_vel2, r_u, r_v
+
+    INTEGER :: len_fname
+    INTEGER :: i_source_group
+    TYPE(source_group_type), ALLOCATABLE :: lie_source_groups(:)
+    LOGICAL :: boundary_source_enabled
+    CHARACTER(LEN=4) :: ext
+    LOGICAL :: is_binary_restart
+    LOGICAL :: runout_exists, mass_exists
+
+    WRITE(*,*) '---------------------'
+    WRITE(*,*) 'IMEX_SfloW2D 2.0'
+    WRITE(*,*) '---------------------'
+
+    ! First initialize the system_clock
+    CALL system_clock(count_rate=cr)
+    CALL system_clock(count_max=cm)
+    rate = DBLE(cr)
+
+    CALL cpu_time(t1)
+    CALL system_clock (st1)
+
+    CALL init_param
+
+    CALL read_param
+
+    runout_exists = .FALSE.
+    mass_exists = .FALSE.
 
 !$ use_openmp = .true.
 !$ print *, "OpenMP program"
 
-   IF ( .NOT. use_openmp) THEN
+    IF ( .NOT. use_openmp) THEN
 
-      PRINT *, "Non-OpenMP simulation"
+        PRINT *, "Non-OpenMP simulation"
 
-   ELSE
+    ELSE
 
-      ! Check the serial flag
-      IF (serial_flag) THEN
-         CALL omp_set_num_threads(1)  ! Use only 1 thread
-         WRITE(*,*) 'Serial run'
-      END IF
+        ! Check the serial flag
+        IF (serial_flag) THEN
+            CALL omp_set_num_threads(1)  ! Use only 1 thread
+            WRITE(*,*) 'Serial run'
+        END IF
 
 !$    n_threads = omp_get_max_threads()
 !$    CALL OMP_SET_NUM_THREADS(n_threads)
-      WRITE(*,*) 'Parallel run: number of threads used',n_threads
+        WRITE(*,*) 'Parallel run: number of threads used',n_threads
 
-   END IF
+    END IF
 
-   CALL init_grid
+    CALL init_grid
 
-   CALL simulation%initialize
+    CALL simulation%initialize
 
-   lie_source_groups=simulation%source_registry%groups()
-   boundary_source_enabled=.FALSE.
-   DO i_source_group=1,SIZE(lie_source_groups)
-      IF (lie_source_groups(i_source_group)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
-      boundary_source_enabled=boundary_source_enabled .OR. group_contains_name( &
-           lie_source_groups(i_source_group),'boundary_injection')
-   END DO
-   DEALLOCATE(lie_source_groups)
+    lie_source_groups=simulation%source_registry%groups()
+    boundary_source_enabled=.FALSE.
+    DO i_source_group=1,SIZE(lie_source_groups)
+        IF (lie_source_groups(i_source_group)%method/=SOURCE_METHOD_EXPLICIT) CYCLE
+        boundary_source_enabled=boundary_source_enabled .OR. group_contains_name( &
+                lie_source_groups(i_source_group),'boundary_injection')
+    END DO
+    DEALLOCATE(lie_source_groups)
 
-   is_binary_restart = .FALSE.
-   simulation%runtime%t = t_start
-   simulation%runtime%t_output = t_start + dt_output
-   simulation%runtime%t_runout = 0.0_wp
-   simulation%runtime%t_probes = 0.0_wp
+    is_binary_restart = .FALSE.
+    simulation%runtime%t = t_start
+    simulation%runtime%t_output = t_start + dt_output
+    simulation%runtime%t_runout = 0.0_wp
+    simulation%runtime%t_probes = 0.0_wp
 
-   IF ( restart ) THEN
+    IF ( restart ) THEN
 
-      ! Calculate string length and extract the last 4 characters
-      len_fname = LEN_TRIM(restart_file)
-      IF (len_fname >= 4) THEN
-         ext = restart_file(len_fname-3:len_fname)
-      ELSE
-         ext = '    '
-      END IF
+        ! Calculate string length and extract the last 4 characters
+        len_fname = LEN_TRIM(restart_file)
+        IF (len_fname >= 4) THEN
+            ext = restart_file(len_fname-3:len_fname)
+        ELSE
+            ext = '    '
+        END IF
 
-      IF ( ext .EQ. '.bin' ) THEN
-         ! ---------------------------------------------------------
-         ! CASE 1: BINARY RESTART (Exact)
-         ! ---------------------------------------------------------
-         WRITE(*,*) 'Binary file (.bin) detected: Performing full restart.'
-         CALL read_restart_file(TRIM(restart_file), simulation%runtime,      &
-              simulation%stochastic, simulation%state, simulation%domain)
-         CALL validate_restart_output_manifest(simulation%runtime)
+        IF ( ext .EQ. '.bin' ) THEN
+            ! ---------------------------------------------------------
+            ! CASE 1: BINARY RESTART (Exact)
+            ! ---------------------------------------------------------
+            WRITE(*,*) 'Binary file (.bin) detected: Performing full restart.'
+            CALL read_restart_file(TRIM(restart_file), simulation%runtime,      &
+                    simulation%stochastic, simulation%state, simulation%domain)
+            CALL validate_restart_output_manifest(simulation%runtime)
 
-         is_binary_restart = .TRUE.
+            is_binary_restart = .TRUE.
 
-         ! In a binary restart, Z is already loaded, but we need to allocate the kernel
-         ! if spatial correlation is active
-         IF (stochastic_flag .AND. length_spatial_corr > 0.0_wp) THEN
-            CALL simulation%stochastic%generate_kernel()
-         END IF
+            ! In a binary restart, Z is already loaded, but we need to allocate the kernel
+            ! if spatial correlation is active
+            IF (stochastic_flag .AND. length_spatial_corr > 0.0_wp) THEN
+                CALL simulation%stochastic%generate_kernel()
+            END IF
 
-         IF (stochastic_flag) CALL simulation%stochastic%refresh_effective()
+            IF (stochastic_flag) CALL simulation%stochastic%refresh_effective()
 
-      ELSE
-         ! ---------------------------------------------------------
-         ! CASE 2: CLASSIC INITIALIZATION (Python / ASCII)
-         ! ---------------------------------------------------------
-         WRITE(*,*) 'Standard format detected: Executing read_solution.'
-         CALL read_solution(simulation%state, simulation%domain)
+        ELSE
+            ! ---------------------------------------------------------
+            ! CASE 2: CLASSIC INITIALIZATION (Python / ASCII)
+            ! ---------------------------------------------------------
+            WRITE(*,*) 'Standard format detected: Executing read_solution.'
+            CALL read_solution(simulation%state, simulation%domain)
 
-      END IF
+        END IF
 
-   ELSE
+    ELSE
 
-      IF ( collapsing_volume_flag ) THEN
+        IF ( collapsing_volume_flag ) THEN
 
-         CALL collapsing_volume(simulation%state)
+            CALL collapsing_volume(simulation%state)
 
-      ELSE
+        ELSE
 
-         CALL init_empty(simulation%state)
+            CALL init_empty(simulation%state)
 
-      END IF
+        END IF
 
-   END IF
+    END IF
 
-   CALL release_initialization_fields
+    CALL release_initialization_fields
 
-   IF ( output_netcdf_flag ) CALL init_netcdf_output
+    IF ( output_netcdf_flag ) CALL init_netcdf_output
 
-   IF ( radial_source_flag .OR. lateral_source_flag ) CALL init_source
+    IF ( radial_source_flag .OR. lateral_source_flag ) CALL init_source
 
-   CALL simulation%domain%check_solve(simulation%state%q,                    &
-        simulation%runtime%t, .TRUE.)
-   CALL simulation%spatial_operator%prepare_hp_workset(simulation%domain)
+    CALL simulation%domain%check_solve(simulation%state%q,                    &
+            simulation%runtime%t, .TRUE.)
+    CALL simulation%spatial_operator%prepare_hp_workset(simulation%domain)
 
-   ! For a new run or a classic restart, initialize the stochastic field only
-   ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
-   ! restart already contains Z and only needs its convolution kernel above.
-   IF ( stochastic_flag .AND. (.NOT. is_binary_restart) )                   &
-        CALL simulation%stochastic%initialize_steady(                        &
-        simulation%state, simulation%domain)
+    ! For a new run or a classic restart, initialize the stochastic field only
+    ! after check_solve has populated solve_cells, j_cent and k_cent. A binary
+    ! restart already contains Z and only needs its convolution kernel above.
+    IF ( stochastic_flag .AND. (.NOT. is_binary_restart) )                   &
+            CALL simulation%stochastic%initialize_steady(                        &
+            simulation%state, simulation%domain)
 
-   IF ( topo_change_flag ) CALL refresh_topography_geometry
+    IF ( topo_change_flag ) CALL refresh_topography_geometry
 
-   IF ( verbose_level .GE. 0 ) THEN
+    IF ( verbose_level .GE. 0 ) THEN
 
-      WRITE(*,*)
-      WRITE(*,*) '******** START COMPUTATION *********'
-      WRITE(*,*)
+        WRITE(*,*)
+        WRITE(*,*) '******** START COMPUTATION *********'
+        WRITE(*,*)
 
-   END IF
-
-   IF ( is_binary_restart ) THEN
-      ! The current step and its history were restored by read_restart_file.
-      WRITE(*,*) 'Restarting with saved timestep dt =', simulation%runtime%dt
-   ELSE
-      ! If it is a new simulation or a legacy restart, we use dt0 from the input
-      simulation%runtime%dt = dt0
-      simulation%runtime%dt_old = dt0
-      simulation%runtime%dt_old_old = dt0
-   END IF
-
-   stop_flag = .FALSE.
-   IF (is_binary_restart) THEN
-      stop_flag = simulation%runtime%stop_requested
-      IF (.NOT. stop_flag) simulation%runtime%steady_deadline = t_end
-   ELSE
-      simulation%runtime%steady_deadline = t_end
-   END IF
-
-   IF ( .NOT. is_binary_restart ) simulation%state%vuln_table = .FALSE.
-
-   !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2, &
-   !$OMP & thickness_exceeds,pressure_exceeds, &
-   !$OMP & mod_vel,r_u,r_v)
-
-   DO l = 1,simulation%domain%solve_cells
-
-      j = simulation%domain%j_cent(l)
-      k = simulation%domain%k_cent(l)
-
-      IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
-
-         CALL qc_to_qp(simulation%state%q(1:n_vars,j,k),                    &
-              simulation%state%qp(1:n_vars+2,j,k), p_dyn)
-
-         IF ( .NOT. is_binary_restart )                                     &
-              simulation%state%hmax(j,k) = simulation%state%qp(idx_h,j,k)
-
-         r_u = simulation%state%qp(n_vars+1,j,k)
-         r_v = simulation%state%qp(n_vars+2,j,k)
-
-         mod_vel2 = r_u**2 + r_v**2
-         mod_vel = SQRT( mod_vel2 )
-
-         IF ( ( .NOT. is_binary_restart ) .AND.                             &
-              ( simulation%state%qp(idx_h,j,k) .GT. 0.001_wp ) ) THEN
-
-            simulation%state%pdynmax(j,k) = p_dyn
-            simulation%state%mod_vel_max(j,k) = mod_vel
-
-         END IF
-
-         IF ( .NOT. is_binary_restart ) THEN
-
-            i_table = 0
-
-            DO i_thk_lev=1,n_thickness_levels
-
-               thickness_exceeds = &
-                    ( simulation%state%qp(idx_h,j,k) .GE.                       &
-                    thickness_levels(i_thk_lev) )
-
-               DO i_pdyn_lev=1,n_dyn_pres_levels
-
-                  pressure_exceeds = &
-                       ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
-
-                  i_table = i_table + 1
-
-                  simulation%state%vuln_table(i_table,j,k) =                &
-                       ( thickness_exceeds .AND. &
-                       pressure_exceeds )
-
-               END DO
-
-            END DO
-
-         END IF
-
-      ELSE
-
-         simulation%state%qp(1:n_vars,j,k) = 0.0_wp
-         simulation%state%qp(idx_T,j,k) = T_ambient
-         IF ( .NOT. is_binary_restart ) THEN
-            simulation%state%hmax(j,k) = 0.0_wp
-            simulation%state%pdynmax(j,k) = 0.0_wp
-            simulation%state%mod_vel_max(j,k) = 0.0_wp
-         END IF
-
-      END IF
-
-   END DO
-
-   !$OMP END PARALLEL DO
-
-   IF (is_binary_restart) THEN
-      CALL validate_runout_outputs(simulation%runtime, runout_exists, mass_exists)
-      CALL write_param_backup()
-   END IF
-   CALL open_runout_outputs(simulation%runtime, is_binary_restart, runout_exists, mass_exists)
-
-   IF ( output_runout_flag .AND. (.NOT. is_binary_restart) )                &
-        CALL output_runout(                                                  &
-        simulation%runtime%t, stop_flag, simulation%state, simulation%runtime)
-
-   IF ( output_cons_flag .OR. output_esri_flag .OR.                            &
-      output_netcdf_flag ) THEN
-      IF ( .NOT. is_binary_restart ) CALL output_solution(                   &
-      simulation%runtime%t, simulation%state, simulation%runtime)
-   END IF
-
-   IF ( ( n_probes .GT. 0 ) .AND. (.NOT. is_binary_restart) )               &
-        CALL output_probes(                                                  &
-        simulation%runtime%t, simulation%state, simulation%runtime)
-
-   IF ( SUM(simulation%state%q(idx_totMassEqn,:,:)) .EQ. 0.0_wp )                        &
-      simulation%runtime%steady_deadline = t_end
-
-   IF ( verbose_level .GE. 0 ) THEN
-
-      WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
-      &ES11.3E3,A11,ES11.3E3)")                                                &
-         't =',simulation%runtime%t,'dt =',simulation%runtime%dt,             &
-         ' mass = ',dx*dy*SUM(simulation%state%q(idx_totMassEqn,:,:)) ,                    &
-         ' volume = ',dx*dy*SUM(simulation%state%qp(idx_h,:,:)) ,                 &
-         ' area = ',dx*dy*COUNT(simulation%state%q(idx_totMassEqn,:,:).GT.1.D-5) ,         &
-         ' solid mass = ',dx*dy*SUM(simulation%state%q(5:4+n_solid,:,:)),     &
-         ' runout = ',simulation%runtime%runout%last_distance
-
-   END IF
-
-   CALL cpu_time(t2)
-   CALL system_clock (st2)
-
-   DO WHILE ( ( simulation%runtime%t .LT. t_end ) .AND.                       &
-        ( simulation%runtime%t .LT. simulation%runtime%steady_deadline ) )
-
-      CALL update_param
-
-      IF ( simulation%runtime%t .EQ. t_start ) THEN
-
-         CALL simulation%domain%check_solve(simulation%state%q,               &
-              simulation%runtime%t, .FALSE.)
-
-      ELSE
-
-         CALL simulation%domain%check_solve(simulation%state%q,               &
-              simulation%runtime%t, .FALSE.)
-
-      END IF
-
-      CALL simulation%spatial_operator%prepare_hp_workset(simulation%domain)
-
-      CALL simulation%spatial_operator%compute_timestep(                      &
-           simulation%state%q, simulation%state%qp, simulation%runtime%t,     &
-           simulation%runtime%dt, simulation%domain,                         &
-           boundary_source_enabled=boundary_source_enabled)
-
-      IF ( t_end - simulation%runtime%t_output < 1.0E-7_WP )                 &
-         simulation%runtime%t_output = t_end
-      IF ( t_end - simulation%runtime%t_runout < 1.0E-7_WP )                 &
-         simulation%runtime%t_runout = t_end
-      IF ( t_end - simulation%runtime%t_probes < 1.0E-7_WP )                 &
-         simulation%runtime%t_probes = t_end
-
-      IF ( simulation%runtime%t+simulation%runtime%dt .GT. t_end )            &
-           simulation%runtime%dt = t_end - simulation%runtime%t
-      IF ( simulation%runtime%t+simulation%runtime%dt .GT.                   &
-           simulation%runtime%t_output )                                     &
-           simulation%runtime%dt = simulation%runtime%t_output - simulation%runtime%t
-
-      IF ( output_runout_flag ) THEN
-
-         IF ( simulation%runtime%t+simulation%runtime%dt .GT.                &
-              simulation%runtime%t_runout )                                  &
-              simulation%runtime%dt = simulation%runtime%t_runout - simulation%runtime%t
-
-      END IF
-
-      IF ( n_probes .GT. 0 ) THEN
-
-         IF ( simulation%runtime%t+simulation%runtime%dt .GT.                &
-              simulation%runtime%t_probes )                                  &
-              simulation%runtime%dt = simulation%runtime%t_probes - simulation%runtime%t
-
-      END IF
-
-      simulation%runtime%dt = MIN(simulation%runtime%dt,1.1_wp * 0.5_wp *    &
-           ( simulation%runtime%dt_old + simulation%runtime%dt_old_old ) )
-
-      simulation%runtime%dt_old_old = simulation%runtime%dt_old
-      simulation%runtime%dt_old = simulation%runtime%dt
-
-      CALL simulation%advance_timestep()
-
-      !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2, &
-      !$OMP & thickness_exceeds,pressure_exceeds, &
-      !$OMP & mod_vel,r_u,r_v)
-
-
-      DO l = 1,simulation%domain%solve_cells
-
-         j = simulation%domain%j_cent(l)
-         k = simulation%domain%k_cent(l)
-
-         IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
-
-            CALL qc_to_qp(simulation%state%q(1:n_vars,j,k),                  &
-                 simulation%state%qp(1:n_vars+2,j,k), p_dyn)
-
-            simulation%state%hmax(j,k) = MAX(simulation%state%hmax(j,k),     &
-                 simulation%state%qp(idx_h,j,k))
+    END IF
+
+    IF ( is_binary_restart ) THEN
+        ! The current step and its history were restored by read_restart_file.
+        WRITE(*,*) 'Restarting with saved timestep dt =', simulation%runtime%dt
+    ELSE
+        ! If it is a new simulation or a legacy restart, we use dt0 from the input
+        simulation%runtime%dt = dt0
+        simulation%runtime%dt_old = dt0
+        simulation%runtime%dt_old_old = dt0
+    END IF
+
+    stop_flag = .FALSE.
+    IF (is_binary_restart) THEN
+        stop_flag = simulation%runtime%stop_requested
+        IF (.NOT. stop_flag) simulation%runtime%steady_deadline = t_end
+    ELSE
+        simulation%runtime%steady_deadline = t_end
+    END IF
+
+    IF ( .NOT. is_binary_restart ) simulation%state%vuln_table = .FALSE.
+
+    !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2, &
+    !$OMP & thickness_exceeds,pressure_exceeds, &
+    !$OMP & mod_vel,r_u,r_v)
+
+    DO l = 1,simulation%domain%solve_cells
+
+        j = simulation%domain%j_cent(l)
+        k = simulation%domain%k_cent(l)
+
+        IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
+
+            CALL qc_to_qp(simulation%state%q(1:n_vars,j,k),                    &
+                    simulation%state%qp(1:n_vars+2,j,k), p_dyn)
+
+            IF ( .NOT. is_binary_restart )                                     &
+                    simulation%state%hmax(j,k) = simulation%state%qp(idx_h,j,k)
 
             r_u = simulation%state%qp(n_vars+1,j,k)
             r_v = simulation%state%qp(n_vars+2,j,k)
@@ -486,131 +311,306 @@ PROGRAM IMEX_SfloW2D
             mod_vel2 = r_u**2 + r_v**2
             mod_vel = SQRT( mod_vel2 )
 
-            IF ( simulation%state%qp(idx_h,j,k) .GT. 0.001_wp ) THEN
+            IF ( ( .NOT. is_binary_restart ) .AND.                             &
+                    ( simulation%state%qp(idx_h,j,k) .GT. 0.001_wp ) ) THEN
 
-               simulation%state%pdynmax(j,k) =                               &
-                    MAX(simulation%state%pdynmax(j,k), p_dyn)
-               simulation%state%mod_vel_max(j,k) =                           &
-                    MAX(simulation%state%mod_vel_max(j,k), mod_vel)
+                simulation%state%pdynmax(j,k) = p_dyn
+                simulation%state%mod_vel_max(j,k) = mod_vel
 
             END IF
 
-            i_table = 0
+            IF ( .NOT. is_binary_restart ) THEN
 
-            DO i_thk_lev=1,n_thickness_levels
+                i_table = 0
 
-               thickness_exceeds = &
-                    ( simulation%state%qp(idx_h,j,k) .GE.                        &
-                    thickness_levels(i_thk_lev) )
+                DO i_thk_lev=1,n_thickness_levels
 
-               DO i_pdyn_lev=1,n_dyn_pres_levels
+                    thickness_exceeds = &
+                            ( simulation%state%qp(idx_h,j,k) .GE.                       &
+                            thickness_levels(i_thk_lev) )
 
-                  pressure_exceeds = &
-                       ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
+                    DO i_pdyn_lev=1,n_dyn_pres_levels
 
-                  i_table = i_table + 1
+                        pressure_exceeds = &
+                                ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
 
-                  simulation%state%vuln_table(i_table,j,k) =                 &
-                       simulation%state%vuln_table(i_table,j,k) .OR.          &
-                       ( thickness_exceeds .AND. &
-                       pressure_exceeds )
+                        i_table = i_table + 1
 
-               END DO
+                        simulation%state%vuln_table(i_table,j,k) =                &
+                                ( thickness_exceeds .AND. &
+                                pressure_exceeds )
 
-            END DO
+                    END DO
 
-         ELSE
+                END DO
 
-            simulation%state%qp(1:n_vars+2,j,k) = 0.0_wp
+            END IF
+
+        ELSE
+
+            simulation%state%qp(1:n_vars,j,k) = 0.0_wp
             simulation%state%qp(idx_T,j,k) = T_ambient
+            IF ( .NOT. is_binary_restart ) THEN
+                simulation%state%hmax(j,k) = 0.0_wp
+                simulation%state%pdynmax(j,k) = 0.0_wp
+                simulation%state%mod_vel_max(j,k) = 0.0_wp
+            END IF
 
-         END IF
+        END IF
 
-      END DO
+    END DO
 
-      !$OMP END PARALLEL DO
+    !$OMP END PARALLEL DO
 
-      IF ( verbose_level .GE. 0 ) THEN
+    IF (is_binary_restart) THEN
+        CALL validate_runout_outputs(simulation%runtime, runout_exists, mass_exists)
+        CALL write_param_backup()
+    END IF
+    CALL open_runout_outputs(simulation%runtime, is_binary_restart, runout_exists, mass_exists)
 
-         WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
-         &ES11.3E3,A11,ES11.3E3)")                                             &
-            't =',simulation%runtime%t,'dt =',simulation%runtime%dt,          &
-            ' mass = ',dx*dy*SUM(simulation%state%q(idx_totMassEqn,:,:)) ,                 &
-            ' volume = ',dx*dy*SUM(simulation%state%qp(idx_h,:,:)) ,              &
-            ' area = ',dx*dy*COUNT(simulation%state%q(idx_totMassEqn,:,:).GT.1.D-7) ,      &
-            ' solid mass = ',dx*dy*SUM(                                      &
-            simulation%state%q(5:4+n_solid,:,:)),                            &
+    IF ( output_runout_flag .AND. (.NOT. is_binary_restart) )                &
+            CALL output_runout(                                                  &
+            simulation%runtime%t, stop_flag, simulation%state, simulation%runtime)
+
+    IF ( output_cons_flag .OR. output_esri_flag .OR.                            &
+        output_netcdf_flag ) THEN
+        IF ( .NOT. is_binary_restart ) CALL output_solution(                   &
+        simulation%runtime%t, simulation%state, simulation%runtime)
+    END IF
+
+    IF ( ( n_probes .GT. 0 ) .AND. (.NOT. is_binary_restart) )               &
+            CALL output_probes(                                                  &
+            simulation%runtime%t, simulation%state, simulation%runtime)
+
+    IF ( SUM(simulation%state%q(idx_totMassEqn,:,:)) .EQ. 0.0_wp )                        &
+        simulation%runtime%steady_deadline = t_end
+
+    IF ( verbose_level .GE. 0 ) THEN
+
+        WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
+        &ES11.3E3,A11,ES11.3E3)")                                                &
+            't =',simulation%runtime%t,'dt =',simulation%runtime%dt,             &
+            ' mass = ',dx*dy*SUM(simulation%state%q(idx_totMassEqn,:,:)) ,                    &
+            ' volume = ',dx*dy*SUM(simulation%state%qp(idx_h,:,:)) ,                 &
+            ' area = ',dx*dy*COUNT(simulation%state%q(idx_totMassEqn,:,:).GT.1.D-5) ,         &
+            ' solid mass = ',dx*dy*SUM(simulation%state%q(5:4+n_solid,:,:)),     &
             ' runout = ',simulation%runtime%runout%last_distance
 
-      END IF
+    END IF
 
-      IF ( output_runout_flag ) THEN
+    CALL cpu_time(t2)
+    CALL system_clock (st2)
 
-         IF ( ( simulation%runtime%t .GE. simulation%runtime%t_runout ) .OR. &
-              ( simulation%runtime%t .GE.                                    &
-                simulation%runtime%steady_deadline ) ) THEN
+    DO WHILE ( ( simulation%runtime%t .LT. t_end ) .AND.                       &
+            ( simulation%runtime%t .LT. simulation%runtime%steady_deadline ) )
 
-            stop_flag_old = stop_flag
+        CALL update_param
 
-            IF ( output_runout_flag ) CALL output_runout(                    &
-                 simulation%runtime%t, stop_flag, simulation%state, simulation%runtime)
+        IF ( simulation%runtime%t .EQ. t_start ) THEN
 
-            IF ( ( stop_flag ) .AND. (.NOT.stop_flag_old) ) THEN
+            CALL simulation%domain%check_solve(simulation%state%q,               &
+                    simulation%runtime%t, .FALSE.)
 
-               simulation%runtime%steady_deadline =                         &
-                    MIN(t_end, simulation%runtime%t_output)
+        ELSE
+
+            CALL simulation%domain%check_solve(simulation%state%q,               &
+                    simulation%runtime%t, .FALSE.)
+
+        END IF
+
+        CALL simulation%spatial_operator%prepare_hp_workset(simulation%domain)
+
+        CALL simulation%spatial_operator%compute_timestep(                      &
+                simulation%state%q, simulation%state%qp, simulation%runtime%t,     &
+                simulation%runtime%dt, simulation%domain,                         &
+                boundary_source_enabled=boundary_source_enabled)
+
+        IF ( t_end - simulation%runtime%t_output < 1.0E-7_WP )                 &
+            simulation%runtime%t_output = t_end
+        IF ( t_end - simulation%runtime%t_runout < 1.0E-7_WP )                 &
+            simulation%runtime%t_runout = t_end
+        IF ( t_end - simulation%runtime%t_probes < 1.0E-7_WP )                 &
+            simulation%runtime%t_probes = t_end
+
+        IF ( simulation%runtime%t+simulation%runtime%dt .GT. t_end )            &
+                simulation%runtime%dt = t_end - simulation%runtime%t
+        IF ( simulation%runtime%t+simulation%runtime%dt .GT.                   &
+                simulation%runtime%t_output )                                     &
+                simulation%runtime%dt = simulation%runtime%t_output - simulation%runtime%t
+
+        IF ( output_runout_flag ) THEN
+
+            IF ( simulation%runtime%t+simulation%runtime%dt .GT.                &
+                    simulation%runtime%t_runout )                                  &
+                    simulation%runtime%dt = simulation%runtime%t_runout - simulation%runtime%t
+
+        END IF
+
+        IF ( n_probes .GT. 0 ) THEN
+
+            IF ( simulation%runtime%t+simulation%runtime%dt .GT.                &
+                    simulation%runtime%t_probes )                                  &
+                    simulation%runtime%dt = simulation%runtime%t_probes - simulation%runtime%t
+
+        END IF
+
+        simulation%runtime%dt = MIN(simulation%runtime%dt,1.1_wp * 0.5_wp *    &
+                ( simulation%runtime%dt_old + simulation%runtime%dt_old_old ) )
+
+        simulation%runtime%dt_old_old = simulation%runtime%dt_old
+        simulation%runtime%dt_old = simulation%runtime%dt
+
+        CALL simulation%advance_timestep()
+
+        !$OMP PARALLEL DO private(j,k,p_dyn,i_table,i_thk_lev,i_pdyn_lev,mod_vel2, &
+        !$OMP & thickness_exceeds,pressure_exceeds, &
+        !$OMP & mod_vel,r_u,r_v)
+
+
+        DO l = 1,simulation%domain%solve_cells
+
+            j = simulation%domain%j_cent(l)
+            k = simulation%domain%k_cent(l)
+
+            IF ( simulation%state%q(idx_totMassEqn,j,k) .GT. 0.0_wp ) THEN
+
+                CALL qc_to_qp(simulation%state%q(1:n_vars,j,k),                  &
+                        simulation%state%qp(1:n_vars+2,j,k), p_dyn)
+
+                simulation%state%hmax(j,k) = MAX(simulation%state%hmax(j,k),     &
+                        simulation%state%qp(idx_h,j,k))
+
+                r_u = simulation%state%qp(n_vars+1,j,k)
+                r_v = simulation%state%qp(n_vars+2,j,k)
+
+                mod_vel2 = r_u**2 + r_v**2
+                mod_vel = SQRT( mod_vel2 )
+
+                IF ( simulation%state%qp(idx_h,j,k) .GT. 0.001_wp ) THEN
+
+                    simulation%state%pdynmax(j,k) =                               &
+                            MAX(simulation%state%pdynmax(j,k), p_dyn)
+                    simulation%state%mod_vel_max(j,k) =                           &
+                            MAX(simulation%state%mod_vel_max(j,k), mod_vel)
+
+                END IF
+
+                i_table = 0
+
+                DO i_thk_lev=1,n_thickness_levels
+
+                    thickness_exceeds = &
+                            ( simulation%state%qp(idx_h,j,k) .GE.                        &
+                            thickness_levels(i_thk_lev) )
+
+                    DO i_pdyn_lev=1,n_dyn_pres_levels
+
+                        pressure_exceeds = &
+                                ( p_dyn .GE. dyn_pres_levels(i_pdyn_lev) )
+
+                        i_table = i_table + 1
+
+                        simulation%state%vuln_table(i_table,j,k) =                 &
+                                simulation%state%vuln_table(i_table,j,k) .OR.          &
+                                ( thickness_exceeds .AND. &
+                                pressure_exceeds )
+
+                    END DO
+
+                END DO
+
+            ELSE
+
+                simulation%state%qp(1:n_vars+2,j,k) = 0.0_wp
+                simulation%state%qp(idx_T,j,k) = T_ambient
 
             END IF
 
-         END IF
+        END DO
 
-      END IF
+        !$OMP END PARALLEL DO
 
-      IF ( n_probes .GT. 0 ) THEN
+        IF ( verbose_level .GE. 0 ) THEN
 
-         IF ( simulation%runtime%t .GE. simulation%runtime%t_probes )        &
-              CALL output_probes(simulation%runtime%t, simulation%state,     &
-                   simulation%runtime)
+            WRITE(*,FMT="(A3,F11.4,A5,F9.5,A9,ES11.3E3,A11,ES11.3E3,A9,ES11.3E3,A15,   &
+            &ES11.3E3,A11,ES11.3E3)")                                             &
+                't =',simulation%runtime%t,'dt =',simulation%runtime%dt,          &
+                ' mass = ',dx*dy*SUM(simulation%state%q(idx_totMassEqn,:,:)) ,                 &
+                ' volume = ',dx*dy*SUM(simulation%state%qp(idx_h,:,:)) ,              &
+                ' area = ',dx*dy*COUNT(simulation%state%q(idx_totMassEqn,:,:).GT.1.D-7) ,      &
+                ' solid mass = ',dx*dy*SUM(                                      &
+                simulation%state%q(5:4+n_solid,:,:)),                            &
+                ' runout = ',simulation%runtime%runout%last_distance
 
-      END IF
+        END IF
 
-      IF ( ( simulation%runtime%t .GE. simulation%runtime%t_output ) .OR.   &
-           ( simulation%runtime%t .GE. t_end ) ) THEN
+        IF ( output_runout_flag ) THEN
 
-         CALL cpu_time(t3)
-         CALL system_clock(st3)
+            IF ( ( simulation%runtime%t .GE. simulation%runtime%t_runout ) .OR. &
+                    ( simulation%runtime%t .GE.                                    &
+                        simulation%runtime%steady_deadline ) ) THEN
 
-         IF ( verbose_level .GE. 0 ) THEN
+                stop_flag_old = stop_flag
 
-            WRITE(*,*) 'Time taken by iterations is',t3-t2,'seconds'
-            WRITE(*,*) 'Elapsed real time = ', DBLE( st3 - st2 ) / rate,'seconds'
+                IF ( output_runout_flag ) CALL output_runout(                    &
+                        simulation%runtime%t, stop_flag, simulation%state, simulation%runtime)
 
-         END IF
+                IF ( ( stop_flag ) .AND. (.NOT.stop_flag_old) ) THEN
 
-         IF ( output_cons_flag .OR. output_esri_flag .OR. output_netcdf_flag ) THEN
+                    simulation%runtime%steady_deadline =                         &
+                            MIN(t_end, simulation%runtime%t_output)
 
-            CALL output_solution(simulation%runtime%t, simulation%state,    &
-                 simulation%runtime)
-            CALL write_restart_file(output_file_path('restart', 'restart.bin'), &
-                 simulation%runtime,                                         &
-                 simulation%stochastic, simulation%state, simulation%domain)
+                END IF
 
-         END IF
+            END IF
 
-      END IF
+        END IF
 
-   END DO
+        IF ( n_probes .GT. 0 ) THEN
 
-   CALL simulation%finalize
+            IF ( simulation%runtime%t .GE. simulation%runtime%t_probes )        &
+                    CALL output_probes(simulation%runtime%t, simulation%state,     &
+                            simulation%runtime)
 
-   IF ( output_netcdf_flag ) CALL close_netcdf
+        END IF
 
-   CALL close_units
+        IF ( ( simulation%runtime%t .GE. simulation%runtime%t_output ) .OR.   &
+                ( simulation%runtime%t .GE. t_end ) ) THEN
 
-   CALL cpu_time(t3)
-   CALL system_clock(st3)
+            CALL cpu_time(t3)
+            CALL system_clock(st3)
 
-   WRITE(*,*) 'Total time taken by the code is',t3-t1,'seconds'
-   WRITE(*,*) 'Total elapsed real time is', DBLE( st3 - st1 ) / rate,'seconds'
+            IF ( verbose_level .GE. 0 ) THEN
+
+                WRITE(*,*) 'Time taken by iterations is',t3-t2,'seconds'
+                WRITE(*,*) 'Elapsed real time = ', DBLE( st3 - st2 ) / rate,'seconds'
+
+            END IF
+
+            IF ( output_cons_flag .OR. output_esri_flag .OR. output_netcdf_flag ) THEN
+
+                CALL output_solution(simulation%runtime%t, simulation%state,    &
+                        simulation%runtime)
+                CALL write_restart_file(output_file_path('restart', 'restart.bin'), &
+                        simulation%runtime,                                         &
+                        simulation%stochastic, simulation%state, simulation%domain)
+
+            END IF
+
+        END IF
+
+    END DO
+
+    CALL simulation%finalize
+
+    IF ( output_netcdf_flag ) CALL close_netcdf
+
+    CALL close_units
+
+    CALL cpu_time(t3)
+    CALL system_clock(st3)
+
+    WRITE(*,*) 'Total time taken by the code is',t3-t1,'seconds'
+    WRITE(*,*) 'Total elapsed real time is', DBLE( st3 - st1 ) / rate,'seconds'
 
 END PROGRAM IMEX_SfloW2D

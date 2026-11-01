@@ -7,262 +7,262 @@
 
 MODULE constitutive_parameters_2d
 
-  USE parameters_2d, ONLY : wp
+    USE parameters_2d, ONLY : wp
 
-  IMPLICIT NONE
+    IMPLICIT NONE
 
-  PRIVATE
+    PRIVATE
 
-  ! Public constitutive-model configuration. Keep this list explicit so that
-  ! implementation details and names imported from other modules are not
-  ! re-exported accidentally.
-  PUBLIC :: entrainment_flag
-  PUBLIC :: grav, inv_grav
-  PUBLIC :: A_drag, B_drag, collective_settling_flag
-  PUBLIC :: alpha_trans, N_inh, f_inhibit_mode
-  PUBLIC :: T_env, emme, c_p
-  PUBLIC :: convective_term_coeff, atm_heat_transf_coeff, exp_area_fract
-  PUBLIC :: radiative_term_coeff, SBconst, emissivity, enne, T_ground
-  PUBLIC :: thermal_conductivity
-  PUBLIC :: rho_c_sub, rho_a_amb
-  PUBLIC :: sp_heat_a, sp_gas_const_a, kin_visc_a
-  PUBLIC :: sp_heat_g, sp_gas_const_g
-  PUBLIC :: kin_visc_l, kin_visc_c, Tref_Suth, muRef_Suth, S_mu, T_ambient
-  PUBLIC :: rho_s, inv_rho_s, diam_s, sphericity_s, sp_heat_s
-  PUBLIC :: settling_flag, alphastot_min
-  PUBLIC :: erosion_coeff, loss_rate, erodible_fract, erodible_porosity
-  PUBLIC :: coeff_porosity, T_erodible
-  PUBLIC :: pres, inv_pres, rho_l, inv_rho_l, sp_heat_l, gamma_steam, vonK
-  PUBLIC :: hydraulic_permeability, dynamic_permeability_flag
-  PUBLIC :: maximum_solid_packing
-  PUBLIC :: pascal_coeff, pascal_coeff_precomputed
-  PUBLIC :: precompute_pascal_coefficient
+    ! Public constitutive-model configuration. Keep this list explicit so that
+    ! implementation details and names imported from other modules are not
+    ! re-exported accidentally.
+    PUBLIC :: entrainment_flag
+    PUBLIC :: grav, inv_grav
+    PUBLIC :: A_drag, B_drag, collective_settling_flag
+    PUBLIC :: alpha_trans, N_inh, f_inhibit_mode
+    PUBLIC :: T_env, emme, c_p
+    PUBLIC :: convective_term_coeff, atm_heat_transf_coeff, exp_area_fract
+    PUBLIC :: radiative_term_coeff, SBconst, emissivity, enne, T_ground
+    PUBLIC :: thermal_conductivity
+    PUBLIC :: rho_c_sub, rho_a_amb
+    PUBLIC :: sp_heat_a, sp_gas_const_a, kin_visc_a
+    PUBLIC :: sp_heat_g, sp_gas_const_g
+    PUBLIC :: kin_visc_l, kin_visc_c, Tref_Suth, muRef_Suth, S_mu, T_ambient
+    PUBLIC :: rho_s, inv_rho_s, diam_s, sphericity_s, sp_heat_s
+    PUBLIC :: settling_flag, alphastot_min
+    PUBLIC :: erosion_coeff, loss_rate, erodible_fract, erodible_porosity
+    PUBLIC :: coeff_porosity, T_erodible
+    PUBLIC :: pres, inv_pres, rho_l, inv_rho_l, sp_heat_l, gamma_steam, vonK
+    PUBLIC :: hydraulic_permeability, dynamic_permeability_flag
+    PUBLIC :: maximum_solid_packing
+    PUBLIC :: pascal_coeff, pascal_coeff_precomputed
+    PUBLIC :: precompute_pascal_coefficient
 
-  !> flag to activate air entrainment
-  LOGICAL :: entrainment_flag
+    !> flag to activate air entrainment
+    LOGICAL :: entrainment_flag
 
-  !> gravitational acceleration
-  REAL(wp) :: grav
-  REAL(wp) :: inv_grav
+    !> gravitational acceleration
+    REAL(wp) :: grav
+    REAL(wp) :: inv_grav
 
 
-  !> Optional collective-settling drag-law coefficients
-  REAL(wp) :: A_drag
-  REAL(wp) :: B_drag
-  LOGICAL :: collective_settling_flag
-   !> f_inhibit
-   REAL(wp) :: alpha_trans !< solid volume fraction at which f_inhibit starts decreasing
-   INTEGER :: N_inh = 2 !< 2N+1 determines order of the smoothstep function for f_inhibit
-   CHARACTER(LEN=8) :: f_inhibit_mode = 'OFF'  ! options: 'OFF','STATIC','DYNAMIC'
+    !> Optional collective-settling drag-law coefficients
+    REAL(wp) :: A_drag
+    REAL(wp) :: B_drag
+    LOGICAL :: collective_settling_flag
+    !> f_inhibit
+    REAL(wp) :: alpha_trans !< solid volume fraction at which f_inhibit starts decreasing
+    INTEGER :: N_inh = 2 !< 2N+1 determines order of the smoothstep function for f_inhibit
+    CHARACTER(LEN=8) :: f_inhibit_mode = 'OFF'  ! options: 'OFF','STATIC','DYNAMIC'
 
-  !> evironment temperature [K]
-  REAL(wp) :: T_env
+    !> evironment temperature [K]
+    REAL(wp) :: T_env
 
-  !> velocity boundary layer fraction of total thickness
-  REAL(wp) :: emme
+    !> velocity boundary layer fraction of total thickness
+    REAL(wp) :: emme
 
-  !> specific heat [J kg-1 K-1]
-  REAL(wp) :: c_p
+    !> specific heat [J kg-1 K-1]
+    REAL(wp) :: c_p
 
-  !> coefficient for the convective term in the temperature equation for lava
-  REAL(wp) :: convective_term_coeff
+    !> coefficient for the convective term in the temperature equation for lava
+    REAL(wp) :: convective_term_coeff
 
-  !> atmospheric heat trasnfer coefficient [W m-2 K-1] (lambda in C&M, 2005)
-  REAL(wp) :: atm_heat_transf_coeff
+    !> atmospheric heat trasnfer coefficient [W m-2 K-1] (lambda in C&M, 2005)
+    REAL(wp) :: atm_heat_transf_coeff
 
-  !> fractional area of the exposed inner core (f in C&M, 2005)
-  REAL(wp) :: exp_area_fract
+    !> fractional area of the exposed inner core (f in C&M, 2005)
+    REAL(wp) :: exp_area_fract
 
-  !> coefficient for the radiative term in the temperature equation for lava
-  REAL(wp) :: radiative_term_coeff
+    !> coefficient for the radiative term in the temperature equation for lava
+    REAL(wp) :: radiative_term_coeff
 
-  !> Stephan-Boltzmann constant [W m-2 K-4]
-  REAL(wp), PARAMETER :: SBconst = 5.67E-8_wp
+    !> Stephan-Boltzmann constant [W m-2 K-4]
+    REAL(wp), PARAMETER :: SBconst = 5.67E-8_wp
 
-  !> emissivity (eps in Costa & Macedonio, 2005)
-  REAL(wp) :: emissivity
+    !> emissivity (eps in Costa & Macedonio, 2005)
+    REAL(wp) :: emissivity
 
-  !> thermal boundary layer fraction of total thickness
-  REAL(wp) :: enne
+    !> thermal boundary layer fraction of total thickness
+    REAL(wp) :: enne
 
-  !> temperature of lava-ground interface
-  REAL(wp) :: T_ground
+    !> temperature of lava-ground interface
+    REAL(wp) :: T_ground
 
-  !> thermal conductivity [W m-1 K-1] (k in Costa & Macedonio, 2005)
-  REAL(wp) :: thermal_conductivity
+    !> thermal conductivity [W m-1 K-1] (k in Costa & Macedonio, 2005)
+    REAL(wp) :: thermal_conductivity
 
-  !> Specific gas constant of gas mixture (units: J kg-1 K-1)
+    !> Specific gas constant of gas mixture (units: J kg-1 K-1)
 
-  !> Density of carrier phase in substrate ( units: kg m-3 )
-  REAL(wp) :: rho_c_sub
+    !> Density of carrier phase in substrate ( units: kg m-3 )
+    REAL(wp) :: rho_c_sub
 
-  !> Ambient density of air ( units: kg m-3 )
-  REAL(wp) :: rho_a_amb
+    !> Ambient density of air ( units: kg m-3 )
+    REAL(wp) :: rho_a_amb
 
-  !> Specific heat of air (units: J K-1 kg-1)
-  REAL(wp) :: sp_heat_a
+    !> Specific heat of air (units: J K-1 kg-1)
+    REAL(wp) :: sp_heat_a
 
-  !> Specific gas constant of air (units: J kg-1 K-1)
-  REAL(wp) :: sp_gas_const_a
+    !> Specific gas constant of air (units: J kg-1 K-1)
+    REAL(wp) :: sp_gas_const_a
 
-  !> Kinematic viscosity of air (units: m2 s-1)
-  REAL(wp) :: kin_visc_a
+    !> Kinematic viscosity of air (units: m2 s-1)
+    REAL(wp) :: kin_visc_a
 
-  !> Specific heat of additional gas (units: J K-1 kg-1)
-  REAL(wp), ALLOCATABLE :: sp_heat_g(:)
+    !> Specific heat of additional gas (units: J K-1 kg-1)
+    REAL(wp), ALLOCATABLE :: sp_heat_g(:)
 
-  !> Specific gas constant of additional gas (units: J kg-1 K-1)
-  REAL(wp), ALLOCATABLE :: sp_gas_const_g(:)
+    !> Specific gas constant of additional gas (units: J kg-1 K-1)
+    REAL(wp), ALLOCATABLE :: sp_gas_const_g(:)
 
-  !> Kinematic viscosity of liquid (units: m2 s-1)
-  REAL(wp) :: kin_visc_l
+    !> Kinematic viscosity of liquid (units: m2 s-1)
+    REAL(wp) :: kin_visc_l
 
-  !> Kinematic viscosity of carrier phase (units: m2 s-1)
-  REAL(wp) :: kin_visc_c
+    !> Kinematic viscosity of carrier phase (units: m2 s-1)
+    REAL(wp) :: kin_visc_c
 
-  !> Reference temperature for Sutherland’s law (units: K)
-  REAL(wp) :: Tref_Suth
+    !> Reference temperature for Sutherland’s law (units: K)
+    REAL(wp) :: Tref_Suth
 
-  !> Reference viscosity for Sutherland's law (units: kg m-1 s-1)
-  REAL(wp) :: muRef_Suth
+    !> Reference viscosity for Sutherland's law (units: kg m-1 s-1)
+    REAL(wp) :: muRef_Suth
 
-  !> Sutherland constant for Sutherland’s law (units: K)
-  REAL(wp) :: S_mu
+    !> Sutherland constant for Sutherland’s law (units: K)
+    REAL(wp) :: S_mu
 
-  !> Temperature of ambient air (units: K)
-  REAL(wp) :: T_ambient
+    !> Temperature of ambient air (units: K)
+    REAL(wp) :: T_ambient
 
-  !> Density of sediments ( units: kg m-3 )
-  REAL(wp), ALLOCATABLE :: rho_s(:)
+    !> Density of sediments ( units: kg m-3 )
+    REAL(wp), ALLOCATABLE :: rho_s(:)
 
-  !> Reciprocal of density of sediments ( units: kg m-3 )
-  REAL(wp), ALLOCATABLE :: inv_rho_s(:)
+    !> Reciprocal of density of sediments ( units: kg m-3 )
+    REAL(wp), ALLOCATABLE :: inv_rho_s(:)
 
-  !> Diameter of sediments ( units: m )
-  REAL(wp), ALLOCATABLE :: diam_s(:)
+    !> Diameter of sediments ( units: m )
+    REAL(wp), ALLOCATABLE :: diam_s(:)
 
-  !> Sphericity of sediments (dimensionless, default 1.0)
-  REAL(wp), ALLOCATABLE :: sphericity_s(:)
+    !> Sphericity of sediments (dimensionless, default 1.0)
+    REAL(wp), ALLOCATABLE :: sphericity_s(:)
 
-  !> Specific heat of solids (units: J K-1 kg-1)
-  REAL(wp), ALLOCATABLE :: sp_heat_s(:)
+    !> Specific heat of solids (units: J K-1 kg-1)
+    REAL(wp), ALLOCATABLE :: sp_heat_s(:)
 
-  !> Flag to determine if sedimentation is active
-  LOGICAL :: settling_flag
+    !> Flag to determine if sedimentation is active
+    LOGICAL :: settling_flag
 
-  !> Minimum volume fraction of solids in the flow
-  REAL(wp) :: alphastot_min
+    !> Minimum volume fraction of solids in the flow
+    REAL(wp) :: alphastot_min
 
-  !> erosion model coefficient  (units: m-1 )
-  REAL(wp), ALLOCATABLE :: erosion_coeff
+    !> erosion model coefficient  (units: m-1 )
+    REAL(wp), ALLOCATABLE :: erosion_coeff
 
-  !> water loss_rate (unit: m s-1)
-  REAL(wp), ALLOCATABLE :: loss_rate
+    !> water loss_rate (unit: m s-1)
+    REAL(wp), ALLOCATABLE :: loss_rate
 
-  !> erodible substrate solid relative volume fractions
-  REAL(wp), ALLOCATABLE :: erodible_fract(:)
+    !> erodible substrate solid relative volume fractions
+    REAL(wp), ALLOCATABLE :: erodible_fract(:)
 
-  !> erodible substrate porosity (we assume filled by continous phase)
-  REAL(wp) :: erodible_porosity
+    !> erodible substrate porosity (we assume filled by continous phase)
+    REAL(wp) :: erodible_porosity
 
-  !> coefficient to compute (eroded/deposited) volume of continuous phase
-  !> from volume of solid
-  REAL(wp) :: coeff_porosity
+    !> coefficient to compute (eroded/deposited) volume of continuous phase
+    !> from volume of solid
+    REAL(wp) :: coeff_porosity
 
-  !> temperature of erodible substrate (units: K)
-  REAL(wp) :: T_erodible
+    !> temperature of erodible substrate (units: K)
+    REAL(wp) :: T_erodible
 
-  !> ambient pressure (units: Pa)
-  REAL(wp) :: pres
+    !> ambient pressure (units: Pa)
+    REAL(wp) :: pres
 
-  !> reciprocal of ambient pressure (units: Pa)
-  REAL(wp) :: inv_pres
+    !> reciprocal of ambient pressure (units: Pa)
+    REAL(wp) :: inv_pres
 
-  !> liquid density (units: kg m-3)
-  REAL(wp) :: rho_l
+    !> liquid density (units: kg m-3)
+    REAL(wp) :: rho_l
 
-  !> reciprocal of liquid density (units: kg m-3)
-  REAL(wp) :: inv_rho_l
+    !> reciprocal of liquid density (units: kg m-3)
+    REAL(wp) :: inv_rho_l
 
-  !> Sepcific heat of liquid (units: J K-1 kg-1)
-  REAL(wp) :: sp_heat_l
+    !> Sepcific heat of liquid (units: J K-1 kg-1)
+    REAL(wp) :: sp_heat_l
 
-  !> Fraction of heat lost by particles producing steam
-  REAL(wp) :: gamma_steam
+    !> Fraction of heat lost by particles producing steam
+    REAL(wp) :: gamma_steam
 
-  !> Von Karman constant used for the diagnostic Rouse number
-  REAL(wp) :: vonK
+    !> Von Karman constant used for the diagnostic Rouse number
+    REAL(wp) :: vonK
 
-  !> Hydraulic permeability (units: m2)
-  REAL(wp) :: hydraulic_permeability
-  !> Flag to activate dynamic permeability
-  LOGICAL :: dynamic_permeability_flag
+    !> Hydraulic permeability (units: m2)
+    REAL(wp) :: hydraulic_permeability
+    !> Flag to activate dynamic permeability
+    LOGICAL :: dynamic_permeability_flag
 
-  !> Maximum solid packing fraction
-  REAL(wp) :: maximum_solid_packing
+    !> Maximum solid packing fraction
+    REAL(wp) :: maximum_solid_packing
 
-  ! store combined pascal coefficients: coeff(n) = pascal1(n) * pascal2(n)
-  REAL(wp), ALLOCATABLE :: pascal_coeff(:)   ! index with 0..N_inh
-  LOGICAL :: pascal_coeff_precomputed
+    ! store combined pascal coefficients: coeff(n) = pascal1(n) * pascal2(n)
+    REAL(wp), ALLOCATABLE :: pascal_coeff(:)   ! index with 0..N_inh
+    LOGICAL :: pascal_coeff_precomputed
 
 CONTAINS
 
-  !> \brief Precompute binomial coefficients for constitutive polynomial expansions.
-  !>
-  !> Function that calculates the pascal coefficients for the smooth transition of f_inhibit
-  !>
-  !> \param[in] N_order Nonnegative transition-polynomial order; coefficients use indices 0:N_order.
-  !>
-  !> \note Writes pascal_coeff(0:N_order) and pascal_coeff_precomputed in this module.
+    !> \brief Precompute binomial coefficients for constitutive polynomial expansions.
+    !>
+    !> Function that calculates the pascal coefficients for the smooth transition of f_inhibit
+    !>
+    !> \param[in] N_order Nonnegative transition-polynomial order; coefficients use indices 0:N_order.
+    !>
+    !> \note Writes pascal_coeff(0:N_order) and pascal_coeff_precomputed in this module.
 
-  SUBROUTINE precompute_pascal_coefficient(N_order)
-    !! Computes the two Pascal-like coefficients for each n = 0..N
-    !! Stores their product in the module array pascal_coeff(0:N_order).
-    IMPLICIT NONE
-    INTEGER, INTENT(IN) :: N_order
-    INTEGER :: n, k
-    REAL(wp) :: pascal1, pascal2
+    SUBROUTINE precompute_pascal_coefficient(N_order)
+        !! Computes the two Pascal-like coefficients for each n = 0..N
+        !! Stores their product in the module array pascal_coeff(0:N_order).
+        IMPLICIT NONE
+        INTEGER, INTENT(IN) :: N_order
+        INTEGER :: n, k
+        REAL(wp) :: pascal1, pascal2
 
-    ! allocate or reallocate pascal_coeff with 0-based indices
-   IF ( ALLOCATED(pascal_coeff) ) THEN
-      IF ( LBOUND(pascal_coeff,1) /= 0 .OR. UBOUND(pascal_coeff,1) /= N_order ) THEN
-         DEALLOCATE(pascal_coeff)
-         ALLOCATE(pascal_coeff(0:N_order))
-      END IF
-   ELSE
-      ALLOCATE(pascal_coeff(0:N_order))
-   END IF
-
-    ! Validate input
-    IF (N_order < 0) THEN
-        WRITE(*,*) 'ERROR: N must be >= 0. N =', N_order
-        STOP
+        ! allocate or reallocate pascal_coeff with 0-based indices
+    IF ( ALLOCATED(pascal_coeff) ) THEN
+        IF ( LBOUND(pascal_coeff,1) /= 0 .OR. UBOUND(pascal_coeff,1) /= N_order ) THEN
+            DEALLOCATE(pascal_coeff)
+            ALLOCATE(pascal_coeff(0:N_order))
+        END IF
+    ELSE
+        ALLOCATE(pascal_coeff(0:N_order))
     END IF
 
-    ! Loop over n = 0..N and compute the two coefficients
-    DO n = 0, N_order
-        ! ----- First coefficient: pascal_triangle(-N-1, n) -----
-        pascal1 = 1.0_wp
-        IF (n > 0) THEN
-            DO k = 0, n-1
-               pascal1 = pascal1 * ( -REAL(N_order,kind=wp) - 1.0_wp - &
-                              REAL(k, kind=wp) ) / REAL(k+1,kind=wp)
-            END DO
-        END IF
-        ! ----- Second coefficient: pascal_triangle(2N+1, N-n) -----
-        pascal2 = 1.0_wp
-        IF (N_order - n > 0) THEN
-            DO k = 0, N_order - n - 1
-               pascal2 = pascal2 * (2.0_wp*REAL(N_order,kind=wp)+1.0_wp- &
-                              REAL(k,kind=wp) ) / REAL(k+1,kind=wp)
-            END DO
+        ! Validate input
+        IF (N_order < 0) THEN
+            WRITE(*,*) 'ERROR: N must be >= 0. N =', N_order
+            STOP
         END IF
 
-        pascal_coeff(n) = pascal1 * pascal2
-    END DO
+        ! Loop over n = 0..N and compute the two coefficients
+        DO n = 0, N_order
+            ! ----- First coefficient: pascal_triangle(-N-1, n) -----
+            pascal1 = 1.0_wp
+            IF (n > 0) THEN
+                DO k = 0, n-1
+                    pascal1 = pascal1 * ( -REAL(N_order,kind=wp) - 1.0_wp - &
+                                        REAL(k, kind=wp) ) / REAL(k+1,kind=wp)
+                END DO
+            END IF
+            ! ----- Second coefficient: pascal_triangle(2N+1, N-n) -----
+            pascal2 = 1.0_wp
+            IF (N_order - n > 0) THEN
+                DO k = 0, N_order - n - 1
+                    pascal2 = pascal2 * (2.0_wp*REAL(N_order,kind=wp)+1.0_wp- &
+                                        REAL(k,kind=wp) ) / REAL(k+1,kind=wp)
+                END DO
+            END IF
 
-      pascal_coeff_precomputed = .TRUE.
+            pascal_coeff(n) = pascal1 * pascal2
+        END DO
 
- END SUBROUTINE precompute_pascal_coefficient
+        pascal_coeff_precomputed = .TRUE.
+
+    END SUBROUTINE precompute_pascal_coefficient
 
 END MODULE constitutive_parameters_2d

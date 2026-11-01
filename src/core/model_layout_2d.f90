@@ -8,228 +8,228 @@
 
 MODULE model_layout_2d
 
-  IMPLICIT NONE
+    IMPLICIT NONE
 
-  PRIVATE
+    PRIVATE
 
-  PUBLIC :: model_layout_type
-  PUBLIC :: supported_layer_count
+    PUBLIC :: model_layout_type
+    PUBLIC :: supported_layer_count
 
-  !> \brief Validated component indices shared by states and numerical workspaces.
-  !> \details Zero optional indices mean that the corresponding transported
-  !>          variable is absent. Appended physical velocities are not equations.
-  TYPE :: model_layout_type
+    !> \brief Validated component indices shared by states and numerical workspaces.
+    !> \details Zero optional indices mean that the corresponding transported
+    !>          variable is absent. Appended physical velocities are not equations.
+    TYPE :: model_layout_type
 
-     INTEGER :: n_layers = 0
-     INTEGER :: n_variables = 0
-     INTEGER :: n_physical_variables = 0
-     INTEGER :: n_equations = 0
+        INTEGER :: n_layers = 0
+        INTEGER :: n_variables = 0
+        INTEGER :: n_physical_variables = 0
+        INTEGER :: n_equations = 0
 
-     INTEGER :: n_solid = 0
-     INTEGER :: n_additional_gas = 0
-     INTEGER :: n_stochastic = 0
-     INTEGER :: n_pore_pressure = 0
-     INTEGER :: idx_mass = 0
-     INTEGER :: idx_momentum_x = 0
-     INTEGER :: idx_momentum_y = 0
-     INTEGER :: idx_energy = 0
-     INTEGER :: idx_solid_first = 0
-     INTEGER :: idx_solid_last = 0
-     INTEGER :: idx_additional_gas_first = 0
-     INTEGER :: idx_additional_gas_last = 0
-     INTEGER :: idx_stochastic = 0
-     INTEGER :: idx_pore_pressure = 0
-     INTEGER :: idx_velocity_x = 0
-     INTEGER :: idx_velocity_y = 0
+        INTEGER :: n_solid = 0
+        INTEGER :: n_additional_gas = 0
+        INTEGER :: n_stochastic = 0
+        INTEGER :: n_pore_pressure = 0
+        INTEGER :: idx_mass = 0
+        INTEGER :: idx_momentum_x = 0
+        INTEGER :: idx_momentum_y = 0
+        INTEGER :: idx_energy = 0
+        INTEGER :: idx_solid_first = 0
+        INTEGER :: idx_solid_last = 0
+        INTEGER :: idx_additional_gas_first = 0
+        INTEGER :: idx_additional_gas_last = 0
+        INTEGER :: idx_stochastic = 0
+        INTEGER :: idx_pore_pressure = 0
+        INTEGER :: idx_velocity_x = 0
+        INTEGER :: idx_velocity_y = 0
 
-   CONTAINS
+    CONTAINS
 
-     PROCEDURE :: initialize => initialize_model_layout
-     PROCEDURE :: finalize => finalize_model_layout
-     PROCEDURE :: is_initialized => model_layout_is_initialized
+        PROCEDURE :: initialize => initialize_model_layout
+        PROCEDURE :: finalize => finalize_model_layout
+        PROCEDURE :: is_initialized => model_layout_is_initialized
 
-  END TYPE model_layout_type
+    END TYPE model_layout_type
 
 CONTAINS
 
-  !******************************************************************************
-  !> \brief Report whether the requested layer count is implemented.
-  !>
-  !> \param[in] n_layers Requested material-layer count; only one layer is currently supported.
-  !> \return True only for the currently implemented single-layer model.
-  !******************************************************************************
+    !******************************************************************************
+    !> \brief Report whether the requested layer count is implemented.
+    !>
+    !> \param[in] n_layers Requested material-layer count; only one layer is currently supported.
+    !> \return True only for the currently implemented single-layer model.
+    !******************************************************************************
 
-  PURE LOGICAL FUNCTION supported_layer_count( n_layers )
+    PURE LOGICAL FUNCTION supported_layer_count( n_layers )
 
-    INTEGER, INTENT(IN) :: n_layers
+        INTEGER, INTENT(IN) :: n_layers
 
-    supported_layer_count = n_layers .EQ. 1
+        supported_layer_count = n_layers .EQ. 1
 
-  END FUNCTION supported_layer_count
-
-
-  !******************************************************************************
-  !> \brief Validate variable counts and build the canonical component index layout.
-  !>
-  !> \param[in,out] this Canonical model variable-count and component-index descriptor.
-  !> \param[in] n_layers Requested material-layer count; only one layer is currently supported.
-  !> \param[in] n_variables Number of conservative variables in each cell state.
-  !> \param[in] n_equations Number of balance equations; currently equal to n_variables.
-  !> \param[in] n_solid Number of independently transported solid classes.
-  !> \param[in] n_additional_gas Number of additional gas components, excluding ambient air.
-  !> \param[in] n_stochastic Number of transported stochastic variables, zero or one.
-  !> \param[in] n_pore_pressure Number of transported pore-pressure variables, zero or one.
-  !******************************************************************************
-
-  SUBROUTINE initialize_model_layout( this, n_layers, n_variables,           &
-       n_equations, n_solid, n_additional_gas, n_stochastic,                &
-       n_pore_pressure )
-
-    CLASS(model_layout_type), INTENT(INOUT) :: this
-    INTEGER, INTENT(IN) :: n_layers
-    INTEGER, INTENT(IN) :: n_variables
-    INTEGER, INTENT(IN) :: n_equations
-    INTEGER, INTENT(IN) :: n_solid
-    INTEGER, INTENT(IN) :: n_additional_gas
-    INTEGER, INTENT(IN) :: n_stochastic
-    INTEGER, INTENT(IN) :: n_pore_pressure
-    INTEGER :: next_index
-
-    CALL this%finalize
-
-    IF ( .NOT. supported_layer_count(n_layers) ) THEN
-       ERROR STOP 'Only N_LAYERS=1 is currently supported'
-    END IF
-
-    IF ( n_solid < 0 .OR. n_additional_gas < 0 ) THEN
-       ERROR STOP 'Model layout component counts must be non-negative'
-    END IF
-
-    IF ( n_stochastic < 0 .OR. n_stochastic > 1 ) THEN
-       ERROR STOP 'Model layout supports zero or one stochastic variable'
-    END IF
-
-    IF ( n_pore_pressure < 0 .OR. n_pore_pressure > 1 ) THEN
-       ERROR STOP 'Model layout supports zero or one pore-pressure variable'
-    END IF
-
-    this%n_layers = n_layers
-    this%n_variables = n_variables
-    this%n_physical_variables = n_variables + 2
-    this%n_equations = n_equations
-    this%n_solid = n_solid
-    this%n_additional_gas = n_additional_gas
-    this%n_stochastic = n_stochastic
-    this%n_pore_pressure = n_pore_pressure
-    this%idx_mass = 1
-    this%idx_momentum_x = 2
-    this%idx_momentum_y = 3
-    this%idx_energy = 4
-
-    this%idx_solid_first = 5
-    this%idx_solid_last = 4 + n_solid
-    this%idx_additional_gas_first = this%idx_solid_last + 1
-    this%idx_additional_gas_last = this%idx_solid_last + n_additional_gas
-
-    next_index = this%idx_additional_gas_last
-
-    IF ( n_stochastic == 1 ) THEN
-       next_index = next_index + 1
-       this%idx_stochastic = next_index
-    END IF
-
-    IF ( n_pore_pressure == 1 ) THEN
-       next_index = next_index + 1
-       this%idx_pore_pressure = next_index
-    END IF
-    this%idx_velocity_x = n_variables + 1
-    this%idx_velocity_y = n_variables + 2
-
-    IF ( next_index /= n_variables ) THEN
-       ERROR STOP 'Configured variable count is inconsistent with model layout'
-    END IF
-
-    IF ( n_equations /= n_variables ) THEN
-       ERROR STOP 'Current model requires one equation per conservative variable'
-    END IF
-
-  END SUBROUTINE initialize_model_layout
+    END FUNCTION supported_layer_count
 
 
-  !******************************************************************************
-  !> \brief Reset all counts and indices to the uninitialized state.
-  !>
-  !> \param[in,out] this Canonical model variable-count and component-index descriptor.
-  !******************************************************************************
+    !******************************************************************************
+    !> \brief Validate variable counts and build the canonical component index layout.
+    !>
+    !> \param[in,out] this Canonical model variable-count and component-index descriptor.
+    !> \param[in] n_layers Requested material-layer count; only one layer is currently supported.
+    !> \param[in] n_variables Number of conservative variables in each cell state.
+    !> \param[in] n_equations Number of balance equations; currently equal to n_variables.
+    !> \param[in] n_solid Number of independently transported solid classes.
+    !> \param[in] n_additional_gas Number of additional gas components, excluding ambient air.
+    !> \param[in] n_stochastic Number of transported stochastic variables, zero or one.
+    !> \param[in] n_pore_pressure Number of transported pore-pressure variables, zero or one.
+    !******************************************************************************
 
-  SUBROUTINE finalize_model_layout( this )
+    SUBROUTINE initialize_model_layout( this, n_layers, n_variables,           &
+            n_equations, n_solid, n_additional_gas, n_stochastic,                &
+            n_pore_pressure )
 
-    CLASS(model_layout_type), INTENT(INOUT) :: this
+        CLASS(model_layout_type), INTENT(INOUT) :: this
+        INTEGER, INTENT(IN) :: n_layers
+        INTEGER, INTENT(IN) :: n_variables
+        INTEGER, INTENT(IN) :: n_equations
+        INTEGER, INTENT(IN) :: n_solid
+        INTEGER, INTENT(IN) :: n_additional_gas
+        INTEGER, INTENT(IN) :: n_stochastic
+        INTEGER, INTENT(IN) :: n_pore_pressure
+        INTEGER :: next_index
 
-    this%n_layers = 0
-    this%n_variables = 0
-    this%n_physical_variables = 0
-    this%n_equations = 0
-    this%n_solid = 0
-    this%n_additional_gas = 0
-    this%n_stochastic = 0
-    this%n_pore_pressure = 0
-    this%idx_mass = 0
-    this%idx_momentum_x = 0
-    this%idx_momentum_y = 0
-    this%idx_energy = 0
-    this%idx_solid_first = 0
-    this%idx_solid_last = 0
-    this%idx_additional_gas_first = 0
-    this%idx_additional_gas_last = 0
-    this%idx_stochastic = 0
-    this%idx_pore_pressure = 0
-    this%idx_velocity_x = 0
-    this%idx_velocity_y = 0
+        CALL this%finalize
 
-  END SUBROUTINE finalize_model_layout
+        IF ( .NOT. supported_layer_count(n_layers) ) THEN
+            ERROR STOP 'Only N_LAYERS=1 is currently supported'
+        END IF
+
+        IF ( n_solid < 0 .OR. n_additional_gas < 0 ) THEN
+            ERROR STOP 'Model layout component counts must be non-negative'
+        END IF
+
+        IF ( n_stochastic < 0 .OR. n_stochastic > 1 ) THEN
+            ERROR STOP 'Model layout supports zero or one stochastic variable'
+        END IF
+
+        IF ( n_pore_pressure < 0 .OR. n_pore_pressure > 1 ) THEN
+            ERROR STOP 'Model layout supports zero or one pore-pressure variable'
+        END IF
+
+        this%n_layers = n_layers
+        this%n_variables = n_variables
+        this%n_physical_variables = n_variables + 2
+        this%n_equations = n_equations
+        this%n_solid = n_solid
+        this%n_additional_gas = n_additional_gas
+        this%n_stochastic = n_stochastic
+        this%n_pore_pressure = n_pore_pressure
+        this%idx_mass = 1
+        this%idx_momentum_x = 2
+        this%idx_momentum_y = 3
+        this%idx_energy = 4
+
+        this%idx_solid_first = 5
+        this%idx_solid_last = 4 + n_solid
+        this%idx_additional_gas_first = this%idx_solid_last + 1
+        this%idx_additional_gas_last = this%idx_solid_last + n_additional_gas
+
+        next_index = this%idx_additional_gas_last
+
+        IF ( n_stochastic == 1 ) THEN
+            next_index = next_index + 1
+            this%idx_stochastic = next_index
+        END IF
+
+        IF ( n_pore_pressure == 1 ) THEN
+            next_index = next_index + 1
+            this%idx_pore_pressure = next_index
+        END IF
+        this%idx_velocity_x = n_variables + 1
+        this%idx_velocity_y = n_variables + 2
+
+        IF ( next_index /= n_variables ) THEN
+            ERROR STOP 'Configured variable count is inconsistent with model layout'
+        END IF
+
+        IF ( n_equations /= n_variables ) THEN
+            ERROR STOP 'Current model requires one equation per conservative variable'
+        END IF
+
+    END SUBROUTINE initialize_model_layout
 
 
-  !******************************************************************************
-  !> \brief Check that all layout counts and indices are mutually consistent.
-  !>
-  !> \param[in] this Canonical model variable-count and component-index descriptor.
-  !> \return True when the descriptor contains a complete supported layout.
-  !******************************************************************************
+    !******************************************************************************
+    !> \brief Reset all counts and indices to the uninitialized state.
+    !>
+    !> \param[in,out] this Canonical model variable-count and component-index descriptor.
+    !******************************************************************************
 
-  LOGICAL FUNCTION model_layout_is_initialized( this )
+    SUBROUTINE finalize_model_layout( this )
 
-    CLASS(model_layout_type), INTENT(IN) :: this
+        CLASS(model_layout_type), INTENT(INOUT) :: this
 
-    model_layout_is_initialized = supported_layer_count(this%n_layers)      &
-         .AND. this%n_variables >= 4                                        &
-         .AND. this%n_solid >= 0                                            &
-         .AND. this%n_additional_gas >= 0                                   &
-         .AND. this%n_stochastic >= 0 .AND. this%n_stochastic <= 1           &
-         .AND. this%n_pore_pressure >= 0 .AND. this%n_pore_pressure <= 1     &
-         .AND. this%n_variables == 4 + this%n_solid                          &
-              + this%n_additional_gas + this%n_stochastic                   &
-              + this%n_pore_pressure                                        &
-         .AND. this%n_physical_variables == this%n_variables + 2            &
-         .AND. this%n_equations == this%n_variables                         &
-         .AND. this%idx_mass == 1                                           &
-         .AND. this%idx_momentum_x == 2                                     &
-         .AND. this%idx_momentum_y == 3                                     &
-         .AND. this%idx_energy == 4                                         &
-         .AND. this%idx_solid_first == 5                                    &
-         .AND. this%idx_solid_last == 4 + this%n_solid                      &
-         .AND. this%idx_additional_gas_first == 5 + this%n_solid            &
-         .AND. this%idx_additional_gas_last == 4 + this%n_solid             &
-              + this%n_additional_gas                                       &
-         .AND. this%idx_stochastic == MERGE(                                &
-              5 + this%n_solid + this%n_additional_gas, 0,                  &
-              this%n_stochastic == 1)                                       &
-         .AND. this%idx_pore_pressure == MERGE(                             &
-              5 + this%n_solid + this%n_additional_gas                      &
-              + this%n_stochastic, 0, this%n_pore_pressure == 1)            &
-         .AND. this%idx_velocity_x == this%n_variables + 1                  &
-         .AND. this%idx_velocity_y == this%n_variables + 2
+        this%n_layers = 0
+        this%n_variables = 0
+        this%n_physical_variables = 0
+        this%n_equations = 0
+        this%n_solid = 0
+        this%n_additional_gas = 0
+        this%n_stochastic = 0
+        this%n_pore_pressure = 0
+        this%idx_mass = 0
+        this%idx_momentum_x = 0
+        this%idx_momentum_y = 0
+        this%idx_energy = 0
+        this%idx_solid_first = 0
+        this%idx_solid_last = 0
+        this%idx_additional_gas_first = 0
+        this%idx_additional_gas_last = 0
+        this%idx_stochastic = 0
+        this%idx_pore_pressure = 0
+        this%idx_velocity_x = 0
+        this%idx_velocity_y = 0
 
-  END FUNCTION model_layout_is_initialized
+    END SUBROUTINE finalize_model_layout
+
+
+    !******************************************************************************
+    !> \brief Check that all layout counts and indices are mutually consistent.
+    !>
+    !> \param[in] this Canonical model variable-count and component-index descriptor.
+    !> \return True when the descriptor contains a complete supported layout.
+    !******************************************************************************
+
+    LOGICAL FUNCTION model_layout_is_initialized( this )
+
+        CLASS(model_layout_type), INTENT(IN) :: this
+
+        model_layout_is_initialized = supported_layer_count(this%n_layers)      &
+            .AND. this%n_variables >= 4                                        &
+            .AND. this%n_solid >= 0                                            &
+            .AND. this%n_additional_gas >= 0                                   &
+            .AND. this%n_stochastic >= 0 .AND. this%n_stochastic <= 1           &
+            .AND. this%n_pore_pressure >= 0 .AND. this%n_pore_pressure <= 1     &
+            .AND. this%n_variables == 4 + this%n_solid                          &
+                    + this%n_additional_gas + this%n_stochastic                   &
+                    + this%n_pore_pressure                                        &
+            .AND. this%n_physical_variables == this%n_variables + 2            &
+            .AND. this%n_equations == this%n_variables                         &
+            .AND. this%idx_mass == 1                                           &
+            .AND. this%idx_momentum_x == 2                                     &
+            .AND. this%idx_momentum_y == 3                                     &
+            .AND. this%idx_energy == 4                                         &
+            .AND. this%idx_solid_first == 5                                    &
+            .AND. this%idx_solid_last == 4 + this%n_solid                      &
+            .AND. this%idx_additional_gas_first == 5 + this%n_solid            &
+            .AND. this%idx_additional_gas_last == 4 + this%n_solid             &
+                    + this%n_additional_gas                                       &
+            .AND. this%idx_stochastic == MERGE(                                &
+                    5 + this%n_solid + this%n_additional_gas, 0,                  &
+                    this%n_stochastic == 1)                                       &
+            .AND. this%idx_pore_pressure == MERGE(                             &
+                    5 + this%n_solid + this%n_additional_gas                      &
+                    + this%n_stochastic, 0, this%n_pore_pressure == 1)            &
+            .AND. this%idx_velocity_x == this%n_variables + 1                  &
+            .AND. this%idx_velocity_y == this%n_variables + 2
+
+    END FUNCTION model_layout_is_initialized
 
 END MODULE model_layout_2d

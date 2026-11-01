@@ -10,424 +10,424 @@
 
 MODULE parameters_2d
 
-  IMPLICIT NONE
-  INTEGER, PARAMETER :: sp = Selected_Real_Kind (P=6,R=37)
-  INTEGER, PARAMETER :: dp = Selected_Real_Kind (P=15,R=307)
+    IMPLICIT NONE
+    INTEGER, PARAMETER :: sp = Selected_Real_Kind (P=6,R=37)
+    INTEGER, PARAMETER :: dp = Selected_Real_Kind (P=15,R=307)
 
-  !> working precision
-  INTEGER, PARAMETER :: wp = dp
+    !> working precision
+    INTEGER, PARAMETER :: wp = dp
 
-  TYPE mass_exchange_rates_type
-    REAL(wp) :: mixture_mass_rate=0.0_wp
-    REAL(wp) :: energy_rate=0.0_wp, dB_dt=0.0_wp
-    REAL(wp) :: lava_deposit_rate=0.0_wp
-    REAL(wp) :: carrier_withdrawal_volume_rate=0.0_wp
-    REAL(wp) :: carrier_erosion_rate=0.0_wp
-    REAL(wp) :: carrier_deposition_rate=0.0_wp
-    REAL(wp), ALLOCATABLE :: solid_mass_rate(:), add_gas_mass_rate(:)
-    REAL(wp), ALLOCATABLE :: solid_erosion_rate(:), solid_deposition_rate(:)
-  END TYPE
+    TYPE mass_exchange_rates_type
+        REAL(wp) :: mixture_mass_rate=0.0_wp
+        REAL(wp) :: energy_rate=0.0_wp, dB_dt=0.0_wp
+        REAL(wp) :: lava_deposit_rate=0.0_wp
+        REAL(wp) :: carrier_withdrawal_volume_rate=0.0_wp
+        REAL(wp) :: carrier_erosion_rate=0.0_wp
+        REAL(wp) :: carrier_deposition_rate=0.0_wp
+        REAL(wp), ALLOCATABLE :: solid_mass_rate(:), add_gas_mass_rate(:)
+        REAL(wp), ALLOCATABLE :: solid_erosion_rate(:), solid_deposition_rate(:)
+    END TYPE
 
 
 
 
-  REAL(wp), PARAMETER :: xinf = HUGE(0.0_wp)
-  
-  REAL(wp), PARAMETER :: four_thirds = 4.0_wp / 3.0_wp
-  REAL(wp), PARAMETER :: neg_four_thirds = -4.0_wp / 3.0_wp
-
-
-  !> Thickness below which a cell is treated as numerically dry [m].
-  REAL(wp), PARAMETER :: dry_thickness_tolerance = 1.0E-10_wp
-
-
-  REAL(wp) :: dt0               !< Initial time step
-
-  REAL(wp) :: max_dt            !< Largest time step allowed
-
-  REAL(wp) :: cfl               !< Courant-Friedrichs-Lewy parameter 
-
-  !> Face-speed timestep policy: 'directional_min' (legacy default) or 'combined'.
-  !> Selected during input setup, then read-only in the spatial operator.
-  !> Both policies retain the configured CFL limits and all integrator time caps.
-  CHARACTER(LEN=32) :: cfl_policy = 'directional_min'
-
-  !> Depth-trace reconstruction used by the KT operator: h_x, eta_x, minmod, or
-  !> froude_blend (cell-local h_x/eta_x slope blend based on directional Fr).
-  !> The hydrostatic/path term continues to use eta_x independently.
-  CHARACTER(LEN=32) :: kt_trace_reconstruction = 'eta_x'
-
-  REAL(wp) :: eps_sing          !< parameter for desingularization
-  REAL(wp) :: eps_sing4         !< parameter for desingularization**4
-
-  REAL(wp) :: reconstr_coeff    !< Slope coefficient in the linear reconstruction
+    REAL(wp), PARAMETER :: xinf = HUGE(0.0_wp)
 
-  !> Flag to choose if we add the rheology
-  !> - T      => rheology activated
-  !> - F      => no rheology
-  !> .
-  LOGICAL :: rheology_flag
-  
-  !> Canonical input name for the selected rheology (none, voellmy, plastic,
-  !> lava, lahar, empirical, quadratic, froude, lucas, mui, or mui_voellmy).
-  CHARACTER(LEN=32) :: rheology_model = 'none'
-
-  ! Cooling can be set independently of the rheology via TEMPERATURE_PARAMETERS.
-  LOGICAL :: thermal_cooling_flag = .FALSE.
-
-  LOGICAL :: liquid_flag
-
-  LOGICAL :: lava_flag = .FALSE.
-  LOGICAL :: gas_flag
-  
-  LOGICAL :: topo_change_flag
-
-  LOGICAL :: radial_source_flag
-
-  LOGICAL :: lateral_source_flag
-
-  LOGICAL :: serial_flag
-  
-  !> Flag to choose if initial volume is subtracted from topography or erodible layer
-  !> - T      => change initial topography or erodible layer by subtracting initial volume 
-  !> - F      => keep initial topography or erodible layer
-  !> .
-  LOGICAL :: subtract_init_flag
-
-  !> Flag to correct for the topography slope when computing pressure forces
-  !> - T      => correction active
-  !> - F      => correction not active
-  !> .
-  LOGICAL :: slope_correction_flag
-
-  !> Flag to account for the centrifugal force associated with topography curvature
-  !> - T      => compute the term
-  !> - F      => neglect the term
-  !> .
-  LOGICAL :: curvature_term_flag
-
-  !> Flag to account for the deposit thickness in the erobidle layer
-  !> - T      => add deposit to erodible thickness
-  !> - F      => do not add deposit to erobile thickness
-  !> .
-  LOGICAL :: erodible_deposit_flag
-
-  !> Flag to account for vaporization of liquid water
-  !> - T      => vaporization form a source of water
-  !> - F      => no vaporization
-  !> .  
-  LOGICAL :: liquid_vaporization_flag
-
-  LOGICAL :: stoch_transport_flag
-
-  LOGICAL :: pore_pressure_flag
-
-  !> Flag for stochastic friction model
-  !> - T      => we use stochastic friction model
-  !> - F      => we use deterministic friction model
-  !> . 
-  LOGICAL :: stochastic_flag
-
-  !> Flag to use the Sutherland's law for gas viscosity
-  !> - T     => use Sutherland's law
-  !> - F     => do not use 
-  !> .
-  LOGICAL :: sutherland_flag
-  
-  !> Scale of spatial correlation for stochastic model
-  REAL(wp) :: length_spatial_corr
-
-  !> Elevation of the water level in the DEM file
-  REAL(wp) :: water_level
-    
-  INTEGER :: n_thickness_levels
-  INTEGER :: n_dyn_pres_levels
-  REAL(wp), ALLOCATABLE :: thickness_levels(:)
-  REAL(wp), ALLOCATABLE :: dyn_pres_levels(:)
-
-  !> x-coordinate of center of the source
-  REAL(wp) :: x_source
-
-  !> y-coordinate of center of the source
-  REAL(wp) :: y_source
-
-  !> radius (or first semi-axis)
-  REAL(wp) :: r_source
-
-  !> second semi-axis
-  REAL(wp) :: r2_source
-
-  !> angle between W-E direction and first semi-axis (clockwise)
-  REAL(wp) :: angle_source
-
-  !> Compass bearing (degrees, N=0 clockwise) of the centre of the active
-  !> radial-source emission sector. Only used when arc_width_source < 360.
-  REAL(wp) :: azimuth_source
-
-  !> Full angular width (degrees) of the active radial-source emission sector.
-  !> 360 (default) activates the full source perimeter.
-  REAL(wp) :: arc_width_source
-
-  REAL(wp) :: vel_source
-  REAL(wp) :: T_source
-  REAL(wp) :: h_source
-  REAL(wp) :: Ri_source
-  REAL(wp) :: mfr_source
-  
-  REAL(wp) :: alphas_source(100)
-  REAL(wp) :: alphag_source(100)
-  !> Flag to use a parameterized grain-size distribution instead of explicit arrays
-  LOGICAL :: particle_distribution_flag
-
-  !> Fractal dimension of the weight grain-size distribution
-  REAL(wp) :: fractal_dim
-  REAL(wp) :: diam_min
-  REAL(wp) :: diam_max
-  REAL(wp) :: rho_s_min
-  REAL(wp) :: rho_s_max
-  REAL(wp) :: sigmoid_k
-  REAL(wp) :: sigmoid_d0
-  REAL(wp) :: alphas_source_total
-
-  REAL(wp) :: xs_source(100)
-  REAL(wp) :: xg_source(100)
-  REAL(wp) :: time_param(4)
-
-
-  !> Optional piecewise-constant velocity history for the bottom radial source
-  INTEGER :: n_intervals
-  REAL(wp) :: t_intervals(100)
-  REAL(wp) :: vel_intervals(100)
-
-  !> Lateral source side:\n
-  !> - 'E'       => East (requires x1_source and x2_source);
-  !> - 'W'       => West (requires x1_source and x2_source);
-  !> - 'S'       => South (requires y1_source and y2_source);
-  !> - 'N'       => North (requires y1_source and y2_source);
-  !> .
-  CHARACTER(LEN=20) :: source_side     
-
-  
-  !> 1st coordinate for lateral source (E or W)
-  REAL(wp) :: x1_source
-  !> 2nd coordinate for lateral source (E or W)
-  REAL(wp) :: x2_source
-
-  !> 1st coordinate for lateral source (S or N)
-  REAL(wp) :: y1_source
-  !> 2nd coordinate for lateral source (S or N)
-  REAL(wp) :: y2_source
-  
-  LOGICAL :: collapsing_volume_flag
-
-  REAL(wp) :: x_collapse
-  REAL(wp) :: y_collapse
-  REAL(wp) :: r_collapse
-  REAL(wp) :: T_collapse
-  REAL(wp) :: h_collapse
-  REAL(wp) :: alphas_collapse(100)
-  REAL(wp) :: alphag_collapse(100)
-
-  LOGICAL :: bottom_radial_source_flag
-
-  ! Elisa Biagioli's fissural-source input model, adapted for per-fissure
-  ! cell fractions and linear injection velocities.
-  LOGICAL :: bottom_fissural_source_flag
-  INTEGER :: n_fissures
-  REAL(wp) :: x_fissures_end_points(2,100)
-  REAL(wp) :: y_fissures_end_points(2,100)
-  REAL(wp) :: width_fissures(100)
-  REAL(wp) :: linear_vel_fissures(100)
-  REAL(wp) :: T_fissures(100)
-  REAL(wp) :: time_param_fissures(4,100)
-  ! Composition of each fissure as mass fractions. A composition given as
-  ! volume fractions is converted at each fissure's own temperature, so all
-  ! fissures carry the same volume fractions.
-  REAL(wp), ALLOCATABLE :: xs_fissures(:,:)
-  REAL(wp), ALLOCATABLE :: xg_fissures(:,:)
-  !> Initial temperature of the pile of material
-  REAL(wp) :: T_init
-
-  !> Initial W-E velocity of the pile of material
-  REAL(wp) :: u_init
-
-
-  !> Initial S-N velocity of the pile of material
-  REAL(wp) :: v_init
-  
-  !> Initial sediment concentration in the pile of material
-  REAL(wp), ALLOCATABLE :: alphas_init(:)
-
-  REAL(wp) :: pore_pres_fract
-
-  LOGICAL :: gas_loss_flag
-  
-  INTEGER :: n_vars   !< Number of conservative variables
-  INTEGER :: n_eqns   !< Number of equations
-
-  !> Number of material layers. Only the single-layer layout is implemented.
-  INTEGER :: n_layers
-
-  INTEGER :: n_solid  !< Number of solid classes
-
-  INTEGER :: n_add_gas  !< Number of additional gas components
-
-  INTEGER :: n_stoch_vars
-  INTEGER :: n_pore_vars
-
-  INTEGER :: idx_h
-  INTEGER :: idx_hu
-  INTEGER :: idx_hv
-  INTEGER :: idx_T
-  INTEGER :: idx_solid_first
-  INTEGER :: idx_solid_last
-  INTEGER :: idx_add_gas_first
-  INTEGER :: idx_add_gas_last
-  INTEGER :: idx_stoch
-  INTEGER :: idx_pore
-  INTEGER :: idx_u
-  INTEGER :: idx_v
-
-  INTEGER :: idx_totMassEqn
-  INTEGER :: idx_uEqn
-  INTEGER :: idx_vEqn
-  INTEGER :: idx_engyEqn
-  INTEGER :: idx_solidEqn_first
-  INTEGER :: idx_solidEqn_last
-  INTEGER :: idx_addGasEqn_first
-  INTEGER :: idx_addGasEqn_last
-  INTEGER :: idx_stochEqn
-  INTEGER :: idx_poreEqn
-  
-  INTEGER, PARAMETER :: max_nl_iter = 100
-
-  REAL(wp), PARAMETER :: tol_abs = 1.0E-5_wp
-  REAL(wp), PARAMETER :: tol_rel = 1.0E-5_wp
-
-  !> Limiter for the slope in the linear reconstruction:\n
-  !> - 'none'     => no limiter (constant value);
-  !> - 'minmod'   => minmod slope;
-  !> - 'superbee' => superbee limiter (Roe, 1985);
-  !> - 'van_leer' => monotonized central-difference limiter (van Leer, 1977)
-  !> .
-  INTEGER :: limiter(30) = -1
-
-  REAL(wp) :: theta             !< Van Leer limiter parameter
-  REAL(wp) :: t_start           !< initial time for the run
-  REAL(wp) :: t_end             !< end time for the run
-  REAL(wp) :: dt_output         !< time interval for the output of the solution
-
-  INTEGER :: verbose_level
-
-  TYPE bc
-     INTEGER :: flag
-     REAL(wp) :: value
-  END TYPE bc
-
-  ! -------boundary conditions variables
-
-  !> bcW&flag defines the west boundary condition:\n
-  !> - bcW%flag = 0     => Dirichlet boundary condition;
-  !> - bcW%flag = 1     => Neumann boundary condition.
-  !> .
-  !> bcLWvalue is the value of the left boundary condition:\n
-  !> - value of the variable for Dirichlet boundary condition (bcW%flag=0);
-  !> - gradient of the variable for Neumann boundary condition (bcW%flag=1).
-  !> .
-  TYPE(bc), ALLOCATABLE :: bcW(:)
-
-  !> bcE&flag defines the east boundary condition:\n
-  !> - bcE%flag = 0     => Dirichlet boundary condition;
-  !> - bcE%flag = 1     => Neumann boundary condition.
-  !> .
-  !> bcE%value is the value of the right boundary condition:\n
-  !> - value of the variable for Dirichlet boundary condition (bcE%flag=0);
-  !> - gradient of the variable for Neumann boundary condition (bcE%flag=1).
-  !> .
-  TYPE(bc), ALLOCATABLE :: bcE(:)
-
-  !> bcS&flag defines the south boundary condition:\n
-  !> - bcS%flag = 0     => Dirichlet boundary condition;
-  !> - bcS%flag = 1     => Neumann boundary condition.
-  !> .
-  !> bcS%value is the value of the bottom boundary condition:\n
-  !> - value of the variable for Dirichlet boundary condition (bcS%flag=0);
-  !> - gradient of the variable for Neumann boundary condition (bcS%flag=1).
-  !> .
-  TYPE(bc), ALLOCATABLE :: bcS(:)
-
-  !> bcN&flag defines the north boundary condition:\n
-  !> - bcN%flag = 0     => Dirichlet boundary condition;
-  !> - bcN%flag = 1     => Neumann boundary condition.
-  !> .
-  !> bcN%value is the value of the top boundary condition:\n
-  !> - value of the variable for Dirichlet boundary condition (bcN%flag=0);
-  !> - gradient of the variable for Neumann boundary condition (bcN%flag=1).
-  !> .
-  TYPE(bc), ALLOCATABLE :: bcN(:)
+    REAL(wp), PARAMETER :: four_thirds = 4.0_wp / 3.0_wp
+    REAL(wp), PARAMETER :: neg_four_thirds = -4.0_wp / 3.0_wp
+
+
+    !> Thickness below which a cell is treated as numerically dry [m].
+    REAL(wp), PARAMETER :: dry_thickness_tolerance = 1.0E-10_wp
+
+
+    REAL(wp) :: dt0               !< Initial time step
+
+    REAL(wp) :: max_dt            !< Largest time step allowed
+
+    REAL(wp) :: cfl               !< Courant-Friedrichs-Lewy parameter
+
+    !> Face-speed timestep policy: 'directional_min' (legacy default) or 'combined'.
+    !> Selected during input setup, then read-only in the spatial operator.
+    !> Both policies retain the configured CFL limits and all integrator time caps.
+    CHARACTER(LEN=32) :: cfl_policy = 'directional_min'
+
+    !> Depth-trace reconstruction used by the KT operator: h_x, eta_x, minmod, or
+    !> froude_blend (cell-local h_x/eta_x slope blend based on directional Fr).
+    !> The hydrostatic/path term continues to use eta_x independently.
+    CHARACTER(LEN=32) :: kt_trace_reconstruction = 'eta_x'
+
+    REAL(wp) :: eps_sing          !< parameter for desingularization
+    REAL(wp) :: eps_sing4         !< parameter for desingularization**4
+
+    REAL(wp) :: reconstr_coeff    !< Slope coefficient in the linear reconstruction
+
+    !> Flag to choose if we add the rheology
+    !> - T      => rheology activated
+    !> - F      => no rheology
+    !> .
+    LOGICAL :: rheology_flag
+
+    !> Canonical input name for the selected rheology (none, voellmy, plastic,
+    !> lava, lahar, empirical, quadratic, froude, lucas, mui, or mui_voellmy).
+    CHARACTER(LEN=32) :: rheology_model = 'none'
+
+    ! Cooling can be set independently of the rheology via TEMPERATURE_PARAMETERS.
+    LOGICAL :: thermal_cooling_flag = .FALSE.
+
+    LOGICAL :: liquid_flag
+
+    LOGICAL :: lava_flag = .FALSE.
+    LOGICAL :: gas_flag
+
+    LOGICAL :: topo_change_flag
+
+    LOGICAL :: radial_source_flag
+
+    LOGICAL :: lateral_source_flag
+
+    LOGICAL :: serial_flag
+
+    !> Flag to choose if initial volume is subtracted from topography or erodible layer
+    !> - T      => change initial topography or erodible layer by subtracting initial volume
+    !> - F      => keep initial topography or erodible layer
+    !> .
+    LOGICAL :: subtract_init_flag
+
+    !> Flag to correct for the topography slope when computing pressure forces
+    !> - T      => correction active
+    !> - F      => correction not active
+    !> .
+    LOGICAL :: slope_correction_flag
+
+    !> Flag to account for the centrifugal force associated with topography curvature
+    !> - T      => compute the term
+    !> - F      => neglect the term
+    !> .
+    LOGICAL :: curvature_term_flag
+
+    !> Flag to account for the deposit thickness in the erobidle layer
+    !> - T      => add deposit to erodible thickness
+    !> - F      => do not add deposit to erobile thickness
+    !> .
+    LOGICAL :: erodible_deposit_flag
+
+    !> Flag to account for vaporization of liquid water
+    !> - T      => vaporization form a source of water
+    !> - F      => no vaporization
+    !> .
+    LOGICAL :: liquid_vaporization_flag
+
+    LOGICAL :: stoch_transport_flag
+
+    LOGICAL :: pore_pressure_flag
+
+    !> Flag for stochastic friction model
+    !> - T      => we use stochastic friction model
+    !> - F      => we use deterministic friction model
+    !> .
+    LOGICAL :: stochastic_flag
+
+    !> Flag to use the Sutherland's law for gas viscosity
+    !> - T     => use Sutherland's law
+    !> - F     => do not use
+    !> .
+    LOGICAL :: sutherland_flag
+
+    !> Scale of spatial correlation for stochastic model
+    REAL(wp) :: length_spatial_corr
+
+    !> Elevation of the water level in the DEM file
+    REAL(wp) :: water_level
+
+    INTEGER :: n_thickness_levels
+    INTEGER :: n_dyn_pres_levels
+    REAL(wp), ALLOCATABLE :: thickness_levels(:)
+    REAL(wp), ALLOCATABLE :: dyn_pres_levels(:)
+
+    !> x-coordinate of center of the source
+    REAL(wp) :: x_source
+
+    !> y-coordinate of center of the source
+    REAL(wp) :: y_source
+
+    !> radius (or first semi-axis)
+    REAL(wp) :: r_source
+
+    !> second semi-axis
+    REAL(wp) :: r2_source
+
+    !> angle between W-E direction and first semi-axis (clockwise)
+    REAL(wp) :: angle_source
+
+    !> Compass bearing (degrees, N=0 clockwise) of the centre of the active
+    !> radial-source emission sector. Only used when arc_width_source < 360.
+    REAL(wp) :: azimuth_source
+
+    !> Full angular width (degrees) of the active radial-source emission sector.
+    !> 360 (default) activates the full source perimeter.
+    REAL(wp) :: arc_width_source
+
+    REAL(wp) :: vel_source
+    REAL(wp) :: T_source
+    REAL(wp) :: h_source
+    REAL(wp) :: Ri_source
+    REAL(wp) :: mfr_source
+
+    REAL(wp) :: alphas_source(100)
+    REAL(wp) :: alphag_source(100)
+    !> Flag to use a parameterized grain-size distribution instead of explicit arrays
+    LOGICAL :: particle_distribution_flag
+
+    !> Fractal dimension of the weight grain-size distribution
+    REAL(wp) :: fractal_dim
+    REAL(wp) :: diam_min
+    REAL(wp) :: diam_max
+    REAL(wp) :: rho_s_min
+    REAL(wp) :: rho_s_max
+    REAL(wp) :: sigmoid_k
+    REAL(wp) :: sigmoid_d0
+    REAL(wp) :: alphas_source_total
+
+    REAL(wp) :: xs_source(100)
+    REAL(wp) :: xg_source(100)
+    REAL(wp) :: time_param(4)
+
+
+    !> Optional piecewise-constant velocity history for the bottom radial source
+    INTEGER :: n_intervals
+    REAL(wp) :: t_intervals(100)
+    REAL(wp) :: vel_intervals(100)
+
+    !> Lateral source side:\n
+    !> - 'E'       => East (requires x1_source and x2_source);
+    !> - 'W'       => West (requires x1_source and x2_source);
+    !> - 'S'       => South (requires y1_source and y2_source);
+    !> - 'N'       => North (requires y1_source and y2_source);
+    !> .
+    CHARACTER(LEN=20) :: source_side
+
+
+    !> 1st coordinate for lateral source (E or W)
+    REAL(wp) :: x1_source
+    !> 2nd coordinate for lateral source (E or W)
+    REAL(wp) :: x2_source
+
+    !> 1st coordinate for lateral source (S or N)
+    REAL(wp) :: y1_source
+    !> 2nd coordinate for lateral source (S or N)
+    REAL(wp) :: y2_source
+
+    LOGICAL :: collapsing_volume_flag
+
+    REAL(wp) :: x_collapse
+    REAL(wp) :: y_collapse
+    REAL(wp) :: r_collapse
+    REAL(wp) :: T_collapse
+    REAL(wp) :: h_collapse
+    REAL(wp) :: alphas_collapse(100)
+    REAL(wp) :: alphag_collapse(100)
+
+    LOGICAL :: bottom_radial_source_flag
+
+    ! Elisa Biagioli's fissural-source input model, adapted for per-fissure
+    ! cell fractions and linear injection velocities.
+    LOGICAL :: bottom_fissural_source_flag
+    INTEGER :: n_fissures
+    REAL(wp) :: x_fissures_end_points(2,100)
+    REAL(wp) :: y_fissures_end_points(2,100)
+    REAL(wp) :: width_fissures(100)
+    REAL(wp) :: linear_vel_fissures(100)
+    REAL(wp) :: T_fissures(100)
+    REAL(wp) :: time_param_fissures(4,100)
+    ! Composition of each fissure as mass fractions. A composition given as
+    ! volume fractions is converted at each fissure's own temperature, so all
+    ! fissures carry the same volume fractions.
+    REAL(wp), ALLOCATABLE :: xs_fissures(:,:)
+    REAL(wp), ALLOCATABLE :: xg_fissures(:,:)
+    !> Initial temperature of the pile of material
+    REAL(wp) :: T_init
+
+    !> Initial W-E velocity of the pile of material
+    REAL(wp) :: u_init
+
+
+    !> Initial S-N velocity of the pile of material
+    REAL(wp) :: v_init
+
+    !> Initial sediment concentration in the pile of material
+    REAL(wp), ALLOCATABLE :: alphas_init(:)
+
+    REAL(wp) :: pore_pres_fract
+
+    LOGICAL :: gas_loss_flag
+
+    INTEGER :: n_vars   !< Number of conservative variables
+    INTEGER :: n_eqns   !< Number of equations
+
+    !> Number of material layers. Only the single-layer layout is implemented.
+    INTEGER :: n_layers
+
+    INTEGER :: n_solid  !< Number of solid classes
+
+    INTEGER :: n_add_gas  !< Number of additional gas components
+
+    INTEGER :: n_stoch_vars
+    INTEGER :: n_pore_vars
+
+    INTEGER :: idx_h
+    INTEGER :: idx_hu
+    INTEGER :: idx_hv
+    INTEGER :: idx_T
+    INTEGER :: idx_solid_first
+    INTEGER :: idx_solid_last
+    INTEGER :: idx_add_gas_first
+    INTEGER :: idx_add_gas_last
+    INTEGER :: idx_stoch
+    INTEGER :: idx_pore
+    INTEGER :: idx_u
+    INTEGER :: idx_v
+
+    INTEGER :: idx_totMassEqn
+    INTEGER :: idx_uEqn
+    INTEGER :: idx_vEqn
+    INTEGER :: idx_engyEqn
+    INTEGER :: idx_solidEqn_first
+    INTEGER :: idx_solidEqn_last
+    INTEGER :: idx_addGasEqn_first
+    INTEGER :: idx_addGasEqn_last
+    INTEGER :: idx_stochEqn
+    INTEGER :: idx_poreEqn
+
+    INTEGER, PARAMETER :: max_nl_iter = 100
+
+    REAL(wp), PARAMETER :: tol_abs = 1.0E-5_wp
+    REAL(wp), PARAMETER :: tol_rel = 1.0E-5_wp
+
+    !> Limiter for the slope in the linear reconstruction:\n
+    !> - 'none'     => no limiter (constant value);
+    !> - 'minmod'   => minmod slope;
+    !> - 'superbee' => superbee limiter (Roe, 1985);
+    !> - 'van_leer' => monotonized central-difference limiter (van Leer, 1977)
+    !> .
+    INTEGER :: limiter(30) = -1
+
+    REAL(wp) :: theta             !< Van Leer limiter parameter
+    REAL(wp) :: t_start           !< initial time for the run
+    REAL(wp) :: t_end             !< end time for the run
+    REAL(wp) :: dt_output         !< time interval for the output of the solution
+
+    INTEGER :: verbose_level
+
+    TYPE bc
+        INTEGER :: flag
+        REAL(wp) :: value
+    END TYPE bc
+
+    ! -------boundary conditions variables
+
+    !> bcW&flag defines the west boundary condition:\n
+    !> - bcW%flag = 0     => Dirichlet boundary condition;
+    !> - bcW%flag = 1     => Neumann boundary condition.
+    !> .
+    !> bcLWvalue is the value of the left boundary condition:\n
+    !> - value of the variable for Dirichlet boundary condition (bcW%flag=0);
+    !> - gradient of the variable for Neumann boundary condition (bcW%flag=1).
+    !> .
+    TYPE(bc), ALLOCATABLE :: bcW(:)
+
+    !> bcE&flag defines the east boundary condition:\n
+    !> - bcE%flag = 0     => Dirichlet boundary condition;
+    !> - bcE%flag = 1     => Neumann boundary condition.
+    !> .
+    !> bcE%value is the value of the right boundary condition:\n
+    !> - value of the variable for Dirichlet boundary condition (bcE%flag=0);
+    !> - gradient of the variable for Neumann boundary condition (bcE%flag=1).
+    !> .
+    TYPE(bc), ALLOCATABLE :: bcE(:)
+
+    !> bcS&flag defines the south boundary condition:\n
+    !> - bcS%flag = 0     => Dirichlet boundary condition;
+    !> - bcS%flag = 1     => Neumann boundary condition.
+    !> .
+    !> bcS%value is the value of the bottom boundary condition:\n
+    !> - value of the variable for Dirichlet boundary condition (bcS%flag=0);
+    !> - gradient of the variable for Neumann boundary condition (bcS%flag=1).
+    !> .
+    TYPE(bc), ALLOCATABLE :: bcS(:)
+
+    !> bcN&flag defines the north boundary condition:\n
+    !> - bcN%flag = 0     => Dirichlet boundary condition;
+    !> - bcN%flag = 1     => Neumann boundary condition.
+    !> .
+    !> bcN%value is the value of the top boundary condition:\n
+    !> - value of the variable for Dirichlet boundary condition (bcN%flag=0);
+    !> - gradient of the variable for Neumann boundary condition (bcN%flag=1).
+    !> .
+    TYPE(bc), ALLOCATABLE :: bcN(:)
 
 CONTAINS
-  !> Configure canonical physical and conservative indices for a complete state.
-  !> Called after setting n_solid, n_add_gas, n_stoch_vars, n_pore_vars and n_vars.
-  SUBROUTINE configure_canonical_state_indices()
-    INTEGER :: next_index
-    IF (n_solid<0 .OR. n_add_gas<0 .OR. n_stoch_vars<0 .OR. n_pore_vars<0) &
-         ERROR STOP 'Negative canonical component count'
-    IF (n_stoch_vars>1 .OR. n_pore_vars>1) &
-         ERROR STOP 'Unsupported optional component count'
-    IF (n_vars/=4+n_solid+n_add_gas+n_stoch_vars+n_pore_vars) &
-         ERROR STOP 'Inconsistent canonical variable count'
-    idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
-    idx_totMassEqn=1; idx_uEqn=2; idx_vEqn=3; idx_engyEqn=4
-    idx_solid_first=5; idx_solid_last=4+n_solid
-    idx_solidEqn_first=idx_solid_first; idx_solidEqn_last=idx_solid_last
-    idx_add_gas_first=idx_solid_last+1
-    idx_add_gas_last=idx_solid_last+n_add_gas
-    idx_addGasEqn_first=idx_add_gas_first
-    idx_addGasEqn_last=idx_add_gas_last
-    next_index=idx_add_gas_last
-    idx_stoch=0; idx_stochEqn=0
-    IF (n_stoch_vars==1) THEN
-       next_index=next_index+1
-       idx_stoch=next_index; idx_stochEqn=next_index
-    END IF
-    idx_pore=0; idx_poreEqn=0
-    IF (n_pore_vars==1) THEN
-       next_index=next_index+1
-       idx_pore=next_index; idx_poreEqn=next_index
-    END IF
-    idx_u=n_vars+1; idx_v=n_vars+2
-  END SUBROUTINE configure_canonical_state_indices
+    !> Configure canonical physical and conservative indices for a complete state.
+    !> Called after setting n_solid, n_add_gas, n_stoch_vars, n_pore_vars and n_vars.
+    SUBROUTINE configure_canonical_state_indices()
+        INTEGER :: next_index
+        IF (n_solid<0 .OR. n_add_gas<0 .OR. n_stoch_vars<0 .OR. n_pore_vars<0) &
+            ERROR STOP 'Negative canonical component count'
+        IF (n_stoch_vars>1 .OR. n_pore_vars>1) &
+            ERROR STOP 'Unsupported optional component count'
+        IF (n_vars/=4+n_solid+n_add_gas+n_stoch_vars+n_pore_vars) &
+            ERROR STOP 'Inconsistent canonical variable count'
+        idx_h=1; idx_hu=2; idx_hv=3; idx_T=4
+        idx_totMassEqn=1; idx_uEqn=2; idx_vEqn=3; idx_engyEqn=4
+        idx_solid_first=5; idx_solid_last=4+n_solid
+        idx_solidEqn_first=idx_solid_first; idx_solidEqn_last=idx_solid_last
+        idx_add_gas_first=idx_solid_last+1
+        idx_add_gas_last=idx_solid_last+n_add_gas
+        idx_addGasEqn_first=idx_add_gas_first
+        idx_addGasEqn_last=idx_add_gas_last
+        next_index=idx_add_gas_last
+        idx_stoch=0; idx_stochEqn=0
+        IF (n_stoch_vars==1) THEN
+            next_index=next_index+1
+            idx_stoch=next_index; idx_stochEqn=next_index
+        END IF
+        idx_pore=0; idx_poreEqn=0
+        IF (n_pore_vars==1) THEN
+            next_index=next_index+1
+            idx_pore=next_index; idx_poreEqn=next_index
+        END IF
+        idx_u=n_vars+1; idx_v=n_vars+2
+    END SUBROUTINE configure_canonical_state_indices
 
-  SUBROUTINE reset_mass_exchange_rates(r)
-    TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
-    IF (ALLOCATED(r%solid_mass_rate)) THEN
-      IF (SIZE(r%solid_mass_rate)/=n_solid) DEALLOCATE(r%solid_mass_rate)
-    END IF
-    IF (ALLOCATED(r%add_gas_mass_rate)) THEN
-      IF (SIZE(r%add_gas_mass_rate)/=n_add_gas) DEALLOCATE(r%add_gas_mass_rate)
-    END IF
-    IF (ALLOCATED(r%solid_erosion_rate)) THEN
-      IF (SIZE(r%solid_erosion_rate)/=n_solid) DEALLOCATE(r%solid_erosion_rate)
-    END IF
-    IF (ALLOCATED(r%solid_deposition_rate)) THEN
-      IF (SIZE(r%solid_deposition_rate)/=n_solid) DEALLOCATE(r%solid_deposition_rate)
-    END IF
-    IF (.NOT.ALLOCATED(r%solid_mass_rate)) ALLOCATE(r%solid_mass_rate(n_solid))
-    IF (.NOT.ALLOCATED(r%add_gas_mass_rate)) ALLOCATE(r%add_gas_mass_rate(n_add_gas))
-    IF (.NOT.ALLOCATED(r%solid_erosion_rate)) ALLOCATE(r%solid_erosion_rate(n_solid))
-    IF (.NOT.ALLOCATED(r%solid_deposition_rate)) ALLOCATE(r%solid_deposition_rate(n_solid))
-    r%mixture_mass_rate=0.0_wp
-    r%energy_rate=0.0_wp
-    r%dB_dt=0.0_wp
-    r%lava_deposit_rate=0.0_wp
-    r%carrier_withdrawal_volume_rate=0.0_wp
-    r%carrier_erosion_rate=0.0_wp
-    r%carrier_deposition_rate=0.0_wp
-    r%solid_mass_rate=0.0_wp
-    r%add_gas_mass_rate=0.0_wp
-    r%solid_erosion_rate=0.0_wp
-    r%solid_deposition_rate=0.0_wp
-  END SUBROUTINE
+    SUBROUTINE reset_mass_exchange_rates(r)
+        TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
+        IF (ALLOCATED(r%solid_mass_rate)) THEN
+        IF (SIZE(r%solid_mass_rate)/=n_solid) DEALLOCATE(r%solid_mass_rate)
+        END IF
+        IF (ALLOCATED(r%add_gas_mass_rate)) THEN
+        IF (SIZE(r%add_gas_mass_rate)/=n_add_gas) DEALLOCATE(r%add_gas_mass_rate)
+        END IF
+        IF (ALLOCATED(r%solid_erosion_rate)) THEN
+        IF (SIZE(r%solid_erosion_rate)/=n_solid) DEALLOCATE(r%solid_erosion_rate)
+        END IF
+        IF (ALLOCATED(r%solid_deposition_rate)) THEN
+        IF (SIZE(r%solid_deposition_rate)/=n_solid) DEALLOCATE(r%solid_deposition_rate)
+        END IF
+        IF (.NOT.ALLOCATED(r%solid_mass_rate)) ALLOCATE(r%solid_mass_rate(n_solid))
+        IF (.NOT.ALLOCATED(r%add_gas_mass_rate)) ALLOCATE(r%add_gas_mass_rate(n_add_gas))
+        IF (.NOT.ALLOCATED(r%solid_erosion_rate)) ALLOCATE(r%solid_erosion_rate(n_solid))
+        IF (.NOT.ALLOCATED(r%solid_deposition_rate)) ALLOCATE(r%solid_deposition_rate(n_solid))
+        r%mixture_mass_rate=0.0_wp
+        r%energy_rate=0.0_wp
+        r%dB_dt=0.0_wp
+        r%lava_deposit_rate=0.0_wp
+        r%carrier_withdrawal_volume_rate=0.0_wp
+        r%carrier_erosion_rate=0.0_wp
+        r%carrier_deposition_rate=0.0_wp
+        r%solid_mass_rate=0.0_wp
+        r%add_gas_mass_rate=0.0_wp
+        r%solid_erosion_rate=0.0_wp
+        r%solid_deposition_rate=0.0_wp
+    END SUBROUTINE
 
 END MODULE parameters_2d
