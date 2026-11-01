@@ -23,6 +23,9 @@ PROGRAM test_source_registry
   IF (ALLOCATED(erosion_coeff)) DEALLOCATE(erosion_coeff)
   rheology_method='NEWTON';thermal_method='NEWTON'
   rheology_group=1;thermal_group=1
+  ! Keep the automatically active liquid-loss source in explicit GROUP 0.
+  ! This fixture tests only coupling/separation of the Newton source groups.
+  mass_exchange_method='EXPLICIT';mass_exchange_group=0
   CALL require(source_catalog_names_unique(),'unique catalog names')
   CALL require(canonical_rheology_catalog_unique(),'unique rheology names')
   CALL require(ALL(source_newton_affected_equations('rheology_voellmy')==[2,3]), &
