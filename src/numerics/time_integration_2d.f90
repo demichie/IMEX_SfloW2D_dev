@@ -48,6 +48,17 @@ CONTAINS
     IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
     this%q_before=q
     this%qp_before=qp
+    ! Reconstruct a defined primitive halo from the conserved pre-step state.
+    DO l=1,domain%reconstruction_cells
+      j=domain%j_reconstruction(l)
+      k=domain%k_reconstruction(l)
+      IF (this%q_before(1,j,k)>0.0_wp) THEN
+        CALL qc_to_qp(this%q_before(:,j,k),this%qp_before(:,j,k),pd, &
+             'Lie pre-spatial reconstruction state')
+      ELSE
+        CALL initialize_dry_physical_cell(this%qp_before(:,j,k))
+      END IF
+    END DO
     CALL spatial_operator%evaluate(this%qp_before,this%spatial_rate,t,domain)
     DO l=1,domain%solve_cells
       j=domain%j_cent(l)

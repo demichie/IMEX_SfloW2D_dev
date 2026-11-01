@@ -155,6 +155,7 @@ CONTAINS
       END BLOCK
       SELECT CASE(TRIM(requested_method))
       CASE('')
+        CONTINUE
       CASE('EXPLICIT')
         method=SOURCE_METHOD_EXPLICIT
       CASE('NEWTON')
@@ -164,6 +165,11 @@ CONTAINS
       CASE DEFAULT
         error='D19: invalid METHOD'; RETURN
       END SELECT
+      IF ((lava_flag .AND. .NOT.term%allows_lava) .OR. &
+           (gas_flag .AND. .NOT.term%allows_gas) .OR. &
+           (liquid_flag .AND. .NOT.term%allows_liquid)) THEN
+        error='D19: source incompatible with phase configuration'; RETURN
+      END IF
       IF (id<0 .OR. (id==0 .AND. method/=SOURCE_METHOD_EXPLICIT)) THEN
         error='D19: GROUP 0 requires EXPLICIT'; RETURN
       END IF
@@ -241,7 +247,7 @@ CONTAINS
     ELSE
       CALL partition%initialize(mask,membership,[INTEGER::])
     END IF
-    CALL registry%initialize_lie(n_eqns,pore,groups,error)
+    CALL registry%initialize(n_eqns,pore,groups,error)
   END SUBROUTINE initialize_configured_sources
 
 END MODULE source_configuration_2d
