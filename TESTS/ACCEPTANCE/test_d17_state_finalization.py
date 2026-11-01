@@ -1,64 +1,76 @@
 #!/usr/bin/env python3
-"""D17.19-10a source-level regression guard for post-RK finalization ordering.
-
-This is deliberately a structural test, not a numerical equivalence test.
-The observer must see raw conservative assembly, before any repairs.
-"""
+"""Static D19 regression guard for Lie state admissibility and atomic publication."""
 from pathlib import Path
 import re
 
 ROOT = Path(__file__).resolve().parents[2]
-state = (ROOT / "src/state/state_2d.f90").read_text()
-time = (ROOT / "src/numerics/time_integration_2d.f90").read_text()
-step = (ROOT / "src/numerics/step_source_executor_2d.f90").read_text()
+
+
+def load(path):
+    return (ROOT / path).read_text(encoding="utf-8")
 
 
 def body(text, name):
-    pattern = rf"(?is)\bsubroutine\s+{name}\s*\(.*?\n(.*?)\bend\s+subroutine\s+{name}\b"
-    match = re.search(pattern, text)
+    match = re.search(
+        rf"(?is)\bsubroutine\s+{re.escape(name)}\s*\(.*?\n(.*?)"
+        rf"\bend\s+subroutine\s+{re.escape(name)}\b", text)
     assert match, f"missing routine {name}"
     return match.group(1)
 
 
-def ordered(text, patterns):
-    locations = []
-    for expression in patterns:
-        match = re.search(expression, text, re.I | re.S)
-        assert match, f"missing invariant: {expression}"
-        locations.append(match.start())
-    assert locations == sorted(locations), "finalization steps are out of order"
+def ordered(code, patterns):
+    offsets = []
+    for pattern in patterns:
+        match = re.search(pattern, code, re.I | re.S)
+        assert match, f"missing invariant: {pattern}"
+        offsets.append(match.start())
+    assert offsets == sorted(offsets), "Lie publication order is incorrect"
 
 
 def check():
-    final = body(state, "finalize_imex_cell_state")
-    ordered(final, [
-        r"ISNAN\(q_cell\)",
-        r"call\s+clip_roundoff_negative_component_masses\(q_cell\)",
-        r"negative_thickness_check:",
-        r"negative_alpha_check:",
-        r"call\s+qc_to_qp\(q_cell\s*,\s*qp_cell",
-        r"call\s+project_dry_cell_momenta",
-        r"qp_cell\(idx_T\)\s*\.LT\.\s*273\.0_wp",
-        r"if\s*\(\s*SUM\(q_cell\(idx_solidEqn_first:idx_solidEqn_last\)\)",
-        r"IF\s*\(\s*nodata\s*\)",
-    ])
-    for term in ("-1.0E-7_wp", "1.0E-10_wp",
-                 "qc_to_qp(q_previous", "solid_excess_roundoff"):
-        assert term.lower() in final.lower(), f"missing legacy behavior: {term}"
+    state = load("src/state/state_2d.f90")
+    time = body(load("src/numerics/time_integration_2d.f90"), "advance_lie")
+    executor = body(load("src/numerics/lie_source_executor_2d.f90"),
+                    "execute_lie_source_groups")
+    conservative = re.search(
+        r"(?is)logical\s+function\s+conservative_mass_admissible\b.*?"
+        r"end\s+function\s+conservative_mass_admissible", state)
+    assert conservative, "missing conservative mass admissibility guard"
+    assert "idx_add_gas_first:idx_add_gas_last" in conservative.group(0)
+    assert "idx_solidEqn_first:idx_solidEqn_last" in conservative.group(0)
 
-    rk = body(time, "imex_RK_solver")
-    ordered(rk, [
-        r"q\(1:n_vars,j,k\)\s*=\s*q_old_cell\s*-\s*dt\*residual_cell",
-        r"CALL\s+observer\(3,\s*0,\s*j,\s*k,\s*q\(:,j,k\),\s*0\)",
-        r"CALL\s+finalize_imex_cell_state\(q\(:,j,k\)",
+    ordered(time, [
+        r"this%q_before\s*=\s*state%q",
+        r"call\s+spatial_operator%evaluate",
+        r"this%q_trial\(1:n_eqns,j,k\)\s*=",
+        r"conservative_mass_admissible\(this%q_trial",
+        r"call\s+state%snapshot_substrate",
+        r"call\s+begin_geometry_transaction",
+        r"call\s+execute_lie_source_groups",
+        r"if\s*\(source_step_failed\)",
+        r"state%q\s*=\s*this%q_trial",
+        r"state%qp\s*=\s*this%qp_trial",
+        r"call\s+commit_geometry_transaction",
     ])
-    assert "CALL initialize_dry_physical_cell(this%qp_rk(:,j,k))" in rk
-    assert "CALL initialize_dry_physical_cell(this%qp_rk(1:n_vars+2,j,k))" in rk
-
-    dry = body(state, "initialize_dry_physical_cell")
-    ordered(dry, [r"qp_cell\s*=\s*0\.0_wp", r"qp_cell\(idx_T\)\s*=\s*T_ambient"])
-    assert step.count("CALL initialize_dry_physical_cell(") == 2
-    print("PASS: D17 post-RK observer, repair order, dry halo and STEP guards")
+    assert "CALL state%restore_substrate(substrate_before)" in time
+    assert "CALL rollback_geometry_transaction" in time
+    assert "CALL initialize_dry_physical_cell(this%qp_before(:,j,k))" in time
+    assert "CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))" in time
+    ordered(executor, [
+        r"q_group\s*=\s*q",
+        r"qp_group\s*=\s*qp",
+        r"cell_loop:\s*do",
+        r"if\s*\(step_failed\)\s*then",
+        r"if\s*\(with_exchange\s*\.and\.\s*topo_change_flag\)",
+        r"call\s+assign_topography_vertices",
+        r"state%deposit\(j,k,1:n_solid\)\s*=",
+        r"call\s+state%refresh_substrate_totals",
+        r"q\s*=\s*q_group",
+        r"qp\s*=\s*qp_group",
+    ])
+    assert "CALL initialize_dry_physical_cell(qp_candidate)" in executor
+    assert "CALL initialize_dry_physical_cell(qp_group(:,j,k))" in executor
+    print("PASS: D19 Lie post-spatial guards, group publication and rollback")
 
 
 if __name__ == "__main__":

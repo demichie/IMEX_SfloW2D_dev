@@ -269,3 +269,9 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Nessun compilatore, processo di test o Action avviato. Il test e' stato aggiornato come sorgente ma non eseguito; eventuali problemi del gate e i restanti controlli di firma/rank vanno verificati prima della chiusura definitiva di D19.
 
 - Verifica testuale post-commit del nuovo gate: corretto l'escaping delle espressioni regolari Python, che durante la generazione della prima versione del file aveva duplicato i backslash nelle raw string. Ora i pattern riconoscono whitespace, parentesi e nomi di procedure come previsto. Nessuna esecuzione del test.
+
+### Audit dei gate legacy di test e manifest distribuzione (2026-11-01)
+
+- Sostituito `TESTS/ACCEPTANCE/test_d17_state_finalization.py`: il vecchio test leggeva `step_source_executor_2d.f90`, `finalize_imex_cell_state` e `imex_RK_solver`, tutti rimossi. Il nuovo gate statico verifica la sequenza Lie di avanzamento spaziale, ammissibilita', snapshot/rollback e commit di substrato/geometria, oltre all'inizializzazione delle celle asciutte. Nessun riferimento a STEP/RK.
+- Rimossi dal manifest `Makefile.am` i riferimenti alle fixture di sorgente non piu' presenti (`TEST_IMEX_STAGES`, `TEST_EQUATION_METADATA`, `probe_sources.f90`, `characterize.py`) e il relativo target `check-local` per `TEST_EQUATION_METADATA`. Non sono state avviate compilazioni ne' Action.
+- I controlli aggiornati non sono ancora stati eseguiti: la verifica del loro esito verra' fatta quando l'utente avviera' la pipeline manuale. D19 non e' dichiarato chiuso, poiche' restano da riconciliare gli altri test legacy e le firme in tutti i callsite.
