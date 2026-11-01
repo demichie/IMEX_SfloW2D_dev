@@ -66,7 +66,7 @@ CONTAINS
     REAL(wp), ALLOCATABLE :: staged_deposit(:,:),staged_erosion(:,:), &
          staged_erodible(:,:),staged_lava(:),staged_bed_rate(:)
     REAL(wp) :: total_rate(n_eqns)
-    REAL(wp) :: analytic_rate(n_eqns),pressure,source_time,noise
+    REAL(wp) :: analytic_rate(n_eqns),analytic_input(n_vars),pressure,source_time,noise
     LOGICAL :: with_exchange,ok,failed,bed_accepted,conversion_ok
     INTEGER :: group_index,cell,j,k,status,iterations,linear_info
 
@@ -207,9 +207,13 @@ CONTAINS
                 staged_bed_rate(cell)=transfers%dB_dt
              END IF
           CASE(SOURCE_METHOD_ANALYTIC)
-             IF (q_group(idx_totMassEqn,j,k)<=0.0_wp) CYCLE
+             ! Group 0 evaluates on the immutable pre-spatial state;
+             ! its increment is applied to the post-spatial group candidate.
+             analytic_input=q_group(:,j,k)
+             IF (groups(group_index)%id==0) analytic_input=q_original(:,j,k)
+             IF (analytic_input(idx_totMassEqn)<=0.0_wp) CYCLE
              analytic_context=cell_analytic_source_context(j,k,noise)
-             CALL eval_source_analytic(groups(group_index),q_group(:,j,k), &
+             CALL eval_source_analytic(groups(group_index),analytic_input, &
                   analytic_context,time_step,analytic_rate,status)
              IF (status/=0) THEN
                 WRITE(failure_reason,'(A,I0)') 'D19: analytic group status ',status

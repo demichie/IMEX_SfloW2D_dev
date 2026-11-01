@@ -124,3 +124,10 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Audit del dispatcher Lie: il ramo ANALYTIC scriveva direttamente nel vettore `q` autorevole, anziche nel candidato `q_group`. Corretto per aggiornare solo `q_group(1:n_eqns,j,k)` prima dei controlli di ammissibilita e della conversione; il commit dei campi `q` e `qp` rimane alla fine del gruppo, come per EXPLICIT e NEWTON.
 - Verificato staticamente che `solve_backward_euler_group` opera sul `q_group` passatogli per riferimento.
 - Nessuna compilazione o test ancora eseguiti, secondo il piano.
+
+### Chiusura del percorso analitico del gruppo 0 (2026-11-01)
+
+- Il ramo ANALYTIC usa ora `q_original` per valutare il contributo del gruppo 0, come gli altri termini fisici del gruppo iniziale, e applica il contributo al candidato post-spaziale `q_group`.
+- Per i gruppi successivi ANALYTIC usa il proprio stato di ingresso `q_group`. Il salto di aggiornamento non viene pubblicato prima della validazione dell'intero gruppo.
+- L'audit statico delle vecchie API `begin_lie_geometry_transaction`, `rollback_lie_geometry_transaction`, `release_topography_workspace` e `project_lie_bed_rate` non trova chiamanti Fortran di produzione residui; rimane una menzione documentale storica.
+- Non attribuire lo stato «validato» all'architettura finche non siano stati eseguiti compilazione e test di integrazione nella fase conclusiva.
