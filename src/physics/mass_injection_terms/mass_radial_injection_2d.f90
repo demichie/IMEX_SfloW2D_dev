@@ -1,4 +1,6 @@
-!> \brief Physical treatment interfaces for radial_injection.
+!> @brief Implement the four radial lateral injection treatment interfaces.
+!> @details Injection physics uses local state and geometric values; unsupported
+!>          numerical treatments terminate with a diagnostic rather than silent rates.
 MODULE mass_radial_injection_2d
         USE parameters_2d, ONLY : idx_h, idx_T
     USE parameters_2d
@@ -15,6 +17,15 @@ MODULE mass_radial_injection_2d
     PUBLIC :: eval_radial_injection_implicit
     PUBLIC :: eval_radial_injection_analytic
 CONTAINS
+    !> @brief Evaluate explicit radial lateral injection source.
+    !> @details Computes cell-local rates using preconfigured source windows.
+    !> @param[in] state Local physical cell state.
+    !> @param[in] time Current source evaluation time [s].
+    !> @param[in] lat_arc_perim_jk Local source arc perimeter [m].
+    !> @param[in] lat_n_x_jk Local boundary normal x component.
+    !> @param[in] lat_n_y_jk Local boundary normal y component.
+    !> @param[in] cell_area_jk Local horizontal cell area [m2].
+    !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_radial_injection_explicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
             cell_area_jk, rate)
         USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source, &
@@ -133,6 +144,25 @@ CONTAINS
         END IF
     END SUBROUTINE eval_radial_injection_explicit
 
+
+    !> @brief Reject unsupported semi-implicit radial lateral injection source.
+
+    !> @details This interface is preserved but fails explicitly when invoked.
+
+    !> @param[in] state Local physical cell state.
+
+    !> @param[in] time Current source evaluation time [s].
+
+    !> @param[in] lat_arc_perim_jk Local source arc perimeter [m].
+
+    !> @param[in] lat_n_x_jk Local boundary normal x component.
+
+    !> @param[in] lat_n_y_jk Local boundary normal y component.
+
+    !> @param[in] cell_area_jk Local horizontal cell area [m2].
+
+    !> @param[out] rate Conservative injection rate vector.
+
     SUBROUTINE eval_radial_injection_semi_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
             cell_area_jk, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
@@ -142,6 +172,25 @@ CONTAINS
         CALL fatal_error('radial_injection: semi_implicit treatment is unsupported')
     END SUBROUTINE eval_radial_injection_semi_implicit
 
+
+    !> @brief Reject unsupported implicit radial lateral injection source.
+
+    !> @details This interface is preserved but fails explicitly when invoked.
+
+    !> @param[in] state Local physical cell state.
+
+    !> @param[in] time Current source evaluation time [s].
+
+    !> @param[in] lat_arc_perim_jk Local source arc perimeter [m].
+
+    !> @param[in] lat_n_x_jk Local boundary normal x component.
+
+    !> @param[in] lat_n_y_jk Local boundary normal y component.
+
+    !> @param[in] cell_area_jk Local horizontal cell area [m2].
+
+    !> @param[out] rate Conservative injection rate vector.
+
     SUBROUTINE eval_radial_injection_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
             cell_area_jk, rate)
         TYPE(complex_physical_state_type), INTENT(IN) :: state
@@ -150,6 +199,25 @@ CONTAINS
         COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
         CALL fatal_error('radial_injection: implicit treatment is unsupported')
     END SUBROUTINE eval_radial_injection_implicit
+
+
+    !> @brief Reject unsupported analytic radial lateral injection source.
+
+    !> @details This interface is preserved but fails explicitly when invoked.
+
+    !> @param[in] state Local physical cell state.
+
+    !> @param[in] time Current source evaluation time [s].
+
+    !> @param[in] lat_arc_perim_jk Local source arc perimeter [m].
+
+    !> @param[in] lat_n_x_jk Local boundary normal x component.
+
+    !> @param[in] lat_n_y_jk Local boundary normal y component.
+
+    !> @param[in] cell_area_jk Local horizontal cell area [m2].
+
+    !> @param[out] rate Conservative injection rate vector.
 
     SUBROUTINE eval_radial_injection_analytic(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, &
             cell_area_jk, rate)

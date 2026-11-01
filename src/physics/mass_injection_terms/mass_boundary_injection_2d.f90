@@ -1,4 +1,6 @@
-!> \brief Physical treatment interfaces for boundary_injection.
+!> @brief Implement the four spatial boundary injection treatment interfaces.
+!> @details Injection physics uses local state and geometric values; unsupported
+!>          numerical treatments terminate with a diagnostic rather than silent rates.
 MODULE mass_boundary_injection_2d
         USE parameters_2d, ONLY : idx_T, idx_h, idx_hu, idx_hv
     USE parameters_2d
@@ -11,6 +13,12 @@ MODULE mass_boundary_injection_2d
     PUBLIC :: eval_boundary_injection_implicit
     PUBLIC :: eval_boundary_injection_analytic
 CONTAINS
+    !> @brief Evaluate explicit spatial boundary injection boundary trace.
+    !> @details Computes cell-local rates using preconfigured source windows.
+    !> @param[in] time Current source evaluation time [s].
+    !> @param[in] vect_x Boundary outward-normal x component.
+    !> @param[in] vect_y Boundary outward-normal y component.
+    !> @param[out] source_bdry Primitive injection boundary trace.
     SUBROUTINE eval_boundary_injection_explicit( time, vect_x , vect_y , source_bdry )
 
         USE parameters_2d, ONLY : h_source , vel_source , T_source , xs_source,    &
@@ -84,17 +92,56 @@ CONTAINS
 
     END SUBROUTINE eval_boundary_injection_explicit
 
+
+    !> @brief Reject unsupported semi-implicit spatial boundary injection boundary trace.
+
+    !> @details This interface is preserved but fails explicitly when invoked.
+
+    !> @param[in] time Current source evaluation time [s].
+
+    !> @param[in] vect_x Boundary outward-normal x component.
+
+    !> @param[in] vect_y Boundary outward-normal y component.
+
+    !> @param[out] source_bdry Primitive injection boundary trace.
+
     SUBROUTINE eval_boundary_injection_semi_implicit(time, vect_x, vect_y, source_bdry)
         REAL(wp), INTENT(IN) :: time, vect_x, vect_y
         REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
         CALL fatal_error('boundary_injection: semi_implicit treatment is unsupported')
     END SUBROUTINE eval_boundary_injection_semi_implicit
 
+
+    !> @brief Reject unsupported implicit spatial boundary injection boundary trace.
+
+    !> @details This interface is preserved but fails explicitly when invoked.
+
+    !> @param[in] time Current source evaluation time [s].
+
+    !> @param[in] vect_x Boundary outward-normal x component.
+
+    !> @param[in] vect_y Boundary outward-normal y component.
+
+    !> @param[out] source_bdry Primitive injection boundary trace.
+
     SUBROUTINE eval_boundary_injection_implicit(time, vect_x, vect_y, source_bdry)
         REAL(wp), INTENT(IN) :: time, vect_x, vect_y
         REAL(wp), INTENT(OUT) :: source_bdry(n_vars+2)
         CALL fatal_error('boundary_injection: implicit treatment is unsupported')
     END SUBROUTINE eval_boundary_injection_implicit
+
+
+    !> @brief Reject unsupported analytic spatial boundary injection boundary trace.
+
+    !> @details This interface is preserved but fails explicitly when invoked.
+
+    !> @param[in] time Current source evaluation time [s].
+
+    !> @param[in] vect_x Boundary outward-normal x component.
+
+    !> @param[in] vect_y Boundary outward-normal y component.
+
+    !> @param[out] source_bdry Primitive injection boundary trace.
 
     SUBROUTINE eval_boundary_injection_analytic(time, vect_x, vect_y, source_bdry)
         REAL(wp), INTENT(IN) :: time, vect_x, vect_y

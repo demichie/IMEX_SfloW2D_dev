@@ -1,4 +1,6 @@
-!> \brief Physical treatment interfaces for bottom_fissural_injection.
+!> @brief Implement the four bottom fissural injection treatment interfaces.
+!> @details Injection physics uses local state and geometric values; unsupported
+!>          numerical treatments terminate with a diagnostic rather than silent rates.
 MODULE mass_bottom_fissural_injection_2d
         USE parameters_2d, ONLY : idx_h, idx_T
     USE parameters_2d
@@ -15,6 +17,12 @@ MODULE mass_bottom_fissural_injection_2d
     PUBLIC :: eval_bottom_fissural_injection_implicit
     PUBLIC :: eval_bottom_fissural_injection_analytic
 CONTAINS
+    !> @brief Evaluate explicit bottom fissural injection source.
+    !> @details Computes cell-local rates using preconfigured source windows.
+    !> @param[in] state Local physical cell state.
+    !> @param[in] time Current source evaluation time [s].
+    !> @param[in] cell_fissure_fract Local coverage fraction for each fissure.
+    !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_bottom_fissural_injection_explicit(state, time, cell_fissure_fract, rate)
         USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source, &
             time_param, bottom_radial_source_flag, pore_pressure_flag, &
@@ -107,6 +115,19 @@ CONTAINS
         END IF
     END SUBROUTINE eval_bottom_fissural_injection_explicit
 
+
+    !> @brief Reject unsupported semi-implicit bottom fissural injection source.
+
+    !> @details This interface is preserved but fails explicitly when invoked.
+
+    !> @param[in] state Local physical cell state.
+
+    !> @param[in] time Current source evaluation time [s].
+
+    !> @param[in] cell_fissure_fract Local coverage fraction for each fissure.
+
+    !> @param[out] rate Conservative injection rate vector.
+
     SUBROUTINE eval_bottom_fissural_injection_semi_implicit(state, time, cell_fissure_fract, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fissure_fract(:)
@@ -114,12 +135,38 @@ CONTAINS
         CALL fatal_error('bottom_fissural_injection: semi_implicit treatment is unsupported')
     END SUBROUTINE eval_bottom_fissural_injection_semi_implicit
 
+
+    !> @brief Reject unsupported implicit bottom fissural injection source.
+
+    !> @details This interface is preserved but fails explicitly when invoked.
+
+    !> @param[in] state Local physical cell state.
+
+    !> @param[in] time Current source evaluation time [s].
+
+    !> @param[in] cell_fissure_fract Local coverage fraction for each fissure.
+
+    !> @param[out] rate Conservative injection rate vector.
+
     SUBROUTINE eval_bottom_fissural_injection_implicit(state, time, cell_fissure_fract, rate)
         TYPE(complex_physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fissure_fract(:)
         COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
         CALL fatal_error('bottom_fissural_injection: implicit treatment is unsupported')
     END SUBROUTINE eval_bottom_fissural_injection_implicit
+
+
+    !> @brief Reject unsupported analytic bottom fissural injection source.
+
+    !> @details This interface is preserved but fails explicitly when invoked.
+
+    !> @param[in] state Local physical cell state.
+
+    !> @param[in] time Current source evaluation time [s].
+
+    !> @param[in] cell_fissure_fract Local coverage fraction for each fissure.
+
+    !> @param[out] rate Conservative injection rate vector.
 
     SUBROUTINE eval_bottom_fissural_injection_analytic(state, time, cell_fissure_fract, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
