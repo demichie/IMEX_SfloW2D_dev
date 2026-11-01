@@ -1027,10 +1027,13 @@ CONTAINS
        IF (.NOT.ALL(ieee_is_finite(qc))) RETURN
        IF (qc(idx_totMassEqn)<0.0_wp) RETURN
        IF (qc(idx_totMassEqn)>EPSILON(1.0_wp)) THEN
+          IF (ANY(qc(idx_solid_first:idx_solid_last)<0.0_wp)) RETURN
+          IF (ANY(qc(idx_add_gas_first:idx_add_gas_last)<0.0_wp)) RETURN
           r_xs=qc(idx_solid_first:idx_solid_last)/qc(idx_totMassEqn)
           r_xg=qc(idx_add_gas_first:idx_add_gas_last)/qc(idx_totMassEqn)
-          IF (ANY(r_xs< -mass_fraction_roundoff_tolerance) .OR. &
-               ANY(r_xg< -mass_fraction_roundoff_tolerance)) RETURN
+          IF (.NOT.ALL(ieee_is_finite(r_xs)) .OR. &
+               .NOT.ALL(ieee_is_finite(r_xg))) RETURN
+          IF (SUM(r_xs)+SUM(r_xg)>1.0_wp+mass_fraction_roundoff_tolerance) RETURN
        END IF
     END IF
 

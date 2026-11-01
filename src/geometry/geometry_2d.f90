@@ -528,6 +528,24 @@ CONTAINS
     lie_geometry_transaction_active=.FALSE.
   END SUBROUTINE clear_lie_geometry_transaction
 
+  !> Validate every geometry field used by subsequent Lie groups.
+  LOGICAL FUNCTION topography_geometry_is_finite()
+    topography_geometry_is_finite=.FALSE.
+    IF (.NOT.ALL(ieee_is_finite(B_vertex))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(B_cent))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(B_face_x))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(B_face_y))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(B_prime_x_geom))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(B_prime_y_geom))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(B_second_xx_geom))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(B_second_yy_geom))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(B_second_xy_geom))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(grav_coeff))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(grav_coeff_stag_x))) RETURN
+    IF (.NOT.ALL(ieee_is_finite(grav_coeff_stag_y))) RETURN
+    topography_geometry_is_finite=.TRUE.
+  END FUNCTION topography_geometry_is_finite
+
   SUBROUTINE refresh_topography_geometry
 
     IMPLICIT NONE
@@ -634,7 +652,10 @@ CONTAINS
     B_vertex=bed_candidate
 
     CALL refresh_topography_geometry
-    IF (PRESENT(accepted)) accepted=.TRUE.
+    IF (PRESENT(accepted)) THEN
+       IF (.NOT.topography_geometry_is_finite()) RETURN
+       accepted=.TRUE.
+    END IF
 
   END SUBROUTINE apply_topography_rate_update
 
