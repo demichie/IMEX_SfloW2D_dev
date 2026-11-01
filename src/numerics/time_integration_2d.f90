@@ -62,7 +62,7 @@ CONTAINS
     DO l=1,domain%reconstruction_cells
       j=domain%j_reconstruction(l)
       k=domain%k_reconstruction(l)
-      IF (this%q_before(1,j,k)>0.0_wp) THEN
+      IF (this%q_before(idx_totMassEqn,j,k)>0.0_wp) THEN
         CALL qc_to_qp(this%q_before(:,j,k),this%qp_before(:,j,k),pd, &
              'Lie pre-spatial reconstruction state',conversion_ok)
         IF (.NOT.conversion_ok) &

@@ -185,3 +185,9 @@ Il gruppo mass-exchange verifica finitezza e nonnegativita di deposito, erosione
 - Confermate in `time_integration_2d` le chiamate ai metodi `state%snapshot_substrate` e `state%restore_substrate`, oltre alle transazioni geometriche; confermato in `lie_source_executor_2d` che gli aggiornamenti `q` e `qp` autorevoli seguono la validazione dei candidati.
 - **Blocco operativo constatato**: `git ls-remote https://github.com/demichie/IMEX_SfloW2D_dev.git HEAD` nell'ambiente di esecuzione fallisce per DNS (`Could not resolve host: github.com`). Non esiste quindi una copia locale verificata dalla quale eseguire la compilazione; il connettore GitHub permette di consultare e registrare il codice, ma non equivale a compilazione.
 - Restano aperti il confronto esaustivo di tutti i simboli `USE ONLY` e delle firme, la verifica di tutti i rami semantici e i test. Nessuna chiusura fittizia dell'audit statico o della compilazione.
+
+### Verifica integratore e indice canonico (2026-11-01)
+
+- Esaminata integralmente la routine `advance_lie`: lo stato originale viene copiato nei workspace, il flusso spaziale aggiorna solo `q_trial`, le conversioni e l'ammissibilita' sono controllate prima dei gruppi; il rollback di substrato e topografia avviene in caso di errore sorgente, mentre `state%q` e `state%qp` vengono pubblicati solo dopo il completamento di tutti i gruppi.
+- Corretta una dipendenza implicita dall'ordinamento delle variabili: la ricostruzione pre-spaziale controllava `q_before(1,j,k)` per distinguere celle bagnate/asciutte, ora usa l'indice canonico `idx_totMassEqn`, gia' importato dal modulo. Non cambiano ne' il metodo temporale ne' la fisica del flusso.
+- Restano da verificare esaustivamente le altre firme/import e i singoli percorsi numerici; compilazione non eseguita, poiche' il clone Git diretto continua a fallire per risoluzione DNS. Non dichiarare chiuso l'audit.
