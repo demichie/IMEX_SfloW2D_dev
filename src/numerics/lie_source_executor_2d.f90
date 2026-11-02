@@ -230,10 +230,12 @@ CONTAINS
             k=domain%k_cent(cell)
             q_local=q(:,j,k)
             qp_local=qp(:,j,k)
-            deposit_local=state%deposit(j,k,1:n_solid)
-            erosion_local=state%erosion(j,k,1:n_solid)
-            erodible_local=state%erodible(1:n_solid,j,k)
-            lava_local=state%lava_deposit(j,k)
+            IF (ANY(exchange_group)) THEN
+                deposit_local=state%deposit(j,k,1:n_solid)
+                erosion_local=state%erosion(j,k,1:n_solid)
+                erodible_local=state%erodible(1:n_solid,j,k)
+                lava_local=state%lava_deposit(j,k)
+            END IF
             analytic_context%Bprime_x=B_prime_x_geom(j,k)
             analytic_context%Bprime_y=B_prime_y_geom(j,k)
             analytic_context%Bsecond_xx=B_second_xx_geom(j,k)
@@ -448,10 +450,12 @@ CONTAINS
             IF (LEN_TRIM(cell_failure(cell))==0) THEN
                 q(:,j,k)=q_local
                 qp(:,j,k)=qp_local
-                state%deposit(j,k,1:n_solid)=deposit_local
-                state%erosion(j,k,1:n_solid)=erosion_local
-                state%erodible(1:n_solid,j,k)=erodible_local
-                state%lava_deposit(j,k)=lava_local
+                IF (ANY(exchange_group)) THEN
+                    state%deposit(j,k,1:n_solid)=deposit_local
+                    state%erosion(j,k,1:n_solid)=erosion_local
+                    state%erodible(1:n_solid,j,k)=erodible_local
+                    state%lava_deposit(j,k)=lava_local
+                END IF
             END IF
         END DO cell_loop
         !$OMP END PARALLEL DO
