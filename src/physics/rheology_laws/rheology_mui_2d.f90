@@ -45,7 +45,7 @@ CONTAINS
         !> \param[in] grav_coeff Local dimensionless gravitational correction.
         !> \param[in] use_pore_pressure Enable pore-pressure correction.
         !> \param[out] rate Two-component conservative momentum source.
-        SUBROUTINE eval_rheology_mui_explicit(state, grav_coeff, use_pore_pressure, rate)
+    SUBROUTINE eval_rheology_mui_explicit(state, grav_coeff, use_pore_pressure, rate)
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: grav_coeff
 

@@ -44,7 +44,7 @@ CONTAINS
         !> \param[in] use_stochastic Whether stochastic rheology parameters are enabled.
         !> \param[in] stochastic_value Stochastic model parameter used in the friction law.
         !> \param[out] rate Conservative horizontal momentum source vector.
-        SUBROUTINE eval_rheology_lucas_explicit(state, grav_coeff, use_stochastic, stochastic_value, rate)
+    SUBROUTINE eval_rheology_lucas_explicit(state, grav_coeff, use_stochastic, stochastic_value, rate)
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: grav_coeff
             REAL(wp), INTENT(IN) :: stochastic_value

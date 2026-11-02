@@ -53,7 +53,7 @@ CONTAINS
         !> \param[in] use_stochastic Enable model stochastic parameter.
         !> \param[in] stochastic_value Stochastic parameter value.
         !> \param[out] rate Two-component conservative momentum source.
-        SUBROUTINE eval_rheology_mui_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic, stochastic_value, rate)
+    SUBROUTINE eval_rheology_mui_voellmy_explicit(state, grav_coeff, use_pore_pressure, use_stochastic, stochastic_value, rate)
             TYPE(physical_state_type), INTENT(IN) :: state
             REAL(wp), INTENT(IN) :: grav_coeff
             REAL(wp), INTENT(IN) :: stochastic_value
@@ -71,13 +71,15 @@ CONTAINS
         END SUBROUTINE eval_rheology_mui_voellmy_explicit
 
         !> \param[in] state Shared real or complex physical state.
-        !> \brief Evaluate the semi-implicit mui_voellmy contribution to the horizontal momentum source.
+        !> \brief Evaluate the semi-implicit mui_voellmy contribution to the horizontal momentum
+        !> source.
         !> \details Compute the momentum source under regularized mu(I) friction combined with
         !> Voellmy-type velocity-dependent resistance, using the treatment-specific velocity and
         !> effective-stress inputs. Outputs are conservative x/y momentum source rates.
         !> \param[in] mod_vel Three-dimensional speed [m s^-1].
         !> \param[in] grav_coeff Local dimensionless gravitational correction.
-        !> \param[in] curvature_acceleration Normal acceleration due to topographic curvature [m s^-2].
+        !> \param[in] curvature_acceleration Normal acceleration due to topographic curvature [m
+        !> s^-2].
         !> \param[in] use_pore_pressure Enable pore-pressure correction.
         !> \param[out] rate_x x momentum source.
         !> \param[out] rate_y y momentum source.
@@ -204,13 +206,16 @@ CONTAINS
 
         !> \param[in] state Shared real physical state before integration.
         !> \brief Integrate the mui_voellmy velocity source in time.
-        !> \details Advance the scalar speed under regularized mu(I) friction combined with Voellmy-type
-        !> velocity-dependent resistance with model coefficients fixed over dt; the horizontal direction
+        !> \details Advance the scalar speed under regularized mu(I) friction combined with
+        !> Voellmy-type
+        !> velocity-dependent resistance with model coefficients fixed over dt; the horizontal
+        !> direction
         !> is retained in the returned velocity vector.
         !> \param[in] dt Source integration interval [s].
         !> \param[in] speed_ratio Ratio of total to horizontal speed.
         !> \param[in] grav_coeff Local dimensionless gravitational correction.
-        !> \param[in] curvature_acceleration Normal acceleration due to topographic curvature [m s^-2].
+        !> \param[in] curvature_acceleration Normal acceleration due to topographic curvature [m
+        !> s^-2].
         !> \param[in] use_pore_pressure Enable pore-pressure correction.
         !> \param[in] use_stochastic_xi Enable stochastic turbulent resistance.
         !> \param[in] stochastic_xi_value Stochastic turbulent resistance parameter.

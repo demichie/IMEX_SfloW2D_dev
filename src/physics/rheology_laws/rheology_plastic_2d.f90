@@ -31,13 +31,14 @@ MODULE rheology_plastic_2d
 CONTAINS
         !> \param[in] state Shared physical state (real or complex according to treatment).
         !> \brief Evaluate the explicit plastic contribution to the horizontal momentum source.
-        !> \details Compute the momentum source under the basal plastic yield-resistance model, using
+        !> \details Compute the momentum source under the basal plastic yield-resistance model,
+        !> using
         !> the treatment-specific velocity and effective-stress inputs. Outputs are conservative x/y
         !> momentum source rates.
         !> \param[in] mod_vel Three-dimensional speed [m s^-1].
         !> \param[in] moving True for a moving local state.
         !> \param[out] rate Two-component conservative momentum source.
-        SUBROUTINE eval_rheology_plastic_explicit(state, rate)
+    SUBROUTINE eval_rheology_plastic_explicit(state, rate)
             TYPE(physical_state_type), INTENT(IN) :: state
 
 
@@ -53,7 +54,8 @@ CONTAINS
 
         !> \param[in] state Shared physical state (real or complex according to treatment).
         !> \brief Evaluate the semi-implicit plastic contribution to the horizontal momentum source.
-        !> \details Return the contribution assigned to the semi-implicit treatment. This implementation
+        !> \details Return the contribution assigned to the semi-implicit treatment. This
+        !> implementation
         !> supplies a zero source when the model has no term in this treatment.
         !> \param[out] rate_x x momentum source.
         !> \param[out] rate_y y momentum source.
@@ -90,7 +92,8 @@ CONTAINS
 
         !> \param[in] state Shared real physical state at the start of the analytic substep.
         !> \brief Integrate the plastic velocity source in time.
-        !> \details Advance the scalar speed under the basal plastic yield-resistance model with model
+        !> \details Advance the scalar speed under the basal plastic yield-resistance model with
+        !> model
         !> coefficients fixed over dt; the horizontal direction is retained in the returned velocity
         !> vector.
         !> \param[in] dt Source integration interval [s].

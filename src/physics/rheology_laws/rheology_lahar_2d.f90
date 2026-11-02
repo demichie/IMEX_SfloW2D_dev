@@ -70,7 +70,7 @@ CONTAINS
         !> \param[in] mod_hor_vel Magnitude of horizontal velocity [m s^-1].
         !> \param[in] moving Whether the local state is considered moving.
         !> \param[out] rate Conservative horizontal momentum source vector.
-        SUBROUTINE eval_rheology_lahar_explicit(state, rate)
+    SUBROUTINE eval_rheology_lahar_explicit(state, rate)
             TYPE(physical_state_type), INTENT(IN) :: state
 
 

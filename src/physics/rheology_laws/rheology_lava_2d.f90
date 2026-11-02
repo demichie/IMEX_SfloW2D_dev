@@ -37,7 +37,7 @@ MODULE rheology_lava_2d
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
 
-        SUBROUTINE eval_rheology_lava_explicit(state, rate)
+    SUBROUTINE eval_rheology_lava_explicit(state, rate)
             TYPE(physical_state_type), INTENT(IN) :: state
 
 
