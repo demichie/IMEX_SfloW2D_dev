@@ -37,7 +37,7 @@ MODULE rheology_voellmy_2d
     PUBLIC :: eval_rheology_voellmy_implicit
     PUBLIC :: eval_rheology_voellmy_analytic
     PUBLIC :: mu
-        REAL(wp) :: mu
+    REAL(wp) :: mu
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
     !> \param[in] state Shared physical state (complex for the implicit contribution).

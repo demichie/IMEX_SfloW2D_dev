@@ -26,7 +26,7 @@ MODULE rheology_plastic_2d
     PUBLIC :: eval_rheology_plastic_implicit
     PUBLIC :: eval_rheology_plastic_analytic
     PUBLIC :: tau
-        REAL(wp) :: tau
+    REAL(wp) :: tau
         ! Uniform source treatment entry points. Existing kernels remain unchanged.
 CONTAINS
     !> \param[in] state Shared physical state (real or complex according to treatment).
