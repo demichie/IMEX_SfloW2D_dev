@@ -84,3 +84,18 @@ end-to-end Action execution have NOT yet been observed on this revision.
 Run the validation workflow first, inspect all job results, and only then
 run the performance benchmark. Do not label the migration verified on the
 strength of a source-level review alone.
+
+## Regression repair after first test run
+
+The direct executor test `TEST_MASS_EXCHANGE/test_projection_stress.f90`
+reported `Lie inventory rollback mismatch`. The old test invoked the
+executor and rolled back geometry but still expected inventories to be
+unchanged, which was the superseded *group-level* transaction contract.
+The revised test now takes the same `substrate_snapshot_type` snapshot as
+the production integrator and explicitly restores it after a deliberately
+rejected group. It continues checking the fluid trial, geometry and all
+inventory arrays. This corrects the test harness rather than restoring
+unwanted per-group staging in the production executor.
+
+Validation of this correction requires a new regression run; no pass has
+been asserted yet.

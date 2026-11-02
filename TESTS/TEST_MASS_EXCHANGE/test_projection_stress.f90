@@ -3,7 +3,7 @@ PROGRAM test_projection_stress
   USE parameters_2d
   USE constitutive_parameters_2d
   USE geometry_2d
-  USE state_2d, ONLY : state_type
+  USE state_2d, ONLY : state_type,substrate_snapshot_type
   USE domain_2d, ONLY : domain_type
   USE source_registry_2d, ONLY : source_registry_type,source_group_type
   USE source_catalog_2d, ONLY : SOURCE_METHOD_EXPLICIT
@@ -227,12 +227,13 @@ CONTAINS
     CALL reset_state(.FALSE.)
   END SUBROUTINE check_lie_exchange_transaction
 
-  !> A later-cell failure must not commit any earlier-cell exchange.
-  !> The caller uses trial fluid state and the geometry transaction rollback,
-  !> matching the Lie time driver. Reject without invoking fatal_error.
+  !> A later-cell failure invalidates the whole Lie time-step.
+  !> The caller must restore substrate and geometry snapshots, while the
+  !> partially updated fluid trial is never published.
   SUBROUTINE check_lie_rejected_transaction
     TYPE(source_registry_type) :: registry
     TYPE(source_group_type) :: groups(1)
+    TYPE(substrate_snapshot_type) :: substrate_before
     REAL(wp) :: q_before(nq,nx,ny),qp_before(nq+2,nx,ny)
     REAL(wp) :: q_trial(nq,nx,ny),qp_trial(nq+2,nx,ny)
     REAL(wp) :: qp_invalid(nq+2,nx,ny)
@@ -269,12 +270,14 @@ CONTAINS
     ! candidate with the executor's INTENT(IN) GROUP-0 reference.
     qp_invalid=qp_before
     qp_invalid(:,2,1)=ieee_value(0.0_wp,ieee_quiet_nan)
+    CALL state%snapshot_substrate(substrate_before)
     CALL begin_geometry_transaction
     CALL execute_lie_source_groups(state,q_trial,qp_trial,1.0_wp,domain,registry, &
          q_original=q_before,qp_original=qp_invalid, &
          step_failed=failed,failure_message=message)
     IF (.NOT.failed) ERROR STOP 'Lie exchange rejection not reported'
     IF (LEN_TRIM(message)==0) ERROR STOP 'Lie rejection missing diagnostic'
+    CALL state%restore_substrate(substrate_before)
     CALL rollback_geometry_transaction
     ! Fluid workspaces are not published by the Lie driver on rejection.
     q_trial=q_before;qp_trial=qp_before
