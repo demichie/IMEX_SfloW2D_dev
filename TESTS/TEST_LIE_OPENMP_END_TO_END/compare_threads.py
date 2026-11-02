@@ -90,11 +90,11 @@ def run_case(solver, fixture, root, case, threads, evidence):
                             text=True, timeout=240)
     log_path = evidence / f"{case}-threads-{threads}.log"
     log_path.write_text(result.stdout)
-    tail = "\\n".join(result.stdout.splitlines()[-35:])
+    tail = "\n".join(result.stdout.splitlines()[-35:])
     if result.returncode:
         raise AssertionError(f"{case}/{threads}: solver exited {result.returncode}; "
-                             f"log={log_path}; tail:\\n{tail}")
-    match = re.search(r"Parallel run:\\s*number of threads used\\s+(\\d+)", result.stdout)
+                             f"log={log_path}; tail:\n{tail}")
+    match = re.search(r"Parallel run:\s*number of threads used\s+(\d+)", result.stdout)
     if not match:
         mode = ("non-OpenMP mode" if "Non-OpenMP simulation" in result.stdout
                 else "no OpenMP team report")
