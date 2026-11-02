@@ -30,6 +30,8 @@ MODULE time_integration_2d
         REAL(wp), ALLOCATABLE :: q_trial(:,:,:), qp_trial(:,:,:)
         TYPE(source_group_type), ALLOCATABLE :: lie_groups(:)
         LOGICAL :: lie_has_exchange=.FALSE.,lie_has_bed=.FALSE.
+        LOGICAL, ALLOCATABLE :: lie_exchange_group(:)
+        INTEGER :: lie_bed_group_id=-1
         LOGICAL :: profile_enabled=.FALSE.
         INTEGER :: profile_calls=0
         REAL(wp) :: profile_spatial=0.0_wp,profile_sources=0.0_wp
@@ -224,11 +226,18 @@ CONTAINS
             IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
             this%lie_groups=source_registry%groups()
             this%lie_has_exchange=.FALSE.
+            ALLOCATE(this%lie_exchange_group(SIZE(this%lie_groups)))
+            this%lie_exchange_group=.FALSE.
+            this%lie_bed_group_id=-1
             DO group_id=1,SIZE(this%lie_groups)
                 IF (.NOT.ALLOCATED(this%lie_groups(group_id)%source_names)) &
                     CALL fatal_error('Lie source group has no allocated source list')
-                IF (ANY(INDEX(this%lie_groups(group_id)%source_names,'mass_exchange_')==1)) &
+                this%lie_exchange_group(group_id)= &
+                    ANY(INDEX(this%lie_groups(group_id)%source_names,'mass_exchange_')==1)
+                IF (this%lie_exchange_group(group_id)) THEN
                     this%lie_has_exchange=.TRUE.
+                    IF (topo_change_flag) this%lie_bed_group_id=this%lie_groups(group_id)%id
+                END IF
             END DO
             this%lie_has_bed=this%lie_has_exchange .AND. topo_change_flag
         END IF
@@ -242,7 +251,8 @@ CONTAINS
             tick=tock
         END IF
         CALL execute_lie_source_groups(state, this%q_trial, this%qp_trial, dt, domain, source_registry,                &
-            stochastic_values, t, this%q_before, this%qp_before, source_step_failed, source_failure, this%lie_groups)
+            stochastic_values, t, this%q_before, this%qp_before, source_step_failed, source_failure, this%lie_groups, &
+            this%lie_exchange_group, this%lie_bed_group_id)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)
@@ -318,6 +328,7 @@ CONTAINS
             WRITE(*,'(A,ES15.7)') 'LIE_PROFILE publish_seconds=',this%profile_publish
         END IF
         IF (ALLOCATED(this%lie_groups)) DEALLOCATE(this%lie_groups)
+        IF (ALLOCATED(this%lie_exchange_group)) DEALLOCATE(this%lie_exchange_group)
         IF (ALLOCATED(this%spatial_rate)) DEALLOCATE(this%spatial_rate)
         IF (ALLOCATED(this%q_before)) DEALLOCATE(this%q_before)
         IF (ALLOCATED(this%qp_before)) DEALLOCATE(this%qp_before)

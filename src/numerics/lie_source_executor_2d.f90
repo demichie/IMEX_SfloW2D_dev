@@ -48,7 +48,7 @@ CONTAINS
     !> @param[out] step_failed True when candidate group state is rejected.
     !> @param[out] failure_message Optional diagnostic describing rejected group.
     SUBROUTINE execute_lie_source_groups(state, q, qp, time_step, domain, source_registry, stochastic_values,          &
-        step_start_time, q_original, qp_original, step_failed, failure_message, cached_groups)
+        step_start_time, q_original, qp_original, step_failed, failure_message, cached_groups, cached_exchange, cached_bed_group_id)
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,                                                             &
             B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff,                                             &
             project_cell_field_to_vertices,assign_topography_vertices,B_vertex,                                        &
@@ -68,6 +68,8 @@ CONTAINS
         TYPE(source_group_type), POINTER :: groups(:)
         TYPE(source_group_type), ALLOCATABLE, TARGET :: owned_groups(:)
         TYPE(source_group_type), TARGET, INTENT(IN), OPTIONAL :: cached_groups(:)
+        LOGICAL, INTENT(IN), OPTIONAL :: cached_exchange(:)
+        INTEGER, INTENT(IN), OPTIONAL :: cached_bed_group_id
         TYPE(mass_exchange_rates_type) :: transfers
         TYPE(analytic_term_context_type) :: analytic_context
         REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
@@ -154,34 +156,48 @@ CONTAINS
         bed_group_id=-1
         has_bed_group=.FALSE.
         IF (profiling_enabled) CALL SYSTEM_CLOCK(tick,clock_rate)
-        DO group_index=1,SIZE(groups)
-            IF (.NOT.ALLOCATED(groups(group_index)%source_names))                                                      &
-                CALL fatal_error('D20: Lie source group has no allocated source list')
-            IF (SIZE(groups(group_index)%source_names)==0) CYCLE
-            SELECT CASE(groups(group_index)%method)
-            CASE(SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_NEWTON)
-                CONTINUE
-            CASE DEFAULT
-                CALL fatal_error('D20: invalid Lie source-group method before OpenMP evaluation')
-            END SELECT
-            IF (ANY(groups(group_index)%source_names=='pore_pressure_dissipation') .OR.                                &
-                ANY(groups(group_index)%source_names=='pore_pressure_darcy')) THEN
-                IF (TRIM(ADJUSTL(f_inhibit_mode))=='STATIC' .OR.                                                       &
-                    TRIM(ADJUSTL(f_inhibit_mode))=='DYNAMIC') THEN
-                    IF (N_inh<0) CALL fatal_error('D20: negative Darcy inhibition order')
-                END IF
+        IF (PRESENT(cached_exchange) .AND. PRESENT(cached_bed_group_id)) THEN
+            IF (SIZE(cached_exchange)/=SIZE(groups)) &
+                CALL fatal_error('D20: cached Lie exchange metadata size mismatch')
+            exchange_group=cached_exchange
+            bed_group_id=cached_bed_group_id
+            has_bed_group=bed_group_id>=0
+            IF (profiling_enabled) THEN
+                DO group_index=1,SIZE(groups)
+                    IF (SIZE(groups(group_index)%source_names)==0) CYCLE
+                    group_profile(group_index)%calls=group_profile(group_index)%calls+1
+                END DO
             END IF
-            exchange_group(group_index)=ANY(INDEX(groups(group_index)%source_names,'mass_exchange_')==1)
-            IF (exchange_group(group_index)) THEN
-                IF (groups(group_index)%method/=SOURCE_METHOD_EXPLICIT)                                                &
-                    CALL fatal_error('D19: mass exchange requires explicit group method')
-                IF (topo_change_flag) THEN
-                    has_bed_group=.TRUE.
-                    bed_group_id=groups(group_index)%id
+        ELSE
+            DO group_index=1,SIZE(groups)
+                IF (.NOT.ALLOCATED(groups(group_index)%source_names))                                                      &
+                    CALL fatal_error('D20: Lie source group has no allocated source list')
+                IF (SIZE(groups(group_index)%source_names)==0) CYCLE
+                SELECT CASE(groups(group_index)%method)
+                CASE(SOURCE_METHOD_EXPLICIT,SOURCE_METHOD_ANALYTIC,SOURCE_METHOD_NEWTON)
+                    CONTINUE
+                CASE DEFAULT
+                    CALL fatal_error('D20: invalid Lie source-group method before OpenMP evaluation')
+                END SELECT
+                IF (ANY(groups(group_index)%source_names=='pore_pressure_dissipation') .OR.                                &
+                    ANY(groups(group_index)%source_names=='pore_pressure_darcy')) THEN
+                    IF (TRIM(ADJUSTL(f_inhibit_mode))=='STATIC' .OR.                                                       &
+                        TRIM(ADJUSTL(f_inhibit_mode))=='DYNAMIC') THEN
+                        IF (N_inh<0) CALL fatal_error('D20: negative Darcy inhibition order')
+                    END IF
                 END IF
-            END IF
-            IF (profiling_enabled) group_profile(group_index)%calls=group_profile(group_index)%calls+1
-        END DO
+                exchange_group(group_index)=ANY(INDEX(groups(group_index)%source_names,'mass_exchange_')==1)
+                IF (exchange_group(group_index)) THEN
+                    IF (groups(group_index)%method/=SOURCE_METHOD_EXPLICIT)                                                &
+                        CALL fatal_error('D19: mass exchange requires explicit group method')
+                    IF (topo_change_flag) THEN
+                        has_bed_group=.TRUE.
+                        bed_group_id=groups(group_index)%id
+                    END IF
+                END IF
+                IF (profiling_enabled) group_profile(group_index)%calls=group_profile(group_index)%calls+1
+            END DO
+        END IF
         ALLOCATE(cell_failure(domain%solve_cells))
         cell_failure=''
         IF (has_bed_group) THEN
