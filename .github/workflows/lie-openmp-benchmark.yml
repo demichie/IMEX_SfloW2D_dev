@@ -44,7 +44,11 @@ jobs:
           ./configure --with-netcdf=/usr
           make -j2
           test -x src/IMEX_SfloW2D
-      - name: Show runner CPU capacity\n        run: |\n          nproc\n          lscpu | grep -E "CPU\\(s\\)|Core\\(s\\)|Thread\\(s\\)" || true\n      - name: Measure wall-clock OpenMP scaling
+      - name: Show runner CPU capacity
+        run: |
+          nproc
+          lscpu | grep -E "CPU\\(s\\)|Core\\(s\\)|Thread\\(s\\)" || true
+      - name: Measure wall-clock OpenMP scaling
         env:
           OMP_DYNAMIC: "FALSE"
           OMP_PROC_BIND: "CLOSE"
