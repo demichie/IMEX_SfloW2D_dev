@@ -39,13 +39,13 @@ MODULE lapack_interfaces_2d
         !> @param[out] info Zero on success; positive for a singular pivot, negative for invalid
         !>                  arguments/shapes.
 
-        SUBROUTINE SGESV(n, nrhs, a, lda, ipiv, b, ldb, info)
+    SUBROUTINE SGESV(n, nrhs, a, lda, ipiv, b, ldb, info)
             IMPORT :: sp
             INTEGER, INTENT(IN) :: n, nrhs, lda, ldb
             INTEGER, INTENT(OUT) :: ipiv(*)
             REAL(sp), INTENT(INOUT) :: a(lda,*), b(ldb,*)
             INTEGER, INTENT(OUT) :: info
-        END SUBROUTINE SGESV
+    END SUBROUTINE SGESV
 
         !> @brief Declare the double-precision LAPACK LU solver ABI.
         !>
@@ -59,13 +59,13 @@ MODULE lapack_interfaces_2d
         !> @param[out] info Zero on success; positive for a singular pivot, negative for invalid
         !>                  arguments/shapes.
 
-        SUBROUTINE DGESV(n, nrhs, a, lda, ipiv, b, ldb, info)
+    SUBROUTINE DGESV(n, nrhs, a, lda, ipiv, b, ldb, info)
             IMPORT :: dp
             INTEGER, INTENT(IN) :: n, nrhs, lda, ldb
             INTEGER, INTENT(OUT) :: ipiv(*)
             REAL(dp), INTENT(INOUT) :: a(lda,*), b(ldb,*)
             INTEGER, INTENT(OUT) :: info
-        END SUBROUTINE DGESV
+    END SUBROUTINE DGESV
 
     END INTERFACE
 

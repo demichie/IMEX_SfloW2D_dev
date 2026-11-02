@@ -30,7 +30,7 @@ MODULE output_paths
         !> \param[out] error_message Buffer receiving a diagnostic on failure.
         !> \param[in] error_size Size of the diagnostic buffer.
         !> \return Zero on success, nonzero on failure.
-        FUNCTION c_prepare_run_directory(base, run, overwrite, allow_existing,                                         &
+    FUNCTION c_prepare_run_directory(base, run, overwrite, allow_existing,                                         &
                                                     error_message, error_size)                                         &
             BIND(C, NAME='imex_prepare_run_directory') RESULT(status)
         IMPORT :: c_char, c_int, c_ptr, c_size_t
@@ -38,7 +38,7 @@ MODULE output_paths
         INTEGER(c_int), VALUE :: overwrite, allow_existing
         INTEGER(c_size_t), VALUE :: error_size
         INTEGER(c_int) :: status
-        END FUNCTION c_prepare_run_directory
+    END FUNCTION c_prepare_run_directory
 
         !> \brief Ensure a directory exists without following unsafe paths.
         !> \param[in] path Directory to create or validate.
@@ -46,14 +46,14 @@ MODULE output_paths
         !> \param[out] error_message Buffer receiving a diagnostic on failure.
         !> \param[in] error_size Size of the diagnostic buffer.
         !> \return Zero on success, nonzero on failure.
-        FUNCTION c_ensure_directory(path, reject_existing, error_message, error_size)                                  &
+    FUNCTION c_ensure_directory(path, reject_existing, error_message, error_size)                                  &
             BIND(C, NAME='imex_ensure_directory') RESULT(status)
         IMPORT :: c_int, c_ptr, c_size_t
         TYPE(c_ptr), VALUE :: path, error_message
         INTEGER(c_int), VALUE :: reject_existing
         INTEGER(c_size_t), VALUE :: error_size
         INTEGER(c_int) :: status
-        END FUNCTION c_ensure_directory
+    END FUNCTION c_ensure_directory
 
         !> \brief Detect a directory entry beginning with a snapshot index prefix.
         !> \param[in] directory Directory to scan.
@@ -61,13 +61,13 @@ MODULE output_paths
         !> \param[out] error_message Buffer receiving a diagnostic on failure.
         !> \param[in] error_size Size of the diagnostic buffer.
         !> \return One if a match exists, zero if not, negative on error.
-        FUNCTION c_snapshot_prefix_exists(directory, prefix, error_message, error_size)                                &
+    FUNCTION c_snapshot_prefix_exists(directory, prefix, error_message, error_size)                                &
             BIND(C, NAME='imex_snapshot_prefix_exists') RESULT(status)
         IMPORT :: c_char, c_int, c_ptr, c_size_t
         TYPE(c_ptr), VALUE :: directory, prefix, error_message
         INTEGER(c_size_t), VALUE :: error_size
         INTEGER(c_int) :: status
-        END FUNCTION c_snapshot_prefix_exists
+    END FUNCTION c_snapshot_prefix_exists
     END INTERFACE
 
 CONTAINS

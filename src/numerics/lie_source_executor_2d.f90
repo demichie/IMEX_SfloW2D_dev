@@ -496,7 +496,7 @@ CONTAINS
         END DO
 
     CONTAINS
-        SUBROUTINE record_group_bed_rates
+    SUBROUTINE record_group_bed_rates
         INTEGER :: n,j_cell,k_cell
 
         DO n=1,domain%solve_cells
@@ -505,15 +505,15 @@ CONTAINS
             bed_rate_cell(j_cell,k_cell)=staged_bed_rate(n)
 
         END DO
-        END SUBROUTINE record_group_bed_rates
+    END SUBROUTINE record_group_bed_rates
 
         ! Return a recoverable cell/group rejection without leaving the executor
         ! before returning the source-group status.
-        SUBROUTINE reject_cell(message)
+    SUBROUTINE reject_cell(message)
         CHARACTER(*), INTENT(IN) :: message
         failure_reason=message
         step_failed=.TRUE.
-        END SUBROUTINE reject_cell
+    END SUBROUTINE reject_cell
     END SUBROUTINE execute_lie_source_groups
 
 END MODULE lie_source_executor_2d
