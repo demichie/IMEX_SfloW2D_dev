@@ -2,20 +2,20 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_carrier_liquid_loss_2d
-        USE parameters_2d, ONLY : wp, liquid_flag, mass_exchange_rates_type,                                           &
+    USE parameters_2d, ONLY : wp, liquid_flag, mass_exchange_rates_type,                                               &
             reset_mass_exchange_rates
-        USE constitutive_parameters_2d, ONLY : loss_rate
-        USE diagnostics_2d, ONLY : fatal_error
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-        USE state_conversion_2d, ONLY : mixt_var_state
+    USE constitutive_parameters_2d, ONLY : loss_rate
+    USE diagnostics_2d, ONLY : fatal_error
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_conversion_2d, ONLY : mixt_var_state
 
-        IMPLICIT NONE
-        PRIVATE
+    IMPLICIT NONE
+    PRIVATE
 
-        PUBLIC :: eval_mass_exchange_carrier_liquid_loss_explicit
-        PUBLIC :: eval_mass_exchange_carrier_liquid_loss_semi_implicit
-        PUBLIC :: eval_mass_exchange_carrier_liquid_loss_implicit
-        PUBLIC :: solve_mass_exchange_carrier_liquid_loss_analytic
+    PUBLIC :: eval_mass_exchange_carrier_liquid_loss_explicit
+    PUBLIC :: eval_mass_exchange_carrier_liquid_loss_semi_implicit
+    PUBLIC :: eval_mass_exchange_carrier_liquid_loss_implicit
+    PUBLIC :: solve_mass_exchange_carrier_liquid_loss_analytic
 
 CONTAINS
 
@@ -37,6 +37,7 @@ CONTAINS
                 ! The liquid is the only carrier in this configuration.
                 r%mixture_mass_rate=-rho_c*r%carrier_withdrawal_volume_rate
                 r%energy_rate=state%T*cp_c*r%mixture_mass_rate
+
             END IF
 
         END SUBROUTINE eval_mass_exchange_carrier_liquid_loss_explicit

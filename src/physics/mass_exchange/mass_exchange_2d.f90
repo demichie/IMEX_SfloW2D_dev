@@ -2,29 +2,29 @@
 !> @details Explicit physics is evaluated locally; unsupported treatment entry points
 !> fail explicitly. The coordinator alone enforces shared carrier inventories.
 MODULE mass_exchange_2d
-        USE parameters_2d, ONLY : idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
-        USE parameters_2d, ONLY : wp, n_vars, n_eqns, n_solid, n_add_gas,                                              &
+    USE parameters_2d, ONLY : idx_totMassEqn, idx_uEqn, idx_vEqn, idx_engyEqn
+    USE parameters_2d, ONLY : wp, n_vars, n_eqns, n_solid, n_add_gas,                                                  &
                     idx_stochEqn, idx_poreEqn,                                                                         &
                     idx_solidEqn_first, idx_solidEqn_last,                                                             &
                     idx_addGasEqn_first, idx_addGasEqn_last, gas_flag, liquid_flag,                                    &
                     pore_pressure_flag, stoch_transport_flag, mass_exchange_rates_type,                                &
                     reset_mass_exchange_rates
-        USE diagnostics_2d, ONLY : fatal_error
-        USE constitutive_parameters_2d, ONLY : maximum_solid_packing
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-        USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
-        USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
-        USE mass_exchange_carrier_liquid_loss_2d, ONLY : eval_mass_exchange_carrier_liquid_loss_explicit
-        USE mass_exchange_entrainment_2d, ONLY : eval_mass_exchange_entrainment_explicit
-        USE mass_exchange_vaporization_2d, ONLY : eval_mass_exchange_vaporization_explicit
-        USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag,                                             &
+    USE diagnostics_2d, ONLY : fatal_error
+    USE constitutive_parameters_2d, ONLY : maximum_solid_packing
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE mass_exchange_erosion_2d, ONLY : eval_mass_exchange_erosion_explicit
+    USE mass_exchange_deposition_2d, ONLY : eval_mass_exchange_deposition_explicit
+    USE mass_exchange_carrier_liquid_loss_2d, ONLY : eval_mass_exchange_carrier_liquid_loss_explicit
+    USE mass_exchange_entrainment_2d, ONLY : eval_mass_exchange_entrainment_explicit
+    USE mass_exchange_vaporization_2d, ONLY : eval_mass_exchange_vaporization_explicit
+    USE mass_exchange_lava_deposition_2d, ONLY : lava_deposition_flag,                                                 &
             eval_mass_exchange_lava_deposition_explicit
 
-        IMPLICIT NONE
-        PRIVATE
+    IMPLICIT NONE
+    PRIVATE
 
-        PUBLIC :: eval_mass_exchange_explicit, eval_mass_exchange_semi_implicit
-        PUBLIC :: eval_mass_exchange_implicit, solve_mass_exchange_analytic
+    PUBLIC :: eval_mass_exchange_explicit, eval_mass_exchange_semi_implicit
+    PUBLIC :: eval_mass_exchange_implicit, solve_mass_exchange_analytic
 
 CONTAINS
 
@@ -81,7 +81,9 @@ CONTAINS
                                 maximum_solid_packing,dt)
                         CALL scale_process(process_rates,erosion_factor)
                         CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
+
                 END IF
+
                 CALL reset_mass_exchange_rates(deposition_rates)
                 CALL reset_mass_exchange_rates(liquid_loss_rates)
                 IF (do_deposition) CALL eval_mass_exchange_deposition_explicit(physical_state,dt,deposition_rates)
@@ -116,26 +118,32 @@ CONTAINS
                 ! Assemble only the rates after all common-inventory limiters have acted.
                 CALL accumulate_process(deposition_rates,physical_state,total_rates,eqns_term)
                 CALL accumulate_process(liquid_loss_rates,physical_state,total_rates,eqns_term)
+
                 IF (do_entrainment) THEN
                         CALL eval_mass_exchange_entrainment_explicit(physical_state,process_rates)
                         CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
+
                 END IF
+
                 IF (do_vaporization) THEN
-                        CALL eval_mass_exchange_vaporization_explicit(physical_state,B_zone,                           &
-                            deposition_rates%solid_deposition_rate,process_rates)
+                        CALL eval_mass_exchange_vaporization_explicit(physical_state, B_zone,                          &
+                            deposition_rates%solid_deposition_rate, process_rates)
                         CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
+
                 END IF
 
                 ! Scalar transport and pore-pressure sources inherit the net mass exchange.
                 IF (stoch_transport_flag) eqns_term(idx_stochEqn)=eqns_term(idx_totMassEqn)*physical_state%Zs
                 IF (pore_pressure_flag) eqns_term(idx_poreEqn)=                                                        &
                                 eqns_term(idx_totMassEqn)*physical_state%exc_pore_pres
+
             END IF  ! gas_flag .OR. liquid_flag
 
             ! Lava deposition follows the same process_rates-rate accumulation contract.
             IF (do_lava .AND. lava_deposition_flag) THEN
                 CALL eval_mass_exchange_lava_deposition_explicit(physical_state,dt,process_rates)
                 CALL accumulate_process(process_rates,physical_state,total_rates,eqns_term)
+
             END IF
 
         END SUBROUTINE eval_mass_exchange_explicit
@@ -275,6 +283,7 @@ CONTAINS
             IF (coefficient>0.0_wp) THEN
 
                 f=MIN(1.0_wp,MAX(0.0_wp,margin)/(dt*coefficient))
+
             END IF
 
         END FUNCTION packing_withdrawal_factor

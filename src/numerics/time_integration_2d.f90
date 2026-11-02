@@ -80,6 +80,7 @@ CONTAINS
         injection_value=''
         CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP', injection_value,STATUS=injection_status)
         check_injected_rollback=injection_status==0 .AND. LEN_TRIM(injection_value)>0
+
         IF (check_injected_rollback) THEN
             qp_authoritative=state%qp
             bed_before=B_vertex
@@ -89,7 +90,9 @@ CONTAINS
             slope_x_before=B_prime_x_geom
             slope_y_before=B_prime_y_geom
             gravity_before=grav_coeff
+
         END IF
+
         this%q_before=state%q
         this%qp_before=state%qp
         this%q_trial=state%q
@@ -101,13 +104,16 @@ CONTAINS
         DO l=1,domain%reconstruction_cells
             j=domain%j_reconstruction(l)
             k=domain%k_reconstruction(l)
+
             IF (this%q_before(idx_totMassEqn,j,k)>0.0_wp) THEN
-                CALL qc_to_qp(this%q_before(:,j,k),this%qp_before(:,j,k),pd,                                           &
-                    'Lie pre-spatial reconstruction state',conversion_ok)
+                CALL qc_to_qp(this%q_before(:,j,k), this%qp_before(:,j,k), pd, 'Lie pre-spatial reconstruction state', &
+                    conversion_ok)
                 IF (.NOT.conversion_ok) reconstruction_status(l)=1
             ELSE
                 CALL initialize_dry_physical_cell(this%qp_before(:,j,k))
+
             END IF
+
         END DO
         !$OMP END PARALLEL DO
         first_failure=MINLOC(reconstruction_status,1,MASK=reconstruction_status/=0)
@@ -128,21 +134,28 @@ CONTAINS
             IF (.NOT.conservative_mass_admissible(this%q_trial(1:n_eqns,j,k))) THEN
                 spatial_status(l)=1
                 CYCLE
+
             END IF
+
             IF (this%q_trial(idx_totMassEqn,j,k)>0.0_wp) THEN
                 CALL qc_to_qp(this%q_trial(:,j,k),this%qp_trial(:,j,k),pd,'Lie spatial update',conversion_ok)
                 IF (.NOT.conversion_ok) spatial_status(l)=2
             ELSE
                 CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))
+
             END IF
+
         END DO
         !$OMP END PARALLEL DO
         first_failure=MINLOC(spatial_status,1,MASK=spatial_status/=0)
+
         IF (first_failure/=0) THEN
             IF (spatial_status(first_failure)==1)                                                                      &
                 CALL fatal_error('Lie spatial update: inadmissible conservative state')
             CALL fatal_error('Lie spatial state conversion rejected')
+
         END IF
+
         DEALLOCATE(spatial_status)
 
         ! GROUP-0 source rates use immutable q^n/qp^n, while applying to post-spatial q.
@@ -152,14 +165,15 @@ CONTAINS
         ! Stage substrate and bed changes before running ordered groups.
         CALL state%snapshot_substrate(substrate_before)
         CALL begin_geometry_transaction
-        CALL execute_lie_source_groups(state,this%q_trial,this%qp_trial,dt,domain,                                     &
-            source_registry,stochastic_values,t,this%q_before,this%qp_before,                                          &
-            source_step_failed,source_failure)
+        CALL execute_lie_source_groups(state, this%q_trial, this%qp_trial, dt, domain, source_registry,                &
+            stochastic_values, t, this%q_before, this%qp_before, source_step_failed, source_failure)
+
         IF (source_step_failed) THEN
             had_bed_change=.FALSE.
             IF (check_injected_rollback) had_bed_change=ANY(B_vertex/=bed_before)
             CALL state%restore_substrate(substrate_before)
             CALL rollback_geometry_transaction
+
             IF (check_injected_rollback) THEN
                 IF (TRIM(source_failure)/='D20_INJECTED_LATE_LIE_FAILURE')                                             &
                     CALL fatal_error('D20 rollback: failpoint did not trigger')
@@ -184,8 +198,11 @@ CONTAINS
                     .NOT.ALL(grav_coeff==gravity_before))                                                              &
                     CALL fatal_error('D20 rollback: geometry not restored')
                 WRITE(*,'(A)') 'D20_FULL_STEP_ROLLBACK_PASS'
+
             END IF
+
             CALL fatal_error('Lie timestep rolled back: '//TRIM(source_failure))
+
         END IF
 
         ! Publish the accepted fluid fields only after all Lie source groups return.

@@ -111,12 +111,16 @@ CONTAINS
         INTEGER :: i
         name=''
         IF (TRIM(model_name)=='none') RETURN
+
         DO i=1,SOURCE_TERM_COUNT
             IF (INDEX(TRIM(SOURCE_CATALOG(i)%name),'rheology_')/=1) CYCLE
+
             IF (TRIM(model_name)==TRIM(SOURCE_CATALOG(i)%name(10:))) THEN
                 name=SOURCE_CATALOG(i)%name
                 RETURN
+
             END IF
+
         END DO
     END FUNCTION canonical_rheology_source_name
     !> Structurally affected conservative equations for a Newton-capable source.
@@ -134,6 +138,7 @@ CONTAINS
         descriptor=source_term_descriptor_by_name(name)
         ALLOCATE(ids(0))
         IF (.NOT.descriptor%has_newton) RETURN
+
         SELECT CASE(TRIM(name))
         CASE('rheology_voellmy','rheology_plastic','rheology_lava',                                                    &
             'rheology_lahar','rheology_empirical','rheology_quadratic',                                                &
@@ -143,6 +148,7 @@ CONTAINS
             ids=[idx_engyEqn]
         CASE('pore_pressure_dissipation')
             IF (idx_poreEqn>0) ids=[idx_poreEqn]
+
         END SELECT
     END FUNCTION source_newton_affected_equations
 
@@ -155,11 +161,15 @@ CONTAINS
         TYPE(source_term_type) :: term
         INTEGER :: i
         term=source_term_type()
+
         DO i=1,SOURCE_TERM_COUNT
+
             IF (TRIM(name)==TRIM(SOURCE_CATALOG(i)%name)) THEN
                 term=SOURCE_CATALOG(i)
                 RETURN
+
             END IF
+
         END DO
     END FUNCTION source_term_descriptor_by_name
 
@@ -168,12 +178,17 @@ CONTAINS
     PURE LOGICAL FUNCTION source_catalog_names_unique() RESULT(ok)
         INTEGER :: i,j
         ok=.FALSE.
+
         DO i=1,SOURCE_TERM_COUNT
             IF (LEN_TRIM(SOURCE_CATALOG(i)%name)==0) RETURN
+
             DO j=i+1,SOURCE_TERM_COUNT
                 IF (SOURCE_CATALOG(i)%name==SOURCE_CATALOG(j)%name) RETURN
+
             END DO
+
         END DO
+
         ok=.TRUE.
     END FUNCTION source_catalog_names_unique
 
@@ -182,13 +197,18 @@ CONTAINS
     PURE LOGICAL FUNCTION canonical_rheology_catalog_unique() RESULT(ok)
         INTEGER :: i,j
         ok=.FALSE.
+
         DO i=1,SOURCE_TERM_COUNT
             IF (INDEX(TRIM(SOURCE_CATALOG(i)%name),'rheology_')/=1) CYCLE
+
             DO j=i+1,SOURCE_TERM_COUNT
                 IF (INDEX(TRIM(SOURCE_CATALOG(j)%name),'rheology_')/=1) CYCLE
                 IF (SOURCE_CATALOG(i)%name==SOURCE_CATALOG(j)%name) RETURN
+
             END DO
+
         END DO
+
         ok=.TRUE.
     END FUNCTION canonical_rheology_catalog_unique
 
@@ -202,6 +222,7 @@ CONTAINS
         CHARACTER(*), INTENT(IN) :: source_name
         INTEGER, INTENT(IN) :: role
         found=.FALSE.
+
         SELECT CASE(role)
         CASE(SOURCE_ROLE_IMPLICIT)
             SELECT CASE(TRIM(source_name))
@@ -209,6 +230,7 @@ CONTAINS
                 'rheology_lahar','rheology_empirical','rheology_quadratic',                                            &
                 'rheology_mui_voellmy','rheology_newmodel')
                 found=.TRUE.
+
             END SELECT
         CASE(SOURCE_ROLE_SEMI_IMPLICIT)
             SELECT CASE(TRIM(source_name))
@@ -216,7 +238,9 @@ CONTAINS
                 'rheology_froude','rheology_lucas','rheology_mui',                                                     &
                 'rheology_mui_voellmy')
                 found=.TRUE.
+
             END SELECT
+
         END SELECT
     END FUNCTION rheology_name_has_role
 END MODULE source_catalog_2d

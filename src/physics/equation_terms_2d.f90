@@ -6,7 +6,7 @@
 
 MODULE equation_terms_2d
 
-        USE parameters_2d, ONLY : idx_h, idx_totMassEqn
+    USE parameters_2d, ONLY : idx_h, idx_totMassEqn
     USE diagnostics_2d, ONLY : fatal_error
     USE constitutive_parameters_2d
     USE state_conversion_2d
@@ -70,6 +70,7 @@ CONTAINS
             normal_velocity = qpj(idx_v)
         CASE DEFAULT
             ERROR STOP 'eval_inertial_flux: invalid direction'
+
         END SELECT
 
         flux = normal_velocity * qcj(1:n_eqns)
@@ -96,8 +97,7 @@ CONTAINS
         REAL(wp) :: Richardson, rho_m, rho_c
         REAL(wp) :: sp_heat_c, sp_heat_mix
 
-        CALL mixt_var(qpj,Richardson,rho_m,rho_c,reduced_gravity,sp_heat_c,                                            &
-            sp_heat_mix)
+        CALL mixt_var(qpj, Richardson, rho_m, rho_c, reduced_gravity, sp_heat_c, sp_heat_mix)
         gamma = rho_m * reduced_gravity
 
     END SUBROUTINE eval_hydrostatic_coefficient
@@ -116,16 +116,14 @@ CONTAINS
     !> \param[out] vel_min Lower characteristic speed [m s^-1].
     !> \param[out] vel_max Upper characteristic speed [m s^-1].
     !> \note normal_velocity_index must identify one of the two Cartesian velocity components.
-    SUBROUTINE eval_local_speeds_direction(qpj,grav_coeff,normal_velocity_index,                                       &
-            vel_min,vel_max)
+    SUBROUTINE eval_local_speeds_direction(qpj, grav_coeff, normal_velocity_index, vel_min, vel_max)
         REAL(wp), INTENT(IN) :: qpj(n_vars+2), grav_coeff
         INTEGER, INTENT(IN) :: normal_velocity_index
         REAL(wp), INTENT(OUT) :: vel_min, vel_max
         REAL(wp) :: r_Ri, r_rho_m, r_rho_c, r_red_grav
         REAL(wp) :: r_sp_heat_c, r_sp_heat_mix, r_h, normal_velocity, celerity
 
-        CALL mixt_var(qpj,r_Ri,r_rho_m,r_rho_c,r_red_grav,r_sp_heat_c,                                                 &
-            r_sp_heat_mix)
+        CALL mixt_var(qpj, r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c, r_sp_heat_mix)
         r_h = qpj(idx_h)
         normal_velocity = qpj(normal_velocity_index)
 
@@ -136,6 +134,7 @@ CONTAINS
             celerity = SQRT( grav_coeff * r_red_grav * r_h )
             vel_min = normal_velocity - celerity
             vel_max = normal_velocity + celerity
+
         END IF
     END SUBROUTINE eval_local_speeds_direction
 
@@ -167,6 +166,7 @@ CONTAINS
                 scale * flux(idx_solidEqn_first:idx_solidEqn_last)
             flux(idx_addGasEqn_first:idx_addGasEqn_last) =                                                             &
                 scale * flux(idx_addGasEqn_first:idx_addGasEqn_last)
+
         END IF
 
     END SUBROUTINE limit_component_mass_flux

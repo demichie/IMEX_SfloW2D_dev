@@ -32,9 +32,9 @@ CONTAINS
 
     !> Solve the entire structurally affected conservative equation set.
     !> Every other conservative component remains fixed at its group input value.
-    SUBROUTINE solve_backward_euler_group(source_group, q_cell,dt,Bprime_x,Bprime_y,grav_correction,stochastic_value,  &
-            iterations_used,converged,linear_info,line_search_failed)
-        USE parameters_2d, ONLY : tol_abs,tol_rel
+    SUBROUTINE solve_backward_euler_group(source_group, q_cell, dt, Bprime_x, Bprime_y, grav_correction,               &
+        stochastic_value, iterations_used, converged, linear_info, line_search_failed)
+    USE parameters_2d, ONLY : tol_abs,tol_rel
         TYPE(source_group_type), INTENT(IN) :: source_group
         REAL(wp), INTENT(INOUT) :: q_cell(n_vars)
         REAL(wp), INTENT(IN) :: dt,Bprime_x,Bprime_y,grav_correction,stochastic_value
@@ -54,35 +54,42 @@ CONTAINS
         IF (n_active<1 .OR. n_active>n_eqns) RETURN
         IF (ANY(source_group%equation_ids<1) .OR.                                                                      &
             ANY(source_group%equation_ids>n_eqns)) RETURN
+
         DO i=1,n_active
             IF (COUNT(source_group%equation_ids==source_group%equation_ids(i))/=1) RETURN
+
         END DO
         ! Freeze the semi-implicit rate and limit its entire increment by one
         ! nonnegative factor, so neither momentum component crosses zero.
         ! Components initially at rest must not acquire a sign from friction.
         CALL eval_source_semi_implicit(source_group,q_in,Bprime_x,Bprime_y, grav_correction,stochastic_value,semi_rate)
         semi_scale=1.0_wp
+
         DO i=2,3
             delta_momentum=dt*semi_rate(i)
+
             IF (q_in(i)==0.0_wp) THEN
                 IF (delta_momentum/=0.0_wp) semi_scale=0.0_wp
             ELSEIF (q_in(i)*delta_momentum<0.0_wp) THEN
                 semi_scale=MIN(semi_scale,ABS(q_in(i)/delta_momentum))
+
             END IF
+
         END DO
+
         q_si=q_in+dt*semi_scale*semi_rate
         ! Set a component exactly to zero at its limiting crossing.
         DO i=2,3
             IF (q_in(i)==0.0_wp) q_si(i)=0.0_wp
             IF (q_in(i)*q_si(i)<0.0_wp) q_si(i)=0.0_wp
+
         END DO
         ! q_si is both the corrected RHS and the Newton initial guess.
         q_cell=q_si
         coeff_f=1.0_wp
         linear_info=0
-        CALL solve_newton_group(source_group,source_group%equation_ids,q_cell,q_si,dt,                                 &
-            Bprime_x,Bprime_y,stochastic_value,coeff_f,tol_abs,tol_rel,                                                &
-            iterations_used,converged,linear_info,line_search_failed)
+        CALL solve_newton_group(source_group, source_group%equation_ids, q_cell, q_si, dt, Bprime_x, Bprime_y,         &
+            stochastic_value, coeff_f, tol_abs, tol_rel, iterations_used, converged, linear_info, line_search_failed)
         IF (.NOT.converged) q_cell=q_in
     END SUBROUTINE solve_backward_euler_group
 
@@ -102,15 +109,12 @@ CONTAINS
     !> \param[out] converged True when the group residual meets its tolerance.
     !> \param[out] linear_info Linear solver status; zero denotes success.
     !> \param[out] line_search_failed True if backtracking cannot accept a step.
-    SUBROUTINE solve_newton_group(source_group,group_equations,                                                        &
-            qj,q_group_input,dt_step,Bprimej_x,Bprimej_y,Zij,coeff_f,                                                  &
-            tol_abs_local,                                                                                             &
-            tol_rel_local, iterations_used, converged, linear_info,                                                    &
-            line_search_failed)
+    SUBROUTINE solve_newton_group(source_group, group_equations, qj, q_group_input, dt_step, Bprimej_x, Bprimej_y, Zij,&
+        coeff_f, tol_abs_local, tol_rel_local, iterations_used, converged, linear_info, line_search_failed)
 
-        USE parameters_2d, ONLY : max_nl_iter
+    USE parameters_2d, ONLY : max_nl_iter
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         TYPE(source_group_type), INTENT(IN) :: source_group
         INTEGER, INTENT(IN) :: group_equations(:)
@@ -144,79 +148,99 @@ CONTAINS
 
         DO nl_iter = 1, max_nl_iter
             iterations_used = iterations_used + 1
-            CALL eval_f(qj, q_group_input, dt_step, coeff_f,                                                           &
-                Bprimej_x, Bprimej_y, right_term, scal_f, Zij, group_equations,                                        &
-                source_group)
+            CALL eval_f(qj, q_group_input, dt_step, coeff_f, Bprimej_x, Bprimej_y, right_term, scal_f, Zij,            &
+                group_equations, source_group)
 
             IF (nl_iter .EQ. 1) residual_ref = ABS(right_term)
             residual_tol = tol_abs_local + tol_rel_local*residual_ref
+
             IF (ALL(ABS(right_term) .LE. residual_tol)) THEN
                 converged = .TRUE.
                 EXIT
+
             END IF
 
-            CALL eval_jacobian(qj_rel, qj_org, dt_step, coeff_f,                                                       &
-                Bprimej_x, Bprimej_y, left_matrix, Zij, group_equations,                                               &
-                source_group)
+            CALL eval_jacobian(qj_rel, qj_org, dt_step, coeff_f, Bprimej_x, Bprimej_y, left_matrix, Zij,               &
+                group_equations, source_group)
             IF (nl_iter .GT. 1) grad_f = MATMUL(right_term,left_matrix)
 
             DO i = 1, SIZE(group_equations)
                 group_rhs(i) = -right_term(group_equations(i))
+
                 DO j = 1, SIZE(group_equations)
                     group_matrix(i,j) = left_matrix(group_equations(i),                                                &
                         group_equations(j))
+
                 END DO
+
             END DO
+
             IF (SIZE(group_equations) .EQ. 2) THEN
                 CALL solve_2x2_pivoted(group_matrix, group_rhs, ok)
             ELSEIF (SIZE(group_equations) .EQ. 3) THEN
                 CALL solve_3x3_pivoted(group_matrix, group_rhs, ok)
             ELSE
                 CALL solve_dense_system(group_matrix, group_rhs, group_pivot, ok)
+
             END IF
+
             IF (ok .NE. 0) THEN
                 linear_info = ok
                 RETURN
+
             END IF
 
             desc_dir = 0.0_wp
+
             DO i = 1, SIZE(group_equations)
                 desc_dir(group_equations(i)) = group_rhs(i)
+
             END DO
+
             qj_rel_old = qj_rel
             scal_f_old = scal_f
 
             IF (nl_iter .GT. 1) THEN
                 stpmax = STPMX * MAX(NORM2(qj_rel),REAL(SIZE(qj_rel),wp))
-                CALL lnsrch(qj_rel_old, qj_org, qj, q_group_input, scal_f_old, grad_f,                                 &
-                    desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax,                                             &
-                    check, dt_step, Bprimej_x, Bprimej_y,                                                              &
-                    Zij, group_equations,source_group)
+                CALL lnsrch(qj_rel_old, qj_org, qj, q_group_input, scal_f_old, grad_f, desc_dir, coeff_f, qj_rel,      &
+                    scal_f, right_term, stpmax, check, dt_step, Bprimej_x, Bprimej_y, Zij, group_equations,            &
+                    source_group)
+
                 IF (check) THEN
                     line_search_failed = .TRUE.
                     RETURN
+
                 END IF
             ELSE
                 qj_rel = qj_rel_old + desc_dir
                 qj_trial = qj
+
                 DO i = 1, SIZE(group_equations)
                     qj_trial(group_equations(i)) =                                                                     &
                         qj_rel(group_equations(i))*qj_org(group_equations(i))
+
                 END DO
+
                 CALL eval_f(qj_trial, q_group_input, dt_step, coeff_f, Bprimej_x, Bprimej_y, right_term, scal_f, Zij,  &
-                    group_equations,source_group)
+                    group_equations, source_group)
+
             END IF
 
             DO i = 1, SIZE(group_equations)
                 qj(group_equations(i)) = qj_rel(group_equations(i))*                                                   &
                     qj_org(group_equations(i))
+
             END DO
+
             IF (ALL(ABS(right_term) .LE. residual_tol)) THEN
                 converged = .TRUE.
                 EXIT
+
             END IF
+
             IF (MAXVAL(ABS(qj_rel-qj_rel_old)/MAX(ABS(qj_rel),1.0_wp)) .LT.                                            &
                 EPSILON(1.0_wp)) EXIT
+
         END DO
 
     END SUBROUTINE solve_newton_group
@@ -237,7 +261,7 @@ CONTAINS
 
     SUBROUTINE solve_2x2_pivoted( matrix, rhs, info )
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(INOUT) :: matrix(2,2)
         REAL(wp), INTENT(INOUT) :: rhs(2)
@@ -257,10 +281,12 @@ CONTAINS
             IF ( row_scale .LE. TINY(1.0_wp) ) THEN
                 info = i
                 RETURN
+
             END IF
 
             matrix(i,:) = matrix(i,:) / row_scale
             rhs(i) = rhs(i) / row_scale
+
         END DO
 
         pivot_tol = pivot_tol_factor * EPSILON(1.0_wp)
@@ -277,11 +303,13 @@ CONTAINS
             swap_value = rhs(1)
             rhs(1) = rhs(2)
             rhs(2) = swap_value
+
         END IF
 
         IF ( ABS(matrix(1,1)) .LE. pivot_tol ) THEN
             info = 1
             RETURN
+
         END IF
 
         factor = matrix(2,1) / matrix(1,1)
@@ -292,6 +320,7 @@ CONTAINS
         IF ( ABS(matrix(2,2)) .LE. pivot_tol ) THEN
             info = 2
             RETURN
+
         END IF
 
         rhs(2) = rhs(2) / matrix(2,2)
@@ -318,7 +347,7 @@ CONTAINS
 
     SUBROUTINE solve_3x3_pivoted( matrix, rhs, info )
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(INOUT) :: matrix(3,3)
         REAL(wp), INTENT(INOUT) :: rhs(3)
@@ -341,10 +370,12 @@ CONTAINS
             IF ( row_scale .LE. TINY(1.0_wp) ) THEN
                 info = i
                 RETURN
+
             END IF
 
             matrix(i,:) = matrix(i,:) / row_scale
             rhs(i) = rhs(i) / row_scale
+
         END DO
 
         pivot_tol = pivot_tol_factor * EPSILON(1.0_wp)
@@ -356,16 +387,19 @@ CONTAINS
         IF ( ABS(matrix(2,1)) .GT. pivot_abs ) THEN
             pivot_row = 2
             pivot_abs = ABS(matrix(2,1))
+
         END IF
 
         IF ( ABS(matrix(3,1)) .GT. pivot_abs ) THEN
             pivot_row = 3
             pivot_abs = ABS(matrix(3,1))
+
         END IF
 
         IF ( pivot_abs .LE. pivot_tol ) THEN
             info = 1
             RETURN
+
         END IF
 
         IF ( pivot_row .NE. 1 ) THEN
@@ -374,6 +408,7 @@ CONTAINS
                 swap_value = matrix(1,j)
                 matrix(1,j) = matrix(pivot_row,j)
                 matrix(pivot_row,j) = swap_value
+
             END DO
 
             swap_value = rhs(1)
@@ -401,11 +436,13 @@ CONTAINS
         IF ( ABS(matrix(3,2)) .GT. pivot_abs ) THEN
             pivot_row = 3
             pivot_abs = ABS(matrix(3,2))
+
         END IF
 
         IF ( pivot_abs .LE. pivot_tol ) THEN
             info = 2
             RETURN
+
         END IF
 
         IF ( pivot_row .NE. 2 ) THEN
@@ -414,6 +451,7 @@ CONTAINS
                 swap_value = matrix(2,j)
                 matrix(2,j) = matrix(pivot_row,j)
                 matrix(pivot_row,j) = swap_value
+
             END DO
 
             swap_value = rhs(2)
@@ -430,6 +468,7 @@ CONTAINS
         IF ( ABS(matrix(3,3)) .LE. pivot_tol ) THEN
             info = 3
             RETURN
+
         END IF
 
         ! Back substitution.
@@ -476,12 +515,10 @@ CONTAINS
     !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
         !******************************************************************************
 
-    SUBROUTINE lnsrch( qj_rel_NR_old, qj_org, qj_fixed, q_group_input, scal_f_old,                                     &
-            grad_f, desc_dir, coeff_f, qj_rel, scal_f, right_term, stpmax, check,                                      &
-            dt_step  , Bprimej_x , Bprimej_y, Zij,                                                                     &
-            active_equations,source_group )
+    SUBROUTINE lnsrch(qj_rel_NR_old, qj_org, qj_fixed, q_group_input, scal_f_old, grad_f, desc_dir, coeff_f, qj_rel,   &
+        scal_f, right_term, stpmax, check, dt_step , Bprimej_x , Bprimej_y, Zij, active_equations, source_group)
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         !> Initial point
         REAL(wp), DIMENSION(:), INTENT(IN) :: qj_rel_NR_old
@@ -570,6 +607,7 @@ CONTAINS
             right_term = right_term_old
             check = .TRUE.
             RETURN
+
         END IF
 
         alamin = TOLX / MAXVAL(ABS( desc_dir(:))/MAX( ABS(qj_rel_NR_old(:)),1.0_wp ))
@@ -600,13 +638,15 @@ CONTAINS
             qj_rel = qj_rel_NR_old + alam * desc_dir
 
             qj = qj_fixed
+
             DO i = 1, SIZE(active_equations)
                 equation = active_equations(i)
                 qj(equation) = qj_rel(equation)*qj_org(equation)
+
             END DO
 
-            CALL eval_f( qj , q_group_input , dt_step  , coeff_f , Bprimej_x , Bprimej_y, right_term , scal_f, Zij,    &
-                active_equations,source_group )
+            CALL eval_f(qj , q_group_input , dt_step , coeff_f , Bprimej_x , Bprimej_y, right_term , scal_f, Zij,      &
+                active_equations, source_group)
 
             IF ( verbose_level .GE. 4 .AND. .NOT. omp_in_parallel() ) THEN
 
@@ -721,12 +761,12 @@ CONTAINS
     !> \param[in] source_group Validated Newton source group for the selected rate evaluation.
         !******************************************************************************
 
-    SUBROUTINE eval_f( qj , q_group_input , dt_step , coeff_f , Bprimej_x ,                                            &
-            Bprimej_y , f_nl , scal_f, Zij, active_equations,source_group )
+    SUBROUTINE eval_f(qj , q_group_input , dt_step , coeff_f , Bprimej_x , Bprimej_y , f_nl , scal_f, Zij,             &
+        active_equations, source_group)
 
-        USE source_terms_2d, ONLY : eval_source_implicit
+    USE source_terms_2d, ONLY : eval_source_implicit
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: qj(n_vars)
         REAL(wp), INTENT(IN) :: q_group_input(n_vars)
@@ -750,8 +790,8 @@ CONTAINS
         ! before subtracting equal large states and falsely report zero residual.
         REAL(wp), VOLATILE :: delta_q(n_vars)
 
-        CALL eval_source_implicit( Bprimej_x , Bprimej_y, Zij, r_qj = qj ,                                             &
-            r_nh_term_impl=nh_term_impl,group=source_group )
+        CALL eval_source_implicit(Bprimej_x , Bprimej_y, Zij, r_qj = qj , r_nh_term_impl=nh_term_impl,                 &
+            group=source_group)
 
         Rj = -nh_term_impl
 
@@ -760,6 +800,7 @@ CONTAINS
         f_nl = coeff_f * f_nl
         WHERE (.NOT. equation_is_active(active_equations))
             f_nl = 0.0_wp
+
         END WHERE
 
         scal_f = 0.5_wp * DOT_PRODUCT( f_nl , f_nl )
@@ -777,8 +818,10 @@ CONTAINS
         INTEGER :: i
 
         mask = .FALSE.
+
         DO i = 1, SIZE(active_equations)
             mask(active_equations(i)) = .TRUE.
+
         END DO
     END FUNCTION equation_is_active
 
@@ -809,13 +852,12 @@ CONTAINS
     !>          subtraction.
     !******************************************************************************
 
-    SUBROUTINE eval_jacobian( qj_rel, qj_org, dt_step, coeff_f,                                                        &
-            Bprimej_x, Bprimej_y, left_matrix, Zij, active_equations,                                                  &
-            source_group )
+    SUBROUTINE eval_jacobian(qj_rel, qj_org, dt_step, coeff_f, Bprimej_x, Bprimej_y, left_matrix, Zij,                 &
+        active_equations, source_group)
 
-        USE source_terms_2d, ONLY : eval_source_implicit
+    USE source_terms_2d, ONLY : eval_source_implicit
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: qj_rel(n_vars)
         REAL(wp), INTENT(IN) :: qj_org(n_vars)
@@ -873,11 +915,15 @@ CONTAINS
                 Jacob_relax(active_equations(j),equation) =                                                            &
                     coeff_f(active_equations(j)) *                                                                     &
                     AIMAG(nh_terms_cmplx_impl(active_equations(j))) * inverse_complex_step_perturbation
+
             END DO
+
             DO j = 1, n_eqns
                 left_matrix(j,equation) = left_matrix(j,equation) -                                                    &
                     dt_step*Jacob_relax(j,equation)
+
             END DO
+
         END DO
 
         RETURN

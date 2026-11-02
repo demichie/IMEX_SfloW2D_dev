@@ -96,13 +96,19 @@ CONTAINS
 
         ALLOCATE(c_base(LEN_TRIM(base_directory) + 1),                                                                 &
                     c_run(LEN_TRIM(run_name) + 1), c_error(LEN(error_message)))
+
         DO i = 1, LEN_TRIM(base_directory)
         c_base(i) = base_directory(i:i)
+
         END DO
+
         c_base(SIZE(c_base)) = c_null_char
+
         DO i = 1, LEN_TRIM(run_name)
         c_run(i) = run_name(i:i)
+
         END DO
+
         c_run(SIZE(c_run)) = c_null_char
         c_error = c_null_char
 
@@ -110,13 +116,18 @@ CONTAINS
             MERGE(1_c_int, 0_c_int, overwrite),                                                                        &
             MERGE(1_c_int, 0_c_int, allow_existing), c_loc(c_error(1)),                                                &
             INT(SIZE(c_error), c_size_t))
+
         IF (status /= 0_c_int) THEN
         error_message = ''
+
         DO i = 1, SIZE(c_error)
             IF (c_error(i) == c_null_char) EXIT
             error_message(i:i) = c_error(i)
+
         END DO
+
         CALL fail(TRIM(error_message))
+
         END IF
 
         run_output_directory = TRIM(base_directory)
@@ -155,7 +166,9 @@ CONTAINS
         index_string = snapshot_index_label(index)
         WRITE(time_label, '(ES24.16E3)') time
         time_label = ADJUSTL(time_label)
+
         DO i = 1, LEN_TRIM(time_label)
+
         SELECT CASE (time_label(i:i))
         CASE (' ')
             time_label(i:i) = '_'
@@ -165,8 +178,11 @@ CONTAINS
             time_label(i:i) = 'm'
         CASE ('.')
             time_label(i:i) = 'd'
+
         END SELECT
+
         END DO
+
         IF (LEN_TRIM(run_output_directory) + LEN('/snapshots/') + LEN_TRIM(index_string) +                             &
             LEN('_t_') + LEN_TRIM(time_label) > LEN(run_output_directory))                                             &
             CALL fail('Snapshot directory path is too long')
@@ -189,10 +205,12 @@ CONTAINS
         IF (index < 0) CALL fail('Snapshot index must be nonnegative')
         WRITE(integer_text, '(I0)') index
         digit_count = LEN_TRIM(integer_text)
+
         IF (digit_count < 4) THEN
         label = REPEAT('0', 4 - digit_count)//TRIM(integer_text)
         ELSE
         label = TRIM(integer_text)
+
         END IF
     END FUNCTION snapshot_index_label
 
@@ -211,29 +229,40 @@ CONTAINS
         prefix = snapshot_index_label(index)//'_t_'
         ALLOCATE(c_directory(LEN_TRIM(directory) + 1),                                                                 &
                     c_prefix(LEN_TRIM(prefix) + 1), c_error(LEN(error_message)))
+
         DO i = 1, LEN_TRIM(directory)
         c_directory(i) = directory(i:i)
+
         END DO
+
         c_directory(SIZE(c_directory)) = c_null_char
+
         DO i = 1, LEN_TRIM(prefix)
         c_prefix(i) = prefix(i:i)
+
         END DO
+
         c_prefix(SIZE(c_prefix)) = c_null_char
         c_error = c_null_char
 
         status = c_snapshot_prefix_exists(c_loc(c_directory(1)), c_loc(c_prefix(1)),                                   &
             c_loc(c_error(1)), INT(SIZE(c_error), c_size_t))
+
         IF (status < 0_c_int) THEN
         error_message = ''
+
         DO i = 1, SIZE(c_error)
             IF (c_error(i) == c_null_char) EXIT
             error_message(i:i) = c_error(i)
+
         END DO
+
         CALL fail(TRIM(error_message))
+
         END IF
+
         IF (status > 0_c_int)                                                                                          &
-            CALL fail('uncommitted snapshot directory exists for restart index: '//                                    &
-                    TRIM(prefix))
+            CALL fail('uncommitted snapshot directory exists for restart index: '// TRIM(prefix))
     END SUBROUTINE validate_snapshot_index
 
     !> \brief Construct a path inside the active snapshot directory.
@@ -266,9 +295,12 @@ CONTAINS
             CALL fail('Invalid output directory path')
 
         ALLOCATE(c_path(LEN_TRIM(directory) + 1), c_error(LEN(error_message)))
+
         DO i = 1, LEN_TRIM(directory)
         c_path(i) = directory(i:i)
+
         END DO
+
         c_path(SIZE(c_path)) = c_null_char
         c_error = c_null_char
         reject_existing_c = 0_c_int
@@ -276,20 +308,25 @@ CONTAINS
             reject_existing_c = MERGE(1_c_int, 0_c_int, reject_existing)
         status = c_ensure_directory(c_loc(c_path(1)), reject_existing_c,                                               &
             c_loc(c_error(1)), INT(SIZE(c_error), c_size_t))
+
         IF (status /= 0_c_int) THEN
         error_message = ''
+
         DO i = 1, SIZE(c_error)
             IF (c_error(i) == c_null_char) EXIT
             error_message(i:i) = c_error(i)
+
         END DO
+
         CALL fail(TRIM(error_message))
+
         END IF
     END SUBROUTINE ensure_output_directory
 
     !> \brief Report an output path error using the solver's standard fatal diagnostic.
     !> \param[in] message Description of the invalid path or failed operation.
     SUBROUTINE fail(message)
-        USE diagnostics_2d, ONLY: fatal_error
+    USE diagnostics_2d, ONLY: fatal_error
         CHARACTER(LEN=*), INTENT(IN) :: message
         CALL fatal_error('Output path error: '//TRIM(message))
     END SUBROUTINE fail

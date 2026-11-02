@@ -51,56 +51,83 @@ CONTAINS
         count=0
         mass_exchange_configuration_present=.FALSE.
         REWIND(input_unit,IOSTAT=ios)
+
         IF (ios/=0) THEN
             error='Unable to scan MASS_EXCHANGE_PARAMETERS'; RETURN
+
         END IF
+
         DO
             READ(input_unit,'(A)',IOSTAT=ios) line
             IF (ios<0) EXIT
+
             IF (ios>0) THEN
                 error='Unable to scan MASS_EXCHANGE_PARAMETERS'; RETURN
+
             END IF
+
             line=uppercase_source_text(ADJUSTL(line))
             IF (INDEX(line,'&SOURCE_GROUPS')==1 .OR.                                                                   &
                 INDEX(line,'$SOURCE_GROUPS')==1) THEN
                 error='SOURCE_GROUPS is removed; use physical METHOD and GROUP'
                 RETURN
+
             END IF
+
             IF (INDEX(line,'&MASS_EXCHANGE_PARAMETERS')==1 .OR.                                                        &
                 INDEX(line,'$MASS_EXCHANGE_PARAMETERS')==1) count=count+1
+
         END DO
+
         IF (count>1) THEN
             error='MASS_EXCHANGE_PARAMETERS may appear only once'; RETURN
+
         END IF
+
         IF (count==1) THEN
             REWIND(input_unit)
             READ(input_unit,NML=mass_exchange_parameters,IOSTAT=ios)
+
             IF (ios/=0) THEN
                 error='Invalid MASS_EXCHANGE_PARAMETERS namelist'; RETURN
+
             END IF
+
             mass_exchange_configuration_present=.TRUE.
             mass_exchange_method=uppercase_source_text(ADJUSTL(mass_exchange_method))
             IF (mass_exchange_method/='EXPLICIT' .AND.                                                                 &
                 mass_exchange_method/='NEWTON' .AND.                                                                   &
                 mass_exchange_method/='ANALYTIC') THEN
                 error='Unsupported mass-exchange METHOD'; RETURN
+
             END IF
+
             lava_deposition_model=uppercase_source_text(ADJUSTL(lava_deposition_model))
+
             IF (lava_deposition_flag) THEN
+
                 SELECT CASE(TRIM(lava_deposition_model))
                 CASE('CONSTANT','TEMPERATURE','VISCOSITY')
                 CASE DEFAULT
                     error='Unsupported LAVA_DEPOSITION_MODEL'; RETURN
+
                 END SELECT
+
                 IF (lava_deposition_rate<0.0_wp .OR. lava_deposition_visc_ref<=0.0_wp .OR.                             &
                     lava_deposition_exponent<=0.0_wp .OR. lava_deposition_temp_width<=0.0_wp) THEN
                     error='Invalid lava deposition parameters'; RETURN
+
                 END IF
+
             END IF
+
             IF (mass_exchange_group<0) THEN
                 error='Mass-exchange GROUP must not be negative'; RETURN
+
             END IF
+
         END IF
+
         REWIND(input_unit,IOSTAT=ios)
         IF (ios/=0) error='Unable to rewind after MASS_EXCHANGE_PARAMETERS'
     END SUBROUTINE read_mass_exchange_parameters
@@ -113,10 +140,12 @@ CONTAINS
         CHARACTER(LEN=LEN(text)) :: upper
         INTEGER :: i,code
         upper=text
+
         DO i=1,LEN(text)
         code=IACHAR(text(i:i))
         IF (code>=IACHAR('a') .AND. code<=IACHAR('z'))                                                                 &
                 upper(i:i)=ACHAR(code-IACHAR('a')+IACHAR('A'))
+
         END DO
     END FUNCTION uppercase_source_text
 

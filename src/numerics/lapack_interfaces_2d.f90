@@ -92,9 +92,11 @@ CONTAINS
         INTEGER :: n
 
         n = SIZE(b)
+
         IF ((SIZE(a,1) /= n) .OR. (SIZE(a,2) /= n) .OR. (SIZE(ipiv) < n)) THEN
             info = -1
             RETURN
+
         END IF
 
         rhs(:,1) = b
@@ -124,9 +126,11 @@ CONTAINS
         INTEGER :: n
 
         n = SIZE(b)
+
         IF ((SIZE(a,1) /= n) .OR. (SIZE(a,2) /= n) .OR. (SIZE(ipiv) < n)) THEN
             info = -1
             RETURN
+
         END IF
 
         rhs(:,1) = b
