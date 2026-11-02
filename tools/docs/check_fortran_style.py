@@ -69,10 +69,13 @@ def structural_warnings(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="+", help="Fortran files/directories")
+    parser.add_argument("--line-width-report", action="store_true",
+                        help="report Fortran and Doxygen line-width exceptions")
     parser.add_argument("--structural-report", action="store_true",
                         help="print conservative block-nesting warnings (non-failing)")
     args = parser.parse_args()
     errors = []
+    width_warnings = []
     seen = set()
     nesting_warnings = []
     for path in files(args.paths):
@@ -82,6 +85,15 @@ def main():
         if args.structural_report:
             nesting_warnings.extend(structural_warnings(path))
         for line_no, line in enumerate(path.read_text().splitlines(), 1):
+            if args.line_width_report:
+                stripped = line.lstrip()
+                if stripped.startswith("!>") and len(line) > 100:
+                    width_warnings.append(f"{path}:{line_no}: Doxygen length {len(line)}")
+                elif not stripped.startswith(("!", "#")):
+                    if len(line) > 120:
+                        width_warnings.append(f"{path}:{line_no}: code length {len(line)}")
+                    elif line.rstrip().endswith("&") and line.rfind("&") != 119:
+                        width_warnings.append(f"{path}:{line_no}: continuation column {line.rfind('&') + 1}")
             if "\t" in line:
                 errors.append(f"{path}:{line_no}: TAB forbidden")
             if line.rstrip(" \t") != line:
@@ -94,6 +106,10 @@ def main():
     if args.structural_report:
         print(*nesting_warnings, sep=chr(10)) if nesting_warnings else print('No conservative nesting warnings')
         print(f'Structural warnings: {len(nesting_warnings)}')
+    if args.line_width_report:
+        for warning in width_warnings:
+            print(warning)
+        print(f"Line-width warnings: {len(width_warnings)}")
     if errors:
         print("\n".join(errors))
         return 1
