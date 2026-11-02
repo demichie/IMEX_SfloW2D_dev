@@ -87,9 +87,20 @@ CONTAINS
 
         CHARACTER(LEN=96) :: context
         CHARACTER(LEN=256) :: failure_reason
+        CHARACTER(LEN=24) :: reject_env
+        INTEGER :: reject_group,env_status,parse_status
 
         step_failed=.FALSE.
         failure_reason=''
+        reject_group=-1
+        reject_env=''
+        CALL GET_ENVIRONMENT_VARIABLE('IMEX_LIE_TEST_REJECT_AFTER_GROUP', &
+            reject_env,STATUS=env_status)
+        IF (env_status==0 .AND. LEN_TRIM(reject_env)>0) THEN
+            READ(reject_env,*,IOSTAT=parse_status) reject_group
+            IF (parse_status/=0 .OR. reject_group<1) &
+                CALL fatal_error('Invalid IMEX_LIE_TEST_REJECT_AFTER_GROUP')
+        END IF
         IF (PRESENT(failure_message)) failure_message=''
         IF (.NOT.source_registry%is_initialized()) &
             CALL fatal_error('D19: uninitialized Lie source registry')
@@ -393,6 +404,16 @@ CONTAINS
             END IF
             q=q_group
             qp=qp_group
+            ! Explicit integration-test failpoint: reject only after the group
+            ! has committed its candidate fluid, inventories and geometry.
+            ! Never enabled in normal runs; the enclosing integrator must undo
+            ! every preceding change using its authoritative snapshots.
+            IF (groups(group_index)%id==reject_group) THEN
+                step_failed=.TRUE.
+                failure_reason='D20_INJECTED_LATE_LIE_FAILURE'
+                IF (PRESENT(failure_message)) failure_message=TRIM(failure_reason)
+                RETURN
+            END IF
         END DO
     CONTAINS
         SUBROUTINE record_group_bed_rates
