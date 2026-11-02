@@ -67,3 +67,20 @@ publishing each cell. Explicit mass-exchange updates the substrate per cell
 inside OpenMP; a later failure rolls back the full time-step. Bed geometry
 projection and its validation remain outside the parallel region. The
 existing injected late-failure regression must still be run.
+
+## Validation route identified
+
+The existing `.github/workflows/lie-openmp-validation.yml` already contains
+an end-to-end production-solver job, running
+`TESTS/TEST_LIE_OPENMP_END_TO_END/compare_threads.py` against four fixtures:
+standard, pore-pressure, Newton, and topography. It compares complete NetCDF
+output at 1, 2, and 4 threads. The topography fixture also injects a late
+failure after group 4 and checks `D20_FULL_STEP_ROLLBACK_PASS` for all three
+thread counts. The strict-debug build and workspace-lifecycle regression
+are separate jobs of the same workflow.
+
+**Current status:** code committed, review performed, but compilation and
+end-to-end Action execution have NOT yet been observed on this revision.
+Run the validation workflow first, inspect all job results, and only then
+run the performance benchmark. Do not label the migration verified on the
+strength of a source-level review alone.
