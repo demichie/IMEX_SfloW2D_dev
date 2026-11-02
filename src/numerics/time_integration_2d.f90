@@ -73,7 +73,8 @@ CONTAINS
         TYPE(source_registry_type), INTENT(IN) :: source_registry
         CLASS(domain_type), INTENT(IN) :: domain
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
-        INTEGER :: l,j,k
+        INTEGER :: l,j,k,first_failure
+        INTEGER, ALLOCATABLE :: reconstruction_status(:),spatial_status(:)
         LOGICAL :: source_step_failed,conversion_ok
         CHARACTER(LEN=256) :: source_failure
         REAL(wp) :: pd
@@ -84,37 +85,56 @@ CONTAINS
         this%qp_before=state%qp
         this%q_trial=state%q
         this%qp_trial=state%qp
-        ! Reconstruct a defined primitive halo from the conserved pre-step state.
+        ! Each cell writes a distinct primitive slice; collect failures by cell.
+        ALLOCATE(reconstruction_status(domain%reconstruction_cells))
+        reconstruction_status=0
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,pd,conversion_ok)
         DO l=1,domain%reconstruction_cells
             j=domain%j_reconstruction(l)
             k=domain%k_reconstruction(l)
             IF (this%q_before(idx_totMassEqn,j,k)>0.0_wp) THEN
                 CALL qc_to_qp(this%q_before(:,j,k),this%qp_before(:,j,k),pd, &
                     'Lie pre-spatial reconstruction state',conversion_ok)
-                IF (.NOT.conversion_ok) &
-                    CALL fatal_error('Lie pre-spatial state conversion rejected')
+                IF (.NOT.conversion_ok) reconstruction_status(l)=1
             ELSE
                 CALL initialize_dry_physical_cell(this%qp_before(:,j,k))
             END IF
         END DO
+        !$OMP END PARALLEL DO
+        first_failure=MINLOC(reconstruction_status,1,MASK=reconstruction_status/=0)
+        IF (first_failure/=0) &
+            CALL fatal_error('Lie pre-spatial state conversion rejected')
+        DEALLOCATE(reconstruction_status)
 
         ! The spatial step is conservative; only admissibility is checked.
         CALL spatial_operator%evaluate(this%qp_before,this%spatial_rate,t,domain)
+        ALLOCATE(spatial_status(domain%solve_cells))
+        spatial_status=0
+        !$OMP PARALLEL DO DEFAULT(SHARED) PRIVATE(l,j,k,pd,conversion_ok)
         DO l=1,domain%solve_cells
             j=domain%j_cent(l)
             k=domain%k_cent(l)
             this%q_trial(1:n_eqns,j,k)=this%q_before(1:n_eqns,j,k)-dt*this%spatial_rate(:,j,k)
             ! Spatial admissibility check. Do not limit or clip its conservative rate.
-            IF (.NOT.conservative_mass_admissible(this%q_trial(1:n_eqns,j,k))) &
-                CALL fatal_error('Lie spatial update: inadmissible conservative state')
+            IF (.NOT.conservative_mass_admissible(this%q_trial(1:n_eqns,j,k))) THEN
+                spatial_status(l)=1
+                CYCLE
+            END IF
             IF (this%q_trial(idx_totMassEqn,j,k)>0.0_wp) THEN
                 CALL qc_to_qp(this%q_trial(:,j,k),this%qp_trial(:,j,k),pd,'Lie spatial update',conversion_ok)
-                IF (.NOT.conversion_ok) &
-                    CALL fatal_error('Lie spatial state conversion rejected')
+                IF (.NOT.conversion_ok) spatial_status(l)=2
             ELSE
                 CALL initialize_dry_physical_cell(this%qp_trial(:,j,k))
             END IF
         END DO
+        !$OMP END PARALLEL DO
+        first_failure=MINLOC(spatial_status,1,MASK=spatial_status/=0)
+        IF (first_failure/=0) THEN
+            IF (spatial_status(first_failure)==1) &
+                CALL fatal_error('Lie spatial update: inadmissible conservative state')
+            CALL fatal_error('Lie spatial state conversion rejected')
+        END IF
+        DEALLOCATE(spatial_status)
 
         ! GROUP-0 source rates use immutable q^n/qp^n, while applying to post-spatial q.
         ! Later groups evaluate from each predecessor's updated state.
