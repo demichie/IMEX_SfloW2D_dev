@@ -23,9 +23,10 @@ def main():
     parser.add_argument("--cells", type=int, default=32)
     parser.add_argument("--horizon", type=float, default=0.02)
     parser.add_argument("--repetitions", type=int, default=3)
+    parser.add_argument("--cfl", type=float, default=0.06)
     args = parser.parse_args()
-    if args.cells < 32 or args.repetitions < 2 or args.horizon <= 0:
-        parser.error("Require cells >=32, repetitions >=2, horizon >0")
+    if args.cells < 32 or args.repetitions < 2 or args.horizon <= 0 or not (0 < args.cfl <= 0.24):
+        parser.error("Require cells >=32, repetitions >=2, horizon >0, 0<CFL<=0.24")
     repo = args.repo.resolve()
     solver = args.solver.resolve()
     evidence = args.evidence.resolve()
@@ -36,7 +37,7 @@ def main():
     spec.loader.exec_module(module)
     report = {"sha": os.environ.get("GITHUB_SHA", "local"),
               "runner": os.environ.get("RUNNER_NAME", "local"),
-              "cells_x": args.cells, "horizon": args.horizon,
+              "cells_x": args.cells, "horizon": args.horizon, "cfl": args.cfl,
               "repetitions": args.repetitions, "samples": {},
               "metric": "wall time including initialization and I/O"}
     try:
@@ -44,6 +45,11 @@ def main():
             root = Path(tmp)
             fixture = module.prepare(repo, root, "EXAMPLE_2D",
                                      cells=args.cells, horizon=f"{args.horizon:.8E}")
+            # Lower the explicit CFL consistently at every thread count; never relax admissibility.
+            input_path = fixture / "IMEX_SfloW2D.inp"
+            inp = input_path.read_text()
+            inp = module.replace_one(inp, r"^\s*CFL\s*=.*$", f" CFL={args.cfl:.8E},")
+            input_path.write_text(inp)
             # Independent directories prevent overwritten outputs and warmup leakage.
             threads = (1, 2, 4, 8)
             schedule = [(n, k) for k in range(args.repetitions + 1) for n in threads]
@@ -97,7 +103,7 @@ def main():
             report["results"] = rows
             report["cpu_available"] = os.cpu_count()
             summary = ["# Lie OpenMP performance benchmark", "",
-                       f"Commit: `{report['sha']}` · grid x={args.cells} · horizon={args.horizon}s",
+                       f"Commit: `{report['sha']}` · grid x={args.cells} · horizon={args.horizon}s · CFL={args.cfl}",
                        "", "| Threads | Median wall (s) | Speedup | Efficiency |",
                        "|---:|---:|---:|---:|"]
             for row in rows:

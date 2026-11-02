@@ -15,6 +15,12 @@ on:
         type: choice
         default: "0.02"
         options: ["0.02", "0.05", "0.1"]
+      cfl:
+        description: "Explicit CFL (0.06 conservative; 0.24 example default)"
+        required: true
+        type: choice
+        default: "0.06"
+        options: ["0.06", "0.12", "0.24"]
       repetitions:
         description: "Timed repetitions per thread count"
         required: true
@@ -68,7 +74,8 @@ jobs:
             --evidence "$GITHUB_WORKSPACE/benchmark-results" \
             --cells "${{ inputs.grid_cells_x }}" \
             --horizon "${{ inputs.horizon }}" \
-            --repetitions "${{ inputs.repetitions }}"
+            --repetitions "${{ inputs.repetitions }}" \
+            --cfl "${{ inputs.cfl }}"
       - name: Publish benchmark summary
         if: always()
         run: |
