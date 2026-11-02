@@ -22,6 +22,7 @@ MODULE lie_source_executor_2d
     TYPE :: group_profile_type
         INTEGER :: id=0,method=0,calls=0
         REAL(wp) :: setup=0.0_wp,evaluate=0.0_wp,commit=0.0_wp
+        REAL(wp) :: input_copy=0.0_wp,output_copy=0.0_wp
     END TYPE group_profile_type
     TYPE(group_profile_type), ALLOCATABLE, SAVE :: group_profile(:)
     LOGICAL, SAVE :: profiling_initialized=.FALSE.,profiling_enabled=.FALSE.
@@ -95,7 +96,7 @@ CONTAINS
         CHARACTER(LEN=256) :: failure_reason
         CHARACTER(LEN=24) :: reject_env
         INTEGER :: reject_group,env_status,parse_status
-        INTEGER :: tick,tock,clock_rate
+        INTEGER :: tick,tock,clock_rate,copy_tick
         CHARACTER(LEN=8) :: profile_env
 
         step_failed=.FALSE.
@@ -143,6 +144,11 @@ CONTAINS
             END IF
             q_group=q
             qp_group=qp
+            IF (profiling_enabled) THEN
+                CALL SYSTEM_CLOCK(tock)
+                group_profile(group_index)%input_copy=group_profile(group_index)%input_copy+ &
+                    REAL(tock-tick,wp)/REAL(clock_rate,wp)
+            END IF
             ! Validate configuration before spawning workers: fatal dispatch errors
             ! must not originate from a concurrent cell evaluation.
             IF (.NOT.ALLOCATED(groups(group_index)%source_names))                                                      &
@@ -519,8 +525,14 @@ CONTAINS
 
             END IF
 
+            IF (profiling_enabled) CALL SYSTEM_CLOCK(copy_tick)
             q=q_group
             qp=qp_group
+            IF (profiling_enabled) THEN
+                CALL SYSTEM_CLOCK(tock)
+                group_profile(group_index)%output_copy=group_profile(group_index)%output_copy+ &
+                    REAL(tock-copy_tick,wp)/REAL(clock_rate,wp)
+            END IF
             ! Explicit integration-test failpoint: reject only after the group
             ! has committed its candidate fluid, inventories and geometry.
             ! Never enabled in normal runs; the enclosing integrator must undo
@@ -574,6 +586,9 @@ CONTAINS
                 ' calls=',group_profile(n)%calls, &
                 ' setup/evaluate/commit=',group_profile(n)%setup, &
                 group_profile(n)%evaluate,group_profile(n)%commit
+            WRITE(*,'(A,I0,A,2(1X,ES15.7))') &
+                'LIE_GROUP_PROFILE_COPY id=',group_profile(n)%id, &
+                ' input/output=',group_profile(n)%input_copy,group_profile(n)%output_copy
         END DO
         WRITE(*,'(A)') 'LIE_GROUP_PROFILE_END'
     END SUBROUTINE report_lie_source_profile
