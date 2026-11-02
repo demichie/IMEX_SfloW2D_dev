@@ -20,7 +20,7 @@ def main():
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--solver", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
-    parser.add_argument("--cells", type=int, default=192)
+    parser.add_argument("--cells", type=int, default=32)
     parser.add_argument("--horizon", type=float, default=0.02)
     parser.add_argument("--repetitions", type=int, default=3)
     args = parser.parse_args()
@@ -67,7 +67,16 @@ def main():
                 log = evidence / f"threads-{n}-repeat-{k}.log"
                 log.write_text(proc.stdout)
                 if proc.returncode:
-                    raise RuntimeError(f"Solver failed with {n} threads: {log}")
+                    tail = "\n".join(proc.stdout.splitlines()[-80:])
+                    print(f"Solver FAILED: threads={n}, repetition={k}, "
+                          f"exit_code={proc.returncode}, wall={wall:.3f}s",
+                          file=sys.stderr, flush=True)
+                    print(tail, file=sys.stderr, flush=True)
+                    shutil.copy2(target / "IMEX_SfloW2D.inp",
+                                 evidence / f"threads-{n}-repeat-{k}.inp")
+                    raise RuntimeError(f"Solver failed with {n} threads, "
+                                       f"repetition {k}: exit={proc.returncode}; "
+                                       f"log={log}")
                 m = re.search(r"Parallel run:\s*number of threads used\s+(\d+)", proc.stdout)
                 if not m or int(m.group(1)) != n:
                     raise RuntimeError(f"Requested {n} threads not confirmed: {log}")

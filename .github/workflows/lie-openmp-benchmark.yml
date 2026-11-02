@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       grid_cells_x:
-        description: "Grid cells in x (96 or 192); y scales with x"
+        description: "Grid cells in x (32 is D20 reference); y scales with x"
         required: true
         type: choice
-        default: "192"
-        options: ["96", "192"]
+        default: "32"
+        options: ["32", "96", "192"]
       horizon:
         description: "Simulation end time in seconds"
         required: true
