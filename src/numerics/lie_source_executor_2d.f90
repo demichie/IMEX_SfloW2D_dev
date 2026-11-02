@@ -24,6 +24,7 @@ MODULE lie_source_executor_2d
         REAL(wp) :: setup=0.0_wp,evaluate=0.0_wp,commit=0.0_wp
     END TYPE group_profile_type
     TYPE :: lie_source_scratch_type
+        CHARACTER(LEN=256), ALLOCATABLE :: cell_failure(:)
         INTEGER, ALLOCATABLE :: newton_iterations(:,:)
         REAL(wp), ALLOCATABLE :: bed_rate_cell(:,:),bed_rate_vertex(:,:),bed_candidate(:,:)
     END TYPE lie_source_scratch_type
@@ -52,7 +53,8 @@ CONTAINS
     !> @param[out] step_failed True when candidate group state is rejected.
     !> @param[out] failure_message Optional diagnostic describing rejected group.
     SUBROUTINE execute_lie_source_groups(state, q, qp, time_step, domain, source_registry, stochastic_values,          &
-        step_start_time, q_original, qp_original, step_failed, failure_message, cached_groups, cached_exchange, cached_bed_group_id, work)
+        step_start_time, q_original, qp_original, step_failed, failure_message, cached_groups, &
+        cached_exchange, cached_bed_group_id, work)
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,                                                             &
             B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff,                                             &
             project_cell_field_to_vertices,assign_topography_vertices,B_vertex,                                        &
@@ -102,7 +104,6 @@ CONTAINS
         LOGICAL, POINTER :: exchange_group(:)
         LOGICAL :: newton_witness_active
         INTEGER :: group_index,cell,j,k,status,iterations,linear_info,first_failure,bed_group_id
-        CHARACTER(LEN=256), ALLOCATABLE :: scratch%cell_failure(:)
 
         CHARACTER(LEN=96) :: context
         CHARACTER(LEN=256) :: failure_reason
@@ -514,8 +515,8 @@ CONTAINS
             DO group_index=1,SIZE(groups)
                 IF (groups(group_index)%method/=SOURCE_METHOD_NEWTON) CYCLE
                 WRITE(*,'(A,I0,A,I0,A,I0)') 'D20_NEWTON_WITNESS group=',                                               &
-                    groups(group_index)%id,' solved_cells=',COUNT(scratch%newton_iterations(:,group_index)>0),                 &
-                    ' total_iterations=',SUM(scratch%newton_iterations(:,group_index))
+                    groups(group_index)%id,' solved_cells=',COUNT(scratch%newton_iterations(1:domain%solve_cells,group_index)>0),                 &
+                    ' total_iterations=',SUM(scratch%newton_iterations(1:domain%solve_cells,group_index))
             END DO
         END IF
         ! Geometry is the same for every source group in the step. Project
