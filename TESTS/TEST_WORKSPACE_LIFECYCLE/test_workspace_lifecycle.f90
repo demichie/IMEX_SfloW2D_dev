@@ -11,10 +11,13 @@ PROGRAM test_workspace_lifecycle
        begin_geometry_transaction, rollback_geometry_transaction, &
        commit_geometry_transaction
   USE init_2d, ONLY : thickness_init, erodible_init, release_initialization_fields
+  USE state_2d, ONLY : state_type, substrate_snapshot_type
   USE reconstruction_2d, ONLY : reconstruction_workspace_type
   USE hyperbolic_2d, ONLY : hyperbolic_workspace_type
   IMPLICIT NONE
 
+  TYPE(state_type) :: state
+  TYPE(substrate_snapshot_type) :: substrate_before
   TYPE(reconstruction_workspace_type) :: reconstruction
   TYPE(hyperbolic_workspace_type) :: hyperbolic
   INTEGER :: j, k
@@ -51,6 +54,35 @@ PROGRAM test_workspace_lifecycle
   CALL assert_true('unused inlet vectors absent',                         &
        .NOT.ALLOCATED(sourceE_vect_x) .AND. .NOT.ALLOCATED(sourceW_vect_x) &
        .AND. .NOT.ALLOCATED(sourceS_vect_x) .AND. .NOT.ALLOCATED(sourceN_vect_x))
+
+  ! Verify that the authoritative physical inventories and their aggregate
+  ! maps are restored exactly after a simulated rejected transaction.
+  ALLOCATE(state%deposit(comp_cells_x,comp_cells_y,1))
+  ALLOCATE(state%erosion(comp_cells_x,comp_cells_y,1))
+  ALLOCATE(state%erodible(1,comp_cells_x,comp_cells_y))
+  ALLOCATE(state%lava_deposit(comp_cells_x,comp_cells_y))
+  ALLOCATE(state%deposit_tot(comp_cells_x,comp_cells_y))
+  ALLOCATE(state%erosion_tot(comp_cells_x,comp_cells_y))
+  state%deposit=1.0_wp
+  state%erosion=2.0_wp
+  state%erodible=3.0_wp
+  state%lava_deposit=4.0_wp
+  state%deposit_tot=5.0_wp
+  state%erosion_tot=6.0_wp
+  CALL state%snapshot_substrate(substrate_before)
+  state%deposit=-11.0_wp
+  state%erosion=-12.0_wp
+  state%erodible=-13.0_wp
+  state%lava_deposit=-14.0_wp
+  state%deposit_tot=-15.0_wp
+  state%erosion_tot=-16.0_wp
+  CALL state%restore_substrate(substrate_before)
+  CALL assert_true('rollback restores deposition', ALL(state%deposit==1.0_wp))
+  CALL assert_true('rollback restores erosion', ALL(state%erosion==2.0_wp))
+  CALL assert_true('rollback restores erodible inventory', ALL(state%erodible==3.0_wp))
+  CALL assert_true('rollback restores lava', ALL(state%lava_deposit==4.0_wp))
+  CALL assert_true('rollback restores deposit totals', ALL(state%deposit_tot==5.0_wp))
+  CALL assert_true('rollback restores erosion totals', ALL(state%erosion_tot==6.0_wp))
 
   ! Exercise the production geometry transaction: all fields must recover
   ! exactly, including cached centre/face elevation and derived coefficients.
