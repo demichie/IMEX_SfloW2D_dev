@@ -3,7 +3,8 @@
 !>          source groups subsequently modify a transaction candidate; only a
 !>          fully accepted timestep publishes fluid, substrate and geometry.
 MODULE time_integration_2d
-    USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_totMassEqn
+    USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_totMassEqn,idx_solidEqn_first,idx_solidEqn_last,                  &
+            idx_add_gas_first,idx_add_gas_last
     USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,                                                                 &
             begin_geometry_transaction,commit_geometry_transaction,                                                    &
             rollback_geometry_transaction,B_vertex,B_cent,B_face_x,B_face_y,                                           &
@@ -63,7 +64,7 @@ CONTAINS
         TYPE(source_registry_type), INTENT(IN) :: source_registry
         CLASS(domain_type), INTENT(IN) :: domain
         CLASS(spatial_operator_type), INTENT(INOUT) :: spatial_operator
-        INTEGER :: l,j,k,first_failure
+        INTEGER :: l,j,k,first_failure,eq
         INTEGER, ALLOCATABLE :: reconstruction_status(:),spatial_status(:)
         LOGICAL :: source_step_failed,conversion_ok
         CHARACTER(LEN=256) :: source_failure
@@ -150,6 +151,28 @@ CONTAINS
         first_failure=MINLOC(spatial_status,1,MASK=spatial_status/=0)
 
         IF (first_failure/=0) THEN
+            ! Diagnose the first failing cell outside the OpenMP region.
+            ! Do not change, limit or repair the rejected conservative candidate.
+            j=domain%j_cent(first_failure)
+            k=domain%k_cent(first_failure)
+            WRITE(*,'(A,2(I0,1X),A,ES23.15,A,ES23.15)') &
+                'LIE_SPATIAL_FAILURE cell(j,k)=',j,k,' t=',t,' dt=',dt
+            WRITE(*,'(A,I0)') 'LIE_SPATIAL_FAILURE status=',spatial_status(first_failure)
+            WRITE(*,'(A,ES23.15,A,ES23.15)') &
+                'LIE_SPATIAL_FAILURE mass_before=',this%q_before(idx_totMassEqn,j,k), &
+                ' mass_after=',this%q_trial(idx_totMassEqn,j,k)
+            WRITE(*,'(A,ES23.15,A,ES23.15)') &
+                'LIE_SPATIAL_FAILURE components_before=', &
+                SUM(this%q_before(idx_solidEqn_first:idx_solidEqn_last,j,k))+ &
+                SUM(this%q_before(idx_add_gas_first:idx_add_gas_last,j,k)), &
+                ' components_after=', &
+                SUM(this%q_trial(idx_solidEqn_first:idx_solidEqn_last,j,k))+ &
+                SUM(this%q_trial(idx_add_gas_first:idx_add_gas_last,j,k))
+            DO eq=1,n_eqns
+                WRITE(*,'(A,I0,A,3(1X,ES23.15))') 'LIE_SPATIAL_FAILURE equation=',eq, &
+                    ' before/rate/after=',this%q_before(eq,j,k), &
+                    this%spatial_rate(eq,j,k),this%q_trial(eq,j,k)
+            END DO
             IF (spatial_status(first_failure)==1)                                                                      &
                 CALL fatal_error('Lie spatial update: inadmissible conservative state')
             CALL fatal_error('Lie spatial state conversion rejected')
