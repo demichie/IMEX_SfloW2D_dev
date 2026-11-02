@@ -28,6 +28,8 @@ MODULE time_integration_2d
         REAL(wp), ALLOCATABLE :: q_before(:,:,:), qp_before(:,:,:)
         !> Candidate cell states, published only after all groups succeed.
         REAL(wp), ALLOCATABLE :: q_trial(:,:,:), qp_trial(:,:,:)
+        TYPE(source_group_type), ALLOCATABLE :: lie_groups(:)
+        LOGICAL :: lie_has_exchange=.FALSE.,lie_has_bed=.FALSE.
         LOGICAL :: profile_enabled=.FALSE.
         INTEGER :: profile_calls=0
         REAL(wp) :: profile_spatial=0.0_wp,profile_sources=0.0_wp
@@ -218,16 +220,20 @@ CONTAINS
         ! fields until the full trial succeeds.
         ! Snapshot only fields a configured source can actually change.
         ! The metadata is immutable within a timestep; no per-cell scan is needed.
-        configured_groups=source_registry%groups()
-        needs_substrate_snapshot=.FALSE.
-        DO group_id=1,SIZE(configured_groups)
-            IF (.NOT.ALLOCATED(configured_groups(group_id)%source_names)) CYCLE
-            IF (ANY(INDEX(configured_groups(group_id)%source_names,'mass_exchange_')==1)) THEN
-                needs_substrate_snapshot=.TRUE.
-                EXIT
-            END IF
-        END DO
-        needs_geometry_snapshot=needs_substrate_snapshot .AND. topo_change_flag
+        IF (.NOT.ALLOCATED(this%lie_groups)) THEN
+            IF (.NOT.source_registry%is_initialized()) CALL fatal_error('Lie registry unavailable')
+            this%lie_groups=source_registry%groups()
+            this%lie_has_exchange=.FALSE.
+            DO group_id=1,SIZE(this%lie_groups)
+                IF (.NOT.ALLOCATED(this%lie_groups(group_id)%source_names)) &
+                    CALL fatal_error('Lie source group has no allocated source list')
+                IF (ANY(INDEX(this%lie_groups(group_id)%source_names,'mass_exchange_')==1)) &
+                    this%lie_has_exchange=.TRUE.
+            END DO
+            this%lie_has_bed=this%lie_has_exchange .AND. topo_change_flag
+        END IF
+        needs_substrate_snapshot=this%lie_has_exchange
+        needs_geometry_snapshot=this%lie_has_bed
         IF (needs_substrate_snapshot) CALL state%snapshot_substrate(substrate_before)
         IF (needs_geometry_snapshot) CALL begin_geometry_transaction
         IF (this%profile_enabled) THEN
@@ -236,7 +242,7 @@ CONTAINS
             tick=tock
         END IF
         CALL execute_lie_source_groups(state, this%q_trial, this%qp_trial, dt, domain, source_registry,                &
-            stochastic_values, t, this%q_before, this%qp_before, source_step_failed, source_failure)
+            stochastic_values, t, this%q_before, this%qp_before, source_step_failed, source_failure, this%lie_groups)
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_source_executor=this%profile_source_executor+REAL(tock-tick,wp)/REAL(tick_rate,wp)
@@ -311,6 +317,7 @@ CONTAINS
             WRITE(*,'(A,ES15.7)') 'LIE_PROFILE source_executor_seconds=',this%profile_source_executor
             WRITE(*,'(A,ES15.7)') 'LIE_PROFILE publish_seconds=',this%profile_publish
         END IF
+        IF (ALLOCATED(this%lie_groups)) DEALLOCATE(this%lie_groups)
         IF (ALLOCATED(this%spatial_rate)) DEALLOCATE(this%spatial_rate)
         IF (ALLOCATED(this%q_before)) DEALLOCATE(this%q_before)
         IF (ALLOCATED(this%qp_before)) DEALLOCATE(this%qp_before)

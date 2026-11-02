@@ -48,7 +48,7 @@ CONTAINS
     !> @param[out] step_failed True when candidate group state is rejected.
     !> @param[out] failure_message Optional diagnostic describing rejected group.
     SUBROUTINE execute_lie_source_groups(state, q, qp, time_step, domain, source_registry, stochastic_values,          &
-        step_start_time, q_original, qp_original, step_failed, failure_message)
+        step_start_time, q_original, qp_original, step_failed, failure_message, cached_groups)
     USE geometry_2d, ONLY : B_prime_x_geom,B_prime_y_geom,                                                             &
             B_second_xx_geom,B_second_xy_geom,B_second_yy_geom,grav_coeff,                                             &
             project_cell_field_to_vertices,assign_topography_vertices,B_vertex,                                        &
@@ -65,7 +65,9 @@ CONTAINS
     USE parameters_2d, ONLY : topo_change_flag,erodible_deposit_flag
     USE constitutive_parameters_2d, ONLY : N_inh,f_inhibit_mode
         CLASS(state_type), INTENT(INOUT) :: state
-        TYPE(source_group_type), ALLOCATABLE :: groups(:)
+        TYPE(source_group_type), POINTER :: groups(:)
+        TYPE(source_group_type), ALLOCATABLE, TARGET :: owned_groups(:)
+        TYPE(source_group_type), TARGET, INTENT(IN), OPTIONAL :: cached_groups(:)
         TYPE(mass_exchange_rates_type) :: transfers
         TYPE(analytic_term_context_type) :: analytic_context
         REAL(wp), INTENT(INOUT) :: q(n_vars,comp_cells_x,comp_cells_y)
@@ -118,7 +120,12 @@ CONTAINS
         IF (PRESENT(failure_message)) failure_message=''
         IF (.NOT.source_registry%is_initialized())                                                                     &
             CALL fatal_error('D19: uninitialized Lie source registry')
-        groups=source_registry%groups()
+        IF (PRESENT(cached_groups)) THEN
+            groups=>cached_groups
+        ELSE
+            owned_groups=source_registry%groups()
+            groups=>owned_groups
+        END IF
         IF (.NOT.profiling_initialized) THEN
             profile_env=''
             CALL GET_ENVIRONMENT_VARIABLE('IMEX_PROFILE_LIE',profile_env,STATUS=env_status)
