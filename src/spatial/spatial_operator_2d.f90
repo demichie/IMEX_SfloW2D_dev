@@ -49,7 +49,7 @@ CONTAINS
     SUBROUTINE diagnose_spatial_cell(this,j,k,eq)
         CLASS(spatial_operator_type), INTENT(IN) :: this
         INTEGER, INTENT(IN) :: j,k,eq
-        CALL this%hp_pccu%diagnose_cell(j,k,eq)
+        CALL this%hp_pccu%diagnose_cell(this%reconstruction,j,k,eq)
     END SUBROUTINE diagnose_spatial_cell
 
     !> \brief Initialize the reconstruction and KT flux workspace.

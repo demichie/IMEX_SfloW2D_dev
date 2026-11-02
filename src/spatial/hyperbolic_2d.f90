@@ -58,11 +58,13 @@ CONTAINS
 
     !> @brief Report the resolved face contributions to one conservative residual.
     !> @param[in] this Face-oriented HP-PCCU workspace.
+    !> @param[in] recon Reconstructed primitive traces on each face.
     !> @param[in] j Horizontal index of the failing cell.
     !> @param[in] k Vertical index of the failing cell.
     !> @param[in] eq Conservative equation index.
-    SUBROUTINE diagnose_hyperbolic_cell(this,j,k,eq)
+    SUBROUTINE diagnose_hyperbolic_cell(this,recon,j,k,eq)
         CLASS(hyperbolic_workspace_type), INTENT(IN) :: this
+        CLASS(reconstruction_workspace_type), INTENT(IN) :: recon
         INTEGER, INTENT(IN) :: j,k,eq
         REAL(wp) :: x_right,x_left,y_top,y_bottom,path_x,path_y
         x_right=0.0_wp
@@ -89,6 +91,15 @@ CONTAINS
             (x_right-x_left-path_x)*one_by_dx, &
             (y_top-y_bottom-path_y)*one_by_dy, &
             (x_right-x_left-path_x)*one_by_dx+(y_top-y_bottom-path_y)*one_by_dy
+        IF (eq>=idx_solidEqn_first .AND. eq<=idx_solidEqn_last) THEN
+            WRITE(*,'(A,4(1X,ES23.15))') 'LIE_TRACE_FAILURE y_upper solidB/solidT/hB/hT=', &
+                recon%qp_adv_interfaceB(idx_solid_first+eq-idx_solidEqn_first,j,k+1), &
+                recon%qp_adv_interfaceT(idx_solid_first+eq-idx_solidEqn_first,j,k+1), &
+                recon%h_selected_interfaceB(j,k+1),recon%h_selected_interfaceT(j,k+1)
+            WRITE(*,'(A,4(1X,ES23.15))') 'LIE_TRACE_FAILURE y_upper vB/vT/amin/aplus=', &
+                recon%qp_adv_interfaceB(idx_v,j,k+1),recon%qp_adv_interfaceT(idx_v,j,k+1), &
+                this%a_interface_yNeg(j,k+1),this%a_interface_yPos(j,k+1)
+        END IF
     END SUBROUTINE diagnose_hyperbolic_cell
 
     !> \brief Allocate and zero wave-speed and oriented KT work arrays.
