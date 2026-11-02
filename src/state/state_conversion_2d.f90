@@ -708,7 +708,8 @@ CONTAINS
 
     !> \brief Recover real velocities from mixture mass and momenta with dry-state regularization.
     !>
-    !> \param[in] qc Local conservative vector: mixture mass, momenta, thermal energy and transported
+    !> \param[in] qc Local conservative vector: mixture mass, momenta, thermal energy and
+    !> transported
     !>               component masses.
     !> \param[out] u Cartesian depth-averaged x velocity [m s^-1].
     !> \param[out] v Cartesian depth-averaged y velocity [m s^-1].
@@ -724,7 +725,8 @@ CONTAINS
 
     !> \brief Recover complex-step velocities using the same real-path regularization.
     !>
-    !> \param[in] qc Local conservative vector: mixture mass, momenta, thermal energy and transported
+    !> \param[in] qc Local conservative vector: mixture mass, momenta, thermal energy and
+    !> transported
     !>               component masses.
     !> \param[out] u Cartesian depth-averaged x velocity [m s^-1].
     !> \param[out] v Cartesian depth-averaged y velocity [m s^-1].
@@ -801,7 +803,8 @@ CONTAINS
     !>
     !> Derive volume fractions from the canonical primitive mass fractions.
     !>
-    !> \param[in] qp Canonical physical states: h, hu, hv, T, component mass fractions, then appended
+    !> \param[in] qp Canonical physical states: h, hu, hv, T, component mass fractions, then
+    !> appended
     !>               u and v.
     !> \param[out] alphas Solid volume fractions, one entry per solid class.
     !> \param[out] alphag Additional-gas volume fractions, excluding ambient air.
@@ -875,7 +878,8 @@ CONTAINS
 
 
     !******************************************************************************
-    !> \brief Evaluate density, reduced gravity, heat capacities and Richardson number from a physical
+    !> \brief Evaluate density, reduced gravity, heat capacities and Richardson number from a
+    !> physical
     !>        state.
     !
     !> This subroutine evaluates from the physical real-value local variables qpj,
@@ -1014,9 +1018,11 @@ CONTAINS
     !> Mattia de' Michieli Vitturi
     !
     !>
-    !> \param[in] qc Local conservative vector: mixture mass, momenta, thermal energy and transported
+    !> \param[in] qc Local conservative vector: mixture mass, momenta, thermal energy and
+    !> transported
     !>               component masses.
-    !> \param[out] qp Canonical physical states: h, hu, hv, T, component mass fractions, then appended
+    !> \param[out] qp Canonical physical states: h, hu, hv, T, component mass fractions, then
+    !> appended
     !>                u and v.
     !> \param[out] p_dyn Dynamic pressure rho_m*(u^2+v^2)/2 [Pa].
     !> \param[in] context Optional diagnostic context included in conversion errors.
@@ -1127,9 +1133,11 @@ CONTAINS
     !> Mattia de' Michieli Vitturi
     !
     !>
-    !> \param[in] qp Canonical physical states: h, hu, hv, T, component mass fractions, then appended
+    !> \param[in] qp Canonical physical states: h, hu, hv, T, component mass fractions, then
+    !> appended
     !>               u and v.
-    !> \param[out] qc Local conservative vector: mixture mass, momenta, thermal energy and transported
+    !> \param[out] qc Local conservative vector: mixture mass, momenta, thermal energy and
+    !> transported
     !>                component masses.
     !> \param[in] context Optional diagnostic context included in conversion errors.
     !******************************************************************************

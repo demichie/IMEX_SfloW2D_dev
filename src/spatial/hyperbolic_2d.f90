@@ -92,7 +92,8 @@ CONTAINS
     !>
     !> \param[in,out] this Persistent face-speed, oriented-flux and cell-path workspace.
     !> \param[in,out] recon Reconstructed cell-owned and face-oriented physical/conservative traces.
-    !> \param[in] qp_expl Cell-centered physical states at the explicit stage, including the required
+    !> \param[in] qp_expl Cell-centered physical states at the explicit stage, including the
+    !> required
     !>                    stencil halo.
     !> \param[out] divFlux_iRK Complete stage spatial term, including face and cell paths, indexed
     !>                         (equation,x,y).
@@ -754,10 +755,12 @@ CONTAINS
     !> Use the wet-side limiting value at the dry endpoint instead.
     !>
     !> \param[in] h_left Depth at the negative/left path endpoint [m].
-    !> \param[in,out] gamma_left Left coefficient, replaced by the right one if only the left trace is
+    !> \param[in,out] gamma_left Left coefficient, replaced by the right one if only the left trace
+    !> is
     !>                           dry.
     !> \param[in] h_right Depth at the positive/right path endpoint [m].
-    !> \param[in,out] gamma_right Right coefficient, replaced by the left one if only the right trace
+    !> \param[in,out] gamma_right Right coefficient, replaced by the left one if only the right
+    !> trace
     !>                            is dry.
     !******************************************************************************
 
