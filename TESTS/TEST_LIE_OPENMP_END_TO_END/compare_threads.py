@@ -36,7 +36,8 @@ def prepare(repo, root, name):
     source = repo / "EXAMPLES" / source_name
     fixture = root / "fixtures" / name
     shutil.copytree(source, fixture, ignore=shutil.ignore_patterns("OUTPUT", "__pycache__"))
-    subprocess.run([sys.executable, "create_example.py", "32", "0.5", "300", "false"],
+    solid_fraction = "0.15" if name == "EXAMPLE_2D_TOPO" else "0.5"
+    subprocess.run([sys.executable, "create_example.py", "32", solid_fraction, "300", "false"],
                    cwd=fixture, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                    text=True)
     input_path = fixture / "IMEX_SfloW2D.inp"
@@ -151,8 +152,14 @@ def run_case(solver, fixture, root, case, threads, evidence):
         witnesses = re.findall(
             r"D20_BED_WITNESS group=[0-9]+ max_abs_delta=([0-9.Ee+-]+)",
             result.stdout)
-        if not witnesses or max(float(value) for value in witnesses) <= 0.0:
-            raise AssertionError(f"{case}/{threads}: bed did not evolve; log={log_path}")
+        if not witnesses:
+            raise AssertionError(f"{case}/{threads}: no bed-update witness (group not "
+                                 f"executed or TOPO_CHANGE_FLAG inactive); log={log_path}; "
+                                 f"tail:\n{tail}")
+        if max(float(value) for value in witnesses) <= 0.0:
+            raise AssertionError(f"{case}/{threads}: bed update executed but zero "
+                                 f"change; witnesses={witnesses[:6]}; log={log_path}; "
+                                 f"tail:\n{tail}")
     return read_fields(target)
 
 
