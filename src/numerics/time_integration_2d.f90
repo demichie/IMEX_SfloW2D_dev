@@ -4,7 +4,7 @@
 !>          fully accepted timestep publishes fluid, substrate and geometry.
 MODULE time_integration_2d
     USE parameters_2d, ONLY : wp,n_eqns,n_vars,idx_totMassEqn,idx_solidEqn_first,idx_solidEqn_last,                  &
-            idx_add_gas_first,idx_add_gas_last
+            idx_add_gas_first,idx_add_gas_last,topo_change_flag
     USE geometry_2d, ONLY : comp_cells_x,comp_cells_y,                                                                 &
             begin_geometry_transaction,commit_geometry_transaction,                                                    &
             rollback_geometry_transaction,B_vertex,B_cent,B_face_x,B_face_y,                                           &
@@ -13,7 +13,7 @@ MODULE time_integration_2d
     USE state_2d, ONLY : state_type,substrate_snapshot_type,                                                           &
             initialize_dry_physical_cell,conservative_mass_admissible
     USE diagnostics_2d, ONLY : fatal_error
-    USE source_registry_2d, ONLY : source_registry_type
+    USE source_registry_2d, ONLY : source_registry_type,source_group_type
     USE spatial_operator_2d, ONLY : spatial_operator_type
     USE domain_2d, ONLY : domain_type
     USE lie_source_executor_2d, ONLY : execute_lie_source_groups,report_lie_source_profile
@@ -83,6 +83,9 @@ CONTAINS
         CHARACTER(LEN=256) :: source_failure
         REAL(wp) :: pd
         TYPE(substrate_snapshot_type) :: substrate_before
+        TYPE(source_group_type), ALLOCATABLE :: configured_groups(:)
+        LOGICAL :: needs_substrate_snapshot,needs_geometry_snapshot
+        INTEGER :: group_id
         REAL(wp), ALLOCATABLE :: qp_authoritative(:,:,:),bed_before(:,:),                                              &
             bed_cent_before(:,:),bed_face_x_before(:,:),bed_face_y_before(:,:),                                        &
             slope_x_before(:,:),slope_y_before(:,:),gravity_before(:,:)
@@ -213,9 +216,20 @@ CONTAINS
         ! Later groups evaluate from each predecessor's updated state.
         ! Geometry stays frozen for all source groups; retain authoritative
         ! fields until the full trial succeeds.
-        ! Stage substrate and bed changes before running ordered groups.
-        CALL state%snapshot_substrate(substrate_before)
-        CALL begin_geometry_transaction
+        ! Snapshot only fields a configured source can actually change.
+        ! The metadata is immutable within a timestep; no per-cell scan is needed.
+        configured_groups=source_registry%groups()
+        needs_substrate_snapshot=.FALSE.
+        DO group_id=1,SIZE(configured_groups)
+            IF (.NOT.ALLOCATED(configured_groups(group_id)%source_names)) CYCLE
+            IF (ANY(INDEX(configured_groups(group_id)%source_names,'mass_exchange_')==1)) THEN
+                needs_substrate_snapshot=.TRUE.
+                EXIT
+            END IF
+        END DO
+        needs_geometry_snapshot=needs_substrate_snapshot .AND. topo_change_flag
+        IF (needs_substrate_snapshot) CALL state%snapshot_substrate(substrate_before)
+        IF (needs_geometry_snapshot) CALL begin_geometry_transaction
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_substrate_snapshot=this%profile_substrate_snapshot+REAL(tock-tick,wp)/REAL(tick_rate,wp)
@@ -231,8 +245,8 @@ CONTAINS
         IF (source_step_failed) THEN
             had_bed_change=.FALSE.
             IF (check_injected_rollback) had_bed_change=ANY(B_vertex/=bed_before)
-            CALL state%restore_substrate(substrate_before)
-            CALL rollback_geometry_transaction
+            IF (needs_substrate_snapshot) CALL state%restore_substrate(substrate_before)
+            IF (needs_geometry_snapshot) CALL rollback_geometry_transaction
 
             IF (check_injected_rollback) THEN
                 IF (TRIM(source_failure)/='D20_INJECTED_LATE_LIE_FAILURE')                                             &
@@ -274,8 +288,8 @@ CONTAINS
         IF (this%profile_enabled) CALL SYSTEM_CLOCK(tick,tick_rate)
         state%q=this%q_trial
         state%qp=this%qp_trial
-        CALL state%refresh_substrate_totals()
-        CALL commit_geometry_transaction
+        IF (needs_substrate_snapshot) CALL state%refresh_substrate_totals()
+        IF (needs_geometry_snapshot) CALL commit_geometry_transaction
         IF (this%profile_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             this%profile_publish=this%profile_publish+REAL(tock-tick,wp)/REAL(tick_rate,wp)

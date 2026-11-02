@@ -485,7 +485,7 @@ CONTAINS
                 RETURN
             END IF
         END IF
-        CALL state%refresh_substrate_totals()
+        IF (ANY(exchange_group)) CALL state%refresh_substrate_totals()
         IF (profiling_enabled) THEN
             CALL SYSTEM_CLOCK(tock)
             profile_final_commit=profile_final_commit+REAL(tock-tick,wp)/REAL(clock_rate,wp)
