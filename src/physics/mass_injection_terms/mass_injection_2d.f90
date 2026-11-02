@@ -31,8 +31,8 @@ CONTAINS
     !> @param[in] use_fissural Enable bottom fissural injection.
     !> @param[in] use_radial Enable lateral radial injection.
     !> @param[out] rate Assembled conservative injection source rate.
-    SUBROUTINE eval_mass_injection_explicit(state,time,cell_fract,cell_fissure_fract,                                  &
-            lat_arc_perim,lat_n_x,lat_n_y,cell_area,use_circular,use_fissural,use_radial,rate)
+    SUBROUTINE eval_mass_injection_explicit(state, time, cell_fract, cell_fissure_fract, lat_arc_perim, lat_n_x,       &
+        lat_n_y, cell_area, use_circular, use_fissural, use_radial, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time,cell_fract,cell_fissure_fract(:)
         REAL(wp), INTENT(IN) :: lat_arc_perim,lat_n_x,lat_n_y,cell_area
@@ -40,18 +40,23 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         REAL(wp) :: process_rate(n_eqns)
         rate=0.0_wp
+
         IF (use_circular) THEN
         CALL eval_bottom_circular_injection_explicit(state,time,cell_fract,process_rate)
         rate=rate+process_rate
+
         END IF
+
         IF (use_fissural) THEN
         CALL eval_bottom_fissural_injection_explicit(state,time,cell_fissure_fract,process_rate)
         rate=rate+process_rate
+
         END IF
+
         IF (use_radial) THEN
-        CALL eval_radial_injection_explicit(state,time,lat_arc_perim,lat_n_x,lat_n_y,                                  &
-                cell_area,process_rate)
+        CALL eval_radial_injection_explicit(state, time, lat_arc_perim, lat_n_x, lat_n_y, cell_area, process_rate)
         rate=rate+process_rate
+
         END IF
     END SUBROUTINE eval_mass_injection_explicit
 
@@ -72,8 +77,8 @@ CONTAINS
     !> @param[in] use_fissural Enable bottom fissural injection.
     !> @param[in] use_radial Enable lateral radial injection.
     !> @param[out] rate Assembled conservative injection source rate.
-    SUBROUTINE eval_mass_injection_semi_implicit(state,time,cell_fract,cell_fissure_fract,                             &
-            lat_arc_perim,lat_n_x,lat_n_y,cell_area,use_circular,use_fissural,use_radial,rate)
+    SUBROUTINE eval_mass_injection_semi_implicit(state, time, cell_fract, cell_fissure_fract, lat_arc_perim, lat_n_x,  &
+        lat_n_y, cell_area, use_circular, use_fissural, use_radial, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time,cell_fract,cell_fissure_fract(:)
         REAL(wp), INTENT(IN) :: lat_arc_perim,lat_n_x,lat_n_y,cell_area
@@ -81,18 +86,23 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         REAL(wp) :: process_rate(n_eqns)
         rate=0.0_wp
+
         IF (use_circular) THEN
         CALL eval_bottom_circular_injection_semi_implicit(state,time,cell_fract,process_rate)
         rate=rate+process_rate
+
         END IF
+
         IF (use_fissural) THEN
         CALL eval_bottom_fissural_injection_semi_implicit(state,time,cell_fissure_fract,process_rate)
         rate=rate+process_rate
+
         END IF
+
         IF (use_radial) THEN
-        CALL eval_radial_injection_semi_implicit(state,time,lat_arc_perim,lat_n_x,lat_n_y,                             &
-                cell_area,process_rate)
+        CALL eval_radial_injection_semi_implicit(state, time, lat_arc_perim, lat_n_x, lat_n_y, cell_area, process_rate)
         rate=rate+process_rate
+
         END IF
     END SUBROUTINE eval_mass_injection_semi_implicit
 
@@ -114,8 +124,8 @@ CONTAINS
     !> @param[in] use_fissural Enable bottom fissural injection.
     !> @param[in] use_radial Enable lateral radial injection.
     !> @param[out] rate Assembled conservative injection source rate.
-    SUBROUTINE eval_mass_injection_implicit(state,time,cell_fract,cell_fissure_fract,                                  &
-            lat_arc_perim,lat_n_x,lat_n_y,cell_area,use_circular,use_fissural,use_radial,rate)
+    SUBROUTINE eval_mass_injection_implicit(state, time, cell_fract, cell_fissure_fract, lat_arc_perim, lat_n_x,       &
+        lat_n_y, cell_area, use_circular, use_fissural, use_radial, rate)
         TYPE(complex_physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time,cell_fract,cell_fissure_fract(:)
         REAL(wp), INTENT(IN) :: lat_arc_perim,lat_n_x,lat_n_y,cell_area
@@ -123,18 +133,23 @@ CONTAINS
         COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
         COMPLEX(wp) :: process_rate(n_eqns)
         rate=CMPLX(0.0_wp,0.0_wp,wp)
+
         IF (use_circular) THEN
         CALL eval_bottom_circular_injection_implicit(state,time,cell_fract,process_rate)
         rate=rate+process_rate
+
         END IF
+
         IF (use_fissural) THEN
         CALL eval_bottom_fissural_injection_implicit(state,time,cell_fissure_fract,process_rate)
         rate=rate+process_rate
+
         END IF
+
         IF (use_radial) THEN
-        CALL eval_radial_injection_implicit(state,time,lat_arc_perim,lat_n_x,lat_n_y,                                  &
-                cell_area,process_rate)
+        CALL eval_radial_injection_implicit(state, time, lat_arc_perim, lat_n_x, lat_n_y, cell_area, process_rate)
         rate=rate+process_rate
+
         END IF
     END SUBROUTINE eval_mass_injection_implicit
 
@@ -156,8 +171,8 @@ CONTAINS
     !> @param[in] use_fissural Enable bottom fissural injection.
     !> @param[in] use_radial Enable lateral radial injection.
     !> @param[out] rate Assembled conservative injection source rate.
-    SUBROUTINE eval_mass_injection_analytic(state,time,cell_fract,cell_fissure_fract,                                  &
-            lat_arc_perim,lat_n_x,lat_n_y,cell_area,use_circular,use_fissural,use_radial,rate)
+    SUBROUTINE eval_mass_injection_analytic(state, time, cell_fract, cell_fissure_fract, lat_arc_perim, lat_n_x,       &
+        lat_n_y, cell_area, use_circular, use_fissural, use_radial, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time,cell_fract,cell_fissure_fract(:)
         REAL(wp), INTENT(IN) :: lat_arc_perim,lat_n_x,lat_n_y,cell_area
@@ -165,18 +180,23 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         REAL(wp) :: process_rate(n_eqns)
         rate=0.0_wp
+
         IF (use_circular) THEN
         CALL eval_bottom_circular_injection_analytic(state,time,cell_fract,process_rate)
         rate=rate+process_rate
+
         END IF
+
         IF (use_fissural) THEN
         CALL eval_bottom_fissural_injection_analytic(state,time,cell_fissure_fract,process_rate)
         rate=rate+process_rate
+
         END IF
+
         IF (use_radial) THEN
-        CALL eval_radial_injection_analytic(state,time,lat_arc_perim,lat_n_x,lat_n_y,                                  &
-                cell_area,process_rate)
+        CALL eval_radial_injection_analytic(state, time, lat_arc_perim, lat_n_x, lat_n_y, cell_area, process_rate)
         rate=rate+process_rate
+
         END IF
     END SUBROUTINE eval_mass_injection_analytic
 

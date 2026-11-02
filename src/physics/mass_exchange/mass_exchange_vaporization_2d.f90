@@ -2,25 +2,25 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_vaporization_2d
-        USE parameters_2d, ONLY : wp, n_solid, n_add_gas, gas_flag, liquid_vaporization_flag,                          &
+    USE parameters_2d, ONLY : wp, n_solid, n_add_gas, gas_flag, liquid_vaporization_flag,                              &
             mass_exchange_rates_type, reset_mass_exchange_rates
-        USE diagnostics_2d, ONLY : fatal_error
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-        USE constitutive_parameters_2d, ONLY : rho_s, sp_heat_s, gamma_steam, sp_heat_g
+    USE diagnostics_2d, ONLY : fatal_error
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE constitutive_parameters_2d, ONLY : rho_s, sp_heat_s, gamma_steam, sp_heat_g
 
-        IMPLICIT NONE
-        PRIVATE
+    IMPLICIT NONE
+    PRIVATE
 
-        PUBLIC :: eval_vaporization_mass_rate, eval_vaporization_energy_rate
+    PUBLIC :: eval_vaporization_mass_rate, eval_vaporization_energy_rate
         REAL(wp), PARAMETER :: vaporization_liquid_temperature = 290.0_wp
         REAL(wp), PARAMETER :: vaporization_boiling_temperature = 373.15_wp
         REAL(wp), PARAMETER :: vaporization_latent_heat = 2264705.0_wp
         REAL(wp), PARAMETER :: vaporization_liquid_heat_capacity = 4184.0_wp
 
-        PUBLIC :: eval_mass_exchange_vaporization_explicit
-        PUBLIC :: eval_mass_exchange_vaporization_semi_implicit
-        PUBLIC :: eval_mass_exchange_vaporization_implicit
-        PUBLIC :: solve_mass_exchange_vaporization_analytic
+    PUBLIC :: eval_mass_exchange_vaporization_explicit
+    PUBLIC :: eval_mass_exchange_vaporization_semi_implicit
+    PUBLIC :: eval_mass_exchange_vaporization_implicit
+    PUBLIC :: solve_mass_exchange_vaporization_analytic
         ! Four-entry physical treatment contract; only EXPLICIT is supported.
 
 CONTAINS

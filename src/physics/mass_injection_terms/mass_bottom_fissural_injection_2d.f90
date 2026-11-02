@@ -24,13 +24,13 @@ CONTAINS
     !> @param[in] cell_fissure_fract Local coverage fraction for each fissure.
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_bottom_fissural_injection_explicit(state, time, cell_fissure_fract, rate)
-        USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source,                                          &
+    USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source,                                              &
             time_param, bottom_radial_source_flag, pore_pressure_flag,                                                 &
             pore_pres_fract, n_intervals, t_intervals, vel_intervals,                                                  &
             radial_source_flag, h_source, bottom_fissural_source_flag,                                                 &
             n_fissures, linear_vel_fissures, T_fissures, time_param_fissures,                                          &
             xs_fissures, xg_fissures
-        USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
+    USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fissure_fract(:)
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
@@ -52,11 +52,14 @@ CONTAINS
 
                 t_rem = MOD(time + time_param_fissures(4,i_fissure),                                                   &
                     time_param_fissures(1,i_fissure))
+
                 IF (time_param_fissures(3,i_fissure) .EQ. 0.0_wp) THEN
+
                     IF (t_rem .LE. time_param_fissures(2,i_fissure)) THEN
                         t_coeff = 1.0_wp
                     ELSE
                         t_coeff = 0.0_wp
+
                     END IF
                 ELSEIF (t_rem .LT. time_param_fissures(3,i_fissure)) THEN
                     t_coeff = t_rem / time_param_fissures(3,i_fissure)
@@ -69,6 +72,7 @@ CONTAINS
                         time_param_fissures(3,i_fissure)
                 ELSE
                     t_coeff = 0.0_wp
+
                 END IF
 
                 IF ( ALLOCATED( fissure_coeff_step ) )                                                                 &
@@ -89,8 +93,7 @@ CONTAINS
                 qp_source(idx_u) = 0.0_wp
                 qp_source(idx_v) = 0.0_wp
 
-                CALL mixt_var(qp_source, r_Ri, r_rho_m, r_rho_c, r_red_grav,                                           &
-                    r_sp_heat_c, r_sp_heat_mix)
+                CALL mixt_var(qp_source, r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c, r_sp_heat_mix)
 
                 rate(1) = rate(1) + t_coeff * h_dot * r_rho_m
                 rate(4) = rate(4) + (t_coeff *                                                                         &
@@ -108,6 +111,7 @@ CONTAINS
                     rate(idx_poreEqn) = rate(idx_poreEqn) +                                                            &
                         t_coeff * ((state%h*state%rho_m) * pore_pres_fract * h_dot *                                   &
                         r_rho_m * r_red_grav + exc_pore_pres * h_dot * r_rho_m)
+
                 END IF
 
             END DO

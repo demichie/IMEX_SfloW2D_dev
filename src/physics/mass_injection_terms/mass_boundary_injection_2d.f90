@@ -21,12 +21,12 @@ CONTAINS
     !> @param[out] source_bdry Primitive injection boundary trace.
     SUBROUTINE eval_boundary_injection_explicit( time, vect_x , vect_y , source_bdry )
 
-        USE parameters_2d, ONLY : h_source , vel_source , T_source , xs_source,                                        &
+    USE parameters_2d, ONLY : h_source , vel_source , T_source , xs_source,                                            &
             xg_source, time_param
 
-        USE geometry_2d, ONLY : pi_g
+    USE geometry_2d, ONLY : pi_g
 
-        IMPLICIT NONE
+    IMPLICIT NONE
 
         REAL(wp), INTENT(IN) :: time
         REAL(wp), INTENT(IN) :: vect_x

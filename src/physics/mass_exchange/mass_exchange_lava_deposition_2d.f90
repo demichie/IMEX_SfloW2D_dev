@@ -2,14 +2,14 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_lava_deposition_2d
-        USE parameters_2d, ONLY : wp, mass_exchange_rates_type, reset_mass_exchange_rates
-        USE diagnostics_2d, ONLY : fatal_error
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-        USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
-        USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
+    USE parameters_2d, ONLY : wp, mass_exchange_rates_type, reset_mass_exchange_rates
+    USE diagnostics_2d, ONLY : fatal_error
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE rheology_lava_2d, ONLY : lava_kinematic_viscosity
+    USE constitutive_parameters_2d, ONLY : rho_l, sp_heat_l
 
-        IMPLICIT NONE
-        PRIVATE
+    IMPLICIT NONE
+    PRIVATE
         LOGICAL, PUBLIC :: lava_deposition_flag=.FALSE.
         CHARACTER(LEN=16), PUBLIC :: lava_deposition_model='CONSTANT'
         REAL(wp), PUBLIC :: lava_deposition_rate=0.0_wp
@@ -17,10 +17,10 @@ MODULE mass_exchange_lava_deposition_2d
         REAL(wp), PUBLIC :: lava_deposition_exponent=1.0_wp
         REAL(wp), PUBLIC :: lava_deposition_temp_ref=900.0_wp
         REAL(wp), PUBLIC :: lava_deposition_temp_width=100.0_wp
-        PUBLIC :: eval_mass_exchange_lava_deposition_explicit
-        PUBLIC :: eval_mass_exchange_lava_deposition_semi_implicit
-        PUBLIC :: eval_mass_exchange_lava_deposition_implicit
-        PUBLIC :: solve_mass_exchange_lava_deposition_analytic
+    PUBLIC :: eval_mass_exchange_lava_deposition_explicit
+    PUBLIC :: eval_mass_exchange_lava_deposition_semi_implicit
+    PUBLIC :: eval_mass_exchange_lava_deposition_implicit
+    PUBLIC :: solve_mass_exchange_lava_deposition_analytic
 
 CONTAINS
 
@@ -36,8 +36,7 @@ CONTAINS
             TYPE(mass_exchange_rates_type), INTENT(INOUT) :: r
 
             CALL reset_mass_exchange_rates(r)
-            CALL eval_lava_deposition_volume_kernel(state%h,state%T,dt,                                                &
-                        r%carrier_deposition_rate)
+            CALL eval_lava_deposition_volume_kernel(state%h, state%T, dt, r%carrier_deposition_rate)
             r%mixture_mass_rate=-rho_l*r%carrier_deposition_rate
             r%energy_rate=sp_heat_l*state%T*r%mixture_mass_rate
             r%lava_deposit_rate=r%carrier_deposition_rate
@@ -114,6 +113,7 @@ CONTAINS
 
                     factor=MIN(1.0_wp,(MAX(0.0_wp,viscosity)/lava_deposition_visc_ref)**                               &
                                 lava_deposition_exponent)
+
             END SELECT
 
             rate=MAX(0.0_wp,lava_deposition_rate)*factor

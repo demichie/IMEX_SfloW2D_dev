@@ -30,13 +30,17 @@ CONTAINS
         LOGICAL, INTENT(IN), OPTIONAL :: include_gas_loss
         INTEGER :: i
         rate=0.0_wp
+
         DO i=1,SIZE(models)
+
         SELECT CASE(TRIM(models(i)))
         CASE('pore_pressure_darcy')
             CALL darcy_explicit(state,rate,include_gas_loss)
         CASE DEFAULT
             CALL fatal_error('Unknown explicit pore-pressure model: '//TRIM(models(i)))
+
         END SELECT
+
         END DO
     END SUBROUTINE eval_pore_pressure_explicit
 
@@ -52,13 +56,17 @@ CONTAINS
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
         INTEGER :: i
         rate=0.0_wp
+
         DO i=1,SIZE(models)
+
         SELECT CASE(TRIM(models(i)))
         CASE('pore_pressure_darcy')
             CALL darcy_semi_implicit(state,rate)
         CASE DEFAULT
             CALL fatal_error('Unknown semi-implicit pore-pressure model: '//TRIM(models(i)))
+
         END SELECT
+
         END DO
     END SUBROUTINE eval_pore_pressure_semi_implicit
 
@@ -74,13 +82,17 @@ CONTAINS
         COMPLEX(wp), INTENT(OUT) :: rate(n_eqns)
         INTEGER :: i
         rate=CMPLX(0.0_wp,0.0_wp,wp)
+
         DO i=1,SIZE(models)
+
         SELECT CASE(TRIM(models(i)))
         CASE('pore_pressure_darcy')
             CALL darcy_implicit(state,rate)
         CASE DEFAULT
             CALL fatal_error('Unknown implicit pore-pressure model: '//TRIM(models(i)))
+
         END SELECT
+
         END DO
     END SUBROUTINE eval_pore_pressure_implicit
 
@@ -97,8 +109,7 @@ CONTAINS
     !> @param[out] rate Mean conservative rate across the substep.
     !> @param[out] admissible Acceptance flag for the resulting local state.
     !> @param[in] include_gas_loss Optional coupled pore-gas loss switch.
-    SUBROUTINE eval_pore_pressure_analytic(models,state,q_before,interval,rate,admissible,                             &
-            include_gas_loss)
+    SUBROUTINE eval_pore_pressure_analytic(models, state, q_before, interval, rate, admissible, include_gas_loss)
         CHARACTER(*), INTENT(IN) :: models(:)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: q_before(n_eqns),interval
@@ -109,17 +120,24 @@ CONTAINS
         rate=0.0_wp
         admissible=.TRUE.
         IF (.NOT.pore_pressure_flag) RETURN
+
         IF (SIZE(models)>1) THEN
         CALL fatal_error('Coupled pore-pressure analytic models require state reconstruction')
+
         END IF
+
         DO i=1,SIZE(models)
+
         SELECT CASE(TRIM(models(i)))
         CASE('pore_pressure_darcy')
             CALL darcy_analytic(state,q_before,interval,rate,admissible,include_gas_loss)
         CASE DEFAULT
             CALL fatal_error('Unknown analytic pore-pressure model: '//TRIM(models(i)))
+
         END SELECT
+
         IF (.NOT.admissible) RETURN
+
         END DO
     END SUBROUTINE eval_pore_pressure_analytic
 

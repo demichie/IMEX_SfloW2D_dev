@@ -23,7 +23,7 @@ CONTAINS
     !> @param[in] dt Integration interval duration [s].
     SUBROUTINE set_source_time_coefficients( time , dt )
 
-        USE parameters_2d, ONLY : time_param , bottom_radial_source_flag ,                                             &
+    USE parameters_2d, ONLY : time_param , bottom_radial_source_flag ,                                                 &
             radial_source_flag , n_intervals , bottom_fissural_source_flag ,                                           &
             n_fissures , time_param_fissures
 
@@ -166,7 +166,7 @@ CONTAINS
 
     REAL(wp) FUNCTION window_integral( a , b , act , ramp , cosine )
 
-        USE geometry_2d, ONLY : pi_g
+    USE geometry_2d, ONLY : pi_g
 
         REAL(wp), INTENT(IN) :: a , b , act , ramp
         LOGICAL, INTENT(IN) :: cosine
@@ -196,6 +196,7 @@ CONTAINS
             ELSE
                 window_integral = window_integral                                                                      &
                     + 0.5_wp * ( x1 - x0 ) * ( x1 + x0 ) / ramp
+
             END IF
 
         END IF
@@ -219,6 +220,7 @@ CONTAINS
             ELSE
                 window_integral = window_integral                                                                      &
                     + 0.5_wp * ( x1 - x0 ) * ( 2.0_wp * act - x0 - x1 ) / ramp
+
             END IF
 
         END IF
@@ -240,7 +242,7 @@ CONTAINS
 
     REAL(wp) FUNCTION interval_mean_velocity( t0 , dt )
 
-        USE parameters_2d, ONLY : n_intervals , t_intervals , vel_intervals
+    USE parameters_2d, ONLY : n_intervals , t_intervals , vel_intervals
 
         REAL(wp), INTENT(IN) :: t0 , dt
 
@@ -258,6 +260,7 @@ CONTAINS
                 x1 = MIN( t1 , t_intervals(i_int+1) )
             ELSE
                 x1 = t1
+
             END IF
 
             IF ( x1 .GT. x0 ) THEN
@@ -265,6 +268,7 @@ CONTAINS
                 IF ( ( x0 .EQ. t0 ) .AND. ( x1 .EQ. t1 ) ) THEN
                     interval_mean_velocity = vel_intervals(i_int)
                     RETURN
+
                 END IF
 
                 total = total + vel_intervals(i_int) * ( x1 - x0 )

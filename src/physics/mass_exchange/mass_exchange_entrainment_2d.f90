@@ -2,20 +2,20 @@
 !> @details Explicit treatment is supported; other treatment interfaces reject
 !> unsupported configurations. Shared resource budgets belong to the coordinator.
 MODULE mass_exchange_entrainment_2d
-        USE parameters_2d, ONLY : wp, mass_exchange_rates_type,                                                        &
+    USE parameters_2d, ONLY : wp, mass_exchange_rates_type,                                                            &
             reset_mass_exchange_rates
-        USE diagnostics_2d, ONLY : fatal_error
-        USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
-        USE state_conversion_2d, ONLY : mixt_var_state
-        USE constitutive_parameters_2d, ONLY : entrainment_flag, rho_a_amb, T_ambient, sp_heat_a
-        IMPLICIT NONE
-        PRIVATE
+    USE diagnostics_2d, ONLY : fatal_error
+    USE state_conversion_2d, ONLY : physical_state_type, complex_physical_state_type
+    USE state_conversion_2d, ONLY : mixt_var_state
+    USE constitutive_parameters_2d, ONLY : entrainment_flag, rho_a_amb, T_ambient, sp_heat_a
+    IMPLICIT NONE
+    PRIVATE
 
-        PUBLIC :: eval_mass_exchange_entrainment_explicit
-        PUBLIC :: eval_mass_exchange_entrainment_semi_implicit
-        PUBLIC :: eval_mass_exchange_entrainment_implicit
-        PUBLIC :: solve_mass_exchange_entrainment_analytic
-        PUBLIC :: eval_air_entrainment_rate
+    PUBLIC :: eval_mass_exchange_entrainment_explicit
+    PUBLIC :: eval_mass_exchange_entrainment_semi_implicit
+    PUBLIC :: eval_mass_exchange_entrainment_implicit
+    PUBLIC :: solve_mass_exchange_entrainment_analytic
+    PUBLIC :: eval_air_entrainment_rate
         ! Four-entry physical treatment contract; only EXPLICIT is supported.
 
 CONTAINS

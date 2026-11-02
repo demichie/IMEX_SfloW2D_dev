@@ -24,13 +24,13 @@ CONTAINS
     !> @param[in] cell_fract_jk Fraction of the cell covered by bottom circular injection.
     !> @param[out] rate Conservative injection rate vector.
     SUBROUTINE eval_bottom_circular_injection_explicit(state, time, cell_fract_jk, rate)
-        USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source,                                          &
+    USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source,                                              &
             time_param, bottom_radial_source_flag, pore_pressure_flag,                                                 &
             pore_pres_fract, n_intervals, t_intervals, vel_intervals,                                                  &
             radial_source_flag, h_source, bottom_fissural_source_flag,                                                 &
             n_fissures, linear_vel_fissures, T_fissures, time_param_fissures,                                          &
             xs_fissures, xg_fissures
-        USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
+    USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, cell_fract_jk
         REAL(wp), INTENT(OUT) :: rate(n_eqns)
@@ -142,8 +142,7 @@ CONTAINS
             qp_source(idx_v) = 0.0_wp
 
 
-            CALL mixt_var(qp_source,r_Ri,r_rho_m,r_rho_c,r_red_grav,                                                   &
-                r_sp_heat_c,r_sp_heat_mix)
+            CALL mixt_var(qp_source, r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c, r_sp_heat_mix)
 
             rate(1) = rate(1) + t_coeff * h_dot * r_rho_m
             rate(2) = rate(2) + 0.0_wp

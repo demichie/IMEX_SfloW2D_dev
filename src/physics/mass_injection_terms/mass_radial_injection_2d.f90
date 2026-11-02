@@ -26,15 +26,14 @@ CONTAINS
     !> @param[in] lat_n_y_jk Local boundary normal y component.
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
-    SUBROUTINE eval_radial_injection_explicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk,                   &
-            cell_area_jk, rate)
-        USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source,                                          &
+    SUBROUTINE eval_radial_injection_explicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, rate)
+    USE parameters_2d, ONLY : vel_source, T_source, xs_source, xg_source,                                              &
             time_param, bottom_radial_source_flag, pore_pressure_flag,                                                 &
             pore_pres_fract, n_intervals, t_intervals, vel_intervals,                                                  &
             radial_source_flag, h_source, bottom_fissural_source_flag,                                                 &
             n_fissures, linear_vel_fissures, T_fissures, time_param_fissures,                                          &
             xs_fissures, xg_fissures
-        USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
+    USE geometry_2d, ONLY : pi_g, bottom_source_area_ratio
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
         REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
@@ -79,7 +78,9 @@ CONTAINS
                     ELSEIF ( t_rem .LE. time_param(2) ) THEN
                         t_coeff = 0.5_wp * ( 1.0_wp + COS( pi_g * ( ( t_rem -                                          &
                             time_param(2) ) / time_param(3) + 1.0_wp ) ) )
+
                     END IF
+
                 END IF
 
             END IF
@@ -101,8 +102,7 @@ CONTAINS
                 qp_source(idx_u) = 0.0_wp
                 qp_source(idx_v) = 0.0_wp
 
-                CALL mixt_var( qp_source, r_Ri, r_rho_m, r_rho_c, r_red_grav,                                          &
-                    r_sp_heat_c, r_sp_heat_mix )
+                CALL mixt_var(qp_source, r_Ri, r_rho_m, r_rho_c, r_red_grav, r_sp_heat_c, r_sp_heat_mix)
 
                 ! Per-cell injection rate (m/s) - integrates to MFR over all cells.
                 h_dot = h_source * vel_source * lat_arc_perim_jk / cell_area_jk
@@ -137,6 +137,7 @@ CONTAINS
                     rate(idx_poreEqn) = rate(idx_poreEqn) +                                                            &
                         t_coeff * ((state%h*state%rho_m) * pore_pres_fract * h_dot *                                   &
                         r_rho_m * r_red_grav + exc_pore_pres * h_dot * r_rho_m)
+
                 END IF
 
             END IF
@@ -154,8 +155,8 @@ CONTAINS
     !> @param[in] lat_n_y_jk Local boundary normal y component.
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
-    SUBROUTINE eval_radial_injection_semi_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk,              &
-            cell_area_jk, rate)
+    SUBROUTINE eval_radial_injection_semi_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk,&
+        rate)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
         REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
@@ -173,8 +174,7 @@ CONTAINS
     !> @param[in] lat_n_y_jk Local boundary normal y component.
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
-    SUBROUTINE eval_radial_injection_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk,                   &
-            cell_area_jk, rate)
+    SUBROUTINE eval_radial_injection_implicit(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, rate)
         TYPE(complex_physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
         REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
@@ -192,8 +192,7 @@ CONTAINS
     !> @param[in] lat_n_y_jk Local boundary normal y component.
     !> @param[in] cell_area_jk Local horizontal cell area [m2].
     !> @param[out] rate Conservative injection rate vector.
-    SUBROUTINE eval_radial_injection_analytic(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk,                   &
-            cell_area_jk, rate)
+    SUBROUTINE eval_radial_injection_analytic(state, time, lat_arc_perim_jk, lat_n_x_jk, lat_n_y_jk, cell_area_jk, rate)
         TYPE(physical_state_type), INTENT(IN) :: state
         REAL(wp), INTENT(IN) :: time, lat_arc_perim_jk
         REAL(wp), INTENT(IN) :: lat_n_x_jk, lat_n_y_jk, cell_area_jk
